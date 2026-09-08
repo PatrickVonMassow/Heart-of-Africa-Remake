@@ -1441,7 +1441,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Dienstag, 08.09.2026, 07:50 · Quellen-Fingerprint: `e51bff79a5b0…`
+Zuletzt aktualisiert: Dienstag, 08.09.2026, 12:04 · Quellen-Fingerprint: `d29ef1f776b7…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1546,8 +1546,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 95 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 126 Prozess-/Meta-TASKS-Punkte (davon 60 offen).
 
-<!-- RETRO-FINGERPRINT: e51bff79a5b0e72eef3b8845631caf4b358df8dbaf0732656bca17bae29657f6 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-08T05:50:24.493Z -->
+<!-- RETRO-FINGERPRINT: d29ef1f776b79c0a22fa2bff3e5fe89a7a3f988c0c0dbc5f649dacfbed4111c5 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-08T10:04:38.290Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -6018,3 +6018,25 @@ den Umbau, der das Produkt verdrängt. Und wenn ein Nutzer ein Datum nennt, ist
 die Frage ernst zu nehmen und das Datum nachzumessen: Sein Eindruck stimmte, sein
 Zeitpunkt lag drei Wochen daneben, und beide Hälften dieser Antwort ändern, was
 als Nächstes zu tun ist.
+
+### 3.112 Eine Sitzung kann ihren eigenen Prüflauf zerreißen
+
+Gemessen am 08.09.2026: Ein Unit-Lauf über 463 Dateien und 14.939 Tests kam
+vollständig grün durch und wurde trotzdem als `FAIL unit` verbucht. Rot war
+nicht ein Test, sondern der Abbau von `repository-integrity`: Während die Suite
+lief, hat dieselbe Sitzung einen Git-Worktree hinzugefügt, um an `main`
+Buchhaltung zu machen — Worktree-Registrierungen, HEADs und Indizes hatten sich
+also mitten im Lauf geändert. Der Wächter kann nicht unterscheiden, ob das
+Test-Leckage oder eine legitime Nebenhandlung war, und meldet beides.
+
+Der Reflex war richtig gemeint: Warten ist teuer, also wurde die Wartezeit mit
+Vorarbeit gefüllt, wie die Batch-Regel es verlangt. Nur ist „Vorarbeit während
+der Validierung" nicht dasselbe wie „Repository-Operationen während der
+Validierung". Lesen, Entwerfen, Texte schreiben stören keinen Lauf; ein
+Branch-Wechsel, ein Worktree, ein Commit im selben Repository stören ihn immer.
+
+**Lehre:** Während ein Prüflauf läuft, ist das Repository fremdes Gebiet — die
+Vorarbeit dieser Zeit ist Lesearbeit. Und ein rotes Urteil ist erst dann ein
+Befund über das Produkt, wenn geprüft ist, wer den roten Zustand erzeugt hat:
+Hier hätte die Zeile `FAIL unit` ohne Nachlesen eine Stunde Fehlersuche in
+grünem Code ausgelöst.
