@@ -232,6 +232,27 @@ put it is the mistake this line exists to stop.
   Wasserpfad, die Krug-Meshes und denselben LARGE-Bildlauf.
   Refs: PART A — src/scenes/place/bankGame.ts (THE TAP ~626, reachDistance/standOff ~223), src/config/balance.ts (bankGame reachDistance 2.2, standOff 2.6), src/render/gesture.ts (GestureKind), src/scenes/place/layout.ts (PLAY_ROCK_RADIUS). PART B — src/scenes/place/adultWork.ts (water-out/water-back ~390-410, AdultCarry, WATER_FOOT_REACH), src/scenes/place/riverBank.ts (bankWaterFoot, BANK_STAND_INSET 1.5, BANK_SHORE_HALF 1.2, walkable region through the waterline ~47-62), src/scenes/place/layout.ts (waterPath head/foot), src/render/figures.ts. Both — src/scenes/place/PlaceLife.tsx (ErrandVillagers, head/hand jar meshes ~2440-2612, HEAD_CARRY_POSE), design.md §13.4, docs/communication-poc-spec.md
   Doc impact: design.md §13.4 and docs/communication-poc-spec.md item 4: the catcher touches the rock with its hand while naming it, and the water carrier dips the jar at the waterline and carries visible water back. If a new gesture kind is added, the point-479 gesture list in the code comments / docs names it. balance.ts: fill seconds (calibratable).
+  State 08.09.2026 (branch feat/1065-teaching-hands-touch at 4c1e7b984, run
+  local/verify-logs/2026-09-08T07-33-21-708-polish.log, WebGPU, polish 237 pass / 4 fail).
+  Three of the four reds belong here and are unresolved:
+  - 'no tap is ever spoken from the waiting station' measures 58.3 cm beside the flank.
+    SUSPECTED CHECK DEFECT, not a game defect: the distance is taken over EVERY frame in which
+    the 'touch' gesture runs, and a gesture outlives its moment — a child that is tapper twice
+    in a row is still measured while it walks to the stone. The neighbouring check ('its DRAWN
+    hand rests on the stone's DRAWN flank') is green and bankGame.test.ts holds 'never from the
+    station' in the pure layer. To try: measure only during the tap hold (phase 'run' and
+    tapFor > 0), or drop the check.
+  - 'the carrier goes INTO the water and dips the jar' and 'comes back with a jar that SHOWS
+    its water' saw NO fill and no return leg in 400 samples, although the older check of the
+    same section was green in the window before; the difference is fillSeconds raised to 9 s.
+    Hypotheses in probing order: all ten adults stuck in errands that never arrive (released
+    only after errandSeconds 180); the shore leg not walkable for their run although
+    waterErrand.test.ts measures it walkable with the same margin; the 9 s fill hitting a stall
+    clock. Probe: window.__placeErrands() over 60 s, logging phase/carry per villager.
+  The fourth red ('leaving after several settlement visits stays fluid', travel-panorama-capture)
+  is older and is NOT this point's. The finished evidence addendum for docs/acceptance-evidence.md
+  (the four new check files and four frames under criterion 7) is parked in the stash
+  "hoa-b7: in-flight 1065 evidence parked for main bookkeeping 08.09.2026" and belongs on this branch.
   Bundle: Dorfleben.
 
 - [ ] 1072. The village speaks with a direction, and the children sound like children (user
@@ -570,6 +591,54 @@ put it is the mistake this line exists to stop.
   `startJointWalk`, `joinSpot`, `JOIN_STAND_OFF`), src/scenes/place/PlaceLife.tsx (every
   actor's `position.set`), src/scenes/travel/TravelScene.tsx (how the outdoor height profile
   carries a figure), design.md §7
+  Bundle: Dorfleben.
+
+- [ ] 1076. The chief's first door press tells of his walk instead of a deciphered message,
+  and he gets a body (user 08.09.2026).
+  Two defects at the same hut, both measured on 08.09.2026.
+
+  PART A — THE FIRST PRESS WRITES THE WRONG ENTRY. `callChiefOut` sets the toast and calls
+  `tellChiefHint`, which writes `journal.titles.chiefHint` plus `journal.hintRaw` and
+  immediately reveals `journal.hintDecoded` — a "Deciphered! … latitude … degrees north"
+  text left over from the spoken-hint mechanic. The chief shares no language and speaks only
+  through the drums (design.md §13.4), so a deciphered message cannot exist here; the walk
+  itself gets no journal entry at all.
+  Final state:
+  - The first press at the chief's hut writes ONE journal entry, in both languages and with
+    the §15 emotional markup: the chief steps out of his hut, walks to his drummer, and the
+    player is evidently meant to follow. No deciphered message and no coordinates.
+  - The dead hint mechanic is DELETED rather than rewritten: `tellChiefHint` and
+    `revealDecoded` are called by nothing else, and `hintsGiven`/`decodedGiven` are read only
+    by the checkpoint. The keys they carry go with them, in both language files.
+  - Every later press at the hut behaves exactly as it does today.
+
+  PART B — THE CHIEF HAS NO BODY. The player resolves only against `layout.colliders`; the
+  seated drummer is in that set (r 0.8), while the chief figure only writes `group.position`
+  per frame and is neither a collider nor an `InhabitantBody` — one walks straight through him.
+  Final state:
+  - The chief is solid wherever he stands and wherever he walks, in both perspectives.
+  - Nobody is wedged by him: the gap between the hut collider (r 3.35) and the chief in his
+    standing place (`CHIEF_STAND_OFFSET` 1.6) stays walkable, and `withinGiveReach` and
+    `nextChiefAction` keep reaching him.
+
+  Test. Vitest: the first press writes exactly the new entry and no decoded text; the hint
+  functions and their keys are gone from the store and from both language files (i18n
+  parity); the chief's body follows his position, the hut-to-chief gap stays walkable, and
+  the reach checks still resolve. Browser (collision lane, WebGPU): one frame in which the
+  player is stopped at the chief in front of his hut, screenshot under verification/ with the
+  subject declared (the player blocked at the chief's body).
+  Quotes:
+  Nutzer, 08.09.2026 10:00: »Folgende Änderungen beim Häuptling: Wenn man das erst Mal an
+  seiner Hütte SPACE auslöst, erscheint aktuell ein Tagebucheintrag, der fälschlicherweise
+  etwas von einer entschlüsselten Nachricht erzählt - vermutlich eine Altlast. Stattdessen
+  soll ein Eintrag kommen, de besagt, dass der Häuptling aus seiner Hütte heraus tritt, zu
+  seinem Trommler läuft und man ihm anscheinend folgen soll: Der Häuptlingsfigur fehlt eine
+  Kollisionserkennung. Hole diese nach. Reihe das direkt vor 690 ein.«
+  Refs: src/state/store.ts (`callChiefOut`, `tellChiefHint`, `revealDecoded`, `hintsGiven`,
+  `decodedGiven` and the checkpoint that reads them), src/i18n/en.ts and src/i18n/de.ts
+  (`journal.titles.chiefHint`, `journal.hintRaw`, `journal.hintDecoded`),
+  src/scenes/place/chiefMeeting.ts, src/scenes/place/PlaceScene.tsx (the chief group, the
+  collider resolve), src/scenes/place/layout.ts (the collider set), design.md §13.4, §15
   Bundle: Dorfleben.
 
 - [ ] 690. The classic game of tag moves to the port cities, and every document describes
