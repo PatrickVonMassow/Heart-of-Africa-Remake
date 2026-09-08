@@ -360,3 +360,30 @@ never disappears into the rock. The exact fix, when the file is open anyway: kee
 radius over the bin's own edge samples instead of the maximum, and interpolate an empty bin
 between its two neighbours rather than copying one. No player impact and no blockade, so it is
 filed here under the CLAUDE.md §2 intake rule instead of becoming a point.
+
+## The clothing research carries adults, not children (discussion 08.09.2026, no code change)
+
+The user asked whether the village figures have a sex. They do not: `child` and `villager`
+carry a grammatical gender and nothing else, a bank child has role, arrival and heading but no
+such field, the bodies differ only in scale, cloth, role, kneeling and legs, and `dress.ts`
+knows six seasonal wraps and no sex at all.
+
+Whether that should change is a design question, and the corpus answers only half of it.
+`docs/peoples-1890.md` distinguishes women and men extensively and with sources — the Zulu
+isidwaba against the isipuku worn "by males and females", the Tuareg tagelmust explicitly "by
+men, not women", the Swahili kanga period-correct from 1876-86, the two cloths of Bambara and
+Hausa women in Barth, the larger Nama and San leather cloak an infant is carried in, the Somali
+chignon in its dark blue bag with no face veil, and the standing warning that Atlas Berber women
+do NOT veil. For CHILDREN the same research yields almost nothing: Pedi herd boys, San children
+often without even a cloak, and Barth's schoolboys. A girl or a boy would therefore be largely
+invented, which CLAUDE.md §2 forbids; the documented difference between children is the WORKING
+ROLE, not the dress.
+
+Two hooks if it is ever decided. The journal already tells the player that among the Tuareg it
+is the men who go veiled and not the women, while the picture shows sexless cones — that is the
+strongest entry point, because the text already claims what the scene does not show. And the
+hold-Ctrl label knows only the KIND today, so a visibly female figure needs a noun per figure
+rather than per kind. One warning for any such build: the corpus's passages on women's clothing
+run straight into period reports of extensive nakedness, so a depiction would have to clothe
+deliberately against its own source, and that choice would have to be argued rather than made
+silently.
