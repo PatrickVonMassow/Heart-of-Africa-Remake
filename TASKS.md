@@ -77,6 +77,52 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
+- [ ] 1080. A child never visibly climbs a stone — the off-game ROCK is a third of a second
+  of nothing (user observation 09.09.2026: "I only ever see the tag game between the two
+  stones"). The moment exists and it fires: `stepRoam` picks a climber in the first roaming
+  step of a visit, walks it to the settlement's nearest loose boulder and says ROCK at the
+  `boulder` moment. What it does not do is show a climb. Three numbers, all read off the
+  shipped code: the approach ends at `reachDistance` = 2.2 m from the boulder's CENTRE, so the
+  child stops well over a metre clear of a stone whose collider radius is 0.35 + s·0.5;
+  nothing then moves it onto the stone — `PlaceLife.tsx` raises its Y by a flat 0.32 m where
+  it stands; and it holds that pose for `BOULDER_CLIMB_SECONDS` = 0.35 s. The scattered
+  boulders are 0.17-0.55 m tall (`buildRock`, instance scale 0.3-1.0), so what the player
+  could see, if he happened to be looking at the roaming quarter rather than at the two play
+  rocks by the water, is a child hovering beside a stone for a third of a second.
+  MEASURED (five seeds, ten minutes of village time each, the shipped balance and the bare
+  stage of `bankGame.test.ts`): five to six namings per ten minutes, the `climbing` pose up at
+  all for 1.83-2.20 s of those 600 s — 0.31-0.37 % of the visit, in flashes of 0.35 s — and
+  the climber standing 2.16-2.22 m from the boulder's centre at every one of them.
+  WHY THIS IS NOT ONLY A PICTURE. It is spec item 4 of `docs/communication-poc-spec.md`: the
+  guard that keeps ROCK from being learned as "base", "goal" or "the thing you run to". A
+  guard the player never sees does not guard, and the word it carries is then taught by the
+  game alone — exactly the wrong reading the spec set out to close.
+  Final state:
+  - The climber ends up ON the boulder: its standing position is the stone's own top, not a
+    point a reach away, and its height comes from that stone rather than from a constant.
+  - The climb reads as a climb — an ascent, not a cut — and the child stands up there long
+    enough for a player who looks over to connect the word with the stone. ROCK falls while
+    it is on the boulder, not on the way to it.
+  - The stone is one that can carry a child: the choice is made among boulders big enough to
+    be stood on, and a settlement whose boulders are all too small keeps today's abandon path
+    rather than staging an impossible climb.
+  - It gets down again and rejoins the roaming group; nothing is left hovering, and
+    `childMotionMetric` stays clean over the whole approach, climb and descent.
+  Test: Vitest — at the `boulder` utterance the climber stands inside the chosen boulder's
+  own footprint, its lift matches that boulder's height, the ascent-hold-descent lasts a
+  player-readable time taken from `balance.ts`, and a settlement whose boulders are all
+  undersized takes the abandon path. Browser (polish lane, both backends): one village frame
+  with the child standing on the stone; screenshots in verification/ (subject declared: the
+  children's roaming quarter with the climber on the boulder).
+  Criticality: medium — nothing crashes and nothing is blocked, but a communication-mechanic
+  guard has never once reached the player, and the user reports it as missing.
+  Refs: src/scenes/place/bankGame.ts (`BOULDER_CLIMB_SECONDS`, `stepRoam`, `climbing`),
+  src/scenes/place/PlaceLife.tsx (the 0.32 m lift in the children's frame loop, `bankStage`),
+  src/config/balance.ts (`villageLife.bankGame.reachDistance`), src/render/flora.ts
+  (`buildRock`), src/scenes/place/layout.ts (the loose-rock scatter), spec item 4 of
+  docs/communication-poc-spec.md.
+  Bundle: Dorfleben.
+
 - [ ] 1077. The Astra lane is routed on paper and almost never authored (measured
   08.09.2026, two findings of the same evening folded into one point).
   CLAUDE.md §6 splits authoring across three lanes, and `author-routing-core.mjs` cuts the
