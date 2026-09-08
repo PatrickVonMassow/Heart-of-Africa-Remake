@@ -15135,3 +15135,51 @@ to land than a mechanism that needs a review.
   Refs: scripts/verify/gamepad.mjs (section `position-query`), src/systems/gamepadMap.ts,
   the position-query toast in src/state/store.ts and both language files
   Bundle: Testinfrastruktur.
+
+- [ ] 1078. The one solvable puzzle of the PoC fails its own check about half the time, and
+  nobody knows whether the player or only the harness is hit (measured 08.09.2026).
+  WHAT HAPPENS. In the `world` suite the traveller jumps to the talus foot below the
+  Bandiagara escarpment, where the rock relief fits the mould, and presses the use key.
+  In the run of 08.09.2026 07:38:23 the press answered "Nothing here has a hollow that
+  would take this shape." — `said ["…noFit"], spent [], mode travel, dialog null` — and so
+  did the following press at what should by then have been a spent socket. Both checks went
+  red, the suite retried once, and the retry passed 10/0. That retry is what makes this a
+  point rather than a fixed bug: a later green does not close a red (CLAUDE.md §7.2), and the
+  same pair is on record from the SUSPECT run of 07:40:15 that only passed on its second try.
+  WHAT THE EVIDENCE ALREADY RULES OUT. It is not the settle time: the earlier press one
+  degree off the socket, which correctly answered noFit, waits only 600 ms, while the press
+  at the foot waits the default 2500 ms and has a screenshot and two zoom changes behind it.
+  It is not the camera either — the frame `20-worldmodel-bandiagara-talus-foot` between the
+  two presses passed its own shutter, so the talus WAS in the rendered projection at that
+  instant. It is not the toast expiry the probe already guards against (the log records the
+  toast as it is SET), and it is not a random event's dialog: the roulette is switched off
+  around the block and `dialog` reads null. So the press reached the game, the game answered,
+  and the answer was that the traveller was not within reach of `bandiagara-talus`.
+  WHAT IS NOT YET KNOWN — and settling it IS the first half of this point: whether the fit
+  test reads a position the PLAYER also has (then `debugJumpTo` leaves the reach computation
+  on a stale or smoothed position and a real traveller walking there can meet the same
+  silence), or whether only the HARNESS jump is at fault. Answer that BEFORE touching either
+  side. Probe: press at the foot in a loop over N runs and log, per attempt, the position the
+  reach test reads next to the socket position, so the distance that decided the answer is
+  named instead of guessed — `node scripts/throttle-probe.mjs world --section=<the block's
+  slug> --runs 8` measures how often it bites.
+  WHAT IT COSTS. This is the ONE puzzle the PoC can solve end to end, so a fit that
+  intermittently refuses is player impact, not only suite noise; and while the red stands
+  unowned, `render-verify-guard` blocks every merge in the repository.
+  Final state:
+  - The cause is named in the commit — player path or harness — with the measurement that
+    distinguishes them.
+  - The named side is fixed, and the block passes eight times in a row on a quiet machine
+    without a retry.
+  - Whatever part of the reach decision is pure gets a Vitest that pins it, where no browser
+    is needed to prove the distance.
+  Test: `npm test -- world` unfiltered on both backends, plus Vitest over the pure part of
+  the reach decision.
+  Criticality: medium — intermittent, and the red is CHARGED to this point in
+  `scripts/render-verify-charges.mjs` so it stops blocking merges the moment this point
+  exists; but it sits on acceptance criterion 10 (goal scaffolding) and the closing run will
+  have to report it if it is still open.
+  Refs: scripts/verify/world.mjs (the talus block ~360-460, `jump`, `pressUseKey`),
+  src/world/forms.ts (`FORM_SOCKETS`, `socketPosition`), the use-key reach test and
+  `spentSockets` in src/state/store.ts, docs/acceptance-criteria-detail.md §10.
+  Bundle: Testinfrastruktur.

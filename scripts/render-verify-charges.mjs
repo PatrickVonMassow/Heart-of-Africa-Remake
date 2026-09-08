@@ -56,6 +56,45 @@
 /** @type {RedCharge[]} */
 export const RED_CHARGES = [
   {
+    point: 1065,
+    suite: 'polish',
+    kind: 'check',
+    match: /(no tap is ever spoken from the waiting station|the tapping child reaches its stone at all|the carrier goes INTO the water and dips the jar|comes back with a jar that SHOWS its water|the village keeps a water stand, and the fetched jars are set down on it)/i,
+    // NO detailMatch: these reds are the DEFECT ITSELF, and every one of them
+    // prints the distance or the depth it measured, so a detail signature would
+    // have to be re-cut on every reading of a defect that is being fixed.
+    why:
+      'THESE ARE THE VERY DEFECTS POINT 1065 IS OPEN FOR, and three of the five name it in '
+      + 'their own check text. Measured on the branch feat/1065-teaching-hands-touch at '
+      + '4c1e7b984 in webgpu/polish at 08:03:38.039Z and 08:33:41.040Z: the tap spoken from '
+      + 'the waiting station 58.3 cm off the flank, the carrier halting above the waterline so '
+      + 'the jar never goes under the drawn surface, no return leg, and the water stand the '
+      + 'point still owes drawing at all (its PART B final state prescribes it). They say '
+      + 'nothing about any other change: both runs are that branch and nothing else. The '
+      + 'charge is not a pass — the point owes the picture on BOTH backends before it lands, '
+      + 'and every one of these entries dies the moment it is ticked.',
+  },
+  {
+    point: 1078,
+    suite: 'world',
+    kind: 'check',
+    match: /(the use key at the talus foot fits the impression|a second press at the spent socket answers like a wrong place)/i,
+    // NO detailMatch: a SUSPECT record carries its first attempt's reds by NAME
+    // only, and both records this entry has to own are of that shape — the
+    // 07:38:23 run's own reds and the 07:40:15 run that passed only on the retry.
+    why:
+      'FILED AS 1078 ON 08.09.2026 OUT OF THE RUN THAT PRINTED IT. In webgl/world at '
+      + '07:38:23.395Z both presses at the talus foot answered noFit — `said ["...noFit"], '
+      + 'spent [], mode travel, dialog null` — and the retry then passed 10/0; the record at '
+      + '07:40:15.798Z is the same pair as a SUSPECT retry-pass. The press reached the game and '
+      + 'the game answered, so what failed is the REACH between the jumped position and '
+      + '`bandiagara-talus`, not the key, the toast expiry (the probe records the toast as it is '
+      + 'set), the settle time (600 ms for the passing miss against 2500 ms plus a screenshot '
+      + 'here) or the camera (the frame between the two presses passed its own shutter). 1078 '
+      + 'owns deciding FIRST whether the player path or only the harness jump is hit, and the '
+      + 'charge dies with it.',
+  },
+  {
     point: 1062,
     suite: 'gamepad',
     kind: 'check',
@@ -1245,7 +1284,7 @@ export const RED_CHARGES = [
     backend: 'webgpu',
     featureLevel: 'compatibility',
     kind: 'check',
-    match: /^bambara-village \(wet\): the boundary ground crop could be measured$/i,
+    match: /^(bambara|maasai)-village \(wet\): the boundary ground crop could be measured$/i,
     // DETAIL-SCOPED to the one wording measured: this check can also fail with a
     // crop that WAS measured and came out wrong, and that is a different red from
     // a frame that never held the crop at all.
@@ -1257,7 +1296,13 @@ export const RED_CHARGES = [
       + 'runs were clean over 44 screenshots each — which under point 640 closes nothing. '
       + 'The charge gives the red an owner that can CLOSE it; it does not decide the cause. '
       + 'Point 1050 owes the throttle probe over `settlement-edge` that separates a real '
-      + 'framing defect from a loaded host, and the charge dies with that point.',
+      + 'framing defect from a loaded host, and the charge dies with that point. '
+      + 'WIDENED 08.09.2026 FROM ONE VILLAGE TO EITHER: webgpu/polish at 08:33:41.040Z '
+      + 'printed the identical wording and the identical detail for MAASAI-village (wet) '
+      + 'in the same section, so the village name was never part of what was measured — it '
+      + 'was the village the first sighting happened to land in, and point 1017 names '
+      + 'exactly this shape of over-narrow charge. The detail stays scoped to `crop '
+      + 'off-frame`, so a crop that WAS measured and came out wrong is still a real red.',
   },
   {
     point: 1050,
