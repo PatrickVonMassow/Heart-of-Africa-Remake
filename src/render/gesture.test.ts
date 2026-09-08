@@ -9,6 +9,7 @@
 // proves the renderer and the module can never drift apart.
 import { describe, expect, it } from 'vitest'
 import * as THREE from 'three/webgpu'
+import { FIGURE_LIMBS } from './figures'
 import {
   GESTURE_BLEND,
   GESTURE_DURATIONS,
@@ -21,12 +22,15 @@ import {
   DIG_CYCLE_SECONDS,
   digPose,
   gestureArm,
+  gestureBlendOf,
   gestureEnvelope,
   gesturePose,
+  handAt,
   isGesturing,
   poseDistanceFromRest,
   restGesture,
   startGesture,
+  TOUCH_LEAN,
   type GestureKind,
   type GestureState,
 } from './gesture'
@@ -409,5 +413,73 @@ describe('the digging pose', () => {
       expect(Number.isFinite(p.left.pitch)).toBe(true)
       expect(Number.isFinite(p.lean)).toBe(true)
     }
+  })
+})
+
+describe('the touch: a hand laid on a thing and held there (work-order 1065)', () => {
+  const held = startGesture('touch', { bearing: 0.2, elevation: 0.8, duration: 1.5 })
+
+  it('holds ONE aim for its whole length, so the hand does not wander off the surface', () => {
+    const aims = [0.2, 0.5, 0.9, 1.2].map((t) => {
+      const pose = gesturePose({ ...held, t })
+      const side = gestureArm(held.bearing)
+      return armDirection(pose[side])
+    })
+    for (const dir of aims.slice(1)) {
+      for (let axis = 0; axis < 3; axis++) expect(dir[axis]).toBeCloseTo(aims[0][axis], 6)
+    }
+  })
+
+  it('reaches its full pose FAST — the word falls at the start of the touch', () => {
+    // The shared blend would leave the hand short of the stone for four tenths
+    // of a 1.5 s touch, including the frame the utterance is spoken on.
+    expect(gestureBlendOf('touch')).toBeLessThan(GESTURE_BLEND)
+    expect(gestureEnvelope({ ...held, t: 0.15 })).toBeGreaterThan(0.95)
+  })
+
+  it('leans the trunk into the reach, by the lean the stand is solved through', () => {
+    expect(gesturePose({ ...held, t: 0.75 }).lean).toBeCloseTo(TOUCH_LEAN, 3)
+  })
+
+  it('takes the free arm back, so a still frame is not a point', () => {
+    const pose = gesturePose({ ...held, t: 0.75 })
+    const free = gestureArm(held.bearing) === 'left' ? 'right' : 'left'
+    expect(pose[free].pitch).toBeGreaterThan(REST_POSE[free].pitch)
+  })
+
+  it('returns to rest when it is spent, like every other gesture', () => {
+    expect(advanceGesture({ ...held, t: 1.49 }, 0.02).kind).toBeNull()
+  })
+})
+
+describe('where the hand actually is (shared by every solve and the picture)', () => {
+  it('puts a straight arm a full arm length from the shoulder', () => {
+    const [x, y, z] = handAt('left', 0, 0)
+    expect(Math.hypot(x - FIGURE_LIMBS.shoulderX, y - FIGURE_LIMBS.shoulderY, z)).toBeCloseTo(
+      FIGURE_LIMBS.armLength,
+      9,
+    )
+  })
+
+  it('mirrors the shoulder for the right arm', () => {
+    expect(handAt('right', 0, 0)[0]).toBeCloseTo(-handAt('left', 0, 0)[0], 9)
+  })
+
+  it('carries the hand FORWARD and DOWN when the trunk leans in', () => {
+    const upright = handAt('left', 0, 0.6, 0, FIGURE_LIMBS.hipY)
+    const leaning = handAt('left', 0, 0.6, 0.5, FIGURE_LIMBS.hipY)
+    expect(leaning[2]).toBeGreaterThan(upright[2])
+    expect(leaning[1]).toBeLessThan(upright[1])
+  })
+
+  it('leaves the pivot itself where it is', () => {
+    const pivot = FIGURE_LIMBS.hipY
+    // A point AT the pivot height on the figure's axis cannot move when the
+    // trunk turns about it — which is what makes the pivot the right one.
+    const arm = FIGURE_LIMBS.armLength
+    const elevation = Math.asin((pivot - FIGURE_LIMBS.shoulderY) / arm)
+    const [, y, z] = handAt('left', Math.PI / 2, elevation, 0.7, pivot)
+    expect(y).toBeCloseTo(pivot, 9)
+    expect(z).toBeCloseTo(0, 9)
   })
 })

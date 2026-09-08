@@ -27,7 +27,7 @@
 // solve runs through the leaning trunk, the way the scene graph draws it.
 
 import { FIGURE_LIMBS } from '../../render/figures'
-import { armAim, REST_POSE, type ArmPose, type FigurePose } from '../../render/gesture'
+import { armAim, handAt as figureHandAt, REST_POSE, type ArmPose, type FigurePose } from '../../render/gesture'
 import {
   drumStrikeAt,
   drumStrikeProgress,
@@ -115,9 +115,9 @@ function shoulderXOf(side: 'left' | 'right'): number {
 
 /**
  * The hand CENTRE for a side, a bearing and an elevation, in the drummer's own
- * frame — shoulder plus posed arm, then the trunk's lean about the hip. It is
- * the chain `Figure` draws, written once so the solve and the assertions share
- * exactly the geometry the picture has.
+ * frame — the shared `handAt` of `render/gesture.ts` with the drummer's own
+ * lean. He is drawn WITHOUT legs, so his trunk turns about the ground rather
+ * than about a hip, which is what the zero pivot says.
  */
 export function handAt(
   side: 'left' | 'right',
@@ -125,13 +125,7 @@ export function handAt(
   elevation: number,
   lean = DRUMMER_LEAN,
 ): [number, number, number] {
-  const reach = FIGURE_LIMBS.armLength * Math.cos(elevation)
-  const x = shoulderXOf(side) + reach * Math.sin(bearing)
-  const y = FIGURE_LIMBS.shoulderY + FIGURE_LIMBS.armLength * Math.sin(elevation)
-  const z = reach * Math.cos(bearing)
-  const cl = Math.cos(lean)
-  const sl = Math.sin(lean)
-  return [x, y * cl - z * sl, y * sl + z * cl]
+  return figureHandAt(side, bearing, elevation, lean, 0)
 }
 
 /** The elevation whose HAND UNDERSIDE ends up at height `y` once the trunk has
