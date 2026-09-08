@@ -25,6 +25,30 @@ describe('evaluatePushArrival (the 24.07 lost-night witness)', () => {
     expect(v.reason).toContain('Everything up-to-date')
   })
 
+  // The rule that a push must not run beside a measuring picture run was written
+  // down three times on 08.09.2026 and fired none of them, because none of the
+  // three copies stood where the demand arrives. These two pin it HERE.
+  it('names the conflict with a running measurement, and the gate\'s own exception', () => {
+    const v = evaluatePushArrival({ branch: 'main', ahead: 1, hasUpstream: true })
+    expect(v.reason).toContain('picture run')
+    expect(v.reason).toContain('--no-verify')
+    // The exception may never read as a free pass: "documentation only" is what
+    // went red, because the unit layer covers the documents.
+    expect(v.reason).toContain('unit tests OVER its documents')
+  })
+
+  it('names the declared work when one is actually in flight', () => {
+    const v = evaluatePushArrival({
+      branch: 'main',
+      ahead: 1,
+      hasUpstream: true,
+      inFlight: 'große Regression für 1065',
+    })
+    expect(v.reason).toContain('VERIFICATION IS IN FLIGHT')
+    expect(v.reason).toContain('große Regression für 1065')
+    expect(v.reason).toContain('--no-verify')
+  })
+
   it('handles a detached HEAD without inventing a branch name', () => {
     const v = evaluatePushArrival({ branch: '', ahead: 1 })
     expect(v.reason).toContain('detached HEAD')
