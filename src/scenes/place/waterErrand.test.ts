@@ -14,7 +14,14 @@ import { BANK_FILL_DEPTH, bankWaterDepth, bankShoreHeight } from './riverBank'
 import { insidePlace } from './boundary'
 import { balance } from '../../config/balance'
 import { fillPose, REST_POSE } from '../../render/gesture'
-import { createAdultWork, goalOf, stepAdultWork, type AdultWorkView } from './adultWork'
+import {
+  createAdultWork,
+  goalOf,
+  stepAdultWork,
+  FILL_ARRIVE_RADIUS,
+  WORK_ARRIVE_RADIUS,
+  type AdultWorkView,
+} from './adultWork'
 
 const RIVER_VILLAGES = ['nubian-village', 'bambara-village', 'mandinka-village']
 const VILLAGES = PLACES.filter((p) => p.kind === 'village').map((p) => p.id)
@@ -77,6 +84,41 @@ describe('the carrier goes TO the water (work-order 1065)', () => {
       const path = layout.waterPath!
       expect(insidePlace({ radius: layout.radius, bank: layout.bank }, path.fill.x, path.fill.z, NPC_MARGIN)).toBe(true)
       expect(standingClear(layout.colliders, path.fill.x, path.fill.z, WALKER_RADIUS)).toBe(true)
+    })
+  }
+})
+
+/** The least water the jar may go under at the WORST arrival. Below this the
+ *  dip is arithmetic rather than a picture. */
+const MIN_DIP = 0.1
+
+describe('the carrier stands in water where he actually STOPS (work-order 1065)', () => {
+  // THE DEFECT THIS PINS (measured 08.09.2026 on a quiet machine): the fill spot
+  // itself was in the water, and the carrier still dipped the jar into air. He
+  // stops anywhere inside his arrival radius of that spot, and the shared 1.1 m
+  // is, on the shore's own slope, some 18 cm of height — enough to leave him
+  // 8 cm ABOVE the drawn water surface. A nominal spot is not a standing place:
+  // what has to be in the water is the ground under his feet at arrival.
+  for (const id of RIVER_VILLAGES) {
+    it(`${id}: the worst arrival on the fill leg is still under water`, () => {
+      const layout = buildLayout(id, 42)
+      const bank = layout.bank!
+      const path = layout.waterPath!
+      const fillOut = path.fill.x * bank.nx + path.fill.z * bank.nz
+      // The worst stop is the one furthest back up the slope: straight inland by
+      // the whole arrival radius.
+      const worstOut = fillOut - FILL_ARRIVE_RADIUS
+      const depth = bankWaterDepth(bank, worstOut)
+      expect(
+        depth,
+        `${id}: stopping ${FILL_ARRIVE_RADIUS} m short of the fill spot leaves him in ` +
+          `${(depth * 100).toFixed(0)} cm of water`,
+      ).toBeGreaterThan(MIN_DIP)
+      // ...and his feet are below the village plate, i.e. on the shore.
+      expect(bankShoreHeight(bank, worstOut)).toBeLessThan(0)
+      // The shared radius is what put him on dry ground; the tight one is the fix.
+      expect(bankWaterDepth(bank, fillOut - WORK_ARRIVE_RADIUS)).toBeLessThan(0)
+      expect(FILL_ARRIVE_RADIUS).toBeLessThan(WORK_ARRIVE_RADIUS)
     })
   }
 })

@@ -95,6 +95,7 @@ import {
   type ErrandPoint,
   type SpokenWord,
   WORK_ARRIVE_RADIUS,
+  arriveRadiusOf,
 } from './adultWork'
 import { gestureIfHeard, speechReach } from '../../communication/spokenGesture'
 import { utterancePlan } from '../../communication/speaking'
@@ -2180,8 +2181,6 @@ function Walkers({
   )
 }
 
-/** How near a villager must come to count as having arrived where it was sent. */
-const ERRAND_ARRIVE_RADIUS = WORK_ARRIVE_RADIUS
 
 /** How near a waypoint of a route counts as passed. Wider than a stride, so a
  *  figure sliding along a wall beside the waypoint still ticks it off instead of
@@ -2445,7 +2444,12 @@ function ErrandVillagers({
         const dx = goal.x - me.x
         const dz = goal.z - me.z
         const d = Math.hypot(dx, dz)
-        const arriveAt = task ? ERRAND_ARRIVE_RADIUS : 0.9
+        // How near counts as arrived: `arriveRadiusOf` per errand leg, because
+        // the fill arrives at a DRAWN water surface and stops tighter than the
+        // rest (work-order 1065). The walk and the scheduler read the same
+        // answer, so a leg can never halt just outside the radius that would
+        // have let it begin.
+        const arriveAt = task ? arriveRadiusOf(task) : 0.9
         if (d <= arriveAt) {
           if (!task) {
             state.target = null

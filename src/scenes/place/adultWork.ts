@@ -171,6 +171,17 @@ export interface AdultWorkState {
 }
 
 export const WORK_ARRIVE_RADIUS = 1.1
+/**
+ * How near the FILL leg must come to the waterline before the jar goes down.
+ *
+ * The shared radius is 1.1 m, which on the bank's own slope is some 18 cm of
+ * height: the carrier stopped short, on ground still 8 cm ABOVE the drawn water
+ * surface, and dipped the jar into air (measured 08.09.2026, work-order 1065).
+ * The fill is the one leg whose arrival is judged against a drawn surface, so it
+ * arrives tightly — and the shore under it is a slope, never a step
+ * (`BANK_MAX_STEP`), so the last third of a metre costs a walker nothing.
+ */
+export const FILL_ARRIVE_RADIUS = 0.35
 export const AIM_CLEARANCE = 1.2
 export const JOIN_STAND_OFF = 2.4
 const JOIN_BEARINGS = 12
@@ -218,6 +229,13 @@ export function taskOf(state: AdultWorkState, index: number): AdultTask | null {
 
 export function goalOf(task: AdultTask): ErrandPoint {
   return task.via ?? { x: task.x, z: task.z }
+}
+
+/** How near this task's goal counts as ARRIVED. One answer for the scheduler and
+ *  for the walk that feeds it, so a leg can never stop outside the radius that
+ *  would have let it begin. */
+export function arriveRadiusOf(task: AdultTask): number {
+  return isWater(task) && task.phase === 'fetch' && !task.via ? FILL_ARRIVE_RADIUS : WORK_ARRIVE_RADIUS
 }
 
 export function isDigging(state: AdultWorkState, index: number): boolean {
@@ -415,7 +433,7 @@ export function stepAdultWork(
     }
 
     const goal = goalOf(t)
-    if (!t.arrived && Math.hypot(me.x - goal.x, me.z - goal.z) <= WORK_ARRIVE_RADIUS) {
+    if (!t.arrived && Math.hypot(me.x - goal.x, me.z - goal.z) <= arriveRadiusOf(t)) {
       t.arrived = true
       t.dug = 0
     }

@@ -183,8 +183,14 @@ export function bankWaterFoot(
  * How deep the water stands where a carrier fills a jar (work-order 1065). Ankle
  * deep: he is IN the water rather than looking at it, and nowhere near the
  * `balance.bankWadeDepth` a man wades to — a filling errand is not a crossing.
+ *
+ * It also has to survive the ARRIVAL. He stops within `FILL_ARRIVE_RADIUS` of
+ * this spot, and the shallows fall 0.225 m for every metre out, so the depth he
+ * actually stands in is this less some 8 cm. At 0.10 m that left 3 cm and a
+ * picture in which nothing goes under; here it leaves 12 cm of jar below the
+ * drawn surface at the worst arrival.
  */
-export const BANK_FILL_DEPTH = 0.1
+export const BANK_FILL_DEPTH = 0.2
 
 /**
  * WHERE THE WATER IS ACTUALLY FETCHED: the waterline on the water path's own

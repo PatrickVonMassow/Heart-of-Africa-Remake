@@ -19,6 +19,8 @@ import {
   JOIN_STAND_OFF,
   jarsOnStand,
   WORK_ARRIVE_RADIUS,
+  arriveRadiusOf,
+  FILL_ARRIVE_RADIUS,
   type AdultWorkConfig,
   type AdultWorkState,
   type AdultWorkView,
@@ -84,7 +86,10 @@ function walkFrame(state: AdultWorkState, v: AdultWorkView, dt: number): void {
     if (!task || task.arrived) continue
     const to = goalOf(task)
     const d = Math.hypot(to.x - me.x, to.z - me.z)
-    if (d <= 1e-6) continue
+    // He STOPS where the scene stops him: `PlaceLife` halts the walk at the same
+    // arrival radius the scheduler judges by, so a leg that arrives here arrives
+    // in the game too (work-order 1065).
+    if (d <= arriveRadiusOf(task)) continue
     const step = Math.min(d, CFG.pace * dt)
     me.x += ((to.x - me.x) / d) * step
     me.z += ((to.z - me.z) / d) * step
@@ -249,6 +254,34 @@ describe('RIVER is a dispatch, not a commentary (work-order 1065)', () => {
     // The jar is FULL only after the fill, never before it.
     const beforeFill = carrier!.slice(0, carrier!.findIndex((leg) => leg.includes(':fill:')))
     expect(beforeFill.some((leg) => leg.includes('fullJar'))).toBe(false)
+  })
+
+  it('stops the fill leg AT the water, and every other leg at the shared radius', () => {
+    // The fill is the one leg judged against a DRAWN surface: stopping 1.1 m
+    // short of the waterline left the carrier 8 cm above it, dipping the jar
+    // into air (measured 08.09.2026, work-order 1065).
+    const v = view(6)
+    const state = createAdultWork(6, CFG)
+    const seen = new Map<string, number>()
+    let closest = Infinity
+    for (let elapsed = 0; elapsed < 240; elapsed += 1 / 60) {
+      walkFrame(state, v, 1 / 60)
+      for (let i = 0; i < 6; i++) {
+        const task = taskOf(state, i)
+        if (!task) continue
+        seen.set(`${task.situation}:${task.phase}`, arriveRadiusOf(task))
+        if (task.situation === 'water-out' && task.phase === 'fetch') {
+          closest = Math.min(closest, Math.hypot(v.villagers[i].x - FILL.x, v.villagers[i].z - FILL.z))
+        }
+      }
+      stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
+      if (state.delivered > 0) break
+    }
+    expect(seen.get('water-out:fetch')).toBe(FILL_ARRIVE_RADIUS)
+    expect(seen.get('water-back:walk')).toBe(WORK_ARRIVE_RADIUS)
+    expect(seen.get('water-out:invite')).toBe(WORK_ARRIVE_RADIUS)
+    // ...and the walk really did come that close to the water.
+    expect(closest).toBeLessThanOrEqual(FILL_ARRIVE_RADIUS)
   })
 
   it('holds the jar under the water for the configured seconds', () => {
