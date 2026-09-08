@@ -34,9 +34,13 @@ export type GestureKind = 'beckon' | 'point' | 'refuse' | 'indicate' | 'touch'
 export const GESTURE_KINDS: readonly GestureKind[] = ['beckon', 'point', 'refuse', 'indicate', 'touch']
 
 /**
- * How long each gesture runs, in seconds. Bounded by construction: a gesture is
- * an event, never a state a figure can get stuck in, so `advanceGesture` returns
- * the figure to rest the moment its own duration is spent.
+ * How long each gesture runs, in seconds — and for a kind in
+ * `GESTURE_NO_FADE_IN`, how long it HOLDS: that kind's fade-out is added beyond
+ * this, so `startGesture(kind).duration` is the longer of the two numbers and is
+ * the one every bound is stated against. Bounded by construction either way: a
+ * gesture is an event, never a state a figure can get stuck in, so
+ * `advanceGesture` returns the figure to rest the moment its own duration is
+ * spent.
  * Calibratable starting values (CLAUDE.md §2): long enough to read from across a
  * village square, short enough that a figure gesturing twice reads as twice.
  */
