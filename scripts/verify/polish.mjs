@@ -4562,6 +4562,8 @@ if (section('children-bank-game')) {
     let sawTouchPose = false
     let stationTap = null
     let looseTouch = null
+    let opening = null
+    const holdTrace = []
     for (let i = 0; i < 400; i++) {
       const now = await page.evaluate(() => (window.__placeTapHand ? window.__placeTapHand() : null))
       if (now) {
@@ -4575,13 +4577,26 @@ if (section('children-bank-game')) {
         // it walks to the stone for the next round, and measuring that walk
         // measures a gait rather than an utterance (08.09.2026, 58.3 cm).
         const holding = now.phase === 'run' && now.tapFor > 0
+        // THE SHAPE OF THE HOLD, not only its worst reading. A hand that never
+        // arrives and a hand that arrives one frame late produce the same worst
+        // number; only the curve tells them apart, and only the written-against-
+        // drawn pair says whether a late arrival is the pose or the drawing of
+        // it (work-order 1065).
+        if (holding) holdTrace.push(now)
+        if (now.opening && (!opening || now.opening.tapper !== opening.tapper)) opening = now.opening
         if (holding && (!stationTap || Math.abs(now.gap) > Math.abs(stationTap.gap))) stationTap = now
         if (now.gesture === 'touch' && !holding && (!looseTouch || Math.abs(now.gap) > Math.abs(looseTouch.gap))) {
           looseTouch = now
         }
       }
-      if (bestTouch && Math.abs(bestTouch.gap) <= 0.06 && sawTouchPose) break
-      await nextFrames(2)
+      // ONE READING OF A HOLD IS A COIN TOSS. The loop used to stop at its first
+      // good reading, so which single frame of a nine-second hold got measured
+      // was luck — and the worst-reading check below then went red or green at
+      // random on the same code (measured 08.09.2026). It now stays until the
+      // hold has been read frame by frame, and reads it at every frame rather
+      // than every second one.
+      if (bestTouch && Math.abs(bestTouch.gap) <= 0.06 && sawTouchPose && holdTrace.length >= 12) break
+      await nextFrames(now && now.phase === 'run' && now.tapFor > 0 ? 1 : 2)
     }
     check(
       'the tapping child reaches its stone at all (work-order 1065)',
@@ -4615,7 +4630,33 @@ if (section('children-bank-game')) {
             (looseTouch
               ? `; outside the hold the touch pose ran on as far as ${(looseTouch.gap * 100).toFixed(1)} cm ` +
                 `in phase ${looseTouch.phase}, which is the walk to the next round rather than a tap`
-              : ''),
+              : '') +
+            `; the hold read ` +
+            holdTrace
+              .slice(0, 6)
+              .map(
+                (r) =>
+                  `[${r.tapFor.toFixed(2)}s ${(r.gap * 100).toFixed(0)}cm ` +
+                  `written ${r.written ? r.written.leftPitch.toFixed(2) + '/' + r.written.rightPitch.toFixed(2) : '-'} ` +
+                  `drawn ${(r.drawn ?? []).map((a) => a.pitch.toFixed(2)).join('/') || '-'}]`,
+              )
+              .join(' '),
+        )
+      }
+      // AND THE FRAME THE WORD FALLS IN, measured when it fell rather than
+      // sampled for afterwards. A sampler reads one frame of a nine-second hold
+      // and which one is luck — this reading is taken by the scene itself, in
+      // the frame the tap is uttered, once that frame's pose is written AND
+      // applied. It is the check that would have named the one-frame render lag
+      // straight away (08.09.2026: 54 cm at the word, on the stone from the next
+      // frame on).
+      if (opening) {
+        check(
+          'and the hand is on the stone in the very frame the word falls',
+          Math.abs(opening.gap) <= 0.06,
+          `child ${opening.tapper}: gap ${(opening.gap * 100).toFixed(1)} cm at the utterance, ` +
+            `shoulder drawn at ${opening.drawnPitch.toFixed(2)} rad against the ` +
+            `${opening.writtenPitch.toFixed(2)} rad written for that frame`,
         )
       }
 
