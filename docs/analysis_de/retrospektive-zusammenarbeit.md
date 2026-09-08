@@ -103,6 +103,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 08.09. früh | Der Nutzer fand den Container zum dritten Mal in drei Tagen tot und fragte, warum es seit seinem Urlaub „nur schlechter" geworden sei. Gemessen: Die Maschinentode sind drei Tage alt, nicht vier Wochen — aber der Durchsatzeinbruch ist echt und älter, und die Merge-Zahl hatte ihn zehn Tage lang verdeckt, weil sie Infrastruktur mitzählte. `scripts/` wuchs seit dem 06.08. um 176.000 Zeilen, `src/` um 11.800; zwischen dem 20.08. und 01.09. um **202 Zeilen Spielcode in zwölf Tagen** (§3.247) |
 | 08.09. mittags | Die zweite Autorenspur war zugeteilt und nie beauftragt: Der Schalter stand richtig und die Regel gab 271 von 376 offenen Punkten an sie ab, doch die Sitzungsprotokolle zaehlen seit dem 04.09. 41 Reviews gegen 3 Autorenlaeufe, und von zwoelf geschlossenen Punkten gehoerten acht der Spur. Zwischen Zuteilung und Arbeit stand kein Aufruf ([§3.248](#3248-die-spur-war-zugeteilt-aber-nie-beauftragt)) |
 | 08.09. abends | Dritter Auftritt derselben Verwechslung, mit einem neuen Sensor: Nach der Kontextuebergabe um 20:26 lehnte der Starter jeden Tick mit `registered-writer-live` ab — „work output 14/18 min old (working files)" —, waehrend `ps` keinen einzigen Autorprozess zeigte. Die frischen Dateien waren die Ausgabe der grossen Regression, die in jenem Arbeitsbaum allein zu Ende lief und um 20:36 rot endete. Eine fertige Suite hinterlaesst Dateien wie ein arbeitender Autor; der Sollzustand von Punkt 1048 nennt Arbeitsbaum-Evidenz aber gerade als Gegenprobe zum frischen Zweigstand. Eine halbe Stunde Stillstand, der rote Lauf ungelesen, beendet wieder von einer Nutzerfrage ([§3.170](#3170-der-letzte-atemzug-wird-als-herzschlag-gelesen), Punkt 1048) |
+| 08.09. nachts | Auf die Standsfrage kam eine korrekt gelesene Messung und daran ein erfundener Reststand: „erst die halbe Strecke, danach WebGPU" — zwei Minuten später war der Lauf beendet, denn ein roter erster Durchgang beendet ihn und die zweite Bahn faehrt nie. Die widerlegende Tatsache stand im selben Absatz derselben Nachricht, drei rote Suiten waren gerade aufgezaehlt worden. Der Nutzer sah beides hintereinander und sagte es ([§3.250](#3250-der-reststand-wurde-erzaehlt-waehrend-der-beleg-dagegen-schon-vorgelesen-war)) |
 
 
 Muster: Ab dem 22.07. explodiert die Commit-Rate (Delegation) — und genau dann häufen sich die Infrastruktur-Vorfälle. **Skalierung der Autonomie erzeugt eine eigene Problemklasse, die die Feature-Arbeit zeitweise überholt.**
@@ -563,6 +564,8 @@ Am 21.08.2026 dieselbe Bauform in einem anderen Werkzeug: `fold-point` schließt
 Am 24.08.2026 zwei weitere Ausprägungen an einem Abend, und beide zeigen dieselbe Wurzel aus einer neuen Richtung: Der Ausweg ist nicht nur unbegehbar, er wird dem Falschen genannt. Der `board-first-guard` will delegierte Arbeitsbäume ausdrücklich ausnehmen — die Ausnahme fragt aber das Verzeichnis des HOOK-Prozesses und nicht das des geprüften Aufrufs, und das ist bei einem angehefteten Agenten die Haupt-Auscheckung. Der delegierte Autor wird also auf eine Tafelkarte verwiesen, die er in seinem Arbeitsbaum gar nicht schreiben kann; die Auskunft, die ihn befreien würde, liegt im Prozess-Nutzlastfeld, das der Riegel eine Zeile weiter unten für etwas anderes bereits liest. Und der Review-Rekorder weist eine Identitätsprüfung mit dem Rat ab, genau die zwei Flags zu setzen, die schon gesetzt waren: Der gemessene Grund — das Sitzungstranskript deckt den angegebenen Zeitpunkt nicht ab, weil die Harness es mit Verzögerung schreibt und „jetzt“ deshalb immer hinter der letzten modelltragenden Nachricht liegt — wird eine Schicht tiefer berechnet und dann verworfen. Beide Male ist die Information, die den Ausweg gangbar macht, im Werkzeug bereits vorhanden.
 
 **Nachtrag 25.08.2026 — dieselbe Wurzel, diesmal an der Vier-Augen-Schranke.** Die Stop-Riegel stehen mit RELATIVEN Befehlen in der Konfiguration, also laeuft aus einem Arbeitsbaum heraus dessen eigene Kopie des Riegels. Die ungetrackte Grundlinien-Datei liegt aber nur im Haupt-Checkout, und so meldete `mechanism-review-guard` eine fehlende Grundlinie, die es nicht gab. Der genannte Ausweg war zum zweiten Mal an einem Abend einer, den niemand gehen kann: „merge origin/main into this branch" bei zwei Refs, die nachweislich identisch sind (0/0), und „end the turn again so the guard can seed the anchor", wobei das Saatkorn wieder in den Arbeitsbaum faellt. Derselbe Aufruf mit derselben Sitzungskennung meldete aus dem Haupt-Checkout die Lueckenklausel und beendete den Zug gruen. Zwei Zugenden gingen dafuer verloren, und die Verweigerung las sich wie ein Produktdefekt, obwohl der Riegel nichts zu beanstanden hatte. Die Lehre ist nicht neu, aber sie hat jetzt eine zweite Adresse: Ein Riegel, der Zustand gegen die Wurzel aufloest, in der er zufaellig laeuft, ist im Delegationsmodell dieses Batches falsch — die Arbeitsbaeume sind der NORMALFALL, nicht die Ausnahme. Als Punkt 922 aufgenommen, direkt hinter Punkt 910, das denselben Defekt am Tafel-Riegel traegt.
+
+**Dritte Adresse, 08.09.2026 — und diesmal verlangt der Riegel etwas, das gerade entsteht.** Aus dem Arbeitsbaum des Punktes 1065 heraus las `render-verify-guard` die ungeprueften Render-Aenderungen des ZWEIGS und verweigerte jedes Zugende, bis ein deckender Bildlauf vorliegt — waehrend genau dieser Lauf seit einer Viertelstunde lief und noch zwei Stunden brauchte. Aus dem Haupt-Checkout beendete derselbe Riegel den Zug wortlos mit 0, weil `main` keine ungepruefte Render-Aenderung traegt. Daneben verweigerte der Tafel-Riegel zum zweiten Mal wie am 25.08. Drei Zugenden gingen verloren, und jede von Hand nachgestellte Diagnose las gruen, weil ich sie aus dem Hauptbaum aufrief. Neu ist nur die Bauform des Schadens: Der Riegel forderte nicht eine fehlende Handlung, sondern eine, die bereits im Gange war — die Verweigerung und ihre eigene Abhilfe liefen gegeneinander. Zweite Lehre desselben Abends: Ein `cd` in einer `&&`-Kette aktualisiert das verfolgte Arbeitsverzeichnis der Sitzung NICHT; nur ein alleinstehendes `cd` haelt. Deshalb sieht die naechste Messung wieder den Arbeitsbaum, obwohl der Befehl davor sichtbar im Hauptbaum lief, und der Drift bleibt unsichtbar.
 
 **Lehre:** Ein Durchsetzer ist erst dann fertig, wenn sein genannter Ausweg **ausgeführt** worden ist, nicht wenn er plausibel klingt. Das gehört in die Prüfung jedes neuen Riegels: den Weg, den die Fehlermeldung vorschlägt, einmal wirklich gehen — im auslösenden Zustand, nicht im gesunden. Zwei Zusatzfragen aus dem 24.08.: Gilt der Weg auch für den, der die Meldung liest — ein delegierter Autor hat andere Rechte als der Besitzer? Und nennt die Absage den Grund, den sie gemessen hat, statt eine Handlung zu empfehlen, die der Aufrufer schon ausgeführt hat?
 
@@ -1443,7 +1446,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Dienstag, 08.09.2026, 21:00 · Quellen-Fingerprint: `b89d61e90298…`
+Zuletzt aktualisiert: Dienstag, 08.09.2026, 23:41 · Quellen-Fingerprint: `66e4da77b4e2…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1515,7 +1518,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A point delivered as a rider on another branch is closed with fold-point --delivered, and its push needs a closing card first | 1 | niedrig | point-proof-guard.mjs, push-arrival-guard.mjs | ✔ Mechanismus |
 | Saved games do not constrain design work: the feature is switched off, nobody plays a serious run, and no migration is ever owed for a data change | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | 24.07.2026 evening chaos — serving model silently degraded to Haiku 4.5; verify the serving model before batch work, Haiku-class must pause instead of working | 6 | hoch | model-guard.mjs | ✔ Mechanismus |
-| Keep the shell cwd in /workspace/hoa; a worktree cwd makes the Stop guards judge the wrong repo root | 1 | niedrig | worktree-reminder.mjs | ✔ Mechanismus |
+| Keep the shell cwd in /workspace/hoa; a worktree cwd makes the Stop guards judge the wrong repo root | 2 | mittel | worktree-reminder.mjs | ✔ Mechanismus |
 | Solved 05.09.2026: every claude session died with exit 143 because two batch-emergency tests ran the real strike against the live session registry — evidence, method, fix, and what to keep in mind | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | ENDED 17.08.2026 — the 13.08. emergency that pushed the MAXIMUM load to OpenAI (hard cases to Sol via --anyway, pool of one) is over; the normal three-lane split of CLAUDE.md §6 applies again | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Every new optical/graphics feature must be sorted into the low/medium/high detail presets, enforced by a pure completeness test — a new quality key with no preset entries fails the gate | 2 | mittel | — (Regel/Memory) | ◐ Regel |
@@ -1548,8 +1551,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 95 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 126 Prozess-/Meta-TASKS-Punkte (davon 60 offen).
 
-<!-- RETRO-FINGERPRINT: b89d61e902985767a462726a42dcfa0b29bb45af9f2fcbdbd0dc1e92db3b589c -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-08T19:00:58.466Z -->
+<!-- RETRO-FINGERPRINT: 66e4da77b4e253c13ff72ffb0dec8b7c5723aa50df402e1ba7ef25ce86b17212 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-08T21:41:54.643Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -6153,3 +6156,30 @@ Zahl noch weiter nach unten gezogen.
 letzten echten Läufe, sonst verwandelt sie sich vom Beleg in eine Falle. Und ein Urteil so hart
 wie „HÄNGEND, brich ab" darf nicht allein auf einer Erwartung stehen: Solange der Prozess
 nachweislich rechnet und sein Log wächst, ist er nicht hängend, egal was die Tabelle sagt.
+
+### 3.250 Der Reststand wurde erzählt, während der Beleg dagegen schon vorgelesen war
+
+Der Nutzer fragte um 23:24 nach dem Stand eines LARGE-Laufs. Die Antwort las den Fortschritt
+korrekt aus dem Log — WebGL-2-Bahn bei den Invarianten, drei Suiten mit CANDIDATE REAL FAILURE —
+und schloss daran den Satz an, danach folge dieselbe Runde auf WebGPU, also erst die halbe
+Strecke. Zwei Minuten später war der Lauf beendet. Ein roter erster Durchgang beendet den Lauf;
+die zweite Grafikbahn fährt nie. Der Nutzer sah beides direkt hintereinander und sagte es:
+„Eben sagst du erst bei der Hälfte und direkt danach fertig".
+
+Bemerkenswert ist nicht der Irrtum, sondern wo er saß. Die widerlegende Tatsache war nicht
+verborgen, sie stand im selben Absatz derselben Nachricht: Wer drei rote Suiten aufzählt, hat
+alles in der Hand, was nötig ist, um zu wissen, dass keine zweite Bahn mehr kommt. Gemessen
+wurde also alles Richtige, und die Schlussfolgerung lief daran vorbei — die Restlaufzeit kam
+aus einem Bild vom Ablauf, nicht aus dem Ablauf. Das ist die teurere Hälfte von „messen, nie
+schätzen" (16.07.): Die Messung fehlte nicht, sie wurde nur nicht auf die Frage angewandt, die
+gerade beantwortet wurde.
+
+Dieselbe Sitzung zeigte die verwandte Form am Werkzeug: Ein `cd` in den Arbeitsbaum blieb
+stehen, und danach maßen `focus`, `board-publish` und `render-verify-guard` den Zweigstand statt
+des Hauptbaums — die Tafel war „nicht gefunden", der Renderprüfer verlangte einen Nachweis, der
+am Hauptbaum längst vorlag. Auch hier war die Auskunft der Werkzeuge korrekt; falsch war, woran
+sie gerichtet wurde.
+
+**Lehre:** Eine Restlaufzeit wird aus der Quittung gelesen oder gar nicht genannt. Und solange
+noch offen ist, worauf sich eine Aussage stützt, gehört der Satz nicht in die Antwort — die
+Zahl, die man nicht belegen kann, ist auch die, die der Nutzer als Erster prüft.

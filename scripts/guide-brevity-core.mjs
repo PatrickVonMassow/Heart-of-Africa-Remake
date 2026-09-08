@@ -409,7 +409,20 @@ export const LIMITS = {
   // it: the neighbours are about two checks that contradict each other and about an instruction
   // that voids its own precondition, neither about WHERE a rule has to stand to be read at all.
   // Its own entry costs +9 lines / +106 words. Ceilings move 602 -> 611 with zero slack.
-  maxLines: 611,
+  // 08.09.2026 (fifth): the guard that demands the very thing being produced. Measured that
+  // evening: `render-verify-guard` refused every turn end until a covering picture run existed,
+  // while that run had been going a quarter hour and needed two more hours — the refusal and its
+  // own remedy running against each other, with no way out but to wait inside a turn that may not
+  // end. Its second half is the cause that hid it: the guard resolves against the root it happens
+  // to run from, so from a worktree it saw the branch's unverified edits while every hand-run
+  // diagnostic, called from the main tree, read green. No existing entry carries it: the
+  // neighbours are about an aged duration killing a healthy run and about a rule filed under the
+  // wrong heading, neither about a check that forbids its own fulfilment. Its own entry costs
+  // +8 lines (7 plus its separator) / +81 words. The liveness entry beside it was SHARPENED
+  // rather than added to — a finished run leaves the same fresh files as a working one, so
+  // corroborating one trace with another proves nothing — at +1 line / +31 words.
+  // Ceilings move 611 -> 620 with zero slack.
+  maxLines: 620,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -645,7 +658,9 @@ export const LIMITS = {
   // without dropping a claim (the clause the test pins by name is untouched): 5679 -> 5669.
   // 08.09.2026 (fourth): the wrong-heading pitfall justified beside maxLines measures 106 words:
   // 5669 -> 5775.
-  maxWords: 5775,
+  // 08.09.2026 (fifth): the demands-what-is-being-produced pitfall justified beside maxLines
+  // measures 81 words, and the liveness sharpening beside it 31: 5775 -> 5887.
+  maxWords: 5887,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,

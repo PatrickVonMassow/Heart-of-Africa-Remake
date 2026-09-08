@@ -324,9 +324,10 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   neu** — überstimm nie den Prüfer."
 
 - **„Läuft der noch?" mit „ist die Ausgabe frisch?" beantwortet.** Frische belegt nur, dass jemand
-  gearbeitet *hat*.
+  gearbeitet *hat*: Ein **fertiger** Lauf hinterlässt frische Dateien wie ein arbeitender, ein
+  Commit ist sogar das **Letzte**, was einer tut. Zwei Spuren gegeneinander zu prüfen hilft nicht.
   → *Prompt:* „Miss Lebendigkeit am **Vorgang** (Kennung samt Startzeit), nie an seinen Spuren;
-  unlesbar heißt **unbekannt**, nicht tot."
+  unlesbar heißt **unbekannt**, nicht tot. Frische darf eine Nachfrist nur **verkürzen**."
 
 - **Plötzlich rot, obwohl niemand den Code angefasst hat.** Zwei Teile buchstabieren dieselbe Regel
   getrennt — eines schreibt, eines prüft.
@@ -567,6 +568,14 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „‚Hängt, abbrechen‘ darf nie allein auf einer hinterlegten Dauer stehen: Solange der
   Prozess **rechnet** und sein Protokoll **wächst**, hängt er nicht."
 
+- **Die Schranke verlangt genau das, was gerade entsteht.** Sie lässt nicht aufhören, solange
+  ein Nachweis fehlt — und der Nachweis ist der Lauf, der noch zwei Stunden braucht.
+  Verweigerung und eigene Abhilfe laufen gegeneinander.
+  → *Prompt:* „Eine Schranke, die einen Nachweis fordert, muss ‚wird gerade erstellt' als
+  eigenen Zustand **durchlassen** — sonst verbietet sie ihre eigene Erfüllung. Verweigert sie
+  trotz nachweislich gelungener Reparatur, **miss zuerst dein Arbeitsverzeichnis, in einem
+  eigenen Aufruf**: Sie urteilt über die Wurzel, aus der sie läuft."
+
 - **Ein Rot, das bei gleichem Code kommt und geht, ist ein Befund über deine MESSUNG.** Eine
   Stichprobe aus einem langen Vorgang trifft den Defekt mal und verfehlt ihn mal.
   → *Prompt:* „Repariere dann die Prüfung, nicht das Programm: ganzen Vorgang lesen, je Vorkommen zählen, **Abdeckung als eigene Prüfung** behaupten."
@@ -609,4 +618,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: b533814b723cd1d15bb3669d98590ca986505c909832d7cbc7679b25b938c231 -->
+<!-- GUIDE-FINGERPRINT: 66e4da77b4e253c13ff72ffb0dec8b7c5723aa50df402e1ba7ef25ce86b17212 -->
