@@ -4555,6 +4555,9 @@ if (section('children-bank-game')) {
   // taken off the SCENE GRAPH: the hand mesh's world position, the flank the
   // instanced rock presents at that height and bearing, and the gap between them.
   if (staged) {
+    const holdSeconds = await page.evaluate(
+      () => window.__balance?.villageLife?.bankGame?.tapPauseSeconds ?? 0,
+    )
     let bestTouch = null
     let sawTouchPose = false
     let stationTap = null
@@ -4606,7 +4609,9 @@ if (section('children-bank-game')) {
           'and no tap is ever spoken from the waiting station',
           Math.abs(stationTap.gap) <= 0.06,
           `the worst reading while the word was falling stood ${(stationTap.gap * 100).toFixed(1)} cm ` +
-            `off the flank` +
+            `off the flank, ${stationTap.tapFor.toFixed(2)} s into the hold's remainder ` +
+            `(the hold runs from ${holdSeconds.toFixed(2)} s down to 0, so a reading near the top ` +
+            `is the arm still swinging in and one near 0 is it swinging back out)` +
             (looseTouch
               ? `; outside the hold the touch pose ran on as far as ${(looseTouch.gap * 100).toFixed(1)} cm ` +
                 `in phase ${looseTouch.phase}, which is the walk to the next round rather than a tap`

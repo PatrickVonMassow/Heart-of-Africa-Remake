@@ -67,6 +67,25 @@ export const GESTURE_BLEND = 0.3
  */
 export const GESTURE_BLENDS: Partial<Record<GestureKind, number>> = { touch: 0.12 }
 
+/**
+ * Kinds that begin AT the pose instead of growing into it — the fade-out is
+ * unchanged, only the fade-IN is dropped.
+ *
+ * A shortened fade-in is not the same as none. Measured 08.09.2026 in the
+ * browser: with the touch's 0.12 s ramp the worst reading of the drawn hand
+ * during the tap's own hold stood 29-59 cm off the stone, and the run recorded
+ * WHEN — 8.95 s into a 9.00 s remainder, i.e. fifty milliseconds after the word
+ * opened, while the arm was still swinging in. The word and the gesture are one
+ * utterance and are issued in the same frame, so a hand that grows into its pose
+ * is by construction NOT on the stone when the word falls — which is the whole
+ * claim the tap exists to make (design.md §13.4). The child has also already
+ * STOPPED at a distance that only makes sense with the arm extended: `touchStand`
+ * solves its stand through the same leaning reach the renderer draws, so the
+ * outstretched arm is what its arrival was measured against, not an extra motion
+ * afterwards.
+ */
+export const GESTURE_NO_FADE_IN: readonly GestureKind[] = ['touch']
+
 /** How long this kind takes to grow out of rest and settle back into it. */
 export function gestureBlendOf(kind: GestureKind): number {
   return GESTURE_BLENDS[kind] ?? GESTURE_BLEND
@@ -213,7 +232,11 @@ export function gestureEnvelope(s: GestureState): number {
   if (s.kind === null || s.duration <= 0) return 0
   const blend = Math.min(gestureBlendOf(s.kind), s.duration / 2)
   if (blend <= 0) return 0
-  return Math.min(smoothstep(s.t / blend), smoothstep((s.duration - s.t) / blend))
+  const out = smoothstep((s.duration - s.t) / blend)
+  // A kind that begins AT its pose skips the in-ramp only; it still returns to
+  // rest, so nothing about point 479's "the pose returns to rest" changes.
+  if (GESTURE_NO_FADE_IN.includes(s.kind)) return s.t < 0 ? 0 : out
+  return Math.min(smoothstep(s.t / blend), out)
 }
 
 /**

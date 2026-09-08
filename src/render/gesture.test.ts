@@ -14,6 +14,7 @@ import {
   GESTURE_BLEND,
   GESTURE_DURATIONS,
   GESTURE_KINDS,
+  GESTURE_NO_FADE_IN,
   REST_POSE,
   advanceGesture,
   aimAt,
@@ -134,9 +135,16 @@ describe('THE POSE RETURNS TO REST — at the start, at the end, and after it', 
   })
 
   it('a gesture BEGINS at rest — no snap into the pose', () => {
+    // …with ONE named exception, and the exception is what makes the tap true:
+    // a touch is issued in the same frame as the word it belongs to, so a hand
+    // that grew into its pose would be off the stone exactly while ROCK is
+    // spoken (measured 08.09.2026, work-order 1065). Its own describe block
+    // below owns that claim and the fade-OUT it keeps.
     for (const kind of GESTURE_KINDS) {
+      if (GESTURE_NO_FADE_IN.includes(kind)) continue
       expect(poseDistanceFromRest(gesturePose(startGesture(kind, { bearing: 1.2 }))), kind).toBeCloseTo(0, 10)
     }
+    expect([...GESTURE_NO_FADE_IN]).toEqual(['touch'])
   })
 
   it('and settles back into rest as it ends, continuously', () => {
@@ -430,11 +438,36 @@ describe('the touch: a hand laid on a thing and held there (work-order 1065)', (
     }
   })
 
-  it('reaches its full pose FAST — the word falls at the start of the touch', () => {
-    // The shared blend would leave the hand short of the stone for four tenths
-    // of a 1.5 s touch, including the frame the utterance is spoken on.
+  it('BEGINS at its full pose — the word falls with the hand already on the stone', () => {
+    // A SHORTENED ramp is not the same as none. Measured in the browser on
+    // 08.09.2026, the 0.12 s ramp still put the worst reading of the drawn hand
+    // 29-59 cm off the stone fifty milliseconds after the word opened, because
+    // word and gesture are one utterance issued in the same frame.
     expect(gestureBlendOf('touch')).toBeLessThan(GESTURE_BLEND)
+    expect(gestureEnvelope({ ...held, t: 0 })).toBe(1)
+    expect(gestureEnvelope({ ...held, t: 0.001 })).toBeGreaterThan(0.999)
     expect(gestureEnvelope({ ...held, t: 0.15 })).toBeGreaterThan(0.95)
+  })
+
+  it('still RETURNS to rest, so the arm is never dropped by a snap', () => {
+    expect(gestureEnvelope({ ...held, t: held.duration })).toBe(0)
+    expect(gestureEnvelope({ ...held, t: held.duration - 0.06 })).toBeLessThan(0.75)
+    // Monotone over the fade-out: no bounce on the way down.
+    let prev = Infinity
+    for (let i = 0; i <= 20; i++) {
+      const t = held.duration - gestureBlendOf('touch') + (i / 20) * gestureBlendOf('touch')
+      const e = gestureEnvelope({ ...held, t })
+      expect(e).toBeLessThanOrEqual(prev + 1e-9)
+      prev = e
+    }
+  })
+
+  it('leaves every OTHER kind growing out of rest', () => {
+    for (const kind of GESTURE_KINDS) {
+      if (kind === 'touch') continue
+      const s = { ...held, kind, duration: 1.5 }
+      expect(gestureEnvelope({ ...s, t: 0 })).toBe(0)
+    }
   })
 
   it('leans the trunk into the reach, by the lean the stand is solved through', () => {
