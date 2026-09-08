@@ -297,93 +297,19 @@ put it is the mistake this line exists to stop.
   Wasserpfad, die Krug-Meshes und denselben LARGE-Bildlauf.
   Refs: PART A — src/scenes/place/bankGame.ts (THE TAP ~626, reachDistance/standOff ~223), src/config/balance.ts (bankGame reachDistance 2.2, standOff 2.6), src/render/gesture.ts (GestureKind), src/scenes/place/layout.ts (PLAY_ROCK_RADIUS). PART B — src/scenes/place/adultWork.ts (water-out/water-back ~390-410, AdultCarry, WATER_FOOT_REACH), src/scenes/place/riverBank.ts (bankWaterFoot, BANK_STAND_INSET 1.5, BANK_SHORE_HALF 1.2, walkable region through the waterline ~47-62), src/scenes/place/layout.ts (waterPath head/foot), src/render/figures.ts. Both — src/scenes/place/PlaceLife.tsx (ErrandVillagers, head/hand jar meshes ~2440-2612, HEAD_CARRY_POSE), design.md §13.4, docs/communication-poc-spec.md
   Doc impact: design.md §13.4 and docs/communication-poc-spec.md item 4: the catcher touches the rock with its hand while naming it, and the water carrier dips the jar at the waterline and carries visible water back. If a new gesture kind is added, the point-479 gesture list in the code comments / docs names it. balance.ts: fill seconds (calibratable).
-  State 08.09.2026 (branch feat/1065-teaching-hands-touch at 4c1e7b984, run
-  local/verify-logs/2026-09-08T07-33-21-708-polish.log, WebGPU, polish 237 pass / 4 fail).
-  Three of the four reds belong here and are unresolved:
-  - 'no tap is ever spoken from the waiting station' measures 58.3 cm beside the flank.
-    SUSPECTED CHECK DEFECT, not a game defect: the distance is taken over EVERY frame in which
-    the 'touch' gesture runs, and a gesture outlives its moment — a child that is tapper twice
-    in a row is still measured while it walks to the stone. The neighbouring check ('its DRAWN
-    hand rests on the stone's DRAWN flank') is green and bankGame.test.ts holds 'never from the
-    station' in the pure layer. To try: measure only during the tap hold (phase 'run' and
-    tapFor > 0), or drop the check.
-  - 'the carrier goes INTO the water and dips the jar' and 'comes back with a jar that SHOWS
-    its water' saw NO fill and no return leg in 400 samples, although the older check of the
-    same section was green in the window before; the difference is fillSeconds raised to 9 s.
-    Hypotheses in probing order: all ten adults stuck in errands that never arrive (released
-    only after errandSeconds 180); the shore leg not walkable for their run although
-    waterErrand.test.ts measures it walkable with the same margin; the 9 s fill hitting a stall
-    clock. Probe: window.__placeErrands() over 60 s, logging phase/carry per villager.
-  The fourth red ('leaving after several settlement visits stays fluid', travel-panorama-capture)
-  is older and is NOT this point's. The evidence addendum has since been recovered from its stash
-  and committed on the branch.
-  Second reading, same day, after the first two causes were fixed on the branch (commit "Send both
-  men of the water errand to ground they can stand on"):
-  - THE TAP RED is closed at its cause. It was NOT a badly written check: even measured strictly
-    inside the tap's own hold the worst reading was the same 58.3 cm. The hold was armed by the
-    RUN rather than by the WORD, so a run whose tapper could not reach its stone opened silently
-    and still froze the group — and the check measured that wordless pause. The hold is now armed
-    with the utterance.
-  - THE WATER RED is halved but open: six unthrottled runs of the errand section on a quiet
-    machine went from 5/6 red to 3/6, and the message changed completely. The carrier now reaches
-    the water; what fails is the DEPTH — "villager 8 standing on ground at -0.17 m, the jar base
-    -0.17 m, -8 cm under the water surface at -0.25 m". He stops within WORK_ARRIVE_RADIUS 1.1 m
-    of the fill spot, which on the bank slope is about 8 cm of height, so the jar never goes under
-    the drawn surface. The neighbouring check does not catch it because it only asks for
-    ground < 0. NEXT: a tight arrival for the fill leg (order of 0.3 m) instead of the shared
-    1.1 m, or a deeper fill spot (BANK_FILL_DEPTH stays under balance.bankWadeDepth/2), plus a
-    Vitest that measures the STANDING height at arrival rather than the nominal spot.
-  - UNEXPLAINED: tagShuffle.test.ts prints the dev assertion "adult-atom-lost — water-out:
-    villager 1 ran out of time with his fetch word unspoken". Phase 'fetch', i.e. after the
-    departure — a different case from the invite stall, not investigated.
-  Third reading, 08.09.2026 12:00 (branch at e77155cab, commit "Stop the fill leg at the water
-  instead of a metre above it"): the DEPTH red is closed at its cause in the code and in the
-  pure layer, and is NOT yet judged in a picture.
-  - The cause is the ARRIVAL, not the spot. The fill spot stands in the water; he stops
-    anywhere inside his arrival radius of it, and the shared 1.10 m is on the shore's own
-    slope some 18 cm of height. A nominal spot is not a standing place.
-  - Fixed: `FILL_ARRIVE_RADIUS` 0.35 for the fill leg alone, read by BOTH the walk
-    (`PlaceLife`) and the scheduler (`adultWork.arriveRadiusOf`), so a leg can never halt just
-    outside the radius that would have let it begin; `BANK_FILL_DEPTH` 0.10 → 0.20 m, which
-    leaves 12 cm of jar under the surface at the worst arrival and stays far under
-    `balance.bankWadeDepth`. Both docs already carry "ankle deep" and need no number.
-  - The pure tests now WALK the way the scene walks — halting at the arrival radius rather
-    than on the goal — and measure the standing height at arrival instead of the nominal
-    spot. Beware the boundary: stepping to exactly the radius leaves a leg outside `<=` on
-    the next float and it never arrives; take full steps and stop when inside, as PlaceLife
-    does.
-  - Unit stage measured green on the branch: 463 files, 14939 tests, 1 skipped
-    (local/verify-logs/2026-09-08T09-57-14-363-verify.log). That run's `FAIL unit` line is
-    NOT a test red: `repository-integrity` teardown saw a git worktree added by the session
-    while the suite ran. Do not add or remove a worktree during a unit run.
-  - STILL OWED: the picture on BOTH backends. The polish section is `--section=adult-errands`;
-    the previous reading needed several unthrottled runs on a quiet machine to be believed.
-  Fourth reading, 08.09.2026 14:00, WebGPU at e77155cab (run
-  local/verify-logs/2026-09-08T11-23-49-286-polish.log in the point's worktree): 241 pass, 1 fail.
-  - PART B IS IN THE PICTURE. Both water checks are green — the carrier goes into the water and
-    dips the jar below its drawn surface, and comes back with a jar that shows its water — and so
-    is "the tapping child reaches its stone at all". The depth fix holds where the pure layer
-    said it would.
-  - PART A HAS ONE RED LEFT, and it is the same number as before: "no tap is ever spoken from
-    the waiting station — the worst reading while the word was falling stood 59.1 cm off the
-    flank" (`--section=children-bank-game`). Its neighbour, which takes the BEST reading of the
-    same hand against the same flank, is green at 6 cm or less. So the hand does arrive; what
-    fails is that it is not there for the WHOLE hold.
-  - THE UTTERANCE IS ALREADY GATED ON CONTACT and the group is already frozen while the word
-    falls, both read in the code: `bankGame.ts` speaks the tap only where
-    `Math.abs(reach.gap) <= TOUCH_GAP` and arms `tapFor` in that same branch, and while
-    `tapFor > 0` in the run phase every child is driven with a null path (`stepHeld`). The
-    rock the tap measures, the rock the tapper walks to and the rock the probe measures are all
-    `otherEnd(s.from)` — checked, not assumed.
-  - HYPOTHESIS, NOT YET MEASURED: the gate is satisfied in the SIMULATION while the check reads
-    the DRAWN hand off the scene graph (`__placeTapHand` traverses the figure's `hand-left` /
-    `hand-right` meshes). If the rendered figure interpolates toward its simulated spot, the
-    drawn hand is still gliding in when the word opens and catches up during the hold — which
-    would produce exactly this pair of readings, a green best and a worst at the start of the
-    hold. PROBE FIRST: sample `__placeTapHand()` every frame across one hold and print the gap
-    against the elapsed hold, so a converging curve is told apart from a hand that never
-    arrives. If it converges, the fix is that the tapper must be settled in the DRAWN world
-    before the run opens, not only in the simulated one.
+  Readings one to four, 08.09.2026 (branch, WebGPU; the runs and their numbers are in the
+  branch's commits). They closed everything but one red, and each cause was a different kind of
+  wrong: the tap's hold was armed by the RUN rather than by the WORD, so a run whose tapper could
+  not reach its stone opened silently and still froze the group; the water carrier reached the
+  water but stopped inside the shared 1.10 m arrival radius, which on the bank's slope is 18 cm
+  of height, so his jar never went under the drawn surface (`FILL_ARRIVE_RADIUS` 0.35 for that
+  leg alone, `BANK_FILL_DEPTH` 0.10 → 0.20 m). A nominal spot is not a standing place, and the
+  pure tests now WALK the way the scene walks. PART B was then green IN THE PICTURE — the
+  carrier goes in, dips below the drawn surface and comes back with a jar that shows its water.
+  PART A kept ONE red, always the same number, and the fourth reading left a hypothesis for it:
+  the gate is satisfied in the SIMULATION while the check reads the DRAWN hand off the scene
+  graph. Two things it ruled out on the way: the check is not badly written (measured strictly
+  inside the hold it read the same), and the tap, the walk and the probe all mean the same rock.
   Fifth reading, 08.09.2026 17:30, WebGPU on the branch: THE HYPOTHESIS HELD, and the cause is
   the DRAWING, not the round. It was measured rather than argued: the scene now records the
   tapping child at the utterance itself (`__placeTapHand().opening`), and that reading was 54 cm
