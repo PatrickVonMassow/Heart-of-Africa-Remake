@@ -346,3 +346,17 @@ it with `batch-in-flight --waiting-on`. `scripts/measure-picture-cost.mjs` repor
 of 127.0 s over 15 runs, which is lower still — it appears to count PARTIAL `--section` runs, so
 refreshing the table needs that separation first. No player impact and no blockade under the
 infrastructure freeze; recorded so the next refresh of §1 does not have to re-derive it.
+
+## The play rock's binned radius is a circumscribed bound, not its surface (measured 08.09.2026)
+
+`playRockSurface.measure` keeps, per 11.25° bin, the LARGEST radius at which an edge of the
+drawn face crosses that bin, and `fillGaps` copies a neighbouring bin into an empty one. Both
+round outward, so the radius a toucher is placed against is the bin's circumscribed bound rather
+than the face inside it. GPT-6 Astra rated it P1 in the `d35e890` round of work-order 1065.
+Measured against the shipped `PROFILE_BINS = 32` on a 1.2 m play rock the worst case is under
+5.8 mm — an order under the few-centimetre tolerance the tap is judged at (`TOUCH_GAP` 3 cm,
+the browser check 6 cm), and it errs toward AIR rather than through the stone, so the hand
+never disappears into the rock. The exact fix, when the file is open anyway: keep the minimum
+radius over the bin's own edge samples instead of the maximum, and interpolate an empty bin
+between its two neighbours rather than copying one. No player impact and no blockade, so it is
+filed here under the CLAUDE.md §2 intake rule instead of becoming a point.
