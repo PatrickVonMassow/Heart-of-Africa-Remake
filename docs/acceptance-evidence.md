@@ -302,9 +302,10 @@ polish.mjs` section `chief-to-drummer` proves he is SEEN walking — part of the
 path behind him, part still in front — and then standing abreast of the drummer
 where the scene really drew him; `scripts/verify/collision.mjs` that his door
 answers its use key from a collision-free standpoint, with the reset to his hut
-checked before the press; and `scripts/verify/flow.mjs` photographs the pair
-from the front in `04-chief-outside-his-hut` and
-`151-chief-beside-his-drummer.png`.
+checked before the press; `scripts/verify/flow.mjs` photographs the pair from
+the front in `04-chief-outside-his-hut.png`; and the same `polish.mjs` section
+photographs them again in `151-chief-beside-his-drummer.png`, with the drums
+still speaking at the shutter.
 
 THE ERRAND'S END (docs/communication-poc-spec.md, point 487). Understood, the
 message sends the traveller out of the village: in the BIRD'S-EYE view, up the
