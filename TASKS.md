@@ -250,9 +250,27 @@ put it is the mistake this line exists to stop.
     waterErrand.test.ts measures it walkable with the same margin; the 9 s fill hitting a stall
     clock. Probe: window.__placeErrands() over 60 s, logging phase/carry per villager.
   The fourth red ('leaving after several settlement visits stays fluid', travel-panorama-capture)
-  is older and is NOT this point's. The finished evidence addendum for docs/acceptance-evidence.md
-  (the four new check files and four frames under criterion 7) is parked in the stash
-  "hoa-b7: in-flight 1065 evidence parked for main bookkeeping 08.09.2026" and belongs on this branch.
+  is older and is NOT this point's. The evidence addendum has since been recovered from its stash
+  and committed on the branch.
+  Second reading, same day, after the first two causes were fixed on the branch (commit "Send both
+  men of the water errand to ground they can stand on"):
+  - THE TAP RED is closed at its cause. It was NOT a badly written check: even measured strictly
+    inside the tap's own hold the worst reading was the same 58.3 cm. The hold was armed by the
+    RUN rather than by the WORD, so a run whose tapper could not reach its stone opened silently
+    and still froze the group — and the check measured that wordless pause. The hold is now armed
+    with the utterance.
+  - THE WATER RED is halved but open: six unthrottled runs of the errand section on a quiet
+    machine went from 5/6 red to 3/6, and the message changed completely. The carrier now reaches
+    the water; what fails is the DEPTH — "villager 8 standing on ground at -0.17 m, the jar base
+    -0.17 m, -8 cm under the water surface at -0.25 m". He stops within WORK_ARRIVE_RADIUS 1.1 m
+    of the fill spot, which on the bank slope is about 8 cm of height, so the jar never goes under
+    the drawn surface. The neighbouring check does not catch it because it only asks for
+    ground < 0. NEXT: a tight arrival for the fill leg (order of 0.3 m) instead of the shared
+    1.1 m, or a deeper fill spot (BANK_FILL_DEPTH stays under balance.bankWadeDepth/2), plus a
+    Vitest that measures the STANDING height at arrival rather than the nominal spot.
+  - UNEXPLAINED: tagShuffle.test.ts prints the dev assertion "adult-atom-lost — water-out:
+    villager 1 ran out of time with his fetch word unspoken". Phase 'fetch', i.e. after the
+    departure — a different case from the invite stall, not investigated.
   Bundle: Dorfleben.
 
 - [ ] 1072. The village speaks with a direction, and the children sound like children (user
