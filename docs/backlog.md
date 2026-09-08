@@ -280,3 +280,40 @@ Gemessen 07.09.2026 19:20 auf Nachfrage des Nutzers ('Bisher konntest du doch im
   where the step is irreversible (landing, merge, push, tag). Not built: the user asked for an
   answer only (07.09.2026, 21:59). Not a work-order point under the CLAUDE.md §2 intake rule — no
   player impact, no risk, no blockade, and it adds rather than deletes.
+
+## A verification frame passed with nothing drawn in it (measured 08.09.2026)
+
+The 07.09.2026 22:21 picture run refreshed `verification/52-collision-port-wall.png` and drew it
+BLACK: the HUD over an empty screen, 23 KB against 644 KB, with no scene at all. The collision
+suite reported `PASS 40 pass, 0 fail` over it, so the shutter's subject declaration accepted a
+frame in which nothing had been rendered — the check that is supposed to refuse a mis-aimed frame
+cannot see an unrendered one. The frame was restored from `main` before the 1070 branch landed, so
+nothing black is in the repository; the cause is unfixed and unexplained. Two questions are open:
+why that ONE frame came out black while every other frame of the same run drew, and what a subject
+declaration has to say about the rendered pixels for an empty picture to be refused. No player
+impact and no blockade — the restore was one command — so it is recorded here rather than made a
+point, in the class point 514 §5 already describes for black frames on this lane.
+
+## The polish suite's recorded cost is a quarter of what it measures (measured 08.09.2026)
+
+`run-wait.mjs --await` announces `expected 5m 41s` for the `polish` suite and declares the wait
+HUNG at 2.5x that. Measured on this host the same day: 27m 17s, 32m 18s and 24m 41s for three
+separate green runs. The consequence is not cosmetic — an honest blocking wait on a healthy run is
+told it is a standstill and advised to "end the run rather than waiting again", which is exactly
+the wrong move, and the batch emergency lane records the wait as hung. Related, and with the same
+root: `batch-in-flight.mjs` refuses to record a waiting position for such a run, because the suite
+writes its log only when a suite finishes, so the evidence check reads the log as "silent for 24
+min" while the run is demonstrably writing a frame every three minutes. No player impact; the fix
+is a re-measurement of the cost table, not a mechanism.
+
+## The flow suite's chief frame may claim a pairing its village does not show (measured 08.09.2026)
+
+`verification/04-chief-outside-his-hut.png` is declared "the chief standing beside his drummer,
+both seen from the front" (`scripts/verify/flow.mjs`), and the version the 07.09.2026 22:21 run drew
+shows the chief half BEHIND a second figure carrying a pole, with the drums several metres to their
+left beside a third man. The geometry point 1070 really proves — one stride beside the drummer,
+abreast, same bearing — is measured by `polish.mjs` in the BAMBARA village, while flow photographs
+the NUBIAN one, where nothing checks the pairing before the shutter. Either the label overclaims
+for that village or the walk lands him elsewhere there. The freshly drawn frame was not committed
+and the older one was not re-judged, so this is a question, not a measured defect: no player impact,
+and the mechanism itself is proven where it is checked.
