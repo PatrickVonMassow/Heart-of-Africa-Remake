@@ -402,7 +402,14 @@ export const LIMITS = {
   // 594 -> 601 with zero slack.
   // 08.09.2026: the aged-expectation pitfall adds one line net after the three compressions
   // above: 601 -> 602.
-  maxLines: 602,
+  // 08.09.2026 (second): the rule filed under the wrong heading. The same mistake was written
+  // down three times that day — a retrospective paragraph, a pitfall in this guide and a
+  // measured memory rule — and none of the three fired, because each sat under its TOPIC while
+  // the contradicting demand arrived in the wording of another guard. No existing entry carries
+  // it: the neighbours are about two checks that contradict each other and about an instruction
+  // that voids its own precondition, neither about WHERE a rule has to stand to be read at all.
+  // Its own entry costs +9 lines / +106 words. Ceilings move 602 -> 611 with zero slack.
+  maxLines: 611,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -636,7 +643,9 @@ export const LIMITS = {
   // and SHORTEN-BEFORE-RAISE was applied to three neighbouring entries — the growing-obligation,
   // contradicting-checks and self-cancelling-instruction pitfalls gave back 62 between them
   // without dropping a claim (the clause the test pins by name is untouched): 5679 -> 5669.
-  maxWords: 5669,
+  // 08.09.2026 (fourth): the wrong-heading pitfall justified beside maxLines measures 106 words:
+  // 5669 -> 5775.
+  maxWords: 5775,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,
