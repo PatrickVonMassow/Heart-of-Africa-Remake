@@ -1446,7 +1446,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Dienstag, 08.09.2026, 23:41 · Quellen-Fingerprint: `66e4da77b4e2…`
+Zuletzt aktualisiert: Mittwoch, 09.09.2026, 00:48 · Quellen-Fingerprint: `2f0fcd97832a…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1551,8 +1551,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 95 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 126 Prozess-/Meta-TASKS-Punkte (davon 60 offen).
 
-<!-- RETRO-FINGERPRINT: 66e4da77b4e253c13ff72ffb0dec8b7c5723aa50df402e1ba7ef25ce86b17212 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-08T21:41:54.643Z -->
+<!-- RETRO-FINGERPRINT: 2f0fcd97832aada410e9c6b3fc35a13c52d47a0e8dd7a58f6d6933c083740ff9 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-08T22:48:56.124Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -6183,3 +6183,32 @@ sie gerichtet wurde.
 **Lehre:** Eine Restlaufzeit wird aus der Quittung gelesen oder gar nicht genannt. Und solange
 noch offen ist, worauf sich eine Aussage stützt, gehört der Satz nicht in die Antwort — die
 Zahl, die man nicht belegen kann, ist auch die, die der Nutzer als Erster prüft.
+### 3.251 Ein fremdes Sicherheitsgutachten legte das ganze Repository still
+
+In der Nacht auf den 09.09.2026 fand die Sitzung neun geänderte Dateien unverbucht im Baum: Die
+Vorgängerin hatte gearbeitet und nichts landen können. Der Grund war kein Fehler von uns. Über
+Nacht war ein Gutachten zu einer Bildbibliothek erschienen, das jede `sharp`-Version unter 0.35.4
+betraf, und unser Push-Tor prüft die Abhängigkeiten vor jedem Push. Von diesem Moment an ging
+nichts mehr hinaus — nicht der Code, nicht die Tafel, nicht die Sitzungsgrenze. Am Tag davor hatte
+dieselbe Klasse schon einmal zugeschlagen, mit einem Gutachten zum Testwerkzeug, dessen einziger
+angebotener Fix ein Hauptversionssprung unter 14868 Tests ist.
+
+Das Tor hat richtig gehandelt; die Klasse ist trotzdem eigen, weil sie drei Eigenschaften
+zusammenbringt, die keine unserer anderen Sperren hat. Sie kommt von außen und ohne unser Zutun —
+niemand hat etwas geändert, das sie ausgelöst hätte. Sie trifft ALLE Wege gleichzeitig, auch die,
+die sonst immer offenstehen: Gerade die Buchhaltung, mit der eine Sitzung ihre Arbeit sichert und
+übergibt, hängt am selben Push. Und ihr Heilmittel ist nicht immer klein: `npm audit` meldete „kein
+Fix verfügbar", weil zwei Kopien derselben Bibliothek im Baum lagen und die zweite tief unter einer
+Laufzeitabhängigkeit hing — erst eine Vereinheitlichung auf eine Version für den ganzen Baum machte
+das Tor wieder grün. Beim Testwerkzeug reichte das nicht, dort blieb nur die begründete Ausnahme
+plus ein eigener Punkt für die Entscheidung.
+
+Der eigentliche Schaden lag nicht im Gutachten, sondern darin, dass eine Sitzung an dieser Sperre
+STILL starb: Sie hatte ihre Arbeit fertig, konnte sie aber weder pushen noch ihre Übergabe
+schreiben, und was sie herausgefunden hatte, lag danach nur noch als Arbeitsbaum da.
+
+**Lehre:** Eine Sperre, die auch die Buchhaltung trifft, ist die erste Arbeit der nächsten Sitzung,
+nicht eine Randnotiz — und wer sie räumt, prüft zuerst, ob das Werkzeug „kein Fix verfügbar" sagt,
+weil es keinen gibt, oder weil eine zweite, tiefer liegende Kopie den Weg versperrt. Wo der Fix
+wirklich groß ist, ist die begründete Ausnahme mit eigenem Punkt richtig; sie darf nur nie
+unbefristet stehenbleiben.
