@@ -14769,6 +14769,24 @@ to land than a mechanism that needs a review.
     into the active host `.devcontainer` — preserving its host-only `CLAUDE.md` and hooks —
     and the container is REBUILT from it. A reload or `docker update` cannot install an
     entrypoint.
+  - The rebuild RESTORES what only the running container has. Measured 08.09.2026 from
+    `/var/log/apt/history.log` and `dpkg -l`: after the running image was built (04.08.2026
+    12:56) the GPU stack was installed BY HAND — `bookworm-backports` as a source, Mesa
+    25.0.7-2~bpo12+1 (`mesa-vulkan-drivers`, `libgl1-mesa-dri`, `libglx-mesa0`, `libegl-mesa0`,
+    `mesa-libgallium`) plus `libgl1` and `mesa-utils` — and on 03.09.2026 `@openai/codex`
+    0.153.0 globally. NONE of it is in the `Dockerfile`, which builds only bookworm Mesa 22.3.6
+    and no libGL/libEGL. A rebuild therefore starts the container WITHOUT the GPU stack (WebGL 2
+    falls back to SwiftShader, WebGPU finds no adapter — exactly the state of point 493) and
+    without the Astra lane. The restore path already exists as `scripts/verify-host-setup.sh`
+    (it writes `backports.list`, installs the backport packages, and `--check` reports "nothing
+    missing" today) but is named in neither `docs/wsl-vm-recovery.md` nor
+    `scripts/windows/README.txt` nor `container-entrypoint.sh`; for the Codex CLI no script
+    exists at all. So the deployment sequence gains two steps AFTER the rebuild —
+    `sudo bash scripts/verify-host-setup.sh` with picture proof from
+    `node scripts/verify/backend-lane-check.mjs`, and `npm install -g @openai/codex` (the
+    shipped `init-firewall.sh` allowlist already knows the OpenAI addresses; the active host
+    copy does not) — and both are written into `docs/wsl-vm-recovery.md` so the next rebuild
+    cannot lose them again.
   - The no-editor drill of `docs/wsl-vm-recovery.md` runs as written: `docker stop` then
     `docker start` from a Windows terminal with every VS Code window closed, and
     `batch-launcher.mjs --status` reaches `ready` or `running` with a live pid and a fresh
