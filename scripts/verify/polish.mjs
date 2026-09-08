@@ -4565,7 +4565,22 @@ if (section('children-bank-game')) {
     let opening = null
     let inHold = false
     let heldToTheEnd = false
+    let tapAimed = false
+    let tapShot = false
     const holdTrace = []
+    /** A spectator's stance in the lane, four metres off and level with the
+     *  contact, so a hand and a stone read as two things. */
+    const aimAtTap = async (hand) =>
+      !!(await page.evaluate((h) => {
+        const p = window.__placePlayer
+        if (!p) return null
+        const bearing = Math.atan2(h.x - h.rock.x, h.z - h.rock.z)
+        p.x = h.rock.x + Math.sin(bearing + 0.9) * 4.2
+        p.z = h.rock.z + Math.cos(bearing + 0.9) * 4.2
+        p.yaw = Math.atan2(-(h.x - p.x), -(h.z - p.z))
+        p.pitch = -0.1
+        return { x: p.x, z: p.z }
+      }, hand))
     for (let i = 0; i < 400; i++) {
       const now = await page.evaluate(() => (window.__placeTapHand ? window.__placeTapHand() : null))
       if (now) {
@@ -4604,6 +4619,27 @@ if (section('children-bank-game')) {
         if (holding && (!stationTap || Math.abs(now.gap) > Math.abs(stationTap.gap))) stationTap = now
         if (now.gesture === 'touch' && !holding && (!looseTouch || Math.abs(now.gap) > Math.abs(looseTouch.gap))) {
           looseTouch = now
+        }
+        // THE SHUTTER FALLS INSIDE THE HOLD, NOT AFTER IT (work-order 1065).
+        // The picture used to be taken once the sampling loop had run THROUGH
+        // the hold — so the frame declared "its hand on the drawn flank while it
+        // names ROCK" and contained a child standing two metres off the stone
+        // with its arm at its side, which is the very defect this section
+        // exists to catch (08.09.2026). Aiming costs one frame, so the camera is
+        // placed on the first good holding reading and the shutter falls on the
+        // next one, both still inside the hold.
+        if (holding && !tapShot && Math.abs(now.gap) <= 0.06) {
+          if (!tapAimed) {
+            tapAimed = await aimAtTap(now)
+          } else {
+            await frame('1065-tapping-child-at-its-rock', {
+              local: { x: now.x, y: now.y, z: now.z },
+              label:
+                `the tapping child at its rock: its hand on the drawn flank of the stone ` +
+                `(${(now.gap * 100).toFixed(1)} cm gap at ${now.y.toFixed(2)} m) while it names ROCK`,
+            })
+            tapShot = true
+          }
         }
       }
       // ONE READING OF A HOLD IS A COIN TOSS. The loop used to stop at its first
@@ -4695,28 +4731,18 @@ if (section('children-bank-game')) {
           : 'unmeasured',
       )
 
-      // The picture: the child at the stone, from a spectator's stance in the
-      // lane, close enough that a hand and a stone are two things.
-      const at = await page.evaluate((hand) => {
-        const p = window.__placePlayer
-        if (!p) return null
-        // Four metres off, on the lane side, level with the contact.
-        const bearing = Math.atan2(hand.x - hand.rock.x, hand.z - hand.rock.z)
-        p.x = hand.rock.x + Math.sin(bearing + 0.9) * 4.2
-        p.z = hand.rock.z + Math.cos(bearing + 0.9) * 4.2
-        p.yaw = Math.atan2(-(hand.x - p.x), -(hand.z - p.z))
-        p.pitch = -0.1
-        return { x: p.x, z: p.z }
-      }, bestTouch)
-      if (at) {
-        await nextFrames(4)
-        await frame('1065-tapping-child-at-its-rock', {
-          local: { x: bestTouch.x, y: bestTouch.y, z: bestTouch.z },
-          label:
-            `the tapping child at its rock: its hand on the drawn flank of the stone ` +
-            `(${(bestTouch.gap * 100).toFixed(1)} cm gap at ${bestTouch.y.toFixed(2)} m) while it names ROCK`,
-        })
-      }
+      // THE PICTURE IS TAKEN ABOVE, INSIDE THE HOLD. What is left here is the
+      // honest report when no hold ever offered one — a silent missing frame
+      // would read as a suite that stopped short, and a frame taken now would
+      // claim a contact the scene is no longer showing.
+      check(
+        'and the contact was PHOTOGRAPHED while it was happening',
+        tapShot,
+        tapShot
+          ? 'the shutter fell inside the hold, on a reading within tolerance'
+          : `no hold offered a frame to shoot (aimed: ${tapAimed}) — the picture would have ` +
+            'been taken after the hand had already left the stone',
+      )
     }
   }
 
