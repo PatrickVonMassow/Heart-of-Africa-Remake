@@ -27002,3 +27002,40 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Nutzer, 13.08.2026 23:32: »Lasse nochmal Sol prüfen, dass nicht noch irgendwo Reste der Spezifikation der bisher geplanten Kommunikationsmechanik stehen.«
   Refs: docs/communication-poc-spec.md, design.md 13.4, CLAUDE.md 7.1 criteria 6 and 7, docs/acceptance-criteria-detail.md 6 and 7, docs/acceptance-evidence.md 7
   Bundle: Dorfleben.
+
+- [x] 1070. The chief comes out to his drummer and speaks through the drums from there (user 07.09.2026).
+  Today SPACE at the chief's hut first shows the stale "Vamue Murmurs …" text (with the 1985
+  original's "Oink Oink" wording and a reference to the Hausa villages), and only a second SPACE
+  starts the communication mechanic, while the player still stands at the hut and misses the
+  start of the drum message. Final state:
+  - Using the hut shows one text (en/de together): the chief comes out and walks to his drummer
+    to speak with the traveller in his mysterious way through drum signs. The chief visibly
+    walks out and takes a standing spot beside the drummer, placed so the player can stand in
+    front of both and see chief and drummer from the front.
+  - Once he has arrived, SPACE at the drummer or at the chief starts the drum message; result
+    and own interpretation work as today. The chief then stays a calibratable minute
+    (`src/config/balance.ts`); during it SPACE at the drummer or the chief repeats the drum
+    message, and the prompt shows that option while the player stands there. Using the hut
+    while the chief is outside does nothing.
+  - After the minute the chief walks back to his hut. On the way SPACE at him or at the drummer
+    calls him back: he returns to the drummer and, once arrived, the drum message plays again
+    without a further trigger. Back in his hut, SPACE at the hut starts the whole process again.
+    Leaving the village and returning always finds the chief in his hut.
+  - SPACE at the drummer while the chief is in his hut: the drummer points to the chief's hut
+    and speaks a new word CHIEF, treated like every other word of the language (BA-ba sounds,
+    interpretation option, and so on; docs/communication-poc-spec.md).
+  - The old "Vamue Murmurs" text is removed from both language files.
+  Test: Vitest — the chief state machine (in hut, walking out, at drummer, walking back), the
+  repeat and call-back transitions, the hut use being inert while he is outside, the reset on
+  leaving the village, and the CHIEF word in en/de parity. Browser (WebGPU lane): use the hut,
+  prove the chief standing beside the drummer, trigger the message at the drummer, screenshot
+  of chief and drummer from the front with the message.
+  Constraints: no dialog, no new HUD panel beyond the prompt option; the drum message itself
+  stays as it is.
+  Quote: Nutzer, 07.09.2026 13:32 — "Kommunikationslogik - Änderung am Häuptlings-Verhalten"
+  (full wording in the chat log of that turn).
+  Refs: src/scenes/place/chiefMeeting.ts, src/scenes/place/chiefPresence.ts,
+  src/scenes/place/PlaceScene.tsx, src/ui/DrumMessage.tsx, src/i18n/en.ts, src/i18n/de.ts,
+  src/config/balance.ts, docs/communication-poc-spec.md, design.md §13.4
+  Doc impact: docs/communication-poc-spec.md (chief comes out to the drummer, CHIEF word), design.md §13.4.
+  Bundle: Kommunikation.
