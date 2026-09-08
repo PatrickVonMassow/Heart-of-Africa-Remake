@@ -547,6 +547,13 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Eine Entscheidung, die du selbst triffst, nennt die **Messung**, die sie stützen
   oder widerlegen würde, und **verfällt**, sobald diese Messung sauber vorliegt."
 
+- **Das Werkzeug zerreißt seinen eigenen Prüflauf.** Warten ist teuer, also füllt es die
+  Wartezeit — und wechselt dabei den Zweig, legt einen Arbeitsbaum an oder committet. Der Lauf
+  meldet Rot, obwohl jeder einzelne Test grün war, und du suchst den Fehler im Code.
+  → *Prompt:* „Solange eine Prüfung läuft, ist das Projekt **fremdes Gebiet**: Vorarbeit dieser
+  Zeit ist **Lesearbeit**, keine Repository-Operation. Und bevor du ein Rot untersuchst, sag mir
+  **wer den roten Zustand erzeugt hat** — der Code oder der Lauf selbst."
+
 ---
 
 ## Drei Meta-Regeln, die alles zusammenhalten
@@ -585,4 +592,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: cbf58433c5ed1950d2ae7473eb8dd250b18f75be3ecc1af81dad3b94a4010724 -->
+<!-- GUIDE-FINGERPRINT: d29ef1f776b79c0a22fa2bff3e5fe89a7a3f988c0c0dbc5f649dacfbed4111c5 -->
