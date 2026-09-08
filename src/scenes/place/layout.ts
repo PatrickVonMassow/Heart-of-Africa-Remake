@@ -158,19 +158,42 @@ export interface PlaceLayout {
 }
 
 /**
- * The play rocks' footprint, in metres — ~2.4 m across, the size the stage was
- * measured at in work-order 687, against the 0.3-1.0 scale of the scattered
- * rock dressing. It is the collider radius AND the drawn block's half-width,
- * because the two are one object (points 129/378).
+ * The play rocks' DRAWN footprint, in metres — ~2.4 m across, the size the stage
+ * was measured at in work-order 687, against the 0.3-1.0 scale of the scattered
+ * rock dressing. It is the widest ring of the drawn mesh, and it sits at about
+ * two thirds of the stone's height.
  */
-export const PLAY_ROCK_RADIUS = 1.2
+export const PLAY_ROCK_SPAN = 1.2
 
 /**
  * The instance scale that gives `buildPlayRock` that footprint. Its detail-1
  * mesh uses the same native footprint as the upstream erratic but lies on a
- * broad base; the collider remains derived from the drawn radius.
+ * broad base.
  */
-export const PLAY_ROCK_SCALE = PLAY_ROCK_RADIUS / ROCK_FOOTPRINT_UNITS
+export const PLAY_ROCK_SCALE = PLAY_ROCK_SPAN / ROCK_FOOTPRINT_UNITS
+
+/**
+ * The play rocks' COLLIDER, in metres — and NOT the same number as the span
+ * above, which is what work-order 1065 found.
+ *
+ * A boulder is not a cylinder. This one is narrow at the foot, widest at about
+ * two thirds of its 1.4 m height, and tapering again to the crown, so a ring
+ * drawn at its widest point stands well outside the stone everywhere a body
+ * actually is: at a child's hand height the drawn flank is some 1.07 m out, not
+ * 1.20 m. Held behind `span + walker radius = 1.5 m`, a child could not reach
+ * the stone it names however far it leaned — its whole arm is 0.24 m — and the
+ * tap of the bank game was therefore spoken a metre from its own object, which
+ * is the defect the user reported on 06.09.2026.
+ *
+ * So the collider is what the rock OCCUPIES WHERE FIGURES ARE: the largest sum
+ * of the drawn flank and the figure body carried at that height, over the whole
+ * height of an adult, less the walker footprint the colliders are tested with.
+ * Measured over both rock seeds it is 1.343 m of clearance, i.e. 1.04 m of
+ * collider; 1.05 is that rounded up. `bankStage.test.ts` MEASURES it against
+ * the mesh rather than restating it, so a rock rebuilt wider fails there instead
+ * of quietly letting a figure into the stone.
+ */
+export const PLAY_ROCK_RADIUS = 1.05
 
 /**
  * Radius of a patch of ground work (work-order point 483), in metres: the pit

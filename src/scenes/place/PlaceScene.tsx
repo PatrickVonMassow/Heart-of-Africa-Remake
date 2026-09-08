@@ -132,6 +132,7 @@ import {
   fleckPosition,
 } from '../../render/placeRiver'
 import { RIVER_DRIFT_SPEED } from '../../render/waterAppearance'
+import { PLAY_ROCK_SEEDS, playRockYaw } from './playRockSurface'
 import { bankGroundHeight, bankPlayRocksView, type PlaceRiverBank } from './riverBank'
 import { scatterGrassTufts } from './groundScatter'
 import { clearEdgeBand, setEdgeBandBoundary, setEdgeBandLook } from '../../render/edgeBand'
@@ -1437,17 +1438,19 @@ function GroundScatter({
  * one object (points 129/378).
  */
 function PlayRocks({ rocks }: { rocks: PlaceLayout['playRocks'] }) {
-  const geos = useMemo(() => [buildPlayRock(0x504c4159), buildPlayRock(0x524f434b)], [])
+  const geos = useMemo(() => PLAY_ROCK_SEEDS.map((seed) => buildPlayRock(seed)), [])
   if (!rocks) return null
   return (
     <>
-      {/* Yaw varies the silhouette while preserving the mesh's broad base. */}
+      {/* Yaw varies the silhouette while preserving the mesh's broad base. Seed
+          and yaw come from `playRockSurface`, which is where the children's
+          round measures the flank it reaches for: one rock, not two. */}
       {[rocks.upstream, rocks.downstream].map((p, i) => (
         <mesh
           key={i}
           geometry={geos[i]}
           position={[p.x, 0, p.z]}
-          rotation={[0, p.x * 1.7 + p.z, 0]}
+          rotation={[0, playRockYaw(p), 0]}
           scale={rocks.scale}
           castShadow
           receiveShadow
