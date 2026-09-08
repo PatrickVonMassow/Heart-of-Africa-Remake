@@ -350,7 +350,11 @@ export interface BankState {
    *  the hearing gap is omitted, never carried into a later moment. */
   pending: BankUtterance[]
   sinceSaid: number
-  /** Seconds left of the visible tap hold at the start of a run. */
+  /** Seconds left of the visible tap hold at the start of a run — running ONLY
+   *  while a tap was actually spoken. A run that opens silently, because the
+   *  tapper could not reach its stone, holds nobody: freezing the group for a
+   *  word that never falls is a pause the player cannot read, and it made the
+   *  hold useless as the window in which the tap is measured (08.09.2026). */
   tapFor: number
   /** Seconds left before the caught children rise at the end of a cycle. */
   endFor: number
@@ -687,7 +691,9 @@ function openRun(s: BankState, stage: BankStage, cfg: BankConfig): void {
   const to = otherEnd(s.from)
   s.phase = 'run'
   s.phaseFor = cfg.runSeconds
-  s.tapFor = cfg.tapPauseSeconds
+  // The hold belongs to the WORD, and the word is offered further down only if
+  // the hand reaches the stone — so it is armed there, not here.
+  s.tapFor = 0
   s.arrivalSpoken = false
   // The stations are behind them: no run, roam or parting walk follows a route.
   for (const c of s.children) clearPath(c)
@@ -732,6 +738,8 @@ function openRun(s: BankState, stage: BankStage, cfg: BankConfig): void {
     // child looking anywhere else would lay its hand somewhere else.
     c.heading = Math.atan2(rock.x - c.x, rock.z - c.z)
     c.facing = c.heading
+    // The group stands still for exactly as long as the hand is on the stone.
+    s.tapFor = cfg.tapPauseSeconds
     say(s, {
       concept: 'ROCK',
       moment: 'tap',

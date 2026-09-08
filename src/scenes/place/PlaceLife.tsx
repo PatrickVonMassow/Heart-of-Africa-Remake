@@ -1062,6 +1062,10 @@ function Kids({
             ...best,
             tapper: i,
             phase: bank.phase,
+            // The tap's own HOLD, so a reading can be told apart from one taken
+            // after it: the word falls while `tapFor` is still running in the
+            // run phase, and the touch gesture outlives that moment by design.
+            tapFor: bank.tapFor,
             end,
             rock: { x: rock.x, z: rock.z },
             gesture: gestures.current[i]?.current?.kind ?? null,
@@ -2695,7 +2699,20 @@ function ErrandVillagers({
           handJar: jar(handJars.current[i]),
           headJar: jar(headJars.current[i]),
           work: task
-            ? { situation: task.situation, phase: task.phase, x: task.x, z: task.z, arrived: task.arrived }
+            ? {
+                situation: task.situation,
+                phase: task.phase,
+                x: task.x,
+                z: task.z,
+                arrived: task.arrived,
+                // WHY AN ERRAND STANDS STILL. A word owed to a listener is held
+                // back while a child is within earshot, and the pair waits in
+                // `invite` until it may be spoken or the errand expires — so a
+                // check that saw no fill can say whether nothing was cast or
+                // everything was hushed (08.09.2026).
+                hushed: !!task.hushed,
+                age: task.age,
+              }
             : null,
         }
       }),

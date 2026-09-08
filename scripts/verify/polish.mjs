@@ -4558,15 +4558,23 @@ if (section('children-bank-game')) {
     let bestTouch = null
     let sawTouchPose = false
     let stationTap = null
+    let looseTouch = null
     for (let i = 0; i < 400; i++) {
       const now = await page.evaluate(() => (window.__placeTapHand ? window.__placeTapHand() : null))
       if (now) {
         if (now.gesture === 'touch') sawTouchPose = true
         if (!bestTouch || Math.abs(now.gap) < Math.abs(bestTouch.gap)) bestTouch = now
-        // ...and the WORST reading while the round is holding at the stations,
-        // which is where the old defect lived: a hand out at the waiting station.
-        if (now.gesture === 'touch' && (!stationTap || Math.abs(now.gap) > Math.abs(stationTap.gap))) {
-          stationTap = now
+        // ...and the WORST reading WHILE THE WORD IS FALLING, which is where the
+        // old defect lived: a hand out at the waiting station as ROCK is spoken.
+        // The window is the tap's own hold (`tapFor` running in the run phase),
+        // NOT the touch gesture: the gesture outlives the moment it belongs to,
+        // so a child that is tapper twice in a row is still flagged 'touch' while
+        // it walks to the stone for the next round, and measuring that walk
+        // measures a gait rather than an utterance (08.09.2026, 58.3 cm).
+        const holding = now.phase === 'run' && now.tapFor > 0
+        if (holding && (!stationTap || Math.abs(now.gap) > Math.abs(stationTap.gap))) stationTap = now
+        if (now.gesture === 'touch' && !holding && (!looseTouch || Math.abs(now.gap) > Math.abs(looseTouch.gap))) {
+          looseTouch = now
         }
       }
       if (bestTouch && Math.abs(bestTouch.gap) <= 0.06 && sawTouchPose) break
@@ -4597,7 +4605,12 @@ if (section('children-bank-game')) {
         check(
           'and no tap is ever spoken from the waiting station',
           Math.abs(stationTap.gap) <= 0.06,
-          `the worst touch measured stood ${(stationTap.gap * 100).toFixed(1)} cm off the flank`,
+          `the worst reading while the word was falling stood ${(stationTap.gap * 100).toFixed(1)} cm ` +
+            `off the flank` +
+            (looseTouch
+              ? `; outside the hold the touch pose ran on as far as ${(looseTouch.gap * 100).toFixed(1)} cm ` +
+                `in phase ${looseTouch.phase}, which is the walk to the next round rather than a tap`
+              : ''),
         )
       }
 
@@ -4879,11 +4892,33 @@ if (section('adult-errands')) {
     let dipped = null
     let carried = null
     let ordered = null
+    // WHAT THE WINDOW SAW, so a red names its cause instead of only its absence
+    // (08.09.2026: "no carrier was ever seen filling a jar" was read three ways
+    // — nothing cast, the word held for a child, the walk never arriving — and
+    // the message could settle none of them). Kept for the water legs only.
+    const witnessed = new Map()
+    let hushedSamples = 0
+    let oldest = 0
+    let nearestGoal = null
+    const stagedBefore = await page.evaluate(() => window.__placeErrands().staged['water-out'] ?? 0)
     for (let i = 0; i < 400; i++) {
       const now = await page.evaluate(() => window.__placeErrands())
       for (let k = 0; k < now.villagers.length; k++) {
         const v = now.villagers[k]
         if (!v.work) continue
+        if (v.work.situation === 'water-out' || v.work.situation === 'water-back') {
+          const key = `${v.work.situation}/${v.work.phase}`
+          witnessed.set(key, (witnessed.get(key) ?? 0) + 1)
+          if (v.work.hushed) hushedSamples++
+          if (v.work.age > oldest) oldest = v.work.age
+          // ...and HOW NEAR HE EVER GOT to where his errand sends him: a leg
+          // that never arrives leaves the whole errand standing in `invite`,
+          // and the distance says whether he is walking or wedged.
+          if (!v.work.arrived) {
+            const d = Math.hypot(v.x - v.work.x, v.z - v.work.z)
+            if (nearestGoal === null || d < nearestGoal) nearestGoal = d
+          }
+        }
         // THE DIP: the jar in his hand, below the drawn water surface, at the
         // waterline he is standing in.
         if (v.work.phase === 'fill' && v.handJar && v.waterSurface != null) {
@@ -4900,6 +4935,13 @@ if (section('adult-errands')) {
       if (dipped && carried) break
       await nextFrames(2)
     }
+    const stagedAfter = await page.evaluate(() => window.__placeErrands().staged['water-out'] ?? 0)
+    const witness =
+      `${stagedAfter - stagedBefore} errand(s) cast in the window, phases ` +
+      `[${[...witnessed].map(([p, n]) => `${p}×${n}`).join(' ') || 'none'}], ` +
+      `${hushedSamples} sample(s) with the word held back for a child, oldest errand ${oldest.toFixed(0)}s, ` +
+      `closest a walking leg came to its own goal ` +
+      `${nearestGoal === null ? 'n/a' : `${nearestGoal.toFixed(2)} m (it arrives at 1.10 m)`}`
     check(
       'the carrier goes INTO the water and dips the jar below its drawn surface (work-order 1065)',
       !!dipped && dipped.under > 0,
@@ -4907,7 +4949,7 @@ if (section('adult-errands')) {
         ? `villager ${dipped.who} standing on ground at ${dipped.ground.toFixed(2)} m, the jar base ` +
             `${dipped.handJar.base.toFixed(2)} m — ${(dipped.under * 100).toFixed(0)} cm under the water surface ` +
             `at ${dipped.waterSurface.toFixed(2)} m`
-        : 'no carrier was ever seen filling a jar',
+        : `no carrier was ever seen filling a jar — ${witness}`,
     )
     if (dipped) {
       check(
@@ -4943,7 +4985,7 @@ if (section('adult-errands')) {
       carried
         ? `villager ${carried.who} carrying the full jar on his head, its water surface at ` +
             `${carried.headJar.surface.toFixed(2)} m, a shade under the rim at ${carried.headJar.rim.toFixed(2)} m`
-        : 'nobody was ever seen carrying water back',
+        : `nobody was ever seen carrying water back — ${witness}`,
     )
     if (carried) {
       const shot = await page.evaluate((v) => {

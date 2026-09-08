@@ -7,18 +7,44 @@
 // in the village — and the pose that dips the jar.
 
 import { describe, expect, it } from 'vitest'
-import { buildLayout, VILLAGE_FIRE, VILLAGE_WATER_STAND, WATER_STAND_RADIUS } from './layout'
+import { buildLayout, VILLAGE_FIRE, VILLAGE_WATER_STAND, WATER_STAND_RADIUS, type PlaceLayout } from './layout'
 import { PLACES } from '../../world/geo'
 import { WALKER_RADIUS, standingClear } from './collision'
 import { BANK_FILL_DEPTH, bankWaterDepth, bankShoreHeight } from './riverBank'
 import { insidePlace } from './boundary'
 import { balance } from '../../config/balance'
 import { fillPose, REST_POSE } from '../../render/gesture'
+import { createAdultWork, goalOf, stepAdultWork, type AdultWorkView } from './adultWork'
 
 const RIVER_VILLAGES = ['nubian-village', 'bambara-village', 'mandinka-village']
 const VILLAGES = PLACES.filter((p) => p.kind === 'village').map((p) => p.id)
 /** The margin a villager's walk is tested with (`PlaceLife`'s `standable`). */
 const NPC_MARGIN = WALKER_RADIUS * 2
+const ERRAND_CFG = balance.villageLife.adultErrands
+
+/** The view `ErrandVillagers` gives the work module, over a real village: the
+ *  same ground test, the same geography, nobody within earshot. */
+function errandView(layout: PlaceLayout): AdultWorkView {
+  const path = layout.waterPath
+  return {
+    villagers: Array.from({ length: ERRAND_CFG.villagerCount }, (_, i) => {
+      const a = (i / ERRAND_CFG.villagerCount) * Math.PI * 2
+      return { x: Math.cos(a) * 7, z: Math.sin(a) * 7, free: true }
+    }),
+    geography: {
+      waterHead: path ? { x: path.head.x, z: path.head.z } : null,
+      waterFoot: path ? { x: path.foot.x, z: path.foot.z } : null,
+      waterStand: path ? { x: VILLAGE_WATER_STAND[0], z: VILLAGE_WATER_STAND[1] } : null,
+      waterFill: path ? { x: path.fill.x, z: path.fill.z } : null,
+      digSites: layout.digSites,
+    },
+    standable: (x, z) =>
+      standingClear(layout.colliders, x, z, WALKER_RADIUS) &&
+      insidePlace({ radius: layout.radius, bank: layout.bank }, x, z, NPC_MARGIN),
+    invitationClear: () => true,
+    childrenHear: () => false,
+  }
+}
 
 describe('the carrier goes TO the water (work-order 1065)', () => {
   for (const id of RIVER_VILLAGES) {
@@ -71,9 +97,9 @@ describe('the village water stand (work-order 1065)', () => {
       // The stand itself is solid: nothing is built on it and nobody walks
       // through it.
       expect(standingClear(layout.colliders, sx, sz, WALKER_RADIUS)).toBe(false)
-      // ...and there is free ground to speak from all round it. The errand puts
-      // the sender ON the stand's own spot and the carrier a join stand-off
-      // away, so a stand walled in on every side would never be reached.
+      // ...and there is free ground to speak from all round it. Both men of the
+      // errand take a join stand-off beside the stand, so a stand walled in on
+      // every side would never be reached.
       let free = 0
       for (let k = 0; k < 12; k++) {
         const a = (k / 12) * Math.PI * 2
@@ -87,6 +113,36 @@ describe('the village water stand (work-order 1065)', () => {
         }
       }
       expect(free, `${id} has ${free} free bearings round the water stand`).toBeGreaterThanOrEqual(4)
+    })
+
+  }
+})
+
+describe('the errand sends both men to ground they can stand on (work-order 1065)', () => {
+  for (const id of RIVER_VILLAGES) {
+    it(`${id}: neither man of the errand is sent onto ground he cannot stand on`, () => {
+      // THE DEFECT THIS PINS (measured 08.09.2026, five of six polish runs on a
+      // quiet machine): the sender's goal was the stand's own spot. A collider
+      // 0.62 m across leaves a walker of 0.30 m a ring 18 cm wide inside the
+      // 1.10 m arrival radius, and the walk steers round obstacles rather than
+      // into them — so he circled the stand, never arrived, never spoke, and the
+      // village fetched no water at all until the errand expired.
+      const layout = buildLayout(id, 42)
+      const view = errandView(layout)
+      const state = createAdultWork(view.villagers.length, ERRAND_CFG)
+      stepAdultWork(state, view, ERRAND_CFG.intervalSeconds, ERRAND_CFG, () => 0.5)
+      const water = state.tasks.filter((task) => task?.situation === 'water-out')
+      expect(water, `${id} staged no water errand`).toHaveLength(2)
+      for (const task of water) {
+        const goal = goalOf(task!)
+        expect(
+          view.standable(goal.x, goal.z),
+          `${id}: the ${task!.role} is sent to ${goal.x.toFixed(2)}/${goal.z.toFixed(2)}, where nobody can stand`,
+        ).toBe(true)
+      }
+      // ...and they are not sent to the same place either.
+      const [a, b] = water.map((task) => goalOf(task!))
+      expect(Math.hypot(a.x - b.x, a.z - b.z)).toBeGreaterThan(1)
     })
   }
 })

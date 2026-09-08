@@ -226,6 +226,25 @@ landing over the figure the scene drew) is the polish suite below:
   settlement's own bank stretch, the stretch in world units, the far rock's share
   of the frame at the default field of view and the reference viewport, and the
   lane at least three walker diameters wide against the shipped collider set.
+- `src/scenes/place/rockTouch.test.ts` (work-order 1065) — the TEACHING HAND ON
+  ITS OBJECT: the reach solved through the renderer's own hand chain lands on the
+  drawn flank, the furthest stand that still touches is the one taken, and both
+  play rocks of all three river villages are reachable from ground a child may
+  stand on. It also pins the defect it closes — from the old waiting station the
+  hand is more than a metre short.
+- `src/scenes/place/playRockSurface.test.ts` (work-order 1065) — the stone's
+  silhouette measured from the mesh the scene instances, at its own scale and
+  yaw: no vertex stands outside the reported surface, and the widest ring sits
+  well above the ground, which is why the collider is not the drawn span.
+- `src/scenes/place/waterErrand.test.ts` (work-order 1065) — the ground the water
+  errand happens on: the fill spot ankle deep in drawn river and reachable, the
+  village water stand solid with free ground round it in every village, and the
+  dip pose going down, HOLDING under the water and coming back up.
+- `src/scenes/place/adultWork.test.ts` (work-order 688, reshaped by 1065) — RIVER
+  as a DISPATCH: both words at the village water stand and none at the water,
+  every utterance naming its addressee, one round trip held by one carrier with
+  `fullJar` only after the fill, the stand never over its capacity, and the
+  return leg never cast on its own.
 - `src/scenes/place/mutedTeaching.test.ts` (work-order 686) — the removed
   eleven-concept catalogues stage nothing: neither the children's old situations
   nor the adults' old errands speak or steer. The adults' own teaching of RIVER
@@ -250,6 +269,17 @@ In the browser, `scripts/verify/polish.mjs` proves what the picture owes: sectio
 note against that figure's own head (`146-speech-hypothesis-label`), and section
 `speech-guess` the click invitation and the opened dialog
 (`148-speech-guess-invitation`, `149-speech-guess-dialog`).
+
+AND THAT THE TEACHING HANDS TOUCH WHAT THEY NAME (work-order 1065). The same
+suite reads the SCENE GRAPH rather than the module: the tapping child's drawn
+hand against the instanced stone's own flank at that height and bearing
+(`1065-tapping-child-at-its-rock`), the carrier's jar below the drawn water
+surface at the shore he is standing in (`1065-carrier-dips-at-the-waterline`),
+the water surface at the rim of the open jar he carries back
+(`1065-carrier-walks-back-full`), and the village water stand with the jars that
+have been set down on it (`1065-village-water-stand`). The tap pause and the fill
+are held at a shutter length for those shots — the same code path at a longer
+configured value — and put back afterwards.
 
 THE CHIEF'S MESSAGE ON THE DRUMS (§13.4, docs/communication-poc-spec.md,
 point 486). Asked for outside his hut — in his village alone, with no

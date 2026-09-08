@@ -174,14 +174,23 @@ export const WORK_ARRIVE_RADIUS = 1.1
 export const AIM_CLEARANCE = 1.2
 export const JOIN_STAND_OFF = 2.4
 const JOIN_BEARINGS = 12
+/** How far apart two men joining the same thing are placed. */
+const JOIN_APART = 1.2
 
-function joinSpot(view: AdultWorkView, site: ErrandPoint, rand: () => number): ErrandPoint | null {
+function joinSpot(
+  view: AdultWorkView,
+  site: ErrandPoint,
+  rand: () => number,
+  avoid: ErrandPoint | null = null,
+): ErrandPoint | null {
   const start = rand() * Math.PI * 2
   for (let k = 0; k < JOIN_BEARINGS; k++) {
     const a = start + (k / JOIN_BEARINGS) * Math.PI * 2
     const x = site.x + Math.cos(a) * JOIN_STAND_OFF
     const z = site.z + Math.sin(a) * JOIN_STAND_OFF
-    if (view.standable(x, z)) return { x, z }
+    if (!view.standable(x, z)) continue
+    if (avoid && Math.hypot(x - avoid.x, z - avoid.z) < JOIN_APART) continue
+    return { x, z }
   }
   return null
 }
@@ -528,16 +537,25 @@ export function stepAdultWork(
       if (who < 0) continue
       const mate = anotherFree(view, who)
       if (mate < 0) continue
+      // THE SENDER WALKS TO A PLACE HE CAN STAND IN. He used to be sent to the
+      // stand's own spot — which is a collider, so the walk resolved him to a
+      // ring 18 cm wide inside the arrival radius and the avoidance normally
+      // steered him round it instead. Measured 08.09.2026: five of six runs on a
+      // quiet machine saw the errand stand in `invite` for its whole life, the
+      // word never falling and no water ever fetched. Both men now take a join
+      // stand-off beside the stand, the same free ground a dig pair joins on.
       const spot = joinSpot(view, g.waterStand, rand)
       if (!spot) continue
+      const mateSpot = joinSpot(view, g.waterStand, rand, spot)
+      if (!mateSpot) continue
       state.tasks[who] = {
         situation: id, phase: 'invite', carry: 'none', role: 'initiator', partner: mate,
-        siteIndex: null, x: g.waterStand.x, z: g.waterStand.z, arrived: false, dug: 0,
+        siteIndex: null, x: spot.x, z: spot.z, arrived: false, dug: 0,
         owes: true, say: null, via: null, age: 0,
       }
       state.tasks[mate] = {
         situation: id, phase: 'invite', carry: 'none', role: 'partner', partner: who,
-        siteIndex: null, x: spot.x, z: spot.z, arrived: true, dug: 0,
+        siteIndex: null, x: mateSpot.x, z: mateSpot.z, arrived: true, dug: 0,
         owes: false, say: null, via: null, age: 0,
       }
       state.staged[id] = (state.staged[id] ?? 0) + 1
