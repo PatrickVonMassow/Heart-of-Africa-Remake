@@ -317,3 +317,15 @@ the NUBIAN one, where nothing checks the pairing before the shutter. Either the 
 for that village or the walk lands him elsewhere there. The freshly drawn frame was not committed
 and the older one was not re-judged, so this is a question, not a measured defect: no player impact,
 and the mechanism itself is proven where it is checked.
+
+## Infrastructure grew threefold while the game stood still (measured 08.09.2026)
+
+Line counts on `main`, taken from the git history: `scripts/` went 97,542 lines (06.08.) →
+191,757 (20.08.) → 266,859 (01.09.) → 273,603 (08.09.). `src/` without tests went 54,256 →
+63,122 → 63,324 → 66,038 — between 20.08. and 01.09. that is 202 lines of game code in twelve
+days. Open `TASKS.md` points over the same span: 118 → 237 → 358 → 374. Merges per day on `main`
+held at 9–16 from 19.08. to 28.08. and fell to 1–4 from 29.08. onward, so the merge count read
+healthy for the ten days in which almost everything merged was infrastructure. The infrastructure
+freeze of 01.09. is measurable: `scripts/` has since grown 6,700 rather than 75,000 lines per week.
+No player impact and no mechanism to build — this is the evidence base for the open Umsteuerung
+measures 4–9, recorded so the next stocktaking does not have to re-derive it.
