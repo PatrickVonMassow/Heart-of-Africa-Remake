@@ -126,28 +126,27 @@ Füllstand empfiehlt ein leeres Modell.
 
 ## Automatische Tests — und ihre Tiefe abstufen
 
-Automatische Tests sind das Rückgrat; ohne sie ist „Vibe Coding" ein Blindflug. Aber nicht
-jede Änderung braucht die volle Batterie — sonst wird Testen umgangen. Bewährt sind
-**abgestufte Umfänge**:
+Automatische Tests sind das Rückgrat; ohne sie ist „Vibe Coding" ein Blindflug. Nicht jede
+Änderung braucht die volle Batterie — sonst wird Testen umgangen. **Abgestufte Umfänge**:
 
-- **Schnell (nach JEDER Änderung):** die Unit-Schicht ohne Browser — Logik, Zustand, reine
-  Funktionen. Sekunden, und kein Browser-Timing kann sie flackern lassen.
+- **Schnell (nach JEDER Änderung):** die Unit-Schicht ohne Browser — Logik und Zustand.
+  Sekunden, und kein Browser-Timing kann sie flackern lassen.
 - **Klein (bei Sichtbarem/Interaktion):** die schnelle Schicht + ein Kernsatz echter
-  Browser-Tests. Gibt es mehrere Unterbauten, prüf auf dem der Nutzer, nicht auf dem
-  bequemeren Ersatzweg.
-- **Groß (vor jedem Release):** die volle Regression über alle Suiten und **alle
-  Ziel-Backends/Geräte**, mehrfach flakefrei.
+  Browser-Tests, auf dem Unterbau des Nutzers statt auf dem bequemeren Ersatzweg.
+- **Groß (vor jedem Release):** die volle Regression über alle Suiten und **Ziel-Backends**,
+  mehrfach flakefrei.
 
 > *Prompt:* „Richte drei Test-Stufen ein — schnell (Unit, immer), klein (Unit + Kern-
 > Browsertests) und groß (volle Regression auf allen Ziel-Backends). Wähl pro Änderung die
-> passende Stufe und nenn mir kurz warum; **etabliere einen Mechanismus, der die große
-> Stufe vor einem Release erzwingt** und eine Freigabe ohne sie verweigert."
+> passende Stufe und nenn mir kurz warum; **etabliere einen Mechanismus**, der die große
+> Stufe vor einem Release **erzwingt** und sie **verweigert**, solange die schmale zum
+> geänderten Stand nicht grün ist."
 
 *(Kosten ≈ 1,5x)* Zwei Mechanismen, die das Netz ehrlich halten:
 
 > *Prompt:* „Etabliere einen Mechanismus, der eine Wiederholung **sichtbar** macht: Ein
-> flakender Test darf einmal wiederholt werden, gilt danach aber als **verdächtig** und trägt
-> keine Freigabe mehr. Erledigt ist ein Rot nur mit **benannter Ursache** — wiederholte Grüns
+> flakender Test darf einmal wiederholt werden, gilt danach als **verdächtig** und trägt keine
+> Freigabe mehr. Erledigt ist ein Rot nur mit **benannter Ursache** — wiederholte Grüns
 > sind keine. Und einen, der feste Wartezeiten aufspürt."
 
 Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
@@ -622,4 +621,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: b6921d822014c9a8148d2c361195e07e76c272ce756964d2926b74bb95f2937f -->
+<!-- GUIDE-FINGERPRINT: 708cb3b11a3131212c8b1ad2c2604e2d7e1e5df671876a9517dbd316a155cabc -->
