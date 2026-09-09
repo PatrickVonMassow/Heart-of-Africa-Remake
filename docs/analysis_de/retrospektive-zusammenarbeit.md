@@ -1447,7 +1447,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 09.09.2026, 04:45 · Quellen-Fingerprint: `6cb5743f4fcd…`
+Zuletzt aktualisiert: Mittwoch, 09.09.2026, 05:55 · Quellen-Fingerprint: `3fdacb852eb0…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1552,8 +1552,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 95 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 126 Prozess-/Meta-TASKS-Punkte (davon 60 offen).
 
-<!-- RETRO-FINGERPRINT: 6cb5743f4fcdbf1def81f17c9a923b783d0c2c63a567015b03f439413c918db6 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-09T02:45:04.939Z -->
+<!-- RETRO-FINGERPRINT: 3fdacb852eb0b5902058a2454569bcb4d83686080808fe8ac99d05147714b855 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-09T03:55:17.846Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -6131,6 +6131,24 @@ Und wenn eine Verteilung im Bericht anders aussieht als in der Wirklichkeit,
 ist die Wirklichkeit an ihrer eigenen Spur zu messen — hier an den
 Sitzungsprotokollen des beauftragten Modells, nicht an der Zuteilungstabelle,
 die genau das behauptet, was zu prüfen war.
+
+**Nachtrag vom 09.09.2026 — die Erklärung war ebenfalls nur eine Vermutung.**
+Der Folgepunkt hielt fest, WARUM die Zuteilung angeblich schiefsteht: Jeder
+spielsichtbare Punkt schreibe „Screenshots, beide Backends" in seine Testzeile,
+also lese die Marker-Liste bloß Formeltext und schiebe das ganze Spiel in die
+eigene Spur. Der Satz stand als Befund im Arbeitsauftrag und hätte einen Eingriff
+in eine über acht Runden gehärtete Regexliste begründet. Nachgemessen ist er
+falsch: Schneidet man jedem offenen Punkt den Standard-Anhang ab — Test, Refs,
+Bundle, Kritikalität, Autorenspur — nennen 97 der 99 betroffenen Punkte einen
+Marker in ihrem eigenen Text. Die naheliegende Verengung hätte zwei Punkte
+bewegt. Die Diagnose vom Vortag war richtig, ihre Begründung war es nicht.
+
+**Lehre daraus:** Ein gemessener Fehler beweist seine eigene Erklärung nicht mit.
+Wer aus einer belegten Zahl eine Ursache ableitet, hat eine zweite Behauptung
+aufgestellt, die ihre eigene Messung braucht — besonders dann, wenn sie plausibel
+klingt und der nächste Schritt ein Eingriff in etwas Gehärtetes wäre. Und die
+tatsächliche Abhilfe blieb dieselbe wie am Vortag: Nicht der Schnitt fehlt,
+sondern der Aufruf, der seit dem 09.09. beim Sitzungsstart wörtlich genannt wird.
 
 ### 3.249 Eine gemessene Erwartung altert zu einem falschen Urteil
 
