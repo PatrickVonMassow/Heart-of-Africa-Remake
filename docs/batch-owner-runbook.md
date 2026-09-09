@@ -18,6 +18,12 @@ not need it and must not act on it.
   merge, fast gate, work-order tick/archive commit, push, board publish, and
   worktree cleanup, stopping on the first failed step. The post-merge gate is
   mandatory even after a clean merge.
+- Schedule a heavy run onto a quiet machine. A whole `polish` pass and a full
+  LARGE are 55 and 119 measured minutes (`docs/picture-check-cost.md` §7), and
+  load alone moves a suite by about a fifth, so an expensive run started while a
+  second author is building buys a slower run and a redder one. This is
+  scheduling, not construction: no guard enforces it, and `--plan` printing the
+  observed band is the whole of its machinery.
 - User-facing aesthetic judgment is against deployed `main`. A test-green,
   independently picture-checked improvement lands before asking whether it is
   aesthetically good enough. Use a branch preview only when the user's eyes are

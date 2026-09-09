@@ -1016,6 +1016,29 @@ describe('the verification ladder', () => {
     expect(text).toMatch(/cosmetic/)
   })
 
+  it('puts a NUMBER behind every rung, so “do not start at the top” costs something', () => {
+    // Point 1083: the rules were already there and the price was not, which is
+    // why five two-hour LARGE runs never read as out of band.
+    const text = VERIFICATION_LADDER.join('\n')
+    expect(text).toMatch(/run-wait\.mjs --plan/)
+    expect(text).toMatch(/0\.2-7\.4 min, median 2\.9/) // one section
+    // …and that band was measured on `polish` alone (Astra, four-eyes round 1):
+    // quoting it for another suite's section makes an unmeasured run look
+    // classified, which is worse than giving no number at all.
+    expect(text).toMatch(/ON `polish` ALONE/)
+    expect(text).toMatch(/No other suite's sections were timed/)
+    // …and it stops there. Telling a reader to SCALE another suite's section
+    // from an unmeasured fraction dresses a guess as a measurement (Astra,
+    // four-eyes rounds 1 and 2).
+    expect(text).not.toMatch(/scale from the plan|fraction of ITS OWN pass/)
+    expect(text).toMatch(/9\.9-61\.5 min, median 55\.2/) // one whole suite
+    expect(text).toMatch(/115\.3-120\.9 min/) // the whole set, both backends
+    // And the caveat travels with them: a band recognises an outlier, and a
+    // reader who takes it for a target has been given a worse figure than none.
+    expect(text).toMatch(/never a target/)
+    expect(text).toMatch(/machine is shared/)
+  })
+
   it('stays inside the brief’s width, like every other carried block', () => {
     for (const line of VERIFICATION_LADDER) expect(line.length, line).toBeLessThanOrEqual(100)
   })

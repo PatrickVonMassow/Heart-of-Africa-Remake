@@ -29,6 +29,7 @@ import {
   backendsFrom,
   buildReceipt,
   formatDuration,
+  formatObservedBand,
   formatReceipt,
   nextWaitMs,
   planRun,
@@ -157,6 +158,10 @@ function doPlan(argv) {
   console.log(`# plan: ${plan.suites.length} suite(s) over ${plan.passes.length} backend pass(es) — ${plan.backends.join(' + ')}`)
   console.log(`  suites:   ${plan.suites.join(', ') || '(none)'}`)
   console.log(`  expected: ${formatDuration(plan.expectedMs)} (measured medians, docs/picture-check-cost.md §1)`)
+  // THE PRICE, NOT ONLY THE PLAN (point 1083). The expectation above sums the
+  // July per-suite medians; the band below is what this shape of run really
+  // took in September, so a run that is running long reads as running long.
+  for (const line of formatObservedBand(plan.observedBand)) console.log(line)
   console.log(`  frames:   ${plan.expectedFrames} expected`)
   if (plan.unmeasured.length > 0) {
     console.log(`  runtime never measured for (so not in the time above): ${plan.unmeasured.join(', ')}`)
@@ -300,7 +305,11 @@ async function main(argv) {
   const timeoutIndex = rest.indexOf('--timeout')
   const timeoutS = timeoutIndex >= 0 ? Number(rest[timeoutIndex + 1]) : null
   const positional = rest.filter((a, i) => !a.startsWith('--') && !(timeoutIndex >= 0 && i === timeoutIndex + 1))
-  if (mode === '--plan') return doPlan(positional)
+  // `--section` is the one FLAG the plan must see (point 1083): it decides
+  // whether the run is the cheap repair rung or the whole pass, and stripping it
+  // with the rest of the flags made a section plan quote the whole suite's time
+  // without ever saying that is what it was doing.
+  if (mode === '--plan') return doPlan([...positional, ...rest.filter((a) => a === '--section' || a.startsWith('--section='))])
   if (mode === '--await') return doAwait(positional[0] ?? null, timeoutS)
   if (mode === '--status') return doStatus(positional[0] ?? null)
   if (mode === '--receipt') return doReceipt(positional[0] ?? null)
