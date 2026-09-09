@@ -454,3 +454,16 @@ stones also share the `GroundScatter` material with the grass tufts, whose `colo
 through `seasonTintNode`. To check: whether the season tint or the coarse faceting of the
 detail-0 mesh darkens them. No blocker — the climb reads on both backends — but it looks wrong
 to a human eye.
+
+## The beginner guide has no room left for a new lesson
+
+Reviewing `docs/analysis_de/vibe-coding-anleitung.md` against the sources of 09.09.2026, one
+pitfall it does not yet carry wanted in: *a numeric bar measured on a single sample* — it stands
+green for months and breaks under a change that does not touch the mechanism it judges, because it
+never held a property, only the luck of one world, one seed, one machine; the lesson is to measure
+the SHIPPED state over several samples before suspecting your own change. The entry does not fit:
+`guide-brevity-core.test.mjs` holds a hard ceiling and demands that both caps carry the guard's
+exact measured size ("no unearned headroom"), so any growth reads red. The entry was therefore
+taken back out; the class itself stands permanently in the retrospective as §3.252. To decide: the
+guide shortens an existing entry to make room, or the ceiling is raised once, deliberately. It does
+not grow quietly, and that is the intent.
