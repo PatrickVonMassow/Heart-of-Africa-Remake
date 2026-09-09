@@ -4615,7 +4615,18 @@ if (section('children-bank-game')) {
         p.pitch = -0.1
         return { x: p.x, z: p.z }
       }, hand))
-    for (let i = 0; i < 400; i++) {
+    // THE BUDGET IS THE HOLD'S OWN LENGTH, NOT A ROUND NUMBER (work-order 1065).
+    // INSIDE a hold this loop steps ONE frame per turn, so reading a hold from
+    // the word to its far side costs as many turns as the lane draws frames in
+    // `tapPauseSeconds` — and 400 does not cover a nine-second hold on WebGL 2.
+    // It ran out INSIDE a hold and then failed its own coverage check: measured
+    // 09.09.2026, 49 readings into the current hold on one run and 140 on the
+    // next. That is not a hand that never arrived, it is a loop out of turns.
+    // Sized for two whole holds at a pessimistic 60 fps plus the walk to the
+    // stone, so the loop leaves because it is FINISHED, never because it is
+    // spent — and the coverage check below therefore means what it says.
+    const sampleBudget = Math.ceil(holdSeconds * 60) * 2 + 300
+    for (let i = 0; i < sampleBudget; i++) {
       const now = await page.evaluate(() => (window.__placeTapHand ? window.__placeTapHand() : null))
       if (now) {
         if (now.gesture === 'touch') sawTouchPose = true
