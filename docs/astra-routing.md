@@ -205,8 +205,11 @@ no trailer at all, so both counts are floors.
 **So no lever that only changes the CUT can move the load.** Reordering the queue
 for load was forbidden by the user on 08.09.2026, with one exception (point 1077
 itself). Tagging seven communication points `Author lane: astra` on 08.09. moved
-the cut from 271/103 to 280/99 and moved no work, because an Astra-lane point is
-still written here anyway. What is left is not a lever but a command:
+seven points at most, and moved no work, because an Astra-lane point is still
+written here anyway. The two readings around it are 271/103 over 374 open points
+on 08.09. and 280/99 over 379 today — five points entered the queue in between,
+so the nine-point difference is NOT the tagging's effect and neither reading is
+the other's before/after. What is left is not a lever but a command:
 `node scripts/author-astra.mjs --point <N>` in the point's own worktree, which
 the session-start policy line now says in those words. **The proof owed is one
 point authored by Astra end to end, and it is owed by point 1072** — the next
