@@ -113,6 +113,92 @@ export const COUNTED_SUITE_FRAMES = Object.freeze({ docs: 0, 'board-layout': 0, 
  *  short". */
 export const FRAME_TABLE_MEASURED = '09.08.2026'
 
+/**
+ * WHAT A WHOLE RUN REALLY TOOK — docs/picture-check-cost.md §7, measured
+ * 09.09.2026 over the 35 finished run records of point 1065.
+ *
+ * WHY THIS SITS BESIDE `SUITE_RUNTIME_S` AND NOT INSIDE IT (point 1083): the
+ * per-suite table is the July baseline the runner PLANS from, and it stays
+ * exactly what it measured. What it cannot say is what the assembled run costs
+ * end to end — the plan it produces for a both-backend LARGE is 80 min 48 s
+ * against a real 115–121, and for a whole `polish` pass 5 min 41 s against
+ * 28–62. With the plan a third to two thirds short, a 62-minute `polish` run and
+ * a fifth two-hour LARGE never read as out of band. So the observed band is
+ * PRINTED under the planned expectation, and the reader compares.
+ *
+ * THESE ARE OUTLIER BANDS, NEVER TARGETS. A second author held a worktree for
+ * part of the window and the host is shared, and §1 already records a 19 %
+ * spread from load alone. 118 minutes is inside the band; 200 is not. That is
+ * the whole use of the figure — no guard reads it and nothing fails on it.
+ */
+export const SEPTEMBER_BANDS = Object.freeze({
+  measured: '09.09.2026',
+  source: 'docs/picture-check-cost.md §7',
+  load: 'shared host, a second author on it for part of the window — an outlier band, not a target',
+  kinds: Object.freeze({
+    large: Object.freeze({
+      label: 'LARGE, both backends, ran to the end',
+      n: 5,
+      lowMin: 115.3,
+      highMin: 120.9,
+      medianMin: 118.8,
+      note: 'eight further LARGE runs aborted early, 0.4–42.1 min (median 4.6)',
+    }),
+    polish: Object.freeze({
+      label: 'whole `polish`, one backend',
+      n: 6,
+      lowMin: 9.9,
+      highMin: 61.5,
+      medianMin: 55.2,
+      note: '',
+    }),
+    section: Object.freeze({
+      label: 'one `--section` of a suite, measured on `polish`',
+      n: 16,
+      lowMin: 0.2,
+      highMin: 7.4,
+      medianMin: 2.9,
+      measuredOn: 'polish',
+      note: 'the plan above quotes the WHOLE suite — a section run is a fiftieth of it',
+    }),
+  }),
+})
+
+/**
+ * The §7 band this invocation falls in, or null when nothing was measured for
+ * its shape. A `--section` run is judged by its FLAG first: it is the cheap rung
+ * whatever suite it names, and quoting it the whole suite's time without saying
+ * so is exactly what made a section run look as expensive as the pass.
+ */
+export function observedBand({ isLargeEquivalent = false, section = null, suites = [] } = {}) {
+  const kinds = SEPTEMBER_BANDS.kinds
+  const list = [...new Set((suites ?? []).map((s) => String(s)))]
+  if (section !== null && section !== undefined && String(section) !== '') {
+    // The band was measured on `polish` sections alone. Reported for another
+    // suite it stays the SHAPE observation it is — a section is a fraction of
+    // its own pass — and says so, rather than quoting polish's minutes as if
+    // they were enrichments'.
+    const elsewhere = list.length === 1 && list[0] !== kinds.section.measuredOn ? list[0] : ''
+    return { key: 'section', ...kinds.section, elsewhere }
+  }
+  if (isLargeEquivalent) return { key: 'large', ...kinds.large }
+  if (list.length === 1 && list[0] === 'polish') return { key: 'polish', ...kinds.polish }
+  return null
+}
+
+/** The band as the two lines `--plan` prints under its expectation. */
+export function formatObservedBand(band) {
+  if (!band) return []
+  const range = `${band.lowMin.toFixed(1)}–${band.highMin.toFixed(1)} min (median ${band.medianMin.toFixed(1)})`
+  const lines = [`  observed: ${range} over ${band.n} run(s), ${band.label} — ${SEPTEMBER_BANDS.measured}, ${SEPTEMBER_BANDS.source}`]
+  if (band.elsewhere) {
+    lines.push(`            NOT measured on \`${band.elsewhere}\` — a section is a fraction of ITS OWN pass, so scale from the expectation above`)
+  }
+  if (band.note) lines.push(`            ${band.note}`)
+  lines.push(`            ${SEPTEMBER_BANDS.load}`)
+  return lines
+}
+
 /** The first wait is 0.9 × the measured median: long enough that the run is
  *  almost always over, short enough that it is not idling past the end. */
 export const FIRST_WAIT_FRACTION = 0.9
@@ -199,7 +285,7 @@ export function expectedFrames(suites = []) {
  * union.
  */
 export function planRun({ argv = [], verifyGl } = {}) {
-  const { tier, filter, fullRun, isLargeEquivalent } = parseArgs(argv)
+  const { tier, filter, fullRun, isLargeEquivalent, section } = parseArgs(argv)
   const plan = planBackends({ isLargeEquivalent, verifyGl, ranBoth: false })
   const passes =
     plan.length > 0
@@ -245,6 +331,8 @@ export function planRun({ argv = [], verifyGl } = {}) {
   return {
     tier,
     filter,
+    section,
+    isLargeEquivalent,
     passes,
     backends: lanes,
     suites: union,
@@ -252,6 +340,10 @@ export function planRun({ argv = [], verifyGl } = {}) {
     expectedFrames: frames.frames,
     framesUnmeasured: frames.unmeasured,
     unmeasured: [...unmeasured],
+    // The measured band this shape of run really fell in (point 1083). null
+    // where nothing was measured for it — an unknown band is reported as
+    // unknown and never as "inside".
+    observedBand: observedBand({ isLargeEquivalent, section, suites: union }),
   }
 }
 
