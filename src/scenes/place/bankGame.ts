@@ -416,8 +416,17 @@ function landingFor(
     const z = b.z + Math.cos(a) * ring
     if (!taken(x, z)) return { x, z }
   }
+  // THE RESCUE IS CHECKED LIKE ANY OTHER CANDIDATE (cross-vendor review,
+  // 09.09.2026): `nudge` answers the STATIC collider set, so it will happily
+  // hand back ground a person is standing on. Where even that is taken the child
+  // comes down where it went up and is an ordinary child again the moment it
+  // does — the body separation and the escape nudge push two figures apart every
+  // frame, and they are what owns a crowd. What must not happen is a landing
+  // chosen while somebody was there and then never looked at again, and that is
+  // what the per-frame re-read above prevents.
   const free = world.nudge(c.footX, c.footZ)
-  return { x: free.x, z: free.z }
+  if (!taken(free.x, free.z)) return { x: free.x, z: free.z }
+  return { x: c.footX, z: c.footZ }
 }
 
 /** How near the boulder's CENTRE the approach walks before the child steps up:
@@ -528,6 +537,13 @@ function stepClimb(
     }
     return false
   }
+  // AND THE WAY DOWN IS RE-READ EVERY FRAME OF IT. The sink takes the better part
+  // of a second, and a target chosen when the hold ended is stale the moment
+  // somebody walks onto it; `landingFor` keeps the current foot while it is
+  // free, so this settles on a spot instead of wandering.
+  const landing = landingFor(c, i, b, cfg, world)
+  c.footX = landing.x
+  c.footZ = landing.z
   const t = Math.min(1, c.climbFor / Math.max(1e-6, cfg.climbSinkSeconds))
   c.x = b.x + (c.footX - b.x) * t
   c.z = b.z + (c.footZ - b.z) * t

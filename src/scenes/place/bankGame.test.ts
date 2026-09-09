@@ -631,6 +631,7 @@ describe('the children`s game at the bank (point 687)', () => {
       const c = s.children[0]
       let world = openWorld()
       let planted = false
+      let followed = false
       let landed: { x: number; z: number } | null = null
       for (let t = 0; t < 60 && !landed; t += 1 / 60) {
         const wasUp = c.climb !== 'none'
@@ -641,9 +642,18 @@ describe('the children`s game at the bank (point 687)', () => {
           planted = true
           world = openWorld({ x: c.footX, z: c.footZ, radius: 0.35 })
         }
+        // …and then he FOLLOWS it: the second round of the same review found that
+        // a landing chosen when the hold ended was never looked at again, so a
+        // traveller who stepped onto it during the descent had the child set down
+        // inside him. He moves onto the new foot halfway down.
+        if (c.climb === 'down' && c.climbFor > CFG.climbSinkSeconds * 0.4 && !followed) {
+          followed = true
+          world = openWorld({ x: c.footX, z: c.footZ, radius: 0.35 })
+        }
         if (wasUp && c.climb === 'none') landed = { x: c.x, z: c.z }
       }
       expect(planted).toBe(true)
+      expect(followed).toBe(true)
       expect(landed).not.toBeNull()
       // It came down somewhere else, and clear of him.
       expect(insideStrangerBerth(world, CFG, landed!.x, landed!.z)).toBe(false)
