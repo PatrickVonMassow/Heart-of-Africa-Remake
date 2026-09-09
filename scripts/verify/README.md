@@ -103,12 +103,11 @@ quiet-machine report), an indented failure dump following a verdict line is not.
 
 Measured over six days (09.08.2026): **2857 responses were polls — 10.9 % of the
 weighted spend** — and another 1189 were bare idle holders (3.6 %). The longest
-unbroken poll chain was **437 responses** for a result that is one word. A LARGE
-run polled every 30 s costs ~45 k weighted **per minute of run time, for the loop
-alone** — and a real both-backend LARGE runs **115–121 minutes**
-(docs/picture-check-cost.md §7, five runs measured 09.09.2026), so that loop is
-~5.4 M weighted for a result that is one word. So the loop is gone, and three
-things replace it.
+unbroken poll chain was **437 responses** for a result that is one word. Polling
+every 30 s costs ~45 k weighted **per minute of run time, for the loop alone**,
+and a real both-backend LARGE runs **115–121 minutes** (docs/picture-check-cost.md
+§7, five runs measured 09.09.2026) — ~5.4 M weighted spent on watching. So the
+loop is gone, and three things replace it.
 
 (The 42-minute figure this passage used to argue from is the ONE-backend sum of
 §1's per-suite medians. It is not what `npm test` costs, and reading it as such
@@ -121,9 +120,11 @@ node scripts/verify/run-wait.mjs --plan large    # or small, or a suite name
 ```
 
 It answers from the measured medians of `docs/picture-check-cost.md` §1 (kept in
-lockstep by `run-wait-core.test.mjs`, which parses that table back out): how long
-the run is expected to take, how many frames it owes, and — the decision that
-matters — whether it may be **one blocking foreground call** at all, or is longer
+lockstep by `run-wait-core.test.mjs`, which parses that table back out) and, under
+that, from the observed §7 band for this shape of run: how long the run is
+expected to take, how long it really took last time, how many frames it owes, and
+— the decision that matters — whether it may be **one blocking foreground call**
+at all, or is longer
 than a shell call may run and has to go to the **background**, where the harness'
 own completion notification announces the exit.
 

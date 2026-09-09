@@ -1022,6 +1022,11 @@ describe('the verification ladder', () => {
     const text = VERIFICATION_LADDER.join('\n')
     expect(text).toMatch(/run-wait\.mjs --plan/)
     expect(text).toMatch(/0\.2-7\.4 min, median 2\.9/) // one section
+    // …and that band was measured on `polish` alone (Astra, four-eyes round 1):
+    // quoting it for another suite's section makes an unmeasured run look
+    // classified, which is worse than giving no number at all.
+    expect(text).toMatch(/ON `polish` ALONE/)
+    expect(text).toMatch(/no other suite's sections were\s+timed/)
     expect(text).toMatch(/9\.9-61\.5 min, median 55\.2/) // one whole suite
     expect(text).toMatch(/115\.3-120\.9 min/) // the whole set, both backends
     // And the caveat travels with them: a band recognises an outlier, and a
