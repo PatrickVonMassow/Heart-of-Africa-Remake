@@ -174,6 +174,94 @@ commits that appeared, their trailers, the tree left behind — never the run's
 own account of itself. A run that reports success and committed nothing is
 reported as having authored nothing.
 
+## Routed and not commissioned (point 1077)
+
+The lane's own numbers, measured 08. and re-measured 09.09.2026, say the routing
+works and the dispatch does not.
+
+| measured 09.09.2026 | |
+| --- | --- |
+| open points the routing gives to Astra | 280 of 379 |
+| — nothing marks them otherwise | 156 |
+| — tagged HIGH criticality | 76 |
+| — a HARD marker matched | 40 |
+| — the point carries `Author lane: astra` | 8 |
+| open points the routing keeps in the Opus lane | 99 |
+| — of those, routed by `VERIFICATION_MARKERS` | 99 |
+| — of those, carrying `Author lane: opus` or an override | 0 |
+| `Co-Authored-By` on `main` since 06.09. — Claude family | 182 |
+| `Co-Authored-By` on `main` since 06.09. — GPT-6 Astra | 6, all six from point 1069 |
+| `Reviewed-By: GPT-6 Astra` over the same range | 14 |
+| `author-astra.mjs` receipts (`.claude/author-<N>.log`) ever | 3 — points 1008, 1031 (31.08.), 1069 (07.09.) |
+| — of those, in the last three days | 1 — point 1069 |
+
+Those rows say one thing together: **the REVIEW half of the lane runs and the
+AUTHORING half is barely called.** Astra read fourteen ranges in three days and
+was commissioned for exactly one point, while 280 stood routed to it. The claim
+is about the recorded COMMISSIONS, not about Astra's total contribution: the
+receipt file is per point and a re-run overwrites it, and unlanded work leaves
+no trailer at all, so both counts are floors.
+
+**So no lever that only changes the CUT can move the load.** Reordering the queue
+for load was forbidden by the user on 08.09.2026, with one exception (point 1077
+itself). Tagging seven communication points `Author lane: astra` on 08.09. moved
+seven points at most, and moved no work, because an Astra-lane point is still
+written here anyway. The two readings around it are 271/103 over 374 open points
+on 08.09. and 280/99 over 379 today — five points entered the queue in between,
+so the nine-point difference is NOT the tagging's effect and neither reading is
+the other's before/after. What is left is not a lever but a command:
+`node scripts/author-astra.mjs --point <N>` in the point's own worktree, which
+the session-start policy line now says in those words. **The proof owed is one
+point authored by Astra end to end, and it is owed by point 1072** — the next
+Astra-lane point in work-order order, and a communication point, which is the
+mechanic the 08.09. tagging was about.
+
+### The picture marker is not narrowed, and why (decided 09.09.2026)
+
+The suspicion that opened this was that `VERIFICATION_MARKERS` matches
+BOILERPLATE: every player-visible point writes a Test line naming screenshots
+and both backends because the house rules demand one, so the marker would route
+the whole game to the Opus lane without any point being about a picture. All 99
+Opus-lane points are indeed Opus for that reason and no other — none carries
+`Author lane: opus`.
+
+**Measured, the suspicion is wrong.** Cut the standing tail off every open point
+— the `Test`, `Refs:`, `Bundle:`, `Criticality:` and `Author lane:` lines a spec
+ends with — and ask the markers only about what the point says in its own words:
+
+| of the 99 Opus-lane points | |
+| --- | --- |
+| a marker stands in the point's OWN prose | 97 |
+| markers stand ONLY in the standing tail | 2 — points 611 and 1062 |
+
+So the marker is not reading boilerplate. Player-visible points describe pictures
+in their own sentences, which is exactly what the list is for, and the narrowing
+that looked obvious — cut the tail before matching, the way `PROCESS_PHRASES`
+already cuts the workflow phrases — would move **two points of ninety-nine**. It
+is not done:
+
+- **It would move no load.** 280 points are routed to Astra today and one was
+  commissioned. Two more change a number, not a habit. The measurement names the
+  missing CALL as the cause; a routing change repairs the half that works.
+- **The freeze (CLAUDE.md §2) excludes it.** It blocks no game work and permits
+  no false approval, and both marker lists are hardened over eight cross-vendor
+  rounds.
+- **Two points do not need a mechanism.** Where a verdict cites only markers out
+  of a point's standing tail, the dispatcher writes `Author lane: astra` into the
+  point as a whole line of its own — the cheap way back the routing file already
+  documents. Eight points carry it today.
+
+What is left standing, and stated rather than hidden: the Opus lane IS the game.
+That is not a marker defect — it is what "a point whose verification is the work"
+means once every player-visible point owes a picture on both backends. Whether
+the game should be authored by one vendor is a question for CLAUDE.md §6 and for
+the user, not for a regex in this repository.
+
+**When the question reopens:** once an Astra-lane point has been authored by
+Astra end to end and the lane is then measured to run dry while game points wait
+in the Opus lane. Not before — until the command is used, the cut is not the
+constraint.
+
 ## What is never routed, at any setting
 
 - A point whose verification is the work, unless its spec marks it hard — since
