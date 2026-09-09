@@ -103,9 +103,16 @@ quiet-machine report), an indented failure dump following a verdict line is not.
 
 Measured over six days (09.08.2026): **2857 responses were polls — 10.9 % of the
 weighted spend** — and another 1189 were bare idle holders (3.6 %). The longest
-unbroken poll chain was **437 responses** for a result that is one word, and a
-42-minute LARGE run polled every 30 s costs ~1.9 M weighted **for the loop
-alone**. So the loop is gone, and three things replace it.
+unbroken poll chain was **437 responses** for a result that is one word. A LARGE
+run polled every 30 s costs ~45 k weighted **per minute of run time, for the loop
+alone** — and a real both-backend LARGE runs **115–121 minutes**
+(docs/picture-check-cost.md §7, five runs measured 09.09.2026), so that loop is
+~5.4 M weighted for a result that is one word. So the loop is gone, and three
+things replace it.
+
+(The 42-minute figure this passage used to argue from is the ONE-backend sum of
+§1's per-suite medians. It is not what `npm test` costs, and reading it as such
+is how a two-hour run came to look normal.)
 
 **1. Ask what the run costs before you start it.**
 
@@ -296,10 +303,17 @@ The browser suites split into two selectable tiers, so a change can be gated at
 the right cost (the regression-tiers rule: per task, pick Vitest-only /
 Vitest+SMALL / Vitest+LARGE; the **closing cycle ALWAYS runs LARGE**):
 
-| Tier | Command | Backend | Browser suites | Preview |
-|------|---------|---------|----------------|---------|
-| **SMALL** (everyday gate) | `npm run test:small` | WebGPU | `docs, board-layout, i18n, flow, health, events, collision, voice` — fast, low-flake, core coverage (doc/board/i18n consistency, the one E2E core loop, health/events/collision, TTS) | no |
-| **LARGE** (default) | `npm test` / `npm run test:large` | WebGL 2, then WebGPU | **all 19** — SMALL plus the heavier scene/geometry/screenshot suites (`world, handwriting, polish, gamepad, touch, settings, invariants`), `startup` (the point-337 loading-picture freeze budget), `benchmark` (the in-game F8 measurement run), `report` (the F6 bug-report archive, whose PNG member is decoded and checked for real scene content) and `enrichments` (the wildlife/atmosphere staging, which carries the rotating family flakes) | yes |
+| Tier | Command | Backend | Browser suites | Preview | What it really costs |
+|------|---------|---------|----------------|---------|----------------------|
+| **SMALL** (everyday gate) | `npm run test:small` | WebGPU | `docs, board-layout, i18n, flow, health, events, collision, voice` — fast, low-flake, core coverage (doc/board/i18n consistency, the one E2E core loop, health/events/collision, TTS) | no | planned 7m 49s; not separately re-measured in September |
+| **LARGE** (default) | `npm test` / `npm run test:large` | WebGL 2, then WebGPU | **all 19** — SMALL plus the heavier scene/geometry/screenshot suites (`world, handwriting, polish, gamepad, touch, settings, invariants`), `startup` (the point-337 loading-picture freeze budget), `benchmark` (the in-game F8 measurement run), `report` (the F6 bug-report archive, whose PNG member is decoded and checked for real scene content) and `enrichments` (the wildlife/atmosphere staging, which carries the rotating family flakes) | yes | planned 80m 48s, **measured 115–121 min** (n=5, 09.09.2026) |
+
+**Read the price before you start one.** `node scripts/verify/run-wait.mjs --plan
+large` prints the planned expectation AND the observed band under it. The plan
+sums §1's July per-suite medians and is a third short of the real thing; the band
+is docs/picture-check-cost.md §7. It is a band to recognise an OUTLIER by — the
+machine is shared and a second author was on it for part of the measured window —
+so 118 minutes is inside it and 200 is not. Nothing fails on the band.
 
 Both tiers run the same Vitest + build + lint preflight. SMALL is a strict subset
 of `DEV_SUITES`; keep it that way. New heavy or flaky browser scenarios join
@@ -443,6 +457,18 @@ waits and the screenshots, not the assertion. So the skippable unit is a
 **section**: a named block that owns the setup it needs plus its checks. The
 `// --- … ---` comments were already those boundaries; `section('<slug>')` in
 front of each turns one into a declaration.
+
+**WHAT THE RUNG COSTS, measured 09.09.2026 (docs/picture-check-cost.md §7).**
+Sixteen `polish --section=<name>` runs took **0.2–7.4 min, median 2.9** together
+0.8 h; the six WHOLE `polish` passes in the same window took **9.9–61.5 min,
+median 55.2**, together 4.5 h. The same localised finding for a fiftieth of the
+time. `--plan` quotes the WHOLE suite for a section run and now says so out loud,
+because a section is a fraction of its own pass and the fraction was never
+measured per suite.
+
+That is the price, not a new rule: a `--section` run is stamped PARTIAL by
+`sections.mjs` and `runVerdict` refuses it as coverage whatever its exit code, so
+the repair loop is cheap and the acceptance run stays whole.
 
 - `scripts/verify/sections.mjs` is the pure module (pinned by `sections.test.mjs`):
   `listSections` reads the declarations out of the suite SOURCE — no hand-kept
