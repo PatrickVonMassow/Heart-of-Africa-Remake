@@ -349,9 +349,17 @@ put it is the mistake this line exists to stop.
     - SPEECH GETS ITS OWN VOLUME: DONE before this point was reached, by "Give the village
       speech its own bus instead of the 'everything else' slider" — `communication.speechVolume`
       is 2 and a dedicated `speechBus` carries it to the master, so the syllables no longer ride
-      the ambient bus at all. `SPEECH_PEAK` and the 0.045 arithmetic this bullet was written
-      around are gone with it (re-measured 08.09.2026 during the wait on 1065). What is left of
-      the loudness half is the FALLOFF below.
+      the ambient bus at all. CORRECTED 10.09.2026 on GPT-6 Astra's escalation, which measured
+      the tree the earlier sentence claimed: `SPEECH_PEAK` is NOT gone — `speaking.ts`:64 still
+      defines it as 1.8 and `phrasePlan` still multiplies it into every syllable's peak
+      (`speaking.ts`:141). It STAYS, unchanged and un-recalibrated: the loudness the user asked
+      for is already delivered by `speechVolume` 2, and a second, unmeasured multiplier on top
+      of it is exactly the guesswork the last bullet of this group forbids. Only its DOC COMMENT
+      is wrong and is corrected with the change — it still says the constant compensates
+      "the ambient bus (0.5) x master (0.5)", a chain the speech bus replaced. If the headroom
+      re-measure below shows the level leaving the chain is unsafe or too quiet, THAT
+      measurement — not the plan — moves the constant. What is left of the loudness half is the
+      FALLOFF below.
     - THE HEARING FALLOFF IS RE-CALIBRATED. `hearingGain` is 1/(1 + falloff·(d/r)²) with a
       hard cut past r (`speaking.ts` ~78-87) and `hearingFalloff` is 24 (`balance.ts`:1437):
       a speaker 3 m away arrives at 31.6 % and one 5 m away at 14.3 % of the level beside
