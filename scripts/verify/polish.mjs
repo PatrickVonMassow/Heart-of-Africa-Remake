@@ -5303,18 +5303,36 @@ if (section('adult-errands')) {
         `his footing is ${dipped.ground.toFixed(2)} m, i.e. ${(-dipped.ground * 100).toFixed(0)} cm below the ` +
           `village plate — he is on the shore, in the water`,
       )
+      // AIMED AT THE JAR, NOT AT THE SHORE (work-order 1065). From five metres
+      // out on a fixed downward tilt the man came out a hand's width tall with
+      // the jar a blob at the end of an arm: the centimetres the check measures
+      // were real and none of them were legible, which is the very complaint
+      // this part answers. The camera now stands closer and solves its pitch
+      // from its own eye onto the jar's base — the part that goes under — so
+      // the drawn water surface and the vessel below it are in the same frame,
+      // his feet still on the shore beneath them.
       const shot = await page.evaluate((v) => {
         const p = window.__placePlayer
-        if (!p) return null
-        // Five metres inland of him, looking down at the jar.
+        const cam = window.__placeCamera
+        if (!p || !cam) return null
         const bearing = Math.atan2(v.x, v.z)
-        p.x = v.x - Math.sin(bearing) * 5
-        p.z = v.z - Math.cos(bearing) * 5
+        p.x = v.x - Math.sin(bearing) * 3.5
+        p.z = v.z - Math.cos(bearing) * 3.5
         p.yaw = Math.atan2(-(v.x - p.x), -(v.z - p.z))
         p.pitch = -0.22
         return true
       }, dipped)
       if (shot) {
+        await nextFrames(2)
+        await page.evaluate((v) => {
+          const p = window.__placePlayer
+          const cam = window.__placeCamera
+          if (!p || !cam) return
+          const eye = new (Object.getPrototypeOf(cam.position).constructor)()
+          cam.getWorldPosition(eye)
+          const flat = Math.hypot(v.handJar.x - eye.x, v.handJar.z - eye.z)
+          p.pitch = Math.atan2(v.handJar.base - eye.y, Math.max(flat, 1e-6))
+        }, dipped)
         await nextFrames(4)
         await frame('1065-carrier-dips-at-the-waterline', {
           local: { x: dipped.handJar.x, y: dipped.handJar.y, z: dipped.handJar.z },
@@ -5347,27 +5365,61 @@ if (section('adult-errands')) {
       // from the camera's OWN eye against the jar's own height, so neither the
       // slope nor his pace can push the subject out of frame. Never catching
       // one is a failing check rather than a frame that quietly never appears.
+      // The camera is stood 5.5 m off him and he keeps walking while the shutter
+      // settles, so a metre or two of drift is expected; anything beyond this is
+      // a camera that stayed where it was.
+      const CARRY_SHOT_MAX_M = 8
+      // AND HE IS PHOTOGRAPHED ON THE OPEN BANK, NOT AMONG THE HUTS. The camera
+      // is teleported to a spot on the village side of him, and once he is
+      // home that spot lies inside a hut: the player is pushed back out to the
+      // nearest free ground and the picture becomes a courtyard with a hut
+      // filling half of it and the man small behind a tree (measured
+      // 09.09.2026 — the distance gate above passed at 8 m and the frame still
+      // showed no jar). Between the waterline and the village edge there is
+      // nothing to be pushed out of, and the water stands behind him, which is
+      // what the frame is meant to say: he is carrying water back from it.
+      const CARRY_SHOT_FROM_WATER_M = 14
       let shotJar = null
       let missed = 'no villager was on the way back with a full jar at all'
-      for (let attempt = 0; attempt < 90 && !shotJar; attempt++) {
-        const placed = await page.evaluate(() => {
-          const p = window.__placePlayer
-          if (!p) return null
-          const s = window.__placeErrands()
-          const k = s.villagers.findIndex(
-            (v) => v.work && v.work.situation === 'water-back' && v.carry === 'fullJar' && v.headJar,
-          )
-          if (k < 0) return null
-          const v = s.villagers[k]
-          // Close and LOW, so the open mouth of the jar on his head is in frame.
-          const bearing = Math.atan2(v.x, v.z)
-          p.x = v.x - Math.sin(bearing) * 3.4
-          p.z = v.z - Math.cos(bearing) * 3.4
-          p.yaw = Math.atan2(-(v.x - p.x), -(v.z - p.z))
-          p.pitch = 0
-          return k
-        })
-        if (placed === null) {
+      let strayed = null
+      // The bank this shot is taken on is measured from where he dipped, so with
+      // no dip there is no stretch to stand him against. That case is already a
+      // red above; here it must not become a silently skipped check.
+      if (!dipped) missed = 'no dip was ever seen, so the open bank he walks up could not be located'
+      for (let attempt = 0; dipped && attempt < 90 && !shotJar; attempt++) {
+        const placed = await page.evaluate(
+          ({ wx, wz, reach }) => {
+            const p = window.__placePlayer
+            if (!p) return null
+            const s = window.__placeErrands()
+            let far = null
+            const k = s.villagers.findIndex((v) => {
+              if (!(v.work && v.work.situation === 'water-back' && v.carry === 'fullJar' && v.headJar)) return false
+              const fromWater = Math.hypot(v.x - wx, v.z - wz)
+              if (fromWater > reach) {
+                if (far === null || fromWater < far) far = fromWater
+                return false
+              }
+              return true
+            })
+            if (k < 0) return { far }
+            const v = s.villagers[k]
+            // Close and LOW, so the jar on his head is in frame — but not so
+            // close that he is cropped by it. At 3.4 m the frame came back a
+            // head and a jar with the man cut off at two edges, which reads as
+            // a mishap rather than as someone carrying water home; the whole
+            // figure with the water behind him says what the errand is.
+            const bearing = Math.atan2(v.x, v.z)
+            p.x = v.x - Math.sin(bearing) * 5.5
+            p.z = v.z - Math.cos(bearing) * 5.5
+            p.yaw = Math.atan2(-(v.x - p.x), -(v.z - p.z))
+            p.pitch = 0
+            return { k }
+          },
+          { wx: dipped.x, wz: dipped.z, reach: CARRY_SHOT_FROM_WATER_M },
+        )
+        if (!placed || placed.k === undefined) {
+          if (placed && placed.far !== null) strayed = placed.far
           await nextFrames(2)
           continue
         }
@@ -5388,10 +5440,39 @@ if (section('adult-errands')) {
           p.yaw = Math.atan2(-(v.x - p.x), -(v.z - p.z))
           const flat = Math.hypot(v.headJar.x - eye.x, v.headJar.z - eye.z)
           p.pitch = Math.atan2(v.headJar.surface - eye.y, Math.max(flat, 1e-6))
-          return { x: v.headJar.x, y: v.headJar.y, z: v.headJar.z, surface: v.headJar.surface, flat }
-        }, placed)
+          return {
+            x: v.headJar.x,
+            y: v.headJar.y,
+            z: v.headJar.z,
+            surface: v.headJar.surface,
+            flat,
+            eye: { x: eye.x, y: eye.y, z: eye.z },
+            stand: { x: p.x, z: p.z },
+            man: { x: v.x, z: v.z },
+          }
+        }, placed.k)
         if (!aimed) {
           missed = 'he set the jar down between the camera being placed and the shutter'
+          await nextFrames(2)
+          continue
+        }
+        // A SUBJECT IN THE PICTURE IS NOT YET A PICTURE OF IT (work-order 1065).
+        // The shutter refuses a frame whose declared subject falls outside the
+        // projection, and a man thirty metres off by the water is still inside
+        // it — so a shot that never moved the camera passes as silently as one
+        // that did. Measured 09.09.2026: this frame came back a wide village
+        // view, hut and tree in the foreground, the carrier a speck at the
+        // waterline, and the check went green. The camera is put 3.4 m off him,
+        // so anything past CARRY_SHOT_MAX_M means the stand did not take; that
+        // is a miss to retry and, if it never resolves, a red that names the
+        // distance, the eye and where the man actually was.
+        if (!(aimed.flat <= CARRY_SHOT_MAX_M)) {
+          missed =
+            `the camera never came near him: the jar measured ${aimed.flat.toFixed(1)} m off the eye ` +
+            `(at ${aimed.eye.x.toFixed(1)}, ${aimed.eye.y.toFixed(1)}, ${aimed.eye.z.toFixed(1)}), ` +
+            `the stand was asked for (${aimed.stand.x.toFixed(1)}, ${aimed.stand.z.toFixed(1)}) and he ` +
+            `walked at (${aimed.man.x.toFixed(1)}, ${aimed.man.z.toFixed(1)}) — a frame from there shows ` +
+            `a village, not a jar`
           await nextFrames(2)
           continue
         }
@@ -5401,7 +5482,7 @@ if (section('adult-errands')) {
             const v = window.__placeErrands().villagers[who]
             return !!(v && v.headJar && v.carry === 'fullJar')
           },
-          placed,
+          placed.k,
         )
         if (!still) {
           missed = 'the jar came off his head in the frames the shutter needed to settle'
@@ -5411,8 +5492,8 @@ if (section('adult-errands')) {
         await frame('1065-carrier-walks-back-full', {
           local: { x: aimed.x, y: aimed.surface, z: aimed.z },
           label:
-            `the carrier walking back with the full jar up on his head, seen from the shore ` +
-            `${aimed.flat.toFixed(1)} m off; its water surface measured at the rim ` +
+            `the carrier walking back up the open bank with the full jar up on his head, the water ` +
+            `behind him, seen from ${aimed.flat.toFixed(1)} m off; its water surface measured at the rim ` +
             `(${aimed.surface.toFixed(2)} m) — the water itself is read from above in the stand frame`,
         })
       }
@@ -5420,8 +5501,13 @@ if (section('adult-errands')) {
         'and that carry is PHOTOGRAPHED with the jar still on his head (work-order 1065)',
         !!shotJar,
         shotJar
-          ? `the jar's water surface at ${shotJar.surface.toFixed(2)} m, aimed at from the camera's own eye`
-          : `no frame of the carry could be taken — ${missed}`,
+          ? `the jar's water surface at ${shotJar.surface.toFixed(2)} m, aimed at from the camera's own ` +
+              `eye ${shotJar.flat.toFixed(1)} m off it`
+          : `no frame of the carry could be taken — ${missed}` +
+              (strayed === null
+                ? ''
+                : `; the nearest carrier was ${strayed.toFixed(1)} m from the water, past the ` +
+                  `${CARRY_SHOT_FROM_WATER_M} m of open bank this shot is taken on`),
       )
     }
     // THE STAND, with the jars that have arrived on it and the two men whose word
