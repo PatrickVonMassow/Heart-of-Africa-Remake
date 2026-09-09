@@ -5311,11 +5311,29 @@ if (section('adult-errands')) {
       // from its own eye onto the jar's base — the part that goes under — so
       // the drawn water surface and the vessel below it are in the same frame,
       // his feet still on the shore beneath them.
+      // AND IT STANDS SIDE-ON TO THE SHORE (09.09.2026). The bearing used to
+      // run from the world origin, which in this village put the camera on the
+      // LAND side: the man was photographed from behind, his own body between
+      // the lens and the jar, and the water surface ran away from the eye
+      // instead of across it — the frame showed a man at a shore and could not
+      // show a jar UNDER anything. Standing square to the walk into the water
+      // draws that surface as a near-horizontal line with the vessel below it,
+      // which is the only arrangement in which "under the surface" is a thing
+      // the picture says rather than a number beside it.
       const shot = await page.evaluate((v) => {
         const p = window.__placePlayer
         const cam = window.__placeCamera
         if (!p || !cam) return null
-        const bearing = Math.atan2(v.x, v.z)
+        const g = window.__placeErrands?.()
+        const foot = g?.geography?.waterFoot
+        const fill = g?.water?.fill
+        // The way INTO the water, from the errand's own two points; the origin
+        // bearing stays as the fallback for a place that names neither.
+        const into =
+          foot && fill && (fill.x !== foot.x || fill.z !== foot.z)
+            ? Math.atan2(fill.x - foot.x, fill.z - foot.z)
+            : Math.atan2(v.x, v.z)
+        const bearing = into + Math.PI / 2
         p.x = v.x - Math.sin(bearing) * 3.5
         p.z = v.z - Math.cos(bearing) * 3.5
         p.yaw = Math.atan2(-(v.x - p.x), -(v.z - p.z))
