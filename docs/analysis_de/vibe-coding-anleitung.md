@@ -261,22 +261,13 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   periodisch **nebeneinander**, zieh **den Code auf den Satz**, und frag: **Welcher naheliegende
   Fall wird von keiner Regel erfasst?**"
 
-- **Die Verweigerung nennt eine Abhilfe, die schadet, nie eintritt — oder längst getan ist.** Wer
-  ihr folgt, steht schlechter da, wartet vergeblich oder wiederholt einen erledigten Schritt.
+- **Der genannte Ausweg trägt nicht:** Er schadet, tritt nie ein, ist längst getan — oder es gibt
+  ihn als Befehl gar nicht. Dann hat die Sperre sogar recht, und übrig bleiben Handarbeit und das
+  Übergehen der Prüfung — die zwei Wege, gegen die sie gebaut wurde.
   → *Prompt:* „**Geh den Ausweg jeder Verweigerung einmal wirklich**, im auslösenden Zustand:
-  Führt er zum Guten, kann er eintreten, und gilt er auch für **den, der die Meldung liest**?“
-
-- **Die Abhilfe ist richtig — nur gibt es sie als Befehl nicht.** Die Sperre hat recht, sie
-  nennt sogar genau den Zustand, den du herstellen sollst, und kein Werkzeug schreibt ihn: Die
-  vorhandenen Befehle setzen einen Vorzustand voraus, den der auslösende Fall gerade nicht mehr
-  hat. Übrig bleiben Handarbeit an der Datei und das Übergehen der Prüfung — also die zwei Wege,
-  gegen die die Sperre gebaut wurde. Solche Lücken stehen oft seit Wochen dokumentiert herum,
-  weil sie niemandem im Weg waren; sichtbar werden sie, wenn ein Nutzer die Folge meldet.
-  → *Prompt:* „Zu jeder Sperre: **Welcher Befehl schreibt den Zustand, den sie verlangt?** Nenne
-  ihn, oder bau ihn — bevor die Sperre scharf geht. Und wenn eine bekannte Lücke nur deshalb
-  harmlos wirkt, weil sie noch niemanden getroffen hat: Sie ist nicht harmlos, sie ist
-  ungemeldet.“
-  *(Womit soll ich das tun?)*
+  Führt er zum Guten, kann er eintreten, gilt er für **den, der die Meldung liest** — und
+  **welcher Befehl schreibt den verlangten Zustand?** Eine Lücke, die niemanden traf, ist nicht
+  harmlos, sondern ungemeldet.“
 
 - **Dieselbe Verweigerung ein zweites Mal — wortgleich.** Du hast begründet, warum sie nicht
   zutrifft, und sie kommt unverändert wieder. Dann irrt nicht der Wächter, sondern dein Bild
@@ -506,9 +497,8 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   Rückstand beim Abtragen: Wer ihn behebt, fasst die Datei an und schuldet neu.
   → *Prompt:* „Binde jede Prüfpflicht an den **einzelnen Beitrag**, nie an einen offenen Zeitraum,
   und buch ein Veto gegen den **Befund**: trenne **gelesen** von bloß berührt, quittiere eine
-  Reparaturkette am **Endzustand** als einen Beitrag, mach neue Befunde derselben Datei zum eigenen
-  Ticket. Eine Verweigerung nennt ihren **Grund**, nie ihren Bestand; sieht eine Pflicht
-  unerfüllbar aus, prüf zuerst dein **Messgerät**."
+  Reparaturkette am **Endzustand** als einen Beitrag, mach neue Befunde derselben Datei zum
+  eigenen Ticket. Sieht eine Pflicht unerfüllbar aus, prüf zuerst dein **Messgerät**."
 
 - **Zwei Prüfungen, die einander widersprechen — Gehorsam sieht aus wie ein Verstoß.** Die eine verlangt,
   freie Kapazität zu nutzen; die andere duldet keine Änderung, während sie läuft. Wer der ersten folgt,
@@ -519,23 +509,21 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   Zug, der **beide** Auflagen erfüllt? Wenn nicht, ist nicht die Sitzung schuld."
 
 - **Die Warnung stand dreimal da und feuerte nie — sie lag unter der falschen Überschrift.**
-  Derselbe Fehler zum dritten Mal, obwohl er als Absatz, als Fallstrick und als gemessene Regel
-  notiert war: Abgelegt war er unter seinem **Thema**, gebraucht wurde er dort, wo die
-  widersprechende Aufforderung ankam — im Wortlaut des Wächters, der zur Vorarbeit drängt.
-  → *Prompt:* „Schreib die Ausnahme in den Text **dessen, der auffordert**, nicht in das Kapitel,
-  das thematisch passt. Prüffrage bei jeder neuen Regel: An welcher **Stelle im Ablauf** wird sie
-  gelesen — und steht sie dort. Eine Regel, die dreimal überlesen wurde, ist nicht zu schwach
-  formuliert, sondern am falschen Ort abgelegt."
+  Derselbe Fehler zum dritten Mal, obwohl als Absatz, Fallstrick und gemessene Regel notiert:
+  abgelegt unter seinem **Thema**, gebraucht dort, wo die widersprechende Aufforderung ankam —
+  im Wortlaut des Wächters, der zur Vorarbeit drängt.
+  → *Prompt:* „Schreib die Ausnahme in den Text **dessen, der auffordert**, nicht ins thematisch
+  passende Kapitel. An welcher **Stelle im Ablauf** wird eine Regel gelesen — und steht sie dort?
+  Eine überlesene Regel ist nicht zu schwach formuliert, sondern falsch abgelegt."
 
-- **Die Anweisung hebt ihre eigene Voraussetzung auf.** Ein Ablauf verlangt, erst eine Markierung zu
-  setzen und sie dann zu veröffentlichen — doch das Veröffentlichen zählt als Arbeit, und Arbeit löscht
-  die Markierung. Dieselbe Falle als Sperre: Ihr Notausgang musste eine Datei schreiben, und genau das
-  untersagte sie als Erstes.
-  → *Prompt:* „Spiel jede neue Durchsetzung als **wörtlichen Gehorsam** durch und probiere
-  ihren Notausgang **unter** der Sperre aus. Prüffrage: Zerstört die vorgeschriebene
-  Handlungsfolge ihre eigene Voraussetzung — oder setzt der Ausweg eine Fähigkeit voraus, die
-  die Sperre gerade entzieht? Und nimmt deine **Ausnahme** nur die **Prüfung** aus oder auch
-  ihre **Abhilfe**?"
+- **Die Anweisung hebt ihre eigene Voraussetzung auf.** Ein Ablauf verlangt, erst eine Markierung
+  zu setzen und sie dann zu veröffentlichen — doch Veröffentlichen zählt als Arbeit, und Arbeit
+  löscht die Markierung. Dieselbe Falle als Sperre: Ihr Notausgang musste eine Datei schreiben —
+  genau das untersagte sie.
+  → *Prompt:* „Spiel jede neue Durchsetzung als **wörtlichen Gehorsam** durch und probier ihren
+  Notausgang **unter** der Sperre. Zerstört die Folge ihre Voraussetzung, oder setzt der Ausweg
+  eine Fähigkeit voraus, die die Sperre entzieht? Nimmt deine **Ausnahme** nur die **Prüfung**
+  aus oder auch ihre **Abhilfe**?"
 
 - **Der Rückfall rettet die Funktion und setzt still eine Vereinbarung aus.** Fällt der zweite
   Anbieter aus — oder fehlt die Datei, die deine Regel einstellt —, verhält sich jedes Werkzeug
