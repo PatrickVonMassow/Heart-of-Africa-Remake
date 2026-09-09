@@ -1450,7 +1450,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 09.09.2026, 17:47 · Quellen-Fingerprint: `c3bb3722daf2…`
+Zuletzt aktualisiert: Mittwoch, 09.09.2026, 21:38 · Quellen-Fingerprint: `b6921d822014…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1555,8 +1555,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 95 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 126 Prozess-/Meta-TASKS-Punkte (davon 60 offen).
 
-<!-- RETRO-FINGERPRINT: c3bb3722daf21e87c77bc04eea0c34f306b98c6dfde841e18cef795c0927278d -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-09T15:47:50.500Z -->
+<!-- RETRO-FINGERPRINT: b6921d822014c9a8148d2c361195e07e76c272ce756964d2926b74bb95f2937f -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-09T19:38:53.231Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -6311,3 +6311,31 @@ nichts kostet: Wenn ein Prüflauf die Reparatursprosse selbst ausdruckt, ist die
 Handlung dieser Ausdruck und nicht der nächste Vollbeweis. Gebucht als Punkt 1083, der
 ausdrücklich keine neue Mechanik baut — die Infrastruktur ist eingefroren —, sondern die
 Julitabelle als Basislinie stehen lässt und das gemessene Septemberband danebenschreibt.
+
+### 3.254 Die Planzahl, die nur eine Wartezeit bemessen sollte, spricht ein Todesurteil
+
+Wenige Stunden nach §3.253, aus demselben Zahlenmaterial und mit umgekehrtem Vorzeichen:
+Am Abend des 09.09.2026 meldete `run-wait --await` den vollen `polish`-Lauf des Punktes
+1065 nach 45 Minuten als HUNG — „past 2.5x this run's expectation" — und riet, ihn zu
+beenden. Der Lauf schrieb zu diesem Zeitpunkt weiter Bilder, alle ein bis drei Minuten,
+und stand bei den Motiven, die der vorherige vollständige Durchlauf zuletzt geschrieben
+hatte.
+
+Die Erwartung von 5:41 war dieselbe Zahl, die §3.253 wenige Stunden zuvor als falsch
+gemessen hatte: `SUITE_RUNTIME_S.polish = 340.9`, aus der Julitabelle, gegen gemessene
+28 bis 62 Minuten. Es ist also keine zweite schlechte Zahl, sondern dieselbe in einem
+zweiten Verbraucher — und Punkt 1083 erreicht ihn nicht, weil er die LESART eines Plans
+verbessert und nicht ein Urteil, das daraus gerechnet wird.
+
+Der eigentliche Fund steht als Kommentar über der Tabelle selbst: Die Zahlen „size a WAIT,
+and a wait that is 20 % short costs one more check, not a wrong verdict." Genau diese
+Rechtfertigung ist die Lücke. Sie war richtig, als die Tabelle einen einzigen Verbraucher
+hatte; dann bekam sie einen zweiten, der aus derselben Zahl ein Urteil macht, und niemand
+ist zu dem Satz zurückgegangen, der ihre Ungenauigkeit erlaubt. Eine Planzahl darf eine
+Wartezeit bemessen; einen Lauf verurteilen darf sie nicht. Wer eine bewusst grobe Größe
+einführt, schuldet ihr eine Liste ihrer erlaubten Verwendungen — sonst wandert sie in
+Entscheidungen, für die sie nie genau genug war.
+
+Bemerkenswert ist auch, WORAN die Lebendigkeit hing: nicht am Log, das eine Bildsuite
+naturgemäß minutenlang schweigen lässt, sondern an den Schreibzeiten der Bilder — dem
+einzigen Signal, das das Urteil nicht liest. Gebucht als Punkt 1084.
