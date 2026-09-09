@@ -1026,7 +1026,11 @@ describe('the verification ladder', () => {
     // quoting it for another suite's section makes an unmeasured run look
     // classified, which is worse than giving no number at all.
     expect(text).toMatch(/ON `polish` ALONE/)
-    expect(text).toMatch(/no other suite's sections were\s+timed/)
+    expect(text).toMatch(/No other suite's sections were timed/)
+    // …and it stops there. Telling a reader to SCALE another suite's section
+    // from an unmeasured fraction dresses a guess as a measurement (Astra,
+    // four-eyes rounds 1 and 2).
+    expect(text).not.toMatch(/scale from the plan|fraction of ITS OWN pass/)
     expect(text).toMatch(/9\.9-61\.5 min, median 55\.2/) // one whole suite
     expect(text).toMatch(/115\.3-120\.9 min/) // the whole set, both backends
     // And the caveat travels with them: a band recognises an outlier, and a
