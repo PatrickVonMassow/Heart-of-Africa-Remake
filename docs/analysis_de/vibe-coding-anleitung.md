@@ -262,12 +262,11 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   Fall wird von keiner Regel erfasst?**"
 
 - **Der genannte Ausweg trägt nicht:** Er schadet, tritt nie ein, ist längst getan — oder es gibt
-  ihn als Befehl gar nicht. Dann hat die Sperre sogar recht, und übrig bleiben Handarbeit und das
+  ihn als Befehl gar nicht. Dann hat die Sperre recht, und übrig bleiben Handarbeit und das
   Übergehen der Prüfung — die zwei Wege, gegen die sie gebaut wurde.
   → *Prompt:* „**Geh den Ausweg jeder Verweigerung einmal wirklich**, im auslösenden Zustand:
   Führt er zum Guten, kann er eintreten, gilt er für **den, der die Meldung liest** — und
-  **welcher Befehl schreibt den verlangten Zustand?** Eine Lücke, die niemanden traf, ist nicht
-  harmlos, sondern ungemeldet.“
+  **welcher Befehl schreibt den verlangten Zustand?** Eine ungenutzte Lücke ist ungemeldet.“
 
 - **Dieselbe Verweigerung ein zweites Mal — wortgleich.** Du hast begründet, warum sie nicht
   zutrifft, und sie kommt unverändert wieder. Dann irrt nicht der Wächter, sondern dein Bild
@@ -498,7 +497,8 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Binde jede Prüfpflicht an den **einzelnen Beitrag**, nie an einen offenen Zeitraum,
   und buch ein Veto gegen den **Befund**: trenne **gelesen** von bloß berührt, quittiere eine
   Reparaturkette am **Endzustand** als einen Beitrag, mach neue Befunde derselben Datei zum
-  eigenen Ticket. Sieht eine Pflicht unerfüllbar aus, prüf zuerst dein **Messgerät**."
+  eigenen Ticket. Eine Verweigerung nennt ihren **Grund**, nie ihren Bestand; sieht eine Pflicht
+  unerfüllbar aus, prüf zuerst dein **Messgerät**."
 
 - **Zwei Prüfungen, die einander widersprechen — Gehorsam sieht aus wie ein Verstoß.** Die eine verlangt,
   freie Kapazität zu nutzen; die andere duldet keine Änderung, während sie läuft. Wer der ersten folgt,
