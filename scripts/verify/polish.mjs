@@ -5333,71 +5333,89 @@ if (section('adult-errands')) {
         : `nobody was ever seen carrying water back — ${witness}`,
     )
     if (carried) {
-      // PHOTOGRAPH WHERE HE IS NOW, AND AIM AT THE JAR (work-order 1065).
-      // `carried` is a snapshot from the sampling loop above and the man it
-      // describes is WALKING. The camera used to be placed on that stale
-      // reading and pitched a fixed 0.06 rad UP — but he walks back UP the
-      // bank, so the camera stands higher than he does and that angle looked
-      // clean over him. Measured 09.09.2026: the frame declared the full jar
-      // and contained the river with a figure clipped at its bottom edge and
-      // nothing on its head. He is re-read live here, and both angles are
-      // solved from the CAMERA'S OWN EYE against the jar's own height, so no
-      // slope and no walking speed can put the subject out of the picture.
-      let live = null
-      for (let i = 0; i < 60 && !live; i++) {
-        live = await page.evaluate(() => {
+      // PHOTOGRAPH THE MAN WHO IS STILL CARRYING, AND AIM AT THE JAR
+      // (work-order 1065). Two things used to put the declared subject out of
+      // the picture. The camera was placed on `carried`, a snapshot taken
+      // earlier in the sampling loop, and the man it describes is WALKING; and
+      // it pitched a fixed 0.06 rad UP, while the carrier walks back UP the
+      // bank, so the camera stands above him and that angle looked clean over
+      // him. Measured 09.09.2026: the frame declared the water surface at the
+      // rim and contained the river with a figure clipped at its bottom edge.
+      // The shot is now TRIED until it catches a carrier mid-walk — he may set
+      // the jar down between the camera being placed and the shutter, and that
+      // is a miss to retry, not a picture to keep — and both angles are solved
+      // from the camera's OWN eye against the jar's own height, so neither the
+      // slope nor his pace can push the subject out of frame. Never catching
+      // one is a failing check rather than a frame that quietly never appears.
+      let shotJar = null
+      let missed = 'no villager was on the way back with a full jar at all'
+      for (let attempt = 0; attempt < 90 && !shotJar; attempt++) {
+        const placed = await page.evaluate(() => {
+          const p = window.__placePlayer
+          if (!p) return null
           const s = window.__placeErrands()
           const k = s.villagers.findIndex(
             (v) => v.work && v.work.situation === 'water-back' && v.carry === 'fullJar' && v.headJar,
           )
-          return k < 0 ? null : { who: k, x: s.villagers[k].x, z: s.villagers[k].z }
-        })
-        if (!live) await nextFrames(2)
-      }
-      check(
-        'and that carry is photographed while the jar is still ON his head',
-        !!live,
-        live
-          ? `villager ${live.who} still on the way back with the jar up`
-          : 'the jar had been set down again before the camera could be placed',
-      )
-      if (live) {
-        const jar = await page.evaluate((who) => {
-          const p = window.__placePlayer
-          const s = window.__placeErrands()
-          const v = s.villagers[who]
-          if (!p || !v || !v.headJar) return null
+          if (k < 0) return null
+          const v = s.villagers[k]
+          // Close and LOW, so the open mouth of the jar on his head is in frame.
           const bearing = Math.atan2(v.x, v.z)
           p.x = v.x - Math.sin(bearing) * 3.4
           p.z = v.z - Math.cos(bearing) * 3.4
           p.yaw = Math.atan2(-(v.x - p.x), -(v.z - p.z))
           p.pitch = 0
-          return true
-        }, live.who)
-        if (jar) {
+          return k
+        })
+        if (placed === null) {
           await nextFrames(2)
-          const aimed = await page.evaluate((who) => {
-            const p = window.__placePlayer
-            const cam = window.__placeCamera
-            const s = window.__placeErrands()
-            const v = s.villagers[who]
-            if (!p || !cam || !v || !v.headJar) return null
-            p.yaw = Math.atan2(-(v.x - p.x), -(v.z - p.z))
-            const flat = Math.hypot(v.headJar.x - cam.position.x, v.headJar.z - cam.position.z)
-            p.pitch = Math.atan2(v.headJar.surface - cam.position.y, Math.max(flat, 1e-6))
-            return { x: v.headJar.x, y: v.headJar.y, z: v.headJar.z, surface: v.headJar.surface }
-          }, live.who)
-          if (aimed) {
-            await nextFrames(3)
-            await frame('1065-carrier-walks-back-full', {
-              local: { x: aimed.x, y: aimed.surface, z: aimed.z },
-              label:
-                `the carrier walking back with the full jar: the water surface standing at the rim of the ` +
-                `open jar on his head (${aimed.surface.toFixed(2)} m)`,
-            })
-          }
+          continue
         }
+        // One frame for the camera to stand where the player was put, then the
+        // angles off ITS eye — and off the jar as it is NOW, not as it was.
+        await nextFrames(2)
+        const aimed = await page.evaluate((who) => {
+          const p = window.__placePlayer
+          const cam = window.__placeCamera
+          const v = window.__placeErrands().villagers[who]
+          if (!p || !cam || !v || !v.headJar || v.carry !== 'fullJar') return null
+          p.yaw = Math.atan2(-(v.x - p.x), -(v.z - p.z))
+          const flat = Math.hypot(v.headJar.x - cam.position.x, v.headJar.z - cam.position.z)
+          p.pitch = Math.atan2(v.headJar.surface - cam.position.y, Math.max(flat, 1e-6))
+          return { x: v.headJar.x, y: v.headJar.y, z: v.headJar.z, surface: v.headJar.surface }
+        }, placed)
+        if (!aimed) {
+          missed = 'he set the jar down between the camera being placed and the shutter'
+          await nextFrames(2)
+          continue
+        }
+        await nextFrames(2)
+        const still = await page.evaluate(
+          (who) => {
+            const v = window.__placeErrands().villagers[who]
+            return !!(v && v.headJar && v.carry === 'fullJar')
+          },
+          placed,
+        )
+        if (!still) {
+          missed = 'the jar came off his head in the frames the shutter needed to settle'
+          continue
+        }
+        shotJar = aimed
+        await frame('1065-carrier-walks-back-full', {
+          local: { x: aimed.x, y: aimed.surface, z: aimed.z },
+          label:
+            `the carrier walking back with the full jar: the water surface standing at the rim of the ` +
+            `open jar on his head (${aimed.surface.toFixed(2)} m)`,
+        })
       }
+      check(
+        'and that carry is PHOTOGRAPHED with the jar still on his head (work-order 1065)',
+        !!shotJar,
+        shotJar
+          ? `the jar's water surface at ${shotJar.surface.toFixed(2)} m, aimed at from the camera's own eye`
+          : `no frame of the carry could be taken — ${missed}`,
+      )
     }
     // THE STAND, with the jars that have arrived on it and the two men whose word
     // sends and reports. Photographed at the stand whether or not an order fell
