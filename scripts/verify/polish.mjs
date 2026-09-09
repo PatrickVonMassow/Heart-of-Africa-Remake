@@ -5333,25 +5333,70 @@ if (section('adult-errands')) {
         : `nobody was ever seen carrying water back — ${witness}`,
     )
     if (carried) {
-      const shot = await page.evaluate((v) => {
-        const p = window.__placePlayer
-        if (!p) return null
-        // Close and LOW, so the open mouth of the jar on his head is in frame.
-        const bearing = Math.atan2(v.x, v.z)
-        p.x = v.x - Math.sin(bearing) * 3.4
-        p.z = v.z - Math.cos(bearing) * 3.4
-        p.yaw = Math.atan2(-(v.x - p.x), -(v.z - p.z))
-        p.pitch = 0.06
-        return true
-      }, carried)
-      if (shot) {
-        await nextFrames(4)
-        await frame('1065-carrier-walks-back-full', {
-          local: { x: carried.headJar.x, y: carried.headJar.surface, z: carried.headJar.z },
-          label:
-            `the carrier walking back with the full jar: the water surface standing at the rim of the ` +
-            `open jar on his head (${carried.headJar.surface.toFixed(2)} m)`,
+      // PHOTOGRAPH WHERE HE IS NOW, AND AIM AT THE JAR (work-order 1065).
+      // `carried` is a snapshot from the sampling loop above and the man it
+      // describes is WALKING. The camera used to be placed on that stale
+      // reading and pitched a fixed 0.06 rad UP — but he walks back UP the
+      // bank, so the camera stands higher than he does and that angle looked
+      // clean over him. Measured 09.09.2026: the frame declared the full jar
+      // and contained the river with a figure clipped at its bottom edge and
+      // nothing on its head. He is re-read live here, and both angles are
+      // solved from the CAMERA'S OWN EYE against the jar's own height, so no
+      // slope and no walking speed can put the subject out of the picture.
+      let live = null
+      for (let i = 0; i < 60 && !live; i++) {
+        live = await page.evaluate(() => {
+          const s = window.__placeErrands()
+          const k = s.villagers.findIndex(
+            (v) => v.work && v.work.situation === 'water-back' && v.carry === 'fullJar' && v.headJar,
+          )
+          return k < 0 ? null : { who: k, x: s.villagers[k].x, z: s.villagers[k].z }
         })
+        if (!live) await nextFrames(2)
+      }
+      check(
+        'and that carry is photographed while the jar is still ON his head',
+        !!live,
+        live
+          ? `villager ${live.who} still on the way back with the jar up`
+          : 'the jar had been set down again before the camera could be placed',
+      )
+      if (live) {
+        const jar = await page.evaluate((who) => {
+          const p = window.__placePlayer
+          const s = window.__placeErrands()
+          const v = s.villagers[who]
+          if (!p || !v || !v.headJar) return null
+          const bearing = Math.atan2(v.x, v.z)
+          p.x = v.x - Math.sin(bearing) * 3.4
+          p.z = v.z - Math.cos(bearing) * 3.4
+          p.yaw = Math.atan2(-(v.x - p.x), -(v.z - p.z))
+          p.pitch = 0
+          return true
+        }, live.who)
+        if (jar) {
+          await nextFrames(2)
+          const aimed = await page.evaluate((who) => {
+            const p = window.__placePlayer
+            const cam = window.__placeCamera
+            const s = window.__placeErrands()
+            const v = s.villagers[who]
+            if (!p || !cam || !v || !v.headJar) return null
+            p.yaw = Math.atan2(-(v.x - p.x), -(v.z - p.z))
+            const flat = Math.hypot(v.headJar.x - cam.position.x, v.headJar.z - cam.position.z)
+            p.pitch = Math.atan2(v.headJar.surface - cam.position.y, Math.max(flat, 1e-6))
+            return { x: v.headJar.x, y: v.headJar.y, z: v.headJar.z, surface: v.headJar.surface }
+          }, live.who)
+          if (aimed) {
+            await nextFrames(3)
+            await frame('1065-carrier-walks-back-full', {
+              local: { x: aimed.x, y: aimed.surface, z: aimed.z },
+              label:
+                `the carrier walking back with the full jar: the water surface standing at the rim of the ` +
+                `open jar on his head (${aimed.surface.toFixed(2)} m)`,
+            })
+          }
+        }
       }
     }
     // THE STAND, with the jars that have arrived on it and the two men whose word
