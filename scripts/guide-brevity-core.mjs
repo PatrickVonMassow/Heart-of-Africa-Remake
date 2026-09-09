@@ -432,7 +432,7 @@ export const LIMITS = {
   // expensive check be scoped, this half says a scope without a measured price is not obeyed.
   // The fold, cut twice more to hold the four-line risk contract, pays back 8 lines and 88
   // words. Ceilings move 620 -> 624 with zero slack, and no existing claim was dropped.
-  maxLines: 624,
+  maxLines: 623,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -672,7 +672,7 @@ export const LIMITS = {
   // measures 81 words, and the liveness sharpening beside it 31: 5775 -> 5887.
   // 09.09.2026: the rule-without-a-price fold justified beside maxLines measures 52 words:
   // 5887 -> 5939.
-  maxWords: 5939,
+  maxWords: 5936,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,
