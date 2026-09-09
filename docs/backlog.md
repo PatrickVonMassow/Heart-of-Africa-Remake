@@ -467,3 +467,17 @@ exact measured size ("no unearned headroom"), so any growth reads red. The entry
 taken back out; the class itself stands permanently in the retrospective as §3.252. To decide: the
 guide shortens an existing entry to make room, or the ceiling is raised once, deliberately. It does
 not grow quietly, and that is the intent.
+
+## Two polish runs on one checkout tear each other up (09.09.2026)
+
+Non-blocking, collected. On 09.09.2026 two `polish` runs were started 7.3 s
+apart on the SAME checkout while a third was still finishing. Both drew into
+the one `verification/` directory, wrote partial frame sets (32 and 35 of 48)
+and exited 1; neither log printed a single section, so neither carried a red
+anybody could own. Both were signed off as crashes with their evidence, and the
+fresh WebGL 2 run afterwards came back green.
+
+Nothing stops the second start: the quiet-machine check NAMES the leftovers and
+lets the run proceed by design. Whether that is worth a refusal rather than a
+warning is a judgement for whoever next touches that check — it costs two runs
+each time, and it happened twice in one night.
