@@ -669,6 +669,126 @@ put it is the mistake this line exists to stop.
   rendered picture, the browser suites and the landing stay in the main session.
   Bundle: Dorfleben.
 
+- [ ] 1082. A child climbing the village boulder becomes something the player actually
+  sees (user 09.09.2026, 05:04 — the same report twice).
+  Point 1080 was filed on 08.09.2026 because the user never saw the climb; it landed in the
+  early hours of 09.09.2026, having lengthened the hold from 0.35 s to 2.8 s and replaced a
+  0.32 m hover with the real height of the stone. At 05:04 on 09.09.2026 he reported it
+  missing AGAIN and asked whether it was meant to happen at the play rocks by the river,
+  where he only ever sees the children run to their game. Measured against the shipped code,
+  not guessed: the whole event lasts 4.4 s (`climbRiseSeconds` 0.9 + `climbHoldSeconds` 2.8 +
+  `climbSinkSeconds` 0.7) and falls once per cycle of about 2.5–4 minutes; it falls in the
+  first ~10 s of the roaming phase, because the climber is picked on the first roam step and
+  walks straight at the stone (`bankGame.ts:1205`), so it is over before a player who has
+  just walked into the village has found the group; and the stone is whatever climbable
+  instance is nearest the quarter, with scatter tops running 0.16–0.53 m (`ROCK_TOP_UNITS`,
+  `flora.ts:323`) — at the low end a step over a pebble. The evidence picture accepted for
+  1080, `verification/187-child-on-the-boulder.png`, was taken with `climbHoldSeconds` forced
+  to 25 s (`polish.mjs:4592`) from a camera two metres in front of the child: it proves the
+  mechanic runs, never that a player can see it, and THAT gap is what the user is reporting.
+  The mechanic is right; the presentation is not. It earns its own branch because the remedy
+  is not a number — the stone has to be placed by the layout instead of found by a search,
+  and the acceptance is a picture at shipped values, the only check that would have caught
+  this the first time.
+  The off-game ROCK stays exactly the mechanic point 1080 built — an ORDINARY scattered
+  village boulder, climbed during the roaming phase, never a play rock at the bank. Only its
+  visibility changes.
+  PART A — THE STONE IS CHOSEN TO BE CLIMBED, NOT MERELY TO BE NEAR.
+  `climbBoulder` takes the nearest stone above a 0.20 m floor, and the scatter tops run
+  0.16–0.53 m: where the nearest instance is a small one, the climb is a step onto a
+  knee-high pebble. Raising the floor alone is already refuted — the balance note at
+  `climbableRockTop` records that 0.30 m sent the climber 5 m further off in two shipped
+  layouts, the approach then failed and the shuffle gate tripped. So height and nearness stop
+  competing: the layout DERIVES one climbing stone, the way it already derives the two play
+  rocks from the bank.
+  Final state:
+  - Every village layout with a quarter for the children also carries one climbing stone:
+    just outside the rim of that quarter, on the side the group roams, within a short walk,
+    at the top of the scatter size range (instance scale 1.0, top ~0.53 m — chest-high on a
+    0.55-scaled child), and clear of huts, lanes, the way to the water, the bank play lane
+    and the quarter disc, under the rules the rest of the scatter already obeys.
+  - `climbBoulder` takes that stone. The present nearest-climbable-else-tallest search stays
+    as the fallback for a fabric that leaves no room, so no village loses its bank round.
+  - `climbableRockTop` is raised to the height the derived stone guarantees, so the fallback
+    can no longer pick a pebble where a real stone exists. Re-measure the layouts the 0.20 m
+    note was measured on rather than assuming the derived stone pays it back.
+  - Renderer, collider and stand height stay the single `LooseRock` value they are today.
+  PART B — THE STAND LASTS LONG ENOUGH TO BE FOUND, AND THE WORD LASTS AS LONG AS THE STAND.
+  `climbHoldSeconds` is 2.8 s and `communication.labelSeconds` is 2.6 s: coupled today only
+  by accident of their values, so lengthening one alone would leave a child standing wordless
+  on a stone.
+  Final state:
+  - `climbHoldSeconds` becomes 7 s (estimate, calibratable, in `src/config/balance.ts` under
+    CLAUDE.md §2 / design.md §14): long enough for a player who looks over when the word
+    falls to find the child and the stone under it.
+  - The overhead label of the boulder utterance lives as long as the child stands, DERIVED
+    from the hold at the call site rather than written down twice, so the two cannot drift
+    apart again.
+  - Rise (0.9 s) and sink (0.7 s) unchanged; the pace of the climb was not the defect.
+  - The child-motion floor is untouched, and the roam guard still bounds the phase.
+  PART C — SOMETHING PULLS THE EYE BEFORE THE WORD DOES.
+  The whole event is one `indicate` gesture fired once on arrival at the top: a player not
+  already watching that child has nothing to look up for.
+  Final state:
+  - The gesture of the climber is visible for the whole hold instead of as a single shot: the
+    arm stays out at the rim of the stone on the side it came up, the aim already computed
+    today.
+  - The group notices. While the climber stands, the other children turn their facing toward
+    the boulder — a turn only, never a stop: no walk is interrupted, and the motion floor and
+    the shuffle gate are re-measured to prove it.
+  - No new word, no repeated word, no second utterance: ROCK still falls exactly once per
+    cycle, at the top of the climb.
+  PART D — THE VERIFICATION STOPS STAGING WHAT IT PHOTOGRAPHS.
+  Section `children-boulder-climb` in `scripts/verify/polish.mjs` sets `climbHoldSeconds` to
+  25 s to be able to take its picture at all. That staging IS the measurement of this defect,
+  so removing it is the acceptance.
+  Final state:
+  - The section photographs the climb at the SHIPPED balance values. Shortening `roamSeconds`
+    to reach a roaming phase quickly stays allowed; overriding hold, rise or sink does not.
+  - The frame is judged, not merely taken: from a standpoint a player can occupy on the
+    ground, the child on the stone reads by the existing `tagFrameReading` bar
+    (`MIN_CHILD_PIXELS`, `judgeTagStandpoint`), and the word is up in the same frame. The
+    close staged camera of `verification/187-child-on-the-boulder.png` is replaced by that
+    standpoint.
+  The bounds the user named: the stone must remain an ordinary village boulder that is NO
+  part of the game — moving the naming to a play rock at the bank is REFUSED, because
+  docs/communication-poc-spec.md (110–112) and `bankGame.ts:26` close the reading of ROCK as
+  base/goal/made-it precisely by naming an off-game stone, and the user asked about that in
+  so many words. No new mechanism (CLAUDE.md §2, infrastructure freeze): this is placement,
+  two durations and a gesture that already exists — no new guard, no scheduler, no situation
+  catalogue. Numbers go into `src/config/balance.ts` as estimates marked calibratable, never
+  scattered through the code. The child-motion floor (25 m per played minute) and the shuffle
+  gate must be re-measured, not assumed. The 0.20 m floor carries a measurement in its own
+  comment: whoever raises it re-runs that measurement over the shipped village/seed layouts
+  and records the new numbers in the same comment, rather than deleting the old note.
+  Test.
+  Vitest: the layout derivation — a village with a quarter always yields a climbing stone, it
+  lies outside the quarter disc and clear of lane, play lane and water route, and
+  `climbBoulder` returns it; the fallback still answers for a fabric with no room; `looseRock`
+  keeps renderer, collider and stand height as one value. The hold/label coupling: the label
+  lifetime of the boulder utterance equals the hold for any hold. The gesture is live for the
+  whole hold, and the facing of the other children turns toward the boulder without any child
+  stopping.
+  Browser (polish lane, `--section=children-boulder-climb`, both backends — the stone is a
+  rendered instance and the reading is a pixel judgement): one frame at shipped values;
+  screenshot under `verification/` with the subject declared (a village child standing on the
+  derived climbing stone with its word over its head, from a standpoint on the ground).
+  Re-measure and report the child-motion floor and the shuffle gate over the seeds the
+  existing suites use, because PART B and PART C both change how long children stand and
+  where they look.
+  Refs: src/scenes/place/bankGame.ts (`climbBoulder` ~1205, the roam step, `climbRiseSeconds`
+  / `climbHoldSeconds` / `climbSinkSeconds`), src/config/balance.ts (`climbableRockTop` and
+  its 0.20 m measurement note, `communication.labelSeconds`), src/scenes/place/layout.ts (the
+  derived play rocks, the quarter disc, the lane and water routes), src/scenes/place/flora.ts
+  (`ROCK_TOP_UNITS` ~323, `LooseRock`), src/render/gesture.ts (`indicate`),
+  scripts/verify/polish.mjs (section `children-boulder-climb` ~4592, `tagFrameReading`,
+  `MIN_CHILD_PIXELS`, `judgeTagStandpoint`), docs/communication-poc-spec.md (110–112),
+  design.md §13.4, §14
+  Author lane: opus
+  Why the lane: the verification IS the work here — the deliverable is a judged rendered
+  frame at shipped values, taken and judged in the main session.
+  Bundle: Dorfleben.
+
 - [ ] 690. The classic game of tag moves to the port cities, and every document describes
   the rebuilt mechanic (user 13.08.2026, playing the deployed communication slice; point 692
   folded in here 07.09.2026).
