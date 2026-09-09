@@ -174,6 +174,76 @@ commits that appeared, their trailers, the tree left behind — never the run's
 own account of itself. A run that reports success and committed nothing is
 reported as having authored nothing.
 
+## Routed and not commissioned (point 1077)
+
+The lane's own numbers, measured 08. and re-measured 09.09.2026, say the routing
+works and the dispatch does not.
+
+| measured 09.09.2026 | |
+| --- | --- |
+| open points the routing gives to Astra | 280 of 379 |
+| — nothing marks them otherwise | 156 |
+| — tagged HIGH criticality | 76 |
+| — a HARD marker matched | 40 |
+| — the point carries `Author lane: astra` | 8 |
+| open points the routing keeps in the Opus lane | 99 |
+| — of those, routed by `VERIFICATION_MARKERS` | 99 |
+| — of those, carrying `Author lane: opus` or an override | 0 |
+| `Co-Authored-By` on `main` since 06.09. — Claude family | 182 |
+| `Co-Authored-By` on `main` since 06.09. — GPT-6 Astra | 6 |
+| `Reviewed-By: GPT-6 Astra` over the same range | 14 |
+| `author-astra.mjs` receipts (`.claude/author-<N>.log`) ever | 3 — points 1008, 1031, 1069 |
+| — of those, since 06.09. | 0 |
+
+Those rows say one thing together: **the REVIEW half of the lane runs and the
+AUTHORING half is not called.** Astra read fourteen ranges in three days and
+authored none, while 280 points stood routed to it. Trailers are a weak proxy in
+one direction only — unlanded work and Astra's reading leave none — so the true
+Astra authoring share can only be higher than 6, never lower.
+
+**So no lever that only changes the CUT can move the load.** Reordering the queue
+for load was forbidden by the user on 08.09.2026, with one exception (point 1077
+itself). Tagging seven communication points `Author lane: astra` on 08.09. moved
+the cut from 271/103 to 280/99 and moved no work, because an Astra-lane point is
+still written here anyway. What is left is not a lever but a command:
+`node scripts/author-astra.mjs --point <N>` in the point's own worktree. The
+proof owed is one point authored by Astra end to end.
+
+### The picture marker is not narrowed, and why (decided 09.09.2026)
+
+Every player-visible point writes a Test line naming screenshots and both
+backends, because the house rules demand one. `VERIFICATION_MARKERS` therefore
+matches every player-visible point, and the table says what that adds up to:
+**all 99 Opus-lane points are Opus for that reason and no other.** The lane
+CLAUDE.md §6 describes as "points whose verification is the work" is in practice
+the lane of the whole game.
+
+That is a real false positive. A Test line saying how a result will be SIGNED OFF
+is not a claim that the measuring IS the work, and the sign-off stays with the
+main session whoever authored the code. The marker is still not narrowed:
+
+- **It would move no load.** 280 points are routed to Astra today and none was
+  commissioned. Widening that to ~360 changes a number, not a habit — the
+  measurement names the missing CALL as the cause, and a routing change repairs
+  the one half that already works.
+- **The lane would empty.** Nothing else feeds it: no open point carries
+  `Author lane: opus`. A narrowing cut to remove the boilerplate removes the
+  lane, and deleting a lane CLAUDE.md §6 names is the user's decision, not a
+  regex edit here.
+- **The freeze (CLAUDE.md §2) excludes it.** It blocks no game work and permits
+  no false approval, and both marker lists are hardened over eight cross-vendor
+  rounds.
+
+Used instead is the cheap way back the routing file already documents: where a
+verdict cites only markers that came out of the point's own Test line, the
+dispatcher writes `Author lane: astra` into the point, as a whole line of its
+own. Eight points carry it today.
+
+**When the question reopens:** once an Astra-lane point has been authored by
+Astra end to end and the lane is then measured to run dry while game points wait
+in the Opus lane. Not before — until the command is used, the cut is not the
+constraint.
+
 ## What is never routed, at any setting
 
 - A point whose verification is the work, unless its spec marks it hard — since
