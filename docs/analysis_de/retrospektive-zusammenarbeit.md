@@ -568,6 +568,8 @@ Am 24.08.2026 zwei weitere Ausprägungen an einem Abend, und beide zeigen diesel
 
 **Dritte Adresse, 08.09.2026 — und diesmal verlangt der Riegel etwas, das gerade entsteht.** Aus dem Arbeitsbaum des Punktes 1065 heraus las `render-verify-guard` die ungeprueften Render-Aenderungen des ZWEIGS und verweigerte jedes Zugende, bis ein deckender Bildlauf vorliegt — waehrend genau dieser Lauf seit einer Viertelstunde lief und noch zwei Stunden brauchte. Aus dem Haupt-Checkout beendete derselbe Riegel den Zug wortlos mit 0, weil `main` keine ungepruefte Render-Aenderung traegt. Daneben verweigerte der Tafel-Riegel zum zweiten Mal wie am 25.08. Drei Zugenden gingen verloren, und jede von Hand nachgestellte Diagnose las gruen, weil ich sie aus dem Hauptbaum aufrief. Neu ist nur die Bauform des Schadens: Der Riegel forderte nicht eine fehlende Handlung, sondern eine, die bereits im Gange war — die Verweigerung und ihre eigene Abhilfe liefen gegeneinander. Zweite Lehre desselben Abends: Ein `cd` in einer `&&`-Kette aktualisiert das verfolgte Arbeitsverzeichnis der Sitzung NICHT; nur ein alleinstehendes `cd` haelt. Deshalb sieht die naechste Messung wieder den Arbeitsbaum, obwohl der Befehl davor sichtbar im Hauptbaum lief, und der Drift bleibt unsichtbar.
 
+**Vierte Adresse, 09.09.2026 — der Ausweg war nicht unbegehbar, es gab ihn als Befehl nicht.** Der `now-eta-past`-Riegel verweigert ein Zugende, solange eine laufende Karte eine bereits verstrichene Endzeit verspricht, und nennt die Abhilfe wörtlich: „give each a realistic new ~HH:MM". Nur schrieb keine einzige Board-Anweisung eine solche Zeit. `promote` setzt eine Warteschlangen-Karte voraus, die ein laufender Punkt nicht mehr hat, `toNow` leitet die Kopfzeile aus derselben fehlenden Karte ab, `status` fasst nur den Textkörper an. Übrig blieben die Handbearbeitung des Board-HTML (§3.45) und `--waive-audit`, also genau das Übergehen der Prüfung, für die der Riegel existiert. Der Board-Text selbst führte die Lücke seit Wochen als bekannt („nur kennt die Board-Werkzeugkiste keinen Befehl dafür"), ohne dass sie jemandem im Weg stand — bis der Nutzer die sichtbare Hälfte meldete: Die Tafel versprach 11:46 für Arbeit, die um 13:40 noch lief. Neu gegenüber den drei Vorgängern ist, dass der Riegel recht hatte und der **Schreiber** fehlte; die Vorgänger hatten einen Schreiber, der im auslösenden Zustand nicht griff. Behoben mit `board.mjs eta`.
+
 **Lehre:** Ein Durchsetzer ist erst dann fertig, wenn sein genannter Ausweg **ausgeführt** worden ist, nicht wenn er plausibel klingt. Das gehört in die Prüfung jedes neuen Riegels: den Weg, den die Fehlermeldung vorschlägt, einmal wirklich gehen — im auslösenden Zustand, nicht im gesunden. Zwei Zusatzfragen aus dem 24.08.: Gilt der Weg auch für den, der die Meldung liest — ein delegierter Autor hat andere Rechte als der Besitzer? Und nennt die Absage den Grund, den sie gemessen hat, statt eine Handlung zu empfehlen, die der Aufrufer schon ausgeführt hat?
 
 ### 3.53 Der Schreiber und der Prüfer kannten dieselbe Regel verschieden
@@ -1447,7 +1449,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 09.09.2026, 05:55 · Quellen-Fingerprint: `3fdacb852eb0…`
+Zuletzt aktualisiert: Mittwoch, 09.09.2026, 13:46 · Quellen-Fingerprint: `50609e846aa1…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1486,7 +1488,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to the OpenAI lane, GPT-6 Astra), and review is cross-vendor, not Fable-by-default | 6 | hoch | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 64 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 66 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | wait-command-guard.mjs | ✔ Mechanismus |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | User 18.08.2026: hard, complex, error-prone and HIGH-criticality points are AUTHORED by the OpenAI lane directly (GPT-6 Astra since 05.09.2026, GPT-5.6 Sol before) — Opus 5 authors only what is left, and Fable authors only a point that tags its lane or one the router escalates | 5 | hoch | — (Regel/Memory) | ◐ Regel |
@@ -1552,8 +1554,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 95 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 126 Prozess-/Meta-TASKS-Punkte (davon 60 offen).
 
-<!-- RETRO-FINGERPRINT: 3fdacb852eb0b5902058a2454569bcb4d83686080808fe8ac99d05147714b855 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-09T03:55:17.846Z -->
+<!-- RETRO-FINGERPRINT: 50609e846aa12edbcdbe28612b51b8ad3c6a792caa3e598385048e9c6a67ac11 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-09T11:46:20.472Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
