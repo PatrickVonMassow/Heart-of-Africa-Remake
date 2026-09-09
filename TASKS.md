@@ -134,11 +134,16 @@ put it is the mistake this line exists to stop.
     2.7 m up the bank. The path's foot for the WORD (`say.aim`) may stay where it is; the
     fill spot is at the water.
   - The fill is an ACT with its own phase: he crouches or bends, the jar in his hand goes
-    down into the water — visibly below the drawn surface — stays there a readable moment
-    (calibratable seconds in `src/config/balance.ts`), comes up, and is lifted onto the head
-    (a fill pose beside `digPose` / `HEAD_CARRY_POSE`). 'fullJar' begins only after the dip;
-    the carry never flips without it. The errand's timing backstops (`errandSeconds`,
-    `stallSeconds`) cover the added leg.
+    down into the water, stays there a readable moment (calibratable seconds in
+    `src/config/balance.ts`), comes up, and is lifted onto the head (a fill pose beside
+    `digPose` / `HEAD_CARRY_POSE`). 'fullJar' begins only after the dip; the carry never
+    flips without it. The errand's timing backstops (`errandSeconds`, `stallSeconds`) cover
+    the added leg.
+    SPLIT OFF 09.09.2026 (evening): whether that act READS as fetching water — the words
+    "visibly below the drawn surface" stood here — is point 1085. This point owes the act,
+    its phase, its hold and the geometry the check measures; it does not owe the legibility
+    of the pose, which four re-aimed frames could not deliver and which needs a design
+    decision about the figure rather than another camera position.
   - Water is visible: both jars have an open mouth; the empty one shows a dark hollow, the
     full one a water surface at the rim (a bright disc with the water's tint, readable at
     the distance the player watches from) — so head-carried and hand-carried jars read as
@@ -5510,10 +5515,20 @@ Build order, chosen so no two parallel agents own the same file:
   not a board he can glance at. The publish gate refuses a now-card whose meta field carries
   no `~<end>`, so the omission cannot recur silently; the estimate is the session's judgment
   and may be restated as it learns, but it may not be absent.
+  MEASURED AGAIN 09.09.2026, and the second half of the rule is the one that was missing.
+  Session 7c67a4cd handed over at the context watermark, wrote the idle card "Gerade keine
+  laufende Arbeit" (stamp 19:17) and stopped; the successor b71dc886 had ALREADY acquired the
+  batch lock at 19:15 and never replaced the card. The board showed idle for 37 minutes while
+  point 1065 sat in its worktree with 25 commits and an interrupted picture run, and the USER
+  had to ask. Note which clause would have caught it: "its session no longer holds the batch
+  lock" catches it, "its stamp predates the current owner's `acquiredAt`" does NOT — the card
+  was written two minutes AFTER the successor acquired. A handover card is written last, so
+  the stamp test is the wrong half by construction and the ownership test must stand alone.
   VERIFIABLE: the pure layer covers orphan detection (foreign session, stamp older than the
-  current acquisition, own live card kept), the missing-estimate refusal (a card with only a
-  start stamp is rejected, one with `start · ~end` passes) and the gate's refusal; a live
-  handover leaves no stale card behind.
+  current acquisition, own live card kept), a card written by a foreign session with a stamp
+  NEWER than the current acquisition (the handover shape measured above), the missing-estimate
+  refusal (a card with only a start stamp is rejected, one with `start · ~end` passes) and the
+  gate's refusal; a live handover leaves no stale card behind.
 
 - [ ] 531. The spec documents still describe the old bird's-eye collision (found
   06.08.2026 while closing point 299, escalated by the building agent rather than
@@ -15285,3 +15300,74 @@ to land than a mechanism that needs a review.
   Refs: scripts/audit-check.mjs (`ALLOW`), vitest.config.ts, package.json (`vitest`,
   `@vitest/coverage-v8`), scripts/verify/tiers.mjs (the unit tier), docs/backlog.md.
   Bundle: Testinfrastruktur.
+
+- [ ] 1084. The planning price that was only ever meant to size a wait also
+  pronounces a run dead. MEASURED 09.09.2026 on the picture run of point 1065:
+  `run-wait --await` declared a healthy full `polish` run HUNG after 45m — "past
+  2.5x this run's expectation" — and told the caller to end it, while the run was
+  writing frames every one to three minutes and stood at the motifs the previous
+  full run had written last. Following it would have destroyed 45 minutes of
+  finished rendering, and the batch emergency lane had already been told a
+  standstill was underway.
+  THE NUMBER IS THE ONE POINT 1083 MEASURED AS WRONG. The expectation was 5m 41s,
+  i.e. `SUITE_RUNTIME_S.polish = 340.9` in `scripts/verify/run-wait-core.mjs`,
+  copied from the July table in `docs/picture-check-cost.md`; 1083 measured the
+  same pass at 28-62 minutes. So this is not a second bad number — it is the SAME
+  bad number in a second consumer, and 1083 does not reach it: that point leaves
+  the July baseline standing and writes the September band beside it, which fixes
+  the READING of a plan and not a verdict computed from it.
+  WHAT THE CODE ITSELF ASSUMED. The comment over that table says the figures "size
+  a WAIT, and a wait that is 20 % short costs one more check, not a wrong verdict."
+  That is the defect in one sentence: the table grew a second consumer that turns
+  it into a verdict, and the sentence licensing its imprecision was never revisited.
+  A planning figure may size a wait; it may not condemn a run.
+  FINAL STATE: the hung verdict rests on a MEASURED runtime of the same shape of run
+  — full suite against full runs, `--section` against section runs — and a run with
+  no same-shape measurement on record is reported as UNMEASURED, never as hung. The
+  planning table keeps its one legitimate job, sizing waits, and the comment says so
+  in a way that names the verdict it must not feed. The liveness the verdict reads
+  includes what the run PRODUCES: a suite that has written a frame within the window
+  is alive whatever its log timestamp says, because a picture suite is quiet in the
+  log while it renders.
+  VERIFIABLE: the pure layer covers a full run against a plan-table expectation (not
+  hung), a run that genuinely overruns its own shape's measurement (hung), an
+  expectation with no same-shape record (unmeasured, never hung), and frame writes
+  inside a silent log window counting as liveness.
+  Refs: scripts/verify/run-wait-core.mjs (`SUITE_RUNTIME_S`, the 2.5x verdict),
+  scripts/verify/run-logged.mjs (`expectedRuntimeMs`), docs/picture-check-cost.md,
+  point 1083.
+  Bundle: Testinfrastruktur.
+
+- [ ] 1085. The fill reads as a man falling into the river, and a jar under an
+  opaque surface cannot be photographed at all. SPLIT OUT OF POINT 1065 on 09.09.2026
+  because that point would not converge: four frames were re-aimed in one evening — from
+  the land side, side-on to the shore, live inside the act instead of after it, and from
+  the flank the jar hangs off — and every one of them came back with the same reading. The
+  camera is no longer the problem; the figure is.
+  WHAT THE FRAMES SHOW. The carrier stands at the waterline and folds forward, and because
+  a villager is a legless cone the fold reads as a topple: the body lies at roughly 55-60°
+  across the water with its head at the top, which a player sees as a man face-down in the
+  river rather than a man scooping from it. `fillPose` in `src/render/gesture.ts` takes the
+  trunk to `lean = 0.12 + 0.62` ≈ 42°, against `digPose`'s ≈ 19° — and DIG is the act the
+  spec itself holds up as the one that works.
+  AND THE SECOND HALF IS GEOMETRY, NOT ART. The check asserts the jar's base below the
+  drawn water surface, and that surface is OPAQUE: a vessel proved to be under it is by
+  construction invisible. Photographing the instant the jar breaks the surface (base under,
+  rim still out) was tried — `scripts/verify/polish.mjs`, the `under <= 0.16` band — and at
+  the distance the player watches from, a 0.32 m cylinder half-sunk beside a bent cone is a
+  nub. "Visibly below the surface" and "opaque water" cannot both hold.
+  FINAL STATE: the act reads as fetching water to someone who has not been told what it is.
+  What that costs is a design decision this point makes and writes into `design.md` §13.4
+  rather than guesses — the candidates measured tonight are (a) cap the trunk fold near the
+  dig's magnitude and take the remaining reach from the arm, so the body crouches instead of
+  tipping; (b) TILT the jar at the surface so its mouth is the thing the player sees going
+  under, with the vessel never fully submerged; (c) give the fill a visible consequence at
+  the surface — a ring, a disturbance — so the act is legible even where the vessel is not.
+  Whatever is chosen, the frame `verification/1065-carrier-dips-at-the-waterline.png` shows
+  it to a reader who was told nothing.
+  VERIFIABLE: the pose layer covers the fold's bound and the arm's reach; the picture is
+  judged on both backends by a reader who is told only "what is this man doing?".
+  Refs: src/render/gesture.ts (`fillPose`, `digPose`), src/scenes/place/PlaceLife.tsx (the
+  jar geometry), scripts/verify/polish.mjs (the `adult-errands` fill frame), design.md
+  §13.4, point 1065.
+  Bundle: Dorfleben.
