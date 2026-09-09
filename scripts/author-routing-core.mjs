@@ -326,17 +326,17 @@ export const HARD_MARKERS = Object.freeze([
  * the Astra lane one point. The point's own `Author lane:` tag is the cheap way
  * back.
  *
- * AND THE ERROR IS NOT SMALL — MEASURED, AND LEFT AS IT IS (point 1077,
- * 09.09.2026). Every player-visible point writes a Test line naming screenshots
- * and both backends because the house rules demand one, so this list matches the
- * whole game: all 99 Opus-lane points of that day were Opus for this reason and
- * no other, and none carried `Author lane: opus`. Narrowing it was DECIDED
- * AGAINST rather than forgotten — it would empty the lane §6 names, and it would
- * move no load, because 280 points were routed to Astra that day and not one was
- * commissioned through author-astra.mjs. The constraint is the missing CALL, not
- * the cut. Where a verdict cites only markers out of a point's Test line, the
- * dispatcher writes the tag. Reasons, numbers and the reopening condition:
- * docs/astra-routing.md, "Routed and not commissioned".
+ * AND THE SUSPICION THAT IT READS BOILERPLATE WAS MEASURED AND IS WRONG (point
+ * 1077, 09.09.2026). Every player-visible point writes a Test line naming
+ * screenshots and both backends, so this list looked as though it were routing
+ * the whole game on house boilerplate: all 99 Opus-lane points of that day were
+ * Opus for this reason and no other, and none carried `Author lane: opus`. But
+ * cut the standing tail off every point — Test, Refs:, Bundle:, Criticality:,
+ * Author lane: — and 97 of those 99 still name a marker in the point's OWN
+ * prose. The obvious narrowing would move TWO points, so it was decided against
+ * rather than forgotten, and the tag handles those two. Numbers, the rest of the
+ * reasoning and the reopening condition: docs/astra-routing.md, "Routed and not
+ * commissioned".
  */
 export const VERIFICATION_MARKERS = Object.freeze([
   /\bscreenshots?\b/i,
