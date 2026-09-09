@@ -123,6 +123,44 @@ put it is the mistake this line exists to stop.
   docs/communication-poc-spec.md.
   Bundle: Dorfleben.
 
+- [ ] 1081. A child boxed by adults planted in its own play ground walks a metre and gets
+  nowhere — and the case that was supposed to catch it pins one lucky seed. Measured on
+  `main` on 09.09.2026 while work-order 1080 was being verified: the crowded construction of
+  `tagShuffle.test.ts` ("and holds when the adults walk through the children's own ground",
+  every errand villager planted INSIDE the children's quarter) reads 0 % at bambara-village
+  seed 2972259115, which is the one village and seed the case runs — and 0.51 % / 0.68 % /
+  0.54 % at mandinka-village seed 99 for the 20 fps, 7.5 fps and 2-12 frame resamplings,
+  against the 0.25 % `shareGate`. maasai-village reads 0.03-0.06 %. So the shipped code
+  already has the episode; the case simply never looked where it lives, and 1080's climb —
+  which moves the children's seeded paths and nothing else about their steering — surfaced
+  the same thing in bambara (0.20 % native, 0.45 % at 7.5 fps).
+  WHAT THE EPISODE IS. One child, one second: 1.4 m of legs inside a 0.29 m circle, roaming
+  its quarter eight to ten metres from anything this point's neighbours changed, with adult
+  bodies standing in its way. It reverses direction inside the second. That is the exact
+  shape the child-motion metric exists for — walking without getting anywhere — at a scale
+  of one episode per crowded minute rather than the penned child's persistent one.
+  Final state:
+  - The cause is named from a trace, not guessed: which of the deflection, the one-side
+    commitment or the roam-heading reflection turns a boxed child back on itself, and
+    whether an adult body standing still is handled differently from one walking.
+  - Either the steering is fixed so a boxed child works its way past the adult, or the
+    episode is shown to be legitimate avoidance and the metric is taught to tell the two
+    apart. Not a raised gate on its own.
+  - The crowded case is judged over more than one settlement afterwards, so it can never
+    again read clean because of the seed it happens to run.
+  - `CROWDED_CADENCE_GATE` in `tagShuffle.test.ts` — the 1 % bar 1080 measured for the
+    resampled cadences — is removed or re-derived from what the fix leaves behind.
+  Test: Vitest — the crowded construction over at least three village/seed pairs at every
+  cadence, including mandinka-village/99, which is the sample that fails today.
+  Criticality: medium — no crash and no blockade once 1080 has landed, but it is a live
+  reading over the gate in shipped code, and the gate that should have caught it was
+  measuring one seed's luck.
+  Refs: src/scenes/place/tagShuffle.test.ts (the crowded case and `CROWDED_CADENCE_GATE`),
+  scripts/verify/childMotionMetric.mjs (`shuffleWindows`, `CHILD_MOTION.shareGate`),
+  src/scenes/place/tagGame.ts (`moveChild`, the deflection and the one-side commitment),
+  src/scenes/place/bankGame.ts (`stepRoam`, the roam-heading reflection).
+  Bundle: Dorfleben.
+
 - [ ] 1077. The Astra lane is routed on paper and almost never authored (measured
   08.09.2026, two findings of the same evening folded into one point).
   CLAUDE.md §6 splits authoring across three lanes, and `author-routing-core.mjs` cuts the
