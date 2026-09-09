@@ -21,6 +21,7 @@ import { looseRock } from './looseRocks'
 import {
   bankChildCanSeparate,
   createBankGame,
+  insideStrangerBerth,
   otherEnd,
   rockAt,
   stationAt,
@@ -615,6 +616,42 @@ describe('the children`s game at the bank (point 687)', () => {
     const after = stepBankGame(roam, 1 / 60, cfg, STAGE, world, roamRand)
     expect(after).toBe(null)
     expect(roam.children[0].climb).toBe('top')
+  })
+
+  it('does not step down into ground somebody took while it stood up there', () => {
+    // Found by the cross-vendor review of 09.09.2026: the descent returned to the
+    // foot it came up from without asking whether that ground was still free.
+    // The hold is seconds long and the stone stands in the village, so the
+    // traveller can walk right up to it — and the child then climbed down inside
+    // him.
+    const b = STAGE.boulder
+    for (const seed of SEEDS) {
+      const rand = mulberry32(seed)
+      const s = createBankGame([{ x: b.x - 4, z: b.z + 3 }], rand, CFG)
+      const c = s.children[0]
+      let world = openWorld()
+      let planted = false
+      let landed: { x: number; z: number } | null = null
+      for (let t = 0; t < 60 && !landed; t += 1 / 60) {
+        const wasUp = c.climb !== 'none'
+        stepBankGame(s, 1 / 60, CFG, STAGE, world, rand)
+        // The moment it is up on the stone, the traveller takes the exact spot it
+        // climbed from and stays there.
+        if (c.climb === 'top' && !planted) {
+          planted = true
+          world = openWorld({ x: c.footX, z: c.footZ, radius: 0.35 })
+        }
+        if (wasUp && c.climb === 'none') landed = { x: c.x, z: c.z }
+      }
+      expect(planted).toBe(true)
+      expect(landed).not.toBeNull()
+      // It came down somewhere else, and clear of him.
+      expect(insideStrangerBerth(world, CFG, landed!.x, landed!.z)).toBe(false)
+      // …and still at the stone, not carried off across the village.
+      const out = Math.hypot(landed!.x - b.x, landed!.z - b.z)
+      expect(out).toBeGreaterThan(b.radius)
+      expect(out).toBeLessThan(b.radius + world.childRadius + CFG.climbApproach + 0.2)
+    }
   })
 
   it('never opens the cycle out from under a child still standing on the stone', () => {

@@ -384,6 +384,42 @@ export function onStone(c: BankChild): boolean {
   return c.climb !== 'none'
 }
 
+/**
+ * Where the climber steps back down to: the foot it came up from while that is
+ * still free, and otherwise the nearest free stand on the same ring round the
+ * stone, searched outward from the side it climbed.
+ *
+ * It is asked at the END of the hold rather than kept from the start, because
+ * the hold is seconds long and the ground below is the village's: another child
+ * wanders past, the traveller walks up to the stone. The last resort is the
+ * world's own rescue, which is what every other placement in this round falls
+ * back to.
+ */
+function landingFor(
+  c: BankChild,
+  i: number,
+  b: BankStage['boulder'],
+  cfg: BankConfig,
+  world: BankWorld,
+): { x: number; z: number } {
+  const taken = (x: number, z: number) =>
+    world.blocked(x, z) || insideStrangerBerth(world, cfg, x, z) || !!world.occupied?.(i, -1, x, z)
+  if (!taken(c.footX, c.footZ)) return { x: c.footX, z: c.footZ }
+  const ring = climbFrom(b, cfg, world)
+  const from = Math.atan2(c.footX - b.x, c.footZ - b.z)
+  // Round the stone in alternating steps, so it comes down as near as it can to
+  // the side it went up.
+  for (let step = 1; step <= 11; step++) {
+    const turn = (((step + 1) >> 1) * Math.PI) / 6
+    const a = from + (step % 2 === 1 ? -turn : turn)
+    const x = b.x + Math.sin(a) * ring
+    const z = b.z + Math.cos(a) * ring
+    if (!taken(x, z)) return { x, z }
+  }
+  const free = world.nudge(c.footX, c.footZ)
+  return { x: free.x, z: free.z }
+}
+
 /** How near the boulder's CENTRE the approach walks before the child steps up:
  *  the stone's own collider — which is what stops it walking any closer — plus
  *  its own footprint and a small margin, so what follows is a step onto the
@@ -479,6 +515,14 @@ function stepClimb(
     // of, which is where anybody who might look is standing.
     c.facing = turnToward(c.facing, Math.atan2(c.footX - b.x, c.footZ - b.z), cfg.turnRate * dt)
     if (c.climbFor >= cfg.climbHoldSeconds) {
+      // WHERE IT COMES DOWN IS DECIDED HERE, not when it went up (cross-vendor
+      // review, 09.09.2026). The child stands on the stone for seconds, and the
+      // ground it climbed from is ordinary village ground: the traveller can
+      // walk right up to the boulder while it is up there, and a descent that
+      // simply returned to the saved foot would set the child down inside him.
+      const landing = landingFor(c, i, b, cfg, world)
+      c.footX = landing.x
+      c.footZ = landing.z
       c.climb = 'down'
       c.climbFor = 0
     }
