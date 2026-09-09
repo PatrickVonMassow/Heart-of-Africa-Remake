@@ -266,6 +266,18 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „**Geh den Ausweg jeder Verweigerung einmal wirklich**, im auslösenden Zustand:
   Führt er zum Guten, kann er eintreten, und gilt er auch für **den, der die Meldung liest**?“
 
+- **Die Abhilfe ist richtig — nur gibt es sie als Befehl nicht.** Die Sperre hat recht, sie
+  nennt sogar genau den Zustand, den du herstellen sollst, und kein Werkzeug schreibt ihn: Die
+  vorhandenen Befehle setzen einen Vorzustand voraus, den der auslösende Fall gerade nicht mehr
+  hat. Übrig bleiben Handarbeit an der Datei und das Übergehen der Prüfung — also die zwei Wege,
+  gegen die die Sperre gebaut wurde. Solche Lücken stehen oft seit Wochen dokumentiert herum,
+  weil sie niemandem im Weg waren; sichtbar werden sie, wenn ein Nutzer die Folge meldet.
+  → *Prompt:* „Zu jeder Sperre: **Welcher Befehl schreibt den Zustand, den sie verlangt?** Nenne
+  ihn, oder bau ihn — bevor die Sperre scharf geht. Und wenn eine bekannte Lücke nur deshalb
+  harmlos wirkt, weil sie noch niemanden getroffen hat: Sie ist nicht harmlos, sie ist
+  ungemeldet.“
+  *(Womit soll ich das tun?)*
+
 - **Dieselbe Verweigerung ein zweites Mal — wortgleich.** Du hast begründet, warum sie nicht
   zutrifft, und sie kommt unverändert wieder. Dann irrt nicht der Wächter, sondern dein Bild
   vom Zustand.
@@ -618,4 +630,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 3fdacb852eb0b5902058a2454569bcb4d83686080808fe8ac99d05147714b855 -->
+<!-- GUIDE-FINGERPRINT: 50609e846aa12edbcdbe28612b51b8ad3c6a792caa3e598385048e9c6a67ac11 -->
