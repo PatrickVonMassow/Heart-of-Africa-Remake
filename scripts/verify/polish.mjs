@@ -5234,7 +5234,109 @@ if (section('adult-errands')) {
       e.fillSeconds = 9
       return was
     })
+    // SHOOT THE DIP WHILE IT IS HAPPENING (09.09.2026). This frame used to be
+    // taken AFTER the sampling loop, and that loop only ends once a CARRY has
+    // also been seen — which by definition comes after the fill is over. The
+    // camera was therefore aimed at the spot a jar had been in while the shutter
+    // caught a man already walking away with it on his head: a bent figure at a
+    // waterline with no vessel anywhere in the picture, which is what the frame
+    // of the 21:56 run actually shows. A live act is photographed live.
+    //
+    // AIMED AT THE JAR, NOT AT THE SHORE (work-order 1065). From five metres out
+    // on a fixed downward tilt the man came out a hand's width tall with the jar
+    // a blob at the end of an arm: the centimetres the check measures were real
+    // and none of them were legible, which is the very complaint this part
+    // answers. The camera stands closer and solves its pitch from its own eye
+    // onto the jar's base — the part that goes under — so the drawn water
+    // surface and the vessel below it are in the same frame.
+    //
+    // AND IT STANDS SIDE-ON TO THE SHORE (09.09.2026). The bearing used to run
+    // from the world origin, which in this village put the camera on the LAND
+    // side: the man was photographed from behind, his own body between the lens
+    // and the jar, and the water surface ran away from the eye instead of across
+    // it. Standing square to the walk into the water draws that surface as a
+    // near-horizontal line with the vessel below it, which is the only
+    // arrangement in which "under the surface" is a thing the picture says
+    // rather than a number beside it.
+    const shootDip = async (who) => {
+      // EVERYTHING THE SHOT USES IS READ AT THE SHOT (09.09.2026, second
+      // correction). Placing the camera from a sample taken earlier in the loop
+      // aims it at where the man WAS: the first live attempt put the lens on an
+      // empty stretch of river because the carrier had moved on between the
+      // reading and the shutter. The placement now re-reads the errands inside
+      // the same evaluate that moves the player, takes the carrier's CURRENT
+      // position and jar, and refuses the frame outright if nobody is filling
+      // any more — an aimed-at-nothing frame is worse than no frame.
+      const aim = await page.evaluate((who) => {
+        const p = window.__placePlayer
+        const cam = window.__placeCamera
+        const g = window.__placeErrands?.()
+        if (!p || !cam || !g) return null
+        const v = g.villagers[who]?.work?.phase === 'fill' && g.villagers[who]?.handJar
+          ? g.villagers[who]
+          : g.villagers.find((x) => x?.work?.phase === 'fill' && x.handJar)
+        if (!v) return null
+        const foot = g.geography?.waterFoot
+        const fill = g.water?.fill
+        // The way INTO the water, from the errand's own two points. The quarter
+        // turn belongs to THAT direction alone (GPT-6 Astra, review of 6efa015):
+        // adding it to the origin fallback as well would have turned the old
+        // bearing ninety degrees rather than kept it, so a place naming neither
+        // point would have got a THIRD camera position that nobody has judged.
+        const into =
+          foot && fill && (fill.x !== foot.x || fill.z !== foot.z)
+            ? Math.atan2(fill.x - foot.x, fill.z - foot.z) + Math.PI / 2
+            : null
+        // WHICH of the two sides square to the shore: the one the JAR is on.
+        // The vessel hangs off one flank of the body, so from the other side the
+        // man himself stands in front of it — the frame of the 22:36 run has the
+        // carrier bent over the water with the jar nowhere in it for exactly
+        // that reason. The offset between the drawn jar and the drawn body says
+        // which flank without needing the figure's facing, and it settles the
+        // free sign the reviewer flagged as unchosen (GPT-6 Astra, P2 of the
+        // review of 6efa015) with the one criterion the frame cares about.
+        const side = into ?? Math.atan2(v.x, v.z)
+        const off = { x: v.handJar.x - v.x, z: v.handJar.z - v.z }
+        const towardJar = Math.sin(side) * off.x + Math.cos(side) * off.z
+        const bearing = towardJar < 0 ? side + Math.PI : side
+        p.x = v.x - Math.sin(bearing) * 3.5
+        p.z = v.z - Math.cos(bearing) * 3.5
+        p.yaw = Math.atan2(-(v.x - p.x), -(v.z - p.z))
+        p.pitch = -0.22
+        return { handJar: v.handJar, under: (v.waterSurface ?? 0) - v.handJar.base }
+      }, who)
+      if (!aim) return false
+      // The place camera follows the player rather than jumping with him, so it
+      // is given four frames to arrive before the pitch is solved onto the jar.
+      await nextFrames(4)
+      const still = await page.evaluate((who) => {
+        const p = window.__placePlayer
+        const cam = window.__placeCamera
+        const g = window.__placeErrands?.()
+        if (!p || !cam || !g) return null
+        const v = g.villagers[who]?.work?.phase === 'fill' && g.villagers[who]?.handJar
+          ? g.villagers[who]
+          : g.villagers.find((x) => x?.work?.phase === 'fill' && x.handJar)
+        if (!v) return null
+        const eye = new (Object.getPrototypeOf(cam.position).constructor)()
+        cam.getWorldPosition(eye)
+        const flat = Math.hypot(v.handJar.x - eye.x, v.handJar.z - eye.z)
+        p.pitch = Math.atan2(v.handJar.base - eye.y, Math.max(flat, 1e-6))
+        return { handJar: v.handJar, under: (v.waterSurface ?? 0) - v.handJar.base }
+      }, who)
+      const shown = still ?? aim
+      await nextFrames(2)
+      await frame('1065-carrier-dips-at-the-waterline', {
+        local: { x: shown.handJar.x, y: shown.handJar.y, z: shown.handJar.z },
+        label:
+          `the carrier dipping at the waterline: the jar in his hand ` +
+          `${(shown.under * 100).toFixed(0)} cm below the drawn water surface, his feet on the shore`,
+      })
+      return true
+    }
+
     let dipped = null
+    let dippedShot = null
     let carried = null
     let ordered = null
     // WHAT THE WINDOW SAW, so a red names its cause instead of only its absence
@@ -5269,6 +5371,25 @@ if (section('adult-errands')) {
         if (v.work.phase === 'fill' && v.handJar && v.waterSurface != null) {
           const under = v.waterSurface - v.handJar.base
           if (!dipped || under > dipped.under) dipped = { who: k, under, ...v }
+          // AND THE INSTANT THAT CAN BE PHOTOGRAPHED. The deepest sample is the
+          // right one to ASSERT on and the wrong one to shoot: the water is
+          // opaque, so a jar entirely beneath it is proved by centimetres and
+          // shown by nothing — the first side-on frame of 09.09.2026 came back
+          // with a bent man and no vessel anywhere in it. The legible instant is
+          // the one where the jar is BREAKING the surface: its base under, its
+          // rim (0.16 above the base) still out, so the player sees the vessel
+          // and the water it is going into at once. Deepest such sample wins;
+          // if the dip never passes through one, the frame falls back to the
+          // deepest and the label still says what it shows.
+          // ...and the shutter opens on the spot, at the instant that can be
+          // READ: the jar breaking the surface, its base under and its rim (0.16
+          // above the base) still out, so the vessel and the water it goes into
+          // are both in the picture. Deeper than that and the opaque river hides
+          // the very thing the check counts in centimetres.
+          if (!dippedShot && under > 0 && under <= 0.16) {
+            dippedShot = { who: k, under, ...v }
+            await shootDip(k)
+          }
         }
         // THE RETURN: the full jar on his head, its water surface at the rim.
         if (v.work.situation === 'water-back' && v.carry === 'fullJar' && v.headJar) {
@@ -5296,6 +5417,12 @@ if (section('adult-errands')) {
             `at ${dipped.waterSurface.toFixed(2)} m`
         : `no carrier was ever seen filling a jar — ${witness}`,
     )
+    if (dipped && !dippedShot) {
+      // The dip never passed through a readable instant in this window — shoot
+      // the deepest sample rather than leave the point without a frame, and say
+      // in the label how deep it was so the reader knows why it is hard to see.
+      await shootDip(dipped.who)
+    }
     if (dipped) {
       check(
         'and he stands at the waterline rather than up the bank',
@@ -5303,65 +5430,6 @@ if (section('adult-errands')) {
         `his footing is ${dipped.ground.toFixed(2)} m, i.e. ${(-dipped.ground * 100).toFixed(0)} cm below the ` +
           `village plate — he is on the shore, in the water`,
       )
-      // AIMED AT THE JAR, NOT AT THE SHORE (work-order 1065). From five metres
-      // out on a fixed downward tilt the man came out a hand's width tall with
-      // the jar a blob at the end of an arm: the centimetres the check measures
-      // were real and none of them were legible, which is the very complaint
-      // this part answers. The camera now stands closer and solves its pitch
-      // from its own eye onto the jar's base — the part that goes under — so
-      // the drawn water surface and the vessel below it are in the same frame,
-      // his feet still on the shore beneath them.
-      // AND IT STANDS SIDE-ON TO THE SHORE (09.09.2026). The bearing used to
-      // run from the world origin, which in this village put the camera on the
-      // LAND side: the man was photographed from behind, his own body between
-      // the lens and the jar, and the water surface ran away from the eye
-      // instead of across it — the frame showed a man at a shore and could not
-      // show a jar UNDER anything. Standing square to the walk into the water
-      // draws that surface as a near-horizontal line with the vessel below it,
-      // which is the only arrangement in which "under the surface" is a thing
-      // the picture says rather than a number beside it.
-      const shot = await page.evaluate((v) => {
-        const p = window.__placePlayer
-        const cam = window.__placeCamera
-        if (!p || !cam) return null
-        const g = window.__placeErrands?.()
-        const foot = g?.geography?.waterFoot
-        const fill = g?.water?.fill
-        // The way INTO the water, from the errand's own two points. The quarter
-        // turn belongs to THAT direction alone (GPT-6 Astra, review of 6efa015):
-        // adding it to the origin fallback as well would have turned the old
-        // bearing ninety degrees rather than kept it, so a place naming neither
-        // point would have got a THIRD camera position that nobody has judged.
-        const into =
-          foot && fill && (fill.x !== foot.x || fill.z !== foot.z)
-            ? Math.atan2(fill.x - foot.x, fill.z - foot.z) + Math.PI / 2
-            : null
-        const bearing = into ?? Math.atan2(v.x, v.z)
-        p.x = v.x - Math.sin(bearing) * 3.5
-        p.z = v.z - Math.cos(bearing) * 3.5
-        p.yaw = Math.atan2(-(v.x - p.x), -(v.z - p.z))
-        p.pitch = -0.22
-        return true
-      }, dipped)
-      if (shot) {
-        await nextFrames(2)
-        await page.evaluate((v) => {
-          const p = window.__placePlayer
-          const cam = window.__placeCamera
-          if (!p || !cam) return
-          const eye = new (Object.getPrototypeOf(cam.position).constructor)()
-          cam.getWorldPosition(eye)
-          const flat = Math.hypot(v.handJar.x - eye.x, v.handJar.z - eye.z)
-          p.pitch = Math.atan2(v.handJar.base - eye.y, Math.max(flat, 1e-6))
-        }, dipped)
-        await nextFrames(4)
-        await frame('1065-carrier-dips-at-the-waterline', {
-          local: { x: dipped.handJar.x, y: dipped.handJar.y, z: dipped.handJar.z },
-          label:
-            `the carrier dipping at the waterline: the jar in his hand ` +
-            `${(dipped.under * 100).toFixed(0)} cm below the drawn water surface, his feet on the shore`,
-        })
-      }
     }
     check(
       'and comes back with a jar that SHOWS its water (work-order 1065)',
