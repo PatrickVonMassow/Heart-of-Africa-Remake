@@ -4759,6 +4759,196 @@ if (section('children-bank-game')) {
   await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
 }
 
+// --- A child up on a stone ----------------------------------------------------
+// THE OFF-GAME ROCK HAS TO BE SEEN (work-order 1080). The children's spec asks
+// for ROCK to be spoken at a stone that is no part of the game, so the word
+// cannot be learned as "the thing you run to" — and the round has said it since
+// work-order 687. Nothing in this file ever looked at it: the only mention of
+// the boulder here SHORTENS the guard so the running section need not wait for
+// it, and at the verify seed the stone goes unnamed every cycle. So the picture
+// side of that guard was never taken at all, while the unit suite asserted a
+// flag that a child hovering 2.2 m from the stone for a third of a second
+// satisfied. The user reported the climb as missing from the game, and he was
+// right about the picture.
+//
+// What this section proves is the one thing only the browser can: that the child
+// is really UP THERE, in the drawn scene, high enough and long enough to be
+// looked at — and it takes the frame as evidence.
+if (section('children-boulder-climb')) {
+  // SPECTATOR TIME, the same knob the running section uses and for the same
+  // reason (§21, a debug-menu value): the off-game ROCK falls once per roaming
+  // phase, and the shipped cycle is about a hundred seconds long. Measured in
+  // the fast-layer replay at THIS suite's seed, the boulder is named twice in
+  // 400 s of village clock — a wait of minutes for a frame that lasts three
+  // seconds. `roamSeconds` is what the phase is SCHEDULED for, so shortening it
+  // brings the next roaming phase round sooner; `roamGuardSeconds` is left at
+  // its shipped 45 s deliberately, because that overtime is what lets a long
+  // approach finish, and cutting it would stage away the very moment this
+  // section exists to photograph.
+  //
+  // AND THE HOLD IS STRETCHED FOR THE SHUTTER. The child stands on the stone for
+  // `climbHoldSeconds` — a few seconds, which is what a player needs and what
+  // the unit suite pins at its shipped length. The shutter's own readiness wait
+  // is longer than that: the first take of this frame passed its subject test
+  // and photographed an empty stone, because the child had climbed down again
+  // while the scene was being judged finished. The hold is therefore held open
+  // for the picture and put back afterwards. Nothing about the climb itself is
+  // staged: the approach, the rise, the word and the descent are the shipped
+  // ones, and this section proves them from the round's own state before the
+  // shutter opens.
+  const shippedClimbRoam = await page.evaluate(() => {
+    const b = window.__balance.villageLife.bankGame
+    const was = { roamSeconds: b.roamSeconds, climbHoldSeconds: b.climbHoldSeconds }
+    b.roamSeconds = 8
+    b.climbHoldSeconds = 25
+    return was
+  })
+  await goToPlace('bambara-village')
+  const staged = await page
+    .waitForFunction(() => !!window.__placeTag && !!window.__placeTag().boulder, null, { timeout: 40000 })
+    .then(() => true)
+    .catch(() => false)
+  check('the village carries a children`s round with a stone to climb', staged, 'no boulder published')
+  if (staged) {
+    const boulder = await page.evaluate(() => window.__placeTag().boulder)
+    // Stand off the stone far enough that the whole child is in the picture, and
+    // look at the height its feet will be at rather than at the ground.
+    // NOT ON THE APPROACH. The first camera this section used stood seven metres
+    // inward of the stone — squarely on the line the climber walks in on — and
+    // the children, who give the traveller a wider berth than they give each
+    // other (spec item 7), swerved round it until the approach watch gave up:
+    // three minutes of `roam` in which no child ever started to climb. The
+    // camera therefore stands on the far side of the stone from the children's
+    // own quarter, and falls back to the flanks where that would put it off the
+    // settlement's ground.
+    // AND IT STANDS WHERE THE SUN IS BEHIND IT. The first take of this frame put
+    // the camera on whichever side came first and photographed the shadowed
+    // flank: a black stone with a black figure on it against bright sand, which
+    // shows that something is up there without showing what. The place sun is a
+    // fixed direction (`SUN_DIR` in src/scenes/place/PlaceScene.tsx, mirrored
+    // here as this file mirrors the body radii), so the lit side is known, and
+    // the camera takes the candidate that faces it.
+    const PLACE_SUN_XZ = { x: 0.52, z: 0.34 }
+    const stood = await page.evaluate(({ b, sun }) => {
+      const p = window.__placePlayer
+      const layout = window.__placeLayout
+      if (!p || !layout) return null
+      const q = layout.playGround ?? { x: 0, z: 0 }
+      const away = Math.atan2(b.x - q.x, b.z - q.z)
+      const rim = (layout.radius ?? 40) * 0.9
+      const sunLen = Math.hypot(sun.x, sun.z) || 1
+      // EVERY SIDE OF THE STONE THAT IS STILL IN THE VILLAGE, scored. A stone can
+      // sit near the settlement's rim — at this suite's seed it stands 28 m out —
+      // and then three of four quarter-turns fall off the drawn ground
+      // altogether. So the whole circle is walked in steps, and the best of
+      // whatever is left is taken.
+      const pick = (keepClear) => {
+        let best = null
+        for (let step = 0; step < 36; step++) {
+          const turn = (step / 36) * Math.PI * 2
+          // The wedge toward the children's quarter is the approach the climber
+          // walks in on, and the children swerve round the traveller rather than
+          // through him: standing there once cost three minutes of `roam` with
+          // no climb at all. It is given up only if the village leaves no other
+          // ground to stand on.
+          if (keepClear && Math.abs(Math.atan2(Math.sin(turn - Math.PI), Math.cos(turn - Math.PI))) < 0.6) continue
+          const a = away + turn
+          const x = b.x + Math.sin(a) * 7
+          const z = b.z + Math.cos(a) * 7
+          if (Math.hypot(x, z) > rim) continue
+          // How well this side faces the light: the camera's offset from the
+          // stone against the direction the sun comes from.
+          const lit = (Math.sin(a) * sun.x + Math.cos(a) * sun.z) / sunLen
+          if (!best || lit > best.lit) best = { x, z, turn, lit, clear: keepClear }
+        }
+        return best
+      }
+      const best = pick(true) ?? pick(false)
+      if (!best) return null
+      p.x = best.x
+      p.z = best.z
+      // The place camera's own convention, as every other aimed frame in this
+      // file writes it: the bearing to the target plus a half turn.
+      p.yaw = Math.atan2(b.x - p.x, b.z - p.z) + Math.PI
+      p.pitch = 0
+      return best
+    }, { b: boulder, sun: PLACE_SUN_XZ })
+    check('the camera has ground to stand on off the children`s approach', !!stood, JSON.stringify(stood))
+    // THE CLIMB ITSELF, waited for on the round's own state. The roaming phase
+    // is the shipped one: the guard holds the cycle until the boulder is named,
+    // so a visit that begins in `roam` reaches this without any staging.
+    const up = await page
+      .waitForFunction(
+        () => (window.__placeTag().children ?? []).some((c) => c.climb === 'top'),
+        null,
+        { timeout: 300000 },
+      )
+      .then(() => true)
+      .catch(() => false)
+    // A timeout has to say WHAT the round was doing, or the next reader is left
+    // with "no child reached the top" and no way to tell a broken climb from a
+    // cycle that simply had not come round yet.
+    const why = up
+      ? ''
+      : await page.evaluate(() => {
+          const t = window.__placeTag()
+          const b = t.boulder
+          const near = Math.min(
+            ...(t.children ?? []).map((c) => Math.hypot(c.x - b.x, c.z - b.z)),
+          )
+          return `phase ${t.phase}, nearest child ${near.toFixed(1)} m from the stone at ` +
+            `(${b.x.toFixed(1)},${b.z.toFixed(1)}), stages ${(t.children ?? []).map((c) => c.climb).join('/')}`
+        })
+    check('a child climbs the ordinary boulder and stands on it', up, why)
+    if (up) {
+      const onTop = await page.evaluate(() => {
+        const t = window.__placeTag()
+        const i = (t.children ?? []).findIndex((c) => c.climb === 'top')
+        return { i, c: t.children[i], boulder: t.boulder }
+      })
+      const over = Math.hypot(onTop.c.x - onTop.boulder.x, onTop.c.z - onTop.boulder.z)
+      check(
+        'it stands ON the stone rather than beside it',
+        over < 0.05 && Math.abs(onTop.c.lift - onTop.boulder.height) < 1e-6,
+        `${over.toFixed(3)} m off the centre, feet at ${onTop.c.lift.toFixed(2)} m ` +
+          `against a stone ${onTop.boulder.height.toFixed(2)} m high`,
+      )
+      // …and the drawn figure really is up there, which is the half a state read
+      // cannot answer: the child's own body, at the height the round put it.
+      const drawn = await page.evaluate((y) => {
+        const t = window.__placeTag()
+        const i = (t.children ?? []).findIndex((c) => c.climb === 'top')
+        const hit = window.__placeRayHit ? window.__placeRayHit(t.children[i].x, y, t.children[i].z) : null
+        return hit ? { name: hit.hitName ?? 'sky', ratio: hit.hitDistance == null ? Infinity : hit.hitDistance / hit.targetDistance } : null
+      }, boulder.height + 0.5)
+      check(
+        'and nothing stands between the camera and the child on the stone',
+        !!drawn && drawn.ratio > 0.9,
+        JSON.stringify(drawn),
+      )
+      await frame('187-child-on-the-boulder', {
+        local: { x: onTop.c.x, z: onTop.c.z, y: onTop.boulder.height + 0.55 },
+        label: 'a village child standing on the ordinary boulder it has just named, with its word over its head',
+      })
+      // THE PICTURE HAS TO CONTAIN WHAT IT CLAIMS (CLAUDE.md §7.2). The shutter
+      // judges that the declared POINT is in the frame; only the round can say
+      // that the child was still standing on the stone when it opened.
+      const still = await page.evaluate(
+        (i) => window.__placeTag().children[i]?.climb ?? 'none',
+        onTop.i,
+      )
+      check('and it was still up there when the shutter opened', still === 'top', still)
+    }
+  }
+  await page.evaluate((was) => {
+    const b = window.__balance.villageLife.bankGame
+    b.roamSeconds = was.roamSeconds
+    b.climbHoldSeconds = was.climbHoldSeconds
+  }, shippedClimbRoam)
+  await page.evaluate(() => window.__game.getState().leavePlace())
+  await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
+}
+
 // --- The adults at the water and the ground work ------------------------------
 // THE ADULTS TEACH BY DOING THEIR OWN WORK (work-order 688). The errand
 // catalogue is gone: what the live scene has to show now is that the two words

@@ -277,6 +277,12 @@ try {
     // degraded to Haiku and wrecked three points — name the ALLOWLIST at every
     // session start; the model-guard Stop hook enforces it at the first
     // forbidden commit.
+    // The policy wording also NAMES THE COMMISSION COMMAND (point 1077,
+    // 09.09.2026): the cut ran and the command did not — 280 of 379 open points
+    // were routed to Astra and one was commissioned in three days, while
+    // fourteen Astra reviews landed. Announcing the routing without its command
+    // is what the measurement found. Kept out of the stamped block below, where
+    // nothing but the stamp may stand.
     const header =
       openPointsHeadline(nums, { gated: gatedNums }) +
 
@@ -289,6 +295,11 @@ try {
       'scripts/astra-share.mjs --status says what the switch routes right now. REVIEW is ' +
       'CROSS-VENDOR: Astra reads Anthropic-authored work (scripts/review-astra.mjs), Claude ' +
       'reads Astra-authored work, and no model reviews its own. ' +
+      'AN ASTRA-LANE POINT IS COMMISSIONED, NOT WRITTEN HERE: run node ' +
+      'scripts/author-astra.mjs --point <N> in the point\'s worktree, then review, run the ' +
+      'suites, judge the picture and land it. Routing a point and then authoring it here ' +
+      'anyway is the measured failure of this lane (docs/astra-routing.md, "Routed and not ' +
+      'commissioned"). ' +
       (fableState.ok ? servingPolicyLine(fableState) : `FABLE SWITCH UNKNOWN: ${fableState.problem}`)
     const now = Date.now()
     if (isPaused()) {

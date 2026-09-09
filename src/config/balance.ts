@@ -729,6 +729,20 @@ export interface BalanceConfig {
       roamTurn: number
       /** How long the climber may make no progress toward the boulder before giving up. */
       roamGoalSeconds: number
+      /** How far outside the boulder's own collider the climber stops before it
+       *  steps up onto the stone (work-order 1080). */
+      climbApproach: number
+      /** How long the step up onto the stone takes, and the step back down. */
+      climbRiseSeconds: number
+      climbSinkSeconds: number
+      /** How long the child stands on the stone before coming down. ROCK is
+       *  spoken at the top of the rise, so this is the time the player has to
+       *  connect the word with what the child is standing on. */
+      climbHoldSeconds: number
+      /** How high a scattered boulder's top must stand for the stage to prefer
+       *  it as the one that gets climbed (m). Below it a stone is a pebble a
+       *  child would step over rather than onto. */
+      climbableRockTop: number
       /** The most OVERTIME the off-game ROCK guard may hold a cycle for, past
        *  the roaming phase's own length. Beyond it the RIVER call goes out with
        *  that one cycle's boulder unnamed. */
@@ -1312,6 +1326,42 @@ export const balance: BalanceConfig = {
       // closer. Thirty seconds without gaining any ground toward it means a
       // hut, pocket or other collider has made the approach impossible.
       roamGoalSeconds: 30,
+      // THE CLIMB IS THE PICTURE, so it is paced to be SEEN (work-order 1080).
+      // What shipped before was a 0.32 m hop held for 0.35 s while the child
+      // stood 2.2 m clear of the stone: measured over five seeds and ten minutes
+      // of village time each, the pose was up for 1.83-2.20 s of 600 s, and the
+      // user reported the climb as missing from the game.
+      //
+      // Estimates, calibratable (CLAUDE.md §2 / design.md §14). The approach
+      // ends a hand's breadth outside the stone's collider — which already
+      // stands 0.35 m proud of the drawn mesh, so the child is close enough that
+      // the step up is a step and not a vault — it rises in a little under a
+      // second, stands long enough for a player who looks over at the word to
+      // find the child and the stone under it, and comes down a touch faster
+      // than it went up. At a middling boulder that makes the rise ~1.2 m
+      // across and ~0.42 m up in 0.9 s: a walking pace while climbing.
+      // Together ~4.5 s per naming, five or six namings in ten minutes: still a
+      // small part of a roaming phase, so the group keeps wandering and the
+      // child-motion floor (25 m per played minute against a measured 102 m) is
+      // untouched.
+      climbApproach: 0.15,
+      climbRiseSeconds: 0.9,
+      climbHoldSeconds: 2.8,
+      climbSinkSeconds: 0.7,
+      // A stone whose top is lower than this is a pebble: a child steps OVER it
+      // rather than onto it, and the climb would read as a stumble. It is a
+      // FLOOR and not a preference — measured, because the first cut of it was
+      // both. At 0.30 m the bar refused the nearest stone in two of four shipped
+      // village/seed layouts and sent the climber to one 5 m further off (in
+      // bambara-village at seed 2972259115, 6.7 m → 12.0 m); the approach then
+      // failed, the guard spent its overtime with the boulder unnamed, and the
+      // group's whole trajectory moved enough to push a child's station-walk
+      // over the shuffle gate (0.274 % against 0.25 %). The scatter's tops run
+      // 0.16-0.53 m, and 0.25 m is a child's step; only the smallest instances
+      // are genuinely too low to stand on. At 0.20 m the nearest stone wins in
+      // every shipped layout, which is what the round wants: the stone the
+      // children are next to anyway.
+      climbableRockTop: 0.2,
       // AND THE PHASE ITSELF IS BOUNDED, because the watch above is not enough:
       // it resets on ANY gain, so a child creeping toward a stone it can never
       // quite reach neither arrives nor fails, and the roaming phase then has no

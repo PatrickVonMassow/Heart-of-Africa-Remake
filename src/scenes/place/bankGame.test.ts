@@ -17,9 +17,11 @@ import { balance } from '../../config/balance'
 import { resetDevAsserts } from '../../systems/devAssert'
 import { floorPace } from '../../systems/pursuit'
 import { mulberry32 } from '../../world/noise'
+import { looseRock } from './looseRocks'
 import {
   bankChildCanSeparate,
   createBankGame,
+  insideStrangerBerth,
   otherEnd,
   rockAt,
   stationAt,
@@ -33,6 +35,7 @@ import {
   type BankState,
   type BankUtterance,
   type BankWorld,
+  type ClimbStage,
 } from './bankGame'
 import { absorbSeparation } from './tagGame'
 import {
@@ -60,13 +63,15 @@ function testFlank(_end: BankEnd, _bearing: number, y: number): number {
 }
 
 /** Two rocks 20 m apart along x, the water to one side, a boulder in the
- *  children's quarter well away from both. */
+ *  children's quarter well away from both. The boulder carries the size a
+ *  middling scattered stone has in a shipped village (`looseRock` at instance
+ *  scale 0.8), because the climb is played against it. */
 const STAGE: BankStage = {
   upstream: { x: -10, z: 0 },
   downstream: { x: 10, z: 0 },
   flank: testFlank,
   water: { x: 0, z: 8 },
-  boulder: { x: 2, z: -22 },
+  boulder: { ...looseRock([2, -22, 0.8]) },
   roam: { x: 0, z: -22, radius: 8 },
 }
 
@@ -93,9 +98,13 @@ interface Log {
     arrivals: number
     direction: string | null
     cycle: number
-    climbing: boolean
-    /** Where the speaker was standing at the instant it spoke. */
-    speaker: { x: number; z: number }
+    /** WHERE THE SPEAKER WAS AND HOW HIGH IT STOOD when the word fell, never a
+     *  flag saying it was climbing (work-order 1080). The flag was what let a
+     *  child hovering 2.2 m from the stone pass as a child climbing it. */
+    climb: ClimbStage
+    speakerX: number
+    speakerZ: number
+    lift: number
   }>
 }
 
@@ -128,8 +137,10 @@ function replay(
         arrivals: s.children.filter((c) => c.arrived).length,
         direction: s.direction,
         cycle: s.cycles,
-        climbing: s.children[u.speaker]?.climbing ?? false,
-        speaker: { x: s.children[u.speaker].x, z: s.children[u.speaker].z },
+        climb: s.children[u.speaker]?.climb ?? 'none',
+        speakerX: s.children[u.speaker]?.x ?? NaN,
+        speakerZ: s.children[u.speaker]?.z ?? NaN,
+        lift: s.children[u.speaker]?.lift ?? 0,
       })
     }
   }
@@ -278,8 +289,18 @@ describe('the children`s game at the bank (point 687)', () => {
     for (const b of boulders) {
       expect(b.phase).toBe('roam')
       expect(b.u.at).toBe('boulder')
-      expect(b.climbing).toBe(true)
-      expect(Math.hypot(b.u.aim.x - STAGE.boulder!.x, b.u.aim.z - STAGE.boulder!.z)).toBeLessThan(1e-6)
+      // ON the stone, not beside it: standing on its top, at its height.
+      expect(b.climb).toBe('top')
+      expect(Math.hypot(b.speakerX - STAGE.boulder.x, b.speakerZ - STAGE.boulder.z)).toBeLessThan(1e-6)
+      expect(b.lift).toBeCloseTo(STAGE.boulder.height, 6)
+      // Aimed at the stone it is standing on — its rim, on the side it climbed
+      // from, so the point has a direction instead of running down through the
+      // child's own feet.
+      expect(Math.hypot(b.u.aim.x - STAGE.boulder.x, b.u.aim.z - STAGE.boulder.z)).toBeCloseTo(
+        STAGE.boulder.radius,
+        6,
+      )
+      expect(b.u.aim.y).toBeCloseTo(STAGE.boulder.height, 6)
       // …and it is nowhere near either play rock, so it cannot be read as one.
       for (const end of ['upstream', 'downstream'] as const) {
         const r = rockAt(STAGE, end)
@@ -597,15 +618,185 @@ describe('the children`s game at the bank (point 687)', () => {
     expect(run.children[1].pace).toBeGreaterThanOrEqual(floorPace(cfg))
     expect(run.children[1].held).toBe(false)
 
-    // Likewise, start the chosen climber on the ordinary boulder: ROCK and the
-    // commanded walking pace must coexist on this frame.
+    // THE OFF-GAME ROCK IS THE ONE MOMENT SPOKEN STANDING STILL, and the point
+    // of this half is that the WORD is not what stopped the child (work-order
+    // 1080). It is on the boulder: it stood before the word fell and it goes on
+    // standing after it, because the climb holds it there and the utterance
+    // changes nothing about that.
     const roamRand = mulberry32(5)
     const roam = createBankGame([STAGE.boulder], roamRand, cfg)
-    const boulder = stepBankGame(roam, 1 / 60, cfg, STAGE, world, roamRand)
+    let boulder: BankUtterance | null = null
+    let beforeHeld = false
+    for (let t = 0; t < 10 && !boulder; t += 1 / 60) {
+      beforeHeld = roam.children[0].climb === 'up'
+      boulder = stepBankGame(roam, 1 / 60, cfg, STAGE, world, roamRand)
+    }
     expect(boulder?.moment).toBe('boulder')
     expect(boulder?.speaker).toBe(0)
-    expect(roam.children[0].pace).toBe(cfg.walkPace)
-    expect(roam.children[0].held).toBe(false)
+    // Already up the stone on the frame BEFORE the word — the word did not put
+    // it there and did not stop it.
+    expect(beforeHeld).toBe(true)
+    expect(roam.children[0].climb).toBe('top')
+    expect(roam.children[0].pace).toBe(0)
+    const after = stepBankGame(roam, 1 / 60, cfg, STAGE, world, roamRand)
+    expect(after).toBe(null)
+    expect(roam.children[0].climb).toBe('top')
+  })
+
+  it('does not step down into ground somebody took while it stood up there', () => {
+    // Found by the cross-vendor review of 09.09.2026: the descent returned to the
+    // foot it came up from without asking whether that ground was still free.
+    // The hold is seconds long and the stone stands in the village, so the
+    // traveller can walk right up to it — and the child then climbed down inside
+    // him.
+    const b = STAGE.boulder
+    for (const seed of SEEDS) {
+      const rand = mulberry32(seed)
+      const s = createBankGame([{ x: b.x - 4, z: b.z + 3 }], rand, CFG)
+      const c = s.children[0]
+      let world = openWorld()
+      let planted = false
+      let followed = false
+      let landed: { x: number; z: number } | null = null
+      let biggestStep = 0
+      for (let t = 0; t < 60 && !landed; t += 1 / 60) {
+        const wasUp = c.climb !== 'none'
+        const from = { x: c.x, z: c.z }
+        stepBankGame(s, 1 / 60, CFG, STAGE, world, rand)
+        if (c.climb === 'down') biggestStep = Math.max(biggestStep, Math.hypot(c.x - from.x, c.z - from.z))
+        // The moment it is up on the stone, the traveller takes the exact spot it
+        // climbed from and stays there.
+        if (c.climb === 'top' && !planted) {
+          planted = true
+          world = openWorld({ x: c.footX, z: c.footZ, radius: 0.35 })
+        }
+        // …and then he FOLLOWS it: the second round of the same review found that
+        // a landing chosen when the hold ended was never looked at again, so a
+        // traveller who stepped onto it during the descent had the child set down
+        // inside him. He moves onto the new foot halfway down.
+        if (c.climb === 'down' && c.climbFor > CFG.climbSinkSeconds * 0.85 && !followed) {
+          followed = true
+          world = openWorld({ x: c.footX, z: c.footZ, radius: 0.35 })
+        }
+        if (wasUp && c.climb === 'none') landed = { x: c.x, z: c.z }
+      }
+      expect(planted).toBe(true)
+      expect(followed).toBe(true)
+      expect(landed).not.toBeNull()
+      // It came down somewhere else, and clear of him.
+      expect(insideStrangerBerth(world, CFG, landed!.x, landed!.z)).toBe(false)
+      // AND IT WALKED DOWN rather than jumping. The traveller arrives at
+      // nine tenths of the way down, which is where a descent read as a fraction
+      // of the whole moved the child nine tenths of the way to the new foot in
+      // one frame; a step that size is a teleport a hand's breadth above the
+      // ground. Bounded by the round's own walking pace, generously.
+      expect(biggestStep).toBeLessThan((CFG.walkPace * 3) / 60)
+      // …and still at the stone, not carried off across the village.
+      const out = Math.hypot(landed!.x - b.x, landed!.z - b.z)
+      expect(out).toBeGreaterThan(b.radius)
+      expect(out).toBeLessThan(b.radius + world.childRadius + CFG.climbApproach + 0.2)
+    }
+  })
+
+  it('never opens the cycle out from under a child still standing on the stone', () => {
+    // The word falls at the TOP of the climb, and by then the roaming phase's own
+    // clock has usually run out — so the cycle was free to open on the very frame
+    // the boulder was named, and `openCycle` put the climber back on the ground
+    // mid-hold. What the player got was ROCK spoken by a child already walking
+    // away from a rock he never saw it on. Replayed at a roaming phase far
+    // shorter than the climb, which is the case that made it visible.
+    const cfg: BankConfig = { ...CFG, roamSeconds: 0.1, roamSpread: 0 }
+    const world = openWorld()
+    const b = STAGE.boulder
+    for (const seed of SEEDS) {
+      const rand = mulberry32(seed)
+      const s = createBankGame([{ x: b.x - 4, z: b.z + 3 }], rand, cfg)
+      const c = s.children[0]
+      let sawTop = false
+      let leftRoamWhileUp = false
+      let heldFor = 0
+      for (let t = 0; t < 60; t += 1 / 60) {
+        stepBankGame(s, 1 / 60, cfg, STAGE, world, rand)
+        if (c.climb === 'top') {
+          sawTop = true
+          heldFor += 1 / 60
+        }
+        if (s.phase !== 'roam' && c.climb !== 'none') leftRoamWhileUp = true
+        if (sawTop && s.phase !== 'roam') break
+      }
+      expect(sawTop).toBe(true)
+      expect(leftRoamWhileUp).toBe(false)
+      // …and the hold it got was its own full length, not whatever was left of a
+      // phase that had already expired.
+      expect(heldFor).toBeGreaterThan(cfg.climbHoldSeconds - 0.05)
+    }
+  })
+
+  // THE CLIMB ITSELF (work-order 1080). What shipped before this point was a
+  // flag: `climbing` went true for 0.35 s while the child stood 2.2 m from the
+  // boulder's centre and the view lifted it 0.32 m where it stood. Every
+  // assertion the round had was about the UTTERANCE — that it fell, in the
+  // roaming phase, aimed at the boulder — so the picture could be nothing at all
+  // and the suite stayed green. These are about the CHILD: where it walks, where
+  // it ends up, how high, and for how long.
+  it('walks the climber onto the stone, holds it up there and brings it down again', () => {
+    const world = openWorld()
+    const b = STAGE.boulder
+    for (const seed of SEEDS) {
+      const rand = mulberry32(seed)
+      // One child, well clear of the stone, so the whole approach is played.
+      const s = createBankGame([{ x: b.x - 6, z: b.z + 4 }], rand, CFG)
+      const c = s.children[0]
+      let approachStop = Infinity
+      let onStoneSeconds = 0
+      let atTopSeconds = 0
+      let highest = 0
+      let farthestWhileUp = 0
+      let cameDown = false
+      let footAt: { x: number; z: number } | null = null
+      for (let t = 0; t < 120; t += 1 / 60) {
+        const wasUp = c.climb !== 'none'
+        stepBankGame(s, 1 / 60, CFG, STAGE, world, rand)
+        if (!wasUp && c.climb === 'up') {
+          // The approach ENDED here: outside the stone's own collider, close
+          // enough that what follows is a step and not a leap.
+          approachStop = Math.hypot(c.x - b.x, c.z - b.z)
+          footAt = { x: c.footX, z: c.footZ }
+        }
+        if (c.climb !== 'none') {
+          onStoneSeconds += 1 / 60
+          if (c.climb === 'top') atTopSeconds += 1 / 60
+          highest = Math.max(highest, c.lift)
+          farthestWhileUp = Math.max(farthestWhileUp, Math.hypot(c.x - b.x, c.z - b.z))
+        } else if (wasUp) {
+          cameDown = true
+          // Back on the ground, at the foot it climbed from.
+          expect(c.lift).toBe(0)
+          expect(Math.hypot(c.x - footAt!.x, c.z - footAt!.z)).toBeLessThan(1e-6)
+          break
+        }
+      }
+      // It walked to the stone rather than stopping a stride short of nothing:
+      // the old approach ended at `reachDistance` (2.2 m) from the CENTRE.
+      expect(approachStop).toBeGreaterThan(b.radius)
+      expect(approachStop).toBeLessThan(b.radius + world.childRadius + CFG.climbApproach + 0.2)
+      expect(approachStop).toBeLessThan(CFG.reachDistance)
+      // It stood ON the top, not beside it, and never wandered off it.
+      expect(highest).toBeCloseTo(b.height, 6)
+      expect(farthestWhileUp).toBeLessThan(approachStop + 1e-6)
+      // And it was up there long enough to be SEEN. The whole climb is the rise,
+      // the hold and the descent; the shipped pose lasted 0.35 s.
+      expect(atTopSeconds).toBeGreaterThan(CFG.climbHoldSeconds - 0.05)
+      expect(onStoneSeconds).toBeGreaterThan(
+        CFG.climbRiseSeconds + CFG.climbHoldSeconds + CFG.climbSinkSeconds - 0.1,
+      )
+      expect(onStoneSeconds).toBeLessThan(
+        CFG.climbRiseSeconds + CFG.climbHoldSeconds + CFG.climbSinkSeconds + 0.1,
+      )
+      expect(cameDown).toBe(true)
+      // Nobody may shove it off the stone while it is up there.
+      expect(bankChildCanSeparate({ ...c, climb: 'top' } as typeof c)).toBe(false)
+    }
   })
 
   it('holds a tagged child in its posture, and moves it only between runs', () => {
@@ -821,11 +1012,12 @@ describe('the tapping child`s hand is ON the stone it names (work-order 1065)', 
         // The rock the tap names is the one the run is TOWARDS, which is the
         // one the speaker is standing at.
         const end: BankEnd = tap.direction === 'UPSTREAM' ? 'upstream' : 'downstream'
-        const reach = touchReach(STAGE, end, tap.speaker)!
+        const spoke = { x: tap.speakerX, z: tap.speakerZ }
+        const reach = touchReach(STAGE, end, spoke)!
         expect(reach).not.toBeNull()
         expect(Math.abs(reach.gap)).toBeLessThanOrEqual(TOUCH_GAP)
         // ...and that is much nearer than the waiting station it used to hold.
-        expect(dist(tap.speaker, rockAt(STAGE, end))).toBeLessThan(CFG.standOff - 1)
+        expect(dist(spoke, rockAt(STAGE, end))).toBeLessThan(CFG.standOff - 1)
       }
     }
   })

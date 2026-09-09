@@ -28,7 +28,8 @@ function stageOf(id: string): { stage: BankStage; layout: ReturnType<typeof buil
     downstream: rocks.downstream,
     flank: playRockFlank(rocks),
     water: { x: 0, z: 0 },
-    boulder: { x: 0, z: 0 },
+    // No part of this check — the climb has its own (work-order 1080).
+    boulder: { x: 0, z: 0, radius: 1, height: 1 },
     roam: { x: 0, z: 0, radius: 1 },
   }
   return { stage, layout }

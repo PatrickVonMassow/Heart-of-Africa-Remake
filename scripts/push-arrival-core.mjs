@@ -24,11 +24,13 @@
  *   ahead       commits on HEAD not contained in ANY remote ref (null: unknown)
  *   hasUpstream whether the branch tracks a remote branch at all
  *   paused      .claude/batch-paused exists → no batch duty in flight
+ *   inFlight    a declared verification is running on this machine (or null when
+ *               that could not be measured) — see THE CONFLICT below
  */
 export function evaluatePushArrival(input) {
   // `= {}` would only cover undefined; the wrapper can hand us null on a git
   // failure, and a guard that throws is a guard that trapped the session.
-  const { branch = '', ahead = null, hasUpstream = false, paused = false } = input ?? {}
+  const { branch = '', ahead = null, hasUpstream = false, paused = false, inFlight = null } = input ?? {}
   if (paused) return null
   if (ahead === null || !Number.isFinite(ahead)) return null // unknown → allow
   if (ahead <= 0) return null
@@ -44,6 +46,47 @@ export function evaluatePushArrival(input) {
       `Run: ${push} — then PROVE it arrived with \`git rev-list --count @{u}..HEAD\` (must be 0). ` +
       'A push that prints "Everything up-to-date" is NOT proof: on 24.07.2026 thirteen commits sat ' +
       'local for a whole night because the session pushed a different branch than the one it had ' +
-      'committed to, and git called that a success.',
+      'committed to, and git called that a success.' +
+      conflictNote({ branch, push, inFlight }),
   }
+}
+
+/** The branch whose push runs the FULL gate — build, lint, audit and unit. Any
+ *  other branch runs lint and audit only, which is seconds and no conflict. */
+export const FULL_GATE_BRANCH = 'main'
+
+/**
+ * THE CONFLICT, stated where the demand arrives (08.09.2026). A push to `main`
+ * runs the full pre-push gate — build, lint, audit, unit — on THIS machine, and
+ * a picture run that is measuring at the same time is torn up by it: it happened
+ * three times in one day, each time to a session that was obeying this very
+ * rule. The exception was written down three times as well — in the
+ * retrospective, in the beginner's guide and in a memory file — and never fired,
+ * because all three copies sat under their TOPIC while the demand arrives HERE.
+ * So it stands here now, and the sharper line is added when a declared run is
+ * actually in flight.
+ */
+function conflictNote({ branch, push, inFlight }) {
+  // Only the deployed branch carries the conflict — the four-eyes review caught
+  // this generalising over every branch, and the gate itself says why: a feature
+  // push runs lint and audit alone.
+  if (branch !== FULL_GATE_BRANCH) return ''
+  // The exception keeps the whole push command, remote and target included: the
+  // incident this guard was built for was a push that went to the wrong place
+  // and still reported success, and a bare `git push --no-verify` walks back
+  // into exactly that.
+  const exception =
+    ` The gate's own visible exception is \`${push} --no-verify\` — and it obliges you to run the ` +
+    'step your change touches by hand: "only documentation" is not safe by itself, because this ' +
+    'repository holds unit tests OVER its documents (proved red on 08.09.2026).'
+  if (inFlight) {
+    return (
+      ` A VERIFICATION IS IN FLIGHT (${inFlight}), and this push runs the full gate — build, lint, ` +
+      'audit, unit — beside it. Prefer waiting for its receipt.' + exception
+    )
+  }
+  return (
+    ' If a picture run is measuring right now, this push runs the full gate beside it and can tear ' +
+    'it up — defer the push until its receipt is in.' + exception
+  )
 }

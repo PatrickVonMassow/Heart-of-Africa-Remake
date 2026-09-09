@@ -232,6 +232,49 @@ put it is the mistake this line exists to stop.
   Wasserpfad, die Krug-Meshes und denselben LARGE-Bildlauf.
   Refs: PART A — src/scenes/place/bankGame.ts (THE TAP ~626, reachDistance/standOff ~223), src/config/balance.ts (bankGame reachDistance 2.2, standOff 2.6), src/render/gesture.ts (GestureKind), src/scenes/place/layout.ts (PLAY_ROCK_RADIUS). PART B — src/scenes/place/adultWork.ts (water-out/water-back ~390-410, AdultCarry, WATER_FOOT_REACH), src/scenes/place/riverBank.ts (bankWaterFoot, BANK_STAND_INSET 1.5, BANK_SHORE_HALF 1.2, walkable region through the waterline ~47-62), src/scenes/place/layout.ts (waterPath head/foot), src/render/figures.ts. Both — src/scenes/place/PlaceLife.tsx (ErrandVillagers, head/hand jar meshes ~2440-2612, HEAD_CARRY_POSE), design.md §13.4, docs/communication-poc-spec.md
   Doc impact: design.md §13.4 and docs/communication-poc-spec.md item 4: the catcher touches the rock with its hand while naming it, and the water carrier dips the jar at the waterline and carries visible water back. If a new gesture kind is added, the point-479 gesture list in the code comments / docs names it. balance.ts: fill seconds (calibratable).
+  Readings one to four, 08.09.2026 (branch, WebGPU; the runs and their numbers are in the
+  branch's commits). They closed everything but one red, and each cause was a different kind of
+  wrong: the tap's hold was armed by the RUN rather than by the WORD, so a run whose tapper could
+  not reach its stone opened silently and still froze the group; the water carrier reached the
+  water but stopped inside the shared 1.10 m arrival radius, which on the bank's slope is 18 cm
+  of height, so his jar never went under the drawn surface (`FILL_ARRIVE_RADIUS` 0.35 for that
+  leg alone, `BANK_FILL_DEPTH` 0.10 → 0.20 m). A nominal spot is not a standing place, and the
+  pure tests now WALK the way the scene walks. PART B was then green IN THE PICTURE — the
+  carrier goes in, dips below the drawn surface and comes back with a jar that shows its water.
+  PART A kept ONE red, always the same number, and the fourth reading left a hypothesis for it:
+  the gate is satisfied in the SIMULATION while the check reads the DRAWN hand off the scene
+  graph. Two things it ruled out on the way: the check is not badly written (measured strictly
+  inside the hold it read the same), and the tap, the walk and the probe all mean the same rock.
+  Fifth reading, 08.09.2026 17:30, WebGPU on the branch: THE HYPOTHESIS HELD, and the cause is
+  the DRAWING, not the round. It was measured rather than argued: the scene now records the
+  tapping child at the utterance itself (`__placeTapHand().opening`), and that reading was 54 cm
+  of arm off the stone with the shoulder still drawn at REST (0.04 rad), on the stone from the
+  next frame on. That is exactly the 58 cm the section had been failing at.
+  - THE MECHANISM. A figure applies its pose in its OWN frame callback, and React subscribes a
+    child's callback before its parent's — so a pose written by the scene was drawn one frame
+    late, and a gesture issued together with a word was drawn after the word had fallen. Body
+    position and facing never lagged: the scene writes those onto the group directly.
+  - THE FIX. `src/render/figurePose.ts` is now the one place that puts a pose on its pivots; a
+    figure publishes its pivots to the caller that owns its pose and stops applying an owned pose
+    itself. Both writers — the children at the bank and the adults at their work — apply in the
+    frame they write. Measured after: 1.6 cm off the drawn flank in the very frame the word falls.
+  - WHY THE RED CAME AND WENT. The check broke out of its sampling loop at its FIRST good
+    reading, so which single frame of a nine-second hold it measured was luck. It now reads the
+    hold frame by frame, prints the shape it read, and asserts the utterance frame from the
+    scene's own record instead of hoping a sample lands on it.
+  - NOT FIXED HERE, and no player impact known: the adults' `speakWork` runs AFTER their pose
+    loop, so an adult's gesture is still written on the frame after the word. Their teaching
+    checks are green and nothing measures it; noted rather than churned.
+  THE TAP'S OWN GESTURE CLOCK RUNS A FRAME AHEAD OF THE HOLD (measured 08.09.2026, drained
+  here 09.09.2026). `polish/children-bank-game` read the catcher's hand 1 cm from the rock for
+  the whole hold and 10.6 cm at the last sample, 0.01 s before its end: the arm is already
+  swinging back while the hold still runs. Cause read off the code — `PlaceLife.tsx` starts the
+  gesture in `speakBankUtterance` and advances it through `advanceGesture` in the SAME frame,
+  while `bankGame.ts` subtracts the hold only on the next one (`tapFor` is set after the
+  decrement). The buffer `startGesture` builds in (`held + gestureBlendOf(kind)`) covers the
+  0.12 s blend, not the extra frame, and the error grows with `dt`. The remedy is to advance
+  every gesture BEFORE the new utterance is spoken, so the later call only reads: both clocks
+  become one and the blend begins exactly at the hold's end.
   Bundle: Dorfleben.
 
 - [ ] 1072. The village speaks with a direction, and the children sound like children (user
@@ -263,12 +306,12 @@ put it is the mistake this line exists to stop.
     English and German debug labels changed together.
   - THE VILLAGE ALSO GETS LOUDER (user 07.09.2026: »Insgesamt soll die Sprache auch lauter
     sein«). Two more fields, both calibratable:
-    - SPEECH GETS ITS OWN VOLUME in the existing family beside `footstepVolume`,
-      `ambientVolume` and `birdsongVolume`. Measured today: a syllable peak is `SPEECH_PEAK`
-      1.8 times the distance gain times `ambienceVolume` 0.1 (`balance.ts`:871), and the chain
-      then applies the ambient bus 0.5 and the master 0.5 — so a villager beside the player
-      peaks near 0.045 at the output. `SPEECH_PEAK`'s own comment claims to compensate the
-      0.25 bus factor and never accounts for the 0.1.
+    - SPEECH GETS ITS OWN VOLUME: DONE before this point was reached, by "Give the village
+      speech its own bus instead of the 'everything else' slider" — `communication.speechVolume`
+      is 2 and a dedicated `speechBus` carries it to the master, so the syllables no longer ride
+      the ambient bus at all. `SPEECH_PEAK` and the 0.045 arithmetic this bullet was written
+      around are gone with it (re-measured 08.09.2026 during the wait on 1065). What is left of
+      the loudness half is the FALLOFF below.
     - THE HEARING FALLOFF IS RE-CALIBRATED. `hearingGain` is 1/(1 + falloff·(d/r)²) with a
       hard cut past r (`speaking.ts` ~78-87) and `hearingFalloff` is 24 (`balance.ts`:1437):
       a speaker 3 m away arrives at 31.6 % and one 5 m away at 14.3 % of the level beside
@@ -310,6 +353,9 @@ put it is the mistake this line exists to stop.
   voices sit above the adults', and how loud the village is at conversational distance.
   balance.ts: both pitch pairs, the stereo width, the speech volume and the re-calibrated
   falloff (calibratable), with the English and German debug labels changed together.
+  Author lane: astra.
+  Why the lane: the communication mechanic is authored by Astra (user 08.09.2026); the
+  rendered picture, the browser suites and the landing stay in the main session.
   Bundle: Dorfleben.
 
 - [ ] 1073. A call carries to the stand the game photographs it from, and the hush stops
@@ -570,6 +616,177 @@ put it is the mistake this line exists to stop.
   `startJointWalk`, `joinSpot`, `JOIN_STAND_OFF`), src/scenes/place/PlaceLife.tsx (every
   actor's `position.set`), src/scenes/travel/TravelScene.tsx (how the outdoor height profile
   carries a figure), design.md §7
+  Bundle: Dorfleben.
+
+- [ ] 1076. The chief's first door press tells of his walk instead of a deciphered message,
+  and he gets a body (user 08.09.2026).
+  Two defects at the same hut, both measured on 08.09.2026.
+
+  PART A — THE FIRST PRESS WRITES THE WRONG ENTRY. `callChiefOut` sets the toast and calls
+  `tellChiefHint`, which writes `journal.titles.chiefHint` plus `journal.hintRaw` and
+  immediately reveals `journal.hintDecoded` — a "Deciphered! … latitude … degrees north"
+  text left over from the spoken-hint mechanic. The chief shares no language and speaks only
+  through the drums (design.md §13.4), so a deciphered message cannot exist here; the walk
+  itself gets no journal entry at all.
+  Final state:
+  - The first press at the chief's hut writes ONE journal entry, in both languages and with
+    the §15 emotional markup: the chief steps out of his hut, walks to his drummer, and the
+    player is evidently meant to follow. No deciphered message and no coordinates.
+  - The dead hint mechanic is DELETED rather than rewritten: `tellChiefHint` and
+    `revealDecoded` are called by nothing else, and `hintsGiven`/`decodedGiven` are read only
+    by the checkpoint. The keys they carry go with them, in both language files.
+  - Every later press at the hut behaves exactly as it does today.
+
+  PART B — THE CHIEF HAS NO BODY. The player resolves only against `layout.colliders`; the
+  seated drummer is in that set (r 0.8), while the chief figure only writes `group.position`
+  per frame and is neither a collider nor an `InhabitantBody` — one walks straight through him.
+  Final state:
+  - The chief is solid wherever he stands and wherever he walks, in both perspectives.
+  - Nobody is wedged by him: the gap between the hut collider (r 3.35) and the chief in his
+    standing place (`CHIEF_STAND_OFFSET` 1.6) stays walkable, and `withinGiveReach` and
+    `nextChiefAction` keep reaching him.
+
+  Test. Vitest: the first press writes exactly the new entry and no decoded text; the hint
+  functions and their keys are gone from the store and from both language files (i18n
+  parity); the chief's body follows his position, the hut-to-chief gap stays walkable, and
+  the reach checks still resolve. Browser (collision lane, WebGPU): one frame in which the
+  player is stopped at the chief in front of his hut, screenshot under verification/ with the
+  subject declared (the player blocked at the chief's body).
+  Quotes:
+  Nutzer, 08.09.2026 10:00: »Folgende Änderungen beim Häuptling: Wenn man das erst Mal an
+  seiner Hütte SPACE auslöst, erscheint aktuell ein Tagebucheintrag, der fälschlicherweise
+  etwas von einer entschlüsselten Nachricht erzählt - vermutlich eine Altlast. Stattdessen
+  soll ein Eintrag kommen, de besagt, dass der Häuptling aus seiner Hütte heraus tritt, zu
+  seinem Trommler läuft und man ihm anscheinend folgen soll: Der Häuptlingsfigur fehlt eine
+  Kollisionserkennung. Hole diese nach. Reihe das direkt vor 690 ein.«
+  Refs: src/state/store.ts (`callChiefOut`, `tellChiefHint`, `revealDecoded`, `hintsGiven`,
+  `decodedGiven` and the checkpoint that reads them), src/i18n/en.ts and src/i18n/de.ts
+  (`journal.titles.chiefHint`, `journal.hintRaw`, `journal.hintDecoded`),
+  src/scenes/place/chiefMeeting.ts, src/scenes/place/PlaceScene.tsx (the chief group, the
+  collider resolve), src/scenes/place/layout.ts (the collider set), design.md §13.4, §15
+  Author lane: astra.
+  Why the lane: the communication mechanic is authored by Astra (user 08.09.2026); the
+  rendered picture, the browser suites and the landing stay in the main session.
+  Bundle: Dorfleben.
+
+- [ ] 1082. A child climbing the village boulder becomes something the player actually
+  sees (user 09.09.2026, 05:04 — the same report twice).
+  Point 1080 was filed on 08.09.2026 because the user never saw the climb; it landed in the
+  early hours of 09.09.2026, having lengthened the hold from 0.35 s to 2.8 s and replaced a
+  0.32 m hover with the real height of the stone. At 05:04 on 09.09.2026 he reported it
+  missing AGAIN and asked whether it was meant to happen at the play rocks by the river,
+  where he only ever sees the children run to their game. Measured against the shipped code,
+  not guessed: the whole event lasts 4.4 s (`climbRiseSeconds` 0.9 + `climbHoldSeconds` 2.8 +
+  `climbSinkSeconds` 0.7) and falls once per cycle of about 2.5–4 minutes; it falls in the
+  first ~10 s of the roaming phase, because the climber is picked on the first roam step and
+  walks straight at the stone (`bankGame.ts:1205`), so it is over before a player who has
+  just walked into the village has found the group; and the stone is whatever climbable
+  instance is nearest the quarter, with scatter tops running 0.16–0.53 m (`ROCK_TOP_UNITS`,
+  `flora.ts:323`) — at the low end a step over a pebble. The evidence picture accepted for
+  1080, `verification/187-child-on-the-boulder.png`, was taken with `climbHoldSeconds` forced
+  to 25 s (`polish.mjs:4592`) from a camera two metres in front of the child: it proves the
+  mechanic runs, never that a player can see it, and THAT gap is what the user is reporting.
+  The mechanic is right; the presentation is not. It earns its own branch because the remedy
+  is not a number — the stone has to be placed by the layout instead of found by a search,
+  and the acceptance is a picture at shipped values, the only check that would have caught
+  this the first time.
+  The off-game ROCK stays exactly the mechanic point 1080 built — an ORDINARY scattered
+  village boulder, climbed during the roaming phase, never a play rock at the bank. Only its
+  visibility changes.
+  PART A — THE STONE IS CHOSEN TO BE CLIMBED, NOT MERELY TO BE NEAR.
+  `climbBoulder` takes the nearest stone above a 0.20 m floor, and the scatter tops run
+  0.16–0.53 m: where the nearest instance is a small one, the climb is a step onto a
+  knee-high pebble. Raising the floor alone is already refuted — the balance note at
+  `climbableRockTop` records that 0.30 m sent the climber 5 m further off in two shipped
+  layouts, the approach then failed and the shuffle gate tripped. So height and nearness stop
+  competing: the layout DERIVES one climbing stone, the way it already derives the two play
+  rocks from the bank.
+  Final state:
+  - Every village layout with a quarter for the children also carries one climbing stone:
+    just outside the rim of that quarter, on the side the group roams, within a short walk,
+    at the top of the scatter size range (instance scale 1.0, top ~0.53 m — chest-high on a
+    0.55-scaled child), and clear of huts, lanes, the way to the water, the bank play lane
+    and the quarter disc, under the rules the rest of the scatter already obeys.
+  - `climbBoulder` takes that stone. The present nearest-climbable-else-tallest search stays
+    as the fallback for a fabric that leaves no room, so no village loses its bank round.
+  - `climbableRockTop` is raised to the height the derived stone guarantees, so the fallback
+    can no longer pick a pebble where a real stone exists. Re-measure the layouts the 0.20 m
+    note was measured on rather than assuming the derived stone pays it back.
+  - Renderer, collider and stand height stay the single `LooseRock` value they are today.
+  PART B — THE STAND LASTS LONG ENOUGH TO BE FOUND, AND THE WORD LASTS AS LONG AS THE STAND.
+  `climbHoldSeconds` is 2.8 s and `communication.labelSeconds` is 2.6 s: coupled today only
+  by accident of their values, so lengthening one alone would leave a child standing wordless
+  on a stone.
+  Final state:
+  - `climbHoldSeconds` becomes 7 s (estimate, calibratable, in `src/config/balance.ts` under
+    CLAUDE.md §2 / design.md §14): long enough for a player who looks over when the word
+    falls to find the child and the stone under it.
+  - The overhead label of the boulder utterance lives as long as the child stands, DERIVED
+    from the hold at the call site rather than written down twice, so the two cannot drift
+    apart again.
+  - Rise (0.9 s) and sink (0.7 s) unchanged; the pace of the climb was not the defect.
+  - The child-motion floor is untouched, and the roam guard still bounds the phase.
+  PART C — SOMETHING PULLS THE EYE BEFORE THE WORD DOES.
+  The whole event is one `indicate` gesture fired once on arrival at the top: a player not
+  already watching that child has nothing to look up for.
+  Final state:
+  - The gesture of the climber is visible for the whole hold instead of as a single shot: the
+    arm stays out at the rim of the stone on the side it came up, the aim already computed
+    today.
+  - The group notices. While the climber stands, the other children turn their facing toward
+    the boulder — a turn only, never a stop: no walk is interrupted, and the motion floor and
+    the shuffle gate are re-measured to prove it.
+  - No new word, no repeated word, no second utterance: ROCK still falls exactly once per
+    cycle, at the top of the climb.
+  PART D — THE VERIFICATION STOPS STAGING WHAT IT PHOTOGRAPHS.
+  Section `children-boulder-climb` in `scripts/verify/polish.mjs` sets `climbHoldSeconds` to
+  25 s to be able to take its picture at all. That staging IS the measurement of this defect,
+  so removing it is the acceptance.
+  Final state:
+  - The section photographs the climb at the SHIPPED balance values. Shortening `roamSeconds`
+    to reach a roaming phase quickly stays allowed; overriding hold, rise or sink does not.
+  - The frame is judged, not merely taken: from a standpoint a player can occupy on the
+    ground, the child on the stone reads by the existing `tagFrameReading` bar
+    (`MIN_CHILD_PIXELS`, `judgeTagStandpoint`), and the word is up in the same frame. The
+    close staged camera of `verification/187-child-on-the-boulder.png` is replaced by that
+    standpoint.
+  The bounds the user named: the stone must remain an ordinary village boulder that is NO
+  part of the game — moving the naming to a play rock at the bank is REFUSED, because
+  docs/communication-poc-spec.md (110–112) and `bankGame.ts:26` close the reading of ROCK as
+  base/goal/made-it precisely by naming an off-game stone, and the user asked about that in
+  so many words. No new mechanism (CLAUDE.md §2, infrastructure freeze): this is placement,
+  two durations and a gesture that already exists — no new guard, no scheduler, no situation
+  catalogue. Numbers go into `src/config/balance.ts` as estimates marked calibratable, never
+  scattered through the code. The child-motion floor (25 m per played minute) and the shuffle
+  gate must be re-measured, not assumed. The 0.20 m floor carries a measurement in its own
+  comment: whoever raises it re-runs that measurement over the shipped village/seed layouts
+  and records the new numbers in the same comment, rather than deleting the old note.
+  Test.
+  Vitest: the layout derivation — a village with a quarter always yields a climbing stone, it
+  lies outside the quarter disc and clear of lane, play lane and water route, and
+  `climbBoulder` returns it; the fallback still answers for a fabric with no room; `looseRock`
+  keeps renderer, collider and stand height as one value. The hold/label coupling: the label
+  lifetime of the boulder utterance equals the hold for any hold. The gesture is live for the
+  whole hold, and the facing of the other children turns toward the boulder without any child
+  stopping.
+  Browser (polish lane, `--section=children-boulder-climb`, both backends — the stone is a
+  rendered instance and the reading is a pixel judgement): one frame at shipped values;
+  screenshot under `verification/` with the subject declared (a village child standing on the
+  derived climbing stone with its word over its head, from a standpoint on the ground).
+  Re-measure and report the child-motion floor and the shuffle gate over the seeds the
+  existing suites use, because PART B and PART C both change how long children stand and
+  where they look.
+  Refs: src/scenes/place/bankGame.ts (`climbBoulder` ~1205, the roam step, `climbRiseSeconds`
+  / `climbHoldSeconds` / `climbSinkSeconds`), src/config/balance.ts (`climbableRockTop` and
+  its 0.20 m measurement note, `communication.labelSeconds`), src/scenes/place/layout.ts (the
+  derived play rocks, the quarter disc, the lane and water routes), src/scenes/place/flora.ts
+  (`ROCK_TOP_UNITS` ~323, `LooseRock`), src/render/gesture.ts (`indicate`),
+  scripts/verify/polish.mjs (section `children-boulder-climb` ~4592, `tagFrameReading`,
+  `MIN_CHILD_PIXELS`, `judgeTagStandpoint`), docs/communication-poc-spec.md (110–112),
+  design.md §13.4, §14
+  Author lane: opus
+  Why the lane: the verification IS the work here — the deliverable is a judged rendered
+  frame at shipped values, taken and judged in the main session.
   Bundle: Dorfleben.
 
 - [ ] 690. The classic game of tag moves to the port cities, and every document describes
@@ -859,6 +1076,44 @@ put it is the mistake this line exists to stop.
   that /v0.3/ and /poc/ serve the new state, and FREEZE the tag: it is never
   re-pointed.
 
+- [ ] 1081. A child boxed by adults planted in its own play ground walks a metre and gets
+  nowhere — and the case that was supposed to catch it pins one lucky seed. Measured on
+  `main` on 09.09.2026 while work-order 1080 was being verified: the crowded construction of
+  `tagShuffle.test.ts` ("and holds when the adults walk through the children's own ground",
+  every errand villager planted INSIDE the children's quarter) reads 0 % at bambara-village
+  seed 2972259115, which is the one village and seed the case runs — and 0.51 % / 0.68 % /
+  0.54 % at mandinka-village seed 99 for the 20 fps, 7.5 fps and 2-12 frame resamplings,
+  against the 0.25 % `shareGate`. maasai-village reads 0.03-0.06 %. So the shipped code
+  already has the episode; the case simply never looked where it lives, and 1080's climb —
+  which moves the children's seeded paths and nothing else about their steering — surfaced
+  the same thing in bambara (0.20 % native, 0.45 % at 7.5 fps).
+  WHAT THE EPISODE IS. One child, one second: 1.4 m of legs inside a 0.29 m circle, roaming
+  its quarter eight to ten metres from anything this point's neighbours changed, with adult
+  bodies standing in its way. It reverses direction inside the second. That is the exact
+  shape the child-motion metric exists for — walking without getting anywhere — at a scale
+  of one episode per crowded minute rather than the penned child's persistent one.
+  Final state:
+  - The cause is named from a trace, not guessed: which of the deflection, the one-side
+    commitment or the roam-heading reflection turns a boxed child back on itself, and
+    whether an adult body standing still is handled differently from one walking.
+  - Either the steering is fixed so a boxed child works its way past the adult, or the
+    episode is shown to be legitimate avoidance and the metric is taught to tell the two
+    apart. Not a raised gate on its own.
+  - The crowded case is judged over more than one settlement afterwards, so it can never
+    again read clean because of the seed it happens to run.
+  - `CROWDED_CADENCE_GATE` in `tagShuffle.test.ts` — the 1 % bar 1080 measured for the
+    resampled cadences — is removed or re-derived from what the fix leaves behind.
+  Test: Vitest — the crowded construction over at least three village/seed pairs at every
+  cadence, including mandinka-village/99, which is the sample that fails today.
+  Criticality: medium — no crash and no blockade once 1080 has landed, but it is a live
+  reading over the gate in shipped code, and the gate that should have caught it was
+  measuring one seed's luck.
+  Refs: src/scenes/place/tagShuffle.test.ts (the crowded case and `CROWDED_CADENCE_GATE`),
+  scripts/verify/childMotionMetric.mjs (`shuffleWindows`, `CHILD_MOTION.shareGate`),
+  src/scenes/place/tagGame.ts (`moveChild`, the deflection and the one-side commitment),
+  src/scenes/place/bankGame.ts (`stepRoam`, the roam-heading reflection).
+  Bundle: Dorfleben.
+
 - [ ] 1068. WebGL 2's polish run reds once on the children-motion check, and the red has no owner
   (measured 07.09.2026 on main at bd050ddf8, `VERIFY_GL=webgl node scripts/verify/run-logged.mjs
   polish`, log `local/verify-logs/2026-09-07T05-44-35-994-polish.log`).
@@ -955,7 +1210,17 @@ put it is the mistake this line exists to stop.
     IS THE LAST THING A SESSION DOES, so a fresh branch tip is evidence the writer just
     FINISHED, not that it is working. Final state: a branch tip alone may not keep a writer
     alive without process or worktree evidence beside it, or its grace drops well below one
-    tick — and the launcher says which evidence it stood on.
+    tick — and the launcher says which evidence it stood on. MEASURED AGAIN 08.09.2026,
+    20:26–20:56, and it CORRECTS that final state: worktree evidence is not the corroboration
+    it names. The predecessor handed over at its context mark; every launcher tick then
+    refused with `registered-writer-live … work output 14/18 min old (working files)` while
+    `ps` showed no author process at all — the fresh files were the output of the LARGE
+    regression that ran on alone in that worktree and finished at 20:36. A finished suite
+    writes working files exactly like a working author, so file mtimes are no liveness
+    signal beside a branch tip; both are traces a writer leaves BEHIND it. Half an hour of
+    standstill, and the red run lay unread. Final state, sharpened: liveness rests on a
+    measured PROCESS wherever one can be measured, and file or tip freshness may only
+    shorten a grace, never extend one.
   - A FOURTH SHAPE, measured 04.09.2026 ON THIS POINT'S OWN WORK three hours after the
     third and therefore the twenty-third union entry: the launcher TAKES the batch from a
     live owner and hands it to NOBODY. At 14:15:25Z it logged `TAKING THE BATCH despite a
@@ -6940,6 +7205,9 @@ Build order, chosen so no two parallel agents own the same file:
   backends, screenshot): walking past a group, at least one inhabitant's yaw turns
   measurably toward the player and returns afterwards, while the errands continue.
   DOCS: design.md §19.10 gains the glance beside the existing village vignettes.
+  Author lane: astra.
+  Why the lane: the communication mechanic is authored by Astra (user 08.09.2026); the
+  rendered picture, the browser suites and the landing stay in the main session.
 
 - [ ] 357. The village sounds inhabited (user 25.07.2026). Checked: the settlement
   soundscape in `src/systems/ambience.ts` runs exactly ONE layer for a village —
@@ -7052,6 +7320,9 @@ Build order, chosen so no two parallel agents own the same file:
   least one pair meets, both yaws turn toward each other, they part, and the errand
   targets are still reached afterwards; no walker is left standing past its window.
   DOCS: design.md §19.10 beside the existing village vignettes.
+  Author lane: astra.
+  Why the lane: the communication mechanic is authored by Astra (user 08.09.2026); the
+  rendered picture, the browser suites and the landing stay in the main session.
 
 - [ ] 362. The crossing turned back — the crocodile takes a calf mid-channel
   (user 26.07.2026; design.md §19.8 states the target). Two systems exist and have
@@ -9239,6 +9510,9 @@ to land than a mechanism that needs a review.
   see a child pass inside its window rather than at the end of a long one.
   Criticality: medium — nothing is broken, but the round's whole purpose is a picture the player
   currently has to wait minutes for.
+  Author lane: astra.
+  Why the lane: the communication mechanic is authored by Astra (user 08.09.2026); the
+  rendered picture, the browser suites and the landing stay in the main session.
   Bundle: Dorfleben.
 
 - [ ] 699. An actor label is drawn through the landmark label behind it (seen 17.08.2026 in the
@@ -14452,6 +14726,9 @@ to land than a mechanism that needs a review.
   Criticality: medium — it blocks landings that have nothing to do with it, and a retry-green is
   SUSPECT, which covers no backend at all.
   Refs: scripts/verify/polish.mjs (section speech-hypothesis), src/scenes/place/PlaceScene.tsx
+  Author lane: astra.
+  Why the lane: the communication mechanic is authored by Astra (user 08.09.2026); the
+  rendered picture, the browser suites and the landing stay in the main session.
   Bundle: Testinfrastruktur.
 
 - [ ] 1044. A crashed suite's stack is swallowed before any log can keep it, so the sign-off
@@ -14514,6 +14791,9 @@ to land than a mechanism that needs a review.
   hits, but not in the one the player is given.
   Refs: src/scenes/place/layout.ts (the `clearRun` sweep and the head ladder),
   src/scenes/place/layout.test.ts (`NO_STRAIGHT_WALK`)
+  Author lane: astra.
+  Why the lane: the communication mechanic is authored by Astra (user 08.09.2026); the
+  rendered picture, the browser suites and the landing stay in the main session.
   Bundle: Dorfleben.
 
 - [ ] 1046. The children's bank round hardly ever carries anyone past the middle of the
@@ -14939,4 +15219,69 @@ to land than a mechanism that needs a review.
   point decides first.
   Refs: scripts/verify/gamepad.mjs (section `position-query`), src/systems/gamepadMap.ts,
   the position-query toast in src/state/store.ts and both language files
+  Bundle: Testinfrastruktur.
+
+- [ ] 1078. The one solvable puzzle of the PoC fails its own check about half the time, and
+  nobody knows whether the player or only the harness is hit (measured 08.09.2026).
+  WHAT HAPPENS. In the `world` suite the traveller jumps to the talus foot below the
+  Bandiagara escarpment, where the rock relief fits the mould, and presses the use key.
+  In the run of 08.09.2026 07:38:23 the press answered "Nothing here has a hollow that
+  would take this shape." — `said ["…noFit"], spent [], mode travel, dialog null` — and so
+  did the following press at what should by then have been a spent socket. Both checks went
+  red, the suite retried once, and the retry passed 10/0. That retry is what makes this a
+  point rather than a fixed bug: a later green does not close a red (CLAUDE.md §7.2), and the
+  same pair is on record from the SUSPECT run of 07:40:15 that only passed on its second try.
+  WHAT THE EVIDENCE ALREADY RULES OUT. It is not the settle time: the earlier press one
+  degree off the socket, which correctly answered noFit, waits only 600 ms, while the press
+  at the foot waits the default 2500 ms and has a screenshot and two zoom changes behind it.
+  It is not the camera either — the frame `20-worldmodel-bandiagara-talus-foot` between the
+  two presses passed its own shutter, so the talus WAS in the rendered projection at that
+  instant. It is not the toast expiry the probe already guards against (the log records the
+  toast as it is SET), and it is not a random event's dialog: the roulette is switched off
+  around the block and `dialog` reads null. So the press reached the game, the game answered,
+  and the answer was that the traveller was not within reach of `bandiagara-talus`.
+  WHAT IS NOT YET KNOWN — and settling it IS the first half of this point: whether the fit
+  test reads a position the PLAYER also has (then `debugJumpTo` leaves the reach computation
+  on a stale or smoothed position and a real traveller walking there can meet the same
+  silence), or whether only the HARNESS jump is at fault. Answer that BEFORE touching either
+  side. Probe: press at the foot in a loop over N runs and log, per attempt, the position the
+  reach test reads next to the socket position, so the distance that decided the answer is
+  named instead of guessed — `node scripts/throttle-probe.mjs world --section=<the block's
+  slug> --runs 8` measures how often it bites.
+  WHAT IT COSTS. This is the ONE puzzle the PoC can solve end to end, so a fit that
+  intermittently refuses is player impact, not only suite noise; and while the red stands
+  unowned, `render-verify-guard` blocks every merge in the repository.
+  Final state:
+  - The cause is named in the commit — player path or harness — with the measurement that
+    distinguishes them.
+  - The named side is fixed, and the block passes eight times in a row on a quiet machine
+    without a retry.
+  - Whatever part of the reach decision is pure gets a Vitest that pins it, where no browser
+    is needed to prove the distance.
+  Test: `npm test -- world` unfiltered on both backends, plus Vitest over the pure part of
+  the reach decision.
+  Criticality: medium — intermittent, and the red is CHARGED to this point in
+  `scripts/render-verify-charges.mjs` so it stops blocking merges the moment this point
+  exists; but it sits on acceptance criterion 10 (goal scaffolding) and the closing run will
+  have to report it if it is still open.
+  Refs: scripts/verify/world.mjs (the talus block ~360-460, `jump`, `pressUseKey`),
+  src/world/forms.ts (`FORM_SOCKETS`, `socketPosition`), the use-key reach test and
+  `spentSockets` in src/state/store.ts, docs/acceptance-criteria-detail.md §10.
+  Bundle: Testinfrastruktur.
+
+- [ ] 1079. The only fix for a live vitest advisory is a semver-major jump, and the
+  advisory blocks every push until someone decides. GHSA-82fw-gwwq-j7x9 (path traversal /
+  arbitrary file read via the `@vitest/mocker` redirect) appeared on 08.09.2026 and made
+  `audit-check` red mid-session, which is the pre-push gate: the board could not publish and
+  the session boundary could not commit. It is recorded in the `ALLOW` map of
+  `scripts/audit-check.mjs` with the measured justification — dev-only dependency, never in
+  the shipped bundle, and the attack needs vitest BROWSER MODE while `vitest.config.ts` runs
+  `environment: 'jsdom'` with no browser block and nothing imports `@vitest/mocker`. That
+  acceptance buys time; it is not the answer. The answer is to decide the upgrade to vitest
+  4.1.11 deliberately: read its migration notes, run the full unit layer (14949 tests) and the
+  vitest type-check against it, and either land the jump or record why we stay on 3.2.7 and
+  what would change that. Do NOT let the ALLOW entry quietly become permanent — it names an
+  unfixed arbitrary-file-read in our own toolchain.
+  Refs: scripts/audit-check.mjs (`ALLOW`), vitest.config.ts, package.json (`vitest`,
+  `@vitest/coverage-v8`), scripts/verify/tiers.mjs (the unit tier), docs/backlog.md.
   Bundle: Testinfrastruktur.

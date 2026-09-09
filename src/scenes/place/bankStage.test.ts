@@ -9,13 +9,15 @@
 // fails.
 
 import { describe, expect, it } from 'vitest'
-import { standingClear, WALKER_RADIUS, spawnPointFree } from './collision'
+import { standingClear, WALKER_RADIUS, spawnPointFree, type CircleCollider } from './collision'
 import { buildLayout, PLAY_ROCK_SCALE } from './layout'
 import { BANK_PLAY_LANE_HALF, bankPlayRocksView, inBankPlayLane, standsOnGroundPlate } from './riverBank'
 import { PLAY_ROCK_SEEDS, playRockSurfaceRadius, playRockYaw } from './playRockSurface'
 import { PLACES } from '../../world/geo'
 import { FIGURE_LIMBS } from '../../render/figures'
 import { PLAY_ROCK_HEIGHT_UNITS } from '../../render/flora'
+import { balance } from '../../config/balance'
+import { climbBoulder } from './looseRocks'
 
 /** The camera the player looks through: App.tsx's own field of view, and the
  *  viewport the verification scripts run at. */
@@ -52,12 +54,28 @@ describe('the children`s play stage on the bank (point 687)', () => {
     }
   })
 
-  it('gives every bank settlement an ordinary off-game boulder', () => {
+  it('gives every bank settlement an ordinary off-game boulder a child can stand on', () => {
+    const minTop = balance.villageLife.bankGame.climbableRockTop
     for (const id of RIVER_VILLAGES) {
       for (const seed of [42, 99, 2972259115, 236333330]) {
         const layout = buildLayout(id, seed)
         expect(layout.bank).not.toBeNull()
         expect(layout.rocks.length).toBeGreaterThan(0)
+        // …and the stone the children's quarter actually gets is one that can be
+        // CLIMBED (work-order 1080), not merely the nearest pebble: every
+        // shipped bank village has a stand-on-able boulder, so the fall-back to
+        // the tallest is a safety net rather than the normal case.
+        const quarter = layout.playGround!
+        expect(quarter).toBeTruthy()
+        const boulder = climbBoulder(layout.rocks, quarter, minTop)
+        expect(boulder).not.toBeNull()
+        expect(boulder!.height).toBeGreaterThanOrEqual(minTop)
+        // The collider the layout put on that same stone is the one the round
+        // stops its approach outside of — renderer, collider and climb all read
+        // one size.
+        const circles = layout.colliders.filter((c): c is CircleCollider => 'r' in c)
+        const collider = circles.find((c) => Math.hypot(c.x - boulder!.x, c.z - boulder!.z) < 1e-9)
+        expect(collider?.r).toBeCloseTo(boulder!.radius, 9)
       }
     }
   })

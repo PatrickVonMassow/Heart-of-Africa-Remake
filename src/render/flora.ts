@@ -307,6 +307,21 @@ export function buildRock(): THREE.BufferGeometry {
   return merge([r]) // through merge so it carries the (zero) foliage attribute
 }
 
+/**
+ * How high the scattered boulder's top stands above the ground it sits on, in
+ * the mesh's own units — what a child's feet are at when it climbs one
+ * (work-order 1080). Its instance scale multiplies this exactly as it multiplies
+ * the footprint the collider is derived from, so the drawn stone and the height
+ * the game stands a child at cannot drift apart.
+ *
+ * Read off `buildRock`'s own transform rather than measured by eye: the highest
+ * vertex of a unit dodecahedron sits at φ/√3 of its radius, and the geometry is
+ * built at radius 0.5, squashed to 0.62 in Y and lifted 0.24 clear of the
+ * ground. `flora.test.ts` pins this against the geometry itself.
+ */
+const DODECAHEDRON_TOP = (1 + Math.sqrt(5)) / 2 / Math.sqrt(3)
+export const ROCK_TOP_UNITS = 0.5 * DODECAHEDRON_TOP * 0.62 + 0.24
+
 /** Native height of the settlement-scale play-rock mesh. Its instance scale is
  *  still derived from its footprint, so renderer and collider stay coupled. */
 export const PLAY_ROCK_HEIGHT_UNITS = 1.05

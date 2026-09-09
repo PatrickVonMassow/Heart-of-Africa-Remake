@@ -27039,3 +27039,123 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   src/config/balance.ts, docs/communication-poc-spec.md, design.md §13.4
   Doc impact: docs/communication-poc-spec.md (chief comes out to the drummer, CHIEF word), design.md §13.4.
   Bundle: Kommunikation.
+
+- [x] 1080. A child never visibly climbs a stone — the off-game ROCK is a third of a second
+  of nothing (user observation 09.09.2026: "I only ever see the tag game between the two
+  stones"). The moment exists and it fires: `stepRoam` picks a climber in the first roaming
+  step of a visit, walks it to the settlement's nearest loose boulder and says ROCK at the
+  `boulder` moment. What it does not do is show a climb. Three numbers, all read off the
+  shipped code: the approach ends at `reachDistance` = 2.2 m from the boulder's CENTRE, so the
+  child stops well over a metre clear of a stone whose collider radius is 0.35 + s·0.5;
+  nothing then moves it onto the stone — `PlaceLife.tsx` raises its Y by a flat 0.32 m where
+  it stands; and it holds that pose for `BOULDER_CLIMB_SECONDS` = 0.35 s. The scattered
+  boulders are 0.17-0.55 m tall (`buildRock`, instance scale 0.3-1.0), so what the player
+  could see, if he happened to be looking at the roaming quarter rather than at the two play
+  rocks by the water, is a child hovering beside a stone for a third of a second.
+  MEASURED (five seeds, ten minutes of village time each, the shipped balance and the bare
+  stage of `bankGame.test.ts`): five to six namings per ten minutes, the `climbing` pose up at
+  all for 1.83-2.20 s of those 600 s — 0.31-0.37 % of the visit, in flashes of 0.35 s — and
+  the climber standing 2.16-2.22 m from the boulder's centre at every one of them.
+  WHY THIS IS NOT ONLY A PICTURE. It is spec item 4 of `docs/communication-poc-spec.md`: the
+  guard that keeps ROCK from being learned as "base", "goal" or "the thing you run to". A
+  guard the player never sees does not guard, and the word it carries is then taught by the
+  game alone — exactly the wrong reading the spec set out to close.
+  Final state:
+  - The climber ends up ON the boulder: its standing position is the stone's own top, not a
+    point a reach away, and its height comes from that stone rather than from a constant.
+  - The climb reads as a climb — an ascent, not a cut — and the child stands up there long
+    enough for a player who looks over to connect the word with the stone. ROCK falls while
+    it is on the boulder, not on the way to it.
+  - The stone is one that can carry a child: the choice is made among boulders big enough to
+    be stood on, and a settlement whose boulders are all too small keeps today's abandon path
+    rather than staging an impossible climb.
+  - It gets down again and rejoins the roaming group; nothing is left hovering, and
+    `childMotionMetric` stays clean over the whole approach, climb and descent.
+  Test: Vitest — at the `boulder` utterance the climber stands inside the chosen boulder's
+  own footprint, its lift matches that boulder's height, the ascent-hold-descent lasts a
+  player-readable time taken from `balance.ts`, and a settlement whose boulders are all
+  undersized takes the abandon path. Browser (polish lane, both backends): one village frame
+  with the child standing on the stone; screenshots in verification/ (subject declared: the
+  children's roaming quarter with the climber on the boulder).
+  Criticality: medium — nothing crashes and nothing is blocked, but a communication-mechanic
+  guard has never once reached the player, and the user reports it as missing.
+  Refs: src/scenes/place/bankGame.ts (`BOULDER_CLIMB_SECONDS`, `stepRoam`, `climbing`),
+  src/scenes/place/PlaceLife.tsx (the 0.32 m lift in the children's frame loop, `bankStage`),
+  src/config/balance.ts (`villageLife.bankGame.reachDistance`), src/render/flora.ts
+  (`buildRock`), src/scenes/place/layout.ts (the loose-rock scatter), spec item 4 of
+  docs/communication-poc-spec.md.
+  Bundle: Dorfleben.
+
+- [x] 1077. The Astra lane is routed on paper and almost never authored (measured
+  08.09.2026, two findings of the same evening folded into one point).
+  CLAUDE.md §6 splits authoring across three lanes, and `author-routing-core.mjs` cuts the
+  374 open points 271 Astra / 103 Opus once criticality is read. The LANDINGS of the last
+  three days on `main` carry 174 Anthropic `Co-Authored-By` against 6 GPT-6 Astra (plus 12
+  `Reviewed-By` Astra). 6 against 174 is past measurement error, and trailers are a weak
+  proxy in ONE direction only: unlanded work and Astra's reading are invisible, so the true
+  Astra share can only be HIGHER than 6, never lower than the ratio suggests.
+  Part of the cause is visible: six of the first ten points in work-order order (1065, 1072,
+  659, 633, 174, 1068) enter the Opus lane on 'its VERIFICATION is the work', so the QUEUE
+  HEAD alone skews the sample. What is NOT measured is whether `author-astra.mjs` ever runs
+  for the 271 Astra points at all — `.claude/batch-activity.jsonl` carries no model-bearing
+  field and the string `author-astra` appears in it zero times.
+  MEASURED 08.09.2026, and the answer is NO: the dispatcher does not delegate. The codex
+  rollouts under `~/.codex/sessions` since 04.09.2026 are 41 reviews against 3 authoring runs,
+  and those three cover two points only (1051 twice, 1069 once). Of the 12 points closed in
+  the last three days — 1061 1052 689 691 1058 1067 1064 1069 1066 1057 692 1070 — EIGHT are
+  Astra-lane, so at least six Astra-lane points were written here against their own routing.
+  The isolated worktree is not the obstacle either: `feat/834-durable-authoring-lane` (122
+  commits), `feat/847-brevity-guard-gaps` (17) and `feat/1065-teaching-hands-touch` (7) carry
+  ZERO Astra trailers, and 847 and 901 are Astra-lane. The mechanism itself is intact —
+  codex-cli 0.153.0, `--dry-run` builds the gpt-6-astra call, the lane last ran 07.09. 20:55.
+  What is missing is the CALL, not the routing: no lever that only changes the lane can move
+  load while an Astra-lane point is authored here anyway.
+  Final state:
+  - It is MEASURED, once, whether the dispatcher actually delegates an Astra-lane point:
+    watch the next Astra-lane point and record whether `author-astra.mjs` ran. That answer
+    decides everything below; without it every lever is a guess.
+  - The three levers that cost no code and no test are applied where the measurement says
+    they help:
+    A — ORDER. NOT APPLIED: the user forbade reordering the work order for load on
+    08.09.2026 and made one exception, this point itself, which moves to the head.
+    B — THE EXISTING TAG. DONE 08.09.2026 for the communication mechanic on the user's
+    order. `Author lane: astra` as its own line is read by `authorLaneFor` BEFORE the
+    verification branch (the source comment calls it 'the cheap way back'), and it must be
+    the WHOLE line: `Author lane: astra — <reason>` parses to no tag at all, so the reason
+    goes on its own line beneath it. GPT-6 Astra enumerated the communication points from
+    the open headlines (`ask-astra.mjs --kind enumerate`); seven that the verification
+    branch was holding here now carry the tag — 1072, 1076, 356, 360, 698, 1043, 1045 —
+    while 1065 was left alone as in-flight, and 357 (village ambience bed), 620 (a picture
+    check that merely uses the speech-guess section) and 1062 (the position query after a
+    UI language switch) were dropped from Astra's list as not the mechanic. Five of the
+    enumerated points already routed to Astra: 1073, 690, 659, 619, 1046. The cut over the
+    open points moves 271/105 to 281/95.
+    C — CRITICALITY. VERIFIED but DELIBERATELY NOT USED AS A LOAD LEVER. 96 of the 376 open
+    points carry none, and `Criticality: high` does route to Astra above the verification
+    branch — but criticality is a claim about the point, not a routing dial, and raising it
+    to move load would corrupt the field every gate reads. It is filled in when a point is
+    judged, never to steer a lane.
+  - NOT DONE: narrowing `VERIFICATION_MARKERS` or `HARD_MARKERS`. That is exactly the
+    infrastructure surgery the freeze (CLAUDE.md §2) excludes, the lists are hardened over
+    several cross-vendor rounds, and none of it is needed if the levers above suffice.
+  - WHAT ACTUALLY MOVES LOAD, and what this point leaves open: the tags decide the lane,
+    not the dispatch. The measurement above shows Astra-lane points being authored here
+    anyway, so the tags bite only once an Astra-lane point is commissioned through
+    `node scripts/author-astra.mjs --point <N>` in its worktree. The first proof owed is
+    one communication point authored by Astra end to end.
+  Test. No product code changes, so no product test. The measurement is the evidence: the
+  recorded observation of one Astra-lane dispatch, and the before/after cut of
+  `author-routing-core.mjs` over the open points.
+  Refs: scripts/author-routing-core.mjs (`authorLaneFor`, `criticalityOf`,
+  VERIFICATION_MARKERS, HARD_MARKERS), scripts/author-astra.mjs, scripts/astra-share.mjs,
+  scripts/fable-switch.mjs, .claude/batch-activity.jsonl, CLAUDE.md §6.
+  AND THE PICTURE CHECK IS ITSELF A CAUSE (measured 09.09.2026 at point 1080). `node
+  scripts/author-astra.mjs --routing --point 1080` answers "opus — because its VERIFICATION is
+  the work (screenshots, PICTURE, both backends)", and what triggered it was the point's own
+  Test line: "Browser (polish lane, both backends) … screenshots in verification/". EVERY
+  player-visible point needs a picture check and therefore writes one, so every player-visible
+  point falls under `VERIFICATION_MARKERS`: the Astra lane structurally receives infrastructure
+  and logic and never the game. This point must decide whether the marker belongs narrowed — a
+  picture check that SIGNS OFF a result is a different thing from a point whose whole work is
+  measuring, and the sign-off stays with the main session either way.
+  Bundle: Modell & Wächter.

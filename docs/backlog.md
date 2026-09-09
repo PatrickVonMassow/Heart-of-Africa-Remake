@@ -348,3 +348,154 @@ exact fix, if the tolerance ever tightens, is to intersect the requested radial 
 actual triangle cross-section rather than binning its endpoints. Note that `fillGaps` has no
 such bound — a bin with no crossing takes a neighbour's radius whole — so a much coarser rock
 mesh would need this looked at again.
+## The polish runtime expectation is a quarter of the measured one (measured 08.09.2026)
+
+`run-wait.mjs --plan polish` promises 5m 41s and 21 frames; the constant behind it
+(`scripts/verify/run-wait-core.mjs` `polish: 340.9`, mirrored from
+`docs/picture-check-cost.md` §1, whose measurement window is 25.–27.07.2026) is six weeks old.
+Measured over every FULL-suite polish run record in this checkout and its worktrees
+(`local/verify-logs/*.run.json`, `--section` runs excluded): 19 runs, median 1658.6 s; the 14
+passing ones median 1614.0 s at 44 frames; the nine passing WebGL-2 ones median 1470.0 s. The
+consequence is a false verdict, not a lost run: `--await` gives up after 9m 01s, calls the run
+HUNG at 20 min and books it into the emergency lane as a standstill, while the Chrome GPU and
+renderer processes are measurably computing at 69 % and 33 % and the dev server stands. The run
+itself finishes and its completion notification arrives, so the wait is recoverable by declaring
+it with `batch-in-flight --waiting-on`. `scripts/measure-picture-cost.mjs` reports a polish median
+of 127.0 s over 15 runs, which is lower still — it appears to count PARTIAL `--section` runs, so
+refreshing the table needs that separation first. No player impact and no blockade under the
+infrastructure freeze; recorded so the next refresh of §1 does not have to re-derive it.
+
+## The play rock's binned radius is a circumscribed bound, not its surface (measured 08.09.2026)
+
+`playRockSurface.measure` keeps, per 11.25° bin, the LARGEST radius at which an edge of the
+drawn face crosses that bin, and `fillGaps` copies a neighbouring bin into an empty one. Both
+round outward, so the radius a toucher is placed against is the bin's circumscribed bound rather
+than the face inside it. GPT-6 Astra rated it P1 in the `d35e890` round of work-order 1065.
+Measured against the shipped `PROFILE_BINS = 32` on a 1.2 m play rock the worst case is under
+5.8 mm — an order under the few-centimetre tolerance the tap is judged at (`TOUCH_GAP` 3 cm,
+the browser check 6 cm), and it errs toward AIR rather than through the stone, so the hand
+never disappears into the rock. The exact fix, when the file is open anyway: keep the minimum
+radius over the bin's own edge samples instead of the maximum, and interpolate an empty bin
+between its two neighbours rather than copying one. No player impact and no blockade, so it is
+filed here under the CLAUDE.md §2 intake rule instead of becoming a point.
+
+## The clothing research carries adults, not children (discussion 08.09.2026, no code change)
+
+The user asked whether the village figures have a sex. They do not: `child` and `villager`
+carry a grammatical gender and nothing else, a bank child has role, arrival and heading but no
+such field, the bodies differ only in scale, cloth, role, kneeling and legs, and `dress.ts`
+knows six seasonal wraps and no sex at all.
+
+Whether that should change is a design question, and the corpus answers only half of it.
+`docs/peoples-1890.md` distinguishes women and men extensively and with sources — the Zulu
+isidwaba against the isipuku worn "by males and females", the Tuareg tagelmust explicitly "by
+men, not women", the Swahili kanga period-correct from 1876-86, the two cloths of Bambara and
+Hausa women in Barth, the larger Nama and San leather cloak an infant is carried in, the Somali
+chignon in its dark blue bag with no face veil, and the standing warning that Atlas Berber women
+do NOT veil. For CHILDREN the same research yields almost nothing: Pedi herd boys, San children
+often without even a cloak, and Barth's schoolboys. A girl or a boy would therefore be largely
+invented, which CLAUDE.md §2 forbids; the documented difference between children is the WORKING
+ROLE, not the dress.
+
+Two hooks if it is ever decided. The journal already tells the player that among the Tuareg it
+is the men who go veiled and not the women, while the picture shows sexless cones — that is the
+strongest entry point, because the text already claims what the scene does not show. And the
+hold-Ctrl label knows only the KIND today, so a visibly female figure needs a noun per figure
+rather than per kind. One warning for any such build: the corpus's passages on women's clothing
+run straight into period reports of extensive nakedness, so a depiction would have to clothe
+deliberately against its own source, and that choice would have to be argued rather than made
+silently.
+
+Why the dress work never split by sex, from the record rather than from memory. The order of
+16.07.2026 behind point 137 named two axes and sex was not one of them — "deutliche Unterschiede
+bzgl. der Kleidung je nach Region und Jahreszeit" (`docs/tasks-archive.md`, point 137) — and
+design.md carries no sex for the inhabitants to this day. The research pass was read with the
+SEASONAL question: §2.6 asks whether the same person wears more in the cold and §7 is a pure
+season sweep, so the women's and men's material in §2 was never put as its own question; where
+the source does touch sex it reports NO difference, the isipuku being worn "by males and
+females". The body could not have carried it either: point 120g recorded on 16.07.2026 that the
+primitive figures cannot even show a wrap worn differently, and arms arrived only with point 479
+on 03.08.2026, so the one shape change ever built is the Somali head-muffle. And the system has
+the wrong axis for it: `dress.ts` hangs on physical drivers (coldness, harmattan, karif), while
+sex has no driver and would be a per-figure attribute rather than another table row.
+
+One inconsistency found on the way, small and real: `docs/design-reference.md` §19.15 states for
+the Tuareg that "the wealthier MEN wear the bernus", while the scene puts the cloak on roughly a
+third of ARBITRARY figures — a rank gate standing where the source names a rank AND sex gate. It
+is the only place where the current depiction contradicts its own recorded source, and the
+cheapest thing to correct if the topic is ever picked up.
+
+## The LARGE run of 08.09.2026 started on a machine that was not quiet
+
+The quiet-machine check of the 1065 LARGE run reported MACHINE NOT QUIET at the shutter: a
+forgotten vite dev server from that very checkout was still running (pid 2848232, port 42729),
+and GPU load could not be read at all on this host (no sysfs `gpu_busy_percent`, no `nvidia-smi`).
+The pick contained startup, polish, voice, settings, enrichments and benchmark — precisely the
+timing-sensitive suites. The run proceeded and its pass/fail verdicts stand; its TIMING verdicts
+cover nothing, which is 115 minutes of measurement thrown away. The server was left alive because
+the run was still using the tree. Not filed as a point: point 296 already owns the quiet-machine
+check, and the fix is operational — shut the dev servers down before a LARGE run, not more
+mechanism.
+
+## A red first backend lane ends the LARGE run, so the second lane never runs
+
+Read on 08.09.2026 while reporting progress: with the WebGL 2 lane near its end and three suites
+already carrying a CANDIDATE REAL FAILURE, the remaining runtime was reported as "the same round
+again on WebGPU". That round cannot come. The run ended with exit 1 after 115m 20s and its
+receipt names `backend: WebGL 2` alone — a red first lane terminates the run. The consequence for
+any progress report: once lane one carries a candidate real failure, the remainder is the rest of
+lane one, never a second lane, and the covering second-backend run has to be started separately —
+which is exactly what `render-verify-guard` then demands before the branch may merge. The runner
+behaves correctly here; what was wrong was the reading of it, so this is a note rather than a
+point.
+
+## The polish retry hangs after a red, and its expected runtime is stale
+
+Measured 08.09.2026. After a red first attempt, `run-all` started the prescribed retry (point
+200) and then wrote nothing for 24 minutes: `polish.mjs` alive at 2 % CPU, two Chrome instances
+standing, the log ending at the retry line. `run-wait --await` booked the run as HUNG after
+51m 30s — two and a half times the 5m 41s expectation — and pointed at killing it rather than
+waiting again; SIGTERM did not clear the processes, SIGKILL did. Open: whether the retry raises
+its own dev server and wedges on the occupied port or on the first attempt's still-open Chrome.
+Noticed beside it: polish takes about 28 minutes on this machine against the
+`expectedRuntimeMs` of 340900 ms recorded in run.json, so every hang detection fires early.
+Infrastructure, and the freeze (CLAUDE.md §2) keeps it here until it reproducibly blocks.
+
+## The scattered boulders are far darker than the play rocks
+
+Seen on the picture evidence `187-child-on-the-boulder` (09.09.2026, both backends): the stone
+the child stands on reads almost black, while the two play rocks in the same village
+(`687-bank-play-rocks`) stand there a light stone grey. Both sit on the same bright sand under
+the same sun. The scattered stone comes from `buildRock` (dodecahedron, detail 0, tint
+`#8a8178`), the play rocks from `buildPlayRock` (detail 1, its own weathering); the scattered
+stones also share the `GroundScatter` material with the grass tufts, whose `colorNode` runs
+through `seasonTintNode`. To check: whether the season tint or the coarse faceting of the
+detail-0 mesh darkens them. No blocker — the climb reads on both backends — but it looks wrong
+to a human eye.
+
+## The beginner guide has no room left for a new lesson
+
+Reviewing `docs/analysis_de/vibe-coding-anleitung.md` against the sources of 09.09.2026, one
+pitfall it does not yet carry wanted in: *a numeric bar measured on a single sample* — it stands
+green for months and breaks under a change that does not touch the mechanism it judges, because it
+never held a property, only the luck of one world, one seed, one machine; the lesson is to measure
+the SHIPPED state over several samples before suspecting your own change. The entry does not fit:
+`guide-brevity-core.test.mjs` holds a hard ceiling and demands that both caps carry the guard's
+exact measured size ("no unearned headroom"), so any growth reads red. The entry was therefore
+taken back out; the class itself stands permanently in the retrospective as §3.252. To decide: the
+guide shortens an existing entry to make room, or the ceiling is raised once, deliberately. It does
+not grow quietly, and that is the intent.
+
+## Two polish runs on one checkout tear each other up (09.09.2026)
+
+Non-blocking, collected. On 09.09.2026 two `polish` runs were started 7.3 s
+apart on the SAME checkout while a third was still finishing. Both drew into
+the one `verification/` directory, wrote partial frame sets (32 and 35 of 48)
+and exited 1; neither log printed a single section, so neither carried a red
+anybody could own. Both were signed off as crashes with their evidence, and the
+fresh WebGL 2 run afterwards came back green.
+
+Nothing stops the second start: the quiet-machine check NAMES the leftovers and
+lets the run proceed by design. Whether that is worth a refusal rather than a
+warning is a judgement for whoever next touches that check — it costs two runs
+each time, and it happened twice in one night.

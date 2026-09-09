@@ -382,7 +382,47 @@ export const LIMITS = {
   // a lock while its remedies stay under it) WAS folded into "Die Anweisung hebt ihre eigene
   // Voraussetzung auf" and the entry was compressed to stay inside its 11-line ceiling: +2 lines.
   // Ceilings move 576 -> 587 with zero slack.
-  maxLines: 587,
+  // 08.09.2026: the run torn up by its OWN session — waiting is expensive, so the tool fills the
+  // wait and switches branch, adds a worktree or commits while a check is running; the run then
+  // reports red although every test was green, and the hunt starts in code that never broke. The
+  // entry was written and the ceiling was NOT moved with it, which left the audit red on `main`
+  // for the whole morning; this is that missing half, not a fresh raise. No existing entry
+  // carries the direction: the neighbouring ones are about a run dying with its session and about
+  // two sessions of the tool on one project, both lifetime and ownership rather than a session
+  // disturbing its own measurement, so folding would have dropped one of their claims. Its own
+  // entry costs +7 lines / +83 words. Ceilings move 587 -> 594 with zero slack.
+  // 08.09.2026 (second): the rule that names WHO should do the work while nothing counts whether
+  // it was ever handed over. Measured the same day on this project: a routing rule assigned 271
+  // of 376 open points to a second author, every report of it read green, and the session logs of
+  // that author held three authoring runs against forty-one reviews — no call stood between the
+  // assignment and the work, and re-labelling more points would only have improved the report.
+  // No existing entry carries it: the neighbouring ones are about a decision record that never
+  // expires and about a session disturbing its own check, neither about a rule whose audit passes
+  // because it only ever audits itself. Its own entry costs +7 lines / +87 words. Ceilings move
+  // 594 -> 601 with zero slack.
+  // 08.09.2026: the aged-expectation pitfall adds one line net after the three compressions
+  // above: 601 -> 602.
+  // 08.09.2026 (second): the rule filed under the wrong heading. The same mistake was written
+  // down three times that day — a retrospective paragraph, a pitfall in this guide and a
+  // measured memory rule — and none of the three fired, because each sat under its TOPIC while
+  // the contradicting demand arrived in the wording of another guard. No existing entry carries
+  // it: the neighbours are about two checks that contradict each other and about an instruction
+  // that voids its own precondition, neither about WHERE a rule has to stand to be read at all.
+  // Its own entry costs +9 lines / +106 words. Ceilings move 602 -> 611 with zero slack.
+  // 08.09.2026 (fifth): the guard that demands the very thing being produced. Measured that
+  // evening: `render-verify-guard` refused every turn end until a covering picture run existed,
+  // while that run had been going a quarter hour and needed two more hours — the refusal and its
+  // own remedy running against each other, with no way out but to wait inside a turn that may not
+  // end. Its second half is the cause that hid it: the guard resolves against the root it happens
+  // to run from, so from a worktree it saw the branch's unverified edits while every hand-run
+  // diagnostic, called from the main tree, read green. No existing entry carries it: the
+  // neighbours are about an aged duration killing a healthy run and about a rule filed under the
+  // wrong heading, neither about a check that forbids its own fulfilment. Its own entry costs
+  // +8 lines (7 plus its separator) / +81 words. The liveness entry beside it was SHARPENED
+  // rather than added to — a finished run leaves the same fresh files as a working one, so
+  // corroborating one trace with another proves nothing — at +1 line / +31 words.
+  // Ceilings move 611 -> 620 with zero slack.
+  maxLines: 620,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -608,7 +648,19 @@ export const LIMITS = {
   // words under the old ceiling: 5396 -> 5381.
   // 07.09.2026 (third): the detached-run pitfall justified beside maxLines measures 99 words and
   // the folded exemption-chain question 29: 5381 -> 5509.
-  maxWords: 5509,
+  // 08.09.2026: the run-torn-up-by-its-own-session pitfall justified beside maxLines measures
+  // 83 words: 5509 -> 5592.
+  // 08.09.2026 (second): the assigned-but-never-commissioned pitfall justified beside maxLines
+  // measures 87 words: 5592 -> 5679.
+  // 08.09.2026 (third): the aged-expectation pitfall justified beside maxLines measures 52 words,
+  // and SHORTEN-BEFORE-RAISE was applied to three neighbouring entries — the growing-obligation,
+  // contradicting-checks and self-cancelling-instruction pitfalls gave back 62 between them
+  // without dropping a claim (the clause the test pins by name is untouched): 5679 -> 5669.
+  // 08.09.2026 (fourth): the wrong-heading pitfall justified beside maxLines measures 106 words:
+  // 5669 -> 5775.
+  // 08.09.2026 (fifth): the demands-what-is-being-produced pitfall justified beside maxLines
+  // measures 81 words, and the liveness sharpening beside it 31: 5775 -> 5887.
+  maxWords: 5887,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,

@@ -14,9 +14,27 @@ import { evaluatePushArrival } from './push-arrival-core.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 import { isMainModule } from './is-main.mjs'
 import { CAUSE } from './guard-preflight-core.mjs'
+import { IN_FLIGHT_MAX_AGE_MS } from './batch-in-flight-core.mjs'
 import { REPO_ROOT, repoPath } from './repo-paths.mjs'
 
 const PAUSE = repoPath('.claude', 'batch-paused')
+const IN_FLIGHT = repoPath('.claude', 'batch-in-flight.json')
+
+/**
+ * What this session declared it is waiting on, when the declaration is still
+ * fresh — the message names it so the conflict with a running measurement is
+ * concrete rather than a general warning. Fail-open to null: an unreadable or
+ * stale declaration must only cost the sharper wording, never the guard.
+ */
+export function declaredWait(path = IN_FLIGHT, now = Date.now()) {
+  try {
+    const d = JSON.parse(readFileSync(path, 'utf8'))
+    if (!d?.waitingOn || !Number.isFinite(d.at)) return null
+    return now - d.at <= IN_FLIGHT_MAX_AGE_MS ? String(d.waitingOn) : null
+  } catch {
+    return null
+  }
+}
 
 function git(args) {
   try {
@@ -46,7 +64,7 @@ export function gatherPushArrivalInputs({ sessionId = '', ignoreOwnership = fals
   const hasUpstream = git('rev-parse --abbrev-ref --symbolic-full-name @{u}') !== null
   return {
     applicable: true,
-    inputs: { branch, ahead, hasUpstream, paused: existsSync(PAUSE) },
+    inputs: { branch, ahead, hasUpstream, paused: existsSync(PAUSE), inFlight: declaredWait() },
   }
 }
 

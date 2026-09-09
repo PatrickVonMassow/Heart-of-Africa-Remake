@@ -1231,17 +1231,29 @@
       "origin": "user",
       "place": "ahead"
     },
-    "1077": {
-      "at": "2026-09-08T10:57:26.960Z",
-      "why": "Der Nutzer hat am 08.09.2026 im Chat ausdruecklich 'Ziehe 1077 vor' angeordnet.",
-      "origin": "user",
-      "place": "ahead"
-    },
     "1078": {
       "at": "2026-09-08T11:50:40.734Z",
       "why": "Zuletzt richtig: der Rote ist gebucht und blockiert keinen Merge mehr, der Fehler tritt sporadisch auf, und der Wiederholungslauf loest das Raetsel — er steht damit hinter jedem Punkt, den ein Spieler bei jedem Start sieht.",
       "origin": "machine",
       "place": "last"
+    },
+    "1079": {
+      "at": "2026-09-08T21:47:54.473Z",
+      "why": "Die Ausnahme haelt den Push frei, also draengt nur die Entscheidung selbst — und die gehoert hinter die Kommunikationspunkte und den Abschlussdurchlauf, nicht davor.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1081": {
+      "at": "2026-09-09T01:31:59.563Z",
+      "why": "Maschinell abgelegt beim Verifizieren von 1080, mittlere Kritikalitaet und ohne Blockade: die Episode steht schon im versandten Stand, also hinter die Auslieferung.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1082": {
+      "at": "2026-09-09T03:54:47.254Z",
+      "why": "Der Nutzer hat den Punkt am 09.09.2026 um 05:04 selbst gemeldet und die Einordnung direkt vor 690 ausdruecklich benannt.",
+      "origin": "user",
+      "place": "ahead"
     }
   },
   "boundary": {
@@ -1274,7 +1286,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-08T11:50:40.744Z",
+    "at": "2026-09-09T03:54:47.266Z",
     "points": [
       174,
       184,
@@ -1651,8 +1663,10 @@
       1074,
       1075,
       1076,
-      1077,
-      1078
+      1078,
+      1079,
+      1081,
+      1082
     ]
   }
 }

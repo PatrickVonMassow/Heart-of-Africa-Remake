@@ -15,6 +15,7 @@ import {
   buildBaobab,
   splitFoliage,
   PLAY_ROCK_HEIGHT_UNITS,
+  ROCK_TOP_UNITS,
 } from './flora'
 import type * as THREE from 'three/webgpu'
 import { FLORA_COLOR_LIFT, seasonTintCpu } from './seasonTint'
@@ -104,6 +105,18 @@ describe('the children`s large play rocks', () => {
     }
     return { count: pos.count, maxR, minY, maxY, base }
   }
+
+  // The scattered boulder's own top, which the children's climb stands on
+  // (work-order 1080): the game reads the constant, the player sees the mesh, so
+  // the two must be the same number or the child hovers over the stone or sinks
+  // into it.
+  it('declares the scattered boulder`s height as the mesh actually has it', () => {
+    const { maxY, minY } = extents(buildRock())
+    expect(maxY).toBeCloseTo(ROCK_TOP_UNITS, 6)
+    // …and it sits ON the ground rather than floating over it, which is what
+    // makes the top height a height above the ground the child walked in on.
+    expect(minY).toBeLessThan(0.02)
+  })
 
   it('uses the detailed mesh only for the large instances and remains seeded', () => {
     const cheap = buildRock()
