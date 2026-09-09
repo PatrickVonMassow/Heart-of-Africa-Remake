@@ -499,3 +499,17 @@ Nothing stops the second start: the quiet-machine check NAMES the leftovers and
 lets the run proceed by design. Whether that is worth a refusal rather than a
 warning is a judgement for whoever next touches that check — it costs two runs
 each time, and it happened twice in one night.
+
+## The fill frame's camera picks a side without checking it (09.09.2026)
+
+Non-blocking, collected. The frame of the water carrier now stands square to
+the walk into the water rather than on the line from the world origin, which is
+what made the dip legible at all. GPT-6 Astra pointed out in the same review
+that the perpendicular has TWO sides and the code takes one of them unchecked:
+with a bank that curves, the chosen anchor can land inside land even when the
+other side is open, and nothing measures clearance before the shutter.
+
+It is not a defect in the one village the PoC draws — the frame was judged and
+it carries its subject — so it stays collected rather than becoming a point.
+Whoever adds a second river village decides it there, with a ground sample at
+both candidates and the one nearer the carrier's own footing winning.

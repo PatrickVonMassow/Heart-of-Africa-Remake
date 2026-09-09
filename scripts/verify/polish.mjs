@@ -5327,13 +5327,16 @@ if (section('adult-errands')) {
         const g = window.__placeErrands?.()
         const foot = g?.geography?.waterFoot
         const fill = g?.water?.fill
-        // The way INTO the water, from the errand's own two points; the origin
-        // bearing stays as the fallback for a place that names neither.
+        // The way INTO the water, from the errand's own two points. The quarter
+        // turn belongs to THAT direction alone (GPT-6 Astra, review of 6efa015):
+        // adding it to the origin fallback as well would have turned the old
+        // bearing ninety degrees rather than kept it, so a place naming neither
+        // point would have got a THIRD camera position that nobody has judged.
         const into =
           foot && fill && (fill.x !== foot.x || fill.z !== foot.z)
-            ? Math.atan2(fill.x - foot.x, fill.z - foot.z)
-            : Math.atan2(v.x, v.z)
-        const bearing = into + Math.PI / 2
+            ? Math.atan2(fill.x - foot.x, fill.z - foot.z) + Math.PI / 2
+            : null
+        const bearing = into ?? Math.atan2(v.x, v.z)
         p.x = v.x - Math.sin(bearing) * 3.5
         p.z = v.z - Math.cos(bearing) * 3.5
         p.yaw = Math.atan2(-(v.x - p.x), -(v.z - p.z))
