@@ -282,6 +282,41 @@ put it is the mistake this line exists to stop.
   become one and the blend begins exactly at the hold's end.
   Bundle: Dorfleben.
 
+- [ ] 1086. The cheap rung is skipped, and only the expensive one is enforced.
+  USER ORDER 09.09.2026, given twice in one evening: "Warum führst du nicht immer erstmal
+  nur die Tests des neuen Features aus und erst wenn die erfolgreich sind die restlichen
+  Regressionstests?" — and, when the answer was that the rule had been written into memory,
+  "'Als dauerhafte Regel abgelegt' garantiert aber nicht, dass die nächste Session sich
+  daran hält, oder?" It does not. This point is the mechanism that the house's own first
+  principle demands.
+  MEASURED THE SAME EVENING on point 1065: a `polish --section=` run costs about 2 minutes
+  and the full suite 31 to 63, and the session used the FULL suite as its debugging loop —
+  four full runs, roughly 2.5 machine-hours, for a defect that two section runs then found
+  in four minutes. Nothing refused any of it. What DID speak was `render-verify-guard`,
+  which accepts only a full covering run and therefore said "not verified" after every edit
+  — an enforcement that pulls in exactly the wrong direction, because it names the finish
+  and is read as the next step.
+  FINAL STATE: the ladder is enforced where runs are STARTED, in
+  `scripts/verify/run-logged.mjs`, which every run already passes through. A FULL browser
+  suite is refused while the files that suite covers carry edits newer than the newest
+  GREEN narrower run of the same material — the suite's own `--section=`, or the unit tier
+  for logic. The refusal prints the exact narrower command to run instead. Once the narrow
+  rung is green at or after the last edit, the full run passes without a flag: the ladder is
+  climbed, not waived. An explicit escape stays for the case the narrow rung cannot exist
+  (`--no-ladder "<why>"`), and it is recorded like every other deliberate exception.
+  AND THE GUARD THAT PULLED THE OTHER WAY SAYS SO: `render-verify-guard`'s refusal names the
+  ladder — the covering full run is what the point owes at its END, not after every edit.
+  NOTE THE FREEZE. CLAUDE.md §2 forbids new guards; this one is ordered by the user, is not
+  a new guard but a refusal inside the runner every run already uses, and its measured cost
+  of NOT existing is 2.5 machine-hours in one evening.
+  VERIFIABLE: the pure layer covers a full run refused after an edit with no narrow green,
+  the same run admitted once the narrow rung is green, a narrow run never refused, an edit
+  to files the suite does not cover leaving the full run free, and the escape being recorded.
+  Refs: scripts/verify/run-logged.mjs, scripts/verify/tiers.mjs, scripts/render-verify-guard.mjs,
+  scripts/point-brief-core.mjs (the ladder's prose), points 595, 1083, 1084.
+  Bundle: Testinfrastruktur.
+
+
 - [ ] 1072. The village speaks with a direction, and the children sound like children (user
   07.09.2026, deciding the first two of the six shore-call aspects).
   Measured 07.09.2026: `src/` holds no `PannerNode`, `createPanner`, `StereoPanner` or
