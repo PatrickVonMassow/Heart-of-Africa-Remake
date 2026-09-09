@@ -77,6 +77,77 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
+- [ ] 1083. The verification plan quotes July prices, so a four-hour check reads as normal
+  while it runs. Measured 09.09.2026 over the run records in
+  `.claude/worktrees/point-1065/local/verify-logs/`: point 1065 has spent about 16.3 machine
+  hours on verification. FIVE full LARGE runs — 115.3 / 115.8 / 118.8 / 120.4 / 120.9 min —
+  and every one of the five exited 1; eight further LARGE runs aborted early between 0.4 and
+  42.1 min, 8.98 h before the fifth. WHOLE `polish` — 6 runs, 4.48 h, at 9.9 / 28.3 / 51.8 /
+  58.6 / 58.8 / 61.5 min. `--section` runs — 16 of them, 0.81 h together, 0.2 to 7.4 min
+  each, median 2.9: the same localized finding for a fiftieth of the time. The fifth LARGE
+  makes the case by itself — its reds are all in `polish` and each one PRINTS the rung that
+  reproduces it (`--section=speech-hypothesis`, `--section=chief-to-drummer`), so 121
+  minutes were spent to learn what two runs of 2 to 4 minutes would have said.
+  WHAT THE AUTHOR IS TOLD BEFORE STARTING ONE OF THEM: `node scripts/verify/run-wait.mjs
+  --plan large` answers `80m 48s` against a real 115–121; `--plan polish` answers `5m 41s`
+  against a real 28–62 for a whole pass; a `--section` run is planned with the WHOLE suite's
+  340.9 s though it takes 0.2–7.4 min; and `scripts/verify/README.md:107` still argues from
+  a "42-minute LARGE run". Every one of those figures comes from `docs/picture-check-cost.md`
+  §1, measured 25.–27.07.2026 — a table that says of itself that it is a *before* figure.
+  With the plan a third to two thirds short, a 62-minute `polish` run and a fifth full LARGE
+  never read as out of band.
+  THE RULES ARE NOT MISSING, THE PRICE IS: `VERIFICATION_LADDER` in
+  `scripts/point-brief-core.mjs` already says the full proof runs exactly once on the exact
+  merge candidate, and `scripts/verify/README.md` already says a `--section` run is the
+  repair loop and never coverage. Both were in the brief of 1065. What no rung carries is
+  what it costs.
+  THE DECIDED SCOPE (user 09.09.2026; carried by Opus 5 and GPT-6 Astra after Astra's audit
+  of the proposal) is these four and nothing beyond them: (1) choose the tier by the changed
+  behaviour and plan ONE GREEN closing LARGE on the final merge candidate, with further
+  necessary LARGE runs expressly allowed; (2) repair with `--section`, while full acceptance
+  and closing runs stay whole because `sections.mjs` stamps every section run PARTIAL and
+  `runVerdict` refuses it as coverage; (3) keep heavy runs off the machine while a second
+  author works, which is scheduling and not construction; (4) bring the runtime figures into
+  line. EXPRESSLY NOT IN SCOPE, and not to be added back: abolishing the closing LARGE
+  risk-based, splitting 1065 now, dedicated hardware, and Astra's further demand that every
+  measurement carry backend, exit status and load — that is more than an alignment and was
+  not released.
+  NO NEW MECHANISM (infrastructure freeze): no guard, no ledger field, no counter. §1 stays
+  the July baseline it declares itself to be, the September band is recorded BESIDE it, and
+  the band is labelled for what it is — a second author was on the machine for part of the
+  window, so it is a band to recognise an outlier by and never a target value. That caveat
+  is Astra's, and it is why this point claims no saving: a red run may have been what made
+  the next candidate possible.
+  WHY IT STANDS AHEAD OF 1065 (user 09.09.2026): 1065 is red and needs repair, and the
+  figures this point corrects are the ones its remaining runs are planned from. Fixing the
+  price first is what stops a sixth two-hour LARGE from being fired where two section runs
+  answer the question.
+  Final state:
+  - `docs/picture-check-cost.md` keeps §1 unchanged and gains a dated §7 carrying the
+    September bands measured above — kind of run, sample size, band, median, and what the
+    plan said — each naming the load it was measured under.
+  - `run-wait-core.mjs` carries those bands as data beside `SUITE_RUNTIME_S`, and
+    `--plan large` / `--plan polish` print the observed band under the planned expectation,
+    so 118 minutes reads as inside it and 200 does not. A `--section` plan says out loud
+    that it is quoting the whole suite.
+  - `scripts/verify/README.md` no longer argues from 42 minutes; the tier table and the
+    section block each carry their measured price.
+  - The ladder in the brief names what each rung costs, so "climb it; do not start at the
+    top" has a number behind it.
+  - The lockstep test parses §1 ALONE, anchored between its heading and the next, so no
+    later section's table can silently join the pinned constants.
+  Test: Vitest only — `run-wait-core.test.mjs` (the anchored parse, the new bands, the
+  printed plan lines) and `point-brief-core.test.mjs` (the ladder text). No browser suite:
+  nothing here moves a picture.
+  Criticality: medium — no player impact, but it is the figure every author reads before
+  spending two hours of machine time, and the reason an over-budget run does not stand out.
+  Refs: docs/picture-check-cost.md §1/§6, scripts/verify/run-wait-core.mjs
+  (`SUITE_RUNTIME_S`), scripts/verify/run-wait-core.test.mjs (`measuredTable`),
+  scripts/verify/README.md:107 and its `Regression tiers` / `Running ONE section` blocks,
+  scripts/point-brief-core.mjs (`VERIFICATION_LADDER`), scripts/verify/sections.mjs,
+  .claude/worktrees/point-1065/local/verify-logs/*.run.json.
+  Bundle: Testinfrastruktur.
+
 - [ ] 1065. The teaching hands touch what they name: the tapping child at its rock, the
   carrier at the water (user 06.09.2026; point 1066 folded in here 07.09.2026 on the user's
   instruction to bundle points that would otherwise each buy their own regression run).
