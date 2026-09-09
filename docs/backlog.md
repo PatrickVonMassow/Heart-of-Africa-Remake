@@ -430,3 +430,27 @@ lane one, never a second lane, and the covering second-backend run has to be sta
 which is exactly what `render-verify-guard` then demands before the branch may merge. The runner
 behaves correctly here; what was wrong was the reading of it, so this is a note rather than a
 point.
+
+## The polish retry hangs after a red, and its expected runtime is stale
+
+Measured 08.09.2026. After a red first attempt, `run-all` started the prescribed retry (point
+200) and then wrote nothing for 24 minutes: `polish.mjs` alive at 2 % CPU, two Chrome instances
+standing, the log ending at the retry line. `run-wait --await` booked the run as HUNG after
+51m 30s — two and a half times the 5m 41s expectation — and pointed at killing it rather than
+waiting again; SIGTERM did not clear the processes, SIGKILL did. Open: whether the retry raises
+its own dev server and wedges on the occupied port or on the first attempt's still-open Chrome.
+Noticed beside it: polish takes about 28 minutes on this machine against the
+`expectedRuntimeMs` of 340900 ms recorded in run.json, so every hang detection fires early.
+Infrastructure, and the freeze (CLAUDE.md §2) keeps it here until it reproducibly blocks.
+
+## The scattered boulders are far darker than the play rocks
+
+Seen on the picture evidence `187-child-on-the-boulder` (09.09.2026, both backends): the stone
+the child stands on reads almost black, while the two play rocks in the same village
+(`687-bank-play-rocks`) stand there a light stone grey. Both sit on the same bright sand under
+the same sun. The scattered stone comes from `buildRock` (dodecahedron, detail 0, tint
+`#8a8178`), the play rocks from `buildPlayRock` (detail 1, its own weathering); the scattered
+stones also share the `GroundScatter` material with the grass tufts, whose `colorNode` runs
+through `seasonTintNode`. To check: whether the season tint or the coarse faceting of the
+detail-0 mesh darkens them. No blocker — the climb reads on both backends — but it looks wrong
+to a human eye.

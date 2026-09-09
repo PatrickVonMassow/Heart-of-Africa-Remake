@@ -49,6 +49,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 09.08. | Ein Punkt wartete auf ein Tor, das nicht aufgehen konnte: die Zuordnung der Fehlschläge war getroffen, aber nie in das Register eingetragen, das der Wächter liest (§3.97) |
 | 09.08. abends | Spielsitzung: zwölf Defekte in einer Mechanik, deren zwölf Punkte alle abgenommen waren — grün gegen einen Stellvertreter (Punkt 589); die veröffentlichte Reihenfolge zweimal falsch, weil sie eine zweite Heimat hat (Punkt 590, Rückfall in §3.77); ein abgehakter Punkt mit unerfülltem drittem Liefergegenstand, gefunden durch eine Nutzerfrage (§3.99) |
 
+| 09.09. | Nutzerfrage „sollte da nicht ein Kind auf einen Stein klettern?“ — gebaut, feuernd, nie sichtbar: der Test prüfte das Flag, das die Reparatur selbst setzt, und die Bildspur hatte den Fall weggeschaltet (§3.252); zwei Kinderlauf-Grenzwerte reißen, beide an einer einzigen Stichprobe gemessen |
 | 13.08. | Der Nachprüfer findet eine echte zweite Klippe im geheilten Mechanismus — und jede der fünf gemessenen Kuren verschlechtert gesunde Dörfer stärker, als der Fehler schadet: Befund wird gebucht statt behoben (§3.115) |
 | 20.08. | Der Dokumentschnitt strich Regeln als »von einem Wächter abgedeckt«, ohne einen einzigen Wächter darauf zu prüfen — die Kontextanzeige verschwand, der Nutzer fand es (§3.134); eine vom Nutzer gesetzte Rangfolge wurde in einer Nacht zweimal maschinell überholt, ohne dass irgendwo ein Grund stand (Punkt 614); zwei Werkzeuge derselben Bauart am falschen Ort gemessen — im Hauptbaum gebaut und geprüft, während der Prozess die Arbeit in den isolierten Bereich schickt (§3.137) |
 | 21.08. | Ein Tor verlangte eine Freigabe, die seine eigenen Werkzeuge nicht herstellen können — der HIGH-Punkt war gemergt, geprüft und freigegeben, und der Zugausgang wies ihn trotzdem ab (§3.153) |
@@ -1446,7 +1447,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 09.09.2026, 00:48 · Quellen-Fingerprint: `2f0fcd97832a…`
+Zuletzt aktualisiert: Mittwoch, 09.09.2026, 03:33 · Quellen-Fingerprint: `2f565aa57e23…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1485,7 +1486,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to the OpenAI lane, GPT-6 Astra), and review is cross-vendor, not Fable-by-default | 6 | hoch | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 63 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 64 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | wait-command-guard.mjs | ✔ Mechanismus |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | User 18.08.2026: hard, complex, error-prone and HIGH-criticality points are AUTHORED by the OpenAI lane directly (GPT-6 Astra since 05.09.2026, GPT-5.6 Sol before) — Opus 5 authors only what is left, and Fable authors only a point that tags its lane or one the router escalates | 5 | hoch | — (Regel/Memory) | ◐ Regel |
@@ -1551,8 +1552,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 95 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 126 Prozess-/Meta-TASKS-Punkte (davon 60 offen).
 
-<!-- RETRO-FINGERPRINT: 2f0fcd97832aada410e9c6b3fc35a13c52d47a0e8dd7a58f6d6933c083740ff9 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-08T22:48:56.124Z -->
+<!-- RETRO-FINGERPRINT: 2f565aa57e233eed93485dab2e155bb2223a420e1076ab1ea71a0ff3d93b7339 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-09T01:33:29.317Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -6212,3 +6213,38 @@ nicht eine Randnotiz — und wer sie räumt, prüft zuerst, ob das Werkzeug „k
 weil es keinen gibt, oder weil eine zweite, tiefer liegende Kopie den Weg versperrt. Wo der Fix
 wirklich groß ist, ist die begründete Ausnahme mit eigenem Punkt richtig; sie darf nur nie
 unbefristet stehenbleiben.
+
+### 3.252 Der Test prüfte die Buchhaltung, nicht die Sache — und der Grenzwert maß ein Glück
+
+Der Nutzer fragte in der Nacht auf den 09.09.2026, ob nicht ein Kind auf einen Stein klettern
+sollte; er habe das noch nie gesehen. Es war gebaut, seit einem Jahr im Code, und es feuerte auch:
+fünf- bis sechsmal in zehn Minuten Dorfzeit. Zu sehen war es trotzdem nie. Das Kind hielt 2,2 m
+vom Mittelpunkt des Findlings an, wurde dort um eine Konstante von 0,32 m angehoben und stand so
+0,35 Sekunden lang — gemessen über fünf Seeds war die Pose in zehn Minuten insgesamt zwei Sekunden
+oben. Es war kein Klettern, es war ein Schweben neben einem Stein.
+
+Bemerkenswert ist nicht der Fehler, sondern warum die Prüfung ihn deckte. Der Fall behauptete vier
+richtige Dinge: dass das Wort fällt, in der richtigen Phase, mit dem Findling als Zielpunkt — und
+dass das Flag `climbing` dabei `true` ist. Das Flag stand ja. Wo das Kind steht, wie hoch und wie
+lange, fragte niemand. Die Browserspur erwähnte den Findling an genau einer Stelle, nämlich um
+seine Wartezeit für eine andere Szene abzukürzen; im Kommentar dort steht sogar, dass der Stein am
+Prüf-Seed „jeden Zyklus" unbenannt bleibt. Der einzige Ort, der das Bild hätte aufnehmen können,
+hatte den Fall also weggeschaltet. Das ist die schärfste Form der schon bekannten Klasse „grün
+gegen einen Stellvertreter": Der Stellvertreter war hier ein boolescher Wert, den die Reparatur
+selbst gesetzt hatte.
+
+Die zweite Hälfte kam beim Reparieren. Die neue Bewegung verschiebt die Pfade der Kinder — mehr
+nicht, das Steuern blieb unangetastet —, und zweimal riss danach ein Kinderlauf-Grenzwert, jedes
+Mal an einer einzelnen Episode eines einzelnen Kindes. Die Messung, die das klärte, prüfte nicht
+den eigenen Zweig, sondern den versandten Stand über mehrere Dörfer: Der gedrängte Prüffall läuft
+nur ein Dorf und einen Seed und liest dort 0 %; in `mandinka-village` liest derselbe Aufbau schon
+auf `main` 0,51 bis 0,68 % gegen ein Tor von 0,25 %. Genauso die Nachbarprüfung, die belegen
+sollte, dass Erwachsene den Kindern nahe kommen: Ihr Balken von 3 m war in einem Dorf gemessen; über
+die versandten Dörfer streut dieselbe Zahl von 0,37 m bis 7,91 m.
+
+**Lehre:** Zwei Regeln, die zusammengehören. Erstens — ein Test darf nie das Flag prüfen, das die
+Reparatur selbst setzt; er muss die Größe messen, die der Spieler sieht: Ort, Höhe, Dauer. Zweitens
+— ein Zahlenbalken, der an einer einzigen Stichprobe gemessen wurde, ist keine Eigenschaft, sondern
+Glück, und er meldet sich als Regression bei der nächsten harmlosen Änderung. Wer ihn reißen sieht,
+misst zuerst den versandten Stand über mehrere Stichproben, bevor er die eigene Änderung
+verdächtigt — hier lag der Defekt jedes Mal schon vorher da, nur in einem Dorf, in das niemand sah.

@@ -1248,6 +1248,12 @@
       "why": "Die Ausnahme haelt den Push frei, also draengt nur die Entscheidung selbst — und die gehoert hinter die Kommunikationspunkte und den Abschlussdurchlauf, nicht davor.",
       "origin": "machine",
       "place": "last"
+    },
+    "1081": {
+      "at": "2026-09-09T01:31:59.563Z",
+      "why": "Maschinell abgelegt beim Verifizieren von 1080, mittlere Kritikalitaet und ohne Blockade: die Episode steht schon im versandten Stand, also hinter die Auslieferung.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1280,7 +1286,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-08T21:47:54.483Z",
+    "at": "2026-09-09T01:31:59.574Z",
     "points": [
       174,
       184,
@@ -1659,7 +1665,8 @@
       1076,
       1077,
       1078,
-      1079
+      1079,
+      1081
     ]
   }
 }
