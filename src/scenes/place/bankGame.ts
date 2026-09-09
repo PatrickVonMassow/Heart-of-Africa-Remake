@@ -544,11 +544,34 @@ function stepClimb(
   const landing = landingFor(c, i, b, cfg, world)
   c.footX = landing.x
   c.footZ = landing.z
+  // THE HEIGHT COMES DOWN ON THE CLIMB'S CLOCK; THE FEET TRAVEL AT A PACE
+  // (cross-vendor review, 09.09.2026, third round). Read as a fraction of the
+  // whole descent, a landing that changed at nine tenths of the way down moved
+  // the child nine tenths of the distance to the new spot in ONE frame — a
+  // teleport a hand's breadth above the ground. Walking the remaining gap at a
+  // pace cannot do that whenever the target moves: the picture is a child
+  // stepping off a stone and, where somebody has taken its place, stepping down
+  // beside them instead.
   const t = Math.min(1, c.climbFor / Math.max(1e-6, cfg.climbSinkSeconds))
-  c.x = b.x + (c.footX - b.x) * t
-  c.z = b.z + (c.footZ - b.z) * t
   c.lift = b.height * (1 - t)
+  // Fast enough to make the ordinary descent in its own time, and never slower
+  // than the child walks.
+  const paced = Math.max(cfg.walkPace, climbFrom(b, cfg, world) / Math.max(1e-6, cfg.climbSinkSeconds))
+  const gap = Math.hypot(c.footX - c.x, c.footZ - c.z)
+  if (gap > 1e-9) {
+    const step = Math.min(gap, paced * dt)
+    c.x += ((c.footX - c.x) / gap) * step
+    c.z += ((c.footZ - c.z) / gap) * step
+  }
   if (t < 1) return false
+  // ITS OWN BOUND, because `openCycle` waits for the stone to be clear: a
+  // traveller who keeps taking the spot the child is walking to could otherwise
+  // hold the whole round. Past a few times the descent's own length the child is
+  // simply on the ground where it stands, and the body separation takes it from
+  // there like any other crowded figure.
+  if (gap > 1e-3 && c.climbFor < cfg.climbSinkSeconds * 4) return false
+  c.footX = c.x
+  c.footZ = c.z
   endClimb(c)
   return true
 }

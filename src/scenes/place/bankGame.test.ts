@@ -633,9 +633,12 @@ describe('the children`s game at the bank (point 687)', () => {
       let planted = false
       let followed = false
       let landed: { x: number; z: number } | null = null
+      let biggestStep = 0
       for (let t = 0; t < 60 && !landed; t += 1 / 60) {
         const wasUp = c.climb !== 'none'
+        const from = { x: c.x, z: c.z }
         stepBankGame(s, 1 / 60, CFG, STAGE, world, rand)
+        if (c.climb === 'down') biggestStep = Math.max(biggestStep, Math.hypot(c.x - from.x, c.z - from.z))
         // The moment it is up on the stone, the traveller takes the exact spot it
         // climbed from and stays there.
         if (c.climb === 'top' && !planted) {
@@ -646,7 +649,7 @@ describe('the children`s game at the bank (point 687)', () => {
         // a landing chosen when the hold ended was never looked at again, so a
         // traveller who stepped onto it during the descent had the child set down
         // inside him. He moves onto the new foot halfway down.
-        if (c.climb === 'down' && c.climbFor > CFG.climbSinkSeconds * 0.4 && !followed) {
+        if (c.climb === 'down' && c.climbFor > CFG.climbSinkSeconds * 0.85 && !followed) {
           followed = true
           world = openWorld({ x: c.footX, z: c.footZ, radius: 0.35 })
         }
@@ -657,6 +660,12 @@ describe('the children`s game at the bank (point 687)', () => {
       expect(landed).not.toBeNull()
       // It came down somewhere else, and clear of him.
       expect(insideStrangerBerth(world, CFG, landed!.x, landed!.z)).toBe(false)
+      // AND IT WALKED DOWN rather than jumping. The traveller arrives at
+      // nine tenths of the way down, which is where a descent read as a fraction
+      // of the whole moved the child nine tenths of the way to the new foot in
+      // one frame; a step that size is a teleport a hand's breadth above the
+      // ground. Bounded by the round's own walking pace, generously.
+      expect(biggestStep).toBeLessThan((CFG.walkPace * 3) / 60)
       // …and still at the stone, not carried off across the village.
       const out = Math.hypot(landed!.x - b.x, landed!.z - b.z)
       expect(out).toBeGreaterThan(b.radius)
