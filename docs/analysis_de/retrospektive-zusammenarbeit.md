@@ -50,6 +50,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 09.08. abends | Spielsitzung: zwölf Defekte in einer Mechanik, deren zwölf Punkte alle abgenommen waren — grün gegen einen Stellvertreter (Punkt 589); die veröffentlichte Reihenfolge zweimal falsch, weil sie eine zweite Heimat hat (Punkt 590, Rückfall in §3.77); ein abgehakter Punkt mit unerfülltem drittem Liefergegenstand, gefunden durch eine Nutzerfrage (§3.99) |
 
 | 09.09. | Nutzerfrage „sollte da nicht ein Kind auf einen Stein klettern?“ — gebaut, feuernd, nie sichtbar: der Test prüfte das Flag, das die Reparatur selbst setzt, und die Bildspur hatte den Fall weggeschaltet (§3.252); zwei Kinderlauf-Grenzwerte reißen, beide an einer einzigen Stichprobe gemessen |
+| 09.09. abends | Ein Punkt verbraucht 16,3 Maschinenstunden Verifikation — fünf volle LARGE-Läufe, alle rot —, ohne dass jemand eine Regel bricht: die Leiter stand im Auftrag, der letzte rote Lauf druckte seine Zwei-Minuten-Sprosse selbst mit, und die Planzahlen vom Juli ließen jeden Ausreißer normal aussehen (§3.253, Schwesterfall zu §3.249); freigegeben werden vier Maßnahmen, die Anthropic und die Gegenseite nach deren Audit gemeinsam tragen |
 | 13.08. | Der Nachprüfer findet eine echte zweite Klippe im geheilten Mechanismus — und jede der fünf gemessenen Kuren verschlechtert gesunde Dörfer stärker, als der Fehler schadet: Befund wird gebucht statt behoben (§3.115) |
 | 20.08. | Der Dokumentschnitt strich Regeln als »von einem Wächter abgedeckt«, ohne einen einzigen Wächter darauf zu prüfen — die Kontextanzeige verschwand, der Nutzer fand es (§3.134); eine vom Nutzer gesetzte Rangfolge wurde in einer Nacht zweimal maschinell überholt, ohne dass irgendwo ein Grund stand (Punkt 614); zwei Werkzeuge derselben Bauart am falschen Ort gemessen — im Hauptbaum gebaut und geprüft, während der Prozess die Arbeit in den isolierten Bereich schickt (§3.137) |
 | 21.08. | Ein Tor verlangte eine Freigabe, die seine eigenen Werkzeuge nicht herstellen können — der HIGH-Punkt war gemergt, geprüft und freigegeben, und der Zugausgang wies ihn trotzdem ab (§3.153) |
@@ -1449,7 +1450,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 09.09.2026, 13:46 · Quellen-Fingerprint: `50609e846aa1…`
+Zuletzt aktualisiert: Mittwoch, 09.09.2026, 17:24 · Quellen-Fingerprint: `568f41858832…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1487,8 +1488,9 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | a drill that recreates the state after an action tests the assumption, not the action — and stays green forever | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
+| Bei großem Kontext einen frischen Punkt nur einreihen und sofort abgeben, nicht selbst umsetzen | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to the OpenAI lane, GPT-6 Astra), and review is cross-vendor, not Fable-by-default | 6 | hoch | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 66 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 68 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | wait-command-guard.mjs | ✔ Mechanismus |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | User 18.08.2026: hard, complex, error-prone and HIGH-criticality points are AUTHORED by the OpenAI lane directly (GPT-6 Astra since 05.09.2026, GPT-5.6 Sol before) — Opus 5 authors only what is left, and Fable authors only a point that tags its lane or one the router escalates | 5 | hoch | — (Regel/Memory) | ◐ Regel |
@@ -1552,10 +1554,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 95 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 126 Prozess-/Meta-TASKS-Punkte (davon 60 offen).
+Erfasste Quellen: 96 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 126 Prozess-/Meta-TASKS-Punkte (davon 60 offen).
 
-<!-- RETRO-FINGERPRINT: 50609e846aa12edbcdbe28612b51b8ad3c6a792caa3e598385048e9c6a67ac11 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-09T11:46:20.472Z -->
+<!-- RETRO-FINGERPRINT: 568f41858832bf5ab6a76db472fcea080f767236c6d07e0f1d6dde6ca0c48472 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-09T15:24:36.326Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -6268,3 +6270,45 @@ Reparatur selbst setzt; er muss die Größe messen, die der Spieler sieht: Ort, 
 Glück, und er meldet sich als Regression bei der nächsten harmlosen Änderung. Wer ihn reißen sieht,
 misst zuerst den versandten Stand über mehrere Stichproben, bevor er die eigene Änderung
 verdächtigt — hier lag der Defekt jedes Mal schon vorher da, nur in einem Dorf, in das niemand sah.
+
+### 3.253 Die Regel stand im Auftrag, ihr Preis nirgends
+
+Am 09.09.2026 hat ein einziger Punkt rund 16,3 Maschinenstunden Verifikation verbraucht:
+fünf vollständige LARGE-Läufe zu 115,3 / 115,8 / 118,8 / 120,4 / 120,9 Minuten, alle fünf
+rot, dazu sechs ganze `polish`-Durchgänge zu 9,9 bis 61,5 Minuten. Danebenstehen sechzehn
+`--section`-Läufe, die zusammen 0,81 Stunden gekostet haben — 0,2 bis 7,4 Minuten je Lauf.
+Das Auffällige ist nicht die Summe, sondern dass niemand eine Regel gebrochen hat. Die
+Verifikationsleiter in `scripts/point-brief-core.mjs` sagt seit Punkt 595 wörtlich, der
+volle Beweis laufe genau einmal auf dem exakten Merge-Kandidaten; `scripts/verify/README.md`
+sagt seit Punkt 566, ein Abschnittslauf sei die Reparaturschleife und nie Abdeckung. Beides
+stand im Auftrag dieses Punktes, und der letzte rote Lauf druckte in jeder einzelnen
+Fehlzeile die Sprosse mit, die ihn in zwei bis vier Minuten reproduziert
+(`--section=speech-hypothesis`, `--section=chief-to-drummer`). Es wurden also 121 Minuten
+ausgegeben, um zu erfahren, was zwei kurze Läufe gesagt hätten — mit der Anleitung dazu im
+eigenen Ausdruck.
+
+Der Unterschied zu [§3.249](#3249-eine-gemessene-erwartung-altert-zu-einem-falschen-urteil)
+ist wichtig, weil beide dieselbe Julimessung berühren. Dort altert eine Konstante zu einem
+falschen *Urteil* — das Werkzeug erklärt einen gesunden Lauf für hängend. Hier altert
+dieselbe Konstante zu einer fehlenden *Warnung*: Wenn ein voller LARGE mit 80 Minuten
+geplant wird und 121 dauert, wenn ein ganzer `polish`-Durchgang mit 5,7 Minuten geplant wird
+und 62 dauert, und wenn ein Abschnittslauf sogar mit der Dauer der ganzen Suite geplant
+wird, dann liest sich jeder Ausreißer wie ein normaler Lauf. Die Regel war da, die
+Verletzung war unsichtbar.
+
+Bemerkenswert ist auch, wie der Befund entstand: blind-parallel nach CLAUDE.md §6, zusammen­
+geführt von einem dritten Modell, und das Audit der Gegenseite hat zwei Rechenfehler
+nachgewiesen und drei Absolutformulierungen zurückgewiesen — „genau ein LARGE" hätte den
+grünen Schlussbeweis auf dem endgültigen Kandidaten gekostet, „nur noch Abschnitte" wäre an
+der PARTIAL-Stempelung gescheitert. Übrig blieben vier Maßnahmen, die beide Modelle tragen.
+Die ehrliche Zahl dazu ist eine Laufzeit, keine bewiesene Ersparnis: ein roter Lauf kann den
+späteren Kandidaten erst ermöglicht haben, und ein Teil der langen Durchgänge lief neben
+einem zweiten Autor auf derselben Maschine.
+
+**Lehre:** Eine Regel ohne Preis ist eine Empfehlung. Wo eine Sprosse billiger ist als die
+nächste, muss der Unterschied an der Sprosse stehen und nicht in einem Dokument daneben —
+und zwar in Zahlen, die jemand in diesem Monat gemessen hat. Und die zweite Hälfte, die
+nichts kostet: Wenn ein Prüflauf die Reparatursprosse selbst ausdruckt, ist die nächste
+Handlung dieser Ausdruck und nicht der nächste Vollbeweis. Gebucht als Punkt 1083, der
+ausdrücklich keine neue Mechanik baut — die Infrastruktur ist eingefroren —, sondern die
+Julitabelle als Basislinie stehen lässt und das gemessene Septemberband danebenschreibt.

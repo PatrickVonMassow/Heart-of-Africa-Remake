@@ -422,7 +422,17 @@ export const LIMITS = {
   // rather than added to — a finished run leaves the same fresh files as a working one, so
   // corroborating one trace with another proves nothing — at +1 line / +31 words.
   // Ceilings move 611 -> 620 with zero slack.
-  maxLines: 620,
+  // 09.09.2026: the rule-without-a-price lesson (retrospective §3.253, point 1083). A point spent
+  // about 16.3 machine hours on five full two-hour proofs, all red, while "the full proof runs
+  // exactly once" stood verbatim in its own brief and the last red run PRINTED the two-minute
+  // section that reproduces each failure — the planning figures were six weeks old and two to
+  // three times short, so no outlier read as one. SHORTEN-BEFORE-RAISE was applied: drafted as
+  // its own entry it cost +12 lines / +140 words, and it was instead FOLDED INTO "Die teuerste
+  // Pruefung grossflaechig verlangt", whose claim it completes — that entry demanded the
+  // expensive check be scoped, this half says a scope without a measured price is not obeyed.
+  // The fold, cut twice more to hold the four-line risk contract, pays back 8 lines and 88
+  // words. Ceilings move 620 -> 624 with zero slack, and no existing claim was dropped.
+  maxLines: 624,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -660,7 +670,9 @@ export const LIMITS = {
   // 5669 -> 5775.
   // 08.09.2026 (fifth): the demands-what-is-being-produced pitfall justified beside maxLines
   // measures 81 words, and the liveness sharpening beside it 31: 5775 -> 5887.
-  maxWords: 5887,
+  // 09.09.2026: the rule-without-a-price fold justified beside maxLines measures 52 words:
+  // 5887 -> 5939.
+  maxWords: 5939,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,
