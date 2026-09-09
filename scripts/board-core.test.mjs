@@ -58,6 +58,7 @@ import {
   setCardStatus,
   applyDerivedStateCard,
   stripDerivedStateCard,
+  setCardTimes,
   setCardTitle,
   toDone,
   doneEntries,
@@ -122,6 +123,47 @@ describe('setCardStatus', () => {
   it('refuses a non-numeric point and an empty document', () => {
     expect(() => setCardStatus(board(), 'abc', 'X', '09:00')).toThrow(/not a point number/)
     expect(() => setCardStatus('', 361, 'X', '09:00')).toThrow(/empty document/)
+  })
+})
+
+describe('setCardTimes — the projected end the eta audit demands', () => {
+  it('moves the end and keeps the start the work actually began at', () => {
+    const out = setCardTimes(board(), 361, '15:15')
+    expect(out).toContain('10:00 · ~15:15')
+    expect(out).not.toContain('~12:00')
+  })
+
+  it('accepts the remedy text verbatim, tilde and all', () => {
+    expect(setCardTimes(board(), 361, '~15:15')).toContain('10:00 · ~15:15')
+  })
+
+  it('leaves the body alone', () => {
+    expect(setCardTimes(board(), 361, '15:15')).toContain('alter Text')
+  })
+
+  it('rewrites only its OWN card when an earlier card carries no header times', () => {
+    // The bound `setCardStatus` needed: a free run to the next `<span
+    // class="meta">` would land in the FOLLOWING card's header.
+    const two =
+      '<main>\n<details class="sect"><summary><h2>Woran ich gerade arbeite</h2></summary>\n' +
+      '<details class="now">\n  <summary><span class="t">361 — Ohne Zeiten</span></summary>\n' +
+      '  <div class="body">\n    <p>a</p>\n  </div>\n</details>\n' +
+      '<details class="now">\n  <summary><span class="t">362 — Mit Zeiten</span>' +
+      '<span class="right"><span class="meta">10:00 · ~12:00</span></span></summary>\n' +
+      '  <div class="body">\n    <p>b</p>\n  </div>\n</details>\n</details>\n</main>'
+    expect(() => setCardTimes(two, 361, '15:15')).toThrow(/no current-work card|no start time/)
+    expect(two).toContain('10:00 · ~12:00')
+  })
+
+  it('refuses a point that has no current-work card', () => {
+    expect(() => setCardTimes(board(361), 999, '15:15')).toThrow(/no current-work card/)
+  })
+
+  it('refuses anything that is not a time of day', () => {
+    expect(() => setCardTimes(board(), 361, 'bald')).toThrow(/not a time of day/)
+    expect(() => setCardTimes(board(), 361, '')).toThrow(/not a time of day/)
+    expect(() => setCardTimes(board(), 'abc', '15:15')).toThrow(/not a point number/)
+    expect(() => setCardTimes('', 361, '15:15')).toThrow(/empty document/)
   })
 })
 

@@ -2251,6 +2251,44 @@ export function setCardStatus(html, point, text, stamp = berlinStamp()) {
 }
 
 /**
+ * Move the PROJECTED END of a current-work card's header to `end` ("HH:MM"),
+ * keeping the start stamp it already carries.
+ *
+ * WHY IT EXISTS: `dashboard-guard-core`'s `now-eta-past` audit refuses a turn
+ * end while a running card promises an end time that has passed, and it names
+ * the remedy — "give each a realistic new ~HH:MM". Until now NOTHING could
+ * write one. `promoteToNow` needs a queue card the running point no longer
+ * has, `toNow` derives the header from that same missing card, and `status`
+ * touches only the body — so the only ways out were hand-editing the HTML (the
+ * edit that once wrote the file back with CRLF and crashed `attest`) or
+ * `--waive-audit`, which papers over exactly what the audit is for. On
+ * 09.09.2026 the user hit the visible half of this: the board promised 11:46
+ * for work still running at 13:40.
+ */
+export function setCardTimes(html, point, end) {
+  if (typeof html !== 'string' || !html) throw new Error('board: empty document')
+  html = unwrapCardHeaderGroups(html)
+  if (!/^\d+$/.test(String(point))) throw new Error(`board: not a point number: ${point}`)
+  const wanted = String(end ?? '').trim().replace(/^~\s*/, '')
+  if (!/^\d{1,2}:\d{2}$/.test(wanted)) {
+    throw new Error(`board: not a time of day: ${end} — give the projected end as "HH:MM"`)
+  }
+  // BOUNDED TO ITS OWN CARD, exactly as `setCardStatus` is: a free run to the
+  // next `<span class="meta">` would rewrite the NEXT card's header when this
+  // card has none.
+  const re = new RegExp(`(${NOW_HEAD(point)}${WITHIN_CARD}<span class="meta">)([^<]*)(</span>)`)
+  const { from, end: to, text: section } = nowSectionSlice(html)
+  const m = section.match(re)
+  if (!m) throw new Error(`board: no current-work card for point ${point} — add the card first`)
+  // The START is never rewritten: it is when the work actually began, and a
+  // re-estimate that moved it would erase how long the point has been running.
+  const start = (String(m[2]).match(/^\s*(\d{1,2}:\d{2})/) ?? [])[1]
+  if (!start) throw new Error(`board: the card for point ${point} carries no start time: "${m[2]}"`)
+  const rewritten = section.replace(re, (_all, head, _old, tail) => `${head}${start} · ~${wanted}${tail}`)
+  return html.slice(0, from) + rewritten + html.slice(to)
+}
+
+/**
  * Retitle the card for `point` — the current-work card when there is one, the
  * queue card otherwise. Times, estimate and body are left exactly as they were.
  *
