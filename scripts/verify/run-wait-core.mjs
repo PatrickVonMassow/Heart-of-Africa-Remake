@@ -121,9 +121,9 @@ export const FRAME_TABLE_MEASURED = '09.08.2026'
  * per-suite table is the July baseline the runner PLANS from, and it stays
  * exactly what it measured. What it cannot say is what the assembled run costs
  * end to end — the plan it produces for a both-backend LARGE is 80 min 48 s
- * against a real 115–121, and for a whole `polish` pass 5 min 41 s against
- * 28–62. With the plan a third to two thirds short, a 62-minute `polish` run and
- * a fifth two-hour LARGE never read as out of band. So the observed band is
+ * against a real 115.3–120.9, and for a whole `polish` pass 5 min 41 s against
+ * 9.9–61.5. With the plan a third to two thirds short, a 62-minute `polish` run
+ * and a fifth two-hour LARGE never read as out of band. So the observed band is
  * PRINTED under the planned expectation, and the reader compares.
  *
  * THESE ARE OUTLIER BANDS, NEVER TARGETS. A second author held a worktree for
@@ -159,7 +159,7 @@ export const SEPTEMBER_BANDS = Object.freeze({
       highMin: 7.4,
       medianMin: 2.9,
       measuredOn: 'polish',
-      note: 'the plan above quotes the WHOLE suite — a section run is a fiftieth of it',
+      note: 'the plan above quotes the WHOLE suite — the six whole `polish` passes of the same window ran 9.9–61.5 min, median 55.2',
     }),
   }),
 })
@@ -170,18 +170,21 @@ export const SEPTEMBER_BANDS = Object.freeze({
  * whatever suite it names, and quoting it the whole suite's time without saying
  * so is exactly what made a section run look as expensive as the pass.
  */
-export function observedBand({ isLargeEquivalent = false, section = null, suites = [] } = {}) {
+export function observedBand({ isLargeEquivalent = false, passes = 1, section = null, suites = [] } = {}) {
   const kinds = SEPTEMBER_BANDS.kinds
   const list = [...new Set((suites ?? []).map((s) => String(s)))]
   if (section !== null && section !== undefined && String(section) !== '') {
     // The band was measured on `polish` sections alone. Reported for another
-    // suite it stays the SHAPE observation it is — a section is a fraction of
-    // its own pass — and says so, rather than quoting polish's minutes as if
-    // they were enrichments'.
+    // suite it names the suite it did NOT cover, rather than quoting polish's
+    // minutes as if they were enrichments'.
     const elsewhere = list.length === 1 && list[0] !== kinds.section.measuredOn ? list[0] : ''
     return { key: 'section', ...kinds.section, elsewhere }
   }
-  if (isLargeEquivalent) return { key: 'large', ...kinds.large }
+  // THE BAND MUST MATCH THE SHAPE THAT WAS MEASURED (Astra, four-eyes round 1).
+  // The five LARGE runs were BOTH-backend runs; `VERIFY_GL=webgl npm test` is
+  // one pass and roughly half the work, and handing it a 115–121 min band would
+  // make a normal run look fast rather than say nothing.
+  if (isLargeEquivalent) return passes >= 2 ? { key: 'large', ...kinds.large } : null
   if (list.length === 1 && list[0] === 'polish') return { key: 'polish', ...kinds.polish }
   return null
 }
@@ -192,7 +195,7 @@ export function formatObservedBand(band) {
   const range = `${band.lowMin.toFixed(1)}–${band.highMin.toFixed(1)} min (median ${band.medianMin.toFixed(1)})`
   const lines = [`  observed: ${range} over ${band.n} run(s), ${band.label} — ${SEPTEMBER_BANDS.measured}, ${SEPTEMBER_BANDS.source}`]
   if (band.elsewhere) {
-    lines.push(`            NOT measured on \`${band.elsewhere}\` — a section is a fraction of ITS OWN pass, so scale from the expectation above`)
+    lines.push(`            NOT measured on \`${band.elsewhere}\` — nothing timed that suite's sections, so this band says nothing about them`)
   }
   if (band.note) lines.push(`            ${band.note}`)
   lines.push(`            ${SEPTEMBER_BANDS.load}`)
@@ -343,7 +346,7 @@ export function planRun({ argv = [], verifyGl } = {}) {
     // The measured band this shape of run really fell in (point 1083). null
     // where nothing was measured for it — an unknown band is reported as
     // unknown and never as "inside".
-    observedBand: observedBand({ isLargeEquivalent, section, suites: union }),
+    observedBand: observedBand({ isLargeEquivalent, passes: passes.length, section, suites: union }),
   }
 }
 

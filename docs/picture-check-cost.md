@@ -433,7 +433,9 @@ full proof runs exactly once on the exact merge candidate, and this README says 
 1. `SEPTEMBER_BANDS` in `scripts/verify/run-wait-core.mjs` carries this table as
    data, and `--plan large` / `--plan polish` print the observed band underneath
    the planned expectation. A `--section` plan says out loud that its number is
-   the whole suite's.
+   the whole suite's. A band is printed only for the SHAPE it was measured on: a
+   pinned single-backend LARGE gets no band, and a section of any suite but
+   `polish` is told that nothing timed it.
 2. `scripts/verify/README.md` carries the measured price in its tier table and in
    its section block, and no longer argues from the 42-minute figure — which is
    the ONE-backend sum of §1, never a whole `npm test`.

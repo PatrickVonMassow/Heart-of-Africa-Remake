@@ -316,6 +316,10 @@ is docs/picture-check-cost.md §7. It is a band to recognise an OUTLIER by — t
 machine is shared and a second author was on it for part of the measured window —
 so 118 minutes is inside it and 200 is not. Nothing fails on the band.
 
+The band is printed only for the shape it was measured on: the five runs were
+BOTH-backend, so a pinned `VERIFY_GL=webgl npm test` gets its planned expectation
+and no band at all. An unknown price is reported as unknown.
+
 Both tiers run the same Vitest + build + lint preflight. SMALL is a strict subset
 of `DEV_SUITES`; keep it that way. New heavy or flaky browser scenarios join
 LARGE only (they must not slow or flake the everyday gate).
@@ -462,10 +466,11 @@ front of each turns one into a declaration.
 **WHAT THE RUNG COSTS, measured 09.09.2026 (docs/picture-check-cost.md §7).**
 Sixteen `polish --section=<name>` runs took **0.2–7.4 min, median 2.9** together
 0.8 h; the six WHOLE `polish` passes in the same window took **9.9–61.5 min,
-median 55.2**, together 4.5 h. The same localised finding for a fiftieth of the
-time. `--plan` quotes the WHOLE suite for a section run and now says so out loud,
-because a section is a fraction of its own pass and the fraction was never
-measured per suite.
+median 55.2**, together 4.5 h. That is the same localised finding for **about a
+nineteenth of the time** on the medians. Both figures are `polish` alone —
+nothing timed another suite's sections, so `--plan` prints the WHOLE suite's
+expectation and says which suite the band did not cover rather than scaling a
+fraction nobody measured.
 
 That is the price, not a new rule: a `--section` run is stamped PARTIAL by
 `sections.mjs` and `runVerdict` refuses it as coverage whatever its exit code, so

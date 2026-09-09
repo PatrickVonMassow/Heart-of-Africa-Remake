@@ -41,16 +41,20 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
  * ANCHORED TO §1 ALONE (point 1083). The shape "backticked name, then a
  * `<n> s` cell" is not unique to that table — §7 records the September runtime
  * bands in a table of the same shape — so the scan is bounded between the §1
- * heading and the NEXT heading of any level. Unanchored, a later section's row
+ * heading and the NEXT heading of ANY level. Unanchored, a later section's row
  * would silently join the pinned constants and the lockstep test would hold the
  * runner to a number nobody pinned it to.
+ *
+ * ANY level, and that is not pedantry (Astra, four-eyes round 1): a `##+` guard
+ * reads straight through a later `# Heading`, which is exactly the boundary a
+ * document reorganised into parts would grow.
  */
 function section1(text = readFileSync(join(ROOT, 'docs', 'picture-check-cost.md'), 'utf8')) {
   const lines = String(text).split(/\r?\n/)
   const start = lines.findIndex((line) => /^##\s+1\./.test(line))
   if (start < 0) return []
   const rest = lines.slice(start + 1)
-  const end = rest.findIndex((line) => /^##+\s/.test(line))
+  const end = rest.findIndex((line) => /^#{1,6}\s/.test(line))
   return end < 0 ? rest : rest.slice(0, end)
 }
 
@@ -98,6 +102,14 @@ describe('the measured constants stay in lockstep with docs/picture-check-cost.m
     const rows = measuredTable(section1(doc))
     expect([...rows.keys()]).toEqual(['flow'])
     expect(rows.get('flow')).toEqual({ shots: 8, seconds: 140.4 })
+
+    // …and a heading of ANY level ends it, not just a `##`. A document split
+    // into parts grows `# Part two` boundaries, and a `##+` guard reads through
+    // one as if it were body text.
+    const parted = doc.replace('## 7. September 2026', '# Part two — September 2026')
+    const partedRows = measuredTable(section1(parted))
+    expect([...partedRows.keys()]).toEqual(['flow'])
+    expect(partedRows.get('flow')).toEqual({ shots: 8, seconds: 140.4 })
   })
 
   it('carries the September bands beside the July table, never inside it', () => {
@@ -286,11 +298,35 @@ describe('the observed band a plan prints under its expectation (point 1083)', (
     expect(formatObservedBand(plan.observedBand).join('\n')).toContain('NOT measured on `enrichments`')
   })
 
+  it('withholds the LARGE band from a run that is not the shape it measured', () => {
+    // The five measured runs were BOTH-backend. `VERIFY_GL=webgl npm test` is
+    // one pass and roughly half the work: handing it 115–121 min would make a
+    // normal run look fast, which is the opposite of what the band is for.
+    const both = planRun({ argv: ['large'], verifyGl: undefined })
+    const pinned = planRun({ argv: ['large'], verifyGl: 'webgl' })
+    expect(both.passes).toHaveLength(2)
+    expect(pinned.passes).toHaveLength(1)
+    expect(both.observedBand?.key).toBe('large')
+    expect(pinned.observedBand).toBeNull()
+    expect(observedBand({ isLargeEquivalent: true, passes: 1 })).toBeNull()
+  })
+
   it('reports no band where nothing measured one, rather than the nearest', () => {
     expect(planRun({ argv: ['small'], verifyGl: 'webgpu' }).observedBand).toBeNull()
     expect(planRun({ argv: ['flow'], verifyGl: 'webgpu' }).observedBand).toBeNull()
     expect(observedBand({})).toBeNull()
     expect(formatObservedBand(null)).toEqual([])
+  })
+
+  it('quotes no fraction it did not measure', () => {
+    // 55.2 / 2.9 is ~19x, not "a fiftieth". A band that overstates its own
+    // saving is the same defect as a plan that understates its own cost.
+    const text = Object.values(SEPTEMBER_BANDS.kinds)
+      .map((band) => `${band.label} ${band.note ?? ''}`)
+      .join('\n')
+    expect(text).not.toMatch(/fiftieth|fraction of/)
+    const section = planRun({ argv: ['enrichments', '--section=x'], verifyGl: 'webgpu' })
+    expect(formatObservedBand(section.observedBand).join('\n')).toMatch(/says nothing about them/)
   })
 })
 
