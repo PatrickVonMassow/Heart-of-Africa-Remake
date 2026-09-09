@@ -978,6 +978,19 @@ function Kids({
       // uncounted it read as the child walking out of its pocket.
       absorbSeparation(children[i], b)
     }
+    // BOTH CLOCKS TICK ONCE A FRAME, AND THE GESTURE'S TICK COMES FIRST
+    // (work-order 1065). The gestures used to be advanced in the pose loop
+    // BELOW, after the word had already started one — so a gesture issued with
+    // an utterance lost a whole dt to the very frame that began it, while
+    // `bankGame` subtracts the tap's hold only from the next frame on. The
+    // gesture then ran one frame ahead of its own hold for the rest of it, and
+    // the arm was measured swinging back out 0.01 s before the hold ended, 10.6
+    // cm off the stone with ROCK still falling. Advancing here means the new
+    // utterance's gesture is only READ below, never advanced in its own frame:
+    // the fade-out begins exactly at the hold's end.
+    for (const gesture of gestures.current) {
+      if (gesture) gesture.current = advanceGesture(gesture.current, dt)
+    }
     if (spoken) {
       speakBankUtterance(spoken, children[spoken.speaker], refs.current[spoken.speaker], gestures.current[spoken.speaker])
     }
@@ -1018,8 +1031,9 @@ function Kids({
       // the arms and the shake, the run owns the lean. Writing the pose (rather
       // than handing the Figure its gesture ref) is what lets the two combine —
       // a figure with a pose ignores its gesture, so the pose must carry it.
+      // Only READ here: this frame's advance already ran above, before the
+      // word could start a new gesture (work-order 1065).
       const gesture = gestures.current[i]
-      gesture.current = advanceGesture(gesture.current, dt)
       const shown = gesturePose(gesture.current)
       pose.left = crouched ? CROUCH_POSE.left : shown.left
       pose.right = crouched ? CROUCH_POSE.right : shown.right
