@@ -1450,7 +1450,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 09.09.2026, 17:24 · Quellen-Fingerprint: `568f41858832…`
+Zuletzt aktualisiert: Mittwoch, 09.09.2026, 17:47 · Quellen-Fingerprint: `c3bb3722daf2…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1458,7 +1458,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Problemklasse (Memory) | Anläufe | Schwere (heuristisch) | Maßnahme (Guard-Treffer) | Status |
 |---|---|---|---|---|
 | Always use background-wait time for prep on upcoming tickets — autonomously, guaranteed by a mechanism, never on a reminder | 2 | mittel | prep-arm-hook.mjs, prep-guard.mjs | ✔ Mechanismus |
-| An analysis over a moving set is run only when it is executed immediately in the same run — never produced and parked | 4 | hoch | — (Regel/Memory) | ◐ Regel |
+| An analysis over a moving set is run only when it is executed immediately in the same run — never produced and parked | 5 | hoch | — (Regel/Memory) | ◐ Regel |
 | OFFEN, attended-only: Punkt 542 scharfschalten — vier gebaute Guards hängen in keiner Hook-Kette | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | User's rulings on the point-205 plausibility audit (what to fix vs. accept, 21.07.2026) | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | For code audits/reviews, mix in a DIFFERENT model than the one that wrote the code — different blind spots find more bugs | 1 | niedrig | model-guard.mjs | ✔ Mechanismus |
@@ -1488,7 +1488,6 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | a drill that recreates the state after an action tests the assumption, not the action — and stays green forever | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
-| Bei großem Kontext einen frischen Punkt nur einreihen und sofort abgeben, nicht selbst umsetzen | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to the OpenAI lane, GPT-6 Astra), and review is cross-vendor, not Fable-by-default | 6 | hoch | — (Regel/Memory) | ◐ Regel |
 | Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 68 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | wait-command-guard.mjs | ✔ Mechanismus |
@@ -1554,10 +1553,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 96 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 126 Prozess-/Meta-TASKS-Punkte (davon 60 offen).
+Erfasste Quellen: 95 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 126 Prozess-/Meta-TASKS-Punkte (davon 60 offen).
 
-<!-- RETRO-FINGERPRINT: 568f41858832bf5ab6a76db472fcea080f767236c6d07e0f1d6dde6ca0c48472 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-09T15:24:36.326Z -->
+<!-- RETRO-FINGERPRINT: c3bb3722daf21e87c77bc04eea0c34f306b98c6dfde841e18cef795c0927278d -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-09T15:47:50.500Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
