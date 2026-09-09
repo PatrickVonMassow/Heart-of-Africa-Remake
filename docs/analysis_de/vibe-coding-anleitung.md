@@ -340,9 +340,9 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Wo ein Teil schreibt, was ein anderes prüft, **importiere** den Wert; der Eingang
   ist **Pflicht**, kein Vorgabewert."
 
-- **Jeder Befund wird zur Arbeit — und die Arbeit findet neue Befunde.** Alles einzureihen ist
-  im ersten Monat richtig und im dritten die Ursache: Die Prüfmechanik findet ihre eigenen
-  Fehler, der Zulauf hat keine Grenze, das Projekt arbeitet an sich selbst.
+- **Jeder Befund wird zur Arbeit — und die Arbeit findet neue Befunde.** Im ersten Monat richtig,
+  im dritten die Ursache: Die Prüfmechanik findet ihre eigenen Fehler, der Zulauf hat keine
+  Grenze, das Projekt arbeitet an sich selbst.
   → *Prompt:* „Ein Befund wird nur Arbeitspunkt bei Nutzerwirkung, Risiko, echter Blockade oder
   Vereinfachung. Sonst in eine gesammelte, **nicht blockierende** Liste."
 
@@ -350,8 +350,7 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Sichere Befunde mit einem billigen Kommando, das immer schreibt, und einer Prüfung,
   die keinen Zug enden lässt, der untersucht und nichts hinterlassen hat."
 
-- **Still ersetzt — und »kaputt« antwortet wie »fehlt«.** Der Ersatz wird klaglos gesetzt; wer
-  aus »fehlt« etwas schließen darf, schließt es dann aus Schrott.
+- **Still ersetzt — »kaputt« antwortet wie »fehlt«.** Wer aus »fehlt« etwas schließt, schließt aus Schrott.
   → *Prompt:* „Jede eingabeverarbeitende Stelle scheitert **sichtbar**; **fehlend und unlesbar
   liefern verschiedene Werte**, und jeder Rückfall wird **gemeldet**, mit seinem Behebungsbefehl."
 
@@ -362,7 +361,8 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 - **Der Ausfall kommt nie an der bequemen Stelle** — am tückischsten mitten zwischen zwei Hälften,
   wo danach jede Seite korrektes Verhalten meldet.
   → *Prompt:* „Gib jeder kritischen Aktion einen **wiederholbaren Aufräumschritt beim Start des
-  Nachfolgers**, nie am Ende des Vorgängers, und prüf ihn mit Abbrüchen zu zufälligen Zeiten."
+  Nachfolgers**, nie am Ende des Vorgängers, und prüf ihn mit Abbrüchen zu zufälligen Zeiten.
+  Liegengebliebenes erkennst du am **Besitzer, nie am Alter**: Der Vermerk wird zuletzt geschrieben."
 
 - **Was außerhalb des Repositorys liegt, kommt nicht mit — und geht nicht zurück.** Das Projekt
   zieht um, die Mechanik nicht; wer dort etwas ändert, hat kein `git`.
@@ -622,4 +622,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: c3bb3722daf21e87c77bc04eea0c34f306b98c6dfde841e18cef795c0927278d -->
+<!-- GUIDE-FINGERPRINT: b6921d822014c9a8148d2c361195e07e76c272ce756964d2926b74bb95f2937f -->

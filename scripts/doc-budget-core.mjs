@@ -157,8 +157,16 @@ export const DOC_BUDGETS = [
     // turn. The memory file itself stays on disk, unindexed. The ceilings follow
     // the cut down to the measured 50 / 766 fit; the index had grown one line
     // past its line ceiling, which is what the run went red on.
-    maxLines: 50,
-    maxWords: 766,
+    // RAISED on 09.09.2026 by ONE genuinely new standing order of the user, given
+    // while watching me debug point 1065 with full regressions: iterate on the new
+    // feature's OWN test — the Vitest case or the suite narrowed to its section —
+    // and spend the wide lane only once, as evidence. It is a new topic: the
+    // surviving entries carry WHERE a suite may run (quiet machine) and what a
+    // main push costs, none of them the ORDER of the ladder. Its hook measures 18
+    // words on this tokenizer, and the ceilings move by exactly that line to the
+    // measured 51 / 784 fit.
+    maxLines: 51,
+    maxWords: 784,
     maxEntryWords: 22,
     // Fifteen words: an index of one-hook lines, where a whole new entry is ~20 words —
     // so the slack cannot hide one, and re-wording an existing hook is free.
