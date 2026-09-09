@@ -206,8 +206,11 @@ for load was forbidden by the user on 08.09.2026, with one exception (point 1077
 itself). Tagging seven communication points `Author lane: astra` on 08.09. moved
 the cut from 271/103 to 280/99 and moved no work, because an Astra-lane point is
 still written here anyway. What is left is not a lever but a command:
-`node scripts/author-astra.mjs --point <N>` in the point's own worktree. The
-proof owed is one point authored by Astra end to end.
+`node scripts/author-astra.mjs --point <N>` in the point's own worktree, which
+the session-start policy line now says in those words. **The proof owed is one
+point authored by Astra end to end, and it is owed by point 1072** — the next
+Astra-lane point in work-order order, and a communication point, which is the
+mechanic the 08.09. tagging was about.
 
 ### The picture marker is not narrowed, and why (decided 09.09.2026)
 
