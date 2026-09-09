@@ -900,6 +900,12 @@ function Kids({
     z: number
     drawnPitch: number
     writtenPitch: number
+    /** How far the word had to carry, in metres, or null with no traveller in
+     *  the place. A gesture reaches exactly as far as the voice (point 580), so
+     *  a tap spoken beyond the hearing radius is deliberately ARMLESS — without
+     *  this number a check measuring its hand reads a resting arm and blames
+     *  the touch (work-order 1065). */
+    heardFrom: number | null
   } | null>(null)
   const poses = useRef<Array<RefObject<FigurePose | null>>>([])
   if (poses.current.length !== count) {
@@ -1073,6 +1079,9 @@ function Kids({
               z: best.z,
               drawnPitch: best.pitch,
               writtenPitch: pose.left.pitch,
+              heardFrom: placePlayerPosition.active
+                ? Math.hypot(c.x - placePlayerPosition.x, c.z - placePlayerPosition.z)
+                : null,
             }
           : null
       }

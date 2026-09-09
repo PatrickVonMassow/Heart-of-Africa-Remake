@@ -4558,6 +4558,40 @@ if (section('children-bank-game')) {
     const holdSeconds = await page.evaluate(
       () => window.__balance?.villageLife?.bankGame?.tapPauseSeconds ?? 0,
     )
+    // THE TAP MUST BE WITHIN EARSHOT, OR THERE IS NO ARM TO MEASURE (work-order
+    // 1065). A gesture carries exactly as far as the voice (point 580), so a tap
+    // spoken further off than the hearing radius is deliberately ARMLESS — and
+    // this section then measured the hearing gate rather than the touch: on
+    // WebGL 2 it read 57.8 cm with the shoulder at REST, written and drawn
+    // alike, 40 ms into a nine-second hold, where no gesture can have expired.
+    // Whichever side of the radius the traveller happened to be left on decided
+    // the verdict, which is why the same code went green on WebGPU and red on
+    // WebGL 2. He is therefore stood BETWEEN the two play rocks first, and the
+    // stand is asserted rather than assumed.
+    const earshot = await page.evaluate(() => {
+      const L = window.__placeLayout
+      const p = window.__placePlayer
+      if (!L?.playRocks || !p) return null
+      const near = L.playRocks.upstream
+      const far = L.playRocks.downstream
+      p.x = (near.x + far.x) / 2
+      p.z = (near.z + far.z) / 2
+      p.pitch = -0.05
+      p.yaw = Math.atan2(far.x - p.x, far.z - p.z)
+      return {
+        radius: window.__balance.communication.hearingRadius,
+        toNear: Math.hypot(near.x - p.x, near.z - p.z),
+        toFar: Math.hypot(far.x - p.x, far.z - p.z),
+      }
+    })
+    check(
+      'the traveller stands within earshot of BOTH play rocks, so a tap has an arm at all',
+      !!earshot && Math.max(earshot.toNear, earshot.toFar) <= earshot.radius,
+      earshot
+        ? `${earshot.toNear.toFixed(1)} m and ${earshot.toFar.toFixed(1)} m from the two rocks, ` +
+          `hearing radius ${earshot.radius} m — the tapper stands a rock's radius nearer still`
+        : 'the layout or the player was not readable',
+    )
     let bestTouch = null
     let sawTouchPose = false
     let stationTap = null
@@ -4689,6 +4723,9 @@ if (section('children-bank-game')) {
           Math.abs(stationTap.gap) <= 0.06,
           `the worst reading while the word was falling stood ${(stationTap.gap * 100).toFixed(1)} cm ` +
             `off the flank, ${stationTap.tapFor.toFixed(2)} s into the hold's remainder ` +
+            `(the word carried ` +
+            `${typeof stationTap.opening?.heardFrom === 'number' ? stationTap.opening.heardFrom.toFixed(1) + ' m' : 'an unread distance'}` +
+            ` to the traveller; beyond the hearing radius there is no arm to measure, by design) ` +
             `(the hold runs from ${holdSeconds.toFixed(2)} s down to 0, so a reading near the top ` +
             `is the arm still swinging in and one near 0 is it swinging back out)` +
             (looseTouch
