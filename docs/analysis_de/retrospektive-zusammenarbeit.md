@@ -50,6 +50,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 09.08. abends | Spielsitzung: zwölf Defekte in einer Mechanik, deren zwölf Punkte alle abgenommen waren — grün gegen einen Stellvertreter (Punkt 589); die veröffentlichte Reihenfolge zweimal falsch, weil sie eine zweite Heimat hat (Punkt 590, Rückfall in §3.77); ein abgehakter Punkt mit unerfülltem drittem Liefergegenstand, gefunden durch eine Nutzerfrage (§3.99) |
 
 | 09.09. | Nutzerfrage „sollte da nicht ein Kind auf einen Stein klettern?“ — gebaut, feuernd, nie sichtbar: der Test prüfte das Flag, das die Reparatur selbst setzt, und die Bildspur hatte den Fall weggeschaltet (§3.252); zwei Kinderlauf-Grenzwerte reißen, beide an einer einzigen Stichprobe gemessen |
+| 09.09. abends | Ein Punkt verbraucht 16,3 Maschinenstunden Verifikation — fünf volle LARGE-Läufe, alle rot —, ohne dass jemand eine Regel bricht: die Leiter stand im Auftrag, der letzte rote Lauf druckte seine Zwei-Minuten-Sprosse selbst mit, und die Planzahlen vom Juli ließen jeden Ausreißer normal aussehen (§3.253, Schwesterfall zu §3.249); freigegeben werden vier Maßnahmen, die Anthropic und die Gegenseite nach deren Audit gemeinsam tragen |
 | 13.08. | Der Nachprüfer findet eine echte zweite Klippe im geheilten Mechanismus — und jede der fünf gemessenen Kuren verschlechtert gesunde Dörfer stärker, als der Fehler schadet: Befund wird gebucht statt behoben (§3.115) |
 | 20.08. | Der Dokumentschnitt strich Regeln als »von einem Wächter abgedeckt«, ohne einen einzigen Wächter darauf zu prüfen — die Kontextanzeige verschwand, der Nutzer fand es (§3.134); eine vom Nutzer gesetzte Rangfolge wurde in einer Nacht zweimal maschinell überholt, ohne dass irgendwo ein Grund stand (Punkt 614); zwei Werkzeuge derselben Bauart am falschen Ort gemessen — im Hauptbaum gebaut und geprüft, während der Prozess die Arbeit in den isolierten Bereich schickt (§3.137) |
 | 21.08. | Ein Tor verlangte eine Freigabe, die seine eigenen Werkzeuge nicht herstellen können — der HIGH-Punkt war gemergt, geprüft und freigegeben, und der Zugausgang wies ihn trotzdem ab (§3.153) |
@@ -567,6 +568,8 @@ Am 24.08.2026 zwei weitere Ausprägungen an einem Abend, und beide zeigen diesel
 **Nachtrag 25.08.2026 — dieselbe Wurzel, diesmal an der Vier-Augen-Schranke.** Die Stop-Riegel stehen mit RELATIVEN Befehlen in der Konfiguration, also laeuft aus einem Arbeitsbaum heraus dessen eigene Kopie des Riegels. Die ungetrackte Grundlinien-Datei liegt aber nur im Haupt-Checkout, und so meldete `mechanism-review-guard` eine fehlende Grundlinie, die es nicht gab. Der genannte Ausweg war zum zweiten Mal an einem Abend einer, den niemand gehen kann: „merge origin/main into this branch" bei zwei Refs, die nachweislich identisch sind (0/0), und „end the turn again so the guard can seed the anchor", wobei das Saatkorn wieder in den Arbeitsbaum faellt. Derselbe Aufruf mit derselben Sitzungskennung meldete aus dem Haupt-Checkout die Lueckenklausel und beendete den Zug gruen. Zwei Zugenden gingen dafuer verloren, und die Verweigerung las sich wie ein Produktdefekt, obwohl der Riegel nichts zu beanstanden hatte. Die Lehre ist nicht neu, aber sie hat jetzt eine zweite Adresse: Ein Riegel, der Zustand gegen die Wurzel aufloest, in der er zufaellig laeuft, ist im Delegationsmodell dieses Batches falsch — die Arbeitsbaeume sind der NORMALFALL, nicht die Ausnahme. Als Punkt 922 aufgenommen, direkt hinter Punkt 910, das denselben Defekt am Tafel-Riegel traegt.
 
 **Dritte Adresse, 08.09.2026 — und diesmal verlangt der Riegel etwas, das gerade entsteht.** Aus dem Arbeitsbaum des Punktes 1065 heraus las `render-verify-guard` die ungeprueften Render-Aenderungen des ZWEIGS und verweigerte jedes Zugende, bis ein deckender Bildlauf vorliegt — waehrend genau dieser Lauf seit einer Viertelstunde lief und noch zwei Stunden brauchte. Aus dem Haupt-Checkout beendete derselbe Riegel den Zug wortlos mit 0, weil `main` keine ungepruefte Render-Aenderung traegt. Daneben verweigerte der Tafel-Riegel zum zweiten Mal wie am 25.08. Drei Zugenden gingen verloren, und jede von Hand nachgestellte Diagnose las gruen, weil ich sie aus dem Hauptbaum aufrief. Neu ist nur die Bauform des Schadens: Der Riegel forderte nicht eine fehlende Handlung, sondern eine, die bereits im Gange war — die Verweigerung und ihre eigene Abhilfe liefen gegeneinander. Zweite Lehre desselben Abends: Ein `cd` in einer `&&`-Kette aktualisiert das verfolgte Arbeitsverzeichnis der Sitzung NICHT; nur ein alleinstehendes `cd` haelt. Deshalb sieht die naechste Messung wieder den Arbeitsbaum, obwohl der Befehl davor sichtbar im Hauptbaum lief, und der Drift bleibt unsichtbar.
+
+**Vierte Adresse, 09.09.2026 — der Ausweg war nicht unbegehbar, es gab ihn als Befehl nicht.** Der `now-eta-past`-Riegel verweigert ein Zugende, solange eine laufende Karte eine bereits verstrichene Endzeit verspricht, und nennt die Abhilfe wörtlich: „give each a realistic new ~HH:MM". Nur schrieb keine einzige Board-Anweisung eine solche Zeit. `promote` setzt eine Warteschlangen-Karte voraus, die ein laufender Punkt nicht mehr hat, `toNow` leitet die Kopfzeile aus derselben fehlenden Karte ab, `status` fasst nur den Textkörper an. Übrig blieben die Handbearbeitung des Board-HTML (§3.45) und `--waive-audit`, also genau das Übergehen der Prüfung, für die der Riegel existiert. Der Board-Text selbst führte die Lücke seit Wochen als bekannt („nur kennt die Board-Werkzeugkiste keinen Befehl dafür"), ohne dass sie jemandem im Weg stand — bis der Nutzer die sichtbare Hälfte meldete: Die Tafel versprach 11:46 für Arbeit, die um 13:40 noch lief. Neu gegenüber den drei Vorgängern ist, dass der Riegel recht hatte und der **Schreiber** fehlte; die Vorgänger hatten einen Schreiber, der im auslösenden Zustand nicht griff. Behoben mit `board.mjs eta`.
 
 **Lehre:** Ein Durchsetzer ist erst dann fertig, wenn sein genannter Ausweg **ausgeführt** worden ist, nicht wenn er plausibel klingt. Das gehört in die Prüfung jedes neuen Riegels: den Weg, den die Fehlermeldung vorschlägt, einmal wirklich gehen — im auslösenden Zustand, nicht im gesunden. Zwei Zusatzfragen aus dem 24.08.: Gilt der Weg auch für den, der die Meldung liest — ein delegierter Autor hat andere Rechte als der Besitzer? Und nennt die Absage den Grund, den sie gemessen hat, statt eine Handlung zu empfehlen, die der Aufrufer schon ausgeführt hat?
 
@@ -1447,7 +1450,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 09.09.2026, 05:55 · Quellen-Fingerprint: `3fdacb852eb0…`
+Zuletzt aktualisiert: Mittwoch, 09.09.2026, 17:47 · Quellen-Fingerprint: `c3bb3722daf2…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1455,7 +1458,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Problemklasse (Memory) | Anläufe | Schwere (heuristisch) | Maßnahme (Guard-Treffer) | Status |
 |---|---|---|---|---|
 | Always use background-wait time for prep on upcoming tickets — autonomously, guaranteed by a mechanism, never on a reminder | 2 | mittel | prep-arm-hook.mjs, prep-guard.mjs | ✔ Mechanismus |
-| An analysis over a moving set is run only when it is executed immediately in the same run — never produced and parked | 4 | hoch | — (Regel/Memory) | ◐ Regel |
+| An analysis over a moving set is run only when it is executed immediately in the same run — never produced and parked | 5 | hoch | — (Regel/Memory) | ◐ Regel |
 | OFFEN, attended-only: Punkt 542 scharfschalten — vier gebaute Guards hängen in keiner Hook-Kette | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | User's rulings on the point-205 plausibility audit (what to fix vs. accept, 21.07.2026) | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | For code audits/reviews, mix in a DIFFERENT model than the one that wrote the code — different blind spots find more bugs | 1 | niedrig | model-guard.mjs | ✔ Mechanismus |
@@ -1486,7 +1489,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to the OpenAI lane, GPT-6 Astra), and review is cross-vendor, not Fable-by-default | 6 | hoch | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 64 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 68 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | wait-command-guard.mjs | ✔ Mechanismus |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | User 18.08.2026: hard, complex, error-prone and HIGH-criticality points are AUTHORED by the OpenAI lane directly (GPT-6 Astra since 05.09.2026, GPT-5.6 Sol before) — Opus 5 authors only what is left, and Fable authors only a point that tags its lane or one the router escalates | 5 | hoch | — (Regel/Memory) | ◐ Regel |
@@ -1552,8 +1555,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 95 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 126 Prozess-/Meta-TASKS-Punkte (davon 60 offen).
 
-<!-- RETRO-FINGERPRINT: 3fdacb852eb0b5902058a2454569bcb4d83686080808fe8ac99d05147714b855 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-09T03:55:17.846Z -->
+<!-- RETRO-FINGERPRINT: c3bb3722daf21e87c77bc04eea0c34f306b98c6dfde841e18cef795c0927278d -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-09T15:47:50.500Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -6266,3 +6269,45 @@ Reparatur selbst setzt; er muss die Größe messen, die der Spieler sieht: Ort, 
 Glück, und er meldet sich als Regression bei der nächsten harmlosen Änderung. Wer ihn reißen sieht,
 misst zuerst den versandten Stand über mehrere Stichproben, bevor er die eigene Änderung
 verdächtigt — hier lag der Defekt jedes Mal schon vorher da, nur in einem Dorf, in das niemand sah.
+
+### 3.253 Die Regel stand im Auftrag, ihr Preis nirgends
+
+Am 09.09.2026 hat ein einziger Punkt rund 16,3 Maschinenstunden Verifikation verbraucht:
+fünf vollständige LARGE-Läufe zu 115,3 / 115,8 / 118,8 / 120,4 / 120,9 Minuten, alle fünf
+rot, dazu sechs ganze `polish`-Durchgänge zu 9,9 bis 61,5 Minuten. Danebenstehen sechzehn
+`--section`-Läufe, die zusammen 0,81 Stunden gekostet haben — 0,2 bis 7,4 Minuten je Lauf.
+Das Auffällige ist nicht die Summe, sondern dass niemand eine Regel gebrochen hat. Die
+Verifikationsleiter in `scripts/point-brief-core.mjs` sagt seit Punkt 595 wörtlich, der
+volle Beweis laufe genau einmal auf dem exakten Merge-Kandidaten; `scripts/verify/README.md`
+sagt seit Punkt 566, ein Abschnittslauf sei die Reparaturschleife und nie Abdeckung. Beides
+stand im Auftrag dieses Punktes, und der letzte rote Lauf druckte in jeder einzelnen
+Fehlzeile die Sprosse mit, die ihn in zwei bis vier Minuten reproduziert
+(`--section=speech-hypothesis`, `--section=chief-to-drummer`). Es wurden also 121 Minuten
+ausgegeben, um zu erfahren, was zwei kurze Läufe gesagt hätten — mit der Anleitung dazu im
+eigenen Ausdruck.
+
+Der Unterschied zu [§3.249](#3249-eine-gemessene-erwartung-altert-zu-einem-falschen-urteil)
+ist wichtig, weil beide dieselbe Julimessung berühren. Dort altert eine Konstante zu einem
+falschen *Urteil* — das Werkzeug erklärt einen gesunden Lauf für hängend. Hier altert
+dieselbe Konstante zu einer fehlenden *Warnung*: Wenn ein voller LARGE mit 80 Minuten
+geplant wird und 121 dauert, wenn ein ganzer `polish`-Durchgang mit 5,7 Minuten geplant wird
+und 62 dauert, und wenn ein Abschnittslauf sogar mit der Dauer der ganzen Suite geplant
+wird, dann liest sich jeder Ausreißer wie ein normaler Lauf. Die Regel war da, die
+Verletzung war unsichtbar.
+
+Bemerkenswert ist auch, wie der Befund entstand: blind-parallel nach CLAUDE.md §6, zusammen­
+geführt von einem dritten Modell, und das Audit der Gegenseite hat zwei Rechenfehler
+nachgewiesen und drei Absolutformulierungen zurückgewiesen — „genau ein LARGE" hätte den
+grünen Schlussbeweis auf dem endgültigen Kandidaten gekostet, „nur noch Abschnitte" wäre an
+der PARTIAL-Stempelung gescheitert. Übrig blieben vier Maßnahmen, die beide Modelle tragen.
+Die ehrliche Zahl dazu ist eine Laufzeit, keine bewiesene Ersparnis: ein roter Lauf kann den
+späteren Kandidaten erst ermöglicht haben, und ein Teil der langen Durchgänge lief neben
+einem zweiten Autor auf derselben Maschine.
+
+**Lehre:** Eine Regel ohne Preis ist eine Empfehlung. Wo eine Sprosse billiger ist als die
+nächste, muss der Unterschied an der Sprosse stehen und nicht in einem Dokument daneben —
+und zwar in Zahlen, die jemand in diesem Monat gemessen hat. Und die zweite Hälfte, die
+nichts kostet: Wenn ein Prüflauf die Reparatursprosse selbst ausdruckt, ist die nächste
+Handlung dieser Ausdruck und nicht der nächste Vollbeweis. Gebucht als Punkt 1083, der
+ausdrücklich keine neue Mechanik baut — die Infrastruktur ist eingefroren —, sondern die
+Julitabelle als Basislinie stehen lässt und das gemessene Septemberband danebenschreibt.

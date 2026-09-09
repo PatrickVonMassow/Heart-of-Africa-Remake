@@ -1254,6 +1254,12 @@
       "why": "Der Nutzer hat den Punkt am 09.09.2026 um 05:04 selbst gemeldet und die Einordnung direkt vor 690 ausdruecklich benannt.",
       "origin": "user",
       "place": "ahead"
+    },
+    "1083": {
+      "at": "2026-09-09T15:47:11.002Z",
+      "why": "Nutzer am 09.09.2026: 'Du reihst 1083 dann aber direkt ganz vorne in der Queue ein, ja?'",
+      "origin": "user",
+      "place": "ahead"
     }
   },
   "boundary": {
@@ -1286,7 +1292,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-09T03:54:47.266Z",
+    "at": "2026-09-09T15:47:11.013Z",
     "points": [
       174,
       184,
@@ -1666,7 +1672,8 @@
       1078,
       1079,
       1081,
-      1082
+      1082,
+      1083
     ]
   }
 }

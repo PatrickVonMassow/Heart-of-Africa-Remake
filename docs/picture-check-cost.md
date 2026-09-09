@@ -384,3 +384,60 @@ communicated as measured.
 4. **The median passing run writes 3 frames, but one suite writes 37.** The
    distribution is bimodal; a single `enrichments` run accounted for 29 % of all
    frames written by the 23 passing runs in the window.
+
+---
+
+## 7. September 2026: what a whole run actually took (point 1083)
+
+**§1 is not superseded.** It says of itself that it is a *before* figure, and it
+stays exactly as measured on 25.–27.07.2026: it is the per-suite table the
+runner's constants are pinned to. This section stands BESIDE it and answers a
+different question — not "what does one suite cost" but **"how long does the run
+I am about to start really take, and when should that worry me."**
+
+Measured 09.09.2026 over the 35 finished run records in
+`.claude/worktrees/point-1065/local/verify-logs/*.run.json` (the `--help`
+invocations are excluded; two records still say `running` and are excluded too).
+Point 1065 spent **16.3 machine hours** on verification across them.
+
+| Kind of run | n | Band | Median | What `--plan` said | Green |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| LARGE, both backends, ran to the end | 5 | 115.3–120.9 min | 118.8 min | 80 min 48 s | 0/5 |
+| LARGE, aborted early | 8 | 0.4–42.1 min | 4.6 min | 80 min 48 s | 0/8 |
+| Whole `polish`, one backend | 6 | 9.9–61.5 min | 55.2 min | 5 min 41 s | 2/6 |
+| One `--section` of a suite (measured on `polish`) | 16 | 0.2–7.4 min | 2.9 min | 5 min 41 s (the WHOLE suite) | 14/16 |
+
+**THE LOAD THESE WERE MEASURED UNDER.** A second author held a worktree for part
+of the window — `feat/1072-village-speaks-with-direction` committed on 08.09.2026
+between 13:56 and 15:47, inside the same hours as the LARGE runs of 13:01–19:31 —
+and the machine is the shared WSL2 host, not dedicated hardware. §1 already
+records a 19 % spread on one suite from load alone with no code change. So these
+are **bands to recognise an outlier by, never target values**: 118 minutes is
+inside the band, 200 is not, and that is the whole use of the figure.
+
+**Nor is this a saving that was left on the table.** All five full LARGE runs
+exited 1, and a red run may well be what made the next candidate possible. The
+number that does stand on its own is the last one: its reds were all in `polish`
+and each one PRINTED the rung that reproduces it
+(`--section=speech-hypothesis`, `--section=chief-to-drummer`), so 121 minutes
+bought what two runs of 2–4 minutes would have said. That is the ladder of
+`scripts/verify/README.md` ("Running ONE section of a suite") not being climbed,
+and the reason it was not climbed is that nothing told the author what the top
+rung costs.
+
+**Three things follow, and they are all price tags, not rules.** The rules
+already existed: `VERIFICATION_LADDER` in `scripts/point-brief-core.mjs` says the
+full proof runs exactly once on the exact merge candidate, and this README says a
+`--section` run is the repair loop and never coverage.
+
+1. `SEPTEMBER_BANDS` in `scripts/verify/run-wait-core.mjs` carries this table as
+   data, and `--plan large` / `--plan polish` print the observed band underneath
+   the planned expectation. A `--section` plan says out loud that its number is
+   the whole suite's. A band is printed only for the SHAPE it was measured on: a
+   pinned single-backend LARGE gets no band, and a section of any suite but
+   `polish` is told that nothing timed it.
+2. `scripts/verify/README.md` carries the measured price in its tier table and in
+   its section block, and no longer argues from the 42-minute figure — which is
+   the ONE-backend sum of §1, never a whole `npm test`.
+3. The ladder in the delegation brief names what each rung costs, so "climb it;
+   do not start at the top" has a number behind it.

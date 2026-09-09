@@ -261,10 +261,12 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   periodisch **nebeneinander**, zieh **den Code auf den Satz**, und frag: **Welcher naheliegende
   Fall wird von keiner Regel erfasst?**"
 
-- **Die Verweigerung nennt eine Abhilfe, die schadet, nie eintritt — oder längst getan ist.** Wer
-  ihr folgt, steht schlechter da, wartet vergeblich oder wiederholt einen erledigten Schritt.
+- **Der genannte Ausweg trägt nicht:** Er schadet, tritt nie ein, ist längst getan — oder es gibt
+  ihn als Befehl gar nicht. Dann hat die Sperre recht, und übrig bleiben Handarbeit und das
+  Übergehen der Prüfung — die zwei Wege, gegen die sie gebaut wurde.
   → *Prompt:* „**Geh den Ausweg jeder Verweigerung einmal wirklich**, im auslösenden Zustand:
-  Führt er zum Guten, kann er eintreten, und gilt er auch für **den, der die Meldung liest**?“
+  Führt er zum Guten, kann er eintreten, gilt er für **den, der die Meldung liest** — und
+  **welcher Befehl schreibt den verlangten Zustand?** Eine ungenutzte Lücke ist ungemeldet.“
 
 - **Dieselbe Verweigerung ein zweites Mal — wortgleich.** Du hast begründet, warum sie nicht
   zutrifft, und sie kommt unverändert wieder. Dann irrt nicht der Wächter, sondern dein Bild
@@ -300,9 +302,13 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   Grenze nennt ihre **Richtung**: zu viel durchgelassen oder zu viel verweigert."
 
 - **Die teuerste Prüfung großflächig verlangt.** Bildbegutachtung, zweiter Lauf, zweites Modell
-  kosten ein Vielfaches — pauschal gefordert auch dort, wo sie nichts beweisen.
+  kosten ein Vielfaches — pauschal gefordert, wo sie nichts beweisen. **Eine Regel ohne Preis ist
+  nur eine Empfehlung:** Ein Punkt verbrannte fünf rote Zwei-Stunden-Läufe, obwohl der Auftrag
+  „genau ein Vollbeweis" sagte — die Zeitangaben waren sechs Wochen alt und dreifach zu niedrig.
   → *Prompt:* „Verlange die teuerste Prüfung nur, wo eine Änderung abweichen kann, und schreib
-  die Grenze samt Begründung in den prüfenden Code."
+  die Grenze samt Begründung in den prüfenden Code. An jede billigere Stufe gehört ihre
+  **gemessene Dauer mit Messdatum**, und ein Prüflauf druckt den Befehl mit, der seinen Fehler
+  billig reproduziert."
 
 - **Was bei jedem Start mitgelesen wird, wächst — und du bezahlst es jedes Mal.** Jede
   Ergänzung ist berechtigt; am teuersten die, die wiederholt, was eine Prüfung erzwingt.
@@ -494,8 +500,8 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   Rückstand beim Abtragen: Wer ihn behebt, fasst die Datei an und schuldet neu.
   → *Prompt:* „Binde jede Prüfpflicht an den **einzelnen Beitrag**, nie an einen offenen Zeitraum,
   und buch ein Veto gegen den **Befund**: trenne **gelesen** von bloß berührt, quittiere eine
-  Reparaturkette am **Endzustand** als einen Beitrag, mach neue Befunde derselben Datei zum eigenen
-  Ticket. Eine Verweigerung nennt ihren **Grund**, nie ihren Bestand; sieht eine Pflicht
+  Reparaturkette am **Endzustand** als einen Beitrag, mach neue Befunde derselben Datei zum
+  eigenen Ticket. Eine Verweigerung nennt ihren **Grund**, nie ihren Bestand; sieht eine Pflicht
   unerfüllbar aus, prüf zuerst dein **Messgerät**."
 
 - **Zwei Prüfungen, die einander widersprechen — Gehorsam sieht aus wie ein Verstoß.** Die eine verlangt,
@@ -507,23 +513,21 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   Zug, der **beide** Auflagen erfüllt? Wenn nicht, ist nicht die Sitzung schuld."
 
 - **Die Warnung stand dreimal da und feuerte nie — sie lag unter der falschen Überschrift.**
-  Derselbe Fehler zum dritten Mal, obwohl er als Absatz, als Fallstrick und als gemessene Regel
-  notiert war: Abgelegt war er unter seinem **Thema**, gebraucht wurde er dort, wo die
-  widersprechende Aufforderung ankam — im Wortlaut des Wächters, der zur Vorarbeit drängt.
-  → *Prompt:* „Schreib die Ausnahme in den Text **dessen, der auffordert**, nicht in das Kapitel,
-  das thematisch passt. Prüffrage bei jeder neuen Regel: An welcher **Stelle im Ablauf** wird sie
-  gelesen — und steht sie dort. Eine Regel, die dreimal überlesen wurde, ist nicht zu schwach
-  formuliert, sondern am falschen Ort abgelegt."
+  Derselbe Fehler zum dritten Mal, obwohl als Absatz, Fallstrick und gemessene Regel notiert:
+  abgelegt unter seinem **Thema**, gebraucht dort, wo die widersprechende Aufforderung ankam —
+  im Wortlaut des Wächters, der zur Vorarbeit drängt.
+  → *Prompt:* „Schreib die Ausnahme in den Text **dessen, der auffordert**, nicht ins thematisch
+  passende Kapitel. An welcher **Stelle im Ablauf** wird eine Regel gelesen — und steht sie dort?
+  Eine überlesene Regel ist nicht zu schwach formuliert, sondern falsch abgelegt."
 
-- **Die Anweisung hebt ihre eigene Voraussetzung auf.** Ein Ablauf verlangt, erst eine Markierung zu
-  setzen und sie dann zu veröffentlichen — doch das Veröffentlichen zählt als Arbeit, und Arbeit löscht
-  die Markierung. Dieselbe Falle als Sperre: Ihr Notausgang musste eine Datei schreiben, und genau das
-  untersagte sie als Erstes.
-  → *Prompt:* „Spiel jede neue Durchsetzung als **wörtlichen Gehorsam** durch und probiere
-  ihren Notausgang **unter** der Sperre aus. Prüffrage: Zerstört die vorgeschriebene
-  Handlungsfolge ihre eigene Voraussetzung — oder setzt der Ausweg eine Fähigkeit voraus, die
-  die Sperre gerade entzieht? Und nimmt deine **Ausnahme** nur die **Prüfung** aus oder auch
-  ihre **Abhilfe**?"
+- **Die Anweisung hebt ihre eigene Voraussetzung auf.** Ein Ablauf verlangt, erst eine Markierung
+  zu setzen und sie dann zu veröffentlichen — doch Veröffentlichen zählt als Arbeit, und Arbeit
+  löscht die Markierung. Dieselbe Falle als Sperre: Ihr Notausgang musste eine Datei schreiben —
+  genau das untersagte sie.
+  → *Prompt:* „Spiel jede neue Durchsetzung als **wörtlichen Gehorsam** durch und probier ihren
+  Notausgang **unter** der Sperre. Zerstört die Folge ihre Voraussetzung, oder setzt der Ausweg
+  eine Fähigkeit voraus, die die Sperre entzieht? Nimmt deine **Ausnahme** nur die **Prüfung**
+  aus oder auch ihre **Abhilfe**?"
 
 - **Der Rückfall rettet die Funktion und setzt still eine Vereinbarung aus.** Fällt der zweite
   Anbieter aus — oder fehlt die Datei, die deine Regel einstellt —, verhält sich jedes Werkzeug
@@ -618,4 +622,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 3fdacb852eb0b5902058a2454569bcb4d83686080808fe8ac99d05147714b855 -->
+<!-- GUIDE-FINGERPRINT: c3bb3722daf21e87c77bc04eea0c34f306b98c6dfde841e18cef795c0927278d -->

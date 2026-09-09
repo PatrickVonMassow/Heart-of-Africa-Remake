@@ -60,6 +60,7 @@ import {
   removeVdzk,
   resolveCardText,
   setCardStatus,
+  setCardTimes,
   setCardTitle,
   toClosingWork,
   toNoCurrentWork,
@@ -247,6 +248,10 @@ try {
     if (!point || words.length === 0) throw new Error('usage: board.mjs status <point> "<text>"|--text-stdin')
     const at = berlinStamp()
     edit((html) => setCardStatus(html, point, textOf(words), at), `status of ${point} restated (Stand ${at})`)
+  } else if (cmd === 'eta') {
+    const [point, when] = rest
+    if (!point || !when) throw new Error('usage: board.mjs eta <point> "<HH:MM>"')
+    edit((html) => setCardTimes(html, point, when), `${point} is now expected to be done by ~${when}`)
   } else if (cmd === 'paused') {
     // THERE IS NOTHING TO COMMAND HERE ANY MORE (point 749). A pause used to be
     // written — first as a user-decision card, then briefly onto the running
@@ -465,7 +470,7 @@ try {
     })
   } else {
     console.error(
-      'usage: board.mjs now|status|title|queue <point> "<text>" | ' +
+      'usage: board.mjs now|status|title|queue <point> "<text>" | eta <point> "<HH:MM>" | ' +
         'done <point> ["<text>"] [--next <m> "<status>" | --none "<reason>"] | ' +
         'none "<reason>" | closing <point> ["--title <Betreff>"] "<reason>" | ' +
         'vdzk-add [--automated] "<title>" "<question>" | vdzk-remove "<title>" | ' +
