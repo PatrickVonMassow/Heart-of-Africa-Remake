@@ -1014,11 +1014,22 @@ function Kids({
         // Standing because it was TOLD to (point 481), not because it stalled —
         // the difference between an obeyed stillness and the reported snag.
         held: c.held,
+        // Where it is in the climb onto the off-game boulder, and how high its
+        // feet stand (work-order 1080) — so a picture check can WAIT for the
+        // frame in which a child is up on the stone rather than shooting the
+        // roaming quarter and hoping.
+        climb: (c as BankChild).climb ?? 'none',
+        lift: (c as BankChild).lift ?? 0,
         walked: c.walked,
         // And how much of that walking happened while the round was ON — the
         // settlement's own counter, for the same reason (point 656).
         walkedWhilePlaying: c.walkedWhilePlaying,
       })),
+      /** The stone the off-game ROCK is climbed and spoken at, with the size the
+       *  climb is played against (work-order 1080). Published rather than
+       *  re-derived by the check, so the picture is judged against the boulder
+       *  the settlement actually chose. Null where this round has no stage. */
+      boulder: stage ? { ...stage.boulder } : null,
     })
     // What the group has SAID so far this visit (point 481), by situation — a
     // live check can read the coverage the pure tests pin.
@@ -1031,7 +1042,7 @@ function Kids({
       delete w.__placeTag
       delete w.__placeChildSpeech
     }
-  }, [round, game, speech, children, x, z, playRadius])
+  }, [round, game, speech, children, stage, x, z, playRadius])
 
   return (
     <>

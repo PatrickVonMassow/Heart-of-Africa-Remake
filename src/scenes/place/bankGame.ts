@@ -939,7 +939,15 @@ function advanceBankGame(
   if (
     s.phase === 'roam' &&
     s.phaseFor <= 0 &&
-    (s.namedBoulder || s.abandonedBoulder)
+    (s.namedBoulder || s.abandonedBoulder) &&
+    // …AND NOBODY IS STILL UP ON THE STONE (work-order 1080). The naming happens
+    // at the TOP of the climb, and the phase clock has usually run out by then,
+    // so without this the cycle opened on the same frame the word fell and
+    // `openCycle` put the climber back on the ground: the player heard ROCK and
+    // saw the child already walking away from a rock it never stood on. The
+    // climb is bounded by its own three lengths, so this can only ever hold the
+    // cycle for the seconds the child needs to come down.
+    !s.children.some(onStone)
   ) {
     openCycle(s, stage, cfg)
   }

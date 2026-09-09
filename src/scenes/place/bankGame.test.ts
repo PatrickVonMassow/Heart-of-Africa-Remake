@@ -617,6 +617,40 @@ describe('the children`s game at the bank (point 687)', () => {
     expect(roam.children[0].climb).toBe('top')
   })
 
+  it('never opens the cycle out from under a child still standing on the stone', () => {
+    // The word falls at the TOP of the climb, and by then the roaming phase's own
+    // clock has usually run out — so the cycle was free to open on the very frame
+    // the boulder was named, and `openCycle` put the climber back on the ground
+    // mid-hold. What the player got was ROCK spoken by a child already walking
+    // away from a rock he never saw it on. Replayed at a roaming phase far
+    // shorter than the climb, which is the case that made it visible.
+    const cfg: BankConfig = { ...CFG, roamSeconds: 0.1, roamSpread: 0 }
+    const world = openWorld()
+    const b = STAGE.boulder
+    for (const seed of SEEDS) {
+      const rand = mulberry32(seed)
+      const s = createBankGame([{ x: b.x - 4, z: b.z + 3 }], rand, cfg)
+      const c = s.children[0]
+      let sawTop = false
+      let leftRoamWhileUp = false
+      let heldFor = 0
+      for (let t = 0; t < 60; t += 1 / 60) {
+        stepBankGame(s, 1 / 60, cfg, STAGE, world, rand)
+        if (c.climb === 'top') {
+          sawTop = true
+          heldFor += 1 / 60
+        }
+        if (s.phase !== 'roam' && c.climb !== 'none') leftRoamWhileUp = true
+        if (sawTop && s.phase !== 'roam') break
+      }
+      expect(sawTop).toBe(true)
+      expect(leftRoamWhileUp).toBe(false)
+      // …and the hold it got was its own full length, not whatever was left of a
+      // phase that had already expired.
+      expect(heldFor).toBeGreaterThan(cfg.climbHoldSeconds - 0.05)
+    }
+  })
+
   // THE CLIMB ITSELF (work-order 1080). What shipped before this point was a
   // flag: `climbing` went true for 0.35 s while the child stood 2.2 m from the
   // boulder's centre and the view lifted it 0.32 m where it stood. Every
