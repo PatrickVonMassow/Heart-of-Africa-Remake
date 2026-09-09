@@ -5379,10 +5379,16 @@ if (section('adult-errands')) {
           const cam = window.__placeCamera
           const v = window.__placeErrands().villagers[who]
           if (!p || !cam || !v || !v.headJar || v.carry !== 'fullJar') return null
+          // The camera's WORLD position, not its `.position` — that one is local
+          // to the rig it hangs in, and reading it as a world point aimed this
+          // shot from the origin: the frame came back a wide village view with
+          // the carrier a speck by the water (measured 09.09.2026).
+          const eye = new (Object.getPrototypeOf(cam.position).constructor)()
+          cam.getWorldPosition(eye)
           p.yaw = Math.atan2(-(v.x - p.x), -(v.z - p.z))
-          const flat = Math.hypot(v.headJar.x - cam.position.x, v.headJar.z - cam.position.z)
-          p.pitch = Math.atan2(v.headJar.surface - cam.position.y, Math.max(flat, 1e-6))
-          return { x: v.headJar.x, y: v.headJar.y, z: v.headJar.z, surface: v.headJar.surface }
+          const flat = Math.hypot(v.headJar.x - eye.x, v.headJar.z - eye.z)
+          p.pitch = Math.atan2(v.headJar.surface - eye.y, Math.max(flat, 1e-6))
+          return { x: v.headJar.x, y: v.headJar.y, z: v.headJar.z, surface: v.headJar.surface, flat }
         }, placed)
         if (!aimed) {
           missed = 'he set the jar down between the camera being placed and the shutter'
@@ -5405,8 +5411,9 @@ if (section('adult-errands')) {
         await frame('1065-carrier-walks-back-full', {
           local: { x: aimed.x, y: aimed.surface, z: aimed.z },
           label:
-            `the carrier walking back with the full jar: the water surface standing at the rim of the ` +
-            `open jar on his head (${aimed.surface.toFixed(2)} m)`,
+            `the carrier walking back with the full jar up on his head, seen from the shore ` +
+            `${aimed.flat.toFixed(1)} m off; its water surface measured at the rim ` +
+            `(${aimed.surface.toFixed(2)} m) — the water itself is read from above in the stand frame`,
         })
       }
       check(
