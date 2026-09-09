@@ -1214,6 +1214,16 @@ function Kids({
             tapFor: bank.tapFor,
             end,
             rock: { x: rock.x, z: rock.z },
+            // WHICH SIDE THE REACH HANGS OFF. The touching hand is the LEFT one
+            // and the child faces the stone, so from the wrong flank the body
+            // stands in front of its own contact — the same miss the dip shot
+            // had. The picture check picks its side from this offset rather
+            // than assuming one (work-order 1065).
+            body: (() => {
+              const b = new THREE.Vector3()
+              g.getWorldPosition(b)
+              return { x: b.x, z: b.z }
+            })(),
             gesture: gestures.current[i]?.current?.kind ?? null,
             // Seconds the gesture has been running, so the swing can be placed
             // on its own clock rather than on the hold's.

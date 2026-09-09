@@ -4568,22 +4568,26 @@ if (section('children-bank-game')) {
     // the verdict, which is why the same code went green on WebGPU and red on
     // WebGL 2. He is therefore stood BETWEEN the two play rocks first, and the
     // stand is asserted rather than assumed.
-    const earshot = await page.evaluate(() => {
-      const L = window.__placeLayout
-      const p = window.__placePlayer
-      if (!L?.playRocks || !p) return null
-      const near = L.playRocks.upstream
-      const far = L.playRocks.downstream
-      p.x = (near.x + far.x) / 2
-      p.z = (near.z + far.z) / 2
-      p.pitch = -0.05
-      p.yaw = Math.atan2(far.x - p.x, far.z - p.z)
-      return {
-        radius: window.__balance.communication.hearingRadius,
-        toNear: Math.hypot(near.x - p.x, near.z - p.z),
-        toFar: Math.hypot(far.x - p.x, far.z - p.z),
-      }
-    })
+    // The stance itself is one function, because the shot below borrows the
+    // traveller and has to hand him back to exactly this spot.
+    const restoreEarshotStance = () =>
+      page.evaluate(() => {
+        const L = window.__placeLayout
+        const p = window.__placePlayer
+        if (!L?.playRocks || !p) return null
+        const near = L.playRocks.upstream
+        const far = L.playRocks.downstream
+        p.x = (near.x + far.x) / 2
+        p.z = (near.z + far.z) / 2
+        p.pitch = -0.05
+        p.yaw = Math.atan2(far.x - p.x, far.z - p.z)
+        return {
+          radius: window.__balance.communication.hearingRadius,
+          toNear: Math.hypot(near.x - p.x, near.z - p.z),
+          toFar: Math.hypot(far.x - p.x, far.z - p.z),
+        }
+      })
+    const earshot = await restoreEarshotStance()
     check(
       'the traveller stands within earshot of BOTH play rocks, so a tap has an arm at all',
       !!earshot && Math.max(earshot.toNear, earshot.toFar) <= earshot.radius,
@@ -4603,14 +4607,42 @@ if (section('children-bank-game')) {
     let tapShot = false
     const holdTrace = []
     /** A spectator's stance in the lane, four metres off and level with the
-     *  contact, so a hand and a stone read as two things. */
+     *  contact, so a hand and a stone read as two things.
+     *
+     *  AND ON THE SIDE THE ARM IS ON (work-order 1065). The quarter-turn used to
+     *  be added blind, and the touching hand is the LEFT one on a child that
+     *  FACES the stone: from the other flank the child's own body and head stand
+     *  in front of the contact, and the frame declared a hand on a flank while
+     *  showing a child leaning against a rock with its visible arm hanging
+     *  (measured 10.09.2026, WebGPU). The offset between the drawn hand and the
+     *  drawn body says which side to stand on — the same reading that settled
+     *  the dip shot. */
     const aimAtTap = async (hand) =>
       !!(await page.evaluate((h) => {
         const p = window.__placePlayer
         if (!p) return null
         const bearing = Math.atan2(h.x - h.rock.x, h.z - h.rock.z)
-        p.x = h.rock.x + Math.sin(bearing + 0.9) * 4.2
-        p.z = h.rock.z + Math.cos(bearing + 0.9) * 4.2
+        const at = (s) => ({
+          x: h.rock.x + Math.sin(bearing + 0.9 * s) * 4.2,
+          z: h.rock.z + Math.cos(bearing + 0.9 * s) * 4.2,
+        })
+        // The side is CHOSEN, not assumed, and by the thing that matters: from
+        // which of the two does the drawn hand stand clear of the drawn body?
+        // That is the hand's distance from the eye→body line, and asking it
+        // beats deriving a handedness convention that the figure, the yaw and
+        // the camera each spell differently.
+        const clearance = (c) => {
+          const b = h.body
+          if (!b) return 0
+          const dx = b.x - c.x
+          const dz = b.z - c.z
+          const len = Math.hypot(dx, dz)
+          if (!(len > 1e-6)) return 0
+          return Math.abs(dz * (h.x - c.x) - dx * (h.z - c.z)) / len
+        }
+        const stand = clearance(at(1)) >= clearance(at(-1)) ? at(1) : at(-1)
+        p.x = stand.x
+        p.z = stand.z
         p.yaw = Math.atan2(-(h.x - p.x), -(h.z - p.z))
         p.pitch = -0.1
         return { x: p.x, z: p.z }
@@ -4684,6 +4716,14 @@ if (section('children-bank-game')) {
                 `(${(now.gap * 100).toFixed(1)} cm gap at ${now.y.toFixed(2)} m) while it names ROCK`,
             })
             tapShot = true
+            // AND THE STANCE GOES BACK (work-order 1065). The traveller is the
+            // LISTENER as well as the camera, and this shot walks him 4.2 m off
+            // one rock — from the far flank the next round's stone falls outside
+            // the hearing radius and its tap is armless by design, which this
+            // section then reads as a tap from the waiting station (measured
+            // 10.09.2026: 60.9 cm, the word carrying 8.5 m). He is put back
+            // between the two rocks, where the earshot check above stood him.
+            await restoreEarshotStance()
           }
         }
       }
