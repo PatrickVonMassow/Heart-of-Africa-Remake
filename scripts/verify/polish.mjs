@@ -3994,9 +3994,19 @@ if (section('children-bank-game')) {
   // spectator-time knob, not a weakened assertion.
   const shippedRoam = await page.evaluate(() => {
     const b = window.__balance.villageLife.bankGame
-    const was = { roamSeconds: b.roamSeconds, roamGuardSeconds: b.roamGuardSeconds }
+    const was = {
+      roamSeconds: b.roamSeconds,
+      roamGuardSeconds: b.roamGuardSeconds,
+      tapPauseSeconds: b.tapPauseSeconds,
+    }
     b.roamSeconds = 8
     b.roamGuardSeconds = 8
+    // AND THE TAP IS HELD LONG ENOUGH TO PHOTOGRAPH (work-order 1065). The
+    // shipped pause is 1.5 s, which is right for a player and shorter than a
+    // headless shutter; the pose, the contact and the word are the SAME code
+    // path at 9 s. It is a spectator-time knob, like the roam above, and the
+    // shipped length is what `bankGame.test.ts` measures the hold against.
+    b.tapPauseSeconds = 9
     return was
   })
   await goToPlace('bambara-village')
@@ -4536,6 +4546,321 @@ if (section('children-bank-game')) {
       }
     }
   }
+  // --- THE TAPPING CHILD'S HAND ON ITS STONE (work-order 1065) ----------------
+  //
+  // The user watched a child say ROCK standing a metre off the rock it named and
+  // read the word as "go!". The Vitest layer proves the SOLVE — where to stand,
+  // which way to reach — against the mesh's own silhouette; what only the browser
+  // can settle is that the drawn hand ends on the drawn stone. So the reading is
+  // taken off the SCENE GRAPH: the hand mesh's world position, the flank the
+  // instanced rock presents at that height and bearing, and the gap between them.
+  if (staged) {
+    const holdSeconds = await page.evaluate(
+      () => window.__balance?.villageLife?.bankGame?.tapPauseSeconds ?? 0,
+    )
+    // THE TAP MUST BE WITHIN EARSHOT, OR THERE IS NO ARM TO MEASURE (work-order
+    // 1065). A gesture carries exactly as far as the voice (point 580), so a tap
+    // spoken further off than the hearing radius is deliberately ARMLESS — and
+    // this section then measured the hearing gate rather than the touch: on
+    // WebGL 2 it read 57.8 cm with the shoulder at REST, written and drawn
+    // alike, 40 ms into a nine-second hold, where no gesture can have expired.
+    // Whichever side of the radius the traveller happened to be left on decided
+    // the verdict, which is why the same code went green on WebGPU and red on
+    // WebGL 2. He is therefore stood BETWEEN the two play rocks first, and the
+    // stand is asserted rather than assumed.
+    // The stance itself is one function, because the shot below borrows the
+    // traveller and has to hand him back to exactly this spot.
+    const restoreEarshotStance = () =>
+      page.evaluate(() => {
+        const L = window.__placeLayout
+        const p = window.__placePlayer
+        if (!L?.playRocks || !p) return null
+        const near = L.playRocks.upstream
+        const far = L.playRocks.downstream
+        p.x = (near.x + far.x) / 2
+        p.z = (near.z + far.z) / 2
+        p.pitch = -0.05
+        p.yaw = Math.atan2(far.x - p.x, far.z - p.z)
+        return {
+          radius: window.__balance.communication.hearingRadius,
+          toNear: Math.hypot(near.x - p.x, near.z - p.z),
+          toFar: Math.hypot(far.x - p.x, far.z - p.z),
+        }
+      })
+    const earshot = await restoreEarshotStance()
+    check(
+      'the traveller stands within earshot of BOTH play rocks, so a tap has an arm at all',
+      !!earshot && Math.max(earshot.toNear, earshot.toFar) <= earshot.radius,
+      earshot
+        ? `${earshot.toNear.toFixed(1)} m and ${earshot.toFar.toFixed(1)} m from the two rocks, ` +
+          `hearing radius ${earshot.radius} m — the tapper stands a rock's radius nearer still`
+        : 'the layout or the player was not readable',
+    )
+    let bestTouch = null
+    let sawTouchPose = false
+    let stationTap = null
+    let looseTouch = null
+    let opening = null
+    let inHold = false
+    let heldToTheEnd = false
+    let tapAimed = false
+    let tapShot = false
+    const holdTrace = []
+    /** A spectator's stance in the lane, four metres off and level with the
+     *  contact, so a hand and a stone read as two things.
+     *
+     *  AND ON THE SIDE THE ARM IS ON (work-order 1065). The quarter-turn used to
+     *  be added blind, and the touching hand is the LEFT one on a child that
+     *  FACES the stone: from the other flank the child's own body and head stand
+     *  in front of the contact, and the frame declared a hand on a flank while
+     *  showing a child leaning against a rock with its visible arm hanging
+     *  (measured 10.09.2026, WebGPU). The offset between the drawn hand and the
+     *  drawn body says which side to stand on. */
+    const aimAtTap = async (hand) =>
+      !!(await page.evaluate((h) => {
+        const p = window.__placePlayer
+        if (!p) return null
+        const bearing = Math.atan2(h.x - h.rock.x, h.z - h.rock.z)
+        const at = (s) => ({
+          x: h.rock.x + Math.sin(bearing + 0.9 * s) * 4.2,
+          z: h.rock.z + Math.cos(bearing + 0.9 * s) * 4.2,
+        })
+        // The side is CHOSEN, not assumed, and by the thing that matters: from
+        // which of the two does the drawn hand stand clear of the drawn body?
+        // That is the hand's distance from the eye→body line, and asking it
+        // beats deriving a handedness convention that the figure, the yaw and
+        // the camera each spell differently.
+        const clearance = (c) => {
+          const b = h.body
+          if (!b) return 0
+          const dx = b.x - c.x
+          const dz = b.z - c.z
+          const len = Math.hypot(dx, dz)
+          if (!(len > 1e-6)) return 0
+          return Math.abs(dz * (h.x - c.x) - dx * (h.z - c.z)) / len
+        }
+        const stand = clearance(at(1)) >= clearance(at(-1)) ? at(1) : at(-1)
+        p.x = stand.x
+        p.z = stand.z
+        p.yaw = Math.atan2(-(h.x - p.x), -(h.z - p.z))
+        p.pitch = -0.1
+        return { x: p.x, z: p.z }
+      }, hand))
+    // THE BUDGET IS THE HOLD'S OWN LENGTH, NOT A ROUND NUMBER (work-order 1065).
+    // INSIDE a hold this loop steps ONE frame per turn, so reading a hold from
+    // the word to its far side costs as many turns as the lane draws frames in
+    // `tapPauseSeconds` — and 400 does not cover a nine-second hold on WebGL 2.
+    // It ran out INSIDE a hold and then failed its own coverage check: measured
+    // 09.09.2026, 49 readings into the current hold on one run and 140 on the
+    // next. That is not a hand that never arrived, it is a loop out of turns.
+    // Sized for two whole holds at a pessimistic 60 fps plus the walk to the
+    // stone, so the loop leaves because it is FINISHED, never because it is
+    // spent — and the coverage check below therefore means what it says.
+    const sampleBudget = Math.ceil(holdSeconds * 60) * 2 + 300
+    for (let i = 0; i < sampleBudget; i++) {
+      const now = await page.evaluate(() => (window.__placeTapHand ? window.__placeTapHand() : null))
+      if (now) {
+        if (now.gesture === 'touch') sawTouchPose = true
+        if (!bestTouch || Math.abs(now.gap) < Math.abs(bestTouch.gap)) bestTouch = now
+        // ...and the WORST reading WHILE THE WORD IS FALLING, which is where the
+        // old defect lived: a hand out at the waiting station as ROCK is spoken.
+        // The window is the tap's own hold (`tapFor` running in the run phase),
+        // NOT the touch gesture: the gesture outlives the moment it belongs to,
+        // so a child that is tapper twice in a row is still flagged 'touch' while
+        // it walks to the stone for the next round, and measuring that walk
+        // measures a gait rather than an utterance (08.09.2026, 58.3 cm).
+        const holding = now.phase === 'run' && now.tapFor > 0
+        // THE SHAPE OF THE HOLD, not only its worst reading. A hand that never
+        // arrives and a hand that arrives one frame late produce the same worst
+        // number; only the curve tells them apart, and only the written-against-
+        // drawn pair says whether a late arrival is the pose or the drawing of
+        // it (work-order 1065).
+        // COVERAGE IS PER HOLD, NEVER CARRIED ACROSS ONE. A latched flag would
+        // let the loop leave INSIDE a later hold on readings taken during an
+        // earlier one, which is the same coin toss in a longer disguise: the
+        // trace is therefore restarted at every hold and only a hold that was
+        // read from the word to its far side counts (GPT-6 Astra, second round).
+        if (holding) {
+          if (!inHold) {
+            inHold = true
+            holdTrace.length = 0
+            stationTap = null
+          }
+          holdTrace.push(now)
+        } else if (inHold) {
+          inHold = false
+          heldToTheEnd = holdTrace.length >= 6
+        }
+        if (now.opening && (!opening || now.opening.tapper !== opening.tapper)) opening = now.opening
+        if (holding && (!stationTap || Math.abs(now.gap) > Math.abs(stationTap.gap))) stationTap = now
+        if (now.gesture === 'touch' && !holding && (!looseTouch || Math.abs(now.gap) > Math.abs(looseTouch.gap))) {
+          looseTouch = now
+        }
+        // THE SHUTTER FALLS INSIDE THE HOLD, NOT AFTER IT (work-order 1065).
+        // The picture used to be taken once the sampling loop had run THROUGH
+        // the hold — so the frame declared "its hand on the drawn flank while it
+        // names ROCK" and contained a child standing two metres off the stone
+        // with its arm at its side, which is the very defect this section
+        // exists to catch (08.09.2026). Aiming costs one frame, so the camera is
+        // placed on the first good holding reading and the shutter falls on the
+        // next one, both still inside the hold.
+        if (holding && !tapShot && Math.abs(now.gap) <= 0.06) {
+          if (!tapAimed) {
+            tapAimed = await aimAtTap(now)
+          } else {
+            await frame('1065-tapping-child-at-its-rock', {
+              local: { x: now.x, y: now.y, z: now.z },
+              label:
+                `the tapping child at its rock: its hand on the drawn flank of the stone ` +
+                `(${(now.gap * 100).toFixed(1)} cm gap at ${now.y.toFixed(2)} m) while it names ROCK`,
+            })
+            tapShot = true
+            // AND THE STANCE GOES BACK (work-order 1065). The traveller is the
+            // LISTENER as well as the camera, and this shot walks him 4.2 m off
+            // one rock — from the far flank the next round's stone falls outside
+            // the hearing radius and its tap is armless by design, which this
+            // section then reads as a tap from the waiting station (measured
+            // 10.09.2026: 60.9 cm, the word carrying 8.5 m). He is put back
+            // between the two rocks, where the earshot check above stood him.
+            await restoreEarshotStance()
+          }
+        }
+      }
+      // ONE READING OF A HOLD IS A COIN TOSS. The loop used to stop at its first
+      // good reading, so which single frame of a nine-second hold got measured
+      // was luck — and the worst-reading check below then went red or green at
+      // random on the same code (measured 08.09.2026). It now reads the hold at
+      // every frame and runs THROUGH IT: a hand that arrives and then leaves
+      // again is caught only by staying to the end, so the loop leaves on the
+      // far side of a hold, never inside one.
+      // …and never from inside a hold: `inHold` is the current sample's own state,
+      // so the loop can only leave on the far side of one.
+      if (bestTouch && Math.abs(bestTouch.gap) <= 0.06 && sawTouchPose && heldToTheEnd && !inHold) break
+      await nextFrames(now && now.phase === 'run' && now.tapFor > 0 ? 1 : 2)
+    }
+    check(
+      'the tapping child reaches its stone at all (work-order 1065)',
+      !!bestTouch,
+      bestTouch ? `child ${bestTouch.tapper} at the ${bestTouch.end} rock` : 'no tapper was ever designated',
+    )
+    if (bestTouch) {
+      // THE DRAWN HAND MEETS THE DRAWN FLANK. The tolerance is the round's own
+      // 3 cm plus the 3 cm a walking child settles within, measured on the
+      // instanced stone rather than on a nominal radius.
+      check(
+        'and its DRAWN hand rests on the stone`s DRAWN flank, not a metre off it',
+        Math.abs(bestTouch.gap) <= 0.06,
+        `hand ${bestTouch.hand} at ${bestTouch.radius.toFixed(3)} m from the stone axis, its flank ` +
+          `${bestTouch.flank.toFixed(3)} m there — gap ${(bestTouch.gap * 100).toFixed(1)} cm ` +
+          `at height ${bestTouch.y.toFixed(2)} m`,
+      )
+      check(
+        'and the tap really is a TOUCH, held on the stone while the word falls',
+        sawTouchPose,
+        sawTouchPose ? 'the touch pose was seen running on the tapper' : 'the tapper never held a touch',
+      )
+      check(
+        'and the whole hold was read, not one frame of it',
+        heldToTheEnd && !inHold,
+        heldToTheEnd && !inHold
+          ? `${holdTrace.length} readings across one hold, from the word to its far side`
+          : `the sampling left while a hold was still running (${holdTrace.length} readings ` +
+            'in the current one) — a hand that arrives and then leaves again would not be seen',
+      )
+      if (stationTap) {
+        // WHAT A READING IS, in one place, because the worst one and the frames
+        // around it have to be comparable at a glance. Four numbers decide
+        // between the three ways this check can go red, and reading them off the
+        // scene costs nothing (work-order 1065):
+        //  - `gap`      — the hand off the drawn flank.
+        //  - `r <radius>`— the hand's distance from the stone's AXIS. A gap that
+        //    grows while this stays put is an ARM returning to rest; a gap that
+        //    grows WITH it is a BODY that was moved off its stand.
+        //  - the gesture's KIND and its own AGE. A touch is issued for the hold
+        //    plus its fade-out, so an age short of that with the kind already
+        //    gone means the gesture was REPLACED, and one past it means the two
+        //    clocks ran at different speeds.
+        //  - `written`/`drawn` — the pose this component wrote against the pose
+        //    the figure is really drawn with, which is the render-lag reading.
+        const reading = (r) =>
+          `[${r.tapFor.toFixed(2)}s ${(r.gap * 100).toFixed(0)}cm r${r.radius.toFixed(2)} ` +
+          `${r.gesture ?? 'rest'}@${typeof r.gestureAge === 'number' ? r.gestureAge.toFixed(2) : '-'} ` +
+          `written ${r.written ? r.written.leftPitch.toFixed(2) + '/' + r.written.rightPitch.toFixed(2) : '-'} ` +
+          `drawn ${(r.drawn ?? []).map((a) => a.pitch.toFixed(2)).join('/') || '-'}]`
+        // THE WINDOW AROUND THE WORST READING, not the hold's first six frames.
+        // The old text printed the opening of the hold, and this defect happens
+        // at its END — so every failure so far showed six frames of a hand
+        // resting on its stone and said nothing at all about the moment it left
+        // (measured 10.09.2026: the trace read 1 cm six times while the check
+        // failed at 61.1 cm). The opening is still worth one frame, so it is
+        // kept and the window is spliced in after it.
+        const worst = holdTrace.indexOf(stationTap)
+        const around =
+          worst < 0
+            ? holdTrace.slice(0, 6)
+            : [holdTrace[0], ...holdTrace.slice(Math.max(1, worst - 3), worst + 4)]
+        check(
+          'and no tap is ever spoken from the waiting station',
+          Math.abs(stationTap.gap) <= 0.06,
+          `the worst reading while the word was falling stood ${(stationTap.gap * 100).toFixed(1)} cm ` +
+            `off the flank, ${stationTap.tapFor.toFixed(2)} s into the hold's remainder, ` +
+            `with the ${stationTap.gesture ?? 'rest'} gesture ` +
+            `${typeof stationTap.gestureAge === 'number' ? stationTap.gestureAge.toFixed(2) + ' s' : 'an unread time'} old ` +
+            `and its hand ${stationTap.radius.toFixed(2)} m from the stone's axis ` +
+            `(the word carried ` +
+            `${typeof stationTap.opening?.heardFrom === 'number' ? stationTap.opening.heardFrom.toFixed(1) + ' m' : 'an unread distance'}` +
+            ` to the traveller; beyond the hearing radius there is no arm to measure, by design) ` +
+            `(the hold runs from ${holdSeconds.toFixed(2)} s down to 0, so a reading near the top ` +
+            `is the arm still swinging in and one near 0 is it swinging back out; a touch is issued ` +
+            `for the hold plus its fade-out, so its age should reach ` +
+            `${holdSeconds.toFixed(2)} s and no gesture can expire inside the hold)` +
+            (looseTouch
+              ? `; outside the hold the touch pose ran on as far as ${(looseTouch.gap * 100).toFixed(1)} cm ` +
+                `in phase ${looseTouch.phase}, which is the walk to the next round rather than a tap`
+              : '') +
+            `; the hold opened and then read, around the worst frame, ` +
+            around.map(reading).join(' '),
+        )
+      }
+      // AND THE FRAME THE WORD FALLS IN, measured when it fell rather than
+      // sampled for afterwards. A sampler reads one frame of a nine-second hold
+      // and which one is luck — this reading is taken by the scene itself, in
+      // the frame the tap is uttered, once that frame's pose is written AND
+      // applied. It is the check that would have named the one-frame render lag
+      // straight away (08.09.2026: 54 cm at the word, on the stone from the next
+      // frame on).
+      check(
+        'the utterance frame was recorded at all, so the reading below is owed',
+        !!opening,
+        opening
+          ? `child ${opening.tapper}'s tap recorded at the frame it fell`
+          : 'no utterance frame was recorded — the check below would otherwise pass unasked',
+      )
+      check(
+        'and the hand is on the stone in the very frame the word falls',
+        !!opening && Math.abs(opening.gap) <= 0.06,
+        opening
+          ? `child ${opening.tapper}: gap ${(opening.gap * 100).toFixed(1)} cm at the utterance, ` +
+            `shoulder drawn at ${opening.drawnPitch.toFixed(2)} rad against the ` +
+            `${opening.writtenPitch.toFixed(2)} rad written for that frame`
+          : 'unmeasured',
+      )
+
+      // THE PICTURE IS TAKEN ABOVE, INSIDE THE HOLD. What is left here is the
+      // honest report when no hold ever offered one — a silent missing frame
+      // would read as a suite that stopped short, and a frame taken now would
+      // claim a contact the scene is no longer showing.
+      check(
+        'and the contact was PHOTOGRAPHED while it was happening',
+        tapShot,
+        tapShot
+          ? 'the shutter fell inside the hold, on a reading within tolerance'
+          : `no hold offered a frame to shoot (aimed: ${tapAimed}) — the picture would have ` +
+            'been taken after the hand had already left the stone',
+      )
+    }
+  }
+
   // The world goes back as it was found: the shipped roaming phase, and the game
   // left outside the settlement — every section after this one would otherwise be
   // reading a village this one staged.
@@ -4543,6 +4868,7 @@ if (section('children-bank-game')) {
     const b = window.__balance.villageLife.bankGame
     b.roamSeconds = was.roamSeconds
     b.roamGuardSeconds = was.roamGuardSeconds
+    b.tapPauseSeconds = was.tapPauseSeconds
   }, shippedRoam)
   await page.evaluate(() => window.__game.getState().leavePlace())
   await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })

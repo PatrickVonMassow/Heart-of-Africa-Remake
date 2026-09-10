@@ -330,6 +330,24 @@ freeze of 01.09. is measurable: `scripts/` has since grown 6,700 rather than 75,
 No player impact and no mechanism to build — this is the evidence base for the open Umsteuerung
 measures 4–9, recorded so the next stocktaking does not have to re-derive it.
 
+## The play rock's measured radius is an upper bound, not the surface (measured 08.09.2026)
+
+`playRockSurface.ts` bins each triangle EDGE's crossing of a ring height by bearing and keeps
+the LARGEST radius in each bin (`measure`, ~line 93); `fillGaps` then copies a neighbour's
+radius into any bin no edge crossed. Both err outward: the drawn face between two vertices lies
+INSIDE the radius of those vertices, so the answer is the circumscribed radius of the facet,
+not the facet. `reachFrom` therefore places the touching hand a little too far out — a hair of
+air rather than a hand through the stone, which is the harmless direction. Magnitude, measured
+against the constants: `PROFILE_BINS = 32` gives 11.25° bins, and the lookup rounds to the
+NEAREST bin, so the worst chord sagitta on a 1.2 m rock is 1.2·(1−cos 5.625°) ≈ 5.8 mm — under
+a centimetre, against a spec tolerance of "a few centimetres, never through it"
+(work-order 1065 PART A). Found by GPT-6 Astra's cross-vendor review of d35e890 and rated P1
+there; the measurement above is why it is filed here instead: no reproducible player impact,
+no blockade, and nothing deleted or simplified by fixing it (CLAUDE.md §2 finding intake). The
+exact fix, if the tolerance ever tightens, is to intersect the requested radial ray with the
+actual triangle cross-section rather than binning its endpoints. Note that `fillGaps` has no
+such bound — a bin with no crossing takes a neighbour's radius whole — so a much coarser rock
+mesh would need this looked at again.
 ## The polish runtime expectation is a quarter of the measured one (measured 08.09.2026)
 
 `run-wait.mjs --plan polish` promises 5m 41s and 21 frames; the constant behind it
@@ -535,6 +553,24 @@ It cost nothing here: `--release` cleared all three and `.claude/wait-leases.jso
 empty state it is committed in. What it can cost is a session that believes the line and waits for
 a run nobody is running — the shape the whole await mechanism exists to prevent. The lease already
 records `pid` and `pidStartedAt`, so the liveness check is a comparison it can already make.
+
+## The fill frame's camera picks a side without checking it (09.09.2026)
+
+Non-blocking, collected. The frame of the water carrier now stands square to
+the walk into the water rather than on the line from the world origin, which is
+what made the dip legible at all. GPT-6 Astra pointed out in the same review
+that the perpendicular has TWO sides and the code takes one of them unchecked:
+with a bank that curves, the chosen anchor can land inside land even when the
+other side is open, and nothing measures clearance before the shutter.
+
+It is not a defect in the one village the PoC draws — the frame was judged and
+it carries its subject — so it stays collected rather than becoming a point.
+Whoever adds a second river village decides it there, with a ground sample at
+both candidates and the one nearer the carrier's own footing winning.
+
+The frame it describes was shed from feat/1065-teaching-hands-touch with the
+rest of the water carrier on 10.09.2026 and belongs to work-order 1087 now. The
+finding is kept here rather than deleted, because the camera will be rebuilt.
 
 - **`run-wait.mjs --await` resolves a relative log against the main worktree, then blames the caller.**
   Measured 10.09.2026. Called from a worktree with the log path relative to that worktree,

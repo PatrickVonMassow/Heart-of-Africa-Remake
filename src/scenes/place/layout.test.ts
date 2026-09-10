@@ -10,7 +10,7 @@ import {
   COMPOUND_RING_MIN,
   DIG_SITE_ANCHOR_REACH,
   DIG_SITE_FIELD_BAND,
-  PLAY_ROCK_RADIUS,
+  PLAY_ROCK_SPAN,
   WATER_PATH_HEAD_RADII,
   WATER_PATH_WIDTH,
   WAY_OUT_HALF_WIDTH,
@@ -486,9 +486,12 @@ describe('no settlement carries a lone teaching stone any more (work-order 688)'
       expect(rocks, id).not.toBeNull()
       if (!rocks) continue
       // The scatter runs scale 0.3-1.0 on a 0.5-radius blob, i.e. up to 0.5 m of
-      // footprint; a play rock's is PLAY_ROCK_RADIUS. It reads as A ROCK rather
-      // than as one more pebble.
-      for (const [, , s] of layout.rocks) expect(rocks.r).toBeGreaterThan(s * 0.5 * 2)
+      // footprint; a play rock's DRAWN span is PLAY_ROCK_SPAN. It reads as A
+      // ROCK rather than as one more pebble — which is a question about what is
+      // drawn, not about the collider behind it.
+      for (const [, , s] of layout.rocks) {
+        expect(ROCK_FOOTPRINT_UNITS * rocks.scale).toBeGreaterThan(s * 0.5 * 2)
+      }
     }
   })
 
@@ -500,8 +503,11 @@ describe('no settlement carries a lone teaching stone any more (work-order 688)'
     const village = placeById(ROCK_VILLAGE_ID)
     const rock = communicationRockSite(42)
     // SETTLEMENT SCALE, NOT WORLD SCALE. The drawn footprint follows from the
-    // instance scale and remains exactly the collider's PLAY_ROCK_RADIUS.
-    expect(ROCK_FOOTPRINT_UNITS * rocks.scale).toBeCloseTo(PLAY_ROCK_RADIUS, 6)
+    // instance scale and remains exactly PLAY_ROCK_SPAN. The collider is a
+    // SMALLER, separately measured number (see PLAY_ROCK_RADIUS): the span is
+    // the stone's widest ring, and it is nowhere near the ground.
+    expect(ROCK_FOOTPRINT_UNITS * rocks.scale).toBeCloseTo(PLAY_ROCK_SPAN, 6)
+    expect(rocks.r).toBeLessThan(ROCK_FOOTPRINT_UNITS * rocks.scale)
     // Distance: the play rocks are a walk down the bank, the erratic a journey.
     expect(Math.hypot(rocks.upstream.x, rocks.upstream.z)).toBeLessThan(layout.radius + 12)
     expect(Math.hypot(rock.lat - village.lat, rock.lon - village.lon)).toBeGreaterThan(1)

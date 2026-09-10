@@ -166,6 +166,39 @@ export function gaitPhase(distanceTravelled: number, cadence: number): number {
   return distanceTravelled * cadence
 }
 
+/** How fast a stopped figure plants its feet (phase radians per second). One
+ *  full cycle is 2π, so the furthest a stop can be from the neutral stance is
+ *  π — reached in a quarter second, which is a foot set down rather than a leg
+ *  slid across the ground. */
+export const RESTING_SETTLE_RATE = 4 * Math.PI
+
+/**
+ * The gait phase a figure that has STOPPED is drawn at (work-order 1065).
+ *
+ * The phase is a pure function of distance walked, which is right while walking
+ * and wrong the moment the walk ends: it freezes wherever the last step was
+ * interrupted, so a standing figure keeps one leg forward, one back and its body
+ * dipped by `gaitBodyLift` — the posture of a step it never finished.
+ *
+ * That dip is also a HEIGHT NOBODY MODELS. A reach solved in the figure's own
+ * frame puts the hand at `hy`; the renderer then draws the whole body up to
+ * 2.56 cm lower, and against a boulder that narrows towards its foot the hand
+ * misses the flank it was solved onto — measured 7.2 cm at the bambara upstream
+ * play rock, which is the tap the user read as "go!" rather than as ROCK.
+ *
+ * So a stopped figure returns to the nearest NEUTRAL phase, where both legs hang
+ * plumb and the body carries no dip. It arrives there EXACTLY rather than
+ * asymptotically: the contact this exists for is judged in centimetres, and an
+ * ease that only ever approaches its target would leave a residue in every one
+ * of them.
+ */
+export function restingPhase(phase: number, dt: number, rate = RESTING_SETTLE_RATE): number {
+  const target = Math.round(phase / (Math.PI * 2)) * Math.PI * 2
+  const step = Math.max(0, rate * dt)
+  const away = target - phase
+  return Math.abs(away) <= step ? target : phase + Math.sign(away) * step
+}
+
 /**
  * Hip rotation (rad about the body's local x) of one leg at a gait phase.
  * Diagonal legs carry a phaseOffset of π (a trot). Positive rotation swings the

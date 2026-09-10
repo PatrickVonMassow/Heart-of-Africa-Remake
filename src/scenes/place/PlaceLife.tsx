@@ -22,9 +22,11 @@ import {
   gaitRig,
   isStance,
   legSwingAngle,
+  restingPhase,
   type FootPlant,
 } from '../../render/fauna'
-import { FIGURE_LIMBS, TESSELLATION } from '../../render/figures'
+import { CHILD_FIGURE_SCALE, FIGURE_LIMBS, TESSELLATION } from '../../render/figures'
+import { applyFigurePose, restingArmRefs, type FigureLimbs } from '../../render/figurePose'
 import {
   advanceGesture,
   aimAt,
@@ -54,12 +56,15 @@ import type { RegionPlaceStyle } from './regionStyles'
 import { nudgeToFree, nudgeWhere, PLAYER_RADIUS, resolveMove, spawnPointFree, standingClear, tryNudgeToFree, WALKER_RADIUS, type Collider } from './collision'
 import { utteranceOf } from '../../communication/lexicon'
 import { insidePlace } from './boundary'
+import { playRockFlank } from './playRockSurface'
 import { standsOnGroundPlate, type PlaceRiverBank } from './riverBank'
 import { buildPlaceNavGrid, findPlaceRoute, navClearBetween, navRestrict, type NavPoint } from './routing'
 import { absorbSeparation, createTagGame, stepTagGame, type TagChild } from './tagGame'
 import {
   bankChildCanSeparate,
   createBankGame,
+  otherEnd,
+  rockAt,
   insideStrangerBerth,
   stepBankGame,
   type BankChild,
@@ -234,6 +239,7 @@ function Figure({
   role = 'villager',
   gesture,
   pose,
+  limbs,
   gait,
   handProp,
 }: {
@@ -250,6 +256,10 @@ function Figure({
   gesture?: RefObject<GestureState>
   /** A pose written by the caller each frame; wins over `gesture` when set. */
   pose?: RefObject<FigurePose | null>
+  /** Where to publish this figure's own pivots. A caller that supplies BOTH
+   *  this and `pose` owns the application and applies it itself, in the frame
+   *  it writes it — see `applyFigurePose` (work-order 1065). */
+  limbs?: RefObject<FigureLimbs | null>
   /** Gait phase (rad) driving the leg swing — the caller accumulates the
    *  distance walked, because only it knows this figure's world scale. */
   gait?: RefObject<number>
@@ -279,6 +289,26 @@ function Figure({
   const trunk = useRef<THREE.Group>(null)
   const arms = useRef<Array<THREE.Group | null>>([])
   const legPivots = useRef<Array<THREE.Group | null>>([])
+  // A PIVOT IS PUT AT REST WHEN IT IS BORN, NOT AT EVERY RENDER (work-order
+  // 1065). Held for this figure's lifetime, because an inline ref callback is a
+  // new function every render and React would re-attach it each time —
+  // `restingArmRefs` says what that cost the tapping child's hand.
+  const armRef = useMemo(() => restingArmRefs(arms.current, REST_POSE_ARMS), [])
+
+  // The caller that owns the pose is given the pivots to write it onto. The
+  // effect runs once the refs are filled, and the object it publishes is read
+  // every frame, so nothing is allocated per frame.
+  const owned = !!(pose && limbs)
+  // Its OWN pivots, in one object that outlives the frame — `arms.current` is a
+  // stable array, only the trunk arrives later.
+  const selfLimbs = useRef<FigureLimbs>({ arms: arms.current, trunk: null })
+  useEffect(() => {
+    if (!limbs) return
+    limbs.current = { arms: arms.current, trunk: trunk.current }
+    return () => {
+      limbs.current = null
+    }
+  }, [limbs])
 
   useFrame((_, rawDt) => {
     const dt = Math.min(rawDt, 0.1)
@@ -287,15 +317,11 @@ function Figure({
       gesture.current = advanceGesture(gesture.current, dt)
       shown = gesturePose(gesture.current)
     }
-    if (shown) {
-      const left = arms.current[0]
-      const right = arms.current[1]
-      if (left) left.rotation.set(shown.left.pitch, shown.left.yaw, shown.left.roll)
-      if (right) right.rotation.set(shown.right.pitch, shown.right.yaw, shown.right.roll)
-      const t = trunk.current
-      // Lean tips the trunk forward about the hip (+x carries the top to +z, the
-      // figure's front); the turn is the refusal's shake.
-      if (t) t.rotation.set(shown.lean, shown.turn, 0)
+    // An OWNED pose is applied by whoever writes it, in that same frame;
+    // applying last frame's copy here would only draw it one frame stale.
+    if (shown && !owned) {
+      selfLimbs.current.trunk = trunk.current
+      applyFigurePose(selfLimbs.current, shown)
     }
     if (withLegs && gait) {
       const phase = gait.current ?? 0
@@ -363,19 +389,16 @@ function Figure({
           <group
             key={i}
             position={[(i === 0 ? 1 : -1) * bodyH * L.shoulderX, bodyH * L.shoulderY - hipY, 0]}
-            ref={(el) => {
-              arms.current[i] = el
-              if (el) {
-                el.rotation.order = 'YXZ'
-                el.rotation.set(REST_POSE_ARMS[i].pitch, 0, REST_POSE_ARMS[i].roll)
-              }
-            }}
+            ref={armRef[i]}
           >
             <mesh position={[0, -armLen * 0.5, 0]} castShadow>
               <cylinderGeometry args={[L.armRadius[0], L.armRadius[1], armLen, segments]} />
               <meshStandardMaterial color={skin} roughness={0.88} />
             </mesh>
-            <mesh position={[0, -armLen, 0]} castShadow>
+            {/* Named so the verification can read where the hand ACTUALLY ended
+                up, rather than re-deriving it: a touch is judged by the drawn
+                hand meeting the drawn surface (work-order 1065). */}
+            <mesh name={i === 0 ? 'hand-left' : 'hand-right'} position={[0, -armLen, 0]} castShadow>
               <sphereGeometry args={[L.handRadius, ...TESSELLATION.figureHand]} />
               <meshStandardMaterial color={skin} roughness={0.85} />
             </mesh>
@@ -470,7 +493,7 @@ function Weaver({ x, z, cloth, weave }: { x: number; z: number; cloth: string; w
 }
 
 /** Height factor of a child figure against a grown one. */
-const KID_SCALE = 0.55
+const KID_SCALE = CHILD_FIGURE_SCALE
 
 /**
  * Speaks one staged situation (point 481): the atom through the §13.4 hearing
@@ -560,8 +583,14 @@ function speakBankUtterance(
       speakOverhead(`kid-${said.speaker}`, [utterance], anchor, { seconds: speechLabelSeconds(1) })
     }
   }
-  gesture.current = gestureIfHeard(distance, said.gesture, {
-    ...aimAt(
+  // A TOUCH BRINGS ITS OWN ARM. Its hand has to land on a drawn flank, and the
+  // round solved that through the leaning trunk the renderer draws; re-deriving
+  // the angles here from a world point through an upright shoulder puts the hand
+  // centimetres off, which is the whole tolerance a contact has (work-order
+  // 1065). Every other moment aims at what it names, exactly as before.
+  const arm =
+    said.arm ??
+    aimAt(
       { x: speaker.x, z: speaker.z, yaw: speaker.facing },
       said.aim,
       // …plus whatever the speaker is STANDING ON (work-order 1080). `aimAt`
@@ -569,7 +598,10 @@ function speakBankUtterance(
       // child up on the boulder reported at ground level would point half a
       // metre over the stone it is naming.
       KID_SCALE * FIGURE_LIMBS.shoulderY + ((speaker as BankChild).lift ?? 0),
-    ),
+    )
+  gesture.current = gestureIfHeard(distance, said.gesture, {
+    ...arm,
+    ...(said.hold ? { duration: said.hold } : {}),
     phase: said.speaker * 1.1,
   })
 }
@@ -843,6 +875,33 @@ function Kids({
   if (gaits.current.length !== count) {
     gaits.current = Array.from({ length: count }, (_, i) => gaits.current[i] ?? { current: 0 })
   }
+  // ...and one PHASE OFFSET per child, which is how a stopped child plants its
+  // feet without the walk it resumes snapping back (work-order 1065). The walked
+  // distance keeps running the gait; the offset absorbs the settling, so it is
+  // still there when the child sets off again and the cycle simply carries on.
+  const gaitOffsets = useRef<number[]>([])
+  if (gaitOffsets.current.length !== count) {
+    gaitOffsets.current = Array.from({ length: count }, (_, i) => gaitOffsets.current[i] ?? 0)
+  }
+  // THE WORD'S OWN FRAME (work-order 1065). Where the DRAWN hand stood in the
+  // very frame the tap was uttered — captured here rather than sampled from
+  // outside, because a sampler reading every second frame catches that one
+  // frame only by luck, and the check then went red or green at random on the
+  // same code.
+  const tapOpening = useRef<{
+    tapper: number
+    x: number
+    y: number
+    z: number
+    drawnPitch: number
+    writtenPitch: number
+    /** How far the word had to carry, in metres, or null with no traveller in
+     *  the place. A gesture reaches exactly as far as the voice (point 580), so
+     *  a tap spoken beyond the hearing radius is deliberately ARMLESS — without
+     *  this number a check measuring its hand reads a resting arm and blames
+     *  the touch (work-order 1065). */
+    heardFrom: number | null
+  } | null>(null)
   const poses = useRef<Array<RefObject<FigurePose | null>>>([])
   if (poses.current.length !== count) {
     poses.current = Array.from(
@@ -852,6 +911,14 @@ function Kids({
           current: { left: { ...REST_POSE.left }, right: { ...REST_POSE.right }, lean: 0, turn: 0 },
         },
     )
+  }
+  // These children's poses are written HERE, so their pivots are written here
+  // too — a pose left for the figure's own callback is drawn a frame late, and
+  // the tap has to be on the stone in the frame the word falls (work-order
+  // 1065).
+  const limbs = useRef<Array<RefObject<FigureLimbs | null>>>([])
+  if (limbs.current.length !== count) {
+    limbs.current = Array.from({ length: count }, (_, i) => limbs.current[i] ?? { current: null })
   }
 
   useFrame((_, rawDt) => {
@@ -921,15 +988,41 @@ function Kids({
       // uncounted it read as the child walking out of its pocket.
       absorbSeparation(children[i], b)
     }
+    // BOTH CLOCKS TICK ONCE A FRAME, AND THE GESTURE'S TICK COMES FIRST
+    // (work-order 1065). The gestures used to be advanced in the pose loop
+    // BELOW, after the word had already started one — so a gesture issued with
+    // an utterance lost a whole dt to the very frame that began it, while
+    // `bankGame` subtracts the tap's hold only from the next frame on. The
+    // gesture then ran one frame ahead of its own hold for the rest of it, and
+    // the arm was measured swinging back out 0.01 s before the hold ended, 10.6
+    // cm off the stone with ROCK still falling. Advancing here means the new
+    // utterance's gesture is only READ below, never advanced in its own frame:
+    // the fade-out begins exactly at the hold's end.
+    for (const gesture of gestures.current) {
+      if (gesture) gesture.current = advanceGesture(gesture.current, dt)
+    }
     if (spoken) {
       speakBankUtterance(spoken, children[spoken.speaker], refs.current[spoken.speaker], gestures.current[spoken.speaker])
     }
+    // THE WORD'S OWN FRAME (work-order 1065). The tap is captured below, once
+    // this frame's pose has been written AND applied — that is the picture the
+    // player sees the word fall over, and the frame the whole claim rests on.
+    const openedTouch = import.meta.env.DEV && spoken && spoken.gesture === 'touch' ? spoken.speaker : -1
     const said = game && speech ? stepChildSpeech(speech, view, dt, cfg, speechRand) : null
     if (said) speakSituation(said, children[said.speaker], refs.current[said.speaker], gestures.current[said.speaker])
     children.forEach((c, i) => {
       const g = refs.current[i]
       if (!g) return
-      const phase = gaitPhase(c.walked, cadence)
+      // A CHILD THAT STANDS STANDS ON BOTH FEET (work-order 1065). While it is
+      // held, the offset is moved so the drawn phase reaches the neutral stance;
+      // the dip that phase carried is what put the tapping hand 7 cm off its
+      // stone, because the reach is solved at a height the body lift then took
+      // away.
+      const walking = gaitPhase(c.walked, cadence)
+      if (c.held) {
+        gaitOffsets.current[i] = restingPhase(walking + gaitOffsets.current[i], dt) - walking
+      }
+      const phase = walking + gaitOffsets.current[i]
       gaits.current[i].current = phase
       // THE HEIGHT IS THE GAME'S, NOT THE VIEW'S (work-order 1080). What stood
       // here was a constant 0.32 m switched on by a flag — a child hovering
@@ -953,13 +1046,40 @@ function Kids({
       // the arms and the shake, the run owns the lean. Writing the pose (rather
       // than handing the Figure its gesture ref) is what lets the two combine —
       // a figure with a pose ignores its gesture, so the pose must carry it.
+      // Only READ here: this frame's advance already ran above, before the
+      // word could start a new gesture (work-order 1065).
       const gesture = gestures.current[i]
-      gesture.current = advanceGesture(gesture.current, dt)
       const shown = gesturePose(gesture.current)
       pose.left = crouched ? CROUCH_POSE.left : shown.left
       pose.right = crouched ? CROUCH_POSE.right : shown.right
       pose.turn = shown.turn
       pose.lean = crouched ? CROUCH_POSE.lean : c.lean + shown.lean
+      applyFigurePose(limbs.current[i]?.current ?? null, pose)
+      if (i === openedTouch) {
+        g.updateWorldMatrix(true, true)
+        const hands: Array<{ x: number; y: number; z: number; pitch: number }> = []
+        g.traverse((o) => {
+          if (o.name !== 'hand-left' && o.name !== 'hand-right') return
+          const w = new THREE.Vector3()
+          o.getWorldPosition(w)
+          hands.push({ x: w.x, y: w.y, z: w.z, pitch: o.parent ? o.parent.rotation.x : 0 })
+        })
+        // The RAISED hand is the one doing the touching; the other hangs.
+        const best = hands.sort((a, b) => b.y - a.y)[0]
+        tapOpening.current = best
+          ? {
+              tapper: i,
+              x: best.x,
+              y: best.y,
+              z: best.z,
+              drawnPitch: best.pitch,
+              writtenPitch: pose.left.pitch,
+              heardFrom: placePlayerPosition.active
+                ? Math.hypot(c.x - placePlayerPosition.x, c.z - placePlayerPosition.z)
+                : null,
+            }
+          : null
+      }
     })
   })
 
@@ -1031,6 +1151,97 @@ function Kids({
        *  the settlement actually chose. Null where this round has no stage. */
       boulder: stage ? { ...stage.boulder } : null,
     })
+    // WHAT THE PICTURE DOES WITH THE TAPPING HAND (work-order 1065). Read off
+    // the SCENE GRAPH — the drawn hand's own world position — and compared with
+    // the drawn stone's flank at that height, so the live check measures the
+    // contact the player sees rather than the one the round solved for.
+    w.__placeTapHand = () => {
+      if (!bank || !stage) return null
+      const i = bank.tapper
+      const g = refs.current[i]
+      if (i < 0 || !g) return null
+      const end = otherEnd(bank.from)
+      const rock = rockAt(stage, end)
+      const hands: Array<{ hand: string; x: number; y: number; z: number; radius: number; flank: number; gap: number }> = []
+      g.updateWorldMatrix(true, true)
+      g.traverse((o) => {
+        if (o.name !== 'hand-left' && o.name !== 'hand-right') return
+        const p = new THREE.Vector3()
+        o.getWorldPosition(p)
+        const bearing = Math.atan2(p.x - rock.x, p.z - rock.z)
+        const radius = Math.hypot(p.x - rock.x, p.z - rock.z)
+        const flank = stage.flank(end, bearing, p.y)
+        hands.push({
+          hand: o.name,
+          x: p.x,
+          y: p.y,
+          z: p.z,
+          radius,
+          flank,
+          gap: radius - flank - FIGURE_LIMBS.handRadius * KID_SCALE,
+        })
+      })
+      // The hand that is ON the stone is the one nearest its flank; the other is
+      // hanging at the child's side.
+      const best = hands.sort((a, b) => Math.abs(a.gap) - Math.abs(b.gap))[0] ?? null
+      if (!best) return null
+      // WHAT WAS WRITTEN against what is DRAWN. The pose is written by this
+      // component's frame callback and applied by the figure's own; a reading
+      // that finds the touch pose already written while the drawn hand is still
+      // out at the child's side is a frame of render lag, not a hand that never
+      // arrived (work-order 1065).
+      const written = poses.current[i]?.current ?? null
+      const opening = tapOpening.current
+      const openingGap = opening
+        ? (() => {
+            const b = Math.atan2(opening.x - rock.x, opening.z - rock.z)
+            const r = Math.hypot(opening.x - rock.x, opening.z - rock.z)
+            return r - stage.flank(end, b, opening.y) - FIGURE_LIMBS.handRadius * KID_SCALE
+          })()
+        : null
+      return {
+            ...best,
+            tapper: i,
+            phase: bank.phase,
+            // The tap's own HOLD, so a reading can be told apart from one taken
+            // after it: the word falls while `tapFor` is still running in the
+            // run phase, and the touch gesture outlives that moment by design.
+            tapFor: bank.tapFor,
+            end,
+            rock: { x: rock.x, z: rock.z },
+            // WHICH SIDE THE REACH HANGS OFF. The touching hand is the LEFT one
+            // and the child faces the stone, so from the wrong flank the body
+            // stands in front of its own contact — the same miss the dip shot
+            // had. The picture check picks its side from this offset rather
+            // than assuming one (work-order 1065).
+            body: (() => {
+              const b = new THREE.Vector3()
+              g.getWorldPosition(b)
+              return { x: b.x, z: b.z }
+            })(),
+            gesture: gestures.current[i]?.current?.kind ?? null,
+            // Seconds the gesture has been running, so the swing can be placed
+            // on its own clock rather than on the hold's.
+            gestureAge: gestures.current[i]?.current?.t ?? null,
+            written: written
+              ? { leftPitch: written.left.pitch, rightPitch: written.right.pitch, lean: written.lean }
+              : null,
+            // The word's own frame, measured when it fell rather than sampled
+            // for afterwards.
+            opening: opening ? { ...opening, gap: openingGap } : null,
+            // The shoulder rotations the figure is REALLY drawn with this
+            // frame, read off the hand meshes' own pivots.
+            drawn: (() => {
+              const arms: Array<{ name: string; pitch: number }> = []
+              g.traverse((o) => {
+                if (o.name !== 'hand-left' && o.name !== 'hand-right') return
+                if (o.parent) arms.push({ name: o.name, pitch: o.parent.rotation.x })
+              })
+              return arms
+            })(),
+      }
+    }
+
     // What the group has SAID so far this visit (point 481), by situation — a
     // live check can read the coverage the pure tests pin.
     w.__placeChildSpeech = () => ({
@@ -1040,6 +1251,7 @@ function Kids({
     })
     return () => {
       delete w.__placeTag
+      delete w.__placeTapHand
       delete w.__placeChildSpeech
     }
   }, [round, game, speech, children, stage, x, z, playRadius])
@@ -1063,6 +1275,7 @@ function Kids({
             role="child"
             gait={gaits.current[i]}
             pose={poses.current[i]}
+            limbs={limbs.current[i]}
           />
         </group>
       ))}
@@ -2287,6 +2500,12 @@ function ErrandVillagers({
         },
     )
   }
+  // Written here, so applied here — see the children at the bank (work-order
+  // 1065): a pose applied by the figure itself is drawn a frame late.
+  const limbs = useRef<Array<RefObject<FigureLimbs | null>>>([])
+  if (limbs.current.length !== count) {
+    limbs.current = Array.from({ length: count }, (_, i) => limbs.current[i] ?? { current: null })
+  }
   const yaws = useRef<number[]>([])
   if (yaws.current.length !== count) {
     yaws.current = Array.from({ length: count }, (_, i) => yaws.current[i] ?? 0)
@@ -2550,6 +2769,7 @@ function ErrandVillagers({
           pose.turn = shown.turn
         }
       }
+      if (pose) applyFigurePose(limbs.current[i]?.current ?? null, pose)
 
       const g = refs.current[i]
       if (g) {
@@ -2628,6 +2848,7 @@ function ErrandVillagers({
           <Figure
             cloth={cloth[i % cloth.length]}
             pose={poses.current[i]}
+            limbs={limbs.current[i]}
             handProp={
               <>
                 <mesh
@@ -2832,7 +3053,13 @@ export function PlaceLife({
   /** The two play rocks of the children's bank game (work-order 687), and the
    *  settlement's loose boulders — one of which a child climbs and names while
    *  the group roams, so ROCK is heard at a stone that is no part of the game. */
-  playRocks: { upstream: { x: number; z: number }; downstream: { x: number; z: number } } | null
+  playRocks: {
+    upstream: { x: number; z: number }
+    downstream: { x: number; z: number }
+    /** The instance scale they are drawn at — the children's round measures the
+     *  flank it reaches for through it (work-order 1065). */
+    scale: number
+  } | null
   /** The children's roaming quarter, decided by the layout (work-order 688) so
    *  the adults' work sites can be placed clear of it. */
   playGround: PlayGround | null
@@ -2976,6 +3203,9 @@ export function PlaceLife({
     return {
       upstream: playRocks.upstream,
       downstream: playRocks.downstream,
+      // The stone as the picture draws it, so the tapping child's hand is solved
+      // against the flank the player sees (work-order 1065).
+      flank: playRockFlank(playRocks),
       // The waterline straight out from the settlement's middle, which is what
       // the drawn river is: the call points at the water, not at a bank stop.
       water: { x: bank.nx * bank.distance, z: bank.nz * bank.distance },

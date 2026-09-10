@@ -14,22 +14,33 @@
 // no labels, no text and no concept vocabulary — only bodies. What a beckon
 // means is decided by what happens next in the world, not here.
 
+import { FIGURE_LIMBS } from './figures'
+
 /**
  * The four gestures that read at conversational distance.
  * - `beckon`  — come here: the arm scoops toward the speaker, repeatedly.
  * - `point`   — at a visible spot or person: the arm holds a straight aim.
  * - `refuse`  — no: both arms out, palms forward, the trunk shaking.
  * - `indicate`— that way: the arm sweeps out from the body onto a bearing.
+ * - `touch`   — ON this: the figure leans in and lays its hand on the thing it
+ *               is naming, and holds it there. Unlike the other four it is not
+ *               a motion the eye reads on its own — it is read by CONTACT, so
+ *               its caller owes it an aim solved against the drawn surface and
+ *               a stand close enough for the hand to arrive (work-order 1065).
  */
-export type GestureKind = 'beckon' | 'point' | 'refuse' | 'indicate'
+export type GestureKind = 'beckon' | 'point' | 'refuse' | 'indicate' | 'touch'
 
 /** Every kind, in a stable order (menus, tests, the verification sweep). */
-export const GESTURE_KINDS: readonly GestureKind[] = ['beckon', 'point', 'refuse', 'indicate']
+export const GESTURE_KINDS: readonly GestureKind[] = ['beckon', 'point', 'refuse', 'indicate', 'touch']
 
 /**
- * How long each gesture runs, in seconds. Bounded by construction: a gesture is
- * an event, never a state a figure can get stuck in, so `advanceGesture` returns
- * the figure to rest the moment its own duration is spent.
+ * How long each gesture runs, in seconds — and for a kind in
+ * `GESTURE_NO_FADE_IN`, how long it HOLDS: that kind's fade-out is added beyond
+ * this, so `startGesture(kind).duration` is the longer of the two numbers and is
+ * the one every bound is stated against. Bounded by construction either way: a
+ * gesture is an event, never a state a figure can get stuck in, so
+ * `advanceGesture` returns the figure to rest the moment its own duration is
+ * spent.
  * Calibratable starting values (CLAUDE.md §2): long enough to read from across a
  * village square, short enough that a figure gesturing twice reads as twice.
  */
@@ -38,6 +49,9 @@ export const GESTURE_DURATIONS: Record<GestureKind, number> = {
   point: 2.0,
   refuse: 1.6,
   indicate: 2.6,
+  // A touch normally runs for as long as the act it belongs to and is given its
+  // own duration by the caller; this is what it lasts when nobody says.
+  touch: 1.8,
 }
 
 /**
@@ -47,6 +61,46 @@ export const GESTURE_DURATIONS: Record<GestureKind, number> = {
  * and ends at rest, so a figure interrupted mid-gesture never jerks.
  */
 export const GESTURE_BLEND = 0.3
+
+/**
+ * Kinds whose pose may NOT fade in over the shared blend, with the seconds they
+ * take instead. A hand laid on a stone arrives and stays: given the common
+ * 0.3 s at each end, a 1.5 s touch would be off the surface for four tenths of
+ * its own length — including the instant the word falls, which is the one frame
+ * the contact exists to prove (work-order 1065).
+ */
+export const GESTURE_BLENDS: Partial<Record<GestureKind, number>> = { touch: 0.12 }
+
+/**
+ * Kinds that begin AT the pose instead of growing into it — the fade-out is
+ * unchanged, only the fade-IN is dropped.
+ *
+ * A shortened fade-in is not the same as none. Measured 08.09.2026 in the
+ * browser: with the touch's 0.12 s ramp the worst reading of the drawn hand
+ * during the tap's own hold stood 29-59 cm off the stone, and the run recorded
+ * WHEN — 8.95 s into a 9.00 s remainder, i.e. fifty milliseconds after the word
+ * opened, while the arm was still swinging in. The word and the gesture are one
+ * utterance and are issued in the same frame, so a hand that grows into its pose
+ * is by construction NOT on the stone when the word falls — which is the whole
+ * claim the tap exists to make (design.md §13.4). The child has also already
+ * STOPPED at a distance that only makes sense with the arm extended: `touchStand`
+ * solves its stand through the same leaning reach the renderer draws, so the
+ * outstretched arm is what its arrival was measured against, not an extra motion
+ * afterwards.
+ */
+export const GESTURE_NO_FADE_IN: readonly GestureKind[] = ['touch']
+
+/** How long this kind takes to grow out of rest and settle back into it. */
+export function gestureBlendOf(kind: GestureKind): number {
+  return GESTURE_BLENDS[kind] ?? GESTURE_BLEND
+}
+
+/**
+ * How far the figure LEANS INTO a touch (rad). The reach is solved through it —
+ * `handAt` is given this same lean — so the stand distance the caller computes
+ * and the pose the renderer draws describe one arm, not two.
+ */
+export const TOUCH_LEAN = 0.5
 
 /** One shoulder pivot's Euler angles, applied in `YXZ` order (see `armDirection`). */
 export interface ArmPose {
@@ -142,7 +196,14 @@ export interface GestureAim {
  */
 export function startGesture(kind: GestureKind, aim: GestureAim = {}): GestureState {
   const wanted = aim.duration
-  const duration = Number.isFinite(wanted) && (wanted as number) > 0 ? (wanted as number) : GESTURE_DURATIONS[kind]
+  const held = Number.isFinite(wanted) && (wanted as number) > 0 ? (wanted as number) : GESTURE_DURATIONS[kind]
+  // A KIND THAT BEGINS AT ITS POSE IS ASKED FOR A HOLD, NOT A TOTAL. Its
+  // fade-out is added BEYOND the time it was asked to hold, so the pose is
+  // whole for every instant of it. Measured 08.09.2026: the tap's gesture ran
+  // exactly as long as its hold, so the arm began swinging back out 0.12 s
+  // before the hold ended and the check read 50.8 cm off the stone with the
+  // word still falling — the same defect as the fade-IN, at the other end.
+  const duration = GESTURE_NO_FADE_IN.includes(kind) ? held + gestureBlendOf(kind) : held
   return {
     kind,
     t: 0,
@@ -180,9 +241,13 @@ function smoothstep(x: number): number {
  */
 export function gestureEnvelope(s: GestureState): number {
   if (s.kind === null || s.duration <= 0) return 0
-  const blend = Math.min(GESTURE_BLEND, s.duration / 2)
+  const blend = Math.min(gestureBlendOf(s.kind), s.duration / 2)
   if (blend <= 0) return 0
-  return Math.min(smoothstep(s.t / blend), smoothstep((s.duration - s.t) / blend))
+  const out = smoothstep((s.duration - s.t) / blend)
+  // A kind that begins AT its pose skips the in-ramp only; it still returns to
+  // rest, so nothing about point 479's "the pose returns to rest" changes.
+  if (GESTURE_NO_FADE_IN.includes(s.kind)) return s.t < 0 ? 0 : out
+  return Math.min(smoothstep(s.t / blend), out)
 }
 
 /**
@@ -224,6 +289,34 @@ export function armDirection(a: ArmPose): [number, number, number] {
   const y = -cr * cp
   const z = -cr * sp
   return [x * cy + z * sy, y, -x * sy + z * cy]
+}
+
+/**
+ * WHERE THE HAND ACTUALLY IS, in the figure's own frame and in BODY HEIGHTS —
+ * shoulder, plus the posed arm, plus the trunk's lean about its pivot. It is
+ * the chain `Figure` draws, written once so that a solve, an assertion and the
+ * picture can never describe three different arms. Multiply by the figure's
+ * own scale for metres.
+ *
+ * `pivotY` is the height the trunk turns about: 0 for a figure drawn without
+ * legs (the trunk starts at the ground), `FIGURE_LIMBS.hipY` for one with them.
+ * Getting it wrong moves a leaning hand by centimetres, which is the whole
+ * tolerance a touch has.
+ */
+export function handAt(
+  side: ArmSide,
+  bearing: number,
+  elevation: number,
+  lean = 0,
+  pivotY = 0,
+): [number, number, number] {
+  const reach = FIGURE_LIMBS.armLength * Math.cos(elevation)
+  const x = (side === 'left' ? FIGURE_LIMBS.shoulderX : -FIGURE_LIMBS.shoulderX) + reach * Math.sin(bearing)
+  const y = FIGURE_LIMBS.shoulderY + FIGURE_LIMBS.armLength * Math.sin(elevation)
+  const z = reach * Math.cos(bearing)
+  const cl = Math.cos(lean)
+  const sl = Math.sin(lean)
+  return [x, pivotY + (y - pivotY) * cl - z * sl, (y - pivotY) * sl + z * cl]
 }
 
 /**
@@ -330,6 +423,18 @@ export function gesturePose(s: GestureState): FigurePose {
       const sweep = smoothstep(u / 0.6)
       arm = armAim(s.bearing * sweep, s.elevation * sweep)
       lean = 0.03
+      break
+    }
+    case 'touch': {
+      // The reaching arm holds the aim it was given — still, because the hand
+      // is ON something and a hand that keeps moving is not resting on a stone.
+      // The trunk leans into the reach (the lean the stand was solved through),
+      // and the FREE arm swings back a little, which is what a body does when
+      // it puts its weight onto one hand and is what tells this apart from a
+      // point at a still frame.
+      arm = armAim(s.bearing, s.elevation)
+      other = { pitch: restOther.pitch + 0.34, yaw: 0, roll: restOther.roll * 0.8 }
+      lean = TOUCH_LEAN
       break
     }
   }

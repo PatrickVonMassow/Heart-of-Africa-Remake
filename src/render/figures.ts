@@ -49,6 +49,14 @@ export const TESSELLATION = {
  * narrow (radius ≈ 0.064 at 0.8) and the arms read against the sky rather than
  * against the trunk.
  */
+/**
+ * The scale a CHILD figure is drawn at, against an adult's 1. Shared rather than
+ * repeated: the children's round solves a reach with it (work-order 1065) and
+ * the scene draws with it, and a reach solved at one scale against a body drawn
+ * at another puts the hand nowhere.
+ */
+export const CHILD_FIGURE_SCALE = 0.55
+
 export const FIGURE_LIMBS = {
   /** Body-cone base radius at the ground, in body heights: the cone tapers to a
    *  point at the top, so its radius at height y is `bodyRadius * (1 - y)`. A

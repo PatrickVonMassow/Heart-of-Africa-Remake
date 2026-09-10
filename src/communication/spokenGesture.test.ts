@@ -5,7 +5,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { balance } from '../config/balance'
 import { gestureIfHeard, speechReach } from './spokenGesture'
-import { GESTURE_DURATIONS, GESTURE_KINDS, REST_POSE, gesturePose } from '../render/gesture'
+import { GESTURE_DURATIONS, GESTURE_KINDS, REST_POSE, gesturePose, startGesture } from '../render/gesture'
 
 const RADIUS = balance.communication.hearingRadius
 
@@ -74,7 +74,10 @@ describe('the gesture a heard figure makes', () => {
       const state = gestureIfHeard(1, kind, { bearing: 0.7, elevation: -0.2, phase: 1.1 })
       expect(state.kind).toBe(kind)
       expect(state.t).toBe(0)
-      expect(state.duration).toBe(GESTURE_DURATIONS[kind])
+      // ITS OWN duration, which for a kind that begins at its pose is the hold
+      // it was asked for PLUS its fade-out (work-order 1065).
+      expect(state.duration).toBe(startGesture(kind).duration)
+      expect(state.duration, kind).toBeGreaterThanOrEqual(GESTURE_DURATIONS[kind])
       expect(state.bearing).toBeCloseTo(0.7, 10)
       expect(state.elevation).toBeCloseTo(-0.2, 10)
       expect(state.phase).toBeCloseTo(1.1, 10)

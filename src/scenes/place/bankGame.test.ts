@@ -26,8 +26,11 @@ import {
   rockAt,
   stationAt,
   stepBankGame,
+  touchReach,
+  TOUCH_GAP,
   wordToward,
   type BankConfig,
+  type BankEnd,
   type BankStage,
   type BankState,
   type BankUtterance,
@@ -44,6 +47,21 @@ import {
 
 const CFG: BankConfig = { ...balance.villageLife.tag, ...balance.villageLife.bankGame }
 
+/**
+ * A play rock's drawn flank, as a shape rather than as the shipped mesh: an
+ * ellipsoid 1.2 m at its widest, and widest at 0.9 m of its 1.4 m height. That
+ * is the property the round depends on and the one the real stone has — narrow
+ * where a child stands, broad above it — and stating it here keeps this suite
+ * independent of the vertices `playRockSurface.test.ts` measures.
+ */
+const FLANK_SPAN = 1.2
+const FLANK_WIDEST = 0.9
+const FLANK_SEMI = 1.05
+function testFlank(_end: BankEnd, _bearing: number, y: number): number {
+  const t = (y - FLANK_WIDEST) / FLANK_SEMI
+  return t <= -1 || t >= 1 ? 0 : FLANK_SPAN * Math.sqrt(1 - t * t)
+}
+
 /** Two rocks 20 m apart along x, the water to one side, a boulder in the
  *  children's quarter well away from both. The boulder carries the size a
  *  middling scattered stone has in a shipped village (`looseRock` at instance
@@ -51,6 +69,7 @@ const CFG: BankConfig = { ...balance.villageLife.tag, ...balance.villageLife.ban
 const STAGE: BankStage = {
   upstream: { x: -10, z: 0 },
   downstream: { x: 10, z: 0 },
+  flank: testFlank,
   water: { x: 0, z: 8 },
   boulder: { ...looseRock([2, -22, 0.8]) },
   roam: { x: 0, z: -22, radius: 8 },
@@ -92,14 +111,15 @@ interface Log {
 /** Runs the group for `seconds` and records what it said and did. */
 function replay(
   seconds: number,
-  options: { seed?: number; count?: number; world?: BankWorld; cfg?: BankConfig } = {},
+  options: { seed?: number; count?: number; world?: BankWorld; cfg?: BankConfig; stage?: BankStage } = {},
 ): { s: BankState; log: Log } {
   const cfg = options.cfg ?? CFG
+  const stage = options.stage ?? STAGE
   const count = options.count ?? balance.villageLife.tag.childCount
   const rand = mulberry32(options.seed ?? 7)
   const spots = Array.from({ length: count }, (_, i) => ({
-    x: STAGE.roam.x + Math.cos((i / count) * Math.PI * 2) * 2.4,
-    z: STAGE.roam.z + Math.sin((i / count) * Math.PI * 2) * 2.4,
+    x: stage.roam.x + Math.cos((i / count) * Math.PI * 2) * 2.4,
+    z: stage.roam.z + Math.sin((i / count) * Math.PI * 2) * 2.4,
   }))
   const s = createBankGame(spots, rand, cfg)
   const world = options.world ?? openWorld()
@@ -107,7 +127,7 @@ function replay(
   const dt = 1 / 60
   for (let t = 0; t < seconds; t += dt) {
     const before = s.phase
-    const u = stepBankGame(s, dt, cfg, STAGE, world, rand)
+    const u = stepBankGame(s, dt, cfg, stage, world, rand)
     if (s.phase !== before || log.phases.length === 0) log.phases.push(s.phase)
     if (u) {
       log.said.push(u)
@@ -136,6 +156,11 @@ function replay(
  * see its property would be pinning that seed, not the game.
  */
 const SEEDS = [7, 13, 21, 42, 99]
+
+/** Plane distance between two spots. */
+function dist(a: { x: number; z: number }, b: { x: number; z: number }): number {
+  return Math.hypot(a.x - b.x, a.z - b.z)
+}
 
 /** The same replay over every seed, with the logs concatenated. */
 function replayAll(
@@ -973,5 +998,63 @@ describe('the round is watched for going silent (point 589)', () => {
     const { s } = replay(180)
     expect(s.speech.produced).toBeGreaterThan(1)
     expect(s.speech.silence).toBeLessThanOrEqual(CFG.roundSilenceSeconds)
+  })
+})
+
+
+describe('the tapping child`s hand is ON the stone it names (work-order 1065)', () => {
+  it('speaks the tap only from a spot its hand reaches the drawn flank from', () => {
+    for (const seed of SEEDS) {
+      const { log } = replay(220, { seed })
+      const taps = log.when.filter((w) => w.u.moment === 'tap')
+      expect(taps.length).toBeGreaterThan(0)
+      for (const tap of taps) {
+        // The rock the tap names is the one the run is TOWARDS, which is the
+        // one the speaker is standing at.
+        const end: BankEnd = tap.direction === 'UPSTREAM' ? 'upstream' : 'downstream'
+        const spoke = { x: tap.speakerX, z: tap.speakerZ }
+        const reach = touchReach(STAGE, end, spoke)!
+        expect(reach).not.toBeNull()
+        expect(Math.abs(reach.gap)).toBeLessThanOrEqual(TOUCH_GAP)
+        // ...and that is much nearer than the waiting station it used to hold.
+        expect(dist(spoke, rockAt(STAGE, end))).toBeLessThan(CFG.standOff - 1)
+      }
+    }
+  })
+
+  it('carries the touch, its solved arm and the whole tap interval as its hold', () => {
+    const { log } = replay(220, { seed: SEEDS[0] })
+    const taps = log.said.filter((u) => u.moment === 'tap')
+    expect(taps.length).toBeGreaterThan(0)
+    for (const tap of taps) {
+      expect(tap.gesture).toBe('touch')
+      expect(tap.hold).toBe(CFG.tapPauseSeconds)
+      // Straight ahead: a figure lays its hand on what it faces.
+      expect(tap.arm?.bearing).toBe(0)
+      expect(tap.arm?.elevation).toBeGreaterThan(0)
+      // The aim's height is where the hand meets the stone, not a nominal 0.6.
+      expect(tap.aim.y).toBeGreaterThan(0.2)
+      expect(tap.aim.y).toBeLessThan(0.8)
+    }
+  })
+
+  it('opens the run SILENTLY where the stone cannot be reached, rather than tapping the air', () => {
+    // A stage whose stones present no flank at all: nothing to lay a hand on.
+    const unreachable: BankStage = { ...STAGE, flank: () => 0 }
+    const { log, s } = replay(220, { seed: SEEDS[0], stage: unreachable })
+    expect(log.said.filter((u) => u.moment === 'tap')).toHaveLength(0)
+    // ...and the game goes on: runs are still played and the other words fall.
+    expect(s.runs).toBeGreaterThan(0)
+    expect(log.said.filter((u) => u.moment === 'announce').length).toBeGreaterThan(0)
+  })
+
+  it('sends ONE child to the stone and leaves the rest at their stations', () => {
+    const { s } = replay(70, { seed: SEEDS[0] })
+    if (s.phase !== 'gather' && s.phase !== 'regroup') return
+    const near = s.children.filter((c, i) => {
+      const end = otherEnd(s.from)
+      return i !== s.tapper && dist(c, rockAt(STAGE, end)) < CFG.standOff - 0.5
+    })
+    expect(near).toHaveLength(0)
   })
 })

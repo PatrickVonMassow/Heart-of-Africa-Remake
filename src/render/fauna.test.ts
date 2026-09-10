@@ -36,6 +36,7 @@ import {
   groundPitch,
   isStance,
   legSwingAngle,
+  restingPhase,
   seatFootOnGround,
   strideLength,
   GAIT_DUTY,
@@ -1179,6 +1180,53 @@ describe('animal gait (design.md §19, points 228/255/300 — planted feet, no s
       expect(Math.abs(gaitBodyLift(Math.PI / 2, rig.legLength))).toBeLessThan(0.15 * rig.legLength)
       expect(gaitBodyLift(0, rig.legLength)).toBeCloseTo(0, 12)
     }
+  })
+
+  it('plants a stopped figure on both feet, and gets the dip to exactly zero (work-order 1065)', () => {
+    const legLength = 0.209 // a child's, the reach in work-order 1065 is solved for
+    // Whatever step the walk was interrupted on, and however small the frames.
+    for (let k = 0; k < 64; k++) {
+      const stopped = -3 * Math.PI + (k / 64) * 6 * Math.PI
+      let phase = stopped
+      for (let f = 0; f < 200; f++) phase = restingPhase(phase, 1 / 60)
+      // It ARRIVES — not "approaches". A hand solved against a flank is judged in
+      // centimetres, and an asymptote leaves a residue in every one of them.
+      expect(gaitBodyLift(phase, legLength)).toBe(0)
+      // ...and it settled to the NEAREST neutral, so nobody walks a lap on the spot.
+      expect(Math.abs(phase - stopped)).toBeLessThanOrEqual(Math.PI + 1e-9)
+    }
+  })
+
+  it('reaches the stance well inside a held gesture, never over one (work-order 1065)', () => {
+    // The tap's own hold is seconds long; the settling may not eat a visible
+    // part of it, or the hand is still travelling while the word falls.
+    let phase = Math.PI // the worst stop there is: half a cycle from either neutral
+    let seconds = 0
+    for (let f = 0; f < 600 && gaitBodyLift(phase, 0.209) !== 0; f++) {
+      phase = restingPhase(phase, 1 / 60)
+      seconds += 1 / 60
+    }
+    expect(gaitBodyLift(phase, 0.209)).toBe(0)
+    expect(seconds).toBeLessThan(0.3)
+  })
+
+  it('does not snap the walk when it resumes: the offset carries the settling (work-order 1065)', () => {
+    // What `PlaceLife` does — the walked distance keeps driving the gait and the
+    // OFFSET absorbs the stand, so the frame the child sets off again is
+    // continuous with the frame before it.
+    const cadence = 15.68
+    let walked = 1.234
+    let offset = 0
+    const drawn = () => gaitPhase(walked, cadence) + offset
+    for (let f = 0; f < 60; f++) {
+      offset = restingPhase(drawn(), 1 / 60) - gaitPhase(walked, cadence)
+    }
+    expect(gaitBodyLift(drawn(), 0.209)).toBe(0)
+    const atRest = drawn()
+    // One step of walking later the phase has moved by the stride, not jumped
+    // back to where the frozen walk had left it.
+    walked += 0.01
+    expect(drawn() - atRest).toBeCloseTo(0.01 * cadence, 12)
   })
 
   it('lays the body on the slope it stands on, so no foot floats on a dune (point 300)', () => {

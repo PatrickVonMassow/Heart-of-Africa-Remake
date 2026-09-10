@@ -9,10 +9,12 @@
 // proves the renderer and the module can never drift apart.
 import { describe, expect, it } from 'vitest'
 import * as THREE from 'three/webgpu'
+import { FIGURE_LIMBS } from './figures'
 import {
   GESTURE_BLEND,
   GESTURE_DURATIONS,
   GESTURE_KINDS,
+  GESTURE_NO_FADE_IN,
   REST_POSE,
   advanceGesture,
   aimAt,
@@ -21,12 +23,15 @@ import {
   DIG_CYCLE_SECONDS,
   digPose,
   gestureArm,
+  gestureBlendOf,
   gestureEnvelope,
   gesturePose,
+  handAt,
   isGesturing,
   poseDistanceFromRest,
   restGesture,
   startGesture,
+  TOUCH_LEAN,
   type GestureKind,
   type GestureState,
 } from './gesture'
@@ -52,7 +57,10 @@ describe('a gesture is BOUNDED — it can never become a state a figure sits in'
 
   it('each kind is back at rest once its own duration is spent', () => {
     for (const kind of GESTURE_KINDS) {
-      const d = GESTURE_DURATIONS[kind]
+      // ITS OWN duration, off the state — a kind that begins at its pose is
+      // given its fade-out BEYOND the time it was asked to hold, so the two
+      // numbers are not the same one (work-order 1065).
+      const d = startGesture(kind).duration
       const states = run(startGesture(kind), d / 40, 41)
       expect(states[states.length - 1].kind, kind).toBeNull()
       expect(isGesturing(states[states.length - 1]), kind).toBe(false)
@@ -67,7 +75,7 @@ describe('a gesture is BOUNDED — it can never become a state a figure sits in'
 
   it('it stays running right up to the last instant before the duration', () => {
     for (const kind of GESTURE_KINDS) {
-      const d = GESTURE_DURATIONS[kind]
+      const d = startGesture(kind).duration
       const almost = advanceGesture(startGesture(kind), d - 0.001)
       expect(almost.kind, kind).toBe(kind)
       expect(advanceGesture(almost, 0.002).kind, kind).toBeNull()
@@ -130,14 +138,21 @@ describe('THE POSE RETURNS TO REST — at the start, at the end, and after it', 
   })
 
   it('a gesture BEGINS at rest — no snap into the pose', () => {
+    // …with ONE named exception, and the exception is what makes the tap true:
+    // a touch is issued in the same frame as the word it belongs to, so a hand
+    // that grew into its pose would be off the stone exactly while ROCK is
+    // spoken (measured 08.09.2026, work-order 1065). Its own describe block
+    // below owns that claim and the fade-OUT it keeps.
     for (const kind of GESTURE_KINDS) {
+      if (GESTURE_NO_FADE_IN.includes(kind)) continue
       expect(poseDistanceFromRest(gesturePose(startGesture(kind, { bearing: 1.2 }))), kind).toBeCloseTo(0, 10)
     }
+    expect([...GESTURE_NO_FADE_IN]).toEqual(['touch'])
   })
 
   it('and settles back into rest as it ends, continuously', () => {
     for (const kind of GESTURE_KINDS) {
-      const d = GESTURE_DURATIONS[kind]
+      const d = startGesture(kind).duration
       const near = { ...startGesture(kind, { bearing: 1.2 }), t: d - 1e-4 }
       expect(poseDistanceFromRest(gesturePose(near)), kind).toBeLessThan(0.01)
       // …and the state after it is rest, so the pose is exactly rest again.
@@ -148,7 +163,7 @@ describe('THE POSE RETURNS TO REST — at the start, at the end, and after it', 
 
   it('no frame of any gesture jumps: the pose moves smoothly, step to step', () => {
     for (const kind of GESTURE_KINDS) {
-      const d = GESTURE_DURATIONS[kind]
+      const d = startGesture(kind).duration
       const dt = d / 200
       let prev = gesturePose(startGesture(kind, { bearing: 1.0, elevation: 0.3 }))
       let s = startGesture(kind, { bearing: 1.0, elevation: 0.3 })
@@ -409,5 +424,117 @@ describe('the digging pose', () => {
       expect(Number.isFinite(p.left.pitch)).toBe(true)
       expect(Number.isFinite(p.lean)).toBe(true)
     }
+  })
+})
+
+describe('the touch: a hand laid on a thing and held there (work-order 1065)', () => {
+  const held = startGesture('touch', { bearing: 0.2, elevation: 0.8, duration: 1.5 })
+
+  it('holds ONE aim for its whole length, so the hand does not wander off the surface', () => {
+    const aims = [0.2, 0.5, 0.9, 1.2].map((t) => {
+      const pose = gesturePose({ ...held, t })
+      const side = gestureArm(held.bearing)
+      return armDirection(pose[side])
+    })
+    for (const dir of aims.slice(1)) {
+      for (let axis = 0; axis < 3; axis++) expect(dir[axis]).toBeCloseTo(aims[0][axis], 6)
+    }
+  })
+
+  it('BEGINS at its full pose — the word falls with the hand already on the stone', () => {
+    // A SHORTENED ramp is not the same as none. Measured in the browser on
+    // 08.09.2026, the 0.12 s ramp still put the worst reading of the drawn hand
+    // 29-59 cm off the stone fifty milliseconds after the word opened, because
+    // word and gesture are one utterance issued in the same frame.
+    expect(gestureBlendOf('touch')).toBeLessThan(GESTURE_BLEND)
+    expect(gestureEnvelope({ ...held, t: 0 })).toBe(1)
+    expect(gestureEnvelope({ ...held, t: 0.001 })).toBeGreaterThan(0.999)
+    expect(gestureEnvelope({ ...held, t: 0.15 })).toBeGreaterThan(0.95)
+  })
+
+  it('still RETURNS to rest, so the arm is never dropped by a snap', () => {
+    expect(gestureEnvelope({ ...held, t: held.duration })).toBe(0)
+    expect(gestureEnvelope({ ...held, t: held.duration - 0.06 })).toBeLessThan(0.75)
+    // Monotone over the fade-out: no bounce on the way down.
+    let prev = Infinity
+    for (let i = 0; i <= 20; i++) {
+      const t = held.duration - gestureBlendOf('touch') + (i / 20) * gestureBlendOf('touch')
+      const e = gestureEnvelope({ ...held, t })
+      expect(e).toBeLessThanOrEqual(prev + 1e-9)
+      prev = e
+    }
+  })
+
+  it('leaves every OTHER kind growing out of rest', () => {
+    for (const kind of GESTURE_KINDS) {
+      if (kind === 'touch') continue
+      const s = { ...held, kind, duration: 1.5 }
+      expect(gestureEnvelope({ ...s, t: 0 })).toBe(0)
+    }
+  })
+
+  it('leans the trunk into the reach, by the lean the stand is solved through', () => {
+    expect(gesturePose({ ...held, t: 0.75 }).lean).toBeCloseTo(TOUCH_LEAN, 3)
+  })
+
+  it('takes the free arm back, so a still frame is not a point', () => {
+    const pose = gesturePose({ ...held, t: 0.75 })
+    const free = gestureArm(held.bearing) === 'left' ? 'right' : 'left'
+    expect(pose[free].pitch).toBeGreaterThan(REST_POSE[free].pitch)
+  })
+
+  it('returns to rest when it is spent, like every other gesture', () => {
+    expect(advanceGesture({ ...held, t: held.duration - 0.01 }, 0.02).kind).toBeNull()
+  })
+
+  it('is asked for a HOLD, and takes its fade-out BEYOND it (work-order 1065)', () => {
+    // The other half of the same defect as the fade-in. The gesture used to run
+    // exactly as long as the hold it was given, so its out-ramp ate the last
+    // 0.12 s of that hold: measured in the browser on 08.09.2026, the drawn hand
+    // stood 50.8 cm off the stone with 0.07 s of the hold still to run, while
+    // the word was by definition still falling.
+    expect(held.duration).toBeCloseTo(1.5 + gestureBlendOf('touch'), 6)
+    // Whole for every instant of the hold it was asked for…
+    expect(gestureEnvelope({ ...held, t: 1.5 })).toBeCloseTo(1, 6)
+    expect(gestureEnvelope({ ...held, t: 1.5 - 1e-4 })).toBeCloseTo(1, 6)
+    // …and only then on its way back to rest.
+    expect(gestureEnvelope({ ...held, t: held.duration })).toBe(0)
+    // Every other kind keeps the total it was given.
+    for (const kind of GESTURE_KINDS) {
+      if (kind === 'touch') continue
+      expect(startGesture(kind, { duration: 1.5 }).duration, kind).toBe(1.5)
+    }
+  })
+})
+
+describe('where the hand actually is (shared by every solve and the picture)', () => {
+  it('puts a straight arm a full arm length from the shoulder', () => {
+    const [x, y, z] = handAt('left', 0, 0)
+    expect(Math.hypot(x - FIGURE_LIMBS.shoulderX, y - FIGURE_LIMBS.shoulderY, z)).toBeCloseTo(
+      FIGURE_LIMBS.armLength,
+      9,
+    )
+  })
+
+  it('mirrors the shoulder for the right arm', () => {
+    expect(handAt('right', 0, 0)[0]).toBeCloseTo(-handAt('left', 0, 0)[0], 9)
+  })
+
+  it('carries the hand FORWARD and DOWN when the trunk leans in', () => {
+    const upright = handAt('left', 0, 0.6, 0, FIGURE_LIMBS.hipY)
+    const leaning = handAt('left', 0, 0.6, 0.5, FIGURE_LIMBS.hipY)
+    expect(leaning[2]).toBeGreaterThan(upright[2])
+    expect(leaning[1]).toBeLessThan(upright[1])
+  })
+
+  it('leaves the pivot itself where it is', () => {
+    const pivot = FIGURE_LIMBS.hipY
+    // A point AT the pivot height on the figure's axis cannot move when the
+    // trunk turns about it — which is what makes the pivot the right one.
+    const arm = FIGURE_LIMBS.armLength
+    const elevation = Math.asin((pivot - FIGURE_LIMBS.shoulderY) / arm)
+    const [, y, z] = handAt('left', Math.PI / 2, elevation, 0.7, pivot)
+    expect(y).toBeCloseTo(pivot, 9)
+    expect(z).toBeCloseTo(0, 9)
   })
 })

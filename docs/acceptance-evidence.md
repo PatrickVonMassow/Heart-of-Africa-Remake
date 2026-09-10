@@ -226,6 +226,16 @@ landing over the figure the scene drew) is the polish suite below:
   settlement's own bank stretch, the stretch in world units, the far rock's share
   of the frame at the default field of view and the reference viewport, and the
   lane at least three walker diameters wide against the shipped collider set.
+- `src/scenes/place/rockTouch.test.ts` (work-order 1065) — the TEACHING HAND ON
+  ITS OBJECT: the reach solved through the renderer's own hand chain lands on the
+  drawn flank, the furthest stand that still touches is the one taken, and both
+  play rocks of all three river villages are reachable from ground a child may
+  stand on. It also pins the defect it closes — from the old waiting station the
+  hand is more than a metre short.
+- `src/scenes/place/playRockSurface.test.ts` (work-order 1065) — the stone's
+  silhouette measured from the mesh the scene instances, at its own scale and
+  yaw: no vertex stands outside the reported surface, and the widest ring sits
+  well above the ground, which is why the collider is not the drawn span.
 - `src/scenes/place/mutedTeaching.test.ts` (work-order 686) — the removed
   eleven-concept catalogues stage nothing: neither the children's old situations
   nor the adults' old errands speak or steer. The adults' own teaching of RIVER
@@ -250,6 +260,13 @@ In the browser, `scripts/verify/polish.mjs` proves what the picture owes: sectio
 note against that figure's own head (`146-speech-hypothesis-label`), and section
 `speech-guess` the click invitation and the opened dialog
 (`148-speech-guess-invitation`, `149-speech-guess-dialog`).
+
+AND THAT THE TEACHING HAND TOUCHES WHAT IT NAMES (work-order 1065). The same
+suite reads the SCENE GRAPH rather than the module: the tapping child's drawn
+hand against the instanced stone's own flank at that height and bearing
+(`1065-tapping-child-at-its-rock`). The tap pause is held at a shutter length for
+that shot — the same code path at a longer configured value — and put back
+afterwards.
 
 THE CHIEF'S MESSAGE ON THE DRUMS (§13.4, docs/communication-poc-spec.md,
 point 486). Asked for outside his hut — in his village alone, with no
@@ -1236,10 +1253,12 @@ it, so two gestures can never run on one body, and the same ref is what the
 speaking layer takes over when it arrives. The added geometry carries its
 per-level entry (`figureLimbSegments`, 5 / 8 / 12).
 Verifiable: the state machine is pure-tested — every kind's duration bounded,
-one kind per figure at every instant, the pose beginning and ending exactly at
-rest with no frame-to-frame jump, each kind visibly away from rest and
-distinguishable from the other three, and the arm maths cross-checked against a
-real `THREE.Object3D` with `YXZ` Euler order so the module and the renderer
+one kind per figure at every instant, the pose ending exactly at rest with no
+frame-to-frame jump and beginning there for every kind but the teaching TOUCH
+(point 1065: it is issued in the same frame as the word it belongs to, so it
+starts AT its pose instead of growing into it, and the test pins it as the only
+such kind), each kind visibly away from rest and distinguishable from the other
+three, and the arm maths cross-checked against a real `THREE.Object3D` with `YXZ` Euler order so the module and the renderer
 cannot drift (`src/render/gesture.test.ts`); the limb proportions and the
 scene's use of the shared constants and the quality lever in
 `src/render/figures.test.ts`; and the rendered poses are photographed at

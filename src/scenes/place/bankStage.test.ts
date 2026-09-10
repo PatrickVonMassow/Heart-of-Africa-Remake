@@ -12,7 +12,9 @@ import { describe, expect, it } from 'vitest'
 import { standingClear, WALKER_RADIUS, spawnPointFree, type CircleCollider } from './collision'
 import { buildLayout, PLAY_ROCK_SCALE } from './layout'
 import { BANK_PLAY_LANE_HALF, bankPlayRocksView, inBankPlayLane, standsOnGroundPlate } from './riverBank'
+import { PLAY_ROCK_SEEDS, playRockSurfaceRadius, playRockYaw } from './playRockSurface'
 import { PLACES } from '../../world/geo'
+import { FIGURE_LIMBS } from '../../render/figures'
 import { PLAY_ROCK_HEIGHT_UNITS } from '../../render/flora'
 import { balance } from '../../config/balance'
 import { climbBoulder } from './looseRocks'
@@ -28,6 +30,20 @@ const RIVER_VILLAGES = ['nubian-village', 'bambara-village', 'mandinka-village']
 /** Height of the detailed play-rock mesh after the layout applies the same
  *  scale that couples its drawn footprint to its collider. */
 const ROCK_HEIGHT = PLAY_ROCK_HEIGHT_UNITS * PLAY_ROCK_SCALE
+
+/** An adult villager, drawn at scale 1: a body cone 1 m tall and the head above
+ *  it. `Figure` marks the whole as `bodyH + 0.45`. */
+const ADULT_HEIGHT = 1.45
+const HEAD_CENTRE = 1.22
+const HEAD_RADIUS = 0.2
+
+/** How wide an adult figure is at height `y`: the cone tapers to a point at the
+ *  top of the trunk, and the head rides above it. */
+function adultBodyRadius(y: number): number {
+  if (y <= 1) return FIGURE_LIMBS.bodyRadius * (1 - y)
+  const dy = y - HEAD_CENTRE
+  return Math.sqrt(Math.max(0, HEAD_RADIUS * HEAD_RADIUS - dy * dy))
+}
 
 describe('the children`s play stage on the bank (point 687)', () => {
   it('gives exactly the river villages two play rocks, and no other settlement any', () => {
@@ -61,6 +77,34 @@ describe('the children`s play stage on the bank (point 687)', () => {
         const collider = circles.find((c) => Math.hypot(c.x - boulder!.x, c.z - boulder!.z) < 1e-9)
         expect(collider?.r).toBeCloseTo(boulder!.radius, 9)
       }
+    }
+  })
+
+  it('keeps the collider off the drawn stone, and no wider than it has to be', () => {
+    // WHAT THE COLLIDER IS FOR: no part of a figure may enter the drawn rock,
+    // and nothing beyond that may be fenced off — a ring drawn at the stone's
+    // widest point is 0.15 m of ground nobody may stand on, and it is exactly
+    // the ground the tapping child has to reach the stone from (work-order
+    // 1065). So the number is MEASURED here against the mesh the scene draws.
+    const layout = buildLayout(RIVER_VILLAGES[0], 42)
+    const rocks = layout.playRocks!
+    for (const [i, seed] of PLAY_ROCK_SEEDS.entries()) {
+      const at = i === 0 ? rocks.upstream : rocks.downstream
+      const yaw = playRockYaw(at)
+      let needed = 0
+      // Every height an adult carries a body at, over every bearing: the flank
+      // drawn there plus the body carried there is how far out the feet belong.
+      for (let y = 0; y <= ADULT_HEIGHT; y += 0.01) {
+        let flank = 0
+        for (let b = 0; b < Math.PI * 2; b += Math.PI / 32) {
+          flank = Math.max(flank, playRockSurfaceRadius(seed, rocks.scale, yaw, b, y))
+        }
+        needed = Math.max(needed, flank + adultBodyRadius(y))
+      }
+      // Clears the drawn stone everywhere...
+      expect(rocks.r + WALKER_RADIUS).toBeGreaterThanOrEqual(needed)
+      // ...and does not fence off more than 5 cm beyond what it must.
+      expect(rocks.r + WALKER_RADIUS).toBeLessThan(needed + 0.05)
     }
   })
 
