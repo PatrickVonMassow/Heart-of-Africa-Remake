@@ -56,6 +56,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 10.09. abends | 43 Minuten Stillstand nach einer korrekten Übergabe, beendet von der Nutzerfrage „seit 17:04 keine Arbeit": Der Launcher verweigerte dreimal den Nachfolger, weil er im Arbeitsbaum einen lebenden Schreiber maß — es war der abgekoppelte Deckungslauf selbst, der dorthin seine Bilder schreibt. Das Veto sperrt den Nachfolger für die volle Dauer genau der Phase, in der die Übergabe vorgesehen ist (§3.258, vierter Wiedergänger von §3.77/§3.220) |
 | 10.09. abends | Ein als »priorisierter Fix« erteilter Nutzerauftrag lag drei Tage im Backlog, den CLAUDE.md §2 ausdrücklich als nie-blockierend bestimmt — die Ablage war die falsche von zwei erlaubten Türen und damit bereits die Entscheidung, den Auftrag nicht auszuführen; gefunden erst durch die Frage des Nutzers, zu welchem Punkt er gehöre (§3.260) |
 | 10.09. spätabends | Die Landungskette hält an ihrem letzten Schritt: Sie hakt den Punkt ab und veröffentlicht DANACH die Tafel, deren Jetzt-Karte noch genau diesen Punkt nennt — die Tafel weist die Veröffentlichung zu Recht ab, und das Aufräumen von Zweig und Arbeitsbaum bleibt liegen. Den gemessenen Grund druckt die Kette nicht mit, weil die Absage auf dem Ausgabekanal steht und sie den Fehlerkanal liest (§3.259) |
+| 11.09. nachts | Zwei Werkzeuge antworten mit Gewissheit auf Fragen, die sie nie gemessen haben: `ci-gate-verdict.mjs` läuft nur im Runner, ignoriert die Flags eines Handaufrufs und druckt bei leerer Umgebung »CI gate passed« — zweimal geglaubt; `run-wait` erklärt einen gesunden `polish`-Lauf nach 20 Minuten für tot, weil seine Schwelle die Modell-Erwartung von 5m41s statt des eigenen gemessenen Medians von 55 min multipliziert, und befiehlt das Töten (§3.263, Punkte 1099/1101) |
 | 13.08. | Der Nachprüfer findet eine echte zweite Klippe im geheilten Mechanismus — und jede der fünf gemessenen Kuren verschlechtert gesunde Dörfer stärker, als der Fehler schadet: Befund wird gebucht statt behoben (§3.115) |
 | 20.08. | Der Dokumentschnitt strich Regeln als »von einem Wächter abgedeckt«, ohne einen einzigen Wächter darauf zu prüfen — die Kontextanzeige verschwand, der Nutzer fand es (§3.134); eine vom Nutzer gesetzte Rangfolge wurde in einer Nacht zweimal maschinell überholt, ohne dass irgendwo ein Grund stand (Punkt 614); zwei Werkzeuge derselben Bauart am falschen Ort gemessen — im Hauptbaum gebaut und geprüft, während der Prozess die Arbeit in den isolierten Bereich schickt (§3.137) |
 | 21.08. | Ein Tor verlangte eine Freigabe, die seine eigenen Werkzeuge nicht herstellen können — der HIGH-Punkt war gemergt, geprüft und freigegeben, und der Zugausgang wies ihn trotzdem ab (§3.153) |
@@ -1459,7 +1460,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 10.09.2026, 23:20 · Quellen-Fingerprint: `a363bb4b99fb…`
+Zuletzt aktualisiert: Freitag, 11.09.2026, 01:18 · Quellen-Fingerprint: `48b942de1b44…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1563,10 +1564,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 96 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 129 Prozess-/Meta-TASKS-Punkte (davon 62 offen).
+Erfasste Quellen: 96 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 130 Prozess-/Meta-TASKS-Punkte (davon 63 offen).
 
-<!-- RETRO-FINGERPRINT: a363bb4b99fb78dbdf4be4bcdcf6def03297f399f6aa43170a10ff84b5cf63a8 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-10T21:20:33.055Z -->
+<!-- RETRO-FINGERPRINT: 48b942de1b4422ac19af7a4d9465be565e70458303cc3f2580b41ec39cb8d9f4 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-10T23:18:44.530Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -6594,3 +6595,41 @@ erscheint im Bericht als Zeit, die der Nutzer verantwortet.
 des Stillstands, der uhrlose, auch die am leichtesten selbst verschuldete. Und ein
 Messinstrument darf keine Klasse kennen, in die sich der Gemessene selbst einsortieren kann;
 sie wird zur Ablage für genau das, was das Instrument finden sollte. Gebucht als Punkt 1097.
+
+### 3.263 Ein Werkzeug antwortet mit Gewissheit, wo es nichts gemessen hat
+
+In der Nacht auf den 11.09.2026 haben zwei Werkzeuge dieselbe Form gezeigt, und beide Male
+hat die Sitzung nach ihrer Antwort gehandelt.
+
+Das erste: `scripts/ci-gate-verdict.mjs` lebt im GitHub-Runner. Es liest `GATE_EVENT`,
+`GATE_REF` und `GATE_OUTCOMES` aus der Umgebung, entscheidet nichts selbst und beendet sich
+grundsätzlich mit 0 — alles korrekt für seinen einen Aufrufer. Von Hand aufgerufen, mit
+`--ref feat/1065-teaching-hands-touch --wait`, hat es beide Flags ignoriert, eine LEERE
+Ergebnismenge bewertet und »CI gate passed.« gedruckt. Ich habe das zweimal getan und beide
+Male gemeldet, die CI sei grün. Sie war es zu diesem Zeitpunkt nicht: der Stop-Wächter nannte
+in derselben Minute den noch laufenden Workflow. Geschadet hat es am Ende nichts — das lokale
+Tor vor dem `main`-Push ist vollständig gelaufen, und `gh run list` hat für den gelandeten
+Stand später Erfolg gezeigt —, aber der Satz »CI gate passed« stand für einen Ref, den das
+Skript nie angesehen hat.
+
+Das zweite: `run-wait --plan polish` druckt in einem Atemzug beide Zahlen — »expected 5m 41s«
+aus dem Bildermodell und, zwei Zeilen darunter, »observed 9.9–61.5 min (median 55.2)« aus der
+eigenen Messreihe. Die Hängen-Schwelle multipliziert die ERWARTUNG: 2,5 × 5m41s = 14m12s. Ein
+`polish`-Lauf von normaler Länge wird damit nach einem Viertel seiner Laufzeit für tot erklärt,
+und das Urteil warnt nicht, es befiehlt: »end the run rather than waiting again«. Ich habe
+gehorcht und einen Lauf getötet, der arbeitete — der Entwicklungsserver antwortete, das
+Protokoll zeigte keinen Fehler, und der Nachfolgelauf schrieb in fünf Minuten 27 Bilder.
+
+**Die gemeinsame Form** ist nicht »ein Fehler in der Zahl«, sondern eine fehlende Enthaltung.
+Beide Werkzeuge kennen den Zustand »ich kann diese Frage nicht beantworten« nicht: das eine
+verwandelt eine leere Eingabe in ein Bestanden, das andere eine unpassende Erwartung in eine
+Todesdiagnose. Das ist die Verwandtschaft zu §3.185 und zur Lehre aus dem Doktor — fail-open
+schützt gegen fehlende Daten, nicht gegen falsche —, nur eine Stufe früher: hier entstehen die
+falschen Daten nicht aus einem verschluckten Fehler, sondern aus einer Voreinstellung, die für
+den einen vorgesehenen Aufrufer richtig ist und für jeden anderen eine Behauptung.
+
+**Lehre:** Ein Werkzeug, dessen Antwort eine Handlung auslöst, muss den Aufruf zurückweisen,
+den es nicht bedienen kann — ein unbekanntes Flag, eine leere Umgebung, eine Erwartung, der
+die eigene Messreihe widerspricht. Und wo neben dem Modellwert eine Messung steht, ist die
+Messung die Zahl, mit der gerechnet wird; der Modellwert ist ihr Boden, nicht ihr Maß. Gebucht
+als Punkte 1101 und 1099.
