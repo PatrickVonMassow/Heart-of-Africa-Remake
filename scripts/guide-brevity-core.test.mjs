@@ -384,9 +384,20 @@ describe('the real vibe-coding guide', () => {
       entries.map((entry) => [entry.title, entry.lines.join(' ').replace(/\s+/g, ' ')]),
     )
 
+    // The claim is pinned, not its punctuation: the entry gained a second half on
+    // 10.09.2026 and the sentence now continues past what used to close it.
     expect(byTitle['Der Prüflauf verändert sein eigenes Projekt.']).toContain(
-      '„Etabliere einen Mechanismus, der einen Prüflauf rot färbt, sobald er das Projekt verändert hat, in dem er läuft"',
+      '„Etabliere einen Mechanismus, der einen Prüflauf rot färbt, sobald er das Projekt verändert hat, in dem er läuft',
     )
+    // Its second half: the run refuses a repository that moves under it, and the
+    // session that ordered the run is the one most likely to move it.
+    expect(byTitle['Der Prüflauf verändert sein eigenes Projekt.']).toContain(
+      'Solange ein Lauf läuft, schreibt **niemand** ins Projekt',
+    )
+    // A tool with an expensive or writing effect refuses an unknown argument.
+    expect(
+      byTitle['Verschlucken sieht aus wie Erfolg — und die Frage nach der Bedienung löst die Wirkung aus.'],
+    ).toContain('**lehnt ein unbekanntes Argument ab**')
     expect(byTitle['Die Ausnahme existiert nur in der Verweigerung.']).toContain(
       'Kann der ehrlichste Wortlaut der Ausnahme meine eigene Prüfung bestehen?',
     )
