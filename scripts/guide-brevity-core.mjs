@@ -451,7 +451,11 @@ export const LIMITS = {
   // ordered the run, obeying "commit every finished step" in another window — that half went into
   // "Der Prüflauf verändert sein eigenes Projekt", which already demands the mechanism that caught
   // it. Net after the fold: five lines and fifty-two words. Ceilings move 634 -> 639.
-  maxLines: 639,
+  // LOWERED 10.09.2026: the same evening's straightening cut of the two pitfall entries
+  // "Gruener Test, falsches Bild" and "Dem Test geht der Gegenstand unter den Fuessen weg"
+  // pays back two lines and two words. The ceiling follows the measurement DOWN, because a
+  // kept 639 would be exactly the unearned headroom the rule above forbids: 639 -> 637.
+  maxLines: 637,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -695,7 +699,9 @@ export const LIMITS = {
   // 128 words after their cut: 5936 -> 6064.
   // 10.09.2026 (second): the unknown-argument and write-nothing-while-a-run-runs claims justified
   // beside maxLines measure 52 words after their fold: 6064 -> 6116.
-  maxWords: 6116,
+  // 10.09.2026 (third): the straightening cut justified beside maxLines pays back two words:
+  // 6116 -> 6114.
+  maxWords: 6114,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,
