@@ -571,16 +571,42 @@ export function settleActiveWork({
   })
   if (!decision.settle) return { ...decision, settled: false }
 
-  if (migrated) {
-    writeDeclaration(
-      transitionActiveDeclaration(migrated, {
-        exitPoint: Number(number),
-        focusPoint: decision.focusNames ? null : (migrated.focusPoint ?? null),
-      }),
-      declarationPath,
-    )
+  // WHAT IS STILL OWED WHEN A WRITE FAILS — never more than that (Astra, pass 1
+  // of the cross-vendor review of this point). The first draft's repair hint
+  // said `focus.mjs set -` unconditionally, so a settlement that failed while
+  // the focus named ANOTHER, still-open point told the operator to clear that
+  // point's focus — undoing the very decision this function had just taken
+  // correctly. The hint is therefore built from the decision and from how far
+  // the writes actually got.
+  let declarationSettled = !decision.evidenceNames
+  const stillOwed = () => {
+    const steps = []
+    if (!declarationSettled) {
+      steps.push(
+        `the in-flight declaration still names ${number} (node scripts/batch-in-flight.mjs --status shows it)`,
+      )
+    }
+    if (decision.focusNames) steps.push(`node scripts/focus.mjs set - "point ${number}: completed"`)
+    else steps.push('LEAVE THE OWNER FOCUS ALONE — it names other, still-open work')
+    return `${steps.join('; ')}; then node scripts/board-publish.mjs — the point itself has landed`
   }
-  if (decision.focusNames) setFocus(`point ${number}: completed`)
+
+  try {
+    if (migrated) {
+      writeDeclaration(
+        transitionActiveDeclaration(migrated, {
+          exitPoint: Number(number),
+          focusPoint: decision.focusNames ? null : (migrated.focusPoint ?? null),
+        }),
+        declarationPath,
+      )
+      declarationSettled = true
+    }
+    if (decision.focusNames) setFocus(`point ${number}: completed`)
+  } catch (cause) {
+    cause.repair = stillOwed()
+    throw cause
+  }
   return { ...decision, settled: true }
 }
 
@@ -910,9 +936,13 @@ async function main(argv) {
     } catch (e) {
       error = new LandingError('the now-card could not be settled before the board publish', {
         step: 'board',
+        // The settlement knows WHICH store it was correcting and how far it
+        // got, so it carries its own repair; the generic one is only for a
+        // failure that never reached that decision.
         repair:
-          `node scripts/focus.mjs set - "point ${number}: completed", then node scripts/board-publish.mjs — ` +
-          'the point itself has landed; only the board is behind',
+          e?.repair ??
+          `node scripts/board-publish.mjs names the source that is still wrong — correct THAT one; ` +
+            'the point itself has landed',
       })
       step('board', VERDICT.failed, childWords(e))
       throw error

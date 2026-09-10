@@ -701,6 +701,113 @@ describe('the landing settles the now-card before it publishes', () => {
     expect(gatherActiveWorkSource({ tasksText: TASKS_AFTER_TICK, declarationPath, focusPath }).ok).toBe(true)
   })
 
+  // THE TWO STORES, IN THE ORDER THAT MATTERS (Astra, cross-vendor review of
+  // this point). The cases above touch one store each, so reversing the write
+  // order would still have passed them. This one holds both, reads the
+  // declaration from INSIDE the focus write to prove which landed first, and
+  // keeps a LEGACY evidence item that carries no recorded point at all.
+  it('writes the declaration BEFORE the focus, and keeps every other strand', () => {
+    const { focusPath, declarationPath } = settleScene()
+    writeFileSync(focusPath, JSON.stringify({ point: 1088, note: 'point 1088: current work' }))
+    writeFileSync(
+      declarationPath,
+      JSON.stringify({
+        focusPoint: 1088,
+        evidence: [
+          { point: 1088, phase: 'authoring', kind: 'branch', ref: 'feat/1088-x' },
+          { phase: 'authoring', kind: 'branch', ref: 'feat/1091-y' },
+        ],
+      }),
+    )
+    let seenAtFocusWrite = null
+    const result = settleActiveWork({
+      number: 1088,
+      focusPath,
+      declarationPath,
+      setFocus: (note) => {
+        seenAtFocusWrite = JSON.parse(readFileSync(declarationPath, 'utf8'))
+        writeFileSync(focusPath, JSON.stringify({ point: null, note }))
+      },
+    })
+    expect(result.settled).toBe(true)
+    expect(result.focusNames).toBe(true)
+    expect(result.evidenceNames).toBe(true)
+    // The declaration was already correct when the focus was written: 1088 gone,
+    // the legacy strand migrated to its recorded point rather than dropped.
+    expect(seenAtFocusWrite.evidence.map((item) => item.point)).toEqual([1091])
+    expect(seenAtFocusWrite.focusPoint).toBe(null)
+    expect(gatherActiveWorkSource({ tasksText: TASKS_AFTER_TICK, declarationPath, focusPath }).ok).toBe(true)
+    // AND a second pass over the source it just settled is a no-op — the real
+    // idempotence, not the trivial one over a source that never needed it.
+    const again = settleActiveWork({
+      number: 1088,
+      focusPath,
+      declarationPath,
+      setFocus: () => {
+        throw new Error('already settled, so nothing may be written again')
+      },
+    })
+    expect(again.settled).toBe(false)
+  })
+
+  it('a failed focus write says what is still owed — and a retry finishes it', () => {
+    const { focusPath, declarationPath } = settleScene()
+    writeFileSync(focusPath, JSON.stringify({ point: 1088, note: 'point 1088: current work' }))
+    writeFileSync(declarationPath, JSON.stringify({ focusPoint: 1088, evidence: [] }))
+    let thrown = null
+    try {
+      settleActiveWork({
+        number: 1088,
+        focusPath,
+        declarationPath,
+        setFocus: () => {
+          throw new Error('focus.mjs exited 1')
+        },
+      })
+    } catch (e) {
+      thrown = e
+    }
+    expect(thrown).not.toBeNull()
+    expect(thrown.repair).toMatch(/focus\.mjs set - "point 1088: completed"/)
+    // The declaration DID land, so the repair must not send the operator after it.
+    expect(thrown.repair).not.toMatch(/declaration still names/)
+    const retried = settleActiveWork({
+      number: 1088,
+      focusPath,
+      declarationPath,
+      setFocus: (note) => writeFileSync(focusPath, JSON.stringify({ point: null, note })),
+    })
+    expect(retried.settled).toBe(true)
+    expect(gatherActiveWorkSource({ tasksText: TASKS_AFTER_TICK, declarationPath, focusPath }).ok).toBe(true)
+  })
+
+  it("NEVER tells the operator to clear a focus that names another point's work", () => {
+    const { focusPath, declarationPath } = settleScene()
+    // The focus names 1091, which is still open; only the evidence names 1088.
+    writeFileSync(focusPath, JSON.stringify({ point: 1091, note: 'point 1091: current work' }))
+    writeFileSync(
+      declarationPath,
+      JSON.stringify({ focusPoint: 1091, evidence: [{ point: 1088, phase: 'authoring' }] }),
+    )
+    let thrown = null
+    try {
+      settleActiveWork({
+        number: 1088,
+        focusPath,
+        declarationPath,
+        // The one write this settlement makes is the declaration; fail it.
+        setFocus: () => {
+          throw new Error('the focus must never be touched here')
+        },
+      })
+    } catch (e) {
+      thrown = e
+    }
+    // The focus write is not even attempted, so this settlement SUCCEEDS.
+    expect(thrown).toBeNull()
+    expect(JSON.parse(readFileSync(focusPath, 'utf8')).point).toBe(1091)
+  })
+
   it('does nothing at all when the source never named the point — and is idempotent', () => {
     const { focusPath, declarationPath } = settleScene()
     writeFileSync(focusPath, JSON.stringify({ point: 1091, note: 'point 1091: current work' }))
