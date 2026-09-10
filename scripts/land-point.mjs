@@ -920,7 +920,14 @@ async function main(argv) {
     } catch (e) {
       error = new LandingError('main could not be pushed', {
         step: 'push',
-        repair: 'git push origin main — the tick IS committed locally, and the feature branch is still intact',
+        // NOT "re-run this command" either (measured 11.09.2026 on point 1065): the tick has
+        // already landed, so a re-run dies at the tick step with "not in TASKS.md" — and the two
+        // steps AFTER the push never ran, so they are owed by hand.
+        repair:
+          'git push origin main — the tick IS committed locally, and the feature branch is still intact. '
+          + 'Then finish the two steps this chain never reached, BY HAND, because a re-run dies at the tick: '
+          + 'node scripts/board-publish.mjs, then node scripts/worktree-cleanup.mjs <worktree> and delete the branch '
+          + 'locally and on the remote.',
       })
       step('push', VERDICT.failed, childWords(e))
       throw error
