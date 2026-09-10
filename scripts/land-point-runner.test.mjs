@@ -24,7 +24,7 @@
 // `land-cleanup-core.mjs` assumes — the lock line, the dirtiness, and above all
 // WITHOUT its own look becoming the evidence (point 629).
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdtempSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, it, expect } from 'vitest'
@@ -636,6 +636,7 @@ describe('the landing settles the now-card before it publishes', () => {
     const root = mkdtempSync(join(tmpdir(), 'land-settle-'))
     roots.push(root)
     return {
+      dir: root,
       focusPath: join(root, 'current-focus.json'),
       declarationPath: join(root, 'in-flight.json'),
     }
@@ -753,7 +754,19 @@ describe('the landing settles the now-card before it publishes', () => {
   it('a failed focus write says what is still owed — and a retry finishes it', () => {
     const { focusPath, declarationPath } = settleScene()
     writeFileSync(focusPath, JSON.stringify({ point: 1088, note: 'point 1088: current work' }))
-    writeFileSync(declarationPath, JSON.stringify({ focusPoint: 1088, evidence: [] }))
+    // EVIDENCE FOR 1088 IS THE POINT OF THIS SETUP (Astra, confirming pass): with an
+    // empty list `declarationSettled` starts true, so dropping the assignment after
+    // the successful declaration write would have passed unnoticed.
+    writeFileSync(
+      declarationPath,
+      JSON.stringify({
+        focusPoint: 1088,
+        evidence: [
+          { point: 1088, phase: 'authoring' },
+          { point: 1091, phase: 'authoring' },
+        ],
+      }),
+    )
     let thrown = null
     try {
       settleActiveWork({
@@ -769,8 +782,10 @@ describe('the landing settles the now-card before it publishes', () => {
     }
     expect(thrown).not.toBeNull()
     expect(thrown.repair).toMatch(/focus\.mjs set - "point 1088: completed"/)
-    // The declaration DID land, so the repair must not send the operator after it.
+    // The declaration DID land, so the repair must not send the operator after it —
+    // and the write it made must survive the focus failure rather than be rolled back.
     expect(thrown.repair).not.toMatch(/declaration still names/)
+    expect(JSON.parse(readFileSync(declarationPath, 'utf8')).evidence.map((i) => i.point)).toEqual([1091])
     const retried = settleActiveWork({
       number: 1088,
       focusPath,
@@ -782,29 +797,38 @@ describe('the landing settles the now-card before it publishes', () => {
   })
 
   it("NEVER tells the operator to clear a focus that names another point's work", () => {
-    const { focusPath, declarationPath } = settleScene()
+    const { focusPath, declarationPath, dir } = settleScene()
     // The focus names 1091, which is still open; only the evidence names 1088.
     writeFileSync(focusPath, JSON.stringify({ point: 1091, note: 'point 1091: current work' }))
     writeFileSync(
       declarationPath,
       JSON.stringify({ focusPoint: 1091, evidence: [{ point: 1088, phase: 'authoring' }] }),
     )
+    // THE WRITE HAS TO ACTUALLY FAIL (Astra, confirming pass). The first draft of
+    // this case succeeded, so it never looked at `repair` at all and would have
+    // passed with the unconditional focus-clear hint restored. A read-only
+    // directory fails the REAL write path rather than a stubbed one.
     let thrown = null
+    chmodSync(dir, 0o500)
     try {
       settleActiveWork({
         number: 1088,
         focusPath,
         declarationPath,
-        // The one write this settlement makes is the declaration; fail it.
         setFocus: () => {
           throw new Error('the focus must never be touched here')
         },
       })
     } catch (e) {
       thrown = e
+    } finally {
+      chmodSync(dir, 0o700)
     }
-    // The focus write is not even attempted, so this settlement SUCCEEDS.
-    expect(thrown).toBeNull()
+    expect(thrown).not.toBeNull()
+    expect(thrown.repair).toMatch(/the in-flight declaration still names 1088/)
+    expect(thrown.repair).toMatch(/LEAVE THE OWNER FOCUS ALONE/)
+    // The whole finding in one assertion: no remedy that would clear 1091's focus.
+    expect(thrown.repair).not.toMatch(/focus\.mjs set -/)
     expect(JSON.parse(readFileSync(focusPath, 'utf8')).point).toBe(1091)
   })
 
