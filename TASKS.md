@@ -77,40 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1090. A writing verification run passes for a live author and no successor starts
-  (user 10.09.2026).
-  The successor decision must not read the file trail of a detached verification run as a
-  registered feature-writer that is still at work. Measured on 10.09.2026: the session
-  handed over cleanly at 19:04 CEST after reaching its context watermark, and the launcher
-  (pid 1133, armed, 15-min tick) then refused at 19:11, 19:26 and 19:41 with
-  `successor decision refused (registered-writer-live) — recent registered feature-writer
-  activity measured for feat/1065-teaching-hands-touch
-  (.claude/worktrees/point-1065) — work output 0 min old (working files)`. No author was
-  alive. The measured writes came from the detached LARGE run (pid 888430, started 18:20
-  CEST), which streams `verification/*.png` into that worktree for its whole ~2 h. The
-  batch stood still for 43 minutes and would have stood still until the run ended; it
-  resumed only because the user opened a session by hand and asked why nothing moved.
-  The veto is exactly inverted: a long coverage run is the phase in which a handover to a
-  fresh session is MEANT to happen, because the run outlives the session that started it.
-  Final state: the writer-liveness verdict in `scripts/batch-autostart-core.mjs`
-  distinguishes a WRITER from a verification run's file trail. Paths a verification run
-  owns — `verification/`, `local/verify-logs/`, `test-results/`, `playwright-report/` —
-  no longer count as "working files" evidence that a feature-writer is alive, so a
-  worktree in which only a run is writing does not veto the successor. A measured live
-  author process, and a working-file change outside those paths, still veto as before.
-  Test. Vitest: a worktree whose only recent writes are under the verification-owned
-  paths yields no `registered-writer-live` veto, while a recent write to a source file in
-  the same worktree still does.
-  Criticality: high — BLOCKING. It stops the whole batch for the entire duration of every
-  long coverage run, which is precisely when the batch depends on the launcher; the
-  standstill is silent (the board keeps reading "no running work") and ends only by hand.
-  Pulled forward under the CLAUDE.md §2 infrastructure-freeze clause "reproducibly blocks
-  current game work".
-  Refs: scripts/batch-autostart-core.mjs (`registered-writer-live`, the
-  `featureWriterRegister` writer verdict), scripts/batch-autostart-core.test.mjs,
-  .claude/batch-launcher.log (10.09.2026 15:26Z, 15:41Z).
-  Bundle: Testinfrastruktur.
-
 - [ ] 1065. The tapping child's hand touches the rock it names (user 06.09.2026).
   ONE DEFECT, and it is the first half of what stood here as two: a figure teaches a word by
   acting on an object, stops more than a metre short of it, and the act stays invisible.
