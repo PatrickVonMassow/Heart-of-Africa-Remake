@@ -59,20 +59,40 @@ export const RED_CHARGES = [
     point: 1065,
     suite: 'polish',
     kind: 'check',
-    match: /(no tap is ever spoken from the waiting station|the tapping child reaches its stone at all|the carrier goes INTO the water and dips the jar|comes back with a jar that SHOWS its water|the village keeps a water stand, and the fetched jars are set down on it)/i,
-    // NO detailMatch: these reds are the DEFECT ITSELF, and every one of them
-    // prints the distance or the depth it measured, so a detail signature would
-    // have to be re-cut on every reading of a defect that is being fixed.
+    match: /(no tap is ever spoken from the waiting station|the tapping child reaches its stone at all)/i,
+    // NO detailMatch: these reds are the DEFECT ITSELF, and both of them print
+    // the distance they measured, so a detail signature would have to be re-cut
+    // on every reading of a defect that is being fixed.
     why:
-      'THESE ARE THE VERY DEFECTS POINT 1065 IS OPEN FOR, and three of the five name it in '
-      + 'their own check text. Measured on the branch feat/1065-teaching-hands-touch at '
-      + '4c1e7b984 in webgpu/polish at 08:03:38.039Z and 08:33:41.040Z: the tap spoken from '
-      + 'the waiting station 58.3 cm off the flank, the carrier halting above the waterline so '
-      + 'the jar never goes under the drawn surface, no return leg, and the water stand the '
-      + 'point still owes drawing at all (its PART B final state prescribes it). They say '
-      + 'nothing about any other change: both runs are that branch and nothing else. The '
-      + 'charge is not a pass — the point owes the picture on BOTH backends before it lands, '
-      + 'and every one of these entries dies the moment it is ticked.',
+      'THESE ARE THE VERY DEFECTS POINT 1065 IS OPEN FOR, and both name it in their own check '
+      + 'text. Measured on the branch feat/1065-teaching-hands-touch at 4c1e7b984 in '
+      + 'webgpu/polish at 08:03:38.039Z and 08:33:41.040Z: the tap spoken from the waiting '
+      + 'station 58.3 cm off the flank. They say nothing about any other change: both runs are '
+      + 'that branch and nothing else. The charge is not a pass — the point owes the picture '
+      + 'on BOTH backends before it lands, and every one of these entries dies the moment it is '
+      + 'ticked. SPLIT 10.09.2026: the three water-carrier reds this entry also held moved to '
+      + 'point 1087 with PART B, so that ticking 1065 does not orphan them.',
+  },
+  {
+    point: 1087,
+    suite: 'polish',
+    kind: 'check',
+    match: /(the carrier goes INTO the water and dips the jar|comes back with a jar that SHOWS its water|that carry is PHOTOGRAPHED with the jar still on his head|the village keeps a water stand, and the fetched jars are set down on it)/i,
+    // NO detailMatch: as above — each of these prints the distance or the depth
+    // it measured, and the defect is still being fixed.
+    why:
+      'PART B OF 1065 BECAME POINT 1087 ON 10.09.2026 ON THE USER INSTRUCTION, and its reds '
+      + 'move with it. They were charged to 1065 while the two halves shared one branch and '
+      + 'would have become unaccounted the moment 1065 was ticked — the stale-exception death '
+      + 'this ledger is built for, firing on the wrong point. The adult-errands checks were '
+      + 'shed from feat/1065-teaching-hands-touch in 59f40b2a9 and no longer run there at all; '
+      + 'the records they still block are older than that commit. Measured in webgl/polish at '
+      + '2026-09-09T23:55:15.542Z on that branch: 251 pass, 2 fail, both in --section='
+      + 'adult-errands — no carrier was ever seen filling a jar (the closest a walking leg '
+      + 'came to its own goal was 1.15 m against an arrival radius of 1.10 m), and with no dip '
+      + 'seen the open bank could not be located, so no frame of the carry could be taken. The '
+      + 'charge is not a pass: 1087 owes the fill and the carry in the picture on both backends '
+      + 'before it lands, and this entry dies the moment it is ticked.',
   },
   {
     point: 1078,
