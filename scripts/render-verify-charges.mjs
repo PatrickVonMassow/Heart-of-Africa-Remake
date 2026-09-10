@@ -56,24 +56,6 @@
 /** @type {RedCharge[]} */
 export const RED_CHARGES = [
   {
-    point: 1065,
-    suite: 'polish',
-    kind: 'check',
-    match: /(no tap is ever spoken from the waiting station|the tapping child reaches its stone at all)/i,
-    // NO detailMatch: these reds are the DEFECT ITSELF, and both of them print
-    // the distance they measured, so a detail signature would have to be re-cut
-    // on every reading of a defect that is being fixed.
-    why:
-      'THESE ARE THE VERY DEFECTS POINT 1065 IS OPEN FOR, and both name it in their own check '
-      + 'text. Measured on the branch feat/1065-teaching-hands-touch at 4c1e7b984 in '
-      + 'webgpu/polish at 08:03:38.039Z and 08:33:41.040Z: the tap spoken from the waiting '
-      + 'station 58.3 cm off the flank. They say nothing about any other change: both runs are '
-      + 'that branch and nothing else. The charge is not a pass — the point owes the picture '
-      + 'on BOTH backends before it lands, and every one of these entries dies the moment it is '
-      + 'ticked. SPLIT 10.09.2026: the three water-carrier reds this entry also held moved to '
-      + 'point 1087 with PART B, so that ticking 1065 does not orphan them.',
-  },
-  {
     point: 1087,
     suite: 'polish',
     kind: 'check',
