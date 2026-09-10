@@ -27364,3 +27364,31 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   gone when the real refusal came. Raises the criticality: with maximum delegation an author is
   almost always committing, so `main` is almost never pushable.
   Bundle: Urlaubsfestigkeit.
+
+- [x] 1088. The unit teardown aborts a run on a foreign worktree's commit (user 10.09.2026).
+  The unit stage's repository-integrity teardown must not abort a run because ANOTHER
+  worktree or main moved. Measured on point 1065 on 10.09.2026: two LARGE runs died in
+  teardown before drawing a single frame (15:37, 16:13) with "LIVE REPOSITORY CHANGED
+  WHILE UNIT SUITE RAN" — the named changes were refs/heads/main, a foreign worktree's
+  index, and worktree registrations, i.e. a legitimate concurrent commit, never test
+  leakage.
+  Final state: assertRepositoryUnchanged (scripts/repository-integrity.mjs) judges only
+  what the RUNNING worktree owns — its own HEAD, its own index, its own branch ref, and
+  the config. A change to a foreign ref, a foreign worktree index, or the worktree
+  registration list is REPORTED as a line in the run log and does NOT fail the run,
+  because the guard cannot distinguish it from test leakage and the run it kills is the
+  expensive one. Test leakage inside the running worktree still fails, loudly.
+  This is the standing defect of open points 805, 852 and 955. It is pulled forward under
+  the CLAUDE.md §2 infrastructure-freeze clause "reproducibly blocks current game work":
+  it blocked 1065's coverage run twice within four hours. Fold 805/852/955 into it or
+  close them against it — do not fix it three more times.
+  Test. Vitest: the assertion passes when only a foreign ref, a foreign worktree index or
+  the worktree registration list moved, and still fails on a change to the running
+  worktree's own HEAD, index or branch ref.
+  Criticality: high — BLOCKING. It holds a red that cannot otherwise close: while it
+  stands, any commit anywhere in the repository aborts the unit stage of a running
+  verification, so no coverage run can be relied on to finish and no point whose landing
+  needs one can be closed. Measured twice within four hours on 10.09.2026.
+  Refs: scripts/repository-integrity.mjs (assertRepositoryUnchanged, protectRepository),
+  scripts/repository-integrity.test.mjs, points 805, 852, 955.
+  Bundle: Testinfrastruktur.
