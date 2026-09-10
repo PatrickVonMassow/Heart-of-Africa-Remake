@@ -26,7 +26,7 @@ import {
   type FootPlant,
 } from '../../render/fauna'
 import { CHILD_FIGURE_SCALE, FIGURE_LIMBS, TESSELLATION } from '../../render/figures'
-import { applyFigurePose, type FigureLimbs } from '../../render/figurePose'
+import { applyFigurePose, restingArmRefs, type FigureLimbs } from '../../render/figurePose'
 import {
   advanceGesture,
   aimAt,
@@ -289,6 +289,11 @@ function Figure({
   const trunk = useRef<THREE.Group>(null)
   const arms = useRef<Array<THREE.Group | null>>([])
   const legPivots = useRef<Array<THREE.Group | null>>([])
+  // A PIVOT IS PUT AT REST WHEN IT IS BORN, NOT AT EVERY RENDER (work-order
+  // 1065). Held for this figure's lifetime, because an inline ref callback is a
+  // new function every render and React would re-attach it each time —
+  // `restingArmRefs` says what that cost the tapping child's hand.
+  const armRef = useMemo(() => restingArmRefs(arms.current, REST_POSE_ARMS), [])
 
   // The caller that owns the pose is given the pivots to write it onto. The
   // effect runs once the refs are filled, and the object it publishes is read
@@ -384,13 +389,7 @@ function Figure({
           <group
             key={i}
             position={[(i === 0 ? 1 : -1) * bodyH * L.shoulderX, bodyH * L.shoulderY - hipY, 0]}
-            ref={(el) => {
-              arms.current[i] = el
-              if (el) {
-                el.rotation.order = 'YXZ'
-                el.rotation.set(REST_POSE_ARMS[i].pitch, 0, REST_POSE_ARMS[i].roll)
-              }
-            }}
+            ref={armRef[i]}
           >
             <mesh position={[0, -armLen * 0.5, 0]} castShadow>
               <cylinderGeometry args={[L.armRadius[0], L.armRadius[1], armLen, segments]} />
