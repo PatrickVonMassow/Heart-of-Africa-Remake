@@ -21,8 +21,8 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.ts'],
     // The suite itself is a hostile boundary: a fixture that escapes through a
     // script's source-derived root must turn the whole run red if it changes a
-    // live ref, the shared config, a worktree registration, or any registered
-    // checkout's HEAD/index.
+    // running checkout's HEAD/index/branch ref or the shared config. Foreign
+    // branches, checkouts and registrations are logged as concurrent activity.
     globalSetup: ['./scripts/repository-integrity.mjs'],
     // The R3F/three scenes never render here; only pure modules and HUD
     // components are imported, so no canvas/WebGL is needed.
