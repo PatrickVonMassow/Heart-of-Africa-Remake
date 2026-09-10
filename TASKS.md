@@ -15562,3 +15562,31 @@ to land than a mechanism that needs a review.
   scripts/verify/run-logged.mjs (`expectedRuntimeMs`), docs/picture-check-cost.md,
   point 1083.
   Bundle: Testinfrastruktur.
+
+- [ ] 1095. The guide's ceiling equals its size, so the review that demands a new lesson
+  cannot deliver one (measured 10.09.2026 20:55).
+  `retro-currency-guard` blocks the turn until `docs/analysis_de/vibe-coding-anleitung.md`
+  has been read against the changed sources, and it asks in its own words whether the guide
+  "needs a new pitfall + prompt". Read against the new lesson §3.260 — an order filed to a
+  list the rules define as never blocking is an order that will not be carried out — the
+  guide has no line on the subject at all. The addition was written (one pitfall plus its
+  prompt, 11 lines in the surrounding style) and the push gate refused it:
+  `guide-brevity-core.test.mjs` pins `maxLines` 637 and `maxWords` 6114, which is EXACTLY the
+  file's current size. Any addition fails. The commit was taken back, so nothing lies half
+  done, and the review itself is attested.
+  THE TWO RULES CONTRADICT EACH OTHER, and neither is wrong on its own: the guide must stay
+  short enough for a beginner to read, and it must carry what the retrospective learns. Today
+  the second one silently loses, and it loses without a word — the refusal names a test, not
+  a decision.
+  Final state: one of the two is taken and written down where the next reader meets it —
+  either the guide trades space (several of its pitfalls come from the guard mechanics and
+  carry less for a beginner than "where does my order end up"), or the ceiling is raised in a
+  commit that STATES the measurement, which is what point 1022 requires of any raise. Either
+  way the §3.260 pitfall stands in the guide when the point closes.
+  Test: the brevity case keeps pinning a ceiling and stays mutation-checked; a case asserts
+  the guide names the two-doors pitfall, so the lesson cannot fall out again unnoticed.
+  Refs: docs/analysis_de/vibe-coding-anleitung.md, scripts/guide-brevity-core.test.mjs,
+  scripts/retro-currency-guard.mjs, docs/analysis_de/retrospektive-zusammenarbeit.md (§3.260),
+  point 1022 (the rule for raising a document ceiling)
+  Criticality: low — it costs no player anything; it costs the guide its currency.
+  Bundle: Testinfrastruktur.

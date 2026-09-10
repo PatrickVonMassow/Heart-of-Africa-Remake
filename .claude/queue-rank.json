@@ -1296,6 +1296,12 @@
       "why": "Nutzer-Auftrag 10.09.2026 20:11: 'Setze deine Empfehlung bzgl. 1045 um' — der Punkt streicht Pruefbreite und gehoert vor die Punkte, deren Stichproben er umstellt.",
       "origin": "user",
       "place": "ahead"
+    },
+    "1095": {
+      "at": "2026-09-10T19:02:17.920Z",
+      "why": "Maschinen-Befund ohne Spielerwirkung: die Anleitung verliert Aktualität, nichts blockiert; steht hinter der Release-Arbeit.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1328,7 +1334,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-10T18:32:34.513Z",
+    "at": "2026-09-10T19:02:17.928Z",
     "points": [
       174,
       184,
@@ -1715,7 +1721,8 @@
       1091,
       1092,
       1093,
-      1094
+      1094,
+      1095
     ]
   }
 }
