@@ -15586,3 +15586,26 @@ to land than a mechanism that needs a review.
   Criticality: medium — it costs no player anything, but it re-imposes on every landing the
   manual repair the chain was just fixed to avoid.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1097. A pause the session wrote itself holds the batch forever and is booked as user
+  downtime (measured 10.09.2026, 21:07–21:48).
+  A session read the handover instruction as a stop and wrote `.claude/batch-paused` with
+  `type: user-stop` and `retry-after: never`. The batch then stood still for 41 minutes and
+  was restarted by the user, not by any mechanism. Three properties keep that invisible:
+  - `scripts/batch-pause-core.mjs` treats `type: user-stop` as PROOF of user origin, although
+    the session writes the marker itself, and it is the only cause with no clock at all.
+  - `pauseMarkerEvidence` in `scripts/batch-standstill-inputs.mjs` books the whole interval as
+    `ACTIVITY_CLASSES.BLOCKED_USER` — excused user downtime — so the standstill report cannot
+    see the session's own misreading even in hindsight.
+  - Nothing notifies when a clockless park is written.
+  Final state: a clockless park notifies at once through `scripts/notify.mjs`; a clockless park
+  the user did not CONFIRM falls back to a clock after a bounded time instead of standing
+  forever; and the standstill analysis no longer books an unconfirmed park on the user.
+  Test. Vitest: a `user-stop` marker without recorded user confirmation ages into a clocked
+  retry, a confirmed one does not; and the standstill classifier books an unconfirmed park
+  outside `BLOCKED_USER` while a confirmed one stays there.
+  Refs: scripts/batch-pause-core.mjs, scripts/batch-standstill-inputs.mjs (`pauseMarkerEvidence`),
+  scripts/notify.mjs, memory rule "no standstill: decide and record" (23.08.2026)
+  Criticality: high — it makes the standing instruction of 23.08.2026 (no permanent standstill)
+  unenforceable, and the report that would expose it excuses the outage instead.
+  Bundle: Session- & Repo-Hygiene.
