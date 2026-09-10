@@ -1278,39 +1278,28 @@
       "why": "Nutzer-Anordnung 10.09.2026 02:15: das Wasserholen bleibt direkt hinter seiner Designentscheidung und der neuen Pruefleiter statt ans Ende zu wandern",
       "origin": "user",
       "place": "ahead"
+    },
+    "1088": {
+      "at": "2026-09-10T16:08:52.616Z",
+      "why": "Nutzerfrage 10.09.2026 18:07: Zwei Deckungsläufe von 1065 sind heute an genau diesem Teardown gestorben (15:37, 16:13) — 1065 profitiert direkt, und jeder weitere Nachweislauf bleibt bis dahin ein Münzwurf.",
+      "origin": "user",
+      "place": "ahead"
+    },
+    "1089": {
+      "at": "2026-09-10T15:03:33.630Z",
+      "why": "Verbesserung der Zurechnung, kein Blocker: sie wartet hinter dem Release.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1090": {
+      "at": "2026-09-10T15:54:41.757Z",
+      "why": "Es stoppt den Stapel still für die volle Dauer jedes langen Deckungslaufs — genau der Phase, in der der Abschlussdurchlauf 633 vor dem Release stattfindet; wartete es auf 174, träfe es das Release selbst.",
+      "origin": "machine",
+      "place": "ahead"
     }
   },
-  "boundary": {
-    "at": "2026-08-21T00:55:14.962Z",
-    "points": [
-      336,
-      553,
-      596,
-      633,
-      659,
-      660,
-      663,
-      690,
-      708,
-      715,
-      719,
-      733,
-      735,
-      736,
-      738,
-      739,
-      746,
-      747,
-      750,
-      759,
-      760,
-      762,
-      764
-    ],
-    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
-  },
   "settled": {
-    "at": "2026-09-10T00:49:31.057Z",
+    "at": "2026-09-10T15:54:41.770Z",
     "points": [
       174,
       184,
@@ -1694,7 +1683,39 @@
       1084,
       1085,
       1086,
-      1087
+      1087,
+      1088,
+      1089,
+      1090
     ]
+  },
+  "boundary": {
+    "at": "2026-08-21T00:55:14.962Z",
+    "points": [
+      336,
+      553,
+      596,
+      633,
+      659,
+      660,
+      663,
+      690,
+      708,
+      715,
+      719,
+      733,
+      735,
+      736,
+      738,
+      739,
+      746,
+      747,
+      750,
+      759,
+      760,
+      762,
+      764
+    ],
+    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   }
 }

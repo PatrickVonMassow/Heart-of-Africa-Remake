@@ -77,6 +77,68 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
+- [ ] 1088. The unit teardown aborts a run on a foreign worktree's commit (user 10.09.2026).
+  The unit stage's repository-integrity teardown must not abort a run because ANOTHER
+  worktree or main moved. Measured on point 1065 on 10.09.2026: two LARGE runs died in
+  teardown before drawing a single frame (15:37, 16:13) with "LIVE REPOSITORY CHANGED
+  WHILE UNIT SUITE RAN" — the named changes were refs/heads/main, a foreign worktree's
+  index, and worktree registrations, i.e. a legitimate concurrent commit, never test
+  leakage.
+  Final state: assertRepositoryUnchanged (scripts/repository-integrity.mjs) judges only
+  what the RUNNING worktree owns — its own HEAD, its own index, its own branch ref, and
+  the config. A change to a foreign ref, a foreign worktree index, or the worktree
+  registration list is REPORTED as a line in the run log and does NOT fail the run,
+  because the guard cannot distinguish it from test leakage and the run it kills is the
+  expensive one. Test leakage inside the running worktree still fails, loudly.
+  This is the standing defect of open points 805, 852 and 955. It is pulled forward under
+  the CLAUDE.md §2 infrastructure-freeze clause "reproducibly blocks current game work":
+  it blocked 1065's coverage run twice within four hours. Fold 805/852/955 into it or
+  close them against it — do not fix it three more times.
+  Test. Vitest: the assertion passes when only a foreign ref, a foreign worktree index or
+  the worktree registration list moved, and still fails on a change to the running
+  worktree's own HEAD, index or branch ref.
+  Criticality: high — BLOCKING. It holds a red that cannot otherwise close: while it
+  stands, any commit anywhere in the repository aborts the unit stage of a running
+  verification, so no coverage run can be relied on to finish and no point whose landing
+  needs one can be closed. Measured twice within four hours on 10.09.2026.
+  Refs: scripts/repository-integrity.mjs (assertRepositoryUnchanged, protectRepository),
+  scripts/repository-integrity.test.mjs, points 805, 852, 955.
+  Bundle: Testinfrastruktur.
+
+- [ ] 1090. A writing verification run passes for a live author and no successor starts
+  (user 10.09.2026).
+  The successor decision must not read the file trail of a detached verification run as a
+  registered feature-writer that is still at work. Measured on 10.09.2026: the session
+  handed over cleanly at 19:04 CEST after reaching its context watermark, and the launcher
+  (pid 1133, armed, 15-min tick) then refused at 19:11, 19:26 and 19:41 with
+  `successor decision refused (registered-writer-live) — recent registered feature-writer
+  activity measured for feat/1065-teaching-hands-touch
+  (.claude/worktrees/point-1065) — work output 0 min old (working files)`. No author was
+  alive. The measured writes came from the detached LARGE run (pid 888430, started 18:20
+  CEST), which streams `verification/*.png` into that worktree for its whole ~2 h. The
+  batch stood still for 43 minutes and would have stood still until the run ended; it
+  resumed only because the user opened a session by hand and asked why nothing moved.
+  The veto is exactly inverted: a long coverage run is the phase in which a handover to a
+  fresh session is MEANT to happen, because the run outlives the session that started it.
+  Final state: the writer-liveness verdict in `scripts/batch-autostart-core.mjs`
+  distinguishes a WRITER from a verification run's file trail. Paths a verification run
+  owns — `verification/`, `local/verify-logs/`, `test-results/`, `playwright-report/` —
+  no longer count as "working files" evidence that a feature-writer is alive, so a
+  worktree in which only a run is writing does not veto the successor. A measured live
+  author process, and a working-file change outside those paths, still veto as before.
+  Test. Vitest: a worktree whose only recent writes are under the verification-owned
+  paths yields no `registered-writer-live` veto, while a recent write to a source file in
+  the same worktree still does.
+  Criticality: high — BLOCKING. It stops the whole batch for the entire duration of every
+  long coverage run, which is precisely when the batch depends on the launcher; the
+  standstill is silent (the board keeps reading "no running work") and ends only by hand.
+  Pulled forward under the CLAUDE.md §2 infrastructure-freeze clause "reproducibly blocks
+  current game work".
+  Refs: scripts/batch-autostart-core.mjs (`registered-writer-live`, the
+  `featureWriterRegister` writer verdict), scripts/batch-autostart-core.test.mjs,
+  .claude/batch-launcher.log (10.09.2026 15:26Z, 15:41Z).
+  Bundle: Testinfrastruktur.
+
 - [ ] 1065. The tapping child's hand touches the rock it names (user 06.09.2026).
   ONE DEFECT, and it is the first half of what stood here as two: a figure teaches a word by
   acting on an object, stops more than a metre short of it, and the act stays invisible.
@@ -135,6 +197,20 @@ put it is the mistake this line exists to stop.
   it; the lane here follows `isBackendSensitivePath` over what the tap actually touches.
   Screenshot: verification/1065-tapping-child-at-its-rock.png (subject declared: the tapping
   child at its rock).
+  COVERING RUN, 10.09.2026 16:20–17:55 CEST: LARGE, WebGL 2 lane, RED (exit 1) after 95m 33s,
+  138 frames, HEAD 764ecb808. SEVEN failing suites, and NOT ONE of them is this branch's.
+  Measured, not argued:
+  - `settings` ground-detail, `enrichments` dressing-growth (point 278) and `crossbrowser`
+    chromium-mobile are the three recurring foreign reds already named in point 1089.
+  - `benchmark` (6 checks, "restored: ssaoEnabled" and its siblings) — classified against the
+    merge-base 4b81b945e, two runs: PRE-EXISTING, already 9 failing on the baseline.
+  - `gamepad` position-query DE — classified the same way: UNSTABLE ON BASELINE (green on
+    baseline run 1, red on run 2), so the baseline decides nothing and the branch owns nothing.
+  Evidence: local/verify-baseline-logs/{benchmark,gamepad}-baseline-4b81b945e8a0-run{1,2}.log,
+  .claude/worktrees/point-1065/local/verify-logs/2026-09-10T14-20-09-713-large.log.
+  Under the user's decision of 10.09.2026 ("Regression bleibt, fremde Reds entkoppeln") none of
+  these holds the point. What the point still owes is its OWN evidence: the narrow
+  `polish --section=children-bank-game` rung and the declared tap screenshot.
   Quotes:
   Nutzer, 06.09.2026 13:48: »Wenn ein Kind beim Fangspiel an den Felsen tippt und ROCK sagt, berührt seine Hand nicht annähernd den Felsen. Das Kind steht in dem Augenblick noch sehr seit davon entfernt. So erkennt man nicht, dass das Gesprochene etwas mit dem Felsen zu tun hat und man könne eher glauben, dass es "Los!" o. ä. bedeutet.«
   Nutzer, 06.09.2026 13:48 (Einreihung aller drei Punkte): »An der Kommunikationsmechanik zu überarbeiten, einzureihen direkt nach 1058, in der Rehenfolge, in der ich es hier aufzähle:« — PART A war der ZWEITE der drei, PART B der DRITTE; die vom Nutzer genannte Reihenfolge bleibt innerhalb dieses Punktes erhalten.
@@ -1232,6 +1308,33 @@ put it is the mistake this line exists to stop.
   tag plus `poc` dynamically, but a tag push alone does not trigger it. Then VERIFY
   that /v0.3/ and /poc/ serve the new state, and FREEZE the tag: it is never
   re-pointed.
+
+- [ ] 1089. Charge a LARGE red that does not touch the point's diff to its own point
+  (user 10.09.2026).
+  Apply the rule CLAUDE.md §7.2 already states — "a red run closes only when its cause is
+  fixed, CHARGED TO ITS OWNING POINT, or FILED AS A NEW POINT" — to the reds that are
+  holding point 1065, and make the charging automatic rather than a judgement call.
+  Measured on 1065 (10.09.2026): 23 full LARGE runs, 16.2 machine hours, none green, and
+  NOT ONE red touched the tap. The recurring reds are `settings` ground-detail (edge
+  energy), `enrichments` dressing-growth (point 278), `crossbrowser` chromium-mobile
+  (getSupportedExtensions on null), plus two teardown aborts from foreign commits. Each
+  was re-diagnosed on every run instead of being charged once.
+  Final state:
+  - A LARGE red whose failing check does not touch the point's own diff is FILED as its
+    own point automatically by the run's own report — the report already computes
+    "touches the diff", so it has the information. The point under test is not held by it.
+  - The run's verdict line says plainly which reds are charged elsewhere and which are the
+    point's own, so a merge decision does not need a human re-reading of the log.
+  - The three reds above get their points at once; 1065 merges on its own evidence — the
+    narrow rung `polish --section=children-bank-game`, unit, build and lint.
+  WHY THIS AND NOT A POLICY CHANGE: nothing here loosens the gate. The full regression
+  still runs and still has to go green — but its failures are owned by whoever broke them
+  instead of by whoever happens to be holding the branch when they surface.
+  Test. Vitest: a red check whose file set is disjoint from the branch diff is reported as
+  charged elsewhere and does not hold the point; a red that touches the diff still does.
+  Refs: scripts/verify/run-all.mjs (the "touches the diff" annotation), CLAUDE.md §7.2,
+  point 1065, point 278.
+  Bundle: Testinfrastruktur.
 
 - [ ] 1081. A child boxed by adults planted in its own play ground walks a metre and gets
   nowhere — and the case that was supposed to catch it pins one lucky seed. Measured on
@@ -15489,4 +15592,3 @@ to land than a mechanism that needs a review.
   scripts/verify/run-logged.mjs (`expectedRuntimeMs`), docs/picture-check-cost.md,
   point 1083.
   Bundle: Testinfrastruktur.
-
