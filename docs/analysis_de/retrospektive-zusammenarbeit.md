@@ -54,6 +54,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 10.09. nachts | Die schmale Sprosse wurde zwölfmal geklettert und war zwölfmal grün — der volle Lauf fiel danach auf genau denselben zwei Prüfungen, weil ein Merge sie ungeprüft überholt hatte und der Abschnitt ein anderes Fenster misst als die Suite: die am Vorabend angeordnete Leiter hätte nichts verweigert (§3.255); dieselbe Nacht zeigt die Faltung zweier Hälften, die einen Regressionslauf sparen sollte und die fertige Hälfte drei Tage ihre Landung kostete |
 | 10.09. nachmittags | Zwei Deckungsläufe desselben Punktes starben im Teardown der Unit-Suite, weil jemand woanders committete — 15:37 an einer main-Ref, 16:13 an einem fremden Worktree-Index, beide vor dem ersten Bild. Der Defekt liegt seit dem 23.08. dreifach im Auftrag (805, 852, 955) an Position 233/261/310 von 383 und ist in Reihenfolge nie erreichbar; sichtbar wird er erst an der Rechnung des Punktes: 24,6 Maschinenstunden, 23 LARGE-Läufe, kein einziger grün (§3.231-Nachtrag) |
 | 10.09. abends | 43 Minuten Stillstand nach einer korrekten Übergabe, beendet von der Nutzerfrage „seit 17:04 keine Arbeit": Der Launcher verweigerte dreimal den Nachfolger, weil er im Arbeitsbaum einen lebenden Schreiber maß — es war der abgekoppelte Deckungslauf selbst, der dorthin seine Bilder schreibt. Das Veto sperrt den Nachfolger für die volle Dauer genau der Phase, in der die Übergabe vorgesehen ist (§3.258, vierter Wiedergänger von §3.77/§3.220) |
+| 10.09. abends | Ein als »priorisierter Fix« erteilter Nutzerauftrag lag drei Tage im Backlog, den CLAUDE.md §2 ausdrücklich als nie-blockierend bestimmt — die Ablage war die falsche von zwei erlaubten Türen und damit bereits die Entscheidung, den Auftrag nicht auszuführen; gefunden erst durch die Frage des Nutzers, zu welchem Punkt er gehöre (§3.260) |
 | 10.09. spätabends | Die Landungskette hält an ihrem letzten Schritt: Sie hakt den Punkt ab und veröffentlicht DANACH die Tafel, deren Jetzt-Karte noch genau diesen Punkt nennt — die Tafel weist die Veröffentlichung zu Recht ab, und das Aufräumen von Zweig und Arbeitsbaum bleibt liegen. Den gemessenen Grund druckt die Kette nicht mit, weil die Absage auf dem Ausgabekanal steht und sie den Fehlerkanal liest (§3.259) |
 | 13.08. | Der Nachprüfer findet eine echte zweite Klippe im geheilten Mechanismus — und jede der fünf gemessenen Kuren verschlechtert gesunde Dörfer stärker, als der Fehler schadet: Befund wird gebucht statt behoben (§3.115) |
 | 20.08. | Der Dokumentschnitt strich Regeln als »von einem Wächter abgedeckt«, ohne einen einzigen Wächter darauf zu prüfen — die Kontextanzeige verschwand, der Nutzer fand es (§3.134); eine vom Nutzer gesetzte Rangfolge wurde in einer Nacht zweimal maschinell überholt, ohne dass irgendwo ein Grund stand (Punkt 614); zwei Werkzeuge derselben Bauart am falschen Ort gemessen — im Hauptbaum gebaut und geprüft, während der Prozess die Arbeit in den isolierten Bereich schickt (§3.137) |
@@ -1458,7 +1459,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 10.09.2026, 19:42 · Quellen-Fingerprint: `768c28b0e231…`
+Zuletzt aktualisiert: Donnerstag, 10.09.2026, 20:32 · Quellen-Fingerprint: `e4df3d63f707…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1498,7 +1499,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to the OpenAI lane, GPT-6 Astra), and review is cross-vendor, not Fable-by-default | 6 | hoch | — (Regel/Memory) | ◐ Regel |
 | Iterate on the new feature's OWN test first; the full regression runs once at the end, never as the debugging loop | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 69 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 70 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | wait-command-guard.mjs | ✔ Mechanismus |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | User 18.08.2026: hard, complex, error-prone and HIGH-criticality points are AUTHORED by the OpenAI lane directly (GPT-6 Astra since 05.09.2026, GPT-5.6 Sol before) — Opus 5 authors only what is left, and Fable authors only a point that tags its lane or one the router escalates | 5 | hoch | — (Regel/Memory) | ◐ Regel |
@@ -1564,8 +1565,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 96 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 127 Prozess-/Meta-TASKS-Punkte (davon 60 offen).
 
-<!-- RETRO-FINGERPRINT: 768c28b0e2319f645f3ad6025a7e93bb21ebb357b2fc8e0bbed65c58062a4045 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-10T17:42:45.700Z -->
+<!-- RETRO-FINGERPRINT: e4df3d63f707bed6ae84096af06ffa256e87f79b1b40424f4874a80ac2846cdb -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-10T18:32:50.549Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -6515,3 +6516,26 @@ Reihenfolge gegen diese Wirkung prüfen — nicht nur gegen die Frage, was logis
 gehört. Und ein Schritt, der eine ganze Kette anhält, muss die Worte dessen mitdrucken, der
 ihn angehalten hat, gleich auf welchem Kanal sie standen. Es ist die Familie von §3.258: das
 eigene Werk, das dem eigenen Fortkommen im Weg steht.
+
+### 3.260 Ein Nutzerauftrag im Backlog ist ein Auftrag, der nie ausgeführt wird
+
+Am 10.09.2026 fragte der Nutzer, zu welchem Punkt das Entfernen des Brunnens gehöre. Zu
+keinem. Sein Auftrag vom 07.09.2026 — ausdrücklich als »priorisierter Fix« gestellt — lag
+seit drei Tagen in `docs/backlog.md`, zusammen mit einem zweiten Auftrag desselben Abends.
+Der Umfang war dort vollständig ausgemessen; es fehlte allein die Einreihung.
+
+Der Kanal selbst ist das Problem. CLAUDE.md §2 bestimmt den Backlog als »nicht-blockierend,
+gesammelt, nie ein Tor« — genau die Eigenschaft, die einen Befund harmlos macht, macht einen
+Auftrag unausführbar. Die Aufnahmeregel desselben Absatzes nennt reproduzierbare
+Spielerwirkung als Grund für einen Punkt, und beide Aufträge erfüllten das; die Ablage im
+Backlog war kein Regelbruch, sondern die falsche von zwei erlaubten Türen. Ein Nutzer sieht
+diesen Unterschied nicht: Er hat einen Auftrag erteilt und hört drei Tage nichts.
+
+Dazu die zweite Hälfte, die den Fall überhaupt möglich machte: Der Träger, aus dem die
+Einträge stammten, existiert zweimal, und die Dokumentation nennt den falschen Pfad. Der
+Auftrag war also nicht verloren, sondern zweimal unsichtbar.
+
+**Lehre:** Was der Nutzer als Auftrag formuliert, gehört in den Arbeitsauftrag — sofort, mit
+Rang, auch wenn die Messung noch fehlt. Der Backlog ist für Befunde, die niemand bestellt
+hat. Wo eine Ablage per Definition nie zu Arbeit führt, ist die Wahl dieser Ablage für einen
+bestellten Auftrag bereits die Entscheidung, ihn nicht auszuführen.
