@@ -701,7 +701,10 @@ export const LIMITS = {
   // beside maxLines measure 52 words after their fold: 6064 -> 6116.
   // 10.09.2026 (third): the straightening cut justified beside maxLines pays back two words:
   // 6116 -> 6114.
-  maxWords: 6114,
+  // 11.09.2026: the measure-not-estimate pitfall took the night's lesson — a threshold that
+  // computes with the estimate, and a tool that invents an 'all clear' — INSIDE its existing
+  // entry and was tightened while doing it, so the guide pays a word back: 6114 -> 6113.
+  maxWords: 6113,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,
