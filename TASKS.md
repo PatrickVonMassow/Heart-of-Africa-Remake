@@ -202,6 +202,13 @@ put it is the mistake this line exists to stop.
   0.12 s blend, not the extra frame, and the error grows with `dt`. The remedy is to advance
   every gesture BEFORE the new utterance is spoken, so the later call only reads: both clocks
   become one and the blend begins exactly at the hold's end.
+  BOTH BACKENDS NOW SAY THE SAME THING (11.09.2026, commit dc3fd8984). The narrow rung the
+  point owed ran on WebGPU — `polish --section=children-bank-game`, 3m 58s, exit 0, 21 pass,
+  0 fail on 764ecb808 — and the covering WebGL 2 LARGE had `polish` at 249 pass, 0 fail. The
+  declared frame verification/1065-tapping-child-at-its-rock.png carries the WebGPU shutter,
+  and both pictures were judged: the child's hand lies on the drawn flank of the play rock
+  while the word falls. The change is backend-sensitive by `isBackendSensitivePath`, and this
+  is the lane it owed.
   Bundle: Dorfleben.
 
 - [ ] 1086. The cheap rung is skipped, and only the expensive one is enforced.
