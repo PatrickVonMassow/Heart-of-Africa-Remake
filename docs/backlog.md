@@ -497,3 +497,21 @@ could not be verified"), so no mechanism is missing. What is collected here is t
 file this near the cap converts any contention into a red that costs a whole two-hour run, and it is
 the second time in two days that one run has been paid for by another starting beside it. Whoever
 next touches that file can buy the margin back by splitting its slowest case; nobody needs to.
+
+## `run-logged.mjs --help` starts a full LARGE run instead of printing help (measured 10.09.2026)
+
+Non-blocking, collected — and the third relative of the two entries above, all of them a run paid
+for by something other than the work it was meant to cover. `scripts/verify/run-logged.mjs` treats
+every argument as a suite selector and has no help branch, so `node scripts/verify/run-logged.mjs
+--help` does not print usage: it launches the default LARGE regression — build, lint, the whole
+unit suite, then both browser lanes — under the command name `verify --help`.
+
+It is not a one-off. The run store holds five such records: `local/verify-logs` in the main tree
+carries `verify --help` runs from 07.09., 08.09. and 09.09., the point-1065 worktree carries one
+from 09.09., and this session started a sixth at 11:43 UTC while looking for the launch command
+and killed it by hand a minute later. Each accident costs up to a two-hour run on a shared machine
+and leaves a junk receipt that `run-wait --status` will happily report as the last run — the
+09.09. one still reads `verify --help — RED` there, which is the shape of a real red.
+
+The fix is a few lines: recognise `--help`/`-h` before the suite parse and print the usage block
+`run-wait.mjs` already prints. Nobody needs to do it today; whoever next touches that file can.

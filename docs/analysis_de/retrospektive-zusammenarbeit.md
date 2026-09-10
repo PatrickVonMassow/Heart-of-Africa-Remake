@@ -572,6 +572,10 @@ Am 24.08.2026 zwei weitere Ausprägungen an einem Abend, und beide zeigen diesel
 
 **Vierte Adresse, 09.09.2026 — der Ausweg war nicht unbegehbar, es gab ihn als Befehl nicht.** Der `now-eta-past`-Riegel verweigert ein Zugende, solange eine laufende Karte eine bereits verstrichene Endzeit verspricht, und nennt die Abhilfe wörtlich: „give each a realistic new ~HH:MM". Nur schrieb keine einzige Board-Anweisung eine solche Zeit. `promote` setzt eine Warteschlangen-Karte voraus, die ein laufender Punkt nicht mehr hat, `toNow` leitet die Kopfzeile aus derselben fehlenden Karte ab, `status` fasst nur den Textkörper an. Übrig blieben die Handbearbeitung des Board-HTML (§3.45) und `--waive-audit`, also genau das Übergehen der Prüfung, für die der Riegel existiert. Der Board-Text selbst führte die Lücke seit Wochen als bekannt („nur kennt die Board-Werkzeugkiste keinen Befehl dafür"), ohne dass sie jemandem im Weg stand — bis der Nutzer die sichtbare Hälfte meldete: Die Tafel versprach 11:46 für Arbeit, die um 13:40 noch lief. Neu gegenüber den drei Vorgängern ist, dass der Riegel recht hatte und der **Schreiber** fehlte; die Vorgänger hatten einen Schreiber, der im auslösenden Zustand nicht griff. Behoben mit `board.mjs eta`.
 
+**Fünfte Adresse, 10.09.2026 — dieselbe Wurzel, und diesmal log der Riegel über eine Pflicht, die erfüllt war.** Der Tafel-Riegel meldete vier Züge hintereinander „BATCH DASHBOARD NOT REGISTERED“, während Veröffentlichung, Attest und `--synced` sauber durchliefen. Ursache ist die Bauform vom 25.08. und 08.09.: Der Stop-Hook läuft im Arbeitsverzeichnis der SITZUNG, und das stand im Worktree — dort gibt es die (git-ignorierte) Datei `.batch-dashboard.html` gar nicht, also fand der Riegel nichts zu registrieren. Neu ist der Schaden: Die Verweigerung nannte nicht eine fehlende Handlung, sondern eine bereits getätigte, und sie nannte sie in der Sprache eines Inhaltsfehlers („bring alle vier Sektionen in Einklang“). Ich habe daraufhin zweimal am Falschen repariert — erst den Fokus-Abgleich neu gesetzt, dann einen Zustandsschreiber verdächtigt —, und beide Male schien die Reparatur zu greifen, weil ich den Riegel danach aus dem Hauptbaum prüfte, wo er ohnehin grün ist. Erst der Nachbau des Hook-Aufrufs selbst (`echo '{"session_id":…,"cwd":…}' | node scripts/dashboard-guard.mjs`, wie er in `.claude/settings.json` steht) trennte die beiden Fälle in einem Zug.
+
+Zwei Übertragbare daraus. Erstens: Bei einer Verweigerung, die eine erledigte Pflicht bestreitet, ist die erste Messung nicht der Zustand, sondern der AUFRUF — mit welcher Arbeitswurzel und welcher Nutzlast läuft der Riegel wirklich? Alles andere ist Raten, und Raten liest hier systematisch grün. Zweitens: Das verfolgte Arbeitsverzeichnis lässt sich NICHT am letzten sichtbaren `cd` ablesen — der Drift überlebte Züge, in denen ein `cd` in den Hauptbaum nachweislich gelaufen war. Welcher Aufruf eines Zuges ihn festlegt, habe ich nicht festgenagelt; die tragfähige Konsequenz braucht die Antwort auch nicht: gar kein `cd` mehr, nur absolute Pfade, und der Hauptbaum bleibt die Wurzel der Sitzung. Das ist zugleich die Memory-Regel `session-cwd-stays-in-main-tree`, die es seit dem 08.09. gibt — sie hat den Rückfall nicht verhindert, weil sie sagt, WAS gilt, aber nicht, woran man den Bruch erkennt.
+
 **Lehre:** Ein Durchsetzer ist erst dann fertig, wenn sein genannter Ausweg **ausgeführt** worden ist, nicht wenn er plausibel klingt. Das gehört in die Prüfung jedes neuen Riegels: den Weg, den die Fehlermeldung vorschlägt, einmal wirklich gehen — im auslösenden Zustand, nicht im gesunden. Zwei Zusatzfragen aus dem 24.08.: Gilt der Weg auch für den, der die Meldung liest — ein delegierter Autor hat andere Rechte als der Besitzer? Und nennt die Absage den Grund, den sie gemessen hat, statt eine Handlung zu empfehlen, die der Aufrufer schon ausgeführt hat?
 
 ### 3.53 Der Schreiber und der Prüfer kannten dieselbe Regel verschieden
@@ -1451,7 +1455,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 10.09.2026, 02:49 · Quellen-Fingerprint: `adf839b100f6…`
+Zuletzt aktualisiert: Donnerstag, 10.09.2026, 14:49 · Quellen-Fingerprint: `15ed1f6990f9…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1557,8 +1561,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 96 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 126 Prozess-/Meta-TASKS-Punkte (davon 60 offen).
 
-<!-- RETRO-FINGERPRINT: adf839b100f61bae172b8b54f8672a98136ba2063c2a4a79065e4b59ef481790 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-10T00:49:34.147Z -->
+<!-- RETRO-FINGERPRINT: 15ed1f6990f9c922697b0490d94eebd9274a23bfed7be3c7dadfc12fb5595b31 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-10T12:49:47.823Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
