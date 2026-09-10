@@ -27392,3 +27392,29 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Refs: scripts/repository-integrity.mjs (assertRepositoryUnchanged, protectRepository),
   scripts/repository-integrity.test.mjs, points 805, 852, 955.
   Bundle: Testinfrastruktur.
+
+- [x] 1091. The landing publishes the board after its own tick, and the publisher rightly
+  refuses (measured 10.09.2026).
+  `land-point` runs its board step LAST, after the tick has closed the point. The publisher
+  derives the now-section from the owner focus, which still names the point just closed, so
+  it refuses: "the derived now-section could not be rendered (active-work source unresolved:
+  the owner focus names point 1088, which is not open)". The chain then stops at `board` and
+  never reaches `cleanup`, so the branch, the remote branch and the worktree are left standing
+  and CLAUDE.md §6's "the merge ends the branch" is owed by hand. Measured landing point 1088
+  on 10.09.2026, 19:14-19:18; the same refusal reproduced in the very next manual publish.
+  AND THE VERDICT LINE SAYS NOTHING. The step printed "FAIL board publish the board" with no
+  cause, because `scripts/land-point.mjs:857` prints the LAST line of `e.stderr` and the
+  publisher writes its refusal on STDOUT. A landing that stops must name what stopped it.
+  Final state:
+  - The landing settles the now-card BEFORE it publishes: the board's active-work source no
+    longer names the point the same command has just ticked, so the publish has a renderable
+    state and the chain reaches `cleanup`.
+  - The board step's failure verdict carries the publisher's own words, from whichever stream
+    it wrote them on.
+  Test. Vitest: the landing's board step reports the publisher's stdout refusal in its verdict
+  line, and a landing whose tick closed the focused point publishes without a refusal.
+  Criticality: high — it stops every landing one step before the cleanup, so every point leaves
+  a branch and a worktree behind and the operator repairs the chain by hand.
+  Refs: scripts/land-point.mjs (the `board` step, `boardDecision`), scripts/board-publish.mjs
+  (the active-work refusal), scripts/land-point-runner.test.mjs, CLAUDE.md §6.
+  Bundle: Session- & Repo-Hygiene.
