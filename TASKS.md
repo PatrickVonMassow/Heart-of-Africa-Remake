@@ -15564,3 +15564,25 @@ to land than a mechanism that needs a review.
   point 1022 (the rule for raising a document ceiling)
   Criticality: low — it costs no player anything; it costs the guide its currency.
   Bundle: Testinfrastruktur.
+
+- [ ] 1096. The landing's cleanup keeps every branch alive while any detached worktree
+  stands (measured 10.09.2026 22:19, landing point 1091).
+  `land-point`'s `cleanup` step refuses to delete a branch it cannot prove is unoccupied,
+  and it treats a detached worktree as unprovable: "a detached worktree outside the agent
+  directory — nothing proves it is NOT standing on feat/1091-…". Two such trees stand under
+  `local/verify-baseline/`, so the step reported "branch KEPT, 2 kept on purpose" and left
+  the local branch, the remote branch and the operator's hand-work behind — exactly the
+  hand-work point 1091 had just removed one step earlier in the same chain.
+  The trees were NOT on the branch. `git -C <worktree> rev-parse HEAD` answered in one call:
+  they stood on `4b81b945e` and `cd9feeb0e`, the branch tip was `5be28fe18`. The step had the
+  measurement available and chose an assumption instead, and the assumption is permanent:
+  the baseline trees are long-lived, so EVERY landing from now on ends this way.
+  Final state: a detached worktree is measured at its HEAD rather than carried as unknown,
+  so a branch no tree stands on is deleted by the chain, and CLAUDE.md §6's "the merge ends
+  the branch" is owed by hand only when a tree really is standing on it.
+  Test. Vitest: the cleanup deletes a branch while a detached worktree stands on a DIFFERENT
+  commit, and still keeps the branch when a detached worktree stands on the branch tip.
+  Refs: scripts/land-point.mjs (the `cleanup` step), scripts/worktree-cleanup.mjs, CLAUDE.md §6
+  Criticality: medium — it costs no player anything, but it re-imposes on every landing the
+  manual repair the chain was just fixed to avoid.
+  Bundle: Session- & Repo-Hygiene.
