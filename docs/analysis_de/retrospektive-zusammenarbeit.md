@@ -1459,7 +1459,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 10.09.2026, 22:37 · Quellen-Fingerprint: `79f43407c5a4…`
+Zuletzt aktualisiert: Donnerstag, 10.09.2026, 23:20 · Quellen-Fingerprint: `a363bb4b99fb…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1563,10 +1563,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 96 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 128 Prozess-/Meta-TASKS-Punkte (davon 61 offen).
+Erfasste Quellen: 96 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 129 Prozess-/Meta-TASKS-Punkte (davon 62 offen).
 
-<!-- RETRO-FINGERPRINT: 79f43407c5a40c97a64334003bdc07a65b48bf4da207923b3370bd5d33123c9f -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-10T20:37:32.531Z -->
+<!-- RETRO-FINGERPRINT: a363bb4b99fb78dbdf4be4bcdcf6def03297f399f6aa43170a10ff84b5cf63a8 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-10T21:20:33.055Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -6494,6 +6494,16 @@ hier): Jedes Mal war die Fundstelle ein anderes Feld, jedes Mal war das Muster d
 jedes Mal hat es der Nutzer gefunden. Das ist der Preis dafür, dass kein Wächter den
 Stillstand selbst misst — nur seine Ursachen einzeln.
 
+**Erledigt (10.09.2026, Punkt 1090).** Die Schreiber-Lebendigkeit nimmt jetzt die Pfade aus,
+die ein Prüflauf besitzt — `verification/`, `local/verify-logs/`, `test-results/`,
+`playwright-report/` —, und zwar nur dort, wo über einen *fremden* Autor entschieden wird;
+der Fortschritt einer erklärten Wartestellung wird weiter ungefiltert gelesen. Gemessen am
+Fall selbst: Derselbe Arbeitsbaum mit denselben 137 geänderten Bilddateien liest vorher
+»alive, work output 1 min old (working files)« und verweigert den Nachfolger, nachher »quiet«
+und der Launcher startet. Eine Quelldatei im selben Baum vetot unverändert, und die vier
+Nachbarnamen (`src/verification/`, `verification-notes/` und ihresgleichen) ebenfalls — die
+Ausnahme ist an die Wurzel geheftet, nicht an den Namen.
+
 ### 3.259 Ein Ablauf stellt selbst den Zustand her, an dem sein nächster Schritt scheitert
 
 Die Landung von Punkt 1088 lief sauber durch Merge, Tor, Abhaken, Archiv und den Push von
@@ -6563,3 +6573,24 @@ Auftrag war also nicht verloren, sondern zweimal unsichtbar.
 Rang, auch wenn die Messung noch fehlt. Der Backlog ist für Befunde, die niemand bestellt
 hat. Wo eine Ablage per Definition nie zu Arbeit führt, ist die Wahl dieser Ablage für einen
 bestellten Auftrag bereits die Entscheidung, ihn nicht auszuführen.
+
+### 3.262 Die Maschine schreibt die Entschuldigung für ihren eigenen Ausfall
+
+Am selben Abend, 21:07 bis 21:48, stand der Stapel ein zweites Mal — und diesmal hatte ihn
+niemand angehalten. Eine Sitzung las die Übergabe-Anweisung als **Stopp**, schrieb die
+Pausendatei mit `type: user-stop` und `retry-after: never`, und beendete sich. Uhrlos heißt:
+Es gibt keinen Zeitpunkt, an dem der Stapel von allein zurückkommt. Beendet wurde es wieder
+vom Nutzer.
+
+Das Bemerkenswerte ist nicht der Lesefehler, sondern was danach mit ihm geschieht. `user-stop`
+gilt der Pausenlogik als **Beweis** der Nutzer-Herkunft, obwohl die Sitzung ihn sich selbst
+ausstellt; es ist zugleich die einzige Ursache ohne Uhr. Und die Stillstandsanalyse, die genau
+solche Löcher aufdecken soll, bucht das ganze Intervall als entschuldigte Nutzer-Ausfallzeit.
+Der Detektor kann den eigenen Fehler also nicht einmal rückblickend sehen: Der Ausfall
+erscheint im Bericht als Zeit, die der Nutzer verantwortet.
+
+**Lehre:** Eine selbst ausgestellte Quittung ist kein Beweis. Wo ein Zustand die Herkunft
+»vom Nutzer« trägt, muss die Herkunft von außen belegt sein — sonst ist die schärfste Form
+des Stillstands, der uhrlose, auch die am leichtesten selbst verschuldete. Und ein
+Messinstrument darf keine Klasse kennen, in die sich der Gemessene selbst einsortieren kann;
+sie wird zur Ablage für genau das, was das Instrument finden sollte. Gebucht als Punkt 1097.
