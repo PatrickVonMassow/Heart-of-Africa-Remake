@@ -89,7 +89,7 @@ tokenizer, not `wc`, because a ceiling is only confirmed against the counter tha
 | document | landed | ceiling | headroom |
 | --- | --- | --- | --- |
 | `CLAUDE.md` | 205 lines / 1,468 words / 10,796 B | 205 / 1,468 | **0 lines**, 0 words |
-| `MEMORY.md` | 51 lines / 784 words / 6,381 B | 51 / 784 | **0 lines**, 0 words |
+| `MEMORY.md` | 51 lines / 783 words / 6,317 B | 51 / 783 | **0 lines**, 0 words |
 | global `CLAUDE.md` | 6 lines / 33 words / 236 B | 6 / 36 | **0 lines**, 3 words |
 
 They hold, and two of them hold with nothing to spare, which is the finding
@@ -118,7 +118,12 @@ line further, and on 24.08.2026 three more topics did — a lesson about drills
 that recreate the step they claim to prove, the user's ruling that a point which
 stops converging is split rather than iterated, and the authorization to execute
 a stated card recommendation. Each raise moved both ceilings by exactly the
-measured hook it bought, with the reason beside it in the code.
+measured hook it bought, with the reason beside it in the code. On 10.09.2026 the
+ratchet ran the other way for the first time in weeks: the solved session-death
+hunt of 05.09.2026 was retired from the index — its fix and its regression spy
+are in the tree and the retrospective carries the story in prose — and the word
+ceiling followed the cut down to the measured 783. The line ceiling stayed,
+because the freed line was exactly what put the index back inside it.
 The row above is the reading after the newest of those, not the merge-day one,
 and it shows what the pressure looks like from close up: zero headroom, for a
 file designed to gain a line per memory. The next raise should cut a retired

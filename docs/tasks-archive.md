@@ -27230,3 +27230,225 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   scripts/point-brief-core.mjs (`VERIFICATION_LADDER`), scripts/verify/sections.mjs,
   .claude/worktrees/point-1065/local/verify-logs/*.run.json.
   Bundle: Testinfrastruktur.
+
+- [x] 805. The push gate reads a delegated author's own commit as a red
+  (measured 21.08.2026, 07:05). A `main` push ran the full unit layer and every test passed: 357
+  files, 12344 tests, 1 skipped, NOTHING failing. The run exited non-zero anyway, at teardown, from
+  `assertRepositoryUnchanged` in `scripts/repository-integrity.mjs`:
+  `refs/heads/feat/781-main-checkout-helper` moved from 8ce92b0 to 4e83124 while the suite ran —
+  GPT-5.6 Sol committing its authoring checkpoints in its own isolated worktree, which is exactly
+  what a delegated author is instructed to do. The assertion's own text already names the case: "a
+  legitimate commit or branch operation in another worktree during the run produces the same
+  result". It says so and blocks anyway.
+  NOT THE SAME AS 803. That point covers CONTENTION — no failing test named while the measured load
+  is high — and its remedy is to wait for a quiet host. This is not load, and waiting does not
+  reach it: the ref that moved belongs to the delegated author, and it moves precisely while the
+  batch is in its normal operating state. The gate's own retry reproduced it under the same
+  conditions, as it must.
+  FINAL STATE: the integrity assertion tells a ref the suite itself may have written apart from a
+  ref that belongs to a known concurrent author. A ref the running session does not own — a
+  registered authoring branch, a worktree named in the in-flight declaration — is REPORTED in the
+  verdict and does not fail the run. A ref the suite has no business touching — `main`, `HEAD`, the
+  fixture branches of point 801 — still fails it loudly.
+  VERIFIABLE: pure tests over the assertion — a moved delegated-author branch is reported and
+  passes; a moved `main` fails; a moved fixture branch fails; and the verdict text names every ref
+  that moved in each case.
+  Criticality: medium — no product defect, but it withholds the push rule's protection for as long
+  as a delegated author runs, and leaves bookkeeping committed but unpushed, which is the exact
+  state that rule exists to prevent.
+  Bundle: Session- & Repo-Hygiene.
+
+- [x] 852. A landing gate cannot run while another author lane commits. MEASURED 23.08.2026,
+  07:47, landing point 669 while a parallel worktree authored point 834. `land-point`'s fast gate
+  runs the unit suite, and `scripts/repository-integrity.mjs` asserts that no ref moved during the
+  run; the other lane's checkpoint commit moved `refs/heads/feat/834-durable-authoring-lane`
+  mid-suite, so the gate went red with "LIVE REPOSITORY CHANGED WHILE UNIT SUITE RAN" although no
+  test failed. The merge had already landed on `main`, so the landing stopped half-way and had to
+  be resumed.
+  WHY IT IS STRUCTURAL: under maximal delegation three lanes commit every few minutes against a
+  ~130 s unit suite, so a landing gets through by luck, and the retry that succeeds is
+  indistinguishable from a retry that hid a real defect (CLAUDE.md §7.2: a retry is SUSPECT and
+  covers nothing). The detector deliberately has no env knob, and its own message names the
+  legitimate case it cannot distinguish.
+  FINAL STATE: the integrity check accepts a set of refs the CALLER declares as foreign and
+  expected — the in-flight declaration already names exactly those branches — so a moved ref
+  belonging to a declared other lane is not a finding, while a moved ref nobody declared still is.
+  The declaration is the only source of that set; no flag lets a caller wave a ref through by hand.
+  VERIFIABLE: unit cases over the integrity check — a ref moved that the declaration names is
+  clean; the same ref moved with no declaration is a finding; a ref moved that the declaration does
+  NOT name is a finding even while other lanes are declared; and `main` moving is a finding under
+  every declaration.
+  Criticality: medium — no product behaviour, but it stops landings half-way and manufactures reds
+  that train sessions to retry a suspect gate.
+  Bundle: Session- & Repo-Hygiene.
+
+- [x] 955. The unit gate refuses while a delegated author commits, so the push gate goes red for no
+  defect (measured 26.08.2026, 20:33, with two Sol authoring lanes running).
+  `scripts/repository-integrity.mjs` asserts in the Vitest GLOBAL TEARDOWN that no ref moved while
+  the unit suite ran, and it fails the whole run when one did: "LIVE REPOSITORY CHANGED WHILE UNIT
+  SUITE RAN: refs changed: refs/heads/feat/943-…". Delegated authors commit on their own branches
+  every few minutes BY DESIGN — `author-sol.mjs` pushes the branch for them — so every unit run that
+  overlaps a busy lane dies, which is every run the owner makes while lanes are busy and every
+  pre-push gate. The check's own message already names the legitimate case, and the pre-push gate's
+  single re-run is what rescued tonight's push; that re-run is a fail-soft, not an answer, because it
+  costs a full unit suite and reports SUSPECT.
+  AND IT KILLS A FULL REGRESSION, NOT ONLY A UNIT RUN (measured 29.08.2026, 19:21-19:32, on
+  `feat/687-roam-bound-fixes` with NO lane running at all). The LARGE run's own `unit` stage went
+  red on `keeps both a shared clone and its live source unchanged with clone-local GIT_DIR` — "one
+  or more worktree indexes changed" — because the SAME session was doing its ordinary main-branch
+  bookkeeping while the suite ran: one commit and one push at 19:22, plus board publishes. Nothing
+  was wrong with the code and nothing leaked; the run simply overlapped the owner writing down what
+  the run was for. The cost is not one suite but eighty-five minutes of both-backend regression
+  thrown away, and the only way to avoid it today is a rule no guard enforces: touch no ref while a
+  LARGE runs. That rule is unworkable in practice, because a LARGE is exactly when there is time for
+  bookkeeping.
+  IT IS NOT ONLY THE DELEGATED LANES — THE OWNER TRIPS IT ON EVERY POINT START (measured
+  27.08.2026, 00:09-00:12Z, on main `6edd81fd`, with NO authoring lane running yet). The chain,
+  end to end: `batch-doctor --gate` began `npm run test:unit` at 00:09:44Z; at 00:12:28Z the same
+  owner session created `feat/957-contribution-scoped-review`, which is the mandated FIRST step of
+  the next point; at 00:12:32Z the suite finished with 430 files and 14 015 tests ALL PASSED and
+  the teardown failed the run on `refs changed: refs/heads/feat/957-…`. So the exposure is not
+  confined to a busy evening of parallel authors: the owner's own `git worktree add` and its own
+  bookkeeping commit on `main` move a ref just as reliably, which puts every point start and every
+  cross-cutting commit in the window. Reproduced the same hour from a manual `npm run test:unit`,
+  again all 430 files green, exit 1 on the same teardown.
+  AND IT COMPOUNDS WITH 455, WHICH IS HOW THE GREEN TREE STAYED UNKNOWN. `batch-doctor` reads only
+  the exit code, so it saw a red; its load probe then excused that red as INCONCLUSIVE on "7 live
+  agent worktree(s)" that held no process and had not been written to for 3 to 14 days. A false red
+  from this point therefore collects a false excuse from 455, and neither mechanism ever learns
+  what was true — that the tree was entirely green. Whichever of the two is built first, its test
+  should name the other, because each one alone still leaves the pair silent.
+  FINAL STATE: the teardown distinguishes TEST LEAKAGE into the live repository from a foreign
+  branch's own progress. A ref that belongs to a declared in-flight lane, or any ref that is neither
+  the running checkout's HEAD nor its branch, is not this suite's leakage and does not fail the run;
+  what remains — the running checkout's own refs, the index, the working tree — still fails loud.
+  MEASURED A THIRD TIME 28.08.2026, 02:52, AND THE RE-RUN DID NOT RESCUE IT. A cross-cutting
+  `main` push ran the pre-push gate twice; BOTH runs were red on this teardown and neither named a
+  failing test — "unit ran 435 files / 14110 tests and its summary named NO failing test, yet the
+  runner exited non-zero" — while the delegated Sol lane for point 946 committed
+  `4f044565 -> ca139085` during the first run and `ca139085 -> d11c541c` during the second. So the
+  single re-run this point calls a fail-soft is not one: a lane that commits every few minutes
+  reds both runs, and the gate then reads that as "the re-run did not clear it, so it blocks". The
+  push only went through on a later manual attempt that happened to fall in a quiet window. Add to
+  the final state that the gate's verdict NAMES a teardown red over foreign activity as an
+  environment condition and says which lane collided, rather than reporting it as a blocking red.
+  MEASURED A FOURTH TIME 03.09.2026, 07:27-07:31 — AND THIS TIME A GUARD ORDERED IT. The new
+  element is not another collision but its cause: the owner was DIRECTED into it. Declaring the
+  wait for point 1047's both-backends LARGE run, `batch-in-flight` REFUSED the declaration because
+  two of three agent slots stood free, named eight independent open points and demanded either a
+  commission or a written reason. The owner complied and commissioned GPT-5.6 Sol onto point 1049
+  in its own worktree; Sol's FIRST commit — the commission record it writes before it even starts —
+  killed the run 3m51s in on `refs/heads/feat/1049-queue-order-rule <absent> -> 9815ce1b1`. So the
+  rule this point calls unworkable ("touch no ref while a LARGE runs") is not merely unenforced:
+  another guard actively punishes obeying it, and the owner had to stop the author it had just been
+  told to start. The same edge caught the board in the same hour — `board-publish.mjs` commits to
+  `refs/heads/board`, so the dashboard duty is a ref mutation too and the publish had to be held
+  until the unit stage passed, which is only knowable by reading `run-all.mjs` to learn that the
+  second backend pass skips the preflight. Add to the final state: while a browser regression is
+  declared in flight, the agent-pool guard stands down, or the declaration itself is the account
+  its free slots need.
+  VERIFIABLE: Vitest over the decision — a moved foreign branch passes, a moved own HEAD fails, and
+  an undeclared foreign ref is reported by name rather than silently allowed.
+  Criticality: medium-high — it turns every parallel authoring evening into red gates that hide real
+  reds among false ones.
+  MEASURED AGAIN 07.09.2026, and this time it BLOCKED the main session for half an hour: three
+  commits on `main` failed the pre-push gate twice with `LIVE REPOSITORY CHANGED WHILE UNIT SUITE
+  RAN: refs changed: refs/heads/feat/1069-wsl-vm-death e3edd33 -> 4506bc7; worktree registrations
+  changed; one or more worktree indexes changed` — GPT-6 Astra committing in
+  `.claude/worktrees/point-1069`, exactly what CLAUDE.md §6 requires of it. Build, lint and audit
+  were green each time. The push only went through once the author's run had finished. Two things
+  the 26.08. reading did not yet show: the collision now meets `push-arrival-guard`, which refuses
+  to let a turn END on unpushed work, so the session was wedged between two rules rather than
+  merely slowed; and load makes the gate spend its one re-run BEFORE the decisive red (99 % CPU
+  across 16 cores, six concurrent vitest runs), so the retry that exists for false reds was already
+  gone when the real refusal came. Raises the criticality: with maximum delegation an author is
+  almost always committing, so `main` is almost never pushable.
+  Bundle: Urlaubsfestigkeit.
+
+- [x] 1088. The unit teardown aborts a run on a foreign worktree's commit (user 10.09.2026).
+  The unit stage's repository-integrity teardown must not abort a run because ANOTHER
+  worktree or main moved. Measured on point 1065 on 10.09.2026: two LARGE runs died in
+  teardown before drawing a single frame (15:37, 16:13) with "LIVE REPOSITORY CHANGED
+  WHILE UNIT SUITE RAN" — the named changes were refs/heads/main, a foreign worktree's
+  index, and worktree registrations, i.e. a legitimate concurrent commit, never test
+  leakage.
+  Final state: assertRepositoryUnchanged (scripts/repository-integrity.mjs) judges only
+  what the RUNNING worktree owns — its own HEAD, its own index, its own branch ref, and
+  the config. A change to a foreign ref, a foreign worktree index, or the worktree
+  registration list is REPORTED as a line in the run log and does NOT fail the run,
+  because the guard cannot distinguish it from test leakage and the run it kills is the
+  expensive one. Test leakage inside the running worktree still fails, loudly.
+  This is the standing defect of open points 805, 852 and 955. It is pulled forward under
+  the CLAUDE.md §2 infrastructure-freeze clause "reproducibly blocks current game work":
+  it blocked 1065's coverage run twice within four hours. Fold 805/852/955 into it or
+  close them against it — do not fix it three more times.
+  Test. Vitest: the assertion passes when only a foreign ref, a foreign worktree index or
+  the worktree registration list moved, and still fails on a change to the running
+  worktree's own HEAD, index or branch ref.
+  Criticality: high — BLOCKING. It holds a red that cannot otherwise close: while it
+  stands, any commit anywhere in the repository aborts the unit stage of a running
+  verification, so no coverage run can be relied on to finish and no point whose landing
+  needs one can be closed. Measured twice within four hours on 10.09.2026.
+  Refs: scripts/repository-integrity.mjs (assertRepositoryUnchanged, protectRepository),
+  scripts/repository-integrity.test.mjs, points 805, 852, 955.
+  Bundle: Testinfrastruktur.
+
+- [x] 1091. The landing publishes the board after its own tick, and the publisher rightly
+  refuses (measured 10.09.2026).
+  `land-point` runs its board step LAST, after the tick has closed the point. The publisher
+  derives the now-section from the owner focus, which still names the point just closed, so
+  it refuses: "the derived now-section could not be rendered (active-work source unresolved:
+  the owner focus names point 1088, which is not open)". The chain then stops at `board` and
+  never reaches `cleanup`, so the branch, the remote branch and the worktree are left standing
+  and CLAUDE.md §6's "the merge ends the branch" is owed by hand. Measured landing point 1088
+  on 10.09.2026, 19:14-19:18; the same refusal reproduced in the very next manual publish.
+  AND THE VERDICT LINE SAYS NOTHING. The step printed "FAIL board publish the board" with no
+  cause, because `scripts/land-point.mjs:857` prints the LAST line of `e.stderr` and the
+  publisher writes its refusal on STDOUT. A landing that stops must name what stopped it.
+  Final state:
+  - The landing settles the now-card BEFORE it publishes: the board's active-work source no
+    longer names the point the same command has just ticked, so the publish has a renderable
+    state and the chain reaches `cleanup`.
+  - The board step's failure verdict carries the publisher's own words, from whichever stream
+    it wrote them on.
+  Test. Vitest: the landing's board step reports the publisher's stdout refusal in its verdict
+  line, and a landing whose tick closed the focused point publishes without a refusal.
+  Criticality: high — it stops every landing one step before the cleanup, so every point leaves
+  a branch and a worktree behind and the operator repairs the chain by hand.
+  Refs: scripts/land-point.mjs (the `board` step, `boardDecision`), scripts/board-publish.mjs
+  (the active-work refusal), scripts/land-point-runner.test.mjs, CLAUDE.md §6.
+  Bundle: Session- & Repo-Hygiene.
+
+- [x] 1090. A writing verification run passes for a live author and no successor starts
+  (user 10.09.2026).
+  The successor decision must not read the file trail of a detached verification run as a
+  registered feature-writer that is still at work. Measured on 10.09.2026: the session
+  handed over cleanly at 19:04 CEST after reaching its context watermark, and the launcher
+  (pid 1133, armed, 15-min tick) then refused at 19:11, 19:26 and 19:41 with
+  `successor decision refused (registered-writer-live) — recent registered feature-writer
+  activity measured for feat/1065-teaching-hands-touch
+  (.claude/worktrees/point-1065) — work output 0 min old (working files)`. No author was
+  alive. The measured writes came from the detached LARGE run (pid 888430, started 18:20
+  CEST), which streams `verification/*.png` into that worktree for its whole ~2 h. The
+  batch stood still for 43 minutes and would have stood still until the run ended; it
+  resumed only because the user opened a session by hand and asked why nothing moved.
+  The veto is exactly inverted: a long coverage run is the phase in which a handover to a
+  fresh session is MEANT to happen, because the run outlives the session that started it.
+  Final state: the writer-liveness verdict in `scripts/batch-autostart-core.mjs`
+  distinguishes a WRITER from a verification run's file trail. Paths a verification run
+  owns — `verification/`, `local/verify-logs/`, `test-results/`, `playwright-report/` —
+  no longer count as "working files" evidence that a feature-writer is alive, so a
+  worktree in which only a run is writing does not veto the successor. A measured live
+  author process, and a working-file change outside those paths, still veto as before.
+  Test. Vitest: a worktree whose only recent writes are under the verification-owned
+  paths yields no `registered-writer-live` veto, while a recent write to a source file in
+  the same worktree still does.
+  Criticality: high — BLOCKING. It stops the whole batch for the entire duration of every
+  long coverage run, which is precisely when the batch depends on the launcher; the
+  standstill is silent (the board keeps reading "no running work") and ends only by hand.
+  Pulled forward under the CLAUDE.md §2 infrastructure-freeze clause "reproducibly blocks
+  current game work".
+  Refs: scripts/batch-autostart-core.mjs (`registered-writer-live`, the
+  `featureWriterRegister` writer verdict), scripts/batch-autostart-core.test.mjs,
+  .claude/batch-launcher.log (10.09.2026 15:26Z, 15:41Z).
+  Bundle: Testinfrastruktur.

@@ -52,6 +52,10 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 09.09. | Nutzerfrage „sollte da nicht ein Kind auf einen Stein klettern?“ — gebaut, feuernd, nie sichtbar: der Test prüfte das Flag, das die Reparatur selbst setzt, und die Bildspur hatte den Fall weggeschaltet (§3.252); zwei Kinderlauf-Grenzwerte reißen, beide an einer einzigen Stichprobe gemessen |
 | 09.09. abends | Ein Punkt verbraucht 16,3 Maschinenstunden Verifikation — fünf volle LARGE-Läufe, alle rot —, ohne dass jemand eine Regel bricht: die Leiter stand im Auftrag, der letzte rote Lauf druckte seine Zwei-Minuten-Sprosse selbst mit, und die Planzahlen vom Juli ließen jeden Ausreißer normal aussehen (§3.253, Schwesterfall zu §3.249); freigegeben werden vier Maßnahmen, die Anthropic und die Gegenseite nach deren Audit gemeinsam tragen |
 | 10.09. nachts | Die schmale Sprosse wurde zwölfmal geklettert und war zwölfmal grün — der volle Lauf fiel danach auf genau denselben zwei Prüfungen, weil ein Merge sie ungeprüft überholt hatte und der Abschnitt ein anderes Fenster misst als die Suite: die am Vorabend angeordnete Leiter hätte nichts verweigert (§3.255); dieselbe Nacht zeigt die Faltung zweier Hälften, die einen Regressionslauf sparen sollte und die fertige Hälfte drei Tage ihre Landung kostete |
+| 10.09. nachmittags | Zwei Deckungsläufe desselben Punktes starben im Teardown der Unit-Suite, weil jemand woanders committete — 15:37 an einer main-Ref, 16:13 an einem fremden Worktree-Index, beide vor dem ersten Bild. Der Defekt liegt seit dem 23.08. dreifach im Auftrag (805, 852, 955) an Position 233/261/310 von 383 und ist in Reihenfolge nie erreichbar; sichtbar wird er erst an der Rechnung des Punktes: 24,6 Maschinenstunden, 23 LARGE-Läufe, kein einziger grün (§3.231-Nachtrag) |
+| 10.09. abends | 43 Minuten Stillstand nach einer korrekten Übergabe, beendet von der Nutzerfrage „seit 17:04 keine Arbeit": Der Launcher verweigerte dreimal den Nachfolger, weil er im Arbeitsbaum einen lebenden Schreiber maß — es war der abgekoppelte Deckungslauf selbst, der dorthin seine Bilder schreibt. Das Veto sperrt den Nachfolger für die volle Dauer genau der Phase, in der die Übergabe vorgesehen ist (§3.258, vierter Wiedergänger von §3.77/§3.220) |
+| 10.09. abends | Ein als »priorisierter Fix« erteilter Nutzerauftrag lag drei Tage im Backlog, den CLAUDE.md §2 ausdrücklich als nie-blockierend bestimmt — die Ablage war die falsche von zwei erlaubten Türen und damit bereits die Entscheidung, den Auftrag nicht auszuführen; gefunden erst durch die Frage des Nutzers, zu welchem Punkt er gehöre (§3.260) |
+| 10.09. spätabends | Die Landungskette hält an ihrem letzten Schritt: Sie hakt den Punkt ab und veröffentlicht DANACH die Tafel, deren Jetzt-Karte noch genau diesen Punkt nennt — die Tafel weist die Veröffentlichung zu Recht ab, und das Aufräumen von Zweig und Arbeitsbaum bleibt liegen. Den gemessenen Grund druckt die Kette nicht mit, weil die Absage auf dem Ausgabekanal steht und sie den Fehlerkanal liest (§3.259) |
 | 13.08. | Der Nachprüfer findet eine echte zweite Klippe im geheilten Mechanismus — und jede der fünf gemessenen Kuren verschlechtert gesunde Dörfer stärker, als der Fehler schadet: Befund wird gebucht statt behoben (§3.115) |
 | 20.08. | Der Dokumentschnitt strich Regeln als »von einem Wächter abgedeckt«, ohne einen einzigen Wächter darauf zu prüfen — die Kontextanzeige verschwand, der Nutzer fand es (§3.134); eine vom Nutzer gesetzte Rangfolge wurde in einer Nacht zweimal maschinell überholt, ohne dass irgendwo ein Grund stand (Punkt 614); zwei Werkzeuge derselben Bauart am falschen Ort gemessen — im Hauptbaum gebaut und geprüft, während der Prozess die Arbeit in den isolierten Bereich schickt (§3.137) |
 | 21.08. | Ein Tor verlangte eine Freigabe, die seine eigenen Werkzeuge nicht herstellen können — der HIGH-Punkt war gemergt, geprüft und freigegeben, und der Zugausgang wies ihn trotzdem ab (§3.153) |
@@ -1455,7 +1459,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 10.09.2026, 15:41 · Quellen-Fingerprint: `a0ef47129684…`
+Zuletzt aktualisiert: Donnerstag, 10.09.2026, 23:20 · Quellen-Fingerprint: `a363bb4b99fb…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1495,9 +1499,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to the OpenAI lane, GPT-6 Astra), and review is cross-vendor, not Fable-by-default | 6 | hoch | — (Regel/Memory) | ◐ Regel |
 | Iterate on the new feature's OWN test first; the full regression runs once at the end, never as the debugging loop | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 69 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 70 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | wait-command-guard.mjs | ✔ Mechanismus |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
+| \"Gib ab\" / \"abgeben\" means hand the batch to a SUCCESSOR session so the context does not overflow — it never means pause or stop the batch | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | User 18.08.2026: hard, complex, error-prone and HIGH-criticality points are AUTHORED by the OpenAI lane directly (GPT-6 Astra since 05.09.2026, GPT-5.6 Sol before) — Opus 5 authors only what is left, and Fable authors only a point that tags its lane or one the router escalates | 5 | hoch | — (Regel/Memory) | ◐ Regel |
 | Two test layers — Vitest (jsdom) for logic/store/HUD, Playwright for browser-only; add a test per new feature on the right layer | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | STANDING RULE: design.md §19.14 (climate) and §19.15 (peoples) — the research→game implementation records — must be updated in the SAME commit whenever the climate or people rendering changes; peoples-1890 §8 / climate-1890 §9 are pointers | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1529,7 +1534,6 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Saved games do not constrain design work: the feature is switched off, nobody plays a serious run, and no migration is ever owed for a data change | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | 24.07.2026 evening chaos — serving model silently degraded to Haiku 4.5; verify the serving model before batch work, Haiku-class must pause instead of working | 6 | hoch | model-guard.mjs | ✔ Mechanismus |
 | Keep the shell cwd in /workspace/hoa; a worktree cwd makes the Stop guards judge the wrong repo root | 2 | mittel | worktree-reminder.mjs | ✔ Mechanismus |
-| Solved 05.09.2026: every claude session died with exit 143 because two batch-emergency tests ran the real strike against the live session registry — evidence, method, fix, and what to keep in mind | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | ENDED 17.08.2026 — the 13.08. emergency that pushed the MAXIMUM load to OpenAI (hard cases to Sol via --anyway, pool of one) is over; the normal three-lane split of CLAUDE.md §6 applies again | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Every new optical/graphics feature must be sorted into the low/medium/high detail presets, enforced by a pure completeness test — a new quality key with no preset entries fails the gate | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Write about this project as a participant (\"wir/unser\"), never as an outside observer (\"euer Mechanismus\", \"die ihr abschaffen wollt\") | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1559,10 +1563,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 96 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 126 Prozess-/Meta-TASKS-Punkte (davon 60 offen).
+Erfasste Quellen: 96 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 129 Prozess-/Meta-TASKS-Punkte (davon 62 offen).
 
-<!-- RETRO-FINGERPRINT: a0ef47129684ae70ec9b49916f5c3680fdd4d05fc4461d84ac14f4bcdc6255d1 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-10T13:41:55.738Z -->
+<!-- RETRO-FINGERPRINT: a363bb4b99fb78dbdf4be4bcdcf6def03297f399f6aa43170a10ff84b5cf63a8 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-10T21:20:33.055Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -5440,6 +5444,31 @@ darf eine Sitzung ohne Schreibrecht gar nicht erst blockieren — er meldet den
 Befund und nennt den einen Weg, der ihr offensteht. Ein Ausweg, der nur in der
 Absage eines anderen Wächters steht, ist für den Blockierten kein Ausweg.
 
+Nachtrag vom 10.09.2026: Dieselbe Klasse traf am Nachmittag zweimal binnen vier
+Stunden, und diesmal war keine Autorenbahn beteiligt. Der Deckungslauf von Punkt
+1065 starb um 15:37 im Teardown an `refs/heads/main 64b6b3f -> 756df06` und
+geänderten Worktree-Registrierungen, der Nachfolgelauf um 16:13 an einem fremden
+Worktree-Index — beide Male, bevor ein einziges Bild gezeichnet war. Es committete
+schlicht jemand woanders. Neu ist daran nicht der Mechanismus, sondern was die
+Wiederholung über unsere Ablage sagt: Der Defekt liegt seit dem 23.08.2026
+dreifach beschrieben im Auftrag — als Punkt 805, 852 und 955 —, und diese Punkte
+stehen an Position 233, 261 und 310 von 383 offenen. In Arbeitsreihenfolge werden
+sie nie erreicht. Die Diagnose der Klasse hat sich damit verschoben: Sie ist keine
+undurchgesetzte Regel und kein Wächterkonflikt mehr, sondern ein bekannter,
+gemessener, dreimal aufgeschriebener Defekt ohne einen Weg nach vorn. Der
+Infrastruktur-Freeze aus CLAUDE.md §2 hat für genau diesen Fall eine Tür — »wenn
+sie reproduzierbar aktuelle Spielarbeit blockiert« —, aber niemand hatte sie
+benutzt, weil jeder einzelne Vorfall für sich als Pech durchgeht. Erst die
+Kostenrechnung des Punktes macht es sichtbar: 64 beendete Läufe, 24,6
+Maschinenstunden, 23 LARGE-Läufe, davon **kein einziger grün** — bei einem Feature,
+dessen schmale Sprosse an diesem Tag zwölfmal grün war.
+
+**Lehre des Nachtrags:** Ein dreifach abgelegter Befund ist kein abgelegter Befund,
+sondern ein Beleg, dass die Ablage an dieser Stelle nicht funktioniert. Wenn
+dieselbe Klasse zum wiederholten Mal die laufende Arbeit tötet, ist die richtige
+Reaktion nicht die vierte Beschreibung, sondern das Vorziehen — und die Regel, die
+das erlaubt, muss beim Vorfall zitiert werden, nicht beim Aufräumen.
+
 ### 3.113 Ein Test, dem der Gegenstand unter den Fuessen weggeht, wird still gruen
 
 Punkt 688 verlegte das Quartier, in dem die Kinder spielen. Der Test des
@@ -6429,3 +6458,139 @@ Befehl gefahrlos ist und die Hand schneller ist als die Erinnerung.
 Argument ABLEHNEN, nicht deuten. Und ein Backlog-Eintrag, der eine Klasse an einer einzigen
 Datei festmacht, lädt zur Wiederholung an den Geschwistern ein — die Fundstelle gehört
 gesucht, sobald die Klasse benannt ist.
+
+### 3.258 Der eigene Prüflauf wird zum Veto gegen den Nachfolger
+
+Am 10.09.2026 stand der Stapel 43 Minuten ohne Arbeiter, und beendet wurde es wieder nicht
+von einem Wächter, sondern von der Frage des Nutzers, warum die Tafel seit 17:04 nichts
+meldet. Es ist der vierte Wiedergänger von §3.220 und derselbe Satz in neuer Verkleidung:
+**die übergebende Sitzung hinterlässt eine Spur, die das Nachfolger-Tor für einen lebenden
+Arbeiter hält.**
+
+Die Übergabe war korrekt. Die Sitzung erreichte um 17:04 ihre Wasserstandsmarke, schrieb auf,
+dass ein Deckungslauf weiterläuft und mit übergeben wird, und gab das Schloss frei. Der
+Launcher tickte danach um 17:11, 17:26 und 17:41 und verweigerte jedes Mal:
+`successor decision refused (registered-writer-live) — recent registered feature-writer
+activity measured for feat/1065-teaching-hands-touch — work output 0 min old (working files)`.
+
+Es gab keinen Autor. Die gemessene »Schreiber-Aktivität« war der abgekoppelte LARGE-Lauf
+selbst, der seit 16:20 seine Bilder nach `verification/*.png` in denselben Arbeitsbaum
+schreibt — zwei Stunden lang, im Minutentakt. Die Lebendigkeitsprüfung misst einen Autor an
+seinem **Dateiabdruck**, nicht an einem Prozess, und ein Prüflauf hinterlässt denselben
+Abdruck wie ein Schreibender.
+
+Das Veto ist damit exakt invertiert. Ein langer Deckungslauf überlebt die Sitzung, die ihn
+gestartet hat — das ist der Sinn der Abkopplung, und genau deshalb ist die Phase eines
+laufenden Laufs die Phase, in der eine Übergabe an eine frische Sitzung *vorgesehen* ist. Das
+Tor sperrt den Nachfolger also nicht trotz, sondern **wegen** der Arbeit, für die er gebraucht
+wird, und zwar für deren volle Dauer. Der Stillstand ist dabei doppelt still: Die Tafel las
+weiter »Gerade keine laufende Arbeit«, weil auch sie niemand fortschrieb.
+
+**Lehre:** Eine Lebendigkeitsmessung, die aus einem Artefakt auf einen Handelnden schließt,
+verwechselt Arbeit mit Arbeiter. Wo ein Tor entscheidet, ob jemand *anderes* anfangen darf,
+muss es einen Prozess messen — oder mindestens die Pfade ausnehmen, die eine Maschine ohne
+Autor beschreibt. Und die Klasse ist inzwischen viermal aufgetreten (§3.77, §3.220, Punkt 590,
+hier): Jedes Mal war die Fundstelle ein anderes Feld, jedes Mal war das Muster dasselbe, und
+jedes Mal hat es der Nutzer gefunden. Das ist der Preis dafür, dass kein Wächter den
+Stillstand selbst misst — nur seine Ursachen einzeln.
+
+**Erledigt (10.09.2026, Punkt 1090).** Die Schreiber-Lebendigkeit nimmt jetzt die Pfade aus,
+die ein Prüflauf besitzt — `verification/`, `local/verify-logs/`, `test-results/`,
+`playwright-report/` —, und zwar nur dort, wo über einen *fremden* Autor entschieden wird;
+der Fortschritt einer erklärten Wartestellung wird weiter ungefiltert gelesen. Gemessen am
+Fall selbst: Derselbe Arbeitsbaum mit denselben 137 geänderten Bilddateien liest vorher
+»alive, work output 1 min old (working files)« und verweigert den Nachfolger, nachher »quiet«
+und der Launcher startet. Eine Quelldatei im selben Baum vetot unverändert, und die vier
+Nachbarnamen (`src/verification/`, `verification-notes/` und ihresgleichen) ebenfalls — die
+Ausnahme ist an die Wurzel geheftet, nicht an den Namen.
+
+### 3.259 Ein Ablauf stellt selbst den Zustand her, an dem sein nächster Schritt scheitert
+
+Die Landung von Punkt 1088 lief sauber durch Merge, Tor, Abhaken, Archiv und den Push von
+main — und starb am letzten Schritt: »FAIL board publish the board«. Die Ursache ist der
+Schritt davor. Die Kette hakt den Punkt ab, und die Tafel weigert sich anschließend zu
+veröffentlichen, weil ihre Jetzt-Karte einen Punkt nennt, der nicht mehr offen ist. Die
+Weigerung ist richtig; falsch ist die Reihenfolge, die sie herbeiführt.
+
+Der Preis steht im nächsten Schritt, den es nie gab: Das Aufräumen von Zweig, Fernzweig und
+Arbeitsbaum lief nicht mehr, obwohl CLAUDE.md §6 den Merge genau damit enden lässt. Die
+Kette hinterlässt also den Zustand, gegen den sie gebaut wurde, und das bei JEDER Landung.
+
+Dazu kam die zweite Hälfte: Der Fehlschlag nannte seinen Grund nicht. Die Kette druckt die
+letzte Zeile des Fehlerkanals, die Tafel schreibt ihre Absage auf den Ausgabekanal — übrig
+bleibt eine leere Begründung. Gefunden wurde der Grund erst, weil der Reparaturbefehl
+danach von Hand lief und dieselbe Absage noch einmal aussprach.
+
+**Lehre:** Eine Kette, deren Schritte den Zustand des jeweils nächsten verändern, muss ihre
+Reihenfolge gegen diese Wirkung prüfen — nicht nur gegen die Frage, was logisch zuerst
+gehört. Und ein Schritt, der eine ganze Kette anhält, muss die Worte dessen mitdrucken, der
+ihn angehalten hat, gleich auf welchem Kanal sie standen. Es ist die Familie von §3.258: das
+eigene Werk, das dem eigenen Fortkommen im Weg steht.
+
+### 3.261 »Mit Absicht stehengelassen« war eine Annahme, keine Entscheidung
+
+Die Reparatur aus §3.259 hat sich auf ihrer eigenen Landung bewiesen: Punkt 1091 lief am
+10.09.2026 durch Merge, Tor, Abhaken, Archiv, Push und Tafel-Veröffentlichung, und der
+Schritt, der zuvor die Kette anhielt, meldete »now-card settled first«. Erreicht wurde damit
+genau der Schritt, um dessentwillen die Reparatur gebaut war — das Aufräumen.
+
+Und dort blieb der Zweig trotzdem stehen. Der Schritt meldete »branch KEPT, 2 kept on
+purpose«: Zwei losgelöste Prüfbäume stehen dauerhaft in der Ablage, und die Kette führt einen
+losgelösten Baum als unbeweisbar — »nothing proves it is NOT standing on feat/1091-…«. Eine
+einzige Messung im jeweiligen Baum widerlegte das sofort; sie standen auf ganz anderen
+Commits als die Zweigspitze. Die Auskunft war verfügbar, die Kette hat sie nicht geholt.
+
+Zwei Dinge daran wiegen schwerer als der gelöschte Zweig. Erstens ist die Annahme dauerhaft:
+Die Prüfbäume sind langlebig, also hätte JEDE künftige Landung so geendet — dieselbe
+Handarbeit, die einen Schritt früher in derselben Kette gerade beseitigt worden war.
+Zweitens tarnte sich die Annahme als Entscheidung. »Auf Absicht stehengelassen« liest sich
+wie ein Urteil; tatsächlich war es das Eingeständnis, nicht nachgesehen zu haben. Ein
+gemeldeter Vorsatz wird nicht nachgeprüft — eine gemeldete Unsicherheit schon.
+
+**Lehre:** Ein Schritt, der aus Vorsicht nicht handelt, muss sagen, ob ihm die Messung
+fehlte oder ob er sie gemacht hat. Und wo die Messung einen Aufruf kostet, ist Vorsicht keine
+zulässige Antwort. Gebucht als Punkt 1096.
+
+### 3.260 Ein Nutzerauftrag im Backlog ist ein Auftrag, der nie ausgeführt wird
+
+Am 10.09.2026 fragte der Nutzer, zu welchem Punkt das Entfernen des Brunnens gehöre. Zu
+keinem. Sein Auftrag vom 07.09.2026 — ausdrücklich als »priorisierter Fix« gestellt — lag
+seit drei Tagen in `docs/backlog.md`, zusammen mit einem zweiten Auftrag desselben Abends.
+Der Umfang war dort vollständig ausgemessen; es fehlte allein die Einreihung.
+
+Der Kanal selbst ist das Problem. CLAUDE.md §2 bestimmt den Backlog als »nicht-blockierend,
+gesammelt, nie ein Tor« — genau die Eigenschaft, die einen Befund harmlos macht, macht einen
+Auftrag unausführbar. Die Aufnahmeregel desselben Absatzes nennt reproduzierbare
+Spielerwirkung als Grund für einen Punkt, und beide Aufträge erfüllten das; die Ablage im
+Backlog war kein Regelbruch, sondern die falsche von zwei erlaubten Türen. Ein Nutzer sieht
+diesen Unterschied nicht: Er hat einen Auftrag erteilt und hört drei Tage nichts.
+
+Dazu die zweite Hälfte, die den Fall überhaupt möglich machte: Der Träger, aus dem die
+Einträge stammten, existiert zweimal, und die Dokumentation nennt den falschen Pfad. Der
+Auftrag war also nicht verloren, sondern zweimal unsichtbar.
+
+**Lehre:** Was der Nutzer als Auftrag formuliert, gehört in den Arbeitsauftrag — sofort, mit
+Rang, auch wenn die Messung noch fehlt. Der Backlog ist für Befunde, die niemand bestellt
+hat. Wo eine Ablage per Definition nie zu Arbeit führt, ist die Wahl dieser Ablage für einen
+bestellten Auftrag bereits die Entscheidung, ihn nicht auszuführen.
+
+### 3.262 Die Maschine schreibt die Entschuldigung für ihren eigenen Ausfall
+
+Am selben Abend, 21:07 bis 21:48, stand der Stapel ein zweites Mal — und diesmal hatte ihn
+niemand angehalten. Eine Sitzung las die Übergabe-Anweisung als **Stopp**, schrieb die
+Pausendatei mit `type: user-stop` und `retry-after: never`, und beendete sich. Uhrlos heißt:
+Es gibt keinen Zeitpunkt, an dem der Stapel von allein zurückkommt. Beendet wurde es wieder
+vom Nutzer.
+
+Das Bemerkenswerte ist nicht der Lesefehler, sondern was danach mit ihm geschieht. `user-stop`
+gilt der Pausenlogik als **Beweis** der Nutzer-Herkunft, obwohl die Sitzung ihn sich selbst
+ausstellt; es ist zugleich die einzige Ursache ohne Uhr. Und die Stillstandsanalyse, die genau
+solche Löcher aufdecken soll, bucht das ganze Intervall als entschuldigte Nutzer-Ausfallzeit.
+Der Detektor kann den eigenen Fehler also nicht einmal rückblickend sehen: Der Ausfall
+erscheint im Bericht als Zeit, die der Nutzer verantwortet.
+
+**Lehre:** Eine selbst ausgestellte Quittung ist kein Beweis. Wo ein Zustand die Herkunft
+»vom Nutzer« trägt, muss die Herkunft von außen belegt sein — sonst ist die schärfste Form
+des Stillstands, der uhrlose, auch die am leichtesten selbst verschuldete. Und ein
+Messinstrument darf keine Klasse kennen, in die sich der Gemessene selbst einsortieren kann;
+sie wird zur Ablage für genau das, was das Instrument finden sollte. Gebucht als Punkt 1097.

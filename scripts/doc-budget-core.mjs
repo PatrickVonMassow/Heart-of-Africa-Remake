@@ -165,8 +165,16 @@ export const DOC_BUDGETS = [
     // main push costs, none of them the ORDER of the ladder. Its hook measures 18
     // words on this tokenizer, and the ceilings move by exactly that line to the
     // measured 51 / 784 fit.
+    // LOWERED on 10.09.2026 by the cut that retired the 05.09.2026 session-death
+    // hunt: it was solved that day, its fix and its regression spy are in the tree,
+    // and the retrospective carries the whole story in prose plus a summary row —
+    // a closed incident is what this index stops paying for at every turn. The
+    // memory file is gone; two hooks also gave their wiki-links back to the bodies
+    // they belong in. The word ceiling follows the cut down to the measured 783;
+    // the line ceiling stays, because the freed line is exactly what put the index
+    // back inside it.
     maxLines: 51,
-    maxWords: 784,
+    maxWords: 783,
     maxEntryWords: 22,
     // Fifteen words: an index of one-hook lines, where a whole new entry is ~20 words —
     // so the slack cannot hide one, and re-wording an existing hook is free.

@@ -135,6 +135,20 @@ put it is the mistake this line exists to stop.
   it; the lane here follows `isBackendSensitivePath` over what the tap actually touches.
   Screenshot: verification/1065-tapping-child-at-its-rock.png (subject declared: the tapping
   child at its rock).
+  COVERING RUN, 10.09.2026 16:20–17:55 CEST: LARGE, WebGL 2 lane, RED (exit 1) after 95m 33s,
+  138 frames, HEAD 764ecb808. SEVEN failing suites, and NOT ONE of them is this branch's.
+  Measured, not argued:
+  - `settings` ground-detail, `enrichments` dressing-growth (point 278) and `crossbrowser`
+    chromium-mobile are the three recurring foreign reds already named in point 1089.
+  - `benchmark` (6 checks, "restored: ssaoEnabled" and its siblings) — classified against the
+    merge-base 4b81b945e, two runs: PRE-EXISTING, already 9 failing on the baseline.
+  - `gamepad` position-query DE — classified the same way: UNSTABLE ON BASELINE (green on
+    baseline run 1, red on run 2), so the baseline decides nothing and the branch owns nothing.
+  Evidence: local/verify-baseline-logs/{benchmark,gamepad}-baseline-4b81b945e8a0-run{1,2}.log,
+  .claude/worktrees/point-1065/local/verify-logs/2026-09-10T14-20-09-713-large.log.
+  Under the user's decision of 10.09.2026 ("Regression bleibt, fremde Reds entkoppeln") none of
+  these holds the point. What the point still owes is its OWN evidence: the narrow
+  `polish --section=children-bank-game` rung and the declared tap screenshot.
   Quotes:
   Nutzer, 06.09.2026 13:48: »Wenn ein Kind beim Fangspiel an den Felsen tippt und ROCK sagt, berührt seine Hand nicht annähernd den Felsen. Das Kind steht in dem Augenblick noch sehr seit davon entfernt. So erkennt man nicht, dass das Gesprochene etwas mit dem Felsen zu tun hat und man könne eher glauben, dass es "Los!" o. ä. bedeutet.«
   Nutzer, 06.09.2026 13:48 (Einreihung aller drei Punkte): »An der Kommunikationsmechanik zu überarbeiten, einzureihen direkt nach 1058, in der Rehenfolge, in der ich es hier aufzähle:« — PART A war der ZWEITE der drei, PART B der DRITTE; die vom Nutzer genannte Reihenfolge bleibt innerhalb dieses Punktes erhalten.
@@ -188,6 +202,13 @@ put it is the mistake this line exists to stop.
   0.12 s blend, not the extra frame, and the error grows with `dt`. The remedy is to advance
   every gesture BEFORE the new utterance is spoken, so the later call only reads: both clocks
   become one and the blend begins exactly at the hold's end.
+  BOTH BACKENDS NOW SAY THE SAME THING (11.09.2026, commit dc3fd8984). The narrow rung the
+  point owed ran on WebGPU — `polish --section=children-bank-game`, 3m 58s, exit 0, 21 pass,
+  0 fail on 764ecb808 — and the covering WebGL 2 LARGE had `polish` at 249 pass, 0 fail. The
+  declared frame verification/1065-tapping-child-at-its-rock.png carries the WebGPU shutter,
+  and both pictures were judged: the child's hand lies on the drawn flank of the play rock
+  while the word falls. The change is backend-sensitive by `isBackendSensitivePath`, and this
+  is the lane it owed.
   Bundle: Dorfleben.
 
 - [ ] 1086. The cheap rung is skipped, and only the expensive one is enforced.
@@ -946,6 +967,144 @@ put it is the mistake this line exists to stop.
   frame at shipped values, taken and judged in the main session.
   Bundle: Dorfleben.
 
+- [ ] 1092. The well leaves the one village that already fetches its water from the river
+  (user 07.09.2026, narrowed by the user on 10.09.2026).
+  The order, verbatim on 07.09.2026: "Zudem macht der Brunnen in dem Dorf ohnehin wenig
+  Sinn, wenn die Erwachsenen immer zum Fluss laufen. Entferne ihn komplett aus dem Dorf
+  (priorisierter Fix fuer Kommunikationsmechanik)." It was triggered by the report
+  `hoa-state-2026-09-07-1702816850` (bambara-village), "Brunnen haengt im Zaun". It sat in
+  `docs/backlog.md` from 07.09. until 10.09.2026 and never became a point; that is why it
+  stands here now, and the collision half of the same evening is point 1093.
+  THE SCOPE IS ONE VILLAGE, NOT THE PROP (user 10.09.2026): "Den Brunnen aber nur aus
+  Bambar entfernen — da ist er redundant, weil der Fluss schon zum Wasserholen genutzt
+  wird. In den anderen Doerfern kann er bleiben." So `VILLAGE_SPOTS.well` STAYS, the `Well`
+  component stays, and only the village the communication slice is played in loses it: its
+  adults teach RIVER on the water path, which makes a second water source there redundant
+  and the teaching harder to read.
+  Final state:
+  - In `ROCK_VILLAGE_ID` alone there is no well: not in the keep-clear list, not as a
+    collider, not among the adult stations, not drawn, and no jar walker heading for it.
+  - Every other village is untouched, prop, stations and collider alike.
+  - The exception is written against `ROCK_VILLAGE_ID`, not against a fresh string, so it
+    follows the slice if the puzzle village ever moves.
+  - The jar walker is DELETED rather than re-aimed (decision 07.09.2026): every jar journey
+    in that village then belongs to the errand adults on the water path (point 1087), and
+    the teaching gains no silent third jar carrier beside it.
+  Test: Vitest — the adult stations, the keep-clear list and the collider set of
+  `ROCK_VILLAGE_ID` hold no well while another village's are unchanged, mutation-checked.
+  Picture check: one frame from the bambara village showing the former well spot empty.
+  Refs: src/scenes/place/lifeSpots.ts (`VILLAGE_SPOTS.well` ~9, `villageAdultStations` ~26
+  with the well and the water-carrier's stop), src/scenes/place/layout.ts (the life-spot
+  list ~763, the well collider ~1453, the place-bound branch at ~973 as the precedent),
+  src/scenes/place/PlaceLife.tsx (`Well` ~1667, its rendering ~3066, the jar `TaskWalker`
+  ~3078), src/world/communicationRock.ts (`ROCK_VILLAGE_ID` ~21)
+  Criticality: medium — a player-visible prop the user asked twice to be gone, and two
+  fewer stations make the children's quarter (481.4) easier to place in exactly the village
+  where the room is tightest.
+  Bundle: Dorfleben.
+
+- [ ] 1045. Two village layouts have no straight walk to the water, so they teach no RIVER
+  at all (measured 02.09.2026 while answering the cross-vendor findings of point 688).
+  Point 688 fits the village water path by sweeping its head until the straight walk to
+  the water clears the settlement's fabric as it is DRAWN — dwellings at their true shape,
+  boxes at their corners, the compound fence panels, the pen, the play rocks, the props.
+  A village that can give no such walk gives NO water path, which is the point's own rule:
+  a track drawn through a wall teaches the wrong thing, and no teaching beats a wrong one.
+  Measured at `abf2faf49` over nine villages at six seeds, two layouts pay that price —
+  bambara-village at seeds 7 and 1337 — and there both water situations are simply absent:
+  no jar goes down, no jar comes back, and the word RIVER is never taught in that village.
+  BOTH OF THEM ARE THE PUZZLE VILLAGE, and the seed is the axis, not the village (measured
+  10.09.2026 on the user's question): the slice is bound to bambara-village
+  (`communicationRock.ts` ~21 `ROCK_VILLAGE_ID`, `store.ts` ~632 `DRUM_MESSAGE_VILLAGE`) and
+  the world seed is DRAWN at every start (`store.ts` ~618, `?seed=` is a dev switch alone).
+  So this is not a village the player never sees — it is two of six drawn seeds in which the
+  village that must teach RIVER never teaches it, before a drum message built on that word.
+  This point's earlier claim that the slice's village "is NOT among them" held for the
+  suites' fixed seeds only and is withdrawn. `layout.test.ts` names the two, so a third one
+  appearing goes red.
+  Final state:
+  - Every river village carries a water path, and none of them draws it through a wall.
+  - One of the two ways is taken and written down: either the track may BEND once at the
+    gap between two compounds (it is a worn footpath, not a surveyed road), or the
+    compound builder opens a GATE where the lane crosses its ring, the way a real
+    compound has one.
+  - The named-exception list in `layout.test.ts` is deleted with the cause.
+  Test: Vitest over the layout — every river village at every swept seed carries a water
+  path whose whole run clears the FULL collider set at the drawn lane's half-width, with
+  no exception list. Picture check on both backends: the track where it passes a compound.
+  Criticality: high — it costs one of the two adult words entirely, in the village the
+  player IS given, in two of six drawn seeds (raised from medium on 10.09.2026 with the
+  measurement above; the "not in the one the player is given" reading was wrong).
+  Refs: src/scenes/place/layout.ts (the `clearRun` sweep and the head ladder),
+  src/scenes/place/layout.test.ts (`NO_STRAIGHT_WALK`)
+  Author lane: astra.
+  Why the lane: the communication mechanic is authored by Astra (user 08.09.2026); the
+  rendered picture, the browser suites and the landing stay in the main session.
+  Bundle: Dorfleben.
+
+- [ ] 1093. A compound fence may be drawn straight through a fixed life prop (user
+  07.09.2026, "reihe einen weiteren Task fuer das Clipping-Problem ein, der spaeter
+  erledigt wird"; restated 10.09.2026 alongside the decision that keeps the well elsewhere).
+  Reported as "Brunnen haengt im Zaun" in `hoa-state-2026-09-07-1702816850`, which caught
+  the well at (9, 8.5). Point 1092 removes the well from that one village, so WITHOUT this
+  point the reported case simply moves to the eight villages that keep it.
+  MEASURED IN `layout.ts`: the fixed prop spots are kept free of DWELLINGS only — `isFree`
+  (~772) tests every candidate against `lifeSpots`. Fences are placed with no prop test at
+  all: none of the five `fences.push` sites (~1109, ~1114, ~1230, ~1294, ~1336) consults
+  `lifeSpots`, and the compound ring's own `clears()` (~1193) knows other rings and the
+  functional buildings and nothing else. Exposure by radius is not limited to the well:
+  the talking pair (4.6, 5.6) and the pounder (-7, 1.2) sit at r 7.2 and 7.1, the weaver at
+  (-8.5, -7), all reachable by a compound band at cr 13.5–17.5 with a ring of about 7.
+  Final state: a fence run is judged against the fixed prop spots the way the water path is
+  already judged against the full collider set — the run is dropped, the ring moved, or the
+  spot planned out of the way — and no shipped layout draws a fence through a prop.
+  Test: Vitest over several villages at many seeds — no prop collider intersects a fence
+  post or a dwelling, mutation-checked, with no exception list.
+  BOUNDARY, measured 07.09.2026: this is a picture and walkability defect, not a teaching
+  defect. The water path, the dig sites and the play rocks all test against the collider
+  set already, so none of the three teaching surfaces breaks; that is why the user ranked
+  it behind 1092.
+  Refs: src/scenes/place/layout.ts (`isFree` ~772, the fence sites ~1109/~1114/~1230/~1294/
+  ~1336, `clears` ~1193, the water-path sweep ~1554 as the pattern to copy)
+  Criticality: medium.
+  Bundle: Dorfleben.
+
+- [ ] 1094. The teaching checks vary the village and pin the seed, which is the wrong axis
+  (user 10.09.2026, 20:11 — "Setze deine Empfehlung bzgl. 1045 um"). This point DELETES
+  test breadth; it builds nothing.
+  The communication slice runs in one village only (`ROCK_VILLAGE_ID`), while the world seed
+  is DRAWN at every start (`store.ts` ~618, `?seed=` is a dev switch alone). The open
+  teaching points are sampled the other way round: 698 measures the direction call at
+  bambara@42, bambara@2972259115, nubian@42 and mandinka@99; 1081 fails at
+  mandinka-village@99 and also samples maasai; 1043 lets `polish --section=speech-hypothesis`
+  speak over a figure of the maasai village. So behaviour is judged in villages where
+  nobody learns the language in this PoC, while the axis that actually costs the player —
+  the same bambara map at another seed, which is point 1045 — goes unjudged.
+  Final state: in the checks that judge the TEACHING (reach of the call, separation of the
+  children's and the adults' groups, the speech label) the seed spread replaces the village
+  spread — same sample count, all in `ROCK_VILLAGE_ID`, across several seeds. The pattern is
+  already in the house: `riverBank.test.ts` sweeps the running lane over 60 seeds per village.
+  EXPLICITLY UNTOUCHED, so nothing right is deleted with it:
+  - assertions where a foreign village IS the statement — `riverBank.test.ts` ("a village
+    away from every river has no bank") stays word for word;
+  - the general settlement and picture suites (`collision.mjs`, `enrichments.mjs`,
+    `gamepad.mjs`) that do not judge the teaching;
+  - the tag game where a riverless village plays the other round.
+  CONSEQUENCE, stated openly: 1081 fails today at mandinka@99 and reads 0 % at
+  bambara@2972259115, so it may go green with no code change. That is the intended outcome
+  when the bambara seed spread is clean, and 1081 is then CLOSED rather than built; if the
+  spread finds the same crowding in bambara, it is finally measured where it counts.
+  Test: Vitest — the converted cases run over at least four bambara seeds and name no
+  foreign village, mutation-checked; one case pins the untouched `riverBank.test.ts`
+  assertion so the deletion cannot run past its boundary.
+  Refs: src/scenes/place/tagShuffle.test.ts (the sample tables ~693, ~920, ~1441, ~1538,
+  ~1671), src/scenes/place/riverBank.test.ts (~295, the boundary), scripts/verify/polish.mjs
+  (`speech-hypothesis`), src/world/communicationRock.ts (`ROCK_VILLAGE_ID` ~21),
+  src/state/store.ts (`newSeed` ~618)
+  Criticality: medium — it removes work rather than adding it, and it points the remaining
+  work at the village the player is given.
+  Bundle: Dorfleben.
+
 - [ ] 690. The classic game of tag moves to the port cities, and every document describes
   the rebuilt mechanic (user 13.08.2026, playing the deployed communication slice; point 692
   folded in here 07.09.2026).
@@ -1232,6 +1391,33 @@ put it is the mistake this line exists to stop.
   tag plus `poc` dynamically, but a tag push alone does not trigger it. Then VERIFY
   that /v0.3/ and /poc/ serve the new state, and FREEZE the tag: it is never
   re-pointed.
+
+- [ ] 1089. Charge a LARGE red that does not touch the point's diff to its own point
+  (user 10.09.2026).
+  Apply the rule CLAUDE.md §7.2 already states — "a red run closes only when its cause is
+  fixed, CHARGED TO ITS OWNING POINT, or FILED AS A NEW POINT" — to the reds that are
+  holding point 1065, and make the charging automatic rather than a judgement call.
+  Measured on 1065 (10.09.2026): 23 full LARGE runs, 16.2 machine hours, none green, and
+  NOT ONE red touched the tap. The recurring reds are `settings` ground-detail (edge
+  energy), `enrichments` dressing-growth (point 278), `crossbrowser` chromium-mobile
+  (getSupportedExtensions on null), plus two teardown aborts from foreign commits. Each
+  was re-diagnosed on every run instead of being charged once.
+  Final state:
+  - A LARGE red whose failing check does not touch the point's own diff is FILED as its
+    own point automatically by the run's own report — the report already computes
+    "touches the diff", so it has the information. The point under test is not held by it.
+  - The run's verdict line says plainly which reds are charged elsewhere and which are the
+    point's own, so a merge decision does not need a human re-reading of the log.
+  - The three reds above get their points at once; 1065 merges on its own evidence — the
+    narrow rung `polish --section=children-bank-game`, unit, build and lint.
+  WHY THIS AND NOT A POLICY CHANGE: nothing here loosens the gate. The full regression
+  still runs and still has to go green — but its failures are owned by whoever broke them
+  instead of by whoever happens to be holding the branch when they surface.
+  Test. Vitest: a red check whose file set is disjoint from the branch diff is reported as
+  charged elsewhere and does not hold the point; a red that touches the diff still does.
+  Refs: scripts/verify/run-all.mjs (the "touches the diff" annotation), CLAUDE.md §7.2,
+  point 1065, point 278.
+  Bundle: Testinfrastruktur.
 
 - [ ] 1081. A child boxed by adults planted in its own play ground walks a metre and gets
   nowhere — and the case that was supposed to catch it pins one lucky seed. Measured on
@@ -10498,33 +10684,6 @@ to land than a mechanism that needs a review.
   this time through the very exit its refusal names.
   Bundle: Session- & Repo-Hygiene.
 
-- [ ] 805. The push gate reads a delegated author's own commit as a red
-  (measured 21.08.2026, 07:05). A `main` push ran the full unit layer and every test passed: 357
-  files, 12344 tests, 1 skipped, NOTHING failing. The run exited non-zero anyway, at teardown, from
-  `assertRepositoryUnchanged` in `scripts/repository-integrity.mjs`:
-  `refs/heads/feat/781-main-checkout-helper` moved from 8ce92b0 to 4e83124 while the suite ran —
-  GPT-5.6 Sol committing its authoring checkpoints in its own isolated worktree, which is exactly
-  what a delegated author is instructed to do. The assertion's own text already names the case: "a
-  legitimate commit or branch operation in another worktree during the run produces the same
-  result". It says so and blocks anyway.
-  NOT THE SAME AS 803. That point covers CONTENTION — no failing test named while the measured load
-  is high — and its remedy is to wait for a quiet host. This is not load, and waiting does not
-  reach it: the ref that moved belongs to the delegated author, and it moves precisely while the
-  batch is in its normal operating state. The gate's own retry reproduced it under the same
-  conditions, as it must.
-  FINAL STATE: the integrity assertion tells a ref the suite itself may have written apart from a
-  ref that belongs to a known concurrent author. A ref the running session does not own — a
-  registered authoring branch, a worktree named in the in-flight declaration — is REPORTED in the
-  verdict and does not fail the run. A ref the suite has no business touching — `main`, `HEAD`, the
-  fixture branches of point 801 — still fails it loudly.
-  VERIFIABLE: pure tests over the assertion — a moved delegated-author branch is reported and
-  passes; a moved `main` fails; a moved fixture branch fails; and the verdict text names every ref
-  that moved in each case.
-  Criticality: medium — no product defect, but it withholds the push rule's protection for as long
-  as a delegated author runs, and leaves bookkeeping committed but unpushed, which is the exact
-  state that rule exists to prevent.
-  Bundle: Session- & Repo-Hygiene.
-
 - [ ] 806. The repair-loop bound speaks on the ninth commit, one minute after the human already
   ended the session (reported 21.08.2026 by the reviewing session, the morning point 772 landed).
   WHAT LANDED AND WHAT IT MEASURES. Point 772 shipped `REPAIR_COMMIT_ORDINARY_MAX = 8`, so a run
@@ -11467,30 +11626,6 @@ to land than a mechanism that needs a review.
   unchanged.
   Criticality: low — no product behaviour; the cost is a self-inflicted second cancellation and
   the batch time spent clearing it.
-  Bundle: Session- & Repo-Hygiene.
-
-- [ ] 852. A landing gate cannot run while another author lane commits. MEASURED 23.08.2026,
-  07:47, landing point 669 while a parallel worktree authored point 834. `land-point`'s fast gate
-  runs the unit suite, and `scripts/repository-integrity.mjs` asserts that no ref moved during the
-  run; the other lane's checkpoint commit moved `refs/heads/feat/834-durable-authoring-lane`
-  mid-suite, so the gate went red with "LIVE REPOSITORY CHANGED WHILE UNIT SUITE RAN" although no
-  test failed. The merge had already landed on `main`, so the landing stopped half-way and had to
-  be resumed.
-  WHY IT IS STRUCTURAL: under maximal delegation three lanes commit every few minutes against a
-  ~130 s unit suite, so a landing gets through by luck, and the retry that succeeds is
-  indistinguishable from a retry that hid a real defect (CLAUDE.md §7.2: a retry is SUSPECT and
-  covers nothing). The detector deliberately has no env knob, and its own message names the
-  legitimate case it cannot distinguish.
-  FINAL STATE: the integrity check accepts a set of refs the CALLER declares as foreign and
-  expected — the in-flight declaration already names exactly those branches — so a moved ref
-  belonging to a declared other lane is not a finding, while a moved ref nobody declared still is.
-  The declaration is the only source of that set; no flag lets a caller wave a ref through by hand.
-  VERIFIABLE: unit cases over the integrity check — a ref moved that the declaration names is
-  clean; the same ref moved with no declaration is a finding; a ref moved that the declaration does
-  NOT name is a finding even while other lanes are declared; and `main` moving is a finding under
-  every declaration.
-  Criticality: medium — no product behaviour, but it stops landings half-way and manufactures reds
-  that train sessions to retry a suspect gate.
   Bundle: Session- & Repo-Hygiene.
 
 - [ ] 853. The guard preflight names a remediation that cannot clear its own block. MEASURED
@@ -13007,89 +13142,6 @@ to land than a mechanism that needs a review.
   Criticality: medium — the board is readable today; what fails is the phone picture the request
   asked for.
   Bundle: Chat & Tafel.
-
-- [ ] 955. The unit gate refuses while a delegated author commits, so the push gate goes red for no
-  defect (measured 26.08.2026, 20:33, with two Sol authoring lanes running).
-  `scripts/repository-integrity.mjs` asserts in the Vitest GLOBAL TEARDOWN that no ref moved while
-  the unit suite ran, and it fails the whole run when one did: "LIVE REPOSITORY CHANGED WHILE UNIT
-  SUITE RAN: refs changed: refs/heads/feat/943-…". Delegated authors commit on their own branches
-  every few minutes BY DESIGN — `author-sol.mjs` pushes the branch for them — so every unit run that
-  overlaps a busy lane dies, which is every run the owner makes while lanes are busy and every
-  pre-push gate. The check's own message already names the legitimate case, and the pre-push gate's
-  single re-run is what rescued tonight's push; that re-run is a fail-soft, not an answer, because it
-  costs a full unit suite and reports SUSPECT.
-  AND IT KILLS A FULL REGRESSION, NOT ONLY A UNIT RUN (measured 29.08.2026, 19:21-19:32, on
-  `feat/687-roam-bound-fixes` with NO lane running at all). The LARGE run's own `unit` stage went
-  red on `keeps both a shared clone and its live source unchanged with clone-local GIT_DIR` — "one
-  or more worktree indexes changed" — because the SAME session was doing its ordinary main-branch
-  bookkeeping while the suite ran: one commit and one push at 19:22, plus board publishes. Nothing
-  was wrong with the code and nothing leaked; the run simply overlapped the owner writing down what
-  the run was for. The cost is not one suite but eighty-five minutes of both-backend regression
-  thrown away, and the only way to avoid it today is a rule no guard enforces: touch no ref while a
-  LARGE runs. That rule is unworkable in practice, because a LARGE is exactly when there is time for
-  bookkeeping.
-  IT IS NOT ONLY THE DELEGATED LANES — THE OWNER TRIPS IT ON EVERY POINT START (measured
-  27.08.2026, 00:09-00:12Z, on main `6edd81fd`, with NO authoring lane running yet). The chain,
-  end to end: `batch-doctor --gate` began `npm run test:unit` at 00:09:44Z; at 00:12:28Z the same
-  owner session created `feat/957-contribution-scoped-review`, which is the mandated FIRST step of
-  the next point; at 00:12:32Z the suite finished with 430 files and 14 015 tests ALL PASSED and
-  the teardown failed the run on `refs changed: refs/heads/feat/957-…`. So the exposure is not
-  confined to a busy evening of parallel authors: the owner's own `git worktree add` and its own
-  bookkeeping commit on `main` move a ref just as reliably, which puts every point start and every
-  cross-cutting commit in the window. Reproduced the same hour from a manual `npm run test:unit`,
-  again all 430 files green, exit 1 on the same teardown.
-  AND IT COMPOUNDS WITH 455, WHICH IS HOW THE GREEN TREE STAYED UNKNOWN. `batch-doctor` reads only
-  the exit code, so it saw a red; its load probe then excused that red as INCONCLUSIVE on "7 live
-  agent worktree(s)" that held no process and had not been written to for 3 to 14 days. A false red
-  from this point therefore collects a false excuse from 455, and neither mechanism ever learns
-  what was true — that the tree was entirely green. Whichever of the two is built first, its test
-  should name the other, because each one alone still leaves the pair silent.
-  FINAL STATE: the teardown distinguishes TEST LEAKAGE into the live repository from a foreign
-  branch's own progress. A ref that belongs to a declared in-flight lane, or any ref that is neither
-  the running checkout's HEAD nor its branch, is not this suite's leakage and does not fail the run;
-  what remains — the running checkout's own refs, the index, the working tree — still fails loud.
-  MEASURED A THIRD TIME 28.08.2026, 02:52, AND THE RE-RUN DID NOT RESCUE IT. A cross-cutting
-  `main` push ran the pre-push gate twice; BOTH runs were red on this teardown and neither named a
-  failing test — "unit ran 435 files / 14110 tests and its summary named NO failing test, yet the
-  runner exited non-zero" — while the delegated Sol lane for point 946 committed
-  `4f044565 -> ca139085` during the first run and `ca139085 -> d11c541c` during the second. So the
-  single re-run this point calls a fail-soft is not one: a lane that commits every few minutes
-  reds both runs, and the gate then reads that as "the re-run did not clear it, so it blocks". The
-  push only went through on a later manual attempt that happened to fall in a quiet window. Add to
-  the final state that the gate's verdict NAMES a teardown red over foreign activity as an
-  environment condition and says which lane collided, rather than reporting it as a blocking red.
-  MEASURED A FOURTH TIME 03.09.2026, 07:27-07:31 — AND THIS TIME A GUARD ORDERED IT. The new
-  element is not another collision but its cause: the owner was DIRECTED into it. Declaring the
-  wait for point 1047's both-backends LARGE run, `batch-in-flight` REFUSED the declaration because
-  two of three agent slots stood free, named eight independent open points and demanded either a
-  commission or a written reason. The owner complied and commissioned GPT-5.6 Sol onto point 1049
-  in its own worktree; Sol's FIRST commit — the commission record it writes before it even starts —
-  killed the run 3m51s in on `refs/heads/feat/1049-queue-order-rule <absent> -> 9815ce1b1`. So the
-  rule this point calls unworkable ("touch no ref while a LARGE runs") is not merely unenforced:
-  another guard actively punishes obeying it, and the owner had to stop the author it had just been
-  told to start. The same edge caught the board in the same hour — `board-publish.mjs` commits to
-  `refs/heads/board`, so the dashboard duty is a ref mutation too and the publish had to be held
-  until the unit stage passed, which is only knowable by reading `run-all.mjs` to learn that the
-  second backend pass skips the preflight. Add to the final state: while a browser regression is
-  declared in flight, the agent-pool guard stands down, or the declaration itself is the account
-  its free slots need.
-  VERIFIABLE: Vitest over the decision — a moved foreign branch passes, a moved own HEAD fails, and
-  an undeclared foreign ref is reported by name rather than silently allowed.
-  Criticality: medium-high — it turns every parallel authoring evening into red gates that hide real
-  reds among false ones.
-  MEASURED AGAIN 07.09.2026, and this time it BLOCKED the main session for half an hour: three
-  commits on `main` failed the pre-push gate twice with `LIVE REPOSITORY CHANGED WHILE UNIT SUITE
-  RAN: refs changed: refs/heads/feat/1069-wsl-vm-death e3edd33 -> 4506bc7; worktree registrations
-  changed; one or more worktree indexes changed` — GPT-6 Astra committing in
-  `.claude/worktrees/point-1069`, exactly what CLAUDE.md §6 requires of it. Build, lint and audit
-  were green each time. The push only went through once the author's run had finished. Two things
-  the 26.08. reading did not yet show: the collision now meets `push-arrival-guard`, which refuses
-  to let a turn END on unpushed work, so the session was wedged between two rules rather than
-  merely slowed; and load makes the gate spend its one re-run BEFORE the decisive red (99 % CPU
-  across 16 cores, six concurrent vitest runs), so the retry that exists for false reds was already
-  gone when the real refusal came. Raises the criticality: with maximum delegation an author is
-  almost always committing, so `main` is almost never pushable.
-  Bundle: Urlaubsfestigkeit.
 
 - [ ] 956. A merge-with-fixes verdict leaves its named fix owed, and nothing tracks it (measured
   26.08.2026 while reading the review ledger for point 943). `.claude/mechanism-reviews.jsonl`
@@ -14931,38 +14983,6 @@ to land than a mechanism that needs a review.
   Refs: scripts/verify/run-all.mjs, scripts/verify/run-logged.mjs, scripts/render-verify-recorder.mjs
   Bundle: Testinfrastruktur.
 
-- [ ] 1045. Two village layouts have no straight walk to the water, so they teach no RIVER
-  at all (measured 02.09.2026 while answering the cross-vendor findings of point 688).
-  Point 688 fits the village water path by sweeping its head until the straight walk to
-  the water clears the settlement's fabric as it is DRAWN — dwellings at their true shape,
-  boxes at their corners, the compound fence panels, the pen, the play rocks, the props.
-  A village that can give no such walk gives NO water path, which is the point's own rule:
-  a track drawn through a wall teaches the wrong thing, and no teaching beats a wrong one.
-  Measured at `abf2faf49` over nine villages at six seeds, two layouts pay that price —
-  bambara-village at seeds 7 and 1337 — and there both water situations are simply absent:
-  no jar goes down, no jar comes back, and the word RIVER is never taught in that village.
-  The village the communication slice is played in is NOT among them, which is why this is
-  a point of its own rather than a blocker. `layout.test.ts` names the two, so a third one
-  appearing goes red.
-  Final state:
-  - Every river village carries a water path, and none of them draws it through a wall.
-  - One of the two ways is taken and written down: either the track may BEND once at the
-    gap between two compounds (it is a worn footpath, not a surveyed road), or the
-    compound builder opens a GATE where the lane crosses its ring, the way a real
-    compound has one.
-  - The named-exception list in `layout.test.ts` is deleted with the cause.
-  Test: Vitest over the layout — every river village at every swept seed carries a water
-  path whose whole run clears the FULL collider set at the drawn lane's half-width, with
-  no exception list. Picture check on both backends: the track where it passes a compound.
-  Criticality: medium — it costs one of the two adult words entirely in the layouts it
-  hits, but not in the one the player is given.
-  Refs: src/scenes/place/layout.ts (the `clearRun` sweep and the head ladder),
-  src/scenes/place/layout.test.ts (`NO_STRAIGHT_WALK`)
-  Author lane: astra.
-  Why the lane: the communication mechanic is authored by Astra (user 08.09.2026); the
-  rendered picture, the browser suites and the landing stay in the main session.
-  Bundle: Dorfleben.
-
 - [ ] 1046. The children's bank round hardly ever carries anyone past the middle of the
   stretch (measured 02.09.2026 while answering the cross-vendor findings of point 688).
   The replay in `tagShuffle.test.ts` used to walk adult bodies to the water's FOOT, which
@@ -15490,3 +15510,75 @@ to land than a mechanism that needs a review.
   point 1083.
   Bundle: Testinfrastruktur.
 
+- [ ] 1095. The guide's ceiling equals its size, so the review that demands a new lesson
+  cannot deliver one (measured 10.09.2026 20:55).
+  `retro-currency-guard` blocks the turn until `docs/analysis_de/vibe-coding-anleitung.md`
+  has been read against the changed sources, and it asks in its own words whether the guide
+  "needs a new pitfall + prompt". Read against the new lesson §3.260 — an order filed to a
+  list the rules define as never blocking is an order that will not be carried out — the
+  guide has no line on the subject at all. The addition was written (one pitfall plus its
+  prompt, 11 lines in the surrounding style) and the push gate refused it:
+  `guide-brevity-core.test.mjs` pins `maxLines` 637 and `maxWords` 6114, which is EXACTLY the
+  file's current size. Any addition fails. The commit was taken back, so nothing lies half
+  done, and the review itself is attested.
+  THE TWO RULES CONTRADICT EACH OTHER, and neither is wrong on its own: the guide must stay
+  short enough for a beginner to read, and it must carry what the retrospective learns. Today
+  the second one silently loses, and it loses without a word — the refusal names a test, not
+  a decision.
+  Final state: one of the two is taken and written down where the next reader meets it —
+  either the guide trades space (several of its pitfalls come from the guard mechanics and
+  carry less for a beginner than "where does my order end up"), or the ceiling is raised in a
+  commit that STATES the measurement, which is what point 1022 requires of any raise. Either
+  way the §3.260 pitfall stands in the guide when the point closes.
+  Test: the brevity case keeps pinning a ceiling and stays mutation-checked; a case asserts
+  the guide names the two-doors pitfall, so the lesson cannot fall out again unnoticed.
+  Refs: docs/analysis_de/vibe-coding-anleitung.md, scripts/guide-brevity-core.test.mjs,
+  scripts/retro-currency-guard.mjs, docs/analysis_de/retrospektive-zusammenarbeit.md (§3.260),
+  point 1022 (the rule for raising a document ceiling)
+  Criticality: low — it costs no player anything; it costs the guide its currency.
+  Bundle: Testinfrastruktur.
+
+- [ ] 1096. The landing's cleanup keeps every branch alive while any detached worktree
+  stands (measured 10.09.2026 22:19, landing point 1091).
+  `land-point`'s `cleanup` step refuses to delete a branch it cannot prove is unoccupied,
+  and it treats a detached worktree as unprovable: "a detached worktree outside the agent
+  directory — nothing proves it is NOT standing on feat/1091-…". Two such trees stand under
+  `local/verify-baseline/`, so the step reported "branch KEPT, 2 kept on purpose" and left
+  the local branch, the remote branch and the operator's hand-work behind — exactly the
+  hand-work point 1091 had just removed one step earlier in the same chain.
+  The trees were NOT on the branch. `git -C <worktree> rev-parse HEAD` answered in one call:
+  they stood on `4b81b945e` and `cd9feeb0e`, the branch tip was `5be28fe18`. The step had the
+  measurement available and chose an assumption instead, and the assumption is permanent:
+  the baseline trees are long-lived, so EVERY landing from now on ends this way.
+  Final state: a detached worktree is measured at its HEAD rather than carried as unknown,
+  so a branch no tree stands on is deleted by the chain, and CLAUDE.md §6's "the merge ends
+  the branch" is owed by hand only when a tree really is standing on it.
+  Test. Vitest: the cleanup deletes a branch while a detached worktree stands on a DIFFERENT
+  commit, and still keeps the branch when a detached worktree stands on the branch tip.
+  Refs: scripts/land-point.mjs (the `cleanup` step), scripts/worktree-cleanup.mjs, CLAUDE.md §6
+  Criticality: medium — it costs no player anything, but it re-imposes on every landing the
+  manual repair the chain was just fixed to avoid.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1097. A pause the session wrote itself holds the batch forever and is booked as user
+  downtime (measured 10.09.2026, 21:07–21:48).
+  A session read the handover instruction as a stop and wrote `.claude/batch-paused` with
+  `type: user-stop` and `retry-after: never`. The batch then stood still for 41 minutes and
+  was restarted by the user, not by any mechanism. Three properties keep that invisible:
+  - `scripts/batch-pause-core.mjs` treats `type: user-stop` as PROOF of user origin, although
+    the session writes the marker itself, and it is the only cause with no clock at all.
+  - `pauseMarkerEvidence` in `scripts/batch-standstill-inputs.mjs` books the whole interval as
+    `ACTIVITY_CLASSES.BLOCKED_USER` — excused user downtime — so the standstill report cannot
+    see the session's own misreading even in hindsight.
+  - Nothing notifies when a clockless park is written.
+  Final state: a clockless park notifies at once through `scripts/notify.mjs`; a clockless park
+  the user did not CONFIRM falls back to a clock after a bounded time instead of standing
+  forever; and the standstill analysis no longer books an unconfirmed park on the user.
+  Test. Vitest: a `user-stop` marker without recorded user confirmation ages into a clocked
+  retry, a confirmed one does not; and the standstill classifier books an unconfirmed park
+  outside `BLOCKED_USER` while a confirmed one stays there.
+  Refs: scripts/batch-pause-core.mjs, scripts/batch-standstill-inputs.mjs (`pauseMarkerEvidence`),
+  scripts/notify.mjs, memory rule "no standstill: decide and record" (23.08.2026)
+  Criticality: high — it makes the standing instruction of 23.08.2026 (no permanent standstill)
+  unenforceable, and the report that would expose it excuses the outage instead.
+  Bundle: Session- & Repo-Hygiene.
