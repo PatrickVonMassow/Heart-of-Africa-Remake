@@ -600,6 +600,7 @@ describe('the board step names what stopped it', () => {
       execFileSync(process.execPath, ['-e', 'console.log("board-publish REFUSED — no now-section."); process.exit(1)'], {
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'pipe'],
+        windowsHide: true,
       })
     } catch (e) {
       caught = e
@@ -614,6 +615,7 @@ describe('the board step names what stopped it', () => {
       execFileSync(process.execPath, ['-e', 'console.error("fatal: it broke"); process.exit(1)'], {
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'pipe'],
+        windowsHide: true,
       })
     } catch (e) {
       caught = e
