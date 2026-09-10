@@ -24,7 +24,7 @@
 // `land-cleanup-core.mjs` assumes — the lock line, the dirtiness, and above all
 // WITHOUT its own look becoming the evidence (point 629).
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, mkdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdtempSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, it, expect } from 'vitest'
@@ -37,7 +37,10 @@ import {
   reproveOne,
   runCommand,
   selectCleanup,
+  settleActiveWork,
 } from './land-point.mjs'
+import { childWords } from './land-point-core.mjs'
+import { gatherActiveWorkSource } from './active-work-source.mjs'
 import { DISPOSITION, branchDeletionBlocker, judgeCleanupTarget } from './land-cleanup-core.mjs'
 
 /** A child that takes a measurable, deterministic amount of time. */
@@ -578,5 +581,268 @@ describe('the re-proof at the moment of deletion', () => {
     })
     expect(r.ok).toBe(false)
     expect(r.reason).toMatch(/no longer lists/)
+  })
+})
+
+// THE LANDING STOPPED ONE STEP BEFORE ITS OWN CLEANUP (point 1091).
+//
+// Measured landing point 1088 on 10.09.2026: the tick closed the point, the
+// board publish then read an active-work source that STILL named it, the
+// publisher refused — and the verdict line said "FAIL board publish the board"
+// with nothing after it, so the operator had to re-run the publisher by hand to
+// learn why. Both halves are measured here against the real thing: the
+// publisher's OWN source function decides whether the state is renderable, and
+// a REAL failing child produces the error whose words the verdict must carry.
+describe('the board step names what stopped it', () => {
+  it("carries a child's refusal even when the child wrote it on STDOUT", () => {
+    let caught = null
+    try {
+      execFileSync(process.execPath, ['-e', 'console.log("board-publish REFUSED — no now-section."); process.exit(1)'], {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+      })
+    } catch (e) {
+      caught = e
+    }
+    expect(caught).not.toBeNull()
+    expect(childWords(caught)).toBe('board-publish REFUSED — no now-section.')
+  })
+
+  it('is not silenced by the trailing newline every well-behaved stream ends with', () => {
+    let caught = null
+    try {
+      execFileSync(process.execPath, ['-e', 'console.error("fatal: it broke"); process.exit(1)'], {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+      })
+    } catch (e) {
+      caught = e
+    }
+    // The old line was `String(e.stderr).split('\n').slice(-1)[0]` — the empty
+    // string after the final newline, which is exactly what the operator saw.
+    expect(String(caught.stderr).split('\n').slice(-1)[0]).toBe('')
+    expect(childWords(caught)).toBe('fatal: it broke')
+  })
+
+  it('falls back to the error itself when the child said nothing at all', () => {
+    expect(childWords({ message: 'spawn ENOENT', stderr: '', stdout: '' })).toBe('spawn ENOENT')
+    expect(childWords(null)).toMatch(/no output/)
+  })
+})
+
+describe('the landing settles the now-card before it publishes', () => {
+  const TASKS_AFTER_TICK = '- [x] 1088. done.\n- [ ] 1091. still open.\n'
+  const settleScene = () => {
+    const root = mkdtempSync(join(tmpdir(), 'land-settle-'))
+    roots.push(root)
+    return {
+      dir: root,
+      focusPath: join(root, 'current-focus.json'),
+      declarationPath: join(root, 'in-flight.json'),
+    }
+  }
+
+  it('REPRODUCES the refusal: the focus still names the point the tick just closed', () => {
+    const { focusPath, declarationPath } = settleScene()
+    writeFileSync(focusPath, JSON.stringify({ point: 1088, note: 'point 1088: current work' }))
+    const before = gatherActiveWorkSource({ tasksText: TASKS_AFTER_TICK, declarationPath, focusPath })
+    expect(before.ok).toBe(false)
+    expect(before.errors.join('; ')).toMatch(/the owner focus names point 1088, which is not open/)
+  })
+
+  it('leaves a source the publisher can render — and says which store it corrected', () => {
+    const { focusPath, declarationPath } = settleScene()
+    writeFileSync(focusPath, JSON.stringify({ point: 1088, note: 'point 1088: current work' }))
+    const notes = []
+    const result = settleActiveWork({
+      number: 1088,
+      focusPath,
+      declarationPath,
+      // Stand in for `focus.mjs set -`, which owns the real record; the file it
+      // would write is written here so the publisher's source can be read back.
+      setFocus: (note) => {
+        notes.push(note)
+        writeFileSync(focusPath, JSON.stringify({ point: null, note }))
+      },
+    })
+    expect(result.settled).toBe(true)
+    expect(result.focusNames).toBe(true)
+    expect(result.reason).toMatch(/the owner focus still names 1088/)
+    expect(notes).toEqual(['point 1088: completed'])
+    expect(gatherActiveWorkSource({ tasksText: TASKS_AFTER_TICK, declarationPath, focusPath }).ok).toBe(true)
+  })
+
+  it("drops the closed point's in-flight evidence too, keeping every other strand", () => {
+    const { focusPath, declarationPath } = settleScene()
+    writeFileSync(focusPath, JSON.stringify({ point: 1091, note: 'point 1091: current work' }))
+    writeFileSync(
+      declarationPath,
+      JSON.stringify({
+        focusPoint: 1091,
+        evidence: [
+          { point: 1088, phase: 'authoring', ref: 'feat/1088-x' },
+          { point: 1091, phase: 'authoring', ref: 'feat/1091-y' },
+        ],
+      }),
+    )
+    const result = settleActiveWork({
+      number: 1088,
+      focusPath,
+      declarationPath,
+      setFocus: () => {
+        throw new Error('the focus does not name 1088, so it must not be rewritten')
+      },
+    })
+    expect(result.settled).toBe(true)
+    expect(result.focusNames).toBe(false)
+    expect(result.evidenceNames).toBe(true)
+    const written = JSON.parse(readFileSync(declarationPath, 'utf8'))
+    expect(written.evidence.map((item) => item.point)).toEqual([1091])
+    expect(written.focusPoint).toBe(1091)
+    expect(gatherActiveWorkSource({ tasksText: TASKS_AFTER_TICK, declarationPath, focusPath }).ok).toBe(true)
+  })
+
+  // THE TWO STORES, IN THE ORDER THAT MATTERS (Astra, cross-vendor review of
+  // this point). The cases above touch one store each, so reversing the write
+  // order would still have passed them. This one holds both, reads the
+  // declaration from INSIDE the focus write to prove which landed first, and
+  // keeps a LEGACY evidence item that carries no recorded point at all.
+  it('writes the declaration BEFORE the focus, and keeps every other strand', () => {
+    const { focusPath, declarationPath } = settleScene()
+    writeFileSync(focusPath, JSON.stringify({ point: 1088, note: 'point 1088: current work' }))
+    writeFileSync(
+      declarationPath,
+      JSON.stringify({
+        focusPoint: 1088,
+        evidence: [
+          { point: 1088, phase: 'authoring', kind: 'branch', ref: 'feat/1088-x' },
+          { phase: 'authoring', kind: 'branch', ref: 'feat/1091-y' },
+        ],
+      }),
+    )
+    let seenAtFocusWrite = null
+    const result = settleActiveWork({
+      number: 1088,
+      focusPath,
+      declarationPath,
+      setFocus: (note) => {
+        seenAtFocusWrite = JSON.parse(readFileSync(declarationPath, 'utf8'))
+        writeFileSync(focusPath, JSON.stringify({ point: null, note }))
+      },
+    })
+    expect(result.settled).toBe(true)
+    expect(result.focusNames).toBe(true)
+    expect(result.evidenceNames).toBe(true)
+    // The declaration was already correct when the focus was written: 1088 gone,
+    // the legacy strand migrated to its recorded point rather than dropped.
+    expect(seenAtFocusWrite.evidence.map((item) => item.point)).toEqual([1091])
+    expect(seenAtFocusWrite.focusPoint).toBe(null)
+    expect(gatherActiveWorkSource({ tasksText: TASKS_AFTER_TICK, declarationPath, focusPath }).ok).toBe(true)
+    // AND a second pass over the source it just settled is a no-op — the real
+    // idempotence, not the trivial one over a source that never needed it.
+    const again = settleActiveWork({
+      number: 1088,
+      focusPath,
+      declarationPath,
+      setFocus: () => {
+        throw new Error('already settled, so nothing may be written again')
+      },
+    })
+    expect(again.settled).toBe(false)
+  })
+
+  it('a failed focus write says what is still owed — and a retry finishes it', () => {
+    const { focusPath, declarationPath } = settleScene()
+    writeFileSync(focusPath, JSON.stringify({ point: 1088, note: 'point 1088: current work' }))
+    // EVIDENCE FOR 1088 IS THE POINT OF THIS SETUP (Astra, confirming pass): with an
+    // empty list `declarationSettled` starts true, so dropping the assignment after
+    // the successful declaration write would have passed unnoticed.
+    writeFileSync(
+      declarationPath,
+      JSON.stringify({
+        focusPoint: 1088,
+        evidence: [
+          { point: 1088, phase: 'authoring' },
+          { point: 1091, phase: 'authoring' },
+        ],
+      }),
+    )
+    let thrown = null
+    try {
+      settleActiveWork({
+        number: 1088,
+        focusPath,
+        declarationPath,
+        setFocus: () => {
+          throw new Error('focus.mjs exited 1')
+        },
+      })
+    } catch (e) {
+      thrown = e
+    }
+    expect(thrown).not.toBeNull()
+    expect(thrown.repair).toMatch(/focus\.mjs set - "point 1088: completed"/)
+    // The declaration DID land, so the repair must not send the operator after it —
+    // and the write it made must survive the focus failure rather than be rolled back.
+    expect(thrown.repair).not.toMatch(/declaration still names/)
+    expect(JSON.parse(readFileSync(declarationPath, 'utf8')).evidence.map((i) => i.point)).toEqual([1091])
+    const retried = settleActiveWork({
+      number: 1088,
+      focusPath,
+      declarationPath,
+      setFocus: (note) => writeFileSync(focusPath, JSON.stringify({ point: null, note })),
+    })
+    expect(retried.settled).toBe(true)
+    expect(gatherActiveWorkSource({ tasksText: TASKS_AFTER_TICK, declarationPath, focusPath }).ok).toBe(true)
+  })
+
+  it("NEVER tells the operator to clear a focus that names another point's work", () => {
+    const { focusPath, declarationPath, dir } = settleScene()
+    // The focus names 1091, which is still open; only the evidence names 1088.
+    writeFileSync(focusPath, JSON.stringify({ point: 1091, note: 'point 1091: current work' }))
+    writeFileSync(
+      declarationPath,
+      JSON.stringify({ focusPoint: 1091, evidence: [{ point: 1088, phase: 'authoring' }] }),
+    )
+    // THE WRITE HAS TO ACTUALLY FAIL (Astra, confirming pass). The first draft of
+    // this case succeeded, so it never looked at `repair` at all and would have
+    // passed with the unconditional focus-clear hint restored. A read-only
+    // directory fails the REAL write path rather than a stubbed one.
+    let thrown = null
+    chmodSync(dir, 0o500)
+    try {
+      settleActiveWork({
+        number: 1088,
+        focusPath,
+        declarationPath,
+        setFocus: () => {
+          throw new Error('the focus must never be touched here')
+        },
+      })
+    } catch (e) {
+      thrown = e
+    } finally {
+      chmodSync(dir, 0o700)
+    }
+    expect(thrown).not.toBeNull()
+    expect(thrown.repair).toMatch(/the in-flight declaration still names 1088/)
+    expect(thrown.repair).toMatch(/LEAVE THE OWNER FOCUS ALONE/)
+    // The whole finding in one assertion: no remedy that would clear 1091's focus.
+    expect(thrown.repair).not.toMatch(/focus\.mjs set -/)
+    expect(JSON.parse(readFileSync(focusPath, 'utf8')).point).toBe(1091)
+  })
+
+  it('does nothing at all when the source never named the point — and is idempotent', () => {
+    const { focusPath, declarationPath } = settleScene()
+    writeFileSync(focusPath, JSON.stringify({ point: 1091, note: 'point 1091: current work' }))
+    const refuse = () => {
+      throw new Error('nothing to settle, so nothing may be written')
+    }
+    const first = settleActiveWork({ number: 1088, focusPath, declarationPath, setFocus: refuse })
+    expect(first.settled).toBe(false)
+    expect(first.reason).toMatch(/no longer names 1088/)
+    // A second pass over an already-settled source is the same answer, which is
+    // what makes the by-hand repair and the automatic one safe to combine.
+    expect(settleActiveWork({ number: 1088, focusPath, declarationPath, setFocus: refuse }).settled).toBe(false)
   })
 })
