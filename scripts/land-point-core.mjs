@@ -511,3 +511,77 @@ export function landingExit(results = []) {
   if (!rows.length) return 1
   return rows.every((r) => r.verdict === VERDICT.ok || r.verdict === VERDICT.skipped) ? 0 : 1
 }
+
+/**
+ * The failing child's OWN WORDS, reduced to one verdict line.
+ *
+ * MEASURED 10.09.2026, landing point 1088: the board step printed
+ * `FAIL board    publish the board` with nothing after the label, while the
+ * publisher had said exactly what was wrong. Two reasons, and both are fixed
+ * here rather than at the three call sites that shared the bug:
+ *
+ *   - `String(stream).split('\n').slice(-1)[0]` takes the LAST element, and a
+ *     stream that ends in a newline — every well-behaved one does — makes that
+ *     element the EMPTY STRING. The more the child said, the less the verdict
+ *     carried.
+ *   - Only `stderr` was read. A child may name its cause on either stream, and
+ *     a landing that STOPS must say why regardless of where the words were
+ *     written.
+ *
+ * The refusal line is preferred when the child named one, because that is the
+ * line carrying the cause; otherwise the first thing it said is closer to the
+ * cause than the last (a stack trace's last line is a frame, its first is the
+ * message). Nothing here is invented: every returned string is text the child
+ * itself produced, or the error's own message when it produced none.
+ */
+export function childWords(error, { fallback = 'no output from the failing command' } = {}) {
+  const text = (stream) =>
+    typeof stream === 'string' ? stream : Buffer.isBuffer(stream) ? stream.toString('utf8') : ''
+  const lines = [...text(error?.stderr).split(/\r?\n/), ...text(error?.stdout).split(/\r?\n/)]
+    .map((line) => line.trim())
+    .filter(Boolean)
+  const named = lines.find((line) => /\b(REFUSED|FAILED|DENIED|ABORTED)\b/.test(line) || /^(error|fatal):/i.test(line))
+  const message = String(error?.message ?? '')
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .find(Boolean)
+  return named || lines[0] || message || fallback
+}
+
+/**
+ * Does the active-work source STILL name the point the tick has just closed?
+ *
+ * THE ORDER WAS THE BUG (point 1091, measured 10.09.2026). `land-point` ticks
+ * the point and then publishes the board, and the publisher derives its
+ * now-section from the active-work source — owner focus plus in-flight
+ * evidence. That source still named the point the same command had just closed,
+ * so the publisher rightly refused ("the owner focus names point 1088, which is
+ * not open"), the chain stopped at `board`, and `cleanup` never ran: branch,
+ * remote branch and worktree were left standing against CLAUDE.md §6's "the
+ * merge ends the branch".
+ *
+ * The publisher is not softened — a board naming closed work as current IS
+ * false. The landing settles the now-card first, so the state the publisher
+ * reads is renderable by the time it reads it.
+ */
+export function settlementNeeded({ number, focusPoint = null, evidencePoints = [] } = {}) {
+  const point = Number(number)
+  if (!Number.isInteger(point) || point <= 0) {
+    return { settle: false, focusNames: false, evidenceNames: false, reason: 'no point number to settle' }
+  }
+  const focusNames = Number(focusPoint) === point
+  const evidenceNames = (Array.isArray(evidencePoints) ? evidencePoints : []).some(
+    (candidate) => Number(candidate) === point,
+  )
+  const named = [focusNames ? 'the owner focus' : '', evidenceNames ? 'the in-flight evidence' : '']
+    .filter(Boolean)
+    .join(' and ')
+  return {
+    settle: focusNames || evidenceNames,
+    focusNames,
+    evidenceNames,
+    reason: named
+      ? `${named} still names ${point}, which the tick has just closed`
+      : `the active-work source no longer names ${point}`,
+  }
+}

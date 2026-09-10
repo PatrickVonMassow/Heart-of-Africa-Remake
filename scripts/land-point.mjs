@@ -41,8 +41,10 @@ import {
   reproveRemoval,
   selectCleanupTargets,
 } from './land-cleanup-core.mjs'
-import { worktreeActiveAt } from './batch-in-flight.mjs'
-import { probePid, readOwnerLock } from './batch-singleton.mjs'
+import { readDeclaration, worktreeActiveAt, writeDeclaration } from './batch-in-flight.mjs'
+import { transitionActiveDeclaration } from './active-work-source.mjs'
+import { FOCUS_PATH } from './dashboard-state.mjs'
+import { IN_FLIGHT_PATH, probePid, readOwnerLock } from './batch-singleton.mjs'
 import { acquireLandingLock, assertLandingReady, recordLandingStage, releaseLandingLock } from './batch-landing-journal.mjs'
 import { recordMetricEvent } from './batch-metric-events.mjs'
 import {
@@ -52,6 +54,7 @@ import {
   VERDICT,
   auditNeeded,
   boardPublishNeeded,
+  childWords,
   foldResult,
   formatLandingVerdict,
   gateConcurrency,
@@ -60,6 +63,7 @@ import {
   planLanding,
   resolveBranch,
   runSteps,
+  settlementNeeded,
   tickAndArchive,
   tickCommitMessage,
   transitionAccepted,
@@ -524,6 +528,63 @@ function boardDecision(postTickTasks) {
 }
 
 /**
+ * SETTLE THE NOW-CARD — before the board is published, never after (point 1091).
+ *
+ * The tick has just closed this point, so the owner focus and any in-flight
+ * evidence that still name it describe work that no longer exists. The
+ * publisher derives its now-section from exactly that source and refuses a
+ * board it cannot render truthfully; measured on 10.09.2026 the refusal stopped
+ * the chain at `board` and `cleanup` never ran, leaving the branch, the remote
+ * branch and the worktree standing.
+ *
+ * So the state is corrected here rather than the refusal softened there: the
+ * declaration is written FIRST (in-process, restorable) and the focus store
+ * follows through `focus.mjs`, which is the same order and the same pair of
+ * writes `board.mjs`'s shared transition uses. Both writes are idempotent — a
+ * second run finds nothing left to name — and a landing whose source never
+ * named the point does nothing at all.
+ */
+export function settleActiveWork({
+  number,
+  focusPath = FOCUS_PATH,
+  declarationPath = IN_FLIGHT_PATH,
+  // The focus store is owned by `focus.mjs` — it writes the record AND carries
+  // the same value into the declaration — so the landing calls it rather than
+  // writing that file itself. It is a seam only so a test can drive the whole
+  // settlement against temporary files instead of the session's own focus.
+  setFocus = (note) =>
+    sh('node', [join('scripts', 'focus.mjs'), 'set', '-', note], { stdio: ['ignore', 'pipe', 'pipe'] }),
+} = {}) {
+  const declaration = readDeclaration(declarationPath)
+  // A transition with no exit only MIGRATES: each evidence item gains the point
+  // the read side resolves anyway, so the decision below sees the SAME
+  // attribution the publisher is about to make. Nothing is written yet.
+  const migrated = declaration ? transitionActiveDeclaration(declaration, {}) : null
+  const evidencePoints = Array.isArray(migrated?.evidence)
+    ? migrated.evidence.map((item) => (item && typeof item === 'object' ? item.point : null))
+    : []
+  const focus = readJson(focusPath)
+  const decision = settlementNeeded({
+    number,
+    focusPoint: focus && Object.hasOwn(focus, 'point') ? focus.point : null,
+    evidencePoints,
+  })
+  if (!decision.settle) return { ...decision, settled: false }
+
+  if (migrated) {
+    writeDeclaration(
+      transitionActiveDeclaration(migrated, {
+        exitPoint: Number(number),
+        focusPoint: decision.focusNames ? null : (migrated.focusPoint ?? null),
+      }),
+      declarationPath,
+    )
+  }
+  if (decision.focusNames) setFocus(`point ${number}: completed`)
+  return { ...decision, settled: true }
+}
+
+/**
  * The machine probe, as data.
  *
  * `level: 'unknown'` is the probe's own word for "I could not read this machine"
@@ -820,7 +881,7 @@ async function main(argv) {
         step: 'push',
         repair: 'commit TASKS.md + docs/tasks-archive.md by hand and push main — the tick is written but NOT durable',
       })
-      step('push', VERDICT.failed, `${(e && (e.stderr || e.message)) || e}`.split('\n').slice(-1)[0])
+      step('push', VERDICT.failed, childWords(e))
       throw error
     }
     try {
@@ -835,11 +896,30 @@ async function main(argv) {
         step: 'push',
         repair: 'git push origin main — the tick IS committed locally, and the feature branch is still intact',
       })
-      step('push', VERDICT.failed, `${(e && (e.stderr || e.message)) || e}`.split('\n').slice(-1)[0])
+      step('push', VERDICT.failed, childWords(e))
       throw error
     }
 
-    // 6. BOARD PUBLISH (rider b: skipped when nothing changed). Re-decided here
+    // 6a. SETTLE THE NOW-CARD (point 1091) — before the publish, and OUTSIDE
+    // its decision: the tick has just closed this point, so a source still
+    // naming it is wrong whether or not THIS landing ships the bytes, and
+    // leaving it wrong only moves the publisher's refusal to whoever comes next.
+    let settled = { settled: false, reason: '' }
+    try {
+      settled = settleActiveWork({ number })
+    } catch (e) {
+      error = new LandingError('the now-card could not be settled before the board publish', {
+        step: 'board',
+        repair:
+          `node scripts/focus.mjs set - "point ${number}: completed", then node scripts/board-publish.mjs — ` +
+          'the point itself has landed; only the board is behind',
+      })
+      step('board', VERDICT.failed, childWords(e))
+      throw error
+    }
+    const settleNote = settled.settled ? ' (now-card settled first)' : ''
+
+    // 6b. BOARD PUBLISH (rider b: skipped when nothing changed). Re-decided here
     // against the state as it now stands on disk: the plan's decision was taken
     // against the same POST-tick work order, but the board file and the recorded
     // publish state may have moved since — a publish is cheap, a stale page is
@@ -848,7 +928,7 @@ async function main(argv) {
     if (board.run) {
       try {
         sh('node', [join('scripts', 'board-publish.mjs')], { stdio: ['ignore', 'pipe', 'pipe'] })
-        step('board', VERDICT.ok, board.reason)
+        step('board', VERDICT.ok, `${board.reason}${settleNote}`)
       } catch (e) {
         error = new LandingError('the board publish failed', {
           step: 'board',
@@ -856,11 +936,11 @@ async function main(argv) {
           // the tick step with "not in TASKS.md". The publisher is the repair.
           repair: 'node scripts/board-publish.mjs — the point itself has landed; only the board is behind',
         })
-        step('board', VERDICT.failed, `${(e && (e.stderr || e.message)) || e}`.split('\n').slice(-1)[0])
+        step('board', VERDICT.failed, childWords(e))
         throw error
       }
     } else {
-      step('board', VERDICT.skipped, board.reason)
+      step('board', VERDICT.skipped, `${board.reason}${settleNote}`)
     }
     if (batchId) {
       const boardHash = createHash('sha256').update(readIf(BOARD_FILE)).digest('hex')
