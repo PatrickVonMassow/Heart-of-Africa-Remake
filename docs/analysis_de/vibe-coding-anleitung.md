@@ -597,6 +597,18 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Bündle nur, wenn beide Hälften **plausibel im selben Lauf** grün werden; bleibt
   eine wiederholt rot, **trenne sie wieder** und liefere die fertige aus."
 
+- **Ein Werkzeug antwortet mit Gewissheit, wo es nichts gemessen hat.** Es war für EINEN
+  Aufrufer gebaut — eine Prüfumgebung, ein Skript, eine Kette — und liest seine Eingaben von
+  dort. Rufst du es selbst auf, findet es nichts vor, hält das für ein leeres Ergebnis und
+  meldet »in Ordnung«. Genauso rechnet eine Hängen-Schwelle mit einer geschätzten Dauer,
+  während die gemessene zehnmal höher danebensteht — und befiehlt, einen gesunden Lauf zu
+  töten.
+  → *Prompt:* „Ein Werkzeug, dessen Antwort eine Handlung auslöst, muss den Aufruf
+  **zurückweisen**, den es nicht bedienen kann: unbekanntes Flag, leere Umgebung, fehlende
+  Eingabe. Kein Urteil aus dem Nichts. Und wo neben einer Schätzung eine **Messung** steht,
+  ist die Messung die Zahl, mit der gerechnet wird — die Schätzung ist ihr Boden, nicht ihr
+  Maß.“
+
 ---
 
 ## Drei Meta-Regeln, die alles zusammenhalten
@@ -635,4 +647,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: a363bb4b99fb78dbdf4be4bcdcf6def03297f399f6aa43170a10ff84b5cf63a8 -->
+<!-- GUIDE-FINGERPRINT: 48b942de1b4422ac19af7a4d9465be565e70458303cc3f2580b41ec39cb8d9f4 -->
