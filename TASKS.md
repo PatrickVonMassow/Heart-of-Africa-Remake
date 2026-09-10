@@ -15530,6 +15530,13 @@ to land than a mechanism that needs a review.
   gate is right to fail closed; what is missing is the third state, which the code already
   half has — `TERMINAL_WORK_PHASES` in scripts/batch-in-flight-core.mjs skips terminal
   evidence without an error, but nothing can put a run into that phase.
+  THE SAME ROOT SHOWS A SECOND WAY, in the two guards' own words within one minute of each
+  other: `node scripts/board.mjs closing 1065` writes the card and says "this is NOT a claim to
+  stop: the board gate lets those duties through", while the Stop guard reads the very same
+  card and calls it stale — "only names point(s) 1065 that are ALL ticked done in TASKS.md, and
+  no branch still works them". One command offers the closing card as the correct state for a
+  landed point, and the other rejects it for being exactly that. Whatever fixes the publish
+  must make these two agree, or the closing card should not exist.
   Final state:
   - Evidence for a point in its CLOSING phase publishes: either `batch-in-flight.mjs` can
     declare a wait as terminal-phase work (the phase list already exists), or the board's

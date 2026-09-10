@@ -587,3 +587,20 @@ finding is kept here rather than deleted, because the camera will be rebuilt.
   so the tip's subject describes nothing that was written. Non-blocking: it costs a reader
   one lookup to find the commit that holds the work. The remedy is for the lane to skip the
   closing commit when the tree is already clean.
+
+## A run the operator ends himself is recorded as a CRASHED RUN (11.09.2026)
+
+Non-blocking, collected. `render-verify-guard` keeps a list of runs that "died
+rather than reported", and it grew by two on 11.09.2026 — both of them WebGL 2
+`polish` passes this session terminated on purpose: one on the explicit
+instruction of `run-wait --await` ("end the run rather than waiting again"), one
+by a `pkill` of my own. A deliberate SIGTERM is not an observed failure of the
+product, but it enters the same list and leaves it only through the same
+signature as a real crash.
+
+It costs nothing but the signature, and the signature is honest work — the
+record does say what happened. Kept here rather than made a point because
+nothing is blocked and nobody is misled: the list names the backend, the suite
+and the minute, and a reader who was there knows which is which. Whoever
+touches that recorder next can carry the operator's own termination as its own
+outcome, so the crash list stays a list of crashes.
