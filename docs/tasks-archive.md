@@ -27257,3 +27257,27 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   as a delegated author runs, and leaves bookkeeping committed but unpushed, which is the exact
   state that rule exists to prevent.
   Bundle: Session- & Repo-Hygiene.
+
+- [x] 852. A landing gate cannot run while another author lane commits. MEASURED 23.08.2026,
+  07:47, landing point 669 while a parallel worktree authored point 834. `land-point`'s fast gate
+  runs the unit suite, and `scripts/repository-integrity.mjs` asserts that no ref moved during the
+  run; the other lane's checkpoint commit moved `refs/heads/feat/834-durable-authoring-lane`
+  mid-suite, so the gate went red with "LIVE REPOSITORY CHANGED WHILE UNIT SUITE RAN" although no
+  test failed. The merge had already landed on `main`, so the landing stopped half-way and had to
+  be resumed.
+  WHY IT IS STRUCTURAL: under maximal delegation three lanes commit every few minutes against a
+  ~130 s unit suite, so a landing gets through by luck, and the retry that succeeds is
+  indistinguishable from a retry that hid a real defect (CLAUDE.md §7.2: a retry is SUSPECT and
+  covers nothing). The detector deliberately has no env knob, and its own message names the
+  legitimate case it cannot distinguish.
+  FINAL STATE: the integrity check accepts a set of refs the CALLER declares as foreign and
+  expected — the in-flight declaration already names exactly those branches — so a moved ref
+  belonging to a declared other lane is not a finding, while a moved ref nobody declared still is.
+  The declaration is the only source of that set; no flag lets a caller wave a ref through by hand.
+  VERIFIABLE: unit cases over the integrity check — a ref moved that the declaration names is
+  clean; the same ref moved with no declaration is a finding; a ref moved that the declaration does
+  NOT name is a finding even while other lanes are declared; and `main` moving is a finding under
+  every declaration.
+  Criticality: medium — no product behaviour, but it stops landings half-way and manufactures reds
+  that train sessions to retry a suspect gate.
+  Bundle: Session- & Repo-Hygiene.
