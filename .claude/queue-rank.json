@@ -1171,12 +1171,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "1065": {
-      "at": "2026-09-06T12:34:42.732Z",
-      "why": "The user asked for it on 06.09.2026 and placed it directly after 1058",
-      "origin": "user",
-      "place": "ahead"
-    },
     "1071": {
       "at": "2026-09-07T15:32:20.885Z",
       "why": "It is gated on host work only the user can perform — copying the reviewed .devcontainer onto Windows, rebuilding the container, running the no-editor restart drill — so no session can start it whatever its rank; moving it forward would park the batch on a human, and its board card is what actually reaches him.",
@@ -1334,7 +1328,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-10T21:20:20.913Z",
+    "at": "2026-09-10T22:19:18.831Z",
     "points": [
       174,
       184,
@@ -1700,7 +1694,6 @@
       1060,
       1062,
       1063,
-      1065,
       1068,
       1071,
       1072,
