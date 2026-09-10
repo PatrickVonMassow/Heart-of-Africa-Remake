@@ -32,7 +32,6 @@ import {
   aimAt,
   armAim,
   digPose,
-  fillPose,
   gesturePose,
   isGesturing,
   REST_POSE,
@@ -57,9 +56,8 @@ import type { RegionPlaceStyle } from './regionStyles'
 import { nudgeToFree, nudgeWhere, PLAYER_RADIUS, resolveMove, spawnPointFree, standingClear, tryNudgeToFree, WALKER_RADIUS, type Collider } from './collision'
 import { utteranceOf } from '../../communication/lexicon'
 import { insidePlace } from './boundary'
-import { VILLAGE_WATER_STAND } from './layout'
 import { playRockFlank } from './playRockSurface'
-import { BANK_WATER_DROP, bankGroundHeight, standsOnGroundPlate, type PlaceRiverBank } from './riverBank'
+import { standsOnGroundPlate, type PlaceRiverBank } from './riverBank'
 import { buildPlaceNavGrid, findPlaceRoute, navClearBetween, navRestrict, type NavPoint } from './routing'
 import { absorbSeparation, createTagGame, stepTagGame, type TagChild } from './tagGame'
 import {
@@ -87,7 +85,6 @@ import {
   createAdultWork,
   digProgressOf,
   isDigging,
-  jarsOnStand,
   goalOf,
   stepAdultWork,
   taskOf,
@@ -97,8 +94,7 @@ import {
   type DigSiteProgress,
   type ErrandPoint,
   type SpokenWord,
-  STALL_ARRIVE_RADIUS,
-  arriveRadiusOf,
+  WORK_ARRIVE_RADIUS,
 } from './adultWork'
 import { gestureIfHeard, speechReach } from '../../communication/spokenGesture'
 import { utterancePlan } from '../../communication/speaking'
@@ -2356,6 +2352,8 @@ function Walkers({
   )
 }
 
+/** How near a villager must come to count as having arrived where it was sent. */
+const ERRAND_ARRIVE_RADIUS = WORK_ARRIVE_RADIUS
 
 /** How near a waypoint of a route counts as passed. Wider than a stride, so a
  *  figure sliding along a wall beside the waypoint still ticks it off instead of
@@ -2411,9 +2409,6 @@ function ErrandVillagers({
   const headJars = useRef<Array<THREE.Object3D | null>>([])
   const handJars = useRef<Array<THREE.Object3D | null>>([])
   const digTools = useRef<Array<THREE.Object3D | null>>([])
-  /** The jars standing on the village water stand: shown by the frame loop, as
-   *  every other per-frame visibility in this scene is. */
-  const standJars = useRef<Array<THREE.Object3D | null>>([])
   const reportedStrikes = useRef<number[]>([])
   const rim = Math.max(1, radius - NPC_RADIUS * 2)
 
@@ -2507,7 +2502,7 @@ function ErrandVillagers({
     )
   }
   // Written here, so applied here — see the children at the bank (work-order
-  // 1065): the dip has to be under the water in the frame the picture takes it.
+  // 1065): a pose applied by the figure itself is drawn a frame late.
   const limbs = useRef<Array<RefObject<FigureLimbs | null>>>([])
   if (limbs.current.length !== count) {
     limbs.current = Array.from({ length: count }, (_, i) => limbs.current[i] ?? { current: null })
@@ -2547,12 +2542,10 @@ function ErrandVillagers({
 
   // An invitation is spoken wherever the partner happened to be standing when
   // cast. Keep that anchor far enough from every fixed children's place that
-  // even the initiator's arrival tolerance cannot put the word in its earshot —
-  // and the tolerance that binds is the WEDGED one, because a man his walk
-  // could not finish still speaks from where it stopped (work-order 1065).
+  // even the initiator's arrival tolerance cannot put the word in its earshot.
   const invitationClear = useCallback(
     (x: number, z: number) => {
-      const margin = balance.communication.hearingRadius + STALL_ARRIVE_RADIUS
+      const margin = balance.communication.hearingRadius + WORK_ARRIVE_RADIUS
       if (playGround && Math.hypot(x - playGround.x, z - playGround.z) - playGround.radius <= margin) return false
       if (geography.waterFoot && Math.hypot(x - geography.waterFoot.x, z - geography.waterFoot.z) <= margin) return false
       if (playRocks) {
@@ -2627,12 +2620,7 @@ function ErrandVillagers({
         const dx = goal.x - me.x
         const dz = goal.z - me.z
         const d = Math.hypot(dx, dz)
-        // How near counts as arrived: `arriveRadiusOf` per errand leg, because
-        // the fill arrives at a DRAWN water surface and stops tighter than the
-        // rest (work-order 1065). The walk and the scheduler read the same
-        // answer, so a leg can never halt just outside the radius that would
-        // have let it begin.
-        const arriveAt = task ? arriveRadiusOf(task) : 0.9
+        const arriveAt = task ? ERRAND_ARRIVE_RADIUS : 0.9
         if (d <= arriveAt) {
           if (!task) {
             state.target = null
@@ -2751,23 +2739,7 @@ function ErrandVillagers({
       const pose = poses.current[i].current
       const gesture = gestures.current[i]
       gesture.current = advanceGesture(gesture.current, dt)
-      if (task?.phase === 'fill') {
-        // THE DIP (work-order 1065): he bends over the water and the jar in his
-        // hand goes under the drawn surface. The jar rides the arm, so the pose
-        // is the whole of it — and the carry stays `emptyJar` until it is done,
-        // which is what makes the filling an act rather than a flip.
-        state.dug = 0
-        const dip = fillPose(task.dug / Math.max(1e-6, cfg.fillSeconds))
-        if (pose) {
-          pose.left = dip.left
-          pose.right = dip.right
-          pose.lean = dip.lean
-          pose.turn = dip.turn
-        }
-        // He faces the water he is dipping into.
-        const fill = geography.waterFill
-        if (fill) yaws.current[i] = Math.atan2(fill.x - me.x, fill.z - me.z)
-      } else if (isDigging(work, i)) {
+      if (isDigging(work, i)) {
         state.dug += dt
         const siteIndex = task?.siteIndex
         const site = siteIndex === null || siteIndex === undefined ? null : geography.digSites[siteIndex]
@@ -2804,22 +2776,9 @@ function ErrandVillagers({
       if (g) {
         // The same walking bob the other inhabitants ride, off the distance this
         // villager has actually covered rather than off a wall clock.
-        // THE SHORE IS GROUND HE WALKS DOWN (work-order 1065). The water errand
-        // now ends at the waterline, so a villager standing at height 0 there
-        // would float over the drawn slope; the footing comes from the same
-        // shore profile the mesh is built from.
-        const bob = Math.abs(Math.sin(state.walked * 3.4 + i * 2)) * 0.05
-        g.position.set(me.x, bankGroundHeight(bank, me.x, me.z) + bob, me.z)
+        g.position.set(me.x, Math.abs(Math.sin(state.walked * 3.4 + i * 2)) * 0.05, me.z)
         g.rotation.y = yaws.current[i]
       }
-    }
-
-    // What the stand is holding right now. A fourth delivery replaces the
-    // oldest jar, so nothing has to consume them for the stock to stay honest.
-    const standing = jarsOnStand(work, cfg.standCapacity)
-    for (let k = 0; k < standJars.current.length; k++) {
-      const jar = standJars.current[k]
-      if (jar) jar.visible = k < standing
     }
 
     const said = stepAdultWork(work, view, dt, cfg, rand)
@@ -2846,10 +2805,6 @@ function ErrandVillagers({
     const w = window as unknown as Record<string, unknown>
     w.__placeErrands = () => ({
       staged: { ...work.staged },
-      // Errands released because a leg could not reach its goal — the ground's
-      // own report, so a check that sees no water fetched can tell a wedged
-      // village from a quiet one (work-order 1065).
-      stalled: { ...work.stalled },
       last: work.last ? { ...work.last } : null,
       geography: {
         waterHead: geography.waterHead,
@@ -2857,54 +2812,16 @@ function ErrandVillagers({
         digSites: geography.digSites.map((d) => ({ ...d })),
       },
       digProgress: digProgressOf(work, geography.digSites.length),
-      // WHAT THE PICTURE DOES WITH THE JARS (work-order 1065): read off the
-      // scene graph, so a live check measures the drawn jar against the drawn
-      // water rather than a number the module believes.
-      water: {
-        stand: geography.waterStand,
-        fill: geography.waterFill,
-        delivered: work.delivered,
-        onStand: standJars.current.filter((jar) => jar?.visible).length,
-      },
       villagers: people.map((p, i) => {
         const task = taskOf(work, i)
-        const jar = (ref: THREE.Object3D | null | undefined) => {
-          if (!ref || !ref.visible) return null
-          ref.updateWorldMatrix(true, false)
-          const at = new THREE.Vector3()
-          ref.getWorldPosition(at)
-          // The jar's own geometry: 0.32 tall about its centre, its rim 0.16
-          // above it and the water surface a shade under the rim.
-          return { x: at.x, y: at.y, z: at.z, base: at.y - 0.16, rim: at.y + 0.16, surface: at.y + 0.132 }
-        }
         return {
           x: p.x,
           z: p.z,
           free: p.free,
           digging: isDigging(work, i),
           carry: carryOf(work, i),
-          // The ground and the water where he is standing, from the same shore
-          // profile the mesh is built from: a dip is only a dip if the jar goes
-          // under the surface HE is standing in.
-          ground: bankGroundHeight(bank, p.x, p.z),
-          waterSurface: bank ? -BANK_WATER_DROP : null,
-          handJar: jar(handJars.current[i]),
-          headJar: jar(headJars.current[i]),
           work: task
-            ? {
-                situation: task.situation,
-                phase: task.phase,
-                x: task.x,
-                z: task.z,
-                arrived: task.arrived,
-                // WHY AN ERRAND STANDS STILL. A word owed to a listener is held
-                // back while a child is within earshot, and the pair waits in
-                // `invite` until it may be spoken or the errand expires — so a
-                // check that saw no fill can say whether nothing was cast or
-                // everything was hushed (08.09.2026).
-                hushed: !!task.hushed,
-                age: task.age,
-              }
+            ? { situation: task.situation, phase: task.phase, x: task.x, z: task.z, arrived: task.arrived }
             : null,
         }
       }),
@@ -2912,55 +2829,10 @@ function ErrandVillagers({
     return () => {
       delete w.__placeErrands
     }
-  }, [work, people, geography, bank])
+  }, [work, people, geography])
 
   return (
     <>
-      {geography.waterStand && (
-        <group position={[geography.waterStand.x, 0, geography.waterStand.z]}>
-          {/* THE WATER STAND (work-order 1065): a low platform of packed earth
-              beside the cooking fire where the village keeps its fetched water.
-              It is what makes the errand a dispatch rather than a commentary —
-              the word is spoken here and the jar is set down here, so the
-              return has a destination the player can see. */}
-          <mesh position={[0, 0.08, 0]} receiveShadow castShadow>
-            <cylinderGeometry args={[0.58, 0.62, 0.16, 12]} />
-            <meshStandardMaterial color="#6d5a44" roughness={0.95} />
-          </mesh>
-          {[0, 1, 2].map((k) => {
-            const a = (k / 3) * Math.PI * 2 + 0.4
-            return (
-              <group
-                key={k}
-                ref={(el) => {
-                  standJars.current[k] = el
-                }}
-                visible={false}
-                position={[Math.sin(a) * 0.27, 0.32, Math.cos(a) * 0.27]}
-              >
-                <mesh castShadow>
-                  <cylinderGeometry args={[0.12, 0.16, 0.32, 8, 1, true]} />
-                  <meshStandardMaterial color="#8a5a30" roughness={0.9} side={THREE.DoubleSide} />
-                </mesh>
-                <mesh position={[0, 0.132, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-                  <circleGeometry args={[0.116, 8]} />
-                  <meshStandardMaterial
-                    color="#6f9fc4"
-                    roughness={0.16}
-                    metalness={0.05}
-                    emissive="#2c4a63"
-                    emissiveIntensity={0.35}
-                  />
-                </mesh>
-                <mesh position={[0, -0.155, 0]} rotation={[Math.PI / 2, 0, 0]}>
-                  <circleGeometry args={[0.16, 8]} />
-                  <meshStandardMaterial color="#8a5a30" roughness={0.9} />
-                </mesh>
-              </group>
-            )
-          })}
-        </group>
-      )}
       {people.map((p, i) => (
         <group
           key={i}
@@ -2980,32 +2852,18 @@ function ErrandVillagers({
             limbs={limbs.current[i]}
             handProp={
               <>
-                <group
+                <mesh
                   ref={(el) => {
                     handJars.current[i] = el
                   }}
                   visible={false}
                   position={[0, -0.12, 0.04]}
                   rotation={[0, 0, 0.12]}
+                  castShadow
                 >
-                  <mesh castShadow>
-                    <cylinderGeometry args={[0.12, 0.16, 0.32, 8, 1, true]} />
-                    <meshStandardMaterial color="#8a5a30" roughness={0.9} side={THREE.DoubleSide} />
-                  </mesh>
-                  {/* THE JAR IS OPEN, AND WHAT IS IN IT SHOWS (work-order 1065).
-                      Both jars were one closed opaque cylinder, so a full one
-                      differed from an empty one only by riding on a head — the
-                      user could see no water at all. The empty one now shows a
-                      dark hollow a little below the rim... */}
-                  <mesh position={[0, 0.1, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-                    <circleGeometry args={[0.113, 8]} />
-                    <meshStandardMaterial color="#2a1a10" roughness={1} />
-                  </mesh>
-                  <mesh position={[0, -0.155, 0]} rotation={[Math.PI / 2, 0, 0]}>
-                    <circleGeometry args={[0.16, 8]} />
-                    <meshStandardMaterial color="#8a5a30" roughness={0.9} />
-                  </mesh>
-                </group>
+                  <cylinderGeometry args={[0.12, 0.16, 0.32, 8]} />
+                  <meshStandardMaterial color="#8a5a30" roughness={0.9} />
+                </mesh>
                 <group
                   name="digging-tool"
                   ref={(el) => {
@@ -3026,36 +2884,17 @@ function ErrandVillagers({
               </>
             }
           />
-          <group
+          <mesh
             ref={(el) => {
               headJars.current[i] = el
             }}
             visible={false}
             position={[0, 1.5, 0]}
+            castShadow
           >
-            <mesh castShadow>
-              <cylinderGeometry args={[0.12, 0.16, 0.32, 8, 1, true]} />
-              <meshStandardMaterial color="#8a5a30" roughness={0.9} side={THREE.DoubleSide} />
-            </mesh>
-            {/* ...and the FULL one a water surface at the rim: a bright disc in
-                the river's own tint, set high in the mouth so it reads as full
-                from the distance the player watches the village from, on both
-                backends. */}
-            <mesh position={[0, 0.132, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-              <circleGeometry args={[0.116, 8]} />
-              <meshStandardMaterial
-                color="#6f9fc4"
-                roughness={0.16}
-                metalness={0.05}
-                emissive="#2c4a63"
-                emissiveIntensity={0.35}
-              />
-            </mesh>
-            <mesh position={[0, -0.155, 0]} rotation={[Math.PI / 2, 0, 0]}>
-              <circleGeometry args={[0.16, 8]} />
-              <meshStandardMaterial color="#8a5a30" roughness={0.9} />
-            </mesh>
-          </group>
+            <cylinderGeometry args={[0.12, 0.16, 0.32, 8]} />
+            <meshStandardMaterial color="#8a5a30" roughness={0.9} />
+          </mesh>
         </group>
       ))}
     </>
@@ -3094,22 +2933,10 @@ function speakWork(
       speakOverhead(`villager-${said.speaker}`, [utterance], anchor, { seconds: speechLabelSeconds(1) })
     }
   }
-  gesture.current = gestureIfHeard(distance, gestureFor(said), {
+  gesture.current = gestureIfHeard(distance, said.purpose === 'invitation' ? 'beckon' : 'indicate', {
     ...aimAt({ x: speaker.x, z: speaker.z, yaw }, said.aim, FIGURE_LIMBS.shoulderY),
     phase: said.speaker * 1.1, // no two villagers beat in lockstep
   })
-}
-
-/**
- * The arm each teaching word takes. The DIG invitation beckons its listener and
- * the site word indicates the hole, as they always did; the water errand's ORDER
- * points at the river it is sending the man to, and his DELIVERY points at the
- * man who sent him — the addressee the word is spoken to (work-order 1065).
- */
-function gestureFor(said: SpokenWord): GestureKind {
-  if (said.purpose === 'invitation') return 'beckon'
-  if (said.errand) return 'point'
-  return 'indicate'
 }
 
 /** Standing traders on the plaza that slowly look around. */
@@ -3223,12 +3050,7 @@ export function PlaceLife({
   bank: PlaceRiverBank | null
   /** The village's water path (work-order 688): its head in the village, where
    *  both carriers speak, and its foot at the river, where neither does. */
-  waterPath: {
-    head: { x: number; z: number }
-    foot: { x: number; z: number }
-    /** Where the carrier dips the jar — ankle deep at the waterline. */
-    fill: { x: number; z: number }
-  } | null
+  waterPath: { head: { x: number; z: number }; foot: { x: number; z: number } } | null
   /** The two play rocks of the children's bank game (work-order 687), and the
    *  settlement's loose boulders — one of which a child climbs and names while
    *  the group roams, so ROCK is heard at a stone that is no part of the game. */
@@ -3323,10 +3145,6 @@ export function PlaceLife({
     () => ({
       waterHead: waterPath ? { x: waterPath.head.x, z: waterPath.head.z } : null,
       waterFoot: waterPath ? { x: waterPath.foot.x, z: waterPath.foot.z } : null,
-      // Where the errand is ordered and delivered, and where the jar is dipped
-      // (work-order 1065). A settlement without a bank has neither.
-      waterStand: waterPath ? { x: VILLAGE_WATER_STAND[0], z: VILLAGE_WATER_STAND[1] } : null,
-      waterFill: waterPath ? { x: waterPath.fill.x, z: waterPath.fill.z } : null,
       digSites,
     }),
     [waterPath, digSites],

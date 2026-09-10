@@ -488,45 +488,6 @@ export function digPose(seconds: number, phase = 0): FigurePose {
 }
 
 /**
- * A figure DIPPING SOMETHING INTO WATER at its feet (work-order 1065): it bends
- * deep over the water and the hand carrying the jar goes down and forward, under
- * the drawn surface, then comes back up.
- *
- * The player has to read three things in a row — the bend, the jar in the river,
- * the lift — because without them the errand is a full jar appearing out of
- * nowhere, which is exactly what the user could not make sense of. So the dip is
- * a POSE driven by progress through the fill rather than by a wall clock: it
- * goes down over the first fifth, HOLDS under the water through the middle (the
- * readable moment the jar is filling), and comes up over the last quarter.
- *
- * `progress` runs 0..1 across the fill. The carrying arm is the LEFT one, which
- * is the side the hand prop is drawn on.
- */
-export function fillPose(progress: number): FigurePose {
-  const p = Math.max(0, Math.min(1, progress));
-  // Down, hold, up — the hold is what makes it an act rather than a dab.
-  const down = p < 0.2 ? smoothstep(p / 0.2) : p > 0.76 ? 1 - smoothstep((p - 0.76) / 0.24) : 1
-  // The bend carries the shoulder toward the water; the arm reaches on past it.
-  const lean = 0.12 + down * 0.62
-  return {
-    left: {
-      pitch: REST_POSE.left.pitch - down * 0.62,
-      yaw: -down * 0.1,
-      roll: REST_POSE.left.roll * (1 - down * 0.8),
-    },
-    // The free arm goes back and out for balance, the way a body crouching over
-    // water does — and it is what tells the dip apart from a figure simply bowed.
-    right: {
-      pitch: REST_POSE.right.pitch + down * 0.5,
-      yaw: 0,
-      roll: REST_POSE.right.roll * (1 + down * 0.5),
-    },
-    lean,
-    turn: 0,
-  }
-}
-
-/**
  * How far a pose stands from rest, as a single scalar (rad, summed over the
  * angles that move). The verification and the tests use it to say "this figure
  * is visibly gesturing" without asserting on a hand-picked angle.

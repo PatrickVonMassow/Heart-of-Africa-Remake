@@ -513,3 +513,7 @@ It is not a defect in the one village the PoC draws — the frame was judged and
 it carries its subject — so it stays collected rather than becoming a point.
 Whoever adds a second river village decides it there, with a ground sample at
 both candidates and the one nearer the carrier's own footing winning.
+
+The frame it describes was shed from feat/1065-teaching-hands-touch with the
+rest of the water carrier on 10.09.2026 and belongs to work-order 1087 now. The
+finding is kept here rather than deleted, because the camera will be rebuilt.

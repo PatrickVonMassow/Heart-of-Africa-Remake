@@ -18,7 +18,6 @@ import {
   BANK_FADE_ANGLE,
   BANK_PLAY_LANE_HALF,
   bankPlayRocks,
-  bankFillSpot,
   bankWaterFoot,
   buildRiverBank,
   inBankPlayLane,
@@ -28,7 +27,7 @@ import {
   type PlaceRiverBank,
 } from './riverBank'
 import { balance } from '../../config/balance'
-import { STALL_ARRIVE_RADIUS } from './adultWork'
+import { WORK_ARRIVE_RADIUS } from './adultWork'
 import { devAssert } from '../../systems/devAssert'
 import type { BuildingType } from '../../state/ui'
 import { pickUseCandidate, type UseCandidate } from './useKeyTarget'
@@ -128,13 +127,7 @@ export interface PlaceLayout {
    * is where it meets the bank, upstream of and clear of the children's stretch.
    * Null in every settlement without a bank.
    */
-  waterPath: {
-    head: BankPoint
-    foot: BankPoint
-    /** Where the carrier stands to dip the jar: ankle deep at the waterline,
-     *  not on the dry foot of the path (work-order 1065). */
-    fill: BankPoint
-  } | null
+  waterPath: { head: BankPoint; foot: BankPoint } | null
   /**
    * The children's roaming quarter (work-order 481.4): where the group plays
    * between two cycles of its bank game, and how far it roams. It is layout data
@@ -276,27 +269,6 @@ export const WATER_PATH_WIDTH = 1.6
 /** Where a village's cooking fire burns (design.md §19.10) — the collider here
  *  and the `FirePit` the scene draws read the same spot. */
 export const VILLAGE_FIRE: [number, number] = [-3.5, 2.5]
-
-/**
- * Where a village keeps its fetched water (work-order 1065): a low stand of
- * standing jars beside the cooking fire, which is the plausible consumer and
- * already an anchor of the village's middle.
- *
- * It exists so that fetching water is a DISPATCH rather than a commentary: one
- * adult sends another from here and the carrier brings the jar back HERE and
- * sets it down, so both utterances fall in the village, at a place with
- * something standing on it, and the return has a destination the player can
- * see. Before this the errand's return goal was the head of the water path —
- * open ground at radius 15, where the task was nulled and the full jar vanished
- * in the same frame.
- *
- * Placed on the fire's own bearing from the centre, out past both colliders, so
- * it reads as belonging to the fire without crowding it.
- */
-export const VILLAGE_WATER_STAND: [number, number] = [-1.1, 3.9]
-
-/** Collider radius of that stand — the platform and the jars on it. */
-export const WATER_STAND_RADIUS = 0.62
 
 /**
  * Circular collider radius of a dwelling — the wall body it is drawn with,
@@ -757,10 +729,6 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     ? {
         head: { x: bank.nx * WATER_PATH_HEAD_RADIUS, z: bank.nz * WATER_PATH_HEAD_RADIUS },
         foot: bankWaterFoot(bank),
-        // Where the jar actually goes into the water (work-order 1065). The foot
-        // is where the drawn path ends on dry ground; the fill is a step and a
-        // half further, ankle deep.
-        fill: bankFillSpot(bank),
       }
     : null
 
@@ -1498,7 +1466,6 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     // collider bought nothing: she kneels INSIDE the fire's stand-off (1.3 + the
     // traveller's 0.35), so nobody could reach her spot in the first place.
     colliders.push({ x: VILLAGE_FIRE[0], z: VILLAGE_FIRE[1], r: 1.3 })
-    colliders.push({ x: VILLAGE_WATER_STAND[0], z: VILLAGE_WATER_STAND[1], r: WATER_STAND_RADIUS })
     colliders.push({ x: -8.5, z: -7, r: 1.0 }) // weaver's loom
     // Village-life props (design.md §19; positions from PlaceLife).
     colliders.push({ x: VILLAGE_SPOTS.talkers[0], z: VILLAGE_SPOTS.talkers[1], r: 0.85 })
@@ -1567,16 +1534,11 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
    * The margin is the hearing radius PLUS a walker's arrival radius, because
    * what has to stay outside the earshot is not the anchor but the position a
    * man may SPEAK from: he counts as arrived, and his word falls, anywhere
-   * within his leg's arrival radius of the place he was sent to. Measuring the
+   * within `WORK_ARRIVE_RADIUS` of the place he was sent to. Measuring the
    * anchor alone let a site sitting exactly on the floor put the actual speaker
    * inside the children's earshot (GPT-5.6 Sol, first cross-vendor round, A4).
-   *
-   * The WIDER of the two radii is the one that binds: a man whose walk is
-   * wedged arrives at `STALL_ARRIVE_RADIUS` rather than `WORK_ARRIVE_RADIUS`
-   * (work-order 1065), and it is exactly that man — held where the ground let
-   * him stop — whose word must still fall clear of the children.
    */
-  const ADULT_SPEECH_MARGIN = balance.communication.hearingRadius + STALL_ARRIVE_RADIUS
+  const ADULT_SPEECH_MARGIN = balance.communication.hearingRadius + WORK_ARRIVE_RADIUS
   /**
    * How far a spot stands from the NEAREST place a child speaks: the roaming
    * quarter's rim, either play rock, and the descent they gather at.

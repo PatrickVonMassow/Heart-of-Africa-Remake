@@ -1,27 +1,8 @@
 // The adults teach by DOING THEIR OWN WORK (work-order 688). Two words, two
 // situations each, and no translation among them.
 //
-// NO VILLAGER SPEAKS TO NOBODY (work-order 1065). Every utterance here has an
-// ADDRESSEE who reacts and a consequence the player watches; the teaching comes
-// from the act that follows the word, never from a word spoken beside an act.
-//
-// RIVER used to break that rule. It was cast twice — a man setting out with an
-// empty jar, and, seconds later, whoever happened to be standing near the water
-// arriving with a full one — so the same inhabitant narrated his own errand, the
-// full jar came from nowhere, and the return's goal was open ground where the
-// task was nulled and the jar vanished in the same frame. The user read it for
-// what it was: staged for him rather than done for a reason.
-//
-// So RIVER is now a DISPATCH, one errand with two legs. At the village water
-// stand an adult turns to a free neighbour, says RIVER and points at the water;
-// the neighbour takes the empty jar, walks down to the waterline, DIPS the jar
-// in the water where the player can see it fill, carries it back to the stand,
-// sets it down and says RIVER again to the man who sent him. Both words fall in
-// the village, at the stand; nothing is said at the water. The two old situation
-// ids survive as LEG LABELS, so the lexicon bookkeeping and the staged counters
-// are unchanged.
-//
-// DIG works the same way and always did: it is an invitation, not a running
+// RIVER is shown once by an empty-jar carrier setting out and once by a full-
+// jar carrier returning. DIG is different: it is an invitation, not a running
 // commentary. An initiator walks to another free adult and says DIG to him;
 // both walk to one of the village's work sites; the initiator says DIG again at
 // the hole; only then do they work it together. Each of the two digging
@@ -51,26 +32,11 @@ export const ADULT_SITUATIONS: readonly AdultSituationId[] = [
   'dig-second',
 ] as const
 
-/**
- * What the catalogue may START. `water-back` is no longer one of them: it is the
- * RETURN LEG of the errand `water-out` opens, not a second casting that finds
- * whoever is standing nearest the water and hands him a full jar (work-order
- * 1065). It keeps its id because that id labels the leg, is counted in `staged`
- * and is what the lexicon bookkeeping reads.
- */
-export const CASTABLE_SITUATIONS: readonly AdultSituationId[] = [
-  'water-out',
-  'dig-first',
-  'dig-second',
-] as const
-
 export const ADULT_CONCEPTS: readonly ConceptId[] = ['RIVER', 'DIG']
 
 export type AdultCarry = 'none' | 'emptyJar' | 'fullJar' | 'digTool'
-export type AdultPhase = 'walk' | 'fetch' | 'invite' | 'site' | 'dig' | 'fill' | 'wait'
+export type AdultPhase = 'walk' | 'fetch' | 'invite' | 'site' | 'dig'
 export type DigUtterance = 'invitation' | 'site'
-/** Which of the errand's two RIVER words this is: the order, or the delivery. */
-export type WaterUtterance = 'order' | 'delivery'
 
 export interface ErrandPoint { x: number; z: number }
 
@@ -81,11 +47,6 @@ export interface DigSite extends ErrandPoint {
 export interface AdultWorkGeography {
   waterHead: ErrandPoint | null
   waterFoot: ErrandPoint | null
-  /** The village's water stand: where the errand is ordered, where the jar is
-   *  set down, and where BOTH of its words fall (work-order 1065). */
-  waterStand: ErrandPoint | null
-  /** Where the jar goes into the water — ankle deep at the waterline. */
-  waterFill: ErrandPoint | null
   digSites: readonly DigSite[]
 }
 
@@ -108,12 +69,6 @@ export interface SpokenWord {
   aim: { x: number; y: number; z: number }
   /** Which of the two DIG utterances this is; absent for RIVER. */
   purpose?: DigUtterance
-  /** Which of the errand's two RIVER words this is; absent for DIG. */
-  errand?: WaterUtterance
-  /** WHO IT IS SAID TO. Every utterance has an addressee who reacts — the rule
-   *  the old water commentary broke. Absent only where the moment genuinely has
-   *  none, which today is nowhere. */
-  to?: number
 }
 
 export interface AdultWorkConfig {
@@ -124,11 +79,6 @@ export interface AdultWorkConfig {
   errandSeconds: number
   stallSeconds: number
   pace: number
-  /** How long the jar stays under the water, in seconds — the act itself. */
-  fillSeconds: number
-  /** How many jars the village water stand holds before a delivery replaces the
-   *  oldest one. */
-  standCapacity: number
 }
 
 export interface AdultTask extends ErrandPoint {
@@ -139,21 +89,8 @@ export interface AdultTask extends ErrandPoint {
   partner: number | null
   siteIndex: number | null
   hushed?: boolean
-  /** Standable ground beside the water stand that this errand was sent from and
-   *  returns to. The stand itself is a collider, so its own spot is no place a
-   *  walk can finish — the departure already takes a join stand-off, and the
-   *  delivery leg has to come back to the same kind of ground (work-order 1065). */
-  home?: ErrandPoint
   arrived: boolean
-  /** How near this leg has come to the goal it is walking at, and for how long
-   *  it has failed to better that. The goal travels with the record, so a leg
-   *  that is re-aimed — sent on from the stand to the water, turned round for
-   *  the way back — starts its own reckoning instead of inheriting the last
-   *  one's. Only a leg that has not arrived carries them. */
-  near?: { x: number; z: number; d: number }
-  stalled?: number
-  /** Seconds this worker has dug in the current bout, or held the jar under
-   *  the water in the current fill. */
+  /** Seconds this worker has dug in the current bout. */
   dug: number
   /** The utterance belonging to the current phase is still owed. */
   owes: boolean
@@ -176,66 +113,21 @@ export interface AdultWorkState {
   next: number
   cursor: number
   siteProgress: Record<number, DigSiteProgress>
-  /** Jars delivered to the village water stand this visit. What the scene draws
-   *  is this capped at the stand's capacity, so a further delivery replaces the
-   *  oldest jar and no consumer logic is owed (work-order 1065). */
-  delivered: number
-  /** Errands released because a leg could not reach its goal. A blocked walk is
-   *  a fact about the ground, not about the word, so it is COUNTED rather than
-   *  raised as `adult-atom-lost` — and a village whose walks wedge is visible in
-   *  the numbers instead of merely being quiet. */
-  stalled: Partial<Record<AdultSituationId, number>>
 }
 
 export const WORK_ARRIVE_RADIUS = 1.1
-/**
- * How near the FILL leg must come to the waterline before the jar goes down.
- *
- * The shared radius is 1.1 m, which on the bank's own slope is some 18 cm of
- * height: the carrier stopped short, on ground still 8 cm ABOVE the drawn water
- * surface, and dipped the jar into air (measured 08.09.2026, work-order 1065).
- * The fill is the one leg whose arrival is judged against a drawn surface, so it
- * arrives tightly — and the shore under it is a slope, never a step
- * (`BANK_MAX_STEP`), so the last third of a metre costs a walker nothing.
- */
-export const FILL_ARRIVE_RADIUS = 0.35
-/**
- * How near a leg whose walk is WEDGED may be to its goal and still count as
- * arrived.
- *
- * A join stand-off is a bearing round an anchor, not a mark on the floor, so a
- * man held a few centimetres outside the arrival radius by a collider or by
- * another body is standing exactly where the errand wanted him. Measured
- * 10.09.2026: legs wedged at 1.15 m against a 1.10 m arrival held their pairs
- * for the full `errandSeconds`, and the caster ran out of free adults.
- *
- * The FILL leg is not forgiven this way — its arrival is judged against the
- * drawn water surface, and a dip granted up the bank is the defect work-order
- * 1065 exists to end.
- */
-export const STALL_ARRIVE_RADIUS = 1.5
-/** How much closer a leg must get to count as still walking rather than wedged. */
-const STALL_PROGRESS = 0.05
+export const WATER_FOOT_REACH = 4
 export const AIM_CLEARANCE = 1.2
 export const JOIN_STAND_OFF = 2.4
 const JOIN_BEARINGS = 12
-/** How far apart two men joining the same thing are placed. */
-const JOIN_APART = 1.2
 
-function joinSpot(
-  view: AdultWorkView,
-  site: ErrandPoint,
-  rand: () => number,
-  avoid: ErrandPoint | null = null,
-): ErrandPoint | null {
+function joinSpot(view: AdultWorkView, site: ErrandPoint, rand: () => number): ErrandPoint | null {
   const start = rand() * Math.PI * 2
   for (let k = 0; k < JOIN_BEARINGS; k++) {
     const a = start + (k / JOIN_BEARINGS) * Math.PI * 2
     const x = site.x + Math.cos(a) * JOIN_STAND_OFF
     const z = site.z + Math.sin(a) * JOIN_STAND_OFF
-    if (!view.standable(x, z)) continue
-    if (avoid && Math.hypot(x - avoid.x, z - avoid.z) < JOIN_APART) continue
-    return { x, z }
+    if (view.standable(x, z)) return { x, z }
   }
   return null
 }
@@ -248,14 +140,7 @@ export function createAdultWork(count: number, cfg: AdultWorkConfig): AdultWorkS
     next: cfg.intervalSeconds,
     cursor: 0,
     siteProgress: {},
-    delivered: 0,
-    stalled: {},
   }
-}
-
-/** How many jars are standing on the village water stand right now. */
-export function jarsOnStand(state: AdultWorkState, capacity: number): number {
-  return Math.min(Math.max(0, Math.floor(capacity)), state.delivered)
 }
 
 export function taskOf(state: AdultWorkState, index: number): AdultTask | null {
@@ -264,13 +149,6 @@ export function taskOf(state: AdultWorkState, index: number): AdultTask | null {
 
 export function goalOf(task: AdultTask): ErrandPoint {
   return task.via ?? { x: task.x, z: task.z }
-}
-
-/** How near this task's goal counts as ARRIVED. One answer for the scheduler and
- *  for the walk that feeds it, so a leg can never stop outside the radius that
- *  would have let it begin. */
-export function arriveRadiusOf(task: AdultTask): number {
-  return isWater(task) && task.phase === 'fetch' && !task.via ? FILL_ARRIVE_RADIUS : WORK_ARRIVE_RADIUS
 }
 
 export function isDigging(state: AdultWorkState, index: number): boolean {
@@ -312,6 +190,22 @@ export function digStrikeCrossed(before: number, after: number, phase = 0): bool
   return Math.floor((after + phase) / DIG_CYCLE_SECONDS) > Math.floor((before + phase) / DIG_CYCLE_SECONDS)
 }
 
+function nearestFree(view: AdultWorkView, to: ErrandPoint, within: number, avoid: number): number {
+  let best = -1
+  let bestD = within
+  let fallback = -1
+  let fallbackD = within
+  for (let i = 0; i < view.villagers.length; i++) {
+    const v = view.villagers[i]
+    if (!v.free) continue
+    const d = Math.hypot(v.x - to.x, v.z - to.z)
+    if (i === avoid) {
+      if (d <= fallbackD) { fallbackD = d; fallback = i }
+    } else if (d <= bestD) { bestD = d; best = i }
+  }
+  return best >= 0 ? best : fallback
+}
+
 function anyFree(view: AdultWorkView, avoid: number): number {
   for (let i = 0; i < view.villagers.length; i++) if (view.villagers[i].free && i !== avoid) return i
   for (let i = 0; i < view.villagers.length; i++) if (view.villagers[i].free) return i
@@ -326,33 +220,9 @@ function anotherFree(view: AdultWorkView, first: number): number {
   return -1
 }
 
-/**
- * The same choice as `anotherFree`, but taking the man who is ALREADY NEAREST
- * `at`. DIG does not need this — its initiator walks to whoever he invites — but
- * the water errand sends BOTH men to the stand, so an addressee picked in index
- * order could be right across the village: the sender then stood at the stand
- * with his order undue for the length of that walk, and the picture showed one
- * man waiting beside a water stand for nothing. The spec's picture is a
- * neighbour who is standing there (work-order 1065).
- */
-function nearestFreeTo(view: AdultWorkView, first: number, at: ErrandPoint): number {
-  let best = -1
-  let bestDistance = Infinity
-  for (let i = 0; i < view.villagers.length; i++) {
-    const v = view.villagers[i]
-    if (i === first || !v.free || !view.invitationClear(v.x, v.z)) continue
-    const d = Math.hypot(v.x - at.x, v.z - at.z)
-    if (d < bestDistance) {
-      bestDistance = d
-      best = i
-    }
-  }
-  return best
-}
-
 function castable(id: AdultSituationId, view: AdultWorkView): boolean {
   const g = view.geography
-  if (id === 'water-out' || id === 'water-back') return !!(g.waterStand && g.waterFill)
+  if (id === 'water-out' || id === 'water-back') return !!(g.waterHead && g.waterFoot)
   if (id === 'dig-second') return g.digSites.length >= 2
   return g.digSites.length >= 1
 }
@@ -381,53 +251,6 @@ function pairReady(state: AdultWorkState, task: AdultTask): boolean {
   if (task.partner === null) return false
   const partner = state.tasks[task.partner]
   return !!partner && partner.arrived && task.arrived && partner.phase === 'site'
-}
-
-/** Is this task a leg of the water errand? Both ids name one round trip. */
-function isWater(task: AdultTask): boolean {
-  return task.situation === 'water-out' || task.situation === 'water-back'
-}
-
-/**
- * The word has fallen: the sender stays at the stand and waits for his water,
- * the neighbour takes the empty jar and sets off for the waterline.
- */
-function sendForWater(state: AdultWorkState, initiator: AdultTask, geography: AdultWorkGeography): void {
-  if (initiator.partner === null) return
-  const carrier = state.tasks[initiator.partner]
-  const fill = geography.waterFill
-  if (!carrier || !fill) return
-  initiator.phase = 'wait'
-  initiator.owes = false
-  delete initiator.hushed
-  carrier.phase = 'fetch'
-  carrier.carry = 'emptyJar'
-  carrier.x = fill.x
-  carrier.z = fill.z
-  carrier.arrived = false
-  carrier.dug = 0
-  // The delivery word is his, and it is owed from the moment he is sent: an
-  // errand that expires with it unspoken is the defect `assertNoOwedWord` names.
-  carrier.owes = true
-}
-
-/** The jar comes up full and goes onto his head; he walks back to the stand. */
-function carryBack(carrier: AdultTask, geography: AdultWorkGeography): void {
-  const stand = geography.waterStand
-  if (!stand) return
-  // BACK TO GROUND HE CAN STAND ON, not to the stand's own spot. The departure
-  // leg was moved off that spot because the stand is a collider and the walk
-  // resolved to an 18 cm ring inside the arrival radius; the delivery leg used
-  // to walk straight back into the same trap, so the jar arrived nowhere and
-  // the errand ran out its whole life in `walk` (work-order 1065).
-  const back = carrier.home ?? stand
-  carrier.situation = 'water-back'
-  carrier.phase = 'walk'
-  carrier.carry = 'fullJar'
-  carrier.x = back.x
-  carrier.z = back.z
-  carrier.arrived = false
-  carrier.dug = 0
 }
 
 function startJointWalk(state: AdultWorkState, initiator: AdultTask, geography: AdultWorkGeography): void {
@@ -498,105 +321,9 @@ export function stepAdultWork(
     }
 
     const goal = goalOf(t)
-    if (!t.arrived && Math.hypot(me.x - goal.x, me.z - goal.z) <= arriveRadiusOf(t)) {
+    if (!t.arrived && Math.hypot(me.x - goal.x, me.z - goal.z) <= WORK_ARRIVE_RADIUS) {
       t.arrived = true
       t.dug = 0
-    }
-
-    // A WEDGED WALK IS RELEASED rather than left to pin its pair for the whole
-    // errand. `stallSeconds` was configured, carried in this module's own config
-    // type, edited by the debug menu and named below as the backstop for a
-    // blocked walk — and nothing ever read it. So a leg that could not close the
-    // last few centimetres held two villagers for the full `errandSeconds`
-    // (180 s). Measured 10.09.2026 inside the full suite: five of ten villagers
-    // pinned that way, `anyFree` therefore finding nobody, and ONE water errand
-    // cast in a 43 s window — which is why no jar was ever seen filling
-    // (work-order 1065).
-    if (!t.arrived) {
-      const d = Math.hypot(me.x - goal.x, me.z - goal.z)
-      const track = t.near
-      if (!track || track.x !== goal.x || track.z !== goal.z || d < track.d - STALL_PROGRESS) {
-        t.near = { x: goal.x, z: goal.z, d }
-        t.stalled = 0
-      } else {
-        t.stalled = (t.stalled ?? 0) + dt
-        if (t.stalled > cfg.stallSeconds) {
-          // He is standing as close as the ground lets him, and for every leg
-          // but the fill that IS his place: he arrives where he stands and the
-          // errand goes on. `STALL_ARRIVE_RADIUS` is what the settlement lays
-          // its teaching grounds apart by, so this slack can never put an adult
-          // word inside a child's earshot.
-          const judgedAgainstTheWater = isWater(t) && t.phase === 'fetch' && !t.via
-          if (!judgedAgainstTheWater && d <= STALL_ARRIVE_RADIUS) {
-            t.arrived = true
-            t.dug = 0
-          } else {
-            // He cannot get there at all, and a word that dies that way is
-            // REPORTED exactly as one lost to the expiry backstop is — the stall
-            // is the same release, only sooner. Counting it as well keeps blocked
-            // ground visible in the numbers, where a check that sees no water
-            // fetched can tell a wedged village from a quiet one.
-            state.stalled[t.situation] = (state.stalled[t.situation] ?? 0) + 1
-            assertNoOwedWord(t, i)
-            if (t.partner !== null) {
-              const mate = state.tasks[t.partner]
-              if (mate) assertNoOwedWord(mate, t.partner)
-            }
-            clearPair(state, i)
-            continue
-          }
-        }
-      }
-    }
-
-    // THE JAR IS SET DOWN BY ARRIVING, NOT BY SPEAKING. Putting it on the stand
-    // is an ACT and owes no listener; only the report to the sender waits for a
-    // hearing gap. Coupled to the word, a child standing in earshot until the
-    // errand expired took the carried jar with it — the full jar vanished at the
-    // stand, which is the very disappearance this work order was written to end
-    // (1065). The `fullJar` carry is what makes this fire exactly once.
-    if (isWater(t) && t.role === 'partner' && t.phase === 'walk' && t.arrived && t.carry === 'fullJar') {
-      t.carry = 'none'
-      state.delivered++
-    }
-
-    // THE ORDER. An adult at the stand turns to the neighbour standing there and
-    // sends him for water: the word, the point at the river, and the jar going
-    // into his hands (work-order 1065).
-    if (!spoken && isWater(t) && t.role === 'initiator' && t.phase === 'invite' && t.arrived && t.owes &&
-        (t.partner === null || state.tasks[t.partner]?.arrived === true)) {
-      // The addressee's OWN arrival gates the word, not merely his existence: he
-      // walks to the stand like the sender, and until he is there the order is
-      // simply not yet due. `errandSeconds` (180 s) is the backstop for a mate
-      // who never gets there, and `stallSeconds` — read at the top of this loop
-      // — for one whose walk is blocked.
-      const partner = t.partner === null ? null : view.villagers[t.partner]
-      const fill = view.geography.waterFill
-      if (!partner || !fill) clearPair(state, i)
-      else if (view.childrenHear(me.x, me.z)) t.hushed = true
-      else {
-        t.owes = false
-        spoken = {
-          id: 'water-out', concept: 'RIVER', speaker: i, errand: 'order', to: t.partner ?? undefined,
-          aim: { x: fill.x, y: 0.2, z: fill.z },
-        }
-        sendForWater(state, t, view.geography)
-      }
-    } else if (!spoken && isWater(t) && t.role === 'partner' && t.phase === 'walk' && t.arrived && t.owes) {
-      // THE DELIVERY. He is back at the stand with a full jar; he sets it down
-      // and reports to the man who sent him, who is still standing there.
-      const sender = t.partner === null ? null : view.villagers[t.partner]
-      if (!sender) clearPair(state, i)
-      else if (view.childrenHear(me.x, me.z)) t.hushed = true
-      else {
-        t.owes = false
-        state.staged['water-back'] = (state.staged['water-back'] ?? 0) + 1
-        spoken = {
-          id: 'water-back', concept: 'RIVER', speaker: i, errand: 'delivery', to: t.partner ?? undefined,
-          aim: { x: sender.x, y: 1, z: sender.z },
-        }
-        clearPair(state, i)
-      }
     }
 
     if (!spoken && t.owes && t.say && t.phase !== 'invite' && t.phase !== 'site' &&
@@ -606,14 +333,14 @@ export function stepAdultWork(
       if (t.via) { t.via = null; t.arrived = false }
     }
 
-    if (!spoken && !isWater(t) && t.role === 'initiator' && t.phase === 'invite' && t.arrived && t.owes) {
+    if (!spoken && t.role === 'initiator' && t.phase === 'invite' && t.arrived && t.owes) {
       const partner = t.partner === null ? null : view.villagers[t.partner]
       if (!partner) clearPair(state, i)
       else if (view.childrenHear(me.x, me.z)) t.hushed = true
       else {
         t.owes = false
         spoken = {
-          id: t.situation, concept: 'DIG', speaker: i, purpose: 'invitation', to: t.partner ?? undefined,
+          id: t.situation, concept: 'DIG', speaker: i, purpose: 'invitation',
           aim: { x: partner.x, y: 1, z: partner.z },
         }
         startJointWalk(state, t, view.geography)
@@ -634,22 +361,6 @@ export function stepAdultWork(
       }
     }
 
-    // THE FILL. He is at the waterline with the jar in his hand; he bends, the
-    // jar goes under the drawn surface and stays there a readable moment. Only
-    // when it comes up is it FULL — the carry never flips without the act.
-    // Arriving BEGINS the fill; it never also spends time in it. The two blocks
-    // used to add `dt` on the same frame, which shortened every dip by a frame,
-    // and the entry was conditional on the first `dt` still being under
-    // `fillSeconds` — so a single frame longer than 2.4 s (a stalled tab) left
-    // him in `fetch` for the rest of the errand and the jar was never dipped.
-    if (isWater(t) && t.phase === 'fetch' && t.arrived) {
-      t.phase = 'fill'
-      t.dug = 0
-    } else if (isWater(t) && t.phase === 'fill') {
-      t.dug += dt
-      if (t.dug >= cfg.fillSeconds) carryBack(t, view.geography)
-    }
-
     if (t.phase === 'dig' && t.arrived && t.siteIndex !== null) {
       const before = t.dug
       t.dug += dt
@@ -657,10 +368,10 @@ export function stepAdultWork(
       progress.dug += dt
       if (digStrikeCrossed(before, t.dug, i * 0.37)) progress.strikes++
       if (t.dug >= cfg.digSeconds) clearPair(state, i)
-    } else if (!isWater(t) && t.arrived && t.phase === 'fetch' && !t.via) {
+    } else if (t.arrived && t.phase === 'fetch' && !t.via) {
       t.dug += dt
       if (t.dug >= cfg.dwellSeconds) state.tasks[i] = null
-    } else if (!isWater(t) && t.arrived && t.phase === 'walk') state.tasks[i] = null
+    } else if (t.arrived && t.phase === 'walk') state.tasks[i] = null
   }
 
   if (spoken) return rememberWord(state, spoken)
@@ -670,47 +381,31 @@ export function stepAdultWork(
   state.next = cfg.intervalSeconds * (1 + (rand() - 0.5) * 2 * cfg.intervalSpread)
 
   const g = view.geography
-  for (let tried = 0; tried < CASTABLE_SITUATIONS.length; tried++) {
-    const id = CASTABLE_SITUATIONS[state.cursor % CASTABLE_SITUATIONS.length]
+  for (let tried = 0; tried < ADULT_SITUATIONS.length; tried++) {
+    const id = ADULT_SITUATIONS[state.cursor % ADULT_SITUATIONS.length]
     state.cursor++
     if (!castable(id, view)) continue
     const avoid = state.last?.speaker ?? -1
 
-    // THE WATER ERRAND IS ORDERED, not narrated (work-order 1065). One adult
-    // walks to the stand to send another; the other is already standing beside
-    // it. Nothing is carried and nothing is said until they are both there and
-    // no child is within earshot — the same yield the two DIG words keep.
-    if (id === 'water-out' && g.waterStand && g.waterFill) {
+    if (id === 'water-out' && g.waterHead && g.waterFoot) {
       const who = anyFree(view, avoid)
       if (who < 0) continue
-      const mate = nearestFreeTo(view, who, g.waterStand)
-      if (mate < 0) continue
-      // THE SENDER WALKS TO A PLACE HE CAN STAND IN. He used to be sent to the
-      // stand's own spot — which is a collider, so the walk resolved him to a
-      // ring 18 cm wide inside the arrival radius and the avoidance normally
-      // steered him round it instead. Measured 08.09.2026: five of six runs on a
-      // quiet machine saw the errand stand in `invite` for its whole life, the
-      // word never falling and no water ever fetched. Both men now take a join
-      // stand-off beside the stand, the same free ground a dig pair joins on.
-      const spot = joinSpot(view, g.waterStand, rand)
-      if (!spot) continue
-      const mateSpot = joinSpot(view, g.waterStand, rand, spot)
-      if (!mateSpot) continue
-      // BOTH MEN WALK THERE. The addressee used to be cast `arrived: true` at a
-      // spot he never went to — and `arrived` is exactly what stops the walk
-      // (PlaceLife walks `goalOf(task)` only while the task is not arrived), so
-      // he stood wherever he happened to be and the order was called across the
-      // village at him. That is the rule this errand exists to keep: NO
-      // VILLAGER SPEAKS TO NOBODY (work-order 1065).
       state.tasks[who] = {
-        situation: id, phase: 'invite', carry: 'none', role: 'initiator', partner: mate,
-        siteIndex: null, x: spot.x, z: spot.z, home: spot, arrived: false, dug: 0,
-        owes: true, say: null, via: null, age: 0,
+        situation: id, phase: 'fetch', carry: 'emptyJar', role: 'worker', partner: null, siteIndex: null,
+        x: g.waterFoot.x, z: g.waterFoot.z, arrived: false, dug: 0, owes: true,
+        say: { at: g.waterHead, aim: g.waterFoot }, via: { ...g.waterHead }, age: 0,
       }
-      state.tasks[mate] = {
-        situation: id, phase: 'invite', carry: 'none', role: 'partner', partner: who,
-        siteIndex: null, x: mateSpot.x, z: mateSpot.z, home: mateSpot, arrived: false, dug: 0,
-        owes: false, say: null, via: null, age: 0,
+      state.staged[id] = (state.staged[id] ?? 0) + 1
+      return null
+    }
+
+    if (id === 'water-back' && g.waterHead && g.waterFoot) {
+      const who = nearestFree(view, g.waterFoot, WATER_FOOT_REACH, avoid)
+      if (who < 0) continue
+      state.tasks[who] = {
+        situation: id, phase: 'walk', carry: 'fullJar', role: 'worker', partner: null, siteIndex: null,
+        x: g.waterHead.x, z: g.waterHead.z, arrived: false, dug: 0, owes: true,
+        say: { at: g.waterHead, aim: g.waterFoot }, via: null, age: 0,
       }
       state.staged[id] = (state.staged[id] ?? 0) + 1
       return null

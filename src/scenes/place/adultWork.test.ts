@@ -15,12 +15,8 @@ import {
   isDigging,
   stepAdultWork,
   taskOf,
-  CASTABLE_SITUATIONS,
-  JOIN_STAND_OFF,
-  jarsOnStand,
+  WATER_FOOT_REACH,
   WORK_ARRIVE_RADIUS,
-  arriveRadiusOf,
-  FILL_ARRIVE_RADIUS,
   type AdultWorkConfig,
   type AdultWorkState,
   type AdultWorkView,
@@ -38,15 +34,10 @@ const CFG: AdultWorkConfig = {
   errandSeconds: 90,
   stallSeconds: 20,
   pace: 1.25,
-  fillSeconds: 2,
-  standCapacity: 3,
 }
 
 const HEAD = { x: 12, z: 0 }
 const FOOT = { x: 34, z: -6 }
-/** The village water stand, and the water itself a step past the foot. */
-const STAND = { x: -1.1, z: 3.9 }
-const FILL = { x: 36, z: -6.4 }
 
 function view(
   n: number,
@@ -64,8 +55,6 @@ function view(
     geography: {
       waterHead: { ...HEAD },
       waterFoot: { ...FOOT },
-      waterStand: { ...STAND },
-      waterFill: { ...FILL },
       digSites: [
         { x: -11, z: 2, kind: 'pit' },
         { x: -16, z: -1, kind: 'postHole' },
@@ -86,10 +75,7 @@ function walkFrame(state: AdultWorkState, v: AdultWorkView, dt: number): void {
     if (!task || task.arrived) continue
     const to = goalOf(task)
     const d = Math.hypot(to.x - me.x, to.z - me.z)
-    // He STOPS where the scene stops him: `PlaceLife` halts the walk at the same
-    // arrival radius the scheduler judges by, so a leg that arrives here arrives
-    // in the game too (work-order 1065).
-    if (d <= arriveRadiusOf(task)) continue
+    if (d <= 1e-6) continue
     const step = Math.min(d, CFG.pace * dt)
     me.x += ((to.x - me.x) / d) * step
     me.z += ((to.z - me.z) / d) * step
@@ -124,8 +110,6 @@ function run(v: AdultWorkView, seconds: number, cfg = CFG): { state: AdultWorkSt
 function riverless(v: AdultWorkView): AdultWorkView {
   v.geography.waterHead = null
   v.geography.waterFoot = null
-  v.geography.waterStand = null
-  v.geography.waterFill = null
   return v
 }
 
@@ -196,307 +180,32 @@ describe('the adults keep to their four teaching situations', () => {
   })
 })
 
-describe('RIVER is a dispatch, not a commentary (work-order 1065)', () => {
-  it('speaks BOTH words at the village water stand, and NOTHING at the water', () => {
+describe('RIVER remains a departure and return at the path head', () => {
+  it('speaks both water situations at the head and aims both at the water', () => {
     const { words } = run(view(6), 240)
     const river = words.filter((word) => word.concept === 'RIVER')
     expect(new Set(river.map((word) => word.id))).toEqual(new Set(['water-out', 'water-back']))
     for (const word of river) {
-      expect(Math.hypot(word.at.x - STAND.x, word.at.z - STAND.z)).toBeLessThanOrEqual(JOIN_STAND_OFF + WORK_ARRIVE_RADIUS)
-      // The bank is a long walk away, and no word may fall down there: the
-      // children's own teaching voices are at the water (work-order 1065).
-      expect(Math.hypot(word.at.x - FILL.x, word.at.z - FILL.z)).toBeGreaterThan(10)
-      expect(Math.hypot(word.at.x - HEAD.x, word.at.z - HEAD.z)).toBeGreaterThan(WORK_ARRIVE_RADIUS)
+      expect(Math.hypot(word.at.x - HEAD.x, word.at.z - HEAD.z)).toBeLessThanOrEqual(WORK_ARRIVE_RADIUS)
+      expect(Math.hypot(word.at.x - FOOT.x, word.at.z - FOOT.z)).toBeGreaterThan(WATER_FOOT_REACH)
+      expect({ x: word.aim.x, z: word.aim.z }).toEqual(FOOT)
     }
   })
 
-  it('addresses every word to somebody, and the order points at the water', () => {
-    const { words } = run(view(6), 240)
-    const river = words.filter((word) => word.concept === 'RIVER')
-    expect(river.length).toBeGreaterThan(0)
-    for (const word of river) {
-      // NO VILLAGER SPEAKS TO NOBODY: each word names the person it is said to.
-      expect(word.to).toBeTypeOf('number')
-      expect(word.to).not.toBe(word.speaker)
-    }
-    const order = river.filter((word) => word.errand === 'order')
-    const delivery = river.filter((word) => word.errand === 'delivery')
-    expect(order.length).toBeGreaterThan(0)
-    expect(delivery.length).toBeGreaterThan(0)
-    // The order points at the river; the delivery is said to the man who sent him.
-    for (const word of order) expect({ x: word.aim.x, z: word.aim.z }).toEqual(FILL)
-    for (const word of delivery) expect(word.aim.y).toBe(1)
-  })
-
-  it('is ONE round trip held by one carrier, not two independent castings', () => {
-    const v = view(6)
-    const state = createAdultWork(6, CFG)
-    const legs = new Map<number, string[]>()
+  it('carries the empty jar out and the full jar back', () => {
+    const v = view(4)
+    const state = createAdultWork(4, CFG)
+    const carried = new Set<string>()
     for (let elapsed = 0; elapsed < 240; elapsed += 1 / 60) {
       walkFrame(state, v, 1 / 60)
-      for (let i = 0; i < 6; i++) {
+      for (let i = 0; i < 4; i++) {
         const task = taskOf(state, i)
-        if (!task || task.situation === 'dig-first' || task.situation === 'dig-second') continue
-        const seen = legs.get(i) ?? []
-        const leg = `${task.situation}:${task.phase}:${carryOf(state, i)}`
-        if (seen[seen.length - 1] !== leg) seen.push(leg)
-        legs.set(i, seen)
+        if (task) carried.add(`${task.situation}:${carryOf(state, i)}`)
       }
       stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
     }
-    // ONE carrier walks the whole errand: out with the empty jar, a fill at the
-    // water, back with the full one. Both ids belong to that same person.
-    const carrier = [...legs.values()].find((seen) => seen.some((leg) => leg.startsWith('water-back')))
-    expect(carrier, 'no villager ever carried water back').toBeDefined()
-    expect(carrier!.join(' > ')).toContain('water-out:fetch:emptyJar')
-    expect(carrier!.join(' > ')).toContain('water-out:fill:emptyJar')
-    expect(carrier!.join(' > ')).toContain('water-back:walk:fullJar')
-    // The jar is FULL only after the fill, never before it.
-    const beforeFill = carrier!.slice(0, carrier!.findIndex((leg) => leg.includes(':fill:')))
-    expect(beforeFill.some((leg) => leg.includes('fullJar'))).toBe(false)
-  })
-
-  it('stops the fill leg AT the water, and every other leg at the shared radius', () => {
-    // The fill is the one leg judged against a DRAWN surface: stopping 1.1 m
-    // short of the waterline left the carrier 8 cm above it, dipping the jar
-    // into air (measured 08.09.2026, work-order 1065).
-    const v = view(6)
-    const state = createAdultWork(6, CFG)
-    const seen = new Map<string, number>()
-    let closest = Infinity
-    for (let elapsed = 0; elapsed < 240; elapsed += 1 / 60) {
-      walkFrame(state, v, 1 / 60)
-      for (let i = 0; i < 6; i++) {
-        const task = taskOf(state, i)
-        if (!task) continue
-        seen.set(`${task.situation}:${task.phase}`, arriveRadiusOf(task))
-        if (task.situation === 'water-out' && task.phase === 'fetch') {
-          closest = Math.min(closest, Math.hypot(v.villagers[i].x - FILL.x, v.villagers[i].z - FILL.z))
-        }
-      }
-      stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
-      if (state.delivered > 0) break
-    }
-    expect(seen.get('water-out:fetch')).toBe(FILL_ARRIVE_RADIUS)
-    expect(seen.get('water-back:walk')).toBe(WORK_ARRIVE_RADIUS)
-    expect(seen.get('water-out:invite')).toBe(WORK_ARRIVE_RADIUS)
-    // ...and the walk really did come that close to the water.
-    expect(closest).toBeLessThanOrEqual(FILL_ARRIVE_RADIUS)
-  })
-
-  it('holds the jar under the water for the configured seconds', () => {
-    // ONE JAR, NOT EVERY JAR. The village may well have two errands out at once,
-    // so a sum over all carriers measures how many men were at the water, not
-    // how long a dip lasts — it stayed under the budget only as long as the
-    // first errand happened to finish before a second one reached the water.
-    const v = view(6)
-    const state = createAdultWork(6, CFG)
-    const filling = new Map<number, number>()
-    for (let elapsed = 0; elapsed < 240; elapsed += 1 / 60) {
-      walkFrame(state, v, 1 / 60)
-      for (let i = 0; i < 6; i++) {
-        if (taskOf(state, i)?.phase === 'fill') filling.set(i, (filling.get(i) ?? 0) + 1 / 60)
-      }
-      stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
-      if (state.delivered > 0) break
-    }
-    // A dip still under way when the first delivery breaks the loop is only
-    // half measured, so the completed one is the longest: it has to reach the
-    // budget, and NO dip may run past it.
-    const dips = [...filling.values()]
-    expect(dips.length).toBeGreaterThan(0)
-    expect(Math.max(...dips)).toBeGreaterThanOrEqual(CFG.fillSeconds * 0.9)
-    expect(Math.max(...dips)).toBeLessThan(CFG.fillSeconds * 1.6)
-  })
-
-  it('sets the jar down on the stand, and the stand never holds more than it can', () => {
-    const v = view(6)
-    const state = createAdultWork(6, CFG)
-    for (let elapsed = 0; elapsed < 900; elapsed += 1 / 60) {
-      walkFrame(state, v, 1 / 60)
-      stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
-    }
-    expect(state.delivered).toBeGreaterThan(0)
-    expect(jarsOnStand(state, CFG.standCapacity)).toBeLessThanOrEqual(CFG.standCapacity)
-    expect(jarsOnStand(state, CFG.standCapacity)).toBe(Math.min(CFG.standCapacity, state.delivered))
-  })
-
-  it('yields the water word while a child could hear it, exactly as DIG does', () => {
-    const heard = view(6, undefined, () => true, () => true)
-    const { words } = run(heard, 240)
-    expect(words.filter((word) => word.concept === 'RIVER')).toHaveLength(0)
-  })
-
-  it('never casts the return leg on its own', () => {
-    expect(CASTABLE_SITUATIONS).not.toContain('water-back')
-    expect(ADULT_SITUATIONS).toContain('water-back')
-  })
-
-  it('does not speak the order until the man it is spoken to has reached the stand', () => {
-    // The addressee used to be cast as ALREADY arrived at a spot he never walked
-    // to — and `arrived` is what stops the walk, so he stood wherever he was and
-    // the order carried across the village to him.
-    const v = view(6, [
-      { x: 0, z: 0 }, { x: 0.6, z: 0 }, { x: 40, z: 40 },
-      { x: 41, z: 40 }, { x: 42, z: 40 }, { x: 43, z: 40 },
-    ])
-    const state = createAdultWork(6, CFG)
-    let order: SpokenWord | null = null
-    for (let elapsed = 0; elapsed < 240 && !order; elapsed += 1 / 60) {
-      walkFrame(state, v, 1 / 60)
-      const word = stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
-      if (word?.errand === 'order') order = word
-    }
-    expect(order, 'the order was never spoken').not.toBeNull()
-    const listener = v.villagers[order!.to!]
-    // He is AT the stand when he is told, not somewhere across the village.
-    expect(Math.hypot(listener.x - STAND.x, listener.z - STAND.z))
-      .toBeLessThanOrEqual(JOIN_STAND_OFF + WORK_ARRIVE_RADIUS)
-  })
-
-  it('walks the full jar back to ground beside the stand, not onto the stand itself', () => {
-    // The stand is a collider. The departure leg was already moved off its own
-    // spot for that reason; the return walked straight back into it.
-    const v = view(6)
-    const state = createAdultWork(6, CFG)
-    const backGoals: Array<{ x: number; z: number }> = []
-    for (let elapsed = 0; elapsed < 240; elapsed += 1 / 60) {
-      walkFrame(state, v, 1 / 60)
-      for (let i = 0; i < 6; i++) {
-        const task = taskOf(state, i)
-        if (task?.situation === 'water-back') backGoals.push(goalOf(task))
-      }
-      stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
-      if (state.delivered > 0) break
-    }
-    expect(backGoals.length).toBeGreaterThan(0)
-    for (const goal of backGoals) {
-      expect(Math.hypot(goal.x - STAND.x, goal.z - STAND.z)).toBeCloseTo(JOIN_STAND_OFF, 5)
-    }
-  })
-
-  it('sets the delivered jar down even when a child holds the report back', () => {
-    // The jar used to go down only together with the word. A child within
-    // earshot until the errand expired therefore took a jar that had already
-    // been carried home: it vanished at the stand with nothing counted.
-    const v = view(6)
-    const state = createAdultWork(6, CFG)
-    let carrier = -1
-    for (let elapsed = 0; elapsed < 240 && carrier < 0; elapsed += 1 / 60) {
-      walkFrame(state, v, 1 / 60)
-      stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
-      for (let i = 0; i < 6; i++) if (taskOf(state, i)?.situation === 'water-back') carrier = i
-    }
-    expect(carrier, 'nobody ever carried water back').toBeGreaterThanOrEqual(0)
-    // From here on every child is within earshot: the report can never fall.
-    v.childrenHear = () => true
-    for (let elapsed = 0; elapsed < 240; elapsed += 1 / 60) {
-      walkFrame(state, v, 1 / 60)
-      stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
-      if (state.delivered > 0) break
-    }
-    expect(state.delivered).toBeGreaterThan(0)
-    expect(carryOf(state, carrier)).not.toBe('fullJar')
-  })
-
-  it('dips the jar even when one frame is longer than the whole fill', () => {
-    // Entering the fill used to be conditional on the first `dt` still being
-    // under the budget, so a single stalled frame left the carrier in `fetch`
-    // for the rest of the errand and no jar ever went into the water.
-    const v = view(6)
-    const state = createAdultWork(6, CFG)
-    // THE CARRIER THE STALL HIT, not whichever carrier happens to be dipping:
-    // a second errand's ordinary dip would answer for the one that was skipped.
-    let stalled = -1
-    let dipped = false
-    for (let elapsed = 0; elapsed < 240 && !dipped; elapsed += 1 / 60) {
-      walkFrame(state, v, 1 / 60)
-      if (stalled < 0) {
-        // The frame that CAUSES the arrival, not one that observes it: arriving
-        // and beginning the fill happen inside the same step, so `fetch` with
-        // `arrived` set is never visible from out here.
-        stalled = [...Array(6).keys()].find((i) => {
-          const task = taskOf(state, i)
-          if (!task || task.situation !== 'water-out' || task.phase !== 'fetch' || task.arrived) return false
-          const to = goalOf(task)
-          return Math.hypot(v.villagers[i].x - to.x, v.villagers[i].z - to.z) <= arriveRadiusOf(task)
-        }) ?? -1
-        // The stalled frame lands exactly on the arrival, which is where it hurt.
-        stepAdultWork(state, v, stalled >= 0 ? CFG.fillSeconds * 2 : 1 / 60, CFG, () => 0.5)
-      } else {
-        stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
-        if (taskOf(state, stalled)?.phase === 'fill') dipped = true
-        if (carryOf(state, stalled) === 'fullJar') break
-      }
-    }
-    expect(stalled, 'no carrier ever reached the water').toBeGreaterThanOrEqual(0)
-    expect(dipped, 'a long frame skipped the dip entirely').toBe(true)
-  })
-})
-
-describe('a blocked walk is released rather than left to pin its pair (work-order 1065)', () => {
-  /**
-   * The village as it really is: a man walks at his goal and something — a
-   * collider, another body — holds him just outside the radius that would let
-   * him arrive. Measured 10.09.2026 inside the full suite at 1.15 m against a
-   * 1.10 m arrival.
-   */
-  function wedgedWalkFrame(state: AdultWorkState, v: AdultWorkView, dt: number, wedgeAt: number): void {
-    for (let i = 0; i < v.villagers.length; i++) {
-      const me = v.villagers[i]
-      const task = taskOf(state, i)
-      me.free = !task
-      if (!task || task.arrived) continue
-      const to = goalOf(task)
-      const d = Math.hypot(to.x - me.x, to.z - me.z)
-      if (d <= Math.max(arriveRadiusOf(task), wedgeAt)) continue
-      const step = Math.min(d - wedgeAt, CFG.pace * dt)
-      me.x += ((to.x - me.x) / d) * step
-      me.z += ((to.z - me.z) / d) * step
-    }
-  }
-
-  function runWedged(v: AdultWorkView, seconds: number, wedgeAt: number): { state: AdultWorkState; words: SpokenWord[] } {
-    const state = createAdultWork(v.villagers.length, CFG)
-    const words: SpokenWord[] = []
-    for (let elapsed = 0; elapsed < seconds; elapsed += 1 / 60) {
-      wedgedWalkFrame(state, v, 1 / 60, wedgeAt)
-      const word = stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
-      if (word) words.push(word)
-    }
-    return { state, words }
-  }
-
-  it('lets a man held a few centimetres short arrive where he stands, and the order still falls', () => {
-    // A join stand-off is a bearing round an anchor, not a mark on the floor.
-    const { words } = runWedged(view(6), 120, 1.15)
-    const order = words.filter((word) => word.id === 'water-out')
-    expect(order.length, 'the order never fell, so both men were still walking').toBeGreaterThan(0)
-    expect(order[0].to).toBeTypeOf('number')
-  })
-
-  it('does NOT forgive the fill leg, which is judged against the drawn water', () => {
-    // A dip granted up the bank is the defect this work order exists to end.
-    const { state } = runWedged(view(6), 200, 1.15)
-    expect(state.delivered, 'a carrier who never reached the water still delivered').toBe(0)
-    expect(state.stalled['water-out'] ?? 0).toBeGreaterThan(0)
-  })
-
-  it('frees the pinned villagers long before the errand would expire', () => {
-    // THE MEASURED DEFECT: with nothing reading `stallSeconds`, a wedged leg
-    // held two villagers for the whole `errandSeconds`, `anyFree` found nobody
-    // and ONE water errand was cast in a whole window.
-    const { state } = runWedged(view(6), 200, 1.15)
-    expect(state.staged['water-out'] ?? 0, 'the caster never got its adults back').toBeGreaterThanOrEqual(2)
-  })
-
-  it('starts a fresh reckoning when a leg is re-aimed, so a long walk is never mistaken for a wedge', () => {
-    // The carrier is sent from the stand to a waterline tens of metres away. If
-    // the stall clock carried the last leg's best distance over, that walk would
-    // look stalled from its first frame and the errand would die at the door.
-    const { state } = run(view(6), 240)
-    expect(state.delivered).toBeGreaterThan(0)
-    expect(state.stalled, 'a village where nobody is blocked stalls nothing').toEqual({})
+    expect(carried).toContain('water-out:emptyJar')
+    expect(carried).toContain('water-back:fullJar')
   })
 })
 

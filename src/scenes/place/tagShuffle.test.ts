@@ -63,7 +63,7 @@ import {
   type InhabitantSet,
 } from './inhabitantBodies'
 import { playRockFlank } from './playRockSurface'
-import { buildLayout, VILLAGE_WATER_STAND, type PlaceLayout } from './layout'
+import { buildLayout, type PlaceLayout } from './layout'
 import { villageAdultStations } from './lifeSpots'
 import { climbBoulder } from './looseRocks'
 import { absorbSeparation, createTagGame, stepTagGame, type TagChild } from './tagGame'
@@ -245,8 +245,6 @@ function crowd(
     geography: {
       waterHead: layout.waterPath ? { x: layout.waterPath.head.x, z: layout.waterPath.head.z } : null,
       waterFoot: layout.waterPath ? { x: layout.waterPath.foot.x, z: layout.waterPath.foot.z } : null,
-      waterStand: layout.waterPath ? { x: VILLAGE_WATER_STAND[0], z: VILLAGE_WATER_STAND[1] } : null,
-      waterFill: layout.waterPath ? { x: layout.waterPath.fill.x, z: layout.waterPath.fill.z } : null,
       digSites: layout.digSites,
     },
     standable: (x, z) => !world.blocked(x, z),
