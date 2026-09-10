@@ -1459,7 +1459,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 10.09.2026, 21:02 · Quellen-Fingerprint: `98278d6ef230…`
+Zuletzt aktualisiert: Donnerstag, 10.09.2026, 22:37 · Quellen-Fingerprint: `79f43407c5a4…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1502,6 +1502,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 70 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | wait-command-guard.mjs | ✔ Mechanismus |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
+| \"Gib ab\" / \"abgeben\" means hand the batch to a SUCCESSOR session so the context does not overflow — it never means pause or stop the batch | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | User 18.08.2026: hard, complex, error-prone and HIGH-criticality points are AUTHORED by the OpenAI lane directly (GPT-6 Astra since 05.09.2026, GPT-5.6 Sol before) — Opus 5 authors only what is left, and Fable authors only a point that tags its lane or one the router escalates | 5 | hoch | — (Regel/Memory) | ◐ Regel |
 | Two test layers — Vitest (jsdom) for logic/store/HUD, Playwright for browser-only; add a test per new feature on the right layer | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | STANDING RULE: design.md §19.14 (climate) and §19.15 (peoples) — the research→game implementation records — must be updated in the SAME commit whenever the climate or people rendering changes; peoples-1890 §8 / climate-1890 §9 are pointers | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1533,7 +1534,6 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Saved games do not constrain design work: the feature is switched off, nobody plays a serious run, and no migration is ever owed for a data change | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | 24.07.2026 evening chaos — serving model silently degraded to Haiku 4.5; verify the serving model before batch work, Haiku-class must pause instead of working | 6 | hoch | model-guard.mjs | ✔ Mechanismus |
 | Keep the shell cwd in /workspace/hoa; a worktree cwd makes the Stop guards judge the wrong repo root | 2 | mittel | worktree-reminder.mjs | ✔ Mechanismus |
-| Solved 05.09.2026: every claude session died with exit 143 because two batch-emergency tests ran the real strike against the live session registry — evidence, method, fix, and what to keep in mind | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | ENDED 17.08.2026 — the 13.08. emergency that pushed the MAXIMUM load to OpenAI (hard cases to Sol via --anyway, pool of one) is over; the normal three-lane split of CLAUDE.md §6 applies again | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Every new optical/graphics feature must be sorted into the low/medium/high detail presets, enforced by a pure completeness test — a new quality key with no preset entries fails the gate | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Write about this project as a participant (\"wir/unser\"), never as an outside observer (\"euer Mechanismus\", \"die ihr abschaffen wollt\") | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1563,10 +1563,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 96 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 127 Prozess-/Meta-TASKS-Punkte (davon 60 offen).
+Erfasste Quellen: 96 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 128 Prozess-/Meta-TASKS-Punkte (davon 61 offen).
 
-<!-- RETRO-FINGERPRINT: 98278d6ef230f5e281b5a00bd23363f4c474be974ca45f9d24006cf8b73e6fc3 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-10T19:02:37.309Z -->
+<!-- RETRO-FINGERPRINT: 79f43407c5a40c97a64334003bdc07a65b48bf4da207923b3370bd5d33123c9f -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-10T20:37:32.531Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -6516,6 +6516,30 @@ Reihenfolge gegen diese Wirkung prüfen — nicht nur gegen die Frage, was logis
 gehört. Und ein Schritt, der eine ganze Kette anhält, muss die Worte dessen mitdrucken, der
 ihn angehalten hat, gleich auf welchem Kanal sie standen. Es ist die Familie von §3.258: das
 eigene Werk, das dem eigenen Fortkommen im Weg steht.
+
+### 3.261 »Mit Absicht stehengelassen« war eine Annahme, keine Entscheidung
+
+Die Reparatur aus §3.259 hat sich auf ihrer eigenen Landung bewiesen: Punkt 1091 lief am
+10.09.2026 durch Merge, Tor, Abhaken, Archiv, Push und Tafel-Veröffentlichung, und der
+Schritt, der zuvor die Kette anhielt, meldete »now-card settled first«. Erreicht wurde damit
+genau der Schritt, um dessentwillen die Reparatur gebaut war — das Aufräumen.
+
+Und dort blieb der Zweig trotzdem stehen. Der Schritt meldete »branch KEPT, 2 kept on
+purpose«: Zwei losgelöste Prüfbäume stehen dauerhaft in der Ablage, und die Kette führt einen
+losgelösten Baum als unbeweisbar — »nothing proves it is NOT standing on feat/1091-…«. Eine
+einzige Messung im jeweiligen Baum widerlegte das sofort; sie standen auf ganz anderen
+Commits als die Zweigspitze. Die Auskunft war verfügbar, die Kette hat sie nicht geholt.
+
+Zwei Dinge daran wiegen schwerer als der gelöschte Zweig. Erstens ist die Annahme dauerhaft:
+Die Prüfbäume sind langlebig, also hätte JEDE künftige Landung so geendet — dieselbe
+Handarbeit, die einen Schritt früher in derselben Kette gerade beseitigt worden war.
+Zweitens tarnte sich die Annahme als Entscheidung. »Auf Absicht stehengelassen« liest sich
+wie ein Urteil; tatsächlich war es das Eingeständnis, nicht nachgesehen zu haben. Ein
+gemeldeter Vorsatz wird nicht nachgeprüft — eine gemeldete Unsicherheit schon.
+
+**Lehre:** Ein Schritt, der aus Vorsicht nicht handelt, muss sagen, ob ihm die Messung
+fehlte oder ob er sie gemacht hat. Und wo die Messung einen Aufruf kostet, ist Vorsicht keine
+zulässige Antwort. Gebucht als Punkt 1096.
 
 ### 3.260 Ein Nutzerauftrag im Backlog ist ein Auftrag, der nie ausgeführt wird
 
