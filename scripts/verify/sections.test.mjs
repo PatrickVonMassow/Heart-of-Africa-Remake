@@ -5,7 +5,7 @@
 // and refused as recorded coverage (that half lives with the recorder's reader,
 // scripts/render-verify-core.test.mjs).
 import { describe, it, expect } from 'vitest'
-import { listSections, makeSectionGate, planSectionRun, resolveSelection, resultSection, SECTION_ENV } from './sections.mjs'
+import { listNonPredictive, listSections, makeSectionGate, planSectionRun, resolveSelection, resultSection, SECTION_ENV } from './sections.mjs'
 import { runVerdict } from '../render-verify-core.mjs'
 import { sectionTag } from '../section-tag-core.mjs'
 
@@ -255,5 +255,58 @@ describe('a partial run is refused as recorded coverage', () => {
     expect(v.covers).toBe(false)
     expect(v.status).toBe('partial')
     expect(v.unaccounted[0].name).toContain('crocodile')
+  })
+})
+
+// ── NON-PREDICTIVE CHECKS (point 1086) ─────────────────────────────────────
+describe('a check that declares it cannot predict the suite’s own reading', () => {
+  const SRC = [
+    "const { section, nonPredictive } = sectionGate()",
+    "if (section('town-plan')) {",
+    "  check('the lanes meet the gate', true)",
+    "}",
+    "if (section('adult-errands')) {",
+    "  nonPredictive('the jar goes down EMPTY and comes back FULL', 'the pass cast ONE errand where the section casts many')",
+    "  check('the jar goes down EMPTY and comes back FULL', true)",
+    "}",
+    "// prose: nonPredictive('phantom', 'written in a comment') declares nothing",
+  ].join('\n')
+
+  it('attaches the declaration to the section it stands in', () => {
+    expect(listNonPredictive(SRC)).toEqual([
+      {
+        section: 'adult-errands',
+        check: 'the jar goes down EMPTY and comes back FULL',
+        why: 'the pass cast ONE errand where the section casts many',
+      },
+    ])
+  })
+
+  it('does not let prose declare one', () => {
+    expect(listNonPredictive("// nonPredictive('x', 'y')")).toEqual([])
+    expect(listNonPredictive("const s = \"nonPredictive('x', 'y')\"")).toEqual([])
+  })
+
+  it('marks the PASSING line of a narrow run, and nothing else', () => {
+    const gate = makeSectionGate({ sections: ['adult-errands'], requested: 'adult-errands', suite: 'polish' })
+    gate.section('adult-errands')
+    gate.nonPredictive('the jar comes back FULL', 'the pass casts one errand')
+    expect(gate.predictiveNote('the jar comes back FULL', true)).toContain('NON-PREDICTIVE narrowly')
+    // A red is a red either way round, and an undeclared check says nothing.
+    expect(gate.predictiveNote('the jar comes back FULL', false)).toBe('')
+    expect(gate.predictiveNote('the lanes meet the gate', true)).toBe('')
+  })
+
+  it('says nothing in a WHOLE-suite run, which measures what it measures', () => {
+    const gate = makeSectionGate({ sections: ['adult-errands'], requested: null, suite: 'polish' })
+    gate.section('adult-errands')
+    gate.nonPredictive('the jar comes back FULL', 'the pass casts one errand')
+    expect(gate.predictiveNote('the jar comes back FULL', true)).toBe('')
+  })
+
+  it('refuses a declaration without a check name or without a reason', () => {
+    const gate = makeSectionGate({ sections: ['x'], requested: null, suite: 'polish' })
+    expect(() => gate.nonPredictive('', 'why')).toThrow(/CHECK NAME/)
+    expect(() => gate.nonPredictive('a check', '  ')).toThrow(/reason/)
   })
 })
