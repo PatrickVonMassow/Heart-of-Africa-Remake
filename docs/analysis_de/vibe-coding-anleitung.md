@@ -635,4 +635,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 8540fe3edf9706379a2b7d6f718e70a0d247374d1fb53ce7c2f956c2d7ee40a0 -->
+<!-- GUIDE-FINGERPRINT: 768c28b0e2319f645f3ad6025a7e93bb21ebb357b2fc8e0bbed65c58062a4045 -->

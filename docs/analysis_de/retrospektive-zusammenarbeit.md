@@ -54,6 +54,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 10.09. nachts | Die schmale Sprosse wurde zwölfmal geklettert und war zwölfmal grün — der volle Lauf fiel danach auf genau denselben zwei Prüfungen, weil ein Merge sie ungeprüft überholt hatte und der Abschnitt ein anderes Fenster misst als die Suite: die am Vorabend angeordnete Leiter hätte nichts verweigert (§3.255); dieselbe Nacht zeigt die Faltung zweier Hälften, die einen Regressionslauf sparen sollte und die fertige Hälfte drei Tage ihre Landung kostete |
 | 10.09. nachmittags | Zwei Deckungsläufe desselben Punktes starben im Teardown der Unit-Suite, weil jemand woanders committete — 15:37 an einer main-Ref, 16:13 an einem fremden Worktree-Index, beide vor dem ersten Bild. Der Defekt liegt seit dem 23.08. dreifach im Auftrag (805, 852, 955) an Position 233/261/310 von 383 und ist in Reihenfolge nie erreichbar; sichtbar wird er erst an der Rechnung des Punktes: 24,6 Maschinenstunden, 23 LARGE-Läufe, kein einziger grün (§3.231-Nachtrag) |
 | 10.09. abends | 43 Minuten Stillstand nach einer korrekten Übergabe, beendet von der Nutzerfrage „seit 17:04 keine Arbeit": Der Launcher verweigerte dreimal den Nachfolger, weil er im Arbeitsbaum einen lebenden Schreiber maß — es war der abgekoppelte Deckungslauf selbst, der dorthin seine Bilder schreibt. Das Veto sperrt den Nachfolger für die volle Dauer genau der Phase, in der die Übergabe vorgesehen ist (§3.258, vierter Wiedergänger von §3.77/§3.220) |
+| 10.09. spätabends | Die Landungskette hält an ihrem letzten Schritt: Sie hakt den Punkt ab und veröffentlicht DANACH die Tafel, deren Jetzt-Karte noch genau diesen Punkt nennt — die Tafel weist die Veröffentlichung zu Recht ab, und das Aufräumen von Zweig und Arbeitsbaum bleibt liegen. Den gemessenen Grund druckt die Kette nicht mit, weil die Absage auf dem Ausgabekanal steht und sie den Fehlerkanal liest (§3.259) |
 | 13.08. | Der Nachprüfer findet eine echte zweite Klippe im geheilten Mechanismus — und jede der fünf gemessenen Kuren verschlechtert gesunde Dörfer stärker, als der Fehler schadet: Befund wird gebucht statt behoben (§3.115) |
 | 20.08. | Der Dokumentschnitt strich Regeln als »von einem Wächter abgedeckt«, ohne einen einzigen Wächter darauf zu prüfen — die Kontextanzeige verschwand, der Nutzer fand es (§3.134); eine vom Nutzer gesetzte Rangfolge wurde in einer Nacht zweimal maschinell überholt, ohne dass irgendwo ein Grund stand (Punkt 614); zwei Werkzeuge derselben Bauart am falschen Ort gemessen — im Hauptbaum gebaut und geprüft, während der Prozess die Arbeit in den isolierten Bereich schickt (§3.137) |
 | 21.08. | Ein Tor verlangte eine Freigabe, die seine eigenen Werkzeuge nicht herstellen können — der HIGH-Punkt war gemergt, geprüft und freigegeben, und der Zugausgang wies ihn trotzdem ab (§3.153) |
@@ -1457,7 +1458,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 10.09.2026, 17:54 · Quellen-Fingerprint: `8540fe3edf97…`
+Zuletzt aktualisiert: Donnerstag, 10.09.2026, 19:42 · Quellen-Fingerprint: `768c28b0e231…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1561,10 +1562,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 96 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 127 Prozess-/Meta-TASKS-Punkte (davon 61 offen).
+Erfasste Quellen: 96 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 127 Prozess-/Meta-TASKS-Punkte (davon 60 offen).
 
-<!-- RETRO-FINGERPRINT: 8540fe3edf9706379a2b7d6f718e70a0d247374d1fb53ce7c2f956c2d7ee40a0 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-10T15:54:47.291Z -->
+<!-- RETRO-FINGERPRINT: 768c28b0e2319f645f3ad6025a7e93bb21ebb357b2fc8e0bbed65c58062a4045 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-10T17:42:45.700Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -6491,3 +6492,26 @@ Autor beschreibt. Und die Klasse ist inzwischen viermal aufgetreten (§3.77, §3
 hier): Jedes Mal war die Fundstelle ein anderes Feld, jedes Mal war das Muster dasselbe, und
 jedes Mal hat es der Nutzer gefunden. Das ist der Preis dafür, dass kein Wächter den
 Stillstand selbst misst — nur seine Ursachen einzeln.
+
+### 3.259 Ein Ablauf stellt selbst den Zustand her, an dem sein nächster Schritt scheitert
+
+Die Landung von Punkt 1088 lief sauber durch Merge, Tor, Abhaken, Archiv und den Push von
+main — und starb am letzten Schritt: »FAIL board publish the board«. Die Ursache ist der
+Schritt davor. Die Kette hakt den Punkt ab, und die Tafel weigert sich anschließend zu
+veröffentlichen, weil ihre Jetzt-Karte einen Punkt nennt, der nicht mehr offen ist. Die
+Weigerung ist richtig; falsch ist die Reihenfolge, die sie herbeiführt.
+
+Der Preis steht im nächsten Schritt, den es nie gab: Das Aufräumen von Zweig, Fernzweig und
+Arbeitsbaum lief nicht mehr, obwohl CLAUDE.md §6 den Merge genau damit enden lässt. Die
+Kette hinterlässt also den Zustand, gegen den sie gebaut wurde, und das bei JEDER Landung.
+
+Dazu kam die zweite Hälfte: Der Fehlschlag nannte seinen Grund nicht. Die Kette druckt die
+letzte Zeile des Fehlerkanals, die Tafel schreibt ihre Absage auf den Ausgabekanal — übrig
+bleibt eine leere Begründung. Gefunden wurde der Grund erst, weil der Reparaturbefehl
+danach von Hand lief und dieselbe Absage noch einmal aussprach.
+
+**Lehre:** Eine Kette, deren Schritte den Zustand des jeweils nächsten verändern, muss ihre
+Reihenfolge gegen diese Wirkung prüfen — nicht nur gegen die Frage, was logisch zuerst
+gehört. Und ein Schritt, der eine ganze Kette anhält, muss die Worte dessen mitdrucken, der
+ihn angehalten hat, gleich auf welchem Kanal sie standen. Es ist die Familie von §3.258: das
+eigene Werk, das dem eigenen Fortkommen im Weg steht.
