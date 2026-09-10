@@ -425,7 +425,7 @@ const stampOf = (p) => {
  * Any failure answers null — evidence that cannot be established never counts as
  * established, the same rule `refTipAt` follows.
  */
-export function worktreeFilesActiveAt(root, { limit } = {}) {
+export function worktreeFilesActiveAt(root, { limit, excludePaths = [] } = {}) {
   const dir = String(root ?? '').trim()
   if (!dir) return null
   let out = ''
@@ -441,6 +441,9 @@ export function worktreeFilesActiveAt(root, { limit } = {}) {
         '-z',
         '--untracked-files=all',
         '--ignore-submodules=all',
+        '--',
+        '.',
+        ...excludePaths.map((path) => `:(top,literal,exclude)${path}`),
       ],
       {
         windowsHide: true,
@@ -477,7 +480,7 @@ export function worktreeFilesActiveAt(root, { limit } = {}) {
  * delegated-agent/registered-writer verdict, and every progress or cleanup reader
  * of this probe; none can turn its own observation into an `alive` stamp.
  */
-export function worktreeActiveAt(path) {
+export function worktreeActiveAt(path, { excludePaths = [] } = {}) {
   const root = String(path ?? '').trim()
   if (!root) return null
   let gitdir = null
@@ -497,7 +500,7 @@ export function worktreeActiveAt(path) {
     headAt: stampOf(join(gitdir, 'HEAD')),
     commitEditAt: stampOf(join(gitdir, 'COMMIT_EDITMSG')),
   })
-  return combineWorktreeStamps({ gitAt, filesAt: worktreeFilesActiveAt(root) })
+  return combineWorktreeStamps({ gitAt, filesAt: worktreeFilesActiveAt(root, { excludePaths }) })
 }
 
 export function mtimeOf(path) {
@@ -845,7 +848,16 @@ export function registeredFeatureWriters({
       const pids = point !== null && registeredBranchesByPoint.get(point)?.size === 1
         ? declared.pids.filter((item) => evidencePoint(item) === point)
         : []
-      const measured = check({ worktree: tree.path, branch: tree.branch, pids, now, pidProbe })
+      const measured = check({
+        worktree: tree.path, branch: tree.branch, pids, now, pidProbe,
+        // A detached verification can write for hours after its author leaves.
+        // Exclude its output before the dirty-path limit so it neither proves a
+        // writer alive nor crowds source edits out of the measurement. Keep the
+        // shared probe's default intact: declared runs still need that progress.
+        worktreeProbe: (path) => worktreeActiveAt(path, {
+          excludePaths: ['verification/', 'local/verify-logs/', 'test-results/', 'playwright-report/'],
+        }),
+      })
       return {
         branch: tree.branch,
         worktree: tree.path,

@@ -14,6 +14,10 @@
 // spawns a session at module load), so the spawn arguments and options are built
 // purely and asserted here.
 import { describe, it, expect } from 'vitest'
+import { execFileSync } from 'node:child_process'
+import { mkdtempSync, mkdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { dirname, join } from 'node:path'
 import {
   buildSpawnArgs,
   firewallTopUpDecision,
@@ -73,12 +77,118 @@ import {
 } from './batch-autostart-core.mjs'
 import { readState, writeState } from './fable-switch-core.mjs'
 import { PAUSE_RETRY_LADDER_MS } from './batch-pause-core.mjs'
-import { checkAgentOutput, registeredFeatureWriters } from './batch-in-flight.mjs'
+import { checkAgentOutput, registeredFeatureWriters, worktreeActiveAt } from './batch-in-flight.mjs'
 
 const fable = (state) => readState(JSON.stringify(writeState(state, { why: 'test', by: 'test', now: 1 })))
 const FABLE_ON = fable('on')
 const FABLE_OFF = fable('off')
 import { isOwnSpawn } from './batch-singleton.mjs'
+
+describe('registered writer liveness beside detached verification output', () => {
+  const NOW = 1_800_000_000_000
+  const BRANCH = 'feat/1090-verification-run-is-no-writer'
+  const outputPaths = [
+    'verification/nested/frame.png',
+    'local/verify-logs/run.log',
+    'test-results/nested/result.json',
+    'playwright-report/nested/index.html',
+  ]
+  const withCheckout = (test) => {
+    const root = mkdtempSync(join(tmpdir(), 'hoa-writer-verification-'))
+    const git = (...args) => execFileSync('git', ['-c', 'core.hooksPath=', ...args], {
+      cwd: root,
+      env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_SYSTEM: '/dev/null' },
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+    const touch = (relative, content = 'recent output') => {
+      const path = join(root, relative)
+      mkdirSync(dirname(path), { recursive: true })
+      writeFileSync(path, content)
+      const recent = new Date(NOW - 1_000)
+      utimesSync(path, recent, recent)
+    }
+    const measure = ({ declaration = null, pidProbe = () => null, commitAt = NOW - 40 * 60_000 } = {}) => {
+      const old = new Date(commitAt)
+      utimesSync(join(root, '.git/HEAD'), old, old)
+      return registeredFeatureWriters({
+        cwd: root,
+        now: NOW,
+        declaration,
+        pidProbe,
+        openProbe: () => ({ readable: true, branches: [{ ref: BRANCH }] }),
+        check: (options) => checkAgentOutput({ ...options, branchProbe: () => commitAt }),
+      })
+    }
+    try {
+      git('-c', 'init.templateDir=', 'init', '-b', BRANCH)
+      test({ root, git, touch, measure })
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  }
+  const decision = (featureWriterRegister) => launcherStartDecision({
+    lock: null,
+    assessment: { alive: false, reason: 'no-lock' },
+    featureWriterRegister,
+    now: NOW,
+  })
+
+  it.each(outputPaths.flatMap((path) => [[path, 'untracked'], [path, 'tracked']]))(
+    'ignores %s (%s), but still vetoes a source edit in the same checkout', (path, state) => {
+      withCheckout(({ root, git, touch, measure }) => {
+        touch(path, 'initial output')
+        if (state === 'tracked') git('add', '--', path)
+        touch(path)
+        const runOnly = measure()
+        expect(runOnly).toMatchObject({ readable: true, writers: [{
+          recognized: false, output: { verdict: 'quiet' },
+        }] })
+        expect(decision(runOnly)).toMatchObject({ start: true })
+        // Declared work still sees run output through the unfiltered shared probe.
+        expect(worktreeActiveAt(root)).toEqual({ at: NOW - 1_000, source: 'working files' })
+
+        touch('src/author.ts')
+        expect(decision(measure())).toMatchObject({
+          start: false,
+          code: 'registered-writer-live',
+          veto: { output: { verdict: 'alive', detail: expect.stringContaining('(working files)') } },
+        })
+      })
+    },
+  )
+
+  it.each(['verification-notes/author.ts', 'local/verify-logs-notes/author.ts',
+    'test-results-notes/author.ts', 'playwright-report-notes/author.ts', 'src/verification/author.ts'])(
+    'still counts a working file outside the exact owned directories: %s', (path) => {
+      withCheckout(({ touch, measure }) => {
+        touch(path)
+        expect(decision(measure())).toMatchObject({ start: false, code: 'registered-writer-live' })
+      })
+    },
+  )
+
+  it('does not let verification files exhaust the dirty-file limit before a source edit', () => {
+    withCheckout(({ touch, measure }) => {
+      for (let index = 0; index < 401; index += 1) touch(`local/verify-logs/${index}.log`)
+      touch('src/author.ts')
+      expect(decision(measure())).toMatchObject({ start: false, code: 'registered-writer-live' })
+    })
+  })
+
+  it('preserves the live author process veto beside verification-only writes', () => {
+    withCheckout(({ touch, measure }) => {
+      for (const path of outputPaths) touch(path)
+      const commitAt = NOW - 10 * 60_000
+      expect(decision(measure({ commitAt }))).toMatchObject({ start: true })
+      expect(decision(measure({
+        commitAt,
+        declaration: { evidence: [{ kind: 'pid', pid: 5150, startedAt: NOW - 60_000, point: 1090 }] },
+        pidProbe: () => ({ exists: true, startedAt: NOW - 60_000 }),
+      }))).toMatchObject({ start: false, code: 'registered-writer-live' })
+    })
+  })
+})
 
 describe('launcher start liveness — fenced or advancing writer authority', () => {
   const NOW = 1_800_000_000_000
