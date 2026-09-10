@@ -1020,6 +1020,144 @@ put it is the mistake this line exists to stop.
   frame at shipped values, taken and judged in the main session.
   Bundle: Dorfleben.
 
+- [ ] 1092. The well leaves the one village that already fetches its water from the river
+  (user 07.09.2026, narrowed by the user on 10.09.2026).
+  The order, verbatim on 07.09.2026: "Zudem macht der Brunnen in dem Dorf ohnehin wenig
+  Sinn, wenn die Erwachsenen immer zum Fluss laufen. Entferne ihn komplett aus dem Dorf
+  (priorisierter Fix fuer Kommunikationsmechanik)." It was triggered by the report
+  `hoa-state-2026-09-07-1702816850` (bambara-village), "Brunnen haengt im Zaun". It sat in
+  `docs/backlog.md` from 07.09. until 10.09.2026 and never became a point; that is why it
+  stands here now, and the collision half of the same evening is point 1093.
+  THE SCOPE IS ONE VILLAGE, NOT THE PROP (user 10.09.2026): "Den Brunnen aber nur aus
+  Bambar entfernen — da ist er redundant, weil der Fluss schon zum Wasserholen genutzt
+  wird. In den anderen Doerfern kann er bleiben." So `VILLAGE_SPOTS.well` STAYS, the `Well`
+  component stays, and only the village the communication slice is played in loses it: its
+  adults teach RIVER on the water path, which makes a second water source there redundant
+  and the teaching harder to read.
+  Final state:
+  - In `ROCK_VILLAGE_ID` alone there is no well: not in the keep-clear list, not as a
+    collider, not among the adult stations, not drawn, and no jar walker heading for it.
+  - Every other village is untouched, prop, stations and collider alike.
+  - The exception is written against `ROCK_VILLAGE_ID`, not against a fresh string, so it
+    follows the slice if the puzzle village ever moves.
+  - The jar walker is DELETED rather than re-aimed (decision 07.09.2026): every jar journey
+    in that village then belongs to the errand adults on the water path (point 1087), and
+    the teaching gains no silent third jar carrier beside it.
+  Test: Vitest — the adult stations, the keep-clear list and the collider set of
+  `ROCK_VILLAGE_ID` hold no well while another village's are unchanged, mutation-checked.
+  Picture check: one frame from the bambara village showing the former well spot empty.
+  Refs: src/scenes/place/lifeSpots.ts (`VILLAGE_SPOTS.well` ~9, `villageAdultStations` ~26
+  with the well and the water-carrier's stop), src/scenes/place/layout.ts (the life-spot
+  list ~763, the well collider ~1453, the place-bound branch at ~973 as the precedent),
+  src/scenes/place/PlaceLife.tsx (`Well` ~1667, its rendering ~3066, the jar `TaskWalker`
+  ~3078), src/world/communicationRock.ts (`ROCK_VILLAGE_ID` ~21)
+  Criticality: medium — a player-visible prop the user asked twice to be gone, and two
+  fewer stations make the children's quarter (481.4) easier to place in exactly the village
+  where the room is tightest.
+  Bundle: Dorfleben.
+
+- [ ] 1045. Two village layouts have no straight walk to the water, so they teach no RIVER
+  at all (measured 02.09.2026 while answering the cross-vendor findings of point 688).
+  Point 688 fits the village water path by sweeping its head until the straight walk to
+  the water clears the settlement's fabric as it is DRAWN — dwellings at their true shape,
+  boxes at their corners, the compound fence panels, the pen, the play rocks, the props.
+  A village that can give no such walk gives NO water path, which is the point's own rule:
+  a track drawn through a wall teaches the wrong thing, and no teaching beats a wrong one.
+  Measured at `abf2faf49` over nine villages at six seeds, two layouts pay that price —
+  bambara-village at seeds 7 and 1337 — and there both water situations are simply absent:
+  no jar goes down, no jar comes back, and the word RIVER is never taught in that village.
+  BOTH OF THEM ARE THE PUZZLE VILLAGE, and the seed is the axis, not the village (measured
+  10.09.2026 on the user's question): the slice is bound to bambara-village
+  (`communicationRock.ts` ~21 `ROCK_VILLAGE_ID`, `store.ts` ~632 `DRUM_MESSAGE_VILLAGE`) and
+  the world seed is DRAWN at every start (`store.ts` ~618, `?seed=` is a dev switch alone).
+  So this is not a village the player never sees — it is two of six drawn seeds in which the
+  village that must teach RIVER never teaches it, before a drum message built on that word.
+  This point's earlier claim that the slice's village "is NOT among them" held for the
+  suites' fixed seeds only and is withdrawn. `layout.test.ts` names the two, so a third one
+  appearing goes red.
+  Final state:
+  - Every river village carries a water path, and none of them draws it through a wall.
+  - One of the two ways is taken and written down: either the track may BEND once at the
+    gap between two compounds (it is a worn footpath, not a surveyed road), or the
+    compound builder opens a GATE where the lane crosses its ring, the way a real
+    compound has one.
+  - The named-exception list in `layout.test.ts` is deleted with the cause.
+  Test: Vitest over the layout — every river village at every swept seed carries a water
+  path whose whole run clears the FULL collider set at the drawn lane's half-width, with
+  no exception list. Picture check on both backends: the track where it passes a compound.
+  Criticality: high — it costs one of the two adult words entirely, in the village the
+  player IS given, in two of six drawn seeds (raised from medium on 10.09.2026 with the
+  measurement above; the "not in the one the player is given" reading was wrong).
+  Refs: src/scenes/place/layout.ts (the `clearRun` sweep and the head ladder),
+  src/scenes/place/layout.test.ts (`NO_STRAIGHT_WALK`)
+  Author lane: astra.
+  Why the lane: the communication mechanic is authored by Astra (user 08.09.2026); the
+  rendered picture, the browser suites and the landing stay in the main session.
+  Bundle: Dorfleben.
+
+- [ ] 1093. A compound fence may be drawn straight through a fixed life prop (user
+  07.09.2026, "reihe einen weiteren Task fuer das Clipping-Problem ein, der spaeter
+  erledigt wird"; restated 10.09.2026 alongside the decision that keeps the well elsewhere).
+  Reported as "Brunnen haengt im Zaun" in `hoa-state-2026-09-07-1702816850`, which caught
+  the well at (9, 8.5). Point 1092 removes the well from that one village, so WITHOUT this
+  point the reported case simply moves to the eight villages that keep it.
+  MEASURED IN `layout.ts`: the fixed prop spots are kept free of DWELLINGS only — `isFree`
+  (~772) tests every candidate against `lifeSpots`. Fences are placed with no prop test at
+  all: none of the five `fences.push` sites (~1109, ~1114, ~1230, ~1294, ~1336) consults
+  `lifeSpots`, and the compound ring's own `clears()` (~1193) knows other rings and the
+  functional buildings and nothing else. Exposure by radius is not limited to the well:
+  the talking pair (4.6, 5.6) and the pounder (-7, 1.2) sit at r 7.2 and 7.1, the weaver at
+  (-8.5, -7), all reachable by a compound band at cr 13.5–17.5 with a ring of about 7.
+  Final state: a fence run is judged against the fixed prop spots the way the water path is
+  already judged against the full collider set — the run is dropped, the ring moved, or the
+  spot planned out of the way — and no shipped layout draws a fence through a prop.
+  Test: Vitest over several villages at many seeds — no prop collider intersects a fence
+  post or a dwelling, mutation-checked, with no exception list.
+  BOUNDARY, measured 07.09.2026: this is a picture and walkability defect, not a teaching
+  defect. The water path, the dig sites and the play rocks all test against the collider
+  set already, so none of the three teaching surfaces breaks; that is why the user ranked
+  it behind 1092.
+  Refs: src/scenes/place/layout.ts (`isFree` ~772, the fence sites ~1109/~1114/~1230/~1294/
+  ~1336, `clears` ~1193, the water-path sweep ~1554 as the pattern to copy)
+  Criticality: medium.
+  Bundle: Dorfleben.
+
+- [ ] 1094. The teaching checks vary the village and pin the seed, which is the wrong axis
+  (user 10.09.2026, 20:11 — "Setze deine Empfehlung bzgl. 1045 um"). This point DELETES
+  test breadth; it builds nothing.
+  The communication slice runs in one village only (`ROCK_VILLAGE_ID`), while the world seed
+  is DRAWN at every start (`store.ts` ~618, `?seed=` is a dev switch alone). The open
+  teaching points are sampled the other way round: 698 measures the direction call at
+  bambara@42, bambara@2972259115, nubian@42 and mandinka@99; 1081 fails at
+  mandinka-village@99 and also samples maasai; 1043 lets `polish --section=speech-hypothesis`
+  speak over a figure of the maasai village. So behaviour is judged in villages where
+  nobody learns the language in this PoC, while the axis that actually costs the player —
+  the same bambara map at another seed, which is point 1045 — goes unjudged.
+  Final state: in the checks that judge the TEACHING (reach of the call, separation of the
+  children's and the adults' groups, the speech label) the seed spread replaces the village
+  spread — same sample count, all in `ROCK_VILLAGE_ID`, across several seeds. The pattern is
+  already in the house: `riverBank.test.ts` sweeps the running lane over 60 seeds per village.
+  EXPLICITLY UNTOUCHED, so nothing right is deleted with it:
+  - assertions where a foreign village IS the statement — `riverBank.test.ts` ("a village
+    away from every river has no bank") stays word for word;
+  - the general settlement and picture suites (`collision.mjs`, `enrichments.mjs`,
+    `gamepad.mjs`) that do not judge the teaching;
+  - the tag game where a riverless village plays the other round.
+  CONSEQUENCE, stated openly: 1081 fails today at mandinka@99 and reads 0 % at
+  bambara@2972259115, so it may go green with no code change. That is the intended outcome
+  when the bambara seed spread is clean, and 1081 is then CLOSED rather than built; if the
+  spread finds the same crowding in bambara, it is finally measured where it counts.
+  Test: Vitest — the converted cases run over at least four bambara seeds and name no
+  foreign village, mutation-checked; one case pins the untouched `riverBank.test.ts`
+  assertion so the deletion cannot run past its boundary.
+  Refs: src/scenes/place/tagShuffle.test.ts (the sample tables ~693, ~920, ~1441, ~1538,
+  ~1671), src/scenes/place/riverBank.test.ts (~295, the boundary), scripts/verify/polish.mjs
+  (`speech-hypothesis`), src/world/communicationRock.ts (`ROCK_VILLAGE_ID` ~21),
+  src/state/store.ts (`newSeed` ~618)
+  Criticality: medium — it removes work rather than adding it, and it points the remaining
+  work at the village the player is given.
+  Bundle: Dorfleben.
+
 - [ ] 690. The classic game of tag moves to the port cities, and every document describes
   the rebuilt mechanic (user 13.08.2026, playing the deployed communication slice; point 692
   folded in here 07.09.2026).
@@ -14897,38 +15035,6 @@ to land than a mechanism that needs a review.
   only way through is to re-measure the death by hand, which is half an hour each time.
   Refs: scripts/verify/run-all.mjs, scripts/verify/run-logged.mjs, scripts/render-verify-recorder.mjs
   Bundle: Testinfrastruktur.
-
-- [ ] 1045. Two village layouts have no straight walk to the water, so they teach no RIVER
-  at all (measured 02.09.2026 while answering the cross-vendor findings of point 688).
-  Point 688 fits the village water path by sweeping its head until the straight walk to
-  the water clears the settlement's fabric as it is DRAWN — dwellings at their true shape,
-  boxes at their corners, the compound fence panels, the pen, the play rocks, the props.
-  A village that can give no such walk gives NO water path, which is the point's own rule:
-  a track drawn through a wall teaches the wrong thing, and no teaching beats a wrong one.
-  Measured at `abf2faf49` over nine villages at six seeds, two layouts pay that price —
-  bambara-village at seeds 7 and 1337 — and there both water situations are simply absent:
-  no jar goes down, no jar comes back, and the word RIVER is never taught in that village.
-  The village the communication slice is played in is NOT among them, which is why this is
-  a point of its own rather than a blocker. `layout.test.ts` names the two, so a third one
-  appearing goes red.
-  Final state:
-  - Every river village carries a water path, and none of them draws it through a wall.
-  - One of the two ways is taken and written down: either the track may BEND once at the
-    gap between two compounds (it is a worn footpath, not a surveyed road), or the
-    compound builder opens a GATE where the lane crosses its ring, the way a real
-    compound has one.
-  - The named-exception list in `layout.test.ts` is deleted with the cause.
-  Test: Vitest over the layout — every river village at every swept seed carries a water
-  path whose whole run clears the FULL collider set at the drawn lane's half-width, with
-  no exception list. Picture check on both backends: the track where it passes a compound.
-  Criticality: medium — it costs one of the two adult words entirely in the layouts it
-  hits, but not in the one the player is given.
-  Refs: src/scenes/place/layout.ts (the `clearRun` sweep and the head ladder),
-  src/scenes/place/layout.test.ts (`NO_STRAIGHT_WALK`)
-  Author lane: astra.
-  Why the lane: the communication mechanic is authored by Astra (user 08.09.2026); the
-  rendered picture, the browser suites and the landing stay in the main session.
-  Bundle: Dorfleben.
 
 - [ ] 1046. The children's bank round hardly ever carries anyone past the middle of the
   stretch (measured 02.09.2026 while answering the cross-vendor findings of point 688).
