@@ -583,6 +583,17 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   Stichprobe aus einem langen Vorgang trifft den Defekt mal und verfehlt ihn mal.
   → *Prompt:* „Repariere dann die Prüfung, nicht das Programm: ganzen Vorgang lesen, je Vorkommen zählen, **Abdeckung als eigene Prüfung** behaupten."
 
+- **Die schmale Stufe ist grün, die große rot — an derselben Prüfung.** Dann kauft die Leiter
+  falsche Sicherheit statt Zeit: Sie lief vor einem **Merge** und wurde nie wiederholt, oder sie
+  misst ein anderes Fenster als die volle Suite.
+  → *Prompt:* „‚Grün' zählt nur, wenn die schmale Stufe **jünger als der letzte Merge** ist und
+  **dasselbe misst** wie die große — sonst sagt sie selbst, dass ihr Grün nichts vorhersagt."
+
+- **Zwei Aufgaben in eine gepackt, um einen teuren Lauf zu sparen.** Die fertige Hälfte wartet
+  dann auf die rote, weil eine Aufgabe nur ganz fertig wird — gespart hat das nichts.
+  → *Prompt:* „Bündle nur, wenn beide Hälften **plausibel im selben Lauf** grün werden; bleibt
+  eine wiederholt rot, **trenne sie wieder** und liefere die fertige aus."
+
 ---
 
 ## Drei Meta-Regeln, die alles zusammenhalten
@@ -621,4 +632,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 708cb3b11a3131212c8b1ad2c2604e2d7e1e5df671876a9517dbd316a155cabc -->
+<!-- GUIDE-FINGERPRINT: adf839b100f61bae172b8b54f8672a98136ba2063c2a4a79065e4b59ef481790 -->

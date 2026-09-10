@@ -77,20 +77,27 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1065. The teaching hands touch what they name: the tapping child at its rock, the
-  carrier at the water (user 06.09.2026; point 1066 folded in here 07.09.2026 on the user's
-  instruction to bundle points that would otherwise each buy their own regression run).
-  ONE DEFECT IN TWO PLACES, and the user reported both in the same message. A figure teaches
-  a word by acting on an object, stops one to three metres short of it, and the act stays
-  invisible: the tapping child's hand ends more than a metre from the rock it names, and the
-  water carrier halts 2.7 m up the bank while his jar changes from empty to full with nothing
-  shown in between. Both are proven by the same kind of evidence — a frame in which a hand
-  meets a drawn surface — in the same scene, over the same figure and gesture code. Kept
-  apart they would buy two picture runs for one verdict; PART A and PART B below are the two former
-  points, unchanged in substance, and either half may be cut back out if the branch does not
-  converge.
-
-  PART A — THE TAPPING CHILD'S HAND TOUCHES THE ROCK IT NAMES.
+- [ ] 1065. The tapping child's hand touches the rock it names (user 06.09.2026).
+  ONE DEFECT, and it is the first half of what stood here as two: a figure teaches a word by
+  acting on an object, stops more than a metre short of it, and the act stays invisible.
+  SPLIT 10.09.2026 on the user's instruction (02:15). The water carrier that stood here as
+  PART B — the former point 1066, folded in on 07.09.2026 to save a regression run — is now
+  point 1087. The saving never materialised and the bundling became the cost it was meant to
+  avoid: three days, 36 commits and about sixty picture runs on one branch, with this half
+  green throughout and every red of the last two days belonging to the other. Two halves that
+  cannot share a green run cannot share a point. What lands here is the tap alone; the branch
+  feat/1065-teaching-hands-touch keeps both halves in its history, and 1087 says what it
+  inherits from it.
+  THE BRANCH MUST SHED PART B BEFORE IT LANDS, and that is this point's first job. Both of its
+  red checks are PART B's — the fill and the carry frame in `polish/adult-errands` — and a
+  branch does not land on a red suite. PART B's CODE must not land unverified either: 1085
+  measured that the fill pose reads as a man face-down in the river, so shipping it while its
+  own checks are gone would be papering over. Cheapest honest cut first: revert the PART B
+  commits on top of the branch as ONE documented commit — they are separable by message (the
+  fill, the dispatch, the stand, the dip and carry frames) — keeping the tap and the shared
+  pose fix in `src/render/figurePose.ts`, which both halves depend on and which is measured
+  green. If that revert fights, cherry-pick the tap commits onto a branch cut fresh from main.
+  Either way the narrow rung `polish --section=children-bank-game` decides when it is done.
   The child that names the rock TOUCHES it. Today the tap of the children's bank game
   (`bankGame.ts` ~626, spec item 4) is spoken from the catcher's waiting station — `standOff`
   2.6 m off the rock's centre (`src/config/balance.ts`), the play rock itself ~1.2 m in radius
@@ -117,7 +124,184 @@ put it is the mistake this line exists to stop.
     docs/communication-poc-spec.md item 4 likewise; the Ctrl-hold label and the speech label
     are unchanged.
 
-  PART B — THE WATER CARRIER VISIBLY FILLS THE JAR AT THE WATER AND CARRIES VISIBLE WATER.
+  Test. Vitest: the tap utterance is offered only once the speaker's hand point lies within a
+  small tolerance of the rock surface and never from the station, the held pose lasts the tap
+  interval, and the hand target lies on the drawn rock's surface for both play rocks of the
+  three river villages (nubian, bambara, mandinka).
+  Browser: `polish --section=children-bank-game` is the narrow rung this point iterates on —
+  about two minutes a run — and a picture check of the tap moment measures the hand's screen
+  position against the rock's silhouette. The covering run is what the point owes at its END,
+  not after every edit. The both-backends lane was set by PART B's water surface and left with
+  it; the lane here follows `isBackendSensitivePath` over what the tap actually touches.
+  Screenshot: verification/1065-tapping-child-at-its-rock.png (subject declared: the tapping
+  child at its rock).
+  Quotes:
+  Nutzer, 06.09.2026 13:48: »Wenn ein Kind beim Fangspiel an den Felsen tippt und ROCK sagt, berührt seine Hand nicht annähernd den Felsen. Das Kind steht in dem Augenblick noch sehr seit davon entfernt. So erkennt man nicht, dass das Gesprochene etwas mit dem Felsen zu tun hat und man könne eher glauben, dass es "Los!" o. ä. bedeutet.«
+  Nutzer, 06.09.2026 13:48 (Einreihung aller drei Punkte): »An der Kommunikationsmechanik zu überarbeiten, einzureihen direkt nach 1058, in der Rehenfolge, in der ich es hier aufzähle:« — PART A war der ZWEITE der drei, PART B der DRITTE; die vom Nutzer genannte Reihenfolge bleibt innerhalb dieses Punktes erhalten.
+  Refs: src/scenes/place/bankGame.ts (THE TAP ~626, reachDistance/standOff ~223),
+  src/config/balance.ts (bankGame reachDistance 2.2, standOff 2.6), src/render/gesture.ts
+  (GestureKind), src/render/figurePose.ts, src/scenes/place/layout.ts (PLAY_ROCK_RADIUS),
+  src/scenes/place/PlaceLife.tsx, design.md §13.4, docs/communication-poc-spec.md.
+  Doc impact: design.md §13.4 and docs/communication-poc-spec.md item 4: the catcher touches
+  the rock with its hand while naming it. If a new gesture kind is added, the point-479
+  gesture list in the code comments / docs names it.
+  Readings one to four, 08.09.2026 (branch, WebGPU; the runs and their numbers are in the
+  branch's commits). They closed everything but one red, and each cause was a different kind of
+  wrong: the tap's hold was armed by the RUN rather than by the WORD, so a run whose tapper could
+  not reach its stone opened silently and still froze the group; the water carrier reached the
+  water but stopped inside the shared 1.10 m arrival radius, which on the bank's slope is 18 cm
+  of height, so his jar never went under the drawn surface (`FILL_ARRIVE_RADIUS` 0.35 for that
+  leg alone, `BANK_FILL_DEPTH` 0.10 → 0.20 m). A nominal spot is not a standing place, and the
+  pure tests now WALK the way the scene walks. PART B was then green IN THE PICTURE — the
+  carrier goes in, dips below the drawn surface and comes back with a jar that shows its water.
+  PART A kept ONE red, always the same number, and the fourth reading left a hypothesis for it:
+  the gate is satisfied in the SIMULATION while the check reads the DRAWN hand off the scene
+  graph. Two things it ruled out on the way: the check is not badly written (measured strictly
+  inside the hold it read the same), and the tap, the walk and the probe all mean the same rock.
+  Fifth reading, 08.09.2026 17:30, WebGPU on the branch: THE HYPOTHESIS HELD, and the cause is
+  the DRAWING, not the round. It was measured rather than argued: the scene now records the
+  tapping child at the utterance itself (`__placeTapHand().opening`), and that reading was 54 cm
+  of arm off the stone with the shoulder still drawn at REST (0.04 rad), on the stone from the
+  next frame on. That is exactly the 58 cm the section had been failing at.
+  - THE MECHANISM. A figure applies its pose in its OWN frame callback, and React subscribes a
+    child's callback before its parent's — so a pose written by the scene was drawn one frame
+    late, and a gesture issued together with a word was drawn after the word had fallen. Body
+    position and facing never lagged: the scene writes those onto the group directly.
+  - THE FIX. `src/render/figurePose.ts` is now the one place that puts a pose on its pivots; a
+    figure publishes its pivots to the caller that owns its pose and stops applying an owned pose
+    itself. Both writers — the children at the bank and the adults at their work — apply in the
+    frame they write. Measured after: 1.6 cm off the drawn flank in the very frame the word falls.
+  - WHY THE RED CAME AND WENT. The check broke out of its sampling loop at its FIRST good
+    reading, so which single frame of a nine-second hold it measured was luck. It now reads the
+    hold frame by frame, prints the shape it read, and asserts the utterance frame from the
+    scene's own record instead of hoping a sample lands on it.
+  - NOT FIXED HERE, and no player impact known: the adults' `speakWork` runs AFTER their pose
+    loop, so an adult's gesture is still written on the frame after the word. Their teaching
+    checks are green and nothing measures it; noted rather than churned.
+  THE TAP'S OWN GESTURE CLOCK RUNS A FRAME AHEAD OF THE HOLD (measured 08.09.2026, drained
+  here 09.09.2026). `polish/children-bank-game` read the catcher's hand 1 cm from the rock for
+  the whole hold and 10.6 cm at the last sample, 0.01 s before its end: the arm is already
+  swinging back while the hold still runs. Cause read off the code — `PlaceLife.tsx` starts the
+  gesture in `speakBankUtterance` and advances it through `advanceGesture` in the SAME frame,
+  while `bankGame.ts` subtracts the hold only on the next one (`tapFor` is set after the
+  decrement). The buffer `startGesture` builds in (`held + gestureBlendOf(kind)`) covers the
+  0.12 s blend, not the extra frame, and the error grows with `dt`. The remedy is to advance
+  every gesture BEFORE the new utterance is spoken, so the later call only reads: both clocks
+  become one and the blend begins exactly at the hold's end.
+  Bundle: Dorfleben.
+
+- [ ] 1086. The cheap rung is skipped, and only the expensive one is enforced.
+  USER ORDER 09.09.2026, given twice in one evening: "Warum führst du nicht immer erstmal
+  nur die Tests des neuen Features aus und erst wenn die erfolgreich sind die restlichen
+  Regressionstests?" — and, when the answer was that the rule had been written into memory,
+  "'Als dauerhafte Regel abgelegt' garantiert aber nicht, dass die nächste Session sich
+  daran hält, oder?" It does not. This point is the mechanism that the house's own first
+  principle demands.
+  MEASURED THE SAME EVENING on point 1065: a `polish --section=` run costs about 2 minutes
+  and the full suite 31 to 63, and the session used the FULL suite as its debugging loop —
+  four full runs, roughly 2.5 machine-hours, for a defect that two section runs then found
+  in four minutes. Nothing refused any of it. What DID speak was `render-verify-guard`,
+  which accepts only a full covering run and therefore said "not verified" after every edit
+  — an enforcement that pulls in exactly the wrong direction, because it names the finish
+  and is read as the next step.
+  FINAL STATE: the ladder is enforced where runs are STARTED, in
+  `scripts/verify/run-logged.mjs`, which every run already passes through. A FULL browser
+  suite is refused while the files that suite covers carry edits newer than the newest
+  GREEN narrower run of the same material — the suite's own `--section=`, or the unit tier
+  for logic. The refusal prints the exact narrower command to run instead. Once the narrow
+  rung is green at or after the last edit, the full run passes without a flag: the ladder is
+  climbed, not waived. An explicit escape stays for the case the narrow rung cannot exist
+  (`--no-ladder "<why>"`), and it is recorded like every other deliberate exception.
+  AND THE GUARD THAT PULLED THE OTHER WAY SAYS SO: `render-verify-guard`'s refusal names the
+  ladder — the covering full run is what the point owes at its END, not after every edit.
+  NOTE THE FREEZE. CLAUDE.md §2 forbids new guards; this one is ordered by the user, is not
+  a new guard but a refusal inside the runner every run already uses, and its measured cost
+  of NOT existing is 2.5 machine-hours in one evening.
+  VERIFIABLE: the pure layer covers a full run refused after an edit with no narrow green,
+  the same run admitted once the narrow rung is green, a narrow run never refused, an edit
+  to files the suite does not cover leaving the full run free, and the escape being recorded.
+  AND THE RUNG MUST BE WORTH CLIMBING — MEASURED 10.09.2026 on the same point, the night after
+  the order. The `adult-errands` rung was climbed twelve times on 09.09. and was GREEN every
+  time (18 pass, 0 fail, last at 22:40 in local/verify-logs/1065-liveshot3.log). The LARGE run
+  started 01:13 then failed WebGL 2 polish on exactly those two checks: "no carrier was ever
+  seen filling a jar" and "no frame of the carry could be taken" — 1 errand cast in the window,
+  phases [water-out/invite×832 water-out/wait×583 water-back/walk×550 water-out/fetch×33]. So
+  the ladder as ordered would have refused nothing that evening and prevented nothing: the
+  cheap rung was green. ENFORCING A RUNG THAT LIES BUYS FALSE CONFIDENCE INSTEAD OF TIME, so
+  this point owes two more things beside the refusal:
+  - THE RUNG MUST BE NEWER THAN THE LAST MERGE, not only than the last edit. Two merges from
+    main landed at ~23:35, after the last green `adult-errands` rung, and that rung was never
+    re-climbed. A merge brings in other material the suite covers, so it ages the rung exactly
+    as an edit does.
+  - A RUNG WHOSE SUBJECT IS CAST RARELY MUST MEASURE WHAT THE SUITE MEASURES. Alone, the
+    section always saw enough errands; inside the full suite it saw ONE, with the fetch phase
+    at 33 of about 2000 phase ticks. Either the section sizes its observation window so both
+    runs measure the same thing, or the section declares itself NON-PREDICTIVE for that check
+    and the check says so when it passes narrowly.
+  VERIFIABLE for this half: the pure layer covers a rung older than the branch's last merge
+  counting as unclimbed, and a check declared non-predictive never satisfying the ladder.
+  Refs: scripts/verify/run-logged.mjs, scripts/verify/tiers.mjs, scripts/render-verify-guard.mjs,
+  scripts/point-brief-core.mjs (the ladder's prose), points 595, 1083, 1084.
+  Bundle: Testinfrastruktur.
+
+- [ ] 1085. The fill reads as a man falling into the river, and a jar under an
+  opaque surface cannot be photographed at all. SPLIT OUT OF POINT 1065 on 09.09.2026
+  because that point would not converge: four frames were re-aimed in one evening — from
+  the land side, side-on to the shore, live inside the act instead of after it, and from
+  the flank the jar hangs off — and every one of them came back with the same reading. The
+  camera is no longer the problem; the figure is.
+  WHAT THE FRAMES SHOW. The carrier stands at the waterline and folds forward, and because
+  a villager is a legless cone the fold reads as a topple: the body lies at roughly 55-60°
+  across the water with its head at the top, which a player sees as a man face-down in the
+  river rather than a man scooping from it. `fillPose` in `src/render/gesture.ts` takes the
+  trunk to `lean = 0.12 + 0.62` ≈ 42°, against `digPose`'s ≈ 19° — and DIG is the act the
+  spec itself holds up as the one that works.
+  AND THE SECOND HALF IS GEOMETRY, NOT ART. The check asserts the jar's base below the
+  drawn water surface, and that surface is OPAQUE: a vessel proved to be under it is by
+  construction invisible. Photographing the instant the jar breaks the surface (base under,
+  rim still out) was tried — `scripts/verify/polish.mjs`, the `under <= 0.16` band — and at
+  the distance the player watches from, a 0.32 m cylinder half-sunk beside a bent cone is a
+  nub. "Visibly below the surface" and "opaque water" cannot both hold.
+  FINAL STATE: the act reads as fetching water to someone who has not been told what it is.
+  What that costs is a design decision this point makes and writes into `design.md` §13.4
+  rather than guesses — the candidates measured tonight are (a) cap the trunk fold near the
+  dig's magnitude and take the remaining reach from the arm, so the body crouches instead of
+  tipping; (b) TILT the jar at the surface so its mouth is the thing the player sees going
+  under, with the vessel never fully submerged; (c) give the fill a visible consequence at
+  the surface — a ring, a disturbance — so the act is legible even where the vessel is not.
+  Whatever is chosen, the frame `verification/1065-carrier-dips-at-the-waterline.png` shows
+  it to a reader who was told nothing.
+  VERIFIABLE: the pose layer covers the fold's bound and the arm's reach; the picture is
+  judged on both backends by a reader who is told only "what is this man doing?".
+  RENUMBERED 10.09.2026: the half this point unblocks left 1065 and is now point 1087. The
+  frame named below was taken on feat/1065-teaching-hands-touch and still shows what it shows.
+  Refs: src/render/gesture.ts (`fillPose`, `digPose`), src/scenes/place/PlaceLife.tsx (the
+  jar geometry), scripts/verify/polish.mjs (the `adult-errands` fill frame), design.md
+  §13.4, point 1065.
+  Bundle: Dorfleben.
+
+- [ ] 1087. The water carrier visibly fills the jar at the water and carries visible water
+  (user 06.09.2026; the former point 1066; SPLIT BACK OUT OF POINT 1065 on 10.09.2026 on the
+  user's instruction, 02:15).
+  WHY IT IS ITS OWN POINT AGAIN. It was folded into 1065 on 07.09.2026 to save a regression
+  run. Measured over three days on feat/1065-teaching-hands-touch: 36 commits, about sixty
+  picture runs, and every red of the last two days belonged to this half while the tap half
+  stood green. The fold bought no run and cost the other half its landing.
+  IT IS BLOCKED ON TWO THINGS, NEITHER OF WHICH IS ITS OWN WORK.
+  - Point 1085 owes the DESIGN decision. The fill pose reads as a man falling into the river,
+    and a jar proved to be under an OPAQUE water surface cannot be photographed at all. No
+    camera position fixes either; four were re-aimed in one evening and all four came back
+    with the same reading.
+  - Point 1086 owes the LADDER this point's evidence needs. Measured 10.09.2026: the
+    `adult-errands` section rung ran twelve times on 09.09. and was GREEN every time (18 pass,
+    0 fail, last at 22:40), and the LARGE run then failed the same two checks — "no carrier was
+    ever seen filling a jar", 1 errand cast in the window, phases [invite×832 wait×583
+    walk×550 fetch×33]. A rung that reads green while the suite is red cannot guide this
+    point's iteration, and iterating on the full suite is what cost the three days.
+  START FROM THE BRANCH, NOT FROM SCRATCH. feat/1065-teaching-hands-touch already holds the
+  walk to the waterline, the fill phase, the dispatch and the water stand, and those are not
+  in doubt. What it does not hold is a pose that reads and a check that predicts. Cut a fresh
+  branch from main after 1085 has decided, and carry over what survives that decision.
   The filling of the jar READS as filling. Today the RIVER errand sends an adult with an
   empty jar to the foot of the water path and back with a full one, and nothing in between is
   shown: the foot (`bankWaterFoot`, `riverBank.ts`) stands `BANK_STAND_INSET` 1.5 m inside the
@@ -196,27 +380,21 @@ put it is the mistake this line exists to stop.
     waterline AND the dispatch; docs/communication-poc-spec.md likewise where it describes
     the errand, plus the no-villager-speaks-to-nobody rule and the accepted WATER reading.
 
-  Test (ONE run for both halves — this is why they are one point). Vitest: for PART A, the tap
-  utterance is offered only once the speaker's hand point lies within a small tolerance of
-  the rock surface and never from the station, the held pose lasts the tap interval, and the
-  hand target lies on the drawn rock's surface for both play rocks of the three river
-  villages (nubian, bambara, mandinka); for PART B, the fill spot lies within a small tolerance
-  of the waterline for the same three villages, a 'fill' phase sits between the walk down and
+  Test. Vitest: the fill spot lies within a small tolerance of the waterline for the three
+  river villages (nubian, bambara, mandinka), a 'fill' phase sits between the walk down and
   the walk back with 'fullJar' set only after it, and the phase lasts its configured seconds;
-  and for the dispatch, 'fullJar' only inside ONE continuous errand record, every water
-  utterance naming an addressee villager index, the return leg's goal being the stand rather
-  than the path head, and the stand holding at most three jars.
-  Browser (LARGE, both backends — PART B's water surface is backend-sensitive and therefore sets
-  the lane for both halves): a picture check of the tap moment measuring the hand's screen
-  position against the rock's silhouette; one of the dip frame measuring the hand jar below
-  the drawn water surface at the carrier's feet; one of the return walk measuring the water
-  disc at the head jar's rim. Screenshots of all four (verification/, subjects declared: the
-  tapping child at its rock; the sending adult and the departing carrier at the village water
-  stand; the carrier dipping at the waterline; the carrier walking back with the full jar).
+  for the dispatch, 'fullJar' only inside ONE continuous errand record, every water utterance
+  naming an addressee villager index, the return leg's goal being the stand rather than the
+  path head, and the stand holding at most three jars.
+  Browser (LARGE, both backends — the water surface is backend-sensitive): a picture check of
+  the fill measuring what 1085 decides it must measure, and one of the return walk measuring
+  the water disc at the head jar's rim. The narrow rung is `polish --section=adult-errands`,
+  and per 1086 it counts only once it measures what the full suite measures.
+  Screenshots (verification/, subjects declared: the sending adult and the departing carrier at
+  the village water stand; the carrier at the waterline; the carrier walking back with the full
+  jar).
   Quotes:
-  Nutzer, 06.09.2026 13:48: »Wenn ein Kind beim Fangspiel an den Felsen tippt und ROCK sagt, berührt seine Hand nicht annähernd den Felsen. Das Kind steht in dem Augenblick noch sehr seit davon entfernt. So erkennt man nicht, dass das Gesprochene etwas mit dem Felsen zu tun hat und man könne eher glauben, dass es "Los!" o. ä. bedeutet.«
   Nutzer, 06.09.2026 13:48: »Man erkennte das Auffüllen des Kruges mit Wasser nicht als solches. Das liegt an mehreren Problemen: Der Erwachsene geht nicht nah genug an den Fluss, für die Tätigkeit des Auffüllens fehlt eine Darstellung (ich würde erwarten, dass er den Krug in die Hand nimmt und ins Wasser taucht) und wenn er ihn dann gefüllt auf dem Kopf trägt, sieht man darin kein Wasser.«
-  Nutzer, 06.09.2026 13:48 (Einreihung aller drei Punkte): »An der Kommunikationsmechanik zu überarbeiten, einzureihen direkt nach 1058, in der Rehenfolge, in der ich es hier aufzähle:« — PART A war der ZWEITE der drei, PART B der DRITTE; die vom Nutzer genannte Reihenfolge bleibt innerhalb dieses Punktes erhalten.
   Nutzer, 07.09.2026 19:25: »Kannst du weitere Zusammenführungen von offenen Punkten zur
   Kommunikationsmechanik vornehmen, um Regressionsdurchläufe einzusparen?« — daraufhin ist
   der frühere Punkt 1066 hier als PART B eingefaltet worden.
@@ -235,87 +413,18 @@ put it is the mistake this line exists to stop.
   einzelne Aspekte an bereits bestehende Tasks, um Regressionsläufe einzusparen.« — deshalb
   steht die Entsendung hier statt als eigener Punkt: PART B öffnet ohnehin adultWork.ts, den
   Wasserpfad, die Krug-Meshes und denselben LARGE-Bildlauf.
-  Refs: PART A — src/scenes/place/bankGame.ts (THE TAP ~626, reachDistance/standOff ~223), src/config/balance.ts (bankGame reachDistance 2.2, standOff 2.6), src/render/gesture.ts (GestureKind), src/scenes/place/layout.ts (PLAY_ROCK_RADIUS). PART B — src/scenes/place/adultWork.ts (water-out/water-back ~390-410, AdultCarry, WATER_FOOT_REACH), src/scenes/place/riverBank.ts (bankWaterFoot, BANK_STAND_INSET 1.5, BANK_SHORE_HALF 1.2, walkable region through the waterline ~47-62), src/scenes/place/layout.ts (waterPath head/foot), src/render/figures.ts. Both — src/scenes/place/PlaceLife.tsx (ErrandVillagers, head/hand jar meshes ~2440-2612, HEAD_CARRY_POSE), design.md §13.4, docs/communication-poc-spec.md
-  Doc impact: design.md §13.4 and docs/communication-poc-spec.md item 4: the catcher touches the rock with its hand while naming it, and the water carrier dips the jar at the waterline and carries visible water back. If a new gesture kind is added, the point-479 gesture list in the code comments / docs names it. balance.ts: fill seconds (calibratable).
-  Readings one to four, 08.09.2026 (branch, WebGPU; the runs and their numbers are in the
-  branch's commits). They closed everything but one red, and each cause was a different kind of
-  wrong: the tap's hold was armed by the RUN rather than by the WORD, so a run whose tapper could
-  not reach its stone opened silently and still froze the group; the water carrier reached the
-  water but stopped inside the shared 1.10 m arrival radius, which on the bank's slope is 18 cm
-  of height, so his jar never went under the drawn surface (`FILL_ARRIVE_RADIUS` 0.35 for that
-  leg alone, `BANK_FILL_DEPTH` 0.10 → 0.20 m). A nominal spot is not a standing place, and the
-  pure tests now WALK the way the scene walks. PART B was then green IN THE PICTURE — the
-  carrier goes in, dips below the drawn surface and comes back with a jar that shows its water.
-  PART A kept ONE red, always the same number, and the fourth reading left a hypothesis for it:
-  the gate is satisfied in the SIMULATION while the check reads the DRAWN hand off the scene
-  graph. Two things it ruled out on the way: the check is not badly written (measured strictly
-  inside the hold it read the same), and the tap, the walk and the probe all mean the same rock.
-  Fifth reading, 08.09.2026 17:30, WebGPU on the branch: THE HYPOTHESIS HELD, and the cause is
-  the DRAWING, not the round. It was measured rather than argued: the scene now records the
-  tapping child at the utterance itself (`__placeTapHand().opening`), and that reading was 54 cm
-  of arm off the stone with the shoulder still drawn at REST (0.04 rad), on the stone from the
-  next frame on. That is exactly the 58 cm the section had been failing at.
-  - THE MECHANISM. A figure applies its pose in its OWN frame callback, and React subscribes a
-    child's callback before its parent's — so a pose written by the scene was drawn one frame
-    late, and a gesture issued together with a word was drawn after the word had fallen. Body
-    position and facing never lagged: the scene writes those onto the group directly.
-  - THE FIX. `src/render/figurePose.ts` is now the one place that puts a pose on its pivots; a
-    figure publishes its pivots to the caller that owns its pose and stops applying an owned pose
-    itself. Both writers — the children at the bank and the adults at their work — apply in the
-    frame they write. Measured after: 1.6 cm off the drawn flank in the very frame the word falls.
-  - WHY THE RED CAME AND WENT. The check broke out of its sampling loop at its FIRST good
-    reading, so which single frame of a nine-second hold it measured was luck. It now reads the
-    hold frame by frame, prints the shape it read, and asserts the utterance frame from the
-    scene's own record instead of hoping a sample lands on it.
-  - NOT FIXED HERE, and no player impact known: the adults' `speakWork` runs AFTER their pose
-    loop, so an adult's gesture is still written on the frame after the word. Their teaching
-    checks are green and nothing measures it; noted rather than churned.
-  THE TAP'S OWN GESTURE CLOCK RUNS A FRAME AHEAD OF THE HOLD (measured 08.09.2026, drained
-  here 09.09.2026). `polish/children-bank-game` read the catcher's hand 1 cm from the rock for
-  the whole hold and 10.6 cm at the last sample, 0.01 s before its end: the arm is already
-  swinging back while the hold still runs. Cause read off the code — `PlaceLife.tsx` starts the
-  gesture in `speakBankUtterance` and advances it through `advanceGesture` in the SAME frame,
-  while `bankGame.ts` subtracts the hold only on the next one (`tapFor` is set after the
-  decrement). The buffer `startGesture` builds in (`held + gestureBlendOf(kind)`) covers the
-  0.12 s blend, not the extra frame, and the error grows with `dt`. The remedy is to advance
-  every gesture BEFORE the new utterance is spoken, so the later call only reads: both clocks
-  become one and the blend begins exactly at the hold's end.
+  Refs: src/scenes/place/adultWork.ts (water-out/water-back ~390-410, AdultCarry,
+  WATER_FOOT_REACH), src/scenes/place/riverBank.ts (bankWaterFoot, BANK_STAND_INSET 1.5,
+  BANK_SHORE_HALF 1.2, walkable region through the waterline ~47-62), src/scenes/place/layout.ts
+  (waterPath head/foot, VILLAGE_FIRE anchor), src/render/figures.ts, src/render/gesture.ts
+  (fillPose), src/scenes/place/PlaceLife.tsx (ErrandVillagers, head/hand jar meshes ~2440-2612,
+  HEAD_CARRY_POSE), scripts/verify/polish.mjs (adult-errands), design.md §13.4,
+  docs/communication-poc-spec.md, points 1085, 1086, 1065.
+  Doc impact: design.md §13.4 and docs/communication-poc-spec.md where they describe the
+  errand: the carrier dips the jar at the waterline and carries visible water back, plus the
+  no-villager-speaks-to-nobody rule and the accepted WATER reading. balance.ts: fill seconds
+  and stand capacity (calibratable).
   Bundle: Dorfleben.
-
-- [ ] 1086. The cheap rung is skipped, and only the expensive one is enforced.
-  USER ORDER 09.09.2026, given twice in one evening: "Warum führst du nicht immer erstmal
-  nur die Tests des neuen Features aus und erst wenn die erfolgreich sind die restlichen
-  Regressionstests?" — and, when the answer was that the rule had been written into memory,
-  "'Als dauerhafte Regel abgelegt' garantiert aber nicht, dass die nächste Session sich
-  daran hält, oder?" It does not. This point is the mechanism that the house's own first
-  principle demands.
-  MEASURED THE SAME EVENING on point 1065: a `polish --section=` run costs about 2 minutes
-  and the full suite 31 to 63, and the session used the FULL suite as its debugging loop —
-  four full runs, roughly 2.5 machine-hours, for a defect that two section runs then found
-  in four minutes. Nothing refused any of it. What DID speak was `render-verify-guard`,
-  which accepts only a full covering run and therefore said "not verified" after every edit
-  — an enforcement that pulls in exactly the wrong direction, because it names the finish
-  and is read as the next step.
-  FINAL STATE: the ladder is enforced where runs are STARTED, in
-  `scripts/verify/run-logged.mjs`, which every run already passes through. A FULL browser
-  suite is refused while the files that suite covers carry edits newer than the newest
-  GREEN narrower run of the same material — the suite's own `--section=`, or the unit tier
-  for logic. The refusal prints the exact narrower command to run instead. Once the narrow
-  rung is green at or after the last edit, the full run passes without a flag: the ladder is
-  climbed, not waived. An explicit escape stays for the case the narrow rung cannot exist
-  (`--no-ladder "<why>"`), and it is recorded like every other deliberate exception.
-  AND THE GUARD THAT PULLED THE OTHER WAY SAYS SO: `render-verify-guard`'s refusal names the
-  ladder — the covering full run is what the point owes at its END, not after every edit.
-  NOTE THE FREEZE. CLAUDE.md §2 forbids new guards; this one is ordered by the user, is not
-  a new guard but a refusal inside the runner every run already uses, and its measured cost
-  of NOT existing is 2.5 machine-hours in one evening.
-  VERIFIABLE: the pure layer covers a full run refused after an edit with no narrow green,
-  the same run admitted once the narrow rung is green, a narrow run never refused, an edit
-  to files the suite does not cover leaving the full run free, and the escape being recorded.
-  Refs: scripts/verify/run-logged.mjs, scripts/verify/tiers.mjs, scripts/render-verify-guard.mjs,
-  scripts/point-brief-core.mjs (the ladder's prose), points 595, 1083, 1084.
-  Bundle: Testinfrastruktur.
-
 
 - [ ] 1072. The village speaks with a direction, and the children sound like children (user
   07.09.2026, deciding the first two of the six shore-call aspects).
@@ -349,9 +458,17 @@ put it is the mistake this line exists to stop.
     - SPEECH GETS ITS OWN VOLUME: DONE before this point was reached, by "Give the village
       speech its own bus instead of the 'everything else' slider" — `communication.speechVolume`
       is 2 and a dedicated `speechBus` carries it to the master, so the syllables no longer ride
-      the ambient bus at all. `SPEECH_PEAK` and the 0.045 arithmetic this bullet was written
-      around are gone with it (re-measured 08.09.2026 during the wait on 1065). What is left of
-      the loudness half is the FALLOFF below.
+      the ambient bus at all. CORRECTED 10.09.2026 on GPT-6 Astra's escalation, which measured
+      the tree the earlier sentence claimed: `SPEECH_PEAK` is NOT gone — `speaking.ts`:64 still
+      defines it as 1.8 and `phrasePlan` still multiplies it into every syllable's peak
+      (`speaking.ts`:141). It STAYS, unchanged and un-recalibrated: the loudness the user asked
+      for is already delivered by `speechVolume` 2, and a second, unmeasured multiplier on top
+      of it is exactly the guesswork the last bullet of this group forbids. Only its DOC COMMENT
+      is wrong and is corrected with the change — it still says the constant compensates
+      "the ambient bus (0.5) x master (0.5)", a chain the speech bus replaced. If the headroom
+      re-measure below shows the level leaving the chain is unsafe or too quiet, THAT
+      measurement — not the plan — moves the constant. What is left of the loudness half is the
+      FALLOFF below.
     - THE HEARING FALLOFF IS RE-CALIBRATED. `hearingGain` is 1/(1 + falloff·(d/r)²) with a
       hard cut past r (`speaking.ts` ~78-87) and `hearingFalloff` is 24 (`balance.ts`:1437):
       a speaker 3 m away arrives at 31.6 % and one 5 m away at 14.3 % of the level beside
@@ -15373,36 +15490,3 @@ to land than a mechanism that needs a review.
   point 1083.
   Bundle: Testinfrastruktur.
 
-- [ ] 1085. The fill reads as a man falling into the river, and a jar under an
-  opaque surface cannot be photographed at all. SPLIT OUT OF POINT 1065 on 09.09.2026
-  because that point would not converge: four frames were re-aimed in one evening — from
-  the land side, side-on to the shore, live inside the act instead of after it, and from
-  the flank the jar hangs off — and every one of them came back with the same reading. The
-  camera is no longer the problem; the figure is.
-  WHAT THE FRAMES SHOW. The carrier stands at the waterline and folds forward, and because
-  a villager is a legless cone the fold reads as a topple: the body lies at roughly 55-60°
-  across the water with its head at the top, which a player sees as a man face-down in the
-  river rather than a man scooping from it. `fillPose` in `src/render/gesture.ts` takes the
-  trunk to `lean = 0.12 + 0.62` ≈ 42°, against `digPose`'s ≈ 19° — and DIG is the act the
-  spec itself holds up as the one that works.
-  AND THE SECOND HALF IS GEOMETRY, NOT ART. The check asserts the jar's base below the
-  drawn water surface, and that surface is OPAQUE: a vessel proved to be under it is by
-  construction invisible. Photographing the instant the jar breaks the surface (base under,
-  rim still out) was tried — `scripts/verify/polish.mjs`, the `under <= 0.16` band — and at
-  the distance the player watches from, a 0.32 m cylinder half-sunk beside a bent cone is a
-  nub. "Visibly below the surface" and "opaque water" cannot both hold.
-  FINAL STATE: the act reads as fetching water to someone who has not been told what it is.
-  What that costs is a design decision this point makes and writes into `design.md` §13.4
-  rather than guesses — the candidates measured tonight are (a) cap the trunk fold near the
-  dig's magnitude and take the remaining reach from the arm, so the body crouches instead of
-  tipping; (b) TILT the jar at the surface so its mouth is the thing the player sees going
-  under, with the vessel never fully submerged; (c) give the fill a visible consequence at
-  the surface — a ring, a disturbance — so the act is legible even where the vessel is not.
-  Whatever is chosen, the frame `verification/1065-carrier-dips-at-the-waterline.png` shows
-  it to a reader who was told nothing.
-  VERIFIABLE: the pose layer covers the fold's bound and the arm's reach; the picture is
-  judged on both backends by a reader who is told only "what is this man doing?".
-  Refs: src/render/gesture.ts (`fillPose`, `digPose`), src/scenes/place/PlaceLife.tsx (the
-  jar geometry), scripts/verify/polish.mjs (the `adult-errands` fill frame), design.md
-  §13.4, point 1065.
-  Bundle: Dorfleben.
