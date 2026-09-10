@@ -145,6 +145,13 @@ export interface AdultTask extends ErrandPoint {
    *  delivery leg has to come back to the same kind of ground (work-order 1065). */
   home?: ErrandPoint
   arrived: boolean
+  /** How near this leg has come to the goal it is walking at, and for how long
+   *  it has failed to better that. The goal travels with the record, so a leg
+   *  that is re-aimed — sent on from the stand to the water, turned round for
+   *  the way back — starts its own reckoning instead of inheriting the last
+   *  one's. Only a leg that has not arrived carries them. */
+  near?: { x: number; z: number; d: number }
+  stalled?: number
   /** Seconds this worker has dug in the current bout, or held the jar under
    *  the water in the current fill. */
   dug: number
@@ -173,6 +180,11 @@ export interface AdultWorkState {
    *  is this capped at the stand's capacity, so a further delivery replaces the
    *  oldest jar and no consumer logic is owed (work-order 1065). */
   delivered: number
+  /** Errands released because a leg could not reach its goal. A blocked walk is
+   *  a fact about the ground, not about the word, so it is COUNTED rather than
+   *  raised as `adult-atom-lost` — and a village whose walks wedge is visible in
+   *  the numbers instead of merely being quiet. */
+  stalled: Partial<Record<AdultSituationId, number>>
 }
 
 export const WORK_ARRIVE_RADIUS = 1.1
@@ -187,6 +199,23 @@ export const WORK_ARRIVE_RADIUS = 1.1
  * (`BANK_MAX_STEP`), so the last third of a metre costs a walker nothing.
  */
 export const FILL_ARRIVE_RADIUS = 0.35
+/**
+ * How near a leg whose walk is WEDGED may be to its goal and still count as
+ * arrived.
+ *
+ * A join stand-off is a bearing round an anchor, not a mark on the floor, so a
+ * man held a few centimetres outside the arrival radius by a collider or by
+ * another body is standing exactly where the errand wanted him. Measured
+ * 10.09.2026: legs wedged at 1.15 m against a 1.10 m arrival held their pairs
+ * for the full `errandSeconds`, and the caster ran out of free adults.
+ *
+ * The FILL leg is not forgiven this way — its arrival is judged against the
+ * drawn water surface, and a dip granted up the bank is the defect work-order
+ * 1065 exists to end.
+ */
+export const STALL_ARRIVE_RADIUS = 1.5
+/** How much closer a leg must get to count as still walking rather than wedged. */
+const STALL_PROGRESS = 0.05
 export const AIM_CLEARANCE = 1.2
 export const JOIN_STAND_OFF = 2.4
 const JOIN_BEARINGS = 12
@@ -220,6 +249,7 @@ export function createAdultWork(count: number, cfg: AdultWorkConfig): AdultWorkS
     cursor: 0,
     siteProgress: {},
     delivered: 0,
+    stalled: {},
   }
 }
 
@@ -473,6 +503,52 @@ export function stepAdultWork(
       t.dug = 0
     }
 
+    // A WEDGED WALK IS RELEASED rather than left to pin its pair for the whole
+    // errand. `stallSeconds` was configured, carried in this module's own config
+    // type, edited by the debug menu and named below as the backstop for a
+    // blocked walk — and nothing ever read it. So a leg that could not close the
+    // last few centimetres held two villagers for the full `errandSeconds`
+    // (180 s). Measured 10.09.2026 inside the full suite: five of ten villagers
+    // pinned that way, `anyFree` therefore finding nobody, and ONE water errand
+    // cast in a 43 s window — which is why no jar was ever seen filling
+    // (work-order 1065).
+    if (!t.arrived) {
+      const d = Math.hypot(me.x - goal.x, me.z - goal.z)
+      const track = t.near
+      if (!track || track.x !== goal.x || track.z !== goal.z || d < track.d - STALL_PROGRESS) {
+        t.near = { x: goal.x, z: goal.z, d }
+        t.stalled = 0
+      } else {
+        t.stalled = (t.stalled ?? 0) + dt
+        if (t.stalled > cfg.stallSeconds) {
+          // He is standing as close as the ground lets him, and for every leg
+          // but the fill that IS his place: he arrives where he stands and the
+          // errand goes on. `STALL_ARRIVE_RADIUS` is what the settlement lays
+          // its teaching grounds apart by, so this slack can never put an adult
+          // word inside a child's earshot.
+          const judgedAgainstTheWater = isWater(t) && t.phase === 'fetch' && !t.via
+          if (!judgedAgainstTheWater && d <= STALL_ARRIVE_RADIUS) {
+            t.arrived = true
+            t.dug = 0
+          } else {
+            // He cannot get there at all, and a word that dies that way is
+            // REPORTED exactly as one lost to the expiry backstop is — the stall
+            // is the same release, only sooner. Counting it as well keeps blocked
+            // ground visible in the numbers, where a check that sees no water
+            // fetched can tell a wedged village from a quiet one.
+            state.stalled[t.situation] = (state.stalled[t.situation] ?? 0) + 1
+            assertNoOwedWord(t, i)
+            if (t.partner !== null) {
+              const mate = state.tasks[t.partner]
+              if (mate) assertNoOwedWord(mate, t.partner)
+            }
+            clearPair(state, i)
+            continue
+          }
+        }
+      }
+    }
+
     // THE JAR IS SET DOWN BY ARRIVING, NOT BY SPEAKING. Putting it on the stand
     // is an ACT and owes no listener; only the report to the sender waits for a
     // hearing gap. Coupled to the word, a child standing in earshot until the
@@ -492,7 +568,8 @@ export function stepAdultWork(
       // The addressee's OWN arrival gates the word, not merely his existence: he
       // walks to the stand like the sender, and until he is there the order is
       // simply not yet due. `errandSeconds` (180 s) is the backstop for a mate
-      // who never gets there, and `stallSeconds` for one whose walk is blocked.
+      // who never gets there, and `stallSeconds` — read at the top of this loop
+      // — for one whose walk is blocked.
       const partner = t.partner === null ? null : view.villagers[t.partner]
       const fill = view.geography.waterFill
       if (!partner || !fill) clearPair(state, i)

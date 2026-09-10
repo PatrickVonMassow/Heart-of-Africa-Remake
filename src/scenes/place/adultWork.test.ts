@@ -434,6 +434,72 @@ describe('RIVER is a dispatch, not a commentary (work-order 1065)', () => {
   })
 })
 
+describe('a blocked walk is released rather than left to pin its pair (work-order 1065)', () => {
+  /**
+   * The village as it really is: a man walks at his goal and something — a
+   * collider, another body — holds him just outside the radius that would let
+   * him arrive. Measured 10.09.2026 inside the full suite at 1.15 m against a
+   * 1.10 m arrival.
+   */
+  function wedgedWalkFrame(state: AdultWorkState, v: AdultWorkView, dt: number, wedgeAt: number): void {
+    for (let i = 0; i < v.villagers.length; i++) {
+      const me = v.villagers[i]
+      const task = taskOf(state, i)
+      me.free = !task
+      if (!task || task.arrived) continue
+      const to = goalOf(task)
+      const d = Math.hypot(to.x - me.x, to.z - me.z)
+      if (d <= Math.max(arriveRadiusOf(task), wedgeAt)) continue
+      const step = Math.min(d - wedgeAt, CFG.pace * dt)
+      me.x += ((to.x - me.x) / d) * step
+      me.z += ((to.z - me.z) / d) * step
+    }
+  }
+
+  function runWedged(v: AdultWorkView, seconds: number, wedgeAt: number): { state: AdultWorkState; words: SpokenWord[] } {
+    const state = createAdultWork(v.villagers.length, CFG)
+    const words: SpokenWord[] = []
+    for (let elapsed = 0; elapsed < seconds; elapsed += 1 / 60) {
+      wedgedWalkFrame(state, v, 1 / 60, wedgeAt)
+      const word = stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
+      if (word) words.push(word)
+    }
+    return { state, words }
+  }
+
+  it('lets a man held a few centimetres short arrive where he stands, and the order still falls', () => {
+    // A join stand-off is a bearing round an anchor, not a mark on the floor.
+    const { words } = runWedged(view(6), 120, 1.15)
+    const order = words.filter((word) => word.id === 'water-out')
+    expect(order.length, 'the order never fell, so both men were still walking').toBeGreaterThan(0)
+    expect(order[0].to).toBeTypeOf('number')
+  })
+
+  it('does NOT forgive the fill leg, which is judged against the drawn water', () => {
+    // A dip granted up the bank is the defect this work order exists to end.
+    const { state } = runWedged(view(6), 200, 1.15)
+    expect(state.delivered, 'a carrier who never reached the water still delivered').toBe(0)
+    expect(state.stalled['water-out'] ?? 0).toBeGreaterThan(0)
+  })
+
+  it('frees the pinned villagers long before the errand would expire', () => {
+    // THE MEASURED DEFECT: with nothing reading `stallSeconds`, a wedged leg
+    // held two villagers for the whole `errandSeconds`, `anyFree` found nobody
+    // and ONE water errand was cast in a whole window.
+    const { state } = runWedged(view(6), 200, 1.15)
+    expect(state.staged['water-out'] ?? 0, 'the caster never got its adults back').toBeGreaterThanOrEqual(2)
+  })
+
+  it('starts a fresh reckoning when a leg is re-aimed, so a long walk is never mistaken for a wedge', () => {
+    // The carrier is sent from the stand to a waterline tens of metres away. If
+    // the stall clock carried the last leg's best distance over, that walk would
+    // look stalled from its first frame and the errand would die at the door.
+    const { state } = run(view(6), 240)
+    expect(state.delivered).toBeGreaterThan(0)
+    expect(state.stalled, 'a village where nobody is blocked stalls nothing').toEqual({})
+  })
+})
+
 describe('DIG is a summons said twice', () => {
   it('walks to a free adult and addresses the invitation to that person', () => {
     const v = riverless(view(4))

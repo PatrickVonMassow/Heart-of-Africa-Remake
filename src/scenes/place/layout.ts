@@ -28,7 +28,7 @@ import {
   type PlaceRiverBank,
 } from './riverBank'
 import { balance } from '../../config/balance'
-import { WORK_ARRIVE_RADIUS } from './adultWork'
+import { STALL_ARRIVE_RADIUS } from './adultWork'
 import { devAssert } from '../../systems/devAssert'
 import type { BuildingType } from '../../state/ui'
 import { pickUseCandidate, type UseCandidate } from './useKeyTarget'
@@ -1567,11 +1567,16 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
    * The margin is the hearing radius PLUS a walker's arrival radius, because
    * what has to stay outside the earshot is not the anchor but the position a
    * man may SPEAK from: he counts as arrived, and his word falls, anywhere
-   * within `WORK_ARRIVE_RADIUS` of the place he was sent to. Measuring the
+   * within his leg's arrival radius of the place he was sent to. Measuring the
    * anchor alone let a site sitting exactly on the floor put the actual speaker
    * inside the children's earshot (GPT-5.6 Sol, first cross-vendor round, A4).
+   *
+   * The WIDER of the two radii is the one that binds: a man whose walk is
+   * wedged arrives at `STALL_ARRIVE_RADIUS` rather than `WORK_ARRIVE_RADIUS`
+   * (work-order 1065), and it is exactly that man — held where the ground let
+   * him stop — whose word must still fall clear of the children.
    */
-  const ADULT_SPEECH_MARGIN = balance.communication.hearingRadius + WORK_ARRIVE_RADIUS
+  const ADULT_SPEECH_MARGIN = balance.communication.hearingRadius + STALL_ARRIVE_RADIUS
   /**
    * How far a spot stands from the NEAREST place a child speaks: the roaming
    * quarter's rim, either play rock, and the descent they gather at.

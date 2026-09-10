@@ -97,7 +97,7 @@ import {
   type DigSiteProgress,
   type ErrandPoint,
   type SpokenWord,
-  WORK_ARRIVE_RADIUS,
+  STALL_ARRIVE_RADIUS,
   arriveRadiusOf,
 } from './adultWork'
 import { gestureIfHeard, speechReach } from '../../communication/spokenGesture'
@@ -2547,10 +2547,12 @@ function ErrandVillagers({
 
   // An invitation is spoken wherever the partner happened to be standing when
   // cast. Keep that anchor far enough from every fixed children's place that
-  // even the initiator's arrival tolerance cannot put the word in its earshot.
+  // even the initiator's arrival tolerance cannot put the word in its earshot —
+  // and the tolerance that binds is the WEDGED one, because a man his walk
+  // could not finish still speaks from where it stopped (work-order 1065).
   const invitationClear = useCallback(
     (x: number, z: number) => {
-      const margin = balance.communication.hearingRadius + WORK_ARRIVE_RADIUS
+      const margin = balance.communication.hearingRadius + STALL_ARRIVE_RADIUS
       if (playGround && Math.hypot(x - playGround.x, z - playGround.z) - playGround.radius <= margin) return false
       if (geography.waterFoot && Math.hypot(x - geography.waterFoot.x, z - geography.waterFoot.z) <= margin) return false
       if (playRocks) {
@@ -2844,6 +2846,10 @@ function ErrandVillagers({
     const w = window as unknown as Record<string, unknown>
     w.__placeErrands = () => ({
       staged: { ...work.staged },
+      // Errands released because a leg could not reach its goal — the ground's
+      // own report, so a check that sees no water fetched can tell a wedged
+      // village from a quiet one (work-order 1065).
+      stalled: { ...work.stalled },
       last: work.last ? { ...work.last } : null,
       geography: {
         waterHead: geography.waterHead,
