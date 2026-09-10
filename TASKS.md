@@ -15448,3 +15448,128 @@ to land than a mechanism that needs a review.
   Criticality: high — it makes the standing instruction of 23.08.2026 (no permanent standstill)
   unenforceable, and the report that would expose it excuses the outage instead.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1098. Half the memory rules are stated but never loaded (measured 11.09.2026).
+  MEASURED, NOT ARGUED. `/home/node/.claude/projects/-workspace-hoa/memory/` holds 99 rule
+  files. `MEMORY.md` — the index that is loaded into every session's context — carries 48
+  pointers. FIFTY-ONE rules are therefore written, kept and never read: a rule that cannot
+  reach the session it governs is silent and is obeyed by nobody, which is exactly the
+  "WIRKUNGSLOS" axis the fortnightly rule review exists to catch.
+  IT IS NOT HARMLESS. `scripts/dashboard-reminder-hook.mjs` injects, on EVERY prompt, that the
+  binding board structure stands in ONE place — memory `batch-dashboard-artifact` — and that
+  file is one of the fifty-one. The prompt names a source the session cannot see. Among the
+  others are `push-after-every-commit`, `verify-gui-on-both-backends`, `never-stop-the-batch`,
+  `no-other-window-to-close`, `hand-over-at-the-watermark` and `pgrep-waiters-match-themselves`
+  — the last of which this session broke twice in one turn before a guard caught it.
+  Only `scripts/retro-sources.mjs` still reads the directory whole (for the retrospective), so
+  the files are not orphaned on disk; they are orphaned in the context.
+  Final state:
+  - Every rule file is either LINKED from `MEMORY.md` with its one-line hook, or marked
+    ZURÜCKGEZOGEN in its own front matter with the insight that survives it, and deleted from
+    disk only after that mark is recorded. No file sits unlinked and unmarked.
+  - Where two files say the same thing, ONE binding version survives and the other is
+    withdrawn with a pointer — the review's REDUNDANT axis, applied once across the whole
+    stock rather than per session.
+  - The index states its own rule at the top: an unlinked file is not a rule.
+  - Whatever mechanism is cheap and already there reports a drift between file count and
+    index count. NO NEW GUARD (infrastructure freeze): if nothing cheap exists, the check
+    belongs to the fortnightly rule review and is written into its instructions instead.
+  Test. Vitest: a check that every `*.md` in the memory directory is either referenced by
+  `MEMORY.md` or carries the withdrawal mark. It runs on the repository's own rules, so it
+  belongs beside the other document sweeps.
+  Refs: /home/node/.claude/projects/-workspace-hoa/memory/, scripts/rule-review.mjs,
+  scripts/dashboard-reminder-core.mjs, scripts/retro-sources.mjs.
+  Criticality: high — it silently voids half the operating rules, and every session since the
+  drift began has been steered by the surviving half without knowing the rest existed.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1099. The wait calls a healthy picture run hung after a quarter of its normal length
+  (measured 11.09.2026).
+  MEASURED ON THIS SESSION'S OWN RUN, and it cost the batch a whole `polish` pass. `node
+  scripts/verify/run-wait.mjs --plan polish` prints both numbers in one breath: "expected 5m
+  41s" from the frame model in docs/picture-check-cost.md §1, and, two lines below, "observed
+  9.9-61.5 min (median 55.2) over 6 run(s), whole `polish`, one backend" from §7 of the same
+  document. `HUNG_FACTOR` is 2.5 (scripts/verify/run-wait-core.mjs) and it multiplies the
+  EXPECTATION, not the observation: 2.5 x 5m41s = 14m12s. A `polish` pass of median length is
+  therefore declared HUNG at a quarter of its normal runtime, and the verdict does not merely
+  warn — it says "end the run rather than waiting again". On 11.09.2026 at 00:56 this session
+  obeyed it and killed a WebGL 2 `polish` run at 20m 12s that showed every sign of working
+  (dev server answering HTTP 200, no error in its log). The restart cost the same time again.
+  Final state:
+  - The hung verdict is measured against what the suite ACTUALLY takes, not against the frame
+    model: the observation band already recorded in docs/picture-check-cost.md §7 is what the
+    factor multiplies for a suite that has one. A suite with no observation keeps today's
+    behaviour.
+  - The plan line stops contradicting itself: where an observed median exists, THAT is the
+    number the caller is told to wait for, and the frame model is named as the floor it is.
+  - Nothing new is built for this (infrastructure freeze): the numbers, the document and the
+    factor all exist — this point makes the arithmetic use the right one.
+  Test. Vitest: a run at the observed median of its suite is SLOW, not hung; a run past the
+  observed band's own multiple is hung; a suite without an observation keeps the expectation
+  path. The plan text names the observed median where one exists.
+  Refs: scripts/verify/run-wait-core.mjs (HUNG_FACTOR, the plan text), docs/picture-check-cost.md
+  §1 and §7, scripts/verify/run-wait.mjs.
+  Criticality: high — the rule does not merely mislead, it instructs the session to destroy
+  running work, and the batch pays for the killed run twice.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1100. A verification for a just-landed point can publish no board at all (measured
+  11.09.2026).
+  MEASURED, AND IT BLOCKED THIS SESSION FOR TWENTY MINUTES. After point 1065 was merged and
+  ticked, its last closing duty was a covering WebGL 2 `polish` run on `main`. While that run
+  was live, `node scripts/board-publish.mjs` refused every attempt, and the two available
+  answers contradict each other:
+  - with no point declared: "evidence item 1 cannot be attributed to a point (no recorded
+    point, no resolvable ref)" — the run record has no `point` field at all
+    (scripts/verify/run-record.mjs), and a run on `main` has no `feat/<N>` ref to derive one
+    from;
+  - with `--point 1065`: "evidence item 1 names point 1065, which is not open" — the point is
+    ticked, which is precisely why the run is a CLOSING duty.
+  So a run that belongs to a closed point's closing work has no state: the board cannot be
+  published, and `dashboard-guard --synced` then refuses the turn end for a stale footer. The
+  gate is right to fail closed; what is missing is the third state, which the code already
+  half has — `TERMINAL_WORK_PHASES` in scripts/batch-in-flight-core.mjs skips terminal
+  evidence without an error, but nothing can put a run into that phase.
+  Final state:
+  - Evidence for a point in its CLOSING phase publishes: either `batch-in-flight.mjs` can
+    declare a wait as terminal-phase work (the phase list already exists), or the board's
+    active-work derivation accepts a point that the board itself shows as a closing card.
+    Whichever is cheaper — no new mechanism (infrastructure freeze).
+  - The refusal, where it still fires, names the remedy that actually exists.
+  Test. Vitest: a declaration naming a ticked point whose board card is a closing card
+  normalises without an error; a declaration naming a ticked point with NO closing card still
+  refuses; the unattributable case is unchanged.
+  Refs: scripts/batch-in-flight-core.mjs (ACTIVE_WORK_PHASES, TERMINAL_WORK_PHASES, the
+  attribution errors), scripts/board-publish.mjs, scripts/verify/run-record.mjs,
+  scripts/board.mjs (`closing`).
+  Criticality: medium — it stops no game work, but it deadlocks the board duty and the point
+  boundary at exactly the moment both are owed.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1101. A runner-only script answers "CI gate passed" to a question nobody asked
+  (measured 11.09.2026).
+  IT PERMITS A FALSE APPROVAL, which is the one class the infrastructure freeze keeps open.
+  `scripts/ci-gate-verdict.mjs` runs INSIDE the GitHub runner after the gate steps, reads
+  `GATE_EVENT`, `GATE_REF` and `GATE_OUTCOMES` from the environment, and always exits 0 by
+  design. Called by hand — `node scripts/ci-gate-verdict.mjs --ref feat/1065-teaching-hands-touch
+  --wait` — it ignores both flags, evaluates an EMPTY outcome set, prints "CI gate passed." and
+  exits 0. This session did exactly that twice on 11.09.2026 and reported a green CI both times
+  while measuring nothing at all; the branch's real run was still in progress, as the Stop
+  guard said in the same minute. Nothing was actually shipped on that false green — the main
+  push ran the full local gate and `gh run list` later showed CI success for 7ff2437a6 — but
+  the script said "passed" for a ref it never looked at.
+  Final state:
+  - Called outside a runner, or with an argument it does not define, the script REFUSES: it
+    names the one legitimate caller (the workflow step) and the command that answers the
+    question a human is actually asking about a ref's CI. No verdict is printed on an empty
+    environment.
+  - Inside the runner nothing changes, exit 0 included — the point does not touch the gate's
+    own behaviour.
+  - Whatever the correct hand-call is (`gh run list --branch <ref>`, or the guard that already
+    watches pushed refs) is named in the refusal, so the next session does not have to find it.
+  Test. Vitest: an argv carrying an unknown flag refuses; an empty gate environment refuses;
+  the recorded runner environment still produces today's verdict text and exit code.
+  Refs: scripts/ci-gate-verdict.mjs, scripts/ci-gate-verdict-core.mjs, scripts/ci-status-guard.mjs.
+  Criticality: high — a script that prints a pass for a question it never evaluated is a false
+  approval, and it was believed twice within one hour of being called.
+  Bundle: Session- & Repo-Hygiene.

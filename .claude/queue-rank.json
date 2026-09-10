@@ -1296,6 +1296,30 @@
       "why": "Machine-filed: high, but a self-written pause is written by a session that misread a handover, not by the release path — nothing in it blocks the tag, so it waits behind point 174.",
       "origin": "machine",
       "place": "last"
+    },
+    "1098": {
+      "at": "2026-09-10T23:13:53.171Z",
+      "why": "Die Regeldurchsicht, die den Fund gemacht hat, ist eine wiederkehrende Pflicht ohne Spielwirkung — der Punkt wartet hinter der laufenden Spielarbeit.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1099": {
+      "at": "2026-09-10T23:17:07.720Z",
+      "why": "Prozessdefekt ohne Spielwirkung: er wartet hinter der offenen Spielarbeit.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1100": {
+      "at": "2026-09-10T23:17:07.819Z",
+      "why": "Prozessdefekt ohne Spielwirkung: er wartet hinter der offenen Spielarbeit.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1101": {
+      "at": "2026-09-10T23:17:07.923Z",
+      "why": "Prozessdefekt ohne Spielwirkung: er wartet hinter der offenen Spielarbeit.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1328,7 +1352,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-10T22:19:18.831Z",
+    "at": "2026-09-10T23:17:07.934Z",
     "points": [
       174,
       184,
@@ -1715,7 +1739,11 @@
       1094,
       1095,
       1096,
-      1097
+      1097,
+      1098,
+      1099,
+      1100,
+      1101
     ]
   }
 }
