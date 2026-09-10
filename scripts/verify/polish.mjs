@@ -4768,30 +4768,58 @@ if (section('children-bank-game')) {
             'in the current one) — a hand that arrives and then leaves again would not be seen',
       )
       if (stationTap) {
+        // WHAT A READING IS, in one place, because the worst one and the frames
+        // around it have to be comparable at a glance. Four numbers decide
+        // between the three ways this check can go red, and reading them off the
+        // scene costs nothing (work-order 1065):
+        //  - `gap`      — the hand off the drawn flank.
+        //  - `r <radius>`— the hand's distance from the stone's AXIS. A gap that
+        //    grows while this stays put is an ARM returning to rest; a gap that
+        //    grows WITH it is a BODY that was moved off its stand.
+        //  - the gesture's KIND and its own AGE. A touch is issued for the hold
+        //    plus its fade-out, so an age short of that with the kind already
+        //    gone means the gesture was REPLACED, and one past it means the two
+        //    clocks ran at different speeds.
+        //  - `written`/`drawn` — the pose this component wrote against the pose
+        //    the figure is really drawn with, which is the render-lag reading.
+        const reading = (r) =>
+          `[${r.tapFor.toFixed(2)}s ${(r.gap * 100).toFixed(0)}cm r${r.radius.toFixed(2)} ` +
+          `${r.gesture ?? 'rest'}@${typeof r.gestureAge === 'number' ? r.gestureAge.toFixed(2) : '-'} ` +
+          `written ${r.written ? r.written.leftPitch.toFixed(2) + '/' + r.written.rightPitch.toFixed(2) : '-'} ` +
+          `drawn ${(r.drawn ?? []).map((a) => a.pitch.toFixed(2)).join('/') || '-'}]`
+        // THE WINDOW AROUND THE WORST READING, not the hold's first six frames.
+        // The old text printed the opening of the hold, and this defect happens
+        // at its END — so every failure so far showed six frames of a hand
+        // resting on its stone and said nothing at all about the moment it left
+        // (measured 10.09.2026: the trace read 1 cm six times while the check
+        // failed at 61.1 cm). The opening is still worth one frame, so it is
+        // kept and the window is spliced in after it.
+        const worst = holdTrace.indexOf(stationTap)
+        const around =
+          worst < 0
+            ? holdTrace.slice(0, 6)
+            : [holdTrace[0], ...holdTrace.slice(Math.max(1, worst - 3), worst + 4)]
         check(
           'and no tap is ever spoken from the waiting station',
           Math.abs(stationTap.gap) <= 0.06,
           `the worst reading while the word was falling stood ${(stationTap.gap * 100).toFixed(1)} cm ` +
-            `off the flank, ${stationTap.tapFor.toFixed(2)} s into the hold's remainder ` +
+            `off the flank, ${stationTap.tapFor.toFixed(2)} s into the hold's remainder, ` +
+            `with the ${stationTap.gesture ?? 'rest'} gesture ` +
+            `${typeof stationTap.gestureAge === 'number' ? stationTap.gestureAge.toFixed(2) + ' s' : 'an unread time'} old ` +
+            `and its hand ${stationTap.radius.toFixed(2)} m from the stone's axis ` +
             `(the word carried ` +
             `${typeof stationTap.opening?.heardFrom === 'number' ? stationTap.opening.heardFrom.toFixed(1) + ' m' : 'an unread distance'}` +
             ` to the traveller; beyond the hearing radius there is no arm to measure, by design) ` +
             `(the hold runs from ${holdSeconds.toFixed(2)} s down to 0, so a reading near the top ` +
-            `is the arm still swinging in and one near 0 is it swinging back out)` +
+            `is the arm still swinging in and one near 0 is it swinging back out; a touch is issued ` +
+            `for the hold plus its fade-out, so its age should reach ` +
+            `${holdSeconds.toFixed(2)} s and no gesture can expire inside the hold)` +
             (looseTouch
               ? `; outside the hold the touch pose ran on as far as ${(looseTouch.gap * 100).toFixed(1)} cm ` +
                 `in phase ${looseTouch.phase}, which is the walk to the next round rather than a tap`
               : '') +
-            `; the hold read ` +
-            holdTrace
-              .slice(0, 6)
-              .map(
-                (r) =>
-                  `[${r.tapFor.toFixed(2)}s ${(r.gap * 100).toFixed(0)}cm ` +
-                  `written ${r.written ? r.written.leftPitch.toFixed(2) + '/' + r.written.rightPitch.toFixed(2) : '-'} ` +
-                  `drawn ${(r.drawn ?? []).map((a) => a.pitch.toFixed(2)).join('/') || '-'}]`,
-              )
-              .join(' '),
+            `; the hold opened and then read, around the worst frame, ` +
+            around.map(reading).join(' '),
         )
       }
       // AND THE FRAME THE WORD FALLS IN, measured when it fell rather than
