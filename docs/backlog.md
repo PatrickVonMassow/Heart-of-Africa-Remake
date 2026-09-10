@@ -535,3 +535,12 @@ It cost nothing here: `--release` cleared all three and `.claude/wait-leases.jso
 empty state it is committed in. What it can cost is a session that believes the line and waits for
 a run nobody is running — the shape the whole await mechanism exists to prevent. The lease already
 records `pid` and `pidStartedAt`, so the liveness check is a comparison it can already make.
+
+- **`run-wait.mjs --await` resolves a relative log against the main worktree, then blames the caller.**
+  Measured 10.09.2026. Called from a worktree with the log path relative to that worktree,
+  it answered "no verify run record at <path>. … A run started through `npm test` … writes
+  one beside its log; a suite started by hand does not." The record existed, and the run had
+  been started through the wrapper — the message diagnoses the wrong cause and sends the
+  caller off to restart a two-hour run. An absolute path works. Non-blocking: the remedy is
+  to resolve the path against the caller's cwd, or to say "not found at <resolved path>"
+  instead of asserting how the run was started.

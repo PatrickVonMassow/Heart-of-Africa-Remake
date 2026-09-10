@@ -52,6 +52,8 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 09.09. | Nutzerfrage „sollte da nicht ein Kind auf einen Stein klettern?“ — gebaut, feuernd, nie sichtbar: der Test prüfte das Flag, das die Reparatur selbst setzt, und die Bildspur hatte den Fall weggeschaltet (§3.252); zwei Kinderlauf-Grenzwerte reißen, beide an einer einzigen Stichprobe gemessen |
 | 09.09. abends | Ein Punkt verbraucht 16,3 Maschinenstunden Verifikation — fünf volle LARGE-Läufe, alle rot —, ohne dass jemand eine Regel bricht: die Leiter stand im Auftrag, der letzte rote Lauf druckte seine Zwei-Minuten-Sprosse selbst mit, und die Planzahlen vom Juli ließen jeden Ausreißer normal aussehen (§3.253, Schwesterfall zu §3.249); freigegeben werden vier Maßnahmen, die Anthropic und die Gegenseite nach deren Audit gemeinsam tragen |
 | 10.09. nachts | Die schmale Sprosse wurde zwölfmal geklettert und war zwölfmal grün — der volle Lauf fiel danach auf genau denselben zwei Prüfungen, weil ein Merge sie ungeprüft überholt hatte und der Abschnitt ein anderes Fenster misst als die Suite: die am Vorabend angeordnete Leiter hätte nichts verweigert (§3.255); dieselbe Nacht zeigt die Faltung zweier Hälften, die einen Regressionslauf sparen sollte und die fertige Hälfte drei Tage ihre Landung kostete |
+| 10.09. nachmittags | Zwei Deckungsläufe desselben Punktes starben im Teardown der Unit-Suite, weil jemand woanders committete — 15:37 an einer main-Ref, 16:13 an einem fremden Worktree-Index, beide vor dem ersten Bild. Der Defekt liegt seit dem 23.08. dreifach im Auftrag (805, 852, 955) an Position 233/261/310 von 383 und ist in Reihenfolge nie erreichbar; sichtbar wird er erst an der Rechnung des Punktes: 24,6 Maschinenstunden, 23 LARGE-Läufe, kein einziger grün (§3.231-Nachtrag) |
+| 10.09. abends | 43 Minuten Stillstand nach einer korrekten Übergabe, beendet von der Nutzerfrage „seit 17:04 keine Arbeit": Der Launcher verweigerte dreimal den Nachfolger, weil er im Arbeitsbaum einen lebenden Schreiber maß — es war der abgekoppelte Deckungslauf selbst, der dorthin seine Bilder schreibt. Das Veto sperrt den Nachfolger für die volle Dauer genau der Phase, in der die Übergabe vorgesehen ist (§3.258, vierter Wiedergänger von §3.77/§3.220) |
 | 13.08. | Der Nachprüfer findet eine echte zweite Klippe im geheilten Mechanismus — und jede der fünf gemessenen Kuren verschlechtert gesunde Dörfer stärker, als der Fehler schadet: Befund wird gebucht statt behoben (§3.115) |
 | 20.08. | Der Dokumentschnitt strich Regeln als »von einem Wächter abgedeckt«, ohne einen einzigen Wächter darauf zu prüfen — die Kontextanzeige verschwand, der Nutzer fand es (§3.134); eine vom Nutzer gesetzte Rangfolge wurde in einer Nacht zweimal maschinell überholt, ohne dass irgendwo ein Grund stand (Punkt 614); zwei Werkzeuge derselben Bauart am falschen Ort gemessen — im Hauptbaum gebaut und geprüft, während der Prozess die Arbeit in den isolierten Bereich schickt (§3.137) |
 | 21.08. | Ein Tor verlangte eine Freigabe, die seine eigenen Werkzeuge nicht herstellen können — der HIGH-Punkt war gemergt, geprüft und freigegeben, und der Zugausgang wies ihn trotzdem ab (§3.153) |
@@ -1455,7 +1457,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 10.09.2026, 15:41 · Quellen-Fingerprint: `a0ef47129684…`
+Zuletzt aktualisiert: Donnerstag, 10.09.2026, 17:54 · Quellen-Fingerprint: `8540fe3edf97…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1559,10 +1561,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 96 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 126 Prozess-/Meta-TASKS-Punkte (davon 60 offen).
+Erfasste Quellen: 96 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 127 Prozess-/Meta-TASKS-Punkte (davon 61 offen).
 
-<!-- RETRO-FINGERPRINT: a0ef47129684ae70ec9b49916f5c3680fdd4d05fc4461d84ac14f4bcdc6255d1 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-10T13:41:55.738Z -->
+<!-- RETRO-FINGERPRINT: 8540fe3edf9706379a2b7d6f718e70a0d247374d1fb53ce7c2f956c2d7ee40a0 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-10T15:54:47.291Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -5440,6 +5442,31 @@ darf eine Sitzung ohne Schreibrecht gar nicht erst blockieren — er meldet den
 Befund und nennt den einen Weg, der ihr offensteht. Ein Ausweg, der nur in der
 Absage eines anderen Wächters steht, ist für den Blockierten kein Ausweg.
 
+Nachtrag vom 10.09.2026: Dieselbe Klasse traf am Nachmittag zweimal binnen vier
+Stunden, und diesmal war keine Autorenbahn beteiligt. Der Deckungslauf von Punkt
+1065 starb um 15:37 im Teardown an `refs/heads/main 64b6b3f -> 756df06` und
+geänderten Worktree-Registrierungen, der Nachfolgelauf um 16:13 an einem fremden
+Worktree-Index — beide Male, bevor ein einziges Bild gezeichnet war. Es committete
+schlicht jemand woanders. Neu ist daran nicht der Mechanismus, sondern was die
+Wiederholung über unsere Ablage sagt: Der Defekt liegt seit dem 23.08.2026
+dreifach beschrieben im Auftrag — als Punkt 805, 852 und 955 —, und diese Punkte
+stehen an Position 233, 261 und 310 von 383 offenen. In Arbeitsreihenfolge werden
+sie nie erreicht. Die Diagnose der Klasse hat sich damit verschoben: Sie ist keine
+undurchgesetzte Regel und kein Wächterkonflikt mehr, sondern ein bekannter,
+gemessener, dreimal aufgeschriebener Defekt ohne einen Weg nach vorn. Der
+Infrastruktur-Freeze aus CLAUDE.md §2 hat für genau diesen Fall eine Tür — »wenn
+sie reproduzierbar aktuelle Spielarbeit blockiert« —, aber niemand hatte sie
+benutzt, weil jeder einzelne Vorfall für sich als Pech durchgeht. Erst die
+Kostenrechnung des Punktes macht es sichtbar: 64 beendete Läufe, 24,6
+Maschinenstunden, 23 LARGE-Läufe, davon **kein einziger grün** — bei einem Feature,
+dessen schmale Sprosse an diesem Tag zwölfmal grün war.
+
+**Lehre des Nachtrags:** Ein dreifach abgelegter Befund ist kein abgelegter Befund,
+sondern ein Beleg, dass die Ablage an dieser Stelle nicht funktioniert. Wenn
+dieselbe Klasse zum wiederholten Mal die laufende Arbeit tötet, ist die richtige
+Reaktion nicht die vierte Beschreibung, sondern das Vorziehen — und die Regel, die
+das erlaubt, muss beim Vorfall zitiert werden, nicht beim Aufräumen.
+
 ### 3.113 Ein Test, dem der Gegenstand unter den Fuessen weggeht, wird still gruen
 
 Punkt 688 verlegte das Quartier, in dem die Kinder spielen. Der Test des
@@ -6429,3 +6456,38 @@ Befehl gefahrlos ist und die Hand schneller ist als die Erinnerung.
 Argument ABLEHNEN, nicht deuten. Und ein Backlog-Eintrag, der eine Klasse an einer einzigen
 Datei festmacht, lädt zur Wiederholung an den Geschwistern ein — die Fundstelle gehört
 gesucht, sobald die Klasse benannt ist.
+
+### 3.258 Der eigene Prüflauf wird zum Veto gegen den Nachfolger
+
+Am 10.09.2026 stand der Stapel 43 Minuten ohne Arbeiter, und beendet wurde es wieder nicht
+von einem Wächter, sondern von der Frage des Nutzers, warum die Tafel seit 17:04 nichts
+meldet. Es ist der vierte Wiedergänger von §3.220 und derselbe Satz in neuer Verkleidung:
+**die übergebende Sitzung hinterlässt eine Spur, die das Nachfolger-Tor für einen lebenden
+Arbeiter hält.**
+
+Die Übergabe war korrekt. Die Sitzung erreichte um 17:04 ihre Wasserstandsmarke, schrieb auf,
+dass ein Deckungslauf weiterläuft und mit übergeben wird, und gab das Schloss frei. Der
+Launcher tickte danach um 17:11, 17:26 und 17:41 und verweigerte jedes Mal:
+`successor decision refused (registered-writer-live) — recent registered feature-writer
+activity measured for feat/1065-teaching-hands-touch — work output 0 min old (working files)`.
+
+Es gab keinen Autor. Die gemessene »Schreiber-Aktivität« war der abgekoppelte LARGE-Lauf
+selbst, der seit 16:20 seine Bilder nach `verification/*.png` in denselben Arbeitsbaum
+schreibt — zwei Stunden lang, im Minutentakt. Die Lebendigkeitsprüfung misst einen Autor an
+seinem **Dateiabdruck**, nicht an einem Prozess, und ein Prüflauf hinterlässt denselben
+Abdruck wie ein Schreibender.
+
+Das Veto ist damit exakt invertiert. Ein langer Deckungslauf überlebt die Sitzung, die ihn
+gestartet hat — das ist der Sinn der Abkopplung, und genau deshalb ist die Phase eines
+laufenden Laufs die Phase, in der eine Übergabe an eine frische Sitzung *vorgesehen* ist. Das
+Tor sperrt den Nachfolger also nicht trotz, sondern **wegen** der Arbeit, für die er gebraucht
+wird, und zwar für deren volle Dauer. Der Stillstand ist dabei doppelt still: Die Tafel las
+weiter »Gerade keine laufende Arbeit«, weil auch sie niemand fortschrieb.
+
+**Lehre:** Eine Lebendigkeitsmessung, die aus einem Artefakt auf einen Handelnden schließt,
+verwechselt Arbeit mit Arbeiter. Wo ein Tor entscheidet, ob jemand *anderes* anfangen darf,
+muss es einen Prozess messen — oder mindestens die Pfade ausnehmen, die eine Maschine ohne
+Autor beschreibt. Und die Klasse ist inzwischen viermal aufgetreten (§3.77, §3.220, Punkt 590,
+hier): Jedes Mal war die Fundstelle ein anderes Feld, jedes Mal war das Muster dasselbe, und
+jedes Mal hat es der Nutzer gefunden. Das ist der Preis dafür, dass kein Wächter den
+Stillstand selbst misst — nur seine Ursachen einzeln.

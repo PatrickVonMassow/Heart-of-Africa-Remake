@@ -156,29 +156,25 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 ## Die häufigsten Fallstricke → und was hilft
 
 - **Grüner Test, falsches Bild.** Er prüfte einen Hilfswert oder *stellt her*, was die Handlung
-  bewirkt hätte, statt sie aufzurufen — und ist für immer grün.
+  bewirkt hätte — und ist für immer grün.
   → *Prompt:* „Eine sichtbare Änderung ist erst fertig, wenn sie am **echten gerenderten Bild**
   geprüft wurde. Zu jeder Prüfung: **Welche Zeile ruft die Sache auf — und was bliebe grün, wenn
   sie kaputt wäre?** Zeit darf ein Test abkürzen, den **Aufruf** nie. Ist die **Ausgabe** das
-  Produkt — Urteil, Plan, Anleitung —, lies sie am **echten Bestand**, nie nur an selbstgebauten
-  Eingaben. Und das Bild beantwortet nicht nur ‚stimmt es?‘, sondern **wozu tut die Figur das —
-  sieht man es ihr an?** Was nur im Datenmodell steht, existiert für den Nutzer nicht.“
+  Produkt, lies sie am **echten Bestand**. Und das Bild
+  beantwortet nicht nur ‚stimmt es?‘, sondern **wozu tut die Figur das — sieht man es ihr an?“
   *(Sieht das richtig aus?)*
 - **Dem Test geht der Gegenstand unter den Füßen weg.** Er hält seinen Prüfling an einer
-  Koordinate, einem Vorgabewert oder einer nachgebauten Simulation fest. Zieht der Prüfling um,
-  fragt der Test weiter — richtig, nur über nichts mehr. Ein Rot meldet sich; ein leer
-  gewordener nicht.
+  Koordinate, einem Vorgabewert oder einer Simulation fest. Zieht der Prüfling um, fragt der
+  Test weiter — nur über nichts mehr. Ein Rot meldet sich; ein leerer nicht.
   → *Prompt:* „**Verlegst** du etwas, ist das Anpassen der roten Stellen nur die Hälfte: Sieh
   jede übrige Zusage desselben Blocks an, ob sie **noch über etwas urteilt**. Leite den Prüfling
   **ab** statt ihn zu nennen, sonst prüf seine **Zugehörigkeit** mit. Und **stell die Gelegenheit
-  her**, statt auf sie zu warten — wer zusieht, ob zufällig ein Störer dort steht, prüft die
-  Würfel.“
-- **Der Fühler misst sich selbst.** Eine Überwachung erneuert beim Nachsehen den eigenen
-  Messwert, oder eine Warteschleife findet per **Namenssuche** sich selbst: Totes wirkt lebendig.
+  her**, statt auf sie zu warten — wer wartet, ob zufällig ein Störer dasteht, prüft Würfel.“
+- **Der Fühler misst sich selbst.** Er erneuert beim Nachsehen seinen Messwert oder liest, was
+  ein Testlauf schreibt: Totes wirkt lebendig, der Nächste bleibt draußen.
   → *Prompt:* „Ein Lebenszeichen kommt nur aus einer Quelle, die der **Beobachter nicht
-  beschreibt** — prüf am **stillgelegten** Gegenstand: Bewegt **erst der Blick** den Wert, misst
-  sie sich selbst. Warte über **Handle oder PID**, nie über eine Textsuche.“
-
+  beschreibt**. Wer entscheidet, ob **ein anderer anfangen darf**, misst einen **Handelnden** —
+  Prozess oder Handle, nie Textsuche oder Dateien: **Arbeit ist kein Arbeiter.**“
 - **Die Sonde kann ihr Nein nicht erreichen.** Die Prüfung könnte „tot“ sagen — aber nur, wenn man
   ihr den Beweis übergibt, und genau dieser Aufrufer übergibt ihn nicht. Ihr „lebt noch“ ist dann
   der einzig mögliche Satz.
@@ -345,9 +341,10 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Ein Befund wird nur Arbeitspunkt bei Nutzerwirkung, Risiko, echter Blockade oder
   Vereinfachung. Sonst in eine gesammelte, **nicht blockierende** Liste."
 
-- **Der Befund stirbt mit dem Gespräch.** Ein echter Fehler fällt nebenbei auf und bleibt im Chat.
+- **Der Befund stirbt mit dem Gespräch — oder liegt dreimal abgelegt ganz hinten.**
   → *Prompt:* „Sichere Befunde mit einem billigen Kommando, das immer schreibt, und einer Prüfung,
-  die keinen Zug enden lässt, der untersucht und nichts hinterlassen hat."
+  die keinen Zug enden lässt, der untersucht und nichts hinterlassen hat. **Such** einen Befund,
+  bevor du ihn ablegst: Steht die Klasse schon da, **zieh vor** statt neu zu beschreiben."
 
 - **Still ersetzt — »kaputt« antwortet wie »fehlt«.** Wer aus »fehlt« etwas schließt, schließt aus Schrott.
   → *Prompt:* „Jede eingabeverarbeitende Stelle scheitert **sichtbar**; **fehlend und unlesbar
@@ -562,7 +559,8 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   meldet Rot, obwohl jeder einzelne Test grün war, und du suchst den Fehler im Code.
   → *Prompt:* „Solange eine Prüfung läuft, ist das Projekt **fremdes Gebiet**: Vorarbeit dieser
   Zeit ist **Lesearbeit**, keine Repository-Operation. Und bevor du ein Rot untersuchst, sag mir
-  **wer den roten Zustand erzeugt hat** — der Code oder der Lauf selbst."
+  **wer den roten Zustand erzeugt hat** — der Code oder der Lauf selbst. Eine Prüfung, die
+  erlaubte **Nebenläufigkeit** nicht vom Verstoß trennen kann, **meldet** statt abzubrechen."
 
 - **Die Regel sagt, WER es tun soll — und niemand zählt, ob es je übergeben wurde.** Du legst
   fest, welche Arbeit an einen Helfer geht. Die Regel greift, jeder Bericht ist grün, und die
@@ -637,4 +635,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: a0ef47129684ae70ec9b49916f5c3680fdd4d05fc4461d84ac14f4bcdc6255d1 -->
+<!-- GUIDE-FINGERPRINT: 8540fe3edf9706379a2b7d6f718e70a0d247374d1fb53ce7c2f956c2d7ee40a0 -->
