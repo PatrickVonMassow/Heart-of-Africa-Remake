@@ -96,6 +96,7 @@ describe('registered writer liveness beside detached verification output', () =>
   const withCheckout = (test) => {
     const root = mkdtempSync(join(tmpdir(), 'hoa-writer-verification-'))
     const git = (...args) => execFileSync('git', ['-c', 'core.hooksPath=', ...args], {
+      windowsHide: true,
       cwd: root,
       env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_SYSTEM: '/dev/null' },
       encoding: 'utf8',
