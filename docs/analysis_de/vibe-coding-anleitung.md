@@ -208,11 +208,11 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Trag eine Ausnahme **im selben Zug** dort ein, wo der Mechanismus sie liest, und
   nenn zu jedem Tor den **Weg, der es fährt**.“
 
-- **Zahlen geschätzt statt gemessen — oder gemessen ohne Uhrzeit.** ‚Das dauert ~2 Minuten'; ein
-  Höchststand ohne Uhrzeit.
-  → *Prompt:* „Laufzeiten, Performance und Kosten nennst du nur **gemessen**, auf der
-  **Ziel-Hardware**; was altern kann, erhebe neu. Ein Maximalwert darf **entlasten**, nie
-  beschuldigen — miss den **echten Lauf** über die Zeit."
+- **Zahlen geschätzt statt gemessen.** Rechnet eine Schranke mit der Schätzung, während die
+  Messung danebensteht, erklärt sie gesunde Arbeit für tot.
+  → *Prompt:* „Laufzeiten und Kosten nur **gemessen**; jede Schwelle rechnet mit der
+  **Messung**. Und ein Werkzeug **verweigert**, was es nicht bedienen kann, statt ein
+  ‚in Ordnung' zu erfinden."
 
 - **Das Kontingent ist die Grenze, nicht die Zeit.** Der Verbrauch hängt an der Kontextgröße,
   nicht an den Stunden.
@@ -596,18 +596,6 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   dann auf die rote, weil eine Aufgabe nur ganz fertig wird — gespart hat das nichts.
   → *Prompt:* „Bündle nur, wenn beide Hälften **plausibel im selben Lauf** grün werden; bleibt
   eine wiederholt rot, **trenne sie wieder** und liefere die fertige aus."
-
-- **Ein Werkzeug antwortet mit Gewissheit, wo es nichts gemessen hat.** Es war für EINEN
-  Aufrufer gebaut — eine Prüfumgebung, ein Skript, eine Kette — und liest seine Eingaben von
-  dort. Rufst du es selbst auf, findet es nichts vor, hält das für ein leeres Ergebnis und
-  meldet »in Ordnung«. Genauso rechnet eine Hängen-Schwelle mit einer geschätzten Dauer,
-  während die gemessene zehnmal höher danebensteht — und befiehlt, einen gesunden Lauf zu
-  töten.
-  → *Prompt:* „Ein Werkzeug, dessen Antwort eine Handlung auslöst, muss den Aufruf
-  **zurückweisen**, den es nicht bedienen kann: unbekanntes Flag, leere Umgebung, fehlende
-  Eingabe. Kein Urteil aus dem Nichts. Und wo neben einer Schätzung eine **Messung** steht,
-  ist die Messung die Zahl, mit der gerechnet wird — die Schätzung ist ihr Boden, nicht ihr
-  Maß.“
 
 ---
 
