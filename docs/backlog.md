@@ -515,3 +515,23 @@ and leaves a junk receipt that `run-wait --status` will happily report as the la
 
 The fix is a few lines: recognise `--help`/`-h` before the suite parse and print the usage block
 `run-wait.mjs` already prints. Nobody needs to do it today; whoever next touches that file can.
+
+It is also not confined to that one file. Two more of the same shape were measured the same day,
+both of them by a session that was only looking for a usage line: `node scripts/verify/run-all.mjs
+--help` opened the LARGE regression and had passed build, lint and the type-check before it was
+killed by hand, and `node scripts/retro-refresh.mjs --help` silently RAN the refresh and rewrote
+the retrospective's timestamp. Neither refuses an unknown flag; both treat it as ordinary input.
+Whoever takes the fix should recognise `--help`/`-h` in all three.
+
+## `wait-lease --status` calls a dead run's lease running (measured 10.09.2026)
+
+Non-blocking, collected. `node scripts/wait-lease.mjs --status` reported three leases as `running`
+at session start today while all three processes were gone — the LARGE runs of the session that had
+died with the container. `waitTimeoutDecision` in `scripts/wait-lease-core.mjs` derives the state
+from `deadlineAt` and `hungAt` alone and never asks whether the pid is alive, so a lease of a dead
+run reads as live until its own deadline crosses, which for a LARGE is over an hour away.
+
+It cost nothing here: `--release` cleared all three and `.claude/wait-leases.json` went back to the
+empty state it is committed in. What it can cost is a session that believes the line and waits for
+a run nobody is running — the shape the whole await mechanism exists to prevent. The lease already
+records `pid` and `pidStartedAt`, so the liveness check is a comparison it can already make.
