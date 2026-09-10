@@ -544,3 +544,10 @@ records `pid` and `pidStartedAt`, so the liveness check is a comparison it can a
   caller off to restart a two-hour run. An absolute path works. Non-blocking: the remedy is
   to resolve the path against the caller's cwd, or to say "not found at <resolved path>"
   instead of asserting how the run was started.
+
+- **A commissioned author closes with an empty commit.**
+  Measured 10.09.2026 on point 1088: the Astra lane's final commit `d5d5c87` ("Complete the
+  authored changes") carries no file at all, and it is the commit the branch tip stands on,
+  so the tip's subject describes nothing that was written. Non-blocking: it costs a reader
+  one lookup to find the commit that holds the work. The remedy is for the lane to skip the
+  closing commit when the tree is already clean.

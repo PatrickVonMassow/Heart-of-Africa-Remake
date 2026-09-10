@@ -1296,6 +1296,12 @@
       "why": "Es stoppt den Stapel still für die volle Dauer jedes langen Deckungslaufs — genau der Phase, in der der Abschlussdurchlauf 633 vor dem Release stattfindet; wartete es auf 174, träfe es das Release selbst.",
       "origin": "machine",
       "place": "ahead"
+    },
+    "1091": {
+      "at": "2026-09-10T17:25:43.865731Z",
+      "why": "Gemessen bei der Landung von 1088 am 10.09.2026: Die Kette haelt vor dem Aufraeumen an, also bleibt nach JEDER Landung ein Zweig samt Arbeitsbaum stehen und der Betreiber raeumt von Hand nach.",
+      "origin": "machine",
+      "place": "ahead"
     }
   },
   "settled": {
