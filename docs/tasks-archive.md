@@ -27452,3 +27452,137 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   `featureWriterRegister` writer verdict), scripts/batch-autostart-core.test.mjs,
   .claude/batch-launcher.log (10.09.2026 15:26Z, 15:41Z).
   Bundle: Testinfrastruktur.
+
+- [x] 1065. The tapping child's hand touches the rock it names (user 06.09.2026).
+  ONE DEFECT, and it is the first half of what stood here as two: a figure teaches a word by
+  acting on an object, stops more than a metre short of it, and the act stays invisible.
+  SPLIT 10.09.2026 on the user's instruction (02:15). The water carrier that stood here as
+  PART B — the former point 1066, folded in on 07.09.2026 to save a regression run — is now
+  point 1087. The saving never materialised and the bundling became the cost it was meant to
+  avoid: three days, 36 commits and about sixty picture runs on one branch, with this half
+  green throughout and every red of the last two days belonging to the other. Two halves that
+  cannot share a green run cannot share a point. What lands here is the tap alone; the branch
+  feat/1065-teaching-hands-touch keeps both halves in its history, and 1087 says what it
+  inherits from it.
+  THE BRANCH MUST SHED PART B BEFORE IT LANDS, and that is this point's first job. Both of its
+  red checks are PART B's — the fill and the carry frame in `polish/adult-errands` — and a
+  branch does not land on a red suite. PART B's CODE must not land unverified either: 1085
+  measured that the fill pose reads as a man face-down in the river, so shipping it while its
+  own checks are gone would be papering over. Cheapest honest cut first: revert the PART B
+  commits on top of the branch as ONE documented commit — they are separable by message (the
+  fill, the dispatch, the stand, the dip and carry frames) — keeping the tap and the shared
+  pose fix in `src/render/figurePose.ts`, which both halves depend on and which is measured
+  green. If that revert fights, cherry-pick the tap commits onto a branch cut fresh from main.
+  Either way the narrow rung `polish --section=children-bank-game` decides when it is done.
+  The child that names the rock TOUCHES it. Today the tap of the children's bank game
+  (`bankGame.ts` ~626, spec item 4) is spoken from the catcher's waiting station — `standOff`
+  2.6 m off the rock's centre (`src/config/balance.ts`), the play rock itself ~1.2 m in radius
+  (`PLAY_ROCK_RADIUS`, `layout.ts`) — with an 'indicate' arm sweep aimed at the centre. The hand
+  ends more than a metre from the stone, so the utterance has no visible object and the user
+  read it as 'go!' rather than ROCK (06.09.2026). The tap exists precisely so that ROCK is
+  learned on a stone with nobody arriving (design.md §13.4); without contact it teaches the
+  wrong thing.
+  Final state:
+  - Before the tap the tapper steps to the rock and lays its hand ON the stone: the hand end
+    reaches the rock's drawn surface at the point nearest the child (a few centimetres, never
+    through it), the body leans into the reach, and the pose is HELD for the whole visible
+    tap interval (`tapPauseSeconds`) while the word falls. The other children hold at their
+    stations as today.
+  - The contact is derived from what the picture draws — the play rock's instanced mesh at
+    its own scale — not from a nominal radius, so a wider or narrower rock keeps the hand on
+    its surface. A child that cannot reach the stone in time does not speak the tap from
+    afar: the run waits for the contact, and a blocked walk to the stone falls back to the
+    existing stall handling rather than a tap in the air.
+  - The arm vocabulary gains the touch it needs (a `touch` gesture kind or a held pose in
+    `src/render/gesture.ts`), used only here for now; the utterance timing, the hearing gate
+    and the tap's audible distinctness (spec: one hearing gap before the run) do not change.
+  - Doc: design.md §13.4 says the catcher's hand touches the rock while he names it;
+    docs/communication-poc-spec.md item 4 likewise; the Ctrl-hold label and the speech label
+    are unchanged.
+
+  Test. Vitest: the tap utterance is offered only once the speaker's hand point lies within a
+  small tolerance of the rock surface and never from the station, the held pose lasts the tap
+  interval, and the hand target lies on the drawn rock's surface for both play rocks of the
+  three river villages (nubian, bambara, mandinka).
+  Browser: `polish --section=children-bank-game` is the narrow rung this point iterates on —
+  about two minutes a run — and a picture check of the tap moment measures the hand's screen
+  position against the rock's silhouette. The covering run is what the point owes at its END,
+  not after every edit. The both-backends lane was set by PART B's water surface and left with
+  it; the lane here follows `isBackendSensitivePath` over what the tap actually touches.
+  Screenshot: verification/1065-tapping-child-at-its-rock.png (subject declared: the tapping
+  child at its rock).
+  COVERING RUN, 10.09.2026 16:20–17:55 CEST: LARGE, WebGL 2 lane, RED (exit 1) after 95m 33s,
+  138 frames, HEAD 764ecb808. SEVEN failing suites, and NOT ONE of them is this branch's.
+  Measured, not argued:
+  - `settings` ground-detail, `enrichments` dressing-growth (point 278) and `crossbrowser`
+    chromium-mobile are the three recurring foreign reds already named in point 1089.
+  - `benchmark` (6 checks, "restored: ssaoEnabled" and its siblings) — classified against the
+    merge-base 4b81b945e, two runs: PRE-EXISTING, already 9 failing on the baseline.
+  - `gamepad` position-query DE — classified the same way: UNSTABLE ON BASELINE (green on
+    baseline run 1, red on run 2), so the baseline decides nothing and the branch owns nothing.
+  Evidence: local/verify-baseline-logs/{benchmark,gamepad}-baseline-4b81b945e8a0-run{1,2}.log,
+  .claude/worktrees/point-1065/local/verify-logs/2026-09-10T14-20-09-713-large.log.
+  Under the user's decision of 10.09.2026 ("Regression bleibt, fremde Reds entkoppeln") none of
+  these holds the point. What the point still owes is its OWN evidence: the narrow
+  `polish --section=children-bank-game` rung and the declared tap screenshot.
+  Quotes:
+  Nutzer, 06.09.2026 13:48: »Wenn ein Kind beim Fangspiel an den Felsen tippt und ROCK sagt, berührt seine Hand nicht annähernd den Felsen. Das Kind steht in dem Augenblick noch sehr seit davon entfernt. So erkennt man nicht, dass das Gesprochene etwas mit dem Felsen zu tun hat und man könne eher glauben, dass es "Los!" o. ä. bedeutet.«
+  Nutzer, 06.09.2026 13:48 (Einreihung aller drei Punkte): »An der Kommunikationsmechanik zu überarbeiten, einzureihen direkt nach 1058, in der Rehenfolge, in der ich es hier aufzähle:« — PART A war der ZWEITE der drei, PART B der DRITTE; die vom Nutzer genannte Reihenfolge bleibt innerhalb dieses Punktes erhalten.
+  Refs: src/scenes/place/bankGame.ts (THE TAP ~626, reachDistance/standOff ~223),
+  src/config/balance.ts (bankGame reachDistance 2.2, standOff 2.6), src/render/gesture.ts
+  (GestureKind), src/render/figurePose.ts, src/scenes/place/layout.ts (PLAY_ROCK_RADIUS),
+  src/scenes/place/PlaceLife.tsx, design.md §13.4, docs/communication-poc-spec.md.
+  Doc impact: design.md §13.4 and docs/communication-poc-spec.md item 4: the catcher touches
+  the rock with its hand while naming it. If a new gesture kind is added, the point-479
+  gesture list in the code comments / docs names it.
+  Readings one to four, 08.09.2026 (branch, WebGPU; the runs and their numbers are in the
+  branch's commits). They closed everything but one red, and each cause was a different kind of
+  wrong: the tap's hold was armed by the RUN rather than by the WORD, so a run whose tapper could
+  not reach its stone opened silently and still froze the group; the water carrier reached the
+  water but stopped inside the shared 1.10 m arrival radius, which on the bank's slope is 18 cm
+  of height, so his jar never went under the drawn surface (`FILL_ARRIVE_RADIUS` 0.35 for that
+  leg alone, `BANK_FILL_DEPTH` 0.10 → 0.20 m). A nominal spot is not a standing place, and the
+  pure tests now WALK the way the scene walks. PART B was then green IN THE PICTURE — the
+  carrier goes in, dips below the drawn surface and comes back with a jar that shows its water.
+  PART A kept ONE red, always the same number, and the fourth reading left a hypothesis for it:
+  the gate is satisfied in the SIMULATION while the check reads the DRAWN hand off the scene
+  graph. Two things it ruled out on the way: the check is not badly written (measured strictly
+  inside the hold it read the same), and the tap, the walk and the probe all mean the same rock.
+  Fifth reading, 08.09.2026 17:30, WebGPU on the branch: THE HYPOTHESIS HELD, and the cause is
+  the DRAWING, not the round. It was measured rather than argued: the scene now records the
+  tapping child at the utterance itself (`__placeTapHand().opening`), and that reading was 54 cm
+  of arm off the stone with the shoulder still drawn at REST (0.04 rad), on the stone from the
+  next frame on. That is exactly the 58 cm the section had been failing at.
+  - THE MECHANISM. A figure applies its pose in its OWN frame callback, and React subscribes a
+    child's callback before its parent's — so a pose written by the scene was drawn one frame
+    late, and a gesture issued together with a word was drawn after the word had fallen. Body
+    position and facing never lagged: the scene writes those onto the group directly.
+  - THE FIX. `src/render/figurePose.ts` is now the one place that puts a pose on its pivots; a
+    figure publishes its pivots to the caller that owns its pose and stops applying an owned pose
+    itself. Both writers — the children at the bank and the adults at their work — apply in the
+    frame they write. Measured after: 1.6 cm off the drawn flank in the very frame the word falls.
+  - WHY THE RED CAME AND WENT. The check broke out of its sampling loop at its FIRST good
+    reading, so which single frame of a nine-second hold it measured was luck. It now reads the
+    hold frame by frame, prints the shape it read, and asserts the utterance frame from the
+    scene's own record instead of hoping a sample lands on it.
+  - NOT FIXED HERE, and no player impact known: the adults' `speakWork` runs AFTER their pose
+    loop, so an adult's gesture is still written on the frame after the word. Their teaching
+    checks are green and nothing measures it; noted rather than churned.
+  THE TAP'S OWN GESTURE CLOCK RUNS A FRAME AHEAD OF THE HOLD (measured 08.09.2026, drained
+  here 09.09.2026). `polish/children-bank-game` read the catcher's hand 1 cm from the rock for
+  the whole hold and 10.6 cm at the last sample, 0.01 s before its end: the arm is already
+  swinging back while the hold still runs. Cause read off the code — `PlaceLife.tsx` starts the
+  gesture in `speakBankUtterance` and advances it through `advanceGesture` in the SAME frame,
+  while `bankGame.ts` subtracts the hold only on the next one (`tapFor` is set after the
+  decrement). The buffer `startGesture` builds in (`held + gestureBlendOf(kind)`) covers the
+  0.12 s blend, not the extra frame, and the error grows with `dt`. The remedy is to advance
+  every gesture BEFORE the new utterance is spoken, so the later call only reads: both clocks
+  become one and the blend begins exactly at the hold's end.
+  BOTH BACKENDS NOW SAY THE SAME THING (11.09.2026, commit dc3fd8984). The narrow rung the
+  point owed ran on WebGPU — `polish --section=children-bank-game`, 3m 58s, exit 0, 21 pass,
+  0 fail on 764ecb808 — and the covering WebGL 2 LARGE had `polish` at 249 pass, 0 fail. The
+  declared frame verification/1065-tapping-child-at-its-rock.png carries the WebGPU shutter,
+  and both pictures were judged: the child's hand lies on the drawn flank of the play rock
+  while the word falls. The change is backend-sensitive by `isBackendSensitivePath`, and this
+  is the lane it owed.
+  Bundle: Dorfleben.
