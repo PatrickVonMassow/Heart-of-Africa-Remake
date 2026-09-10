@@ -27281,3 +27281,86 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Criticality: medium — no product behaviour, but it stops landings half-way and manufactures reds
   that train sessions to retry a suspect gate.
   Bundle: Session- & Repo-Hygiene.
+
+- [x] 955. The unit gate refuses while a delegated author commits, so the push gate goes red for no
+  defect (measured 26.08.2026, 20:33, with two Sol authoring lanes running).
+  `scripts/repository-integrity.mjs` asserts in the Vitest GLOBAL TEARDOWN that no ref moved while
+  the unit suite ran, and it fails the whole run when one did: "LIVE REPOSITORY CHANGED WHILE UNIT
+  SUITE RAN: refs changed: refs/heads/feat/943-…". Delegated authors commit on their own branches
+  every few minutes BY DESIGN — `author-sol.mjs` pushes the branch for them — so every unit run that
+  overlaps a busy lane dies, which is every run the owner makes while lanes are busy and every
+  pre-push gate. The check's own message already names the legitimate case, and the pre-push gate's
+  single re-run is what rescued tonight's push; that re-run is a fail-soft, not an answer, because it
+  costs a full unit suite and reports SUSPECT.
+  AND IT KILLS A FULL REGRESSION, NOT ONLY A UNIT RUN (measured 29.08.2026, 19:21-19:32, on
+  `feat/687-roam-bound-fixes` with NO lane running at all). The LARGE run's own `unit` stage went
+  red on `keeps both a shared clone and its live source unchanged with clone-local GIT_DIR` — "one
+  or more worktree indexes changed" — because the SAME session was doing its ordinary main-branch
+  bookkeeping while the suite ran: one commit and one push at 19:22, plus board publishes. Nothing
+  was wrong with the code and nothing leaked; the run simply overlapped the owner writing down what
+  the run was for. The cost is not one suite but eighty-five minutes of both-backend regression
+  thrown away, and the only way to avoid it today is a rule no guard enforces: touch no ref while a
+  LARGE runs. That rule is unworkable in practice, because a LARGE is exactly when there is time for
+  bookkeeping.
+  IT IS NOT ONLY THE DELEGATED LANES — THE OWNER TRIPS IT ON EVERY POINT START (measured
+  27.08.2026, 00:09-00:12Z, on main `6edd81fd`, with NO authoring lane running yet). The chain,
+  end to end: `batch-doctor --gate` began `npm run test:unit` at 00:09:44Z; at 00:12:28Z the same
+  owner session created `feat/957-contribution-scoped-review`, which is the mandated FIRST step of
+  the next point; at 00:12:32Z the suite finished with 430 files and 14 015 tests ALL PASSED and
+  the teardown failed the run on `refs changed: refs/heads/feat/957-…`. So the exposure is not
+  confined to a busy evening of parallel authors: the owner's own `git worktree add` and its own
+  bookkeeping commit on `main` move a ref just as reliably, which puts every point start and every
+  cross-cutting commit in the window. Reproduced the same hour from a manual `npm run test:unit`,
+  again all 430 files green, exit 1 on the same teardown.
+  AND IT COMPOUNDS WITH 455, WHICH IS HOW THE GREEN TREE STAYED UNKNOWN. `batch-doctor` reads only
+  the exit code, so it saw a red; its load probe then excused that red as INCONCLUSIVE on "7 live
+  agent worktree(s)" that held no process and had not been written to for 3 to 14 days. A false red
+  from this point therefore collects a false excuse from 455, and neither mechanism ever learns
+  what was true — that the tree was entirely green. Whichever of the two is built first, its test
+  should name the other, because each one alone still leaves the pair silent.
+  FINAL STATE: the teardown distinguishes TEST LEAKAGE into the live repository from a foreign
+  branch's own progress. A ref that belongs to a declared in-flight lane, or any ref that is neither
+  the running checkout's HEAD nor its branch, is not this suite's leakage and does not fail the run;
+  what remains — the running checkout's own refs, the index, the working tree — still fails loud.
+  MEASURED A THIRD TIME 28.08.2026, 02:52, AND THE RE-RUN DID NOT RESCUE IT. A cross-cutting
+  `main` push ran the pre-push gate twice; BOTH runs were red on this teardown and neither named a
+  failing test — "unit ran 435 files / 14110 tests and its summary named NO failing test, yet the
+  runner exited non-zero" — while the delegated Sol lane for point 946 committed
+  `4f044565 -> ca139085` during the first run and `ca139085 -> d11c541c` during the second. So the
+  single re-run this point calls a fail-soft is not one: a lane that commits every few minutes
+  reds both runs, and the gate then reads that as "the re-run did not clear it, so it blocks". The
+  push only went through on a later manual attempt that happened to fall in a quiet window. Add to
+  the final state that the gate's verdict NAMES a teardown red over foreign activity as an
+  environment condition and says which lane collided, rather than reporting it as a blocking red.
+  MEASURED A FOURTH TIME 03.09.2026, 07:27-07:31 — AND THIS TIME A GUARD ORDERED IT. The new
+  element is not another collision but its cause: the owner was DIRECTED into it. Declaring the
+  wait for point 1047's both-backends LARGE run, `batch-in-flight` REFUSED the declaration because
+  two of three agent slots stood free, named eight independent open points and demanded either a
+  commission or a written reason. The owner complied and commissioned GPT-5.6 Sol onto point 1049
+  in its own worktree; Sol's FIRST commit — the commission record it writes before it even starts —
+  killed the run 3m51s in on `refs/heads/feat/1049-queue-order-rule <absent> -> 9815ce1b1`. So the
+  rule this point calls unworkable ("touch no ref while a LARGE runs") is not merely unenforced:
+  another guard actively punishes obeying it, and the owner had to stop the author it had just been
+  told to start. The same edge caught the board in the same hour — `board-publish.mjs` commits to
+  `refs/heads/board`, so the dashboard duty is a ref mutation too and the publish had to be held
+  until the unit stage passed, which is only knowable by reading `run-all.mjs` to learn that the
+  second backend pass skips the preflight. Add to the final state: while a browser regression is
+  declared in flight, the agent-pool guard stands down, or the declaration itself is the account
+  its free slots need.
+  VERIFIABLE: Vitest over the decision — a moved foreign branch passes, a moved own HEAD fails, and
+  an undeclared foreign ref is reported by name rather than silently allowed.
+  Criticality: medium-high — it turns every parallel authoring evening into red gates that hide real
+  reds among false ones.
+  MEASURED AGAIN 07.09.2026, and this time it BLOCKED the main session for half an hour: three
+  commits on `main` failed the pre-push gate twice with `LIVE REPOSITORY CHANGED WHILE UNIT SUITE
+  RAN: refs changed: refs/heads/feat/1069-wsl-vm-death e3edd33 -> 4506bc7; worktree registrations
+  changed; one or more worktree indexes changed` — GPT-6 Astra committing in
+  `.claude/worktrees/point-1069`, exactly what CLAUDE.md §6 requires of it. Build, lint and audit
+  were green each time. The push only went through once the author's run had finished. Two things
+  the 26.08. reading did not yet show: the collision now meets `push-arrival-guard`, which refuses
+  to let a turn END on unpushed work, so the session was wedged between two rules rather than
+  merely slowed; and load makes the gate spend its one re-run BEFORE the decisive red (99 % CPU
+  across 16 cores, six concurrent vitest runs), so the retry that exists for false reds was already
+  gone when the real refusal came. Raises the criticality: with maximum delegation an author is
+  almost always committing, so `main` is almost never pushable.
+  Bundle: Urlaubsfestigkeit.
