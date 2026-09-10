@@ -1262,14 +1262,20 @@
       "place": "last"
     },
     "1085": {
-      "at": "2026-09-09T20:42:22.517Z",
-      "why": "Die Handlung ist gebaut und geprüft; nur ihre Lesbarkeit fehlt, und die braucht eine Gestaltungsentscheidung statt Eile.",
-      "origin": "machine",
-      "place": "last"
+      "at": "2026-09-10T00:49:30.955Z",
+      "why": "Nutzer-Anordnung 10.09.2026 02:15: die Designentscheidung zur Haltung am Wasser wird vorgezogen, weil das Wasserholen ohne sie nicht grün werden kann",
+      "origin": "user",
+      "place": "ahead"
     },
     "1086": {
       "at": "2026-09-09T20:53:21.296Z",
       "why": "Vom Nutzer am 09.09.2026 ausdrücklich angeordnet, nachdem er zweimal nachgefragt hatte — eine abgelegte Regel bindet die nächste Sitzung nicht.",
+      "origin": "user",
+      "place": "ahead"
+    },
+    "1087": {
+      "at": "2026-09-10T00:49:31.047Z",
+      "why": "Nutzer-Anordnung 10.09.2026 02:15: das Wasserholen bleibt direkt hinter seiner Designentscheidung und der neuen Pruefleiter statt ans Ende zu wandern",
       "origin": "user",
       "place": "ahead"
     }
@@ -1304,7 +1310,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-09T20:53:21.306Z",
+    "at": "2026-09-10T00:49:31.057Z",
     "points": [
       174,
       184,
@@ -1687,7 +1693,8 @@
       1082,
       1084,
       1085,
-      1086
+      1086,
+      1087
     ]
   }
 }

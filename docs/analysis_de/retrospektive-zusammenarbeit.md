@@ -51,6 +51,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 
 | 09.09. | Nutzerfrage „sollte da nicht ein Kind auf einen Stein klettern?“ — gebaut, feuernd, nie sichtbar: der Test prüfte das Flag, das die Reparatur selbst setzt, und die Bildspur hatte den Fall weggeschaltet (§3.252); zwei Kinderlauf-Grenzwerte reißen, beide an einer einzigen Stichprobe gemessen |
 | 09.09. abends | Ein Punkt verbraucht 16,3 Maschinenstunden Verifikation — fünf volle LARGE-Läufe, alle rot —, ohne dass jemand eine Regel bricht: die Leiter stand im Auftrag, der letzte rote Lauf druckte seine Zwei-Minuten-Sprosse selbst mit, und die Planzahlen vom Juli ließen jeden Ausreißer normal aussehen (§3.253, Schwesterfall zu §3.249); freigegeben werden vier Maßnahmen, die Anthropic und die Gegenseite nach deren Audit gemeinsam tragen |
+| 10.09. nachts | Die schmale Sprosse wurde zwölfmal geklettert und war zwölfmal grün — der volle Lauf fiel danach auf genau denselben zwei Prüfungen, weil ein Merge sie ungeprüft überholt hatte und der Abschnitt ein anderes Fenster misst als die Suite: die am Vorabend angeordnete Leiter hätte nichts verweigert (§3.255); dieselbe Nacht zeigt die Faltung zweier Hälften, die einen Regressionslauf sparen sollte und die fertige Hälfte drei Tage ihre Landung kostete |
 | 13.08. | Der Nachprüfer findet eine echte zweite Klippe im geheilten Mechanismus — und jede der fünf gemessenen Kuren verschlechtert gesunde Dörfer stärker, als der Fehler schadet: Befund wird gebucht statt behoben (§3.115) |
 | 20.08. | Der Dokumentschnitt strich Regeln als »von einem Wächter abgedeckt«, ohne einen einzigen Wächter darauf zu prüfen — die Kontextanzeige verschwand, der Nutzer fand es (§3.134); eine vom Nutzer gesetzte Rangfolge wurde in einer Nacht zweimal maschinell überholt, ohne dass irgendwo ein Grund stand (Punkt 614); zwei Werkzeuge derselben Bauart am falschen Ort gemessen — im Hauptbaum gebaut und geprüft, während der Prozess die Arbeit in den isolierten Bereich schickt (§3.137) |
 | 21.08. | Ein Tor verlangte eine Freigabe, die seine eigenen Werkzeuge nicht herstellen können — der HIGH-Punkt war gemergt, geprüft und freigegeben, und der Zugausgang wies ihn trotzdem ab (§3.153) |
@@ -1450,7 +1451,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 09.09.2026, 22:53 · Quellen-Fingerprint: `708cb3b11a31…`
+Zuletzt aktualisiert: Donnerstag, 10.09.2026, 02:49 · Quellen-Fingerprint: `adf839b100f6…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1490,7 +1491,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to the OpenAI lane, GPT-6 Astra), and review is cross-vendor, not Fable-by-default | 6 | hoch | — (Regel/Memory) | ◐ Regel |
 | Iterate on the new feature's OWN test first; the full regression runs once at the end, never as the debugging loop | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 68 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 69 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | wait-command-guard.mjs | ✔ Mechanismus |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | User 18.08.2026: hard, complex, error-prone and HIGH-criticality points are AUTHORED by the OpenAI lane directly (GPT-6 Astra since 05.09.2026, GPT-5.6 Sol before) — Opus 5 authors only what is left, and Fable authors only a point that tags its lane or one the router escalates | 5 | hoch | — (Regel/Memory) | ◐ Regel |
@@ -1556,8 +1557,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 96 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 126 Prozess-/Meta-TASKS-Punkte (davon 60 offen).
 
-<!-- RETRO-FINGERPRINT: 708cb3b11a3131212c8b1ad2c2604e2d7e1e5df671876a9517dbd316a155cabc -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-09T20:53:22.251Z -->
+<!-- RETRO-FINGERPRINT: adf839b100f61bae172b8b54f8672a98136ba2063c2a4a79065e4b59ef481790 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-10T00:49:34.147Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -6340,3 +6341,37 @@ Entscheidungen, für die sie nie genau genug war.
 Bemerkenswert ist auch, WORAN die Lebendigkeit hing: nicht am Log, das eine Bildsuite
 naturgemäß minutenlang schweigen lässt, sondern an den Schreibzeiten der Bilder — dem
 einzigen Signal, das das Urteil nicht liest. Gebucht als Punkt 1084.
+
+### 3.255 Die billige Sprosse war grün, und der teure Lauf war rot
+
+Die Nacht zum 10.09.2026 ist das dritte Kapitel derselben Geschichte, und sie dreht die
+Lehre von §3.253 um. Dort war die schmale Sprosse übersprungen worden; hier wurde sie
+zwölfmal geklettert. `polish --section=adult-errands` lief am 09.09. zwölfmal, je etwa zwei
+Minuten, und war jedes Mal grün — 18 bestanden, 0 gefallen, zuletzt um 22:40. Der volle
+LARGE-Lauf um 01:13 fiel dann auf genau denselben zwei Prüfungen: „no carrier was ever seen
+filling a jar", ein einziger Botengang im Messfenster, Phasen [invite×832 wait×583
+walk×550 fetch×33].
+
+Die Leiter, die der Nutzer am Vorabend angeordnet hatte, hätte an diesem Abend also nichts
+verweigert und nichts verhindert. Das ist der Fund: **Eine erzwungene Sprosse, die grün
+meldet, wo der Lauf über ihr rot wird, kauft keine Zeit, sondern falsche Sicherheit.** Zwei
+Ursachen waren messbar. Erstens altert eine Sprosse nicht nur an der eigenen Änderung: Zwei
+Merges von main landeten gegen 23:35 nach dem letzten grünen Abschnittslauf, und der wurde
+nie wiederholt — ein Merge bringt fremdes Material in genau die Dateien, die die Suite
+abdeckt. Zweitens misst der Abschnitt etwas anderes als der Vollauf: Allein bekommt die
+Szene ihre Botengänge zuverlässig, in der vollen Suite teilt sie sich den Lauf mit rund 250
+anderen Prüfungen und sah einen einzigen, die Füllphase in 33 von etwa 2000 Phasen-Ticks.
+Ein Prüfling, den die Suite selten auslöst, braucht ein Fenster, das beide Läufe gleich
+groß macht — oder die Prüfung muss sagen, dass ihr schmales Grün nichts vorhersagt.
+
+Daneben steht der zweite Fund derselben Nacht, und er betrifft nicht die Messung, sondern
+den Zuschnitt der Arbeit. Punkt 1066 war am 07.09. in 1065 eingefaltet worden, ausdrücklich
+um einen Regressionslauf zu sparen. Gemessen über drei Tage: 36 Commits, rund sechzig
+Bildläufe, die Tipp-Hälfte durchgehend grün, jedes Rot der letzten zwei Tage bei der
+Wasser-Hälfte — die ihrerseits an einer Designfrage hängt, die kein Kamerawinkel löst.
+Die Faltung hat keinen Lauf gespart und der fertigen Hälfte ihre Landung gekostet.
+**Zwei Hälften, die kein gemeinsames Grün erreichen können, teilen sich keinen Punkt.**
+Die Ersparnis einer Bündelung ist nur echt, wenn beide Hälften plausibel im selben Lauf
+grün werden; sonst zahlt die schnellere die Verzögerung der langsameren. Aufgeteilt am
+10.09. auf Anordnung des Nutzers: 1065 trägt das tippende Kind, 1087 den Wasserträger, und
+die Sprossen-Ergänzung ist in Punkt 1086 eingearbeitet.
