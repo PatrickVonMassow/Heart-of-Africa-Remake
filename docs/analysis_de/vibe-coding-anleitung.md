@@ -576,8 +576,8 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   Verweigerung und eigene Abhilfe laufen gegeneinander.
   → *Prompt:* „Eine Schranke, die einen Nachweis fordert, muss ‚wird gerade erstellt' als
   eigenen Zustand **durchlassen** — sonst verbietet sie ihre eigene Erfüllung. Verweigert sie
-  trotz nachweislich gelungener Reparatur, **miss zuerst dein Arbeitsverzeichnis, in einem
-  eigenen Aufruf**: Sie urteilt über die Wurzel, aus der sie läuft."
+  trotz nachweislich gelungener Reparatur, **miss dein Arbeitsverzeichnis und bau ihren
+  Aufruf nach**: Sie urteilt über die Wurzel, aus der sie läuft."
 
 - **Ein Rot, das bei gleichem Code kommt und geht, ist ein Befund über deine MESSUNG.** Eine
   Stichprobe aus einem langen Vorgang trifft den Defekt mal und verfehlt ihn mal.
