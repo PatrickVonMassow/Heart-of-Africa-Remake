@@ -500,6 +500,22 @@ lets the run proceed by design. Whether that is worth a refusal rather than a
 warning is a judgement for whoever next touches that check — it costs two runs
 each time, and it happened twice in one night.
 
+## The guard's own unit file sits close enough to the per-test cap to red under load (measured 10.09.2026)
+
+Non-blocking, collected — and a near relative of the entry above. `scripts/mechanism-review-guard.test.mjs`
+runs 65 cases in 34.0 s on a quiet machine, which puts its slowest single case within reach of the
+20 s per-test timeout. On 10.09.2026 a covering LARGE run and a `batch-doctor --gate` overlapped —
+both run the whole unit suite — and the LARGE died 5m 23s in on exactly that file, with
+`bootstrapBase > seeds the anchor from the one shape that carries the flag AND the baseline` timing
+out. Nothing was wrong with the product: the same file passed in the doctor's own gate and in a
+standalone `vitest run` of all 465 files the same hour.
+
+The run diagnosed itself correctly ("UNDER LOAD — the unit stage failed on a machine whose quiet
+could not be verified"), so no mechanism is missing. What is collected here is the MARGIN: a unit
+file this near the cap converts any contention into a red that costs a whole two-hour run, and it is
+the second time in two days that one run has been paid for by another starting beside it. Whoever
+next touches that file can buy the margin back by splitting its slowest case; nobody needs to.
+
 ## The fill frame's camera picks a side without checking it (09.09.2026)
 
 Non-blocking, collected. The frame of the water carrier now stands square to
