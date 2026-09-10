@@ -1455,7 +1455,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 10.09.2026, 14:49 · Quellen-Fingerprint: `15ed1f6990f9…`
+Zuletzt aktualisiert: Donnerstag, 10.09.2026, 15:41 · Quellen-Fingerprint: `a0ef47129684…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1561,8 +1561,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 96 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 126 Prozess-/Meta-TASKS-Punkte (davon 60 offen).
 
-<!-- RETRO-FINGERPRINT: 15ed1f6990f9c922697b0490d94eebd9274a23bfed7be3c7dadfc12fb5595b31 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-10T12:49:47.823Z -->
+<!-- RETRO-FINGERPRINT: a0ef47129684ae70ec9b49916f5c3680fdd4d05fc4461d84ac14f4bcdc6255d1 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-10T13:41:55.738Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -6379,3 +6379,53 @@ Die Ersparnis einer Bündelung ist nur echt, wenn beide Hälften plausibel im se
 grün werden; sonst zahlt die schnellere die Verzögerung der langsameren. Aufgeteilt am
 10.09. auf Anordnung des Nutzers: 1065 trägt das tippende Kind, 1087 den Wasserträger, und
 die Sprossen-Ergänzung ist in Punkt 1086 eingearbeitet.
+
+
+### 3.256 Der Lauf überlebte seine Sitzung — und lieferte die Antwort an niemanden
+
+Am 10.09.2026 um 15:21 begann eine neue Sitzung, weil keine mehr lief. Im Arbeitsbaum
+des Punktes 1065 standen 135 geänderte Bilddateien, dazu eine Quittung, die niemand je
+gelesen hatte: ein voller LARGE-Lauf, um 11:46 UTC gestartet, 94 Minuten und 43 Sekunden
+gelaufen, 138 Bilder geschrieben, fertig geworden um 15:21 — also genau in der Minute, in
+der die neue Sitzung startete, und lange nachdem die bestellende Sitzung gestorben war.
+Sein Urteil zum eigentlichen Gegenstand: `polish` 249 bestanden, 0 gefallen. Die Prüfung,
+die fünfmal an derselben Zahl gescheitert war, war grün.
+
+Das ist der Gegenfall zu §3.244 mit umgekehrtem Vorzeichen, und er ist nicht der harmlose.
+Dort starb die Messung mit ihrer Sitzung; hier hat sie überlebt und trotzdem fast nichts
+genützt, weil ihr Ergebnis an keinen Empfänger adressiert war. Der Zustand, in dem sie lag,
+sieht für jede Nachfolgesitzung aus wie Unordnung: uncommittete Binärdateien, ein Zweig
+ohne neuen Commit, eine `--status`-Abfrage im HAUPTBAUM, die einen alten Schrott-Datensatz
+meldet, weil die Quittung im Arbeitsbaum des Punktes liegt. Der billigste Reflex der
+Nachfolgerin ist, den Lauf zu wiederholen — zwei weitere Stunden für eine Antwort, die
+schon dastand.
+
+**Lehre:** Eine Messung ist nicht fertig, wenn der Prozess endet, sondern wenn ihr Urteil
+an einer Stelle steht, die eine fremde Sitzung ohne Verdacht findet. Solange das Ergebnis
+nur als Dateizustand existiert, ist es kein Ergebnis, sondern ein Fund — und ein Fund wird
+übersehen. Der erste Griff einer Wiederaufnahme gehört deshalb nicht dem Neustart, sondern
+den Quittungen der letzten Läufe, und zwar in JEDEM Arbeitsbaum, nicht nur im Hauptbaum.
+
+
+### 3.257 Wer nach der Hilfe fragt, löst die teure Handlung aus
+
+Der Backlog führte seit dem Morgen des 10.09.2026, dass `run-logged.mjs --help` keine
+Nutzung druckt, sondern die volle LARGE-Regression startet: fünf solcher Datensätze über
+vier Tage, jeder bis zu zwei Stunden einer geteilten Maschine, jeder mit einer Quittung,
+die aussieht wie ein echtes Rot. Am selben Nachmittag lief dieselbe Sitzung, die den
+Eintrag gelesen hatte, zweimal in dieselbe Falle: `run-all.mjs --help` öffnete die
+Regression und hatte Bau, Lint und Typprüfung hinter sich, ehe sie von Hand abgeschossen
+wurde, und `retro-refresh.mjs --help` führte den Refresh aus und schrieb den Zeitstempel
+der Retrospektive um.
+
+Die Klasse ist nicht „ein fehlender Hilfetext". Sie ist: **Ein Werkzeug, das ein unbekanntes
+Argument als gewöhnliche Eingabe behandelt, macht die Frage nach seiner Bedienung zur
+Ausführung seiner Wirkung.** Das trifft ausgerechnet den, der das Werkzeug NICHT kennt, und
+es trifft ihn am teuersten Punkt. Gegen das Wissen um den Eintrag hilft es nicht: Die
+Kenntnis war vorhanden und hat zweimal nicht gegriffen, weil `--help` bei jedem anderen
+Befehl gefahrlos ist und die Hand schneller ist als die Erinnerung.
+
+**Lehre:** Ein Werkzeug mit einer teuren oder schreibenden Wirkung muss ein unbekanntes
+Argument ABLEHNEN, nicht deuten. Und ein Backlog-Eintrag, der eine Klasse an einer einzigen
+Datei festmacht, lädt zur Wiederholung an den Geschwistern ein — die Fundstelle gehört
+gesucht, sobald die Klasse benannt ist.

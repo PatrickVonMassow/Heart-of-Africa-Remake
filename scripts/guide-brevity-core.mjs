@@ -440,7 +440,18 @@ export const LIMITS = {
   // to the four-line contract and dropping a cross-reference clause from the ladder prompt pays
   // back 8 lines and 84 words. Ceilings move 623 -> 634 with zero slack, and no existing claim
   // was dropped.
-  maxLines: 634,
+  // RAISED 10.09.2026 by the measured net of two genuinely new claims, both FOLDED rather than
+  // given entries of their own. First (§3.257): a tool that treats an unknown argument as ordinary
+  // input turns the question about its operation into the execution of its effect — asking three
+  // separate commands for help launched a two-hour regression, twice on the same afternoon by a
+  // session that had just read the finding. It went into "Verschlucken sieht aus wie Erfolg",
+  // which already carries the tool that misreads its own input; its title gained the second half
+  // and lost the never-started clause, which the prompt still states. Second: a verify run refuses
+  // a repository that moves under it, and the one most likely to move it is the session that
+  // ordered the run, obeying "commit every finished step" in another window — that half went into
+  // "Der Prüflauf verändert sein eigenes Projekt", which already demands the mechanism that caught
+  // it. Net after the fold: five lines and fifty-two words. Ceilings move 634 -> 639.
+  maxLines: 639,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -682,7 +693,9 @@ export const LIMITS = {
   // 5887 -> 5939.
   // 10.09.2026: the narrow-rung-lied and folded-halves pitfalls justified beside maxLines measure
   // 128 words after their cut: 5936 -> 6064.
-  maxWords: 6064,
+  // 10.09.2026 (second): the unknown-argument and write-nothing-while-a-run-runs claims justified
+  // beside maxLines measure 52 words after their fold: 6064 -> 6116.
+  maxWords: 6116,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,

@@ -405,9 +405,11 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Änderst du deine eigene Umgebung: Gibt es eine **kleinere Handlung**, die nur
   **ergänzt**? Und: **Wer räumt auf, wenn der Aufräumende nicht mehr da ist?**"
 
-- **Verschlucken sieht aus wie Erfolg — ein nie gestartetes Werkzeug wie ein strenges.**
+- **Verschlucken sieht aus wie Erfolg — und die Frage nach der Bedienung löst die Wirkung aus.**
   → *Prompt:* „Ein Ersatzwert im `catch` gilt nur, wenn er zu **weniger** Aktion führt.
-  ‚Nicht gestartet' ist ein eigener Fehlschlag, nie ein Ablehnen."
+  ‚Nicht gestartet' ist ein eigener Fehlschlag, nie ein Ablehnen. Ein Werkzeug mit teurer oder
+  schreibender Wirkung **lehnt ein unbekanntes Argument ab**, statt es zu deuten — sonst startet
+  `--help` den Zwei-Stunden-Lauf."
 
 - **„Nichts geliefert" wurde nie nachgemessen.** Ein Lauf meldet, er habe nichts geschrieben,
   während fertige, ungesicherte Arbeit danebenliegt.
@@ -460,7 +462,10 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 - **Der Prüflauf verändert sein eigenes Projekt.** Eine Suite, die ihren Zielpfad aus dem Quellort
   statt der Testumgebung nimmt, schreibt Zweige um und bleibt grün.
-  → *Prompt:* „Etabliere einen Mechanismus, der einen Prüflauf rot färbt, sobald er das Projekt verändert hat, in dem er läuft".
+  → *Prompt:* „Etabliere einen Mechanismus, der einen Prüflauf rot färbt, sobald er das Projekt
+  verändert hat, in dem er läuft — und **umgekehrt**: Solange ein Lauf läuft, schreibt **niemand**
+  ins Projekt. ‚Committe jeden fertigen Schritt' und ‚der Lauf verlangt einen unveränderten Stand'
+  stoßen sich sonst gegenseitig um."
 
 - **Grün über einem Programm, das nicht startet.** Der Testlader ist milder als der echte.
   → *Prompt:* „Laden Prüfstand und Betrieb **verschieden**, gib dem Betrieb einen eigenen Zeugen."
@@ -632,4 +637,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: adf839b100f61bae172b8b54f8672a98136ba2063c2a4a79065e4b59ef481790 -->
+<!-- GUIDE-FINGERPRINT: a0ef47129684ae70ec9b49916f5c3680fdd4d05fc4461d84ac14f4bcdc6255d1 -->
