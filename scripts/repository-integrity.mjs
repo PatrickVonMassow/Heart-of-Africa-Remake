@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process'
 import { readdirSync, readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { dirname, resolve } from 'node:path'
 import { withoutGitLocalEnvironment } from './repo-paths.mjs'
 
 const git = (root, args) =>
@@ -22,7 +22,8 @@ export function repositoryStatePaths(root = process.cwd()) {
   const checkout = resolve(root)
   const commonDir = resolve(git(checkout, ['rev-parse', '--path-format=absolute', '--git-common-dir']))
   const headPath = resolve(git(checkout, ['rev-parse', '--path-format=absolute', '--git-path', 'HEAD']))
-  return { checkout, commonDir, configPath: resolve(commonDir, 'config'), headPath }
+  const indexPath = resolve(git(checkout, ['rev-parse', '--path-format=absolute', '--git-path', 'index']))
+  return { checkout, commonDir, configPath: resolve(commonDir, 'config'), headPath, indexPath }
 }
 
 const worktreeAdministrativeDirectories = (commonDir) => {
@@ -40,25 +41,36 @@ const worktreeAdministrativeDirectories = (commonDir) => {
   return found
 }
 
-const administrativeFileState = (commonDir, name) =>
+const optionalFile = (path) => {
+  try {
+    return readFileSync(path)
+  } catch (error) {
+    if (error.code === 'ENOENT') return null
+    throw error
+  }
+}
+
+const administrativeFileState = (paths, name) =>
   Buffer.from(
     JSON.stringify(
-      worktreeAdministrativeDirectories(commonDir).map(([key, directory]) => {
-        try {
-          return [key, readFileSync(resolve(directory, name)).toString('base64')]
-        } catch {
-          return [key, null]
-        }
-      }),
+      worktreeAdministrativeDirectories(paths.commonDir)
+        .filter(([, directory]) => directory !== dirname(paths.headPath))
+        .map(([key, directory]) => {
+          try {
+            return [key, readFileSync(resolve(directory, name)).toString('base64')]
+          } catch {
+            return [key, null]
+          }
+        }),
     ),
   )
 
-/** Byte-for-byte state whose mutation makes a unit run unsafe.
+/** Capture owned state for enforcement and foreign state for run-log diagnostics.
  *
  * Remote-tracking refs are deliberately outside the boundary: the authoring
  * harness pushes this branch every two minutes and updates origin/* in this
- * same shared repository. Fixture damage has always landed under refs/heads;
- * those are the refs a local git command can move without network activity. */
+ * same shared repository. Other local branches and worktrees are observed, but
+ * cannot be enforced: a legitimate concurrent author changes the same bytes. */
 export function repositoryState(paths) {
   const refs = isolatedGit(
     ['--git-dir', paths.commonDir, 'for-each-ref', '--format=%(refname)%00%(objectname)', 'refs/heads'],
@@ -75,13 +87,17 @@ export function repositoryState(paths) {
     config,
     configEntries,
     head: readFileSync(paths.headPath),
+    index: optionalFile(paths.indexPath),
     worktrees: isolatedGit(['--git-dir', paths.commonDir, 'worktree', 'list', '--porcelain', '-z']),
-    worktreeHeads: administrativeFileState(paths.commonDir, 'HEAD'),
-    worktreeIndexes: administrativeFileState(paths.commonDir, 'index'),
+    foreignWorktreeHeads: administrativeFileState(paths, 'HEAD'),
+    foreignWorktreeIndexes: administrativeFileState(paths, 'index'),
   }
 }
 
-const changed = (before, after, field) => !before[field].equals(after[field])
+const changed = (before, after, field) =>
+  before[field] === null || after[field] === null
+    ? before[field] !== after[field]
+    : !before[field].equals(after[field])
 
 const refMap = (snapshot) =>
   new Map(
@@ -99,8 +115,10 @@ const refChanges = (before, after) => {
     .sort()
     .filter((name) => beforeRefs.get(name) !== afterRefs.get(name))
     .map(
-      (name) =>
-        `${name} ${beforeRefs.get(name) ?? '<absent>'} -> ${afterRefs.get(name) ?? '<absent>'}`,
+      (name) => ({
+        name,
+        detail: `${name} ${beforeRefs.get(name) ?? '<absent>'} -> ${afterRefs.get(name) ?? '<absent>'}`,
+      }),
     )
 }
 
@@ -132,7 +150,14 @@ const headValue = (snapshot) => JSON.stringify(snapshot.head.toString('utf8').tr
 
 export function assertRepositoryUnchanged(before, after) {
   const details = []
-  if (changed(before, after, 'refs')) details.push(`refs changed: ${refChanges(before, after).join(', ')}`)
+  const foreign = []
+  // Bind ownership to the initial HEAD, even if the suite switches branches.
+  // Detached HEADs own no branch ref; unborn branches still own their named ref.
+  const ownRef = /^ref: (.+)$/.exec(before.head.toString('utf8').trim())?.[1]
+  for (const { name, detail } of refChanges(before, after)) {
+    if (name === ownRef) details.push(`own branch ref changed: ${detail}`)
+    else foreign.push(`foreign ref changed: ${detail}`)
+  }
   if (changed(before, after, 'config')) {
     const keys = configChanges(before, after)
     details.push(
@@ -146,15 +171,18 @@ export function assertRepositoryUnchanged(before, after) {
   if (changed(before, after, 'head')) {
     details.push(`head changed: ${headValue(before)} -> ${headValue(after)}`)
   }
-  if (changed(before, after, 'worktrees')) details.push('worktree registrations changed')
-  if (changed(before, after, 'worktreeHeads')) details.push('one or more worktree HEADs changed')
-  if (changed(before, after, 'worktreeIndexes')) details.push('one or more worktree indexes changed')
+  if (changed(before, after, 'index')) details.push('own index changed')
+  if (changed(before, after, 'worktrees')) foreign.push('worktree registrations changed')
+  if (changed(before, after, 'foreignWorktreeHeads')) foreign.push('foreign worktree HEADs changed')
+  if (changed(before, after, 'foreignWorktreeIndexes')) foreign.push('foreign worktree indexes changed')
+  for (const detail of foreign) {
+    console.info(`REPOSITORY INTEGRITY (informational): ${detail}; does not fail the unit run.`)
+  }
   if (details.length === 0) return
   throw new Error(
     `LIVE REPOSITORY CHANGED WHILE UNIT SUITE RAN: ${details.join('; ')}. ` +
-      'This may be test leakage, but a legitimate commit or branch operation in another worktree ' +
-      'during the run produces the same result. Inspect the named changes and concurrent activity ' +
-      'before deciding whether any restoration is needed.',
+      'The running worktree\'s own HEAD, index, branch ref, or shared config changed. ' +
+      'Inspect these changes for test leakage before deciding whether any restoration is needed.',
   )
 }
 

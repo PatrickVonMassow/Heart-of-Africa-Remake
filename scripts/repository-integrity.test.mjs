@@ -1,6 +1,6 @@
-import { afterEach, beforeEach, describe, expect, inject, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, inject, it, vi } from 'vitest'
 import { execFileSync, spawnSync } from 'node:child_process'
-import { appendFileSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { appendFileSync, mkdtempSync, realpathSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
@@ -18,8 +18,10 @@ describe('unit-suite repository integrity guard', () => {
   let repo
   let runGit
   let temporaryDirectories
+  let log
 
   beforeEach(() => {
+    log = vi.spyOn(console, 'info').mockImplementation(() => {})
     repo = mkdtempSync(join(tmpdir(), 'hoa-repository-integrity-'))
     temporaryDirectories = [repo]
     runGit = (...args) =>
@@ -54,90 +56,148 @@ describe('unit-suite repository integrity guard', () => {
     expect(() => assertRepositoryUnchanged(repositoryState(paths), repositoryState(paths))).not.toThrow()
   })
 
-  it('names added, removed, and moved refs with their old and new object ids', () => {
+  it('logs added, removed, and moved foreign refs with their old and new object ids', () => {
     runGit('branch', 'removed-fixture-branch')
+    runGit('branch', 'moved-fixture-branch')
     const verify = protectRepository(repo)
     const oldObject = runGit('rev-parse', 'main')
-    const newObject = runGit('commit-tree', 'HEAD^{tree}', '-p', 'HEAD', '-m', 'fixture ref move')
+    const newObject = runGit('commit-tree', 'HEAD^{tree}', '-p', 'HEAD', '-m', 'foreign ref move')
     runGit('branch', '-D', 'removed-fixture-branch')
-    runGit('update-ref', 'refs/heads/main', newObject, oldObject)
+    runGit('update-ref', 'refs/heads/moved-fixture-branch', newObject, oldObject)
     runGit('branch', 'added-fixture-branch', newObject)
 
-    expect(verify).toThrow(
-      new RegExp(
-        `refs changed: refs/heads/added-fixture-branch <absent> -> ${newObject}, ` +
-          `refs/heads/main ${oldObject} -> ${newObject}, ` +
-          `refs/heads/removed-fixture-branch ${oldObject} -> <absent>`,
-      ),
-    )
+    expect(verify).not.toThrow()
+    for (const detail of [
+      `refs/heads/added-fixture-branch <absent> -> ${newObject}`,
+      `refs/heads/moved-fixture-branch ${oldObject} -> ${newObject}`,
+      `refs/heads/removed-fixture-branch ${oldObject} -> <absent>`,
+    ]) {
+      expect(log).toHaveBeenCalledWith(expect.stringContaining(`foreign ref changed: ${detail}`))
+    }
   })
 
   it('ignores remote-tracking updates made by the external branch pusher', () => {
     const verify = protectRepository(repo)
     runGit('update-ref', 'refs/remotes/origin/main', 'HEAD')
     expect(verify).not.toThrow()
+    expect(log).not.toHaveBeenCalled()
   })
 
-  it('does not blame the suite for a ref change that could come from another worktree', () => {
+  it.each(['main', 'linked'])('enforces only the %s checkout ownership', (runner) => {
+    const linked = addLinkedWorktree()
+    const root = runner === 'main' ? repo : linked
+    const foreignRoot = runner === 'main' ? linked : repo
+    const foreignPaths = repositoryStatePaths(foreignRoot)
+    const foreignRef = runner === 'main' ? 'integrity-linked' : 'main'
+    const verify = protectRepository(root)
+    runGit('update-ref', `refs/heads/${foreignRef}`,
+      runGit('commit-tree', 'HEAD^{tree}', '-p', 'HEAD', '-m', 'concurrent commit'))
+    writeFileSync(foreignPaths.headPath, 'ref: refs/heads/foreign-switched\n')
+    writeFileSync(foreignPaths.indexPath, 'foreign index\n')
+
+    expect(verify).not.toThrow()
+    expect(log).toHaveBeenCalledWith(expect.stringContaining(`foreign ref changed: refs/heads/${foreignRef}`))
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('foreign worktree HEADs changed'))
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('foreign worktree indexes changed'))
+  })
+
+  it.each(['HEAD', 'index'])('logs an isolated foreign %s change without failing', (name) => {
+    const linked = addLinkedWorktree()
+    const paths = repositoryStatePaths(linked)
     const verify = protectRepository(repo)
-    const oldObject = runGit('rev-parse', 'main')
-    const newObject = runGit('commit-tree', 'HEAD^{tree}', '-p', 'HEAD', '-m', 'concurrent commit')
-    runGit('update-ref', 'refs/heads/main', newObject, oldObject)
-
-    let failure
-    try {
-      verify()
-    } catch (error) {
-      failure = error
-    }
-    expect(failure?.message).toContain('LIVE REPOSITORY CHANGED WHILE UNIT SUITE RAN')
-    expect(failure?.message).toContain(
-      'a legitimate commit or branch operation in another worktree during the run produces the same result',
-    )
-    expect(failure?.message).not.toContain('UNIT SUITE MUTATED')
+    writeFileSync(name === 'HEAD' ? paths.headPath : paths.indexPath,
+      name === 'HEAD' ? 'ref: refs/heads/foreign-switched\n' : 'foreign index\n')
+    expect(verify).not.toThrow()
+    expect(log).toHaveBeenCalledWith(expect.stringContaining(
+      name === 'HEAD' ? 'foreign worktree HEADs changed' : 'foreign worktree indexes changed',
+    ))
   })
 
-  it('fails when the shared repository config changes', () => {
-    const paths = repositoryStatePaths(repo)
-    const verify = protectRepository(repo)
-    appendFileSync(paths.configPath, '\n[core]\n\tbare = true\n')
-    expect(verify).toThrow(/config changed \(keys: core\.bare\)/)
-  })
-
-  it('fails when the checkout HEAD changes', () => {
-    const paths = repositoryStatePaths(repo)
-    const verify = protectRepository(repo)
-    writeFileSync(paths.headPath, 'ref: refs/heads/escaped\n')
-    expect(verify).toThrow(
-      /head changed: "ref: refs\/heads\/main" -> "ref: refs\/heads\/escaped"/,
-    )
-  })
-
-  it('fails when the worktree registry changes', () => {
-    const verify = protectRepository(repo)
-    addLinkedWorktree()
-    expect(verify).toThrow(/worktree registrations changed/)
-  })
-
-  it('fails when any registered worktree HEAD or index changes', () => {
+  it.each(['add', 'remove'])('logs worktree registration %s without failing', (operation) => {
     const linked = addLinkedWorktree()
     const verify = protectRepository(repo)
-    const gitPath = (name) =>
-      execFileSync('git', ['-C', linked, 'rev-parse', '--path-format=absolute', '--git-path', name], {
-        encoding: 'utf8',
-        windowsHide: true,
-      }).trim()
-    writeFileSync(gitPath('HEAD'), 'ref: refs/heads/escaped-linked-head\n')
-    writeFileSync(gitPath('index'), 'escaped fixture index\n')
-    expect(verify).toThrow(/one or more worktree HEADs changed; one or more worktree indexes changed/)
+    if (operation === 'add') addLinkedWorktree('another-linked')
+    else runGit('worktree', 'remove', linked)
+    expect(verify).not.toThrow()
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('worktree registrations changed'))
   })
 
-  it('makes the Vitest run red when a fixture writes into the common checkout', () => {
+  describe.each(['main', 'linked'])('running %s checkout', (runner) => {
+    let root
+    beforeEach(() => {
+      root = runner === 'main' ? repo : addLinkedWorktree()
+    })
+
+    it('fails when the shared config changes', () => {
+      const paths = repositoryStatePaths(root)
+      const verify = protectRepository(root)
+      appendFileSync(paths.configPath, '\n[core]\n\tbare = true\n')
+      expect(verify).toThrow(/config changed \(keys: core\.bare\)/)
+    })
+
+    it('fails when its HEAD changes', () => {
+      const paths = repositoryStatePaths(root)
+      const verify = protectRepository(root)
+      writeFileSync(paths.headPath, 'ref: refs/heads/escaped\n')
+      expect(verify).toThrow(/head changed: .* -> "ref: refs\/heads\/escaped"/)
+    })
+
+    it.each(['move', 'delete'])('fails on its own branch ref %s even with unchanged HEAD bytes', (operation) => {
+      const verify = protectRepository(root)
+      const ref = `refs/heads/${runner === 'main' ? 'main' : 'integrity-linked'}`
+      const oldObject = runGit('rev-parse', ref)
+      const newObject = runGit('commit-tree', 'HEAD^{tree}', '-p', 'HEAD', '-m', 'own ref move')
+      if (operation === 'move') runGit('update-ref', ref, newObject, oldObject)
+      else runGit('update-ref', '-d', ref)
+      expect(verify).toThrow(`own branch ref changed: ${ref} ${oldObject} -> ${operation === 'move' ? newObject : '<absent>'}`)
+    })
+
+    it.each(['modify', 'delete', 'create'])('fails on its own index %s', (operation) => {
+      const paths = repositoryStatePaths(root)
+      if (operation === 'create') unlinkSync(paths.indexPath)
+      const verify = protectRepository(root)
+      if (operation === 'delete') unlinkSync(paths.indexPath)
+      else writeFileSync(paths.indexPath, 'escaped fixture index\n')
+      expect(verify).toThrow(/own index changed/)
+    })
+
+    it('still fails on owned damage while reporting foreign changes', () => {
+      const paths = repositoryStatePaths(root)
+      const verify = protectRepository(root)
+      runGit('branch', 'foreign-added')
+      writeFileSync(paths.indexPath, 'escaped fixture index\n')
+      expect(verify).toThrow(/LIVE REPOSITORY CHANGED WHILE UNIT SUITE RAN: own index changed/)
+      expect(log).toHaveBeenCalledWith(expect.stringContaining('foreign ref changed: refs/heads/foreign-added'))
+    })
+  })
+
+  it('protects detached HEAD bytes without owning the previously checked-out branch', () => {
+    runGit('checkout', '--detach', '-q')
+    const verify = protectRepository(repo)
+    const newObject = runGit('commit-tree', 'HEAD^{tree}', '-p', 'HEAD', '-m', 'foreign branch move')
+    runGit('update-ref', 'refs/heads/main', newObject)
+    expect(verify).not.toThrow()
+    writeFileSync(repositoryStatePaths(repo).headPath, `${newObject}\n`)
+    expect(verify).toThrow(/head changed/)
+  })
+
+  it('protects an unborn branch ref and accepts a persistently absent index', () => {
+    runGit('checkout', '--orphan', 'unborn', '-q')
+    const paths = repositoryStatePaths(repo)
+    unlinkSync(paths.indexPath)
+    const verify = protectRepository(repo)
+    expect(verify).not.toThrow()
+    runGit('update-ref', 'refs/heads/unborn', 'main')
+    expect(verify).toThrow(/own branch ref changed: refs\/heads\/unborn <absent> ->/)
+  })
+
+  it.each(['own', 'foreign'])('returns the correct Vitest exit status for a %s branch mutation', (owner) => {
     const linked = addLinkedWorktree('integrity-runner')
     const detectorUrl = pathToFileURL(resolve('scripts/repository-integrity.mjs')).href
     const vitestPackage = dirname(createRequire(import.meta.url).resolve('vitest'))
     const vitestUrl = pathToFileURL(join(vitestPackage, 'dist', 'index.js')).href
     const cli = join(vitestPackage, 'vitest.mjs')
+    const ref = owner === 'own' ? 'refs/heads/integrity-runner' : 'refs/heads/main'
     writeFileSync(
       join(linked, 'vitest.config.mjs'),
       `export default { test: { environment: 'node', globalSetup: [${JSON.stringify(detectorUrl)}], include: ['escape.test.mjs'] } }\n`,
@@ -147,7 +207,7 @@ describe('unit-suite repository integrity guard', () => {
       `import { execFileSync } from 'node:child_process'\n` +
         `import { it } from ${JSON.stringify(vitestUrl)}\n` +
         `it('writes through the shared ref store', () => {\n` +
-        `  execFileSync('git', ['-C', ${JSON.stringify(repo)}, 'branch', 'escaped-by-fixture'])\n` +
+        `  execFileSync('git', ['-C', ${JSON.stringify(linked)}, 'update-ref', '-d', ${JSON.stringify(ref)}])\n` +
         `})\n`,
     )
     const result = spawnSync(process.execPath, [cli, 'run', '--config', 'vitest.config.mjs'], {
@@ -157,9 +217,11 @@ describe('unit-suite repository integrity guard', () => {
       windowsHide: true,
     })
     const output = `${result.stdout ?? ''}${result.stderr ?? ''}`
-    expect(result.status).not.toBe(0)
-    expect(output).toContain('LIVE REPOSITORY CHANGED WHILE UNIT SUITE RAN')
-    expect(output).toContain('refs/heads/escaped-by-fixture')
+    expect(result.status, output).toBe(owner === 'own' ? 1 : 0)
+    expect(output).toContain(owner === 'own'
+      ? 'LIVE REPOSITORY CHANGED WHILE UNIT SUITE RAN'
+      : 'REPOSITORY INTEGRITY (informational)')
+    expect(output).toContain(ref)
   }, 20_000)
 
   it('scrubs a linked-worktree GIT_DIR before fixture workers can inherit it', () => {
