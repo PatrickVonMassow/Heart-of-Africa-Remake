@@ -1166,6 +1166,33 @@ describe('arriving runners name the far stone by contact', () => {
     expect(s.tags).toBe(0)
   })
 
+  it.each([1 / 60, 0.1])('reaches a stand beside the collider without probing past it at dt=%s', (dt) => {
+    const stand = touchStand(STAGE, 'downstream', undefined, -Math.PI / 2)!
+    const radius = dist(stand, STAGE.downstream) - 0.005
+    const world = { ...openWorld(), blocked: (x: number, z: number) => dist({ x, z }, STAGE.downstream) < radius }
+    const { s, rand } = arriving([{ x: 8, z: 0 }])
+    const c = s.children[1]
+    stepBankGame(s, 1 / 60, CFG, STAGE, world, rand)
+    expect(c.arrival).not.toBeNull()
+    const start = { x: c.x, z: c.z, walked: c.walked }
+    const approach = dist(c, c.arrival!.stand)
+    // Carry an obstacle-following heading into the approach: both the short
+    // step probe and the longer clearance probe must end at the contact goal.
+    c.edgeFor = CFG.edgeSeconds
+    c.edgeSide = 1
+    c.heading = 0
+    let word: BankUtterance | null = null
+    const budget = Math.ceil(approach / (CFG.walkPace * dt)) + 2
+    for (let k = 0; k < budget && !word; k++) {
+      word = stepBankGame(s, dt, CFG, STAGE, world, rand)
+      expect(world.blocked(c.x, c.z)).toBe(false)
+    }
+    expect(word?.moment).toBe('arrival')
+    expect(Math.abs(touchReach(STAGE, 'downstream', c)!.gap)).toBeLessThanOrEqual(TOUCH_GAP)
+    expect(c.walked - start.walked).toBeCloseTo(dist(start, c), 10)
+    expect(c.nudges).toBe(0)
+  })
+
   it('arrives silently when the far flank is blocked', () => {
     const { s, rand } = arriving([{ x: 8, z: 0 }])
     const world = { ...openWorld(), blocked: (x: number, z: number) => dist({ x, z }, STAGE.downstream) < 1.7 }

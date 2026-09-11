@@ -539,8 +539,9 @@ function wayOpen(
   heading: number,
   world: TagWorld,
   blockedAt: (x: number, z: number) => boolean,
+  maxReach = Infinity,
 ): boolean {
-  const reach = world.childRadius * OPEN_AHEAD
+  const reach = Math.min(world.childRadius * OPEN_AHEAD, maxReach)
   for (let i = 1; i <= OPEN_SAMPLES; i++) {
     const d = (reach * i) / OPEN_SAMPLES
     if (blockedAt(c.x + Math.sin(heading) * d, c.z + Math.cos(heading) * d)) return false
@@ -759,6 +760,9 @@ export function moveChild(
    *  world answers for (a rescue beside a moving body is resolved by the
    *  separation the frame after). */
   occupied?: (x: number, z: number) => boolean,
+  /** A contact approach ends at this stand. Probe the path to it, without
+   * requiring walkable ground beyond it inside the stone being touched. */
+  stopAt?: { x: number; z: number },
 ): void {
   const blockedAt = occupied
     ? (x: number, z: number) => world.blocked(x, z) || occupied(x, z)
@@ -769,7 +773,8 @@ export function moveChild(
   const look = Math.max(len, world.childRadius * 2)
   // Going round something and the way it wants has opened: it is past whatever
   // it was going round, and takes its own heading again.
-  if (c.edgeFor > 0 && wayOpen(c, desired, world, blockedAt)) {
+  const remaining = stopAt ? Math.hypot(stopAt.x - c.x, stopAt.z - c.z) : Infinity
+  if (c.edgeFor > 0 && wayOpen(c, desired, world, blockedAt, remaining)) {
     c.edgeSide = 0
     c.edgeFor = 0
   }
@@ -787,7 +792,8 @@ export function moveChild(
     // the user's "hängt kurz fest": measured at his seed, every single stalled
     // frame had free ground 105–150° off the heading it wanted, just outside
     // what the probe could see.
-    const r = deflectedStep(c.x, c.z, heading, len, blockedAt, look, 12, course, c.edgeSide)
+    const probe = stopAt ? Math.min(look, Math.hypot(stopAt.x - c.x, stopAt.z - c.z)) : look
+    const r = deflectedStep(c.x, c.z, heading, len, blockedAt, probe, 12, course, c.edgeSide)
     if (!r.moved) break
     c.walked += Math.hypot(r.x - c.x, r.z - c.z)
     c.x = r.x

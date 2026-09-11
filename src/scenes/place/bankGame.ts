@@ -1313,7 +1313,7 @@ function drive(
   // Contact has millimetres of tolerance. Walk the final partial step instead
   // of overshooting the solved stand and oscillating across it at low FPS.
   const step = stopAtGoal ? Math.min(c.pace * dt, dist(c, to)) : c.pace * dt
-  if (c.pace > 0) moveChild(c, desired, step, dt, cfg, world, blockedByBody)
+  if (c.pace > 0) moveChild(c, desired, step, dt, cfg, world, blockedByBody, stopAtGoal ? to : undefined)
   trackProgress(c, dt, cfg, world)
   if (s.playing) c.walkedWhilePlaying += c.walked - walkedBefore
   c.facing = turnToward(c.facing, c.heading, cfg.turnRate * dt)

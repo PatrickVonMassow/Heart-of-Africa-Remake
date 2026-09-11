@@ -50,3 +50,41 @@ the reviewer still owes a picture judgment at this bar. The Bambara cycle test
 checks both holds every simulation frame, including their opening poses, body
 height, facing, lean and eligibility for body separation. Low-frame-rate arrival
 and station-side alternate-facet regressions cover the approach changes.
+
+## Motion regression from the contact approach
+
+Cross-vendor review reproduced a 0.3182579564% worst-child shuffle share at
+Bambara seed 2972259115, against the unchanged 0.25% gate. Before editing
+movement, the deterministic 200 s replay printed `shuffleWindows(paths)`:
+child 3 had 38 bad windows (0.633333 s of 199 judged seconds); the worst began
+at 105.033333 s, with 1.400000 m walked inside a 0.143595 m radius.
+
+The child was in `regroup`, still approaching its downstream arrival stand.
+It acquired that stand at about 103.33 s and retained it until contact at
+106.30 s: x=-13.0304614073, z=-28.4096246422, bearing=0.7210718472.
+This was neither a rejected stand nor repeated alternate-facet selection.
+The reduced blocked-outward search was therefore not the cause of this window.
+`moveChild` adds each achieved substep's displacement to `walked`, not the
+requested distance; there was no distance-accounting error either.
+
+The cause was clearance probing beyond a destination beside a collider.
+`drive` capped the walking step at the stand, but `moveChild` still required
+clear ground two child radii ahead for deflection and eight radii ahead to
+release an obstacle-following heading. Those probes entered the stone beyond
+the reachable stand. The child repeatedly turned away and circled the contact
+spot. Tighter contact admission exposed this approach defect.
+
+Contact approaches now pass their destination into `moveChild`; both probes
+end at the remaining distance to it. The probes still check intervening ground,
+the achieved step still checks static and body obstacles, and ordinary roaming
+and running retain their existing lookahead. No contact or motion bar changed.
+Two regressions at 60 and 10 FPS require direct, collision-free arrival beside
+a stone with an inherited obstacle-following heading. Both fail without the
+fix. Separate static-wall and body-wall cases assert that an obstruction before
+the destination still keeps the child following its clear route around it.
+
+All four 200 s river-layout motion cases pass. Their worst-child one-second
+shares are now 0.0000% (Bambara/42), 0.0084% (Bambara/2972259115), 0.0168%
+(Nubian/42), and 0.1256% (Mandinka/99). Child 3 in the reported layout has zero
+bad windows. Its remaining worst child is child 1, with one window at 43.566667 s
+(path 1.400000 m, out 0.349958 m). The burst and rescue gates also pass.
