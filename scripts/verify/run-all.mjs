@@ -27,6 +27,8 @@ import {
   DEV_SUITES, laneFor, needsDevServer, needsGpuBackendProbe, parseArgs, planBackends,
   selectBackend, skippedSuites, suitesFor,
 } from './tiers.mjs'
+import { LADDER_STATUS, formatLadderRefusal } from './ladder-core.mjs'
+import { ladderCheck } from './ladder.mjs'
 import { SECTION_ENV, listSections, planSectionRun, resolveSelection } from './sections.mjs'
 import { readFileSync } from 'node:fs'
 
@@ -67,6 +69,30 @@ const WEBGL_ONLY_COVERED = process.env.RVA_WEBGL_COVERED === '1'
 const args = process.argv.slice(2)
 const { tier, filter, flags, fullRun, isLargeEquivalent, baseline, section } = parseArgs(args)
 const wantBaseline = baseline || process.env.VERIFY_BASELINE === '1'
+
+// THE VERIFICATION LADDER (point 1086), asked HERE because this is the
+// ENTRYPOINT. run-logged.mjs wraps this file and asks it too, but the README
+// documents `node scripts/verify/run-all.mjs <suite>` as an ordinary command
+// and that path answered to nothing — the refusal the point owes was absent
+// from the very command the house uses, and the LARGE run of 11.09.2026 was
+// started through it (four-eyes review, GPT-6 Astra, pass 3/4).
+//
+// ASKED ONCE PER RUN. A parent that already asked sets the marker, so a waiver
+// granted above — `--no-ladder "<why>"`, which run-logged consumes and does not
+// forward — is not overruled down here. The backend re-exec below inherits the
+// marker with the rest of the environment, so the second pass of a both-backend
+// run does not ask again either.
+if (process.env.RVA_LADDER_ASKED !== '1') {
+  const verdict = ladderCheck({ argv: args, verifyGl: process.env.VERIFY_GL })
+  if (!verdict.ok) {
+    console.log(formatLadderRefusal(verdict))
+    process.exit(1)
+  }
+  if (verdict.status === LADDER_STATUS.WAIVED_NON_PREDICTIVE) {
+    console.log(`# ladder waived (${verdict.status}) — ${verdict.reason}`)
+  }
+  process.env.RVA_LADDER_ASKED = '1'
+}
 
 // Run ONE declared section of ONE suite (point 566) — the repair loop, where a
 // check that needed fixing used to cost the whole 17-minute pass. Validated HERE,

@@ -10,6 +10,8 @@ import {
   ladderVerdict,
   suitesCovering,
 } from './ladder-core.mjs'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { parseDiffSuiteMap } from '../point-brief-core.mjs'
 
 // The work order's own paragraph, in the shape `parseDiffSuiteMap` reads. Kept
@@ -343,5 +345,25 @@ describe('the ladder fails open', () => {
   it('answers FREE rather than refusing when nothing could be gathered', () => {
     expect(ladderVerdict({ run: fullPolish() }).status).toBe(LADDER_STATUS.FREE)
     expect(ladderVerdict().ok).toBe(true)
+  })
+})
+
+describe('every entrypoint answers to the ladder', () => {
+  // THE CLAIM THIS PINS. The README says every run passes through the refusal.
+  // It did not: `run-logged.mjs` asked, and `run-all.mjs` — documented in the
+  // same README as an ordinary command, and the way the LARGE run of 11.09.2026
+  // was actually started — asked nothing at all. A mechanism absent from the
+  // command the house uses is a mechanism that does not exist (four-eyes
+  // review, GPT-6 Astra).
+  const source = (file) => readFileSync(join(import.meta.dirname, file), 'utf8')
+
+  it('run-all.mjs asks it before it spawns a suite', () => {
+    expect(source('run-all.mjs')).toContain('ladderCheck(')
+  })
+
+  it('run-logged.mjs asks it too, and says so to the child', () => {
+    const text = source('run-logged.mjs')
+    expect(text).toContain('ladderCheck(')
+    expect(text).toContain('RVA_LADDER_ASKED')
   })
 })

@@ -309,7 +309,10 @@ function runVerify() {
     // stdin inherited so nothing can silently block on input; stdout/stderr piped
     // through us into the log.
     stdio: ['inherit', 'pipe', 'pipe'],
-    env: process.env,
+    // THE LADDER WAS ALREADY ASKED, above, with the escape this wrapper
+    // consumes and does not forward. run-all asks it too — it is the entrypoint
+    // the README names — so the marker keeps it to ONE question per run.
+    env: { ...process.env, RVA_LADDER_ASKED: '1' },
   })
 
   const lines = []
