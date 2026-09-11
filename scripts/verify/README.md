@@ -492,10 +492,14 @@ runs then found in four minutes. Nothing refused any of it, while
 `render-verify-guard`, which accepts only a full covering run, said "not
 verified" after every edit and was read as the next command.
 
-So `scripts/verify/run-logged.mjs` — which every run passes through — asks
-`ladder-core.mjs` before it spawns anything, and **refuses a full browser pass
-while the files that suite covers carry edits newer than the newest GREEN
-narrower run of the same material.** The coverage question is answered by the
+So both entrypoints ask `ladder-core.mjs` before they spawn anything, and
+**refuse a full browser pass while the files that suite covers carry edits — or
+a merge — newer than the newest GREEN narrower run of the same material.**
+`run-logged.mjs` asks it, and so does `run-all.mjs`, which this document
+documents as an ordinary command and which for a while answered to nothing at
+all: the mechanism was missing from the command the house actually uses. The
+question is asked ONCE per run — the wrapper marks the child environment, so the
+escape it consumes is never overruled below. The coverage question is answered by the
 work order's own diff→suite mapping, so it moves with TASKS.md and not with a
 list here. The refusal prints the section commands to run instead; the picture
 gate's own refusal now says the covering run is what the point owes at its END.
