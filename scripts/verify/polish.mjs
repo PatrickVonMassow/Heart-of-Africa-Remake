@@ -5331,7 +5331,13 @@ if (section('adult-errands')) {
       }
       if (who < 0) return null
       window.__placeForceFill(who, 0.5)
-      return { who, x: v[who].x, z: v[who].z, clearance: best }
+      return {
+        who,
+        x: v[who].x,
+        z: v[who].z,
+        clearance: best,
+        others: v.filter((_, j) => j !== who).map((p) => ({ x: p.x, z: p.z })),
+      }
     })
     check(
       'one village adult, standing clear of the others, can be held in the fill pose',
@@ -5369,8 +5375,34 @@ if (section('adult-errands')) {
       // only follows the player on the next frame (point 549).
       const shot = await (async () => {
         const blocked = []
+        // NOBODY MAY STAND BEHIND HIM EITHER. The ray below rejects a body
+        // BETWEEN the lens and the subject; a neighbour a little FURTHER along
+        // the same line is just as fatal, because the frame is judged on a
+        // silhouette and two overlapping cones have none. Measured 11.09.2026:
+        // the first fixed WebGL 2 frame put a standing villager directly behind
+        // the crouching one. So a bearing is dropped when another villager lies
+        // within 1.3 m of the line where it runs BEYOND him, out to nine metres.
+        // The band is deliberately narrow: a neighbour off to one side leaves
+        // his outline whole, and a wide band would reject every bearing rather
+        // than the bad ones.
+        const clearBehind = (bearing) => {
+          const cx = posed.x + Math.sin(bearing) * 3
+          const cz = posed.z + Math.cos(bearing) * 3
+          const dx = (posed.x - cx) / 3
+          const dz = (posed.z - cz) / 3
+          for (const o of posed.others) {
+            const along = (o.x - cx) * dx + (o.z - cz) * dz
+            if (along <= 3.2 || along > 9) continue
+            if (Math.hypot(o.x - (cx + dx * along), o.z - (cz + dz * along)) < 1.3) return false
+          }
+          return true
+        }
         for (let i = 0; i < 16; i++) {
           const a = (i / 16) * Math.PI * 2
+          if (!clearBehind(a)) {
+            blocked.push(`${a.toFixed(2)}→a villager stands in the line past him`)
+            continue
+          }
           const hit = await page.evaluate(
             ([bearing, v]) =>
               new Promise((res) => {
@@ -5409,6 +5441,21 @@ if (section('adult-errands')) {
           : `bearing ${shot.bearing.toFixed(2)} rad, the ${shot.tried}. of 16 tried`,
       )
       await nextFrames(6)
+      // HE MUST STILL BE WHERE THE CAMERA IS AIMED. The pin held his pose and
+      // left his errand walking underneath it: on WebGL 2, at 33-52 FPS, he was
+      // metres away by the shutter and the frame came back as an empty bank —
+      // while this section reported 18 pass, 0 fail, because nothing asked. The
+      // subject's own position is the one thing a frame of a single figure
+      // cannot take on trust (CLAUDE.md §7.2).
+      const stood = await page.evaluate((w) => {
+        const v = window.__placeErrands().villagers[w]
+        return { x: v.x, z: v.z }
+      }, posed.who)
+      check(
+        'and he is still standing where the shutter is aimed, rather than having walked on',
+        Math.hypot(stood.x - posed.x, stood.z - posed.z) < 0.05,
+        `${Math.hypot(stood.x - posed.x, stood.z - posed.z).toFixed(2)} m from the aim point`,
+      )
       await frame('1085-village-adult-fills-a-jar', {
         local: { x: posed.x, y: 0.6, z: posed.z },
         label: 'a village adult held at the bottom of the fill, side-on, three metres off',

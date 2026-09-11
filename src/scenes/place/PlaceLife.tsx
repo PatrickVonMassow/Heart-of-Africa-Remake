@@ -2440,7 +2440,13 @@ function ErrandVillagers({
    *  verification poses one by, since the errand itself does not dip yet
    *  (work-order 1085 owes the pose, 1087 owes the act that drives it). Null
    *  outside a forced frame, which is every real run. */
-  const forcedFill = useRef<{ who: number; progress: number; facing: number | null } | null>(null)
+  const forcedFill = useRef<{
+    who: number
+    progress: number
+    facing: number | null
+    /** Where EVERY villager stood when the pin was taken, by index. */
+    anchors: Array<{ x: number; z: number }>
+  } | null>(null)
   /** Each villager's live y-squash, so his own Figure can keep his head round
    *  through it. Written by the frame loop below, read by the Figure. */
   const squats = useRef<Array<{ current: number }>>([])
@@ -2757,6 +2763,29 @@ function ErrandVillagers({
         me.z = body.z
       }
 
+      // THE VILLAGE HOLDS STILL FOR THE PHOTOGRAPH (work-order 1085). The pin
+      // held one man's POSE and left every errand running underneath it, so he
+      // strolled on while bent double and the camera, aimed at where he stood
+      // when he was pinned, photographed an empty bank — which is what the
+      // WebGL 2 lane produced on 11.09.2026 while the check reported 18 pass,
+      // 0 fail. The faster lane simply walked him further between the pin and
+      // the shutter. Pinning HIM alone is not enough either: the frame is judged
+      // on a silhouette, and a neighbour who keeps walking arrives behind him
+      // and overlaps it. So while the dev route holds a fill, every villager
+      // stands on the mark he had when it was taken — the clearance measured at
+      // the pin is then the clearance at the shutter, on either lane. Restored
+      // AFTER the separation, so no body can push anybody off his mark.
+      const held = forcedFill.current?.anchors[i]
+      if (held) {
+        me.x = held.x
+        me.z = held.z
+        if (body) {
+          body.x = held.x
+          body.z = held.z
+        }
+      }
+      const pinned = forcedFill.current?.who === i ? forcedFill.current : null
+
       // WHAT HE IS CARRYING, and what that does to his body: jars keep their
       // established positions; the digging tool lives in the hand pivot so the
       // shaft rides the stroke instead of swinging beside an empty-handed man.
@@ -2773,7 +2802,7 @@ function ErrandVillagers({
       const pose = poses.current[i].current
       const gesture = gestures.current[i]
       gesture.current = advanceGesture(gesture.current, dt)
-      const filling = forcedFill.current?.who === i ? forcedFill.current.progress : null
+      const filling = pinned ? pinned.progress : null
       if (filling !== null) {
         state.dug = 0
         // The jar rides the dipping hand of its own accord — it hangs inside the
@@ -2925,7 +2954,10 @@ function ErrandVillagers({
     // work-order 1087's half. This exists so the POSE the design decided on can
     // be photographed on the figure it belongs to (work-order 1085).
     w.__placeForceFill = (who: number | null, progress = 0.5, facing: number | null = null) => {
-      forcedFill.current = who === null ? null : { who, progress, facing }
+      forcedFill.current =
+        who === null
+          ? null
+          : { who, progress, facing, anchors: people.map((p) => ({ x: p.x, z: p.z })) }
     }
     return () => {
       delete w.__placeErrands
