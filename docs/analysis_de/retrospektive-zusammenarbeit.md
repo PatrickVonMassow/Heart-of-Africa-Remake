@@ -56,6 +56,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 10.09. abends | 43 Minuten Stillstand nach einer korrekten Übergabe, beendet von der Nutzerfrage „seit 17:04 keine Arbeit": Der Launcher verweigerte dreimal den Nachfolger, weil er im Arbeitsbaum einen lebenden Schreiber maß — es war der abgekoppelte Deckungslauf selbst, der dorthin seine Bilder schreibt. Das Veto sperrt den Nachfolger für die volle Dauer genau der Phase, in der die Übergabe vorgesehen ist (§3.258, vierter Wiedergänger von §3.77/§3.220) |
 | 10.09. abends | Ein als »priorisierter Fix« erteilter Nutzerauftrag lag drei Tage im Backlog, den CLAUDE.md §2 ausdrücklich als nie-blockierend bestimmt — die Ablage war die falsche von zwei erlaubten Türen und damit bereits die Entscheidung, den Auftrag nicht auszuführen; gefunden erst durch die Frage des Nutzers, zu welchem Punkt er gehöre (§3.260) |
 | 10.09. spätabends | Die Landungskette hält an ihrem letzten Schritt: Sie hakt den Punkt ab und veröffentlicht DANACH die Tafel, deren Jetzt-Karte noch genau diesen Punkt nennt — die Tafel weist die Veröffentlichung zu Recht ab, und das Aufräumen von Zweig und Arbeitsbaum bleibt liegen. Den gemessenen Grund druckt die Kette nicht mit, weil die Absage auf dem Ausgabekanal steht und sie den Fehlerkanal liest (§3.259) |
+| 11.09. nachts | Die Verweigerung der billigen Sprosse saß in der Wrapper-Datei, während der Einstiegsbefehl, den dieselbe README als gewöhnlich dokumentiert, niemanden fragte — der deckende Lauf des Punktes selbst lief an ihr vorbei; und beim ersten ernsthaften Gebrauch verweigerte sie ihren eigenen Deckungslauf, weil ein Branchwechsel eine mtime bewegt hatte, ohne ein Byte zu ändern (§3.265, Punkt 1086) |
 | 11.09. nachts | Zwei Werkzeuge antworten mit Gewissheit auf Fragen, die sie nie gemessen haben: `ci-gate-verdict.mjs` läuft nur im Runner, ignoriert die Flags eines Handaufrufs und druckt bei leerer Umgebung »CI gate passed« — zweimal geglaubt; `run-wait` erklärt einen gesunden `polish`-Lauf nach 20 Minuten für tot, weil seine Schwelle die Modell-Erwartung von 5m41s statt des eigenen gemessenen Medians von 55 min multipliziert, und befiehlt das Töten (§3.263, Punkte 1099/1101) |
 | 13.08. | Der Nachprüfer findet eine echte zweite Klippe im geheilten Mechanismus — und jede der fünf gemessenen Kuren verschlechtert gesunde Dörfer stärker, als der Fehler schadet: Befund wird gebucht statt behoben (§3.115) |
 | 20.08. | Der Dokumentschnitt strich Regeln als »von einem Wächter abgedeckt«, ohne einen einzigen Wächter darauf zu prüfen — die Kontextanzeige verschwand, der Nutzer fand es (§3.134); eine vom Nutzer gesetzte Rangfolge wurde in einer Nacht zweimal maschinell überholt, ohne dass irgendwo ein Grund stand (Punkt 614); zwei Werkzeuge derselben Bauart am falschen Ort gemessen — im Hauptbaum gebaut und geprüft, während der Prozess die Arbeit in den isolierten Bereich schickt (§3.137) |
@@ -1335,6 +1336,36 @@ die Diagnose, die der Guard schon gestellt hat.
 
 ---
 
+### 3.265 Der Mechanismus saß nicht in dem Befehl, mit dem gearbeitet wird
+
+§3.264 endet mit dem Schluss, die Reihenfolge gehöre dorthin, wo Läufe gestartet werden. Punkt
+1086 hat sie dorthin gelegt — in `scripts/verify/run-logged.mjs`, mit der Begründung, das sei
+die Datei, durch die jeder Lauf ohnehin geht. Die Begründung war falsch, und die Gegenlese
+durch GPT-6 Astra hat es an derselben README gezeigt, die sie behauptet: Wenige Abschnitte
+weiter dokumentiert dasselbe Dokument `node scripts/verify/run-all.mjs <suite>` als gewöhnlichen
+Befehl, und dieser Weg fragte niemanden. Der Beweis lag im eigenen Haus: Der deckende
+LARGE-Lauf, der Punkt 1086 belegen sollte, war genau so gestartet worden und ist an der
+Verweigerung vorbeigelaufen, die er belegen sollte.
+
+Das ist nicht dasselbe wie eine Lücke in einer Prüfung. Der Mechanismus war gebaut, getestet
+und grün — nur an einer Stelle, an der wir nicht arbeiten. Eine Erzwingung, die im tatsächlich
+benutzten Befehl nicht sitzt, existiert nicht, und ihre Tests beweisen dann genau so viel wie
+die Tests eines toten Zweigs.
+
+Die zweite Hälfte fand der Mechanismus an sich selbst, beim ersten ernsthaften Gebrauch: Er
+verweigerte den deckenden Lauf des Punktes, der ihn gebaut hat. Ein Wechsel nach `main` und
+zurück hatte `polish.mjs` neu geschrieben und seine mtime über jede grüne Sprosse gehoben —
+ohne dass ein einziges Byte sich änderte. Eine mtime ist keine Änderung: Auschecken, Stash-Pop
+und frischer Klon bewegen sie umsonst. Eine Verweigerung, die ein Autor nicht durch Arbeiten
+beantworten kann, ist die teure Richtung; eine Sprosse, die einmal zu oft geklettert wird, die
+billige.
+
+**Lehre:** Die Frage ist nicht »wo gehört die Regel hin«, sondern »welchen Befehl tippen wir
+wirklich« — und die Antwort steht oft im eigenen Dokument, ein paar Zeilen über der Behauptung.
+Wo zwei Einstiege existieren, fragen beide, und genau einmal pro Lauf. Und jede Erzwingung
+braucht vor ihrem ersten Einsatz einen Probelauf am eigenen Material: Beide Defekte hier haben
+kein Test gefunden, sondern die Gegenlese und der erste echte Gebrauch.
+
 ## 4. Die Guards als Immunsystem
 
 Jedes Guard-Skript ist die geronnene Lösung eines real aufgetretenen, wiederholten Problems.
@@ -1460,7 +1491,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Freitag, 11.09.2026, 02:18 · Quellen-Fingerprint: `8470d7ade400…`
+Zuletzt aktualisiert: Freitag, 11.09.2026, 03:35 · Quellen-Fingerprint: `8470d7ade400…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1567,7 +1598,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 Erfasste Quellen: 96 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 130 Prozess-/Meta-TASKS-Punkte (davon 63 offen).
 
 <!-- RETRO-FINGERPRINT: 8470d7ade40002c39b0e1e2c4baa529494672b97b4b73211ccb8527e8ffca847 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-11T00:18:52.363Z -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-11T01:35:55.113Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
