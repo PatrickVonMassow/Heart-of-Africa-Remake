@@ -6,9 +6,9 @@
 // itself. Also installs the procedural IBL environment on the scene.
 //
 // TRAA is the default since its manual WebGPU check passed (CLAUDE.md §7.1
-// pt. 32); the debug toggle (design.md §21.3) can switch back to the render
-// pass' MSAA samples. TRAA requires MSAA off and a velocity MRT target, so
-// the scene pass is built per mode.
+// pt. 32); the debug toggle (design.md §21.3) disables temporal resolve.
+// Both modes use a single-sampled half-float scene pass; TRAA additionally
+// requires a velocity MRT target, so the scene pass is built per mode.
 //
 // Screen-space reflections were integrated (design.md §2.7) but removed again
 // after the manual WebGPU check (CLAUDE.md pt. 32): with the bird's-eye camera
@@ -20,11 +20,12 @@
 import { useEffect, useLayoutEffect, useMemo } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
-import { float, max, mix, mrt, normalView, output, pass, smoothstep, vec3, velocity, viewportUV } from 'three/tsl'
+import { float, max, mix, smoothstep, vec3, velocity, viewportUV } from 'three/tsl'
 import { ao } from 'three/addons/tsl/display/GTAONode.js'
 import { bloom } from 'three/addons/tsl/display/BloomNode.js'
 import { traa } from 'three/addons/tsl/display/TRAANode.js'
 import { createEnvironmentTexture } from './environment'
+import { createScenePass } from './scenePass'
 import { useUi, effectiveSsao, effectiveTraa, effectiveBloom } from '../state/ui'
 
 /** Sun direction used for the IBL texture (matches the scene suns closely). */
@@ -68,24 +69,12 @@ export function Effects() {
     // toggles on real hardware).
     const disposables: Array<{ dispose: () => void }> = []
 
-    // TRAA jitters the camera and resolves temporally, so MSAA must be off
-    // and the pass must write per-pixel velocities. The samples MUST be set
-    // explicitly: an omitted option inherits renderer.samples (4, from
-    // antialias: true), and a multisampled depth breaks TRAA's history copy
-    // with per-frame WebGPU validation errors.
-    const scenePass = pass(scene, camera, { samples: traaEnabled ? 0 : 4 })
+    const scenePass = createScenePass(scene, camera, traaEnabled)
     disposables.push(scenePass)
     // Dev hook for the headless verification (CLAUDE.md §7.2).
     if (import.meta.env.DEV) {
       ;(window as unknown as Record<string, unknown>).__scenePass = scenePass
     }
-    scenePass.setMRT(
-      mrt({
-        output,
-        normal: normalView,
-        ...(traaEnabled ? { velocity } : {}),
-      }),
-    )
     const color = scenePass.getTextureNode('output')
     const depth = scenePass.getTextureNode('depth')
     const normal = scenePass.getTextureNode('normal')
