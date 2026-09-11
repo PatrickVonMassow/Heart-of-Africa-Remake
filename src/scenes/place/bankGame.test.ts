@@ -1090,7 +1090,7 @@ describe('arriving runners name the far stone by contact', () => {
     // Replay the actual stage and drawn rock colliders. Village routing and
     // the live crowd are covered by tagShuffle and the reviewer's browser run.
     const rockColliders = layout.colliders.filter((c) =>
-      'r' in c && [rocks.upstream, rocks.downstream].some((r) => dist(c, r) < 0.01))
+      'x' in c && [rocks.upstream, rocks.downstream].some((r) => dist(c, r) < 0.01))
     const world = { ...openWorld(), radius: 100,
       blocked: (x: number, z: number) => !standingClear(rockColliders, x, z, WALKER_RADIUS),
     }
