@@ -106,37 +106,6 @@ export function suitesCovering(path, map) {
   return named.filter((s) => DEV_SUITES.includes(s))
 }
 
-/**
- * The paths in a `git status --porcelain` listing.
- *
- * The two status columns are POSITIONAL and the first of them is often a SPACE
- * (` M path`), so the text must not be trimmed as a whole before it is read —
- * doing that ate the first character of the first path, which is a silent
- * "nothing is edited" and therefore the exact failure this mechanism exists to
- * prevent. A rename prints `old -> new`; the new name carries the edit. A path
- * with a character git has to escape arrives quoted, and is unquoted here.
- * Total: never throws.
- */
-export function porcelainPaths(text) {
-  const out = []
-  for (const line of String(text ?? '').split('\n')) {
-    if (line.length < 4) continue
-    let path = line.slice(3)
-    const arrow = path.indexOf(' -> ')
-    if (arrow >= 0) path = path.slice(arrow + 4)
-    path = path.trim()
-    if (path.startsWith('"') && path.endsWith('"') && path.length > 1) {
-      try {
-        path = JSON.parse(path)
-      } catch {
-        path = path.slice(1, -1)
-      }
-    }
-    if (path) out.push(path)
-  }
-  return out
-}
-
 /** The newest timestamp in a list, or 0. */
 function newest(values) {
   let out = 0

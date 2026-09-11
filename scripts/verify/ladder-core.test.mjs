@@ -8,7 +8,6 @@ import {
   classifyLadderRun,
   formatLadderRefusal,
   ladderVerdict,
-  porcelainPaths,
   suitesCovering,
 } from './ladder-core.mjs'
 import { parseDiffSuiteMap } from '../point-brief-core.mjs'
@@ -281,28 +280,6 @@ describe('the deliberate escape', () => {
       escape: { why: '   ' },
     })
     expect(verdict.status).toBe(LADDER_STATUS.REFUSED)
-  })
-})
-
-describe('reading `git status --porcelain`', () => {
-  it('keeps the first path whole — the columns are positional, and the first is a space', () => {
-    // Trimming the whole listing ate the leading space of the FIRST line and
-    // therefore the first character of its path, which reads as "nothing is
-    // edited": a silent pass, the one failure this mechanism exists to prevent.
-    expect(porcelainPaths(' M scripts/verify/polish.mjs\n M verification/98.png\n')).toEqual([
-      'scripts/verify/polish.mjs',
-      'verification/98.png',
-    ])
-  })
-
-  it('reads a rename as its NEW name, and unquotes an escaped path', () => {
-    expect(porcelainPaths('R  src/old.ts -> src/new.ts')).toEqual(['src/new.ts'])
-    expect(porcelainPaths('?? "src/caf\\303\\251.ts"')[0]).toContain('src/caf')
-  })
-
-  it('is total on nothing at all', () => {
-    expect(porcelainPaths('')).toEqual([])
-    expect(porcelainPaths(null)).toEqual([])
   })
 })
 

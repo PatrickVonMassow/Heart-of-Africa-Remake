@@ -11,14 +11,15 @@ import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { REPO_ROOT } from '../repo-paths.mjs'
+import { porcelainPaths } from '../batch-in-flight-core.mjs'
 import { parseDiffSuiteMap } from '../point-brief-core.mjs'
 import { readRenderState } from '../render-verify-state.mjs'
 import { listNonPredictive } from './sections.mjs'
-import { LADDER_STATUS, classifyLadderRun, ladderVerdict, porcelainPaths } from './ladder-core.mjs'
+import { LADDER_STATUS, classifyLadderRun, ladderVerdict } from './ladder-core.mjs'
 
 const ROOT = REPO_ROOT
 
-/** Git's stdout, UNTRIMMED: `git status --porcelain` puts its two status
+/** Git's stdout, UNTRIMMED: `git status --porcelain -z` puts its two status
  *  columns in fixed positions and the first is usually a space, so trimming the
  *  whole output eats the first path's first character. Callers that want a
  *  single token trim it themselves. */
@@ -64,7 +65,13 @@ export function editedFiles({ cwd = ROOT } = {}) {
     }
   }
   try {
-    for (const path of porcelainPaths(git(['status', '--porcelain'], cwd))) paths.add(path)
+    // NO PRACTICAL LIMIT HERE. The shared reader bounds its work at 400 paths
+    // because a liveness probe must not turn into a tree walk; for the ladder an
+    // unread path is a MISSING edit, which reads as "nothing is edited" — the
+    // silent pass this mechanism exists to prevent. A verification run can
+    // afford the whole listing.
+    const dirty = porcelainPaths(git(['status', '--porcelain', '-z'], cwd), { limit: 100_000 })
+    for (const path of dirty) paths.add(path)
   } catch {
     /* not a repository — nothing is edited as far as the ladder can tell */
   }
