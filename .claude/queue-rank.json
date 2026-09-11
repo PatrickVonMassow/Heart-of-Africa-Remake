@@ -1332,6 +1332,12 @@
       "why": "User order 11.09.2026: work the measured three-hour-per-point suite loss at once, before 1085 — every later point pays for its absence",
       "origin": "user",
       "place": "ahead"
+    },
+    "1105": {
+      "at": "2026-09-11T08:02:02.347Z",
+      "why": "It cannot wait for the release because it IS in the release picture: the low graphics level ships black on the primary backend, and its red sits inside the settings suite every point behind it must pass, where a wrong classification hides the next real failure.",
+      "origin": "machine",
+      "place": "ahead"
     }
   },
   "boundary": {
@@ -1364,7 +1370,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-11T07:52:43.479Z",
+    "at": "2026-09-11T08:02:02.356Z",
     "points": [
       174,
       184,
@@ -1757,7 +1763,8 @@
       1101,
       1102,
       1103,
-      1104
+      1104,
+      1105
     ]
   }
 }
