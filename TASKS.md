@@ -136,7 +136,7 @@ put it is the mistake this line exists to stop.
   communication mechanic and it is a bug that keeps the user from reaching it in play.
   Criticality: HIGH (a teaching moment contradicts design.md §13.4 on every run;
   user-reported twice).
-  Bundle: Dorf & Kommunikation.
+  Bundle: Dorfleben.
 
 - [ ] 1107. After its one tag a catcher stops playing and stands beside the child it caught.
   USER REPORT 11.09.2026. For the rest of the run the catcher neither chases nor returns; it
@@ -166,7 +166,7 @@ put it is the mistake this line exists to stop.
     the catcher on its way back, subject declared.
   Criticality: medium — it is player-visible on every run that produces a catch, and it
   misreads as a dead actor, but the teaching itself still completes.
-  Bundle: Dorf & Kommunikation.
+  Bundle: Dorfleben.
 
 - [ ] 1108. The fill's proof frame measures its neighbours BEFORE they walk, so a green suite
   can still certify a picture with no readable subject.
