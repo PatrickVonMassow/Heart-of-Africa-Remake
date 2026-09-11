@@ -45,20 +45,42 @@ function mergeBase(cwd) {
  *
  * Two sources, because either alone misses half the repair loop: the commits
  * this branch carries beyond `main`, and the working tree's uncommitted changes.
- * The time is the file's own mtime — that is what "carries edits" means, and it
- * moves for a `git merge` exactly as it moves for an editor. A file that is gone
- * (a deletion) drops out: no suite can be pre-checked for it.
+ * The time is the LATER of the file's own mtime and the newest branch commit
+ * that touched it — which is what this function always promised and, until the
+ * four-eyes round of 11.09.2026, did not do: it read mtimes alone.
+ *
+ * AND A FILE THAT IS GONE STILL COUNTS. The earlier reasoning — "a deletion
+ * drops out: no suite can be pre-checked for it" — had it backwards. Deleting a
+ * file the suite covers can break that suite exactly as editing it can, and
+ * dropping the path made the whole run answer FREE: delete one tracked file
+ * under a covered directory, change nothing else, and the ladder waved the full
+ * pass through. A deleted path therefore keeps its commit time, and an
+ * UNCOMMITTED deletion keeps the path with time 0 — present in the material, so
+ * the run is not free, without the moving `now` that would refuse every run
+ * forever.
  *
  * On `main` itself the branch half is empty, so only uncommitted work counts —
  * which is the honest answer there and keeps a fresh CI clone free.
  */
 export function editedFiles({ cwd = ROOT } = {}) {
-  const paths = new Set()
+  /** path → the newest time any SOURCE claims for it. */
+  const times = new Map()
+  const note = (path, at) => {
+    const key = String(path ?? '').trim()
+    if (!key) return
+    const n = Number(at) || 0
+    times.set(key, Math.max(times.get(key) ?? 0, n))
+  }
+
   const base = mergeBase(cwd)
   if (base) {
+    // ONE pass over the branch's own commits. `\x01` cannot occur in a path, so
+    // a stamp line is never confused with a file called "1789084300".
     try {
-      for (const line of git(['diff', '--name-only', base, 'HEAD'], cwd).split('\n')) {
-        if (line.trim()) paths.add(line.trim())
+      let at = 0
+      for (const line of git(['log', '--format=%x01%ct', '--name-only', `${base}..HEAD`], cwd).split('\n')) {
+        if (line.startsWith('\x01')) at = Number(line.slice(1).trim()) * 1000
+        else note(line, at)
       }
     } catch {
       /* unreadable history — the working tree below still speaks */
@@ -70,18 +92,22 @@ export function editedFiles({ cwd = ROOT } = {}) {
     // unread path is a MISSING edit, which reads as "nothing is edited" — the
     // silent pass this mechanism exists to prevent. A verification run can
     // afford the whole listing.
-    const dirty = porcelainPaths(git(['status', '--porcelain', '-z'], cwd), { limit: 100_000 })
-    for (const path of dirty) paths.add(path)
+    for (const path of porcelainPaths(git(['status', '--porcelain', '-z'], cwd), { limit: 100_000 })) {
+      note(path, 0)
+    }
   } catch {
     /* not a repository — nothing is edited as far as the ladder can tell */
   }
+
   const out = []
-  for (const path of paths) {
+  for (const [path, committedAt] of times) {
+    let mtime = 0
     try {
-      out.push({ path, editedAt: statSync(join(cwd, path)).mtimeMs })
+      mtime = statSync(join(cwd, path)).mtimeMs
     } catch {
-      /* deleted, or outside the checkout */
+      /* gone, or outside the checkout — its commit time still speaks for it */
     }
+    out.push({ path, editedAt: Math.max(mtime, committedAt) })
   }
   return out
 }

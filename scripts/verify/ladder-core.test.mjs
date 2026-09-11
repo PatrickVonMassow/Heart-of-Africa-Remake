@@ -160,6 +160,22 @@ describe('an edit the suite does not cover', () => {
     expect(verdict.status).toBe(LADDER_STATUS.FREE)
   })
 
+  it('keeps a DELETED covered file in the material rather than answering free', () => {
+    // A file that is gone has no mtime, so `editedFiles` gives it the time 0 it
+    // can prove. Dropping it instead made the whole run FREE: delete one tracked
+    // file under a covered directory, change nothing else, and the expensive
+    // pass was waved through. Removing code breaks its covering suite exactly as
+    // editing it does.
+    const verdict = ladderVerdict({
+      run: fullPolish(),
+      map: MAP,
+      changes: [edit('src/scenes/place/gone.ts', 0)],
+      runs: [],
+    })
+    expect(verdict.status).toBe(LADDER_STATUS.REFUSED)
+    expect(verdict.ok).toBe(false)
+  })
+
   it('sends a suite file to the suite that IS the file', () => {
     expect(suitesCovering('scripts/verify/polish.mjs', MAP)).toEqual(['polish'])
     // "store/systems logic → Vitest only" names no browser suite, so nothing
