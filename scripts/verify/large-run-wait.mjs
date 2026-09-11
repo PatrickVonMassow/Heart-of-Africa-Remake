@@ -73,7 +73,7 @@ export async function waitForLargeRun({
       report(`# waiting for LARGE pid ${blocker.pid}: ${blocker.cmd} (VERIFY_NO_WAIT=1 to start anyway)`)
       reported = true
     }
-    do { await sleep(250) } while (stillRunning(blocker))
+    do { await sleep(2000) } while (stillRunning(blocker))
   }
 }
 

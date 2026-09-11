@@ -66,4 +66,23 @@ describe('LARGE process admission', () => {
     const again = row(20, 1, 'run-logged', 'polish', '--again')
     expect(blockingLargeRun([large, again], 20)).toBe(large)
   })
+
+  it('probes the named blocker every two seconds without rescanning the process table', async () => {
+    const events = []
+    let probes = 0
+    await waitForLargeRun({
+      pid: 20, env: {}, report: () => {},
+      readProcesses: () => {
+        events.push('scan')
+        return probes < 3 ? [large, section] : [section]
+      },
+      sleep: async (ms) => { events.push(ms) },
+      stillRunning: (blocker) => {
+        expect(blocker).toBe(large)
+        events.push('probe')
+        return ++probes < 3
+      },
+    })
+    expect(events).toEqual(['scan', 2000, 'probe', 2000, 'probe', 2000, 'probe', 'scan'])
+  })
 })
