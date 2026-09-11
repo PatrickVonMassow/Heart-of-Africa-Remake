@@ -965,7 +965,13 @@ if (section('graphics-levels')) {
   check('F9 → low: post off, shadows low-res, no campfire shadows',
     atLow.level === 'low' && atLow.ssao === false && atLow.traa === false && atLow.bloom === false &&
     atLow.shadowRes === PRESETS.low.shadowRes && atLow.fireShadows === false, JSON.stringify(atLow))
-  const lowMean = await meanLuma(await capturePixels(page, 'F9 low detail mean luma'))
+  // The defect this section guards was a BLACK picture, so the LOW preset
+  // leaves a frame behind rather than a number alone (CLAUDE.md §7.2).
+  const lowShot = await shot('1105-graphics-level-low', {
+    general: 'the LOW graphics preset is judged by the mean luma of this whole frame, which is therefore the subject',
+    scene: 'travel',
+  })
+  const lowMean = await meanLuma(lowShot)
   check('F9 low: scene still renders non-black', lowMean > 8, `mean ${lowMean.toFixed(1)}`)
   // F9 #2: low → high (wraps to the top; SSAO on, sharper shadows).
   const atHigh = await cycleF9()
