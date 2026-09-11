@@ -8,10 +8,31 @@ import { buildLayout } from './layout'
 import { PLAY_ROCK_SEEDS, playRockFlank, playRockYaw } from './playRockSurface'
 import { rockAt, touchReach, touchStand, type BankStage } from './bankGame'
 
+it('keeps drawn hand faceting below the browser bar`s 2 mm allowance', () => {
+  const geometry = new THREE.SphereGeometry(L.handRadius, ...TESSELLATION.figureHand)
+  const p = geometry.getAttribute('position')
+  const index = geometry.index!
+  const triangle = new THREE.Triangle()
+  const plane = new THREE.Plane()
+  let innerRadius = Infinity
+  for (let k = 0; k < index.count; k += 3) {
+    triangle.a.fromBufferAttribute(p, index.getX(k))
+    triangle.b.fromBufferAttribute(p, index.getX(k + 1))
+    triangle.c.fromBufferAttribute(p, index.getX(k + 2))
+    plane.setFromCoplanarPoints(triangle.a, triangle.b, triangle.c)
+    innerRadius = Math.min(innerRadius, Math.abs(plane.constant))
+  }
+  expect((L.handRadius - innerRadius) * SCALE).toBeLessThan(0.002)
+  geometry.dispose()
+})
+
 it('measures the solved hand against its scene pivots and the stone triangles', () => {
   for (const id of ['nubian-village', 'bambara-village', 'mandinka-village']) {
     const rocks = buildLayout(id, 42).playRocks!
-    const stage = { ...rocks, flank: playRockFlank(rocks) } as BankStage
+    const stage: BankStage = {
+      ...rocks, flank: playRockFlank(rocks), water: { x: 0, z: 0 },
+      boulder: { x: 0, z: 0, radius: 1, height: 1 }, roam: { x: 0, z: 0, radius: 1 },
+    }
     for (const end of ['upstream', 'downstream'] as const) {
       const stand = touchStand(stage, end)!
       const rock = rockAt(stage, end)

@@ -25,3 +25,28 @@ tolerance can add further daylight before the gesture even starts.
 The existing verification images were inspected; they show ground between
 the reaching hand and the stone. New browser captures and whole-hold readings
 belong to the reviewer; the author does not run browser suites.
+
+The corrected lookup intersects cached face planes and tests triangle edges,
+with only 1e-10 mesh units of shared-edge rounding. Independent Three.js mesh
+raycasts test intermediate bearings, heights, scaling and yaw. At the same six
+solved stands the nearest-triangle residual now ranges from -6.36 to -0.02 mm:
+radial sphere tangency slightly intersects a sloping facet, leaving the hand
+centre outside the stone. This shallow overlap is retained because it makes
+contact; it is not a positive daylight allowance or a moved stone surface.
+
+The exact flank also exposes unreachable direct approaches behind the existing
+collider. Tappers try adjacent facets within 45 degrees of their station side;
+arrivals use their existing neighbouring-bearing search for unreachable as well
+as occupied stands. The final walking step is capped at the contact goal so a
+10 FPS step cannot overshoot a millimetre-scale admission tolerance. Both holds
+keep the solved position and body height; tap opening resets residual running
+lean just as arrival opening already did.
+
+Contact admission is now 2 mm. The browser bar for both complete holds and both
+word frames is 5 mm: less than one pixel at the brief's approximately 150 px/m,
+comprising 2 mm admission, less than 2 mm of hand-sphere facet loss (measured in
+the unit test), and 1 mm rounding margin. This replaces the old nine-pixel bar;
+the reviewer still owes a picture judgment at this bar. The Bambara cycle test
+checks both holds every simulation frame, including their opening poses, body
+height, facing, lean and eligibility for body separation. Low-frame-rate arrival
+and station-side alternate-facet regressions cover the approach changes.

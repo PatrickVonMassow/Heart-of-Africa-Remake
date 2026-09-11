@@ -617,21 +617,25 @@ export function wordToward(end: BankEnd): BankConcept {
   return end === 'upstream' ? 'UPSTREAM' : 'DOWNSTREAM'
 }
 
-/** Whether the settlement's body-separation pass may move this child. A tagged
- *  child is a fixed posture for the rest of its run: other bodies yield to it,
- *  but the pass must not rewrite the place where it was caught. */
-export function bankChildCanSeparate(c: BankChild): boolean {
+/** Both teaching holds keep the body at the position and height solved for
+ * contact, including the opening frame before a frozen gait settles. */
+export function bankChildTouching(s: BankState, i: number): boolean {
+  return (s.phase === 'run' && s.tapFor > 0 && i === s.tapper) || (s.children[i].arrival?.holdFor ?? 0) > 0
+}
+
+/** Other bodies yield to a tagged child or a child holding contact. */
+export function bankChildCanSeparate(c: BankChild, touching = false): boolean {
   // …and a child ON THE STONE is not in anybody's way either (work-order 1080):
   // the separation works in the ground plane and knows nothing about the half
   // metre it is standing above it, so left in the set it would be shoved off
   // the boulder by whoever wandered past below.
-  return !c.crouched && !onStone(c) && !(c.arrival && c.arrival.holdFor !== null)
+  return !c.crouched && !onStone(c) && !touching && !(c.arrival && c.arrival.holdFor !== null)
 }
 
 /** A teaching contact is solved at standing height, even on its opening frame.
  * The runner's last gait dip must not lower the hand onto a narrower flank. */
-export function bankChildBodyLift(c: BankChild, gaitLift: number): number {
-  return c.lift + (c.arrival?.holdFor != null ? 0 : gaitLift)
+export function bankChildBodyLift(c: BankChild, gaitLift: number, touching = false): number {
+  return c.lift + (touching || c.arrival?.holdFor != null ? 0 : gaitLift)
 }
 
 /** A group at its spawn points, roaming. Every point must already be free — the
@@ -762,14 +766,11 @@ export function stationAt(
   }
 }
 
-/**
- * HOW NEAR THE HAND HAS TO BE for the stone to count as touched, in metres. It
- * is the tolerance the user's own report sets: a hand a metre off its object
- * teaches nothing, a hand three centimetres off is resting on it. Nothing may
- * be spoken at a larger gap — the tap is silent instead (spec: no tap in the
- * air).
+/** Maximum radial contact residual, in metres. At the verification framing
+ * (~150 px/m), 2 mm is 0.3 pixel; the former 30 mm admitted visible daylight.
+ * The flank lookup now intersects the actual triangles (hand-stone-contact.md).
  */
-export const TOUCH_GAP = 0.03
+export const TOUCH_GAP = 0.002
 
 /**
  * WHERE THE TAPPER STANDS TO REACH THE STONE, and from which side.
@@ -790,6 +791,16 @@ export function touchStand(
   const here = rockAt(stage, end)
   const far = rockAt(stage, otherEnd(end))
   const bearing = approachBearing ?? Math.atan2(far.x - here.x, far.z - here.z)
+  if (approachBearing === undefined) {
+    // Try the station bearing first, then neighbouring facets on that same
+    // side. The exact flank can be unreachable behind the collider on one
+    // bearing while the next facet is reachable; never move the collider.
+    for (const offset of [0, 1, -1, 2, -2, 3, -3]) {
+      const found = touchStand(stage, end, blocked, bearing + offset * Math.PI / 12)
+      if (found) return found
+    }
+    return null
+  }
   const flank = (y: number, offset: number) => stage.flank(end, bearing + offset, y)
   const solved = solveTouch(flank, CHILD_FIGURE_SCALE)
   if (!solved) return null
@@ -804,7 +815,7 @@ export function touchStand(
   // OUT to the first free ground, and kept only while the hand still reaches.
   let stand = solved.stand
   if (blocked) {
-    const step = 0.02
+    const step = TOUCH_GAP / 2
     for (let k = 0; k <= 20 && blocked(spotAt(stand).x, spotAt(stand).z); k++) stand = solved.stand + k * step
     if (blocked(spotAt(stand).x, spotAt(stand).z)) return null
   }
@@ -982,6 +993,7 @@ function openRun(s: BankState, stage: BankStage, cfg: BankConfig): void {
     // child looking anywhere else would lay its hand somewhere else.
     c.heading = Math.atan2(rock.x - c.x, rock.z - c.z)
     c.facing = c.heading
+    c.lean = 0
     // The group stands still for exactly as long as the hand is on the stone.
     s.tapFor = cfg.tapPauseSeconds
     say(s, {
@@ -1272,6 +1284,7 @@ function drive(
   dt: number,
   cfg: BankConfig,
   world: BankWorld,
+  stopAtGoal = false,
 ): void {
   const c = s.children[i]
   ageEdge(c, dt)
@@ -1297,7 +1310,10 @@ function drive(
   const blockedByBody = (x: number, z: number) => !!occupied?.(x, z) ||
     s.children.some((other, j) => j !== i && other.arrival?.holdFor != null &&
       dist(other, { x, z }) < world.childRadius * 2)
-  if (c.pace > 0) moveChild(c, desired, c.pace * dt, dt, cfg, world, blockedByBody)
+  // Contact has millimetres of tolerance. Walk the final partial step instead
+  // of overshooting the solved stand and oscillating across it at low FPS.
+  const step = stopAtGoal ? Math.min(c.pace * dt, dist(c, to)) : c.pace * dt
+  if (c.pace > 0) moveChild(c, desired, step, dt, cfg, world, blockedByBody)
   trackProgress(c, dt, cfg, world)
   if (s.playing) c.walkedWhilePlaying += c.walked - walkedBefore
   c.facing = turnToward(c.facing, c.heading, cfg.turnRate * dt)
@@ -1631,7 +1647,7 @@ function stepStations(
       clearPath(c)
       drive(s, i, null, false, dt, cfg, world)
     } else {
-      drive(s, i, wayTo(c, to, dt, world), running, dt, cfg, world)
+      drive(s, i, wayTo(c, to, dt, world), running, dt, cfg, world, tapping)
     }
   }
 }
@@ -1752,7 +1768,7 @@ function stepArrival(
     })
   } else {
     const approachWorld = { ...world, occupied: (_self: number, _ignore: number, x: number, z: number) => occupied(x, z) }
-    drive(s, i, arrival.stand, false, dt, cfg, approachWorld)
+    drive(s, i, arrival.stand, false, dt, cfg, approachWorld, true)
   }
   return true
 }
@@ -1805,21 +1821,22 @@ function stepRun(
       c.arrived = true
       const bearing = Math.atan2(c.x - farRock.x, c.z - farRock.z)
       let stand = touchStand(stage, to, world.blocked, bearing)
-      if (stand) {
-        const taken = (spot: { x: number; z: number }) =>
-          !!obstacles(i, cfg, world)?.(spot.x, spot.z) || s.children.some((other, j) => j !== i && (
-            dist(other, spot) < world.childRadius * 2 ||
-            (other.arrival && dist(other.arrival.stand, spot) < world.childRadius * 2)
-          ))
-        // Keep the runner's own side, fanning out only when that stand is taken.
-        // If every nearby bearing is occupied, retain its stand and wait.
-        if (taken(stand)) {
-          for (const offset of [1, -1, 2, -2, 3, -3]) {
-            const alternative = touchStand(stage, to, world.blocked, bearing + offset * Math.PI / 6)
-            if (alternative && !taken(alternative)) {
-              stand = alternative
-              break
-            }
+      const taken = (spot: { x: number; z: number }) =>
+        !!obstacles(i, cfg, world)?.(spot.x, spot.z) || s.children.some((other, j) => j !== i && (
+          dist(other, spot) < world.childRadius * 2 ||
+          (other.arrival && dist(other.arrival.stand, spot) < world.childRadius * 2)
+        ))
+      // A narrow facet can be unreachable behind the collider as well as
+      // occupied by another child. Search nearby bearings in either case.
+      // If all reachable stands are occupied, retain one and wait its turn.
+      if (!stand || taken(stand)) {
+        for (const offset of [1, -1, 2, -2, 3, -3]) {
+          const alternative = touchStand(stage, to, world.blocked, bearing + offset * Math.PI / 6)
+          if (!alternative) continue
+          stand ??= alternative
+          if (!taken(alternative)) {
+            stand = alternative
+            break
           }
         }
       }

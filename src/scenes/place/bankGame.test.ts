@@ -22,6 +22,8 @@ import { playRockFlank } from './playRockSurface'
 import { standingClear, WALKER_RADIUS } from './collision'
 import {
   bankChildCanSeparate,
+  bankChildBodyLift,
+  bankChildTouching,
   createBankGame,
   insideStrangerBerth,
   otherEnd,
@@ -40,6 +42,9 @@ import {
   type BankWorld,
   type ClimbStage,
 } from './bankGame'
+import { CHILD_FIGURE_SCALE, FIGURE_LIMBS } from '../../render/figures'
+import { advanceGesture, gesturePose, restGesture, startGesture } from '../../render/gesture'
+import { touchedPoint } from './rockTouch'
 import { absorbSeparation } from './tagGame'
 import {
   addBodies,
@@ -114,7 +119,7 @@ interface Log {
 /** Runs the group for `seconds` and records what it said and did. */
 function replay(
   seconds: number,
-  options: { seed?: number; count?: number; world?: BankWorld; cfg?: BankConfig; stage?: BankStage } = {},
+  options: { seed?: number; count?: number; world?: BankWorld; cfg?: BankConfig; stage?: BankStage; observe?: (s: BankState, u: BankUtterance | null, dt: number) => void } = {},
 ): { s: BankState; log: Log } {
   const cfg = options.cfg ?? CFG
   const stage = options.stage ?? STAGE
@@ -131,6 +136,7 @@ function replay(
   for (let t = 0; t < seconds; t += dt) {
     const before = s.phase
     const u = stepBankGame(s, dt, cfg, stage, world, rand)
+    options.observe?.(s, u, dt)
     if (s.phase !== before || log.phases.length === 0) log.phases.push(s.phase)
     if (u) {
       log.said.push(u)
@@ -1094,7 +1100,43 @@ describe('arriving runners name the far stone by contact', () => {
     const world = { ...openWorld(), radius: 100,
       blocked: (x: number, z: number) => !standingClear(rockColliders, x, z, WALKER_RADIUS),
     }
-    const { s, log } = replay(360, { seed: 3791639114, stage, world, cfg: { ...CFG, utteranceGapSeconds: 0 } })
+    const gestures = Array.from({ length: balance.villageLife.tag.childCount }, restGesture)
+    const moments = new Map<number, BankUtterance>()
+    const samples = { tap: 0, arrival: 0 }
+    const { s, log } = replay(360, { seed: 3791639114, stage, world, cfg: { ...CFG, utteranceGapSeconds: 0 },
+      observe: (state, word, dt) => {
+        for (let i = 0; i < gestures.length; i++) gestures[i] = advanceGesture(gestures[i], dt)
+        if (word?.gesture === 'touch') {
+          gestures[word.speaker] = startGesture('touch', { ...word.arm, duration: word.hold })
+          moments.set(word.speaker, word)
+        }
+        state.children.forEach((c, i) => {
+          const touching = bankChildTouching(state, i)
+          if (!touching) return
+          const word = moments.get(i)!
+          expect(word).toBeDefined()
+          if (!word || (word.moment !== 'tap' && word.moment !== 'arrival')) return
+          samples[word.moment]++
+          expect(bankChildCanSeparate(c, touching)).toBe(false)
+          // Even the deepest possible frozen stride must draw this hold at
+          // its solved height, from the word's frame through the entire hold.
+          expect(bankChildBodyLift(c, -0.03, touching)).toBe(0)
+          expect(c.lean).toBe(0)
+          const shown = gesturePose(gestures[i])
+          const rock = word.aim
+          expect(c.facing).toBeCloseTo(Math.atan2(rock.x - c.x, rock.z - c.z), 9)
+          const at = touchedPoint(dist(c, rock), gestures[i].elevation, CHILD_FIGURE_SCALE,
+            FIGURE_LIMBS.hipY, shown.lean + c.lean)
+          const bearing = Math.atan2(c.x - rock.x, c.z - rock.z) +
+            Math.atan2(-at.offAxis, Math.sqrt(at.radius ** 2 - at.offAxis ** 2))
+          const end = dist(rock, stage.upstream) < 0.01 ? 'upstream' : 'downstream'
+          const gap = at.radius - FIGURE_LIMBS.handRadius * CHILD_FIGURE_SCALE - stage.flank(end, bearing, at.height)
+          expect(Math.abs(gap), JSON.stringify({ moment: word.moment, clock: state.clock, gesture: gestures[i], tap: state.tapFor, arrival: c.arrival })).toBeLessThanOrEqual(TOUCH_GAP)
+        })
+      },
+    })
+    expect(samples.tap).toBeGreaterThan(60)
+    expect(samples.arrival).toBeGreaterThan(60)
     expect(s.cycles).toBeGreaterThan(0)
     const words = log.when.filter(({ u }) => u.at === 'rock' && u.concept === 'ROCK')
     expect(new Set(words.map(({ u }) => u.moment))).toEqual(new Set(['tap', 'arrival']))
@@ -1108,7 +1150,7 @@ describe('arriving runners name the far stone by contact', () => {
     }
   })
 
-  it('becomes safe at the old radius, ends the run, then walks the last metre before speaking', () => {
+  it.each([1 / 60, 0.1])('walks the last metre into contact without overshooting at dt=%s', (dt) => {
     const { s, rand } = arriving([{ x: 8, z: 0 }])
     const c = s.children[1]
     const first = stepBankGame(s, 1 / 60, CFG, STAGE, openWorld(), rand)
@@ -1118,7 +1160,7 @@ describe('arriving runners name the far stone by contact', () => {
     expect(c.arrival).not.toBeNull()
     expect(dist(c, STAGE.downstream)).toBeGreaterThan(1.8)
     let word: BankUtterance | null = null
-    for (let k = 0; k < 600 && !word; k++) word = stepBankGame(s, 1 / 60, CFG, STAGE, openWorld(), rand)
+    for (let k = 0; k < 600 && !word; k++) word = stepBankGame(s, dt, CFG, STAGE, openWorld(), rand)
     expect(word?.moment).toBe('arrival')
     expect(Math.abs(touchReach(STAGE, 'downstream', c)!.gap)).toBeLessThanOrEqual(TOUCH_GAP)
     expect(s.tags).toBe(0)
