@@ -205,3 +205,25 @@ describe('run-logged default launch — the run-identity re-exec (point 700, Sol
     60_000,
   )
 })
+
+describe('the ladder escape carries a REASON', () => {
+  it('reads the reason that follows it', () => {
+    const { own, forward } = parseRunLoggedArgs(['polish', '--no-ladder', 'no section covers a boot path'])
+    expect(own.noLadder).toBe('no section covers a boot path')
+    expect(forward).toEqual(['polish'])
+  })
+
+  it('does not swallow the NEXT OPTION as its reason', () => {
+    // `--no-ladder --quiet` used to waive the ladder with "--quiet" recorded as
+    // the explanation — an explanation nobody wrote, which is the one thing the
+    // reason exists to prevent. An empty reason leaves the refusal standing.
+    const { own, forward } = parseRunLoggedArgs(['polish', '--no-ladder', '--quiet'])
+    expect(own.noLadder).toBe('')
+    expect(own.quiet).toBe(true)
+    expect(forward).toEqual(['polish'])
+  })
+
+  it('is empty when it ends the command line', () => {
+    expect(parseRunLoggedArgs(['polish', '--no-ladder']).own.noLadder).toBe('')
+  })
+})

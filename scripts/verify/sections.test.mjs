@@ -310,3 +310,18 @@ describe('a check that declares it cannot predict the suite’s own reading', ()
     expect(() => gate.nonPredictive('a check', '  ')).toThrow(/reason/)
   })
 })
+
+describe('a declaration whose prose carries the other quote', () => {
+  it('is still read — each body excludes only its OWN delimiter', () => {
+    // Excluding both quote characters lost every declaration written the
+    // ordinary way. It declared itself at runtime and was invisible to the
+    // ladder, so its narrow green went on being credited as honest — the exact
+    // false confidence the declaration exists to stop.
+    const found = listNonPredictive([
+      "if (section('jars')) {",
+      '  nonPredictive(\'jar\', "the suite\'s sampling differs")',
+      '}',
+    ].join('\n'))
+    expect(found).toEqual([{ section: 'jars', check: 'jar', why: "the suite's sampling differs" }])
+  })
+})

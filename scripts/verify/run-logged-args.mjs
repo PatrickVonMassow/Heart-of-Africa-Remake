@@ -37,7 +37,15 @@ export function parseRunLoggedArgs(argv) {
     else if (a === '--max') own.max = Number(value())
     else if (a === '--keep') own.keep = Number(value())
     else if (a === '--log-file') own.logFile = value()
-    else if (a === '--no-ladder') own.noLadder = value() ?? ''
+    else if (a === '--no-ladder') {
+      // A REASON, NOT THE NEXT FLAG. Consuming the next argument unconditionally
+      // meant `npm test -- polish --no-ladder --quiet` waived the ladder with
+      // "--quiet" recorded as the explanation — and an explanation nobody wrote
+      // is exactly what the reason exists to prevent. An empty reason leaves the
+      // refusal standing, which the core already pins.
+      const next = argv[i + 1]
+      own.noLadder = next !== undefined && !next.startsWith('-') ? argv[++i] : ''
+    }
     else if (a === '--stream') own.stream = true
     else if (a === '--quiet') own.quiet = true
     else forward.push(a)

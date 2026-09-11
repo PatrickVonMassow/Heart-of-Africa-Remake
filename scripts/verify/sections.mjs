@@ -88,9 +88,13 @@ export function listSections(source) {
  */
 const NP_HEAD = /(?<![\w.$])nonPredictive\(\s*['"]/g
 /** The same call with both strings captured, read from the ORIGINAL source at a
- *  position the masked one proved is code. Escapes are tolerated because check
- *  names are prose and carry apostrophes. */
-const NP_RE = /(?<![\w.$])nonPredictive\(\s*(['"])((?:[^'"\\]|\\.)*)\1\s*,\s*(['"])((?:[^'"\\]|\\.)*)\3/g
+ *  position the masked one proved is code. Each body excludes only ITS OWN
+ *  delimiter: excluding both quote characters silently lost every declaration
+ *  whose prose carried the other one — `nonPredictive('jar', "the suite's
+ *  sampling differs")` declared itself at runtime and was invisible here, so its
+ *  narrow green went on being credited as honest. Escapes are tolerated because
+ *  check names are prose. */
+const NP_RE = /(?<![\w.$])nonPredictive\(\s*(['"])((?:\\.|(?!\1)[^\\])*)\1\s*,\s*(['"])((?:\\.|(?!\3)[^\\])*)\3/g
 
 /**
  * Every non-predictive declaration a suite makes, each attached to the SECTION
