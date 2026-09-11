@@ -592,6 +592,13 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „‚Grün' zählt nur, wenn die schmale Stufe **jünger als der letzte Merge** ist und
   **dasselbe misst** wie die große — sonst sagt sie selbst, dass ihr Grün nichts vorhersagt."
 
+- **Der Wächter ist gebaut, getestet und grün — und greift nicht.** Er sitzt in einer Datei, die
+  dein Ablauf gar nicht benutzt; der Befehl, den du wirklich tippst, geht daran vorbei.
+  → *Prompt:* „Bevor du eine Erzwingung für fertig erklärst: **tipp den Befehl, mit dem ihr
+  arbeitet**, und sieh ihr beim Feuern zu. Gibt es zwei Eingänge, fragen **beide**, genau einmal
+  pro Lauf. Und eine **mtime ist keine Änderung** — Auschecken und Stash-Pop bewegen sie umsonst,
+  also datiere eine saubere Datei nach dem Commit, den sie trägt."
+
 - **Zwei Aufgaben in eine gepackt, um einen teuren Lauf zu sparen.** Die fertige Hälfte wartet
   dann auf die rote, weil eine Aufgabe nur ganz fertig wird — gespart hat das nichts.
   → *Prompt:* „Bündle nur, wenn beide Hälften **plausibel im selben Lauf** grün werden; bleibt
