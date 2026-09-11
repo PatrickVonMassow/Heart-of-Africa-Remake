@@ -22,6 +22,12 @@ import {
   armDirection,
   DIG_CYCLE_SECONDS,
   digPose,
+  FILL_CARRY_SIDE,
+  FILL_REACH_BEARING,
+  FILL_SQUAT,
+  fillHandAt,
+  fillPose,
+  fillSquat,
   gestureArm,
   gestureBlendOf,
   gestureEnvelope,
@@ -32,6 +38,7 @@ import {
   restGesture,
   startGesture,
   TOUCH_LEAN,
+  WORK_LEAN_MAX,
   type GestureKind,
   type GestureState,
 } from './gesture'
@@ -423,6 +430,88 @@ describe('the digging pose', () => {
       const p = digPose(t)
       expect(Number.isFinite(p.left.pitch)).toBe(true)
       expect(Number.isFinite(p.lean)).toBe(true)
+    }
+  })
+})
+
+// The fill (work-order 1085). The reading these pin is the one four re-aimed
+// cameras could not fix: a trunk folded twice as deep as a digging strike reads
+// as a man face-down in the river, because a legless cone has no knee to say the
+// body meant to go down. So the fold is BOUNDED here, and the reach that the
+// fold no longer provides is proved to come from somewhere else — the sink and
+// the arm. A picture judges whether it reads; this layer judges that the three
+// things the design decided on are all actually there.
+describe('the fill: fetching water from a body with no legs', () => {
+  const across = (f: (p: number) => number) => {
+    const out: number[] = []
+    for (let p = 0; p <= 1.0001; p += 0.005) out.push(f(Math.min(1, p)))
+    return out
+  }
+
+  it('never folds the trunk deeper than a digging strike does', () => {
+    const leans = across((p) => fillPose(p).lean)
+    expect(Math.max(...leans)).toBeLessThanOrEqual(WORK_LEAN_MAX + 1e-9)
+    const strikes = []
+    for (let t = 0; t < DIG_CYCLE_SECONDS; t += DIG_CYCLE_SECONDS / 64) strikes.push(digPose(t).lean)
+    expect(Math.max(...leans)).toBeLessThanOrEqual(Math.max(...strikes) + 1e-9)
+    // …and it does fold that far: a bound nothing reaches would prove nothing
+    // about the pose the player actually sees.
+    expect(Math.max(...leans)).toBeCloseTo(WORK_LEAN_MAX, 8)
+  })
+
+  it('sinks the body and reaches with the arm, so the hand arrives at the water', () => {
+    // Standing, the hand hangs at hip height and BESIDE the body; at the bottom
+    // of the dip it is down at the feet and out in FRONT, which is where water a
+    // figure is standing in lies.
+    const [, restY, restZ] = fillHandAt(0)
+    const [, dipY, dipZ] = fillHandAt(0.5)
+    expect(restY).toBeGreaterThan(0.2)
+    expect(dipY).toBeLessThan(0.125)
+    expect(dipZ).toBeGreaterThan(restZ + 0.15)
+    // The sink CARRIES its share: the capped fold and the arm on their own leave
+    // the hand above the band, and it is the squat that takes it under. That is
+    // the whole reason the fold could be capped at all.
+    expect(dipY / FILL_SQUAT).toBeGreaterThan(0.125)
+    expect(fillSquat(0.5)).toBeCloseTo(FILL_SQUAT, 8)
+  })
+
+  it('holds the dip, and comes back to rest at both ends', () => {
+    expect(poseDistanceFromRest(fillPose(0))).toBeCloseTo(0, 8)
+    expect(poseDistanceFromRest(fillPose(1))).toBeCloseTo(0, 8)
+    expect(fillSquat(0)).toBeCloseTo(1, 8)
+    expect(fillSquat(1)).toBeCloseTo(1, 8)
+    // The middle is a HOLD, not a passing instant: the moment a screenshot has
+    // to be able to catch lasts for over half the act.
+    const held = across((p) => (fillPose(p).lean >= WORK_LEAN_MAX - 1e-9 ? 1 : 0))
+    expect(held.filter(Boolean).length / held.length).toBeGreaterThan(0.5)
+    expect(poseDistanceFromRest(fillPose(0.5))).toBeGreaterThan(1)
+  })
+
+  it('throws the free arm back while the carrying arm goes down', () => {
+    const rest = fillPose(0)
+    const dip = fillPose(0.5)
+    const carryRest = FILL_CARRY_SIDE === 'left' ? rest.left : rest.right
+    const carryDip = FILL_CARRY_SIDE === 'left' ? dip.left : dip.right
+    const freeRest = FILL_CARRY_SIDE === 'left' ? rest.right : rest.left
+    const freeDip = FILL_CARRY_SIDE === 'left' ? dip.right : dip.left
+    // Negative pitch raises an arm forward, positive swings it back — so the two
+    // arms move in OPPOSITE directions. A body that only bends reads as a bow.
+    expect(carryDip.pitch).toBeLessThan(carryRest.pitch)
+    expect(freeDip.pitch).toBeGreaterThan(freeRest.pitch)
+    // The free arm also goes OUT, away from the flank it hangs against.
+    expect(Math.abs(freeDip.roll)).toBeGreaterThan(Math.abs(freeRest.roll))
+    // And the carrying arm swings across the front rather than straight down a
+    // side, so the jar is where the camera can see it.
+    expect(carryDip.yaw).toBeCloseTo(FILL_REACH_BEARING, 8)
+  })
+
+  it('survives a progress reading outside its own range', () => {
+    for (const p of [-0.4, -1, 1.6, 12]) {
+      const pose = fillPose(p)
+      expect(Number.isFinite(pose.lean), `p=${p}`).toBe(true)
+      expect(Number.isFinite(pose.left.pitch), `p=${p}`).toBe(true)
+      expect(poseDistanceFromRest(pose), `p=${p}`).toBeCloseTo(0, 8)
+      expect(fillSquat(p), `p=${p}`).toBeCloseTo(1, 8)
     }
   })
 })

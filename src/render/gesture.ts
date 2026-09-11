@@ -456,6 +456,14 @@ export function gesturePose(s: GestureState): FigurePose {
 export const DIG_CYCLE_SECONDS = 1.5
 
 /**
+ * The DEEPEST a working trunk folds (rad): the digging strike at the bottom of
+ * its swing. It is named because it is the ceiling every other work pose is held
+ * to — the dig is the one adult act design.md §13.4 holds up as legible from the
+ * body alone, so nothing that must also be read may tip further than it does.
+ */
+export const WORK_LEAN_MAX = 0.34
+
+/**
  * A figure WORKING THE GROUND (work-order point 483): both arms swing a tool up
  * and drive it down while the trunk folds over the spot, over and over. This is
  * the one adult action the teaching hangs on — the player has to read "digging"
@@ -482,9 +490,132 @@ export function digPose(seconds: number, phase = 0): FigurePose {
     left: { pitch, yaw: -0.12, roll },
     right: { pitch, yaw: 0.12, roll: -roll },
     // The trunk folds over the ground at the strike and comes up with the lift.
-    lean: 0.34 - raise * 0.2,
+    lean: WORK_LEAN_MAX - raise * 0.2,
     turn: 0,
   }
+}
+
+/**
+ * THE ELEVATION AN ARM HANGS AT, in `armAim`'s own terms — the inverse of the
+ * rest pitch, so a pose that swings an arm from rest onto an aim can interpolate
+ * ONE number instead of blending a pitch that means something else at each end.
+ */
+const REST_ELEVATION = -Math.PI / 2 - REST_POSE.left.pitch
+
+/**
+ * How far the fill folds the trunk, how low it sinks the body, and where it puts
+ * the carrying hand (work-order 1085, design.md §13.4).
+ *
+ * WHY THERE ARE THREE NUMBERS AND NOT ONE. The first fill was a fold alone, to
+ * 0.74 rad, and four re-aimed cameras all read it the same way: a man lying
+ * face-down in the river. A villager is a legless cone, so a trunk past the
+ * dig's own magnitude has nothing left to read as a bend — there is no knee to
+ * say the body meant to go down. The tagged child (`CROUCH_POSE`) folds deeper
+ * still and reads as a squat, because its HEIGHT and its ARMS move with the
+ * fold. The fill borrows that shape: the fold is capped at `WORK_LEAN_MAX`, the
+ * body sinks to `FILL_SQUAT` of its height, and the remaining reach is the arm's.
+ *
+ * The squat is not part of `FigurePose` because it is not an angle: it is the
+ * y-squash the caller puts on the figure's own group, exactly as the crouching
+ * child's is. `fillSquat` returns it off the same envelope as the pose, so the
+ * sink and the fold can never come apart.
+ */
+export const FILL_SQUAT = 0.72
+
+/** The bearing the carrying arm swings onto (rad): across the front of the body,
+ *  so the jar hangs where the player can see it rather than beside a flank. */
+export const FILL_REACH_BEARING = 0.22
+
+/** The elevation the carrying arm reaches to (rad): down and a little forward.
+ *  With `WORK_LEAN_MAX` and `FILL_SQUAT` it puts the hand under an eighth of the
+ *  figure's height, which is where water at the feet is — the reach the fold no
+ *  longer provides. */
+export const FILL_REACH_ELEVATION = -1.28
+
+/** The side the jar is carried on, and therefore the arm that dips it. */
+export const FILL_CARRY_SIDE: ArmSide = 'left'
+
+/**
+ * The dip's envelope: down over the first fifth, HELD through the middle, up
+ * over the last quarter. The hold is what makes the fill an act rather than a
+ * dab — the readable moment the jar is filling — and it is the only part of the
+ * motion a screenshot can be expected to catch.
+ */
+function fillDip(progress: number): number {
+  const p = Math.max(0, Math.min(1, progress))
+  if (p < 0.2) return smoothstep(p / 0.2)
+  if (p > 0.76) return 1 - smoothstep((p - 0.76) / 0.24)
+  return 1
+}
+
+/**
+ * A figure FETCHING WATER at its feet (work-order 1085): it sinks, folds no
+ * deeper than a digging strike, and reaches down past the hem of its cone with
+ * the jar while the free arm swings back and out for balance.
+ *
+ * A pose, not a gesture — like `digPose` it has no duration and no aim, and the
+ * caller drops back to rest when the act ends. Driven by PROGRESS through the
+ * fill (0..1) rather than by a wall clock, so the hold lasts as long as the act
+ * says and a paused errand does not keep dipping.
+ *
+ * The free arm is not decoration: a body that only bends reads as a bow, and the
+ * arm thrown back is what says the bend was meant to put something down there.
+ */
+export function fillPose(progress: number): FigurePose {
+  const down = fillDip(progress)
+  const aim = armAim(FILL_REACH_BEARING * down, REST_ELEVATION + (FILL_REACH_ELEVATION - REST_ELEVATION) * down)
+  const carrying: ArmPose = {
+    pitch: aim.pitch,
+    yaw: aim.yaw,
+    // The outward roll goes with the arm: it exists to keep a HANGING arm clear
+    // of the cone, and an arm swung out in front is clear of it already. A tenth
+    // is left standing so the elbow does not graze the flank on the way down.
+    roll: REST_POSE.left.roll * (1 - down * 0.9),
+  }
+  const free: ArmPose = {
+    // Positive pitch swings the arm BACK (negative raises it forward).
+    pitch: REST_POSE.right.pitch + down * 0.55,
+    yaw: 0,
+    roll: REST_POSE.right.roll * (1 + down * 0.6),
+  }
+  return {
+    left: FILL_CARRY_SIDE === 'left' ? carrying : free,
+    right: FILL_CARRY_SIDE === 'left' ? free : carrying,
+    lean: WORK_LEAN_MAX * down,
+    turn: 0,
+  }
+}
+
+/**
+ * The y-squash that goes with `fillPose` at the same progress: 1 while the
+ * figure stands, `FILL_SQUAT` at the bottom of the dip. The caller applies it to
+ * the figure's group (`g.scale.set(1, fillSquat(p), 1)`), which is how the
+ * crouching child is drawn too.
+ */
+export function fillSquat(progress: number): number {
+  return 1 - fillDip(progress) * (1 - FILL_SQUAT)
+}
+
+/**
+ * WHERE THE FILLING HAND IS, in the figure's own frame and in body heights,
+ * squat included — the same chain `handAt` walks, but off a POSE rather than off
+ * an aim, because the fill's arm carries a roll that an aim cannot express.
+ *
+ * It exists so the reach can be ASSERTED and so the jar prop can be hung without
+ * anybody re-deriving the arm: a solve, a test and the drawn hand must describe
+ * one arm (work-order 1065's lesson, paid for in centimetres).
+ */
+export function fillHandAt(progress: number, pivotY = 0): [number, number, number] {
+  const pose = fillPose(progress)
+  const arm = FILL_CARRY_SIDE === 'left' ? pose.left : pose.right
+  const [dx, dy, dz] = armDirection(arm)
+  const x = (FILL_CARRY_SIDE === 'left' ? FIGURE_LIMBS.shoulderX : -FIGURE_LIMBS.shoulderX) + FIGURE_LIMBS.armLength * dx
+  const y = FIGURE_LIMBS.shoulderY + FIGURE_LIMBS.armLength * dy
+  const z = FIGURE_LIMBS.armLength * dz
+  const cl = Math.cos(pose.lean)
+  const sl = Math.sin(pose.lean)
+  const squat = fillSquat(progress)
+  return [x, (pivotY + (y - pivotY) * cl - z * sl) * squat, (y - pivotY) * sl + z * cl]
 }
 
 /**
