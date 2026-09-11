@@ -361,7 +361,14 @@ export const DOC_BUDGETS = [
     // ROCK. New behaviour with a new player-reachable state (a run that opens
     // in silence because the stone is out of reach), not a longer telling of
     // the old tap.
-    maxWords: 28462,
+    // RAISED by the 184 measured words work-order 1085 owes §13.4: how the act of
+    // FETCHING WATER is made legible on a legless cone. The section said nothing
+    // about it, and the first attempt — a trunk folded twice as deep as a digging
+    // strike — read to four re-aimed cameras as a man face-down in the river. The
+    // decision recorded is new behaviour with a new player-reachable reading (the
+    // figure sinks, the fold is bounded by the dig's, the jar's mouth is what goes
+    // under an opaque surface), not a longer telling of the errand already there.
+    maxWords: 28646,
     // A hundred words across 28k: design.md is edited section by section and a genuine
     // new decision runs 40–215 measured words, so the slack absorbs the rewording that
     // accompanies one and refuses the disappearance of a whole section without a
