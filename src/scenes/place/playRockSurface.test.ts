@@ -7,8 +7,6 @@ import * as THREE from 'three'
 import { buildPlayRock } from '../../render/flora'
 import {
   PLAY_ROCK_SEEDS,
-  PROFILE_BINS,
-  playRockProfile,
   playRockSurfaceRadius,
   playRockYaw,
 } from './playRockSurface'
@@ -27,21 +25,17 @@ describe('the play rock`s drawn silhouette (work-order 1065)', () => {
       for (const [x, y, z] of vertices(seed)) {
         const bearing = Math.atan2(x, z)
         const reported = playRockSurfaceRadius(seed, 1, 0, bearing, y)
-        // One bin is 11.25°; a vertex may sit up to half a bin off the bearing
-        // the ring reports, so it is compared with a small tolerance rather
-        // than exactly. What must never happen is the surface being reported
-        // WELL INSIDE the stone, which is what would let a hand pass through.
-        expect(reported).toBeGreaterThan(Math.hypot(x, z) - 0.12)
+        // Flattened base vertices can lie inside the outer boundary.
+        expect(reported).toBeGreaterThanOrEqual(Math.hypot(x, z) - 1e-7)
       }
     }
   })
 
   it('is widest well above the ground, which is the whole reason for the point', () => {
     for (const seed of PLAY_ROCK_SEEDS) {
-      const profile = playRockProfile(seed)
-      const widest = profile.rings.map((ring) => Math.max(...ring))
-      const top = widest.indexOf(Math.max(...widest))
-      const height = top / (profile.rings.length - 1)
+      const points = vertices(seed)
+      const widest = points.reduce((a, b) => Math.hypot(a[0], a[2]) > Math.hypot(b[0], b[2]) ? a : b)
+      const height = widest[1] / Math.max(...points.map((v) => v[1]))
       expect(height).toBeGreaterThan(0.4)
       expect(height).toBeLessThan(0.95)
       // And at a child's hand height the flank stands a good way inside it.
@@ -69,12 +63,34 @@ describe('the play rock`s drawn silhouette (work-order 1065)', () => {
     )
   })
 
-  it('fills every bearing of every ring, so no lookup falls into a hole', () => {
+  it('matches independent raycasts between vertices, across heights and yaws', () => {
+    const raycaster = new THREE.Raycaster()
     for (const seed of PLAY_ROCK_SEEDS) {
-      for (const ring of playRockProfile(seed).rings.slice(1, -1)) {
-        expect(ring).toHaveLength(PROFILE_BINS)
-        for (const r of ring) expect(r).toBeGreaterThan(0)
+      const geometry = buildPlayRock(seed)
+      const material = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide })
+      const mesh = new THREE.Mesh(geometry, material)
+      mesh.scale.setScalar(PLAY_ROCK_SCALE)
+      mesh.rotation.y = 0.73
+      mesh.updateMatrixWorld(true)
+      for (const y of [0.2, 0.37, 0.48, 0.61, 0.9, 1.2]) {
+        for (let k = 0; k < 73; k++) {
+          const bearing = k / 73 * Math.PI * 2
+          const direction = new THREE.Vector3(Math.sin(bearing), 0, Math.cos(bearing))
+          raycaster.set(direction.clone().multiplyScalar(3).setY(y), direction.clone().negate())
+          const hits = raycaster.intersectObject(mesh)
+          const expected = hits.length ? 3 - hits[0].distance : 0
+          expect(playRockSurfaceRadius(seed, PLAY_ROCK_SCALE, 0.73, bearing, y)).toBeCloseTo(expected, 6)
+        }
       }
+      geometry.dispose()
+      material.dispose()
+    }
+  })
+
+  it('reports no flank below or above the stone', () => {
+    for (const seed of PLAY_ROCK_SEEDS) {
+      expect(playRockSurfaceRadius(seed, 1, 0, 0, -0.01)).toBe(0)
+      expect(playRockSurfaceRadius(seed, 1, 0, 0, 10)).toBe(0)
     }
   })
 

@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest'
 import * as THREE from 'three'
 import { buildPlayRock } from '../../render/flora'
-import { CHILD_FIGURE_SCALE as SCALE, FIGURE_LIMBS as L } from '../../render/figures'
+import { CHILD_FIGURE_SCALE as SCALE, FIGURE_LIMBS as L, TESSELLATION } from '../../render/figures'
 import { applyFigurePose } from '../../render/figurePose'
 import { gesturePose, handAt, startGesture } from '../../render/gesture'
 import { buildLayout } from './layout'
@@ -9,7 +9,6 @@ import { PLAY_ROCK_SEEDS, playRockFlank, playRockYaw } from './playRockSurface'
 import { rockAt, touchReach, touchStand, type BankStage } from './bankGame'
 
 it('measures the solved hand against its scene pivots and the stone triangles', () => {
-  const rows = []
   for (const id of ['nubian-village', 'bambara-village', 'mandinka-village']) {
     const rocks = buildLayout(id, 42).playRocks!
     const stage = { ...rocks, flank: playRockFlank(rocks) } as BankStage
@@ -28,7 +27,7 @@ it('measures the solved hand against its scene pivots and the stone triangles', 
       arm.position.set(L.shoulderX, L.shoulderY - L.hipY, 0)
       arm.rotation.order = 'YXZ'
       trunk.add(arm)
-      const hand = new THREE.Mesh(new THREE.SphereGeometry(L.handRadius, 12, 8))
+      const hand = new THREE.Mesh(new THREE.SphereGeometry(L.handRadius, ...TESSELLATION.figureHand))
       hand.position.y = -L.armLength
       arm.add(hand)
       applyFigurePose({ arms: [arm], trunk }, gesturePose(startGesture('touch', { elevation: reach.elevation })))
@@ -52,10 +51,13 @@ it('measures the solved hand against its scene pivots and the stone triangles', 
         triangle.closestPointToPoint(drawn, closest)
         distance = Math.min(distance, drawn.distanceTo(closest))
       }
-      rows.push({ id, end, solvedGap: reach.gap, triangleGap: distance - L.handRadius * SCALE })
+      // Independent nearest-triangle measurement catches a fictitious flank.
+      // Radial tangency overlaps a sloping face slightly (at most 6.36 mm in
+      // these fixtures); that contact leaves the centre outside the stone.
+      expect(distance - L.handRadius * SCALE, `${id}/${end}`).toBeLessThanOrEqual(0.002)
+      expect(distance - L.handRadius * SCALE, `${id}/${end}`).toBeGreaterThan(-0.007)
       geometry.dispose()
       hand.geometry.dispose()
     }
   }
-  console.table(rows)
 })
