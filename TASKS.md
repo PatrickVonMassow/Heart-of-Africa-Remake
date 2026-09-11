@@ -29,9 +29,10 @@ npm test            # LARGE: build → lint → vitest → every suite → previ
 ```
 
 Per point: build + lint + audit + the whole Vitest layer, plus the browser suites
-the diff touches. LARGE is mandatory on a scene core (TravelScene/Wildlife/
-PlaceScene, the renderer/post pipeline, store.ts), at every ~4th point as a
-collective gate, before every closing, and whenever a flake retry failed twice.
+the diff touches. LARGE runs ONCE PER BUNDLE and before every closing (point
+1104) — not per point. It stays mandatory inside the bundle that touches a scene
+core (TravelScene/Wildlife/PlaceScene, the renderer/post pipeline, store.ts), and
+a flake retry that failed twice still forces one on the spot.
 
 Diff → browser-suite mapping: `src/i18n/` → i18n · store/systems logic → Vitest
 only (flow if the core loop is touched) · `src/scenes/place/` → collision,
