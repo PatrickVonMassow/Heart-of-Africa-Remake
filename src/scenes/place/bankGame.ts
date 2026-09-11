@@ -790,7 +790,7 @@ export function touchStand(
   const here = rockAt(stage, end)
   const far = rockAt(stage, otherEnd(end))
   const bearing = approachBearing ?? Math.atan2(far.x - here.x, far.z - here.z)
-  const flank = (y: number) => stage.flank(end, bearing, y)
+  const flank = (y: number, offset: number) => stage.flank(end, bearing + offset, y)
   const solved = solveTouch(flank, CHILD_FIGURE_SCALE)
   if (!solved) return null
   const spotAt = (stand: number) => ({
@@ -828,7 +828,7 @@ export function touchReach(
   const dx = at.x - here.x
   const dz = at.z - here.z
   const bearing = Math.atan2(dx, dz)
-  const reached = reachFrom(Math.hypot(dx, dz), (y) => stage.flank(end, bearing, y), CHILD_FIGURE_SCALE)
+  const reached = reachFrom(Math.hypot(dx, dz), (y, offset) => stage.flank(end, bearing + offset, y), CHILD_FIGURE_SCALE)
   if (!reached) return null
   return { elevation: reached.elevation, gap: reached.gap, height: reached.height }
 }
@@ -1727,7 +1727,7 @@ function stepArrival(
     return false
   }
   // Reservations include children still approaching, so two runners cannot
-  // acquire overlapping holds in the same frame. Earlier arrivals have priority.
+  // acquire overlapping holds in the same frame. Index order breaks a tie.
   const occupied = (x: number, z: number) =>
     !!obstacles(i, cfg, world)?.(x, z) || s.children.some((other, j) => j !== i && (
       dist(other, { x, z }) < world.childRadius * 2 ||

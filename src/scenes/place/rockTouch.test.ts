@@ -21,8 +21,8 @@ const ENDS: BankEnd[] = ['upstream', 'downstream']
 const HAND = FIGURE_LIMBS.handRadius * CHILD_FIGURE_SCALE
 
 /** The children's stage as `PlaceLife` builds it, for one settlement. */
-function stageOf(id: string): { stage: BankStage; layout: ReturnType<typeof buildLayout> } {
-  const layout = buildLayout(id, 42)
+function stageOf(id: string, seed = 42): { stage: BankStage; layout: ReturnType<typeof buildLayout> } {
+  const layout = buildLayout(id, seed)
   const rocks = layout.playRocks!
   const stage: BankStage = {
     upstream: rocks.upstream,
@@ -142,18 +142,20 @@ describe('the tapping child reaches the stone it names, in every river village',
         const rock = rockAt(stage, end)
         const bearing = Math.atan2(spot.x - rock.x, spot.z - rock.z)
         const reach = touchReach(stage, end, spot)!
-        const flankAt = (y: number) => stage.flank(end, bearing, y)
+        const point = touchedPoint(Math.hypot(spot.x - rock.x, spot.z - rock.z), reach.elevation, CHILD_FIGURE_SCALE)
+        const handBearing = bearing + Math.atan2(-point.offAxis, Math.sqrt(point.radius ** 2 - point.offAxis ** 2))
+        const flankAt = (y: number) => stage.flank(end, handBearing, y)
         // The same hand, drawn `dip` lower: the flank it meets is the thinner one.
         worst = Math.max(worst, reach.gap + (flankAt(reach.height) - flankAt(reach.height + dip)))
       }
     }
-    // Over the 6 cm the browser allows — so a stopped child left mid-step CANNOT
-    // pass the picture check, and this number is why the settling is not cosmetic.
-    expect(worst).toBeGreaterThan(0.06)
+    // The corrected off-axis solve changes which elevation wins. A frozen
+    // stride still spends more than the entire contact tolerance on height.
+    expect(worst).toBeGreaterThan(TOUCH_GAP)
   })
 
-  it('solves arrivals from their own bearings on both Bambara flanks, respecting blocked ground', () => {
-    const { stage, layout } = stageOf('bambara-village')
+  it.each([42, 3791639114])('solves arrival bearings on both Bambara flanks with blocked ground, seed %s', (seed) => {
+    const { stage, layout } = stageOf('bambara-village', seed)
     const blocked = (x: number, z: number) => !standingClear(layout.colliders, x, z, WALKER_RADIUS)
     let reached = 0
     for (const end of ENDS) {
@@ -189,7 +191,8 @@ describe('the tapping child reaches the stone it names, in every river village',
     for (let k = 0; k < 100; k++) {
       const dip = gaitBodyLift(k / 100 * Math.PI * 2, FIGURE_LIMBS.hipY * CHILD_FIGURE_SCALE)
       const lift = bankChildBodyLift(c, dip)
-      const gap = hand.radius - HAND - stage.flank('downstream', bearing, hand.height + lift)
+      const handBearing = bearing + Math.atan2(-hand.offAxis, Math.sqrt(hand.radius ** 2 - hand.offAxis ** 2))
+      const gap = hand.radius - HAND - stage.flank('downstream', handBearing, hand.height + lift)
       expect(Math.abs(gap)).toBeLessThanOrEqual(TOUCH_GAP)
     }
     c.arrival = null

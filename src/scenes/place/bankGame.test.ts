@@ -15,7 +15,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { balance } from '../../config/balance'
 import { resetDevAsserts } from '../../systems/devAssert'
-import { floorPace } from '../../systems/pursuit'
 import { mulberry32 } from '../../world/noise'
 import { climbBoulder, looseRock } from './looseRocks'
 import { buildLayout } from './layout'
@@ -1085,13 +1084,13 @@ describe('arriving runners name the far stone by contact', () => {
       upstream: rocks.upstream, downstream: rocks.downstream,
       flank: playRockFlank(rocks),
       water: { x: bank.nx * bank.distance, z: bank.nz * bank.distance },
-      boulder: climbBoulder(layout.rocks, quarter, CFG.climbableRockTop)!,
+      boulder: climbBoulder(layout.rocks, quarter, balance.villageLife.bankGame.climbableRockTop)!,
       roam: quarter,
     }
     // Replay the actual stage and drawn rock colliders. Village routing and
     // the live crowd are covered by tagShuffle and the reviewer's browser run.
     const rockColliders = layout.colliders.filter((c) =>
-      [rocks.upstream, rocks.downstream].some((r) => dist(c, r) < 0.01))
+      'r' in c && [rocks.upstream, rocks.downstream].some((r) => dist(c, r) < 0.01))
     const world = { ...openWorld(), radius: 100,
       blocked: (x: number, z: number) => !standingClear(rockColliders, x, z, WALKER_RADIUS),
     }
@@ -1165,6 +1164,37 @@ describe('arriving runners name the far stone by contact', () => {
     expect(elapsed).toBeLessThan(seconds + dt * 3)
     expect(c.arrival).toBeNull()
     expect(bankChildCanSeparate(c)).toBe(true)
+  })
+
+  it('finishes a last-run arrival hold before the parting phase can return to roaming', () => {
+    const cfg = { ...CFG, partSeconds: 0.1, endPauseSeconds: 0.1, arrivalHoldSeconds: 2 }
+    const { s, rand } = arriving([{ x: 8, z: 0 }], cfg)
+    s.runsThisCycle = s.children.length
+    let word: BankUtterance | null = null
+    for (let k = 0; k < 600 && !word; k++) word = stepBankGame(s, 1 / 60, cfg, STAGE, openWorld(), rand)
+    expect(word?.moment).toBe('arrival')
+    expect(s.phase).toBe('part')
+    expect(s.phaseFor).toBeLessThan(0)
+    const c = s.children[1]
+    const at = { x: c.x, z: c.z }
+    while (c.arrival) {
+      stepBankGame(s, 1 / 60, cfg, STAGE, openWorld(), rand)
+      expect(s.phase).toBe('part')
+      if (c.arrival) expect({ x: c.x, z: c.z }).toEqual(at)
+    }
+    stepBankGame(s, 1 / 60, cfg, STAGE, openWorld(), rand)
+    expect(s.phase).toBe('roam')
+  })
+
+  it('gives up a newly obstructed approach silently without freezing the next run', () => {
+    const { s, rand } = arriving([{ x: 8, z: 0 }])
+    const world = openWorld()
+    stepBankGame(s, 1 / 60, CFG, STAGE, world, rand)
+    expect(s.children[1].arrival).not.toBeNull()
+    world.blocked = (x, z) => dist({ x, z }, STAGE.downstream) < 1.7
+    expect(stepBankGame(s, 1 / 60, CFG, STAGE, world, rand)).toBeNull()
+    expect(s.children[1].arrival).toBeNull()
+    expect(s.phase).toBe('regroup')
   })
 
   it('reserves distinct stands or waits when several runners arrive together', () => {

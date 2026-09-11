@@ -4012,7 +4012,6 @@ if (section('children-bank-game')) {
     // path at 9 s. It is a spectator-time knob, like the roam above, and the
     // shipped length is what `bankGame.test.ts` measures the hold against.
     b.tapPauseSeconds = 9
-    b.arrivalHoldSeconds = 9
     return was
   })
   await goToPlace('bambara-village')
@@ -4870,7 +4869,11 @@ if (section('children-bank-game')) {
     // through the side swap and to the far side of its own hold. Another
     // runner naming the same stone cannot replace this trace halfway through.
     await restoreEarshotStance()
-    const arrivalSeconds = await page.evaluate(() => window.__balance.villageLife.bankGame.arrivalHoldSeconds)
+    const arrivalSeconds = await page.evaluate(() => {
+      // Lengthen only the contact observation, after the ordinary round checks.
+      window.__balance.villageLife.bankGame.arrivalHoldSeconds = 9
+      return window.__balance.villageLife.bankGame.arrivalHoldSeconds
+    })
     let runner = null
     let arrivalOpening = null
     let arrivalEnded = false

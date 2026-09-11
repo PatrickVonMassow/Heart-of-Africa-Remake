@@ -41,7 +41,8 @@ const STEPS = 96
 
 /**
  * Where a figure of this `scale` must stand to lay its hand on a surface whose
- * radius at height `y` is `surfaceAt(y)`, and how high it must reach.
+ * radius is `surfaceAt(y, bearingOffset)`, and how high it must reach. The
+ * offset is measured from the body's approach bearing to its touching hand.
  *
  * `pivotY` is the height its trunk leans about, in body heights — 0 for a figure
  * drawn without legs, `FIGURE_LIMBS.hipY` for one with them. `null` comes back
@@ -49,7 +50,7 @@ const STEPS = 96
  * figure's reach rather than a failure to solve.
  */
 export function solveTouch(
-  surfaceAt: (y: number) => number,
+  surfaceAt: (y: number, bearingOffset: number) => number,
   scale: number,
   pivotY = FIGURE_LIMBS.hipY,
   lean = TOUCH_LEAN,
@@ -62,7 +63,17 @@ export function solveTouch(
     // The bearing is 0: the figure faces what it touches.
     const [hx, hy, hz] = handAt('left', 0, elevation, lean, pivotY).map((v) => v * scale)
     if (hy <= 0) continue
-    const radius = surfaceAt(hy)
+    // The left hand is beside the body's centreline. On an irregular stone
+    // that changes the flank it meets; converge the radius and that bearing
+    // together instead of treating every approach as a circular cross-section.
+    let radius = surfaceAt(hy, 0)
+    for (let j = 0; j < 12 && radius + hand > Math.abs(hx); j++) {
+      const offset = Math.atan2(-hx, Math.sqrt((radius + hand) ** 2 - hx ** 2))
+      const next = surfaceAt(hy, offset)
+      const difference = Math.abs(next - radius)
+      radius = next
+      if (difference < 1e-7) break
+    }
     if (!(radius > 0)) continue
     // The hand sits `hx` off the figure's own axis, so it meets the surface a
     // shade short of straight ahead; the stand follows from the triangle rather
@@ -104,7 +115,7 @@ export function touchedPoint(
  */
 export function reachFrom(
   stand: number,
-  surfaceAt: (y: number) => number,
+  surfaceAt: (y: number, bearingOffset: number) => number,
   scale: number,
   pivotY = FIGURE_LIMBS.hipY,
   lean = TOUCH_LEAN,
@@ -115,7 +126,8 @@ export function reachFrom(
     const elevation = LOW + ((HIGH - LOW) * k) / STEPS
     const at = touchedPoint(stand, elevation, scale, pivotY, lean)
     if (at.height <= 0) continue
-    const radius = surfaceAt(at.height)
+    const forward = Math.sqrt(Math.max(0, at.radius ** 2 - at.offAxis ** 2))
+    const radius = surfaceAt(at.height, Math.atan2(-at.offAxis, forward))
     if (!(radius > 0)) continue
     const gap = at.radius - (radius + hand)
     if (!best || Math.abs(gap) < Math.abs(best.gap)) {
