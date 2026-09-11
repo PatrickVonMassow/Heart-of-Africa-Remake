@@ -707,6 +707,7 @@ export interface BalanceConfig {
       runSeconds: number
       /** Visible held-standing pause while the catcher taps ROCK. */
       tapPauseSeconds: number
+      arrivalHoldSeconds: number
       /** Backstop on the walk between two runs. */
       regroupSeconds: number
       /** How long the group walks toward its roaming quarter before roaming again. */
@@ -1299,11 +1300,13 @@ export const balance: BalanceConfig = {
       // One complete atom lasts 1.2 s. The extra beat lets the player connect
       // the catcher's held indication to ROCK before either side charges.
       tapPauseSeconds: 1.5,
+      // Calibratable: one ROCK atom plus a beat with the hand resting on the flank.
+      arrivalHoldSeconds: 1.5,
       regroupSeconds: 14,
       partSeconds: 8,
       endPauseSeconds: 3,
-      // Past the rock's own collider (1.2 m) plus a child's footprint (0.3 m):
-      // touching the stone, not standing in it.
+      // Arrival/safe radius from the centre, outside the collider and footprint.
+      // The runner walks on from here before its hand can name the stone.
       reachDistance: 2.2,
       standOff: 2.6,
       stationSpacing: 1,

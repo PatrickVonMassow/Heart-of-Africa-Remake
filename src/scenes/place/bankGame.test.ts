@@ -17,7 +17,10 @@ import { balance } from '../../config/balance'
 import { resetDevAsserts } from '../../systems/devAssert'
 import { floorPace } from '../../systems/pursuit'
 import { mulberry32 } from '../../world/noise'
-import { looseRock } from './looseRocks'
+import { climbBoulder, looseRock } from './looseRocks'
+import { buildLayout } from './layout'
+import { playRockFlank } from './playRockSurface'
+import { standingClear, WALKER_RADIUS } from './collision'
 import {
   bankChildCanSeparate,
   createBankGame,
@@ -27,6 +30,7 @@ import {
   stationAt,
   stepBankGame,
   touchReach,
+  touchStand,
   TOUCH_GAP,
   wordToward,
   type BankConfig,
@@ -537,7 +541,11 @@ describe('the children`s game at the bank (point 687)', () => {
     s.sinceSaid = 0
     s.children[0].role = 'catcher'
     s.children[1].role = 'runner'
-    const arrival = stepBankGame(s, 1 / 60, CFG, STAGE, openWorld(), rand)
+    Object.assign(s.children[1], touchStand(STAGE, 'downstream')!)
+    let arrival: BankUtterance | null = null
+    for (let k = 0; k < 120 && !arrival; k++) {
+      arrival = stepBankGame(s, 1 / 60, CFG, STAGE, openWorld(), rand)
+    }
     expect(arrival?.moment).toBe('arrival')
     expect(arrival?.speaker).toBe(1)
     expect(s.arrivalSpoken).toBe(true)
@@ -596,33 +604,27 @@ describe('the children`s game at the bank (point 687)', () => {
     expect(s.runs).toBeGreaterThanOrEqual(s.children.length)
   })
 
-  it('keeps a moving speaker at the round`s commanded pace while it speaks', () => {
+  it('holds the arrival on its flank and leaves the boulder naming on top of its stone', () => {
     const cfg: BankConfig = { ...CFG, utteranceGapSeconds: 0 }
     const world = openWorld()
-
-    // Put one runner at the far rock so this exact step is both its arrival and
-    // its utterance, independent of a replay seed.
     const runRand = mulberry32(3)
-    const run = createBankGame([STAGE.upstream, STAGE.downstream], runRand, cfg)
+    const run = createBankGame([STAGE.upstream, touchStand(STAGE, 'downstream')!], runRand, cfg)
     run.phase = 'run'
     run.phaseFor = cfg.runSeconds
     run.from = 'upstream'
     run.direction = 'DOWNSTREAM'
     run.children[0].role = 'catcher'
     run.children[1].role = 'runner'
-    const arrival = stepBankGame(run, 1 / 60, cfg, STAGE, world, runRand)
+    let arrival: BankUtterance | null = null
+    for (let k = 0; k < 120 && !arrival; k++) {
+      arrival = stepBankGame(run, 1 / 60, cfg, STAGE, world, runRand)
+    }
     expect(arrival?.moment).toBe('arrival')
     expect(arrival?.speaker).toBe(1)
-    // Mutating `say` to hold its speaker or zero its pace fails these exact
-    // action-frame checks; they do not compare the value with itself.
-    expect(run.children[1].pace).toBeGreaterThanOrEqual(floorPace(cfg))
-    expect(run.children[1].held).toBe(false)
+    expect(run.children[1].pace).toBe(0)
+    expect(run.children[1].held).toBe(true)
 
-    // THE OFF-GAME ROCK IS THE ONE MOMENT SPOKEN STANDING STILL, and the point
-    // of this half is that the WORD is not what stopped the child (work-order
-    // 1080). It is on the boulder: it stood before the word fell and it goes on
-    // standing after it, because the climb holds it there and the utterance
-    // changes nothing about that.
+    // Reviewed, unchanged: the off-game ROCK is spoken on top of its boulder.
     const roamRand = mulberry32(5)
     const roam = createBankGame([STAGE.boulder], roamRand, cfg)
     let boulder: BankUtterance | null = null
@@ -1056,5 +1058,135 @@ describe('the tapping child`s hand is ON the stone it names (work-order 1065)', 
       return i !== s.tapper && dist(c, rockAt(STAGE, end)) < CFG.standOff - 0.5
     })
     expect(near).toHaveLength(0)
+  })
+})
+
+
+describe('arriving runners name the far stone by contact', () => {
+  function arriving(spots: Array<{ x: number; z: number }>, cfg = CFG) {
+    const rand = mulberry32(33)
+    const s = createBankGame([{ x: -20, z: 0 }, ...spots], rand, cfg)
+    s.phase = 'run'
+    s.phaseFor = cfg.runSeconds
+    s.from = 'upstream'
+    s.direction = 'DOWNSTREAM'
+    s.runsThisCycle = 1
+    s.children[0].role = 'catcher'
+    s.children[0].madeTag = true
+    return { s, rand }
+  }
+
+  it('offers every play-rock ROCK with a solved touch at the speaker`s own spot over a Bambara cycle', () => {
+    const layout = buildLayout('bambara-village', 3791639114)
+    const rocks = layout.playRocks!
+    const bank = layout.bank!
+    const quarter = layout.playGround!
+    const stage: BankStage = {
+      upstream: rocks.upstream, downstream: rocks.downstream,
+      flank: playRockFlank(rocks),
+      water: { x: bank.nx * bank.distance, z: bank.nz * bank.distance },
+      boulder: climbBoulder(layout.rocks, quarter, CFG.climbableRockTop)!,
+      roam: quarter,
+    }
+    // Replay the actual stage and drawn rock colliders. Village routing and
+    // the live crowd are covered by tagShuffle and the reviewer's browser run.
+    const rockColliders = layout.colliders.filter((c) =>
+      [rocks.upstream, rocks.downstream].some((r) => dist(c, r) < 0.01))
+    const world = { ...openWorld(), radius: 100,
+      blocked: (x: number, z: number) => !standingClear(rockColliders, x, z, WALKER_RADIUS),
+    }
+    const { s, log } = replay(360, { seed: 3791639114, stage, world, cfg: { ...CFG, utteranceGapSeconds: 0 } })
+    expect(s.cycles).toBeGreaterThan(0)
+    const words = log.when.filter(({ u }) => u.at === 'rock' && u.concept === 'ROCK')
+    expect(new Set(words.map(({ u }) => u.moment))).toEqual(new Set(['tap', 'arrival']))
+    for (const { u, speakerX: x, speakerZ: z } of words) {
+      const end = dist(u.aim, stage.upstream) < 0.01 ? 'upstream' : 'downstream'
+      const reach = touchReach(stage, end, { x, z })!
+      expect(reach).not.toBeNull()
+      expect(Math.abs(reach.gap)).toBeLessThanOrEqual(TOUCH_GAP)
+      expect(u.gesture).toBe('touch')
+      expect(u.arm).toEqual({ bearing: 0, elevation: reach.elevation })
+    }
+  })
+
+  it('becomes safe at the old radius, ends the run, then walks the last metre before speaking', () => {
+    const { s, rand } = arriving([{ x: 8, z: 0 }])
+    const c = s.children[1]
+    const first = stepBankGame(s, 1 / 60, CFG, STAGE, openWorld(), rand)
+    expect(first).toBeNull()
+    expect(s.phase).toBe('regroup')
+    expect(s.phaseFor).toBe(CFG.regroupSeconds)
+    expect(c.arrival).not.toBeNull()
+    expect(dist(c, STAGE.downstream)).toBeGreaterThan(1.8)
+    let word: BankUtterance | null = null
+    for (let k = 0; k < 600 && !word; k++) word = stepBankGame(s, 1 / 60, CFG, STAGE, openWorld(), rand)
+    expect(word?.moment).toBe('arrival')
+    expect(Math.abs(touchReach(STAGE, 'downstream', c)!.gap)).toBeLessThanOrEqual(TOUCH_GAP)
+    expect(s.tags).toBe(0)
+  })
+
+  it('arrives silently when the far flank is blocked', () => {
+    const { s, rand } = arriving([{ x: 8, z: 0 }])
+    const world = { ...openWorld(), blocked: (x: number, z: number) => dist({ x, z }, STAGE.downstream) < 1.7 }
+    const said: BankUtterance[] = []
+    for (let k = 0; k < 120; k++) {
+      const u = stepBankGame(s, 1 / 60, CFG, STAGE, world, rand)
+      if (u) said.push(u)
+    }
+    expect(s.phase).toBe('regroup')
+    expect(s.tags).toBe(0)
+    expect(s.children[1].arrival).toBeNull()
+    expect(said.filter((u) => u.moment === 'arrival')).toHaveLength(0)
+  })
+
+  it.each([0.7, 2.3])('keeps contact for the configured %s seconds across the side swap', (seconds) => {
+    const cfg = { ...CFG, arrivalHoldSeconds: seconds }
+    const { s, rand } = arriving([{ x: 8, z: 0 }], cfg)
+    const c = s.children[1]
+    const dt = 1 / 60
+    let word: BankUtterance | null = null
+    for (let k = 0; k < 600 && !word; k++) word = stepBankGame(s, dt, cfg, STAGE, openWorld(), rand)
+    expect(word?.moment).toBe('arrival')
+    expect(word?.hold).toBe(seconds)
+    expect(c.arrival?.holdFor).toBe(seconds)
+    const at = { x: c.x, z: c.z, facing: c.facing }
+    let elapsed = 0
+    while (c.arrival && elapsed < seconds + 1) {
+      expect(bankChildCanSeparate(c)).toBe(false)
+      stepBankGame(s, dt, cfg, STAGE, openWorld(), rand)
+      elapsed += dt
+      if (c.arrival) {
+        expect({ x: c.x, z: c.z, facing: c.facing }).toEqual(at)
+        expect(c.held).toBe(true)
+        expect(c.pace).toBe(0)
+      }
+    }
+    expect(elapsed).toBeGreaterThanOrEqual(seconds)
+    expect(elapsed).toBeLessThan(seconds + dt * 3)
+    expect(c.arrival).toBeNull()
+    expect(bankChildCanSeparate(c)).toBe(true)
+  })
+
+  it('reserves distinct stands or waits when several runners arrive together', () => {
+    const cfg = { ...CFG, utteranceGapSeconds: 0, catchDistance: -1 }
+    const { s, rand } = arriving([{ x: 8, z: -0.7 }, { x: 8, z: 0 }, { x: 8, z: 0.7 }], cfg)
+    const spoken = new Set<number>()
+    const touched = new Set<number>()
+    let concurrent = false
+    for (let k = 0; k < 600; k++) {
+      const u = stepBankGame(s, 1 / 60, cfg, STAGE, openWorld(), rand)
+      if (u?.moment === 'arrival') spoken.add(u.speaker)
+      const holding = s.children.filter((c) => c.arrival?.holdFor != null)
+      s.children.forEach((c, i) => { if (c.arrival?.holdFor != null) touched.add(i) })
+      if (holding.length > 1) concurrent = true
+      for (const c of holding) {
+        for (const other of s.children) {
+          if (other !== c) expect(dist(c, other)).toBeGreaterThanOrEqual(0.6 - 1e-6)
+        }
+      }
+    }
+    expect(spoken.size).toBeGreaterThanOrEqual(1)
+    expect(touched.size, JSON.stringify(s.children.map((c) => ({ x: c.x, z: c.z, arrival: c.arrival })))).toBe(3)
+    expect(concurrent || touched.size === 3).toBe(true)
   })
 })
