@@ -77,6 +77,56 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
+- [ ] 1110. The teaching hand still stands visibly clear of the stone, in BOTH play-rock
+  moments (reviewer of point 1106, 11.09.2026).
+  MEASURED on 5a40ff04f, three frames, two backends. Point 1106 removed what the user
+  photographed: the arriving runner no longer names ROCK from 2.2 m with its arm in the air.
+  It walks the last metre, leans and reaches. What remains is SMALLER and OLDER — in the
+  RENDERED PROJECTION the drawn hand still stands a few centimetres clear of the flank, with
+  a band of ground visible between hand and stone.
+  THE SAME GAP IS IN THE LANDED TAP, which is why this is not 1106's regression:
+  `verification/1065-tapping-child-at-its-rock.png` — the frame 1106's own specification
+  cites as the CORRECT reference — shows it at the same magnitude or slightly worse. Both
+  backends draw it alike (`verification/1106-arriving-runner-hand-on-the-far-stone.png` was
+  captured on WebGPU and again on WebGL 2), so it is not a lane fault.
+  WHY EVERY CHECK IS GREEN OVER IT. The browser bar is `Math.abs(gap) <= 0.06` — six
+  centimetres, inherited by 1106's spec from 1065. The solve aims at `TOUCH_GAP` = 0.03 at
+  the child's own spot, and the DRAWN hand then measures out to the looser bound. At the
+  framing these shots use, roughly 150 px per metre, 5-6 cm is 8-9 px of daylight: under the
+  bar, over the threshold of the eye. The check and the picture disagree, and the check wins
+  every run.
+  THE USER JUDGES BY THE PICTURE and has now said it twice — "Die Hand des Kindes beruehrt
+  nach wie vor nicht den Stein". design.md 13.4 is unconditional: "A teaching hand TOUCHES
+  what it names".
+  Final state:
+  - The drawn hand RESTS ON the flank in the rendered frame, for BOTH play-rock moments (tap
+    and arrival), with no ground visible between hand and stone at the framing the
+    verification shots use.
+  - MEASURE BEFORE CHANGING A NUMBER. The solve already aims at 3 cm while the drawn hand
+    reads out to 6, so the centimetres come from somewhere between the two: candidates are
+    the drawn hand radius against `FIGURE_LIMBS.handRadius`, the pose interpolation between
+    the solved frame and the drawn one, and the lean the figure actually renders. Name which
+    one it is; do not tighten the bar and hope.
+  - The bar is then set by what the PICTURE shows, with the reason written into the check,
+    rather than the 6 cm inherited from 1065. Any residual that is kept is justified in the
+    same commit.
+  - The boulder moment is out of scope: the child stands ON the stone it names there.
+  Test. Browser (`scripts/verify/polish.mjs`, section `children-bank-game`): the existing tap
+  and arrival hand readings tightened to the decided bar, BOTH moments, worst reading over
+  the whole hold — the readings already exist (`__placeTapHand`, `__placeArrivalHand`) and
+  read the drawn hand from the scene graph, so this is a bar change plus its evidence, not a
+  new mechanism.
+  Refs: verification/1065-tapping-child-at-its-rock.png,
+  verification/1106-arriving-runner-hand-on-the-far-stone.png, src/scenes/place/rockTouch.ts,
+  src/scenes/place/bankGame.ts (`TOUCH_GAP`), scripts/verify/polish.mjs, design.md 13.4.
+  MOVED TO THE FRONT on filing, 11.09.2026, under the standing release order: it touches the
+  communication mechanic and it is the bug that keeps the user from reading the teaching
+  moment.
+  Criticality: HIGH — a teaching moment the player is meant to read contradicts design.md
+  13.4 on every run, the user has reported it twice, and the checks that cover it pass while
+  it is visibly wrong.
+  Bundle: Dorfleben.
+
 - [ ] 1103. On WebGL 2 the distant village is not in the picture at all.
   MEASURED 11.09.2026 on a quiet machine, by reading the two lanes of point 1086's covering
   runs against each other rather than by any red — the check that owns the frame passes on
@@ -15699,3 +15749,34 @@ to land than a mechanism that needs a review.
   pass and produces a SUSPECT record that covers no backend, which is how a finished point
   waits an extra hour.
   Bundle: Testinfrastruktur.
+- [ ] 1111. Two cases in `scripts/mechanism-review-guard.test.mjs` run 19.4 s against a 20 s
+  timeout, so the fast gate fails whenever the machine is not idle.
+  MEASURED 11.09.2026 during the landing of point 1106. The landing stopped at its gate with
+  "seeds the anchor from the one shape that carries the flag AND the baseline — Test timed out
+  in 20000ms". Re-run ALONE on the same head the file is green, and the timings say why: that
+  case takes 19396 ms and its sibling "stands down for every caller but the measuring read"
+  takes 19453 ms, both against the 20000 ms default. The headroom is about 600 ms — three per
+  cent. Load average at the failing run was 10.3, with a `batch-doctor` gate building beside
+  it; on a quiet machine the identical landing went green through every step.
+  IT IS NOT A FLAKE TO RETRY. `batch-doctor` reached the same verdict independently in the
+  same window: its own unit gate "FAILED but the verdict is INCONCLUSIVE (load)". A test whose
+  pass depends on what else the machine is doing is not evidence either way, and CLAUDE.md
+  §7.2 says a retry is SUSPECT and covers nothing — so every landing that meets this pays a
+  full gate to learn nothing, and the honest reading costs a separate isolated run.
+  Final state:
+  - Neither case depends on wall-clock headroom. Find what takes nineteen seconds inside a
+    guard UNIT test first — a real subprocess or a wait the test does not need — and remove
+    it, rather than raising the timeout, which only moves the cliff.
+  - If the work is genuinely that long, it is not a unit test: it gets its own timeout with
+    the measured reason written beside it, so the next reader knows the number is deliberate.
+  - The gate stops being decidable by machine load: the same head gives the same verdict busy
+    or idle.
+  Test. Vitest: the two cases keep their assertions and run in a fraction of their present
+  time; the file's slowest case is recorded in its header so a regression is visible.
+  Refs: scripts/mechanism-review-guard.test.mjs (the two cases named above),
+  scripts/land-point.mjs (the fast gate that stopped), scripts/batch-doctor.mjs (the
+  independent load verdict), CLAUDE.md §7.2.
+  Criticality: HIGH — it blocked a finished, reviewed point from landing and cost a full gate
+  run, and it will do so again on any busy machine.
+  Bundle: Testinfrastruktur.
+
