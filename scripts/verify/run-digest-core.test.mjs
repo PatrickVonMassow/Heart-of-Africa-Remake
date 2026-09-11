@@ -398,3 +398,19 @@ describe('a NON-PREDICTIVE pass is a conclusion, not bulk (point 1086)', () => {
     expect(selectLines(lines).map((l) => l.kind)).toEqual(['result', 'final', 'final'])
   })
 })
+
+describe('a declared limitation outranks the line budget', () => {
+  it('keeps NON-PREDICTIVE when the budget drops everything around it', () => {
+    // The budget drops from the FRONT once the low-priority lines are gone, so a
+    // green narrow run with a tight --keep lost the one line saying the green
+    // does not predict the suite, while the later ALL GREEN and PARTIAL lines
+    // survived. Exit 0 supplies no raw tail to fall back on.
+    const entries = [
+      { line: 'NON-PREDICTIVE  polish  [NON-PREDICTIVE] jar — cast too rarely' },
+      { line: 'ALL GREEN — 1 suites run' },
+      { line: 'PARTIAL — only section "adult-errands" of polish ran' },
+    ]
+    const { kept } = applyBudget(entries, 2)
+    expect(kept.map((e) => e.line)).toContain(entries[0].line)
+  })
+})

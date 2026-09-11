@@ -196,16 +196,24 @@ export function applyBudget(entries, maxKeptLines) {
   if (list.length <= maxKeptLines) return { kept: list, dropped: 0 }
   let over = list.length - maxKeptLines
   const doomed = new Set()
+  // A DECLARED LIMITATION OUTRANKS THE BUDGET (point 1086). Once the low-priority
+  // lines are gone the budget drops from the FRONT, whatever the class — so on a
+  // green narrow run with a tight `--keep`, the later ALL GREEN and PARTIAL lines
+  // survived while NON-PREDICTIVE, which stands earlier, disappeared. Exit 0
+  // supplies no raw tail either, so the reader was left with a green that did not
+  // mean what it looked like. There are a handful of these per run at most: the
+  // budget yields to them rather than the other way round.
+  const declaredLimitation = (e) => /^NON-PREDICTIVE\b/.test(String(e?.line ?? '').trimStart())
   for (const e of list) {
     if (over === 0) break
-    if (priorityOf(e) === 'low') {
+    if (priorityOf(e) === 'low' && !declaredLimitation(e)) {
       doomed.add(e)
       over -= 1
     }
   }
   for (const e of list) {
     if (over === 0) break
-    if (!doomed.has(e)) {
+    if (!doomed.has(e) && !declaredLimitation(e)) {
       doomed.add(e)
       over -= 1
     }
