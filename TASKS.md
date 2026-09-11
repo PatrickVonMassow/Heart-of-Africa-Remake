@@ -15583,9 +15583,20 @@ to land than a mechanism that needs a review.
     processes, the dev server answering. Where the verdict cannot see those, it says so instead
     of commanding an end.
   - Ending a run takes its children with it: no orphaned dev server, no orphaned browser.
+  A THIRD OCCURRENCE, 12.09.2026, NAMES A CAUSE THIS POINT DOES NOT YET CARRY: the
+  expectation is the sum of ONE pass per named suite, and the run's OWN retry of a red suite
+  (point 200's rotating-flake retry) is not in it. Both lanes of the covering proof for point
+  1105 were declared hung while demonstrably working — the WebGPU lane at 71m against a 24m
+  46s expectation while a Chrome renderer sat at 49 % CPU and the worktree had written
+  eighteen `verification/*.png` in the preceding ten minutes, the WebGL 2 lane at 66m while
+  seven frames landed in five. Each had simply retried a suite and moved on. So the
+  arithmetic must add the retry the run may itself decide to perform, not only pick the right
+  base number; a single retried `polish` is worth roughly a third of a four-suite
+  expectation. Both verdicts were disobeyed on the measurement above and both runs finished
+  with their receipts.
   Criticality: high — the rule does not merely mislead, it instructs the session to destroy
-  running work, and the batch pays for the killed run twice. It has now done so twice in one
-  day, to both backends.
+  running work, and the batch pays for the killed run twice. It has now done so three times
+  in two days, to both backends.
   Bundle: Session- & Repo-Hygiene.
 
 - [ ] 1100. A verification for a just-landed point can publish no board at all (measured

@@ -698,25 +698,3 @@ it up decides between settling the scene before the shutter (as the neighbouring
 sections do) and declaring these two frames as OVERLAY-only evidence, so that
 nobody reads the background as a statement about rendering. The second is the
 cheaper honest fix.
-
-## The hung-run verdict does not know about a suite retry
-
-`scripts/verify/run-wait.mjs --await` declares a run HUNG once it passes 2.5x
-the expectation it computed from the suite medians, and tells the caller to
-"end the run rather than waiting again". That expectation is the sum of one
-pass per named suite. It does not carry the retry that the run itself performs
-when a suite fails on the first try (point 200's rotating-flake retry), and a
-retried `polish` alone is worth roughly a third of the whole expectation.
-
-Measured on 12.09.2026 00:06: the covering run for point 1105 was declared HUNG
-at 71m against a 24m 46s expectation, while it was demonstrably working — the
-process tree was intact, a Chrome renderer sat at 49 % CPU, and the worktree had
-written eighteen `verification/*.png` files in the preceding ten minutes. It had
-simply retried `polish` and moved on to `enrichments`. Following the verdict
-would have killed a healthy 71-minute render run and cost the point its picture
-proof.
-
-No player impact and no false approval, so it is collected here. Whoever picks
-it up should add the run's own retry decision to the expectation, or require the
-same liveness probe `batch-in-flight.mjs --agent-check` already uses (advancing
-worktree output, not elapsed time) before the word HUNG is printed.
