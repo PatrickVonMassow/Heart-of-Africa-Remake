@@ -6,7 +6,7 @@ import { cacheEnvironment, findGreenReceipt, formatCachedGreen, lastGreenReceipt
 
 const ARGS = ['polish', '--section=adult-errands']
 const green = (overrides = {}) => ({
-  args: ARGS, head: 'abc123', verifyGl: null, status: 'finished', exitCode: 0,
+  args: ARGS, head: 'abc123', verifyGl: null, status: 'finished', exitCode: 0, cleanAtStart: true,
   finishedAt: 60_000, receipt: { exitCode: 0, green: true }, ...overrides,
 })
 const entry = (overrides = {}) => ({ path: 'green.log.run.json', record: green(overrides) })
@@ -34,11 +34,21 @@ describe('run-logged green receipts', () => {
 
   it.each([
     { status: 'running' }, { exitCode: 1 }, { receipt: null },
-    { receipt: { exitCode: 1 } }, { finishedAt: null }, { cleanAtStart: false },
+    { receipt: { exitCode: 1 } }, { finishedAt: null },
     { receipt: { exitCode: 0, green: false, failing: [{ name: 'settings' }] } },
     { args: ['large', ...ARGS] },
   ])('does not reuse incomplete or ineligible evidence: %j', (change) => {
     expect(lastGreenReceipt(request({ records: [entry(change)] }))).toBeNull()
+  })
+
+  it('does not reuse a receipt from a dirty tree even when the current tree is clean', () => {
+    expect(lastGreenReceipt(request({ clean: true, records: [entry({ cleanAtStart: false })] }))).toBeNull()
+  })
+
+  it('does not treat a legacy receipt with unknown tree state as clean', () => {
+    const legacy = entry()
+    delete legacy.record.cleanAtStart
+    expect(lastGreenReceipt(request({ clean: true, records: [legacy] }))).toBeNull()
   })
 
   it('keeps seed and retry settings distinct while ignoring wrapper controls', () => {

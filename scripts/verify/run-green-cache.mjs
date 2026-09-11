@@ -24,7 +24,7 @@ export function cleanWorktree(cwd) {
 
 /** Reuse only the requested suite/section, never promote a partial to coverage.
  * Backend and extra flags must also match; --again always asks for fresh work.
- * A dirty tree cannot be identified by HEAD, so it cannot serve a cached run. */
+ * Only a tree recorded as clean can be identified by HEAD and serve a cached run. */
 export function lastGreenReceipt({ records, argv, head, verifyGl, environment = '[]', again = false, clean = true }) {
   const wanted = parseArgs(argv)
   if (again || !clean || !head || wanted.tier || wanted.filter.length !== 1 || wanted.section === '') return null
@@ -32,7 +32,7 @@ export function lastGreenReceipt({ records, argv, head, verifyGl, environment = 
   let best = null
   for (const entry of records) {
     const r = entry.record
-    if (!r || !Array.isArray(r.args) || r.head !== head || r.cleanAtStart === false ||
+    if (!r || !Array.isArray(r.args) || r.head !== head || r.cleanAtStart !== true ||
       r.status !== 'finished' || r.exitCode !== 0 || r.receipt?.exitCode !== 0 || r.receipt.green !== true ||
       (r.cacheEnvironment ?? '[]') !== environment ||
       !Number.isFinite(r.finishedAt)) continue
