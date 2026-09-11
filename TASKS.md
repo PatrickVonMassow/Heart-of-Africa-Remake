@@ -113,6 +113,34 @@ put it is the mistake this line exists to stop.
   §13.4, point 1065.
   Bundle: Dorfleben.
 
+- [ ] 1103. On WebGL 2 the distant village is not in the picture at all.
+  MEASURED 11.09.2026 on a quiet machine, by reading the two lanes of point 1086's covering
+  runs against each other rather than by any red — the check that owns the frame passes on
+  both lanes, which is exactly why nothing reported it.
+  In `verification/101-street-village-plan.png` the hut LABELS ("Chief's Hut", "Market Hut")
+  sit at IDENTICAL screen positions on both lanes, so the camera and the world positions
+  agree — and on WebGL 2 the huts themselves are simply not drawn, leaving a pale haze where
+  WebGPU shows the street. It is not load: it reproduced on a quiet machine at 10 FPS after
+  first appearing on a busy one. It is not missing geometry either, because the CLOSE huts of
+  `151-chief-beside-his-drummer` draw correctly on the same lane in the same run. What differs
+  is DISTANCE, which points at the fog or far-plane the fallback lane gets.
+  THIS IS THE LANE THE PLAYER FALLS BACK TO. CLAUDE.md §3 makes WebGL 2 the automatic fallback
+  with a dismissible notice; a player on it would walk a village whose houses appear only when
+  they are a few metres away.
+  Final state:
+  - The far plane and the atmospheric falloff are read from ONE place for both backends, so a
+    settlement visible on WebGPU is visible on WebGL 2 from the same distance.
+  - The difference is measured, not argued: the same frame on both lanes is compared and the
+    reading recorded, so "it looks the same now" is never the evidence.
+  Test. Browser: a polish check that asserts the settlement's silhouette is present in the
+  street view on BOTH lanes — the pixels, not the labels, because the labels were present
+  throughout this defect and that is what hid it.
+  Refs: verification/101-street-village-plan.png, verification/151-chief-beside-his-drummer.png,
+  scripts/verify/polish.mjs (section `town-plan`), docs/render-architecture.md, design.md §3.
+  Criticality: high — it is a player-visible hole in the supported fallback lane, and it
+  survived every green run because the only checks over that frame read labels and overlays.
+  Bundle: Dorfleben.
+
 - [ ] 1087. The water carrier visibly fills the jar at the water and carries visible water
   (user 06.09.2026; the former point 1066; SPLIT BACK OUT OF POINT 1065 on 10.09.2026 on the
   user's instruction, 02:15).
@@ -15557,31 +15585,3 @@ to land than a mechanism that needs a review.
   pass and produces a SUSPECT record that covers no backend, which is how a finished point
   waits an extra hour.
   Bundle: Testinfrastruktur.
-
-- [ ] 1103. On WebGL 2 the distant village is not in the picture at all.
-  MEASURED 11.09.2026 on a quiet machine, by reading the two lanes of point 1086's covering
-  runs against each other rather than by any red — the check that owns the frame passes on
-  both lanes, which is exactly why nothing reported it.
-  In `verification/101-street-village-plan.png` the hut LABELS ("Chief's Hut", "Market Hut")
-  sit at IDENTICAL screen positions on both lanes, so the camera and the world positions
-  agree — and on WebGL 2 the huts themselves are simply not drawn, leaving a pale haze where
-  WebGPU shows the street. It is not load: it reproduced on a quiet machine at 10 FPS after
-  first appearing on a busy one. It is not missing geometry either, because the CLOSE huts of
-  `151-chief-beside-his-drummer` draw correctly on the same lane in the same run. What differs
-  is DISTANCE, which points at the fog or far-plane the fallback lane gets.
-  THIS IS THE LANE THE PLAYER FALLS BACK TO. CLAUDE.md §3 makes WebGL 2 the automatic fallback
-  with a dismissible notice; a player on it would walk a village whose houses appear only when
-  they are a few metres away.
-  Final state:
-  - The far plane and the atmospheric falloff are read from ONE place for both backends, so a
-    settlement visible on WebGPU is visible on WebGL 2 from the same distance.
-  - The difference is measured, not argued: the same frame on both lanes is compared and the
-    reading recorded, so "it looks the same now" is never the evidence.
-  Test. Browser: a polish check that asserts the settlement's silhouette is present in the
-  street view on BOTH lanes — the pixels, not the labels, because the labels were present
-  throughout this defect and that is what hid it.
-  Refs: verification/101-street-village-plan.png, verification/151-chief-beside-his-drummer.png,
-  scripts/verify/polish.mjs (section `town-plan`), docs/render-architecture.md, design.md §3.
-  Criticality: high — it is a player-visible hole in the supported fallback lane, and it
-  survived every green run because the only checks over that frame read labels and overlays.
-  Bundle: Dorfleben.
