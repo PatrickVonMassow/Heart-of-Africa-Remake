@@ -15,7 +15,7 @@ import { porcelainPaths } from '../batch-in-flight-core.mjs'
 import { parseDiffSuiteMap } from '../point-brief-core.mjs'
 import { readRenderState } from '../render-verify-state.mjs'
 import { listNonPredictive, sectionsForLines } from './sections.mjs'
-import { LADDER_STATUS, classifyLadderRun, ladderVerdict } from './ladder-core.mjs'
+import { LADDER_STATUS, classifyLadderRun, editTimeFor, ladderVerdict } from './ladder-core.mjs'
 
 const ROOT = REPO_ROOT
 
@@ -65,6 +65,8 @@ function mergeBase(cwd) {
 export function editedFiles({ cwd = ROOT } = {}) {
   /** path → the newest time any SOURCE claims for it. */
   const times = new Map()
+  /** the paths whose bytes may differ from the commit they carry. */
+  const dirty = new Set()
   const note = (path, at) => {
     const key = String(path ?? '').trim()
     if (!key) return
@@ -94,6 +96,7 @@ export function editedFiles({ cwd = ROOT } = {}) {
     // afford the whole listing.
     for (const path of porcelainPaths(git(['status', '--porcelain', '-z'], cwd), { limit: 100_000 })) {
       note(path, 0)
+      dirty.add(path)
     }
   } catch {
     /* not a repository — nothing is edited as far as the ladder can tell */
@@ -102,13 +105,15 @@ export function editedFiles({ cwd = ROOT } = {}) {
   const out = []
   for (const [path, committedAt] of times) {
     let mtime = 0
-    try {
-      mtime = statSync(join(cwd, path)).mtimeMs
-    } catch {
-      /* gone, or outside the checkout — its commit time still speaks for it */
+    if (dirty.has(path)) {
+      try {
+        mtime = statSync(join(cwd, path)).mtimeMs
+      } catch {
+        /* gone — a deletion; its commit time still speaks for it */
+      }
     }
     const sections = sectionsTouched(path, cwd, base)
-    out.push({ path, editedAt: Math.max(mtime, committedAt), ...(sections ? { sections } : {}) })
+    out.push({ path, editedAt: editTimeFor({ dirty: dirty.has(path), mtime, committedAt }), ...(sections ? { sections } : {}) })
   }
   return out
 }

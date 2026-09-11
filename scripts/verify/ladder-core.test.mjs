@@ -6,6 +6,7 @@ import {
   LADDER_ESCAPE_FLAG,
   LADDER_STATUS,
   classifyLadderRun,
+  editTimeFor,
   formatLadderRefusal,
   ladderVerdict,
   suitesCovering,
@@ -384,6 +385,26 @@ describe('the deliberate escape', () => {
       escape: { why: '   ' },
     })
     expect(verdict.status).toBe(LADDER_STATUS.REFUSED)
+  })
+})
+
+describe('when a file was really last edited', () => {
+  it('dates a CLEAN file by the commit it carries, not by its mtime', () => {
+    // Measured the first time the ladder was used in anger: switching to `main`
+    // and back rewrote polish.mjs, moved its mtime past every green rung, and
+    // refused the covering run of the point that built the ladder — without one
+    // byte of the file changing. An mtime is not an edit.
+    expect(editTimeFor({ dirty: false, mtime: T0 + HOUR, committedAt: T0 })).toBe(T0)
+  })
+
+  it('takes the later of the two for a DIRTY file, where the bytes really may differ', () => {
+    expect(editTimeFor({ dirty: true, mtime: T0 + HOUR, committedAt: T0 })).toBe(T0 + HOUR)
+    expect(editTimeFor({ dirty: true, mtime: 0, committedAt: T0 })).toBe(T0)
+  })
+
+  it('is total on nothing at all', () => {
+    expect(editTimeFor()).toBe(0)
+    expect(editTimeFor({ dirty: true })).toBe(0)
   })
 })
 

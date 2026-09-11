@@ -106,6 +106,24 @@ export function suitesCovering(path, map) {
   return named.filter((s) => DEV_SUITES.includes(s))
 }
 
+/**
+ * WHEN A FILE WAS REALLY LAST EDITED (point 1086).
+ *
+ * An mtime is NOT an edit. `git checkout`, a stash pop and a fresh clone all
+ * rewrite a file and move its mtime without changing one byte — measured the
+ * moment this mechanism was first used in anger: switching to `main` and back
+ * aged `polish.mjs` past every green rung and refused the covering run of the
+ * point that built the ladder. A refusal an author cannot answer by working is
+ * the costly direction, so a CLEAN file is dated by the commit it carries, and
+ * only a DIRTY one — where the bytes really may differ from that commit — is
+ * dated by the later of its mtime and that commit.
+ */
+export function editTimeFor({ dirty = false, mtime = 0, committedAt = 0 } = {}) {
+  const c = Number(committedAt) || 0
+  if (!dirty) return c
+  return Math.max(Number(mtime) || 0, c)
+}
+
 /** The newest timestamp in a list, or 0. */
 function newest(values) {
   let out = 0
