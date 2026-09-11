@@ -5351,6 +5351,13 @@ if (section('adult-errands')) {
         drawn ? `y-scale ${String(drawn.drawn.squatY)}` : 'no villager',
       )
       check(
+        'and the head stays round through the sink, instead of flattening with it',
+        !!drawn && drawn.drawn.headAspect != null && Math.abs(drawn.drawn.headAspect - 1) < 0.08,
+        drawn
+          ? `head height/width ${drawn.drawn.headAspect == null ? 'nothing' : drawn.drawn.headAspect.toFixed(3)}`
+          : 'no villager',
+      )
+      check(
         'and its carrying hand arrives at ankle height, out in front of it',
         !!drawn && drawn.drawn.handY != null && drawn.drawn.handY < 0.3,
         drawn ? `hand at ${drawn.drawn.handY == null ? 'nothing' : drawn.drawn.handY.toFixed(3)} m` : 'no villager',

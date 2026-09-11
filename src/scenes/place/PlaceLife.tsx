@@ -333,10 +333,22 @@ function Figure({
       selfLimbs.current.trunk = trunk.current
       applyFigurePose(selfLimbs.current, shown)
     }
-    // The head, kept round through the caller's squash (work-order 1085).
+    // THE HEAD, KEPT ROUND THROUGH THE CALLER'S SQUASH (work-order 1085).
+    // A y-scale of its own CANNOT undo it: the squash sits on the figure's group,
+    // ABOVE the trunk, and the trunk is rotated by the lean, so the head's local
+    // y is not the axis being squashed. Measured on the drawn head: 0.720 with
+    // the lean standing and the scale alone applied — the full squash, straight
+    // through. The parent chain contributes `diag(1,s,1) · Rx(lean)` at the head,
+    // and a three.js mesh's own linear part is `R · S`, so the exact inverse IS
+    // expressible there: `Rx(-lean) · diag(1,1/s,1)`, which is a counter-rotation
+    // and a stretch. The head is a smooth sphere, so its counter-rotation is
+    // invisible; only its roundness survives. `turn` needs no answer — a rotation
+    // about y commutes with a scale along y.
     if (head.current) {
       const squash = squat?.current ?? 1
-      head.current.scale.y = squash > 0.01 ? 1 / squash : 1
+      const flattened = squash > 0.01 && Math.abs(squash - 1) > 1e-4
+      head.current.scale.y = flattened ? 1 / squash : 1
+      head.current.rotation.x = flattened ? -(trunk.current?.rotation.x ?? 0) : 0
     }
     if (withLegs && gait) {
       const phase = gait.current ?? 0
@@ -390,7 +402,7 @@ function Figure({
         )}
         {/* The head shows unless the wrap is drawn over it. */}
         {!(wrap && cold!.wear === 'head') && (
-          <mesh ref={head} position={[0, bodyH + 0.18 - hipY, 0]} castShadow>
+          <mesh name="figure-head" ref={head} position={[0, bodyH + 0.18 - hipY, 0]} castShadow>
             <sphereGeometry args={[0.16, ...TESSELLATION.figureHead]} />
             <meshStandardMaterial color={skin} roughness={0.85} />
           </mesh>
@@ -2868,10 +2880,28 @@ function ErrandVillagers({
         // agrees with itself.
         const g = refs.current[i]
         let handY = null
+        let headAspect = null
         if (g) {
           g.updateWorldMatrix(true, true)
           g.traverse((o) => {
             if (o.name === 'hand-left') handY = o.getWorldPosition(new THREE.Vector3()).y
+            // THE HEAD AS DRAWN, in world extents: a squat shortens a man, it does
+            // not deflate his skull, so the ratio of the head's world height to its
+            // world width must stay 1 through the sink (work-order 1085).
+            if (o.name === 'figure-head') {
+              // HOW TALL THE DRAWN HEAD IS AGAINST HOW WIDE, off its world matrix.
+              // A sphere of radius r maps to an ellipsoid whose world half-extent
+              // along an axis is r times that row's length, so equal rows ARE a
+              // round head — squash, lean and counter-rotation all included.
+              // `Box3.setFromObject` answers a different question and was measured
+              // giving 0.73 for a head this says is 1.000: it transforms the
+              // GEOMETRY'S BOX, whose corners swing out under the head's own
+              // counter-rotation. The box is not the sphere.
+              const e = o.matrixWorld.elements
+              const rowLen = (a: number, b: number, c: number) => Math.hypot(e[a], e[b], e[c])
+              const wide = rowLen(0, 4, 8)
+              headAspect = wide > 1e-6 ? rowLen(1, 5, 9) / wide : null
+            }
           })
         }
         return {
@@ -2881,7 +2911,7 @@ function ErrandVillagers({
           digging: isDigging(work, i),
           filling: forcedFill.current?.who === i ? forcedFill.current.progress : null,
           yaw: yaws.current[i] ?? 0,
-          drawn: { squatY: g ? g.scale.y : null, handY },
+          drawn: { squatY: g ? g.scale.y : null, handY, headAspect },
           carry: carryOf(work, i),
           work: task
             ? { situation: task.situation, phase: task.phase, x: task.x, z: task.z, arrived: task.arrived }
