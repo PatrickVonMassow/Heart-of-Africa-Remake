@@ -23,7 +23,7 @@ const ROOT = REPO_ROOT
  *  whole output eats the first path's first character. Callers that want a
  *  single token trim it themselves. */
 function git(args, cwd = ROOT) {
-  return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
+  return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true })
 }
 
 /** The commit both this branch and `main` share, or null on a checkout that has
