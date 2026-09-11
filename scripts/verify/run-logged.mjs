@@ -61,7 +61,8 @@ import { framesWrittenSince, gitPosition, readRecord, recordPathFor, selfCommand
 import { emitActivity } from '../batch-activity-journal.mjs'
 import { ACTIVITY_EVENTS } from '../batch-activity-journal-core.mjs'
 import { budgetToolOutput } from '../tool-output-budget-core.mjs'
-import { parseRunLoggedArgs } from './run-logged-args.mjs'
+import { developmentRunRefusal, parseRunLoggedArgs } from './run-logged-args.mjs'
+import { cleanWorktree, findGreenReceipt, formatCachedGreen } from './run-green-cache.mjs'
 import { LADDER_STATUS, formatLadderRefusal } from './ladder-core.mjs'
 import { ladderCheck } from './ladder.mjs'
 
@@ -271,6 +272,7 @@ function runVerify() {
     verifyGl: process.env.VERIFY_GL ?? null,
     head: where.head,
     branch: where.branch,
+    cleanAtStart: cleanWorktree(ROOT),
     log: shown,
     startedAt: started,
     expectedRuntimeMs: plan.expectedMs,
@@ -484,5 +486,19 @@ function reexecWithLogPath() {
 
 const { own, forward } = parseRunLoggedArgs(process.argv.slice(2))
 if (own.show) process.exitCode = showLog(own.show)
-else if (own.logFile) runVerify()
-else reexecWithLogPath()
+else {
+  const refusal = developmentRunRefusal(forward)
+  if (refusal) {
+    console.log(refusal)
+    process.exitCode = 1
+  } else {
+    const cached = findGreenReceipt({
+      dir: join(ROOT, process.env.VERIFY_LOG_DIR || 'local/verify-logs'),
+      argv: forward, head: gitPosition().head, verifyGl: process.env.VERIFY_GL,
+      again: own.again, clean: cleanWorktree(ROOT),
+    })
+    if (cached) console.log(formatCachedGreen({ ...cached, path: forDisplay(cached.path) }))
+    else if (own.logFile) runVerify()
+    else reexecWithLogPath()
+  }
+}

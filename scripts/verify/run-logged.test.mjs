@@ -13,7 +13,7 @@ import { describe, it, expect } from 'vitest'
 import { parseActivityJournal } from '../batch-activity-journal-core.mjs'
 import { commandNamesRun } from '../batch-in-flight.mjs'
 import { ORDINARY_OUTPUT_BUDGET } from '../tool-output-budget-core.mjs'
-import { MAX_SELECTED_LINES, parseRunLoggedArgs } from './run-logged-args.mjs'
+import { developmentRunRefusal, MAX_SELECTED_LINES, parseRunLoggedArgs } from './run-logged-args.mjs'
 
 const WRAPPER = join(dirname(fileURLToPath(import.meta.url)), 'run-logged.mjs')
 
@@ -27,6 +27,29 @@ function runShow(args, logDir) {
 }
 
 describe('run-logged argument budgets', () => {
+  it('consumes --again instead of forwarding it to run-all', () => {
+    expect(parseRunLoggedArgs(['polish', '--again'])).toMatchObject({
+      own: { again: true }, forward: ['polish'],
+    })
+  })
+
+  it('refuses a development multi-suite call before making a log', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-runlogged-refusal-'))
+    try {
+      const result = runShow(['polish', 'settings', 'enrichments', 'collision'], dir)
+      expect(result.status).toBe(1)
+      expect(result.stdout).toContain('--section=adult-errands')
+      expect(readdirSync(dir)).toEqual([])
+    } finally { rmSync(dir, { recursive: true, force: true }) }
+  })
+
+  it('accepts tier commands and rejects the positional empty-section typo', () => {
+    for (const args of [[], ['small'], ['large', 'polish', 'settings'], ['polish'], ['polish', '--section=adult-errands']]) {
+      expect(developmentRunRefusal(args)).toBeNull()
+    }
+    expect(developmentRunRefusal(['polish', 'adult-errands', '--section='])).toContain('--section=adult-errands')
+  })
+
   it('clamps both selective reads and verify digest lines before output is assembled', () => {
     const parsed = parseRunLoggedArgs([
       '--tail',
