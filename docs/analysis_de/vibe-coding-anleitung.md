@@ -596,6 +596,15 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Bündle nur, wenn beide Hälften **plausibel im selben Lauf** grün werden; bleibt
   eine wiederholt rot, **trenne sie wieder** und liefere die fertige aus."
 
+- **Das Urteil über den Lauf schlägt die Beweise des Laufs.** Ein Werkzeug sagt „das hängt",
+  und die Zahl dahinter stammt aus einer anderen Tabelle als die gemessene Dauer, die direkt
+  daneben steht. Wer dem Urteil folgt, beendet gesunde Arbeit — und merkt es nicht, weil der
+  Log bauartbedingt schweigt, solange der Lauf noch im ersten Abschnitt steckt.
+  → *Prompt:* „Bevor du etwas Laufendes **beendest**, lies die Belege, die es **selbst**
+  erzeugt: geschriebene Dateien, lebende Kindprozesse, wandernde Stände. Ein stiller Log ist
+  **kein** Stillstand. Und wo ein Werkzeug Plan **und** gemessene Spanne nebeneinander druckt,
+  muss es sagen, **welche** seine Abbruchschranke benutzt."
+
 ---
 
 ## Drei Meta-Regeln, die alles zusammenhalten
@@ -634,4 +643,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: bc5b08e6df32fd98f7b164a3cdf177bd68ff8e936cc414d3797014649b1b5e6a -->
+<!-- GUIDE-FINGERPRINT: 3d13a7bb71a27ae8ef6473c5d4c2510cd6f16bca2f9cfca0d14cf4fd0e923df0 -->

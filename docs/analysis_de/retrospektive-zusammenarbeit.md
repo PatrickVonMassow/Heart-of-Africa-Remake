@@ -1491,7 +1491,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Freitag, 11.09.2026, 16:05 · Quellen-Fingerprint: `bc5b08e6df32…`
+Zuletzt aktualisiert: Freitag, 11.09.2026, 17:32 · Quellen-Fingerprint: `3d13a7bb71a2…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1595,10 +1595,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 96 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 131 Prozess-/Meta-TASKS-Punkte (davon 63 offen).
+Erfasste Quellen: 96 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 132 Prozess-/Meta-TASKS-Punkte (davon 64 offen).
 
-<!-- RETRO-FINGERPRINT: bc5b08e6df32fd98f7b164a3cdf177bd68ff8e936cc414d3797014649b1b5e6a -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-11T14:05:52.012Z -->
+<!-- RETRO-FINGERPRINT: 3d13a7bb71a27ae8ef6473c5d4c2510cd6f16bca2f9cfca0d14cf4fd0e923df0 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-11T15:32:11.968Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -6700,3 +6700,34 @@ und teuer gilt, gehört sie dorthin, wo Läufe gestartet werden, nicht in den W�
 Der Wächter kann nur den Schluss bewerten, der Starter kann die Reihenfolge halten. Gebucht
 als Punkt 1086, der die Verweigerung in `scripts/verify/run-logged.mjs` legt und die
 Bildschranke ihren eigenen Zeitpunkt aussprechen lässt.
+
+### 3.266 Ein abgeleitetes Urteil schlug die Beweise, die der Lauf selbst schrieb
+
+Am 11.09.2026 übernahm eine frische Sitzung einen laufenden deckenden Politur-Lauf. Das
+Wartewerkzeug meldete nach 19 Minuten „HUNG — 19m 25s ist über dem 2,5-fachen der Erwartung
+dieses Laufs; beende ihn, statt erneut zu warten". Ich habe genau das getan. Die Quittung
+sagte danach, was der Log nicht sagen konnte: 35 geschriebene Bilder, „failing: none". Der
+Lauf arbeitete; sein Log stand nur bei acht Zeilen, weil er erst je abgeschlossenem Abschnitt
+schreibt.
+
+Der Fehler steckt nicht im Werkzeug allein, sondern in der Art, wie ich seine Ausgabe gelesen
+habe. Dasselbe Kommando druckt zwei Erwartungen direkt untereinander: „expected: 5m 41s"
+aus §1 der Kostentabelle und „observed: 9,9-61,5 min (Median 55,2)" aus §7 derselben Datei.
+Die HUNG-Schranke rechnet mit der kleineren — 2,5 × 5m 41s sind rund 14 Minuten für eine
+Suite, deren eigener gemessener Median bei 55 Minuten liegt. Beide Zahlen standen vor mir,
+und ich habe die gelesen, die zum Abbruch führte, ohne zu bemerken, dass die Zeile darunter
+ihr widerspricht.
+
+Das ist die eigene Klasse: Ein ABGELEITETES Urteil („hängt") tritt mit derselben Autorität
+auf wie eine Messung, obwohl es auf einem Parameter ruht, den niemand gegen die Messung
+daneben geprüft hat. Und es erscheint genau dann, wenn die widersprechende Evidenz teurer zu
+lesen ist als das Urteil: Die geschriebenen Bilder auf der Platte und die lebenden
+Renderer-Prozesse hätten den Lauf in einem einzigen Aufruf entlastet — ich habe stattdessen
+den Log gelesen, der bauartbedingt schweigt, und das Urteil, das sich selbst bestätigt.
+
+**Lehre:** Bevor etwas Laufendes auf ein Urteil hin beendet wird, wird die Evidenz gelesen,
+die das Laufende SELBST erzeugt — geschriebene Dateien, lebende Kindprozesse, wandernde
+Branch-Spitzen —, nicht nur sein Log und nie nur das Urteil über es. Und wo ein Werkzeug
+Plan und gemessene Spanne nebeneinander druckt, gehört seine Abbruchschranke auf die
+gemessene Spanne; zwei widersprechende Erwartungen dürfen nicht gleichrangig nebeneinander
+stehen, ohne zu sagen, welche gilt. Gebucht als Punkt 1112.
