@@ -165,7 +165,10 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   *(Sieht das richtig aus?)*
 - **Dem Test geht der Gegenstand unter den Füßen weg.** Er hält seinen Prüfling an einer
   Koordinate, einem Vorgabewert oder einer Simulation fest. Zieht der Prüfling um, fragt der
-  Test weiter — nur über nichts mehr. Ein Rot meldet sich; ein leerer nicht.
+  Test weiter — nur über nichts mehr. Ein Rot meldet sich; ein leerer nicht. Das gilt auch fürs
+  **Beweisbild**: Wer die Kamera auf eine einmal gelesene Position richtet, während sich die
+  Figur weiterbewegt, fotografiert eine leere Wiese — und die Testreihe meldet lauter Grün,
+  weil niemand nach der Figur gefragt hat. Ein Bild kann seine eigene Leere nicht melden.
   → *Prompt:* „**Verlegst** du etwas, ist das Anpassen der roten Stellen nur die Hälfte: Sieh
   jede übrige Zusage desselben Blocks an, ob sie **noch über etwas urteilt**. Leite den Prüfling
   **ab** statt ihn zu nennen, sonst prüf seine **Zugehörigkeit** mit. Und **stell die Gelegenheit
