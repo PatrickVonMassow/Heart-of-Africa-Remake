@@ -48,7 +48,7 @@ do not create a monolith.
 
 ## 5. Commands
 
-Choose tier suites by changed behavior (`scripts/verify/tiers.mjs`).
+Choose covering tier suites by changed behavior (`scripts/verify/tiers.mjs`).
 Run both-backend LARGE once per bundle and at closing.
 
 Use Vitest (jsdom) for logic, state, and HUD behavior assertable without a

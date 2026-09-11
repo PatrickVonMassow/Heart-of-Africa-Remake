@@ -15,7 +15,7 @@ export function cacheEnvironment(env = process.env) {
 export function cleanWorktree(cwd) {
   try {
     return execFileSync('git', ['status', '--porcelain'], {
-      cwd, encoding: 'utf8', timeout: 8000, stdio: ['ignore', 'pipe', 'ignore'],
+      cwd, encoding: 'utf8', timeout: 8000, windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'],
     }).trim() === ''
   } catch {
     return false
