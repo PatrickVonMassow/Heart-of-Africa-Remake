@@ -1333,17 +1333,17 @@
       "origin": "user",
       "place": "ahead"
     },
-    "1107": {
-      "at": "2026-09-11T12:29:02.913Z",
-      "why": "Aus demselben Bugreport vom 11.09.2026: der Fänger bleibt nach seinem Fang stehen; er sitzt im selben bankGame.ts, das 1106 umschreibt, und wird direkt danach gearbeitet",
-      "origin": "user",
-      "place": "ahead"
-    },
     "1108": {
       "at": "2026-09-11T12:29:10.894Z",
       "why": "Maschinell eingereiht und nicht dringend: kein Spielerimpakt, es kostet nur dem Bildbeweis seine Aussage. Es steht direkt hinter dem Release und vor 1087, das einen Rahmen derselben Handlung schuldet",
       "origin": "machine",
       "place": "last"
+    },
+    "1109": {
+      "at": "2026-09-11T14:06:21.099Z",
+      "why": "Deine Anweisung vom 11.09.2026: 'Setze es so um, wie du es vorschlaegst. Reihe das direkt vor 1092 ein.'",
+      "origin": "user",
+      "place": "ahead"
     }
   },
   "boundary": {
@@ -1376,7 +1376,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-11T12:29:10.902Z",
+    "at": "2026-09-11T14:06:21.111Z",
     "points": [
       174,
       184,
@@ -1770,8 +1770,8 @@
       1103,
       1105,
       1106,
-      1107,
-      1108
+      1108,
+      1109
     ]
   }
 }
