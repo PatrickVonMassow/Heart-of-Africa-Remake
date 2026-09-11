@@ -843,6 +843,30 @@ export const RED_CHARGES = [
       'owns it.',
   },
   {
+    point: 521,
+    suite: 'enrichments',
+    backend: 'webgl',
+    kind: 'check',
+    match: /^frame 72-water-victoria-falls\b/i,
+    detailMatch: /subject is not in the rendered picture/i,
+    why:
+      'THE WebGL 2 HALF, measured 11.09.2026. The entry above is scoped to the WebGPU ' +
+      'compatibility lane on the evidence that WebGL 2 passed the same suite minutes apart, so it ' +
+      'deliberately excuses nothing here — but point 521 owns the CAUSE on EVERY lane rather than ' +
+      'on one, and names this exact frame: enrichments.mjs jumps the traveller with debugJumpTo, ' +
+      'which sets the POSITION instantly while the travel camera springs toward it, then waits a ' +
+      'fixed 1500 ms before shooting — so whether the camera has arrived is a question of frame ' +
+      'rate, "on a loaded machine, or on the slower backend, it has not". The machine was loaded, ' +
+      'and this run measured that rather than argued it: the LARGE regression of 11.09.2026 ' +
+      '00:13Z was itself occupying the host, a second session held it for part of the window, and ' +
+      'the runner classified the pair in its own words — "FAIL (twice, DIFFERENT checks) — ' +
+      'LOAD/FLAKE SIGNATURE, not evidence of a defect", the two attempts failing at DIFFERENT ' +
+      'checks. DETAIL-SCOPED because the record carries one: this entry answers the frame that ' +
+      'MISSED ITS SUBJECT, and a future failure of the same frame for another reason stays a real ' +
+      'red. The charge dies with point 521, which replaces the stopwatch with a wait on the ' +
+      'camera actually arriving.',
+  },
+  {
     point: 938,
     suite: 'enrichments',
     backend: 'webgl',
