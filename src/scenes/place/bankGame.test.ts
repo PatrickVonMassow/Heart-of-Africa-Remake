@@ -1172,13 +1172,11 @@ describe('arriving runners name the far stone by contact', () => {
     const { s, rand } = arriving([{ x: 8, z: -0.7 }, { x: 8, z: 0 }, { x: 8, z: 0.7 }], cfg)
     const spoken = new Set<number>()
     const touched = new Set<number>()
-    let concurrent = false
     for (let k = 0; k < 600; k++) {
       const u = stepBankGame(s, 1 / 60, cfg, STAGE, openWorld(), rand)
       if (u?.moment === 'arrival') spoken.add(u.speaker)
       const holding = s.children.filter((c) => c.arrival?.holdFor != null)
       s.children.forEach((c, i) => { if (c.arrival?.holdFor != null) touched.add(i) })
-      if (holding.length > 1) concurrent = true
       for (const c of holding) {
         for (const other of s.children) {
           if (other !== c) expect(dist(c, other)).toBeGreaterThanOrEqual(0.6 - 1e-6)
@@ -1186,7 +1184,6 @@ describe('arriving runners name the far stone by contact', () => {
       }
     }
     expect(spoken.size).toBeGreaterThanOrEqual(1)
-    expect(touched.size, JSON.stringify(s.children.map((c) => ({ x: c.x, z: c.z, arrival: c.arrival })))).toBe(3)
-    expect(concurrent || touched.size === 3).toBe(true)
+    expect(touched.size).toBe(3)
   })
 })

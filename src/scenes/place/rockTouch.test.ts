@@ -6,6 +6,7 @@
 // both play rocks of all three river villages.
 
 import { describe, expect, it } from 'vitest'
+import { balance } from '../../config/balance'
 import { FIGURE_LIMBS, CHILD_FIGURE_SCALE } from '../../render/figures'
 import { gaitBodyLift } from '../../render/fauna'
 import { TOUCH_LEAN } from '../../render/gesture'
@@ -13,7 +14,7 @@ import { reachFrom, solveTouch, touchedPoint } from './rockTouch'
 import { playRockFlank } from './playRockSurface'
 import { buildLayout } from './layout'
 import { WALKER_RADIUS, standingClear } from './collision'
-import { rockAt, touchReach, touchStand, TOUCH_GAP, type BankEnd, type BankStage } from './bankGame'
+import { bankChildBodyLift, createBankGame, rockAt, touchReach, touchStand, TOUCH_GAP, type BankEnd, type BankStage } from './bankGame'
 
 const RIVER_VILLAGES = ['nubian-village', 'bambara-village', 'mandinka-village']
 const ENDS: BankEnd[] = ['upstream', 'downstream']
@@ -149,6 +150,51 @@ describe('the tapping child reaches the stone it names, in every river village',
     // Over the 6 cm the browser allows — so a stopped child left mid-step CANNOT
     // pass the picture check, and this number is why the settling is not cosmetic.
     expect(worst).toBeGreaterThan(0.06)
+  })
+
+  it('solves arrivals from their own bearings on both Bambara flanks, respecting blocked ground', () => {
+    const { stage, layout } = stageOf('bambara-village')
+    const blocked = (x: number, z: number) => !standingClear(layout.colliders, x, z, WALKER_RADIUS)
+    let reached = 0
+    for (const end of ENDS) {
+      for (let k = 0; k < 24; k++) {
+        const bearing = k / 24 * Math.PI * 2
+        const stand = touchStand(stage, end, blocked, bearing)
+        if (!stand) continue
+        reached++
+        expect(stand.bearing).toBe(bearing)
+        expect(blocked(stand.x, stand.z)).toBe(false)
+        const reach = touchReach(stage, end, stand)!
+        expect(Math.abs(reach.gap)).toBeLessThanOrEqual(TOUCH_GAP)
+        // Check the hand's own bearing too: it hangs to one side of the body.
+        const point = touchedPoint(Math.hypot(stand.x - rockAt(stage, end).x, stand.z - rockAt(stage, end).z), reach.elevation, CHILD_FIGURE_SCALE)
+        const handBearing = bearing + Math.atan2(-point.offAxis, Math.sqrt(point.radius ** 2 - point.offAxis ** 2))
+        expect(Math.abs(point.radius - HAND - stage.flank(end, handBearing, point.height))).toBeLessThanOrEqual(0.06)
+      }
+    }
+    expect(reached).toBeGreaterThan(12)
+    expect(touchStand(stage, 'downstream', () => true, 0.7)).toBeNull()
+  })
+
+  it('draws an arriving touch at its solved height from the opening frame, regardless of the last stride', () => {
+    const cfg = { ...balance.villageLife.tag, ...balance.villageLife.bankGame }
+    const { stage } = stageOf('bambara-village')
+    const stand = touchStand(stage, 'downstream')!
+    const c = createBankGame([stand], () => 0.5, cfg).children[0]
+    const reach = touchReach(stage, 'downstream', c)!
+    const rock = rockAt(stage, 'downstream')
+    const bearing = Math.atan2(c.x - rock.x, c.z - rock.z)
+    c.arrival = { end: 'downstream', stand, approachFor: 0, holdFor: cfg.arrivalHoldSeconds }
+    const hand = touchedPoint(Math.hypot(c.x - rock.x, c.z - rock.z), reach.elevation, CHILD_FIGURE_SCALE)
+    for (let k = 0; k < 100; k++) {
+      const dip = gaitBodyLift(k / 100 * Math.PI * 2, FIGURE_LIMBS.hipY * CHILD_FIGURE_SCALE)
+      const lift = bankChildBodyLift(c, dip)
+      const gap = hand.radius - HAND - stage.flank('downstream', bearing, hand.height + lift)
+      expect(Math.abs(gap)).toBeLessThanOrEqual(TOUCH_GAP)
+    }
+    c.arrival = null
+    c.lift = 0.5
+    expect(bankChildBodyLift(c, -0.03)).toBeCloseTo(0.47)
   })
 
   it('does NOT reach from the waiting station the tap used to be spoken from', () => {

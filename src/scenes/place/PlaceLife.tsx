@@ -64,12 +64,14 @@ import { buildPlaceNavGrid, findPlaceRoute, navClearBetween, navRestrict, type N
 import { absorbSeparation, createTagGame, stepTagGame, type TagChild } from './tagGame'
 import {
   bankChildCanSeparate,
+  bankChildBodyLift,
   createBankGame,
   otherEnd,
   rockAt,
   insideStrangerBerth,
   stepBankGame,
   type BankChild,
+  type BankEnd,
   type BankStage,
   type BankUtterance,
   type BankWorld,
@@ -917,6 +919,8 @@ function Kids({
   // same code.
   const tapOpening = useRef<{
     tapper: number
+    end: BankEnd
+    clock: number
     x: number
     y: number
     z: number
@@ -929,6 +933,7 @@ function Kids({
      *  the touch (work-order 1065). */
     heardFrom: number | null
   } | null>(null)
+  const arrivalOpenings = useRef<Array<typeof tapOpening.current>>([])
   const poses = useRef<Array<RefObject<FigurePose | null>>>([])
   if (poses.current.length !== count) {
     poses.current = Array.from(
@@ -1056,8 +1061,9 @@ function Kids({
       // beside a stone rather than standing on one. The climb now carries its
       // own lift in metres, taken from the boulder the child is actually on, and
       // this only draws it.
-      const lift = (c as BankChild).lift ?? 0
-      g.position.set(c.x, gaitBodyLift(phase, legLength) + lift, c.z)
+      const gaitLift = gaitBodyLift(phase, legLength)
+      const lift = round.bank ? bankChildBodyLift(c as BankChild, gaitLift) : gaitLift
+      g.position.set(c.x, lift, c.z)
       // A TAGGED CHILD IS UNMISTAKABLY OUT OF PLAY (work-order 687 item 3):
       // squatted down, trunk folded over and both arms crossed in front of it.
       // Written here rather than as a prop, because the state changes inside the
@@ -1093,9 +1099,12 @@ function Kids({
         })
         // The RAISED hand is the one doing the touching; the other hangs.
         const best = hands.sort((a, b) => b.y - a.y)[0]
-        tapOpening.current = best
+        const opening: typeof tapOpening.current = best
           ? {
               tapper: i,
+              end: Math.hypot(spoken!.aim.x - stage!.upstream.x, spoken!.aim.z - stage!.upstream.z) < 0.01
+                ? 'upstream' : 'downstream',
+              clock: round.bank!.clock,
               x: best.x,
               y: best.y,
               z: best.z,
@@ -1106,6 +1115,8 @@ function Kids({
                 : null,
             }
           : null
+        if (spoken?.moment === 'arrival') arrivalOpenings.current[i] = opening
+        else tapOpening.current = opening
       }
     })
   })
@@ -1182,12 +1193,16 @@ function Kids({
     // the SCENE GRAPH — the drawn hand's own world position — and compared with
     // the drawn stone's flank at that height, so the live check measures the
     // contact the player sees rather than the one the round solved for.
-    w.__placeTapHand = () => {
+    const readTouchHand = (moment: 'tap' | 'arrival', speaker?: number) => {
       if (!bank || !stage) return null
-      const i = bank.tapper
+      const opening = moment === 'tap' ? tapOpening.current : speaker !== undefined
+        ? arrivalOpenings.current[speaker] ?? null
+        : arrivalOpenings.current.reduce((latest, entry) =>
+          entry && (!latest || entry.clock > latest.clock) ? entry : latest, null)
+      const i = moment === 'arrival' ? opening?.tapper ?? -1 : bank.tapper
       const g = refs.current[i]
       if (i < 0 || !g) return null
-      const end = otherEnd(bank.from)
+      const end = moment === 'arrival' && opening ? opening.end : otherEnd(bank.from)
       const rock = rockAt(stage, end)
       const hands: Array<{ hand: string; x: number; y: number; z: number; radius: number; flank: number; gap: number }> = []
       g.updateWorldMatrix(true, true)
@@ -1218,7 +1233,6 @@ function Kids({
       // out at the child's side is a frame of render lag, not a hand that never
       // arrived (work-order 1065).
       const written = poses.current[i]?.current ?? null
-      const opening = tapOpening.current
       const openingGap = opening
         ? (() => {
             const b = Math.atan2(opening.x - rock.x, opening.z - rock.z)
@@ -1234,6 +1248,8 @@ function Kids({
             // after it: the word falls while `tapFor` is still running in the
             // run phase, and the touch gesture outlives that moment by design.
             tapFor: bank.tapFor,
+            arrivalFor: bank.children[i].arrival?.holdFor ?? 0,
+            clock: bank.clock,
             end,
             rock: { x: rock.x, z: rock.z },
             // WHICH SIDE THE REACH HANGS OFF. The touching hand is the LEFT one
@@ -1269,6 +1285,9 @@ function Kids({
       }
     }
 
+    w.__placeTapHand = () => readTouchHand('tap')
+    w.__placeArrivalHand = (speaker?: number) => readTouchHand('arrival', speaker)
+
     // What the group has SAID so far this visit (point 481), by situation — a
     // live check can read the coverage the pure tests pin.
     w.__placeChildSpeech = () => ({
@@ -1279,6 +1298,7 @@ function Kids({
     return () => {
       delete w.__placeTag
       delete w.__placeTapHand
+      delete w.__placeArrivalHand
       delete w.__placeChildSpeech
     }
   }, [round, game, speech, children, stage, x, z, playRadius])

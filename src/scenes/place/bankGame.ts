@@ -628,6 +628,12 @@ export function bankChildCanSeparate(c: BankChild): boolean {
   return !c.crouched && !onStone(c) && !(c.arrival && c.arrival.holdFor !== null)
 }
 
+/** A teaching contact is solved at standing height, even on its opening frame.
+ * The runner's last gait dip must not lower the hand onto a narrower flank. */
+export function bankChildBodyLift(c: BankChild, gaitLift: number): number {
+  return c.lift + (c.arrival?.holdFor != null ? 0 : gaitLift)
+}
+
 /** A group at its spawn points, roaming. Every point must already be free — the
  *  caller validates it against the real collider set, exactly as the tag game's
  *  spawns are. */

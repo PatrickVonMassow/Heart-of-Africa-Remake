@@ -4002,6 +4002,7 @@ if (section('children-bank-game')) {
       roamSeconds: b.roamSeconds,
       roamGuardSeconds: b.roamGuardSeconds,
       tapPauseSeconds: b.tapPauseSeconds,
+      arrivalHoldSeconds: b.arrivalHoldSeconds,
     }
     b.roamSeconds = 8
     b.roamGuardSeconds = 8
@@ -4011,6 +4012,7 @@ if (section('children-bank-game')) {
     // path at 9 s. It is a spectator-time knob, like the roam above, and the
     // shipped length is what `bankGame.test.ts` measures the hold against.
     b.tapPauseSeconds = 9
+    b.arrivalHoldSeconds = 9
     return was
   })
   await goToPlace('bambara-village')
@@ -4863,6 +4865,68 @@ if (section('children-bank-game')) {
             'been taken after the hand had already left the stone',
       )
     }
+
+    // ARRIVAL CONTACT (work-order 1106). Follow one spoken runner by identity
+    // through the side swap and to the far side of its own hold. Another
+    // runner naming the same stone cannot replace this trace halfway through.
+    await restoreEarshotStance()
+    const arrivalSeconds = await page.evaluate(() => window.__balance.villageLife.bankGame.arrivalHoldSeconds)
+    let runner = null
+    let arrivalOpening = null
+    let arrivalEnded = false
+    let arrivalAimed = false
+    let arrivalShot = false
+    const arrivalTrace = []
+    const arrivalBudget = Math.ceil(arrivalSeconds * 60) * 2 + 900
+    for (let i = 0; i < arrivalBudget; i++) {
+      const now = await page.evaluate((speaker) => window.__placeArrivalHand?.(speaker) ?? null, runner ?? undefined)
+      if (runner === null && now?.arrivalFor > 0 && now.opening && now.clock - now.opening.clock <= 0.2) {
+        runner = now.tapper
+        arrivalOpening = now.opening
+      }
+      if (runner !== null && now?.tapper === runner) {
+        if (now.opening?.clock !== arrivalOpening.clock) break
+        if (now.arrivalFor <= 0) {
+          arrivalEnded = true
+          break
+        }
+        arrivalTrace.push(now)
+        if (!arrivalShot && Math.abs(now.gap) <= 0.06 && now.gesture === 'touch') {
+          if (!arrivalAimed) arrivalAimed = await aimAtTap(now)
+          else {
+            await frame('1106-arriving-runner-hand-on-the-far-stone', {
+              local: { x: now.x, y: now.y, z: now.z },
+              label: 'the arriving runner with its hand on the far play rock while it names ROCK',
+            })
+            arrivalShot = true
+            await restoreEarshotStance()
+          }
+        }
+      }
+      await nextFrames(now?.arrivalFor > 0 ? 1 : 2)
+    }
+    const arrivalWorst = Math.max(
+      Math.abs(arrivalOpening?.gap ?? Infinity),
+      ...arrivalTrace.map((r) => Math.abs(r.gap)),
+    )
+    check(
+      'the arriving runner is read from ROCK to the far side of its contact hold',
+      !!arrivalOpening && arrivalTrace.length >= 6 && arrivalEnded &&
+        arrivalTrace[0].arrivalFor >= arrivalSeconds - 0.2 &&
+        arrivalTrace.at(-1).arrivalFor <= 0.2,
+      `${arrivalTrace.length} readings; opening ${arrivalOpening?.clock ?? 'missing'}, ` +
+        `remaining ${arrivalTrace[0]?.arrivalFor ?? '-'} to ${arrivalTrace.at(-1)?.arrivalFor ?? '-'} s; ended ${arrivalEnded}`,
+    )
+    check(
+      'the arriving runner`s DRAWN hand stays within 6 cm of the far stone, including the word frame',
+      arrivalWorst <= 0.06 && arrivalTrace.every((r) => r.gesture === 'touch'),
+      `worst ${(arrivalWorst * 100).toFixed(1)} cm over ${arrivalTrace.length} readings`,
+    )
+    check(
+      'the arriving runner was photographed naming ROCK with its hand on the far stone',
+      arrivalShot,
+      arrivalShot ? 'shutter inside the arrival hold' : 'no arrival contact frame was captured',
+    )
   }
 
   // The world goes back as it was found: the shipped roaming phase, and the game
@@ -4873,6 +4937,7 @@ if (section('children-bank-game')) {
     b.roamSeconds = was.roamSeconds
     b.roamGuardSeconds = was.roamGuardSeconds
     b.tapPauseSeconds = was.tapPauseSeconds
+    b.arrivalHoldSeconds = was.arrivalHoldSeconds
   }, shippedRoam)
   await page.evaluate(() => window.__game.getState().leavePlace())
   await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
