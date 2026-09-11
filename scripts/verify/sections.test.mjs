@@ -5,7 +5,7 @@
 // and refused as recorded coverage (that half lives with the recorder's reader,
 // scripts/render-verify-core.test.mjs).
 import { describe, it, expect } from 'vitest'
-import { listSections, makeSectionGate, planSectionRun, resolveSelection, resultSection, SECTION_ENV } from './sections.mjs'
+import { sectionsForLines, listNonPredictive, listSections, makeSectionGate, planSectionRun, resolveSelection, resultSection, SECTION_ENV } from './sections.mjs'
 import { runVerdict } from '../render-verify-core.mjs'
 import { sectionTag } from '../section-tag-core.mjs'
 
@@ -255,5 +255,100 @@ describe('a partial run is refused as recorded coverage', () => {
     expect(v.covers).toBe(false)
     expect(v.status).toBe('partial')
     expect(v.unaccounted[0].name).toContain('crocodile')
+  })
+})
+
+// ── NON-PREDICTIVE CHECKS (point 1086) ─────────────────────────────────────
+describe('a check that declares it cannot predict the suite’s own reading', () => {
+  const SRC = [
+    "const { section, nonPredictive } = sectionGate()",
+    "if (section('town-plan')) {",
+    "  check('the lanes meet the gate', true)",
+    "}",
+    "if (section('adult-errands')) {",
+    "  nonPredictive('the jar goes down EMPTY and comes back FULL', 'the pass cast ONE errand where the section casts many')",
+    "  check('the jar goes down EMPTY and comes back FULL', true)",
+    "}",
+    "// prose: nonPredictive('phantom', 'written in a comment') declares nothing",
+  ].join('\n')
+
+  it('attaches the declaration to the section it stands in', () => {
+    expect(listNonPredictive(SRC)).toEqual([
+      {
+        section: 'adult-errands',
+        check: 'the jar goes down EMPTY and comes back FULL',
+        why: 'the pass cast ONE errand where the section casts many',
+      },
+    ])
+  })
+
+  it('does not let prose declare one', () => {
+    expect(listNonPredictive("// nonPredictive('x', 'y')")).toEqual([])
+    expect(listNonPredictive("const s = \"nonPredictive('x', 'y')\"")).toEqual([])
+  })
+
+  it('marks the PASSING line of a narrow run, and nothing else', () => {
+    const gate = makeSectionGate({ sections: ['adult-errands'], requested: 'adult-errands', suite: 'polish' })
+    gate.section('adult-errands')
+    gate.nonPredictive('the jar comes back FULL', 'the pass casts one errand')
+    expect(gate.predictiveNote('the jar comes back FULL', true)).toContain('NON-PREDICTIVE narrowly')
+    // A red is a red either way round, and an undeclared check says nothing.
+    expect(gate.predictiveNote('the jar comes back FULL', false)).toBe('')
+    expect(gate.predictiveNote('the lanes meet the gate', true)).toBe('')
+  })
+
+  it('says nothing in a WHOLE-suite run, which measures what it measures', () => {
+    const gate = makeSectionGate({ sections: ['adult-errands'], requested: null, suite: 'polish' })
+    gate.section('adult-errands')
+    gate.nonPredictive('the jar comes back FULL', 'the pass casts one errand')
+    expect(gate.predictiveNote('the jar comes back FULL', true)).toBe('')
+  })
+
+  it('refuses a declaration without a check name or without a reason', () => {
+    const gate = makeSectionGate({ sections: ['x'], requested: null, suite: 'polish' })
+    expect(() => gate.nonPredictive('', 'why')).toThrow(/CHECK NAME/)
+    expect(() => gate.nonPredictive('a check', '  ')).toThrow(/reason/)
+  })
+})
+
+describe('a declaration whose prose carries the other quote', () => {
+  it('is still read — each body excludes only its OWN delimiter', () => {
+    // Excluding both quote characters lost every declaration written the
+    // ordinary way. It declared itself at runtime and was invisible to the
+    // ladder, so its narrow green went on being credited as honest — the exact
+    // false confidence the declaration exists to stop.
+    const found = listNonPredictive([
+      "if (section('jars')) {",
+      '  nonPredictive(\'jar\', "the suite\'s sampling differs")',
+      '}',
+    ].join('\n'))
+    expect(found).toEqual([{ section: 'jars', check: 'jar', why: "the suite's sampling differs" }])
+  })
+})
+
+describe('which section a changed line of a suite source belongs to', () => {
+  const SRC = [
+    "const check = (name, ok) => {}",   // 1 — the prologue every section pays for
+    "if (section('town-plan')) {",      // 2
+    "  check('a plan is drawn', true)", // 3
+    '}',                                // 4
+    "if (section('adult-errands')) {",  // 5
+    "  check('a jar is filled', true)", // 6
+    '}',                                // 7
+  ].join('\n')
+
+  it('reads the nearest declaration at or above the line', () => {
+    expect(sectionsForLines(SRC, [3])).toEqual(['town-plan'])
+    expect(sectionsForLines(SRC, [6])).toEqual(['adult-errands'])
+    expect(sectionsForLines(SRC, [3, 6])).toEqual(['town-plan', 'adult-errands'])
+  })
+
+  it('answers null for the prologue, which every section pays for', () => {
+    expect(sectionsForLines(SRC, [1])).toEqual([null])
+  })
+
+  it('is total on nothing at all', () => {
+    expect(sectionsForLines('', [])).toEqual([])
+    expect(sectionsForLines(null, [1])).toEqual([null])
   })
 })

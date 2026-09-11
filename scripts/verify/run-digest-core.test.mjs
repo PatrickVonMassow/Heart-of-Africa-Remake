@@ -383,3 +383,34 @@ describe('output progress mark', () => {
     expect(state.mark).not.toBe(empty)
   })
 })
+
+describe('a NON-PREDICTIVE pass is a conclusion, not bulk (point 1086)', () => {
+  it('survives the selection, like the PARTIAL banner it is the finer twin of', () => {
+    expect(classifyLine('NON-PREDICTIVE  polish       PASS  the jar comes back FULL — 3 samples  [NON-PREDICTIVE narrowly: one errand]')).toBe('final')
+  })
+
+  it('and is kept when a budget has to drop the bulk around it', () => {
+    const lines = [
+      'PASS  polish       13 pass, 0 fail, 0 console-errors (exit 0)',
+      'NON-PREDICTIVE  polish       PASS  the jar comes back FULL  [NON-PREDICTIVE narrowly: one errand]',
+      'PARTIAL — only section "adult-errands" of polish ran; the suite is NOT covered by this run',
+    ]
+    expect(selectLines(lines).map((l) => l.kind)).toEqual(['result', 'final', 'final'])
+  })
+})
+
+describe('a declared limitation outranks the line budget', () => {
+  it('keeps NON-PREDICTIVE when the budget drops everything around it', () => {
+    // The budget drops from the FRONT once the low-priority lines are gone, so a
+    // green narrow run with a tight --keep lost the one line saying the green
+    // does not predict the suite, while the later ALL GREEN and PARTIAL lines
+    // survived. Exit 0 supplies no raw tail to fall back on.
+    const entries = [
+      { line: 'NON-PREDICTIVE  polish  [NON-PREDICTIVE] jar — cast too rarely' },
+      { line: 'ALL GREEN — 1 suites run' },
+      { line: 'PARTIAL — only section "adult-errands" of polish ran' },
+    ]
+    const { kept } = applyBudget(entries, 2)
+    expect(kept.map((e) => e.line)).toContain(entries[0].line)
+  })
+})

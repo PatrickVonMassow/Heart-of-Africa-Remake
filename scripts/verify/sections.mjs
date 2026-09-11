@@ -70,6 +70,66 @@ export function listSections(source) {
   return out
 }
 
+/**
+ * A NON-PREDICTIVE declaration in a suite's source:
+ * `nonPredictive('<check name>', '<why>')`, written inside the section block
+ * whose check it speaks about.
+ *
+ * WHY IT EXISTS (point 1086, measured 10.09.2026). `adult-errands` was climbed
+ * twelve times on 09.09. and was green every time — 18 pass, 0 fail. The LARGE
+ * run that night then failed on exactly that section's material: alone the
+ * section always saw enough errands, inside the full suite it saw ONE, with the
+ * fetch phase at 33 of about 2000 phase ticks. A rung that does not measure what
+ * the suite measures is worse than no rung, because the ladder would credit it.
+ * So a check whose subject is CAST RARELY either sizes its observation window so
+ * both runs measure the same thing, or it says here that it cannot — and then
+ * the ladder never counts it as climbed (scripts/verify/ladder-core.mjs) and the
+ * result line says so when it passes narrowly.
+ */
+const NP_HEAD = /(?<![\w.$])nonPredictive\(\s*['"]/g
+/** The same call with both strings captured, read from the ORIGINAL source at a
+ *  position the masked one proved is code. Each body excludes only ITS OWN
+ *  delimiter: excluding both quote characters silently lost every declaration
+ *  whose prose carried the other one — `nonPredictive('jar', "the suite's
+ *  sampling differs")` declared itself at runtime and was invisible here, so its
+ *  narrow green went on being credited as honest. Escapes are tolerated because
+ *  check names are prose. */
+const NP_RE = /(?<![\w.$])nonPredictive\(\s*(['"])((?:\\.|(?!\1)[^\\])*)\1\s*,\s*(['"])((?:\\.|(?!\3)[^\\])*)\3/g
+
+/**
+ * Every non-predictive declaration a suite makes, each attached to the SECTION
+ * it stands in — the nearest preceding `section('…')` declaration, which is how
+ * these files are shaped (`if (section('x')) { … }`). A declaration before the
+ * first section belongs to the boot prologue and carries `section: null`.
+ *
+ * Read from the source, not from a list: a hand-kept list drifts from the code
+ * it names within a month. Masked like the section declarations, so a suite
+ * explaining itself in a comment cannot declare a phantom. Total: never throws.
+ */
+export function listNonPredictive(source) {
+  const src = String(source ?? '')
+  const masked = maskCode(src)
+  const marks = []
+  for (const head of masked.matchAll(DECL_HEAD)) {
+    DECL_RE.lastIndex = head.index
+    const decl = DECL_RE.exec(src)
+    if (decl && decl.index === head.index) marks.push({ at: head.index, name: decl[2] })
+  }
+  const out = []
+  for (const head of masked.matchAll(NP_HEAD)) {
+    NP_RE.lastIndex = head.index
+    const decl = NP_RE.exec(src)
+    if (!decl || decl.index !== head.index) continue
+    let section = null
+    for (const mark of marks) {
+      if (mark.at < head.index) section = mark.name
+      else break
+    }
+    out.push({ section, check: decl[2], why: decl[4] })
+  }
+  return out
+}
+
 /** The requested name reduced to its comparable form; '' and null both mean
  *  "no request", i.e. run the whole suite. */
 function normalise(requested) {
@@ -155,6 +215,9 @@ export function makeSectionGate({ sections = [], requested = null, suite = 'the 
   currentResultSection = null
   let current = null
   const ran = []
+  // The checks this run has been told cannot predict the suite's own reading,
+  // by check name (point 1086). Declared inside the block they belong to.
+  const nonPredictiveChecks = new Map()
   const gate = {
     /** True while ONE section was selected — the run proves nothing about the rest. */
     partial: verdict.partial,
@@ -166,6 +229,32 @@ export function makeSectionGate({ sections = [], requested = null, suite = 'the 
       const selected = verdict.requested === null || verdict.requested === name
       if (selected) ran.push(name)
       return selected
+    },
+    /**
+     * THIS CHECK CANNOT PREDICT WHAT THE SUITE WILL READ (point 1086) — its
+     * subject is cast rarely enough that the section alone and the full pass
+     * measure different things. Declared beside the check, in the block that
+     * owns it; `predictiveNote` then marks the result line and the ladder
+     * refuses to count the narrow green as climbed.
+     */
+    nonPredictive(check, why) {
+      const name = String(check ?? '')
+      if (name === '') throw new TypeError('nonPredictive needs the CHECK NAME it speaks about')
+      const reason = String(why ?? '').trim()
+      if (reason === '') throw new TypeError(`nonPredictive(${JSON.stringify(name)}) needs a reason`)
+      nonPredictiveChecks.set(name, reason)
+      return name
+    },
+    /**
+     * What a PASSING result line appends in a narrow run, so no reader takes a
+     * green here for a green in the pass. Empty on a whole-suite run (which
+     * measures what it measures), on a failure (a red is a red either way) and
+     * for every check that made no declaration.
+     */
+    predictiveNote(check, ok) {
+      if (!verdict.partial || ok === false) return ''
+      const why = nonPredictiveChecks.get(String(check ?? ''))
+      return why ? `  [NON-PREDICTIVE narrowly: ${why}]` : ''
     },
     /** The section a check being printed right now sits in. */
     currentSection: () => current,
@@ -229,4 +318,51 @@ export function sectionGate({ suitePath = process.argv[1], env = process.env } =
   })
   gateBuilt = true
   return gate
+}
+
+/**
+ * WHICH SECTION EACH CHANGED LINE OF A SUITE'S SOURCE BELONGS TO (point 1086).
+ *
+ * The ladder credits a green narrow run of the suite whose material was edited.
+ * Which section covers a given edit is NOT derivable in general — an edit to
+ * `src/render/fauna.ts` reaches three suites and no section in particular — but
+ * when the edited file IS the suite's own source it is derivable exactly: a
+ * section is a block, and a changed line sits in one. Without this the measured
+ * case went uncaught, and the four-eyes round of 11.09.2026 named it: edit the
+ * `adult-errands` block, run only `town-plan`, and the full pass counted as
+ * climbed although the edited material was never checked once.
+ *
+ * A line above the first declaration belongs to the boot prologue, which every
+ * section pays for — it answers `null`, and the ladder treats that as "no
+ * section can stand in for this", i.e. every section is aged.
+ *
+ * Total: never throws; an unreadable source names no sections.
+ */
+export function sectionsForLines(source, lines) {
+  const src = String(source ?? '')
+  const masked = maskCode(src)
+  // Declaration offsets → the 1-based line they stand on.
+  const marks = []
+  for (const head of masked.matchAll(DECL_HEAD)) {
+    DECL_RE.lastIndex = head.index
+    const decl = DECL_RE.exec(src)
+    if (!decl || decl.index !== head.index) continue
+    let line = 1
+    for (let i = 0; i < head.index; i += 1) if (src[i] === '\n') line += 1
+    marks.push({ line, name: decl[2] })
+  }
+  marks.sort((a, b) => a.line - b.line)
+
+  const out = new Set()
+  for (const raw of lines ?? []) {
+    const n = Number(raw)
+    if (!Number.isFinite(n)) continue
+    let name = null
+    for (const mark of marks) {
+      if (mark.line <= n) name = mark.name
+      else break
+    }
+    out.add(name)
+  }
+  return [...out]
 }

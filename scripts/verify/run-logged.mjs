@@ -37,6 +37,8 @@
 //   --quiet         no live echo; the end digest then carries the structured lines
 //   --keep N        the structured-line budget of the end digest (default 120)
 //   --tail N        raw tail lines on a failure (default 40)
+//   --no-ladder "<why>"  start a full pass whose cheap rung is unclimbed, and
+//                   RECORD why (the verification ladder, point 1086)
 //   --log-file P    write the log here instead of local/verify-logs/<stamp>.log
 //                   (a launch WITHOUT it re-execs itself with the resolved path
 //                   appended — the record writer's argv must name its log; see
@@ -60,6 +62,8 @@ import { emitActivity } from '../batch-activity-journal.mjs'
 import { ACTIVITY_EVENTS } from '../batch-activity-journal-core.mjs'
 import { budgetToolOutput } from '../tool-output-budget-core.mjs'
 import { parseRunLoggedArgs } from './run-logged-args.mjs'
+import { LADDER_STATUS, formatLadderRefusal } from './ladder-core.mjs'
+import { ladderCheck } from './ladder.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, '..', '..')
@@ -205,8 +209,44 @@ function closeRecord({ lines, exitCode, started, recordPath, baseRecord }) {
   }
 }
 
+/**
+ * THE VERIFICATION LADDER (point 1086), asked before anything is spawned.
+ *
+ * The rule was written down in point 595 and was therefore climbed by whoever
+ * remembered it; measured 09.09.2026, one session used the full pass as its
+ * debugging loop for 2.5 machine-hours on a defect two section runs then found
+ * in four minutes. So the refusal sits HERE, where every run is started, rather
+ * than in a document. It refuses exactly one thing — a full browser pass whose
+ * cheap rung is unclimbed — and it prints the narrower command to run instead.
+ *
+ * Returns the verdict; the caller stops on `ok === false`.
+ */
+function askTheLadder() {
+  const verdict = ladderCheck({
+    argv: forward,
+    verifyGl: process.env.VERIFY_GL,
+    escape: own.noLadder === null ? null : { why: own.noLadder },
+  })
+  if (!verdict.ok) {
+    console.log(formatLadderRefusal(verdict))
+    return verdict
+  }
+  // A waiver is never only a printed line — it goes into the run record below
+  // too — but it IS printed, because an exception nobody sees is an exception
+  // nobody reconsiders.
+  if (verdict.status === LADDER_STATUS.WAIVED_ESCAPE || verdict.status === LADDER_STATUS.WAIVED_NON_PREDICTIVE) {
+    console.log(`# ladder waived (${verdict.status}) — ${verdict.reason}`)
+  }
+  return verdict
+}
+
 /** Run the regression, log all of it, print the bounded digest. */
 function runVerify() {
+  const ladder = askTheLadder()
+  if (!ladder.ok) {
+    process.exitCode = 1
+    return
+  }
   const logPath = logPathFor(forward, own)
   mkdirSync(dirname(logPath), { recursive: true })
   const log = createWriteStream(logPath, { flags: 'a' })
@@ -237,6 +277,10 @@ function runVerify() {
     expectedFrames: plan.expectedFrames,
     unmeasuredSuites: plan.unmeasured,
     polls: 0,
+    // WHAT THE LADDER SAID ABOUT THIS RUN (point 1086) — climbed, free, or
+    // waived and why. A deliberate exception that leaves no trace is one nobody
+    // can weigh later.
+    ladder: ladder.record,
     status: 'running',
     pid: process.pid,
     // The writer's own argv, recorded as EVIDENCE. The identity the transfer
@@ -265,7 +309,10 @@ function runVerify() {
     // stdin inherited so nothing can silently block on input; stdout/stderr piped
     // through us into the log.
     stdio: ['inherit', 'pipe', 'pipe'],
-    env: process.env,
+    // THE LADDER WAS ALREADY ASKED, above, with the escape this wrapper
+    // consumes and does not forward. run-all asks it too — it is the entrypoint
+    // the README names — so the marker keeps it to ONE question per run.
+    env: { ...process.env, RVA_LADDER_ASKED: '1' },
   })
 
   const lines = []

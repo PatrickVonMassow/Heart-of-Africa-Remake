@@ -476,6 +476,54 @@ That is the price, not a new rule: a `--section` run is stamped PARTIAL by
 `sections.mjs` and `runVerdict` refuses it as coverage whatever its exit code, so
 the repair loop is cheap and the acceptance run stays whole.
 
+### The ladder is ENFORCED where runs start (point 1086)
+
+```
+npm test -- polish                       # refused while polish.mjs carries an edit
+npm test -- polish --section=town-plan   # the rung — never refused
+npm test -- polish                       # admitted once that rung is green
+npm test -- polish --no-ladder "<why>"   # the escape, recorded with the run
+```
+
+Point 595 wrote the ladder down, so it was climbed by whoever remembered it.
+Measured 09.09.2026 on point 1065: one session used the FULL pass as its
+debugging loop — four runs, roughly 2.5 machine-hours, for a defect two section
+runs then found in four minutes. Nothing refused any of it, while
+`render-verify-guard`, which accepts only a full covering run, said "not
+verified" after every edit and was read as the next command.
+
+So both entrypoints ask `ladder-core.mjs` before they spawn anything, and
+**refuse a full browser pass while the files that suite covers carry edits — or
+a merge — newer than the newest GREEN narrower run of the same material.**
+`run-logged.mjs` asks it, and so does `run-all.mjs`, which this document
+documents as an ordinary command and which for a while answered to nothing at
+all: the mechanism was missing from the command the house actually uses. The
+question is asked ONCE per run — the wrapper marks the child environment, so the
+escape it consumes is never overruled below. The coverage question is answered by the
+work order's own diff→suite mapping, so it moves with TASKS.md and not with a
+list here. The refusal prints the section commands to run instead; the picture
+gate's own refusal now says the covering run is what the point owes at its END.
+
+Two halves the night of 10.09.2026 added, because a rung that lies is worse than
+no rung:
+
+- **A merge ages the rung exactly as an edit does.** Two merges landed at ~23:35
+  after the last green `adult-errands` rung, that rung was never re-climbed, and
+  the pass at 01:13 failed on exactly its material.
+- **A rung whose subject is cast rarely must measure what the suite measures.**
+  Alone, `adult-errands` always saw enough errands; inside the pass it saw ONE,
+  fetch phase 33 of about 2000 ticks. Either the section sizes its window so both
+  runs measure the same thing, or it declares `nonPredictive('<check>', '<why>')`
+  beside the check — the narrow PASS then says so on its own line, and the ladder
+  never counts that rung as climbed. It does not refuse the pass either:
+  enforcing a rung that lies buys false confidence instead of time, so the ladder
+  steps aside and the waiver is recorded with the run.
+
+Everything fails OPEN. A ladder that cannot read the tree (no `main` to compare
+against, an unreadable ledger, a missing mapping) lets the run start and says so.
+On `main` only uncommitted work counts as an edit, which keeps a fresh clone and
+CI free.
+
 - `scripts/verify/sections.mjs` is the pure module (pinned by `sections.test.mjs`):
   `listSections` reads the declarations out of the suite SOURCE — no hand-kept
   list to drift — and `resolveSelection` decides what a request means.

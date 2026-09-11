@@ -83,6 +83,8 @@ export const NON_RENDER_VERIFY = new Set([
   'gpu-backend-probe-core.mjs', // the host GPU verdict over a CDP/canvas reading; gpu-backend-probe.mjs does the driving
   'frameSubject.mjs', // the frame shutter's decision layer; the suites hand it their page
   'labelFusion.mjs', // the no-fusion bar over a sampled rect series; enrichments.mjs and polish.mjs sample it
+  'ladder-core.mjs', // WHETHER a full pass may start (point 1086); it decides, it draws nothing
+  'ladder.mjs', // the ladder's git/ledger/source reads; it opens no page
   'launch-args-core.mjs', // the launcher's PLATFORM policy; _browser.mjs opens the browser
   'liveness.mjs', // main-thread liveness ATTRIBUTION; the suites do the driving
   'machine-load-core.mjs',
@@ -2070,6 +2072,16 @@ export function evaluate(input) {
       `Run: ${cmds} (pick the suite whose screenshots show the changed view — ` +
       'passing runs are recorded automatically by the suite itself), then INSPECT the frames of ' +
       'both backends. ' +
+      // THIS REFUSAL NAMES THE FINISH, NOT THE NEXT STEP (point 1086). It
+      // accepts only a full covering run, so while a fix is still being made it
+      // says "not verified" after every edit — and on 09.09.2026 that was read
+      // as the next command and answered with four full passes, 2.5 machine-
+      // hours, for a defect two section runs then found in four minutes.
+      'WHILE YOU ARE STILL FIXING, DO NOT RUN THIS YET: the covering run is what the point owes at ' +
+      'its END. Climb the ladder first — `npm test -- <suite> --section=<name>` costs about two ' +
+      'minutes against the pass\'s thirty, and `--section=list` prints a suite\'s real names ' +
+      'without booting a browser. The run starter enforces that order and prints the narrower ' +
+      'command itself (scripts/verify/ladder-core.mjs). ' +
       (whyNot.length
         ? `WHY THE LAST ATTEMPT DID NOT COUNT — ${whyNot.join(' | ')}. A RED CLOSES IN EXACTLY ` +
           'THREE WAYS (point 640): (1) its CAUSE is named and fixed; (2) it is CHARGED in ' +

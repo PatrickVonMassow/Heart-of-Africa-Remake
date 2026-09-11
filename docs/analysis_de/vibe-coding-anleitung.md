@@ -297,13 +297,12 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   Grenze nennt ihre **Richtung**: zu viel durchgelassen oder zu viel verweigert."
 
 - **Die teuerste Prüfung großflächig verlangt.** Bildbegutachtung, zweiter Lauf, zweites Modell
-  kosten ein Vielfaches — pauschal gefordert, wo sie nichts beweisen. **Eine Regel ohne Preis ist
-  nur eine Empfehlung:** Ein Punkt verbrannte fünf rote Zwei-Stunden-Läufe, obwohl der Auftrag
-  „genau ein Vollbeweis" sagte — die Zeitangaben waren sechs Wochen alt und dreifach zu niedrig.
+  kosten ein Vielfaches, pauschal gefordert, wo sie nichts beweisen. **Eine Regel ohne Preis ist
+  nur eine Empfehlung.**
   → *Prompt:* „Verlange die teuerste Prüfung nur, wo eine Änderung abweichen kann, und schreib
-  die Grenze samt Begründung in den prüfenden Code. An jede billigere Stufe gehört ihre
-  **gemessene Dauer mit Messdatum**, und ein Prüflauf druckt den Befehl mit, der seinen Fehler
-  billig reproduziert."
+  die Grenze in den prüfenden Code. An jede billigere Stufe gehört ihre **gemessene Dauer mit
+  Messdatum**; ein Prüflauf druckt den Befehl mit, der ihn billig reproduziert, und was während
+  der Reparatur feuert, sagt **wann** es fällig ist — sonst gilt es als nächste Aufgabe."
 
 - **Was bei jedem Start mitgelesen wird, wächst — und du bezahlst es jedes Mal.** Jede
   Ergänzung ist berechtigt; am teuersten die, die wiederholt, was eine Prüfung erzwingt.
@@ -514,9 +513,8 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   Zug, der **beide** Auflagen erfüllt? Wenn nicht, ist nicht die Sitzung schuld."
 
 - **Die Warnung stand dreimal da und feuerte nie — sie lag unter der falschen Überschrift.**
-  Derselbe Fehler zum dritten Mal, obwohl als Absatz, Fallstrick und gemessene Regel notiert:
-  abgelegt unter seinem **Thema**, gebraucht dort, wo die widersprechende Aufforderung ankam —
-  im Wortlaut des Wächters, der zur Vorarbeit drängt.
+  Dreimal notiert, jedes Mal unter seinem **Thema** abgelegt statt dort, wo die widersprechende
+  Aufforderung ankommt.
   → *Prompt:* „Schreib die Ausnahme in den Text **dessen, der auffordert**, nicht ins thematisch
   passende Kapitel. An welcher **Stelle im Ablauf** wird eine Regel gelesen — und steht sie dort?
   Eine überlesene Regel ist nicht zu schwach formuliert, sondern falsch abgelegt."
@@ -578,9 +576,7 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   ein Nachweis fehlt — und der Nachweis ist der Lauf, der noch zwei Stunden braucht.
   Verweigerung und eigene Abhilfe laufen gegeneinander.
   → *Prompt:* „Eine Schranke, die einen Nachweis fordert, muss ‚wird gerade erstellt' als
-  eigenen Zustand **durchlassen** — sonst verbietet sie ihre eigene Erfüllung. Verweigert sie
-  trotz nachweislich gelungener Reparatur, **miss dein Arbeitsverzeichnis und bau ihren
-  Aufruf nach**: Sie urteilt über die Wurzel, aus der sie läuft."
+  eigenen Zustand **durchlassen** — sonst verbietet sie ihre eigene Erfüllung."
 
 - **Ein Rot, das bei gleichem Code kommt und geht, ist ein Befund über deine MESSUNG.** Eine
   Stichprobe aus einem langen Vorgang trifft den Defekt mal und verfehlt ihn mal.
@@ -591,6 +587,10 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   misst ein anderes Fenster als die volle Suite.
   → *Prompt:* „‚Grün' zählt nur, wenn die schmale Stufe **jünger als der letzte Merge** ist und
   **dasselbe misst** wie die große — sonst sagt sie selbst, dass ihr Grün nichts vorhersagt."
+
+- **Der Wächter ist grün und greift nicht** — er sitzt in einer Datei, die euer Ablauf nie aufruft.
+  → *Prompt:* „**Tipp den Befehl, mit dem ihr arbeitet**, und sieh ihr beim Feuern zu. Zwei
+  Eingänge heißt: **beide** fragen, genau einmal pro Lauf."
 
 - **Zwei Aufgaben in eine gepackt, um einen teuren Lauf zu sparen.** Die fertige Hälfte wartet
   dann auf die rote, weil eine Aufgabe nur ganz fertig wird — gespart hat das nichts.
@@ -635,4 +635,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 48b942de1b4422ac19af7a4d9465be565e70458303cc3f2580b41ec39cb8d9f4 -->
+<!-- GUIDE-FINGERPRINT: 8470d7ade40002c39b0e1e2c4baa529494672b97b4b73211ccb8527e8ffca847 -->

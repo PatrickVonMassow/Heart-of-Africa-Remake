@@ -843,6 +843,47 @@ export const RED_CHARGES = [
       'owns it.',
   },
   {
+    point: 1102,
+    suite: 'polish',
+    backend: 'webgl',
+    kind: 'check',
+    match: /^the drums were still speaking when the picture was taken/i,
+    why:
+      'Measured 11.09.2026 on a QUIET machine during point 1086\'s covering WebGL 2 picture run: '
+      + 'the check failed once and passed on the retry, which records the whole 56-minute pass '
+      + 'SUSPECT and covering no backend. It is the first time this check has failed in the kept '
+      + 'logs, and 1102 is the point that owns it — the frame is aimed by stopwatch and fires '
+      + 'after the drum message has already ended, which is point 521\'s defect mirrored (521 '
+      + 'shoots too EARLY after a jump; this one too LATE). Suite- and lane-scoped to what was '
+      + 'measured: nothing here excuses the same check on WebGPU, where it has never been seen. '
+      + 'The charge dies with 1102, which waits on the speaking state the game already holds '
+      + 'instead of on a duration.',
+  },
+  {
+    point: 521,
+    suite: 'enrichments',
+    backend: 'webgl',
+    kind: 'check',
+    match: /^frame 72-water-victoria-falls\b/i,
+    detailMatch: /subject is not in the rendered picture/i,
+    why:
+      'THE WebGL 2 HALF, measured 11.09.2026. The entry above is scoped to the WebGPU ' +
+      'compatibility lane on the evidence that WebGL 2 passed the same suite minutes apart, so it ' +
+      'deliberately excuses nothing here — but point 521 owns the CAUSE on EVERY lane rather than ' +
+      'on one, and names this exact frame: enrichments.mjs jumps the traveller with debugJumpTo, ' +
+      'which sets the POSITION instantly while the travel camera springs toward it, then waits a ' +
+      'fixed 1500 ms before shooting — so whether the camera has arrived is a question of frame ' +
+      'rate, "on a loaded machine, or on the slower backend, it has not". The machine was loaded, ' +
+      'and this run measured that rather than argued it: the LARGE regression of 11.09.2026 ' +
+      '00:13Z was itself occupying the host, a second session held it for part of the window, and ' +
+      'the runner classified the pair in its own words — "FAIL (twice, DIFFERENT checks) — ' +
+      'LOAD/FLAKE SIGNATURE, not evidence of a defect", the two attempts failing at DIFFERENT ' +
+      'checks. DETAIL-SCOPED because the record carries one: this entry answers the frame that ' +
+      'MISSED ITS SUBJECT, and a future failure of the same frame for another reason stays a real ' +
+      'red. The charge dies with point 521, which replaces the stopwatch with a wait on the ' +
+      'camera actually arriving.',
+  },
+  {
     point: 938,
     suite: 'enrichments',
     backend: 'webgl',
