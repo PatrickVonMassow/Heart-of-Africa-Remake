@@ -455,7 +455,10 @@ export const LIMITS = {
   // "Gruener Test, falsches Bild" and "Dem Test geht der Gegenstand unter den Fuessen weg"
   // pays back two lines and two words. The ceiling follows the measurement DOWN, because a
   // kept 639 would be exactly the unearned headroom the rule above forbids: 639 -> 637.
-  maxLines: 637,
+  // LOWERED 11.09.2026: the vanished-subject pitfall took the morning's lesson — a proof
+  // PICTURE aimed at a coordinate its subject had walked away from — inside its existing entry
+  // and was tightened while doing it, so the guide pays a line back: 637 -> 636.
+  maxLines: 636,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -710,7 +713,9 @@ export const LIMITS = {
   // wrong root, a point's five red two-hour runs, the count of one misfiled warning). The net is
   // a PAYBACK, so the ceiling follows the measurement DOWN: 6113 -> 6104. Keeping 6113 would be
   // exactly the unearned headroom the rule above forbids.
-  maxWords: 6104,
+  // 11.09.2026 (third): the same vanished-subject lesson went in as a clause of the risk and a
+  // clause of the prompt, paid for by tightening both, and lands one word under: 6104 -> 6103.
+  maxWords: 6103,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,

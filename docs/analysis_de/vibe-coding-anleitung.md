@@ -160,19 +160,15 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Eine sichtbare Änderung ist erst fertig, wenn sie am **echten gerenderten Bild**
   geprüft wurde. Zu jeder Prüfung: **Welche Zeile ruft die Sache auf — und was bliebe grün, wenn
   sie kaputt wäre?** Zeit darf ein Test abkürzen, den **Aufruf** nie. Ist die **Ausgabe** das
-  Produkt, lies sie am **echten Bestand**. Und das Bild
-  beantwortet nicht nur ‚stimmt es?‘, sondern **wozu tut die Figur das — sieht man es ihr an?“
-  *(Sieht das richtig aus?)*
+  Produkt, lies sie am **echten Bestand**. Und das Bild beantwortet nicht nur ‚stimmt es?‘,
+  sondern **wozu tut die Figur das — sieht man es ihr an?“ *(Sieht das richtig aus?)*
 - **Dem Test geht der Gegenstand unter den Füßen weg.** Er hält seinen Prüfling an einer
-  Koordinate, einem Vorgabewert oder einer Simulation fest. Zieht der Prüfling um, fragt der
-  Test weiter — nur über nichts mehr. Ein Rot meldet sich; ein leerer nicht. Das gilt auch fürs
-  **Beweisbild**: Wer die Kamera auf eine einmal gelesene Position richtet, während sich die
-  Figur weiterbewegt, fotografiert eine leere Wiese — und die Testreihe meldet lauter Grün,
-  weil niemand nach der Figur gefragt hat. Ein Bild kann seine eigene Leere nicht melden.
+  Koordinate, einem Vorgabewert oder einer Simulation fest. Zieht der Prüfling um, fragt er
+  weiter — nur über nichts mehr. Ein Rot meldet sich; ein leerer nicht, ein leeres Bild ebenso wenig.
   → *Prompt:* „**Verlegst** du etwas, ist das Anpassen der roten Stellen nur die Hälfte: Sieh
   jede übrige Zusage desselben Blocks an, ob sie **noch über etwas urteilt**. Leite den Prüfling
-  **ab** statt ihn zu nennen, sonst prüf seine **Zugehörigkeit** mit. Und **stell die Gelegenheit
-  her**, statt auf sie zu warten — wer wartet, ob zufällig ein Störer dasteht, prüft Würfel.“
+  **ab** statt ihn zu nennen, sonst prüf seine **Zugehörigkeit** mit — beim Bild seine Lage
+  im Auslösemoment. Und **stell die Gelegenheit her**, statt zu warten.“
 - **Der Fühler misst sich selbst.** Er erneuert beim Nachsehen seinen Messwert oder liest, was
   ein Testlauf schreibt: Totes wirkt lebendig, der Nächste bleibt draußen.
   → *Prompt:* „Ein Lebenszeichen kommt nur aus einer Quelle, die der **Beobachter nicht
