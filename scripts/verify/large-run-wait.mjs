@@ -70,7 +70,7 @@ export async function waitForLargeRun({
     const blocker = blockingLargeRun(readProcesses(), pid)
     if (!blocker) return
     if (!reported) {
-      report(`# waiting for LARGE pid ${blocker.pid}: ${blocker.cmd}`)
+      report(`# waiting for LARGE pid ${blocker.pid}: ${blocker.cmd} (VERIFY_NO_WAIT=1 to start anyway)`)
       reported = true
     }
     do { await sleep(250) } while (stillRunning(blocker))

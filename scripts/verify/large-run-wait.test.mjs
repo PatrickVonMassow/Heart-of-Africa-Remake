@@ -48,7 +48,7 @@ describe('LARGE process admission', () => {
     expect(blockingLargeRun([large, active, row(31, 30, 'run-all', 'large')], 10)).toBe(active)
   })
 
-  it('prints one pid/command line, waits, then resumes as soon as LARGE disappears', async () => {
+  it('prints one pid/command line with the escape, waits, then resumes when LARGE disappears', async () => {
     let sleeps = 0
     const output = []
     await waitForLargeRun({
@@ -58,7 +58,7 @@ describe('LARGE process admission', () => {
       sleep: async () => { sleeps++ },
     })
     expect(sleeps).toBe(2)
-    expect(output).toEqual([`# waiting for LARGE pid 10: ${large.cmd}`])
+    expect(output).toEqual([`# waiting for LARGE pid 10: ${large.cmd} (VERIFY_NO_WAIT=1 to start anyway)`])
   })
 
   it('only VERIFY_NO_WAIT=1 bypasses waiting, not --again', async () => {
