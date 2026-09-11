@@ -206,6 +206,14 @@ function runSuite(name, baseUrl, retryAfter = '') {
   const consoleErrors = errMatch ? Number(errMatch[1]) : 0
   const ok = res.status === 0 && fail === 0 && consoleErrors === 0
   console.log(`${ok ? 'PASS' : 'FAIL'}  ${name.padEnd(12)} ${pass} pass, ${fail} fail, ${consoleErrors} console-errors (exit ${res.status})`)
+  // A NON-PREDICTIVE PASS MUST BE SEEN (point 1086). Only the summary above
+  // leaves this child, so a marker sitting on a passing line would die here —
+  // and a green that does not mean what it looks like is exactly the thing a
+  // reader must not miss. Lifted out as a CONCLUSION about the headline, the
+  // same class as the PARTIAL banner.
+  for (const line of out.split('\n')) {
+    if (line.includes('[NON-PREDICTIVE')) console.log(`NON-PREDICTIVE  ${name.padEnd(12)} ${line.trim()}`)
+  }
   if (!ok) {
     for (const line of out.split('\n')) if (/^FAIL\s{2,}\S|^ERR:/.test(line)) console.log('      ' + line)
     // A non-zero exit without any FAIL line is a CRASH (uncaught exception,
