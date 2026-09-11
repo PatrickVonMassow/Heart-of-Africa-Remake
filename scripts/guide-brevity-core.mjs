@@ -458,7 +458,14 @@ export const LIMITS = {
   // LOWERED 11.09.2026: the vanished-subject pitfall took the morning's lesson — a proof
   // PICTURE aimed at a coordinate its subject had walked away from — inside its existing entry
   // and was tightened while doing it, so the guide pays a line back: 637 -> 636.
-  maxLines: 636,
+  // RAISED 11.09.2026 (second): a killed covering run showed that the aged-expectation prompt
+  // named the WRONG liveness test — it said a run is alive while "sein Protokoll waechst", and
+  // the run that was killed wrote nothing to its log for nineteen minutes because it writes per
+  // completed SECTION, while writing 35 frames to disk the whole time. The correction went into
+  // that existing entry rather than a new one (two neighbouring entries already carry the class:
+  // "Zahlen geschaetzt statt gemessen" and this one), and it names the artefacts as the test
+  // instead: two lines: 636 -> 638.
+  maxLines: 638,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -715,7 +722,11 @@ export const LIMITS = {
   // exactly the unearned headroom the rule above forbids.
   // 11.09.2026 (third): the same vanished-subject lesson went in as a clause of the risk and a
   // clause of the prompt, paid for by tightening both, and lands one word under: 6104 -> 6103.
-  maxWords: 6103,
+  // 11.09.2026 (fourth): the silent-log correction justified beside maxLines measures 24 words
+  // after the fold — the entry gained the artefacts-not-the-log liveness test and the
+  // which-number-does-the-threshold-use clause, and a separately drafted pitfall of its own was
+  // DROPPED as a duplicate of the two entries that already carry the class: 6103 -> 6127.
+  maxWords: 6127,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,

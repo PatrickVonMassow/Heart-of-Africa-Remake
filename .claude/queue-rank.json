@@ -1327,12 +1327,6 @@
       "origin": "machine",
       "place": "ahead"
     },
-    "1106": {
-      "at": "2026-09-11T12:29:02.825Z",
-      "why": "Sein eigener Bugreport vom 11.09.2026, zum zweiten Mal gemeldet: die lehrende Hand berührt den Stein nicht, den sie benennt — und die stehende Release-Ordnung stellt alles, was die Kommunikationsmechanik betrifft, nach vorn",
-      "origin": "user",
-      "place": "ahead"
-    },
     "1108": {
       "at": "2026-09-11T12:29:10.894Z",
       "why": "Maschinell eingereiht und nicht dringend: kein Spielerimpakt, es kostet nur dem Bildbeweis seine Aussage. Es steht direkt hinter dem Release und vor 1087, das einen Rahmen derselben Handlung schuldet",
@@ -1344,6 +1338,18 @@
       "why": "Deine Anweisung vom 11.09.2026: 'Setze es so um, wie du es vorschlaegst. Reihe das direkt vor 1092 ein.'",
       "origin": "user",
       "place": "ahead"
+    },
+    "1110": {
+      "at": "2026-09-11T15:32:00.753Z",
+      "why": "Der Nutzer hat die nicht anliegende Hand des Kindes zweimal selbst gemeldet; der Punkt setzt seine Meldung um und ist damit keine Maschinen-Einreihung.",
+      "origin": "user",
+      "place": "ahead"
+    },
+    "1111": {
+      "at": "2026-09-11T15:32:01.606Z",
+      "why": "Infrastruktur-Defekt unter dem Einfrieren aus CLAUDE.md §2: Er blockiert keine laufende Spielarbeit, sondern nur Tore auf einer belasteten Maschine, und dafuer gilt bereits die Regel, Suiten nur auf ruhiger Maschine zu fahren.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1376,7 +1382,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-11T14:06:21.111Z",
+    "at": "2026-09-11T15:32:01.616Z",
     "points": [
       174,
       184,
@@ -1769,9 +1775,10 @@
       1102,
       1103,
       1105,
-      1106,
       1108,
-      1109
+      1109,
+      1110,
+      1111
     ]
   }
 }

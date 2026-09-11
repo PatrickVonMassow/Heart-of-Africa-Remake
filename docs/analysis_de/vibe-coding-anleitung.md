@@ -568,8 +568,10 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 - **Die gemessene Dauer von damals tötet den gesunden Lauf von heute.** Die Prüfung wächst weiter,
   ihre hinterlegte Erwartung nicht — und das Werkzeug erklärt einen rechnenden Lauf für hängend.
-  → *Prompt:* „‚Hängt, abbrechen‘ darf nie allein auf einer hinterlegten Dauer stehen: Solange der
-  Prozess **rechnet** und sein Protokoll **wächst**, hängt er nicht."
+  → *Prompt:* „‚Hängt, abbrechen‘ darf nie allein auf einer hinterlegten Dauer stehen, und ein
+  **stilles Protokoll** ist kein Stillstand — viele Läufe schreiben erst je fertigem Abschnitt.
+  Lies, was der Lauf **sonst** erzeugt: Dateien, Kindprozesse, Stände. Drucken Plan **und**
+  Messung nebeneinander, muss dabeistehen, **welche** die Abbruchschranke benutzt."
 
 - **Die Schranke verlangt genau das, was gerade entsteht.** Sie lässt nicht aufhören, solange
   ein Nachweis fehlt — und der Nachweis ist der Lauf, der noch zwei Stunden braucht.
@@ -634,4 +636,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: bc5b08e6df32fd98f7b164a3cdf177bd68ff8e936cc414d3797014649b1b5e6a -->
+<!-- GUIDE-FINGERPRINT: 3d13a7bb71a27ae8ef6473c5d4c2510cd6f16bca2f9cfca0d14cf4fd0e923df0 -->

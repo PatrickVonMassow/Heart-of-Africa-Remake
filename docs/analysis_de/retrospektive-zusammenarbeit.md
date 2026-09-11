@@ -1491,7 +1491,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Freitag, 11.09.2026, 16:05 · Quellen-Fingerprint: `bc5b08e6df32…`
+Zuletzt aktualisiert: Freitag, 11.09.2026, 17:32 · Quellen-Fingerprint: `3d13a7bb71a2…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1595,10 +1595,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 96 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 131 Prozess-/Meta-TASKS-Punkte (davon 63 offen).
+Erfasste Quellen: 96 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 132 Prozess-/Meta-TASKS-Punkte (davon 64 offen).
 
-<!-- RETRO-FINGERPRINT: bc5b08e6df32fd98f7b164a3cdf177bd68ff8e936cc414d3797014649b1b5e6a -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-11T14:05:52.012Z -->
+<!-- RETRO-FINGERPRINT: 3d13a7bb71a27ae8ef6473c5d4c2510cd6f16bca2f9cfca0d14cf4fd0e923df0 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-11T15:32:11.968Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -6676,6 +6676,19 @@ den es nicht bedienen kann — ein unbekanntes Flag, eine leere Umgebung, eine E
 die eigene Messreihe widerspricht. Und wo neben dem Modellwert eine Messung steht, ist die
 Messung die Zahl, mit der gerechnet wird; der Modellwert ist ihr Boden, nicht ihr Maß. Gebucht
 als Punkte 1101 und 1099.
+
+**Nachtrag, 17:29 desselben Tages — dieselbe Diagnose, derselbe Gehorsam, die andere Bahn.**
+Eine frische Sitzung übernahm den deckenden `polish`-Lauf des gelandeten Punktes 1106, bekam
+nach 19m 25s denselben Satz und tötete ihn ebenfalls. Die Quittung las sich danach »35 Bilder
+geschrieben, failing: none«. Was diese Wiederholung dem Befund hinzufügt, ist der Grund, warum
+der Sitzung nichts zum Gegenhalten blieb: Das Protokoll war STILL — acht Zeilen, Abbruch nach
+»starting dev server« —, weil die Suite erst je FERTIGEM Abschnitt schreibt. Damit fällt auch
+die naheliegende Gegenprobe aus, die §3.249 noch als Rettung nennt (»solange der Prozess
+rechnet und sein Protokoll wächst, hängt er nicht«): Ein arbeitender Lauf liest sich für die
+Dauer seines ersten Abschnitts wie ein toter. Die Lebendigkeit gehört an das, was der Lauf
+ERZEUGT — geschriebene Bilder, lebende Kindprozesse, ein antwortender Entwicklungsserver —,
+nicht an die Zeilen, die er dabei über sich selbst schreibt. Nachgetragen in Punkt 1099; ein
+zweiter Punkt dafür wurde geschrieben und wieder verworfen, weil 1099 ihn schon trug.
 
 ### 3.264 Eine Erzwingung, die das Ende nennt, wird als nächster Schritt gelesen
 
