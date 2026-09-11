@@ -670,3 +670,31 @@ that the word is not HEARD. Not reproducible and not caused by that point
 rather than charged: if it recurs, the question is whether the bar should be
 `>= 10` — or whether an adult standing exactly at the children's earshot is the
 real finding.
+
+## The `settlement-fabric` frames shoot before the scene has drawn (11.09.2026)
+
+Measured while investigating point 1103, which this finding voided. The two
+frames of `polish`'s `settlement-fabric` section — `101-street-village-plan` and
+`102-cairo-lane-plan` (`scripts/verify/polish.mjs:1743-1766`) — are taken about
+800 ms after `enterPlace`, with no scene-readiness wait: `waitForTimeout(400)`,
+`toggleMap()`, `waitForTimeout(400)`. Their declared subject is the DOM overlay
+`.map-place-plan`, and the check beside them reads `window.__placeLayout`, so
+both pass regardless of what the 3D scene behind the overlay has managed to
+draw. Neighbouring sections settle for 2500 ms before their shutter.
+
+The consequence is not a failing check but a MISLEADING PICTURE: on a slow host
+the frame keeps whatever the lane rendered in those 800 ms, which was sky and
+haze in the three WebGL 2 copies on file and a completely empty image at 0 FPS
+in the WebGPU run of 11.09.2026 20:01
+(`local/verify-logs/2026-09-11T20-01-23-301-polish.log`). Read as evidence about
+the SCENE, those frames say whatever the host's frame rate said that minute.
+That is exactly how point 1103 came to be filed as a HIGH-criticality
+player-visible WebGL 2 defect: two such frames were read against each other, and
+the labels — DOM elements drawn from layout data, present on both lanes from the
+first millisecond — made the comparison look controlled.
+
+No player impact, so it is collected here rather than made a point. Whoever picks
+it up decides between settling the scene before the shutter (as the neighbouring
+sections do) and declaring these two frames as OVERLAY-only evidence, so that
+nobody reads the background as a statement about rendering. The second is the
+cheaper honest fix.
