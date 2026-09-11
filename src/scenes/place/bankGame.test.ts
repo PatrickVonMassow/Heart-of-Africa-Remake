@@ -837,7 +837,7 @@ describe('the children`s game at the bank (point 687)', () => {
       })
       separateGroup(
         set,
-        bodies.filter((_, i) => bankChildCanSeparate(s.children[i])),
+        bodies.filter((_, i) => bankChildCanSeparate(s.children[i], bankChildTouching(s, i))),
         1 / 60,
         balance.villageLife.separation,
         world,

@@ -69,6 +69,7 @@ import { climbBoulder } from './looseRocks'
 import { absorbSeparation, createTagGame, stepTagGame, type TagChild } from './tagGame'
 import {
   bankChildCanSeparate,
+  bankChildTouching,
   createBankGame,
   insideStrangerBerth,
   stepBankGame,
@@ -562,7 +563,7 @@ function frame(v: ReturnType<typeof village>, dt: number): void {
     v.bodies[i].z = v.children[i].z
   }
   const separable = v.bank
-    ? v.bodies.filter((_, i) => bankChildCanSeparate(v.children[i] as BankChild))
+    ? v.bodies.filter((_, i) => bankChildCanSeparate(v.children[i] as BankChild, bankChildTouching(v.bank!, i)))
     : v.bodies
   // The separation resolves in the round's ground PLUS the traveller's berth,
   // exactly as `PlaceLife` wires it: the traveller is not an inhabitant body, so
