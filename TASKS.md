@@ -77,42 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1085. The fill reads as a man falling into the river, and a jar under an
-  opaque surface cannot be photographed at all. SPLIT OUT OF POINT 1065 on 09.09.2026
-  because that point would not converge: four frames were re-aimed in one evening — from
-  the land side, side-on to the shore, live inside the act instead of after it, and from
-  the flank the jar hangs off — and every one of them came back with the same reading. The
-  camera is no longer the problem; the figure is.
-  WHAT THE FRAMES SHOW. The carrier stands at the waterline and folds forward, and because
-  a villager is a legless cone the fold reads as a topple: the body lies at roughly 55-60°
-  across the water with its head at the top, which a player sees as a man face-down in the
-  river rather than a man scooping from it. `fillPose` in `src/render/gesture.ts` takes the
-  trunk to `lean = 0.12 + 0.62` ≈ 42°, against `digPose`'s ≈ 19° — and DIG is the act the
-  spec itself holds up as the one that works.
-  AND THE SECOND HALF IS GEOMETRY, NOT ART. The check asserts the jar's base below the
-  drawn water surface, and that surface is OPAQUE: a vessel proved to be under it is by
-  construction invisible. Photographing the instant the jar breaks the surface (base under,
-  rim still out) was tried — `scripts/verify/polish.mjs`, the `under <= 0.16` band — and at
-  the distance the player watches from, a 0.32 m cylinder half-sunk beside a bent cone is a
-  nub. "Visibly below the surface" and "opaque water" cannot both hold.
-  FINAL STATE: the act reads as fetching water to someone who has not been told what it is.
-  What that costs is a design decision this point makes and writes into `design.md` §13.4
-  rather than guesses — the candidates measured tonight are (a) cap the trunk fold near the
-  dig's magnitude and take the remaining reach from the arm, so the body crouches instead of
-  tipping; (b) TILT the jar at the surface so its mouth is the thing the player sees going
-  under, with the vessel never fully submerged; (c) give the fill a visible consequence at
-  the surface — a ring, a disturbance — so the act is legible even where the vessel is not.
-  Whatever is chosen, the frame `verification/1065-carrier-dips-at-the-waterline.png` shows
-  it to a reader who was told nothing.
-  VERIFIABLE: the pose layer covers the fold's bound and the arm's reach; the picture is
-  judged on both backends by a reader who is told only "what is this man doing?".
-  RENUMBERED 10.09.2026: the half this point unblocks left 1065 and is now point 1087. The
-  frame named below was taken on feat/1065-teaching-hands-touch and still shows what it shows.
-  Refs: src/render/gesture.ts (`fillPose`, `digPose`), src/scenes/place/PlaceLife.tsx (the
-  jar geometry), scripts/verify/polish.mjs (the `adult-errands` fill frame), design.md
-  §13.4, point 1065.
-  Bundle: Dorfleben.
-
 - [ ] 1103. On WebGL 2 the distant village is not in the picture at all.
   MEASURED 11.09.2026 on a quiet machine, by reading the two lanes of point 1086's covering
   runs against each other rather than by any red — the check that owns the frame passes on
