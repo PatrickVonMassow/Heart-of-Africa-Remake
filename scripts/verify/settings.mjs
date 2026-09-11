@@ -776,10 +776,10 @@ check('the speech slider is the only one that silences it, and the bed stays up'
 }
 
 // --- TRAA toggle (design.md §2.7; CLAUDE.md §7.1 pt. 32) ----------------------
-// TRAA is the default; toggling rebuilds the post pipeline (velocity MRT,
-// MSAA off ↔ MSAA on). Headless this exercises the WebGL 2 fallback only —
-// the WebGPU path passed its supervised manual check. Assert the scene keeps
-// rendering a non-black frame without new console errors on both paths.
+// TRAA is the default; toggling rebuilds the post pipeline and adds/removes
+// the velocity MRT. Both modes keep half-float targets single-sampled.
+// Assert the scene keeps rendering a non-black frame without new console
+// errors on either backend lane.
 if (section('traa-toggle')) {
   await ensureTravel()
   const errsBeforeTraa = errors.length
@@ -795,8 +795,8 @@ if (section('traa-toggle')) {
     errors.slice(errsBeforeTraa).join(' | ').slice(0, 300))
   await page.evaluate(() => window.__ui.getState().setTraaEnabled(false))
   await page.waitForTimeout(1500)
-  const msaaMean = await meanLuma(await capturePixels(page, 'MSAA path mean luma'))
-  check('TRAA off again: MSAA path renders non-black', msaaMean > 8, `mean ${msaaMean.toFixed(1)}`)
+  const traaOffMean = await meanLuma(await capturePixels(page, 'TRAA off path mean luma'))
+  check('TRAA off again: scene renders non-black', traaOffMean > 8, `mean ${traaOffMean.toFixed(1)}`)
   check('TRAA off again: no new console errors', errors.length === errsBeforeTraa,
     errors.slice(errsBeforeTraa).join(' | ').slice(0, 300))
 
@@ -890,18 +890,17 @@ if (section('traa-toggle')) {
   check('TRAA toggle stress: no new console errors', errors.length === errsBeforeTraa,
     errors.slice(errsBeforeTraa).join(' | ').slice(0, 300))
 
-  // The TRAA scene pass must be single-sampled: an omitted samples option
-  // inherits the renderer's MSAA (4, antialias: true), whose multisampled
-  // depth breaks TRAA's history copy with per-frame WebGPU validation errors
-  // (invisible on the WebGL 2 fallback, so asserted structurally here).
+  // Both scene-pass modes must be single-sampled: omitting samples inherits
+  // renderer MSAA (4), which some adapters refuse for our half-float MRT.
+  // TRAA also needs single-sampled depth for its history copy.
   await page.evaluate(() => window.__ui.getState().setTraaEnabled(true))
   await page.waitForTimeout(800)
   const traaSamples = await page.evaluate(() => window.__scenePass.renderTarget.samples)
   await page.evaluate(() => window.__ui.getState().setTraaEnabled(false))
   await page.waitForTimeout(800)
-  const msaaSamples = await page.evaluate(() => window.__scenePass.renderTarget.samples)
-  check('TRAA scene pass renders single-sampled (MSAA pass keeps 4)',
-    traaSamples === 0 && msaaSamples === 4, `traa ${traaSamples}, msaa ${msaaSamples}`)
+  const traaOffSamples = await page.evaluate(() => window.__scenePass.renderTarget.samples)
+  check('Scene pass stays single-sampled with TRAA on and off',
+    traaSamples === 0 && traaOffSamples === 0, `traa on ${traaSamples}, off ${traaOffSamples}`)
 }
 
 // --- Graphics quality levels (design.md §21, F9 / point 276 part B) ------------
