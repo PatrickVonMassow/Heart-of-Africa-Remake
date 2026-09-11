@@ -48,8 +48,8 @@ do not create a monolith.
 
 ## 5. Commands
 
-Choose Vitest-only, SMALL, or LARGE by the changed behavior; the tier map is
-`scripts/verify/tiers.mjs`. The closing always runs LARGE.
+Choose tier suites by changed behavior (`scripts/verify/tiers.mjs`).
+Run both-backend LARGE once per bundle and at closing.
 
 Use Vitest (jsdom) for logic, state, and HUD behavior assertable without a
 browser; use Playwright only for scene, geometry, CSS/layout, audio, screenshot,
@@ -60,8 +60,8 @@ strategy and suite map: `scripts/verify/README.md`.
 
 - Each work-order point uses its own `feat/<point>-<slug>` branch from `main`,
   in small self-contained commits. Commit atomically and push after every
-  commit; report a failed push. Merge only when complete and test-green, with
-  the rendered picture checked on both backends for a backend-sensitive change
+  commit; report a failed push. Merge only when complete and test-green, after
+  its tier suites and picture check on both backends for a backend-sensitive change
   and one otherwise (`isBackendSensitivePath`). Re-test conflicts that touched
   code.
 - **The merge ends the branch:** remove its local branch, remote branch, and

@@ -23,7 +23,7 @@ npm test              # full (LARGE) regression: build + lint + test-types + vit
 npm run test:small    # build + lint + vitest, then the SMALL everyday browser gate (no preview)
 npm run test:large    # == npm test (explicit LARGE)
 npm test -- unit      # just the vitest stage, via the full runner
-npm test -- flow      # just the named browser suite(s) (dev server managed for you)
+npm test -- flow      # just one named browser suite (dev server managed for you)
 ```
 
 `npm test` runs, in order: type-check + build → lint → **vitest (fail-fast)** →
@@ -298,11 +298,37 @@ single case that legitimately needs longer gets **its own** explicit timeout
 values, and a deliberately hanging case that must still be failed rather than
 stall the suite, are pinned by `src/test/vitestConfig.test.ts`.
 
+### Keep development runs narrow (point 1104)
+
+`run-logged.mjs` refuses multiple named suites without a section unless the
+command explicitly names `small` or `large`. During development, use one suite,
+or `npm test -- polish --section=adult-errands`. The section name attaches to
+`--section=`; `adult-errands --section=` is refused before starting a run.
+
+For the same HEAD, suite and section, the wrapper returns the last green
+receipt in `local/verify-logs/`: `already green N min ago, receipt <path>`.
+Backend and additional runner flags must match too. An uncommitted tree cannot
+reuse a HEAD-only receipt. `--again` requests a fresh run. Reuse never creates
+coverage: a section receipt remains partial, and a full suite needs its own
+unfiltered receipt.
+
+Before launching a suite, the wrapper waits for a live LARGE wrapper in any
+worktree. It prints one line with that process's pid and command and resumes
+when the process exits. LARGE children (including nested baseline passes) do
+not wait on their enclosing run. Simultaneous LARGE launches are ordered to
+avoid mutual waiting. `--again` does not bypass this; the operator escape is
+`VERIFY_NO_WAIT=1`. The process table is the mechanism, with no shared ledger.
+
+A running LARGE's structured `CANDIDATE REAL FAILURE` verdict ends its declared
+in-flight wait immediately. The owner evaluates the red and its relationship
+to the diff; neither the lease clock nor continuing suite output justifies
+waiting past that signal. This does not kill the runner or classify the red.
+
 ### Regression tiers (point 173)
 
-The browser suites split into two selectable tiers, so a change can be gated at
-the right cost (the regression-tiers rule: per task, pick Vitest-only /
-Vitest+SMALL / Vitest+LARGE; the **closing cycle ALWAYS runs LARGE**):
+Each point lands after the full fast gates, its covering tier suites and the
+picture check. The **both-backend LARGE runs once per bundle and at closing**,
+not once per point. Choose the covering suites from the tier map below:
 
 | Tier | Command | Backend | Browser suites | Preview | What it really costs |
 |------|---------|---------|----------------|---------|----------------------|
@@ -1276,8 +1302,7 @@ failure there stops before WebGPU.
 **The everyday lane is WebGPU; WebGL 2 is the regression lane.** With no
 `VERIFY_GL` pinned, `npm run test:small` and a bare suite filter
 (`npm test -- polish`) come up on WebGPU — the PLAYER's backend. WebGL 2 is what
-every LARGE run covers, and LARGE is not rare: it is mandatory on a scene core,
-at roughly every fourth point as a collective gate, and before every closing.
+every LARGE run covers: run it once per bundle and before every closing.
 
 The evidence for the direction: the work order records **no** defect that showed
 on WebGL 2 alone. Every one-backend defect ran the other way — point 334 (the
