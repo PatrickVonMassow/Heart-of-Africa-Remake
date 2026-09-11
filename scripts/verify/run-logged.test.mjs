@@ -22,7 +22,7 @@ function runShow(args, logDir) {
     windowsHide: true,
     encoding: 'utf8',
     timeout: 20_000,
-    env: { ...process.env, VERIFY_LOG_DIR: logDir },
+    env: { ...process.env, VERIFY_LOG_DIR: logDir, VERIFY_NO_WAIT: '1' },
   })
 }
 
@@ -143,7 +143,7 @@ describe('run-logged default launch — the run-identity re-exec (point 700, Sol
         windowsHide: true,
         encoding: 'utf8',
         timeout: 60_000,
-        env: { ...process.env, VERIFY_LOG_DIR: relDir, HOA_ACTIVITY_JOURNAL_PATH: join(dir, 'activity.jsonl') },
+        env: { ...process.env, VERIFY_NO_WAIT: '1', VERIFY_LOG_DIR: relDir, HOA_ACTIVITY_JOURNAL_PATH: join(dir, 'activity.jsonl') },
       })
       expect(res.status, res.stderr).toBe(1) // the shim forwards the child's exit code
       expect(res.stdout).toContain('── tool error digest ── run-logged verify digest')
@@ -194,7 +194,7 @@ describe('run-logged default launch — the run-identity re-exec (point 700, Sol
         const shim = spawn(process.execPath, [WRAPPER, 'world', '--section=__no_such_section__'], {
           windowsHide: true,
           stdio: 'ignore',
-          env: { ...process.env, VERIFY_LOG_DIR: relDir, HOA_ACTIVITY_JOURNAL_PATH: join(dir, 'activity.jsonl') },
+          env: { ...process.env, VERIFY_NO_WAIT: '1', VERIFY_LOG_DIR: relDir, HOA_ACTIVITY_JOURNAL_PATH: join(dir, 'activity.jsonl') },
         })
         const closed = new Promise((resolvePromise) =>
           shim.on('close', (code, signal) => resolvePromise({ code, signal })),

@@ -63,6 +63,7 @@ import { ACTIVITY_EVENTS } from '../batch-activity-journal-core.mjs'
 import { budgetToolOutput } from '../tool-output-budget-core.mjs'
 import { developmentRunRefusal, parseRunLoggedArgs } from './run-logged-args.mjs'
 import { cleanWorktree, findGreenReceipt, formatCachedGreen } from './run-green-cache.mjs'
+import { waitForLargeRun } from './large-run-wait.mjs'
 import { LADDER_STATUS, formatLadderRefusal } from './ladder-core.mjs'
 import { ladderCheck } from './ladder.mjs'
 
@@ -498,7 +499,10 @@ else {
       again: own.again, clean: cleanWorktree(ROOT),
     })
     if (cached) console.log(formatCachedGreen({ ...cached, path: forDisplay(cached.path) }))
-    else if (own.logFile) runVerify()
-    else reexecWithLogPath()
+    else {
+      await waitForLargeRun()
+      if (own.logFile) runVerify()
+      else reexecWithLogPath()
+    }
   }
 }
