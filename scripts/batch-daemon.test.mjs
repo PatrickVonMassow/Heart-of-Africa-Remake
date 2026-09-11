@@ -347,12 +347,18 @@ describe('the daemon lifecycle in the sandbox', () => {
   }, 25_000)
 
   it('cancels the attempt, preserves the branch, and journals the last pushed SHA', async () => {
-    const tip = git(['rev-parse', 'feat/stub'], originDir)
     const cancelled = await request('cancel-attempt', { attemptId: 'a1', requestId: 'cx-1', reason: 'drill over' })
     expect(cancelled.ok, cancelled.reason).toBe(true)
     expect(cancelled.result.branchPreserved).toBe(true)
-    await sleep(300)
-    expect(git(['rev-parse', 'feat/stub'], originDir)).toBe(tip)
+    // The tip is read AFTER the cancel returned, exactly as the fencing case
+    // above reads its tip after the fencing. Read BEFORE the request it races
+    // the stub worker's own push interval: the branch then moves legitimately
+    // between the two lines, and CI went red on precisely that (run 34543882226,
+    // 10.09.2026, green on this machine). What this case proves is that a
+    // CANCELLED worker pushes no more — measured from the moment it was cancelled.
+    const tipAtCancel = git(['rev-parse', 'feat/stub'], originDir)
+    await sleep(2500) // two stub work intervals: time enough for an uncancelled worker to push again
+    expect(git(['rev-parse', 'feat/stub'], originDir)).toBe(tipAtCancel)
     // The on-disk lease was REVOKED before any signal: even a worker that had
     // resisted its signals would find every further push fenced, and the dead
     // worker probes gone before anything was released.
