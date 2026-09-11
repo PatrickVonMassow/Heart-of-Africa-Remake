@@ -357,6 +357,12 @@ describe('the daemon lifecycle in the sandbox', () => {
     // 10.09.2026, green on this machine). What this case proves is that a
     // CANCELLED worker pushes no more — measured from the moment it was cancelled.
     const tipAtCancel = git(['rev-parse', 'feat/stub'], originDir)
+    // AND THE JOURNALLED SHA IS THE PROMISE IN THIS CASE'S NAME, which nothing
+    // checked. Both branch reads happen after the cancel, so a record holding a
+    // STALE sha — the worker pushed once more while it was being stopped and
+    // died before writing its status — satisfied every assertion here. The
+    // record must name the tip that actually stands.
+    expect(cancelled.result.lastPushedSha).toBe(tipAtCancel)
     await sleep(2500) // two stub work intervals: time enough for an uncancelled worker to push again
     expect(git(['rev-parse', 'feat/stub'], originDir)).toBe(tipAtCancel)
     // The on-disk lease was REVOKED before any signal: even a worker that had
