@@ -568,8 +568,10 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 - **Die gemessene Dauer von damals tötet den gesunden Lauf von heute.** Die Prüfung wächst weiter,
   ihre hinterlegte Erwartung nicht — und das Werkzeug erklärt einen rechnenden Lauf für hängend.
-  → *Prompt:* „‚Hängt, abbrechen‘ darf nie allein auf einer hinterlegten Dauer stehen: Solange der
-  Prozess **rechnet** und sein Protokoll **wächst**, hängt er nicht."
+  → *Prompt:* „‚Hängt, abbrechen‘ darf nie allein auf einer hinterlegten Dauer stehen, und ein
+  **stilles Protokoll** ist kein Stillstand — viele Läufe schreiben erst je fertigem Abschnitt.
+  Lies, was der Lauf **sonst** erzeugt: Dateien, Kindprozesse, Stände. Drucken Plan **und**
+  Messung nebeneinander, muss dabeistehen, **welche** die Abbruchschranke benutzt."
 
 - **Die Schranke verlangt genau das, was gerade entsteht.** Sie lässt nicht aufhören, solange
   ein Nachweis fehlt — und der Nachweis ist der Lauf, der noch zwei Stunden braucht.
@@ -595,15 +597,6 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   dann auf die rote, weil eine Aufgabe nur ganz fertig wird — gespart hat das nichts.
   → *Prompt:* „Bündle nur, wenn beide Hälften **plausibel im selben Lauf** grün werden; bleibt
   eine wiederholt rot, **trenne sie wieder** und liefere die fertige aus."
-
-- **Das Urteil über den Lauf schlägt die Beweise des Laufs.** Ein Werkzeug sagt „das hängt",
-  und die Zahl dahinter stammt aus einer anderen Tabelle als die gemessene Dauer, die direkt
-  daneben steht. Wer dem Urteil folgt, beendet gesunde Arbeit — und merkt es nicht, weil der
-  Log bauartbedingt schweigt, solange der Lauf noch im ersten Abschnitt steckt.
-  → *Prompt:* „Bevor du etwas Laufendes **beendest**, lies die Belege, die es **selbst**
-  erzeugt: geschriebene Dateien, lebende Kindprozesse, wandernde Stände. Ein stiller Log ist
-  **kein** Stillstand. Und wo ein Werkzeug Plan **und** gemessene Spanne nebeneinander druckt,
-  muss es sagen, **welche** seine Abbruchschranke benutzt."
 
 ---
 

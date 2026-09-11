@@ -15647,8 +15647,23 @@ to land than a mechanism that needs a review.
   path. The plan text names the observed median where one exists.
   Refs: scripts/verify/run-wait-core.mjs (HUNG_FACTOR, the plan text), docs/picture-check-cost.md
   §1 and §7, scripts/verify/run-wait.mjs.
+  IT HAPPENED A SECOND TIME THE SAME DAY, 11.09.2026 at 17:29, and the repetition adds one
+  requirement this point did not have. A fresh session adopted the covering `polish` run on
+  `main` for the landed point 1106, was told "HUNG — 19m 25s is past 2.5x this run's
+  expectation; end the run rather than waiting again", and killed it. Its receipt then read
+  "35 frames written, failing: none", and orphaned vite and chrome processes stayed behind.
+  The reason the session had nothing to weigh against the verdict is that the RUN LOG WAS
+  SILENT: eight lines, stopping after "starting dev server", because the suite writes per
+  COMPLETED SECTION. So the liveness test everybody reaches for — "the process is computing
+  and its log is growing" — reads a working run as dead for as long as its first section
+  lasts. Final state, in addition to the above:
+  - Liveness is judged by what the run WRITES, not only by its log: frames on disk, live child
+    processes, the dev server answering. Where the verdict cannot see those, it says so instead
+    of commanding an end.
+  - Ending a run takes its children with it: no orphaned dev server, no orphaned browser.
   Criticality: high — the rule does not merely mislead, it instructs the session to destroy
-  running work, and the batch pays for the killed run twice.
+  running work, and the batch pays for the killed run twice. It has now done so twice in one
+  day, to both backends.
   Bundle: Session- & Repo-Hygiene.
 
 - [ ] 1100. A verification for a just-landed point can publish no board at all (measured
@@ -15778,34 +15793,4 @@ to land than a mechanism that needs a review.
   independent load verdict), CLAUDE.md §7.2.
   Criticality: HIGH — it blocked a finished, reviewed point from landing and cost a full gate
   run, and it will do so again on any busy machine.
-  Bundle: Testinfrastruktur.
-
-- [ ] 1112. `run-wait` declares every real `polish` run HUNG at about fourteen minutes,
-  because its expectation comes from a different table than its own measured band.
-  MEASURED 11.09.2026. `node scripts/verify/run-wait.mjs --plan polish` prints BOTH numbers
-  in the same block: "expected: 5m 41s (measured medians, docs/picture-check-cost.md §1)"
-  and, one line below, "observed: 9.9-61.5 min (median 55.2) over 6 run(s), whole `polish`,
-  one backend — 09.09.2026, docs/picture-check-cost.md §7". The HUNG verdict is computed
-  from the SMALLER one: 2.5x of 5m 41s is about 14 min, against a suite whose own measured
-  median is 55 min. So a healthy `polish` pass is declared hung roughly a quarter of the way
-  through, every single time.
-  WHAT IT COST. On this date the covering run for the landed point 1106 was killed on that
-  verdict after 19m 33s. Its receipt then read "35 frames written, failing: none" — the run
-  was working; the log stood at 8 lines only because it writes per completed section. The
-  verdict destroyed a covering run and left orphaned vite and chrome processes behind.
-  Final state:
-  - The hung threshold is derived from the band the same command already prints for the same
-    suite, not from a table that disagrees with it. Where the two sources disagree, the wider
-    one decides how long the run may take.
-  - The `--plan` output no longer states two contradicting expectations as equals: it says
-    which one the wait and the HUNG verdict actually use.
-  - A run that is still writing evidence — frames on disk, live child processes — is not
-    declared hung on elapsed time alone, or the verdict names that it did not look.
-  - Ending a run leaves no orphans: the dev server and the browser go with it.
-  Test. Vitest: the threshold for a suite whose §1 median and §7 band disagree is taken from
-  the band; a run inside its band is not hung; the plan text names the source it used.
-  Refs: scripts/verify/run-wait.mjs, docs/picture-check-cost.md §1 and §7,
-  local/verify-logs/2026-09-11T15-09-56-009-polish.log (the killed run).
-  Criticality: HIGH — it instructs every session to kill healthy covering runs, and it did so
-  once already; the picture proof is what the work order is judged by.
   Bundle: Testinfrastruktur.

@@ -6677,6 +6677,19 @@ die eigene Messreihe widerspricht. Und wo neben dem Modellwert eine Messung steh
 Messung die Zahl, mit der gerechnet wird; der Modellwert ist ihr Boden, nicht ihr Maß. Gebucht
 als Punkte 1101 und 1099.
 
+**Nachtrag, 17:29 desselben Tages — dieselbe Diagnose, derselbe Gehorsam, die andere Bahn.**
+Eine frische Sitzung übernahm den deckenden `polish`-Lauf des gelandeten Punktes 1106, bekam
+nach 19m 25s denselben Satz und tötete ihn ebenfalls. Die Quittung las sich danach »35 Bilder
+geschrieben, failing: none«. Was diese Wiederholung dem Befund hinzufügt, ist der Grund, warum
+der Sitzung nichts zum Gegenhalten blieb: Das Protokoll war STILL — acht Zeilen, Abbruch nach
+»starting dev server« —, weil die Suite erst je FERTIGEM Abschnitt schreibt. Damit fällt auch
+die naheliegende Gegenprobe aus, die §3.249 noch als Rettung nennt (»solange der Prozess
+rechnet und sein Protokoll wächst, hängt er nicht«): Ein arbeitender Lauf liest sich für die
+Dauer seines ersten Abschnitts wie ein toter. Die Lebendigkeit gehört an das, was der Lauf
+ERZEUGT — geschriebene Bilder, lebende Kindprozesse, ein antwortender Entwicklungsserver —,
+nicht an die Zeilen, die er dabei über sich selbst schreibt. Nachgetragen in Punkt 1099; ein
+zweiter Punkt dafür wurde geschrieben und wieder verworfen, weil 1099 ihn schon trug.
+
 ### 3.264 Eine Erzwingung, die das Ende nennt, wird als nächster Schritt gelesen
 
 Am 09.09.2026 hat eine Sitzung den vollen Durchlauf als Debug-Schleife benutzt: vier Läufe,
@@ -6700,34 +6713,3 @@ und teuer gilt, gehört sie dorthin, wo Läufe gestartet werden, nicht in den W�
 Der Wächter kann nur den Schluss bewerten, der Starter kann die Reihenfolge halten. Gebucht
 als Punkt 1086, der die Verweigerung in `scripts/verify/run-logged.mjs` legt und die
 Bildschranke ihren eigenen Zeitpunkt aussprechen lässt.
-
-### 3.266 Ein abgeleitetes Urteil schlug die Beweise, die der Lauf selbst schrieb
-
-Am 11.09.2026 übernahm eine frische Sitzung einen laufenden deckenden Politur-Lauf. Das
-Wartewerkzeug meldete nach 19 Minuten „HUNG — 19m 25s ist über dem 2,5-fachen der Erwartung
-dieses Laufs; beende ihn, statt erneut zu warten". Ich habe genau das getan. Die Quittung
-sagte danach, was der Log nicht sagen konnte: 35 geschriebene Bilder, „failing: none". Der
-Lauf arbeitete; sein Log stand nur bei acht Zeilen, weil er erst je abgeschlossenem Abschnitt
-schreibt.
-
-Der Fehler steckt nicht im Werkzeug allein, sondern in der Art, wie ich seine Ausgabe gelesen
-habe. Dasselbe Kommando druckt zwei Erwartungen direkt untereinander: „expected: 5m 41s"
-aus §1 der Kostentabelle und „observed: 9,9-61,5 min (Median 55,2)" aus §7 derselben Datei.
-Die HUNG-Schranke rechnet mit der kleineren — 2,5 × 5m 41s sind rund 14 Minuten für eine
-Suite, deren eigener gemessener Median bei 55 Minuten liegt. Beide Zahlen standen vor mir,
-und ich habe die gelesen, die zum Abbruch führte, ohne zu bemerken, dass die Zeile darunter
-ihr widerspricht.
-
-Das ist die eigene Klasse: Ein ABGELEITETES Urteil („hängt") tritt mit derselben Autorität
-auf wie eine Messung, obwohl es auf einem Parameter ruht, den niemand gegen die Messung
-daneben geprüft hat. Und es erscheint genau dann, wenn die widersprechende Evidenz teurer zu
-lesen ist als das Urteil: Die geschriebenen Bilder auf der Platte und die lebenden
-Renderer-Prozesse hätten den Lauf in einem einzigen Aufruf entlastet — ich habe stattdessen
-den Log gelesen, der bauartbedingt schweigt, und das Urteil, das sich selbst bestätigt.
-
-**Lehre:** Bevor etwas Laufendes auf ein Urteil hin beendet wird, wird die Evidenz gelesen,
-die das Laufende SELBST erzeugt — geschriebene Dateien, lebende Kindprozesse, wandernde
-Branch-Spitzen —, nicht nur sein Log und nie nur das Urteil über es. Und wo ein Werkzeug
-Plan und gemessene Spanne nebeneinander druckt, gehört seine Abbruchschranke auf die
-gemessene Spanne; zwei widersprechende Erwartungen dürfen nicht gleichrangig nebeneinander
-stehen, ohne zu sagen, welche gilt. Gebucht als Punkt 1112.
