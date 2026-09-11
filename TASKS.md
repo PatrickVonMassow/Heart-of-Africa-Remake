@@ -77,6 +77,133 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
+- [ ] 1106. The arriving runner names ROCK with its hand ON the far stone, never from the
+  air (user 11.09.2026, bug report hoa-state-2026-09-11-3791639114).
+  WHAT THE USER SAW. Bambara village, seed 3791639114, production build 72114fb on WebGPU: a
+  child stands upright about a metre off a play rock, one arm held out horizontally toward
+  it, hand in the air, with ROCK over its head — "Die Hand des Kindes beruehrt nach wie vor
+  nicht den Stein". The tap of point 1065 is NOT the failing moment: its verification frame
+  (verification/1065-tapping-child-at-its-rock.png) shows the leaning tapper with its hand on
+  the flank, and the reported picture shows no lean and a horizontal arm, which is the
+  `indicate` gesture. The bank game offers ROCK at THREE moments
+  (`src/scenes/place/bankGame.ts`): the tap (`moment: 'tap'`, gesture `touch`, solved against
+  the drawn flank — the only one 1065 fixed), the runner's ARRIVAL at the far rock
+  (`moment: 'arrival'`, ~line 1728: fired the frame `dist(c, farRock) <= cfg.reachDistance`,
+  gesture `indicate`, arm aimed at the rock's centre from 2.2 m off it), and the climber on
+  the boulder (`moment: 'boulder'`, spoken standing ON the stone). The arrival is what the
+  user photographed: `reachDistance` is 2.2 m from the rock's CENTRE (`balance.ts` ~1307,
+  "past the 1.2 m collider plus a child's footprint"), so the body stops a metre outside the
+  flank and the aimed hand ends 60-100 cm short of it, every run, for every runner that gets
+  through. design.md §13.4 rules it out in one sentence: "A teaching hand TOUCHES what it
+  names … and a stone out of reach is named by nobody."
+  FINAL STATE.
+  - The arrival ROCK follows the tap's rule. The word is offered only when `touchReach`
+    measured from the runner's ACTUAL spot lands on the drawn flank (`|gap| <= TOUCH_GAP`),
+    with gesture `touch` and the solved arm (`arm: { bearing: 0, elevation }`, the child
+    facing the stone), exactly as `startRun` does for the tapper. No ROCK with an `indicate`
+    gesture is ever spoken at a play rock.
+  - The runner therefore goes ON to the stone. Being SAFE (`c.arrived`, out of the catchers'
+    reach) may still be granted at `reachDistance`, so the catch rule and the run's timing are
+    untouched; but the WORD waits until the child has walked the last metre to a touch stand
+    on the flank. `touchStand` today takes its approach side from the OTHER rock; it needs the
+    runner's own approach bearing (a bearing argument), and it must respect `world.blocked` as
+    it already does. A runner whose flank cannot be reached (blocked, `null`) arrives SILENTLY
+    rather than naming the stone from the air — the same rule as the blocked tap.
+  - The hand rests a readable moment: an arrival hold (calibratable seconds in
+    `src/config/balance.ts`, beside `tapPauseSeconds`) during which the runner stands with its
+    hand on the stone before stepping into the line for the next run. Several runners arriving
+    at once take stands at distinct bearings on the flank, or wait their turn; none stands
+    inside another.
+  - The boulder moment stays as it is (the child stands on the stone it names); record it as
+    reviewed, not changed.
+  - `reachDistance`'s doc line ("how near a rock's centre counts as touching it") is reworded
+    to what it is: the arrival/safe radius, not a touch.
+  TESTS.
+  - Vitest (`bankGame.test.ts`): over a full cycle on the bambara stage, every ROCK utterance
+    offered at a play rock (moments `tap` and `arrival`) carries gesture `touch` and a
+    `touchReach` gap <= `TOUCH_GAP` measured at the speaker's own x/z at the moment of the
+    offer; a run whose far flank is blocked produces an arrival without a ROCK; the arrival
+    hold has the configured length.
+  - Browser (`scripts/verify/polish.mjs`, the 1065 section): the `__placeTapHand` reading is
+    extended to the arrival hold (or given a sibling), read from the word to the far side of
+    the hold as the tap is, worst reading <= 6 cm; frame
+    `verification/1106-arriving-runner-hand-on-the-far-stone.png`, subject declared: the
+    arriving runner with its hand on the far play rock while it names ROCK.
+  EVIDENCE TO START FROM: local/hoa-state-2026-09-11-3791639114.zip (copied from
+  /backup/hoa/local by the owner; the reporting session could not write local/), its PNG, and
+  the overlay entry `span.syllables ROCK` at x 1016 / y 628 over the child.
+  MOVED TO THE FRONT on filing, 11.09.2026, under the standing release order: it touches the
+  communication mechanic and it is a bug that keeps the user from reaching it in play.
+  Criticality: HIGH (a teaching moment contradicts design.md §13.4 on every run;
+  user-reported twice).
+  Bundle: Dorf & Kommunikation.
+
+- [ ] 1107. After its one tag a catcher stops playing and stands beside the child it caught.
+  USER REPORT 11.09.2026. For the rest of the run the catcher neither chases nor returns; it
+  simply stays where its prey went down, which reads as a broken actor rather than as a rule.
+  THE CAUSE IS AN EXPLICIT RULE, not a bug in the walk: `src/scenes/place/bankGame.ts` sets
+  `madeTag` (~L1759) and from then on drives that catcher with no target (~L1707) until
+  `endRun`. It was introduced deliberately by the rescue commit a39dfd912 (03.09.2026) so a
+  catcher could not sweep a bunched group and starve the ROCK arrival call, and
+  `bankGame.test` pins the effect it was bought for ("lets a typical first run tag one or two
+  children and bring the rest home"). `docs/communication-poc-spec.md` (L97-108) does not
+  carry the rule at all: it says only that the caught child drops out where he stands.
+  DECIDED ON FILING (11.09.2026), recommendation recorded for veto: keep the one-tag rule —
+  it is what protects the arrival call the whole teaching hangs on — and fix what the user
+  actually sees by WALKING THE CATCHER BACK TO ITS ROCK instead of leaving it standing at the
+  prey. The alternative considered and not taken was letting the catcher resume after a short
+  hold, which puts the sweep problem back and would have to be solved a second time
+  elsewhere.
+  Final state:
+  - A catcher that has made its tag walks back to its own rock and waits there until
+    `endRun`, rather than standing beside the caught child. It takes no further target.
+  - `docs/communication-poc-spec.md` states the one-tag rule and this return, so the next
+    reader finds the rule where the game's behaviour is described.
+  - `bankGame.test.ts` keeps the run-outcome case it already has and adds one: after a tag,
+    the catcher's distance to its own rock falls over the remaining run and it tags nobody
+    else.
+  - Browser evidence: a frame of the moment after a catch showing the caught child down and
+    the catcher on its way back, subject declared.
+  Criticality: medium — it is player-visible on every run that produces a catch, and it
+  misreads as a dead actor, but the teaching itself still completes.
+  Bundle: Dorf & Kommunikation.
+
+- [ ] 1108. The fill's proof frame measures its neighbours BEFORE they walk, so a green suite
+  can still certify a picture with no readable subject.
+  MEASURED 11.09.2026 on main at 72114fb3, in the covering runs of point 1085 on BOTH lanes:
+  `polish` reported 255 pass, 0 fail, 0 console-errors — and
+  `verification/1085-village-adult-fills-a-jar.png` came back as the village square with two
+  cones overlapping the subject and a large vessel in the near field, the same unreadable
+  picture that 1085 was split off to fix. Run as a SINGLE SECTION
+  (`polish --section=adult-errands`) the very same code writes a clean frame on both lanes —
+  one figure alone on the bank — which is why nothing reported it.
+  THE CAUSE IS A STALE SNAPSHOT. In `scripts/verify/polish.mjs` the adult-errands shot reads
+  `posed.others` ONCE, before the bearing loop, and every clearance test — the angular
+  overlap test and the ray probes alike — is judged against those positions. The subject is
+  pinned by `__placeForceFill`, but the OTHER villagers keep walking their errands through
+  the loop and through the six settling frames before the shutter, so by the time the frame
+  is taken a neighbour has walked into a line that was clear when it was measured. The
+  section-only run is quiet enough that they have not moved far; the full pass, thirty
+  minutes in with the errands well advanced, is not. The code already knows this failure mode
+  for the SUBJECT — it re-reads his position and asserts "he is still standing where the
+  shutter is aimed" — and simply never asked it of anyone else.
+  Final state:
+  - The clearance the frame depends on is measured at the SHUTTER, not before it: the
+    villagers' positions are re-read immediately before `frame(...)` and the same angular
+    overlap test is asserted then, as a check that can fail.
+  - A bearing that has gone stale is re-chosen rather than shot: the search re-runs against
+    the fresh positions, and only an exhausted search reds.
+  - The check says which neighbour spoiled the line and by how much, so a future red names its
+    cause instead of leaving a reader to compare pictures.
+  - Evidence: the frame is taken in a FULL `polish` pass on both lanes, not only in the
+    section, and read by someone told nothing but "what is this man doing?".
+  WHY IT IS A POINT AND NOT A BACKLOG LINE: it permits a false approval. The suite certifies
+  a proof frame whose subject is not readable, which is exactly the vanished-subject pitfall
+  this repository recorded on 11.09.2026, and point 1087 owes a frame of this same act.
+  Criticality: medium — no player impact; it costs the picture proof its meaning, and it sits
+  directly in front of point 1087.
+  Bundle: Dorfleben.
+
 - [ ] 1103. On WebGL 2 the distant village is not in the picture at all.
   MEASURED 11.09.2026 on a quiet machine, by reading the two lanes of point 1086's covering
   runs against each other rather than by any red — the check that owns the frame passes on
