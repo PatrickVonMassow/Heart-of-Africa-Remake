@@ -843,6 +843,23 @@ export const RED_CHARGES = [
       'owns it.',
   },
   {
+    point: 1102,
+    suite: 'polish',
+    backend: 'webgl',
+    kind: 'check',
+    match: /^the drums were still speaking when the picture was taken/i,
+    why:
+      'Measured 11.09.2026 on a QUIET machine during point 1086\'s covering WebGL 2 picture run: '
+      + 'the check failed once and passed on the retry, which records the whole 56-minute pass '
+      + 'SUSPECT and covering no backend. It is the first time this check has failed in the kept '
+      + 'logs, and 1102 is the point that owns it — the frame is aimed by stopwatch and fires '
+      + 'after the drum message has already ended, which is point 521\'s defect mirrored (521 '
+      + 'shoots too EARLY after a jump; this one too LATE). Suite- and lane-scoped to what was '
+      + 'measured: nothing here excuses the same check on WebGPU, where it has never been seen. '
+      + 'The charge dies with 1102, which waits on the speaking state the game already holds '
+      + 'instead of on a duration.',
+  },
+  {
     point: 521,
     suite: 'enrichments',
     backend: 'webgl',
