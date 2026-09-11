@@ -88,3 +88,22 @@ shares are now 0.0000% (Bambara/42), 0.0084% (Bambara/2972259115), 0.0168%
 (Nubian/42), and 0.1256% (Mandinka/99). Child 3 in the reported layout has zero
 bad windows. Its remaining worst child is child 1, with one window at 43.566667 s
 (path 1.400000 m, out 0.349958 m). The burst and rescue gates also pass.
+
+## Review: the blocked-outward search
+
+Before changing any search or tolerance, replayed 78 bearing/seed cases against
+Bambara's actual flank and **all layout colliders**: both ends, -90° through
++90° from the station bearing in 15° steps, seeds 42, 3791639114 and 2972259115.
+An independent 1 mm ground search extended to the former 40 cm limit recovered
+**zero** additional stands satisfying the unchanged 2 mm contact tolerance.
+27 candidates are reachable already; 39 require more than the current 20 mm
+search to clear ground, but every one of those fails contact afterwards.
+For example, downstream at the station bearing clears at +32 mm, with a
+32.161792 mm hand gap. Upstream clears at +3 mm, with a 2.961867 mm gap.
+`rockTouchCollider.test.ts` preserves that measurement against real colliders.
+
+The proposed search expansion therefore does not repair these measured cases.
+`solveTouch` chooses the furthest touching stand; extending outward generally
+loses contact even if it finds free ground. The search and contact allowance
+have different purposes, but the search budget is not established as a defect.
+Neither it nor the contact tolerance has been changed on this hypothesis.
