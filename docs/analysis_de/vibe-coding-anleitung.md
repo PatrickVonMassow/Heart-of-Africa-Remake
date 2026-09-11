@@ -298,8 +298,7 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 - **Die teuerste Prüfung großflächig verlangt.** Bildbegutachtung, zweiter Lauf, zweites Modell
   kosten ein Vielfaches, pauschal gefordert, wo sie nichts beweisen. **Eine Regel ohne Preis ist
-  nur eine Empfehlung:** Ein Punkt verbrannte fünf rote Zwei-Stunden-Läufe an sechs Wochen
-  alten Zeitangaben.
+  nur eine Empfehlung.**
   → *Prompt:* „Verlange die teuerste Prüfung nur, wo eine Änderung abweichen kann, und schreib
   die Grenze in den prüfenden Code. An jede billigere Stufe gehört ihre **gemessene Dauer mit
   Messdatum**; ein Prüflauf druckt den Befehl mit, der ihn billig reproduziert, und was während
@@ -514,9 +513,8 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   Zug, der **beide** Auflagen erfüllt? Wenn nicht, ist nicht die Sitzung schuld."
 
 - **Die Warnung stand dreimal da und feuerte nie — sie lag unter der falschen Überschrift.**
-  Derselbe Fehler zum dritten Mal, obwohl als Absatz, Fallstrick und gemessene Regel notiert:
-  abgelegt unter seinem **Thema**, gebraucht dort, wo die widersprechende Aufforderung ankam —
-  im Wortlaut des Wächters, der zur Vorarbeit drängt.
+  Dreimal notiert, jedes Mal unter seinem **Thema** abgelegt statt dort, wo die widersprechende
+  Aufforderung ankommt.
   → *Prompt:* „Schreib die Ausnahme in den Text **dessen, der auffordert**, nicht ins thematisch
   passende Kapitel. An welcher **Stelle im Ablauf** wird eine Regel gelesen — und steht sie dort?
   Eine überlesene Regel ist nicht zu schwach formuliert, sondern falsch abgelegt."
@@ -578,9 +576,7 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   ein Nachweis fehlt — und der Nachweis ist der Lauf, der noch zwei Stunden braucht.
   Verweigerung und eigene Abhilfe laufen gegeneinander.
   → *Prompt:* „Eine Schranke, die einen Nachweis fordert, muss ‚wird gerade erstellt' als
-  eigenen Zustand **durchlassen** — sonst verbietet sie ihre eigene Erfüllung. Verweigert sie
-  trotz nachweislich gelungener Reparatur, **miss dein Arbeitsverzeichnis und bau ihren
-  Aufruf nach**: Sie urteilt über die Wurzel, aus der sie läuft."
+  eigenen Zustand **durchlassen** — sonst verbietet sie ihre eigene Erfüllung."
 
 - **Ein Rot, das bei gleichem Code kommt und geht, ist ein Befund über deine MESSUNG.** Eine
   Stichprobe aus einem langen Vorgang trifft den Defekt mal und verfehlt ihn mal.
@@ -592,12 +588,9 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „‚Grün' zählt nur, wenn die schmale Stufe **jünger als der letzte Merge** ist und
   **dasselbe misst** wie die große — sonst sagt sie selbst, dass ihr Grün nichts vorhersagt."
 
-- **Der Wächter ist gebaut, getestet und grün — und greift nicht.** Er sitzt in einer Datei, die
-  dein Ablauf gar nicht benutzt; der Befehl, den du wirklich tippst, geht daran vorbei.
-  → *Prompt:* „Bevor du eine Erzwingung für fertig erklärst: **tipp den Befehl, mit dem ihr
-  arbeitet**, und sieh ihr beim Feuern zu. Gibt es zwei Eingänge, fragen **beide**, genau einmal
-  pro Lauf. Und eine **mtime ist keine Änderung** — Auschecken und Stash-Pop bewegen sie umsonst,
-  also datiere eine saubere Datei nach dem Commit, den sie trägt."
+- **Der Wächter ist grün und greift nicht** — er sitzt in einer Datei, die euer Ablauf nie aufruft.
+  → *Prompt:* „**Tipp den Befehl, mit dem ihr arbeitet**, und sieh ihr beim Feuern zu. Zwei
+  Eingänge heißt: **beide** fragen, genau einmal pro Lauf."
 
 - **Zwei Aufgaben in eine gepackt, um einen teuren Lauf zu sparen.** Die fertige Hälfte wartet
   dann auf die rote, weil eine Aufgabe nur ganz fertig wird — gespart hat das nichts.
