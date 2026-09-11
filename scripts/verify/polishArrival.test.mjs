@@ -75,3 +75,10 @@ it('keeps a later bad contact frame in the acquired hold', async () => {
   const { checks } = await sample(readings)
   expect(checks.map((c) => c.pass)).toEqual([true, false, true])
 })
+
+it('fails all arrival evidence when an unreachable stand produces no opening', async () => {
+  const { checks, frames } = await sample([null])
+  expect(checks.map((c) => !!c.pass)).toEqual([false, false, false])
+  expect(checks[1].detail).toContain('Infinity cm over 0 readings')
+  expect(frames).toEqual([])
+})

@@ -1267,6 +1267,8 @@ describe('arriving runners name the far stone by contact', () => {
     for (let k = 0; k < 120; k++) {
       const u = stepBankGame(s, 1 / 60, CFG, STAGE, world, rand)
       if (u) said.push(u)
+      expect(s.children[1].arrival).toBeNull()
+      expect(bankChildTouching(s, 1)).toBe(false)
     }
     expect(s.phase).toBe('regroup')
     expect(s.tags).toBe(0)

@@ -147,3 +147,15 @@ sampler block with unheard-then-heard readings, a heard but missing arm, bad
 word-frame contact, later bad contact, and no audible event. This corrects the
 hearing precondition without changing the game, geometry, movement or pose.
 Full WebGPU/WebGL 2 passes and frame judgment remain the reviewer's work.
+
+## Review: an actually unreachable stand
+
+Keeping a safe runner silent when no stand can reach is intentional: it must
+not name ROCK with a hand in the air. No new failure-state mechanism was added.
+The existing blocked-flank regression now asserts on every step that no arrival
+hold exists and `bankChildTouching` is false. A sampler regression supplies no
+opening and requires all three arrival evidence checks to fail, with Infinity
+cm over zero readings and no photograph. The absence is already observable;
+it cannot silently pass the picture checks, and is distinct from the reported
+finite hold. The rotating adult-fill and settlement-visit findings are unchanged
+and remain outside this review's assigned work.
