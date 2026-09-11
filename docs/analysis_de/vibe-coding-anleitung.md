@@ -636,4 +636,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 3d13a7bb71a27ae8ef6473c5d4c2510cd6f16bca2f9cfca0d14cf4fd0e923df0 -->
+<!-- GUIDE-FINGERPRINT: 0708e037f5cdf7993834df8a89cd055a0251b2fb5c653df581d6a0fa4235663f -->

@@ -1315,12 +1315,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "1103": {
-      "at": "2026-09-11T03:37:23.291Z",
-      "why": "Die Auslieferung ist genau das, was den Defekt sichtbar macht: Wer kein WebGPU hat, landet automatisch auf dieser Bahn und bekäme ein Dorf, dessen Häuser erst auf wenige Meter auftauchen — hinter der Freigabe repariert hieße, ihn mit ausliefern.",
-      "origin": "machine",
-      "place": "ahead"
-    },
     "1105": {
       "at": "2026-09-11T08:02:02.347Z",
       "why": "It cannot wait for the release because it IS in the release picture: the low graphics level ships black on the primary backend, and its red sits inside the settings suite every point behind it must pass, where a wrong classification hides the next real failure.",
@@ -1336,12 +1330,6 @@
     "1109": {
       "at": "2026-09-11T14:06:21.099Z",
       "why": "Deine Anweisung vom 11.09.2026: 'Setze es so um, wie du es vorschlaegst. Reihe das direkt vor 1092 ein.'",
-      "origin": "user",
-      "place": "ahead"
-    },
-    "1110": {
-      "at": "2026-09-11T15:32:00.753Z",
-      "why": "Der Nutzer hat die nicht anliegende Hand des Kindes zweimal selbst gemeldet; der Punkt setzt seine Meldung um und ist damit keine Maschinen-Einreihung.",
       "origin": "user",
       "place": "ahead"
     },
@@ -1382,7 +1370,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-11T15:32:01.616Z",
+    "at": "2026-09-11T20:31:13.178Z",
     "points": [
       174,
       184,
@@ -1773,11 +1761,9 @@
       1100,
       1101,
       1102,
-      1103,
       1105,
       1108,
       1109,
-      1110,
       1111
     ]
   }
