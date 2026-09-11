@@ -572,7 +572,22 @@ export function currentBranchOf({ cwd = REPO_ROOT } = {}) {
 // The FULL probe, not the cheap one: `cheapProbePid` answers existence only (and
 // true on EPERM), so a reused pid would keep a declaration alive on a stranger's
 // process. The start time is what makes a pid an identity.
-const probes = { probePid, refTipAt, worktreeActiveAt, mtimeOf }
+/** Only the runner's structured verdict ends a LARGE wait. A quoted error,
+ * first-attempt failure or a completed/stale run is not this signal. */
+export function runFailureOf(logPath, { read = (path) => readFileSync(path, 'utf8') } = {}) {
+  try {
+    const log = absPath(logPath)
+    const record = JSON.parse(read(`${log}.run.json`))
+    const large = record.tier === 'large' || (record.tier == null &&
+      Array.isArray(record.args) && record.args.every((arg) => typeof arg === 'string' && arg.startsWith('-')))
+    if (record.status !== 'running' || !large) return null
+    return read(log).match(/^FAIL \(twice, SAME check\)\s+\S+ — CANDIDATE REAL FAILURE\s*$/m)?.[0].trim() ?? null
+  } catch {
+    return null
+  }
+}
+
+const probes = { probePid, refTipAt, worktreeActiveAt, mtimeOf, runFailureOf }
 
 /**
  * Everything the Stop hook needs, gathered. Returns the core's assessment plus

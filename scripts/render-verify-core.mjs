@@ -93,6 +93,8 @@ export const NON_RENDER_VERIFY = new Set([
   'run-all.mjs',
   'run-digest-core.mjs', // which of a run's OUTPUT lines the caller reads; it draws nothing
   'run-logged-args.mjs', // pure CLI parsing and output-line caps for the logging wrapper
+  'run-green-cache.mjs', // receipt lookup; starts no browser
+  'large-run-wait.mjs', // process-table admission; starts no browser
   'run-logged.mjs', // the logging wrapper around run-all; it spawns the runner, it does not render
   'run-record.mjs', // the run's own bookkeeping file (point 592); it counts frames, it draws none
   'run-wait-core.mjs', // the poll budget and the receipt's shape; pure arithmetic over a run
