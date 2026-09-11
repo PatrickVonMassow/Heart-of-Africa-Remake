@@ -5,7 +5,7 @@
 // and refused as recorded coverage (that half lives with the recorder's reader,
 // scripts/render-verify-core.test.mjs).
 import { describe, it, expect } from 'vitest'
-import { listNonPredictive, listSections, makeSectionGate, planSectionRun, resolveSelection, resultSection, SECTION_ENV } from './sections.mjs'
+import { sectionsForLines, listNonPredictive, listSections, makeSectionGate, planSectionRun, resolveSelection, resultSection, SECTION_ENV } from './sections.mjs'
 import { runVerdict } from '../render-verify-core.mjs'
 import { sectionTag } from '../section-tag-core.mjs'
 
@@ -323,5 +323,32 @@ describe('a declaration whose prose carries the other quote', () => {
       '}',
     ].join('\n'))
     expect(found).toEqual([{ section: 'jars', check: 'jar', why: "the suite's sampling differs" }])
+  })
+})
+
+describe('which section a changed line of a suite source belongs to', () => {
+  const SRC = [
+    "const check = (name, ok) => {}",   // 1 — the prologue every section pays for
+    "if (section('town-plan')) {",      // 2
+    "  check('a plan is drawn', true)", // 3
+    '}',                                // 4
+    "if (section('adult-errands')) {",  // 5
+    "  check('a jar is filled', true)", // 6
+    '}',                                // 7
+  ].join('\n')
+
+  it('reads the nearest declaration at or above the line', () => {
+    expect(sectionsForLines(SRC, [3])).toEqual(['town-plan'])
+    expect(sectionsForLines(SRC, [6])).toEqual(['adult-errands'])
+    expect(sectionsForLines(SRC, [3, 6])).toEqual(['town-plan', 'adult-errands'])
+  })
+
+  it('answers null for the prologue, which every section pays for', () => {
+    expect(sectionsForLines(SRC, [1])).toEqual([null])
+  })
+
+  it('is total on nothing at all', () => {
+    expect(sectionsForLines('', [])).toEqual([])
+    expect(sectionsForLines(null, [1])).toEqual([null])
   })
 })

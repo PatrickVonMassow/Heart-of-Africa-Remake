@@ -176,7 +176,14 @@ export function ladderVerdict({
     if (!path) continue
     const suites = suitesCovering(path, map).filter((s) => run.browser.includes(s))
     if (suites.length === 0) continue
-    covered.push({ path, editedAt: Number(change.editedAt) || 0, suites })
+    covered.push({
+      path,
+      editedAt: Number(change.editedAt) || 0,
+      suites,
+      // Carried through: the sections an edit to a suite's OWN source touches,
+      // when that link could be read at all (scripts/verify/ladder.mjs).
+      ...(Array.isArray(change.sections) ? { sections: change.sections } : {}),
+    })
   }
 
   const lastMerge = newest((merges ?? []).map((m) => Number(m?.at)))
@@ -232,19 +239,37 @@ export function ladderVerdict({
   const unclimbed = []
   const lying = []
   const green = []
+  const credited = []
   for (const suite of needing) {
     const since = (runs ?? []).filter(
       (r) => r && r.suite === suite && Number(r.exit) === 0 && Number(r.startedAt) >= (thresholds.get(suite) ?? threshold),
     )
+    // WHICH SECTIONS CAN STAND IN for this suite's edits. A narrow run answers
+    // only for the material it RAN, and where that link is derivable — an edit
+    // to the suite's OWN source, where a section is a block and a changed line
+    // sits in one — a run of a different section cannot stand in for it. Edit
+    // the `adult-errands` block, run only `town-plan`, and the full pass used to
+    // count as climbed although the edited material was never checked once.
+    //
+    // Where it is NOT derivable — `src/render/fauna.ts` reaches three suites and
+    // no section in particular — any narrow green of the suite still answers, as
+    // before, and the verdict NAMES the section it credited so the approximation
+    // is on the record instead of inside it.
+    const own = covered.filter((c) => c.suites.includes(suite))
+    const derivable = own.length > 0 && own.every((c) => Array.isArray(c.sections))
+    const demanded = derivable ? new Set(own.flatMap((c) => c.sections)) : null
     const liars = []
-    let honest = false
+    let honest = null
     for (const r of since) {
+      if (r.partial === true && demanded && !demanded.has(r.section)) continue
       const declared = r.partial === true ? declaresNonPredictive(nonPredictive[suite], r.section) : []
       if (declared.length > 0) liars.push({ suite, section: r.section, checks: declared.map((d) => d.check) })
-      else honest = true
+      else honest = honest ?? r
     }
-    if (honest) green.push(suite)
-    else if (liars.length > 0) lying.push(...liars)
+    if (honest) {
+      green.push(suite)
+      credited.push({ suite, section: honest.partial === true ? (honest.section ?? null) : null })
+    } else if (liars.length > 0) lying.push(...liars)
     else unclimbed.push(suite)
   }
 
@@ -290,10 +315,13 @@ export function ladderVerdict({
     )
   }
 
+  const named = credited
+    .map((c) => (c.section ? `${c.suite} --section=${c.section}` : `${c.suite} (whole suite)`))
+    .join(', ')
   return answer(
     LADDER_STATUS.CLIMBED,
-    `the cheap rung is green since ${agedBy} for ${green.join(', ')} — the ladder is climbed, not waived`,
-    { suites: green, threshold, record: { suites: green, threshold } },
+    `the cheap rung is green since ${agedBy} for ${named} — the ladder is climbed, not waived`,
+    { suites: green, threshold, record: { suites: green, credited, threshold } },
   )
 }
 

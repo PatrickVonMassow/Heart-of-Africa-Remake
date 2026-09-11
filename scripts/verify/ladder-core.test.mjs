@@ -309,6 +309,52 @@ describe('a check that declares itself non-predictive', () => {
   })
 })
 
+describe('a narrow run answers only for the material it RAN', () => {
+  // Where the link IS derivable — an edit to the suite's own source, where a
+  // section is a block and a changed line sits in one — a run of a different
+  // section cannot stand in for it. Edit the `adult-errands` block, run only
+  // `town-plan`, and the full pass used to count as climbed although the edited
+  // material was never checked once (four-eyes review, GPT-6 Astra).
+  const editedBlock = { path: 'scripts/verify/polish.mjs', editedAt: T0, sections: ['adult-errands'] }
+
+  it('does not credit a green run of a DIFFERENT section', () => {
+    const verdict = ladderVerdict({
+      run: fullPolish(),
+      map: MAP,
+      changes: [editedBlock],
+      runs: [ledgerRun({ startedAt: T0 + HOUR, partial: true, section: 'town-plan' })],
+    })
+    expect(verdict.status).toBe(LADDER_STATUS.REFUSED)
+    expect(verdict.ok).toBe(false)
+  })
+
+  it('credits the section that actually ran, and NAMES it', () => {
+    const verdict = ladderVerdict({
+      run: fullPolish(),
+      map: MAP,
+      changes: [editedBlock],
+      runs: [ledgerRun({ startedAt: T0 + HOUR, partial: true, section: 'adult-errands' })],
+    })
+    expect(verdict.status).toBe(LADDER_STATUS.CLIMBED)
+    expect(verdict.reason).toContain('--section=adult-errands')
+    expect(verdict.record.credited).toEqual([{ suite: 'polish', section: 'adult-errands' }])
+  })
+
+  it('still credits any narrow green where the link cannot be read', () => {
+    // `src/scenes/place/` reaches three suites and no section in particular, so
+    // the ladder keeps its approximation — and puts it on the record by naming
+    // the section it credited, instead of hiding it inside the verdict.
+    const verdict = ladderVerdict({
+      run: fullPolish(),
+      map: MAP,
+      changes: [edit('src/scenes/place/layout.ts', T0)],
+      runs: [ledgerRun({ startedAt: T0 + HOUR, partial: true, section: 'town-plan' })],
+    })
+    expect(verdict.status).toBe(LADDER_STATUS.CLIMBED)
+    expect(verdict.record.credited).toEqual([{ suite: 'polish', section: 'town-plan' }])
+  })
+})
+
 describe('the deliberate escape', () => {
   it('lets the run through and RECORDS what it waived', () => {
     const verdict = ladderVerdict({

@@ -319,3 +319,50 @@ export function sectionGate({ suitePath = process.argv[1], env = process.env } =
   gateBuilt = true
   return gate
 }
+
+/**
+ * WHICH SECTION EACH CHANGED LINE OF A SUITE'S SOURCE BELONGS TO (point 1086).
+ *
+ * The ladder credits a green narrow run of the suite whose material was edited.
+ * Which section covers a given edit is NOT derivable in general — an edit to
+ * `src/render/fauna.ts` reaches three suites and no section in particular — but
+ * when the edited file IS the suite's own source it is derivable exactly: a
+ * section is a block, and a changed line sits in one. Without this the measured
+ * case went uncaught, and the four-eyes round of 11.09.2026 named it: edit the
+ * `adult-errands` block, run only `town-plan`, and the full pass counted as
+ * climbed although the edited material was never checked once.
+ *
+ * A line above the first declaration belongs to the boot prologue, which every
+ * section pays for — it answers `null`, and the ladder treats that as "no
+ * section can stand in for this", i.e. every section is aged.
+ *
+ * Total: never throws; an unreadable source names no sections.
+ */
+export function sectionsForLines(source, lines) {
+  const src = String(source ?? '')
+  const masked = maskCode(src)
+  // Declaration offsets → the 1-based line they stand on.
+  const marks = []
+  for (const head of masked.matchAll(DECL_HEAD)) {
+    DECL_RE.lastIndex = head.index
+    const decl = DECL_RE.exec(src)
+    if (!decl || decl.index !== head.index) continue
+    let line = 1
+    for (let i = 0; i < head.index; i += 1) if (src[i] === '\n') line += 1
+    marks.push({ line, name: decl[2] })
+  }
+  marks.sort((a, b) => a.line - b.line)
+
+  const out = new Set()
+  for (const raw of lines ?? []) {
+    const n = Number(raw)
+    if (!Number.isFinite(n)) continue
+    let name = null
+    for (const mark of marks) {
+      if (mark.line <= n) name = mark.name
+      else break
+    }
+    out.add(name)
+  }
+  return [...out]
+}

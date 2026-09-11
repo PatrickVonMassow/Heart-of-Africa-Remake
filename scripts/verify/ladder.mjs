@@ -14,7 +14,7 @@ import { REPO_ROOT } from '../repo-paths.mjs'
 import { porcelainPaths } from '../batch-in-flight-core.mjs'
 import { parseDiffSuiteMap } from '../point-brief-core.mjs'
 import { readRenderState } from '../render-verify-state.mjs'
-import { listNonPredictive } from './sections.mjs'
+import { listNonPredictive, sectionsForLines } from './sections.mjs'
 import { LADDER_STATUS, classifyLadderRun, ladderVerdict } from './ladder-core.mjs'
 
 const ROOT = REPO_ROOT
@@ -107,9 +107,74 @@ export function editedFiles({ cwd = ROOT } = {}) {
     } catch {
       /* gone, or outside the checkout — its commit time still speaks for it */
     }
-    out.push({ path, editedAt: Math.max(mtime, committedAt) })
+    const sections = sectionsTouched(path, cwd, base)
+    out.push({ path, editedAt: Math.max(mtime, committedAt), ...(sections ? { sections } : {}) })
   }
   return out
+}
+
+/** A suite's own source file, and the suite it IS. */
+const SUITE_SOURCE = /^scripts\/verify\/([a-z0-9-]+)\.mjs$/
+/** The `+` side of a `-U0` hunk header: where the change landed. */
+const HUNK = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/
+
+/**
+ * The lines a path changed, on the branch and in the working tree. `-U0` so a
+ * hunk names the changed lines and not three neighbours on each side.
+ * Total: never throws — an unreadable diff names no lines.
+ */
+function changedLines(path, cwd, base) {
+  const lines = new Set()
+  const scan = (text) => {
+    for (const line of String(text).split('\n')) {
+      const m = HUNK.exec(line)
+      if (!m) continue
+      const start = Number(m[1])
+      // A pure DELETION hunk counts 0 and points at the line that now sits
+      // where the removed ones were: that line is what a reader sees change.
+      const count = Math.max(m[2] === undefined ? 1 : Number(m[2]), 1)
+      for (let i = 0; i < count; i += 1) lines.add(start + i)
+    }
+  }
+  if (base) {
+    try {
+      scan(git(['diff', '-U0', base, 'HEAD', '--', path], cwd))
+    } catch {
+      /* unreadable history */
+    }
+  }
+  try {
+    scan(git(['diff', '-U0', 'HEAD', '--', path], cwd))
+  } catch {
+    /* not a repository, or the path is untracked */
+  }
+  return [...lines]
+}
+
+/**
+ * THE SECTIONS AN EDIT TO A SUITE'S OWN SOURCE TOUCHES (point 1086).
+ *
+ * Attached ONLY when every changed line lands inside a declared section. A line
+ * in the boot prologue, an unreadable source, or a suite that declares no
+ * sections all answer `undefined` — and the ladder then behaves as it did
+ * before, crediting any narrow green of the suite. Conservative on purpose: this
+ * may only ever REFUSE a rung that provably did not run the edited block, never
+ * invent a refusal out of a link it could not read.
+ */
+function sectionsTouched(path, cwd, base) {
+  const suite = SUITE_SOURCE.exec(path)?.[1]
+  if (!suite) return undefined
+  let source = ''
+  try {
+    source = readFileSync(join(cwd, path), 'utf8')
+  } catch {
+    return undefined
+  }
+  const lines = changedLines(path, cwd, base)
+  if (lines.length === 0) return undefined
+  const names = sectionsForLines(source, lines)
+  if (names.length === 0 || names.includes(null)) return undefined
+  return names
 }
 
 /** The merge commits this branch carries beyond `main`. A merge brings in other
