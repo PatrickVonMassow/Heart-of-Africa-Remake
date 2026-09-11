@@ -128,8 +128,26 @@ put it is the mistake this line exists to stop.
   4. Same head + same suite + same section is not re-run: `run-logged.mjs` finds the last
      green receipt for that triple in `local/verify-logs/` and answers with it (one line,
      "already green N min ago, receipt <path>"), unless `--again` is passed.
-  5. While a LARGE runs, no other suite starts in any worktree: the existing wait-lease
-     is the gate, and a section run started against it waits rather than reddens.
+  5. While a LARGE runs, no other suite starts in any worktree, and a section run started
+     against one waits rather than reddens.
+     THE BRIEF'S CLAIM THAT THIS GATE ALREADY EXISTS IS WRONG, measured 11.09.2026 at head
+     f1b67a891: the lease in `run-logged.mjs` is a PROGRESS lease on one run RECORD, nothing
+     in `run-logged.mjs` or `run-all.mjs` reads another run's lease before launching, and the
+     lease tests permit two sessions to wait side by side on purpose. So this measure is
+     BUILT — small, and inside the runner measures 3 and 4 already change:
+     - before launching, `run-logged.mjs` looks for a LIVE `run-logged.mjs` process whose
+       argv names a LARGE tier (the same argv reading `commandNamesRun` already does) and,
+       finding one, WAITS for it to exit instead of starting beside it. It prints ONE line
+       naming that pid and its command, and proceeds the moment the process is gone.
+     - the process table is the whole mechanism: worktrees do not share `local/verify-logs/`,
+       so no shared file and no new ledger field is introduced for this.
+     - it never waits on ITSELF or on its own ancestors — a LARGE's nested suite runs and
+       `baseline-classify`'s baseline passes are children of the run that is already going.
+     - `--again` does NOT bypass it; one named escape does, for the operator who knows the
+       found run is finished work: `VERIFY_NO_WAIT=1`.
+     MEASURES 2, 3, 4 AND 6 DO NOT DEPEND ON THIS ONE and are delivered even if measure 5
+     raises a further question — a question about one measure parks that measure, never the
+     other five.
   6. LARGE per BUNDLE, not per point: CLAUDE.md §5/§6 says a point lands after its tier
      suites and the picture check; the both-backends LARGE runs once per bundle and at
      the closing. Text change only.
