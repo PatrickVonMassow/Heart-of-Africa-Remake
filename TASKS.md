@@ -15580,3 +15580,62 @@ to land than a mechanism that needs a review.
   Criticality: high — a script that prints a pass for a question it never evaluated is a false
   approval, and it was believed twice within one hour of being called.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1102. The drum picture is aimed by stopwatch and fires after the message has ended.
+  MEASURED 11.09.2026 on a quiet machine, during point 1086's covering WebGL 2 picture run:
+  `polish --section=chief-to-drummer` failed with "the drums were still speaking when the
+  picture was taken — the message had already ended at the shutter", then passed on the
+  retry. That pair is the signature this house already refuses to read as luck: a run that
+  passes the second time is recorded SUSPECT and covers no backend, so one timing race costs
+  a whole 56-minute pass. It is the first time this check has ever failed in the kept logs.
+  IT IS THE SAME SHAPE AS POINT 521, MIRRORED. 521 shoots too EARLY — a fixed wait after a
+  jump, and on a slow frame the camera has not arrived. This one shoots too LATE: the check
+  wants the drums mid-message and the message is already over when the frame is taken. Both
+  are a stopwatch standing in for a state nobody asked about.
+  Final state:
+  - The chief-to-drummer frame is taken when the drum message is PROVABLY still running —
+    the suite waits on the speaking state the game already holds, not on a duration, and the
+    check names that state in its failure text so the next reader is not guessing.
+  - If the window is genuinely short, the suite says so where it matters: either it sizes its
+    wait so both a fast and a slow frame land inside the message, or the check declares itself
+    NON-PREDICTIVE for the narrow rung (`nonPredictive(...)`, point 1086), which the ladder
+    then never credits.
+  - No retry is used as the fix. The pass must be green on the FIRST attempt, because the
+    second attempt is what makes the whole run suspect.
+  Test. Vitest over the pure half: a window whose message has ended fails, one that is still
+  running passes, and a declared non-predictive check never satisfies the ladder. Browser:
+  `npm test -- polish --section=chief-to-drummer` green on the first attempt on both lanes.
+  Refs: scripts/verify/polish.mjs (section `chief-to-drummer`), scripts/verify/sections.mjs,
+  points 521, 640, 1086.
+  Criticality: medium — it reddens no product code, but each occurrence burns a full covering
+  pass and produces a SUSPECT record that covers no backend, which is how a finished point
+  waits an extra hour.
+  Bundle: Testinfrastruktur.
+
+- [ ] 1103. On WebGL 2 the distant village is not in the picture at all.
+  MEASURED 11.09.2026 on a quiet machine, by reading the two lanes of point 1086's covering
+  runs against each other rather than by any red — the check that owns the frame passes on
+  both lanes, which is exactly why nothing reported it.
+  In `verification/101-street-village-plan.png` the hut LABELS ("Chief's Hut", "Market Hut")
+  sit at IDENTICAL screen positions on both lanes, so the camera and the world positions
+  agree — and on WebGL 2 the huts themselves are simply not drawn, leaving a pale haze where
+  WebGPU shows the street. It is not load: it reproduced on a quiet machine at 10 FPS after
+  first appearing on a busy one. It is not missing geometry either, because the CLOSE huts of
+  `151-chief-beside-his-drummer` draw correctly on the same lane in the same run. What differs
+  is DISTANCE, which points at the fog or far-plane the fallback lane gets.
+  THIS IS THE LANE THE PLAYER FALLS BACK TO. CLAUDE.md §3 makes WebGL 2 the automatic fallback
+  with a dismissible notice; a player on it would walk a village whose houses appear only when
+  they are a few metres away.
+  Final state:
+  - The far plane and the atmospheric falloff are read from ONE place for both backends, so a
+    settlement visible on WebGPU is visible on WebGL 2 from the same distance.
+  - The difference is measured, not argued: the same frame on both lanes is compared and the
+    reading recorded, so "it looks the same now" is never the evidence.
+  Test. Browser: a polish check that asserts the settlement's silhouette is present in the
+  street view on BOTH lanes — the pixels, not the labels, because the labels were present
+  throughout this defect and that is what hid it.
+  Refs: verification/101-street-village-plan.png, verification/151-chief-beside-his-drummer.png,
+  scripts/verify/polish.mjs (section `town-plan`), docs/render-architecture.md, design.md §3.
+  Criticality: high — it is a player-visible hole in the supported fallback lane, and it
+  survived every green run because the only checks over that frame read labels and overlays.
+  Bundle: Dorfleben.
