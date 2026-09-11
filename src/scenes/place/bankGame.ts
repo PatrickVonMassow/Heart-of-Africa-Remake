@@ -104,9 +104,11 @@ export interface BankUtterance {
  *  it is this run and whether it is out of play. */
 export interface BankChild extends TagChild {
   role: BankRole
-  /** Touched the far rock in the current run — safe, and out of the catchers'
+  /** Entered the far rock's safe radius in the current run, out of the catchers'
    *  reach until the next one. */
   arrived: boolean
+  /** The last metre and contact hold survive the run's side swap. */
+  arrival: { end: BankEnd; stand: { x: number; z: number }; approachFor: number; holdFor: number | null } | null
   /** Tagged: crouched where it stood, arms folded, through the readable ending
    *  when this is the cycle's last run. */
   crouched: boolean
@@ -249,14 +251,15 @@ export interface BankRoundConfig {
   runSeconds: number
   /** How long everybody holds at the stations while the catcher taps ROCK. */
   tapPauseSeconds: number
+  /** How long an arriving runner rests its hand on the far stone. */
+  arrivalHoldSeconds: number
   /** Backstop on the walk between two runs. */
   regroupSeconds: number
   /** How long the group walks toward its roaming quarter before roaming again. */
   partSeconds: number
   /** How long the caught children remain crouched after the cycle's last run. */
   endPauseSeconds: number
-  /** How near a rock's CENTRE counts as touching it. It must clear the rock's
-   *  own collider plus a child's footprint, or nobody could ever arrive. */
+  /** Arrival/safe radius from the rock's centre; hand contact is solved separately. */
   reachDistance: number
   /** Where a child waits: how far off the rock's centre its station stands. */
   standOff: number
@@ -622,7 +625,13 @@ export function bankChildCanSeparate(c: BankChild): boolean {
   // the separation works in the ground plane and knows nothing about the half
   // metre it is standing above it, so left in the set it would be shoved off
   // the boulder by whoever wandered past below.
-  return !c.crouched && !onStone(c)
+  return !c.crouched && !onStone(c) && !(c.arrival && c.arrival.holdFor !== null)
+}
+
+/** A teaching contact is solved at standing height, even on its opening frame.
+ * The runner's last gait dip must not lower the hand onto a narrower flank. */
+export function bankChildBodyLift(c: BankChild, gaitLift: number): number {
+  return c.lift + (c.arrival?.holdFor != null ? 0 : gaitLift)
 }
 
 /** A group at its spawn points, roaming. Every point must already be free — the
@@ -664,6 +673,7 @@ export function createBankGame(
       held: false,
       role: 'runner' as BankRole,
       arrived: false,
+      arrival: null,
       crouched: false,
       roamHeading: heading,
       goalX: p.x,
@@ -769,16 +779,18 @@ export const TOUCH_GAP = 0.03
  * open rather than behind the rock. The distance is solved against the stone's
  * DRAWN flank (`stage.flank`), so the child ends up at the stone however wide
  * or narrow this one is; `null` where the flank cannot be reached at all.
+ * Arrivals supply their own approach bearing instead of the other stone's.
  */
 export function touchStand(
   stage: BankStage,
   end: BankEnd,
   blocked?: (x: number, z: number) => boolean,
+  approachBearing?: number,
 ): { x: number; z: number; bearing: number; elevation: number } | null {
   const here = rockAt(stage, end)
   const far = rockAt(stage, otherEnd(end))
-  const bearing = Math.atan2(far.x - here.x, far.z - here.z)
-  const flank = (y: number) => stage.flank(end, bearing, y)
+  const bearing = approachBearing ?? Math.atan2(far.x - here.x, far.z - here.z)
+  const flank = (y: number, offset: number) => stage.flank(end, bearing + offset, y)
   const solved = solveTouch(flank, CHILD_FIGURE_SCALE)
   if (!solved) return null
   const spotAt = (stand: number) => ({
@@ -816,7 +828,7 @@ export function touchReach(
   const dx = at.x - here.x
   const dz = at.z - here.z
   const bearing = Math.atan2(dx, dz)
-  const reached = reachFrom(Math.hypot(dx, dz), (y) => stage.flank(end, bearing, y), CHILD_FIGURE_SCALE)
+  const reached = reachFrom(Math.hypot(dx, dz), (y, offset) => stage.flank(end, bearing + offset, y), CHILD_FIGURE_SCALE)
   if (!reached) return null
   return { elevation: reached.elevation, gap: reached.gap, height: reached.height }
 }
@@ -1153,6 +1165,7 @@ function advanceBankGame(
   let openedRun = false
   if (
     (s.phase === 'gather' || s.phase === 'regroup') &&
+    !s.children.some((c) => c.arrival) &&
     (s.phaseFor <= 0 || inPlace(s, stage, cfg, world, s.from, otherEnd(s.from)))
   ) {
     if (s.direction === null && s.sinceSaid >= cfg.utteranceGapSeconds) {
@@ -1162,7 +1175,7 @@ function advanceBankGame(
       openedRun = true
     }
   }
-  if (s.phase === 'part' && s.phaseFor <= 0) openRoam(s, cfg, rand)
+  if (s.phase === 'part' && s.phaseFor <= 0 && !s.children.some((c) => c.arrival)) openRoam(s, cfg, rand)
   switch (s.phase) {
     case 'roam':
       stepRoam(s, dt, cfg, stage, world, rand)
@@ -1174,7 +1187,7 @@ function advanceBankGame(
     case 'run':
       // The tap owns a visible held-standing interval, including its opening
       // frame. Only after it expires does either side charge.
-      if (openedRun || holdsTapThisStep) stepHeld(s, dt, cfg, world)
+      if (openedRun || holdsTapThisStep) stepHeld(s, dt, cfg, stage, world)
       else stepRun(s, dt, cfg, stage, world)
       break
     case 'part':
@@ -1280,7 +1293,11 @@ function drive(
     ? Math.max(floor, effortPace(c.effort, c.reserve, cfg, c.role === 'catcher' ? 'chaser' : 'runner'))
     : Math.max(0, cfg.walkPace)
   const desired = headingToward(c.x, c.z, to.x, to.z, c.heading)
-  if (c.pace > 0) moveChild(c, desired, c.pace * dt, dt, cfg, world, obstacles(i, cfg, world))
+  const occupied = obstacles(i, cfg, world)
+  const blockedByBody = (x: number, z: number) => !!occupied?.(x, z) ||
+    s.children.some((other, j) => j !== i && other.arrival?.holdFor != null &&
+      dist(other, { x, z }) < world.childRadius * 2)
+  if (c.pace > 0) moveChild(c, desired, c.pace * dt, dt, cfg, world, blockedByBody)
   trackProgress(c, dt, cfg, world)
   if (s.playing) c.walkedWhilePlaying += c.walked - walkedBefore
   c.facing = turnToward(c.facing, c.heading, cfg.turnRate * dt)
@@ -1590,6 +1607,7 @@ function stepStations(
     const c = s.children[i]
     const end = c.role === 'catcher' ? wait : line
     const slot = c.role === 'catcher' ? atWait++ : atLine++
+    if (stepArrival(s, i, dt, cfg, stage, world)) continue
     // THE TAPPER GOES TO THE STONE, not to the waiting station a stride and a
     // half off it (work-order 1065). The other children hold their stations as
     // they always did; where the stone cannot be reached at all there is no
@@ -1685,6 +1703,60 @@ function chooseQuarry(s: BankState, self: number, cfg: BankConfig): number {
     : cur
 }
 
+/** Finish a safe runner's approach without extending the run or its catch window.
+ * Occupied stands wait their turn; an obstructed approach expires silently at
+ * the regroup backstop. Only actual contact may offer the word. */
+function stepArrival(
+  s: BankState, i: number, dt: number, cfg: BankConfig, stage: BankStage, world: BankWorld,
+): boolean {
+  const c = s.children[i]
+  const arrival = c.arrival
+  if (!arrival) return false
+  if (arrival.holdFor !== null) {
+    if (arrival.holdFor <= 0) {
+      c.arrival = null
+      return false
+    }
+    arrival.holdFor = Math.max(0, arrival.holdFor - dt)
+    drive(s, i, null, false, dt, cfg, world)
+    return true
+  }
+  arrival.approachFor -= dt
+  if (arrival.approachFor <= 0 || world.blocked(arrival.stand.x, arrival.stand.z)) {
+    c.arrival = null
+    return false
+  }
+  // Reservations include children still approaching, so two runners cannot
+  // acquire overlapping holds in the same frame. Index order breaks a tie.
+  const occupied = (x: number, z: number) =>
+    !!obstacles(i, cfg, world)?.(x, z) || s.children.some((other, j) => j !== i && (
+      dist(other, { x, z }) < world.childRadius * 2 ||
+      (j < i && other.arrival && dist(other.arrival.stand, { x, z }) < world.childRadius * 2)
+    ))
+  if (occupied(arrival.stand.x, arrival.stand.z)) {
+    drive(s, i, null, false, dt, cfg, world)
+    return true
+  }
+  const reach = touchReach(stage, arrival.end, c)
+  if (reach && Math.abs(reach.gap) <= TOUCH_GAP && dist(c, arrival.stand) <= world.childRadius && !occupied(c.x, c.z)) {
+    const rock = rockAt(stage, arrival.end)
+    c.heading = Math.atan2(rock.x - c.x, rock.z - c.z)
+    c.facing = c.heading
+    c.lean = 0
+    drive(s, i, null, false, dt, cfg, world)
+    arrival.holdFor = cfg.arrivalHoldSeconds
+    say(s, {
+      concept: 'ROCK', moment: 'arrival', speaker: i, gesture: 'touch',
+      arm: { bearing: 0, elevation: reach.elevation }, hold: cfg.arrivalHoldSeconds,
+      aim: { x: rock.x, y: reach.height, z: rock.z }, at: 'rock',
+    })
+  } else {
+    const approachWorld = { ...world, occupied: (_self: number, _ignore: number, x: number, z: number) => occupied(x, z) }
+    drive(s, i, arrival.stand, false, dt, cfg, approachWorld)
+  }
+  return true
+}
+
 /** One run: the runners cross to the far rock, the catchers come to meet them. */
 function stepRun(
   s: BankState,
@@ -1714,6 +1786,10 @@ function stepRun(
       drive(s, i, target >= 0 ? s.children[target] : farRock, target >= 0, dt, cfg, world)
       continue
     }
+    if (stepArrival(s, i, dt, cfg, stage, world)) {
+      safeSlot++
+      continue
+    }
     if (c.arrived) {
       // Safe at the far rock: it steps aside into the line for the next run, and
       // stays there once it is in it (the same hysteresis as the stations).
@@ -1727,14 +1803,27 @@ function stepRun(
     drive(s, i, dodgedAim(s, c, farRock, cfg), true, dt, cfg, world)
     if (dist(c, farRock) <= cfg.reachDistance) {
       c.arrived = true
-      say(s, {
-        concept: 'ROCK',
-        moment: 'arrival',
-        speaker: i,
-        gesture: 'indicate',
-        aim: { x: farRock.x, y: 0.6, z: farRock.z },
-        at: 'rock',
-      })
+      const bearing = Math.atan2(c.x - farRock.x, c.z - farRock.z)
+      let stand = touchStand(stage, to, world.blocked, bearing)
+      if (stand) {
+        const taken = (spot: { x: number; z: number }) =>
+          !!obstacles(i, cfg, world)?.(spot.x, spot.z) || s.children.some((other, j) => j !== i && (
+            dist(other, spot) < world.childRadius * 2 ||
+            (other.arrival && dist(other.arrival.stand, spot) < world.childRadius * 2)
+          ))
+        // Keep the runner's own side, fanning out only when that stand is taken.
+        // If every nearby bearing is occupied, retain its stand and wait.
+        if (taken(stand)) {
+          for (const offset of [1, -1, 2, -2, 3, -3]) {
+            const alternative = touchStand(stage, to, world.blocked, bearing + offset * Math.PI / 6)
+            if (alternative && !taken(alternative)) {
+              stand = alternative
+              break
+            }
+          }
+        }
+      }
+      c.arrival = stand ? { end: to, stand, approachFor: cfg.regroupSeconds, holdFor: null } : null
     }
   }
 
@@ -1769,8 +1858,10 @@ function stepRun(
 
 /** Holds every child in the posture the visible moment requires. These are
  *  commanded standing frames, so the stall watches read them as held. */
-function stepHeld(s: BankState, dt: number, cfg: BankConfig, world: BankWorld): void {
-  for (let i = 0; i < s.children.length; i++) drive(s, i, null, false, dt, cfg, world)
+function stepHeld(s: BankState, dt: number, cfg: BankConfig, stage: BankStage, world: BankWorld): void {
+  for (let i = 0; i < s.children.length; i++) {
+    if (!stepArrival(s, i, dt, cfg, stage, world)) drive(s, i, null, false, dt, cfg, world)
+  }
 }
 
 /** After the caught children have stayed down long enough to read, the group
@@ -1784,7 +1875,7 @@ function stepPart(
   holding: boolean,
 ): void {
   if (holding) {
-    stepHeld(s, dt, cfg, world)
+    stepHeld(s, dt, cfg, stage, world)
     if (s.endFor === 0) {
       for (const c of s.children) {
         if (c.role === 'out') c.role = 'catcher'
@@ -1795,6 +1886,7 @@ function stepPart(
   }
   for (let i = 0; i < s.children.length; i++) {
     const c = s.children[i]
+    if (stepArrival(s, i, dt, cfg, stage, world)) continue
     if (c.role === 'out') c.role = 'catcher'
     c.crouched = false
     drive(s, i, stage.roam, false, dt, cfg, world)
