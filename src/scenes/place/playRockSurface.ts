@@ -37,96 +37,53 @@ export function playRockYaw(at: { x: number; z: number }): number {
   return at.x * 1.7 + at.z
 }
 
-/** Bearing bins of one profile ring. 32 bins is 11.25° — finer than the mesh's
- *  own facets at detail 1, so the ring resolves every face rather than
- *  averaging neighbouring ones into a bulge that is not drawn. */
-export const PROFILE_BINS = 32
-
-/** Height rings sampled per rock, from the foot to the crown. The rock is
- *  1.05 mesh units tall; 22 rings put one every ~5 cm of drawn height, which is
- *  finer than the 6 cm a hand is wide. */
-export const PROFILE_RINGS = 22
-
-/** One rock's measured silhouette: `rings[i][bin]` is the mesh-unit radius of
- *  the surface at height `i / (PROFILE_RINGS - 1) * height`, on that bearing. */
-export interface RockProfile {
-  /** Mesh height the rings span. */
-  height: number
-  rings: readonly (readonly number[])[]
+/** Cached mesh triangles, with height bounds to skip faces outside a slice. */
+interface SurfaceTriangle {
+  plane: THREE.Plane
+  edges: THREE.Plane[]
+  low: number
+  high: number
 }
 
-const cache = new Map<number, RockProfile>()
+const cache = new Map<number, SurfaceTriangle[]>()
 
-/** The silhouette of the play rock built from `seed`, measured once per seed. */
-export function playRockProfile(seed: number): RockProfile {
+function surfaceTriangles(seed: number): SurfaceTriangle[] {
   const held = cache.get(seed)
   if (held) return held
-  const built = measure(buildPlayRock(seed))
-  cache.set(seed, built)
-  return built
-}
-
-function measure(geometry: THREE.BufferGeometry): RockProfile {
-  const position = geometry.getAttribute('position') as THREE.BufferAttribute
+  const geometry = buildPlayRock(seed)
+  const position = geometry.getAttribute('position')
   const index = geometry.getIndex()
-  const count = index ? index.count : position.count
-  let height = 0
-  for (let i = 0; i < position.count; i++) height = Math.max(height, position.getY(i))
-  const rings: number[][] = Array.from({ length: PROFILE_RINGS }, () => new Array<number>(PROFILE_BINS).fill(0))
-  const at = (k: number): [number, number, number] => [position.getX(k), position.getY(k), position.getZ(k)]
-
-  for (let t = 0; t < count; t += 3) {
-    const vs = [0, 1, 2].map((o) => at(index ? index.getX(t + o) : t + o))
-    for (let r = 0; r < PROFILE_RINGS; r++) {
-      const y = (r / (PROFILE_RINGS - 1)) * height
-      for (let e = 0; e < 3; e++) {
-        const a = vs[e]
-        const b = vs[(e + 1) % 3]
-        // The edge has to CROSS this height for the ring to see it; an edge
-        // lying exactly in the plane is taken at its own end points.
-        if ((a[1] - y) * (b[1] - y) > 0) continue
-        const span = b[1] - a[1]
-        const f = Math.abs(span) < 1e-9 ? 0 : (y - a[1]) / span
-        const x = a[0] + (b[0] - a[0]) * f
-        const z = a[2] + (b[2] - a[2]) * f
-        let bin = Math.floor(((Math.atan2(x, z) + Math.PI) / (2 * Math.PI)) * PROFILE_BINS)
-        bin = ((bin % PROFILE_BINS) + PROFILE_BINS) % PROFILE_BINS
-        rings[r][bin] = Math.max(rings[r][bin], Math.hypot(x, z))
-      }
-    }
+  const triangles: SurfaceTriangle[] = []
+  for (let k = 0; k < (index?.count ?? position.count); k += 3) {
+    const vertices = [0, 1, 2].map((offset) =>
+      new THREE.Vector3().fromBufferAttribute(position, index ? index.getX(k + offset) : k + offset))
+    const [a, b, c] = vertices
+    const plane = new THREE.Plane().setFromCoplanarPoints(a, b, c)
+    triangles.push({
+      plane,
+      edges: vertices.map((v, i) => new THREE.Plane().setFromNormalAndCoplanarPoint(
+        new THREE.Vector3().subVectors(vertices[(i + 1) % 3], v).cross(plane.normal).normalize(), v)),
+      low: Math.min(...vertices.map((v) => v.y)),
+      high: Math.max(...vertices.map((v) => v.y)),
+    })
   }
-  // A bin no edge crossed at this height takes its neighbours' answer rather
-  // than zero: a gap in the sampling is not a hole in the stone.
-  for (const ring of rings) fillGaps(ring)
-  return { height, rings }
+  geometry.dispose()
+  cache.set(seed, triangles)
+  return triangles
 }
 
-function fillGaps(ring: number[]): void {
-  const known = ring.filter((r) => r > 0)
-  if (known.length === 0) return
-  for (let i = 0; i < ring.length; i++) {
-    if (ring[i] > 0) continue
-    for (let step = 1; step <= ring.length; step++) {
-      const left = ring[(i - step + ring.length * 2) % ring.length]
-      const right = ring[(i + step) % ring.length]
-      const found = Math.max(left, right)
-      if (found > 0) {
-        ring[i] = found
-        break
-      }
-    }
-  }
-}
+// Synchronous queries reuse scratch vectors; only the two immutable meshes are
+// cached. No raycaster, material, scene graph or per-query allocation is needed.
+const hit = new THREE.Vector3()
+// Shared-edge rounding must not turn a vertex into a hole. This is one tenth
+// of a nanometre in mesh units, not a contact or silhouette allowance.
+const EDGE_EPSILON = 1e-10
 
 /**
- * The world radius of a play rock's drawn surface at world height `y`, on the
- * WORLD bearing `bearing` measured from the rock's own axis (`atan2(dx, dz)`,
- * the codebase's own convention).
- *
- * `scale` is the instance scale and `yaw` the instance rotation, so the answer
- * is the silhouette the picture shows, not the mesh's unrotated one. Heights
- * outside the rock take the nearest ring — below the foot that is the foot,
- * above the crown the crown, and neither is a surface a hand can meet.
+ * Exact outer flank at this world height and bearing. Intersect the mesh's
+ * triangles, not a table of neighbouring edge maxima: that table overstated
+ * the flank by centimetres even when the solved and drawn hand agreed exactly
+ * (see docs/hand-stone-contact.md). Outside the mesh there is no surface.
  */
 export function playRockSurfaceRadius(
   seed: number,
@@ -135,15 +92,21 @@ export function playRockSurfaceRadius(
   bearing: number,
   y: number,
 ): number {
-  const profile = playRockProfile(seed)
+  const height = y / scale
   const local = bearing - yaw
-  const bin = ((Math.round(((local + Math.PI) / (2 * Math.PI)) * PROFILE_BINS) % PROFILE_BINS) + PROFILE_BINS) % PROFILE_BINS
-  const at = Math.max(0, Math.min(PROFILE_RINGS - 1, ((y / scale) / profile.height) * (PROFILE_RINGS - 1)))
-  const lo = Math.floor(at)
-  const hi = Math.min(PROFILE_RINGS - 1, lo + 1)
-  const f = at - lo
-  const r = profile.rings[lo][bin] * (1 - f) + profile.rings[hi][bin] * f
-  return r * scale
+  const dx = Math.sin(local)
+  const dz = Math.cos(local)
+  let radius = 0
+  for (const { plane, edges, low, high } of surfaceTriangles(seed)) {
+    if (height < low - EDGE_EPSILON || height > high + EDGE_EPSILON) continue
+    const denominator = plane.normal.x * dx + plane.normal.z * dz
+    if (Math.abs(denominator) < 1e-12) continue
+    const distance = -(plane.constant + plane.normal.y * height) / denominator
+    if (distance < 0 || distance < radius) continue
+    hit.set(dx * distance, height, dz * distance)
+    if (edges.every((edge) => edge.distanceToPoint(hit) <= EDGE_EPSILON)) radius = distance
+  }
+  return radius * scale
 }
 
 /**

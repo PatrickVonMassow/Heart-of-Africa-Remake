@@ -69,6 +69,7 @@ import { climbBoulder } from './looseRocks'
 import { absorbSeparation, createTagGame, stepTagGame, type TagChild } from './tagGame'
 import {
   bankChildCanSeparate,
+  bankChildTouching,
   createBankGame,
   insideStrangerBerth,
   stepBankGame,
@@ -562,7 +563,7 @@ function frame(v: ReturnType<typeof village>, dt: number): void {
     v.bodies[i].z = v.children[i].z
   }
   const separable = v.bank
-    ? v.bodies.filter((_, i) => bankChildCanSeparate(v.children[i] as BankChild))
+    ? v.bodies.filter((_, i) => bankChildCanSeparate(v.children[i] as BankChild, bankChildTouching(v.bank!, i)))
     : v.bodies
   // The separation resolves in the round's ground PLUS the traveller's berth,
   // exactly as `PlaceLife` wires it: the traveller is not an inhabitant body, so
@@ -1898,18 +1899,13 @@ describe('the children`s bank round can reach its own stage (work-order 687)', (
       expect(judgedEnough(r)).toBe(true)
       expect(judgedEnough(burst)).toBe(true)
       // THE VERDICT OFF THE WORST CHILD, because one child wedged among four
-      // healthy ones is divided by five in every group average — which is the
-      // whole shape of the cost being gated here. Measured with the carve gone,
-      // worst child of each layout: bambara@42 0.000 %, bambara@2972259115
-      // 0.000 %, nubian@42 0.050 %, mandinka@99 0.126 % against the 0.25 % gate,
-      // and the burst window 0.000 / 0.000 / 0.042 / 0.000 %. Two of them read
-      // above zero where all four read exactly zero before 1047: the swerve is
-      // wider now (dodgeReach 3 -> 4.5), so a runner bending round its catcher
-      // covers a shorter straight line inside one second. That is the widened
-      // dodge being paid for, and the margin to the gate is still a factor of
-      // two on the worst of the four.
+      // healthy ones is divided by five in every group average. With contact
+      // probes ending at the stand, the worst child reads 0.000 / 0.0084 /
+      // 0.0168 / 0.1256 % in the four layouts, against the unchanged 0.25 %
+      // gate. Probing beyond the stand into the rock made Bambara's child 3
+      // circle it at 105 s: 38 bad windows, now zero (hand-stone-contact.md).
       expect(r.leastJudged).toBeGreaterThan(CHILD_MOTION.judgedGate)
-      expect(r.worstShare).toBeLessThan(CHILD_MOTION.shareGate)
+      expect(r.worstShare, JSON.stringify(r.worst)).toBeLessThan(CHILD_MOTION.shareGate)
       expect(burst.worstShare).toBeLessThan(CHILD_MOTION.shareGate)
       // AND NOBODY IS CARRIED OUT OF A WEDGE INSTEAD: the rescue teleport is what
       // ENDS a snag, so a layout that keeps its share down only by picking a

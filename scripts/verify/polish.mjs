@@ -4560,6 +4560,13 @@ if (section('children-bank-game')) {
   // taken off the SCENE GRAPH: the hand mesh's world position, the flank the
   // instanced rock presents at that height and bearing, and the gap between them.
   if (staged) {
+    // At these shots' ~150 px/m, the former 6 cm bar admitted 9 pixels of
+    // daylight. Five millimetres is <1 pixel: 2 mm solve residual plus <2 mm
+    // hand-sphere faceting, rounded up by 1 mm. The flank is now the exact mesh,
+    // not the edge-bin approximation that overstated it by up to 64 mm in the
+    // unit fixtures (docs/hand-stone-contact.md). Judge the new pictures too;
+    // this bar covers BOTH whole holds and their recorded word frames.
+    const contactBar = 0.005
     const holdSeconds = await page.evaluate(
       () => window.__balance?.villageLife?.bankGame?.tapPauseSeconds ?? 0,
     )
@@ -4709,7 +4716,7 @@ if (section('children-bank-game')) {
         // exists to catch (08.09.2026). Aiming costs one frame, so the camera is
         // placed on the first good holding reading and the shutter falls on the
         // next one, both still inside the hold.
-        if (holding && !tapShot && Math.abs(now.gap) <= 0.06) {
+        if (holding && !tapShot && Math.abs(now.gap) <= contactBar) {
           if (!tapAimed) {
             tapAimed = await aimAtTap(now)
           } else {
@@ -4740,7 +4747,7 @@ if (section('children-bank-game')) {
       // far side of a hold, never inside one.
       // …and never from inside a hold: `inHold` is the current sample's own state,
       // so the loop can only leave on the far side of one.
-      if (bestTouch && Math.abs(bestTouch.gap) <= 0.06 && sawTouchPose && heldToTheEnd && !inHold) break
+      if (bestTouch && Math.abs(bestTouch.gap) <= contactBar && sawTouchPose && heldToTheEnd && !inHold) break
       await nextFrames(now && now.phase === 'run' && now.tapFor > 0 ? 1 : 2)
     }
     check(
@@ -4749,12 +4756,11 @@ if (section('children-bank-game')) {
       bestTouch ? `child ${bestTouch.tapper} at the ${bestTouch.end} rock` : 'no tapper was ever designated',
     )
     if (bestTouch) {
-      // THE DRAWN HAND MEETS THE DRAWN FLANK. The tolerance is the round's own
-      // 3 cm plus the 3 cm a walking child settles within, measured on the
-      // instanced stone rather than on a nominal radius.
+      // The same subpixel bar applies to the best frame and the worst hold
+      // reading below; a walking allowance cannot be added to resting contact.
       check(
         'and its DRAWN hand rests on the stone`s DRAWN flank, not a metre off it',
-        Math.abs(bestTouch.gap) <= 0.06,
+        Math.abs(bestTouch.gap) <= contactBar,
         `hand ${bestTouch.hand} at ${bestTouch.radius.toFixed(3)} m from the stone axis, its flank ` +
           `${bestTouch.flank.toFixed(3)} m there — gap ${(bestTouch.gap * 100).toFixed(1)} cm ` +
           `at height ${bestTouch.y.toFixed(2)} m`,
@@ -4805,8 +4811,8 @@ if (section('children-bank-game')) {
             ? holdTrace.slice(0, 6)
             : [holdTrace[0], ...holdTrace.slice(Math.max(1, worst - 3), worst + 4)]
         check(
-          'and no tap is ever spoken from the waiting station',
-          Math.abs(stationTap.gap) <= 0.06,
+          'and the tapping hand stays within 5 mm of the flank over the whole hold',
+          Math.abs(stationTap.gap) <= contactBar,
           `the worst reading while the word was falling stood ${(stationTap.gap * 100).toFixed(1)} cm ` +
             `off the flank, ${stationTap.tapFor.toFixed(2)} s into the hold's remainder, ` +
             `with the ${stationTap.gesture ?? 'rest'} gesture ` +
@@ -4843,7 +4849,7 @@ if (section('children-bank-game')) {
       )
       check(
         'and the hand is on the stone in the very frame the word falls',
-        !!opening && Math.abs(opening.gap) <= 0.06,
+        !!opening && Math.abs(opening.gap) <= contactBar,
         opening
           ? `child ${opening.tapper}: gap ${(opening.gap * 100).toFixed(1)} cm at the utterance, ` +
             `shoulder drawn at ${opening.drawnPitch.toFixed(2)} rad against the ` +
@@ -4874,6 +4880,9 @@ if (section('children-bank-game')) {
       window.__balance.villageLife.bankGame.arrivalHoldSeconds = 9
       return window.__balance.villageLife.bankGame.arrivalHoldSeconds
     })
+    const arrivalHearingRadius = await page.evaluate(() => window.__balance.communication.hearingRadius)
+    let unheardOpening = null
+    let unheardArrivals = 0
     let runner = null
     let arrivalOpening = null
     let arrivalEnded = false
@@ -4884,8 +4893,20 @@ if (section('children-bank-game')) {
     for (let i = 0; i < arrivalBudget; i++) {
       const now = await page.evaluate((speaker) => window.__placeArrivalHand?.(speaker) ?? null, runner ?? undefined)
       if (runner === null && now?.arrivalFor > 0 && now.opening && now.clock - now.opening.clock <= 0.2) {
-        runner = now.tapper
-        arrivalOpening = now.opening
+        // The midpoint is in earshot of both rock AXES, but alternate arrival
+        // stands can lie beyond it: a measured +25° approach reaches the stone
+        // at 10.43 m from the listener. The hearing gate then correctly leaves
+        // the hand at rest (66.05 cm), despite the game's completed contact hold.
+        // Acquire by hearing distance, never by gesture or gap: a heard word
+        // with a missing/bad arm must still fail every existing contact check.
+        const heardFrom = now.opening.heardFrom
+        if (typeof heardFrom === 'number' && Number.isFinite(heardFrom) && heardFrom <= arrivalHearingRadius) {
+          runner = now.tapper
+          arrivalOpening = now.opening
+        } else if (unheardOpening !== now.opening.clock) {
+          unheardOpening = now.opening.clock
+          unheardArrivals++
+        }
       }
       if (runner !== null && now?.tapper === runner) {
         if (now.opening?.clock !== arrivalOpening.clock) break
@@ -4894,7 +4915,7 @@ if (section('children-bank-game')) {
           break
         }
         arrivalTrace.push(now)
-        if (!arrivalShot && Math.abs(now.gap) <= 0.06 && now.gesture === 'touch') {
+        if (!arrivalShot && Math.abs(now.gap) <= contactBar && now.gesture === 'touch') {
           if (!arrivalAimed) arrivalAimed = await aimAtTap(now)
           else {
             await frame('1106-arriving-runner-hand-on-the-far-stone', {
@@ -4918,11 +4939,13 @@ if (section('children-bank-game')) {
         arrivalTrace[0].arrivalFor >= arrivalSeconds - 0.2 &&
         arrivalTrace.at(-1).arrivalFor <= 0.2,
       `${arrivalTrace.length} readings; opening ${arrivalOpening?.clock ?? 'missing'}, ` +
-        `remaining ${arrivalTrace[0]?.arrivalFor ?? '-'} to ${arrivalTrace.at(-1)?.arrivalFor ?? '-'} s; ended ${arrivalEnded}`,
+        `remaining ${arrivalTrace[0]?.arrivalFor ?? '-'} to ${arrivalTrace.at(-1)?.arrivalFor ?? '-'} s; ended ${arrivalEnded}; ` +
+        `heard from ${arrivalOpening?.heardFrom ?? 'missing'} m (radius ${arrivalHearingRadius} m); ` +
+        `${unheardArrivals} unheard openings before acquisition`,
     )
     check(
-      'the arriving runner`s DRAWN hand stays within 6 cm of the far stone, including the word frame',
-      arrivalWorst <= 0.06 && arrivalTrace.every((r) => r.gesture === 'touch'),
+      'the arriving runner`s DRAWN hand stays within 5 mm of the far stone, including the word frame',
+      arrivalWorst <= contactBar && arrivalTrace.every((r) => r.gesture === 'touch'),
       `worst ${(arrivalWorst * 100).toFixed(1)} cm over ${arrivalTrace.length} readings`,
     )
     check(

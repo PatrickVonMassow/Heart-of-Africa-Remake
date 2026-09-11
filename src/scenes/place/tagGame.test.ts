@@ -14,6 +14,7 @@ import {
   chooseTarget,
   createTagGame,
   lineClear,
+  moveChild,
   nearestCatchable,
   stepTagGame,
   type TagChild,
@@ -1740,5 +1741,24 @@ describe('the rescue is a finding, not an escape (point 656)', () => {
       expect(c.pinned).toBe(0)
       expect(c.nudges).toBe(0)
     }
+  })
+})
+
+describe('contact approach clearance', () => {
+  it.each(['static', 'body'])('keeps steering round a %s obstruction before the stand', (kind) => {
+    const c = game([[0, 0]]).children[0]
+    c.heading = Math.PI / 2
+    c.edgeSide = 1
+    c.edgeFor = CFG.edgeSeconds
+    // The near side is clear, but a thin obstruction crosses the path to the
+    // stand. Shortening the probe must still inspect that intervening ground.
+    const blocked = (_x: number, z: number) => z >= 0.08 && z <= 0.12
+    const world = { ...OPEN, blocked: kind === 'static' ? blocked : () => false }
+    moveChild(c, 0, 0.14, 0.1, CFG, world, kind === 'body' ? blocked : undefined, { x: 0, z: 0.2 })
+    expect(c.edgeFor).toBeGreaterThan(0)
+    expect(c.x).toBeCloseTo(0.14)
+    expect(c.z).toBeCloseTo(0)
+    expect(c.walked).toBeCloseTo(0.14)
+    expect(c.nudges).toBe(0)
   })
 })

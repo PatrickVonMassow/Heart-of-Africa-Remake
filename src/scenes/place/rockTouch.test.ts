@@ -118,6 +118,20 @@ describe('the tapping child reaches the stone it names, in every river village',
     }
   }
 
+  it('uses a neighbouring station-side facet when the direct reach is behind the collider', () => {
+    const { stage, layout } = stageOf('bambara-village')
+    const blocked = (x: number, z: number) => !standingClear(layout.colliders, x, z, WALKER_RADIUS)
+    const rock = rockAt(stage, 'downstream')
+    const far = rockAt(stage, 'upstream')
+    const direct = Math.atan2(far.x - rock.x, far.z - rock.z)
+    expect(touchStand(stage, 'downstream', blocked, direct)).toBeNull()
+    const stand = touchStand(stage, 'downstream', blocked)!
+    expect(stand).not.toBeNull()
+    expect(Math.abs(stand.bearing - direct)).toBeLessThanOrEqual(Math.PI / 4)
+    expect(blocked(stand.x, stand.z)).toBe(false)
+    expect(Math.abs(touchReach(stage, 'downstream', stand)!.gap)).toBeLessThanOrEqual(TOUCH_GAP)
+  })
+
   it('is solved at the height the renderer DRAWS the body at, dip included', () => {
     // WHY THIS TEST EXISTS. The reach is solved in the figure's own frame, so it
     // silently assumes the renderer draws the body at ground level. It does not
@@ -171,7 +185,7 @@ describe('the tapping child reaches the stone it names, in every river village',
         // Check the hand's own bearing too: it hangs to one side of the body.
         const point = touchedPoint(Math.hypot(stand.x - rockAt(stage, end).x, stand.z - rockAt(stage, end).z), reach.elevation, CHILD_FIGURE_SCALE)
         const handBearing = bearing + Math.atan2(-point.offAxis, Math.sqrt(point.radius ** 2 - point.offAxis ** 2))
-        expect(Math.abs(point.radius - HAND - stage.flank(end, handBearing, point.height))).toBeLessThanOrEqual(0.06)
+        expect(Math.abs(point.radius - HAND - stage.flank(end, handBearing, point.height))).toBeLessThanOrEqual(TOUCH_GAP)
       }
     }
     expect(reached).toBeGreaterThan(12)

@@ -64,6 +64,7 @@ import { buildPlaceNavGrid, findPlaceRoute, navClearBetween, navRestrict, type N
 import { absorbSeparation, createTagGame, stepTagGame, type TagChild } from './tagGame'
 import {
   bankChildCanSeparate,
+  bankChildTouching,
   bankChildBodyLift,
   createBankGame,
   otherEnd,
@@ -1009,7 +1010,7 @@ function Kids({
       b.z = children[i].z
     }
     const separable = round.bank
-      ? bodies.filter((_, i) => bankChildCanSeparate(children[i] as BankChild))
+      ? bodies.filter((_, i) => bankChildCanSeparate(children[i] as BankChild, bankChildTouching(round.bank!, i)))
       : bodies
     separateGroup(bodySet, separable, dt, sep, separationWorld)
     for (let i = 0; i < children.length; i++) {
@@ -1062,7 +1063,7 @@ function Kids({
       // own lift in metres, taken from the boulder the child is actually on, and
       // this only draws it.
       const gaitLift = gaitBodyLift(phase, legLength)
-      const lift = round.bank ? bankChildBodyLift(c as BankChild, gaitLift) : gaitLift
+      const lift = round.bank ? bankChildBodyLift(c as BankChild, gaitLift, bankChildTouching(round.bank, i)) : gaitLift
       g.position.set(c.x, lift, c.z)
       // A TAGGED CHILD IS UNMISTAKABLY OUT OF PLAY (work-order 687 item 3):
       // squatted down, trunk folded over and both arms crossed in front of it.
