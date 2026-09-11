@@ -107,3 +107,43 @@ The proposed search expansion therefore does not repair these measured cases.
 loses contact even if it finds free ground. The search and contact allowance
 have different purposes, but the search budget is not established as a defect.
 Neither it nor the contact tolerance has been changed on this hypothesis.
+
+## Review: finite arrival trace with a resting hand
+
+The reported 129 finite readings cannot be produced by `arrival: null`.
+`__placeArrivalHand` requires an opening recorded when an arrival utterance
+was returned, and the sampler acquires only with `arrivalFor > 0` and that
+opening at most 0.2 s old. A missing approach/hold instead yields no trace and
+an infinite worst gap. The opening records the game event even outside hearing
+range; `speakBankUtterance` correctly calls `gestureIfHeard`, which rests the arm
+beyond the unchanged 10 m radius (point 580).
+
+Reproduced without a browser, before modifying the sampler: Bambara layout seed
+3791639114, all layout colliders, runner initially 2.1 m from the downstream
+axis at +25° from the inward bearing. At 60 FPS it reaches a 1.360071 m stand,
+with a **1.374307 mm solved contact gap**, but is **10.434405 m** from the
+sampler's midpoint listener. The hearing-gated resting hand, measured through
+Three.js hip/shoulder/hand pivots, is **66.054250 cm** off the drawn flank.
+This matches the reported 66.0 cm scale without a failed approach. At 10 FPS,
+the identical initial state selects an audible stand **8.815263 m** from the
+listener. Both have valid contact holds. `bankGame.test.ts` preserves this
+cadence-dependent choice and measures every frame of both nine-second holds;
+a listener 4 m away sees contact throughout either hold.
+
+This explains how different approach histories or frame timing in the full
+pass can select an armless event where the isolated section selects an audible
+one. It is a deterministic reproduction of that failure mechanism, not a claim
+to have replayed the reviewer's exact browser history. The old output omitted
+the arrival's hearing distance, so the two historical traces cannot establish
+that last correspondence on their own.
+
+The sampler now acquires the first fresh **audible** arrival opening, by its
+existing `heardFrom` value. It does not select by arm state or contact gap.
+Once acquired, identity, word-frame contact, worst whole-hold contact, duration
+coverage and an in-hold photograph remain mandatory at the same 5 mm bar.
+Unheard openings are counted in the result; the selected hearing distance is
+printed. Missing audible contact still fails. Unit tests execute the actual
+sampler block with unheard-then-heard readings, a heard but missing arm, bad
+word-frame contact, later bad contact, and no audible event. This corrects the
+hearing precondition without changing the game, geometry, movement or pose.
+Full WebGPU/WebGL 2 passes and frame judgment remain the reviewer's work.

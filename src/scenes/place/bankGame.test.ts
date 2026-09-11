@@ -45,6 +45,9 @@ import {
 import { CHILD_FIGURE_SCALE, FIGURE_LIMBS } from '../../render/figures'
 import { advanceGesture, gesturePose, restGesture, startGesture } from '../../render/gesture'
 import { touchedPoint } from './rockTouch'
+import * as THREE from 'three'
+import { applyFigurePose } from '../../render/figurePose'
+import { gestureIfHeard } from '../../communication/spokenGesture'
 import { absorbSeparation } from './tagGame'
 import {
   addBodies,
@@ -1080,6 +1083,70 @@ describe('arriving runners name the far stone by contact', () => {
     s.children[0].madeTag = true
     return { s, rand }
   }
+
+  it.each([{ dt: 1 / 60, audible: false }, { dt: 0.1, audible: true }])('resolves the same arrival approach to an audible=$audible hold at dt=$dt', ({ dt, audible }) => {
+    const layout = buildLayout('bambara-village', 3791639114)
+    const rocks = layout.playRocks!
+    const stage: BankStage = { ...STAGE, ...rocks, flank: playRockFlank(rocks) }
+    const midpoint = { x: (rocks.upstream.x + rocks.downstream.x) / 2, z: (rocks.upstream.z + rocks.downstream.z) / 2 }
+    const rock = rocks.downstream
+    const bearing = Math.atan2(midpoint.x - rock.x, midpoint.z - rock.z) + 25 * Math.PI / 180
+    const cfg = { ...CFG, arrivalHoldSeconds: 9 }
+    const { s, rand } = arriving([{ x: rock.x + Math.sin(bearing) * 2.1, z: rock.z + Math.cos(bearing) * 2.1 }], cfg)
+    Object.assign(s.children[0], midpoint)
+    const world = { ...openWorld(), radius: 100,
+      blocked: (x: number, z: number) => !standingClear(layout.colliders, x, z, WALKER_RADIUS),
+    }
+    let word: BankUtterance | null = null
+    for (let k = 0; k < 600 && !word; k++) word = stepBankGame(s, dt, cfg, stage, world, rand)
+    expect(word?.moment).toBe('arrival')
+    const c = s.children[1]
+    expect(c.arrival?.holdFor).toBe(9)
+    expect(dist(c, rock)).toBeLessThan(1.4)
+    const distance = dist(c, midpoint)
+    expect(distance <= balance.communication.hearingRadius).toBe(audible)
+
+    // The scene records an opening even when the distance gate rests its arm.
+    // Measure the same pivots as the browser, with both listener distances.
+    const root = new THREE.Group()
+    root.position.set(c.x, 0, c.z)
+    root.rotation.y = c.facing
+    root.scale.setScalar(CHILD_FIGURE_SCALE)
+    const trunk = new THREE.Group()
+    trunk.position.y = FIGURE_LIMBS.hipY
+    root.add(trunk)
+    const arm = new THREE.Group()
+    arm.position.set(FIGURE_LIMBS.shoulderX, FIGURE_LIMBS.shoulderY - FIGURE_LIMBS.hipY, 0)
+    arm.rotation.order = 'YXZ'
+    trunk.add(arm)
+    const hand = new THREE.Group()
+    hand.position.y = -FIGURE_LIMBS.armLength
+    arm.add(hand)
+    let heard = gestureIfHeard(4, word!.gesture, { ...word!.arm, duration: word!.hold })
+    let observed = gestureIfHeard(distance, word!.gesture, { ...word!.arm, duration: word!.hold })
+    expect(observed.kind).toBe(audible ? 'touch' : null)
+    let readings = 0
+    while (c.arrival!.holdFor! > 0) {
+      for (const gesture of [heard, observed]) {
+        applyFigurePose({ arms: [arm], trunk }, gesturePose(gesture))
+        const p = hand.getWorldPosition(new THREE.Vector3())
+        const gap = Math.hypot(p.x - rock.x, p.z - rock.z) -
+          stage.flank('downstream', Math.atan2(p.x - rock.x, p.z - rock.z), p.y) -
+          FIGURE_LIMBS.handRadius * CHILD_FIGURE_SCALE
+        if (gesture.kind === 'touch') expect(Math.abs(gap)).toBeLessThanOrEqual(TOUCH_GAP)
+        else {
+          expect(gap).toBeGreaterThan(0.64)
+          expect(gap).toBeLessThan(0.69)
+        }
+      }
+      expect(Math.abs(touchReach(stage, 'downstream', c)!.gap)).toBeLessThanOrEqual(TOUCH_GAP)
+      readings++
+      stepBankGame(s, dt, cfg, stage, world, rand)
+      heard = advanceGesture(heard, dt)
+      observed = advanceGesture(observed, dt)
+    }
+    expect(readings).toBeGreaterThanOrEqual(Math.floor(9 / dt))
+  })
 
   it('offers every play-rock ROCK with a solved touch at the speaker`s own spot over a Bambara cycle', () => {
     const layout = buildLayout('bambara-village', 3791639114)

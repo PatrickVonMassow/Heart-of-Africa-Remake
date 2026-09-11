@@ -4880,6 +4880,9 @@ if (section('children-bank-game')) {
       window.__balance.villageLife.bankGame.arrivalHoldSeconds = 9
       return window.__balance.villageLife.bankGame.arrivalHoldSeconds
     })
+    const arrivalHearingRadius = await page.evaluate(() => window.__balance.communication.hearingRadius)
+    let unheardOpening = null
+    let unheardArrivals = 0
     let runner = null
     let arrivalOpening = null
     let arrivalEnded = false
@@ -4890,8 +4893,20 @@ if (section('children-bank-game')) {
     for (let i = 0; i < arrivalBudget; i++) {
       const now = await page.evaluate((speaker) => window.__placeArrivalHand?.(speaker) ?? null, runner ?? undefined)
       if (runner === null && now?.arrivalFor > 0 && now.opening && now.clock - now.opening.clock <= 0.2) {
-        runner = now.tapper
-        arrivalOpening = now.opening
+        // The midpoint is in earshot of both rock AXES, but alternate arrival
+        // stands can lie beyond it: a measured +25° approach reaches the stone
+        // at 10.43 m from the listener. The hearing gate then correctly leaves
+        // the hand at rest (66.05 cm), despite the game's completed contact hold.
+        // Acquire by hearing distance, never by gesture or gap: a heard word
+        // with a missing/bad arm must still fail every existing contact check.
+        const heardFrom = now.opening.heardFrom
+        if (typeof heardFrom === 'number' && Number.isFinite(heardFrom) && heardFrom <= arrivalHearingRadius) {
+          runner = now.tapper
+          arrivalOpening = now.opening
+        } else if (unheardOpening !== now.opening.clock) {
+          unheardOpening = now.opening.clock
+          unheardArrivals++
+        }
       }
       if (runner !== null && now?.tapper === runner) {
         if (now.opening?.clock !== arrivalOpening.clock) break
@@ -4924,7 +4939,9 @@ if (section('children-bank-game')) {
         arrivalTrace[0].arrivalFor >= arrivalSeconds - 0.2 &&
         arrivalTrace.at(-1).arrivalFor <= 0.2,
       `${arrivalTrace.length} readings; opening ${arrivalOpening?.clock ?? 'missing'}, ` +
-        `remaining ${arrivalTrace[0]?.arrivalFor ?? '-'} to ${arrivalTrace.at(-1)?.arrivalFor ?? '-'} s; ended ${arrivalEnded}`,
+        `remaining ${arrivalTrace[0]?.arrivalFor ?? '-'} to ${arrivalTrace.at(-1)?.arrivalFor ?? '-'} s; ended ${arrivalEnded}; ` +
+        `heard from ${arrivalOpening?.heardFrom ?? 'missing'} m (radius ${arrivalHearingRadius} m); ` +
+        `${unheardArrivals} unheard openings before acquisition`,
     )
     check(
       'the arriving runner`s DRAWN hand stays within 5 mm of the far stone, including the word frame',
