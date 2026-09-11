@@ -106,6 +106,18 @@ put it is the mistake this line exists to stop.
   1. The pre-existing WebGPU MSAA red on main is classified ONCE as baseline
      (`scripts/verify/baseline-classify.mjs settings` on main) and recorded, so no point
      re-litigates it; its repair is filed as its own point with the error text above.
+     DONE ON MAIN 11.09.2026 by the owning session — it is main-session work, since the
+     classification reads the main tree's run records and the repair point is a TASKS.md
+     append. The named command could NOT be the instrument: on main its default baseline is
+     the merge-base with main, which is HEAD, so it exits without classifying, and an
+     invented `--ref` would have cost two more `settings` passes to answer a question the
+     evidence already answers. The classification therefore stands on the run record itself
+     — `local/verify-logs/2026-09-11T04-24-16-290-settings.log.run.json`, branch `main`,
+     head 54294c8b0, clean tree, exit 1 — and a red with no diff under it belongs to no
+     point BY CONSTRUCTION. Recorded as POINT 1105 with the full error text and the cause
+     found while filing it: `pass(scene, camera, { samples: traaEnabled ? 0 : 4 })` in
+     `src/render/Effects.tsx` against `low`'s `traa: false` in `src/config/quality.ts`, so
+     only the low level asks for a multisampled half-float target. Measures 2-6 remain.
   2. A running LARGE that is already red on a check the point's diff does not touch is
      EVALUATED, not waited on: the runner's own "CANDIDATE REAL FAILURE" line ends the
      declared wait instead of the lease clock.
@@ -199,6 +211,57 @@ put it is the mistake this line exists to stop.
   Criticality: high — it is a player-visible hole in the supported fallback lane, and it
   survived every green run because the only checks over that frame read labels and overlays.
   Bundle: Dorfleben.
+
+- [ ] 1105. Graphics level LOW blackens the WebGPU picture, because the scene pass asks for
+  MSAA on a format the adapter refuses to multisample. FILED BY POINT 1104 on 11.09.2026,
+  whose first measure classified this red as a pre-existing main baseline so that no further
+  point re-litigates it; the repair is this point.
+  MEASURED 11.09.2026 on main, head 54294c8b0, clean tree —
+  `local/verify-logs/2026-09-11T04-24-16-290-settings.log.run.json`, the run of 06:24:16 local
+  (`verify settings --section=graphics-levels`, exit 1 after 75 s, 0 frames written). No
+  point's diff is under it: the run stood on main itself, which is what makes it a baseline
+  rather than anybody's regression. Two checks fail and the second names the cause:
+  - `FAIL  F9 low: scene still renders non-black — mean 2.2`
+  - `FAIL  Graphics levels: no new console errors across the F9 cycle — THREE.WebGPURenderer:
+    Uncaptured WebGPU GPUValidationError: The texture format (TextureFormat::RGBA16Float)
+    does not support multisampling.`
+  What follows in the log is ONE error, not many: the refused multisampled target invalidates
+  the textures built on it (`[Invalid Texture "output-msaa"]`, `[Invalid Texture
+  "normal-msaa"]`), every pipeline that would draw into them fails in turn (`Async render
+  pipeline creation failed (renderPipeline_MeshStandardNodeMaterial_1004): [Invalid
+  TextureView]`), and the command buffers are rejected after them (`[Invalid CommandBuffer
+  from CommandEncoder "renderContext_8"]`). Nothing is drawn, which is the mean 2.2 the first
+  check reads.
+  THE CAUSE IS ONE EXPRESSION, and it is why only LOW is red. `src/render/Effects.tsx` builds
+  the scene pass as `pass(scene, camera, { samples: traaEnabled ? 0 : 4 })`, and `low` in
+  `src/config/quality.ts` is the one preset with `traa: false` (medium and high both set it
+  true). So LOW — and only LOW — asks for four samples, on an MRT whose `output` and `normal`
+  attachments are half-float; the adapter multisamples neither.
+  THE PLAYER REACHES IT WITH ONE KEY. F9 steps the graphics level down (CLAUDE.md §7.1 #20,
+  design.md §21), and LOW is the level a weak machine is meant to end on. On the primary
+  backend that player gets a black window.
+  Final state:
+  - No render target is ever created multisampled in a format the adapter will not
+    multisample. The sample count and the pass's attachment formats are decided together in
+    ONE place, so the unsupported pair cannot be built rather than being caught after the
+    fact.
+  - Every graphics level renders a non-black scene on WebGPU and on WebGL 2, and a full F9
+    cycle raises no new console error on either lane.
+  - LOW keeps its purpose: if MSAA cannot be had there, it is dropped rather than paid for
+    elsewhere — the level exists to cost less, not to look better.
+  Test. Vitest over the pure half: the level→sample-count decision refuses the unsupported
+  pair and yields a single-sampled pass, and every level yields a buildable combination.
+  Browser: `npm test -- settings --section=graphics-levels` green on BOTH lanes. The check
+  already exists and is red today, so the proof of this point is that check turning green,
+  not a new one.
+  Refs: src/render/Effects.tsx, src/config/quality.ts, src/state/ui.ts (`effectiveTraa`),
+  scripts/verify/settings.mjs (section `graphics-levels`),
+  local/verify-logs/2026-09-11T04-24-16-290-settings.log.run.json,
+  docs/render-architecture.md, design.md §2/§21, CLAUDE.md §3/§7.1 #20, points 1104, 938, 277.
+  Criticality: high — a black screen on a setting one key reaches, on the backend CLAUDE.md
+  §3 makes primary; and until it is repaired every settings suite behind it carries a known
+  red whose classification can hide a real one.
+  Bundle: Steuerung & Performance.
 
 - [ ] 1087. The water carrier visibly fills the jar at the water and carries visible water
   (user 06.09.2026; the former point 1066; SPLIT BACK OUT OF POINT 1065 on 10.09.2026 on the
