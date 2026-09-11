@@ -489,7 +489,7 @@ function reexecWithLogPath() {
 const { own, forward } = parseRunLoggedArgs(process.argv.slice(2))
 if (own.show) process.exitCode = showLog(own.show)
 else {
-  const refusal = developmentRunRefusal(forward)
+  const refusal = developmentRunRefusal(forward, own)
   if (refusal) {
     console.log(refusal)
     process.exitCode = 1

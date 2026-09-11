@@ -300,10 +300,13 @@ stall the suite, are pinned by `src/test/vitestConfig.test.ts`.
 
 ### Keep development runs narrow (point 1104)
 
-`run-logged.mjs` refuses multiple named suites without a section unless the
-command explicitly names `small` or `large`. During development, use one suite,
+`run-logged.mjs` refuses multiple named suites without a section by default unless
+the command explicitly names `small` or `large`. During development, use one suite,
 or `npm test -- polish --section=adult-errands`. The section name attaches to
 `--section=`; `adult-errands --section=` is refused before starting a run.
+For a covering proof, use e.g. `npm test -- polish settings enrichments collision
+--no-ladder "final covering proof"`. This admits the multi-suite run with one shared
+dev server and records the reason in its run record. The reason must be nonblank.
 
 For the same HEAD, suite and section, the wrapper returns the last green
 receipt in `local/verify-logs/`: `already green N min ago, receipt <path>`.

@@ -39,6 +39,7 @@ describe('run-logged argument budgets', () => {
       const result = runShow(['polish', 'settings', 'enrichments', 'collision'], dir)
       expect(result.status).toBe(1)
       expect(result.stdout).toContain('--section=adult-errands')
+      expect(result.stdout).toContain('--no-ladder "<why>"')
       expect(readdirSync(dir)).toEqual([])
     } finally { rmSync(dir, { recursive: true, force: true }) }
   })
@@ -48,6 +49,28 @@ describe('run-logged argument budgets', () => {
       expect(developmentRunRefusal(args)).toBeNull()
     }
     expect(developmentRunRefusal(['polish', 'adult-errands', '--section='])).toContain('--section=adult-errands')
+  })
+
+  it('admits a covering multi-suite proof with a reason consumed by the wrapper', () => {
+    const suites = ['polish', 'settings', 'enrichments', 'collision']
+    const { own, forward } = parseRunLoggedArgs([...suites, '--no-ladder', 'final covering proof'])
+    expect(forward).toEqual(suites)
+    expect(own.noLadder).toBe('final covering proof')
+    expect(developmentRunRefusal(forward, own)).toBeNull()
+  })
+
+  it.each([[], ['--no-ladder'], ['--no-ladder', ''], ['--no-ladder', '   '], ['--no-ladder', '--quiet']])(
+    'keeps the multi-suite refusal without a nonblank reason: %j', (...escape) => {
+      const { own, forward } = parseRunLoggedArgs(['polish', 'settings', ...escape])
+      expect(developmentRunRefusal(forward, own)).toContain('--no-ladder "<why>"')
+    },
+  )
+
+  it('does not waive an empty section with the covering-proof escape', () => {
+    const { own, forward } = parseRunLoggedArgs([
+      'polish', 'adult-errands', '--section=', '--no-ladder', 'final covering proof',
+    ])
+    expect(developmentRunRefusal(forward, own)).toContain('--section=adult-errands')
   })
 
   it('clamps both selective reads and verify digest lines before output is assembled', () => {
