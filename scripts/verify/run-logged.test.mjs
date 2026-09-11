@@ -13,7 +13,7 @@ import { describe, it, expect } from 'vitest'
 import { parseActivityJournal } from '../batch-activity-journal-core.mjs'
 import { commandNamesRun } from '../batch-in-flight.mjs'
 import { ORDINARY_OUTPUT_BUDGET } from '../tool-output-budget-core.mjs'
-import { MAX_SELECTED_LINES, parseRunLoggedArgs } from './run-logged-args.mjs'
+import { developmentRunRefusal, MAX_SELECTED_LINES, parseRunLoggedArgs } from './run-logged-args.mjs'
 
 const WRAPPER = join(dirname(fileURLToPath(import.meta.url)), 'run-logged.mjs')
 
@@ -22,11 +22,57 @@ function runShow(args, logDir) {
     windowsHide: true,
     encoding: 'utf8',
     timeout: 20_000,
-    env: { ...process.env, VERIFY_LOG_DIR: logDir },
+    env: { ...process.env, VERIFY_LOG_DIR: logDir, VERIFY_NO_WAIT: '1' },
   })
 }
 
 describe('run-logged argument budgets', () => {
+  it('consumes --again instead of forwarding it to run-all', () => {
+    expect(parseRunLoggedArgs(['polish', '--again'])).toMatchObject({
+      own: { again: true }, forward: ['polish'],
+    })
+  })
+
+  it('refuses a development multi-suite call before making a log', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-runlogged-refusal-'))
+    try {
+      const result = runShow(['polish', 'settings', 'enrichments', 'collision'], dir)
+      expect(result.status).toBe(1)
+      expect(result.stdout).toContain('--section=adult-errands')
+      expect(result.stdout).toContain('--no-ladder "<why>"')
+      expect(readdirSync(dir)).toEqual([])
+    } finally { rmSync(dir, { recursive: true, force: true }) }
+  })
+
+  it('accepts tier commands and rejects the positional empty-section typo', () => {
+    for (const args of [[], ['small'], ['large', 'polish', 'settings'], ['polish'], ['polish', '--section=adult-errands']]) {
+      expect(developmentRunRefusal(args)).toBeNull()
+    }
+    expect(developmentRunRefusal(['polish', 'adult-errands', '--section='])).toContain('--section=adult-errands')
+  })
+
+  it('admits a covering multi-suite proof with a reason consumed by the wrapper', () => {
+    const suites = ['polish', 'settings', 'enrichments', 'collision']
+    const { own, forward } = parseRunLoggedArgs([...suites, '--no-ladder', 'final covering proof'])
+    expect(forward).toEqual(suites)
+    expect(own.noLadder).toBe('final covering proof')
+    expect(developmentRunRefusal(forward, own)).toBeNull()
+  })
+
+  it.each([[], ['--no-ladder'], ['--no-ladder', ''], ['--no-ladder', '   '], ['--no-ladder', '--quiet']])(
+    'keeps the multi-suite refusal without a nonblank reason: %j', (...escape) => {
+      const { own, forward } = parseRunLoggedArgs(['polish', 'settings', ...escape])
+      expect(developmentRunRefusal(forward, own)).toContain('--no-ladder "<why>"')
+    },
+  )
+
+  it('does not waive an empty section with the covering-proof escape', () => {
+    const { own, forward } = parseRunLoggedArgs([
+      'polish', 'adult-errands', '--section=', '--no-ladder', 'final covering proof',
+    ])
+    expect(developmentRunRefusal(forward, own)).toContain('--section=adult-errands')
+  })
+
   it('clamps both selective reads and verify digest lines before output is assembled', () => {
     const parsed = parseRunLoggedArgs([
       '--tail',
@@ -120,7 +166,7 @@ describe('run-logged default launch — the run-identity re-exec (point 700, Sol
         windowsHide: true,
         encoding: 'utf8',
         timeout: 60_000,
-        env: { ...process.env, VERIFY_LOG_DIR: relDir, HOA_ACTIVITY_JOURNAL_PATH: join(dir, 'activity.jsonl') },
+        env: { ...process.env, VERIFY_NO_WAIT: '1', VERIFY_LOG_DIR: relDir, HOA_ACTIVITY_JOURNAL_PATH: join(dir, 'activity.jsonl') },
       })
       expect(res.status, res.stderr).toBe(1) // the shim forwards the child's exit code
       expect(res.stdout).toContain('── tool error digest ── run-logged verify digest')
@@ -171,7 +217,7 @@ describe('run-logged default launch — the run-identity re-exec (point 700, Sol
         const shim = spawn(process.execPath, [WRAPPER, 'world', '--section=__no_such_section__'], {
           windowsHide: true,
           stdio: 'ignore',
-          env: { ...process.env, VERIFY_LOG_DIR: relDir, HOA_ACTIVITY_JOURNAL_PATH: join(dir, 'activity.jsonl') },
+          env: { ...process.env, VERIFY_NO_WAIT: '1', VERIFY_LOG_DIR: relDir, HOA_ACTIVITY_JOURNAL_PATH: join(dir, 'activity.jsonl') },
         })
         const closed = new Promise((resolvePromise) =>
           shim.on('close', (code, signal) => resolvePromise({ code, signal })),

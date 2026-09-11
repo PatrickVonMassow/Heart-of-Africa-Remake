@@ -624,3 +624,14 @@ swing out under the counter-rotation.
 The tagged child does not pass that prop and keeps the flattened head.
 Pre-existing and fast-moving, no player blockade, so it waits here: the fix is the
 one prop on the child's `Figure`, and the check is the matrix reading, not a box.
+
+## A `--section` run pays a cold browser and dev-server boot every time (11.09.2026)
+
+Measured on point 1085: `verify polish --section=adult-errands` takes 110 s, of
+which the 18 assertions are a fraction — the rest is the quiet-machine check, the
+GPU preflight with its own browser, and `starting dev server` (the 504 "Outdated
+Optimize Dep" errors in the same logs are the server being rebuilt under a test).
+`scripts/verify/_server.mjs` reuses nothing between runs. A warm server held across
+the section runs of one development cycle would take the cheap rung from ~110 s to
+an estimated ~25 s and is the largest structural lever left after point 1104 — but
+it is a rebuild of the server lifecycle, not a small change, so it waits here.

@@ -1,4 +1,5 @@
 import { DEFAULTS } from './run-digest-core.mjs'
+import { parseArgs } from './tiers.mjs'
 
 export const MAX_SELECTED_LINES = 400
 
@@ -22,6 +23,7 @@ export function parseRunLoggedArgs(argv) {
     stream: false,
     quiet: false,
     logFile: null,
+    again: false,
     // The verification ladder's deliberate escape (point 1086). It carries a
     // REASON on purpose: a bare flag would be a habit within a week, and the
     // reason is what the run record keeps.
@@ -48,10 +50,23 @@ export function parseRunLoggedArgs(argv) {
     }
     else if (a === '--stream') own.stream = true
     else if (a === '--quiet') own.quiet = true
+    else if (a === '--again') own.again = true
     else forward.push(a)
   }
   own.tail = boundedLines(own.tail, DEFAULTS.tailLines)
   own.max = boundedLines(own.max, MAX_SELECTED_LINES)
   own.keep = boundedLines(own.keep, DEFAULTS.maxKeptLines)
   return { own, forward }
+}
+
+/** Refuse an expensive development bundle before a log or browser is opened. */
+export function developmentRunRefusal(argv, { noLadder = null } = {}) {
+  const { tier, filter, section } = parseArgs(argv)
+  const hasReason = typeof noLadder === 'string' && noLadder.trim().length > 0
+  if (section === '' || (tier === null && filter.length > 1 && section === null && !hasReason)) {
+    return 'Refused: name one suite during development, or use small/large for a tier run. ' +
+      'For one section: npm test -- polish --section=adult-errands (the name attaches to --section=). ' +
+      'For a covering multi-suite proof, use --no-ladder "<why>"; the reason is recorded with the run.'
+  }
+  return null
 }

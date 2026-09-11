@@ -687,6 +687,16 @@ export function assessInFlight({
   const evidence = Array.isArray(declaration.evidence) ? declaration.evidence : []
   if (evidence.length === 0) return out(false, 'no-evidence', { ageMs })
 
+  // A reproducing LARGE failure needs a decision now, even with fresh output
+  // and hours left on the lease. This ends the wait, not the running process;
+  // the owner evaluates attribution instead of treating the red as baseline.
+  for (const e of evidence) {
+    const failure = e.kind === 'log' ? probes.runFailureOf?.(e.path) : null
+    if (failure) return out(false, 'verification-needs-evaluation', {
+      ageMs, summary: `${e.path}: ${failure} — evaluate the red now; the declared wait is over`,
+    })
+  }
+
   const items = evidence.map((e) => checkEvidence(e, { now, ...probes }))
   const verdict = evidenceVerdict(items)
   const summary = items.map((i) => `${i.describe} — ${i.detail}`).join('; ')
