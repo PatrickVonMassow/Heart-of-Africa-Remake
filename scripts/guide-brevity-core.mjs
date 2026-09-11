@@ -704,7 +704,13 @@ export const LIMITS = {
   // 11.09.2026: the measure-not-estimate pitfall took the night's lesson — a threshold that
   // computes with the estimate, and a tool that invents an 'all clear' — INSIDE its existing
   // entry and was tightened while doing it, so the guide pays a word back: 6114 -> 6113.
-  maxWords: 6113,
+  // 11.09.2026 (second): the guard-that-never-fires pitfall is a genuinely new tip and cost 45
+  // words, and it was PAID FOR rather than added on top — three passages of project narrative
+  // moved to the retrospective where the contract says they belong (a barrier judging from the
+  // wrong root, a point's five red two-hour runs, the count of one misfiled warning). The net is
+  // a PAYBACK, so the ceiling follows the measurement DOWN: 6113 -> 6104. Keeping 6113 would be
+  // exactly the unearned headroom the rule above forbids.
+  maxWords: 6104,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,
