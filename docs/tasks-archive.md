@@ -27640,3 +27640,92 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Refs: scripts/verify/run-logged.mjs, scripts/verify/tiers.mjs, scripts/render-verify-guard.mjs,
   scripts/point-brief-core.mjs (the ladder's prose), points 595, 1083, 1084.
   Bundle: Testinfrastruktur.
+
+- [x] 1104. One ordinary point burns three hours of suite wall clock, and the regression it
+  waits for is red before it starts. USER ORDER 11.09.2026: this point is worked AT ONCE,
+  before 1085 — the measures below are cheap, and every point after this one pays for
+  their absence.
+  MEASURED 11.09.2026 on point 1085 (`local/verify-logs/*.run.json` in its worktree,
+  `.claude/batch-activity.jsonl`): 27 verify runs, 182 min of suite wall clock inside
+  205 min of elapsed time — 89 %. Planning and coding were the remaining ~23 min. The
+  guards are NOT the measured brake: 29 Stop hooks cost seconds per stop. Where the
+  minutes went, exactly:
+  - 78 min: ONE run `verify polish settings enrichments collision` — four suites, no
+    `--section` — that died in a WebGPU cascade (`RGBA16Float does not support
+    multisampling` → `Invalid Texture "output-msaa"` → pipeline creation failed).
+  - That cascade is PRE-EXISTING ON MAIN: the run of 06:24:16 on `branch=main,
+    head=54294c8b0` (`local/verify-logs/2026-09-11T04-24-16-290-settings.log.run.json`)
+    was red with the identical error. Every LARGE of every point walks into it and
+    then owes a classify-and-rerun cycle — which is why "1 h development + 2 h
+    regression, green" never comes true.
+  - 22 min: nine repeats on an UNCHANGED head — five green `polish --section=adult-errands`
+    on e89d500e8 (06:03–06:15, 110–116 s each), four red on 8970feec4 (07:48–08:04).
+  - 68+ min: the point's LARGE, red on `settings/ground-detail` and `enrichments/
+    dressing-growth` before it was half done, still waited on with a lease to 12:35.
+  - A `--section` run costs 110 s of which the assertions are a fraction: quiet-machine
+    check, GPU preflight with its own browser, `starting dev server`, then 18 checks.
+    No warm server is reused. Every log also says `MACHINE STATE UNKNOWN`, and the red
+    main run says `UNDER LOAD — NOT AUTHORITATIVE` — six worktrees were open.
+  FINAL STATE — six small, low-risk measures, no rebuild, in this order:
+  1. The pre-existing WebGPU MSAA red on main is classified ONCE as baseline
+     (`scripts/verify/baseline-classify.mjs settings` on main) and recorded, so no point
+     re-litigates it; its repair is filed as its own point with the error text above.
+     DONE ON MAIN 11.09.2026 by the owning session — it is main-session work, since the
+     classification reads the main tree's run records and the repair point is a TASKS.md
+     append. The named command could NOT be the instrument: on main its default baseline is
+     the merge-base with main, which is HEAD, so it exits without classifying, and an
+     invented `--ref` would have cost two more `settings` passes to answer a question the
+     evidence already answers. The classification therefore stands on the run record itself
+     — `local/verify-logs/2026-09-11T04-24-16-290-settings.log.run.json`, branch `main`,
+     head 54294c8b0, clean tree, exit 1 — and a red with no diff under it belongs to no
+     point BY CONSTRUCTION. Recorded as POINT 1105 with the full error text and the cause
+     found while filing it: `pass(scene, camera, { samples: traaEnabled ? 0 : 4 })` in
+     `src/render/Effects.tsx` against `low`'s `traa: false` in `src/config/quality.ts`, so
+     only the low level asks for a multisampled half-float target. Measures 2-6 remain.
+  2. A running LARGE that is already red on a check the point's diff does not touch is
+     EVALUATED, not waited on: the runner's own "CANDIDATE REAL FAILURE" line ends the
+     declared wait instead of the lease clock.
+  3. During development no run names more than one suite without `--section=<name>`;
+     `run-logged.mjs` refuses such a call unless it is the tier command (`small`/`large`).
+     The refusal text shows the correct syntax (`--section=adult-errands`, never a
+     positional `adult-errands --section=` — that exact typo cost four runs today).
+  4. Same head + same suite + same section is not re-run: `run-logged.mjs` finds the last
+     green receipt for that triple in `local/verify-logs/` and answers with it (one line,
+     "already green N min ago, receipt <path>"), unless `--again` is passed.
+  5. While a LARGE runs, no other suite starts in any worktree, and a section run started
+     against one waits rather than reddens.
+     THE BRIEF'S CLAIM THAT THIS GATE ALREADY EXISTS IS WRONG, measured 11.09.2026 at head
+     f1b67a891: the lease in `run-logged.mjs` is a PROGRESS lease on one run RECORD, nothing
+     in `run-logged.mjs` or `run-all.mjs` reads another run's lease before launching, and the
+     lease tests permit two sessions to wait side by side on purpose. So this measure is
+     BUILT — small, and inside the runner measures 3 and 4 already change:
+     - before launching, `run-logged.mjs` looks for a LIVE `run-logged.mjs` process whose
+       argv names a LARGE tier (the same argv reading `commandNamesRun` already does) and,
+       finding one, WAITS for it to exit instead of starting beside it. It prints ONE line
+       naming that pid and its command, and proceeds the moment the process is gone.
+     - the process table is the whole mechanism: worktrees do not share `local/verify-logs/`,
+       so no shared file and no new ledger field is introduced for this.
+     - it never waits on ITSELF or on its own ancestors — a LARGE's nested suite runs and
+       `baseline-classify`'s baseline passes are children of the run that is already going.
+     - `--again` does NOT bypass it; one named escape does, for the operator who knows the
+       found run is finished work: `VERIFY_NO_WAIT=1`.
+     MEASURES 2, 3, 4 AND 6 DO NOT DEPEND ON THIS ONE and are delivered even if measure 5
+     raises a further question — a question about one measure parks that measure, never the
+     other five.
+  6. LARGE per BUNDLE, not per point: CLAUDE.md §5/§6 says a point lands after its tier
+     suites and the picture check; the both-backends LARGE runs once per bundle and at
+     the closing. Text change only.
+  NOT in scope: switching Stop hooks off (measured: no minutes there), a warm dev server
+  across runs (the biggest structural lever, but a rebuild of `scripts/verify/_server.mjs`
+  — filed to `docs/backlog.md`).
+  Test. Vitest: measures 3 and 4 on `run-logged`'s argument and receipt logic (a
+  refused multi-suite call, a served cached green, `--again` bypass); measure 2 on the
+  in-flight wait decision. Measures 1, 5 and 6 are records and text: the baseline
+  record exists, the wait-lease refusal is exercised by its existing test, CLAUDE.md
+  and `scripts/verify/README.md` say the new LARGE cadence.
+  Refs: scripts/verify/run-logged.mjs, scripts/verify/baseline-classify.mjs,
+  scripts/batch-in-flight.mjs, scripts/verify/tiers.mjs, scripts/verify/README.md,
+  CLAUDE.md §5/§6, docs/backlog.md, points 200, 294, 296, 566, 1085.
+  Criticality: high — it is the measured reason every point takes a working day
+  instead of three hours, and it deletes or short-circuits rather than adds.
+  Bundle: Testinfrastruktur.
