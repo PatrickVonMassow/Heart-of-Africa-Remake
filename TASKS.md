@@ -138,36 +138,6 @@ put it is the mistake this line exists to stop.
   user-reported twice).
   Bundle: Dorfleben.
 
-- [ ] 1107. After its one tag a catcher stops playing and stands beside the child it caught.
-  USER REPORT 11.09.2026. For the rest of the run the catcher neither chases nor returns; it
-  simply stays where its prey went down, which reads as a broken actor rather than as a rule.
-  THE CAUSE IS AN EXPLICIT RULE, not a bug in the walk: `src/scenes/place/bankGame.ts` sets
-  `madeTag` (~L1759) and from then on drives that catcher with no target (~L1707) until
-  `endRun`. It was introduced deliberately by the rescue commit a39dfd912 (03.09.2026) so a
-  catcher could not sweep a bunched group and starve the ROCK arrival call, and
-  `bankGame.test` pins the effect it was bought for ("lets a typical first run tag one or two
-  children and bring the rest home"). `docs/communication-poc-spec.md` (L97-108) does not
-  carry the rule at all: it says only that the caught child drops out where he stands.
-  DECIDED ON FILING (11.09.2026), recommendation recorded for veto: keep the one-tag rule —
-  it is what protects the arrival call the whole teaching hangs on — and fix what the user
-  actually sees by WALKING THE CATCHER BACK TO ITS ROCK instead of leaving it standing at the
-  prey. The alternative considered and not taken was letting the catcher resume after a short
-  hold, which puts the sweep problem back and would have to be solved a second time
-  elsewhere.
-  Final state:
-  - A catcher that has made its tag walks back to its own rock and waits there until
-    `endRun`, rather than standing beside the caught child. It takes no further target.
-  - `docs/communication-poc-spec.md` states the one-tag rule and this return, so the next
-    reader finds the rule where the game's behaviour is described.
-  - `bankGame.test.ts` keeps the run-outcome case it already has and adds one: after a tag,
-    the catcher's distance to its own rock falls over the remaining run and it tags nobody
-    else.
-  - Browser evidence: a frame of the moment after a catch showing the caught child down and
-    the catcher on its way back, subject declared.
-  Criticality: medium — it is player-visible on every run that produces a catch, and it
-  misreads as a dead actor, but the teaching itself still completes.
-  Bundle: Dorfleben.
-
 - [ ] 1103. On WebGL 2 the distant village is not in the picture at all.
   MEASURED 11.09.2026 on a quiet machine, by reading the two lanes of point 1086's covering
   runs against each other rather than by any red — the check that owns the frame passes on
@@ -911,6 +881,69 @@ put it is the mistake this line exists to stop.
   Author lane: opus
   Why the lane: the verification IS the work here — the deliverable is a judged rendered
   frame at shipped values, taken and judged in the main session.
+  Bundle: Dorfleben.
+
+- [ ] 1109. The catcher group stands as one group at its rock; the tap is a moment, not a post.
+  USER ORDER 11.09.2026 on the bank game (`src/scenes/place/bankGame.ts`), queued DIRECTLY
+  BEFORE 1092. WHAT THE USER SAW: in a follow-up run one catcher stands at the stone and the
+  other catchers far from it, which reads as a special role for the child at the rock although
+  every child in the catcher group has the same role. His own sentences: "Mir gefaellt es nicht,
+  dass einer der Faenger am Felsen steht und die anderen Faenger so weit davon entfernt. Das
+  impliziert eine Sonderrolle des Kindes, das nah am Felsen ist, obwohl alle Kinder in der
+  Faengergruppe die gleiche Rolle haben: Faenger." / "Setze es so um, wie du es vorschlaegst.
+  Reihe das direkt vor 1092 ein."
+  FINAL STATE, three parts, all mandatory.
+  - (1) THE REGROUP WAITS FOR THE GROUP. `advanceBankGame` (~L1154-1163) currently opens the
+    next run on `phaseFor <= 0` OR `inPlace`, and `regroupSeconds: 14` is too short for the
+    catchers who crouched or tagged mid-stretch to walk to the opposite wait rock after the
+    sides swap (`endRun` ~L996). The run opens only when every child is at its station
+    (`inPlace`); the time bound becomes a BACKSTOP for a child that genuinely cannot arrive —
+    raised in `balance.ts` (`regroupSeconds`, and `gatherSeconds` where the same rule applies)
+    to a value that clears a full-stretch walk round a hut, marked calibratable. A child still
+    walking at the backstop starts from where it is, as today. The one-tag rule (`madeTag`)
+    stays exactly as it is — point 1107 was deleted by the user and this point must NOT change
+    what a catcher does after its tag during the run.
+  - (2) THE TAP IS A MOMENT, NOT A POST. Today the tapper walks to `touchStand` at the stone
+    (`stepStations` ~L1593-1598), stays there through the tap and STARTS THE RUN FROM THE
+    STONE, while the other catchers stand at their stations 2.6 m (`standOff`) in front of it.
+    New sequence: regroup -> everybody at station, tapper at the touch spot -> announce
+    (unchanged) -> tap: hand on the stone, ROCK falls with its `tapPauseSeconds` hold exactly
+    as 1065 built it (hand gap <= `TOUCH_GAP`, silent when unreachable) -> the tapper WALKS
+    BACK to its own catcher station -> only when it is settled there (or a short backstop
+    elapsed) does the charge begin; runners and the other catchers hold through the walk back.
+    At the first frame of the charge every catcher stands within `reachDistance * 0.6` of its
+    station and NO child stands at the touch spot. The catcher line is the wall the runners
+    break through; nobody guards the stone. This holds for the first run of a cycle too (one
+    catcher taps and steps back into its own station).
+  - (3) THE TAPPER ROTATES. `endRun` (~L1019) and `openCycle` pick the tapper as the catcher
+    nearest the rock, so in follow-up runs it is often the same child. The tapper is chosen
+    round-robin among the catchers within a cycle (e.g. the catcher with the fewest taps this
+    cycle, ties to the lower index), so no child is permanently the one who says the word.
+  TESTS.
+  - Vitest (`bankGame.test.ts`): (a) with >= 2 catchers and one of them placed mid-stretch at
+    `endRun`, the run does not open before that catcher is within `reachDistance` of its
+    station, and does open at the backstop; (b) at the first charge frame every catcher is
+    within `reachDistance * 0.6` of its station and none within touch of the stone; (c) the
+    ROCK tap utterance is still offered only with the hand on the stone (the existing 1065
+    tests stay green); (d) over a cycle with >= 2 catchers the tapper index changes between
+    runs.
+  - Browser (`scripts/verify/polish.mjs`): the 1065 tap frame stays; add or extend one frame at
+    charge start that shows the catcher line as one group before its rock.
+    `scripts/verify/childMotionMetric.mjs` stays within its gate — the added walk back is a
+    short straight walk on open ground.
+  BOUNDS THE USER NAMED: do not change the one-tag rule (1107 deleted, user decision
+  11.09.2026). Keep the 1065 guarantee: ROCK only with the hand on the stone, never from the
+  air. Runners' stations, lanes and dodge stay as they are. Numbers go to `balance.ts` as
+  calibratable estimates.
+  DOC IMPACT: `docs/communication-poc-spec.md` "The children's game at the bank" (~L103-105):
+  after "names ROCK while everybody holds at the stones" add that the catcher steps back into
+  his group before the run. `design.md` §13.4 unchanged unless it names the tapper's position.
+  ORDERING: it edits `openRun`, `endRun`, `stepStations`, `advanceBankGame` and
+  `balance.villageLife.bankGame` — the same bank-game path 1106, 1047, 1065, 1080, 1081 and
+  1082 reach — so it is worked after 1106 and never beside any of them. Position: directly
+  before 1092, by the user's order. It absorbs the carrier finding "Bank game: follow-up run
+  opens with catchers still mid-stretch" of 11.09.2026 13:49, which is part (1) and is closed
+  with this point.
   Bundle: Dorfleben.
 
 - [ ] 1092. The well leaves the one village that already fetches its water from the river
