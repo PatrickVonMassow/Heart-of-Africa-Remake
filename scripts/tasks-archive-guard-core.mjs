@@ -18,6 +18,7 @@
 export const KNOWN_GAPS = new Set([
   301, // folded during specification
   324, // folded into 312 (the water rule) on 25.07.2026
+  1107, // deleted unimplemented on 11.09.2026 — the user never commissioned it
 ])
 
 /** Point numbers with their tick state: [{ n, done }]. */
