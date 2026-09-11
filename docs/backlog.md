@@ -604,3 +604,23 @@ nothing is blocked and nobody is misled: the list names the backend, the suite
 and the minute, and a reader who was there knows which is which. Whoever
 touches that recorder next can carry the operator's own termination as its own
 outcome, so the crash list stays a list of crashes.
+
+## The tagged child's head flattens with its crouch (11.09.2026)
+
+Non-blocking, collected; target point 687. `PlaceLife.tsx` squats a tagged child
+with `g.scale.set(1, CROUCH_SQUAT, 1)` on its whole group, and that reaches the
+head sphere: at 0.66 the skull is drawn as a disc.
+
+Point 1085 measured the identical artefact on the water carrier at 0.72 — a
+deflated ball hovering over a traffic cone — and fixed it by handing `Figure` the
+caller's squash through a `squat` prop. Note what that fix had to be: a local
+`scale.y` on the head CANNOT undo the squash, because the squash sits on the
+figure's group ABOVE the trunk and the trunk is rotated by the lean, so the exact
+inverse is `Rx(-lean) · diag(1,1/s,1)` — a counter-rotation as well as a stretch.
+The check that proves it reads the head off its WORLD MATRIX; a `Box3` over the
+same head called it 0.73 where the matrix calls it 1.000, because a box's corners
+swing out under the counter-rotation.
+
+The tagged child does not pass that prop and keeps the flattened head.
+Pre-existing and fast-moving, no player blockade, so it waits here: the fix is the
+one prop on the child's `Figure`, and the check is the matrix reading, not a box.
