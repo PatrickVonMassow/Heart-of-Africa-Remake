@@ -27586,3 +27586,57 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   while the word falls. The change is backend-sensitive by `isBackendSensitivePath`, and this
   is the lane it owed.
   Bundle: Dorfleben.
+
+- [x] 1086. The cheap rung is skipped, and only the expensive one is enforced.
+  USER ORDER 09.09.2026, given twice in one evening: "Warum führst du nicht immer erstmal
+  nur die Tests des neuen Features aus und erst wenn die erfolgreich sind die restlichen
+  Regressionstests?" — and, when the answer was that the rule had been written into memory,
+  "'Als dauerhafte Regel abgelegt' garantiert aber nicht, dass die nächste Session sich
+  daran hält, oder?" It does not. This point is the mechanism that the house's own first
+  principle demands.
+  MEASURED THE SAME EVENING on point 1065: a `polish --section=` run costs about 2 minutes
+  and the full suite 31 to 63, and the session used the FULL suite as its debugging loop —
+  four full runs, roughly 2.5 machine-hours, for a defect that two section runs then found
+  in four minutes. Nothing refused any of it. What DID speak was `render-verify-guard`,
+  which accepts only a full covering run and therefore said "not verified" after every edit
+  — an enforcement that pulls in exactly the wrong direction, because it names the finish
+  and is read as the next step.
+  FINAL STATE: the ladder is enforced where runs are STARTED, in
+  `scripts/verify/run-logged.mjs`, which every run already passes through. A FULL browser
+  suite is refused while the files that suite covers carry edits newer than the newest
+  GREEN narrower run of the same material — the suite's own `--section=`, or the unit tier
+  for logic. The refusal prints the exact narrower command to run instead. Once the narrow
+  rung is green at or after the last edit, the full run passes without a flag: the ladder is
+  climbed, not waived. An explicit escape stays for the case the narrow rung cannot exist
+  (`--no-ladder "<why>"`), and it is recorded like every other deliberate exception.
+  AND THE GUARD THAT PULLED THE OTHER WAY SAYS SO: `render-verify-guard`'s refusal names the
+  ladder — the covering full run is what the point owes at its END, not after every edit.
+  NOTE THE FREEZE. CLAUDE.md §2 forbids new guards; this one is ordered by the user, is not
+  a new guard but a refusal inside the runner every run already uses, and its measured cost
+  of NOT existing is 2.5 machine-hours in one evening.
+  VERIFIABLE: the pure layer covers a full run refused after an edit with no narrow green,
+  the same run admitted once the narrow rung is green, a narrow run never refused, an edit
+  to files the suite does not cover leaving the full run free, and the escape being recorded.
+  AND THE RUNG MUST BE WORTH CLIMBING — MEASURED 10.09.2026 on the same point, the night after
+  the order. The `adult-errands` rung was climbed twelve times on 09.09. and was GREEN every
+  time (18 pass, 0 fail, last at 22:40 in local/verify-logs/1065-liveshot3.log). The LARGE run
+  started 01:13 then failed WebGL 2 polish on exactly those two checks: "no carrier was ever
+  seen filling a jar" and "no frame of the carry could be taken" — 1 errand cast in the window,
+  phases [water-out/invite×832 water-out/wait×583 water-back/walk×550 water-out/fetch×33]. So
+  the ladder as ordered would have refused nothing that evening and prevented nothing: the
+  cheap rung was green. ENFORCING A RUNG THAT LIES BUYS FALSE CONFIDENCE INSTEAD OF TIME, so
+  this point owes two more things beside the refusal:
+  - THE RUNG MUST BE NEWER THAN THE LAST MERGE, not only than the last edit. Two merges from
+    main landed at ~23:35, after the last green `adult-errands` rung, and that rung was never
+    re-climbed. A merge brings in other material the suite covers, so it ages the rung exactly
+    as an edit does.
+  - A RUNG WHOSE SUBJECT IS CAST RARELY MUST MEASURE WHAT THE SUITE MEASURES. Alone, the
+    section always saw enough errands; inside the full suite it saw ONE, with the fetch phase
+    at 33 of about 2000 phase ticks. Either the section sizes its observation window so both
+    runs measure the same thing, or the section declares itself NON-PREDICTIVE for that check
+    and the check says so when it passes narrowly.
+  VERIFIABLE for this half: the pure layer covers a rung older than the branch's last merge
+  counting as unclimbed, and a check declared non-predictive never satisfying the ladder.
+  Refs: scripts/verify/run-logged.mjs, scripts/verify/tiers.mjs, scripts/render-verify-guard.mjs,
+  scripts/point-brief-core.mjs (the ladder's prose), points 595, 1083, 1084.
+  Bundle: Testinfrastruktur.
