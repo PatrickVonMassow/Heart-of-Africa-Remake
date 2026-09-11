@@ -635,3 +635,38 @@ Optimize Dep" errors in the same logs are the server being rebuilt under a test)
 the section runs of one development cycle would take the cheap rung from ~110 s to
 an estimated ~25 s and is the largest structural lever left after point 1104 — but
 it is a rebuild of the server lifecycle, not a small change, so it waits here.
+
+## A teaching arrival outside the player's earshot shows nothing at all (11.09.2026)
+
+Measured while landing point 1110. A runner that arrives, reaches the stone and
+holds a perfectly good contact — 1.37 mm solved gap — draws **no gesture at all**
+if it stands beyond the 10 m hearing radius: `speakBankUtterance` calls
+`gestureIfHeard`, which rests the arm (point 580). The child then walks to the
+rock and simply stands there, arm down, and the teaching moment the player is
+meant to read never exists.
+
+That gate is pre-existing and deliberate. What 1110 changed is how OFTEN it is
+hit: the alternate-facet search added for the contact fix can pick a stand well
+round the flank, and a measured +25° approach put the runner 10.43 m from the
+listener where the straight-in stand is closer. So silent, armless arrivals are
+now somewhat more likely than before.
+
+No player blockade — the tap moment at the near rock is unaffected and the round
+still teaches — so it waits here rather than becoming a point. Two directions if
+it is ever picked up: prefer the audible stand among equally good candidates, or
+let the arm reach even when the word is not heard, on the grounds that a hand on
+a stone is a thing you can SEE from outside earshot. The second is a design
+question for `design.md` 13.4, not a bug fix.
+
+## `polish --section=adult-errands` fails at exactly the earshot boundary (11.09.2026)
+
+Seen once in the WebGL 2 pass of point 1110, green on the retry and green on
+WebGPU in the same tree: "no adult word ever falls inside the children`s earshot
+— nearest utterance to the children: DIG at 10.0 m from a child". The assertion
+is `nearestBankVoice > 10` against a hearing radius of exactly 10 m, so an adult
+that happens to speak while standing ON the radius fails a check whose intent is
+that the word is not HEARD. Not reproducible and not caused by that point
+(`adultWork.ts` does not use the changed movement helper), so it is recorded here
+rather than charged: if it recurs, the question is whether the bar should be
+`>= 10` — or whether an adult standing exactly at the children's earshot is the
+real finding.
