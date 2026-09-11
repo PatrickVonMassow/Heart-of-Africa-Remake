@@ -201,6 +201,23 @@ describe('a merge ages the rung exactly as an edit does (measured 10.09.2026)', 
     expect(verdict.reason).toContain('last merge')
   })
 
+  it('ages the rung when the MERGE is the only thing that changed', () => {
+    // `git merge main` moves the merge base to main's tip, so everything the
+    // merge imported leaves the branch delta: `changes` is empty. The run then
+    // answered FREE with a rung older than the merge — the exact case measured
+    // on 09.09.2026, when two merges landed after the last green rung and the
+    // LARGE run failed on that section's material.
+    const verdict = ladderVerdict({
+      run: fullPolish(),
+      map: MAP,
+      changes: [],
+      merges: [{ at: T0 + HOUR }],
+      runs: [ledgerRun({ startedAt: T0, partial: true, section: 'town-plan' })],
+    })
+    expect(verdict.status).toBe(LADDER_STATUS.REFUSED)
+    expect(verdict.ok).toBe(false)
+  })
+
   it('and admits it once the rung is re-climbed after the merge', () => {
     const verdict = ladderVerdict({
       run: fullPolish(),
@@ -210,6 +227,29 @@ describe('a merge ages the rung exactly as an edit does (measured 10.09.2026)', 
       merges: [{ at: T0 + 2 * HOUR }],
     })
     expect(verdict.status).toBe(LADDER_STATUS.CLIMBED)
+  })
+})
+
+describe('one suite’s threshold is its own', () => {
+  it('leaves a green rung standing when ANOTHER suite is the one that was edited', () => {
+    // One threshold across every covered suite let an unrelated edit invalidate
+    // a rung that was green for its own material — a FALSE refusal, which is
+    // the costly direction: it blocks an author who DID climb the ladder.
+    const run = { kind: 'full', browser: ['collision', 'polish'], suites: ['collision', 'polish'], section: null }
+    const verdict = ladderVerdict({
+      run,
+      map: MAP,
+      changes: [
+        edit('scripts/verify/polish.mjs', T0),
+        edit('scripts/verify/collision.mjs', T0 + 2 * HOUR),
+      ],
+      runs: [
+        { suite: 'polish', exit: 0, startedAt: T0 + HOUR, partial: true, section: 'town-plan' },
+        { suite: 'collision', exit: 0, startedAt: T0 + 3 * HOUR, partial: true, section: 'huts' },
+      ],
+    })
+    expect(verdict.status).toBe(LADDER_STATUS.CLIMBED)
+    expect(verdict.ok).toBe(true)
   })
 })
 

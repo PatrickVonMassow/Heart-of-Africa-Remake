@@ -179,21 +179,44 @@ export function ladderVerdict({
     covered.push({ path, editedAt: Number(change.editedAt) || 0, suites })
   }
 
-  if (covered.length === 0) {
+  const lastMerge = newest((merges ?? []).map((m) => Number(m?.at)))
+
+  // A MERGE AGES EVERY RUNG THIS RUN COVERS, even when the branch's own delta is
+  // empty — and that case is not exotic, it is what `git merge main` PRODUCES.
+  // The merge moves the merge base to main's tip, so everything the merge
+  // imported leaves the branch delta entirely: it vanishes from `changes`, the
+  // run answered FREE, and a narrow rung climbed before the merge counted. The
+  // merge is the edit in that case.
+  if (covered.length === 0 && lastMerge === 0) {
     return answer(
       LADDER_STATUS.FREE,
       'nothing this run covers carries an edit — the full pass is the cheapest rung there is',
     )
   }
 
+  // ONE THRESHOLD PER SUITE. A single threshold across all of them let an
+  // UNRELATED suite's edit invalidate a rung that was green for its own
+  // material: edit `polish.mjs`, climb its section, then edit `collision.mjs`
+  // and climb that one, and a run holding both refused `polish` because its
+  // green predated the collision edit. That is a FALSE refusal, which is the
+  // costly direction — it blocks an author who did climb the ladder. A suite is
+  // aged by its OWN material, and by the merge that ages them all.
+  const needing = (
+    covered.length > 0 ? [...new Set(covered.flatMap((c) => c.suites))] : [...(run.browser ?? [])]
+  ).sort()
+  const thresholds = new Map(
+    needing.map((suite) => [
+      suite,
+      Math.max(newest(covered.filter((c) => c.suites.includes(suite)).map((c) => c.editedAt)), lastMerge),
+    ]),
+  )
+
   const lastEdit = newest(covered.map((c) => c.editedAt))
-  const lastMerge = newest((merges ?? []).map((m) => Number(m?.at)))
-  const threshold = Math.max(lastEdit, lastMerge)
+  const threshold = newest([...thresholds.values()])
   const agedBy = lastMerge > lastEdit ? 'the branch’s last merge' : 'the last edit'
 
   // The escape is read AFTER the material is known, so its record names what it
   // waived rather than only that it was used.
-  const needing = [...new Set(covered.flatMap((c) => c.suites))].sort()
   if (escape && String(escape.why ?? '').trim() !== '') {
     return answer(
       LADDER_STATUS.WAIVED_ESCAPE,
@@ -211,7 +234,7 @@ export function ladderVerdict({
   const green = []
   for (const suite of needing) {
     const since = (runs ?? []).filter(
-      (r) => r && r.suite === suite && Number(r.exit) === 0 && Number(r.startedAt) >= threshold,
+      (r) => r && r.suite === suite && Number(r.exit) === 0 && Number(r.startedAt) >= (thresholds.get(suite) ?? threshold),
     )
     const liars = []
     let honest = false
