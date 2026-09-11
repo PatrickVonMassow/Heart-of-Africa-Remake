@@ -4,6 +4,14 @@ import { join } from 'node:path'
 import { readRecord } from './run-record.mjs'
 import { parseArgs, selectBackend } from './tiers.mjs'
 
+// These wrapper controls do not change the tested behavior. All other VERIFY_
+// settings (seed, retry policy, load policy, etc.) must agree with the receipt.
+export function cacheEnvironment(env = process.env) {
+  const controls = new Set(['VERIFY_GL', 'VERIFY_LOG_DIR', 'VERIFY_NO_WAIT'])
+  return JSON.stringify(Object.entries(env).filter(([key]) => key.startsWith('VERIFY_') && !controls.has(key))
+    .sort(([a], [b]) => a.localeCompare(b)))
+}
+
 export function cleanWorktree(cwd) {
   try {
     return execFileSync('git', ['status', '--porcelain'], {
@@ -17,7 +25,7 @@ export function cleanWorktree(cwd) {
 /** Reuse only the requested suite/section, never promote a partial to coverage.
  * Backend and extra flags must also match; --again always asks for fresh work.
  * A dirty tree cannot be identified by HEAD, so it cannot serve a cached run. */
-export function lastGreenReceipt({ records, argv, head, verifyGl, again = false, clean = true }) {
+export function lastGreenReceipt({ records, argv, head, verifyGl, environment = '[]', again = false, clean = true }) {
   const wanted = parseArgs(argv)
   if (again || !clean || !head || wanted.tier || wanted.filter.length !== 1 || wanted.section === '') return null
   const flags = (args) => parseArgs(args).flags.filter((f) => !f.startsWith('--section')).sort().join('\0')
@@ -25,7 +33,8 @@ export function lastGreenReceipt({ records, argv, head, verifyGl, again = false,
   for (const entry of records) {
     const r = entry.record
     if (!r || !Array.isArray(r.args) || r.head !== head || r.cleanAtStart === false ||
-      r.status !== 'finished' || r.exitCode !== 0 || r.receipt?.exitCode !== 0 ||
+      r.status !== 'finished' || r.exitCode !== 0 || r.receipt?.exitCode !== 0 || r.receipt.green !== true ||
+      (r.cacheEnvironment ?? '[]') !== environment ||
       !Number.isFinite(r.finishedAt)) continue
     const shape = parseArgs(r.args)
     if (shape.tier || shape.filter.length !== 1 || shape.filter[0] !== wanted.filter[0] ||

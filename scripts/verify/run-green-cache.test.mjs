@@ -2,12 +2,12 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { findGreenReceipt, formatCachedGreen, lastGreenReceipt } from './run-green-cache.mjs'
+import { cacheEnvironment, findGreenReceipt, formatCachedGreen, lastGreenReceipt } from './run-green-cache.mjs'
 
 const ARGS = ['polish', '--section=adult-errands']
 const green = (overrides = {}) => ({
   args: ARGS, head: 'abc123', verifyGl: null, status: 'finished', exitCode: 0,
-  finishedAt: 60_000, receipt: { exitCode: 0 }, ...overrides,
+  finishedAt: 60_000, receipt: { exitCode: 0, green: true }, ...overrides,
 })
 const entry = (overrides = {}) => ({ path: 'green.log.run.json', record: green(overrides) })
 const request = (overrides = {}) => ({ argv: ARGS, head: 'abc123', records: [entry()], ...overrides })
@@ -27,6 +27,7 @@ describe('run-logged green receipts', () => {
     { argv: ['large'] }, { argv: ['polish', 'settings'] },
     { argv: [...ARGS, '--baseline'] }, { verifyGl: 'webgl' },
     { again: true }, { clean: false }, { head: null },
+    { environment: cacheEnvironment({ VERIFY_SEED: '1234' }) },
   ])('does not reuse a different request or an explicit fresh run: %j', (change) => {
     expect(lastGreenReceipt(request(change))).toBeNull()
   })
@@ -34,9 +35,17 @@ describe('run-logged green receipts', () => {
   it.each([
     { status: 'running' }, { exitCode: 1 }, { receipt: null },
     { receipt: { exitCode: 1 } }, { finishedAt: null }, { cleanAtStart: false },
+    { receipt: { exitCode: 0, green: false, failing: [{ name: 'settings' }] } },
     { args: ['large', ...ARGS] },
   ])('does not reuse incomplete or ineligible evidence: %j', (change) => {
     expect(lastGreenReceipt(request({ records: [entry(change)] }))).toBeNull()
+  })
+
+  it('keeps seed and retry settings distinct while ignoring wrapper controls', () => {
+    expect(cacheEnvironment({ VERIFY_NO_WAIT: '1', VERIFY_LOG_DIR: 'logs', VERIFY_GL: 'webgl' })).toBe('[]')
+    const environment = cacheEnvironment({ VERIFY_SEED: '1234', VERIFY_NO_RETRY: '1' })
+    expect(lastGreenReceipt(request({ environment, records: [entry({ cacheEnvironment: environment })] }))).not.toBeNull()
+    expect(lastGreenReceipt(request({ environment, records: [entry()] }))).toBeNull()
   })
 
   it('finds a green beyond twenty newer red records and ignores torn JSON', () => {

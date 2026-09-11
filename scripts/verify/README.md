@@ -307,7 +307,8 @@ or `npm test -- polish --section=adult-errands`. The section name attaches to
 
 For the same HEAD, suite and section, the wrapper returns the last green
 receipt in `local/verify-logs/`: `already green N min ago, receipt <path>`.
-Backend and additional runner flags must match too. An uncommitted tree cannot
+Backend, verification environment and additional runner flags must match too.
+An exit-zero receipt with recorded failures is not green. An uncommitted tree cannot
 reuse a HEAD-only receipt. `--again` requests a fresh run. Reuse never creates
 coverage: a section receipt remains partial, and a full suite needs its own
 unfiltered receipt.

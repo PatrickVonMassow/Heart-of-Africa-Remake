@@ -62,7 +62,7 @@ import { emitActivity } from '../batch-activity-journal.mjs'
 import { ACTIVITY_EVENTS } from '../batch-activity-journal-core.mjs'
 import { budgetToolOutput } from '../tool-output-budget-core.mjs'
 import { developmentRunRefusal, parseRunLoggedArgs } from './run-logged-args.mjs'
-import { cleanWorktree, findGreenReceipt, formatCachedGreen } from './run-green-cache.mjs'
+import { cacheEnvironment, cleanWorktree, findGreenReceipt, formatCachedGreen } from './run-green-cache.mjs'
 import { waitForLargeRun } from './large-run-wait.mjs'
 import { LADDER_STATUS, formatLadderRefusal } from './ladder-core.mjs'
 import { ladderCheck } from './ladder.mjs'
@@ -274,6 +274,7 @@ function runVerify() {
     head: where.head,
     branch: where.branch,
     cleanAtStart: cleanWorktree(ROOT),
+    cacheEnvironment: cacheEnvironment(),
     log: shown,
     startedAt: started,
     expectedRuntimeMs: plan.expectedMs,
@@ -496,6 +497,7 @@ else {
     const cached = findGreenReceipt({
       dir: join(ROOT, process.env.VERIFY_LOG_DIR || 'local/verify-logs'),
       argv: forward, head: gitPosition().head, verifyGl: process.env.VERIFY_GL,
+      environment: cacheEnvironment(),
       again: own.again, clean: cleanWorktree(ROOT),
     })
     if (cached) console.log(formatCachedGreen({ ...cached, path: forDisplay(cached.path) }))
