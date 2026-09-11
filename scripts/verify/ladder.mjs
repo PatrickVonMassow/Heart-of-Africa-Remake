@@ -14,12 +14,16 @@ import { REPO_ROOT } from '../repo-paths.mjs'
 import { parseDiffSuiteMap } from '../point-brief-core.mjs'
 import { readRenderState } from '../render-verify-state.mjs'
 import { listNonPredictive } from './sections.mjs'
-import { LADDER_STATUS, classifyLadderRun, ladderVerdict } from './ladder-core.mjs'
+import { LADDER_STATUS, classifyLadderRun, ladderVerdict, porcelainPaths } from './ladder-core.mjs'
 
 const ROOT = REPO_ROOT
 
+/** Git's stdout, UNTRIMMED: `git status --porcelain` puts its two status
+ *  columns in fixed positions and the first is usually a space, so trimming the
+ *  whole output eats the first path's first character. Callers that want a
+ *  single token trim it themselves. */
 function git(args, cwd = ROOT) {
-  return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
+  return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
 }
 
 /** The commit both this branch and `main` share, or null on a checkout that has
@@ -27,7 +31,7 @@ function git(args, cwd = ROOT) {
 function mergeBase(cwd) {
   for (const ref of ['main', 'origin/main']) {
     try {
-      return git(['merge-base', ref, 'HEAD'], cwd)
+      return git(['merge-base', ref, 'HEAD'], cwd).trim()
     } catch {
       /* try the next spelling */
     }
@@ -60,12 +64,7 @@ export function editedFiles({ cwd = ROOT } = {}) {
     }
   }
   try {
-    for (const line of git(['status', '--porcelain'], cwd).split('\n')) {
-      const path = line.slice(3).trim()
-      if (!path) continue
-      // A rename prints "old -> new"; the new name is the one that carries the edit.
-      paths.add(path.includes(' -> ') ? path.slice(path.indexOf(' -> ') + 4).trim() : path)
-    }
+    for (const path of porcelainPaths(git(['status', '--porcelain'], cwd))) paths.add(path)
   } catch {
     /* not a repository — nothing is edited as far as the ladder can tell */
   }

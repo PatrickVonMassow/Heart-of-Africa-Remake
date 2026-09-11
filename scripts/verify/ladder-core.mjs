@@ -106,6 +106,37 @@ export function suitesCovering(path, map) {
   return named.filter((s) => DEV_SUITES.includes(s))
 }
 
+/**
+ * The paths in a `git status --porcelain` listing.
+ *
+ * The two status columns are POSITIONAL and the first of them is often a SPACE
+ * (` M path`), so the text must not be trimmed as a whole before it is read —
+ * doing that ate the first character of the first path, which is a silent
+ * "nothing is edited" and therefore the exact failure this mechanism exists to
+ * prevent. A rename prints `old -> new`; the new name carries the edit. A path
+ * with a character git has to escape arrives quoted, and is unquoted here.
+ * Total: never throws.
+ */
+export function porcelainPaths(text) {
+  const out = []
+  for (const line of String(text ?? '').split('\n')) {
+    if (line.length < 4) continue
+    let path = line.slice(3)
+    const arrow = path.indexOf(' -> ')
+    if (arrow >= 0) path = path.slice(arrow + 4)
+    path = path.trim()
+    if (path.startsWith('"') && path.endsWith('"') && path.length > 1) {
+      try {
+        path = JSON.parse(path)
+      } catch {
+        path = path.slice(1, -1)
+      }
+    }
+    if (path) out.push(path)
+  }
+  return out
+}
+
 /** The newest timestamp in a list, or 0. */
 function newest(values) {
   let out = 0
@@ -226,14 +257,20 @@ export function ladderVerdict({
   }
 
   if (unclimbed.length > 0) {
-    const commands = unclimbed.map((suite) => {
+    // THE COMMANDS, LABELLED. Which section covers a given edit cannot be
+    // derived from the diff, so the ladder never pretends it was: it offers the
+    // section this suite LAST ran — in a repair loop that is almost always the
+    // one being repaired — and, beside it, the call that prints the real names
+    // in a tenth of a second and without booting a browser.
+    const commands = []
+    for (const suite of unclimbed) {
       const last = [...(runs ?? [])]
         .filter((r) => r && r.suite === suite && r.partial === true && typeof r.section === 'string')
         .sort((a, b) => Number(a.startedAt) - Number(b.startedAt))
         .pop()
-      const name = last?.section ?? 'list'
-      return `npm test -- ${suite} --section=${name}`
-    })
+      if (last) commands.push(`npm test -- ${suite} --section=${last.section}   # the section ${suite} last ran`)
+      commands.push(`npm test -- ${suite} --section=list   # every section ${suite} declares`)
+    }
     const files = covered
       .filter((c) => c.suites.some((s) => unclimbed.includes(s)))
       .map((c) => c.path)
@@ -271,6 +308,7 @@ export function ladderVerdict({
 /** The block run-logged prints on a refusal: the reason, then the exact commands. */
 export function formatLadderRefusal(verdict) {
   const lines = [`REFUSED BY THE VERIFICATION LADDER (point 1086) — ${verdict.reason}`]
-  for (const cmd of verdict.commands ?? []) lines.push(`  run this instead:  ${cmd}`)
+  if ((verdict.commands ?? []).length > 0) lines.push('RUN THIS INSTEAD:')
+  for (const cmd of verdict.commands ?? []) lines.push(`  ${cmd}`)
   return lines.join('\n')
 }

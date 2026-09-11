@@ -8,6 +8,7 @@ import {
   classifyLadderRun,
   formatLadderRefusal,
   ladderVerdict,
+  porcelainPaths,
   suitesCovering,
 } from './ladder-core.mjs'
 import { parseDiffSuiteMap } from '../point-brief-core.mjs'
@@ -78,19 +79,23 @@ describe('the refusal, and what lifts it', () => {
     expect(verdict.ok).toBe(false)
     expect(verdict.status).toBe(LADDER_STATUS.REFUSED)
     expect(verdict.suites).toEqual(['polish'])
-    expect(verdict.commands).toEqual(['npm test -- polish --section=town-plan'])
+    expect(verdict.commands).toEqual([
+      'npm test -- polish --section=town-plan   # the section polish last ran',
+      'npm test -- polish --section=list   # every section polish declares',
+    ])
     expect(verdict.threshold).toBe(T0 + HOUR)
+    expect(formatLadderRefusal(verdict)).toContain('RUN THIS INSTEAD:')
     expect(formatLadderRefusal(verdict)).toContain('npm test -- polish --section=town-plan')
   })
 
-  it('names --section=list when the suite has no recorded section run to copy', () => {
+  it('offers only the name list when no section run is recorded to copy', () => {
     const verdict = ladderVerdict({
       run: fullPolish(),
       map: MAP,
       changes: [edit('src/scenes/place/village.ts', T0 + HOUR)],
       runs: [],
     })
-    expect(verdict.commands).toEqual(['npm test -- polish --section=list'])
+    expect(verdict.commands).toEqual(['npm test -- polish --section=list   # every section polish declares'])
     expect(verdict.reason).toContain(LADDER_ESCAPE_FLAG)
   })
 
@@ -276,6 +281,28 @@ describe('the deliberate escape', () => {
       escape: { why: '   ' },
     })
     expect(verdict.status).toBe(LADDER_STATUS.REFUSED)
+  })
+})
+
+describe('reading `git status --porcelain`', () => {
+  it('keeps the first path whole — the columns are positional, and the first is a space', () => {
+    // Trimming the whole listing ate the leading space of the FIRST line and
+    // therefore the first character of its path, which reads as "nothing is
+    // edited": a silent pass, the one failure this mechanism exists to prevent.
+    expect(porcelainPaths(' M scripts/verify/polish.mjs\n M verification/98.png\n')).toEqual([
+      'scripts/verify/polish.mjs',
+      'verification/98.png',
+    ])
+  })
+
+  it('reads a rename as its NEW name, and unquotes an escaped path', () => {
+    expect(porcelainPaths('R  src/old.ts -> src/new.ts')).toEqual(['src/new.ts'])
+    expect(porcelainPaths('?? "src/caf\\303\\251.ts"')[0]).toContain('src/caf')
+  })
+
+  it('is total on nothing at all', () => {
+    expect(porcelainPaths('')).toEqual([])
+    expect(porcelainPaths(null)).toEqual([])
   })
 })
 

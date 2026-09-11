@@ -42,7 +42,7 @@ const OUT = fileURLToPath(new URL('../../verification/', import.meta.url))
 // scripts/verify/sections.mjs, so an unknown one is refused with the list of the
 // real ones — and the run is stamped PARTIAL, never counted as suite coverage.
 const sections = sectionGate()
-const { section } = sections
+const { section, nonPredictive } = sections
 if (sections.banner()) console.log(sections.banner())
 
 let failures = 0
@@ -50,7 +50,11 @@ const check = (name, ok, detail) => {
   // The section tag goes AFTER the ' — ' separator: the check's NAME is its
   // identity for the red ledger and the baseline classifier and must not change.
   const tail = [detail, sections.tag().trim()].filter(Boolean).join('  ')
-  console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${tail ? ' — ' + tail : ''}`)
+  // A check that declared itself NON-PREDICTIVE says so on the line where it
+  // passes narrowly (point 1086), so a green section run cannot be read as a
+  // promise about the pass.
+  const note = sections.predictiveNote(name, ok)
+  console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${tail ? ' — ' + tail : ''}${note}`)
   if (!ok) failures++
 }
 
@@ -5233,6 +5237,18 @@ if (section('adult-errands')) {
         `(${Object.entries(staged)
           .map(([k, n]) => `${k}×${n}`)
           .join(', ')}), ${atWork} villager-samples at work`,
+    )
+    // MEASURED 10.09.2026: this reading does not survive the pass. Run alone,
+    // the section always saw enough errands — twelve green climbs on 09.09.,
+    // 18 pass and 0 fail. Inside the full suite the same window cast ONE errand,
+    // with the fetch phase at 33 of about 2000 phase ticks, and the pass failed
+    // here. Until the window is sized so both runs measure the same thing (the
+    // water carrier's own points own that), the narrow green says out loud that
+    // it promises nothing about the pass — and the ladder refuses to count it as
+    // climbed (scripts/verify/ladder-core.mjs).
+    nonPredictive(
+      'a villager is seen digging, and the jar goes down EMPTY and comes back FULL',
+      'run alone this window casts many errands; inside the full pass it cast ONE, fetch phase 33 of ~2000 ticks (10.09.2026)',
     )
     check(
       'a villager is seen digging, and the jar goes down EMPTY and comes back FULL',
