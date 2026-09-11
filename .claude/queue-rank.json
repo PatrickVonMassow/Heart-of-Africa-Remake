@@ -1237,12 +1237,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "1085": {
-      "at": "2026-09-10T00:49:30.955Z",
-      "why": "Nutzer-Anordnung 10.09.2026 02:15: die Designentscheidung zur Haltung am Wasser wird vorgezogen, weil das Wasserholen ohne sie nicht grün werden kann",
-      "origin": "user",
-      "place": "ahead"
-    },
     "1087": {
       "at": "2026-09-10T00:49:31.047Z",
       "why": "Nutzer-Anordnung 10.09.2026 02:15: das Wasserholen bleibt direkt hinter seiner Designentscheidung und der neuen Pruefleiter statt ans Ende zu wandern",
@@ -1332,6 +1326,24 @@
       "why": "It cannot wait for the release because it IS in the release picture: the low graphics level ships black on the primary backend, and its red sits inside the settings suite every point behind it must pass, where a wrong classification hides the next real failure.",
       "origin": "machine",
       "place": "ahead"
+    },
+    "1106": {
+      "at": "2026-09-11T12:29:02.825Z",
+      "why": "Sein eigener Bugreport vom 11.09.2026, zum zweiten Mal gemeldet: die lehrende Hand berührt den Stein nicht, den sie benennt — und die stehende Release-Ordnung stellt alles, was die Kommunikationsmechanik betrifft, nach vorn",
+      "origin": "user",
+      "place": "ahead"
+    },
+    "1107": {
+      "at": "2026-09-11T12:29:02.913Z",
+      "why": "Aus demselben Bugreport vom 11.09.2026: der Fänger bleibt nach seinem Fang stehen; er sitzt im selben bankGame.ts, das 1106 umschreibt, und wird direkt danach gearbeitet",
+      "origin": "user",
+      "place": "ahead"
+    },
+    "1108": {
+      "at": "2026-09-11T12:29:10.894Z",
+      "why": "Maschinell eingereiht und nicht dringend: kein Spielerimpakt, es kostet nur dem Bildbeweis seine Aussage. Es steht direkt hinter dem Release und vor 1087, das einen Rahmen derselben Handlung schuldet",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1364,7 +1376,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-11T09:49:43.128Z",
+    "at": "2026-09-11T12:29:10.902Z",
     "points": [
       174,
       184,
@@ -1742,7 +1754,6 @@
       1081,
       1082,
       1084,
-      1085,
       1087,
       1089,
       1092,
@@ -1757,7 +1768,10 @@
       1101,
       1102,
       1103,
-      1105
+      1105,
+      1106,
+      1107,
+      1108
     ]
   }
 }

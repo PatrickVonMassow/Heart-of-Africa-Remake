@@ -168,42 +168,6 @@ put it is the mistake this line exists to stop.
   misreads as a dead actor, but the teaching itself still completes.
   Bundle: Dorfleben.
 
-- [ ] 1108. The fill's proof frame measures its neighbours BEFORE they walk, so a green suite
-  can still certify a picture with no readable subject.
-  MEASURED 11.09.2026 on main at 72114fb3, in the covering runs of point 1085 on BOTH lanes:
-  `polish` reported 255 pass, 0 fail, 0 console-errors — and
-  `verification/1085-village-adult-fills-a-jar.png` came back as the village square with two
-  cones overlapping the subject and a large vessel in the near field, the same unreadable
-  picture that 1085 was split off to fix. Run as a SINGLE SECTION
-  (`polish --section=adult-errands`) the very same code writes a clean frame on both lanes —
-  one figure alone on the bank — which is why nothing reported it.
-  THE CAUSE IS A STALE SNAPSHOT. In `scripts/verify/polish.mjs` the adult-errands shot reads
-  `posed.others` ONCE, before the bearing loop, and every clearance test — the angular
-  overlap test and the ray probes alike — is judged against those positions. The subject is
-  pinned by `__placeForceFill`, but the OTHER villagers keep walking their errands through
-  the loop and through the six settling frames before the shutter, so by the time the frame
-  is taken a neighbour has walked into a line that was clear when it was measured. The
-  section-only run is quiet enough that they have not moved far; the full pass, thirty
-  minutes in with the errands well advanced, is not. The code already knows this failure mode
-  for the SUBJECT — it re-reads his position and asserts "he is still standing where the
-  shutter is aimed" — and simply never asked it of anyone else.
-  Final state:
-  - The clearance the frame depends on is measured at the SHUTTER, not before it: the
-    villagers' positions are re-read immediately before `frame(...)` and the same angular
-    overlap test is asserted then, as a check that can fail.
-  - A bearing that has gone stale is re-chosen rather than shot: the search re-runs against
-    the fresh positions, and only an exhausted search reds.
-  - The check says which neighbour spoiled the line and by how much, so a future red names its
-    cause instead of leaving a reader to compare pictures.
-  - Evidence: the frame is taken in a FULL `polish` pass on both lanes, not only in the
-    section, and read by someone told nothing but "what is this man doing?".
-  WHY IT IS A POINT AND NOT A BACKLOG LINE: it permits a false approval. The suite certifies
-  a proof frame whose subject is not readable, which is exactly the vanished-subject pitfall
-  this repository recorded on 11.09.2026, and point 1087 owes a frame of this same act.
-  Criticality: medium — no player impact; it costs the picture proof its meaning, and it sits
-  directly in front of point 1087.
-  Bundle: Dorfleben.
-
 - [ ] 1103. On WebGL 2 the distant village is not in the picture at all.
   MEASURED 11.09.2026 on a quiet machine, by reading the two lanes of point 1086's covering
   runs against each other rather than by any red — the check that owns the frame passes on
@@ -1373,6 +1337,42 @@ put it is the mistake this line exists to stop.
   tag plus `poc` dynamically, but a tag push alone does not trigger it. Then VERIFY
   that /v0.3/ and /poc/ serve the new state, and FREEZE the tag: it is never
   re-pointed.
+
+- [ ] 1108. The fill's proof frame measures its neighbours BEFORE they walk, so a green suite
+  can still certify a picture with no readable subject.
+  MEASURED 11.09.2026 on main at 72114fb3, in the covering runs of point 1085 on BOTH lanes:
+  `polish` reported 255 pass, 0 fail, 0 console-errors — and
+  `verification/1085-village-adult-fills-a-jar.png` came back as the village square with two
+  cones overlapping the subject and a large vessel in the near field, the same unreadable
+  picture that 1085 was split off to fix. Run as a SINGLE SECTION
+  (`polish --section=adult-errands`) the very same code writes a clean frame on both lanes —
+  one figure alone on the bank — which is why nothing reported it.
+  THE CAUSE IS A STALE SNAPSHOT. In `scripts/verify/polish.mjs` the adult-errands shot reads
+  `posed.others` ONCE, before the bearing loop, and every clearance test — the angular
+  overlap test and the ray probes alike — is judged against those positions. The subject is
+  pinned by `__placeForceFill`, but the OTHER villagers keep walking their errands through
+  the loop and through the six settling frames before the shutter, so by the time the frame
+  is taken a neighbour has walked into a line that was clear when it was measured. The
+  section-only run is quiet enough that they have not moved far; the full pass, thirty
+  minutes in with the errands well advanced, is not. The code already knows this failure mode
+  for the SUBJECT — it re-reads his position and asserts "he is still standing where the
+  shutter is aimed" — and simply never asked it of anyone else.
+  Final state:
+  - The clearance the frame depends on is measured at the SHUTTER, not before it: the
+    villagers' positions are re-read immediately before `frame(...)` and the same angular
+    overlap test is asserted then, as a check that can fail.
+  - A bearing that has gone stale is re-chosen rather than shot: the search re-runs against
+    the fresh positions, and only an exhausted search reds.
+  - The check says which neighbour spoiled the line and by how much, so a future red names its
+    cause instead of leaving a reader to compare pictures.
+  - Evidence: the frame is taken in a FULL `polish` pass on both lanes, not only in the
+    section, and read by someone told nothing but "what is this man doing?".
+  WHY IT IS A POINT AND NOT A BACKLOG LINE: it permits a false approval. The suite certifies
+  a proof frame whose subject is not readable, which is exactly the vanished-subject pitfall
+  this repository recorded on 11.09.2026, and point 1087 owes a frame of this same act.
+  Criticality: medium — no player impact; it costs the picture proof its meaning, and it sits
+  directly in front of point 1087.
+  Bundle: Dorfleben.
 
 - [ ] 1089. Charge a LARGE red that does not touch the point's diff to its own point
   (user 10.09.2026).
