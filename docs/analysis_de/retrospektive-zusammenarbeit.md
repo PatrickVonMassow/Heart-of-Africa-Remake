@@ -1460,7 +1460,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Freitag, 11.09.2026, 01:18 · Quellen-Fingerprint: `48b942de1b44…`
+Zuletzt aktualisiert: Freitag, 11.09.2026, 02:16 · Quellen-Fingerprint: `afd804e602c8…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1500,7 +1500,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to the OpenAI lane, GPT-6 Astra), and review is cross-vendor, not Fable-by-default | 6 | hoch | — (Regel/Memory) | ◐ Regel |
 | Iterate on the new feature's OWN test first; the full regression runs once at the end, never as the debugging loop | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 70 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 71 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | wait-command-guard.mjs | ✔ Mechanismus |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | \"Gib ab\" / \"abgeben\" means hand the batch to a SUCCESSOR session so the context does not overflow — it never means pause or stop the batch | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1566,8 +1566,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 96 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 130 Prozess-/Meta-TASKS-Punkte (davon 63 offen).
 
-<!-- RETRO-FINGERPRINT: 48b942de1b4422ac19af7a4d9465be565e70458303cc3f2580b41ec39cb8d9f4 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-10T23:18:44.530Z -->
+<!-- RETRO-FINGERPRINT: afd804e602c8296c56df210d98e8a474b8ddff947d3b4b6d202dc2777953bef2 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-11T00:16:35.404Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -6633,3 +6633,27 @@ den es nicht bedienen kann — ein unbekanntes Flag, eine leere Umgebung, eine E
 die eigene Messreihe widerspricht. Und wo neben dem Modellwert eine Messung steht, ist die
 Messung die Zahl, mit der gerechnet wird; der Modellwert ist ihr Boden, nicht ihr Maß. Gebucht
 als Punkte 1101 und 1099.
+
+### 3.264 Eine Erzwingung, die das Ende nennt, wird als nächster Schritt gelesen
+
+Am 09.09.2026 hat eine Sitzung den vollen Durchlauf als Debug-Schleife benutzt: vier Läufe,
+rund 2,5 Maschinenstunden, für einen Defekt, den danach zwei Abschnittsläufe in vier Minuten
+gefunden haben. §3.253 hat dazu festgehalten, dass die Regel im Auftrag stand und ihr Preis
+nirgends. Was dort noch fehlt, ist die aktive Hälfte: Es war nicht nur so, dass nichts zur
+billigen Sprosse drängte — es hat etwas in die entgegengesetzte Richtung gezogen. Die
+Bildschranke akzeptiert ausschließlich einen vollen deckenden Lauf und sagt deshalb nach
+*jeder* Änderung »nicht verifiziert«, mit dem Vollbefehl im eigenen Text. Ein Wächter, der
+nach jeder Änderung feuert, wird gelesen wie eine Aufgabenliste, und der Befehl in seiner
+Verweigerung wie der nächste Schritt.
+
+Die Verwandtschaft zu §3.263 ist der fehlende Zustand: Die Schranke kennt kein »noch nicht an
+der Reihe«. Sie kennt nur erfüllt und nicht erfüllt und beschreibt das Ende eines Punktes, als
+wäre es sein nächster Zug. Der Unterschied zu einem falschen Urteil ist, dass hier jedes Wort
+stimmt — der deckende Lauf wird tatsächlich geschuldet, nur eben am Schluss.
+
+**Lehre:** Eine Erzwingung, die während der Reparatur wiederholt feuert, muss sagen, *wann*
+sie fällig ist, sonst wird ihr Zeitpunkt überlesen. Und wo eine Reihenfolge zwischen billig
+und teuer gilt, gehört sie dorthin, wo Läufe gestartet werden, nicht in den Wächter am Ende:
+Der Wächter kann nur den Schluss bewerten, der Starter kann die Reihenfolge halten. Gebucht
+als Punkt 1086, der die Verweigerung in `scripts/verify/run-logged.mjs` legt und die
+Bildschranke ihren eigenen Zeitpunkt aussprechen lässt.

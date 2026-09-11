@@ -297,13 +297,13 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   Grenze nennt ihre **Richtung**: zu viel durchgelassen oder zu viel verweigert."
 
 - **Die teuerste Prüfung großflächig verlangt.** Bildbegutachtung, zweiter Lauf, zweites Modell
-  kosten ein Vielfaches — pauschal gefordert, wo sie nichts beweisen. **Eine Regel ohne Preis ist
-  nur eine Empfehlung:** Ein Punkt verbrannte fünf rote Zwei-Stunden-Läufe, obwohl der Auftrag
-  „genau ein Vollbeweis" sagte — die Zeitangaben waren sechs Wochen alt und dreifach zu niedrig.
+  kosten ein Vielfaches, pauschal gefordert, wo sie nichts beweisen. **Eine Regel ohne Preis ist
+  nur eine Empfehlung:** Ein Punkt verbrannte fünf rote Zwei-Stunden-Läufe an sechs Wochen
+  alten Zeitangaben.
   → *Prompt:* „Verlange die teuerste Prüfung nur, wo eine Änderung abweichen kann, und schreib
-  die Grenze samt Begründung in den prüfenden Code. An jede billigere Stufe gehört ihre
-  **gemessene Dauer mit Messdatum**, und ein Prüflauf druckt den Befehl mit, der seinen Fehler
-  billig reproduziert."
+  die Grenze in den prüfenden Code. An jede billigere Stufe gehört ihre **gemessene Dauer mit
+  Messdatum**; ein Prüflauf druckt den Befehl mit, der ihn billig reproduziert, und was während
+  der Reparatur feuert, sagt **wann** es fällig ist — sonst gilt es als nächste Aufgabe."
 
 - **Was bei jedem Start mitgelesen wird, wächst — und du bezahlst es jedes Mal.** Jede
   Ergänzung ist berechtigt; am teuersten die, die wiederholt, was eine Prüfung erzwingt.
@@ -635,4 +635,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 48b942de1b4422ac19af7a4d9465be565e70458303cc3f2580b41ec39cb8d9f4 -->
+<!-- GUIDE-FINGERPRINT: afd804e602c8296c56df210d98e8a474b8ddff947d3b4b6d202dc2777953bef2 -->
