@@ -5300,6 +5300,116 @@ if (section('adult-errands')) {
       })
     }
 
+    // --- THE FILL READS AS FETCHING, NOT AS FALLING (work-order 1085) ---------
+    // Four re-aimed cameras all read the old fill as a man face-down in the
+    // river, so what is photographed here is the FIGURE, not another angle on
+    // it: a villager pinned into the decided pose at the hold, judged by a
+    // reader who is told only "what is this man doing?". The errand itself does
+    // not dip yet — that act is work-order 1087 — so the pose is forced onto the
+    // villager it belongs to, jar in hand, through the dev route.
+    // THE MAN HAS TO BE ALONE IN THE FRAME. The first attempt stood three metres
+    // off whoever came first and photographed a thicket of ten cones: a fold
+    // cannot be judged against a silhouette that overlaps two other bodies. So
+    // the subject is the MOST ISOLATED villager, and the camera takes the
+    // bearing whose line to him is actually clear.
+    const posed = await page.evaluate(() => {
+      if (typeof window.__placeForceFill !== 'function') return null
+      const v = window.__placeErrands().villagers
+      let who = -1
+      let best = -1
+      for (let i = 0; i < v.length; i++) {
+        if (v[i].digging) continue
+        let near = Infinity
+        for (let j = 0; j < v.length; j++) {
+          if (j === i) continue
+          near = Math.min(near, Math.hypot(v[i].x - v[j].x, v[i].z - v[j].z))
+        }
+        if (near > best) {
+          best = near
+          who = i
+        }
+      }
+      if (who < 0) return null
+      window.__placeForceFill(who, 0.5)
+      return { who, x: v[who].x, z: v[who].z, clearance: best }
+    })
+    check(
+      'one village adult, standing clear of the others, can be held in the fill pose',
+      posed != null && posed.clearance > 1.5,
+      posed ? `villager ${posed.who}, nearest neighbour ${posed.clearance.toFixed(1)} m` : 'nobody free',
+    )
+    if (posed) {
+      await nextFrames(6)
+      const drawn = await page.evaluate((w) => window.__placeErrands().villagers[w], posed.who)
+      // The two halves the design decided on, read off the DRAWN figure rather
+      // than off the pose that asked for them: the body sank, and the carrying
+      // hand came down to where water at a standing man's feet is. The angles
+      // themselves are pinned in src/render/gesture.test.ts.
+      check(
+        'the filling body sinks instead of only folding over',
+        !!drawn && drawn.drawn.squatY != null && drawn.drawn.squatY < 0.8,
+        drawn ? `y-scale ${String(drawn.drawn.squatY)}` : 'no villager',
+      )
+      check(
+        'and its carrying hand arrives at ankle height, out in front of it',
+        !!drawn && drawn.drawn.handY != null && drawn.drawn.handY < 0.3,
+        drawn ? `hand at ${drawn.drawn.handY == null ? 'nothing' : drawn.drawn.handY.toFixed(3)} m` : 'no villager',
+      )
+      // Four metres off on a CLEAR bearing, level with him: the fold is a
+      // silhouette question, so nothing may stand in the line, and a camera
+      // looking down its own axis at a bent figure foreshortens the very angle
+      // under judgement. Each bearing is DRAWN before it is judged — the camera
+      // only follows the player on the next frame (point 549).
+      const shot = await (async () => {
+        const blocked = []
+        for (let i = 0; i < 16; i++) {
+          const a = (i / 16) * Math.PI * 2
+          const hit = await page.evaluate(
+            ([bearing, v]) =>
+              new Promise((res) => {
+                const p = window.__placePlayer
+                p.x = v.x + Math.sin(bearing) * 3
+                p.z = v.z + Math.cos(bearing) * 3
+                p.yaw = Math.atan2(-(v.x - p.x), -(v.z - p.z))
+                p.pitch = -0.12
+                // IN PROFILE, CARRYING SIDE TOWARD THE LENS. Profile is the
+                // only view that shows both halves at once — the trunk's fold as
+                // a silhouette, and the arm reaching down in front of it rather
+                // than straight at the camera. The SIDE matters as much: the jar
+                // hangs on the figure's left, so a profile taken from its right
+                // photographs the fill with the whole act behind the cone, which
+                // is what the second frame showed.
+                window.__placeForceFill(v.who, 0.5, bearing - Math.PI / 2)
+                requestAnimationFrame(() =>
+                  requestAnimationFrame(() => {
+                    const h = window.__placeRayHit(v.x, 0.5, v.z)
+                    res({ hit: h.hitDistance, target: h.targetDistance, name: h.hitName, bearing })
+                  }),
+                )
+              }),
+            [a, posed],
+          )
+          if (hit.hit == null || hit.hit >= hit.target - 0.6) return { bearing: a, tried: i + 1, blocked }
+          blocked.push(`${a.toFixed(2)}→${hit.name} at ${hit.hit.toFixed(2)} of ${hit.target.toFixed(2)}`)
+        }
+        return { bearing: null, tried: 16, blocked }
+      })()
+      check(
+        'and a clear line to him exists for the shutter',
+        shot.bearing != null,
+        shot.bearing == null
+          ? `all 16 bearings blocked: ${shot.blocked.join(', ')}`
+          : `bearing ${shot.bearing.toFixed(2)} rad, the ${shot.tried}. of 16 tried`,
+      )
+      await nextFrames(6)
+      await frame('1085-village-adult-fills-a-jar', {
+        local: { x: posed.x, y: 0.6, z: posed.z },
+        label: 'a village adult held at the bottom of the fill, side-on, three metres off',
+      })
+      await page.evaluate(() => window.__placeForceFill(null))
+      await nextFrames(4)
+    }
+
     // --- The river itself (work-order 482) ------------------------------------
     // Two things only the live scene can settle: that the water is DRAWN in the
     // settlement rather than painted into the surroundings, and that its

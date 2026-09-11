@@ -32,6 +32,8 @@ import {
   aimAt,
   armAim,
   digPose,
+  fillPose,
+  fillSquat,
   gesturePose,
   isGesturing,
   REST_POSE,
@@ -241,6 +243,7 @@ function Figure({
   pose,
   limbs,
   gait,
+  squat,
   handProp,
 }: {
   cloth: string
@@ -256,6 +259,12 @@ function Figure({
   gesture?: RefObject<GestureState>
   /** A pose written by the caller each frame; wins over `gesture` when set. */
   pose?: RefObject<FigurePose | null>
+  /** The y-squash the CALLER is applying to this figure's own group, read every
+   *  frame so the head can be kept round through it (work-order 1085). A squat
+   *  shortens a man; it does not flatten his skull, and a sphere squashed to
+   *  seven tenths reads as a deflated ball hovering over a traffic cone — which
+   *  is what the first two frames of the fill showed. */
+  squat?: RefObject<number>
   /** Where to publish this figure's own pivots. A caller that supplies BOTH
    *  this and `pose` owns the application and applies it itself, in the frame
    *  it writes it — see `applyFigurePose` (work-order 1065). */
@@ -287,6 +296,7 @@ function Figure({
   // and the arm clearance pinned in figures.test.ts holds for every figure.
   const trunkRadius = L.bodyRadius * (trunkH / bodyH)
   const trunk = useRef<THREE.Group>(null)
+  const head = useRef<THREE.Mesh>(null)
   const arms = useRef<Array<THREE.Group | null>>([])
   const legPivots = useRef<Array<THREE.Group | null>>([])
   // A PIVOT IS PUT AT REST WHEN IT IS BORN, NOT AT EVERY RENDER (work-order
@@ -322,6 +332,11 @@ function Figure({
     if (shown && !owned) {
       selfLimbs.current.trunk = trunk.current
       applyFigurePose(selfLimbs.current, shown)
+    }
+    // The head, kept round through the caller's squash (work-order 1085).
+    if (head.current) {
+      const squash = squat?.current ?? 1
+      head.current.scale.y = squash > 0.01 ? 1 / squash : 1
     }
     if (withLegs && gait) {
       const phase = gait.current ?? 0
@@ -375,7 +390,7 @@ function Figure({
         )}
         {/* The head shows unless the wrap is drawn over it. */}
         {!(wrap && cold!.wear === 'head') && (
-          <mesh position={[0, bodyH + 0.18 - hipY, 0]} castShadow>
+          <mesh ref={head} position={[0, bodyH + 0.18 - hipY, 0]} castShadow>
             <sphereGeometry args={[0.16, ...TESSELLATION.figureHead]} />
             <meshStandardMaterial color={skin} roughness={0.85} />
           </mesh>
@@ -2409,6 +2424,14 @@ function ErrandVillagers({
   const handJars = useRef<Array<THREE.Object3D | null>>([])
   const digTools = useRef<Array<THREE.Object3D | null>>([])
   const reportedStrikes = useRef<number[]>([])
+  /** A villager PINNED into the fill, by index and progress — the dev route the
+   *  verification poses one by, since the errand itself does not dip yet
+   *  (work-order 1085 owes the pose, 1087 owes the act that drives it). Null
+   *  outside a forced frame, which is every real run. */
+  const forcedFill = useRef<{ who: number; progress: number; facing: number | null } | null>(null)
+  /** Each villager's live y-squash, so his own Figure can keep his head round
+   *  through it. Written by the frame loop below, read by the Figure. */
+  const squats = useRef<Array<{ current: number }>>([])
   const rim = Math.max(1, radius - NPC_RADIUS * 2)
 
   /** Every place a villager may stroll to of its own accord: the head of the
@@ -2733,12 +2756,28 @@ function ErrandVillagers({
       if (handJar) handJar.visible = carry === 'emptyJar'
       if (digTool) digTool.visible = carry === 'digTool'
 
-      // The pose: digging wins over everything, then the gesture, then the load
-      // on the head, then rest.
+      // The pose: a fill wins over everything, then digging, then the gesture,
+      // then the load on the head, then rest.
       const pose = poses.current[i].current
       const gesture = gestures.current[i]
       gesture.current = advanceGesture(gesture.current, dt)
-      if (isDigging(work, i)) {
+      const filling = forcedFill.current?.who === i ? forcedFill.current.progress : null
+      if (filling !== null) {
+        state.dug = 0
+        // The jar rides the dipping hand of its own accord — it hangs inside the
+        // arm pivot — so the fill needs no prop of its own, only the empty jar
+        // shown and the body that takes it down (design.md §13.4).
+        if (headJar) headJar.visible = false
+        if (handJar) handJar.visible = true
+        if (digTool) digTool.visible = false
+        const dip = fillPose(filling)
+        if (pose) {
+          pose.left = dip.left
+          pose.right = dip.right
+          pose.lean = dip.lean
+          pose.turn = dip.turn
+        }
+      } else if (isDigging(work, i)) {
         state.dug += dt
         const siteIndex = task?.siteIndex
         const site = siteIndex === null || siteIndex === undefined ? null : geography.digSites[siteIndex]
@@ -2776,7 +2815,16 @@ function ErrandVillagers({
         // The same walking bob the other inhabitants ride, off the distance this
         // villager has actually covered rather than off a wall clock.
         g.position.set(me.x, Math.abs(Math.sin(state.walked * 3.4 + i * 2)) * 0.05, me.z)
+        const facing = forcedFill.current?.who === i ? forcedFill.current.facing : null
+        if (facing !== null) yaws.current[i] = facing
         g.rotation.y = yaws.current[i]
+        // THE SINK, which is half of what makes a fill read as fetching rather
+        // than as falling: a y-squash on the figure's own group, exactly as the
+        // crouching child's is drawn (work-order 1085).
+        const squash = filling === null ? 1 : fillSquat(filling)
+        g.scale.set(1, squash, 1)
+        const squatRef = squats.current[i]
+        if (squatRef) squatRef.current = squash
       }
     }
 
@@ -2813,11 +2861,27 @@ function ErrandVillagers({
       digProgress: digProgressOf(work, geography.digSites.length),
       villagers: people.map((p, i) => {
         const task = taskOf(work, i)
+        // WHAT IS ACTUALLY DRAWN, not what the pose intended (work-order 1085):
+        // the squash on the figure's own group and the world height its carrying
+        // hand reached. A fill is judged by the body that arrived at the water,
+        // and re-deriving either from the pose would prove only that the maths
+        // agrees with itself.
+        const g = refs.current[i]
+        let handY = null
+        if (g) {
+          g.updateWorldMatrix(true, true)
+          g.traverse((o) => {
+            if (o.name === 'hand-left') handY = o.getWorldPosition(new THREE.Vector3()).y
+          })
+        }
         return {
           x: p.x,
           z: p.z,
           free: p.free,
           digging: isDigging(work, i),
+          filling: forcedFill.current?.who === i ? forcedFill.current.progress : null,
+          yaw: yaws.current[i] ?? 0,
+          drawn: { squatY: g ? g.scale.y : null, handY },
           carry: carryOf(work, i),
           work: task
             ? { situation: task.situation, phase: task.phase, x: task.x, z: task.z, arrived: task.arrived }
@@ -2825,8 +2889,17 @@ function ErrandVillagers({
         }
       }),
     })
+    // Pins one villager into the fill pose at a given progress, or releases him
+    // with `null`. It is the only thing that dips anybody today: the errand
+    // still flips 'emptyJar' to 'fullJar' with no act in between, which is
+    // work-order 1087's half. This exists so the POSE the design decided on can
+    // be photographed on the figure it belongs to (work-order 1085).
+    w.__placeForceFill = (who: number | null, progress = 0.5, facing: number | null = null) => {
+      forcedFill.current = who === null ? null : { who, progress, facing }
+    }
     return () => {
       delete w.__placeErrands
+      delete w.__placeForceFill
     }
   }, [work, people, geography])
 
@@ -2849,6 +2922,7 @@ function ErrandVillagers({
             cloth={cloth[i % cloth.length]}
             pose={poses.current[i]}
             limbs={limbs.current[i]}
+            squat={(squats.current[i] ??= { current: 1 })}
             handProp={
               <>
                 <mesh
