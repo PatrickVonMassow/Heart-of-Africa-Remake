@@ -1491,7 +1491,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Freitag, 11.09.2026, 03:35 · Quellen-Fingerprint: `8470d7ade400…`
+Zuletzt aktualisiert: Freitag, 11.09.2026, 11:50 · Quellen-Fingerprint: `f1d2d0649fbc…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1595,10 +1595,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 96 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 130 Prozess-/Meta-TASKS-Punkte (davon 63 offen).
+Erfasste Quellen: 96 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 131 Prozess-/Meta-TASKS-Punkte (davon 63 offen).
 
-<!-- RETRO-FINGERPRINT: 8470d7ade40002c39b0e1e2c4baa529494672b97b4b73211ccb8527e8ffca847 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-11T01:35:55.113Z -->
+<!-- RETRO-FINGERPRINT: f1d2d0649fbc6c5d9df795bdbf544ea69ba3862517471dad6c46559c0f2b89e5 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-11T09:50:07.120Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -5530,6 +5530,18 @@ geblieben, haette man den gepruefen Mechanismus danach entfernt — weil sie auf
 die Gelegenheit warteten, statt sie herzustellen. Ein Test, der einen Mann auf
 die Grabstelle STELLT, prueft die Regel; einer, der zusieht, ob zufaellig einer
 dort steht, prueft die Wuerfel.
+
+Am 11.09.2026 traf dieselbe Bauform das BILD statt den Test. Fuer die Aufnahme
+der Schoepf-Haltung wurde ein Dorfbewohner in die Haltung geklemmt, seine
+Position einmal gelesen und die Kamera darauf gerichtet — sein Botengang lief
+darunter weiter. Auf der schnelleren Grafikbahn war er beim Ausloesen aus dem
+Bild spaziert: Der Rahmen zeigte einen leeren Uferstreifen, und die Suite meldete
+18 Zusagen, 0 Fehler, weil keine einzige nach ihm fragte. Die Koordinate war
+noch gueltig, der Gegenstand nicht mehr da — und ein Bild kann seine eigene
+Leere nicht melden. Die Lehre ist dieselbe wie oben, um eine Ebene erweitert:
+Auch ein Beweisfoto haelt seinen Gegenstand fest, statt ihn nur zu nennen. Hier
+heisst das, dass das Dorf fuer die Aufnahme stillhaelt und zwei Zusagen die
+Lage des Motivs beim Ausloesen selbst nachmessen.
 
 ### 3.232 Die Maschine lud sich selbst ein und nannte es eine Anweisung des Nutzers
 
