@@ -698,6 +698,15 @@ describe('owned — shared open-point ownership', () => {
     expect(owns(red, null)).toBe(false)
   })
 
+  it('snapshots iterable owners once when sweeping several reds', () => {
+    const openPoints = (function* () { yield 603; yield 938 })()
+    const stored = run('webgl', 1500, {
+      exit: 1, crashed: false, terminalVerdict: true,
+      reds: [{ ...red, point: 603 }, { name: 'another known red', kind: 'check', point: 938 }],
+    })
+    expect(unexplainedRuns([stored], 1000, { openPoints, ledger: [] })).toEqual([])
+  })
+
   it('keeps scope restrictions and refuses lost or unreadable reds', () => {
     expect(owned(red, 'polish', 'webgl', null, [603], ledger)).toBe(false)
     expect(owned(red, 'settings', 'webgpu', null, [603], ledger)).toBe(false)

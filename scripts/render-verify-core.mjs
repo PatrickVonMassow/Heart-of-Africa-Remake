@@ -1317,6 +1317,7 @@ export function unexplainedRuns(runs, since, options) {
       return sawCodeSince(later, from) && runVerdict(later, { openPoints }).covers
     })
   }
+  const open = pointSet(openPoints)
   const out = []
   for (const r of Array.isArray(runs) ? runs : []) {
     if (!r || typeof r !== 'object') continue
@@ -1483,7 +1484,7 @@ export function unexplainedRuns(runs, since, options) {
         // reporting only that sentence hid every red the run really printed and
         // nobody owns. Charged ones stay out: a red an open point already owns
         // was never part of the bypass.
-        const stillOpen = residualOf(r).reds.filter((red) => !owned(red, suite, backend, level, openPoints, ledger))
+        const stillOpen = residualOf(r).reds.filter((red) => !owned(red, suite, backend, level, open, ledger))
         // The lost-recording sentence speaks about THIS record — two truncated
         // records of the same suite print it identically and each owes its own
         // disposition — so it is keyed per record; the reds it kept are not.
@@ -1509,7 +1510,7 @@ export function unexplainedRuns(runs, since, options) {
       // by the run's OWN class — a truncated run that also passed on the RETRY
       // keeps its first attempt's reds, which reading `r.reds` had thrown away.
       const residual = residualOf(r)
-      const unowned = residual.reds.filter((red) => !owned(red, suite, backend, level, openPoints, ledger))
+      const unowned = residual.reds.filter((red) => !owned(red, suite, backend, level, open, ledger))
       if (unowned.length === 0) continue
       out.push({
         backend,
@@ -1549,7 +1550,7 @@ export function unexplainedRuns(runs, since, options) {
       // Only the reds NOBODY owns are still open. Counting the whole run's
       // reds would report a charged one as waved through beside its
       // unexplained neighbour.
-      unowned = observed.filter((red) => !owned(red, suite, backend, level, openPoints, ledger))
+      unowned = observed.filter((red) => !owned(red, suite, backend, level, open, ledger))
       if (unowned.length === 0) continue
     }
     // The individual reds, NOT the one sentence runVerdict writes about them: a
