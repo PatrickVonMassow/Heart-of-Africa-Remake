@@ -96,6 +96,12 @@ interface SeenWord extends SpokenWord {
   at: { x: number; z: number }
   phases: Array<string | null>
   digging: boolean[]
+  /** Who ORDERED the errand the speaker was on, and whom he ordered — read off
+   *  the task BEFORE the step, because a report clears its pair in the same
+   *  frame it speaks. Together they let a case pair an order with its own
+   *  report instead of comparing run-wide sets of speakers. */
+  orderedBy: number | null
+  carrier: number | null
 }
 
 function run(v: AdultWorkView, seconds: number, cfg = CFG): { state: AdultWorkState; words: SeenWord[] } {
@@ -104,10 +110,13 @@ function run(v: AdultWorkView, seconds: number, cfg = CFG): { state: AdultWorkSt
   const dt = 1 / 60
   for (let elapsed = 0; elapsed < seconds; elapsed += dt) {
     walkFrame(state, v, dt)
+    const ends = state.tasks.map((task) => task && { orderedBy: task.orderedBy, carrier: task.partner })
     const word = stepAdultWork(state, v, dt, cfg, () => 0.5)
     if (word) {
       words.push({
         ...word,
+        orderedBy: ends[word.speaker]?.orderedBy ?? null,
+        carrier: ends[word.speaker]?.carrier ?? null,
         at: { x: v.villagers[word.speaker].x, z: v.villagers[word.speaker].z },
         phases: state.tasks.map((task) => task?.phase ?? null),
         digging: state.tasks.map((_, i) => isDigging(state, i)),
@@ -262,9 +271,18 @@ describe('RIVER is ordered and reported at the village water stand', () => {
     expect(back.length).toBeGreaterThan(0)
     // The sender orders, the carrier reports: the same man never does both for
     // one errand, which is what stopped the inhabitant narrating his own act.
-    const senders = new Set(out.map((w) => w.speaker))
-    const carriers = new Set(back.map((w) => w.speaker))
-    expect([...carriers].some((c) => !senders.has(c)) || senders.size > 1).toBe(true)
+    // PER ERRAND, not across the run. Counting distinct speakers over a whole
+    // window passes even when every sender reports his own errand: what has to
+    // hold is that EACH report comes from someone other than the man who ordered
+    // THAT errand.
+    for (const report of back) {
+      expect(report.orderedBy).not.toBeNull()
+      expect(report.orderedBy).not.toBe(report.speaker)
+    }
+    // And every report answers an order that was actually given, by that sender
+    // to that carrier.
+    const ordered = out.map((w) => `${w.speaker}->${w.carrier}`)
+    for (const report of back) expect(ordered).toContain(`${report.orderedBy}->${report.speaker}`)
   })
 
   it('carries the empty jar out and the full jar back', () => {
@@ -369,6 +387,31 @@ describe('the water carrier dips his jar at the water (work-order 1087)', () => 
     }
   })
 
+  it('sets the jar down even when a child in earshot holds the report back', () => {
+    // THE DELIVERY IS NOT THE WORD. Behind the hearing gate the jar was hostage
+    // to a passing child: the errand ran into its backstop and was cleared with
+    // the water still on the carrier's head, so a fetched jar was DELETED. The
+    // report may wait; the water may not.
+    const { state, v } = threeWordsDue()
+    let heard = true
+    const listening: AdultWorkView = { ...v, childrenHear: () => heard }
+    const carrier = 0
+
+    const hushedWord = stepAdultWork(state, listening, 1 / 60, CFG, () => 0.5)
+    expect(hushedWord).toBeNull()
+    expect(state.standJars).toBe(1)
+    expect(carryOf(state, carrier)).toBe('none')
+    expect(taskOf(state, carrier)).toMatchObject({ hushed: true, owes: true })
+
+    // And once the children move off, the report falls — without the jar being
+    // counted a second time.
+    heard = false
+    const word = stepAdultWork(state, listening, 1 / 60, CFG, () => 0.5)
+    expect(word).toMatchObject({ id: 'water-back', concept: 'RIVER', speaker: carrier })
+    expect(state.standJars).toBe(1)
+    expect(taskOf(state, carrier)).toBeNull()
+  })
+
   it('is ONE errand held by ONE carrier, not two castings', () => {
     const seen = fillFrames()
     const outward = new Set(seen.filter((f) => f.phase === 'fetch' || f.phase === 'fill').map((f) => f.i))
@@ -377,6 +420,27 @@ describe('the water carrier dips his jar at the water (work-order 1087)', () => 
     // The man who walked back is a man who walked down: no return leg belongs to
     // a villager the errand never sent.
     for (const i of back) expect(outward.has(i)).toBe(true)
+    // AND IN ORDER WITHIN EACH ERRAND, not merely somewhere in the window.
+    // Run-wide sets pass when villager 3 fetches for one errand and walks back
+    // for the NEXT — which is exactly the two castings this point removed. So
+    // every carrier's legs are walked as a state machine: he may take a fresh
+    // errand after finishing one, but no return leg may follow anything but the
+    // dip that filled the jar it carries.
+    const NEXT: Record<string, readonly string[]> = {
+      start: ['fetch'],
+      fetch: ['fetch', 'fill'],
+      fill: ['fill', 'walk'],
+      walk: ['walk', 'fetch'],
+    }
+    const leg = new Map<number, string>()
+    for (const f of seen) {
+      // The SENDER stands in these frames too, on 'send' and 'wait'; his legs are
+      // not the carrier's and are not walked here.
+      if (f.phase !== 'fetch' && f.phase !== 'fill' && f.phase !== 'walk') continue
+      const was = leg.get(f.i) ?? 'start'
+      expect(NEXT[was], `villager ${f.i} went ${was} -> ${f.phase} at frame ${f.f}`).toContain(f.phase)
+      leg.set(f.i, f.phase)
+    }
   })
 })
 

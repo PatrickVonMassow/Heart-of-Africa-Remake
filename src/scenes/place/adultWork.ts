@@ -394,13 +394,20 @@ export function stepAdultWork(
       // THE RETURN HAS A DESTINATION. He is back at the stand: the jar goes down
       // and he reports to the man who sent him. Same hearing gate.
       const sender = typeof t.orderedBy === 'number' ? view.villagers[t.orderedBy] : null
+      // THE DELIVERY IS NOT THE WORD. The jar goes down and is counted the moment
+      // he reaches the stand, whether or not he may speak yet. Behind the hearing
+      // gate it was hostage to a passing child: the errand then ran into its
+      // `errandSeconds` backstop and was cleared with the water still on his head,
+      // so a fetched jar was deleted rather than delivered. Only the REPORT waits.
+      if (t.carry === 'fullJar') {
+        t.carry = 'none'
+        state.standJars = Math.min(balance.waterStandCapacity, state.standJars + 1)
+      }
       if (!sender) clearPair(state, i)
       else if (view.childrenHear(me.x, me.z)) t.hushed = true
       else {
         t.owes = false
         t.hushed = false
-        t.carry = 'none'
-        state.standJars = Math.min(balance.waterStandCapacity, state.standJars + 1)
         spoken = { id: t.situation, concept: 'RIVER', speaker: i, aim: { x: sender.x, y: 1, z: sender.z } }
         clearPair(state, i)
       }
