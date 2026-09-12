@@ -3057,6 +3057,10 @@ function ErrandVillagers({
             }}
             visible={false}
             position={[0, 1.5, 0]}
+            // A carried jar is not a plumb cylinder: a small lean turns the
+            // mouth off the vertical, which is what lets any of the water in it
+            // be seen from a standing eye rather than only its rim edge-on.
+            rotation={[0.16, 0, 0.1]}
           >
             <Jar full />
           </group>
@@ -3104,7 +3108,23 @@ function Jar({ full }: { full: boolean }) {
         <circleGeometry args={[JAR_BASE_R, 14]} />
         <meshStandardMaterial color="#6b4423" roughness={1} side={THREE.DoubleSide} />
       </mesh>
-      {/* What is IN it. */}
+      {/* What is IN it. The full jar's water is a shallow DOME standing slightly
+          proud of the rim, not a flat disc in it: a head-carried jar's mouth
+          sits at about 1.66 m and the player's eye at about 1.6 m, so a disc
+          inside the rim is edge-on from every standing distance and reads as
+          nothing. A meniscus breaks the rim line and shows as a bright cap. */}
+      {full ? (
+        <mesh position={[0, JAR_HEIGHT / 2 - JAR_WATER_DROP, 0]}>
+          <sphereGeometry args={[JAR_RIM_R - 0.008, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />
+          <meshStandardMaterial
+            color={RIVER_WATER_TONES.sheen}
+            roughness={0.14}
+            metalness={WATER_METALNESS}
+            emissive={RIVER_WATER_TONES.deep}
+            emissiveIntensity={0.35}
+          />
+        </mesh>
+      ) : null}
       <mesh
         position={[0, JAR_HEIGHT / 2 - (full ? JAR_WATER_DROP : JAR_HOLLOW_DROP), 0]}
         rotation={[-Math.PI / 2, 0, 0]}
