@@ -907,3 +907,10 @@ describe('every settlement keeps one way out free (work-order 688)', () => {
     }
   })
 })
+
+describe('PROBE quarter', () => {
+  it('prints the play ground and dig sites', () => {
+    const l = buildLayout('bambara-village', 1)
+    console.log('PROBE', JSON.stringify({ pg: l.playGround, ws: l.waterStand, ds: l.digSites }))
+  })
+})

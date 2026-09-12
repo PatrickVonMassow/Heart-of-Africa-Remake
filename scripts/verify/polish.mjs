@@ -5193,6 +5193,11 @@ if (section('adult-errands')) {
     e.digSeconds = 3
     e.pace = 6
     e.villagerCount = 10
+    // THE DIP IS HELD LONG ENOUGH TO BE CAUGHT (work-order 1087). At its played
+    // value the fill lasts well under two seconds, which a polling check can
+    // walk straight past; this stretches the hold for the capture and changes
+    // nothing about the act itself.
+    window.__balance.bankFillSeconds = 8
   })
   await page.evaluate(() => window.__game.getState().enterPlace('bambara-village'))
   const live = await page
@@ -5403,37 +5408,71 @@ if (section('adult-errands')) {
     // cannot be judged against a silhouette that overlaps two other bodies. So
     // the subject is the MOST ISOLATED villager, and the camera takes the
     // bearing whose line to him is actually clear.
-    const posed = await page.evaluate(() => {
-      if (typeof window.__placeForceFill !== 'function') return null
-      const v = window.__placeErrands().villagers
-      let who = -1
-      let best = -1
-      for (let i = 0; i < v.length; i++) {
-        if (v[i].digging) continue
-        let near = Infinity
-        for (let j = 0; j < v.length; j++) {
-          if (j === i) continue
-          near = Math.min(near, Math.hypot(v[i].x - v[j].x, v[i].z - v[j].z))
-        }
-        if (near > best) {
-          best = near
-          who = i
-        }
-      }
-      if (who < 0) return null
-      window.__placeForceFill(who, 0.5)
-      return {
-        who,
-        x: v[who].x,
-        z: v[who].z,
-        clearance: best,
-        others: v.filter((_, j) => j !== who).map((p) => ({ x: p.x, z: p.z })),
-      }
-    })
+    // THE SUBJECT IS THE MAN WHO IS REALLY FILLING (work-order 1087). Until the
+    // errand had a fill of its own, this block picked the most ISOLATED villager
+    // and forced the pose onto him wherever he happened to stand — a drill that
+    // recreated the aftermath and would have stayed green over a fill that never
+    // reached the water. The errand dips now, so the check waits for a carrier
+    // in the 'fill' phase and photographs HIM, at the spot he is really standing
+    // on. The pin stays, and only holds that same man still for the shutter.
+    const posed = await page
+      .waitForFunction(
+        () => {
+          if (typeof window.__placeForceFill !== 'function') return null
+          const errands = window.__placeErrands()
+          const v = errands.villagers
+          for (let i = 0; i < v.length; i++) {
+            if (v[i].work?.phase !== 'fill') continue
+            let near = Infinity
+            for (let j = 0; j < v.length; j++) {
+              if (j === i) continue
+              near = Math.min(near, Math.hypot(v[i].x - v[j].x, v[i].z - v[j].z))
+            }
+            window.__placeForceFill(i, 0.5)
+            return {
+              who: i,
+              x: v[i].x,
+              z: v[i].z,
+              carry: v[i].carry,
+              clearance: near,
+              fill: errands.geography.waterFill,
+              foot: errands.geography.waterFoot,
+              others: v.filter((_, j) => j !== i).map((p) => ({ x: p.x, z: p.z })),
+            }
+          }
+          return null
+        },
+        null,
+        { timeout: 90000 },
+      )
+      .then((handle) => handle.jsonValue())
+      .catch(() => null)
     check(
-      'one village adult, standing clear of the others, can be held in the fill pose',
+      'a village adult is really filling his jar, clear of the others',
       posed != null && posed.clearance > 1.5,
-      posed ? `villager ${posed.who}, nearest neighbour ${posed.clearance.toFixed(1)} m` : 'nobody free',
+      posed
+        ? `villager ${posed.who}, nearest neighbour ${posed.clearance.toFixed(1)} m`
+        : 'no carrier reached the fill phase in 90 s',
+    )
+    // THE GEOMETRY THE CHECK MEASURES (work-order 1087). The errand used to halt
+    // at the water path's landing, about 2.7 m up the bank, and no camera
+    // position could make that read as fetching water. He stands at the fill
+    // spot now, which is solved in the water itself.
+    check(
+      'and he is standing at the water, not up the bank where the path lands',
+      posed != null &&
+        posed.fill != null &&
+        Math.hypot(posed.x - posed.fill.x, posed.z - posed.fill.z) < 1.5,
+      posed && posed.fill
+        ? `${Math.hypot(posed.x - posed.fill.x, posed.z - posed.fill.z).toFixed(2)} m from the fill spot, ` +
+          `${posed.foot ? Math.hypot(posed.x - posed.foot.x, posed.z - posed.foot.z).toFixed(2) : '?'} m from the path's landing`
+        : 'no filling carrier',
+    )
+    // ... and the jar he is dipping is still EMPTY: it fills by being dipped.
+    check(
+      'and the jar he is dipping is still the empty one',
+      posed != null && posed.carry === 'emptyJar',
+      posed ? `carrying ${posed.carry}` : 'no filling carrier',
     )
     if (posed) {
       await nextFrames(6)
@@ -5563,7 +5602,7 @@ if (section('adult-errands')) {
       )
       await frame('1085-village-adult-fills-a-jar', {
         local: { x: posed.x, y: 0.6, z: posed.z },
-        label: 'a village adult held at the bottom of the fill, side-on, three metres off',
+        label: 'the village water carrier at the bottom of his dip, standing in the river, side-on, three metres off',
       })
       await page.evaluate(() => window.__placeForceFill(null))
       await nextFrames(4)

@@ -474,6 +474,12 @@ export function stepAdultWork(
       // man's word sends another. So the errand is cast as two men at the stand:
       // the SENDER, who says RIVER and points at the water, and the CARRIER, who
       // takes the jar and goes. Neither walks with the other.
+      // ONE WATER ERRAND AT A TIME. The village has ONE stand and one fill spot,
+      // and a second carrier sent while the first is out stands inside him at
+      // both — measured in the picture check, where every one of sixteen
+      // bearings on the filling man was blocked by another villager. The errand
+      // is a round trip held by one carrier, so the next one waits for it.
+      if (state.tasks.some((t) => t?.situation === 'water-out' || t?.situation === 'water-back')) continue
       const sender = anyFree(view, avoid)
       if (sender < 0) continue
       const carrier = anotherFreeAdult(view, sender)
@@ -481,11 +487,18 @@ export function stepAdultWork(
       // given at all, and the errand simply does not cast this round.
       if (carrier < 0) continue
       const stand = { ...g.waterStand }
+      // TWO MEN, TWO PLACES. The stand itself is the CARRIER's spot: it is where
+      // he is handed the errand and where he sets the jar down again. The sender
+      // waits a body's width off it — sent to the same point, the two of them
+      // simply blocked each other, neither ever counted as arrived, and the word
+      // was never spoken.
+      const senderSpot = joinSpot(view, stand, rand)
+      if (!senderSpot) continue
       state.tasks[sender] = {
         situation: id, phase: 'send', carry: 'none', role: 'initiator', partner: carrier,
         siteIndex: null, orderedBy: null,
-        x: stand.x, z: stand.z, arrived: false, dug: 0, owes: true,
-        say: { at: stand, aim: g.waterFoot }, via: null, age: 0,
+        x: senderSpot.x, z: senderSpot.z, arrived: false, dug: 0, owes: true,
+        say: { at: senderSpot, aim: g.waterFoot }, via: null, age: 0,
       }
       state.tasks[carrier] = {
         situation: id, phase: 'wait', carry: 'none', role: 'partner', partner: sender,

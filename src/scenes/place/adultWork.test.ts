@@ -15,6 +15,7 @@ import {
   isDigging,
   stepAdultWork,
   taskOf,
+  JOIN_STAND_OFF,
   WORK_ARRIVE_RADIUS,
   type AdultWorkConfig,
   type AdultWorkState,
@@ -200,7 +201,9 @@ describe('RIVER is ordered and reported at the village water stand', () => {
       // BOTH UTTERANCES FALL INSIDE THE VILLAGE, at the stand beside the fire —
       // they used to fall at the water path's head out at the edge of the built
       // ground, which is also where the children's bank game is heard.
-      expect(Math.hypot(word.at.x - STAND.x, word.at.z - STAND.z)).toBeLessThanOrEqual(WORK_ARRIVE_RADIUS)
+      // At the stand: the carrier ON it, the sender a body's width off it.
+      expect(Math.hypot(word.at.x - STAND.x, word.at.z - STAND.z))
+        .toBeLessThanOrEqual(JOIN_STAND_OFF + WORK_ARRIVE_RADIUS)
       expect(Math.hypot(word.at.x - FOOT.x, word.at.z - FOOT.z)).toBeGreaterThan(4)
       expect(Math.hypot(word.at.x - FILL.x, word.at.z - FILL.z)).toBeGreaterThan(4)
     }
