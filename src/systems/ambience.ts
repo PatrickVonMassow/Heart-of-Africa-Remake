@@ -7,7 +7,7 @@ import type { PlaceKind, RegionId } from '../world/geo'
 import { balance } from '../config/balance'
 import { devAssert } from './devAssert'
 import type { Tone } from '../communication/lexicon'
-import { phrasePlan, utterancePlan, type SpeechPlan } from '../communication/speaking'
+import { phrasePlan, utterancePlan, type SpeechPlan, type SpeechVoice } from '../communication/speaking'
 import type { DrumId, DrumMessagePlan } from '../communication/drumMessage'
 
 export interface AmbienceScene {
@@ -911,9 +911,9 @@ export function playThunder(delaySeconds: number, strength = 1): void {
 
 /** The carrier of a tone, in Hz, from the calibratable balance values: `ba` is
  *  the low pitch, `BA` sits `speechPitchInterval` above it. */
-export function syllableCarrier(tone: Tone): number {
+export function syllableCarrier(tone: Tone, voice: SpeechVoice = 'adult'): number {
   const c = balance.communication
-  const low = Math.max(20, c.speechPitchHz)
+  const low = Math.max(20, voice === 'child' ? c.speechChildPitchHz : c.speechPitchHz)
   return tone === 'low' ? low : low * Math.max(1, c.speechPitchInterval)
 }
 
@@ -951,8 +951,8 @@ const speechProbe =
  * short dip of the closure opening, then the vowel body. Exported so the
  * offline spectrum check (ambience.speech.test.ts) renders the REAL chain.
  */
-export function speakSyllable(ac: AudioContext, dest: AudioNode, t0: number, tone: Tone, dur: number, peak: number) {
-  const carrier = syllableCarrier(tone)
+export function speakSyllable(ac: AudioContext, dest: AudioNode, t0: number, tone: Tone, dur: number, peak: number, voice: SpeechVoice = 'adult') {
+  const carrier = syllableCarrier(tone, voice)
   const osc = ac.createOscillator()
   osc.type = 'sawtooth'
   osc.frequency.setValueAtTime(carrier, t0)
@@ -986,6 +986,33 @@ export function speakSyllable(ac: AudioContext, dest: AudioNode, t0: number, ton
   g.connect(dest)
   osc.start(t0)
   osc.stop(t0 + dur + 0.05)
+  return osc
+}
+
+/** One route per utterance. The equal-power panner is compensated to keep
+ * (L + R) / 2 at unity: mono downmix loses direction, never level. Stereo power
+ * can rise toward the side; the headroom check includes that louder channel.
+ * Width zero and engines without a panner retain the original mono route. */
+export function speechRoute(ac: AudioContext, dest: AudioNode, pan: number) {
+  const bounded = Number.isFinite(pan) ? Math.max(-1, Math.min(1, pan)) : 0
+  if (bounded === 0 || typeof ac.createStereoPanner !== 'function') {
+    return { input: dest, channelPeak: 1, monoGain: 1, dispose: () => {} }
+  }
+  const panner = ac.createStereoPanner()
+  panner.pan.value = bounded
+  const angle = (panner.pan.value + 1) * Math.PI / 4
+  const left = Math.cos(angle)
+  const right = Math.sin(angle)
+  const compensation = ac.createGain()
+  compensation.gain.value = 2 / (left + right)
+  compensation.connect(panner)
+  panner.connect(dest)
+  return {
+    input: compensation,
+    channelPeak: compensation.gain.value * Math.max(left, right),
+    monoGain: compensation.gain.value * (left + right) / 2,
+    dispose: () => { compensation.disconnect(); panner.disconnect() },
+  }
 }
 
 /**
@@ -1004,9 +1031,12 @@ export function playSpeech(plan: SpeechPlan): void {
   const ac = ctx
   const dest = speechBus ?? master
   const t0 = ac.currentTime
+  const route = speechRoute(ac, dest, plan.pan)
+  let last: OscillatorNode | undefined
   for (const s of plan.syllables) {
-    speakSyllable(ac, dest, t0 + s.startOffset, s.tone, s.duration, Math.max(0.0001, s.peak))
+    last = speakSyllable(ac, route.input, t0 + s.startOffset, s.tone, s.duration, Math.max(0.0001, s.peak), plan.voice)
   }
+  if (last) last.onended = route.dispose
   const peak = Math.max(...plan.syllables.map((s) => s.peak))
   // THE RESULT-LEVEL ASSERTION (point 589, rule 1): sound is judged at the END
   // of the chain — the level that actually LEAVES the graph — not at the level
@@ -1027,7 +1057,7 @@ export function playSpeech(plan: SpeechPlan): void {
   // (`scripts/verify/settings.mjs`).
   const chain = speechBus ? speechBus.gain.value * master.gain.value : master.gain.value
   devAssert(
-    peak * chain > 0 || balance.communication.speechVolume <= 0,
+    peak * chain * route.monoGain > 0 || balance.communication.speechVolume <= 0,
     'speech-inaudible',
     () =>
       `${plan.syllables.length} syllables leave the graph at ${(peak * chain).toExponential(2)} ` +

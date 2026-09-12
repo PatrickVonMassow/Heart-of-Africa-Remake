@@ -12,6 +12,8 @@ import {
   emitDrumPhrase,
   playDrumMessage,
   playSpeech,
+  speechRoute,
+  syllableCarrier,
   playThunder,
   proximityGain,
   refreshAmbienceVolume,
@@ -319,6 +321,9 @@ class FakeNode {
 class FakeGain extends FakeNode {
   gain = new FakeParam()
 }
+class FakePanner extends FakeNode {
+  pan = new FakeParam()
+}
 class FakeFilter extends FakeNode {
   type = ''
   frequency = new FakeParam()
@@ -331,6 +336,7 @@ class FakeOscillator extends FakeNode {
   frequency = new FakeParam()
   startedAt: number | null = null
   stoppedAt: number | null = null
+  onended: (() => void) | null = null
   start(t = 0) {
     this.startedAt = t
   }
@@ -352,6 +358,7 @@ class FakeSource extends FakeNode {
   loop = false
   startedAt: number | null = null
   stoppedAt: number | null = null
+  onended: (() => void) | null = null
   start(t = 0) {
     this.startedAt = t
   }
@@ -371,6 +378,12 @@ class FakeCtx {
   gains: FakeGain[] = []
   constructor() {
     FakeCtx.last = this
+  }
+  panners: FakePanner[] = []
+  createStereoPanner() {
+    const p = new FakePanner()
+    this.panners.push(p)
+    return p
   }
   createGain() {
     const g = new FakeGain()
@@ -751,6 +764,71 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
     }
     return node
   }
+
+  it('routes overlapping utterances through separate fixed panners and releases each route', () => {
+    const adult = utterancePlan(utteranceOf('RIVER'), 3, { bearing: -Math.PI / 2 })
+    const child = utterancePlan(utteranceOf('RIVER'), 3, { bearing: Math.PI / 2, voice: 'child' })
+    const before = ctx.panners.length
+    const adults = spoken(() => playSpeech(adult))
+    const children = spoken(() => playSpeech(child))
+    const routes = [adults, children].map((voices) => {
+      const route = envelopeOf(voices[0]).connected[0] as FakeGain
+      for (const v of voices) expect(envelopeOf(v).connected[0]).toBe(route)
+      return route
+    })
+    expect(ctx.panners.length - before).toBe(2)
+    const panners = routes.map((r) => r.connected[0] as FakePanner)
+    expect(panners[0].pan.value).toBe(-0.6)
+    expect(panners[1].pan.value).toBe(0.6)
+    expect(panners[0].connected[0]).toBe(panners[1].connected[0])
+    expect(adults[0].startedAt).toBe(children[0].startedAt)
+    for (let i = 0; i < adults.length; i++) {
+      expect(children[i].frequency.events[0].value! / adults[i].frequency.events[0].value!).toBeCloseTo(1.5)
+    }
+    adults.at(-1)!.onended!()
+    expect(routes[0].disconnectCalls).toBe(1)
+    expect(panners[0].disconnectCalls).toBe(1)
+    expect(routes[1].disconnectCalls).toBe(0)
+    children.at(-1)!.onended!()
+    expect(routes[1].disconnectCalls).toBe(1)
+  })
+
+  it('preserves the mono downmix at every position, and never reduces stereo power', () => {
+    for (const pan of [-1, -0.6, 0, 0.6, 1]) {
+      const dest = new FakeGain()
+      const route = speechRoute(ctx as unknown as AudioContext, dest as unknown as AudioNode, pan)
+      if (pan === 0) {
+        expect(route.input).toBe(dest)
+        continue
+      }
+      const gain = route.input as unknown as FakeGain
+      const panner = gain.connected[0] as FakePanner
+      expect(panner.connected[0]).toBe(dest)
+      // Web Audio mono-input equal-power law; measure the actual node values.
+      const angle = (panner.pan.value + 1) * Math.PI / 4
+      const left = gain.gain.value * Math.cos(angle)
+      const right = gain.gain.value * Math.sin(angle)
+      expect((left + right) / 2).toBeCloseTo(1, 12)
+      expect(left * left + right * right).toBeGreaterThanOrEqual(2 - 1e-12)
+      expect(route.channelPeak).toBeCloseTo(Math.max(left, right))
+      route.dispose()
+    }
+    const dest = new FakeGain()
+    const withoutPanner = { createGain: () => { throw new Error('fallback must retain unity') } }
+    const route = speechRoute(withoutPanner as unknown as AudioContext, dest as unknown as AudioNode, 0.6)
+    expect(route.input).toBe(dest)
+    expect(route.monoGain).toBe(1)
+  })
+
+  it('transposes both child carriers while sharing the adult tonal interval', () => {
+    for (const voice of ['adult', 'child'] as const) {
+      expect(syllableCarrier('high', voice) / syllableCarrier('low', voice)).toBeCloseTo(1.68)
+    }
+    expect(syllableCarrier('low', 'adult')).toBe(140)
+    expect(syllableCarrier('high', 'adult')).toBeCloseTo(235.2)
+    expect(syllableCarrier('low', 'child')).toBe(210)
+    expect(syllableCarrier('high', 'child')).toBeCloseTo(352.8)
+  })
 
   it('is quieter from further away, and never louder than right beside the speaker', () => {
     ctx.currentTime = 120

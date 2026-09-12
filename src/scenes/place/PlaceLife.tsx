@@ -102,6 +102,7 @@ import {
   WORK_ARRIVE_RADIUS,
 } from './adultWork'
 import { gestureIfHeard, speechReach } from '../../communication/spokenGesture'
+import { speechBearing } from './speechBearing'
 import { utterancePlan } from '../../communication/speaking'
 import { speechLabelSeconds } from '../../communication/speechLabel'
 import { playSpeech } from '../../systems/ambience'
@@ -538,6 +539,7 @@ const KID_SCALE = CHILD_FIGURE_SCALE
  * (docs/communication-poc-spec.md, src/communication/spokenGesture.ts).
  */
 function speakSituation(
+  camera: THREE.Camera,
   said: SpokenSituation,
   speaker: TagChild | undefined,
   anchor: THREE.Group | null,
@@ -548,7 +550,7 @@ function speakSituation(
     ? Math.hypot(speaker.x - placePlayerPosition.x, speaker.z - placePlayerPosition.z)
     : Infinity
   const reach = speechReach(distance)
-  playSpeech(utterancePlan(said.utterance, distance))
+  playSpeech(utterancePlan(said.utterance, distance, { bearing: speechBearing(camera, speaker), voice: 'child' }))
   if (reach.audible) {
     useGame.getState().hearUtterance(said.utterance)
     if (anchor) {
@@ -595,6 +597,7 @@ const CROUCH_POSE: FigurePose = {
  * the player could not hear teaches him nothing however plainly he saw the arm.
  */
 function speakBankUtterance(
+  camera: THREE.Camera,
   said: BankUtterance,
   speaker: TagChild | undefined,
   anchor: THREE.Group | null,
@@ -606,7 +609,7 @@ function speakBankUtterance(
     : Infinity
   const reach = speechReach(distance)
   const utterance = utteranceOf(said.concept)
-  playSpeech(utterancePlan(utterance, distance))
+  playSpeech(utterancePlan(utterance, distance, { bearing: speechBearing(camera, speaker), voice: 'child' }))
   if (reach.audible) {
     useGame.getState().hearUtterance(utterance)
     if (anchor) {
@@ -695,6 +698,7 @@ function Kids({
    *  the live ones this component moves, so nothing is copied per frame. */
   childBodies: RefObject<readonly InhabitantBody[]>
 }) {
+  const camera = useThree((state) => state.camera)
   const refs = useRef<Array<THREE.Group | null>>([])
   // The world leg length these children walk on, and the cadence it dictates.
   const legLength = FIGURE_LIMBS.hipY * KID_SCALE
@@ -1035,14 +1039,14 @@ function Kids({
       if (gesture) gesture.current = advanceGesture(gesture.current, dt)
     }
     if (spoken) {
-      speakBankUtterance(spoken, children[spoken.speaker], refs.current[spoken.speaker], gestures.current[spoken.speaker])
+      speakBankUtterance(camera, spoken, children[spoken.speaker], refs.current[spoken.speaker], gestures.current[spoken.speaker])
     }
     // THE WORD'S OWN FRAME (work-order 1065). The tap is captured below, once
     // this frame's pose has been written AND applied — that is the picture the
     // player sees the word fall over, and the frame the whole claim rests on.
     const openedTouch = import.meta.env.DEV && spoken && spoken.gesture === 'touch' ? spoken.speaker : -1
     const said = game && speech ? stepChildSpeech(speech, view, dt, cfg, speechRand) : null
-    if (said) speakSituation(said, children[said.speaker], refs.current[said.speaker], gestures.current[said.speaker])
+    if (said) speakSituation(camera, said, children[said.speaker], refs.current[said.speaker], gestures.current[said.speaker])
     children.forEach((c, i) => {
       const g = refs.current[i]
       if (!g) return
@@ -1825,6 +1829,7 @@ function Drum({ drum, headRef }: { drum: DrumGeometry; headRef: RefObject<THREE.
  * have heard the word is not shown the arm that goes with it.
  */
 function speakChiefWord(
+  camera: THREE.Camera,
   drummer: { x: number; z: number; yaw: number },
   hut: readonly [number, number],
   anchor: THREE.Group | null,
@@ -1834,7 +1839,7 @@ function speakChiefWord(
     ? Math.hypot(drummer.x - placePlayerPosition.x, drummer.z - placePlayerPosition.z)
     : Infinity
   const utterance = utteranceOf('CHIEF')
-  playSpeech(utterancePlan(utterance, distance))
+  playSpeech(utterancePlan(utterance, distance, { bearing: speechBearing(camera, drummer) }))
   if (speechReach(distance).audible) {
     useGame.getState().hearUtterance(utterance)
     if (anchor) {
@@ -1864,6 +1869,7 @@ function speakChiefWord(
  * and the sound can never tell different messages.
  */
 function Drummer({ x, z, cloth }: { x: number; z: number; cloth: string }) {
+  const camera = useThree((state) => state.camera)
   // A body the passers-by go round (point 578).
   useStandingBody(x, z)
   const pose = useRef<FigurePose | null>({ left: { ...REST_POSE.left }, right: { ...REST_POSE.right }, lean: DRUMMER_LEAN, turn: 0 })
@@ -1874,9 +1880,9 @@ function Drummer({ x, z, cloth }: { x: number; z: number; cloth: string }) {
   const yaw = drummerFacing([x, z])
   // His voice, for the use key that is read in PlaceScene (drummerVoice.ts).
   useEffect(() => {
-    setDrummerVoice((hut) => speakChiefWord({ x, z, yaw }, hut, group.current, gesture))
+    setDrummerVoice((hut) => speakChiefWord(camera, { x, z, yaw }, hut, group.current, gesture))
     return () => setDrummerVoice(null)
-  }, [x, z, yaw])
+  }, [camera, x, z, yaw])
   useFrame((_, rawDt) => {
     const p = pose.current
     if (!p) return
@@ -2449,6 +2455,7 @@ function ErrandVillagers({
   childBodies: RefObject<readonly InhabitantBody[]>
   onDigProgress: (progress: readonly DigSiteProgress[]) => void
 }) {
+  const camera = useThree((state) => state.camera)
   const refs = useRef<Array<THREE.Group | null>>([])
   // The jar each carrier holds: on the head when it is FULL, in the hand when it
   // is empty. Both are mounted once and shown by the frame loop, like every other
@@ -2902,7 +2909,7 @@ function ErrandVillagers({
       const speaker = people[said.speaker]
       if (speaker) {
         yaws.current[said.speaker] = Math.atan2(said.aim.x - speaker.x, said.aim.z - speaker.z)
-        speakWork(said, speaker, yaws.current[said.speaker], refs.current[said.speaker], gestures.current[said.speaker])
+        speakWork(camera, said, speaker, yaws.current[said.speaker], refs.current[said.speaker], gestures.current[said.speaker])
       }
     }
   })
@@ -3071,6 +3078,7 @@ function ErrandVillagers({
  * generic "come" reading.
  */
 function speakWork(
+  camera: THREE.Camera,
   said: SpokenWord,
   speaker: { x: number; z: number },
   yaw: number,
@@ -3082,7 +3090,7 @@ function speakWork(
     ? Math.hypot(speaker.x - placePlayerPosition.x, speaker.z - placePlayerPosition.z)
     : Infinity
   const utterance = utteranceOf(said.concept)
-  playSpeech(utterancePlan(utterance, distance))
+  playSpeech(utterancePlan(utterance, distance, { bearing: speechBearing(camera, speaker) }))
   if (speechReach(distance).audible) {
     useGame.getState().hearUtterance(utterance)
     if (anchor) {

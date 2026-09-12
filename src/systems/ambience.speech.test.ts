@@ -16,6 +16,7 @@
 // under test is the SHIPPED function, driven through the same node interface.
 import { describe, expect, it } from 'vitest'
 import { speakSyllable, syllableCarrier } from './ambience'
+import type { SpeechVoice } from '../communication/speaking'
 import type { Tone } from '../communication/lexicon'
 
 const SR = 24000
@@ -195,7 +196,7 @@ class OfflineCtx {
 const DUR = 0.186 // one syllable at the shipped pace (0.3 s step × 0.62 duty)
 
 /** Render ONE syllable of the given tone through the shipped synthesis. */
-function renderSyllable(tone: Tone): Float64Array {
+function renderSyllable(tone: Tone, voice: SpeechVoice = 'adult'): Float64Array {
   const ctx = new OfflineCtx()
   speakSyllable(
     ctx as unknown as AudioContext,
@@ -204,6 +205,7 @@ function renderSyllable(tone: Tone): Float64Array {
     tone,
     DUR,
     1,
+    voice,
   )
   return ctx.render(DUR)
 }
@@ -380,5 +382,19 @@ describe('the spoken syllable is a VOICE, measured on the rendered signal (point
     expect(pitchHz(high) / carrierHigh).toBeLessThan(1.08)
     // And the two are far enough apart to be told apart by ear at speaking pace.
     expect(carrierHigh / carrierLow).toBeGreaterThan(1.4)
+  })
+})
+
+
+describe('child register through the shipped vowel filters', () => {
+  it.each(['low', 'high'] as const)('keeps the %s child carrier audible and measures synthesis output', (tone) => {
+    const buf = renderSyllable(tone, 'child')
+    const hz = syllableCarrier(tone, 'child')
+    expect(pitchHz(buf) / hz).toBeGreaterThan(0.92)
+    expect(pitchHz(buf) / hz).toBeLessThan(1.08)
+    const peak = buf.reduce((max, v) => Math.max(max, Math.abs(v)), 0)
+    // Measured: 2.192 (low), 2.671 (high) per unit envelope peak.
+    expect(peak).toBeGreaterThan(tone === 'low' ? 2.1 : 2.6)
+    expect(peak).toBeLessThan(tone === 'low' ? 2.3 : 2.8)
   })
 })
