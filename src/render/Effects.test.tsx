@@ -1,6 +1,6 @@
 import { act, render } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { PerspectiveCamera, RenderPipeline, Scene, Texture } from 'three/webgpu'
+import { PerspectiveCamera, RenderPipeline, Scene, Texture, WebGPURenderer } from 'three/webgpu'
 import { velocity } from 'three/tsl'
 import { Effects } from './Effects'
 import { createScenePass } from './scenePass'
@@ -19,7 +19,9 @@ const currentPass = () => (window as unknown as { __scenePass: ReturnType<typeof
 afterEach(() => { useUi.setState(initialUi, true) })
 
 function mountEffects() {
-  fiber.state = { gl: {}, scene: new Scene(), camera: new PerspectiveCamera() }
+  const gl = new WebGPURenderer({ forceWebGL: true })
+  vi.spyOn(gl, 'render').mockImplementation(() => {})
+  fiber.state = { gl, scene: new Scene(), camera: new PerspectiveCamera() }
   // All graph construction and disposal is real; jsdom cannot draw a frame.
   const renderPipeline = vi.spyOn(RenderPipeline.prototype, 'render').mockImplementation(() => {})
   const view = render(<Effects />)
@@ -82,6 +84,35 @@ describe('post chain ownership', () => {
     view.unmount()
     expect(finalPost).toHaveBeenCalledTimes(1)
     expect(disposeScene).toHaveBeenCalledTimes(1)
+  })
+
+  it('draws the scene before post on every frame across effect and graphics transitions', () => {
+    const view = mountEffects()
+    const gl = fiber.state.gl as WebGPURenderer
+    const order: string[] = []
+    vi.mocked(gl.render).mockImplementation((object) => {
+      expect(object).toBe(fiber.state.scene)
+      order.push('scene')
+    })
+    vi.mocked(RenderPipeline.prototype.render).mockImplementation(function () {
+      order.push('post')
+      expect(order).toEqual(['scene', 'post'])
+      // The real output ContextNode disables upstream automatic jitter: the
+      // frame owner now brackets scene + post, including the first-ever frame.
+      const output = this.outputNode as unknown as { getFlowContextData: () => Record<string, unknown> }
+      expect(output.getFlowContextData().renderPipeline).toBeNull()
+    })
+    for (const state of [
+      { traaEnabled: false }, { traaEnabled: true }, { detailLevel: 'high' as const },
+      { ssaoEnabled: false }, { detailLevel: 'low' as const },
+      { detailLevel: 'medium' as const }, { traaEnabled: false },
+    ]) {
+      act(() => useUi.setState(state))
+      order.length = 0
+      fiber.frame()
+      expect(order).toEqual(['scene', 'post'])
+    }
+    view.unmount()
   })
 
   it.each(['scene', 'camera'] as const)('releases the scene pass when its %s changes', (field) => {

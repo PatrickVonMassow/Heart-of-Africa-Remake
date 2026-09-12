@@ -49,6 +49,42 @@ and renderer context-node ID stayed unchanged. Upstream TRAA also calls
 Keep the existing camera/velocity teardown and the accepted stable MRT,
 scene-pass lifetime, queue priority and scene-crop measurement.
 
+## Repair and first post-repair measurement
+
+`sceneFrame.ts` renders the existing scene pass once, before the post pipeline,
+at render depth 0 (shadows at depth 1). The pass keeps its targets and MRT; its
+texture consumers perform setup but no longer trigger nested scene renders.
+No extra render target, fullscreen pass or synchronous compile was added.
+
+The frame owner applies TRAA jitter before that first scene draw and clears it
+in a `finally` block after post. The output TSL context disables TRAA's automatic
+pipeline callbacks to prevent double jitter/advancement. Every temporal resolve
+uses the scene owner's persistent unjittered projection matrix. This matters
+because an already compiled velocity uniform retains its matrix by reference;
+replacing the TRAA node must not leave that uniform reading a retired matrix.
+Off frames also update the same matrix, and existing teardown cleanup remains.
+
+Repeating the same standalone diagnostic after the repair measured:
+
+| Transition | Started | New programs | Queue at 1500 ms | Scene crop mean |
+| --- | --- | ---: | ---: | ---: |
+| First off | 171 -> 179 | 8 | 0 | 163.6228 |
+| On | 179 -> 189 | 10 | 0 | 163.1881 |
+| Off again | 189 -> 197 | 8 | 0 | 163.4598 |
+
+All 391 sampled mesh/material entries kept their render-context IDs, material
+keys, dynamic keys and pipeline keys through all three transitions. This is a
+standalone diagnostic receipt, not a claim that the reviewer suite passed.
+
+Unit tests exercise real Three scene passes, renderer state, temporal jitter
+and post pipeline with only GPU draws replaced. They assert one scene draw
+before post even if nested NodeFrame schedulers request the pass repeatedly;
+projection identity and values across temporal rebuilds and camera changes;
+resize, first-frame jitter, one jitter advancement, and cleanup on either draw
+throwing. Component tests assert the eager scene draw across graphics/effect
+transitions while retaining the accepted target/disposal checks. Restoring the
+pre-repair Effects implementation makes the new component regression fail.
+
 ## Reviewer-owned checks
 
 The browser suites have not been run by the author. The reviewer must judge

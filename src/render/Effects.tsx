@@ -26,6 +26,7 @@ import { bloom } from 'three/addons/tsl/display/BloomNode.js'
 import { traa } from 'three/addons/tsl/display/TRAANode.js'
 import { createEnvironmentTexture } from './environment'
 import { createScenePass } from './scenePass'
+import { createSceneFrame } from './sceneFrame'
 import { useUi, effectiveSsao, effectiveTraa, effectiveBloom } from '../state/ui'
 
 /** Sun direction used for the IBL texture (matches the scene suns closely). */
@@ -65,6 +66,7 @@ export function Effects() {
   // changed fragment-output layout relinks scene/shadow materials as well as
   // the post chain, leaving an empty scene behind a long first-use backlog.
   const scenePass = useMemo(() => createScenePass(scene, camera), [scene, camera])
+  const sceneFrame = useMemo(() => createSceneFrame(scenePass, gl), [scenePass, gl])
   useLayoutEffect(() => {
     if (import.meta.env.DEV) {
       ;(window as unknown as Record<string, unknown>).__scenePass = scenePass
@@ -115,6 +117,7 @@ export function Effects() {
     // getTextureNode() and the RTT internals missing from the upstream
     // declaration file.
     let composed = aoComposed
+    let temporal: ReturnType<typeof sceneFrame.bindTemporal> | null = null
     if (traaEnabled) {
       // TRAA reads its beauty input from a render target and copies it into its
       // history buffer. When SSAO is on, aoComposed is an operator node
@@ -129,6 +132,7 @@ export function Effects() {
       // yields is disposed as `traaNode.beautyNode.renderTarget` below.
       const beauty = ssaoEnabled ? aoComposed : color.mul(float(1))
       const traaNode = traa(beauty, depth, scenePass.getTextureNode('velocity'), camera)
+      temporal = sceneFrame.bindTemporal(traaNode)
       disposables.push(traaNode)
       // traa() wraps the composed input in an RTT node, which owns a
       // full-resolution render target of its own and has no dispose().
@@ -181,7 +185,10 @@ export function Effects() {
     // RenderPipeline is r185's name for the former PostProcessing (which now
     // only lives on as a deprecation alias that warns on construction).
     const processing = new THREE.RenderPipeline(gl)
-    processing.outputNode = graded.mul(vignette)
+    // The frame owner applies jitter before the eager scene draw and clears it
+    // after post. Disable TRAA's lazy RenderPipeline jitter callbacks so neither
+    // the first frame nor a rebuild applies a second jitter or advances twice.
+    processing.outputNode = graded.mul(vignette).context({ renderPipeline: null })
 
     const dispose = () => {
       processing.dispose()
@@ -194,8 +201,8 @@ export function Effects() {
         velocity.setProjectionMatrix(null)
       }
     }
-    return { processing, dispose }
-  }, [gl, scenePass, camera, traaEnabled, ssaoEnabled, bloomEnabled])
+    return { processing, dispose, render: () => sceneFrame.render(processing, temporal) }
+  }, [gl, scenePass, sceneFrame, camera, traaEnabled, ssaoEnabled, bloomEnabled])
 
   // useLayoutEffect (not useEffect): free the SUPERSEDED pipeline synchronously
   // at commit, the instant a rebuild replaces it. A passive effect defers the
@@ -211,7 +218,7 @@ export function Effects() {
 
   // Priority render: replaces R3F's default render with the post pipeline.
   useFrame(() => {
-    post.processing.render()
+    post.render()
   }, 1)
 
   return null
