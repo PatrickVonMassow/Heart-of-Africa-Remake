@@ -211,6 +211,12 @@ export function Effects() {
   // alongside the new one's — a spurious per-toggle spike in the leak gate.
   // Commit-time disposal keeps renderer.info.memory.textures deterministic.
   useLayoutEffect(() => {
+    // A committed rebuild is the condition the browser suite waits on instead
+    // of a wall-clock pause: it counts up exactly when the new pipeline is live.
+    if (import.meta.env.DEV) {
+      const hooks = window as unknown as { __postBuilds?: number }
+      hooks.__postBuilds = (hooks.__postBuilds ?? 0) + 1
+    }
     return () => {
       post.dispose()
     }

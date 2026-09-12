@@ -115,6 +115,20 @@ describe('post chain ownership', () => {
     view.unmount()
   })
 
+  it('counts a committed pipeline rebuild, which is what the browser suite waits on', () => {
+    const builds = () => (window as unknown as { __postBuilds?: number }).__postBuilds ?? 0
+    const view = mountEffects()
+    const afterMount = builds()
+    expect(afterMount).toBeGreaterThan(0)
+    act(() => useUi.setState({ traaEnabled: false }))
+    expect(builds()).toBe(afterMount + 1)
+    // A write that leaves the EFFECTIVE value alone rebuilds nothing, which is
+    // why the suite only waits when the effective value changed.
+    act(() => useUi.setState({ traaEnabled: false }))
+    expect(builds()).toBe(afterMount + 1)
+    view.unmount()
+  })
+
   it.each(['scene', 'camera'] as const)('releases the scene pass when its %s changes', (field) => {
     const view = mountEffects()
     const previous = currentPass()

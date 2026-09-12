@@ -998,11 +998,25 @@ if (section('graphics-levels')) {
   // section does: let the rebuild commit, then force a frame that builds its
   // targets. End with the allow-flag restored so the F9 effective-lever and
   // flag-preservation checks retain their meaning.
-  for (const on of [true, false, true, false, true]) {
+  // The rebuild is awaited on the APPLICATION's clock: __postBuilds counts up
+  // when the new pipeline is committed, so no wall-clock pause is needed. A
+  // toggle that does not change the EFFECTIVE value rebuilds nothing and is
+  // therefore not waited for.
+  const setTraaAndDraw = async (on) => {
+    const before = await page.evaluate(() => {
+      const s = window.__ui.getState()
+      return {
+        builds: window.__postBuilds ?? 0,
+        traa: s.detailLevel !== 'low' && s.traaEnabled,
+      }
+    })
     await page.evaluate((value) => window.__ui.getState().setTraaEnabled(value), on)
-    await page.waitForTimeout(600)
+    if (before.traa !== on) {
+      await page.waitForFunction((from) => (window.__postBuilds ?? 0) > from, before.builds, { timeout: 15000 })
+    }
     await forceFrame()
   }
+  for (const on of [true, false, true, false, true]) await setTraaAndDraw(on)
   // F9 #1: medium → low (every fill-rate lever forced DOWN).
   const atLow = await cycleF9()
   check('F9 → low: post off, shadows low-res, no campfire shadows',
