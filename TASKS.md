@@ -1357,6 +1357,20 @@ put it is the mistake this line exists to stop.
   WHY IT IS A POINT AND NOT A BACKLOG LINE: it permits a false approval. The suite certifies
   a proof frame whose subject is not readable, which is exactly the vanished-subject pitfall
   this repository recorded on 11.09.2026, and point 1087 owes a frame of this same act.
+  THE SAME CLASS, FOUND AGAIN ON 12.09.2026 while point 1087 was being reviewed, in TWO more
+  places in the same section — so the fix belongs here rather than being repaired shot by shot:
+  - THE RETURN CAPTURE ASSERTS A STALE SAMPLE. `holdStill()` sets the errand pace to 0.5 and
+    leaves movement ON, and the return shot samples the carrier's position and cargo, then
+    advances another frame before the shutter and asserts the SAMPLED `still.carry`. A carrier
+    who delivers his jar between the measurement and the exposure is photographed empty-handed
+    while the check passes.
+  - A CLEAR MIDPOINT IS NOT TWO VISIBLE MEN. The order shot raycasts `placeCamera` at the
+    MIDPOINT between sender and carrier, so a post standing in front of either man leaves that
+    midpoint clear and the bearing is accepted. Both participants and the stand have to be
+    visible, not the empty air between them.
+  Both are the same defect as the one above — a frame judged on a state that was true before
+  the shutter rather than at it — and the final state below covers them: the clearance and the
+  cargo are measured AT the shutter, and a bearing that has gone stale is re-chosen.
   Criticality: medium — no player impact; it costs the picture proof its meaning, and it sits
   directly in front of point 1087.
   Bundle: Dorfleben.
