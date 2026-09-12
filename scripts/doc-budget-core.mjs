@@ -368,7 +368,15 @@ export const DOC_BUDGETS = [
     // decision recorded is new behaviour with a new player-reachable reading (the
     // figure sinks, the fold is bounded by the dig's, the jar's mouth is what goes
     // under an opaque surface), not a longer telling of the errand already there.
-    maxWords: 28646,
+    // RAISED by the 214 measured words work-order 1087 owes §13.4: fetching water
+    // is now an ERRAND ONE MAN ORDERS AND ANOTHER RUNS, with a village water
+    // stand, an addressee for both utterances, the rule that no villager speaks
+    // to nobody, and the accepted WATER reading. The section described a carrier
+    // who narrated his own act and never reached the water; none of the dispatch
+    // existed anywhere in it. New mechanics the user asked for (07.09.2026), not
+    // a longer telling of the old errand — the discovery narrative of the fill
+    // pose was CUT from the same section in the same commit to pay part of it.
+    maxWords: 28860,
     // A hundred words across 28k: design.md is edited section by section and a genuine
     // new decision runs 40–215 measured words, so the slack absorbs the rewording that
     // accompanies one and refuses the disappearance of a whole section without a

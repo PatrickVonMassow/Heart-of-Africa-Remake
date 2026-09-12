@@ -134,8 +134,30 @@ traveller are calibratable under `balance.villageLife.bankGame`.
 
 ## The adults' work
 
-The adults teach RIVER through an empty-jar departure and a full-jar return at
-the village end of the water path. DIG is said twice in each of two paired
+The adults teach RIVER through an errand ONE MAN ORDERS AND ANOTHER RUNS. At the
+village water stand beside the fire, an adult turns to a free adult, says RIVER
+and points at the river; the one addressed takes the empty jar, walks down the
+water path and on past its landing to the waterline, stands ankle-deep and dips
+the jar for a held moment. He carries the full jar back to the stand, sets it
+down and says RIVER a second time to the man who sent him. It is ONE round trip
+held by ONE carrier: the jar is empty on the way down and full only after the
+dip, never flipped between two castings. Both utterances fall at the stand,
+inside the village and clear of the children's bank game, and both wait while a
+child is in earshot, exactly as the DIG utterances do. The stand holds a few
+standing jars; a further delivery replaces the oldest, so the water needs no
+consumer.
+
+NO VILLAGER SPEAKS TO NOBODY. Every utterance has an addressee who reacts and a
+consequence the player sees; the teaching comes from the act that follows the
+word, never from a word spoken beside an act. With nobody free to send, the
+order is not given at all, and the errand simply waits for the next round.
+
+THE WATER READING IS ACCEPTED, NOT CLOSED. A player may read the second RIVER as
+WATER. The chief's message carries just as well as `WATER · UPSTREAM · ROCK ·
+DIG`, so the reading is left standing — unlike the three readings ROCK closes
+deliberately.
+
+DIG is said twice in each of two paired
 bouts at different excavations: an initiator first walks to a free adult and
 says it as an invitation, then both walk to the site, where the initiator says
 it again before they dig together with tools in hand. A bout with no second
