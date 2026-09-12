@@ -303,6 +303,15 @@ function runSuite(name, baseUrl, retryAfter = '') {
 // read from the failing check NAMES (baseline-classify-core.mjs): the SAME check
 // twice is a candidate real failure, disjoint sets are load. Whether the check
 // even touches the diff is printed beside it as a weak second signal.
+// A RED WHOSE OWNER IS KNOWN BUYS NO SECOND PASS (point 1113, user 12.09.2026).
+// The retry answers one question — transient or defect? — and for a red that a
+// named OPEN point already owns in the charge ledger that question is answered.
+// So a suite whose run record carries reds and whose reds are ALL owned runs
+// once, says which points own them, and stays red; ONE uncharged red keeps the
+// retry. The decision reads the suite's own record (feature level, capture cuts
+// and repeated identities are lost by parsing output), and every doubt — a
+// missing, stale, crashed, truncated or non-terminal record — falls back to the
+// retry. Measured on point 1112's closing: three red suites cost six passes.
 const RETRY_ENABLED = process.env.VERIFY_NO_RETRY !== '1'
 /** Suites that stayed red, kept for the opt-in baseline classification below.
  *  `runs` is 1 when retry is disabled or every red has an open owner. */
