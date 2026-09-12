@@ -15783,3 +15783,27 @@ to land than a mechanism that needs a review.
   touching its change. This point owns it.
   Refs: scripts/verify/enrichments.mjs, point 1089, point 1065, point 278.
   Bundle: Testinfrastruktur.
+
+- [ ] 1119. Repair the arriving runner's contact hold, which reds under load and passes on a
+  quiet machine (filed 12.09.2026 from a SUSPECT retry in point 1087's LARGE run, under point
+  1089's ownership rule).
+  The polish check `the arriving runner is read from ROCK to the far side of its contact hold`
+  (`scripts/verify/polish.mjs` ~4937, `--section=children-bank-game`) reads the hold to its
+  end on a loaded machine as it does on a quiet one, or its frame budget is stated and
+  enforced so a short read fails for a named reason rather than as `ended false`.
+  Measured 12.09.2026, WebGL 2 lane of the LARGE run in the point-1087 worktree: 137 readings,
+  remaining 8.9589 s down to 3.1986 s, `ended false`, heard from 8.57 m against a 10 m radius,
+  one unheard opening before acquisition. The retry of the same suite ran 266 pass / 0 fail,
+  which the runner recorded as SUSPECT — a second pass covers nothing. The session had put
+  its own build, type-check and push gate (15235 unit tests) on the same machine inside that
+  window, so LOAD is the leading hypothesis and is not yet measured.
+  FIRST STEP, before any repair: `node scripts/throttle-probe.mjs polish
+  --section=children-bank-game --runs 8` on a quiet machine. If the probe reproduces the red
+  under load only, the defect is the check's frame budget, not the game. If it reds on a quiet
+  machine too, the arrival hold itself is short and the game owes the fix.
+  The check belongs to point 1106, which is closed, so it cannot take a charge-ledger entry
+  (`scripts/render-verify-charges.mjs` refuses a closed point) — which is why it is its own
+  point.
+  Refs: scripts/verify/polish.mjs (~4878-4960), scripts/throttle-probe.mjs,
+  scripts/render-verify-charges.mjs, point 1106, point 1089, point 1087.
+  Bundle: Testinfrastruktur.
