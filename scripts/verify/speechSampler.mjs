@@ -28,6 +28,8 @@ export async function sampleSpeech(ac, analysers, tones, startedAt) {
       })
     })
     if (window !== -1) windowHits[window]++
+    // Review-required polling cadence, recorded in fixed-wait-baseline.json:
+    // this schedules the next read, never declares the audio ready after a sleep.
     await new Promise((resolve) => setTimeout(resolve, 5))
   }
   return { peak, bands, passes, windowHits }
