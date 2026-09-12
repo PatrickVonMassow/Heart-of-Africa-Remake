@@ -20,7 +20,12 @@ import {
   LEVEL, annotateResult, annotateStageFailure, decideRun, formatLoadReport, onLoadMode,
 } from './machine-load-core.mjs'
 import { readMachine } from './machine-load.mjs'
-import { RETRY_ENV, formatSuspectEnv } from '../render-verify-core.mjs'
+import {
+  RETRY_ENV, chargeablePoints, chargeFor, formatSuspectEnv, isCrashedRun,
+  isIncompleteRecording, owned, runIdentity,
+} from '../render-verify-core.mjs'
+import { readRenderState } from '../render-verify-state.mjs'
+import { readTasksAll } from '../tasks-source.mjs'
 import { backendProbeDetail, gpuBackendVerdict } from './gpu-backend-probe-core.mjs'
 import { probeGpuBackends } from './gpu-backend-probe.mjs'
 import {
@@ -33,6 +38,7 @@ import { SECTION_ENV, listSections, planSectionRun, resolveSelection } from './s
 import { readFileSync } from 'node:fs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
+const chargedPoints = new Set()
 
 // Hybrid test architecture: the fast, deterministic Vitest layer (jsdom, no
 // browser) runs first (`unit` stage below) and covers all pure logic, store
@@ -202,6 +208,9 @@ const SUITE_TIMEOUT_MS = Number(process.env.VERIFY_SUITE_TIMEOUT_MS) || 45 * 60 
  *  attempt (point 640) — blank for a first attempt, which also neutralises a
  *  stale export in the calling shell. */
 function runSuite(name, baseUrl, retryAfter = '') {
+  const before = readRenderState()?.runs
+  const previous = new Set((Array.isArray(before) ? before : []).map(runIdentity))
+  const startedAt = Date.now()
   const res = spawnSync(process.execPath, [join(HERE, `${name}.mjs`)], {
     windowsHide: true,
     encoding: 'utf8',
@@ -248,7 +257,27 @@ function runSuite(name, baseUrl, retryAfter = '') {
       for (const line of out.split('\n').filter((l) => l.trim()).slice(-12)) console.log('      | ' + line)
     }
   }
-  return { ok, out }
+  // Read the child's own complete record: output parsing alone loses feature
+  // level, capture cuts and repeated identities with different measurements.
+  // Never borrow a previous or concurrent run's charges to skip this attempt.
+  const finishedAt = Date.now()
+  const after = readRenderState()?.runs
+  const fresh = (Array.isArray(after) ? after : []).filter((r) =>
+    r?.suite === name && r.backend === laneFor(name, VERIFY_GL) &&
+    r.startedAt >= startedAt && r.startedAt <= r.at && r.at <= finishedAt && !previous.has(runIdentity(r)),
+  )
+  const record = fresh.length === 1 && !res.error && !res.signal ? fresh[0] : null
+  const openPoints = new Set(chargeablePoints(readTasksAll()))
+  const complete = record && record.exit === res.status && record.asserted === true &&
+    record.terminalVerdict === true && !isCrashedRun(record) && !isIncompleteRecording(record)
+  const reds = complete && Array.isArray(record.reds) ? record.reds : []
+  const ownedReds = reds.filter((red) => owned(red, name, record.backend, record.featureLevel, openPoints))
+  const points = [...new Set(ownedReds.map((red) => openPoints.has(red.point)
+    ? red.point
+    : chargeFor(red, { suite: name, backend: record.backend, featureLevel: record.featureLevel }).point,
+  ))].sort((a, b) => a - b)
+  for (const point of points) chargedPoints.add(point)
+  return { ok, out, allOwned: reds.length > 0 && ownedReds.length === reds.length, points, partial: record?.partial === true }
 }
 
 // Auto-retry a failed BROWSER suite once (point 200 — general flake resilience).
@@ -274,13 +303,27 @@ function runSuite(name, baseUrl, retryAfter = '') {
 // read from the failing check NAMES (baseline-classify-core.mjs): the SAME check
 // twice is a candidate real failure, disjoint sets are load. Whether the check
 // even touches the diff is printed beside it as a weak second signal.
+// A RED WHOSE OWNER IS KNOWN BUYS NO SECOND PASS (point 1113, user 12.09.2026).
+// The retry answers one question — transient or defect? — and for a red that a
+// named OPEN point already owns in the charge ledger that question is answered.
+// So a suite whose run record carries reds and whose reds are ALL owned runs
+// once, says which points own them, and stays red; ONE uncharged red keeps the
+// retry. The decision reads the suite's own record (feature level, capture cuts
+// and repeated identities are lost by parsing output), and every doubt — a
+// missing, stale, crashed, truncated or non-terminal record — falls back to the
+// retry. Measured on point 1112's closing: three red suites cost six passes.
 const RETRY_ENABLED = process.env.VERIFY_NO_RETRY !== '1'
 /** Suites that stayed red, kept for the opt-in baseline classification below.
- *  `runs` is 1 in strict mode (no retry, so there is no repeat signature). */
+ *  `runs` is 1 when retry is disabled or every red has an open owner. */
 const redSuites = []
 function runSuiteWithRetry(name, baseUrl) {
   const first = runSuite(name, baseUrl)
   if (first.ok) return true
+  if (first.allOwned) {
+    console.log(`${first.partial ? 'PARTIAL' : 'ACCOUNTED FOR'}  ${name} — retry skipped; all reds charged to open points ${first.points.join(', ')}; suite stays red`)
+    redSuites.push({ suite: name, failed: failedChecks(first.out), checks: allChecks(first.out).length, runs: 1 })
+    return false
+  }
   if (!RETRY_ENABLED) {
     // Strict mode (the closing's flake-free gate): no retry, so no repeat
     // signature exists — say that rather than imply one.
@@ -533,7 +576,9 @@ else if (redSuites.length > 0) {
 }
 
 const failed = results.filter((r) => !r).length
-console.log(`\n${failed === 0 ? 'ALL GREEN' : failed + ' SUITE(S) FAILED'} — ${results.length} suites run`)
+const charges = [...chargedPoints].sort((a, b) => a - b)
+console.log(`\n${failed === 0 ? 'ALL GREEN' : failed + ' SUITE(S) FAILED'} — ${results.length} suites run` +
+  (charges.length ? ` — reds charged to open points ${charges.join(', ')}` : ''))
 // Say it again at the END, where the verdict is read (point 566): a green
 // headline from a one-section run must never be quoted as the suite's.
 if (section) console.log(`PARTIAL — only section "${section}" of ${filter[0]} ran; the suite is NOT covered by this run`)

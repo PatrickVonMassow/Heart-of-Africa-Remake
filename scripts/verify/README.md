@@ -1021,8 +1021,16 @@ gate.
 A red is now read, not asserted. Two signals, both decided in the pure module
 `baseline-classify-core.mjs` (pinned by `baseline-classify.test.mjs`):
 
-**1. The repeat signature — free, always on.** A failed browser suite is retried
-once (point 200). The runner used to conclude from "it failed twice" that this
+**1. The repeat signature — free, always on, EXCEPT where the question is already
+answered (point 1113).** A failed browser suite is retried once (point 200) —
+unless every red in its own run record is charged to an OPEN point in
+`scripts/render-verify-charges.mjs`. The retry exists to tell a transient from a
+defect, and for a red a named open point already owns there is nothing left to
+tell: the suite runs once, prints `ACCOUNTED FOR <suite> — retry skipped; all reds
+charged to open points <N, …>; suite stays red`, and the run's closing line repeats
+those points, so the price of the open defects is read on every run. ONE uncharged
+red in the set keeps the retry exactly as below. The suite stays RED and the record
+stays ACCOUNTED FOR — a charge is not a pass. The runner used to conclude from "it failed twice" that this
 was "a real failure, not a flake". That is not what two failures prove: on
 27.07.2026 `enrichments` failed two staging checks, then a completely different
 one (the crocodile eye knobs) on the retry, on a machine carrying a unit run and
