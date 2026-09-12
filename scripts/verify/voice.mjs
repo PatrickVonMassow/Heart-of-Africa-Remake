@@ -17,6 +17,7 @@ import { frameShutter } from './frameSubject.mjs'
 import { sectionGate } from './sections.mjs'
 import { installTtsCache, markTtsCacheComplete } from './ttsCache.mjs'
 import { attributeBlocks, maxGap } from './liveness.mjs'
+import { judgeSpeechSampling } from './speechSampler.mjs'
 import { fileURLToPath } from 'node:url'
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:5173/'
@@ -365,9 +366,12 @@ if (section('village-stereo')) {
       analysers.forEach((node) => node.disconnect())
     }
   })
+  const sampling = judgeSpeechSampling(measured)
+  check('speech sampler enters both low-syllable windows in each mix', sampling.ok, sampling.detail)
   const [adult, child] = measured.deployed.bands
   check('overlapping adult and child speech reaches opposite stereo sides',
-    adult[0] > adult[1] + 4 && child[1] > child[0] + 4, JSON.stringify(measured.deployed))
+    sampling.ok && adult[0] > adult[1] + 4 && child[1] > child[0] + 4,
+    sampling.ok ? JSON.stringify(measured.deployed) : sampling.detail)
   check('deployed and drum-audition speech leave the master audibly below full scale',
     measured.heldDrums === false && [measured.deployed, measured.withDrums].every((mix) => mix.peak > 0.02 && mix.peak < 1),
     JSON.stringify(measured))

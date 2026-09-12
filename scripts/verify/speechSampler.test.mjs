@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { sampleSpeech } from './speechSampler.mjs'
+import { judgeSpeechSampling, sampleSpeech } from './speechSampler.mjs'
 
 function analysers() {
   return [0, 1].map(() => ({
@@ -35,6 +35,9 @@ describe('live speech sampling cadence', () => {
     }
     expect(result.peak).toBeCloseTo(0.2)
     expect(result.bands).toEqual([[-50, -50], [-50, -50]])
+    expect(result.passes).toBe(nodes[0].getFloatTimeDomainData.mock.calls.length)
+    expect(result.windowHits.every((hits) => hits > 20)).toBe(true)
+    expect(result.windowHits[0] + result.windowHits[1]).toBe(nodes[0].getFloatFrequencyData.mock.calls.length)
     expect(vi.getTimerCount()).toBe(0)
   })
 
@@ -68,6 +71,45 @@ describe('live speech sampling cadence', () => {
       await vi.advanceTimersByTimeAsync(5)
       for (const node of nodes) expect(node.getFloatFrequencyData).toHaveBeenCalledTimes(reads)
     }
-    await sampled
+    expect((await sampled).windowHits).toEqual([2, 2])
+  })
+
+  it('reports zero hits for the measured paint-starvation timeline', async () => {
+    const ac = { currentTime: 0, sampleRate: 48000 }
+    const sampled = sampleSpeech(ac, analysers(), [140, 210], 0)
+    for (const elapsed of [0.238, 1.08, 1.4]) {
+      ac.currentTime = elapsed
+      await vi.advanceTimersByTimeAsync(5)
+    }
+    const result = await sampled
+    expect(result.passes).toBe(3)
+    expect(result.windowHits).toEqual([0, 0])
+    expect(result.bands).toEqual([[-Infinity, -Infinity], [-Infinity, -Infinity]])
+    const verdict = judgeSpeechSampling({ deployed: result, withDrums: { windowHits: [1, 1] } })
+    expect(verdict.ok).toBe(false)
+    expect(verdict.detail).toContain('SAMPLER MISSED LOW-SYLLABLE WINDOWS')
+    expect(verdict.detail).toContain('deployed 0.04–0.18 s: 0 hits')
+    expect(verdict.detail).toContain('deployed 0.64–0.78 s: 0 hits')
+  })
+})
+
+describe('speech sampling coverage verdict', () => {
+  it.each([
+    ['deployed', 0, '0.04–0.18'], ['deployed', 1, '0.64–0.78'],
+    ['withDrums', 0, '0.04–0.18'], ['withDrums', 1, '0.64–0.78'],
+  ])('fails if %s window %i was never entered despite valid bands elsewhere', (mix, window, label) => {
+    const measured = Object.fromEntries(['deployed', 'withDrums'].map((name) => [name, {
+      windowHits: [20, 20], peak: 0.2, bands: [[-45, -55], [-54, -46]],
+    }]))
+    measured[mix].windowHits[window] = 0
+    const verdict = judgeSpeechSampling(measured)
+    expect(verdict.ok).toBe(false)
+    expect(verdict.detail).toContain(`${mix} ${label} s: 0 hits`)
+  })
+
+  it('accepts one actual look per window without mistaking silent audio for missed sampling', () => {
+    const mix = { windowHits: [1, 1], peak: 0, bands: [[-Infinity, -Infinity], [-Infinity, -Infinity]] }
+    // The existing separation and audibility checks still reject this silence.
+    expect(judgeSpeechSampling({ deployed: mix, withDrums: mix }).ok).toBe(true)
   })
 })
