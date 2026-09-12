@@ -1080,22 +1080,33 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
       expect(speech / drums).toBeLessThanOrEqual(4)
     })
 
-    it('leaves the mix headroom — the loudest realistic moment stays under full scale', () => {
-      ctx.currentTime = 260
-      const { drums, speech, master } = measure()
-      // A footstep, on its own bus, is the third voice in that moment.
-      const before = ctx.sources.length
-      emitFootstep('stone')
-      const step = ctx.sources.slice(before)[0]
-      const stepGain = (step.connected[0] as FakeFilter).connected[0] as FakeGain
-      const stepBus = stepGain.connected[0] as FakeGain
-      const footstep =
-        Math.max(...stepGain.gain.events.map((e) => e.value ?? 0)) * stepBus.gain.value
-      // Two villagers speaking right beside the player, over the drum bed, with
-      // the player walking. The panned child upper bound is checked below.
-      expect((2 * speech + drums + footstep) * master).toBeLessThan(1)
-    })
+
   })
+
+  const villageFloor = () => {
+    // Find the ambient bus through a real ambient emitter, then select layer
+    // nodes by their setTarget ramps rather than assuming graph build order.
+    const beforeProbe = ctx.gains.length
+    const beforeSources = ctx.sources.length
+    playThunder(thunderDelaySeconds(3), 0.8)
+    const clap = ctx.sources.slice(beforeSources)[0]
+    const clapEnvelope = (clap.connected[0] as FakeFilter).connected[0] as FakeGain
+    const ambientBus = clapEnvelope.connected[0] as FakeGain
+    const activeLayers = ctx.gains
+      .slice(0, beforeProbe)
+      .filter((g) => g.connected[0] === ambientBus)
+      .filter((g) => g.gain.value > 0 && g.gain.events.some((e) => e.type === 'cancel'))
+    const activeParams = new Set(activeLayers.map((g) => g.gain))
+    const modulation = ctx.gains
+      .slice(0, beforeProbe)
+      .filter((g) => activeParams.has(g.connected[0] as FakeParam))
+      .reduce((sum, g) => sum + Math.max(0, g.gain.value), 0)
+    const ambienceFloor = (
+      activeLayers.reduce((sum, layer) => sum + layer.gain.value, 0) + modulation
+    ) * ambientBus.gain.value
+
+    return { ambienceFloor, ambientBus }
+  }
 
   it('measures headroom after the panner for two close child voices, ambience, drums and a step', () => {
     setAmbienceScene({ region: 'central', mode: 'place', placeKind: 'village', nearVillage: false })
@@ -1122,10 +1133,18 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
     const stepGain = (step.connected[0] as FakeFilter).connected[0] as FakeGain
     const stepBus = stepGain.connected[0] as FakeGain
     const footstep = Math.max(...stepGain.gain.events.map((e) => e.value ?? 0)) * stepBus.gain.value
-    // Measured active village floor and optional drum peak are independently
-    // pinned in the adjacent deployed/audition mix tests.
-    const ambience = 0.2275
-    const drums = DRUM_BEAT_PEAK * balance.drumBed.villageGain * balance.ambientVolume
+    // Read the active floor and optional drum layer from their deployed buses.
+    const { ambienceFloor: ambience, ambientBus } = villageFloor()
+    const heldDrums = balance.drumBed.enabled
+    const before = ctx.gains.map((g) => g.gain.value)
+    balance.drumBed.enabled = true
+    refreshAmbienceVolume()
+    const drumLayer = ctx.gains.filter((g, i) => g.connected[0] === ambientBus && g.gain.value > before[i])
+    const drums = DRUM_BEAT_PEAK * (drumLayer[0]?.gain.value ?? 0) * ambientBus.gain.value
+    balance.drumBed.enabled = heldDrums
+    refreshAmbienceVolume()
+    expect(drumLayer).toHaveLength(1)
+    expect(drums).toBeGreaterThan(0)
     const output = (2 * speech + ambience + drums + footstep) * master.gain.value
     // Re-measured: 1.780 at the former envelope peak 1.8; 0.977 at 0.85.
     expect(output).toBeCloseTo(0.97678411396, 5)
@@ -1144,26 +1163,7 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
     setAmbienceScene({ region: 'central', mode: 'place', placeKind: 'village', nearVillage: false })
     refreshAmbienceVolume()
 
-    // Find the ambient bus through a real ambient emitter, then select layer
-    // nodes by their setTarget ramps rather than assuming graph build order.
-    const beforeProbe = ctx.gains.length
-    const beforeSources = ctx.sources.length
-    playThunder(thunderDelaySeconds(3), 0.8)
-    const clap = ctx.sources.slice(beforeSources)[0]
-    const clapEnvelope = (clap.connected[0] as FakeFilter).connected[0] as FakeGain
-    const ambientBus = clapEnvelope.connected[0] as FakeGain
-    const activeLayers = ctx.gains
-      .slice(0, beforeProbe)
-      .filter((g) => g.connected[0] === ambientBus)
-      .filter((g) => g.gain.value > 0 && g.gain.events.some((e) => e.type === 'cancel'))
-    const activeParams = new Set(activeLayers.map((g) => g.gain))
-    const modulation = ctx.gains
-      .slice(0, beforeProbe)
-      .filter((g) => activeParams.has(g.connected[0] as FakeParam))
-      .reduce((sum, g) => sum + Math.max(0, g.gain.value), 0)
-    const ambienceFloor = (
-      activeLayers.reduce((sum, layer) => sum + layer.gain.value, 0) + modulation
-    ) * ambientBus.gain.value
+    const { ambienceFloor } = villageFloor()
 
     const beforeSpeech = ctx.oscillators.length
     playSpeech(utterancePlan(utteranceOf('DIG'), distance))

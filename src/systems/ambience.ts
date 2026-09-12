@@ -7,7 +7,7 @@ import type { PlaceKind, RegionId } from '../world/geo'
 import { balance } from '../config/balance'
 import { devAssert } from './devAssert'
 import type { Tone } from '../communication/lexicon'
-import { phrasePlan, utterancePlan, type SpeechPlan, type SpeechVoice } from '../communication/speaking'
+import { phrasePlan, utterancePlan, type SpeechPlan, type SpeechVoice, type SpeechOptions } from '../communication/speaking'
 import type { DrumId, DrumMessagePlan } from '../communication/drumMessage'
 
 export interface AmbienceScene {
@@ -1194,7 +1194,10 @@ if (import.meta.env.DEV && typeof window !== 'undefined') {
     surfWobble: () => wobbles.find((w) => w.name === 'surf')?.gain.gain.value ?? 0,
     // Village speech (design.md §13.4): speak an utterance/phrase from a given
     // distance, and read what was actually scheduled.
-    speak: (utterance: string, distance: number) => playSpeech(utterancePlan(utterance, distance)),
+    speak: (utterance: string, distance: number, options: SpeechOptions = {}) => playSpeech(utterancePlan(utterance, distance, options)),
+    // Native browser analysers tap the deployed output after every bus.
+    context: () => ctx,
+    output: () => master,
     speakPhrase: (phrase: string[], distance: number) => playSpeech(phrasePlan(phrase, distance)),
     speechProbe: () => ({ ...(speechProbe ?? { spoken: 0, syllables: 0, lastPeak: 0 }) }),
   }

@@ -1515,7 +1515,7 @@ export const balance: BalanceConfig = {
     speechStereoWidth: 0.6,
     speechPitchInterval: 1.68,
     // Independent speech bus. Re-measured with child carriers and compensated
-    // stereo: the synthesis peak was reduced for headroom (speaking.ts), while
+    // stereo: the envelope peak was reduced for headroom (speaking.ts), while
     // falloff 4 still lifts speech at 3 m and at the hearing rim. The graph test
     // measures 0.2375 before the master at 3 m over a 0.2275 village floor,
     // and 0.977 worst-case output with two panned children, drums and a step.

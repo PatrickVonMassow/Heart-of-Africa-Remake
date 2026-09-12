@@ -313,6 +313,88 @@ if (section('auto-narration')) {
   await page.waitForTimeout(400)
 }
 
+// Village speech uses native analysers on the DEPLOYED master, after the
+// per-utterance panner, speech bus and master gain. This is the audio/WebGL lane.
+if (section('village-stereo')) {
+  await firstGesture()
+  const measured = await page.evaluate(async () => {
+    const { utteranceOf } = await import('/src/communication/lexicon.ts')
+    const a = window.__ambience
+    const b = window.__balance
+    a.start()
+    const ac = a.context()
+    await ac.resume()
+    const master = a.output()
+    const split = ac.createChannelSplitter(2)
+    master.connect(split)
+    const analysers = [0, 1].map((channel) => {
+      const node = ac.createAnalyser()
+      node.fftSize = 4096
+      node.smoothingTimeConstant = 0
+      split.connect(node, channel)
+      return node
+    })
+    const heldDrums = b.drumBed.enabled
+    const sample = async (childrenOnly) => {
+      const tones = [b.communication.speechPitchHz, b.communication.speechChildPitchHz]
+      const bands = [[-Infinity, -Infinity], [-Infinity, -Infinity]]
+      let peak = 0
+      const spectra = new Float32Array(analysers[0].frequencyBinCount)
+      const wave = new Float32Array(analysers[0].fftSize)
+      const startedAt = ac.currentTime
+      a.speak(utteranceOf('RIVER'), childrenOnly ? 0 : 3, {
+        bearing: childrenOnly ? Math.PI / 2 : -Math.PI / 2,
+        voice: childrenOnly ? 'child' : 'adult',
+      })
+      a.speak(utteranceOf('RIVER'), childrenOnly ? 0 : 3, { bearing: Math.PI / 2, voice: 'child' })
+      const until = ac.currentTime + 1.4
+      while (ac.currentTime < until) {
+        analysers.forEach((node, channel) => {
+          node.getFloatTimeDomainData(wave)
+          for (const value of wave) peak = Math.max(peak, Math.abs(value))
+          // RIVER's first and third syllables are low. Restrict the carrier
+          // comparison to those windows: the adult HIGH carrier is near the
+          // child LOW and must not contaminate a comparison across time.
+          const elapsed = ac.currentTime - startedAt
+          if (!((elapsed > 0.04 && elapsed < 0.18) || (elapsed > 0.64 && elapsed < 0.78))) return
+          node.getFloatFrequencyData(spectra)
+          tones.forEach((hz, voice) => {
+            const from = Math.floor(hz * 0.92 * node.fftSize / ac.sampleRate)
+            const to = Math.ceil(hz * 1.03 * node.fftSize / ac.sampleRate)
+            for (let i = from; i <= to; i++) bands[voice][channel] = Math.max(bands[voice][channel], spectra[i])
+          })
+        })
+        await new Promise((resolve) => setTimeout(resolve, 15))
+      }
+      return { peak, bands }
+    }
+    try {
+      a.setScene({ region: 'central', mode: 'place', placeKind: 'village', nearVillage: false })
+      a.refresh()
+      const deployed = await sample(false)
+      // The optional bed is a second, louder headroom condition. Two children
+      // on the same side exercise the loudest new carrier/channel combination.
+      b.drumBed.enabled = true
+      a.refresh()
+      const withDrums = await sample(true)
+      return { deployed, withDrums, heldDrums }
+    } finally {
+      b.drumBed.enabled = heldDrums
+      a.setScene({ region: 'central', mode: 'place', placeKind: 'port', nearVillage: false })
+      a.refresh()
+      master.disconnect(split)
+      split.disconnect()
+      analysers.forEach((node) => node.disconnect())
+    }
+  })
+  const [adult, child] = measured.deployed.bands
+  check('overlapping adult and child speech reaches opposite stereo sides',
+    adult[0] > adult[1] + 4 && child[1] > child[0] + 4, JSON.stringify(measured.deployed))
+  check('deployed and drum-audition speech leave the master audibly below full scale',
+    measured.heldDrums === false && [measured.deployed, measured.withDrums].every((mix) => mix.peak > 0.02 && mix.peak < 1),
+    JSON.stringify(measured))
+}
+
 // A selected section that never executed is a FAILURE, not a quiet pass: it is
 // the one way a --section run could report green having verified nothing.
 const unrun = sections.unrun()
