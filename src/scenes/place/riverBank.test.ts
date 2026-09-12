@@ -21,7 +21,7 @@ import {
 import { balance } from '../../config/balance'
 import { BACKDROP_SCALE, GROUND_DISC_OVERHANG } from './backdrop'
 import { insidePlace, isOutsidePlace, maxBoundaryRadius, groundPlateRadius, placeBoundaryRadius } from './boundary'
-import { buildLayout, PLACE_RADIUS } from './layout'
+import { buildLayout, PLACE_RADIUS, WATER_STAND_WORK_RING } from './layout'
 import { resolveMove, PLAYER_RADIUS, WALKER_RADIUS, standingClear } from './collision'
 import { buildPlaceNavGrid, findPlaceRoute } from './routing'
 import { PLACES, RIVERS, VILLAGE_RIVER_CLEARANCE_DEG, placeById, latLonToWorld } from '../../world/geo'
@@ -472,5 +472,43 @@ describe('the water carrier fills his jar at the waterline (work-order 1087)', (
     expect(footOut).toBeLessThan(bank.walkEdge)
     // The two lie on one bearing: the carrier walks straight down to the water.
     expect(Math.atan2(foot.z, foot.x)).toBeCloseTo(Math.atan2(bankFillSpot(bank).z, bankFillSpot(bank).x), 6)
+  })
+})
+
+// --- The village water stand is a place men can reach (work-order 1087) -----
+//
+// MEASURED 12.09.2026 in the running settlement: a stand whose own footprint was
+// clear still left the carrier stalled 4.2 m away, never counted as arrived,
+// circling it until the errand's backstop expired. The ring the two men work
+// from lay inside the fire's keep-out. What is pinned here is the ring, not the
+// spot.
+describe('the village water stand can be walked up to (work-order 1087)', () => {
+  const riverVillages = ['nubian-village', 'bambara-village', 'mandinka-village']
+
+  it('leaves most of the working ring around it open ground', () => {
+    let checked = 0
+    for (const id of riverVillages) {
+      for (let seed = 1; seed <= 20; seed++) {
+        const layout = buildLayout(id, seed)
+        const stand = layout.waterStand
+        if (!stand) continue
+        checked++
+        let open = 0
+        for (let k = 0; k < 16; k++) {
+          const a = (k / 16) * Math.PI * 2
+          const x = stand.x + Math.cos(a) * WATER_STAND_WORK_RING
+          const z = stand.z + Math.sin(a) * WATER_STAND_WORK_RING
+          if (standingClear(layout.colliders, x, z, WALKER_RADIUS)) open++
+        }
+        expect(open).toBeGreaterThanOrEqual(9)
+      }
+    }
+    expect(checked).toBe(riverVillages.length * 20)
+  })
+
+  it('gives every river village a stand at all', () => {
+    for (const id of riverVillages) {
+      for (let seed = 1; seed <= 20; seed++) expect(buildLayout(id, seed).waterStand).toBeTruthy()
+    }
   })
 })

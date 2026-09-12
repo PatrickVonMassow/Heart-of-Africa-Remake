@@ -265,7 +265,15 @@ const WAY_OUT_BEARINGS = 180
 // carrier then never got nearer than 2.61 m to a stand he was sent to stand at,
 // was never counted as arrived, and circled it until the errand's backstop
 // expired. The gap is set so a walker passes between the two on EVERY bearing.
-export const WATER_STAND_FIRE_GAP = 3.4
+export const WATER_STAND_FIRE_GAPS = [3.4, 4.2, 5.0, 5.8] as const
+/** How many bearings of the working ring around the stand are tested, and how
+ *  many of them must be open ground for the stand to count as reachable. */
+const WATER_STAND_APPROACHES = 16
+/** The ring the two men work from — `JOIN_STAND_OFF` in `adultWork.ts`, restated
+ *  here rather than imported because the layout must not depend on the errand
+ *  module; `layout.test.ts` pins the two together. */
+export const WATER_STAND_WORK_RING = 2.4
+const WATER_STAND_APPROACHES_NEEDED = 9
 /** Its own footprint — three standing jars and the ground they are set on. */
 export const WATER_STAND_RADIUS = 0.6
 /** The bearings the stand is tried on, the one facing the water first: the man
@@ -1522,15 +1530,38 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   let waterStand: PlaceLayout['waterStand'] = null
   if (place.kind === 'village' && waterPath && bank) {
     const standClear = colliderBuckets(colliders, WATER_STAND_RADIUS)
+    const walkClear = colliderBuckets(colliders, WALKER_RADIUS)
     const facing = Math.atan2(bank.nz, bank.nx)
-    for (let k = 0; k < WATER_STAND_BEARINGS && !waterStand; k++) {
-      // Alternating out from the water's own bearing, so the first bearing tried
-      // is the one that reads and the fallbacks stay as near it as possible.
-      const step = Math.ceil(k / 2) * ((k % 2 === 0 ? 1 : -1) * (Math.PI * 2) / WATER_STAND_BEARINGS)
-      const a = facing + step
-      const x = VILLAGE_FIRE[0] + Math.cos(a) * WATER_STAND_FIRE_GAP
-      const z = VILLAGE_FIRE[1] + Math.sin(a) * WATER_STAND_FIRE_GAP
-      if (standingClear(standClear(x, z), x, z, WATER_STAND_RADIUS)) waterStand = { x, z }
+    // A SPOT NOBODY CAN REACH IS NOT A PLACE. Measured 12.09.2026: a stand whose
+    // own footprint was clear still left the carrier stalled 4.2 m away, because
+    // the ring he had to stand on lay inside the fire's keep-out and the gap
+    // between the two was barely a walker wide. So the ground AROUND the stand
+    // is tested too: the men work from `JOIN_STAND_OFF` out, and that ring has
+    // to be open on most of its bearings, not merely somewhere.
+    const approachable = (x: number, z: number) => {
+      let open = 0
+      for (let k = 0; k < WATER_STAND_APPROACHES; k++) {
+        const a = (k / WATER_STAND_APPROACHES) * Math.PI * 2
+        const ax = x + Math.cos(a) * WATER_STAND_WORK_RING
+        const az = z + Math.sin(a) * WATER_STAND_WORK_RING
+        if (standingClear(walkClear(ax, az), ax, az, WALKER_RADIUS)) open++
+      }
+      return open >= WATER_STAND_APPROACHES_NEEDED
+    }
+    for (const gap of WATER_STAND_FIRE_GAPS) {
+      for (let k = 0; k < WATER_STAND_BEARINGS && !waterStand; k++) {
+        // Alternating out from the water's own bearing, so the first bearing
+        // tried is the one that reads and the fallbacks stay as near it as
+        // possible.
+        const step = Math.ceil(k / 2) * ((k % 2 === 0 ? 1 : -1) * (Math.PI * 2) / WATER_STAND_BEARINGS)
+        const a = facing + step
+        const x = VILLAGE_FIRE[0] + Math.cos(a) * gap
+        const z = VILLAGE_FIRE[1] + Math.sin(a) * gap
+        if (!standingClear(standClear(x, z), x, z, WATER_STAND_RADIUS)) continue
+        if (!approachable(x, z)) continue
+        waterStand = { x, z }
+      }
+      if (waterStand) break
     }
     if (waterStand) colliders.push({ x: waterStand.x, z: waterStand.z, r: WATER_STAND_RADIUS })
   }

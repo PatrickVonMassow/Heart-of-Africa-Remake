@@ -5616,8 +5616,18 @@ if (section('adult-errands')) {
     // is therefore set, drawn, and READ BACK; the first one the ground actually
     // accepts, with a clear line to the subject, wins.
     const placeCamera = async (subject, radius, pitch) => {
+      // NEVER OUTSIDE THE SETTLEMENT. Putting the lens past the walkable region
+      // does not merely move it: the leave check hands the player back to the
+      // bird's-eye view and DESTROYS the place scene — measured as
+      // "Execution context was destroyed" mid-capture, and before that as three
+      // frames of an empty river. A spot no further from the settlement's middle
+      // than the subject himself is inland of him by construction.
+      const subjectR = Math.hypot(subject.x, subject.z)
       for (let i = 0; i < 12; i++) {
         const bearing = (i / 12) * Math.PI * 2
+        const cx = subject.x + Math.sin(bearing) * radius
+        const cz = subject.z + Math.cos(bearing) * radius
+        if (Math.hypot(cx, cz) > subjectR) continue
         const got = await page.evaluate(
           ([a, v, r, tilt]) =>
             new Promise((res) => {
@@ -5692,15 +5702,21 @@ if (section('adult-errands')) {
             if (p.work.arrived) w.backArrived = (w.backArrived ?? 0) + 1
             w.backGoal = Math.hypot(p.work.x - stand.x, p.work.z - stand.z)
           }
-          // The carrier has been sent: he is on his way to the water with the
-          // empty jar, and the man who sent him is still standing at the stand.
-          const sender = v.findIndex((p) => p.work?.situation === 'water-out' && p.work.phase === 'send')
-          if (sender < 0) return null
+          // THE MOMENT IS THE WORD, NOT A DISTANCE. Waiting for the carrier to be
+          // within so many metres of the stand chased a window whose width
+          // depends on the errand's pace; the errand itself says when the order
+          // fell. `last` carries the utterance and its age, so this waits for a
+          // RIVER that has just been spoken on the outward leg — the sender is
+          // its speaker and is still standing there, the carrier is the man
+          // walking off with the empty jar.
+          const said = e.last
+          if (!said || said.id !== 'water-out' || said.age > 2.5) return null
+          const sender = said.speaker
+          if (!v[sender]) return null
           for (let i = 0; i < v.length; i++) {
             if (i === sender || v[i].work?.situation !== 'water-out' || v[i].carry !== 'emptyJar') continue
             const gap = Math.hypot(v[i].x - stand.x, v[i].z - stand.z)
             w.best = Math.min(w.best, gap)
-            if (gap > 12) continue
             return { stand, carrier: { x: v[i].x, z: v[i].z }, sender: { x: v[sender].x, z: v[sender].z }, gap }
           }
           return null
@@ -5711,13 +5727,6 @@ if (section('adult-errands')) {
       .then((handle) => handle.jsonValue())
       .catch(() => null)
     const watched = await page.evaluate(() => window.__errandWatch ?? { seen: {}, best: Infinity })
-    check(
-      'MEASURE the errand watch',
-      true,
-      `phases: ${Object.entries(watched.seen).map(([k, n]) => `${k}×${n}`).join(', ') || 'none'} | ` +
-        `returning carrier nearest ${watched.back != null ? `${watched.back.toFixed(2)} m` : 'never'} of the stand, ` +
-        `arrived-samples ${watched.backArrived ?? 0}, goal ${watched.backGoal != null ? `${watched.backGoal.toFixed(2)} m` : '?'} off it`,
-    )
     check(
       'the order at the stand can be photographed: a sender still there and a carrier already going',
       order != null,
@@ -5752,9 +5761,23 @@ if (section('adult-errands')) {
     const returning = await page
       .waitForFunction(
         () => {
-          const v = window.__placeErrands().villagers
+          const e = window.__placeErrands()
+          const v = e.villagers
+          const stand = e.geography.waterStand
+          if (!stand) return null
+          // HE HAS TO BE BACK AMONG THE VILLAGE. 'water-back' begins the instant
+          // he turns round, which is while he is still standing IN the river.
+          // A lens put three metres to his side out there lies outside the
+          // settlement's walkable region, and that does not merely move it: the
+          // leave check hands the player back to the bird's-eye view and tears
+          // the place scene down mid-capture ("Execution context was
+          // destroyed"). Before that it came back as three frames of empty
+          // river, with the shutter's own subject test passing each time. Near
+          // the stand the ground is inside beyond doubt — and he walks there
+          // anyway, so nothing about the errand is bent to be photographed.
           for (let i = 0; i < v.length; i++) {
             if (v[i].carry !== 'fullJar' || v[i].work?.situation !== 'water-back') continue
+            if (Math.hypot(v[i].x - stand.x, v[i].z - stand.z) > 15) continue
             return { who: i, x: v[i].x, z: v[i].z, yaw: v[i].yaw }
           }
           return null
@@ -5777,31 +5800,40 @@ if (section('adult-errands')) {
         const v = window.__placeErrands().villagers[w]
         return { x: v.x, z: v.z }
       }, returning.who)
-      // Slightly DOWN, so the jar on his head is met from a little above and the
-      // water standing at its rim is an ellipse rather than an edge.
-      const stood = await placeCamera(live, 3.2, -0.06)
-      check(
-        'and a stand for the shutter exists that the ground accepts and nothing blocks',
-        stood != null,
-        stood ? `bearing ${stood.bearing.toFixed(2)} rad, ${stood.drift.toFixed(2)} m of drift` : 'all 12 bearings refused',
-      )
+      // STRAIGHT INLAND OF HIM, no sweep. A bearing search around a man on the
+      // bank keeps offering spots on the water side, and a lens there tears the
+      // scene down; the line from him toward the settlement's middle is inside
+      // by construction, and it puts the river behind him, which is where the
+      // walk he is on comes from. Slightly DOWN, so the jar on his head is met
+      // from a little above and the water standing at its rim is an ellipse
+      // rather than an edge.
+      await page.evaluate((v) => {
+        const p = window.__placePlayer
+        const len = Math.max(0.001, Math.hypot(v.x, v.z))
+        p.x = v.x - (v.x / len) * 3.2
+        p.z = v.z - (v.z / len) * 3.2
+        p.yaw = Math.atan2(-(v.x - p.x), -(v.z - p.z))
+        p.pitch = -0.06
+      }, live)
+      await nextFrames(2)
       const still = await page.evaluate((w) => {
         const v = window.__placeErrands().villagers[w]
         const p = window.__placePlayer
-        const cam = window.__placeCamera ? window.__placeCamera() : null
         return {
           x: v.x, z: v.z, carry: v.carry,
-          player: { x: p.x, z: p.z, yaw: p.yaw, pitch: p.pitch },
-          cam,
+          px: p.x, pz: p.z, yaw: p.yaw, pitch: p.pitch,
           gap: Math.hypot(v.x - p.x, v.z - p.z),
         }
       }, returning.who)
+      // THE SUBJECT IS WHERE THE LENS IS, not merely somewhere in the picture.
+      // Three aimings in a row came back showing an empty river with the carrier
+      // a speck at the edge, and the shutter's own subject test passed every
+      // time: "inside the frustum" is not "readable".
       check(
-        'MEASURE the return shutter geometry',
-        true,
-        `subject (${still.x.toFixed(1)}, ${still.z.toFixed(1)}) — player (${still.player.x.toFixed(1)}, ` +
-          `${still.player.z.toFixed(1)}) yaw ${still.player.yaw.toFixed(2)} — gap ${still.gap.toFixed(2)} m` +
-          (still.cam ? ` — camera (${still.cam.x?.toFixed?.(1)}, ${still.cam.z?.toFixed?.(1)})` : ' — no camera probe'),
+        'and the carrier stands where the lens was put, close enough to read',
+        still.gap < 5,
+        `${still.gap.toFixed(2)} m from the lens — subject (${still.x.toFixed(1)}, ${still.z.toFixed(1)}), ` +
+          `lens (${still.px.toFixed(1)}, ${still.pz.toFixed(1)}) yaw ${still.yaw.toFixed(2)} pitch ${still.pitch.toFixed(2)}`,
       )
       await nextFrames(1)
       check(
