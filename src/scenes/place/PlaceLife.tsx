@@ -2451,6 +2451,8 @@ function ErrandVillagers({
   onDigProgress: (progress: readonly DigSiteProgress[]) => void
 }) {
   const refs = useRef<Array<THREE.Group | null>>([])
+  /** The jars STANDING at the village water stand (work-order 1087). */
+  const standJars = useRef<Array<THREE.Object3D | null>>([])
   // The jar each carrier holds: on the head when it is FULL, in the hand when it
   // is empty. Both are mounted once and shown by the frame loop, like every other
   // per-frame visibility in this scene.
@@ -2641,6 +2643,13 @@ function ErrandVillagers({
   useFrame((_, rawDt) => {
     const dt = Math.min(rawDt, 0.1)
     const cfg = balance.villageLife.adultErrands
+    // The jars standing at the village water stand: as many as the errand
+    // state says have been set down, capped at the stand's capacity.
+    for (let k = 0; k < standJars.current.length; k++) {
+      const jar = standJars.current[k]
+      if (jar) jar.visible = k < work.standJars
+    }
+
     for (let i = 0; i < people.length; i++) {
       const me = people[i]
       const task = taskOf(work, i)
@@ -2916,10 +2925,12 @@ function ErrandVillagers({
     w.__placeErrands = () => ({
       staged: { ...work.staged },
       last: work.last ? { ...work.last } : null,
+      standJars: work.standJars,
       geography: {
         waterHead: geography.waterHead,
         waterFoot: geography.waterFoot,
         waterFill: geography.waterFill,
+        waterStand: geography.waterStand,
         digSites: geography.digSites.map((d) => ({ ...d })),
       },
       digProgress: digProgressOf(work, geography.digSites.length),
@@ -3051,6 +3062,9 @@ function ErrandVillagers({
           </group>
         </group>
       ))}
+      {geography.waterStand && (
+        <WaterStand x={geography.waterStand.x} z={geography.waterStand.z} jarRefs={standJars} />
+      )}
     </>
   )
 }
@@ -3113,6 +3127,58 @@ function Jar({ full }: { full: boolean }) {
         )}
       </mesh>
     </>
+  )
+}
+
+/**
+ * THE VILLAGE WATER STAND (work-order 1087): a low platform beside the fire
+ * where the filled jars are set down. It is what gives the errand's return leg a
+ * destination — the carrier used to walk to a radius, where his task was nulled
+ * and the full jar vanished in the same frame.
+ *
+ * It draws `jars` of them, capped by the errand state at
+ * `balance.waterStandCapacity`, so a delivery past the cap replaces the oldest
+ * standing jar rather than piling one more on.
+ */
+function WaterStand({ x, z, jarRefs }: { x: number; z: number; jarRefs: RefObject<Array<THREE.Object3D | null>> }) {
+  return (
+    <group position={[x, 0, z]}>
+      {/* Four short posts and a plank top — the same worn timber the village's
+          other frames are built from. */}
+      {[
+        [-0.34, -0.34],
+        [0.34, -0.34],
+        [-0.34, 0.34],
+        [0.34, 0.34],
+      ].map(([px, pz]) => (
+        <mesh key={`${px},${pz}`} position={[px, 0.16, pz]} castShadow>
+          <cylinderGeometry args={[0.05, 0.06, 0.32, 5]} />
+          <meshStandardMaterial color="#5f4526" roughness={0.95} />
+        </mesh>
+      ))}
+      <mesh position={[0, 0.35, 0]} castShadow receiveShadow>
+        <boxGeometry args={[0.92, 0.07, 0.92]} />
+        <meshStandardMaterial color="#6b5433" roughness={0.92} />
+      </mesh>
+      {Array.from({ length: balance.waterStandCapacity }, (_, i) => {
+        // Set down in a row across the plank, so three read as three. All of
+        // them are mounted once and the frame loop shows as many as stand there.
+        const spread = 0.28
+        const offset = (i - (balance.waterStandCapacity - 1) / 2) * spread
+        return (
+          <group
+            key={i}
+            ref={(el) => {
+              if (jarRefs.current) jarRefs.current[i] = el
+            }}
+            visible={false}
+            position={[offset, 0.385 + JAR_HEIGHT / 2, i % 2 === 0 ? 0.04 : -0.06]}
+          >
+            <Jar full />
+          </group>
+        )
+      })}
+    </group>
   )
 }
 
@@ -3240,6 +3306,7 @@ export function PlaceLife({
   digSites,
   bank,
   waterPath,
+  waterStand,
   playRocks,
   playGround,
   rocks,
@@ -3267,6 +3334,9 @@ export function PlaceLife({
    *  the carriers speak, its foot at the river, where neither does, and the
    *  fill spot in the water where the jar is dipped (work-order 1087). */
   waterPath: { head: { x: number; z: number }; foot: { x: number; z: number }; fill: { x: number; z: number } } | null
+  /** The village water stand (work-order 1087): where the errand is ordered and
+   *  where the filled jars are set down. */
+  waterStand: { x: number; z: number } | null
   /** The two play rocks of the children's bank game (work-order 687), and the
    *  settlement's loose boulders — one of which a child climbs and names while
    *  the group roams, so ROCK is heard at a stone that is no part of the game. */
@@ -3362,9 +3432,10 @@ export function PlaceLife({
       waterHead: waterPath ? { x: waterPath.head.x, z: waterPath.head.z } : null,
       waterFoot: waterPath ? { x: waterPath.foot.x, z: waterPath.foot.z } : null,
       waterFill: waterPath ? { x: waterPath.fill.x, z: waterPath.fill.z } : null,
+      waterStand: waterStand ? { x: waterStand.x, z: waterStand.z } : null,
       digSites,
     }),
-    [waterPath, digSites],
+    [waterPath, waterStand, digSites],
   )
 
   // WHERE they play comes from the LAYOUT (work-order 688): far enough from

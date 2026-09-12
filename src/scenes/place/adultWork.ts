@@ -36,7 +36,7 @@ export const ADULT_SITUATIONS: readonly AdultSituationId[] = [
 export const ADULT_CONCEPTS: readonly ConceptId[] = ['RIVER', 'DIG']
 
 export type AdultCarry = 'none' | 'emptyJar' | 'fullJar' | 'digTool'
-export type AdultPhase = 'walk' | 'fetch' | 'fill' | 'invite' | 'site' | 'dig'
+export type AdultPhase = 'walk' | 'fetch' | 'fill' | 'send' | 'wait' | 'invite' | 'site' | 'dig'
 export type DigUtterance = 'invitation' | 'site'
 
 export interface ErrandPoint { x: number; z: number }
@@ -52,6 +52,9 @@ export interface AdultWorkGeography {
    *  The foot is the drawn track's landing and stays where it is; this is the
    *  last stretch down the shore, and it is where the act happens. */
   waterFill: ErrandPoint | null
+  /** The village water stand (work-order 1087): where the errand is ordered,
+   *  where the filled jar is set down, and where BOTH its words are spoken. */
+  waterStand: ErrandPoint | null
   digSites: readonly DigSite[]
 }
 
@@ -94,6 +97,12 @@ export interface AdultTask extends ErrandPoint {
   partner: number | null
   siteIndex: number | null
   hushed?: boolean
+  /** The villager who ORDERED this errand and who its words are addressed to
+   *  (work-order 1087). He stands at the water stand for the whole round trip,
+   *  because the point's own rule is that no villager speaks to nobody: the
+   *  first word is his order to the carrier, the second is the carrier's report
+   *  back to him. He is NOT an escort — he walks nowhere. */
+  orderedBy: number | null
   arrived: boolean
   /** Seconds this worker has dug in the current bout. */
   dug: number
@@ -118,6 +127,10 @@ export interface AdultWorkState {
   next: number
   cursor: number
   siteProgress: Record<number, DigSiteProgress>
+  /** How many filled jars stand at the village water stand (work-order 1087).
+   *  It is capped at `balance.waterStandCapacity`: a delivery past the cap
+   *  replaces the oldest jar, which is what lets the stand need no consumer. */
+  standJars: number
 }
 
 export const WORK_ARRIVE_RADIUS = 1.1
@@ -144,6 +157,7 @@ export function createAdultWork(count: number, cfg: AdultWorkConfig): AdultWorkS
     next: cfg.intervalSeconds,
     cursor: 0,
     siteProgress: {},
+    standJars: 0,
   }
 }
 
@@ -209,12 +223,20 @@ function anotherFree(view: AdultWorkView, first: number): number {
   return -1
 }
 
+/** Another free adult, with none of DIG's invitation clearance: the water
+ *  errand's second man STAYS at the stand and walks nowhere, so the ground he is
+ *  standing on has nothing to clear (work-order 1087). */
+function anotherFreeAdult(view: AdultWorkView, first: number): number {
+  for (let i = 0; i < view.villagers.length; i++) if (i !== first && view.villagers[i].free) return i
+  return -1
+}
+
 function castable(id: AdultSituationId, view: AdultWorkView): boolean {
   const g = view.geography
   // 'water-back' is never CAST: it is the return leg of the one water errand
   // (work-order 1087), reached from the fill rather than from a second casting.
   if (id === 'water-back') return false
-  if (id === 'water-out') return !!(g.waterHead && g.waterFoot && g.waterFill)
+  if (id === 'water-out') return !!(g.waterFoot && g.waterFill && g.waterStand)
   if (id === 'dig-second') return g.digSites.length >= 2
   return g.digSites.length >= 1
 }
@@ -318,7 +340,47 @@ export function stepAdultWork(
       t.dug = 0
     }
 
-    if (!spoken && t.owes && t.say && t.phase !== 'invite' && t.phase !== 'site' &&
+    // THE ORDER AT THE STAND. The sender says RIVER pointing at the water, and
+    // what follows it is the carrier setting off — the teaching comes from the
+    // act after the word, never from a word spoken beside an act. It is GATED BY
+    // A HEARING CHILD exactly as the two DIG utterances are: a word the children
+    // are inside the earshot of is held, not spent.
+    if (!spoken && t.owes && t.say && t.role === 'initiator' && t.phase === 'send' && t.arrived) {
+      const carrier = t.partner === null ? null : state.tasks[t.partner]
+      if (!carrier || !view.villagers[t.partner ?? -1]) clearPair(state, i)
+      else if (!carrier.arrived) {
+        // The carrier is still on his way to the stand: nothing is owed yet.
+      } else if (view.childrenHear(me.x, me.z)) t.hushed = true
+      else {
+        t.owes = false
+        t.hushed = false
+        spoken = { id: t.situation, concept: 'RIVER', speaker: i, aim: { x: t.say.aim.x, y: 0.2, z: t.say.aim.z } }
+        // ... and the carrier takes the empty jar and goes.
+        const fill = view.geography.waterFill
+        if (fill) {
+          carrier.phase = 'fetch'
+          carrier.carry = 'emptyJar'
+          carrier.x = fill.x
+          carrier.z = fill.z
+          carrier.arrived = false
+        }
+      }
+    } else if (!spoken && t.owes && t.say && t.situation === 'water-back' &&
+               Math.hypot(me.x - t.say.at.x, me.z - t.say.at.z) <= WORK_ARRIVE_RADIUS) {
+      // THE RETURN HAS A DESTINATION. He is back at the stand: the jar goes down
+      // and he reports to the man who sent him. Same hearing gate.
+      const sender = typeof t.orderedBy === 'number' ? view.villagers[t.orderedBy] : null
+      if (!sender) clearPair(state, i)
+      else if (view.childrenHear(me.x, me.z)) t.hushed = true
+      else {
+        t.owes = false
+        t.hushed = false
+        t.carry = 'none'
+        state.standJars = Math.min(balance.waterStandCapacity, state.standJars + 1)
+        spoken = { id: t.situation, concept: 'RIVER', speaker: i, aim: { x: sender.x, y: 1, z: sender.z } }
+        clearPair(state, i)
+      }
+    } else if (!spoken && t.owes && t.say && t.phase !== 'invite' && t.phase !== 'site' && t.phase !== 'send' &&
         Math.hypot(me.x - t.say.at.x, me.z - t.say.at.z) <= WORK_ARRIVE_RADIUS) {
       t.owes = false
       spoken = { id: t.situation, concept: 'RIVER', speaker: i, aim: { x: t.say.aim.x, y: 0.2, z: t.say.aim.z } }
@@ -371,7 +433,7 @@ export function stepAdultWork(
     } else if (t.arrived && t.phase === 'fill') {
       t.dug += dt
       const geo = view.geography
-      if (t.dug >= balance.bankFillSeconds && geo.waterHead && geo.waterFoot) {
+      if (t.dug >= balance.bankFillSeconds && geo.waterStand) {
         // ONE ROUND TRIP, NOT TWO CASTINGS. The full jar used to appear on a
         // SECOND villager cast at the water, so it came from nowhere; the same
         // carrier turns round here instead. Both situation ids survive as LEG
@@ -380,15 +442,17 @@ export function stepAdultWork(
         t.carry = 'fullJar'
         t.situation = 'water-back'
         t.phase = 'walk'
-        t.x = geo.waterHead.x
-        t.z = geo.waterHead.z
-        t.say = { at: geo.waterHead, aim: geo.waterFoot }
+        t.x = geo.waterStand.x
+        t.z = geo.waterStand.z
+        // The aim is replaced by the SENDER's own position when the word falls:
+        // the report is addressed to the man, not to the ground he stands on.
+        t.say = { at: { ...geo.waterStand }, aim: { ...geo.waterStand } }
         t.owes = true
         t.arrived = false
         t.dug = 0
         state.staged['water-back'] = (state.staged['water-back'] ?? 0) + 1
       }
-    } else if (t.arrived && t.phase === 'walk') state.tasks[i] = null
+    } else if (t.arrived && t.phase === 'walk' && !t.owes) state.tasks[i] = null
   }
 
   if (spoken) return rememberWord(state, spoken)
@@ -404,15 +468,30 @@ export function stepAdultWork(
     if (!castable(id, view)) continue
     const avoid = state.last?.speaker ?? -1
 
-    if (id === 'water-out' && g.waterHead && g.waterFoot && g.waterFill) {
-      const who = anyFree(view, avoid)
-      if (who < 0) continue
-      state.tasks[who] = {
-        situation: id, phase: 'fetch', carry: 'emptyJar', role: 'worker', partner: null, siteIndex: null,
-        // He walks THROUGH the path's landing and on down the shore to the
-        // water: the goal is the fill spot, not the foot he used to halt at.
-        x: g.waterFill.x, z: g.waterFill.z, arrived: false, dug: 0, owes: true,
-        say: { at: g.waterHead, aim: g.waterFoot }, via: { ...g.waterHead }, age: 0,
+    if (id === 'water-out' && g.waterFoot && g.waterFill && g.waterStand) {
+      // THE WORD IS THE ORDER (user 07.09.2026). The inhabitant used to narrate
+      // his own act, which reads as staged for the player; DIG works because one
+      // man's word sends another. So the errand is cast as two men at the stand:
+      // the SENDER, who says RIVER and points at the water, and the CARRIER, who
+      // takes the jar and goes. Neither walks with the other.
+      const sender = anyFree(view, avoid)
+      if (sender < 0) continue
+      const carrier = anotherFreeAdult(view, sender)
+      // NO VILLAGER SPEAKS TO NOBODY: with nobody to send, the order is not
+      // given at all, and the errand simply does not cast this round.
+      if (carrier < 0) continue
+      const stand = { ...g.waterStand }
+      state.tasks[sender] = {
+        situation: id, phase: 'send', carry: 'none', role: 'initiator', partner: carrier,
+        siteIndex: null, orderedBy: null,
+        x: stand.x, z: stand.z, arrived: false, dug: 0, owes: true,
+        say: { at: stand, aim: g.waterFoot }, via: null, age: 0,
+      }
+      state.tasks[carrier] = {
+        situation: id, phase: 'wait', carry: 'none', role: 'partner', partner: sender,
+        siteIndex: null, orderedBy: sender,
+        x: stand.x, z: stand.z, arrived: false, dug: 0, owes: false,
+        say: null, via: null, age: 0,
       }
       state.staged[id] = (state.staged[id] ?? 0) + 1
       return null
@@ -431,12 +510,12 @@ export function stepAdultWork(
 
       const partnerAt = view.villagers[mate]
       state.tasks[who] = {
-        situation: id, phase: 'invite', carry: 'digTool', role: 'initiator', partner: mate,
+        situation: id, phase: 'invite', carry: 'digTool', role: 'initiator', partner: mate, orderedBy: null,
         siteIndex: selected.index, x: partnerAt.x, z: partnerAt.z, arrived: false, dug: 0,
         owes: true, say: null, via: null, age: 0,
       }
       state.tasks[mate] = {
-        situation: id, phase: 'invite', carry: 'digTool', role: 'partner', partner: who,
+        situation: id, phase: 'invite', carry: 'digTool', role: 'partner', partner: who, orderedBy: null,
         siteIndex: selected.index, x: spot.x, z: spot.z, arrived: true, dug: 0,
         owes: false, say: null, via: null, age: 0,
       }

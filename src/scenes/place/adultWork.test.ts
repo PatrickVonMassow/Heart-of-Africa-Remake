@@ -42,6 +42,9 @@ const FOOT = { x: 34, z: -6 }
 // (work-order 1087); the layout solves it there, and the fixture keeps the
 // same relation.
 const FILL = { x: 36.5, z: -6.5 }
+// The village water stand, beside the fire: where the errand is ordered, where
+// the jar is set down, and where both of its words fall (work-order 1087).
+const STAND = { x: -2, z: 3 }
 
 function view(
   n: number,
@@ -60,6 +63,7 @@ function view(
       waterHead: { ...HEAD },
       waterFoot: { ...FOOT },
       waterFill: { ...FILL },
+      waterStand: { ...STAND },
       digSites: [
         { x: -11, z: 2, kind: 'pit' },
         { x: -16, z: -1, kind: 'postHole' },
@@ -136,7 +140,8 @@ function putAtGoal(state: AdultWorkState, v: AdultWorkView, index: number): void
 
 function threeWordsDue(): { state: AdultWorkState; v: AdultWorkView } {
   const v = view(5, [
-    { ...HEAD },
+    // The returning carrier stands at the stand, where his report falls.
+    { ...STAND },
     { x: 5, z: 5 },
     { x: 5, z: 5.5 },
     { x: -16, z: -1 },
@@ -146,8 +151,9 @@ function threeWordsDue(): { state: AdultWorkState; v: AdultWorkView } {
   state.next = Number.POSITIVE_INFINITY
   state.tasks[0] = {
     situation: 'water-back', phase: 'walk', carry: 'fullJar', role: 'worker', partner: null, siteIndex: null,
-    x: HEAD.x, z: HEAD.z, arrived: false, dug: 0, owes: true,
-    say: { at: HEAD, aim: FOOT }, via: null, age: 0,
+    orderedBy: 1,
+    x: STAND.x, z: STAND.z, arrived: false, dug: 0, owes: true,
+    say: { at: STAND, aim: STAND }, via: null, age: 0,
   }
   state.tasks[1] = {
     situation: 'dig-first', phase: 'invite', carry: 'digTool', role: 'initiator', partner: 2, siteIndex: 0,
@@ -185,18 +191,73 @@ describe('the adults keep to their four teaching situations', () => {
   })
 })
 
-describe('RIVER remains a departure and return at the path head', () => {
-  it('speaks both water situations at the head and aims both at the water', () => {
+describe('RIVER is ordered and reported at the village water stand', () => {
+  it('speaks both water words at the STAND, never at the water', () => {
     const { words } = run(view(6), 240)
     const river = words.filter((word) => word.concept === 'RIVER')
     expect(new Set(river.map((word) => word.id))).toEqual(new Set(['water-out', 'water-back']))
     for (const word of river) {
-      expect(Math.hypot(word.at.x - HEAD.x, word.at.z - HEAD.z)).toBeLessThanOrEqual(WORK_ARRIVE_RADIUS)
-      // The word falls in the VILLAGE, never at the water — the head sits a
-      // long walk from the foot, and both utterances are spoken at it.
+      // BOTH UTTERANCES FALL INSIDE THE VILLAGE, at the stand beside the fire —
+      // they used to fall at the water path's head out at the edge of the built
+      // ground, which is also where the children's bank game is heard.
+      expect(Math.hypot(word.at.x - STAND.x, word.at.z - STAND.z)).toBeLessThanOrEqual(WORK_ARRIVE_RADIUS)
       expect(Math.hypot(word.at.x - FOOT.x, word.at.z - FOOT.z)).toBeGreaterThan(4)
+      expect(Math.hypot(word.at.x - FILL.x, word.at.z - FILL.z)).toBeGreaterThan(4)
+    }
+    // THE ORDER points at the water; THE REPORT is addressed to the man who
+    // gave it, never at the ground.
+    for (const word of river.filter((w) => w.id === 'water-out')) {
       expect({ x: word.aim.x, z: word.aim.z }).toEqual(FOOT)
     }
+    expect(river.some((w) => w.id === 'water-back')).toBe(true)
+    for (const word of river.filter((w) => w.id === 'water-back')) {
+      expect(Math.hypot(word.aim.x - FOOT.x, word.aim.z - FOOT.z)).toBeGreaterThan(4)
+      // Addressed at a person's height, not at the ground a place sits on.
+      expect(word.aim.y).toBe(1)
+    }
+  })
+
+  it('never speaks to nobody: every water word names a villager as its speaker', () => {
+    const { words } = run(view(6), 240)
+    for (const word of words.filter((w) => w.concept === 'RIVER')) {
+      expect(word.speaker).toBeGreaterThanOrEqual(0)
+      expect(word.speaker).toBeLessThan(6)
+    }
+  })
+
+  it('holds a hearing child`s word rather than spending it', () => {
+    // THE WATER WORD IS GATED BY A HEARING CHILD exactly as the two DIG
+    // utterances are: only the DIG branches carried that check before.
+    const deaf = run(view(6), 240)
+    const heard = run(view(6, undefined, () => true, () => true), 240)
+    expect(deaf.words.some((w) => w.concept === 'RIVER')).toBe(true)
+    expect(heard.words.some((w) => w.concept === 'RIVER')).toBe(false)
+  })
+
+  it('sets the delivered jars down at the stand, up to its capacity', () => {
+    const v = view(6)
+    const state = createAdultWork(6, CFG)
+    for (let elapsed = 0; elapsed < 600; elapsed += 1 / 60) {
+      walkFrame(state, v, 1 / 60)
+      stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
+      expect(state.standJars).toBeLessThanOrEqual(balance.waterStandCapacity)
+    }
+    // Deliveries really happened, and the stand never grew past its capacity —
+    // a delivery past it replaces the oldest jar rather than adding one.
+    expect(state.standJars).toBe(balance.waterStandCapacity)
+  })
+
+  it('gives the order and the report to TWO different men', () => {
+    const { words } = run(view(6), 240)
+    const out = words.filter((w) => w.id === 'water-out')
+    const back = words.filter((w) => w.id === 'water-back')
+    expect(out.length).toBeGreaterThan(0)
+    expect(back.length).toBeGreaterThan(0)
+    // The sender orders, the carrier reports: the same man never does both for
+    // one errand, which is what stopped the inhabitant narrating his own act.
+    const senders = new Set(out.map((w) => w.speaker))
+    const carriers = new Set(back.map((w) => w.speaker))
+    expect([...carriers].some((c) => !senders.has(c)) || senders.size > 1).toBe(true)
   })
 
   it('carries the empty jar out and the full jar back', () => {

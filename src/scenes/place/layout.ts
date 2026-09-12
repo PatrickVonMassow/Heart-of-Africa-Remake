@@ -134,6 +134,10 @@ export interface PlaceLayout {
    *  and foot are drawn as a track; the last stretch down the shore is not a
    *  worn path. */
   waterPath: { head: BankPoint; foot: BankPoint; fill: BankPoint } | null
+  /** The village water stand (work-order 1087): where the filled jars are set
+   *  down and where both of the errand's words are spoken. Null where the
+   *  settlement has no water path to serve. */
+  waterStand: BankPoint | null
   /**
    * The children's roaming quarter (work-order 481.4): where the group plays
    * between two cycles of its bank game, and how far it roams. It is layout data
@@ -243,6 +247,24 @@ export const WAY_OUT_OUTER = 6
 /** How many bearings the way out is looked for on — one every two degrees, which
  *  is finer than the half-width it is looking for. */
 const WAY_OUT_BEARINGS = 180
+
+/**
+ * THE VILLAGE WATER STAND (work-order 1087): where the filled jars are set down,
+ * and where BOTH utterances of the water errand fall.
+ *
+ * It stands beside the fire, which already has a collider and is the plausible
+ * consumer of the water. The errand's two words used to be spoken at the water
+ * path's head out at `WATER_PATH_HEAD_RADIUS`, which is the edge of the built
+ * ground; moving them to the stand puts them among the village, keeps them clear
+ * of the children's bank game, and gives the return leg a destination that is a
+ * place rather than a radius.
+ */
+export const WATER_STAND_FIRE_GAP = 2.7
+/** Its own footprint — three standing jars and the ground they are set on. */
+export const WATER_STAND_RADIUS = 0.6
+/** The bearings the stand is tried on, the one facing the water first: the man
+ *  who says RIVER at it points past it at the river. */
+const WATER_STAND_BEARINGS = 16
 
 /** Where the WATER PATH's head stands: on the bank's own bearing, out past the
  *  compound ring (7-14 m, work-order 604) at the edge of the built ground. It
@@ -1486,6 +1508,27 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   }
 
 
+  // THE VILLAGE WATER STAND (work-order 1087). It goes in beside the fire, on
+  // the bearing that faces the water so the man who says RIVER at it points past
+  // it at the river, and it steps round the ring if that bearing is taken. It is
+  // placed BEFORE the children's quarter is searched, so the quarter is fitted
+  // around it exactly as it is around the other adult places.
+  let waterStand: PlaceLayout['waterStand'] = null
+  if (place.kind === 'village' && waterPath && bank) {
+    const standClear = colliderBuckets(colliders, WATER_STAND_RADIUS)
+    const facing = Math.atan2(bank.nz, bank.nx)
+    for (let k = 0; k < WATER_STAND_BEARINGS && !waterStand; k++) {
+      // Alternating out from the water's own bearing, so the first bearing tried
+      // is the one that reads and the fallbacks stay as near it as possible.
+      const step = Math.ceil(k / 2) * ((k % 2 === 0 ? 1 : -1) * (Math.PI * 2) / WATER_STAND_BEARINGS)
+      const a = facing + step
+      const x = VILLAGE_FIRE[0] + Math.cos(a) * WATER_STAND_FIRE_GAP
+      const z = VILLAGE_FIRE[1] + Math.sin(a) * WATER_STAND_FIRE_GAP
+      if (standingClear(standClear(x, z), x, z, WATER_STAND_RADIUS)) waterStand = { x, z }
+    }
+    if (waterStand) colliders.push({ x: waterStand.x, z: waterStand.z, r: WATER_STAND_RADIUS })
+  }
+
   // THE CHILDREN'S ROAMING QUARTER (work-order 481.4, moved here by 688). It is
   // decided from the settlement's BUILT bodies, BEFORE anything loose is
   // scattered and BEFORE the water path is laid, and that order is item 6 of the
@@ -1875,5 +1918,5 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   }
 
 
-  return { radius, spawnZ: radius - SPAWN_INSET, interactives, dwellings, fences, paths, flora, rocks, digSites, bank, playRocks, waterPath, playGround, wayOut, pen, errands, colliders }
+  return { radius, spawnZ: radius - SPAWN_INSET, interactives, dwellings, fences, paths, flora, rocks, digSites, bank, playRocks, waterPath, waterStand, playGround, wayOut, pen, errands, colliders }
 }
