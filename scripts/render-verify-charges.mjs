@@ -98,6 +98,29 @@ export const RED_CHARGES = [
       + 'so nothing here excuses this section on that backend. The charge dies with 1087.',
   },
   {
+    point: 1073,
+    suite: 'polish',
+    kind: 'console',
+    // SCOPED TO THE DIG SITUATIONS ONLY. The same assert also has a `water-out`
+    // reading, and that one belongs to whoever owns the water errand — it must
+    // stay a real red there, not be swept up by an entry filed for DIG.
+    match: /^console error: \[ASSERT\] adult-atom-lost — dig-(first|second):/i,
+    why:
+      'POINT 1073 NAMES THIS ASSERT BY NAME AND OWNS ITS CAUSE. Its spec states the mechanism in '
+      + 'full: `t.hushed` is set at three places in `adultWork.ts` — the invitation and twice for '
+      + 'the site word — is never taken back inside a running task, and `assertNoOwedWord` excuses '
+      + 'the loss on `task.hushed === true`, so the flag that CAUSES the deferral is exactly the '
+      + 'exemption that lets the word be dropped; since the shore game of point 687 the children '
+      + 'cross the whole village, so "a child can hear" is far more common than the dig-site '
+      + 'placement assumed, and the only way out is the 180 s `errandSeconds` backstop. Measured '
+      + '12.09.2026 in webgpu/polish on feat/1087-carrier-fills-the-jar (60460fdf0): first attempt '
+      + '264 pass, 1 fail and exactly this one console red — "dig-second: villager 3 ran out of '
+      + 'time with his site word unspoken" — and the retry ran clean, which is the intermittency '
+      + 'the hush produces. Nothing in the water errand under test reaches a DIG site word. It is '
+      + 'charged, not excused: 1073 owes the bounded deferral that makes the word fall anyway, and '
+      + 'the charge dies with that point.',
+  },
+  {
     point: 1078,
     suite: 'world',
     kind: 'check',

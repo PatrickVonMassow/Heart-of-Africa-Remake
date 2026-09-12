@@ -1269,6 +1269,62 @@ put it is the mistake this line exists to stop.
   pass uses), point 1089, point 1065.
   Bundle: Testinfrastruktur.
 
+- [ ] 1117. The fill's decided surface reading was never built (found 12.09.2026 while building
+  point 1087).
+  design.md §13.4 states two things about the dip that NO code produces: the jar's MOUTH is
+  "tilted at the surface, never the vessel", and "the surface answers the dip with a spreading
+  ring instead". Measured 12.09.2026 on feat/1087-carrier-fills-the-jar: `fillPose`
+  (`src/render/gesture.ts`) swings the carrying arm down and REDUCES its roll
+  (`roll: REST_POSE.left.roll * (1 - down * 0.9)`), so the jar becomes MORE upright through the
+  dip rather than tipping its mouth into the water; and no ring, ripple or surface disturbance
+  exists anywhere for the fill.
+  WHY IT IS ITS OWN POINT. Point 1085 made the design decision and wrote it into design.md.
+  Point 1087 built the act, its phase, its hold and the geometry the check measures, and its
+  spec says in so many words that it does NOT owe the legibility of the pose. So the decided
+  half of 1085 stands unbuilt while the document asserts it — a document describing behaviour
+  the game does not have.
+  WHY IT MATTERS NOW rather than when it was decided: until 1087 the dip did not happen at the
+  water at all, so neither the tilt nor the ring had anything to sit on. They do now.
+  Final state: the jar's mouth tips at the surface through the dip (the vessel itself never
+  proved to be under an opaque surface, which is what 1085 ruled out), and the water answers
+  with a spreading ring at the fill spot for the length of the hold. Both calibratable in
+  `src/config/balance.ts`. Where neither can be made to read, design.md §13.4 is corrected to
+  say what the game does instead — the document and the code agree at the end either way.
+  Test. Vitest: the fill pose's jar tilt grows with the dip rather than shrinking, and the ring
+  is alive exactly while the fill phase is. Browser (LARGE, both backends — the water surface is
+  backend-sensitive): the `polish --section=adult-errands` fill frame, judged by a reader told
+  only "what is this man doing?".
+  Criticality: LOW — the errand already reads as fetching water from the stand, the walk and the
+  visible full jar; this sharpens the moment of the dip itself.
+  Refs: design.md §13.4, src/render/gesture.ts (`fillPose`), src/scenes/place/PlaceLife.tsx,
+  scripts/verify/polish.mjs (`adult-errands`), points 1085, 1087.
+  Bundle: Dorfleben.
+
+- [ ] 1118. The board's currency check is blind to everything but the set of open point numbers
+  (found 12.09.2026; the user had reported the symptom).
+  `scripts/board-publish.mjs --check` compares only the fingerprint from `board-currency-core.mjs`,
+  and that fingerprint is EXCLUSIVELY the set of open point numbers (`normaliseOpenSet`). The
+  status line, the "Stand" time, every card's text and the queue's order are not in it.
+  MEASURED 12.09.2026 around 16:5x: the live page carried "Stand 14:24" while the local
+  `.batch-dashboard.html` carried "Stand 15:13", with different card text and point 1116 in a
+  different position — and `--check` still reported CURRENT (work order sha256:ff3f2beaacd8702c
+  == live page). The user reported it himself; a hard refresh with the cache cleared still showed
+  14:24.
+  WHY IT IS WORKED ON UNDER THE INFRASTRUCTURE FREEZE: it permits a false approval. Every gate
+  reports the board current while the user reads an arbitrarily old one on his phone, which is
+  the exact case the engmaschig rule exists for.
+  Final state: `--check` compares what the reader actually sees. The file hash already exists in
+  `board-publish.mjs` as `sha256(repoBytes)`; either the fingerprint takes in the now-card's
+  "Stand" line as well, or `--check` compares that hash beside the open-point set. A stale status
+  line makes the check say so.
+  Test. Vitest: a board that differs only in its status line or its "Stand" time is reported
+  BEHIND, not CURRENT.
+  Criticality: LOW by player impact, but it is the reason a stale board went unnoticed for
+  388 minutes.
+  Refs: scripts/board-publish.mjs, scripts/board-currency-core.mjs (`normaliseOpenSet`),
+  docs/batch-autonomy.md.
+  Bundle: Testinfrastruktur.
+
 - [ ] 1108. The fill's proof frame measures its neighbours BEFORE they walk, so a green suite
   can still certify a picture with no readable subject.
   MEASURED 11.09.2026 on main at 72114fb3, in the covering runs of point 1085 on BOTH lanes:
