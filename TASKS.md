@@ -80,17 +80,39 @@ put it is the mistake this line exists to stop.
 - [ ] 1116. Repair pre-existing crossbrowser check: chromium-mobile no console errors on
   mobile (filed automatically by a LARGE run on 12.09.2026 under point 1089's ownership
   rule; the user ordered these three reds filed at once on 10.09.2026).
-  Chromium mobile boots and initialises its renderer without calling getSupportedExtensions
-  on null. Diagnose and repair the recurring renderer initialisation error; add a regression
-  test for the failing path. Prove the full crossbrowser suite at standard depth, including
-  chromium-mobile and its no-console-errors assertion.
+  MEASURED 12.09.2026, and it corrects this point's own first draft. Against the dev
+  server the crossbrowser suite uses (run-all launches `npm run dev`, not preview), at
+  standard depth, on a COLD vite dependency cache:
+    PASS  chromium-mobile the app boots on a mobile viewport
+    PASS  chromium-mobile the renderer initialises on mobile
+    PASS  chromium-mobile the touch layer arms on the first touch (stick + look)
+    FAIL  chromium-mobile no console errors on mobile
+          — Failed to load resource: the server responded with a status of
+            504 (Outdated Optimize Dep)   (twice)
+  The IMMEDIATELY following run, same command, warm cache: ALL GREEN, exit 0.
+  So the cause is NOT a renderer crash and NOT getSupportedExtensions on null — that
+  reading was wrong. Mobile boots, the renderer initialises and the touch layer arms.
+  The single red is vite's dev-server dependency pre-bundling race: when the optimizer
+  re-bundles mid-load, in-flight requests for the superseded chunks answer 504, the page
+  logs them as resource errors, and the no-console-errors assertion trips. A production
+  build has no optimized-dep chunks at all, so NO PLAYER can meet this.
+  Final state: the crossbrowser pass no longer reds on the optimizer's own 504. Settle
+  vite's dependency optimization before the browser pass (or let the harness treat a
+  504 "Outdated Optimize Dep" as the reload signal vite means it to be), so that a cold
+  cache and a warm one give the same verdict. Prove it by running the suite at standard
+  depth TWICE FROM A COLD CACHE (delete node_modules/.vite between runs) and getting
+  the same green both times — a single warm run proves nothing here.
+  Test. Vitest: the console-error filter classifies a 504 "Outdated Optimize Dep" as the
+  optimizer's reload signal and a genuine resource error as a failure.
+  Criticality: LOW, corrected from HIGH on the measurement above. It is a cold-cache
+  flake in the verify harness, not a mobile lane that fails to boot. It still has to be
+  fixed rather than tolerated: it is one of the reds that held point 1065 across 23 LARGE
+  runs, and a gate that reds on its own server's cache state teaches the batch to ignore
+  reds.
   Observed 10.09.2026: this red held point 1065 across 23 full LARGE runs without ever
   touching its change. This point owns it.
-  Criticality: HIGH — the mobile lane does not boot at all: the renderer throws before a
-  single frame is drawn, so a player who opens the game on a phone sees nothing. It is also
-  the one of the three filed reds that cannot close any other way, because no branch will
-  ever "own" a crash that predates them all.
-  Refs: scripts/verify/crossbrowser.mjs, point 1089, point 1065.
+  Refs: scripts/verify/crossbrowser.mjs, scripts/verify/run-all.mjs (the dev server the
+  pass uses), point 1089, point 1065.
   Bundle: Testinfrastruktur.
 
 - [ ] 1087. The water carrier visibly fills the jar at the water and carries visible water
