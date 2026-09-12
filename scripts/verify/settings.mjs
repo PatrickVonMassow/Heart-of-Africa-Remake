@@ -771,8 +771,8 @@ check('the speech slider is the only one that silences it, and the bed stays up'
 }
 
 // --- TRAA toggle (design.md §2.7; CLAUDE.md §7.1 pt. 32) ----------------------
-// TRAA is the default; toggling rebuilds the post pipeline and adds/removes
-// the velocity MRT. Both modes keep half-float targets single-sampled.
+// TRAA is the default; toggling rebuilds the downstream post pipeline.
+// Both modes share the single-sampled half-float scene MRT, including velocity.
 // Assert the scene keeps rendering a non-black frame without new console
 // errors on either backend lane.
 if (section('traa-toggle')) {
@@ -804,7 +804,8 @@ if (section('traa-toggle')) {
     errors.slice(errsBeforeTraa).join(' | ').slice(0, 300))
 
   // Repeated toggling must not leak the pipeline: every rebuild disposes the
-  // full node chain (scene MRT, GTAO, bloom, TRAA history/RTT). The regression
+  // downstream node chain (GTAO, bloom, TRAA history/RTT). The scene MRT stays
+  // alive across toggles. The regression
   // was a GPU-memory leak per toggle that blacked out the device after a few
   // switches on real hardware. Gate on the renderer's live texture count — it
   // must RETURN to where it started across cycles, not grow per toggle.
