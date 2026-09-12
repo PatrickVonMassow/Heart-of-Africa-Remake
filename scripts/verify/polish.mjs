@@ -5608,6 +5608,115 @@ if (section('adult-errands')) {
       await nextFrames(4)
     }
 
+    // --- The errand's other two subjects (work-order 1087) -------------------
+    //
+    // The fill is one moment of three. What the user could not read was the
+    // whole errand: that a man is SENT, and that what comes back is full. Both
+    // are photographed where they happen, and both wait for the real state
+    // rather than posing one.
+    const order = await page
+      .waitForFunction(
+        () => {
+          const e = window.__placeErrands()
+          const v = e.villagers
+          const stand = e.geography.waterStand
+          if (!stand) return null
+          // The carrier has just been sent: he is walking to the water with the
+          // empty jar, and the man who sent him is still at the stand.
+          for (let i = 0; i < v.length; i++) {
+            if (v[i].work?.situation !== 'water-out' || v[i].carry !== 'emptyJar') continue
+            if (Math.hypot(v[i].x - stand.x, v[i].z - stand.z) > 6) continue
+            const sender = v.findIndex((p, j) => j !== i && p.work?.situation === 'water-out' && p.work.phase === 'send')
+            if (sender < 0) continue
+            return { stand, carrier: { x: v[i].x, z: v[i].z }, sender: { x: v[sender].x, z: v[sender].z } }
+          }
+          return null
+        },
+        null,
+        { timeout: 90000 },
+      )
+      .then((handle) => handle.jsonValue())
+      .catch(() => null)
+    check(
+      'the order at the stand can be photographed: a sender still there and a carrier already going',
+      order != null,
+      order
+        ? `carrier ${Math.hypot(order.carrier.x - order.stand.x, order.carrier.z - order.stand.z).toFixed(1)} m ` +
+          `off the stand, sender ${Math.hypot(order.sender.x - order.stand.x, order.sender.z - order.stand.z).toFixed(1)} m`
+        : 'no order was in progress within 90 s',
+    )
+    if (order) {
+      // Backed off the stand along the bisector of the two men, so both and the
+      // stand between them are in one frame.
+      const mid = { x: (order.carrier.x + order.sender.x) / 2, z: (order.carrier.z + order.sender.z) / 2 }
+      await page.evaluate(
+        (aim) => {
+          const p = window.__placePlayer
+          const dx = aim.mid.x - aim.stand.x
+          const dz = aim.mid.z - aim.stand.z
+          const len = Math.max(0.001, Math.hypot(dx, dz))
+          p.x = aim.stand.x - (dx / len) * 7
+          p.z = aim.stand.z - (dz / len) * 7
+          p.yaw = Math.atan2(-(aim.stand.x - p.x), -(aim.stand.z - p.z))
+          p.pitch = -0.1
+        },
+        { stand: order.stand, mid },
+      )
+      await nextFrames(6)
+      await frame('1087-village-water-order-at-the-stand', {
+        local: { x: order.stand.x, y: 0.8, z: order.stand.z },
+        label: 'the village water stand: the adult who said RIVER still standing at it, the carrier he sent already on his way',
+      })
+    }
+
+    const returning = await page
+      .waitForFunction(
+        () => {
+          const v = window.__placeErrands().villagers
+          for (let i = 0; i < v.length; i++) {
+            if (v[i].carry !== 'fullJar' || v[i].work?.situation !== 'water-back') continue
+            return { who: i, x: v[i].x, z: v[i].z, yaw: v[i].yaw }
+          }
+          return null
+        },
+        null,
+        { timeout: 90000 },
+      )
+      .then((handle) => handle.jsonValue())
+      .catch(() => null)
+    check(
+      'the return walk can be photographed: a carrier under a full jar',
+      returning != null,
+      returning ? `villager ${returning.who}` : 'no carrier walked back within 90 s',
+    )
+    if (returning) {
+      // Side-on and close, level with the jar rather than below it: the water
+      // surface at the rim is the subject, and it is an ELLIPSE that closes as
+      // the lens drops toward the jar's own height.
+      await page.evaluate((v) => {
+        const p = window.__placePlayer
+        const side = v.yaw + Math.PI / 2
+        p.x = v.x + Math.sin(side) * 2.6
+        p.z = v.z + Math.cos(side) * 2.6
+        p.yaw = Math.atan2(-(v.x - p.x), -(v.z - p.z))
+        p.pitch = 0.12
+      }, returning)
+      await nextFrames(4)
+      const still = await page.evaluate((w) => {
+        const v = window.__placeErrands().villagers[w]
+        return { x: v.x, z: v.z, carry: v.carry }
+      }, returning.who)
+      check(
+        'and he is still under it at the shutter, rather than having set it down',
+        still.carry === 'fullJar',
+        `carrying ${still.carry}, ${Math.hypot(still.x - returning.x, still.z - returning.z).toFixed(2)} m on`,
+      )
+      await frame('1087-village-carrier-returns-with-water', {
+        local: { x: still.x, y: 1.5, z: still.z },
+        label: 'the water carrier walking back to the village under a full jar, side-on, the water surface at its rim',
+      })
+    }
+
     // --- The river itself (work-order 482) ------------------------------------
     // Two things only the live scene can settle: that the water is DRAWN in the
     // settlement rather than painted into the surroundings, and that its
