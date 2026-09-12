@@ -364,7 +364,7 @@ if (section('village-stereo')) {
             for (let i = from; i <= to; i++) bands[voice][channel] = Math.max(bands[voice][channel], spectra[i])
           })
         })
-        await new Promise((resolve) => setTimeout(resolve, 15))
+        await new Promise((resolve) => requestAnimationFrame(resolve))
       }
       return { peak, bands }
     }
