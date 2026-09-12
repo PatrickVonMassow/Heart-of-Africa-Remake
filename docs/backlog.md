@@ -698,3 +698,12 @@ it up decides between settling the scene before the shutter (as the neighbouring
 sections do) and declaring these two frames as OVERLAY-only evidence, so that
 nobody reads the background as a statement about rendering. The second is the
 cheaper honest fix.
+
+## First-person ground micro-detail fails on both `main` and every branch (12.09.2026)
+
+`settings --section=ground-detail` fails its edge-energy check on WebGL 2 with a laplacian
+mean of 1.06-1.07, measured on `main` at bf27c94e6 and again on an unrelated feature branch
+at f14ce3438. It touches no feature diff and holds finished work hostage in every whole-suite
+run it appears in, which is exactly the attribution the 10.09.2026 decision decoupled.
+Non-blocking and collected here: it needs its own point once someone measures whether the
+ground really lost its micro-detail or the bar drifted.
