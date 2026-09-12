@@ -2,7 +2,7 @@ import { expect, it } from 'vitest'
 import { buildLayout } from './layout'
 import { playRockFlank } from './playRockSurface'
 import { standingClear, WALKER_RADIUS } from './collision'
-import { touchStand, type BankStage, type BankEnd, TOUCH_GAP } from './bankGame'
+import { touchStand, type BankEnd, TOUCH_GAP } from './bankGame'
 import { reachFrom, solveTouch } from './rockTouch'
 import { CHILD_FIGURE_SCALE } from '../../render/figures'
 
@@ -13,7 +13,7 @@ it('recovers no reachable Bambara stand by extending the blocked search to 40 cm
   for (const seed of [42, 3791639114, 2972259115]) {
     const layout = buildLayout('bambara-village', seed)
     const rocks = layout.playRocks!
-    const stage = { ...rocks, flank: playRockFlank(rocks) } as BankStage
+    const stage = { ...rocks, flank: playRockFlank(rocks) }
     const blocked = (x: number, z: number) => !standingClear(layout.colliders, x, z, WALKER_RADIUS)
     const mid = { x: (rocks.upstream.x + rocks.downstream.x) / 2, z: (rocks.upstream.z + rocks.downstream.z) / 2 }
     for (const end of ['upstream', 'downstream'] as BankEnd[]) {

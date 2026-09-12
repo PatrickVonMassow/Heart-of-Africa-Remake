@@ -94,7 +94,7 @@ describe('post chain ownership', () => {
       expect(object).toBe(fiber.state.scene)
       order.push('scene')
     })
-    vi.mocked(RenderPipeline.prototype.render).mockImplementation(function () {
+    vi.mocked(RenderPipeline.prototype.render).mockImplementation(function (this: { outputNode: unknown }) {
       order.push('post')
       expect(order).toEqual(['scene', 'post'])
       // The real output ContextNode disables upstream automatic jitter: the
