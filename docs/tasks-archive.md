@@ -27955,3 +27955,44 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   §3 makes primary; and until it is repaired every settings suite behind it carries a known
   red whose classification can hide a real one.
   Bundle: Steuerung & Performance.
+
+- [x] 1112. On WebGL 2 the LOW graphics level still draws nothing once TRAA has been toggled,
+  and the check that guards it reads the HUD instead of the scene (measured 12.09.2026).
+  MEASURED ON `main` AT bf27c94e6, the covering run of the just-landed point 1105, three
+  times and with the same number every time. In the WebGL 2 pass of the whole `settings`
+  suite, `verification/1105-graphics-level-low.png` carries a mean luma of 13.39 and shows
+  the head-up display, the two place labels and the compatibility notice on black — no
+  ground, no water, no traveller. Its NEIGHBOUR from the same suite, taken at the same
+  place, from the same camera and at the same in-game minute, is
+  `verification/69-traa-on.png` at 128.75: grass, rocks, trees, the lake and the traveller,
+  all drawn. So it is not night, not another place and not a shutter that fired too early.
+  The WebGPU pass of the same commit is unaffected — LOW reads 133.48 against its
+  neighbour's 130.49, with giraffes at the lake — so this is the WebGL 2 lane alone.
+  IT IS NOT WHAT 1105 REPAIRED, AND 1105 DID NOT CAUSE IT: run on its own,
+  `npm test -- settings --section=graphics-levels` is green and fully drawn on BOTH lanes,
+  which is exactly the rung 1105 was judged on. The black frame appears only in the whole
+  suite, after the `traa-toggle` section has rebuilt the post pipeline four times and left
+  the temporal resolve OFF. What a player reaches is the same sequence: the debug toggle of
+  design.md §21.3, then F9 down to LOW, on the fallback backend of CLAUDE.md §3.
+  AND THE GATE CANNOT SEE IT. `F9 low: scene still renders non-black` measures the mean luma
+  of the WHOLE frame against a bar of 8. The head-up display, the two place labels and the
+  compatibility notice alone carry 13.39, so a completely black SCENE passes with 1.7x
+  headroom. The number that caught the original defect — 2.2 — only worked because that
+  frame had no compatibility notice in it. A check that a black picture passes is not a
+  guard; it is why this survived a landing.
+  Final state:
+  - Switching to LOW renders the scene on WebGL 2 after any sequence of TRAA toggles, judged
+    AT THE PICTURE on both lanes, not by a number alone.
+  - The check measures the SCENE and not the frame: the head-up display band and the notice
+    are outside what it reads, so a black scene cannot pass on interface brightness. The bar
+    is restated against what the corrected measurement reads on a drawn scene.
+  Test. Browser (`settings`): the graphics-levels section asserts a drawn scene at LOW AFTER
+  a TRAA on/off cycle, on both lanes, and leaves its frame behind. Vitest: the crop the check
+  reads excludes the interface bands, pinned against the measured frame geometry.
+  Refs: `src/render/Effects.tsx` and `src/render/scenePass.ts` (the per-mode pass rebuild),
+  `scripts/verify/settings.mjs` (`traa-toggle`, `graphics-levels`, the luma bar),
+  `verification/1105-graphics-level-low.png` and `verification/69-traa-on.png` (the two
+  frames this point is measured on), docs/tasks-archive.md point 1105.
+  Criticality: HIGH — a black picture on a setting one key reaches, on the backend the game
+  falls back to, and the gate reports it green.
+  Bundle: Steuerung & Performance.
