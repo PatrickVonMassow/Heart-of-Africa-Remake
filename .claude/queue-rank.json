@@ -1315,12 +1315,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "1105": {
-      "at": "2026-09-11T08:02:02.347Z",
-      "why": "It cannot wait for the release because it IS in the release picture: the low graphics level ships black on the primary backend, and its red sits inside the settings suite every point behind it must pass, where a wrong classification hides the next real failure.",
-      "origin": "machine",
-      "place": "ahead"
-    },
     "1108": {
       "at": "2026-09-11T12:29:10.894Z",
       "why": "Maschinell eingereiht und nicht dringend: kein Spielerimpakt, es kostet nur dem Bildbeweis seine Aussage. Es steht direkt hinter dem Release und vor 1087, das einen Rahmen derselben Handlung schuldet",
@@ -1338,6 +1332,12 @@
       "why": "Infrastruktur-Defekt unter dem Einfrieren aus CLAUDE.md §2: Er blockiert keine laufende Spielarbeit, sondern nur Tore auf einer belasteten Maschine, und dafuer gilt bereits die Regel, Suiten nur auf ruhiger Maschine zu fahren.",
       "origin": "machine",
       "place": "last"
+    },
+    "1112": {
+      "at": "2026-09-12T01:06:43.624Z",
+      "why": "Der Release ist ein Demo-Build, und genau dieser Defekt ist der, den ein Demo-Publikum trifft: die Stufe NIEDRIG zeichnet auf WebGL 2 ein schwarzes Bild, und WebGL 2 ist die Bahn, auf die jede Maschine ohne WebGPU faellt. Warten kann er auch deshalb nicht, weil die Pruefung, die ihn abfangen soll, ihn gruen meldet - der Abschlussdurchlauf vor dem Release wuerde ihn nicht finden, sondern bestaetigen.",
+      "origin": "machine",
+      "place": "ahead"
     }
   },
   "boundary": {
@@ -1370,7 +1370,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-11T20:31:13.178Z",
+    "at": "2026-09-12T01:06:43.633Z",
     "points": [
       174,
       184,
@@ -1761,10 +1761,10 @@
       1100,
       1101,
       1102,
-      1105,
       1108,
       1109,
-      1111
+      1111,
+      1112
     ]
   }
 }
