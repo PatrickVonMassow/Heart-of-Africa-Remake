@@ -128,6 +128,33 @@ put it is the mistake this line exists to stop.
   point behind it.
   Bundle: Testinfrastruktur.
 
+- [ ] 1089. Charge a LARGE red that does not touch the point's diff to its own point
+  (user 10.09.2026).
+  Apply the rule CLAUDE.md §7.2 already states — "a red run closes only when its cause is
+  fixed, CHARGED TO ITS OWNING POINT, or FILED AS A NEW POINT" — to the reds that are
+  holding point 1065, and make the charging automatic rather than a judgement call.
+  Measured on 1065 (10.09.2026): 23 full LARGE runs, 16.2 machine hours, none green, and
+  NOT ONE red touched the tap. The recurring reds are `settings` ground-detail (edge
+  energy), `enrichments` dressing-growth (point 278), `crossbrowser` chromium-mobile
+  (getSupportedExtensions on null), plus two teardown aborts from foreign commits. Each
+  was re-diagnosed on every run instead of being charged once.
+  Final state:
+  - A LARGE red whose failing check does not touch the point's own diff is FILED as its
+    own point automatically by the run's own report — the report already computes
+    "touches the diff", so it has the information. The point under test is not held by it.
+  - The run's verdict line says plainly which reds are charged elsewhere and which are the
+    point's own, so a merge decision does not need a human re-reading of the log.
+  - The three reds above get their points at once; 1065 merges on its own evidence — the
+    narrow rung `polish --section=children-bank-game`, unit, build and lint.
+  WHY THIS AND NOT A POLICY CHANGE: nothing here loosens the gate. The full regression
+  still runs and still has to go green — but its failures are owned by whoever broke them
+  instead of by whoever happens to be holding the branch when they surface.
+  Test. Vitest: a red check whose file set is disjoint from the branch diff is reported as
+  charged elsewhere and does not hold the point; a red that touches the diff still does.
+  Refs: scripts/verify/run-all.mjs (the "touches the diff" annotation), CLAUDE.md §7.2,
+  point 1065, point 278.
+  Bundle: Testinfrastruktur.
+
 - [ ] 1087. The water carrier visibly fills the jar at the water and carries visible water
   (user 06.09.2026; the former point 1066; SPLIT BACK OUT OF POINT 1065 on 10.09.2026 on the
   user's instruction, 02:15).
@@ -1317,33 +1344,6 @@ put it is the mistake this line exists to stop.
   Criticality: medium — no player impact; it costs the picture proof its meaning, and it sits
   directly in front of point 1087.
   Bundle: Dorfleben.
-
-- [ ] 1089. Charge a LARGE red that does not touch the point's diff to its own point
-  (user 10.09.2026).
-  Apply the rule CLAUDE.md §7.2 already states — "a red run closes only when its cause is
-  fixed, CHARGED TO ITS OWNING POINT, or FILED AS A NEW POINT" — to the reds that are
-  holding point 1065, and make the charging automatic rather than a judgement call.
-  Measured on 1065 (10.09.2026): 23 full LARGE runs, 16.2 machine hours, none green, and
-  NOT ONE red touched the tap. The recurring reds are `settings` ground-detail (edge
-  energy), `enrichments` dressing-growth (point 278), `crossbrowser` chromium-mobile
-  (getSupportedExtensions on null), plus two teardown aborts from foreign commits. Each
-  was re-diagnosed on every run instead of being charged once.
-  Final state:
-  - A LARGE red whose failing check does not touch the point's own diff is FILED as its
-    own point automatically by the run's own report — the report already computes
-    "touches the diff", so it has the information. The point under test is not held by it.
-  - The run's verdict line says plainly which reds are charged elsewhere and which are the
-    point's own, so a merge decision does not need a human re-reading of the log.
-  - The three reds above get their points at once; 1065 merges on its own evidence — the
-    narrow rung `polish --section=children-bank-game`, unit, build and lint.
-  WHY THIS AND NOT A POLICY CHANGE: nothing here loosens the gate. The full regression
-  still runs and still has to go green — but its failures are owned by whoever broke them
-  instead of by whoever happens to be holding the branch when they surface.
-  Test. Vitest: a red check whose file set is disjoint from the branch diff is reported as
-  charged elsewhere and does not hold the point; a red that touches the diff still does.
-  Refs: scripts/verify/run-all.mjs (the "touches the diff" annotation), CLAUDE.md §7.2,
-  point 1065, point 278.
-  Bundle: Testinfrastruktur.
 
 - [ ] 1081. A child boxed by adults planted in its own play ground walks a metre and gets
   nowhere — and the case that was supposed to catch it pins one lucky seed. Measured on
