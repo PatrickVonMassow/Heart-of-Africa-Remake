@@ -158,104 +158,40 @@ describe('enableAsyncPipelineCompile (point 337)', () => {
     expect(backend.completed).toHaveLength(3)
   })
 
-  it('releases a rebuild of completed sources behind cold shaders within one frame', () => {
+  it('paces identical rebuilt sources like every other first use', () => {
     const backend = fakeWebglBackend()
     const frames = fakeFrames()
     const handle = enableAsyncPipelineCompile(backend, { schedule: frames.schedule })!
     backend.createRenderPipeline(shaderObject(0), null)
     backend.settleAll()
     frames.tick()
-    // Two new shaders head the burst; only one can consume this frame's slot.
-    const cold = [shaderObject(1, 'new vertex'), shaderObject(2, 'vertex', 'new fragment')]
-    for (const object of cold) backend.createRenderPipeline(object, null)
-    // IDs and material names do not define shader identity after a rebuild.
-    const rebuilt = Array.from({ length: 111 }, (_, i) => shaderObject(i + 3))
-    for (const object of rebuilt) {
-      object.material.name = 'ShadowMaterial'
+    for (let id = 1; id <= 3; id++) backend.createRenderPipeline(shaderObject(id), null)
+    backend.settleAll()
+    frames.tick()
+    expect(backend.completed).toHaveLength(2)
+    expect(handle.state()).toMatchObject({ queued: 2, reused: 0 })
+    frames.tick()
+    frames.tick()
+    expect(backend.completed).toHaveLength(4)
+    expect(handle.state()).toMatchObject({ queued: 0, reused: 0 })
+  })
+
+  it('does not inspect shader sources or walk the backlog after spending the frame budget', () => {
+    const backend = fakeWebglBackend()
+    const frames = fakeFrames()
+    enableAsyncPipelineCompile(backend, { schedule: frames.schedule })!
+    const objects = [shaderObject(0), shaderObject(1), shaderObject(2)]
+    for (const object of objects) {
+      Object.defineProperty(object.pipeline.vertexProgram, 'code', {
+        get: () => { throw new Error('source text must not be read') },
+      })
       backend.createRenderPipeline(object, null)
     }
     backend.settleAll()
+    const get = vi.spyOn(backend, 'get')
     frames.tick()
-    expect(backend.completed).toEqual([
-      shaderObject(0).pipeline, cold[0].pipeline, ...rebuilt.map((object) => object.pipeline),
-    ])
-    expect(handle.state()).toMatchObject({ queued: 1, reused: 111, dropped: 0 })
-    frames.tick()
-    expect(backend.completed.at(-1)).toBe(cold[1].pipeline)
-    expect(handle.state().queued).toBe(0)
-  })
-
-  it('does not treat a pending or retired source pair as completed', () => {
-    const backend = fakeWebglBackend()
-    const frames = fakeFrames()
-    const handle = enableAsyncPipelineCompile(backend, { schedule: frames.schedule })!
-    const retired = shaderObject(0)
-    retired.pipeline.usedTimes = 0
-    const replacement = shaderObject(1)
-    backend.createRenderPipeline(retired, null)
-    backend.createRenderPipeline(replacement, null)
-    backend.createRenderPipeline(shaderObject(2, 'new'), null)
-    backend.settleAll()
-    expect(backend.completed).toHaveLength(0)
-    frames.tick()
-    expect(backend.completed).toEqual([replacement.pipeline])
-    expect(handle.state()).toMatchObject({ queued: 1, reused: 0, dropped: 1 })
-  })
-
-  it('keeps retirement checks for repeat links and preserves the cold budget', () => {
-    const backend = fakeWebglBackend()
-    const frames = fakeFrames()
-    const handle = enableAsyncPipelineCompile(backend, { schedule: frames.schedule })!
-    backend.createRenderPipeline(shaderObject(0), null)
-    backend.settleAll()
-    frames.tick()
-    const unused = shaderObject(1)
-    const released = shaderObject(2)
-    const cold = shaderObject(3, 'new')
-    for (const object of [unused, released, cold]) backend.createRenderPipeline(object, null)
-    backend.settleAll()
-    unused.pipeline.usedTimes = 0
-    backend.releasePipeline(released.pipeline)
-    frames.tick()
-    expect(backend.completed).toEqual([shaderObject(0).pipeline, cold.pipeline])
-    expect(handle.state()).toMatchObject({ queued: 0, reused: 0, dropped: 2 })
-    expect(handle.diagnostics().recentDrops.map((entry) => entry.reason)).toEqual(['unused', 'released'])
-  })
-
-  it('requires exact source pairs and confines completed history to its backend', () => {
-    const frames = fakeFrames()
-    const first = fakeWebglBackend()
-    enableAsyncPipelineCompile(first, { schedule: frames.schedule })!
-    first.createRenderPipeline(shaderObject(0, 'ab', 'c'), null)
-    first.settleAll()
-    frames.tick()
-    const second = fakeWebglBackend()
-    const handle = enableAsyncPipelineCompile(second, { schedule: frames.schedule })!
-    for (const object of [shaderObject(0, 'ab', 'c'), shaderObject(0, 'a', 'bc')]) {
-      second.createRenderPipeline(object, null)
-    }
-    second.settleAll()
-    frames.tick()
-    expect(second.completed).toHaveLength(1)
-    expect(handle.state()).toMatchObject({ queued: 1, reused: 0 })
-    frames.tick()
-    expect(second.completed).toHaveLength(2)
-  })
-
-  it('evicts old source text conservatively when the completed history is full', () => {
-    const backend = fakeWebglBackend()
-    const frames = fakeFrames()
-    const handle = enableAsyncPipelineCompile(backend, { schedule: frames.schedule })!
-    for (let i = 0; i <= 256; i++) {
-      backend.createRenderPipeline(shaderObject(i, String(i)), null)
-      backend.settleAll()
-      frames.tick()
-    }
-    backend.createRenderPipeline(shaderObject(1000, '0'), null)
-    backend.createRenderPipeline(shaderObject(1001, 'unseen'), null)
-    backend.settleAll()
-    frames.tick()
-    expect(handle.state()).toMatchObject({ queued: 1, reused: 0 })
+    expect(get).toHaveBeenCalledTimes(1)
+    expect(get).toHaveBeenCalledWith(objects[0].pipeline)
   })
 
   it('stops pumping once the queue drains and restarts on the next pipeline', () => {
