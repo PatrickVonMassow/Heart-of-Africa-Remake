@@ -1049,10 +1049,24 @@ so the console-gated suites (`world`, `i18n`) can be triaged at all. Each check
 is annotated with whether its name touches the branch diff — a weak
 corroborating hint, never a verdict.
 
-**2. The baseline classification — OPT-IN, because it is a second browser run.**
+**2. The baseline classification — automatic for LARGE reds, opt-in for smaller runs.**
+
+A LARGE run compares every suite that stayed red against its merge-base, including
+crossbrowser at the same depth. Both attempts' reds are retained, even when some
+rotate beside a stable failure. Only a `pre-existing` classification charges a
+check elsewhere. The report deposits one request per check through
+`finding.mjs --request … --once --spec-file … --why-file …` into the main
+checkout's findings carrier; the owner drains and numbers it. Title identity
+survives repeated runs, concurrent reports and already numbered requests.
+
+The closing `POINT REDS` line names the charged requests and the point's own or
+unresolved reds. Real regressions, flaky/dead/inconclusive baselines, incomplete
+current runs and filing failures keep holding the point. Filename overlap remains
+a hint. The full regression retains its red exit and its coverage requirements;
+charging a check does not make the suite green.
 
 ```
-npm test -- --baseline                 # classify every suite that failed twice
+npm test                              # LARGE classifies suites that stayed red
 VERIFY_BASELINE=1 npm run test:small   # same, via the environment
 node scripts/verify/baseline-classify.mjs enrichments          # one suite, on demand
 node scripts/verify/baseline-classify.mjs polish --ref HEAD~1  # against a named commit

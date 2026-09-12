@@ -26,9 +26,8 @@
 //   --strict            exit 1 when a REAL REGRESSION was found (default: 0 —
 //                       this is a triage aid, the suite result stays the gate)
 //
-// Cost discipline (the point's DESIGN care): this is never part of a normal
-// run. run-all calls it only for a suite that stayed RED and only with
-// automatically for LARGE reds, or with --baseline / VERIFY_BASELINE=1, and the baseline checkout is a REUSED git
+// run-all calls this only for suites that stayed RED: automatically on LARGE,
+// or with --baseline / VERIFY_BASELINE=1 on smaller runs. The checkout is a REUSED git
 // worktree under the git-ignored local/verify-baseline/, sharing the repo's
 // node_modules through Node's ancestor resolution (no second install).
 //
