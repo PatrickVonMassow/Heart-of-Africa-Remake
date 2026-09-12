@@ -1650,7 +1650,13 @@ describe('the children`s bank round can reach its own stage (work-order 687)', (
     }
     // Four layouts of 480 replayed seconds each: this measurement carries its own
     // budget rather than flaking under the suite's worker contention.
-  }, 120000)
+    // MEASURED 12.09.2026, and the number is deliberate (point 1111's rule for a
+    // genuinely long case): this replay takes 85.5 s on the batch host and 1.55x
+    // that on the GitHub runner, so the 120 s that stood here was 13 s of
+    // headroom and the runner ate it. An abort here is not a local failure — it
+    // leaves the shared BANK_CFG mutated and its async replay still stepping, so
+    // the two cases after it failed with it on 12.09.2026 (CI run 34664112811).
+  }, 300_000)
 
 
 
@@ -1881,6 +1887,8 @@ describe('the children`s bank round can reach its own stage (work-order 687)', (
    */
 
   for (const [placeId, seed] of RIVER_VILLAGES) {
+    // 8.0 s on the batch host; the default 20 s left too little for a slower
+    // runner once a neighbouring case had been aborted (CI run 34664112811).
     it(`${placeId} at seed ${seed} keeps every child covering ground with the carve gone`, () => {
       const { v, paths } = playRound(placeId, seed, 200)
       // THE WINDOW HELD A WHOLE CYCLE, read off the very replay judged below —
@@ -1917,7 +1925,7 @@ describe('the children`s bank round can reach its own stage (work-order 687)', (
       expect(rescues.nudgesPublished).toBe(true)
       expect(rescues.worstPerChildMinute).toBeLessThan(CHILD_MOTION.worstChildRescueGate)
       expect(rescues.worstCarriedMetresPerChildMinute).toBeLessThan(CHILD_MOTION.worstChildCarryGate)
-    })
+    }, 60_000)
   }
 })
 
