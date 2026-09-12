@@ -470,7 +470,13 @@ export const LIMITS = {
   // beginner-facing half of the retrospective's §3.266 and has no neighbour to fold into: the
   // guide's other delegation entries are about a delegate that BUILT something. Eight lines:
   // 638 -> 646.
-  maxLines: 646,
+  // RAISED 12.09.2026 (second): the quiet-machine tip named the machine but not the party who
+  // makes it noisy. The evening's lesson is that a long run is killed by the HOUSEKEEPING the
+  // reader's own tooling demands of him while it runs — the same tests, the same machine — so
+  // prep during a wait means reading only. It went into the existing measurement entry rather
+  // than a new one, because "measure on a quiet machine" is exactly where a reader looks for it.
+  // Two lines: 646 -> 648.
+  maxLines: 648,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -731,7 +737,11 @@ export const LIMITS = {
   // after the fold — the entry gained the artefacts-not-the-log liveness test and the
   // which-number-does-the-threshold-use clause, and a separately drafted pitfall of its own was
   // DROPPED as a duplicate of the two entries that already carry the class: 6103 -> 6127.
-  maxWords: 6207,
+  // 12.09.2026 (second): the self-inflicted-load clause justified beside maxLines measures 26
+  // words. It is a genuinely new tip, not a longer telling: the existing sentence says WHERE to
+  // measure, this one says what the reader himself must not do while the measurement runs, and
+  // it is the half no neighbouring entry carries: 6207 -> 6233.
+  maxWords: 6233,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,

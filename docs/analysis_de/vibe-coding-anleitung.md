@@ -241,7 +241,9 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 - **Messung und Vorschau verunreinigt.** Halbfertiges gilt als ‚fertig'.
   → *Prompt:* „Hol mein Urteil am **veröffentlichten** Stand ein, nie an einem Zwischenzweig, und
-  miss auf einer ruhigen Maschine."
+  miss auf einer ruhigen Maschine. Läuft schon etwas Langes, ist **Vorarbeit nur Lesen** —
+  auch die Aufräumarbeit, die ein Werkzeug gerade von dir verlangt, fährt dieselben Tests
+  und erschlägt deinen Lauf."
 
 - **Der Bericht urteilt über den Versuch, nicht über die Wirkung.** „Erfolgreich“ heißt nicht
   „angekommen“ — und ein fehlgeschlagener Push nennt Arbeit „nur lokal“, die längst drüben liegt.
@@ -644,4 +646,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 348bda3f929f138df9eefa154c5741f865f4976050aa267d5906989ebe027028 -->
+<!-- GUIDE-FINGERPRINT: b9a173b03667fc31d5197de9751a9cce18010428ceba6fcbe99c2cee81872793 -->
