@@ -16,6 +16,7 @@ import { launchVerifyBrowser, assertBackend, waitForSceneBuilt } from './_browse
 import { frameShutter, capturePixels } from './frameSubject.mjs'
 import { leakVerdict } from './textureLeak.mjs'
 import { SETTINGS_VIEWPORT, SETTINGS_SCENE_LUMA_MIN, settingsSceneLuma } from './settingsSceneLuma.mjs'
+import { settingsPipelineState } from './settingsPipelineState.mjs'
 import { sectionGate } from './sections.mjs'
 import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
@@ -787,9 +788,12 @@ if (section('traa-toggle')) {
   check('TRAA on: scene renders non-black', traaMean > SETTINGS_SCENE_LUMA_MIN, `scene crop mean ${traaMean.toFixed(1)} > ${SETTINGS_SCENE_LUMA_MIN}`)
   check('TRAA on: no new console errors', errors.length === errsBeforeTraa,
     errors.slice(errsBeforeTraa).join(' | ').slice(0, 300))
+  const traaOnPipelines = await page.evaluate(settingsPipelineState)
   await page.evaluate(() => window.__ui.getState().setTraaEnabled(false))
   await page.waitForTimeout(1500)
   const traaOffMean = await settingsSceneLuma(await capturePixels(page, 'TRAA off path mean luma'))
+  const traaOffPipelines = await page.evaluate(settingsPipelineState)
+  console.log(`TRAA pipeline evidence — ${JSON.stringify({ before: traaOnPipelines, after: traaOffPipelines })}`)
   check('TRAA off again: scene renders non-black', traaOffMean > SETTINGS_SCENE_LUMA_MIN, `scene crop mean ${traaOffMean.toFixed(1)} > ${SETTINGS_SCENE_LUMA_MIN}`)
   check('TRAA off again: no new console errors', errors.length === errsBeforeTraa,
     errors.slice(errsBeforeTraa).join(' | ').slice(0, 300))
