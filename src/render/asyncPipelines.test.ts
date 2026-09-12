@@ -5,6 +5,7 @@
 // compileAsync is left alone, the throttled first-use release and its
 // bookkeeping.
 import { describe, expect, it, vi } from 'vitest'
+import { RenderPipeline, type WebGPURenderer } from 'three/webgpu'
 import {
   asyncPipelineHandle,
   enableAsyncPipelineCompile,
@@ -173,6 +174,66 @@ describe('enableAsyncPipelineCompile (point 337)', () => {
     frames.tick()
     expect(handle.state().dropped).toBe(1)
     expect(backend.completed).toEqual([{ id: 2 }])
+  })
+
+  it('presents LOW ahead of a TRAA rebuild backlog without increasing the release budget', () => {
+    const backend = fakeWebglBackend()
+    const frames = fakeFrames()
+    const handle = enableAsyncPipelineCompile(backend, { schedule: frames.schedule })!
+    const scenePrograms = [renderObject(1), renderObject(2), renderObject(3)]
+    for (const object of scenePrograms) backend.createRenderPipeline(object, null)
+    backend.settleAll()
+
+    // Use Three's actual composite quad/material: the priority depends on its
+    // identity contract, not on an invented material name in a fake fixture.
+    const post = new RenderPipeline({} as WebGPURenderer)
+    const quad = (post as unknown as {
+      _quadMesh: { isQuadMesh: boolean; material: { name: string } }
+    })._quadMesh
+    const low = { ...renderObject(4), object: quad, material: quad.material }
+    backend.createRenderPipeline(low, null)
+    backend.settleAll()
+    expect(backend.completed).toEqual([])
+    frames.tick()
+    expect(backend.completed).toEqual([low.pipeline])
+    expect(handle.state().queued).toBe(3)
+    frames.tick()
+    expect(backend.completed).toEqual([low.pipeline, scenePrograms[0].pipeline])
+    frames.tick()
+    frames.tick()
+    expect(backend.completed).toEqual([low.pipeline, ...scenePrograms.map((object) => object.pipeline)])
+    post.dispose()
+  })
+
+  it('does not prioritize a scene material merely named RenderPipeline', () => {
+    const backend = fakeWebglBackend()
+    const frames = fakeFrames()
+    enableAsyncPipelineCompile(backend, { schedule: frames.schedule })
+    const first = renderObject(1)
+    const named = { ...renderObject(2), material: { name: 'RenderPipeline' } }
+    backend.createRenderPipeline(first, null)
+    backend.createRenderPipeline(named, null)
+    backend.settleAll()
+    frames.tick()
+    expect(backend.completed).toEqual([first.pipeline])
+  })
+
+  it('drops retired post programs whose backend data survives, without spending a release frame', () => {
+    const backend = fakeWebglBackend()
+    const frames = fakeFrames()
+    const handle = enableAsyncPipelineCompile(backend, { schedule: frames.schedule })!
+    const retired = Array.from({ length: 12 }, (_, id) => ({ pipeline: { id, usedTimes: 1 } }))
+    for (const object of retired) backend.createRenderPipeline(object, null)
+    const live = { pipeline: { id: 12, usedTimes: 1 } }
+    backend.createRenderPipeline(live, null)
+    backend.settleAll()
+    // Mirrors Three's release: usage reaches zero, but backend.get(pipeline)
+    // still has a programGPU. Repeated toggles must not queue dead first uses.
+    for (const object of retired) object.pipeline.usedTimes = 0
+    frames.tick()
+    expect(backend.completed).toEqual([live.pipeline])
+    expect(handle.state()).toMatchObject({ dropped: 12, queued: 0 })
+    expect(frames.depth).toBe(0)
   })
 
   it('is idempotent — a second arming does not stack a second wrapper', () => {

@@ -160,7 +160,8 @@ export function enableAsyncPipelineCompile(
   let restoreComplete: (() => void) | null = null
   if (typeof completeOriginal === 'function') {
     const pump = () => {
-      for (let i = 0; i < releasePerFrame && queue.length > 0; i++) {
+      let released = 0
+      while (released < releasePerFrame && queue.length > 0) {
         const entry = queue.shift()
         if (!entry) break
         const [renderObject, pipeline] = entry
@@ -168,11 +169,16 @@ export function enableAsyncPipelineCompile(
         // (a post-chain rebuild, a graphics-level switch); completing a dead
         // program would raise a GL error, so skip it and count the drop.
         const data = backend.get?.(pipeline)
-        if (data !== undefined && data.programGPU === undefined) {
+        // Three's Pipelines._releasePipeline removes the cache entry but leaves
+        // backend data behind. programGPU alone therefore does not prove life:
+        // disposed post materials can leave a linked program with no users.
+        const retired = (pipeline as { usedTimes?: number } | null)?.usedTimes === 0
+        if (retired || (data !== undefined && data.programGPU === undefined)) {
           dropped++
           continue
         }
         completeOriginal.call(backend, renderObject, pipeline)
+        released++
       }
       if (queue.length > 0) schedule(pump)
       else pumping = false
@@ -184,7 +190,20 @@ export function enableAsyncPipelineCompile(
         completeOriginal.call(backend, renderObject, pipeline)
         return
       }
-      queue.push([renderObject, pipeline])
+      // A replacement final composite is the only route from the scene target
+      // to the screen. After TRAA rebuilds, FIFO can leave LOW black behind a
+      // backlog even though its scene target is already drawn. Release the
+      // composite first, still within the one-program-per-frame budget. Scene
+      // shaders keep their FIFO order and their asynchronous compilation path.
+      const object = renderObject as {
+        object?: { isQuadMesh?: boolean }
+        material?: { name?: string }
+      } | null
+      if (object?.object?.isQuadMesh === true && object.material?.name === 'RenderPipeline') {
+        queue.unshift([renderObject, pipeline])
+      } else {
+        queue.push([renderObject, pipeline])
+      }
       if (!pumping) {
         pumping = true
         schedule(pump)
