@@ -1528,6 +1528,9 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   // placed BEFORE the children's quarter is searched, so the quarter is fitted
   // around it exactly as it is around the other adult places.
   let waterStand: PlaceLayout['waterStand'] = null
+  /** Where the stand's own collider sits, so it can be taken out again if the
+   *  water path it was placed for is discarded further down. */
+  let standColliderAt = -1
   if (place.kind === 'village' && waterPath && bank) {
     const standClear = colliderBuckets(colliders, WATER_STAND_RADIUS)
     const walkClear = colliderBuckets(colliders, WALKER_RADIUS)
@@ -1558,12 +1561,20 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
         const x = VILLAGE_FIRE[0] + Math.cos(a) * gap
         const z = VILLAGE_FIRE[1] + Math.sin(a) * gap
         if (!standingClear(standClear(x, z), x, z, WATER_STAND_RADIUS)) continue
+        // A LANE CARRIES NO COLLIDER, so the footprint test above cannot see one:
+        // measured 12.09.2026, mandinka-village seed 7 put the stand 0.50 m off
+        // the centre of a lane 1.30 m wide — a solid body standing in the middle
+        // of a drawn path. The same exclusion the other village places use.
+        if (onLane(x, z, WATER_STAND_RADIUS)) continue
         if (!approachable(x, z)) continue
         waterStand = { x, z }
       }
       if (waterStand) break
     }
-    if (waterStand) colliders.push({ x: waterStand.x, z: waterStand.z, r: WATER_STAND_RADIUS })
+    if (waterStand) {
+      standColliderAt = colliders.length
+      colliders.push({ x: waterStand.x, z: waterStand.z, r: WATER_STAND_RADIUS })
+    }
   }
 
   // THE CHILDREN'S ROAMING QUARTER (work-order 481.4, moved here by 688). It is
@@ -1751,6 +1762,14 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
       // points at work-order 1045; a THIRD one appearing is what that case
       // catches.
       waterPath = null
+      // AND THE STAND GOES WITH IT. It is placed further up, while every bank
+      // still has a provisional path, so a settlement whose head search finds no
+      // clear walk kept a water stand no adult ever visits — furniture with a
+      // collider and no errand behind it. Measured 12.09.2026: bambara-village
+      // at seeds 2 and 7.
+      if (standColliderAt >= 0) colliders.splice(standColliderAt, 1)
+      standColliderAt = -1
+      waterStand = null
     } else {
       waterPath.head = head
       paths.push({ points: [[head.x, head.z], [foot.x, foot.z]], width: WATER_PATH_WIDTH })

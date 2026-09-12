@@ -503,12 +503,70 @@ describe('the village water stand can be walked up to (work-order 1087)', () => 
         expect(open).toBeGreaterThanOrEqual(9)
       }
     }
-    expect(checked).toBe(riverVillages.length * 20)
+    // Not every sweep, because a village whose head search gives up its water
+    // path keeps no stand either — but most of them, so a silent collapse of the
+    // placement still reads here.
+    expect(checked).toBeGreaterThan(riverVillages.length * 20 * 0.7)
   })
 
-  it('gives every river village a stand at all', () => {
+  it('gives every river village that fetches water a stand at all', () => {
+    // A river village with no usable WATER PATH fetches nothing and rightly has
+    // no stand (point 1045 owns the walk it cannot find); every village that
+    // does fetch must have one, or the return leg has nowhere to go.
+    let fetching = 0
     for (const id of riverVillages) {
-      for (let seed = 1; seed <= 20; seed++) expect(buildLayout(id, seed).waterStand).toBeTruthy()
+      for (let seed = 1; seed <= 20; seed++) {
+        const layout = buildLayout(id, seed)
+        if (!layout.waterPath) continue
+        fetching++
+        expect(layout.waterStand, `${id} seed ${seed}: a water path but no stand`).toBeTruthy()
+      }
     }
+    expect(fetching).toBeGreaterThan(riverVillages.length * 20 * 0.7)
+  })
+
+  it('never stands one in a drawn lane', () => {
+    // A LANE CARRIES NO COLLIDER, so the stand's footprint test cannot see one
+    // and a solid body was accepted in the middle of a path people walk:
+    // mandinka-village seed 7 put it 0.50 m off the centre of a lane 1.30 m wide.
+    for (const id of riverVillages) {
+      for (let seed = 1; seed <= 20; seed++) {
+        const layout = buildLayout(id, seed)
+        const stand = layout.waterStand
+        if (!stand) continue
+        for (const path of layout.paths) {
+          for (let k = 0; k + 1 < path.points.length; k++) {
+            const [ax, az] = path.points[k]
+            const [bx, bz] = path.points[k + 1]
+            const dx = bx - ax
+            const dz = bz - az
+            const len2 = dx * dx + dz * dz
+            const t = len2 < 1e-9 ? 0 : Math.max(0, Math.min(1, ((stand.x - ax) * dx + (stand.z - az) * dz) / len2))
+            const gap = Math.hypot(stand.x - (ax + dx * t), stand.z - (az + dz * t))
+            expect(gap, `${id} seed ${seed}: the stand sits ${gap.toFixed(2)} m off a lane ${path.width} m wide`)
+              .toBeGreaterThan(path.width / 2)
+          }
+        }
+      }
+    }
+  })
+
+  it('keeps no stand in a village whose water path was given up', () => {
+    // The stand is placed while every bank still has a PROVISIONAL path, and the
+    // head search may discard that path further down — which left a water stand
+    // and its collider standing in a village no adult ever fetches water in.
+    // Measured 12.09.2026 at bambara-village, seeds 2 and 7.
+    let seenWithoutPath = 0
+    for (const id of riverVillages) {
+      for (let seed = 1; seed <= 40; seed++) {
+        const layout = buildLayout(id, seed)
+        if (!layout.waterPath) {
+          seenWithoutPath++
+          expect(layout.waterStand, `${id} seed ${seed}: a stand with no water path`).toBeNull()
+        }
+      }
+    }
+    // The case is only worth its runtime while such a village exists at all.
+    expect(seenWithoutPath).toBeGreaterThan(0)
   })
 })
