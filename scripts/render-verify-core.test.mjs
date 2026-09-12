@@ -2977,6 +2977,31 @@ describe('the shipped charge ledger', () => {
     expect(RED_CHARGES.filter((c) => !open.has(c.point)).map((c) => c.point)).toEqual([])
   })
 
+  it.each([
+    [603, 'settings', 'first-person ground shows micro-detail (edge energy)', 'laplacian mean 1.01'],
+    [938, 'enrichments', 'the streamed dressing does not grow over a session at a fixed anchor (point 278)', '{"samples":[0,0,0,0,0],"min":0,"max":0,"spread":0}'],
+    [521, 'enrichments', 'frame 72-water-victoria-falls', 'subject is not in the rendered picture'],
+    [1102, 'polish', 'the drums were still speaking when the picture was taken', 'the drums had stopped'],
+    [1087, 'polish', 'one village adult, standing clear of the others, can be held in the fill pose', 'villager 2, nearest neighbour 0.8 m'],
+    [1087, 'polish', 'and a clear line to him exists for the shutter', 'all 16 bearings blocked'],
+    [1087, 'polish', 'frame 1085-village-adult-fills-a-jar', 'subject is not in the rendered picture'],
+  ])('keeps the measured WebGL red owned by open point %i: %s / %s', (point, suite, name, detail) => {
+    const scope = { suite, backend: 'webgl' }
+    const [red] = failedChecks(`FAIL  ${name} — ${detail}`)
+    expect(chargeFor(red, scope)?.point).toBe(point)
+    expect(chargeFor({ ...red, kind: 'console' }, scope)).toBeNull()
+    expect(chargeFor(red, { ...scope, suite: 'flow' })).toBeNull()
+    const [stored] = chargeReds([red], scope)
+    const record = { ...scope, exit: 1, asserted: true, crashed: false, terminalVerdict: true, reds: [stored] }
+    expect(owned(stored, suite, 'webgl', null, [point])).toBe(true)
+    expect(runVerdict(record, { openPoints: [point] }).status).toBe('accounted')
+    const ticked = chargeablePoints(`- [x] ${point}. repaired`)
+    expect(owned(stored, suite, 'webgl', null, ticked)).toBe(false)
+    expect(owned(red, suite, 'webgl', null, ticked)).toBe(false)
+    expect(runVerdict(record, { openPoints: ticked }).covers).toBe(false)
+    expect(unexplainedRuns([record], 0, { openPoints: ticked })).toHaveLength(1)
+  })
+
   // THE TWO LANES ANSWER TO DIFFERENT POINTS, and that separation is the whole
   // value of the charge (13.08.2026). The WebGPU entry says in its own words that
   // on WebGL 2 the check "stays a real red" — so it must never swallow a
