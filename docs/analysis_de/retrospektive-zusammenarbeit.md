@@ -1527,7 +1527,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Samstag, 12.09.2026, 21:55 · Quellen-Fingerprint: `b9a173b03667…`
+Zuletzt aktualisiert: Samstag, 12.09.2026, 23:23 · Quellen-Fingerprint: `24d163e65a1b…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1633,8 +1633,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 96 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 132 Prozess-/Meta-TASKS-Punkte (davon 64 offen).
 
-<!-- RETRO-FINGERPRINT: b9a173b03667fc31d5197de9751a9cce18010428ceba6fcbe99c2cee81872793 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-12T19:55:12.227Z -->
+<!-- RETRO-FINGERPRINT: 24d163e65a1b3fbc1e2a5da26bf7bef19f36e57593e3bf373f9b86809d9c4d85 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-12T21:23:48.404Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -6749,3 +6749,33 @@ und teuer gilt, gehört sie dorthin, wo Läufe gestartet werden, nicht in den W�
 Der Wächter kann nur den Schluss bewerten, der Starter kann die Reihenfolge halten. Gebucht
 als Punkt 1086, der die Verweigerung in `scripts/verify/run-logged.mjs` legt und die
 Bildschranke ihren eigenen Zeitpunkt aussprechen lässt.
+
+### 3.267 Die Sitzung belastete die Maschine, auf der ihre eigene Messung lief
+
+Am Abend des 12.09.2026 hat eine Sitzung einen laufenden LARGE-Lauf übernommen und in
+denselben neunzig Minuten ihre eigene Pflichtarbeit auf dieselbe Maschine gelegt: eine
+Typprüfung, einen Produktionsbuild und einen Push, dessen Tor 15235 Unit-Tests fährt. Der
+Lauf hat das nicht überstanden. In `polish` ist genau in diesem Fenster ein Zeitfenster-Test
+rot geworden — die Haltespur des ankommenden Läufers brach mit 3,2 Sekunden Rest ab —, die
+Wiederholung auf der wieder ruhigen Maschine lief grün, und das Ergebnis ist ein SUSPECT,
+der nichts abdeckt und einen eigenen Punkt kostet (1119).
+
+Das Unangenehme daran ist nicht der Fehler, sondern sein Zeitpunkt: Dieselbe Sitzung hatte
+eine Stunde zuvor genau diese Lehre in die Anfänger-Anleitung geschrieben — »läuft schon
+etwas Langes, ist Vorarbeit nur Lesen« — und den dafür nötigen Kürze-Grenzwert mit einer
+Begründung angehoben, die den Fall wörtlich beschreibt. Die Regel war also nicht unbekannt,
+sie war aufgeschrieben und im Kontext. Was gefehlt hat, ist die Stelle, an der sie greift:
+Die Wartestellung wird deklariert, das Board sagt »ich warte blockierend«, und die Pflichten
+daneben — committen, pushen, ein Tor fahren — laufen weiter, als wäre die Maschine frei.
+Kein Wächter fragt beim Start eines Tores, ob gerade ein Bildlauf misst; die
+In-Flight-Markierung weiß es, und niemand liest sie.
+
+Die Verwandtschaft zu §3.262 ist die Quelle der Entschuldigung: Dort schreibt die Maschine
+den Grund für ihren eigenen Ausfall, hier erzeugt sie ihn. Der Unterschied zu einem
+gewöhnlichen Flackern ist, dass der Verursacher benennbar ist und im selben Protokoll steht.
+
+**Lehre:** Eine deklarierte Wartestellung muss auch die eigene Buchhaltung anhalten, nicht
+nur die Absicht. Solange das nicht erzwungen wird, gilt die Handregel unverkürzt: Während
+ein Lauf misst, ist alles außer Lesen aufgeschoben — auch ein Commit, auch ein Push, auch
+ein Tor, das »nur« vier Minuten dauert. Und ein SUSPECT wird nicht dem Punkt angehängt, der
+gerade läuft, sondern als eigener Punkt gemessen, bevor jemand »Last« behauptet.

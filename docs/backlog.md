@@ -755,3 +755,15 @@ process mechanism but the four or five chronically red checks themselves — rep
 lay each down once as a classified baseline (measure 1 of point 1104, done so far for a
 single red). Non-blocking and collected here on the user's instruction of 12.09.2026 to
 discuss this first and change nothing in the process yet.
+
+## The handover card claims nothing is running while an adopted run runs (12.09.2026)
+
+`scripts/batch-boundary-core.mjs` ends every boundary card with "Hier läuft nichts weiter.",
+whether or not the handover passes transferable in-flight work on. Measured at 23:22 on
+12.09.2026: the context watermark handed over while the LARGE two-backend regression for
+point 1087 (pid 441803) was in its WebGPU pass, declared transferable, and adopted by the
+successor — so the board told the user nothing was running while two hours of regression ran
+on. The session appended the true state as its own paragraph rather than touching the
+sanctioned wording. Non-blocking under the infrastructure freeze: nobody is misdirected into
+an action by it, the card's own purpose (naming WHY the handover happens) is intact, and the
+fix is one sentence in a card generator, not a mechanism.

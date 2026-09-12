@@ -1344,6 +1344,12 @@
       "why": "Spielfehler: Auf der mobilen Bahn startet die Darstellung gar nicht, und das Rot kann auf keinem anderen Weg schliessen.",
       "origin": "machine",
       "place": "ahead"
+    },
+    "1119": {
+      "at": "2026-09-12T21:24:19.202Z",
+      "why": "Last is right: it stands beside its siblings 1114/1115/1116, the same class of pre-existing check red filed by a run, and nothing waits on it — the point it was found in (1087) is closed by measuring the load hypothesis, not by repairing this check.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1376,7 +1382,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-12T15:24:24.157Z",
+    "at": "2026-09-12T21:24:19.210Z",
     "points": [
       174,
       184,
@@ -1773,7 +1779,8 @@
       1115,
       1116,
       1117,
-      1118
+      1118,
+      1119
     ]
   }
 }
