@@ -236,6 +236,68 @@ describe('enableAsyncPipelineCompile (point 337)', () => {
     expect(frames.depth).toBe(0)
   })
 
+  it('completes a queued composite whose usage recovers before the release frame', () => {
+    const backend = fakeWebglBackend()
+    const frames = fakeFrames()
+    const handle = enableAsyncPipelineCompile(backend, { schedule: frames.schedule })!
+    const composite = {
+      object: { isQuadMesh: true },
+      material: { name: 'RenderPipeline' },
+      pipeline: { id: 7, usedTimes: 1 },
+    }
+    backend.createRenderPipeline(composite, null)
+    composite.pipeline.usedTimes = 0
+    backend.settleAll()
+    // Retirement is checked at release, not when the completion is queued.
+    composite.pipeline.usedTimes = 1
+    frames.tick()
+    expect(backend.completed).toEqual([composite.pipeline])
+    expect(handle.state()).toMatchObject({ queued: 0, dropped: 0 })
+  })
+
+  it('names queued and dropped programs without exposing mutable diagnostic state', () => {
+    const backend = fakeWebglBackend()
+    const frames = fakeFrames()
+    const handle = enableAsyncPipelineCompile(backend, { schedule: frames.schedule })!
+    const composite = { material: { name: 'RenderPipeline' }, pipeline: { id: 7, usedTimes: 1 } }
+    const bloom = { material: { name: 'Bloom_comp' }, pipeline: { id: 8, usedTimes: 1 } }
+    backend.createRenderPipeline(composite, null)
+    backend.createRenderPipeline(bloom, null)
+    backend.settleAll()
+    expect(handle.diagnostics().queued).toEqual([
+      { id: 7, material: 'RenderPipeline', usedTimes: 1 },
+      { id: 8, material: 'Bloom_comp', usedTimes: 1 },
+    ])
+    composite.pipeline.usedTimes = 0
+    backend.releasePipeline(bloom.pipeline)
+    frames.tick()
+    const diagnostic = handle.diagnostics()
+    expect(diagnostic).toEqual({
+      queued: [],
+      recentDrops: [
+        { id: 7, material: 'RenderPipeline', usedTimes: 0, reason: 'unused' },
+        { id: 8, material: 'Bloom_comp', usedTimes: 1, reason: 'released' },
+      ],
+    })
+    diagnostic.recentDrops[0].material = 'changed by reader'
+    expect(handle.diagnostics().recentDrops[0].material).toBe('RenderPipeline')
+    expect(handle.state().dropped).toBe(2)
+  })
+
+  it('bounds drop history while keeping the full drop count', () => {
+    const backend = fakeWebglBackend()
+    const frames = fakeFrames()
+    const handle = enableAsyncPipelineCompile(backend, { schedule: frames.schedule })!
+    for (let id = 0; id < 40; id++) {
+      backend.createRenderPipeline({ pipeline: { id, usedTimes: 0 } }, null)
+    }
+    backend.settleAll()
+    frames.tick()
+    expect(handle.state().dropped).toBe(40)
+    expect(handle.diagnostics().recentDrops.map((entry) => entry.id))
+      .toEqual(Array.from({ length: 32 }, (_, i) => i + 8))
+  })
+
   it('is idempotent — a second arming does not stack a second wrapper', () => {
     const backend = fakeWebglBackend()
     const frames = fakeFrames()

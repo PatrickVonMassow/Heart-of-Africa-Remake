@@ -83,6 +83,23 @@ export interface PipelineBackend {
   get?: (object: unknown) => { programGPU?: unknown } | undefined
 }
 
+interface ProgramDiagnostic {
+  id: number | null
+  material: string
+  usedTimes: number | null
+}
+
+/** Only scalar snapshots are retained; disposed render objects must be collectible. */
+function describeProgram(renderObject: unknown, pipeline: unknown): ProgramDiagnostic {
+  const program = pipeline as { id?: number; usedTimes?: number } | null
+  const object = renderObject as { material?: { name?: string } } | null
+  return {
+    id: program?.id ?? null,
+    material: object?.material?.name ?? '',
+    usedTimes: program?.usedTimes ?? null,
+  }
+}
+
 /** Injectable frame scheduler — `requestAnimationFrame` in the game, a manual
  *  pump in the tests. */
 export type FrameScheduler = (cb: () => void) => void
@@ -106,6 +123,11 @@ export interface AsyncPipelineHandle {
    *  resolves when the LINK is done, which is one throttled release short of
    *  the program actually being drawable. */
   state(): AsyncPipelineState
+  /** On-demand queue identities and the last 32 drops, for rebuild diagnosis. */
+  diagnostics(): {
+    queued: ProgramDiagnostic[]
+    recentDrops: Array<ProgramDiagnostic & { reason: 'unused' | 'released' }>
+  }
   /** Restores the backend's original method (used by the tests and on unmount). */
   restore(): void
   /** Runs `fn` with pipeline creation SYNCHRONOUS — see
@@ -150,6 +172,7 @@ export function enableAsyncPipelineCompile(
   let started = 0
   let done = 0
   let dropped = 0
+  const recentDrops: Array<ProgramDiagnostic & { reason: 'unused' | 'released' }> = []
   /** Nesting depth of `runSynchronously` — see withSynchronousPipelineCompile. */
   let synchronous = 0
 
@@ -175,6 +198,11 @@ export function enableAsyncPipelineCompile(
         const retired = (pipeline as { usedTimes?: number } | null)?.usedTimes === 0
         if (retired || (data !== undefined && data.programGPU === undefined)) {
           dropped++
+          recentDrops.push({
+            ...describeProgram(renderObject, pipeline),
+            reason: retired ? 'unused' : 'released',
+          })
+          if (recentDrops.length > 32) recentDrops.shift()
           continue
         }
         completeOriginal.call(backend, renderObject, pipeline)
@@ -253,6 +281,10 @@ export function enableAsyncPipelineCompile(
   backend.createRenderPipeline = wrapped
   const handle: AsyncPipelineHandle = {
     state: () => ({ pending, started, done, queued: queue.length, dropped }),
+    diagnostics: () => ({
+      queued: queue.map(([object, pipeline]) => describeProgram(object, pipeline)),
+      recentDrops: recentDrops.map((entry) => ({ ...entry })),
+    }),
     restore: () => {
       if (backend.createRenderPipeline === wrapped) backend.createRenderPipeline = original
       restoreComplete?.()
