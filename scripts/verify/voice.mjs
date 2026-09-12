@@ -319,6 +319,7 @@ if (section('village-stereo')) {
   await firstGesture()
   const measured = await page.evaluate(async () => {
     const { utteranceOf } = await import('/src/communication/lexicon.ts')
+    const { sampleSpeech } = await import('/scripts/verify/speechSampler.mjs')
     const a = window.__ambience
     const b = window.__balance
     a.start()
@@ -337,36 +338,13 @@ if (section('village-stereo')) {
     const heldDrums = b.drumBed.enabled
     const sample = async (childrenOnly) => {
       const tones = [b.communication.speechPitchHz, b.communication.speechChildPitchHz]
-      const bands = [[-Infinity, -Infinity], [-Infinity, -Infinity]]
-      let peak = 0
-      const spectra = new Float32Array(analysers[0].frequencyBinCount)
-      const wave = new Float32Array(analysers[0].fftSize)
       const startedAt = ac.currentTime
       a.speak(utteranceOf('RIVER'), childrenOnly ? 0 : 3, {
         bearing: childrenOnly ? Math.PI / 2 : -Math.PI / 2,
         voice: childrenOnly ? 'child' : 'adult',
       })
       a.speak(utteranceOf('RIVER'), childrenOnly ? 0 : 3, { bearing: Math.PI / 2, voice: 'child' })
-      const until = ac.currentTime + 1.4
-      while (ac.currentTime < until) {
-        analysers.forEach((node, channel) => {
-          node.getFloatTimeDomainData(wave)
-          for (const value of wave) peak = Math.max(peak, Math.abs(value))
-          // RIVER's first and third syllables are low. Restrict the carrier
-          // comparison to those windows: the adult HIGH carrier is near the
-          // child LOW and must not contaminate a comparison across time.
-          const elapsed = ac.currentTime - startedAt
-          if (!((elapsed > 0.04 && elapsed < 0.18) || (elapsed > 0.64 && elapsed < 0.78))) return
-          node.getFloatFrequencyData(spectra)
-          tones.forEach((hz, voice) => {
-            const from = Math.floor(hz * 0.92 * node.fftSize / ac.sampleRate)
-            const to = Math.ceil(hz * 1.03 * node.fftSize / ac.sampleRate)
-            for (let i = from; i <= to; i++) bands[voice][channel] = Math.max(bands[voice][channel], spectra[i])
-          })
-        })
-        await new Promise((resolve) => requestAnimationFrame(resolve))
-      }
-      return { peak, bands }
+      return sampleSpeech(ac, analysers, tones, startedAt)
     }
     try {
       a.setScene({ region: 'central', mode: 'place', placeKind: 'village', nearVillage: false })
