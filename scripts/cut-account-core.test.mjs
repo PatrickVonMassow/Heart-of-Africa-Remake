@@ -41,7 +41,6 @@ const MAIN_ROOT =
   ) ?? ROOT
 const ACCOUNT_PATH = resolve(ROOT, 'docs/document-cut-757.md')
 const MEMORY_DIR = resolve(homedir(), '.claude', 'projects', '-workspace-hoa', 'memory')
-const MEMORY_PATH = resolve(MEMORY_DIR, 'MEMORY.md')
 
 // Two of the three cut documents live in the USER's home, outside any checkout,
 // so a CI runner has no `~/.claude` at all and cannot see a destination that
@@ -634,10 +633,8 @@ describe('docs/document-cut-757.md — the measured floors', () => {
   })
 })
 
-// THE CEILINGS, against the LANDED files rather than the pre-merge ones. Point
-// 761 asks for that confirmation because the budgets were written from figures
-// measured before the merge, and two of them turned out to be off by a line and
-// ten words — enough to leave MEMORY.md sitting exactly on its word ceiling.
+// Ceiling values belong to the repository. Current measurements only belong
+// here for repository files; home-directory edits must not stale this table.
 describe('docs/document-cut-757.md — the ceilings table', () => {
   const text = existsSync(ACCOUNT_PATH) ? readFileSync(ACCOUNT_PATH, 'utf8') : ''
   // The global file shares its BASENAME with the project one, so a row cannot be
@@ -666,23 +663,18 @@ describe('docs/document-cut-757.md — the ceilings table', () => {
     }
   })
 
-  // The landed measurement is the point of the table: a row still quoting the
-  // pre-merge figure is exactly the defect point 761 exists to remove.
-  it('quotes the landed line and word counts the guard tokenizer reports', () => {
-    const files = {
-      'CLAUDE.md': resolve(ROOT, 'CLAUDE.md'),
-      'MEMORY.md': MEMORY_PATH,
-      'global-CLAUDE.md': resolve(homedir(), '.claude', 'CLAUDE.md'),
-    }
-    for (const path of CUT_SOURCES) {
-      const file = files[path]
-      if (!existsSync(file)) continue // refused read off the batch machine
-      const { lines, words } = measure(readFileSync(file, 'utf8'))
-      const row = rowFor(path)
-      expect(row, `no ceilings row for ${path}`).toBeTruthy()
+  const assertRepositoryCounts = (read = readFileSync) => {
+    for (const budget of DOC_BUDGETS.filter((b) => CUT_SOURCES.includes(b.path) && !b.location)) {
+      const { lines, words } = measure(read(resolve(ROOT, budget.path), 'utf8'))
+      const row = rowFor(budget.path)
+      expect(row, `no ceilings row for ${budget.path}`).toBeTruthy()
       expect(row).toContain(`${lines} lines`)
       expect(row).toContain(`${words.toLocaleString('en-US')} words`)
     }
+  }
+
+  it('quotes current line and word counts only for repository-owned cut documents', () => {
+    assertRepositoryCounts()
   })
 })
 

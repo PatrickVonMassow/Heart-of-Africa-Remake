@@ -79,21 +79,24 @@ from their character counts rather than a tokenizer reading. Both would need a
 per-session record of the harness share to become measurements, and that record
 does not exist.
 
-## Ceilings confirmed against the landed files
+## Ceilings and repository-owned measurements
 
-Initially measured 20.08.2026 on merged `main`; living rows remeasured
-27.08.2026 with `measure()` from `scripts/doc-budget-core.mjs` — the guard's OWN
-tokenizer, not `wc`, because a ceiling is only confirmed against the counter that enforces it.
-`evaluateDocBudgets()` reports no findings, so all three hold.
+The ceilings below come from `scripts/doc-budget-core.mjs`. Only the checkout's
+`CLAUDE.md` has current counts, checked with the guard's `measure()` tokenizer.
+`MEMORY.md` and global `CLAUDE.md` live outside the repository: their current
+counts and headroom are deliberately not recorded or asserted here. Writing,
+editing or deleting a memory does not require updating this table. The budget
+guard still enforces the configured ceilings when those files are present.
 
-| document | landed | ceiling | headroom |
+| document | current repository measurement | ceiling | headroom |
 | --- | --- | --- | --- |
 | `CLAUDE.md` | 205 lines / 1,468 words / 10,809 B | 205 / 1,468 | **0 lines**, 0 words |
-| `MEMORY.md` | 51 lines / 783 words / 6,317 B | 51 / 783 | **0 lines**, 0 words |
-| global `CLAUDE.md` | 6 lines / 33 words / 236 B | 6 / 36 | **0 lines**, 3 words |
+| `MEMORY.md` | outside repository | 51 / 783 | not recorded |
+| global `CLAUDE.md` | outside repository | 6 / 36 | not recorded |
 
-They hold, and two of them hold with nothing to spare, which is the finding
-this confirmation produced. The ceilings were set from figures taken BEFORE the
+### Historical measurements and budget decisions
+
+The original confirmation found two documents with nothing to spare. The ceilings were set from figures taken BEFORE the
 merge — the code comments in `scripts/doc-budget-core.mjs` still said MEMORY.md
 had landed at 45 lines / 700 words and the global stub at five lines, where the
 landed files measure 46 / 710 and six. Those comments are corrected in the same
@@ -106,9 +109,8 @@ in the code comment beside the budget: a raise is allowed only by the MEASURED
 size of a genuinely new topic, and it is written down with the topic that bought
 it, which is what keeps it from being a quiet widening.
 
-THREE OF THESE ROWS HAVE SINCE MOVED, and the table follows the LIVING file rather
-than freezing the merge-day reading, because the unit case measures what the
-files hold today. `MEMORY.md` stood at 710 words on merge day; on 20.08.2026 a
+All three readings subsequently changed. The following dated measurements
+record the budget decisions; they are not assertions about current external files. `MEMORY.md` stood at 710 words on merge day; on 20.08.2026 a
 later session executed the ruled cut of the time-tracking entry and wrote others,
 and the count moved twice within the hour. On 21.08.2026 it moved again: a new
 memory took the file one line and twenty words over both ceilings, and the room
@@ -124,9 +126,8 @@ hunt of 05.09.2026 was retired from the index — its fix and its regression spy
 are in the tree and the retrospective carries the story in prose — and the word
 ceiling followed the cut down to the measured 783. The line ceiling stayed,
 because the freed line was exactly what put the index back inside it.
-The row above is the reading after the newest of those, not the merge-day one,
-and it shows what the pressure looks like from close up: zero headroom, for a
-file designed to gain a line per memory. The next raise should cut a retired
+That 10.09.2026 reading showed zero word headroom for a file designed to gain
+a line per memory. The next raise should cut a retired
 entry rather than widen again.
 On 22.08.2026 `CLAUDE.md` moved for the first time since the merge: the
 four-eyes cut of point 768 rewrote the file, and the cross-vendor review of that
@@ -140,10 +141,8 @@ word ceiling rose by exactly those words, preserving 18 words of headroom; its
 unchanged line ceiling is now exact.
 The global stub is GONE: the user released it in the same ruling and it was
 deleted on 20.08.2026 (backup `local/global-CLAUDE-before-deletion-20-08-2026.md`),
-so its row is history and `doc-budget-guard` simply skips a budget whose file no
-longer exists. Note what this costs: pinning the table to a live index that gains
-a line per memory means every memory written reddens the case until the table is
-restated. That coupling belongs to the budget decision and is recorded there.
+and `doc-budget-guard` simply skips a budget whose file no longer exists. The
+table retains its configured ceiling, without tracking the home-directory file.
 
 ## The cut entries
 
