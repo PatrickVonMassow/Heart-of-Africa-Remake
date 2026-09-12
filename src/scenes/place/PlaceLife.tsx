@@ -26,6 +26,7 @@ import {
   type FootPlant,
 } from '../../render/fauna'
 import { CHILD_FIGURE_SCALE, FIGURE_LIMBS, TESSELLATION } from '../../render/figures'
+import { RIVER_WATER_TONES, WATER_METALNESS } from '../../render/waterAppearance'
 import { applyFigurePose, restingArmRefs, type FigureLimbs } from '../../render/figurePose'
 import {
   advanceGesture,
@@ -3009,18 +3010,16 @@ function ErrandVillagers({
             squat={(squats.current[i] ??= { current: 1 })}
             handProp={
               <>
-                <mesh
+                <group
                   ref={(el) => {
                     handJars.current[i] = el
                   }}
                   visible={false}
                   position={[0, -0.12, 0.04]}
                   rotation={[0, 0, 0.12]}
-                  castShadow
                 >
-                  <cylinderGeometry args={[0.12, 0.16, 0.32, 8]} />
-                  <meshStandardMaterial color="#8a5a30" roughness={0.9} />
-                </mesh>
+                  <Jar full={false} />
+                </group>
                 <group
                   name="digging-tool"
                   ref={(el) => {
@@ -3041,19 +3040,78 @@ function ErrandVillagers({
               </>
             }
           />
-          <mesh
+          <group
             ref={(el) => {
               headJars.current[i] = el
             }}
             visible={false}
             position={[0, 1.5, 0]}
-            castShadow
           >
-            <cylinderGeometry args={[0.12, 0.16, 0.32, 8]} />
-            <meshStandardMaterial color="#8a5a30" roughness={0.9} />
-          </mesh>
+            <Jar full />
+          </group>
         </group>
       ))}
+    </>
+  )
+}
+
+// --- The water carrier's jar (work-order 1087) -----------------------------
+//
+// BOTH JARS ARE THE SAME VESSEL, and it is OPEN. It used to be one closed opaque
+// cylinder in both states, and the full one was the empty one moved onto the
+// head: the user (06.09.2026) could see no water in it and therefore could not
+// tell that water was being fetched. The mouth is open now, and what stands
+// inside it is what tells the two apart at a glance — a dark hollow in the empty
+// one, the river's own tone at the rim in the full one.
+//
+// The rim is FLARED past the body's waist. A head-carried jar sits near the
+// player's own eye height, so its mouth is seen at a shallow angle; a wider
+// mouth is a wider ellipse, which is what makes the reading survive the
+// distance the player watches from.
+const JAR_RIM_R = 0.155
+const JAR_WAIST_R = 0.16
+const JAR_BASE_R = 0.13
+const JAR_HEIGHT = 0.32
+/** How far below the rim the water stands in a full jar, and the hollow in an
+ *  empty one. The full one is brim-full; the empty one is a shadow well down. */
+const JAR_WATER_DROP = 0.03
+const JAR_HOLLOW_DROP = 0.13
+
+function Jar({ full }: { full: boolean }) {
+  return (
+    <>
+      <mesh castShadow>
+        <cylinderGeometry args={[JAR_RIM_R, JAR_WAIST_R, JAR_HEIGHT, 14, 1, true]} />
+        {/* Double-sided: the inner wall is half of what an open mouth reads as. */}
+        <meshStandardMaterial color="#8a5a30" roughness={0.9} side={THREE.DoubleSide} />
+      </mesh>
+      {/* The base, so the vessel is a jar and not a tube. */}
+      <mesh position={[0, -JAR_HEIGHT / 2, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <circleGeometry args={[JAR_BASE_R, 14]} />
+        <meshStandardMaterial color="#6b4423" roughness={1} side={THREE.DoubleSide} />
+      </mesh>
+      {/* What is IN it. */}
+      <mesh
+        position={[0, JAR_HEIGHT / 2 - (full ? JAR_WATER_DROP : JAR_HOLLOW_DROP), 0]}
+        rotation={[-Math.PI / 2, 0, 0]}
+      >
+        <circleGeometry args={[full ? JAR_RIM_R - 0.012 : JAR_WAIST_R - 0.02, 14]} />
+        {full ? (
+          // The river's own sheen, glossy like the water it came from, with a
+          // little light of its own so the disc still reads in the shade of the
+          // carrier's own head.
+          <meshStandardMaterial
+            color={RIVER_WATER_TONES.sheen}
+            roughness={0.14}
+            metalness={WATER_METALNESS}
+            emissive={RIVER_WATER_TONES.deep}
+            emissiveIntensity={0.35}
+            side={THREE.DoubleSide}
+          />
+        ) : (
+          <meshStandardMaterial color="#241a12" roughness={1} side={THREE.DoubleSide} />
+        )}
+      </mesh>
     </>
   )
 }
