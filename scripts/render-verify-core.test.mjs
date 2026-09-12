@@ -45,6 +45,7 @@ import {
   parseSuspectReds,
   suspectRedsOf,
   unexplainedRuns,
+  owned,
   isIncompleteRecording,
   incompleteClosureFor,
   crashClosureFor,
@@ -681,6 +682,27 @@ describe('pointStatusesFrom / chargeablePoints — which points may carry a char
   it('is total on garbage', () => {
     expect(pointStatusesFrom(null).size).toBe(0)
     expect(chargeablePoints(undefined)).toEqual([])
+  })
+})
+
+describe('owned — shared open-point ownership', () => {
+  const red = { name: 'known red', kind: 'check' }
+  const ledger = [{ point: 603, suite: 'settings', backend: 'webgl', kind: 'check', match: /^known red$/ }]
+  const owns = (value, openPoints, entries = ledger) => owned(value, 'settings', 'webgl', null, openPoints, entries)
+
+  it('accepts recorded and current-ledger charges only while their point is open', () => {
+    expect(owns(red, [603])).toBe(true)
+    expect(owns({ ...red, point: 603 }, new Set([603]), [])).toBe(true)
+    expect(owns(red, chargeablePoints('- [x] 603. repaired'))).toBe(false)
+    expect(owns({ ...red, point: 603 }, [])).toBe(false)
+    expect(owns(red, null)).toBe(false)
+  })
+
+  it('keeps scope restrictions and refuses lost or unreadable reds', () => {
+    expect(owned(red, 'polish', 'webgl', null, [603], ledger)).toBe(false)
+    expect(owned(red, 'settings', 'webgpu', null, [603], ledger)).toBe(false)
+    expect(owns({ ...red, kind: TRUNCATED_KIND, point: 603 }, [603])).toBe(false)
+    expect(owns(null, [603])).toBe(false)
   })
 })
 

@@ -159,6 +159,18 @@ export function isRenderPath(path) {
   return false
 }
 
+/** Is this red owned by an OPEN point, through its recorded charge or today's ledger? */
+export function owned(red, suite, backend, featureLevel, openPoints, ledger = RED_CHARGES) {
+  const open = pointSet(openPoints)
+  // Reds that never reached the record cannot be owned by anything — in
+  // either shape a record may carry the marker (kind, or the legacy key).
+  if (isTruncationEntry(red)) return false
+  const recorded = Number.isInteger(red?.point) ? red.point : null
+  if (recorded !== null && open.has(recorded)) return true
+  const now = chargeFor(red, { suite, backend, featureLevel, ledger })
+  return !!now && open.has(now.point)
+}
+
 /**
  * WHICH WORK-ORDER POINTS MAY CARRY A CHARGE (point 550). Parsed from the whole
  * work order — TASKS.md plus docs/tasks-archive.md, handed in as one text — into
@@ -1305,18 +1317,6 @@ export function unexplainedRuns(runs, since, options) {
       return sawCodeSince(later, from) && runVerdict(later, { openPoints }).covers
     })
   }
-  const open = pointSet(openPoints)
-  /** Is this red owned by an OPEN point — by the charge it was recorded with, or
-   *  by one the ledger carries today? */
-  const owned = (red, suite, backend, featureLevel) => {
-    // Reds that never reached the record cannot be owned by anything — in
-    // either shape a record may carry the marker (kind, or the legacy key).
-    if (isTruncationEntry(red)) return false
-    const recorded = Number.isInteger(red?.point) ? red.point : null
-    if (recorded !== null && open.has(recorded)) return true
-    const now = chargeFor(red, { suite, backend, featureLevel, ledger })
-    return !!now && open.has(now.point)
-  }
   const out = []
   for (const r of Array.isArray(runs) ? runs : []) {
     if (!r || typeof r !== 'object') continue
@@ -1483,7 +1483,7 @@ export function unexplainedRuns(runs, since, options) {
         // reporting only that sentence hid every red the run really printed and
         // nobody owns. Charged ones stay out: a red an open point already owns
         // was never part of the bypass.
-        const stillOpen = residualOf(r).reds.filter((red) => !owned(red, suite, backend, level))
+        const stillOpen = residualOf(r).reds.filter((red) => !owned(red, suite, backend, level, openPoints, ledger))
         // The lost-recording sentence speaks about THIS record — two truncated
         // records of the same suite print it identically and each owes its own
         // disposition — so it is keyed per record; the reds it kept are not.
@@ -1509,7 +1509,7 @@ export function unexplainedRuns(runs, since, options) {
       // by the run's OWN class — a truncated run that also passed on the RETRY
       // keeps its first attempt's reds, which reading `r.reds` had thrown away.
       const residual = residualOf(r)
-      const unowned = residual.reds.filter((red) => !owned(red, suite, backend, level))
+      const unowned = residual.reds.filter((red) => !owned(red, suite, backend, level, openPoints, ledger))
       if (unowned.length === 0) continue
       out.push({
         backend,
@@ -1549,7 +1549,7 @@ export function unexplainedRuns(runs, since, options) {
       // Only the reds NOBODY owns are still open. Counting the whole run's
       // reds would report a charged one as waved through beside its
       // unexplained neighbour.
-      unowned = observed.filter((red) => !owned(red, suite, backend, level))
+      unowned = observed.filter((red) => !owned(red, suite, backend, level, openPoints, ledger))
       if (unowned.length === 0) continue
     }
     // The individual reds, NOT the one sentence runVerdict writes about them: a
