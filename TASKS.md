@@ -126,6 +126,18 @@ put it is the mistake this line exists to stop.
   point 1065, point 278.
   Bundle: Testinfrastruktur.
 
+- [ ] 1116. Repair pre-existing crossbrowser check: chromium-mobile no console errors on
+  mobile (filed automatically by a LARGE run on 12.09.2026 under point 1089's ownership
+  rule; the user ordered these three reds filed at once on 10.09.2026).
+  Chromium mobile boots and initialises its renderer without calling getSupportedExtensions
+  on null. Diagnose and repair the recurring renderer initialisation error; add a regression
+  test for the failing path. Prove the full crossbrowser suite at standard depth, including
+  chromium-mobile and its no-console-errors assertion.
+  Observed 10.09.2026: this red held point 1065 across 23 full LARGE runs without ever
+  touching its change. This point owns it.
+  Refs: scripts/verify/crossbrowser.mjs, point 1089, point 1065.
+  Bundle: Testinfrastruktur.
+
 - [ ] 1087. The water carrier visibly fills the jar at the water and carries visible water
   (user 06.09.2026; the former point 1066; SPLIT BACK OUT OF POINT 1065 on 10.09.2026 on the
   user's instruction, 02:15).
@@ -15723,16 +15735,4 @@ to land than a mechanism that needs a review.
   Observed 10.09.2026: this red held point 1065 across 23 full LARGE runs without ever
   touching its change. This point owns it.
   Refs: scripts/verify/enrichments.mjs, point 1089, point 1065, point 278.
-  Bundle: Testinfrastruktur.
-
-- [ ] 1116. Repair pre-existing crossbrowser check: chromium-mobile no console errors on
-  mobile (filed automatically by a LARGE run on 12.09.2026 under point 1089's ownership
-  rule; the user ordered these three reds filed at once on 10.09.2026).
-  Chromium mobile boots and initialises its renderer without calling getSupportedExtensions
-  on null. Diagnose and repair the recurring renderer initialisation error; add a regression
-  test for the failing path. Prove the full crossbrowser suite at standard depth, including
-  chromium-mobile and its no-console-errors assertion.
-  Observed 10.09.2026: this red held point 1065 across 23 full LARGE runs without ever
-  touching its change. This point owns it.
-  Refs: scripts/verify/crossbrowser.mjs, point 1089, point 1065.
   Bundle: Testinfrastruktur.
