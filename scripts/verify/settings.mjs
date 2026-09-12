@@ -15,6 +15,7 @@
 import { launchVerifyBrowser, assertBackend, waitForSceneBuilt } from './_browser.mjs'
 import { frameShutter, capturePixels } from './frameSubject.mjs'
 import { leakVerdict } from './textureLeak.mjs'
+import { SETTINGS_VIEWPORT, SETTINGS_SCENE_LUMA_MIN, settingsSceneLuma } from './settingsSceneLuma.mjs'
 import { sectionGate } from './sections.mjs'
 import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
@@ -43,7 +44,7 @@ const check = (name, ok, detail) => {
 }
 
 const browser = await launchVerifyBrowser()
-const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
+const page = await browser.newPage({ viewport: SETTINGS_VIEWPORT })
 const shot = frameShutter(page, OUT)
 const errors = []
 page.on('console', (m) => {
@@ -84,13 +85,6 @@ const ensureTravel = async () => {
   await page.evaluate(() => window.__game.getState().leavePlace())
   await page.waitForTimeout(2500)
   await page.evaluate(() => window.__game.getState().setJournalOpen(false))
-}
-
-/** Mean luminance of a PNG buffer — the "did it render at all" measure the TRAA
- *  and the graphics-level sections both judge their frames by. */
-const meanLuma = async (png) => {
-  const stats = await sharp(png).stats()
-  return stats.channels.slice(0, 3).reduce((a, c) => a + c.mean, 0) / 3
 }
 
 // A screenshot is the reliable way to make a throttled headless page render; an
@@ -786,17 +780,17 @@ if (section('traa-toggle')) {
   await page.evaluate(() => window.__ui.getState().setTraaEnabled(true))
   await page.waitForTimeout(2500)
   const traaShot = await shot('69-traa-on', {
-    general: 'the TRAA pipeline rebuild is judged by the mean luma of this whole frame, which is therefore the subject',
+    general: 'the travel scene after the TRAA rebuild; brightness is measured only in the interface-free scene crop',
     scene: 'travel',
   })
-  const traaMean = await meanLuma(traaShot)
-  check('TRAA on: scene renders non-black', traaMean > 8, `mean ${traaMean.toFixed(1)}`)
+  const traaMean = await settingsSceneLuma(traaShot)
+  check('TRAA on: scene renders non-black', traaMean > SETTINGS_SCENE_LUMA_MIN, `scene crop mean ${traaMean.toFixed(1)} > ${SETTINGS_SCENE_LUMA_MIN}`)
   check('TRAA on: no new console errors', errors.length === errsBeforeTraa,
     errors.slice(errsBeforeTraa).join(' | ').slice(0, 300))
   await page.evaluate(() => window.__ui.getState().setTraaEnabled(false))
   await page.waitForTimeout(1500)
-  const traaOffMean = await meanLuma(await capturePixels(page, 'TRAA off path mean luma'))
-  check('TRAA off again: scene renders non-black', traaOffMean > 8, `mean ${traaOffMean.toFixed(1)}`)
+  const traaOffMean = await settingsSceneLuma(await capturePixels(page, 'TRAA off path mean luma'))
+  check('TRAA off again: scene renders non-black', traaOffMean > SETTINGS_SCENE_LUMA_MIN, `scene crop mean ${traaOffMean.toFixed(1)} > ${SETTINGS_SCENE_LUMA_MIN}`)
   check('TRAA off again: no new console errors', errors.length === errsBeforeTraa,
     errors.slice(errsBeforeTraa).join(' | ').slice(0, 300))
 
@@ -885,8 +879,8 @@ if (section('traa-toggle')) {
     before: firstCycle.count, after: afterStress.count, cycles: 5, tolerance: 2, liveBefore, liveAfter,
   })
   check('TRAA toggle stress: no render-target leak across rebuilds', leak.ok, leak.detail)
-  const stressMean = await meanLuma(await capturePixels(page, 'TRAA toggle stress mean luma'))
-  check('TRAA toggle stress: scene still renders non-black', stressMean > 8, `mean ${stressMean.toFixed(1)}`)
+  const stressMean = await settingsSceneLuma(await capturePixels(page, 'TRAA toggle stress mean luma'))
+  check('TRAA toggle stress: scene still renders non-black', stressMean > SETTINGS_SCENE_LUMA_MIN, `scene crop mean ${stressMean.toFixed(1)} > ${SETTINGS_SCENE_LUMA_MIN}`)
   check('TRAA toggle stress: no new console errors', errors.length === errsBeforeTraa,
     errors.slice(errsBeforeTraa).join(' | ').slice(0, 300))
 
@@ -960,6 +954,18 @@ if (section('graphics-levels')) {
     atMedium.level === 'medium' && atMedium.ssao === false && atMedium.traa && atMedium.bloom &&
     atMedium.shadows && atMedium.shadowRes === 2048 && atMedium.fireShadows === true,
     JSON.stringify(atMedium))
+  // Own the reproducer even in a section-only run. Each mode must reach the
+  // scene pass and render before the next toggle; batched store writes do not
+  // exercise pipeline teardown/rebuild. End with the allow-flag restored so
+  // the F9 effective-lever and flag-preservation checks retain their meaning.
+  for (const on of [true, false, true, false, true]) {
+    await page.evaluate((value) => window.__ui.getState().setTraaEnabled(value), on)
+    await page.waitForFunction(
+      (value) => window.__scenePass?.getMRT()?.has('velocity') === value,
+      on, { timeout: 15000 },
+    )
+    await forceFrame()
+  }
   // F9 #1: medium → low (every fill-rate lever forced DOWN).
   const atLow = await cycleF9()
   check('F9 → low: post off, shadows low-res, no campfire shadows',
@@ -968,11 +974,11 @@ if (section('graphics-levels')) {
   // The defect this section guards was a BLACK picture, so the LOW preset
   // leaves a frame behind rather than a number alone (CLAUDE.md §7.2).
   const lowShot = await shot('1105-graphics-level-low', {
-    general: 'the LOW graphics preset is judged by the mean luma of this whole frame, which is therefore the subject',
+    general: 'the travel scene at LOW after rendered TRAA on/off cycles; brightness is measured only in the interface-free scene crop',
     scene: 'travel',
   })
-  const lowMean = await meanLuma(lowShot)
-  check('F9 low: scene still renders non-black', lowMean > 8, `mean ${lowMean.toFixed(1)}`)
+  const lowMean = await settingsSceneLuma(lowShot)
+  check('F9 low: scene still renders non-black', lowMean > SETTINGS_SCENE_LUMA_MIN, `scene crop mean ${lowMean.toFixed(1)} > ${SETTINGS_SCENE_LUMA_MIN}`)
   // F9 #2: low → high (wraps to the top; SSAO on, sharper shadows).
   const atHigh = await cycleF9()
   check('F9 → high (wraps from the bottom): SSAO on, 4096 shadows, campfire on',
