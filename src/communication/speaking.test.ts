@@ -11,6 +11,7 @@ import {
   hearPhrase,
   hearUtterance,
   hearingGain,
+  speechPan,
   phrasePlan,
   utterancePlan,
   utteranceSeconds,
@@ -210,5 +211,36 @@ describe('hearing bookkeeping (point 477 store — what the distance decides)', 
     expect(hasHeard(hearUtterance(emptyMemory(), RIVER_UTTERANCE, 4, day), RIVER_UTTERANCE)).toBe(false)
     balance.communication.hearingRadius = 30
     expect(hasHeard(hearUtterance(emptyMemory(), RIVER_UTTERANCE, 4, day), RIVER_UTTERANCE)).toBe(true)
+  })
+})
+
+
+describe('direction and conversational reach', () => {
+  it('centres ahead, bounds either side, and keeps the side behind the camera', () => {
+    expect(speechPan(0, 0.6)).toBe(0)
+    expect(speechPan(Math.PI / 2, 0.6)).toBeCloseTo(0.6)
+    expect(speechPan(-Math.PI / 2, 0.6)).toBeCloseTo(-0.6)
+    expect(speechPan(3 * Math.PI / 4, 0.6)).toBeGreaterThan(0)
+    expect(speechPan(-3 * Math.PI / 4, 0.6)).toBeLessThan(0)
+    expect(speechPan(Math.PI - 0.001)).toBeCloseTo(speechPan(-Math.PI - 0.001))
+    expect(speechPan(0.7, 0)).toBe(0)
+    expect(speechPan(Math.PI / 2, 5)).toBe(1)
+  })
+
+  it('stores one position and register without changing syllable levels or timing', () => {
+    const centred = phrasePlan(phraseOf(['UPSTREAM', 'DOWNSTREAM']), 3)
+    const child = phrasePlan(phraseOf(['UPSTREAM', 'DOWNSTREAM']), 3, { bearing: Math.PI / 2, voice: 'child' })
+    expect(child.pan).toBe(balance.communication.speechStereoWidth)
+    expect(child.voice).toBe('child')
+    expect(child.syllables).toEqual(centred.syllables)
+    balance.communication.speechStereoWidth = 0
+    expect(child.pan).toBeGreaterThan(0) // already planned, unaffected by later changes
+  })
+
+  it('carries 73.5 % at 3 m, half at 5 m, and 20 % at the hearing rim', () => {
+    expect(hearingGain(3)).toBeCloseTo(0.7352941176)
+    expect(hearingGain(5)).toBe(0.5)
+    expect(hearingGain(10)).toBe(0.2)
+    expect(hearingGain(10.001)).toBe(0)
   })
 })

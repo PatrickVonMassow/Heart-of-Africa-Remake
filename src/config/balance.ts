@@ -828,6 +828,10 @@ export interface BalanceConfig {
     labelSeconds: number
     /** Carrier pitch of the LOW syllable `ba`, in Hz (point 587). */
     speechPitchHz: number
+    /** Child low carrier; the same shared interval transposes the whole pair. */
+    speechChildPitchHz: number
+    /** Maximum stereo pan, 0 = mono, 1 = full width (calibratable). */
+    speechStereoWidth: number
     /** The HIGH syllable `BA` as a multiple of the low pitch — the interval that
      *  carries the entire language, so it is calibratable on its own. */
     speechPitchInterval: number
@@ -1495,10 +1499,8 @@ export const balance: BalanceConfig = {
     // word from five syllables to four) — slow enough to count the beats by ear,
     // quick enough that the chief's four-atom message stays short.
     syllableSeconds: 0.3,
-    // A sharp fall: half way to the radius a voice is already at ~14 % and at
-    // the rim at 4 %, so the children's group and the adults' group are never
-    // both a permanent babble from the middle of the village.
-    hearingFalloff: 24,
+    // Conversational reach: 73.5 % at 3 m, 50 % at 5 m, 20 % at the 10 m rim.
+    hearingFalloff: 4,
     // Long enough to read one reading and look back at the speaker, short
     // enough that the scene never carries standing text; a phrase adds one
     // pause per further atom (speechLabelSeconds).
@@ -1508,6 +1510,9 @@ export const balance: BalanceConfig = {
     // octave, which the ear is prone to confuse with the same note. Both pitches
     // stay in one human speaking range, so the two read as one voice.
     speechPitchHz: 140,
+    // Calibratable child register and width; both tones move by the same factor.
+    speechChildPitchHz: 210,
+    speechStereoWidth: 0.6,
     speechPitchInterval: 1.68,
     // Calibrated against the deployed audio graph after the ambient drum bed
     // went silent (point 673). At the master's input a syllable beside the

@@ -907,6 +907,8 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
           syllables: [{ tone: 'low', startOffset: 0, duration: 0.1, peak: 0 }],
           duration: 0.1,
           gain: 1,
+          pan: 0,
+          voice: 'adult',
         })
         expect(codes().join(' ')).toContain('speech-inaudible')
       })

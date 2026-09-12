@@ -299,6 +299,8 @@ describe('DebugMenu editable fields write through to balance (settings.mjs fillF
     { label: en.debug.speechSyllable, read: () => balance.communication.syllableSeconds, value: 0.45 },
     { label: en.debug.speechPhrasePause, read: () => balance.communication.phrasePauseSeconds, value: 1.4 },
     { label: en.debug.speechHearingRadius, read: () => balance.communication.hearingRadius, value: 14 },
+    { label: en.debug.speechChildPitch, read: () => balance.communication.speechChildPitchHz, value: 240 },
+    { label: en.debug.speechStereoWidth, read: () => balance.communication.speechStereoWidth, value: 0 },
     { label: en.debug.speechHearingFalloff, read: () => balance.communication.hearingFalloff, value: 12 },
     // How long the player's reading stands over the speaker's head (point 485).
     { label: en.debug.speechLabelSeconds, read: () => balance.communication.labelSeconds, value: 4 },
@@ -877,7 +879,7 @@ const EXPECTED_CONTROLS: Record<DebugGroupId, readonly string[]> = {
     'debug.separationSpeed', 'debug.separationWedge', 'debug.separationPasses',
     'debug.speechSyllable', 'debug.speechPhrasePause', 'debug.speechHearingRadius',
     'debug.speechHearingFalloff', 'debug.speechLabelSeconds', 'debug.speechLabelHeadroom',
-    'debug.speechPitch', 'debug.speechPitchInterval',
+    'debug.speechPitch', 'debug.speechChildPitch', 'debug.speechStereoWidth', 'debug.speechPitchInterval',
     'debug.speechConceptLabels',
     'debug.tagChildCount', 'debug.tagSprintSpeed', 'debug.tagRunnerBoost', 'debug.tagTrotFactor',
     'debug.tagRecoverFactor', 'debug.tagFloorFactor', 'debug.tagDrain', 'debug.tagRecover',
@@ -990,12 +992,12 @@ describe('DebugMenu completeness: every control is present, in its group (point 
     })
   })
 
-  it('carries all 200 controls in total, and none twice', () => {
+  it('carries all 202 controls in total, and none twice', () => {
     render(<DebugMenu />)
     const labels = renderedRowLabels()
     const expected = DEBUG_GROUP_ORDER.flatMap((id) => EXPECTED_CONTROLS[id])
     expect(labels.length).toBe(expected.length)
-    expect(labels.length).toBe(200)
+    expect(labels.length).toBe(202)
     expect(new Set(labels).size).toBe(labels.length)
   })
 
@@ -1042,7 +1044,7 @@ describe('DebugMenu completeness: every control is present, in its group (point 
   it('gives every control a real input, select or button — no label without a control', () => {
     render(<DebugMenu />)
     const rows = [...document.querySelectorAll('.debug-menu .debug-group-body > label')]
-    expect(rows.length).toBe(200)
+    expect(rows.length).toBe(202)
     for (const row of rows) {
       const label = row.querySelector('span')?.textContent ?? '(none)'
       // The renderer row is the one deliberate read-only display (design.md §21.3).
@@ -1096,7 +1098,7 @@ describe('DebugMenu groups collapse and remember their state (point 393)', () =>
     render(<DebugMenu />)
     // Nothing opened: the whole set is still there (hidden), and a value still
     // writes through — the verify suites drive the controls this way.
-    expect(renderedRowLabels().length).toBe(200)
+    expect(renderedRowLabels().length).toBe(202)
     fireEvent.change(numberField(en.debug.travelSpeed), { target: { value: '9' } })
     expect(balance.travelSpeed).toBe(9)
     balance.travelSpeed = DEFAULTS.travelSpeed
@@ -1144,7 +1146,7 @@ describe('DebugMenu filter narrows the whole menu (point 393)', () => {
     typeFilter('croc')
     expect(renderedRowLabels().length).toBeLessThan(149)
     typeFilter('')
-    expect(renderedRowLabels().length).toBe(200)
+    expect(renderedRowLabels().length).toBe(202)
     expect(renderedGroups().filter((g) => g.open).map((g) => g.title)).toEqual([en.debug.groups.tools])
   })
 

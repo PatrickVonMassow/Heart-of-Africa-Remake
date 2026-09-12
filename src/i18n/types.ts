@@ -551,6 +551,8 @@ export interface Strings {
     speechHearingFalloff: string
     speechLabelSeconds: string
     speechPitch: string
+    speechChildPitch: string
+    speechStereoWidth: string
     speechPitchInterval: string
     speechLabelHeadroom: string
     speechConceptLabels: string

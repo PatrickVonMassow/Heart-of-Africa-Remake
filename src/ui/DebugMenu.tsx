@@ -670,6 +670,10 @@ export function DebugMenu() {
       // the high one sits above it — the only difference the language carries.
       num(t.debug.speechPitch, balance.communication.speechPitchHz,
         (v) => { balance.communication.speechPitchHz = Math.max(20, v); bump() }, 5),
+      num(t.debug.speechChildPitch, balance.communication.speechChildPitchHz,
+        (v) => { balance.communication.speechChildPitchHz = Math.max(20, v); bump() }, 5),
+      num(t.debug.speechStereoWidth, balance.communication.speechStereoWidth,
+        (v) => { balance.communication.speechStereoWidth = Math.max(0, Math.min(1, v)); bump() }, 0.05),
       num(t.debug.speechPitchInterval, balance.communication.speechPitchInterval,
         (v) => { balance.communication.speechPitchInterval = Math.max(1, v); bump() }, 0.02),
       // The speech's own LEVEL is a volume, so it lives with the other volumes

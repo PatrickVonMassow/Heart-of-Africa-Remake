@@ -32,10 +32,24 @@ export interface SpeechPlan {
   duration: number
   /** The level the utterance arrives at, 0..1; 0 = out of range or muted. */
   gain: number
+  /** Fixed for the whole utterance, negative left / positive right. */
+  pan: number
+  voice: SpeechVoice
+}
+
+export type SpeechVoice = 'adult' | 'child'
+
+/** Camera-relative bearing in radians; rear speakers retain their side. */
+export function speechPan(bearing: number, width = balance.communication.speechStereoWidth): number {
+  if (!Number.isFinite(bearing) || !Number.isFinite(width)) return 0
+  return Math.sin(bearing) * Math.max(0, Math.min(1, width))
 }
 
 /** Overridable inputs; each defaults to its calibratable balance value. */
 export interface SpeechOptions {
+  /** Horizontal bearing from the camera, positive to its right. */
+  bearing?: number
+  voice?: SpeechVoice
   /** How far an utterance carries at all (balance.communication.hearingRadius). */
   radius?: number
   /** Steepness of the fall inside that radius (balance.communication.hearingFalloff). */
@@ -56,10 +70,9 @@ export interface SpeechOptions {
 const SYLLABLE_DUTY = 0.62
 
 /**
- * Peak of one syllable before the buses. Like the thunder and crunch peaks it
- * compensates the ambient bus (0.5) × master (0.5) attenuation, so a villager
- * standing beside the player is plainly heard over the beds. Calibratable
- * shape; the audible RANGE is the balance value, not this.
+ * Envelope peak before the dedicated speech bus and master. The vowel filters
+ * add synthesis gain; graph measurements, not the envelope alone, judge output.
+ * Speech volume and hearing falloff are the calibratable loudness controls.
  */
 const SPEECH_PEAK = 1.8
 
@@ -108,7 +121,7 @@ function resolve(options: SpeechOptions = {}) {
 
 /** An empty plan — nothing audible, nothing scheduled. */
 function silence(): SpeechPlan {
-  return { syllables: [], duration: 0, gain: 0 }
+  return { syllables: [], duration: 0, gain: 0, pan: 0, voice: 'adult' }
 }
 
 /**
@@ -135,9 +148,11 @@ export function phrasePlan(
   options: SpeechOptions = {},
 ): SpeechPlan {
   const { radius, falloff, syllableSeconds, pauseSeconds, volume } = resolve(options)
+  const pan = speechPan(options.bearing ?? 0)
+  const voice = options.voice ?? 'adult'
   const gain = hearingGain(distance, radius, falloff)
   const level = gain * volume
-  if (level <= 0 || syllableSeconds <= 0) return { ...silence(), gain }
+  if (level <= 0 || syllableSeconds <= 0) return { ...silence(), gain, pan, voice }
   const peak = SPEECH_PEAK * level
   const syllables: SpokenSyllable[] = []
   let t = 0
@@ -155,9 +170,9 @@ export function phrasePlan(
       t += syllableSeconds
     }
   }
-  if (syllables.length === 0) return { ...silence(), gain }
+  if (syllables.length === 0) return { ...silence(), gain, pan, voice }
   const last = syllables[syllables.length - 1]
-  return { syllables, duration: last.startOffset + last.duration, gain }
+  return { syllables, duration: last.startOffset + last.duration, gain, pan, voice }
 }
 
 /**
