@@ -5449,7 +5449,12 @@ if (section('adult-errands')) {
           return null
         },
         null,
-        { timeout: 90000 },
+        // THREE MINUTES, not ninety seconds. ONE water errand runs at a time and
+        // its round trip is a small share of a window the DIG pairs otherwise
+        // fill, so a fill of a few seconds is genuinely missed by a short poll —
+        // measured repeatedly. Waiting longer for the REAL act is the honest
+        // lever; making the errand more frequent for the camera is not.
+        { timeout: 180000 },
       )
       .then((handle) => handle.jsonValue())
       .catch(() => null)
@@ -5729,7 +5734,7 @@ if (section('adult-errands')) {
           return null
         },
         null,
-        { timeout: 120000 },
+        { timeout: 180000 },
       )
       .then((handle) => handle.jsonValue())
       .catch(() => null)
@@ -5792,7 +5797,12 @@ if (section('adult-errands')) {
           return null
         },
         null,
-        { timeout: 90000 },
+        // THREE MINUTES, not ninety seconds. ONE water errand runs at a time and
+        // its round trip is a small share of a window the DIG pairs otherwise
+        // fill, so a fill of a few seconds is genuinely missed by a short poll —
+        // measured repeatedly. Waiting longer for the REAL act is the honest
+        // lever; making the errand more frequent for the camera is not.
+        { timeout: 180000 },
       )
       .then((handle) => handle.jsonValue())
       .catch(() => null)
