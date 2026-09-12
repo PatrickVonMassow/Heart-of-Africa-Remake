@@ -100,6 +100,28 @@ put it is the mistake this line exists to stop.
   instead of by whoever happens to be holding the branch when they surface.
   Test. Vitest: a red check whose file set is disjoint from the branch diff is reported as
   charged elsewhere and does not hold the point; a red that touches the diff still does.
+  OWNERSHIP CONTRACT (decided 12.09.2026 after the authoring lane escalated the spec as
+  contradictory, and it was right to). "Touches the diff" must NOT be read as
+  changeRelatedness in scripts/verify/baseline-classify-core.mjs: that is word overlap between
+  a check name and a filename, its own comment says a false is not innocence, and releasing a
+  point on it would excuse a red the point itself caused. The authoritative evidence is the
+  point-294 BASELINE CLASSIFICATION in the same file, classifyAgainstBaseline:
+  - verdict pre-existing — the check is red on the branch's merge-base too — is the ONLY
+    verdict that charges a red elsewhere. That is evidence, not a hint: the red predates the
+    branch.
+  - real-regression, baseline-flaky, baseline-died and inconclusive ALL keep holding the
+    point. Uncertainty never releases.
+  - changeRelatedness stays exactly what it is today: a hint printed beside the verdict,
+    never a verdict of its own.
+  The classification is opt-in today (--baseline / VERIFY_BASELINE=1) and already runs only
+  for the suites that stayed red; a LARGE run that goes red runs it by itself from now on,
+  because a verdict that needs a second manual command IS the judgement call this point
+  removes.
+  FILING CONTRACT (same decision). The run writes nothing into TASKS.md — that file is
+  main-only and a run happens in a worktree. It files into the findings carrier that exists
+  for exactly this: node scripts/finding.mjs --request "<title>" --spec-file <f> --why-file <f>,
+  which the owner drains and numbers. One request per distinct pre-existing check, keyed by
+  its title so twenty-three runs file it once, not twenty-three times.
   Refs: scripts/verify/run-all.mjs (the "touches the diff" annotation), CLAUDE.md §7.2,
   point 1065, point 278.
   Bundle: Testinfrastruktur.
