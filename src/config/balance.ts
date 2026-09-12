@@ -39,6 +39,19 @@ export interface BalanceConfig {
    *  the boundary ends and the bird's-eye view — where the river is swum and the
    *  current carries him — takes over. Nothing ever HOLDS him at the water. */
   bankWadeDepth: number
+  /** How deep the water stands where a water carrier fills his jar, in metres
+   *  (work-order 1087). The fill spot is solved on the shore profile at this
+   *  depth rather than pinned to a distance, so it stays at the waterline
+   *  whatever the calibratable river width does to it. Ankle-deep: he stands IN
+   *  the water, which is what makes the act read as fetching from the river,
+   *  and far short of `bankWadeDepth`, so filling is never wading. */
+  bankFillDepth: number
+  /** How long the jar stays under, in seconds (work-order 1087) — the readable
+   *  hold between the dip going down and the jar coming up full. */
+  bankFillSeconds: number
+  /** How many filled jars the village water stand holds before a new delivery
+   *  replaces the oldest (work-order 1087). */
+  waterStandCapacity: number
   /** The settlement edge painted on the ground (design.md §2.6, point 352/488):
    *  where the swept, trodden ground gives way to open land. The band's PLACE is
    *  never configured — it sits at the boundary the leave check reads
@@ -874,6 +887,18 @@ export const balance: BalanceConfig = {
   // wading stops being walking. It lands the far edge of the walkable region
   // roughly three metres past the waterline, well inside the drawn shallows.
   bankWadeDepth: 0.7,
+  // Calibratable: 0.12 m is ankle-deep on a grown man — far enough in that the
+  // water is unmistakably around his feet, shallow enough that he is standing
+  // rather than wading. Solved on the profile, it lands the carrier a few
+  // centimetres past the drawn waterline.
+  bankFillDepth: 0.12,
+  // Calibratable: 1.4 s under the surface. Long enough for a player who is not
+  // looking for it to see the jar go down and come up, short enough that the
+  // errand's own timing backstops are untouched.
+  bankFillSeconds: 1.4,
+  // Calibratable: three standing jars. The fourth delivery replaces the oldest,
+  // which is what lets the stand need no consumer.
+  waterStandCapacity: 3,
   placeEdgeBand: {
     // Calibratable: ~8 m of give-way at a slightly softened 0.8 strength —
     // tuned by the operator in play on 27.08.2026: the wider, gentler ramp

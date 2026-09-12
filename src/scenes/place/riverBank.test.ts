@@ -11,8 +11,10 @@ import {
   BANK_MIN_GAP,
   BANK_SHALLOWS_SPAN,
   BANK_SHORE_HALF,
+  bankFillSpot,
   bankPlayRocks,
   bankWaterDepth,
+  bankWaterFoot,
   buildRiverBank,
   type PlaceRiverBank,
 } from './riverBank'
@@ -421,5 +423,54 @@ describe('the river places can be told apart (points 686/687)', () => {
       }
     }
     expect(checked).toBeGreaterThan(0)
+  })
+})
+
+// --- Where the water carrier fills his jar (work-order 1087) ---------------
+//
+// The errand used to stop at `bankWaterFoot`, which sits BANK_STAND_INSET inland
+// of the walkable edge: about 2.7 m short of the water, which is why the user
+// (06.09.2026) could not tell that water was being fetched. The fill spot is a
+// separate point solved on the shore profile, and what is pinned here is that it
+// really is AT the water and that standing in it is never wading.
+describe('the water carrier fills his jar at the waterline (work-order 1087)', () => {
+  // Measured: these three are the places `buildRiverBank` returns a bank for at
+  // every seed; every other place is dry.
+  const riverVillages = ['nubian-village', 'bambara-village', 'mandinka-village']
+
+  it('stands the carrier ankle-deep, past the waterline and far short of the wade edge', () => {
+    let checked = 0
+    for (const id of riverVillages) {
+      for (let seed = 1; seed <= 20; seed++) {
+        const bank = buildLayout(id, seed).bank
+        if (!bank) continue
+        checked++
+        const spot = bankFillSpot(bank)
+        // Distance measured along the bank NORMAL, which is the axis the shore
+        // profile is written on.
+        const out = spot.x * bank.nx + spot.z * bank.nz
+        expect(out).toBeGreaterThan(bank.distance)
+        expect(bankWaterDepth(bank, out)).toBeCloseTo(balance.bankFillDepth, 6)
+        expect(bankWaterDepth(bank, out)).toBeLessThan(balance.bankWadeDepth)
+        expect(out).toBeLessThan(bank.wadeEdge)
+        // "At the water" is the whole point. Ankle depth puts him about half a
+        // metre out on the shallows' slope; what is pinned is that he never
+        // leaves the DRAWN shore strip for the open channel, against the 2.7 m
+        // up the bank the errand used to halt at.
+        expect(out - bank.distance).toBeLessThan(BANK_SHORE_HALF)
+      }
+    }
+    expect(checked).toBe(riverVillages.length * 20)
+  })
+
+  it('leaves the path`s landing where it is — only the fill moved', () => {
+    const bank = buildLayout('bambara-village', 1).bank
+    expect(bank).toBeTruthy()
+    if (!bank) return
+    const foot = bankWaterFoot(bank)
+    const footOut = foot.x * bank.nx + foot.z * bank.nz
+    expect(footOut).toBeLessThan(bank.walkEdge)
+    // The two lie on one bearing: the carrier walks straight down to the water.
+    expect(Math.atan2(foot.z, foot.x)).toBeCloseTo(Math.atan2(bankFillSpot(bank).z, bankFillSpot(bank).x), 6)
   })
 })
