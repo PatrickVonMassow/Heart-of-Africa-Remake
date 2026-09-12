@@ -259,7 +259,13 @@ const WAY_OUT_BEARINGS = 180
  * of the children's bank game, and gives the return leg a destination that is a
  * place rather than a radius.
  */
-export const WATER_STAND_FIRE_GAP = 2.7
+// MEASURED 12.09.2026: at 2.7 m the fire's own keep-out (1.3 + a walker's 0.3)
+// and the stand's (0.6 + 0.3) left a gap of 0.2 m between them — narrower than
+// a walker, which is the same notch the fire tender's collider once made. The
+// carrier then never got nearer than 2.61 m to a stand he was sent to stand at,
+// was never counted as arrived, and circled it until the errand's backstop
+// expired. The gap is set so a walker passes between the two on EVERY bearing.
+export const WATER_STAND_FIRE_GAP = 3.4
 /** Its own footprint — three standing jars and the ground they are set on. */
 export const WATER_STAND_RADIUS = 0.6
 /** The bearings the stand is tried on, the one facing the water first: the man

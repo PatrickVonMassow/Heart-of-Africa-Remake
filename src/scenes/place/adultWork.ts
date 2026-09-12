@@ -103,6 +103,11 @@ export interface AdultTask extends ErrandPoint {
    *  first word is his order to the carrier, the second is the carrier's report
    *  back to him. He is NOT an escort — he walks nowhere. */
   orderedBy: number | null
+  /** The spot BESIDE the water stand this errand's carrier works from
+   *  (work-order 1087). He is never sent to the stand's own centre: it is a
+   *  solid body, so a man sent there stalls a walker's width off it and is never
+   *  counted as arrived. He stands next to it, as one does at a table. */
+  standSpot: ErrandPoint | null
   arrived: boolean
   /** Seconds this worker has dug in the current bout. */
   dug: number
@@ -221,6 +226,25 @@ function anotherFree(view: AdultWorkView, first: number): number {
     if (i !== first && v.free && view.invitationClear(v.x, v.z)) return i
   }
   return -1
+}
+
+/**
+ * A standable spot beside `site`, as far round from `taken` as the ground
+ * allows: straight opposite it first, then stepping alternately to each side
+ * (work-order 1087). Two men at one place block each other, and neither is then
+ * counted as arrived.
+ */
+function facingSpot(view: AdultWorkView, site: ErrandPoint, taken: ErrandPoint): ErrandPoint | null {
+  const away = Math.atan2(site.z - taken.z, site.x - taken.x)
+  for (let k = 0; k < JOIN_BEARINGS; k++) {
+    const step = Math.ceil(k / 2) * ((k % 2 === 0 ? 1 : -1) * (Math.PI * 2) / JOIN_BEARINGS)
+    const a = away + step
+    const x = site.x + Math.cos(a) * JOIN_STAND_OFF
+    const z = site.z + Math.sin(a) * JOIN_STAND_OFF
+    if (Math.hypot(x - taken.x, z - taken.z) <= WORK_ARRIVE_RADIUS * 2) continue
+    if (view.standable(x, z)) return { x, z }
+  }
+  return null
 }
 
 /** Another free adult, with none of DIG's invitation clearance: the water
@@ -433,7 +457,7 @@ export function stepAdultWork(
     } else if (t.arrived && t.phase === 'fill') {
       t.dug += dt
       const geo = view.geography
-      if (t.dug >= balance.bankFillSeconds && geo.waterStand) {
+      if (t.dug >= balance.bankFillSeconds && geo.waterStand && t.standSpot) {
         // ONE ROUND TRIP, NOT TWO CASTINGS. The full jar used to appear on a
         // SECOND villager cast at the water, so it came from nowhere; the same
         // carrier turns round here instead. Both situation ids survive as LEG
@@ -442,11 +466,11 @@ export function stepAdultWork(
         t.carry = 'fullJar'
         t.situation = 'water-back'
         t.phase = 'walk'
-        t.x = geo.waterStand.x
-        t.z = geo.waterStand.z
+        t.x = t.standSpot.x
+        t.z = t.standSpot.z
         // The aim is replaced by the SENDER's own position when the word falls:
         // the report is addressed to the man, not to the ground he stands on.
-        t.say = { at: { ...geo.waterStand }, aim: { ...geo.waterStand } }
+        t.say = { at: { ...t.standSpot }, aim: { ...t.standSpot } }
         t.owes = true
         t.arrived = false
         t.dug = 0
@@ -492,18 +516,27 @@ export function stepAdultWork(
       // waits a body's width off it — sent to the same point, the two of them
       // simply blocked each other, neither ever counted as arrived, and the word
       // was never spoken.
+      // TWO MEN, TWO SPOTS, AND NEITHER OF THEM IS THE STAND ITSELF. The stand
+      // is a solid body: a man sent to its centre stalls a walker's width off it
+      // and never counts as arrived. Both stand BESIDE it, far enough apart not
+      // to block each other.
       const senderSpot = joinSpot(view, stand, rand)
       if (!senderSpot) continue
+      // The carrier takes the FAR side, swept from straight opposite the sender:
+      // drawing a second spot at random gave the same one wherever the caller's
+      // rand is steady, and two men on one spot block each other.
+      const carrierSpot = facingSpot(view, stand, senderSpot)
+      if (!carrierSpot) continue
       state.tasks[sender] = {
         situation: id, phase: 'send', carry: 'none', role: 'initiator', partner: carrier,
-        siteIndex: null, orderedBy: null,
+        siteIndex: null, orderedBy: null, standSpot: senderSpot,
         x: senderSpot.x, z: senderSpot.z, arrived: false, dug: 0, owes: true,
         say: { at: senderSpot, aim: g.waterFoot }, via: null, age: 0,
       }
       state.tasks[carrier] = {
         situation: id, phase: 'wait', carry: 'none', role: 'partner', partner: sender,
-        siteIndex: null, orderedBy: sender,
-        x: stand.x, z: stand.z, arrived: false, dug: 0, owes: false,
+        siteIndex: null, orderedBy: sender, standSpot: carrierSpot,
+        x: carrierSpot.x, z: carrierSpot.z, arrived: false, dug: 0, owes: false,
         say: null, via: null, age: 0,
       }
       state.staged[id] = (state.staged[id] ?? 0) + 1
@@ -523,12 +556,12 @@ export function stepAdultWork(
 
       const partnerAt = view.villagers[mate]
       state.tasks[who] = {
-        situation: id, phase: 'invite', carry: 'digTool', role: 'initiator', partner: mate, orderedBy: null,
+        situation: id, phase: 'invite', carry: 'digTool', role: 'initiator', partner: mate, orderedBy: null, standSpot: null,
         siteIndex: selected.index, x: partnerAt.x, z: partnerAt.z, arrived: false, dug: 0,
         owes: true, say: null, via: null, age: 0,
       }
       state.tasks[mate] = {
-        situation: id, phase: 'invite', carry: 'digTool', role: 'partner', partner: who, orderedBy: null,
+        situation: id, phase: 'invite', carry: 'digTool', role: 'partner', partner: who, orderedBy: null, standSpot: null,
         siteIndex: selected.index, x: spot.x, z: spot.z, arrived: true, dug: 0,
         owes: false, say: null, via: null, age: 0,
       }

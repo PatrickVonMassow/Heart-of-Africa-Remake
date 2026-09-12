@@ -152,7 +152,7 @@ function threeWordsDue(): { state: AdultWorkState; v: AdultWorkView } {
   state.next = Number.POSITIVE_INFINITY
   state.tasks[0] = {
     situation: 'water-back', phase: 'walk', carry: 'fullJar', role: 'worker', partner: null, siteIndex: null,
-    orderedBy: 1,
+    orderedBy: 1, standSpot: { ...STAND },
     x: STAND.x, z: STAND.z, arrived: false, dug: 0, owes: true,
     say: { at: STAND, aim: STAND }, via: null, age: 0,
   }
