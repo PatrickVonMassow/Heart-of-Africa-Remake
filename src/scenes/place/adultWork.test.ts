@@ -158,21 +158,25 @@ function threeWordsDue(): { state: AdultWorkState; v: AdultWorkView } {
   }
   state.tasks[1] = {
     situation: 'dig-first', phase: 'invite', carry: 'digTool', role: 'initiator', partner: 2, siteIndex: 0,
+    orderedBy: null, standSpot: null,
     x: v.villagers[2].x, z: v.villagers[2].z, arrived: true, dug: 0, owes: true,
     say: null, via: null, age: 0,
   }
   state.tasks[2] = {
     situation: 'dig-first', phase: 'invite', carry: 'digTool', role: 'partner', partner: 1, siteIndex: 0,
+    orderedBy: null, standSpot: null,
     x: -8.6, z: 2, arrived: true, dug: 0, owes: false,
     say: null, via: null, age: 0,
   }
   state.tasks[3] = {
     situation: 'dig-second', phase: 'site', carry: 'digTool', role: 'initiator', partner: 4, siteIndex: 1,
+    orderedBy: null, standSpot: null,
     x: -16, z: -1, arrived: true, dug: 0, owes: true,
     say: null, via: null, age: 0,
   }
   state.tasks[4] = {
     situation: 'dig-second', phase: 'site', carry: 'digTool', role: 'partner', partner: 3, siteIndex: 1,
+    orderedBy: null, standSpot: null,
     x: -13.6, z: -1, arrived: true, dug: 0, owes: false,
     say: null, via: null, age: 0,
   }
