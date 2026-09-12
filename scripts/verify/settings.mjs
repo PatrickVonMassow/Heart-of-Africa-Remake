@@ -16,7 +16,7 @@ import { launchVerifyBrowser, assertBackend, waitForSceneBuilt } from './_browse
 import { frameShutter, capturePixels } from './frameSubject.mjs'
 import { leakVerdict } from './textureLeak.mjs'
 import { SETTINGS_VIEWPORT, SETTINGS_SCENE_LUMA_MIN, settingsSceneLuma } from './settingsSceneLuma.mjs'
-import { settingsPipelineState } from './settingsPipelineState.mjs'
+import { settingsPipelineState, startSettingsFrameTiming, stopSettingsFrameTiming } from './settingsPipelineState.mjs'
 import { sectionGate } from './sections.mjs'
 import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
@@ -789,11 +789,16 @@ if (section('traa-toggle')) {
   check('TRAA on: no new console errors', errors.length === errsBeforeTraa,
     errors.slice(errsBeforeTraa).join(' | ').slice(0, 300))
   const traaOnPipelines = await page.evaluate(settingsPipelineState)
+  await page.evaluate(startSettingsFrameTiming)
   await page.evaluate(() => window.__ui.getState().setTraaEnabled(false))
   await page.waitForTimeout(1500)
   const traaOffMean = await settingsSceneLuma(await capturePixels(page, 'TRAA off path mean luma'))
   const traaOffPipelines = await page.evaluate(settingsPipelineState)
+  const traaTiming = await page.evaluate(stopSettingsFrameTiming)
   console.log(`TRAA pipeline evidence — ${JSON.stringify({ before: traaOnPipelines, after: traaOffPipelines })}`)
+  console.log(`TRAA repeat-link pacing — max painted-frame gap ${(traaTiming.maxGapMs / 1000).toFixed(3)} s; ` +
+    `${traaTiming.callbacks} callback completions in ${Math.round(traaTiming.elapsedMs)} ms; ` +
+    `repeat links released ${traaOffPipelines.pipelines?.reused - traaOnPipelines.pipelines?.reused}`)
   check('TRAA off again: scene renders non-black', traaOffMean > SETTINGS_SCENE_LUMA_MIN, `scene crop mean ${traaOffMean.toFixed(1)} > ${SETTINGS_SCENE_LUMA_MIN}`)
   check('TRAA off again: no new console errors', errors.length === errsBeforeTraa,
     errors.slice(errsBeforeTraa).join(' | ').slice(0, 300))

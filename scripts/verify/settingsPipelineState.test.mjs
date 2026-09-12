@@ -1,8 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import RenderObjectPipeline from 'three/src/renderers/common/RenderObjectPipeline.js'
-import { settingsPipelineState } from './settingsPipelineState.mjs'
+import { settingsPipelineState, startSettingsFrameTiming, stopSettingsFrameTiming } from './settingsPipelineState.mjs'
 
-afterEach(() => vi.unstubAllGlobals())
+afterEach(() => {
+  window.__stopSettingsFrameTiming?.()
+  vi.unstubAllGlobals()
+})
 
 describe('settings pipeline evidence', () => {
   it('reports absent hooks without treating them as an empty, ready queue', () => {
@@ -40,5 +43,58 @@ describe('settings pipeline evidence', () => {
       ],
     })
     expect(get).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('TRAA painted-frame timing receipt', () => {
+  it('observes callback completion gaps and both window edges without scheduling frames', () => {
+    let now = 100
+    vi.spyOn(performance, 'now').mockImplementation(() => now)
+    const scheduled = []
+    const native = vi.fn((callback) => {
+      scheduled.push(callback)
+      return scheduled.length
+    })
+    vi.stubGlobal('requestAnimationFrame', native)
+    // Both functions must survive Playwright serialization without imports.
+    new Function(`return (${startSettingsFrameTiming.toString()})()`)()
+    expect(native).not.toHaveBeenCalled()
+    const first = vi.fn(() => { now = 900 })
+    expect(window.requestAnimationFrame(first)).toBe(1)
+    scheduled.shift()(120)
+    expect(first).toHaveBeenCalledWith(120)
+    window.requestAnimationFrame(() => { now = 1400 })
+    scheduled.shift()(1000)
+    now = 2300
+    const result = new Function(`return (${stopSettingsFrameTiming.toString()})()`)()
+    expect(result).toEqual({ maxGapMs: 900, elapsedMs: 2200, callbacks: 2 })
+    expect(window.requestAnimationFrame).toBe(native)
+    expect(window.__stopSettingsFrameTiming).toBeUndefined()
+  })
+
+  it('reports a window with no callbacks as a full gap rather than zero', () => {
+    let now = 0
+    vi.spyOn(performance, 'now').mockImplementation(() => now)
+    const native = vi.fn()
+    vi.stubGlobal('requestAnimationFrame', native)
+    startSettingsFrameTiming()
+    now = 8500
+    expect(stopSettingsFrameTiming()).toEqual({ maxGapMs: 8500, elapsedMs: 8500, callbacks: 0 })
+    expect(native).not.toHaveBeenCalled()
+  })
+
+  it('records a throwing callback and preserves a later installed wrapper', () => {
+    let now = 0
+    vi.spyOn(performance, 'now').mockImplementation(() => now)
+    let scheduled
+    vi.stubGlobal('requestAnimationFrame', (callback) => { scheduled = callback })
+    startSettingsFrameTiming()
+    window.requestAnimationFrame(() => { throw new Error('render failed') })
+    now = 2500
+    expect(() => scheduled(100)).toThrow('render failed')
+    const later = vi.fn()
+    window.requestAnimationFrame = later
+    expect(stopSettingsFrameTiming()).toEqual({ maxGapMs: 2500, elapsedMs: 2500, callbacks: 1 })
+    expect(window.requestAnimationFrame).toBe(later)
   })
 })
