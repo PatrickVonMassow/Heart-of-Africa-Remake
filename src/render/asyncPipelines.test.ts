@@ -5,7 +5,7 @@
 // compileAsync is left alone, the throttled first-use release and its
 // bookkeeping.
 import { describe, expect, it, vi } from 'vitest'
-import { RenderPipeline, type WebGPURenderer } from 'three/webgpu'
+import { NodeMaterial, QuadMesh, RenderPipeline, type WebGPURenderer } from 'three/webgpu'
 import {
   asyncPipelineHandle,
   enableAsyncPipelineCompile,
@@ -250,6 +250,53 @@ describe('enableAsyncPipelineCompile (point 337)', () => {
     frames.tick()
     expect(backend.completed).toEqual([low.pipeline, ...scenePrograms.map((object) => object.pipeline)])
     post.dispose()
+  })
+
+  it('releases the entire post chain ahead of a scene burst, keeping feeder order and one slot per frame', () => {
+    const backend = fakeWebglBackend()
+    const frames = fakeFrames()
+    const handle = enableAsyncPipelineCompile(backend, { schedule: frames.schedule })!
+    const scene = Array.from({ length: 104 }, (_, id) => renderObject(id))
+    for (const object of scene) backend.createRenderPipeline(object, null)
+    const names = ['GTAO', 'RTT', 'TRAA.resolve', 'Bloom_highPass',
+      ...Array<string>(5).fill('Bloom_separable'), 'Bloom_comp', 'RenderPipeline']
+    const post = names.map((name, id) => {
+      const material = new NodeMaterial()
+      material.name = name
+      return { ...renderObject(104 + id), object: new QuadMesh(material), material }
+    })
+    for (const object of post) backend.createRenderPipeline(object, null)
+    backend.settleAll()
+    const expected = [post.at(-1)!, ...post.slice(0, -1), ...scene]
+    expect(handle.diagnostics().queued.map((entry) => entry.material).slice(0, post.length))
+      .toEqual([names.at(-1), ...names.slice(0, -1)])
+    for (let i = 0; i < expected.length; i++) {
+      frames.tick()
+      expect(backend.completed).toHaveLength(i + 1)
+      expect(backend.completed[i]).toBe(expected[i].pipeline)
+    }
+    expect(handle.state().queued).toBe(0)
+    for (const object of post) object.material.dispose()
+  })
+
+  it('drops a retired feeder and prioritizes a newly linked feeder on the next pump', () => {
+    const backend = fakeWebglBackend()
+    const frames = fakeFrames()
+    const handle = enableAsyncPipelineCompile(backend, { schedule: frames.schedule })!
+    const scene = [renderObject(0), renderObject(1)]
+    for (const object of scene) backend.createRenderPipeline(object, null)
+    backend.settleAll()
+    frames.tick()
+    const retired = { object: new QuadMesh(), pipeline: { id: 2, usedTimes: 0 } }
+    const feeder = { object: new QuadMesh(), pipeline: { id: 3, usedTimes: 1 } }
+    backend.createRenderPipeline(retired, null)
+    backend.createRenderPipeline(feeder, null)
+    backend.settleAll()
+    frames.tick()
+    expect(backend.completed).toEqual([scene[0].pipeline, feeder.pipeline])
+    expect(handle.state()).toMatchObject({ dropped: 1, queued: 1 })
+    frames.tick()
+    expect(backend.completed.at(-1)).toBe(scene[1].pipeline)
   })
 
   it('does not prioritize a scene material merely named RenderPipeline', () => {

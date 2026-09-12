@@ -181,13 +181,14 @@ export function enableAsyncPipelineCompile(
   // --- The throttled first-use release (WebGL 2 only) ------------------------
   const completeOriginal = backend._completeCompile
   const queue: Array<[unknown, unknown]> = []
+  const postQueue: Array<[unknown, unknown]> = []
   let pumping = false
   let restoreComplete: (() => void) | null = null
   if (typeof completeOriginal === 'function') {
     const pump = () => {
       let released = 0
-      while (released < releasePerFrame && queue.length > 0) {
-        const entry = queue.shift()
+      while (released < releasePerFrame && (postQueue.length > 0 || queue.length > 0)) {
+        const entry = postQueue.length > 0 ? postQueue.shift() : queue.shift()
         if (!entry) break
         const [renderObject, pipeline] = entry
         // The pipeline may have been released in the frames we held it back
@@ -210,7 +211,7 @@ export function enableAsyncPipelineCompile(
         completeOriginal.call(backend, renderObject, pipeline)
         released++
       }
-      if (queue.length > 0) schedule(pump)
+      if (postQueue.length > 0 || queue.length > 0) schedule(pump)
       else pumping = false
     }
     const throttled = function (this: PipelineBackend, renderObject: unknown, pipeline: unknown): void {
@@ -220,17 +221,17 @@ export function enableAsyncPipelineCompile(
         completeOriginal.call(backend, renderObject, pipeline)
         return
       }
-      // A replacement final composite is the only route from the scene target
-      // to the screen. After TRAA rebuilds, FIFO can leave LOW black behind a
-      // backlog even though its scene target is already drawn. Release the
-      // composite first, still within the one-program-per-frame budget. Scene
-      // shaders keep their FIFO order and their asynchronous compilation path.
+      // Fullscreen passes feed the final composite. Let the whole post chain
+      // precede scene geometry; a ready composite alone can sample empty RTT,
+      // AO or bloom targets. Keep feeders FIFO and the final composite first,
+      // all within the same one-program-per-frame budget.
       const object = renderObject as {
         object?: { isQuadMesh?: boolean }
         material?: { name?: string }
       } | null
-      if (object?.object?.isQuadMesh === true && object.material?.name === 'RenderPipeline') {
-        queue.unshift([renderObject, pipeline])
+      if (object?.object?.isQuadMesh === true) {
+        if (object.material?.name === 'RenderPipeline') postQueue.unshift([renderObject, pipeline])
+        else postQueue.push([renderObject, pipeline])
       } else {
         queue.push([renderObject, pipeline])
       }
@@ -282,9 +283,9 @@ export function enableAsyncPipelineCompile(
 
   backend.createRenderPipeline = wrapped
   const handle: AsyncPipelineHandle = {
-    state: () => ({ pending, started, done, queued: queue.length, dropped, reused: 0 }),
+    state: () => ({ pending, started, done, queued: postQueue.length + queue.length, dropped, reused: 0 }),
     diagnostics: () => ({
-      queued: queue.map(([object, pipeline]) => describeProgram(object, pipeline)),
+      queued: [...postQueue, ...queue].map(([object, pipeline]) => describeProgram(object, pipeline)),
       recentDrops: recentDrops.map((entry) => ({ ...entry })),
     }),
     restore: () => {
