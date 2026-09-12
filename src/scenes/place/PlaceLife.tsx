@@ -2816,6 +2816,16 @@ function ErrandVillagers({
         }
       }
       const pinned = forcedFill.current?.who === i ? forcedFill.current : null
+      // THE LIVE DIP, not only the photographed one. `filling` came from the dev
+      // route alone, so the fill pose existed for the camera and never for a
+      // player: in the game the carrier stood UPRIGHT at the water for
+      // `bankFillSeconds` and then simply had a full jar on his head — the very
+      // thing the user could not read on 06.09.2026, and the act this point owes.
+      // The errand's own phase drives it now; the dev route only overrides which
+      // man is held and how far along his dip is.
+      const dipping = task && task.arrived && task.phase === 'fill'
+        ? Math.min(1, task.dug / balance.bankFillSeconds)
+        : null
 
       // WHAT HE IS CARRYING, and what that does to his body: jars keep their
       // established positions; the digging tool lives in the hand pivot so the
@@ -2833,7 +2843,7 @@ function ErrandVillagers({
       const pose = poses.current[i].current
       const gesture = gestures.current[i]
       gesture.current = advanceGesture(gesture.current, dt)
-      const filling = pinned ? pinned.progress : null
+      const filling = pinned ? pinned.progress : dipping
       if (filling !== null) {
         state.dug = 0
         // The jar rides the dipping hand of its own accord — it hangs inside the
@@ -2972,7 +2982,11 @@ function ErrandVillagers({
           z: p.z,
           free: p.free,
           digging: isDigging(work, i),
-          filling: forcedFill.current?.who === i ? forcedFill.current.progress : null,
+          filling: forcedFill.current?.who === i
+            ? forcedFill.current.progress
+            : task && task.arrived && task.phase === 'fill'
+              ? Math.min(1, task.dug / balance.bankFillSeconds)
+              : null,
           yaw: yaws.current[i] ?? 0,
           drawn: { squatY: g ? g.scale.y : null, handY, headAspect },
           carry: carryOf(work, i),
@@ -3093,6 +3107,14 @@ const JAR_HEIGHT = 0.32
 /** How far below the rim the water stands in a full jar, and the hollow in an
  *  empty one. The full one is brim-full; the empty one is a shadow well down. */
 const JAR_WATER_DROP = 0.03
+/** How flat the meniscus is against the hemisphere its geometry starts from.
+ *  A FULL hemisphere of the rim's radius stands 0.117 m over a jar 0.32 m tall —
+ *  a ball on a pot, not water in it, and not the "shallow dome standing slightly
+ *  proud of the rim" its own drawing describes. Flattened to a fifth of the
+ *  jar's height it clears the rim by about 6.5 cm — judged at the picture:
+ *  3 cm left a stripe too thin to read at the distance a player watches from,
+ *  and the full hemisphere read as a ball sitting on a pot. */
+const JAR_MENISCUS_FLATTEN = 0.65
 const JAR_HOLLOW_DROP = 0.13
 
 function Jar({ full }: { full: boolean }) {
@@ -3114,7 +3136,7 @@ function Jar({ full }: { full: boolean }) {
           inside the rim is edge-on from every standing distance and reads as
           nothing. A meniscus breaks the rim line and shows as a bright cap. */}
       {full ? (
-        <mesh position={[0, JAR_HEIGHT / 2 - JAR_WATER_DROP, 0]}>
+        <mesh position={[0, JAR_HEIGHT / 2 - JAR_WATER_DROP, 0]} scale={[1, JAR_MENISCUS_FLATTEN, 1]}>
           <sphereGeometry args={[JAR_RIM_R - 0.008, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />
           <meshStandardMaterial
             color={RIVER_WATER_TONES.sheen}

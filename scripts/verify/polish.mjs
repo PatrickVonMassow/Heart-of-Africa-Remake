@@ -5429,11 +5429,19 @@ if (section('adult-errands')) {
           const v = errands.villagers
           for (let i = 0; i < v.length; i++) {
             if (v[i].work?.phase !== 'fill') continue
+            // A QUARTER OF THE WAY IN, so what is read below is the LIVE dip and
+            // not the first upright frame of the phase.
+            if (!(v[i].filling >= 0.25)) continue
             let near = Infinity
             for (let j = 0; j < v.length; j++) {
               if (j === i) continue
               near = Math.min(near, Math.hypot(v[i].x - v[j].x, v[i].z - v[j].z))
             }
+            // READ BEFORE THE PIN. Everything below is judged on a villager the
+            // dev route is holding, so it could never tell a fill the game plays
+            // from a pose put on for the camera — which is exactly what it was
+            // measuring while `filling` came from the dev route alone.
+            const live = v[i].drawn ? v[i].drawn.squatY : null
             window.__placeForceFill(i, 0.5)
             return {
               who: i,
@@ -5441,6 +5449,8 @@ if (section('adult-errands')) {
               z: v[i].z,
               carry: v[i].carry,
               clearance: near,
+              liveSquatY: live,
+              liveFilling: v[i].filling,
               fill: errands.geography.waterFill,
               foot: errands.geography.waterFoot,
               others: v.filter((_, j) => j !== i).map((p) => ({ x: p.x, z: p.z })),
@@ -5464,6 +5474,18 @@ if (section('adult-errands')) {
       posed
         ? `villager ${posed.who}, nearest neighbour ${posed.clearance.toFixed(1)} m`
         : 'no carrier reached the fill phase in 90 s',
+    )
+    // AND THE DIP IS THE GAME'S, NOT THE CAMERA'S (work-order 1087). The pose came
+    // from the dev route alone: in play the carrier stood upright for his whole
+    // hold and then simply had a full jar, while every check below read a figure
+    // the route was posing. This one is measured on the LIVE villager, one frame
+    // before he is pinned.
+    check(
+      'and he was bending of his own accord, before the camera pinned him',
+      posed != null && posed.liveFilling != null && posed.liveSquatY != null && posed.liveSquatY < 0.95,
+      posed
+        ? `y-scale ${String(posed.liveSquatY)} at fill ${String(posed.liveFilling)}`
+        : 'no filling carrier',
     )
     // THE GEOMETRY THE CHECK MEASURES (work-order 1087). The errand used to halt
     // at the water path's landing, about 2.7 m up the bank, and no camera
