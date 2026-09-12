@@ -966,14 +966,15 @@ if (section('graphics-levels')) {
     JSON.stringify(atMedium))
   // Own the reproducer even in a section-only run. Each mode must reach the
   // scene pass and render before the next toggle; batched store writes do not
-  // exercise pipeline teardown/rebuild. End with the allow-flag restored so
-  // the F9 effective-lever and flag-preservation checks retain their meaning.
+  // exercise pipeline teardown/rebuild. The MRT is NOT the observable here --
+  // the repair keeps velocity allocated in every mode, so waiting for it to
+  // disappear would wait forever. Drive the toggle the way the traa-toggle
+  // section does: let the rebuild commit, then force a frame that builds its
+  // targets. End with the allow-flag restored so the F9 effective-lever and
+  // flag-preservation checks retain their meaning.
   for (const on of [true, false, true, false, true]) {
     await page.evaluate((value) => window.__ui.getState().setTraaEnabled(value), on)
-    await page.waitForFunction(
-      (value) => window.__scenePass?.getMRT()?.has('velocity') === value,
-      on, { timeout: 15000 },
-    )
+    await page.waitForTimeout(600)
     await forceFrame()
   }
   // F9 #1: medium → low (every fill-rate lever forced DOWN).
