@@ -92,19 +92,34 @@ put it is the mistake this line exists to stop.
   - `enrichments` the streamed dressing does not grow at a fixed anchor — point 938
   - `enrichments` frame 72-water-victoria-falls, subject not in the picture — point 521
   - `polish` the drums had stopped at the shutter — point 1102
-  - `polish` the fill pose blocked on all 16 bearings, frame off the edge — point 1108
+  - `polish` the fill pose blocked on all 16 bearings, frame off the edge — point 1087,
+    NOT 1108 (corrected 12.09.2026 against the ledger). The delegated author caught the
+    contradiction: the entry that already carries this red was written the same day, is
+    scoped to `polish`/`webgl`/`check` and reasons it out as "the staging half of 1087".
+    1108 is the CHECK defect that stands in front of it — its own text says so, and says
+    that after its fix "only an exhausted search reds", which is 1087's staging debt.
+    One red, one owner: charging it twice would break the rule the ledger exists for.
   WHY IT COSTS DOUBLE. `runSuiteWithRetry` in `scripts/verify/run-all.mjs` retries every red
   suite once (point 200's rotating-flake rule) and decides on the suite's EXIT CODE alone.
   Three red suites therefore run six passes. The retry exists to separate a transient from a
   defect — a question already ANSWERED for a red that a named open point owns.
   Final state:
-  - Each red above is charged in `scripts/render-verify-charges.mjs` to the open point that
-    owns it, scoped as narrowly as the evidence allows (`suite`, `backend`, `featureLevel`),
-    each with its one dated `why`.
-  - A suite whose failing checks are ALL charged to an open point is NOT retried. `run-all.mjs`
-    already imports `../render-verify-core.mjs`, so `owned()` is one call away. It prints one
+  - MEASURED 12.09.2026, BEFORE ANY WORK: all five reds above are ALREADY charged in
+    `scripts/render-verify-charges.mjs`, each scoped to its suite, backend and kind, each with
+    its dated `why` — 603 at the `settings` micro-detail check, 938 on BOTH lanes of the
+    dressing check, 521 at the Victoria-Falls frame, 1102 at the drum shutter, 1087 at the
+    three fill-pose checks. This bullet is therefore a VERIFICATION, not hand-work: confirm
+    each entry still matches the red the run prints and still names an open point, and change
+    nothing that already holds. What this point owes is the SKIPPED RETRY below.
+  - A suite whose failing checks are ALL charged to an open point is NOT retried. It prints one
     line naming the owning points instead. A suite carrying even ONE uncharged red keeps its
     retry exactly as today.
+  - `owned()` IS NOT CALLABLE TODAY, and the earlier claim that it was "one call away" was
+    wrong (caught by the delegated author, 12.09.2026): it is a closure INSIDE the exported
+    `unexplainedRuns()`, capturing that function's open-point set. Lift it to a module-level
+    exported function that takes the open points as an argument, and let `unexplainedRuns()`
+    call that same function — identical behaviour, one implementation, reusable from the
+    runner. Nothing about the decision it makes changes.
   - The run STAYS RED and is still recorded ACCOUNTED FOR, never clean. Charging is not a pass
     and this point does not turn it into one.
   - NOTHING CAN BE FORGOTTEN, by mechanism and not by note: a charge names an OPEN point, its
@@ -122,8 +137,9 @@ put it is the mistake this line exists to stop.
   a suite with one unowned red is retried unchanged; the existing sweep extended over the new
   entries, including that a charge naming a ticked point clears nothing.
   Refs: scripts/verify/run-all.mjs (`runSuiteWithRetry`, `RETRY_ENABLED`),
-  scripts/render-verify-charges.mjs, scripts/render-verify-core.mjs (`owned()`),
-  points 200, 640, 1089, 603, 938, 521, 1102, 1108, 1112, docs/backlog.md.
+  scripts/render-verify-charges.mjs, scripts/render-verify-core.mjs (`owned()`, today a
+  closure inside `unexplainedRuns()`),
+  points 200, 640, 1089, 603, 938, 521, 1087, 1102, 1108, 1112, docs/backlog.md.
   Criticality: high — 138 of 161 suite minutes on one ordinary point, paid again by every
   point behind it.
   Bundle: Testinfrastruktur.
