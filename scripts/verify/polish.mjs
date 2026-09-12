@@ -5429,8 +5429,13 @@ if (section('adult-errands')) {
           const v = errands.villagers
           for (let i = 0; i < v.length; i++) {
             if (v[i].work?.phase !== 'fill') continue
-            // A QUARTER OF THE WAY IN, so what is read below is the LIVE dip and
-            // not the first upright frame of the phase.
+            // A QUARTER OF THE WAY IN — and that is already the FULL depth, not a
+            // fraction of it: `fillDip` reaches 1 at progress 0.2 and holds it to
+            // 0.76 (src/render/gesture.ts), so a live figure at 0.25 stands at the
+            // same 0.72 squat the dev route poses at 0.5. Waiting for half way
+            // bought no strictness and cost the ORDER check its window: one errand
+            // runs at a time, and a fill held longer leaves the next check waiting
+            // for the errand after it.
             if (!(v[i].filling >= 0.25)) continue
             let near = Infinity
             for (let j = 0; j < v.length; j++) {
@@ -5473,7 +5478,7 @@ if (section('adult-errands')) {
       posed != null && posed.clearance > 1.5,
       posed
         ? `villager ${posed.who}, nearest neighbour ${posed.clearance.toFixed(1)} m`
-        : 'no carrier reached the fill phase in 90 s',
+        : 'no carrier reached the fill phase in 180 s',
     )
     // AND THE DIP IS THE GAME'S, NOT THE CAMERA'S (work-order 1087). The pose came
     // from the dev route alone: in play the carrier stood upright for his whole
@@ -5482,7 +5487,7 @@ if (section('adult-errands')) {
     // before he is pinned.
     check(
       'and he was bending of his own accord, before the camera pinned him',
-      posed != null && posed.liveFilling != null && posed.liveSquatY != null && posed.liveSquatY < 0.95,
+      posed != null && posed.liveFilling != null && posed.liveSquatY != null && posed.liveSquatY < 0.8,
       posed
         ? `y-scale ${String(posed.liveSquatY)} at fill ${String(posed.liveFilling)}`
         : 'no filling carrier',
@@ -5763,11 +5768,17 @@ if (section('adult-errands')) {
     const watched = await page.evaluate(() => window.__errandWatch ?? { seen: {}, best: Infinity })
     check(
       'the order at the stand can be photographed: a sender still there and a carrier already going',
-      order != null,
+      // AND THE SENDER IS AT THE STAND. Both utterances falling inside the
+      // village, at the stand, is the half of the spec that replaced a word
+      // spoken at the water path's head at radius 15 — and this check measured
+      // the sender's distance without ever bounding it. He works from
+      // JOIN_STAND_OFF, 2.4 m out, so 4 m is his own ground and nothing further.
+      order != null
+        && Math.hypot(order.sender.x - order.stand.x, order.sender.z - order.stand.z) <= 4,
       order
         ? `carrier ${order.gap.toFixed(1)} m off the stand, ` +
           `sender ${Math.hypot(order.sender.x - order.stand.x, order.sender.z - order.stand.z).toFixed(1)} m`
-        : `no order in 120 s — phases seen: ${Object.entries(watched.seen).map(([k, n]) => `${k}×${n}`).join(', ') || 'none'}; ` +
+        : `no order in 180 s — phases seen: ${Object.entries(watched.seen).map(([k, n]) => `${k}×${n}`).join(', ') || 'none'}; ` +
           `nearest sent carrier to the stand: ${Number.isFinite(watched.best) ? `${watched.best.toFixed(1)} m` : 'none'}; ` +
           `returning carrier got to ${watched.back != null ? `${watched.back.toFixed(2)} m` : 'never seen'} of the stand, ` +
           `arrived-samples ${watched.backArrived ?? 0}, his goal sits ${watched.backGoal != null ? `${watched.backGoal.toFixed(2)} m` : '?'} from it`,
@@ -5831,7 +5842,7 @@ if (section('adult-errands')) {
     check(
       'the return walk can be photographed: a carrier under a full jar',
       returning != null,
-      returning ? `villager ${returning.who}` : 'no carrier walked back within 90 s',
+      returning ? `villager ${returning.who}` : 'no carrier walked back within 180 s',
     )
     if (returning) await holdStill()
     if (returning) {
