@@ -58,6 +58,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 10.09. spätabends | Die Landungskette hält an ihrem letzten Schritt: Sie hakt den Punkt ab und veröffentlicht DANACH die Tafel, deren Jetzt-Karte noch genau diesen Punkt nennt — die Tafel weist die Veröffentlichung zu Recht ab, und das Aufräumen von Zweig und Arbeitsbaum bleibt liegen. Den gemessenen Grund druckt die Kette nicht mit, weil die Absage auf dem Ausgabekanal steht und sie den Fehlerkanal liest (§3.259) |
 | 11.09. nachts | Die Verweigerung der billigen Sprosse saß in der Wrapper-Datei, während der Einstiegsbefehl, den dieselbe README als gewöhnlich dokumentiert, niemanden fragte — der deckende Lauf des Punktes selbst lief an ihr vorbei; und beim ersten ernsthaften Gebrauch verweigerte sie ihren eigenen Deckungslauf, weil ein Branchwechsel eine mtime bewegt hatte, ohne ein Byte zu ändern (§3.265, Punkt 1086) |
 | 11.09. nachts | Zwei Werkzeuge antworten mit Gewissheit auf Fragen, die sie nie gemessen haben: `ci-gate-verdict.mjs` läuft nur im Runner, ignoriert die Flags eines Handaufrufs und druckt bei leerer Umgebung »CI gate passed« — zweimal geglaubt; `run-wait` erklärt einen gesunden `polish`-Lauf nach 20 Minuten für tot, weil seine Schwelle die Modell-Erwartung von 5m41s statt des eigenen gemessenen Medians von 55 min multipliziert, und befiehlt das Töten (§3.263, Punkte 1099/1101) |
+| 12.09. | Der beauftragte Autor schrieb zweimal nichts und hatte zweimal recht: einmal, weil der Punkttext eine Wortüberlappungs-Heuristik zur Freigabe-Evidenz erklärte, deren eigener Kommentar sagt, ein Nein beweise keine Unschuld; einmal, weil der Unterbau des Punktes ungebaut war. Das Werkzeug meldete beide Male PROBLEMS — »NOTHING WAS COMMITTED«, »gates not green« —, also den Fehlschlag der Spur, wo die Spur genau das getan hatte, wofür sie existiert (§3.266, Punkte 1089/1073) |
 | 13.08. | Der Nachprüfer findet eine echte zweite Klippe im geheilten Mechanismus — und jede der fünf gemessenen Kuren verschlechtert gesunde Dörfer stärker, als der Fehler schadet: Befund wird gebucht statt behoben (§3.115) |
 | 20.08. | Der Dokumentschnitt strich Regeln als »von einem Wächter abgedeckt«, ohne einen einzigen Wächter darauf zu prüfen — die Kontextanzeige verschwand, der Nutzer fand es (§3.134); eine vom Nutzer gesetzte Rangfolge wurde in einer Nacht zweimal maschinell überholt, ohne dass irgendwo ein Grund stand (Punkt 614); zwei Werkzeuge derselben Bauart am falschen Ort gemessen — im Hauptbaum gebaut und geprüft, während der Prozess die Arbeit in den isolierten Bereich schickt (§3.137) |
 | 21.08. | Ein Tor verlangte eine Freigabe, die seine eigenen Werkzeuge nicht herstellen können — der HIGH-Punkt war gemergt, geprüft und freigegeben, und der Zugausgang wies ihn trotzdem ab (§3.153) |
@@ -1446,6 +1447,40 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ---
 
+### 3.266 Die zurückgewiesene Spezifikation ist der Erfolg der Spur, nicht ihr Fehlschlag
+
+Am 12.09.2026 wurden zwei Punkte an den fremden Autor vergeben, und beide kamen ohne eine
+Zeile Code zurück. Punkt 1089 sollte ein rotes Prüfergebnis, das »den Diff nicht berührt«,
+einem anderen Punkt zurechnen — und der Punkttext zeigte dafür auf eine Stelle, die Wörter
+aus Prüfnamen mit Wörtern aus Dateinamen vergleicht und deren eigener Kommentar festhält,
+ein Nein beweise keine Unschuld. Der Autor baute das nicht, sondern schrieb auf, dass ein
+auf dieser Grundlage freigegebener Punkt genau das Rot entschuldigen kann, das er selbst
+verursacht hat. Punkt 1073 kam mit einer Messung zurück: Sein Unterbau lag ungebaut, die
+drei Konstanten, auf denen er aufsetzt, standen unverändert.
+
+Beide Male war das die richtige Antwort, und beide Male meldete das Werkzeug sie als
+Fehlschlag. Der Abschlussbericht druckt »PROBLEMS with this run« und darunter »NOTHING WAS
+COMMITTED — the branch is where it started« sowie die Feststellung, die Torzeile melde keine
+drei grünen Tore. Wer den Bericht liest, ohne den Text darüber zu lesen, sieht einen
+verbrannten Autorenlauf. Tatsächlich hat die Vier-Augen-Trennung hier ihren teuersten Dienst
+geleistet: Sie hat einen Spezifikationsfehler gefangen, bevor er Code wurde, und eine
+Reihenfolge korrigiert, die niemand geprüft hatte.
+
+Die Ursache ist eine Begriffslücke. Die Spur kennt bisher zwei Ausgänge — gebaut oder
+gescheitert — und eine Eskalation zählt sie als erfolglose Prüfrunde, also als Kostenstelle.
+Für den dritten Ausgang, die begründete Zurückweisung, gibt es keinen Namen und damit auch
+keine Buchung. Das ist gefährlicher als es klingt: Was als Fehlschlag gebucht wird, wird beim
+nächsten Mal vermieden, und der billigste Weg, eine Zurückweisung zu vermeiden, ist, den
+widersprüchlichen Auftrag doch zu bauen.
+
+**Lehre:** Eine Spur, die eine Spezifikation zurückweisen darf, muss diese Zurückweisung auch
+benennen können — sonst ist die Erlaubnis nur auf dem Papier. Ein Lauf ohne Commit ist nicht
+automatisch ein leerer Lauf; die Frage ist, ob er eine Begründung mitbringt, die den Auftrag
+verändert. Hier tat er es zweimal, und beide Male bewegte er den Punkt weiter, als ein Diff
+es gekonnt hätte.
+
+---
+
 ### 3.179 Ein Tor, dessen Abhilfe außerhalb der Reichweite liegt
 
 Punkt 749 landete am 25.08.2026 grün: 13 703 Tests, Bild-Prüfung nicht fällig, Zweig beendet.
@@ -1491,7 +1526,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Samstag, 12.09.2026, 12:16 · Quellen-Fingerprint: `14118f5c7754…`
+Zuletzt aktualisiert: Samstag, 12.09.2026, 12:18 · Quellen-Fingerprint: `3a11d2dd7080…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1597,8 +1632,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 96 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 132 Prozess-/Meta-TASKS-Punkte (davon 64 offen).
 
-<!-- RETRO-FINGERPRINT: 14118f5c7754823f84601578f9fb2c12fc219db8c837ac6e944291bf1007b2a7 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-12T10:16:30.349Z -->
+<!-- RETRO-FINGERPRINT: 3a11d2dd70804090b1e6030752a603dd98dc233eea0335e2444a377ccd20caea -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-12T10:18:23.691Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
