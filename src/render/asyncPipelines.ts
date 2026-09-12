@@ -65,11 +65,31 @@
 // has no such step (`createRenderPipelineAsync` resolves a ready pipeline) and
 // no `_completeCompile`, so the feature detection below simply finds nothing to
 // throttle there.
+//
+// Rebuilds can link the same shader sources under new Three stage IDs. Once a
+// source pair has completed on this backend, its subsequent links bypass the
+// first-use budget at the next frame pump. Unseen pairs still cost one slot.
+// This is a driver-cache hypothesis, not a measured pacing result: the TRAA
+// toggle receipt must report its painted-frame gap before this can be accepted.
 
 /** Completions released per animation frame on the WebGL 2 fallback (see above).
  *  Not a balance value: it is fixed render-internal pacing, meaningful only
  *  while a compile backlog exists and not something play calibrates. */
 const RELEASE_PER_FRAME = 1
+
+// Bound retained source text without retaining disposed render objects or GPU
+// resources. Eviction only makes an old pair take the conservative path again.
+const COMPLETED_SOURCE_LIMIT = 256
+
+function sourceKey(pipeline: unknown): string | null {
+  const program = pipeline as {
+    vertexProgram?: { code?: string }
+    fragmentProgram?: { code?: string }
+  } | null
+  const vertex = program?.vertexProgram?.code
+  const fragment = program?.fragmentProgram?.code
+  return vertex && fragment ? JSON.stringify([vertex, fragment]) : null
+}
 
 /** The shape of `renderer.backend` this module touches. Kept structural so the
  *  tests can drive it with a plain object — three.js exposes neither the
@@ -80,7 +100,7 @@ export interface PipelineBackend {
   _completeCompile?: (renderObject: unknown, pipeline: unknown) => void
   /** three.js's per-object data map, used to see whether a queued pipeline is
    *  still alive by the time its completion is released. */
-  get?: (object: unknown) => { programGPU?: unknown } | undefined
+  get?: (object: unknown) => { programGPU?: unknown; pipeline?: unknown } | undefined
 }
 
 interface ProgramDiagnostic {
@@ -115,6 +135,8 @@ export interface AsyncPipelineState {
   queued: number
   /** Queued completions dropped because their pipeline was released meanwhile. */
   dropped: number
+  /** Repeat source pairs released without consuming a first-use slot (WebGL 2). */
+  reused: number
 }
 
 export interface AsyncPipelineHandle {
@@ -172,6 +194,8 @@ export function enableAsyncPipelineCompile(
   let started = 0
   let done = 0
   let dropped = 0
+  let reused = 0
+  const completedSources = new Set<string>()
   const recentDrops: Array<ProgramDiagnostic & { reason: 'unused' | 'released' }> = []
   /** Nesting depth of `runSynchronously` — see withSynchronousPipelineCompile. */
   let synchronous = 0
@@ -182,9 +206,24 @@ export function enableAsyncPipelineCompile(
   let pumping = false
   let restoreComplete: (() => void) | null = null
   if (typeof completeOriginal === 'function') {
+    const complete = (renderObject: unknown, pipeline: unknown, key: string | null) => {
+      completeOriginal.call(backend, renderObject, pipeline)
+      // Record only after completion made the pipeline drawable. A pending,
+      // retired, throwing or uninspectable completion cannot warm another link.
+      if (key !== null && backend.get?.(pipeline)?.pipeline != null) {
+        completedSources.delete(key)
+        completedSources.add(key)
+        if (completedSources.size > COMPLETED_SOURCE_LIMIT) {
+          completedSources.delete(completedSources.values().next().value!)
+        }
+      }
+    }
     const pump = () => {
       let released = 0
-      while (released < releasePerFrame && queue.length > 0) {
+      // Inspect the entire burst: a cold entry must not hold already-completed
+      // source pairs behind it. Rotate deferred cold entries in FIFO order.
+      const count = queue.length
+      for (let i = 0; i < count; i++) {
         const entry = queue.shift()
         if (!entry) break
         const [renderObject, pipeline] = entry
@@ -205,8 +244,15 @@ export function enableAsyncPipelineCompile(
           if (recentDrops.length > 32) recentDrops.shift()
           continue
         }
-        completeOriginal.call(backend, renderObject, pipeline)
-        released++
+        const key = sourceKey(pipeline)
+        const warm = key !== null && completedSources.has(key)
+        if (!warm && released >= releasePerFrame) {
+          queue.push(entry)
+          continue
+        }
+        complete(renderObject, pipeline, key)
+        if (warm) reused++
+        else released++
       }
       if (queue.length > 0) schedule(pump)
       else pumping = false
@@ -215,7 +261,7 @@ export function enableAsyncPipelineCompile(
       // Inside a synchronous scope the caller needs the program DRAWABLE when
       // its render returns, so the throttle is bypassed rather than queued.
       if (synchronous > 0) {
-        completeOriginal.call(backend, renderObject, pipeline)
+        complete(renderObject, pipeline, sourceKey(pipeline))
         return
       }
       // A replacement final composite is the only route from the scene target
@@ -280,7 +326,7 @@ export function enableAsyncPipelineCompile(
 
   backend.createRenderPipeline = wrapped
   const handle: AsyncPipelineHandle = {
-    state: () => ({ pending, started, done, queued: queue.length, dropped }),
+    state: () => ({ pending, started, done, queued: queue.length, dropped, reused }),
     diagnostics: () => ({
       queued: queue.map(([object, pipeline]) => describeProgram(object, pipeline)),
       recentDrops: recentDrops.map((entry) => ({ ...entry })),
