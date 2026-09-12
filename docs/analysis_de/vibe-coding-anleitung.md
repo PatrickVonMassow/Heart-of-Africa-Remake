@@ -598,6 +598,14 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Bündle nur, wenn beide Hälften **plausibel im selben Lauf** grün werden; bleibt
   eine wiederholt rot, **trenne sie wieder** und liefere die fertige aus."
 
+- **Der Auftrag kam ohne Code zurück — und das war richtig.** Wenn das zweite Modell die
+  Aufgabe zurückweist, statt sie zu bauen, meldet euer Werkzeug einen Fehlschlag: nichts
+  committet, keine Tests grün. Genau dann lohnt sich das Lesen am meisten, denn oft steckt
+  dort ein Widerspruch in eurer eigenen Aufgabenstellung.
+  → *Prompt:* „Wenn die Aufgabe sich nicht widerspruchsfrei bauen lässt, **baue sie nicht** —
+  schreib mir auf, welche Annahme nicht trägt. Eine begründete Zurückweisung ist ein
+  Ergebnis, kein Fehlschlag."
+
 ---
 
 ## Drei Meta-Regeln, die alles zusammenhalten
@@ -636,4 +644,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 7c8e96b24e731f0698f30213e6c89cbf0f7c41bebf483e54214af5f8841d10c6 -->
+<!-- GUIDE-FINGERPRINT: e108faa45d8be9e71498a66a459701bc6524155976063399680e35b6709b4f0d -->

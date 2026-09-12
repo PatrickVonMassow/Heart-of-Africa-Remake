@@ -1344,10 +1344,45 @@
       "why": "Testinfrastruktur-Rot ohne Spielwirkung: Nach Punkt 1089 haelt es keinen fremden Punkt mehr fest, also darf es hinten warten.",
       "origin": "machine",
       "place": "last"
+    },
+    "1116": {
+      "at": "2026-09-12T10:20:24.828Z",
+      "why": "Spielfehler: Auf der mobilen Bahn startet die Darstellung gar nicht, und das Rot kann auf keinem anderen Weg schliessen.",
+      "origin": "machine",
+      "place": "ahead"
     }
   },
+  "boundary": {
+    "at": "2026-08-21T00:55:14.962Z",
+    "points": [
+      336,
+      553,
+      596,
+      633,
+      659,
+      660,
+      663,
+      690,
+      708,
+      715,
+      719,
+      733,
+      735,
+      736,
+      738,
+      739,
+      746,
+      747,
+      750,
+      759,
+      760,
+      762,
+      764
+    ],
+    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
+  },
   "settled": {
-    "at": "2026-09-12T09:54:46.728Z",
+    "at": "2026-09-12T10:20:24.838Z",
     "points": [
       174,
       184,
@@ -1740,36 +1775,10 @@
       1102,
       1108,
       1109,
-      1111
+      1111,
+      1114,
+      1115,
+      1116
     ]
-  },
-  "boundary": {
-    "at": "2026-08-21T00:55:14.962Z",
-    "points": [
-      336,
-      553,
-      596,
-      633,
-      659,
-      660,
-      663,
-      690,
-      708,
-      715,
-      719,
-      733,
-      735,
-      736,
-      738,
-      739,
-      746,
-      747,
-      750,
-      759,
-      760,
-      762,
-      764
-    ],
-    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   }
 }

@@ -135,6 +135,10 @@ put it is the mistake this line exists to stop.
   chromium-mobile and its no-console-errors assertion.
   Observed 10.09.2026: this red held point 1065 across 23 full LARGE runs without ever
   touching its change. This point owns it.
+  Criticality: HIGH — the mobile lane does not boot at all: the renderer throws before a
+  single frame is drawn, so a player who opens the game on a phone sees nothing. It is also
+  the one of the three filed reds that cannot close any other way, because no branch will
+  ever "own" a crash that predates them all.
   Refs: scripts/verify/crossbrowser.mjs, point 1089, point 1065.
   Bundle: Testinfrastruktur.
 

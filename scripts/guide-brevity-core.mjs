@@ -465,7 +465,12 @@ export const LIMITS = {
   // that existing entry rather than a new one (two neighbouring entries already carry the class:
   // "Zahlen geschaetzt statt gemessen" and this one), and it names the artefacts as the test
   // instead: two lines: 636 -> 638.
-  maxLines: 638,
+  // RAISED 12.09.2026: the refused-commission pitfall — a commissioned author that returns a
+  // reasoned refusal instead of code, which every tool reports as a failed run. It is the
+  // beginner-facing half of the retrospective's §3.266 and has no neighbour to fold into: the
+  // guide's other delegation entries are about a delegate that BUILT something. Eight lines:
+  // 638 -> 646.
+  maxLines: 646,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -726,7 +731,7 @@ export const LIMITS = {
   // after the fold — the entry gained the artefacts-not-the-log liveness test and the
   // which-number-does-the-threshold-use clause, and a separately drafted pitfall of its own was
   // DROPPED as a duplicate of the two entries that already carry the class: 6103 -> 6127.
-  maxWords: 6127,
+  maxWords: 6207,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,
