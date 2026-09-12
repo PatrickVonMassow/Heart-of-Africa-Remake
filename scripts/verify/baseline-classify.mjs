@@ -20,6 +20,7 @@
 //   --current-checks <n>  how many checks the CURRENT run reached — the yardstick
 //                       for the died-early verdict (point 418). run-all hands it
 //                       over; it is measured here when the suite runs here.
+//   --report-file <f>  write structured classification for the run report
 //   --keep              keep the baseline worktree even on success (it is reused
 //                       anyway; this only skips the retention prune)
 //   --strict            exit 1 when a REAL REGRESSION was found (default: 0 —
@@ -27,7 +28,7 @@
 //
 // Cost discipline (the point's DESIGN care): this is never part of a normal
 // run. run-all calls it only for a suite that stayed RED and only with
-// --baseline / VERIFY_BASELINE=1, and the baseline checkout is a REUSED git
+// automatically for LARGE reds, or with --baseline / VERIFY_BASELINE=1, and the baseline checkout is a REUSED git
 // worktree under the git-ignored local/verify-baseline/, sharing the repo's
 // node_modules through Node's ancestor resolution (no second install).
 //
@@ -39,6 +40,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, wri
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { killTree, launchServer } from './_server.mjs'
+import { baselineReport } from './red-ownership-core.mjs'
 import { DEV_SUITES, SERVERLESS_SUITES, selectBackend } from './tiers.mjs'
 import {
   allChecks,
@@ -70,12 +72,13 @@ const INFRA_PATHS = [
 const KEEP_BASELINES = 2
 
 export function parseWrapperArgs(argv) {
-  const out = { suite: null, ref: null, runs: 2, keep: false, strict: false, currentOut: null, currentChecks: 0, failed: [] }
+  const out = { suite: null, ref: null, runs: 2, keep: false, strict: false, currentOut: null, reportFile: null, currentChecks: 0, failed: [] }
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]
     if (a === '--ref') out.ref = argv[++i] ?? null
     else if (a === '--runs') out.runs = Math.max(1, Number(argv[++i]) || 1)
     else if (a === '--failed') out.failed.push(argv[++i] ?? '')
+    else if (a === '--report-file') out.reportFile = argv[++i] ?? null
     else if (a === '--current-out') out.currentOut = argv[++i] ?? null
     else if (a === '--current-checks') out.currentChecks = Math.max(0, Number(argv[++i]) || 0)
     else if (a === '--keep') out.keep = true
@@ -202,7 +205,7 @@ function runSuiteOnce({ suitePath, cwd, baseUrl, label, logPath }) {
 
 async function main() {
   const opts = parseWrapperArgs(process.argv.slice(2))
-  if (!opts.suite || !DEV_SUITES.includes(opts.suite)) {
+  if (!opts.suite || ![...DEV_SUITES, 'crossbrowser'].includes(opts.suite)) {
     console.log(`usage: node scripts/verify/baseline-classify.mjs <suite> [--ref <git-ref>] [--runs n] [--failed "<check>"] [--current-out <file>] [--strict]`)
     console.log(`known suites: ${DEV_SUITES.join(', ')}`)
     process.exit(2)
@@ -319,6 +322,9 @@ async function main() {
   })) {
     console.log(line)
   }
+  if (opts.reportFile) writeFileSync(opts.reportFile, JSON.stringify(baselineReport({
+    suite: opts.suite, backend, baseline: baseline.sha, head: headSha, classified, logs,
+  })) + '\n')
   const regressions = classified.filter((c) => c.verdict === 'real-regression').length
   // --strict fails on a DIED baseline too: it produced no classification at all,
   // which is a worse outcome than a regression it could have named (point 418).
