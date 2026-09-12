@@ -11,10 +11,12 @@
 // writes a decision card and publishes the live board, which a test may never
 // do; its pure half is covered beside the other transitions.
 import { describe, expect, it, beforeEach, afterEach } from 'vitest'
-import { execFileSync } from 'node:child_process'
+import { execFile, execFileSync } from 'node:child_process'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
+import { promisify } from 'node:util'
+import { requestEntries } from './findings-request-core.mjs'
 import { REPO_ROOT } from './repo-paths.mjs'
 
 const SPEC = ['FINAL STATE: der Träger bekommt eine zweite Art.', '', '  - [ ] eine Zeile, die wie ein Kopf aussieht', 'Ende.'].join('\n')
@@ -203,5 +205,30 @@ describe('the refusals a caller will actually meet', () => {
     deposit()
     expect(run(['--blocked', 'Nebenfenster'], true)).toMatch(/--why/)
     expect(run(['--requests'])).toMatch(/1 request\(s\) waiting/)
+  })
+})
+
+
+describe('automatic requests are filed once by title', () => {
+  it('deduplicates repeated runs even after the owner numbered the request', () => {
+    expect(deposit('Repair pre-existing settings check: ground', ['--once'])).toContain('request deposited')
+    for (let i = 1; i < 23; i++) {
+      expect(deposit('Repair pre-existing settings check: ground', ['--once'])).toContain('request already filed')
+    }
+    run(['--queued', 'settings check: ground', '--point', '1200'])
+    expect(deposit('Repair pre-existing settings check: ground', ['--once'])).toContain('request already filed')
+    expect(requestEntries(carrierText())).toHaveLength(1)
+    expect(carrierText()).toContain('queued 1200')
+  })
+
+  it('serializes concurrent reports while preserving distinct titles', async () => {
+    const args = ['scripts/finding.mjs', '--request', 'Same red', '--once', '--spec-file', join(dir, 'spec.md')]
+    const results = await Promise.all(Array.from({ length: 4 }, () => promisify(execFile)(process.execPath, args, {
+      cwd: REPO_ROOT, encoding: 'utf8', env: { ...process.env, FINDINGS_MEMORY_DIR: dir },
+    })))
+    expect(results.filter((r) => r.stdout.includes('request deposited'))).toHaveLength(1)
+    expect(requestEntries(carrierText())).toHaveLength(1)
+    deposit('Another red', ['--once'])
+    expect(requestEntries(carrierText())).toHaveLength(2)
   })
 })
