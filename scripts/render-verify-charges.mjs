@@ -77,6 +77,27 @@ export const RED_CHARGES = [
       + 'before it lands, and this entry dies the moment it is ticked.',
   },
   {
+    point: 1087,
+    suite: 'polish',
+    backend: 'webgl',
+    kind: 'check',
+    match: /^(one village adult, standing clear of the others, can be held in the fill pose|and a clear line to him exists for the shutter|frame \d+-village-adult-fills-a-jar)$/i,
+    // NO detailMatch: the staging half of the same defect prints a different
+    // measurement every run (which villager, which neighbour distance, which
+    // bearings are blocked), so a signature would only name one draw of it.
+    why:
+      'THE STAGING HALF OF 1087, measured 12.09.2026 in the covering WebGL 2 pass of point 1112 '
+      + '(polish, second attempt: 206 pass, 3 fail). The entry above owns what the carrier DOES '
+      + 'at the water; these three own the step before it — adult-errands could not even hold ONE '
+      + 'adult clear of the others in the fill pose (villager 2, nearest neighbour 0.8 m), all 16 '
+      + 'bearings to him were blocked by another villager in the picture, and the frame it then '
+      + 'took has its subject off the left edge. Same section, same point, same open work: 1087 '
+      + 'owes a carrier who is VISIBLE while he fills, and a jar nobody can photograph is that '
+      + 'debt, not a defect of the render change that happened to be under test. Lane-scoped to '
+      + 'what was measured: the WebGPU pass of the same proof ran polish clean (258 pass, 0 fail), '
+      + 'so nothing here excuses this section on that backend. The charge dies with 1087.',
+  },
+  {
     point: 1078,
     suite: 'world',
     kind: 'check',

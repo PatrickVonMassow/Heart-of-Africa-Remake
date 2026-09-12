@@ -77,46 +77,83 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1112. On WebGL 2 the LOW graphics level still draws nothing once TRAA has been toggled,
-  and the check that guards it reads the HUD instead of the scene (measured 12.09.2026).
-  MEASURED ON `main` AT bf27c94e6, the covering run of the just-landed point 1105, three
-  times and with the same number every time. In the WebGL 2 pass of the whole `settings`
-  suite, `verification/1105-graphics-level-low.png` carries a mean luma of 13.39 and shows
-  the head-up display, the two place labels and the compatibility notice on black — no
-  ground, no water, no traveller. Its NEIGHBOUR from the same suite, taken at the same
-  place, from the same camera and at the same in-game minute, is
-  `verification/69-traa-on.png` at 128.75: grass, rocks, trees, the lake and the traveller,
-  all drawn. So it is not night, not another place and not a shutter that fired too early.
-  The WebGPU pass of the same commit is unaffected — LOW reads 133.48 against its
-  neighbour's 130.49, with giraffes at the lake — so this is the WebGL 2 lane alone.
-  IT IS NOT WHAT 1105 REPAIRED, AND 1105 DID NOT CAUSE IT: run on its own,
-  `npm test -- settings --section=graphics-levels` is green and fully drawn on BOTH lanes,
-  which is exactly the rung 1105 was judged on. The black frame appears only in the whole
-  suite, after the `traa-toggle` section has rebuilt the post pipeline four times and left
-  the temporal resolve OFF. What a player reaches is the same sequence: the debug toggle of
-  design.md §21.3, then F9 down to LOW, on the fallback backend of CLAUDE.md §3.
-  AND THE GATE CANNOT SEE IT. `F9 low: scene still renders non-black` measures the mean luma
-  of the WHOLE frame against a bar of 8. The head-up display, the two place labels and the
-  compatibility notice alone carry 13.39, so a completely black SCENE passes with 1.7x
-  headroom. The number that caught the original defect — 2.2 — only worked because that
-  frame had no compatibility notice in it. A check that a black picture passes is not a
-  guard; it is why this survived a landing.
+- [ ] 1113. A whole-suite run pays for its known reds twice, and the second pass learns nothing.
+  USER ORDER 12.09.2026: make the regression markedly faster NOW without first repairing the
+  defects behind its reds, and make forgetting those repairs impossible — "was koennen wir
+  machen, damit jetzt erstmal die Regressionstests wieder deutlich schneller werden, ohne
+  diese Spiele-Bugs beheben zu muessen, aber dass sichergestellt ist, dass deren Behebung
+  nicht spaeter vergessen geht?"
+  MEASURED 12.09.2026 on point 1112's closing proof
+  (`.claude/worktrees/point-1112/local/verify-logs/`): the both-backend proof cost 98 min on
+  WebGL 2 (head b5b40eb59) and 40 min on WebGPU (head e225bc7b5) against the run's own 25 min
+  expectation, and NOT ONE of its reds belonged to 1112. Together they were 138 of the 161
+  minutes that point spent on suites. Each red already has an OPEN owner:
+  - `settings` first-person ground micro-detail (laplacian 1.01-1.07) — point 603
+  - `enrichments` the streamed dressing does not grow at a fixed anchor — point 938
+  - `enrichments` frame 72-water-victoria-falls, subject not in the picture — point 521
+  - `polish` the drums had stopped at the shutter — point 1102
+  - `polish` the fill pose blocked on all 16 bearings, frame off the edge — point 1108
+  WHY IT COSTS DOUBLE. `runSuiteWithRetry` in `scripts/verify/run-all.mjs` retries every red
+  suite once (point 200's rotating-flake rule) and decides on the suite's EXIT CODE alone.
+  Three red suites therefore run six passes. The retry exists to separate a transient from a
+  defect — a question already ANSWERED for a red that a named open point owns.
   Final state:
-  - Switching to LOW renders the scene on WebGL 2 after any sequence of TRAA toggles, judged
-    AT THE PICTURE on both lanes, not by a number alone.
-  - The check measures the SCENE and not the frame: the head-up display band and the notice
-    are outside what it reads, so a black scene cannot pass on interface brightness. The bar
-    is restated against what the corrected measurement reads on a drawn scene.
-  Test. Browser (`settings`): the graphics-levels section asserts a drawn scene at LOW AFTER
-  a TRAA on/off cycle, on both lanes, and leaves its frame behind. Vitest: the crop the check
-  reads excludes the interface bands, pinned against the measured frame geometry.
-  Refs: `src/render/Effects.tsx` and `src/render/scenePass.ts` (the per-mode pass rebuild),
-  `scripts/verify/settings.mjs` (`traa-toggle`, `graphics-levels`, the luma bar),
-  `verification/1105-graphics-level-low.png` and `verification/69-traa-on.png` (the two
-  frames this point is measured on), docs/tasks-archive.md point 1105.
-  Criticality: HIGH — a black picture on a setting one key reaches, on the backend the game
-  falls back to, and the gate reports it green.
-  Bundle: Steuerung & Performance.
+  - Each red above is charged in `scripts/render-verify-charges.mjs` to the open point that
+    owns it, scoped as narrowly as the evidence allows (`suite`, `backend`, `featureLevel`),
+    each with its one dated `why`.
+  - A suite whose failing checks are ALL charged to an open point is NOT retried. `run-all.mjs`
+    already imports `../render-verify-core.mjs`, so `owned()` is one call away. It prints one
+    line naming the owning points instead. A suite carrying even ONE uncharged red keeps its
+    retry exactly as today.
+  - The run STAYS RED and is still recorded ACCOUNTED FOR, never clean. Charging is not a pass
+    and this point does not turn it into one.
+  - NOTHING CAN BE FORGOTTEN, by mechanism and not by note: a charge names an OPEN point, its
+    entries stop clearing anything the moment that point is ticked, and
+    `render-verify-core.test.mjs` fails when an entry names a point the work order does not
+    hold open. Added to that: the run's closing line NAMES the points its reds are charged to,
+    so the price of the five open defects is read on every run rather than buried in a ledger.
+  EXPECTED EFFECT, an estimate to be measured on the first closing that uses it: 1112's two
+  lanes would have run three passes instead of six. It does NOT touch the cold boot every run
+  pays (docs/backlog.md, the warm dev server) and it does NOT make a red green.
+  NOTE THE FREEZE. CLAUDE.md §2 forbids new guards. This is not one: it is a refusal to repeat
+  work, inside the runner every run already passes through, ordered by the user, and it deletes
+  a pass rather than adding a mechanism.
+  Test. Vitest: a suite whose reds are all owned is not retried and says which points own them;
+  a suite with one unowned red is retried unchanged; the existing sweep extended over the new
+  entries, including that a charge naming a ticked point clears nothing.
+  Refs: scripts/verify/run-all.mjs (`runSuiteWithRetry`, `RETRY_ENABLED`),
+  scripts/render-verify-charges.mjs, scripts/render-verify-core.mjs (`owned()`),
+  points 200, 640, 1089, 603, 938, 521, 1102, 1108, 1112, docs/backlog.md.
+  Criticality: high — 138 of 161 suite minutes on one ordinary point, paid again by every
+  point behind it.
+  Bundle: Testinfrastruktur.
+
+- [ ] 1089. Charge a LARGE red that does not touch the point's diff to its own point
+  (user 10.09.2026).
+  Apply the rule CLAUDE.md §7.2 already states — "a red run closes only when its cause is
+  fixed, CHARGED TO ITS OWNING POINT, or FILED AS A NEW POINT" — to the reds that are
+  holding point 1065, and make the charging automatic rather than a judgement call.
+  Measured on 1065 (10.09.2026): 23 full LARGE runs, 16.2 machine hours, none green, and
+  NOT ONE red touched the tap. The recurring reds are `settings` ground-detail (edge
+  energy), `enrichments` dressing-growth (point 278), `crossbrowser` chromium-mobile
+  (getSupportedExtensions on null), plus two teardown aborts from foreign commits. Each
+  was re-diagnosed on every run instead of being charged once.
+  Final state:
+  - A LARGE red whose failing check does not touch the point's own diff is FILED as its
+    own point automatically by the run's own report — the report already computes
+    "touches the diff", so it has the information. The point under test is not held by it.
+  - The run's verdict line says plainly which reds are charged elsewhere and which are the
+    point's own, so a merge decision does not need a human re-reading of the log.
+  - The three reds above get their points at once; 1065 merges on its own evidence — the
+    narrow rung `polish --section=children-bank-game`, unit, build and lint.
+  WHY THIS AND NOT A POLICY CHANGE: nothing here loosens the gate. The full regression
+  still runs and still has to go green — but its failures are owned by whoever broke them
+  instead of by whoever happens to be holding the branch when they surface.
+  Test. Vitest: a red check whose file set is disjoint from the branch diff is reported as
+  charged elsewhere and does not hold the point; a red that touches the diff still does.
+  Refs: scripts/verify/run-all.mjs (the "touches the diff" annotation), CLAUDE.md §7.2,
+  point 1065, point 278.
+  Bundle: Testinfrastruktur.
 
 - [ ] 1087. The water carrier visibly fills the jar at the water and carries visible water
   (user 06.09.2026; the former point 1066; SPLIT BACK OUT OF POINT 1065 on 10.09.2026 on the
@@ -1307,33 +1344,6 @@ put it is the mistake this line exists to stop.
   Criticality: medium — no player impact; it costs the picture proof its meaning, and it sits
   directly in front of point 1087.
   Bundle: Dorfleben.
-
-- [ ] 1089. Charge a LARGE red that does not touch the point's diff to its own point
-  (user 10.09.2026).
-  Apply the rule CLAUDE.md §7.2 already states — "a red run closes only when its cause is
-  fixed, CHARGED TO ITS OWNING POINT, or FILED AS A NEW POINT" — to the reds that are
-  holding point 1065, and make the charging automatic rather than a judgement call.
-  Measured on 1065 (10.09.2026): 23 full LARGE runs, 16.2 machine hours, none green, and
-  NOT ONE red touched the tap. The recurring reds are `settings` ground-detail (edge
-  energy), `enrichments` dressing-growth (point 278), `crossbrowser` chromium-mobile
-  (getSupportedExtensions on null), plus two teardown aborts from foreign commits. Each
-  was re-diagnosed on every run instead of being charged once.
-  Final state:
-  - A LARGE red whose failing check does not touch the point's own diff is FILED as its
-    own point automatically by the run's own report — the report already computes
-    "touches the diff", so it has the information. The point under test is not held by it.
-  - The run's verdict line says plainly which reds are charged elsewhere and which are the
-    point's own, so a merge decision does not need a human re-reading of the log.
-  - The three reds above get their points at once; 1065 merges on its own evidence — the
-    narrow rung `polish --section=children-bank-game`, unit, build and lint.
-  WHY THIS AND NOT A POLICY CHANGE: nothing here loosens the gate. The full regression
-  still runs and still has to go green — but its failures are owned by whoever broke them
-  instead of by whoever happens to be holding the branch when they surface.
-  Test. Vitest: a red check whose file set is disjoint from the branch diff is reported as
-  charged elsewhere and does not hold the point; a red that touches the diff still does.
-  Refs: scripts/verify/run-all.mjs (the "touches the diff" annotation), CLAUDE.md §7.2,
-  point 1065, point 278.
-  Bundle: Testinfrastruktur.
 
 - [ ] 1081. A child boxed by adults planted in its own play ground walks a metre and gets
   nowhere — and the case that was supposed to catch it pins one lucky seed. Measured on

@@ -65,7 +65,7 @@
 // has no such step (`createRenderPipelineAsync` resolves a ready pipeline) and
 // no `_completeCompile`, so the feature detection below simply finds nothing to
 // throttle there.
-
+//
 /** Completions released per animation frame on the WebGL 2 fallback (see above).
  *  Not a balance value: it is fixed render-internal pacing, meaningful only
  *  while a compile backlog exists and not something play calibrates. */
@@ -80,7 +80,24 @@ export interface PipelineBackend {
   _completeCompile?: (renderObject: unknown, pipeline: unknown) => void
   /** three.js's per-object data map, used to see whether a queued pipeline is
    *  still alive by the time its completion is released. */
-  get?: (object: unknown) => { programGPU?: unknown } | undefined
+  get?: (object: unknown) => { programGPU?: unknown; pipeline?: unknown } | undefined
+}
+
+interface ProgramDiagnostic {
+  key: string | null
+  material: string
+  usedTimes: number | null
+}
+
+/** Only scalar snapshots are retained; disposed render objects must be collectible. */
+function describeProgram(renderObject: unknown, pipeline: unknown): ProgramDiagnostic {
+  const program = pipeline as { cacheKey?: string; usedTimes?: number } | null
+  const object = renderObject as { material?: { name?: string } } | null
+  return {
+    key: program?.cacheKey ?? null,
+    material: object?.material?.name ?? '',
+    usedTimes: program?.usedTimes ?? null,
+  }
 }
 
 /** Injectable frame scheduler — `requestAnimationFrame` in the game, a manual
@@ -98,6 +115,8 @@ export interface AsyncPipelineState {
   queued: number
   /** Queued completions dropped because their pipeline was released meanwhile. */
   dropped: number
+  /** Legacy diagnostic: repeat-source bypass removed; always zero. */
+  reused: number
 }
 
 export interface AsyncPipelineHandle {
@@ -106,6 +125,11 @@ export interface AsyncPipelineHandle {
    *  resolves when the LINK is done, which is one throttled release short of
    *  the program actually being drawable. */
   state(): AsyncPipelineState
+  /** On-demand queue identities and the last 32 drops, for rebuild diagnosis. */
+  diagnostics(): {
+    queued: ProgramDiagnostic[]
+    recentDrops: Array<ProgramDiagnostic & { reason: 'unused' | 'released' }>
+  }
   /** Restores the backend's original method (used by the tests and on unmount). */
   restore(): void
   /** Runs `fn` with pipeline creation SYNCHRONOUS — see
@@ -150,31 +174,44 @@ export function enableAsyncPipelineCompile(
   let started = 0
   let done = 0
   let dropped = 0
+  const recentDrops: Array<ProgramDiagnostic & { reason: 'unused' | 'released' }> = []
   /** Nesting depth of `runSynchronously` — see withSynchronousPipelineCompile. */
   let synchronous = 0
 
   // --- The throttled first-use release (WebGL 2 only) ------------------------
   const completeOriginal = backend._completeCompile
   const queue: Array<[unknown, unknown]> = []
+  const postQueue: Array<[unknown, unknown]> = []
   let pumping = false
   let restoreComplete: (() => void) | null = null
   if (typeof completeOriginal === 'function') {
     const pump = () => {
-      for (let i = 0; i < releasePerFrame && queue.length > 0; i++) {
-        const entry = queue.shift()
+      let released = 0
+      while (released < releasePerFrame && (postQueue.length > 0 || queue.length > 0)) {
+        const entry = postQueue.length > 0 ? postQueue.shift() : queue.shift()
         if (!entry) break
         const [renderObject, pipeline] = entry
         // The pipeline may have been released in the frames we held it back
         // (a post-chain rebuild, a graphics-level switch); completing a dead
         // program would raise a GL error, so skip it and count the drop.
         const data = backend.get?.(pipeline)
-        if (data !== undefined && data.programGPU === undefined) {
+        // Three's Pipelines._releasePipeline removes the cache entry but leaves
+        // backend data behind. programGPU alone therefore does not prove life:
+        // disposed post materials can leave a linked program with no users.
+        const retired = (pipeline as { usedTimes?: number } | null)?.usedTimes === 0
+        if (retired || (data !== undefined && data.programGPU === undefined)) {
           dropped++
+          recentDrops.push({
+            ...describeProgram(renderObject, pipeline),
+            reason: retired ? 'unused' : 'released',
+          })
+          if (recentDrops.length > 32) recentDrops.shift()
           continue
         }
         completeOriginal.call(backend, renderObject, pipeline)
+        released++
       }
-      if (queue.length > 0) schedule(pump)
+      if (postQueue.length > 0 || queue.length > 0) schedule(pump)
       else pumping = false
     }
     const throttled = function (this: PipelineBackend, renderObject: unknown, pipeline: unknown): void {
@@ -184,7 +221,20 @@ export function enableAsyncPipelineCompile(
         completeOriginal.call(backend, renderObject, pipeline)
         return
       }
-      queue.push([renderObject, pipeline])
+      // Fullscreen passes feed the final composite. Let the whole post chain
+      // precede scene geometry; a ready composite alone can sample empty RTT,
+      // AO or bloom targets. Keep feeders FIFO and the final composite first,
+      // all within the same one-program-per-frame budget.
+      const object = renderObject as {
+        object?: { isQuadMesh?: boolean }
+        material?: { name?: string }
+      } | null
+      if (object?.object?.isQuadMesh === true) {
+        if (object.material?.name === 'RenderPipeline') postQueue.unshift([renderObject, pipeline])
+        else postQueue.push([renderObject, pipeline])
+      } else {
+        queue.push([renderObject, pipeline])
+      }
       if (!pumping) {
         pumping = true
         schedule(pump)
@@ -233,7 +283,11 @@ export function enableAsyncPipelineCompile(
 
   backend.createRenderPipeline = wrapped
   const handle: AsyncPipelineHandle = {
-    state: () => ({ pending, started, done, queued: queue.length, dropped }),
+    state: () => ({ pending, started, done, queued: postQueue.length + queue.length, dropped, reused: 0 }),
+    diagnostics: () => ({
+      queued: [...postQueue, ...queue].map(([object, pipeline]) => describeProgram(object, pipeline)),
+      recentDrops: recentDrops.map((entry) => ({ ...entry })),
+    }),
     restore: () => {
       if (backend.createRenderPipeline === wrapped) backend.createRenderPipeline = original
       restoreComplete?.()

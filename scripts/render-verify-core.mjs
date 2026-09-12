@@ -102,6 +102,8 @@ export const NON_RENDER_VERIFY = new Set([
   'sceneReady-core.mjs', // the scene-readiness verdict; frameSubject.mjs polls the page for it
   'sectionScope.mjs', // a TEXT audit of the suites' section blocks; it opens no page
   'sections.mjs', // WHICH block of a suite a --section run selects; the suite does the driving
+  'settingsSceneLuma.mjs', // the interface-free scene crop; settings.mjs supplies the frame
+  'settingsPipelineState.mjs', // read-only program evidence at the TRAA shutter
   'snowMetric.mjs', // the snow-vs-sand pixel verdict; enrichments.mjs feeds it a crop
   'speechSampler.mjs', // analyser polling and coverage; voice.mjs owns the browser
   'spawnAssertion.mjs', // a TEXT audit of the test files' spawn assertions; it opens no page

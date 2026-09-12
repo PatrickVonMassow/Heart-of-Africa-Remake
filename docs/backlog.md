@@ -698,3 +698,45 @@ it up decides between settling the scene before the shutter (as the neighbouring
 sections do) and declaring these two frames as OVERLAY-only evidence, so that
 nobody reads the background as a statement about rendering. The second is the
 cheaper honest fix.
+
+## First-person ground micro-detail fails on both `main` and every branch (12.09.2026)
+
+`settings --section=ground-detail` fails its edge-energy check on WebGL 2 with a laplacian
+mean of 1.06-1.07, measured on `main` at bf27c94e6 and again on an unrelated feature branch
+at f14ce3438. It touches no feature diff and holds finished work hostage in every whole-suite
+run it appears in, which is exactly the attribution the 10.09.2026 decision decoupled.
+Non-blocking and collected here: it needs its own point once someone measures whether the
+ground really lost its micro-detail or the bar drifted.
+
+## LOW now allocates a velocity attachment it never reads (12.09.2026)
+
+Point 1112's repair keeps the scene MRT identical in every mode, so the LOW graphics
+level allocates and writes an RGBA16F velocity attachment although no temporal resolve
+consumes it. Calculated, not measured: 8 bytes per render pixel, ~10.4 MB of additional
+logical payload per full image write at 1440x900 / DPR 1, ~593 MiB/s at 60 writes per
+second. Overdraw, clears, compression and tiling are not represented, and no frame time
+was taken. Omitting velocity on LOW would change the fragment layout again and bring the
+relink the repair exists to remove, so the alternative is a second scene pass, not a
+smaller MRT. Non-blocking: the LOW picture draws, and no measurement says the fill cost
+is player-visible. It needs its own point only once someone measures the frame time on a
+weak GPU.
+
+## What the closing regression actually costs, measured at one point (12.09.2026)
+
+Measured across point 1112's twelve suite runs (161 min of suite wall clock): the cheap
+ladder works — iteration ran on 1-3 minute sections and the full regression ran exactly
+once, at the end, where it found no side effect of the point at all. The cost now sits in
+that single round: 138 of the 161 minutes are the two closing passes (WebGL 2, 98 min
+against an expectation of 25; WebGPU, 40 min), and three causes multiply. The regression
+starts chronically red and no red belongs to the point under test (ground-detail,
+dressing-growth, chief-to-drummer, the fill-pose staging, the Victoria Falls frame); every
+red suite is retried once, so three red suites become six passes rather than three; and the
+result then carries "MACHINE STATE UNKNOWN" and "UNDER LOAD — NOT AUTHORITATIVE" and asks
+for another run. Each foreign red afterwards costs hand work in the charge ledger.
+
+The point for this already exists and is open: 1089 describes the same thing from the
+measurement at point 1065. What this measurement adds is that the cure is not another
+process mechanism but the four or five chronically red checks themselves — repair them, or
+lay each down once as a classified baseline (measure 1 of point 1104, done so far for a
+single red). Non-blocking and collected here on the user's instruction of 12.09.2026 to
+discuss this first and change nothing in the process yet.
