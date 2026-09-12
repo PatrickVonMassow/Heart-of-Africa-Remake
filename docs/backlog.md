@@ -707,3 +707,16 @@ at f14ce3438. It touches no feature diff and holds finished work hostage in ever
 run it appears in, which is exactly the attribution the 10.09.2026 decision decoupled.
 Non-blocking and collected here: it needs its own point once someone measures whether the
 ground really lost its micro-detail or the bar drifted.
+
+## LOW now allocates a velocity attachment it never reads (12.09.2026)
+
+Point 1112's repair keeps the scene MRT identical in every mode, so the LOW graphics
+level allocates and writes an RGBA16F velocity attachment although no temporal resolve
+consumes it. Calculated, not measured: 8 bytes per render pixel, ~10.4 MB of additional
+logical payload per full image write at 1440x900 / DPR 1, ~593 MiB/s at 60 writes per
+second. Overdraw, clears, compression and tiling are not represented, and no frame time
+was taken. Omitting velocity on LOW would change the fragment layout again and bring the
+relink the repair exists to remove, so the alternative is a second scene pass, not a
+smaller MRT. Non-blocking: the LOW picture draws, and no measurement says the fill cost
+is player-visible. It needs its own point only once someone measures the frame time on a
+weak GPU.
