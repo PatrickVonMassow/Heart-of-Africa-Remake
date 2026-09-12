@@ -720,3 +720,23 @@ relink the repair exists to remove, so the alternative is a second scene pass, n
 smaller MRT. Non-blocking: the LOW picture draws, and no measurement says the fill cost
 is player-visible. It needs its own point only once someone measures the frame time on a
 weak GPU.
+
+## What the closing regression actually costs, measured at one point (12.09.2026)
+
+Measured across point 1112's twelve suite runs (161 min of suite wall clock): the cheap
+ladder works — iteration ran on 1-3 minute sections and the full regression ran exactly
+once, at the end, where it found no side effect of the point at all. The cost now sits in
+that single round: 138 of the 161 minutes are the two closing passes (WebGL 2, 98 min
+against an expectation of 25; WebGPU, 40 min), and three causes multiply. The regression
+starts chronically red and no red belongs to the point under test (ground-detail,
+dressing-growth, chief-to-drummer, the fill-pose staging, the Victoria Falls frame); every
+red suite is retried once, so three red suites become six passes rather than three; and the
+result then carries "MACHINE STATE UNKNOWN" and "UNDER LOAD — NOT AUTHORITATIVE" and asks
+for another run. Each foreign red afterwards costs hand work in the charge ledger.
+
+The point for this already exists and is open: 1089 describes the same thing from the
+measurement at point 1065. What this measurement adds is that the cure is not another
+process mechanism but the four or five chronically red checks themselves — repair them, or
+lay each down once as a classified baseline (measure 1 of point 1104, done so far for a
+single red). Non-blocking and collected here on the user's instruction of 12.09.2026 to
+discuss this first and change nothing in the process yet.
