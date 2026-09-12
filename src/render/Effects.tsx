@@ -7,8 +7,8 @@
 //
 // TRAA is the default since its manual WebGPU check passed (CLAUDE.md §7.1
 // pt. 32); the debug toggle (design.md §21.3) disables temporal resolve.
-// Both modes use a single-sampled half-float scene pass; TRAA additionally
-// requires a velocity MRT target, so the scene pass is built per mode.
+// All modes share a single-sampled half-float scene pass with velocity. Only
+// the downstream post chain is rebuilt when an effect is toggled.
 //
 // Screen-space reflections were integrated (design.md §2.7) but removed again
 // after the manual WebGPU check (CLAUDE.md pt. 32): with the bird's-eye camera
@@ -61,20 +61,28 @@ export function Effects() {
   const ssaoEnabled = useUi(effectiveSsao)
   const bloomEnabled = useUi(effectiveBloom)
 
-  const post = useMemo(() => {
-    // The toggle rebuilds the whole pipeline, and three's RenderPipeline
-    // disposes only its own quad material — every pass created here must be
-    // collected and disposed with it, or each rebuild leaks its render
-    // targets until the GPU device is lost (black screen after a few
-    // toggles on real hardware).
-    const disposables: Array<{ dispose: () => void }> = []
-
-    const scenePass = createScenePass(scene, camera, traaEnabled)
-    disposables.push(scenePass)
-    // Dev hook for the headless verification (CLAUDE.md §7.2).
+  // Keep the render target and MRT identity across every graphics toggle. A
+  // changed fragment-output layout relinks scene/shadow materials as well as
+  // the post chain, leaving an empty scene behind a long first-use backlog.
+  const scenePass = useMemo(() => createScenePass(scene, camera), [scene, camera])
+  useLayoutEffect(() => {
     if (import.meta.env.DEV) {
       ;(window as unknown as Record<string, unknown>).__scenePass = scenePass
     }
+    return () => {
+      scenePass.dispose()
+      if (import.meta.env.DEV) {
+        const hooks = window as unknown as Record<string, unknown>
+        if (hooks.__scenePass === scenePass) delete hooks.__scenePass
+      }
+    }
+  }, [scenePass])
+
+  const post = useMemo(() => {
+    // RenderPipeline disposes only its quad material. Own every downstream
+    // pass here; the shared scene pass has a separate lifetime above.
+    const disposables: Array<{ dispose: () => void }> = []
+
     const color = scenePass.getTextureNode('output')
     const depth = scenePass.getTextureNode('depth')
     const normal = scenePass.getTextureNode('normal')
@@ -187,7 +195,7 @@ export function Effects() {
       }
     }
     return { processing, dispose }
-  }, [gl, scene, camera, traaEnabled, ssaoEnabled, bloomEnabled])
+  }, [gl, scenePass, camera, traaEnabled, ssaoEnabled, bloomEnabled])
 
   // useLayoutEffect (not useEffect): free the SUPERSEDED pipeline synchronously
   // at commit, the instant a rebuild replaces it. A passive effect defers the
