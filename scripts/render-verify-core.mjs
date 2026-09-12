@@ -89,6 +89,8 @@ export const NON_RENDER_VERIFY = new Set([
   'liveness.mjs', // main-thread liveness ATTRIBUTION; the suites do the driving
   'machine-load-core.mjs',
   'machine-load.mjs',
+  'red-ownership-core.mjs', // baseline evidence determines ownership; it draws nothing
+  'red-ownership.mjs', // classifier and finding subprocesses; it opens no page
   'report-archive-names.mjs', // the names the F6 archive checks print; report.mjs does the downloading
   'run-all.mjs',
   'run-digest-core.mjs', // which of a run's OUTPUT lines the caller reads; it draws nothing

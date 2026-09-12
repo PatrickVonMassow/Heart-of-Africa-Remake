@@ -8,6 +8,7 @@ import * as classify from './baseline-classify-core.mjs'
 import * as tiers from './tiers.mjs'
 import * as load from './machine-load-core.mjs'
 import * as sections from './sections.mjs'
+import * as ownership from './red-ownership-core.mjs'
 
 const { chargeReds, RETRY_ENV, runVerdict } = core
 const ground = 'first-person ground shows micro-detail (edge energy)'
@@ -21,14 +22,15 @@ const source = readFileSync(runnerUrl, 'utf8')
   .replaceAll('import.meta.url', JSON.stringify(runnerUrl.href))
 
 async function run({ outputs = [known], records = [{}], tasks = '- [ ] 603. ground repair', noRetry = false,
-  backend = 'webgl', suite = 'settings', previous = [], spawnError = null } = {}) {
+  backend = 'webgl', suite = 'settings', previous = [], spawnError = null, large = false, verdict = 'pre-existing' } = {}) {
   const printed = []
+  const classifiedCalls = []
   const exit = new Error('runner exited')
   let exitCode
   const saved = [...previous]
   const attempts = []
   const spawnSync = (_cmd, args, options) => {
-    if (!args[0].endsWith(`/${suite}.mjs`)) return { status: 1, stdout: '', stderr: '' }
+    if (!args[0].endsWith(`/${suite}.mjs`)) return { status: args[0].endsWith('/crossbrowser.mjs') ? 0 : 1, stdout: '', stderr: '' }
     const i = attempts.length
     attempts.push(options)
     const out = outputs[Math.min(i, outputs.length - 1)]
@@ -43,21 +45,30 @@ async function run({ outputs = [known], records = [{}], tasks = '- [ ] 603. grou
     return { status, stdout: out, stderr: '', error: spawnError }
   }
   const context = {
-    ...core, ...classify, ...tiers, ...load, ...sections,
+    ...core, ...classify, ...tiers, ...load, ...sections, ...ownership,
     spawnSync, dirname, join, fileURLToPath,
     readRenderState: () => ({ runs: saved }), readTasksAll: () => tasks,
     launchServer: async () => ({ base: 'http://test', child: null }), killTree: () => {},
     needsGpuBackendProbe: () => false,
+    classifyRedSuites: (reds) => {
+      classifiedCalls.push(reds)
+      return { rows: reds.flatMap((red) => ownership.redOwnership({
+        suite: red.suite, backend, failed: red.failed,
+        report: ownership.baselineReport({ suite: red.suite, backend, baseline: 'a'.repeat(40), head: 'b'.repeat(40),
+          classified: red.failed.map((c) => ({ check: c.name, key: c.key, verdict })), logs: [] }),
+        filed: red.failed.map((c) => ownership.redRequestTitle(red.suite, c.name)),
+      })), unresolved: reds.filter((r) => r.unresolved).map((r) => `${r.suite}: incomplete run`) }
+    },
     console: { log: (...args) => printed.push(args.join(' ')) },
     process: {
-      execPath: 'node', argv: ['node', 'run-all.mjs', suite],
-      env: { VERIFY_GL: backend, VERIFY_NO_RETRY: noRetry ? '1' : '0', VERIFY_ON_LOAD: 'off', RVA_LADDER_ASKED: '1' },
+      execPath: 'node', argv: ['node', 'run-all.mjs', ...(large ? ['large'] : []), suite],
+      env: { RVA_SKIP_PREFLIGHT: large ? '1' : '0', VERIFY_GL: backend, VERIFY_NO_RETRY: noRetry ? '1' : '0', VERIFY_ON_LOAD: 'off', RVA_LADDER_ASKED: '1' },
       exit: (code) => { exitCode = code; throw exit },
     },
   }
   try { await runInNewContext(`(async () => {${source}\n})()`, context) }
   catch (error) { if (error !== exit) throw error }
-  return { attempts, saved, log: printed.join('\n'), status: exitCode }
+  return { attempts, saved, classifiedCalls, log: printed.join('\n'), status: exitCode }
 }
 
 describe('run-all owned-red retry', () => {
@@ -152,5 +163,47 @@ describe('run-all owned-red retry', () => {
     })
     expect(result.attempts).toHaveLength(featureLevel === 'compatibility' ? 1 : 2)
     if (featureLevel === 'compatibility') expect(result.log).toContain('open points 938')
+  })
+})
+
+
+describe('LARGE automatically resolves red ownership in its own report', () => {
+  it('classifies and files a pre-existing red, releases that red, and keeps regression exit 1', async () => {
+    const result = await run({ large: true })
+    expect(result.classifiedCalls).toHaveLength(1)
+    expect(result.log).toContain('POINT REDS DO NOT HOLD — charged elsewhere: "Repair pre-existing settings check:')
+    expect(result.status).toBe(1)
+  })
+
+  it.each(['real-regression', 'baseline-flaky', 'baseline-died', 'inconclusive'])('keeps %s holding', async (verdict) => {
+    const result = await run({ large: true, verdict })
+    expect(result.log).toContain('POINT REDS HOLD')
+    expect(result.log).toContain(`(${verdict})`)
+    expect(result.status).toBe(1)
+  })
+
+  it('retains the rotating failures next to a stable red for baseline classification', async () => {
+    const result = await run({ large: true, tasks: '', outputs: [`${known}\n${unknown}`, known] })
+    expect(result.classifiedCalls[0][0].failed.map((c) => c.name)).toEqual([ground, 'a new defect'])
+  })
+
+  it('holds a crashed record even if its named check predates the branch', async () => {
+    const result = await run({ large: true, noRetry: true, records: [{ crashed: true, crashSource: 'uncaught-exception' }] })
+    expect(result.log).toContain('POINT REDS HOLD')
+    expect(result.log).toContain('incomplete run')
+  })
+
+  it('does no baseline work for green runs or unrequested narrow reds', async () => {
+    expect((await run({ large: true, outputs: ['PASS  all checks'] })).classifiedCalls).toHaveLength(0)
+    expect((await run()).classifiedCalls).toHaveLength(0)
+  })
+
+  it('includes crossbrowser in ownership classification', async () => {
+    const result = await run({ large: true, suite: 'crossbrowser', outputs: [
+      'FAIL  chromium-mobile no console errors on mobile — getSupportedExtensions on null\n1 CROSS-BROWSER/MOBILE CHECK(S) FAILED',
+    ] })
+    expect(result.classifiedCalls[0][0]).toMatchObject({ suite: 'crossbrowser', depth: 'standard', unresolved: false })
+    expect(result.log).toContain('POINT REDS DO NOT HOLD')
+    expect(result.status).toBe(1)
   })
 })

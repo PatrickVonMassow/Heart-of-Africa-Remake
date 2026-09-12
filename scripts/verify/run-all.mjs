@@ -36,6 +36,8 @@ import { LADDER_STATUS, formatLadderRefusal } from './ladder-core.mjs'
 import { ladderCheck } from './ladder.mjs'
 import { SECTION_ENV, listSections, planSectionRun, resolveSelection } from './sections.mjs'
 import { readFileSync } from 'node:fs'
+import { distinctReds, formatOwnershipVerdict, wantsBaseline } from './red-ownership-core.mjs'
+import { classifyRedSuites } from './red-ownership.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const chargedPoints = new Set()
@@ -74,7 +76,7 @@ const WEBGL_ONLY_COVERED = process.env.RVA_WEBGL_COVERED === '1'
 
 const args = process.argv.slice(2)
 const { tier, filter, flags, fullRun, isLargeEquivalent, baseline, section } = parseArgs(args)
-const wantBaseline = baseline || process.env.VERIFY_BASELINE === '1'
+const wantBaseline = wantsBaseline({ isLargeEquivalent, baseline, env: process.env })
 
 // THE VERIFICATION LADDER (point 1086), asked HERE because this is the
 // ENTRYPOINT. run-logged.mjs wraps this file and asks it too, but the README
@@ -277,7 +279,7 @@ function runSuite(name, baseUrl, retryAfter = '') {
     : chargeFor(red, { suite: name, backend: record.backend, featureLevel: record.featureLevel }).point,
   ))].sort((a, b) => a - b)
   for (const point of points) chargedPoints.add(point)
-  return { ok, out, allOwned: reds.length > 0 && ownedReds.length === reds.length, points, partial: record?.partial === true }
+  return { ok, out, unresolved: !complete, allOwned: reds.length > 0 && ownedReds.length === reds.length, points, partial: record?.partial === true }
 }
 
 // Auto-retry a failed BROWSER suite once (point 200 — general flake resilience).
@@ -313,7 +315,7 @@ function runSuite(name, baseUrl, retryAfter = '') {
 // missing, stale, crashed, truncated or non-terminal record — falls back to the
 // retry. Measured on point 1112's closing: three red suites cost six passes.
 const RETRY_ENABLED = process.env.VERIFY_NO_RETRY !== '1'
-/** Suites that stayed red, kept for the opt-in baseline classification below.
+/** Suites that stayed red, kept for automatic LARGE baseline classification below.
  *  `runs` is 1 when retry is disabled or every red has an open owner. */
 const redSuites = []
 function runSuiteWithRetry(name, baseUrl) {
@@ -321,13 +323,13 @@ function runSuiteWithRetry(name, baseUrl) {
   if (first.ok) return true
   if (first.allOwned) {
     console.log(`${first.partial ? 'PARTIAL' : 'ACCOUNTED FOR'}  ${name} — retry skipped; all reds charged to open points ${first.points.join(', ')}; suite stays red`)
-    redSuites.push({ suite: name, failed: failedChecks(first.out), checks: allChecks(first.out).length, runs: 1 })
+    redSuites.push({ suite: name, failed: failedChecks(first.out), checks: allChecks(first.out).length, runs: 1, unresolved: first.unresolved })
     return false
   }
   if (!RETRY_ENABLED) {
     // Strict mode (the closing's flake-free gate): no retry, so no repeat
     // signature exists — say that rather than imply one.
-    redSuites.push({ suite: name, failed: failedChecks(first.out), checks: allChecks(first.out).length, runs: 1 })
+    redSuites.push({ suite: name, failed: failedChecks(first.out), checks: allChecks(first.out).length, runs: 1, unresolved: first.unresolved })
     return false
   }
   console.log(`↻ retry ${name} once — a first-try failure may be a rotating staging flake (point 200)`)
@@ -348,7 +350,7 @@ function runSuiteWithRetry(name, baseUrl) {
   const interesting = signature.stable.length ? signature.stable : [...signature.onlyFirst, ...signature.onlySecond]
   const relatedness = changeRelatedness({ checks: interesting, changedFiles: changedFiles() })
   for (const line of formatRepeatReport({ suite: name, signature, relatedness })) console.log(line)
-  redSuites.push({ suite: name, failed: interesting, checks: Math.max(allChecks(first.out).length, allChecks(second.out).length), runs: 2, verdict: signature.verdict })
+  redSuites.push({ suite: name, failed: distinctReds(failedChecks(first.out), failedChecks(second.out)), unresolved: first.unresolved || second.unresolved, checks: Math.max(allChecks(first.out).length, allChecks(second.out).length), runs: 2, verdict: signature.verdict })
   return false
 }
 
@@ -365,36 +367,6 @@ function changedFiles() {
   const diff = spawnSync('git', ['diff', '--name-only', base.stdout.trim(), '--'], { windowsHide: true, cwd: root, encoding: 'utf8' })
   changedFilesCache = diff.status === 0 ? diff.stdout.split('\n').map((l) => l.trim()).filter(Boolean) : []
   return changedFilesCache
-}
-
-/**
- * OPT-IN baseline classification (point 294): for each suite that stayed red,
- * re-run it against the pre-change baseline and label each red REAL REGRESSION
- * vs PRE-EXISTING. Off by default — it is a second (and third) browser run on a
- * second checkout. Enable with `npm test -- --baseline` or VERIFY_BASELINE=1.
- */
-function classifyAgainstBaselineRuns() {
-  if (redSuites.length === 0) return
-  console.log(`\n===== baseline classification (point 294) — ${redSuites.length} red suite(s) =====`)
-  for (const { suite, failed, checks } of redSuites) {
-    if (!DEV_SUITES.includes(suite)) {
-      console.log(`SKIP  ${suite} — no baseline lane for it (it is not one of the dev suites).`)
-      continue
-    }
-    if (failed.length === 0) {
-      // A crash or a wall-timeout kill left no check names. Classifying would
-      // mean running the suite again from scratch on BOTH sides — expensive and
-      // pointless while the crash itself is the finding.
-      console.log(`SKIP  ${suite} — it produced no check names (crash or timeout kill); read its output first.`)
-      continue
-    }
-    const args = [join(HERE, 'baseline-classify.mjs'), suite]
-    for (const c of failed) args.push('--failed', c.name)
-    // How far the CURRENT run got: without it a baseline run that ends early
-    // cannot be told from one that simply predates a newer check (point 418).
-    if (checks > 0) args.push('--current-checks', String(checks))
-    spawnSync(process.execPath, args, { windowsHide: true, cwd: join(HERE, '..', '..'), stdio: 'inherit' })
-  }
 }
 
 // Cross-browser functional smoke (point 213): a SHORT check on Firefox + WebKit
@@ -417,6 +389,8 @@ function runCrossBrowser(baseUrl, depth) {
     if (/backend:|^SKIP/.test(line)) console.log('      ' + line.trim())
     else if (!ok && /^FAIL\s{2,}\S/.test(line)) console.log('      ' + line.trim())
   }
+  if (!ok) redSuites.push({ suite: 'crossbrowser', failed: failedChecks(out), checks: allChecks(out).length, runs: 1, depth,
+    unresolved: Boolean(res.error || res.signal) || !/^\d+ CROSS-BROWSER\/MOBILE CHECK\(S\) FAILED$/m.test(out) })
   return ok
 }
 
@@ -568,7 +542,11 @@ if (wantPreview) {
   }
 }
 
-if (wantBaseline) classifyAgainstBaselineRuns()
+let ownership = null
+if (wantBaseline && redSuites.length > 0) {
+  console.log(`\n===== baseline classification — ${redSuites.length} red suite(s) =====`)
+  ownership = classifyRedSuites(redSuites, { backend: VERIFY_GL })
+}
 else if (redSuites.length > 0) {
   console.log(`\n# ${redSuites.length} suite(s) stayed red — to label each red REAL REGRESSION vs PRE-EXISTING,`)
   console.log(`# re-run with --baseline (or VERIFY_BASELINE=1), or classify one suite directly:`)
@@ -579,6 +557,10 @@ const failed = results.filter((r) => !r).length
 const charges = [...chargedPoints].sort((a, b) => a - b)
 console.log(`\n${failed === 0 ? 'ALL GREEN' : failed + ' SUITE(S) FAILED'} — ${results.length} suites run` +
   (charges.length ? ` — reds charged to open points ${charges.join(', ')}` : ''))
+if (ownership) console.log(formatOwnershipVerdict({
+  rows: ownership.rows,
+  unresolved: [...ownership.unresolved, ...(failed > redSuites.length ? ['other failed stages: see regression report'] : [])],
+}))
 // Say it again at the END, where the verdict is read (point 566): a green
 // headline from a one-section run must never be quoted as the suite's.
 if (section) console.log(`PARTIAL — only section "${section}" of ${filter[0]} ran; the suite is NOT covered by this run`)
