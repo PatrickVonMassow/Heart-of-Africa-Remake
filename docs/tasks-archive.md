@@ -28063,3 +28063,52 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Criticality: high — 138 of 161 suite minutes on one ordinary point, paid again by every
   point behind it.
   Bundle: Testinfrastruktur.
+
+- [x] 1089. Charge a LARGE red that does not touch the point's diff to its own point
+  (user 10.09.2026).
+  Apply the rule CLAUDE.md §7.2 already states — "a red run closes only when its cause is
+  fixed, CHARGED TO ITS OWNING POINT, or FILED AS A NEW POINT" — to the reds that are
+  holding point 1065, and make the charging automatic rather than a judgement call.
+  Measured on 1065 (10.09.2026): 23 full LARGE runs, 16.2 machine hours, none green, and
+  NOT ONE red touched the tap. The recurring reds are `settings` ground-detail (edge
+  energy), `enrichments` dressing-growth (point 278), `crossbrowser` chromium-mobile
+  (getSupportedExtensions on null), plus two teardown aborts from foreign commits. Each
+  was re-diagnosed on every run instead of being charged once.
+  Final state:
+  - A LARGE red whose failing check does not touch the point's own diff is FILED as its
+    own point automatically by the run's own report — the report already computes
+    "touches the diff", so it has the information. The point under test is not held by it.
+  - The run's verdict line says plainly which reds are charged elsewhere and which are the
+    point's own, so a merge decision does not need a human re-reading of the log.
+  - The three reds above get their points at once; 1065 merges on its own evidence — the
+    narrow rung `polish --section=children-bank-game`, unit, build and lint.
+  WHY THIS AND NOT A POLICY CHANGE: nothing here loosens the gate. The full regression
+  still runs and still has to go green — but its failures are owned by whoever broke them
+  instead of by whoever happens to be holding the branch when they surface.
+  Test. Vitest: a red check whose file set is disjoint from the branch diff is reported as
+  charged elsewhere and does not hold the point; a red that touches the diff still does.
+  OWNERSHIP CONTRACT (decided 12.09.2026 after the authoring lane escalated the spec as
+  contradictory, and it was right to). "Touches the diff" must NOT be read as
+  changeRelatedness in scripts/verify/baseline-classify-core.mjs: that is word overlap between
+  a check name and a filename, its own comment says a false is not innocence, and releasing a
+  point on it would excuse a red the point itself caused. The authoritative evidence is the
+  point-294 BASELINE CLASSIFICATION in the same file, classifyAgainstBaseline:
+  - verdict pre-existing — the check is red on the branch's merge-base too — is the ONLY
+    verdict that charges a red elsewhere. That is evidence, not a hint: the red predates the
+    branch.
+  - real-regression, baseline-flaky, baseline-died and inconclusive ALL keep holding the
+    point. Uncertainty never releases.
+  - changeRelatedness stays exactly what it is today: a hint printed beside the verdict,
+    never a verdict of its own.
+  The classification is opt-in today (--baseline / VERIFY_BASELINE=1) and already runs only
+  for the suites that stayed red; a LARGE run that goes red runs it by itself from now on,
+  because a verdict that needs a second manual command IS the judgement call this point
+  removes.
+  FILING CONTRACT (same decision). The run writes nothing into TASKS.md — that file is
+  main-only and a run happens in a worktree. It files into the findings carrier that exists
+  for exactly this: node scripts/finding.mjs --request "<title>" --spec-file <f> --why-file <f>,
+  which the owner drains and numbers. One request per distinct pre-existing check, keyed by
+  its title so twenty-three runs file it once, not twenty-three times.
+  Refs: scripts/verify/run-all.mjs (the "touches the diff" annotation), CLAUDE.md §7.2,
+  point 1065, point 278.
+  Bundle: Testinfrastruktur.
