@@ -171,6 +171,21 @@ Format: one line per finding — `- YYYY-MM-DD <source> — <finding>`.
   blockade: an inconclusive verdict never approves anything, and the doctor says the batch
   continues. The cheap fix is one call, not a new mechanism.
 
+- 2026-09-12 point 1087 picture review — `verification/1087-village-carrier-returns-with-water.png`
+  carries its declared subject (the carrier with the full jar and a readable water disc at its
+  rim), but he stands at the LEFT EDGE and about two thirds of the frame is empty savannah and
+  sky; a human reader does not find the subject first. The check is green because it requires the
+  carrier to be CONTAINED, not centred. Framing only — the stale-shutter defects of the same
+  section already belong to point 1108, and this is neither of them.
+- 2026-09-12 batch operation — `scripts/batch-doctor.mjs --gate` and a running verification run
+  collide. The Stop hook demanded the doctor gate because of a parallel session; its gate runs
+  `npm run test:unit` + `build` + `lint` in the main tree while point 1087's LARGE run, which
+  begins with the same unit suite, was running in the worktree. The LARGE run died after 6 m 53 s
+  on a 20 s timeout in `scripts/mechanism-review-guard.test.mjs`, and the runner itself wrote
+  "UNDER LOAD — a timeout failure under load is not evidence of a broken test". Two hours of run
+  time lost. Neither side knows about the other; the in-flight declaration would know, but the
+  doctor does not read it. No player impact and no blockade, so it is collected here.
+
 ## The give's second evidence frame is aimed by construction, not by rule (measured 07.09.2026, FIXED 08.09.2026)
 
 `150-artefact-chiefs-answer` in `scripts/verify/polish.mjs` stepped the camera back seven

@@ -59,6 +59,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 11.09. nachts | Die Verweigerung der billigen Sprosse saß in der Wrapper-Datei, während der Einstiegsbefehl, den dieselbe README als gewöhnlich dokumentiert, niemanden fragte — der deckende Lauf des Punktes selbst lief an ihr vorbei; und beim ersten ernsthaften Gebrauch verweigerte sie ihren eigenen Deckungslauf, weil ein Branchwechsel eine mtime bewegt hatte, ohne ein Byte zu ändern (§3.265, Punkt 1086) |
 | 11.09. nachts | Zwei Werkzeuge antworten mit Gewissheit auf Fragen, die sie nie gemessen haben: `ci-gate-verdict.mjs` läuft nur im Runner, ignoriert die Flags eines Handaufrufs und druckt bei leerer Umgebung »CI gate passed« — zweimal geglaubt; `run-wait` erklärt einen gesunden `polish`-Lauf nach 20 Minuten für tot, weil seine Schwelle die Modell-Erwartung von 5m41s statt des eigenen gemessenen Medians von 55 min multipliziert, und befiehlt das Töten (§3.263, Punkte 1099/1101) |
 | 12.09. | Der beauftragte Autor schrieb zweimal nichts und hatte zweimal recht: einmal, weil der Punkttext eine Wortüberlappungs-Heuristik zur Freigabe-Evidenz erklärte, deren eigener Kommentar sagt, ein Nein beweise keine Unschuld; einmal, weil der Unterbau des Punktes ungebaut war. Das Werkzeug meldete beide Male PROBLEMS — »NOTHING WAS COMMITTED«, »gates not green« —, also den Fehlschlag der Spur, wo die Spur genau das getan hatte, wofür sie existiert (§3.266, Punkte 1089/1073) |
+| 12.09. abends | Wiedergänger von §3.231: Der LARGE-Lauf eines Punktes starb nach 6 m 53 s an einem 20-Sekunden-Timeout in einer Unit-Datei — diesmal war der Störer kein fremder Committer, sondern eine PFLICHT derselben Sitzung. Der Stop-Hook forderte wegen einer Parallel-Sitzung `batch-doctor --gate`, und dessen Tor fährt `test:unit`, `build` und `lint` im Hauptbaum, während der Worktree-Lauf mit genau derselben Unit-Suite beginnt. Der Runner druckte sein eigenes Urteil mit — »UNDER LOAD — a timeout failure under load is not evidence of a broken test« —, also wusste er, dass die Maschine nicht ruhig war, und lief trotzdem an. Die In-Flight-Markierung, die es gewusst hätte, liest der Doctor nicht (Backlog 12.09.) |
 | 13.08. | Der Nachprüfer findet eine echte zweite Klippe im geheilten Mechanismus — und jede der fünf gemessenen Kuren verschlechtert gesunde Dörfer stärker, als der Fehler schadet: Befund wird gebucht statt behoben (§3.115) |
 | 20.08. | Der Dokumentschnitt strich Regeln als »von einem Wächter abgedeckt«, ohne einen einzigen Wächter darauf zu prüfen — die Kontextanzeige verschwand, der Nutzer fand es (§3.134); eine vom Nutzer gesetzte Rangfolge wurde in einer Nacht zweimal maschinell überholt, ohne dass irgendwo ein Grund stand (Punkt 614); zwei Werkzeuge derselben Bauart am falschen Ort gemessen — im Hauptbaum gebaut und geprüft, während der Prozess die Arbeit in den isolierten Bereich schickt (§3.137) |
 | 21.08. | Ein Tor verlangte eine Freigabe, die seine eigenen Werkzeuge nicht herstellen können — der HIGH-Punkt war gemergt, geprüft und freigegeben, und der Zugausgang wies ihn trotzdem ab (§3.153) |
@@ -1526,7 +1527,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Samstag, 12.09.2026, 17:12 · Quellen-Fingerprint: `348bda3f929f…`
+Zuletzt aktualisiert: Samstag, 12.09.2026, 21:55 · Quellen-Fingerprint: `b9a173b03667…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1632,8 +1633,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 96 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 132 Prozess-/Meta-TASKS-Punkte (davon 64 offen).
 
-<!-- RETRO-FINGERPRINT: 348bda3f929f138df9eefa154c5741f865f4976050aa267d5906989ebe027028 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-12T15:12:51.478Z -->
+<!-- RETRO-FINGERPRINT: b9a173b03667fc31d5197de9751a9cce18010428ceba6fcbe99c2cee81872793 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-12T19:55:12.227Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
