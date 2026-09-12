@@ -162,15 +162,6 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   sie kaputt wäre?** Zeit darf ein Test abkürzen, den **Aufruf** nie. Ist die **Ausgabe** das
   Produkt, lies sie am **echten Bestand**. Und das Bild beantwortet nicht nur ‚stimmt es?‘,
   sondern **wozu tut die Figur das — sieht man es ihr an?“ *(Sieht das richtig aus?)*
-- **„Im Bild" ist nicht „erkennbar".** Die Prüfung bestätigt, dass der Gegenstand im
-  Sichtfeld liegt — und das Bild zeigt ihn hinter der Menüleiste, als Fleck am Rand oder gar
-  nicht, weil etwas davorsteht. Vier Aufnahmen hintereinander waren unbrauchbar, und jede
-  Messung meldete grün: Die Prüfung beschrieb eine Eigenschaft des **Bildes**, nicht eine des
-  **Programms**.
-  → *Prompt:* „Ein Bildbeweis braucht zwei Aussagen: Die Messung sagt, **wo** der Gegenstand
-  liegt — ob man ihn **erkennt**, entscheidet ein Mensch, der hinsieht. Bau den Ablauf so, dass
-  dieses Hinsehen **erzwungen** wird, und miss zusätzlich, was Lesbarkeit ausmacht:
-  **Entfernung, freie Sichtlinie, Größe im Bild.**"
 - **Dem Test geht der Gegenstand unter den Füßen weg.** Er hält seinen Prüfling an einer
   Koordinate, einem Vorgabewert oder einer Simulation fest. Zieht der Prüfling um, fragt er
   weiter — nur über nichts mehr. Ein Rot meldet sich; ein leerer nicht, ein leeres Bild ebenso wenig.
@@ -653,4 +644,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 348bda3f929f138df9eefa154c5741f865f4976050aa267d5906989ebe027028 -->
+<!-- GUIDE-FINGERPRINT: e108faa45d8be9e71498a66a459701bc6524155976063399680e35b6709b4f0d -->
