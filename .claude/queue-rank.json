@@ -1333,10 +1333,10 @@
       "origin": "machine",
       "place": "last"
     },
-    "1112": {
-      "at": "2026-09-12T01:06:43.624Z",
-      "why": "Der Release ist ein Demo-Build, und genau dieser Defekt ist der, den ein Demo-Publikum trifft: die Stufe NIEDRIG zeichnet auf WebGL 2 ein schwarzes Bild, und WebGL 2 ist die Bahn, auf die jede Maschine ohne WebGPU faellt. Warten kann er auch deshalb nicht, weil die Pruefung, die ihn abfangen soll, ihn gruen meldet - der Abschlussdurchlauf vor dem Release wuerde ihn nicht finden, sondern bestaetigen.",
-      "origin": "machine",
+    "1113": {
+      "at": "2026-09-12T08:01:48.117Z",
+      "why": "User order 12.09.2026: make the regression markedly faster now without repairing the five defects behind its reds; it stands first because every point behind it pays the doubled pass.",
+      "origin": "user",
       "place": "ahead"
     }
   },
@@ -1370,7 +1370,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-12T01:06:43.633Z",
+    "at": "2026-09-12T08:01:48.127Z",
     "points": [
       174,
       184,
@@ -1764,7 +1764,7 @@
       1108,
       1109,
       1111,
-      1112
+      1113
     ]
   }
 }

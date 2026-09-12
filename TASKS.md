@@ -77,6 +77,57 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
+- [ ] 1113. A whole-suite run pays for its known reds twice, and the second pass learns nothing.
+  USER ORDER 12.09.2026: make the regression markedly faster NOW without first repairing the
+  defects behind its reds, and make forgetting those repairs impossible — "was koennen wir
+  machen, damit jetzt erstmal die Regressionstests wieder deutlich schneller werden, ohne
+  diese Spiele-Bugs beheben zu muessen, aber dass sichergestellt ist, dass deren Behebung
+  nicht spaeter vergessen geht?"
+  MEASURED 12.09.2026 on point 1112's closing proof
+  (`.claude/worktrees/point-1112/local/verify-logs/`): the both-backend proof cost 98 min on
+  WebGL 2 (head b5b40eb59) and 40 min on WebGPU (head e225bc7b5) against the run's own 25 min
+  expectation, and NOT ONE of its reds belonged to 1112. Together they were 138 of the 161
+  minutes that point spent on suites. Each red already has an OPEN owner:
+  - `settings` first-person ground micro-detail (laplacian 1.01-1.07) — point 603
+  - `enrichments` the streamed dressing does not grow at a fixed anchor — point 938
+  - `enrichments` frame 72-water-victoria-falls, subject not in the picture — point 521
+  - `polish` the drums had stopped at the shutter — point 1102
+  - `polish` the fill pose blocked on all 16 bearings, frame off the edge — point 1108
+  WHY IT COSTS DOUBLE. `runSuiteWithRetry` in `scripts/verify/run-all.mjs` retries every red
+  suite once (point 200's rotating-flake rule) and decides on the suite's EXIT CODE alone.
+  Three red suites therefore run six passes. The retry exists to separate a transient from a
+  defect — a question already ANSWERED for a red that a named open point owns.
+  Final state:
+  - Each red above is charged in `scripts/render-verify-charges.mjs` to the open point that
+    owns it, scoped as narrowly as the evidence allows (`suite`, `backend`, `featureLevel`),
+    each with its one dated `why`.
+  - A suite whose failing checks are ALL charged to an open point is NOT retried. `run-all.mjs`
+    already imports `../render-verify-core.mjs`, so `owned()` is one call away. It prints one
+    line naming the owning points instead. A suite carrying even ONE uncharged red keeps its
+    retry exactly as today.
+  - The run STAYS RED and is still recorded ACCOUNTED FOR, never clean. Charging is not a pass
+    and this point does not turn it into one.
+  - NOTHING CAN BE FORGOTTEN, by mechanism and not by note: a charge names an OPEN point, its
+    entries stop clearing anything the moment that point is ticked, and
+    `render-verify-core.test.mjs` fails when an entry names a point the work order does not
+    hold open. Added to that: the run's closing line NAMES the points its reds are charged to,
+    so the price of the five open defects is read on every run rather than buried in a ledger.
+  EXPECTED EFFECT, an estimate to be measured on the first closing that uses it: 1112's two
+  lanes would have run three passes instead of six. It does NOT touch the cold boot every run
+  pays (docs/backlog.md, the warm dev server) and it does NOT make a red green.
+  NOTE THE FREEZE. CLAUDE.md §2 forbids new guards. This is not one: it is a refusal to repeat
+  work, inside the runner every run already passes through, ordered by the user, and it deletes
+  a pass rather than adding a mechanism.
+  Test. Vitest: a suite whose reds are all owned is not retried and says which points own them;
+  a suite with one unowned red is retried unchanged; the existing sweep extended over the new
+  entries, including that a charge naming a ticked point clears nothing.
+  Refs: scripts/verify/run-all.mjs (`runSuiteWithRetry`, `RETRY_ENABLED`),
+  scripts/render-verify-charges.mjs, scripts/render-verify-core.mjs (`owned()`),
+  points 200, 640, 1089, 603, 938, 521, 1102, 1108, 1112, docs/backlog.md.
+  Criticality: high — 138 of 161 suite minutes on one ordinary point, paid again by every
+  point behind it.
+  Bundle: Testinfrastruktur.
+
 - [ ] 1087. The water carrier visibly fills the jar at the water and carries visible water
   (user 06.09.2026; the former point 1066; SPLIT BACK OUT OF POINT 1065 on 10.09.2026 on the
   user's instruction, 02:15).
