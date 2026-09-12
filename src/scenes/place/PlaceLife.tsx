@@ -2918,6 +2918,7 @@ function ErrandVillagers({
       geography: {
         waterHead: geography.waterHead,
         waterFoot: geography.waterFoot,
+        waterFill: geography.waterFill,
         digSites: geography.digSites.map((d) => ({ ...d })),
       },
       digProgress: digProgressOf(work, geography.digSites.length),
@@ -3205,8 +3206,9 @@ export function PlaceLife({
    *  (work-order 482): the ground the children's stage stands on. */
   bank: PlaceRiverBank | null
   /** The village's water path (work-order 688): its head in the village, where
-   *  both carriers speak, and its foot at the river, where neither does. */
-  waterPath: { head: { x: number; z: number }; foot: { x: number; z: number } } | null
+   *  the carriers speak, its foot at the river, where neither does, and the
+   *  fill spot in the water where the jar is dipped (work-order 1087). */
+  waterPath: { head: { x: number; z: number }; foot: { x: number; z: number }; fill: { x: number; z: number } } | null
   /** The two play rocks of the children's bank game (work-order 687), and the
    *  settlement's loose boulders — one of which a child climbs and names while
    *  the group roams, so ROCK is heard at a stone that is no part of the game. */
@@ -3301,6 +3303,7 @@ export function PlaceLife({
     () => ({
       waterHead: waterPath ? { x: waterPath.head.x, z: waterPath.head.z } : null,
       waterFoot: waterPath ? { x: waterPath.foot.x, z: waterPath.foot.z } : null,
+      waterFill: waterPath ? { x: waterPath.fill.x, z: waterPath.fill.z } : null,
       digSites,
     }),
     [waterPath, digSites],

@@ -15,13 +15,13 @@ import {
   isDigging,
   stepAdultWork,
   taskOf,
-  WATER_FOOT_REACH,
   WORK_ARRIVE_RADIUS,
   type AdultWorkConfig,
   type AdultWorkState,
   type AdultWorkView,
   type SpokenWord,
 } from './adultWork'
+import { balance } from '../../config/balance'
 import { CONCEPT_IDS } from '../../communication/lexicon'
 import { DIG_CYCLE_SECONDS } from '../../render/gesture'
 import { resetDevAsserts } from '../../systems/devAssert'
@@ -38,6 +38,10 @@ const CFG: AdultWorkConfig = {
 
 const HEAD = { x: 12, z: 0 }
 const FOOT = { x: 34, z: -6 }
+// The fill spot lies on past the foot, down the shore and in the water
+// (work-order 1087); the layout solves it there, and the fixture keeps the
+// same relation.
+const FILL = { x: 36.5, z: -6.5 }
 
 function view(
   n: number,
@@ -55,6 +59,7 @@ function view(
     geography: {
       waterHead: { ...HEAD },
       waterFoot: { ...FOOT },
+      waterFill: { ...FILL },
       digSites: [
         { x: -11, z: 2, kind: 'pit' },
         { x: -16, z: -1, kind: 'postHole' },
@@ -187,7 +192,9 @@ describe('RIVER remains a departure and return at the path head', () => {
     expect(new Set(river.map((word) => word.id))).toEqual(new Set(['water-out', 'water-back']))
     for (const word of river) {
       expect(Math.hypot(word.at.x - HEAD.x, word.at.z - HEAD.z)).toBeLessThanOrEqual(WORK_ARRIVE_RADIUS)
-      expect(Math.hypot(word.at.x - FOOT.x, word.at.z - FOOT.z)).toBeGreaterThan(WATER_FOOT_REACH)
+      // The word falls in the VILLAGE, never at the water — the head sits a
+      // long walk from the foot, and both utterances are spoken at it.
+      expect(Math.hypot(word.at.x - FOOT.x, word.at.z - FOOT.z)).toBeGreaterThan(4)
       expect({ x: word.aim.x, z: word.aim.z }).toEqual(FOOT)
     }
   })
@@ -206,6 +213,102 @@ describe('RIVER remains a departure and return at the path head', () => {
     }
     expect(carried).toContain('water-out:emptyJar')
     expect(carried).toContain('water-back:fullJar')
+    // AND THE FULL JAR IS NEVER CARRIED OUT, nor the empty one back: the flip
+    // happens at the water and only there (work-order 1087).
+    expect(carried).not.toContain('water-out:fullJar')
+    expect(carried).not.toContain('water-back:emptyJar')
+  })
+})
+
+// --- The fill is an act with its own phase (work-order 1087) ---------------
+//
+// The jar used to flip to 'fullJar' when a SECOND villager was cast at the
+// water, so the full jar came from nowhere and the same man in practice went
+// down and came up. What is pinned here is the one round trip: the carrier walks
+// THROUGH the path's landing to the water, dips for a configured hold, and only
+// then turns round with a full jar.
+describe('the water carrier dips his jar at the water (work-order 1087)', () => {
+  const fillFrames = () => {
+    const v = view(4)
+    const state = createAdultWork(4, CFG)
+    const seen: Array<{ f: number; i: number; phase: string; carry: string; goal: { x: number; z: number } }> = []
+    let f = 0
+    for (let elapsed = 0; elapsed < 240; elapsed += 1 / 60) {
+      walkFrame(state, v, 1 / 60)
+      for (let i = 0; i < 4; i++) {
+        const task = taskOf(state, i)
+        if (task && task.situation.startsWith('water-')) {
+          seen.push({ f, i, phase: task.phase, carry: carryOf(state, i), goal: goalOf(task) })
+        }
+      }
+      stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
+      f++
+    }
+    return seen
+  }
+
+  it('sends the carrier to the water, not to the path`s landing', () => {
+    const outward = fillFrames().filter((f) => f.phase === 'fetch')
+    expect(outward.length).toBeGreaterThan(0)
+    // Every outward goal is either the head he speaks at (the `via`) or the FILL
+    // spot. The foot is never a destination any more.
+    for (const f of outward) {
+      const atHead = Math.hypot(f.goal.x - HEAD.x, f.goal.z - HEAD.z) < 1e-6
+      const atFill = Math.hypot(f.goal.x - FILL.x, f.goal.z - FILL.z) < 1e-6
+      expect(atHead || atFill).toBe(true)
+    }
+    expect(outward.some((f) => Math.hypot(f.goal.x - FILL.x, f.goal.z - FILL.z) < 1e-6)).toBe(true)
+  })
+
+  it('holds a fill phase between the walk down and the walk back, jar still empty', () => {
+    const seen = fillFrames()
+    const filling = seen.filter((f) => f.phase === 'fill')
+    expect(filling.length).toBeGreaterThan(0)
+    // The jar is EMPTY for the whole dip — it fills by being dipped, not by
+    // being sent.
+    for (const f of filling) expect(f.carry).toBe('emptyJar')
+    // ... and EACH dip lasts what it is configured to last. The run spans many
+    // errands, so the frames are grouped into the individual holds first: a new
+    // hold begins wherever the same carrier's fill frames are not consecutive.
+    // Grouped PER CARRIER: two carriers can dip at once, and their frames
+    // interleave, so a single running group would split every hold into ones.
+    const holds: Array<{ i: number; last: number; frames: number }> = []
+    const open = new Map<number, { i: number; last: number; frames: number }>()
+    for (const frame of filling) {
+      const mine = open.get(frame.i)
+      if (mine && mine.last === frame.f - 1) {
+        mine.last = frame.f
+        mine.frames++
+      } else {
+        const started = { i: frame.i, last: frame.f, frames: 1 }
+        open.set(frame.i, started)
+        holds.push(started)
+      }
+    }
+    // A hold counts only where the return leg was actually observed after it —
+    // the sampling window cuts the last dip in half, and half a dip measures the
+    // window rather than the hold.
+    const completed = holds.filter((h) =>
+      seen.some((frame) => frame.i === h.i && frame.f === h.last + 1 && frame.phase === 'walk'),
+    )
+    expect(completed.length).toBeGreaterThan(1)
+    const expected = balance.bankFillSeconds * 60
+    // One frame of slack each way: the phase opens on the arrival frame and
+    // closes on the frame that crosses the threshold.
+    for (const hold of completed) {
+      expect(hold.frames).toBeGreaterThanOrEqual(Math.floor(expected) - 1)
+      expect(hold.frames).toBeLessThanOrEqual(Math.ceil(expected) + 1)
+    }
+  })
+
+  it('is ONE errand held by ONE carrier, not two castings', () => {
+    const seen = fillFrames()
+    const outward = new Set(seen.filter((f) => f.phase === 'fetch' || f.phase === 'fill').map((f) => f.i))
+    const back = new Set(seen.filter((f) => f.phase === 'walk').map((f) => f.i))
+    expect(outward.size).toBeGreaterThan(0)
+    // The man who walked back is a man who walked down: no return leg belongs to
+    // a villager the errand never sent.
+    for (const i of back) expect(outward.has(i)).toBe(true)
   })
 })
 

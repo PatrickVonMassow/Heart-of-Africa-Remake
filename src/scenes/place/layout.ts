@@ -18,6 +18,7 @@ import {
   BANK_FADE_ANGLE,
   BANK_PLAY_LANE_HALF,
   bankPlayRocks,
+  bankFillSpot,
   bankWaterFoot,
   buildRiverBank,
   inBankPlayLane,
@@ -127,7 +128,12 @@ export interface PlaceLayout {
    * is where it meets the bank, upstream of and clear of the children's stretch.
    * Null in every settlement without a bank.
    */
-  waterPath: { head: BankPoint; foot: BankPoint } | null
+  /** The village's walk to the water: `head` in the village where the word
+   *  falls, `foot` the drawn track's landing on flat ground, and `fill` the spot
+   *  IN the water where the carrier dips his jar (work-order 1087). Only head
+   *  and foot are drawn as a track; the last stretch down the shore is not a
+   *  worn path. */
+  waterPath: { head: BankPoint; foot: BankPoint; fill: BankPoint } | null
   /**
    * The children's roaming quarter (work-order 481.4): where the group plays
    * between two cycles of its bank game, and how far it roams. It is layout data
@@ -729,6 +735,7 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     ? {
         head: { x: bank.nx * WATER_PATH_HEAD_RADIUS, z: bank.nz * WATER_PATH_HEAD_RADIUS },
         foot: bankWaterFoot(bank),
+        fill: bankFillSpot(bank),
       }
     : null
 

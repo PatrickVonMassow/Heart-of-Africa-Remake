@@ -19,6 +19,7 @@
 // The module is pure: no three, no scene. `PlaceLife` gives it the live village
 // and carries out what comes back.
 
+import { balance } from '../../config/balance'
 import type { ConceptId } from '../../communication/lexicon'
 import { DIG_CYCLE_SECONDS } from '../../render/gesture'
 import { devAssert } from '../../systems/devAssert'
@@ -35,7 +36,7 @@ export const ADULT_SITUATIONS: readonly AdultSituationId[] = [
 export const ADULT_CONCEPTS: readonly ConceptId[] = ['RIVER', 'DIG']
 
 export type AdultCarry = 'none' | 'emptyJar' | 'fullJar' | 'digTool'
-export type AdultPhase = 'walk' | 'fetch' | 'invite' | 'site' | 'dig'
+export type AdultPhase = 'walk' | 'fetch' | 'fill' | 'invite' | 'site' | 'dig'
 export type DigUtterance = 'invitation' | 'site'
 
 export interface ErrandPoint { x: number; z: number }
@@ -47,6 +48,10 @@ export interface DigSite extends ErrandPoint {
 export interface AdultWorkGeography {
   waterHead: ErrandPoint | null
   waterFoot: ErrandPoint | null
+  /** Where the carrier stands IN the water to fill his jar (work-order 1087).
+   *  The foot is the drawn track's landing and stays where it is; this is the
+   *  last stretch down the shore, and it is where the act happens. */
+  waterFill: ErrandPoint | null
   digSites: readonly DigSite[]
 }
 
@@ -116,7 +121,6 @@ export interface AdultWorkState {
 }
 
 export const WORK_ARRIVE_RADIUS = 1.1
-export const WATER_FOOT_REACH = 4
 export const AIM_CLEARANCE = 1.2
 export const JOIN_STAND_OFF = 2.4
 const JOIN_BEARINGS = 12
@@ -190,21 +194,6 @@ export function digStrikeCrossed(before: number, after: number, phase = 0): bool
   return Math.floor((after + phase) / DIG_CYCLE_SECONDS) > Math.floor((before + phase) / DIG_CYCLE_SECONDS)
 }
 
-function nearestFree(view: AdultWorkView, to: ErrandPoint, within: number, avoid: number): number {
-  let best = -1
-  let bestD = within
-  let fallback = -1
-  let fallbackD = within
-  for (let i = 0; i < view.villagers.length; i++) {
-    const v = view.villagers[i]
-    if (!v.free) continue
-    const d = Math.hypot(v.x - to.x, v.z - to.z)
-    if (i === avoid) {
-      if (d <= fallbackD) { fallbackD = d; fallback = i }
-    } else if (d <= bestD) { bestD = d; best = i }
-  }
-  return best >= 0 ? best : fallback
-}
 
 function anyFree(view: AdultWorkView, avoid: number): number {
   for (let i = 0; i < view.villagers.length; i++) if (view.villagers[i].free && i !== avoid) return i
@@ -222,7 +211,10 @@ function anotherFree(view: AdultWorkView, first: number): number {
 
 function castable(id: AdultSituationId, view: AdultWorkView): boolean {
   const g = view.geography
-  if (id === 'water-out' || id === 'water-back') return !!(g.waterHead && g.waterFoot)
+  // 'water-back' is never CAST: it is the return leg of the one water errand
+  // (work-order 1087), reached from the fill rather than from a second casting.
+  if (id === 'water-back') return false
+  if (id === 'water-out') return !!(g.waterHead && g.waterFoot && g.waterFill)
   if (id === 'dig-second') return g.digSites.length >= 2
   return g.digSites.length >= 1
 }
@@ -369,8 +361,33 @@ export function stepAdultWork(
       if (digStrikeCrossed(before, t.dug, i * 0.37)) progress.strikes++
       if (t.dug >= cfg.digSeconds) clearPair(state, i)
     } else if (t.arrived && t.phase === 'fetch' && !t.via) {
+      // ARRIVING AT THE WATER OPENS THE FILL, IT DOES NOT END THE ERRAND. The
+      // jar used to flip to 'fullJar' at the next casting, with nothing shown in
+      // between, and the user (06.09.2026) could not tell that water was being
+      // fetched. The dip is its own phase now, and 'fullJar' begins only when it
+      // has run its configured hold.
+      t.phase = 'fill'
+      t.dug = 0
+    } else if (t.arrived && t.phase === 'fill') {
       t.dug += dt
-      if (t.dug >= cfg.dwellSeconds) state.tasks[i] = null
+      const geo = view.geography
+      if (t.dug >= balance.bankFillSeconds && geo.waterHead && geo.waterFoot) {
+        // ONE ROUND TRIP, NOT TWO CASTINGS. The full jar used to appear on a
+        // SECOND villager cast at the water, so it came from nowhere; the same
+        // carrier turns round here instead. Both situation ids survive as LEG
+        // LABELS, which is what keeps the lexicon bookkeeping and the staged
+        // counters unchanged.
+        t.carry = 'fullJar'
+        t.situation = 'water-back'
+        t.phase = 'walk'
+        t.x = geo.waterHead.x
+        t.z = geo.waterHead.z
+        t.say = { at: geo.waterHead, aim: geo.waterFoot }
+        t.owes = true
+        t.arrived = false
+        t.dug = 0
+        state.staged['water-back'] = (state.staged['water-back'] ?? 0) + 1
+      }
     } else if (t.arrived && t.phase === 'walk') state.tasks[i] = null
   }
 
@@ -387,25 +404,15 @@ export function stepAdultWork(
     if (!castable(id, view)) continue
     const avoid = state.last?.speaker ?? -1
 
-    if (id === 'water-out' && g.waterHead && g.waterFoot) {
+    if (id === 'water-out' && g.waterHead && g.waterFoot && g.waterFill) {
       const who = anyFree(view, avoid)
       if (who < 0) continue
       state.tasks[who] = {
         situation: id, phase: 'fetch', carry: 'emptyJar', role: 'worker', partner: null, siteIndex: null,
-        x: g.waterFoot.x, z: g.waterFoot.z, arrived: false, dug: 0, owes: true,
+        // He walks THROUGH the path's landing and on down the shore to the
+        // water: the goal is the fill spot, not the foot he used to halt at.
+        x: g.waterFill.x, z: g.waterFill.z, arrived: false, dug: 0, owes: true,
         say: { at: g.waterHead, aim: g.waterFoot }, via: { ...g.waterHead }, age: 0,
-      }
-      state.staged[id] = (state.staged[id] ?? 0) + 1
-      return null
-    }
-
-    if (id === 'water-back' && g.waterHead && g.waterFoot) {
-      const who = nearestFree(view, g.waterFoot, WATER_FOOT_REACH, avoid)
-      if (who < 0) continue
-      state.tasks[who] = {
-        situation: id, phase: 'walk', carry: 'fullJar', role: 'worker', partner: null, siteIndex: null,
-        x: g.waterHead.x, z: g.waterHead.z, arrived: false, dug: 0, owes: true,
-        say: { at: g.waterHead, aim: g.waterFoot }, via: null, age: 0,
       }
       state.staged[id] = (state.staged[id] ?? 0) + 1
       return null
