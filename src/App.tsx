@@ -97,6 +97,7 @@ export default function App() {
           if (import.meta.env.DEV) {
             ;(window as unknown as Record<string, unknown>).__renderer = renderer
             ;(window as unknown as Record<string, unknown>).__shaderPipelines = () => pipelines?.state() ?? null
+            ;(window as unknown as Record<string, unknown>).__shaderPipelineDiagnostics = () => pipelines?.diagnostics() ?? null
             // GPU-resource leak invariant (point 295): armed here, before the
             // first frame, so every scene switch, detail-level change and
             // effect toggle of the session is watched. Imported dynamically so

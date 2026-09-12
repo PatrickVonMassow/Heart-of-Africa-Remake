@@ -15,6 +15,8 @@
 import { launchVerifyBrowser, assertBackend, waitForSceneBuilt } from './_browser.mjs'
 import { frameShutter, capturePixels } from './frameSubject.mjs'
 import { leakVerdict } from './textureLeak.mjs'
+import { SETTINGS_VIEWPORT, SETTINGS_SCENE_LUMA_MIN, settingsSceneLuma } from './settingsSceneLuma.mjs'
+import { settingsPipelineState, startSettingsFrameTiming, stopSettingsFrameTiming } from './settingsPipelineState.mjs'
 import { sectionGate } from './sections.mjs'
 import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
@@ -43,7 +45,7 @@ const check = (name, ok, detail) => {
 }
 
 const browser = await launchVerifyBrowser()
-const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
+const page = await browser.newPage({ viewport: SETTINGS_VIEWPORT })
 const shot = frameShutter(page, OUT)
 const errors = []
 page.on('console', (m) => {
@@ -84,13 +86,6 @@ const ensureTravel = async () => {
   await page.evaluate(() => window.__game.getState().leavePlace())
   await page.waitForTimeout(2500)
   await page.evaluate(() => window.__game.getState().setJournalOpen(false))
-}
-
-/** Mean luminance of a PNG buffer — the "did it render at all" measure the TRAA
- *  and the graphics-level sections both judge their frames by. */
-const meanLuma = async (png) => {
-  const stats = await sharp(png).stats()
-  return stats.channels.slice(0, 3).reduce((a, c) => a + c.mean, 0) / 3
 }
 
 // A screenshot is the reliable way to make a throttled headless page render; an
@@ -776,8 +771,8 @@ check('the speech slider is the only one that silences it, and the bed stays up'
 }
 
 // --- TRAA toggle (design.md §2.7; CLAUDE.md §7.1 pt. 32) ----------------------
-// TRAA is the default; toggling rebuilds the post pipeline and adds/removes
-// the velocity MRT. Both modes keep half-float targets single-sampled.
+// TRAA is the default; toggling rebuilds the downstream post pipeline.
+// Both modes share the single-sampled half-float scene MRT, including velocity.
 // Assert the scene keeps rendering a non-black frame without new console
 // errors on either backend lane.
 if (section('traa-toggle')) {
@@ -786,22 +781,57 @@ if (section('traa-toggle')) {
   await page.evaluate(() => window.__ui.getState().setTraaEnabled(true))
   await page.waitForTimeout(2500)
   const traaShot = await shot('69-traa-on', {
-    general: 'the TRAA pipeline rebuild is judged by the mean luma of this whole frame, which is therefore the subject',
+    general: 'the travel scene after the TRAA rebuild; brightness is measured only in the interface-free scene crop',
     scene: 'travel',
   })
-  const traaMean = await meanLuma(traaShot)
-  check('TRAA on: scene renders non-black', traaMean > 8, `mean ${traaMean.toFixed(1)}`)
+  const traaMean = await settingsSceneLuma(traaShot)
+  check('TRAA on: scene renders non-black', traaMean > SETTINGS_SCENE_LUMA_MIN, `scene crop mean ${traaMean.toFixed(1)} > ${SETTINGS_SCENE_LUMA_MIN}`)
   check('TRAA on: no new console errors', errors.length === errsBeforeTraa,
     errors.slice(errsBeforeTraa).join(' | ').slice(0, 300))
+  const traaOnPipelines = await page.evaluate(settingsPipelineState)
+  await page.evaluate(startSettingsFrameTiming)
   await page.evaluate(() => window.__ui.getState().setTraaEnabled(false))
   await page.waitForTimeout(1500)
-  const traaOffMean = await meanLuma(await capturePixels(page, 'TRAA off path mean luma'))
-  check('TRAA off again: scene renders non-black', traaOffMean > 8, `mean ${traaOffMean.toFixed(1)}`)
+  const traaOffMean = await settingsSceneLuma(await capturePixels(page, 'TRAA off path mean luma'))
+  const traaOffPipelines = await page.evaluate(settingsPipelineState)
+  const traaTiming = await page.evaluate(stopSettingsFrameTiming)
+  console.log(`TRAA pipeline evidence — ${JSON.stringify({ before: traaOnPipelines, after: traaOffPipelines })}`)
+  console.log(`TRAA repeat-link pacing — max painted-frame gap ${(traaTiming.maxGapMs / 1000).toFixed(3)} s; ` +
+    `${traaTiming.callbacks} callback completions in ${Math.round(traaTiming.elapsedMs)} ms; ` +
+    `repeat links released ${traaOffPipelines.pipelines?.reused - traaOnPipelines.pipelines?.reused}`)
+  // The runner keeps only the FAILING check line, so the evidence that names the
+  // cause of a black frame belongs IN the detail, not in a console line beside it.
+  /** Which materials are waiting in the first-use queue — a black scene behind a
+   *  backlog of SCENE materials is a relink, behind post materials a pacing cost. */
+  const queuedByMaterial = (state) => {
+    const counts = new Map()
+    for (const program of state.diagnostics?.queued ?? []) {
+      const name = program.material || '(unnamed)'
+      counts.set(name, (counts.get(name) ?? 0) + 1)
+    }
+    const ranked = [...counts].sort((a, b) => b[1] - a[1]).slice(0, 6)
+    return ranked.length ? ranked.map(([name, n]) => `${name}x${n}`).join(', ') : 'none'
+  }
+  const pipelineDelta = (before, after) => {
+    const b = before.pipelines ?? {}, a = after.pipelines ?? {}
+    return `programs started ${b.started ?? '?'}\u2192${a.started ?? '?'}, queued ${b.queued ?? '?'}\u2192${a.queued ?? '?'}, ` +
+      `dropped ${b.dropped ?? '?'}\u2192${a.dropped ?? '?'}, composites ready ` +
+      `${before.composites.filter((c) => c.ready).length}/${before.composites.length}\u2192` +
+      `${after.composites.filter((c) => c.ready).length}/${after.composites.length}, ` +
+      `renderer frame ${before.frame}\u2192${after.frame}`
+  }
+  check('TRAA off again: scene renders non-black', traaOffMean > SETTINGS_SCENE_LUMA_MIN,
+    `scene crop mean ${traaOffMean.toFixed(1)} > ${SETTINGS_SCENE_LUMA_MIN}; ` +
+    `${pipelineDelta(traaOnPipelines, traaOffPipelines)}; ` +
+    `${traaTiming.callbacks} frame callbacks in ${Math.round(traaTiming.elapsedMs)} ms, ` +
+    `max gap ${(traaTiming.maxGapMs / 1000).toFixed(3)} s; ` +
+    `queued by material ${queuedByMaterial(traaOffPipelines)}`)
   check('TRAA off again: no new console errors', errors.length === errsBeforeTraa,
     errors.slice(errsBeforeTraa).join(' | ').slice(0, 300))
 
   // Repeated toggling must not leak the pipeline: every rebuild disposes the
-  // full node chain (scene MRT, GTAO, bloom, TRAA history/RTT). The regression
+  // downstream node chain (GTAO, bloom, TRAA history/RTT). The scene MRT stays
+  // alive across toggles. The regression
   // was a GPU-memory leak per toggle that blacked out the device after a few
   // switches on real hardware. Gate on the renderer's live texture count — it
   // must RETURN to where it started across cycles, not grow per toggle.
@@ -885,8 +915,8 @@ if (section('traa-toggle')) {
     before: firstCycle.count, after: afterStress.count, cycles: 5, tolerance: 2, liveBefore, liveAfter,
   })
   check('TRAA toggle stress: no render-target leak across rebuilds', leak.ok, leak.detail)
-  const stressMean = await meanLuma(await capturePixels(page, 'TRAA toggle stress mean luma'))
-  check('TRAA toggle stress: scene still renders non-black', stressMean > 8, `mean ${stressMean.toFixed(1)}`)
+  const stressMean = await settingsSceneLuma(await capturePixels(page, 'TRAA toggle stress mean luma'))
+  check('TRAA toggle stress: scene still renders non-black', stressMean > SETTINGS_SCENE_LUMA_MIN, `scene crop mean ${stressMean.toFixed(1)} > ${SETTINGS_SCENE_LUMA_MIN}`)
   check('TRAA toggle stress: no new console errors', errors.length === errsBeforeTraa,
     errors.slice(errsBeforeTraa).join(' | ').slice(0, 300))
 
@@ -960,6 +990,33 @@ if (section('graphics-levels')) {
     atMedium.level === 'medium' && atMedium.ssao === false && atMedium.traa && atMedium.bloom &&
     atMedium.shadows && atMedium.shadowRes === 2048 && atMedium.fireShadows === true,
     JSON.stringify(atMedium))
+  // Own the reproducer even in a section-only run. Each mode must reach the
+  // scene pass and render before the next toggle; batched store writes do not
+  // exercise pipeline teardown/rebuild. The MRT is NOT the observable here --
+  // the repair keeps velocity allocated in every mode, so waiting for it to
+  // disappear would wait forever. Drive the toggle the way the traa-toggle
+  // section does: let the rebuild commit, then force a frame that builds its
+  // targets. End with the allow-flag restored so the F9 effective-lever and
+  // flag-preservation checks retain their meaning.
+  // The rebuild is awaited on the APPLICATION's clock: __postBuilds counts up
+  // when the new pipeline is committed, so no wall-clock pause is needed. A
+  // toggle that does not change the EFFECTIVE value rebuilds nothing and is
+  // therefore not waited for.
+  const setTraaAndDraw = async (on) => {
+    const before = await page.evaluate(() => {
+      const s = window.__ui.getState()
+      return {
+        builds: window.__postBuilds ?? 0,
+        traa: s.detailLevel !== 'low' && s.traaEnabled,
+      }
+    })
+    await page.evaluate((value) => window.__ui.getState().setTraaEnabled(value), on)
+    if (before.traa !== on) {
+      await page.waitForFunction((from) => (window.__postBuilds ?? 0) > from, before.builds, { timeout: 15000 })
+    }
+    await forceFrame()
+  }
+  for (const on of [true, false, true, false, true]) await setTraaAndDraw(on)
   // F9 #1: medium → low (every fill-rate lever forced DOWN).
   const atLow = await cycleF9()
   check('F9 → low: post off, shadows low-res, no campfire shadows',
@@ -968,11 +1025,11 @@ if (section('graphics-levels')) {
   // The defect this section guards was a BLACK picture, so the LOW preset
   // leaves a frame behind rather than a number alone (CLAUDE.md §7.2).
   const lowShot = await shot('1105-graphics-level-low', {
-    general: 'the LOW graphics preset is judged by the mean luma of this whole frame, which is therefore the subject',
+    general: 'the travel scene at LOW after rendered TRAA on/off cycles; brightness is measured only in the interface-free scene crop',
     scene: 'travel',
   })
-  const lowMean = await meanLuma(lowShot)
-  check('F9 low: scene still renders non-black', lowMean > 8, `mean ${lowMean.toFixed(1)}`)
+  const lowMean = await settingsSceneLuma(lowShot)
+  check('F9 low: scene still renders non-black', lowMean > SETTINGS_SCENE_LUMA_MIN, `scene crop mean ${lowMean.toFixed(1)} > ${SETTINGS_SCENE_LUMA_MIN}`)
   // F9 #2: low → high (wraps to the top; SSAO on, sharper shadows).
   const atHigh = await cycleF9()
   check('F9 → high (wraps from the bottom): SSAO on, 4096 shadows, campfire on',
