@@ -15,6 +15,7 @@
 import { hypothesisFor, type CommunicationMemory } from './heard'
 import { phraseOf, tonesOf, type ConceptId, type LectId, type Phrase, type UtteranceId } from './lexicon'
 import { NO_READING } from './speechLabel'
+import { balance } from '../config/balance'
 import { phrasePlan, type SpeechOptions } from './speaking'
 
 /**
@@ -71,6 +72,9 @@ export function chiefMessagePhrase(lect?: LectId): Phrase {
  * one on the small drum, and nothing else encodes anything.
  */
 export function drumMessagePlan(options: SpeechOptions = {}, lect?: LectId): DrumMessagePlan {
+  // Speech shares the timing, but its measured vowel/panner headroom must not
+  // recalibrate the message drums. Preserve their original envelope level.
+  const peak = 1.8 * Math.max(0, options.volume ?? balance.ambienceVolume)
   const atoms = chiefMessagePhrase(lect)
   const plan = phrasePlan(atoms, 0, options)
   const perAtom = atoms.map((atom) => tonesOf(atom).length)
@@ -88,7 +92,7 @@ export function drumMessagePlan(options: SpeechOptions = {}, lect?: LectId): Dru
       duration: syllable.duration,
       conceptIndex,
       syllableIndex,
-      peak: syllable.peak,
+      peak,
     })
     syllableIndex++
   }

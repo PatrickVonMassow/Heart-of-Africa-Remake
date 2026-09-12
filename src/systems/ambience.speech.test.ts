@@ -370,7 +370,7 @@ describe('the spoken syllable is a VOICE, measured on the rendered signal (point
     const peakOf = (buf: Float64Array) => buf.reduce((m, v) => Math.max(m, Math.abs(v)), 0)
     // MEASURED: 1.99 (low), 2.07 (high) at an envelope peak of 1.
     for (const [name, buf] of [['low', low], ['high', high]] as const) {
-      expect(peakOf(buf), `${name}: output per unit envelope peak`).toBeGreaterThan(1.7)
+      expect(peakOf(buf), `${name}: output per unit envelope peak`).toBeGreaterThan(1.9)
       expect(peakOf(buf), `${name}: output per unit envelope peak`).toBeLessThan(2.4)
     }
   })

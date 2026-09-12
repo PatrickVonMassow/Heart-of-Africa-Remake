@@ -1514,13 +1514,11 @@ export const balance: BalanceConfig = {
     speechChildPitchHz: 210,
     speechStereoWidth: 0.6,
     speechPitchInterval: 1.68,
-    // Calibrated against the deployed audio graph after the ambient drum bed
-    // went silent (point 673). At the master's input a syllable beside the
-    // player reaches 0.612, while the conservative sum of every remaining
-    // active village layer and gain modulation reaches 0.2275: 2.69×, or
-    // 8.6 dB, above that ambience floor. The failed deployed value was 1.5;
-    // src/systems/ambience.test.ts measures this margin on the live buses and
-    // still checks the louder debug drum mix for headroom.
+    // Independent speech bus. Re-measured with child carriers and compensated
+    // stereo: the synthesis peak was reduced for headroom (speaking.ts), while
+    // falloff 4 still lifts speech at 3 m and at the hearing rim. The graph test
+    // measures 0.2375 before the master at 3 m over a 0.2275 village floor,
+    // and 0.977 worst-case output with two panned children, drums and a step.
     speechVolume: 2,
     // A hand's breadth over the head, no more (point 582). The note used to
     // hang at a flat 2.3 m over the speaker's FEET — 0.85 m over a grown

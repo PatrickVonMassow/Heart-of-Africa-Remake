@@ -74,19 +74,20 @@ const SYLLABLE_DUTY = 0.62
  * add synthesis gain; graph measurements, not the envelope alone, judge output.
  * Speech volume and hearing falloff are the calibratable loudness controls.
  */
-const SPEECH_PEAK = 1.8
+// Re-measured with 210/352.8 Hz children and width 0.6: the former 1.8
+// exceeded full scale (1.780 conservative mixed peak); 0.85 leaves 0.977.
+const SPEECH_PEAK = 0.85
 
 /**
  * How loud an utterance spoken `distance` away arrives: 1 right beside the
- * speaker, falling off sharply with the square of the distance, and cut to
+ * speaker, falling off with the square of the distance, and cut to
  * exactly 0 beyond the hearing radius. The hard cut is deliberate — it makes
  * "audible" and isWithinHearing() the SAME condition, so nothing is ever
  * recorded that could not be heard, and nothing heard goes unrecorded.
  *
  * `falloff` is the steepness: the level at the rim of the radius is
  * 1/(1+falloff), so a large value means the voices die away close to the
- * speaker — which is what keeps the children's group and the adults' group
- * from babbling over each other in the middle of the village.
+ * speaker. The shipped 4 keeps conversation audible at 3–5 metres.
  */
 export function hearingGain(
   distance: number,

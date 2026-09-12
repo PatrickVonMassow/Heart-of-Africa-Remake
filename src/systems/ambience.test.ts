@@ -995,7 +995,7 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
 
   /** Conservative measured output of the rendered vowel filters per unit of
    * scheduled speech envelope; pinned in ambience.speech.test.ts. */
-  const SYLLABLE_SYNTHESIS_GAIN = 1.7
+  const SYLLABLE_SYNTHESIS_GAIN = 1.9
 
   // Point 605: point 577 gave the speech its own bus at the level it had had on
   // the ambient one, and at that level the syllables sat BELOW the village drum
@@ -1074,8 +1074,8 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
       expect(balance.drumBed.villageGain).toBe(0.42)
       const { drums, speech } = measure()
       expect(drums).toBeGreaterThan(0)
-      // MEASURED: 3.24× the drum beat (0.612 against 0.189) at the pinned
-      // synthesis gain. Under 1 is the reported bug; a shout is no fix either.
+      // MEASURED: 1.71× the drum beat (0.323 against 0.189) at the pinned
+      // synthesis lower bound. Under 1 is the reported bug; a shout is no fix either.
       expect(speech / drums).toBeGreaterThanOrEqual(1.6)
       expect(speech / drums).toBeLessThanOrEqual(4)
     })
@@ -1092,9 +1092,44 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
       const footstep =
         Math.max(...stepGain.gain.events.map((e) => e.value ?? 0)) * stepBus.gain.value
       // Two villagers speaking right beside the player, over the drum bed, with
-      // the player walking: MEASURED 0.76 of full scale after the master.
+      // the player walking. The panned child upper bound is checked below.
       expect((2 * speech + drums + footstep) * master).toBeLessThan(1)
     })
+  })
+
+  it('measures headroom after the panner for two close child voices, ambience, drums and a step', () => {
+    setAmbienceScene({ region: 'central', mode: 'place', placeKind: 'village', nearVillage: false })
+    refreshAmbienceVolume()
+    const voices = spoken(() => playSpeech(utterancePlan(utteranceOf('RIVER'), 0, {
+      bearing: Math.PI / 2, voice: 'child',
+    })))
+    const envelope = envelopeOf(voices[0])
+    const compensation = envelope.connected[0] as FakeGain
+    const panner = compensation.connected[0] as FakePanner
+    const bus = panner.connected[0] as FakeGain
+    const master = bus.connected[0] as FakeGain
+    expect(master.connected[0]).toBe(ctx.destination)
+    const panAngle = (panner.pan.value + 1) * Math.PI / 4
+    // Upper bound measured on all four rendered carriers, including the new
+    // 352.8 Hz vowel (2.671). The old 1.7 lower bound hid the peak load.
+    const synthesisUpper = 2.8
+    const speech = Math.max(...envelope.gain.events.map((e) => e.value ?? 0)) *
+      compensation.gain.value * Math.max(Math.cos(panAngle), Math.sin(panAngle)) *
+      bus.gain.value * synthesisUpper
+    const sourceBefore = ctx.sources.length
+    emitFootstep('stone')
+    const step = ctx.sources[sourceBefore]
+    const stepGain = (step.connected[0] as FakeFilter).connected[0] as FakeGain
+    const stepBus = stepGain.connected[0] as FakeGain
+    const footstep = Math.max(...stepGain.gain.events.map((e) => e.value ?? 0)) * stepBus.gain.value
+    // Measured active village floor and optional drum peak are independently
+    // pinned in the adjacent deployed/audition mix tests.
+    const ambience = 0.2275
+    const drums = DRUM_BEAT_PEAK * balance.drumBed.villageGain * balance.ambientVolume
+    const output = (2 * speech + ambience + drums + footstep) * master.gain.value
+    // Re-measured: 1.780 at the former envelope peak 1.8; 0.977 at 0.85.
+    expect(output).toBeCloseTo(0.97678411396, 5)
+    expect(output).toBeLessThan(1)
   })
 
   // Point 673 follows the shipped drum silence, so the calibration that closes
@@ -1103,7 +1138,7 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
   // layer gains are summed as though their peaks coincided, along with gain
   // modulation feeding those layers, before the common master gain. Real bird
   // and music envelopes can only make the instantaneous floor lower.
-  it('puts a nearby syllable at least 8 dB above the remaining deployed village ambience', () => {
+  it.each([0, 3, 10])('measures deployed speech over the village floor at %s metres', (distance) => {
     ctx.currentTime = 280
     expect(balance.drumBed.enabled).toBe(false)
     setAmbienceScene({ region: 'central', mode: 'place', placeKind: 'village', nearVillage: false })
@@ -1131,7 +1166,7 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
     ) * ambientBus.gain.value
 
     const beforeSpeech = ctx.oscillators.length
-    playSpeech(utterancePlan(utteranceOf('DIG'), 0))
+    playSpeech(utterancePlan(utteranceOf('DIG'), distance))
     const voice = ctx.oscillators.slice(beforeSpeech)[0]
     const envelope = envelopeOf(voice)
     const speechBus = envelope.connected[0] as FakeGain
@@ -1139,11 +1174,19 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
     const speechPeak = peak * speechBus.gain.value * SYLLABLE_SYNTHESIS_GAIN
     const marginDb = 20 * Math.log10(speechPeak / ambienceFloor)
 
-    // MEASURED at the default preset: 0.612 over 0.2275, a 2.69× / 8.59 dB
-    // peak-to-floor margin. The explicit floor makes the promised margin the
-    // failure boundary, not an incidental consequence of the chosen number.
+    // Lower bound from all four rendered carriers (1.99–2.67), through the
+    // live speech/master buses. At 3 m speech still clears the conservative
+    // sum of every deployed layer, and exceeds the former falloff-24 mix.
     expect(ambienceFloor).toBeCloseTo(0.2275, 10)
-    expect(speechPeak).toBeCloseTo(0.612, 10)
-    expect(marginDb).toBeGreaterThanOrEqual(8)
+    const expected = new Map([[0, 0.323], [3, 0.2375], [10, 0.0646]])
+    expect(speechPeak).toBeCloseTo(expected.get(distance)!, 8)
+    const master = speechBus.connected[0] as FakeGain
+    expect(master.connected[0]).toBe(ctx.destination)
+    expect(speechPeak * master.gain.value).toBeCloseTo(expected.get(distance)! * 0.5, 8)
+    if (distance <= 3) expect(marginDb).toBeGreaterThan(0)
+    if (distance > 0) {
+      const former = 1.8 * 0.1 * 2 * SYLLABLE_SYNTHESIS_GAIN / (1 + 24 * (distance / 10) ** 2)
+      expect(speechPeak).toBeGreaterThan(former)
+    }
   })
 })

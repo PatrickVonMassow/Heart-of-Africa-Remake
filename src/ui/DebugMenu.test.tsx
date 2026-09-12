@@ -50,6 +50,8 @@ const DEFAULTS = {
   labelOverlayMax: balance.labelOverlay.maxLabels,
   birdsongVolume: balance.birdsongVolume,
   speechVolume: balance.communication.speechVolume,
+  speechChildPitchHz: balance.communication.speechChildPitchHz,
+  speechStereoWidth: balance.communication.speechStereoWidth,
   drumBed: { ...balance.drumBed },
   surfNearRadius: balance.surf.nearRadius,
   surfCutoff: balance.surf.cutoff,
@@ -140,6 +142,8 @@ afterEach(() => {
   balance.labelOverlay.maxLabels = DEFAULTS.labelOverlayMax
   balance.birdsongVolume = DEFAULTS.birdsongVolume
   balance.communication.speechVolume = DEFAULTS.speechVolume
+  balance.communication.speechChildPitchHz = DEFAULTS.speechChildPitchHz
+  balance.communication.speechStereoWidth = DEFAULTS.speechStereoWidth
   Object.assign(balance.drumBed, DEFAULTS.drumBed)
   balance.surf.nearRadius = DEFAULTS.surfNearRadius
   balance.surf.cutoff = DEFAULTS.surfCutoff
