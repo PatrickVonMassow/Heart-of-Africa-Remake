@@ -24,7 +24,7 @@ export function redOwnership({ suite, backend, failed, report, filed = [] }) {
     report.baseline !== report.head && Array.isArray(report.classified)
   const deposited = new Set(filed)
   return distinctReds(failed).map((check) => {
-    const matches = valid ? report.classified.filter((c) => c.key === check.key &&
+    const matches = valid ? report.classified.filter((c) => c?.key === check.key &&
       checkFromName(c.check).key === check.key) : []
     const verdict = matches.length === 1 ? matches[0].verdict : 'inconclusive'
     const title = redRequestTitle(suite, check.name)

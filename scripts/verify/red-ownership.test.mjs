@@ -38,7 +38,7 @@ describe('baseline evidence owns a red', () => {
 
   it('holds unfiled evidence and missing, mismatched or duplicate reports', () => {
     expect(decide(reportFor('pre-existing'), [])[0].reason).toContain('filing failed')
-    for (const report of [null, {}, { ...reportFor('pre-existing'), backend: 'webgpu' },
+    for (const report of [null, {}, { ...reportFor('pre-existing'), classified: [null, {}] }, { ...reportFor('pre-existing'), backend: 'webgpu' },
       { ...reportFor('pre-existing'), baseline: 'b'.repeat(40) },
       { ...reportFor('pre-existing'), classified: [reportFor('pre-existing').classified[0], reportFor('pre-existing').classified[0]] }]) {
       expect(decide(report)[0].elsewhere).toBe(false)

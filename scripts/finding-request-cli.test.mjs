@@ -224,7 +224,7 @@ describe('automatic requests are filed once by title', () => {
   it('serializes concurrent reports while preserving distinct titles', async () => {
     const args = ['scripts/finding.mjs', '--request', 'Same red', '--once', '--spec-file', join(dir, 'spec.md')]
     const results = await Promise.all(Array.from({ length: 4 }, () => promisify(execFile)(process.execPath, args, {
-      cwd: REPO_ROOT, encoding: 'utf8', env: { ...process.env, FINDINGS_MEMORY_DIR: dir },
+      cwd: REPO_ROOT, windowsHide: true, encoding: 'utf8', env: { ...process.env, FINDINGS_MEMORY_DIR: dir },
     })))
     expect(results.filter((r) => r.stdout.includes('request deposited'))).toHaveLength(1)
     expect(requestEntries(carrierText())).toHaveLength(1)

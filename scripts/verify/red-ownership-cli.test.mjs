@@ -30,7 +30,7 @@ function run({ suite = 'settings', verdict = 'pre-existing', missing = false, fa
         })))
         return { status: failedProcess ? 1 : 0 }
       }
-      return failedDeposit ? { status: 1 } : spawnSync(command, args, { ...options, stdio: 'pipe', encoding: 'utf8' })
+      return failedDeposit ? { status: 1 } : spawnSync(command, args, { ...options, windowsHide: true, stdio: 'pipe', encoding: 'utf8' })
     },
   })
   return { ...result, calls, log: log.join('\n') }

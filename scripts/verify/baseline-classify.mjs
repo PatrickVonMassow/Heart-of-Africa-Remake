@@ -205,8 +205,8 @@ function runSuiteOnce({ suitePath, cwd, baseUrl, label, logPath }) {
 async function main() {
   const opts = parseWrapperArgs(process.argv.slice(2))
   if (!opts.suite || ![...DEV_SUITES, 'crossbrowser'].includes(opts.suite)) {
-    console.log(`usage: node scripts/verify/baseline-classify.mjs <suite> [--ref <git-ref>] [--runs n] [--failed "<check>"] [--current-out <file>] [--strict]`)
-    console.log(`known suites: ${DEV_SUITES.join(', ')}`)
+    console.log(`usage: node scripts/verify/baseline-classify.mjs <suite> [--ref <git-ref>] [--runs n] [--failed "<check>"] [--current-out <file>] [--report-file <file>] [--strict]`)
+    console.log(`known suites: ${[...DEV_SUITES, 'crossbrowser'].join(', ')}`)
     process.exit(2)
   }
   const backend = selectBackend(process.env.VERIFY_GL)
