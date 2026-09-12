@@ -2,7 +2,7 @@
 // document: the account only does its job if it holds TODAY, so the shipped
 // docs/document-cut-757.md is judged here against the real filesystem and the
 // really wired hook chains, not only against synthetic input.
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { readFileSync, existsSync, realpathSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { resolve } from 'node:path'
@@ -23,7 +23,7 @@ import {
   userTreeRootOf,
   wiredGuards,
 } from './cut-account-core.mjs'
-import { DOC_BUDGETS, measure } from './doc-budget-core.mjs'
+import { DOC_BUDGETS, measure, evaluateDocBudgets } from './doc-budget-core.mjs'
 import { mainCheckoutFrom } from './main-checkout-core.mjs'
 import { execFileSync } from 'node:child_process'
 
@@ -41,6 +41,7 @@ const MAIN_ROOT =
   ) ?? ROOT
 const ACCOUNT_PATH = resolve(ROOT, 'docs/document-cut-757.md')
 const MEMORY_DIR = resolve(homedir(), '.claude', 'projects', '-workspace-hoa', 'memory')
+const MEMORY_PATH = resolve(MEMORY_DIR, 'MEMORY.md')
 
 // Two of the three cut documents live in the USER's home, outside any checkout,
 // so a CI runner has no `~/.claude` at all and cannot see a destination that
@@ -675,6 +676,56 @@ describe('docs/document-cut-757.md — the ceilings table', () => {
 
   it('quotes current line and word counts only for repository-owned cut documents', () => {
     assertRepositoryCounts()
+  })
+
+  it('never reads external files as a memory is written, edited and deleted', () => {
+    const projectPath = resolve(ROOT, 'CLAUDE.md')
+    // An in-memory filesystem exercises every state without touching user data.
+    const files = new Map([[projectPath, readFileSync(projectPath, 'utf8')]])
+    const globalPath = resolve(homedir(), '.claude', 'CLAUDE.md')
+    const read = vi.fn((path) => {
+      if (!files.has(path)) throw new Error(`Missing fixture: ${path}`)
+      return files.get(path)
+    })
+    for (const memory of [null, '# Memory\nA new topic.\n', '# Memory\nAn edited topic with more words.\n', null]) {
+      if (memory === null) {
+        files.delete(MEMORY_PATH)
+        files.delete(globalPath)
+      } else {
+        files.set(MEMORY_PATH, memory)
+        files.set(globalPath, 'User instructions changed too.\n')
+      }
+      read.mockClear()
+      assertRepositoryCounts(read)
+      expect(read.mock.calls).toEqual([[projectPath, 'utf8']])
+    }
+  })
+
+  it('records no current measurements or headroom for external cut documents', () => {
+    for (const budget of DOC_BUDGETS.filter((b) => CUT_SOURCES.includes(b.path) && b.location)) {
+      const cells = rowFor(budget.path).split('|').map((cell) => cell.trim())
+      expect(cells[2]).toBe('outside repository')
+      expect(cells[4]).toBe('not recorded')
+    }
+  })
+
+  it('still rejects stale repository measurements', () => {
+    const project = readFileSync(resolve(ROOT, 'CLAUDE.md'), 'utf8')
+    expect(() => assertRepositoryCounts(() => `${project}\nAnother word.\n`)).toThrow()
+  })
+
+  it.each(CUT_SOURCES)('still rejects real line and word ceiling breaches for %s', (path) => {
+    const budget = DOC_BUDGETS.find((b) => b.path === path)
+    for (const [kind, text, ceiling] of [
+      ['words', Array(budget.maxWords + 1).fill('word').join(' '), budget.maxWords],
+      ['lines', Array(budget.maxLines + 1).fill('word').join('\n'), budget.maxLines],
+    ]) {
+      const verdict = evaluateDocBudgets([{ path, text }], [budget])
+      expect(verdict.block).toBe(true)
+      expect(verdict.findings).toContainEqual(expect.objectContaining({
+        path, kind, actual: ceiling + 1, budget: ceiling,
+      }))
+    }
   })
 })
 
