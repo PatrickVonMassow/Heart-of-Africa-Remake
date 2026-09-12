@@ -15699,3 +15699,40 @@ to land than a mechanism that needs a review.
   run, and it will do so again on any busy machine.
   Bundle: Testinfrastruktur.
 
+
+- [ ] 1114. Repair pre-existing settings check: first-person ground shows micro-detail
+  (edge energy) (filed automatically by a LARGE run on 12.09.2026 under point 1089's
+  ownership rule; the user ordered these three reds filed at once on 10.09.2026).
+  The first-person ground-detail frame shows measurable micro-detail and passes its
+  edge-energy assertion. Diagnose and fix the rendering, staging or check defect responsible
+  for the recurring red; preserve a meaningful assertion and add regression coverage. Prove
+  settings --section=ground-detail, then the full settings suite on the affected backend.
+  Observed 10.09.2026: point 1065 spent 23 full LARGE runs and 16.2 machine hours with no
+  green run, and none of the recurring reds touched its own change. This point owns the
+  settings red.
+  Refs: scripts/verify/settings.mjs, point 1089, point 1065.
+  Bundle: Testinfrastruktur.
+
+- [ ] 1115. Repair pre-existing enrichments check: the streamed dressing does not grow over
+  a session at a fixed anchor (filed automatically by a LARGE run on 12.09.2026 under point
+  1089's ownership rule; the user ordered these three reds filed at once on 10.09.2026).
+  Streamed dressing stays bounded over a session at a fixed anchor as required by point 278.
+  Diagnose and repair the recurring dressing-growth failure without weakening the
+  bounded-growth check; add regression coverage. Prove enrichments --section=dressing-growth,
+  then the full enrichments suite on the affected backend.
+  Observed 10.09.2026: this red held point 1065 across 23 full LARGE runs without ever
+  touching its change. This point owns it.
+  Refs: scripts/verify/enrichments.mjs, point 1089, point 1065, point 278.
+  Bundle: Testinfrastruktur.
+
+- [ ] 1116. Repair pre-existing crossbrowser check: chromium-mobile no console errors on
+  mobile (filed automatically by a LARGE run on 12.09.2026 under point 1089's ownership
+  rule; the user ordered these three reds filed at once on 10.09.2026).
+  Chromium mobile boots and initialises its renderer without calling getSupportedExtensions
+  on null. Diagnose and repair the recurring renderer initialisation error; add a regression
+  test for the failing path. Prove the full crossbrowser suite at standard depth, including
+  chromium-mobile and its no-console-errors assertion.
+  Observed 10.09.2026: this red held point 1065 across 23 full LARGE runs without ever
+  touching its change. This point owns it.
+  Refs: scripts/verify/crossbrowser.mjs, point 1089, point 1065.
+  Bundle: Testinfrastruktur.
