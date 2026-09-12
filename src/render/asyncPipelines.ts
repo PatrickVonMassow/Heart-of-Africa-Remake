@@ -84,17 +84,17 @@ export interface PipelineBackend {
 }
 
 interface ProgramDiagnostic {
-  id: number | null
+  key: string | null
   material: string
   usedTimes: number | null
 }
 
 /** Only scalar snapshots are retained; disposed render objects must be collectible. */
 function describeProgram(renderObject: unknown, pipeline: unknown): ProgramDiagnostic {
-  const program = pipeline as { id?: number; usedTimes?: number } | null
+  const program = pipeline as { cacheKey?: string; usedTimes?: number } | null
   const object = renderObject as { material?: { name?: string } } | null
   return {
-    id: program?.id ?? null,
+    key: program?.cacheKey ?? null,
     material: object?.material?.name ?? '',
     usedTimes: program?.usedTimes ?? null,
   }

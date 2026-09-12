@@ -9,7 +9,7 @@ export function settingsPipelineState() {
       if (pipeline.fragmentProgram?.name !== 'RenderPipeline') continue
       const data = renderer.backend.get(pipeline)
       composites.push({
-        id: pipeline.id,
+        key: pipeline.cacheKey,
         usedTimes: pipeline.usedTimes,
         ready: data.pipeline != null,
       })

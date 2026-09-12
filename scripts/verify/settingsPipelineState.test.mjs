@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import RenderObjectPipeline from 'three/src/renderers/common/RenderObjectPipeline.js'
 import { settingsPipelineState } from './settingsPipelineState.mjs'
 
 afterEach(() => vi.unstubAllGlobals())
@@ -11,9 +12,11 @@ describe('settings pipeline evidence', () => {
   })
 
   it('distinguishes a linked composite from a drawable composite and preserves drop identities', () => {
-    const linked = { id: 1, usedTimes: 1, fragmentProgram: { name: 'RenderPipeline' } }
-    const ready = { id: 2, usedTimes: 3, fragmentProgram: { name: 'RenderPipeline' } }
-    const scene = { id: 3, usedTimes: 1, fragmentProgram: { name: 'ground' } }
+    const linked = new RenderObjectPipeline('1,2,', {}, { name: 'RenderPipeline' })
+    linked.usedTimes = 1
+    const ready = new RenderObjectPipeline('1,3,', {}, { name: 'RenderPipeline' })
+    ready.usedTimes = 3
+    const scene = new RenderObjectPipeline('4,5,', {}, { name: 'ground' })
     const get = vi.fn((pipeline) => pipeline === ready ? { pipeline: {} } : { programGPU: {} })
     vi.stubGlobal('__renderer', {
       info: { frame: 90, render: { drawCalls: 24 } },
@@ -22,8 +25,8 @@ describe('settings pipeline evidence', () => {
     })
     const counts = { pending: 0, queued: 1, dropped: 1 }
     const diagnostics = {
-      queued: [{ id: 1, material: 'RenderPipeline', usedTimes: 1 }],
-      recentDrops: [{ id: 0, material: 'RenderPipeline', usedTimes: 0, reason: 'unused' }],
+      queued: [{ key: '1,2,', material: 'RenderPipeline', usedTimes: 1 }],
+      recentDrops: [{ key: '1,0,', material: 'RenderPipeline', usedTimes: 0, reason: 'unused' }],
     }
     vi.stubGlobal('__shaderPipelines', () => counts)
     vi.stubGlobal('__shaderPipelineDiagnostics', () => diagnostics)
@@ -32,8 +35,8 @@ describe('settings pipeline evidence', () => {
     expect(probe).toEqual({
       frame: 90, drawCalls: 24, pipelines: counts, diagnostics,
       composites: [
-        { id: 1, usedTimes: 1, ready: false },
-        { id: 2, usedTimes: 3, ready: true },
+        { key: '1,2,', usedTimes: 1, ready: false },
+        { key: '1,3,', usedTimes: 3, ready: true },
       ],
     })
     expect(get).toHaveBeenCalledTimes(2)
