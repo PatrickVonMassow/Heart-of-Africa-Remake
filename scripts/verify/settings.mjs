@@ -799,7 +799,33 @@ if (section('traa-toggle')) {
   console.log(`TRAA repeat-link pacing — max painted-frame gap ${(traaTiming.maxGapMs / 1000).toFixed(3)} s; ` +
     `${traaTiming.callbacks} callback completions in ${Math.round(traaTiming.elapsedMs)} ms; ` +
     `repeat links released ${traaOffPipelines.pipelines?.reused - traaOnPipelines.pipelines?.reused}`)
-  check('TRAA off again: scene renders non-black', traaOffMean > SETTINGS_SCENE_LUMA_MIN, `scene crop mean ${traaOffMean.toFixed(1)} > ${SETTINGS_SCENE_LUMA_MIN}`)
+  // The runner keeps only the FAILING check line, so the evidence that names the
+  // cause of a black frame belongs IN the detail, not in a console line beside it.
+  /** Which materials are waiting in the first-use queue — a black scene behind a
+   *  backlog of SCENE materials is a relink, behind post materials a pacing cost. */
+  const queuedByMaterial = (state) => {
+    const counts = new Map()
+    for (const program of state.diagnostics?.queued ?? []) {
+      const name = program.material || '(unnamed)'
+      counts.set(name, (counts.get(name) ?? 0) + 1)
+    }
+    const ranked = [...counts].sort((a, b) => b[1] - a[1]).slice(0, 6)
+    return ranked.length ? ranked.map(([name, n]) => `${name}x${n}`).join(', ') : 'none'
+  }
+  const pipelineDelta = (before, after) => {
+    const b = before.pipelines ?? {}, a = after.pipelines ?? {}
+    return `programs started ${b.started ?? '?'}\u2192${a.started ?? '?'}, queued ${b.queued ?? '?'}\u2192${a.queued ?? '?'}, ` +
+      `dropped ${b.dropped ?? '?'}\u2192${a.dropped ?? '?'}, composites ready ` +
+      `${before.composites.filter((c) => c.ready).length}/${before.composites.length}\u2192` +
+      `${after.composites.filter((c) => c.ready).length}/${after.composites.length}, ` +
+      `renderer frame ${before.frame}\u2192${after.frame}`
+  }
+  check('TRAA off again: scene renders non-black', traaOffMean > SETTINGS_SCENE_LUMA_MIN,
+    `scene crop mean ${traaOffMean.toFixed(1)} > ${SETTINGS_SCENE_LUMA_MIN}; ` +
+    `${pipelineDelta(traaOnPipelines, traaOffPipelines)}; ` +
+    `${traaTiming.callbacks} frame callbacks in ${Math.round(traaTiming.elapsedMs)} ms, ` +
+    `max gap ${(traaTiming.maxGapMs / 1000).toFixed(3)} s; ` +
+    `queued by material ${queuedByMaterial(traaOffPipelines)}`)
   check('TRAA off again: no new console errors', errors.length === errsBeforeTraa,
     errors.slice(errsBeforeTraa).join(' | ').slice(0, 300))
 
