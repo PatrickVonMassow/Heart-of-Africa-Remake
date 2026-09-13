@@ -79,9 +79,10 @@ export function speakOverhead(
   speakerId: string,
   atoms: Phrase,
   anchor: Object3D,
-  options: { seconds?: number; height?: number; now?: number; reach?: number } = {},
+  options: { seconds?: number; height?: number; now?: number; reach?: number; exclusive?: boolean } = {},
 ): void {
   const now = options.now ?? speechClock()
+  if (options.exclusive) { anchors.clear(); reaches.clear() }
   anchors.set(speakerId, anchor)
   reaches.set(speakerId, options.reach ?? balance.communication.talk.reach)
   // The height is read from the SPEAKER, here rather than at each call site, so
@@ -90,7 +91,7 @@ export function speakOverhead(
   // figure's own actor record says how tall it is drawn; a speaker that carries
   // none falls back to a grown figure's height.
   const height = options.height ?? speechLabelHeight(markedActorRise(anchor as MarkedNode))
-  publish(showSpeechLabel(expireSpeechLabels(state, now), speakerId, atoms, now, { ...options, height }))
+  publish(showSpeechLabel(options.exclusive ? noSpeechLabels() : expireSpeechLabels(state, now), speakerId, atoms, now, { ...options, height }))
 }
 
 /** The object a speaker is drawn as, or null once it is gone. */

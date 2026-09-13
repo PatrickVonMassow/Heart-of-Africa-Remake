@@ -13,6 +13,7 @@
 // `tagShuffle.test.ts` replays.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { SpeechFloor } from '../../communication/speechFloor'
 import { bankPlayRocksView } from './riverBank'
 import { registerOptions, utterancePlan } from '../../communication/speaking'
 import { utteranceOf } from '../../communication/lexicon'
@@ -1394,4 +1395,30 @@ describe('the call register reaches the documented spectator stand', () => {
     }
     expect(heard).toEqual(new Set(['RIVER', 'UPSTREAM', 'DOWNSTREAM', 'ROCK']))
   })
+})
+
+
+it('queues the bank call behind an adult exchange before sending the children to the river', () => {
+  const cfg = { ...CFG, roamGuardSeconds: 0 }
+  const rand = mulberry32(7)
+  const state = createBankGame([{ x: 0, z: -22 }, { x: 2, z: -22 }], rand, cfg)
+  state.phaseFor = 0
+  state.namedBoulder = true
+  let clock = 0
+  const stand = { x: 0, z: -20 }
+  const floor = new SpeechFloor(() => ({ ...stand, active: true }), () => clock)
+  const adult = {}
+  const source = { ...stand, register: 'talk' as const }
+  expect(floor.request({ situation: adult, name: 'water errand', word: 'dispatch', source, sources: () => [source] })).toBe(true)
+  const world = { ...openWorld(), floor }
+  for (let i = 0; i < 50; i++) {
+    clock += 0.1
+    expect(stepBankGame(state, 0.1, cfg, STAGE, world, rand)).toBeNull()
+    expect(state.phase).toBe('roam')
+  }
+  expect(floor.waiting(state)).toBe(true)
+  floor.release(adult)
+  clock += 0.1
+  expect(stepBankGame(state, 0.1, cfg, STAGE, world, rand)?.moment).toBe('call')
+  expect(state.phase).toBe('gather')
 })

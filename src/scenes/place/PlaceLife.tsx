@@ -105,6 +105,7 @@ import {
 } from './adultWork'
 import { gestureIfHeard, speechReach } from '../../communication/spokenGesture'
 import { speechBearing } from './speechBearing'
+import { SpeechFloor } from '../../communication/speechFloor'
 import { utterancePlan, registerOptions } from '../../communication/speaking'
 import { speechLabelSeconds } from '../../communication/speechLabel'
 import { playSpeech } from '../../systems/ambience'
@@ -146,6 +147,8 @@ const NPC_RADIUS = WALKER_RADIUS
  * §19.13), or null for the everyday dress. A context rather than a prop: every
  * life vignette builds its own Figures, and only the Figure itself cares.
  */
+const SpeechFloorContext = createContext<SpeechFloor | null>(null)
+
 const ColdCloaksContext = createContext<ColdDress | null>(null)
 
 /**
@@ -616,7 +619,7 @@ function speakBankUtterance(
   if (reach.audible) {
     useGame.getState().hearUtterance(utterance)
     if (anchor) {
-      speakOverhead(`kid-${said.speaker}`, [utterance], anchor, { seconds: speechLabelSeconds(1), reach: options.radius })
+      speakOverhead(`kid-${said.speaker}`, [utterance], anchor, { exclusive: true, seconds: speechLabelSeconds(1), reach: options.radius })
     }
   }
   // A TOUCH BRINGS ITS OWN ARM. Its hand has to land on a drawn flank, and the
@@ -710,6 +713,7 @@ function Kids({
   // The body each child presents to every other inhabitant (point 578), and the
   // whole settlement's registry — claimed BEFORE the world below, because the
   // chase steers by both (point 657).
+  const speechFloor = useContext(SpeechFloorContext)
   const bodySet = useContext(InhabitantBodiesContext)
   const bodies = useInhabitantBodies(count, { scale: KID_SCALE })
   // Which bodies are the game's own playmates, for the world's occupied rules.
@@ -965,6 +969,7 @@ function Kids({
     const dt = Math.min(rawDt, 0.1)
     const cfg = balance.villageLife.childSpeech
     let spoken: BankUtterance | null = null
+    world.floor = speechFloor ?? undefined
     if (round.bank) {
       // THE TRAVELLER IS AN OBSTACLE, NEVER A STOP (work-order 687 item 7): the
       // children steer round him — with one extra radius over a villager's body,
@@ -1846,7 +1851,7 @@ function speakChiefWord(
   if (speechReach(distance).audible) {
     useGame.getState().hearUtterance(utterance)
     if (anchor) {
-      speakOverhead(DRUMMER_SPEAKER_ID, [utterance], anchor, { seconds: speechLabelSeconds(1) })
+      speakOverhead(DRUMMER_SPEAKER_ID, [utterance], anchor, { exclusive: true, seconds: speechLabelSeconds(1) })
     }
   }
   // The arm is aimed at the hut's DOOR height rather than its ridge: a man
@@ -2629,9 +2634,10 @@ function ErrandVillagers({
     },
     [geography, playGround, playRocks],
   )
+  const speechFloor = useContext(SpeechFloorContext)
   const view = useMemo<AdultWorkView>(
-    () => ({ villagers: people, geography, standable, invitationClear, childrenHear }),
-    [people, geography, standable, invitationClear, childrenHear],
+    () => ({ villagers: people, geography, standable, invitationClear, childrenHear, floor: speechFloor ?? undefined }),
+    [people, geography, standable, invitationClear, childrenHear, speechFloor],
   )
 
   // The body each villager presents to every other inhabitant (point 578): two
@@ -2919,13 +2925,13 @@ function ErrandVillagers({
       }
     }
 
-    const said = stepAdultWork(work, view, dt, cfg, rand)
+    stepAdultWork(work, view, dt, cfg, rand)
     const progress = digProgressOf(work, geography.digSites.length)
     if (progress.some((site, i) => site.strikes !== (reportedStrikes.current[i] ?? 0))) {
       reportedStrikes.current = progress.map((site) => site.strikes)
       onDigProgress(progress)
     }
-    if (said) {
+    for (const said of work.emitted) {
       // The speaker turns to what he is talking about before he says it: a word
       // thrown over a shoulder at nothing reads as nothing at all.
       const speaker = people[said.speaker]
@@ -3263,7 +3269,7 @@ function speakWork(
   if (speechReach(distance).audible) {
     useGame.getState().hearUtterance(utterance)
     if (anchor) {
-      speakOverhead(`villager-${said.speaker}`, [utterance], anchor, { seconds: speechLabelSeconds(1) })
+      speakOverhead(`villager-${said.speaker}`, [utterance], anchor, { exclusive: true, seconds: speechLabelSeconds(1) })
     }
   }
   gesture.current = gestureIfHeard(distance, said.purpose === 'invitation' ? 'beckon' : 'indicate', {
@@ -3410,6 +3416,9 @@ export function PlaceLife({
   /** Publishes strike-quantized progress to the site meshes in PlaceScene. */
   onDigProgress: (progress: readonly DigSiteProgress[]) => void
 }) {
+  const speechTime = useRef(0)
+  useFrame((_, dt) => { speechTime.current += Math.min(dt, 0.1) })
+  const speechFloor = useMemo(() => new SpeechFloor(() => placePlayerPosition, () => speechTime.current), [placeId])
   let hash = 0
   for (const c of placeId) hash = (hash * 31 + c.charCodeAt(0)) | 0
   const localSeed = (seed ^ hash) >>> 0
@@ -3584,11 +3593,13 @@ export function PlaceLife({
       <ColdCloaksContext.Provider value={cloaks}>
         <LimbDetailContext.Provider value={limbSegments}>
           <InhabitantBodiesContext.Provider value={inhabitantBodies}>
+          <SpeechFloorContext.Provider value={speechFloor}>
             <Porters seed={localSeed} stops={buildings} cloth={style.cloth} colliders={colliders} count={1 + size} />
             <Traders seed={localSeed} cloth={style.cloth} />
             <Talkers x={PORT_TALKERS[0]} z={PORT_TALKERS[1]} cloth={style.cloth} />
             <Walkers seed={localSeed} homes={homes} errands={errands} cloth={style.cloth} count={2 + size * 2} colliders={colliders} />
-          </InhabitantBodiesContext.Provider>
+          </SpeechFloorContext.Provider>
+        </InhabitantBodiesContext.Provider>
         </LimbDetailContext.Provider>
       </ColdCloaksContext.Provider>
     )
@@ -3597,6 +3608,7 @@ export function PlaceLife({
     <ColdCloaksContext.Provider value={cloaks}>
       <LimbDetailContext.Provider value={limbSegments}>
         <InhabitantBodiesContext.Provider value={inhabitantBodies}>
+          <SpeechFloorContext.Provider value={speechFloor}>
           <Cook x={firePos[0] + 1.2} z={firePos[1] + 1.0} cloth={style.cloth[0]} />
           <Weaver x={-8.5} z={-7} cloth={style.cloth[1 % style.cloth.length]} weave={style.bandColor} />
           <Kids
@@ -3655,6 +3667,7 @@ export function PlaceLife({
               startDelay={9}
             />
           )}
+        </SpeechFloorContext.Provider>
         </InhabitantBodiesContext.Provider>
       </LimbDetailContext.Provider>
     </ColdCloaksContext.Provider>

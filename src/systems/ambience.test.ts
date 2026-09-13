@@ -33,7 +33,7 @@ import {
 import { thunderDelaySeconds } from './season'
 import { balance } from '../config/balance'
 import { phraseOf, utteranceOf, SEQUENCE_LENGTH } from '../communication/lexicon'
-import { phrasePlan, utterancePlan } from '../communication/speaking'
+import { phrasePlan, utterancePlan, registerOptions } from '../communication/speaking'
 import { resetDevAsserts } from './devAssert'
 import { drumMessagePlan } from '../communication/drumMessage'
 
@@ -1108,11 +1108,11 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
     return { ambienceFloor, ambientBus }
   }
 
-  it('measures headroom after the panner for two close child voices, ambience, drums and a step', () => {
+  it.each([{ register: 'talk' as const, count: 2 }, { register: 'call' as const, count: 1 }])('measures headroom for $count close child $register voices, ambience, drums and a step', ({ register, count }) => {
     setAmbienceScene({ region: 'central', mode: 'place', placeKind: 'village', nearVillage: false })
     refreshAmbienceVolume()
     const voices = spoken(() => playSpeech(utterancePlan(utteranceOf('RIVER'), 0, {
-      bearing: Math.PI / 2, voice: 'child',
+      bearing: Math.PI / 2, voice: 'child', ...registerOptions(register),
     })))
     const envelope = envelopeOf(voices[0])
     const compensation = envelope.connected[0] as FakeGain
@@ -1145,9 +1145,9 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
     refreshAmbienceVolume()
     expect(drumLayer).toHaveLength(1)
     expect(drums).toBeGreaterThan(0)
-    const output = (2 * speech + ambience + drums + footstep) * master.gain.value
+    const output = (count * speech + ambience + drums + footstep) * master.gain.value
     // Re-measured: 1.780 at the former envelope peak 1.8; 0.977 at 0.85.
-    expect(output).toBeCloseTo(0.97678411396, 5)
+    if (register === 'talk') expect(output).toBeCloseTo(0.97678411396, 5)
     expect(output).toBeLessThan(1)
   })
 

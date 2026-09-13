@@ -22,6 +22,7 @@ import {
   type AdultWorkView,
   type SpokenWord,
 } from './adultWork'
+import { utteranceSeconds } from '../../communication/speaking'
 import { balance } from '../../config/balance'
 import { CONCEPT_IDS } from '../../communication/lexicon'
 import { DIG_CYCLE_SECONDS } from '../../render/gesture'
@@ -245,7 +246,7 @@ describe('RIVER is ordered and reported at the village water stand', () => {
     // THE WATER WORD IS GATED BY A HEARING CHILD exactly as the two DIG
     // utterances are: only the DIG branches carried that check before.
     const deaf = run(view(6), 240)
-    const heard = run(view(6, undefined, () => true, () => true), 240)
+    const heard = run(view(6, undefined, () => true, () => true), 60)
     expect(deaf.words.some((w) => w.concept === 'RIVER')).toBe(true)
     expect(heard.words.some((w) => w.concept === 'RIVER')).toBe(false)
   })
@@ -483,7 +484,7 @@ describe('DIG is a summons said twice', () => {
     putAtGoal(state, v, initiator)
     putAtGoal(state, v, partner)
     stepAdultWork(state, v, 1 / 60, CFG, () => 0.5) // both arrival flags
-    const atSite = stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
+    const atSite = stepAdultWork(state, v, utteranceSeconds(4) + balance.communication.consequenceSeconds, CFG, () => 0.5)
     expect(atSite).toMatchObject({ concept: 'DIG', speaker: initiator, purpose: 'site' })
     expect(atSite?.aim).toEqual({ x: site.x, y: 0, z: site.z })
     expect(isDigging(state, initiator)).toBe(true)
@@ -570,7 +571,7 @@ describe('DIG is a summons said twice', () => {
     expect(taskOf(state, initiator)).toMatchObject({ phase: 'site', owes: true, hushed: true })
     expect(isDigging(state, initiator)).toBe(false)
     audibleToChild = false
-    expect(stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)?.purpose).toBe('site')
+    expect(stepAdultWork(state, v, utteranceSeconds(4) + balance.communication.consequenceSeconds, CFG, () => 0.5)?.purpose).toBe('site')
     expect(isDigging(state, initiator)).toBe(true)
     expect(isDigging(state, partner)).toBe(true)
   })
@@ -597,7 +598,7 @@ describe('DIG is a summons said twice', () => {
 
     v.villagers[bystander].x = 40
     v.villagers[bystander].z = 40
-    expect(stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)?.purpose).toBe('site')
+    expect(stepAdultWork(state, v, utteranceSeconds(4) + balance.communication.consequenceSeconds, CFG, () => 0.5)?.purpose).toBe('site')
     expect(isDigging(state, initiator)).toBe(true)
     expect(isDigging(state, partner)).toBe(true)
   })
@@ -624,7 +625,7 @@ describe('digging records work at the site', () => {
     stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
     expect(digProgressOf(state, v.geography.digSites.length)[siteIndex]).toEqual({ dug: 0, strikes: 0 })
     stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
-    for (let t = 0; t < 5; t += 1 / 60) {
+    for (let t = 0; t < 5 + utteranceSeconds(4) + balance.communication.consequenceSeconds; t += 1 / 60) {
       walkFrame(state, v, 1 / 60)
       stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
     }
@@ -709,7 +710,7 @@ describe('task lifecycle safeguards', () => {
     resetDevAsserts()
   })
 
-  it('does not report an owed word that expires only because a child held it', () => {
+  it('forces a child-held word before expiry and reports the hush instead of excusing it', () => {
     resetDevAsserts()
     const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
     const v = riverless(view(3, undefined, undefined, () => true))
@@ -718,11 +719,13 @@ describe('task lifecycle safeguards', () => {
     putAtGoal(state, v, initiator)
     stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
     expect(taskOf(state, initiator)).toMatchObject({ owes: true, hushed: true })
-
-    state.next = Number.POSITIVE_INFINITY
-    stepAdultWork(state, v, CFG.errandSeconds, CFG, () => 0.5)
-    expect(state.tasks.every((task) => task === null)).toBe(true)
-    expect(errors).not.toHaveBeenCalled()
+    state.next = Infinity
+    const t = taskOf(state, initiator)!
+    t.age = CFG.errandSeconds - 0.025
+    const word = stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
+    expect(word?.purpose).toBe('invitation')
+    expect(t.age).toBeLessThan(CFG.errandSeconds)
+    expect(errors.mock.calls.flat().join(' ')).toContain('adult-atom-lost')
     errors.mockRestore()
     resetDevAsserts()
   })

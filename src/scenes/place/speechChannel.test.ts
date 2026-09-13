@@ -281,3 +281,11 @@ it('keeps a call label actionable from the distant spectator stand', () => {
   updateSpeechTarget(() => true, undefined, { ...player, x: 34.01 })
   expect(speechTargetLabel()).toBeNull()
 })
+
+
+it('replaces the preceding village note when the floor grants a new word', () => {
+  speakOverhead('first', [DIG], figure(), { now: 0, seconds: 10, exclusive: true })
+  speakOverhead('second', [RIVER_UTTERANCE], figure(), { now: 1, exclusive: true })
+  expect(speechLabelState().labels.map((l) => l.speakerId)).toEqual(['second'])
+  expect(speechAnchor('first')).toBeNull()
+})

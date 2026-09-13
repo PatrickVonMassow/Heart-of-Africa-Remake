@@ -23,6 +23,8 @@ interface Situation { name: string; sources: FloorRequest['sources']; next: numb
 interface HeldWord { since: number; deadline: number }
 
 export class SpeechFloor {
+  /** Count every forced release, independently of diagnostic log throttling. */
+  forcedCount = 0
   private situations = new Map<object, Situation>()
   private held = new Map<object, Map<string, HeldWord>>()
   private consequence: { source: FloorSource; until: number } | null = null
@@ -37,6 +39,10 @@ export class SpeechFloor {
   private audible(source: FloorSource): boolean {
     const player = this.player()
     return player.active && isWithinHearing(Math.hypot(source.x - player.x, source.z - player.z), voiceRegister(source.register).reach)
+  }
+
+  waiting(situation: object): boolean {
+    return (this.held.get(situation)?.size ?? 0) > 0
   }
 
   release(situation: object): void {
@@ -65,6 +71,7 @@ export class SpeechFloor {
       return false
     }
     if (forced) {
+      this.forcedCount++
       devAssert(false, 'adult-atom-lost', () => `${r.name}/${r.word}: forced after ${(now - (queued?.since ?? now)).toFixed(2)}s; overrun situation ${foreign?.name ?? own?.name ?? r.name}${r.blocked ? ' (hush or occupied site)' : ''}`)
     }
     words?.delete(r.word)
