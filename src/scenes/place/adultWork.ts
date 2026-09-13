@@ -468,7 +468,11 @@ export function stepAdultWork(
       // here would make the floor measure travel instead of speech: the hold
       // then ran the pair's whole task length and the bound fired on healthy
       // work. Nothing withholds this word, so the hush is off as well.
-      if (!ready) { t.hushed = false; continue }
+      if (!ready) {
+        t.hushed = false
+        if (t.owes) state.floor.suspend(t.speechOwner ?? t, t.phase)
+        continue
+      }
       // DEFERRED BY THE FRAME, NOT BY THE FLOOR — and still deferred. The
       // village says at most one word a frame, so a task whose moment HAS come
       // can be passed over because somebody else spoke first. That never

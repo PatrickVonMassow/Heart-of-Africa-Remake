@@ -99,11 +99,11 @@ bound falls from 1.780 to 0.977, speech at 3 m and the rim remains louder.
 
 ## The speech floor
 
-One exchange speaks at a time within the player's earshot. The unit of
-exclusivity is the SITUATION, not the word: while a dig bout stands between its
-two DIGs, or a water errand between its dispatch and its report, no foreign word
-falls. Two simultaneous dig bouts are impossible for the same reason — DIG
-followed by DIG from two people cannot be told from one exchange.
+One situation speaks at a time within the player's earshot. Its word and visible
+consequence finish before another situation speaks, and a ready continuation
+keeps precedence. A silent walk, a child's ear or an occupied dig site yields
+after the consequence window. Work can continue in several places; a pair's
+existence alone never owns the village's speech for its entire task lifetime.
 
 The gap after a word is a CONSEQUENCE WINDOW rather than plain silence: the next
 word waits until the previous word's effect was visible — the invited adult sets
@@ -120,9 +120,11 @@ over 180 s at six villagers, one pair spoke exactly once in the whole run,
 because the bound forced its word out one step before its task expired. Two
 rules keep that from returning. A word whose moment has NOT come — a pair still
 walking to its site owes its DIG but cannot yet say it — takes no turn from
-anybody, so the floor measures speech contention and not travel. And a standing
-exchange never queues behind a waiter: it holds the floor, so waiting for one
-deadlocks both, measured as 89 s of village silence.
+anybody, through either the waiting queue or an existing situation's precedence.
+A previously queued word that stops being ready keeps its deadline but yields
+its turn. A ready continuation never queues behind the waiter it is blocking;
+doing so deadlocks both. Reserving the floor for silent situations instead held
+water dispatch and the bank's call for the full 240 s backstop in the browser.
 
 A QUEUED WORD NEVER EXPIRES. The hold is not a scheduling knob but a
 stuck-situation backstop, calibratable and derived: strictly longer than the

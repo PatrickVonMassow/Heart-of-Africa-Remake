@@ -1,4 +1,4 @@
-// A situation owns its exchange; its words leave time for their visible effect.
+// A speaking situation owns the floor; silent work yields after its visible effect.
 // Only exchanges reaching the player's ear compete. Out-of-range work continues.
 import { balance } from '../config/balance'
 import { devAssert } from '../systems/devAssert'
@@ -49,6 +49,12 @@ export class SpeechFloor {
     return (this.held.get(situation)?.size ?? 0) > 0
   }
 
+  /** Keep the debt and its deadline when a queued speaker stops being ready. */
+  suspend(situation: object, word: string): void {
+    const held = this.held.get(situation)?.get(word)
+    if (held) held.sayable = false
+  }
+
   release(situation: object): void {
     this.situations.delete(situation)
     this.held.delete(situation)
@@ -57,9 +63,13 @@ export class SpeechFloor {
   request(r: FloorRequest): boolean {
     const now = this.now()
     const own = this.situations.get(r.situation)
-    // The oldest audible situation retains precedence if the player walks into
-    // the reach of two exchanges that began independently outside his earshot.
-    const first = [...this.situations.entries()].find(([, s]) => s.sources().some((p) => this.audible(p)))
+    // A word and its consequence finish before any ready continuation. After
+    // that, an exchange retains precedence only while it can actually speak:
+    // walking, hush and an occupied site must not reserve the village for a
+    // task's entire life. Use this request's live readiness for its own entry.
+    const audible = [...this.situations.entries()].filter(([, s]) => s.sources().some((p) => this.audible(p)))
+    const first = audible.find(([, s]) => now < s.next) ?? audible.find(([owner]) =>
+      owner === r.situation ? !r.blocked : [...(this.held.get(owner)?.values() ?? [])].some((h) => h.sayable))
     const foreign = this.audible(r.source) && first && first[0] !== r.situation ? first[1] : null
     /** This exchange already holds the floor and is finishing its own words. */
     const holding = !!first && first[0] === r.situation
@@ -73,11 +83,7 @@ export class SpeechFloor {
     // before the task expired. The bound is a backstop, not a turn-taking
     // mechanism, so the longest-waiting sayable word goes next.
     const since = queued?.since ?? now
-    // A standing exchange never queues behind a waiter: it holds the floor, so
-    // waiting for one would deadlock — the waiter is blocked by this situation
-    // and this situation by the waiter, and the village falls silent until both
-    // words are forced out. Turn-taking decides who speaks NEXT, not whether an
-    // exchange may finish.
+    // A ready continuation never queues behind the waiter it is blocking.
     const older = !holding && this.audible(r.source) && [...this.held].some(([situation, held]) =>
       situation !== r.situation &&
       [...held.values()].some((h) => h.sayable && h.since < since && h.sources().some((p) => this.audible(p))))

@@ -1,5 +1,7 @@
 import { expect, it, vi } from 'vitest'
 import { SpeechFloor } from '../../communication/speechFloor'
+import { utteranceSeconds } from '../../communication/speaking'
+import { balance } from '../../config/balance'
 import { queuedDrummerVoice } from './drummerVoice'
 
 it('keeps each requested CHIEF word behind the active exchange and its consequence', () => {
@@ -11,10 +13,10 @@ it('keeps each requested CHIEF word behind the active exchange and its consequen
   const speak = vi.fn()
   const queued = queuedDrummerVoice(floor, source, speak)
   queued.voice([1, 2]); queued.voice([3, 4])
-  now = 10
+  now = utteranceSeconds(4) + balance.communication.consequenceSeconds - 0.01
   queued.step()
   expect(speak).not.toHaveBeenCalled()
-  floor.release(owner)
+  now += 0.01
   queued.step()
   expect(speak).toHaveBeenCalledExactlyOnceWith([1, 2])
   queued.step()

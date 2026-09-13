@@ -826,7 +826,7 @@ describe('task lifecycle safeguards', () => {
 })
 
 
-it('keeps whole adult exchanges exclusive at the player’s ear while other work continues', () => {
+it('keeps adult speech and its consequences exclusive while silent work continues', () => {
   const v = view(6)
   v.geography = {
     waterStand: { x: 2, z: 2 }, waterHead: { x: 4, z: 0 },
@@ -837,7 +837,8 @@ it('keeps whole adult exchanges exclusive at the player’s ear while other work
   const floor = new SpeechFloor(() => ({ x: 0, z: 0, active: true }), () => clock)
   v.floor = floor
   const state = createAdultWork(6, CFG)
-  let active: object | null = null
+  const active = new Set<object>()
+  let nextWord = 0
   let completed = 0
   for (; clock < 180; clock += 0.1) {
     v.villagers.forEach((me, i) => {
@@ -854,13 +855,14 @@ it('keeps whole adult exchanges exclusive at the player’s ear while other work
     const tasks = [...state.tasks]
     stepAdultWork(state, v, 0.1, CFG, () => 0.5)
     for (const word of state.emitted) {
+      expect(clock + 1e-8).toBeGreaterThanOrEqual(nextWord)
+      nextWord = clock + utteranceSeconds(4) + balance.communication.consequenceSeconds
       const owner = tasks[word.speaker]!.speechOwner!
       if (word.purpose === 'invitation' || word.id === 'water-out') {
-        expect(active).toBeNull()
-        active = owner
+        expect(active.has(owner)).toBe(false)
+        active.add(owner)
       } else {
-        expect(owner).toBe(active)
-        active = null
+        expect(active.delete(owner)).toBe(true)
         completed++
       }
     }
