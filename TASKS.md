@@ -166,6 +166,25 @@ put it is the mistake this line exists to stop.
       tool pointing at the floor instead of only at `childrenHear`. Without the bound an
       errand runs into the 180 s `errandSeconds` backstop with a word still owed and trips
       `assertNoOwedWord`.
+    - PRECEDENCE AT THE BOUND — the bound WINS, and the overrun is reported LOUDLY (decided
+      13.09.2026 by the batch session after GPT-6 Astra escalated the gap rather than
+      guessing it; recorded for veto on the board). The two requirements above look like they
+      contradict each other when a word reaches its hold while a situation is still standing:
+      speaking breaks the situation's exclusivity, waiting breaks the unconditional bound.
+      They do not contradict, because the HOLD IS NOT A SCHEDULING KNOB BUT A STUCK-SITUATION
+      BACKSTOP. It is DERIVED, like the call reach: strictly longer than the longest
+      situation a healthy village can produce, and strictly shorter than the
+      `errandSeconds` task kill (measured 13.09.2026: `errandSeconds` is 300 s today, not the
+      180 s this point's text states above; `stallSeconds` 20 s is declared at `balance.ts`
+      and still read nowhere). So in healthy play the bound NEVER fires, exclusivity is never
+      broken, and acceptance criterion 15 keeps everything it has. When the bound DOES fire,
+      the standing situation has by definition outlived its own maximum — its exchange is no
+      longer legible to anybody, so letting the queued word through costs no clarity that was
+      still there, while holding it costs the word. Therefore both happen at once: the word
+      is spoken, AND the forcing is reported as a defect naming the situation that overran,
+      never silently. The Test line below keeps `adult-atom-lost` for the word that was held
+      past its hold; the overrun report is the same event seen from the other side and may
+      share that code as long as the situation is named in it.
   Test: Vitest — the reach of each utterance moment, `bankPlayRocksView`'s stand-to-rock
   distance bounding the call reach, a full bank round evaluated from that stand yielding a
   measured LEVEL for every call word, no two situations overlapping in the speech floor, and

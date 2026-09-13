@@ -1177,12 +1177,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "1072": {
-      "at": "2026-09-07T17:37:27.072Z",
-      "why": "Nutzer-Entscheidung 07.09.2026 zur Ufer-Karte: Ortung und höhere Kinderstimmen sind Voraussetzung dafür, dass ein Ruf weiter tragen darf",
-      "origin": "user",
-      "place": "ahead"
-    },
     "1073": {
       "at": "2026-09-07T17:37:27.184Z",
       "why": "Nutzer-Entscheidung 07.09.2026 zur Ufer-Karte: die Richtungsansage ist vom definierten Zuschauerstand aus heute nie hörbar",
@@ -1382,7 +1376,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-13T14:25:17.131Z",
+    "at": "2026-09-13T17:27:14.867Z",
     "points": [
       174,
       184,
@@ -1750,7 +1744,6 @@
       1063,
       1068,
       1071,
-      1072,
       1073,
       1074,
       1075,
