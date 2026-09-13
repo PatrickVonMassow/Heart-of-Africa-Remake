@@ -9,6 +9,29 @@ when their area is touched anyway or a triage says otherwise.
 Format: one line per finding — `- YYYY-MM-DD <source> — <finding>`.
 
 <!-- entries -->
+- 2026-09-13 point 1072 LARGE (WebGPU, `polish`, feat/1072 at 5a5c8d7a5) — the suite went red on
+  its first attempt and clean on the retry, so the run is recorded SUSPECT and covers nothing
+  (CLAUDE.md §7.2). Three of its reds have owners and one family has none. Owned: `leaving after
+  several settlement visits stays fluid (point 96) — 3528 ms` [`travel-panorama-capture`] is the
+  duration signature point 1050 already carries at 3683 ms and 3292 ms, and the recorder resolved
+  it to 1050 by itself; the console red `[ASSERT] adult-atom-lost — dig-first: villager 2 ran out
+  of time with his site word unspoken` is charged to point 1073. UNOWNED: the four
+  `adult-errands` checks (`a village adult is really filling his jar, clear of the others — no
+  carrier reached the fill phase in 180 s`, and the three that follow it with "no filling
+  carrier"), and the console red `[ASSERT] adult-atom-lost — water-back: villager 0 ran out of
+  time with his walk word unspoken`. Both are the 180 s `errandSeconds` backstop being reached:
+  the errand does not finish, so the fill phase never arrives and the owed word is dropped. The
+  1073 charge scopes itself to the DIG readings on purpose and names the water errand's own point
+  as the owner of the rest — but that point, 1087, has since closed, so the water reading now has
+  no owner at all. Not charged and not queued here: it is not reproducible. The WebGL 2 LARGE of
+  the same code (b50ccb836, which differs from the tip only by a review record in
+  `.claude/mechanism-reviews.jsonl`) had `adult-errands` green and a DIFFERENT polish section red
+  (`settlement-season` at the full 60 s, charged to 642), the WebGPU retry was clean over 266
+  checks, and the branch diff cannot reach errand scheduling or the hush — it threads a camera
+  bearing and a voice register through the existing speech calls. A rotating, load-shaped
+  signature on a host whose quiet-machine check reported MACHINE STATE UNKNOWN. If it recurs on a
+  measured quiet host, the question is whether the water reading should widen the 1073 charge
+  (the mechanism is the one 1073 owns for every errand, not only for dig) or become its own point.
 - 2026-09-06 point 689 LARGE regression (`world`, feat/689 at 8c70662b8, WebGL 2) — the landmark
   frame `11-worldmodel-khartoum-confluence` red with "its subject is not in the rendered picture:
   off the left and bottom edge of the frame". That is verbatim the unsettled-jump signature point
