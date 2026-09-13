@@ -288,6 +288,42 @@ put it is the mistake this line exists to stop.
   expectation comes from a PARTIAL section run; the full suite needs ~33 min per pass here.
   That is the already-booked defect of points 1099/1101; measure the frame progress, do not
   kill the run.
+  STAND 14.09.2026 NACHTS, measured on a quiet machine and charged to this point — the
+  branch still does NOT merge. The floor repair of `a7e21ad09` is correct and holds (the
+  chief's answer survives every village word), but the covering `polish` run on WebGPU at
+  that head is RED on its FIRST attempt: 259 pass, 4 fail, 2 console errors. Its retry came
+  back 268/0/0, and a retry covers nothing (CLAUDE.md §7.2), so the run does not cover the
+  lane. REPRODUCED deterministically: the narrow `polish --section=adult-errands` on an
+  otherwise idle host is red in BOTH of its attempts, log
+  `local/verify-logs/2026-09-13T23-26-34-467-polish.log`.
+  THE RED IS ONE DEFECT WITH TWO FACES, and it is the mechanism this point added.
+   · Four FAILs from one root: `no carrier reached the fill phase in 180 s`
+     (`scripts/verify/polish.mjs:5558`). The water errand never gets sent.
+   · The new hold bound firing in a HEALTHY village, which the decision card said it never
+     would: `water-out pair 2/3/send: forced after 239.97s; overrun situation dig-second
+     pair 8/9`, `bank cycle 0/0:call: forced after 240.03s; overrun situation dig-second
+     pair 4/5`, and `dig-first pair 6/7/site: forced after 239.95s; overrun situation
+     dig-first pair 6/7 (hush or occupied site)`. Every one of them waited the FULL hold.
+  THE CAUSE, named in `src/communication/speechFloor.ts` `request`. Precedence is taken
+  from `this.situations`, and a situation enters that map on its first granted word and
+  leaves it only through `release` — which `adultWork.ts` reaches only at the `site` word
+  or at `water-back`, or when `clearPair` finally expires the pair. `first` then picks the
+  OLDEST audible entry whatever it is doing, and `foreign` blocks everybody else against
+  it. So a pair that CANNOT say its next word — its site is occupied, a child is in
+  earshot, or it is simply still walking — keeps the whole village silent for the rest of
+  its 300 s life. The starvation is not hypothetical: the water `send` word and the bank
+  `call` were both held for the full bound by such a pair.
+  The point already contains the distinction that fixes this and applies it in only one of
+  the two places: `HeldWord.sayable` (`sayable: !r.blocked`) keeps an unsayable word from
+  taking a turn from others through the `older` path, while the same situation still takes
+  the floor from everybody through `foreign`.
+  DIRECTION (not yet written, and the commissioned author may argue it down): precedence
+  belongs to a situation that is SPEAKING, not to one that merely exists — `now < s.next`
+  (its word and its consequence window are still running) or a sayable word ready to go.
+  Walking, hushed and site-blocked situations yield. That deletes the deadlock instead of
+  adding a mechanism, and it leaves Abnahmekriterium 15 intact, because exclusivity means
+  no two situations speak AT ONCE, not that one silent pair owns the village for 300 s.
+  The bound must go back to never firing in a healthy village; that it fires is the test.
   Bundle: Dorfleben.
 
 - [ ] 1056. The excavation becomes a real place: it says what it is for, and its earth is
