@@ -179,7 +179,10 @@ describe('village speech (design.md §13.4)', () => {
       syllableSeconds: 0.3,
       phrasePauseSeconds: 0.9,
       hearingRadius: 10,
-      hearingFalloff: 4,
+      talk: { reach: 10, loudness: 1, falloff: 4 },
+      call: { reach: 34, loudness: 1.25, falloff: 4 },
+      consequenceSeconds: 2,
+      speechHoldSeconds: 240,
       labelSeconds: 2.6,
       speechPitchHz: 140,
       speechChildPitchHz: 210,
@@ -198,6 +201,16 @@ describe('village speech (design.md §13.4)', () => {
     // there without reaching across the village.
     expect(balance.communication.chiefBesideDrummer).toBeGreaterThan(0.5)
     expect(balance.communication.chiefTalkReach).toBeLessThan(balance.communication.hearingRadius)
+    // TALK is the ordinary register and keeps the rim every other budget reads;
+    // a CALL is a child at play — it must carry further AND arrive louder, or
+    // raising the reach alone would leave it at the ~4 % the point set out to fix.
+    expect(balance.communication.talk.reach).toBe(balance.communication.hearingRadius)
+    expect(balance.communication.call.reach).toBeGreaterThan(balance.communication.talk.reach)
+    expect(balance.communication.call.loudness).toBeGreaterThan(balance.communication.talk.loudness)
+    // The hold is a backstop, never a scheduling knob: it must outlast the
+    // longest healthy exchange (measured in adultWork.floor.test.ts) and still
+    // fall strictly inside the errand's own kill time.
+    expect(balance.communication.speechHoldSeconds).toBeLessThan(balance.villageLife.adultErrands.errandSeconds)
     // He walks, rather than slides: slower than the traveller himself.
     expect(balance.communication.chiefWalkSpeed).toBeLessThan(balance.placeWalkSpeed)
     // Handing a find over is face to face: the reach clears the step the chief
