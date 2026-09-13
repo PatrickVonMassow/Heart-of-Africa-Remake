@@ -1534,7 +1534,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Sonntag, 13.09.2026, 16:24 · Quellen-Fingerprint: `149eaaf10ed0…`
+Zuletzt aktualisiert: Sonntag, 13.09.2026, 18:56 · Quellen-Fingerprint: `0266394b31a3…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1640,8 +1640,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 96 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 132 Prozess-/Meta-TASKS-Punkte (davon 64 offen).
 
-<!-- RETRO-FINGERPRINT: 149eaaf10ed064f8e58188194fa0598c689b471d3059fd90cf0ebf18ca166ddd -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-13T14:24:26.811Z -->
+<!-- RETRO-FINGERPRINT: 0266394b31a368798278924e0f47dbf770673ee82592cd5817fbbcc66d9b2ecf -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-13T16:56:13.133Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -6818,3 +6818,30 @@ nächste Rücknahme sie neu ausrichtet statt sie zu zerbrechen. Und das Tor der 
 auf dem Zweig, nicht erst hinter dem Merge: Ein Rot, das man vor dem Merge findet, kostet
 eine Reparatur, dasselbe Rot danach kostet zusätzlich einen main, der halb gelandet
 dasteht.
+
+### 3.269 Der Nachweis wohnte in dem Baum, den das Aufräumen entfernt
+
+Am 13.09.2026 lief der große Lauf eines Punktes zwei Stunden lang in dessen eigenem
+Worktree — beide Backends, jede rote Suite am Ende gegen die Merge-Basis eingestuft, jede
+davon vorbestehend. Die Landung war sauber, und danach verlangte die Zweig-Hygiene das
+Übliche: lokalen Zweig, entfernten Zweig und Worktree entfernen. Genau dabei verschwand der
+Beweis. Das Nachweis-Register ist git-ignoriert und steht pro Arbeitsbaum; der Lauf hatte
+sich in die Kopie des Worktrees geschrieben, main hatte nie einen Eintrag, und mit dem
+Verzeichnis waren auch die Laufprotokolle weg. Zurück blieb ein gelandeter Punkt, dessen
+Bildprüfung nachweislich stattgefunden hatte und den der Wächter trotzdem als ungeprüft
+führte.
+
+Die Reparatur war billig — eine deckende Suite auf beiden Backends im Hauptbaum, vier
+Minuten —, aber sie war nur billig, weil der Punkt zufällig eine kurze deckende Suite hatte.
+Bei einem Punkt, dessen einzige deckende Suite der große Lauf ist, hätte dieselbe
+Aufräumzeile zwei Stunden gekostet. Und die Reihenfolge ist der ganze Fehler: Die Hygiene
+räumt den Zweig weg, sobald der Merge steht, das Register wird erst danach gelesen. Zwischen
+beiden liegt kein Schritt, der fragt, ob der Beweis den Umzug überlebt hat.
+
+Verwandt mit §3.11, aber nicht dasselbe: Dort galt ein Nachweis für den falschen ZUSTAND und
+war noch vorhanden, hier gilt er für den richtigen Zustand und ist nicht mehr da.
+
+**Lehre:** Bevor ein Arbeitsbaum entfernt wird, gehört sein Nachweis dorthin, wo er gelesen
+wird — oder der deckende Lauf wird im Zielbaum wiederholt, solange er noch billig ist. Was
+git ignoriert, überlebt kein Aufräumen, und ein Aufräumschritt, der eine ungesicherte
+Messung mitnimmt, ist kein Aufräumen, sondern ein Datenverlust mit Quittung.

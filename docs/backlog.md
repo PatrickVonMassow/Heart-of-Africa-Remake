@@ -9,6 +9,21 @@ when their area is touched anyway or a triage says otherwise.
 Format: one line per finding — `- YYYY-MM-DD <source> — <finding>`.
 
 <!-- entries -->
+- 2026-09-13 point 1072 landing (`scripts/verify/run-wait.mjs`) — a healthy LARGE was reported
+  HUNG and recorded as a batch standstill. The run record's `expectedRuntimeMs` covers the SUITE
+  time only (42m 16s here), but a run that ends with red suites then enters its baseline
+  classification and runs every red suite TWICE against the merge-base checkout. On this run that
+  phase was working normally — the log growing, one baseline log appearing per suite — when
+  `--await` printed "HUNG — 108m 11s is past 2.5x this run's expectation. The wait has been
+  recorded as hung and the batch emergency lane will treat it as a standstill; end the run rather
+  than waiting again." The run in fact ran to its end at 120m 28s and carried the only both-backend
+  evidence that could land the point; ending it there would have cost the landing and handed a
+  working batch to the emergency lane. The 2.5x bound is measured against a number that never
+  claimed to cover classification. Two cheap directions if it is ever picked up: the writer extends
+  the expectation when it enters the classification phase, or the hung test stops applying once the
+  log shows the classification banner. Collected rather than queued: it mis-advises, it does not
+  block — judgment overrode it here — and the infrastructure freeze of CLAUDE.md §2 keeps it out of
+  the work order until it actually costs a run.
 - 2026-09-13 point 1072 LARGE (WebGPU, `polish`, feat/1072 at 5a5c8d7a5) — the suite went red on
   its first attempt and clean on the retry, so the run is recorded SUSPECT and covers nothing
   (CLAUDE.md §7.2). Three of its reds have owners and one family has none. Owned: `leaving after
