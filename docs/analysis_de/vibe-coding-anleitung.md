@@ -591,16 +591,13 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „‚Grün' zählt nur, wenn die schmale Stufe **jünger als der letzte Merge** ist und
   **dasselbe misst** wie die große — sonst sagt sie selbst, dass ihr Grün nichts vorhersagt."
 
-- **Du nimmst einen gemeinsamen Eintrag heraus — und was darauf stand, bleibt stehen.** Eine
-  Ausnahmeliste, eine Registerzeile, ein Kulissenwert: Das Entfernen ist richtig und trotzdem
-  nur die halbe Handlung, denn wer den Eintrag löscht, sieht ihn — nicht die, die sich auf ihn
-  stützen. Gefunden wird es dann im Tor, und wenn das Tor hinter dem Merge steht, steht auch
-  dein Hauptzweig halb gelandet da.
-  → *Prompt:* „Entfernst du einen **geteilten Eintrag**, such im selben Zug, **wer auf ihm
-  steht**, und nimm es mit — Löschen ist Umbau. Benutzt eine Testkulisse **lebende Daten**,
-  schreib die Kopplung über sie, damit die nächste Rücknahme sie **neu ausrichtet** statt sie
-  zu zerbrechen. Und fahr das Tor **auf dem Zweig**: dasselbe Rot davor kostet eine Reparatur,
-  dahinter zusätzlich einen halb gelandeten Hauptzweig."
+- **Du nimmst einen geteilten Eintrag heraus — was darauf stand, bleibt stehen.** Wer eine
+  Ausnahmeliste oder einen Kulissenwert löscht, sieht den Eintrag, nicht seine Nutzer. Das Rot
+  kommt dann im Tor — und steht das Tor hinter dem Merge, steht auch dein Hauptzweig halb
+  gelandet da.
+  → *Prompt:* „Löschen ist **Umbau**: Entfernst du einen geteilten Eintrag, such im selben Zug,
+  **wer auf ihm steht**. Benutzt eine Testkulisse **lebende Daten**, schreib das über sie. Und
+  fahr das Tor **auf dem Zweig**, nicht dahinter."
 
 - **Der Wächter ist grün und greift nicht** — er sitzt in einer Datei, die euer Ablauf nie aufruft.
   → *Prompt:* „**Tipp den Befehl, mit dem ihr arbeitet**, und sieh ihr beim Feuern zu. Zwei

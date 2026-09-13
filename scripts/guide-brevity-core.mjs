@@ -476,7 +476,13 @@ export const LIMITS = {
   // prep during a wait means reading only. It went into the existing measurement entry rather
   // than a new one, because "measure on a quiet machine" is exactly where a reader looks for it.
   // Two lines: 646 -> 648.
-  maxLines: 648,
+  // RAISED 13.09.2026: the deleted-shared-entry pitfall is a genuinely new tip with no
+  // neighbour to fold into — the guide's other entries warn about a subject that MOVED or a
+  // test that measures the wrong thing, never about removing an entry that other code stands
+  // on, which is what a red charge retired with its point does. The long telling stays in the
+  // retrospective (§3.268); what is here is the risk in four lines and the prompt in three.
+  // Eight lines: 648 -> 656.
+  maxLines: 656,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -741,7 +747,10 @@ export const LIMITS = {
   // words. It is a genuinely new tip, not a longer telling: the existing sentence says WHERE to
   // measure, this one says what the reader himself must not do while the measurement runs, and
   // it is the half no neighbouring entry carries: 6207 -> 6233.
-  maxWords: 6233,
+  // 13.09.2026: the deleted-shared-entry pitfall justified beside maxLines measures 83 words
+  // after its cut — the first draft ran 129 and five risk lines, which the guard refused, so it
+  // was tightened rather than bought headroom for: 6233 -> 6316.
+  maxWords: 6316,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,
