@@ -104,6 +104,8 @@ consequence finish before another situation speaks, and a ready continuation
 keeps precedence. A silent walk, a child's ear or an occupied dig site yields
 after the consequence window. Work can continue in several places; a pair's
 existence alone never owns the village's speech for its entire task lifetime.
+An assigned dig site stays with its pair until the bout ends, including their
+walk there, so two pairs cannot arrive at one hole and block each other's word.
 
 The gap after a word is a CONSEQUENCE WINDOW rather than plain silence: the next
 word waits until the previous word's effect was visible — the invited adult sets

@@ -314,10 +314,13 @@ function siteClear(view: AdultWorkView, site: ErrandPoint, initiator: number, pa
   return true
 }
 
-function digSiteFor(view: AdultWorkView, start: number, initiator: number): { site: DigSite; index: number } | null {
+function digSiteFor(state: AdultWorkState, view: AdultWorkView, start: number, initiator: number): { site: DigSite; index: number } | null {
   const sites = view.geography.digSites
   for (let k = 0; k < sites.length; k++) {
     const index = (start + k) % sites.length
+    // An invited pair already has a destination even while it is still walking.
+    // Sending another pair there makes both initiators block each other's DIG.
+    if (state.tasks.some((t) => t?.siteIndex === index)) continue
     if (siteClear(view, sites[index], initiator)) return { site: sites[index], index }
   }
   return null
@@ -620,7 +623,7 @@ export function stepAdultWork(
       const mate = anotherFree(view, who)
       if (mate < 0) continue
       const start = (state.staged[id] ?? 0) + (id === 'dig-second' ? 1 : 0)
-      const selected = digSiteFor(view, start, who)
+      const selected = digSiteFor(state, view, start, who)
       if (!selected) continue
       const spot = joinSpot(view, selected.site, rand)
       if (!spot) continue

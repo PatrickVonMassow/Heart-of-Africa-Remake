@@ -690,6 +690,32 @@ describe('task lifecycle safeguards', () => {
     expect(taskOf(state, initiator)?.siteIndex).not.toBe(0)
   })
 
+  it('keeps an assigned hole for its walking pair and makes it available after their bout', () => {
+    const v = riverless(view(6))
+    v.geography.digSites = v.geography.digSites.slice(0, 1)
+    const state = stageDig(v)
+    const first = initiatorOf(state)
+    const partner = state.tasks[first]!.partner!
+    for (let clock = 0; clock < 5; clock += 0.1) {
+      v.villagers.forEach((me, i) => { me.free = !state.tasks[i] })
+      stepAdultWork(state, v, 0.1, CFG, () => 0.5)
+    }
+    expect(state.tasks.filter(Boolean)).toHaveLength(2)
+    // Complete this pair's final work phase, then let the catalogue retry.
+    for (const i of [first, partner]) Object.assign(state.tasks[i]!, {
+      phase: 'dig', arrived: true, owes: false, dug: CFG.digSeconds,
+    })
+    stepAdultWork(state, v, 0.1, CFG, () => 0.5)
+    expect(state.tasks[first]).toBeNull()
+    for (let clock = 0; clock < 2; clock += 0.1) {
+      v.villagers.forEach((me, i) => { me.free = !state.tasks[i] })
+      stepAdultWork(state, v, 0.1, CFG, () => 0.5)
+    }
+    expect(state.tasks.filter(Boolean)).toHaveLength(2)
+    expect(state.tasks.filter((t) => t?.siteIndex === 0)).toHaveLength(2)
+    expect(Object.values(state.staged).reduce((sum, n) => sum + n, 0)).toBe(2)
+  })
+
   it('never stages work where the second stand has no room', () => {
     const v = riverless(view(3, undefined, () => false))
     const state = stageDig(v)
@@ -870,3 +896,73 @@ it('keeps adult speech and its consequences exclusive while silent work continue
   expect(completed).toBeGreaterThan(5)
   expect(floor.forcedCount).toBe(0)
 })
+
+
+it.each(['walking', 'hushed', 'occupied site'] as const)(
+  'sends water and admits a bank call while a %s dig pair yields, without forcing', (obstruction) => {
+    const cfg = balance.villageLife.adultErrands
+    const v = view(10)
+    v.geography = {
+      waterStand: { x: 2, z: 2 }, waterHead: { x: 4, z: 0 },
+      waterFoot: { x: 6, z: 0 }, waterFill: { x: 7, z: 0 },
+      digSites: [{ x: -5, z: 4, kind: 'pit' }, { x: -5, z: -4, kind: 'postHole' }],
+    }
+    let clock = 0
+    const floor = new SpeechFloor(() => ({ x: 0, z: 0, active: true }), () => clock)
+    v.floor = floor
+    const state = createAdultWork(v.villagers.length, cfg)
+    state.cursor = 2 // Open with DIG, then let the shipped catalogue cast the rest.
+    let heldSpeaker = -1, heldUntil = 0
+    let heldSite = { x: Infinity, z: Infinity }
+    let dispatchDuringHold = false, bankDuringHold = false
+    let firstFill = Infinity, nextSpeech = 0
+    const bank = {}
+    const source = { x: 22, z: 0, register: 'call' as const }
+    v.childrenHear = (x, z) => obstruction === 'hushed' && clock < heldUntil &&
+      Math.hypot(x - heldSite.x, z - heldSite.z) <= WORK_ARRIVE_RADIUS
+    for (; clock < 360; clock += 0.1) {
+      v.villagers.forEach((me, i) => {
+        // A free bystander steps onto the already assigned site. He is never
+        // cast into a task while obstructing it, and leaves after the hold.
+        if (obstruction === 'occupied site' && i === 9 && clock < heldUntil) {
+          Object.assign(me, heldSite, { free: false })
+          return
+        }
+        const task = state.tasks[i]
+        me.free = !task
+        if (obstruction === 'walking' && i === heldSpeaker && clock < heldUntil) return
+        if (task?.arrived) return
+        const goal = task ? goalOf(task) : { x: i * 0.4, z: 0 }
+        const distance = Math.hypot(goal.x - me.x, goal.z - me.z)
+        if (!distance) return
+        const step = Math.min(distance, cfg.pace * 0.1)
+        me.x += (goal.x - me.x) / distance * step
+        me.z += (goal.z - me.z) / distance * step
+      })
+      stepAdultWork(state, v, 0.1, cfg, () => 0.5)
+      for (const word of state.emitted) {
+        expect(clock + 1e-8).toBeGreaterThanOrEqual(nextSpeech)
+        nextSpeech = clock + utteranceSeconds(4) + balance.communication.consequenceSeconds
+        if (word.purpose === 'invitation' && heldSpeaker === -1) {
+          heldSpeaker = word.speaker
+          heldSite = { ...v.geography.digSites[state.tasks[word.speaker]!.siteIndex!] }
+          heldUntil = clock + 60
+        }
+        if (word.id === 'water-out' && clock < heldUntil) dispatchDuringHold = true
+      }
+      if (heldSpeaker >= 0 && !bankDuringHold && clock < heldUntil && floor.request({
+        situation: bank, name: 'bank call', word: 'RIVER', source, sources: () => [source], ends: true,
+      })) {
+        expect(clock + 1e-8).toBeGreaterThanOrEqual(nextSpeech)
+        nextSpeech = clock + utteranceSeconds(4) + balance.communication.consequenceSeconds
+        bankDuringHold = true
+      }
+      if (state.tasks.some((t) => t?.phase === 'fill')) firstFill = Math.min(firstFill, clock)
+    }
+    expect(dispatchDuringHold).toBe(true)
+    expect(bankDuringHold).toBe(true)
+    expect(firstFill).toBeLessThan(180)
+    expect(state.standJars).toBeGreaterThan(0)
+    expect(floor.forcedCount).toBe(0)
+  },
+)
