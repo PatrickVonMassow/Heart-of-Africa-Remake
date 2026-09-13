@@ -15,13 +15,14 @@ import {
   isDigging,
   stepAdultWork,
   taskOf,
-  WATER_FOOT_REACH,
+  JOIN_STAND_OFF,
   WORK_ARRIVE_RADIUS,
   type AdultWorkConfig,
   type AdultWorkState,
   type AdultWorkView,
   type SpokenWord,
 } from './adultWork'
+import { balance } from '../../config/balance'
 import { CONCEPT_IDS } from '../../communication/lexicon'
 import { DIG_CYCLE_SECONDS } from '../../render/gesture'
 import { resetDevAsserts } from '../../systems/devAssert'
@@ -38,6 +39,13 @@ const CFG: AdultWorkConfig = {
 
 const HEAD = { x: 12, z: 0 }
 const FOOT = { x: 34, z: -6 }
+// The fill spot lies on past the foot, down the shore and in the water
+// (work-order 1087); the layout solves it there, and the fixture keeps the
+// same relation.
+const FILL = { x: 36.5, z: -6.5 }
+// The village water stand, beside the fire: where the errand is ordered, where
+// the jar is set down, and where both of its words fall (work-order 1087).
+const STAND = { x: -2, z: 3 }
 
 function view(
   n: number,
@@ -55,6 +63,8 @@ function view(
     geography: {
       waterHead: { ...HEAD },
       waterFoot: { ...FOOT },
+      waterFill: { ...FILL },
+      waterStand: { ...STAND },
       digSites: [
         { x: -11, z: 2, kind: 'pit' },
         { x: -16, z: -1, kind: 'postHole' },
@@ -86,6 +96,12 @@ interface SeenWord extends SpokenWord {
   at: { x: number; z: number }
   phases: Array<string | null>
   digging: boolean[]
+  /** Who ORDERED the errand the speaker was on, and whom he ordered — read off
+   *  the task BEFORE the step, because a report clears its pair in the same
+   *  frame it speaks. Together they let a case pair an order with its own
+   *  report instead of comparing run-wide sets of speakers. */
+  orderedBy: number | null
+  carrier: number | null
 }
 
 function run(v: AdultWorkView, seconds: number, cfg = CFG): { state: AdultWorkState; words: SeenWord[] } {
@@ -94,10 +110,13 @@ function run(v: AdultWorkView, seconds: number, cfg = CFG): { state: AdultWorkSt
   const dt = 1 / 60
   for (let elapsed = 0; elapsed < seconds; elapsed += dt) {
     walkFrame(state, v, dt)
+    const ends = state.tasks.map((task) => task && { orderedBy: task.orderedBy, carrier: task.partner })
     const word = stepAdultWork(state, v, dt, cfg, () => 0.5)
     if (word) {
       words.push({
         ...word,
+        orderedBy: ends[word.speaker]?.orderedBy ?? null,
+        carrier: ends[word.speaker]?.carrier ?? null,
         at: { x: v.villagers[word.speaker].x, z: v.villagers[word.speaker].z },
         phases: state.tasks.map((task) => task?.phase ?? null),
         digging: state.tasks.map((_, i) => isDigging(state, i)),
@@ -131,7 +150,8 @@ function putAtGoal(state: AdultWorkState, v: AdultWorkView, index: number): void
 
 function threeWordsDue(): { state: AdultWorkState; v: AdultWorkView } {
   const v = view(5, [
-    { ...HEAD },
+    // The returning carrier stands at the stand, where his report falls.
+    { ...STAND },
     { x: 5, z: 5 },
     { x: 5, z: 5.5 },
     { x: -16, z: -1 },
@@ -141,26 +161,31 @@ function threeWordsDue(): { state: AdultWorkState; v: AdultWorkView } {
   state.next = Number.POSITIVE_INFINITY
   state.tasks[0] = {
     situation: 'water-back', phase: 'walk', carry: 'fullJar', role: 'worker', partner: null, siteIndex: null,
-    x: HEAD.x, z: HEAD.z, arrived: false, dug: 0, owes: true,
-    say: { at: HEAD, aim: FOOT }, via: null, age: 0,
+    orderedBy: 1, standSpot: { ...STAND },
+    x: STAND.x, z: STAND.z, arrived: false, dug: 0, owes: true,
+    say: { at: STAND, aim: STAND }, via: null, age: 0,
   }
   state.tasks[1] = {
     situation: 'dig-first', phase: 'invite', carry: 'digTool', role: 'initiator', partner: 2, siteIndex: 0,
+    orderedBy: null, standSpot: null,
     x: v.villagers[2].x, z: v.villagers[2].z, arrived: true, dug: 0, owes: true,
     say: null, via: null, age: 0,
   }
   state.tasks[2] = {
     situation: 'dig-first', phase: 'invite', carry: 'digTool', role: 'partner', partner: 1, siteIndex: 0,
+    orderedBy: null, standSpot: null,
     x: -8.6, z: 2, arrived: true, dug: 0, owes: false,
     say: null, via: null, age: 0,
   }
   state.tasks[3] = {
     situation: 'dig-second', phase: 'site', carry: 'digTool', role: 'initiator', partner: 4, siteIndex: 1,
+    orderedBy: null, standSpot: null,
     x: -16, z: -1, arrived: true, dug: 0, owes: true,
     say: null, via: null, age: 0,
   }
   state.tasks[4] = {
     situation: 'dig-second', phase: 'site', carry: 'digTool', role: 'partner', partner: 3, siteIndex: 1,
+    orderedBy: null, standSpot: null,
     x: -13.6, z: -1, arrived: true, dug: 0, owes: false,
     say: null, via: null, age: 0,
   }
@@ -180,16 +205,84 @@ describe('the adults keep to their four teaching situations', () => {
   })
 })
 
-describe('RIVER remains a departure and return at the path head', () => {
-  it('speaks both water situations at the head and aims both at the water', () => {
+describe('RIVER is ordered and reported at the village water stand', () => {
+  it('speaks both water words at the STAND, never at the water', () => {
     const { words } = run(view(6), 240)
     const river = words.filter((word) => word.concept === 'RIVER')
     expect(new Set(river.map((word) => word.id))).toEqual(new Set(['water-out', 'water-back']))
     for (const word of river) {
-      expect(Math.hypot(word.at.x - HEAD.x, word.at.z - HEAD.z)).toBeLessThanOrEqual(WORK_ARRIVE_RADIUS)
-      expect(Math.hypot(word.at.x - FOOT.x, word.at.z - FOOT.z)).toBeGreaterThan(WATER_FOOT_REACH)
+      // BOTH UTTERANCES FALL INSIDE THE VILLAGE, at the stand beside the fire —
+      // they used to fall at the water path's head out at the edge of the built
+      // ground, which is also where the children's bank game is heard.
+      // At the stand: the carrier ON it, the sender a body's width off it.
+      expect(Math.hypot(word.at.x - STAND.x, word.at.z - STAND.z))
+        .toBeLessThanOrEqual(JOIN_STAND_OFF + WORK_ARRIVE_RADIUS)
+      expect(Math.hypot(word.at.x - FOOT.x, word.at.z - FOOT.z)).toBeGreaterThan(4)
+      expect(Math.hypot(word.at.x - FILL.x, word.at.z - FILL.z)).toBeGreaterThan(4)
+    }
+    // THE ORDER points at the water; THE REPORT is addressed to the man who
+    // gave it, never at the ground.
+    for (const word of river.filter((w) => w.id === 'water-out')) {
       expect({ x: word.aim.x, z: word.aim.z }).toEqual(FOOT)
     }
+    expect(river.some((w) => w.id === 'water-back')).toBe(true)
+    for (const word of river.filter((w) => w.id === 'water-back')) {
+      expect(Math.hypot(word.aim.x - FOOT.x, word.aim.z - FOOT.z)).toBeGreaterThan(4)
+      // Addressed at a person's height, not at the ground a place sits on.
+      expect(word.aim.y).toBe(1)
+    }
+  })
+
+  it('never speaks to nobody: every water word names a villager as its speaker', () => {
+    const { words } = run(view(6), 240)
+    for (const word of words.filter((w) => w.concept === 'RIVER')) {
+      expect(word.speaker).toBeGreaterThanOrEqual(0)
+      expect(word.speaker).toBeLessThan(6)
+    }
+  })
+
+  it('holds a hearing child`s word rather than spending it', () => {
+    // THE WATER WORD IS GATED BY A HEARING CHILD exactly as the two DIG
+    // utterances are: only the DIG branches carried that check before.
+    const deaf = run(view(6), 240)
+    const heard = run(view(6, undefined, () => true, () => true), 240)
+    expect(deaf.words.some((w) => w.concept === 'RIVER')).toBe(true)
+    expect(heard.words.some((w) => w.concept === 'RIVER')).toBe(false)
+  })
+
+  it('sets the delivered jars down at the stand, up to its capacity', () => {
+    const v = view(6)
+    const state = createAdultWork(6, CFG)
+    for (let elapsed = 0; elapsed < 600; elapsed += 1 / 60) {
+      walkFrame(state, v, 1 / 60)
+      stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
+      expect(state.standJars).toBeLessThanOrEqual(balance.waterStandCapacity)
+    }
+    // Deliveries really happened, and the stand never grew past its capacity —
+    // a delivery past it replaces the oldest jar rather than adding one.
+    expect(state.standJars).toBe(balance.waterStandCapacity)
+  })
+
+  it('gives the order and the report to TWO different men', () => {
+    const { words } = run(view(6), 240)
+    const out = words.filter((w) => w.id === 'water-out')
+    const back = words.filter((w) => w.id === 'water-back')
+    expect(out.length).toBeGreaterThan(0)
+    expect(back.length).toBeGreaterThan(0)
+    // The sender orders, the carrier reports: the same man never does both for
+    // one errand, which is what stopped the inhabitant narrating his own act.
+    // PER ERRAND, not across the run. Counting distinct speakers over a whole
+    // window passes even when every sender reports his own errand: what has to
+    // hold is that EACH report comes from someone other than the man who ordered
+    // THAT errand.
+    for (const report of back) {
+      expect(report.orderedBy).not.toBeNull()
+      expect(report.orderedBy).not.toBe(report.speaker)
+    }
+    // And every report answers an order that was actually given, by that sender
+    // to that carrier.
+    const ordered = out.map((w) => `${w.speaker}->${w.carrier}`)
+    for (const report of back) expect(ordered).toContain(`${report.orderedBy}->${report.speaker}`)
   })
 
   it('carries the empty jar out and the full jar back', () => {
@@ -206,6 +299,148 @@ describe('RIVER remains a departure and return at the path head', () => {
     }
     expect(carried).toContain('water-out:emptyJar')
     expect(carried).toContain('water-back:fullJar')
+    // AND THE FULL JAR IS NEVER CARRIED OUT, nor the empty one back: the flip
+    // happens at the water and only there (work-order 1087).
+    expect(carried).not.toContain('water-out:fullJar')
+    expect(carried).not.toContain('water-back:emptyJar')
+  })
+})
+
+// --- The fill is an act with its own phase (work-order 1087) ---------------
+//
+// The jar used to flip to 'fullJar' when a SECOND villager was cast at the
+// water, so the full jar came from nowhere and the same man in practice went
+// down and came up. What is pinned here is the one round trip: the carrier walks
+// THROUGH the path's landing to the water, dips for a configured hold, and only
+// then turns round with a full jar.
+describe('the water carrier dips his jar at the water (work-order 1087)', () => {
+  const fillFrames = () => {
+    const v = view(4)
+    const state = createAdultWork(4, CFG)
+    const seen: Array<{ f: number; i: number; phase: string; carry: string; goal: { x: number; z: number } }> = []
+    let f = 0
+    for (let elapsed = 0; elapsed < 240; elapsed += 1 / 60) {
+      walkFrame(state, v, 1 / 60)
+      for (let i = 0; i < 4; i++) {
+        const task = taskOf(state, i)
+        if (task && task.situation.startsWith('water-')) {
+          seen.push({ f, i, phase: task.phase, carry: carryOf(state, i), goal: goalOf(task) })
+        }
+      }
+      stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
+      f++
+    }
+    return seen
+  }
+
+  it('sends the carrier to the water, not to the path`s landing', () => {
+    const outward = fillFrames().filter((f) => f.phase === 'fetch')
+    expect(outward.length).toBeGreaterThan(0)
+    // Every outward goal is either the head he speaks at (the `via`) or the FILL
+    // spot. The foot is never a destination any more.
+    for (const f of outward) {
+      const atHead = Math.hypot(f.goal.x - HEAD.x, f.goal.z - HEAD.z) < 1e-6
+      const atFill = Math.hypot(f.goal.x - FILL.x, f.goal.z - FILL.z) < 1e-6
+      expect(atHead || atFill).toBe(true)
+    }
+    expect(outward.some((f) => Math.hypot(f.goal.x - FILL.x, f.goal.z - FILL.z) < 1e-6)).toBe(true)
+  })
+
+  it('holds a fill phase between the walk down and the walk back, jar still empty', () => {
+    const seen = fillFrames()
+    const filling = seen.filter((f) => f.phase === 'fill')
+    expect(filling.length).toBeGreaterThan(0)
+    // The jar is EMPTY for the whole dip — it fills by being dipped, not by
+    // being sent.
+    for (const f of filling) expect(f.carry).toBe('emptyJar')
+    // ... and EACH dip lasts what it is configured to last. The run spans many
+    // errands, so the frames are grouped into the individual holds first: a new
+    // hold begins wherever the same carrier's fill frames are not consecutive.
+    // Grouped PER CARRIER: two carriers can dip at once, and their frames
+    // interleave, so a single running group would split every hold into ones.
+    const holds: Array<{ i: number; last: number; frames: number }> = []
+    const open = new Map<number, { i: number; last: number; frames: number }>()
+    for (const frame of filling) {
+      const mine = open.get(frame.i)
+      if (mine && mine.last === frame.f - 1) {
+        mine.last = frame.f
+        mine.frames++
+      } else {
+        const started = { i: frame.i, last: frame.f, frames: 1 }
+        open.set(frame.i, started)
+        holds.push(started)
+      }
+    }
+    // A hold counts only where the return leg was actually observed after it —
+    // the sampling window cuts the last dip in half, and half a dip measures the
+    // window rather than the hold.
+    const completed = holds.filter((h) =>
+      seen.some((frame) => frame.i === h.i && frame.f === h.last + 1 && frame.phase === 'walk'),
+    )
+    expect(completed.length).toBeGreaterThan(1)
+    const expected = balance.bankFillSeconds * 60
+    // One frame of slack each way: the phase opens on the arrival frame and
+    // closes on the frame that crosses the threshold.
+    for (const hold of completed) {
+      expect(hold.frames).toBeGreaterThanOrEqual(Math.floor(expected) - 1)
+      expect(hold.frames).toBeLessThanOrEqual(Math.ceil(expected) + 1)
+    }
+  })
+
+  it('sets the jar down even when a child in earshot holds the report back', () => {
+    // THE DELIVERY IS NOT THE WORD. Behind the hearing gate the jar was hostage
+    // to a passing child: the errand ran into its backstop and was cleared with
+    // the water still on the carrier's head, so a fetched jar was DELETED. The
+    // report may wait; the water may not.
+    const { state, v } = threeWordsDue()
+    let heard = true
+    const listening: AdultWorkView = { ...v, childrenHear: () => heard }
+    const carrier = 0
+
+    const hushedWord = stepAdultWork(state, listening, 1 / 60, CFG, () => 0.5)
+    expect(hushedWord).toBeNull()
+    expect(state.standJars).toBe(1)
+    expect(carryOf(state, carrier)).toBe('none')
+    expect(taskOf(state, carrier)).toMatchObject({ hushed: true, owes: true })
+
+    // And once the children move off, the report falls — without the jar being
+    // counted a second time.
+    heard = false
+    const word = stepAdultWork(state, listening, 1 / 60, CFG, () => 0.5)
+    expect(word).toMatchObject({ id: 'water-back', concept: 'RIVER', speaker: carrier })
+    expect(state.standJars).toBe(1)
+    expect(taskOf(state, carrier)).toBeNull()
+  })
+
+  it('is ONE errand held by ONE carrier, not two castings', () => {
+    const seen = fillFrames()
+    const outward = new Set(seen.filter((f) => f.phase === 'fetch' || f.phase === 'fill').map((f) => f.i))
+    const back = new Set(seen.filter((f) => f.phase === 'walk').map((f) => f.i))
+    expect(outward.size).toBeGreaterThan(0)
+    // The man who walked back is a man who walked down: no return leg belongs to
+    // a villager the errand never sent.
+    for (const i of back) expect(outward.has(i)).toBe(true)
+    // AND IN ORDER WITHIN EACH ERRAND, not merely somewhere in the window.
+    // Run-wide sets pass when villager 3 fetches for one errand and walks back
+    // for the NEXT — which is exactly the two castings this point removed. So
+    // every carrier's legs are walked as a state machine: he may take a fresh
+    // errand after finishing one, but no return leg may follow anything but the
+    // dip that filled the jar it carries.
+    const NEXT: Record<string, readonly string[]> = {
+      start: ['fetch'],
+      fetch: ['fetch', 'fill'],
+      fill: ['fill', 'walk'],
+      walk: ['walk', 'fetch'],
+    }
+    const leg = new Map<number, string>()
+    for (const f of seen) {
+      // The SENDER stands in these frames too, on 'send' and 'wait'; his legs are
+      // not the carrier's and are not walked here.
+      if (f.phase !== 'fetch' && f.phase !== 'fill' && f.phase !== 'walk') continue
+      const was = leg.get(f.i) ?? 'start'
+      expect(NEXT[was], `villager ${f.i} went ${was} -> ${f.phase} at frame ${f.f}`).toContain(f.phase)
+      leg.set(f.i, f.phase)
+    }
   })
 })
 

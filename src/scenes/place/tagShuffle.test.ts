@@ -246,6 +246,8 @@ function crowd(
     geography: {
       waterHead: layout.waterPath ? { x: layout.waterPath.head.x, z: layout.waterPath.head.z } : null,
       waterFoot: layout.waterPath ? { x: layout.waterPath.foot.x, z: layout.waterPath.foot.z } : null,
+      waterFill: layout.waterPath ? { x: layout.waterPath.fill.x, z: layout.waterPath.fill.z } : null,
+      waterStand: layout.waterStand ? { x: layout.waterStand.x, z: layout.waterStand.z } : null,
       digSites: layout.digSites,
     },
     standable: (x, z) => !world.blocked(x, z),

@@ -18,6 +18,7 @@ import {
   BANK_FADE_ANGLE,
   BANK_PLAY_LANE_HALF,
   bankPlayRocks,
+  bankFillSpot,
   bankWaterFoot,
   buildRiverBank,
   inBankPlayLane,
@@ -127,7 +128,16 @@ export interface PlaceLayout {
    * is where it meets the bank, upstream of and clear of the children's stretch.
    * Null in every settlement without a bank.
    */
-  waterPath: { head: BankPoint; foot: BankPoint } | null
+  /** The village's walk to the water: `head` in the village where the word
+   *  falls, `foot` the drawn track's landing on flat ground, and `fill` the spot
+   *  IN the water where the carrier dips his jar (work-order 1087). Only head
+   *  and foot are drawn as a track; the last stretch down the shore is not a
+   *  worn path. */
+  waterPath: { head: BankPoint; foot: BankPoint; fill: BankPoint } | null
+  /** The village water stand (work-order 1087): where the filled jars are set
+   *  down and where both of the errand's words are spoken. Null where the
+   *  settlement has no water path to serve. */
+  waterStand: BankPoint | null
   /**
    * The children's roaming quarter (work-order 481.4): where the group plays
    * between two cycles of its bank game, and how far it roams. It is layout data
@@ -237,6 +247,38 @@ export const WAY_OUT_OUTER = 6
 /** How many bearings the way out is looked for on — one every two degrees, which
  *  is finer than the half-width it is looking for. */
 const WAY_OUT_BEARINGS = 180
+
+/**
+ * THE VILLAGE WATER STAND (work-order 1087): where the filled jars are set down,
+ * and where BOTH utterances of the water errand fall.
+ *
+ * It stands beside the fire, which already has a collider and is the plausible
+ * consumer of the water. The errand's two words used to be spoken at the water
+ * path's head out at `WATER_PATH_HEAD_RADIUS`, which is the edge of the built
+ * ground; moving them to the stand puts them among the village, keeps them clear
+ * of the children's bank game, and gives the return leg a destination that is a
+ * place rather than a radius.
+ */
+// MEASURED 12.09.2026: at 2.7 m the fire's own keep-out (1.3 + a walker's 0.3)
+// and the stand's (0.6 + 0.3) left a gap of 0.2 m between them — narrower than
+// a walker, which is the same notch the fire tender's collider once made. The
+// carrier then never got nearer than 2.61 m to a stand he was sent to stand at,
+// was never counted as arrived, and circled it until the errand's backstop
+// expired. The gap is set so a walker passes between the two on EVERY bearing.
+export const WATER_STAND_FIRE_GAPS = [3.4, 4.2, 5.0, 5.8] as const
+/** How many bearings of the working ring around the stand are tested, and how
+ *  many of them must be open ground for the stand to count as reachable. */
+const WATER_STAND_APPROACHES = 16
+/** The ring the two men work from — `JOIN_STAND_OFF` in `adultWork.ts`, restated
+ *  here rather than imported because the layout must not depend on the errand
+ *  module; `layout.test.ts` pins the two together. */
+export const WATER_STAND_WORK_RING = 2.4
+const WATER_STAND_APPROACHES_NEEDED = 9
+/** Its own footprint — three standing jars and the ground they are set on. */
+export const WATER_STAND_RADIUS = 0.6
+/** The bearings the stand is tried on, the one facing the water first: the man
+ *  who says RIVER at it points past it at the river. */
+const WATER_STAND_BEARINGS = 16
 
 /** Where the WATER PATH's head stands: on the bank's own bearing, out past the
  *  compound ring (7-14 m, work-order 604) at the edge of the built ground. It
@@ -729,6 +771,7 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     ? {
         head: { x: bank.nx * WATER_PATH_HEAD_RADIUS, z: bank.nz * WATER_PATH_HEAD_RADIUS },
         foot: bankWaterFoot(bank),
+        fill: bankFillSpot(bank),
       }
     : null
 
@@ -1479,6 +1522,61 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   }
 
 
+  // THE VILLAGE WATER STAND (work-order 1087). It goes in beside the fire, on
+  // the bearing that faces the water so the man who says RIVER at it points past
+  // it at the river, and it steps round the ring if that bearing is taken. It is
+  // placed BEFORE the children's quarter is searched, so the quarter is fitted
+  // around it exactly as it is around the other adult places.
+  let waterStand: PlaceLayout['waterStand'] = null
+  /** Where the stand's own collider sits, so it can be taken out again if the
+   *  water path it was placed for is discarded further down. */
+  let standColliderAt = -1
+  if (place.kind === 'village' && waterPath && bank) {
+    const standClear = colliderBuckets(colliders, WATER_STAND_RADIUS)
+    const walkClear = colliderBuckets(colliders, WALKER_RADIUS)
+    const facing = Math.atan2(bank.nz, bank.nx)
+    // A SPOT NOBODY CAN REACH IS NOT A PLACE. Measured 12.09.2026: a stand whose
+    // own footprint was clear still left the carrier stalled 4.2 m away, because
+    // the ring he had to stand on lay inside the fire's keep-out and the gap
+    // between the two was barely a walker wide. So the ground AROUND the stand
+    // is tested too: the men work from `JOIN_STAND_OFF` out, and that ring has
+    // to be open on most of its bearings, not merely somewhere.
+    const approachable = (x: number, z: number) => {
+      let open = 0
+      for (let k = 0; k < WATER_STAND_APPROACHES; k++) {
+        const a = (k / WATER_STAND_APPROACHES) * Math.PI * 2
+        const ax = x + Math.cos(a) * WATER_STAND_WORK_RING
+        const az = z + Math.sin(a) * WATER_STAND_WORK_RING
+        if (standingClear(walkClear(ax, az), ax, az, WALKER_RADIUS)) open++
+      }
+      return open >= WATER_STAND_APPROACHES_NEEDED
+    }
+    for (const gap of WATER_STAND_FIRE_GAPS) {
+      for (let k = 0; k < WATER_STAND_BEARINGS && !waterStand; k++) {
+        // Alternating out from the water's own bearing, so the first bearing
+        // tried is the one that reads and the fallbacks stay as near it as
+        // possible.
+        const step = Math.ceil(k / 2) * ((k % 2 === 0 ? 1 : -1) * (Math.PI * 2) / WATER_STAND_BEARINGS)
+        const a = facing + step
+        const x = VILLAGE_FIRE[0] + Math.cos(a) * gap
+        const z = VILLAGE_FIRE[1] + Math.sin(a) * gap
+        if (!standingClear(standClear(x, z), x, z, WATER_STAND_RADIUS)) continue
+        // A LANE CARRIES NO COLLIDER, so the footprint test above cannot see one:
+        // measured 12.09.2026, mandinka-village seed 7 put the stand 0.50 m off
+        // the centre of a lane 1.30 m wide — a solid body standing in the middle
+        // of a drawn path. The same exclusion the other village places use.
+        if (onLane(x, z, WATER_STAND_RADIUS)) continue
+        if (!approachable(x, z)) continue
+        waterStand = { x, z }
+      }
+      if (waterStand) break
+    }
+    if (waterStand) {
+      standColliderAt = colliders.length
+      colliders.push({ x: waterStand.x, z: waterStand.z, r: WATER_STAND_RADIUS })
+    }
+  }
+
   // THE CHILDREN'S ROAMING QUARTER (work-order 481.4, moved here by 688). It is
   // decided from the settlement's BUILT bodies, BEFORE anything loose is
   // scattered and BEFORE the water path is laid, and that order is item 6 of the
@@ -1664,6 +1762,14 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
       // points at work-order 1045; a THIRD one appearing is what that case
       // catches.
       waterPath = null
+      // AND THE STAND GOES WITH IT. It is placed further up, while every bank
+      // still has a provisional path, so a settlement whose head search finds no
+      // clear walk kept a water stand no adult ever visits — furniture with a
+      // collider and no errand behind it. Measured 12.09.2026: bambara-village
+      // at seeds 2 and 7.
+      if (standColliderAt >= 0) colliders.splice(standColliderAt, 1)
+      standColliderAt = -1
+      waterStand = null
     } else {
       waterPath.head = head
       paths.push({ points: [[head.x, head.z], [foot.x, foot.z]], width: WATER_PATH_WIDTH })
@@ -1868,5 +1974,5 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   }
 
 
-  return { radius, spawnZ: radius - SPAWN_INSET, interactives, dwellings, fences, paths, flora, rocks, digSites, bank, playRocks, waterPath, playGround, wayOut, pen, errands, colliders }
+  return { radius, spawnZ: radius - SPAWN_INSET, interactives, dwellings, fences, paths, flora, rocks, digSites, bank, playRocks, waterPath, waterStand, playGround, wayOut, pen, errands, colliders }
 }
