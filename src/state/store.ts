@@ -237,10 +237,6 @@ export interface GameState {
   villageCamps: Record<string, ItemBag>
   /** Per region: the village whose people knows the location hint (§13.3). */
   knowingVillages: Record<RegionId, string>
-  /** Regions whose knowing chief already gave his raw hint. */
-  hintsGiven: Partial<Record<RegionId, boolean>>
-  /** Regions whose raw hint has been deciphered into a decoded entry. */
-  decodedGiven: Partial<Record<RegionId, boolean>>
   graveLatLon: LatLon
   victory: boolean
   /** Short-lived HUD message. */
@@ -284,8 +280,6 @@ export interface GameState {
   campStore: (kind: ItemKind, id: string) => void
   /** Take one item back out of the cache (capacity permitting). */
   campTake: (kind: ItemKind, id: string) => void
-  /** Write the decoded version of a region's hint once language + hint meet. */
-  revealDecoded: (region: RegionId) => void
   dig: () => void
   /** Press a carried form against whatever the traveller is standing at
    *  (src/world/forms.ts). Answers in his own voice where nothing fits. */
@@ -334,8 +328,6 @@ export interface GameState {
    *  on the drums — there is no audience indoors, and the hut answers nothing
    *  while he is already outside. */
   callChiefOut: () => void
-  /** The chief's own knowledge about the tomb, told when he steps out (§13.3). */
-  tellChiefHint: () => void
   setToast: (msg: string | null) => void
   saveCheckpoint: () => void
   /** Load a port-visit snapshot; the latest without an index (design.md §18). */
@@ -561,8 +553,6 @@ export function startState(seed: number, placeId: string = startPlaceId()) {
     freeCamps: [] as FreeCamp[],
     villageCamps: {} as Record<string, ItemBag>,
     knowingVillages: pickKnowingVillages(seed),
-    hintsGiven: {} as Partial<Record<RegionId, boolean>>,
-    decodedGiven: {} as Partial<Record<RegionId, boolean>>,
     graveLatLon: generateGrave(seed),
     victory: false,
     toast: null,
@@ -756,35 +746,10 @@ export const useGame = create<GameState>()((set, get) => ({
     // are marked here.
     if (!s.orientationGiven[place.id]) {
       set({ orientationGiven: { ...get().orientationGiven, [place.id]: true } })
-    }
-    // He says what he knows in the same breath (design.md §13.1/§13.3).
-    get().tellChiefHint()
-  },
-
-  /**
-   * What this chief knows about the tomb, told when he comes out (design.md
-   * §13.1/§13.3). Per region only the KNOWING people names the location
-   * component, once; a chief who does not know says nothing at all — the
-   * murmured pointer at the knowing people went with the stale text that
-   * carried it (user 07.09.2026).
-   */
-  tellChiefHint: () => {
-    const s = get()
-    if (s.mode !== 'place' || !s.placeId) return
-    const place = placeById(s.placeId)
-    if (place.kind !== 'village') return
-    const region = place.region
-    if (s.knowingVillages[region] === place.id) {
-      if (s.hintsGiven[region]) return
-      set({ hintsGiven: { ...s.hintsGiven, [region]: true } })
-      const g = get().graveLatLon
       get().addEntry(
-        { key: 'journal.titles.chiefHint' },
-        { key: 'journal.hintRaw', params: { region, lat: g.lat, lon: g.lon } },
-        'hint',
-        'compass',
+        { key: 'journal.titles.chiefWalk' },
+        { key: 'journal.chiefWalk' },
       )
-      get().revealDecoded(region)
     }
   },
 
@@ -1788,19 +1753,6 @@ export const useGame = create<GameState>()((set, get) => ({
     get().tickDeadline(get().day)
   },
 
-  revealDecoded: (region) => {
-    const s = get()
-    if (s.decodedGiven[region] || !s.hintsGiven[region]) return
-    set({ decodedGiven: { ...s.decodedGiven, [region]: true } })
-    const g = s.graveLatLon
-    get().addEntry(
-      { key: 'journal.titles.decoded' },
-      { key: 'journal.hintDecoded', params: { region, lat: g.lat, lon: g.lon } },
-      'hint',
-      'compass',
-    )
-  },
-
   pitchOrOpenCamp: () => {
     const s = get()
     if (s.mode !== 'travel' || s.defeat || s.victory) return
@@ -2008,7 +1960,7 @@ export const useGame = create<GameState>()((set, get) => ({
       health: s.health, afflictions: s.afflictions, sunblindRecovery: s.sunblindRecovery,
       dryDays: s.dryDays, canteenFill: s.canteenFill, woundHealDays: s.woundHealDays,
       visitedPlaces: s.visitedPlaces, enteredPlaces: s.enteredPlaces, placeSituations: s.placeSituations,
-      knowingVillages: s.knowingVillages, hintsGiven: s.hintsGiven, decodedGiven: s.decodedGiven,
+      knowingVillages: s.knowingVillages,
       graveLatLon: s.graveLatLon, foodWarned: s.foodWarned, foodOutWarned: s.foodOutWarned,
       penaltyJournaled: s.penaltyJournaled,
       dangerWarned: s.dangerWarned,
@@ -2075,8 +2027,6 @@ export const useGame = create<GameState>()((set, get) => ({
         dangerWarned: snap.dangerWarned ?? { unarmed: false, desert: false, water: false, wetland: false },
         deadlineWarned: snap.deadlineWarned ?? 0,
         knowingVillages: snap.knowingVillages ?? pickKnowingVillages(snap.seed ?? 0),
-        hintsGiven: snap.hintsGiven ?? {},
-        decodedGiven: snap.decodedGiven ?? {},
         afflictions: snap.afflictions ?? { fever: false, dehydration: false, sunblind: false, wounds: 0 },
         sunblindRecovery: snap.sunblindRecovery ?? 0,
         dryDays: snap.dryDays ?? 0,

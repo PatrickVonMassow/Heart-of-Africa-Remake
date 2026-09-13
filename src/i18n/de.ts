@@ -2,7 +2,7 @@
 // visible German text lives here; identifiers and comments stay English.
 
 import type { Strings, TextParams } from './types'
-import { DIRECTION_WORDS, GLOSSARY } from '../world/lore'
+import { GLOSSARY } from '../world/lore'
 import { namesFromCsv } from './names'
 
 const MONTHS = [
@@ -770,12 +770,11 @@ export const de: Strings = {
       villageReturn: (p: TextParams) => `Wieder in ${PLACES[p.place as string]}`,
       monument: (p: TextParams) => PLACES[p.place as string],
       monumentReturn: (p: TextParams) => `${PLACES[p.place as string]} – noch einmal`,
-      chiefHint: 'Die Worte des Oberhaupts',
+      chiefWalk: 'Das Oberhaupt geht voraus',
       drumMessage: 'Die Trommeln sprechen',
       rockArtefact: 'Am Fuß des großen Felsens',
       artefactGiven: 'In die Hände des Oberhaupts',
       mouldFitted: 'Der Ton findet seinen Felsen',
-      decoded: 'Entschlüsselt!',
       victory: 'Das Herz von Afrika',
       foodLow: 'Proviant knapp',
       foodOut: 'Proviant aufgebraucht',
@@ -990,39 +989,8 @@ export const de: Strings = {
         `[somber]Ich kam zurück, und der Ort ist nicht mehr, wie ich ihn verließ.[pause] Was hier seit meinem letzten Besuch geschah, steht stumm in den Gesichtern.[/somber]`
       )
     },
-    hintRaw: (p: TextParams) => {
-      const regionId = p.region as string
-      const w = DIRECTION_WORDS[regionId as keyof typeof DIRECTION_WORDS]
-      const seasonNorth = 'Sommer'
-      const texts: Record<string, string> = {
-        north:
-          'Das Oberhaupt beugte sich vor und sprach mit leiser Stimme: [whisper]„Du suchst das Grab des großen Königs. ' +
-          `Wo die Breite ${dec(p.lat as number)} Grad gen [emph]${w.north}[/emph] zählt, dort ruht er unter dem Sand."[/whisper] ` +
-          `[breath][somber]${w.north} …[pause] ich muss lernen, was dieses Wort bedeutet;[/somber] [excited]dann weist mir diese Zahl den Weg.[/excited]`,
-        east:
-          'Das Oberhaupt wies mit dem Stab weit über die Ebene: [whisper]„Jenseits der großen Wüste, dorthin, wo Unumpara sich verbirgt – ' +
-          `wo die Länge ${dec(p.lon as number)} Grad gen [emph]${w.east}[/emph] zählt, schläft der alte König."[/whisper] ` +
-          `[breath][somber]${w.east} …[pause] wieder ein Wort, das ich entschlüsseln muss.[/somber]`,
-        west:
-          `Das Oberhaupt sprach von einem Land weit gen [emph]${w.north}[/emph], jenseits des großen Sandes, wo kein Gras mehr wächst: [whisper]„Dort, so heißt es, wurde einst ein König in die Erde gelegt."[/whisper] [somber]Wenn ${w.north} eine Richtung ist, engt das meine Suche ein.[/somber]`,
-        central:
-          `Das Oberhaupt murmelte: [whisper]„Geh [emph]${w.north}[/emph], fort vom ${GLOSSARY.congo}, bis die Bäume enden und der Sand beginnt – unter solchem Sand schlafen die alten Könige."[/whisper] [somber]Die Worte des Waldes verhüllen mir noch die Richtung.[/somber]`,
-        south:
-          `Das Oberhaupt blickte lange zum Horizont: [whisper]„Viele Monde gen [emph]${seasonNorth}[/emph], weiter als ${GLOSSARY.zambezi}, weiter als der große Wald – wo das Land nur noch Sand ist, liegt der große König."[/whisper] [somber]Gen ${seasonNorth} … eine Jahreszeit als Wegweiser?[/somber]`,
-      }
-      return texts[regionId]
-    },
-    hintDecoded: (p: TextParams) => {
-      const regionId = p.region as string
-      const texts: Record<string, string> = {
-        north: `[excited]Entschlüsselt![/excited] Die Worte des Oberhaupts bedeuten: [emph]Das Grab liegt auf Breite ${dec(p.lat as number)} Grad Nord.[/emph] [somber]Nun fehlt mir noch seine Länge.[/somber]`,
-        east: `[excited]Entschlüsselt![/excited] „Salewa" ist der Sonnenaufgang: [emph]Das Grab liegt auf Länge ${dec(p.lon as number)} Grad Ost.[/emph] [somber]Zusammen mit der Breite ist der Ort bestimmt.[/somber]`,
-        west: '[excited]Nun verstehe ich das Oberhaupt des Westens:[/excited] Das Grab liegt [emph]im Norden, jenseits des Wüstenrands[/emph] – ein Land ohne Gras.',
-        central: '[excited]Die Worte des Waldes öffnen sich:[/excited] Das Grab liegt [emph]im Norden, fort vom Kongo, wo der Sand beginnt[/emph].',
-        south: '[excited]Die Jahreszeiten sprechen:[/excited] „Gen Sommer" heißt [emph]weit nach Norden[/emph] – jenseits des Sambesi, jenseits der Wälder, im großen Sand.',
-      }
-      return texts[regionId]
-    },
+    chiefWalk:
+      '[awe]Das Oberhaupt trat aus seiner Hütte und ging hinüber zu seinem Trommler.[/awe] [pause]Er gab mir kein Wort, das ich hätte verstehen können. [somber]Und doch schien seine Absicht deutlich genug:[/somber] [emph]Offenbar sollte ich ihm folgen.[/emph]',
     drumMessage:
       '[awe]Das Oberhaupt rief seinen Trommler, und zwei Trommeln sprachen an seiner Statt – eine große und eine kleine.[/awe] [pause]Vier Wörter zu je vier Schlägen, jedes vom nächsten durch dieselbe kurze Stille getrennt – dumpf für die tiefe Silbe, hell für die hohe. [excited]Ich kenne diese Wörter. Jedes einzelne habe ich in den Gassen und am Wasser gehört.[/excited] [pause]Ich habe sie in der Reihenfolge notiert, in der sie geschlagen wurden; was sie von mir verlangen, muss ich selbst lesen.',
     rockArtefact:
