@@ -34,6 +34,7 @@
 // judges the village (`scripts/verify/childMotionMetric.mjs`) judges this round
 // on the same terms. What is new here is the ROUND, not the step.
 
+import type { VoiceRegister } from '../../communication/speaking'
 import { CHILD_FIGURE_SCALE } from '../../render/figures'
 import type { GestureKind } from '../../render/gesture'
 import { reachFrom, solveTouch } from './rockTouch'
@@ -73,6 +74,10 @@ export type BankRole = 'runner' | 'catcher' | 'out'
 
 /** The fixed point of the round an utterance falls at. */
 export type BankMoment = 'call' | 'boulder' | 'announce' | 'tap' | 'arrival'
+
+export function bankVoiceRegister(moment: BankMoment): VoiceRegister {
+  return moment === 'call' || moment === 'announce' || moment === 'arrival' ? 'call' : 'talk'
+}
 
 /** What the utterance was aimed at. ROCK falls once with nobody arriving and
  *  once outside the game altogether. */

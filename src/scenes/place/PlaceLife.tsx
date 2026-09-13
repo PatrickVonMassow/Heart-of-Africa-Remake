@@ -72,6 +72,7 @@ import {
   rockAt,
   insideStrangerBerth,
   stepBankGame,
+  bankVoiceRegister,
   type BankChild,
   type BankEnd,
   type BankStage,
@@ -104,7 +105,7 @@ import {
 } from './adultWork'
 import { gestureIfHeard, speechReach } from '../../communication/spokenGesture'
 import { speechBearing } from './speechBearing'
-import { utterancePlan } from '../../communication/speaking'
+import { utterancePlan, registerOptions } from '../../communication/speaking'
 import { speechLabelSeconds } from '../../communication/speechLabel'
 import { playSpeech } from '../../systems/ambience'
 import { speakOverhead, speechClock } from './speechChannel'
@@ -608,13 +609,14 @@ function speakBankUtterance(
   const distance = placePlayerPosition.active
     ? Math.hypot(speaker.x - placePlayerPosition.x, speaker.z - placePlayerPosition.z)
     : Infinity
-  const reach = speechReach(distance)
+  const options = registerOptions(bankVoiceRegister(said.moment))
+  const reach = speechReach(distance, options.radius)
   const utterance = utteranceOf(said.concept)
-  playSpeech(utterancePlan(utterance, distance, { bearing: speechBearing(camera, speaker), voice: 'child' }))
+  playSpeech(utterancePlan(utterance, distance, { bearing: speechBearing(camera, speaker), voice: 'child', ...options }))
   if (reach.audible) {
     useGame.getState().hearUtterance(utterance)
     if (anchor) {
-      speakOverhead(`kid-${said.speaker}`, [utterance], anchor, { seconds: speechLabelSeconds(1) })
+      speakOverhead(`kid-${said.speaker}`, [utterance], anchor, { seconds: speechLabelSeconds(1), reach: options.radius })
     }
   }
   // A TOUCH BRINGS ITS OWN ARM. Its hand has to land on a drawn flank, and the
@@ -637,7 +639,7 @@ function speakBankUtterance(
     ...arm,
     ...(said.hold ? { duration: said.hold } : {}),
     phase: said.speaker * 1.1,
-  })
+  }, options.radius)
 }
 
 /**

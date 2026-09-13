@@ -269,3 +269,15 @@ describe('the speaker the use key would take (design.md §13.4)', () => {
     expect(speechTargetLabel()).toBeNull()
   })
 })
+
+
+it('keeps a call label actionable from the distant spectator stand', () => {
+  const anchor = { parent: {}, updateWorldMatrix() {}, matrixWorld: { elements: Array(16).fill(0) } } as unknown as Object3D
+  speakOverhead('caller', [RIVER_UTTERANCE], anchor, { now: 0, reach: 34 })
+  const player = { x: 22, z: 0, active: true }
+  updateSpeechTarget(() => true, undefined, player)
+  expect(speechTargetLabel()?.speakerId).toBe('caller')
+  expect(speechUseCandidate(player)?.range).toBe(34)
+  updateSpeechTarget(() => true, undefined, { ...player, x: 34.01 })
+  expect(speechTargetLabel()).toBeNull()
+})

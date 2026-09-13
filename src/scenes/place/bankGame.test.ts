@@ -13,6 +13,9 @@
 // `tagShuffle.test.ts` replays.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { bankPlayRocksView } from './riverBank'
+import { registerOptions, utterancePlan } from '../../communication/speaking'
+import { utteranceOf } from '../../communication/lexicon'
 import { balance } from '../../config/balance'
 import { resetDevAsserts } from '../../systems/devAssert'
 import { mulberry32 } from '../../world/noise'
@@ -22,6 +25,7 @@ import { playRockFlank } from './playRockSurface'
 import { standingClear, WALKER_RADIUS } from './collision'
 import {
   bankChildCanSeparate,
+  bankVoiceRegister,
   bankChildBodyLift,
   bankChildTouching,
   createBankGame,
@@ -1353,5 +1357,41 @@ describe('arriving runners name the far stone by contact', () => {
     }
     expect(spoken.size).toBeGreaterThanOrEqual(1)
     expect(touched.size).toBe(3)
+  })
+})
+
+
+describe('the call register reaches the documented spectator stand', () => {
+  it.each(['call', 'announce', 'arrival', 'tap', 'boulder'] as const)('%s selects its own voice register', (moment) => {
+    expect(bankVoiceRegister(moment)).toBe(['tap', 'boulder'].includes(moment) ? 'talk' : 'call')
+  })
+
+  it.each(['bambara-village', 'mandinka-village', 'nubian-village'])('measures every call word in a complete %s round at the stand', (id) => {
+    const layout = buildLayout(id, 3791639114)
+    const rocks = layout.playRocks!
+    const stand = bankPlayRocksView(rocks)
+    for (const rock of [rocks.upstream, rocks.downstream]) {
+      expect(balance.communication.call.reach).toBeGreaterThanOrEqual(dist(stand, rock))
+    }
+    const bank = layout.bank!
+    const stage: BankStage = {
+      ...STAGE, ...rocks, flank: playRockFlank(rocks),
+      water: { x: bank.nx * bank.distance, z: bank.nz * bank.distance },
+      roam: layout.playGround!,
+      boulder: climbBoulder(layout.rocks, layout.playGround!, balance.villageLife.bankGame.climbableRockTop)!,
+    }
+    const { log, s: state } = replay(600, { stage, seed: 3791639114, world: { ...openWorld(), radius: 100 } })
+    expect(state.cycles).toBeGreaterThan(0)
+    const heard = new Set<string>()
+    for (const { u, speakerX: x, speakerZ: z } of log.when) {
+      if (bankVoiceRegister(u.moment) !== 'call') continue
+      const distance = dist(stand, { x, z })
+      const plan = utterancePlan(utteranceOf(u.concept), distance, { ...registerOptions('call'), voice: 'child', volume: 1 })
+      expect(plan.gain, `${id} ${u.moment} ${distance.toFixed(2)} m`).toBeGreaterThanOrEqual(0.2)
+      expect(plan.syllables[0].peak).toBeGreaterThanOrEqual(0.85 * 1.25 * 0.2)
+      expect(gestureIfHeard(distance, u.gesture, {}, balance.communication.call.reach).kind).toBe(u.gesture)
+      heard.add(u.concept)
+    }
+    expect(heard).toEqual(new Set(['RIVER', 'UPSTREAM', 'DOWNSTREAM', 'ROCK']))
   })
 })

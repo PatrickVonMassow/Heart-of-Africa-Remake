@@ -87,6 +87,8 @@ A syllable is a sample, low for `ba` and high for `BA`, differing in pitch
 alone. An utterance plays all four syllables at a constant pace. A phrase uses
 one constant pause between atoms and no other structure.
 
+CALL and TALK are utterance registers with separate reach, loudness and falloff. RIVER calls, direction announcements and arrival ROCK use CALL; taps, off-game boulders and all ordinary speech use TALK. TALK retains 10 m; CALL uses 34 m, 1.25 times the source level and falloff 4. The rock-to-spectator distance is about 22 m, but the shipped Mandinka opening RIVER caller was measured at 32.64 m from that stand. The full-round tests measure each received call at at least 20% before its loudness multiplier. Sound, memory, gestures and label interaction share each register’s hard boundary. The adult/child separation budget remains 10 m.
+
 Speech falls off sharply and is silent outside the hearing radius. The same
 range decision governs sound, observation, overhead note, and gesture: unheard
 speech teaches nothing and is not silently mimed. Pace, pause, radius, and

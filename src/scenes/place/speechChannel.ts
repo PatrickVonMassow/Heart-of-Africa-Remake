@@ -37,6 +37,7 @@ import { placePlayerPosition } from './playerPosition'
 let state: SpeechLabelState = noSpeechLabels()
 
 /** The object each speaker is drawn as — the label rides on its world position. */
+const reaches = new Map<string, number>()
 const anchors = new Map<string, Object3D>()
 
 const listeners = new Set<() => void>()
@@ -78,10 +79,11 @@ export function speakOverhead(
   speakerId: string,
   atoms: Phrase,
   anchor: Object3D,
-  options: { seconds?: number; height?: number; now?: number } = {},
+  options: { seconds?: number; height?: number; now?: number; reach?: number } = {},
 ): void {
   const now = options.now ?? speechClock()
   anchors.set(speakerId, anchor)
+  reaches.set(speakerId, options.reach ?? balance.communication.talk.reach)
   // The height is read from the SPEAKER, here rather than at each call site, so
   // every speaker — the villagers, the children, the dev hook — gets its note
   // over its own head without computing anything (work-order point 582). The
@@ -124,9 +126,10 @@ export function updateSpeechTarget(
     // through a scratch vector — the module stays free of a three value import.
     anchor.updateWorldMatrix(true, false)
     const e = anchor.matrixWorld.elements
-    candidates.push({ speakerId: label.speakerId, distance: Math.hypot(e[12] - player.x, e[14] - player.z) })
+    const distance = Math.hypot(e[12] - player.x, e[14] - player.z)
+    if (distance <= (reaches.get(label.speakerId) ?? reach)) candidates.push({ speakerId: label.speakerId, distance })
   }
-  publish(withSpeechTarget(state, pickSpeechTarget(candidates, state.targetId, reach)))
+  publish(withSpeechTarget(state, pickSpeechTarget(candidates, state.targetId, Infinity)))
 }
 
 /** The label SPACE would take right now, or null while none is highlighted. */
@@ -159,7 +162,7 @@ export function speechUseCandidate(
   return {
     key: `speech:${label.speakerId}`,
     distance: Math.hypot(e[12] - player.x, e[14] - player.z),
-    range: reach,
+    range: reaches.get(label.speakerId) ?? reach,
     payload: label,
   }
 }
@@ -198,5 +201,6 @@ export function forgetSpeechLabel(speakerId: string): void {
 /** Wipes the channel — the label layer does this when the settlement is left. */
 export function clearSpeechLabels(): void {
   anchors.clear()
+  reaches.clear()
   publish(noSpeechLabels())
 }
