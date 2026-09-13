@@ -604,6 +604,58 @@ if (section('village')) {
 // where the layout says. The backend-sensitive pictures are also where the
 // detailed surfaces and broad level bases can actually be judged; neither may
 // read as an egg balanced on a vertex.
+// Hold the chief at the beginning of his real walk so contact can be measured
+// and photographed at his hut. The authored unit tests cover the moving body.
+if (section('chief-body')) {
+  await page.evaluate(() => window.__game.getState().enterPlace('bambara-village'))
+  await page.waitForFunction(() => window.__game.getState().placeId === 'bambara-village' && window.__placeLayout,
+    null, { timeout: 30000 })
+  const speed = await page.evaluate(() => {
+    const speed = window.__balance.communication.chiefWalkSpeed
+    window.__balance.communication.chiefWalkSpeed = 0
+    window.__game.getState().bumpBalance()
+    window.__chiefHome()
+    window.__game.getState().callChiefOut()
+    window.__game.getState().setJournalOpen(false)
+    return speed
+  })
+  try {
+    await page.waitForFunction(() => window.__chief?.phase === 'walking-out' && window.__chief.progress === 0,
+      null, { timeout: 8000 })
+    const contact = await page.evaluate(() => {
+      const chief = window.__chief
+      const hut = window.__placeLayout.interactives.find((it) => it.type === 'chief')
+      const length = Math.hypot(chief.x - hut.pos[0], chief.z - hut.pos[1])
+      const nx = (chief.x - hut.pos[0]) / length
+      const nz = (chief.z - hut.pos[1]) / length
+      const p = window.__placePlayer
+      p.x = chief.x + nx * 2
+      p.z = chief.z + nz * 2
+      p.yaw = Math.atan2(chief.x - p.x, chief.z - p.z) + Math.PI
+      return { x: chief.x, z: chief.z, r: chief.r, nx, nz }
+    })
+    await pushFrames(24)
+    const stopped = await page.evaluate(({ x, z, nx, nz }) => {
+      const p = window.__placePlayer
+      return { distance: Math.hypot(p.x - x, p.z - z), side: (p.x - x) * nx + (p.z - z) * nz }
+    }, contact)
+    const touching = stopped.distance >= contact.r + 0.35 - 0.01 &&
+      stopped.distance <= contact.r + 0.35 + 0.05 && stopped.side > 0
+    check('Chief: walking forward stops at his body in front of the hut', touching, JSON.stringify(stopped))
+    if (!touching) throw new Error('The declared blocked-player frame requires contact with the chief')
+    await shot('53-collision-chief-body', {
+      local: { x: contact.x, y: 1.4, z: contact.z },
+      label: 'the player blocked at the chief’s body in front of his hut',
+    })
+  } finally {
+    await page.evaluate((speed) => {
+      window.__balance.communication.chiefWalkSpeed = speed
+      window.__game.getState().bumpBalance()
+      window.__chiefHome()
+    }, speed)
+  }
+}
+
 if (section('drawn-colliders')) {
   await enterSettlement('bambara-village')
   // === Nothing blocks where nothing is drawn (work-order 583) ===================

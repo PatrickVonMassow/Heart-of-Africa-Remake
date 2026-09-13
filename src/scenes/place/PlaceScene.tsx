@@ -693,6 +693,7 @@ function Chief({
       win.__chief = {
         phase: step.walk.phase,
         progress: step.walk.progress,
+        r: CHIEF_BODY_RADIUS,
         x: px,
         z: pz,
         facing: standingFacing,
