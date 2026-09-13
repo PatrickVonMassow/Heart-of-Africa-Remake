@@ -267,6 +267,27 @@ put it is the mistake this line exists to stop.
   audibility from the spectator's stand. balance.ts: both register triples, the consequence
   window and the hush hold (calibratable), with the English and German debug labels changed
   together.
+  STAND 13.09.2026 NACHTS, measured and charged to this point — the branch does NOT merge
+  yet. The covering `polish` run on `feat/1073-call-register-and-speech-floor@9185a79c8`
+  (WebGPU, 66 min, 54 frames) is RED, and the harness's own flake retry reproduced the
+  SAME failure, so it is not a flake: `the words were still over his head when the picture
+  was taken` [--section=artefact-give], evidence
+  `{"standing":false,"drawn":["villager-4"],"held":["villager-4"]}`.
+  CAUSE. Commit bd38ef2dd added the `exclusive` option to `speechChannel.ts` (it does not
+  exist on main). It clears EVERY label and EVERY anchor, not only the previous village
+  note, so the chief's answer to the player (`PlaceScene.tsx:588`, deliberately raised
+  WITHOUT `exclusive`, and held at 120 s by the shot) is swept away by the next village
+  word. The point's own unit test names the intent: "replaces the preceding VILLAGE note".
+  REPAIR, designed and not yet written: the floor clears what the floor raised. Rename the
+  option `exclusive` -> `floor`; a floor word drops the previous FLOOR note and its anchor
+  and leaves a note raised outside the floor standing. Touches `speechLabel.ts` (a `floor`
+  field plus `dropFloorLabels`), `speechChannel.ts`, `PlaceLife.tsx:622/1867/3289`,
+  `speechChannel.test.ts` (the existing case plus one for the surviving note) and the
+  "The speech floor" section of `docs/communication-poc-spec.md`.
+  NOTE ON THE HARNESS: `run-wait` called this healthy run HUNG three times — its 5m41s
+  expectation comes from a PARTIAL section run; the full suite needs ~33 min per pass here.
+  That is the already-booked defect of points 1099/1101; measure the frame progress, do not
+  kill the run.
   Bundle: Dorfleben.
 
 - [ ] 1056. The excavation becomes a real place: it says what it is for, and its earth is

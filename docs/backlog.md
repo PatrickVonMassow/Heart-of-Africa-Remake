@@ -805,3 +805,25 @@ on. The session appended the true state as its own paragraph rather than touchin
 sanctioned wording. Non-blocking under the infrastructure freeze: nobody is misdirected into
 an action by it, the card's own purpose (naming WHY the handover happens) is intact, and the
 fix is one sentence in a card generator, not a mechanism.
+
+## The beginner guide is missing the ceiling a green run cannot show (13.09.2026)
+
+The retrospective's newest lesson of the same evening (§3.270) has no counterpart in
+`docs/analysis_de/vibe-coding-anleitung.md`: four CI runs of one branch died as "cancelled"
+because the `fast` job's 15-minute limit was consumed while every signal read green — the
+last two passing runs, one of them on main, left about fifteen seconds of headroom, so the
+next point adding any test at all had to fail, whichever one it was. The failure word names
+neither cause nor repair, and no retry heals it.
+
+The guide's existing duration pitfall ("Die gemessene Dauer von damals tötet den gesunden
+Lauf von heute") is the other side of it: a stored expectation killing a healthy run. The
+missing one is a healthy run hiding that it has nearly spent its limit — generalisable to
+any reader with a job timeout, which is why it belongs in the guide and not only in the
+retrospective.
+
+Measured price, 13.09.2026: the bullet as drafted costs 9 lines and 106 words, and the
+guide's ceiling IS the guard's exact measured size and only ratchets down
+(`scripts/guide-brevity-core.test.mjs`, "sets both ceilings to the guard's exact measured
+size"). So the room must be CUT elsewhere first, the way design.md paid for its
+speech-floor section. Drafted, measured, reverted in 55b12d04e's successor commit rather
+than left half-applied; non-blocking, because the guide is prose nobody's build reads.
