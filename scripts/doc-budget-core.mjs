@@ -251,7 +251,10 @@ export const DOC_BUDGETS = [
   },
   {
     path: 'design.md',
-    maxLines: 850,
+    // RAISED by the 2 measured lines of the §13.4 speech paragraph work-order 1072
+    // owes the section (the same paragraph the word ceiling below prices in); the
+    // one line of margin that stood here is left untouched.
+    maxLines: 852,
     // RAISED at the merge by 113 measured words: point 341 landed on main while
     // the compression branch was open and added the separated-juvenile decision
     // to §19.8. That is a genuinely new decision, which is exactly what the
@@ -376,7 +379,15 @@ export const DOC_BUDGETS = [
     // existed anywhere in it. New mechanics the user asked for (07.09.2026), not
     // a longer telling of the old errand — the discovery narrative of the fill
     // pose was CUT from the same section in the same commit to pay part of it.
-    maxWords: 28860,
+    // RAISED by the 103 measured words work-order 1072 owes §13.4: village speech
+    // gains a camera-relative pan per utterance with a bounded width and a stable
+    // rear side, a second, higher carrier pair for the children against the adults'
+    // unchanged one, the compensated panning that keeps the mono sum, the speech
+    // volume and the recalibrated falloff, and the envelope peak the added channel
+    // forced down. The section named no direction, one voice for everyone and no
+    // level at all — new mechanics the user asked for (07.09.2026), not a longer
+    // telling of anything already there.
+    maxWords: 28963,
     // A hundred words across 28k: design.md is edited section by section and a genuine
     // new decision runs 40–215 measured words, so the slack absorbs the rewording that
     // accompanies one and refuses the disappearance of a whole section without a

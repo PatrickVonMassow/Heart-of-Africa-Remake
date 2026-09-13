@@ -112,6 +112,7 @@ import { VILLAGE_SPOTS } from './lifeSpots'
 import { forgetSpeechLabel, speakOverhead, speechClock, speechUseCandidate } from './speechChannel'
 import { chiefRewardPhrase } from '../../communication/chiefReply'
 import type { Phrase } from '../../communication/lexicon'
+import { speechBearing } from './speechBearing'
 import { phrasePlan } from '../../communication/speaking'
 import { speechLabelSeconds, type SpeechLabel } from '../../communication/speechLabel'
 import { drumMessagePlan } from '../../communication/drumMessage'
@@ -574,7 +575,7 @@ function actOnChief(target: ChiefTarget, layout: PlaceLayout | null): void {
  *  over the chief's head, like any other villager's word (design.md §13.4).
  *  The distance is measured to the spot the standing figure registered, so the
  *  voice comes from the man in the picture. */
-function speakChiefPhrase(phrase: Phrase): void {
+function speakChiefPhrase(phrase: Phrase, camera: THREE.Camera): void {
   const distance =
     placePlayerPosition.active && chiefStandingPosition.active
       ? Math.hypot(
@@ -582,7 +583,7 @@ function speakChiefPhrase(phrase: Phrase): void {
           placePlayerPosition.z - chiefStandingPosition.z,
         )
       : 0
-  playSpeech(phrasePlan(phrase, distance))
+  playSpeech(phrasePlan(phrase, distance, { bearing: speechBearing(camera, chiefStandingPosition) }))
   const anchor = chiefAnchor()
   if (anchor) speakOverhead(CHIEF_SPEAKER_ID, phrase, anchor, { seconds: speechLabelSeconds(phrase.length) })
 }
@@ -611,6 +612,7 @@ function Chief({
   style: RegionPlaceStyle
   dress: ColdDress | null
 }) {
+  const camera = useThree((state) => state.camera)
   const t = useStrings()
   const group = useRef<THREE.Group>(null)
   // The two ends of his path: the spot beside his own door he has always come
@@ -707,9 +709,9 @@ function Chief({
     () =>
       useGame.subscribe((state, prev) => {
         if (state.rockArtefact !== 'given' || prev.rockArtefact === 'given') return
-        speakChiefPhrase(chiefRewardPhrase())
+        speakChiefPhrase(chiefRewardPhrase(), camera)
       }),
-    [],
+    [camera],
   )
   return (
     // NOT marked for the §17.8 Ctrl layer: he carries his own standing label
