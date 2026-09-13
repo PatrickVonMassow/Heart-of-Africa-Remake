@@ -575,6 +575,15 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   Lies, was der Lauf **sonst** erzeugt: Dateien, Kindprozesse, Stände. Drucken Plan **und**
   Messung nebeneinander, muss dabeistehen, **welche** die Abbruchschranke benutzt."
 
+- **Die Grenze, die ein grüner Lauf nicht zeigen kann.** Deine Prüfung läuft grün — und
+  verbraucht dabei fast das ganze Zeitlimit, unter dem sie steht. Der nächste Test, ganz gleich
+  welcher, muss auflaufen, und der Fehlschlag heißt dann *abgebrochen*: ein Wort, das weder
+  Ursache noch Reparatur nennt und das kein erneuter Anlauf heilt.
+  → *Prompt:* „Ein Grün sagt nichts über die **Luft**, die noch da war. Zu jedem Lauf, der unter
+  einem Limit steht, gehört sein **Abstand zu diesem Limit** in die Ausgabe — und ein Lauf, der
+  es fast aufbraucht, ist eine **Warnung**, kein Erfolg. Prüffrage: Wie viel Reserve hatte der
+  letzte grüne Lauf?"
+
 - **Die Schranke verlangt genau das, was gerade entsteht.** Sie lässt nicht aufhören, solange
   ein Nachweis fehlt — und der Nachweis ist der Lauf, der noch zwei Stunden braucht.
   Verweigerung und eigene Abhilfe laufen gegeneinander.
