@@ -12685,6 +12685,19 @@ to land than a mechanism that needs a review.
   Criticality: medium — one run, one line, but it is the cheapest possible demonstration that the
   gate cannot tell a broken machine from a broken game, and that confusion is what makes a red
   gate get waved through.
+  SEEN AGAIN 13.09.2026 ON A LANE THE LEDGER CANNOT REACH, and that is the half this point did not
+  know it had. The covering picture run of point 1072, `webgpu/flow` on main at 88e6aec92: first
+  attempt 36 pass, 0 fail and exactly two console reds, both this 504, the retry clean at 36 pass /
+  0 console errors, 8 of 8 frames written on both attempts. So far it is the same transient as the
+  four lanes already charged. What is NEW is that no charge could be written for it: `flow` prints
+  its console errors inside the tail block rather than as top-level `ERR:` lines, so the recorder
+  stored the failing run with NO `reds` array at all, the retry marker fell back to
+  `SUSPECT_UNNAMED`, and the run reads as "the first attempt failed without naming a check". A
+  ledger entry for that placeholder would excuse every future unnamed failure of the lane —
+  including a crash — which is precisely the over-broad signature the charge table forbids, so the
+  only valve left was `--defer`. The third bullet of the FINAL STATE therefore has a second
+  addressee: as long as a suite's console reds do not reach the record under their own names, the
+  disposition route cannot be applied to them at all, and the lane can only ever be deferred.
   Bundle: Session- & Repo-Hygiene.
 
 - [ ] 940. The derived state card is authenticated by a shape that is not the writer's (cross-vendor
