@@ -4216,14 +4216,21 @@ if (section('children-bank-game')) {
         .waitForFunction(
           () => {
             const t = window.__placeTag()
-            if (!t || t.direction == null) return null
-            const spoken = (window.__speech?.labels() ?? []).find((l) => String(l.speakerId).startsWith('kid-'))
+            if (!t || t.direction == null || !t.announcedWord) return null
+            // THE ANNOUNCED WORD, not merely SOME child's word. Taking the first
+            // `kid-` label would pass on any utterance the round happens to be
+            // holding — a tap, an arrival ROCK — with the taught direction
+            // absent from the picture, which is the very defect this checks for.
+            const spoken = (window.__speech?.labels() ?? []).find((l) =>
+              String(l.speakerId).startsWith('kid-') &&
+              Array.isArray(l.atoms) && l.atoms.length === 1 && l.atoms[0] === t.announcedWord)
             if (!spoken) return null
             const who = Number(String(spoken.speakerId).slice(4))
             const child = t.children[who]
             if (!child) return null
             return {
               direction: t.direction,
+              announcedWord: t.announcedWord,
               who,
               atoms: spoken.atoms,
               screen: window.__speech?.anchorScreen(spoken.speakerId) ?? null,
@@ -4238,17 +4245,20 @@ if (section('children-bank-game')) {
         .catch(() => null)
       check(
         'the announced direction is READ over the calling child, inside the picture from the spectator`s stand',
-        !!called && Array.isArray(called.atoms) && called.atoms.length > 0 && !!called.screen &&
+        !!called && called.atoms.length === 1 && called.atoms[0] === called.announcedWord && !!called.screen &&
           called.screen.x > 0 && called.screen.x < called.view.w &&
           called.screen.y > 0 && called.screen.y < called.view.h,
-        JSON.stringify(called && { direction: called.direction, who: called.who, atoms: called.atoms, screen: called.screen }),
+        JSON.stringify(called && { direction: called.direction, word: called.announcedWord, who: called.who, atoms: called.atoms, screen: called.screen }),
       )
       // The arm is the half a raised reach alone would never have bought: the
       // gesture is cut by the SAME hard boundary as the sound, so a call out of
       // reach is a silent child standing still, not a mute child pointing.
+      // `point` is the gesture `announceRun` gives this moment, and the only one
+      // that means "that way". Accepting any non-rest arm would pass on a beckon
+      // or a refusal and call it a direction shown.
       check(
         'and the same child POINTS it — the arm carries as far as the voice',
-        !!called && !!called.gesture && called.gesture.kind !== 'rest' && called.gesture.t < called.gesture.duration,
+        !!called && !!called.gesture && called.gesture.kind === 'point' && called.gesture.t < called.gesture.duration,
         JSON.stringify(called && called.gesture),
       )
       if (called && Array.isArray(called.atoms) && called.atoms.length > 0) {

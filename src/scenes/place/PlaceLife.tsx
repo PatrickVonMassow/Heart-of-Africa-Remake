@@ -1155,8 +1155,12 @@ function Kids({
       phase: bank ? bank.phase : null,
       /** The direction this run was announced in (work-order 1073), so a check
        *  can WAIT for the call it means to photograph instead of shooting the
-       *  stretch and hoping. Null between runs, and in the tag round. */
+       *  stretch and hoping. Null between runs, and in the tag round. The word
+       *  itself travels with it: a check that only knows SOME child spoke
+       *  cannot tell the taught direction from any other utterance in the
+       *  round, and would pass on the wrong one. */
       direction: bank ? bank.direction : null,
+      announcedWord: bank && bank.direction ? utteranceOf(bank.direction) : null,
       // The game's OWN clock: the verification samples an interval of GAME,
       // never a count of frames, which buy different amounts of it per machine.
       clock: bank ? bank.clock : game!.clock,

@@ -706,7 +706,12 @@ describe('task lifecycle safeguards', () => {
       stepAdultWork(state, v, 1 / 30, CFG, () => 0.5)
     }
     expect(state.tasks.every((task) => task === null)).toBe(true)
-    expect(errors.mock.calls.map((call) => String(call[0])).join(' ')).toContain('[ASSERT] adult-atom-lost')
+    // The pair never assembled, so no word was ever WITHHELD: this reports as
+    // the walking failure it is, and must not be filed as a lost word — the two
+    // send a reader to different subsystems (work-order 1073).
+    const reported = errors.mock.calls.map((call) => String(call[0])).join(' ')
+    expect(reported).toContain('[ASSERT] adult-pair-never-met')
+    expect(reported).not.toContain('[ASSERT] adult-atom-lost')
     errors.mockRestore()
     resetDevAsserts()
   })

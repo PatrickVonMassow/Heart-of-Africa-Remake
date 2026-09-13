@@ -213,10 +213,25 @@ function clearPair(state: AdultWorkState, index: number): void {
 }
 
 export function assertNoOwedWord(task: AdultTask, index: number): void {
+  // TWO DIFFERENT FAILURES, REPORTED APART (work-order 1073). Nothing is
+  // excused here — conflating them is exactly what the old blanket `hushed`
+  // exemption did, and it hid both.
+  //  · The word's moment HAD come and it was WITHHELD (`hushed`): the floor
+  //    owes it and let the owning task die with it unsaid. That is the loss
+  //    this point exists to catch.
+  //  · The word never became sayable at all: the pair never assembled, so no
+  //    floor decision touched it and there was nobody to say it to. That is a
+  //    WALKING failure, and naming it as a lost word sends every reader to the
+  //    wrong subsystem.
   devAssert(
-    !task.owes,
+    !task.owes || !task.hushed,
     'adult-atom-lost',
-    () => `${task.situation}: villager ${index} ran out of time with his ${task.phase} word unspoken`,
+    () => `${task.situation}: villager ${index} ran out of time with his ${task.phase} word withheld`,
+  )
+  devAssert(
+    !task.owes || task.hushed === true,
+    'adult-pair-never-met',
+    () => `${task.situation}: villager ${index} expired still on his way to the ${task.phase} word; the pair never assembled`,
   )
 }
 

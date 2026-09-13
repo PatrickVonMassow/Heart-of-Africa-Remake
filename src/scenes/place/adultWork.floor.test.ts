@@ -91,7 +91,14 @@ it('measures the hold above complete healthy exchanges on every shipped village 
         if ((state.floor?.forcedCount ?? 0) > forcedCount || errors.mock.calls.length > errorCount) {
           // A nav obstruction is not a healthy situation. Prove it was stalled,
           // rather than quietly excluding a slow but moving exchange from the maximum.
-          expect(walking.length, `${id}/${seed}: forcing must have a physical stall ${errors.mock.calls.slice(errorCount).flat().join(' ')}`).toBeGreaterThan(0)
+          // THE INVARIANT THIS POINT OWNS: the floor never loses a word whose
+          // moment had come. An exchange may still be abandoned because the
+          // pair never assembled — that is a walking failure and reports under
+          // its own name — but `adult-atom-lost` means the floor held a sayable
+          // word until its task died, and it must never appear in healthy play.
+          const said = errors.mock.calls.slice(errorCount).flat().join(' ')
+          expect(said, `${id}/${seed} at ${clock}: the floor lost a word it was holding`).not.toContain('adult-atom-lost')
+          expect(walking.length, `${id}/${seed}: forcing must have a physical stall ${said}`).toBeGreaterThan(0)
           const spans = walking.map((i) => Math.max(...recent[i].map((p) => Math.hypot(p.x - recent[i][0].x, p.z - recent[i][0].z))))
           expect(spans.every((span) => span < WORK_ARRIVE_RADIUS), `${id}/${seed}: stalled position spans ${spans}`).toBe(true)
           stuckExchanges++
