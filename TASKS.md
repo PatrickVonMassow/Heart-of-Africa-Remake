@@ -9037,6 +9037,22 @@ to land than a mechanism that needs a review.
   the one point 514 already states for its own instance — the wait after a jump POLLS the
   camera having arrived rather than counting milliseconds. Both frames are charged to this
   point in `scripts/render-verify-charges.mjs`, each scoped to `world`/WebGPU.
+  MEASURED A THIRD TIME 13.09.2026, on main at 49cef70ee645, and this round carries the
+  DETAIL the earlier records lack. Two `baseline-classify.mjs world` runs on a quiet machine
+  (load 0.35 over sixteen cores) both red on `11-worldmodel-khartoum-confluence` with the same
+  wording, while the other six landmarks pass in both — the rotation stands, and point 995,
+  which owns making these entries narrowable at all, now has a recorded measurement to narrow
+  this one by.
+  AND THE CHARGE DID NOT REACH THE RED, which is a second thing this point has to carry. The
+  WebGPU world run of 13.09. reported both this frame and the talus pair as UNACCOUNTED, and
+  the reason is structural rather than a mis-filing: the entry is scoped to the compatibility
+  feature level, and a run that records no level — or records `core` — matches no level-scoped
+  charge. Measured against the shipped ledger that day: `chargeFor` on this red answers point
+  627 at `compatibility` and NOTHING at `core` or at no level at all. So a known, owned,
+  reproducible red reads as unowned whenever the world suite does not record the level it drew
+  at, and `render-verify-guard` then blocks on a defect that is already filed. Whatever this
+  point decides about the jump, the world run has to record its feature level, or this entry
+  cannot account for the red it was written for.
   FINAL STATE: the cause is NAMED with evidence — the jump to (-17.9, 25.9) not settling
   before the shutter opens, a camera clamp at that latitude, or a real placement change —
   and fixed at that cause. If it is timing, the frame waits on the STATE the jump reaches,
@@ -15245,6 +15261,23 @@ to land than a mechanism that needs a review.
   reach test reads next to the socket position, so the distance that decided the answer is
   named instead of guessed — `node scripts/throttle-probe.mjs world --section=<the block's
   slug> --runs 8` measures how often it bites.
+  IT IS NOT INTERMITTENT ON MAIN — MEASURED 13.09.2026, and that is cheaper news than the
+  title above. `baseline-classify.mjs world` ran the suite TWICE against 49cef70ee645, main's
+  own tip, on a quiet machine (load 0.35 over sixteen cores), and BOTH presses answered noFit
+  in BOTH runs, word for word as on 08.09.: `said ["Nothing here has a hollow that would take
+  this shape."], spent [], mode travel, dialog null`. The branch it was measured from,
+  feat/1087-carrier-fills-the-jar, had the pair red in only ONE of its two attempts — so
+  "about half the time" is the branch's draw, and on main the defect reproduces every time.
+  The probe this point specifies therefore does not need eight runs to bite: two section runs
+  on main already carry it, which makes the player-versus-harness question above cheap to
+  settle.
+  AND THE FRAME BESIDE IT WAS READ, 13.09.2026, which narrows that question from the other
+  side. `20-worldmodel-bandiagara-talus-foot` — taken between the two presses, at travel zoom
+  0.25 — shows the traveller standing under the "Unknown ruins" label with the rock slab drawn
+  behind him and the Clay Impression in his belt, and it is the same picture as the frame
+  committed before it. So the jump DID put him at the landmark the shutter photographs, while
+  the reach test read a position out of range in the same instant. The two positions are not
+  the same position; that is the measurement this point asked for.
   WHAT IT COSTS. This is the ONE puzzle the PoC can solve end to end, so a fit that
   intermittently refuses is player impact, not only suite noise; and while the red stands
   unowned, `render-verify-guard` blocks every merge in the repository.
