@@ -91,6 +91,7 @@ import {
   DRUMMER_SPEAKER_ID,
   chiefAnchor,
   chiefStandingPosition,
+  chiefMovementColliders,
   chiefWalkState,
   clearChiefStanding,
   resetChiefWalk,
@@ -120,7 +121,7 @@ import { playDrumMessage, playSpeech, playThunder } from '../../systems/ambience
 import { releasePointerLock, requestPlacePointerLock } from './pointerLock'
 import { ActorLabels } from '../ActorLabels'
 import { markActor } from '../actorLabelSource'
-import { resolveMove, standingClear, PLAYER_RADIUS } from './collision'
+import { resolveMove, standingClear, PLAYER_RADIUS, CHIEF_BODY_RADIUS } from './collision'
 import { UNSTUCK_KEY_CODE, UNSTUCK_KEY_LABEL, escapeOutcome, findFreeSpot, newStallState, stuckHintDue, updateStall } from '../../systems/unstuck'
 import { buildBoundaryLut, isOutsidePlace } from './boundary'
 import {
@@ -139,7 +140,7 @@ import { scatterGrassTufts } from './groundScatter'
 import { clearEdgeBand, setEdgeBandBoundary, setEdgeBandLook } from '../../render/edgeBand'
 import { devAssert } from '../../systems/devAssert'
 import { pickUseCandidate, type UseCandidate } from './useKeyTarget'
-import { buildLayout, chiefStandingSpot, DIG_SITE_RADIUS, doorCandidates, fencePanels, isOnLane, PLACE_RADIUS, SPAWN_INSET, VILLAGE_FIRE, type Interactive, type PathDef, type DwellingDef, type FenceDef, type PlaceLayout } from './layout'
+import { buildLayout, chiefStandingSpot, interactiveCircleRadius, DIG_SITE_RADIUS, doorCandidates, fencePanels, isOnLane, PLACE_RADIUS, SPAWN_INSET, VILLAGE_FIRE, type Interactive, type PathDef, type DwellingDef, type FenceDef, type PlaceLayout } from './layout'
 import {
   COOK_SHELTER,
   EYE_HEIGHT,
@@ -617,11 +618,14 @@ function Chief({
   const group = useRef<THREE.Group>(null)
   // The two ends of his path: the spot beside his own door he has always come
   // out onto, and the stand abreast of the drummer.
-  const door = useMemo(() => chiefStandingSpot(item), [item])
+  const balanceVersion = useGame((s) => s.balanceVersion)
+  const door = useMemo(() => {
+    void balanceVersion
+    return chiefStandingSpot(item, interactiveCircleRadius('chief', style))
+  }, [item, style, balanceVersion])
   // The stand and the timing are read from the CALIBRATABLE values, so a live
   // change in the debug menu has to reach them: without the version the memo
   // holds the stand he was mounted with until he next comes out.
-  const balanceVersion = useGame((s) => s.balanceVersion)
   const beside = useMemo(() => {
     void balanceVersion // read so the rebuild is the dependency it looks like
     return chiefBesideDrummerSpot(balance.communication.chiefBesideDrummer)
@@ -671,7 +675,8 @@ function Chief({
     wasWalking.current = step.walk.phase === 'walking-out'
     if (step.beatDrums) sendDrumMessage()
     const [px, pz] = chiefWalkPosition(step.walk, door, beside)
-    setChiefStanding(px, pz)
+    if (step.walk.phase === 'in-hut') clearChiefStanding()
+    else setChiefStanding(px, pz)
     const g = group.current
     if (g) {
       g.position.set(px, 0, pz)
@@ -700,7 +705,7 @@ function Chief({
       const game = useGame.getState()
       if (game.placeId && game.chiefOutside[game.placeId]) useGame.setState({ chiefOutside: {} })
     }
-  })
+  }, -1) // Publish his body before the player resolves movement in either perspective.
   // His ANSWER to the find (design.md §6): the give is an act on the inventory
   // item, so the store owns it and the figure that must speak it listens for
   // it. Only the transition speaks — a settlement re-entered with the find long
@@ -721,7 +726,7 @@ function Chief({
     <group ref={group} name={CHIEF_SPEAKER_ID} position={[x, 0, z]} rotation={[0, standingFacing, 0]}>
       {/* Robe */}
       <mesh position={[0, 0.62, 0]} castShadow>
-        <coneGeometry args={[0.42, 1.25, TESSELLATION.figureBody]} />
+        <coneGeometry args={[CHIEF_BODY_RADIUS, 1.25, TESSELLATION.figureBody]} />
         <meshStandardMaterial color={robe} roughness={0.95} />
       </mesh>
       {/* Torso and shoulder cloth */}
@@ -2930,7 +2935,7 @@ export function PlaceScene() {
         maxRadius: balance.unstuck.searchRadius,
         // Free ground here is the full rule: no collider touches his footprint,
         // and the spot lies inside the settlement, on the drawn ground.
-        accept: (x, z) => standingClear(l.colliders, x, z, PLAYER_RADIUS) && !isOutsidePlace(l, x, z),
+        accept: (x, z) => standingClear(chiefMovementColliders(l.colliders), x, z, PLAYER_RADIUS) && !isOutsidePlace(l, x, z),
         // A POINT inside a collider is a wall between him and a candidate, so he
         // is never set down on the far side of something he could not walk through.
         blocked: (x, z) => !standingClear(l.colliders, x, z, 0),
@@ -3109,16 +3114,17 @@ export function PlaceScene() {
     // EYE_HEIGHT (no perpetual sub-millimetre bob from residual velocity).
     if (tf === 0 && Math.abs(w.velF) < 1e-3) w.velF = 0
     if (ts === 0 && Math.abs(w.velS) < 1e-3) w.velS = 0
-    if (Math.abs(w.velF) > 1e-4 || Math.abs(w.velS) > 1e-4) {
-      const sin = Math.sin(p.yaw)
-      const cos = Math.cos(p.yaw)
-      // Forward is -Z rotated by yaw; strafe is +X rotated by yaw.
-      const dx = (-sin * w.velF + cos * w.velS) * dt
-      const dz = (-cos * w.velF - sin * w.velS) * dt
-      const [rx, rz] = resolveMove(layout.colliders, p.x + dx, p.z + dz, PLAYER_RADIUS)
-      p.x = rx
-      p.z = rz
-    }
+    // Resolve even at rest: the chief can walk into a stationary traveller.
+    // Sweep from the previous feet so a long input frame cannot cross his body.
+    const sin = Math.sin(p.yaw)
+    const cos = Math.cos(p.yaw)
+    const dx = (-sin * w.velF + cos * w.velS) * dt
+    const dz = (-cos * w.velF - sin * w.velS) * dt
+    const [rx, rz] = resolveMove(
+      chiefMovementColliders(layout.colliders), p.x + dx, p.z + dz, PLAYER_RADIUS, [p.x, p.z],
+    )
+    p.x = rx
+    p.z = rz
 
     // Stall watch (work-order 604): holding a movement input while the position
     // does not advance is what being wedged looks like. It only INFORMS — the

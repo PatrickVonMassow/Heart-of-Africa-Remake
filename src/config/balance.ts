@@ -865,6 +865,8 @@ export interface BalanceConfig {
     chiefStaySeconds: number
     /** How far beside the drummer he takes his stand, in settlement units. */
     chiefBesideDrummer: number
+    /** Clear passage between the hut wall and the chief’s robe at his door. */
+    chiefHutGap: number
     /** How near the traveller must stand to the chief or to the drummer for the
      *  use key to reach either man. */
     chiefTalkReach: number
@@ -1583,6 +1585,8 @@ export const balance: BalanceConfig = {
     // shells (the further one reaches 0.5 m out) and keeps the two men close
     // enough to stand in one picture from the front.
     chiefBesideDrummer: 1.5,
+    // Calibratable: the player’s 0.7 m diameter plus 0.1 m of walking clearance.
+    chiefHutGap: 0.8,
     // Calibratable: the same reach the give already uses, so a traveller who
     // can hand the find over is exactly one who can ask for the drums.
     chiefTalkReach: 2.6,

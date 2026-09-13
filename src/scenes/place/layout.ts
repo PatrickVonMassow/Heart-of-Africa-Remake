@@ -8,7 +8,7 @@ import { placeById } from '../../world/geo'
 import { mulberry32 } from '../../world/noise'
 import { REGION_PLACE_STYLES, VILLAGE_PLANS, type RegionPlaceStyle } from './regionStyles'
 import { PORT_TALKERS, VILLAGE_SPOTS, childPlayGround, villageAdultStations, type PlayGround } from './lifeSpots'
-import { boxCollider, nudgeToFree, spawnPointFree, standingClear, PLAYER_RADIUS, WALKER_RADIUS, type Collider } from './collision'
+import { boxCollider, nudgeToFree, spawnPointFree, standingClear, PLAYER_RADIUS, WALKER_RADIUS, CHIEF_BODY_RADIUS, type Collider } from './collision'
 import { CHIEF_HUT, MARKET_HUT, dwellingRoofProfile, hutRoofProfile, roofStandOff } from './roofClearance'
 import { windingPoints, laneSlots, closestOnPolyline, bendAround, type LaneSlot } from './lanePlan'
 import { buildGizaLayout } from './gizaSite'
@@ -357,14 +357,22 @@ export const CHIEF_STAND_OFFSET = 1.6
  * so the figure the picture shows and the door the key is pressed at can never
  * describe different spots.
  */
-export function chiefStandingSpot(it: Interactive): [number, number] {
+export function chiefStandingSpot(it: Interactive, hutRadius = 3.35): [number, number] {
   const door = it.door ?? it.pos
   const dx = door[0] - it.pos[0]
   const dz = door[1] - it.pos[1]
   const len = Math.hypot(dx, dz) || 1
   const nx = dx / len
   const nz = dz / len
-  return [door[0] + nz * CHIEF_STAND_OFFSET, door[1] - nx * CHIEF_STAND_OFFSET]
+  // Keep the sideways offset and move the stand outward only as far as the
+  // hut/body passage requires. The door interaction point itself stays put.
+  const clearance = Math.max(2 * PLAYER_RADIUS, balance.communication.chiefHutGap)
+  const distance = hutRadius + CHIEF_BODY_RADIUS + clearance
+  const outward = Math.max(0, Math.sqrt(Math.max(0, distance ** 2 - CHIEF_STAND_OFFSET ** 2)) - len)
+  return [
+    door[0] + nx * outward + nz * CHIEF_STAND_OFFSET,
+    door[1] + nz * outward - nx * CHIEF_STAND_OFFSET,
+  ]
 }
 /**
  * Door proximity that arms the Space use key at a functional building — merely

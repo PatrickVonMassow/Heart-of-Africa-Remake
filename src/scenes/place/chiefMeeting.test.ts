@@ -205,13 +205,16 @@ describe('where he stands (design.md §12)', () => {
     const [x, z] = chiefStandingSpot(hut)
     const door = hut.door!
     // A step to the side of the door the traveller presses the key at …
-    expect(Math.hypot(x - door[0], z - door[1])).toBeCloseTo(CHIEF_STAND_OFFSET, 5)
+    const dx = door[0] - hut.pos[0]
+    const dz = door[1] - hut.pos[1]
+    const length = Math.hypot(dx, dz)
+    expect(((x - door[0]) * dz - (z - door[1]) * dx) / length).toBeCloseTo(CHIEF_STAND_OFFSET, 5)
     // … and outside the hut's own body, so he is met face to face.
     expect(Math.hypot(x - hut.pos[0], z - hut.pos[1])).toBeGreaterThan(3.35)
   })
 
   it('walks a line to the drummer that is clear of the settlement', () => {
-    // He has no collider of his own and does not resolve one, so the path he is
+    // He does not resolve the static colliders, so the path he is
     // interpolated along has to BE clear. Measured in the village the whole
     // mechanic plays in, by the game's OWN standing rule and with a grown
     // figure's footprint — the two ends are excepted by construction: he steps
