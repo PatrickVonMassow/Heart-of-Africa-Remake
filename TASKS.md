@@ -185,6 +185,25 @@ put it is the mistake this line exists to stop.
       never silently. The Test line below keeps `adult-atom-lost` for the word that was held
       past its hold; the overrun report is the same event seen from the other side and may
       share that code as long as the situation is named in it.
+    - THE HOLD IS CAPPED BY THE OWNING TASK'S REMAINING LIFE, NOT A BARE CONSTANT (decided
+      13.09.2026, after GPT-6 Astra escalated a second gap in the rule above rather than
+      guessing it). `adultWork.ts` counts a task's age from the moment it is CAST and expires
+      the pair at `errandSeconds`, running `assertNoOwedWord` on the way out — so a flat hold
+      H protects nothing about a word queued after age `errandSeconds - H`: the task dies
+      before that word ever reaches its hold, which is the very assertion this point exists to
+      stop tripping. THE INVARIANT, stated once and binding on every deferral in this point:
+      NO WORD IS EVER STILL OWED WHEN ITS TASK EXPIRES. The floor therefore releases a word at
+      the EARLIER of its hold and the moment its owning task would expire, so the release
+      always happens strictly inside the task's life.
+      REJECTED ALTERNATIVE, recorded with its reason: excluding deferral time from both
+      partners' task age (Astra's own recommendation). It preserves the queued exchange, but it
+      turns `errandSeconds` from a hard backstop against a stuck villager into a soft one that
+      repeated deferral can extend without limit, and it changes task-lifetime semantics that
+      nothing else in this point touches. The cap achieves the same guarantee and changes
+      neither.
+      AND IT GENERALISES: a further interaction of this kind — any place where a deferral could
+      outlive the thing that owes the word — is resolved BY THIS INVARIANT rather than escalated
+      again. The author records what was built and why.
   Test: Vitest — the reach of each utterance moment, `bankPlayRocksView`'s stand-to-rock
   distance bounding the call reach, a full bank round evaluated from that stand yielding a
   measured LEVEL for every call word, no two situations overlapping in the speech floor, and
