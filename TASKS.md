@@ -15694,3 +15694,35 @@ to land than a mechanism that needs a review.
   Refs: scripts/verify/polish.mjs (~4878-4960), scripts/throttle-probe.mjs,
   scripts/render-verify-charges.mjs, point 1106, point 1089, point 1087.
   Bundle: Testinfrastruktur.
+- [ ] 1120. The baseline classification reads the branch under load and the baseline after it, so
+  a load artefact is promoted to a REAL REGRESSION (measured 13.09.2026 on
+  `feat/1072-village-speaks-with-direction`, WebGL 2 lane, in the mechanism point 1089 built).
+  WHAT WAS MEASURED: the LARGE run reported `the dry settlement season reading settles before it
+  is read` red after 60496 ms. The automatic classification then ran the merge-base
+  `734be2f35bff` twice, found that check green in both runs, and printed REAL REGRESSION (green
+  on baseline, red now) — the one verdict that holds a finished branch. It is not the branch's.
+  Re-run once the LARGE run had left the host, same branch, same backend, same section
+  (`VERIFY_GL=webgl node scripts/verify/run-all.mjs polish --section=settlement-season`): GREEN
+  three times out of three, 9 pass / 0 fail each. The branch diff cannot reach the check at all —
+  its only two touches to the verification machinery are registrations (`speechSampler.mjs` into
+  `NON_RENDER_VERIFY` and into `fixed-wait-baseline.json`).
+  WHY IT HAPPENS: the baseline runs AFTER the branch run, on a machine the branch run has
+  meanwhile stopped loading. That run's own banner recorded `MACHINE STATE UNKNOWN` for the
+  branch pass. So "green on baseline, red now" can mean nothing more than "quieter now", and the
+  two sides are not comparable. The check is load-fragile in the way open point 642 describes: it
+  waits with `requireChange: true` for the reading to MOVE inside a 60 s window, and 60496 ms is
+  the full timeout — no movement was ever observed. That is the class of point 1119, one check
+  further along the same suite.
+  FINAL STATE: the classification can tell "the branch broke it" from "the branch's own run
+  loaded the machine". Either both sides are read under comparable load — the baseline taken
+  while the host is as busy as the branch read was, or both taken on a quiet host — or the
+  verdict names the load it could not rule out. A classification that cannot read the machine
+  may report UNRESOLVED; it may not assert REAL REGRESSION.
+  EVIDENCE: a red that today's mechanism calls REAL REGRESSION, whose check then passes
+  repeatedly on the quiet machine, is not reported as the branch's.
+  Refs: scripts/verify/baseline-classify.mjs, scripts/verify/machine-load.mjs,
+  scripts/verify/_browser.mjs (waitForReadingStable), scripts/verify/polish.mjs
+  (~1410-1435), point 1089, point 642, point 1119.
+  It edits `scripts/verify/baseline-classify.mjs`, the mechanism point 1089 built and 1114 and
+  1115 were filed by, so it is worked after 1089 and never beside it.
+  Bundle: Testinfrastruktur.
