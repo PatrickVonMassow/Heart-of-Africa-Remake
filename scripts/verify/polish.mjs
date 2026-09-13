@@ -4202,6 +4202,77 @@ if (section('children-bank-game')) {
           `both detailed play rocks resting on broad bases, seen from a quarter of the stretch back of the upstream rock and ` +
           `an eighth of it aside (stretch ${stood.stretch.toFixed(1)} m)`,
       })
+
+      // THE CALL REACHES THE STAND THE GAME IS PHOTOGRAPHED FROM (work-order
+      // 1073). The defect this exists for: the runner announces the direction
+      // from the START rock while this stand lies 22.0 m from EITHER rock, and
+      // the old 10 m hearing radius is a HARD cut — so from the one place the
+      // project photographs the round, the taught direction word arrived as no
+      // sound, no reading and no arm at all. The CALL register carries it. What
+      // only a browser can answer is whether the reading and the arm are in the
+      // PROJECTION; audibility itself is measured numerically over whole rounds
+      // from this same stand in `bankGame.test.ts`.
+      const called = await page
+        .waitForFunction(
+          () => {
+            const t = window.__placeTag()
+            if (!t || t.direction == null) return null
+            const spoken = (window.__speech?.labels() ?? []).find((l) => String(l.speakerId).startsWith('kid-'))
+            if (!spoken) return null
+            const who = Number(String(spoken.speakerId).slice(4))
+            const child = t.children[who]
+            if (!child) return null
+            return {
+              direction: t.direction,
+              who,
+              atoms: spoken.atoms,
+              screen: window.__speech?.anchorScreen(spoken.speakerId) ?? null,
+              gesture: child.gesture ?? null,
+              view: { w: window.innerWidth, h: window.innerHeight },
+            }
+          },
+          null,
+          { timeout: 240000 },
+        )
+        .then((h) => h.jsonValue())
+        .catch(() => null)
+      check(
+        'the announced direction is READ over the calling child, inside the picture from the spectator`s stand',
+        !!called && Array.isArray(called.atoms) && called.atoms.length > 0 && !!called.screen &&
+          called.screen.x > 0 && called.screen.x < called.view.w &&
+          called.screen.y > 0 && called.screen.y < called.view.h,
+        JSON.stringify(called && { direction: called.direction, who: called.who, atoms: called.atoms, screen: called.screen }),
+      )
+      // The arm is the half a raised reach alone would never have bought: the
+      // gesture is cut by the SAME hard boundary as the sound, so a call out of
+      // reach is a silent child standing still, not a mute child pointing.
+      check(
+        'and the same child POINTS it — the arm carries as far as the voice',
+        !!called && !!called.gesture && called.gesture.kind !== 'rest' && called.gesture.t < called.gesture.duration,
+        JSON.stringify(called && called.gesture),
+      )
+      if (called && Array.isArray(called.atoms) && called.atoms.length > 0) {
+        // Held for the shutter exactly as the chief's answer is, and for the
+        // same reason: a reading stands its few seconds only and the scene-ready
+        // wait before a frame outlasts them. What was really said is measured
+        // LIVE above; this only keeps it in the picture.
+        await page.evaluate(
+          ({ id, atoms }) => { window.__speech?.speak(id, atoms, 'kid-call', 120) },
+          { id: `kid-${called.who}`, atoms: called.atoms },
+        )
+        const child = await page.evaluate((who) => {
+          const c = window.__placeTag().children[who]
+          return c ? { x: c.x, z: c.z } : null
+        }, called.who)
+        if (child) {
+          await frame('1073-bank-call-from-the-spectator-stand', {
+            local: { x: child.x, y: 1.1, z: child.z },
+            label:
+              `the child announcing the run's direction (${called.direction}), its word standing over its head, seen from the ` +
+              `bank-game spectator stand a quarter of the ${stood.stretch.toFixed(1)} m stretch back of the upstream rock`,
+          })
+        }
+      }
     }
 
     // THE TRAVELLER IN THE LANE (spec item 7). He plants himself in the middle of

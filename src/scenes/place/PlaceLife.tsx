@@ -1153,6 +1153,10 @@ function Kids({
       /** The bank round's own phase, for a check that wants to know what it is
        *  looking at; absent in the tag round. */
       phase: bank ? bank.phase : null,
+      /** The direction this run was announced in (work-order 1073), so a check
+       *  can WAIT for the call it means to photograph instead of shooting the
+       *  stretch and hoping. Null between runs, and in the tag round. */
+      direction: bank ? bank.direction : null,
       // The game's OWN clock: the verification samples an interval of GAME,
       // never a count of frames, which buy different amounts of it per machine.
       clock: bank ? bank.clock : game!.clock,
@@ -1163,7 +1167,7 @@ function Kids({
       // The radius a child's BODY occupies, so a live check can judge an overlap
       // against the real figure rather than against a guessed one (point 648).
       bodyRadius: balance.villageLife.separation.bodyRadius * KID_SCALE,
-      children: children.map((c) => ({
+      children: children.map((c, i) => ({
         x: c.x,
         z: c.z,
         heading: c.heading,
@@ -1195,6 +1199,11 @@ function Kids({
         // And how much of that walking happened while the round was ON — the
         // settlement's own counter, for the same reason (point 656).
         walkedWhilePlaying: c.walkedWhilePlaying,
+        // The arm this child is speaking WITH (work-order 1073). A call is three
+        // things at one distance — sound, reading and arm — and the frame from
+        // the spectator's stand has to prove the arm, not just the note; nothing
+        // outside the game can read a live gesture off the drawn pose.
+        gesture: ((g) => g && { kind: g.kind, t: g.t, duration: g.duration, bearing: g.bearing })(gestures.current[i]?.current),
       })),
       /** The stone the off-game ROCK is climbed and spoken at, with the size the
        *  climb is played against (work-order 1080). Published rather than
