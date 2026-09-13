@@ -49,12 +49,6 @@ export class SpeechFloor {
     return (this.held.get(situation)?.size ?? 0) > 0
   }
 
-  /** Keep the debt and its deadline when a queued speaker stops being ready. */
-  suspend(situation: object, word: string): void {
-    const held = this.held.get(situation)?.get(word)
-    if (held) held.sayable = false
-  }
-
   release(situation: object): void {
     this.situations.delete(situation)
     this.held.delete(situation)
@@ -99,7 +93,7 @@ export class SpeechFloor {
     }
     if (forced) {
       this.forcedCount++
-      devAssert(false, 'adult-atom-lost', () => `${this.scope}: ${r.name}/${r.word}: forced after ${(now - (queued?.since ?? now)).toFixed(2)}s; overrun situation ${foreign?.name ?? own?.name ?? r.name}${r.blocked ? ' (hush or occupied site)' : ''}`)
+      devAssert(false, 'adult-atom-lost', () => `${this.scope}: ${r.name}/${r.word}: forced after ${(now - (queued?.since ?? now)).toFixed(2)}s; overrun situation ${foreign?.name ?? own?.name ?? r.name}${r.blocked ? ' (speaker blocked)' : ''}`)
     }
     words?.delete(r.word)
     const next = now + utteranceSeconds(4) + balance.communication.consequenceSeconds

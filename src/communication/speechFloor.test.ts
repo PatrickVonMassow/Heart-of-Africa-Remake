@@ -81,7 +81,7 @@ describe('one speech floor at the player’s ear', () => {
     expect(arbiter.request({ ...other, ends: true })).toBe(true)
     at(11)
     expect(arbiter.request({ ...dig, word: 'site' })).toBe(false)
-    arbiter.suspend(dig.situation, 'site')
+    expect(arbiter.request({ ...dig, word: 'site', blocked: true })).toBe(false)
     expect(arbiter.waiting(dig.situation)).toBe(true)
     at(20)
     expect(arbiter.request(ask('third pair'))).toBe(true)

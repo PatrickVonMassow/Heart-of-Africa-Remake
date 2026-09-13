@@ -842,6 +842,35 @@ describe('task lifecycle safeguards', () => {
     resetDevAsserts()
   })
 
+  it.each([90, 300])('releases a queued word whose partner steps away before its %ss task expires', (errandSeconds) => {
+    resetDevAsserts()
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const { state, v } = threeWordsDue()
+    state.tasks[0] = state.tasks[1] = state.tasks[2] = null
+    const cfg = { ...CFG, errandSeconds }
+    v.childrenHear = () => true
+    expect(stepAdultWork(state, v, 0.1, cfg, () => 0.5)).toBeNull()
+    const task = state.tasks[3]!, partner = state.tasks[4]!
+    expect(task.withheld).toBe(true)
+    partner.arrived = false
+    v.villagers[4].x += 10
+    const since = state.clock
+    expect(stepAdultWork(state, v, 0.1, cfg, () => 0.5)).toBeNull()
+    expect(task.hushed).toBe(false)
+    expect(state.floor!.waiting(task.speechOwner!)).toBe(true)
+    let paid: SpokenWord | null = null
+    while (state.clock < errandSeconds && !paid) paid = stepAdultWork(state, v, 0.1, cfg, () => 0.5)
+    expect(paid).toMatchObject({ concept: 'DIG', purpose: 'site', speaker: 3 })
+    expect(task.owes).toBe(false)
+    expect(task.age).toBeLessThan(errandSeconds)
+    expect(state.clock - since).toBeLessThanOrEqual(balance.communication.speechHoldSeconds + 0.1)
+    expect(state.floor!.forcedCount).toBe(1)
+    expect(errors.mock.calls.flat().join(' ')).toContain('adult-atom-lost')
+    expect(errors.mock.calls.flat().join(' ')).toContain('dig-second pair 3/4')
+    errors.mockRestore()
+    resetDevAsserts()
+  })
+
   it('is inert in a settlement with neither water nor work', () => {
     const v = riverless(view(3))
     v.geography.digSites = []

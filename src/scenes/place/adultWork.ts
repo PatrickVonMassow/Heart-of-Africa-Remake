@@ -470,10 +470,10 @@ export function stepAdultWork(
       // walking to its site owes its DIG, but cannot say it yet, so queuing it
       // here would make the floor measure travel instead of speech: the hold
       // then ran the pair's whole task length and the bound fired on healthy
-      // work. Nothing withholds this word, so the hush is off as well.
-      if (!ready) {
+      // work. A word ALREADY withheld still asks, marked blocked: it yields
+      // precedence but must reach its deadline even if its partner steps away.
+      if (!ready && !t.withheld) {
         t.hushed = false
-        if (t.owes) state.floor.suspend(t.speechOwner ?? t, t.phase)
         continue
       }
       // DEFERRED BY THE FRAME, NOT BY THE FLOOR — and still deferred. The
@@ -482,14 +482,14 @@ export function stepAdultWork(
       // reaches the floor, so without this the word carries no record of having
       // been held back, and a speaker who then steps out of his own radius
       // before his task runs out is filed as a pair that never met.
-      if (t.pendingWord && spoken && !urgent) { t.hushed = true; t.withheld = true }
+      if (t.pendingWord && spoken && !urgent) { t.hushed = !!ready; t.withheld = true }
       if (t.pendingWord && (!spoken || urgent)) {
         const partnerTask = t.partner === null ? null : state.tasks[t.partner]
         const owner = t.speechOwner ?? partnerTask?.speechOwner ?? {}
         t.speechOwner = owner
         if (partnerTask) partnerTask.speechOwner = owner
         const site = t.siteIndex === null ? null : view.geography.digSites[t.siteIndex]
-        const blocked = view.childrenHear(me.x, me.z) ||
+        const blocked = !ready || view.childrenHear(me.x, me.z) ||
           (t.phase === 'site' && !!site && !siteClear(view, site, i, t.partner ?? -1))
         const ends = t.phase === 'site' || t.situation === 'water-back'
         const allowed = state.floor.request({
@@ -499,7 +499,7 @@ export function stepAdultWork(
             .filter((p) => !!p).map((p) => ({ x: p.x, z: p.z, register: 'talk' as const })),
           blocked, remaining: cfg.errandSeconds - Math.max(t.age, partnerTask?.age ?? 0), step: dt, ends,
         })
-        t.hushed = !allowed
+        t.hushed = !!ready && !allowed
         if (!allowed) t.withheld = true
         if (allowed) {
           const word = t.pendingWord
