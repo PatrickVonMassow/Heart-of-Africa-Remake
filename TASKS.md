@@ -204,6 +204,22 @@ put it is the mistake this line exists to stop.
       AND IT GENERALISES: a further interaction of this kind — any place where a deferral could
       outlive the thing that owes the word — is resolved BY THIS INVARIANT rather than escalated
       again. The author records what was built and why.
+    - THE LONGEST HEALTHY SITUATION IS MEASURED, NOT STATED HERE (decided 13.09.2026, after
+      GPT-6 Astra escalated a third time rather than guessing it — it asked this point for the
+      number the paragraph above calls "the longest situation a healthy village can produce").
+      This point does not supply that number, for the same reason it does not supply the call
+      reach: a constant written into the spec would be a guess about village timing that the
+      next layout, walking speed or `digSeconds` change silently invalidates, and nothing would
+      catch the drift. The TEST computes it, exactly as the call reach is computed from
+      `bankPlayRocksView`'s stand-to-rock distance rather than restated. It runs the adult work
+      of the shipped village layouts, takes the longest span of a SITUATION as this point
+      defines one — a dig bout from its first DIG to its second, a water errand from its
+      dispatch to its report — and asserts the hold sits STRICTLY between that measured maximum
+      and `errandSeconds`. The hold itself stays one calibratable number in `balance.ts` (the
+      code may not run a simulation to find it); the test is what keeps that number honest and
+      fails the day village timing grows past it, which is the day the bound would start firing
+      in healthy play. Report the measured maximum in the commit, so the margin to
+      `errandSeconds` is on the record rather than in a test run nobody reads.
   Test: Vitest — the reach of each utterance moment, `bankPlayRocksView`'s stand-to-rock
   distance bounding the call reach, a full bank round evaluated from that stand yielding a
   measured LEVEL for every call word, no two situations overlapping in the speech floor, and
