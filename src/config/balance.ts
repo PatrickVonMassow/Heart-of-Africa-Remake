@@ -1449,10 +1449,21 @@ export const balance: BalanceConfig = {
       digSeconds: 9, // several strokes of the digging motion, plainly readable
       // Backstop only: a blocked walk lets go instead of pinning. It has to
       // OUTLAST the longest errand the catalogue can order, or the villager is
-      // released halfway and the errand teaches nothing — and the longest one is
-      // now the walk out to the river bank, some forty metres of village away,
-      // at an unhurried 1.25 m/s and around whatever stands in the line.
-      errandSeconds: 180,
+      // released halfway and the errand teaches nothing.
+      // RE-SIZED FOR THE ROUND TRIP. The water errand is no longer the walk OUT
+      // to the bank: one carrier now walks to the stand, on to the water, dips,
+      // and walks the whole way BACK to report. Measured over the three river
+      // villages at twenty seeds each: the worst stand-to-fill leg is 34.8 m, so
+      // the round trip alone is 69.6 m — 55.7 s at this pace — and the carrier's
+      // own walk to the stand comes on top, about 84 s of straight line in the
+      // worst village. At the old 180 s a walk that took twice its straight line
+      // round huts and villagers ran the errand out of time ON THE WAY BACK: the
+      // jar was set down but the report was never spoken, which the WebGPU pass
+      // of 12.09.2026 caught as "water-back: villager 1 ran out of time with his
+      // walk word unspoken". 300 s is 3.6x the measured straight line, and a
+      // genuinely stuck villager is still let go by `stallSeconds` below long
+      // before it. Calibratable (CLAUDE.md §2).
+      errandSeconds: 300,
       // A walk that gets NOWHERE for this long is let go — twenty seconds is
       // many times the longest stretch a legitimate detour round a hut spends
       // without shortening the straight line, and a twentieth of the backstop

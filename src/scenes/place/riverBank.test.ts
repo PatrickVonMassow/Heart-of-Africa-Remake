@@ -570,3 +570,65 @@ describe('the village water stand can be walked up to (work-order 1087)', () => 
     expect(seenWithoutPath).toBeGreaterThan(0)
   })
 })
+
+// --- The round trip fits inside the errand's backstop (work-order 1087) -----
+//
+// `errandSeconds` was sized for the errand the water fetch USED to be: a walk
+// OUT to the bank, and its own comment still said "some forty metres of village
+// away". This point made it a ROUND TRIP — to the stand, on to the water, a dip,
+// and the whole way back to report — without re-sizing the budget, though the
+// point's own text requires the backstops to cover the added leg. The cost was
+// measured in the WebGPU pass of 12.09.2026: "[ASSERT] adult-atom-lost —
+// water-back: villager 1 ran out of time with his walk word unspoken". The jar
+// was set down, the report never fell, and RIVER is taught by the report.
+//
+// What is pinned is the ARITHMETIC, not a simulation: the walk the carrier is
+// ordered to make, at the pace he makes it, against the budget he is given.
+describe('the water errand fits the time it is given (work-order 1087)', () => {
+  const riverVillages = ['nubian-village', 'bambara-village', 'mandinka-village']
+
+  it('leaves room for the round trip and a walk that is not a straight line', () => {
+    const { errandSeconds, pace } = balance.villageLife.adultErrands
+    let worst = 0
+    let worstWhere = ''
+    let checked = 0
+    for (const id of riverVillages) {
+      for (let seed = 1; seed <= 20; seed++) {
+        const layout = buildLayout(id, seed)
+        const stand = layout.waterStand
+        if (!stand || !layout.bank) continue
+        checked++
+        const fill = bankFillSpot(layout.bank)
+        // The carrier's own walk to the stand is bounded by the same leg: he is
+        // picked in the village, never further out than the water he is sent to.
+        const leg = Math.hypot(stand.x - fill.x, stand.z - fill.z)
+        const straight = leg * 3 // to the stand, out to the water, and back
+        const seconds = straight / pace + balance.bankFillSeconds
+        if (seconds > worst) {
+          worst = seconds
+          worstWhere = `${id} seed ${seed}`
+        }
+      }
+    }
+    expect(checked).toBeGreaterThan(riverVillages.length * 20 * 0.7)
+    // THE BUDGET IS NOT THE WALK. The backstop has to cover the walk AND what
+    // the errand legitimately spends standing still, or it expires on a carrier
+    // who is doing everything right. Built from the constants that spend it,
+    // with no factor invented for the occasion:
+    //   - a DOUBLE of the straight line, because the route bends round huts,
+    //     fires and other villagers — an ordinary walk here, not a bad one;
+    //   - `dwellSeconds`, which he spends arrived before he moves on;
+    //   - `stallSeconds`, the longest a legitimate detour may make no headway
+    //     at all before the stall watch lets him go anyway.
+    // At the old 180 s this sum did not fit, and the report was the part that
+    // fell off the end.
+    const { dwellSeconds, stallSeconds } = balance.villageLife.adultErrands
+    const needed = worst * 2 + dwellSeconds + stallSeconds
+    expect(
+      needed,
+      `${worstWhere}: the round trip needs ${worst.toFixed(1)} s of straight line, ` +
+        `${needed.toFixed(1)} s once it walks round things, dwells and waits, ` +
+        `against errandSeconds ${errandSeconds}`,
+    ).toBeLessThan(errandSeconds)
+  })
+})
