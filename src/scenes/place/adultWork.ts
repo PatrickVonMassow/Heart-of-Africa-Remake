@@ -436,13 +436,19 @@ export function stepAdultWork(
       const ready = readyWord(state, view, t, i)
       if (ready) t.pendingWord = ready
       const urgent = t.age + dt * 2 >= cfg.errandSeconds
+      // A word whose moment has NOT come claims no turn on the floor. The pair
+      // walking to its site owes its DIG, but cannot say it yet, so queuing it
+      // here would make the floor measure travel instead of speech: the hold
+      // then ran the pair's whole task length and the bound fired on healthy
+      // work. Nothing withholds this word, so the hush is off as well.
+      if (!ready) { t.hushed = false; continue }
       if (t.pendingWord && (!spoken || urgent)) {
         const partnerTask = t.partner === null ? null : state.tasks[t.partner]
         const owner = t.speechOwner ?? partnerTask?.speechOwner ?? {}
         t.speechOwner = owner
         if (partnerTask) partnerTask.speechOwner = owner
         const site = t.siteIndex === null ? null : view.geography.digSites[t.siteIndex]
-        const blocked = !ready || view.childrenHear(me.x, me.z) ||
+        const blocked = view.childrenHear(me.x, me.z) ||
           (t.phase === 'site' && !!site && !siteClear(view, site, i, t.partner ?? -1))
         const ends = t.phase === 'site' || t.situation === 'water-back'
         const allowed = state.floor.request({

@@ -20,7 +20,9 @@ export interface FloorRequest {
   ends?: boolean
 }
 interface Situation { name: string; sources: FloorRequest['sources']; next: number }
-interface HeldWord { since: number; deadline: number }
+/** `sayable` separates a word the FLOOR defers from one its own speaker cannot
+ *  yet say: only the former takes a turn away from the others. */
+interface HeldWord { since: number; deadline: number; sources: FloorRequest['sources']; sayable: boolean }
 
 export class SpeechFloor {
   /** Count every forced release, independently of diagnostic log throttling. */
@@ -59,17 +61,34 @@ export class SpeechFloor {
     // the reach of two exchanges that began independently outside his earshot.
     const first = [...this.situations.entries()].find(([, s]) => s.sources().some((p) => this.audible(p)))
     const foreign = this.audible(r.source) && first && first[0] !== r.situation ? first[1] : null
+    /** This exchange already holds the floor and is finishing its own words. */
+    const holding = !!first && first[0] === r.situation
     const window = this.consequence && now < this.consequence.until && this.audible(r.source) && this.audible(this.consequence.source)
-    const blocked = r.blocked || !!foreign || !!window || (own !== undefined && now < own.next)
     let words = this.held.get(r.situation)
     const queued = words?.get(r.word)
+    // FIRST COME, FIRST SPOKEN among audible exchanges. Without it the floor is
+    // granted in villager-index order, and a pair the loop reaches late is
+    // starved for its whole life: measured over 180 s at six villagers, pair 4/5
+    // got the floor exactly once, when the bound forced its word out one step
+    // before the task expired. The bound is a backstop, not a turn-taking
+    // mechanism, so the longest-waiting sayable word goes next.
+    const since = queued?.since ?? now
+    // A standing exchange never queues behind a waiter: it holds the floor, so
+    // waiting for one would deadlock — the waiter is blocked by this situation
+    // and this situation by the waiter, and the village falls silent until both
+    // words are forced out. Turn-taking decides who speaks NEXT, not whether an
+    // exchange may finish.
+    const older = !holding && this.audible(r.source) && [...this.held].some(([situation, held]) =>
+      situation !== r.situation &&
+      [...held.values()].some((h) => h.sayable && h.since < since && h.sources().some((p) => this.audible(p))))
+    const blocked = r.blocked || !!foreign || !!window || older || (own !== undefined && now < own.next)
     // Look ahead one simulation step, releasing strictly before the hard kill.
     const life = Math.max(0, (r.remaining ?? Infinity) - (r.step ?? 0))
     const deadline = Math.min(queued?.deadline ?? now + balance.communication.speechHoldSeconds, now + life)
     const forced = (!!queued || blocked) && now + (r.step ?? 0) >= deadline
     if (blocked && !forced) {
       if (!words) this.held.set(r.situation, words = new Map())
-      words.set(r.word, { since: queued?.since ?? now, deadline })
+      words.set(r.word, { since, deadline, sources: r.sources, sayable: !r.blocked })
       return false
     }
     if (forced) {
