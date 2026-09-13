@@ -224,9 +224,9 @@ export function assertNoOwedWord(task: AdultTask, index: number): void {
   // TWO DIFFERENT FAILURES, REPORTED APART (work-order 1073). Nothing is
   // excused here — conflating them is exactly what the old blanket `hushed`
   // exemption did, and it hid both.
-  //  · The word's moment HAD come and it was WITHHELD (`hushed`): the floor
-  //    owes it and let the owning task die with it unsaid. That is the loss
-  //    this point exists to catch.
+  //  · The word's moment HAD come and it was WITHHELD — by the floor, by a
+  //    child's ear, or by the one-word-a-frame limit. Somebody owes it and let
+  //    the owning task die with it unsaid. That is the loss this point catches.
   //  · The word never became sayable at all: the pair never assembled, so no
   //    floor decision touched it and there was nobody to say it to. That is a
   //    WALKING failure, and naming it as a lost word sends every reader to the
@@ -469,6 +469,13 @@ export function stepAdultWork(
       // then ran the pair's whole task length and the bound fired on healthy
       // work. Nothing withholds this word, so the hush is off as well.
       if (!ready) { t.hushed = false; continue }
+      // DEFERRED BY THE FRAME, NOT BY THE FLOOR — and still deferred. The
+      // village says at most one word a frame, so a task whose moment HAS come
+      // can be passed over because somebody else spoke first. That never
+      // reaches the floor, so without this the word carries no record of having
+      // been held back, and a speaker who then steps out of his own radius
+      // before his task runs out is filed as a pair that never met.
+      if (t.pendingWord && spoken && !urgent) { t.hushed = true; t.withheld = true }
       if (t.pendingWord && (!spoken || urgent)) {
         const partnerTask = t.partner === null ? null : state.tasks[t.partner]
         const owner = t.speechOwner ?? partnerTask?.speechOwner ?? {}

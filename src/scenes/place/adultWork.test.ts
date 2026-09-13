@@ -763,6 +763,39 @@ describe('task lifecycle safeguards', () => {
     resetDevAsserts()
   })
 
+  it('files a word the FRAME passed over as withheld, not as a pair that never met', () => {
+    // Three words fall due at once and the village says one a frame, so two are
+    // simply passed over — no floor refused them and no child was near. If that
+    // deferral left no record, a speaker who then steps out of his own place
+    // before his task runs out is filed as a pair that never assembled, and the
+    // word he was really owed goes unreported.
+    resetDevAsserts()
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const { state, v } = threeWordsDue()
+    const said = stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
+    expect(said).not.toBeNull()
+    // The second digging pair is at its site with its DIG due; whoever spoke
+    // this frame, it was not them.
+    const passedOver = 3
+    expect(said!.speaker).not.toBe(passedOver)
+    const t = taskOf(state, passedOver)!
+    expect(t).toMatchObject({ owes: true, phase: 'site' })
+    expect(t.withheld, 'a word nobody refused, that still did not get out, kept no record').toBe(true)
+    // His moment passes: his partner is no longer standing ready at the site, so
+    // the word stops being sayable and the LIVE hush goes out with it.
+    taskOf(state, t.partner!)!.arrived = false
+    stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
+    expect(t.hushed).toBe(false)
+    expect(t.owes).toBe(true)
+    t.age = CFG.errandSeconds
+    stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
+    const reported = errors.mock.calls.flat().join(' ')
+    expect(reported).toContain('adult-atom-lost')
+    expect(reported).not.toContain('adult-pair-never-met')
+    errors.mockRestore()
+    resetDevAsserts()
+  })
+
   it('forces a child-held word before expiry and reports the hush instead of excusing it', () => {
     resetDevAsserts()
     const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
