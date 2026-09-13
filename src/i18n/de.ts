@@ -2,7 +2,6 @@
 // visible German text lives here; identifiers and comments stay English.
 
 import type { Strings, TextParams } from './types'
-import { GLOSSARY } from '../world/lore'
 import { namesFromCsv } from './names'
 
 const MONTHS = [

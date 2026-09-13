@@ -3,7 +3,6 @@
 // being literal translations of the German originals.
 
 import type { Strings, TextParams } from './types'
-import { GLOSSARY } from '../world/lore'
 import { namesFromCsv } from './names'
 
 const MONTHS = [
