@@ -89,6 +89,8 @@ export const NON_RENDER_VERIFY = new Set([
   'liveness.mjs', // main-thread liveness ATTRIBUTION; the suites do the driving
   'machine-load-core.mjs',
   'machine-load.mjs',
+  'red-ownership-core.mjs', // baseline evidence determines ownership; it draws nothing
+  'red-ownership.mjs', // classifier and finding subprocesses; it opens no page
   'report-archive-names.mjs', // the names the F6 archive checks print; report.mjs does the downloading
   'run-all.mjs',
   'run-digest-core.mjs', // which of a run's OUTPUT lines the caller reads; it draws nothing
@@ -158,6 +160,18 @@ export function isRenderPath(path) {
   const suite = p.match(/^scripts\/verify\/([^/]+\.mjs)$/)
   if (suite && !NON_RENDER_VERIFY.has(suite[1])) return true
   return false
+}
+
+/** Is this red owned by an OPEN point, through its recorded charge or today's ledger? */
+export function owned(red, suite, backend, featureLevel, openPoints, ledger = RED_CHARGES) {
+  const open = pointSet(openPoints)
+  // Reds that never reached the record cannot be owned by anything — in
+  // either shape a record may carry the marker (kind, or the legacy key).
+  if (isTruncationEntry(red)) return false
+  const recorded = Number.isInteger(red?.point) ? red.point : null
+  if (recorded !== null && open.has(recorded)) return true
+  const now = chargeFor(red, { suite, backend, featureLevel, ledger })
+  return !!now && open.has(now.point)
 }
 
 /**
@@ -1307,17 +1321,6 @@ export function unexplainedRuns(runs, since, options) {
     })
   }
   const open = pointSet(openPoints)
-  /** Is this red owned by an OPEN point — by the charge it was recorded with, or
-   *  by one the ledger carries today? */
-  const owned = (red, suite, backend, featureLevel) => {
-    // Reds that never reached the record cannot be owned by anything — in
-    // either shape a record may carry the marker (kind, or the legacy key).
-    if (isTruncationEntry(red)) return false
-    const recorded = Number.isInteger(red?.point) ? red.point : null
-    if (recorded !== null && open.has(recorded)) return true
-    const now = chargeFor(red, { suite, backend, featureLevel, ledger })
-    return !!now && open.has(now.point)
-  }
   const out = []
   for (const r of Array.isArray(runs) ? runs : []) {
     if (!r || typeof r !== 'object') continue
@@ -1484,7 +1487,7 @@ export function unexplainedRuns(runs, since, options) {
         // reporting only that sentence hid every red the run really printed and
         // nobody owns. Charged ones stay out: a red an open point already owns
         // was never part of the bypass.
-        const stillOpen = residualOf(r).reds.filter((red) => !owned(red, suite, backend, level))
+        const stillOpen = residualOf(r).reds.filter((red) => !owned(red, suite, backend, level, open, ledger))
         // The lost-recording sentence speaks about THIS record — two truncated
         // records of the same suite print it identically and each owes its own
         // disposition — so it is keyed per record; the reds it kept are not.
@@ -1510,7 +1513,7 @@ export function unexplainedRuns(runs, since, options) {
       // by the run's OWN class — a truncated run that also passed on the RETRY
       // keeps its first attempt's reds, which reading `r.reds` had thrown away.
       const residual = residualOf(r)
-      const unowned = residual.reds.filter((red) => !owned(red, suite, backend, level))
+      const unowned = residual.reds.filter((red) => !owned(red, suite, backend, level, open, ledger))
       if (unowned.length === 0) continue
       out.push({
         backend,
@@ -1550,7 +1553,7 @@ export function unexplainedRuns(runs, since, options) {
       // Only the reds NOBODY owns are still open. Counting the whole run's
       // reds would report a charged one as waved through beside its
       // unexplained neighbour.
-      unowned = observed.filter((red) => !owned(red, suite, backend, level))
+      unowned = observed.filter((red) => !owned(red, suite, backend, level, open, ledger))
       if (unowned.length === 0) continue
     }
     // The individual reds, NOT the one sentence runVerdict writes about them: a

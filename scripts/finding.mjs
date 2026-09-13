@@ -20,6 +20,7 @@
 //        --why-file <path> [--constraints-file <path>] [--quotes-file <path>] \
 //        [--doc-impact-file <path>] [--open-questions-file <path>] \
 //        [--bundle "<German name>"] [--refs "<…>"] [--rev <sha>]
+//   --once with --request deduplicates by exact normalized title in every state.
 //   node scripts/finding.mjs --requests                    list what was deposited
 //   node scripts/finding.mjs --show "<title substring>"    the full spec to append
 //   node scripts/finding.mjs --queued "<title>" --point <N>
@@ -40,11 +41,13 @@ import {
   markQueued,
   pendingRequests,
   reapplyTransition,
+  requestEntries,
   requestEntry,
   requestRoute,
   requestWarnings,
 } from './findings-request-core.mjs'
 import { REPO_ROOT } from './repo-paths.mjs'
+import { withBoardEditLock as withCarrierLock } from './board-edit-lock.mjs'
 
 const argv = process.argv.slice(2)
 const flag = (name) => {
@@ -194,10 +197,25 @@ if (has('--request')) {
     revision: flag('--rev') ?? headRevision(),
     openQuestions: field('open-questions'),
   }
-  ensureCarrier()
-  const at = new Date().toISOString()
-  appendFileSync(CARRIER, `${requestEntry({ at, session: sessionTag(), title, ...fields })}\n\n`, 'utf8')
+  // The shared lock helper uses an explicit carrier path: this never takes the
+  // board or batch lock. Serialize deposits so --once is also once under two
+  // concurrent LARGE reports. Completed requests retain their title identity.
+  mkdirSync(dirname(CARRIER), { recursive: true })
+  const deposited = withCarrierLock(() => {
+    const cleanTitle = title.replace(/\s+/g, ' ').trim()
+    const existing = has('--once') && requestEntries(readCarrier()).find((r) => r.title === cleanTitle)
+    if (existing) return false
+    ensureCarrier()
+    const at = new Date().toISOString()
+    appendFileSync(CARRIER, `${requestEntry({ at, session: sessionTag(), title, ...fields })}\n\n`, 'utf8')
+    return true
+  }, { lockPath: `${CARRIER}.request-lock.json`, waitMs: 5000 })
   ensureIndexed()
+  if (!deposited) {
+    console.log(`request already filed: ${title}`)
+    console.log(`carrier: ${CARRIER}`)
+    process.exit(0)
+  }
   const waiting = pendingRequests(readCarrier())
   console.log(`request deposited (${waiting.length} waiting): ${title}`)
   console.log(`carrier: ${CARRIER}`)

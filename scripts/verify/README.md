@@ -1021,8 +1021,16 @@ gate.
 A red is now read, not asserted. Two signals, both decided in the pure module
 `baseline-classify-core.mjs` (pinned by `baseline-classify.test.mjs`):
 
-**1. The repeat signature — free, always on.** A failed browser suite is retried
-once (point 200). The runner used to conclude from "it failed twice" that this
+**1. The repeat signature — free, always on, EXCEPT where the question is already
+answered (point 1113).** A failed browser suite is retried once (point 200) —
+unless every red in its own run record is charged to an OPEN point in
+`scripts/render-verify-charges.mjs`. The retry exists to tell a transient from a
+defect, and for a red a named open point already owns there is nothing left to
+tell: the suite runs once, prints `ACCOUNTED FOR <suite> — retry skipped; all reds
+charged to open points <N, …>; suite stays red`, and the run's closing line repeats
+those points, so the price of the open defects is read on every run. ONE uncharged
+red in the set keeps the retry exactly as below. The suite stays RED and the record
+stays ACCOUNTED FOR — a charge is not a pass. The runner used to conclude from "it failed twice" that this
 was "a real failure, not a flake". That is not what two failures prove: on
 27.07.2026 `enrichments` failed two staging checks, then a completely different
 one (the crocodile eye knobs) on the retry, on a machine carrying a unit run and
@@ -1041,10 +1049,24 @@ so the console-gated suites (`world`, `i18n`) can be triaged at all. Each check
 is annotated with whether its name touches the branch diff — a weak
 corroborating hint, never a verdict.
 
-**2. The baseline classification — OPT-IN, because it is a second browser run.**
+**2. The baseline classification — automatic for LARGE reds, opt-in for smaller runs.**
+
+A LARGE run compares every suite that stayed red against its merge-base, including
+crossbrowser at the same depth. Both attempts' reds are retained, even when some
+rotate beside a stable failure. Only a `pre-existing` classification charges a
+check elsewhere. The report deposits one request per check through
+`finding.mjs --request … --once --spec-file … --why-file …` into the main
+checkout's findings carrier; the owner drains and numbers it. Title identity
+survives repeated runs, concurrent reports and already numbered requests.
+
+The closing `POINT REDS` line names the charged requests and the point's own or
+unresolved reds. Real regressions, flaky/dead/inconclusive baselines, incomplete
+current runs and filing failures keep holding the point. Filename overlap remains
+a hint. The full regression retains its red exit and its coverage requirements;
+charging a check does not make the suite green.
 
 ```
-npm test -- --baseline                 # classify every suite that failed twice
+npm test                              # LARGE classifies suites that stayed red
 VERIFY_BASELINE=1 npm run test:small   # same, via the environment
 node scripts/verify/baseline-classify.mjs enrichments          # one suite, on demand
 node scripts/verify/baseline-classify.mjs polish --ref HEAD~1  # against a named commit

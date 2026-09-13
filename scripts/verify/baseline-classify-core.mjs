@@ -16,7 +16,8 @@
 //      (the 24.07. SSAO ground-edge and proximity-call-fade cases); one that is
 //      green on the baseline and red now is a REAL REGRESSION. Re-running a
 //      browser suite against a baseline checkout is expensive, so the wrapper
-//      (baseline-classify.mjs) does it OPT-IN and only for the checks that
+//      (baseline-classify.mjs) runs automatically for LARGE reds, opt-in for
+//      smaller runs, and only for the checks that
 //      failed — this module only decides what the two outputs MEAN.
 //
 // A third, deliberately WEAK signal corroborates: whether the failing check's

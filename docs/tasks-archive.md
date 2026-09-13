@@ -27996,3 +27996,265 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Criticality: HIGH — a black picture on a setting one key reaches, on the backend the game
   falls back to, and the gate reports it green.
   Bundle: Steuerung & Performance.
+
+- [x] 1113. A whole-suite run pays for its known reds twice, and the second pass learns nothing.
+  USER ORDER 12.09.2026: make the regression markedly faster NOW without first repairing the
+  defects behind its reds, and make forgetting those repairs impossible — "was koennen wir
+  machen, damit jetzt erstmal die Regressionstests wieder deutlich schneller werden, ohne
+  diese Spiele-Bugs beheben zu muessen, aber dass sichergestellt ist, dass deren Behebung
+  nicht spaeter vergessen geht?"
+  MEASURED 12.09.2026 on point 1112's closing proof
+  (`.claude/worktrees/point-1112/local/verify-logs/`): the both-backend proof cost 98 min on
+  WebGL 2 (head b5b40eb59) and 40 min on WebGPU (head e225bc7b5) against the run's own 25 min
+  expectation, and NOT ONE of its reds belonged to 1112. Together they were 138 of the 161
+  minutes that point spent on suites. Each red already has an OPEN owner:
+  - `settings` first-person ground micro-detail (laplacian 1.01-1.07) — point 603
+  - `enrichments` the streamed dressing does not grow at a fixed anchor — point 938
+  - `enrichments` frame 72-water-victoria-falls, subject not in the picture — point 521
+  - `polish` the drums had stopped at the shutter — point 1102
+  - `polish` the fill pose blocked on all 16 bearings, frame off the edge — point 1087,
+    NOT 1108 (corrected 12.09.2026 against the ledger). The delegated author caught the
+    contradiction: the entry that already carries this red was written the same day, is
+    scoped to `polish`/`webgl`/`check` and reasons it out as "the staging half of 1087".
+    1108 is the CHECK defect that stands in front of it — its own text says so, and says
+    that after its fix "only an exhausted search reds", which is 1087's staging debt.
+    One red, one owner: charging it twice would break the rule the ledger exists for.
+  WHY IT COSTS DOUBLE. `runSuiteWithRetry` in `scripts/verify/run-all.mjs` retries every red
+  suite once (point 200's rotating-flake rule) and decides on the suite's EXIT CODE alone.
+  Three red suites therefore run six passes. The retry exists to separate a transient from a
+  defect — a question already ANSWERED for a red that a named open point owns.
+  Final state:
+  - MEASURED 12.09.2026, BEFORE ANY WORK: all five reds above are ALREADY charged in
+    `scripts/render-verify-charges.mjs`, each scoped to its suite, backend and kind, each with
+    its dated `why` — 603 at the `settings` micro-detail check, 938 on BOTH lanes of the
+    dressing check, 521 at the Victoria-Falls frame, 1102 at the drum shutter, 1087 at the
+    three fill-pose checks. This bullet is therefore a VERIFICATION, not hand-work: confirm
+    each entry still matches the red the run prints and still names an open point, and change
+    nothing that already holds. What this point owes is the SKIPPED RETRY below.
+  - A suite whose failing checks are ALL charged to an open point is NOT retried. It prints one
+    line naming the owning points instead. A suite carrying even ONE uncharged red keeps its
+    retry exactly as today.
+  - `owned()` IS NOT CALLABLE TODAY, and the earlier claim that it was "one call away" was
+    wrong (caught by the delegated author, 12.09.2026): it is a closure INSIDE the exported
+    `unexplainedRuns()`, capturing that function's open-point set. Lift it to a module-level
+    exported function that takes the open points as an argument, and let `unexplainedRuns()`
+    call that same function — identical behaviour, one implementation, reusable from the
+    runner. Nothing about the decision it makes changes.
+  - The run STAYS RED and is still recorded ACCOUNTED FOR, never clean. Charging is not a pass
+    and this point does not turn it into one.
+  - NOTHING CAN BE FORGOTTEN, by mechanism and not by note: a charge names an OPEN point, its
+    entries stop clearing anything the moment that point is ticked, and
+    `render-verify-core.test.mjs` fails when an entry names a point the work order does not
+    hold open. Added to that: the run's closing line NAMES the points its reds are charged to,
+    so the price of the five open defects is read on every run rather than buried in a ledger.
+  EXPECTED EFFECT, an estimate to be measured on the first closing that uses it: 1112's two
+  lanes would have run three passes instead of six. It does NOT touch the cold boot every run
+  pays (docs/backlog.md, the warm dev server) and it does NOT make a red green.
+  NOTE THE FREEZE. CLAUDE.md §2 forbids new guards. This is not one: it is a refusal to repeat
+  work, inside the runner every run already passes through, ordered by the user, and it deletes
+  a pass rather than adding a mechanism.
+  Test. Vitest: a suite whose reds are all owned is not retried and says which points own them;
+  a suite with one unowned red is retried unchanged; the existing sweep extended over the new
+  entries, including that a charge naming a ticked point clears nothing.
+  Refs: scripts/verify/run-all.mjs (`runSuiteWithRetry`, `RETRY_ENABLED`),
+  scripts/render-verify-charges.mjs, scripts/render-verify-core.mjs (`owned()`, today a
+  closure inside `unexplainedRuns()`),
+  points 200, 640, 1089, 603, 938, 521, 1087, 1102, 1108, 1112, docs/backlog.md.
+  Criticality: high — 138 of 161 suite minutes on one ordinary point, paid again by every
+  point behind it.
+  Bundle: Testinfrastruktur.
+
+- [x] 1089. Charge a LARGE red that does not touch the point's diff to its own point
+  (user 10.09.2026).
+  Apply the rule CLAUDE.md §7.2 already states — "a red run closes only when its cause is
+  fixed, CHARGED TO ITS OWNING POINT, or FILED AS A NEW POINT" — to the reds that are
+  holding point 1065, and make the charging automatic rather than a judgement call.
+  Measured on 1065 (10.09.2026): 23 full LARGE runs, 16.2 machine hours, none green, and
+  NOT ONE red touched the tap. The recurring reds are `settings` ground-detail (edge
+  energy), `enrichments` dressing-growth (point 278), `crossbrowser` chromium-mobile
+  (getSupportedExtensions on null), plus two teardown aborts from foreign commits. Each
+  was re-diagnosed on every run instead of being charged once.
+  Final state:
+  - A LARGE red whose failing check does not touch the point's own diff is FILED as its
+    own point automatically by the run's own report — the report already computes
+    "touches the diff", so it has the information. The point under test is not held by it.
+  - The run's verdict line says plainly which reds are charged elsewhere and which are the
+    point's own, so a merge decision does not need a human re-reading of the log.
+  - The three reds above get their points at once; 1065 merges on its own evidence — the
+    narrow rung `polish --section=children-bank-game`, unit, build and lint.
+  WHY THIS AND NOT A POLICY CHANGE: nothing here loosens the gate. The full regression
+  still runs and still has to go green — but its failures are owned by whoever broke them
+  instead of by whoever happens to be holding the branch when they surface.
+  Test. Vitest: a red check whose file set is disjoint from the branch diff is reported as
+  charged elsewhere and does not hold the point; a red that touches the diff still does.
+  OWNERSHIP CONTRACT (decided 12.09.2026 after the authoring lane escalated the spec as
+  contradictory, and it was right to). "Touches the diff" must NOT be read as
+  changeRelatedness in scripts/verify/baseline-classify-core.mjs: that is word overlap between
+  a check name and a filename, its own comment says a false is not innocence, and releasing a
+  point on it would excuse a red the point itself caused. The authoritative evidence is the
+  point-294 BASELINE CLASSIFICATION in the same file, classifyAgainstBaseline:
+  - verdict pre-existing — the check is red on the branch's merge-base too — is the ONLY
+    verdict that charges a red elsewhere. That is evidence, not a hint: the red predates the
+    branch.
+  - real-regression, baseline-flaky, baseline-died and inconclusive ALL keep holding the
+    point. Uncertainty never releases.
+  - changeRelatedness stays exactly what it is today: a hint printed beside the verdict,
+    never a verdict of its own.
+  The classification is opt-in today (--baseline / VERIFY_BASELINE=1) and already runs only
+  for the suites that stayed red; a LARGE run that goes red runs it by itself from now on,
+  because a verdict that needs a second manual command IS the judgement call this point
+  removes.
+  FILING CONTRACT (same decision). The run writes nothing into TASKS.md — that file is
+  main-only and a run happens in a worktree. It files into the findings carrier that exists
+  for exactly this: node scripts/finding.mjs --request "<title>" --spec-file <f> --why-file <f>,
+  which the owner drains and numbers. One request per distinct pre-existing check, keyed by
+  its title so twenty-three runs file it once, not twenty-three times.
+  Refs: scripts/verify/run-all.mjs (the "touches the diff" annotation), CLAUDE.md §7.2,
+  point 1065, point 278.
+  Bundle: Testinfrastruktur.
+
+- [x] 1087. The water carrier visibly fills the jar at the water and carries visible water
+  (user 06.09.2026; the former point 1066; SPLIT BACK OUT OF POINT 1065 on 10.09.2026 on the
+  user's instruction, 02:15).
+  WHY IT IS ITS OWN POINT AGAIN. It was folded into 1065 on 07.09.2026 to save a regression
+  run. Measured over three days on feat/1065-teaching-hands-touch: 36 commits, about sixty
+  picture runs, and every red of the last two days belonged to this half while the tap half
+  stood green. The fold bought no run and cost the other half its landing.
+  IT IS BLOCKED ON TWO THINGS, NEITHER OF WHICH IS ITS OWN WORK.
+  - Point 1085 owes the DESIGN decision. The fill pose reads as a man falling into the river,
+    and a jar proved to be under an OPAQUE water surface cannot be photographed at all. No
+    camera position fixes either; four were re-aimed in one evening and all four came back
+    with the same reading.
+  - Point 1086 owes the LADDER this point's evidence needs. Measured 10.09.2026: the
+    `adult-errands` section rung ran twelve times on 09.09. and was GREEN every time (18 pass,
+    0 fail, last at 22:40), and the LARGE run then failed the same two checks — "no carrier was
+    ever seen filling a jar", 1 errand cast in the window, phases [invite×832 wait×583
+    walk×550 fetch×33]. A rung that reads green while the suite is red cannot guide this
+    point's iteration, and iterating on the full suite is what cost the three days.
+  START FROM THE BRANCH, NOT FROM SCRATCH. feat/1065-teaching-hands-touch already holds the
+  walk to the waterline, the fill phase, the dispatch and the water stand, and those are not
+  in doubt. What it does not hold is a pose that reads and a check that predicts. Cut a fresh
+  branch from main after 1085 has decided, and carry over what survives that decision.
+  The filling of the jar READS as filling. Today the RIVER errand sends an adult with an
+  empty jar to the foot of the water path and back with a full one, and nothing in between is
+  shown: the foot (`bankWaterFoot`, `riverBank.ts`) stands `BANK_STAND_INSET` 1.5 m inside the
+  walkable edge while the waterline lies `BANK_SHORE_HALF` 1.2 m beyond it, so the carrier
+  halts about 2.7 m from the water; the carry flips 'emptyJar' → 'fullJar' between the
+  'water-out' and 'water-back' situations (`adultWork.ts` ~390-410) with no act; and both jars
+  are one closed opaque cylinder (`PlaceLife.tsx` ~2557-2612), the full one merely moved onto
+  the head. The user (06.09.2026) could not tell that water was being fetched — and this
+  errand is where RIVER is learned (design.md §13.4).
+  Final state:
+  - The carrier goes TO the water: the errand's last leg walks down the shore to the
+    waterline (the walkable region already reaches through it to `balance.bankWadeDepth`,
+    `riverBank.ts`), and he stands with his feet at the water's edge or ankle-deep, never
+    2.7 m up the bank. The path's foot for the WORD (`say.aim`) may stay where it is; the
+    fill spot is at the water.
+  - The fill is an ACT with its own phase: he crouches or bends, the jar in his hand goes
+    down into the water, stays there a readable moment (calibratable seconds in
+    `src/config/balance.ts`), comes up, and is lifted onto the head (a fill pose beside
+    `digPose` / `HEAD_CARRY_POSE`). 'fullJar' begins only after the dip; the carry never
+    flips without it. The errand's timing backstops (`errandSeconds`, `stallSeconds`) cover
+    the added leg.
+    SPLIT OFF 09.09.2026 (evening): whether that act READS as fetching water — the words
+    "visibly below the drawn surface" stood here — is point 1085. This point owes the act,
+    its phase, its hold and the geometry the check measures; it does not owe the legibility
+    of the pose, which four re-aimed frames could not deliver and which needs a design
+    decision about the figure rather than another camera position.
+  - Water is visible: both jars have an open mouth; the empty one shows a dark hollow, the
+    full one a water surface at the rim (a bright disc with the water's tint, readable at
+    the distance the player watches from) — so head-carried and hand-carried jars read as
+    full and empty at a glance, on both backends.
+  - THE ERRAND IS A DISPATCH, NOT A COMMENTARY (user 07.09.2026, replacing this part's
+    earlier sentence that nothing about who is cast or when changes). Today the inhabitant
+    narrates his own act, which reads as staged for the player; DIG works because one man's
+    word sends another. RIVER now does the same:
+    - ONE ROUND TRIP, NOT TWO CASTINGS. `water-out` and `water-back` stop being independently
+      cast situations (`adultWork.ts` ~390-412) and become legs of a single errand held by one
+      carrier. Both ids survive as leg labels, so the lexicon bookkeeping and the staged
+      counters are unchanged.
+    - THE WORD IS THE ORDER. At the village water stand an adult A turns to a free adult B,
+      says RIVER and points at the water; B takes the empty jar and goes.
+    - BOTH UTTERANCES FALL INSIDE THE VILLAGE, at the stand, no longer at the water path head
+      (`WATER_PATH_HEAD_RADIUS` 15, `layout.ts` ~222) — which also keeps the errand's speech
+      clear of the children's bank game.
+    - NO WORD FALLS AT THE WATER: the fill is silent and is the act this part already
+      specifies.
+    - THE RETURN HAS A DESTINATION. B walks back to the stand, sets the jar down (carry →
+      none) and says RIVER a second time, addressed to A, who is still standing there.
+    - THE STAND IS DRAWN: a water stand beside the existing `VILLAGE_FIRE` anchor
+      (`layout.ts` ~247), which already has a collider and is the plausible consumer. It holds
+      up to three standing jars; a fourth delivery replaces the oldest, so no consumer logic
+      is needed. Capacity calibratable in `balance.ts`.
+    - TWO ADULTS, NOT THREE. Water fetching gains no pair mechanics — no partner, no
+      `invitationClear` for a second adult; those stay with DIG, where two people are
+      materially required. The escort half of the user's first framing was withdrawn by his
+      own later message; what it was for (keeping the speech away from the shore) is
+      delivered by moving both utterances into the village.
+    - DELETED with the second casting: `WATER_FOOT_REACH` (`adultWork.ts` ~119) and its
+      `nearestFree` caller.
+    - THE WATER WORD IS GATED BY A HEARING CHILD exactly as the two DIG utterances are; today
+      only the DIG branches carry that check (`adultWork.ts` ~328-333).
+    - THE RULE THE DEFECT VIOLATED, written into the spec: NO VILLAGER SPEAKS TO NOBODY.
+      Every utterance has an addressee who reacts and a consequence the player sees; the
+      teaching comes from the act that follows the word, never from a word spoken beside an
+      act.
+    - THE WATER READING IS ACCEPTED, NOT CLOSED. A player may read the second RIVER as WATER;
+      the chief's message carries just as well as WATER · UPSTREAM · ROCK · DIG. Written down
+      beside the three readings ROCK deliberately closes.
+    The measured defect behind this (07.09.2026): the full jar comes from nowhere
+    (`water-back` sets `fullJar` at cast time), the same man goes down and comes up (the
+    nearest free adult within 4 m of the water foot is in practice the one who just
+    finished), and the return's goal is the path head at radius 15, where the task is nulled
+    and the full jar vanishes in the same frame. The code follows
+    docs/communication-poc-spec.md:115 literally — a gap in the SPEC, not an implementation
+    defect against it.
+  - Doc: design.md §13.4 ('the adults' water and digging work') states the dip at the
+    waterline AND the dispatch; docs/communication-poc-spec.md likewise where it describes
+    the errand, plus the no-villager-speaks-to-nobody rule and the accepted WATER reading.
+
+  Test. Vitest: the fill spot lies within a small tolerance of the waterline for the three
+  river villages (nubian, bambara, mandinka), a 'fill' phase sits between the walk down and
+  the walk back with 'fullJar' set only after it, and the phase lasts its configured seconds;
+  for the dispatch, 'fullJar' only inside ONE continuous errand record, every water utterance
+  naming an addressee villager index, the return leg's goal being the stand rather than the
+  path head, and the stand holding at most three jars.
+  Browser (LARGE, both backends — the water surface is backend-sensitive): a picture check of
+  the fill measuring what 1085 decides it must measure, and one of the return walk measuring
+  the water disc at the head jar's rim. The narrow rung is `polish --section=adult-errands`,
+  and per 1086 it counts only once it measures what the full suite measures.
+  Screenshots (verification/, subjects declared: the sending adult and the departing carrier at
+  the village water stand; the carrier at the waterline; the carrier walking back with the full
+  jar).
+  Quotes:
+  Nutzer, 06.09.2026 13:48: »Man erkennte das Auffüllen des Kruges mit Wasser nicht als solches. Das liegt an mehreren Problemen: Der Erwachsene geht nicht nah genug an den Fluss, für die Tätigkeit des Auffüllens fehlt eine Darstellung (ich würde erwarten, dass er den Krug in die Hand nimmt und ins Wasser taucht) und wenn er ihn dann gefüllt auf dem Kopf trägt, sieht man darin kein Wasser.«
+  Nutzer, 07.09.2026 19:25: »Kannst du weitere Zusammenführungen von offenen Punkten zur
+  Kommunikationsmechanik vornehmen, um Regressionsdurchläufe einzusparen?« — daraufhin ist
+  der frühere Punkt 1066 hier als PART B eingefaltet worden.
+  Nutzer, 07.09.2026: »Der Einwohner kommentiert seine Handlungen. Das ist nicht organisch,
+  sondern offensichtlich nur dafür da, dem Spieler das Wort RIVER zu vermitteln. Bei DIG ist
+  das besser, weil ein Einwohner durch Benutzung des Wortes einen anderen dazu auffordert,
+  mitzukommen, um ihm beim Graben zu helfen.«
+  Nutzer, 07.09.2026: »Wasserholen soll eine Kombination aus Entsendung und Einholung einer
+  Begleitung sein. Beides soll möglichst weit weg vom Fluss passieren.« — die Begleitung hat
+  der Nutzer im selben Zug wieder zurückgenommen: »Insgesamt sind es mir mit 3 beteiligten
+  Erwachsenen beim Wasserholen jetzt doch zu viele.«
+  Nutzer, 07.09.2026: »Aber das wäre gar nicht schlimm, weil die Häuptlingsbotschaft WATER
+  UPSTREAM ROCK DIG genauso gut funktionieren würde wie mit RIVER. Insofern ist es okay, dann
+  nochmal RIVER zu sagen.«
+  Nutzer, 07.09.2026: »Reihe das alles so ein. Fasse dabei sinnvoll zusammen und/oder hänge
+  einzelne Aspekte an bereits bestehende Tasks, um Regressionsläufe einzusparen.« — deshalb
+  steht die Entsendung hier statt als eigener Punkt: PART B öffnet ohnehin adultWork.ts, den
+  Wasserpfad, die Krug-Meshes und denselben LARGE-Bildlauf.
+  Refs: src/scenes/place/adultWork.ts (water-out/water-back ~390-410, AdultCarry,
+  WATER_FOOT_REACH), src/scenes/place/riverBank.ts (bankWaterFoot, BANK_STAND_INSET 1.5,
+  BANK_SHORE_HALF 1.2, walkable region through the waterline ~47-62), src/scenes/place/layout.ts
+  (waterPath head/foot, VILLAGE_FIRE anchor), src/render/figures.ts, src/render/gesture.ts
+  (fillPose), src/scenes/place/PlaceLife.tsx (ErrandVillagers, head/hand jar meshes ~2440-2612,
+  HEAD_CARRY_POSE), scripts/verify/polish.mjs (adult-errands), design.md §13.4,
+  docs/communication-poc-spec.md, points 1085, 1086, 1065.
+  Doc impact: design.md §13.4 and docs/communication-poc-spec.md where they describe the
+  errand: the carrier dips the jar at the waterline and carries visible water back, plus the
+  no-villager-speaks-to-nobody rule and the accepted WATER reading. balance.ts: fill seconds
+  and stand capacity (calibratable).
+  Bundle: Dorfleben.

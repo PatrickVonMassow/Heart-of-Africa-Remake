@@ -26,6 +26,7 @@ import {
   type FootPlant,
 } from '../../render/fauna'
 import { CHILD_FIGURE_SCALE, FIGURE_LIMBS, TESSELLATION } from '../../render/figures'
+import { RIVER_WATER_TONES, WATER_METALNESS } from '../../render/waterAppearance'
 import { applyFigurePose, restingArmRefs, type FigureLimbs } from '../../render/figurePose'
 import {
   advanceGesture,
@@ -2457,6 +2458,8 @@ function ErrandVillagers({
 }) {
   const camera = useThree((state) => state.camera)
   const refs = useRef<Array<THREE.Group | null>>([])
+  /** The jars STANDING at the village water stand (work-order 1087). */
+  const standJars = useRef<Array<THREE.Object3D | null>>([])
   // The jar each carrier holds: on the head when it is FULL, in the hand when it
   // is empty. Both are mounted once and shown by the frame loop, like every other
   // per-frame visibility in this scene.
@@ -2647,6 +2650,13 @@ function ErrandVillagers({
   useFrame((_, rawDt) => {
     const dt = Math.min(rawDt, 0.1)
     const cfg = balance.villageLife.adultErrands
+    // The jars standing at the village water stand: as many as the errand
+    // state says have been set down, capped at the stand's capacity.
+    for (let k = 0; k < standJars.current.length; k++) {
+      const jar = standJars.current[k]
+      if (jar) jar.visible = k < work.standJars
+    }
+
     for (let i = 0; i < people.length; i++) {
       const me = people[i]
       const task = taskOf(work, i)
@@ -2813,6 +2823,16 @@ function ErrandVillagers({
         }
       }
       const pinned = forcedFill.current?.who === i ? forcedFill.current : null
+      // THE LIVE DIP, not only the photographed one. `filling` came from the dev
+      // route alone, so the fill pose existed for the camera and never for a
+      // player: in the game the carrier stood UPRIGHT at the water for
+      // `bankFillSeconds` and then simply had a full jar on his head — the very
+      // thing the user could not read on 06.09.2026, and the act this point owes.
+      // The errand's own phase drives it now; the dev route only overrides which
+      // man is held and how far along his dip is.
+      const dipping = task && task.arrived && task.phase === 'fill'
+        ? Math.min(1, task.dug / balance.bankFillSeconds)
+        : null
 
       // WHAT HE IS CARRYING, and what that does to his body: jars keep their
       // established positions; the digging tool lives in the hand pivot so the
@@ -2830,7 +2850,7 @@ function ErrandVillagers({
       const pose = poses.current[i].current
       const gesture = gestures.current[i]
       gesture.current = advanceGesture(gesture.current, dt)
-      const filling = pinned ? pinned.progress : null
+      const filling = pinned ? pinned.progress : dipping
       if (filling !== null) {
         state.dug = 0
         // The jar rides the dipping hand of its own accord — it hangs inside the
@@ -2922,9 +2942,12 @@ function ErrandVillagers({
     w.__placeErrands = () => ({
       staged: { ...work.staged },
       last: work.last ? { ...work.last } : null,
+      standJars: work.standJars,
       geography: {
         waterHead: geography.waterHead,
         waterFoot: geography.waterFoot,
+        waterFill: geography.waterFill,
+        waterStand: geography.waterStand,
         digSites: geography.digSites.map((d) => ({ ...d })),
       },
       digProgress: digProgressOf(work, geography.digSites.length),
@@ -2966,7 +2989,11 @@ function ErrandVillagers({
           z: p.z,
           free: p.free,
           digging: isDigging(work, i),
-          filling: forcedFill.current?.who === i ? forcedFill.current.progress : null,
+          filling: forcedFill.current?.who === i
+            ? forcedFill.current.progress
+            : task && task.arrived && task.phase === 'fill'
+              ? Math.min(1, task.dug / balance.bankFillSeconds)
+              : null,
           yaw: yaws.current[i] ?? 0,
           drawn: { squatY: g ? g.scale.y : null, handY, headAspect },
           carry: carryOf(work, i),
@@ -3015,18 +3042,16 @@ function ErrandVillagers({
             squat={(squats.current[i] ??= { current: 1 })}
             handProp={
               <>
-                <mesh
+                <group
                   ref={(el) => {
                     handJars.current[i] = el
                   }}
                   visible={false}
                   position={[0, -0.12, 0.04]}
                   rotation={[0, 0, 0.12]}
-                  castShadow
                 >
-                  <cylinderGeometry args={[0.12, 0.16, 0.32, 8]} />
-                  <meshStandardMaterial color="#8a5a30" roughness={0.9} />
-                </mesh>
+                  <Jar full={false} />
+                </group>
                 <group
                   name="digging-tool"
                   ref={(el) => {
@@ -3047,20 +3072,162 @@ function ErrandVillagers({
               </>
             }
           />
-          <mesh
+          <group
             ref={(el) => {
               headJars.current[i] = el
             }}
             visible={false}
             position={[0, 1.5, 0]}
-            castShadow
+            // A carried jar is not a plumb cylinder: a small lean turns the
+            // mouth off the vertical, which is what lets any of the water in it
+            // be seen from a standing eye rather than only its rim edge-on.
+            rotation={[0.16, 0, 0.1]}
           >
-            <cylinderGeometry args={[0.12, 0.16, 0.32, 8]} />
-            <meshStandardMaterial color="#8a5a30" roughness={0.9} />
-          </mesh>
+            <Jar full />
+          </group>
         </group>
       ))}
+      {geography.waterStand && (
+        <WaterStand x={geography.waterStand.x} z={geography.waterStand.z} jarRefs={standJars} />
+      )}
     </>
+  )
+}
+
+// --- The water carrier's jar (work-order 1087) -----------------------------
+//
+// BOTH JARS ARE THE SAME VESSEL, and it is OPEN. It used to be one closed opaque
+// cylinder in both states, and the full one was the empty one moved onto the
+// head: the user (06.09.2026) could see no water in it and therefore could not
+// tell that water was being fetched. The mouth is open now, and what stands
+// inside it is what tells the two apart at a glance — a dark hollow in the empty
+// one, the river's own tone at the rim in the full one.
+//
+// The rim is FLARED past the body's waist. A head-carried jar sits near the
+// player's own eye height, so its mouth is seen at a shallow angle; a wider
+// mouth is a wider ellipse, which is what makes the reading survive the
+// distance the player watches from.
+const JAR_RIM_R = 0.155
+const JAR_WAIST_R = 0.16
+const JAR_BASE_R = 0.13
+const JAR_HEIGHT = 0.32
+/** How far below the rim the water stands in a full jar, and the hollow in an
+ *  empty one. The full one is brim-full; the empty one is a shadow well down. */
+const JAR_WATER_DROP = 0.03
+/** How flat the meniscus is against the hemisphere its geometry starts from.
+ *  A FULL hemisphere of the rim's radius stands 0.117 m over a jar 0.32 m tall —
+ *  a ball on a pot, not water in it, and not the "shallow dome standing slightly
+ *  proud of the rim" its own drawing describes. Flattened to a fifth of the
+ *  jar's height it clears the rim by about 6.5 cm — judged at the picture:
+ *  3 cm left a stripe too thin to read at the distance a player watches from,
+ *  and the full hemisphere read as a ball sitting on a pot. */
+const JAR_MENISCUS_FLATTEN = 0.65
+const JAR_HOLLOW_DROP = 0.13
+
+function Jar({ full }: { full: boolean }) {
+  return (
+    <>
+      <mesh castShadow>
+        <cylinderGeometry args={[JAR_RIM_R, JAR_WAIST_R, JAR_HEIGHT, 14, 1, true]} />
+        {/* Double-sided: the inner wall is half of what an open mouth reads as. */}
+        <meshStandardMaterial color="#8a5a30" roughness={0.9} side={THREE.DoubleSide} />
+      </mesh>
+      {/* The base, so the vessel is a jar and not a tube. */}
+      <mesh position={[0, -JAR_HEIGHT / 2, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <circleGeometry args={[JAR_BASE_R, 14]} />
+        <meshStandardMaterial color="#6b4423" roughness={1} side={THREE.DoubleSide} />
+      </mesh>
+      {/* What is IN it. The full jar's water is a shallow DOME standing slightly
+          proud of the rim, not a flat disc in it: a head-carried jar's mouth
+          sits at about 1.66 m and the player's eye at about 1.6 m, so a disc
+          inside the rim is edge-on from every standing distance and reads as
+          nothing. A meniscus breaks the rim line and shows as a bright cap. */}
+      {full ? (
+        <mesh position={[0, JAR_HEIGHT / 2 - JAR_WATER_DROP, 0]} scale={[1, JAR_MENISCUS_FLATTEN, 1]}>
+          <sphereGeometry args={[JAR_RIM_R - 0.008, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />
+          <meshStandardMaterial
+            color={RIVER_WATER_TONES.sheen}
+            roughness={0.14}
+            metalness={WATER_METALNESS}
+            emissive={RIVER_WATER_TONES.deep}
+            emissiveIntensity={0.35}
+          />
+        </mesh>
+      ) : null}
+      <mesh
+        position={[0, JAR_HEIGHT / 2 - (full ? JAR_WATER_DROP : JAR_HOLLOW_DROP), 0]}
+        rotation={[-Math.PI / 2, 0, 0]}
+      >
+        <circleGeometry args={[full ? JAR_RIM_R - 0.012 : JAR_WAIST_R - 0.02, 14]} />
+        {full ? (
+          // The river's own sheen, glossy like the water it came from, with a
+          // little light of its own so the disc still reads in the shade of the
+          // carrier's own head.
+          <meshStandardMaterial
+            color={RIVER_WATER_TONES.sheen}
+            roughness={0.14}
+            metalness={WATER_METALNESS}
+            emissive={RIVER_WATER_TONES.deep}
+            emissiveIntensity={0.35}
+            side={THREE.DoubleSide}
+          />
+        ) : (
+          <meshStandardMaterial color="#241a12" roughness={1} side={THREE.DoubleSide} />
+        )}
+      </mesh>
+    </>
+  )
+}
+
+/**
+ * THE VILLAGE WATER STAND (work-order 1087): a low platform beside the fire
+ * where the filled jars are set down. It is what gives the errand's return leg a
+ * destination — the carrier used to walk to a radius, where his task was nulled
+ * and the full jar vanished in the same frame.
+ *
+ * It draws `jars` of them, capped by the errand state at
+ * `balance.waterStandCapacity`, so a delivery past the cap replaces the oldest
+ * standing jar rather than piling one more on.
+ */
+function WaterStand({ x, z, jarRefs }: { x: number; z: number; jarRefs: RefObject<Array<THREE.Object3D | null>> }) {
+  return (
+    <group position={[x, 0, z]}>
+      {/* Four short posts and a plank top — the same worn timber the village's
+          other frames are built from. */}
+      {[
+        [-0.34, -0.34],
+        [0.34, -0.34],
+        [-0.34, 0.34],
+        [0.34, 0.34],
+      ].map(([px, pz]) => (
+        <mesh key={`${px},${pz}`} position={[px, 0.16, pz]} castShadow>
+          <cylinderGeometry args={[0.05, 0.06, 0.32, 5]} />
+          <meshStandardMaterial color="#5f4526" roughness={0.95} />
+        </mesh>
+      ))}
+      <mesh position={[0, 0.35, 0]} castShadow receiveShadow>
+        <boxGeometry args={[0.92, 0.07, 0.92]} />
+        <meshStandardMaterial color="#6b5433" roughness={0.92} />
+      </mesh>
+      {Array.from({ length: balance.waterStandCapacity }, (_, i) => {
+        // Set down in a row across the plank, so three read as three. All of
+        // them are mounted once and the frame loop shows as many as stand there.
+        const spread = 0.28
+        const offset = (i - (balance.waterStandCapacity - 1) / 2) * spread
+        return (
+          <group
+            key={i}
+            ref={(el) => {
+              if (jarRefs.current) jarRefs.current[i] = el
+            }}
+            visible={false}
+            position={[offset, 0.385 + JAR_HEIGHT / 2, i % 2 === 0 ? 0.04 : -0.06]}
+          >
+            <Jar full />
+          </group>
+        )
+      })}
+    </group>
   )
 }
 
@@ -3189,6 +3356,7 @@ export function PlaceLife({
   digSites,
   bank,
   waterPath,
+  waterStand,
   playRocks,
   playGround,
   rocks,
@@ -3213,8 +3381,12 @@ export function PlaceLife({
    *  (work-order 482): the ground the children's stage stands on. */
   bank: PlaceRiverBank | null
   /** The village's water path (work-order 688): its head in the village, where
-   *  both carriers speak, and its foot at the river, where neither does. */
-  waterPath: { head: { x: number; z: number }; foot: { x: number; z: number } } | null
+   *  the carriers speak, its foot at the river, where neither does, and the
+   *  fill spot in the water where the jar is dipped (work-order 1087). */
+  waterPath: { head: { x: number; z: number }; foot: { x: number; z: number }; fill: { x: number; z: number } } | null
+  /** The village water stand (work-order 1087): where the errand is ordered and
+   *  where the filled jars are set down. */
+  waterStand: { x: number; z: number } | null
   /** The two play rocks of the children's bank game (work-order 687), and the
    *  settlement's loose boulders — one of which a child climbs and names while
    *  the group roams, so ROCK is heard at a stone that is no part of the game. */
@@ -3309,9 +3481,11 @@ export function PlaceLife({
     () => ({
       waterHead: waterPath ? { x: waterPath.head.x, z: waterPath.head.z } : null,
       waterFoot: waterPath ? { x: waterPath.foot.x, z: waterPath.foot.z } : null,
+      waterFill: waterPath ? { x: waterPath.fill.x, z: waterPath.fill.z } : null,
+      waterStand: waterStand ? { x: waterStand.x, z: waterStand.z } : null,
       digSites,
     }),
-    [waterPath, digSites],
+    [waterPath, waterStand, digSites],
   )
 
   // WHERE they play comes from the LAYOUT (work-order 688): far enough from

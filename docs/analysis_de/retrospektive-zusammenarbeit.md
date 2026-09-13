@@ -58,6 +58,9 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 10.09. spätabends | Die Landungskette hält an ihrem letzten Schritt: Sie hakt den Punkt ab und veröffentlicht DANACH die Tafel, deren Jetzt-Karte noch genau diesen Punkt nennt — die Tafel weist die Veröffentlichung zu Recht ab, und das Aufräumen von Zweig und Arbeitsbaum bleibt liegen. Den gemessenen Grund druckt die Kette nicht mit, weil die Absage auf dem Ausgabekanal steht und sie den Fehlerkanal liest (§3.259) |
 | 11.09. nachts | Die Verweigerung der billigen Sprosse saß in der Wrapper-Datei, während der Einstiegsbefehl, den dieselbe README als gewöhnlich dokumentiert, niemanden fragte — der deckende Lauf des Punktes selbst lief an ihr vorbei; und beim ersten ernsthaften Gebrauch verweigerte sie ihren eigenen Deckungslauf, weil ein Branchwechsel eine mtime bewegt hatte, ohne ein Byte zu ändern (§3.265, Punkt 1086) |
 | 11.09. nachts | Zwei Werkzeuge antworten mit Gewissheit auf Fragen, die sie nie gemessen haben: `ci-gate-verdict.mjs` läuft nur im Runner, ignoriert die Flags eines Handaufrufs und druckt bei leerer Umgebung »CI gate passed« — zweimal geglaubt; `run-wait` erklärt einen gesunden `polish`-Lauf nach 20 Minuten für tot, weil seine Schwelle die Modell-Erwartung von 5m41s statt des eigenen gemessenen Medians von 55 min multipliziert, und befiehlt das Töten (§3.263, Punkte 1099/1101) |
+| 12.09. | Der beauftragte Autor schrieb zweimal nichts und hatte zweimal recht: einmal, weil der Punkttext eine Wortüberlappungs-Heuristik zur Freigabe-Evidenz erklärte, deren eigener Kommentar sagt, ein Nein beweise keine Unschuld; einmal, weil der Unterbau des Punktes ungebaut war. Das Werkzeug meldete beide Male PROBLEMS — »NOTHING WAS COMMITTED«, »gates not green« —, also den Fehlschlag der Spur, wo die Spur genau das getan hatte, wofür sie existiert (§3.266, Punkte 1089/1073) |
+| 13.09. | Ein Punkt zog seine eigenen Rot-Ladungen zurück, wie es die Regel verlangt — zwei Tests standen noch auf ihnen und wurden erst im Tor der LANDUNG rot, als der Merge schon auf main lag: Das Register erzwingt »kein Eintrag ohne offenen Punkt«, niemand erzwingt »kein Test ohne seinen Eintrag« (§3.268). Dieselbe Sitzung wies drei Fremd-Rot nach: gegen die Zweigwurzel gemessen sind alle drei auch auf main rot, und das Rätsel am Schutthang ist dort nicht sporadisch, sondern reproduziert jedes Mal |
+| 12.09. abends | Wiedergänger von §3.231: Der LARGE-Lauf eines Punktes starb nach 6 m 53 s an einem 20-Sekunden-Timeout in einer Unit-Datei — diesmal war der Störer kein fremder Committer, sondern eine PFLICHT derselben Sitzung. Der Stop-Hook forderte wegen einer Parallel-Sitzung `batch-doctor --gate`, und dessen Tor fährt `test:unit`, `build` und `lint` im Hauptbaum, während der Worktree-Lauf mit genau derselben Unit-Suite beginnt. Der Runner druckte sein eigenes Urteil mit — »UNDER LOAD — a timeout failure under load is not evidence of a broken test« —, also wusste er, dass die Maschine nicht ruhig war, und lief trotzdem an. Die In-Flight-Markierung, die es gewusst hätte, liest der Doctor nicht (Backlog 12.09.) |
 | 13.08. | Der Nachprüfer findet eine echte zweite Klippe im geheilten Mechanismus — und jede der fünf gemessenen Kuren verschlechtert gesunde Dörfer stärker, als der Fehler schadet: Befund wird gebucht statt behoben (§3.115) |
 | 20.08. | Der Dokumentschnitt strich Regeln als »von einem Wächter abgedeckt«, ohne einen einzigen Wächter darauf zu prüfen — die Kontextanzeige verschwand, der Nutzer fand es (§3.134); eine vom Nutzer gesetzte Rangfolge wurde in einer Nacht zweimal maschinell überholt, ohne dass irgendwo ein Grund stand (Punkt 614); zwei Werkzeuge derselben Bauart am falschen Ort gemessen — im Hauptbaum gebaut und geprüft, während der Prozess die Arbeit in den isolierten Bereich schickt (§3.137) |
 | 21.08. | Ein Tor verlangte eine Freigabe, die seine eigenen Werkzeuge nicht herstellen können — der HIGH-Punkt war gemergt, geprüft und freigegeben, und der Zugausgang wies ihn trotzdem ab (§3.153) |
@@ -1446,6 +1449,40 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ---
 
+### 3.266 Die zurückgewiesene Spezifikation ist der Erfolg der Spur, nicht ihr Fehlschlag
+
+Am 12.09.2026 wurden zwei Punkte an den fremden Autor vergeben, und beide kamen ohne eine
+Zeile Code zurück. Punkt 1089 sollte ein rotes Prüfergebnis, das »den Diff nicht berührt«,
+einem anderen Punkt zurechnen — und der Punkttext zeigte dafür auf eine Stelle, die Wörter
+aus Prüfnamen mit Wörtern aus Dateinamen vergleicht und deren eigener Kommentar festhält,
+ein Nein beweise keine Unschuld. Der Autor baute das nicht, sondern schrieb auf, dass ein
+auf dieser Grundlage freigegebener Punkt genau das Rot entschuldigen kann, das er selbst
+verursacht hat. Punkt 1073 kam mit einer Messung zurück: Sein Unterbau lag ungebaut, die
+drei Konstanten, auf denen er aufsetzt, standen unverändert.
+
+Beide Male war das die richtige Antwort, und beide Male meldete das Werkzeug sie als
+Fehlschlag. Der Abschlussbericht druckt »PROBLEMS with this run« und darunter »NOTHING WAS
+COMMITTED — the branch is where it started« sowie die Feststellung, die Torzeile melde keine
+drei grünen Tore. Wer den Bericht liest, ohne den Text darüber zu lesen, sieht einen
+verbrannten Autorenlauf. Tatsächlich hat die Vier-Augen-Trennung hier ihren teuersten Dienst
+geleistet: Sie hat einen Spezifikationsfehler gefangen, bevor er Code wurde, und eine
+Reihenfolge korrigiert, die niemand geprüft hatte.
+
+Die Ursache ist eine Begriffslücke. Die Spur kennt bisher zwei Ausgänge — gebaut oder
+gescheitert — und eine Eskalation zählt sie als erfolglose Prüfrunde, also als Kostenstelle.
+Für den dritten Ausgang, die begründete Zurückweisung, gibt es keinen Namen und damit auch
+keine Buchung. Das ist gefährlicher als es klingt: Was als Fehlschlag gebucht wird, wird beim
+nächsten Mal vermieden, und der billigste Weg, eine Zurückweisung zu vermeiden, ist, den
+widersprüchlichen Auftrag doch zu bauen.
+
+**Lehre:** Eine Spur, die eine Spezifikation zurückweisen darf, muss diese Zurückweisung auch
+benennen können — sonst ist die Erlaubnis nur auf dem Papier. Ein Lauf ohne Commit ist nicht
+automatisch ein leerer Lauf; die Frage ist, ob er eine Begründung mitbringt, die den Auftrag
+verändert. Hier tat er es zweimal, und beide Male bewegte er den Punkt weiter, als ein Diff
+es gekonnt hätte.
+
+---
+
 ### 3.179 Ein Tor, dessen Abhilfe außerhalb der Reichweite liegt
 
 Punkt 749 landete am 25.08.2026 grün: 13 703 Tests, Bild-Prüfung nicht fällig, Zweig beendet.
@@ -1491,7 +1528,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Samstag, 12.09.2026, 10:20 · Quellen-Fingerprint: `7c8e96b24e73…`
+Zuletzt aktualisiert: Sonntag, 13.09.2026, 12:23 · Quellen-Fingerprint: `a4163aba5b65…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1531,7 +1568,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to the OpenAI lane, GPT-6 Astra), and review is cross-vendor, not Fable-by-default | 6 | hoch | — (Regel/Memory) | ◐ Regel |
 | Iterate on the new feature's OWN test first; the full regression runs once at the end, never as the debugging loop | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 74 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 75 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | wait-command-guard.mjs | ✔ Mechanismus |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | \"Gib ab\" / \"abgeben\" means hand the batch to a SUCCESSOR session so the context does not overflow — it never means pause or stop the batch | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1597,8 +1634,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 96 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 132 Prozess-/Meta-TASKS-Punkte (davon 64 offen).
 
-<!-- RETRO-FINGERPRINT: 7c8e96b24e731f0698f30213e6c89cbf0f7c41bebf483e54214af5f8841d10c6 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-12T08:20:48.604Z -->
+<!-- RETRO-FINGERPRINT: a4163aba5b65f9a7b3a2acac58bec54752a6eeed67f6661c52438a148b473211 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-13T10:23:52.097Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -6713,3 +6750,65 @@ und teuer gilt, gehört sie dorthin, wo Läufe gestartet werden, nicht in den W�
 Der Wächter kann nur den Schluss bewerten, der Starter kann die Reihenfolge halten. Gebucht
 als Punkt 1086, der die Verweigerung in `scripts/verify/run-logged.mjs` legt und die
 Bildschranke ihren eigenen Zeitpunkt aussprechen lässt.
+
+### 3.267 Die Sitzung belastete die Maschine, auf der ihre eigene Messung lief
+
+Am Abend des 12.09.2026 hat eine Sitzung einen laufenden LARGE-Lauf übernommen und in
+denselben neunzig Minuten ihre eigene Pflichtarbeit auf dieselbe Maschine gelegt: eine
+Typprüfung, einen Produktionsbuild und einen Push, dessen Tor 15235 Unit-Tests fährt. Der
+Lauf hat das nicht überstanden. In `polish` ist genau in diesem Fenster ein Zeitfenster-Test
+rot geworden — die Haltespur des ankommenden Läufers brach mit 3,2 Sekunden Rest ab —, die
+Wiederholung auf der wieder ruhigen Maschine lief grün, und das Ergebnis ist ein SUSPECT,
+der nichts abdeckt und einen eigenen Punkt kostet (1119).
+
+Das Unangenehme daran ist nicht der Fehler, sondern sein Zeitpunkt: Dieselbe Sitzung hatte
+eine Stunde zuvor genau diese Lehre in die Anfänger-Anleitung geschrieben — »läuft schon
+etwas Langes, ist Vorarbeit nur Lesen« — und den dafür nötigen Kürze-Grenzwert mit einer
+Begründung angehoben, die den Fall wörtlich beschreibt. Die Regel war also nicht unbekannt,
+sie war aufgeschrieben und im Kontext. Was gefehlt hat, ist die Stelle, an der sie greift:
+Die Wartestellung wird deklariert, das Board sagt »ich warte blockierend«, und die Pflichten
+daneben — committen, pushen, ein Tor fahren — laufen weiter, als wäre die Maschine frei.
+Kein Wächter fragt beim Start eines Tores, ob gerade ein Bildlauf misst; die
+In-Flight-Markierung weiß es, und niemand liest sie.
+
+Die Verwandtschaft zu §3.262 ist die Quelle der Entschuldigung: Dort schreibt die Maschine
+den Grund für ihren eigenen Ausfall, hier erzeugt sie ihn. Der Unterschied zu einem
+gewöhnlichen Flackern ist, dass der Verursacher benennbar ist und im selben Protokoll steht.
+
+**Lehre:** Eine deklarierte Wartestellung muss auch die eigene Buchhaltung anhalten, nicht
+nur die Absicht. Solange das nicht erzwungen wird, gilt die Handregel unverkürzt: Während
+ein Lauf misst, ist alles außer Lesen aufgeschoben — auch ein Commit, auch ein Push, auch
+ein Tor, das »nur« vier Minuten dauert. Und ein SUSPECT wird nicht dem Punkt angehängt, der
+gerade läuft, sondern als eigener Punkt gemessen, bevor jemand »Last« behauptet.
+
+
+### 3.268 Die Ladung starb mit ihrem Punkt, ihre Tests nicht
+
+Am 13.09.2026 hat ein Punkt getan, was das Rot-Register verlangt: Er hatte seine Bildschuld
+bezahlt und seine eigenen Einträge daraus zurückgezogen. Das ist keine Nachlässigkeit,
+sondern die Regel — ein Eintrag, der seinen Punkt überlebt, ist genau die veraltete Ausnahme,
+gegen die das Register gebaut ist, und ein eigener Test verweigert jeden Eintrag, dessen
+Punkt der Auftrag nicht mehr offen führt.
+
+Zwei Tests standen aber auf diesen Einträgen. Einer benutzte sie als Kulisse für eine
+Aussage, die mit dem Register selbst nichts zu tun hat — »der Läufer nennt jeden Besitzer
+genau einmal, in numerischer Reihenfolge« —, der andere behauptete zeilenweise, diese
+Einträge würden verrechnen. Beide wurden rot, und zwar erst im Tor der Landung: Der Merge
+lag da bereits auf main. Die Landung hielt korrekt an und ließ keinen Halbzustand zurück,
+aber main trug einen Merge, dessen Abhaken und Push noch ausstanden, und die Reparatur
+musste auf main statt auf dem Zweig passieren.
+
+Die Asymmetrie ist der ganze Fall: Das Register erzwingt die eine Richtung — kein Eintrag
+ohne offenen Punkt — und niemand erzwingt die andere — kein Test ohne den Eintrag, auf dem
+er steht. Wer eine Ladung zurückzieht, sieht die Einträge, die er löscht; er sieht nicht,
+wer sich auf sie stützt. Die Verwandtschaft zu §3.97 ist die Spiegelung: Dort war die
+Zuordnung getroffen und nie ins Register eingetragen, hier ist sie aus dem Register entfernt
+und die Abhängigen blieben stehen.
+
+**Lehre:** Das Zurückziehen einer Ladung ist kein Löschen, sondern ein Umbau — wer einen
+Eintrag entfernt, sucht im selben Zug nach dem, was auf ihm steht, und nimmt es mit. Eine
+Kulisse, die lebende Registerdaten benutzt, schreibt diese Kopplung über sich, damit die
+nächste Rücknahme sie neu ausrichtet statt sie zu zerbrechen. Und das Tor der Landung fährt
+auf dem Zweig, nicht erst hinter dem Merge: Ein Rot, das man vor dem Merge findet, kostet
+eine Reparatur, dasselbe Rot danach kostet zusätzlich einen main, der halb gelandet
+dasteht.

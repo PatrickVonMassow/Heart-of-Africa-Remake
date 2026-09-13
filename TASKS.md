@@ -77,246 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1113. A whole-suite run pays for its known reds twice, and the second pass learns nothing.
-  USER ORDER 12.09.2026: make the regression markedly faster NOW without first repairing the
-  defects behind its reds, and make forgetting those repairs impossible — "was koennen wir
-  machen, damit jetzt erstmal die Regressionstests wieder deutlich schneller werden, ohne
-  diese Spiele-Bugs beheben zu muessen, aber dass sichergestellt ist, dass deren Behebung
-  nicht spaeter vergessen geht?"
-  MEASURED 12.09.2026 on point 1112's closing proof
-  (`.claude/worktrees/point-1112/local/verify-logs/`): the both-backend proof cost 98 min on
-  WebGL 2 (head b5b40eb59) and 40 min on WebGPU (head e225bc7b5) against the run's own 25 min
-  expectation, and NOT ONE of its reds belonged to 1112. Together they were 138 of the 161
-  minutes that point spent on suites. Each red already has an OPEN owner:
-  - `settings` first-person ground micro-detail (laplacian 1.01-1.07) — point 603
-  - `enrichments` the streamed dressing does not grow at a fixed anchor — point 938
-  - `enrichments` frame 72-water-victoria-falls, subject not in the picture — point 521
-  - `polish` the drums had stopped at the shutter — point 1102
-  - `polish` the fill pose blocked on all 16 bearings, frame off the edge — point 1087,
-    NOT 1108 (corrected 12.09.2026 against the ledger). The delegated author caught the
-    contradiction: the entry that already carries this red was written the same day, is
-    scoped to `polish`/`webgl`/`check` and reasons it out as "the staging half of 1087".
-    1108 is the CHECK defect that stands in front of it — its own text says so, and says
-    that after its fix "only an exhausted search reds", which is 1087's staging debt.
-    One red, one owner: charging it twice would break the rule the ledger exists for.
-  WHY IT COSTS DOUBLE. `runSuiteWithRetry` in `scripts/verify/run-all.mjs` retries every red
-  suite once (point 200's rotating-flake rule) and decides on the suite's EXIT CODE alone.
-  Three red suites therefore run six passes. The retry exists to separate a transient from a
-  defect — a question already ANSWERED for a red that a named open point owns.
-  Final state:
-  - MEASURED 12.09.2026, BEFORE ANY WORK: all five reds above are ALREADY charged in
-    `scripts/render-verify-charges.mjs`, each scoped to its suite, backend and kind, each with
-    its dated `why` — 603 at the `settings` micro-detail check, 938 on BOTH lanes of the
-    dressing check, 521 at the Victoria-Falls frame, 1102 at the drum shutter, 1087 at the
-    three fill-pose checks. This bullet is therefore a VERIFICATION, not hand-work: confirm
-    each entry still matches the red the run prints and still names an open point, and change
-    nothing that already holds. What this point owes is the SKIPPED RETRY below.
-  - A suite whose failing checks are ALL charged to an open point is NOT retried. It prints one
-    line naming the owning points instead. A suite carrying even ONE uncharged red keeps its
-    retry exactly as today.
-  - `owned()` IS NOT CALLABLE TODAY, and the earlier claim that it was "one call away" was
-    wrong (caught by the delegated author, 12.09.2026): it is a closure INSIDE the exported
-    `unexplainedRuns()`, capturing that function's open-point set. Lift it to a module-level
-    exported function that takes the open points as an argument, and let `unexplainedRuns()`
-    call that same function — identical behaviour, one implementation, reusable from the
-    runner. Nothing about the decision it makes changes.
-  - The run STAYS RED and is still recorded ACCOUNTED FOR, never clean. Charging is not a pass
-    and this point does not turn it into one.
-  - NOTHING CAN BE FORGOTTEN, by mechanism and not by note: a charge names an OPEN point, its
-    entries stop clearing anything the moment that point is ticked, and
-    `render-verify-core.test.mjs` fails when an entry names a point the work order does not
-    hold open. Added to that: the run's closing line NAMES the points its reds are charged to,
-    so the price of the five open defects is read on every run rather than buried in a ledger.
-  EXPECTED EFFECT, an estimate to be measured on the first closing that uses it: 1112's two
-  lanes would have run three passes instead of six. It does NOT touch the cold boot every run
-  pays (docs/backlog.md, the warm dev server) and it does NOT make a red green.
-  NOTE THE FREEZE. CLAUDE.md §2 forbids new guards. This is not one: it is a refusal to repeat
-  work, inside the runner every run already passes through, ordered by the user, and it deletes
-  a pass rather than adding a mechanism.
-  Test. Vitest: a suite whose reds are all owned is not retried and says which points own them;
-  a suite with one unowned red is retried unchanged; the existing sweep extended over the new
-  entries, including that a charge naming a ticked point clears nothing.
-  Refs: scripts/verify/run-all.mjs (`runSuiteWithRetry`, `RETRY_ENABLED`),
-  scripts/render-verify-charges.mjs, scripts/render-verify-core.mjs (`owned()`, today a
-  closure inside `unexplainedRuns()`),
-  points 200, 640, 1089, 603, 938, 521, 1087, 1102, 1108, 1112, docs/backlog.md.
-  Criticality: high — 138 of 161 suite minutes on one ordinary point, paid again by every
-  point behind it.
-  Bundle: Testinfrastruktur.
-
-- [ ] 1089. Charge a LARGE red that does not touch the point's diff to its own point
-  (user 10.09.2026).
-  Apply the rule CLAUDE.md §7.2 already states — "a red run closes only when its cause is
-  fixed, CHARGED TO ITS OWNING POINT, or FILED AS A NEW POINT" — to the reds that are
-  holding point 1065, and make the charging automatic rather than a judgement call.
-  Measured on 1065 (10.09.2026): 23 full LARGE runs, 16.2 machine hours, none green, and
-  NOT ONE red touched the tap. The recurring reds are `settings` ground-detail (edge
-  energy), `enrichments` dressing-growth (point 278), `crossbrowser` chromium-mobile
-  (getSupportedExtensions on null), plus two teardown aborts from foreign commits. Each
-  was re-diagnosed on every run instead of being charged once.
-  Final state:
-  - A LARGE red whose failing check does not touch the point's own diff is FILED as its
-    own point automatically by the run's own report — the report already computes
-    "touches the diff", so it has the information. The point under test is not held by it.
-  - The run's verdict line says plainly which reds are charged elsewhere and which are the
-    point's own, so a merge decision does not need a human re-reading of the log.
-  - The three reds above get their points at once; 1065 merges on its own evidence — the
-    narrow rung `polish --section=children-bank-game`, unit, build and lint.
-  WHY THIS AND NOT A POLICY CHANGE: nothing here loosens the gate. The full regression
-  still runs and still has to go green — but its failures are owned by whoever broke them
-  instead of by whoever happens to be holding the branch when they surface.
-  Test. Vitest: a red check whose file set is disjoint from the branch diff is reported as
-  charged elsewhere and does not hold the point; a red that touches the diff still does.
-  Refs: scripts/verify/run-all.mjs (the "touches the diff" annotation), CLAUDE.md §7.2,
-  point 1065, point 278.
-  Bundle: Testinfrastruktur.
-
-- [ ] 1087. The water carrier visibly fills the jar at the water and carries visible water
-  (user 06.09.2026; the former point 1066; SPLIT BACK OUT OF POINT 1065 on 10.09.2026 on the
-  user's instruction, 02:15).
-  WHY IT IS ITS OWN POINT AGAIN. It was folded into 1065 on 07.09.2026 to save a regression
-  run. Measured over three days on feat/1065-teaching-hands-touch: 36 commits, about sixty
-  picture runs, and every red of the last two days belonged to this half while the tap half
-  stood green. The fold bought no run and cost the other half its landing.
-  IT IS BLOCKED ON TWO THINGS, NEITHER OF WHICH IS ITS OWN WORK.
-  - Point 1085 owes the DESIGN decision. The fill pose reads as a man falling into the river,
-    and a jar proved to be under an OPAQUE water surface cannot be photographed at all. No
-    camera position fixes either; four were re-aimed in one evening and all four came back
-    with the same reading.
-  - Point 1086 owes the LADDER this point's evidence needs. Measured 10.09.2026: the
-    `adult-errands` section rung ran twelve times on 09.09. and was GREEN every time (18 pass,
-    0 fail, last at 22:40), and the LARGE run then failed the same two checks — "no carrier was
-    ever seen filling a jar", 1 errand cast in the window, phases [invite×832 wait×583
-    walk×550 fetch×33]. A rung that reads green while the suite is red cannot guide this
-    point's iteration, and iterating on the full suite is what cost the three days.
-  START FROM THE BRANCH, NOT FROM SCRATCH. feat/1065-teaching-hands-touch already holds the
-  walk to the waterline, the fill phase, the dispatch and the water stand, and those are not
-  in doubt. What it does not hold is a pose that reads and a check that predicts. Cut a fresh
-  branch from main after 1085 has decided, and carry over what survives that decision.
-  The filling of the jar READS as filling. Today the RIVER errand sends an adult with an
-  empty jar to the foot of the water path and back with a full one, and nothing in between is
-  shown: the foot (`bankWaterFoot`, `riverBank.ts`) stands `BANK_STAND_INSET` 1.5 m inside the
-  walkable edge while the waterline lies `BANK_SHORE_HALF` 1.2 m beyond it, so the carrier
-  halts about 2.7 m from the water; the carry flips 'emptyJar' → 'fullJar' between the
-  'water-out' and 'water-back' situations (`adultWork.ts` ~390-410) with no act; and both jars
-  are one closed opaque cylinder (`PlaceLife.tsx` ~2557-2612), the full one merely moved onto
-  the head. The user (06.09.2026) could not tell that water was being fetched — and this
-  errand is where RIVER is learned (design.md §13.4).
-  Final state:
-  - The carrier goes TO the water: the errand's last leg walks down the shore to the
-    waterline (the walkable region already reaches through it to `balance.bankWadeDepth`,
-    `riverBank.ts`), and he stands with his feet at the water's edge or ankle-deep, never
-    2.7 m up the bank. The path's foot for the WORD (`say.aim`) may stay where it is; the
-    fill spot is at the water.
-  - The fill is an ACT with its own phase: he crouches or bends, the jar in his hand goes
-    down into the water, stays there a readable moment (calibratable seconds in
-    `src/config/balance.ts`), comes up, and is lifted onto the head (a fill pose beside
-    `digPose` / `HEAD_CARRY_POSE`). 'fullJar' begins only after the dip; the carry never
-    flips without it. The errand's timing backstops (`errandSeconds`, `stallSeconds`) cover
-    the added leg.
-    SPLIT OFF 09.09.2026 (evening): whether that act READS as fetching water — the words
-    "visibly below the drawn surface" stood here — is point 1085. This point owes the act,
-    its phase, its hold and the geometry the check measures; it does not owe the legibility
-    of the pose, which four re-aimed frames could not deliver and which needs a design
-    decision about the figure rather than another camera position.
-  - Water is visible: both jars have an open mouth; the empty one shows a dark hollow, the
-    full one a water surface at the rim (a bright disc with the water's tint, readable at
-    the distance the player watches from) — so head-carried and hand-carried jars read as
-    full and empty at a glance, on both backends.
-  - THE ERRAND IS A DISPATCH, NOT A COMMENTARY (user 07.09.2026, replacing this part's
-    earlier sentence that nothing about who is cast or when changes). Today the inhabitant
-    narrates his own act, which reads as staged for the player; DIG works because one man's
-    word sends another. RIVER now does the same:
-    - ONE ROUND TRIP, NOT TWO CASTINGS. `water-out` and `water-back` stop being independently
-      cast situations (`adultWork.ts` ~390-412) and become legs of a single errand held by one
-      carrier. Both ids survive as leg labels, so the lexicon bookkeeping and the staged
-      counters are unchanged.
-    - THE WORD IS THE ORDER. At the village water stand an adult A turns to a free adult B,
-      says RIVER and points at the water; B takes the empty jar and goes.
-    - BOTH UTTERANCES FALL INSIDE THE VILLAGE, at the stand, no longer at the water path head
-      (`WATER_PATH_HEAD_RADIUS` 15, `layout.ts` ~222) — which also keeps the errand's speech
-      clear of the children's bank game.
-    - NO WORD FALLS AT THE WATER: the fill is silent and is the act this part already
-      specifies.
-    - THE RETURN HAS A DESTINATION. B walks back to the stand, sets the jar down (carry →
-      none) and says RIVER a second time, addressed to A, who is still standing there.
-    - THE STAND IS DRAWN: a water stand beside the existing `VILLAGE_FIRE` anchor
-      (`layout.ts` ~247), which already has a collider and is the plausible consumer. It holds
-      up to three standing jars; a fourth delivery replaces the oldest, so no consumer logic
-      is needed. Capacity calibratable in `balance.ts`.
-    - TWO ADULTS, NOT THREE. Water fetching gains no pair mechanics — no partner, no
-      `invitationClear` for a second adult; those stay with DIG, where two people are
-      materially required. The escort half of the user's first framing was withdrawn by his
-      own later message; what it was for (keeping the speech away from the shore) is
-      delivered by moving both utterances into the village.
-    - DELETED with the second casting: `WATER_FOOT_REACH` (`adultWork.ts` ~119) and its
-      `nearestFree` caller.
-    - THE WATER WORD IS GATED BY A HEARING CHILD exactly as the two DIG utterances are; today
-      only the DIG branches carry that check (`adultWork.ts` ~328-333).
-    - THE RULE THE DEFECT VIOLATED, written into the spec: NO VILLAGER SPEAKS TO NOBODY.
-      Every utterance has an addressee who reacts and a consequence the player sees; the
-      teaching comes from the act that follows the word, never from a word spoken beside an
-      act.
-    - THE WATER READING IS ACCEPTED, NOT CLOSED. A player may read the second RIVER as WATER;
-      the chief's message carries just as well as WATER · UPSTREAM · ROCK · DIG. Written down
-      beside the three readings ROCK deliberately closes.
-    The measured defect behind this (07.09.2026): the full jar comes from nowhere
-    (`water-back` sets `fullJar` at cast time), the same man goes down and comes up (the
-    nearest free adult within 4 m of the water foot is in practice the one who just
-    finished), and the return's goal is the path head at radius 15, where the task is nulled
-    and the full jar vanishes in the same frame. The code follows
-    docs/communication-poc-spec.md:115 literally — a gap in the SPEC, not an implementation
-    defect against it.
-  - Doc: design.md §13.4 ('the adults' water and digging work') states the dip at the
-    waterline AND the dispatch; docs/communication-poc-spec.md likewise where it describes
-    the errand, plus the no-villager-speaks-to-nobody rule and the accepted WATER reading.
-
-  Test. Vitest: the fill spot lies within a small tolerance of the waterline for the three
-  river villages (nubian, bambara, mandinka), a 'fill' phase sits between the walk down and
-  the walk back with 'fullJar' set only after it, and the phase lasts its configured seconds;
-  for the dispatch, 'fullJar' only inside ONE continuous errand record, every water utterance
-  naming an addressee villager index, the return leg's goal being the stand rather than the
-  path head, and the stand holding at most three jars.
-  Browser (LARGE, both backends — the water surface is backend-sensitive): a picture check of
-  the fill measuring what 1085 decides it must measure, and one of the return walk measuring
-  the water disc at the head jar's rim. The narrow rung is `polish --section=adult-errands`,
-  and per 1086 it counts only once it measures what the full suite measures.
-  Screenshots (verification/, subjects declared: the sending adult and the departing carrier at
-  the village water stand; the carrier at the waterline; the carrier walking back with the full
-  jar).
-  Quotes:
-  Nutzer, 06.09.2026 13:48: »Man erkennte das Auffüllen des Kruges mit Wasser nicht als solches. Das liegt an mehreren Problemen: Der Erwachsene geht nicht nah genug an den Fluss, für die Tätigkeit des Auffüllens fehlt eine Darstellung (ich würde erwarten, dass er den Krug in die Hand nimmt und ins Wasser taucht) und wenn er ihn dann gefüllt auf dem Kopf trägt, sieht man darin kein Wasser.«
-  Nutzer, 07.09.2026 19:25: »Kannst du weitere Zusammenführungen von offenen Punkten zur
-  Kommunikationsmechanik vornehmen, um Regressionsdurchläufe einzusparen?« — daraufhin ist
-  der frühere Punkt 1066 hier als PART B eingefaltet worden.
-  Nutzer, 07.09.2026: »Der Einwohner kommentiert seine Handlungen. Das ist nicht organisch,
-  sondern offensichtlich nur dafür da, dem Spieler das Wort RIVER zu vermitteln. Bei DIG ist
-  das besser, weil ein Einwohner durch Benutzung des Wortes einen anderen dazu auffordert,
-  mitzukommen, um ihm beim Graben zu helfen.«
-  Nutzer, 07.09.2026: »Wasserholen soll eine Kombination aus Entsendung und Einholung einer
-  Begleitung sein. Beides soll möglichst weit weg vom Fluss passieren.« — die Begleitung hat
-  der Nutzer im selben Zug wieder zurückgenommen: »Insgesamt sind es mir mit 3 beteiligten
-  Erwachsenen beim Wasserholen jetzt doch zu viele.«
-  Nutzer, 07.09.2026: »Aber das wäre gar nicht schlimm, weil die Häuptlingsbotschaft WATER
-  UPSTREAM ROCK DIG genauso gut funktionieren würde wie mit RIVER. Insofern ist es okay, dann
-  nochmal RIVER zu sagen.«
-  Nutzer, 07.09.2026: »Reihe das alles so ein. Fasse dabei sinnvoll zusammen und/oder hänge
-  einzelne Aspekte an bereits bestehende Tasks, um Regressionsläufe einzusparen.« — deshalb
-  steht die Entsendung hier statt als eigener Punkt: PART B öffnet ohnehin adultWork.ts, den
-  Wasserpfad, die Krug-Meshes und denselben LARGE-Bildlauf.
-  Refs: src/scenes/place/adultWork.ts (water-out/water-back ~390-410, AdultCarry,
-  WATER_FOOT_REACH), src/scenes/place/riverBank.ts (bankWaterFoot, BANK_STAND_INSET 1.5,
-  BANK_SHORE_HALF 1.2, walkable region through the waterline ~47-62), src/scenes/place/layout.ts
-  (waterPath head/foot, VILLAGE_FIRE anchor), src/render/figures.ts, src/render/gesture.ts
-  (fillPose), src/scenes/place/PlaceLife.tsx (ErrandVillagers, head/hand jar meshes ~2440-2612,
-  HEAD_CARRY_POSE), scripts/verify/polish.mjs (adult-errands), design.md §13.4,
-  docs/communication-poc-spec.md, points 1085, 1086, 1065.
-  Doc impact: design.md §13.4 and docs/communication-poc-spec.md where they describe the
-  errand: the carrier dips the jar at the waterline and carries visible water back, plus the
-  no-villager-speaks-to-nobody rule and the accepted WATER reading. balance.ts: fill seconds
-  and stand capacity (calibratable).
-  Bundle: Dorfleben.
-
 - [ ] 1072. The village speaks with a direction, and the children sound like children (user
   07.09.2026, deciding the first two of the six shore-call aspects).
   Measured 07.09.2026: `src/` holds no `PannerNode`, `createPanner`, `StereoPanner` or
@@ -1325,6 +1085,100 @@ put it is the mistake this line exists to stop.
   that /v0.3/ and /poc/ serve the new state, and FREEZE the tag: it is never
   re-pointed.
 
+- [ ] 1116. Repair pre-existing crossbrowser check: chromium-mobile no console errors on
+  mobile (filed automatically by a LARGE run on 12.09.2026 under point 1089's ownership
+  rule; the user ordered these three reds filed at once on 10.09.2026).
+  MEASURED 12.09.2026, and it corrects this point's own first draft. Against the dev
+  server the crossbrowser suite uses (run-all launches `npm run dev`, not preview), at
+  standard depth, on a COLD vite dependency cache:
+    PASS  chromium-mobile the app boots on a mobile viewport
+    PASS  chromium-mobile the renderer initialises on mobile
+    PASS  chromium-mobile the touch layer arms on the first touch (stick + look)
+    FAIL  chromium-mobile no console errors on mobile
+          — Failed to load resource: the server responded with a status of
+            504 (Outdated Optimize Dep)   (twice)
+  The IMMEDIATELY following run, same command, warm cache: ALL GREEN, exit 0.
+  So the cause is NOT a renderer crash and NOT getSupportedExtensions on null — that
+  reading was wrong. Mobile boots, the renderer initialises and the touch layer arms.
+  The single red is vite's dev-server dependency pre-bundling race: when the optimizer
+  re-bundles mid-load, in-flight requests for the superseded chunks answer 504, the page
+  logs them as resource errors, and the no-console-errors assertion trips. A production
+  build has no optimized-dep chunks at all, so NO PLAYER can meet this.
+  Final state: the crossbrowser pass no longer reds on the optimizer's own 504. Settle
+  vite's dependency optimization before the browser pass (or let the harness treat a
+  504 "Outdated Optimize Dep" as the reload signal vite means it to be), so that a cold
+  cache and a warm one give the same verdict. Prove it by running the suite at standard
+  depth TWICE FROM A COLD CACHE (delete node_modules/.vite between runs) and getting
+  the same green both times — a single warm run proves nothing here.
+  Test. Vitest: the console-error filter classifies a 504 "Outdated Optimize Dep" as the
+  optimizer's reload signal and a genuine resource error as a failure.
+  Criticality: LOW, corrected from HIGH on the measurement above. It is a cold-cache
+  flake in the verify harness, not a mobile lane that fails to boot. It still has to be
+  fixed rather than tolerated: it is one of the reds that held point 1065 across 23 LARGE
+  runs, and a gate that reds on its own server's cache state teaches the batch to ignore
+  reds.
+  Observed 10.09.2026: this red held point 1065 across 23 full LARGE runs without ever
+  touching its change. This point owns it.
+  Refs: scripts/verify/crossbrowser.mjs, scripts/verify/run-all.mjs (the dev server the
+  pass uses), point 1089, point 1065.
+  Bundle: Testinfrastruktur.
+
+- [ ] 1117. The fill's decided surface reading was never built (found 12.09.2026 while building
+  point 1087).
+  design.md §13.4 states two things about the dip that NO code produces: the jar's MOUTH is
+  "tilted at the surface, never the vessel", and "the surface answers the dip with a spreading
+  ring instead". Measured 12.09.2026 on feat/1087-carrier-fills-the-jar: `fillPose`
+  (`src/render/gesture.ts`) swings the carrying arm down and REDUCES its roll
+  (`roll: REST_POSE.left.roll * (1 - down * 0.9)`), so the jar becomes MORE upright through the
+  dip rather than tipping its mouth into the water; and no ring, ripple or surface disturbance
+  exists anywhere for the fill.
+  WHY IT IS ITS OWN POINT. Point 1085 made the design decision and wrote it into design.md.
+  Point 1087 built the act, its phase, its hold and the geometry the check measures, and its
+  spec says in so many words that it does NOT owe the legibility of the pose. So the decided
+  half of 1085 stands unbuilt while the document asserts it — a document describing behaviour
+  the game does not have.
+  WHY IT MATTERS NOW rather than when it was decided: until 1087 the dip did not happen at the
+  water at all, so neither the tilt nor the ring had anything to sit on. They do now.
+  Final state: the jar's mouth tips at the surface through the dip (the vessel itself never
+  proved to be under an opaque surface, which is what 1085 ruled out), and the water answers
+  with a spreading ring at the fill spot for the length of the hold. Both calibratable in
+  `src/config/balance.ts`. Where neither can be made to read, design.md §13.4 is corrected to
+  say what the game does instead — the document and the code agree at the end either way.
+  Test. Vitest: the fill pose's jar tilt grows with the dip rather than shrinking, and the ring
+  is alive exactly while the fill phase is. Browser (LARGE, both backends — the water surface is
+  backend-sensitive): the `polish --section=adult-errands` fill frame, judged by a reader told
+  only "what is this man doing?".
+  Criticality: LOW — the errand already reads as fetching water from the stand, the walk and the
+  visible full jar; this sharpens the moment of the dip itself.
+  Refs: design.md §13.4, src/render/gesture.ts (`fillPose`), src/scenes/place/PlaceLife.tsx,
+  scripts/verify/polish.mjs (`adult-errands`), points 1085, 1087.
+  Bundle: Dorfleben.
+
+- [ ] 1118. The board's currency check is blind to everything but the set of open point numbers
+  (found 12.09.2026; the user had reported the symptom).
+  `scripts/board-publish.mjs --check` compares only the fingerprint from `board-currency-core.mjs`,
+  and that fingerprint is EXCLUSIVELY the set of open point numbers (`normaliseOpenSet`). The
+  status line, the "Stand" time, every card's text and the queue's order are not in it.
+  MEASURED 12.09.2026 around 16:5x: the live page carried "Stand 14:24" while the local
+  `.batch-dashboard.html` carried "Stand 15:13", with different card text and point 1116 in a
+  different position — and `--check` still reported CURRENT (work order sha256:ff3f2beaacd8702c
+  == live page). The user reported it himself; a hard refresh with the cache cleared still showed
+  14:24.
+  WHY IT IS WORKED ON UNDER THE INFRASTRUCTURE FREEZE: it permits a false approval. Every gate
+  reports the board current while the user reads an arbitrarily old one on his phone, which is
+  the exact case the engmaschig rule exists for.
+  Final state: `--check` compares what the reader actually sees. The file hash already exists in
+  `board-publish.mjs` as `sha256(repoBytes)`; either the fingerprint takes in the now-card's
+  "Stand" line as well, or `--check` compares that hash beside the open-point set. A stale status
+  line makes the check say so.
+  Test. Vitest: a board that differs only in its status line or its "Stand" time is reported
+  BEHIND, not CURRENT.
+  Criticality: LOW by player impact, but it is the reason a stale board went unnoticed for
+  388 minutes.
+  Refs: scripts/board-publish.mjs, scripts/board-currency-core.mjs (`normaliseOpenSet`),
+  docs/batch-autonomy.md.
+  Bundle: Testinfrastruktur.
+
 - [ ] 1108. The fill's proof frame measures its neighbours BEFORE they walk, so a green suite
   can still certify a picture with no readable subject.
   MEASURED 11.09.2026 on main at 72114fb3, in the covering runs of point 1085 on BOTH lanes:
@@ -1357,6 +1211,20 @@ put it is the mistake this line exists to stop.
   WHY IT IS A POINT AND NOT A BACKLOG LINE: it permits a false approval. The suite certifies
   a proof frame whose subject is not readable, which is exactly the vanished-subject pitfall
   this repository recorded on 11.09.2026, and point 1087 owes a frame of this same act.
+  THE SAME CLASS, FOUND AGAIN ON 12.09.2026 while point 1087 was being reviewed, in TWO more
+  places in the same section — so the fix belongs here rather than being repaired shot by shot:
+  - THE RETURN CAPTURE ASSERTS A STALE SAMPLE. `holdStill()` sets the errand pace to 0.5 and
+    leaves movement ON, and the return shot samples the carrier's position and cargo, then
+    advances another frame before the shutter and asserts the SAMPLED `still.carry`. A carrier
+    who delivers his jar between the measurement and the exposure is photographed empty-handed
+    while the check passes.
+  - A CLEAR MIDPOINT IS NOT TWO VISIBLE MEN. The order shot raycasts `placeCamera` at the
+    MIDPOINT between sender and carrier, so a post standing in front of either man leaves that
+    midpoint clear and the bearing is accepted. Both participants and the stand have to be
+    visible, not the empty air between them.
+  Both are the same defect as the one above — a frame judged on a state that was true before
+  the shutter rather than at it — and the final state below covers them: the clearance and the
+  cargo are measured AT the shutter, and a bearing that has gone stale is re-chosen.
   Criticality: medium — no player impact; it costs the picture proof its meaning, and it sits
   directly in front of point 1087.
   Bundle: Dorfleben.
@@ -9169,6 +9037,22 @@ to land than a mechanism that needs a review.
   the one point 514 already states for its own instance — the wait after a jump POLLS the
   camera having arrived rather than counting milliseconds. Both frames are charged to this
   point in `scripts/render-verify-charges.mjs`, each scoped to `world`/WebGPU.
+  MEASURED A THIRD TIME 13.09.2026, on main at 49cef70ee645, and this round carries the
+  DETAIL the earlier records lack. Two `baseline-classify.mjs world` runs on a quiet machine
+  (load 0.35 over sixteen cores) both red on `11-worldmodel-khartoum-confluence` with the same
+  wording, while the other six landmarks pass in both — the rotation stands, and point 995,
+  which owns making these entries narrowable at all, now has a recorded measurement to narrow
+  this one by.
+  AND THE CHARGE DID NOT REACH THE RED, which is a second thing this point has to carry. The
+  WebGPU world run of 13.09. reported both this frame and the talus pair as UNACCOUNTED, and
+  the reason is structural rather than a mis-filing: the entry is scoped to the compatibility
+  feature level, and a run that records no level — or records `core` — matches no level-scoped
+  charge. Measured against the shipped ledger that day: `chargeFor` on this red answers point
+  627 at `compatibility` and NOTHING at `core` or at no level at all. So a known, owned,
+  reproducible red reads as unowned whenever the world suite does not record the level it drew
+  at, and `render-verify-guard` then blocks on a defect that is already filed. Whatever this
+  point decides about the jump, the world run has to record its feature level, or this entry
+  cannot account for the red it was written for.
   FINAL STATE: the cause is NAMED with evidence — the jump to (-17.9, 25.9) not settling
   before the shutter opens, a camera clamp at that latitude, or a real placement change —
   and fixed at that cause. If it is timing, the frame waits on the STATE the jump reaches,
@@ -15377,6 +15261,23 @@ to land than a mechanism that needs a review.
   reach test reads next to the socket position, so the distance that decided the answer is
   named instead of guessed — `node scripts/throttle-probe.mjs world --section=<the block's
   slug> --runs 8` measures how often it bites.
+  IT IS NOT INTERMITTENT ON MAIN — MEASURED 13.09.2026, and that is cheaper news than the
+  title above. `baseline-classify.mjs world` ran the suite TWICE against 49cef70ee645, main's
+  own tip, on a quiet machine (load 0.35 over sixteen cores), and BOTH presses answered noFit
+  in BOTH runs, word for word as on 08.09.: `said ["Nothing here has a hollow that would take
+  this shape."], spent [], mode travel, dialog null`. The branch it was measured from,
+  feat/1087-carrier-fills-the-jar, had the pair red in only ONE of its two attempts — so
+  "about half the time" is the branch's draw, and on main the defect reproduces every time.
+  The probe this point specifies therefore does not need eight runs to bite: two section runs
+  on main already carry it, which makes the player-versus-harness question above cheap to
+  settle.
+  AND THE FRAME BESIDE IT WAS READ, 13.09.2026, which narrows that question from the other
+  side. `20-worldmodel-bandiagara-talus-foot` — taken between the two presses, at travel zoom
+  0.25 — shows the traveller standing under the "Unknown ruins" label with the rock slab drawn
+  behind him and the Clay Impression in his belt, and it is the same picture as the frame
+  committed before it. So the jump DID put him at the landmark the shutter photographs, while
+  the reach test read a position out of range in the same instant. The two positions are not
+  the same position; that is the measurement this point asked for.
   WHAT IT COSTS. This is the ONE puzzle the PoC can solve end to end, so a fit that
   intermittently refuses is player impact, not only suite noise; and while the red stands
   unowned, `render-verify-guard` blocks every merge in the repository.
@@ -15744,3 +15645,52 @@ to land than a mechanism that needs a review.
   run, and it will do so again on any busy machine.
   Bundle: Testinfrastruktur.
 
+
+- [ ] 1114. Repair pre-existing settings check: first-person ground shows micro-detail
+  (edge energy) (filed automatically by a LARGE run on 12.09.2026 under point 1089's
+  ownership rule; the user ordered these three reds filed at once on 10.09.2026).
+  The first-person ground-detail frame shows measurable micro-detail and passes its
+  edge-energy assertion. Diagnose and fix the rendering, staging or check defect responsible
+  for the recurring red; preserve a meaningful assertion and add regression coverage. Prove
+  settings --section=ground-detail, then the full settings suite on the affected backend.
+  Observed 10.09.2026: point 1065 spent 23 full LARGE runs and 16.2 machine hours with no
+  green run, and none of the recurring reds touched its own change. This point owns the
+  settings red.
+  Refs: scripts/verify/settings.mjs, point 1089, point 1065.
+  Bundle: Testinfrastruktur.
+
+- [ ] 1115. Repair pre-existing enrichments check: the streamed dressing does not grow over
+  a session at a fixed anchor (filed automatically by a LARGE run on 12.09.2026 under point
+  1089's ownership rule; the user ordered these three reds filed at once on 10.09.2026).
+  Streamed dressing stays bounded over a session at a fixed anchor as required by point 278.
+  Diagnose and repair the recurring dressing-growth failure without weakening the
+  bounded-growth check; add regression coverage. Prove enrichments --section=dressing-growth,
+  then the full enrichments suite on the affected backend.
+  Observed 10.09.2026: this red held point 1065 across 23 full LARGE runs without ever
+  touching its change. This point owns it.
+  Refs: scripts/verify/enrichments.mjs, point 1089, point 1065, point 278.
+  Bundle: Testinfrastruktur.
+
+- [ ] 1119. Repair the arriving runner's contact hold, which reds under load and passes on a
+  quiet machine (filed 12.09.2026 from a SUSPECT retry in point 1087's LARGE run, under point
+  1089's ownership rule).
+  The polish check `the arriving runner is read from ROCK to the far side of its contact hold`
+  (`scripts/verify/polish.mjs` ~4937, `--section=children-bank-game`) reads the hold to its
+  end on a loaded machine as it does on a quiet one, or its frame budget is stated and
+  enforced so a short read fails for a named reason rather than as `ended false`.
+  Measured 12.09.2026, WebGL 2 lane of the LARGE run in the point-1087 worktree: 137 readings,
+  remaining 8.9589 s down to 3.1986 s, `ended false`, heard from 8.57 m against a 10 m radius,
+  one unheard opening before acquisition. The retry of the same suite ran 266 pass / 0 fail,
+  which the runner recorded as SUSPECT — a second pass covers nothing. The session had put
+  its own build, type-check and push gate (15235 unit tests) on the same machine inside that
+  window, so LOAD is the leading hypothesis and is not yet measured.
+  FIRST STEP, before any repair: `node scripts/throttle-probe.mjs polish
+  --section=children-bank-game --runs 8` on a quiet machine. If the probe reproduces the red
+  under load only, the defect is the check's frame budget, not the game. If it reds on a quiet
+  machine too, the arrival hold itself is short and the game owes the fix.
+  The check belongs to point 1106, which is closed, so it cannot take a charge-ledger entry
+  (`scripts/render-verify-charges.mjs` refuses a closed point) — which is why it is its own
+  point.
+  Refs: scripts/verify/polish.mjs (~4878-4960), scripts/throttle-probe.mjs,
+  scripts/render-verify-charges.mjs, point 1106, point 1089, point 1087.
+  Bundle: Testinfrastruktur.

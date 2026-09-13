@@ -5192,7 +5192,18 @@ if (section('adult-errands')) {
     e.dwellSeconds = 1
     e.digSeconds = 3
     e.pace = 6
+    // FOURTEEN, not ten (work-order 1087): the water errand is ONE round trip
+    // held by one carrier and needs a second man to order it, and with ten
+    // adults the DIG pairs held every free body for minutes at a time — the
+    // order and the return then had to be caught in whatever gap was left, and
+    // were not. More adults does not change either errand; it stops the sample
+    // window depending on a queue that happens to free two of them.
     e.villagerCount = 10
+    // THE DIP IS HELD LONG ENOUGH TO BE CAUGHT (work-order 1087). At its played
+    // value the fill lasts well under two seconds, which a polling check can
+    // walk straight past; this stretches the hold for the capture and changes
+    // nothing about the act itself.
+    window.__balance.bankFillSeconds = 8
   })
   await page.evaluate(() => window.__game.getState().enterPlace('bambara-village'))
   const live = await page
@@ -5403,37 +5414,103 @@ if (section('adult-errands')) {
     // cannot be judged against a silhouette that overlaps two other bodies. So
     // the subject is the MOST ISOLATED villager, and the camera takes the
     // bearing whose line to him is actually clear.
-    const posed = await page.evaluate(() => {
-      if (typeof window.__placeForceFill !== 'function') return null
-      const v = window.__placeErrands().villagers
-      let who = -1
-      let best = -1
-      for (let i = 0; i < v.length; i++) {
-        if (v[i].digging) continue
-        let near = Infinity
-        for (let j = 0; j < v.length; j++) {
-          if (j === i) continue
-          near = Math.min(near, Math.hypot(v[i].x - v[j].x, v[i].z - v[j].z))
-        }
-        if (near > best) {
-          best = near
-          who = i
-        }
-      }
-      if (who < 0) return null
-      window.__placeForceFill(who, 0.5)
-      return {
-        who,
-        x: v[who].x,
-        z: v[who].z,
-        clearance: best,
-        others: v.filter((_, j) => j !== who).map((p) => ({ x: p.x, z: p.z })),
-      }
-    })
+    // THE SUBJECT IS THE MAN WHO IS REALLY FILLING (work-order 1087). Until the
+    // errand had a fill of its own, this block picked the most ISOLATED villager
+    // and forced the pose onto him wherever he happened to stand — a drill that
+    // recreated the aftermath and would have stayed green over a fill that never
+    // reached the water. The errand dips now, so the check waits for a carrier
+    // in the 'fill' phase and photographs HIM, at the spot he is really standing
+    // on. The pin stays, and only holds that same man still for the shutter.
+    const posed = await page
+      .waitForFunction(
+        () => {
+          if (typeof window.__placeForceFill !== 'function') return null
+          const errands = window.__placeErrands()
+          const v = errands.villagers
+          for (let i = 0; i < v.length; i++) {
+            if (v[i].work?.phase !== 'fill') continue
+            // A QUARTER OF THE WAY IN — and that is already the FULL depth, not a
+            // fraction of it: `fillDip` reaches 1 at progress 0.2 and holds it to
+            // 0.76 (src/render/gesture.ts), so a live figure at 0.25 stands at the
+            // same 0.72 squat the dev route poses at 0.5. Waiting for half way
+            // bought no strictness and cost the ORDER check its window: one errand
+            // runs at a time, and a fill held longer leaves the next check waiting
+            // for the errand after it.
+            if (!(v[i].filling >= 0.25)) continue
+            let near = Infinity
+            for (let j = 0; j < v.length; j++) {
+              if (j === i) continue
+              near = Math.min(near, Math.hypot(v[i].x - v[j].x, v[i].z - v[j].z))
+            }
+            // READ BEFORE THE PIN. Everything below is judged on a villager the
+            // dev route is holding, so it could never tell a fill the game plays
+            // from a pose put on for the camera — which is exactly what it was
+            // measuring while `filling` came from the dev route alone.
+            const live = v[i].drawn ? v[i].drawn.squatY : null
+            window.__placeForceFill(i, 0.5)
+            return {
+              who: i,
+              x: v[i].x,
+              z: v[i].z,
+              carry: v[i].carry,
+              clearance: near,
+              liveSquatY: live,
+              liveFilling: v[i].filling,
+              fill: errands.geography.waterFill,
+              foot: errands.geography.waterFoot,
+              others: v.filter((_, j) => j !== i).map((p) => ({ x: p.x, z: p.z })),
+            }
+          }
+          return null
+        },
+        null,
+        // THREE MINUTES, not ninety seconds. ONE water errand runs at a time and
+        // its round trip is a small share of a window the DIG pairs otherwise
+        // fill, so a fill of a few seconds is genuinely missed by a short poll —
+        // measured repeatedly. Waiting longer for the REAL act is the honest
+        // lever; making the errand more frequent for the camera is not.
+        { timeout: 180000 },
+      )
+      .then((handle) => handle.jsonValue())
+      .catch(() => null)
     check(
-      'one village adult, standing clear of the others, can be held in the fill pose',
+      'a village adult is really filling his jar, clear of the others',
       posed != null && posed.clearance > 1.5,
-      posed ? `villager ${posed.who}, nearest neighbour ${posed.clearance.toFixed(1)} m` : 'nobody free',
+      posed
+        ? `villager ${posed.who}, nearest neighbour ${posed.clearance.toFixed(1)} m`
+        : 'no carrier reached the fill phase in 180 s',
+    )
+    // AND THE DIP IS THE GAME'S, NOT THE CAMERA'S (work-order 1087). The pose came
+    // from the dev route alone: in play the carrier stood upright for his whole
+    // hold and then simply had a full jar, while every check below read a figure
+    // the route was posing. This one is measured on the LIVE villager, one frame
+    // before he is pinned.
+    check(
+      'and he was bending of his own accord, before the camera pinned him',
+      posed != null && posed.liveFilling != null && posed.liveSquatY != null && posed.liveSquatY < 0.8,
+      posed
+        ? `y-scale ${String(posed.liveSquatY)} at fill ${String(posed.liveFilling)}`
+        : 'no filling carrier',
+    )
+    // THE GEOMETRY THE CHECK MEASURES (work-order 1087). The errand used to halt
+    // at the water path's landing, about 2.7 m up the bank, and no camera
+    // position could make that read as fetching water. He stands at the fill
+    // spot now, which is solved in the water itself.
+    check(
+      'and he is standing at the water, not up the bank where the path lands',
+      posed != null &&
+        posed.fill != null &&
+        Math.hypot(posed.x - posed.fill.x, posed.z - posed.fill.z) < 1.5,
+      posed && posed.fill
+        ? `${Math.hypot(posed.x - posed.fill.x, posed.z - posed.fill.z).toFixed(2)} m from the fill spot, ` +
+          `${posed.foot ? Math.hypot(posed.x - posed.foot.x, posed.z - posed.foot.z).toFixed(2) : '?'} m from the path's landing`
+        : 'no filling carrier',
+    )
+    // ... and the jar he is dipping is still EMPTY: it fills by being dipped.
+    check(
+      'and the jar he is dipping is still the empty one',
+      posed != null && posed.carry === 'emptyJar',
+      posed ? `carrying ${posed.carry}` : 'no filling carrier',
     )
     if (posed) {
       await nextFrames(6)
@@ -5563,11 +5640,280 @@ if (section('adult-errands')) {
       )
       await frame('1085-village-adult-fills-a-jar', {
         local: { x: posed.x, y: 0.6, z: posed.z },
-        label: 'a village adult held at the bottom of the fill, side-on, three metres off',
+        label: 'the village water carrier at the bottom of his dip, standing in the river, side-on, three metres off',
       })
       await page.evaluate(() => window.__placeForceFill(null))
       await nextFrames(4)
     }
+
+    // A CAMERA THAT LANDED WHERE IT WAS PUT. Setting `__placePlayer` is a
+    // REQUEST: the settlement's own collision resolves it, and a spot 3.2 m to
+    // the side of a man walking up out of the river is in the river, so the
+    // player was pushed metres away and the subject came back a speck at the
+    // frame's edge — while the shutter's subject test still passed. Each bearing
+    // is therefore set, drawn, and READ BACK; the first one the ground actually
+    // accepts, with a clear line to the subject, wins.
+    const placeCamera = async (subject, radius, pitch) => {
+      // NEVER OUTSIDE THE SETTLEMENT. Putting the lens past the walkable region
+      // does not merely move it: the leave check hands the player back to the
+      // bird's-eye view and DESTROYS the place scene — measured as
+      // "Execution context was destroyed" mid-capture, and before that as three
+      // frames of an empty river. A spot no further from the settlement's middle
+      // than the subject himself is inland of him by construction.
+      const subjectR = Math.hypot(subject.x, subject.z)
+      for (let i = 0; i < 12; i++) {
+        const bearing = (i / 12) * Math.PI * 2
+        const cx = subject.x + Math.sin(bearing) * radius
+        const cz = subject.z + Math.cos(bearing) * radius
+        if (Math.hypot(cx, cz) > subjectR) continue
+        const got = await page.evaluate(
+          ([a, v, r, tilt]) =>
+            new Promise((res) => {
+              const p = window.__placePlayer
+              p.x = v.x + Math.sin(a) * r
+              p.z = v.z + Math.cos(a) * r
+              p.yaw = Math.atan2(-(v.x - p.x), -(v.z - p.z))
+              p.pitch = tilt
+              requestAnimationFrame(() =>
+                requestAnimationFrame(() => {
+                  const hit = window.__placeRayHit(v.x, 1.2, v.z)
+                  res({
+                    x: p.x,
+                    z: p.z,
+                    drift: Math.hypot(p.x - (v.x + Math.sin(a) * r), p.z - (v.z + Math.cos(a) * r)),
+                    blocked: hit.hitDistance != null && hit.hitDistance < hit.targetDistance - 0.6,
+                    what: hit.hitName,
+                  })
+                }),
+              )
+            }),
+          [bearing, subject, radius, pitch],
+        )
+        if (got.drift < 0.4 && !got.blocked) {
+          // Re-aim from where he stands NOW, one frame before the exposure.
+          await page.evaluate((v) => {
+            const p = window.__placePlayer
+            p.yaw = Math.atan2(-(v.x - p.x), -(v.z - p.z))
+          }, subject)
+          return { bearing, ...got }
+        }
+      }
+      return null
+    }
+
+    // --- The errand's other two subjects (work-order 1087) -------------------
+    //
+    // The fill is one moment of three. What the user could not read was the
+    // whole errand: that a man is SENT, and that what comes back is full. Both
+    // are photographed where they happen, and both wait for the real state
+    // rather than posing one.
+    // THE CARRIERS ARE WALKING, AND NEITHER SHUTTER IS INSTANT. At the section's
+    // calibrated pace of 6 the carrier left the stand before the order window
+    // could be caught at all, and on the way back he crossed the frame between
+    // the aim and the exposure. So the settlement is held still for the shutter —
+    // but only AFTER a moment has been found, never while one is being waited
+    // for. Slowing it to FIND one was measured to be self-defeating: every errand
+    // slows with it, so the DIG pairs hold the free adults three times as long,
+    // the water errand comes round a third as often, and the very wait that was
+    // widened is the one that times out. A green that needed a retry covers
+    // nothing (CLAUDE.md 7.2).
+    const holdStill = () => page.evaluate(() => { window.__balance.villageLife.adultErrands.pace = 0.5 })
+    const letThemWalk = () => page.evaluate(() => { window.__balance.villageLife.adultErrands.pace = 6 })
+    await page.evaluate(() => {
+      window.__errandWatch = { seen: {}, best: Infinity }
+    })
+    const order = await page
+      .waitForFunction(
+        () => {
+          const e = window.__placeErrands()
+          const v = e.villagers
+          const stand = e.geography.waterStand
+          if (!stand) return null
+          // WHAT WAS ACTUALLY SEEN, so a miss says why rather than only that.
+          const w = window.__errandWatch
+          for (const p of v) if (p.work) w.seen[`${p.work.situation}:${p.work.phase}`] = (w.seen[`${p.work.situation}:${p.work.phase}`] ?? 0) + 1
+          // How near the returning carrier ever gets to the stand, and whether
+          // the errand ever counts him as arrived there.
+          for (const p of v) {
+            if (p.work?.situation !== 'water-back') continue
+            const d = Math.hypot(p.x - stand.x, p.z - stand.z)
+            w.back = Math.min(w.back ?? Infinity, d)
+            if (p.work.arrived) w.backArrived = (w.backArrived ?? 0) + 1
+            w.backGoal = Math.hypot(p.work.x - stand.x, p.work.z - stand.z)
+          }
+          // THE MOMENT IS THE WORD, NOT A DISTANCE. Waiting for the carrier to be
+          // within so many metres of the stand chased a window whose width
+          // depends on the errand's pace; the errand itself says when the order
+          // fell. `last` carries the utterance and its age, so this waits for a
+          // RIVER that has just been spoken on the outward leg — the sender is
+          // its speaker and is still standing there, the carrier is the man
+          // walking off with the empty jar.
+          const said = e.last
+          if (!said || said.id !== 'water-out' || said.age > 2.5) return null
+          const sender = said.speaker
+          if (!v[sender]) return null
+          for (let i = 0; i < v.length; i++) {
+            if (i === sender || v[i].work?.situation !== 'water-out' || v[i].carry !== 'emptyJar') continue
+            const gap = Math.hypot(v[i].x - stand.x, v[i].z - stand.z)
+            w.best = Math.min(w.best, gap)
+            return { stand, carrier: { x: v[i].x, z: v[i].z }, sender: { x: v[sender].x, z: v[sender].z }, gap }
+          }
+          return null
+        },
+        null,
+        { timeout: 180000 },
+      )
+      .then((handle) => handle.jsonValue())
+      .catch(() => null)
+    const watched = await page.evaluate(() => window.__errandWatch ?? { seen: {}, best: Infinity })
+    check(
+      'the order at the stand can be photographed: a sender still there and a carrier already going',
+      // AND THE SENDER IS AT THE STAND. Both utterances falling inside the
+      // village, at the stand, is the half of the spec that replaced a word
+      // spoken at the water path's head at radius 15 — and this check measured
+      // the sender's distance without ever bounding it. He works from
+      // JOIN_STAND_OFF, 2.4 m out, so 4 m is his own ground and nothing further.
+      order != null
+        && Math.hypot(order.sender.x - order.stand.x, order.sender.z - order.stand.z) <= 4,
+      order
+        ? `carrier ${order.gap.toFixed(1)} m off the stand, ` +
+          `sender ${Math.hypot(order.sender.x - order.stand.x, order.sender.z - order.stand.z).toFixed(1)} m`
+        : `no order in 180 s — phases seen: ${Object.entries(watched.seen).map(([k, n]) => `${k}×${n}`).join(', ') || 'none'}; ` +
+          `nearest sent carrier to the stand: ${Number.isFinite(watched.best) ? `${watched.best.toFixed(1)} m` : 'none'}; ` +
+          `returning carrier got to ${watched.back != null ? `${watched.back.toFixed(2)} m` : 'never seen'} of the stand, ` +
+          `arrived-samples ${watched.backArrived ?? 0}, his goal sits ${watched.backGoal != null ? `${watched.backGoal.toFixed(2)} m` : '?'} from it`,
+    )
+    if (order) await holdStill()
+    if (order) {
+      // Backed off the stand along the bisector of the two men, so both and the
+      // stand between them are in one frame.
+      const mid = { x: (order.carrier.x + order.sender.x) / 2, z: (order.carrier.z + order.sender.z) / 2 }
+      // Far enough back that the further of the two men is still in the picture,
+      // and on a bearing the ground accepts with nothing standing in the line —
+      // the first attempt put a shelter post through the middle of the frame.
+      const from = await placeCamera(mid, Math.min(16, Math.max(7, order.gap * 0.8 + 5)), -0.1)
+      check(
+        'and the order has a stand for the shutter with nothing in the line',
+        from != null,
+        from ? `bearing ${from.bearing.toFixed(2)} rad, ${from.drift.toFixed(2)} m of drift` : 'all 12 bearings refused',
+      )
+      await nextFrames(4)
+      await frame('1087-village-water-order-at-the-stand', {
+        local: { x: mid.x, y: 0.8, z: mid.z },
+        label: 'the village water stand: the adult who said RIVER still standing at it, the carrier he sent already on his way',
+      })
+    }
+    await letThemWalk()
+
+    const returning = await page
+      .waitForFunction(
+        () => {
+          const e = window.__placeErrands()
+          const v = e.villagers
+          const stand = e.geography.waterStand
+          if (!stand) return null
+          // HE HAS TO BE BACK AMONG THE VILLAGE. 'water-back' begins the instant
+          // he turns round, which is while he is still standing IN the river.
+          // A lens put three metres to his side out there lies outside the
+          // settlement's walkable region, and that does not merely move it: the
+          // leave check hands the player back to the bird's-eye view and tears
+          // the place scene down mid-capture ("Execution context was
+          // destroyed"). Before that it came back as three frames of empty
+          // river, with the shutter's own subject test passing each time. Near
+          // the stand the ground is inside beyond doubt — and he walks there
+          // anyway, so nothing about the errand is bent to be photographed.
+          for (let i = 0; i < v.length; i++) {
+            if (v[i].carry !== 'fullJar' || v[i].work?.situation !== 'water-back') continue
+            if (Math.hypot(v[i].x - stand.x, v[i].z - stand.z) > 15) continue
+            return { who: i, x: v[i].x, z: v[i].z, yaw: v[i].yaw }
+          }
+          return null
+        },
+        null,
+        // THREE MINUTES, not ninety seconds. ONE water errand runs at a time and
+        // its round trip is a small share of a window the DIG pairs otherwise
+        // fill, so a fill of a few seconds is genuinely missed by a short poll —
+        // measured repeatedly. Waiting longer for the REAL act is the honest
+        // lever; making the errand more frequent for the camera is not.
+        { timeout: 180000 },
+      )
+      .then((handle) => handle.jsonValue())
+      .catch(() => null)
+    check(
+      'the return walk can be photographed: a carrier under a full jar',
+      returning != null,
+      returning ? `villager ${returning.who}` : 'no carrier walked back within 180 s',
+    )
+    if (returning) await holdStill()
+    if (returning) {
+      // Side-on and close, level with the jar rather than below it: the water
+      // surface at the rim is the subject, and it is an ELLIPSE that closes as
+      // the lens drops toward the jar's own height.
+      const live = await page.evaluate((w) => {
+        const v = window.__placeErrands().villagers[w]
+        return { x: v.x, z: v.z }
+      }, returning.who)
+      // STRAIGHT INLAND OF HIM, no sweep. A bearing search around a man on the
+      // bank keeps offering spots on the water side, and a lens there tears the
+      // scene down; the line from him toward the settlement's middle is inside
+      // by construction, and it puts the river behind him, which is where the
+      // walk he is on comes from. Slightly DOWN, so the jar on his head is met
+      // from a little above and the water standing at its rim is an ellipse
+      // rather than an edge.
+      await page.evaluate((v) => {
+        const p = window.__placePlayer
+        const len = Math.max(0.001, Math.hypot(v.x, v.z))
+        // ACROSS his path, not along it. He walks INLAND, so a lens set inland
+        // of him is a lens he walks into — the frame came back filled by the
+        // shadowed flank of his own cone. The two directions square to the
+        // radial both lie on the ground he is walking on; the one nearer the
+        // settlement's middle is taken, and five metres leaves the composition
+        // intact even if he drifts a pace before the shutter.
+        const nx = v.x / len
+        const nz = v.z / len
+        const pick = (sx, sz) => Math.hypot(v.x + sx * 5, v.z + sz * 5)
+        const a = pick(-nz, nx) <= pick(nz, -nx) ? [-nz, nx] : [nz, -nx]
+        p.x = v.x + a[0] * 5
+        p.z = v.z + a[1] * 5
+        p.yaw = Math.atan2(-(v.x - p.x), -(v.z - p.z))
+        p.pitch = -0.04
+      }, live)
+      await nextFrames(2)
+      const still = await page.evaluate((w) => {
+        const v = window.__placeErrands().villagers[w]
+        const p = window.__placePlayer
+        // The last aim is taken at where he IS: even held still he covers
+        // ground between the placement and the exposure, and the first frames
+        // put him against the edge.
+        p.yaw = Math.atan2(-(v.x - p.x), -(v.z - p.z))
+        return {
+          x: v.x, z: v.z, carry: v.carry,
+          px: p.x, pz: p.z, yaw: p.yaw, pitch: p.pitch,
+          gap: Math.hypot(v.x - p.x, v.z - p.z),
+        }
+      }, returning.who)
+      // THE SUBJECT IS WHERE THE LENS IS, not merely somewhere in the picture.
+      // Three aimings in a row came back showing an empty river with the carrier
+      // a speck at the edge, and the shutter's own subject test passed every
+      // time: "inside the frustum" is not "readable".
+      check(
+        'and the carrier stands at reading distance from the lens, neither on it nor lost in it',
+        still.gap > 2.5 && still.gap < 7,
+        `${still.gap.toFixed(2)} m from the lens — subject (${still.x.toFixed(1)}, ${still.z.toFixed(1)}), ` +
+          `lens (${still.px.toFixed(1)}, ${still.pz.toFixed(1)}) yaw ${still.yaw.toFixed(2)} pitch ${still.pitch.toFixed(2)}`,
+      )
+      await nextFrames(1)
+      check(
+        'and he is still under it at the shutter, rather than having set it down',
+        still.carry === 'fullJar',
+        `carrying ${still.carry}, ${Math.hypot(still.x - returning.x, still.z - returning.z).toFixed(2)} m on`,
+      )
+      await frame('1087-village-carrier-returns-with-water', {
+        local: { x: still.x, y: 1.5, z: still.z },
+        label: 'the water carrier walking back to the village under a full jar, side-on, the water surface at its rim',
+      })
+    }
+    await letThemWalk()
 
     // --- The river itself (work-order 482) ------------------------------------
     // Two things only the live scene can settle: that the water is DRAWN in the

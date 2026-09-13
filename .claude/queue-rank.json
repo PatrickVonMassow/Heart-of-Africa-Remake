@@ -1237,18 +1237,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "1087": {
-      "at": "2026-09-10T00:49:31.047Z",
-      "why": "Nutzer-Anordnung 10.09.2026 02:15: das Wasserholen bleibt direkt hinter seiner Designentscheidung und der neuen Pruefleiter statt ans Ende zu wandern",
-      "origin": "user",
-      "place": "ahead"
-    },
-    "1089": {
-      "at": "2026-09-12T08:11:20.834Z",
-      "why": "User order 12.09.2026: ranked directly behind 1113 so the next foreign red is charged automatically instead of recreating the same hand-work.",
-      "origin": "user",
-      "place": "ahead"
-    },
     "1092": {
       "at": "2026-09-10T18:32:34.225Z",
       "why": "Nutzer-Auftrag 07.09.2026, am 10.09.2026 auf bambara-village eingegrenzt und ausdruecklich direkt hinter 1082 eingereiht.",
@@ -1333,15 +1321,62 @@
       "origin": "machine",
       "place": "last"
     },
-    "1113": {
-      "at": "2026-09-12T08:01:48.117Z",
-      "why": "User order 12.09.2026: make the regression markedly faster now without repairing the five defects behind its reds; it stands first because every point behind it pays the doubled pass.",
-      "origin": "user",
+    "1114": {
+      "at": "2026-09-12T10:19:26.026Z",
+      "why": "Testinfrastruktur-Rot ohne Spielwirkung: Nach Punkt 1089 haelt es keinen fremden Punkt mehr fest, also darf es hinten warten.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1115": {
+      "at": "2026-09-12T10:19:26.137Z",
+      "why": "Testinfrastruktur-Rot ohne Spielwirkung: Nach Punkt 1089 haelt es keinen fremden Punkt mehr fest, also darf es hinten warten.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1116": {
+      "at": "2026-09-12T10:20:24.828Z",
+      "why": "Spielfehler: Auf der mobilen Bahn startet die Darstellung gar nicht, und das Rot kann auf keinem anderen Weg schliessen.",
+      "origin": "machine",
       "place": "ahead"
+    },
+    "1119": {
+      "at": "2026-09-12T21:24:19.202Z",
+      "why": "Last is right: it stands beside its siblings 1114/1115/1116, the same class of pre-existing check red filed by a run, and nothing waits on it — the point it was found in (1087) is closed by measuring the load hypothesis, not by repairing this check.",
+      "origin": "machine",
+      "place": "last"
     }
   },
+  "boundary": {
+    "at": "2026-08-21T00:55:14.962Z",
+    "points": [
+      336,
+      553,
+      596,
+      633,
+      659,
+      660,
+      663,
+      690,
+      708,
+      715,
+      719,
+      733,
+      735,
+      736,
+      738,
+      739,
+      746,
+      747,
+      750,
+      759,
+      760,
+      762,
+      764
+    ],
+    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
+  },
   "settled": {
-    "at": "2026-09-12T08:01:48.127Z",
+    "at": "2026-09-13T10:04:29.442Z",
     "points": [
       174,
       184,
@@ -1719,8 +1754,6 @@
       1081,
       1082,
       1084,
-      1087,
-      1089,
       1092,
       1093,
       1094,
@@ -1735,36 +1768,12 @@
       1108,
       1109,
       1111,
-      1113
+      1114,
+      1115,
+      1116,
+      1117,
+      1118,
+      1119
     ]
-  },
-  "boundary": {
-    "at": "2026-08-21T00:55:14.962Z",
-    "points": [
-      336,
-      553,
-      596,
-      633,
-      659,
-      660,
-      663,
-      690,
-      708,
-      715,
-      719,
-      733,
-      735,
-      736,
-      738,
-      739,
-      746,
-      747,
-      750,
-      759,
-      760,
-      762,
-      764
-    ],
-    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   }
 }

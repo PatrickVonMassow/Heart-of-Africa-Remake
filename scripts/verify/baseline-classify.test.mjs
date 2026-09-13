@@ -468,6 +468,10 @@ describe('classifying against the baseline', () => {
 })
 
 describe('the wrapper CLI', () => {
+  it('accepts a structured report destination without mistaking it for a suite', () => {
+    expect(parseWrapperArgs(['--report-file', '/tmp/report.json', 'crossbrowser'])).toMatchObject({ suite: 'crossbrowser', reportFile: '/tmp/report.json' })
+  })
+
   it('reads the suite, the flags and their values, with the safe defaults', () => {
     const a = parseWrapperArgs(['enrichments', '--ref', 'HEAD~1', '--runs', '3', '--failed', 'a herd gathers', '--strict'])
     expect(a).toMatchObject({ suite: 'enrichments', ref: 'HEAD~1', runs: 3, strict: true, keep: false })

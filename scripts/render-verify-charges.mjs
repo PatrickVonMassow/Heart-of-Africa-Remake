@@ -56,46 +56,27 @@
 /** @type {RedCharge[]} */
 export const RED_CHARGES = [
   {
-    point: 1087,
+    point: 1073,
     suite: 'polish',
-    kind: 'check',
-    match: /(the carrier goes INTO the water and dips the jar|comes back with a jar that SHOWS its water|that carry is PHOTOGRAPHED with the jar still on his head|the village keeps a water stand, and the fetched jars are set down on it)/i,
-    // NO detailMatch: as above — each of these prints the distance or the depth
-    // it measured, and the defect is still being fixed.
+    kind: 'console',
+    // SCOPED TO THE DIG SITUATIONS ONLY. The same assert also has a `water-out`
+    // reading, and that one belongs to whoever owns the water errand — it must
+    // stay a real red there, not be swept up by an entry filed for DIG.
+    match: /^console error: \[ASSERT\] adult-atom-lost — dig-(first|second):/i,
     why:
-      'PART B OF 1065 BECAME POINT 1087 ON 10.09.2026 ON THE USER INSTRUCTION, and its reds '
-      + 'move with it. They were charged to 1065 while the two halves shared one branch and '
-      + 'would have become unaccounted the moment 1065 was ticked — the stale-exception death '
-      + 'this ledger is built for, firing on the wrong point. The adult-errands checks were '
-      + 'shed from feat/1065-teaching-hands-touch in 59f40b2a9 and no longer run there at all; '
-      + 'the records they still block are older than that commit. Measured in webgl/polish at '
-      + '2026-09-09T23:55:15.542Z on that branch: 251 pass, 2 fail, both in --section='
-      + 'adult-errands — no carrier was ever seen filling a jar (the closest a walking leg '
-      + 'came to its own goal was 1.15 m against an arrival radius of 1.10 m), and with no dip '
-      + 'seen the open bank could not be located, so no frame of the carry could be taken. The '
-      + 'charge is not a pass: 1087 owes the fill and the carry in the picture on both backends '
-      + 'before it lands, and this entry dies the moment it is ticked.',
-  },
-  {
-    point: 1087,
-    suite: 'polish',
-    backend: 'webgl',
-    kind: 'check',
-    match: /^(one village adult, standing clear of the others, can be held in the fill pose|and a clear line to him exists for the shutter|frame \d+-village-adult-fills-a-jar)$/i,
-    // NO detailMatch: the staging half of the same defect prints a different
-    // measurement every run (which villager, which neighbour distance, which
-    // bearings are blocked), so a signature would only name one draw of it.
-    why:
-      'THE STAGING HALF OF 1087, measured 12.09.2026 in the covering WebGL 2 pass of point 1112 '
-      + '(polish, second attempt: 206 pass, 3 fail). The entry above owns what the carrier DOES '
-      + 'at the water; these three own the step before it — adult-errands could not even hold ONE '
-      + 'adult clear of the others in the fill pose (villager 2, nearest neighbour 0.8 m), all 16 '
-      + 'bearings to him were blocked by another villager in the picture, and the frame it then '
-      + 'took has its subject off the left edge. Same section, same point, same open work: 1087 '
-      + 'owes a carrier who is VISIBLE while he fills, and a jar nobody can photograph is that '
-      + 'debt, not a defect of the render change that happened to be under test. Lane-scoped to '
-      + 'what was measured: the WebGPU pass of the same proof ran polish clean (258 pass, 0 fail), '
-      + 'so nothing here excuses this section on that backend. The charge dies with 1087.',
+      'POINT 1073 NAMES THIS ASSERT BY NAME AND OWNS ITS CAUSE. Its spec states the mechanism in '
+      + 'full: `t.hushed` is set at three places in `adultWork.ts` — the invitation and twice for '
+      + 'the site word — is never taken back inside a running task, and `assertNoOwedWord` excuses '
+      + 'the loss on `task.hushed === true`, so the flag that CAUSES the deferral is exactly the '
+      + 'exemption that lets the word be dropped; since the shore game of point 687 the children '
+      + 'cross the whole village, so "a child can hear" is far more common than the dig-site '
+      + 'placement assumed, and the only way out is the 180 s `errandSeconds` backstop. Measured '
+      + '12.09.2026 in webgpu/polish on feat/1087-carrier-fills-the-jar (60460fdf0): first attempt '
+      + '264 pass, 1 fail and exactly this one console red — "dig-second: villager 3 ran out of '
+      + 'time with his site word unspoken" — and the retry ran clean, which is the intermittency '
+      + 'the hush produces. Nothing in the water errand under test reaches a DIG site word. It is '
+      + 'charged, not excused: 1073 owes the bounded deferral that makes the word fall anyway, and '
+      + 'the charge dies with that point.',
   },
   {
     point: 1078,

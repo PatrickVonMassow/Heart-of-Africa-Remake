@@ -731,7 +731,7 @@ export function createBankGame(
 }
 
 /** The rock at one end of the stretch. */
-export function rockAt(stage: BankStage, end: BankEnd): { x: number; z: number } {
+export function rockAt(stage: Pick<BankStage, 'upstream' | 'downstream'>, end: BankEnd): { x: number; z: number } {
   return end === 'upstream' ? stage.upstream : stage.downstream
 }
 
@@ -783,7 +783,10 @@ export const TOUCH_GAP = 0.002
  * Arrivals supply their own approach bearing instead of the other stone's.
  */
 export function touchStand(
-  stage: BankStage,
+  // ONLY WHAT IT READS: the two rock centres and the drawn flank. Asking for a
+  // whole stage made every caller invent a water point, a boulder and a roaming
+  // quarter it had no use for.
+  stage: Pick<BankStage, 'upstream' | 'downstream' | 'flank'>,
   end: BankEnd,
   blocked?: (x: number, z: number) => boolean,
   approachBearing?: number,

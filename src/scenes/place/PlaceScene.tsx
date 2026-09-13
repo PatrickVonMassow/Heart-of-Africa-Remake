@@ -3386,6 +3386,7 @@ export function PlaceScene() {
           digSites={layout.digSites}
           bank={layout.bank}
           waterPath={layout.waterPath}
+          waterStand={layout.waterStand}
           pen={layout.pen}
           colliders={layout.colliders}
           radius={layout.radius}

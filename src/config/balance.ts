@@ -39,6 +39,19 @@ export interface BalanceConfig {
    *  the boundary ends and the bird's-eye view — where the river is swum and the
    *  current carries him — takes over. Nothing ever HOLDS him at the water. */
   bankWadeDepth: number
+  /** How deep the water stands where a water carrier fills his jar, in metres
+   *  (work-order 1087). The fill spot is solved on the shore profile at this
+   *  depth rather than pinned to a distance, so it stays at the waterline
+   *  whatever the calibratable river width does to it. Ankle-deep: he stands IN
+   *  the water, which is what makes the act read as fetching from the river,
+   *  and far short of `bankWadeDepth`, so filling is never wading. */
+  bankFillDepth: number
+  /** How long the jar stays under, in seconds (work-order 1087) — the readable
+   *  hold between the dip going down and the jar coming up full. */
+  bankFillSeconds: number
+  /** How many filled jars the village water stand holds before a new delivery
+   *  replaces the oldest (work-order 1087). */
+  waterStandCapacity: number
   /** The settlement edge painted on the ground (design.md §2.6, point 352/488):
    *  where the swept, trodden ground gives way to open land. The band's PLACE is
    *  never configured — it sits at the boundary the leave check reads
@@ -878,6 +891,18 @@ export const balance: BalanceConfig = {
   // wading stops being walking. It lands the far edge of the walkable region
   // roughly three metres past the waterline, well inside the drawn shallows.
   bankWadeDepth: 0.7,
+  // Calibratable: 0.12 m is ankle-deep on a grown man — far enough in that the
+  // water is unmistakably around his feet, shallow enough that he is standing
+  // rather than wading. Solved on the profile, it lands the carrier a few
+  // centimetres past the drawn waterline.
+  bankFillDepth: 0.12,
+  // Calibratable: 1.4 s under the surface. Long enough for a player who is not
+  // looking for it to see the jar go down and come up, short enough that the
+  // errand's own timing backstops are untouched.
+  bankFillSeconds: 1.4,
+  // Calibratable: three standing jars. The fourth delivery replaces the oldest,
+  // which is what lets the stand need no consumer.
+  waterStandCapacity: 3,
   placeEdgeBand: {
     // Calibratable: ~8 m of give-way at a slightly softened 0.8 strength —
     // tuned by the operator in play on 27.08.2026: the wider, gentler ramp
@@ -1428,10 +1453,21 @@ export const balance: BalanceConfig = {
       digSeconds: 9, // several strokes of the digging motion, plainly readable
       // Backstop only: a blocked walk lets go instead of pinning. It has to
       // OUTLAST the longest errand the catalogue can order, or the villager is
-      // released halfway and the errand teaches nothing — and the longest one is
-      // now the walk out to the river bank, some forty metres of village away,
-      // at an unhurried 1.25 m/s and around whatever stands in the line.
-      errandSeconds: 180,
+      // released halfway and the errand teaches nothing.
+      // RE-SIZED FOR THE ROUND TRIP. The water errand is no longer the walk OUT
+      // to the bank: one carrier now walks to the stand, on to the water, dips,
+      // and walks the whole way BACK to report. Measured over the three river
+      // villages at twenty seeds each: the worst stand-to-fill leg is 34.8 m, so
+      // the round trip alone is 69.6 m — 55.7 s at this pace — and the carrier's
+      // own walk to the stand comes on top, about 84 s of straight line in the
+      // worst village. At the old 180 s a walk that took twice its straight line
+      // round huts and villagers ran the errand out of time ON THE WAY BACK: the
+      // jar was set down but the report was never spoken, which the WebGPU pass
+      // of 12.09.2026 caught as "water-back: villager 1 ran out of time with his
+      // walk word unspoken". 300 s is 3.6x the measured straight line, and a
+      // genuinely stuck villager is still let go by `stallSeconds` below long
+      // before it. Calibratable (CLAUDE.md §2).
+      errandSeconds: 300,
       // A walk that gets NOWHERE for this long is let go — twenty seconds is
       // many times the longest stretch a legitimate detour round a hut spends
       // without shortening the straight line, and a twentieth of the backstop

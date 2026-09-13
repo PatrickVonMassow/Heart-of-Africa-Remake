@@ -241,7 +241,9 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 - **Messung und Vorschau verunreinigt.** Halbfertiges gilt als ‚fertig'.
   → *Prompt:* „Hol mein Urteil am **veröffentlichten** Stand ein, nie an einem Zwischenzweig, und
-  miss auf einer ruhigen Maschine."
+  miss auf einer ruhigen Maschine. Läuft schon etwas Langes, ist **Vorarbeit nur Lesen** —
+  auch die Aufräumarbeit, die ein Werkzeug gerade von dir verlangt, fährt dieselben Tests
+  und erschlägt deinen Lauf."
 
 - **Der Bericht urteilt über den Versuch, nicht über die Wirkung.** „Erfolgreich“ heißt nicht
   „angekommen“ — und ein fehlgeschlagener Push nennt Arbeit „nur lokal“, die längst drüben liegt.
@@ -589,6 +591,14 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „‚Grün' zählt nur, wenn die schmale Stufe **jünger als der letzte Merge** ist und
   **dasselbe misst** wie die große — sonst sagt sie selbst, dass ihr Grün nichts vorhersagt."
 
+- **Du nimmst einen geteilten Eintrag heraus — was darauf stand, bleibt stehen.** Wer eine
+  Ausnahmeliste oder einen Kulissenwert löscht, sieht den Eintrag, nicht seine Nutzer. Das Rot
+  kommt dann im Tor — und steht das Tor hinter dem Merge, steht auch dein Hauptzweig halb
+  gelandet da.
+  → *Prompt:* „Löschen ist **Umbau**: Entfernst du einen geteilten Eintrag, such im selben Zug,
+  **wer auf ihm steht**. Benutzt eine Testkulisse **lebende Daten**, schreib das über sie. Und
+  fahr das Tor **auf dem Zweig**, nicht dahinter."
+
 - **Der Wächter ist grün und greift nicht** — er sitzt in einer Datei, die euer Ablauf nie aufruft.
   → *Prompt:* „**Tipp den Befehl, mit dem ihr arbeitet**, und sieh ihr beim Feuern zu. Zwei
   Eingänge heißt: **beide** fragen, genau einmal pro Lauf."
@@ -597,6 +607,14 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   dann auf die rote, weil eine Aufgabe nur ganz fertig wird — gespart hat das nichts.
   → *Prompt:* „Bündle nur, wenn beide Hälften **plausibel im selben Lauf** grün werden; bleibt
   eine wiederholt rot, **trenne sie wieder** und liefere die fertige aus."
+
+- **Der Auftrag kam ohne Code zurück — und das war richtig.** Wenn das zweite Modell die
+  Aufgabe zurückweist, statt sie zu bauen, meldet euer Werkzeug einen Fehlschlag: nichts
+  committet, keine Tests grün. Genau dann lohnt sich das Lesen am meisten, denn oft steckt
+  dort ein Widerspruch in eurer eigenen Aufgabenstellung.
+  → *Prompt:* „Wenn die Aufgabe sich nicht widerspruchsfrei bauen lässt, **baue sie nicht** —
+  schreib mir auf, welche Annahme nicht trägt. Eine begründete Zurückweisung ist ein
+  Ergebnis, kein Fehlschlag."
 
 ---
 
@@ -636,4 +654,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 7c8e96b24e731f0698f30213e6c89cbf0f7c41bebf483e54214af5f8841d10c6 -->
+<!-- GUIDE-FINGERPRINT: a4163aba5b65f9a7b3a2acac58bec54752a6eeed67f6661c52438a148b473211 -->
