@@ -59,6 +59,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 11.09. nachts | Die Verweigerung der billigen Sprosse saß in der Wrapper-Datei, während der Einstiegsbefehl, den dieselbe README als gewöhnlich dokumentiert, niemanden fragte — der deckende Lauf des Punktes selbst lief an ihr vorbei; und beim ersten ernsthaften Gebrauch verweigerte sie ihren eigenen Deckungslauf, weil ein Branchwechsel eine mtime bewegt hatte, ohne ein Byte zu ändern (§3.265, Punkt 1086) |
 | 11.09. nachts | Zwei Werkzeuge antworten mit Gewissheit auf Fragen, die sie nie gemessen haben: `ci-gate-verdict.mjs` läuft nur im Runner, ignoriert die Flags eines Handaufrufs und druckt bei leerer Umgebung »CI gate passed« — zweimal geglaubt; `run-wait` erklärt einen gesunden `polish`-Lauf nach 20 Minuten für tot, weil seine Schwelle die Modell-Erwartung von 5m41s statt des eigenen gemessenen Medians von 55 min multipliziert, und befiehlt das Töten (§3.263, Punkte 1099/1101) |
 | 12.09. | Der beauftragte Autor schrieb zweimal nichts und hatte zweimal recht: einmal, weil der Punkttext eine Wortüberlappungs-Heuristik zur Freigabe-Evidenz erklärte, deren eigener Kommentar sagt, ein Nein beweise keine Unschuld; einmal, weil der Unterbau des Punktes ungebaut war. Das Werkzeug meldete beide Male PROBLEMS — »NOTHING WAS COMMITTED«, »gates not green« —, also den Fehlschlag der Spur, wo die Spur genau das getan hatte, wofür sie existiert (§3.266, Punkte 1089/1073) |
+| 13.09. | Ein Punkt zog seine eigenen Rot-Ladungen zurück, wie es die Regel verlangt — zwei Tests standen noch auf ihnen und wurden erst im Tor der LANDUNG rot, als der Merge schon auf main lag: Das Register erzwingt »kein Eintrag ohne offenen Punkt«, niemand erzwingt »kein Test ohne seinen Eintrag« (§3.268). Dieselbe Sitzung wies drei Fremd-Rot nach: gegen die Zweigwurzel gemessen sind alle drei auch auf main rot, und das Rätsel am Schutthang ist dort nicht sporadisch, sondern reproduziert jedes Mal |
 | 12.09. abends | Wiedergänger von §3.231: Der LARGE-Lauf eines Punktes starb nach 6 m 53 s an einem 20-Sekunden-Timeout in einer Unit-Datei — diesmal war der Störer kein fremder Committer, sondern eine PFLICHT derselben Sitzung. Der Stop-Hook forderte wegen einer Parallel-Sitzung `batch-doctor --gate`, und dessen Tor fährt `test:unit`, `build` und `lint` im Hauptbaum, während der Worktree-Lauf mit genau derselben Unit-Suite beginnt. Der Runner druckte sein eigenes Urteil mit — »UNDER LOAD — a timeout failure under load is not evidence of a broken test« —, also wusste er, dass die Maschine nicht ruhig war, und lief trotzdem an. Die In-Flight-Markierung, die es gewusst hätte, liest der Doctor nicht (Backlog 12.09.) |
 | 13.08. | Der Nachprüfer findet eine echte zweite Klippe im geheilten Mechanismus — und jede der fünf gemessenen Kuren verschlechtert gesunde Dörfer stärker, als der Fehler schadet: Befund wird gebucht statt behoben (§3.115) |
 | 20.08. | Der Dokumentschnitt strich Regeln als »von einem Wächter abgedeckt«, ohne einen einzigen Wächter darauf zu prüfen — die Kontextanzeige verschwand, der Nutzer fand es (§3.134); eine vom Nutzer gesetzte Rangfolge wurde in einer Nacht zweimal maschinell überholt, ohne dass irgendwo ein Grund stand (Punkt 614); zwei Werkzeuge derselben Bauart am falschen Ort gemessen — im Hauptbaum gebaut und geprüft, während der Prozess die Arbeit in den isolierten Bereich schickt (§3.137) |
@@ -1527,7 +1528,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Samstag, 12.09.2026, 23:23 · Quellen-Fingerprint: `24d163e65a1b…`
+Zuletzt aktualisiert: Sonntag, 13.09.2026, 12:23 · Quellen-Fingerprint: `a4163aba5b65…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1567,7 +1568,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to the OpenAI lane, GPT-6 Astra), and review is cross-vendor, not Fable-by-default | 6 | hoch | — (Regel/Memory) | ◐ Regel |
 | Iterate on the new feature's OWN test first; the full regression runs once at the end, never as the debugging loop | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 74 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 75 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | wait-command-guard.mjs | ✔ Mechanismus |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | \"Gib ab\" / \"abgeben\" means hand the batch to a SUCCESSOR session so the context does not overflow — it never means pause or stop the batch | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1633,8 +1634,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 96 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 132 Prozess-/Meta-TASKS-Punkte (davon 64 offen).
 
-<!-- RETRO-FINGERPRINT: 24d163e65a1b3fbc1e2a5da26bf7bef19f36e57593e3bf373f9b86809d9c4d85 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-12T21:23:48.404Z -->
+<!-- RETRO-FINGERPRINT: a4163aba5b65f9a7b3a2acac58bec54752a6eeed67f6661c52438a148b473211 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-13T10:23:52.097Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -6779,3 +6780,35 @@ nur die Absicht. Solange das nicht erzwungen wird, gilt die Handregel unverkürz
 ein Lauf misst, ist alles außer Lesen aufgeschoben — auch ein Commit, auch ein Push, auch
 ein Tor, das »nur« vier Minuten dauert. Und ein SUSPECT wird nicht dem Punkt angehängt, der
 gerade läuft, sondern als eigener Punkt gemessen, bevor jemand »Last« behauptet.
+
+
+### 3.268 Die Ladung starb mit ihrem Punkt, ihre Tests nicht
+
+Am 13.09.2026 hat ein Punkt getan, was das Rot-Register verlangt: Er hatte seine Bildschuld
+bezahlt und seine eigenen Einträge daraus zurückgezogen. Das ist keine Nachlässigkeit,
+sondern die Regel — ein Eintrag, der seinen Punkt überlebt, ist genau die veraltete Ausnahme,
+gegen die das Register gebaut ist, und ein eigener Test verweigert jeden Eintrag, dessen
+Punkt der Auftrag nicht mehr offen führt.
+
+Zwei Tests standen aber auf diesen Einträgen. Einer benutzte sie als Kulisse für eine
+Aussage, die mit dem Register selbst nichts zu tun hat — »der Läufer nennt jeden Besitzer
+genau einmal, in numerischer Reihenfolge« —, der andere behauptete zeilenweise, diese
+Einträge würden verrechnen. Beide wurden rot, und zwar erst im Tor der Landung: Der Merge
+lag da bereits auf main. Die Landung hielt korrekt an und ließ keinen Halbzustand zurück,
+aber main trug einen Merge, dessen Abhaken und Push noch ausstanden, und die Reparatur
+musste auf main statt auf dem Zweig passieren.
+
+Die Asymmetrie ist der ganze Fall: Das Register erzwingt die eine Richtung — kein Eintrag
+ohne offenen Punkt — und niemand erzwingt die andere — kein Test ohne den Eintrag, auf dem
+er steht. Wer eine Ladung zurückzieht, sieht die Einträge, die er löscht; er sieht nicht,
+wer sich auf sie stützt. Die Verwandtschaft zu §3.97 ist die Spiegelung: Dort war die
+Zuordnung getroffen und nie ins Register eingetragen, hier ist sie aus dem Register entfernt
+und die Abhängigen blieben stehen.
+
+**Lehre:** Das Zurückziehen einer Ladung ist kein Löschen, sondern ein Umbau — wer einen
+Eintrag entfernt, sucht im selben Zug nach dem, was auf ihm steht, und nimmt es mit. Eine
+Kulisse, die lebende Registerdaten benutzt, schreibt diese Kopplung über sich, damit die
+nächste Rücknahme sie neu ausrichtet statt sie zu zerbrechen. Und das Tor der Landung fährt
+auf dem Zweig, nicht erst hinter dem Merge: Ein Rot, das man vor dem Merge findet, kostet
+eine Reparatur, dasselbe Rot danach kostet zusätzlich einen main, der halb gelandet
+dasteht.
