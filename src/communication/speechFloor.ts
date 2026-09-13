@@ -31,9 +31,11 @@ export class SpeechFloor {
 
   private readonly player: () => { x: number; z: number; active: boolean }
   private readonly now: () => number
-  constructor(player: () => { x: number; z: number; active: boolean }, now: () => number) {
+  private readonly scope: string
+  constructor(player: () => { x: number; z: number; active: boolean }, now: () => number, scope = 'village') {
     this.player = player
     this.now = now
+    this.scope = scope
   }
 
   private audible(source: FloorSource): boolean {
@@ -72,7 +74,7 @@ export class SpeechFloor {
     }
     if (forced) {
       this.forcedCount++
-      devAssert(false, 'adult-atom-lost', () => `${r.name}/${r.word}: forced after ${(now - (queued?.since ?? now)).toFixed(2)}s; overrun situation ${foreign?.name ?? own?.name ?? r.name}${r.blocked ? ' (hush or occupied site)' : ''}`)
+      devAssert(false, 'adult-atom-lost', () => `${this.scope}: ${r.name}/${r.word}: forced after ${(now - (queued?.since ?? now)).toFixed(2)}s; overrun situation ${foreign?.name ?? own?.name ?? r.name}${r.blocked ? ' (hush or occupied site)' : ''}`)
     }
     words?.delete(r.word)
     const next = now + utteranceSeconds(4) + balance.communication.consequenceSeconds

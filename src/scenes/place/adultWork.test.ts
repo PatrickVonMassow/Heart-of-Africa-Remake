@@ -22,6 +22,7 @@ import {
   type AdultWorkView,
   type SpokenWord,
 } from './adultWork'
+import { SpeechFloor } from '../../communication/speechFloor'
 import { utteranceSeconds } from '../../communication/speaking'
 import { balance } from '../../config/balance'
 import { CONCEPT_IDS } from '../../communication/lexicon'
@@ -737,4 +738,48 @@ describe('task lifecycle safeguards', () => {
     for (let t = 0; t < 30; t += 1 / 60) expect(stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)).toBeNull()
     expect(state.last).toBeNull()
   })
+})
+
+
+it('keeps whole adult exchanges exclusive at the player’s ear while other work continues', () => {
+  const v = view(6)
+  v.geography = {
+    waterStand: { x: 2, z: 2 }, waterHead: { x: 4, z: 0 },
+    waterFoot: { x: 6, z: 0 }, waterFill: { x: 7, z: 0 },
+    digSites: [{ x: -5, z: 4, kind: 'pit' }, { x: -5, z: -4, kind: 'postHole' }],
+  }
+  let clock = 0
+  const floor = new SpeechFloor(() => ({ x: 0, z: 0, active: true }), () => clock)
+  v.floor = floor
+  const state = createAdultWork(6, CFG)
+  let active: object | null = null
+  let completed = 0
+  for (; clock < 180; clock += 0.1) {
+    v.villagers.forEach((me, i) => {
+      if (state.tasks[i]) return
+      const x = i * 0.4, z = 0
+      const distance = Math.hypot(x - me.x, z - me.z)
+      if (distance > 0) {
+        const step = Math.min(distance, CFG.pace * 0.1)
+        me.x += (x - me.x) / distance * step
+        me.z += (z - me.z) / distance * step
+      }
+    })
+    walkFrame(state, v, 0.1)
+    const tasks = [...state.tasks]
+    stepAdultWork(state, v, 0.1, CFG, () => 0.5)
+    for (const word of state.emitted) {
+      const owner = tasks[word.speaker]!.speechOwner!
+      if (word.purpose === 'invitation' || word.id === 'water-out') {
+        expect(active).toBeNull()
+        active = owner
+      } else {
+        expect(owner).toBe(active)
+        active = null
+        completed++
+      }
+    }
+  }
+  expect(completed).toBeGreaterThan(5)
+  expect(floor.forcedCount).toBe(0)
 })

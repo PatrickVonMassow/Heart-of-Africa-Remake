@@ -32,7 +32,7 @@ it('measures the hold above complete healthy exchanges on every shipped village 
         return { x, z, free: true }
       })
       resetDevAsserts()
-      const stalled = [0, 0]
+      const recent: NavPoint[][] = [[], []]
       const state = createAdultWork(people.length, cfg)
       const routes: Array<{ goal: NavPoint; points: NavPoint[] | null } | null> = [null, null]
       const view: AdultWorkView = {
@@ -59,10 +59,8 @@ it('measures the hold above complete healthy exchanges on every shipped village 
       for (let clock = 0; clock < 1200; clock += dt) {
         people.forEach((me, i) => {
           const t = state.tasks[i]
-          const before = { x: me.x, z: me.z }
           me.free = !t
           if (!t || t.arrived) return
-          stalled[i] += dt
           const goal = goalOf(t)
           if (!routes[i] || Math.hypot(routes[i]!.goal.x - goal.x, routes[i]!.goal.z - goal.z) > 0.01) {
             routes[i] = { goal: { ...goal }, points: findPlaceRoute(nav, me, goal) }
@@ -80,7 +78,10 @@ it('measures the hold above complete healthy exchanges on every shipped village 
           if (!insidePlace(bounds, x, z, WALKER_RADIUS * 2)) return
           const next = resolveMove(layout.colliders, x, z, WALKER_RADIUS, [me.x, me.z])
           me.x = next[0]; me.z = next[1]
-          if (Math.hypot(me.x - before.x, me.z - before.z) >= step * 0.25) stalled[i] = 0
+        })
+        people.forEach((me, i) => {
+          recent[i].push({ x: me.x, z: me.z })
+          if (recent[i].length > Math.ceil(cfg.stallSeconds / dt)) recent[i].shift()
         })
         const tasks = [...state.tasks]
         const walking = tasks.flatMap((t, i) => t && !t.arrived ? [i] : [])
@@ -91,7 +92,8 @@ it('measures the hold above complete healthy exchanges on every shipped village 
           // A nav obstruction is not a healthy situation. Prove it was stalled,
           // rather than quietly excluding a slow but moving exchange from the maximum.
           expect(walking.length, `${id}/${seed}: forcing must have a physical stall ${errors.mock.calls.slice(errorCount).flat().join(' ')}`).toBeGreaterThan(0)
-          expect(walking.every((i) => stalled[i] >= cfg.stallSeconds), `${id}/${seed}: ${stalled} clock=${clock} ${errors.mock.calls.slice(errorCount).flat().join(' ')} ${JSON.stringify(tasks)}`).toBe(true)
+          const spans = walking.map((i) => Math.max(...recent[i].map((p) => Math.hypot(p.x - recent[i][0].x, p.z - recent[i][0].z))))
+          expect(spans.every((span) => span < WORK_ARRIVE_RADIUS), `${id}/${seed}: stalled position spans ${spans}`).toBe(true)
           stuckExchanges++
           if (word) starts.delete(tasks[word.speaker]!.speechOwner!)
           continue

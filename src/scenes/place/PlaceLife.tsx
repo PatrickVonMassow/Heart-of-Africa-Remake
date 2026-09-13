@@ -135,7 +135,7 @@ import {
 import { PORT_TALKERS, VILLAGE_SPOTS, villageAdultStations, type PlayGround } from './lifeSpots'
 import { drummerFacing } from './chiefWalk'
 import { DRUMMER_SPEAKER_ID } from './chiefPresence'
-import { setDrummerVoice } from './drummerVoice'
+import { queuedDrummerVoice, setDrummerVoice } from './drummerVoice'
 import { buildWedgeCarve } from './wedgeCarve'
 import { figureStance, unplacedInhabitant, type PlaceSpot } from './placement'
 
@@ -1886,15 +1886,19 @@ function Drummer({ x, z, cloth }: { x: number; z: number; cloth: string }) {
   const group = useRef<THREE.Group>(null)
   const gesture = useRef<GestureState>(restGesture())
   const yaw = drummerFacing([x, z])
+  const floor = useContext(SpeechFloorContext)
+  const voice = useMemo(() => floor ? queuedDrummerVoice(floor, { x, z, register: 'talk' },
+    (hut) => speakChiefWord(camera, { x, z, yaw }, hut, group.current, gesture)) : null, [floor, camera, x, z, yaw])
   // His voice, for the use key that is read in PlaceScene (drummerVoice.ts).
   useEffect(() => {
-    setDrummerVoice((hut) => speakChiefWord(camera, { x, z, yaw }, hut, group.current, gesture))
-    return () => setDrummerVoice(null)
-  }, [camera, x, z, yaw])
+    setDrummerVoice(voice?.voice ?? null)
+    return () => { setDrummerVoice(null); voice?.dispose() }
+  }, [voice])
   useFrame((_, rawDt) => {
     const p = pose.current
     if (!p) return
     const beating = useUi.getState().drumPerformance
+    voice?.step(!!beating)
     const elapsed = beating ? (speechClock() * 1000 - beating.startedAt) / 1000 : 0
     const frame = drummerPoseAt(beating?.plan ?? null, elapsed)
     gesture.current = advanceGesture(gesture.current, Math.min(rawDt, 0.1))
@@ -3418,7 +3422,7 @@ export function PlaceLife({
 }) {
   const speechTime = useRef(0)
   useFrame((_, dt) => { speechTime.current += Math.min(dt, 0.1) })
-  const speechFloor = useMemo(() => new SpeechFloor(() => placePlayerPosition, () => speechTime.current), [placeId])
+  const speechFloor = useMemo(() => new SpeechFloor(() => placePlayerPosition, () => speechTime.current, placeId), [placeId])
   let hash = 0
   for (const c of placeId) hash = (hash * 31 + c.charCodeAt(0)) | 0
   const localSeed = (seed ^ hash) >>> 0
