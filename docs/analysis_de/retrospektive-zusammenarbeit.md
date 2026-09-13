@@ -531,6 +531,12 @@ Die Wiederholung prüft nur dann etwas, wenn sich zwischen den beiden Läufen et
 
 **Lehre:** Eine Wiederholung ist erst dann ein Ausschlussverfahren, wenn die vermutete Ursache dazwischen **entfernt** wurde. Ein Tor, das Last als Ursache ausschließen will, muss die Last messen (das tut dieses beim Start bereits) und sie in sein Urteil einrechnen — oder ehrlich sagen, was es gesehen hat: alle Tests bestanden, der Prozess endete trotzdem mit einem Fehler.
 
+**Nachtrag 13.09.2026 — dieselbe Lücke, spiegelverkehrt, und diesmal im Gegenmittel.** Seit Punkt 1089 klassifiziert der volle Lauf ein rot gebliebenes Ergebnis selbst: Er fährt die rote Suite gegen den Abzweigpunkt und entscheidet, ob das Rot dem laufenden Zweig gehört. Am 13.09.2026 meldete er für `feat/1072-village-speaks-with-direction` »REAL REGRESSION (green on baseline, red now)« — das eine Urteil, das fertige Arbeit festhält. Auf dem Zweig war die Prüfung nach 60 496 ms rot, also im vollen Anschlag ihres 60-Sekunden-Fensters, ohne je eine Bewegung gesehen zu haben. Auf der ruhigen Maschine, nachdem der Lauf den Host verlassen hatte, war dieselbe Prüfung bei gleichem Zweig und gleichem Backend **dreimal von dreimal grün** — und der Diff des Zweigs kann sie überhaupt nicht erreichen: zwei Registrierungszeilen sind seine ganze Berührung mit der Prüfmaschinerie.
+
+Die Lücke ist dieselbe wie oben, nur in der anderen Richtung. Die Baseline läuft **nach** dem Zweiglauf, auf einer Maschine, die dieser inzwischen nicht mehr belastet. »Grün auf der Baseline« schließt die Last damit genauso wenig aus, wie »zweimal rot« sie ausschließt: Beide Male wurde die vermutete Ursache zwischen den beiden Messungen nicht konstant gehalten, sondern ist stillschweigend verschwunden. Der Lauf selbst hatte für seinen Zweig-Durchgang »MACHINE STATE UNKNOWN« protokolliert.
+
+**Lehre:** Der Satz oben gilt in beide Richtungen — ein Vergleich zweier Läufe misst die Last mit, ob er will oder nicht. Wer daraus ein Urteil ableitet, liest beide Seiten unter vergleichbarer Last oder benennt die Last, die er nicht ausschließen konnte; ein Mechanismus, der die Maschine nicht lesen kann, darf »unschlüssig« sagen, aber keine Regression behaupten. Bemerkenswert ist, wo der Fehler saß: nicht in einer alten Prüfung, sondern in genau dem Mechanismus, der gebaut wurde, um fremde Rote von fertiger Arbeit zu trennen. Erfasst als Punkt 1120.
+
 ### 3.49 Aufräumen, das durch eine Verknüpfung hindurchlöscht
 
 Sechsunddreißig verwaiste Arbeitsbäume wurden entfernt — eine reine Hygienemaßnahme, deren Zweck es war, vier wirklich offene Zweige wieder sichtbar zu machen. Dabei verschwand `node_modules` im Hauptbaum vollständig: Die Arbeitsbäume enthielten Verknüpfungen dorthin, und das rekursive Löschen folgte ihnen. Der nächste Build meldete „tsc ist nicht erkannt".
@@ -1528,7 +1534,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Sonntag, 13.09.2026, 16:04 · Quellen-Fingerprint: `577d087534bb…`
+Zuletzt aktualisiert: Sonntag, 13.09.2026, 16:24 · Quellen-Fingerprint: `149eaaf10ed0…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1568,7 +1574,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to the OpenAI lane, GPT-6 Astra), and review is cross-vendor, not Fable-by-default | 6 | hoch | — (Regel/Memory) | ◐ Regel |
 | Iterate on the new feature's OWN test first; the full regression runs once at the end, never as the debugging loop | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 75 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 76 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | wait-command-guard.mjs | ✔ Mechanismus |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | \"Gib ab\" / \"abgeben\" means hand the batch to a SUCCESSOR session so the context does not overflow — it never means pause or stop the batch | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1634,8 +1640,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 96 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 132 Prozess-/Meta-TASKS-Punkte (davon 64 offen).
 
-<!-- RETRO-FINGERPRINT: 577d087534bb7ec858382947a2add6092e0de300b98be87205a80a1bddaf7886 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-13T14:04:43.078Z -->
+<!-- RETRO-FINGERPRINT: 149eaaf10ed064f8e58188194fa0598c689b471d3059fd90cf0ebf18ca166ddd -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-13T14:24:26.811Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
