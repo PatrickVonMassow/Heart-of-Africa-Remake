@@ -5,6 +5,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   ADULT_CONCEPTS,
+  assertNoOwedWord,
   ADULT_SITUATIONS,
   carryOf,
   clearTask,
@@ -712,6 +713,52 @@ describe('task lifecycle safeguards', () => {
     const reported = errors.mock.calls.map((call) => String(call[0])).join(' ')
     expect(reported).toContain('[ASSERT] adult-pair-never-met')
     expect(reported).not.toContain('[ASSERT] adult-atom-lost')
+    errors.mockRestore()
+    resetDevAsserts()
+  })
+
+  it('files a withheld word as a loss even after its moment has passed', () => {
+    // THE SIDE DOOR THE REVIEW FOUND. `hushed` answers only for the frame it is
+    // read in, and a word stops being sayable the instant its speaker steps out
+    // of place — a carrier a metre past his stand, a partner who has not arrived.
+    // If the report asked `hushed` at expiry, one such frame before the task ran
+    // out would file a word the village really did withhold as a pair that never
+    // met, which is exactly the blanket excuse this point removed.
+    resetDevAsserts()
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const v = riverless(view(3, undefined, undefined, () => true))
+    const state = stageDig(v)
+    const initiator = initiatorOf(state)
+    putAtGoal(state, v, initiator)
+    stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
+    const t = taskOf(state, initiator)!
+    expect(t).toMatchObject({ owes: true, hushed: true, withheld: true })
+    // His moment passes: the live hush goes out, the debt does not.
+    t.hushed = false
+    assertNoOwedWord(t, initiator)
+    const reported = errors.mock.calls.flat().join(' ')
+    expect(reported).toContain('adult-atom-lost')
+    expect(reported).not.toContain('adult-pair-never-met')
+    errors.mockRestore()
+    resetDevAsserts()
+  })
+
+  it('lets a paid word clear its own history, so the next one starts clean', () => {
+    resetDevAsserts()
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const v = riverless(view(3, undefined, undefined, () => true))
+    const state = stageDig(v)
+    const initiator = initiatorOf(state)
+    putAtGoal(state, v, initiator)
+    stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
+    const t = taskOf(state, initiator)!
+    expect(t.withheld).toBe(true)
+    state.next = Infinity
+    t.age = CFG.errandSeconds - 0.025
+    expect(stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)?.purpose).toBe('invitation')
+    // Paid at the bound. The DIG he now owes at the site was never withheld by
+    // anybody, and must not inherit the last word's record.
+    expect(taskOf(state, initiator)?.withheld).toBeUndefined()
     errors.mockRestore()
     resetDevAsserts()
   })

@@ -99,6 +99,14 @@ export interface AdultTask extends ErrandPoint {
   partner: number | null
   siteIndex: number | null
   hushed?: boolean
+  /** Whether the CURRENTLY owed word has ever been refused a turn. `hushed` is
+   *  only this frame's answer and is cleared the moment the word stops being
+   *  sayable, so it cannot testify to what happened earlier; this survives
+   *  until the word is paid. Without it a word withheld by a child's ear, whose
+   *  speaker then steps out of range for a single frame before his task
+   *  expires, reports as a pair that never met — the blanket excuse this point
+   *  removed, let back in through the side door. */
+  withheld?: boolean
   speechOwner?: object
   pendingWord?: SpokenWord
   /** The villager who ORDERED this errand and who its words are addressed to
@@ -224,12 +232,12 @@ export function assertNoOwedWord(task: AdultTask, index: number): void {
   //    WALKING failure, and naming it as a lost word sends every reader to the
   //    wrong subsystem.
   devAssert(
-    !task.owes || !task.hushed,
+    !task.owes || !task.withheld,
     'adult-atom-lost',
     () => `${task.situation}: villager ${index} ran out of time with his ${task.phase} word withheld`,
   )
   devAssert(
-    !task.owes || task.hushed === true,
+    !task.owes || task.withheld === true,
     'adult-pair-never-met',
     () => `${task.situation}: villager ${index} expired still on his way to the ${task.phase} word; the pair never assembled`,
   )
@@ -336,6 +344,7 @@ function startJointWalk(state: AdultWorkState, initiator: AdultTask, geography: 
     aim: { x: site.x, y: 0, z: site.z },
   }
   delete initiator.hushed
+  delete initiator.withheld
   partner.phase = 'site'
   partner.arrived = false
 }
@@ -395,6 +404,9 @@ function readyWord(state: AdultWorkState, view: AdultWorkView, t: AdultTask, i: 
 function wordConsequence(state: AdultWorkState, view: AdultWorkView, t: AdultTask, i: number): void {
   t.owes = false
   t.hushed = false
+  // The word is paid, so its withholding history ends here and the next word
+  // this task owes starts with a clean slate.
+  delete t.withheld
   delete t.pendingWord
   if (t.phase === 'invite') startJointWalk(state, t, view.geography)
   else if (t.phase === 'site') startDigging(state, t)
@@ -474,6 +486,7 @@ export function stepAdultWork(
           blocked, remaining: cfg.errandSeconds - Math.max(t.age, partnerTask?.age ?? 0), step: dt, ends,
         })
         t.hushed = !allowed
+        if (!allowed) t.withheld = true
         if (allowed) {
           const word = t.pendingWord
           state.emitted.push(word)
