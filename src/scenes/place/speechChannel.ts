@@ -20,6 +20,7 @@ import type { Object3D } from 'three/webgpu'
 import { balance } from '../../config/balance'
 import type { Phrase } from '../../communication/lexicon'
 import {
+  dropFloorLabels,
   dropSpeechLabel,
   expireSpeechLabels,
   noSpeechLabels,
@@ -79,10 +80,24 @@ export function speakOverhead(
   speakerId: string,
   atoms: Phrase,
   anchor: Object3D,
-  options: { seconds?: number; height?: number; now?: number; reach?: number; exclusive?: boolean } = {},
+  options: { seconds?: number; height?: number; now?: number; reach?: number; floor?: boolean } = {},
 ): void {
   const now = options.now ?? speechClock()
-  if (options.exclusive) { anchors.clear(); reaches.clear() }
+  // THE FLOOR CLEARS WHAT THE FLOOR RAISED, and nothing else. Clearing every
+  // label instead swept away the chief's answer to the player — raised outside
+  // the floor and deliberately held for as long as the player needs to read it
+  // — the moment any villager said anything, which is what the picture check
+  // caught: the words were gone from over his head when the shot was taken.
+  let base = expireSpeechLabels(state, now)
+  if (options.floor) {
+    const before = base
+    base = dropFloorLabels(before)
+    for (const label of before.labels) {
+      if (!label.floor || label.speakerId === speakerId || base.labels.some((l) => l.speakerId === label.speakerId)) continue
+      anchors.delete(label.speakerId)
+      reaches.delete(label.speakerId)
+    }
+  }
   anchors.set(speakerId, anchor)
   reaches.set(speakerId, options.reach ?? balance.communication.talk.reach)
   // The height is read from the SPEAKER, here rather than at each call site, so
@@ -91,7 +106,7 @@ export function speakOverhead(
   // figure's own actor record says how tall it is drawn; a speaker that carries
   // none falls back to a grown figure's height.
   const height = options.height ?? speechLabelHeight(markedActorRise(anchor as MarkedNode))
-  publish(showSpeechLabel(options.exclusive ? noSpeechLabels() : expireSpeechLabels(state, now), speakerId, atoms, now, { ...options, height }))
+  publish(showSpeechLabel(base, speakerId, atoms, now, { ...options, height }))
 }
 
 /** The object a speaker is drawn as, or null once it is gone. */

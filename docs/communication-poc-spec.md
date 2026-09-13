@@ -143,6 +143,14 @@ the forcing is reported as a defect naming the situation that overran. A word
 held past its hold is a defect, never an exemption — the hush that causes a
 deferral no longer excuses the lost word.
 
+THE FLOOR CLEARS WHAT THE FLOOR RAISED. One village word at a time is the
+floor's own rule, so the word it grants takes the previous village note down and
+forgets that speaker's figure with it. A note raised OUTSIDE the floor is not the
+floor's to clear: the chief's answer to the player stands for as long as it was
+given, however much the village says meanwhile. Taking every note down instead
+left the chief's head bare the moment any villager spoke, which the picture check
+caught.
+
 Speech falls off sharply and is silent outside the hearing radius. The same
 range decision governs sound, observation, overhead note, and gesture: unheard
 speech teaches nothing and is not silently mimed. Pace, pause, radius, and

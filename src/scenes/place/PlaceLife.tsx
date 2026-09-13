@@ -619,7 +619,7 @@ function speakBankUtterance(
   if (reach.audible) {
     useGame.getState().hearUtterance(utterance)
     if (anchor) {
-      speakOverhead(`kid-${said.speaker}`, [utterance], anchor, { exclusive: true, seconds: speechLabelSeconds(1), reach: options.radius })
+      speakOverhead(`kid-${said.speaker}`, [utterance], anchor, { floor: true, seconds: speechLabelSeconds(1), reach: options.radius })
     }
   }
   // A TOUCH BRINGS ITS OWN ARM. Its hand has to land on a drawn flank, and the
@@ -1864,7 +1864,7 @@ function speakChiefWord(
   if (speechReach(distance).audible) {
     useGame.getState().hearUtterance(utterance)
     if (anchor) {
-      speakOverhead(DRUMMER_SPEAKER_ID, [utterance], anchor, { exclusive: true, seconds: speechLabelSeconds(1) })
+      speakOverhead(DRUMMER_SPEAKER_ID, [utterance], anchor, { floor: true, seconds: speechLabelSeconds(1) })
     }
   }
   // The arm is aimed at the hut's DOOR height rather than its ridge: a man
@@ -3286,7 +3286,7 @@ function speakWork(
   if (speechReach(distance).audible) {
     useGame.getState().hearUtterance(utterance)
     if (anchor) {
-      speakOverhead(`villager-${said.speaker}`, [utterance], anchor, { exclusive: true, seconds: speechLabelSeconds(1) })
+      speakOverhead(`villager-${said.speaker}`, [utterance], anchor, { floor: true, seconds: speechLabelSeconds(1) })
     }
   }
   gesture.current = gestureIfHeard(distance, said.purpose === 'invitation' ? 'beckon' : 'indicate', {
