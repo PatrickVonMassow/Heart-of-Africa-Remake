@@ -2263,14 +2263,30 @@ function Walkers({
   )
 
   // Dev hook for the headless verification (CLAUDE.md §7.2).
+  const heldWalker = useRef<number | null>(null)
   useEffect(() => {
     if (!import.meta.env.DEV) return
     const w = window as unknown as Record<string, unknown>
-    w.__placeWalkers = { states: states.current, homes: defs.map((d) => d.home) }
+    w.__placeWalkers = {
+      states: states.current,
+      homes: defs.map((d) => d.home),
+      // Read the rendered body independently of the surface it should ride.
+      sample: (who: number) => {
+        const s = states.current[who]
+        const g = refs.current[who]
+        return s && g ? {
+          x: s.x, z: s.z, mode: s.mode, pause: s.pause,
+          groundHeight: groundHeight(s.x, s.z),
+          drawn: { x: g.position.x, y: g.position.y, z: g.position.z, visible: g.visible },
+          held: heldWalker.current === who,
+        } : null
+      },
+      hold: (who: number | null) => { heldWalker.current = who },
+    }
     return () => {
       delete w.__placeWalkers
     }
-  }, [defs])
+  }, [defs, groundHeight])
 
   useFrame(({ clock }, rawDt) => {
     const dt = Math.min(rawDt, 0.1)
@@ -2296,6 +2312,8 @@ function Walkers({
       const s = states.current[i]
       const g = refs.current[i]
       if (!s || !g) return
+      // Freeze the observed walking transform through the asynchronous shutter.
+      if (import.meta.env.DEV && heldWalker.current === i) return
 
       if (s.mode === 'inside') {
         settleBody(i, s, false)
