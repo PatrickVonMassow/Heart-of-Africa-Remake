@@ -47,7 +47,36 @@ it('lays no earth outside the mound, and closes its seam', () => {
     }
     // The outer ring really reaches the foot, so the mesh covers the whole mound.
     expect(rim).toBeCloseTo(1, 6)
-    // A closed seam: no two vertices share a position, so lighting has no crease.
+    // A CLOSED SEAM IS A CLAIM ABOUT TRIANGLES, NOT ABOUT POSITIONS. Unique
+    // vertex positions still hold with the wraparound triangles deleted, and
+    // that leaves an open wedge down one side. So count edge incidence: every
+    // interior edge carries two triangles, and the only boundary edges are the
+    // rim's own closed loop.
+    const index = geometry.getIndex()!
+    const edges = new Map<string, number>()
+    for (let t = 0; t < index.count; t += 3) {
+      const tri = [index.getX(t), index.getX(t + 1), index.getX(t + 2)]
+      for (let e = 0; e < 3; e++) {
+        const a = tri[e]
+        const b = tri[(e + 1) % 3]
+        const key = a < b ? `${a}|${b}` : `${b}|${a}`
+        edges.set(key, (edges.get(key) ?? 0) + 1)
+      }
+    }
+    const radius = (i: number) =>
+      Math.hypot((positions.getX(i) - offset) / SPOIL_RADIUS_X, positions.getZ(i) / SPOIL_RADIUS_Z)
+    for (const [, count] of edges) expect(count).toBeLessThanOrEqual(2)
+    const boundary = [...edges].filter(([, count]) => count === 1).map(([key]) => key)
+    let rimCount = 0
+    for (let i = 0; i < positions.count; i++) if (radius(i) > 0.999) rimCount++
+    expect(rimCount).toBeGreaterThan(8)
+    // The rim loop is closed, so it contributes exactly one edge per rim vertex
+    // — and nothing else in the mesh is left open.
+    expect(boundary.length).toBe(rimCount)
+    for (const key of boundary) {
+      for (const v of key.split('|')) expect(radius(Number(v))).toBeCloseTo(1, 6)
+    }
+    // And no vertex is duplicated, so lighting has no crease at the seam.
     const seen = new Set<string>()
     for (let i = 0; i < positions.count; i++) {
       seen.add(`${positions.getX(i).toFixed(6)}|${positions.getZ(i).toFixed(6)}`)
