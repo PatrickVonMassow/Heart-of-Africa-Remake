@@ -1537,7 +1537,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Montag, 14.09.2026, 14:31 · Quellen-Fingerprint: `21914e28d948…`
+Zuletzt aktualisiert: Montag, 14.09.2026, 15:17 · Quellen-Fingerprint: `03b60d374508…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1643,8 +1643,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 96 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 133 Prozess-/Meta-TASKS-Punkte (davon 65 offen).
 
-<!-- RETRO-FINGERPRINT: 21914e28d94856fa695ef782be85feb9a9f5c4a26ced61359cc7594cf3c35208 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-14T12:31:08.134Z -->
+<!-- RETRO-FINGERPRINT: 03b60d3745085cf3b6dcf938c0cb3e09f6e01391b2f2041a850a0377b0fbe492 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-14T13:17:39.128Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -6981,3 +6981,32 @@ die seine Lesart entscheidet — hier das Signal oder ein schlichtes `exitedNorm
 Feld, das nur ins Terminal geht, existiert für jede spätere Sitzung nicht. Das ist dieselbe
 Abkürzung wie in §3.112, eine Ebene tiefer: Dort wurde die Lebendigkeit aus der Buchhaltung
 abgeleitet statt gemessen, hier wird sie gar nicht erst aufgeschrieben.
+
+### 3.201 Zwei Schranken, deren Bedingungen sich gegenseitig ausschließen
+
+Am 14.09.2026 hat die Kontext-Wassermarke die Übergabe verlangt, während der Beweislauf zu
+Punkt 1056 noch lief. Der In-Flight-Wächter hat sie verweigert: Ein Nachfolger könne diesen
+Lauf nicht übernehmen. Er bot vier Auswege an, und keiner griff — ein Testlauf hat keinen
+Checkpoint, die Neu-Deklaration mit Zweig und Arbeitsbaum ändert nichts, Wegwerfen kostet
+zwei Stunden Maschine, und Austrinken heißt: über der Wassermarke weiterlaufen, also genau
+das tun, was die Wassermarke verhindern soll.
+
+Die Ursache ist kein Zufall der Lage, sondern eine Konstruktion. Die Übergabeprüfung
+vergleicht `run.head` gegen `headNow` — und `headNow` ist der HEAD des HAUPTBAUMS, während
+ein Lauf im Worktree eines Punkts immer den HEAD SEINES ZWEIGS trägt. Beide stimmen genau
+dann überein, wenn main und der Zweig auf demselben Commit stehen, also während eines
+laufenden Punkts praktisch nie. Kein noch so guter Nachweis kann diese Bedingung erfüllen.
+Die Schranke fragt nach etwas, das es in der Lage, für die sie geschrieben wurde, nicht
+geben kann.
+
+Der Unterschied zu §3.198 ist wichtig. Dort gaben zwei Wächter einander ein ALIBI — beide
+grün, die Wahrheit dazwischen verloren. Hier ist es das Gegenteil: Beide bestehen auf
+einander ausschließenden Bedingungen, und die Sitzung steht still, bis sie den Widerspruch
+selbst auflöst. Der Preis ist derselbe — die Arbeit wandert von der Sache zur Schrankenpflege
+—, aber die Diagnose ist eine andere: Ein Alibi findet man, indem man die Wächter
+gegeneinander prüft; einen Widerspruch findet man nur, indem man die Bedingung liest.
+
+**Lehre:** Eine Schranke, die eine Übergabe verweigert, muss ihre Bedingung an dem Ding
+messen, um das es geht — hier am Arbeitsbaum, in dem der Lauf läuft, nicht am Hauptbaum.
+Und wo zwei Schranken einander widersprechen, ist das kein Bedienfehler: Es gehört gemessen,
+abgelegt und als Defekt behandelt, statt in jedem Zug neu beantwortet zu werden.
