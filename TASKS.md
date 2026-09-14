@@ -226,6 +226,49 @@ put it is the mistake this line exists to stop.
   `verification/` frames in the point's worktree come from a RED run and are not evidence.
   Bundle: Dorfleben.
 
+- [ ] 1127. A check that declares itself non-predictive still reds the pass and blocks a
+  foreign point (measured 14.09.2026 on point 1056).
+  `scripts/verify/polish.mjs` calls `nonPredictive()` on "a villager is seen digging, and the
+  jar goes down EMPTY and comes back FULL" and states why in its own comment (10.09.2026):
+  "Run alone, the section always saw enough errands... Inside the full suite the same window
+  cast ONE errand, with the fetch phase at 33 of about 2000 phase ticks, and the pass failed
+  here." The declaration reaches the LADDER only (`scripts/verify/ladder-core.mjs` refuses to
+  count the rung as climbed); it does NOT reach the suite's exit code. So the check still
+  fails the pass, the runner promotes it to CANDIDATE REAL FAILURE, and an unrelated point is
+  blocked by a reading its own author declared meaningless.
+  MEASURED, like for like, all on WebGL 2:
+  - merge base f799ad619885, section standalone: 37 and 30 full-jar samples — PASS, twice.
+  - `main` 09b96e7b1, section standalone: 48 and 39 — PASS, twice.
+  - point 1056's merge candidate 781b14a84, section standalone: **50** — PASS
+    (local/verify-logs/2026-09-14T18-56-15-496-polish.log, 2m 08s).
+  - the SAME commit inside the full pass: 0 and 0 — FAIL, twice
+    (local/verify-logs/2026-09-14T15-50-11-451-large.log).
+  The branch matches its own merge base and `main` whenever the two are measured the same
+  way. The split is standalone-against-in-pass, not before-against-after, and the baseline
+  classification cannot see that: it runs the baseline STANDALONE and the candidate IN PASS,
+  then prints "REAL REGRESSION (green on baseline, red now)". That verdict cost point 1056 a
+  day and, with the runs of point 1126, the larger part of 599 minutes of machine.
+  Final state:
+  - A check declared `nonPredictive()` cannot by itself decide the run it is declared
+    non-predictive IN. Either it does not run there, or its reading there does not set the
+    exit code — one of the two, not a third mechanism.
+  - The baseline classification compares like with like, or says out loud that it did not:
+    a baseline measured standalone against a candidate measured in-pass may not be printed as
+    "REAL REGRESSION" without that qualification.
+  - The adult-errands window itself is sized so both runs measure the same thing, or the
+    check stops claiming to. This is the half points 1085 and 1087 left behind when they
+    closed; it has no open owner today, which is why the red had nowhere to be charged.
+  - NOTHING IS WEAKENED: the check keeps its full force standalone, where it discriminates
+    (37/30/48/39/50 against 0), and no other check changes.
+  Criticality: high — a real, measured blockade with a false-approval risk in both
+  directions: a meaningless red blocked a sound branch, and the same path would print
+  "REAL REGRESSION" for any point whose branch merely runs the pass.
+  Refs: scripts/verify/polish.mjs (`adult-errands`, `nonPredictive`),
+  scripts/verify/ladder-core.mjs, scripts/verify/baseline-classify.mjs,
+  scripts/verify/run-all.mjs (the CANDIDATE REAL FAILURE promotion),
+  scripts/render-verify-charges.mjs, points 1085, 1087, 1126
+  Bundle: Testinfrastruktur.
+
 - [ ] 1126. The full proof runs once, and a red repeats only its own rung (user 14.09.2026,
   after asking why a feature costs more verification than development).
   MEASURED ON 14.09.2026, from `local/verify-logs/*.run.json` in every worktree and from
