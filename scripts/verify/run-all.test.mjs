@@ -176,6 +176,17 @@ describe('run-all owned-red retry', () => {
 
 
 describe('LARGE automatically resolves red ownership in its own report', () => {
+  it('surfaces advisory observations without retrying, charging or classifying them as reds', async () => {
+    const advisory = 'NON-PREDICTIVE  jar — 0 with the full one  [NON-PREDICTIVE in full suite: observed fail; sampling differs]'
+    const result = await run({ large: true, suite: 'polish', outputs: [`PASS  another check\n${advisory}`] })
+    expect(result.status).toBe(0)
+    expect(result.attempts).toHaveLength(1)
+    expect(result.classifiedCalls).toEqual([])
+    expect(result.saved[0].reds).toEqual([])
+    expect(result.log).toContain(advisory)
+    expect(result.log).not.toContain('CANDIDATE REAL FAILURE')
+  })
+
   it('classifies and files a pre-existing red, releases that red, and keeps regression exit 1', async () => {
     const result = await run({ large: true })
     expect(result.classifiedCalls).toHaveLength(1)
