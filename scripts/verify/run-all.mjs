@@ -15,7 +15,7 @@ import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { killTree, launchServer } from './_server.mjs'
-import { allChecks, changeRelatedness, countCheckLines, failedChecks, formatRepeatReport, repeatSignature, suiteLaneEnv } from './baseline-classify-core.mjs'
+import { allChecks, changeRelatedness, clearInheritedBaselineLane, countCheckLines, failedChecks, formatRepeatReport, repeatSignature } from './baseline-classify-core.mjs'
 import {
   LEVEL, annotateResult, annotateStageFailure, decideRun, formatLoadReport, onLoadMode,
 } from './machine-load-core.mjs'
@@ -41,6 +41,13 @@ import { classifyRedSuites } from './red-ownership.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const chargedPoints = new Set()
+
+// A REGRESSION PASS IS NEVER THE BASELINE LANE. Dropped from this process's own
+// environment, so no child — suite, retry, cross-browser check or Vitest — can
+// inherit a stale marker and stand a block down where a missing capability IS
+// the regression. Only baseline-classify.mjs writes the marker, on the suites it
+// spawns itself.
+clearInheritedBaselineLane(process.env)
 
 // Hybrid test architecture: the fast, deterministic Vitest layer (jsdom, no
 // browser) runs first (`unit` stage below) and covers all pure logic, store
@@ -221,12 +228,9 @@ function runSuite(name, baseUrl, retryAfter = '') {
     // VERIFY_GL is pinned PER SUITE (point 571): the pass's backend for all but
     // the WebGL2-only ones, which are routed to WebGL 2 rather than dropped — so
     // each suite's own run record names the backend it really opened.
-    // The pass is never the baseline lane, and suiteLaneEnv WRITES that rather
-    // than leaving it to inheritance: a stale marker in the environment would
-    // let a suite stand a block down here, where the missing capability IS the
-    // regression (GPT-6 Astra, cross-vendor review of fea5ce9, 15.09.2026).
     env: {
-      ...suiteLaneEnv({ baselineLane: false, baseUrl, env: process.env }),
+      ...process.env,
+      ...(baseUrl ? { BASE_URL: baseUrl } : {}),
       [RETRY_ENV]: retryAfter,
       VERIFY_GL: laneFor(name, VERIFY_GL),
     },

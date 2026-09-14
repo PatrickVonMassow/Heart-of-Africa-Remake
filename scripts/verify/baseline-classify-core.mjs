@@ -637,3 +637,15 @@ export function suiteLaneEnv({ baselineLane = false, baseUrl = null, env = {} } 
 export function onBaselineLane(env = {}) {
   return env[BASELINE_LANE_ENV] === '1'
 }
+
+// THE PASS DROPS AN INHERITED MARKER ONCE, FOR EVERY CHILD IT WILL EVER SPAWN.
+// Writing the lane at each spawn site is incomplete by construction: run-all
+// also starts the cross-browser check and Vitest, and the next spawn added
+// would inherit the marker again (GPT-6 Astra, confirming review of a175498).
+// Clearing it from the pass's OWN environment covers every child at once,
+// present and future, and leaves the classifier free to WRITE the lane it
+// means on the two suites it spawns itself.
+export function clearInheritedBaselineLane(env) {
+  delete env[BASELINE_LANE_ENV]
+  return env
+}

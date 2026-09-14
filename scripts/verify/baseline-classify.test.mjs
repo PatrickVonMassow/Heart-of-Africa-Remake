@@ -2,6 +2,7 @@
 // (point 294): the repeat signature (same check twice vs different checks), the
 // baseline classification (green→red = regression, red→red = pre-existing), the
 // weak changed-file relatedness, and the printed report.
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
   allChecks,
@@ -19,6 +20,7 @@ import {
   formatRepeatReport,
   normaliseErrorText,
   parseCheckLines,
+  clearInheritedBaselineLane,
   onBaselineLane,
   repeatSignature,
   suiteLaneEnv,
@@ -681,5 +683,48 @@ describe('the baseline lane marker', () => {
       expect(onBaselineLane({ VERIFY_BASELINE_LANE: value })).toBe(false)
     }
     expect(onBaselineLane({})).toBe(false)
+  })
+})
+
+// The pass drops an inherited marker ONCE, for every child it spawns. Writing
+// the lane per spawn site was incomplete: run-all also starts the cross-browser
+// check and Vitest (GPT-6 Astra, confirming review of a175498).
+describe('the pass drops an inherited baseline marker', () => {
+  it('removes the marker rather than overwriting it with a falsy value', () => {
+    const env = { VERIFY_BASELINE_LANE: '1', PATH: '/usr/bin' }
+    clearInheritedBaselineLane(env)
+    expect('VERIFY_BASELINE_LANE' in env).toBe(false)
+    expect(onBaselineLane(env)).toBe(false)
+    expect(env.PATH).toBe('/usr/bin')
+  })
+
+  it('is harmless when there was no marker', () => {
+    const env = { PATH: '/usr/bin' }
+    expect(() => clearInheritedBaselineLane(env)).not.toThrow()
+    expect(onBaselineLane(env)).toBe(false)
+  })
+
+  it('leaves a child spawned from the cleared environment off the baseline lane', () => {
+    const passEnv = clearInheritedBaselineLane({ VERIFY_BASELINE_LANE: '1' })
+    expect(onBaselineLane({ ...passEnv, BASE_URL: 'http://x' })).toBe(false)
+  })
+
+  // THE WIRING, NOT ONLY THE HELPER. Five cases that only exercise the helper
+  // would all stay green if the call were deleted, which is exactly what the
+  // review said about the previous round. The property is "no child of the pass
+  // inherits the marker", and it holds only if the pass clears its OWN
+  // environment before it spawns anything.
+  it('is called by run-all before the pass spawns anything', () => {
+    const source = readFileSync('scripts/verify/run-all.mjs', 'utf8')
+    const cleared = source.indexOf('clearInheritedBaselineLane(process.env)')
+    const firstSpawn = source.indexOf('spawnSync(')
+    expect(cleared).toBeGreaterThan(-1)
+    expect(firstSpawn).toBeGreaterThan(-1)
+    expect(cleared).toBeLessThan(firstSpawn)
+  })
+
+  it('leaves run-all with no baseline-lane write of its own', () => {
+    const source = readFileSync('scripts/verify/run-all.mjs', 'utf8')
+    expect(source).not.toMatch(/VERIFY_BASELINE_LANE\s*:/)
   })
 })
