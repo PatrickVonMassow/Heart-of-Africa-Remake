@@ -26,6 +26,7 @@ import {
 } from './childMotionMetric.mjs'
 import { DIG_PICTURE, digPictureUnmounted, digPictureView, captureSpoilWalk } from './digSitePicture.mjs'
 import { sectionGate } from './sections.mjs'
+import { onBaselineLane } from './baseline-classify-core.mjs'
 import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
 
@@ -6243,14 +6244,14 @@ if (section('adult-errands')) {
   // a silent SKIP would report it as green (GPT-6 Astra, cross-vendor review of
   // 23495d5, 14.09.2026). `baseline-classify.mjs` sets the marker when it spawns
   // the suite inside the baseline checkout, and nothing else sets it.
-  const onBaselineLane = process.env.VERIFY_BASELINE_LANE === '1'
+  const baselineLane = onBaselineLane(process.env)
   const digPictureSupported = await page.evaluate(
     () => typeof window.__game.getState().recordVillageDig === 'function',
   )
-  if (!digPictureSupported && onBaselineLane) {
+  if (!digPictureSupported && baselineLane) {
     console.log('  SKIP  the excavation picture — this BASELINE build has no durable dig record to pose it from')
   }
-  if (!digPictureSupported && !onBaselineLane) {
+  if (!digPictureSupported && !baselineLane) {
     check(
       'the build carries the durable dig record the excavation picture is posed from',
       false,

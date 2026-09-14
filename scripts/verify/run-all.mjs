@@ -15,7 +15,7 @@ import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { killTree, launchServer } from './_server.mjs'
-import { allChecks, changeRelatedness, countCheckLines, failedChecks, formatRepeatReport, repeatSignature } from './baseline-classify-core.mjs'
+import { allChecks, changeRelatedness, countCheckLines, failedChecks, formatRepeatReport, repeatSignature, suiteLaneEnv } from './baseline-classify-core.mjs'
 import {
   LEVEL, annotateResult, annotateStageFailure, decideRun, formatLoadReport, onLoadMode,
 } from './machine-load-core.mjs'
@@ -221,9 +221,12 @@ function runSuite(name, baseUrl, retryAfter = '') {
     // VERIFY_GL is pinned PER SUITE (point 571): the pass's backend for all but
     // the WebGL2-only ones, which are routed to WebGL 2 rather than dropped — so
     // each suite's own run record names the backend it really opened.
+    // The pass is never the baseline lane, and suiteLaneEnv WRITES that rather
+    // than leaving it to inheritance: a stale marker in the environment would
+    // let a suite stand a block down here, where the missing capability IS the
+    // regression (GPT-6 Astra, cross-vendor review of fea5ce9, 15.09.2026).
     env: {
-      ...process.env,
-      ...(baseUrl ? { BASE_URL: baseUrl } : {}),
+      ...suiteLaneEnv({ baselineLane: false, baseUrl, env: process.env }),
       [RETRY_ENV]: retryAfter,
       VERIFY_GL: laneFor(name, VERIFY_GL),
     },

@@ -51,6 +51,7 @@ import {
   failedChecks,
   foldBaselineRuns,
   formatBaselineReport,
+  suiteLaneEnv,
 } from './baseline-classify-core.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -171,18 +172,17 @@ function logDir(mainRoot) {
   return dir
 }
 
-function runSuiteOnce({ suitePath, cwd, baseUrl, label, logPath }) {
+function runSuiteOnce({ suitePath, cwd, baseUrl, label, logPath, baselineLane }) {
   console.log(`# ${label}`)
   const res = spawnSync(process.execPath, [suitePath], {
     windowsHide: true,
     cwd,
     encoding: 'utf8',
-    // THE SUITE IS TOLD IT IS ON THE BASELINE LANE. A suite that stands a block
-    // down because the PRE-change app cannot pose it (the excavation picture,
-    // polish.mjs) must do so HERE and nowhere else: on the candidate the same
-    // missing capability is a regression, and a skip would wave it through
-    // (GPT-6 Astra, cross-vendor review of 23495d5, 14.09.2026).
-    env: { ...process.env, VERIFY_BASELINE_LANE: '1', ...(baseUrl ? { BASE_URL: baseUrl } : {}) },
+    // THIS FUNCTION RUNS BOTH TREES — the first call below measures what is red
+    // on the CURRENT tree — so the lane is a PARAMETER, never a constant here.
+    // What the marker means, and why it is written rather than inherited, is at
+    // suiteLaneEnv in baseline-classify-core.mjs.
+    env: suiteLaneEnv({ baselineLane, baseUrl, env: process.env }),
     timeout: SUITE_TIMEOUT_MS,
     killSignal: 'SIGKILL',
   })
@@ -264,6 +264,7 @@ async function main() {
         suitePath: join(HERE, `${opts.suite}.mjs`),
         cwd: ROOT,
         baseUrl: url,
+        baselineLane: false,
         label: `running ${opts.suite} on the CURRENT tree to see what is red`,
         logPath: join(logDir(tree.mainRoot), `${opts.suite}-current.log`),
       })
@@ -294,6 +295,7 @@ async function main() {
         suitePath: needsServer ? join(HERE, `${opts.suite}.mjs`) : join(tree.dir, 'scripts', 'verify', `${opts.suite}.mjs`),
         cwd: needsServer ? ROOT : tree.dir,
         baseUrl: url,
+        baselineLane: true,
         label: `baseline run ${i}/${opts.runs}`,
         logPath,
       })

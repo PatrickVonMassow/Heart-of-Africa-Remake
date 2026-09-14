@@ -19,7 +19,9 @@ import {
   formatRepeatReport,
   normaliseErrorText,
   parseCheckLines,
+  onBaselineLane,
   repeatSignature,
+  suiteLaneEnv,
 } from './baseline-classify-core.mjs'
 import { parseWrapperArgs } from './baseline-classify.mjs'
 
@@ -641,5 +643,43 @@ describe('an empty-detail check keys the same from a run and from a pasted line'
 
   it('cuts at the FIRST separator when a name carries both forms', () => {
     expect(checkFromName('FAIL  the check — measured 1.02 —').name).toBe('the check')
+  })
+})
+
+// The lane marker decides whether a suite may stand a block down because the
+// PRE-change app cannot pose it. The classifier spawns BOTH trees through one
+// helper, so a constant there exempted the candidate too, and an omitted marker
+// let a stale environment exempt the pass (GPT-6 Astra, review of fea5ce9).
+describe('the baseline lane marker', () => {
+  it('marks the baseline lane and only the baseline lane', () => {
+    expect(onBaselineLane(suiteLaneEnv({ baselineLane: true }))).toBe(true)
+    expect(onBaselineLane(suiteLaneEnv({ baselineLane: false }))).toBe(false)
+  })
+
+  it('writes the candidate lane rather than leaving an inherited marker standing', () => {
+    const inherited = { VERIFY_BASELINE_LANE: '1', PATH: '/usr/bin' }
+    const env = suiteLaneEnv({ baselineLane: false, env: inherited })
+    expect(env.VERIFY_BASELINE_LANE).toBe('0')
+    expect(onBaselineLane(env)).toBe(false)
+    expect(env.PATH).toBe('/usr/bin')
+  })
+
+  it('defaults to the candidate lane when no lane is stated', () => {
+    expect(onBaselineLane(suiteLaneEnv())).toBe(false)
+    expect(onBaselineLane(suiteLaneEnv({ env: { VERIFY_BASELINE_LANE: '1' } }))).toBe(false)
+  })
+
+  it('carries BASE_URL only when there is one, and never loses the lane to it', () => {
+    const withUrl = suiteLaneEnv({ baselineLane: true, baseUrl: 'http://localhost:4173' })
+    expect(withUrl.BASE_URL).toBe('http://localhost:4173')
+    expect(onBaselineLane(withUrl)).toBe(true)
+    expect('BASE_URL' in suiteLaneEnv({ baselineLane: true })).toBe(false)
+  })
+
+  it('reads only the exact marker value as the baseline lane', () => {
+    for (const value of ['0', '', 'true', 'yes', '11', undefined]) {
+      expect(onBaselineLane({ VERIFY_BASELINE_LANE: value })).toBe(false)
+    }
+    expect(onBaselineLane({})).toBe(false)
   })
 })
