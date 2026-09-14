@@ -168,6 +168,24 @@ export const RED_CHARGES = [
       + 'lane, charged here for the lane this evidence measured; the charge dies with that point.',
   },
   {
+    point: 939,
+    suite: 'settings',
+    backend: 'webgpu',
+    featureLevel: 'compatibility',
+    kind: 'console',
+    // THE SAME VITE TRANSIENT REACHING THE SETTINGS LANE. Scoped to its own
+    // suite like every entry here, because the evidence below measured this one.
+    match: /^console error: Failed to load resource: the server responded with a status of 504 \(Outdated Optimize Dep\)/i,
+    why:
+      'MEASURED 14.09.2026 in .claude/render-verify-state.json: the webgpu/settings run of '
+      + '12.09.2026 00:04:47Z (head bf27c94e6) recorded exactly two reds — the ground-detail check, '
+      + 'already owned by point 514, and this 504 console error, which no point owned. It is the '
+      + 'same cold Vite optimize-dep cache re-bundling while the suite pages are open that point '
+      + '939 already owns on webgpu/startup, webgpu/report, webgpu/polish and webgl/polish, and it '
+      + 'came in a night of five settings runs whose other reds are all accounted. Nothing of the '
+      + 'code under test reaches this reading. The charge dies with point 939.',
+  },
+  {
     point: 733,
     suite: 'startup',
     backend: 'webgpu',
