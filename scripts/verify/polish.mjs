@@ -4267,7 +4267,7 @@ if (section('children-bank-game')) {
         // wait before a frame outlasts them. What was really said is measured
         // LIVE above; this only keeps it in the picture.
         await page.evaluate(
-          ({ id, atoms }) => { window.__speech?.speak(id, atoms, 'kid-call', 120) },
+          ({ id, atoms }) => { window.__speech?.speak(id, atoms, undefined, 120) },
           { id: `kid-${called.who}`, atoms: called.atoms },
         )
         const child = await page.evaluate((who) => {
