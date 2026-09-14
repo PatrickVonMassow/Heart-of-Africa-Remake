@@ -827,3 +827,16 @@ guide's ceiling IS the guard's exact measured size and only ratchets down
 size"). So the room must be CUT elsewhere first, the way design.md paid for its
 speech-floor section. Drafted, measured, reverted in 55b12d04e's successor commit rather
 than left half-applied; non-blocking, because the guide is prose nobody's build reads.
+
+## A unit test spends twenty seconds reading the live review history (14.09.2026)
+
+`scripts/mechanism-review-guard.test.mjs` has two cases that scan the REAL review
+history through `gatherMechanismReviewInputs`. Measured 14.09.2026 in isolation:
+23.34 s and 20.60 s. Point 1073's second author raised both to a 60 s per-case
+budget so the unit gate stays green, which is the right unblocking move and was
+accepted in review.
+
+The cost grows with the history, so the budget will be raised again. The test asks
+a question about the guard, not about the archive: a fixture history would answer
+it in milliseconds and would not drift. Non-blocking — noted so the next raise is
+recognised as the third one, not the first.
