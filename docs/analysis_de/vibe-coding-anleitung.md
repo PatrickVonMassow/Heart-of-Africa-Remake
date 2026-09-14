@@ -539,10 +539,17 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 - **Die lange Messung hing am Leben der Sitzung, die sie bestellt hat.** Endet das Fenster, das
   einen langen Prüflauf startete, stirbt er mitten drin — und zwar **wie ein Fehlschlag**:
-  Abbruchcode gesetzt, Fehlerliste leer, Protokoll mitten im Satz zu Ende.
+  Abbruchcode gesetzt, Protokoll mitten im Satz zu Ende. Manchmal ist die Fehlerliste leer;
+  manchmal stehen **echte Rote darin**, die er vor dem Tod noch gefunden hat — und dann sieht
+  der Abbruch aus wie ein regulär durchgelaufener roter Test. Wer das Signal nicht
+  **aufschreibt**, kann diese Roten hinterher **nicht mehr einordnen**: Er glaubt ihnen und
+  sucht Defekte, die es nicht gibt, oder er wiederholt den ganzen Lauf.
   → *Prompt:* „Was **länger dauert als ein Zug**, startest du **abgekoppelt** — im **Werkzeug**,
-  nicht als Merkregel. Ein Lauf ohne Schlussurteil, der **keinen** Fehlschlag nennt, heißt
-  *abgebrochen*, nicht *rot*. Prüffrage: Wessen Tod nimmt diesen Lauf mit?"
+  nicht als Merkregel. Ein Lauf ohne Schlussurteil heißt *abgebrochen*, nicht *rot* — **auch
+  dann, wenn er Fehlschläge nennt**. Und was über einen Lauf entscheidet, gehört in seinen
+  **Datensatz**, nicht nur in die Ausgabe: Ein Feld, das nur ins Terminal geht, existiert für
+  die nächste Sitzung nicht. Prüffrage: Wessen Tod nimmt diesen Lauf mit — und sähe man ihm
+  den Tod morgen noch an?"
 
 - **Die Schranke aus zwei Hälften, von denen nur eine ein Polster bekam.** Dieselbe Messung,
   zwei Kriterien: eins ließ vier von neunzig durchgehen, das andere färbte bei einem rot.
