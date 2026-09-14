@@ -15597,7 +15597,7 @@ to land than a mechanism that needs a review.
   Criticality: medium — no player impact, but a misdiagnosis costs a session, and both of our own
   memories currently point the reader at the wrong counter.
   Refs: docs/batch-owner-runbook.md, scripts/batch-launcher.mjs, scripts/batch-autostart.mjs
-  Bundle: Batch-Infrastruktur
+  Bundle: Session- & Repo-Hygiene
 
 - [ ] 1123. When the batch owner dies mid-verification its run keeps going and nobody harvests the
   receipt (measured 14.09.2026).
@@ -15635,4 +15635,4 @@ to land than a mechanism that needs a review.
   promises a clean release that a pid-dead owner does not deliver.
   Refs: scripts/batch-claim.mjs, scripts/batch-in-flight.mjs, scripts/verify/run-wait.mjs,
   scripts/verify/run-all.mjs
-  Bundle: Batch-Infrastruktur
+  Bundle: Session- & Repo-Hygiene
