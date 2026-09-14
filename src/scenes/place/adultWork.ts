@@ -45,6 +45,8 @@ export interface ErrandPoint { x: number; z: number }
 
 export interface DigSite extends ErrandPoint {
   kind: 'pit' | 'postHole' | 'patch'
+  /** Layout-selected orientation gives the heap and purpose props free ground. */
+  rotation?: number
 }
 
 export interface AdultWorkGeography {

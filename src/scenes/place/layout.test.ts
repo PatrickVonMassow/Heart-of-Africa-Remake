@@ -636,6 +636,19 @@ describe('the village water path (work-order 688)', () => {
 // hut or on a lane teaches nothing — the placement is checked like every other
 // errand target.
 describe('the ground work villagers dig at (work-order 483)', () => {
+  it.each([['bambara-village', 29], ['mandinka-village', 48]] as const)(
+    'keeps both purposes in a narrow anchored space: %s seed %i', (id, seed) => {
+    const layout = buildLayout(id, seed)
+    expect(layout.digSites).toHaveLength(2)
+    expect(layout.digSites.some((site) => site.kind === 'patch')).toBe(true)
+    for (const site of layout.digSites) {
+      expect(site.x * layout.bank!.nx + site.z * layout.bank!.nz).toBeLessThan(0)
+      const heap = spoilCentre(site)
+      expect(standingClear(layout.colliders, heap.x, heap.z, SPOIL_RADIUS_X)).toBe(true)
+      expect(digStandingPlaces(site, (x, z) => standingClear(layout.colliders, x, z, WALKER_RADIUS))).not.toBeNull()
+    }
+  })
+
   it.each(SEEDS)('seed %i: every village has two distinct inland purposes, each on its own spot', (seed) => {
     for (const v of VILLAGES) {
       const layout = buildLayout(v.id, seed)

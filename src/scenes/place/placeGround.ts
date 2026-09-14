@@ -16,7 +16,7 @@ export const SPOIL_RADIUS_X = 1.05
 export const SPOIL_RADIUS_Z = 0.8
 
 export function digSiteRotation(site: DigSite): number {
-  return site.x * 2.3 + site.z
+  return site.rotation ?? site.x * 2.3 + site.z
 }
 
 export function digLocalToWorld(site: DigSite, x: number, z: number): ErrandPoint {

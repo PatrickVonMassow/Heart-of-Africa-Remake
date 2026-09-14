@@ -105,7 +105,7 @@ export interface PlaceLayout {
    * a turned patch at the edge of the worked ground. Digging in the middle of
    * the village square is what made the old picture read as meaningless.
    */
-  digSites: Array<{ x: number; z: number; kind: 'pit' | 'postHole' | 'patch' }>
+  digSites: Array<{ x: number; z: number; kind: 'pit' | 'postHole' | 'patch'; rotation?: number }>
   /**
    * The walkable river bank (work-order 482), where the settlement stands on a
    * river: which way the water lies, which way it runs, and the three points on
@@ -1940,50 +1940,61 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     // Rank all candidates by distance inland, then retain the first that fits
     // its purpose. Riverless villages have no shore half to clear.
     const angle = rand() * Math.PI * 2
-    const candidates: Array<{ x: number; z: number }> = []
-    for (let ring = 0; ring < 40; ring++) {
-      const r = CENTRAL_GROUND_RADIUS + DIG_SITE_RADIUS + ring * 0.4
-      if (r >= radius - 1.5) break
-      for (let bearing = 0; bearing < 96; bearing++) {
-        const a = angle + bearing * Math.PI * 2 / 96
-        const x = Math.cos(a) * r
-        const z = Math.sin(a) * r
-        if (bank && x * bank.nx + z * bank.nz >= -DIG_SITE_RADIUS) continue
-        candidates.push({ x, z })
-      }
-    }
     const inland = (p: { x: number; z: number }) => bank
       ? -(p.x * bank.nx + p.z * bank.nz) : Math.hypot(p.x, p.z)
-    candidates.sort((a, b) => inland(b) - inland(a))
+    const siteCandidates = (radialStep: number, bearings: number) => {
+      const out: Array<{ x: number; z: number }> = []
+      for (let r = CENTRAL_GROUND_RADIUS + DIG_SITE_RADIUS; r < radius - 1.5; r += radialStep) {
+        for (let bearing = 0; bearing < bearings; bearing++) {
+          const a = angle + bearing * Math.PI * 2 / bearings
+          const x = Math.cos(a) * r
+          const z = Math.sin(a) * r
+          if (bank && x * bank.nx + z * bank.nz >= -DIG_SITE_RADIUS) continue
+          out.push({ x, z })
+        }
+      }
+      return out.sort((a, b) => inland(b) - inland(a))
+    }
+    const candidates = siteCandidates(0.4, 96)
     const standable = (x: number, z: number) =>
       Math.hypot(x, z) < radius - WALKER_RADIUS && standingClear(colliders, x, z, WALKER_RADIUS)
-    const placeSite = (kind: PlaceLayout['digSites'][number]['kind']) => {
-      for (const p of candidates) {
+    const placeSite = (kind: PlaceLayout['digSites'][number]['kind'], points = candidates) => {
+      for (const p of points) {
         const { x, z } = p
         if (!belongs[kind](x, z)) continue
         if (!isFree(x, z, 2.4, DIG_SITE_RADIUS) || onLane(x, z, DIG_SITE_RADIUS + 0.4)) continue
         if (digSites.some((s) => Math.hypot(s.x - x, s.z - z) < 6)) continue
         if (toChildren(x, z) < earshot) continue
-        const site = { x, z, kind }
-        const heap = spoilCentre(site)
-        // Reserve room for the whole mound, without adding an obstacle.
-        if (Math.hypot(heap.x, heap.z) + SPOIL_RADIUS_X >= radius - 0.5) continue
-        if (!standingClear(colliders, heap.x, heap.z, SPOIL_RADIUS_X)) continue
-        if (digFurnitureFootprints(kind).some((prop) => {
-          const at = digLocalToWorld(site, prop.x, prop.z)
-          return Math.hypot(at.x, at.z) + prop.radius >= radius - 0.5
-            || !standingClear(colliders, at.x, at.z, prop.radius)
-        })) continue
-        if (!standable(x, z) || !digStandingPlaces(site, standable)) continue
-        digSites.push(site)
-        return true
+        // Turn the whole working arrangement to fit the available ground;
+        // an arbitrary coordinate-derived heap side must not cost a site.
+        for (let turn = 0; turn < 12; turn++) {
+          const site = { x, z, kind, rotation: x * 2.3 + z + turn * Math.PI / 6 }
+          const heap = spoilCentre(site)
+          // Reserve room for the whole mound, without adding an obstacle.
+          if (Math.hypot(heap.x, heap.z) + SPOIL_RADIUS_X >= radius - 0.5) continue
+          if (!standingClear(colliders, heap.x, heap.z, SPOIL_RADIUS_X)) continue
+          if (digFurnitureFootprints(kind).some((prop) => {
+            const at = digLocalToWorld(site, prop.x, prop.z)
+            return Math.hypot(at.x, at.z) + prop.radius >= radius - 0.5
+              || !standingClear(colliders, at.x, at.z, prop.radius)
+          })) continue
+          if (!standable(x, z) || !digStandingPlaces(site, standable)) continue
+          digSites.push(site)
+          return true
+        }
       }
       return false
     }
     // Keep the storage purpose where a compound gives it room; a lane post is
     // the anchored alternative in a dense plan. The planting bed always stays.
-    const anchored = placeSite('pit') || placeSite('postHole')
-    const field = placeSite('patch')
+    let anchored = placeSite('pit') || placeSite('postHole')
+    // A narrow strip beside a compound can fall between the coarse samples.
+    // Refine the search before declaring the purpose impossible; no rule yields.
+    if (!anchored) {
+      const refined = siteCandidates(0.1, 720)
+      anchored = placeSite('pit', refined) || placeSite('postHole', refined)
+    }
+    const field = placeSite('patch') || placeSite('patch', siteCandidates(0.1, 720))
     devAssert(anchored && field, 'dig-site-missing',
       () => `${place.id}: no two inland work sites fit their anchors and safe rim positions`)
 

@@ -3056,11 +3056,8 @@ export function PlaceScene() {
     // One fixed composition order (point 392): the bob stays a POSITION offset
     // on the yaw's right axis, the look a YXZ rotation — so pitching the view
     // never swings the head and the horizon never tilts with it.
-    // The ground he stands on: flat everywhere but on the river bank, where he
-    // walks DOWN the drawn shore into the shallows (work-order 584). Reading the
-    // footing from the same profile the shore is built from is what makes the
-    // wade visible — the head sinks toward the water instead of gliding out over
-    // it — and it is the only way the picture and the walk can agree.
+    // The same surface carries every figure: the bank slopes down into the
+    // shallows and worked earth rises smoothly above the village plateau.
     const footing = placeGroundHeight(ground, p.x, p.z)
     const pose = placeCameraPose(p.x, p.z, EYE_HEIGHT + footing, p.yaw, p.pitch, w.roll, bob.dy, bob.dx + idle)
     camera.position.set(pose.position[0], pose.position[1], pose.position[2])

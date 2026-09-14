@@ -4,7 +4,7 @@ import { digLocalToWorld, placeGroundHeight } from './placeGround'
 
 it('draws the exact walking profile as work grows, at every vertex and site orientation', () => {
   for (const kind of ['pit', 'postHole', 'patch'] as const) {
-    const site = { x: -13.4, z: 8.1, kind }
+    const site = { x: -13.4, z: 8.1, kind, rotation: Math.PI / 3 }
     const geometry = buildDigSpoilGeometry(site)
     for (const dug of [0, 3, 9, 18, 100]) {
       const progress = { dug, strikes: 0 }

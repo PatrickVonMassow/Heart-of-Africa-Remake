@@ -82,3 +82,10 @@ it('throws earth onto the full-grown mound for both excavation sizes', () => {
     expect(end.y).toBeGreaterThan(0.4)
   }
 })
+
+it('uses the layout-selected orientation for the heap and work positions', () => {
+  const s = { ...site, rotation: 0 }
+  expect(spoilCentre(s)).toEqual({ x: s.x + 1.65, z: s.z })
+  const pair = digStandingPlaces(s, () => true)!
+  expect(pair.every((p) => p.x < s.x)).toBe(true)
+})

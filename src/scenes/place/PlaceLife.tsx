@@ -1,4 +1,3 @@
-import { usePlaceGround } from './PlaceGroundContext'
 // Ambient life in places (design.md §19 "village and market life", §2 bustle):
 // villagers cooking and weaving, playing children and goats in villages;
 // porters and traders in the wealthier ports. Inhabitants interact with each
@@ -8,6 +7,7 @@ import { usePlaceGround } from './PlaceGroundContext'
 // carried from the well.
 // Pure animation, no mechanics.
 
+import { usePlaceGround } from './PlaceGroundContext'
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, type ReactNode, type RefObject } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
