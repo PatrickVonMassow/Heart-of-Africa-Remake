@@ -482,7 +482,13 @@ export const LIMITS = {
   // on, which is what a red charge retired with its point does. The long telling stays in the
   // retrospective (§3.268); what is here is the risk in four lines and the prompt in three.
   // Eight lines: 648 -> 656.
-  maxLines: 656,
+  // RAISED 14.09.2026: the sensor entry already forbade deriving life from files, which covers
+  // the log-mtime half of the morning's double failure. What it did not say is that a dead
+  // OWNER is not a dead thing — the queue card declared a running two-backend suite orphaned and
+  // ordered it re-set while it was 43 minutes in. Folded into that entry as one sentence rather
+  // than a new tip, because "measure an actor, not its paperwork" is where a reader looks for
+  // it. The long telling stays in the retrospective (3.272). One line: 656 -> 657.
+  maxLines: 657,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -750,7 +756,9 @@ export const LIMITS = {
   // 13.09.2026: the deleted-shared-entry pitfall justified beside maxLines measures 83 words
   // after its cut — the first draft ran 129 and five risk lines, which the guard refused, so it
   // was tightened rather than bought headroom for: 6233 -> 6316.
-  maxWords: 6316,
+  // 14.09.2026: the dead-owner-is-not-a-dead-thing sentence justified beside maxLines measures
+  // 7 words: 6316 -> 6323.
+  maxWords: 6323,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,
