@@ -473,12 +473,10 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Frag bei jedem Test über einem **erzeugten** Artefakt, **woher die Erwartung kommt**.
   Richtigkeit braucht eine Aussage, die der Erzeuger **nicht selbst herstellt**."
 
-- **Vorher und Nachher wurden verschieden gemessen — und die Maschine machte ein Urteil daraus.**
-  Der alte Stand läuft allein und in Ruhe, der neue mitten im vollen Durchlauf; das Werkzeug
-  nennt den Unterschied trotzdem „Regression", obwohl nur die Messbedingung verschieden war.
-  → *Prompt:* „Bevor du zwei Messungen vergleichst, sag **wie jede erhoben wurde**. Sind die
-  Bedingungen verschieden, ist das Ergebnis **kein Vergleich** — dann miss neu oder schreib die
-  Einschränkung **ins Urteil**."
+- **Vorher und Nachher wurden verschieden gemessen — und die Maschine urteilt trotzdem.** Der alte
+  Stand lief allein, der neue im vollen Durchlauf; „Regression" heißt dann nur „anders gemessen".
+  → *Prompt:* „Vergleichst du zwei Messungen, nenne **wie jede erhoben wurde**; bei verschiedenen
+  Bedingungen ist es **kein Vergleich** — neu messen oder die Einschränkung **ins Urteil** schreiben."
 
 - **Ein Auftrag, den du einer laufenden Sitzung nur zurufst, stirbt mit ihr.**
   → *Prompt:* „Was eine Sitzung überdauern soll, gehört in eine Datei, die dein Werkzeug beim
