@@ -1442,4 +1442,26 @@ export const RED_CHARGES = [
       + 'balance values and play-rock geometry, and touches no wildlife anchoring. The charge dies '
       + 'with 565.',
   },
+  {
+    point: 1121,
+    suite: 'polish',
+    backend: 'webgl',
+    // SHAPE-SCOPED, not measurement-scoped: the frame's subject is a DRIFTING
+    // fleck picked six frames before the shutter, so which edge it leaves by is
+    // the accident and the race is the defect. Scoped to WebGL 2, the only lane
+    // it has ever been measured on; on WebGPU the same check has stayed green on
+    // the first attempt of every recorded pass and must remain a real red there.
+    match: /^frame 482-village-river-bank\b/i,
+    why:
+      'THE RACE POINT 1121 WAS FILED FOR, measured 14.09.2026 on the covering WebGL 2 pass of '
+      + 'point 1073 (local/verify-logs/2026-09-14T01-49-02-197-polish.log, first attempt 221 pass '
+      + '1 fail, subject off the right edge). It is not 1073\'s: that point touches the speech '
+      + 'floor, adult work, dig-site assignment, speech labels and the bank-call block and nothing '
+      + 'in the river, the identical code ran full polish twice on WebGPU green on the FIRST '
+      + 'attempt with this check among them, and throttle-probe polish --section=adult-errands '
+      + '--backend webgl --runs 8 at a quarter of a core left 482 green in all eight while the '
+      + 'skew fell on the fill checks (2/8). The cause is in the check: polish.mjs ~6047 chooses '
+      + 'the fleck nearest the bank, then waits nextFrames(6) before the shutter, and the flecks '
+      + 'drift by design. The charge dies with 1121.',
+  },
 ]
