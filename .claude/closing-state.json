@@ -1,57 +1,57 @@
 {
-  "commit": "1cbd8a1a831063c5ef9c4db5acc3718049e2e5e6",
+  "commit": "151bae68f29dfa71865007b1d50cbf4115d93325",
   "steps": {
     "large-regression": {
-      "evidence": "NOT RUN — WAIVED BY THE USER on 20.8.2026, 19:37:32. He instructed that the poc tag point at the current main and be served at /poc/, was shown that 0 of 13 closing steps stand for 1cbd8a1a8310 and that the state would go out unclosed, and chose the override deliberately. This records the waiver, never a run: no LARGE regression, no cleanup and no acceptance evidence exists for this commit.",
-      "at": "2026-08-20T17:37:32.497Z"
+      "evidence": "WAIVED by the user on 14.09.2026: \"Tagge den aktuellen main-Stand als poc und mache ihn via https://patrickvonmassow.github.io/Heart-of-Africa-Remake/poc/ zugaenglich. In diesem Fall ist kein Closing-Durchlauf notwendig.\" The poc tag mirrors main 151bae68f29d as-is; no closing cycle was run for it. CI on 151bae68f29d is green (CI + Deploy to GitHub Pages, 2026-09-14T08:32:56Z).",
+      "at": "2026-09-14T09:15:32.272Z"
     },
     "lint-audit": {
-      "evidence": "NOT RUN — WAIVED BY THE USER on 20.8.2026, 19:37:32. He instructed that the poc tag point at the current main and be served at /poc/, was shown that 0 of 13 closing steps stand for 1cbd8a1a8310 and that the state would go out unclosed, and chose the override deliberately. This records the waiver, never a run: no LARGE regression, no cleanup and no acceptance evidence exists for this commit.",
-      "at": "2026-08-20T17:37:32.531Z"
+      "evidence": "WAIVED by the user on 14.09.2026: \"Tagge den aktuellen main-Stand als poc und mache ihn via https://patrickvonmassow.github.io/Heart-of-Africa-Remake/poc/ zugaenglich. In diesem Fall ist kein Closing-Durchlauf notwendig.\" The poc tag mirrors main 151bae68f29d as-is; no closing cycle was run for it. CI on 151bae68f29d is green (CI + Deploy to GitHub Pages, 2026-09-14T08:32:56Z).",
+      "at": "2026-09-14T09:15:32.326Z"
     },
     "dead-code": {
-      "evidence": "NOT RUN — WAIVED BY THE USER on 20.8.2026, 19:37:32. He instructed that the poc tag point at the current main and be served at /poc/, was shown that 0 of 13 closing steps stand for 1cbd8a1a8310 and that the state would go out unclosed, and chose the override deliberately. This records the waiver, never a run: no LARGE regression, no cleanup and no acceptance evidence exists for this commit.",
-      "at": "2026-08-20T17:37:32.562Z"
+      "evidence": "WAIVED by the user on 14.09.2026: \"Tagge den aktuellen main-Stand als poc und mache ihn via https://patrickvonmassow.github.io/Heart-of-Africa-Remake/poc/ zugaenglich. In diesem Fall ist kein Closing-Durchlauf notwendig.\" The poc tag mirrors main 151bae68f29d as-is; no closing cycle was run for it. CI on 151bae68f29d is green (CI + Deploy to GitHub Pages, 2026-09-14T08:32:56Z).",
+      "at": "2026-09-14T09:15:32.366Z"
     },
     "stale-doc": {
-      "evidence": "NOT RUN — WAIVED BY THE USER on 20.8.2026, 19:37:32. He instructed that the poc tag point at the current main and be served at /poc/, was shown that 0 of 13 closing steps stand for 1cbd8a1a8310 and that the state would go out unclosed, and chose the override deliberately. This records the waiver, never a run: no LARGE regression, no cleanup and no acceptance evidence exists for this commit.",
-      "at": "2026-08-20T17:37:32.600Z"
+      "evidence": "WAIVED by the user on 14.09.2026: \"Tagge den aktuellen main-Stand als poc und mache ihn via https://patrickvonmassow.github.io/Heart-of-Africa-Remake/poc/ zugaenglich. In diesem Fall ist kein Closing-Durchlauf notwendig.\" The poc tag mirrors main 151bae68f29d as-is; no closing cycle was run for it. CI on 151bae68f29d is green (CI + Deploy to GitHub Pages, 2026-09-14T08:32:56Z).",
+      "at": "2026-09-14T09:15:32.406Z"
     },
     "stale-comment": {
-      "evidence": "NOT RUN — WAIVED BY THE USER on 20.8.2026, 19:37:32. He instructed that the poc tag point at the current main and be served at /poc/, was shown that 0 of 13 closing steps stand for 1cbd8a1a8310 and that the state would go out unclosed, and chose the override deliberately. This records the waiver, never a run: no LARGE regression, no cleanup and no acceptance evidence exists for this commit.",
-      "at": "2026-08-20T17:37:32.640Z"
+      "evidence": "WAIVED by the user on 14.09.2026: \"Tagge den aktuellen main-Stand als poc und mache ihn via https://patrickvonmassow.github.io/Heart-of-Africa-Remake/poc/ zugaenglich. In diesem Fall ist kein Closing-Durchlauf notwendig.\" The poc tag mirrors main 151bae68f29d as-is; no closing cycle was run for it. CI on 151bae68f29d is green (CI + Deploy to GitHub Pages, 2026-09-14T08:32:56Z).",
+      "at": "2026-09-14T09:15:32.450Z"
     },
     "md-audit": {
-      "evidence": "NOT RUN — WAIVED BY THE USER on 20.8.2026, 19:37:32. He instructed that the poc tag point at the current main and be served at /poc/, was shown that 0 of 13 closing steps stand for 1cbd8a1a8310 and that the state would go out unclosed, and chose the override deliberately. This records the waiver, never a run: no LARGE regression, no cleanup and no acceptance evidence exists for this commit.",
-      "at": "2026-08-20T17:37:32.674Z"
+      "evidence": "WAIVED by the user on 14.09.2026: \"Tagge den aktuellen main-Stand als poc und mache ihn via https://patrickvonmassow.github.io/Heart-of-Africa-Remake/poc/ zugaenglich. In diesem Fall ist kein Closing-Durchlauf notwendig.\" The poc tag mirrors main 151bae68f29d as-is; no closing cycle was run for it. CI on 151bae68f29d is green (CI + Deploy to GitHub Pages, 2026-09-14T08:32:56Z).",
+      "at": "2026-09-14T09:15:32.491Z"
     },
     "cleanup-blind-parallel": {
-      "evidence": "NOT RUN — WAIVED BY THE USER on 20.8.2026, 19:37:32. He instructed that the poc tag point at the current main and be served at /poc/, was shown that 0 of 13 closing steps stand for 1cbd8a1a8310 and that the state would go out unclosed, and chose the override deliberately. This records the waiver, never a run: no LARGE regression, no cleanup and no acceptance evidence exists for this commit.",
-      "at": "2026-08-20T17:37:32.708Z"
+      "evidence": "WAIVED by the user on 14.09.2026: \"Tagge den aktuellen main-Stand als poc und mache ihn via https://patrickvonmassow.github.io/Heart-of-Africa-Remake/poc/ zugaenglich. In diesem Fall ist kein Closing-Durchlauf notwendig.\" The poc tag mirrors main 151bae68f29d as-is; no closing cycle was run for it. CI on 151bae68f29d is green (CI + Deploy to GitHub Pages, 2026-09-14T08:32:56Z).",
+      "at": "2026-09-14T09:15:32.534Z"
     },
     "regression-after-cleanup": {
-      "evidence": "NOT RUN on 1cbd8a1a831063c5ef9c4db5acc3718049e2e5e6 — WAIVED BY THE USER, 20.08.2026, after he was shown that no closing step stands for this commit and chose to move the poc tag anyway. No second LARGE regression exists for it; this line records the waiver, not a run.",
-      "at": "2026-08-20T17:37:43.573Z"
+      "evidence": "WAIVED by the user on 14.09.2026 together with the whole closing cycle: \"In diesem Fall ist kein Closing-Durchlauf notwendig.\" No cleanup stage ran for this tag, so no second regression on 151bae68f29d exists either; the poc tag mirrors main as-is.",
+      "at": "2026-09-14T09:15:35.508Z"
     },
     "impl-sections": {
-      "evidence": "NOT RUN — WAIVED BY THE USER on 20.8.2026, 19:37:32. He instructed that the poc tag point at the current main and be served at /poc/, was shown that 0 of 13 closing steps stand for 1cbd8a1a8310 and that the state would go out unclosed, and chose the override deliberately. This records the waiver, never a run: no LARGE regression, no cleanup and no acceptance evidence exists for this commit.",
-      "at": "2026-08-20T17:37:32.781Z"
+      "evidence": "WAIVED by the user on 14.09.2026: \"Tagge den aktuellen main-Stand als poc und mache ihn via https://patrickvonmassow.github.io/Heart-of-Africa-Remake/poc/ zugaenglich. In diesem Fall ist kein Closing-Durchlauf notwendig.\" The poc tag mirrors main 151bae68f29d as-is; no closing cycle was run for it. CI on 151bae68f29d is green (CI + Deploy to GitHub Pages, 2026-09-14T08:32:56Z).",
+      "at": "2026-09-14T09:15:32.619Z"
     },
     "graphics-detail-doc": {
-      "evidence": "NOT RUN — WAIVED BY THE USER on 20.8.2026, 19:37:32. He instructed that the poc tag point at the current main and be served at /poc/, was shown that 0 of 13 closing steps stand for 1cbd8a1a8310 and that the state would go out unclosed, and chose the override deliberately. This records the waiver, never a run: no LARGE regression, no cleanup and no acceptance evidence exists for this commit.",
-      "at": "2026-08-20T17:37:32.815Z"
+      "evidence": "WAIVED by the user on 14.09.2026: \"Tagge den aktuellen main-Stand als poc und mache ihn via https://patrickvonmassow.github.io/Heart-of-Africa-Remake/poc/ zugaenglich. In diesem Fall ist kein Closing-Durchlauf notwendig.\" The poc tag mirrors main 151bae68f29d as-is; no closing cycle was run for it. CI on 151bae68f29d is green (CI + Deploy to GitHub Pages, 2026-09-14T08:32:56Z).",
+      "at": "2026-09-14T09:15:32.665Z"
     },
     "acceptance-criteria": {
-      "evidence": "NOT RUN — WAIVED BY THE USER on 20.8.2026, 19:37:32. He instructed that the poc tag point at the current main and be served at /poc/, was shown that 0 of 13 closing steps stand for 1cbd8a1a8310 and that the state would go out unclosed, and chose the override deliberately. This records the waiver, never a run: no LARGE regression, no cleanup and no acceptance evidence exists for this commit.",
-      "at": "2026-08-20T17:37:32.851Z"
+      "evidence": "WAIVED by the user on 14.09.2026: \"Tagge den aktuellen main-Stand als poc und mache ihn via https://patrickvonmassow.github.io/Heart-of-Africa-Remake/poc/ zugaenglich. In diesem Fall ist kein Closing-Durchlauf notwendig.\" The poc tag mirrors main 151bae68f29d as-is; no closing cycle was run for it. CI on 151bae68f29d is green (CI + Deploy to GitHub Pages, 2026-09-14T08:32:56Z).",
+      "at": "2026-09-14T09:15:32.710Z"
     },
     "open-items": {
-      "evidence": "NOT RUN — WAIVED BY THE USER on 20.8.2026, 19:37:32. He instructed that the poc tag point at the current main and be served at /poc/, was shown that 0 of 13 closing steps stand for 1cbd8a1a8310 and that the state would go out unclosed, and chose the override deliberately. This records the waiver, never a run: no LARGE regression, no cleanup and no acceptance evidence exists for this commit.",
-      "at": "2026-08-20T17:37:32.886Z"
+      "evidence": "WAIVED by the user on 14.09.2026: \"Tagge den aktuellen main-Stand als poc und mache ihn via https://patrickvonmassow.github.io/Heart-of-Africa-Remake/poc/ zugaenglich. In diesem Fall ist kein Closing-Durchlauf notwendig.\" The poc tag mirrors main 151bae68f29d as-is; no closing cycle was run for it. CI on 151bae68f29d is green (CI + Deploy to GitHub Pages, 2026-09-14T08:32:56Z).",
+      "at": "2026-09-14T09:15:32.758Z"
     },
     "simplifications": {
-      "evidence": "NOT RUN — WAIVED BY THE USER on 20.8.2026, 19:37:32. He instructed that the poc tag point at the current main and be served at /poc/, was shown that 0 of 13 closing steps stand for 1cbd8a1a8310 and that the state would go out unclosed, and chose the override deliberately. This records the waiver, never a run: no LARGE regression, no cleanup and no acceptance evidence exists for this commit.",
-      "at": "2026-08-20T17:37:32.923Z"
+      "evidence": "WAIVED by the user on 14.09.2026: \"Tagge den aktuellen main-Stand als poc und mache ihn via https://patrickvonmassow.github.io/Heart-of-Africa-Remake/poc/ zugaenglich. In diesem Fall ist kein Closing-Durchlauf notwendig.\" The poc tag mirrors main 151bae68f29d as-is; no closing cycle was run for it. CI on 151bae68f29d is green (CI + Deploy to GitHub Pages, 2026-09-14T08:32:56Z).",
+      "at": "2026-09-14T09:15:32.817Z"
     }
   }
 }

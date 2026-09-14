@@ -898,3 +898,21 @@ Quellen-Fingerprint der Retrospektive und meldet sie damit als STALE. Der geford
 Refresh erzeugt dann eine Änderung, die nur aus Fingerprint und Zeitstempel besteht.
 Zweimal hintereinander gemessen. Ein Tretrad, kein Defekt — aber es kostet je einen
 Lauf und einen Commit.
+
+## Ein vom Nutzer erlassenes Closing kostet dreizehn einzelne Verzichtsbuchungen (14.09.2026)
+
+Beim `poc`-Tag vom 14.09.2026 hat der Nutzer den Closing-Durchlauf ausdrücklich
+erlassen („In diesem Fall ist kein Closing-Durchlauf notwendig"). `closing-guard`
+verweigerte das Tag bei 0/13 Schritten; sein einziger vorgesehener Weg ist, JEDEN
+der dreizehn Schritte einzeln mit der Verzichtserklärung als Evidenz zu buchen.
+Zusätzlich lehnt `regression-after-cleanup` eine wortgleiche Evidenz zu
+`large-regression` ab — der Verzicht braucht also zwei verschieden formulierte
+Texte für denselben Sachverhalt.
+
+Inhaltlich ist das richtig: der Verzicht bleibt als Text in der Checkliste stehen,
+statt als erfundene Grün-Meldung zu verschwinden. Es fehlt nur der eine Befehl
+dafür, etwa ein `--waive-all "<Zitat des Nutzers>"`, das die dreizehn Buchungen mit
+je eigener Formulierung setzt.
+
+Nicht umgesetzt wegen des Infrastruktur-Freezes: kein Spielerimpakt, keine
+Blockade — der Weg existiert und wurde gegangen, er ist nur umständlich.
