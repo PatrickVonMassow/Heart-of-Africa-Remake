@@ -6243,11 +6243,25 @@ if (section('adult-errands')) {
   // this suite then defaults to "real regression" and the point is held by a
   // crash rather than by evidence. Skipping the block instead leaves the other
   // 225 checks classifiable, which is the entire purpose of the baseline lane.
+  // ONLY THE BASELINE LANE MAY STAND THE BLOCK DOWN. The exemption exists for
+  // the PRE-change app, which has no durable dig record; on the candidate the
+  // same missing capability IS the regression this block is here to catch, and
+  // a silent SKIP would report it as green (GPT-6 Astra, cross-vendor review of
+  // 23495d5, 14.09.2026). `baseline-classify.mjs` sets the marker when it spawns
+  // the suite inside the baseline checkout, and nothing else sets it.
+  const onBaselineLane = process.env.VERIFY_BASELINE_LANE === '1'
   const digPictureSupported = await page.evaluate(
     () => typeof window.__game.getState().recordVillageDig === 'function',
   )
-  if (!digPictureSupported) {
-    console.log('  SKIP  the excavation picture — this build has no durable dig record to pose it from')
+  if (!digPictureSupported && onBaselineLane) {
+    console.log('  SKIP  the excavation picture — this BASELINE build has no durable dig record to pose it from')
+  }
+  if (!digPictureSupported && !onBaselineLane) {
+    check(
+      'the build carries the durable dig record the excavation picture is posed from',
+      false,
+      'window.__game.getState().recordVillageDig is not a function, and this is not the baseline lane',
+    )
   }
   if (digPictureSupported) {
   const digPictureSaved = await page.evaluate(() => {

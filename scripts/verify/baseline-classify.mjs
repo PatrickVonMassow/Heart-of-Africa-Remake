@@ -171,7 +171,12 @@ function runSuiteOnce({ suitePath, cwd, baseUrl, label, logPath }) {
     windowsHide: true,
     cwd,
     encoding: 'utf8',
-    env: baseUrl ? { ...process.env, BASE_URL: baseUrl } : process.env,
+    // THE SUITE IS TOLD IT IS ON THE BASELINE LANE. A suite that stands a block
+    // down because the PRE-change app cannot pose it (the excavation picture,
+    // polish.mjs) must do so HERE and nowhere else: on the candidate the same
+    // missing capability is a regression, and a skip would wave it through
+    // (GPT-6 Astra, cross-vendor review of 23495d5, 14.09.2026).
+    env: { ...process.env, VERIFY_BASELINE_LANE: '1', ...(baseUrl ? { BASE_URL: baseUrl } : {}) },
     timeout: SUITE_TIMEOUT_MS,
     killSignal: 'SIGKILL',
   })
