@@ -6234,6 +6234,22 @@ if (section('adult-errands')) {
   // The shared excavation picture has its own measured composition, within the
   // same adult-errands run. Seed 12 puts a store pit and patch 6.38 m apart with
   // an open standing view (the layout unit test pins both the view and crossing).
+  //
+  // IT ASKS THE BUILD WHETHER IT CAN BE PHOTOGRAPHED AT ALL. The baseline
+  // classifier runs THIS suite file against the PRE-CHANGE app, which has no
+  // durable dig record — and an unguarded call to it threw an uncaught
+  // TypeError that killed the whole baseline run after 225 of 274 checks, twice
+  // (measured 14.09.2026). A died baseline yields no verdict, so every red of
+  // this suite then defaults to "real regression" and the point is held by a
+  // crash rather than by evidence. Skipping the block instead leaves the other
+  // 225 checks classifiable, which is the entire purpose of the baseline lane.
+  const digPictureSupported = await page.evaluate(
+    () => typeof window.__game.getState().recordVillageDig === 'function',
+  )
+  if (!digPictureSupported) {
+    console.log('  SKIP  the excavation picture — this build has no durable dig record to pose it from')
+  }
+  if (digPictureSupported) {
   const digPictureSaved = await page.evaluate(() => {
     const g = window.__game.getState()
     const saved = { seed: g.seed, progress: g.villageDigProgress, conceptLabels: window.__ui.getState().speechConceptLabels,
@@ -6291,6 +6307,7 @@ if (section('adult-errands')) {
       window.__ui.getState().setSpeechConceptLabels(saved.conceptLabels)
       window.__balance.villageLife.adultErrands.intervalSeconds = saved.interval
     }, digPictureSaved)
+  }
   }
 
 }
