@@ -465,6 +465,23 @@ describe('DIG is a summons said twice', () => {
     expect(word?.aim).toEqual({ x: v.villagers[partner].x, y: 1, z: v.villagers[partner].z })
   })
 
+  it('does not partly start the joint walk when the initiator has lost its standing spot', () => {
+    const v = riverless(view(4))
+    const state = stageDig(v)
+    const initiator = initiatorOf(state)
+    const task = taskOf(state, initiator)!
+    const partner = taskOf(state, task.partner!)!
+    task.standSpot = null
+    putAtGoal(state, v, initiator)
+    const before = { x: task.x, z: task.z }
+
+    stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
+
+    expect(task).toMatchObject({ ...before, phase: 'invite' })
+    expect(partner).toMatchObject({ phase: 'invite', arrived: true })
+    expect(task.pendingWord).toBeUndefined()
+  })
+
   it('sends the invited pair toward one site, says DIG there, then starts both digging', () => {
     const v = riverless(view(4))
     const state = stageDig(v)

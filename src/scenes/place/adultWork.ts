@@ -347,9 +347,8 @@ function startJointWalk(state: AdultWorkState, initiator: AdultTask, geography: 
   if (initiator.partner === null || initiator.siteIndex === null) return
   const partner = state.tasks[initiator.partner]
   const site = geography.digSites[initiator.siteIndex]
-  if (!partner || !site) return
+  if (!partner || !site || !initiator.standSpot) return
   initiator.phase = 'site'
-  if (!initiator.standSpot) return
   initiator.x = initiator.standSpot.x
   initiator.z = initiator.standSpot.z
   initiator.arrived = false
