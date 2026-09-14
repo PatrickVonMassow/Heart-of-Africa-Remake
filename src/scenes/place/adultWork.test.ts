@@ -23,6 +23,7 @@ import {
   type AdultWorkView,
   type SpokenWord,
 } from './adultWork'
+import { clearOfSpoil, DIG_RIM_DISTANCE } from './placeGround'
 import { SpeechFloor } from '../../communication/speechFloor'
 import { utteranceSeconds } from '../../communication/speaking'
 import { balance } from '../../config/balance'
@@ -480,8 +481,11 @@ describe('DIG is a summons said twice', () => {
     expect(second.arrived).toBe(false)
     expect(first.siteIndex).toBe(second.siteIndex)
     const site = v.geography.digSites[first.siteIndex!]
-    expect(goalOf(first)).toEqual({ x: site.x, z: site.z })
-    expect(Math.hypot(goalOf(second).x - site.x, goalOf(second).z - site.z)).toBeCloseTo(2.4, 6)
+    for (const task of [first, second]) {
+      const goal = goalOf(task)
+      expect(Math.hypot(goal.x - site.x, goal.z - site.z)).toBeCloseTo(DIG_RIM_DISTANCE)
+      expect(clearOfSpoil(site, goal.x, goal.z)).toBe(true)
+    }
 
     putAtGoal(state, v, initiator)
     putAtGoal(state, v, partner)
@@ -634,6 +638,24 @@ describe('digging records work at the site', () => {
     const progress = digProgressOf(state, v.geography.digSites.length)[siteIndex]
     expect(progress.dug).toBeGreaterThan(9)
     expect(progress.strikes).toBeGreaterThanOrEqual(6)
+  })
+
+  it('a finished bout leaves a result that a later visit restores', () => {
+    const v = riverless(view(4))
+    const state = stageDig(v)
+    const index = taskOf(state, initiatorOf(state))!.siteIndex!
+    state.next = 1000
+    for (let t = 0; t < 45; t += 1 / 60) {
+      walkFrame(state, v, 1 / 60)
+      stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
+    }
+    const progress = digProgressOf(state, v.geography.digSites.length)
+    expect(progress[index].completed).toBe(true)
+    expect(state.tasks.every((task) => task === null)).toBe(true)
+    const nextVisit = createAdultWork(4, CFG, progress)
+    expect(digProgressOf(nextVisit, progress.length)).toEqual(progress)
+    nextVisit.siteProgress[index].dug++
+    expect(nextVisit.siteProgress[index].dug).not.toBe(progress[index].dug)
   })
 
   it('returns progress as a copy rather than exposing scheduler state', () => {
