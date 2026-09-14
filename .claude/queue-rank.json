@@ -1350,6 +1350,18 @@
       "why": "Infrastructure under the freeze: real but worked around today by measuring the processes instead of trusting the claim text, so it waits behind the playable queue despite its high criticality.",
       "origin": "machine",
       "place": "last"
+    },
+    "1124": {
+      "at": "2026-09-14T11:25:29.394Z",
+      "why": "User 14.09.2026 ranked it directly behind 1076 with the order itself",
+      "origin": "user",
+      "place": "ahead"
+    },
+    "1125": {
+      "at": "2026-09-14T11:25:29.496Z",
+      "why": "User 14.09.2026 ranked it directly behind 1092 with the order itself",
+      "origin": "user",
+      "place": "ahead"
     }
   },
   "boundary": {
@@ -1382,7 +1394,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-14T08:31:47.131Z",
+    "at": "2026-09-14T11:25:29.505Z",
     "points": [
       174,
       184,
@@ -1781,7 +1793,9 @@
       1120,
       1121,
       1122,
-      1123
+      1123,
+      1124,
+      1125
     ]
   }
 }

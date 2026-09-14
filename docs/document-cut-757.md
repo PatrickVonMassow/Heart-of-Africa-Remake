@@ -89,7 +89,7 @@ tokenizer, not `wc`, because a ceiling is only confirmed against the counter tha
 | document | landed | ceiling | headroom |
 | --- | --- | --- | --- |
 | `CLAUDE.md` | 205 lines / 1,468 words / 10,809 B | 205 / 1,468 | **0 lines**, 0 words |
-| `MEMORY.md` | 51 lines / 783 words / 6,317 B | 51 / 783 | **0 lines**, 0 words |
+| `MEMORY.md` | 51 lines / 780 words / 6,331 B | 51 / 783 | **0 lines**, 3 words |
 | global `CLAUDE.md` | 6 lines / 33 words / 236 B | 6 / 36 | **0 lines**, 3 words |
 
 They hold, and two of them hold with nothing to spare, which is the finding
@@ -123,7 +123,11 @@ ratchet ran the other way for the first time in weeks: the solved session-death
 hunt of 05.09.2026 was retired from the index — its fix and its regression spy
 are in the tree and the retrospective carries the story in prose — and the word
 ceiling followed the cut down to the measured 783. The line ceiling stayed,
-because the freed line was exactly what put the index back inside it.
+because the freed line was exactly what put the index back inside it. On
+14.09.2026 the row was restated again, at 780 words over the same 51 lines: three
+words were tightened out of existing entries, no entry was added or retired, and
+the ceiling was left where it stands, so the file now carries three words of
+headroom.
 The row above is the reading after the newest of those, not the merge-day one,
 and it shows what the pressure looks like from close up: zero headroom, for a
 file designed to gain a line per memory. The next raise should cut a retired
