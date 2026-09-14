@@ -12591,6 +12591,19 @@ to land than a mechanism that needs a review.
   only valve left was `--defer`. The third bullet of the FINAL STATE therefore has a second
   addressee: as long as a suite's console reds do not reach the record under their own names, the
   disposition route cannot be applied to them at all, and the lane can only ever be deferred.
+  THE CAUSE IS NOW MEASURED, not only described (14.09.2026, three `flow` runs on main in one
+  sitting). `scripts/render-verify-recorder.mjs` keeps a result line only when it is anchored at the
+  line START (`KEPT_LINE`: `FAIL`, `ERR:`, `console errors:`), but `flow` prints its console errors
+  INDENTED inside its own tail block — `      | console errors: 2` and then `      |   - <text>`.
+  Nothing matches, so the record is written with no `reds` array at all (checked in
+  `.claude/render-verify-state.json` for all four `flow` failures of 13. and 14.09.), the guard
+  synthesises "the run failed without reporting a single red", and the retry falls back to
+  SUSPECT_UNNAMED. That is why THIS lane, alone among the suites, can never be charged, and why
+  points 1072, 1073 and the session of 14.09. each had to write the same `--defer` by hand.
+  THE TRANSIENT ITSELF IS THE COLD CACHE, reproduced the same morning: the first browser run after
+  a push had changed source files reported the two 504s, and the two runs after it — WebGL 2 and
+  WebGPU, cache now warm — were clean on the FIRST attempt, 36/0/0 and 8/8 frames each. Warming the
+  dev server before the suite starts, the first bullet above, is therefore the whole remedy.
   Bundle: Session- & Repo-Hygiene.
 
 - [ ] 940. The derived state card is authenticated by a shape that is not the writer's (cross-vendor
