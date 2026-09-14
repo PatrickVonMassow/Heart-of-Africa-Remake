@@ -63,3 +63,20 @@ it('fails the shutter check if the speech hook disappears after the live call', 
   expect(checks[2].detail).toContain('speak returned undefined')
   expect(frames).toEqual([])
 })
+
+it.each([
+  null,
+  { kind: 'point', t: 2, duration: 2 },
+  { kind: 'beckon', t: 0.5, duration: 2 },
+])('keeps the live pointing check red for gesture %j even when the word is held', async (gesture) => {
+  const { checks } = await sample({ gesture })
+  expect(checks.map((c) => c.pass)).toEqual([true, false, true])
+})
+
+it('declares the later frame as a held word, without promising the live pointing pose', async () => {
+  const { frames } = await sample()
+  expect(frames[0].declaration.label).toBe(
+    'the held direction word (UPSTREAM) standing over the child that called it, seen from the ' +
+    'bank-game spectator stand a quarter of the 19.7 m stretch back of the upstream rock',
+  )
+})

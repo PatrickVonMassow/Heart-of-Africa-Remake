@@ -4280,10 +4280,13 @@ if (section('children-bank-game')) {
           return c ? { x: c.x, z: c.z } : null
         }, called.who)
         if (held === true && child) {
+          // The point lasts 2 s; scene readiness can wait for 5 s of stability.
+          // This frame declares only the held word. The arm remains a live
+          // assertion above, not a pose this later shutter promises to contain.
           await frame('1073-bank-call-from-the-spectator-stand', {
             local: { x: child.x, y: 1.1, z: child.z },
             label:
-              `the child announcing the run's direction (${called.direction}), its word standing over its head, seen from the ` +
+              `the held direction word (${called.direction}) standing over the child that called it, seen from the ` +
               `bank-game spectator stand a quarter of the ${stood.stretch.toFixed(1)} m stretch back of the upstream rock`,
           })
         }
