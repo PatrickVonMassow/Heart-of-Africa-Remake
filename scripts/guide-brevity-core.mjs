@@ -494,7 +494,13 @@ export const LIMITS = {
   // that same entry rather than a new tip, because it corrects a rule the entry already states,
   // and it carries the remedy with it: what decides a run's reading belongs in its record, not in
   // the terminal. The long telling stays in the retrospective (3.200). Two lines: 657 -> 659.
-  maxLines: 659,
+  // RAISED 14.09.2026 (third): the barrier entry said a gate must let "being produced right now"
+  // through. The afternoon added the sibling case — a gate that measures its condition on the
+  // WRONG OBJECT can never be satisfied at all, and two gates then forbid each other. Folded into
+  // that entry because it is the same reader question, and it carries the house answer with it:
+  // a contradiction between gates is a defect to file, not a thing to re-answer every turn. The
+  // long telling stays in the retrospective (3.201). Two lines: 659 -> 661.
+  maxLines: 661,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -767,7 +773,9 @@ export const LIMITS = {
   // 14.09.2026 (second): the abort-that-names-reds correction justified beside maxLines measures
   // 17 words after two rounds of tightening — the first draft ran 98 and was cut rather than
   // bought headroom for: 6323 -> 6340.
-  maxWords: 6340,
+  // 14.09.2026 (third): the wrong-object-gate fold justified beside maxLines measures 29 words:
+  // 6340 -> 6369.
+  maxWords: 6369,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,

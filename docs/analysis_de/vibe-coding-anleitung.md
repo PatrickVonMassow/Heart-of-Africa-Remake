@@ -582,7 +582,9 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   ein Nachweis fehlt — und der Nachweis ist der Lauf, der noch zwei Stunden braucht.
   Verweigerung und eigene Abhilfe laufen gegeneinander.
   → *Prompt:* „Eine Schranke, die einen Nachweis fordert, muss ‚wird gerade erstellt' als
-  eigenen Zustand **durchlassen** — sonst verbietet sie ihre eigene Erfüllung."
+  eigenen Zustand **durchlassen** — sonst verbietet sie ihre eigene Erfüllung. Und misst sie am
+  **falschen Gegenstand**, ist sie nie erfüllbar: Widersprechen sich zwei Schranken, ist das ein
+  **Defekt**, kein Bedienfehler — messen, ablegen, nicht in jedem Zug neu beantworten."
 
 - **Ein Rot, das bei gleichem Code kommt und geht, ist ein Befund über deine MESSUNG.** Eine
   Stichprobe aus einem langen Vorgang trifft den Defekt mal und verfehlt ihn mal.
