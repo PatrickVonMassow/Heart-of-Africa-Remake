@@ -199,7 +199,8 @@ describe('bootstrapBase', () => {
     expect(gathered.applicable).toBe(true)
     expect(Object.hasOwn(gathered, 'baselineMissing')).toBe(true)
     expect(gathered.baselineMissing).toBe(gathered.inputs.baselineMissing)
-  })
+    // The same live-history read as the report above: measured at 20.60 s.
+  }, 60_000)
 
   it('refuses an unreachable anchor and names the merge that makes recovery possible', () => {
     const head = 'headsha'
