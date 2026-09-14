@@ -1338,6 +1338,18 @@
       "why": "Last is right: it is infrastructure under the freeze, it blocked point 1072 for minutes rather than reproducibly, and the manual path — re-running the section on a quiet machine — settles it; the communication points the user is waiting on keep the front.",
       "origin": "machine",
       "place": "last"
+    },
+    "1122": {
+      "at": "2026-09-14T08:31:47.025Z",
+      "why": "Infrastructure under the freeze and a discriminator rather than a fix: it costs a re-derivation when it recurs but blocks no game work, so it waits behind the playable queue.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1123": {
+      "at": "2026-09-14T08:31:47.121Z",
+      "why": "Infrastructure under the freeze: real but worked around today by measuring the processes instead of trusting the claim text, so it waits behind the playable queue despite its high criticality.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1370,7 +1382,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-14T05:31:31.694Z",
+    "at": "2026-09-14T08:31:47.131Z",
     "points": [
       174,
       184,
@@ -1767,7 +1779,9 @@
       1118,
       1119,
       1120,
-      1121
+      1121,
+      1122,
+      1123
     ]
   }
 }

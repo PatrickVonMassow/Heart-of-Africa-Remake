@@ -15556,3 +15556,83 @@ to land than a mechanism that needs a review.
   It edits `scripts/verify/baseline-classify.mjs`, the mechanism point 1089 built and 1114 and
   1115 were filed by, so it is worked after 1089 and never beside it.
   Bundle: Testinfrastruktur.
+
+- [ ] 1122. A third session-death class is undocumented, so every recurrence is re-derived from
+  scratch (user 14.09.2026, reported as „schon wieder“).
+  A THIRD session-death class exists and is not documented: a session killed with
+  SIGKILL while every sibling process survives and the machine is healthy.
+
+  Deliverable is a DISCRIMINATOR, not a fix. The killer cannot be named from
+  inside the container; do not invent an in-container cause.
+
+  1. Give the three classes one decision table (docs, and the forensics command if
+     one is written):
+     - 143 / SIGTERM -> our own context-boundary handover. Ledger carries a
+       `handover` row with cause `context-boundary` on that pid.
+     - VM reboot -> /proc/uptime in minutes; ledger `heartbeat-predates-boot`.
+     - SIGKILL, victim idle, siblings alive -> NEITHER. Signature measured
+       13.09.2026: `Closing Claude on channel: <id>` in the extension log in the
+       SAME millisecond as the error and nowhere else in that log;
+       remoteagent.log and exthost.log silent in the window; container PID 1 and
+       the exthost process both OLDER than the death; `oom_kill 0` in every
+       cgroup; sibling batch sessions keep writing the ledger straight through.
+
+  2. Nail down the two counters, because both of our memories currently point a
+     reader at the wrong one:
+     - `memory.peak` is NOT evidence. It is dominated by RECLAIMABLE page cache
+       (measured: peak 15,2 GB against 8,3 GB buff/cache and only 5,6 GB used).
+     - `memory.swap.peak` IS the load-bearing counter. 102 MB all-time here means
+       the machine never had to page anything out, so memory exhaustion is
+       excluded outright.
+
+  3. Record the precursor worth watching: an `[event-loop-stall]` line with
+     `blocked 0ms monotonic` but a multi-second `wall drift` / `clock jump` is a
+     SUSPENDED VM, not CPU starvation — CLOCK_MONOTONIC stops across suspend.
+     On 13.09. it preceded the kill by 2 min 22 s.
+
+  4. Name where the answer lives, so the next reader stops digging inside the
+     container: Windows Event Viewer around the death minute, and
+     %LOCALAPPDATA%\Docker\log\host\ — the same path that solved the 07.09. VM
+     reboot.
+  Criticality: medium — no player impact, but a misdiagnosis costs a session, and both of our own
+  memories currently point the reader at the wrong counter.
+  Refs: docs/batch-owner-runbook.md, scripts/batch-launcher.mjs, scripts/batch-autostart.mjs
+  Bundle: Session- & Repo-Hygiene
+
+- [ ] 1123. When the batch owner dies mid-verification its run keeps going and nobody harvests the
+  receipt (measured 14.09.2026).
+  When the batch owner dies mid-verification, its run keeps going and NOBODY
+  harvests the receipt. Close that gap.
+
+  Measured 14.09.2026: owner 65f2ab12 (pid 739806) went `pid-dead` between
+  10:07:31 and 10:12:35 with its two-backend LARGE for point 1056 still running.
+  The successor took the lock and found run-all.mjs (pids 744989/745004) and a
+  chrome-headless burning CPU in .claude/worktrees/point-1056, all green so far,
+  with no process left that was waiting on the log.
+
+  Two defects, one point:
+
+  1. NO HARVESTER. A run whose waiter died is invisible: nothing declares the
+     wait, nothing reads the receipt, nothing charges a red to its point. The
+     next owner has to notice the stray processes by hand (`ps` for run-all.mjs
+     plus chrome-headless) to even learn a run exists. Make the successor ADOPT a
+     live run it finds — the wait-lease already models "this run belongs to a
+     session", so the reconciliation that names a missing worker should also name
+     an ownerless RUN and re-attach a waiter to it.
+
+  2. THE CLAIM PATH PROMISES SOMETHING IT DOES NOT DELIVER. The text printed by
+     `scripts/batch-claim.mjs` says the owner "releases the lock at the first
+     CLEAN moment — never mid-merge, never with a delegated agent still building
+     or a verification running, so nothing it is doing gets cut in half". Here
+     the lock came free by `pid-dead` with a verification running, and the
+     ledger records no `handover` and no boundary row for that session. Either
+     make the wording conditional on an actual clean release, or say plainly that
+     a dead owner frees the lock in whatever state it was in. The operator plans
+     around that sentence — the successor nearly committed to main on the
+     strength of it, which would have killed the orphaned LARGE at its unit stage
+     for the third time (01.09., 08.09., see the quiet-machine memory).
+  Criticality: high — a real blockade with a measured cost, plus a false-approval risk: the claim text
+  promises a clean release that a pid-dead owner does not deliver.
+  Refs: scripts/batch-claim.mjs, scripts/batch-in-flight.mjs, scripts/verify/run-wait.mjs,
+  scripts/verify/run-all.mjs
+  Bundle: Session- & Repo-Hygiene

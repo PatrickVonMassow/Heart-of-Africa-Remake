@@ -173,7 +173,8 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   ein Testlauf schreibt: Totes wirkt lebendig, der Nächste bleibt draußen.
   → *Prompt:* „Ein Lebenszeichen kommt nur aus einer Quelle, die der **Beobachter nicht
   beschreibt**. Wer entscheidet, ob **ein anderer anfangen darf**, misst einen **Handelnden** —
-  Prozess oder Handle, nie Textsuche oder Dateien: **Arbeit ist kein Arbeiter.**“
+  Prozess oder Handle, nie Textsuche oder Dateien: **Arbeit ist kein Arbeiter.** Aus totem
+  **Besitzer** folgt **Übernahme**, nie Neustart.“
 - **Die Sonde kann ihr Nein nicht erreichen.** Die Prüfung könnte „tot“ sagen — aber nur, wenn man
   ihr den Beweis übergibt, und genau dieser Aufrufer übergibt ihn nicht. Ihr „lebt noch“ ist dann
   der einzig mögliche Satz.
@@ -654,4 +655,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: d04e6c6b4940bb022794f9bb411c8d887befca5743304788255b4a49063cd0ca -->
+<!-- GUIDE-FINGERPRINT: 48bc5763b84e8a2f1d8669bbfd8ff81db4fb21ec5d3d96ea52ea44701db37924 -->

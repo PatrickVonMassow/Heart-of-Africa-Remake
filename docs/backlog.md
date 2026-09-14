@@ -840,3 +840,79 @@ The cost grows with the history, so the budget will be raised again. The test as
 a question about the guard, not about the archive: a fixture history would answer
 it in milliseconds and would not drift. Non-blocking — noted so the next raise is
 recognised as the third one, not the first.
+
+## Der Saum-Test des Erdhaufens beweist die Saumschließung nicht (14.09.2026)
+
+`src/scenes/place/digSpoilGeometry.test.ts` prüft, dass die Vertex-Positionen des
+Polar-Netzes eindeutig sind. Das beweist die Eigenschaft nicht, die der Test tragen
+soll: ließe man die umlaufenden Dreiecke am Saum weg, blieben diese Zusicherung und
+die Normalen-Prüfungen grün. Belastbar wäre eine Kantenzählung — nur die Kanten des
+Außenrands haben ein inzidentes Dreieck, alle anderen zwei.
+
+Gefunden von GPT-6 Astra im cross-vendor Review von d9e60b3c0 (P3, Gesamturteil
+merge). Kein Produktdefekt: das Netz ist nachgerechnet korrekt, nur der Test hält
+weniger, als er verspricht. Nicht sofort behoben, weil der Zweig zu diesem Zeitpunkt
+unter einem laufenden Zwei-Backend-Bildlauf stand und eine Änderung ihn entwertet
+hätte.
+
+## Erledigt-Karten des Boards behaupten pauschal ausstehende Abschlussarbeiten (14.09.2026)
+
+Über die Erledigt-Sektion läuft die Schablone „dieser Punkt ist zusammengeführt und
+abgehakt; die Abschlussarbeiten stehen noch aus" — gezählt mindestens acht Karten.
+Für 1087 und 1113 nachgemessen: kein lokaler Zweig, kein Remote-Zweig, kein
+Worktree. Die Arbeiten sind vollständig erledigt, die Karte sagt das Gegenteil.
+
+Es ist Generator-Verhalten, keine einzelne vergessene Karte: von Hand editiert stünde
+der Satz beim nächsten Publish wieder da. Board-Struktur wird nicht eigenmächtig
+geändert (Dashboard-Regel), deshalb hier gesammelt statt umgesetzt. Nebenbefund:
+dieselbe Sektion enthält transliterierte Umlaute (etwa „Haeuser"), die der
+Umlaut-Audit dort nicht prüft — er greift nur auf Aktuell- und Warteschlangenkarten.
+
+## Lebendigkeit wird aus der Buchhaltung abgeleitet statt am Prozess gemessen (14.09.2026)
+
+Zwei Ausprägungen derselben Abkürzung an einem Vormittag, beide an der laufenden
+Zwei-Backend-LARGE für Punkt 1056 gemessen. Ausführlich steht der Fall als §3.272 in
+der Retrospektive; hier nur, was am Mechanismus zu tun bliebe.
+
+ERSTENS die Ernte-Anweisung. Die Warteschlangen-Karte erklärte den Lauf für verwaist
+und wies an, ihn neu aufzusetzen. Tot war nur sein Besitzer; der Lauf stand nach 43
+Minuten in den langen Suiten. Ein Neuaufsetzen hätte diese 43 Minuten weggeworfen.
+Wer einen Lauf für verwaist erklärt, muss getrennt messen und getrennt melden, ob
+sein BESITZER lebt und ob ER lebt — aus einem toten Besitzer folgt eine Adoption
+(`--adopt`), nie ein Neustart.
+
+ZWEITENS die In-Flight-Prüfung. Sie wies die Deklaration der Wartestellung mit
+`evidence-gone` und der Begründung „log silent for 28 min" ab, während der Lauf
+nachweislich rechnete: chrome-headless auf 63,3 % und 49,5 % CPU bei 17:50 bzw. 13:56
+CPU-Zeit, zwei frische Beweisbilder binnen fünf Minuten. Die `polish`-Suite schreibt
+ihre Logzeile erst am Suite-Ende und läuft im Median 55 Minuten — die Mtime des Logs
+ist in dieser Spanne per Konstruktion alt. Der Fortschrittsbeweis einer Bildsuite sind
+die geschriebenen FRAMES und die CPU-Zeit des Browsers, nicht die Logdatei.
+
+Nicht umgesetzt wegen des Infrastruktur-Freezes: Beide Fälle wurden erkannt und
+umgangen, keiner hat Spielarbeit dauerhaft blockiert. Die Umgehung für den zweiten
+ist eine Deklaration ohne `--log`, die auf der Worktree-Aktivität durchgeht.
+
+NEBENBEFUND aus demselben Vormittag: Jeder aufgezeichnete Befund verändert den
+Quellen-Fingerprint der Retrospektive und meldet sie damit als STALE. Der geforderte
+Refresh erzeugt dann eine Änderung, die nur aus Fingerprint und Zeitstempel besteht.
+Zweimal hintereinander gemessen. Ein Tretrad, kein Defekt — aber es kostet je einen
+Lauf und einen Commit.
+
+## Ein vom Nutzer erlassenes Closing kostet dreizehn einzelne Verzichtsbuchungen (14.09.2026)
+
+Beim `poc`-Tag vom 14.09.2026 hat der Nutzer den Closing-Durchlauf ausdrücklich
+erlassen („In diesem Fall ist kein Closing-Durchlauf notwendig"). `closing-guard`
+verweigerte das Tag bei 0/13 Schritten; sein einziger vorgesehener Weg ist, JEDEN
+der dreizehn Schritte einzeln mit der Verzichtserklärung als Evidenz zu buchen.
+Zusätzlich lehnt `regression-after-cleanup` eine wortgleiche Evidenz zu
+`large-regression` ab — der Verzicht braucht also zwei verschieden formulierte
+Texte für denselben Sachverhalt.
+
+Inhaltlich ist das richtig: der Verzicht bleibt als Text in der Checkliste stehen,
+statt als erfundene Grün-Meldung zu verschwinden. Es fehlt nur der eine Befehl
+dafür, etwa ein `--waive-all "<Zitat des Nutzers>"`, das die dreizehn Buchungen mit
+je eigener Formulierung setzt.
+
+Nicht umgesetzt wegen des Infrastruktur-Freezes: kein Spielerimpakt, keine
+Blockade — der Weg existiert und wurde gegangen, er ist nur umständlich.
