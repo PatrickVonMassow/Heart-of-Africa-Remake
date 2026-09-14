@@ -2473,11 +2473,13 @@ export function PlaceScene() {
   }, [ground])
   const onDigProgress = useCallback((progress: readonly DigSiteProgress[]) => {
     ground.progress = progress
+    // Feet read live growth every frame; durable state and meshes advance on
+    // strikes or completion, without waking the whole store during each stroke.
+    if (!progress.some((p, i) => p.strikes !== (shownProgress.current[i]?.strikes ?? 0)
+      || !!p.completed !== !!shownProgress.current[i]?.completed)) return
     if (placeId && useGame.getState().seed === seed && useGame.getState().placeId === placeId) {
       useGame.getState().recordVillageDig(placeId, progress)
     }
-    if (!progress.some((p, i) => p.strikes !== (shownProgress.current[i]?.strikes ?? 0)
-      || !!p.completed !== !!shownProgress.current[i]?.completed)) return
     shownProgress.current = progress
     setDigProgress(progress)
   }, [ground, placeId, seed])
