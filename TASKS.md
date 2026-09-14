@@ -197,7 +197,81 @@ put it is the mistake this line exists to stop.
   `startJointWalk`, `joinSpot`, `JOIN_STAND_OFF`), src/scenes/place/PlaceLife.tsx (every
   actor's `position.set`), src/scenes/travel/TravelScene.tsx (how the outdoor height profile
   carries a figure), design.md §7
+  STATE ON 14.09.2026 (measured, carried over from the session that had to hand over):
+  On the merge candidate 781b14a84, `polish` fails on WebGL 2 TWICE with the SAME check —
+  "a villager is seen digging, and the jar goes down EMPTY and comes back FULL" (204 / 174
+  samples at the dig pose, 201 / 205 with the empty jar, 0 with the full one). The runner
+  calls it a CANDIDATE REAL FAILURE; the two other reds rotated between the runs and read as
+  load. Baseline run 1/2 of the pre-state f799ad619885 is GREEN (269 checks, 0 red), so this
+  is the branch's own defect, not a pre-existing one — unlike the 12:02 run, whose baseline
+  died on an unhandled TypeError and therefore gave no verdict at all. The check carries its
+  own `nonPredictive()` since 10.09.2026: run alone it was green twice (61 full-jar samples),
+  in the full pass zero — the narrow rung proves nothing here.
+  SUSPICION TRAIL, not verified: `src/scenes/place/adultWork.ts`. `startJointWalk` now puts
+  the initiator on `initiator.standSpot` instead of the pit centre and bails without one
+  (`if (!partner || !site || !initiator.standSpot) return`); the place comes from
+  `digStandingPlaces(selected.site, view.standable)`, which can return null where `joinSpot`
+  still found a place. Swallowed dig situations can starve the water errand in the shared
+  window — the earlier run's phase counts fit: `water-out:send` ×10588 against
+  `water-out:fill` ×13.
+  STILL TO RECORD (deliberately not committed while a picture run held the quiet machine):
+  the cross-vendor review of GPT-6 Astra on commit 23495d52e, verdict merge, no findings —
+  `node scripts/mechanism-review.mjs --record 23495d52e35e081afe531b6ade033ff6354fc630
+  --model "GPT-6 Astra" --verdict merge --mode review --point 1056 --pass 1/1
+  --pass-files "scripts/verify/polish.mjs"` with the recorded evidence text.
+  DO NOT TIDY AWAY: the two uncommitted document stamps in the main tree
+  (`docs/analysis_de/vibe-coding-anleitung.md`, fingerprint attestation 03b60d37, and a
+  timestamp in `docs/analysis_de/retrospektive-zusammenarbeit.md`) are the predecessor's work;
+  `batch-doctor --repair` would quarantine them into a stash. The 144 freshly written
+  `verification/` frames in the point's worktree come from a RED run and are not evidence.
   Bundle: Dorfleben.
+
+- [ ] 1126. The full proof runs once, and a red repeats only its own rung (user 14.09.2026,
+  after asking why a feature costs more verification than development).
+  MEASURED ON 14.09.2026, from `local/verify-logs/*.run.json` in every worktree and from
+  `.claude/render-verify-state.json`. On that one day the repository spent **599 minutes of
+  verification wall clock in 28 runs**, practically all of it on ONE point (1056). Five
+  two-backend LARGE runs for that same point: 09:21 (4 min, aborted), 09:26 (9 min, aborted),
+  09:41 (159 min, exit 1), 14:02 (208 min, exit 1), 17:50 (still in backend 1 of 2 at 133 min).
+  Every red restarted the whole proof instead of repairing on the rung the red check itself
+  printed. Inside the last run `polish` runs FOUR times — first pass, flake retry, two baseline
+  passes on the merge base — at ~28 min each. For comparison, all fifteen NON-covering suites
+  of the tier together cost ~16 min per backend: the breadth of the tier is not the cost.
+  The rule against this already exists and was broken four times in one day:
+  `VERIFICATION_LADDER` in `scripts/point-brief-core.mjs` says "THE FULL PROOF RUNS EXACTLY
+  ONCE, ON THE EXACT MERGE CANDIDATE".
+  Final state:
+  - PART A — A RED NEVER RESTARTS THE FULL RUN. Repair happens on the printed `--section`
+    (median 2.9 min on `polish`), and the full proof runs exactly once on the exact merge
+    candidate. This is the existing rule made enforceable rather than a new one; measured
+    saving on 14.09.2026 alone: about eight hours.
+  - PART B — FLAKE RETRY AND BASELINE CLASSIFICATION WORK ON THE SECTION, NOT THE SUITE.
+    Today the retry re-runs all 274 `polish` checks to re-ask ONE check, and the baseline
+    classification runs the whole suite twice on the merge base. The same question answered
+    by three `--section` runs costs ~9 min instead of ~84. NAMED RISK: a failure that only
+    appears in the full suite's sequence would read as absent on the section, so the
+    narrowing applies to DIAGNOSIS ONLY — a covering proof stays whole and unfiltered.
+  - PART C — `polish` IS SPLIT BY THEME. 7,383 lines, 254 checks, ~28 min, and it carries
+    the rotating flakes; it is the one object that makes every red expensive. Split by theme,
+    a red costs only its own theme. Same checks, different files, no change to coverage.
+  - PART D — THE REGRESSION IS SHARED ACROSS SEVERAL FINISHED BRANCHES. `scripts/verify/README.md`
+    already allows it word for word ("a shared final regression over several finished branches
+    may replace the repeated REGRESSION, never that picture"), and folding 1057 into 1056 on
+    07.09.2026 was the same user instruction. What is NEVER shared is the two-backend PICTURE
+    check per point; it stays on the branch before the merge.
+  - NOTHING IS DELETED OR SOFTENED: no suite is removed, no check is weakened, no red is waved
+    through as cosmetic, and the per-point picture check keeps both backends. A and D apply
+    rules that already exist; B and C shrink existing mechanism rather than adding new one,
+    which is what the infrastructure freeze of 01.09.2026 permits.
+  NOT THE LEVER, so that nobody measures it again: parallelism. The host has 16 cores at load
+  1.38, but the expensive suites are the picture suites, the GPU is a serialised device
+  (`scripts/verify/README.md`, "GPU 44 %"), and load already moves a suite's runtime by 19 %.
+  Only the cheap suites could run in parallel, and together they are 16 minutes.
+  Touches: scripts/verify/baseline-classify.mjs, scripts/verify/baseline-classify-core.mjs,
+  scripts/verify/run-logged.mjs (the retry path), scripts/verify/polish.mjs (the split),
+  scripts/verify/tiers.mjs, scripts/verify/README.md, scripts/point-brief-core.mjs
+  (`VERIFICATION_LADDER`), docs/picture-check-cost.md
+  Bundle: Testinfrastruktur.
 
 - [ ] 1076. The chief's first door press tells of his walk instead of a deciphered message,
   and he gets a body (user 08.09.2026).
