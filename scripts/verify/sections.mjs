@@ -84,7 +84,8 @@ export function listSections(source) {
  * So a check whose subject is CAST RARELY either sizes its observation window so
  * both runs measure the same thing, or it says here that it cannot — and then
  * the ladder never counts it as climbed (scripts/verify/ladder-core.mjs) and the
- * result line says so when it passes narrowly.
+ * result line says so when it passes narrowly. In the whole suite its reading
+ * is advisory: neither a pass nor a failure is evidence there.
  */
 const NP_HEAD = /(?<![\w.$])nonPredictive\(\s*['"]/g
 /** The same call with both strings captured, read from the ORIGINAL source at a
@@ -234,7 +235,7 @@ export function makeSectionGate({ sections = [], requested = null, suite = 'the 
      * THIS CHECK CANNOT PREDICT WHAT THE SUITE WILL READ (point 1086) — its
      * subject is cast rarely enough that the section alone and the full pass
      * measure different things. Declared beside the check, in the block that
-     * owns it; `predictiveNote` then marks the result line and the ladder
+     * owns it; `checkResult` then marks the result line and the ladder
      * refuses to count the narrow green as climbed.
      */
     nonPredictive(check, why) {
@@ -245,16 +246,25 @@ export function makeSectionGate({ sections = [], requested = null, suite = 'the 
       nonPredictiveChecks.set(name, reason)
       return name
     },
-    /**
-     * What a PASSING result line appends in a narrow run, so no reader takes a
-     * green here for a green in the pass. Empty on a whole-suite run (which
-     * measures what it measures), on a failure (a red is a red either way) and
-     * for every check that made no declaration.
+    /** One decision for both the printed status and the suite's failure count.
+     * A declared check retains full force when its section runs alone. In the
+     * whole suite the observation is advisory, even when it happens to pass.
+     * Neither downstream FAIL scrapers nor PASS counters may credit it there.
      */
-    predictiveNote(check, ok) {
-      if (!verdict.partial || ok === false) return ''
+    checkResult(check, ok) {
       const why = nonPredictiveChecks.get(String(check ?? ''))
-      return why ? `  [NON-PREDICTIVE narrowly: ${why}]` : ''
+      if (why && !verdict.partial) {
+        return {
+          status: 'NON-PREDICTIVE',
+          failed: false,
+          note: `  [NON-PREDICTIVE in full suite: observed ${ok ? 'pass' : 'fail'}; ${why}]`,
+        }
+      }
+      return {
+        status: ok ? 'PASS' : 'FAIL',
+        failed: !ok,
+        note: why && ok ? `  [NON-PREDICTIVE narrowly: ${why}]` : '',
+      }
     },
     /** The section a check being printed right now sits in. */
     currentSection: () => current,
