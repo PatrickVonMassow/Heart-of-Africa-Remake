@@ -468,6 +468,14 @@ describe('classifying against the baseline', () => {
 })
 
 describe('the wrapper CLI', () => {
+  it('never assumes the context of supplied check names or logs', () => {
+    expect(parseWrapperArgs(['polish', '--failed', 'jar']).currentContext).toBe('unknown')
+    expect(parseWrapperArgs(['polish', '--current-out', 'large.log']).currentContext).toBe('unknown')
+    expect(parseWrapperArgs(['--current-context', 'in-pass', 'polish'])).toMatchObject({ suite: 'polish', currentContext: 'in-pass' })
+    expect(parseWrapperArgs(['polish', '--current-context', 'standalone']).currentContext).toBe('standalone')
+    expect(parseWrapperArgs(['polish', '--current-context', 'typo']).currentContext).toBe('unknown')
+  })
+
   it('accepts a structured report destination without mistaking it for a suite', () => {
     expect(parseWrapperArgs(['--report-file', '/tmp/report.json', 'crossbrowser'])).toMatchObject({ suite: 'crossbrowser', reportFile: '/tmp/report.json' })
   })
@@ -494,6 +502,38 @@ describe('the wrapper CLI', () => {
 })
 
 describe('the printed report', () => {
+  it.each(['in-pass', 'unknown'])('qualifies every regression when candidate context is %s', (currentContext) => {
+    const classified = classifyAgainstBaseline({
+      currentFailed: ['jar', 'another check', checkFromName('console error: boom')],
+      baselineFailed: [], baselineChecks: ['jar', 'another check'],
+    })
+    const report = formatBaselineReport({ suite: 'polish', ref: 'abc1234', classified, currentContext })
+    const claims = report.filter((line) => line.includes('REAL REGRESSION'))
+    expect(claims).toHaveLength(3)
+    for (const claim of claims) {
+      expect(claim).toContain(`baseline standalone, candidate ${currentContext}`)
+      expect(claim).toContain('causation unproven')
+      expect(claim).toContain(currentContext === 'unknown' ? 'COMPARABILITY UNKNOWN' : 'NOT LIKE-FOR-LIKE')
+    }
+  })
+
+  it.each(['standalone', 'standalone section "adult-errands"'])('compares matching %s contexts without a mismatch warning', (context) => {
+    const report = formatBaselineReport({ suite: 'polish', ref: 'abc1234',
+      classified: [{ check: 'jar', verdict: 'real-regression' }], currentContext: context, baselineContext: context,
+    }).join('\n')
+    expect(report).toContain('REAL REGRESSION (green on baseline, red now)')
+    expect(report).not.toContain('NOT LIKE-FOR-LIKE')
+    expect(report).not.toContain('COMPARABILITY UNKNOWN')
+  })
+
+  it('does not claim a supplied whole-suite result matches an inherited baseline section filter', () => {
+    const report = formatBaselineReport({ suite: 'polish', ref: 'abc1234',
+      classified: [{ check: 'jar', verdict: 'real-regression' }], currentContext: 'standalone',
+      baselineContext: 'standalone section "adult-errands"',
+    }).join('\n')
+    expect(report).toContain('NOT LIKE-FOR-LIKE (baseline standalone section "adult-errands", candidate standalone; causation unproven)')
+  })
+
   it('names the load signature and points at the quiet-machine rule', () => {
     const lines = formatRepeatReport({ suite: 'enrichments', signature: repeatSignature({ first: RUN_1, second: RUN_2 }) })
     expect(lines[0]).toContain('DIFFERENT checks')

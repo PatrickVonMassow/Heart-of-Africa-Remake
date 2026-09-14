@@ -543,6 +543,8 @@ export function formatBaselineReport({
   ref,
   backend = 'webgl',
   classified,
+  currentContext = 'unknown',
+  baselineContext = 'standalone',
   suiteFileChanged = false,
   infraChanged = [],
   baselineRan = true,
@@ -551,7 +553,10 @@ export function formatBaselineReport({
   logs = [],
   note = '',
 }) {
-  const lines = [`--- baseline classification — ${suite} vs ${ref} (backend ${backend === 'webgpu' ? 'WebGPU' : 'WebGL 2'}) ---`]
+  const comparable = currentContext !== 'unknown' && currentContext === baselineContext
+  const comparison = `baseline ${baselineContext}, candidate ${currentContext}`
+  const qualification = comparable ? '' : ` — ${currentContext === 'unknown' ? 'COMPARABILITY UNKNOWN' : 'NOT LIKE-FOR-LIKE'} (${comparison}; causation unproven)`
+  const lines = [`--- baseline classification — ${suite} vs ${ref} (backend ${backend === 'webgpu' ? 'WebGPU' : 'WebGL 2'}; ${comparison}) ---`]
   if (!baselineRan) {
     lines.push('      the baseline run did not produce a result — NOT classified (never assume green).')
     if (note) lines.push(`      ${note}`)
@@ -580,7 +585,9 @@ export function formatBaselineReport({
     }
     lines.push('      Read the kept output below at the last check named above — the throw is the line after it.')
   }
-  for (const c of classified) lines.push(`      ${c.check}: ${VERDICT_LABEL[c.verdict]}`)
+  for (const c of classified) {
+    lines.push(`      ${c.check}: ${VERDICT_LABEL[c.verdict]}${c.verdict === 'real-regression' ? qualification : ''}`)
+  }
   // A CAVEAT, printed after the verdicts because they still stand: the run
   // reported, it just reported over a shorter suite than the current one.
   for (const s of shortfalls) {

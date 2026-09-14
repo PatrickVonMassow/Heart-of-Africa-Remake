@@ -25,7 +25,7 @@ export function classifyRedSuites(redSuites, { backend, root = REPO_ROOT, env = 
       } else {
         dir = mkdtempSync(join(tmpdir(), 'hoa-red-ownership-'))
         const reportFile = join(dir, 'baseline.json')
-        const args = [join(root, 'scripts/verify/baseline-classify.mjs'), suite, '--report-file', reportFile]
+        const args = [join(root, 'scripts/verify/baseline-classify.mjs'), suite, '--report-file', reportFile, '--current-context', 'in-pass']
         for (const check of failed) args.push('--failed', check.name)
         if (checks > 0) args.push('--current-checks', String(checks))
         const result = spawn(process.execPath, args, { cwd: root, windowsHide: true, stdio: 'inherit',
