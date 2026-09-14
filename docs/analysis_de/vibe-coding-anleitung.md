@@ -473,6 +473,11 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Frag bei jedem Test über einem **erzeugten** Artefakt, **woher die Erwartung kommt**.
   Richtigkeit braucht eine Aussage, die der Erzeuger **nicht selbst herstellt**."
 
+- **Vorher und Nachher wurden verschieden gemessen — und die Maschine urteilt trotzdem.** Der alte
+  Stand lief allein, der neue im vollen Durchlauf; „Regression" heißt dann nur „anders gemessen".
+  → *Prompt:* „Vergleichst du zwei Messungen, nenne **wie jede erhoben wurde**; bei verschiedenen
+  Bedingungen ist es **kein Vergleich** — neu messen oder die Einschränkung **ins Urteil** schreiben."
+
 - **Ein Auftrag, den du einer laufenden Sitzung nur zurufst, stirbt mit ihr.**
   → *Prompt:* „Was eine Sitzung überdauern soll, gehört in eine Datei, die dein Werkzeug beim
   nächsten Start liest. Ein Zuruf ist ein Hinweis, nie ein Auftrag."
@@ -659,4 +664,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 21914e28d94856fa695ef782be85feb9a9f5c4a26ced61359cc7594cf3c35208 -->
+<!-- GUIDE-FINGERPRINT: bfbf5d956dcbee0ec9f3eedb17dec6c462df80576c6f9d2b62879f71e44a1162 -->

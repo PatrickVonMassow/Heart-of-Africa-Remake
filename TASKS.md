@@ -81,6 +81,16 @@ put it is the mistake this line exists to stop.
   ground the village walks over (user 04.09.2026, watching the merged digging work; point
   1057 folded in here 07.09.2026 on the user's instruction to bundle points that would
   otherwise each buy their own regression run).
+  PARKED 14.09.2026 BEHIND POINT 1127, on the user's instruction after asking whether this
+  point profits from doing 1127 first. Its code stands finished on
+  `feat/1056-dig-site-purpose-and-ground` (34 files, +1404/-284); what it cannot get is a
+  green run, because the pass reds on a check whose own author declared the reading
+  meaningless. Its last commits had begun to work AROUND that check from inside this
+  feature branch — the branch also touches `scripts/verify/polish.mjs` and
+  `scripts/verify/baseline-classify.mjs`, which is 1127's ground — so landing it as it
+  stands would hide the infrastructure defect instead of fixing it. ON RESUMPTION: sync
+  main, re-examine whether those stand-down commits can come back out, then ONE covering
+  run. No two-backend LARGE is bought for this point until 1127 has landed.
   ONE OBJECT, TWO COMPLAINTS FROM THE SAME MORNING. The dig site says nothing about its
   purpose (PART A) and its earth behaves like nothing at all (PART B). Both are judged by the same
   evidence — a village frame holding the excavations, on both backends — and both edit the
@@ -225,49 +235,6 @@ put it is the mistake this line exists to stop.
   `batch-doctor --repair` would quarantine them into a stash. The 144 freshly written
   `verification/` frames in the point's worktree come from a RED run and are not evidence.
   Bundle: Dorfleben.
-
-- [ ] 1127. A check that declares itself non-predictive still reds the pass and blocks a
-  foreign point (measured 14.09.2026 on point 1056).
-  `scripts/verify/polish.mjs` calls `nonPredictive()` on "a villager is seen digging, and the
-  jar goes down EMPTY and comes back FULL" and states why in its own comment (10.09.2026):
-  "Run alone, the section always saw enough errands... Inside the full suite the same window
-  cast ONE errand, with the fetch phase at 33 of about 2000 phase ticks, and the pass failed
-  here." The declaration reaches the LADDER only (`scripts/verify/ladder-core.mjs` refuses to
-  count the rung as climbed); it does NOT reach the suite's exit code. So the check still
-  fails the pass, the runner promotes it to CANDIDATE REAL FAILURE, and an unrelated point is
-  blocked by a reading its own author declared meaningless.
-  MEASURED, like for like, all on WebGL 2:
-  - merge base f799ad619885, section standalone: 37 and 30 full-jar samples — PASS, twice.
-  - `main` 09b96e7b1, section standalone: 48 and 39 — PASS, twice.
-  - point 1056's merge candidate 781b14a84, section standalone: **50** — PASS
-    (local/verify-logs/2026-09-14T18-56-15-496-polish.log, 2m 08s).
-  - the SAME commit inside the full pass: 0 and 0 — FAIL, twice
-    (local/verify-logs/2026-09-14T15-50-11-451-large.log).
-  The branch matches its own merge base and `main` whenever the two are measured the same
-  way. The split is standalone-against-in-pass, not before-against-after, and the baseline
-  classification cannot see that: it runs the baseline STANDALONE and the candidate IN PASS,
-  then prints "REAL REGRESSION (green on baseline, red now)". That verdict cost point 1056 a
-  day and, with the runs of point 1126, the larger part of 599 minutes of machine.
-  Final state:
-  - A check declared `nonPredictive()` cannot by itself decide the run it is declared
-    non-predictive IN. Either it does not run there, or its reading there does not set the
-    exit code — one of the two, not a third mechanism.
-  - The baseline classification compares like with like, or says out loud that it did not:
-    a baseline measured standalone against a candidate measured in-pass may not be printed as
-    "REAL REGRESSION" without that qualification.
-  - The adult-errands window itself is sized so both runs measure the same thing, or the
-    check stops claiming to. This is the half points 1085 and 1087 left behind when they
-    closed; it has no open owner today, which is why the red had nowhere to be charged.
-  - NOTHING IS WEAKENED: the check keeps its full force standalone, where it discriminates
-    (37/30/48/39/50 against 0), and no other check changes.
-  Criticality: high — a real, measured blockade with a false-approval risk in both
-  directions: a meaningless red blocked a sound branch, and the same path would print
-  "REAL REGRESSION" for any point whose branch merely runs the pass.
-  Refs: scripts/verify/polish.mjs (`adult-errands`, `nonPredictive`),
-  scripts/verify/ladder-core.mjs, scripts/verify/baseline-classify.mjs,
-  scripts/verify/run-all.mjs (the CANDIDATE REAL FAILURE promotion),
-  scripts/render-verify-charges.mjs, points 1085, 1087, 1126
-  Bundle: Testinfrastruktur.
 
 - [ ] 1126. The full proof runs once, and a red repeats only its own rung (user 14.09.2026,
   after asking why a feature costs more verification than development).
@@ -15550,9 +15517,16 @@ to land than a mechanism that needs a review.
   base number; a single retried `polish` is worth roughly a third of a four-suite
   expectation. Both verdicts were disobeyed on the measurement above and both runs finished
   with their receipts.
+  A FOURTH AND FIFTH OCCURRENCE, 15.09.2026, on the two covering runs of point 1127, and this
+  time the verdict was DISOBEYED both times: full `polish` on WebGPU was called hung at 19m 00s
+  and again at 28m 33s and finished GREEN ON THE FIRST ATTEMPT at 31m 47s with 54 frames; the
+  WebGL 2 lane was called hung at 19m 20s and 28m 43s and finished at 30m 27s, its single red
+  charged to open point 1068. What the session had to weigh against the verdict was the
+  hand-measured liveness this point already demands — renderer CPU accumulating, the dev server
+  answering 200 — because the log was silent for 31 minutes, exactly as recorded above.
   Criticality: high — the rule does not merely mislead, it instructs the session to destroy
-  running work, and the batch pays for the killed run twice. It has now done so three times
-  in two days, to both backends.
+  running work, and the batch pays for the killed run twice. It has now done so five times
+  in four days, to both backends.
   Bundle: Session- & Repo-Hygiene.
 
 - [ ] 1100. A verification for a just-landed point can publish no board at all (measured

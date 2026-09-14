@@ -500,7 +500,15 @@ export const LIMITS = {
   // that entry because it is the same reader question, and it carries the house answer with it:
   // a contradiction between gates is a defect to file, not a thing to re-answer every turn. The
   // long telling stays in the retrospective (3.201). Two lines: 659 -> 661.
-  maxLines: 661,
+  // RAISED 14.09.2026 (fourth): a genuinely new reader question, not a longer telling of an
+  // existing one — two measurements taken under DIFFERENT conditions carry no comparison, yet
+  // the tool prints a verdict from them anyway (the baseline measured alone, the candidate
+  // inside the full pass, the difference announced as "Regression"). It was NOT folded: the
+  // neighbouring entries ask where an expectation comes from and whether the harness loads like
+  // production, and neither asks how each side was MEASURED. Written at four lines after the
+  // shortening step this rule demands — a first draft at six was cut by a third before any
+  // raise. The long telling stays in the retrospective (3.273). Five lines: 661 -> 666.
+  maxLines: 666,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -775,7 +783,10 @@ export const LIMITS = {
   // bought headroom for: 6323 -> 6340.
   // 14.09.2026 (third): the wrong-object-gate fold justified beside maxLines measures 29 words:
   // 6340 -> 6369.
-  maxWords: 6369,
+  // 14.09.2026 (fourth): the unlike-for-unlike comparison entry justified beside maxLines
+  // measures 56 words after the shortening step — the first draft ran 73 and was cut rather
+  // than bought headroom for: 6369 -> 6425.
+  maxWords: 6425,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,

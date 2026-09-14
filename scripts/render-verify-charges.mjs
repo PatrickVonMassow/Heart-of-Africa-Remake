@@ -1459,27 +1459,4 @@ export const RED_CHARGES = [
       + 'the fleck nearest the bank, then waits nextFrames(6) before the shutter, and the flecks '
       + 'drift by design. The charge dies with 1121.',
   },
-  {
-    point: 1127,
-    suite: 'polish',
-    // SCOPED TO THE ONE CHECK THAT DECLARES ITSELF NON-PREDICTIVE IN THE PASS.
-    // Not backend-scoped: the declaration in polish.mjs is about the sample
-    // WINDOW, which is the same on both lanes, and the check keeps its full
-    // force standalone — where it discriminates sharply (37/30/48/39/50 full-jar
-    // samples green against 0 red) and where this charge does not reach, because
-    // a PARTIAL --section run is never counted as suite coverage.
-    match: /jar goes down EMPTY and comes back FULL/i,
-    why:
-      'THE IN-PASS READING POINT 1127 WAS FILED FOR. scripts/verify/polish.mjs declares this '
-      + 'check nonPredictive() with its own dated reason (10.09.2026): run alone the window '
-      + 'casts many errands, inside the full pass it cast ONE. Measured like for like on '
-      + 'WebGL 2, 14.09.2026: merge base f799ad619885 standalone 37 and 30 full-jar samples, '
-      + "main 09b96e7b1 standalone 48 and 39, and point 1056's merge candidate 781b14a84 "
-      + 'standalone 50 (local/verify-logs/2026-09-14T18-56-15-496-polish.log) — all PASS. The '
-      + 'same 781b14a84 inside the full pass read 0 twice '
-      + '(local/verify-logs/2026-09-14T15-50-11-451-large.log). The split is '
-      + 'standalone-against-in-pass, not before-against-after, so the baseline '
-      + 'classification printed "REAL REGRESSION" from a standalone baseline against an '
-      + 'in-pass candidate. The charge dies with 1127.',
-  },
 ]

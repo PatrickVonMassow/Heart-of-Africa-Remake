@@ -51,12 +51,9 @@ const check = (name, ok, detail) => {
   // The section tag goes AFTER the ' — ' separator: the check's NAME is its
   // identity for the red ledger and the baseline classifier and must not change.
   const tail = [detail, sections.tag().trim()].filter(Boolean).join('  ')
-  // A check that declared itself NON-PREDICTIVE says so on the line where it
-  // passes narrowly (point 1086), so a green section run cannot be read as a
-  // promise about the pass.
-  const note = sections.predictiveNote(name, ok)
-  console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${tail ? ' — ' + tail : ''}${note}`)
-  if (!ok) failures++
+  const { status, failed, note } = sections.checkResult(name, ok)
+  console.log(`${status}  ${name}${tail ? ' — ' + tail : ''}${note}`)
+  if (failed) failures++
 }
 
 /**
@@ -5282,12 +5279,9 @@ if (section('adult-errands')) {
     e.dwellSeconds = 1
     e.digSeconds = 3
     e.pace = 6
-    // FOURTEEN, not ten (work-order 1087): the water errand is ONE round trip
-    // held by one carrier and needs a second man to order it, and with ten
-    // adults the DIG pairs held every free body for minutes at a time — the
-    // order and the return then had to be caught in whatever gap was left, and
-    // were not. More adults does not change either errand; it stops the sample
-    // window depending on a queue that happens to free two of them.
+    // Keep the measured ten-adult standalone setup. This fixed sample window
+    // does not provide equivalent jar observations inside the full suite; the
+    // jar check below declares that limitation instead of claiming coverage.
     e.villagerCount = 10
     // THE DIP IS HELD LONG ENOUGH TO BE CAUGHT (work-order 1087). At its played
     // value the fill lasts well under two seconds, which a polling check can
@@ -5434,10 +5428,10 @@ if (section('adult-errands')) {
     // the section always saw enough errands — twelve green climbs on 09.09.,
     // 18 pass and 0 fail. Inside the full suite the same window cast ONE errand,
     // with the fetch phase at 33 of about 2000 phase ticks, and the pass failed
-    // here. Until the window is sized so both runs measure the same thing (the
-    // water carrier's own points own that), the narrow green says out loud that
-    // it promises nothing about the pass — and the ladder refuses to count it as
-    // climbed (scripts/verify/ladder-core.mjs).
+    // here. The fixed 240-sample window does NOT measure equivalent activity
+    // in both contexts. Keep the standalone assertion; the full-suite reading
+    // is advisory and cannot decide the exit or enter the red ledger. A narrow
+    // green still promises nothing about the pass, so the ladder refuses it.
     nonPredictive(
       'a villager is seen digging, and the jar goes down EMPTY and comes back FULL',
       'run alone this window casts many errands; inside the full pass it cast ONE, fetch phase 33 of ~2000 ticks (10.09.2026)',

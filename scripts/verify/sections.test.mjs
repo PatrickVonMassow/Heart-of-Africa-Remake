@@ -291,17 +291,21 @@ describe('a check that declares it cannot predict the suite’s own reading', ()
     const gate = makeSectionGate({ sections: ['adult-errands'], requested: 'adult-errands', suite: 'polish' })
     gate.section('adult-errands')
     gate.nonPredictive('the jar comes back FULL', 'the pass casts one errand')
-    expect(gate.predictiveNote('the jar comes back FULL', true)).toContain('NON-PREDICTIVE narrowly')
-    // A red is a red either way round, and an undeclared check says nothing.
-    expect(gate.predictiveNote('the jar comes back FULL', false)).toBe('')
-    expect(gate.predictiveNote('the lanes meet the gate', true)).toBe('')
+    expect(gate.checkResult('the jar comes back FULL', true).note).toContain('NON-PREDICTIVE narrowly')
+    // A standalone red retains its full force, and an undeclared check says nothing.
+    expect(gate.checkResult('the jar comes back FULL', false).note).toBe('')
+    expect(gate.checkResult('the lanes meet the gate', true).note).toBe('')
   })
 
-  it('says nothing in a WHOLE-suite run, which measures what it measures', () => {
+  it('makes both outcomes advisory in the whole suite and leaves other checks decisive', () => {
     const gate = makeSectionGate({ sections: ['adult-errands'], requested: null, suite: 'polish' })
     gate.section('adult-errands')
     gate.nonPredictive('the jar comes back FULL', 'the pass casts one errand')
-    expect(gate.predictiveNote('the jar comes back FULL', true)).toBe('')
+    for (const ok of [true, false]) {
+      expect(gate.checkResult('the jar comes back FULL', ok)).toMatchObject({ status: 'NON-PREDICTIVE', failed: false })
+      expect(gate.checkResult('the jar comes back FULL', ok).note).toContain(`observed ${ok ? 'pass' : 'fail'}`)
+      expect(gate.checkResult('the lanes meet the gate', ok)).toEqual({ status: ok ? 'PASS' : 'FAIL', failed: !ok, note: '' })
+    }
   })
 
   it('refuses a declaration without a check name or without a reason', () => {
