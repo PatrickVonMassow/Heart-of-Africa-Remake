@@ -539,10 +539,12 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 - **Die lange Messung hing am Leben der Sitzung, die sie bestellt hat.** Endet das Fenster, das
   einen langen Prüflauf startete, stirbt er mitten drin — und zwar **wie ein Fehlschlag**:
-  Abbruchcode gesetzt, Fehlerliste leer, Protokoll mitten im Satz zu Ende.
+  Abbruchcode gesetzt, Protokoll mitten im Satz zu Ende. Hat er vorher **echte Rote** gefunden,
+  sind die hinterher **nicht mehr einzuordnen**.
   → *Prompt:* „Was **länger dauert als ein Zug**, startest du **abgekoppelt** — im **Werkzeug**,
-  nicht als Merkregel. Ein Lauf ohne Schlussurteil, der **keinen** Fehlschlag nennt, heißt
-  *abgebrochen*, nicht *rot*. Prüffrage: Wessen Tod nimmt diesen Lauf mit?"
+  nicht als Merkregel. Ein Lauf ohne Schlussurteil heißt *abgebrochen*, nicht *rot* — **auch
+  wenn er Fehlschläge nennt**. Was seine Lesart entscheidet, gehört in den **Datensatz**, nicht
+  nur ins Terminal."
 
 - **Die Schranke aus zwei Hälften, von denen nur eine ein Polster bekam.** Dieselbe Messung,
   zwei Kriterien: eins ließ vier von neunzig durchgehen, das andere färbte bei einem rot.
@@ -580,7 +582,9 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   ein Nachweis fehlt — und der Nachweis ist der Lauf, der noch zwei Stunden braucht.
   Verweigerung und eigene Abhilfe laufen gegeneinander.
   → *Prompt:* „Eine Schranke, die einen Nachweis fordert, muss ‚wird gerade erstellt' als
-  eigenen Zustand **durchlassen** — sonst verbietet sie ihre eigene Erfüllung."
+  eigenen Zustand **durchlassen** — sonst verbietet sie ihre eigene Erfüllung. Und misst sie am
+  **falschen Gegenstand**, ist sie nie erfüllbar: Widersprechen sich zwei Schranken, ist das ein
+  **Defekt**, kein Bedienfehler — messen, ablegen, nicht in jedem Zug neu beantworten."
 
 - **Ein Rot, das bei gleichem Code kommt und geht, ist ein Befund über deine MESSUNG.** Eine
   Stichprobe aus einem langen Vorgang trifft den Defekt mal und verfehlt ihn mal.
@@ -655,4 +659,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 48bc5763b84e8a2f1d8669bbfd8ff81db4fb21ec5d3d96ea52ea44701db37924 -->
+<!-- GUIDE-FINGERPRINT: 21914e28d94856fa695ef782be85feb9a9f5c4a26ced61359cc7594cf3c35208 -->

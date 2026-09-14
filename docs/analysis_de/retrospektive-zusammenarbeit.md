@@ -1537,7 +1537,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Montag, 14.09.2026, 12:01 · Quellen-Fingerprint: `48bc5763b84e…`
+Zuletzt aktualisiert: Montag, 14.09.2026, 15:17 · Quellen-Fingerprint: `03b60d374508…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1643,8 +1643,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 96 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 133 Prozess-/Meta-TASKS-Punkte (davon 65 offen).
 
-<!-- RETRO-FINGERPRINT: 48bc5763b84e8a2f1d8669bbfd8ff81db4fb21ec5d3d96ea52ea44701db37924 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-14T10:01:05.523Z -->
+<!-- RETRO-FINGERPRINT: 03b60d3745085cf3b6dcf938c0cb3e09f6e01391b2f2041a850a0377b0fbe492 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-14T13:17:39.128Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -6952,3 +6952,61 @@ Adoption, nie ein Neustart — `--adopt` existiert genau dafür. Und bevor eine 
 Rote zuordnet, ist die Selbstbuchung des Laufs zu lesen: Ein Lauf, der seine Roten bereits
 einem offenen Punkt angelastet hat, braucht keinen zweiten Zuordner, sondern nur noch einen
 Leser.
+
+### 3.200 Ein abgewürgter Lauf sieht im Datensatz aus wie ein normal beendeter
+
+Der Fall aus §3.112 hat einen Nachhall, der erst am Folgetag Geld gekostet hat. Der
+zerrissene Zwei-Backend-LARGE zu Punkt 1056 hinterließ eine Quittung mit `exit 1` und sechs
+roten Suiten aus sechs voneinander unabhängigen Themen — `world`, `polish`, `touch`,
+`settings`, `enrichments`, `benchmark`. Die Nachfolgesitzung stand damit vor der Frage, die
+das Haus für jedes Rot stellt: echte Regression, vorbestehend oder Umgebung?
+
+Diese Frage war nicht mehr beantwortbar. `scripts/verify/run-logged.mjs` flacht ein per
+Signal getötetes Kind auf `code === null ? 1 : code` ab; der einzige Ort, der das Signal
+benennt, ist ein Digest-Feld, das ins Terminal des Bestellers geht und nicht in den
+`.run.json`-Datensatz. Stirbt die wartende Sitzung — hier tat sie es 42 Sekunden vor dem
+Laufende —, ist die Unterscheidung zwischen Kill und Selbst-Exit unwiederbringlich verloren.
+Übrig bleibt eine Quittung, die aussieht wie ein regulär durchgelaufener roter Test, und sechs
+Rote, deren einziger gemeinsamer Nenner die Uhrzeit ist.
+
+Der Schaden ist nicht das fehlende Feld, sondern was an seiner Stelle passieren muss. Sechs
+unklassifizierbare Rote lassen genau zwei Wege offen: sie zu glauben und Arbeit an Defekten
+zu beginnen, die es nicht gibt, oder den ganzen Lauf zu wiederholen. Die Nachfolgesitzung
+hat wiederholt — gut zwei Stunden Maschine, um eine Auskunft nachzuholen, die ein Wort im
+Datensatz gehabt hätte. Dass die Wiederholung `world` sofort grün zeigte, bestätigt die
+Diagnose nachträglich und ändert am Preis nichts.
+
+**Lehre:** Ein Datensatz, der über einen Lauf Auskunft geben soll, muss die Tatsache tragen,
+die seine Lesart entscheidet — hier das Signal oder ein schlichtes `exitedNormally`. Ein
+Feld, das nur ins Terminal geht, existiert für jede spätere Sitzung nicht. Das ist dieselbe
+Abkürzung wie in §3.112, eine Ebene tiefer: Dort wurde die Lebendigkeit aus der Buchhaltung
+abgeleitet statt gemessen, hier wird sie gar nicht erst aufgeschrieben.
+
+### 3.201 Zwei Schranken, deren Bedingungen sich gegenseitig ausschließen
+
+Am 14.09.2026 hat die Kontext-Wassermarke die Übergabe verlangt, während der Beweislauf zu
+Punkt 1056 noch lief. Der In-Flight-Wächter hat sie verweigert: Ein Nachfolger könne diesen
+Lauf nicht übernehmen. Er bot vier Auswege an, und keiner griff — ein Testlauf hat keinen
+Checkpoint, die Neu-Deklaration mit Zweig und Arbeitsbaum ändert nichts, Wegwerfen kostet
+zwei Stunden Maschine, und Austrinken heißt: über der Wassermarke weiterlaufen, also genau
+das tun, was die Wassermarke verhindern soll.
+
+Die Ursache ist kein Zufall der Lage, sondern eine Konstruktion. Die Übergabeprüfung
+vergleicht `run.head` gegen `headNow` — und `headNow` ist der HEAD des HAUPTBAUMS, während
+ein Lauf im Worktree eines Punkts immer den HEAD SEINES ZWEIGS trägt. Beide stimmen genau
+dann überein, wenn main und der Zweig auf demselben Commit stehen, also während eines
+laufenden Punkts praktisch nie. Kein noch so guter Nachweis kann diese Bedingung erfüllen.
+Die Schranke fragt nach etwas, das es in der Lage, für die sie geschrieben wurde, nicht
+geben kann.
+
+Der Unterschied zu §3.198 ist wichtig. Dort gaben zwei Wächter einander ein ALIBI — beide
+grün, die Wahrheit dazwischen verloren. Hier ist es das Gegenteil: Beide bestehen auf
+einander ausschließenden Bedingungen, und die Sitzung steht still, bis sie den Widerspruch
+selbst auflöst. Der Preis ist derselbe — die Arbeit wandert von der Sache zur Schrankenpflege
+—, aber die Diagnose ist eine andere: Ein Alibi findet man, indem man die Wächter
+gegeneinander prüft; einen Widerspruch findet man nur, indem man die Bedingung liest.
+
+**Lehre:** Eine Schranke, die eine Übergabe verweigert, muss ihre Bedingung an dem Ding
+messen, um das es geht — hier am Arbeitsbaum, in dem der Lauf läuft, nicht am Hauptbaum.
+Und wo zwei Schranken einander widersprechen, ist das kein Bedienfehler: Es gehört gemessen,
+abgelegt und als Defekt behandelt, statt in jedem Zug neu beantwortet zu werden.

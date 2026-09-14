@@ -15723,8 +15723,38 @@ to land than a mechanism that needs a review.
      around that sentence — the successor nearly committed to main on the
      strength of it, which would have killed the orphaned LARGE at its unit stage
      for the third time (01.09., 08.09., see the quiet-machine memory).
+
+  3. A KILLED RUN AND A SELF-EXIT LOOK THE SAME IN THE RECORD. Measured
+     14.09.2026 on the aborted LARGE of point 1056
+     (local/verify-logs/2026-09-14T07-41-21-135-large.log, 09:41-12:20): it stops
+     inside the automatic baseline classification before its fourth red suite and
+     never prints its own closing line. The receipt says exit 1, which proves
+     nothing - `scripts/verify/run-logged.mjs` flattens a signalled child to
+     `code === null ? 1 : code`, and the only place that names the signal is the
+     digest field `command: <cmd> (killed by SIGxxx)`, which goes to the
+     orderer's terminal and NOT into the `.run.json` record. Once the waiting
+     session is gone, kill and self-exit can no longer be told apart - so the six
+     red suites of that run cannot be classified at all, and each of them costs
+     the next session a re-run to rule out. Cheap remedy: write the signal (or
+     `exitedNormally`) into the record, not only into the digest.
+
+  4. A RUN ON A FEATURE BRANCH CAN NEVER BE HANDED OVER. Measured 14.09.2026 at
+     the context watermark, with the two-backend LARGE for point 1056 running:
+     `scripts/batch-in-flight-core.mjs` tests a declared run with
+     `sameHead(run.head, headNow)`, where `headNow` is the MAIN tree's HEAD while
+     the run carries the HEAD of the worktree it runs in. The two agree only when
+     main and the branch stand on the same commit — that is, essentially never
+     while a point is in progress. The handover is refused with "its run covers
+     HEAD <branch>, not the <main> being handed over" however well the run is
+     evidenced, and none of the four offered ways out applies: a test run has no
+     CHECKPOINT, RE-DECLARE with `--branch`/`--worktree` does not touch the
+     comparison, ABANDON throws away hours of machine, and DRAIN forces the
+     session to keep running above the watermark — which is exactly what the
+     watermark exists to prevent. So the two guards contradict each other by
+     construction. Cheap remedy: compare against the HEAD of the worktree the run
+     runs in (or the branch the declaration names), not against the main HEAD.
   Criticality: high — a real blockade with a measured cost, plus a false-approval risk: the claim text
   promises a clean release that a pid-dead owner does not deliver.
   Refs: scripts/batch-claim.mjs, scripts/batch-in-flight.mjs, scripts/verify/run-wait.mjs,
-  scripts/verify/run-all.mjs
+  scripts/verify/run-all.mjs, scripts/verify/run-logged.mjs
   Bundle: Session- & Repo-Hygiene
