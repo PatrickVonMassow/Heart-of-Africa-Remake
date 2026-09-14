@@ -488,7 +488,13 @@ export const LIMITS = {
   // ordered it re-set while it was 43 minutes in. Folded into that entry as one sentence rather
   // than a new tip, because "measure an actor, not its paperwork" is where a reader looks for
   // it. The long telling stays in the retrospective (3.272). One line: 656 -> 657.
-  maxLines: 657,
+  // RAISED 14.09.2026 (second): the detached-run entry read an EMPTY failure list as the mark of
+  // an abort. The 14.09.2026 case had six reds in it, so the abort read as an ordinary red run and
+  // its reds could not be classified at all — the cost was a repeated two-hour pass. Folded into
+  // that same entry rather than a new tip, because it corrects a rule the entry already states,
+  // and it carries the remedy with it: what decides a run's reading belongs in its record, not in
+  // the terminal. The long telling stays in the retrospective (3.200). Two lines: 657 -> 659.
+  maxLines: 659,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -758,7 +764,10 @@ export const LIMITS = {
   // was tightened rather than bought headroom for: 6233 -> 6316.
   // 14.09.2026: the dead-owner-is-not-a-dead-thing sentence justified beside maxLines measures
   // 7 words: 6316 -> 6323.
-  maxWords: 6323,
+  // 14.09.2026 (second): the abort-that-names-reds correction justified beside maxLines measures
+  // 17 words after two rounds of tightening — the first draft ran 98 and was cut rather than
+  // bought headroom for: 6323 -> 6340.
+  maxWords: 6340,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,

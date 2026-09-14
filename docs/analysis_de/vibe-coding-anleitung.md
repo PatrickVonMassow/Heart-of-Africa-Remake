@@ -539,17 +539,12 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 - **Die lange Messung hing am Leben der Sitzung, die sie bestellt hat.** Endet das Fenster, das
   einen langen Prüflauf startete, stirbt er mitten drin — und zwar **wie ein Fehlschlag**:
-  Abbruchcode gesetzt, Protokoll mitten im Satz zu Ende. Manchmal ist die Fehlerliste leer;
-  manchmal stehen **echte Rote darin**, die er vor dem Tod noch gefunden hat — und dann sieht
-  der Abbruch aus wie ein regulär durchgelaufener roter Test. Wer das Signal nicht
-  **aufschreibt**, kann diese Roten hinterher **nicht mehr einordnen**: Er glaubt ihnen und
-  sucht Defekte, die es nicht gibt, oder er wiederholt den ganzen Lauf.
+  Abbruchcode gesetzt, Protokoll mitten im Satz zu Ende. Hat er vorher **echte Rote** gefunden,
+  sind die hinterher **nicht mehr einzuordnen**.
   → *Prompt:* „Was **länger dauert als ein Zug**, startest du **abgekoppelt** — im **Werkzeug**,
   nicht als Merkregel. Ein Lauf ohne Schlussurteil heißt *abgebrochen*, nicht *rot* — **auch
-  dann, wenn er Fehlschläge nennt**. Und was über einen Lauf entscheidet, gehört in seinen
-  **Datensatz**, nicht nur in die Ausgabe: Ein Feld, das nur ins Terminal geht, existiert für
-  die nächste Sitzung nicht. Prüffrage: Wessen Tod nimmt diesen Lauf mit — und sähe man ihm
-  den Tod morgen noch an?"
+  wenn er Fehlschläge nennt**. Was seine Lesart entscheidet, gehört in den **Datensatz**, nicht
+  nur ins Terminal."
 
 - **Die Schranke aus zwei Hälften, von denen nur eine ein Polster bekam.** Dieselbe Messung,
   zwei Kriterien: eins ließ vier von neunzig durchgehen, das andere färbte bei einem rot.
@@ -662,4 +657,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 48bc5763b84e8a2f1d8669bbfd8ff81db4fb21ec5d3d96ea52ea44701db37924 -->
+<!-- GUIDE-FINGERPRINT: 21914e28d94856fa695ef782be85feb9a9f5c4a26ced61359cc7594cf3c35208 -->
