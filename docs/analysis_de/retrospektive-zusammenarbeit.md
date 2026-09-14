@@ -64,6 +64,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 14.09. | Nach einer Parallelsitzung verlangte ein Stop-Hook `batch-doctor --gate` vor JEDER weiteren Batch-Arbeit — dessen Tor fährt eine volle Unit-Suite, neben dem laufenden Zwei-Backend-Bildlauf auf derselben Maschine. Gefunden hat der Doktor genau eine Datei: die Review-Zeile, die dieselbe Sitzung vier Minuten zuvor geschrieben hatte. Sie zu committen genügte, das Urteil sprang auf `consistent`, die Unit-Suite wurde nie gebraucht; ihr Abbruch ließ zwei verwaiste vitest-Worker neben dem Bildlauf zurück (§3.271, Wiedergänger von §3.267) |
 | 14.09. | Eine Karte erklärte die laufende Zwei-Backend-LARGE für verwaist und ordnete an, sie neu aufzusetzen — tot war nur ihr Besitzer, der Lauf stand nach 34 Minuten in den langen Suiten; ihre zwei Roten hatte er längst selbst an Punkt 1078 gebucht (§3.272, Spiegel von §3.155/§3.170) |
 | 12.09. abends | Wiedergänger von §3.231: Der LARGE-Lauf eines Punktes starb nach 6 m 53 s an einem 20-Sekunden-Timeout in einer Unit-Datei — diesmal war der Störer kein fremder Committer, sondern eine PFLICHT derselben Sitzung. Der Stop-Hook forderte wegen einer Parallel-Sitzung `batch-doctor --gate`, und dessen Tor fährt `test:unit`, `build` und `lint` im Hauptbaum, während der Worktree-Lauf mit genau derselben Unit-Suite beginnt. Der Runner druckte sein eigenes Urteil mit — »UNDER LOAD — a timeout failure under load is not evidence of a broken test« —, also wusste er, dass die Maschine nicht ruhig war, und lief trotzdem an. Die In-Flight-Markierung, die es gewusst hätte, liest der Doctor nicht (Backlog 12.09.) |
+| 14.09. abends | Ein einziger roter Prüfpunkt hielt einen Punkt einen Tag fest — und war ein Fehlalarm: Gleich gemessen liest er auf Merge-Basis 37/30, auf `main` 48/39 und auf dem Kandidaten **50** volle Krüge, alle grün; nur im vollen Pass null. Die Baseline-Klassifikation fährt die Baseline standalone und den Kandidaten im Pass und druckt die Differenz als »REAL REGRESSION«. Der Prüfpunkt erklärt sich seit dem 10.09. selbst für nicht aussagekräftig — die Erklärung erreicht die Leiter, aber nicht den Exit-Code (§3.273, Punkt 1127) |
 | 13.08. | Der Nachprüfer findet eine echte zweite Klippe im geheilten Mechanismus — und jede der fünf gemessenen Kuren verschlechtert gesunde Dörfer stärker, als der Fehler schadet: Befund wird gebucht statt behoben (§3.115) |
 | 20.08. | Der Dokumentschnitt strich Regeln als »von einem Wächter abgedeckt«, ohne einen einzigen Wächter darauf zu prüfen — die Kontextanzeige verschwand, der Nutzer fand es (§3.134); eine vom Nutzer gesetzte Rangfolge wurde in einer Nacht zweimal maschinell überholt, ohne dass irgendwo ein Grund stand (Punkt 614); zwei Werkzeuge derselben Bauart am falschen Ort gemessen — im Hauptbaum gebaut und geprüft, während der Prozess die Arbeit in den isolierten Bereich schickt (§3.137) |
 | 21.08. | Ein Tor verlangte eine Freigabe, die seine eigenen Werkzeuge nicht herstellen können — der HIGH-Punkt war gemergt, geprüft und freigegeben, und der Zugausgang wies ihn trotzdem ab (§3.153) |
@@ -1530,6 +1531,41 @@ des Registers ist der Beitrag geprüft. Das ist die stillste Art, eine eingebaut
 Prüfung zu verlieren: nicht durch Umgehung, sondern dadurch, dass die halbe Zusage
 keinen Träger hat. Gebucht als Punkt 956.
 
+### 3.273 Ungleiches mit Ungleichem verglichen — und die Maschine machte ein Urteil daraus
+
+Am 14.09.2026 hielt ein einziger roter Prüfpunkt den Punkt 1056 einen ganzen Tag lang fest:
+»a villager is seen digging, and the jar goes down EMPTY and comes back FULL«, zweimal rot im
+Gesamtlauf, vom Runner zur CANDIDATE REAL FAILURE erhoben. Der Arbeitsauftrag trug die
+Schlussfolgerung der Vorgängersitzung bereits als Tatsache: »Baseline run 1/2 of the pre-state
+f799ad619885 is GREEN, so this is the branch's own defect, not a pre-existing one.« Der Satz
+ist formal richtig und inhaltlich falsch, und der Fehler steckt nicht im Zweig, sondern im
+Vergleich.
+
+Gleich gemessen — jeder Stand als Abschnittslauf allein, WebGL 2 — liest derselbe Prüfpunkt:
+Merge-Basis 37 und 30 volle Krüge, `main` 48 und 39, der Merge-Kandidat des Zweigs **50**.
+Alle grün. Derselbe Kandidat im vollen Pass: null, zweimal. Der Bruch verläuft zwischen
+*allein gelaufen* und *im Pass gelaufen*, nicht zwischen *vorher* und *nachher*. Die
+Baseline-Klassifikation kann das strukturell nicht sehen: Sie fährt die Baseline **standalone**
+und den Kandidaten **im Pass** und druckt die Differenz als »REAL REGRESSION (green on
+baseline, red now)«. Sie vergleicht zwei Größen, die sich in zwei Achsen unterscheiden, und
+schreibt die eine Achse der anderen zu.
+
+Das Bittere daran: Der Prüfpunkt wusste es selbst. Seit dem 10.09.2026 trägt er ein
+`nonPredictive()` mit datiertem Grund — allein gelaufen caste das Fenster viele Botengänge,
+im vollen Pass genau einen. Diese Erklärung erreicht aber nur die *Leiter*, die die Sprosse
+nicht als geklettert zählt; sie erreicht **nicht den Exit-Code**. Ein Prüfpunkt, der von sich
+selbst sagt, dass er hier nichts beweist, färbt den Lauf trotzdem rot und blockiert damit
+einen fremden Punkt. Genau diese Lücke ist jetzt Punkt 1127.
+
+Die Lehre ist nicht »mehr messen«, sondern **gleich messen**: Ein Vergleich, dessen zwei
+Seiten unter verschiedenen Bedingungen entstanden sind, ist kein Beweis, sondern eine
+Vermutung mit Zahlen daran — und je genauer die Zahlen aussehen, desto teurer wird der
+Irrtum. Die Gegenprobe kostete hier zwei Minuten und acht Sekunden; sie zu unterlassen kostete
+einen Tag und, zusammen mit den Läufen aus §3.253 und Punkt 1126, den größeren Teil von 599
+Maschinenminuten. Eine zweite Lehre steht daneben: Ein übernommener Befund ist ein Befund,
+keine Messung. Die Vorgängersitzung hatte sorgfältig protokolliert — und ihre Schlussfolgerung
+stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die sie widerlegt.
+
 <!-- AUTO-GENERATED:START -->
 <!-- Dieser Abschnitt wird maschinell von scripts/retro-refresh.mjs gepflegt.
      NICHT von Hand editieren — der naechste Refresh ueberschreibt ihn.
@@ -1537,7 +1573,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Montag, 14.09.2026, 15:17 · Quellen-Fingerprint: `03b60d374508…`
+Zuletzt aktualisiert: Montag, 14.09.2026, 21:23 · Quellen-Fingerprint: `a3fbd3874212…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1643,8 +1679,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 96 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 133 Prozess-/Meta-TASKS-Punkte (davon 65 offen).
 
-<!-- RETRO-FINGERPRINT: 03b60d3745085cf3b6dcf938c0cb3e09f6e01391b2f2041a850a0377b0fbe492 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-14T13:17:39.128Z -->
+<!-- RETRO-FINGERPRINT: a3fbd3874212b996ea8363bbe9ce277fcb92310d31c1b8b7085215d2598da2e8 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-14T19:23:43.055Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
