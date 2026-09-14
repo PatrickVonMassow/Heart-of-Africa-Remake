@@ -840,3 +840,30 @@ The cost grows with the history, so the budget will be raised again. The test as
 a question about the guard, not about the archive: a fixture history would answer
 it in milliseconds and would not drift. Non-blocking — noted so the next raise is
 recognised as the third one, not the first.
+
+## Der Saum-Test des Erdhaufens beweist die Saumschließung nicht (14.09.2026)
+
+`src/scenes/place/digSpoilGeometry.test.ts` prüft, dass die Vertex-Positionen des
+Polar-Netzes eindeutig sind. Das beweist die Eigenschaft nicht, die der Test tragen
+soll: ließe man die umlaufenden Dreiecke am Saum weg, blieben diese Zusicherung und
+die Normalen-Prüfungen grün. Belastbar wäre eine Kantenzählung — nur die Kanten des
+Außenrands haben ein inzidentes Dreieck, alle anderen zwei.
+
+Gefunden von GPT-6 Astra im cross-vendor Review von d9e60b3c0 (P3, Gesamturteil
+merge). Kein Produktdefekt: das Netz ist nachgerechnet korrekt, nur der Test hält
+weniger, als er verspricht. Nicht sofort behoben, weil der Zweig zu diesem Zeitpunkt
+unter einem laufenden Zwei-Backend-Bildlauf stand und eine Änderung ihn entwertet
+hätte.
+
+## Erledigt-Karten des Boards behaupten pauschal ausstehende Abschlussarbeiten (14.09.2026)
+
+Über die Erledigt-Sektion läuft die Schablone „dieser Punkt ist zusammengeführt und
+abgehakt; die Abschlussarbeiten stehen noch aus" — gezählt mindestens acht Karten.
+Für 1087 und 1113 nachgemessen: kein lokaler Zweig, kein Remote-Zweig, kein
+Worktree. Die Arbeiten sind vollständig erledigt, die Karte sagt das Gegenteil.
+
+Es ist Generator-Verhalten, keine einzelne vergessene Karte: von Hand editiert stünde
+der Satz beim nächsten Publish wieder da. Board-Struktur wird nicht eigenmächtig
+geändert (Dashboard-Regel), deshalb hier gesammelt statt umgesetzt. Nebenbefund:
+dieselbe Sektion enthält transliterierte Umlaute (etwa „Haeuser"), die der
+Umlaut-Audit dort nicht prüft — er greift nur auf Aktuell- und Warteschlangenkarten.

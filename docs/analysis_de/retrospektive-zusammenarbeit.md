@@ -61,6 +61,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 12.09. | Der beauftragte Autor schrieb zweimal nichts und hatte zweimal recht: einmal, weil der Punkttext eine Wortüberlappungs-Heuristik zur Freigabe-Evidenz erklärte, deren eigener Kommentar sagt, ein Nein beweise keine Unschuld; einmal, weil der Unterbau des Punktes ungebaut war. Das Werkzeug meldete beide Male PROBLEMS — »NOTHING WAS COMMITTED«, »gates not green« —, also den Fehlschlag der Spur, wo die Spur genau das getan hatte, wofür sie existiert (§3.266, Punkte 1089/1073) |
 | 13.09. | Ein Punkt zog seine eigenen Rot-Ladungen zurück, wie es die Regel verlangt — zwei Tests standen noch auf ihnen und wurden erst im Tor der LANDUNG rot, als der Merge schon auf main lag: Das Register erzwingt »kein Eintrag ohne offenen Punkt«, niemand erzwingt »kein Test ohne seinen Eintrag« (§3.268). Dieselbe Sitzung wies drei Fremd-Rot nach: gegen die Zweigwurzel gemessen sind alle drei auch auf main rot, und das Rätsel am Schutthang ist dort nicht sporadisch, sondern reproduziert jedes Mal |
 | 13.09. abends | Vier CI-Läufe eines Zweigs starben als »cancelled« — ein Wort, das weder Ursache noch Reparatur nennt und das kein Push heilen kann. Es war das 15-Minuten-Limit des `fast`-Jobs: Die letzten beiden GRÜNEN Läufe, einer davon auf main, brauchten 14 m 41 s und 14 m 45 s, also rund fünfzehn Sekunden Luft. Der nächste Punkt, der irgendeinen Test hinzufügt, musste auflaufen, egal welcher. Sichtbar wurde es erst im Schrittprotokoll: install/build/lint/audit grün, `unit: cancelled`, »The operation was canceled« nach 15 m 13 s (§3.270) |
+| 14.09. | Nach einer Parallelsitzung verlangte ein Stop-Hook `batch-doctor --gate` vor JEDER weiteren Batch-Arbeit — dessen Tor fährt eine volle Unit-Suite, neben dem laufenden Zwei-Backend-Bildlauf auf derselben Maschine. Gefunden hat der Doktor genau eine Datei: die Review-Zeile, die dieselbe Sitzung vier Minuten zuvor geschrieben hatte. Sie zu committen genügte, das Urteil sprang auf `consistent`, die Unit-Suite wurde nie gebraucht; ihr Abbruch ließ zwei verwaiste vitest-Worker neben dem Bildlauf zurück (§3.271, Wiedergänger von §3.267) |
 | 12.09. abends | Wiedergänger von §3.231: Der LARGE-Lauf eines Punktes starb nach 6 m 53 s an einem 20-Sekunden-Timeout in einer Unit-Datei — diesmal war der Störer kein fremder Committer, sondern eine PFLICHT derselben Sitzung. Der Stop-Hook forderte wegen einer Parallel-Sitzung `batch-doctor --gate`, und dessen Tor fährt `test:unit`, `build` und `lint` im Hauptbaum, während der Worktree-Lauf mit genau derselben Unit-Suite beginnt. Der Runner druckte sein eigenes Urteil mit — »UNDER LOAD — a timeout failure under load is not evidence of a broken test« —, also wusste er, dass die Maschine nicht ruhig war, und lief trotzdem an. Die In-Flight-Markierung, die es gewusst hätte, liest der Doctor nicht (Backlog 12.09.) |
 | 13.08. | Der Nachprüfer findet eine echte zweite Klippe im geheilten Mechanismus — und jede der fünf gemessenen Kuren verschlechtert gesunde Dörfer stärker, als der Fehler schadet: Befund wird gebucht statt behoben (§3.115) |
 | 20.08. | Der Dokumentschnitt strich Regeln als »von einem Wächter abgedeckt«, ohne einen einzigen Wächter darauf zu prüfen — die Kontextanzeige verschwand, der Nutzer fand es (§3.134); eine vom Nutzer gesetzte Rangfolge wurde in einer Nacht zweimal maschinell überholt, ohne dass irgendwo ein Grund stand (Punkt 614); zwei Werkzeuge derselben Bauart am falschen Ort gemessen — im Hauptbaum gebaut und geprüft, während der Prozess die Arbeit in den isolierten Bereich schickt (§3.137) |
@@ -1535,7 +1536,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Montag, 14.09.2026, 07:31 · Quellen-Fingerprint: `d04e6c6b4940…`
+Zuletzt aktualisiert: Montag, 14.09.2026, 09:50 · Quellen-Fingerprint: `85d016dbe3e9…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1641,8 +1642,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 96 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 132 Prozess-/Meta-TASKS-Punkte (davon 64 offen).
 
-<!-- RETRO-FINGERPRINT: d04e6c6b4940bb022794f9bb411c8d887befca5743304788255b4a49063cd0ca -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-14T05:31:51.181Z -->
+<!-- RETRO-FINGERPRINT: 85d016dbe3e9607dfe5094f476714d2ed77128b0cb62b5b89f9e8be2135e73b1 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-14T07:50:22.913Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -6879,3 +6880,40 @@ etwas Wachsendem steht — Job-Timeout, Dokumentbudget, Kontextfenster —, geh�
 in die Ausgabe, nicht nur das Urteil. Das Limit steht jetzt auf 25 Minuten, mit der Messung
 im Kommentar daneben und der ausdrücklichen Auflage, beim nächsten Annähern die Suite
 billiger zu machen statt die Zahl ein zweites Mal zu heben.
+
+
+### 3.271 Die Regel sagt »nur lesen«, der Wächter verlangt eine volle Suite
+
+§3.267 endet mit einer Handregel: *Während ein Lauf misst, ist alles außer Lesen
+aufgeschoben — auch ein Commit, auch ein Push, auch ein Tor, das »nur« vier Minuten
+dauert.* Am 14.09.2026 war diese Regel bekannt, im Kontext und ausdrücklich zitiert — und
+trotzdem lief neben dem Zwei-Backend-Bildlauf für Punkt 1056 eine zweite volle Unit-Suite.
+Der Unterschied zum Vorfall vom 12.09. ist, dass die Sitzung sie sich diesmal nicht
+ausgesucht hat: Ein Stop-Hook hatte nach einer erkannten Parallelsitzung
+`node scripts/batch-doctor.mjs --gate` **vor jeder weiteren Batch-Arbeit** verlangt, und
+dessen Tor fährt `npm run test:unit`. Die Handregel und der Wächter widersprachen sich, und
+der Wächter gewinnt, weil er den Zug nicht enden lässt.
+
+Teuer war daran nichts Notwendiges. Der Doktor hat genau eine Auffälligkeit gemeldet —
+`dirty=1` —, und das war `.claude/mechanism-reviews.jsonl`: die Review-Zeile, die dieselbe
+Sitzung vier Minuten zuvor selbst geschrieben hatte, mit Zeitstempel, Transkript-Anker und
+Nachrichten-Id im Eintrag. Die Regel des Doktors kennt diesen Autor nicht: Jede
+uncommittete Datei in einem Parallelsitzungs-Fenster gilt als nicht zuordenbar und wird zur
+Quarantäne vorgemerkt. Die Datei zu committen genügte, das Urteil sprang auf `consistent`,
+und die Unit-Suite, für die der Bildlauf die Maschine teilen musste, wurde nie gebraucht.
+
+Der Abbruch hatte einen eigenen Preis. Das Töten des überflüssigen Tores ließ zwei
+vitest-Worker als Waisen (`ppid=1`) zurück, die weiter neben dem Bildlauf rechneten und
+einzeln per PID abgeräumt werden mussten; ein Mustertreffer über `pkill -f` erwischte
+außerdem die aufrufende Shell selbst, weil deren Kommandozeile den Suchstring enthielt.
+Beides ist Kleinkram, aber es zeigt, dass das nachträgliche Abräumen einer verordneten Last
+schwieriger ist, als sie gar nicht erst zu starten.
+
+**Lehre:** Zwei Dinge, die §3.267 noch nicht sagen konnte. Erstens darf ein Wächter, der den
+teuren Lauf schützt, nicht dieselbe Ressource verbrauchen wie der Lauf — die
+In-Flight-Markierung sagt ihm, dass gerade gemessen wird, also gehört die teure Hälfte
+seines Tores aufgeschoben oder übersprungen, statt die Sitzung in den Widerspruch zu
+zwingen. Zweitens ist »nicht zuordenbar« keine Eigenschaft des Zeitfensters, sondern der
+Datei: Was der aktuelle Besitzer nachweislich selbst geschrieben hat, ist zugeordnet, auch
+wenn daneben eine fremde Sitzung lief. Bis beides greift, bleibt der billige Ausweg der
+richtige — erst die eigene Schreibarbeit committen, dann den Doktor fragen.
