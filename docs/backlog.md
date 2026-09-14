@@ -941,3 +941,22 @@ nicht reproduzierbar, kein Spielerimpakt gemessen, keine stehende Blockade.
 Wenn er wiederkommt, ist das hier die zweite Messung — dann gehört er in einen
 eigenen Punkt mit `node scripts/throttle-probe.mjs polish --section=adult-errands
 --backend webgl --runs 8` als erster Messung.
+
+## Der deckende Lauf stirbt mit seinem Arbeitsverzeichnis (15.09.2026)
+
+Die beiden deckenden `polish`-Läufe für Punkt 1127 liefen im Arbeitsverzeichnis
+des Punktes. Beim Landen räumt die Kette das Verzeichnis ab — und mit ihm das
+Protokoll (`local/verify-logs/`) und den Laufdatensatz (`.claude/render-verify-state.json`),
+die beide PRO Checkout liegen. Auf `main` steht danach ein Bildwächter, der von
+zwei gefahrenen Läufen nichts weiß, obwohl die Bilder selbst als
+`verification/*.png` im Repositorium committet sind.
+
+Ausweg war eine protokollierte Ausnahme (`render-verify-guard --defer`) mit den
+Messwerten im Text — also genau die Handschrift, die das Ladenbuch abschaffen
+sollte. Der billige Weg wäre, den Laufdatensatz beim Landen aus dem
+Arbeitsverzeichnis in den Haupt-Checkout zu übernehmen, bevor das Verzeichnis
+fällt; die Kette weiß an dieser Stelle beides.
+
+Nicht als Punkt eingereiht wegen des Infrastruktur-Freezes: kein Spielerimpakt,
+keine stehende Blockade — der Weg existiert und wurde gegangen. Kommt es
+wieder, gehört es zu Punkt 1123, der schon zwei Defekte derselben Familie trägt.
