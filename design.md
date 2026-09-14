@@ -249,6 +249,8 @@ Inventory caches relieve the limited inventory and allow, for instance, leaving 
 
 Core rule: items act by possession alone, never "in hand" (§6.1); the table above carries the per-item effects. The map is NOT among these items: it is always available (from a bottom-right button and the M key, §17.4), opening the exploration overview — and inside a settlement a PLAN OF THE PLACE instead: the walkable area with every functional (enterable) building marked and named (localized), dwellings as unlabelled context and the lanes sketched, in the same worn-paper style (§19.11).
 
+Village digging prepares a covered food store at a compound and a furrowed planting bed at the field edge; where the compound cannot accommodate a pit, a lane post takes its place. Two sites lie as far inland as their anchors allow. Baskets and a cover, stacked posts, or a seedling tray show the purpose before work; a completed pair's bout leaves the covered store, set post, or planted rows. Work persists across visits. Diggers stand on the rim away from spoil; everyone walks over its smooth ground rise without new collision barriers.
+
 ---
 
 ## 8. Valuables and the Culture/Value Matrix

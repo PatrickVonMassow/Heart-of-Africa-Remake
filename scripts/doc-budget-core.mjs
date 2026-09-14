@@ -387,7 +387,10 @@ export const DOC_BUDGETS = [
     // forced down. The section named no direction, one voice for everyone and no
     // level at all — new mechanics the user asked for (07.09.2026), not a longer
     // telling of anything already there.
-    maxWords: 28963,
+    // Raised by 93 measured words: §7 now specifies the two village
+    // excavation purposes, persistent results, and passable ground rise. These
+    // requested world behaviours were absent from the equipment table.
+    maxWords: 29056,
     // A hundred words across 28k: design.md is edited section by section and a genuine
     // new decision runs 40–215 measured words, so the slack absorbs the rewording that
     // accompanies one and refuses the disappearance of a whole section without a

@@ -2004,9 +2004,12 @@ export const useGame = create<GameState>()((set, get) => ({
     get().addEntry({ key: 'journal.titles.mouldFitted' }, { key: 'journal.mouldFitted' }, 'event')
   },
 
-  recordVillageDig: (placeId, progress) => set((s) => ({
-    villageDigProgress: { ...s.villageDigProgress, [placeId]: progress.map((p) => ({ ...p })) },
-  })),
+  recordVillageDig: (placeId, progress) => set((s) => {
+    const before = s.villageDigProgress[placeId]
+    if (before?.length === progress.length && progress.every((p, i) =>
+      p.dug === before[i].dug && p.strikes === before[i].strikes && !!p.completed === !!before[i].completed)) return s
+    return { villageDigProgress: { ...s.villageDigProgress, [placeId]: progress.map((p) => ({ ...p })) } }
+  }),
 
   saveCheckpoint: () => {
     const s = get()

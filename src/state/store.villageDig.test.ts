@@ -18,6 +18,14 @@ describe('the village keeps its excavations', () => {
     expect(g().villageDigProgress['zulu-village']).toBeUndefined()
   })
 
+  it('does not publish unchanged frame records', () => {
+    const progress = [{ dug: 3, strikes: 2 }]
+    g().recordVillageDig('bambara-village', progress)
+    const before = g()
+    g().recordVillageDig('bambara-village', progress.map((p) => ({ ...p })))
+    expect(g()).toBe(before)
+  })
+
   it('restores saved work and clears it for a new expedition', () => {
     const progress = [{ dug: 18, strikes: 12, completed: true }]
     g().recordVillageDig('bambara-village', progress)

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clearOfSpoil, DIG_ARRIVE_RADIUS, DIG_RIM_DISTANCE, digLocalToWorld, digStandingPlaces, placeGroundHeight, spoilCentre, spoilHeightAt, SPOIL_RADIUS_X } from './placeGround'
+import { clearOfSpoil, digEarthFlight, DIG_ARRIVE_RADIUS, DIG_RIM_DISTANCE, digLocalToWorld, digStandingPlaces, placeGroundHeight, spoilCentre, spoilHeightAt, SPOIL_RADIUS_X } from './placeGround'
 import type { DigSite } from './adultWork'
 import { bankGroundHeight, buildRiverBank } from './riverBank'
 import { placeById } from '../../world/geo'
@@ -67,4 +67,18 @@ describe('the digging pair works from the rim', () => {
     const first = digStandingPlaces(site, () => true)![0]
     expect(digStandingPlaces(site, (x, z) => Math.hypot(x - first.x, z - first.z) < 0.1)).toBeNull()
   })
+})
+
+it('throws earth onto the full-grown mound for both excavation sizes', () => {
+  for (const kind of ['pit', 'patch'] as const) for (let clod = 0; clod < 6; clod++) {
+    const s = { ...site, kind }
+    const start = digEarthFlight(s, full, 0, clod)
+    const air = digEarthFlight(s, full, 0.36, clod)
+    const end = digEarthFlight(s, full, 0.72, clod)
+    const world = digLocalToWorld(s, end.x, end.z)
+    expect(start.y).toBe(0.12)
+    expect(air.y).toBeGreaterThan(end.y)
+    expect(end.y).toBeCloseTo(spoilHeightAt(s, full, world.x, world.z))
+    expect(end.y).toBeGreaterThan(0.4)
+  }
 })

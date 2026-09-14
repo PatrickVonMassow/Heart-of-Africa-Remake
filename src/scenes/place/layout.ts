@@ -28,7 +28,8 @@ import {
   type PlaceRiverBank,
 } from './riverBank'
 import { balance } from '../../config/balance'
-import { digStandingPlaces, spoilCentre, SPOIL_RADIUS_X } from './placeGround'
+import { digLocalToWorld, digStandingPlaces, spoilCentre, SPOIL_RADIUS_X } from './placeGround'
+import { digFurnitureFootprints } from './digSiteAppearance'
 import { WORK_ARRIVE_RADIUS } from './adultWork'
 import { devAssert } from '../../systems/devAssert'
 import type { BuildingType } from '../../state/ui'
@@ -1968,6 +1969,11 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
         // Reserve room for the whole mound, without adding an obstacle.
         if (Math.hypot(heap.x, heap.z) + SPOIL_RADIUS_X >= radius - 0.5) continue
         if (!standingClear(colliders, heap.x, heap.z, SPOIL_RADIUS_X)) continue
+        if (digFurnitureFootprints(kind).some((prop) => {
+          const at = digLocalToWorld(site, prop.x, prop.z)
+          return Math.hypot(at.x, at.z) + prop.radius >= radius - 0.5
+            || !standingClear(colliders, at.x, at.z, prop.radius)
+        })) continue
         if (!standable(x, z) || !digStandingPlaces(site, standable)) continue
         digSites.push(site)
         return true

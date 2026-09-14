@@ -1,3 +1,5 @@
+import { digFurnitureFootprints } from './digSiteAppearance'
+import { digLocalToWorld, digStandingPlaces, spoilCentre, SPOIL_RADIUS_X } from './placeGround'
 // Pure layout invariants (design.md §2.6/§4.5, point 15): ports grow an
 // organic lane fabric whose buildings front the lanes with their door side,
 // villages follow their people's period-accurate organising principle, and
@@ -663,6 +665,14 @@ describe('the ground work villagers dig at (work-order 483)', () => {
         // Free ground against the FULL collider set (point 155), and reachable:
         // the dig site is a target a walker heads for like any errand point.
         expect(standingClear(layout.colliders, site.x, site.z, WALKER_RADIUS), where).toBe(true)
+        expect(digStandingPlaces(site, (x, z) => standingClear(layout.colliders, x, z, WALKER_RADIUS)), where).not.toBeNull()
+        const heap = spoilCentre(site)
+        expect(standingClear(layout.colliders, heap.x, heap.z, SPOIL_RADIUS_X), where).toBe(true)
+        for (const prop of digFurnitureFootprints(site.kind)) {
+          const p = digLocalToWorld(site, prop.x, prop.z)
+          expect(Math.hypot(p.x, p.z) + prop.radius, where).toBeLessThan(layout.radius)
+          expect(standingClear(layout.colliders, p.x, p.z, prop.radius), where).toBe(true)
+        }
         // No lane runs through it: the ground work never blocks the path net.
         for (const path of layout.paths) {
           expect(closestOnPolyline(path.points, site.x, site.z).dist, where).toBeGreaterThan(

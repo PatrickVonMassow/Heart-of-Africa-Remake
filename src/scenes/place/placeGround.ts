@@ -24,8 +24,22 @@ export function digLocalToWorld(site: DigSite, x: number, z: number): ErrandPoin
   return { x: site.x + Math.cos(a) * x + Math.sin(a) * z, z: site.z - Math.sin(a) * x + Math.cos(a) * z }
 }
 
+export function spoilOffset(site: DigSite): number {
+  return site.kind === 'patch' ? 2.1 : 1.65
+}
+
 export function spoilCentre(site: DigSite): ErrandPoint {
-  return digLocalToWorld(site, site.kind === 'patch' ? 2.1 : 1.65, 0)
+  return digLocalToWorld(site, spoilOffset(site), 0)
+}
+
+/** Local clod flight, landing on the same surface the villagers walk over. */
+export function digEarthFlight(site: DigSite, progress: DigSiteProgress | undefined, age: number, clod: number): { x: number; y: number; z: number } {
+  const u = Math.max(0, Math.min(1, age / 0.72))
+  const x = 0.12 + (spoilOffset(site) - 0.12 + (clod % 3 - 1) * 0.12) * u
+  const z = (clod - 2.5) * 0.075
+  const landing = digLocalToWorld(site, x, z)
+  const y = 0.12 * (1 - u) + spoilHeightAt(site, progress, landing.x, landing.z) * u + 2.4 * u * (1 - u)
+  return { x, y, z }
 }
 
 /** A smooth, compact mound: zero height AND slope at its edge. The drawn mesh
