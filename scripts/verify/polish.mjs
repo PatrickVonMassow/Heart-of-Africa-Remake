@@ -4266,15 +4266,20 @@ if (section('children-bank-game')) {
         // same reason: a reading stands its few seconds only and the scene-ready
         // wait before a frame outlasts them. What was really said is measured
         // LIVE above; this only keeps it in the picture.
-        await page.evaluate(
-          ({ id, atoms }) => { window.__speech?.speak(id, atoms, undefined, 120) },
+        const held = await page.evaluate(
+          ({ id, atoms }) => window.__speech?.speak(id, atoms, undefined, 120),
           { id: `kid-${called.who}`, atoms: called.atoms },
+        )
+        check(
+          'the calling child`s word is held over its scene anchor for the shutter',
+          held === true,
+          `kid-${called.who}: speak returned ${String(held)}`,
         )
         const child = await page.evaluate((who) => {
           const c = window.__placeTag().children[who]
           return c ? { x: c.x, z: c.z } : null
         }, called.who)
-        if (child) {
+        if (held === true && child) {
           await frame('1073-bank-call-from-the-spectator-stand', {
             local: { x: child.x, y: 1.1, z: child.z },
             label:
