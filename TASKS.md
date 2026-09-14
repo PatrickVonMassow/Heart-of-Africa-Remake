@@ -77,6 +77,38 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
+- [ ] 1128. The bank round's roaming replay is sized to what it costs today, not to a
+  measurement from before the adults moved in (CI run 34909464052, 15.09.2026).
+  WORKED FIRST because it is a standing blockade, not because it is important: the red sits
+  on `main` itself, `ci-status-guard` covers every pushed ref, and no other point can land
+  while it stands.
+  MEASURED 15.09.2026 on the quiet batch host, one case at a time:
+  `bounds the roaming phase, so a run always comes` in `src/scenes/place/tagShuffle.test.ts`
+  costs **91.2 s**, while the comment beside its 180 s budget still claims 46.5 s. The replay
+  has doubled since that number was written, because the adults' errands and dig tasks now
+  run inside the replayed village. At the runner's measured 1.55x that is 141 s, so the
+  budget held 39 s of headroom and the suite's worker contention ate it — the case was
+  aborted at 180 s and took the whole `fast` job down with it.
+  THE NEIGHBOUR IS THE CALIBRATION, so the number is derived and not guessed: `carries a
+  child past a planted traveller` was re-measured the same hour at **88.8 s** — its own
+  comment's 85.5 s still stands — and it carries 300 s and has never been aborted. The same
+  cost therefore gets the same budget.
+  Final state: the roaming case carries 300 s with the fresh measurement written beside it,
+  in the shape `f3cda59a1` already established for this file. Nothing is skipped, shortened
+  or weakened — the replay keeps all five layouts and all 400 replayed seconds, because the
+  case exists to prove a bound that only shows over that length.
+  NOT THE REPAIR, so nobody measures it again: making the replay cheaper. Cutting layouts or
+  replayed seconds would cut the coverage this case was written for, and the adults inside
+  the village are the product, not overhead.
+  OBSERVED BESIDE IT, already filed and NOT re-opened here: the dev-mode assertions
+  `adult-pair-never-met` and `way-out-missing` fire as stderr during this replay without
+  reddening it. That is the entry of 14.09.2026 in `docs/backlog.md`, word for word — same
+  file, same `dig-first`/`dig-second`, same mandinka-village. It stays there.
+  Criticality: high — a standing blockade on `main` that refuses every landing, with a
+  measured cause and a derived remedy.
+  Refs: src/scenes/place/tagShuffle.test.ts, docs/backlog.md
+  Bundle: Testinfrastruktur.
+
 - [ ] 1056. The excavation becomes a real place: it says what it is for, and its earth is
   ground the village walks over (user 04.09.2026, watching the merged digging work; point
   1057 folded in here 07.09.2026 on the user's instruction to bundle points that would
