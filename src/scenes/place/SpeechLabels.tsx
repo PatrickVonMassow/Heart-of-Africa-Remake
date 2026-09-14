@@ -121,8 +121,8 @@ export function SpeechLabels() {
   })
 
   // Dev hook for the headless verification and manual checks (CLAUDE.md §7.2):
-  // speak over any named object of the scene — the villager behaviour that will
-  // drive this in play is its own work-order point. `anchorScreen` projects the
+  // Speak over a named scene object, or reuse a live speaker's own anchor when
+  // no explicit name is supplied (children have unnamed groups). `anchorScreen` projects the
   // label's anchor point to the rendered frame, so a check can judge the
   // ATTACHMENT by the picture (§7.2) instead of by an assumed offset.
   useEffect(() => {
@@ -130,8 +130,9 @@ export function SpeechLabels() {
     const w = window as unknown as Record<string, unknown>
     w.__speech = {
       speak: (speakerId: string, atoms: Phrase, anchorName?: string, seconds?: number) => {
-        const anchor = scene.getObjectByName(anchorName ?? speakerId)
-        if (!anchor) return false
+        const anchor = scene.getObjectByName(anchorName ?? speakerId) ??
+          (anchorName === undefined ? speechAnchor(speakerId) : null)
+        if (!anchor || scene.getObjectById(anchor.id) !== anchor) return false
         speakOverhead(speakerId, atoms, anchor, { seconds })
         return true
       },

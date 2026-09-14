@@ -50,7 +50,7 @@ export function hasHeard(memory: CommunicationMemory, utterance: UtteranceId): b
  */
 export function isWithinHearing(
   distance: number,
-  radius: number = balance.communication.hearingRadius,
+  radius: number = balance.communication.talk.reach,
 ): boolean {
   return Number.isFinite(distance) && distance >= 0 && distance <= radius
 }

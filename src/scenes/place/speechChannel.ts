@@ -20,6 +20,7 @@ import type { Object3D } from 'three/webgpu'
 import { balance } from '../../config/balance'
 import type { Phrase } from '../../communication/lexicon'
 import {
+  dropFloorLabels,
   dropSpeechLabel,
   expireSpeechLabels,
   noSpeechLabels,
@@ -37,6 +38,7 @@ import { placePlayerPosition } from './playerPosition'
 let state: SpeechLabelState = noSpeechLabels()
 
 /** The object each speaker is drawn as — the label rides on its world position. */
+const reaches = new Map<string, number>()
 const anchors = new Map<string, Object3D>()
 
 const listeners = new Set<() => void>()
@@ -78,17 +80,33 @@ export function speakOverhead(
   speakerId: string,
   atoms: Phrase,
   anchor: Object3D,
-  options: { seconds?: number; height?: number; now?: number } = {},
+  options: { seconds?: number; height?: number; now?: number; reach?: number; floor?: boolean } = {},
 ): void {
   const now = options.now ?? speechClock()
+  // THE FLOOR CLEARS WHAT THE FLOOR RAISED, and nothing else. Clearing every
+  // label instead swept away the chief's answer to the player — raised outside
+  // the floor and deliberately held for as long as the player needs to read it
+  // — the moment any villager said anything, which is what the picture check
+  // caught: the words were gone from over his head when the shot was taken.
+  let base = expireSpeechLabels(state, now)
+  if (options.floor) {
+    const before = base
+    base = dropFloorLabels(before)
+    for (const label of before.labels) {
+      if (!label.floor || label.speakerId === speakerId || base.labels.some((l) => l.speakerId === label.speakerId)) continue
+      anchors.delete(label.speakerId)
+      reaches.delete(label.speakerId)
+    }
+  }
   anchors.set(speakerId, anchor)
+  reaches.set(speakerId, options.reach ?? balance.communication.talk.reach)
   // The height is read from the SPEAKER, here rather than at each call site, so
   // every speaker — the villagers, the children, the dev hook — gets its note
   // over its own head without computing anything (work-order point 582). The
   // figure's own actor record says how tall it is drawn; a speaker that carries
   // none falls back to a grown figure's height.
   const height = options.height ?? speechLabelHeight(markedActorRise(anchor as MarkedNode))
-  publish(showSpeechLabel(expireSpeechLabels(state, now), speakerId, atoms, now, { ...options, height }))
+  publish(showSpeechLabel(base, speakerId, atoms, now, { ...options, height }))
 }
 
 /** The object a speaker is drawn as, or null once it is gone. */
@@ -124,9 +142,10 @@ export function updateSpeechTarget(
     // through a scratch vector — the module stays free of a three value import.
     anchor.updateWorldMatrix(true, false)
     const e = anchor.matrixWorld.elements
-    candidates.push({ speakerId: label.speakerId, distance: Math.hypot(e[12] - player.x, e[14] - player.z) })
+    const distance = Math.hypot(e[12] - player.x, e[14] - player.z)
+    if (distance <= (reaches.get(label.speakerId) ?? reach)) candidates.push({ speakerId: label.speakerId, distance })
   }
-  publish(withSpeechTarget(state, pickSpeechTarget(candidates, state.targetId, reach)))
+  publish(withSpeechTarget(state, pickSpeechTarget(candidates, state.targetId, Infinity)))
 }
 
 /** The label SPACE would take right now, or null while none is highlighted. */
@@ -159,7 +178,7 @@ export function speechUseCandidate(
   return {
     key: `speech:${label.speakerId}`,
     distance: Math.hypot(e[12] - player.x, e[14] - player.z),
-    range: reach,
+    range: reaches.get(label.speakerId) ?? reach,
     payload: label,
   }
 }
@@ -198,5 +217,6 @@ export function forgetSpeechLabel(speakerId: string): void {
 /** Wipes the channel — the label layer does this when the settlement is left. */
 export function clearSpeechLabels(): void {
   anchors.clear()
+  reaches.clear()
   publish(noSpeechLabels())
 }

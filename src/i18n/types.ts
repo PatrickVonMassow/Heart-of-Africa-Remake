@@ -548,6 +548,13 @@ export interface Strings {
     speechSyllable: string
     speechPhrasePause: string
     speechHearingRadius: string
+    talkReach: string
+    callReach: string
+    talkLoudness: string
+    callLoudness: string
+    callFalloff: string
+    speechConsequence: string
+    speechHold: string
     speechHearingFalloff: string
     speechLabelSeconds: string
     speechPitch: string

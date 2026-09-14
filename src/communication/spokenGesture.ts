@@ -42,7 +42,7 @@ export interface SpeechReach {
  */
 export function speechReach(
   distance: number,
-  radius: number = balance.communication.hearingRadius,
+  radius: number = balance.communication.talk.reach,
 ): SpeechReach {
   const audible = isWithinHearing(distance, radius)
   return { audible, gesture: audible }
@@ -58,7 +58,7 @@ export function gestureIfHeard(
   distance: number,
   kind: GestureKind,
   aim: GestureAim = {},
-  radius: number = balance.communication.hearingRadius,
+  radius: number = balance.communication.talk.reach,
 ): GestureState {
   return speechReach(distance, radius).gesture ? startGesture(kind, aim) : restGesture()
 }

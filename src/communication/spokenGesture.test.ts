@@ -7,10 +7,10 @@ import { balance } from '../config/balance'
 import { gestureIfHeard, speechReach } from './spokenGesture'
 import { GESTURE_DURATIONS, GESTURE_KINDS, REST_POSE, gesturePose, startGesture } from '../render/gesture'
 
-const RADIUS = balance.communication.hearingRadius
+const RADIUS = balance.communication.talk.reach
 
 afterEach(() => {
-  balance.communication.hearingRadius = RADIUS
+  balance.communication.talk.reach = RADIUS
 })
 
 /** Every distance the sweep judges: inside, at the rim, and well beyond it. */
@@ -47,10 +47,10 @@ describe('the one decision: a gesture carries no further than its utterance', ()
   })
 
   it('follows the radius the debug menu sets, while the game runs', () => {
-    balance.communication.hearingRadius = 2
+    balance.communication.talk.reach = 2
     expect(speechReach(5).gesture).toBe(false)
     expect(gestureIfHeard(5, 'beckon').kind).toBe(null)
-    balance.communication.hearingRadius = 50
+    balance.communication.talk.reach = 50
     expect(speechReach(5).gesture).toBe(true)
     expect(gestureIfHeard(5, 'beckon').kind).toBe('beckon')
   })

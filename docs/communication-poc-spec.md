@@ -87,6 +87,74 @@ A syllable is a sample, low for `ba` and high for `BA`, differing in pitch
 alone. An utterance plays all four syllables at a constant pace. A phrase uses
 one constant pause between atoms and no other structure.
 
+CALL and TALK are utterance registers with separate reach, loudness and falloff. RIVER calls, direction announcements and arrival ROCK use CALL; taps, off-game boulders and all ordinary speech use TALK. TALK retains 10 m; CALL uses 34 m, 1.25 times the source level and falloff 4. The rock-to-spectator distance is about 22 m, but the shipped Mandinka opening RIVER caller was measured at 32.64 m from that stand. The full-round tests measure each received call at at least 20% before its loudness multiplier. Sound, memory, gestures and label interaction share each register’s hard boundary. The adult/child separation budget remains 10 m.
+
+## Panning and mixing
+
+Compensated panning preserves the mono sum and never reduces stereo power.
+Speech has its own volume, 2. Falloff 4 carries 73.5% at 3 m and 20% at the
+10 m rim. Including the louder child synthesis and panned channel required
+reducing the envelope peak from 1.8 to 0.85: the conservative mixed-output
+bound falls from 1.780 to 0.977, speech at 3 m and the rim remains louder.
+
+## The speech floor
+
+One situation speaks at a time within the player's earshot. Its word and visible
+consequence finish before another situation speaks, and a ready continuation
+keeps precedence. A silent walk, a child's ear or an occupied dig site yields
+after the consequence window. Work can continue in several places; a pair's
+existence alone never owns the village's speech for its entire task lifetime.
+An assigned dig site stays with its pair until the bout ends, including their
+walk there, so two pairs cannot arrive at one hole and block each other's word.
+
+The gap after a word is a CONSEQUENCE WINDOW rather than plain silence: the next
+word waits until the previous word's effect was visible — the invited adult sets
+off, the dispatched carrier leaves. Silence teaches nothing; the visible
+consequence is the lesson.
+
+The floor measures at the player's ear, at each register's own reach rather than
+a flat radius, so a village out of earshot keeps talking and acceptance criterion
+15 is not paid for a confusion that never reaches the player.
+
+Turn-taking is FIRST COME, FIRST SPOKEN among audible exchanges. Granting the
+floor in villager order starves whichever pair the loop reaches late: measured
+over 180 s at six villagers, one pair spoke exactly once in the whole run,
+because the bound forced its word out one step before its task expired. Two
+rules keep that from returning. A word whose moment has NOT come — a pair still
+walking to its site owes its DIG but cannot yet say it — takes no turn from
+anybody, through either the waiting queue or an existing situation's precedence.
+A previously queued word that stops being ready keeps its deadline but yields
+its turn. A ready continuation never queues behind the waiter it is blocking;
+doing so deadlocks both. Reserving the floor for silent situations instead held
+water dispatch and the bank's call for the full 240 s backstop in the browser.
+
+A QUEUED WORD NEVER EXPIRES. The hold is not a scheduling knob but a
+stuck-situation backstop, calibratable and derived: strictly longer than the
+longest situation a healthy village produces and strictly shorter than the
+errand's own kill time. The unit test measures that maximum over every shipped
+village layout rather than restating it, so the number fails the day village
+timing grows past it. The hold is additionally capped by the owning task's
+remaining life, because a flat hold protects nothing about a word queued late in
+a task's life — the task would die first, tripping the very assertion the floor
+exists to stop. The invariant, binding on every deferral here: NO WORD IS EVER
+STILL OWED WHEN ITS TASK EXPIRES.
+
+At the bound the bound WINS and the overrun is reported LOUDLY. The two rules
+only look contradictory: a situation still standing at that point has outlived
+its own maximum, so its exchange is no longer legible to anybody, and letting the
+queued word through costs no clarity that was still there. The word is spoken AND
+the forcing is reported as a defect naming the situation that overran. A word
+held past its hold is a defect, never an exemption — the hush that causes a
+deferral no longer excuses the lost word.
+
+THE FLOOR CLEARS WHAT THE FLOOR RAISED. One village word at a time is the
+floor's own rule, so the word it grants takes the previous village note down and
+forgets that speaker's figure with it. A note raised OUTSIDE the floor is not the
+floor's to clear: the chief's answer to the player stands for as long as it was
+given, however much the village says meanwhile. Taking every note down instead
+left the chief's head bare the moment any villager spoke, which the picture check
+caught.
+
 Speech falls off sharply and is silent outside the hearing radius. The same
 range decision governs sound, observation, overhead note, and gesture: unheard
 speech teaches nothing and is not silently mimed. Pace, pause, radius, and

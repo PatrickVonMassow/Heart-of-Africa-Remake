@@ -34,6 +34,8 @@
 // judges the village (`scripts/verify/childMotionMetric.mjs`) judges this round
 // on the same terms. What is new here is the ROUND, not the step.
 
+import type { SpeechFloor } from '../../communication/speechFloor'
+import type { VoiceRegister } from '../../communication/speaking'
 import { CHILD_FIGURE_SCALE } from '../../render/figures'
 import type { GestureKind } from '../../render/gesture'
 import { reachFrom, solveTouch } from './rockTouch'
@@ -73,6 +75,10 @@ export type BankRole = 'runner' | 'catcher' | 'out'
 
 /** The fixed point of the round an utterance falls at. */
 export type BankMoment = 'call' | 'boulder' | 'announce' | 'tap' | 'arrival'
+
+export function bankVoiceRegister(moment: BankMoment): VoiceRegister {
+  return moment === 'call' || moment === 'announce' || moment === 'arrival' ? 'call' : 'talk'
+}
 
 /** What the utterance was aimed at. ROCK falls once with nobody arriving and
  *  once outside the game altogether. */
@@ -317,6 +323,7 @@ export type BankConfig = TagConfig & BankRoundConfig
  * the player stepped into it would never be watched at all.
  */
 export interface BankWorld extends TagWorld {
+  floor?: SpeechFloor
   stranger?: { x: number; z: number; radius: number } | null
   /** Whether the straight line between two points crosses ground a child may
    *  not walk. Left out, every line counts as open and the round steers
@@ -513,6 +520,7 @@ function stepClimb(
     // Up it goes facing the stone, the way anybody climbs one.
     c.facing = turnToward(c.facing, Math.atan2(b.x - c.footX, b.z - c.footZ), cfg.turnRate * dt)
     if (t >= 1) {
+      if (!maySpeak(s, world, i, 'boulder')) return false
       c.climb = 'top'
       c.climbFor = 0
       // THE WORD FALLS UP HERE, not on the way. Spoken at the foot of the stone
@@ -847,10 +855,20 @@ export function touchReach(
   return { elevation: reached.elevation, gap: reached.gap, height: reached.height }
 }
 
-/** Offer one utterance in this step. Nothing here touches a pace or a heading:
- *  an utterance is something the player HEARS, never something that steers a
- *  child. Two simultaneous offers remain simultaneous; `drain` chooses one and
- *  discards the rest rather than moving either to the wrong moment. */
+/** Reserve the word before changing the action it teaches. */
+function maySpeak(s: BankState, world: BankWorld, speaker: number, moment: BankMoment): boolean {
+  if (!world.floor) return true
+  if (s.pending.length > 0) return false
+  const c = s.children[speaker]
+  if (!c) return false
+  return world.floor.request({
+    situation: s, name: `bank cycle ${s.cycles}`, word: `${s.runs}:${moment}${moment === 'arrival' ? `:${speaker}` : ''}`,
+    source: { x: c.x, z: c.z, register: bankVoiceRegister(moment) },
+    sources: () => s.children.map((child) => ({ x: child.x, z: child.z, register: 'call' as const })),
+    ends: moment === 'boulder',
+  })
+}
+
 function say(s: BankState, u: BankUtterance): void {
   s.pending.push(u)
 }
@@ -879,7 +897,7 @@ const free = (s: BankState): number[] =>
 
 /** Opens a cycle: the caller names the river and becomes the first catcher,
  *  everyone else is a runner, and the runners take the rock nearer the group. */
-function openCycle(s: BankState, stage: BankStage, cfg: BankConfig): void {
+function openCycle(s: BankState, stage: BankStage, cfg: BankConfig, world: BankWorld): void {
   const n = s.children.length
   let cx = 0
   let cz = 0
@@ -898,6 +916,7 @@ function openCycle(s: BankState, stage: BankStage, cfg: BankConfig): void {
     s.children.map((_, i) => i),
     rockAt(stage, otherEnd(s.from)),
   )
+  if (caller >= 0 && !maySpeak(s, world, caller, 'call')) return
   s.caller = caller
   s.children.forEach((c, i) => {
     c.role = i === caller ? 'catcher' : 'runner'
@@ -925,12 +944,12 @@ function openCycle(s: BankState, stage: BankStage, cfg: BankConfig): void {
 
 /** Announces the direction while both sides are still at their stations. The
  *  run itself waits one hearing gap, so its tap is a distinct audible moment. */
-function announceRun(s: BankState, stage: BankStage): void {
+function announceRun(s: BankState, stage: BankStage, world: BankWorld): void {
   const to = otherEnd(s.from)
   const direction = wordToward(to)
   const line = runners(s)
   const announcer = line.length > 0 ? nearestOf(s, line, rockAt(stage, s.from)) : -1
-  if (announcer < 0) return
+  if (announcer < 0 || !maySpeak(s, world, announcer, 'announce')) return
   const rock = rockAt(stage, to)
   s.direction = direction
   say(s, {
@@ -945,8 +964,10 @@ function announceRun(s: BankState, stage: BankStage): void {
 
 /** Opens one run: the catcher taps his own rock and names it with nobody
  *  arriving. Its direction was announced one hearing gap before this. */
-function openRun(s: BankState, stage: BankStage, cfg: BankConfig): void {
+function openRun(s: BankState, stage: BankStage, cfg: BankConfig, world: BankWorld): boolean {
   const to = otherEnd(s.from)
+  const contact = s.tapper >= 0 ? touchReach(stage, to, s.children[s.tapper]) : null
+  if (contact && Math.abs(contact.gap) <= TOUCH_GAP && !maySpeak(s, world, s.tapper, 'tap')) return false
   s.phase = 'run'
   s.phaseFor = cfg.runSeconds
   // The hold belongs to the WORD, and the word is offered further down only if
@@ -1010,6 +1031,7 @@ function openRun(s: BankState, stage: BankStage, cfg: BankConfig): void {
       at: 'rock',
     })
   }
+  return true
 }
 
 /** Ends the run: the sides swap — the survivors start where they arrived — and
@@ -1099,7 +1121,7 @@ export function stepBankGame(
       produced: spoken !== null,
       // A round with nobody to play it is quiet by right, exactly as a group of
       // one is at the chase.
-      expected: s.children.length >= 2,
+      expected: s.children.length >= 2 && !world.floor?.waiting(s),
       maxSilenceSeconds: cfg.roundSilenceSeconds,
       detail: () =>
         `${s.children.length} children, phase ${s.phase} for ${s.phaseFor.toFixed(0)}s more, ` +
@@ -1119,9 +1141,8 @@ function advanceBankGame(
 ): BankUtterance | null {
   assertRoundSound(s, cfg)
   if (!(dt > 0)) return null
-  // Nothing spoken in an earlier step survives into this one. A delayed word
-  // belongs to a different visible action and therefore teaches the wrong
-  // reading; a collision is omitted instead.
+  // Floor deferrals keep the producer at its teaching moment; pending contains
+  // only words already granted in this step.
   s.pending.length = 0
   s.clock += dt
   s.sinceSaid += dt
@@ -1175,7 +1196,7 @@ function advanceBankGame(
     // cycle for the seconds the child needs to come down.
     !s.children.some(onStone)
   ) {
-    openCycle(s, stage, cfg)
+    openCycle(s, stage, cfg, world)
   }
   let openedRun = false
   if (
@@ -1183,14 +1204,16 @@ function advanceBankGame(
     !s.children.some((c) => c.arrival) &&
     (s.phaseFor <= 0 || inPlace(s, stage, cfg, world, s.from, otherEnd(s.from)))
   ) {
-    if (s.direction === null && s.sinceSaid >= cfg.utteranceGapSeconds) {
-      announceRun(s, stage)
-    } else if (s.direction !== null && s.sinceSaid >= cfg.utteranceGapSeconds) {
-      openRun(s, stage, cfg)
-      openedRun = true
+    if (s.direction === null && (world.floor || s.sinceSaid >= cfg.utteranceGapSeconds)) {
+      announceRun(s, stage, world)
+    } else if (s.direction !== null && (world.floor || s.sinceSaid >= cfg.utteranceGapSeconds)) {
+      openedRun = openRun(s, stage, cfg, world)
     }
   }
-  if (s.phase === 'part' && s.phaseFor <= 0 && !s.children.some((c) => c.arrival)) openRoam(s, cfg, rand)
+  if (s.phase === 'part' && s.phaseFor <= 0 && !s.children.some((c) => c.arrival)) {
+    world.floor?.release(s)
+    openRoam(s, cfg, rand)
+  }
   switch (s.phase) {
     case 'roam':
       stepRoam(s, dt, cfg, stage, world, rand)
@@ -1210,7 +1233,7 @@ function advanceBankGame(
       break
   }
   assertPlaced(s, world)
-  return drain(s, cfg)
+  return drain(s, world.floor ? { ...cfg, utteranceGapSeconds: 0 } : cfg)
 }
 
 /** Speaks at most one utterance born this step, normally after the configured
@@ -1763,6 +1786,11 @@ function stepArrival(
     c.facing = c.heading
     c.lean = 0
     drive(s, i, null, false, dt, cfg, world)
+    if (!maySpeak(s, world, i, 'arrival')) {
+      // The teaching moment is reached; its approach timeout no longer owns it.
+      arrival.approachFor += dt
+      return true
+    }
     arrival.holdFor = cfg.arrivalHoldSeconds
     say(s, {
       concept: 'ROCK', moment: 'arrival', speaker: i, gesture: 'touch',

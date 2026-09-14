@@ -269,3 +269,36 @@ describe('the speaker the use key would take (design.md §13.4)', () => {
     expect(speechTargetLabel()).toBeNull()
   })
 })
+
+
+it('keeps a call label actionable from the distant spectator stand', () => {
+  const anchor = { parent: {}, updateWorldMatrix() {}, matrixWorld: { elements: Array(16).fill(0) } } as unknown as Object3D
+  speakOverhead('caller', [RIVER_UTTERANCE], anchor, { now: 0, reach: 34 })
+  const player = { x: 22, z: 0, active: true }
+  updateSpeechTarget(() => true, undefined, player)
+  expect(speechTargetLabel()?.speakerId).toBe('caller')
+  expect(speechUseCandidate(player)?.range).toBe(34)
+  updateSpeechTarget(() => true, undefined, { ...player, x: 34.01 })
+  expect(speechTargetLabel()).toBeNull()
+})
+
+
+it('replaces the preceding village note when the floor grants a new word', () => {
+  speakOverhead('first', [DIG], figure(), { now: 0, seconds: 10, floor: true })
+  speakOverhead('second', [RIVER_UTTERANCE], figure(), { now: 1, floor: true })
+  expect(speechLabelState().labels.map((l) => l.speakerId)).toEqual(['second'])
+  expect(speechAnchor('first')).toBeNull()
+})
+
+it('leaves a note raised outside the floor standing, with its figure', () => {
+  // The chief answers the player and his words are held far longer than a
+  // village word stands (PlaceScene speakChiefPhrase). The village then talks
+  // on. Sweeping every label took his answer down under him, and the picture
+  // check found his head bare while a villager spoke.
+  speakOverhead('chief', [DIG], figure(), { now: 0, seconds: 120 })
+  speakOverhead('villager-4', [RIVER_UTTERANCE], figure(), { now: 1, floor: true })
+  speakOverhead('villager-5', [DIG], figure(), { now: 2, floor: true })
+  expect(speechLabelState().labels.map((l) => l.speakerId).sort()).toEqual(['chief', 'villager-5'])
+  expect(speechAnchor('chief')).not.toBeNull()
+  expect(speechAnchor('villager-4')).toBeNull()
+})

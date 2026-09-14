@@ -38,6 +38,16 @@ export interface SpeechPlan {
 }
 
 export type SpeechVoice = 'adult' | 'child'
+export type VoiceRegister = 'talk' | 'call'
+
+export function voiceRegister(register: VoiceRegister = 'talk') {
+  return balance.communication[register]
+}
+
+export function registerOptions(register: VoiceRegister = 'talk'): SpeechOptions {
+  const { reach, loudness, falloff } = voiceRegister(register)
+  return { radius: reach, loudness, falloff }
+}
 
 /** Camera-relative bearing in radians; rear speakers retain their side. */
 export function speechPan(bearing: number, width = balance.communication.speechStereoWidth): number {
@@ -50,9 +60,10 @@ export interface SpeechOptions {
   /** Horizontal bearing from the camera, positive to its right. */
   bearing?: number
   voice?: SpeechVoice
-  /** How far an utterance carries at all (balance.communication.hearingRadius). */
+  loudness?: number
+  /** How far an utterance carries at all (balance.communication.talk.reach). */
   radius?: number
-  /** Steepness of the fall inside that radius (balance.communication.hearingFalloff). */
+  /** Steepness of the fall inside that radius (balance.communication.talk.falloff). */
   falloff?: number
   /** Seconds per syllable — the constant pace (balance.communication.syllableSeconds). */
   syllableSeconds?: number
@@ -91,8 +102,8 @@ const SPEECH_PEAK = 0.85
  */
 export function hearingGain(
   distance: number,
-  radius: number = balance.communication.hearingRadius,
-  falloff: number = balance.communication.hearingFalloff,
+  radius: number = balance.communication.talk.reach,
+  falloff: number = balance.communication.talk.falloff,
 ): number {
   if (!isWithinHearing(distance, radius)) return 0
   if (radius <= 0) return distance <= 0 ? 1 : 0
@@ -112,11 +123,12 @@ export function utteranceSeconds(
 function resolve(options: SpeechOptions = {}) {
   const c = balance.communication
   return {
-    radius: options.radius ?? c.hearingRadius,
-    falloff: options.falloff ?? c.hearingFalloff,
+    radius: options.radius ?? c.talk.reach,
+    falloff: options.falloff ?? c.talk.falloff,
     syllableSeconds: Math.max(0, options.syllableSeconds ?? c.syllableSeconds),
     pauseSeconds: Math.max(0, options.pauseSeconds ?? c.phrasePauseSeconds),
     volume: Math.max(0, options.volume ?? balance.ambienceVolume),
+    loudness: Math.max(0, options.loudness ?? c.talk.loudness),
   }
 }
 
@@ -148,11 +160,11 @@ export function phrasePlan(
   distance: number,
   options: SpeechOptions = {},
 ): SpeechPlan {
-  const { radius, falloff, syllableSeconds, pauseSeconds, volume } = resolve(options)
+  const { radius, falloff, syllableSeconds, pauseSeconds, volume, loudness } = resolve(options)
   const pan = speechPan(options.bearing ?? 0)
   const voice = options.voice ?? 'adult'
   const gain = hearingGain(distance, radius, falloff)
-  const level = gain * volume
+  const level = gain * volume * loudness
   if (level <= 0 || syllableSeconds <= 0) return { ...silence(), gain, pan, voice }
   const peak = SPEECH_PEAK * level
   const syllables: SpokenSyllable[] = []
@@ -186,7 +198,7 @@ export function hearUtterance(
   utterance: UtteranceId,
   distance: number,
   day: number,
-  radius: number = balance.communication.hearingRadius,
+  radius: number = balance.communication.talk.reach,
 ): CommunicationMemory {
   return isWithinHearing(distance, radius) ? observeUtterance(memory, utterance, day) : memory
 }
@@ -197,7 +209,7 @@ export function hearPhrase(
   phrase: Phrase,
   distance: number,
   day: number,
-  radius: number = balance.communication.hearingRadius,
+  radius: number = balance.communication.talk.reach,
 ): CommunicationMemory {
   return isWithinHearing(distance, radius) ? observePhrase(memory, phrase, day) : memory
 }

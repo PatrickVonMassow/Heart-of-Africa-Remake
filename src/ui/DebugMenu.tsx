@@ -661,9 +661,21 @@ export function DebugMenu() {
         (v) => { balance.communication.phrasePauseSeconds = Math.max(0, v); bump() }, 0.1),
       num(t.debug.speechHearingRadius, balance.communication.hearingRadius,
         (v) => { balance.communication.hearingRadius = Math.max(0, v); bump() }, 1),
-      num(t.debug.speechHearingFalloff, balance.communication.hearingFalloff,
-        (v) => { balance.communication.hearingFalloff = Math.max(0, v); bump() }, 2),
+      num(t.debug.speechHearingFalloff, balance.communication.talk.falloff,
+        (v) => { balance.communication.talk.falloff = Math.max(0, v); bump() }, 2),
       // How long the player's reading stands over the speaker's head (point 485).
+      ...(['talk', 'call'] as const).flatMap((register) => [
+        num(t.debug[register === 'talk' ? 'talkReach' : 'callReach'], balance.communication[register].reach,
+          (v) => { balance.communication[register].reach = Math.max(0, v); bump() }, 1),
+        num(t.debug[register === 'talk' ? 'talkLoudness' : 'callLoudness'], balance.communication[register].loudness,
+          (v) => { balance.communication[register].loudness = Math.max(0, v); bump() }, 0.05),
+      ]),
+      num(t.debug.callFalloff, balance.communication.call.falloff,
+        (v) => { balance.communication.call.falloff = Math.max(0, v); bump() }, 1),
+      num(t.debug.speechConsequence, balance.communication.consequenceSeconds,
+        (v) => { balance.communication.consequenceSeconds = Math.max(0, v); bump() }, 0.5),
+      num(t.debug.speechHold, balance.communication.speechHoldSeconds,
+        (v) => { balance.communication.speechHoldSeconds = Math.max(0, v); bump() }, 5),
       num(t.debug.speechLabelSeconds, balance.communication.labelSeconds,
         (v) => { balance.communication.labelSeconds = Math.max(0, v); bump() }, 0.2),
       // The two pitches themselves (point 587): the low tone and the interval
