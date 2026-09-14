@@ -867,3 +867,34 @@ der Satz beim nächsten Publish wieder da. Board-Struktur wird nicht eigenmächt
 geändert (Dashboard-Regel), deshalb hier gesammelt statt umgesetzt. Nebenbefund:
 dieselbe Sektion enthält transliterierte Umlaute (etwa „Haeuser"), die der
 Umlaut-Audit dort nicht prüft — er greift nur auf Aktuell- und Warteschlangenkarten.
+
+## Lebendigkeit wird aus der Buchhaltung abgeleitet statt am Prozess gemessen (14.09.2026)
+
+Zwei Ausprägungen derselben Abkürzung an einem Vormittag, beide an der laufenden
+Zwei-Backend-LARGE für Punkt 1056 gemessen. Ausführlich steht der Fall als §3.272 in
+der Retrospektive; hier nur, was am Mechanismus zu tun bliebe.
+
+ERSTENS die Ernte-Anweisung. Die Warteschlangen-Karte erklärte den Lauf für verwaist
+und wies an, ihn neu aufzusetzen. Tot war nur sein Besitzer; der Lauf stand nach 43
+Minuten in den langen Suiten. Ein Neuaufsetzen hätte diese 43 Minuten weggeworfen.
+Wer einen Lauf für verwaist erklärt, muss getrennt messen und getrennt melden, ob
+sein BESITZER lebt und ob ER lebt — aus einem toten Besitzer folgt eine Adoption
+(`--adopt`), nie ein Neustart.
+
+ZWEITENS die In-Flight-Prüfung. Sie wies die Deklaration der Wartestellung mit
+`evidence-gone` und der Begründung „log silent for 28 min" ab, während der Lauf
+nachweislich rechnete: chrome-headless auf 63,3 % und 49,5 % CPU bei 17:50 bzw. 13:56
+CPU-Zeit, zwei frische Beweisbilder binnen fünf Minuten. Die `polish`-Suite schreibt
+ihre Logzeile erst am Suite-Ende und läuft im Median 55 Minuten — die Mtime des Logs
+ist in dieser Spanne per Konstruktion alt. Der Fortschrittsbeweis einer Bildsuite sind
+die geschriebenen FRAMES und die CPU-Zeit des Browsers, nicht die Logdatei.
+
+Nicht umgesetzt wegen des Infrastruktur-Freezes: Beide Fälle wurden erkannt und
+umgangen, keiner hat Spielarbeit dauerhaft blockiert. Die Umgehung für den zweiten
+ist eine Deklaration ohne `--log`, die auf der Worktree-Aktivität durchgeht.
+
+NEBENBEFUND aus demselben Vormittag: Jeder aufgezeichnete Befund verändert den
+Quellen-Fingerprint der Retrospektive und meldet sie damit als STALE. Der geforderte
+Refresh erzeugt dann eine Änderung, die nur aus Fingerprint und Zeitstempel besteht.
+Zweimal hintereinander gemessen. Ein Tretrad, kein Defekt — aber es kostet je einen
+Lauf und einen Commit.
