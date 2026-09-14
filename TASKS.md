@@ -1002,6 +1002,37 @@ put it is the mistake this line exists to stop.
   directly in front of point 1087.
   Bundle: Dorfleben.
 
+- [ ] 1121. The river-bank frame aims at a drifting fleck and shoots six frames later
+  (measured 14.09.2026 on the covering WebGL 2 pass of point 1073).
+  THE RED. `polish --section=adult-errands`, WebGL 2, first attempt:
+  `FAIL frame 482-village-river-bank — its subject is not in the rendered picture: off the
+  right edge of the frame` (221 pass, 1 fail; log
+  `local/verify-logs/2026-09-14T01-49-02-197-polish.log`). The retry ran 269/0/0, which
+  covers nothing, so the whole WebGL 2 lane of that pass is recorded SUSPECT.
+  IT IS NOT POINT 1073'S, and that is measured rather than argued. Point 1073 touches the
+  speech floor, adult work, dig-site assignment, the speech labels and the bank-call block
+  of the suite — nothing in the river or its flecks. The IDENTICAL code ran the full
+  `polish` suite twice on WebGPU, both times green on the FIRST attempt, this check
+  included. And `node scripts/throttle-probe.mjs polish --section=adult-errands
+  --backend webgl --runs 8` at a quarter of a core did NOT reproduce it: 482 stayed green
+  in all eight, while the skew fell on the fill checks instead (SKEW RATE 2/8). So it is
+  not this point's, and it is not plain load either.
+  THE CAUSE IS THE CHECK'S OWN SHAPE, read at `scripts/verify/polish.mjs` ~6047-6066: the
+  aim block picks the fleck NEAREST the bank spot, returns it, waits `nextFrames(6)` and
+  only then opens the shutter. The flecks drift with the current — that is the very thing
+  the surrounding checks measure — so the subject moves between being chosen and being
+  photographed. On the slower lane the six frames cost more wall time and the fleck can
+  leave the frame to the right. The check races its own subject by construction; it has
+  simply been winning the race.
+  FINAL STATE: the frame's subject is the fleck that is in the picture AT THE SHUTTER, not
+  the one that was nearest six frames earlier — re-read the nearest fleck at shutter time,
+  or keep the chosen one and aim at where it has drifted to. Whichever is chosen, the
+  frame must still show the foam that demonstrates the current, and the check must not be
+  weakened into one that would pass on an empty river.
+  Refs: scripts/verify/polish.mjs (~6044-6070, the `aim` block and the 482 frame),
+  scripts/render-verify-charges.mjs (the entry filed with this point).
+  Bundle: Testinfrastruktur.
+
 - [ ] 1081. A child boxed by adults planted in its own play ground walks a metre and gets
   nowhere — and the case that was supposed to catch it pins one lucky seed. Measured on
   `main` on 09.09.2026 while work-order 1080 was being verified: the crowded construction of
@@ -15511,35 +15542,4 @@ to land than a mechanism that needs a review.
   (~1410-1435), point 1089, point 642, point 1119.
   It edits `scripts/verify/baseline-classify.mjs`, the mechanism point 1089 built and 1114 and
   1115 were filed by, so it is worked after 1089 and never beside it.
-  Bundle: Testinfrastruktur.
-
-- [ ] 1121. The river-bank frame aims at a drifting fleck and shoots six frames later
-  (measured 14.09.2026 on the covering WebGL 2 pass of point 1073).
-  THE RED. `polish --section=adult-errands`, WebGL 2, first attempt:
-  `FAIL frame 482-village-river-bank — its subject is not in the rendered picture: off the
-  right edge of the frame` (221 pass, 1 fail; log
-  `local/verify-logs/2026-09-14T01-49-02-197-polish.log`). The retry ran 269/0/0, which
-  covers nothing, so the whole WebGL 2 lane of that pass is recorded SUSPECT.
-  IT IS NOT POINT 1073'S, and that is measured rather than argued. Point 1073 touches the
-  speech floor, adult work, dig-site assignment, the speech labels and the bank-call block
-  of the suite — nothing in the river or its flecks. The IDENTICAL code ran the full
-  `polish` suite twice on WebGPU, both times green on the FIRST attempt, this check
-  included. And `node scripts/throttle-probe.mjs polish --section=adult-errands
-  --backend webgl --runs 8` at a quarter of a core did NOT reproduce it: 482 stayed green
-  in all eight, while the skew fell on the fill checks instead (SKEW RATE 2/8). So it is
-  not this point's, and it is not plain load either.
-  THE CAUSE IS THE CHECK'S OWN SHAPE, read at `scripts/verify/polish.mjs` ~6047-6066: the
-  aim block picks the fleck NEAREST the bank spot, returns it, waits `nextFrames(6)` and
-  only then opens the shutter. The flecks drift with the current — that is the very thing
-  the surrounding checks measure — so the subject moves between being chosen and being
-  photographed. On the slower lane the six frames cost more wall time and the fleck can
-  leave the frame to the right. The check races its own subject by construction; it has
-  simply been winning the race.
-  FINAL STATE: the frame's subject is the fleck that is in the picture AT THE SHUTTER, not
-  the one that was nearest six frames earlier — re-read the nearest fleck at shutter time,
-  or keep the chosen one and aim at where it has drifted to. Whichever is chosen, the
-  frame must still show the foam that demonstrates the current, and the check must not be
-  weakened into one that would pass on an empty river.
-  Refs: scripts/verify/polish.mjs (~6044-6070, the `aim` block and the 482 frame),
-  scripts/render-verify-charges.mjs (the entry filed with this point).
   Bundle: Testinfrastruktur.

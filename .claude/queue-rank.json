@@ -1177,12 +1177,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "1073": {
-      "at": "2026-09-07T17:37:27.184Z",
-      "why": "Nutzer-Entscheidung 07.09.2026 zur Ufer-Karte: die Richtungsansage ist vom definierten Zuschauerstand aus heute nie hörbar",
-      "origin": "user",
-      "place": "ahead"
-    },
     "1074": {
       "at": "2026-09-07T19:47:32.134Z",
       "why": "Last is right: the footgun has a known, proven workaround (start the run under setsid), so it no longer blocks — and under the infrastructure freeze an infra defect waits unless it reproducibly blocks game work. It is read together with 567 when either is taken.",
@@ -1345,35 +1339,6 @@
       "origin": "machine",
       "place": "last"
     }
-  },
-  "boundary": {
-    "at": "2026-08-21T00:55:14.962Z",
-    "points": [
-      336,
-      553,
-      596,
-      633,
-      659,
-      660,
-      663,
-      690,
-      708,
-      715,
-      719,
-      733,
-      735,
-      736,
-      738,
-      739,
-      746,
-      747,
-      750,
-      759,
-      760,
-      762,
-      764
-    ],
-    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
     "at": "2026-09-13T17:27:14.867Z",
@@ -1744,7 +1709,6 @@
       1063,
       1068,
       1071,
-      1073,
       1074,
       1075,
       1076,
@@ -1775,5 +1739,34 @@
       1119,
       1120
     ]
+  },
+  "boundary": {
+    "at": "2026-08-21T00:55:14.962Z",
+    "points": [
+      336,
+      553,
+      596,
+      633,
+      659,
+      660,
+      663,
+      690,
+      708,
+      715,
+      719,
+      733,
+      735,
+      736,
+      738,
+      739,
+      746,
+      747,
+      750,
+      759,
+      760,
+      762,
+      764
+    ],
+    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   }
 }
