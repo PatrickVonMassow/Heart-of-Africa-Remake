@@ -17,6 +17,8 @@
 //                       suite in THIS tree first and take its failures
 //   --current-out <f>   a file holding the failing run's output, as an
 //                       alternative to naming each check with --failed
+//   --current-context <standalone|in-pass>  how supplied failures were measured;
+//                       omitted means unknown, never assumed comparable
 //   --current-checks <n>  how many checks the CURRENT run reached — the yardstick
 //                       for the died-early verdict (point 418). run-all hands it
 //                       over; it is measured here when the suite runs here.
@@ -71,7 +73,7 @@ const INFRA_PATHS = [
 const KEEP_BASELINES = 2
 
 export function parseWrapperArgs(argv) {
-  const out = { suite: null, ref: null, runs: 2, keep: false, strict: false, currentOut: null, reportFile: null, currentChecks: 0, failed: [] }
+  const out = { suite: null, ref: null, runs: 2, keep: false, strict: false, currentOut: null, currentContext: 'unknown', reportFile: null, currentChecks: 0, failed: [] }
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]
     if (a === '--ref') out.ref = argv[++i] ?? null
@@ -79,6 +81,10 @@ export function parseWrapperArgs(argv) {
     else if (a === '--failed') out.failed.push(argv[++i] ?? '')
     else if (a === '--report-file') out.reportFile = argv[++i] ?? null
     else if (a === '--current-out') out.currentOut = argv[++i] ?? null
+    else if (a === '--current-context') {
+      const context = argv[++i]
+      out.currentContext = ['standalone', 'in-pass'].includes(context) ? context : 'unknown'
+    }
     else if (a === '--current-checks') out.currentChecks = Math.max(0, Number(argv[++i]) || 0)
     else if (a === '--keep') out.keep = true
     else if (a === '--strict') out.strict = true
@@ -232,6 +238,11 @@ async function main() {
   // What is red NOW: handed in by run-all (its captured output or the names), or
   // measured here by running the suite in THIS tree.
   let currentFailed = opts.failed.map(checkFromName)
+  // runSuiteOnce is an isolated process. An inherited section filter narrows
+  // BOTH locally measured runs; supplied failures have no such guarantee.
+  const section = String(process.env.VERIFY_SECTION ?? '').trim()
+  const baselineContext = section ? `standalone section "${section}"` : 'standalone'
+  let currentContext = opts.currentContext
   // How far the CURRENT run got — the yardstick a died-early baseline is
   // measured against (point 418).
   let currentCheckCount = opts.currentChecks
@@ -251,6 +262,7 @@ async function main() {
         label: `running ${opts.suite} on the CURRENT tree to see what is red`,
         logPath: join(logDir(tree.mainRoot), `${opts.suite}-current.log`),
       })
+      currentContext = baselineContext
       currentFailed = run.failed
       currentCheckCount = run.checks.length
     } finally {
@@ -311,6 +323,8 @@ async function main() {
     ref: `${baseline.sha.slice(0, 12)} (${baseline.ref})`,
     backend,
     classified,
+    currentContext,
+    baselineContext,
     suiteFileChanged,
     infraChanged,
     baselineRan: folded.ran,
