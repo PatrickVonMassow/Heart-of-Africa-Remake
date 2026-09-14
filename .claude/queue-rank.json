@@ -1368,12 +1368,6 @@
       "why": "User 14.09.2026, after asking why a feature costs more verification than development; the measurement he asked for is the point itself.",
       "origin": "user",
       "place": "ahead"
-    },
-    "1127": {
-      "at": "2026-09-14T19:23:32.943Z",
-      "why": "It holds a red that cannot otherwise close: until it lands, every point whose branch runs the full pass gets this check promoted to CANDIDATE REAL FAILURE — it held 1056 for a day and would hold the next point the same way.",
-      "origin": "machine",
-      "place": "ahead"
     }
   },
   "boundary": {
@@ -1406,7 +1400,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-14T19:23:33.060Z",
+    "at": "2026-09-14T23:13:50.426Z",
     "points": [
       174,
       184,
@@ -1808,8 +1802,7 @@
       1123,
       1124,
       1125,
-      1126,
-      1127
+      1126
     ]
   }
 }
