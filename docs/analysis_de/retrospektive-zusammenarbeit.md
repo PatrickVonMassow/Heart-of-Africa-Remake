@@ -1537,7 +1537,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Montag, 14.09.2026, 12:01 · Quellen-Fingerprint: `48bc5763b84e…`
+Zuletzt aktualisiert: Montag, 14.09.2026, 14:31 · Quellen-Fingerprint: `21914e28d948…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1643,8 +1643,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 96 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 133 Prozess-/Meta-TASKS-Punkte (davon 65 offen).
 
-<!-- RETRO-FINGERPRINT: 48bc5763b84e8a2f1d8669bbfd8ff81db4fb21ec5d3d96ea52ea44701db37924 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-14T10:01:05.523Z -->
+<!-- RETRO-FINGERPRINT: 21914e28d94856fa695ef782be85feb9a9f5c4a26ced61359cc7594cf3c35208 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-14T12:31:08.134Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -6952,3 +6952,32 @@ Adoption, nie ein Neustart — `--adopt` existiert genau dafür. Und bevor eine 
 Rote zuordnet, ist die Selbstbuchung des Laufs zu lesen: Ein Lauf, der seine Roten bereits
 einem offenen Punkt angelastet hat, braucht keinen zweiten Zuordner, sondern nur noch einen
 Leser.
+
+### 3.200 Ein abgewürgter Lauf sieht im Datensatz aus wie ein normal beendeter
+
+Der Fall aus §3.112 hat einen Nachhall, der erst am Folgetag Geld gekostet hat. Der
+zerrissene Zwei-Backend-LARGE zu Punkt 1056 hinterließ eine Quittung mit `exit 1` und sechs
+roten Suiten aus sechs voneinander unabhängigen Themen — `world`, `polish`, `touch`,
+`settings`, `enrichments`, `benchmark`. Die Nachfolgesitzung stand damit vor der Frage, die
+das Haus für jedes Rot stellt: echte Regression, vorbestehend oder Umgebung?
+
+Diese Frage war nicht mehr beantwortbar. `scripts/verify/run-logged.mjs` flacht ein per
+Signal getötetes Kind auf `code === null ? 1 : code` ab; der einzige Ort, der das Signal
+benennt, ist ein Digest-Feld, das ins Terminal des Bestellers geht und nicht in den
+`.run.json`-Datensatz. Stirbt die wartende Sitzung — hier tat sie es 42 Sekunden vor dem
+Laufende —, ist die Unterscheidung zwischen Kill und Selbst-Exit unwiederbringlich verloren.
+Übrig bleibt eine Quittung, die aussieht wie ein regulär durchgelaufener roter Test, und sechs
+Rote, deren einziger gemeinsamer Nenner die Uhrzeit ist.
+
+Der Schaden ist nicht das fehlende Feld, sondern was an seiner Stelle passieren muss. Sechs
+unklassifizierbare Rote lassen genau zwei Wege offen: sie zu glauben und Arbeit an Defekten
+zu beginnen, die es nicht gibt, oder den ganzen Lauf zu wiederholen. Die Nachfolgesitzung
+hat wiederholt — gut zwei Stunden Maschine, um eine Auskunft nachzuholen, die ein Wort im
+Datensatz gehabt hätte. Dass die Wiederholung `world` sofort grün zeigte, bestätigt die
+Diagnose nachträglich und ändert am Preis nichts.
+
+**Lehre:** Ein Datensatz, der über einen Lauf Auskunft geben soll, muss die Tatsache tragen,
+die seine Lesart entscheidet — hier das Signal oder ein schlichtes `exitedNormally`. Ein
+Feld, das nur ins Terminal geht, existiert für jede spätere Sitzung nicht. Das ist dieselbe
+Abkürzung wie in §3.112, eine Ebene tiefer: Dort wurde die Lebendigkeit aus der Buchhaltung
+abgeleitet statt gemessen, hier wird sie gar nicht erst aufgeschrieben.
