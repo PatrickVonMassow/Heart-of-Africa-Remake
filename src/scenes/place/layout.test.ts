@@ -634,10 +634,15 @@ describe('the village water path (work-order 688)', () => {
 // hut or on a lane teaches nothing — the placement is checked like every other
 // errand target.
 describe('the ground work villagers dig at (work-order 483)', () => {
-  it.each(SEEDS)('seed %i: every village grows the three kinds, each on its own spot', (seed) => {
+  it.each(SEEDS)('seed %i: every village has two distinct inland purposes, each on its own spot', (seed) => {
     for (const v of VILLAGES) {
       const layout = buildLayout(v.id, seed)
-      expect(layout.digSites.map((s) => s.kind).sort(), v.id).toEqual(['patch', 'pit', 'postHole'])
+      expect(layout.digSites, v.id).toHaveLength(2)
+      expect(layout.digSites.filter((s) => s.kind === 'patch'), v.id).toHaveLength(1)
+      expect(layout.digSites.some((s) => s.kind === 'pit' || s.kind === 'postHole'), v.id).toBe(true)
+      if (layout.bank) for (const site of layout.digSites) {
+        expect(site.x * layout.bank.nx + site.z * layout.bank.nz, v.id).toBeLessThan(0)
+      }
       for (let i = 0; i < layout.digSites.length; i++) {
         for (let j = i + 1; j < layout.digSites.length; j++) {
           const a = layout.digSites[i]
@@ -712,7 +717,7 @@ describe('the ground work villagers dig at (work-order 483)', () => {
     }
   })
 
-  it('puts most of them where their own work belongs', () => {
+  it('puts each site where its own work belongs', () => {
     // The anchor is a first-pass rule with a documented fallback (a ksar cannot
     // always give one), so this pins that the rule is doing real work rather
     // than that it never yields.
@@ -742,7 +747,7 @@ describe('the ground work villagers dig at (work-order 483)', () => {
       }
     }
     expect(total).toBeGreaterThan(100)
-    expect(anchored / total).toBeGreaterThan(0.8)
+    expect(anchored).toBe(total)
   })
 
   it('gives ports none: the teaching is a village matter', () => {
