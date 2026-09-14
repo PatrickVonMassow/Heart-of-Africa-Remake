@@ -916,3 +916,28 @@ je eigener Formulierung setzt.
 
 Nicht umgesetzt wegen des Infrastruktur-Freezes: kein Spielerimpakt, keine
 Blockade — der Weg existiert und wurde gegangen, er ist nur umständlich.
+
+## Das Wasserpaar findet im ersten Anlauf nicht zusammen (14.09.2026)
+
+Der Abschnittslauf `polish --section=adult-errands` auf WebGL 2 färbte im ERSTEN
+Anlauf rot und im zweiten grün (SUSPECT, deckt damit nichts):
+
+    FAIL  a village adult is really filling his jar, clear of the others
+          — no carrier reached the fill phase in 180 s
+    ERR:  [ASSERT] adult-pair-never-met — water-back: villager 1 expired still
+          on his way to the walk word; the pair never assembled
+
+Dieselbe Zusicherung feuert auch in den Unit-Tests (`tagShuffle.test.ts`) als
+stderr-Zeile, dort gleich zweimal in der Grabvariante (`dig-first`, `dig-second`)
+und einmal als `way-out-missing` in mandinka-village — ohne den Test rot zu
+machen. Das ist genau die Deadlock-Klasse, die Punkt 1073 repariert hat; sie ist
+seltener geworden, aber nicht verschwunden.
+
+Gegenmessung derselben Stunde: der ganze Durchgang fuhr die Erwachsenenarbeit
+danach zweimal ohne diesen Roten — WebGPU 268/0/0 im ersten Anlauf, WebGL 2
+267/1/0 mit einem fremden, verbuchten Roten. Ein Punkt wird daraus deshalb NICHT:
+nicht reproduzierbar, kein Spielerimpakt gemessen, keine stehende Blockade.
+
+Wenn er wiederkommt, ist das hier die zweite Messung — dann gehört er in einen
+eigenen Punkt mit `node scripts/throttle-probe.mjs polish --section=adult-errands
+--backend webgl --runs 8` als erster Messung.

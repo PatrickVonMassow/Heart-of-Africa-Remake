@@ -15842,3 +15842,44 @@ to land than a mechanism that needs a review.
   Refs: scripts/batch-claim.mjs, scripts/batch-in-flight.mjs, scripts/verify/run-wait.mjs,
   scripts/verify/run-all.mjs, scripts/verify/run-logged.mjs
   Bundle: Session- & Repo-Hygiene
+
+- [ ] 1128. The one instrument the batch must wait with declares a healthy run HUNG and tells
+  the session to kill it (measured twice, 14./15.09.2026, on the two covering runs of point
+  1127).
+  `scripts/verify/run-wait.mjs --plan polish` prints BOTH numbers in the same breath:
+  "expected 5m 41s (measured medians, docs/picture-check-cost.md §1)" and, one line below,
+  "observed: 9.9-61.5 min (median 55.2) over 6 run(s), whole `polish`, one backend". It then
+  derives its patience from the FIRST number alone: `--await` gives the run 1.65x of it
+  (9m 20s), and past 2.5x it prints "HUNG - ... end the run rather than waiting again" and
+  records the wait as a standstill for the emergency lane.
+  MEASURED, both runs healthy and both declared hung:
+  - full `polish` on WebGPU: HUNG at 19m 00s and again at 28m 33s; it finished GREEN ON THE
+    FIRST ATTEMPT at 31m 47s, 268 pass / 0 fail, 54 frames.
+  - full `polish` on WebGL 2: HUNG at 19m 20s and again at 28m 43s; it finished at 30m 27s,
+    267 pass / 1 fail, its single red charged to open point 1068.
+  Obeying either verdict would have destroyed a run that was 60 % done, and both runs were
+  the covering evidence of a point that could not land without them. What the session had
+  instead was a hand-measured liveness check (renderer CPU accumulating, vite answering 200)
+  — which is exactly the reading the instrument is supposed to spare it.
+  WHY THE EXPECTATION IS WRONG, not merely unlucky: §1's median is the median over ALL
+  polish runs including `--section` runs of two minutes; the whole suite has its own measured
+  band in §7 and the plan already prints it. A `--section=adult-errands` run in the same hour
+  took 9m 36s against the same 5m 41s expectation — so the expectation is not even right for
+  the cheap rung it was averaged from.
+  Final state:
+  - The patience of `--await` and the HUNG threshold are taken from the band that matches
+    WHAT IS BEING RUN (whole suite vs section), not from one average over both. The number is
+    read from the table that is already printed, not from a second source.
+  - A run that is demonstrably advancing is never called HUNG. If the wait must end because
+    its call is spent, it says "STILL RUNNING" and nothing more — the standstill record and
+    the "end the run" instruction belong to a run that has stopped moving, not to one that is
+    slower than an average.
+  - NOTHING IS ADDED: this is one number taken from the right column and one verdict deleted
+    where it cannot be true. No new guard, no new record, no new lane.
+  Test: Vitest over the wait's verdict function — a run inside the whole-suite band is STILL
+  RUNNING and never HUNG, a section run keeps the tighter band, and a genuinely stalled run
+  (no advance in its own evidence) still reaches HUNG.
+  Criticality: high — a real, twice-measured blockade that instructs the destruction of
+  verification runs, and the batch has no other sanctioned way to wait.
+  Refs: scripts/verify/run-wait.mjs, docs/picture-check-cost.md §1 and §7, points 1123, 1126
+  Bundle: Testinfrastruktur.
