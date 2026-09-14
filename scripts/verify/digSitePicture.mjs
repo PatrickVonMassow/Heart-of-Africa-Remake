@@ -2,6 +2,10 @@
 // The layout/clearance test pins this choice without running a browser.
 export const DIG_PICTURE = { placeId: 'bambara-village', seed: 12 }
 
+export function digPictureUnmounted() {
+  return !window.__game.getState().placeId && !window.__placeWalkers && !window.__placeErrands
+}
+
 export function digPictureView(sites) {
   if (sites.length !== 2) return null
   const [a, b] = sites
@@ -28,6 +32,7 @@ export function readSpoilWalker({ who, start, hold = false }) {
 
 // Project the actual purpose meshes, not just the midpoint between two holes.
 export function readDigPicture() {
+  if (window.__ui?.getState().speechConceptLabels !== false) return null
   const scene = window.__placeScene
   const camera = window.__placeCamera
   if (!scene || !camera) return null

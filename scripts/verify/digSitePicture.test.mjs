@@ -1,11 +1,12 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import { BoxGeometry, Group, Mesh, PerspectiveCamera } from 'three/webgpu'
-import { captureSpoilWalk, readDigPicture, readSpoilWalker } from './digSitePicture.mjs'
+import { captureSpoilWalk, digPictureUnmounted, readDigPicture, readSpoilWalker } from './digSitePicture.mjs'
 
 const route = { who: 0, start: { x: 0, z: 0 }, end: { x: 0, z: 3.2 } }
 afterEach(() => vi.unstubAllGlobals())
 
 function sceneFixture() {
+  vi.stubGlobal('__ui', { getState: () => ({ speechConceptLabels: false }) })
   const scene = new Group()
   const camera = new PerspectiveCamera(50, 1.6, 0.1, 100)
   camera.position.set(0, 1.65, 0)
@@ -135,4 +136,23 @@ it('does not write a frame if either purpose is lost before the shutter', async 
   } })
   expect(checks.map((c) => c.ok)).toEqual([true, false])
   expect(frame).not.toHaveBeenCalled()
+})
+
+it('refuses a picture that still has the concept overlay enabled', () => {
+  sceneFixture()
+  vi.stubGlobal('__ui', { getState: () => ({ speechConceptLabels: true }) })
+  expect(readDigPicture()).toBeNull()
+})
+
+it('waits for both the store transition and the old village hooks to unmount', () => {
+  vi.stubGlobal('__game', { getState: () => ({ placeId: null }) })
+  vi.stubGlobal('__placeWalkers', {})
+  vi.stubGlobal('__placeErrands', () => ({}))
+  expect(digPictureUnmounted()).toBe(false)
+  vi.stubGlobal('__placeWalkers', undefined)
+  expect(digPictureUnmounted()).toBe(false)
+  vi.stubGlobal('__placeErrands', undefined)
+  expect(digPictureUnmounted()).toBe(true)
+  vi.stubGlobal('__game', { getState: () => ({ placeId: 'bambara-village' }) })
+  expect(digPictureUnmounted()).toBe(false)
 })

@@ -24,7 +24,7 @@ import {
   shuffleWindows,
   traceLiveness,
 } from './childMotionMetric.mjs'
-import { DIG_PICTURE, digPictureView, captureSpoilWalk } from './digSitePicture.mjs'
+import { DIG_PICTURE, digPictureUnmounted, digPictureView, captureSpoilWalk } from './digSitePicture.mjs'
 import { sectionGate } from './sections.mjs'
 import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
@@ -6236,14 +6236,15 @@ if (section('adult-errands')) {
   // an open standing view (the layout unit test pins both the view and crossing).
   const digPictureSaved = await page.evaluate(() => {
     const g = window.__game.getState()
-    const saved = { seed: g.seed, progress: g.villageDigProgress,
+    const saved = { seed: g.seed, progress: g.villageDigProgress, conceptLabels: window.__ui.getState().speechConceptLabels,
       interval: window.__balance.villageLife.adultErrands.intervalSeconds }
     if (g.placeId) g.leavePlace()
     return saved
   })
-  await page.waitForFunction(() => !window.__game.getState().placeId)
+  await page.waitForFunction(digPictureUnmounted, null, { timeout: 30000 })
   try {
     await page.evaluate(({ placeId, seed }) => {
+      window.__ui.getState().setSpeechConceptLabels(false)
       window.__game.setState({ seed })
       // Load finished bouts through the durable game path. A single accelerated
       // three-second bout is only six worker-seconds, not the full 18 required
@@ -6284,9 +6285,10 @@ if (section('adult-errands')) {
     }
   } finally {
     await page.evaluate(() => window.__game.getState().leavePlace())
-    await page.waitForFunction(() => !window.__game.getState().placeId)
+    await page.waitForFunction(digPictureUnmounted, null, { timeout: 30000 })
     await page.evaluate((saved) => {
       window.__game.setState({ seed: saved.seed, villageDigProgress: saved.progress })
+      window.__ui.getState().setSpeechConceptLabels(saved.conceptLabels)
       window.__balance.villageLife.adultErrands.intervalSeconds = saved.interval
     }, digPictureSaved)
   }
