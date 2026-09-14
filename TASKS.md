@@ -15737,6 +15737,22 @@ to land than a mechanism that needs a review.
      red suites of that run cannot be classified at all, and each of them costs
      the next session a re-run to rule out. Cheap remedy: write the signal (or
      `exitedNormally`) into the record, not only into the digest.
+
+  4. A RUN ON A FEATURE BRANCH CAN NEVER BE HANDED OVER. Measured 14.09.2026 at
+     the context watermark, with the two-backend LARGE for point 1056 running:
+     `scripts/batch-in-flight-core.mjs` tests a declared run with
+     `sameHead(run.head, headNow)`, where `headNow` is the MAIN tree's HEAD while
+     the run carries the HEAD of the worktree it runs in. The two agree only when
+     main and the branch stand on the same commit — that is, essentially never
+     while a point is in progress. The handover is refused with "its run covers
+     HEAD <branch>, not the <main> being handed over" however well the run is
+     evidenced, and none of the four offered ways out applies: a test run has no
+     CHECKPOINT, RE-DECLARE with `--branch`/`--worktree` does not touch the
+     comparison, ABANDON throws away hours of machine, and DRAIN forces the
+     session to keep running above the watermark — which is exactly what the
+     watermark exists to prevent. So the two guards contradict each other by
+     construction. Cheap remedy: compare against the HEAD of the worktree the run
+     runs in (or the branch the declaration names), not against the main HEAD.
   Criticality: high — a real blockade with a measured cost, plus a false-approval risk: the claim text
   promises a clean release that a pid-dead owner does not deliver.
   Refs: scripts/batch-claim.mjs, scripts/batch-in-flight.mjs, scripts/verify/run-wait.mjs,
