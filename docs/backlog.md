@@ -1123,3 +1123,36 @@ Veröffentlichung stand hinter dem deckenden Bildlauf still, den sie erzeugt
 hätten. Ein Melder, der gelegentlich spät anschlägt, ist einem vorzuziehen, der
 zuverlässig tötet, was er beobachtet. Der saubere Weg wäre ein Bild, das seinen
 Lauf benennt — eine Änderung an jedem Suite-Auslöser, nicht am Prüfläufer.
+
+## Eine Marke, deren Besitzer sich mitten im Lauf ändert, bleibt stehen (16.09.2026)
+
+Aus der zehnten Prüfrunde zu Punkt 1137, von GPT-6 Astra gefunden und bewusst
+nicht geschlossen: Der Lauf hält seine Fortschrittsmarke offen und verschiebt
+ihren Zeitstempel über den Dateideskriptor. Ein ausdrückliches Setzen des
+Zeitstempels unterliegt aber nicht denselben Rechteprüfungen wie ein gewöhnliches
+Schreiben — ändert jemand mitten im Lauf den Besitzer der Markendatei, verweigert
+das System das Setzen, während das Log weiter Bytes annimmt. Der Lauf wird dann
+allein an seinem Log gemessen; eine lange, stille Bildsuite könnte so nach einer
+Viertelstunde als hängend gemeldet werden.
+
+Wirkung: eine Falschmeldung, kein getöteter Lauf — das Hängend-Urteil berichtet,
+es beendet nichts. Voraussetzung ist ein Eingriff von außen an einer Datei, die
+dem Lauf gehört. Nicht als Punkt eingereiht: kein Spielerimpakt, keine
+Datenfrage, keine Blockade — und die Brücken, die in den Runden sechs bis neun
+für genau diese Klasse gebaut wurden, haben jedes Mal mehr gekostet als der Fall,
+den sie abdeckten (zerschnittene Ergebniszeilen im Log, eine Frist, die sich
+selbst erneuerte, verlorene Beobachtungen). Der billige Weg wäre, gar keinen zu
+bauen und die Meldung zu lesen, wie sie gemeint ist.
+
+## Zehn Prüfrunden an einem Punkt: die Abbruchentscheidung (16.09.2026)
+
+Punkt 1137 hat zehn kreuzverlagerte Prüfrunden durchlaufen; jede fand etwas
+Echtes, und die Voraussetzungen wurden von Runde zu Runde enger — von einer
+veralteten Kostentabelle über eine Umfrage, die ihre eigene Akte neu schreibt,
+bis zu einem Besitzerwechsel an einer Datei mitten im Lauf. Abgebrochen wurde
+nach Runde zehn, mit folgender Begründung: Alles, was einen **gesunden Lauf
+beenden** kann, ist repariert und durch Tests festgehalten. Was bleibt, lässt das
+Hängend-Urteil zu spät oder falsch **melden** — und eine Meldung tötet nichts.
+Der Infrastruktur-Freeze (CLAUDE.md §2) arbeitet an einem Infrastrukturdefekt
+nur, wenn er reproduzierbar blockiert oder eine falsche Freigabe erlaubt; beides
+trifft auf den Rest nicht zu.

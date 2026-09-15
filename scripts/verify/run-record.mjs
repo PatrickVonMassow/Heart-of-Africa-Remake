@@ -390,14 +390,20 @@ export function progressMarkPathFor(logPath) {
  * OPEN the mark and keep the descriptor, for as long as the run lasts.
  *
  * Only run-logged.mjs calls this. The descriptor is the whole point (Astra
- * review rounds 6 to 9): a mark re-CREATED on every stamp can start failing
- * halfway through a run — a read-only file, a directory that will take no new
- * entry — while the log, whose descriptor was opened at the same moment in the
- * same directory, writes on happily. Every repair for that asymmetry put a
- * second writer into the log and cost three review rounds of line corruption
- * and self-renewing leases. An open descriptor removes the asymmetry instead:
- * the mark and the log now fail together or not at all, and there is nothing to
- * fall back to.
+ * review rounds 6 to 10): a mark re-CREATED on every stamp had to create a
+ * directory entry on every stamp, and a directory that stops taking new entries
+ * halfway through a run leaves the log's own descriptor writing on happily.
+ * Every repair for that asymmetry put a second writer into the log and cost
+ * three review rounds of split result lines and self-renewing leases. An open
+ * descriptor removes the case instead, and there is nothing to fall back to.
+ *
+ * It does NOT make the two inseparable, and the comment should not pretend
+ * otherwise: `futimes` is an explicit timestamp update, not an ordinary write,
+ * so a marker whose ownership changes under a running run can still refuse the
+ * stamp while the log accepts bytes. `stamp` answers false there and the run is
+ * judged by its log alone — where it stood before this point. Collected in
+ * docs/backlog.md rather than bridged, because every bridge built for it so far
+ * cost more than the case it covered.
  *
  * Null when the mark cannot be opened at all — which is the case where the log
  * could not have been created either, so the run has larger problems than this.

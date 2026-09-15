@@ -170,10 +170,15 @@ And the FRAME DIRECTORY, because `verification/` is shared and carries no run
 identity: a reader that folded it in could have any other run's pictures vouch
 for the one it is judging. The frames are read by the writer instead, about its
 own run, while that run is going. The descriptor is why there is no
-fallback: a mark re-created on every stamp could start failing halfway through a
-run — a read-only file, a directory that will take no new entry — while the log,
-opened in the same directory at the same moment, wrote on. Held open, the two
-fail together or not at all, and nothing but the child ever writes into the log. `--await` and `--status` ask the same question and give the same
+fallback: a mark re-created on every stamp had to create a directory entry on
+every stamp, and a directory that stops taking new entries mid-run leaves the
+log's own descriptor writing on. Held open, that case is gone and nothing but the
+child ever writes into the log. What is NOT claimed is that the two can never
+fail apart — an explicit timestamp update does not share an ordinary write's
+permission checks, so a marker whose ownership changes under a running run can
+still refuse the stamp. Then the run is judged by its log alone, which is where
+it stood before this point, and the residual is collected in
+`docs/backlog.md`. `--await` and `--status` ask the same question and give the same
 answer: a run that is still writing is `SLOW`, never `HUNG`. The clock alone could
 never say it: the §1 plan is measured to be a third to two thirds of the real
 cost, so the hung mark for a whole `polish` pass falls at 14 minutes against a
