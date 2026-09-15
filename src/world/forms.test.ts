@@ -45,7 +45,7 @@ describe('where the sockets are', () => {
   })
 })
 
-describe('what the use key resolves', () => {
+describe('what using a carried form resolves', () => {
   it('fits at the talus foot, with the form in the pack', () => {
     const at = socketPosition(talus)
     const r = use(at.lat, at.lon)

@@ -45,8 +45,8 @@ import {
   settlementCollisionRadius,
   settlementColliders,
   settlementEnterCandidate,
-  settlementToEnter,
 } from './settlementEntry'
+import { bindTravelSpace } from './travelSpace'
 import { isBlocked, sampleTerrain, type TerrainType } from '../../world/terrain'
 import { REFINE_RING_MAX, chunkNeedsRefine, refinedSegments, setTerrainRefine } from './terrainLod'
 import { drainChunkQueue, orderChunkJobs, planChunkWindow, predictedNextCenter, type ChunkJob } from './terrainQueue'
@@ -2922,41 +2922,9 @@ export function TravelScene() {
     }
   }, [setPrompt])
 
-  // Space enters the settlement the traveller stands within (design.md §2.3):
-  // movement-based approach, confirmed with the use key — never automatic on
-  // reaching the enter radius. The candidate + water guard still arm the hint
-  // each frame (ui.enterPlaceId, below), but the press re-derives the decision
-  // from the LIVE traveller position through the same pure helper: a keydown
-  // landing after a teleport or between frames used to act on the last rendered
-  // frame's candidate — the stale-`nearRef` race the first-person use key had.
-  // Entering a finished/defeated run stays blocked so a dead traveller never
-  // overwrites the checkpoint.
+  // Space only enters settlements; carried forms act through the inventory.
   useEffect(() => {
-    const off = onKeyPress('Space', () => {
-      const ui = useUi.getState()
-      const g = useGame.getState()
-      const blocked = !!ui.dialog || !!g.defeat || g.victory
-      const ll = worldToLatLon(g.pos.x, g.pos.z)
-      const onWater = sampleTerrain(ll.lat, ll.lon, g.seed).type === 'water'
-      const id = settlementToEnter(
-        g.pos.x,
-        g.pos.z,
-        PLACE_WORLD_POSITIONS,
-        balance.placeEnterRadius,
-        onWater,
-        blocked,
-      )
-      if (id !== null) {
-        g.enterPlace(id)
-        return
-      }
-      // Out on the open map the SAME use key presses a carried form against
-      // whatever the traveller is standing at: one key for "use what is here",
-      // whether that is a settlement gate or a socket in a rock. The store
-      // answers a wrong or a spent place in his own voice, and does nothing at
-      // all when he carries no form.
-      if (!blocked) g.useCarriedForm()
-    })
+    const off = bindTravelSpace(PLACE_WORLD_POSITIONS)
     return () => {
       off()
       useUi.getState().setEnterPlaceId(null)

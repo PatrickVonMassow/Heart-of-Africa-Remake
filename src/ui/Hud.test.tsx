@@ -16,6 +16,7 @@ import { MONTH_KEYS } from '../systems/season'
 import { useUi } from '../state/ui'
 import { freshGame, withWorld, jumpTo, terrainAt, g, COORD } from '../test/store'
 import { balance } from '../config/balance'
+import { FORM_SOCKETS, socketPosition } from '../world/forms'
 
 withWorld()
 
@@ -33,6 +34,40 @@ afterEach(() => {
 })
 
 const invClass = (eq: string) => document.querySelector(`[data-eq="${eq}"]`)?.className ?? ''
+
+describe('clay impression inventory click', () => {
+  it('answers a wrong place, fits at the talus, and refuses a spent socket without consuming the form', () => {
+    const talus = socketPosition(FORM_SOCKETS.find((s) => s.id === 'bandiagara-talus')!)
+    jumpTo(talus.lat + 4 * balance.digRadius / 10, talus.lon)
+    useGame.setState({ carriedForms: ['rock-relief'], toast: null })
+    const { getByRole } = render(<Hud />)
+    const form = getByRole('button', { name: en.forms['rock-relief'] })
+    const journalBefore = g().journal
+
+    fireEvent.click(form)
+
+    expect(g().toast).toBe(en.toasts.formNoFit)
+    expect(g().spentSockets).toEqual([])
+    expect(g().journal).toEqual(journalBefore)
+
+    jumpTo(talus.lat, talus.lon)
+    fireEvent.click(form)
+
+    expect(g().toast).toBe(en.toasts.pocSolved)
+    expect(g().spentSockets).toEqual(['bandiagara-talus'])
+    expect(g().journal.filter((e) => e.text.key === 'journal.mouldFitted')).toHaveLength(1)
+    expect(g().carriedForms).toEqual(['rock-relief'])
+    const fittedJournal = g().journal
+
+    g().setJournalOpen(false)
+    fireEvent.click(form)
+
+    expect(g().toast).toBe(en.toasts.formNoFit)
+    expect(g().spentSockets).toEqual(['bandiagara-talus'])
+    expect(g().journal).toEqual(fittedJournal)
+    expect(g().carriedForms).toEqual(['rock-relief'])
+  })
+})
 
 describe('InventoryBar .inv-active glow (design.md §17)', () => {
   it('a canoe on water glows while an idle item does not', () => {

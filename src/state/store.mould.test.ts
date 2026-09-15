@@ -3,7 +3,7 @@
 //
 // The RULES of the form/socket lock are pinned in src/world/forms.test.ts; this
 // file pins the store wiring — the hand-over that puts the form in the pack, the
-// use key out on the map, the capacity and trade exemption, the chronicle in
+// form use out on the map, the capacity and trade exemption, the chronicle in
 // both languages, and the save/load round trip of a spent socket.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { balance } from '../config/balance'
@@ -41,7 +41,7 @@ function handedOver(): void {
   g().handArtefactToChief()
 }
 
-/** Stand where the socket is and press the use key. */
+/** Stand where the socket is and use the carried form. */
 function useAtTheTalus(): void {
   const at = socketPosition(talus)
   g().debugJumpTo(at.lat, at.lon)
