@@ -144,6 +144,28 @@ async function pushUntilClear(maxMs = 15000) {
   await page.waitForTimeout(120)
 }
 
+/** Hold forward until the traveller's feet are within `reach` of a fixed point (or a
+ *  generous window). Same reason as pushUntilClear above: how far a held key walks is
+ *  decided by the RENDER cadence, not by the number of presses — and the settlement
+ *  scene under headless WebGPU draws about a third of a frame per second (measured
+ *  15.09.2026: three frames in nine seconds). A fixed count of 40 ms presses then buys
+ *  one or two steps and the walk stalls in open ground, well short of its target. */
+async function pushUntilWithin(target, reach, maxMs = 25000) {
+  const t0 = Date.now()
+  await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW' })))
+  while (Date.now() - t0 < maxMs) {
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW' })))
+    await page.waitForTimeout(80)
+    const distance = await page.evaluate(
+      ({ x, z }) => Math.hypot(window.__placePlayer.x - x, window.__placePlayer.z - z),
+      target,
+    )
+    if (distance <= reach) break
+  }
+  await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyW' })))
+  await page.waitForTimeout(120)
+}
+
 /** Hold forward at the river until the settlement hands the traveller back to
  *  the bird's-eye view — or a generous window elapses (work-order 584). Reports
  *  how far out he got, how far his footing sank on the way, and which mode the
@@ -668,7 +690,10 @@ if (section('chief-body')) {
     })
     check('Chief: a free stand-off two metres off his body exists', contact.standFound === true, JSON.stringify(contact))
     if (!contact.standFound) throw new Error('No free ground two metres off the chief to walk at him from')
-    await pushFrames(24)
+    // Walk at him until he is REACHED, never for a fixed number of input frames:
+    // the resolve that carries the traveller runs once per RENDER frame, and this
+    // scene's headless cadence starves a counted push long before his body.
+    await pushUntilWithin(contact, contact.r + 0.35 + 0.05)
     const stopped = await page.evaluate(({ x, z, nx, nz }) => {
       const p = window.__placePlayer
       return { distance: Math.hypot(p.x - x, p.z - z), side: (p.x - x) * nx + (p.z - z) * nz }
