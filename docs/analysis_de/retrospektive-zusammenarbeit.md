@@ -124,6 +124,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 
 | 15.09. nachmittags | Ein neu eingereihter Punkt erzaehlte der Maschine das Gegenteil von sich selbst: Seine Ueberschrift »has no covering picture run« las der Bildpflicht-Klassierer als VERNEINUNG, der Punkt, dessen einziger Zweck zwei Bildlaeufe sind, wies sich damit als bildfrei aus. Gefangen von einer angehefteten Pruefung, die die exakte Menge solcher Zeilen festhaelt statt ihrer Anzahl; die Korrektur war ein positiv formulierter Satz (§3.274) |
 | 15.09. nachmittags | Und derselbe Punkt trug eine falsche Tatsache: Die deckenden Laeufe lagen scheinbar zwei Stunden VOR dem Merge, den sie decken sollten — Laufstempel in UTC gegen Commit-Zeiten in +0200 gelesen. Beide liefen am Merge-HEAD selbst, mit je sechs Bildern auf beiden Bahnen. Aufgefallen beilaeufig, weil eine Wartequittung ihren HEAD mit ausdruckte. Wortwoertlich die Lehre aus §3.253, drei Tage alt und von mir wiederholt (§3.275) |
+| 15.09. abends | Der beauftragte Autorenlauf zu Punkt 1131 hing ohne `setsid` an der Schale, die ihn startete, und starb mit ihr — sein Protokoll behauptet bis zuletzt »while the run continues«. Ungesichert im Arbeitsbaum lag seine ganze Ausbeute: ein fertiger Reproduktionsstand des gemeldeten Dorfes, gerettet nur, weil ich zufaellig hinsah. Beide Vorsichtsmassnahmen — nach jedem Schritt committen, lange Laeufe abkoppeln — standen geschrieben und adressierten beide den AUFRUFER; Punkt 1133 verschiebt die zweite in den Startpfad des Werkzeugs (§3.106-Nachtrag) |
 
 Muster: Ab dem 22.07. explodiert die Commit-Rate (Delegation) — und genau dann häufen sich die Infrastruktur-Vorfälle. **Skalierung der Autonomie erzeugt eine eigene Problemklasse, die die Feature-Arbeit zeitweise überholt.**
 
@@ -1211,6 +1212,29 @@ parallel gearbeitet wird: Zerstörungsrisiko und Nebenläufigkeit treffen sich g
 wenn der Betrieb am produktivsten ist. Die zweite Hälfte ist billiger und wird trotzdem
 übersprungen: Nicht gepushte Arbeit ist der einzige Zustand, den nichts retten kann.
 
+**Nachtrag 15.09.2026 — dieselbe Vernichtung, ohne dass jemand etwas löscht.** Der für
+Punkt 1131 beauftragte Autorenlauf wurde als Kind einer Werkzeug-Schale gestartet, ohne
+`setsid`. Wenige Minuten später waren Eltern- und Kindprozess weg; sein Protokoll endet
+mit dem Satz „pushed 384ec4c while the run continues" und behauptet damit bis zuletzt das
+Gegenteil seines Zustands. Im Arbeitsbaum lag seine ganze Ausbeute ungesichert: ein
+fertiger Reproduktionsstand, der das gemeldete Dorf durch die echte Bewegungsschleife
+fährt. Er überlebte nur, weil ich zufällig hinsah und ihn von Hand committete.
+
+Die zweite Ursache von 3.106 ist damit unverändert wiedergekehrt — Arbeit als ein Block
+bis zur Grünmeldung —, die erste hat eine neue Gestalt: Nicht ein löschender Schritt nahm
+den Agenten mit, sondern die Prozesskette, an der er hing. Und die Regel dagegen stand
+längst geschrieben, nur an der falschen Stelle: Der Punktbrief schärft jedem beauftragten
+Autor ein, nach jedem Schritt zu committen, und die Merkregel dieser Sitzung verlangt,
+lange Läufe abzukoppeln — beides adressiert den AUFRUFER, der es jedes Mal neu richtig
+machen muss. Eine Regel, die bei jedem Aufruf erneut befolgt werden will, ist keine
+Absicherung, sondern eine Wette. Punkt 1133 verschiebt sie deshalb dorthin, wo sie nicht
+mehr vergessen werden kann: in den Startpfad des Werkzeugs selbst.
+
+**Lehre:** Wo eine Vorsichtsmaßnahme dem Aufrufer überlassen bleibt, zählt nicht, wie oft
+sie befolgt wurde, sondern was ihr einmaliges Ausbleiben kostet. Und ein Protokoll, dessen
+letzte Zeile „läuft weiter" sagt, ist kein Lebenszeichen: Der Tod eines Laufs schreibt
+nichts mehr, also muss die Lebendprüfung am Prozess hängen, nie am letzten Satz.
+
 ---
 
 ### 3.107 Die Schicht über den eigenen Einstellungen
@@ -1576,7 +1600,7 @@ stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die s
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Dienstag, 15.09.2026, 18:03 · Quellen-Fingerprint: `937eadb420bc…`
+Zuletzt aktualisiert: Dienstag, 15.09.2026, 19:16 · Quellen-Fingerprint: `b1f3841b18b7…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1682,8 +1706,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 96 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 133 Prozess-/Meta-TASKS-Punkte (davon 65 offen).
 
-<!-- RETRO-FINGERPRINT: 937eadb420bc597dfadf83020f268071b84a905b1ccd4f5d783258e29f9c3759 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-15T16:03:35.944Z -->
+<!-- RETRO-FINGERPRINT: b1f3841b18b7138feb1de8504b2b5adbc488ea3cb43e12d32fd1b096ec970866 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-15T17:16:37.774Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam

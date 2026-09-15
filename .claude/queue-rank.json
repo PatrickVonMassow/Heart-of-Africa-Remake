@@ -1350,6 +1350,12 @@
       "why": "The user's own two bug reports of 15.09.2026 that nobody fetches water and that the two at the water place merely stand there; he ranked it himself directly behind his earlier front-order 1124",
       "origin": "user",
       "place": "ahead"
+    },
+    "1133": {
+      "at": "2026-09-15T17:16:22.791Z",
+      "why": "Es verliert die Arbeit jedes beauftragten Autorenlaufs, und heute traf es einen schon fertigen Befund — jeder weitere Lauf vor dem Fix riskiert denselben stillen Verlust.",
+      "origin": "machine",
+      "place": "ahead"
     }
   },
   "boundary": {
@@ -1382,7 +1388,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-15T17:10:37.487Z",
+    "at": "2026-09-15T17:16:22.805Z",
     "points": [
       174,
       184,
@@ -1783,7 +1789,8 @@
       1125,
       1129,
       1131,
-      1132
+      1132,
+      1133
     ]
   }
 }
