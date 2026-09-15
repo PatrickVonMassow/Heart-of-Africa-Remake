@@ -254,7 +254,8 @@ export const DOC_BUDGETS = [
     // RAISED by the 2 measured lines of the §13.4 speech paragraph work-order 1072
     // owes the section (the same paragraph the word ceiling below prices in); the
     // one line of margin that stood here is left untouched.
-    maxLines: 852,
+    // Two new §7 lines describe excavation purpose, results and walkable spoil.
+    maxLines: 854,
     // RAISED at the merge by 113 measured words: point 341 landed on main while
     // the compression branch was open and added the separated-juvenile decision
     // to §19.8. That is a genuinely new decision, which is exactly what the
@@ -387,7 +388,10 @@ export const DOC_BUDGETS = [
     // forced down. The section named no direction, one voice for everyone and no
     // level at all — new mechanics the user asked for (07.09.2026), not a longer
     // telling of anything already there.
-    maxWords: 28963,
+    // Raised by 93 measured words: §7 now specifies the two village
+    // excavation purposes, persistent results, and passable ground rise. These
+    // requested world behaviours were absent from the equipment table.
+    maxWords: 29056,
     // A hundred words across 28k: design.md is edited section by section and a genuine
     // new decision runs 40–215 measured words, so the slack absorbs the rewording that
     // accompanies one and refuses the disappearance of a whole section without a

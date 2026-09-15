@@ -25,3 +25,26 @@ export function setDrummerVoice(next: DrummerVoice | null): void {
 export function drummerNamesChief(hut: readonly [number, number]): void {
   voice?.(hut)
 }
+
+/** Requests survive a busy village floor; repeating the use key queues a new
+ * word, rather than overwriting the request already waiting. */
+export function queuedDrummerVoice(
+  floor: import('../../communication/speechFloor').SpeechFloor,
+  source: import('../../communication/speechFloor').FloorSource,
+  speak: DrummerVoice,
+) {
+  const pending: Array<{ hut: readonly [number, number]; owner: object }> = []
+  return {
+    voice: (hut: readonly [number, number]) => { pending.push({ hut: [...hut], owner: {} }) },
+    step: (blocked = false) => {
+      const word = pending[0]
+      if (!word || !floor.request({ situation: word.owner, name: 'drummer names chief', word: 'CHIEF', source, sources: () => [source], blocked, ends: true })) return
+      pending.shift()
+      speak(word.hut)
+    },
+    dispose: () => {
+      for (const word of pending) floor.release(word.owner)
+      pending.length = 0
+    },
+  }
+}

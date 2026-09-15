@@ -5,7 +5,7 @@
 // and refused as recorded coverage (that half lives with the recorder's reader,
 // scripts/render-verify-core.test.mjs).
 import { describe, it, expect } from 'vitest'
-import { sectionsForLines, listNonPredictive, listSections, makeSectionGate, planSectionRun, resolveSelection, resultSection, SECTION_ENV } from './sections.mjs'
+import { narrowDiagnosis, sectionOfLine, sectionsForLines, listNonPredictive, listSections, makeSectionGate, planSectionRun, resolveSelection, resultSection, SECTION_ENV } from './sections.mjs'
 import { runVerdict } from '../render-verify-core.mjs'
 import { sectionTag } from '../section-tag-core.mjs'
 
@@ -291,17 +291,21 @@ describe('a check that declares it cannot predict the suite’s own reading', ()
     const gate = makeSectionGate({ sections: ['adult-errands'], requested: 'adult-errands', suite: 'polish' })
     gate.section('adult-errands')
     gate.nonPredictive('the jar comes back FULL', 'the pass casts one errand')
-    expect(gate.predictiveNote('the jar comes back FULL', true)).toContain('NON-PREDICTIVE narrowly')
-    // A red is a red either way round, and an undeclared check says nothing.
-    expect(gate.predictiveNote('the jar comes back FULL', false)).toBe('')
-    expect(gate.predictiveNote('the lanes meet the gate', true)).toBe('')
+    expect(gate.checkResult('the jar comes back FULL', true).note).toContain('NON-PREDICTIVE narrowly')
+    // A standalone red retains its full force, and an undeclared check says nothing.
+    expect(gate.checkResult('the jar comes back FULL', false).note).toBe('')
+    expect(gate.checkResult('the lanes meet the gate', true).note).toBe('')
   })
 
-  it('says nothing in a WHOLE-suite run, which measures what it measures', () => {
+  it('makes both outcomes advisory in the whole suite and leaves other checks decisive', () => {
     const gate = makeSectionGate({ sections: ['adult-errands'], requested: null, suite: 'polish' })
     gate.section('adult-errands')
     gate.nonPredictive('the jar comes back FULL', 'the pass casts one errand')
-    expect(gate.predictiveNote('the jar comes back FULL', true)).toBe('')
+    for (const ok of [true, false]) {
+      expect(gate.checkResult('the jar comes back FULL', ok)).toMatchObject({ status: 'NON-PREDICTIVE', failed: false })
+      expect(gate.checkResult('the jar comes back FULL', ok).note).toContain(`observed ${ok ? 'pass' : 'fail'}`)
+      expect(gate.checkResult('the lanes meet the gate', ok)).toEqual({ status: ok ? 'PASS' : 'FAIL', failed: !ok, note: '' })
+    }
   })
 
   it('refuses a declaration without a check name or without a reason', () => {
@@ -350,5 +354,95 @@ describe('which section a changed line of a suite source belongs to', () => {
   it('is total on nothing at all', () => {
     expect(sectionsForLines('', [])).toEqual([])
     expect(sectionsForLines(null, [1])).toEqual([null])
+  })
+})
+
+// ── the diagnosis narrowing (point 1126) ───────────────────────────────────
+// A red asks "transient or defect?", and the flake retry and the baseline
+// classification both used to ask it by replaying the WHOLE suite. What is
+// proven here is the DECISION: which blocks answer the question, and — the half
+// that matters — every case where the narrow reading may not stand in for the
+// suite's and the caller must repeat the pass exactly as before.
+describe('narrowDiagnosis', () => {
+  const DECLARED = ['town-plan', 'adult-errands', 'children-tag', 'roof-clearance', 'campfire-shadows', 'giza-site']
+  const red = (name, section) => ({ status: 'FAIL', name, detail: section === null ? 'saw 0' : `saw 0  ${sectionTag(section).trim()}` })
+
+  it('names the blocks the red checks sit in, in the order the suite declares them', () => {
+    const verdict = narrowDiagnosis({
+      failures: [red('a jar is filled', 'adult-errands'), red('a plan is drawn', 'town-plan')],
+      declared: DECLARED,
+      suite: 'polish',
+    })
+    expect(verdict.whole).toBe(false)
+    expect(verdict.sections).toEqual(['town-plan', 'adult-errands'])
+  })
+
+  it('folds several reds of one block into one run of it', () => {
+    const verdict = narrowDiagnosis({
+      failures: [red('a jar is filled', 'adult-errands'), red('the jar arrives', 'adult-errands')],
+      declared: DECLARED,
+    })
+    expect(verdict.sections).toEqual(['adult-errands'])
+  })
+
+  it('refuses the narrowing when a red names no block at all', () => {
+    const verdict = narrowDiagnosis({
+      failures: [red('the boot reaches the menu', null), red('a plan is drawn', 'town-plan')],
+      declared: DECLARED,
+    })
+    expect(verdict.whole).toBe(true)
+    expect(verdict.sections).toEqual([])
+    expect(verdict.why).toContain('names no section')
+  })
+
+  it('refuses a block the suite no longer declares', () => {
+    const verdict = narrowDiagnosis({ failures: [red('a plan is drawn', 'old-block')], declared: DECLARED })
+    expect(verdict.whole).toBe(true)
+    expect(verdict.why).toContain('no longer declares')
+  })
+
+  it('refuses a check that declared its own narrow reading non-predictive', () => {
+    const verdict = narrowDiagnosis({
+      failures: [red('a jar is filled', 'adult-errands')],
+      declared: DECLARED,
+      nonPredictive: [{ section: 'adult-errands', check: 'a jar is filled', why: 'one errand is cast per pass' }],
+    })
+    expect(verdict.whole).toBe(true)
+    expect(verdict.why).toContain('NON-PREDICTIVE')
+  })
+
+  it('leaves a non-predictive check of ANOTHER block alone', () => {
+    const verdict = narrowDiagnosis({
+      failures: [red('a plan is drawn', 'town-plan')],
+      declared: DECLARED,
+      nonPredictive: [{ section: 'adult-errands', check: 'a jar is filled', why: 'one errand is cast per pass' }],
+    })
+    expect(verdict.whole).toBe(false)
+    expect(verdict.sections).toEqual(['town-plan'])
+  })
+
+  it('repeats the whole pass once half the suite is red — each block pays the prologue again', () => {
+    const verdict = narrowDiagnosis({
+      failures: DECLARED.slice(0, 3).map((s, i) => red(`check ${i}`, s)),
+      declared: DECLARED,
+    })
+    expect(verdict.whole).toBe(true)
+    expect(verdict.why).toContain('boot prologue')
+  })
+
+  it('answers whole for a suite that is not sectioned, and for no red at all', () => {
+    expect(narrowDiagnosis({ failures: [red('x', 'town-plan')], declared: [] }).whole).toBe(true)
+    expect(narrowDiagnosis({ failures: [], declared: DECLARED }).whole).toBe(true)
+  })
+
+  it('is total on nothing at all', () => {
+    expect(narrowDiagnosis().whole).toBe(true)
+    expect(narrowDiagnosis({ failures: null, declared: null, nonPredictive: null }).whole).toBe(true)
+  })
+
+  it('reads the tag out of a whole printed line, which is what --failed pastes', () => {
+    expect(sectionOfLine(`FAIL  a jar is filled — saw 0${sectionTag('adult-errands')}`)).toBe('adult-errands')
+    expect(sectionOfLine('FAIL  a jar is filled — saw 0')).toBe(null)
+    expect(sectionOfLine(null)).toBe(null)
   })
 })

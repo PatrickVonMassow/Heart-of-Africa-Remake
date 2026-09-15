@@ -60,7 +60,12 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 11.09. nachts | Zwei Werkzeuge antworten mit Gewissheit auf Fragen, die sie nie gemessen haben: `ci-gate-verdict.mjs` läuft nur im Runner, ignoriert die Flags eines Handaufrufs und druckt bei leerer Umgebung »CI gate passed« — zweimal geglaubt; `run-wait` erklärt einen gesunden `polish`-Lauf nach 20 Minuten für tot, weil seine Schwelle die Modell-Erwartung von 5m41s statt des eigenen gemessenen Medians von 55 min multipliziert, und befiehlt das Töten (§3.263, Punkte 1099/1101) |
 | 12.09. | Der beauftragte Autor schrieb zweimal nichts und hatte zweimal recht: einmal, weil der Punkttext eine Wortüberlappungs-Heuristik zur Freigabe-Evidenz erklärte, deren eigener Kommentar sagt, ein Nein beweise keine Unschuld; einmal, weil der Unterbau des Punktes ungebaut war. Das Werkzeug meldete beide Male PROBLEMS — »NOTHING WAS COMMITTED«, »gates not green« —, also den Fehlschlag der Spur, wo die Spur genau das getan hatte, wofür sie existiert (§3.266, Punkte 1089/1073) |
 | 13.09. | Ein Punkt zog seine eigenen Rot-Ladungen zurück, wie es die Regel verlangt — zwei Tests standen noch auf ihnen und wurden erst im Tor der LANDUNG rot, als der Merge schon auf main lag: Das Register erzwingt »kein Eintrag ohne offenen Punkt«, niemand erzwingt »kein Test ohne seinen Eintrag« (§3.268). Dieselbe Sitzung wies drei Fremd-Rot nach: gegen die Zweigwurzel gemessen sind alle drei auch auf main rot, und das Rätsel am Schutthang ist dort nicht sporadisch, sondern reproduziert jedes Mal |
+| 13.09. abends | Vier CI-Läufe eines Zweigs starben als »cancelled« — ein Wort, das weder Ursache noch Reparatur nennt und das kein Push heilen kann. Es war das 15-Minuten-Limit des `fast`-Jobs: Die letzten beiden GRÜNEN Läufe, einer davon auf main, brauchten 14 m 41 s und 14 m 45 s, also rund fünfzehn Sekunden Luft. Der nächste Punkt, der irgendeinen Test hinzufügt, musste auflaufen, egal welcher. Sichtbar wurde es erst im Schrittprotokoll: install/build/lint/audit grün, `unit: cancelled`, »The operation was canceled« nach 15 m 13 s (§3.270) |
+| 14.09. | Nach einer Parallelsitzung verlangte ein Stop-Hook `batch-doctor --gate` vor JEDER weiteren Batch-Arbeit — dessen Tor fährt eine volle Unit-Suite, neben dem laufenden Zwei-Backend-Bildlauf auf derselben Maschine. Gefunden hat der Doktor genau eine Datei: die Review-Zeile, die dieselbe Sitzung vier Minuten zuvor geschrieben hatte. Sie zu committen genügte, das Urteil sprang auf `consistent`, die Unit-Suite wurde nie gebraucht; ihr Abbruch ließ zwei verwaiste vitest-Worker neben dem Bildlauf zurück (§3.271, Wiedergänger von §3.267) |
+| 14.09. | Eine Karte erklärte die laufende Zwei-Backend-LARGE für verwaist und ordnete an, sie neu aufzusetzen — tot war nur ihr Besitzer, der Lauf stand nach 34 Minuten in den langen Suiten; ihre zwei Roten hatte er längst selbst an Punkt 1078 gebucht (§3.272, Spiegel von §3.155/§3.170) |
 | 12.09. abends | Wiedergänger von §3.231: Der LARGE-Lauf eines Punktes starb nach 6 m 53 s an einem 20-Sekunden-Timeout in einer Unit-Datei — diesmal war der Störer kein fremder Committer, sondern eine PFLICHT derselben Sitzung. Der Stop-Hook forderte wegen einer Parallel-Sitzung `batch-doctor --gate`, und dessen Tor fährt `test:unit`, `build` und `lint` im Hauptbaum, während der Worktree-Lauf mit genau derselben Unit-Suite beginnt. Der Runner druckte sein eigenes Urteil mit — »UNDER LOAD — a timeout failure under load is not evidence of a broken test« —, also wusste er, dass die Maschine nicht ruhig war, und lief trotzdem an. Die In-Flight-Markierung, die es gewusst hätte, liest der Doctor nicht (Backlog 12.09.) |
+| 14.09. abends | Ein einziger roter Prüfpunkt hielt einen Punkt einen Tag fest — und war ein Fehlalarm: Gleich gemessen liest er auf Merge-Basis 37/30, auf `main` 48/39 und auf dem Kandidaten **50** volle Krüge, alle grün; nur im vollen Pass null. Die Baseline-Klassifikation fährt die Baseline standalone und den Kandidaten im Pass und druckt die Differenz als »REAL REGRESSION«. Der Prüfpunkt erklärt sich seit dem 10.09. selbst für nicht aussagekräftig — die Erklärung erreicht die Leiter, aber nicht den Exit-Code (§3.273, Punkt 1127) |
+| 15.09. nachts | §3.270 ist eingetreten, wie es dort vorhergesagt stand — eine Ebene tiefer: Nicht das Job-Limit, sondern das Zeitbudget EINES Testfalls war aufgebraucht. Der Fall wurde auf dem Server bei 180 Sekunden abgebrochen und riss den ganzen `fast`-Job mit; daneben stand seine eigene Messung von 46,5 Sekunden, geschrieben, bevor die Erwachsenenarbeit in das nachgespielte Dorf einzog. Nachgemessen kostet er 91,2 Sekunden, auf dem Server mindestens 217. Der Test war nie geändert worden — gewachsen ist das Spiel unter ihm, und der Kommentar hat lautlos mitgealtert |
 | 13.08. | Der Nachprüfer findet eine echte zweite Klippe im geheilten Mechanismus — und jede der fünf gemessenen Kuren verschlechtert gesunde Dörfer stärker, als der Fehler schadet: Befund wird gebucht statt behoben (§3.115) |
 | 20.08. | Der Dokumentschnitt strich Regeln als »von einem Wächter abgedeckt«, ohne einen einzigen Wächter darauf zu prüfen — die Kontextanzeige verschwand, der Nutzer fand es (§3.134); eine vom Nutzer gesetzte Rangfolge wurde in einer Nacht zweimal maschinell überholt, ohne dass irgendwo ein Grund stand (Punkt 614); zwei Werkzeuge derselben Bauart am falschen Ort gemessen — im Hauptbaum gebaut und geprüft, während der Prozess die Arbeit in den isolierten Bereich schickt (§3.137) |
 | 21.08. | Ein Tor verlangte eine Freigabe, die seine eigenen Werkzeuge nicht herstellen können — der HIGH-Punkt war gemergt, geprüft und freigegeben, und der Zugausgang wies ihn trotzdem ab (§3.153) |
@@ -1527,6 +1532,41 @@ des Registers ist der Beitrag geprüft. Das ist die stillste Art, eine eingebaut
 Prüfung zu verlieren: nicht durch Umgehung, sondern dadurch, dass die halbe Zusage
 keinen Träger hat. Gebucht als Punkt 956.
 
+### 3.273 Ungleiches mit Ungleichem verglichen — und die Maschine machte ein Urteil daraus
+
+Am 14.09.2026 hielt ein einziger roter Prüfpunkt den Punkt 1056 einen ganzen Tag lang fest:
+»a villager is seen digging, and the jar goes down EMPTY and comes back FULL«, zweimal rot im
+Gesamtlauf, vom Runner zur CANDIDATE REAL FAILURE erhoben. Der Arbeitsauftrag trug die
+Schlussfolgerung der Vorgängersitzung bereits als Tatsache: »Baseline run 1/2 of the pre-state
+f799ad619885 is GREEN, so this is the branch's own defect, not a pre-existing one.« Der Satz
+ist formal richtig und inhaltlich falsch, und der Fehler steckt nicht im Zweig, sondern im
+Vergleich.
+
+Gleich gemessen — jeder Stand als Abschnittslauf allein, WebGL 2 — liest derselbe Prüfpunkt:
+Merge-Basis 37 und 30 volle Krüge, `main` 48 und 39, der Merge-Kandidat des Zweigs **50**.
+Alle grün. Derselbe Kandidat im vollen Pass: null, zweimal. Der Bruch verläuft zwischen
+*allein gelaufen* und *im Pass gelaufen*, nicht zwischen *vorher* und *nachher*. Die
+Baseline-Klassifikation kann das strukturell nicht sehen: Sie fährt die Baseline **standalone**
+und den Kandidaten **im Pass** und druckt die Differenz als »REAL REGRESSION (green on
+baseline, red now)«. Sie vergleicht zwei Größen, die sich in zwei Achsen unterscheiden, und
+schreibt die eine Achse der anderen zu.
+
+Das Bittere daran: Der Prüfpunkt wusste es selbst. Seit dem 10.09.2026 trägt er ein
+`nonPredictive()` mit datiertem Grund — allein gelaufen caste das Fenster viele Botengänge,
+im vollen Pass genau einen. Diese Erklärung erreicht aber nur die *Leiter*, die die Sprosse
+nicht als geklettert zählt; sie erreicht **nicht den Exit-Code**. Ein Prüfpunkt, der von sich
+selbst sagt, dass er hier nichts beweist, färbt den Lauf trotzdem rot und blockiert damit
+einen fremden Punkt. Genau diese Lücke ist jetzt Punkt 1127.
+
+Die Lehre ist nicht »mehr messen«, sondern **gleich messen**: Ein Vergleich, dessen zwei
+Seiten unter verschiedenen Bedingungen entstanden sind, ist kein Beweis, sondern eine
+Vermutung mit Zahlen daran — und je genauer die Zahlen aussehen, desto teurer wird der
+Irrtum. Die Gegenprobe kostete hier zwei Minuten und acht Sekunden; sie zu unterlassen kostete
+einen Tag und, zusammen mit den Läufen aus §3.253 und Punkt 1126, den größeren Teil von 599
+Maschinenminuten. Eine zweite Lehre steht daneben: Ein übernommener Befund ist ein Befund,
+keine Messung. Die Vorgängersitzung hatte sorgfältig protokolliert — und ihre Schlussfolgerung
+stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die sie widerlegt.
+
 <!-- AUTO-GENERATED:START -->
 <!-- Dieser Abschnitt wird maschinell von scripts/retro-refresh.mjs gepflegt.
      NICHT von Hand editieren — der naechste Refresh ueberschreibt ihn.
@@ -1534,7 +1574,7 @@ keinen Träger hat. Gebucht als Punkt 956.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Sonntag, 13.09.2026, 18:56 · Quellen-Fingerprint: `0266394b31a3…`
+Zuletzt aktualisiert: Dienstag, 15.09.2026, 12:11 · Quellen-Fingerprint: `01d7479e905e…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1569,12 +1609,12 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | The batch dashboard \"Von dir zu klären\" section holds ONLY genuine user decisions — no done items, no announcements for in-progress work | 2 | mittel | dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
 | Detach a landing or long gate with setsid, and end every third turn with prose so the wait does not hand the batch away | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | When a measured doc budget blocks an addition, shorten or MERGE existing entries — raising the limit is the last resort, decided by me with a written reason, NEVER asked of the user | 4 | hoch | doc-budget-guard.mjs | ✔ Mechanismus |
-| a drill that recreates the state after an action tests the assumption, not the action — and stays green forever | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
+| a drill that recreates the state after an action tests the assumption, not the action — and stays green forever | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to the OpenAI lane, GPT-6 Astra), and review is cross-vendor, not Fable-by-default | 6 | hoch | — (Regel/Memory) | ◐ Regel |
-| Iterate on the new feature's OWN test first; the full regression runs once at the end, never as the debugging loop | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 76 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| Iterate on the new feature's OWN test first; the full regression runs once at the end, never as the debugging loop | 2 | mittel | — (Regel/Memory) | ◐ Regel |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 80 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | wait-command-guard.mjs | ✔ Mechanismus |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | \"Gib ab\" / \"abgeben\" means hand the batch to a SUCCESSOR session so the context does not overflow — it never means pause or stop the batch | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1608,7 +1648,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A point delivered as a rider on another branch is closed with fold-point --delivered, and its push needs a closing card first | 1 | niedrig | point-proof-guard.mjs, push-arrival-guard.mjs | ✔ Mechanismus |
 | Saved games do not constrain design work: the feature is switched off, nobody plays a serious run, and no migration is ever owed for a data change | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | 24.07.2026 evening chaos — serving model silently degraded to Haiku 4.5; verify the serving model before batch work, Haiku-class must pause instead of working | 6 | hoch | model-guard.mjs | ✔ Mechanismus |
-| Keep the shell cwd in /workspace/hoa; a worktree cwd makes the Stop guards judge the wrong repo root | 2 | mittel | worktree-reminder.mjs | ✔ Mechanismus |
+| Keep the shell cwd in /workspace/hoa; a worktree cwd makes the Stop guards judge the wrong repo root | 3 | mittel | worktree-reminder.mjs | ✔ Mechanismus |
 | ENDED 17.08.2026 — the 13.08. emergency that pushed the MAXIMUM load to OpenAI (hard cases to Sol via --anyway, pool of one) is over; the normal three-lane split of CLAUDE.md §6 applies again | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Every new optical/graphics feature must be sorted into the low/medium/high detail presets, enforced by a pure completeness test — a new quality key with no preset entries fails the gate | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Write about this project as a participant (\"wir/unser\"), never as an outside observer (\"euer Mechanismus\", \"die ihr abschaffen wollt\") | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1629,19 +1669,19 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Headless probes must screenshot the DEFAULT zoom too (zoom-gated dressing like haze only shows there); headless WebGPU is impossible, so WebGPU-only branches stay user-checked | 2 | mittel | render-verify-guard.mjs | ✔ Mechanismus |
 | Every GUI/rendering fix must be verified on BOTH WebGPU and WebGL2 before it counts as done — never mark a render fix done on one path | 2 | mittel | render-verify-guard.mjs | ✔ Mechanismus |
 | A resumed batch session must check the previous owner's PROCESS before working — the launcher's \"provably dead\" verdict was wrong and double-spawned | 2 | mittel | render-verify-guard.mjs | ✔ Mechanismus |
-| Rotating verify AND unit failures under a running agent pool are LOAD, not bugs — 8 of 12 unit runs red from load alone; judge a red only on a quiet machine | 10 | hoch | render-verify-guard.mjs | ✔ Mechanismus |
+| Rotating verify AND unit failures under a running agent pool are LOAD, not bugs — 8 of 12 unit runs red from load alone; judge a red only on a quiet machine | 11 | hoch | render-verify-guard.mjs | ✔ Mechanismus |
 | The named \"version release\" process and its trigger — queue/run a version release for a version the user names (full closing → user approval → tag → mirror poc → publish /TAG/ and /poc/) | 3 | mittel | lock-release-hook.mjs | ✔ Mechanismus |
 | Standing licence to move, REMOVE or ADD villages when it helps — but every change must be checked against the other requirements first, and the check has already caught a real bug | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
-| A VS Code restart restarts the devcontainer — every process inside dies, PPID 1 proves nothing | 9 | hoch | container-ask-guard.mjs | ✔ Mechanismus |
+| A VS Code restart restarts the devcontainer — every process inside dies, PPID 1 proves nothing | 12 | hoch | container-ask-guard.mjs | ✔ Mechanismus |
 | Keep the visual QA eye open for functionally-fine but weird-LOOKING oddities, not just functional bugs | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | WebGPU is testable headless/autonomously via system Chrome (channel:'chrome') + --headless=new; the limitation applies only to Playwright's bundled Chromium | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 96 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 132 Prozess-/Meta-TASKS-Punkte (davon 64 offen).
+Erfasste Quellen: 96 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 133 Prozess-/Meta-TASKS-Punkte (davon 65 offen).
 
-<!-- RETRO-FINGERPRINT: 0266394b31a368798278924e0f47dbf770673ee82592cd5817fbbcc66d9b2ecf -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-13T16:56:13.133Z -->
+<!-- RETRO-FINGERPRINT: 01d7479e905e51ac57b3a2104c6fd700c707f418e2b3426264d3130147a9b57d -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-15T10:11:02.555Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -6845,3 +6885,187 @@ war noch vorhanden, hier gilt er für den richtigen Zustand und ist nicht mehr d
 wird — oder der deckende Lauf wird im Zielbaum wiederholt, solange er noch billig ist. Was
 git ignoriert, überlebt kein Aufräumen, und ein Aufräumschritt, der eine ungesicherte
 Messung mitnimmt, ist kein Aufräumen, sondern ein Datenverlust mit Quittung.
+
+### 3.270 Ein grüner Lauf verrät seinen Abstand zur Decke nicht
+
+Am 13.09.2026 meldete GitHub für einen Zweig viermal hintereinander »cancelled«. Das Wort
+nennt weder eine Ursache noch eine Reparatur, und der Wächter sagt zu Recht dazu, dass kein
+Push im Repository eine Abbruchmeldung heilen kann. Meine erste Erklärung war plausibel und
+falsch: Die Concurrency-Gruppe des Workflows bricht laufende Läufe derselben Ref ab, und
+CLAUDE.md §6 verlangt einen Push nach JEDEM Commit — vier Pushes, vier abgebrochene Läufe,
+die Rechnung schien aufzugehen. Sie ging nicht auf, denn der letzte Lauf hatte keinen
+Nachfolger, der ihn hätte abbrechen können.
+
+Das Schrittprotokoll entschied es in einer Zeile: install, build, lint und audit grün,
+`unit: cancelled`, und im Log »##[error]The operation was canceled« nach 15 m 13 s. Der Job
+trägt `timeout-minutes: 15`. GitHub meldet einen Job-Timeout als Abbruch, und damit trägt der
+teuerste Fehlschlag des Tages den Namen eines Vorgangs, der gar nicht stattgefunden hat.
+
+Die eigentliche Lehre steckt aber nicht im Namen, sondern im Abstand. Die letzten beiden
+GRÜNEN Läufe — einer davon auf main selbst — brauchten 14 m 41 s und 14 m 45 s. Die Decke war
+also längst aufgebraucht, und zwar auf dem Hauptzweig, während jede Anzeige grün stand. Der
+nächste Punkt, der einen Test hinzufügt, musste auflaufen; es war Zufall, welcher es wurde,
+und der Punkt, den es traf, hat mit der Ursache nichts zu tun. Eine Unit-Suite wächst mit dem
+Spiel — das ist gewollt —, aber ein Limit, das mit ihr nicht mitwächst, verwandelt normales
+Wachstum in einen Fehlschlag, der auf den Falschen zeigt.
+
+Verwandt mit §3.253 und §3.263, aber gespiegelt: Dort ließen veraltete Planzahlen einen
+Ausreißer normal aussehen, hier lässt ein grünes Urteil eine erschöpfte Reserve normal
+aussehen. Beide Male ist die Zahl, auf die es ankommt, nicht die, die gedruckt wird.
+
+**Lehre:** Ein Bestehen sagt nichts über den Abstand zur Grenze. Wo eine harte Decke über
+etwas Wachsendem steht — Job-Timeout, Dokumentbudget, Kontextfenster —, gehört der ABSTAND
+in die Ausgabe, nicht nur das Urteil. Das Limit steht jetzt auf 25 Minuten, mit der Messung
+im Kommentar daneben und der ausdrücklichen Auflage, beim nächsten Annähern die Suite
+billiger zu machen statt die Zahl ein zweites Mal zu heben.
+
+ES IST AM 15.09.2026 GENAU SO EINGETRETEN, eine Ebene tiefer. Diesmal war die Decke nicht
+das Job-Limit, sondern das Zeitbudget EINES Testfalls: Der Fall, der beweist, dass die
+Bummelphase der Kinderrunde nicht ewig laufen kann, wurde auf dem Server bei seinen 180
+Sekunden abgebrochen und riss den ganzen `fast`-Job mit. Neben dem Budget stand seine eigene
+Messung — 46,5 Sekunden, geschrieben, bevor die Botengänge und Grabaufgaben der Erwachsenen
+in das nachgespielte Dorf einzogen. Nachgemessen auf dem ruhigen Rechner kostet derselbe Fall
+91,2 Sekunden, also das Doppelte. Der Test war nie geändert worden; gewachsen ist das Spiel
+unter ihm.
+
+Bemerkenswert ist, was NICHT passiert ist: Der Kommentar hat gelogen, ohne je falsch
+geschrieben worden zu sein. Er war am Tag seiner Messung richtig und ist es Commit für
+Commit weniger geworden, und nichts im Repositorium liest eine solche Zahl je wieder nach.
+Der Nachbarfall in derselben Datei, gleich teuer und mit 300 Sekunden ausgestattet, ist nie
+abgebrochen — er war die Eichung, aus der die neue Zahl abgeleitet wurde, statt sie zu raten.
+Der Beweis kam vom Server selbst: Der reparierte Fall brauchte dort mindestens 217 Sekunden.
+Die alten 180 konnten ihn nie halten.
+
+**Zusatzlehre:** Eine gemessene Zahl, die als Budget in den Code geschrieben wird, altert mit
+dem, was sie misst, und ihr Kommentar altert lautlos mit. Wo eine solche Zahl steht, gehört
+neben sie, WORAN sie gemessen wurde — ein zweiter, gleich teurer Fall taugt als Eichung
+besser als jede Schätzung. Und ein Rot dieser Art zeigt nie auf den Punkt, der es auslöst.
+
+
+### 3.271 Die Regel sagt »nur lesen«, der Wächter verlangt eine volle Suite
+
+§3.267 endet mit einer Handregel: *Während ein Lauf misst, ist alles außer Lesen
+aufgeschoben — auch ein Commit, auch ein Push, auch ein Tor, das »nur« vier Minuten
+dauert.* Am 14.09.2026 war diese Regel bekannt, im Kontext und ausdrücklich zitiert — und
+trotzdem lief neben dem Zwei-Backend-Bildlauf für Punkt 1056 eine zweite volle Unit-Suite.
+Der Unterschied zum Vorfall vom 12.09. ist, dass die Sitzung sie sich diesmal nicht
+ausgesucht hat: Ein Stop-Hook hatte nach einer erkannten Parallelsitzung
+`node scripts/batch-doctor.mjs --gate` **vor jeder weiteren Batch-Arbeit** verlangt, und
+dessen Tor fährt `npm run test:unit`. Die Handregel und der Wächter widersprachen sich, und
+der Wächter gewinnt, weil er den Zug nicht enden lässt.
+
+Teuer war daran nichts Notwendiges. Der Doktor hat genau eine Auffälligkeit gemeldet —
+`dirty=1` —, und das war `.claude/mechanism-reviews.jsonl`: die Review-Zeile, die dieselbe
+Sitzung vier Minuten zuvor selbst geschrieben hatte, mit Zeitstempel, Transkript-Anker und
+Nachrichten-Id im Eintrag. Die Regel des Doktors kennt diesen Autor nicht: Jede
+uncommittete Datei in einem Parallelsitzungs-Fenster gilt als nicht zuordenbar und wird zur
+Quarantäne vorgemerkt. Die Datei zu committen genügte, das Urteil sprang auf `consistent`,
+und die Unit-Suite, für die der Bildlauf die Maschine teilen musste, wurde nie gebraucht.
+
+Der Abbruch hatte einen eigenen Preis. Das Töten des überflüssigen Tores ließ zwei
+vitest-Worker als Waisen (`ppid=1`) zurück, die weiter neben dem Bildlauf rechneten und
+einzeln per PID abgeräumt werden mussten; ein Mustertreffer über `pkill -f` erwischte
+außerdem die aufrufende Shell selbst, weil deren Kommandozeile den Suchstring enthielt.
+Beides ist Kleinkram, aber es zeigt, dass das nachträgliche Abräumen einer verordneten Last
+schwieriger ist, als sie gar nicht erst zu starten.
+
+**Lehre:** Zwei Dinge, die §3.267 noch nicht sagen konnte. Erstens darf ein Wächter, der den
+teuren Lauf schützt, nicht dieselbe Ressource verbrauchen wie der Lauf — die
+In-Flight-Markierung sagt ihm, dass gerade gemessen wird, also gehört die teure Hälfte
+seines Tores aufgeschoben oder übersprungen, statt die Sitzung in den Widerspruch zu
+zwingen. Zweitens ist »nicht zuordenbar« keine Eigenschaft des Zeitfensters, sondern der
+Datei: Was der aktuelle Besitzer nachweislich selbst geschrieben hat, ist zugeordnet, auch
+wenn daneben eine fremde Sitzung lief. Bis beides greift, bleibt der billige Ausweg der
+richtige — erst die eigene Schreibarbeit committen, dann den Doktor fragen.
+
+### 3.272 Ein toter Besitzer ist kein toter Lauf
+
+Am 14.09.2026 übernahm eine frische Sitzung den Stapel und fand auf der Warteschlangen-Karte
+zu Punkt 1056 eine klare Anweisung: Die Zwei-Backend-LARGE sei verwaist, ihre Quittung sei zu
+ernten, die zwei roten `world`-Fälle seien diesem Punkt anzulasten oder als neuer Punkt
+abzulegen, und der Lauf sei danach **neu aufzusetzen**. Die Karte stimmte in genau einem
+Punkt: Der Besitzer der Deklaration war um ~10:08 gestorben. Sie irrte in allem, was daraus
+folgte. Der Lauf selbst lebte — zwei Node-Prozesse mit 34 Minuten Laufzeit, dazu ein
+chrome-headless auf WebGL 2 —, hatte Build, Lint, 15 362 Unit-Fälle und neun Browser-Suiten
+hinter sich und stand in den langen Suiten. Ein Neuaufsetzen hätte diese 34 Minuten eines
+etwa zweistündigen Laufs weggeworfen, um exakt dieselben Prüfungen ein zweites Mal zu fahren.
+
+Die zweite Hälfte der Anweisung war bereits erledigt, bevor sie geschrieben wurde. Der Lauf
+hatte seine eigenen Roten selbst gebucht — `ACCOUNTED FOR world — retry skipped; all reds
+charged to open points 1078` —, und Punkt 1078 beschreibt seit dem 08.09.2026 wortgleich
+dieses Rätsel-Flackern am Fuß der Bandiagara-Halde, inklusive der Feststellung, dass ein
+grüner Wiederholungslauf es nicht schließt. Die Karte forderte also eine Zuordnung, die im
+Log darüber schon stand, und bot als Alternative an, eine Dublette anzulegen.
+
+Der Zusammenhang mit §3.155 und §3.170 ist der Spiegel. Dort wurde je ein **toter** Lauf als
+lebend geführt, weil die Deklaration nie auf die pid schaute; hier wird ein **lebender** Lauf
+als tot geführt, weil die Deklaration ihren Besitzer mit ihrem Gegenstand verwechselt. Beide
+Male ist die Ursache dieselbe Abkürzung: Die Lebendigkeit wird aus der Buchhaltung abgeleitet
+statt am Prozess gemessen. Nur die Kosten unterscheiden sich, und die des neuen Falls sind
+die höheren — ein als tot geführter lebender Lauf zieht eine Anweisung nach sich, die ihn
+tatsächlich tötet, und die Buchhaltung bestätigt sich dabei selbst.
+
+**Lehre:** Wer einen Lauf für verwaist erklärt, muss zwei Dinge getrennt messen und getrennt
+melden: ob sein BESITZER lebt und ob ER lebt. Aus einem toten Besitzer folgt eine neue
+Adoption, nie ein Neustart — `--adopt` existiert genau dafür. Und bevor eine Karte fremde
+Rote zuordnet, ist die Selbstbuchung des Laufs zu lesen: Ein Lauf, der seine Roten bereits
+einem offenen Punkt angelastet hat, braucht keinen zweiten Zuordner, sondern nur noch einen
+Leser.
+
+### 3.200 Ein abgewürgter Lauf sieht im Datensatz aus wie ein normal beendeter
+
+Der Fall aus §3.112 hat einen Nachhall, der erst am Folgetag Geld gekostet hat. Der
+zerrissene Zwei-Backend-LARGE zu Punkt 1056 hinterließ eine Quittung mit `exit 1` und sechs
+roten Suiten aus sechs voneinander unabhängigen Themen — `world`, `polish`, `touch`,
+`settings`, `enrichments`, `benchmark`. Die Nachfolgesitzung stand damit vor der Frage, die
+das Haus für jedes Rot stellt: echte Regression, vorbestehend oder Umgebung?
+
+Diese Frage war nicht mehr beantwortbar. `scripts/verify/run-logged.mjs` flacht ein per
+Signal getötetes Kind auf `code === null ? 1 : code` ab; der einzige Ort, der das Signal
+benennt, ist ein Digest-Feld, das ins Terminal des Bestellers geht und nicht in den
+`.run.json`-Datensatz. Stirbt die wartende Sitzung — hier tat sie es 42 Sekunden vor dem
+Laufende —, ist die Unterscheidung zwischen Kill und Selbst-Exit unwiederbringlich verloren.
+Übrig bleibt eine Quittung, die aussieht wie ein regulär durchgelaufener roter Test, und sechs
+Rote, deren einziger gemeinsamer Nenner die Uhrzeit ist.
+
+Der Schaden ist nicht das fehlende Feld, sondern was an seiner Stelle passieren muss. Sechs
+unklassifizierbare Rote lassen genau zwei Wege offen: sie zu glauben und Arbeit an Defekten
+zu beginnen, die es nicht gibt, oder den ganzen Lauf zu wiederholen. Die Nachfolgesitzung
+hat wiederholt — gut zwei Stunden Maschine, um eine Auskunft nachzuholen, die ein Wort im
+Datensatz gehabt hätte. Dass die Wiederholung `world` sofort grün zeigte, bestätigt die
+Diagnose nachträglich und ändert am Preis nichts.
+
+**Lehre:** Ein Datensatz, der über einen Lauf Auskunft geben soll, muss die Tatsache tragen,
+die seine Lesart entscheidet — hier das Signal oder ein schlichtes `exitedNormally`. Ein
+Feld, das nur ins Terminal geht, existiert für jede spätere Sitzung nicht. Das ist dieselbe
+Abkürzung wie in §3.112, eine Ebene tiefer: Dort wurde die Lebendigkeit aus der Buchhaltung
+abgeleitet statt gemessen, hier wird sie gar nicht erst aufgeschrieben.
+
+### 3.201 Zwei Schranken, deren Bedingungen sich gegenseitig ausschließen
+
+Am 14.09.2026 hat die Kontext-Wassermarke die Übergabe verlangt, während der Beweislauf zu
+Punkt 1056 noch lief. Der In-Flight-Wächter hat sie verweigert: Ein Nachfolger könne diesen
+Lauf nicht übernehmen. Er bot vier Auswege an, und keiner griff — ein Testlauf hat keinen
+Checkpoint, die Neu-Deklaration mit Zweig und Arbeitsbaum ändert nichts, Wegwerfen kostet
+zwei Stunden Maschine, und Austrinken heißt: über der Wassermarke weiterlaufen, also genau
+das tun, was die Wassermarke verhindern soll.
+
+Die Ursache ist kein Zufall der Lage, sondern eine Konstruktion. Die Übergabeprüfung
+vergleicht `run.head` gegen `headNow` — und `headNow` ist der HEAD des HAUPTBAUMS, während
+ein Lauf im Worktree eines Punkts immer den HEAD SEINES ZWEIGS trägt. Beide stimmen genau
+dann überein, wenn main und der Zweig auf demselben Commit stehen, also während eines
+laufenden Punkts praktisch nie. Kein noch so guter Nachweis kann diese Bedingung erfüllen.
+Die Schranke fragt nach etwas, das es in der Lage, für die sie geschrieben wurde, nicht
+geben kann.
+
+Der Unterschied zu §3.198 ist wichtig. Dort gaben zwei Wächter einander ein ALIBI — beide
+grün, die Wahrheit dazwischen verloren. Hier ist es das Gegenteil: Beide bestehen auf
+einander ausschließenden Bedingungen, und die Sitzung steht still, bis sie den Widerspruch
+selbst auflöst. Der Preis ist derselbe — die Arbeit wandert von der Sache zur Schrankenpflege
+—, aber die Diagnose ist eine andere: Ein Alibi findet man, indem man die Wächter
+gegeneinander prüft; einen Widerspruch findet man nur, indem man die Bedingung liest.
+
+**Lehre:** Eine Schranke, die eine Übergabe verweigert, muss ihre Bedingung an dem Ding
+messen, um das es geht — hier am Arbeitsbaum, in dem der Lauf läuft, nicht am Hauptbaum.
+Und wo zwei Schranken einander widersprechen, ist das kein Bedienfehler: Es gehört gemessen,
+abgelegt und als Defekt behandelt, statt in jedem Zug neu beantwortet zu werden.

@@ -23,7 +23,7 @@ const ROCK_UTTERANCE = utteranceOf('ROCK')
 
 describe('hearing distance', () => {
   it('carries to the balance radius and no further', () => {
-    const r = balance.communication.hearingRadius
+    const r = balance.communication.talk.reach
     expect(isWithinHearing(0)).toBe(true)
     expect(isWithinHearing(r)).toBe(true)
     expect(isWithinHearing(r + 0.01)).toBe(false)

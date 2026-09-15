@@ -249,6 +249,8 @@ Inventory caches relieve the limited inventory and allow, for instance, leaving 
 
 Core rule: items act by possession alone, never "in hand" (§6.1); the table above carries the per-item effects. The map is NOT among these items: it is always available (from a bottom-right button and the M key, §17.4), opening the exploration overview — and inside a settlement a PLAN OF THE PLACE instead: the walkable area with every functional (enterable) building marked and named (localized), dwellings as unlabelled context and the lanes sketched, in the same worn-paper style (§19.11).
 
+Village digging prepares a covered food store at a compound and a furrowed planting bed at the field edge; where the compound cannot accommodate a pit, a lane post takes its place. Two sites lie as far inland as their anchors allow. Baskets and a cover, stacked posts, or a seedling tray show the purpose before work; a completed pair's bout leaves the covered store, set post, or planted rows. Work persists across visits. Diggers stand on the rim away from spoil; everyone walks over its smooth ground rise without new collision barriers.
+
 ---
 
 ## 8. Valuables and the Culture/Value Matrix
@@ -417,7 +419,7 @@ The fill itself is read from the body, and the body is a legless cone. A deep fo
 
 Each word is an atomic four-syllable sequence of low and high `ba`. Valid sequences have an even number of highs, making every pair differ in at least two positions. Four syllables provide eight such sequences: six are used and two reserved. UPSTREAM and DOWNSTREAM are exact tonal reversals and form the one direction pair the player is meant to notice; CHIEF took the last mixed-tone sequence, RIVER's mirror, and is only ever said alone.
 
-Each utterance fixes its camera-relative pan within width 0.6; rear speakers keep their side. Adults retain 140/235.2 Hz, children use 210/352.8 Hz, with one shared 1.68 interval. Both registers and width are calibratable; width zero gives mono. Compensated panning preserves the mono sum and never reduces stereo power. Speech has its own volume, 2. Falloff 4 carries 73.5% at 3 m and 20% at the 10 m rim. Including the louder child synthesis and panned channel required reducing the envelope peak from 1.8 to 0.85: the conservative mixed-output bound falls from 1.780 to 0.977, speech at 3 m and the rim remains louder.
+Each utterance fixes its camera-relative pan within width 0.6; rear speakers keep their side. Adults retain 140/235.2 Hz, children use 210/352.8 Hz, with one shared 1.68 interval. Both registers and width are calibratable; width zero gives mono. Speech carries in two registers: TALK at the 10 m rim, CALL — the bank round's words, always children at play — further and louder, so the direction call reaches the stand the game is photographed from. Within earshot ONE EXCHANGE SPEAKS AT A TIME: its word and visible consequence finish first; walking, hush and occupied sites yield. Deferred words are released rather than dropped (`docs/communication-poc-spec.md`).
 
 What the drums send for is brought back as an act on the ITEM (§6): the traveller stands before the chief out in the open, within the give reach, and activates the find in his inventory bar; used anywhere else it hands nothing over and says why. The use key at the chief's hut hands nothing over at all.
 

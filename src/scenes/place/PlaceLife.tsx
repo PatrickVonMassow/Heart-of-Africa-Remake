@@ -7,6 +7,7 @@
 // carried from the well.
 // Pure animation, no mechanics.
 
+import { usePlaceGround } from './PlaceGroundContext'
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, type ReactNode, type RefObject } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
@@ -72,6 +73,7 @@ import {
   rockAt,
   insideStrangerBerth,
   stepBankGame,
+  bankVoiceRegister,
   type BankChild,
   type BankEnd,
   type BankStage,
@@ -101,10 +103,12 @@ import {
   type ErrandPoint,
   type SpokenWord,
   WORK_ARRIVE_RADIUS,
+  workArrivalRadius,
 } from './adultWork'
 import { gestureIfHeard, speechReach } from '../../communication/spokenGesture'
 import { speechBearing } from './speechBearing'
-import { utterancePlan } from '../../communication/speaking'
+import { SpeechFloor } from '../../communication/speechFloor'
+import { utterancePlan, registerOptions } from '../../communication/speaking'
 import { speechLabelSeconds } from '../../communication/speechLabel'
 import { playSpeech } from '../../systems/ambience'
 import { speakOverhead, speechClock } from './speechChannel'
@@ -133,7 +137,7 @@ import {
 import { PORT_TALKERS, VILLAGE_SPOTS, villageAdultStations, type PlayGround } from './lifeSpots'
 import { drummerFacing } from './chiefWalk'
 import { DRUMMER_SPEAKER_ID } from './chiefPresence'
-import { setDrummerVoice } from './drummerVoice'
+import { queuedDrummerVoice, setDrummerVoice } from './drummerVoice'
 import { buildWedgeCarve } from './wedgeCarve'
 import { figureStance, unplacedInhabitant, type PlaceSpot } from './placement'
 
@@ -145,6 +149,8 @@ const NPC_RADIUS = WALKER_RADIUS
  * §19.13), or null for the everyday dress. A context rather than a prop: every
  * life vignette builds its own Figures, and only the Figure itself cares.
  */
+const SpeechFloorContext = createContext<SpeechFloor | null>(null)
+
 const ColdCloaksContext = createContext<ColdDress | null>(null)
 
 /**
@@ -464,10 +470,11 @@ function Figure({
 
 /** Kneeling cook with a three-stick pot beside the village fire. */
 function Cook({ x, z, cloth }: { x: number; z: number; cloth: string }) {
+  const groundHeight = usePlaceGround()
   // A body the passers-by go round (point 578).
   useStandingBody(x, z)
   return (
-    <group position={[x, 0, z]} rotation={[0, Math.PI / 3, 0]}>
+    <group position={[x, groundHeight(x, z), z]} rotation={[0, Math.PI / 3, 0]}>
       <Figure cloth={cloth} kneel />
       {/* Tripod with pot over the embers */}
       <group position={[0.85, 0, -0.4]}>
@@ -496,11 +503,12 @@ function Cook({ x, z, cloth }: { x: number; z: number; cloth: string }) {
 
 /** Weaver working at a simple standing loom. */
 function Weaver({ x, z, cloth, weave }: { x: number; z: number; cloth: string; weave: string }) {
+  const groundHeight = usePlaceGround()
   // A body the passers-by go round (point 578).
   useStandingBody(x, z)
   const facing = Math.atan2(-x, -z)
   return (
-    <group position={[x, 0, z]} rotation={[0, facing, 0]}>
+    <group position={[x, groundHeight(x, z), z]} rotation={[0, facing, 0]}>
       {/* Loom frame */}
       {[-0.55, 0.55].map((px) => (
         <mesh key={px} position={[px, 0.75, 0]} castShadow>
@@ -608,13 +616,14 @@ function speakBankUtterance(
   const distance = placePlayerPosition.active
     ? Math.hypot(speaker.x - placePlayerPosition.x, speaker.z - placePlayerPosition.z)
     : Infinity
-  const reach = speechReach(distance)
+  const options = registerOptions(bankVoiceRegister(said.moment))
+  const reach = speechReach(distance, options.radius)
   const utterance = utteranceOf(said.concept)
-  playSpeech(utterancePlan(utterance, distance, { bearing: speechBearing(camera, speaker), voice: 'child' }))
+  playSpeech(utterancePlan(utterance, distance, { bearing: speechBearing(camera, speaker), voice: 'child', ...options }))
   if (reach.audible) {
     useGame.getState().hearUtterance(utterance)
     if (anchor) {
-      speakOverhead(`kid-${said.speaker}`, [utterance], anchor, { seconds: speechLabelSeconds(1) })
+      speakOverhead(`kid-${said.speaker}`, [utterance], anchor, { floor: true, seconds: speechLabelSeconds(1), reach: options.radius })
     }
   }
   // A TOUCH BRINGS ITS OWN ARM. Its hand has to land on a drawn flank, and the
@@ -637,7 +646,7 @@ function speakBankUtterance(
     ...arm,
     ...(said.hold ? { duration: said.hold } : {}),
     phase: said.speaker * 1.1,
-  })
+  }, options.radius)
 }
 
 /**
@@ -699,6 +708,7 @@ function Kids({
    *  the live ones this component moves, so nothing is copied per frame. */
   childBodies: RefObject<readonly InhabitantBody[]>
 }) {
+  const groundHeight = usePlaceGround()
   const camera = useThree((state) => state.camera)
   const refs = useRef<Array<THREE.Group | null>>([])
   // The world leg length these children walk on, and the cadence it dictates.
@@ -708,6 +718,7 @@ function Kids({
   // The body each child presents to every other inhabitant (point 578), and the
   // whole settlement's registry — claimed BEFORE the world below, because the
   // chase steers by both (point 657).
+  const speechFloor = useContext(SpeechFloorContext)
   const bodySet = useContext(InhabitantBodiesContext)
   const bodies = useInhabitantBodies(count, { scale: KID_SCALE })
   // Which bodies are the game's own playmates, for the world's occupied rules.
@@ -963,6 +974,7 @@ function Kids({
     const dt = Math.min(rawDt, 0.1)
     const cfg = balance.villageLife.childSpeech
     let spoken: BankUtterance | null = null
+    world.floor = speechFloor ?? undefined
     if (round.bank) {
       // THE TRAVELLER IS AN OBSTACLE, NEVER A STOP (work-order 687 item 7): the
       // children steer round him — with one extra radius over a villager's body,
@@ -1069,7 +1081,7 @@ function Kids({
       // this only draws it.
       const gaitLift = gaitBodyLift(phase, legLength)
       const lift = round.bank ? bankChildBodyLift(c as BankChild, gaitLift, bankChildTouching(round.bank, i)) : gaitLift
-      g.position.set(c.x, lift, c.z)
+      g.position.set(c.x, groundHeight(c.x, c.z) + lift, c.z)
       // A TAGGED CHILD IS UNMISTAKABLY OUT OF PLAY (work-order 687 item 3):
       // squatted down, trunk folded over and both arms crossed in front of it.
       // Written here rather than as a prop, because the state changes inside the
@@ -1146,6 +1158,14 @@ function Kids({
       /** The bank round's own phase, for a check that wants to know what it is
        *  looking at; absent in the tag round. */
       phase: bank ? bank.phase : null,
+      /** The direction this run was announced in (work-order 1073), so a check
+       *  can WAIT for the call it means to photograph instead of shooting the
+       *  stretch and hoping. Null between runs, and in the tag round. The word
+       *  itself travels with it: a check that only knows SOME child spoke
+       *  cannot tell the taught direction from any other utterance in the
+       *  round, and would pass on the wrong one. */
+      direction: bank ? bank.direction : null,
+      announcedWord: bank && bank.direction ? utteranceOf(bank.direction) : null,
       // The game's OWN clock: the verification samples an interval of GAME,
       // never a count of frames, which buy different amounts of it per machine.
       clock: bank ? bank.clock : game!.clock,
@@ -1156,7 +1176,7 @@ function Kids({
       // The radius a child's BODY occupies, so a live check can judge an overlap
       // against the real figure rather than against a guessed one (point 648).
       bodyRadius: balance.villageLife.separation.bodyRadius * KID_SCALE,
-      children: children.map((c) => ({
+      children: children.map((c, i) => ({
         x: c.x,
         z: c.z,
         heading: c.heading,
@@ -1188,6 +1208,11 @@ function Kids({
         // And how much of that walking happened while the round was ON — the
         // settlement's own counter, for the same reason (point 656).
         walkedWhilePlaying: c.walkedWhilePlaying,
+        // The arm this child is speaking WITH (work-order 1073). A call is three
+        // things at one distance — sound, reading and arm — and the frame from
+        // the spectator's stand has to prove the arm, not just the note; nothing
+        // outside the game can read a live gesture off the drawn pose.
+        gesture: ((g) => g && { kind: g.kind, t: g.t, duration: g.duration, bearing: g.bearing })(gestures.current[i]?.current),
       })),
       /** The stone the off-game ROCK is climbed and spoken at, with the size the
        *  climb is played against (work-order 1080). Published rather than
@@ -1346,6 +1371,7 @@ function Kids({
  *  no slope pitch is needed here — the panorama silhouettes, which walk real
  *  relief, carry that half. */
 function Goats({ seed, count, pen, colliders }: { seed: number; count: number; pen: PenDef | null; colliders: Collider[] }) {
+  const groundHeight = usePlaceGround()
   const parts = useMemo(() => buildGoatParts(), [])
   // The gait read off this rig's own legs (point 300): stride length, cadence.
   const rig = useMemo(() => gaitRig(parts.legs), [parts])
@@ -1426,7 +1452,7 @@ function Goats({ seed, count, pen, colliders }: { seed: number; count: number; p
       // sideways or its bounded facing turns over the stance.
       const phase = gaitPhase(s.dist, rig.cadence)
       const lift = gaitBodyLift(phase, rig.legLength)
-      g.position.set(px, lift, pz)
+      g.position.set(px, groundHeight(px, pz) + lift, pz)
       g.rotation.y = s.yaw
       const legs = legRefs.current[i]
       if (legs) {
@@ -1537,6 +1563,7 @@ function Porters({
   colliders: Collider[]
   count?: number
 }) {
+  const groundHeight = usePlaceGround()
   const routes = useMemo(() => {
     const rand = mulberry32((seed + 4711) >>> 0)
     const n = Math.min(count, Math.max(1, stops.length))
@@ -1599,7 +1626,7 @@ function Porters({
       }
       const px = p.x
       const pz = p.z
-      g.position.set(px, Math.abs(Math.sin(t * 5 + r.phase)) * 0.05, pz)
+      g.position.set(px, groundHeight(px, pz) + Math.abs(Math.sin(t * 5 + r.phase)) * 0.05, pz)
       g.rotation.y = Math.atan2((r.bx - r.ax) * dir, (r.bz - r.az) * dir)
     })
   })
@@ -1689,6 +1716,7 @@ function talkerAim(
  * real utterances and gestures again behind the hearing gate.
  */
 function Talkers({ x, z, cloth }: { x: number; z: number; cloth: string[] }) {
+  const groundHeight = usePlaceGround()
   const a = useRef<THREE.Group>(null)
   const b = useRef<THREE.Group>(null)
   const gestureA = useRef<GestureState>(restGesture())
@@ -1752,7 +1780,7 @@ function Talkers({ x, z, cloth }: { x: number; z: number; cloth: string[] }) {
   }, [stances])
 
   return (
-    <group position={[x, 0, z]}>
+    <group position={[x, groundHeight(x, z), z]}>
       <group ref={a} position={[-0.5, 0, 0]}>
         <Figure cloth={cloth[0]} gesture={gestureA} />
       </group>
@@ -1765,6 +1793,7 @@ function Talkers({ x, z, cloth }: { x: number; z: number; cloth: string[] }) {
 
 /** Grain pounding: mortar and a rising, falling pestle (period staple). */
 function Pounder({ x, z, cloth }: { x: number; z: number; cloth: string }) {
+  const groundHeight = usePlaceGround()
   // A body the passers-by go round (point 578).
   useStandingBody(x, z)
   const pestle = useRef<THREE.Mesh>(null)
@@ -1786,7 +1815,7 @@ function Pounder({ x, z, cloth }: { x: number; z: number; cloth: string }) {
     }
   })
   return (
-    <group position={[x, 0, z]} rotation={[0, Math.atan2(-x, -z), 0]}>
+    <group position={[x, groundHeight(x, z), z]} rotation={[0, Math.atan2(-x, -z), 0]}>
       <group ref={body} position={[0, 0, -0.55]}>
         <Figure cloth={cloth} pose={pose} />
       </group>
@@ -1844,7 +1873,7 @@ function speakChiefWord(
   if (speechReach(distance).audible) {
     useGame.getState().hearUtterance(utterance)
     if (anchor) {
-      speakOverhead(DRUMMER_SPEAKER_ID, [utterance], anchor, { seconds: speechLabelSeconds(1) })
+      speakOverhead(DRUMMER_SPEAKER_ID, [utterance], anchor, { floor: true, seconds: speechLabelSeconds(1) })
     }
   }
   // The arm is aimed at the hut's DOOR height rather than its ridge: a man
@@ -1870,6 +1899,7 @@ function speakChiefWord(
  * and the sound can never tell different messages.
  */
 function Drummer({ x, z, cloth }: { x: number; z: number; cloth: string }) {
+  const groundHeight = usePlaceGround()
   const camera = useThree((state) => state.camera)
   // A body the passers-by go round (point 578).
   useStandingBody(x, z)
@@ -1879,15 +1909,19 @@ function Drummer({ x, z, cloth }: { x: number; z: number; cloth: string }) {
   const group = useRef<THREE.Group>(null)
   const gesture = useRef<GestureState>(restGesture())
   const yaw = drummerFacing([x, z])
+  const floor = useContext(SpeechFloorContext)
+  const voice = useMemo(() => floor ? queuedDrummerVoice(floor, { x, z, register: 'talk' },
+    (hut) => speakChiefWord(camera, { x, z, yaw }, hut, group.current, gesture)) : null, [floor, camera, x, z, yaw])
   // His voice, for the use key that is read in PlaceScene (drummerVoice.ts).
   useEffect(() => {
-    setDrummerVoice((hut) => speakChiefWord(camera, { x, z, yaw }, hut, group.current, gesture))
-    return () => setDrummerVoice(null)
-  }, [camera, x, z, yaw])
+    setDrummerVoice(voice?.voice ?? null)
+    return () => { setDrummerVoice(null); voice?.dispose() }
+  }, [voice])
   useFrame((_, rawDt) => {
     const p = pose.current
     if (!p) return
     const beating = useUi.getState().drumPerformance
+    voice?.step(!!beating)
     const elapsed = beating ? (speechClock() * 1000 - beating.startedAt) / 1000 : 0
     const frame = drummerPoseAt(beating?.plan ?? null, elapsed)
     gesture.current = advanceGesture(gesture.current, Math.min(rawDt, 0.1))
@@ -1902,7 +1936,7 @@ function Drummer({ x, z, cloth }: { x: number; z: number; cloth: string }) {
     if (highHead.current) highHead.current.position.y = drumHeadY(HIGH_DRUM, frame.highSwing)
   })
   return (
-    <group ref={group} name={DRUMMER_SPEAKER_ID} position={[x, 0, z]} rotation={[0, yaw, 0]}>
+    <group ref={group} name={DRUMMER_SPEAKER_ID} position={[x, groundHeight(x, z), z]} rotation={[0, yaw, 0]}>
       <Figure cloth={cloth} pose={pose} />
       {/* The large low drum (`ba`) and the small high one (`BA`) — each on the
           side its own x puts it, which is the side its hand is read from. */}
@@ -1914,6 +1948,7 @@ function Drummer({ x, z, cloth }: { x: number; z: number; cloth: string }) {
 
 /** Fire tender kneeling at the fire pit, stoking the embers with a stick. */
 function FireTender({ x, z, cloth }: { x: number; z: number; cloth: string }) {
+  const groundHeight = usePlaceGround()
   // A body the passers-by go round (point 578).
   useStandingBody(x, z)
   const stick = useRef<THREE.Mesh>(null)
@@ -1921,7 +1956,7 @@ function FireTender({ x, z, cloth }: { x: number; z: number; cloth: string }) {
     if (stick.current) stick.current.rotation.x = 0.85 + Math.sin(clock.elapsedTime * 1.6) * 0.12
   })
   return (
-    <group position={[x, 0, z]} rotation={[0, Math.atan2(-3.5 - x, 2.5 - z), 0]}>
+    <group position={[x, groundHeight(x, z), z]} rotation={[0, Math.atan2(-3.5 - x, 2.5 - z), 0]}>
       <Figure cloth={cloth} kneel />
       <mesh ref={stick} position={[0.2, 0.5, 0.35]} castShadow>
         <cylinderGeometry args={[0.025, 0.03, 1.15, 4]} />
@@ -1988,6 +2023,7 @@ function TaskWalker({
   colliders: Collider[]
   startDelay: number
 }) {
+  const groundHeight = usePlaceGround()
   const standing = useRef<THREE.Group>(null)
   const kneeling = useRef<THREE.Group>(null)
   const state = useRef({
@@ -2030,8 +2066,8 @@ function TaskWalker({
       // Both bodies follow the state while it is at home (point 509): neither
       // may keep the identity transform that would park it at the settlement
       // origin until its first outing writes one.
-      stand.position.set(s.x, 0, s.z)
-      kneel.position.set(s.x, 0, s.z)
+      stand.position.set(s.x, groundHeight(s.x, s.z), s.z)
+      kneel.position.set(s.x, groundHeight(s.x, s.z), s.z)
       s.timer -= dt
       if (s.timer <= 0) {
         s.mode = 'go'
@@ -2044,7 +2080,7 @@ function TaskWalker({
     if (s.mode === 'work') {
       stand.visible = false
       kneel.visible = true
-      kneel.position.set(s.x, 0, s.z)
+      kneel.position.set(s.x, groundHeight(s.x, s.z), s.z)
       kneel.rotation.y = s.yaw
       s.timer -= dt
       if (s.timer <= 0) {
@@ -2101,7 +2137,7 @@ function TaskWalker({
         s.z = body.z
       }
     }
-    stand.position.set(s.x, 0, s.z)
+    stand.position.set(s.x, groundHeight(s.x, s.z), s.z)
     stand.rotation.y = s.yaw
   })
 
@@ -2180,6 +2216,7 @@ function Walkers({
   count: number
   colliders: Collider[]
 }) {
+  const groundHeight = usePlaceGround()
   const defs = useMemo(() => {
     const rand = mulberry32((seed + 60601) >>> 0)
     const n = Math.min(count, homes.length)
@@ -2226,14 +2263,30 @@ function Walkers({
   )
 
   // Dev hook for the headless verification (CLAUDE.md §7.2).
+  const heldWalker = useRef<number | null>(null)
   useEffect(() => {
     if (!import.meta.env.DEV) return
     const w = window as unknown as Record<string, unknown>
-    w.__placeWalkers = { states: states.current, homes: defs.map((d) => d.home) }
+    w.__placeWalkers = {
+      states: states.current,
+      homes: defs.map((d) => d.home),
+      // Read the rendered body independently of the surface it should ride.
+      sample: (who: number) => {
+        const s = states.current[who]
+        const g = refs.current[who]
+        return s && g ? {
+          x: s.x, z: s.z, mode: s.mode, pause: s.pause,
+          groundHeight: groundHeight(s.x, s.z),
+          drawn: { x: g.position.x, y: g.position.y, z: g.position.z, visible: g.visible },
+          held: heldWalker.current === who,
+        } : null
+      },
+      hold: (who: number | null) => { heldWalker.current = who },
+    }
     return () => {
       delete w.__placeWalkers
     }
-  }, [defs])
+  }, [defs, groundHeight])
 
   useFrame(({ clock }, rawDt) => {
     const dt = Math.min(rawDt, 0.1)
@@ -2259,6 +2312,8 @@ function Walkers({
       const s = states.current[i]
       const g = refs.current[i]
       if (!s || !g) return
+      // Freeze the observed walking transform through the asynchronous shutter.
+      if (import.meta.env.DEV && heldWalker.current === i) return
 
       if (s.mode === 'inside') {
         settleBody(i, s, false)
@@ -2268,7 +2323,7 @@ function Walkers({
         // the identity transform — a figure standing at the settlement origin
         // for its whole first stay indoors, and several of them on one spot.
         g.visible = false
-        g.position.set(s.x, 0, s.z)
+        g.position.set(s.x, groundHeight(s.x, s.z), s.z)
         s.timer -= dt
         if (s.timer <= 0) {
           const e = errands.length > 0 ? errands[Math.floor(Math.random() * errands.length)] : ([0, 2] as [number, number])
@@ -2292,7 +2347,7 @@ function Walkers({
         // Linger at the errand: slight idle sway, no bob.
         s.pause -= dt
         settleBody(i, s, true)
-        g.position.set(s.x, 0, s.z)
+        g.position.set(s.x, groundHeight(s.x, s.z), s.z)
         g.rotation.y = s.yaw + Math.sin(t * 0.6 + i) * 0.35
         return
       }
@@ -2374,7 +2429,7 @@ function Walkers({
         s.pinned = 0
       }
       settleBody(i, s, !throughDoor)
-      g.position.set(s.x, Math.abs(Math.sin(t * 6.5 + i * 2)) * 0.05, s.z)
+      g.position.set(s.x, groundHeight(s.x, s.z) + Math.abs(Math.sin(t * 6.5 + i * 2)) * 0.05, s.z)
       g.rotation.y = s.yaw
     })
   })
@@ -2406,9 +2461,6 @@ function Walkers({
   )
 }
 
-/** How near a villager must come to count as having arrived where it was sent. */
-const ERRAND_ARRIVE_RADIUS = WORK_ARRIVE_RADIUS
-
 /** How near a waypoint of a route counts as passed. Wider than a stride, so a
  *  figure sliding along a wall beside the waypoint still ticks it off instead of
  *  circling it. */
@@ -2430,6 +2482,7 @@ const WAYPOINT_RADIUS = 1.2
  */
 function ErrandVillagers({
   seed,
+  placeId,
   cloth,
   colliders,
   radius,
@@ -2442,6 +2495,7 @@ function ErrandVillagers({
   onDigProgress,
 }: {
   seed: number
+  placeId: string
   cloth: string[]
   colliders: Collider[]
   radius: number
@@ -2456,6 +2510,7 @@ function ErrandVillagers({
   childBodies: RefObject<readonly InhabitantBody[]>
   onDigProgress: (progress: readonly DigSiteProgress[]) => void
 }) {
+  const groundHeight = usePlaceGround()
   const camera = useThree((state) => state.camera)
   const refs = useRef<Array<THREE.Group | null>>([])
   /** The jars STANDING at the village water stand (work-order 1087). */
@@ -2466,7 +2521,6 @@ function ErrandVillagers({
   const headJars = useRef<Array<THREE.Object3D | null>>([])
   const handJars = useRef<Array<THREE.Object3D | null>>([])
   const digTools = useRef<Array<THREE.Object3D | null>>([])
-  const reportedStrikes = useRef<number[]>([])
   /** A villager PINNED into the fill, by index and progress — the dev route the
    *  verification poses one by, since the errand itself does not dip yet
    *  (work-order 1085 owes the pose, 1087 owes the act that drives it). Null
@@ -2507,10 +2561,11 @@ function ErrandVillagers({
     })
     return {
       people: spawn,
-      work: createAdultWork(count, balance.villageLife.adultErrands),
+      work: createAdultWork(count, balance.villageLife.adultErrands, useGame.getState().villageDigProgress[placeId]),
       rand: r,
     }
-  }, [seed, count, colliders])
+  }, [seed, count, colliders, placeId])
+
 
   // The settlement's free ground, sampled once per visit (work-order 482/483).
   // An errand sends a villager clear across the village — out to the river bank,
@@ -2627,9 +2682,10 @@ function ErrandVillagers({
     },
     [geography, playGround, playRocks],
   )
+  const speechFloor = useContext(SpeechFloorContext)
   const view = useMemo<AdultWorkView>(
-    () => ({ villagers: people, geography, standable, invitationClear, childrenHear }),
-    [people, geography, standable, invitationClear, childrenHear],
+    () => ({ villagers: people, geography, standable, invitationClear, childrenHear, floor: speechFloor ?? undefined }),
+    [people, geography, standable, invitationClear, childrenHear, speechFloor],
   )
 
   // The body each villager presents to every other inhabitant (point 578): two
@@ -2698,7 +2754,7 @@ function ErrandVillagers({
         const dx = goal.x - me.x
         const dz = goal.z - me.z
         const d = Math.hypot(dx, dz)
-        const arriveAt = task ? ERRAND_ARRIVE_RADIUS : 0.9
+        const arriveAt = task ? workArrivalRadius(task) : 0.9
         if (d <= arriveAt) {
           if (!task) {
             state.target = null
@@ -2903,7 +2959,7 @@ function ErrandVillagers({
       if (g) {
         // The same walking bob the other inhabitants ride, off the distance this
         // villager has actually covered rather than off a wall clock.
-        g.position.set(me.x, Math.abs(Math.sin(state.walked * 3.4 + i * 2)) * 0.05, me.z)
+        g.position.set(me.x, groundHeight(me.x, me.z) + Math.abs(Math.sin(state.walked * 3.4 + i * 2)) * 0.05, me.z)
         const facing = forcedFill.current?.who === i ? forcedFill.current.facing : null
         if (facing !== null) yaws.current[i] = facing
         g.rotation.y = yaws.current[i]
@@ -2917,13 +2973,10 @@ function ErrandVillagers({
       }
     }
 
-    const said = stepAdultWork(work, view, dt, cfg, rand)
+    stepAdultWork(work, view, dt, cfg, rand)
     const progress = digProgressOf(work, geography.digSites.length)
-    if (progress.some((site, i) => site.strikes !== (reportedStrikes.current[i] ?? 0))) {
-      reportedStrikes.current = progress.map((site) => site.strikes)
-      onDigProgress(progress)
-    }
-    if (said) {
+    onDigProgress(progress)
+    for (const said of work.emitted) {
       // The speaker turns to what he is talking about before he says it: a word
       // thrown over a shoulder at nothing reads as nothing at all.
       const speaker = people[said.speaker]
@@ -3261,7 +3314,7 @@ function speakWork(
   if (speechReach(distance).audible) {
     useGame.getState().hearUtterance(utterance)
     if (anchor) {
-      speakOverhead(`villager-${said.speaker}`, [utterance], anchor, { seconds: speechLabelSeconds(1) })
+      speakOverhead(`villager-${said.speaker}`, [utterance], anchor, { floor: true, seconds: speechLabelSeconds(1) })
     }
   }
   gesture.current = gestureIfHeard(distance, said.purpose === 'invitation' ? 'beckon' : 'indicate', {
@@ -3272,6 +3325,7 @@ function speakWork(
 
 /** Standing traders on the plaza that slowly look around. */
 function Traders({ seed, cloth }: { seed: number; cloth: string[] }) {
+  const groundHeight = usePlaceGround()
   const spots = useMemo(() => {
     const rand = mulberry32((seed + 913) >>> 0)
     return [
@@ -3295,7 +3349,7 @@ function Traders({ seed, cloth }: { seed: number; cloth: string[] }) {
       {spots.map((s, i) => (
         <group
           key={i}
-          position={[s.x, 0, s.z]}
+          position={[s.x, groundHeight(s.x, s.z), s.z]}
           ref={(el) => {
             refs.current[i] = el
           }}
@@ -3408,6 +3462,9 @@ export function PlaceLife({
   /** Publishes strike-quantized progress to the site meshes in PlaceScene. */
   onDigProgress: (progress: readonly DigSiteProgress[]) => void
 }) {
+  const speechTime = useRef(0)
+  useFrame((_, dt) => { speechTime.current += Math.min(dt, 0.1) })
+  const speechFloor = useMemo(() => new SpeechFloor(() => placePlayerPosition, () => speechTime.current, placeId), [placeId])
   let hash = 0
   for (const c of placeId) hash = (hash * 31 + c.charCodeAt(0)) | 0
   const localSeed = (seed ^ hash) >>> 0
@@ -3582,11 +3639,13 @@ export function PlaceLife({
       <ColdCloaksContext.Provider value={cloaks}>
         <LimbDetailContext.Provider value={limbSegments}>
           <InhabitantBodiesContext.Provider value={inhabitantBodies}>
+          <SpeechFloorContext.Provider value={speechFloor}>
             <Porters seed={localSeed} stops={buildings} cloth={style.cloth} colliders={colliders} count={1 + size} />
             <Traders seed={localSeed} cloth={style.cloth} />
             <Talkers x={PORT_TALKERS[0]} z={PORT_TALKERS[1]} cloth={style.cloth} />
             <Walkers seed={localSeed} homes={homes} errands={errands} cloth={style.cloth} count={2 + size * 2} colliders={colliders} />
-          </InhabitantBodiesContext.Provider>
+          </SpeechFloorContext.Provider>
+        </InhabitantBodiesContext.Provider>
         </LimbDetailContext.Provider>
       </ColdCloaksContext.Provider>
     )
@@ -3595,6 +3654,7 @@ export function PlaceLife({
     <ColdCloaksContext.Provider value={cloaks}>
       <LimbDetailContext.Provider value={limbSegments}>
         <InhabitantBodiesContext.Provider value={inhabitantBodies}>
+          <SpeechFloorContext.Provider value={speechFloor}>
           <Cook x={firePos[0] + 1.2} z={firePos[1] + 1.0} cloth={style.cloth[0]} />
           <Weaver x={-8.5} z={-7} cloth={style.cloth[1 % style.cloth.length]} weave={style.bandColor} />
           <Kids
@@ -3613,6 +3673,7 @@ export function PlaceLife({
           {/* The adults at their errands (point 483): the five landscape and
               action concepts, taught by what the villagers visibly go and do. */}
           <ErrandVillagers
+            placeId={placeId}
             childBodies={childBodies}
             seed={localSeed}
             cloth={style.cloth}
@@ -3653,6 +3714,7 @@ export function PlaceLife({
               startDelay={9}
             />
           )}
+        </SpeechFloorContext.Provider>
         </InhabitantBodiesContext.Provider>
       </LimbDetailContext.Provider>
     </ColdCloaksContext.Provider>

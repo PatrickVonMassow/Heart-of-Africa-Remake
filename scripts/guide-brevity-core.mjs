@@ -482,7 +482,44 @@ export const LIMITS = {
   // on, which is what a red charge retired with its point does. The long telling stays in the
   // retrospective (§3.268); what is here is the risk in four lines and the prompt in three.
   // Eight lines: 648 -> 656.
-  maxLines: 656,
+  // RAISED 14.09.2026: the sensor entry already forbade deriving life from files, which covers
+  // the log-mtime half of the morning's double failure. What it did not say is that a dead
+  // OWNER is not a dead thing — the queue card declared a running two-backend suite orphaned and
+  // ordered it re-set while it was 43 minutes in. Folded into that entry as one sentence rather
+  // than a new tip, because "measure an actor, not its paperwork" is where a reader looks for
+  // it. The long telling stays in the retrospective (3.272). One line: 656 -> 657.
+  // RAISED 14.09.2026 (second): the detached-run entry read an EMPTY failure list as the mark of
+  // an abort. The 14.09.2026 case had six reds in it, so the abort read as an ordinary red run and
+  // its reds could not be classified at all — the cost was a repeated two-hour pass. Folded into
+  // that same entry rather than a new tip, because it corrects a rule the entry already states,
+  // and it carries the remedy with it: what decides a run's reading belongs in its record, not in
+  // the terminal. The long telling stays in the retrospective (3.200). Two lines: 657 -> 659.
+  // RAISED 14.09.2026 (third): the barrier entry said a gate must let "being produced right now"
+  // through. The afternoon added the sibling case — a gate that measures its condition on the
+  // WRONG OBJECT can never be satisfied at all, and two gates then forbid each other. Folded into
+  // that entry because it is the same reader question, and it carries the house answer with it:
+  // a contradiction between gates is a defect to file, not a thing to re-answer every turn. The
+  // long telling stays in the retrospective (3.201). Two lines: 659 -> 661.
+  // RAISED 14.09.2026 (fourth): a genuinely new reader question, not a longer telling of an
+  // existing one — two measurements taken under DIFFERENT conditions carry no comparison, yet
+  // the tool prints a verdict from them anyway (the baseline measured alone, the candidate
+  // inside the full pass, the difference announced as "Regression"). It was NOT folded: the
+  // neighbouring entries ask where an expectation comes from and whether the harness loads like
+  // production, and neither asks how each side was MEASURED. Written at four lines after the
+  // shortening step this rule demands — a first draft at six was cut by a third before any
+  // raise. The long telling stays in the retrospective (3.273). Five lines: 661 -> 666.
+  // RAISED 15.09.2026: the MIRROR of the aged-expectation entry it joins, and the half that
+  // entry never carried. It says a stored DURATION must not alone declare a running job hung;
+  // this says a stored BUDGET aborts the healthy run once the measured thing grows under it.
+  // It was FOLDED into that entry rather than given one of its own, because it is the same
+  // reader question. The long telling stays in the retrospective (3.270). Three lines: 666 -> 669.
+  // RAISED 15.09.2026: the red-restarts-the-whole-proof pitfall is the OTHER HALF of the ladder
+  // entry beside it, which only warned that a narrow green may not predict the suite. It got an
+  // entry of its own rather than a fold, because the reader question is a different one: not
+  // "may I trust this green" but "what do I do after a red". SHORTEN-BEFORE-RAISE was applied to
+  // it first — seven lines to five — and the long telling stays out of the guide
+  // (docs/picture-check-cost.md §8 carries the measurement). Six lines: 669 -> 675.
+  maxLines: 675,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -750,7 +787,23 @@ export const LIMITS = {
   // 13.09.2026: the deleted-shared-entry pitfall justified beside maxLines measures 83 words
   // after its cut — the first draft ran 129 and five risk lines, which the guard refused, so it
   // was tightened rather than bought headroom for: 6233 -> 6316.
-  maxWords: 6316,
+  // 14.09.2026: the dead-owner-is-not-a-dead-thing sentence justified beside maxLines measures
+  // 7 words: 6316 -> 6323.
+  // 14.09.2026 (second): the abort-that-names-reds correction justified beside maxLines measures
+  // 17 words after two rounds of tightening — the first draft ran 98 and was cut rather than
+  // bought headroom for: 6323 -> 6340.
+  // 14.09.2026 (third): the wrong-object-gate fold justified beside maxLines measures 29 words:
+  // 6340 -> 6369.
+  // 14.09.2026 (fourth): the unlike-for-unlike comparison entry justified beside maxLines
+  // measures 56 words after the shortening step — the first draft ran 73 and was cut rather
+  // than bought headroom for: 6369 -> 6425.
+  // 15.09.2026: the stale-budget half justified beside maxLines measures 39 words after the
+  // shortening step — the first draft ran 57 and was cut rather than bought headroom for, and
+  // its closing clause ("a red of this kind never points at whoever triggers it") was DROPPED
+  // here because the retrospective's own Lehre already carries it: 6425 -> 6464.
+  // 15.09.2026: the red-restarts-the-whole-proof pitfall justified beside maxLines measures 63
+  // words after its tightening: 6464 -> 6527.
+  maxWords: 6527,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,

@@ -5,6 +5,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   ADULT_CONCEPTS,
+  assertNoOwedWord,
   ADULT_SITUATIONS,
   carryOf,
   clearTask,
@@ -22,6 +23,9 @@ import {
   type AdultWorkView,
   type SpokenWord,
 } from './adultWork'
+import { clearOfSpoil, DIG_RIM_DISTANCE } from './placeGround'
+import { SpeechFloor } from '../../communication/speechFloor'
+import { utteranceSeconds } from '../../communication/speaking'
 import { balance } from '../../config/balance'
 import { CONCEPT_IDS } from '../../communication/lexicon'
 import { DIG_CYCLE_SECONDS } from '../../render/gesture'
@@ -245,7 +249,7 @@ describe('RIVER is ordered and reported at the village water stand', () => {
     // THE WATER WORD IS GATED BY A HEARING CHILD exactly as the two DIG
     // utterances are: only the DIG branches carried that check before.
     const deaf = run(view(6), 240)
-    const heard = run(view(6, undefined, () => true, () => true), 240)
+    const heard = run(view(6, undefined, () => true, () => true), 60)
     expect(deaf.words.some((w) => w.concept === 'RIVER')).toBe(true)
     expect(heard.words.some((w) => w.concept === 'RIVER')).toBe(false)
   })
@@ -461,6 +465,23 @@ describe('DIG is a summons said twice', () => {
     expect(word?.aim).toEqual({ x: v.villagers[partner].x, y: 1, z: v.villagers[partner].z })
   })
 
+  it('does not partly start the joint walk when the initiator has lost its standing spot', () => {
+    const v = riverless(view(4))
+    const state = stageDig(v)
+    const initiator = initiatorOf(state)
+    const task = taskOf(state, initiator)!
+    const partner = taskOf(state, task.partner!)!
+    task.standSpot = null
+    putAtGoal(state, v, initiator)
+    const before = { x: task.x, z: task.z }
+
+    stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
+
+    expect(task).toMatchObject({ ...before, phase: 'invite' })
+    expect(partner).toMatchObject({ phase: 'invite', arrived: true })
+    expect(task.pendingWord).toBeUndefined()
+  })
+
   it('sends the invited pair toward one site, says DIG there, then starts both digging', () => {
     const v = riverless(view(4))
     const state = stageDig(v)
@@ -477,13 +498,16 @@ describe('DIG is a summons said twice', () => {
     expect(second.arrived).toBe(false)
     expect(first.siteIndex).toBe(second.siteIndex)
     const site = v.geography.digSites[first.siteIndex!]
-    expect(goalOf(first)).toEqual({ x: site.x, z: site.z })
-    expect(Math.hypot(goalOf(second).x - site.x, goalOf(second).z - site.z)).toBeCloseTo(2.4, 6)
+    for (const task of [first, second]) {
+      const goal = goalOf(task)
+      expect(Math.hypot(goal.x - site.x, goal.z - site.z)).toBeCloseTo(DIG_RIM_DISTANCE)
+      expect(clearOfSpoil(site, goal.x, goal.z)).toBe(true)
+    }
 
     putAtGoal(state, v, initiator)
     putAtGoal(state, v, partner)
     stepAdultWork(state, v, 1 / 60, CFG, () => 0.5) // both arrival flags
-    const atSite = stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
+    const atSite = stepAdultWork(state, v, utteranceSeconds(4) + balance.communication.consequenceSeconds, CFG, () => 0.5)
     expect(atSite).toMatchObject({ concept: 'DIG', speaker: initiator, purpose: 'site' })
     expect(atSite?.aim).toEqual({ x: site.x, y: 0, z: site.z })
     expect(isDigging(state, initiator)).toBe(true)
@@ -570,7 +594,7 @@ describe('DIG is a summons said twice', () => {
     expect(taskOf(state, initiator)).toMatchObject({ phase: 'site', owes: true, hushed: true })
     expect(isDigging(state, initiator)).toBe(false)
     audibleToChild = false
-    expect(stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)?.purpose).toBe('site')
+    expect(stepAdultWork(state, v, utteranceSeconds(4) + balance.communication.consequenceSeconds, CFG, () => 0.5)?.purpose).toBe('site')
     expect(isDigging(state, initiator)).toBe(true)
     expect(isDigging(state, partner)).toBe(true)
   })
@@ -597,7 +621,7 @@ describe('DIG is a summons said twice', () => {
 
     v.villagers[bystander].x = 40
     v.villagers[bystander].z = 40
-    expect(stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)?.purpose).toBe('site')
+    expect(stepAdultWork(state, v, utteranceSeconds(4) + balance.communication.consequenceSeconds, CFG, () => 0.5)?.purpose).toBe('site')
     expect(isDigging(state, initiator)).toBe(true)
     expect(isDigging(state, partner)).toBe(true)
   })
@@ -624,13 +648,31 @@ describe('digging records work at the site', () => {
     stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
     expect(digProgressOf(state, v.geography.digSites.length)[siteIndex]).toEqual({ dug: 0, strikes: 0 })
     stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
-    for (let t = 0; t < 5; t += 1 / 60) {
+    for (let t = 0; t < 5 + utteranceSeconds(4) + balance.communication.consequenceSeconds; t += 1 / 60) {
       walkFrame(state, v, 1 / 60)
       stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
     }
     const progress = digProgressOf(state, v.geography.digSites.length)[siteIndex]
     expect(progress.dug).toBeGreaterThan(9)
     expect(progress.strikes).toBeGreaterThanOrEqual(6)
+  })
+
+  it('a finished bout leaves a result that a later visit restores', () => {
+    const v = riverless(view(4))
+    const state = stageDig(v)
+    const index = taskOf(state, initiatorOf(state))!.siteIndex!
+    state.next = 1000
+    for (let t = 0; t < 45; t += 1 / 60) {
+      walkFrame(state, v, 1 / 60)
+      stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
+    }
+    const progress = digProgressOf(state, v.geography.digSites.length)
+    expect(progress[index].completed).toBe(true)
+    expect(state.tasks.every((task) => task === null)).toBe(true)
+    const nextVisit = createAdultWork(4, CFG, progress)
+    expect(digProgressOf(nextVisit, progress.length)).toEqual(progress)
+    nextVisit.siteProgress[index].dug++
+    expect(nextVisit.siteProgress[index].dug).not.toBe(progress[index].dug)
   })
 
   it('returns progress as a copy rather than exposing scheduler state', () => {
@@ -687,6 +729,32 @@ describe('task lifecycle safeguards', () => {
     expect(taskOf(state, initiator)?.siteIndex).not.toBe(0)
   })
 
+  it('keeps an assigned hole for its walking pair and makes it available after their bout', () => {
+    const v = riverless(view(6))
+    v.geography.digSites = v.geography.digSites.slice(0, 1)
+    const state = stageDig(v)
+    const first = initiatorOf(state)
+    const partner = state.tasks[first]!.partner!
+    for (let clock = 0; clock < 5; clock += 0.1) {
+      v.villagers.forEach((me, i) => { me.free = !state.tasks[i] })
+      stepAdultWork(state, v, 0.1, CFG, () => 0.5)
+    }
+    expect(state.tasks.filter(Boolean)).toHaveLength(2)
+    // Complete this pair's final work phase, then let the catalogue retry.
+    for (const i of [first, partner]) Object.assign(state.tasks[i]!, {
+      phase: 'dig', arrived: true, owes: false, dug: CFG.digSeconds,
+    })
+    stepAdultWork(state, v, 0.1, CFG, () => 0.5)
+    expect(state.tasks[first]).toBeNull()
+    for (let clock = 0; clock < 2; clock += 0.1) {
+      v.villagers.forEach((me, i) => { me.free = !state.tasks[i] })
+      stepAdultWork(state, v, 0.1, CFG, () => 0.5)
+    }
+    expect(state.tasks.filter(Boolean)).toHaveLength(2)
+    expect(state.tasks.filter((t) => t?.siteIndex === 0)).toHaveLength(2)
+    expect(Object.values(state.staged).reduce((sum, n) => sum + n, 0)).toBe(2)
+  })
+
   it('never stages work where the second stand has no room', () => {
     const v = riverless(view(3, undefined, () => false))
     const state = stageDig(v)
@@ -704,12 +772,96 @@ describe('task lifecycle safeguards', () => {
       stepAdultWork(state, v, 1 / 30, CFG, () => 0.5)
     }
     expect(state.tasks.every((task) => task === null)).toBe(true)
-    expect(errors.mock.calls.map((call) => String(call[0])).join(' ')).toContain('[ASSERT] adult-atom-lost')
+    // The pair never assembled, so no word was ever WITHHELD: this reports as
+    // the walking failure it is, and must not be filed as a lost word — the two
+    // send a reader to different subsystems (work-order 1073).
+    const reported = errors.mock.calls.map((call) => String(call[0])).join(' ')
+    expect(reported).toContain('[ASSERT] adult-pair-never-met')
+    expect(reported).not.toContain('[ASSERT] adult-atom-lost')
     errors.mockRestore()
     resetDevAsserts()
   })
 
-  it('does not report an owed word that expires only because a child held it', () => {
+  it('files a withheld word as a loss even after its moment has passed', () => {
+    // THE SIDE DOOR THE REVIEW FOUND. `hushed` answers only for the frame it is
+    // read in, and a word stops being sayable the instant its speaker steps out
+    // of place — a carrier a metre past his stand, a partner who has not arrived.
+    // If the report asked `hushed` at expiry, one such frame before the task ran
+    // out would file a word the village really did withhold as a pair that never
+    // met, which is exactly the blanket excuse this point removed.
+    resetDevAsserts()
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const v = riverless(view(3, undefined, undefined, () => true))
+    const state = stageDig(v)
+    const initiator = initiatorOf(state)
+    putAtGoal(state, v, initiator)
+    stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
+    const t = taskOf(state, initiator)!
+    expect(t).toMatchObject({ owes: true, hushed: true, withheld: true })
+    // His moment passes: the live hush goes out, the debt does not.
+    t.hushed = false
+    assertNoOwedWord(t, initiator)
+    const reported = errors.mock.calls.flat().join(' ')
+    expect(reported).toContain('adult-atom-lost')
+    expect(reported).not.toContain('adult-pair-never-met')
+    errors.mockRestore()
+    resetDevAsserts()
+  })
+
+  it('lets a paid word clear its own history, so the next one starts clean', () => {
+    resetDevAsserts()
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const v = riverless(view(3, undefined, undefined, () => true))
+    const state = stageDig(v)
+    const initiator = initiatorOf(state)
+    putAtGoal(state, v, initiator)
+    stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
+    const t = taskOf(state, initiator)!
+    expect(t.withheld).toBe(true)
+    state.next = Infinity
+    t.age = CFG.errandSeconds - 0.025
+    expect(stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)?.purpose).toBe('invitation')
+    // Paid at the bound. The DIG he now owes at the site was never withheld by
+    // anybody, and must not inherit the last word's record.
+    expect(taskOf(state, initiator)?.withheld).toBeUndefined()
+    errors.mockRestore()
+    resetDevAsserts()
+  })
+
+  it('files a word the FRAME passed over as withheld, not as a pair that never met', () => {
+    // Three words fall due at once and the village says one a frame, so two are
+    // simply passed over — no floor refused them and no child was near. If that
+    // deferral left no record, a speaker who then steps out of his own place
+    // before his task runs out is filed as a pair that never assembled, and the
+    // word he was really owed goes unreported.
+    resetDevAsserts()
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const { state, v } = threeWordsDue()
+    const said = stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
+    expect(said).not.toBeNull()
+    // The second digging pair is at its site with its DIG due; whoever spoke
+    // this frame, it was not them.
+    const passedOver = 3
+    expect(said!.speaker).not.toBe(passedOver)
+    const t = taskOf(state, passedOver)!
+    expect(t).toMatchObject({ owes: true, phase: 'site' })
+    expect(t.withheld, 'a word nobody refused, that still did not get out, kept no record').toBe(true)
+    // His moment passes: his partner is no longer standing ready at the site, so
+    // the word stops being sayable and the LIVE hush goes out with it.
+    taskOf(state, t.partner!)!.arrived = false
+    stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
+    expect(t.hushed).toBe(false)
+    expect(t.owes).toBe(true)
+    t.age = CFG.errandSeconds
+    stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
+    const reported = errors.mock.calls.flat().join(' ')
+    expect(reported).toContain('adult-atom-lost')
+    expect(reported).not.toContain('adult-pair-never-met')
+    errors.mockRestore()
+    resetDevAsserts()
+  })
+
+  it('forces a child-held word before expiry and reports the hush instead of excusing it', () => {
     resetDevAsserts()
     const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
     const v = riverless(view(3, undefined, undefined, () => true))
@@ -718,11 +870,42 @@ describe('task lifecycle safeguards', () => {
     putAtGoal(state, v, initiator)
     stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
     expect(taskOf(state, initiator)).toMatchObject({ owes: true, hushed: true })
+    state.next = Infinity
+    const t = taskOf(state, initiator)!
+    t.age = CFG.errandSeconds - 0.025
+    const word = stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
+    expect(word?.purpose).toBe('invitation')
+    expect(t.age).toBeLessThan(CFG.errandSeconds)
+    expect(errors.mock.calls.flat().join(' ')).toContain('adult-atom-lost')
+    errors.mockRestore()
+    resetDevAsserts()
+  })
 
-    state.next = Number.POSITIVE_INFINITY
-    stepAdultWork(state, v, CFG.errandSeconds, CFG, () => 0.5)
-    expect(state.tasks.every((task) => task === null)).toBe(true)
-    expect(errors).not.toHaveBeenCalled()
+  it.each([90, 300])('releases a queued word whose partner steps away before its %ss task expires', (errandSeconds) => {
+    resetDevAsserts()
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const { state, v } = threeWordsDue()
+    state.tasks[0] = state.tasks[1] = state.tasks[2] = null
+    const cfg = { ...CFG, errandSeconds }
+    v.childrenHear = () => true
+    expect(stepAdultWork(state, v, 0.1, cfg, () => 0.5)).toBeNull()
+    const task = state.tasks[3]!, partner = state.tasks[4]!
+    expect(task.withheld).toBe(true)
+    partner.arrived = false
+    v.villagers[4].x += 10
+    const since = state.clock
+    expect(stepAdultWork(state, v, 0.1, cfg, () => 0.5)).toBeNull()
+    expect(task.hushed).toBe(false)
+    expect(state.floor!.waiting(task.speechOwner!)).toBe(true)
+    let paid: SpokenWord | null = null
+    while (state.clock < errandSeconds && !paid) paid = stepAdultWork(state, v, 0.1, cfg, () => 0.5)
+    expect(paid).toMatchObject({ concept: 'DIG', purpose: 'site', speaker: 3 })
+    expect(task.owes).toBe(false)
+    expect(task.age).toBeLessThan(errandSeconds)
+    expect(state.clock - since).toBeLessThanOrEqual(balance.communication.speechHoldSeconds + 0.1)
+    expect(state.floor!.forcedCount).toBe(1)
+    expect(errors.mock.calls.flat().join(' ')).toContain('adult-atom-lost')
+    expect(errors.mock.calls.flat().join(' ')).toContain('dig-second pair 3/4')
     errors.mockRestore()
     resetDevAsserts()
   })
@@ -735,3 +918,119 @@ describe('task lifecycle safeguards', () => {
     expect(state.last).toBeNull()
   })
 })
+
+
+it('keeps adult speech and its consequences exclusive while silent work continues', () => {
+  const v = view(6)
+  v.geography = {
+    waterStand: { x: 2, z: 2 }, waterHead: { x: 4, z: 0 },
+    waterFoot: { x: 6, z: 0 }, waterFill: { x: 7, z: 0 },
+    digSites: [{ x: -5, z: 4, kind: 'pit' }, { x: -5, z: -4, kind: 'postHole' }],
+  }
+  let clock = 0
+  const floor = new SpeechFloor(() => ({ x: 0, z: 0, active: true }), () => clock)
+  v.floor = floor
+  const state = createAdultWork(6, CFG)
+  const active = new Set<object>()
+  let nextWord = 0
+  let completed = 0
+  for (; clock < 180; clock += 0.1) {
+    v.villagers.forEach((me, i) => {
+      if (state.tasks[i]) return
+      const x = i * 0.4, z = 0
+      const distance = Math.hypot(x - me.x, z - me.z)
+      if (distance > 0) {
+        const step = Math.min(distance, CFG.pace * 0.1)
+        me.x += (x - me.x) / distance * step
+        me.z += (z - me.z) / distance * step
+      }
+    })
+    walkFrame(state, v, 0.1)
+    const tasks = [...state.tasks]
+    stepAdultWork(state, v, 0.1, CFG, () => 0.5)
+    for (const word of state.emitted) {
+      expect(clock + 1e-8).toBeGreaterThanOrEqual(nextWord)
+      nextWord = clock + utteranceSeconds(4) + balance.communication.consequenceSeconds
+      const owner = tasks[word.speaker]!.speechOwner!
+      if (word.purpose === 'invitation' || word.id === 'water-out') {
+        expect(active.has(owner)).toBe(false)
+        active.add(owner)
+      } else {
+        expect(active.delete(owner)).toBe(true)
+        completed++
+      }
+    }
+  }
+  expect(completed).toBeGreaterThan(5)
+  expect(floor.forcedCount).toBe(0)
+})
+
+
+it.each(['walking', 'hushed', 'occupied site'] as const)(
+  'sends water and admits a bank call while a %s dig pair yields, without forcing', (obstruction) => {
+    const cfg = balance.villageLife.adultErrands
+    const v = view(10)
+    v.geography = {
+      waterStand: { x: 2, z: 2 }, waterHead: { x: 4, z: 0 },
+      waterFoot: { x: 6, z: 0 }, waterFill: { x: 7, z: 0 },
+      digSites: [{ x: -5, z: 4, kind: 'pit' }, { x: -5, z: -4, kind: 'postHole' }],
+    }
+    let clock = 0
+    const floor = new SpeechFloor(() => ({ x: 0, z: 0, active: true }), () => clock)
+    v.floor = floor
+    const state = createAdultWork(v.villagers.length, cfg)
+    state.cursor = 2 // Open with DIG, then let the shipped catalogue cast the rest.
+    let heldSpeaker = -1, heldUntil = 0
+    let heldSite = { x: Infinity, z: Infinity }
+    let dispatchDuringHold = false, bankDuringHold = false
+    let firstFill = Infinity, nextSpeech = 0
+    const bank = {}
+    const source = { x: 22, z: 0, register: 'call' as const }
+    v.childrenHear = (x, z) => obstruction === 'hushed' && clock < heldUntil &&
+      Math.hypot(x - heldSite.x, z - heldSite.z) <= WORK_ARRIVE_RADIUS
+    for (; clock < 360; clock += 0.1) {
+      v.villagers.forEach((me, i) => {
+        // A free bystander steps onto the already assigned site. He is never
+        // cast into a task while obstructing it, and leaves after the hold.
+        if (obstruction === 'occupied site' && i === 9 && clock < heldUntil) {
+          Object.assign(me, heldSite, { free: false })
+          return
+        }
+        const task = state.tasks[i]
+        me.free = !task
+        if (obstruction === 'walking' && i === heldSpeaker && clock < heldUntil) return
+        if (task?.arrived) return
+        const goal = task ? goalOf(task) : { x: i * 0.4, z: 0 }
+        const distance = Math.hypot(goal.x - me.x, goal.z - me.z)
+        if (!distance) return
+        const step = Math.min(distance, cfg.pace * 0.1)
+        me.x += (goal.x - me.x) / distance * step
+        me.z += (goal.z - me.z) / distance * step
+      })
+      stepAdultWork(state, v, 0.1, cfg, () => 0.5)
+      for (const word of state.emitted) {
+        expect(clock + 1e-8).toBeGreaterThanOrEqual(nextSpeech)
+        nextSpeech = clock + utteranceSeconds(4) + balance.communication.consequenceSeconds
+        if (word.purpose === 'invitation' && heldSpeaker === -1) {
+          heldSpeaker = word.speaker
+          heldSite = { ...v.geography.digSites[state.tasks[word.speaker]!.siteIndex!] }
+          heldUntil = clock + 60
+        }
+        if (word.id === 'water-out' && clock < heldUntil) dispatchDuringHold = true
+      }
+      if (heldSpeaker >= 0 && !bankDuringHold && clock < heldUntil && floor.request({
+        situation: bank, name: 'bank call', word: 'RIVER', source, sources: () => [source], ends: true,
+      })) {
+        expect(clock + 1e-8).toBeGreaterThanOrEqual(nextSpeech)
+        nextSpeech = clock + utteranceSeconds(4) + balance.communication.consequenceSeconds
+        bankDuringHold = true
+      }
+      if (state.tasks.some((t) => t?.phase === 'fill')) firstFill = Math.min(firstFill, clock)
+    }
+    expect(dispatchDuringHold).toBe(true)
+    expect(bankDuringHold).toBe(true)
+    expect(firstFill).toBeLessThan(180)
+    expect(state.standJars).toBeGreaterThan(0)
+    expect(floor.forcedCount).toBe(0)
+  },
+)

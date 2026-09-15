@@ -1,3 +1,4 @@
+import type { DigSiteProgress } from '../scenes/place/adultWork'
 // Central game state (zustand). Holds the run seed, player resources, journal,
 // travel position, place/audience state and win condition.
 
@@ -215,6 +216,9 @@ export interface GameState {
    *  change, then updates this. A place with no modelled situation reports a
    *  constant key and so never changes or re-fires (systems/placeSituation). */
   placeSituations: Record<string, string>
+  /** Excavation work survives leaving and re-entering its village. */
+  villageDigProgress: Record<string, DigSiteProgress[]>
+  recordVillageDig: (placeId: string, progress: readonly DigSiteProgress[]) => void
   /** Villages whose chief is out of his hut right now (design.md §12/§13.4):
    *  the use key at his door sends him out and across to his drummer, and he
    *  stays out until he has walked home again. It is the COARSE half of his
@@ -552,6 +556,7 @@ export function startState(seed: number, placeId: string = startPlaceId()) {
     lastFriendAidDay: -9999,
     freeCamps: [] as FreeCamp[],
     villageCamps: {} as Record<string, ItemBag>,
+    villageDigProgress: {} as Record<string, DigSiteProgress[]>,
     knowingVillages: pickKnowingVillages(seed),
     graveLatLon: generateGrave(seed),
     victory: false,
@@ -1951,6 +1956,13 @@ export const useGame = create<GameState>()((set, get) => ({
     get().addEntry({ key: 'journal.titles.mouldFitted' }, { key: 'journal.mouldFitted' }, 'event')
   },
 
+  recordVillageDig: (placeId, progress) => set((s) => {
+    const before = s.villageDigProgress[placeId]
+    if (before?.length === progress.length && progress.every((p, i) =>
+      p.dug === before[i].dug && p.strikes === before[i].strikes && !!p.completed === !!before[i].completed)) return s
+    return { villageDigProgress: { ...s.villageDigProgress, [placeId]: progress.map((p) => ({ ...p })) } }
+  }),
+
   saveCheckpoint: () => {
     const s = get()
     const snapshot = {
@@ -1971,6 +1983,7 @@ export const useGame = create<GameState>()((set, get) => ({
       orientationGiven: s.orientationGiven,
       honoredFriend: s.honoredFriend, lastFriendAidDay: s.lastFriendAidDay,
       freeCamps: s.freeCamps, villageCamps: s.villageCamps,
+      villageDigProgress: s.villageDigProgress,
       communication: serializeMemory(s.communication),
       drumMessageHeard: s.drumMessageHeard,
       rockArtefact: s.rockArtefact, carriedForms: s.carriedForms, spentSockets: s.spentSockets,
@@ -2003,6 +2016,7 @@ export const useGame = create<GameState>()((set, get) => ({
       set({
         ...snap,
         equipment: cleanEquipment,
+        villageDigProgress: snap.villageDigProgress ?? {},
         explored: snap.explored ?? {},
         // The ten ports are known from the start (point 288): a legacy save from
         // before this rule migrates by marking them discovered, so their labels

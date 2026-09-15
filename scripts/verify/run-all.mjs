@@ -15,7 +15,7 @@ import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { killTree, launchServer } from './_server.mjs'
-import { allChecks, changeRelatedness, countCheckLines, failedChecks, formatRepeatReport, repeatSignature } from './baseline-classify-core.mjs'
+import { allChecks, changeRelatedness, clearInheritedBaselineLane, countCheckLines, failedChecks, formatRepeatReport, repeatSignature } from './baseline-classify-core.mjs'
 import {
   LEVEL, annotateResult, annotateStageFailure, decideRun, formatLoadReport, onLoadMode,
 } from './machine-load-core.mjs'
@@ -34,13 +34,20 @@ import {
 } from './tiers.mjs'
 import { LADDER_STATUS, formatLadderRefusal } from './ladder-core.mjs'
 import { ladderCheck } from './ladder.mjs'
-import { SECTION_ENV, listSections, planSectionRun, resolveSelection } from './sections.mjs'
+import { SECTION_ENV, listNonPredictive, listSections, narrowDiagnosis, planSectionRun, resolveSelection } from './sections.mjs'
 import { readFileSync } from 'node:fs'
 import { distinctReds, formatOwnershipVerdict, wantsBaseline } from './red-ownership-core.mjs'
 import { classifyRedSuites } from './red-ownership.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const chargedPoints = new Set()
+
+// A REGRESSION PASS IS NEVER THE BASELINE LANE. Dropped from this process's own
+// environment, so no child — suite, retry, cross-browser check or Vitest — can
+// inherit a stale marker and stand a block down where a missing capability IS
+// the regression. Only baseline-classify.mjs writes the marker, on the suites it
+// spawns itself.
+clearInheritedBaselineLane(process.env)
 
 // Hybrid test architecture: the fast, deterministic Vitest layer (jsdom, no
 // browser) runs first (`unit` stage below) and covers all pure logic, store
@@ -209,7 +216,7 @@ const SUITE_TIMEOUT_MS = Number(process.env.VERIFY_SUITE_TIMEOUT_MS) || 45 * 60 
 /** `retryAfter` is the env value that marks this spawn as the RETRY of a failed
  *  attempt (point 640) — blank for a first attempt, which also neutralises a
  *  stale export in the calling shell. */
-function runSuite(name, baseUrl, retryAfter = '') {
+function runSuite(name, baseUrl, retryAfter = '', onlySection = '') {
   const before = readRenderState()?.runs
   const previous = new Set((Array.isArray(before) ? before : []).map(runIdentity))
   const startedAt = Date.now()
@@ -225,6 +232,10 @@ function runSuite(name, baseUrl, retryAfter = '') {
       ...process.env,
       ...(baseUrl ? { BASE_URL: baseUrl } : {}),
       [RETRY_ENV]: retryAfter,
+      // ONE BLOCK OF THE SUITE, for a diagnosis run that needs no more (point
+      // 1126). Blank restores whatever the pass itself selected, so a normal
+      // spawn is untouched; the suite's own gate stamps the record PARTIAL.
+      ...(onlySection ? { [SECTION_ENV]: onlySection } : {}),
       VERIFY_GL: laneFor(name, VERIFY_GL),
     },
     timeout: SUITE_TIMEOUT_MS,
@@ -242,7 +253,10 @@ function runSuite(name, baseUrl, retryAfter = '') {
   const errMatch = out.match(/console errors: (\d+)/i)
   const consoleErrors = errMatch ? Number(errMatch[1]) : 0
   const ok = res.status === 0 && fail === 0 && consoleErrors === 0
-  console.log(`${ok ? 'PASS' : 'FAIL'}  ${name.padEnd(12)} ${pass} pass, ${fail} fail, ${consoleErrors} console-errors (exit ${res.status})`)
+  // A narrowed spawn says so on its own result line: a reader who sees only the
+  // headline must never mistake one block's tally for the suite's (point 1126).
+  const scope = onlySection ? ` [--section=${onlySection}]` : ''
+  console.log(`${ok ? 'PASS' : 'FAIL'}  ${name.padEnd(12)}${scope} ${pass} pass, ${fail} fail, ${consoleErrors} console-errors (exit ${res.status})`)
   // A NON-PREDICTIVE PASS MUST BE SEEN (point 1086). Only the summary above
   // leaves this child, so a marker sitting on a passing line would die here —
   // and a green that does not mean what it looks like is exactly the thing a
@@ -314,6 +328,50 @@ function runSuite(name, baseUrl, retryAfter = '') {
 // and repeated identities are lost by parsing output), and every doubt — a
 // missing, stale, crashed, truncated or non-terminal record — falls back to the
 // retry. Measured on point 1112's closing: three red suites cost six passes.
+/** A suite's own source, read once per pass: the declarations that decide
+ *  whether a diagnosis run may be narrowed live in it. Unreadable source means
+ *  no sections, which means no narrowing — never a wrong one. */
+const suiteSources = new Map()
+function suiteSource(name) {
+  if (!suiteSources.has(name)) {
+    let text = ''
+    try {
+      text = readFileSync(join(HERE, `${name}.mjs`), 'utf8')
+    } catch {
+      /* not sectioned, or not a file suite — narrowDiagnosis then answers `whole` */
+    }
+    suiteSources.set(name, text)
+  }
+  return suiteSources.get(name)
+}
+
+/** May this suite's retry be narrowed to the blocks that went red, and to which
+ *  (point 1126)? The decision itself is pure (scripts/verify/sections.mjs). */
+function narrowRetry(name, failures) {
+  const source = suiteSource(name)
+  return narrowDiagnosis({
+    failures,
+    declared: listSections(source),
+    nonPredictive: listNonPredictive(source),
+    suite: name,
+  })
+}
+
+/** Run the named blocks of one suite, one spawn each, and fold the results into
+ *  the shape a single `runSuite` returns. Always PARTIAL: it is a diagnosis, and
+ *  no fold of blocks is ever the suite's own coverage. */
+function runSections(name, baseUrl, retryAfter, sections) {
+  const parts = sections.map((only) => runSuite(name, baseUrl, retryAfter, only))
+  return {
+    ok: parts.every((p) => p.ok),
+    out: parts.map((p) => p.out).join('\n'),
+    unresolved: parts.some((p) => p.unresolved),
+    allOwned: parts.length > 0 && parts.every((p) => p.allOwned),
+    points: [...new Set(parts.flatMap((p) => p.points))].sort((a, b) => a - b),
+    partial: true,
+  }
+}
+
 const RETRY_ENABLED = process.env.VERIFY_NO_RETRY !== '1'
 /** Suites that stayed red, kept for automatic LARGE baseline classification below.
  *  `runs` is 1 when retry is disabled or every red has an open owner. */
@@ -332,13 +390,28 @@ function runSuiteWithRetry(name, baseUrl) {
     redSuites.push({ suite: name, failed: failedChecks(first.out), checks: allChecks(first.out).length, runs: 1, unresolved: first.unresolved })
     return false
   }
-  console.log(`↻ retry ${name} once — a first-try failure may be a rotating staging flake (point 200)`)
+  // THE RETRY ASKS ITS QUESTION ON THE RED BLOCKS, NOT THE WHOLE SUITE (point
+  // 1126). Every failing check already names the block that re-runs it alone, so
+  // re-asking "transient or defect?" costs those blocks rather than all 274 of
+  // `polish`'s checks. `narrowDiagnosis` refuses the narrowing wherever the
+  // narrow reading would not be the suite's, and then this is the pass it always
+  // was.
+  const narrow = narrowRetry(name, failedChecks(first.out))
+  if (narrow.whole) {
+    console.log(`↻ retry ${name} once — a first-try failure may be a rotating staging flake (point 200); whole pass: ${narrow.why}`)
+  } else {
+    console.log(
+      `↻ retry ${name} on its ${narrow.sections.length} red block(s) only — ${narrow.sections.join(', ')} ` +
+        '(point 1126): a whole pass answers "transient or defect?" no better than the blocks that went red',
+    )
+  }
   // The retry carries what the first attempt failed on, so its own run record is
   // stamped SUSPECT (point 640) and cannot be the covering evidence for a landing.
-  const second = runSuite(name, baseUrl, formatSuspectEnv(failedChecks(first.out)))
+  const suspect = formatSuspectEnv(failedChecks(first.out))
+  const second = narrow.whole ? runSuite(name, baseUrl, suspect) : runSections(name, baseUrl, suspect, narrow.sections)
   if (second.ok) {
     console.log(
-      `⚠ PASSED ON RETRY  ${name} — recorded SUSPECT: it covers no backend, because "it passed the ` +
+      `⚠ PASSED ON RETRY  ${name}${narrow.whole ? '' : ` (blocks ${narrow.sections.join(', ')})`} — recorded SUSPECT: it covers no backend, because "it passed the ` +
         'second time" is consistent with a fixed defect, a rare one, a timing race and an idle ' +
         'machine alike. Close it by a CAUSE (fix it), by CHARGING it in ' +
         'scripts/render-verify-charges.mjs to the open point that owns it, or by filing it as an ' +

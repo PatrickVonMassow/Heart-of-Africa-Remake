@@ -4,7 +4,7 @@
 // which buildings exist is fixed per place kind. Visuals: TSL sky dome and
 // noise materials, sun shadows, detailed buildings, palms and scatter props.
 
-import { useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import * as THREE from 'three/webgpu'
@@ -83,7 +83,9 @@ import {
 } from '../../render/fauna'
 import { MONUMENT_GROUND, PORT_GROUND, REGION_PLACE_STYLES, type RegionPlaceStyle } from './regionStyles'
 import { PlaceLife } from './PlaceLife'
-import { digSiteAppearance } from './digSiteAppearance'
+import { DigSites } from './DigSites'
+import { PlaceGroundContext, usePlaceGround } from './PlaceGroundContext'
+import { placeGroundHeight, type PlaceGround } from './placeGround'
 import type { DigSiteProgress } from './adultWork'
 import { SpeechLabels } from './SpeechLabels'
 import {
@@ -135,12 +137,12 @@ import {
 } from '../../render/placeRiver'
 import { RIVER_DRIFT_SPEED } from '../../render/waterAppearance'
 import { PLAY_ROCK_SEEDS, playRockYaw } from './playRockSurface'
-import { bankGroundHeight, bankPlayRocksView, type PlaceRiverBank } from './riverBank'
+import { bankPlayRocksView, type PlaceRiverBank } from './riverBank'
 import { scatterGrassTufts } from './groundScatter'
 import { clearEdgeBand, setEdgeBandBoundary, setEdgeBandLook } from '../../render/edgeBand'
 import { devAssert } from '../../systems/devAssert'
 import { pickUseCandidate, type UseCandidate } from './useKeyTarget'
-import { buildLayout, chiefStandingSpot, interactiveCircleRadius, DIG_SITE_RADIUS, doorCandidates, fencePanels, isOnLane, PLACE_RADIUS, SPAWN_INSET, VILLAGE_FIRE, type Interactive, type PathDef, type DwellingDef, type FenceDef, type PlaceLayout } from './layout'
+import { buildLayout, chiefStandingSpot, interactiveCircleRadius, doorCandidates, fencePanels, isOnLane, PLACE_RADIUS, SPAWN_INSET, VILLAGE_FIRE, type Interactive, type PathDef, type DwellingDef, type FenceDef, type PlaceLayout } from './layout'
 import {
   COOK_SHELTER,
   EYE_HEIGHT,
@@ -613,6 +615,7 @@ function Chief({
   style: RegionPlaceStyle
   dress: ColdDress | null
 }) {
+  const groundHeight = usePlaceGround()
   const camera = useThree((state) => state.camera)
   const t = useStrings()
   const group = useRef<THREE.Group>(null)
@@ -679,7 +682,7 @@ function Chief({
     else setChiefStanding(px, pz)
     const g = group.current
     if (g) {
-      g.position.set(px, 0, pz)
+      g.position.set(px, groundHeight(px, pz), pz)
       g.rotation.y = chiefWalkFacing(step.walk, door, beside, standingFacing)
     }
     // Dev-only hook for the headless verification (CLAUDE.md §7.2): where he is
@@ -724,7 +727,7 @@ function Chief({
     // below, and the layer would print the same word twice over one man.
     // Named, so a check can read where the picture really puts him — and so the
     // §13.4 speech dev hook finds his anchor by the speaker id he speaks under.
-    <group ref={group} name={CHIEF_SPEAKER_ID} position={[x, 0, z]} rotation={[0, standingFacing, 0]}>
+    <group ref={group} name={CHIEF_SPEAKER_ID} position={[x, groundHeight(x, z), z]} rotation={[0, standingFacing, 0]}>
       {/* Robe */}
       <mesh position={[0, 0.62, 0]} castShadow>
         <coneGeometry args={[CHIEF_BODY_RADIUS, 1.25, TESSELLATION.figureBody]} />
@@ -1303,9 +1306,10 @@ function FirePit({
  * which reads consistent rather than wrong.
  */
 function PlayerShadowProxy({ player }: { player: MutableRefObject<{ x: number; z: number; yaw: number }> }) {
+  const groundHeight = usePlaceGround()
   const mesh = useRef<THREE.Mesh>(null)
   useFrame(() => {
-    mesh.current?.position.set(player.current.x, 0.85, player.current.z)
+    mesh.current?.position.set(player.current.x, groundHeight(player.current.x, player.current.z) + 0.85, player.current.z)
   })
   return (
     <mesh ref={mesh} castShadow>
@@ -1466,150 +1470,6 @@ function PlayRocks({ rocks }: { rocks: PlaceLayout['playRocks'] }) {
           <meshStandardMaterial vertexColors roughness={0.95} />
         </mesh>
       ))}
-    </>
-  )
-}
-
-/**
- * The village's ground work (work-order point 483): the patches the adults teach
- * the word for digging at — a store pit being sunk, a post hole beside the lane,
- * a patch of earth turned over. Small dressing drawn at the layout's own
- * positions, so a villager digs exactly where the excavation is (points
- * 129/378). A raised broken rim, sloping inner walls, shadowed bottom and one
- * joined spoil mass make each read as a HOLE from standing height; the adults
- * carry the tools themselves.
- *
- * No quality lever of its own: three patches of a few small meshes are the same
- * order as the rock scatter beside them, and they ride the place scene's shadow
- * settings like every other prop.
- */
-/** The brief shower from one completed tool stroke, thrown toward the heap. */
-function EarthThrow({ strike, radius }: { strike: number; radius: number }) {
-  const group = useRef<THREE.Group>(null)
-  const age = useRef(Number.POSITIVE_INFINITY)
-  const previous = useRef(strike)
-  useEffect(() => {
-    if (strike > previous.current) age.current = 0
-    previous.current = strike
-  }, [strike])
-  useFrame((_, rawDt) => {
-    const g = group.current
-    if (!g) return
-    age.current += Math.min(rawDt, 0.1)
-    g.visible = age.current < 0.72
-    if (!g.visible) return
-    for (let i = 0; i < g.children.length; i++) {
-      const t = age.current
-      const clod = g.children[i]
-      clod.position.set(
-        radius * 0.12 + t * (0.72 + i * 0.07),
-        0.12 + t * (1.2 + (i % 3) * 0.16) - t * t * 2.35,
-        (i - 2.5) * 0.075 + Math.sin(t * 7 + i) * 0.035,
-      )
-      clod.rotation.x += rawDt * (3 + i)
-      clod.rotation.z += rawDt * (2 + i * 0.4)
-    }
-  })
-  return (
-    <group ref={group} visible={false}>
-      {Array.from({ length: 6 }, (_, i) => (
-        <mesh key={i} scale={0.045 + (i % 2) * 0.012} castShadow>
-          <dodecahedronGeometry args={[1, 0]} />
-          <meshStandardMaterial color={i % 2 ? '#6b4929' : '#52351f'} roughness={1} />
-        </mesh>
-      ))}
-    </group>
-  )
-}
-
-function DigSites({
-  sites,
-  progress,
-}: {
-  sites: PlaceLayout['digSites']
-  progress: readonly DigSiteProgress[]
-}) {
-  if (sites.length === 0) return null
-  return (
-    <>
-      {sites.map((site, i) => {
-        const wide = site.kind === 'patch'
-        const r = wide ? DIG_SITE_RADIUS * 1.35 : DIG_SITE_RADIUS
-        const worked = progress[i]
-        const look = digSiteAppearance(worked)
-        return (
-          <group
-            name="dig-site"
-            userData={{ kind: site.kind, dug: worked?.dug ?? 0, strikes: worked?.strikes ?? 0 }}
-            key={i}
-            position={[site.x, 0, site.z]}
-            rotation={[0, site.x * 2.3 + site.z, 0]}
-            scale={[wide ? 1.18 : 1, 1, wide ? 0.86 : 1]}
-          >
-            {/* Broken ground under the raised rim keeps the ground plate from
-                reading through the excavation as an untouched flat circle. */}
-            <mesh position={[0, 0.018, 0]} receiveShadow>
-              <cylinderGeometry args={[r * 1.08, r * 1.12, 0.035, 15]} />
-              <meshStandardMaterial color="#62452a" roughness={1} />
-            </mesh>
-            {/* A real mouth, sloping inner walls, and the shadowed bottom. The
-                bottom tightens while `wallDepth` grows, so watched work reads
-                as a deepening hole from the standing camera. */}
-            <mesh position={[0, 0.058, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow receiveShadow>
-              <torusGeometry args={[r * 0.78, r * 0.14, 5, 15]} />
-              <meshStandardMaterial color="#775334" roughness={1} />
-            </mesh>
-            <mesh position={[0, 0.045 - look.wallDepth * 0.12, 0]} receiveShadow>
-              <cylinderGeometry args={[r * 0.82, r * look.bottomRadius, look.wallDepth, 16, 2, true]} />
-              <meshStandardMaterial color="#49301f" roughness={1} side={THREE.DoubleSide} />
-            </mesh>
-            <mesh position={[0, 0.026, 0]} receiveShadow>
-              <cylinderGeometry args={[r * look.bottomRadius, r * look.bottomRadius * 0.92, 0.025, 16]} />
-              <meshStandardMaterial color="#211914" roughness={1} />
-            </mesh>
-
-            {/* Irregular clods break the rim silhouette; they are individually
-                small but share its earth colours, rather than forming beads. */}
-            {Array.from({ length: 9 }, (_, k) => {
-              const a = (k / 9) * Math.PI * 2
-              const d = r * (0.9 + (k % 3) * 0.06)
-              return (
-                <mesh
-                  key={k}
-                  position={[Math.cos(a) * d, 0.075 + (k % 2) * 0.018, Math.sin(a) * d]}
-                  rotation={[k * 0.31, a, k * 0.17]}
-                  scale={[0.13 + (k % 2) * 0.035, 0.075, 0.11 + (k % 3) * 0.018]}
-                  castShadow
-                  receiveShadow
-                >
-                  <dodecahedronGeometry args={[1, 0]} />
-                  <meshStandardMaterial color={k % 2 ? '#765236' : '#5d4028'} roughness={1} />
-                </mesh>
-              )
-            })}
-
-            {/* One overlapping spoil mass, grown from durable worker-seconds. */}
-            <group
-              name="dig-spoil"
-              position={[r * 1.32, look.spoilHeight, 0]}
-              scale={[look.spoilScale, look.spoilScale, look.spoilScale]}
-            >
-              {[
-                [0, 0, 0, 0.48],
-                [-0.3, -0.01, 0.18, 0.34],
-                [0.25, 0.01, 0.2, 0.36],
-                [0.08, 0.08, -0.22, 0.31],
-              ].map(([x, y, z, s], k) => (
-                <mesh key={k} position={[x, y, z]} scale={[s * 1.35, s * 0.62, s]} castShadow receiveShadow>
-                  <dodecahedronGeometry args={[1, 1]} />
-                  <meshStandardMaterial color={k % 2 ? '#6b492d' : '#795438'} roughness={1} />
-                </mesh>
-              ))}
-            </group>
-            <EarthThrow strike={worked?.strikes ?? 0} radius={r} />
-          </group>
-        )
-      })}
     </>
   )
 }
@@ -2443,6 +2303,7 @@ function Donkey() {
  * slowly around (no mechanics).
  */
 function GizaAmbient({ anchors }: { anchors: Array<{ x: number; z: number; role: GizaAmbientRole }> }) {
+  const groundHeight = usePlaceGround()
   const refs = useRef<Array<THREE.Group | null>>([])
   const phases = useMemo(() => anchors.map((_, i) => i * 1.7 + 0.3), [anchors])
   useFrame(({ clock }) => {
@@ -2452,7 +2313,7 @@ function GizaAmbient({ anchors }: { anchors: Array<{ x: number; z: number; role:
       if (!g) return
       g.rotation.y = phases[i] + Math.sin(t * 0.3 + phases[i]) * 0.5
       const person = a.role === 'guide' || a.role === 'tourist' || a.role === 'cameleer' || a.role === 'donkeyboy'
-      g.position.y = person ? Math.max(0, Math.sin(t * 1.6 + phases[i])) * 0.03 : 0
+      g.position.y = groundHeight(a.x, a.z) + (person ? Math.max(0, Math.sin(t * 1.6 + phases[i])) * 0.03 : 0)
     })
   })
   const figureFor = (role: GizaAmbientRole) => {
@@ -2579,7 +2440,8 @@ export function PlaceScene() {
   const chiefOutside = useGame((s) => s.chiefOutside)
   const setPrompt = useUi((s) => s.setPrompt)
   const setDialog = useUi((s) => s.setDialog)
-  const [digProgress, setDigProgress] = useState<readonly DigSiteProgress[]>([])
+  const [digProgress, setDigProgress] = useState<readonly DigSiteProgress[]>(() =>
+    placeId ? useGame.getState().villageDigProgress[placeId] ?? [] : [])
 
   // The camera is shared across scenes: the travel view widens its near plane
   // in the debug zoom range (depth precision at continental distances), and a
@@ -2605,7 +2467,28 @@ export function PlaceScene() {
     void balanceVersion // read so the rebuild is the dependency it looks like
     return placeId ? buildLayout(placeId, seed) : null
   }, [placeId, seed, balanceVersion])
-  useEffect(() => setDigProgress([]), [placeId, seed])
+  const ground = useMemo<PlaceGround>(() => ({
+    bank: layout?.bank ?? null,
+    sites: layout?.digSites ?? [],
+    progress: placeId ? useGame.getState().villageDigProgress[placeId] ?? [] : [],
+  }), [layout, placeId])
+  const shownProgress = useRef(ground.progress)
+  useEffect(() => {
+    shownProgress.current = ground.progress
+    setDigProgress(ground.progress)
+  }, [ground])
+  const onDigProgress = useCallback((progress: readonly DigSiteProgress[]) => {
+    ground.progress = progress
+    // Feet read live growth every frame; durable state and meshes advance on
+    // strikes or completion, without waking the whole store during each stroke.
+    if (!progress.some((p, i) => p.strikes !== (shownProgress.current[i]?.strikes ?? 0)
+      || !!p.completed !== !!shownProgress.current[i]?.completed)) return
+    if (placeId && useGame.getState().seed === seed && useGame.getState().placeId === placeId) {
+      useGame.getState().recordVillageDig(placeId, progress)
+    }
+    shownProgress.current = progress
+    setDigProgress(progress)
+  }, [ground, placeId, seed])
   // The settlement edge on the ground (design.md §2.6, point 352/488): the band
   // is pointed at the boundary the leave check reads, sampled over the full
   // turn — it never carries a radius of its own.
@@ -3182,12 +3065,9 @@ export function PlaceScene() {
     // One fixed composition order (point 392): the bob stays a POSITION offset
     // on the yaw's right axis, the look a YXZ rotation — so pitching the view
     // never swings the head and the horizon never tilts with it.
-    // The ground he stands on: flat everywhere but on the river bank, where he
-    // walks DOWN the drawn shore into the shallows (work-order 584). Reading the
-    // footing from the same profile the shore is built from is what makes the
-    // wade visible — the head sinks toward the water instead of gliding out over
-    // it — and it is the only way the picture and the walk can agree.
-    const footing = bankGroundHeight(layout.bank, p.x, p.z)
+    // The same surface carries every figure: the bank slopes down into the
+    // shallows and worked earth rises smoothly above the village plateau.
+    const footing = placeGroundHeight(ground, p.x, p.z)
     const pose = placeCameraPose(p.x, p.z, EYE_HEIGHT + footing, p.yaw, p.pitch, w.roll, bob.dy, bob.dx + idle)
     camera.position.set(pose.position[0], pose.position[1], pose.position[2])
     camera.rotation.set(pose.rotation[0], pose.rotation[1], pose.rotation[2], 'YXZ')
@@ -3240,7 +3120,7 @@ export function PlaceScene() {
   const sky = sandy ? PORT_SKY : VILLAGE_SKY
 
   return (
-    <>
+    <PlaceGroundContext.Provider value={ground}>
       <color attach="background" args={[sky.horizon]} />
       <fog attach="fog" args={[sky.horizon, 42, 320]} />
       <SkyDome preset={sky} sunDirection={SUN_DIR} radius={400} />
@@ -3397,7 +3277,7 @@ export function PlaceScene() {
           pen={layout.pen}
           colliders={layout.colliders}
           radius={layout.radius}
-          onDigProgress={setDigProgress}
+          onDigProgress={onDigProgress}
         />
       )}
 
@@ -3408,6 +3288,6 @@ export function PlaceScene() {
       {/* Names the inhabitants, their animals and the usable objects while Ctrl
           is held (design.md §17.8). */}
       <ActorLabels />
-    </>
+    </PlaceGroundContext.Provider>
   )
 }

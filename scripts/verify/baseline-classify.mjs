@@ -17,6 +17,8 @@
 //                       suite in THIS tree first and take its failures
 //   --current-out <f>   a file holding the failing run's output, as an
 //                       alternative to naming each check with --failed
+//   --current-context <standalone|in-pass>  how supplied failures were measured;
+//                       omitted means unknown, never assumed comparable
 //   --current-checks <n>  how many checks the CURRENT run reached — the yardstick
 //                       for the died-early verdict (point 418). run-all hands it
 //                       over; it is measured here when the suite runs here.
@@ -49,7 +51,10 @@ import {
   failedChecks,
   foldBaselineRuns,
   formatBaselineReport,
+  parseCheckLines,
+  suiteLaneEnv,
 } from './baseline-classify-core.mjs'
+import { SECTION_ENV, listNonPredictive, listSections, narrowDiagnosis, sectionOfLine } from './sections.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, '..', '..')
@@ -71,7 +76,7 @@ const INFRA_PATHS = [
 const KEEP_BASELINES = 2
 
 export function parseWrapperArgs(argv) {
-  const out = { suite: null, ref: null, runs: 2, keep: false, strict: false, currentOut: null, reportFile: null, currentChecks: 0, failed: [] }
+  const out = { suite: null, ref: null, runs: 2, keep: false, strict: false, currentOut: null, currentContext: 'unknown', reportFile: null, currentChecks: 0, failed: [] }
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]
     if (a === '--ref') out.ref = argv[++i] ?? null
@@ -79,6 +84,10 @@ export function parseWrapperArgs(argv) {
     else if (a === '--failed') out.failed.push(argv[++i] ?? '')
     else if (a === '--report-file') out.reportFile = argv[++i] ?? null
     else if (a === '--current-out') out.currentOut = argv[++i] ?? null
+    else if (a === '--current-context') {
+      const context = argv[++i]
+      out.currentContext = ['standalone', 'in-pass'].includes(context) ? context : 'unknown'
+    }
     else if (a === '--current-checks') out.currentChecks = Math.max(0, Number(argv[++i]) || 0)
     else if (a === '--keep') out.keep = true
     else if (a === '--strict') out.strict = true
@@ -165,13 +174,20 @@ function logDir(mainRoot) {
   return dir
 }
 
-function runSuiteOnce({ suitePath, cwd, baseUrl, label, logPath }) {
+function runSuiteOnce({ suitePath, cwd, baseUrl, label, logPath, baselineLane, onlySection = '' }) {
   console.log(`# ${label}`)
   const res = spawnSync(process.execPath, [suitePath], {
     windowsHide: true,
     cwd,
     encoding: 'utf8',
-    env: baseUrl ? { ...process.env, BASE_URL: baseUrl } : process.env,
+    // THIS FUNCTION RUNS BOTH TREES — the first call below measures what is red
+    // on the CURRENT tree — so the lane is a PARAMETER, never a constant here.
+    // What the marker means, and why it is written rather than inherited, is at
+    // suiteLaneEnv in baseline-classify-core.mjs.
+    // ONE BLOCK OF THE SUITE where the classification needs no more (point
+    // 1126): the question is whether the checks that are red NOW were red on the
+    // baseline, and only the blocks they sit in can answer it.
+    env: suiteLaneEnv({ baselineLane, baseUrl, env: onlySection ? { ...process.env, [SECTION_ENV]: onlySection } : process.env }),
     timeout: SUITE_TIMEOUT_MS,
     killSignal: 'SIGKILL',
   })
@@ -232,13 +248,22 @@ async function main() {
   // What is red NOW: handed in by run-all (its captured output or the names), or
   // measured here by running the suite in THIS tree.
   let currentFailed = opts.failed.map(checkFromName)
+  // runSuiteOnce is an isolated process. An inherited section filter narrows
+  // BOTH locally measured runs; supplied failures have no such guarantee.
+  const section = String(process.env.VERIFY_SECTION ?? '').trim()
+  let baselineContext = section ? `standalone section "${section}"` : 'standalone'
+  let currentContext = opts.currentContext
   // How far the CURRENT run got — the yardstick a died-early baseline is
   // measured against (point 418).
   let currentCheckCount = opts.currentChecks
+  // The current run's own OUTPUT, where there is one. Failures handed over as
+  // bare names (`--failed`) carry no result lines, and a yardstick counted from
+  // lines that do not exist would be a wrong one rather than a missing one.
+  let currentOutput = ''
   if (opts.currentOut && existsSync(opts.currentOut)) {
-    const text = readFileSync(opts.currentOut, 'utf8')
-    currentFailed = failedChecks(text)
-    currentCheckCount = allChecks(text).length
+    currentOutput = readFileSync(opts.currentOut, 'utf8')
+    currentFailed = failedChecks(currentOutput)
+    currentCheckCount = allChecks(currentOutput).length
   }
   if (currentFailed.length === 0) {
     let server
@@ -248,9 +273,12 @@ async function main() {
         suitePath: join(HERE, `${opts.suite}.mjs`),
         cwd: ROOT,
         baseUrl: url,
+        baselineLane: false,
         label: `running ${opts.suite} on the CURRENT tree to see what is red`,
         logPath: join(logDir(tree.mainRoot), `${opts.suite}-current.log`),
       })
+      currentContext = baselineContext
+      currentOutput = run.out
       currentFailed = run.failed
       currentCheckCount = run.checks.length
     } finally {
@@ -262,24 +290,78 @@ async function main() {
     process.exit(0)
   }
 
+  // THE BASELINE ANSWERS ONE QUESTION PER RED CHECK — was it already red there?
+  // — and only the block a red check sits in can answer it (point 1126).
+  // Measured 14.09.2026: two whole `polish` passes on the merge base cost ~56 min
+  // to re-ask a handful of checks the blocks answer in about three. The decision
+  // is pure and refuses itself wherever the narrow reading would not be the
+  // suite's (scripts/verify/sections.mjs). An INHERITED section filter already
+  // narrows both lanes, so there is nothing left to narrow.
+  let suiteSource = ''
+  try {
+    suiteSource = readFileSync(join(HERE, `${opts.suite}.mjs`), 'utf8')
+  } catch {
+    /* not a file suite — narrowDiagnosis then answers `whole` */
+  }
+  const narrow = section
+    ? { sections: [], whole: true, why: `VERIFY_SECTION already pins both lanes to "${section}"` }
+    : narrowDiagnosis({
+        failures: currentFailed,
+        declared: listSections(suiteSource),
+        nonPredictive: listNonPredictive(suiteSource),
+        suite: opts.suite,
+      })
+  // The passes are what they always were; each one is narrowed to the red blocks.
+  const passes = narrow.whole ? [''] : narrow.sections
+  if (narrow.whole) {
+    console.log(`# baseline runs the WHOLE suite — ${narrow.why}`)
+  } else {
+    console.log(`# baseline runs only the red block(s) ${narrow.sections.join(', ')} — the checks that are red now sit in them, and nothing else can answer for them`)
+    baselineContext = `standalone block(s) "${narrow.sections.join('", "')}"`
+    // THE DIED-EARLY YARDSTICK MUST MEASURE THE SAME THING (point 418). A
+    // narrowed baseline reaches the blocks' checks, not the suite's, so the
+    // count it is held against is the blocks' count on the CURRENT run — and
+    // when the failures were merely NAMED (`--failed`), there is no current
+    // output to count, so the yardstick is honestly unknown rather than wrong.
+    currentCheckCount = currentOutput
+      ? parseCheckLines(currentOutput).filter((c) => narrow.sections.includes(sectionOfLine(c.detail) ?? '')).length
+      : 0
+  }
+
   const outputs = []
   const logs = []
   let server
   try {
     const url = needsServer ? (server = await launchServer('npm run dev', 'baseline', tree.dir)).base : null
     for (let i = 1; i <= opts.runs; i++) {
-      const logPath = join(logDir(tree.mainRoot), `${opts.suite}-baseline-${baseline.sha.slice(0, 12)}-run${i}.log`)
-      logs.push(logPath)
-      const run = runSuiteOnce({
-        // The CURRENT check against the BASELINE app, so only the product
-        // differs — except for the pure-Node suites, which read their own
-        // tree and must therefore run the baseline's own copy.
-        suitePath: needsServer ? join(HERE, `${opts.suite}.mjs`) : join(tree.dir, 'scripts', 'verify', `${opts.suite}.mjs`),
-        cwd: needsServer ? ROOT : tree.dir,
-        baseUrl: url,
-        label: `baseline run ${i}/${opts.runs}`,
-        logPath,
-      })
+      const parts = []
+      for (const only of passes) {
+        const logPath = join(
+          logDir(tree.mainRoot),
+          `${opts.suite}-baseline-${baseline.sha.slice(0, 12)}-run${i}${only ? `-${only}` : ''}.log`,
+        )
+        logs.push(logPath)
+        parts.push(runSuiteOnce({
+          // The CURRENT check against the BASELINE app, so only the product
+          // differs — except for the pure-Node suites, which read their own
+          // tree and must therefore run the baseline's own copy.
+          suitePath: needsServer ? join(HERE, `${opts.suite}.mjs`) : join(tree.dir, 'scripts', 'verify', `${opts.suite}.mjs`),
+          cwd: needsServer ? ROOT : tree.dir,
+          baseUrl: url,
+          baselineLane: true,
+          label: `baseline run ${i}/${opts.runs}${only ? ` — block ${only}` : ''}`,
+          logPath,
+          onlySection: only,
+        }))
+      }
+      // One PASS of the baseline, however many spawns it took: the fold below
+      // compares run against run, so the blocks of one run are one result.
+      const run = {
+        out: parts.map((p) => p.out).join('\n'),
+        exitCode: parts.every((p) => p.exitCode === 0) ? 0 : (parts.find((p) => p.exitCode !== 0)?.exitCode ?? 1),
+        checks: parts.flatMap((p) => p.checks),
+        failed: parts.flatMap((p) => p.failed),
+      }
       outputs.push({ output: run.out, exitCode: run.exitCode })
       const death = baselineRunDeath({ ...run, currentCheckCount })
       if (death) {
@@ -311,6 +393,8 @@ async function main() {
     ref: `${baseline.sha.slice(0, 12)} (${baseline.ref})`,
     backend,
     classified,
+    currentContext,
+    baselineContext,
     suiteFileChanged,
     infraChanged,
     baselineRan: folded.ran,

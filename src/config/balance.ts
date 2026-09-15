@@ -836,7 +836,12 @@ export interface BalanceConfig {
     /** Seconds per spoken syllable — the constant pace of every utterance. */
     syllableSeconds: number
     /** Steepness of the hearing falloff; the level at the rim is 1/(1+falloff). */
-    hearingFalloff: number
+    talk: { reach: number; loudness: number; falloff: number }
+    call: { reach: number; loudness: number; falloff: number }
+    /** Visible consequence after the last syllable; calibratable seconds. */
+    consequenceSeconds: number
+    /** Stuck-situation backstop, measured against shipped work in tests. */
+    speechHoldSeconds: number
     /** How long the hypothesis stands over a speaker's head, for one atom. */
     labelSeconds: number
     /** Carrier pitch of the LOW syllable `ba`, in Hz (point 587). */
@@ -1538,7 +1543,12 @@ export const balance: BalanceConfig = {
     // quick enough that the chief's four-atom message stays short.
     syllableSeconds: 0.3,
     // Conversational reach: 73.5 % at 3 m, 50 % at 5 m, 20 % at the 10 m rim.
-    hearingFalloff: 4,
+    talk: { reach: 10, loudness: 1, falloff: 4 },
+    // Rock-to-stand is 22.03 m; Mandinka's roaming RIVER caller reaches 32.64 m
+    // in the shipped-layout replay. Keep the whole call audible (calibratable).
+    call: { reach: 34, loudness: 1.25, falloff: 4 },
+    consequenceSeconds: 2,
+    speechHoldSeconds: 240,
     // Long enough to read one reading and look back at the speaker, short
     // enough that the scene never carries standing text; a phrase adds one
     // pause per further atom (speechLabelSeconds).

@@ -805,3 +805,226 @@ on. The session appended the true state as its own paragraph rather than touchin
 sanctioned wording. Non-blocking under the infrastructure freeze: nobody is misdirected into
 an action by it, the card's own purpose (naming WHY the handover happens) is intact, and the
 fix is one sentence in a card generator, not a mechanism.
+
+## The beginner guide is missing the ceiling a green run cannot show (13.09.2026)
+
+The retrospective's newest lesson of the same evening (§3.270) has no counterpart in
+`docs/analysis_de/vibe-coding-anleitung.md`: four CI runs of one branch died as "cancelled"
+because the `fast` job's 15-minute limit was consumed while every signal read green — the
+last two passing runs, one of them on main, left about fifteen seconds of headroom, so the
+next point adding any test at all had to fail, whichever one it was. The failure word names
+neither cause nor repair, and no retry heals it.
+
+The guide's existing duration pitfall ("Die gemessene Dauer von damals tötet den gesunden
+Lauf von heute") is the other side of it: a stored expectation killing a healthy run. The
+missing one is a healthy run hiding that it has nearly spent its limit — generalisable to
+any reader with a job timeout, which is why it belongs in the guide and not only in the
+retrospective.
+
+Measured price, 13.09.2026: the bullet as drafted costs 9 lines and 106 words, and the
+guide's ceiling IS the guard's exact measured size and only ratchets down
+(`scripts/guide-brevity-core.test.mjs`, "sets both ceilings to the guard's exact measured
+size"). So the room must be CUT elsewhere first, the way design.md paid for its
+speech-floor section. Drafted, measured, reverted in 55b12d04e's successor commit rather
+than left half-applied; non-blocking, because the guide is prose nobody's build reads.
+
+## A unit test spends twenty seconds reading the live review history (14.09.2026)
+
+`scripts/mechanism-review-guard.test.mjs` has two cases that scan the REAL review
+history through `gatherMechanismReviewInputs`. Measured 14.09.2026 in isolation:
+23.34 s and 20.60 s. Point 1073's second author raised both to a 60 s per-case
+budget so the unit gate stays green, which is the right unblocking move and was
+accepted in review.
+
+The cost grows with the history, so the budget will be raised again. The test asks
+a question about the guard, not about the archive: a fixture history would answer
+it in milliseconds and would not drift. Non-blocking — noted so the next raise is
+recognised as the third one, not the first.
+
+## Der Saum-Test des Erdhaufens beweist die Saumschließung nicht (14.09.2026)
+
+`src/scenes/place/digSpoilGeometry.test.ts` prüft, dass die Vertex-Positionen des
+Polar-Netzes eindeutig sind. Das beweist die Eigenschaft nicht, die der Test tragen
+soll: ließe man die umlaufenden Dreiecke am Saum weg, blieben diese Zusicherung und
+die Normalen-Prüfungen grün. Belastbar wäre eine Kantenzählung — nur die Kanten des
+Außenrands haben ein inzidentes Dreieck, alle anderen zwei.
+
+Gefunden von GPT-6 Astra im cross-vendor Review von d9e60b3c0 (P3, Gesamturteil
+merge). Kein Produktdefekt: das Netz ist nachgerechnet korrekt, nur der Test hält
+weniger, als er verspricht. Nicht sofort behoben, weil der Zweig zu diesem Zeitpunkt
+unter einem laufenden Zwei-Backend-Bildlauf stand und eine Änderung ihn entwertet
+hätte.
+
+## Erledigt-Karten des Boards behaupten pauschal ausstehende Abschlussarbeiten (14.09.2026)
+
+Über die Erledigt-Sektion läuft die Schablone „dieser Punkt ist zusammengeführt und
+abgehakt; die Abschlussarbeiten stehen noch aus" — gezählt mindestens acht Karten.
+Für 1087 und 1113 nachgemessen: kein lokaler Zweig, kein Remote-Zweig, kein
+Worktree. Die Arbeiten sind vollständig erledigt, die Karte sagt das Gegenteil.
+
+Es ist Generator-Verhalten, keine einzelne vergessene Karte: von Hand editiert stünde
+der Satz beim nächsten Publish wieder da. Board-Struktur wird nicht eigenmächtig
+geändert (Dashboard-Regel), deshalb hier gesammelt statt umgesetzt. Nebenbefund:
+dieselbe Sektion enthält transliterierte Umlaute (etwa „Haeuser"), die der
+Umlaut-Audit dort nicht prüft — er greift nur auf Aktuell- und Warteschlangenkarten.
+
+## Lebendigkeit wird aus der Buchhaltung abgeleitet statt am Prozess gemessen (14.09.2026)
+
+Zwei Ausprägungen derselben Abkürzung an einem Vormittag, beide an der laufenden
+Zwei-Backend-LARGE für Punkt 1056 gemessen. Ausführlich steht der Fall als §3.272 in
+der Retrospektive; hier nur, was am Mechanismus zu tun bliebe.
+
+ERSTENS die Ernte-Anweisung. Die Warteschlangen-Karte erklärte den Lauf für verwaist
+und wies an, ihn neu aufzusetzen. Tot war nur sein Besitzer; der Lauf stand nach 43
+Minuten in den langen Suiten. Ein Neuaufsetzen hätte diese 43 Minuten weggeworfen.
+Wer einen Lauf für verwaist erklärt, muss getrennt messen und getrennt melden, ob
+sein BESITZER lebt und ob ER lebt — aus einem toten Besitzer folgt eine Adoption
+(`--adopt`), nie ein Neustart.
+
+ZWEITENS die In-Flight-Prüfung. Sie wies die Deklaration der Wartestellung mit
+`evidence-gone` und der Begründung „log silent for 28 min" ab, während der Lauf
+nachweislich rechnete: chrome-headless auf 63,3 % und 49,5 % CPU bei 17:50 bzw. 13:56
+CPU-Zeit, zwei frische Beweisbilder binnen fünf Minuten. Die `polish`-Suite schreibt
+ihre Logzeile erst am Suite-Ende und läuft im Median 55 Minuten — die Mtime des Logs
+ist in dieser Spanne per Konstruktion alt. Der Fortschrittsbeweis einer Bildsuite sind
+die geschriebenen FRAMES und die CPU-Zeit des Browsers, nicht die Logdatei.
+
+Nicht umgesetzt wegen des Infrastruktur-Freezes: Beide Fälle wurden erkannt und
+umgangen, keiner hat Spielarbeit dauerhaft blockiert. Die Umgehung für den zweiten
+ist eine Deklaration ohne `--log`, die auf der Worktree-Aktivität durchgeht.
+
+NEBENBEFUND aus demselben Vormittag: Jeder aufgezeichnete Befund verändert den
+Quellen-Fingerprint der Retrospektive und meldet sie damit als STALE. Der geforderte
+Refresh erzeugt dann eine Änderung, die nur aus Fingerprint und Zeitstempel besteht.
+Zweimal hintereinander gemessen. Ein Tretrad, kein Defekt — aber es kostet je einen
+Lauf und einen Commit.
+
+## Ein vom Nutzer erlassenes Closing kostet dreizehn einzelne Verzichtsbuchungen (14.09.2026)
+
+Beim `poc`-Tag vom 14.09.2026 hat der Nutzer den Closing-Durchlauf ausdrücklich
+erlassen („In diesem Fall ist kein Closing-Durchlauf notwendig"). `closing-guard`
+verweigerte das Tag bei 0/13 Schritten; sein einziger vorgesehener Weg ist, JEDEN
+der dreizehn Schritte einzeln mit der Verzichtserklärung als Evidenz zu buchen.
+Zusätzlich lehnt `regression-after-cleanup` eine wortgleiche Evidenz zu
+`large-regression` ab — der Verzicht braucht also zwei verschieden formulierte
+Texte für denselben Sachverhalt.
+
+Inhaltlich ist das richtig: der Verzicht bleibt als Text in der Checkliste stehen,
+statt als erfundene Grün-Meldung zu verschwinden. Es fehlt nur der eine Befehl
+dafür, etwa ein `--waive-all "<Zitat des Nutzers>"`, das die dreizehn Buchungen mit
+je eigener Formulierung setzt.
+
+Nicht umgesetzt wegen des Infrastruktur-Freezes: kein Spielerimpakt, keine
+Blockade — der Weg existiert und wurde gegangen, er ist nur umständlich.
+
+## Das Wasserpaar findet im ersten Anlauf nicht zusammen (14.09.2026)
+
+Der Abschnittslauf `polish --section=adult-errands` auf WebGL 2 färbte im ERSTEN
+Anlauf rot und im zweiten grün (SUSPECT, deckt damit nichts):
+
+    FAIL  a village adult is really filling his jar, clear of the others
+          — no carrier reached the fill phase in 180 s
+    ERR:  [ASSERT] adult-pair-never-met — water-back: villager 1 expired still
+          on his way to the walk word; the pair never assembled
+
+Dieselbe Zusicherung feuert auch in den Unit-Tests (`tagShuffle.test.ts`) als
+stderr-Zeile, dort gleich zweimal in der Grabvariante (`dig-first`, `dig-second`)
+und einmal als `way-out-missing` in mandinka-village — ohne den Test rot zu
+machen. Das ist genau die Deadlock-Klasse, die Punkt 1073 repariert hat; sie ist
+seltener geworden, aber nicht verschwunden.
+
+Gegenmessung derselben Stunde: der ganze Durchgang fuhr die Erwachsenenarbeit
+danach zweimal ohne diesen Roten — WebGPU 268/0/0 im ersten Anlauf, WebGL 2
+267/1/0 mit einem fremden, verbuchten Roten. Ein Punkt wird daraus deshalb NICHT:
+nicht reproduzierbar, kein Spielerimpakt gemessen, keine stehende Blockade.
+
+Wenn er wiederkommt, ist das hier die zweite Messung — dann gehört er in einen
+eigenen Punkt mit `node scripts/throttle-probe.mjs polish --section=adult-errands
+--backend webgl --runs 8` als erster Messung.
+
+## Der deckende Lauf stirbt mit seinem Arbeitsverzeichnis (15.09.2026)
+
+Die beiden deckenden `polish`-Läufe für Punkt 1127 liefen im Arbeitsverzeichnis
+des Punktes. Beim Landen räumt die Kette das Verzeichnis ab — und mit ihm das
+Protokoll (`local/verify-logs/`) und den Laufdatensatz (`.claude/render-verify-state.json`),
+die beide PRO Checkout liegen. Auf `main` steht danach ein Bildwächter, der von
+zwei gefahrenen Läufen nichts weiß, obwohl die Bilder selbst als
+`verification/*.png` im Repositorium committet sind.
+
+Ausweg war eine protokollierte Ausnahme (`render-verify-guard --defer`) mit den
+Messwerten im Text — also genau die Handschrift, die das Ladenbuch abschaffen
+sollte. Der billige Weg wäre, den Laufdatensatz beim Landen aus dem
+Arbeitsverzeichnis in den Haupt-Checkout zu übernehmen, bevor das Verzeichnis
+fällt; die Kette weiß an dieser Stelle beides.
+
+Nicht als Punkt eingereiht wegen des Infrastruktur-Freezes: kein Spielerimpakt,
+keine stehende Blockade — der Weg existiert und wurde gegangen. Kommt es
+wieder, gehört es zu Punkt 1123, der schon zwei Defekte derselben Familie trägt.
+
+## Der Bildschirm-Wächter verweigert jeden Zug, wenn die Sitzung im Arbeitsverzeichnis steht (15.09.2026)
+
+Der Stop-Wächter liest `.claude/dashboard-state.json` AUS DEM VERZEICHNIS, in dem
+er läuft. Ein Arbeitsverzeichnis eines Punktes hat eine eigene, praktisch leere
+Fassung dieser Datei — ohne `dashboardPath` und ohne Veröffentlichungs-Eintrag.
+Steht die Sitzung dort, findet er keine Registrierung und meldet "BATCH DASHBOARD
+NOT REGISTERED", obwohl Board, Fokus und Registrierung im Haupt-Checkout tadellos
+stehen und derselbe Wächter von dort grün ist.
+
+Gemessen am 15.09.2026: der Wächter hat vier Züge hintereinander verweigert.
+Aus dem Haupt-Checkout mit derselben Sitzungs-ID auf stdin war er still; aus dem
+Arbeitsverzeichnis blockierte er. Nachregistrieren HILFT DORT NICHT — `--synced`
+verweigert im Arbeitsverzeichnis mit "this board was never published", weil auch
+der Veröffentlichungs-Eintrag pro Checkout liegt.
+
+Die Reparatur ist, das Arbeitsverzeichnis der Sitzung im Haupt-Checkout zu
+lassen und Befehle für den Punkt-Checkout mit `git -C` oder in einer Subshell zu
+fahren, statt mit `cd` dorthin zu wandern. Das deckt sich mit der stehenden
+Notiz "Session cwd stays in main tree".
+
+Nicht als Punkt eingereiht wegen des Infrastruktur-Freezes: kein Spielerimpakt,
+und der Weg daran vorbei ist eine Verhaltensregel, keine Änderung. Kommt es
+wieder, wäre der billige Weg, den Marker aus dem gemeinsamen Git-Verzeichnis zu
+lesen statt aus dem laufenden Checkout — die Registrierung gilt ohnehin für die
+ganze Batch, nicht für einen Checkout.
+
+## Die Wartehilfe erklärt einen gesunden Bild-Lauf für hängend (15.09.2026)
+
+`run-wait.mjs --await` meldet "HUNG" und rät zum Abbruch, sobald ein Lauf das
+2,5-fache seiner ERWARTUNG überschreitet. Für `polish` ist diese Erwartung
+5m 41s aus der Median-Tabelle — derselbe Aufruf druckt zwei Zeilen darüber
+seine eigene Beobachtungsreihe: 9,9 bis 61,5 Minuten, Median 55,2, über sechs
+Läufe. Die Abbruchschwelle liegt damit bei 14 Minuten, also unterhalb der
+Hälfte dessen, was das Werkzeug selbst als typisch ausweist.
+
+Gemessen am 15.09.2026: der Alleinlauf der Bild-Suite wurde nach 18m 16s als
+hängend erfasst, während er alle drei Minuten ein Bild schrieb und der
+GPU-Prozess auf 68 % stand. Gefolgt wäre der Rat, einen gesunden Lauf
+abzuwürgen — und ein Abbruch deckt nichts, also hätte er den Lauf ein zweites
+Mal gekostet.
+
+Nicht als Punkt eingereiht wegen des Infrastruktur-Freezes: kein Spielerimpakt,
+und der Weg daran vorbei ist gemessenes Urteil statt Gehorsam. Der billige Weg
+wäre, die Schwelle an die BEOBACHTETE Bandbreite zu hängen statt an die
+Median-Tabelle, wo beide ohnehin nebeneinander gedruckt werden.
+
+Zum dritten Mal gemessen, 15.09.2026, 10:49, beim Deckungsbeweis des Punktes
+1126: derselbe Rat nach 29m 19s, während der Lauf zwei Minuten zuvor noch
+Bilder schrieb. Ich habe hier zunächst einen Arbeitsauftrag daraus gemacht und
+ihn wieder zurückgenommen — genau das meint §2 mit „Duplikate werden
+geschlossen, nicht neu mechanisiert". Die Zählung bleibt: dreimal gesehen,
+dreimal ohne Spielerimpakt, weiterhin kein Punkt.
+
+## Der batch-resume-Kopf nach /clear ist auf den Sitzungsbeginn eingefroren (15.09.2026)
+
+Gemessen 15.09.2026, 12:08–12:12: Die `SessionStart:clear`-Zeile meldete „402
+open point(s); the first in work-order order is 1126", obwohl Punkt 1126 seit
+11:42 abgehakt war. Ein direkter Aufruf von `scripts/batch-resume-hook.mjs` um
+12:12 antwortete korrekt mit 401 offenen Punkten und 1076 an der Spitze — der
+Kern liest die Arbeitsliste also richtig, die zugestellte Zeile stammt aus einer
+älteren Berechnung.
+
+Wirkung: ein frischer Worker nach `/clear` kann auf einen bereits gelandeten
+Punkt gezeigt werden und ihn erneut anfassen. Nicht als Punkt eingereiht wegen
+des Infrastruktur-Freezes: kein Spielerimpakt, und der erste Blick auf den
+Zweig- und Hakenstand fängt es ab. Der billige Weg wäre, die Zeile beim
+Zustellen zu berechnen statt beim Sitzungsstart.

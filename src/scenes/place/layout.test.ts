@@ -1,3 +1,5 @@
+import { digFurnitureFootprints } from './digSiteAppearance'
+import { digLocalToWorld, digStandingPlaces, spoilCentre, SPOIL_RADIUS_X } from './placeGround'
 // Pure layout invariants (design.md §2.6/§4.5, point 15): ports grow an
 // organic lane fabric whose buildings front the lanes with their door side,
 // villages follow their people's period-accurate organising principle, and
@@ -634,10 +636,28 @@ describe('the village water path (work-order 688)', () => {
 // hut or on a lane teaches nothing — the placement is checked like every other
 // errand target.
 describe('the ground work villagers dig at (work-order 483)', () => {
-  it.each(SEEDS)('seed %i: every village grows the three kinds, each on its own spot', (seed) => {
+  it.each([['bambara-village', 29], ['mandinka-village', 48]] as const)(
+    'keeps both purposes in a narrow anchored space: %s seed %i', (id, seed) => {
+    const layout = buildLayout(id, seed)
+    expect(layout.digSites).toHaveLength(2)
+    expect(layout.digSites.some((site) => site.kind === 'patch')).toBe(true)
+    for (const site of layout.digSites) {
+      expect(site.x * layout.bank!.nx + site.z * layout.bank!.nz).toBeLessThan(0)
+      const heap = spoilCentre(site)
+      expect(standingClear(layout.colliders, heap.x, heap.z, SPOIL_RADIUS_X)).toBe(true)
+      expect(digStandingPlaces(site, (x, z) => standingClear(layout.colliders, x, z, WALKER_RADIUS))).not.toBeNull()
+    }
+  })
+
+  it.each(SEEDS)('seed %i: every village has two distinct inland purposes, each on its own spot', (seed) => {
     for (const v of VILLAGES) {
       const layout = buildLayout(v.id, seed)
-      expect(layout.digSites.map((s) => s.kind).sort(), v.id).toEqual(['patch', 'pit', 'postHole'])
+      expect(layout.digSites, v.id).toHaveLength(2)
+      expect(layout.digSites.filter((s) => s.kind === 'patch'), v.id).toHaveLength(1)
+      expect(layout.digSites.some((s) => s.kind === 'pit' || s.kind === 'postHole'), v.id).toBe(true)
+      if (layout.bank) for (const site of layout.digSites) {
+        expect(site.x * layout.bank.nx + site.z * layout.bank.nz, v.id).toBeLessThan(0)
+      }
       for (let i = 0; i < layout.digSites.length; i++) {
         for (let j = i + 1; j < layout.digSites.length; j++) {
           const a = layout.digSites[i]
@@ -658,6 +678,14 @@ describe('the ground work villagers dig at (work-order 483)', () => {
         // Free ground against the FULL collider set (point 155), and reachable:
         // the dig site is a target a walker heads for like any errand point.
         expect(standingClear(layout.colliders, site.x, site.z, WALKER_RADIUS), where).toBe(true)
+        expect(digStandingPlaces(site, (x, z) => standingClear(layout.colliders, x, z, WALKER_RADIUS)), where).not.toBeNull()
+        const heap = spoilCentre(site)
+        expect(standingClear(layout.colliders, heap.x, heap.z, SPOIL_RADIUS_X), where).toBe(true)
+        for (const prop of digFurnitureFootprints(site.kind)) {
+          const p = digLocalToWorld(site, prop.x, prop.z)
+          expect(Math.hypot(p.x, p.z) + prop.radius, where).toBeLessThan(layout.radius)
+          expect(standingClear(layout.colliders, p.x, p.z, prop.radius), where).toBe(true)
+        }
         // No lane runs through it: the ground work never blocks the path net.
         for (const path of layout.paths) {
           expect(closestOnPolyline(path.points, site.x, site.z).dist, where).toBeGreaterThan(
@@ -712,7 +740,7 @@ describe('the ground work villagers dig at (work-order 483)', () => {
     }
   })
 
-  it('puts most of them where their own work belongs', () => {
+  it('puts each site where its own work belongs', () => {
     // The anchor is a first-pass rule with a documented fallback (a ksar cannot
     // always give one), so this pins that the rule is doing real work rather
     // than that it never yields.
@@ -742,7 +770,7 @@ describe('the ground work villagers dig at (work-order 483)', () => {
       }
     }
     expect(total).toBeGreaterThan(100)
-    expect(anchored / total).toBeGreaterThan(0.8)
+    expect(anchored).toBe(total)
   })
 
   it('gives ports none: the teaching is a village matter', () => {

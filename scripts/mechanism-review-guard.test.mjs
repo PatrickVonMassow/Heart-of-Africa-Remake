@@ -67,7 +67,9 @@ describe('the switched-off gate (point 1036)', () => {
     // that made a hand-run `--status` print "stands down" and exit 0.
     const read = gatherMechanismReviewInputs({ sessionId: '', report: true })
     expect(read.applicable).toBe(true)
-  })
+    // This scans the live review history: measured at 23.34 s even in isolation
+    // on 14.09.2026. Keep the read and assertions, with a per-case history budget.
+  }, 60_000)
 
   it('lets the report outlive a context-fence deferral, and only the report', () => {
     // The fence suspends ENFORCEMENT. With the block gone there is nothing left
@@ -197,7 +199,8 @@ describe('bootstrapBase', () => {
     expect(gathered.applicable).toBe(true)
     expect(Object.hasOwn(gathered, 'baselineMissing')).toBe(true)
     expect(gathered.baselineMissing).toBe(gathered.inputs.baselineMissing)
-  })
+    // The same live-history read as the report above: measured at 20.60 s.
+  }, 60_000)
 
   it('refuses an unreachable anchor and names the merge that makes recovery possible', () => {
     const head = 'headsha'
