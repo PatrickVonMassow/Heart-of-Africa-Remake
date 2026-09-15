@@ -194,6 +194,11 @@ export function taskOf(state: AdultWorkState, index: number): AdultTask | null {
 }
 
 export function workArrivalRadius(task: AdultTask): number {
+  // Both men must reach their own spot before waiting at the stand. Stopping
+  // a metre early can block the other man's route around its solid body.
+  if (task.standSpot && (task.phase === 'send' || task.phase === 'wait' || task.situation === 'water-back')) {
+    return balance.waterStandArrivalRadius
+  }
   return task.siteIndex !== null && (task.phase === 'site' || task.phase === 'dig')
     ? DIG_ARRIVE_RADIUS : WORK_ARRIVE_RADIUS
 }
@@ -396,7 +401,7 @@ function readyWord(state: AdultWorkState, view: AdultWorkView, t: AdultTask, i: 
   if (t.phase === 'send' && t.role === 'initiator' && t.arrived && t.say && mate && state.tasks[t.partner!]?.arrived) {
     return { id: t.situation, concept: 'RIVER', speaker: i, aim: { ...t.say.aim, y: 0.2 } }
   }
-  if (t.situation === 'water-back' && t.say && Math.hypot(me.x - t.say.at.x, me.z - t.say.at.z) <= WORK_ARRIVE_RADIUS) {
+  if (t.situation === 'water-back' && t.say && Math.hypot(me.x - t.say.at.x, me.z - t.say.at.z) <= workArrivalRadius(t)) {
     // Delivery is physical work, independent of permission to make the report.
     if (t.carry === 'fullJar') {
       t.carry = 'none'

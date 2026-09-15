@@ -41,3 +41,23 @@ reported build **31f2024**. The water path is older still: **1989617d4**
 (2026-09-02), “Send the water path to the river and lift the digging out of the
 square”. The relevant layout, movement and adult-work source is identical
 between the reported build and authoring base **72dc3907c**.
+
+## Correction and unit evidence
+
+The stand's send, wait and return phases use a shared, calibratable 0.3 m
+arrival tolerance. Movement, task arrival and physical delivery use that same
+tolerance. The bank's fill approach retains its existing tolerance.
+
+Arrival precision alone still stranded the sender at 10 Hz. Body avoidance
+was choosing a point-clear deflection whose segment crossed the waiting
+carrier, rejecting it only after selection, then choosing it again next frame.
+Each candidate now passes the continuous crossing check during selection, so
+the search can choose another clear bearing. A closed corridor still returns
+the origin; a clear alternate route produces an actual non-crossing step.
+
+The replay now completes the first order, empty-jar walk, fill, full-jar return
+and delivery at 10, 30, 60 and 107 Hz, before task expiry, with one delivered
+jar, both tasks released, no forced speech and no assertion errors. Focused
+tests also cover arrival at both stand spots and delivery while a child holds
+the report. The hold and expiry rules are unchanged. Browser rendering and
+full scene verification remain the reviewing session's responsibility.

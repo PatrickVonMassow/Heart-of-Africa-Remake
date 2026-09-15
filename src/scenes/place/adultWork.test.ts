@@ -210,6 +210,36 @@ describe('the adults keep to their four teaching situations', () => {
 })
 
 describe('RIVER is ordered and reported at the village water stand', () => {
+  it('assembles both adults at their stand spots before giving the order', () => {
+    const v = view(2)
+    const state = createAdultWork(2, CFG)
+    stepAdultWork(state, v, CFG.intervalSeconds, CFG, () => 0.5)
+    for (let i = 0; i < 2; i++) {
+      putAtGoal(state, v, i)
+      v.villagers[i].x += 0.6 // Inside the old 1.1 m radius, still in the approach lane.
+    }
+    expect(stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)).toBeNull()
+    expect(state.tasks.every((t) => t && !t.arrived)).toBe(true)
+    for (let i = 0; i < 2; i++) putAtGoal(state, v, i)
+    // The carrier's arrival is recorded after the sender's first turn.
+    stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
+    expect(stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)).toMatchObject({ id: 'water-out' })
+    expect(state.tasks[1]).toMatchObject({ phase: 'fetch', carry: 'emptyJar' })
+  })
+
+  it('finishes the return walk before delivering, even while the report is held', () => {
+    const { state, v } = threeWordsDue()
+    v.childrenHear = () => true
+    v.villagers[0].x += 0.6
+    stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
+    expect(state.standJars).toBe(0)
+    expect(taskOf(state, 0)).toMatchObject({ arrived: false, carry: 'fullJar', owes: true })
+    putAtGoal(state, v, 0)
+    stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
+    expect(state.standJars).toBe(1)
+    expect(taskOf(state, 0)).toMatchObject({ arrived: true, carry: 'none', owes: true, hushed: true })
+  })
+
   it('speaks both water words at the STAND, never at the water', () => {
     const { words } = run(view(6), 240)
     const river = words.filter((word) => word.concept === 'RIVER')

@@ -52,6 +52,8 @@ export interface BalanceConfig {
   /** How many filled jars the village water stand holds before a new delivery
    *  replaces the oldest (work-order 1087). */
   waterStandCapacity: number
+  /** Arrival tolerance at the separate working spots beside the water stand. */
+  waterStandArrivalRadius: number
   /** The settlement edge painted on the ground (design.md §2.6, point 352/488):
    *  where the swept, trodden ground gives way to open land. The band's PLACE is
    *  never configured — it sits at the boundary the leave check reads
@@ -910,6 +912,9 @@ export const balance: BalanceConfig = {
   // Calibratable: three standing jars. The fourth delivery replaces the oldest,
   // which is what lets the stand need no consumer.
   waterStandCapacity: 3,
+  // Calibratable: stop within 0.3 m of the assigned spot. The generic 1.1 m
+  // tolerance let a waiting carrier occupy the sender's approach lane.
+  waterStandArrivalRadius: 0.3,
   placeEdgeBand: {
     // Calibratable: ~8 m of give-way at a slightly softened 0.8 strength —
     // tuned by the operator in play on 27.08.2026: the wider, gentler ramp

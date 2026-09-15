@@ -37,7 +37,7 @@ function sceneMovement() {
   return (env: object) => move(...Object.values(deps), env)
 }
 
-it.each([0.1, 1 / 60])('completes the first reported village water errand before expiry (dt=%s)', (dt) => {
+it.each([0.1, 1 / 30, 1 / 60, 1 / 107])('completes the first reported village water errand before expiry (dt=%s)', (dt) => {
   const move = sceneMovement()
   // Both September 15 reports: Bambara Village, production build 31f2024.
   // The dumps contain layout/behavior inputs, but no live adult task snapshot.

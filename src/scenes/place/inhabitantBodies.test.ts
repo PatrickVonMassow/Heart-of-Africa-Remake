@@ -490,6 +490,24 @@ describe('inhabitant bodies', () => {
       expect(r.z).toBe(0)
     })
 
+    it('tries another bearing when a point-clear deflection crosses a body', () => {
+      const set = createInhabitantSet()
+      const [self] = claimBodies(set, 1)
+      const [ahead] = claimBodies(set, 1, { x: -0.1, z: 2.05 })
+      const [beside] = claimBodies(set, 1, { x: 0.26, z: 0.97, scale: KID_SCALE })
+      // Same two bodies as the closed corridor above, but there is room to go
+      // around them. Rejecting only after choosing +15 degrees stranded the
+      // walker even though another swept, collision-free step was available.
+      const step = stepRoundBodies(set, self, 0, 0, 0, 2, SEP, () => false)
+      const length = Math.hypot(step.x, step.z)
+      expect(length).toBeCloseTo(2)
+      for (const body of [ahead, beside]) {
+        const t = Math.max(0, Math.min(1, (body.x * step.x + body.z * step.z) / (length * length)))
+        expect(Math.hypot(step.x * t - body.x, step.z * t - body.z))
+          .toBeGreaterThanOrEqual(SEP.bodyRadius * (self.scale + body.scale))
+      }
+    })
+
     it('never counts an excluded body or an inactive one', () => {
       const set = createInhabitantSet()
       const [self, partner, sleeper] = claimBodies(set, 3, { x: 0, z: 0 })
