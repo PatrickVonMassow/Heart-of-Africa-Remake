@@ -604,6 +604,12 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „‚Grün' zählt nur, wenn die schmale Stufe **jünger als der letzte Merge** ist und
   **dasselbe misst** wie die große — sonst sagt sie selbst, dass ihr Grün nichts vorhersagt."
 
+- **Ein Rot startet den ganzen Beweis neu, statt seine eigene Sprosse zu wiederholen.** Die
+  fehlgeschlagene Prüfung nennt den Block, der sie allein wiederholt — an einem Tag kostete das
+  599 Minuten Maschinenzeit für einen einzigen Punkt.
+  → *Prompt:* „Repariere auf der **gedruckten Sprosse**; der volle Beweis läuft genau **einmal**,
+  auf dem Stand, der gemergt wird. Und lass die Regel **verweigern** statt erinnern."
+
 - **Du nimmst einen geteilten Eintrag heraus — was darauf stand, bleibt stehen.** Wer eine
   Ausnahmeliste oder einen Kulissenwert löscht, sieht den Eintrag, nicht seine Nutzer. Das Rot
   kommt dann im Tor — und steht das Tor hinter dem Merge, steht auch dein Hauptzweig halb
@@ -667,4 +673,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: efc78466bc5bf28726421b6139e9eb41262e52ff7e1d35838a074e5c981c98c6 -->
+<!-- GUIDE-FINGERPRINT: 1ee0421a42c5c2eae162bd9ccb63f059eb7d9a84a4f28a26e7ccfed8efa9161e -->
