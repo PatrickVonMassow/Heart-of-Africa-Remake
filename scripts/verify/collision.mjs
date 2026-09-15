@@ -147,26 +147,28 @@ async function pushUntilClear(maxMs = 15000) {
 /** Hold forward until the traveller's feet are within `reach` of a fixed point and
  *  STAY there while he keeps walking into it (or a generous window elapses).
  *
- *  Two measurements shape this. How far a held key walks is decided by the RENDER
+ *  Three measurements shape this. How far a held key walks is decided by the RENDER
  *  cadence, not by the number of presses — this settlement under headless WebGPU
  *  draws about a third of a frame per second (measured 15.09.2026: three frames in
  *  nine seconds), so a fixed count of 40 ms presses buys one or two steps and the
- *  walk stalls in open ground, well short of its target. And arriving at a distance
- *  is not the same as being STOPPED at it: a traveller walking through a body that
- *  does not resolve passes through `reach` on his way past. So the key stays held
- *  for `settleFrames` further RESOLVED frames, which without the body would carry
- *  him a quarter of a metre per frame beyond it and redden the caller's assert.
- *
- *  The frames counted are the scene's OWN resolves (`window.__placeResolves`), never
- *  the browser's animation callbacks: those keep ticking while a stalled scene moves
+ *  walk stalls in open ground, well short of its target. Arriving at a distance is
+ *  not the same as being STOPPED at it: a traveller walking through a body that does
+ *  not resolve passes through `reach` on his way past, so the key stays held for
+ *  `settleFrames` further RESOLVED frames, which without the body would carry him a
+ *  quarter of a metre per frame beyond it and redden the caller's assert. And the
+ *  frames counted are the scene's OWN resolves (`window.__placeResolves`), never the
+ *  browser's animation callbacks: those keep ticking while a stalled scene moves
  *  nobody, and three of them against an unchanged position would prove nothing.
+ *
+ *  Every wait here is a wait for that counter to advance — the event this loop is
+ *  actually after — never for the wall clock.
  *
  *  Returns what happened, because a window that simply elapsed is not a stop: the
  *  caller has to be able to fail on `settled === false` rather than measure a
  *  position that was never held against anything. */
-async function pushUntilWithin(target, reach, { settleFrames = 3, maxMs = 40000 } = {}) {
+async function pushUntilWithin(target, reach, { settleFrames = 3, maxMs = 60000 } = {}) {
   const t0 = Date.now()
-  await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW' })))
+  const hold = () => page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW' })))
   const read = () =>
     page.evaluate(
       ({ x, z }) => ({
@@ -175,12 +177,23 @@ async function pushUntilWithin(target, reach, { settleFrames = 3, maxMs = 40000 
       }),
       target,
     )
-  let arrivedAt = null
+  /** Block until the scene has resolved the traveller's movement once more. */
+  const resolvedAgain = async (after, timeout) => {
+    if (timeout <= 0) return false
+    try {
+      await page.waitForFunction((n) => (window.__placeResolves ?? 0) > n, after, { timeout })
+      return true
+    } catch {
+      return false
+    }
+  }
+  await hold()
   let last = await read()
+  let arrivedAt = null
   let settled = false
   while (Date.now() - t0 < maxMs) {
-    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW' })))
-    await page.waitForTimeout(80)
+    await hold() // re-affirm the held key, exactly as pushUntilClear does
+    if (!(await resolvedAgain(last.resolves, maxMs - (Date.now() - t0)))) break
     last = await read()
     if (last.distance > reach) {
       arrivedAt = null
@@ -193,7 +206,9 @@ async function pushUntilWithin(target, reach, { settleFrames = 3, maxMs = 40000 
     }
   }
   await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyW' })))
-  await page.waitForTimeout(120)
+  // The release is taken up on the next resolved frame — that frame, not a pause.
+  await resolvedAgain(last.resolves, 10000)
+  last = await read()
   return {
     settled,
     heldFrames: arrivedAt === null ? 0 : last.resolves - arrivedAt,
