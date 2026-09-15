@@ -262,6 +262,14 @@ function runVerify() {
   const logPath = logPathFor(forward, own)
   mkdirSync(dirname(logPath), { recursive: true })
   const log = createWriteStream(logPath, { flags: 'a' })
+  // A LOG THAT FAILS MUST NOT KILL THE RUN (Astra review round 7). `write`
+  // queues, so a filesystem error surfaces on the stream and, unhandled, throws
+  // out of the process — ending a picture run that may be an hour in. It is
+  // reported on stderr, where it cannot be mistaken for run output, and the run
+  // goes on: losing the log is bad, losing the run is what this point is about.
+  log.on('error', (err) => {
+    process.stderr.write(`# the run log ${logPath} could not be written: ${err?.message ?? err}\n`)
+  })
   const shown = forDisplay(logPath)
   const command = `verify ${forward.join(' ') || '(default: LARGE)'}`
 
@@ -365,13 +373,27 @@ function runVerify() {
     // there, a healthy silent picture suite would have gone a whole lease without
     // a sign of life and been called hung — the exact defect this point removes.
     // A `#` line is what every log parser here ignores and every reader can see.
+    //
+    // ONLY AT A LINE BOUNDARY (Astra review round 7). `consume` writes the
+    // child's raw chunks, which end mid-line as often as not; a line pushed in
+    // between would turn `FA` + `IL  polish …` into `FA# still running…` and cost
+    // the saved log the very result line it exists to carry. `pending` is
+    // empty exactly when the log is between lines, so the fallback waits for one.
+    if (pending !== '') return false
+    // AND IT IS NEVER CLAIMED AS PROVEN (Astra review round 7). `log.write`
+    // queues: an ENOSPC arrives later and out of this frame's reach, so a `true`
+    // here would consume the frame observation that paid for it. The throttle
+    // still advances — a line a minute is the rate, failing or not — but the
+    // answer is false, and what speaks for the run is the log's own mtime IF the
+    // write in fact landed.
+    recordedProgressAt = at
     try {
-      log.write(`# still running — progress mark ${forDisplay(progressMarkPathFor(logPath))} is not writable, so this line is the run's sign of life\n`)
-      recordedProgressAt = at
-      return true
+      log.write(`# still running — the progress mark ${forDisplay(progressMarkPathFor(logPath))} is not writable, so this line is the run's sign of life\n`)
     } catch {
-      return false
+      /* a log that cannot take a line says nothing; the stream's own error
+         handler below reports it, and this run has no third place to speak */
     }
+    return false
   }
   markProgress(started)
 
