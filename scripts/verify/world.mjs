@@ -377,14 +377,14 @@ if (section('communication-errand')) {
         const s = window.__game.getState()
         return geo.worldToLatLon(s.pos.x, s.pos.z)
       })
-    // THE CURRENT SWEEPS HIM WHILE HE WAITS. `driftCurrent` moves the idle
-    // traveller downstream every frame (design.md §11), and the Bandiagara
-    // talus lies in that drift: measured 15.09.2026, three idle seconds carried
-    // him 0.14° — half the 0.30° reach — and a slow first click let him leave
-    // it altogether. A keypress used to beat the drift; a click, which waits
-    // for the button to be actionable, does not. So the act stands him where it
-    // is about to be JUDGED as its last step before pressing, and the reading
-    // pair below proves he was still there.
+    // HE DOES NOT STAY WHERE HE IS PUT. Measured 15.09.2026: after the jump had
+    // landed him exactly on the talus, three idle seconds carried him 0.14° of
+    // the 0.30° reach, and a first click — which waits for the button to be
+    // actionable where a keypress does not — carried him out of reach
+    // altogether, red in two of six first attempts. `driftCurrent` (design.md
+    // §11) is the suspect and point 1133 owns naming it; what matters here is
+    // that the act stands him where it is about to be JUDGED as its last step
+    // before pressing, and that the reading pair below proves he was there.
     const clickForm = async (standAt) => {
       await page.evaluate(([la, lo]) => {
         window.__game.getState().debugJumpTo(la, lo)
