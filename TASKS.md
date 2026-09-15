@@ -92,6 +92,15 @@ put it is the mistake this line exists to stop.
   decisions already standing on the board ("Ein gestautes Wort darf seine Aufgabe nicht
   überleben"), so check whether a hold or a task expiry swallows the errand before blaming the
   dispatcher.
+  TWO MEASUREMENTS ALREADY ON RECORD point at this exact spot and belong in the first reading.
+  `docs/backlog.md` "Das Wasserpaar findet im ersten Anlauf nicht zusammen" (14.09.2026): the
+  WebGL 2 run of `polish --section=adult-errands` was red on its first attempt with "no carrier
+  reached the fill phase in 180 s" and "[ASSERT] adult-pair-never-met — water-back: villager 1
+  expired still on his way to the walk word; the pair never assembled" — that is the user's
+  picture exactly, and an EXPIRY, which is why the hold/expiry check above comes before the
+  dispatcher. `docs/backlog.md` "Wasserholen der Erwachsenen ist ein Kreislauf ohne Ziel"
+  (07.09.2026) holds the second half: the full jar is cast out of nothing and `water-out` ends at
+  the water without ever returning full.
   ALSO ANSWER HIS QUESTION in the closing report — was the water place there before? — from the
   history of the settlement layout, not from memory.
   Criticality: medium — the village reads as inhabited only while its people do their work, and
