@@ -107,6 +107,25 @@ put it is the mistake this line exists to stop.
   §7.1 criterion 15 (lively settlements) is measured on exactly this.
   Bundle: Dorfleben.
 
+- [ ] 1133. A commissioned authoring run dies with the session that started it, and takes
+  its uncommitted work with it.
+  MEASURED 15.09.2026: the first `scripts/author-astra.mjs --point 1131` was started at 19:08
+  from a Bash tool shell without `setsid` (parent PID 3147048, piped through `tee`). Within
+  eight minutes parent and child were both gone; `local/1131-astra-author.log` ends at
+  "pushed 384ec4c while the run continues" — no closing line, no verdict, no commit. The
+  entire work product sat UNCOMMITTED in the worktree: a finished reproduction harness that
+  drives the reported village through the real movement loop. It was rescued by hand as
+  72dc3907c and the run restarted behind `setsid`; nothing but that hand rescue stood between
+  the work and the bin.
+  THE FIX IS A DELETION, not a new mechanism: `author-astra.mjs` re-executes itself detached
+  (setsid, own session, output to its log) when it is not already a session leader, so no
+  caller has to remember it and no caller can get it wrong. The caller keeps the same command
+  and the same log path. Check what the script already does about its own process group
+  before adding anything — this point must not grow a supervisor, a ledger field or a guard.
+  Criticality: high — it is not the point's own work that is lost but a commissioned agent's,
+  and the loss is silent: the log's last line claims the run continues.
+  Bundle: Session- & Repo-Hygiene.
+
 - [ ] 1082. A child climbing the village boulder becomes something the player actually
   sees (user 09.09.2026, 05:04 — the same report twice).
   Point 1080 was filed on 08.09.2026 because the user never saw the climb; it landed in the
