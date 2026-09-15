@@ -441,3 +441,54 @@ full proof runs exactly once on the exact merge candidate, and this README says 
    the ONE-backend sum of §1, never a whole `npm test`.
 3. The ladder in the delegation brief names what each rung costs, so "climb it;
    do not start at the top" has a number behind it.
+
+## 8. 14 September 2026: what a RED cost, and what was done about it (point 1126)
+
+§7 priced the runs. This section prices the **repetitions**, which is where the
+day went. Measured from `local/verify-logs/*.run.json` in every worktree and from
+`.claude/render-verify-state.json`: on 14.09.2026 the repository spent **599
+minutes of verification wall clock in 28 runs**, practically all of it on ONE
+point (1056).
+
+| Two-backend LARGE run for point 1056 | Started | Outcome |
+| --- | ---: | --- |
+| 1 | 09:21 | aborted after 4 min |
+| 2 | 09:26 | aborted after 9 min |
+| 3 | 09:41 | 159 min, exit 1 |
+| 4 | 14:02 | 208 min, exit 1 |
+| 5 | 17:50 | still in backend 1 of 2 at 133 min |
+
+**The breadth of the tier is not the cost.** All fifteen NON-covering suites of
+the tier together cost ~16 min per backend. What cost the day is one suite run
+repeatedly: inside run 5, `polish` runs FOUR times — first pass, flake retry,
+two baseline passes on the merge base — at ~28 min each.
+
+**And the rule against it already existed.** `VERIFICATION_LADDER` in
+`scripts/point-brief-core.mjs` says "THE FULL PROOF RUNS EXACTLY ONCE, ON THE
+EXACT MERGE CANDIDATE". It was broken four times in one day, because nothing
+refused it: the ladder aged its rungs by edits, and after a red where nothing was
+edited it answered FREE.
+
+Four things changed, and none of them removes a check:
+
+1. **A red never restarts the full run.** The ladder refuses a whole pass while
+   the last whole run of a suite is red with blocks that were never re-run green,
+   and prints those `--section` commands (`unrepairedReds`,
+   `scripts/verify/ladder-core.mjs`). Measured saving on 14.09.2026 alone: about
+   eight hours.
+2. **The flake retry and the baseline classification ask on the block.** Three
+   `--section` runs (~9 min) in place of three suite passes (~84). The narrowing
+   is DIAGNOSIS ONLY and refuses itself wherever the narrow reading would not be
+   the suite's (`narrowDiagnosis`, `scripts/verify/sections.mjs`).
+3. **The regression may be shared across several finished branches**, which
+   `scripts/verify/README.md` already allowed word for word. What is never shared
+   is the two-backend PICTURE check per point.
+4. Nothing is deleted or softened: no suite is removed, no check is weakened, no
+   red is waved through as cosmetic, and the per-point picture check keeps both
+   backends.
+
+**NOT THE LEVER, so that nobody measures it again: parallelism.** The host has 16
+cores at load 1.38, but the expensive suites are the picture suites, the GPU is a
+serialised device (`scripts/verify/README.md`, "GPU 44 %"), and load alone
+already moves a suite's runtime by 19 % (§1). Only the cheap suites could run in
+parallel, and together they are 16 minutes.

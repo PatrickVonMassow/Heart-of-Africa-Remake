@@ -910,6 +910,13 @@ export const VERIFICATION_LADDER = [
   '  verifying afterwards cost ~30 turns of a block-loop on 24.07.2026, so the both-backend',
   '  PICTURE proof stays ON THE BRANCH, before the merge — a shared final regression over',
   '  several finished branches may replace the repeated REGRESSION, never that picture.',
+  '- A RED REPEATS ONLY ITS OWN RUNG (point 1126, user 14.09.2026). A failing check PRINTS the',
+  '  block that re-runs it, so repair happens THERE and the full proof still runs exactly once.',
+  '  Restarting the whole proof after a red cost 599 minutes of machine time on 14.09.2026 for',
+  '  one point. The ladder refuses it now: a whole pass whose last whole run went red is blocked',
+  '  until the blocks that run named are green again — `--no-ladder "<why>"` where the block',
+  '  genuinely cannot answer. The flake retry and the baseline classification ask that same',
+  '  question on those same blocks rather than on the suite.',
   '- A RED IS A RED. There is no "cosmetic" class that may be waved through: an iteration run',
   '  is not credited either way, so the distinction buys nothing and only opens a door.',
 ]
