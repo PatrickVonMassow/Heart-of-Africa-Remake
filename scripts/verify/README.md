@@ -647,6 +647,89 @@ CI free.
   running every section alone once and diffing its checks against the whole
   run's — that sweep is how `calf-jitter` and `elephant-trampling` were caught.
 
+### A red repeats its OWN rung, never the whole proof (point 1126)
+
+```
+npm test -- polish                       # refused while polish's last whole run is red
+npm test -- polish --section=town-plan   # the block that red named — the rung
+npm test -- polish                       # admitted once that block is green again
+```
+
+The rule above ages a rung by EDITS and merges. That leaves the case measured on
+14.09.2026 wide open: a whole pass goes red, nothing is edited, the ladder
+answers FREE, and the whole proof starts again. On that one day the repository
+spent **599 minutes of verification wall clock in 28 runs**, practically all of
+it on one point — five two-backend LARGE runs, two of which ran 159 and 208
+minutes to exit 1, while every red check had PRINTED the block that re-runs it
+in a median of 2.9.
+
+So the last WHOLE run of a suite has to have its red blocks re-run green before
+another whole pass may start (`unrepairedReds` in `ladder-core.mjs`, from the
+render-verify ledger's own `reds[].section`). The refusal prints those
+`--section` commands. **It fails open wherever it could not name one** — a
+crashed or non-terminal run, a red carrying no block (a console error, an
+unsectioned suite), a red already CHARGED to an open work-order point, which no
+green rung could ever clear — because a refusal an author cannot answer by
+working costs more than the run it saved. `--no-ladder "<why>"` waives it and
+records what it waived.
+
+### The diagnosis runs on the block, the PROOF stays whole (point 1126)
+
+Two mechanisms re-ask a red's one question — transient, or defect? — and both
+asked it by replaying the whole suite. Inside the last LARGE run of 14.09.2026
+`polish` ran FOUR times at ~28 min each: first pass, flake retry, two baseline
+passes on the merge base. The same question answered on the blocks costs about
+nine minutes instead of eighty-four.
+
+- **The flake retry** (point 200) spawns the blocks the red checks named, one
+  each, instead of the pass. It stays SUSPECT and covers no backend exactly as
+  the whole retry did.
+- **The baseline classification** (point 294) runs each of its passes on those
+  same blocks. Its died-early yardstick (point 418) is re-measured on the same
+  blocks, and answers "unknown" rather than wrong when the failures arrived as
+  bare `--failed` names with no output to count.
+
+`narrowDiagnosis` in `sections.mjs` decides it, and **refuses the narrowing
+wherever the narrow reading would not be the suite's**: a red that names no
+block, a check the suite declares NON-PREDICTIVE (point 1086), or a red spread
+over half the blocks, where paying the boot prologue that often costs more than
+the one pass. This narrows what is ASKED, never what is CREDITED — a `--section`
+run is PARTIAL, and the covering proof stays whole and unfiltered.
+
+### One REGRESSION for several finished branches — never one PICTURE (point 1126)
+
+The brief's ladder has allowed this for a long time (`VERIFICATION_LADDER` in
+`scripts/point-brief-core.mjs`): *"a shared final regression over several
+finished branches may replace the repeated REGRESSION, never that picture."*
+Folding point 1057 into 1056 on 07.09.2026 was the same instruction, given by
+hand. It is written down here so it is a procedure rather than a memory.
+
+**What may be shared.** Two or more branches that are FINISHED — implemented,
+unit-green, and each judged on its own picture — are merged into one tree, and
+the LARGE regression runs ONCE on that tree. The alternative is the same set of
+suites run once per branch for a delta the merge will combine anyway.
+
+**What is never shared.** The two-backend PICTURE check of each point, which
+stays ON ITS OWN BRANCH, before the merge. A picture is a judgement about what a
+change LOOKS like; a shared tree cannot say which change produced a frame.
+
+**How.**
+
+1. Each branch finishes its own work and its own both-backend picture check, and
+   reports the `git HEAD` it judged.
+2. Merge `main` into each branch, then merge the finished branches into one
+   integration tree — in practice the first branch, with the others merged into
+   it (`scripts/fold-point.mjs` for a point that is folded outright).
+3. Run the LARGE regression ONCE there, on the exact tree that will land, and
+   report that `git rev-parse HEAD`.
+4. Land the points from that tree. A red in the shared run is charged like any
+   other red — to the point that owns it, never to "the bundle".
+
+**When NOT to.** Where one branch's red would make the other's result
+unreadable — two branches editing the same suite, or the same subsystem — the
+shared run buys a cheaper answer to a question nobody can then attribute. Run
+them separately and say why.
+
 ## A spawn that never ran is not a rejection (points 573/606)
 
 Two rules, both from one defect. `scope.test.mjs` resolved its linter as
