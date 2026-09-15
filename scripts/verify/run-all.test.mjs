@@ -82,16 +82,24 @@ describe('run-all owned-red retry', () => {
     expect(runVerdict(result.saved[0], { openPoints: [603] }).status).toBe('accounted')
   })
 
+  // THE FIXTURE NAMES LIVE LEDGER ENTRIES, and that is the coupling to watch: a
+  // charge dies with its point, so retiring one silently turns a charged red here
+  // into an uncharged one, the suite is no longer accounted for, run-all retries,
+  // and this test reds on `attempts` — which is what it did on 13.09.2026 when
+  // point 1087's two entries left the ledger with the point. Pick reds whose
+  // owners are OPEN, and re-aim this fixture when you retire one of them.
+  // 642 owns both season readings through one alternation, which is what makes
+  // "once" measurable at all; 1102 owns the drums on the WebGL lane this runs on.
   it('names every owner once in numeric order when several defects share a suite', async () => {
     const out = [
       'FAIL  the drums were still speaking when the picture was taken — stopped',
-      'FAIL  and a clear line to him exists for the shutter — all 16 bearings blocked',
-      'FAIL  frame 1085-village-adult-fills-a-jar — subject is not in the rendered picture',
+      'FAIL  the dry settlement season reading settles before it is read (read after 60276 ms)',
+      'FAIL  the wet settlement season reading settles before it is read (read after 60104 ms)',
     ].join('\n')
-    const result = await run({ suite: 'polish', outputs: [out], tasks: '- [ ] 1102. drums\n- [ ] 1087. fill staging' })
+    const result = await run({ suite: 'polish', outputs: [out], tasks: '- [ ] 642. settle deadline\n- [ ] 1102. drums' })
     expect(result.attempts).toHaveLength(1)
-    expect(result.log).toContain('all reds charged to open points 1087, 1102; suite stays red')
-    expect(result.log).toContain('1 SUITE(S) FAILED — 1 suites run — reds charged to open points 1087, 1102')
+    expect(result.log).toContain('all reds charged to open points 642, 1102; suite stays red')
+    expect(result.log).toContain('1 SUITE(S) FAILED — 1 suites run — reds charged to open points 642, 1102')
   })
 
   it('does not describe a partial record as accounted-for coverage', async () => {
@@ -168,6 +176,17 @@ describe('run-all owned-red retry', () => {
 
 
 describe('LARGE automatically resolves red ownership in its own report', () => {
+  it('surfaces advisory observations without retrying, charging or classifying them as reds', async () => {
+    const advisory = 'NON-PREDICTIVE  jar — 0 with the full one  [NON-PREDICTIVE in full suite: observed fail; sampling differs]'
+    const result = await run({ large: true, suite: 'polish', outputs: [`PASS  another check\n${advisory}`] })
+    expect(result.status).toBe(0)
+    expect(result.attempts).toHaveLength(1)
+    expect(result.classifiedCalls).toEqual([])
+    expect(result.saved[0].reds).toEqual([])
+    expect(result.log).toContain(advisory)
+    expect(result.log).not.toContain('CANDIDATE REAL FAILURE')
+  })
+
   it('classifies and files a pre-existing red, releases that red, and keeps regression exit 1', async () => {
     const result = await run({ large: true })
     expect(result.classifiedCalls).toHaveLength(1)

@@ -45,6 +45,11 @@ describe('the message itself', () => {
 })
 
 describe('the drum plan says what the village speaks', () => {
+  it('keeps the original drum level when speech headroom is recalibrated', () => {
+    for (const strike of drumMessagePlan().strikes) expect(strike.peak).toBeCloseTo(0.18)
+    for (const strike of drumMessagePlan({ volume: 0.5 }).strikes) expect(strike.peak).toBeCloseTo(0.9)
+  })
+
   it('beats each concept as its spoken sequence, concept for concept', () => {
     const plan = drumMessagePlan()
     CHIEF_MESSAGE_CONCEPTS.forEach((concept, index) => {

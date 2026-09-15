@@ -351,18 +351,16 @@ if (section('communication-errand')) {
     await page.waitForFunction(() => window.__game.getState().mode === 'travel', null, { timeout: 20000 })
 
     // THE OTHER END OF THE DIRECTION. The words said where; the clay says what
-    // to do there. This is driven through the REAL use key on the REAL keyboard
-    // — the wiring from keydown to store is exactly what a unit test cannot
-    // reach, and the socket's coordinate is read from the world module the
-    // scene draws the escarpment from, never copied into this script.
+    // to do there. Click the REAL inventory button in the rendered scene.
+    // The socket's coordinate comes from the world module that draws the
+    // escarpment, never from a copy in this script.
     const talus = await page.evaluate(async () => {
       const forms = await import('/src/world/forms.ts')
       const socket = forms.FORM_SOCKETS.find((x) => x.id === 'bandiagara-talus')
       return { ...forms.socketPosition(socket), id: socket.id, form: socket.form }
     })
-    // A random event's dialog blocks the use key by design, so the roulette is
-    // switched off for this block and put back after it: what is under test is
-    // the key, not the odds.
+    // Keep random-event dialogs out of the inventory click sequence, restoring
+    // their setting after the block.
     const eventsWere = await page.evaluate(() => {
       const was = window.__balance.randomEventsEnabled
       window.__balance.randomEventsEnabled = false
@@ -371,9 +369,26 @@ if (section('communication-errand')) {
     // WHAT THE TOAST SAID IS RECORDED AS IT IS SET, not read back afterwards.
     // The HUD clears a toast by itself after a few seconds; on a loaded machine
     // the read can arrive after that expiry and report an empty toast for a
-    // press that answered perfectly well — a flake in the probe, not in the
+    // click that answered perfectly well — a flake in the probe, not in the
     // game. It cost this section a first-attempt red on 05.09.2026.
-    const pressUseKey = async () => {
+    const at = () =>
+      page.evaluate(async () => {
+        const geo = await import('/src/world/geo.ts')
+        const s = window.__game.getState()
+        return geo.worldToLatLon(s.pos.x, s.pos.z)
+      })
+    // HE DOES NOT STAY WHERE HE IS PUT. Measured 15.09.2026: after the jump had
+    // landed him exactly on the talus, three idle seconds carried him 0.14° of
+    // the 0.30° reach, and a first click — which waits for the button to be
+    // actionable where a keypress does not — carried him out of reach
+    // altogether, red in two of six first attempts. `driftCurrent` (design.md
+    // §11) is the suspect and point 1133 owns naming it; what matters here is
+    // that the act stands him where it is about to be JUDGED as its last step
+    // before pressing, and that the reading pair below proves he was there.
+    const clickForm = async (standAt) => {
+      await page.evaluate(([la, lo]) => {
+        window.__game.getState().debugJumpTo(la, lo)
+      }, [standAt.lat, standAt.lon])
       await page.evaluate(() => {
         const g = window.__game.getState()
         g.setToast(null)
@@ -385,19 +400,30 @@ if (section('communication-errand')) {
             if (s.toast && s.toast !== prev.toast) window.__toastLog.push(s.toast)
           })
       })
-      await page.keyboard.press('Space')
-      return page.evaluate(() => {
-        const s = window.__game.getState()
-        return {
-          said: window.__toastLog,
-          spent: s.spentSockets,
-          keys: s.journal.map((e) => e.text.key),
-          // Reported on a failure so a red names its own cause instead of
-          // sending the next reader back to the browser.
-          mode: s.mode,
-          dialog: window.__ui.getState().dialog ?? null,
-        }
-      })
+      // WHERE HE STOOD IS READ ON BOTH SIDES OF THE CLICK. The act resolves
+      // against the LIVE position, so a red that says "no fit" has two very
+      // different causes — he was never brought there, or the click itself
+      // moved him — and only the pair of readings tells them apart.
+      const before = await at()
+      await page.locator('[data-form="rock-relief"]').click()
+      const after = await at()
+      return page.evaluate(
+        ([b, a]) => {
+          const s = window.__game.getState()
+          return {
+            said: window.__toastLog,
+            spent: s.spentSockets,
+            keys: s.journal.map((e) => e.text.key),
+            // Reported on a failure so a red names its own cause instead of
+            // sending the next reader back to the browser.
+            mode: s.mode,
+            dialog: window.__ui.getState().dialog ?? null,
+            before: b,
+            after: a,
+          }
+        },
+        [before, after],
+      )
     }
     const strings = await page.evaluate(async () => {
       const i18n = await import('/src/i18n/index.ts')
@@ -406,24 +432,27 @@ if (section('communication-errand')) {
     })
 
     // A wrong place answers, and answers with a SENTENCE — the rule the player
-    // has to be able to carry to the next lock.
-    await jump(talus.lat + reachDeg * 4, talus.lon, 600)
-    const miss = await pressUseKey()
+    // has to be able to carry to the next lock. Four reaches off the foot is far
+    // enough that the drift cannot carry him back into the socket.
+    const offTalus = { lat: talus.lat + reachDeg * 4, lon: talus.lon }
+    const miss = await clickForm(offTalus)
     // The detail rides ON the FAIL line: the runner echoes only those lines, and
     // the `console errors:` list below never reaches a run log.
-    const pressDetail = (r) =>
+    const place = (ll) => `${ll.lat.toFixed(4)}/${ll.lon.toFixed(4)}`
+    const clickDetail = (r) =>
       `said ${JSON.stringify(r.said)}, spent ${JSON.stringify(r.spent)}, mode ${r.mode}, ` +
-      `dialog ${JSON.stringify(r.dialog)}`
+      `dialog ${JSON.stringify(r.dialog)}, stood at ${place(r.before)} and after the click ` +
+      `at ${place(r.after)} (the talus is at ${place(talus)})`
     const missOk = miss.said.includes(strings.noFit) && !miss.spent.includes('bandiagara-talus')
     console.log(
-      `${missOk ? 'PASS' : 'FAIL'}  the use key clear of the escarpment answers in the traveller's own voice` +
-        (missOk ? '' : ` — ${pressDetail(miss)}`),
+      `${missOk ? 'PASS' : 'FAIL'}  the inventory click clear of the escarpment answers in the traveller's own voice` +
+        (missOk ? '' : ` — ${clickDetail(miss)}`),
     )
     if (!missOk) {
-      errors.push(`a use ${(reachDeg * 4).toFixed(2)}° off the talus foot: ${pressDetail(miss)}`)
+      errors.push(`an inventory click ${(reachDeg * 4).toFixed(2)}° off the talus foot: ${clickDetail(miss)}`)
     }
 
-    // And at the foot of the wall it fits. The frame is taken BEFORE the press,
+    // And at the foot of the wall it fits. The frame is taken BEFORE the click,
     // so the picture shows the place the claim is about rather than the journal
     // that opens on top of it — and a step wider than the erratic's frame,
     // because the evidence here is the traveller standing at the FOOT of the
@@ -436,27 +465,27 @@ if (section('communication-errand')) {
       label: `the talus foot below the Bandiagara escarpment, where the ${strings.name} fits`,
     })
     await page.evaluate(() => window.__ui.getState().setTravelZoom(0.5))
-    const fitted = await pressUseKey()
+    const fitted = await clickForm(talus)
     const fittedOk =
       fitted.said.includes(strings.solved) &&
       fitted.spent.includes('bandiagara-talus') &&
       fitted.keys.includes('journal.mouldFitted')
     console.log(
-      `${fittedOk ? 'PASS' : 'FAIL'}  the use key at the talus foot fits the impression and solves the puzzle` +
-        (fittedOk ? '' : ` — ${pressDetail(fitted)}`),
+      `${fittedOk ? 'PASS' : 'FAIL'}  the inventory click at the talus foot fits the impression and solves the puzzle` +
+        (fittedOk ? '' : ` — ${clickDetail(fitted)}`),
     )
-    if (!fittedOk) errors.push(`the use key at the talus foot: ${pressDetail(fitted)}`)
+    if (!fittedOk) errors.push(`the inventory click at the talus foot: ${clickDetail(fitted)}`)
 
     // A spent socket answers like a wrong place, and writes no second page.
-    const again = await pressUseKey()
+    const again = await clickForm(talus)
     const againOk =
       again.said.includes(strings.noFit) &&
       again.keys.filter((k) => k === 'journal.mouldFitted').length === 1
     console.log(
-      `${againOk ? 'PASS' : 'FAIL'}  a second press at the spent socket answers like a wrong place` +
-        (againOk ? '' : ` — ${pressDetail(again)}`),
+      `${againOk ? 'PASS' : 'FAIL'}  a second click at the spent socket answers like a wrong place` +
+        (againOk ? '' : ` — ${clickDetail(again)}`),
     )
-    if (!againOk) errors.push(`a second press at the spent socket: ${pressDetail(again)}`)
+    if (!againOk) errors.push(`a second click at the spent socket: ${clickDetail(again)}`)
 
     await page.evaluate((was) => {
       window.__balance.randomEventsEnabled = was

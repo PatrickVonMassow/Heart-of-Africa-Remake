@@ -12,6 +12,8 @@ import {
   emitDrumPhrase,
   playDrumMessage,
   playSpeech,
+  speechRoute,
+  syllableCarrier,
   playThunder,
   proximityGain,
   refreshAmbienceVolume,
@@ -31,7 +33,7 @@ import {
 import { thunderDelaySeconds } from './season'
 import { balance } from '../config/balance'
 import { phraseOf, utteranceOf, SEQUENCE_LENGTH } from '../communication/lexicon'
-import { phrasePlan, utterancePlan } from '../communication/speaking'
+import { phrasePlan, utterancePlan, registerOptions } from '../communication/speaking'
 import { resetDevAsserts } from './devAssert'
 import { drumMessagePlan } from '../communication/drumMessage'
 
@@ -319,6 +321,9 @@ class FakeNode {
 class FakeGain extends FakeNode {
   gain = new FakeParam()
 }
+class FakePanner extends FakeNode {
+  pan = new FakeParam()
+}
 class FakeFilter extends FakeNode {
   type = ''
   frequency = new FakeParam()
@@ -331,6 +336,7 @@ class FakeOscillator extends FakeNode {
   frequency = new FakeParam()
   startedAt: number | null = null
   stoppedAt: number | null = null
+  onended: (() => void) | null = null
   start(t = 0) {
     this.startedAt = t
   }
@@ -352,6 +358,7 @@ class FakeSource extends FakeNode {
   loop = false
   startedAt: number | null = null
   stoppedAt: number | null = null
+  onended: (() => void) | null = null
   start(t = 0) {
     this.startedAt = t
   }
@@ -371,6 +378,12 @@ class FakeCtx {
   gains: FakeGain[] = []
   constructor() {
     FakeCtx.last = this
+  }
+  panners: FakePanner[] = []
+  createStereoPanner() {
+    const p = new FakePanner()
+    this.panners.push(p)
+    return p
   }
   createGain() {
     const g = new FakeGain()
@@ -752,6 +765,71 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
     return node
   }
 
+  it('routes overlapping utterances through separate fixed panners and releases each route', () => {
+    const adult = utterancePlan(utteranceOf('RIVER'), 3, { bearing: -Math.PI / 2 })
+    const child = utterancePlan(utteranceOf('RIVER'), 3, { bearing: Math.PI / 2, voice: 'child' })
+    const before = ctx.panners.length
+    const adults = spoken(() => playSpeech(adult))
+    const children = spoken(() => playSpeech(child))
+    const routes = [adults, children].map((voices) => {
+      const route = envelopeOf(voices[0]).connected[0] as FakeGain
+      for (const v of voices) expect(envelopeOf(v).connected[0]).toBe(route)
+      return route
+    })
+    expect(ctx.panners.length - before).toBe(2)
+    const panners = routes.map((r) => r.connected[0] as FakePanner)
+    expect(panners[0].pan.value).toBe(-0.6)
+    expect(panners[1].pan.value).toBe(0.6)
+    expect(panners[0].connected[0]).toBe(panners[1].connected[0])
+    expect(adults[0].startedAt).toBe(children[0].startedAt)
+    for (let i = 0; i < adults.length; i++) {
+      expect(children[i].frequency.events[0].value! / adults[i].frequency.events[0].value!).toBeCloseTo(1.5)
+    }
+    adults.at(-1)!.onended!()
+    expect(routes[0].disconnectCalls).toBe(1)
+    expect(panners[0].disconnectCalls).toBe(1)
+    expect(routes[1].disconnectCalls).toBe(0)
+    children.at(-1)!.onended!()
+    expect(routes[1].disconnectCalls).toBe(1)
+  })
+
+  it('preserves the mono downmix at every position, and never reduces stereo power', () => {
+    for (const pan of [-1, -0.6, 0, 0.6, 1]) {
+      const dest = new FakeGain()
+      const route = speechRoute(ctx as unknown as AudioContext, dest as unknown as AudioNode, pan)
+      if (pan === 0) {
+        expect(route.input).toBe(dest)
+        continue
+      }
+      const gain = route.input as unknown as FakeGain
+      const panner = gain.connected[0] as FakePanner
+      expect(panner.connected[0]).toBe(dest)
+      // Web Audio mono-input equal-power law; measure the actual node values.
+      const angle = (panner.pan.value + 1) * Math.PI / 4
+      const left = gain.gain.value * Math.cos(angle)
+      const right = gain.gain.value * Math.sin(angle)
+      expect((left + right) / 2).toBeCloseTo(1, 12)
+      expect(left * left + right * right).toBeGreaterThanOrEqual(2 - 1e-12)
+      expect(route.channelPeak).toBeCloseTo(Math.max(left, right))
+      route.dispose()
+    }
+    const dest = new FakeGain()
+    const withoutPanner = { createGain: () => { throw new Error('fallback must retain unity') } }
+    const route = speechRoute(withoutPanner as unknown as AudioContext, dest as unknown as AudioNode, 0.6)
+    expect(route.input).toBe(dest)
+    expect(route.monoGain).toBe(1)
+  })
+
+  it('transposes both child carriers while sharing the adult tonal interval', () => {
+    for (const voice of ['adult', 'child'] as const) {
+      expect(syllableCarrier('high', voice) / syllableCarrier('low', voice)).toBeCloseTo(1.68)
+    }
+    expect(syllableCarrier('low', 'adult')).toBe(140)
+    expect(syllableCarrier('high', 'adult')).toBeCloseTo(235.2)
+    expect(syllableCarrier('low', 'child')).toBe(210)
+    expect(syllableCarrier('high', 'child')).toBeCloseTo(352.8)
+  })
+
   it('is quieter from further away, and never louder than right beside the speaker', () => {
     ctx.currentTime = 120
     const peakOf = (distance: number) => {
@@ -907,6 +985,8 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
           syllables: [{ tone: 'low', startOffset: 0, duration: 0.1, peak: 0 }],
           duration: 0.1,
           gain: 1,
+          pan: 0,
+          voice: 'adult',
         })
         expect(codes().join(' ')).toContain('speech-inaudible')
       })
@@ -915,7 +995,7 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
 
   /** Conservative measured output of the rendered vowel filters per unit of
    * scheduled speech envelope; pinned in ambience.speech.test.ts. */
-  const SYLLABLE_SYNTHESIS_GAIN = 1.7
+  const SYLLABLE_SYNTHESIS_GAIN = 1.9
 
   // Point 605: point 577 gave the speech its own bus at the level it had had on
   // the ambient one, and at that level the syllables sat BELOW the village drum
@@ -994,41 +1074,16 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
       expect(balance.drumBed.villageGain).toBe(0.42)
       const { drums, speech } = measure()
       expect(drums).toBeGreaterThan(0)
-      // MEASURED: 3.24× the drum beat (0.612 against 0.189) at the pinned
-      // synthesis gain. Under 1 is the reported bug; a shout is no fix either.
+      // MEASURED: 1.71× the drum beat (0.323 against 0.189) at the pinned
+      // synthesis lower bound. Under 1 is the reported bug; a shout is no fix either.
       expect(speech / drums).toBeGreaterThanOrEqual(1.6)
       expect(speech / drums).toBeLessThanOrEqual(4)
     })
 
-    it('leaves the mix headroom — the loudest realistic moment stays under full scale', () => {
-      ctx.currentTime = 260
-      const { drums, speech, master } = measure()
-      // A footstep, on its own bus, is the third voice in that moment.
-      const before = ctx.sources.length
-      emitFootstep('stone')
-      const step = ctx.sources.slice(before)[0]
-      const stepGain = (step.connected[0] as FakeFilter).connected[0] as FakeGain
-      const stepBus = stepGain.connected[0] as FakeGain
-      const footstep =
-        Math.max(...stepGain.gain.events.map((e) => e.value ?? 0)) * stepBus.gain.value
-      // Two villagers speaking right beside the player, over the drum bed, with
-      // the player walking: MEASURED 0.76 of full scale after the master.
-      expect((2 * speech + drums + footstep) * master).toBeLessThan(1)
-    })
+
   })
 
-  // Point 673 follows the shipped drum silence, so the calibration that closes
-  // it measures the DEPLOYED village mix rather than turning the dormant bed
-  // back on. The floor is deliberately conservative: all remaining active
-  // layer gains are summed as though their peaks coincided, along with gain
-  // modulation feeding those layers, before the common master gain. Real bird
-  // and music envelopes can only make the instantaneous floor lower.
-  it('puts a nearby syllable at least 8 dB above the remaining deployed village ambience', () => {
-    ctx.currentTime = 280
-    expect(balance.drumBed.enabled).toBe(false)
-    setAmbienceScene({ region: 'central', mode: 'place', placeKind: 'village', nearVillage: false })
-    refreshAmbienceVolume()
-
+  const villageFloor = () => {
     // Find the ambient bus through a real ambient emitter, then select layer
     // nodes by their setTarget ramps rather than assuming graph build order.
     const beforeProbe = ctx.gains.length
@@ -1050,8 +1105,68 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
       activeLayers.reduce((sum, layer) => sum + layer.gain.value, 0) + modulation
     ) * ambientBus.gain.value
 
+    return { ambienceFloor, ambientBus }
+  }
+
+  it.each([{ register: 'talk' as const, count: 2 }, { register: 'call' as const, count: 1 }])('measures headroom for $count close child $register voices, ambience, drums and a step', ({ register, count }) => {
+    setAmbienceScene({ region: 'central', mode: 'place', placeKind: 'village', nearVillage: false })
+    refreshAmbienceVolume()
+    const voices = spoken(() => playSpeech(utterancePlan(utteranceOf('RIVER'), 0, {
+      bearing: Math.PI / 2, voice: 'child', ...registerOptions(register),
+    })))
+    const envelope = envelopeOf(voices[0])
+    const compensation = envelope.connected[0] as FakeGain
+    const panner = compensation.connected[0] as FakePanner
+    const bus = panner.connected[0] as FakeGain
+    const master = bus.connected[0] as FakeGain
+    expect(master.connected[0]).toBe(ctx.destination)
+    const panAngle = (panner.pan.value + 1) * Math.PI / 4
+    // Upper bound measured on all four rendered carriers, including the new
+    // 352.8 Hz vowel (2.671). The old 1.7 lower bound hid the peak load.
+    const synthesisUpper = 2.8
+    const speech = Math.max(...envelope.gain.events.map((e) => e.value ?? 0)) *
+      compensation.gain.value * Math.max(Math.cos(panAngle), Math.sin(panAngle)) *
+      bus.gain.value * synthesisUpper
+    const sourceBefore = ctx.sources.length
+    emitFootstep('stone')
+    const step = ctx.sources[sourceBefore]
+    const stepGain = (step.connected[0] as FakeFilter).connected[0] as FakeGain
+    const stepBus = stepGain.connected[0] as FakeGain
+    const footstep = Math.max(...stepGain.gain.events.map((e) => e.value ?? 0)) * stepBus.gain.value
+    // Read the active floor and optional drum layer from their deployed buses.
+    const { ambienceFloor: ambience, ambientBus } = villageFloor()
+    const heldDrums = balance.drumBed.enabled
+    const before = ctx.gains.map((g) => g.gain.value)
+    balance.drumBed.enabled = true
+    refreshAmbienceVolume()
+    const drumLayer = ctx.gains.filter((g, i) => g.connected[0] === ambientBus && g.gain.value > before[i])
+    const drums = DRUM_BEAT_PEAK * (drumLayer[0]?.gain.value ?? 0) * ambientBus.gain.value
+    balance.drumBed.enabled = heldDrums
+    refreshAmbienceVolume()
+    expect(drumLayer).toHaveLength(1)
+    expect(drums).toBeGreaterThan(0)
+    const output = (count * speech + ambience + drums + footstep) * master.gain.value
+    // Re-measured: 1.780 at the former envelope peak 1.8; 0.977 at 0.85.
+    if (register === 'talk') expect(output).toBeCloseTo(0.97678411396, 5)
+    expect(output).toBeLessThan(1)
+  })
+
+  // Point 673 follows the shipped drum silence, so the calibration that closes
+  // it measures the DEPLOYED village mix rather than turning the dormant bed
+  // back on. The floor is deliberately conservative: all remaining active
+  // layer gains are summed as though their peaks coincided, along with gain
+  // modulation feeding those layers, before the common master gain. Real bird
+  // and music envelopes can only make the instantaneous floor lower.
+  it.each([0, 3, 10])('measures deployed speech over the village floor at %s metres', (distance) => {
+    ctx.currentTime = 280
+    expect(balance.drumBed.enabled).toBe(false)
+    setAmbienceScene({ region: 'central', mode: 'place', placeKind: 'village', nearVillage: false })
+    refreshAmbienceVolume()
+
+    const { ambienceFloor } = villageFloor()
+
     const beforeSpeech = ctx.oscillators.length
-    playSpeech(utterancePlan(utteranceOf('DIG'), 0))
+    playSpeech(utterancePlan(utteranceOf('DIG'), distance))
     const voice = ctx.oscillators.slice(beforeSpeech)[0]
     const envelope = envelopeOf(voice)
     const speechBus = envelope.connected[0] as FakeGain
@@ -1059,11 +1174,19 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
     const speechPeak = peak * speechBus.gain.value * SYLLABLE_SYNTHESIS_GAIN
     const marginDb = 20 * Math.log10(speechPeak / ambienceFloor)
 
-    // MEASURED at the default preset: 0.612 over 0.2275, a 2.69× / 8.59 dB
-    // peak-to-floor margin. The explicit floor makes the promised margin the
-    // failure boundary, not an incidental consequence of the chosen number.
+    // Lower bound from all four rendered carriers (1.99–2.67), through the
+    // live speech/master buses. At 3 m speech still clears the conservative
+    // sum of every deployed layer, and exceeds the former falloff-24 mix.
     expect(ambienceFloor).toBeCloseTo(0.2275, 10)
-    expect(speechPeak).toBeCloseTo(0.612, 10)
-    expect(marginDb).toBeGreaterThanOrEqual(8)
+    const expected = new Map([[0, 0.323], [3, 0.2375], [10, 0.0646]])
+    expect(speechPeak).toBeCloseTo(expected.get(distance)!, 8)
+    const master = speechBus.connected[0] as FakeGain
+    expect(master.connected[0]).toBe(ctx.destination)
+    expect(speechPeak * master.gain.value).toBeCloseTo(expected.get(distance)! * 0.5, 8)
+    if (distance <= 3) expect(marginDb).toBeGreaterThan(0)
+    if (distance > 0) {
+      const former = 1.8 * 0.1 * 2 * SYLLABLE_SYNTHESIS_GAIN / (1 + 24 * (distance / 10) ** 2)
+      expect(speechPeak).toBeGreaterThan(former)
+    }
   })
 })

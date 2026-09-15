@@ -2,6 +2,7 @@
 // (point 294): the repeat signature (same check twice vs different checks), the
 // baseline classification (green→red = regression, red→red = pre-existing), the
 // weak changed-file relatedness, and the printed report.
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
   allChecks,
@@ -19,7 +20,10 @@ import {
   formatRepeatReport,
   normaliseErrorText,
   parseCheckLines,
+  clearInheritedBaselineLane,
+  onBaselineLane,
   repeatSignature,
+  suiteLaneEnv,
 } from './baseline-classify-core.mjs'
 import { parseWrapperArgs } from './baseline-classify.mjs'
 
@@ -468,6 +472,14 @@ describe('classifying against the baseline', () => {
 })
 
 describe('the wrapper CLI', () => {
+  it('never assumes the context of supplied check names or logs', () => {
+    expect(parseWrapperArgs(['polish', '--failed', 'jar']).currentContext).toBe('unknown')
+    expect(parseWrapperArgs(['polish', '--current-out', 'large.log']).currentContext).toBe('unknown')
+    expect(parseWrapperArgs(['--current-context', 'in-pass', 'polish'])).toMatchObject({ suite: 'polish', currentContext: 'in-pass' })
+    expect(parseWrapperArgs(['polish', '--current-context', 'standalone']).currentContext).toBe('standalone')
+    expect(parseWrapperArgs(['polish', '--current-context', 'typo']).currentContext).toBe('unknown')
+  })
+
   it('accepts a structured report destination without mistaking it for a suite', () => {
     expect(parseWrapperArgs(['--report-file', '/tmp/report.json', 'crossbrowser'])).toMatchObject({ suite: 'crossbrowser', reportFile: '/tmp/report.json' })
   })
@@ -494,6 +506,38 @@ describe('the wrapper CLI', () => {
 })
 
 describe('the printed report', () => {
+  it.each(['in-pass', 'unknown'])('qualifies every regression when candidate context is %s', (currentContext) => {
+    const classified = classifyAgainstBaseline({
+      currentFailed: ['jar', 'another check', checkFromName('console error: boom')],
+      baselineFailed: [], baselineChecks: ['jar', 'another check'],
+    })
+    const report = formatBaselineReport({ suite: 'polish', ref: 'abc1234', classified, currentContext })
+    const claims = report.filter((line) => line.includes('REAL REGRESSION'))
+    expect(claims).toHaveLength(3)
+    for (const claim of claims) {
+      expect(claim).toContain(`baseline standalone, candidate ${currentContext}`)
+      expect(claim).toContain('causation unproven')
+      expect(claim).toContain(currentContext === 'unknown' ? 'COMPARABILITY UNKNOWN' : 'NOT LIKE-FOR-LIKE')
+    }
+  })
+
+  it.each(['standalone', 'standalone section "adult-errands"'])('compares matching %s contexts without a mismatch warning', (context) => {
+    const report = formatBaselineReport({ suite: 'polish', ref: 'abc1234',
+      classified: [{ check: 'jar', verdict: 'real-regression' }], currentContext: context, baselineContext: context,
+    }).join('\n')
+    expect(report).toContain('REAL REGRESSION (green on baseline, red now)')
+    expect(report).not.toContain('NOT LIKE-FOR-LIKE')
+    expect(report).not.toContain('COMPARABILITY UNKNOWN')
+  })
+
+  it('does not claim a supplied whole-suite result matches an inherited baseline section filter', () => {
+    const report = formatBaselineReport({ suite: 'polish', ref: 'abc1234',
+      classified: [{ check: 'jar', verdict: 'real-regression' }], currentContext: 'standalone',
+      baselineContext: 'standalone section "adult-errands"',
+    }).join('\n')
+    expect(report).toContain('NOT LIKE-FOR-LIKE (baseline standalone section "adult-errands", candidate standalone; causation unproven)')
+  })
+
   it('names the load signature and points at the quiet-machine rule', () => {
     const lines = formatRepeatReport({ suite: 'enrichments', signature: repeatSignature({ first: RUN_1, second: RUN_2 }) })
     expect(lines[0]).toContain('DIFFERENT checks')
@@ -601,5 +645,86 @@ describe('an empty-detail check keys the same from a run and from a pasted line'
 
   it('cuts at the FIRST separator when a name carries both forms', () => {
     expect(checkFromName('FAIL  the check — measured 1.02 —').name).toBe('the check')
+  })
+})
+
+// The lane marker decides whether a suite may stand a block down because the
+// PRE-change app cannot pose it. The classifier spawns BOTH trees through one
+// helper, so a constant there exempted the candidate too, and an omitted marker
+// let a stale environment exempt the pass (GPT-6 Astra, review of fea5ce9).
+describe('the baseline lane marker', () => {
+  it('marks the baseline lane and only the baseline lane', () => {
+    expect(onBaselineLane(suiteLaneEnv({ baselineLane: true }))).toBe(true)
+    expect(onBaselineLane(suiteLaneEnv({ baselineLane: false }))).toBe(false)
+  })
+
+  it('writes the candidate lane rather than leaving an inherited marker standing', () => {
+    const inherited = { VERIFY_BASELINE_LANE: '1', PATH: '/usr/bin' }
+    const env = suiteLaneEnv({ baselineLane: false, env: inherited })
+    expect(env.VERIFY_BASELINE_LANE).toBe('0')
+    expect(onBaselineLane(env)).toBe(false)
+    expect(env.PATH).toBe('/usr/bin')
+  })
+
+  it('defaults to the candidate lane when no lane is stated', () => {
+    expect(onBaselineLane(suiteLaneEnv())).toBe(false)
+    expect(onBaselineLane(suiteLaneEnv({ env: { VERIFY_BASELINE_LANE: '1' } }))).toBe(false)
+  })
+
+  it('carries BASE_URL only when there is one, and never loses the lane to it', () => {
+    const withUrl = suiteLaneEnv({ baselineLane: true, baseUrl: 'http://localhost:4173' })
+    expect(withUrl.BASE_URL).toBe('http://localhost:4173')
+    expect(onBaselineLane(withUrl)).toBe(true)
+    expect('BASE_URL' in suiteLaneEnv({ baselineLane: true })).toBe(false)
+  })
+
+  it('reads only the exact marker value as the baseline lane', () => {
+    for (const value of ['0', '', 'true', 'yes', '11', undefined]) {
+      expect(onBaselineLane({ VERIFY_BASELINE_LANE: value })).toBe(false)
+    }
+    expect(onBaselineLane({})).toBe(false)
+  })
+})
+
+// The pass drops an inherited marker ONCE, for every child it spawns. Writing
+// the lane per spawn site was incomplete: run-all also starts the cross-browser
+// check and Vitest (GPT-6 Astra, confirming review of a175498).
+describe('the pass drops an inherited baseline marker', () => {
+  it('removes the marker rather than overwriting it with a falsy value', () => {
+    const env = { VERIFY_BASELINE_LANE: '1', PATH: '/usr/bin' }
+    clearInheritedBaselineLane(env)
+    expect('VERIFY_BASELINE_LANE' in env).toBe(false)
+    expect(onBaselineLane(env)).toBe(false)
+    expect(env.PATH).toBe('/usr/bin')
+  })
+
+  it('is harmless when there was no marker', () => {
+    const env = { PATH: '/usr/bin' }
+    expect(() => clearInheritedBaselineLane(env)).not.toThrow()
+    expect(onBaselineLane(env)).toBe(false)
+  })
+
+  it('leaves a child spawned from the cleared environment off the baseline lane', () => {
+    const passEnv = clearInheritedBaselineLane({ VERIFY_BASELINE_LANE: '1' })
+    expect(onBaselineLane({ ...passEnv, BASE_URL: 'http://x' })).toBe(false)
+  })
+
+  // THE WIRING, NOT ONLY THE HELPER. Five cases that only exercise the helper
+  // would all stay green if the call were deleted, which is exactly what the
+  // review said about the previous round. The property is "no child of the pass
+  // inherits the marker", and it holds only if the pass clears its OWN
+  // environment before it spawns anything.
+  it('is called by run-all before the pass spawns anything', () => {
+    const source = readFileSync('scripts/verify/run-all.mjs', 'utf8')
+    const cleared = source.indexOf('clearInheritedBaselineLane(process.env)')
+    const firstSpawn = source.indexOf('spawnSync(')
+    expect(cleared).toBeGreaterThan(-1)
+    expect(firstSpawn).toBeGreaterThan(-1)
+    expect(cleared).toBeLessThan(firstSpawn)
+  })
+
+  it('leaves run-all with no baseline-lane write of its own', () => {
+    const source = readFileSync('scripts/verify/run-all.mjs', 'utf8')
+    expect(source).not.toMatch(/VERIFY_BASELINE_LANE\s*:/)
   })
 })

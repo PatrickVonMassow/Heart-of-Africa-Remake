@@ -8,7 +8,7 @@ import { placeById } from '../../world/geo'
 import { mulberry32 } from '../../world/noise'
 import { REGION_PLACE_STYLES, VILLAGE_PLANS, type RegionPlaceStyle } from './regionStyles'
 import { PORT_TALKERS, VILLAGE_SPOTS, childPlayGround, villageAdultStations, type PlayGround } from './lifeSpots'
-import { boxCollider, nudgeToFree, spawnPointFree, standingClear, PLAYER_RADIUS, WALKER_RADIUS, type Collider } from './collision'
+import { boxCollider, nudgeToFree, spawnPointFree, standingClear, PLAYER_RADIUS, WALKER_RADIUS, CHIEF_BODY_RADIUS, type Collider } from './collision'
 import { CHIEF_HUT, MARKET_HUT, dwellingRoofProfile, hutRoofProfile, roofStandOff } from './roofClearance'
 import { windingPoints, laneSlots, closestOnPolyline, bendAround, type LaneSlot } from './lanePlan'
 import { buildGizaLayout } from './gizaSite'
@@ -18,6 +18,7 @@ import {
   BANK_FADE_ANGLE,
   BANK_PLAY_LANE_HALF,
   bankPlayRocks,
+  bankFillSpot,
   bankWaterFoot,
   buildRiverBank,
   inBankPlayLane,
@@ -27,6 +28,8 @@ import {
   type PlaceRiverBank,
 } from './riverBank'
 import { balance } from '../../config/balance'
+import { digLocalToWorld, digStandingPlaces, spoilCentre, SPOIL_RADIUS_X } from './placeGround'
+import { digFurnitureFootprints } from './digSiteAppearance'
 import { WORK_ARRIVE_RADIUS } from './adultWork'
 import { devAssert } from '../../systems/devAssert'
 import type { BuildingType } from '../../state/ui'
@@ -102,7 +105,7 @@ export interface PlaceLayout {
    * a turned patch at the edge of the worked ground. Digging in the middle of
    * the village square is what made the old picture read as meaningless.
    */
-  digSites: Array<{ x: number; z: number; kind: 'pit' | 'postHole' | 'patch' }>
+  digSites: Array<{ x: number; z: number; kind: 'pit' | 'postHole' | 'patch'; rotation?: number }>
   /**
    * The walkable river bank (work-order 482), where the settlement stands on a
    * river: which way the water lies, which way it runs, and the three points on
@@ -127,7 +130,16 @@ export interface PlaceLayout {
    * is where it meets the bank, upstream of and clear of the children's stretch.
    * Null in every settlement without a bank.
    */
-  waterPath: { head: BankPoint; foot: BankPoint } | null
+  /** The village's walk to the water: `head` in the village where the word
+   *  falls, `foot` the drawn track's landing on flat ground, and `fill` the spot
+   *  IN the water where the carrier dips his jar (work-order 1087). Only head
+   *  and foot are drawn as a track; the last stretch down the shore is not a
+   *  worn path. */
+  waterPath: { head: BankPoint; foot: BankPoint; fill: BankPoint } | null
+  /** The village water stand (work-order 1087): where the filled jars are set
+   *  down and where both of the errand's words are spoken. Null where the
+   *  settlement has no water path to serve. */
+  waterStand: BankPoint | null
   /**
    * The children's roaming quarter (work-order 481.4): where the group plays
    * between two cycles of its bank game, and how far it roams. It is layout data
@@ -238,6 +250,38 @@ export const WAY_OUT_OUTER = 6
  *  is finer than the half-width it is looking for. */
 const WAY_OUT_BEARINGS = 180
 
+/**
+ * THE VILLAGE WATER STAND (work-order 1087): where the filled jars are set down,
+ * and where BOTH utterances of the water errand fall.
+ *
+ * It stands beside the fire, which already has a collider and is the plausible
+ * consumer of the water. The errand's two words used to be spoken at the water
+ * path's head out at `WATER_PATH_HEAD_RADIUS`, which is the edge of the built
+ * ground; moving them to the stand puts them among the village, keeps them clear
+ * of the children's bank game, and gives the return leg a destination that is a
+ * place rather than a radius.
+ */
+// MEASURED 12.09.2026: at 2.7 m the fire's own keep-out (1.3 + a walker's 0.3)
+// and the stand's (0.6 + 0.3) left a gap of 0.2 m between them — narrower than
+// a walker, which is the same notch the fire tender's collider once made. The
+// carrier then never got nearer than 2.61 m to a stand he was sent to stand at,
+// was never counted as arrived, and circled it until the errand's backstop
+// expired. The gap is set so a walker passes between the two on EVERY bearing.
+export const WATER_STAND_FIRE_GAPS = [3.4, 4.2, 5.0, 5.8] as const
+/** How many bearings of the working ring around the stand are tested, and how
+ *  many of them must be open ground for the stand to count as reachable. */
+const WATER_STAND_APPROACHES = 16
+/** The ring the two men work from — `JOIN_STAND_OFF` in `adultWork.ts`, restated
+ *  here rather than imported because the layout must not depend on the errand
+ *  module; `layout.test.ts` pins the two together. */
+export const WATER_STAND_WORK_RING = 2.4
+const WATER_STAND_APPROACHES_NEEDED = 9
+/** Its own footprint — three standing jars and the ground they are set on. */
+export const WATER_STAND_RADIUS = 0.6
+/** The bearings the stand is tried on, the one facing the water first: the man
+ *  who says RIVER at it points past it at the river. */
+const WATER_STAND_BEARINGS = 16
+
 /** Where the WATER PATH's head stands: on the bank's own bearing, out past the
  *  compound ring (7-14 m, work-order 604) at the edge of the built ground. It
  *  is the point both water carriers speak at, so it has to be a place the
@@ -315,14 +359,22 @@ export const CHIEF_STAND_OFFSET = 1.6
  * so the figure the picture shows and the door the key is pressed at can never
  * describe different spots.
  */
-export function chiefStandingSpot(it: Interactive): [number, number] {
+export function chiefStandingSpot(it: Interactive, hutRadius = 3.35): [number, number] {
   const door = it.door ?? it.pos
   const dx = door[0] - it.pos[0]
   const dz = door[1] - it.pos[1]
   const len = Math.hypot(dx, dz) || 1
   const nx = dx / len
   const nz = dz / len
-  return [door[0] + nz * CHIEF_STAND_OFFSET, door[1] - nx * CHIEF_STAND_OFFSET]
+  // Keep the sideways offset and move the stand outward only as far as the
+  // hut/body passage requires. The door interaction point itself stays put.
+  const clearance = Math.max(2 * PLAYER_RADIUS, balance.communication.chiefHutGap)
+  const distance = hutRadius + CHIEF_BODY_RADIUS + clearance
+  const outward = Math.max(0, Math.sqrt(Math.max(0, distance ** 2 - CHIEF_STAND_OFFSET ** 2)) - len)
+  return [
+    door[0] + nx * outward + nz * CHIEF_STAND_OFFSET,
+    door[1] + nz * outward - nx * CHIEF_STAND_OFFSET,
+  ]
 }
 /**
  * Door proximity that arms the Space use key at a functional building — merely
@@ -729,6 +781,7 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     ? {
         head: { x: bank.nx * WATER_PATH_HEAD_RADIUS, z: bank.nz * WATER_PATH_HEAD_RADIUS },
         foot: bankWaterFoot(bank),
+        fill: bankFillSpot(bank),
       }
     : null
 
@@ -1479,6 +1532,61 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   }
 
 
+  // THE VILLAGE WATER STAND (work-order 1087). It goes in beside the fire, on
+  // the bearing that faces the water so the man who says RIVER at it points past
+  // it at the river, and it steps round the ring if that bearing is taken. It is
+  // placed BEFORE the children's quarter is searched, so the quarter is fitted
+  // around it exactly as it is around the other adult places.
+  let waterStand: PlaceLayout['waterStand'] = null
+  /** Where the stand's own collider sits, so it can be taken out again if the
+   *  water path it was placed for is discarded further down. */
+  let standColliderAt = -1
+  if (place.kind === 'village' && waterPath && bank) {
+    const standClear = colliderBuckets(colliders, WATER_STAND_RADIUS)
+    const walkClear = colliderBuckets(colliders, WALKER_RADIUS)
+    const facing = Math.atan2(bank.nz, bank.nx)
+    // A SPOT NOBODY CAN REACH IS NOT A PLACE. Measured 12.09.2026: a stand whose
+    // own footprint was clear still left the carrier stalled 4.2 m away, because
+    // the ring he had to stand on lay inside the fire's keep-out and the gap
+    // between the two was barely a walker wide. So the ground AROUND the stand
+    // is tested too: the men work from `JOIN_STAND_OFF` out, and that ring has
+    // to be open on most of its bearings, not merely somewhere.
+    const approachable = (x: number, z: number) => {
+      let open = 0
+      for (let k = 0; k < WATER_STAND_APPROACHES; k++) {
+        const a = (k / WATER_STAND_APPROACHES) * Math.PI * 2
+        const ax = x + Math.cos(a) * WATER_STAND_WORK_RING
+        const az = z + Math.sin(a) * WATER_STAND_WORK_RING
+        if (standingClear(walkClear(ax, az), ax, az, WALKER_RADIUS)) open++
+      }
+      return open >= WATER_STAND_APPROACHES_NEEDED
+    }
+    for (const gap of WATER_STAND_FIRE_GAPS) {
+      for (let k = 0; k < WATER_STAND_BEARINGS && !waterStand; k++) {
+        // Alternating out from the water's own bearing, so the first bearing
+        // tried is the one that reads and the fallbacks stay as near it as
+        // possible.
+        const step = Math.ceil(k / 2) * ((k % 2 === 0 ? 1 : -1) * (Math.PI * 2) / WATER_STAND_BEARINGS)
+        const a = facing + step
+        const x = VILLAGE_FIRE[0] + Math.cos(a) * gap
+        const z = VILLAGE_FIRE[1] + Math.sin(a) * gap
+        if (!standingClear(standClear(x, z), x, z, WATER_STAND_RADIUS)) continue
+        // A LANE CARRIES NO COLLIDER, so the footprint test above cannot see one:
+        // measured 12.09.2026, mandinka-village seed 7 put the stand 0.50 m off
+        // the centre of a lane 1.30 m wide — a solid body standing in the middle
+        // of a drawn path. The same exclusion the other village places use.
+        if (onLane(x, z, WATER_STAND_RADIUS)) continue
+        if (!approachable(x, z)) continue
+        waterStand = { x, z }
+      }
+      if (waterStand) break
+    }
+    if (waterStand) {
+      standColliderAt = colliders.length
+      colliders.push({ x: waterStand.x, z: waterStand.z, r: WATER_STAND_RADIUS })
+    }
+  }
+
   // THE CHILDREN'S ROAMING QUARTER (work-order 481.4, moved here by 688). It is
   // decided from the settlement's BUILT bodies, BEFORE anything loose is
   // scattered and BEFORE the water path is laid, and that order is item 6 of the
@@ -1664,6 +1772,14 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
       // points at work-order 1045; a THIRD one appearing is what that case
       // catches.
       waterPath = null
+      // AND THE STAND GOES WITH IT. It is placed further up, while every bank
+      // still has a provisional path, so a settlement whose head search finds no
+      // clear walk kept a water stand no adult ever visits — furniture with a
+      // collider and no errand behind it. Measured 12.09.2026: bambara-village
+      // at seeds 2 and 7.
+      if (standColliderAt >= 0) colliders.splice(standColliderAt, 1)
+      standColliderAt = -1
+      waterStand = null
     } else {
       waterPath.head = head
       paths.push({ points: [[head.x, head.z], [foot.x, foot.z]], width: WATER_PATH_WIDTH })
@@ -1791,14 +1907,14 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   // villagers dig — a store pit, a post hole and a patch turned over. They are
   // placed like every other loose object (free ground, off the lanes, seeded by
   // the same generator) and they carry NO collider: a shallow pit is walked
-  // over, and the villager working it must be able to stand IN it.
+  // over. The pair works from safe places on the rim.
   //
   // THEY LEAVE THE MIDDLE (work-order 688). The first placement swept the whole
   // open ground from 5 m out, which put men digging on the village square beside
   // a boulder that stood there for no reason — the picture the user read as
   // meaningless on 13.08.2026. Each kind now stands where its own work belongs:
   // the store pit at a compound edge, the post hole beside a lane, the turned
-  // patch out at the edge of the worked ground. All three keep clear of
+  // patch out at the edge of the worked ground. Both sites keep clear of
   // `CENTRAL_GROUND_RADIUS`, the open middle the fire, the pounder and the
   // talkers share.
   const digSites: PlaceLayout['digSites'] = []
@@ -1829,44 +1945,69 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
       // last compound rather than between them.
       patch: (x, z) => Math.hypot(x, z) >= radius * DIG_SITE_FIELD_BAND,
     }
-    const kinds: Array<PlaceLayout['digSites'][number]['kind']> = ['pit', 'postHole', 'patch']
-    for (const kind of kinds) {
-      // TWO PASSES, AND THE ORDER OF THEM IS THE RULE. The first asks for the
-      // spot the work belongs at; the second drops that and takes any spot
-      // outside the middle. What is NEVER dropped is the central ground and the
-      // children's earshot — those are what the point is about — while the
-      // anchor is what a ksar, the densest plan there is, cannot always give:
-      // measured at tuareg-village, no ground beside a lane there is both free
-      // and outside the middle, and a village short of a work site is worse than
-      // a post hole away from its lane.
-      for (const anchored of [true, false]) {
-        // A deterministic golden-angle sweep over the ground outside the middle.
-        for (let i = 0; i < 240 && !digSites.some((s) => s.kind === kind); i++) {
-          const a = rand() * Math.PI * 2 + i * 2.399963
-          const r = CENTRAL_GROUND_RADIUS + DIG_SITE_RADIUS + (i % 24) * 0.62
+    // Rank all candidates by distance inland, then retain the first that fits
+    // its purpose. Riverless villages have no shore half to clear.
+    const angle = rand() * Math.PI * 2
+    const inland = (p: { x: number; z: number }) => bank
+      ? -(p.x * bank.nx + p.z * bank.nz) : Math.hypot(p.x, p.z)
+    const siteCandidates = (radialStep: number, bearings: number) => {
+      const out: Array<{ x: number; z: number }> = []
+      for (let r = CENTRAL_GROUND_RADIUS + DIG_SITE_RADIUS; r < radius - 1.5; r += radialStep) {
+        for (let bearing = 0; bearing < bearings; bearing++) {
+          const a = angle + bearing * Math.PI * 2 / bearings
           const x = Math.cos(a) * r
           const z = Math.sin(a) * r
-          if (!isFree(x, z, 2.4, DIG_SITE_RADIUS) || onLane(x, z, DIG_SITE_RADIUS + 0.4)) continue
-          if (digSites.some((s) => Math.hypot(s.x - x, s.z - z) < 3)) continue
-          if (!standingClear(colliders, x, z, WALKER_RADIUS)) continue
-          if (toChildren(x, z) < earshot) continue
-          if (anchored && !belongs[kind](x, z)) continue
-          digSites.push({ x, z, kind })
+          if (bank && x * bank.nx + z * bank.nz >= -DIG_SITE_RADIUS) continue
+          out.push({ x, z })
         }
       }
-      // A kind the two passes could not place leaves the village short of a work
-      // site — and with fewer than two sites the joined dig cannot be shown at
-      // all. `layout.test.ts` sweeps every village at every seed and finds all
-      // three, so this firing means a plan changed under the rule rather than an
-      // ordinary unlucky draw (GPT-5.6 Sol, first cross-vendor round, B3).
-      devAssert(
-        digSites.some((s) => s.kind === kind),
-        'dig-site-missing',
-        () => `${place.id}: no ${kind} could be placed outside the middle and clear of the children`,
-      )
+      return out.sort((a, b) => inland(b) - inland(a))
     }
+    const candidates = siteCandidates(0.4, 96)
+    const standable = (x: number, z: number) =>
+      Math.hypot(x, z) < radius - WALKER_RADIUS && standingClear(colliders, x, z, WALKER_RADIUS)
+    const placeSite = (kind: PlaceLayout['digSites'][number]['kind'], points = candidates) => {
+      for (const p of points) {
+        const { x, z } = p
+        if (!belongs[kind](x, z)) continue
+        if (!isFree(x, z, 2.4, DIG_SITE_RADIUS) || onLane(x, z, DIG_SITE_RADIUS + 0.4)) continue
+        if (digSites.some((s) => Math.hypot(s.x - x, s.z - z) < 6)) continue
+        if (toChildren(x, z) < earshot) continue
+        // Turn the whole working arrangement to fit the available ground;
+        // an arbitrary coordinate-derived heap side must not cost a site.
+        for (let turn = 0; turn < 12; turn++) {
+          const site = { x, z, kind, rotation: x * 2.3 + z + turn * Math.PI / 6 }
+          const heap = spoilCentre(site)
+          // Reserve room for the whole mound, without adding an obstacle.
+          if (Math.hypot(heap.x, heap.z) + SPOIL_RADIUS_X >= radius - 0.5) continue
+          if (!standingClear(colliders, heap.x, heap.z, SPOIL_RADIUS_X)) continue
+          if (digFurnitureFootprints(kind).some((prop) => {
+            const at = digLocalToWorld(site, prop.x, prop.z)
+            return Math.hypot(at.x, at.z) + prop.radius >= radius - 0.5
+              || !standingClear(colliders, at.x, at.z, prop.radius)
+          })) continue
+          if (!standable(x, z) || !digStandingPlaces(site, standable)) continue
+          digSites.push(site)
+          return true
+        }
+      }
+      return false
+    }
+    // Keep the storage purpose where a compound gives it room; a lane post is
+    // the anchored alternative in a dense plan. The planting bed always stays.
+    let anchored = placeSite('pit') || placeSite('postHole')
+    // A narrow strip beside a compound can fall between the coarse samples.
+    // Refine the search before declaring the purpose impossible; no rule yields.
+    if (!anchored) {
+      const refined = siteCandidates(0.1, 720)
+      anchored = placeSite('pit', refined) || placeSite('postHole', refined)
+    }
+    const field = placeSite('patch') || placeSite('patch', siteCandidates(0.1, 720))
+    devAssert(anchored && field, 'dig-site-missing',
+      () => `${place.id}: no two inland work sites fit their anchors and safe rim positions`)
+
   }
 
 
-  return { radius, spawnZ: radius - SPAWN_INSET, interactives, dwellings, fences, paths, flora, rocks, digSites, bank, playRocks, waterPath, playGround, wayOut, pen, errands, colliders }
+  return { radius, spawnZ: radius - SPAWN_INSET, interactives, dwellings, fences, paths, flora, rocks, digSites, bank, playRocks, waterPath, waterStand, playGround, wayOut, pen, errands, colliders }
 }

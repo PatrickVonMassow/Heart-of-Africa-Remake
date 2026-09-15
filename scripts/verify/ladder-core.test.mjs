@@ -10,6 +10,7 @@ import {
   formatLadderRefusal,
   ladderVerdict,
   suitesCovering,
+  unrepairedReds,
 } from './ladder-core.mjs'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -432,5 +433,112 @@ describe('every entrypoint answers to the ladder', () => {
     const text = source('run-logged.mjs')
     expect(text).toContain('ladderCheck(')
     expect(text).toContain('RVA_LADDER_ASKED')
+  })
+})
+
+// ── a red never restarts the full run (point 1126) ────────────────────────
+// The half the edit rule cannot see: after a red where nothing was edited it
+// answers FREE and waves the whole proof through — the loop measured on
+// 14.09.2026 at five two-backend LARGE runs for one point. Pinned here because
+// every wrong answer is expensive in one direction or the other: a missed
+// refusal costs an hour of machine time, a false one blocks an author who has
+// no command to run.
+describe('unrepairedReds', () => {
+  const T = 1_000_000
+  const wholeRed = (reds, over = {}) => ({
+    suite: 'polish', backend: 'webgpu', partial: undefined, section: undefined,
+    startedAt: T, at: T + 1000, exit: 1, terminalVerdict: true, crashed: false, reds, ...over,
+  })
+  const rung = (section, over = {}) => ({
+    suite: 'polish', backend: 'webgpu', partial: true, section,
+    startedAt: T + 5000, at: T + 6000, exit: 0, terminalVerdict: true, crashed: false, reds: [], ...over,
+  })
+  const red = (name, section, over = {}) => ({ name, key: name, kind: 'check', section, ...over })
+
+  it('names the block a red sat in, and the command that re-runs it', () => {
+    const out = unrepairedReds({ suites: ['polish'], runs: [wholeRed([red('a plan is drawn', 'town-plan')])] })
+    expect(out).toEqual([{ suite: 'polish', sections: ['town-plan'], at: T + 1000 }])
+  })
+
+  it('steps aside once that block has been re-run green', () => {
+    const runs = [wholeRed([red('a plan is drawn', 'town-plan')]), rung('town-plan')]
+    expect(unrepairedReds({ suites: ['polish'], runs })).toBe(null)
+  })
+
+  it('does not credit a green rung of a DIFFERENT block', () => {
+    const runs = [wholeRed([red('a plan is drawn', 'town-plan')]), rung('adult-errands')]
+    expect(unrepairedReds({ suites: ['polish'], runs })?.[0].sections).toEqual(['town-plan'])
+  })
+
+  it('does not credit a rung climbed BEFORE the red', () => {
+    const runs = [rung('town-plan', { startedAt: T - 5000, at: T - 4000 }), wholeRed([red('a plan is drawn', 'town-plan')])]
+    expect(unrepairedReds({ suites: ['polish'], runs })?.[0].sections).toEqual(['town-plan'])
+  })
+
+  it('does not credit a RED rung', () => {
+    const runs = [wholeRed([red('a plan is drawn', 'town-plan')]), rung('town-plan', { exit: 1 })]
+    expect(unrepairedReds({ suites: ['polish'], runs })?.[0].sections).toEqual(['town-plan'])
+  })
+
+  it('is silent once a later WHOLE run of the suite went green', () => {
+    const runs = [wholeRed([red('a plan is drawn', 'town-plan')]), wholeRed([], { startedAt: T + 9000, exit: 0 })]
+    expect(unrepairedReds({ suites: ['polish'], runs })).toBe(null)
+  })
+
+  it('fails open on a red that names no block, on a crash and on a run with no verdict', () => {
+    expect(unrepairedReds({ suites: ['polish'], runs: [wholeRed([red('console error: 504', undefined)])] })).toBe(null)
+    expect(unrepairedReds({ suites: ['polish'], runs: [wholeRed([red('a plan', 'town-plan')], { crashed: true })] })).toBe(null)
+    expect(unrepairedReds({ suites: ['polish'], runs: [wholeRed([red('a plan', 'town-plan')], { terminalVerdict: false })] })).toBe(null)
+  })
+
+  it('fails open on a red already charged to a work-order point — no rung could clear it', () => {
+    const runs = [wholeRed([red('a plan is drawn', 'town-plan', { point: 939 })])]
+    expect(unrepairedReds({ suites: ['polish'], runs })).toBe(null)
+  })
+
+  it('ignores suites this run does not cover, and is total on nothing', () => {
+    expect(unrepairedReds({ suites: ['collision'], runs: [wholeRed([red('a plan', 'town-plan')])] })).toBe(null)
+    expect(unrepairedReds()).toBe(null)
+    expect(unrepairedReds({ suites: null, runs: null })).toBe(null)
+  })
+})
+
+describe('ladderVerdict — the red rung', () => {
+  const T = 1_000_000
+  const runs = [{
+    suite: 'polish', partial: undefined, startedAt: T, at: T + 1000, exit: 1,
+    terminalVerdict: true, crashed: false, reds: [{ name: 'a plan is drawn', key: 'a plan is drawn', kind: 'check', section: 'town-plan' }],
+  }]
+  const run = { kind: 'full', tier: null, suites: ['polish'], browser: ['polish'], section: null }
+
+  it('refuses the whole pass a red left behind, and prints the block to run', () => {
+    const verdict = ladderVerdict({ run, changes: [], merges: [], runs, map: MAP })
+    expect(verdict.ok).toBe(false)
+    expect(verdict.status).toBe(LADDER_STATUS.RED_RUNG)
+    expect(verdict.commands).toEqual(['npm test -- polish --section=town-plan'])
+    expect(formatLadderRefusal(verdict)).toContain('point 1126')
+  })
+
+  it('is waived by the escape, with its reason on the record', () => {
+    const verdict = ladderVerdict({ run, changes: [], merges: [], runs, map: MAP, escape: { why: 'the block cannot boot alone' } })
+    expect(verdict.ok).toBe(true)
+    expect(verdict.status).toBe(LADDER_STATUS.WAIVED_ESCAPE)
+  })
+
+  it('never refuses the rung run itself', () => {
+    const verdict = ladderVerdict({
+      run: { kind: 'section', tier: null, suites: ['polish'], browser: ['polish'], section: 'town-plan' },
+      changes: [], merges: [], runs, map: MAP,
+    })
+    expect(verdict.ok).toBe(true)
+    expect(verdict.status).toBe(LADDER_STATUS.RUNG)
+  })
+
+  it('leaves a run whose suites carry no red alone', () => {
+    const verdict = ladderVerdict({
+      run: { kind: 'full', tier: null, suites: ['collision'], browser: ['collision'], section: null },
+      changes: [], merges: [], runs, map: MAP,
+    })
+    expect(verdict.status).toBe(LADDER_STATUS.FREE)
   })
 })

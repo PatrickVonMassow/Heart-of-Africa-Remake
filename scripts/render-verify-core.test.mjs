@@ -2991,9 +2991,6 @@ describe('the shipped charge ledger', () => {
     [938, 'enrichments', 'the streamed dressing does not grow over a session at a fixed anchor (point 278)', '{"samples":[0,0,0,0,0],"min":0,"max":0,"spread":0}'],
     [521, 'enrichments', 'frame 72-water-victoria-falls', 'subject is not in the rendered picture'],
     [1102, 'polish', 'the drums were still speaking when the picture was taken', 'the drums had stopped'],
-    [1087, 'polish', 'one village adult, standing clear of the others, can be held in the fill pose', 'villager 2, nearest neighbour 0.8 m'],
-    [1087, 'polish', 'and a clear line to him exists for the shutter', 'all 16 bearings blocked'],
-    [1087, 'polish', 'frame 1085-village-adult-fills-a-jar', 'subject is not in the rendered picture'],
   ])('keeps the measured WebGL red owned by open point %i: %s / %s', (point, suite, name, detail) => {
     const scope = { suite, backend: 'webgl' }
     const [red] = failedChecks(`FAIL  ${name} — ${detail}`)

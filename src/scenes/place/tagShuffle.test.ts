@@ -246,6 +246,8 @@ function crowd(
     geography: {
       waterHead: layout.waterPath ? { x: layout.waterPath.head.x, z: layout.waterPath.head.z } : null,
       waterFoot: layout.waterPath ? { x: layout.waterPath.foot.x, z: layout.waterPath.foot.z } : null,
+      waterFill: layout.waterPath ? { x: layout.waterPath.fill.x, z: layout.waterPath.fill.z } : null,
+      waterStand: layout.waterStand ? { x: layout.waterStand.x, z: layout.waterStand.z } : null,
       digSites: layout.digSites,
     },
     standable: (x, z) => !world.blocked(x, z),
@@ -1745,10 +1747,18 @@ describe('the children`s bank round can reach its own stage (work-order 687)', (
     } finally {
       BANK_CFG.roamSeconds = shippedRoam
     }
-    // Five cases of 400 replayed seconds each: 46.5 s alone on this machine
-    // since the adults joined the replayed village, and past 60 s on the slower
-    // CI runner — a measurement this long carries its own budget, not a flake.
-  }, 180_000)
+    // Five cases of 400 replayed seconds each, and the budget is the neighbour
+    // replay's rule rather than a guess.
+    // RE-MEASURED 15.09.2026, after CI run 34909464052 aborted this case at its
+    // 180 s and took the whole job down: the replay costs 91.2 s alone on the
+    // batch host — TWICE the 46.5 s that stood here, because the adults' errands
+    // and dig tasks have joined the replayed village since. At the runner's
+    // measured 1.55x that is 141 s, so the 180 s left 39 s of headroom and the
+    // suite's worker contention ate it.
+    // The neighbour above is the calibration: 88.8 s here, re-measured the same
+    // hour and still the 85.5 s it claims, carries 300 s and has never been
+    // aborted. The same cost therefore gets the same number.
+  }, 300_000)
 
   for (const [placeId, seed] of RIVER_VILLAGES) {
     it(`${placeId} at seed ${seed} walks the group down to the bank and runs the stretch`, () => {

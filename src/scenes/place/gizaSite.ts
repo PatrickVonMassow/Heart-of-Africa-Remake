@@ -186,7 +186,8 @@ export function buildGizaLayout(_seed: number): PlaceLayout {
     digSites: [], // and the ground work of point 483 is village life, not a monument's
     bank: null, // the plateau stands well clear of the Nile (work-order 482)
     playRocks: null, // and with no bank there is no children's stretch (687)
-    waterPath: null, // nor a water path to it (688)
+    waterPath: null,
+    waterStand: null, // nor a water path to it (688)
     playGround: null, // a monument site has no inhabitants, so no children roam it
     wayOut: null, // the bare plateau has no dressing to keep off a crossing (688)
     pen: null,

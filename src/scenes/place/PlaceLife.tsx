@@ -7,6 +7,7 @@
 // carried from the well.
 // Pure animation, no mechanics.
 
+import { usePlaceGround } from './PlaceGroundContext'
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, type ReactNode, type RefObject } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
@@ -26,6 +27,7 @@ import {
   type FootPlant,
 } from '../../render/fauna'
 import { CHILD_FIGURE_SCALE, FIGURE_LIMBS, TESSELLATION } from '../../render/figures'
+import { RIVER_WATER_TONES, WATER_METALNESS } from '../../render/waterAppearance'
 import { applyFigurePose, restingArmRefs, type FigureLimbs } from '../../render/figurePose'
 import {
   advanceGesture,
@@ -71,6 +73,7 @@ import {
   rockAt,
   insideStrangerBerth,
   stepBankGame,
+  bankVoiceRegister,
   type BankChild,
   type BankEnd,
   type BankStage,
@@ -100,9 +103,12 @@ import {
   type ErrandPoint,
   type SpokenWord,
   WORK_ARRIVE_RADIUS,
+  workArrivalRadius,
 } from './adultWork'
 import { gestureIfHeard, speechReach } from '../../communication/spokenGesture'
-import { utterancePlan } from '../../communication/speaking'
+import { speechBearing } from './speechBearing'
+import { SpeechFloor } from '../../communication/speechFloor'
+import { utterancePlan, registerOptions } from '../../communication/speaking'
 import { speechLabelSeconds } from '../../communication/speechLabel'
 import { playSpeech } from '../../systems/ambience'
 import { speakOverhead, speechClock } from './speechChannel'
@@ -131,7 +137,7 @@ import {
 import { PORT_TALKERS, VILLAGE_SPOTS, villageAdultStations, type PlayGround } from './lifeSpots'
 import { drummerFacing } from './chiefWalk'
 import { DRUMMER_SPEAKER_ID } from './chiefPresence'
-import { setDrummerVoice } from './drummerVoice'
+import { queuedDrummerVoice, setDrummerVoice } from './drummerVoice'
 import { buildWedgeCarve } from './wedgeCarve'
 import { figureStance, unplacedInhabitant, type PlaceSpot } from './placement'
 
@@ -143,6 +149,8 @@ const NPC_RADIUS = WALKER_RADIUS
  * §19.13), or null for the everyday dress. A context rather than a prop: every
  * life vignette builds its own Figures, and only the Figure itself cares.
  */
+const SpeechFloorContext = createContext<SpeechFloor | null>(null)
+
 const ColdCloaksContext = createContext<ColdDress | null>(null)
 
 /**
@@ -462,10 +470,11 @@ function Figure({
 
 /** Kneeling cook with a three-stick pot beside the village fire. */
 function Cook({ x, z, cloth }: { x: number; z: number; cloth: string }) {
+  const groundHeight = usePlaceGround()
   // A body the passers-by go round (point 578).
   useStandingBody(x, z)
   return (
-    <group position={[x, 0, z]} rotation={[0, Math.PI / 3, 0]}>
+    <group position={[x, groundHeight(x, z), z]} rotation={[0, Math.PI / 3, 0]}>
       <Figure cloth={cloth} kneel />
       {/* Tripod with pot over the embers */}
       <group position={[0.85, 0, -0.4]}>
@@ -494,11 +503,12 @@ function Cook({ x, z, cloth }: { x: number; z: number; cloth: string }) {
 
 /** Weaver working at a simple standing loom. */
 function Weaver({ x, z, cloth, weave }: { x: number; z: number; cloth: string; weave: string }) {
+  const groundHeight = usePlaceGround()
   // A body the passers-by go round (point 578).
   useStandingBody(x, z)
   const facing = Math.atan2(-x, -z)
   return (
-    <group position={[x, 0, z]} rotation={[0, facing, 0]}>
+    <group position={[x, groundHeight(x, z), z]} rotation={[0, facing, 0]}>
       {/* Loom frame */}
       {[-0.55, 0.55].map((px) => (
         <mesh key={px} position={[px, 0.75, 0]} castShadow>
@@ -538,6 +548,7 @@ const KID_SCALE = CHILD_FIGURE_SCALE
  * (docs/communication-poc-spec.md, src/communication/spokenGesture.ts).
  */
 function speakSituation(
+  camera: THREE.Camera,
   said: SpokenSituation,
   speaker: TagChild | undefined,
   anchor: THREE.Group | null,
@@ -548,7 +559,7 @@ function speakSituation(
     ? Math.hypot(speaker.x - placePlayerPosition.x, speaker.z - placePlayerPosition.z)
     : Infinity
   const reach = speechReach(distance)
-  playSpeech(utterancePlan(said.utterance, distance))
+  playSpeech(utterancePlan(said.utterance, distance, { bearing: speechBearing(camera, speaker), voice: 'child' }))
   if (reach.audible) {
     useGame.getState().hearUtterance(said.utterance)
     if (anchor) {
@@ -595,6 +606,7 @@ const CROUCH_POSE: FigurePose = {
  * the player could not hear teaches him nothing however plainly he saw the arm.
  */
 function speakBankUtterance(
+  camera: THREE.Camera,
   said: BankUtterance,
   speaker: TagChild | undefined,
   anchor: THREE.Group | null,
@@ -604,13 +616,14 @@ function speakBankUtterance(
   const distance = placePlayerPosition.active
     ? Math.hypot(speaker.x - placePlayerPosition.x, speaker.z - placePlayerPosition.z)
     : Infinity
-  const reach = speechReach(distance)
+  const options = registerOptions(bankVoiceRegister(said.moment))
+  const reach = speechReach(distance, options.radius)
   const utterance = utteranceOf(said.concept)
-  playSpeech(utterancePlan(utterance, distance))
+  playSpeech(utterancePlan(utterance, distance, { bearing: speechBearing(camera, speaker), voice: 'child', ...options }))
   if (reach.audible) {
     useGame.getState().hearUtterance(utterance)
     if (anchor) {
-      speakOverhead(`kid-${said.speaker}`, [utterance], anchor, { seconds: speechLabelSeconds(1) })
+      speakOverhead(`kid-${said.speaker}`, [utterance], anchor, { floor: true, seconds: speechLabelSeconds(1), reach: options.radius })
     }
   }
   // A TOUCH BRINGS ITS OWN ARM. Its hand has to land on a drawn flank, and the
@@ -633,7 +646,7 @@ function speakBankUtterance(
     ...arm,
     ...(said.hold ? { duration: said.hold } : {}),
     phase: said.speaker * 1.1,
-  })
+  }, options.radius)
 }
 
 /**
@@ -695,6 +708,8 @@ function Kids({
    *  the live ones this component moves, so nothing is copied per frame. */
   childBodies: RefObject<readonly InhabitantBody[]>
 }) {
+  const groundHeight = usePlaceGround()
+  const camera = useThree((state) => state.camera)
   const refs = useRef<Array<THREE.Group | null>>([])
   // The world leg length these children walk on, and the cadence it dictates.
   const legLength = FIGURE_LIMBS.hipY * KID_SCALE
@@ -703,6 +718,7 @@ function Kids({
   // The body each child presents to every other inhabitant (point 578), and the
   // whole settlement's registry — claimed BEFORE the world below, because the
   // chase steers by both (point 657).
+  const speechFloor = useContext(SpeechFloorContext)
   const bodySet = useContext(InhabitantBodiesContext)
   const bodies = useInhabitantBodies(count, { scale: KID_SCALE })
   // Which bodies are the game's own playmates, for the world's occupied rules.
@@ -958,6 +974,7 @@ function Kids({
     const dt = Math.min(rawDt, 0.1)
     const cfg = balance.villageLife.childSpeech
     let spoken: BankUtterance | null = null
+    world.floor = speechFloor ?? undefined
     if (round.bank) {
       // THE TRAVELLER IS AN OBSTACLE, NEVER A STOP (work-order 687 item 7): the
       // children steer round him — with one extra radius over a villager's body,
@@ -1035,14 +1052,14 @@ function Kids({
       if (gesture) gesture.current = advanceGesture(gesture.current, dt)
     }
     if (spoken) {
-      speakBankUtterance(spoken, children[spoken.speaker], refs.current[spoken.speaker], gestures.current[spoken.speaker])
+      speakBankUtterance(camera, spoken, children[spoken.speaker], refs.current[spoken.speaker], gestures.current[spoken.speaker])
     }
     // THE WORD'S OWN FRAME (work-order 1065). The tap is captured below, once
     // this frame's pose has been written AND applied — that is the picture the
     // player sees the word fall over, and the frame the whole claim rests on.
     const openedTouch = import.meta.env.DEV && spoken && spoken.gesture === 'touch' ? spoken.speaker : -1
     const said = game && speech ? stepChildSpeech(speech, view, dt, cfg, speechRand) : null
-    if (said) speakSituation(said, children[said.speaker], refs.current[said.speaker], gestures.current[said.speaker])
+    if (said) speakSituation(camera, said, children[said.speaker], refs.current[said.speaker], gestures.current[said.speaker])
     children.forEach((c, i) => {
       const g = refs.current[i]
       if (!g) return
@@ -1064,7 +1081,7 @@ function Kids({
       // this only draws it.
       const gaitLift = gaitBodyLift(phase, legLength)
       const lift = round.bank ? bankChildBodyLift(c as BankChild, gaitLift, bankChildTouching(round.bank, i)) : gaitLift
-      g.position.set(c.x, lift, c.z)
+      g.position.set(c.x, groundHeight(c.x, c.z) + lift, c.z)
       // A TAGGED CHILD IS UNMISTAKABLY OUT OF PLAY (work-order 687 item 3):
       // squatted down, trunk folded over and both arms crossed in front of it.
       // Written here rather than as a prop, because the state changes inside the
@@ -1141,6 +1158,14 @@ function Kids({
       /** The bank round's own phase, for a check that wants to know what it is
        *  looking at; absent in the tag round. */
       phase: bank ? bank.phase : null,
+      /** The direction this run was announced in (work-order 1073), so a check
+       *  can WAIT for the call it means to photograph instead of shooting the
+       *  stretch and hoping. Null between runs, and in the tag round. The word
+       *  itself travels with it: a check that only knows SOME child spoke
+       *  cannot tell the taught direction from any other utterance in the
+       *  round, and would pass on the wrong one. */
+      direction: bank ? bank.direction : null,
+      announcedWord: bank && bank.direction ? utteranceOf(bank.direction) : null,
       // The game's OWN clock: the verification samples an interval of GAME,
       // never a count of frames, which buy different amounts of it per machine.
       clock: bank ? bank.clock : game!.clock,
@@ -1151,7 +1176,7 @@ function Kids({
       // The radius a child's BODY occupies, so a live check can judge an overlap
       // against the real figure rather than against a guessed one (point 648).
       bodyRadius: balance.villageLife.separation.bodyRadius * KID_SCALE,
-      children: children.map((c) => ({
+      children: children.map((c, i) => ({
         x: c.x,
         z: c.z,
         heading: c.heading,
@@ -1183,6 +1208,11 @@ function Kids({
         // And how much of that walking happened while the round was ON — the
         // settlement's own counter, for the same reason (point 656).
         walkedWhilePlaying: c.walkedWhilePlaying,
+        // The arm this child is speaking WITH (work-order 1073). A call is three
+        // things at one distance — sound, reading and arm — and the frame from
+        // the spectator's stand has to prove the arm, not just the note; nothing
+        // outside the game can read a live gesture off the drawn pose.
+        gesture: ((g) => g && { kind: g.kind, t: g.t, duration: g.duration, bearing: g.bearing })(gestures.current[i]?.current),
       })),
       /** The stone the off-game ROCK is climbed and spoken at, with the size the
        *  climb is played against (work-order 1080). Published rather than
@@ -1341,6 +1371,7 @@ function Kids({
  *  no slope pitch is needed here — the panorama silhouettes, which walk real
  *  relief, carry that half. */
 function Goats({ seed, count, pen, colliders }: { seed: number; count: number; pen: PenDef | null; colliders: Collider[] }) {
+  const groundHeight = usePlaceGround()
   const parts = useMemo(() => buildGoatParts(), [])
   // The gait read off this rig's own legs (point 300): stride length, cadence.
   const rig = useMemo(() => gaitRig(parts.legs), [parts])
@@ -1421,7 +1452,7 @@ function Goats({ seed, count, pen, colliders }: { seed: number; count: number; p
       // sideways or its bounded facing turns over the stance.
       const phase = gaitPhase(s.dist, rig.cadence)
       const lift = gaitBodyLift(phase, rig.legLength)
-      g.position.set(px, lift, pz)
+      g.position.set(px, groundHeight(px, pz) + lift, pz)
       g.rotation.y = s.yaw
       const legs = legRefs.current[i]
       if (legs) {
@@ -1532,6 +1563,7 @@ function Porters({
   colliders: Collider[]
   count?: number
 }) {
+  const groundHeight = usePlaceGround()
   const routes = useMemo(() => {
     const rand = mulberry32((seed + 4711) >>> 0)
     const n = Math.min(count, Math.max(1, stops.length))
@@ -1594,7 +1626,7 @@ function Porters({
       }
       const px = p.x
       const pz = p.z
-      g.position.set(px, Math.abs(Math.sin(t * 5 + r.phase)) * 0.05, pz)
+      g.position.set(px, groundHeight(px, pz) + Math.abs(Math.sin(t * 5 + r.phase)) * 0.05, pz)
       g.rotation.y = Math.atan2((r.bx - r.ax) * dir, (r.bz - r.az) * dir)
     })
   })
@@ -1684,6 +1716,7 @@ function talkerAim(
  * real utterances and gestures again behind the hearing gate.
  */
 function Talkers({ x, z, cloth }: { x: number; z: number; cloth: string[] }) {
+  const groundHeight = usePlaceGround()
   const a = useRef<THREE.Group>(null)
   const b = useRef<THREE.Group>(null)
   const gestureA = useRef<GestureState>(restGesture())
@@ -1747,7 +1780,7 @@ function Talkers({ x, z, cloth }: { x: number; z: number; cloth: string[] }) {
   }, [stances])
 
   return (
-    <group position={[x, 0, z]}>
+    <group position={[x, groundHeight(x, z), z]}>
       <group ref={a} position={[-0.5, 0, 0]}>
         <Figure cloth={cloth[0]} gesture={gestureA} />
       </group>
@@ -1760,6 +1793,7 @@ function Talkers({ x, z, cloth }: { x: number; z: number; cloth: string[] }) {
 
 /** Grain pounding: mortar and a rising, falling pestle (period staple). */
 function Pounder({ x, z, cloth }: { x: number; z: number; cloth: string }) {
+  const groundHeight = usePlaceGround()
   // A body the passers-by go round (point 578).
   useStandingBody(x, z)
   const pestle = useRef<THREE.Mesh>(null)
@@ -1781,7 +1815,7 @@ function Pounder({ x, z, cloth }: { x: number; z: number; cloth: string }) {
     }
   })
   return (
-    <group position={[x, 0, z]} rotation={[0, Math.atan2(-x, -z), 0]}>
+    <group position={[x, groundHeight(x, z), z]} rotation={[0, Math.atan2(-x, -z), 0]}>
       <group ref={body} position={[0, 0, -0.55]}>
         <Figure cloth={cloth} pose={pose} />
       </group>
@@ -1825,6 +1859,7 @@ function Drum({ drum, headRef }: { drum: DrumGeometry; headRef: RefObject<THREE.
  * have heard the word is not shown the arm that goes with it.
  */
 function speakChiefWord(
+  camera: THREE.Camera,
   drummer: { x: number; z: number; yaw: number },
   hut: readonly [number, number],
   anchor: THREE.Group | null,
@@ -1834,11 +1869,11 @@ function speakChiefWord(
     ? Math.hypot(drummer.x - placePlayerPosition.x, drummer.z - placePlayerPosition.z)
     : Infinity
   const utterance = utteranceOf('CHIEF')
-  playSpeech(utterancePlan(utterance, distance))
+  playSpeech(utterancePlan(utterance, distance, { bearing: speechBearing(camera, drummer) }))
   if (speechReach(distance).audible) {
     useGame.getState().hearUtterance(utterance)
     if (anchor) {
-      speakOverhead(DRUMMER_SPEAKER_ID, [utterance], anchor, { seconds: speechLabelSeconds(1) })
+      speakOverhead(DRUMMER_SPEAKER_ID, [utterance], anchor, { floor: true, seconds: speechLabelSeconds(1) })
     }
   }
   // The arm is aimed at the hut's DOOR height rather than its ridge: a man
@@ -1864,6 +1899,8 @@ function speakChiefWord(
  * and the sound can never tell different messages.
  */
 function Drummer({ x, z, cloth }: { x: number; z: number; cloth: string }) {
+  const groundHeight = usePlaceGround()
+  const camera = useThree((state) => state.camera)
   // A body the passers-by go round (point 578).
   useStandingBody(x, z)
   const pose = useRef<FigurePose | null>({ left: { ...REST_POSE.left }, right: { ...REST_POSE.right }, lean: DRUMMER_LEAN, turn: 0 })
@@ -1872,15 +1909,19 @@ function Drummer({ x, z, cloth }: { x: number; z: number; cloth: string }) {
   const group = useRef<THREE.Group>(null)
   const gesture = useRef<GestureState>(restGesture())
   const yaw = drummerFacing([x, z])
+  const floor = useContext(SpeechFloorContext)
+  const voice = useMemo(() => floor ? queuedDrummerVoice(floor, { x, z, register: 'talk' },
+    (hut) => speakChiefWord(camera, { x, z, yaw }, hut, group.current, gesture)) : null, [floor, camera, x, z, yaw])
   // His voice, for the use key that is read in PlaceScene (drummerVoice.ts).
   useEffect(() => {
-    setDrummerVoice((hut) => speakChiefWord({ x, z, yaw }, hut, group.current, gesture))
-    return () => setDrummerVoice(null)
-  }, [x, z, yaw])
+    setDrummerVoice(voice?.voice ?? null)
+    return () => { setDrummerVoice(null); voice?.dispose() }
+  }, [voice])
   useFrame((_, rawDt) => {
     const p = pose.current
     if (!p) return
     const beating = useUi.getState().drumPerformance
+    voice?.step(!!beating)
     const elapsed = beating ? (speechClock() * 1000 - beating.startedAt) / 1000 : 0
     const frame = drummerPoseAt(beating?.plan ?? null, elapsed)
     gesture.current = advanceGesture(gesture.current, Math.min(rawDt, 0.1))
@@ -1895,7 +1936,7 @@ function Drummer({ x, z, cloth }: { x: number; z: number; cloth: string }) {
     if (highHead.current) highHead.current.position.y = drumHeadY(HIGH_DRUM, frame.highSwing)
   })
   return (
-    <group ref={group} name={DRUMMER_SPEAKER_ID} position={[x, 0, z]} rotation={[0, yaw, 0]}>
+    <group ref={group} name={DRUMMER_SPEAKER_ID} position={[x, groundHeight(x, z), z]} rotation={[0, yaw, 0]}>
       <Figure cloth={cloth} pose={pose} />
       {/* The large low drum (`ba`) and the small high one (`BA`) — each on the
           side its own x puts it, which is the side its hand is read from. */}
@@ -1907,6 +1948,7 @@ function Drummer({ x, z, cloth }: { x: number; z: number; cloth: string }) {
 
 /** Fire tender kneeling at the fire pit, stoking the embers with a stick. */
 function FireTender({ x, z, cloth }: { x: number; z: number; cloth: string }) {
+  const groundHeight = usePlaceGround()
   // A body the passers-by go round (point 578).
   useStandingBody(x, z)
   const stick = useRef<THREE.Mesh>(null)
@@ -1914,7 +1956,7 @@ function FireTender({ x, z, cloth }: { x: number; z: number; cloth: string }) {
     if (stick.current) stick.current.rotation.x = 0.85 + Math.sin(clock.elapsedTime * 1.6) * 0.12
   })
   return (
-    <group position={[x, 0, z]} rotation={[0, Math.atan2(-3.5 - x, 2.5 - z), 0]}>
+    <group position={[x, groundHeight(x, z), z]} rotation={[0, Math.atan2(-3.5 - x, 2.5 - z), 0]}>
       <Figure cloth={cloth} kneel />
       <mesh ref={stick} position={[0.2, 0.5, 0.35]} castShadow>
         <cylinderGeometry args={[0.025, 0.03, 1.15, 4]} />
@@ -1981,6 +2023,7 @@ function TaskWalker({
   colliders: Collider[]
   startDelay: number
 }) {
+  const groundHeight = usePlaceGround()
   const standing = useRef<THREE.Group>(null)
   const kneeling = useRef<THREE.Group>(null)
   const state = useRef({
@@ -2023,8 +2066,8 @@ function TaskWalker({
       // Both bodies follow the state while it is at home (point 509): neither
       // may keep the identity transform that would park it at the settlement
       // origin until its first outing writes one.
-      stand.position.set(s.x, 0, s.z)
-      kneel.position.set(s.x, 0, s.z)
+      stand.position.set(s.x, groundHeight(s.x, s.z), s.z)
+      kneel.position.set(s.x, groundHeight(s.x, s.z), s.z)
       s.timer -= dt
       if (s.timer <= 0) {
         s.mode = 'go'
@@ -2037,7 +2080,7 @@ function TaskWalker({
     if (s.mode === 'work') {
       stand.visible = false
       kneel.visible = true
-      kneel.position.set(s.x, 0, s.z)
+      kneel.position.set(s.x, groundHeight(s.x, s.z), s.z)
       kneel.rotation.y = s.yaw
       s.timer -= dt
       if (s.timer <= 0) {
@@ -2094,7 +2137,7 @@ function TaskWalker({
         s.z = body.z
       }
     }
-    stand.position.set(s.x, 0, s.z)
+    stand.position.set(s.x, groundHeight(s.x, s.z), s.z)
     stand.rotation.y = s.yaw
   })
 
@@ -2173,6 +2216,7 @@ function Walkers({
   count: number
   colliders: Collider[]
 }) {
+  const groundHeight = usePlaceGround()
   const defs = useMemo(() => {
     const rand = mulberry32((seed + 60601) >>> 0)
     const n = Math.min(count, homes.length)
@@ -2219,14 +2263,30 @@ function Walkers({
   )
 
   // Dev hook for the headless verification (CLAUDE.md §7.2).
+  const heldWalker = useRef<number | null>(null)
   useEffect(() => {
     if (!import.meta.env.DEV) return
     const w = window as unknown as Record<string, unknown>
-    w.__placeWalkers = { states: states.current, homes: defs.map((d) => d.home) }
+    w.__placeWalkers = {
+      states: states.current,
+      homes: defs.map((d) => d.home),
+      // Read the rendered body independently of the surface it should ride.
+      sample: (who: number) => {
+        const s = states.current[who]
+        const g = refs.current[who]
+        return s && g ? {
+          x: s.x, z: s.z, mode: s.mode, pause: s.pause,
+          groundHeight: groundHeight(s.x, s.z),
+          drawn: { x: g.position.x, y: g.position.y, z: g.position.z, visible: g.visible },
+          held: heldWalker.current === who,
+        } : null
+      },
+      hold: (who: number | null) => { heldWalker.current = who },
+    }
     return () => {
       delete w.__placeWalkers
     }
-  }, [defs])
+  }, [defs, groundHeight])
 
   useFrame(({ clock }, rawDt) => {
     const dt = Math.min(rawDt, 0.1)
@@ -2252,6 +2312,8 @@ function Walkers({
       const s = states.current[i]
       const g = refs.current[i]
       if (!s || !g) return
+      // Freeze the observed walking transform through the asynchronous shutter.
+      if (import.meta.env.DEV && heldWalker.current === i) return
 
       if (s.mode === 'inside') {
         settleBody(i, s, false)
@@ -2261,7 +2323,7 @@ function Walkers({
         // the identity transform — a figure standing at the settlement origin
         // for its whole first stay indoors, and several of them on one spot.
         g.visible = false
-        g.position.set(s.x, 0, s.z)
+        g.position.set(s.x, groundHeight(s.x, s.z), s.z)
         s.timer -= dt
         if (s.timer <= 0) {
           const e = errands.length > 0 ? errands[Math.floor(Math.random() * errands.length)] : ([0, 2] as [number, number])
@@ -2285,7 +2347,7 @@ function Walkers({
         // Linger at the errand: slight idle sway, no bob.
         s.pause -= dt
         settleBody(i, s, true)
-        g.position.set(s.x, 0, s.z)
+        g.position.set(s.x, groundHeight(s.x, s.z), s.z)
         g.rotation.y = s.yaw + Math.sin(t * 0.6 + i) * 0.35
         return
       }
@@ -2367,7 +2429,7 @@ function Walkers({
         s.pinned = 0
       }
       settleBody(i, s, !throughDoor)
-      g.position.set(s.x, Math.abs(Math.sin(t * 6.5 + i * 2)) * 0.05, s.z)
+      g.position.set(s.x, groundHeight(s.x, s.z) + Math.abs(Math.sin(t * 6.5 + i * 2)) * 0.05, s.z)
       g.rotation.y = s.yaw
     })
   })
@@ -2399,9 +2461,6 @@ function Walkers({
   )
 }
 
-/** How near a villager must come to count as having arrived where it was sent. */
-const ERRAND_ARRIVE_RADIUS = WORK_ARRIVE_RADIUS
-
 /** How near a waypoint of a route counts as passed. Wider than a stride, so a
  *  figure sliding along a wall beside the waypoint still ticks it off instead of
  *  circling it. */
@@ -2423,6 +2482,7 @@ const WAYPOINT_RADIUS = 1.2
  */
 function ErrandVillagers({
   seed,
+  placeId,
   cloth,
   colliders,
   radius,
@@ -2435,6 +2495,7 @@ function ErrandVillagers({
   onDigProgress,
 }: {
   seed: number
+  placeId: string
   cloth: string[]
   colliders: Collider[]
   radius: number
@@ -2449,14 +2510,17 @@ function ErrandVillagers({
   childBodies: RefObject<readonly InhabitantBody[]>
   onDigProgress: (progress: readonly DigSiteProgress[]) => void
 }) {
+  const groundHeight = usePlaceGround()
+  const camera = useThree((state) => state.camera)
   const refs = useRef<Array<THREE.Group | null>>([])
+  /** The jars STANDING at the village water stand (work-order 1087). */
+  const standJars = useRef<Array<THREE.Object3D | null>>([])
   // The jar each carrier holds: on the head when it is FULL, in the hand when it
   // is empty. Both are mounted once and shown by the frame loop, like every other
   // per-frame visibility in this scene.
   const headJars = useRef<Array<THREE.Object3D | null>>([])
   const handJars = useRef<Array<THREE.Object3D | null>>([])
   const digTools = useRef<Array<THREE.Object3D | null>>([])
-  const reportedStrikes = useRef<number[]>([])
   /** A villager PINNED into the fill, by index and progress — the dev route the
    *  verification poses one by, since the errand itself does not dip yet
    *  (work-order 1085 owes the pose, 1087 owes the act that drives it). Null
@@ -2497,10 +2561,11 @@ function ErrandVillagers({
     })
     return {
       people: spawn,
-      work: createAdultWork(count, balance.villageLife.adultErrands),
+      work: createAdultWork(count, balance.villageLife.adultErrands, useGame.getState().villageDigProgress[placeId]),
       rand: r,
     }
-  }, [seed, count, colliders])
+  }, [seed, count, colliders, placeId])
+
 
   // The settlement's free ground, sampled once per visit (work-order 482/483).
   // An errand sends a villager clear across the village — out to the river bank,
@@ -2617,9 +2682,10 @@ function ErrandVillagers({
     },
     [geography, playGround, playRocks],
   )
+  const speechFloor = useContext(SpeechFloorContext)
   const view = useMemo<AdultWorkView>(
-    () => ({ villagers: people, geography, standable, invitationClear, childrenHear }),
-    [people, geography, standable, invitationClear, childrenHear],
+    () => ({ villagers: people, geography, standable, invitationClear, childrenHear, floor: speechFloor ?? undefined }),
+    [people, geography, standable, invitationClear, childrenHear, speechFloor],
   )
 
   // The body each villager presents to every other inhabitant (point 578): two
@@ -2640,6 +2706,13 @@ function ErrandVillagers({
   useFrame((_, rawDt) => {
     const dt = Math.min(rawDt, 0.1)
     const cfg = balance.villageLife.adultErrands
+    // The jars standing at the village water stand: as many as the errand
+    // state says have been set down, capped at the stand's capacity.
+    for (let k = 0; k < standJars.current.length; k++) {
+      const jar = standJars.current[k]
+      if (jar) jar.visible = k < work.standJars
+    }
+
     for (let i = 0; i < people.length; i++) {
       const me = people[i]
       const task = taskOf(work, i)
@@ -2681,7 +2754,7 @@ function ErrandVillagers({
         const dx = goal.x - me.x
         const dz = goal.z - me.z
         const d = Math.hypot(dx, dz)
-        const arriveAt = task ? ERRAND_ARRIVE_RADIUS : 0.9
+        const arriveAt = task ? workArrivalRadius(task) : 0.9
         if (d <= arriveAt) {
           if (!task) {
             state.target = null
@@ -2806,6 +2879,16 @@ function ErrandVillagers({
         }
       }
       const pinned = forcedFill.current?.who === i ? forcedFill.current : null
+      // THE LIVE DIP, not only the photographed one. `filling` came from the dev
+      // route alone, so the fill pose existed for the camera and never for a
+      // player: in the game the carrier stood UPRIGHT at the water for
+      // `bankFillSeconds` and then simply had a full jar on his head — the very
+      // thing the user could not read on 06.09.2026, and the act this point owes.
+      // The errand's own phase drives it now; the dev route only overrides which
+      // man is held and how far along his dip is.
+      const dipping = task && task.arrived && task.phase === 'fill'
+        ? Math.min(1, task.dug / balance.bankFillSeconds)
+        : null
 
       // WHAT HE IS CARRYING, and what that does to his body: jars keep their
       // established positions; the digging tool lives in the hand pivot so the
@@ -2823,7 +2906,7 @@ function ErrandVillagers({
       const pose = poses.current[i].current
       const gesture = gestures.current[i]
       gesture.current = advanceGesture(gesture.current, dt)
-      const filling = pinned ? pinned.progress : null
+      const filling = pinned ? pinned.progress : dipping
       if (filling !== null) {
         state.dug = 0
         // The jar rides the dipping hand of its own accord — it hangs inside the
@@ -2876,7 +2959,7 @@ function ErrandVillagers({
       if (g) {
         // The same walking bob the other inhabitants ride, off the distance this
         // villager has actually covered rather than off a wall clock.
-        g.position.set(me.x, Math.abs(Math.sin(state.walked * 3.4 + i * 2)) * 0.05, me.z)
+        g.position.set(me.x, groundHeight(me.x, me.z) + Math.abs(Math.sin(state.walked * 3.4 + i * 2)) * 0.05, me.z)
         const facing = forcedFill.current?.who === i ? forcedFill.current.facing : null
         if (facing !== null) yaws.current[i] = facing
         g.rotation.y = yaws.current[i]
@@ -2890,19 +2973,16 @@ function ErrandVillagers({
       }
     }
 
-    const said = stepAdultWork(work, view, dt, cfg, rand)
+    stepAdultWork(work, view, dt, cfg, rand)
     const progress = digProgressOf(work, geography.digSites.length)
-    if (progress.some((site, i) => site.strikes !== (reportedStrikes.current[i] ?? 0))) {
-      reportedStrikes.current = progress.map((site) => site.strikes)
-      onDigProgress(progress)
-    }
-    if (said) {
+    onDigProgress(progress)
+    for (const said of work.emitted) {
       // The speaker turns to what he is talking about before he says it: a word
       // thrown over a shoulder at nothing reads as nothing at all.
       const speaker = people[said.speaker]
       if (speaker) {
         yaws.current[said.speaker] = Math.atan2(said.aim.x - speaker.x, said.aim.z - speaker.z)
-        speakWork(said, speaker, yaws.current[said.speaker], refs.current[said.speaker], gestures.current[said.speaker])
+        speakWork(camera, said, speaker, yaws.current[said.speaker], refs.current[said.speaker], gestures.current[said.speaker])
       }
     }
   })
@@ -2915,9 +2995,12 @@ function ErrandVillagers({
     w.__placeErrands = () => ({
       staged: { ...work.staged },
       last: work.last ? { ...work.last } : null,
+      standJars: work.standJars,
       geography: {
         waterHead: geography.waterHead,
         waterFoot: geography.waterFoot,
+        waterFill: geography.waterFill,
+        waterStand: geography.waterStand,
         digSites: geography.digSites.map((d) => ({ ...d })),
       },
       digProgress: digProgressOf(work, geography.digSites.length),
@@ -2959,7 +3042,11 @@ function ErrandVillagers({
           z: p.z,
           free: p.free,
           digging: isDigging(work, i),
-          filling: forcedFill.current?.who === i ? forcedFill.current.progress : null,
+          filling: forcedFill.current?.who === i
+            ? forcedFill.current.progress
+            : task && task.arrived && task.phase === 'fill'
+              ? Math.min(1, task.dug / balance.bankFillSeconds)
+              : null,
           yaw: yaws.current[i] ?? 0,
           drawn: { squatY: g ? g.scale.y : null, handY, headAspect },
           carry: carryOf(work, i),
@@ -3008,18 +3095,16 @@ function ErrandVillagers({
             squat={(squats.current[i] ??= { current: 1 })}
             handProp={
               <>
-                <mesh
+                <group
                   ref={(el) => {
                     handJars.current[i] = el
                   }}
                   visible={false}
                   position={[0, -0.12, 0.04]}
                   rotation={[0, 0, 0.12]}
-                  castShadow
                 >
-                  <cylinderGeometry args={[0.12, 0.16, 0.32, 8]} />
-                  <meshStandardMaterial color="#8a5a30" roughness={0.9} />
-                </mesh>
+                  <Jar full={false} />
+                </group>
                 <group
                   name="digging-tool"
                   ref={(el) => {
@@ -3040,20 +3125,162 @@ function ErrandVillagers({
               </>
             }
           />
-          <mesh
+          <group
             ref={(el) => {
               headJars.current[i] = el
             }}
             visible={false}
             position={[0, 1.5, 0]}
-            castShadow
+            // A carried jar is not a plumb cylinder: a small lean turns the
+            // mouth off the vertical, which is what lets any of the water in it
+            // be seen from a standing eye rather than only its rim edge-on.
+            rotation={[0.16, 0, 0.1]}
           >
-            <cylinderGeometry args={[0.12, 0.16, 0.32, 8]} />
-            <meshStandardMaterial color="#8a5a30" roughness={0.9} />
-          </mesh>
+            <Jar full />
+          </group>
         </group>
       ))}
+      {geography.waterStand && (
+        <WaterStand x={geography.waterStand.x} z={geography.waterStand.z} jarRefs={standJars} />
+      )}
     </>
+  )
+}
+
+// --- The water carrier's jar (work-order 1087) -----------------------------
+//
+// BOTH JARS ARE THE SAME VESSEL, and it is OPEN. It used to be one closed opaque
+// cylinder in both states, and the full one was the empty one moved onto the
+// head: the user (06.09.2026) could see no water in it and therefore could not
+// tell that water was being fetched. The mouth is open now, and what stands
+// inside it is what tells the two apart at a glance — a dark hollow in the empty
+// one, the river's own tone at the rim in the full one.
+//
+// The rim is FLARED past the body's waist. A head-carried jar sits near the
+// player's own eye height, so its mouth is seen at a shallow angle; a wider
+// mouth is a wider ellipse, which is what makes the reading survive the
+// distance the player watches from.
+const JAR_RIM_R = 0.155
+const JAR_WAIST_R = 0.16
+const JAR_BASE_R = 0.13
+const JAR_HEIGHT = 0.32
+/** How far below the rim the water stands in a full jar, and the hollow in an
+ *  empty one. The full one is brim-full; the empty one is a shadow well down. */
+const JAR_WATER_DROP = 0.03
+/** How flat the meniscus is against the hemisphere its geometry starts from.
+ *  A FULL hemisphere of the rim's radius stands 0.117 m over a jar 0.32 m tall —
+ *  a ball on a pot, not water in it, and not the "shallow dome standing slightly
+ *  proud of the rim" its own drawing describes. Flattened to a fifth of the
+ *  jar's height it clears the rim by about 6.5 cm — judged at the picture:
+ *  3 cm left a stripe too thin to read at the distance a player watches from,
+ *  and the full hemisphere read as a ball sitting on a pot. */
+const JAR_MENISCUS_FLATTEN = 0.65
+const JAR_HOLLOW_DROP = 0.13
+
+function Jar({ full }: { full: boolean }) {
+  return (
+    <>
+      <mesh castShadow>
+        <cylinderGeometry args={[JAR_RIM_R, JAR_WAIST_R, JAR_HEIGHT, 14, 1, true]} />
+        {/* Double-sided: the inner wall is half of what an open mouth reads as. */}
+        <meshStandardMaterial color="#8a5a30" roughness={0.9} side={THREE.DoubleSide} />
+      </mesh>
+      {/* The base, so the vessel is a jar and not a tube. */}
+      <mesh position={[0, -JAR_HEIGHT / 2, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <circleGeometry args={[JAR_BASE_R, 14]} />
+        <meshStandardMaterial color="#6b4423" roughness={1} side={THREE.DoubleSide} />
+      </mesh>
+      {/* What is IN it. The full jar's water is a shallow DOME standing slightly
+          proud of the rim, not a flat disc in it: a head-carried jar's mouth
+          sits at about 1.66 m and the player's eye at about 1.6 m, so a disc
+          inside the rim is edge-on from every standing distance and reads as
+          nothing. A meniscus breaks the rim line and shows as a bright cap. */}
+      {full ? (
+        <mesh position={[0, JAR_HEIGHT / 2 - JAR_WATER_DROP, 0]} scale={[1, JAR_MENISCUS_FLATTEN, 1]}>
+          <sphereGeometry args={[JAR_RIM_R - 0.008, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />
+          <meshStandardMaterial
+            color={RIVER_WATER_TONES.sheen}
+            roughness={0.14}
+            metalness={WATER_METALNESS}
+            emissive={RIVER_WATER_TONES.deep}
+            emissiveIntensity={0.35}
+          />
+        </mesh>
+      ) : null}
+      <mesh
+        position={[0, JAR_HEIGHT / 2 - (full ? JAR_WATER_DROP : JAR_HOLLOW_DROP), 0]}
+        rotation={[-Math.PI / 2, 0, 0]}
+      >
+        <circleGeometry args={[full ? JAR_RIM_R - 0.012 : JAR_WAIST_R - 0.02, 14]} />
+        {full ? (
+          // The river's own sheen, glossy like the water it came from, with a
+          // little light of its own so the disc still reads in the shade of the
+          // carrier's own head.
+          <meshStandardMaterial
+            color={RIVER_WATER_TONES.sheen}
+            roughness={0.14}
+            metalness={WATER_METALNESS}
+            emissive={RIVER_WATER_TONES.deep}
+            emissiveIntensity={0.35}
+            side={THREE.DoubleSide}
+          />
+        ) : (
+          <meshStandardMaterial color="#241a12" roughness={1} side={THREE.DoubleSide} />
+        )}
+      </mesh>
+    </>
+  )
+}
+
+/**
+ * THE VILLAGE WATER STAND (work-order 1087): a low platform beside the fire
+ * where the filled jars are set down. It is what gives the errand's return leg a
+ * destination — the carrier used to walk to a radius, where his task was nulled
+ * and the full jar vanished in the same frame.
+ *
+ * It draws `jars` of them, capped by the errand state at
+ * `balance.waterStandCapacity`, so a delivery past the cap replaces the oldest
+ * standing jar rather than piling one more on.
+ */
+function WaterStand({ x, z, jarRefs }: { x: number; z: number; jarRefs: RefObject<Array<THREE.Object3D | null>> }) {
+  return (
+    <group position={[x, 0, z]}>
+      {/* Four short posts and a plank top — the same worn timber the village's
+          other frames are built from. */}
+      {[
+        [-0.34, -0.34],
+        [0.34, -0.34],
+        [-0.34, 0.34],
+        [0.34, 0.34],
+      ].map(([px, pz]) => (
+        <mesh key={`${px},${pz}`} position={[px, 0.16, pz]} castShadow>
+          <cylinderGeometry args={[0.05, 0.06, 0.32, 5]} />
+          <meshStandardMaterial color="#5f4526" roughness={0.95} />
+        </mesh>
+      ))}
+      <mesh position={[0, 0.35, 0]} castShadow receiveShadow>
+        <boxGeometry args={[0.92, 0.07, 0.92]} />
+        <meshStandardMaterial color="#6b5433" roughness={0.92} />
+      </mesh>
+      {Array.from({ length: balance.waterStandCapacity }, (_, i) => {
+        // Set down in a row across the plank, so three read as three. All of
+        // them are mounted once and the frame loop shows as many as stand there.
+        const spread = 0.28
+        const offset = (i - (balance.waterStandCapacity - 1) / 2) * spread
+        return (
+          <group
+            key={i}
+            ref={(el) => {
+              if (jarRefs.current) jarRefs.current[i] = el
+            }}
+            visible={false}
+            position={[offset, 0.385 + JAR_HEIGHT / 2, i % 2 === 0 ? 0.04 : -0.06]}
+          >
+            <Jar full />
+          </group>
+        )
+      })}
+    </group>
   )
 }
 
@@ -3071,6 +3298,7 @@ function ErrandVillagers({
  * generic "come" reading.
  */
 function speakWork(
+  camera: THREE.Camera,
   said: SpokenWord,
   speaker: { x: number; z: number },
   yaw: number,
@@ -3082,11 +3310,11 @@ function speakWork(
     ? Math.hypot(speaker.x - placePlayerPosition.x, speaker.z - placePlayerPosition.z)
     : Infinity
   const utterance = utteranceOf(said.concept)
-  playSpeech(utterancePlan(utterance, distance))
+  playSpeech(utterancePlan(utterance, distance, { bearing: speechBearing(camera, speaker) }))
   if (speechReach(distance).audible) {
     useGame.getState().hearUtterance(utterance)
     if (anchor) {
-      speakOverhead(`villager-${said.speaker}`, [utterance], anchor, { seconds: speechLabelSeconds(1) })
+      speakOverhead(`villager-${said.speaker}`, [utterance], anchor, { floor: true, seconds: speechLabelSeconds(1) })
     }
   }
   gesture.current = gestureIfHeard(distance, said.purpose === 'invitation' ? 'beckon' : 'indicate', {
@@ -3097,6 +3325,7 @@ function speakWork(
 
 /** Standing traders on the plaza that slowly look around. */
 function Traders({ seed, cloth }: { seed: number; cloth: string[] }) {
+  const groundHeight = usePlaceGround()
   const spots = useMemo(() => {
     const rand = mulberry32((seed + 913) >>> 0)
     return [
@@ -3120,7 +3349,7 @@ function Traders({ seed, cloth }: { seed: number; cloth: string[] }) {
       {spots.map((s, i) => (
         <group
           key={i}
-          position={[s.x, 0, s.z]}
+          position={[s.x, groundHeight(s.x, s.z), s.z]}
           ref={(el) => {
             refs.current[i] = el
           }}
@@ -3181,6 +3410,7 @@ export function PlaceLife({
   digSites,
   bank,
   waterPath,
+  waterStand,
   playRocks,
   playGround,
   rocks,
@@ -3205,8 +3435,12 @@ export function PlaceLife({
    *  (work-order 482): the ground the children's stage stands on. */
   bank: PlaceRiverBank | null
   /** The village's water path (work-order 688): its head in the village, where
-   *  both carriers speak, and its foot at the river, where neither does. */
-  waterPath: { head: { x: number; z: number }; foot: { x: number; z: number } } | null
+   *  the carriers speak, its foot at the river, where neither does, and the
+   *  fill spot in the water where the jar is dipped (work-order 1087). */
+  waterPath: { head: { x: number; z: number }; foot: { x: number; z: number }; fill: { x: number; z: number } } | null
+  /** The village water stand (work-order 1087): where the errand is ordered and
+   *  where the filled jars are set down. */
+  waterStand: { x: number; z: number } | null
   /** The two play rocks of the children's bank game (work-order 687), and the
    *  settlement's loose boulders — one of which a child climbs and names while
    *  the group roams, so ROCK is heard at a stone that is no part of the game. */
@@ -3228,6 +3462,9 @@ export function PlaceLife({
   /** Publishes strike-quantized progress to the site meshes in PlaceScene. */
   onDigProgress: (progress: readonly DigSiteProgress[]) => void
 }) {
+  const speechTime = useRef(0)
+  useFrame((_, dt) => { speechTime.current += Math.min(dt, 0.1) })
+  const speechFloor = useMemo(() => new SpeechFloor(() => placePlayerPosition, () => speechTime.current, placeId), [placeId])
   let hash = 0
   for (const c of placeId) hash = (hash * 31 + c.charCodeAt(0)) | 0
   const localSeed = (seed ^ hash) >>> 0
@@ -3301,9 +3538,11 @@ export function PlaceLife({
     () => ({
       waterHead: waterPath ? { x: waterPath.head.x, z: waterPath.head.z } : null,
       waterFoot: waterPath ? { x: waterPath.foot.x, z: waterPath.foot.z } : null,
+      waterFill: waterPath ? { x: waterPath.fill.x, z: waterPath.fill.z } : null,
+      waterStand: waterStand ? { x: waterStand.x, z: waterStand.z } : null,
       digSites,
     }),
-    [waterPath, digSites],
+    [waterPath, waterStand, digSites],
   )
 
   // WHERE they play comes from the LAYOUT (work-order 688): far enough from
@@ -3400,11 +3639,13 @@ export function PlaceLife({
       <ColdCloaksContext.Provider value={cloaks}>
         <LimbDetailContext.Provider value={limbSegments}>
           <InhabitantBodiesContext.Provider value={inhabitantBodies}>
+          <SpeechFloorContext.Provider value={speechFloor}>
             <Porters seed={localSeed} stops={buildings} cloth={style.cloth} colliders={colliders} count={1 + size} />
             <Traders seed={localSeed} cloth={style.cloth} />
             <Talkers x={PORT_TALKERS[0]} z={PORT_TALKERS[1]} cloth={style.cloth} />
             <Walkers seed={localSeed} homes={homes} errands={errands} cloth={style.cloth} count={2 + size * 2} colliders={colliders} />
-          </InhabitantBodiesContext.Provider>
+          </SpeechFloorContext.Provider>
+        </InhabitantBodiesContext.Provider>
         </LimbDetailContext.Provider>
       </ColdCloaksContext.Provider>
     )
@@ -3413,6 +3654,7 @@ export function PlaceLife({
     <ColdCloaksContext.Provider value={cloaks}>
       <LimbDetailContext.Provider value={limbSegments}>
         <InhabitantBodiesContext.Provider value={inhabitantBodies}>
+          <SpeechFloorContext.Provider value={speechFloor}>
           <Cook x={firePos[0] + 1.2} z={firePos[1] + 1.0} cloth={style.cloth[0]} />
           <Weaver x={-8.5} z={-7} cloth={style.cloth[1 % style.cloth.length]} weave={style.bandColor} />
           <Kids
@@ -3431,6 +3673,7 @@ export function PlaceLife({
           {/* The adults at their errands (point 483): the five landscape and
               action concepts, taught by what the villagers visibly go and do. */}
           <ErrandVillagers
+            placeId={placeId}
             childBodies={childBodies}
             seed={localSeed}
             cloth={style.cloth}
@@ -3471,6 +3714,7 @@ export function PlaceLife({
               startDelay={9}
             />
           )}
+        </SpeechFloorContext.Provider>
         </InhabitantBodiesContext.Provider>
       </LimbDetailContext.Provider>
     </ColdCloaksContext.Provider>

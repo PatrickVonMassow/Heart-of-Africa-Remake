@@ -77,551 +77,54 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1087. The water carrier visibly fills the jar at the water and carries visible water
-  (user 06.09.2026; the former point 1066; SPLIT BACK OUT OF POINT 1065 on 10.09.2026 on the
-  user's instruction, 02:15).
-  WHY IT IS ITS OWN POINT AGAIN. It was folded into 1065 on 07.09.2026 to save a regression
-  run. Measured over three days on feat/1065-teaching-hands-touch: 36 commits, about sixty
-  picture runs, and every red of the last two days belonged to this half while the tap half
-  stood green. The fold bought no run and cost the other half its landing.
-  IT IS BLOCKED ON TWO THINGS, NEITHER OF WHICH IS ITS OWN WORK.
-  - Point 1085 owes the DESIGN decision. The fill pose reads as a man falling into the river,
-    and a jar proved to be under an OPAQUE water surface cannot be photographed at all. No
-    camera position fixes either; four were re-aimed in one evening and all four came back
-    with the same reading.
-  - Point 1086 owes the LADDER this point's evidence needs. Measured 10.09.2026: the
-    `adult-errands` section rung ran twelve times on 09.09. and was GREEN every time (18 pass,
-    0 fail, last at 22:40), and the LARGE run then failed the same two checks — "no carrier was
-    ever seen filling a jar", 1 errand cast in the window, phases [invite×832 wait×583
-    walk×550 fetch×33]. A rung that reads green while the suite is red cannot guide this
-    point's iteration, and iterating on the full suite is what cost the three days.
-  START FROM THE BRANCH, NOT FROM SCRATCH. feat/1065-teaching-hands-touch already holds the
-  walk to the waterline, the fill phase, the dispatch and the water stand, and those are not
-  in doubt. What it does not hold is a pose that reads and a check that predicts. Cut a fresh
-  branch from main after 1085 has decided, and carry over what survives that decision.
-  The filling of the jar READS as filling. Today the RIVER errand sends an adult with an
-  empty jar to the foot of the water path and back with a full one, and nothing in between is
-  shown: the foot (`bankWaterFoot`, `riverBank.ts`) stands `BANK_STAND_INSET` 1.5 m inside the
-  walkable edge while the waterline lies `BANK_SHORE_HALF` 1.2 m beyond it, so the carrier
-  halts about 2.7 m from the water; the carry flips 'emptyJar' → 'fullJar' between the
-  'water-out' and 'water-back' situations (`adultWork.ts` ~390-410) with no act; and both jars
-  are one closed opaque cylinder (`PlaceLife.tsx` ~2557-2612), the full one merely moved onto
-  the head. The user (06.09.2026) could not tell that water was being fetched — and this
-  errand is where RIVER is learned (design.md §13.4).
-  Final state:
-  - The carrier goes TO the water: the errand's last leg walks down the shore to the
-    waterline (the walkable region already reaches through it to `balance.bankWadeDepth`,
-    `riverBank.ts`), and he stands with his feet at the water's edge or ankle-deep, never
-    2.7 m up the bank. The path's foot for the WORD (`say.aim`) may stay where it is; the
-    fill spot is at the water.
-  - The fill is an ACT with its own phase: he crouches or bends, the jar in his hand goes
-    down into the water, stays there a readable moment (calibratable seconds in
-    `src/config/balance.ts`), comes up, and is lifted onto the head (a fill pose beside
-    `digPose` / `HEAD_CARRY_POSE`). 'fullJar' begins only after the dip; the carry never
-    flips without it. The errand's timing backstops (`errandSeconds`, `stallSeconds`) cover
-    the added leg.
-    SPLIT OFF 09.09.2026 (evening): whether that act READS as fetching water — the words
-    "visibly below the drawn surface" stood here — is point 1085. This point owes the act,
-    its phase, its hold and the geometry the check measures; it does not owe the legibility
-    of the pose, which four re-aimed frames could not deliver and which needs a design
-    decision about the figure rather than another camera position.
-  - Water is visible: both jars have an open mouth; the empty one shows a dark hollow, the
-    full one a water surface at the rim (a bright disc with the water's tint, readable at
-    the distance the player watches from) — so head-carried and hand-carried jars read as
-    full and empty at a glance, on both backends.
-  - THE ERRAND IS A DISPATCH, NOT A COMMENTARY (user 07.09.2026, replacing this part's
-    earlier sentence that nothing about who is cast or when changes). Today the inhabitant
-    narrates his own act, which reads as staged for the player; DIG works because one man's
-    word sends another. RIVER now does the same:
-    - ONE ROUND TRIP, NOT TWO CASTINGS. `water-out` and `water-back` stop being independently
-      cast situations (`adultWork.ts` ~390-412) and become legs of a single errand held by one
-      carrier. Both ids survive as leg labels, so the lexicon bookkeeping and the staged
-      counters are unchanged.
-    - THE WORD IS THE ORDER. At the village water stand an adult A turns to a free adult B,
-      says RIVER and points at the water; B takes the empty jar and goes.
-    - BOTH UTTERANCES FALL INSIDE THE VILLAGE, at the stand, no longer at the water path head
-      (`WATER_PATH_HEAD_RADIUS` 15, `layout.ts` ~222) — which also keeps the errand's speech
-      clear of the children's bank game.
-    - NO WORD FALLS AT THE WATER: the fill is silent and is the act this part already
-      specifies.
-    - THE RETURN HAS A DESTINATION. B walks back to the stand, sets the jar down (carry →
-      none) and says RIVER a second time, addressed to A, who is still standing there.
-    - THE STAND IS DRAWN: a water stand beside the existing `VILLAGE_FIRE` anchor
-      (`layout.ts` ~247), which already has a collider and is the plausible consumer. It holds
-      up to three standing jars; a fourth delivery replaces the oldest, so no consumer logic
-      is needed. Capacity calibratable in `balance.ts`.
-    - TWO ADULTS, NOT THREE. Water fetching gains no pair mechanics — no partner, no
-      `invitationClear` for a second adult; those stay with DIG, where two people are
-      materially required. The escort half of the user's first framing was withdrawn by his
-      own later message; what it was for (keeping the speech away from the shore) is
-      delivered by moving both utterances into the village.
-    - DELETED with the second casting: `WATER_FOOT_REACH` (`adultWork.ts` ~119) and its
-      `nearestFree` caller.
-    - THE WATER WORD IS GATED BY A HEARING CHILD exactly as the two DIG utterances are; today
-      only the DIG branches carry that check (`adultWork.ts` ~328-333).
-    - THE RULE THE DEFECT VIOLATED, written into the spec: NO VILLAGER SPEAKS TO NOBODY.
-      Every utterance has an addressee who reacts and a consequence the player sees; the
-      teaching comes from the act that follows the word, never from a word spoken beside an
-      act.
-    - THE WATER READING IS ACCEPTED, NOT CLOSED. A player may read the second RIVER as WATER;
-      the chief's message carries just as well as WATER · UPSTREAM · ROCK · DIG. Written down
-      beside the three readings ROCK deliberately closes.
-    The measured defect behind this (07.09.2026): the full jar comes from nowhere
-    (`water-back` sets `fullJar` at cast time), the same man goes down and comes up (the
-    nearest free adult within 4 m of the water foot is in practice the one who just
-    finished), and the return's goal is the path head at radius 15, where the task is nulled
-    and the full jar vanishes in the same frame. The code follows
-    docs/communication-poc-spec.md:115 literally — a gap in the SPEC, not an implementation
-    defect against it.
-  - Doc: design.md §13.4 ('the adults' water and digging work') states the dip at the
-    waterline AND the dispatch; docs/communication-poc-spec.md likewise where it describes
-    the errand, plus the no-villager-speaks-to-nobody rule and the accepted WATER reading.
-
-  Test. Vitest: the fill spot lies within a small tolerance of the waterline for the three
-  river villages (nubian, bambara, mandinka), a 'fill' phase sits between the walk down and
-  the walk back with 'fullJar' set only after it, and the phase lasts its configured seconds;
-  for the dispatch, 'fullJar' only inside ONE continuous errand record, every water utterance
-  naming an addressee villager index, the return leg's goal being the stand rather than the
-  path head, and the stand holding at most three jars.
-  Browser (LARGE, both backends — the water surface is backend-sensitive): a picture check of
-  the fill measuring what 1085 decides it must measure, and one of the return walk measuring
-  the water disc at the head jar's rim. The narrow rung is `polish --section=adult-errands`,
-  and per 1086 it counts only once it measures what the full suite measures.
-  Screenshots (verification/, subjects declared: the sending adult and the departing carrier at
-  the village water stand; the carrier at the waterline; the carrier walking back with the full
-  jar).
-  Quotes:
-  Nutzer, 06.09.2026 13:48: »Man erkennte das Auffüllen des Kruges mit Wasser nicht als solches. Das liegt an mehreren Problemen: Der Erwachsene geht nicht nah genug an den Fluss, für die Tätigkeit des Auffüllens fehlt eine Darstellung (ich würde erwarten, dass er den Krug in die Hand nimmt und ins Wasser taucht) und wenn er ihn dann gefüllt auf dem Kopf trägt, sieht man darin kein Wasser.«
-  Nutzer, 07.09.2026 19:25: »Kannst du weitere Zusammenführungen von offenen Punkten zur
-  Kommunikationsmechanik vornehmen, um Regressionsdurchläufe einzusparen?« — daraufhin ist
-  der frühere Punkt 1066 hier als PART B eingefaltet worden.
-  Nutzer, 07.09.2026: »Der Einwohner kommentiert seine Handlungen. Das ist nicht organisch,
-  sondern offensichtlich nur dafür da, dem Spieler das Wort RIVER zu vermitteln. Bei DIG ist
-  das besser, weil ein Einwohner durch Benutzung des Wortes einen anderen dazu auffordert,
-  mitzukommen, um ihm beim Graben zu helfen.«
-  Nutzer, 07.09.2026: »Wasserholen soll eine Kombination aus Entsendung und Einholung einer
-  Begleitung sein. Beides soll möglichst weit weg vom Fluss passieren.« — die Begleitung hat
-  der Nutzer im selben Zug wieder zurückgenommen: »Insgesamt sind es mir mit 3 beteiligten
-  Erwachsenen beim Wasserholen jetzt doch zu viele.«
-  Nutzer, 07.09.2026: »Aber das wäre gar nicht schlimm, weil die Häuptlingsbotschaft WATER
-  UPSTREAM ROCK DIG genauso gut funktionieren würde wie mit RIVER. Insofern ist es okay, dann
-  nochmal RIVER zu sagen.«
-  Nutzer, 07.09.2026: »Reihe das alles so ein. Fasse dabei sinnvoll zusammen und/oder hänge
-  einzelne Aspekte an bereits bestehende Tasks, um Regressionsläufe einzusparen.« — deshalb
-  steht die Entsendung hier statt als eigener Punkt: PART B öffnet ohnehin adultWork.ts, den
-  Wasserpfad, die Krug-Meshes und denselben LARGE-Bildlauf.
-  Refs: src/scenes/place/adultWork.ts (water-out/water-back ~390-410, AdultCarry,
-  WATER_FOOT_REACH), src/scenes/place/riverBank.ts (bankWaterFoot, BANK_STAND_INSET 1.5,
-  BANK_SHORE_HALF 1.2, walkable region through the waterline ~47-62), src/scenes/place/layout.ts
-  (waterPath head/foot, VILLAGE_FIRE anchor), src/render/figures.ts, src/render/gesture.ts
-  (fillPose), src/scenes/place/PlaceLife.tsx (ErrandVillagers, head/hand jar meshes ~2440-2612,
-  HEAD_CARRY_POSE), scripts/verify/polish.mjs (adult-errands), design.md §13.4,
-  docs/communication-poc-spec.md, points 1085, 1086, 1065.
-  Doc impact: design.md §13.4 and docs/communication-poc-spec.md where they describe the
-  errand: the carrier dips the jar at the waterline and carries visible water back, plus the
-  no-villager-speaks-to-nobody rule and the accepted WATER reading. balance.ts: fill seconds
-  and stand capacity (calibratable).
+- [ ] 1131. Nobody in the village fetches water, and the two standing at the water place just
+  stand there (user 15.09.2026, two reports, ranked here directly behind his previous
+  front-order 1124).
+  The reports, verbatim: "Neuer Bugreport \"KeinWasserholen.zip\" unter Backup in local" and,
+  as his addendum: "WasserstelleGefundenKeinerHolt.zip - die Stelle habe ich gefunden (war die
+  vorher auch schon da?), aber die zwei stehen da nur und holen kein Wasser."
+  THE EVIDENCE IS IN THE REPOSITORY: `local/KeinWasserholen.zip` and
+  `local/WasserstelleGefundenKeinerHolt.zip` (copied from the backup 15.09.2026, 16:26; the
+  folder is ignored, so they travel with the checkout and not with git).
+  NOT YET MEASURED — that is this point's first act: read both dumps, name the settlement and
+  seed, and say whether the water errand is never dispatched, dispatched and never walked, or
+  walked and never reported. The water errand and its hold rules are the subject of the
+  decisions already standing on the board ("Ein gestautes Wort darf seine Aufgabe nicht
+  überleben"), so check whether a hold or a task expiry swallows the errand before blaming the
+  dispatcher.
+  TWO MEASUREMENTS ALREADY ON RECORD point at this exact spot and belong in the first reading.
+  `docs/backlog.md` "Das Wasserpaar findet im ersten Anlauf nicht zusammen" (14.09.2026): the
+  WebGL 2 run of `polish --section=adult-errands` was red on its first attempt with "no carrier
+  reached the fill phase in 180 s" and "[ASSERT] adult-pair-never-met — water-back: villager 1
+  expired still on his way to the walk word; the pair never assembled" — that is the user's
+  picture exactly, and an EXPIRY, which is why the hold/expiry check above comes before the
+  dispatcher. `docs/backlog.md` "Wasserholen der Erwachsenen ist ein Kreislauf ohne Ziel"
+  (07.09.2026) holds the second half: the full jar is cast out of nothing and `water-out` ends at
+  the water without ever returning full.
+  ALSO ANSWER HIS QUESTION in the closing report — was the water place there before? — from the
+  history of the settlement layout, not from memory.
+  Criticality: medium — the village reads as inhabited only while its people do their work, and
+  §7.1 criterion 15 (lively settlements) is measured on exactly this.
   Bundle: Dorfleben.
 
-- [ ] 1072. The village speaks with a direction, and the children sound like children (user
-  07.09.2026, deciding the first two of the six shore-call aspects).
-  Measured 07.09.2026: `src/` holds no `PannerNode`, `createPanner`, `StereoPanner` or
-  `PositionalAudio` at all. `speaking.ts` `phrasePlan` takes a scalar distance and returns a
-  scalar peak, and `ambience.ts` routes every syllable through ONE mono `speechBus`. All
-  village speech therefore arrives dead centre whatever the bearing to the speaker. Every
-  figure in the game also shares one carrier pitch and one interval
-  (`speechPitchHz` 140, `speechPitchInterval` 1.68, a major sixth), so a child and a grown
-  man are acoustically the same voice. That is the hardest case an ear can be given: two
-  voices at a similar distance cannot be separated at all, and the level says nothing.
-  This is why the adults are hushed whenever a child can hear them — separation is
-  impossible today, so overlap has to be PREVENTED instead of heard through. It is also the
-  precondition for letting a call carry further than the hearing radius (point 1073): a
-  louder village without direction is a louder mush.
-  Final state:
-  - Every spoken syllable arrives from the DIRECTION of its speaker: one stereo position per
-    utterance, taken from the bearing camera -> speaker when the utterance is planned. A
-    speaker straight ahead stays centred, the position is bounded so no voice leaves the
-    stage, and a speaker behind the camera keeps a stable side instead of flipping.
-  - The children speak a HIGHER low/high pair than the adults. The two-tone relation itself
-    is untouched — the pair is TRANSPOSED, not re-intervalled — because the exact tonal
-    mirror of low against high carries the whole language (`lexicon.ts`, the UPSTREAM /
-    DOWNSTREAM pair). The adults keep today's pair.
-  - Panning never costs level: an utterance is not quieter for having been panned, and a
-    mono output (device or comfort setting) loses the direction and nothing else.
-  - Both pitch pairs and the stereo width are calibratable fields in `balance.ts`, with the
-    English and German debug labels changed together.
-  - THE VILLAGE ALSO GETS LOUDER (user 07.09.2026: »Insgesamt soll die Sprache auch lauter
-    sein«). Two more fields, both calibratable:
-    - SPEECH GETS ITS OWN VOLUME: DONE before this point was reached, by "Give the village
-      speech its own bus instead of the 'everything else' slider" — `communication.speechVolume`
-      is 2 and a dedicated `speechBus` carries it to the master, so the syllables no longer ride
-      the ambient bus at all. CORRECTED 10.09.2026 on GPT-6 Astra's escalation, which measured
-      the tree the earlier sentence claimed: `SPEECH_PEAK` is NOT gone — `speaking.ts`:64 still
-      defines it as 1.8 and `phrasePlan` still multiplies it into every syllable's peak
-      (`speaking.ts`:141). It STAYS, unchanged and un-recalibrated: the loudness the user asked
-      for is already delivered by `speechVolume` 2, and a second, unmeasured multiplier on top
-      of it is exactly the guesswork the last bullet of this group forbids. Only its DOC COMMENT
-      is wrong and is corrected with the change — it still says the constant compensates
-      "the ambient bus (0.5) x master (0.5)", a chain the speech bus replaced. If the headroom
-      re-measure below shows the level leaving the chain is unsafe or too quiet, THAT
-      measurement — not the plan — moves the constant. What is left of the loudness half is the
-      FALLOFF below.
-    - THE HEARING FALLOFF IS RE-CALIBRATED. `hearingGain` is 1/(1 + falloff·(d/r)²) with a
-      hard cut past r (`speaking.ts` ~78-87) and `hearingFalloff` is 24 (`balance.ts`:1437):
-      a speaker 3 m away arrives at 31.6 % and one 5 m away at 14.3 % of the level beside
-      him. Two adults standing together must be plainly audible to a player standing with
-      them; at falloff 4 the same distances give 73.5 % and 50.0 %.
-    - THE VALUES ARE MEASURED, NOT GUESSED: the new level is taken at the shipped defaults
-      over the drum bed and the ambience, not asserted from the plan.
-  - The deployed-graph speech headroom assertion is RE-MEASURED for the new carriers, the
-    added node AND the raised level, and still judges the level that LEAVES the chain rather
-    than the level the plan asked for (point 589, rule 1).
-  Test: Vitest over the plan and the graph — bearing -> stereo position for the
-  straight-ahead, hard-side and behind-the-camera cases, the mono fallback losing direction
-  but not level, the child carriers lying above the adult ones while the interval is
-  preserved for both, and a level measured at 3 m and at the hearing rim. Browser (audio
-  lane, WebGL 2 per the §7.2 routing): two overlapping village voices measured at different
-  stereo positions with the headroom assertion green at the raised level.
-  Criticality: normal — it changes how the village sounds and unblocks 1073, but nothing the
-  player can already do breaks if it lands late.
-  Quotes:
-  Nutzer, 07.09.2026: »Okay, dann brauchen wir einen StereoPanner. Zudem sollen die Kinder
-  zwei Tonhöhen verwenden, die höher sind als bei den Erwachsenen. Dann klingt es auch mehr
-  nach Kinderstimmen.«
-  Nutzer, 07.09.2026 19:08 (Einreihung aller sechs Aspekte): »Setze alle 6 Punkte so um, wie
-  jetzt in der Karte beschrieben. Fasse dabei sinnvoll Punkte zusammen, sodass nicht alles in
-  einzelnen Tasks steht, von denen jeder für sich einen teuren Regressionstest benötigt.« —
-  dieser Punkt fasst die Aspekte 1 und 2 zusammen, weil beide denselben Audiographen
-  anfassen und dieselbe Headroom-Nachmessung erzwingen.
-  Nutzer, 07.09.2026: »Insgesamt soll die Sprache auch lauter sein und beim neu eingeführten
-  Rufen (Task 1073) noch lauter - nicht nur weiter tragen.« — die Gesamtlautstärke und der
-  Abfall stehen hier, weil dieser Punkt als einziger offener Punkt speaking.ts, ambience.ts
-  und den Kommunikationsblock von balance.ts ohnehin öffnet und die Headroom-Nachmessung
-  bereits erzwingt; die Aufteilung nach Stimmlage folgt in 1073.
-  Refs: src/systems/ambience.ts (`speechBus`, `syllableCarrier`, `playSpeech`, the headroom
-  assertion), src/communication/speaking.ts (`phrasePlan`, `hearingGain`),
-  src/communication/lexicon.ts (the direction pair's tonal mirror), src/config/balance.ts
-  (`communication.speechPitchHz`, `speechPitchInterval`), src/i18n/en.ts + src/i18n/de.ts
-  (debug labels), src/systems/ambience.test.ts, design.md §13.4
-  Doc impact: design.md §13.4: village speech carries the speaker's direction, the children's
-  voices sit above the adults', and how loud the village is at conversational distance.
-  balance.ts: both pitch pairs, the stereo width, the speech volume and the re-calibrated
-  falloff (calibratable), with the English and German debug labels changed together.
-  Author lane: astra.
-  Why the lane: the communication mechanic is authored by Astra (user 08.09.2026); the
-  rendered picture, the browser suites and the landing stay in the main session.
-  Bundle: Dorfleben.
-
-- [ ] 1073. A call carries to the stand the game photographs it from, and the hush stops
-  eating words (user 07.09.2026, deciding aspects 3, 4 and 5 of the shore-call card).
-  THE DEFECT, measured 07.09.2026. The bank round announces its direction before every run
-  (`bankGame.ts` `announceRun`, gaplessly, because the run waits on `s.direction !== null`),
-  but the announcer is the runner at the START rock while the catcher taps ROCK at the far
-  one. The rocks stand 19.7 m apart (`riverBank.ts`), `hearingRadius` is 10 m, and it is a
-  HARD cut: beyond it no sound, no label and no pointing gesture (`spokenGesture.ts`
-  `speechReach`, `PlaceLife.tsx` `speakBankUtterance`). The sides swap every run, so a
-  spectator at one rock is in earshot at best every second run, and in the middle he stands
-  9.85 m from both at about 4 % level. Worse, the stand the project itself photographs and
-  judges the game from — `bankPlayRocksView`, back by the stretch's length and off its axis
-  — lies 22.0 m from EITHER rock, so from the documented spectator's place the direction
-  call is never audible at all. Evidence: state dump hoa-state-2026-09-07-1186491426
-  (bambara-village) holds two heard words after a whole session, both of them single-tone
-  non-words; RIVER and both direction words are missing. Test gap: `bankGame.test.ts` checks
-  only the alternation and runs with `utteranceGapSeconds` 0 and no distance evaluation at
-  all.
-  THE SECOND HALF, also measured. `t.hushed` is set at three places in `adultWork.ts` (the
-  invitation, and twice for the site word) and is never taken back inside a running task —
-  the only `delete` sits where a fresh initiator task is cast. `assertNoOwedWord` fires
-  `adult-atom-lost` on `!task.owes || task.hushed === true`, so the flag that CAUSES the
-  deferral is exactly the exemption that permits the word to be dropped. Since the shore
-  game (point 687) the children cross the whole village, so "a child can hear" is far more
-  common than the dig-site placement assumed, and the only way out is the 180 s
-  `errandSeconds` backstop (`stallSeconds` 20 s is declared, settable in the debug menu and
-  set in tests, but read nowhere). That is the same defect as the user's report of two
-  adults standing around doing nothing.
-  Final state:
-  - Carrying distance is a property of the UTTERANCE, not of the village — and it is a VOICE
-    REGISTER, not a bare reach field (user 07.09.2026: calls must be LOUDER, »nicht nur
-    weiter tragen«). A register carries three numbers: reach, loudness and falloff steepness.
-    Two registers, one `balance.ts` block each, passed through the radius parameter
-    `speaking.ts`, `spokenGesture.ts` and `heard.ts` already accept:
-    - CALL — the bank round's `moment` `call` (RIVER), `announce` (the direction) and
-      `arrival` (ROCK at the far rock). About 22 m, and louder: the callers are always
-      children at play, and children at play are louder than adults talking side by side.
-    - TALK — every other utterance, the catcher's `tap` and the off-game `boulder` included,
-      keeping the 10 m `hearingRadius`.
-    WHY THE REACH ALONE DOES NOT FULFIL THIS POINT, computed at the unchanged
-    `hearingFalloff` 24: at the new ~22 m reach the call arrives at 4.8 % at 20 m, 4.0 % at
-    22 m and 4.9 % at 19.7 m — the same ~4 % this point itself cites as the reason the
-    spectator in the middle hears nothing. At falloff 4 the same distances give 23.2 %,
-    20.0 % and 23.8 %. Point 1072 lands the global level and falloff; this point splits them
-    per register.
-    THE HARD CUT IS PRESERVED at each register's own reach: audible stays the same condition
-    as `isWithinHearing`, so nothing is recorded that could not be heard and nothing heard
-    goes unrecorded.
-  - The value is DERIVED, not guessed: it is at least the distance from `bankPlayRocksView`'s
-    stand to either play rock, and the test computes that distance rather than restating it.
-  - Untouched, as the card promises: `hearingRadius` itself, `childrenHear`'s separation
-    budget, the children's-quarter assertion and `invitationClear` — all of which read
-    `hearingRadius` directly and therefore keep their 10 m.
-  - The adults' hush becomes a BOUNDED deferral: `hushed` holds an owed word for at most a
-    calibratable hold, after which the villager speaks anyway or the loss is reported loudly.
-    `assertNoOwedWord` stops taking `hushed === true` as a blanket excuse — a word held past
-    the hold is a defect, not an exemption.
-  - Reception is measured, not assumed, and it is a LEVEL rather than a boolean: over a full
-    bank round watched from the documented stand, the player hears the RIVER call, both
-    direction announcements and the arrival ROCK, each asserted as a measured level at that
-    stand rather than as gain greater than zero. Today that count is zero — and a reach
-    change alone would turn a gain-greater-than-zero test green while the call stayed at ~4 %
-    in the built game, a point landing without reaching its goal.
-  - ONE SPEECH FLOOR FOR THE WHOLE VILLAGE (user 07.09.2026: »Die verschiedenen Abläufe
-    laufen nie gleichzeitig«). Adult work and the bank round ask ONE arbiter instead of each
-    keeping its own time. Today `bankGame`'s `utteranceGapSeconds` is internal to the game and
-    adult work allows at most one word per FRAME (~16 ms, the not-spoken guard), which is no
-    gap at all; nothing coordinates the two, and the label layer holds several labels at once.
-    Measured: an adult errand is cast every ~9 s and lives up to 180 s (`balance.ts`:1357,
-    :1366), so a dig pair overlapping a water carrier is the normal case.
-    - THE UNIT OF EXCLUSIVITY IS THE SITUATION, NOT THE WORD: while a dig bout stands between
-      its two DIGs, or a water errand between its dispatch and its report, no foreign word
-      falls. Two simultaneous dig bouts are therefore impossible too — the case the user
-      judged worst, because DIG followed by DIG from two people cannot be told from one
-      exchange.
-    - THE GAP AFTER A WORD IS A CONSEQUENCE WINDOW: the next word waits until the previous
-      word's effect was visible — the invited adult sets off, the dispatched carrier leaves.
-      Silence teaches nothing; the visible consequence is the lesson. Calibratable.
-    - THE FLOOR MEASURES AT THE PLAYER'S EAR, at the speaking register's own reach rather
-      than a flat 10 m: outside it the village keeps talking, so acceptance criterion 15
-      (lively settlements) is not paid for a confusion that never reaches the player.
-      RECOMMENDED AND DECIDED THIS WAY, with the alternative recorded for veto: if
-      player-dependent behaviour proves too risky in the branch, the global lock is the more
-      robust variant and costs only rarely audible simultaneity. The author records which was
-      built and why.
-    - A QUEUED WORD NEVER EXPIRES: the floor has an upper bound past which it lets the word
-      through — the SAME requirement as the bounded hush above, built ONCE, with the deferral
-      tool pointing at the floor instead of only at `childrenHear`. Without the bound an
-      errand runs into the 180 s `errandSeconds` backstop with a word still owed and trips
-      `assertNoOwedWord`.
-  Test: Vitest — the reach of each utterance moment, `bankPlayRocksView`'s stand-to-rock
-  distance bounding the call reach, a full bank round evaluated from that stand yielding a
-  measured LEVEL for every call word, no two situations overlapping in the speech floor, and
-  a word held past the bound reported as `adult-atom-lost` rather than excused by the flag
-  that caused it. Browser (communication lane): the direction word's label and pointing
-  gesture present in a frame taken from the documented stand (verification/, subject
-  declared: the announcing child seen from the bank-game spectator stand).
-  Criticality: high — the taught direction word never reaches the player at the very stand
-  the project photographs the game from, and the one assertion that should catch a lost adult
-  word is disarmed by the flag that causes the loss.
-  Quotes:
-  Nutzer, 07.09.2026: »Die Kinder müssen vor jedem Start ihre Richtung ansagen. Ich sehe sie
-  das nur selten machen.«
-  Nutzer, 07.09.2026 19:08: »Setze alle 6 Punkte so um, wie jetzt in der Karte beschrieben.« —
-  dieser Punkt fasst die Aspekte 3, 4 und 5 zusammen: 3 ohne 4 wäre stiller Wortverlust, und
-  5 ist der Beweis von 3.
-  Nutzer, 07.09.2026: »Insgesamt soll die Sprache auch lauter sein und beim neu eingeführten
-  Rufen (Task 1073) noch lauter - nicht nur weiter tragen. Die Rufer sind bisher immer Kinder.
-  Es ist ohnehin plausibel, dass spielende Kinder lauter sind als Erwachsene, die miteinander
-  reden, während sie direkt nebeneinander stehen.«
-  Nutzer, 07.09.2026: »Die verschiedenen Abläufe laufen nie gleichzeitig (sofern das nicht
-  sowieso schon der Fall ist).« — die Sprachschranke serialisiert das SPRECHEN, nicht die
-  Tätigkeit; das ist der schmalere Schnitt, der dieselbe Klarheit liefert, ohne die Siedlung
-  zur Bühne einzufrieren.
-  Nutzer, 07.09.2026: »Reihe das alles so ein.« — Register, gemessene Aufnahme und
-  Sprachschranke stehen hier statt als eigene Punkte, weil dieser Punkt die Reichweiten-
-  Verkabelung, die Sprechmomente der Bankrunde und die hush-/`assertNoOwedWord`-Stellen in
-  adultWork.ts ohnehin öffnet. Reihenfolge: 1072 vor 1073, wie in der Arbeitsliste.
-  Note: the card justifies the bounded hush by saying the raised reach would otherwise cause
-  silent word loss. Measured, that chain does not hold — `childrenHear` gates on the CHILD's
-  distance to the speaking adult and a separate call-reach field leaves it at 10 m. The hush
-  bound is due anyway, for the reason measured above, and stays bundled here by the user's
-  decision. Recorded 07.09.2026 19:16 and reported to the user in the same turn.
-  Refs: src/scenes/place/bankGame.ts (`BankMoment`, `announceRun`, `say`),
-  src/scenes/place/riverBank.ts (`bankPlayRocksView`, `BANK_PLAY_ROCK_INSET`),
-  src/scenes/place/PlaceLife.tsx (`speakBankUtterance` ~540, `childrenHear` ~2243,
-  `invitationClear` ~2259), src/communication/spokenGesture.ts (`speechReach`),
-  src/communication/speaking.ts, src/communication/heard.ts,
-  src/scenes/place/adultWork.ts (`assertNoOwedWord` ~176, the `hushed` sites ~339/349/352),
-  src/config/balance.ts (`communication.hearingRadius`), src/scenes/place/bankGame.test.ts,
-  design.md §13.4
-  Doc impact: design.md §13.4 and docs/communication-poc-spec.md: the two voice registers, a
-  call carrying further AND louder than ordinary speech, the rule that no two situations
-  speak at once, a held word spoken or reported rather than dropped, and the bank round's
-  audibility from the spectator's stand. balance.ts: both register triples, the consequence
-  window and the hush hold (calibratable), with the English and German debug labels changed
-  together.
-  Bundle: Dorfleben.
-
-- [ ] 1056. The excavation becomes a real place: it says what it is for, and its earth is
-  ground the village walks over (user 04.09.2026, watching the merged digging work; point
-  1057 folded in here 07.09.2026 on the user's instruction to bundle points that would
-  otherwise each buy their own regression run).
-  ONE OBJECT, TWO COMPLAINTS FROM THE SAME MORNING. The dig site says nothing about its
-  purpose (PART A) and its earth behaves like nothing at all (PART B). Both are judged by the same
-  evidence — a village frame holding the excavations, on both backends — and both edit the
-  dig-site meshes, `layout.ts`, `adultWork.ts` and the place scene's actor heights, which is
-  why the bundle already forbids working them beside each other. Landed apart, the second
-  would re-photograph the ground the first had just rebuilt, and PART A's left-behind RESULT and
-  PART B's raised earth occupy the very same patch. PART A and PART B are the two former points,
-  unchanged in substance; either half may be cut back out if the branch does not converge.
-
-  PART A — THE ADULTS DIG FOR NO VISIBLE REASON, AND THE PICTURE NEVER SAYS WHAT COMES OUT.
-  The user asked what the adults are digging FOR and found no answer in the scene: "Sie
-  scheinen zum Selbstzweck zu graben. Was graben sie aus?" The reason exists in the code
-  and nowhere else. Every site is placed as a KIND with a real purpose — a store pit
-  against a compound wall, a post hole beside a lane, turned ground at the outer edge of
-  the worked land — but the kind is only a placement rule. All three render the same
-  round hole; only the patch is a little wider. No post is ever set, no store is ever
-  sunk, no ground is ever planted, and the pair's bout ends with the hole a little deeper
-  and the spoil a little higher and nothing else. The excavation also resets when the
-  village is re-entered, so a returning player finds untouched ground where he watched
-  men work. This is the 13.08.2026 complaint of point 690 in a new place — "Selbst wenn
-  ich diese Übersetzungen sehe, erkenne ich keinen Sinn hinter den Handlungen" — and it
-  costs the DIG lesson its footing: a word demonstrated on a purposeless act is a word
-  the player has no reason to trust.
-  Final state:
-  - THE VILLAGE KEEPS TWO EXCAVATIONS, NOT THREE (user 07.09.2026, aspect 6 of the
-    shore-call card). Two carry the distinction completely: `adultWork.ts` asks only for
-    `digSites.length >= 2` before the second dig situation, so the DIG lesson is untouched
-    and the third site is variety, not meaning. Both remaining sites sit as far from the
-    water as their placement rules allow, in the village half turned away from the shore, so
-    the diggers and the shore game share less ground. The field-edge turned ground is the
-    only freely placeable kind and therefore stays; the second is one of the two kinds
-    anchored near the middle (the store pit at a compound, the post hole beside a lane), and
-    the remaining kind is dropped. Nothing of this is visible today — all three render the
-    same round hole — so the removal alone changes no picture.
-  - A standing player can tell, without text and without the concept overlay, what each
-    of the two excavations is FOR. Each kind carries its own answer in the scene beside
-    it, and the two no longer read as one repeated hole.
-  - A finished bout leaves a RESULT, not only a deeper hole: what the pair was digging
-    for is there to be seen when they walk away.
-  - The turned patch is worked ground, not a pit — its shape says what is done to it.
-  - The DIG lesson is untouched: two bouts at two different sites, the invitation and the
-    site word, both still held while a child can hear, and the aim of the site word still
-    lands on the excavation itself.
-  - Design and code agree afterwards: `design.md` §7 states what the digging is for in the
-    world, not only that it teaches a word.
-  PART B — THE SPOIL HEAP BURIES THE DIGGERS, AND EVERYONE ELSE WALKS STRAIGHT THROUGH IT.
-  Three causes, each read off the shipped code:
-  - The heap's SIDE is fixed. It sits at a constant local offset in a group rotated by an
-    angle derived from the site's own coordinates, so it grows where it grows no matter who
-    stands there.
-  - The initiator walks into the MIDDLE of the pit — `startJointWalk` sets his goal to the
-    site centre and he stops within `WORK_ARRIVE_RADIUS` of it, while the heap's centre lies
-    about 1.19 m out at `DIG_SITE_RADIUS` 0.9. He digs himself in.
-  - NOTHING collides with the excavation. The collider set is finished before the dig sites
-    are placed at all, and neither pit nor heap is ever added, so villagers, children and the
-    player pass through the earth.
-  The user decided the shape of the remedy and the reason for it: a collider is NOT the
-  answer, because an impassable heap wedges figures — the player included — into corners. The
-  heap becomes a LOCAL RAISING OF THE GROUND that everyone walks up and over, the way the
-  height profile outside a settlement already works. Today a settlement is flat: every actor's
-  Y is set independently and lands at zero (the bank children's climb is the one exception),
-  while outdoors the figure rides `sampleTerrain(...).height`. So this half brings a place its
-  first ground height, and it must arrive as ONE source every actor reads, not as a second
-  scatter of Y assignments.
-  Final state:
-  - The heap never grows on a side somebody is standing on — the digging pair's places are
-    chosen away from it, and the initiator works from the rim instead of the middle.
-  - Nobody walks through the heap: villagers, children and the player ride over it, in both
-    perspectives, and the first-person camera rises and falls smoothly rather than stepping.
-  - One ground-height source for a place, read by every actor and by the camera; a flat
-    settlement keeps behaving exactly as it does today.
-  - Nothing in a settlement becomes impassable through this point — no new collider, and no
-    figure can be wedged by the earth.
-
-  Test (ONE picture run for both halves — this is why they are one point). Vitest: for PART A,
-  each dig-site kind carries its own distinct furniture, a completed bout adds the result to
-  the site, and a village lays out exactly two dig sites, both on the side of the settlement
-  away from the water; for PART B, the ground-height source and the standing-place choice — a
-  pair never takes a place inside the heap's footprint, and the height is zero everywhere no
-  excavation reaches. Browser (polish lane, both backends): one village frame in which the
-  two sites are visibly different things AND a figure is carried over the raised earth;
-  screenshots of it (verification/, subject declared: the two excavations with a villager
-  walking over the spoil).
-  Criticality: high — PART A is the second time the player has read village work as meaningless,
-  and the first time cost the whole communication slice a rebuild; PART B's defect is visible in
-  the very picture the player is meant to learn from, and its remedy touches every actor's
-  height in a place, which is the error-prone half.
-  Quotes:
-  Nutzer, 04.09.2026 08:40: »Was ist der inhaltliche Grund fürs Graben der Erwachsenen?
-  Bisher ist keiner erkennbar. Sie scheinen zum Selbstzweck zu graben. Was graben sie
-  aus?«
-  Nutzer, 04.09.2026 08:47: »Reihe einen Punkt direkt vor 690 ein, der das sichtbar
-  macht.«
-  Nutzer, 07.09.2026 19:08: »Setze alle 6 Punkte so um, wie jetzt in der Karte beschrieben.
-  Fasse dabei sinnvoll Punkte zusammen, sodass nicht alles in einzelnen Tasks steht, von
-  denen jeder für sich einen teuren Regressionstest benötigt. Evtl. Passen manche der 6
-  Aspekte ja auch als Zusatz an noch offene Punkte in der Queue.« — Aspekt 6 (drei
-  Grabungsstellen auf zwei, beide vom Fluss abgewandt) ist hier eingehängt statt als eigener
-  Punkt: dieselben Dateien, derselbe Zweig, derselbe Bildlauf.
-  Nutzer, 04.09.2026 09:05: »Die Erwachsenen sollten nicht in dem entstehenden Erdhaufen
-  stehen. Zum einen graben sie sich damit manchmal quasi selbst ein und zum anderen laufen
-  sie später ohne Clipping-Abfrage hindurch.«
-  Nutzer, 04.09.2026 09:05: »Der Erdhaufen ist nicht unpassierbar, sondern er ist eine lokale
-  Erhöhung des Bodens, über den die Figuren laufen — so wie bei dem Höhenprofil in der
-  Vogelperspektive.«
-  Nutzer, 04.09.2026 09:14: »Setze beides — Höhenprofil statt Kollision und die Leute dem
-  Haufen ausweichen zu lassen — als neuen Punkt um und reihe ihn direkt vor 690 ein.«
-  Nutzer, 07.09.2026 19:25: »Kannst du weitere Zusammenführungen von offenen Punkten zur
-  Kommunikationsmechanik vornehmen, um Regressionsdurchläufe einzusparen?« — daraufhin ist
-  der frühere Punkt 1057 hier als PART B eingefaltet worden.
-  Refs: src/scenes/place/PlaceScene.tsx (`DigSites`, the player mesh's fixed Y),
-  src/scenes/place/digSiteAppearance.ts, src/scenes/place/layout.ts (the kind-anchored
-  placement, the collider set), src/scenes/place/adultWork.ts (the durable work record,
-  `startJointWalk`, `joinSpot`, `JOIN_STAND_OFF`), src/scenes/place/PlaceLife.tsx (every
-  actor's `position.set`), src/scenes/travel/TravelScene.tsx (how the outdoor height profile
-  carries a figure), design.md §7
-  Bundle: Dorfleben.
-
-- [ ] 1076. The chief's first door press tells of his walk instead of a deciphered message,
-  and he gets a body (user 08.09.2026).
-  Two defects at the same hut, both measured on 08.09.2026.
-
-  PART A — THE FIRST PRESS WRITES THE WRONG ENTRY. `callChiefOut` sets the toast and calls
-  `tellChiefHint`, which writes `journal.titles.chiefHint` plus `journal.hintRaw` and
-  immediately reveals `journal.hintDecoded` — a "Deciphered! … latitude … degrees north"
-  text left over from the spoken-hint mechanic. The chief shares no language and speaks only
-  through the drums (design.md §13.4), so a deciphered message cannot exist here; the walk
-  itself gets no journal entry at all.
-  Final state:
-  - The first press at the chief's hut writes ONE journal entry, in both languages and with
-    the §15 emotional markup: the chief steps out of his hut, walks to his drummer, and the
-    player is evidently meant to follow. No deciphered message and no coordinates.
-  - The dead hint mechanic is DELETED rather than rewritten: `tellChiefHint` and
-    `revealDecoded` are called by nothing else, and `hintsGiven`/`decodedGiven` are read only
-    by the checkpoint. The keys they carry go with them, in both language files.
-  - Every later press at the hut behaves exactly as it does today.
-
-  PART B — THE CHIEF HAS NO BODY. The player resolves only against `layout.colliders`; the
-  seated drummer is in that set (r 0.8), while the chief figure only writes `group.position`
-  per frame and is neither a collider nor an `InhabitantBody` — one walks straight through him.
-  Final state:
-  - The chief is solid wherever he stands and wherever he walks, in both perspectives.
-  - Nobody is wedged by him: the gap between the hut collider (r 3.35) and the chief in his
-    standing place (`CHIEF_STAND_OFFSET` 1.6) stays walkable, and `withinGiveReach` and
-    `nextChiefAction` keep reaching him.
-
-  Test. Vitest: the first press writes exactly the new entry and no decoded text; the hint
-  functions and their keys are gone from the store and from both language files (i18n
-  parity); the chief's body follows his position, the hut-to-chief gap stays walkable, and
-  the reach checks still resolve. Browser (collision lane, WebGPU): one frame in which the
-  player is stopped at the chief in front of his hut, screenshot under verification/ with the
-  subject declared (the player blocked at the chief's body).
-  Quotes:
-  Nutzer, 08.09.2026 10:00: »Folgende Änderungen beim Häuptling: Wenn man das erst Mal an
-  seiner Hütte SPACE auslöst, erscheint aktuell ein Tagebucheintrag, der fälschlicherweise
-  etwas von einer entschlüsselten Nachricht erzählt - vermutlich eine Altlast. Stattdessen
-  soll ein Eintrag kommen, de besagt, dass der Häuptling aus seiner Hütte heraus tritt, zu
-  seinem Trommler läuft und man ihm anscheinend folgen soll: Der Häuptlingsfigur fehlt eine
-  Kollisionserkennung. Hole diese nach. Reihe das direkt vor 690 ein.«
-  Refs: src/state/store.ts (`callChiefOut`, `tellChiefHint`, `revealDecoded`, `hintsGiven`,
-  `decodedGiven` and the checkpoint that reads them), src/i18n/en.ts and src/i18n/de.ts
-  (`journal.titles.chiefHint`, `journal.hintRaw`, `journal.hintDecoded`),
-  src/scenes/place/chiefMeeting.ts, src/scenes/place/PlaceScene.tsx (the chief group, the
-  collider resolve), src/scenes/place/layout.ts (the collider set), design.md §13.4, §15
-  Author lane: astra.
-  Why the lane: the communication mechanic is authored by Astra (user 08.09.2026); the
-  rendered picture, the browser suites and the landing stay in the main session.
-  Bundle: Dorfleben.
+- [ ] 1133. A commissioned authoring run dies with the session that started it, and takes
+  its uncommitted work with it.
+  MEASURED 15.09.2026: the first `scripts/author-astra.mjs --point 1131` was started at 19:08
+  from a Bash tool shell without `setsid` (parent PID 3147048, piped through `tee`). Within
+  eight minutes parent and child were both gone; `local/1131-astra-author.log` ends at
+  "pushed 384ec4c while the run continues" — no closing line, no verdict, no commit. The
+  entire work product sat UNCOMMITTED in the worktree: a finished reproduction harness that
+  drives the reported village through the real movement loop. It was rescued by hand as
+  72dc3907c and the run restarted behind `setsid`; nothing but that hand rescue stood between
+  the work and the bin.
+  THE FIX IS A DELETION, not a new mechanism: `author-astra.mjs` re-executes itself detached
+  (setsid, own session, output to its log) when it is not already a session leader, so no
+  caller has to remember it and no caller can get it wrong. The caller keeps the same command
+  and the same log path. Check what the script already does about its own process group
+  before adding anything — this point must not grow a supervisor, a ledger field or a guard.
+  Criticality: high — it is not the point's own work that is lost but a commissioned agent's,
+  and the loss is silent: the log's last line claims the run continues.
+  Bundle: Session- & Repo-Hygiene.
 
 - [ ] 1082. A child climbing the village boulder becomes something the player actually
   sees (user 09.09.2026, 05:04 — the same report twice).
@@ -840,6 +343,55 @@ put it is the mistake this line exists to stop.
   Criticality: medium — a player-visible prop the user asked twice to be gone, and two
   fewer stations make the children's quarter (481.4) easier to place in exactly the village
   where the room is tightest.
+  Bundle: Dorfleben.
+
+- [ ] 1125. The second adult of a dig pair swings at untouched ground metres from the pit
+  (user 14.09.2026, ranked here by the user).
+  Reported as "Der Erwachsene graebt an der falschen Stelle" with the state archive
+  `hoa-state-2026-09-14-1093434877` (bambara-village, seed 1093434877, build 09b96e7,
+  WebGPU): one adult stands at the pit with his tool in the hole while his partner plays the
+  same full dig stroke several metres away, blade in the air over flat, unbroken ground. The
+  spoken word on the sheet at that moment is DIG.
+  MEASURED 14.09.2026 in `src/scenes/place/adultWork.ts` at 09b96e7b1:
+  - The pair is created at ~632-641. The initiator's target is the PARTNER; the partner's
+    target is `joinSpot(site)`, a stand at `JOIN_STAND_OFF` 2.4 m from the site centre (~159,
+    ~162-171).
+  - `startJointWalk` (~335-353) then moves ONLY the initiator onto the site centre
+    (`initiator.x = site.x`, `initiator.z = site.z`, ~341-342) and merely clears the
+    partner's `arrived` flag. The partner keeps the 2.4 m join stand as his goal.
+  - Arrival is granted within `WORK_ARRIVE_RADIUS` 1.1 m of that goal (~157, ~460-462), so
+    the partner comes to rest 1.3–3.5 m from the centre.
+  - `startDigging` (~355-366) sets `partner.phase = 'dig'` and `partner.arrived = true`
+    regardless of where he stopped, and `isDigging` (~195-198) tests only the phase and that
+    flag — so `PlaceLife.tsx` (~2894) plays the full `digPose` for him wherever he stands.
+  - The drawn pit is `DIG_SITE_RADIUS` 0.9 m (`layout.ts` ~214; a `patch` is ×1.35) with
+    broken ground out to r·1.12 (`PlaceScene.tsx` ~1545). The partner is therefore ALWAYS
+    outside the excavation — this is every dig bout, not an unlucky seed.
+  design.md §13.4 requires the opposite: "the initiator says DIG again while indicating the
+  hole, and only then do BOTH dig with tools in hand". A stroke that lands in open ground
+  teaches the player nothing about the word it is supposed to carry.
+  Final state:
+  - Once the site word has fallen, BOTH adults stand at the pit's working rim — a stand
+    derived from the drawn pit radius plus the tool's reach, held in `src/config/balance.ts`
+    as a calibratable value. `JOIN_STAND_OFF` keeps its own job: the approach stand while the
+    invitation and the site word are spoken.
+  - The two stand on opposite bearings of that rim, facing each other across the hole, and
+    NEITHER stands in it — the initiator's current `x = site.x, z = site.z` puts him on the
+    centre of the excavation and goes with this.
+  - A figure outside the working rim does not play the dig stroke: a future regression reads
+    as a villager standing idle, never as one hoeing untouched ground.
+  Test: Vitest in `src/scenes/place/adultWork.test.ts` — drive a bout to `phase === 'dig'`
+  over many seeds and assert for BOTH members of the pair that the villager is inside the
+  working rim of his site, and that nothing reports `isDigging` outside it. No browser tier
+  is needed: the positions are logic and the rendered stroke follows them; the picture is
+  judged once at the landing.
+  Refs: src/scenes/place/adultWork.ts (`JOIN_STAND_OFF` ~159, `joinSpot` ~162, `goalOf` ~191,
+  `isDigging` ~195, `startJointWalk` ~335, `startDigging` ~355, arrival ~460, pair creation
+  ~632), src/scenes/place/PlaceLife.tsx (~2894), src/scenes/place/layout.ts
+  (`DIG_SITE_RADIUS` ~214), src/scenes/place/PlaceScene.tsx (`DigSites` ~1519),
+  src/config/balance.ts, design.md §13.4
+  Criticality: medium — a player-visible teaching defect in the slice the release exists for,
+  reported from a real session, and reproducible on every bout.
   Bundle: Dorfleben.
 
 - [ ] 1045. Two village layouts have no straight walk to the water, so they teach no RIVER
@@ -1231,6 +783,90 @@ put it is the mistake this line exists to stop.
   that /v0.3/ and /poc/ serve the new state, and FREEZE the tag: it is never
   re-pointed.
 
+- [ ] 1132. The chief's collision check was amended seven seconds after the last run of it, so
+  no frame proves the check that guards him today, and four webgpu/flow records of 13./14.09.
+  still owe a verdict (verification debt of point 1076). THIS POINT DEMANDS RENDERED PROOF:
+  its deliverable is two suite runs whose frames are looked at.
+  MEASURED 15.09.2026 at 20756b89a. WHAT IS ALREADY PROVEN, and is NOT what this point is for:
+  the chief-walk work IS photographed on both lanes. `.claude/render-verify-state.json` records
+  `collision` at HEAD `712b689aa` — the chief-walk merge itself — webgpu @12:16:09Z and webgl
+  @12:19:35Z, both exit 0 with the same six frames, `53-collision-chief-body.png` among them.
+  A first reading of this debt put those runs BEFORE the merge and called the work
+  unphotographed; that was a timezone error — the run stamps are UTC and the commit times
+  +0200 — and it is recorded here so the corrected measurement is the one that survives.
+  WHAT IS ACTUALLY OPEN: `6c777423f` ("Wait for the settlement to resolve, never for the wall
+  clock") landed at 12:19:42Z, SEVEN SECONDS after the WebGL run finished, and it rewrites
+  `scripts/verify/collision.mjs` (30 insertions, 15 deletions) and updates
+  `verification/53-collision-chief-body.png`. So both green runs exercised the OLD check. The
+  amended check — the one that now decides whether the chief is judged at all — has never run
+  on either lane, and the frame in the repository was written by hand rather than by it.
+  THE FOUR RECORDS ARE A SEPARATE DEBT and are only "not blocking" because a deferral covers
+  this HEAD: webgpu/flow @2026-09-13T16:45:36.824Z and @2026-09-14T05:22:45.174Z are
+  unaccounted reds ("the run failed without reporting a single red"), and
+  @2026-09-13T16:47:42.549Z and @2026-09-14T05:25:12.689Z are their SUSPECT retries. Under
+  CLAUDE.md §7.2 a retry covers nothing and a red closes only when its cause is fixed, charged
+  to its owning point, or filed — none of the four has been.
+  Final state:
+  - `VERIFY_GL=webgpu node scripts/verify/run-all.mjs collision` and the same with
+    `VERIFY_GL=webgl` have both run green at a HEAD that CONTAINS `6c777423f`, on a quiet
+    machine, and their frames have been LOOKED AT — the chief standing, walking out and
+    meeting the player reads correctly in the picture on both lanes, not merely exit 0.
+  - `verification/53-collision-chief-body.png` is the frame the amended check wrote, not a
+    hand-updated one.
+  - Each of the four webgpu/flow records has a recorded verdict: cause fixed, charged to its
+    owning point, or filed as its own point. `render-verify-guard --status` names none of them
+    as unaccounted afterwards.
+  - The standing deferral is consumed rather than renewed, and the board's decision card "Den
+    Bildlauf fahre ich nicht jetzt" is closed with what the runs showed.
+  Test: no production code is expected to change. Should a frame show a real defect, it is
+  charged to point 1076 or filed as its own point rather than repaired silently here.
+  Refs: scripts/render-verify-guard.mjs, .claude/render-verify-state.json,
+  scripts/verify/collision.mjs, src/scenes/place/chiefWalk.ts, commits 712b689aa and
+  6c777423f, CLAUDE.md §7.2
+  Criticality: medium — it certifies nothing false today, but the check that guards the chief
+  has never itself been run.
+  Bundle: Dorfleben.
+
+- [ ] 1129. `polish` is split by theme, so a red costs only its own theme (split out of
+  point 1126 on 15.09.2026, which delivered its other three parts the same day).
+  MEASURED: `scripts/verify/polish.mjs` is 7,447 lines and 27 declared sections, runs
+  ~28 min per backend, and carries the rotating flakes. It is the one object that makes
+  every red of the LARGE tier expensive: point 1126's measurement of 14.09.2026 found it
+  running FOUR times inside a single LARGE run — first pass, flake retry, two baseline
+  passes.
+  Point 1126 made a red repeat only its own SECTION, which is the repair loop. This point
+  makes the COVERING PROOF cheap too: a green theme stays green, and only the red theme's
+  own pass has to be run again.
+  Final state:
+  - The 27 sections are split by THEME into separate suite files under `scripts/verify/`,
+    each with its own name in `DEV_SUITES`. Same checks, same section names, same
+    screenshots, no change to coverage.
+  - The boot prologue and the shared helpers (`nextFrames`, `stepUntil`, `goToPlace`,
+    `probeSilhouetteFooting`, the frame shutter, the console-error gate) move ABOVE the
+    themes into one shared module the theme files import; a section is a block scope, so
+    nothing two themes use may live inside one of them (`scripts/verify/README.md`,
+    "A section is a BLOCK SCOPE").
+  - FIVE SECTIONS DO NOT STAGE THEIR OWN PLACE TODAY and must, before they can move:
+    `giza-skyline` (it relies on the boot standing in Cairo), `panorama-slope-footing`,
+    `settlement-edge`, `children-bank-game`, `children-boulder-climb`. A section that
+    reads a scene the block before it staged passes in the whole run and fails alone —
+    README, "The one recurring defect".
+  - Everything that NAMES the suite follows in the same commit: `tiers.mjs`
+    (`DEV_SUITES`, and `SMALL_SUITES` if it is affected), `machine-load-core.mjs`,
+    `run-wait-core.mjs` (the per-suite expectations and `SEPTEMBER_BANDS`),
+    `render-verify-charges.mjs`, the work order's `Diff → browser-suite mapping`
+    paragraph, `scripts/verify/README.md`, `docs/acceptance-evidence.md`.
+  - NOTHING IS DELETED OR SOFTENED: no check is removed or weakened, the per-point
+    two-backend picture check is unchanged, and the sum of the themes covers exactly what
+    `polish` covered.
+  - The proof is every theme suite green on BOTH backends, with the screenshot set
+    identical to what `polish` wrote before the split.
+  Touches: scripts/verify/polish.mjs (split), scripts/verify/tiers.mjs,
+  scripts/verify/machine-load-core.mjs, scripts/verify/run-wait-core.mjs,
+  scripts/render-verify-charges.mjs, scripts/verify/README.md, TASKS.md (the diff→suite
+  paragraph), docs/acceptance-evidence.md
+  Bundle: Testinfrastruktur.
+
 - [ ] 1116. Repair pre-existing crossbrowser check: chromium-mobile no console errors on
   mobile (filed automatically by a LARGE run on 12.09.2026 under point 1089's ownership
   rule; the user ordered these three reds filed at once on 10.09.2026).
@@ -1374,6 +1010,37 @@ put it is the mistake this line exists to stop.
   Criticality: medium — no player impact; it costs the picture proof its meaning, and it sits
   directly in front of point 1087.
   Bundle: Dorfleben.
+
+- [ ] 1121. The river-bank frame aims at a drifting fleck and shoots six frames later
+  (measured 14.09.2026 on the covering WebGL 2 pass of point 1073).
+  THE RED. `polish --section=adult-errands`, WebGL 2, first attempt:
+  `FAIL frame 482-village-river-bank — its subject is not in the rendered picture: off the
+  right edge of the frame` (221 pass, 1 fail; log
+  `local/verify-logs/2026-09-14T01-49-02-197-polish.log`). The retry ran 269/0/0, which
+  covers nothing, so the whole WebGL 2 lane of that pass is recorded SUSPECT.
+  IT IS NOT POINT 1073'S, and that is measured rather than argued. Point 1073 touches the
+  speech floor, adult work, dig-site assignment, the speech labels and the bank-call block
+  of the suite — nothing in the river or its flecks. The IDENTICAL code ran the full
+  `polish` suite twice on WebGPU, both times green on the FIRST attempt, this check
+  included. And `node scripts/throttle-probe.mjs polish --section=adult-errands
+  --backend webgl --runs 8` at a quarter of a core did NOT reproduce it: 482 stayed green
+  in all eight, while the skew fell on the fill checks instead (SKEW RATE 2/8). So it is
+  not this point's, and it is not plain load either.
+  THE CAUSE IS THE CHECK'S OWN SHAPE, read at `scripts/verify/polish.mjs` ~6047-6066: the
+  aim block picks the fleck NEAREST the bank spot, returns it, waits `nextFrames(6)` and
+  only then opens the shutter. The flecks drift with the current — that is the very thing
+  the surrounding checks measure — so the subject moves between being chosen and being
+  photographed. On the slower lane the six frames cost more wall time and the fleck can
+  leave the frame to the right. The check races its own subject by construction; it has
+  simply been winning the race.
+  FINAL STATE: the frame's subject is the fleck that is in the picture AT THE SHUTTER, not
+  the one that was nearest six frames earlier — re-read the nearest fleck at shutter time,
+  or keep the chosen one and aim at where it has drifted to. Whichever is chosen, the
+  frame must still show the foam that demonstrates the current, and the check must not be
+  weakened into one that would pass on an empty river.
+  Refs: scripts/verify/polish.mjs (~6044-6070, the `aim` block and the 482 frame),
+  scripts/render-verify-charges.mjs (the entry filed with this point).
+  Bundle: Testinfrastruktur.
 
 - [ ] 1081. A child boxed by adults planted in its own play ground walks a metre and gets
   nowhere — and the case that was supposed to catch it pins one lucky seed. Measured on
@@ -3657,6 +3324,17 @@ put it is the mistake this line exists to stop.
   commit at 05:50 on a quiet one; the water rim's "handover zone" red once at 05:36 and green
   on its own retry. Each must come out of the sweep classified — repaired as a state check,
   or declared timing and reported UNMEASURED under load.
+  A FOURTH CASE, measured 15.09.2026 on `polish`, is the sharpest of them because BOTH
+  sides of the comparison flutter: `the order at the stand can be photographed` waits up to
+  180 s for the LAST utterance in the village to be a water word at most 2.5 s old while a
+  second man is already walking off with the empty jar. It went red twice out of two on the
+  candidate of point 1056 and, on the untouched baseline of the same commit and the same
+  backend, its sibling `the return walk can be photographed` went red once out of two — same
+  section, same cause, no carrier moment inside the window. The check's own comment names
+  the reason: the window's width depends on the errand's pace, and the suite runs that pace
+  at six times normal. It is a moment-catcher, not a state check, and the sweep must decide
+  which of the two kinds it is. Point 1056 was verified past it: its branch does not touch
+  the water errand at all.
   THE INVENTORY THE SWEEP STARTS FROM IS ALREADY COUNTED (carried over from point 200 on
   20.08.2026, which measured it as Pillar-2 group E): 26 wall-clock/radius sites — 20 in
   `enrichments`, plus `polish` 270, `settings` 183/277, `flow` 242, `voice` 56, `touch` 75 — and
@@ -9183,6 +8861,22 @@ to land than a mechanism that needs a review.
   the one point 514 already states for its own instance — the wait after a jump POLLS the
   camera having arrived rather than counting milliseconds. Both frames are charged to this
   point in `scripts/render-verify-charges.mjs`, each scoped to `world`/WebGPU.
+  MEASURED A THIRD TIME 13.09.2026, on main at 49cef70ee645, and this round carries the
+  DETAIL the earlier records lack. Two `baseline-classify.mjs world` runs on a quiet machine
+  (load 0.35 over sixteen cores) both red on `11-worldmodel-khartoum-confluence` with the same
+  wording, while the other six landmarks pass in both — the rotation stands, and point 995,
+  which owns making these entries narrowable at all, now has a recorded measurement to narrow
+  this one by.
+  AND THE CHARGE DID NOT REACH THE RED, which is a second thing this point has to carry. The
+  WebGPU world run of 13.09. reported both this frame and the talus pair as UNACCOUNTED, and
+  the reason is structural rather than a mis-filing: the entry is scoped to the compatibility
+  feature level, and a run that records no level — or records `core` — matches no level-scoped
+  charge. Measured against the shipped ledger that day: `chargeFor` on this red answers point
+  627 at `compatibility` and NOTHING at `core` or at no level at all. So a known, owned,
+  reproducible red reads as unowned whenever the world suite does not record the level it drew
+  at, and `render-verify-guard` then blocks on a defect that is already filed. Whatever this
+  point decides about the jump, the world run has to record its feature level, or this entry
+  cannot account for the red it was written for.
   FINAL STATE: the cause is NAMED with evidence — the jump to (-17.9, 25.9) not settling
   before the shutter opens, a camera clamp at that latitude, or a real placement change —
   and fixed at that cause. If it is timing, the frame waits on the STATE the jump reaches,
@@ -12904,6 +12598,32 @@ to land than a mechanism that needs a review.
   Criticality: medium — one run, one line, but it is the cheapest possible demonstration that the
   gate cannot tell a broken machine from a broken game, and that confusion is what makes a red
   gate get waved through.
+  SEEN AGAIN 13.09.2026 ON A LANE THE LEDGER CANNOT REACH, and that is the half this point did not
+  know it had. The covering picture run of point 1072, `webgpu/flow` on main at 88e6aec92: first
+  attempt 36 pass, 0 fail and exactly two console reds, both this 504, the retry clean at 36 pass /
+  0 console errors, 8 of 8 frames written on both attempts. So far it is the same transient as the
+  four lanes already charged. What is NEW is that no charge could be written for it: `flow` prints
+  its console errors inside the tail block rather than as top-level `ERR:` lines, so the recorder
+  stored the failing run with NO `reds` array at all, the retry marker fell back to
+  `SUSPECT_UNNAMED`, and the run reads as "the first attempt failed without naming a check". A
+  ledger entry for that placeholder would excuse every future unnamed failure of the lane —
+  including a crash — which is precisely the over-broad signature the charge table forbids, so the
+  only valve left was `--defer`. The third bullet of the FINAL STATE therefore has a second
+  addressee: as long as a suite's console reds do not reach the record under their own names, the
+  disposition route cannot be applied to them at all, and the lane can only ever be deferred.
+  THE CAUSE IS NOW MEASURED, not only described (14.09.2026, three `flow` runs on main in one
+  sitting). `scripts/render-verify-recorder.mjs` keeps a result line only when it is anchored at the
+  line START (`KEPT_LINE`: `FAIL`, `ERR:`, `console errors:`), but `flow` prints its console errors
+  INDENTED inside its own tail block — `      | console errors: 2` and then `      |   - <text>`.
+  Nothing matches, so the record is written with no `reds` array at all (checked in
+  `.claude/render-verify-state.json` for all four `flow` failures of 13. and 14.09.), the guard
+  synthesises "the run failed without reporting a single red", and the retry falls back to
+  SUSPECT_UNNAMED. That is why THIS lane, alone among the suites, can never be charged, and why
+  points 1072, 1073 and the session of 14.09. each had to write the same `--defer` by hand.
+  THE TRANSIENT ITSELF IS THE COLD CACHE, reproduced the same morning: the first browser run after
+  a push had changed source files reported the two 504s, and the two runs after it — WebGL 2 and
+  WebGPU, cache now warm — were clean on the FIRST attempt, 36/0/0 and 8/8 frames each. Warming the
+  dev server before the suite starts, the first bullet above, is therefore the whole remedy.
   Bundle: Session- & Repo-Hygiene.
 
 - [ ] 940. The derived state card is authenticated by a shape that is not the writer's (cross-vendor
@@ -15391,6 +15111,23 @@ to land than a mechanism that needs a review.
   reach test reads next to the socket position, so the distance that decided the answer is
   named instead of guessed — `node scripts/throttle-probe.mjs world --section=<the block's
   slug> --runs 8` measures how often it bites.
+  IT IS NOT INTERMITTENT ON MAIN — MEASURED 13.09.2026, and that is cheaper news than the
+  title above. `baseline-classify.mjs world` ran the suite TWICE against 49cef70ee645, main's
+  own tip, on a quiet machine (load 0.35 over sixteen cores), and BOTH presses answered noFit
+  in BOTH runs, word for word as on 08.09.: `said ["Nothing here has a hollow that would take
+  this shape."], spent [], mode travel, dialog null`. The branch it was measured from,
+  feat/1087-carrier-fills-the-jar, had the pair red in only ONE of its two attempts — so
+  "about half the time" is the branch's draw, and on main the defect reproduces every time.
+  The probe this point specifies therefore does not need eight runs to bite: two section runs
+  on main already carry it, which makes the player-versus-harness question above cheap to
+  settle.
+  AND THE FRAME BESIDE IT WAS READ, 13.09.2026, which narrows that question from the other
+  side. `20-worldmodel-bandiagara-talus-foot` — taken between the two presses, at travel zoom
+  0.25 — shows the traveller standing under the "Unknown ruins" label with the rock slab drawn
+  behind him and the Clay Impression in his belt, and it is the same picture as the frame
+  committed before it. So the jump DID put him at the landmark the shutter photographs, while
+  the reach test read a position out of range in the same instant. The two positions are not
+  the same position; that is the measurement this point asked for.
   WHAT IT COSTS. This is the ONE puzzle the PoC can solve end to end, so a fit that
   intermittently refuses is player impact, not only suite noise; and while the red stands
   unowned, `render-verify-guard` blocks every merge in the repository.
@@ -15624,9 +15361,16 @@ to land than a mechanism that needs a review.
   base number; a single retried `polish` is worth roughly a third of a four-suite
   expectation. Both verdicts were disobeyed on the measurement above and both runs finished
   with their receipts.
+  A FOURTH AND FIFTH OCCURRENCE, 15.09.2026, on the two covering runs of point 1127, and this
+  time the verdict was DISOBEYED both times: full `polish` on WebGPU was called hung at 19m 00s
+  and again at 28m 33s and finished GREEN ON THE FIRST ATTEMPT at 31m 47s with 54 frames; the
+  WebGL 2 lane was called hung at 19m 20s and 28m 43s and finished at 30m 27s, its single red
+  charged to open point 1068. What the session had to weigh against the verdict was the
+  hand-measured liveness this point already demands — renderer CPU accumulating, the dev server
+  answering 200 — because the log was silent for 31 minutes, exactly as recorded above.
   Criticality: high — the rule does not merely mislead, it instructs the session to destroy
-  running work, and the batch pays for the killed run twice. It has now done so three times
-  in two days, to both backends.
+  running work, and the batch pays for the killed run twice. It has now done so five times
+  in four days, to both backends.
   Bundle: Session- & Repo-Hygiene.
 
 - [ ] 1100. A verification for a just-landed point can publish no board at all (measured
@@ -15783,3 +15527,169 @@ to land than a mechanism that needs a review.
   touching its change. This point owns it.
   Refs: scripts/verify/enrichments.mjs, point 1089, point 1065, point 278.
   Bundle: Testinfrastruktur.
+
+- [ ] 1119. Repair the arriving runner's contact hold, which reds under load and passes on a
+  quiet machine (filed 12.09.2026 from a SUSPECT retry in point 1087's LARGE run, under point
+  1089's ownership rule).
+  The polish check `the arriving runner is read from ROCK to the far side of its contact hold`
+  (`scripts/verify/polish.mjs` ~4937, `--section=children-bank-game`) reads the hold to its
+  end on a loaded machine as it does on a quiet one, or its frame budget is stated and
+  enforced so a short read fails for a named reason rather than as `ended false`.
+  Measured 12.09.2026, WebGL 2 lane of the LARGE run in the point-1087 worktree: 137 readings,
+  remaining 8.9589 s down to 3.1986 s, `ended false`, heard from 8.57 m against a 10 m radius,
+  one unheard opening before acquisition. The retry of the same suite ran 266 pass / 0 fail,
+  which the runner recorded as SUSPECT — a second pass covers nothing. The session had put
+  its own build, type-check and push gate (15235 unit tests) on the same machine inside that
+  window, so LOAD is the leading hypothesis and is not yet measured.
+  FIRST STEP, before any repair: `node scripts/throttle-probe.mjs polish
+  --section=children-bank-game --runs 8` on a quiet machine. If the probe reproduces the red
+  under load only, the defect is the check's frame budget, not the game. If it reds on a quiet
+  machine too, the arrival hold itself is short and the game owes the fix.
+  The check belongs to point 1106, which is closed, so it cannot take a charge-ledger entry
+  (`scripts/render-verify-charges.mjs` refuses a closed point) — which is why it is its own
+  point.
+  Refs: scripts/verify/polish.mjs (~4878-4960), scripts/throttle-probe.mjs,
+  scripts/render-verify-charges.mjs, point 1106, point 1089, point 1087.
+  Bundle: Testinfrastruktur.
+- [ ] 1120. The baseline classification reads the branch under load and the baseline after it, so
+  a load artefact is promoted to a REAL REGRESSION (measured 13.09.2026 on
+  `feat/1072-village-speaks-with-direction`, WebGL 2 lane, in the mechanism point 1089 built).
+  WHAT WAS MEASURED: the LARGE run reported `the dry settlement season reading settles before it
+  is read` red after 60496 ms. The automatic classification then ran the merge-base
+  `734be2f35bff` twice, found that check green in both runs, and printed REAL REGRESSION (green
+  on baseline, red now) — the one verdict that holds a finished branch. It is not the branch's.
+  Re-run once the LARGE run had left the host, same branch, same backend, same section
+  (`VERIFY_GL=webgl node scripts/verify/run-all.mjs polish --section=settlement-season`): GREEN
+  three times out of three, 9 pass / 0 fail each. The branch diff cannot reach the check at all —
+  its only two touches to the verification machinery are registrations (`speechSampler.mjs` into
+  `NON_RENDER_VERIFY` and into `fixed-wait-baseline.json`).
+  WHY IT HAPPENS: the baseline runs AFTER the branch run, on a machine the branch run has
+  meanwhile stopped loading. That run's own banner recorded `MACHINE STATE UNKNOWN` for the
+  branch pass. So "green on baseline, red now" can mean nothing more than "quieter now", and the
+  two sides are not comparable. The check is load-fragile in the way open point 642 describes: it
+  waits with `requireChange: true` for the reading to MOVE inside a 60 s window, and 60496 ms is
+  the full timeout — no movement was ever observed. That is the class of point 1119, one check
+  further along the same suite.
+  FINAL STATE: the classification can tell "the branch broke it" from "the branch's own run
+  loaded the machine". Either both sides are read under comparable load — the baseline taken
+  while the host is as busy as the branch read was, or both taken on a quiet host — or the
+  verdict names the load it could not rule out. A classification that cannot read the machine
+  may report UNRESOLVED; it may not assert REAL REGRESSION.
+  EVIDENCE: a red that today's mechanism calls REAL REGRESSION, whose check then passes
+  repeatedly on the quiet machine, is not reported as the branch's.
+  Refs: scripts/verify/baseline-classify.mjs, scripts/verify/machine-load.mjs,
+  scripts/verify/_browser.mjs (waitForReadingStable), scripts/verify/polish.mjs
+  (~1410-1435), point 1089, point 642, point 1119.
+  It edits `scripts/verify/baseline-classify.mjs`, the mechanism point 1089 built and 1114 and
+  1115 were filed by, so it is worked after 1089 and never beside it.
+  Bundle: Testinfrastruktur.
+
+- [ ] 1122. A third session-death class is undocumented, so every recurrence is re-derived from
+  scratch (user 14.09.2026, reported as „schon wieder“).
+  A THIRD session-death class exists and is not documented: a session killed with
+  SIGKILL while every sibling process survives and the machine is healthy.
+
+  Deliverable is a DISCRIMINATOR, not a fix. The killer cannot be named from
+  inside the container; do not invent an in-container cause.
+
+  1. Give the three classes one decision table (docs, and the forensics command if
+     one is written):
+     - 143 / SIGTERM -> our own context-boundary handover. Ledger carries a
+       `handover` row with cause `context-boundary` on that pid.
+     - VM reboot -> /proc/uptime in minutes; ledger `heartbeat-predates-boot`.
+     - SIGKILL, victim idle, siblings alive -> NEITHER. Signature measured
+       13.09.2026: `Closing Claude on channel: <id>` in the extension log in the
+       SAME millisecond as the error and nowhere else in that log;
+       remoteagent.log and exthost.log silent in the window; container PID 1 and
+       the exthost process both OLDER than the death; `oom_kill 0` in every
+       cgroup; sibling batch sessions keep writing the ledger straight through.
+
+  2. Nail down the two counters, because both of our memories currently point a
+     reader at the wrong one:
+     - `memory.peak` is NOT evidence. It is dominated by RECLAIMABLE page cache
+       (measured: peak 15,2 GB against 8,3 GB buff/cache and only 5,6 GB used).
+     - `memory.swap.peak` IS the load-bearing counter. 102 MB all-time here means
+       the machine never had to page anything out, so memory exhaustion is
+       excluded outright.
+
+  3. Record the precursor worth watching: an `[event-loop-stall]` line with
+     `blocked 0ms monotonic` but a multi-second `wall drift` / `clock jump` is a
+     SUSPENDED VM, not CPU starvation — CLOCK_MONOTONIC stops across suspend.
+     On 13.09. it preceded the kill by 2 min 22 s.
+
+  4. Name where the answer lives, so the next reader stops digging inside the
+     container: Windows Event Viewer around the death minute, and
+     %LOCALAPPDATA%\Docker\log\host\ — the same path that solved the 07.09. VM
+     reboot.
+  Criticality: medium — no player impact, but a misdiagnosis costs a session, and both of our own
+  memories currently point the reader at the wrong counter.
+  Refs: docs/batch-owner-runbook.md, scripts/batch-launcher.mjs, scripts/batch-autostart.mjs
+  Bundle: Session- & Repo-Hygiene
+
+- [ ] 1123. When the batch owner dies mid-verification its run keeps going and nobody harvests the
+  receipt (measured 14.09.2026).
+  When the batch owner dies mid-verification, its run keeps going and NOBODY
+  harvests the receipt. Close that gap.
+
+  Measured 14.09.2026: owner 65f2ab12 (pid 739806) went `pid-dead` between
+  10:07:31 and 10:12:35 with its two-backend LARGE for point 1056 still running.
+  The successor took the lock and found run-all.mjs (pids 744989/745004) and a
+  chrome-headless burning CPU in .claude/worktrees/point-1056, all green so far,
+  with no process left that was waiting on the log.
+
+  Two defects, one point:
+
+  1. NO HARVESTER. A run whose waiter died is invisible: nothing declares the
+     wait, nothing reads the receipt, nothing charges a red to its point. The
+     next owner has to notice the stray processes by hand (`ps` for run-all.mjs
+     plus chrome-headless) to even learn a run exists. Make the successor ADOPT a
+     live run it finds — the wait-lease already models "this run belongs to a
+     session", so the reconciliation that names a missing worker should also name
+     an ownerless RUN and re-attach a waiter to it.
+
+  2. THE CLAIM PATH PROMISES SOMETHING IT DOES NOT DELIVER. The text printed by
+     `scripts/batch-claim.mjs` says the owner "releases the lock at the first
+     CLEAN moment — never mid-merge, never with a delegated agent still building
+     or a verification running, so nothing it is doing gets cut in half". Here
+     the lock came free by `pid-dead` with a verification running, and the
+     ledger records no `handover` and no boundary row for that session. Either
+     make the wording conditional on an actual clean release, or say plainly that
+     a dead owner frees the lock in whatever state it was in. The operator plans
+     around that sentence — the successor nearly committed to main on the
+     strength of it, which would have killed the orphaned LARGE at its unit stage
+     for the third time (01.09., 08.09., see the quiet-machine memory).
+
+  3. A KILLED RUN AND A SELF-EXIT LOOK THE SAME IN THE RECORD. Measured
+     14.09.2026 on the aborted LARGE of point 1056
+     (local/verify-logs/2026-09-14T07-41-21-135-large.log, 09:41-12:20): it stops
+     inside the automatic baseline classification before its fourth red suite and
+     never prints its own closing line. The receipt says exit 1, which proves
+     nothing - `scripts/verify/run-logged.mjs` flattens a signalled child to
+     `code === null ? 1 : code`, and the only place that names the signal is the
+     digest field `command: <cmd> (killed by SIGxxx)`, which goes to the
+     orderer's terminal and NOT into the `.run.json` record. Once the waiting
+     session is gone, kill and self-exit can no longer be told apart - so the six
+     red suites of that run cannot be classified at all, and each of them costs
+     the next session a re-run to rule out. Cheap remedy: write the signal (or
+     `exitedNormally`) into the record, not only into the digest.
+
+  4. A RUN ON A FEATURE BRANCH CAN NEVER BE HANDED OVER. Measured 14.09.2026 at
+     the context watermark, with the two-backend LARGE for point 1056 running:
+     `scripts/batch-in-flight-core.mjs` tests a declared run with
+     `sameHead(run.head, headNow)`, where `headNow` is the MAIN tree's HEAD while
+     the run carries the HEAD of the worktree it runs in. The two agree only when
+     main and the branch stand on the same commit — that is, essentially never
+     while a point is in progress. The handover is refused with "its run covers
+     HEAD <branch>, not the <main> being handed over" however well the run is
+     evidenced, and none of the four offered ways out applies: a test run has no
+     CHECKPOINT, RE-DECLARE with `--branch`/`--worktree` does not touch the
+     comparison, ABANDON throws away hours of machine, and DRAIN forces the
+     session to keep running above the watermark — which is exactly what the
+     watermark exists to prevent. So the two guards contradict each other by
+     construction. Cheap remedy: compare against the HEAD of the worktree the run
+     runs in (or the branch the declaration names), not against the main HEAD.
+  Criticality: high — a real blockade with a measured cost, plus a false-approval risk: the claim text
+  promises a clean release that a pid-dead owner does not deliver.
+  Refs: scripts/batch-claim.mjs, scripts/batch-in-flight.mjs, scripts/verify/run-wait.mjs,
+  scripts/verify/run-all.mjs, scripts/verify/run-logged.mjs
+  Bundle: Session- & Repo-Hygiene

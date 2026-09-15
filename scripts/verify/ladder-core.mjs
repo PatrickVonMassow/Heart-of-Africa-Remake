@@ -61,6 +61,7 @@ export const LADDER_STATUS = Object.freeze({
   FREE: 'free', // nothing the run covers carries an edit
   CLIMBED: 'climbed', // every covered suite has a green narrow run since
   REFUSED: 'refused', // the one blocking answer
+  RED_RUNG: 'red-rung', // the other one: a red whose own block was never re-run
   WAIVED_ESCAPE: 'waived-escape', // --no-ladder "<why>"
   WAIVED_NON_PREDICTIVE: 'waived-non-predictive', // the only rung declared itself a liar
   UNREADABLE: 'unreadable', // the inputs could not be gathered — fail open
@@ -139,6 +140,56 @@ function declaresNonPredictive(declarations, section) {
   return (declarations ?? []).filter((d) => d && d.section === section)
 }
 
+
+/**
+ * A RED NEVER RESTARTS THE FULL RUN (point 1126, user 14.09.2026).
+ *
+ * THE RULE ALREADY EXISTED and was broken four times in one day. `polish` went
+ * red, and the answer each time was the WHOLE proof again: five two-backend
+ * LARGE runs for one point on 14.09.2026, 599 minutes of machine time, while the
+ * red check itself had printed the block that re-runs it in about three.
+ *
+ * So the rung the red NAMED must be climbed green before the full pass may be
+ * started again. This is the half the edit rule above cannot see: after a red
+ * where nothing was edited, that rule answers FREE and waves the whole proof
+ * through, which is exactly the loop measured.
+ *
+ * IT FAILS OPEN WHEREVER IT COULD NOT NAME A COMMAND, because a refusal an
+ * author cannot answer by working is worse than the run it saved:
+ *   · a run that CRASHED or never reached a terminal verdict names nothing;
+ *   · a red carrying no section — a console error, an unsectioned suite — has no
+ *     block to re-run;
+ *   · a red already CHARGED to a work-order point is knowingly tolerated, and no
+ *     green rung could ever clear it.
+ *
+ * Returns the suites whose last whole run is red with an unclimbed block, or
+ * null when nothing stands in the way. Total: never throws.
+ */
+export function unrepairedReds({ suites = [], runs = [] } = {}) {
+  const ledger = Array.isArray(runs) ? runs : []
+  const out = []
+  for (const suite of suites ?? []) {
+    const whole = ledger
+      .filter((r) => r && r.suite === suite && r.partial !== true && Number.isFinite(Number(r.startedAt)))
+      .sort((a, b) => Number(a.startedAt) - Number(b.startedAt))
+      .pop()
+    if (!whole || Number(whole.exit) === 0) continue
+    if (whole.terminalVerdict !== true || whole.crashed === true) continue
+    const reds = (Array.isArray(whole.reds) ? whole.reds : []).filter((red) => red && !red.point)
+    if (reds.length === 0) continue
+    if (reds.some((red) => !red.section)) continue
+    const since = Number(whole.at ?? whole.startedAt) || 0
+    const climbed = new Set(
+      ledger
+        .filter((r) => r && r.suite === suite && r.partial === true && Number(r.exit) === 0 && Number(r.startedAt) >= since)
+        .map((r) => r.section),
+    )
+    const open = [...new Set(reds.map((red) => red.section))].filter((name) => !climbed.has(name))
+    if (open.length > 0) out.push({ suite, sections: open, at: since })
+  }
+  return out.length > 0 ? out : null
+}
+
 /**
  * THE LADDER'S ANSWER for one run.
  *
@@ -171,7 +222,7 @@ export function ladderVerdict({
   now = Date.now(),
 } = {}) {
   const answer = (status, reason, extra = {}) => ({
-    ok: status !== LADDER_STATUS.REFUSED,
+    ok: status !== LADDER_STATUS.REFUSED && status !== LADDER_STATUS.RED_RUNG,
     status,
     reason,
     commands: [],
@@ -205,6 +256,45 @@ export function ladderVerdict({
   }
 
   const lastMerge = newest((merges ?? []).map((m) => Number(m?.at)))
+
+  // A RED NEVER RESTARTS THE FULL RUN (point 1126). Asked BEFORE the edit rule
+  // below, because the loop it closes is precisely the one that rule calls FREE:
+  // a red pass, nothing edited, and the whole proof started again. The escape
+  // waives it exactly as it waives the edit rule.
+  const escapeGiven = Boolean(escape && String(escape.why ?? '').trim() !== '')
+  const stillRed = unrepairedReds({ suites: run.browser ?? [], runs })
+  if (stillRed && escapeGiven) {
+    // The waiver is answered HERE rather than by falling through: on a tree with
+    // no edits the run would otherwise read FREE, and the record would say
+    // nothing stood in its way — losing the very reason the author typed.
+    return answer(
+      LADDER_STATUS.WAIVED_ESCAPE,
+      `${LADDER_ESCAPE_FLAG}: ${String(escape.why).trim()} — waived over the unclimbed red block(s) ` +
+        stillRed.map((r) => `${r.suite} (${r.sections.join(', ')})`).join(', '),
+      {
+        suites: stillRed.map((r) => r.suite),
+        threshold: newest(stillRed.map((r) => r.at)),
+        record: { why: String(escape.why).trim(), red: stillRed },
+      },
+    )
+  }
+  if (stillRed) {
+    const commands = stillRed.flatMap((r) => r.sections.map((name) => `npm test -- ${r.suite} --section=${name}`))
+    const named = stillRed.map((r) => `${r.suite} (${r.sections.join(', ')})`).join(', ')
+    return answer(
+      LADDER_STATUS.RED_RUNG,
+      `the last WHOLE run of ${named} went red and the block(s) it named were never re-run green. ` +
+        'A red repeats its own rung, not the whole proof: repair on the printed `--section` (measured median ' +
+        '2.9 min on `polish`, against 55.2 for the pass), and let the full proof run ONCE, on the exact merge ' +
+        `candidate. If the block genuinely cannot answer it, say so: ${LADDER_ESCAPE_FLAG} "<why>".`,
+      {
+        commands,
+        suites: stillRed.map((r) => r.suite),
+        threshold: newest(stillRed.map((r) => r.at)),
+        record: { red: stillRed, commands },
+      },
+    )
+  }
 
   // A MERGE AGES EVERY RUNG THIS RUN COVERS, even when the branch's own delta is
   // empty — and that case is not exotic, it is what `git merge main` PRODUCES.
@@ -345,7 +435,8 @@ export function ladderVerdict({
 
 /** The block run-logged prints on a refusal: the reason, then the exact commands. */
 export function formatLadderRefusal(verdict) {
-  const lines = [`REFUSED BY THE VERIFICATION LADDER (point 1086) — ${verdict.reason}`]
+  const rule = verdict?.status === LADDER_STATUS.RED_RUNG ? 'point 1126' : 'point 1086'
+  const lines = [`REFUSED BY THE VERIFICATION LADDER (${rule}) — ${verdict.reason}`]
   if ((verdict.commands ?? []).length > 0) lines.push('RUN THIS INSTEAD:')
   for (const cmd of verdict.commands ?? []) lines.push(`  ${cmd}`)
   return lines.join('\n')

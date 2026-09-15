@@ -84,7 +84,8 @@ export function listSections(source) {
  * So a check whose subject is CAST RARELY either sizes its observation window so
  * both runs measure the same thing, or it says here that it cannot — and then
  * the ladder never counts it as climbed (scripts/verify/ladder-core.mjs) and the
- * result line says so when it passes narrowly.
+ * result line says so when it passes narrowly. In the whole suite its reading
+ * is advisory: neither a pass nor a failure is evidence there.
  */
 const NP_HEAD = /(?<![\w.$])nonPredictive\(\s*['"]/g
 /** The same call with both strings captured, read from the ORIGINAL source at a
@@ -234,7 +235,7 @@ export function makeSectionGate({ sections = [], requested = null, suite = 'the 
      * THIS CHECK CANNOT PREDICT WHAT THE SUITE WILL READ (point 1086) — its
      * subject is cast rarely enough that the section alone and the full pass
      * measure different things. Declared beside the check, in the block that
-     * owns it; `predictiveNote` then marks the result line and the ladder
+     * owns it; `checkResult` then marks the result line and the ladder
      * refuses to count the narrow green as climbed.
      */
     nonPredictive(check, why) {
@@ -245,16 +246,25 @@ export function makeSectionGate({ sections = [], requested = null, suite = 'the 
       nonPredictiveChecks.set(name, reason)
       return name
     },
-    /**
-     * What a PASSING result line appends in a narrow run, so no reader takes a
-     * green here for a green in the pass. Empty on a whole-suite run (which
-     * measures what it measures), on a failure (a red is a red either way) and
-     * for every check that made no declaration.
+    /** One decision for both the printed status and the suite's failure count.
+     * A declared check retains full force when its section runs alone. In the
+     * whole suite the observation is advisory, even when it happens to pass.
+     * Neither downstream FAIL scrapers nor PASS counters may credit it there.
      */
-    predictiveNote(check, ok) {
-      if (!verdict.partial || ok === false) return ''
+    checkResult(check, ok) {
       const why = nonPredictiveChecks.get(String(check ?? ''))
-      return why ? `  [NON-PREDICTIVE narrowly: ${why}]` : ''
+      if (why && !verdict.partial) {
+        return {
+          status: 'NON-PREDICTIVE',
+          failed: false,
+          note: `  [NON-PREDICTIVE in full suite: observed ${ok ? 'pass' : 'fail'}; ${why}]`,
+        }
+      }
+      return {
+        status: ok ? 'PASS' : 'FAIL',
+        failed: !ok,
+        note: why && ok ? `  [NON-PREDICTIVE narrowly: ${why}]` : '',
+      }
     },
     /** The section a check being printed right now sits in. */
     currentSection: () => current,
@@ -365,4 +375,63 @@ export function sectionsForLines(source, lines) {
     out.add(name)
   }
   return [...out]
+}
+
+/** The section a printed result line names, taken from the tag `check()` appends
+ *  (scripts/section-tag-core.mjs). Null when the line carries none: a suite that
+ *  is not sectioned yet, or a check in the boot prologue that belongs to no
+ *  block. Total: never throws. */
+const TAG_RE = new RegExp(`\\[--section=(${SECTION_NAME_PATTERN})\\]`)
+export function sectionOfLine(line) {
+  const m = TAG_RE.exec(String(line ?? ''))
+  return m === null ? null : m[1]
+}
+
+/**
+ * WHICH SECTIONS A DIAGNOSIS RUN REPEATS (point 1126, user 14.09.2026).
+ *
+ * WHY. A red asks ONE question — transient or defect? — and two mechanisms ask
+ * it today by replaying the WHOLE suite: the flake retry (point 200) and the
+ * baseline classification (point 294). Measured 14.09.2026 on point 1056, inside
+ * a single LARGE run: `polish` ran FOUR times at ~28 min each — first pass, flake
+ * retry, two baseline passes on the merge base — to re-ask a handful of checks.
+ * Each failing check already NAMES the block that re-runs it alone, so the same
+ * question costs three section runs (~9 min) instead of three suite passes (~84).
+ *
+ * DIAGNOSIS ONLY. A `--section` run is stamped PARTIAL and can never be suite
+ * coverage; this narrows what is asked, never what is credited. And it narrows
+ * only where the narrow reading is TRUSTWORTHY — otherwise it answers `whole`
+ * and the caller repeats the suite exactly as before:
+ *   · a failing check that names no section: nothing can stand in for it;
+ *   · a check the suite declares NON-PREDICTIVE (point 1086): its narrow reading
+ *     is admittedly not the suite's, so a narrow verdict would be a lie;
+ *   · a red spread over half the suite's blocks: every section pays the boot
+ *     prologue again, so repeating that many costs more than the one pass.
+ *
+ * `failures` are the parsed failing checks (baseline-classify-core's
+ * `failedChecks`) — the tag rides in `detail`, and `name` is read too so a
+ * `--failed "<pasted line>"` keeps working. Total: never throws.
+ */
+export function narrowDiagnosis({ failures = [], declared = [], nonPredictive = [], suite = 'the suite' } = {}) {
+  const known = Array.isArray(declared) ? declared : []
+  const whole = (why) => ({ sections: [], whole: true, why })
+  if (known.length === 0) return whole(`${suite} declares no sections`)
+  const reds = Array.isArray(failures) ? failures : []
+  if (reds.length === 0) return whole('no failing check to narrow to')
+  const undeclarable = new Set((Array.isArray(nonPredictive) ? nonPredictive : []).map((d) => String(d?.check ?? '')))
+  const named = new Set()
+  for (const red of reds) {
+    const label = String(red?.name ?? '')
+    const where = sectionOfLine(red?.detail ?? '') ?? sectionOfLine(label)
+    if (where === null) return whole(`"${label}" names no section, so no block can stand in for it`)
+    if (!known.includes(where)) return whole(`"${label}" names section "${where}", which ${suite} no longer declares`)
+    if (undeclarable.has(label)) {
+      return whole(`"${label}" is declared NON-PREDICTIVE in "${where}" — its narrow reading is admittedly not the suite's`)
+    }
+    named.add(where)
+  }
+  if (named.size * 2 >= known.length) {
+    return whole(`${named.size} of ${known.length} blocks are red — repeating them one by one pays the boot prologue ${named.size} times`)
+  }
+  return { sections: known.filter((name) => named.has(name)), whole: false, why: '' }
 }

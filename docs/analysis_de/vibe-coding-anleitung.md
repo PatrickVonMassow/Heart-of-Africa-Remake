@@ -173,7 +173,8 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   ein Testlauf schreibt: Totes wirkt lebendig, der Nächste bleibt draußen.
   → *Prompt:* „Ein Lebenszeichen kommt nur aus einer Quelle, die der **Beobachter nicht
   beschreibt**. Wer entscheidet, ob **ein anderer anfangen darf**, misst einen **Handelnden** —
-  Prozess oder Handle, nie Textsuche oder Dateien: **Arbeit ist kein Arbeiter.**“
+  Prozess oder Handle, nie Textsuche oder Dateien: **Arbeit ist kein Arbeiter.** Aus totem
+  **Besitzer** folgt **Übernahme**, nie Neustart.“
 - **Die Sonde kann ihr Nein nicht erreichen.** Die Prüfung könnte „tot“ sagen — aber nur, wenn man
   ihr den Beweis übergibt, und genau dieser Aufrufer übergibt ihn nicht. Ihr „lebt noch“ ist dann
   der einzig mögliche Satz.
@@ -241,7 +242,9 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 - **Messung und Vorschau verunreinigt.** Halbfertiges gilt als ‚fertig'.
   → *Prompt:* „Hol mein Urteil am **veröffentlichten** Stand ein, nie an einem Zwischenzweig, und
-  miss auf einer ruhigen Maschine."
+  miss auf einer ruhigen Maschine. Läuft schon etwas Langes, ist **Vorarbeit nur Lesen** —
+  auch die Aufräumarbeit, die ein Werkzeug gerade von dir verlangt, fährt dieselben Tests
+  und erschlägt deinen Lauf."
 
 - **Der Bericht urteilt über den Versuch, nicht über die Wirkung.** „Erfolgreich“ heißt nicht
   „angekommen“ — und ein fehlgeschlagener Push nennt Arbeit „nur lokal“, die längst drüben liegt.
@@ -337,7 +340,9 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   im dritten die Ursache: Die Prüfmechanik findet ihre eigenen Fehler, der Zulauf hat keine
   Grenze, das Projekt arbeitet an sich selbst.
   → *Prompt:* „Ein Befund wird nur Arbeitspunkt bei Nutzerwirkung, Risiko, echter Blockade oder
-  Vereinfachung. Sonst in eine gesammelte, **nicht blockierende** Liste."
+  Vereinfachung. Sonst in eine gesammelte, **nicht blockierende** Liste. Ein **übernommener**
+  Befund ist ein Befund, keine Messung: miss ihn gegen den **jetzigen** Stand nach, bevor er ein
+  Punkt wird — Zeitangaben in **einer** Zeitzone."
 
 - **Der Befund stirbt mit dem Gespräch — oder liegt dreimal abgelegt ganz hinten.**
   → *Prompt:* „Sichere Befunde mit einem billigen Kommando, das immer schreibt, und einer Prüfung,
@@ -377,7 +382,10 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   Delegaten für fremd: Die Übergabe nannte ihn nur im Text.
   → *Prompt:* „Trag jede wirksame Angabe in das **Feld**, das der Mechanismus liest; laufen beide
   auseinander, schlägt eine Prüfung fehl. Priorisiere das **Ziel**, und sag bei jeder
-  Sortierregel, was mit dem **Altbestand** geschieht: nachräumen oder liegen lassen."
+  Sortierregel, was mit dem **Altbestand** geschieht: nachräumen oder liegen lassen. Dein
+  **Arbeitsauftrag** ist selbst so ein Feld: Wächter leiten Pflichten aus seinen Sätzen ab, und
+  eine **Verneinung** in der Überschrift ist dort kein Stil, sondern ein Schalter — fordere eine
+  Pflicht **positiv** ein."
 
 - **Die Begründung, die sich im eigenen Dokument widerlegt.** Ein Sicherheitsargument und sein
   Gegenbeweis standen drei Abschnitte auseinander; vier Prüfrunden sahen je eine Hälfte, weil der
@@ -436,7 +444,10 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 - **Die Kur ist teurer als der Fehler.** Eine Regel, die ein seltenes Fehlverhalten sicher
   unterbindet, verbiegt alles andere mit.
   → *Prompt:* „Ein bestätigter Befund verpflichtet zur **Untersuchung**, nicht zur Änderung: Miss
-  die Kur gegen gesunde Fälle. Ist sie teurer, **buche** den Fehler mit Zahlen und verworfener Kur."
+  die Kur gegen gesunde Fälle. Ist sie teurer, **buche** den Fehler mit Zahlen und verworfener Kur.
+  Dasselbe gilt für deinen **Ablauf**: Zwingt die Kette aus Tor, Nummer und Tabelle jede
+  Zweiminutensache in einen Stundenvorgang, fehlt der **kleine Weg** — reine Prosa, die nur du
+  liest, wird **gemacht**, nicht eingereiht."
 
 - **Die Reihenfolge wird gerankt, nicht befolgt.** Die KI fängt Neues an, während halbfertige
   Zweige liegen; die Sortierprüfungen prüfen die Liste, nie den Punkt in Arbeit.
@@ -469,6 +480,11 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   die Erwartung mit; Grün heißt nur „nicht veraltet".
   → *Prompt:* „Frag bei jedem Test über einem **erzeugten** Artefakt, **woher die Erwartung kommt**.
   Richtigkeit braucht eine Aussage, die der Erzeuger **nicht selbst herstellt**."
+
+- **Vorher und Nachher wurden verschieden gemessen — und die Maschine urteilt trotzdem.** Der alte
+  Stand lief allein, der neue im vollen Durchlauf; „Regression" heißt dann nur „anders gemessen".
+  → *Prompt:* „Vergleichst du zwei Messungen, nenne **wie jede erhoben wurde**; bei verschiedenen
+  Bedingungen ist es **kein Vergleich** — neu messen oder die Einschränkung **ins Urteil** schreiben."
 
 - **Ein Auftrag, den du einer laufenden Sitzung nur zurufst, stirbt mit ihr.**
   → *Prompt:* „Was eine Sitzung überdauern soll, gehört in eine Datei, die dein Werkzeug beim
@@ -534,12 +550,14 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Ein Rückfall meldet, **welche Zusage er aussetzt**. Vergleiche **Regel gegen Ist**,
   nicht Ist gegen Plausibilität. Prüffrage: Welche Vereinbarung bricht er still?"
 
-- **Die lange Messung hing am Leben der Sitzung, die sie bestellt hat.** Endet das Fenster, das
-  einen langen Prüflauf startete, stirbt er mitten drin — und zwar **wie ein Fehlschlag**:
-  Abbruchcode gesetzt, Fehlerliste leer, Protokoll mitten im Satz zu Ende.
+- **Der lange Lauf hing am Leben der Sitzung, die ihn bestellt hat.** Endet das Fenster, stirbt
+  er mittendrin — **wie ein Fehlschlag**: Abbruchcode gesetzt, Protokoll mitten im Satz. Echte
+  Rote sind dann **nicht mehr einzuordnen**, und ein beauftragter Helfer, der erst am Ende
+  committet, hinterlässt **nichts**.
   → *Prompt:* „Was **länger dauert als ein Zug**, startest du **abgekoppelt** — im **Werkzeug**,
-  nicht als Merkregel. Ein Lauf ohne Schlussurteil, der **keinen** Fehlschlag nennt, heißt
-  *abgebrochen*, nicht *rot*. Prüffrage: Wessen Tod nimmt diesen Lauf mit?"
+  nicht als Merkregel; ein Helfer committet **jeden Schritt sofort**. Ein Lauf ohne Schlussurteil
+  heißt *abgebrochen*, nicht *rot*. Ob er lebt, sagt der **Prozess**, nie sein Protokoll; die
+  Lesart gehört in den **Datensatz**."
 
 - **Die Schranke aus zwei Hälften, von denen nur eine ein Polster bekam.** Dieselbe Messung,
   zwei Kriterien: eins ließ vier von neunzig durchgehen, das andere färbte bei einem rot.
@@ -571,13 +589,18 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „‚Hängt, abbrechen‘ darf nie allein auf einer hinterlegten Dauer stehen, und ein
   **stilles Protokoll** ist kein Stillstand — viele Läufe schreiben erst je fertigem Abschnitt.
   Lies, was der Lauf **sonst** erzeugt: Dateien, Kindprozesse, Stände. Drucken Plan **und**
-  Messung nebeneinander, muss dabeistehen, **welche** die Abbruchschranke benutzt."
+  Messung nebeneinander, muss dabeistehen, **welche** die Abbruchschranke benutzt.
+  Und gespiegelt: Ein hinterlegtes **Budget** bricht den gesunden Lauf ab, weil das Gemessene
+  unter ihm wächst. Schreib neben jede solche Zahl, **woran** sie gemessen wurde, und leite sie
+  aus einem zweiten, gleich teuren Fall ab, statt sie zu schätzen."
 
 - **Die Schranke verlangt genau das, was gerade entsteht.** Sie lässt nicht aufhören, solange
   ein Nachweis fehlt — und der Nachweis ist der Lauf, der noch zwei Stunden braucht.
   Verweigerung und eigene Abhilfe laufen gegeneinander.
   → *Prompt:* „Eine Schranke, die einen Nachweis fordert, muss ‚wird gerade erstellt' als
-  eigenen Zustand **durchlassen** — sonst verbietet sie ihre eigene Erfüllung."
+  eigenen Zustand **durchlassen** — sonst verbietet sie ihre eigene Erfüllung. Und misst sie am
+  **falschen Gegenstand**, ist sie nie erfüllbar: Widersprechen sich zwei Schranken, ist das ein
+  **Defekt**, kein Bedienfehler — messen, ablegen, nicht in jedem Zug neu beantworten."
 
 - **Ein Rot, das bei gleichem Code kommt und geht, ist ein Befund über deine MESSUNG.** Eine
   Stichprobe aus einem langen Vorgang trifft den Defekt mal und verfehlt ihn mal.
@@ -588,6 +611,20 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   misst ein anderes Fenster als die volle Suite.
   → *Prompt:* „‚Grün' zählt nur, wenn die schmale Stufe **jünger als der letzte Merge** ist und
   **dasselbe misst** wie die große — sonst sagt sie selbst, dass ihr Grün nichts vorhersagt."
+
+- **Ein Rot startet den ganzen Beweis neu, statt seine eigene Sprosse zu wiederholen.** Die
+  fehlgeschlagene Prüfung nennt den Block, der sie allein wiederholt — an einem Tag kostete das
+  599 Minuten Maschinenzeit für einen einzigen Punkt.
+  → *Prompt:* „Repariere auf der **gedruckten Sprosse**; der volle Beweis läuft genau **einmal**,
+  auf dem Stand, der gemergt wird. Und lass die Regel **verweigern** statt erinnern."
+
+- **Du nimmst einen geteilten Eintrag heraus — was darauf stand, bleibt stehen.** Wer eine
+  Ausnahmeliste oder einen Kulissenwert löscht, sieht den Eintrag, nicht seine Nutzer. Das Rot
+  kommt dann im Tor — und steht das Tor hinter dem Merge, steht auch dein Hauptzweig halb
+  gelandet da.
+  → *Prompt:* „Löschen ist **Umbau**: Entfernst du einen geteilten Eintrag, such im selben Zug,
+  **wer auf ihm steht**. Benutzt eine Testkulisse **lebende Daten**, schreib das über sie. Und
+  fahr das Tor **auf dem Zweig**, nicht dahinter."
 
 - **Der Wächter ist grün und greift nicht** — er sitzt in einer Datei, die euer Ablauf nie aufruft.
   → *Prompt:* „**Tipp den Befehl, mit dem ihr arbeitet**, und sieh ihr beim Feuern zu. Zwei
@@ -644,4 +681,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 348bda3f929f138df9eefa154c5741f865f4976050aa267d5906989ebe027028 -->
+<!-- GUIDE-FINGERPRINT: b1f3841b18b7138feb1de8504b2b5adbc488ea3cb43e12d32fd1b096ec970866 -->

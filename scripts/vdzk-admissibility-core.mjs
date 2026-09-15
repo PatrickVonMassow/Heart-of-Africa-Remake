@@ -86,6 +86,14 @@ export function namesOptions(text) {
  * decision-sounding sentence. The fixed possibilities sentence says that the
  * decision is already in force: leaving it needs no user act; reversal names
  * the one exact veto action.
+ *
+ * THE FOUR LABELS ARE THE SHAPE; THE CARD ITSELF IS SHORT AND PLAINLY
+ * UNDERSTANDABLE (user 15.09.2026). One or two short sentences per label — no
+ * file names, no test names, no identifiers, no version strings, no number that
+ * means nothing to the reader, who knows the game rather than the code and reads
+ * the board on a phone. Nothing below measures this, on purpose: a length gate
+ * would bounce writers and slow the lane for something easier to follow than to
+ * count.
  */
 export function isAdvisoryDecisionRecord({ title, body } = {}) {
   const head = String(title ?? '').trim()
@@ -106,7 +114,9 @@ const openQuestionPattern = () =>
 const decisionRecordPattern =
   'For an owner-decidable question, act first and write an "Entscheidungsprotokoll:" card with ' +
   '"Entscheidung:", "Evidenz:", "Folge:" and "Deine Möglichkeiten: die Entscheidung stehen lassen, ' +
-  'oder sie zurücknehmen — exakte Veto-Aktion:"; the veto is the user’s only action.'
+  'oder sie zurücknehmen — exakte Veto-Aktion:"; the veto is the user’s only action. Keep it SHORT ' +
+  'and plainly understandable — one or two short sentences per label, no file or test names, no ' +
+  'identifiers, no number that means nothing to the reader; nothing checks this, it is on you.'
 
 /**
  * Is this card admissible? The historical export name is retained because the

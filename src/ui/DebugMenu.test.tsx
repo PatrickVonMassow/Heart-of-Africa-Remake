@@ -50,6 +50,9 @@ const DEFAULTS = {
   labelOverlayMax: balance.labelOverlay.maxLabels,
   birdsongVolume: balance.birdsongVolume,
   speechVolume: balance.communication.speechVolume,
+  communication: structuredClone(balance.communication),
+  speechChildPitchHz: balance.communication.speechChildPitchHz,
+  speechStereoWidth: balance.communication.speechStereoWidth,
   drumBed: { ...balance.drumBed },
   surfNearRadius: balance.surf.nearRadius,
   surfCutoff: balance.surf.cutoff,
@@ -139,7 +142,10 @@ afterEach(() => {
   balance.startup.pictureFreezeBudgetMs = DEFAULTS.startupFreezeBudgetMs
   balance.labelOverlay.maxLabels = DEFAULTS.labelOverlayMax
   balance.birdsongVolume = DEFAULTS.birdsongVolume
+  Object.assign(balance.communication, structuredClone(DEFAULTS.communication))
   balance.communication.speechVolume = DEFAULTS.speechVolume
+  balance.communication.speechChildPitchHz = DEFAULTS.speechChildPitchHz
+  balance.communication.speechStereoWidth = DEFAULTS.speechStereoWidth
   Object.assign(balance.drumBed, DEFAULTS.drumBed)
   balance.surf.nearRadius = DEFAULTS.surfNearRadius
   balance.surf.cutoff = DEFAULTS.surfCutoff
@@ -299,7 +305,16 @@ describe('DebugMenu editable fields write through to balance (settings.mjs fillF
     { label: en.debug.speechSyllable, read: () => balance.communication.syllableSeconds, value: 0.45 },
     { label: en.debug.speechPhrasePause, read: () => balance.communication.phrasePauseSeconds, value: 1.4 },
     { label: en.debug.speechHearingRadius, read: () => balance.communication.hearingRadius, value: 14 },
-    { label: en.debug.speechHearingFalloff, read: () => balance.communication.hearingFalloff, value: 12 },
+    { label: en.debug.speechChildPitch, read: () => balance.communication.speechChildPitchHz, value: 240 },
+    { label: en.debug.speechStereoWidth, read: () => balance.communication.speechStereoWidth, value: 0 },
+    { label: en.debug.talkReach, read: () => balance.communication.talk.reach, value: 11 },
+    { label: en.debug.callReach, read: () => balance.communication.call.reach, value: 35 },
+    { label: en.debug.talkLoudness, read: () => balance.communication.talk.loudness, value: 1.1 },
+    { label: en.debug.callLoudness, read: () => balance.communication.call.loudness, value: 1.3 },
+    { label: en.debug.callFalloff, read: () => balance.communication.call.falloff, value: 5 },
+    { label: en.debug.speechConsequence, read: () => balance.communication.consequenceSeconds, value: 3 },
+    { label: en.debug.speechHold, read: () => balance.communication.speechHoldSeconds, value: 250 },
+    { label: en.debug.speechHearingFalloff, read: () => balance.communication.talk.falloff, value: 12 },
     // How long the player's reading stands over the speaker's head (point 485).
     { label: en.debug.speechLabelSeconds, read: () => balance.communication.labelSeconds, value: 4 },
     // The speech's own level (point 577) — the slider the player lacked when he
@@ -876,8 +891,8 @@ const EXPECTED_CONTROLS: Record<DebugGroupId, readonly string[]> = {
     'debug.separationRadius', 'debug.separationSlop', 'debug.separationStiffness',
     'debug.separationSpeed', 'debug.separationWedge', 'debug.separationPasses',
     'debug.speechSyllable', 'debug.speechPhrasePause', 'debug.speechHearingRadius',
-    'debug.speechHearingFalloff', 'debug.speechLabelSeconds', 'debug.speechLabelHeadroom',
-    'debug.speechPitch', 'debug.speechPitchInterval',
+    'debug.speechHearingFalloff', 'debug.talkReach', 'debug.callReach', 'debug.talkLoudness', 'debug.callLoudness', 'debug.callFalloff', 'debug.speechConsequence', 'debug.speechHold', 'debug.speechLabelSeconds', 'debug.speechLabelHeadroom',
+    'debug.speechPitch', 'debug.speechChildPitch', 'debug.speechStereoWidth', 'debug.speechPitchInterval',
     'debug.speechConceptLabels',
     'debug.tagChildCount', 'debug.tagSprintSpeed', 'debug.tagRunnerBoost', 'debug.tagTrotFactor',
     'debug.tagRecoverFactor', 'debug.tagFloorFactor', 'debug.tagDrain', 'debug.tagRecover',
@@ -990,12 +1005,12 @@ describe('DebugMenu completeness: every control is present, in its group (point 
     })
   })
 
-  it('carries all 200 controls in total, and none twice', () => {
+  it('carries all 209 controls in total, and none twice', () => {
     render(<DebugMenu />)
     const labels = renderedRowLabels()
     const expected = DEBUG_GROUP_ORDER.flatMap((id) => EXPECTED_CONTROLS[id])
     expect(labels.length).toBe(expected.length)
-    expect(labels.length).toBe(200)
+    expect(labels.length).toBe(209)
     expect(new Set(labels).size).toBe(labels.length)
   })
 
@@ -1042,7 +1057,7 @@ describe('DebugMenu completeness: every control is present, in its group (point 
   it('gives every control a real input, select or button — no label without a control', () => {
     render(<DebugMenu />)
     const rows = [...document.querySelectorAll('.debug-menu .debug-group-body > label')]
-    expect(rows.length).toBe(200)
+    expect(rows.length).toBe(209)
     for (const row of rows) {
       const label = row.querySelector('span')?.textContent ?? '(none)'
       // The renderer row is the one deliberate read-only display (design.md §21.3).
@@ -1096,7 +1111,7 @@ describe('DebugMenu groups collapse and remember their state (point 393)', () =>
     render(<DebugMenu />)
     // Nothing opened: the whole set is still there (hidden), and a value still
     // writes through — the verify suites drive the controls this way.
-    expect(renderedRowLabels().length).toBe(200)
+    expect(renderedRowLabels().length).toBe(209)
     fireEvent.change(numberField(en.debug.travelSpeed), { target: { value: '9' } })
     expect(balance.travelSpeed).toBe(9)
     balance.travelSpeed = DEFAULTS.travelSpeed
@@ -1144,7 +1159,7 @@ describe('DebugMenu filter narrows the whole menu (point 393)', () => {
     typeFilter('croc')
     expect(renderedRowLabels().length).toBeLessThan(149)
     typeFilter('')
-    expect(renderedRowLabels().length).toBe(200)
+    expect(renderedRowLabels().length).toBe(209)
     expect(renderedGroups().filter((g) => g.open).map((g) => g.title)).toEqual([en.debug.groups.tools])
   })
 

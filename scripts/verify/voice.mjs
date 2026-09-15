@@ -17,6 +17,7 @@ import { frameShutter } from './frameSubject.mjs'
 import { sectionGate } from './sections.mjs'
 import { installTtsCache, markTtsCacheComplete } from './ttsCache.mjs'
 import { attributeBlocks, maxGap } from './liveness.mjs'
+import { judgeSpeechSampling } from './speechSampler.mjs'
 import { fileURLToPath } from 'node:url'
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:5173/'
@@ -311,6 +312,69 @@ if (section('auto-narration')) {
   await shot('66-voice-auto-narration', { element: '.journal .entries > .entry:nth-last-child(2)', label: 'the new entry narrating itself' })
   await page.locator('.journal .speak').last().click()
   await page.waitForTimeout(400)
+}
+
+// Village speech uses native analysers on the DEPLOYED master, after the
+// per-utterance panner, speech bus and master gain. This is the audio/WebGL lane.
+if (section('village-stereo')) {
+  await firstGesture()
+  const measured = await page.evaluate(async () => {
+    const { utteranceOf } = await import('/src/communication/lexicon.ts')
+    const { sampleSpeech } = await import('/scripts/verify/speechSampler.mjs')
+    const a = window.__ambience
+    const b = window.__balance
+    a.start()
+    const ac = a.context()
+    await ac.resume()
+    const master = a.output()
+    const split = ac.createChannelSplitter(2)
+    master.connect(split)
+    const analysers = [0, 1].map((channel) => {
+      const node = ac.createAnalyser()
+      node.fftSize = 4096
+      node.smoothingTimeConstant = 0
+      split.connect(node, channel)
+      return node
+    })
+    const heldDrums = b.drumBed.enabled
+    const sample = async (childrenOnly) => {
+      const tones = [b.communication.speechPitchHz, b.communication.speechChildPitchHz]
+      const startedAt = ac.currentTime
+      a.speak(utteranceOf('RIVER'), childrenOnly ? 0 : 3, {
+        bearing: childrenOnly ? Math.PI / 2 : -Math.PI / 2,
+        voice: childrenOnly ? 'child' : 'adult',
+      })
+      a.speak(utteranceOf('RIVER'), childrenOnly ? 0 : 3, { bearing: Math.PI / 2, voice: 'child' })
+      return sampleSpeech(ac, analysers, tones, startedAt)
+    }
+    try {
+      a.setScene({ region: 'central', mode: 'place', placeKind: 'village', nearVillage: false })
+      a.refresh()
+      const deployed = await sample(false)
+      // The optional bed is a second, louder headroom condition. Two children
+      // on the same side exercise the loudest new carrier/channel combination.
+      b.drumBed.enabled = true
+      a.refresh()
+      const withDrums = await sample(true)
+      return { deployed, withDrums, heldDrums }
+    } finally {
+      b.drumBed.enabled = heldDrums
+      a.setScene({ region: 'central', mode: 'place', placeKind: 'port', nearVillage: false })
+      a.refresh()
+      master.disconnect(split)
+      split.disconnect()
+      analysers.forEach((node) => node.disconnect())
+    }
+  })
+  const sampling = judgeSpeechSampling(measured)
+  check('speech sampler enters both low-syllable windows in each mix', sampling.ok, sampling.detail)
+  const [adult, child] = measured.deployed.bands
+  check('overlapping adult and child speech reaches opposite stereo sides',
+    sampling.ok && adult[0] > adult[1] + 4 && child[1] > child[0] + 4,
+    sampling.ok ? JSON.stringify(measured.deployed) : sampling.detail)
+  check('deployed and drum-audition speech leave the master audibly below full scale',
+    measured.heldDrums === false && [measured.deployed, measured.withDrums].every((mix) => mix.peak > 0.02 && mix.peak < 1),
+    JSON.stringify(measured))
 }
 
 // A selected section that never executed is a FAILURE, not a quiet pass: it is

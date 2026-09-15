@@ -543,6 +543,8 @@ export function formatBaselineReport({
   ref,
   backend = 'webgl',
   classified,
+  currentContext = 'unknown',
+  baselineContext = 'standalone',
   suiteFileChanged = false,
   infraChanged = [],
   baselineRan = true,
@@ -551,7 +553,10 @@ export function formatBaselineReport({
   logs = [],
   note = '',
 }) {
-  const lines = [`--- baseline classification — ${suite} vs ${ref} (backend ${backend === 'webgpu' ? 'WebGPU' : 'WebGL 2'}) ---`]
+  const comparable = currentContext !== 'unknown' && currentContext === baselineContext
+  const comparison = `baseline ${baselineContext}, candidate ${currentContext}`
+  const qualification = comparable ? '' : ` — ${currentContext === 'unknown' ? 'COMPARABILITY UNKNOWN' : 'NOT LIKE-FOR-LIKE'} (${comparison}; causation unproven)`
+  const lines = [`--- baseline classification — ${suite} vs ${ref} (backend ${backend === 'webgpu' ? 'WebGPU' : 'WebGL 2'}; ${comparison}) ---`]
   if (!baselineRan) {
     lines.push('      the baseline run did not produce a result — NOT classified (never assume green).')
     if (note) lines.push(`      ${note}`)
@@ -580,7 +585,9 @@ export function formatBaselineReport({
     }
     lines.push('      Read the kept output below at the last check named above — the throw is the line after it.')
   }
-  for (const c of classified) lines.push(`      ${c.check}: ${VERDICT_LABEL[c.verdict]}`)
+  for (const c of classified) {
+    lines.push(`      ${c.check}: ${VERDICT_LABEL[c.verdict]}${c.verdict === 'real-regression' ? qualification : ''}`)
+  }
   // A CAVEAT, printed after the verdicts because they still stand: the run
   // reported, it just reported over a shorter suite than the current one.
   for (const s of shortfalls) {
@@ -603,4 +610,42 @@ export function formatBaselineReport({
   if (note) lines.push(`      ${note}`)
   lines.push('      The baseline run is EVIDENCE, not a verdict: read the failing check before acting on it.')
   return lines
+}
+
+// THE ENVIRONMENT A SPAWNED SUITE SEES, as far as the LANE is concerned.
+//
+// A suite may stand a block down because the PRE-change app cannot pose it (the
+// excavation picture in polish.mjs, which needs a durable dig record the
+// baseline build does not have). That exemption belongs to the baseline tree
+// and nowhere else: on the candidate the same missing capability IS the
+// regression, and a silent SKIP would report it green.
+//
+// The marker is therefore never inherited and never omitted — every spawn
+// states its lane, including the pass's own suites and the classifier's
+// CURRENT-tree run, which shares runSuiteOnce with the baseline run
+// (GPT-6 Astra, cross-vendor review of fea5ce9, 15.09.2026).
+export const BASELINE_LANE_ENV = 'VERIFY_BASELINE_LANE'
+
+export function suiteLaneEnv({ baselineLane = false, baseUrl = null, env = {} } = {}) {
+  return {
+    ...env,
+    [BASELINE_LANE_ENV]: baselineLane ? '1' : '0',
+    ...(baseUrl ? { BASE_URL: baseUrl } : {}),
+  }
+}
+
+export function onBaselineLane(env = {}) {
+  return env[BASELINE_LANE_ENV] === '1'
+}
+
+// THE PASS DROPS AN INHERITED MARKER ONCE, FOR EVERY CHILD IT WILL EVER SPAWN.
+// Writing the lane at each spawn site is incomplete by construction: run-all
+// also starts the cross-browser check and Vitest, and the next spawn added
+// would inherit the marker again (GPT-6 Astra, confirming review of a175498).
+// Clearing it from the pass's OWN environment covers every child at once,
+// present and future, and leaves the classifier free to WRITE the lane it
+// means on the two suites it spawns itself.
+export function clearInheritedBaselineLane(env) {
+  delete env[BASELINE_LANE_ENV]
+  return env
 }

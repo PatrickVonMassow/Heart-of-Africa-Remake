@@ -60,6 +60,13 @@ export interface SpeechLabel {
   hideAt: number
   /** Metres above the speaker's origin. */
   height: number
+  /**
+   * Whether the speech floor raised this note. Only these are swept away when
+   * the floor grants the next word: a note raised OUTSIDE the floor — the
+   * chief's answer to the player, which stands as long as he needs to read it
+   * — is none of the floor's business and survives every village word.
+   */
+  floor: boolean
 }
 
 /** Every label standing right now. Nothing here is saved. */
@@ -105,7 +112,7 @@ export function showSpeechLabel(
   speakerId: string,
   atoms: Phrase,
   now: number,
-  options: { seconds?: number; height?: number } = {},
+  options: { seconds?: number; height?: number; floor?: boolean } = {},
 ): SpeechLabelState {
   if (speakerId === '' || atoms.length === 0) return state
   const seconds = Math.max(0, options.seconds ?? speechLabelSeconds(atoms.length))
@@ -122,6 +129,7 @@ export function showSpeechLabel(
         shownAt: now,
         hideAt: now + seconds,
         height: options.height ?? speechLabelHeight(),
+        floor: options.floor === true,
       },
     ],
   }
@@ -137,6 +145,21 @@ export function showSpeechLabel(
 export function expireSpeechLabels(state: SpeechLabelState, now: number): SpeechLabelState {
   const labels = state.labels.filter((l) => l.hideAt > now || l.speakerId === state.targetId)
   return labels.length === state.labels.length ? state : { ...state, labels }
+}
+
+/**
+ * Drops every note the SPEECH FLOOR raised, and nothing else — what the floor
+ * grants, the floor takes back. One village word at a time is the floor's own
+ * rule, so the next word it grants clears the previous one; a note raised
+ * outside the floor is not the floor's to clear, and stands.
+ */
+export function dropFloorLabels(state: SpeechLabelState): SpeechLabelState {
+  const labels = state.labels.filter((l) => !l.floor)
+  if (labels.length === state.labels.length) return state
+  // A speaker whose note is gone can no longer be clicked, exactly as in
+  // dropSpeechLabel: the highlight goes with the note rather than dangling.
+  const targetDropped = state.labels.some((l) => l.floor && l.speakerId === state.targetId)
+  return { labels, targetId: targetDropped ? null : state.targetId }
 }
 
 /** Drops one speaker's label — used when its figure leaves the scene. */

@@ -32,13 +32,38 @@ export interface SpeechPlan {
   duration: number
   /** The level the utterance arrives at, 0..1; 0 = out of range or muted. */
   gain: number
+  /** Fixed for the whole utterance, negative left / positive right. */
+  pan: number
+  voice: SpeechVoice
+}
+
+export type SpeechVoice = 'adult' | 'child'
+export type VoiceRegister = 'talk' | 'call'
+
+export function voiceRegister(register: VoiceRegister = 'talk') {
+  return balance.communication[register]
+}
+
+export function registerOptions(register: VoiceRegister = 'talk'): SpeechOptions {
+  const { reach, loudness, falloff } = voiceRegister(register)
+  return { radius: reach, loudness, falloff }
+}
+
+/** Camera-relative bearing in radians; rear speakers retain their side. */
+export function speechPan(bearing: number, width = balance.communication.speechStereoWidth): number {
+  if (!Number.isFinite(bearing) || !Number.isFinite(width)) return 0
+  return Math.sin(bearing) * Math.max(0, Math.min(1, width))
 }
 
 /** Overridable inputs; each defaults to its calibratable balance value. */
 export interface SpeechOptions {
-  /** How far an utterance carries at all (balance.communication.hearingRadius). */
+  /** Horizontal bearing from the camera, positive to its right. */
+  bearing?: number
+  voice?: SpeechVoice
+  loudness?: number
+  /** How far an utterance carries at all (balance.communication.talk.reach). */
   radius?: number
-  /** Steepness of the fall inside that radius (balance.communication.hearingFalloff). */
+  /** Steepness of the fall inside that radius (balance.communication.talk.falloff). */
   falloff?: number
   /** Seconds per syllable — the constant pace (balance.communication.syllableSeconds). */
   syllableSeconds?: number
@@ -56,29 +81,29 @@ export interface SpeechOptions {
 const SYLLABLE_DUTY = 0.62
 
 /**
- * Peak of one syllable before the buses. Like the thunder and crunch peaks it
- * compensates the ambient bus (0.5) × master (0.5) attenuation, so a villager
- * standing beside the player is plainly heard over the beds. Calibratable
- * shape; the audible RANGE is the balance value, not this.
+ * Envelope peak before the dedicated speech bus and master. The vowel filters
+ * add synthesis gain; graph measurements, not the envelope alone, judge output.
+ * Speech volume and hearing falloff are the calibratable loudness controls.
  */
-const SPEECH_PEAK = 1.8
+// Re-measured with 210/352.8 Hz children and width 0.6: the former 1.8
+// exceeded full scale (1.780 conservative mixed peak); 0.85 leaves 0.977.
+const SPEECH_PEAK = 0.85
 
 /**
  * How loud an utterance spoken `distance` away arrives: 1 right beside the
- * speaker, falling off sharply with the square of the distance, and cut to
+ * speaker, falling off with the square of the distance, and cut to
  * exactly 0 beyond the hearing radius. The hard cut is deliberate — it makes
  * "audible" and isWithinHearing() the SAME condition, so nothing is ever
  * recorded that could not be heard, and nothing heard goes unrecorded.
  *
  * `falloff` is the steepness: the level at the rim of the radius is
  * 1/(1+falloff), so a large value means the voices die away close to the
- * speaker — which is what keeps the children's group and the adults' group
- * from babbling over each other in the middle of the village.
+ * speaker. The shipped 4 keeps conversation audible at 3–5 metres.
  */
 export function hearingGain(
   distance: number,
-  radius: number = balance.communication.hearingRadius,
-  falloff: number = balance.communication.hearingFalloff,
+  radius: number = balance.communication.talk.reach,
+  falloff: number = balance.communication.talk.falloff,
 ): number {
   if (!isWithinHearing(distance, radius)) return 0
   if (radius <= 0) return distance <= 0 ? 1 : 0
@@ -98,17 +123,18 @@ export function utteranceSeconds(
 function resolve(options: SpeechOptions = {}) {
   const c = balance.communication
   return {
-    radius: options.radius ?? c.hearingRadius,
-    falloff: options.falloff ?? c.hearingFalloff,
+    radius: options.radius ?? c.talk.reach,
+    falloff: options.falloff ?? c.talk.falloff,
     syllableSeconds: Math.max(0, options.syllableSeconds ?? c.syllableSeconds),
     pauseSeconds: Math.max(0, options.pauseSeconds ?? c.phrasePauseSeconds),
     volume: Math.max(0, options.volume ?? balance.ambienceVolume),
+    loudness: Math.max(0, options.loudness ?? c.talk.loudness),
   }
 }
 
 /** An empty plan — nothing audible, nothing scheduled. */
 function silence(): SpeechPlan {
-  return { syllables: [], duration: 0, gain: 0 }
+  return { syllables: [], duration: 0, gain: 0, pan: 0, voice: 'adult' }
 }
 
 /**
@@ -134,10 +160,12 @@ export function phrasePlan(
   distance: number,
   options: SpeechOptions = {},
 ): SpeechPlan {
-  const { radius, falloff, syllableSeconds, pauseSeconds, volume } = resolve(options)
+  const { radius, falloff, syllableSeconds, pauseSeconds, volume, loudness } = resolve(options)
+  const pan = speechPan(options.bearing ?? 0)
+  const voice = options.voice ?? 'adult'
   const gain = hearingGain(distance, radius, falloff)
-  const level = gain * volume
-  if (level <= 0 || syllableSeconds <= 0) return { ...silence(), gain }
+  const level = gain * volume * loudness
+  if (level <= 0 || syllableSeconds <= 0) return { ...silence(), gain, pan, voice }
   const peak = SPEECH_PEAK * level
   const syllables: SpokenSyllable[] = []
   let t = 0
@@ -155,9 +183,9 @@ export function phrasePlan(
       t += syllableSeconds
     }
   }
-  if (syllables.length === 0) return { ...silence(), gain }
+  if (syllables.length === 0) return { ...silence(), gain, pan, voice }
   const last = syllables[syllables.length - 1]
-  return { syllables, duration: last.startOffset + last.duration, gain }
+  return { syllables, duration: last.startOffset + last.duration, gain, pan, voice }
 }
 
 /**
@@ -170,7 +198,7 @@ export function hearUtterance(
   utterance: UtteranceId,
   distance: number,
   day: number,
-  radius: number = balance.communication.hearingRadius,
+  radius: number = balance.communication.talk.reach,
 ): CommunicationMemory {
   return isWithinHearing(distance, radius) ? observeUtterance(memory, utterance, day) : memory
 }
@@ -181,7 +209,7 @@ export function hearPhrase(
   phrase: Phrase,
   distance: number,
   day: number,
-  radius: number = balance.communication.hearingRadius,
+  radius: number = balance.communication.talk.reach,
 ): CommunicationMemory {
   return isWithinHearing(distance, radius) ? observePhrase(memory, phrase, day) : memory
 }

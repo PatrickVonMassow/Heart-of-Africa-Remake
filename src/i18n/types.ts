@@ -548,9 +548,18 @@ export interface Strings {
     speechSyllable: string
     speechPhrasePause: string
     speechHearingRadius: string
+    talkReach: string
+    callReach: string
+    talkLoudness: string
+    callLoudness: string
+    callFalloff: string
+    speechConsequence: string
+    speechHold: string
     speechHearingFalloff: string
     speechLabelSeconds: string
     speechPitch: string
+    speechChildPitch: string
+    speechStereoWidth: string
     speechPitchInterval: string
     speechLabelHeadroom: string
     speechConceptLabels: string
@@ -774,7 +783,7 @@ export interface Strings {
       /** Arrival at a walkable monument site, and a changed return (§16). */
       monument(p: TextParams): string
       monumentReturn(p: TextParams): string
-      chiefHint: string
+      chiefWalk: string
       /** The chief's drum message (design.md §13.4, point 486). */
       drumMessage: string
       /** Dug up at the foot of the landmark boulder (point 487). */
@@ -783,7 +792,6 @@ export interface Strings {
       artefactGiven: string
       /** The clay impression pressed into the rock it was taken from. */
       mouldFitted: string
-      decoded: string
       victory: string
       foodLow: string
       foodOut: string
@@ -842,10 +850,8 @@ export interface Strings {
     monumentReturn(p: TextParams): string
     villageFirstVisit(p: TextParams): string
     villageReturn(p: TextParams): string
-    /** Raw location hint in the region's own words (design.md §13.1/13.3). */
-    hintRaw(p: TextParams): string
-    /** Deciphered version of the same hint. */
-    hintDecoded(p: TextParams): string
+    /** The chief leaves his hut and the traveller takes his walk as an invitation. */
+    chiefWalk: string
     /** The chief's drums beat his message out (design.md §13.4, point 486). */
     drumMessage: string
     /** The dig at the boulder the drum message sends the traveller to (point 487). */

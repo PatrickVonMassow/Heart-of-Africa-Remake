@@ -16,6 +16,7 @@ import type { Object3D } from 'three/webgpu'
 import { balance } from '../../config/balance'
 import { chiefInHut, type ChiefWalk } from './chiefWalk'
 import { placePlayerPosition } from './playerPosition'
+import { CHIEF_BODY_RADIUS, type Collider } from './collision'
 
 /** The speaker id the chief's labels ride under — one chief per settlement. */
 export const CHIEF_SPEAKER_ID = 'chief'
@@ -45,6 +46,7 @@ export function setChiefWalkState(next: ChiefWalk): void {
 /** Back in his hut: what a settlement entered (or left) resets him to. */
 export function resetChiefWalk(): void {
   walk = chiefInHut()
+  clearChiefStanding()
 }
 
 let anchor: Object3D | null = null
@@ -65,7 +67,13 @@ export function chiefAnchor(): Object3D | null {
  * measured against this, so the item is used on the man on screen rather than
  * on a spot recomputed from the layout. `active` is true only while he stands.
  */
-export const chiefStandingPosition = { x: 0, z: 0, active: false }
+export const chiefStandingPosition = { x: 0, z: 0, r: CHIEF_BODY_RADIUS, active: false }
+
+/** The chief’s live position is also his body, so collision and reach cannot drift.
+ *  Kept out of the static layout: his walk must not collide with itself. */
+export function chiefMovementColliders(colliders: Collider[]): Collider[] {
+  return chiefStandingPosition.active ? [...colliders, chiefStandingPosition] : colliders
+}
 
 /** The figure registers its own ground spot while it stands. */
 export function setChiefStanding(x: number, z: number): void {

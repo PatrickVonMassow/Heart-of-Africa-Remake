@@ -47,6 +47,9 @@ describe('the report deposits evidence through the real finding carrier', () => 
     expect(entries[0].fields.why).toContain('/kept/baseline.log')
     expect(entries[0].fields.spec).toContain('full settings suite passes')
     expect(first.calls[0].args).toContain('--current-checks')
+    const contextIndex = first.calls[0].args.indexOf('--current-context')
+    expect(contextIndex).toBeGreaterThan(0)
+    expect(first.calls[0].args[contextIndex + 1]).toBe('in-pass')
     expect(first.calls[1].args).toContain('--once')
   })
 

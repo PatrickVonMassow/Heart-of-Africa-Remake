@@ -11,6 +11,7 @@ import {
   hearPhrase,
   hearUtterance,
   hearingGain,
+  speechPan,
   phrasePlan,
   utterancePlan,
   utteranceSeconds,
@@ -20,10 +21,10 @@ const RIVER_UTTERANCE = utteranceOf('RIVER')
 const DIG = utteranceOf('DIG')
 const ROCK_UTTERANCE = utteranceOf('ROCK')
 
-const defaults = { ...balance.communication }
+const defaults = structuredClone(balance.communication)
 const defaultVolume = balance.ambienceVolume
 afterEach(() => {
-  Object.assign(balance.communication, defaults)
+  Object.assign(balance.communication, structuredClone(defaults))
   balance.ambienceVolume = defaultVolume
 })
 
@@ -63,11 +64,11 @@ describe('hearingGain (the short, sharply falling range)', () => {
   })
 
   it('reads the calibratable balance values by default', () => {
-    balance.communication.hearingRadius = 4
-    balance.communication.hearingFalloff = 24
+    balance.communication.talk.reach = 4
+    balance.communication.talk.falloff = 24
     expect(hearingGain(5)).toBe(0)
     expect(hearingGain(0)).toBe(1)
-    balance.communication.hearingRadius = 40
+    balance.communication.talk.reach = 40
     expect(hearingGain(5)).toBeGreaterThan(0)
   })
 })
@@ -206,9 +207,53 @@ describe('hearing bookkeeping (point 477 store — what the distance decides)', 
   })
 
   it('uses the calibratable radius when none is passed', () => {
-    balance.communication.hearingRadius = 3
+    balance.communication.talk.reach = 3
     expect(hasHeard(hearUtterance(emptyMemory(), RIVER_UTTERANCE, 4, day), RIVER_UTTERANCE)).toBe(false)
-    balance.communication.hearingRadius = 30
+    balance.communication.talk.reach = 30
     expect(hasHeard(hearUtterance(emptyMemory(), RIVER_UTTERANCE, 4, day), RIVER_UTTERANCE)).toBe(true)
   })
+})
+
+
+describe('direction and conversational reach', () => {
+  it('centres ahead, bounds either side, and keeps the side behind the camera', () => {
+    expect(speechPan(0, 0.6)).toBe(0)
+    expect(speechPan(Math.PI / 2, 0.6)).toBeCloseTo(0.6)
+    expect(speechPan(-Math.PI / 2, 0.6)).toBeCloseTo(-0.6)
+    expect(speechPan(3 * Math.PI / 4, 0.6)).toBeGreaterThan(0)
+    expect(speechPan(-3 * Math.PI / 4, 0.6)).toBeLessThan(0)
+    expect(speechPan(Math.PI - 0.001)).toBeCloseTo(speechPan(-Math.PI - 0.001))
+    expect(speechPan(0.7, 0)).toBe(0)
+    expect(speechPan(Math.PI / 2, 5)).toBe(1)
+  })
+
+  it('stores one position and register without changing syllable levels or timing', () => {
+    const centred = phrasePlan(phraseOf(['UPSTREAM', 'DOWNSTREAM']), 3)
+    const child = phrasePlan(phraseOf(['UPSTREAM', 'DOWNSTREAM']), 3, { bearing: Math.PI / 2, voice: 'child' })
+    expect(child.pan).toBe(balance.communication.speechStereoWidth)
+    expect(child.voice).toBe('child')
+    expect(child.syllables).toEqual(centred.syllables)
+    balance.communication.speechStereoWidth = 0
+    expect(child.pan).toBeGreaterThan(0) // already planned, unaffected by later changes
+  })
+
+  it('carries 73.5 % at 3 m, half at 5 m, and 20 % at the hearing rim', () => {
+    expect(hearingGain(3)).toBeCloseTo(0.7352941176)
+    expect(hearingGain(5)).toBe(0.5)
+    expect(hearingGain(10)).toBe(0.2)
+    expect(hearingGain(10.001)).toBe(0)
+  })
+})
+
+
+it('makes calls louder at source and cuts each register off at its own rim', async () => {
+  const { registerOptions } = await import('./speaking')
+  const talk = utterancePlan('babababa', 0, registerOptions('talk'))
+  const call = utterancePlan('babababa', 0, registerOptions('call'))
+  expect(call.syllables[0].peak).toBeGreaterThan(talk.syllables[0].peak)
+  for (const register of ['talk', 'call'] as const) {
+    const options = registerOptions(register)
+    expect(utterancePlan('babababa', options.radius!, options).gain).toBeCloseTo(0.2)
+    expect(utterancePlan('babababa', options.radius! + 0.001, options).syllables).toEqual([])
+  }
 })

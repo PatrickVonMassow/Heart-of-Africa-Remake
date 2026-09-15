@@ -1,94 +1,115 @@
-// Store hints (CLAUDE.md §7.1 pt. 7/10, design.md §13). Ports the store-driven
-// asserts of scripts/verify/hints.mjs into fast jsdom checks: one knowing
-// village per region, the hint→decoded cascade the chief gives when he steps
-// out of his hut, the north-latitude / east-longitude triangulation matching
-// the actual grave, and the unspecific words of a non-knowing chief pointing
-// to the knowing people. The single DOM assert (the raw in-world word "koko"
-// in the rendered JournalPanel) stays in the Playwright E2E.
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import type { RegionId } from '../world/geo'
+// The door records the chief's walk; only the drums carry his message (§13.4).
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { PLACES } from '../world/geo'
 import { balance } from '../config/balance'
-import { g, freshGame, withWorld } from '../test/store'
+import { g, freshGame, withWorld, useGame } from '../test/store'
+import { DICTIONARIES, resolveText, useLocale } from '../i18n'
+import { stripVoiceMarkup } from '../journal/voiceMarkup'
+import { chiefWalkState, resetChiefWalk } from '../scenes/place/chiefPresence'
 
 withWorld()
-
 beforeEach(() => {
   freshGame()
-  balance.randomEventsEnabled = false // deterministic: no hidden per-day rolls
+  balance.randomEventsEnabled = false
 })
 afterEach(() => {
   balance.randomEventsEnabled = true
-  vi.restoreAllMocks()
+  useLocale.getState().setLang('en')
 })
 
 const REGIONS = ['north', 'west', 'central', 'east', 'south'] as const
 
-/** Grave/hint layout is seeded per run, so read the knowing village from state. */
-const knowingVillage = (region: RegionId) => g().knowingVillages[region]
-
-/** The full hint cascade at a region's knowing village: the use key at the hut
- *  calls the chief out, and he says what he knows in the same breath. */
-function cascadeKnowingVillage(region: RegionId): void {
-  g().enterPlace(knowingVillage(region))
-  g().callChiefOut()
-  g().leavePlace()
-}
-
-const decodedEntry = (region: RegionId) =>
-  g().journal.find((e) => e.text.key === 'journal.hintDecoded' && e.text.params?.region === region)
-
 describe('knowing people (design.md §13.3)', () => {
-  it('has exactly one knowing village per region, each within its region', () => {
-    const knowing = g().knowingVillages
-    const regions = Object.keys(knowing)
-    expect(regions.sort()).toEqual([...REGIONS].sort())
+  it('keeps exactly one knowing village within each region', () => {
+    expect(Object.keys(g().knowingVillages).sort()).toEqual([...REGIONS].sort())
     for (const region of REGIONS) {
-      const place = PLACES.find((p) => p.id === knowing[region])
-      expect(place).toBeTruthy()
-      expect(place?.region).toBe(region)
+      expect(PLACES.find((p) => p.id === g().knowingVillages[region])?.region).toBe(region)
     }
   })
 })
 
-describe('per-region cascade (design.md §13.1/§13.3)', () => {
-  it('the hint is recorded and deciphered in every region', () => {
-    for (const region of REGIONS) {
-      cascadeKnowingVillage(region)
-      expect(g().hintsGiven[region]).toBe(true)
-      expect(g().decodedGiven[region]).toBe(true)
+describe('the first door press', () => {
+  it.each(['en', 'de'] as const)('%s: writes exactly the walk entry at every village', (lang) => {
+    useLocale.getState().setLang(lang)
+    for (const village of PLACES.filter((p) => p.kind === 'village')) {
+      g().enterPlace(village.id)
+      const before = g().journal.length
+      g().callChiefOut()
+      const added = g().journal.slice(before)
+      expect(added, village.id).toHaveLength(1)
+      expect(added[0]).toMatchObject({
+        title: { key: 'journal.titles.chiefWalk' },
+        text: { key: 'journal.chiefWalk' },
+        kind: 'event',
+      })
+      expect(added[0].text.params).toBeUndefined()
+      const text = resolveText(DICTIONARIES[lang], added[0].text)
+      expect(text).toBe(DICTIONARIES[lang].journal.chiefWalk)
+      expect(text).toMatch(/\[awe\].+\[\/awe\]/)
+      expect(stripVoiceMarkup(text)).toMatch(lang === 'en' ? /hut.*drummer.*follow/s : /Hütte.*Trommler.*folgen/s)
+      expect(text).not.toMatch(/decipher|latitude|longitude|degrees|entschlüssel|Breite|Länge|Grad|\d/i)
+      expect(chiefWalkState().phase).toBe('walking-out')
+      g().leavePlace()
     }
   })
 
-  it('accumulates at least ten hint entries across the regions', () => {
-    for (const region of REGIONS) cascadeKnowingVillage(region)
-    const hintCount = g().journal.filter((e) => e.kind === 'hint').length
-    expect(hintCount).toBeGreaterThanOrEqual(10)
-  })
-})
-
-describe('triangulation (design.md §13.3)', () => {
-  it('the deciphered north latitude and east longitude name the actual grave', () => {
-    cascadeKnowingVillage('north')
-    cascadeKnowingVillage('east')
-    const grave = g().graveLatLon
-    expect(decodedEntry('north')?.text.params?.lat).toBe(grave.lat)
-    expect(decodedEntry('east')?.text.params?.lon).toBe(grave.lon)
-  })
-})
-
-describe('a chief who does not know (design.md §13.3)', () => {
-  it('says nothing at all — the murmured pointer went with its stale text', () => {
-    const region: RegionId = 'north'
-    const knowingId = knowingVillage(region)
-    const other = PLACES.find((p) => p.kind === 'village' && p.region === region && p.id !== knowingId)
-    expect(other).toBeTruthy()
-    g().enterPlace(other!.id)
+  it('later presses do nothing outside, then call him out again without another entry', () => {
+    const village = g().knowingVillages.north
+    g().enterPlace(village)
+    g().callChiefOut()
+    const journal = g().journal
+    const walk = chiefWalkState()
+    g().setToast(null)
+    g().callChiefOut()
+    expect(g().journal).toBe(journal)
+    expect(g().toast).toBeNull()
+    expect(chiefWalkState()).toBe(walk)
+    // The scene finishes the round trip and puts him indoors.
+    resetChiefWalk()
+    useGame.setState({ chiefOutside: {} })
+    g().callChiefOut()
+    expect(chiefWalkState().phase).toBe('walking-out')
+    expect(g().journal).toBe(journal)
+    g().leavePlace()
+    g().enterPlace(village)
     const before = g().journal.length
     g().callChiefOut()
     expect(g().journal).toHaveLength(before)
-    // The knowing village itself must NOT have leaked its precise hint here.
-    expect(g().hintsGiven[region]).toBeFalsy()
+  })
+
+  it('checkpoint reload preserves the first meeting without saving hint state', () => {
+    g().enterPlace(g().knowingVillages.north)
+    g().callChiefOut()
+    g().saveCheckpoint()
+    const saved = JSON.parse(localStorage.getItem('hoa-checkpoints-v1')!)[0]
+    expect(saved).not.toHaveProperty('hintsGiven')
+    expect(saved).not.toHaveProperty('decodedGiven')
+    g().newGame()
+    expect(g().loadCheckpoint()).toBe(true)
+    const before = g().journal.length
+    g().callChiefOut()
+    expect(g().journal).toHaveLength(before)
+    expect(chiefWalkState().phase).toBe('walking-out')
+  })
+
+  it('does not write a chief entry outside a village', () => {
+    g().enterPlace('cairo')
+    const before = g().journal.length
+    g().callChiefOut()
+    expect(g().journal).toHaveLength(before)
     g().leavePlace()
+    g().callChiefOut()
+    expect(g().journal).toHaveLength(before)
+  })
+
+  it('removes the spoken hint actions, state and both dictionaries’ keys', () => {
+    for (const key of ['tellChiefHint', 'revealDecoded', 'hintsGiven', 'decodedGiven']) {
+      expect(g()).not.toHaveProperty(key)
+    }
+    for (const strings of Object.values(DICTIONARIES)) {
+      for (const key of ['hintRaw', 'hintDecoded', 'titles.chiefHint', 'titles.decoded']) {
+        expect(strings.journal).not.toHaveProperty(key)
+      }
+    }
   })
 })

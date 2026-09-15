@@ -251,7 +251,11 @@ export const DOC_BUDGETS = [
   },
   {
     path: 'design.md',
-    maxLines: 850,
+    // RAISED by the 2 measured lines of the §13.4 speech paragraph work-order 1072
+    // owes the section (the same paragraph the word ceiling below prices in); the
+    // one line of margin that stood here is left untouched.
+    // Two new §7 lines describe excavation purpose, results and walkable spoil.
+    maxLines: 854,
     // RAISED at the merge by 113 measured words: point 341 landed on main while
     // the compression branch was open and added the separated-juvenile decision
     // to §19.8. That is a genuinely new decision, which is exactly what the
@@ -368,7 +372,26 @@ export const DOC_BUDGETS = [
     // decision recorded is new behaviour with a new player-reachable reading (the
     // figure sinks, the fold is bounded by the dig's, the jar's mouth is what goes
     // under an opaque surface), not a longer telling of the errand already there.
-    maxWords: 28646,
+    // RAISED by the 214 measured words work-order 1087 owes §13.4: fetching water
+    // is now an ERRAND ONE MAN ORDERS AND ANOTHER RUNS, with a village water
+    // stand, an addressee for both utterances, the rule that no villager speaks
+    // to nobody, and the accepted WATER reading. The section described a carrier
+    // who narrated his own act and never reached the water; none of the dispatch
+    // existed anywhere in it. New mechanics the user asked for (07.09.2026), not
+    // a longer telling of the old errand — the discovery narrative of the fill
+    // pose was CUT from the same section in the same commit to pay part of it.
+    // RAISED by the 103 measured words work-order 1072 owes §13.4: village speech
+    // gains a camera-relative pan per utterance with a bounded width and a stable
+    // rear side, a second, higher carrier pair for the children against the adults'
+    // unchanged one, the compensated panning that keeps the mono sum, the speech
+    // volume and the recalibrated falloff, and the envelope peak the added channel
+    // forced down. The section named no direction, one voice for everyone and no
+    // level at all — new mechanics the user asked for (07.09.2026), not a longer
+    // telling of anything already there.
+    // Raised by 93 measured words: §7 now specifies the two village
+    // excavation purposes, persistent results, and passable ground rise. These
+    // requested world behaviours were absent from the equipment table.
+    maxWords: 29056,
     // A hundred words across 28k: design.md is edited section by section and a genuine
     // new decision runs 40–215 measured words, so the slack absorbs the rewording that
     // accompanies one and refuses the disappearance of a whole section without a

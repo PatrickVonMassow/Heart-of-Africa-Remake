@@ -39,6 +39,19 @@ export interface BalanceConfig {
    *  the boundary ends and the bird's-eye view — where the river is swum and the
    *  current carries him — takes over. Nothing ever HOLDS him at the water. */
   bankWadeDepth: number
+  /** How deep the water stands where a water carrier fills his jar, in metres
+   *  (work-order 1087). The fill spot is solved on the shore profile at this
+   *  depth rather than pinned to a distance, so it stays at the waterline
+   *  whatever the calibratable river width does to it. Ankle-deep: he stands IN
+   *  the water, which is what makes the act read as fetching from the river,
+   *  and far short of `bankWadeDepth`, so filling is never wading. */
+  bankFillDepth: number
+  /** How long the jar stays under, in seconds (work-order 1087) — the readable
+   *  hold between the dip going down and the jar coming up full. */
+  bankFillSeconds: number
+  /** How many filled jars the village water stand holds before a new delivery
+   *  replaces the oldest (work-order 1087). */
+  waterStandCapacity: number
   /** The settlement edge painted on the ground (design.md §2.6, point 352/488):
    *  where the swept, trodden ground gives way to open land. The band's PLACE is
    *  never configured — it sits at the boundary the leave check reads
@@ -823,11 +836,20 @@ export interface BalanceConfig {
     /** Seconds per spoken syllable — the constant pace of every utterance. */
     syllableSeconds: number
     /** Steepness of the hearing falloff; the level at the rim is 1/(1+falloff). */
-    hearingFalloff: number
+    talk: { reach: number; loudness: number; falloff: number }
+    call: { reach: number; loudness: number; falloff: number }
+    /** Visible consequence after the last syllable; calibratable seconds. */
+    consequenceSeconds: number
+    /** Stuck-situation backstop, measured against shipped work in tests. */
+    speechHoldSeconds: number
     /** How long the hypothesis stands over a speaker's head, for one atom. */
     labelSeconds: number
     /** Carrier pitch of the LOW syllable `ba`, in Hz (point 587). */
     speechPitchHz: number
+    /** Child low carrier; the same shared interval transposes the whole pair. */
+    speechChildPitchHz: number
+    /** Maximum stereo pan, 0 = mono, 1 = full width (calibratable). */
+    speechStereoWidth: number
     /** The HIGH syllable `BA` as a multiple of the low pitch — the interval that
      *  carries the entire language, so it is calibratable on its own. */
     speechPitchInterval: number
@@ -848,6 +870,8 @@ export interface BalanceConfig {
     chiefStaySeconds: number
     /** How far beside the drummer he takes his stand, in settlement units. */
     chiefBesideDrummer: number
+    /** Clear passage between the hut wall and the chief’s robe at his door. */
+    chiefHutGap: number
     /** How near the traveller must stand to the chief or to the drummer for the
      *  use key to reach either man. */
     chiefTalkReach: number
@@ -874,6 +898,18 @@ export const balance: BalanceConfig = {
   // wading stops being walking. It lands the far edge of the walkable region
   // roughly three metres past the waterline, well inside the drawn shallows.
   bankWadeDepth: 0.7,
+  // Calibratable: 0.12 m is ankle-deep on a grown man — far enough in that the
+  // water is unmistakably around his feet, shallow enough that he is standing
+  // rather than wading. Solved on the profile, it lands the carrier a few
+  // centimetres past the drawn waterline.
+  bankFillDepth: 0.12,
+  // Calibratable: 1.4 s under the surface. Long enough for a player who is not
+  // looking for it to see the jar go down and come up, short enough that the
+  // errand's own timing backstops are untouched.
+  bankFillSeconds: 1.4,
+  // Calibratable: three standing jars. The fourth delivery replaces the oldest,
+  // which is what lets the stand need no consumer.
+  waterStandCapacity: 3,
   placeEdgeBand: {
     // Calibratable: ~8 m of give-way at a slightly softened 0.8 strength —
     // tuned by the operator in play on 27.08.2026: the wider, gentler ramp
@@ -1424,10 +1460,21 @@ export const balance: BalanceConfig = {
       digSeconds: 9, // several strokes of the digging motion, plainly readable
       // Backstop only: a blocked walk lets go instead of pinning. It has to
       // OUTLAST the longest errand the catalogue can order, or the villager is
-      // released halfway and the errand teaches nothing — and the longest one is
-      // now the walk out to the river bank, some forty metres of village away,
-      // at an unhurried 1.25 m/s and around whatever stands in the line.
-      errandSeconds: 180,
+      // released halfway and the errand teaches nothing.
+      // RE-SIZED FOR THE ROUND TRIP. The water errand is no longer the walk OUT
+      // to the bank: one carrier now walks to the stand, on to the water, dips,
+      // and walks the whole way BACK to report. Measured over the three river
+      // villages at twenty seeds each: the worst stand-to-fill leg is 34.8 m, so
+      // the round trip alone is 69.6 m — 55.7 s at this pace — and the carrier's
+      // own walk to the stand comes on top, about 84 s of straight line in the
+      // worst village. At the old 180 s a walk that took twice its straight line
+      // round huts and villagers ran the errand out of time ON THE WAY BACK: the
+      // jar was set down but the report was never spoken, which the WebGPU pass
+      // of 12.09.2026 caught as "water-back: villager 1 ran out of time with his
+      // walk word unspoken". 300 s is 3.6x the measured straight line, and a
+      // genuinely stuck villager is still let go by `stallSeconds` below long
+      // before it. Calibratable (CLAUDE.md §2).
+      errandSeconds: 300,
       // A walk that gets NOWHERE for this long is let go — twenty seconds is
       // many times the longest stretch a legitimate detour round a hut spends
       // without shortening the straight line, and a twentieth of the backstop
@@ -1495,10 +1542,13 @@ export const balance: BalanceConfig = {
     // word from five syllables to four) — slow enough to count the beats by ear,
     // quick enough that the chief's four-atom message stays short.
     syllableSeconds: 0.3,
-    // A sharp fall: half way to the radius a voice is already at ~14 % and at
-    // the rim at 4 %, so the children's group and the adults' group are never
-    // both a permanent babble from the middle of the village.
-    hearingFalloff: 24,
+    // Conversational reach: 73.5 % at 3 m, 50 % at 5 m, 20 % at the 10 m rim.
+    talk: { reach: 10, loudness: 1, falloff: 4 },
+    // Rock-to-stand is 22.03 m; Mandinka's roaming RIVER caller reaches 32.64 m
+    // in the shipped-layout replay. Keep the whole call audible (calibratable).
+    call: { reach: 34, loudness: 1.25, falloff: 4 },
+    consequenceSeconds: 2,
+    speechHoldSeconds: 240,
     // Long enough to read one reading and look back at the speaker, short
     // enough that the scene never carries standing text; a phrase adds one
     // pause per further atom (speechLabelSeconds).
@@ -1508,14 +1558,15 @@ export const balance: BalanceConfig = {
     // octave, which the ear is prone to confuse with the same note. Both pitches
     // stay in one human speaking range, so the two read as one voice.
     speechPitchHz: 140,
+    // Calibratable child register and width; both tones move by the same factor.
+    speechChildPitchHz: 210,
+    speechStereoWidth: 0.6,
     speechPitchInterval: 1.68,
-    // Calibrated against the deployed audio graph after the ambient drum bed
-    // went silent (point 673). At the master's input a syllable beside the
-    // player reaches 0.612, while the conservative sum of every remaining
-    // active village layer and gain modulation reaches 0.2275: 2.69×, or
-    // 8.6 dB, above that ambience floor. The failed deployed value was 1.5;
-    // src/systems/ambience.test.ts measures this margin on the live buses and
-    // still checks the louder debug drum mix for headroom.
+    // Independent speech bus. Re-measured with child carriers and compensated
+    // stereo: the envelope peak was reduced for headroom (speaking.ts), while
+    // falloff 4 still lifts speech at 3 m and at the hearing rim. The graph test
+    // measures 0.2375 before the master at 3 m over a 0.2275 village floor,
+    // and 0.977 worst-case output with two panned children, drums and a step.
     speechVolume: 2,
     // A hand's breadth over the head, no more (point 582). The note used to
     // hang at a flat 2.3 m over the speaker's FEET — 0.85 m over a grown
@@ -1544,6 +1595,8 @@ export const balance: BalanceConfig = {
     // shells (the further one reaches 0.5 m out) and keeps the two men close
     // enough to stand in one picture from the front.
     chiefBesideDrummer: 1.5,
+    // Calibratable: the player’s 0.7 m diameter plus 0.1 m of walking clearance.
+    chiefHutGap: 0.8,
     // Calibratable: the same reach the give already uses, so a traveller who
     // can hand the find over is exactly one who can ask for the drums.
     chiefTalkReach: 2.6,

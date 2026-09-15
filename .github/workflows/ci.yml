@@ -76,7 +76,17 @@ jobs:
 
   fast:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # OUTGROWN AT 15, RAISED ONCE AND MEASURED (13.09.2026). The unit layer grows
+    # with the game, and this ceiling had been eaten: the last two GREEN runs —
+    # one of them on `main` itself — took 14 min 41 s and 14 min 45 s, leaving
+    # about fifteen SECONDS of headroom. The next point to add a test was going
+    # to hit it whatever that test was, and it did: a branch whose own tests all
+    # pass locally was reported `cancelled`, because GitHub calls a job timeout a
+    # cancellation and no push can clear one. That is the worst shape of red —
+    # it names neither the cause nor a fix. 25 leaves real room on a ~15 min run
+    # and still catches a genuine hang; a run that approaches it again is a
+    # signal to make the suite cheaper, not to raise this a second time.
+    timeout-minutes: 25
     # The one condition under which no step may fail the job. Repeated verbatim
     # on every step (`env` is not available to `continue-on-error`), and pinned
     # step by step in scripts/ci-gate-verdict-core.test.mjs.

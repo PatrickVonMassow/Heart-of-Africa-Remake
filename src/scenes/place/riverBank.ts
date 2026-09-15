@@ -179,6 +179,27 @@ export function bankWaterFoot(
   return alongBank(bank, a, bank.walkEdge / Math.cos(a) - BANK_STAND_INSET)
 }
 
+/**
+ * WHERE THE WATER CARRIER FILLS HIS JAR — on the water path's own bearing, out
+ * where the river stands `balance.bankFillDepth` deep (work-order 1087).
+ *
+ * It is deliberately NOT `bankWaterFoot`. That point is the path's landing, set
+ * `BANK_STAND_INSET` INLAND of the walkable edge, so a carrier who stopped there
+ * halted `BANK_STAND_INSET + BANK_SHORE_HALF` — about 2.7 m — short of the water
+ * and nothing about his errand read as fetching from the river (user 06.09.2026).
+ * The WORD still falls at the foot; only the fill moved.
+ *
+ * The spot is SOLVED on the shore profile rather than pinned to a distance, so
+ * it follows the waterline wherever the calibratable river width puts it, and
+ * it can never name ground the drawn shore does not have.
+ */
+export function bankFillSpot(
+  bank: Pick<PlaceRiverBank, 'nx' | 'nz' | 'fx' | 'fz' | 'distance' | 'walkEdge'>,
+): BankPoint {
+  const a = -BANK_PLATEAU_ANGLE * BANK_WATER_PATH_ANGLE_FRAC
+  return alongBank(bank, a, outAtDepth(bank, balance.bankFillDepth) / Math.cos(a))
+}
+
 /** The two play rocks of a bank: the ends of the children's stretch, upstream
  *  and downstream, mirrored exactly as the bank's own stretch points are. */
 export function bankPlayRocks(

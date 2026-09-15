@@ -1147,12 +1147,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "1056": {
-      "at": "2026-09-04T07:05:28.679Z",
-      "why": "User order 04.09.2026: »Reihe einen Punkt direkt vor 690 ein, der das sichtbar macht.«",
-      "origin": "user",
-      "place": "ahead"
-    },
     "1059": {
       "at": "2026-09-05T05:14:33.727Z",
       "why": "Appended by the responder path; ranking belongs to the batch owner",
@@ -1177,18 +1171,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "1072": {
-      "at": "2026-09-07T17:37:27.072Z",
-      "why": "Nutzer-Entscheidung 07.09.2026 zur Ufer-Karte: Ortung und höhere Kinderstimmen sind Voraussetzung dafür, dass ein Ruf weiter tragen darf",
-      "origin": "user",
-      "place": "ahead"
-    },
-    "1073": {
-      "at": "2026-09-07T17:37:27.184Z",
-      "why": "Nutzer-Entscheidung 07.09.2026 zur Ufer-Karte: die Richtungsansage ist vom definierten Zuschauerstand aus heute nie hörbar",
-      "origin": "user",
-      "place": "ahead"
-    },
     "1074": {
       "at": "2026-09-07T19:47:32.134Z",
       "why": "Last is right: the footgun has a known, proven workaround (start the run under setsid), so it no longer blocks — and under the infrastructure freeze an infra defect waits unless it reproducibly blocks game work. It is read together with 567 when either is taken.",
@@ -1199,12 +1181,6 @@
       "at": "2026-09-07T20:25:52.481Z",
       "why": "Es blockiert jeden Push nach main und damit jede Landung; die Blockade kehrt beim naechsten Memory-Schreiben von selbst zurueck.",
       "origin": "machine",
-      "place": "ahead"
-    },
-    "1076": {
-      "at": "2026-09-08T10:57:34.696Z",
-      "why": "Punkt 1076 ist eine Nutzer-Meldung vom 08.09.2026 zum Haeuptlingsauftritt und stand schon vor der Umstellung an dieser Stelle.",
-      "origin": "user",
       "place": "ahead"
     },
     "1078": {
@@ -1236,12 +1212,6 @@
       "why": "Der Wächter-Defekt kostet nur Rechenzeit und ist mit Nachmessen zu umgehen; er wartet hinter der Spielarbeit.",
       "origin": "machine",
       "place": "last"
-    },
-    "1087": {
-      "at": "2026-09-10T00:49:31.047Z",
-      "why": "Nutzer-Anordnung 10.09.2026 02:15: das Wasserholen bleibt direkt hinter seiner Designentscheidung und der neuen Pruefleiter statt ans Ende zu wandern",
-      "origin": "user",
-      "place": "ahead"
     },
     "1092": {
       "at": "2026-09-10T18:32:34.225Z",
@@ -1344,6 +1314,48 @@
       "why": "Spielfehler: Auf der mobilen Bahn startet die Darstellung gar nicht, und das Rot kann auf keinem anderen Weg schliessen.",
       "origin": "machine",
       "place": "ahead"
+    },
+    "1119": {
+      "at": "2026-09-12T21:24:19.202Z",
+      "why": "Last is right: it stands beside its siblings 1114/1115/1116, the same class of pre-existing check red filed by a run, and nothing waits on it — the point it was found in (1087) is closed by measuring the load hypothesis, not by repairing this check.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1120": {
+      "at": "2026-09-13T14:25:17.120Z",
+      "why": "Last is right: it is infrastructure under the freeze, it blocked point 1072 for minutes rather than reproducibly, and the manual path — re-running the section on a quiet machine — settles it; the communication points the user is waiting on keep the front.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1122": {
+      "at": "2026-09-14T08:31:47.025Z",
+      "why": "Infrastructure under the freeze and a discriminator rather than a fix: it costs a re-derivation when it recurs but blocks no game work, so it waits behind the playable queue.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1123": {
+      "at": "2026-09-14T08:31:47.121Z",
+      "why": "Infrastructure under the freeze: real but worked around today by measuring the processes instead of trusting the claim text, so it waits behind the playable queue despite its high criticality.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1125": {
+      "at": "2026-09-14T11:25:29.496Z",
+      "why": "User 14.09.2026 ranked it directly behind 1092 with the order itself",
+      "origin": "user",
+      "place": "ahead"
+    },
+    "1131": {
+      "at": "2026-09-15T14:53:46.297Z",
+      "why": "The user's own two bug reports of 15.09.2026 that nobody fetches water and that the two at the water place merely stand there; he ranked it himself directly behind his earlier front-order 1124",
+      "origin": "user",
+      "place": "ahead"
+    },
+    "1133": {
+      "at": "2026-09-15T17:16:22.791Z",
+      "why": "Es verliert die Arbeit jedes beauftragten Autorenlaufs, und heute traf es einen schon fertigen Befund — jeder weitere Lauf vor dem Fix riskiert denselben stillen Verlust.",
+      "origin": "machine",
+      "place": "ahead"
     }
   },
   "boundary": {
@@ -1376,7 +1388,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-12T15:24:24.157Z",
+    "at": "2026-09-15T17:16:22.805Z",
     "points": [
       174,
       184,
@@ -1737,24 +1749,19 @@
       1053,
       1054,
       1055,
-      1056,
       1059,
       1060,
       1062,
       1063,
       1068,
       1071,
-      1072,
-      1073,
       1074,
       1075,
-      1076,
       1078,
       1079,
       1081,
       1082,
       1084,
-      1087,
       1092,
       1093,
       1094,
@@ -1773,7 +1780,17 @@
       1115,
       1116,
       1117,
-      1118
+      1118,
+      1119,
+      1120,
+      1121,
+      1122,
+      1123,
+      1125,
+      1129,
+      1131,
+      1132,
+      1133
     ]
   }
 }

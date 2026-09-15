@@ -11,15 +11,17 @@ import {
   BANK_MIN_GAP,
   BANK_SHALLOWS_SPAN,
   BANK_SHORE_HALF,
+  bankFillSpot,
   bankPlayRocks,
   bankWaterDepth,
+  bankWaterFoot,
   buildRiverBank,
   type PlaceRiverBank,
 } from './riverBank'
 import { balance } from '../../config/balance'
 import { BACKDROP_SCALE, GROUND_DISC_OVERHANG } from './backdrop'
 import { insidePlace, isOutsidePlace, maxBoundaryRadius, groundPlateRadius, placeBoundaryRadius } from './boundary'
-import { buildLayout, PLACE_RADIUS } from './layout'
+import { buildLayout, PLACE_RADIUS, WATER_STAND_WORK_RING } from './layout'
 import { resolveMove, PLAYER_RADIUS, WALKER_RADIUS, standingClear } from './collision'
 import { buildPlaceNavGrid, findPlaceRoute } from './routing'
 import { PLACES, RIVERS, VILLAGE_RIVER_CLEARANCE_DEG, placeById, latLonToWorld } from '../../world/geo'
@@ -421,5 +423,212 @@ describe('the river places can be told apart (points 686/687)', () => {
       }
     }
     expect(checked).toBeGreaterThan(0)
+  })
+})
+
+// --- Where the water carrier fills his jar (work-order 1087) ---------------
+//
+// The errand used to stop at `bankWaterFoot`, which sits BANK_STAND_INSET inland
+// of the walkable edge: about 2.7 m short of the water, which is why the user
+// (06.09.2026) could not tell that water was being fetched. The fill spot is a
+// separate point solved on the shore profile, and what is pinned here is that it
+// really is AT the water and that standing in it is never wading.
+describe('the water carrier fills his jar at the waterline (work-order 1087)', () => {
+  // Measured: these three are the places `buildRiverBank` returns a bank for at
+  // every seed; every other place is dry.
+  const riverVillages = ['nubian-village', 'bambara-village', 'mandinka-village']
+
+  it('stands the carrier ankle-deep, past the waterline and far short of the wade edge', () => {
+    let checked = 0
+    for (const id of riverVillages) {
+      for (let seed = 1; seed <= 20; seed++) {
+        const bank = buildLayout(id, seed).bank
+        if (!bank) continue
+        checked++
+        const spot = bankFillSpot(bank)
+        // Distance measured along the bank NORMAL, which is the axis the shore
+        // profile is written on.
+        const out = spot.x * bank.nx + spot.z * bank.nz
+        expect(out).toBeGreaterThan(bank.distance)
+        expect(bankWaterDepth(bank, out)).toBeCloseTo(balance.bankFillDepth, 6)
+        expect(bankWaterDepth(bank, out)).toBeLessThan(balance.bankWadeDepth)
+        expect(out).toBeLessThan(bank.wadeEdge)
+        // "At the water" is the whole point. Ankle depth puts him about half a
+        // metre out on the shallows' slope; what is pinned is that he never
+        // leaves the DRAWN shore strip for the open channel, against the 2.7 m
+        // up the bank the errand used to halt at.
+        expect(out - bank.distance).toBeLessThan(BANK_SHORE_HALF)
+      }
+    }
+    expect(checked).toBe(riverVillages.length * 20)
+  })
+
+  it('leaves the path`s landing where it is — only the fill moved', () => {
+    const bank = buildLayout('bambara-village', 1).bank
+    expect(bank).toBeTruthy()
+    if (!bank) return
+    const foot = bankWaterFoot(bank)
+    const footOut = foot.x * bank.nx + foot.z * bank.nz
+    expect(footOut).toBeLessThan(bank.walkEdge)
+    // The two lie on one bearing: the carrier walks straight down to the water.
+    expect(Math.atan2(foot.z, foot.x)).toBeCloseTo(Math.atan2(bankFillSpot(bank).z, bankFillSpot(bank).x), 6)
+  })
+})
+
+// --- The village water stand is a place men can reach (work-order 1087) -----
+//
+// MEASURED 12.09.2026 in the running settlement: a stand whose own footprint was
+// clear still left the carrier stalled 4.2 m away, never counted as arrived,
+// circling it until the errand's backstop expired. The ring the two men work
+// from lay inside the fire's keep-out. What is pinned here is the ring, not the
+// spot.
+describe('the village water stand can be walked up to (work-order 1087)', () => {
+  const riverVillages = ['nubian-village', 'bambara-village', 'mandinka-village']
+
+  it('leaves most of the working ring around it open ground', () => {
+    let checked = 0
+    for (const id of riverVillages) {
+      for (let seed = 1; seed <= 20; seed++) {
+        const layout = buildLayout(id, seed)
+        const stand = layout.waterStand
+        if (!stand) continue
+        checked++
+        let open = 0
+        for (let k = 0; k < 16; k++) {
+          const a = (k / 16) * Math.PI * 2
+          const x = stand.x + Math.cos(a) * WATER_STAND_WORK_RING
+          const z = stand.z + Math.sin(a) * WATER_STAND_WORK_RING
+          if (standingClear(layout.colliders, x, z, WALKER_RADIUS)) open++
+        }
+        expect(open).toBeGreaterThanOrEqual(9)
+      }
+    }
+    // Not every sweep, because a village whose head search gives up its water
+    // path keeps no stand either — but most of them, so a silent collapse of the
+    // placement still reads here.
+    expect(checked).toBeGreaterThan(riverVillages.length * 20 * 0.7)
+  })
+
+  it('gives every river village that fetches water a stand at all', () => {
+    // A river village with no usable WATER PATH fetches nothing and rightly has
+    // no stand (point 1045 owns the walk it cannot find); every village that
+    // does fetch must have one, or the return leg has nowhere to go.
+    let fetching = 0
+    for (const id of riverVillages) {
+      for (let seed = 1; seed <= 20; seed++) {
+        const layout = buildLayout(id, seed)
+        if (!layout.waterPath) continue
+        fetching++
+        expect(layout.waterStand, `${id} seed ${seed}: a water path but no stand`).toBeTruthy()
+      }
+    }
+    expect(fetching).toBeGreaterThan(riverVillages.length * 20 * 0.7)
+  })
+
+  it('never stands one in a drawn lane', () => {
+    // A LANE CARRIES NO COLLIDER, so the stand's footprint test cannot see one
+    // and a solid body was accepted in the middle of a path people walk:
+    // mandinka-village seed 7 put it 0.50 m off the centre of a lane 1.30 m wide.
+    for (const id of riverVillages) {
+      for (let seed = 1; seed <= 20; seed++) {
+        const layout = buildLayout(id, seed)
+        const stand = layout.waterStand
+        if (!stand) continue
+        for (const path of layout.paths) {
+          for (let k = 0; k + 1 < path.points.length; k++) {
+            const [ax, az] = path.points[k]
+            const [bx, bz] = path.points[k + 1]
+            const dx = bx - ax
+            const dz = bz - az
+            const len2 = dx * dx + dz * dz
+            const t = len2 < 1e-9 ? 0 : Math.max(0, Math.min(1, ((stand.x - ax) * dx + (stand.z - az) * dz) / len2))
+            const gap = Math.hypot(stand.x - (ax + dx * t), stand.z - (az + dz * t))
+            expect(gap, `${id} seed ${seed}: the stand sits ${gap.toFixed(2)} m off a lane ${path.width} m wide`)
+              .toBeGreaterThan(path.width / 2)
+          }
+        }
+      }
+    }
+  })
+
+  it('keeps no stand in a village whose water path was given up', () => {
+    // The stand is placed while every bank still has a PROVISIONAL path, and the
+    // head search may discard that path further down — which left a water stand
+    // and its collider standing in a village no adult ever fetches water in.
+    // Measured 12.09.2026 at bambara-village, seeds 2 and 7.
+    let seenWithoutPath = 0
+    for (const id of riverVillages) {
+      for (let seed = 1; seed <= 40; seed++) {
+        const layout = buildLayout(id, seed)
+        if (!layout.waterPath) {
+          seenWithoutPath++
+          expect(layout.waterStand, `${id} seed ${seed}: a stand with no water path`).toBeNull()
+        }
+      }
+    }
+    // The case is only worth its runtime while such a village exists at all.
+    expect(seenWithoutPath).toBeGreaterThan(0)
+  })
+})
+
+// --- The round trip fits inside the errand's backstop (work-order 1087) -----
+//
+// `errandSeconds` was sized for the errand the water fetch USED to be: a walk
+// OUT to the bank, and its own comment still said "some forty metres of village
+// away". This point made it a ROUND TRIP — to the stand, on to the water, a dip,
+// and the whole way back to report — without re-sizing the budget, though the
+// point's own text requires the backstops to cover the added leg. The cost was
+// measured in the WebGPU pass of 12.09.2026: "[ASSERT] adult-atom-lost —
+// water-back: villager 1 ran out of time with his walk word unspoken". The jar
+// was set down, the report never fell, and RIVER is taught by the report.
+//
+// What is pinned is the ARITHMETIC, not a simulation: the walk the carrier is
+// ordered to make, at the pace he makes it, against the budget he is given.
+describe('the water errand fits the time it is given (work-order 1087)', () => {
+  const riverVillages = ['nubian-village', 'bambara-village', 'mandinka-village']
+
+  it('leaves room for the round trip and a walk that is not a straight line', () => {
+    const { errandSeconds, pace } = balance.villageLife.adultErrands
+    let worst = 0
+    let worstWhere = ''
+    let checked = 0
+    for (const id of riverVillages) {
+      for (let seed = 1; seed <= 20; seed++) {
+        const layout = buildLayout(id, seed)
+        const stand = layout.waterStand
+        if (!stand || !layout.bank) continue
+        checked++
+        const fill = bankFillSpot(layout.bank)
+        // The carrier's own walk to the stand is bounded by the same leg: he is
+        // picked in the village, never further out than the water he is sent to.
+        const leg = Math.hypot(stand.x - fill.x, stand.z - fill.z)
+        const straight = leg * 3 // to the stand, out to the water, and back
+        const seconds = straight / pace + balance.bankFillSeconds
+        if (seconds > worst) {
+          worst = seconds
+          worstWhere = `${id} seed ${seed}`
+        }
+      }
+    }
+    expect(checked).toBeGreaterThan(riverVillages.length * 20 * 0.7)
+    // THE BUDGET IS NOT THE WALK. The backstop has to cover the walk AND what
+    // the errand legitimately spends standing still, or it expires on a carrier
+    // who is doing everything right. Built from the constants that spend it,
+    // with no factor invented for the occasion:
+    //   - a DOUBLE of the straight line, because the route bends round huts,
+    //     fires and other villagers — an ordinary walk here, not a bad one;
+    //   - `dwellSeconds`, which he spends arrived before he moves on;
+    //   - `stallSeconds`, the longest a legitimate detour may make no headway
+    //     at all before the stall watch lets him go anyway.
+    // At the old 180 s this sum did not fit, and the report was the part that
+    // fell off the end.
+    const { dwellSeconds, stallSeconds } = balance.villageLife.adultErrands
+    const needed = worst * 2 + dwellSeconds + stallSeconds
+    expect(
+      needed,
+      `${worstWhere}: the round trip needs ${worst.toFixed(1)} s of straight line, ` +
+        `${needed.toFixed(1)} s once it walks round things, dwells and waits, ` +
+        `against errandSeconds ${errandSeconds}`,
+    ).toBeLessThan(errandSeconds)
   })
 })

@@ -125,8 +125,12 @@ ratchet ran the other way for the first time in weeks: the solved session-death
 hunt of 05.09.2026 was retired from the index — its fix and its regression spy
 are in the tree and the retrospective carries the story in prose — and the word
 ceiling followed the cut down to the measured 783. The line ceiling stayed,
-because the freed line was exactly what put the index back inside it.
-That 10.09.2026 reading showed zero word headroom for a file designed to gain
+because the freed line was exactly what put the index back inside it. On
+14.09.2026 the index was restated once more, at 780 words over the same 51 lines:
+three words were tightened out of existing entries, no entry was added or
+retired, and the ceiling was left where it stands. That hand restatement is the
+last of its kind — it was made only to clear the red this point removes.
+The 10.09.2026 reading showed zero word headroom for a file designed to gain
 a line per memory. The next raise should cut a retired
 entry rather than widen again.
 On 22.08.2026 `CLAUDE.md` moved for the first time since the merge: the
