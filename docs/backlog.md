@@ -1045,3 +1045,12 @@ oder Datenrisiko, keine Blockade, und es löscht nichts. Offen, sobald jemand oh
 Anleitung arbeitet: eine kompakte Fassung des Fallstricks, bezahlt aus rund 9 Zeilen / 103
 Wörtern eines bestehenden Eintrags, danach die Obergrenzen exakt auf die neue Messung ohne
 Spielraum.
+
+Nachtrag 15.09.2026, 17:15: Zwei weitere Lehren desselben Tages stehen jetzt in derselben
+Warteschlange vor demselben vollen Budget — §3.274 (ein Punkt, dessen Überschrift als
+Verneinung formuliert war, wies sich dem Bildpflicht-Klassierer als bildfrei aus) und §3.275
+(ein übernommener Befund verglich UTC-Laufstempel mit +0200-Commit-Zeiten und stellte die
+deckenden Läufe zwei Stunden vor den Merge, den sie deckten). Beide sind Anleitungsstoff:
+»schreib den Auftrag auch für seinen maschinellen Leser« und »miss einen übernommenen Befund
+nach, bevor er ein Punkt wird«. Die Anleitung ist deshalb NICHT als aktuell bezeugt; wer sie
+das nächste Mal anfasst, zahlt alle drei Einträge aus einer Kürzung.

@@ -122,6 +122,8 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 08.09. abends | Dritter Auftritt derselben Verwechslung, mit einem neuen Sensor: Nach der Kontextuebergabe um 20:26 lehnte der Starter jeden Tick mit `registered-writer-live` ab — „work output 14/18 min old (working files)" —, waehrend `ps` keinen einzigen Autorprozess zeigte. Die frischen Dateien waren die Ausgabe der grossen Regression, die in jenem Arbeitsbaum allein zu Ende lief und um 20:36 rot endete. Eine fertige Suite hinterlaesst Dateien wie ein arbeitender Autor; der Sollzustand von Punkt 1048 nennt Arbeitsbaum-Evidenz aber gerade als Gegenprobe zum frischen Zweigstand. Eine halbe Stunde Stillstand, der rote Lauf ungelesen, beendet wieder von einer Nutzerfrage ([§3.170](#3170-der-letzte-atemzug-wird-als-herzschlag-gelesen), Punkt 1048) |
 | 08.09. nachts | Auf die Standsfrage kam eine korrekt gelesene Messung und daran ein erfundener Reststand: „erst die halbe Strecke, danach WebGPU" — zwei Minuten später war der Lauf beendet, denn ein roter erster Durchgang beendet ihn und die zweite Bahn faehrt nie. Die widerlegende Tatsache stand im selben Absatz derselben Nachricht, drei rote Suiten waren gerade aufgezaehlt worden. Der Nutzer sah beides hintereinander und sagte es ([§3.250](#3250-der-reststand-wurde-erzaehlt-waehrend-der-beleg-dagegen-schon-vorgelesen-war)) |
 
+| 15.09. nachmittags | Ein neu eingereihter Punkt erzaehlte der Maschine das Gegenteil von sich selbst: Seine Ueberschrift »has no covering picture run« las der Bildpflicht-Klassierer als VERNEINUNG, der Punkt, dessen einziger Zweck zwei Bildlaeufe sind, wies sich damit als bildfrei aus. Gefangen von einer angehefteten Pruefung, die die exakte Menge solcher Zeilen festhaelt statt ihrer Anzahl; die Korrektur war ein positiv formulierter Satz (§3.274) |
+| 15.09. nachmittags | Und derselbe Punkt trug eine falsche Tatsache: Die deckenden Laeufe lagen scheinbar zwei Stunden VOR dem Merge, den sie decken sollten — Laufstempel in UTC gegen Commit-Zeiten in +0200 gelesen. Beide liefen am Merge-HEAD selbst, mit je sechs Bildern auf beiden Bahnen. Aufgefallen beilaeufig, weil eine Wartequittung ihren HEAD mit ausdruckte. Wortwoertlich die Lehre aus §3.253, drei Tage alt und von mir wiederholt (§3.275) |
 
 Muster: Ab dem 22.07. explodiert die Commit-Rate (Delegation) — und genau dann häufen sich die Infrastruktur-Vorfälle. **Skalierung der Autonomie erzeugt eine eigene Problemklasse, die die Feature-Arbeit zeitweise überholt.**
 
@@ -1574,7 +1576,7 @@ stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die s
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Dienstag, 15.09.2026, 15:51 · Quellen-Fingerprint: `df5ff0e382ca…`
+Zuletzt aktualisiert: Dienstag, 15.09.2026, 17:13 · Quellen-Fingerprint: `937eadb420bc…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1680,8 +1682,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 96 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 133 Prozess-/Meta-TASKS-Punkte (davon 65 offen).
 
-<!-- RETRO-FINGERPRINT: df5ff0e382ca5e89b408216403f52a1c3edd208c2314e489cb71e036a5686d9a -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-15T13:51:06.171Z -->
+<!-- RETRO-FINGERPRINT: 937eadb420bc597dfadf83020f268071b84a905b1ccd4f5d783258e29f9c3759 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-15T15:13:32.084Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -7091,3 +7093,59 @@ für die kleine. Fehlt er, zahlt jede Kleinigkeit den vollen Preis, und der Nutz
 eine Stundenaufgabe, wo er um einen Satz gebeten hat. Reine Prosa, die nur der Nutzer
 liest, gehört gemacht und veröffentlicht — nicht eingereiht. Und die Nennung eines Modells
 ist eine Wegweisung, keine Bitte um ein Vier-Augen-Verfahren.
+### 3.274 Ein Punkt, der der Maschine das Gegenteil von sich selbst erzählt
+
+Am 15.09.2026 habe ich eine übernommene Bildschuld als Punkt 1132 eingereiht. Seine
+Überschrift lautete: »The landed chief-walk work has no covering picture run on either
+backend«. Der Push wurde rot — nicht an einem Produktfehler, sondern an einer angehefteten
+Prüfung in `queue-calibration`, die genau eine Zeilenform im ganzen Auftrag kennt und jede
+neue erzwingt anzusehen. Der Grund: Der Klassierer, der entscheidet, ob ein Punkt gerenderte
+Beweise schuldet, liest `no … picture run` als **Verneinung** — der Punkt, dessen einziger
+Zweck zwei Bildläufe sind, hätte sich selbst als bildfrei ausgewiesen.
+
+Das ist eine eigene Klasse, und nicht die bekannte der falschen Messung: Die Zahlen im Punkt
+waren richtig, die Beschreibung war es auch — für einen menschlichen Leser. Falsch war sie
+allein für den automatischen Leser, der über den Punkt entscheidet. Ein Arbeitsauftrag ist in
+diesem Projekt kein Text, sondern eine Eingabe: Wächter lesen ihn, Bündel prüfen ihn, Ranking
+und Bildpflicht werden aus seinen Sätzen abgeleitet. Wer ihn nur für Menschen schreibt,
+schreibt die Hälfte seiner Leser nicht mit.
+
+Die Korrektur war ein Satz — die Forderung positiv formuliert statt als Verneinung, plus eine
+ausdrückliche Zeile »THIS POINT DEMANDS RENDERED PROOF« — und danach stufte der Klassierer den
+Punkt korrekt als bildtragend ein. Bemerkenswert ist, was die Prüfung richtig machte: Sie
+pinnt die **exakte Menge** solcher Zeilen statt ihrer Anzahl, damit eine bekannte Zeile nicht
+unbemerkt gegen eine ungeprüfte getauscht werden kann. Eine Zählung hätte hier geschwiegen.
+
+**Lehre:** Ein Punkt beschreibt nicht nur eine Arbeit, er **konfiguriert** ihre Behandlung.
+Eine Verneinung in der Überschrift ist deshalb kein Stilfrage, sondern ein Schalter. Wo ein
+Punkt eine Pflicht *einfordert*, wird sie positiv formuliert; wo er eine Pflicht *bestreitet*,
+gehört das ausdrücklich dahin und nirgends sonst. Und ein angehefteter Erwartungswert, der
+eine Menge festhält statt einer Zahl, ist die billigste Form, einen Blick zu erzwingen.
+
+### 3.275 Dieselbe Lehre, drei Tage später, von mir wiederholt
+
+Derselbe Punkt 1132 trug in seiner ersten Fassung eine falsche Tatsache: Die Häuptlings-Arbeit
+sei »auf keiner der beiden Bahnen fotografiert«. Belegt war das mit Zeitstempeln — die
+deckenden `collision`-Läufe um 12:16 und 12:19, der Merge um 14:03, die Prüfdatei-Änderung um
+14:19. Die Läufe lagen also scheinbar zwei Stunden vor der Arbeit, die sie decken sollten.
+
+Sie lagen danach. Die Laufstempel sind UTC, die Commit-Zeiten `+0200`; beide Läufe liefen
+nachweislich am HEAD `712b689aa` — dem Häuptlings-Merge selbst — mit je sechs Bildern auf
+beiden Bahnen. Aufgefallen ist es nicht beim Anlegen des Punktes, sondern beiläufig, als eine
+Wartequittung den HEAD ihres Laufes mit ausdruckte. Ohne diese Zeile wäre eine falsche
+Messung als Arbeitsauftrag stehen geblieben.
+
+Das ist wörtlich die Lehre aus §3.253: »Ein übernommener Befund ist ein Befund, keine
+Messung.« Sie stand geschrieben, ich hatte sie nicht gelesen, und ich habe sie reproduziert —
+diesmal sogar mit einem Befundtext, der seine eigene Zeitzone sauber mitführte. Der
+Vorgängerbefund war um 11:44 UTC geschrieben worden, als der Merge um 12:03 UTC noch gar nicht
+existierte; seine Aussage war zum Zeitpunkt ihrer Entstehung richtig und zum Zeitpunkt ihrer
+Übernahme überholt. Genau das macht übernommene Befunde gefährlich: Sie sind nicht falsch,
+sie sind **alt**, und nichts an ihrer Form sagt das.
+
+**Lehre:** Ein Befund trägt seinen Messzeitpunkt, und wer ihn einreiht, misst gegen den
+JETZIGEN Stand nach, bevor daraus ein Punkt wird — bei Zeitangaben ausdrücklich in EINER
+Zeitzone. Für die Kernthese dieses Dokuments ist der Fall der bessere Beleg als jede
+Wiederholung der These: Die Lehre war aufgeschrieben, zugänglich und drei Tage alt, und sie
+hat nichts verhindert. Verhindert hat es eine Maschine, die nebenbei einen HEAD mit ausdruckte.
+
