@@ -2,7 +2,7 @@
 // document: the account only does its job if it holds TODAY, so the shipped
 // docs/document-cut-757.md is judged here against the real filesystem and the
 // really wired hook chains, not only against synthetic input.
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { readFileSync, existsSync, realpathSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { resolve } from 'node:path'
@@ -23,7 +23,7 @@ import {
   userTreeRootOf,
   wiredGuards,
 } from './cut-account-core.mjs'
-import { DOC_BUDGETS, measure } from './doc-budget-core.mjs'
+import { DOC_BUDGETS, measure, evaluateDocBudgets } from './doc-budget-core.mjs'
 import { mainCheckoutFrom } from './main-checkout-core.mjs'
 import { execFileSync } from 'node:child_process'
 
@@ -634,10 +634,8 @@ describe('docs/document-cut-757.md — the measured floors', () => {
   })
 })
 
-// THE CEILINGS, against the LANDED files rather than the pre-merge ones. Point
-// 761 asks for that confirmation because the budgets were written from figures
-// measured before the merge, and two of them turned out to be off by a line and
-// ten words — enough to leave MEMORY.md sitting exactly on its word ceiling.
+// Ceiling values belong to the repository. Current measurements only belong
+// here for repository files; home-directory edits must not stale this table.
 describe('docs/document-cut-757.md — the ceilings table', () => {
   const text = existsSync(ACCOUNT_PATH) ? readFileSync(ACCOUNT_PATH, 'utf8') : ''
   // The global file shares its BASENAME with the project one, so a row cannot be
@@ -666,22 +664,67 @@ describe('docs/document-cut-757.md — the ceilings table', () => {
     }
   })
 
-  // The landed measurement is the point of the table: a row still quoting the
-  // pre-merge figure is exactly the defect point 761 exists to remove.
-  it('quotes the landed line and word counts the guard tokenizer reports', () => {
-    const files = {
-      'CLAUDE.md': resolve(ROOT, 'CLAUDE.md'),
-      'MEMORY.md': MEMORY_PATH,
-      'global-CLAUDE.md': resolve(homedir(), '.claude', 'CLAUDE.md'),
-    }
-    for (const path of CUT_SOURCES) {
-      const file = files[path]
-      if (!existsSync(file)) continue // refused read off the batch machine
-      const { lines, words } = measure(readFileSync(file, 'utf8'))
-      const row = rowFor(path)
-      expect(row, `no ceilings row for ${path}`).toBeTruthy()
+  const assertRepositoryCounts = (read = readFileSync) => {
+    for (const budget of DOC_BUDGETS.filter((b) => CUT_SOURCES.includes(b.path) && !b.location)) {
+      const { lines, words } = measure(read(resolve(ROOT, budget.path), 'utf8'))
+      const row = rowFor(budget.path)
+      expect(row, `no ceilings row for ${budget.path}`).toBeTruthy()
       expect(row).toContain(`${lines} lines`)
       expect(row).toContain(`${words.toLocaleString('en-US')} words`)
+    }
+  }
+
+  it('quotes current line and word counts only for repository-owned cut documents', () => {
+    assertRepositoryCounts()
+  })
+
+  it('never reads external files as a memory is written, edited and deleted', () => {
+    const projectPath = resolve(ROOT, 'CLAUDE.md')
+    // An in-memory filesystem exercises every state without touching user data.
+    const files = new Map([[projectPath, readFileSync(projectPath, 'utf8')]])
+    const globalPath = resolve(homedir(), '.claude', 'CLAUDE.md')
+    const read = vi.fn((path) => {
+      if (!files.has(path)) throw new Error(`Missing fixture: ${path}`)
+      return files.get(path)
+    })
+    for (const memory of [null, '# Memory\nA new topic.\n', '# Memory\nAn edited topic with more words.\n', null]) {
+      if (memory === null) {
+        files.delete(MEMORY_PATH)
+        files.delete(globalPath)
+      } else {
+        files.set(MEMORY_PATH, memory)
+        files.set(globalPath, 'User instructions changed too.\n')
+      }
+      read.mockClear()
+      assertRepositoryCounts(read)
+      expect(read.mock.calls).toEqual([[projectPath, 'utf8']])
+    }
+  })
+
+  it('records no current measurements or headroom for external cut documents', () => {
+    for (const budget of DOC_BUDGETS.filter((b) => CUT_SOURCES.includes(b.path) && b.location)) {
+      const cells = rowFor(budget.path).split('|').map((cell) => cell.trim())
+      expect(cells[2]).toBe('outside repository')
+      expect(cells[4]).toBe('not recorded')
+    }
+  })
+
+  it('still rejects stale repository measurements', () => {
+    const project = readFileSync(resolve(ROOT, 'CLAUDE.md'), 'utf8')
+    expect(() => assertRepositoryCounts(() => `${project}\nAnother word.\n`)).toThrow()
+  })
+
+  it.each(CUT_SOURCES)('still rejects real line and word ceiling breaches for %s', (path) => {
+    const budget = DOC_BUDGETS.find((b) => b.path === path)
+    for (const [kind, text, ceiling] of [
+      ['words', Array(budget.maxWords + 1).fill('word').join(' '), budget.maxWords],
+      ['lines', Array(budget.maxLines + 1).fill('word').join('\n'), budget.maxLines],
+    ]) {
+      const verdict = evaluateDocBudgets([{ path, text }], [budget])
+      expect(verdict.block).toBe(true)
+      expect(verdict.findings).toContainEqual(expect.objectContaining({
+        path, kind, actual: ceiling + 1, budget: ceiling,
+      }))
     }
   })
 })
