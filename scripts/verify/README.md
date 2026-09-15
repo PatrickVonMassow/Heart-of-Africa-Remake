@@ -161,10 +161,14 @@ both-backends run overwrites the same 93 names and a count would stop rising
 while the pictures kept coming. The mark is a file of its own so that neither a
 reader's bookkeeping can pass for the run's progress nor a reader's
 read-modify-write can drop a fresh mark, and the verdict takes the **newest** of
-the run's own writings — the mark, the log, the frames — so that a marker which
-stops being writable cannot outvote a run that is still working. The run RECORD
-is deliberately not among them: `--status` rewrites it when it counts a poll, and
-nothing a reader writes is evidence that the run is alive. `--await` and `--status` ask the same question and give the same
+the run's own writings — the mark and the log — so that a marker which stops
+being writable cannot outvote a run that is still working. Two things are
+deliberately NOT among them. The run RECORD, because `--status` rewrites it when
+it counts a poll, and nothing a reader writes is evidence that the run is alive.
+And the FRAME DIRECTORY, because `verification/` is shared and carries no run
+identity: a reader that folded it in could have any other run's pictures vouch
+for the one it is judging. The frames are read by the writer instead, about its
+own run, while that run is going. `--await` and `--status` ask the same question and give the same
 answer: a run that is still writing is `SLOW`, never `HUNG`. The clock alone could
 never say it: the §1 plan is measured to be a third to two thirds of the real
 cost, so the hung mark for a whole `polish` pass falls at 14 minutes against a

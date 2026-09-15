@@ -264,9 +264,7 @@ async function doAwait(logArg, timeoutS) {
   // question. A run that has written something within the progress lease is
   // SLOW — the word for it is the STILL RUNNING line below, not HUNG.
   const status = waitStatus()
-  const progressAt = lastProgressAtFor({
-    logPath: current?.log ?? null, recordPath: path, since: current?.startedAt ?? null,
-  })
+  const progressAt = lastProgressAtFor({ logPath: current?.log ?? null, recordPath: path })
   const silent = progressAt === null || Date.now() - progressAt >= PROGRESS_LEASE_MS
   const hung = status.hung.some((lease) => lease.runId === runId) ||
     (silent && Number.isFinite(current?.expectedRuntimeMs) && current.expectedRuntimeMs > 0 &&
@@ -308,9 +306,7 @@ function doStatus(logArg) {
   // COUNTING THE POLL MUST NOT MANUFACTURE THE PROGRESS IT THEN READS (Astra
   // review rounds 1 and 2): `countPoll` rewrites the record, so the mark is read
   // from the writer's own marker FILE, which nothing but the run ever writes.
-  const progressAt = lastProgressAtFor({
-    logPath: counted.log ?? null, recordPath: path, since: counted.startedAt ?? null,
-  })
+  const progressAt = lastProgressAtFor({ logPath: counted.log ?? null, recordPath: path })
   const verdict = pollBudget({
     polls: counted.polls,
     running: true,

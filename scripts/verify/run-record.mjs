@@ -328,9 +328,7 @@ export function newestFrameMtimeMs({ dir = FRAME_DIR, since = null } = {}) {
  * Returns null when nothing could be read at all, which callers treat as
  * "nobody looked" and not as "nothing happened".
  */
-export function lastProgressAtFor({
-  logPath = null, recordPath = null, frameDir = FRAME_DIR, since = null, markPath = undefined,
-} = {}) {
+export function lastProgressAtFor({ logPath = null, recordPath = null, markPath = undefined } = {}) {
   // ONLY WHAT THE RUN ITSELF WROTE COUNTS — the LATEST of it (Astra review
   // rounds 1 to 3). Three rules, each paid for by a finding:
   //
@@ -347,10 +345,17 @@ export function lastProgressAtFor({
   //
   // AND IT IS A MAXIMUM, NOT A PREFERENCE. A mark that stops being writable
   // freezes at its last value; preferring it blindly would then let a stale file
-  // outvote a log and frames that are still moving, and condemn a healthy run
-  // after one lease. Every source below is written by the RUN — the wrapper
-  // appends the log, the suites take the frames — so the newest of them is the
-  // run's last sign of life.
+  // outvote a log that is still moving, and condemn a healthy run after one
+  // lease. Both sources below belong to ONE run — the wrapper stamps the mark
+  // and appends the log — so the newest of them is that run's last sign of life.
+  //
+  // THE FRAMES ARE NOT AMONG THEM, AND THAT IS THE POINT (Astra review round 4).
+  // `verification/` is shared and carries no run identity, so a reader that
+  // folded it in could have any other run's pictures vouch for the one it is
+  // judging — for ever, and for a selection that takes no frames at all. The
+  // frames are read by the WRITER instead, about its own run, while it is the
+  // run that is going; see the sampler in run-logged.mjs for what still bounds
+  // that. Here, nothing that another run could have written is evidence.
   const marks = []
   const mark = markPath === undefined ? progressMarkPathFor(logPath ?? recordPath) : markPath
   for (const path of [mark, logPath]) {
@@ -361,11 +366,6 @@ export function lastProgressAtFor({
       /* an absent mark or log is not a progress mark */
     }
   }
-  // The frames are the one shared source: the directory carries no run identity,
-  // so a second concurrent run's pictures would vouch for this one. What bounds
-  // it is written beside the sampler in run-logged.mjs.
-  const frames = newestFrameMtimeMs({ dir: frameDir, since })
-  if (frames !== null) marks.push(frames)
   return marks.length > 0 ? Math.max(...marks) : null
 }
 

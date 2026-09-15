@@ -364,16 +364,19 @@ function runVerify() {
   // FRAMES advance the whole time, so the writer samples its own frame count —
   // sampled here, by the run itself, rather than read by whoever is waiting.
   //
-  // RESIDUAL, NAMED (Astra review round 1). Frames carry NO run identity — the
-  // directory is shared and `framesWrittenSince` says so — so a SECOND verify
-  // run's pictures would also raise this count and could vouch for a wedged run
-  // for as long as that second run lasts. What bounds it: `large-run-wait.mjs`
-  // makes a LARGE wait for a running LARGE, `run-wait.mjs` refuses to resolve a
-  // wait when two runs are live, and the quiet-machine check reports a second
-  // run as load. The unbounded version of the defect is the one that is gone —
-  // a masked wedge now surfaces when the masking run ends, where a false HUNG
-  // killed a healthy run outright. Closing it completely needs a frame that
-  // names its run, which is a change to every suite's shutter, not to this file.
+  // RESIDUAL, NAMED, AND NOW CONFINED TO THIS ONE PLACE (Astra review rounds 1
+  // and 4). Frames carry NO run identity — `verification/` is shared and
+  // `framesWrittenSince` says so — so a SECOND verify run's pictures would raise
+  // this sample too and could vouch for a run that is in fact wedged. Three
+  // things bound it, and none of them is a comment: the sampler runs only while
+  // THIS run is going and stops with it; a second run does not normally overlap,
+  // because `large-run-wait.mjs` makes a LARGE wait for a running LARGE (measured
+  // 16.09.2026 — a single-suite run launched beside one waited instead of running
+  // alongside) and `run-wait.mjs` refuses to resolve a wait when two runs are
+  // live; and a mark this sampler raises falsely is corrected by the next real
+  // one. What is gone is the unbounded version: no READER folds the shared
+  // directory into its verdict any more. Closing it completely needs a frame that
+  // names its run — a change to every suite's shutter, not to this file.
   //
   // BY MTIME, NOT BY COUNT (Astra review round 2). `framesWrittenSince` counts
   // DISTINCT names on purpose — a both-backends run photographs the same 93

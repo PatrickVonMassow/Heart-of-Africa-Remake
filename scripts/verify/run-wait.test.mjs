@@ -160,7 +160,7 @@ describe('--await: one blocking call, and no poll counted', () => {
     // past the progress lease: that is what "silent" means here.
     const stale = new Date(startedAt)
     for (const path of [log, `${log}.run.json`]) utimesSync(path, stale, stale)
-    const res = run(['--await', log, '--timeout', '1'], { HOA_FRAME_DIR: join(dir, 'no-frames') })
+    const res = run(['--await', log, '--timeout', '1'])
     expect(res.status).toBe(5)
     expect(res.stdout).toMatch(/HUNG/)
     expect(res.stdout).toMatch(/emergency lane/)
@@ -171,9 +171,9 @@ describe('--await: one blocking call, and no poll counted', () => {
   // 2.5x its estimate long before it is done; on 15.09.2026 one that had already
   // written 34 frames was reported HUNG and ended, and the release stood still
   // behind it. A run that is still writing is SLOW.
-  it('does NOT call a run hung while it is still writing frames', () => {
+  it('does NOT call a run hung while it is still stamping its mark', () => {
     const startedAt = Date.now() - 40 * 60_000
-    const { dir, log } = fixture({
+    const { log } = fixture({
       ...finished,
       status: 'running',
       pid: process.pid,
@@ -182,10 +182,10 @@ describe('--await: one blocking call, and no poll counted', () => {
     })
     const stale = new Date(startedAt)
     for (const path of [log, `${log}.run.json`]) utimesSync(path, stale, stale)
-    const frames = join(dir, 'frames')
-    mkdirSync(frames, { recursive: true })
-    writeFileSync(join(frames, '34-just-written.png'), 'x')
-    const res = run(['--await', log, '--timeout', '1'], { HOA_FRAME_DIR: frames })
+    // The run itself said something a moment ago — its frame sampling stamped
+    // the mark — while its log has been quiet for the whole suite.
+    writeFileSync(`${log}.progress`, '')
+    const res = run(['--await', log, '--timeout', '1'])
     expect(res.status).toBe(3)
     expect(res.stdout).not.toMatch(/HUNG/)
     expect(res.stdout).toMatch(/STILL WORKING/)
@@ -203,7 +203,7 @@ describe('--await: one blocking call, and no poll counted', () => {
       startedAt,
     })
     writeFileSync(`${log}.progress`, '')
-    const res = run(['--status', log], { HOA_FRAME_DIR: join(dir, 'no-frames') })
+    const res = run(['--status', log])
     expect(res.stdout).toMatch(/SLOW, not hung/)
     expect(res.status).toBe(0)
   })
@@ -220,7 +220,7 @@ describe('--await: one blocking call, and no poll counted', () => {
     const stale = new Date(startedAt)
     writeFileSync(`${log}.progress`, '')
     utimesSync(`${log}.progress`, stale, stale)
-    const res = run(['--status', log], { HOA_FRAME_DIR: join(dir, 'no-frames') })
+    const res = run(['--status', log])
     expect(res.stdout).toMatch(/HUNG/)
     expect(res.status).toBe(4)
   })
@@ -272,7 +272,7 @@ describe('--status: the ONE counted poll', () => {
     const stale = new Date(startedAt)
     writeFileSync(`${log}.progress`, '')
     utimesSync(`${log}.progress`, stale, stale)
-    const res = run(['--status', log], { HOA_FRAME_DIR: join(dir, 'no-frames') })
+    const res = run(['--status', log])
     expect(res.status).toBe(4)
     expect(res.stdout).toMatch(/HUNG/)
   })

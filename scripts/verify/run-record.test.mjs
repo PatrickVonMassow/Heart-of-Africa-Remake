@@ -126,20 +126,7 @@ describe('the last sign of life (point 1137)', () => {
   it('answers null when there is nothing to look at, rather than a false silence', () => {
     expect(newestFrameMtimeMs({ dir: join(tmp(), 'absent') })).toBeNull()
     expect(newestFrameMtimeMs({ dir: tmp() })).toBeNull()
-    expect(lastProgressAtFor({ frameDir: join(tmp(), 'absent') })).toBeNull()
-  })
-
-  it('takes the newest of log, record and frames — the frame the log cannot see wins', () => {
-    const dir = tmp()
-    const frames = join(dir, 'frames')
-    mkdirSync(frames, { recursive: true })
-    const log = join(dir, 'run.log')
-    const stale = new Date(Date.now() - 3_600_000)
-    writeFileSync(log, 'starting dev server')
-    utimesSync(log, stale, stale)
-    writeFileSync(join(frames, '07-live.png'), 'x')
-    const at = lastProgressAtFor({ logPath: log, frameDir: frames })
-    expect(at).toBeGreaterThan(stale.getTime())
+    expect(lastProgressAtFor({})).toBeNull()
   })
 
   // ASTRA REVIEW ROUNDS 1 TO 3 — `countPoll` rewrites the run RECORD, so a reader
@@ -159,8 +146,7 @@ describe('the last sign of life (point 1137)', () => {
     writeFileSync(record, '{}')
     // The record was touched a moment ago, as a counted poll would touch it.
     // The run itself has said nothing for 45 minutes, and that is the answer.
-    expect(lastProgressAtFor({ logPath: log, recordPath: record, frameDir: join(dir, 'absent') }))
-      .toBeLessThan(Date.now() - 40 * 60_000)
+    expect(lastProgressAtFor({ logPath: log, recordPath: record })).toBeLessThan(Date.now() - 40 * 60_000)
   })
 
   it('takes the newest of the run\'s OWN writings, so a frozen mark cannot condemn it', () => {
@@ -172,8 +158,23 @@ describe('the last sign of life (point 1137)', () => {
     utimesSync(mark, stale, stale)
     // The marker went unwritable 45 minutes ago; the log is still moving.
     writeFileSync(log, 'x')
-    expect(lastProgressAtFor({ logPath: log, frameDir: join(dir, 'absent') }))
-      .toBeGreaterThan(Date.now() - 60_000)
+    expect(lastProgressAtFor({ logPath: log })).toBeGreaterThan(Date.now() - 60_000)
+  })
+
+  // ASTRA REVIEW ROUND 4 — `verification/` is shared and carries no run identity,
+  // so any other run's pictures could have vouched for the one being judged, for
+  // ever, and even for a selection that takes no frames at all. The frames are
+  // the WRITER's business, about its own run, while that run is going.
+  it('never lets the shared frame directory speak for a run', () => {
+    const dir = tmp()
+    const frames = join(dir, 'frames')
+    mkdirSync(frames, { recursive: true })
+    const log = join(dir, 'run.log')
+    const stale = new Date(Date.now() - 45 * 60_000)
+    writeFileSync(log, 'x')
+    utimesSync(log, stale, stale)
+    writeFileSync(join(frames, '07-somebody-elses.png'), 'x')
+    expect(lastProgressAtFor({ logPath: log })).toBeLessThan(Date.now() - 40 * 60_000)
   })
 
   it('derives the mark from the log and from the record path alike', () => {
@@ -195,15 +196,14 @@ describe('the last sign of life (point 1137)', () => {
     const dir = tmp()
     const log = join(dir, 'run.log')
     writeFileSync(log, 'x')
-    expect(lastProgressAtFor({ logPath: log, frameDir: join(dir, 'absent') }))
-      .toBeGreaterThan(Date.now() - 60_000)
+    expect(lastProgressAtFor({ logPath: log })).toBeGreaterThan(Date.now() - 60_000)
   })
 
   it('ignores a path it cannot stat instead of counting it as silence', () => {
     const dir = tmp()
     const log = join(dir, 'run.log')
     writeFileSync(log, 'x')
-    expect(lastProgressAtFor({ logPath: log, recordPath: join(dir, 'gone.run.json'), frameDir: join(dir, 'absent') }))
+    expect(lastProgressAtFor({ logPath: log, recordPath: join(dir, 'gone.run.json') }))
       .toBeGreaterThan(Date.now() - 60_000)
   })
 })
