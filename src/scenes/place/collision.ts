@@ -230,6 +230,8 @@ export const WALKER_RADIUS = 0.3
  *  places colliders whose stand-off has to land the player exactly where the
  *  boundary says he may stand (work-order 482's water wall). */
 export const PLAYER_RADIUS = 0.35
+/** The chief’s robe hem, shared by his drawn cone and his solid footprint. */
+export const CHIEF_BODY_RADIUS = 0.42
 /** Directions probed for an escape / spiral samples on the innermost ring. */
 const ESCAPE_DIRECTIONS = 12
 

@@ -477,7 +477,7 @@ if (section('core-loop')) {
   // that bearing has chief and drummer in one picture, from the front.
   await page.waitForFunction(() => window.__chief?.phase === 'at-drummer', null, { timeout: 30000 })
   // Read the state AFTER his walk: the snapshot above was taken at his door, and
-  // the hint checks below belong to the man who has arrived.
+  // the journal checks below belong to the man who has arrived.
   s = await state()
   await page.evaluate(() => {
     const chief = window.__chief
@@ -491,23 +491,22 @@ if (section('core-loop')) {
     p.yaw = Math.atan2(mx - p.x, mz - p.z) + Math.PI
   })
   await shot('04-chief-outside-his-hut', { place: 'nubian-village', label: 'the chief standing beside his drummer, both seen from the front' })
-  check('Meeting him unlocks the hint', s.hintsGiven.north === true)
-  const hint = s.journal.find((e) => titleKey(e) === 'journal.titles.chiefHint')
-  check('Hint stores grave coordinates (language-neutral)',
-    !!hint && typeof hint.text === 'object' && typeof hint.text.params?.lat === 'number')
-  check('The hint is deciphered in the same breath (latitude)', s.decodedGiven.north === true &&
-    s.journal.some((e) => titleKey(e) === 'journal.titles.decoded'))
+  const walkEntries = s.journal.filter((e) => titleKey(e) === 'journal.titles.chiefWalk')
+  check('Meeting him records his walk once', walkEntries.length === 1 &&
+    walkEntries[0].text.key === 'journal.chiefWalk' && !walkEntries[0].text.params)
+  check('The door supplies no deciphered message',
+    !s.journal.some((e) => ['journal.hintRaw', 'journal.hintDecoded'].includes(e.text?.key)))
   // Do-not-disturb is on for this run (line ~110, so the long walks are not
   // interrupted), and DND is exactly the setting that stops a new entry from
   // opening the book. The player's own way to read it is to open it — so open it,
   // rather than photograph a panel this suite has arranged not to appear.
   await page.evaluate(() => window.__game.getState().setJournalOpen(true))
   await page.waitForFunction(() => !!document.querySelector('.journal'), null, { timeout: 5000 })
-  await shot('05-journal-hint', { element: '.journal', label: 'the journal holding the hint' })
+  await shot('05-journal-hint', { element: '.journal', label: 'the journal recording the chief’s walk' })
   await page.evaluate(() => window.__game.getState().setJournalOpen(false))
   await page.waitForTimeout(200)
 
-  // --- 7. Triangulation: the East's knowing people contributes the longitude ---
+  // --- 7. Another village records its own chief’s walk ---
   await leaveByWalking()
   await page.evaluate(() => {
     const g = window.__game.getState()
@@ -521,8 +520,9 @@ if (section('core-loop')) {
   })
   await page.waitForTimeout(400)
   s = await state()
-  check('Second hint: longitude from the East, deciphered (triangulation)',
-    s.hintsGiven.east === true && s.decodedGiven.east === true)
+  check('The eastern chief also records his walk without coordinates',
+    s.journal.filter((e) => titleKey(e) === 'journal.titles.chiefWalk').length === 2 &&
+    !s.journal.some((e) => ['journal.hintRaw', 'journal.hintDecoded'].includes(e.text?.key)))
   await page.evaluate(() => window.__game.getState().leavePlace())
   await page.waitForTimeout(800)
 

@@ -144,6 +144,64 @@ async function pushUntilClear(maxMs = 15000) {
   await page.waitForTimeout(120)
 }
 
+/** Hold forward until the traveller's feet are within `reach` of a fixed point and
+ *  STAY there while he keeps walking into it (or a generous window elapses).
+ *
+ *  Two measurements shape this. How far a held key walks is decided by the RENDER
+ *  cadence, not by the number of presses — this settlement under headless WebGPU
+ *  draws about a third of a frame per second (measured 15.09.2026: three frames in
+ *  nine seconds), so a fixed count of 40 ms presses buys one or two steps and the
+ *  walk stalls in open ground, well short of its target. And arriving at a distance
+ *  is not the same as being STOPPED at it: a traveller walking through a body that
+ *  does not resolve passes through `reach` on his way past. So the key stays held
+ *  for `settleFrames` further RESOLVED frames, which without the body would carry
+ *  him a quarter of a metre per frame beyond it and redden the caller's assert.
+ *
+ *  The frames counted are the scene's OWN resolves (`window.__placeResolves`), never
+ *  the browser's animation callbacks: those keep ticking while a stalled scene moves
+ *  nobody, and three of them against an unchanged position would prove nothing.
+ *
+ *  Returns what happened, because a window that simply elapsed is not a stop: the
+ *  caller has to be able to fail on `settled === false` rather than measure a
+ *  position that was never held against anything. */
+async function pushUntilWithin(target, reach, { settleFrames = 3, maxMs = 40000 } = {}) {
+  const t0 = Date.now()
+  await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW' })))
+  const read = () =>
+    page.evaluate(
+      ({ x, z }) => ({
+        distance: Math.hypot(window.__placePlayer.x - x, window.__placePlayer.z - z),
+        resolves: window.__placeResolves ?? 0,
+      }),
+      target,
+    )
+  let arrivedAt = null
+  let last = await read()
+  let settled = false
+  while (Date.now() - t0 < maxMs) {
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW' })))
+    await page.waitForTimeout(80)
+    last = await read()
+    if (last.distance > reach) {
+      arrivedAt = null
+      continue
+    }
+    if (arrivedAt === null) arrivedAt = last.resolves
+    else if (last.resolves - arrivedAt >= settleFrames) {
+      settled = true
+      break
+    }
+  }
+  await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyW' })))
+  await page.waitForTimeout(120)
+  return {
+    settled,
+    heldFrames: arrivedAt === null ? 0 : last.resolves - arrivedAt,
+    distance: last.distance,
+    seconds: +((Date.now() - t0) / 1000).toFixed(1),
+  }
+}
+
 /** Hold forward at the river until the settlement hands the traveller back to
  *  the bird's-eye view — or a generous window elapses (work-order 584). Reports
  *  how far out he got, how far his footing sank on the way, and which mode the
@@ -604,6 +662,107 @@ if (section('village')) {
 // where the layout says. The backend-sensitive pictures are also where the
 // detailed surfaces and broad level bases can actually be judged; neither may
 // read as an egg balanced on a vertex.
+// Hold the chief at the beginning of his real walk so contact can be measured
+// and photographed at his hut. The authored unit tests cover the moving body.
+if (section('chief-body')) {
+  await page.evaluate(() => window.__game.getState().enterPlace('bambara-village'))
+  await page.waitForFunction(() => window.__game.getState().placeId === 'bambara-village' && window.__placeLayout,
+    null, { timeout: 30000 })
+  const speed = await page.evaluate(() => {
+    const speed = window.__balance.communication.chiefWalkSpeed
+    window.__balance.communication.chiefWalkSpeed = 0
+    window.__game.getState().bumpBalance()
+    window.__chiefHome()
+    window.__game.getState().callChiefOut()
+    window.__game.getState().setJournalOpen(false)
+    return speed
+  })
+  try {
+    await page.waitForFunction(() => window.__chief?.phase === 'walking-out' && window.__chief.progress === 0,
+      null, { timeout: 8000 })
+    // WHERE the traveller starts matters, and the outward normal is not free
+    // ground everywhere: at bambara-village a scattered 0.77 m prop sits 0.51 m
+    // behind his stand, so a player planted there is inside it, is pushed out
+    // instead of forward and never reaches the chief at all (measured
+    // 15.09.2026, the first red of this block). So SEARCH for the stand-off:
+    // the outward normal first, then the nearest bearings to it, and take the
+    // first whose stand-off AND whose straight line to the chief are clear of
+    // every static collider. The chief is not among them — his body is
+    // published live — so the search cannot reject a spot because of him.
+    const contact = await page.evaluate(() => {
+      const chief = window.__chief
+      const hut = window.__placeLayout.interactives.find((it) => it.type === 'chief')
+      const base = Math.atan2(chief.x - hut.pos[0], chief.z - hut.pos[1])
+      const STAND_OFF = 2
+      const free = (x, z) => window.__placeColliders.every((c) => window.__clearanceTo(c, x, z) - 0.35 > 0.02)
+      // He walks from the stand-off up to his body, i.e. over the first
+      // (STAND_OFF - r - 0.35) / STAND_OFF of the line — sample exactly that,
+      // never the last stretch he is meant to be stopped in.
+      const walked = (STAND_OFF - chief.r - 0.35) / STAND_OFF
+      // Sampled to the CONTACT itself: stepping by a flat 0.1 left the last
+      // three centimetres before his body unread, which is exactly where a prop
+      // would stop the traveller early and redden the block on its own geometry.
+      const laneSteps = Math.max(1, Math.ceil(walked / 0.1))
+      const laneClear = (x, z) => {
+        for (let i = 1; i <= laneSteps; i++) {
+          const t = (walked * i) / laneSteps
+          if (!free(x + (chief.x - x) * t, z + (chief.z - z) * t)) return false
+        }
+        return true
+      }
+      let picked = null
+      for (let step = 0; step <= 18 && !picked; step++) {
+        for (const sign of step === 0 ? [1] : [1, -1]) {
+          const a = base + (sign * step * Math.PI) / 18
+          const x = chief.x + Math.sin(a) * STAND_OFF
+          const z = chief.z + Math.cos(a) * STAND_OFF
+          if (free(x, z) && laneClear(x, z)) {
+            picked = { x, z, nx: Math.sin(a), nz: Math.cos(a), bearingSteps: sign * step }
+            break
+          }
+        }
+      }
+      if (!picked) return { x: chief.x, z: chief.z, r: chief.r, nx: 0, nz: 0, standFound: false }
+      const p = window.__placePlayer
+      p.x = picked.x
+      p.z = picked.z
+      p.yaw = Math.atan2(chief.x - p.x, chief.z - p.z) + Math.PI
+      return { x: chief.x, z: chief.z, r: chief.r, nx: picked.nx, nz: picked.nz, standFound: true, bearingSteps: picked.bearingSteps }
+    })
+    check('Chief: a free stand-off two metres off his body exists', contact.standFound === true, JSON.stringify(contact))
+    if (!contact.standFound) throw new Error('No free ground two metres off the chief to walk at him from')
+    // Walk at him until he is REACHED, never for a fixed number of input frames:
+    // the resolve that carries the traveller runs once per RENDER frame, and this
+    // scene's headless cadence starves a counted push long before his body.
+    const walkIn = await pushUntilWithin(contact, contact.r + 0.35 + 0.05)
+    // The window must have been SPENT walking into him, not merely elapsed.
+    check(
+      'Chief: the traveller keeps walking into him over further resolved frames',
+      walkIn.settled,
+      JSON.stringify(walkIn),
+    )
+    if (!walkIn.settled) throw new Error('The traveller never came to rest against the chief')
+    const stopped = await page.evaluate(({ x, z, nx, nz }) => {
+      const p = window.__placePlayer
+      return { distance: Math.hypot(p.x - x, p.z - z), side: (p.x - x) * nx + (p.z - z) * nz }
+    }, contact)
+    const touching = stopped.distance >= contact.r + 0.35 - 0.01 &&
+      stopped.distance <= contact.r + 0.35 + 0.05 && stopped.side > 0
+    check('Chief: walking forward stops at his body in front of the hut', touching, JSON.stringify(stopped))
+    if (!touching) throw new Error('The declared blocked-player frame requires contact with the chief')
+    await shot('53-collision-chief-body', {
+      local: { x: contact.x, y: 1.4, z: contact.z },
+      label: 'the player blocked at the chief’s body in front of his hut',
+    })
+  } finally {
+    await page.evaluate((speed) => {
+      window.__balance.communication.chiefWalkSpeed = speed
+      window.__game.getState().bumpBalance()
+      window.__chiefHome()
+    }, speed)
+  }
+}
+
 if (section('drawn-colliders')) {
   await enterSettlement('bambara-village')
   // === Nothing blocks where nothing is drawn (work-order 583) ===================

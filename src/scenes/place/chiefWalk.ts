@@ -150,7 +150,7 @@ export function chiefTick(walk: ChiefWalk, now: number, timing: ChiefWalkTiming)
  * village the mechanic plays in (chiefMeeting.test.ts).
  * // OPEN: swept 07.09.2026 over all 22 villages — only `maasai-village` has a
  * // scattered 0.78 m collider on the line (0.24 m into his footprint, at about
- * // a fifth of the way over). He has no collider and does not resolve one, so
+ * // a fifth of the way over). His path does not resolve static colliders, so
  * // there he brushes through it. Not routed around: routing him would need the
  * // nav grid and a path length that changes per frame, which the minute and
  * // the call-back are counted against.

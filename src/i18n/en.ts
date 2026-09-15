@@ -3,7 +3,6 @@
 // being literal translations of the German originals.
 
 import type { Strings, TextParams } from './types'
-import { DIRECTION_WORDS, GLOSSARY } from '../world/lore'
 import { namesFromCsv } from './names'
 
 const MONTHS = [
@@ -778,12 +777,11 @@ export const en: Strings = {
       villageReturn: (p: TextParams) => `Back in ${PLACES[p.place as string]}`,
       monument: (p: TextParams) => PLACES[p.place as string],
       monumentReturn: (p: TextParams) => `${PLACES[p.place as string]} Once More`,
-      chiefHint: "The Chief's Words",
+      chiefWalk: 'The Chief Sets Out',
       drumMessage: 'The Drums Speak',
       rockArtefact: 'At the Foot of the Great Rock',
       artefactGiven: 'Into the Hands of the Chief',
       mouldFitted: 'The Clay Finds Its Rock',
-      decoded: 'Deciphered!',
       victory: 'The Heart of Africa',
       foodLow: 'Provisions Running Low',
       foodOut: 'Provisions Exhausted',
@@ -996,38 +994,8 @@ export const en: Strings = {
         `[somber]I came back, and the place is not the one I left.[pause] What has happened here since my last visit stands unspoken in every face.[/somber]`
       )
     },
-    hintRaw: (p: TextParams) => {
-      const regionId = p.region as string
-      const w = DIRECTION_WORDS[regionId as keyof typeof DIRECTION_WORDS]
-      const texts: Record<string, string> = {
-        north:
-          'The chief leaned close and spoke in a low voice: [whisper]"You seek the tomb of the great king. ' +
-          `Where the latitude counts ${dec(p.lat as number)} degrees toward [emph]${w.north}[/emph], there he rests beneath the sand."[/whisper] ` +
-          `[breath][somber]${w.north} …[pause] I must learn what that word means;[/somber] [excited]then this number will show me the way.[/excited]`,
-        east:
-          'The chief pointed his staff far across the plain: [whisper]"Beyond the great desert, towards where Unumpara hides — ' +
-          `where the longitude counts ${dec(p.lon as number)} degrees toward [emph]${w.east}[/emph], the old king sleeps."[/whisper] ` +
-          `[breath][somber]${w.east} …[pause] another word I must decipher.[/somber]`,
-        west:
-          `The chief spoke of a land far toward [emph]${w.north}[/emph], beyond the great sand, where no grass grows: [whisper]"There, they say, a king of old was laid into the earth."[/whisper] [somber]If ${w.north} is a direction, this narrows my search.[/somber]`,
-        central:
-          `The chief murmured: [whisper]"Go [emph]${w.north}[/emph], away from ${GLOSSARY.congo}, until the trees end and the sand begins — under such sand the old kings sleep."[/whisper] [somber]The words of the forest still veil the direction from me.[/somber]`,
-        south:
-          `The chief gazed long toward the horizon: [whisper]"Many moons toward [emph]${w.north}[/emph], farther than ${GLOSSARY.zambezi}, farther than the great forest — where the land is nothing but sand, the great king lies."[/whisper] [somber]Toward ${w.north} … a season as a signpost?[/somber]`,
-      }
-      return texts[regionId]
-    },
-    hintDecoded: (p: TextParams) => {
-      const regionId = p.region as string
-      const texts: Record<string, string> = {
-        north: `[excited]Deciphered![/excited] The chief's words mean: [emph]the tomb lies at latitude ${dec(p.lat as number)} degrees north.[/emph] [somber]Now I still need its longitude.[/somber]`,
-        east: `[excited]Deciphered![/excited] "Salewa" is the sunrise: [emph]the tomb lies at longitude ${dec(p.lon as number)} degrees east.[/emph] [somber]Together with the latitude, the site is fixed.[/somber]`,
-        west: '[excited]Now I understand the chief of the West:[/excited] the tomb lies [emph]north, beyond the edge of the great desert[/emph] — a land without grass.',
-        central: '[excited]The forest\u2019s words open up:[/excited] the tomb lies [emph]north, away from the Congo, where the sand begins[/emph].',
-        south: '[excited]The seasons speak:[/excited] "toward summer" means [emph]far north[/emph] — beyond the Zambezi, beyond the forests, in the great sand.',
-      }
-      return texts[regionId]
-    },
+    chiefWalk:
+      '[awe]The chief stepped out of his hut and walked across to his drummer.[/awe] [pause]He offered no words I could understand. [somber]Yet his purpose seemed plain enough:[/somber] [emph]I was meant to follow.[/emph]',
     drumMessage:
       '[awe]The chief called his drummer, and two drums spoke for him — a great one and a small one.[/awe] [pause]Four words, each of four beats, each parted from the next by the same short silence — deep for the low syllable, bright for the high one. [excited]I know these words. I have heard every one of them in the lanes and at the water.[/excited] [pause]I have written them down in the order they were beaten; what they ask of me I must read for myself.',
     rockArtefact:

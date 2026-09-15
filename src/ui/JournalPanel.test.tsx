@@ -76,7 +76,7 @@ describe('entry kinds, ordering and sketches (design.md §15/§16)', () => {
   it('marks a hint entry with the .hint class', () => {
     // Entries are added before render, so the handwriting animation never
     // starts (its baseline is the mounted journal length) — the text is final.
-    g().addEntry({ key: 'journal.titles.chiefHint' }, { key: 'journal.foodLow' }, 'hint')
+    g().addEntry({ key: 'journal.titles.drumMessage' }, { key: 'journal.drumMessage' }, 'hint')
     render(<JournalPanel />)
     expect(document.querySelector('.entry.hint')).toBeInTheDocument()
   })
