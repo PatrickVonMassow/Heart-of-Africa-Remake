@@ -1045,3 +1045,19 @@ Punkt eingereiht: kein blockierender Defekt, keine Datenfrage, und die Marken
 verlieren ihre Überlappung, sobald der Spieler einen Schritt weitergeht. Der
 billige Weg wäre, überlappende Marken gegeneinander auszublenden statt sie zu
 versetzen.
+
+## Die Fehlerquote des Wasserauftrags ist nicht gemessen (15.09.2026)
+
+Aus dem Code des 1131-Zweigs abgeleitet, kein Sweep gefahren: Die Blockade am
+Wasserstand trifft einen Teil der Aufträge, nicht alle — sie hängt daran, wo der
+Sender bei der Vergabe zufällig steht, nicht an der Lage der beiden Standplätze
+zueinander. Wie groß dieser Teil ist, steht nicht fest. Der Wiederholungs-
+Harnisch aus `72dc3907c` kann die Quote über einen Seed- und Startpositions-
+Sweep der Baseline liefern.
+
+Wirkung: keine — die Reparatur von Punkt 1131 hebt die Blockade unabhängig von
+ihrer Häufigkeit auf, und die Quote beträfe allein die Nachbetrachtung. Nicht
+als Punkt eingereiht: kein Spielerimpakt, keine Datenfrage, kein Blocker; die
+Messung kostet einen ruhigen Rechner für einen Sweep, den niemand braucht,
+solange der Rundgang gelingt. Der billige Weg wäre, die Quote beim nächsten
+ohnehin fälligen Baseline-Lauf mitzuzählen.
