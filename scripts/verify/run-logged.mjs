@@ -355,47 +355,58 @@ function runVerify() {
   // alone, from what the child actually produced, and nothing a reader does can
   // move it. `--status` and `--await` read the FIELD, never the file's mtime.
   let recordedProgressAt = 0
-  /** Stamp the mark, and SAY whether the run managed to say anything. */
-  function markProgress(at) {
-    // THE THROTTLE ADVANCES ONLY ON A WRITE THAT HAPPENED (Astra review round 3).
-    // Advancing it on a write that did NOT happen would leave the last good mark
-    // standing as the run's newest word about itself, and a run whose marker
-    // went unwritable while it worked would be reported hung one lease later.
+  /**
+   * Act on ONE observation that the run is alive, and say whether that
+   * observation was CONSUMED.
+   *
+   * CONSUMED IS NOT "WRITTEN" (Astra review rounds 7 and 8). `log.write` queues,
+   * so nothing here can promise the bytes landed; what speaks for the run is the
+   * MTIME of its mark or its log, read by whoever is waiting. This answer says
+   * only whether the observation has been acted on and need not be offered
+   * again — false means "come back", and every false is bounded by something
+   * that changes on its own, or the sampler would offer one frame for ever.
+   */
+  function noteProgress(at) {
+    // TOO SOON. A line a minute is the rate; the caller retries.
     if (at - recordedProgressAt < PROGRESS_RECORD_MS) return false
+    // THE MARK IS THE ORDINARY PATH, and the throttle advances only on a write
+    // that happened (round 3): advancing it on a failed touch would leave the
+    // last good mark standing as the run's newest word about itself, and a run
+    // whose marker went unwritable while it worked would be called hung one
+    // lease later.
     if (touchProgressMark(logPath)) {
       recordedProgressAt = at
       return true
     }
-    // AND A MARK THAT CANNOT BE WRITTEN FALLS BACK TO THE LOG (Astra review
-    // round 6). The two live in one directory, but that does NOT make their
-    // failures one: a read-only marker, or a directory that can no longer take a
-    // new file, leaves the log's ALREADY OPEN descriptor writing happily. Left
-    // there, a healthy silent picture suite would have gone a whole lease without
-    // a sign of life and been called hung — the exact defect this point removes.
-    // A `#` line is what every log parser here ignores and every reader can see.
+    // A MARK THAT CANNOT BE WRITTEN FALLS BACK TO THE LOG (round 6). The two
+    // live in one directory, but that does NOT make their failures one: a
+    // read-only marker, or a directory that will take no new file, leaves the
+    // log's ALREADY OPEN descriptor writing happily. Left there, a healthy
+    // silent picture suite would have gone a whole lease without a sign of life
+    // and been called hung — the exact defect this point removes. A `#` line is
+    // what every log parser here ignores and every reader can see.
     //
-    // ONLY AT A LINE BOUNDARY (Astra review round 7). `consume` writes the
-    // child's raw chunks, which end mid-line as often as not; a line pushed in
-    // between would turn `FA` + `IL  polish …` into `FA# still running…` and cost
-    // the saved log the very result line it exists to carry. `pending` is
-    // empty exactly when the log is between lines, so the fallback waits for one.
+    // ONLY AT A LINE BOUNDARY (round 7). `consume` writes the child's raw
+    // chunks, which end mid-line as often as not; a line pushed in between would
+    // turn `FA` + `IL  polish …` into `FA# still running…` and cost the saved log
+    // the very result line it exists to carry. `pending` is empty exactly when
+    // the log sits between lines — and the caller updates it BEFORE asking
+    // (round 8), or this would read the state of the chunk before last.
     if (pending !== '') return false
-    // AND IT IS NEVER CLAIMED AS PROVEN (Astra review round 7). `log.write`
-    // queues: an ENOSPC arrives later and out of this frame's reach, so a `true`
-    // here would consume the frame observation that paid for it. The throttle
-    // still advances — a line a minute is the rate, failing or not — but the
-    // answer is false, and what speaks for the run is the log's own mtime IF the
-    // write in fact landed.
     recordedProgressAt = at
     try {
       log.write(`# still running — the progress mark ${forDisplay(progressMarkPathFor(logPath))} is not writable, so this line is the run's sign of life\n`)
     } catch {
       /* a log that cannot take a line says nothing; the stream's own error
-         handler below reports it, and this run has no third place to speak */
+         handler reports it, and this run has no third place to speak */
     }
-    return false
+    // CONSUMED EITHER WAY (round 8). Answering false here would leave the frame
+    // that prompted it unconsumed, and the sampler would offer that same frame
+    // every minute for ever — appending a line each time, and refreshing the log
+    // that the lease is measured against. One observation, one attempt.
+    return true
   }
-  markProgress(started)
+  noteProgress(started)
 
   // THE STRETCH THE OUTPUT CANNOT SEE. `run-all.mjs` captures a suite's output,
   // so between two suite lines a 55-minute `polish` says nothing at all. Its
@@ -436,7 +447,7 @@ function runVerify() {
       // newest frame, took it for no progress, and only a LATER frame could
       // ever try again. The mark now moves with the write, so a tick that could
       // not record retries on the next one.
-      if (typeof now === 'number' && now > frameMark && markProgress(Date.now())) frameMark = now
+      if (typeof now === 'number' && now > frameMark && noteProgress(Date.now())) frameMark = now
     }, FRAME_SAMPLE_MS)
     : null
   frameTick?.unref?.()
@@ -447,7 +458,6 @@ function runVerify() {
     log.write(text)
     const progressAt = Date.now()
     advanceOutputProgress(progress, text)
-    markProgress(progressAt)
     if (progress.mark !== lastProgressMark && progressAt - lastProgressEmittedAt >= PROGRESS_EMIT_MS) {
       lastProgressEmittedAt = progressAt
       lastProgressMark = progress.mark
@@ -469,6 +479,11 @@ function runVerify() {
       if (own.stream) console.log(line)
       else if (!own.quiet && kind) console.log(line)
     }
+    // AFTER `pending`, NEVER BEFORE (Astra review round 8). The note's fallback
+    // asks whether the log sits between lines; asked before this split it would
+    // read the state of the chunk BEFORE last, and could append straight after a
+    // chunk ending in `FA`.
+    noteProgress(progressAt)
   }
 
   child.stdout.on('data', consume)
