@@ -1100,3 +1100,26 @@ Last-Einstufung ist genau die Vorsicht, die die Retrospektive §3.22/§3.48
 verlangt. Der billige Weg wäre, denselben Lebendtest zu benutzen, den
 `batch-in-flight.mjs --agent-check` schon fährt: ein Arbeitsbaum ohne laufenden
 Prozess und ohne fortschreitenden Zweig ist geparkt, nicht belegt.
+
+## Ein festgefahrener Lauf kann von fremden Bildern am Leben gehalten werden (16.09.2026)
+
+Aus fünf Prüfrunden zu Punkt 1137, von GPT-6 Astra gefunden und nicht
+geschlossen: Der Prüfläufer erkennt einen festgefahrenen Lauf daran, dass dieser
+eine ganze Viertelstunde lang nichts mehr geschrieben hat. Weil eine lange
+Bildsuite zwischen ihrer Startzeile und ihrer Ergebniszeile nichts ins Log
+schreibt, tastet der Lauf zusätzlich seine eigenen Bilder ab — und
+`verification/` ist ein gemeinsames Verzeichnis ohne Laufkennung. Ein wirklich
+festgefahrener Lauf hält seinen Aufseher am Leben; nimmt in dieser Zeit ein
+anderer Lauf Bilder auf, wandert die Fortschrittsmarke des festgefahrenen mit.
+Von innen korrigiert das nichts, denn ein festgefahrener Lauf schreibt nie eine
+eigene echte Marke.
+
+Wirkung: das Hängend-Urteil kann sich verzögern, solange jemand anders
+fotografiert — es fällt nicht falsch, es fällt später. Die lesende Seite ist
+davon frei: sie sieht nur Marke und Log des Laufs, nach dem sie gefragt wird.
+Nicht als Punkt eingereiht: die entgegengesetzte Störung ist die teure und die
+belegte — an einem Abend wurden zwei kerngesunde Läufe beendet und die
+Veröffentlichung stand hinter dem deckenden Bildlauf still, den sie erzeugt
+hätten. Ein Melder, der gelegentlich spät anschlägt, ist einem vorzuziehen, der
+zuverlässig tötet, was er beobachtet. Der saubere Weg wäre ein Bild, das seinen
+Lauf benennt — eine Änderung an jedem Suite-Auslöser, nicht am Prüfläufer.
