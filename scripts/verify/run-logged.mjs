@@ -57,7 +57,7 @@ import {
   showWindow,
 } from './run-digest-core.mjs'
 import { backendsFrom, buildReceipt, formatReceipt, planRun } from './run-wait-core.mjs'
-import { framesWrittenSince, gitPosition, newestFrameMtimeMs, readRecord, recordPathFor, selfCommandLine, touchProgressMark, writeRecord } from './run-record.mjs'
+import { framesWrittenSince, gitPosition, newestFrameMtimeMs, progressMarkPathFor, readRecord, recordPathFor, selfCommandLine, touchProgressMark, writeRecord } from './run-record.mjs'
 import { emitActivity } from '../batch-activity-journal.mjs'
 import { ACTIVITY_EVENTS } from '../batch-activity-journal-core.mjs'
 import { budgetToolOutput } from '../tool-output-budget-core.mjs'
@@ -347,17 +347,31 @@ function runVerify() {
   // alone, from what the child actually produced, and nothing a reader does can
   // move it. `--status` and `--await` read the FIELD, never the file's mtime.
   let recordedProgressAt = 0
-  /** Stamp the mark, and SAY whether it happened. */
+  /** Stamp the mark, and SAY whether the run managed to say anything. */
   function markProgress(at) {
     // THE THROTTLE ADVANCES ONLY ON A WRITE THAT HAPPENED (Astra review round 3).
-    // Advancing it on a FAILED touch would leave the last good mark standing as
-    // the run's newest word about itself, and a run whose marker went unwritable
-    // while it worked would be reported hung one lease later. A failure is
-    // simply not a mark: the next tick tries again.
+    // Advancing it on a write that did NOT happen would leave the last good mark
+    // standing as the run's newest word about itself, and a run whose marker
+    // went unwritable while it worked would be reported hung one lease later.
     if (at - recordedProgressAt < PROGRESS_RECORD_MS) return false
-    if (!touchProgressMark(logPath)) return false
-    recordedProgressAt = at
-    return true
+    if (touchProgressMark(logPath)) {
+      recordedProgressAt = at
+      return true
+    }
+    // AND A MARK THAT CANNOT BE WRITTEN FALLS BACK TO THE LOG (Astra review
+    // round 6). The two live in one directory, but that does NOT make their
+    // failures one: a read-only marker, or a directory that can no longer take a
+    // new file, leaves the log's ALREADY OPEN descriptor writing happily. Left
+    // there, a healthy silent picture suite would have gone a whole lease without
+    // a sign of life and been called hung — the exact defect this point removes.
+    // A `#` line is what every log parser here ignores and every reader can see.
+    try {
+      log.write(`# still running — progress mark ${forDisplay(progressMarkPathFor(logPath))} is not writable, so this line is the run's sign of life\n`)
+      recordedProgressAt = at
+      return true
+    } catch {
+      return false
+    }
   }
   markProgress(started)
 

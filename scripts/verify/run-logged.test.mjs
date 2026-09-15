@@ -4,7 +4,7 @@
 // first way, the `--show` branch printed its window and then fell through
 // into the spawn — so asking a question about a finished log started a full
 // LARGE regression behind the answer. These cases pin the exit paths.
-import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { spawn, spawnSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -250,6 +250,35 @@ describe('run-logged default launch — the run-identity re-exec (point 700, Sol
     },
     60_000,
   )
+})
+
+// ASTRA REVIEW ROUND 6 — a marker that cannot be written must not read as a run
+// that has stopped: the two failures are not one, and a healthy silent picture
+// suite would otherwise go a whole lease without a sign of life.
+describe('the progress mark falls back to the log when it cannot be written', () => {
+  it('writes its sign of life into the log instead, and keeps running', () => {
+    const ROOT = join(dirname(WRAPPER), '..', '..')
+    const relDir = join('local', `runlogged-markfail-${process.pid}`)
+    const dir = join(ROOT, relDir)
+    const relLog = join(relDir, 'markfail.log')
+    try {
+      mkdirSync(dir, { recursive: true })
+      // The marker's own path, occupied by a DIRECTORY: `writeFileSync` on it
+      // fails exactly as an unwritable marker would.
+      mkdirSync(join(ROOT, `${relLog}.progress`), { recursive: true })
+      const res = spawnSync(process.execPath, [WRAPPER, 'world', '--section=__no_such_section__', '--log-file', relLog], {
+        windowsHide: true,
+        encoding: 'utf8',
+        timeout: 60_000,
+        env: { ...process.env, VERIFY_NO_WAIT: '1', VERIFY_LOG_DIR: relDir, HOA_ACTIVITY_JOURNAL_PATH: join(dir, 'activity.jsonl') },
+      })
+      expect(res.status, res.stderr).toBe(1)
+      const log = readFileSync(join(ROOT, relLog), 'utf8')
+      expect(log).toContain('is not writable, so this line is the run')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
 })
 
 describe('the ladder escape carries a REASON', () => {

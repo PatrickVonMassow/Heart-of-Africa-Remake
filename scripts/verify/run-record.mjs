@@ -357,11 +357,13 @@ export function lastProgressAtFor({ logPath = null, recordPath = null, markPath 
   // run that is going; run-logged.mjs states what of that remains. Here, nothing
   // another run could have written is evidence.
   //
-  // WHY LOSING THEM COSTS THIS READER NOTHING (Astra review round 5 asked): the
-  // mark and the log live in the SAME directory, so the case where the writer
-  // cannot stamp its mark while frames keep arriving is the case where it cannot
-  // append its log either — and a run whose own log has failed is not a run this
-  // probe can rescue by reading somebody else's pictures.
+  // WHY LOSING THEM COSTS THIS READER NOTHING (Astra review rounds 5 and 6): a
+  // writer that cannot stamp its mark — a read-only marker, a directory that can
+  // no longer take a new file — can still APPEND its log, whose descriptor is
+  // already open. It does exactly that, with a `#` line, so the run keeps a sign
+  // of life this probe can read without anybody else's pictures. The two failures
+  // are not one failure, which is why the writer carries the fallback rather than
+  // this reader carrying a source it cannot attribute.
   const marks = []
   const mark = markPath === undefined ? progressMarkPathFor(logPath ?? recordPath) : markPath
   for (const path of [mark, logPath]) {

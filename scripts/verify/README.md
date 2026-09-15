@@ -168,7 +168,10 @@ it counts a poll, and nothing a reader writes is evidence that the run is alive.
 And the FRAME DIRECTORY, because `verification/` is shared and carries no run
 identity: a reader that folded it in could have any other run's pictures vouch
 for the one it is judging. The frames are read by the writer instead, about its
-own run, while that run is going. `--await` and `--status` ask the same question and give the same
+own run, while that run is going. And a writer that cannot stamp its mark at all
+— a read-only marker, a directory that will take no new file — writes its sign of
+life into the log as a `#` line, whose descriptor is already open: the two
+failures are not one failure. `--await` and `--status` ask the same question and give the same
 answer: a run that is still writing is `SLOW`, never `HUNG`. The clock alone could
 never say it: the §1 plan is measured to be a third to two thirds of the real
 cost, so the hung mark for a whole `polish` pass falls at 14 minutes against a
