@@ -1356,12 +1356,6 @@
       "why": "User 14.09.2026 ranked it directly behind 1092 with the order itself",
       "origin": "user",
       "place": "ahead"
-    },
-    "1126": {
-      "at": "2026-09-14T19:23:33.050Z",
-      "why": "User 14.09.2026, after asking why a feature costs more verification than development; the measurement he asked for is the point itself.",
-      "origin": "user",
-      "place": "ahead"
     }
   },
   "boundary": {
@@ -1394,7 +1388,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-15T08:01:43.147Z",
+    "at": "2026-09-15T10:49:10.742Z",
     "points": [
       174,
       184,
@@ -1795,7 +1789,6 @@
       1123,
       1124,
       1125,
-      1126,
       1129
     ]
   }

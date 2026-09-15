@@ -622,18 +622,52 @@ if (section('chief-body')) {
   try {
     await page.waitForFunction(() => window.__chief?.phase === 'walking-out' && window.__chief.progress === 0,
       null, { timeout: 8000 })
+    // WHERE the traveller starts matters, and the outward normal is not free
+    // ground everywhere: at bambara-village a scattered 0.77 m prop sits 0.51 m
+    // behind his stand, so a player planted there is inside it, is pushed out
+    // instead of forward and never reaches the chief at all (measured
+    // 15.09.2026, the first red of this block). So SEARCH for the stand-off:
+    // the outward normal first, then the nearest bearings to it, and take the
+    // first whose stand-off AND whose straight line to the chief are clear of
+    // every static collider. The chief is not among them — his body is
+    // published live — so the search cannot reject a spot because of him.
     const contact = await page.evaluate(() => {
       const chief = window.__chief
       const hut = window.__placeLayout.interactives.find((it) => it.type === 'chief')
-      const length = Math.hypot(chief.x - hut.pos[0], chief.z - hut.pos[1])
-      const nx = (chief.x - hut.pos[0]) / length
-      const nz = (chief.z - hut.pos[1]) / length
+      const base = Math.atan2(chief.x - hut.pos[0], chief.z - hut.pos[1])
+      const STAND_OFF = 2
+      const free = (x, z) => window.__placeColliders.every((c) => window.__clearanceTo(c, x, z) - 0.35 > 0.02)
+      // He walks from the stand-off up to his body, i.e. over the first
+      // (STAND_OFF - r - 0.35) / STAND_OFF of the line — sample exactly that,
+      // never the last stretch he is meant to be stopped in.
+      const walked = (STAND_OFF - chief.r - 0.35) / STAND_OFF
+      const laneClear = (x, z) => {
+        for (let t = 0.1; t <= walked + 1e-9; t += 0.1) {
+          if (!free(x + (chief.x - x) * t, z + (chief.z - z) * t)) return false
+        }
+        return true
+      }
+      let picked = null
+      for (let step = 0; step <= 18 && !picked; step++) {
+        for (const sign of step === 0 ? [1] : [1, -1]) {
+          const a = base + (sign * step * Math.PI) / 18
+          const x = chief.x + Math.sin(a) * STAND_OFF
+          const z = chief.z + Math.cos(a) * STAND_OFF
+          if (free(x, z) && laneClear(x, z)) {
+            picked = { x, z, nx: Math.sin(a), nz: Math.cos(a), bearingSteps: sign * step }
+            break
+          }
+        }
+      }
+      if (!picked) return { x: chief.x, z: chief.z, r: chief.r, nx: 0, nz: 0, standFound: false }
       const p = window.__placePlayer
-      p.x = chief.x + nx * 2
-      p.z = chief.z + nz * 2
+      p.x = picked.x
+      p.z = picked.z
       p.yaw = Math.atan2(chief.x - p.x, chief.z - p.z) + Math.PI
-      return { x: chief.x, z: chief.z, r: chief.r, nx, nz }
+      return { x: chief.x, z: chief.z, r: chief.r, nx: picked.nx, nz: picked.nz, standFound: true, bearingSteps: picked.bearingSteps }
     })
+    check('Chief: a free stand-off two metres off his body exists', contact.standFound === true, JSON.stringify(contact))
+    if (!contact.standFound) throw new Error('No free ground two metres off the chief to walk at him from')
     await pushFrames(24)
     const stopped = await page.evaluate(({ x, z, nx, nz }) => {
       const p = window.__placePlayer
