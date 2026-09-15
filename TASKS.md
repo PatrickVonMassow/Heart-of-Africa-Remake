@@ -77,49 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1124. The clay impression is used by a Space press anywhere on the map instead of
-  being clicked at Bandiagara (user 14.09.2026, ranked here by the user).
-  The order, verbatim: "Auch bei der Clay Impression of a Rock soll es bei Space keine
-  automatische Benutzung geben, sondern man soll das Item bei Bandiagara gezielt anklicken
-  muessen, damit es dort benutzt wird."
-  MEASURED 14.09.2026 at 09b96e7b1. `src/scenes/travel/TravelScene.tsx` (~2934-2962) binds
-  ONE Space handler: it asks `settlementToEnter` first and, where no settlement answers,
-  falls through to `g.useCarriedForm()` (~2958). So out on the open map every Space press
-  presses the carried form against the ground the traveller stands on — at the talus foot it
-  solves the puzzle without the player ever having chosen the item, and everywhere else it
-  answers `toasts.formNoFit` at a key the player pressed for something else entirely.
-  THE INVENTORY CLICK ALREADY EXISTS and nothing about it changes: `src/ui/Hud.tsx`
-  (~147-152) renders each carried form as a button whose `onClick` calls the same action.
-  THE DOCUMENTS ALREADY SAY THE CLICK IS THE ACT: design.md §6.1 ("consumables and tools are
-  used by clicking them in the inventory bar") and §13.4 ("brought back as an act on the
-  ITEM … activates the find in his inventory bar … The use key at his hut hands nothing over
-  at all"), and `docs/communication-poc-spec.md`, "Where the digging happens" ("it is given
-  by USING it … a click, exactly as medicine and the shovel act"). The Space fallback is the
-  exception nobody decided; it only ever existed because the impression travels the opposite
-  way from the artefact.
-  Final state:
-  - Space in the bird's-eye view enters a settlement and does nothing else. A press with no
-    settlement in reach is a non-action: no toast, no socket spent, no journal entry.
-  - A carried form is used ONLY by clicking it in the inventory bar. At the talus foot below
-    the Bandiagara escarpment the click fits it and solves the puzzle; a click anywhere else,
-    and a second click at the spent socket, answer `toasts.formNoFit` in the traveller's own
-    voice exactly as they do today.
-  - The rules themselves are untouched: `resolveFormUse` and `useCarriedForm` keep their
-    reach, their spent-socket rule and their "a form is not consumed by fitting it" rule.
-  Test: the browser section that drives this (`scripts/verify/world.mjs` ~407-455) presses
-  the REAL key today and must press the REAL button instead (`[data-form="rock-relief"]`) —
-  the wiring from the input to the store is exactly what a unit test cannot reach, which is
-  why that check exists. Plus a Vitest case that a Space press on the open map, with a form
-  in the pack and no settlement in reach, leaves `spentSockets` and the journal untouched, so
-  the removed fallback cannot return unnoticed.
-  Refs: src/scenes/travel/TravelScene.tsx (~2934-2962), src/ui/Hud.tsx (~147-152),
-  src/state/store.ts (`useCarriedForm` ~1976), src/world/forms.ts, scripts/verify/world.mjs
-  (~407-455), design.md §6.1 and §13.4, docs/communication-poc-spec.md ("Where the digging
-  happens")
-  Criticality: medium — this is the PoC's one solvable puzzle, and today it can solve itself
-  under a key the player pressed to enter a village.
-  Bundle: Kommunikation.
-
 - [ ] 1131. Nobody in the village fetches water, and the two standing at the water place just
   stand there (user 15.09.2026, two reports, ranked here directly behind his previous
   front-order 1124).
