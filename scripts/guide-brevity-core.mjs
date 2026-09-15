@@ -519,7 +519,17 @@ export const LIMITS = {
   // "may I trust this green" but "what do I do after a red". SHORTEN-BEFORE-RAISE was applied to
   // it first — seven lines to five — and the long telling stays out of the guide
   // (docs/picture-check-cost.md §8 carries the measurement). Six lines: 669 -> 675.
-  maxLines: 675,
+  // RAISED 15.09.2026 by the measured net of THREE genuinely new lesson classes, all FOLDED into
+  // entries that already carry their neighbourhood rather than opening three new ones: a work
+  // order is an INPUT and a negation in its heading flips the classifier that reads it (§3.274,
+  // into "Prosa wirkt nicht"); an INHERITED finding is a finding and not a measurement, so it is
+  // re-measured against the current state, timestamps in ONE timezone, before it becomes a point
+  // (§3.275, into "Jeder Befund wird zur Arbeit"); and a chain of gates written for the big job
+  // charges the two-minute text change the full price of a point, so the small way has to exist
+  // (§3.273, into "Die Kur ist teurer als der Fehler"). Drafted as three standalone entries this
+  // is far more; folded it measures +8 lines / +91 words, and the ceilings follow that
+  // measurement exactly, with no headroom. 675 -> 683.
+  maxLines: 683,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -803,7 +813,9 @@ export const LIMITS = {
   // here because the retrospective's own Lehre already carries it: 6425 -> 6464.
   // 15.09.2026: the red-restarts-the-whole-proof pitfall justified beside maxLines measures 63
   // words after its tightening: 6464 -> 6527.
-  maxWords: 6527,
+  // 15.09.2026, later: the three folded lesson classes justified beside maxLines measure 91
+  // words: 6527 -> 6618.
+  maxWords: 6618,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,
