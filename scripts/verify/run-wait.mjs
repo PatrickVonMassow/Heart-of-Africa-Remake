@@ -265,7 +265,7 @@ async function doAwait(logArg, timeoutS) {
   // SLOW — the word for it is the STILL RUNNING line below, not HUNG.
   const status = waitStatus()
   const progressAt = lastProgressAtFor({
-    logPath: current?.log ?? null, recordPath: path, record: current, since: current?.startedAt ?? null,
+    logPath: current?.log ?? null, recordPath: path, since: current?.startedAt ?? null,
   })
   const silent = progressAt === null || Date.now() - progressAt >= PROGRESS_LEASE_MS
   const hung = status.hung.some((lease) => lease.runId === runId) ||
@@ -306,10 +306,10 @@ function doStatus(logArg) {
   }
   const counted = countPoll(path) ?? record
   // COUNTING THE POLL MUST NOT MANUFACTURE THE PROGRESS IT THEN READS (Astra
-  // review round 1): `countPoll` rewrites the record, so the mark is read from
-  // the WRITER's own field in it, never from the file's mtime.
+  // review rounds 1 and 2): `countPoll` rewrites the record, so the mark is read
+  // from the writer's own marker FILE, which nothing but the run ever writes.
   const progressAt = lastProgressAtFor({
-    logPath: counted.log ?? null, recordPath: path, record: counted, since: counted.startedAt ?? null,
+    logPath: counted.log ?? null, recordPath: path, since: counted.startedAt ?? null,
   })
   const verdict = pollBudget({
     polls: counted.polls,

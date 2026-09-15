@@ -57,7 +57,7 @@ import {
   showWindow,
 } from './run-digest-core.mjs'
 import { backendsFrom, buildReceipt, formatReceipt, planRun } from './run-wait-core.mjs'
-import { framesWrittenSince, gitPosition, readRecord, recordPathFor, selfCommandLine, writeRecord } from './run-record.mjs'
+import { framesWrittenSince, gitPosition, newestFrameMtimeMs, readRecord, recordPathFor, selfCommandLine, touchProgressMark, writeRecord } from './run-record.mjs'
 import { emitActivity } from '../batch-activity-journal.mjs'
 import { ACTIVITY_EVENTS } from '../batch-activity-journal-core.mjs'
 import { budgetToolOutput } from '../tool-output-budget-core.mjs'
@@ -73,9 +73,9 @@ import { PROGRESS_LEASE_MS } from '../wait-lease-core.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, '..', '..')
-/** How often the writer's progress mark may be rewritten into the record. The
- *  wait reads it against a 15-minute lease, so a minute of granularity is far
- *  finer than any verdict needs and keeps the record's writes rare. */
+/** How often the writer's progress mark may be re-stamped. The wait reads it
+ *  against a 15-minute lease, so a minute of granularity is far finer than any
+ *  verdict needs and keeps the writes rare. */
 const PROGRESS_RECORD_MS = 60_000
 /** How often the writer counts its own frames — the only sign of life a long
  *  render suite gives, because its output does not leave `run-all` until it ends. */
@@ -306,9 +306,6 @@ function runVerify() {
     finishedAt: null,
     exitCode: null,
     framesWritten: null,
-    // The writer's own progress mark (point 1137). Present from the first write
-    // so a reader never has to guess whether the field exists yet.
-    lastProgressAt: started,
     receipt: null,
   }
   writeRecord(recordPath, baseRecord)
@@ -349,16 +346,13 @@ function runVerify() {
   // renewed its apparent life for ever. The mark below is set by this process
   // alone, from what the child actually produced, and nothing a reader does can
   // move it. `--status` and `--await` read the FIELD, never the file's mtime.
-  let recordedProgressAt = started
-  let framesSeen = baseRecord.expectedFrames > 0 ? (framesWrittenSince(started) ?? 0) : 0
+  let recordedProgressAt = 0
   function markProgress(at) {
     if (at - recordedProgressAt < PROGRESS_RECORD_MS) return
     recordedProgressAt = at
-    const current = readRecord(recordPath)
-    // Only a RUNNING record is stamped: the closing write owns the finished one,
-    // and a late tick must not reopen it.
-    if (current && current.status === 'running') writeRecord(recordPath, { ...current, lastProgressAt: at })
+    touchProgressMark(logPath)
   }
+  markProgress(started)
 
   // THE STRETCH THE OUTPUT CANNOT SEE. `run-all.mjs` captures a suite's output,
   // so between two suite lines a 55-minute `polish` says nothing at all. Its
@@ -375,11 +369,18 @@ function runVerify() {
   // a masked wedge now surfaces when the masking run ends, where a false HUNG
   // killed a healthy run outright. Closing it completely needs a frame that
   // names its run, which is a change to every suite's shutter, not to this file.
+  //
+  // BY MTIME, NOT BY COUNT (Astra review round 2). `framesWrittenSince` counts
+  // DISTINCT names on purpose — a both-backends run photographs the same 93
+  // files twice — so on the second backend pass, and on every retry, the count
+  // stops rising while the pictures keep coming. A run producing frames the
+  // whole time would have gone silent for a whole suite and been called hung.
+  let frameMark = newestFrameMtimeMs({ since: started }) ?? 0
   const frameTick = baseRecord.expectedFrames > 0
     ? setInterval(() => {
-      const now = framesWrittenSince(started)
-      if (typeof now === 'number' && now > framesSeen) {
-        framesSeen = now
+      const now = newestFrameMtimeMs({ since: started })
+      if (typeof now === 'number' && now > frameMark) {
+        frameMark = now
         markProgress(Date.now())
       }
     }, FRAME_SAMPLE_MS)

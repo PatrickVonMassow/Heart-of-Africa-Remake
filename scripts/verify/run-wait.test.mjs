@@ -201,8 +201,8 @@ describe('--await: one blocking call, and no poll counted', () => {
       pid: process.pid,
       expectedRuntimeMs: 60_000,
       startedAt,
-      lastProgressAt: Date.now() - 60_000,
     })
+    writeFileSync(`${log}.progress`, '')
     const res = run(['--status', log], { HOA_FRAME_DIR: join(dir, 'no-frames') })
     expect(res.stdout).toMatch(/SLOW, not hung/)
     expect(res.status).toBe(0)
@@ -216,8 +216,10 @@ describe('--await: one blocking call, and no poll counted', () => {
       pid: process.pid,
       expectedRuntimeMs: 60_000,
       startedAt,
-      lastProgressAt: startedAt,
     })
+    const stale = new Date(startedAt)
+    writeFileSync(`${log}.progress`, '')
+    utimesSync(`${log}.progress`, stale, stale)
     const res = run(['--status', log], { HOA_FRAME_DIR: join(dir, 'no-frames') })
     expect(res.stdout).toMatch(/HUNG/)
     expect(res.status).toBe(4)
@@ -266,8 +268,10 @@ describe('--status: the ONE counted poll', () => {
       pid: process.pid,
       startedAt,
       expectedRuntimeMs: 60_000,
-      lastProgressAt: startedAt,
     })
+    const stale = new Date(startedAt)
+    writeFileSync(`${log}.progress`, '')
+    utimesSync(`${log}.progress`, stale, stale)
     const res = run(['--status', log], { HOA_FRAME_DIR: join(dir, 'no-frames') })
     expect(res.status).toBe(4)
     expect(res.stdout).toMatch(/HUNG/)

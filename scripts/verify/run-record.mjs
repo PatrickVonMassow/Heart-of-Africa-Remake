@@ -13,7 +13,7 @@
 // proves to the batch guard that a session is waiting rather than idling).
 // Every read is failure-tolerant: an absent or unreadable record means "nothing
 // known", never a false verdict.
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { dirname, isAbsolute, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -329,20 +329,28 @@ export function newestFrameMtimeMs({ dir = FRAME_DIR, since = null } = {}) {
  * "nobody looked" and not as "nothing happened".
  */
 export function lastProgressAtFor({
-  logPath = null, recordPath = null, frameDir = FRAME_DIR, since = null, record = undefined,
+  logPath = null, recordPath = null, frameDir = FRAME_DIR, since = null, markPath = undefined,
 } = {}) {
-  // THE WRITER'S OWN MARK WINS, AND IS THE ONLY ONE A POLL CANNOT MOVE (Astra
-  // review round 1). `countPoll` rewrites the record, so reading the record
-  // FILE's mtime let a reader manufacture the progress it was looking for —
-  // poll a wedged run often enough and it never reports hung. `lastProgressAt`
-  // is written by run-logged.mjs alone, from what the child really produced.
-  const carried = recordPath !== null && record === undefined ? readRecord(resolveIn(recordPath)) : record
-  const own = carried?.lastProgressAt
-  if (typeof own === 'number' && Number.isFinite(own)) return own
-  // FALLBACK, for a record written before the field existed: the file marks and
-  // the frames. Both are weaker — the frame directory is shared, so a second
-  // concurrent run's pictures would vouch for this one — which is why the writer
-  // owns the mark above and this branch only serves old records.
+  // THE WRITER'S OWN MARK WINS, AND IT IS A FILE OF ITS OWN (Astra review rounds
+  // 1 and 2). Two things had to be true at once. A reader must not be able to
+  // manufacture the life it is looking for — `countPoll` rewrites the run
+  // record, so the record FILE's mtime meant polling a wedged run renewed it for
+  // ever. And the writer's mark must not share a read-modify-write with that
+  // poll: a poll that read the record, was overtaken by the writer, and then
+  // wrote its stale copy back would silently DROP a fresh mark. So the mark is a
+  // zero-byte file nobody else ever writes, and its mtime is the whole answer.
+  const mark = markPath === undefined ? progressMarkPathFor(logPath ?? recordPath) : markPath
+  if (mark) {
+    try {
+      return statSync(resolveIn(mark)).mtimeMs
+    } catch {
+      /* no mark yet — fall through to the weaker signals below */
+    }
+  }
+  // FALLBACK, for a run that predates the mark: the file marks and the frames.
+  // Both are weaker — the frame directory is shared, so a second concurrent
+  // run's pictures would vouch for this one — which is why the writer owns the
+  // mark above and this branch only serves old runs.
   const marks = []
   for (const path of [logPath, recordPath]) {
     if (typeof path !== 'string' || path.trim() === '') continue
@@ -358,3 +366,24 @@ export function lastProgressAtFor({
 }
 
 const resolveIn = (path) => (isAbsolute(path) ? path : join(ROOT, path))
+
+/** The writer's progress mark, beside the log it belongs to. A zero-byte file
+ *  whose MTIME is the whole message: one writer, one write, no read-modify-write,
+ *  and therefore nothing a concurrent reader can lose. */
+export function progressMarkPathFor(logPath) {
+  if (typeof logPath !== 'string' || logPath.trim() === '') return null
+  return `${logPath.replace(/\.run\.json$/, '')}.progress`
+}
+
+/** Stamp the mark. Only run-logged.mjs calls this, and a failure is silent: a
+ *  run must never die because it could not say it was alive. */
+export function touchProgressMark(logPath) {
+  const path = progressMarkPathFor(logPath)
+  if (!path) return false
+  try {
+    writeFileSync(resolveIn(path), '')
+    return true
+  } catch {
+    return false
+  }
+}

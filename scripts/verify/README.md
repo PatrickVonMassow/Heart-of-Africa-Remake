@@ -155,10 +155,13 @@ the transcript rather than remembered.
 **Long is not hung (point 1137).** Past **2.5 ×** its expectation a run is
 *overdue*. It is *hung* only when it is ALSO silent — nothing produced for a
 whole 15-minute progress lease. That silence is judged on the **writer's own
-mark**: `run-logged.mjs` stamps `lastProgressAt` into the record from what its
-child really emitted and from its own frame sampling, so a reader's bookkeeping
-can never pass for the run's progress (`--status` rewrites the record when it
-counts a poll). `--await` and `--status` ask the same question and give the same
+mark**: `run-logged.mjs` touches a zero-byte `<log>.progress` from what its child
+really emitted and from sampling the newest frame's mtime — by mtime, because a
+both-backends run overwrites the same 93 names and a count would stop rising
+while the pictures kept coming. The mark is a file of its own so that neither a
+reader's bookkeeping can pass for the run's progress (`--status` rewrites the run
+record when it counts a poll) nor a reader's read-modify-write can drop a fresh
+mark. `--await` and `--status` ask the same question and give the same
 answer: a run that is still writing is `SLOW`, never `HUNG`. The clock alone could
 never say it: the §1 plan is measured to be a third to two thirds of the real
 cost, so the hung mark for a whole `polish` pass falls at 14 minutes against a

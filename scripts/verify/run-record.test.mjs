@@ -14,11 +14,13 @@ import {
   lastProgressAtFor,
   latestRecordPath,
   newestFrameMtimeMs,
+  progressMarkPathFor,
   pidAlive,
   readRecord,
   logDir,
   recordPathFor,
   runIsLive,
+  touchProgressMark,
   writeRecord,
 } from './run-record.mjs'
 
@@ -140,22 +142,44 @@ describe('the last sign of life (point 1137)', () => {
     expect(at).toBeGreaterThan(stale.getTime())
   })
 
-  // ASTRA REVIEW ROUND 1 — `countPoll` rewrites the record, so a reader that took
-  // the record FILE's mtime for progress could manufacture the life it was
-  // looking for: poll a wedged run often enough and it never reports hung.
-  it('prefers the WRITER\'S OWN mark, which no reader\'s bookkeeping can move', () => {
+  // ASTRA REVIEW ROUNDS 1 AND 2 — `countPoll` rewrites the run record, so a
+  // reader that took the record FILE's mtime for progress could manufacture the
+  // life it was looking for; and a mark kept INSIDE that record would be dropped
+  // whenever a poll's read-modify-write overtook the writer's. The mark is
+  // therefore a file of its own that nothing but the run ever writes.
+  it('reads the WRITER\'S OWN mark, which no reader\'s bookkeeping can move', () => {
     const dir = tmp()
     const log = join(dir, 'run.log')
     writeFileSync(log, 'x')
-    const written = Date.now() - 45 * 60_000
-    expect(lastProgressAtFor({ logPath: log, record: { lastProgressAt: written } })).toBe(written)
+    const mark = join(dir, 'run.log.progress')
+    writeFileSync(mark, '')
+    const stale = new Date(Date.now() - 45 * 60_000)
+    utimesSync(mark, stale, stale)
+    // The log was touched a moment ago; the writer's mark says the run has in
+    // fact said nothing for 45 minutes, and the mark is what counts.
+    expect(lastProgressAtFor({ logPath: log })).toBeLessThan(Date.now() - 40 * 60_000)
   })
 
-  it('falls back to the file marks only for a record that carries no mark', () => {
+  it('derives the mark from the log and from the record path alike', () => {
+    expect(progressMarkPathFor('/x/y/run.log')).toBe('/x/y/run.log.progress')
+    expect(progressMarkPathFor('/x/y/run.log.run.json')).toBe('/x/y/run.log.progress')
+    expect(progressMarkPathFor('')).toBeNull()
+    expect(progressMarkPathFor(null)).toBeNull()
+  })
+
+  it('stamps the mark, and says so rather than throwing when it cannot', () => {
+    const dir = tmp()
+    const log = join(dir, 'run.log')
+    expect(touchProgressMark(log)).toBe(true)
+    expect(lastProgressAtFor({ logPath: log })).toBeGreaterThan(Date.now() - 60_000)
+    expect(touchProgressMark(join(dir, 'absent', 'run.log'))).toBe(false)
+  })
+
+  it('falls back to the file marks only for a run that carries no mark', () => {
     const dir = tmp()
     const log = join(dir, 'run.log')
     writeFileSync(log, 'x')
-    expect(lastProgressAtFor({ logPath: log, record: null, frameDir: join(dir, 'absent') }))
+    expect(lastProgressAtFor({ logPath: log, frameDir: join(dir, 'absent') }))
       .toBeGreaterThan(Date.now() - 60_000)
   })
 
