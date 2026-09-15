@@ -1006,3 +1006,25 @@ Nicht als Punkt eingereiht wegen des Infrastruktur-Freezes: kein Spielerimpakt,
 und der Weg daran vorbei ist gemessenes Urteil statt Gehorsam. Der billige Weg
 wäre, die Schwelle an die BEOBACHTETE Bandbreite zu hängen statt an die
 Median-Tabelle, wo beide ohnehin nebeneinander gedruckt werden.
+
+Zum dritten Mal gemessen, 15.09.2026, 10:49, beim Deckungsbeweis des Punktes
+1126: derselbe Rat nach 29m 19s, während der Lauf zwei Minuten zuvor noch
+Bilder schrieb. Ich habe hier zunächst einen Arbeitsauftrag daraus gemacht und
+ihn wieder zurückgenommen — genau das meint §2 mit „Duplikate werden
+geschlossen, nicht neu mechanisiert". Die Zählung bleibt: dreimal gesehen,
+dreimal ohne Spielerimpakt, weiterhin kein Punkt.
+
+## Der batch-resume-Kopf nach /clear ist auf den Sitzungsbeginn eingefroren (15.09.2026)
+
+Gemessen 15.09.2026, 12:08–12:12: Die `SessionStart:clear`-Zeile meldete „402
+open point(s); the first in work-order order is 1126", obwohl Punkt 1126 seit
+11:42 abgehakt war. Ein direkter Aufruf von `scripts/batch-resume-hook.mjs` um
+12:12 antwortete korrekt mit 401 offenen Punkten und 1076 an der Spitze — der
+Kern liest die Arbeitsliste also richtig, die zugestellte Zeile stammt aus einer
+älteren Berechnung.
+
+Wirkung: ein frischer Worker nach `/clear` kann auf einen bereits gelandeten
+Punkt gezeigt werden und ihn erneut anfassen. Nicht als Punkt eingereiht wegen
+des Infrastruktur-Freezes: kein Spielerimpakt, und der erste Blick auf den
+Zweig- und Hakenstand fängt es ab. Der billige Weg wäre, die Zeile beim
+Zustellen zu berechnen statt beim Sitzungsstart.

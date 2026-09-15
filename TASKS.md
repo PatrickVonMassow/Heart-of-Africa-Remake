@@ -868,40 +868,6 @@ put it is the mistake this line exists to stop.
   paragraph), docs/acceptance-evidence.md
   Bundle: Testinfrastruktur.
 
-- [ ] 1130. A run is called hung by the band that was MEASURED, not by the model that was
-  computed (found 15.09.2026 while waiting for point 1126's own covering proof).
-  MEASURED 15.09.2026, 10:49. The covering `polish` pass of point 1126 (pid 843974,
-  started 10:19 on the exact merge candidate) was still writing frames —
-  `verification/1106-arriving-runner-hand-on-the-far-stone.png` at 10:47:26 — when
-  `node scripts/verify/run-wait.mjs --await` answered: "HUNG — 29m 19s is past 2.5x this
-  run's expectation. The wait has been recorded as hung and the batch emergency lane will
-  treat it as a standstill; end the run rather than waiting again."
-  The mark is `waited > expectedRuntimeMs * 2.5` in `doAwait`
-  (`scripts/verify/run-wait.mjs`), and `expectedRuntimeMs` for `polish` is the
-  `docs/picture-check-cost.md` §1 per-frame model: 340.9 s. So the mark sits at 14m 12s
-  for a suite whose OBSERVED band in §7 of the same document — the band `--plan` already
-  prints two lines under the expectation — is 9.9–61.5 min, median 55.2 over six runs,
-  with the §1 plan matching only 2 of those 6. `SEPTEMBER_BANDS` in
-  `scripts/verify/run-wait-core.mjs` says so of itself: "no guard reads it and nothing
-  fails on it".
-  IMPACT: the tool orders the destruction of a healthy covering run and records a false
-  standstill for the emergency lane. Obeying it costs a whole `polish` pass (~55 min) and
-  re-opens exactly the loop point 1126 closed.
-  Final state:
-  - The hung mark is taken from the OBSERVED band where one exists for that shape of run
-    (`observedBand` / `SEPTEMBER_BANDS`, the same source `--plan` already reads), and
-    falls back to the §1 model only where nothing was measured for that shape. A run
-    still inside its measured band is never called hung.
-  - `--status` (`pollBudget`) is judged by the same mark, so the two answers cannot
-    disagree about one run.
-  - The message NAMES the band that judged it, so a reader can tell a real standstill
-    from a suite that is merely slow.
-  - NOTHING IS SOFTENED: a run genuinely past its measured band is still called hung, the
-    emergency lane still hears about it, and no wait budget grows.
-  Touches: scripts/verify/run-wait.mjs, scripts/verify/run-wait-core.mjs,
-  docs/picture-check-cost.md
-  Bundle: Testinfrastruktur.
-
 - [ ] 1116. Repair pre-existing crossbrowser check: chromium-mobile no console errors on
   mobile (filed automatically by a LARGE run on 12.09.2026 under point 1089's ownership
   rule; the user ordered these three reds filed at once on 10.09.2026).
