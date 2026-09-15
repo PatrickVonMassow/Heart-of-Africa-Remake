@@ -24,6 +24,11 @@ Format: one line per finding — `- YYYY-MM-DD <source> — <finding>`.
   log shows the classification banner. Collected rather than queued: it mis-advises, it does not
   block — judgment overrode it here — and the infrastructure freeze of CLAUDE.md §2 keeps it out of
   the work order until it actually costs a run.
+  CLOSED by point 1137 (16.09.2026): it did cost a run two days later, twice, and became the
+  blockade in front of the release. The repair is neither of the two directions above but the one
+  they share: the hung verdict now needs SILENCE as well as the clock — no log line, no record
+  update and no frame for a whole 15-minute progress lease — so the classification phase, a long
+  `polish` pass and every other long-but-working run report OVERDUE instead of HUNG.
 - 2026-09-13 point 1072 LARGE (WebGPU, `polish`, feat/1072 at 5a5c8d7a5) — the suite went red on
   its first attempt and clean on the retry, so the run is recorded SUSPECT and covers nothing
   (CLAUDE.md §7.2). Three of its reds have owners and one family has none. Owned: `leaving after
@@ -1061,3 +1066,37 @@ als Punkt eingereiht: kein Spielerimpakt, keine Datenfrage, kein Blocker; die
 Messung kostet einen ruhigen Rechner für einen Sweep, den niemand braucht,
 solange der Rundgang gelingt. Der billige Weg wäre, die Quote beim nächsten
 ohnehin fälligen Baseline-Lauf mitzuzählen.
+
+## Der 45-Minuten-Riegel je Suite steht unter dem gemessenen Band (16.09.2026)
+
+Aus Punkt 1137 mitgemessen, noch nie ausgelöst: `run-all.mjs` tötet eine Suite
+nach `SUITE_TIMEOUT_MS` = 45 min mit SIGKILL und der Zeile „KILLED after 45 min
+wall timeout (hung, not slow)". Ein ganzer `polish`-Durchgang wurde im September
+mit 9,9–61,5 min gemessen (docs/picture-check-cost.md §7). Das Band gilt für den
+ganzen Durchgang samt Bau-, Lint- und Unit-Stufe, die Suite selbst liegt
+darunter — in 314 abgelegten Läufen steht die Zeile kein einziges Mal. Aber es
+ist dieselbe Familie wie der Hängend-Befund: eine feste Zahl gegen eine Laufzeit,
+die niemand nachgemessen hat, und im Zweifel stirbt der gesunde Lauf.
+
+Wirkung: keine gemessene — kein Lauf hat den Riegel je berührt. Nicht als Punkt
+eingereiht: kein Spielerimpakt, keine Datenfrage, keine Blockade, und der
+Infrastruktur-Freeze hält ihn draußen, bis er wirklich einen Lauf kostet. Der
+billige Weg wäre, ihn gegen dieselbe Stillstandsprobe zu tauschen, die der
+Hängend-Befund jetzt benutzt, statt die Zahl zu erhöhen.
+
+## Geparkte Zweige zählen als lebende Agentenlanes (16.09.2026)
+
+`batch-doctor --gate` hat am 16.09. ein rotes `npm run test:unit` als
+„INCONCLUSIVE (load)" eingestuft und dabei fünf Arbeitsbäume als „live agent
+worktree(s)" genannt — `point-1049`, `point-1133`, `point-834`, `point-847`,
+`point-901`. In keinem davon lief ein Prozess; es sind geparkte Zweige offener
+Punkte, der jüngste vom 15.09., der älteste vom 23.08. Gezählt wird ihre bloße
+Existenz, nicht ihre Arbeit.
+
+Wirkung: das Tor kann auf diesem Rechner kein rotes Urteil mehr fällen, solange
+irgendein Zweig geparkt ist — ein Rot wird immer als Last erklärt. Nicht als
+Punkt eingereiht: es macht ein Urteil weicher, statt eines zu fälschen, und die
+Last-Einstufung ist genau die Vorsicht, die die Retrospektive §3.22/§3.48
+verlangt. Der billige Weg wäre, denselben Lebendtest zu benutzen, den
+`batch-in-flight.mjs --agent-check` schon fährt: ein Arbeitsbaum ohne laufenden
+Prozess und ohne fortschreitenden Zweig ist geparkt, nicht belegt.
