@@ -1147,12 +1147,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "1056": {
-      "at": "2026-09-04T07:05:28.679Z",
-      "why": "User order 04.09.2026: »Reihe einen Punkt direkt vor 690 ein, der das sichtbar macht.«",
-      "origin": "user",
-      "place": "ahead"
-    },
     "1059": {
       "at": "2026-09-05T05:14:33.727Z",
       "why": "Appended by the responder path; ranking belongs to the batch owner",
@@ -1400,7 +1394,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-14T23:13:50.426Z",
+    "at": "2026-09-15T08:01:43.147Z",
     "points": [
       174,
       184,
@@ -1761,7 +1755,6 @@
       1053,
       1054,
       1055,
-      1056,
       1059,
       1060,
       1062,
@@ -1802,7 +1795,8 @@
       1123,
       1124,
       1125,
-      1126
+      1126,
+      1129
     ]
   }
 }

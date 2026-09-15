@@ -513,7 +513,13 @@ export const LIMITS = {
   // this says a stored BUDGET aborts the healthy run once the measured thing grows under it.
   // It was FOLDED into that entry rather than given one of its own, because it is the same
   // reader question. The long telling stays in the retrospective (3.270). Three lines: 666 -> 669.
-  maxLines: 669,
+  // RAISED 15.09.2026: the red-restarts-the-whole-proof pitfall is the OTHER HALF of the ladder
+  // entry beside it, which only warned that a narrow green may not predict the suite. It got an
+  // entry of its own rather than a fold, because the reader question is a different one: not
+  // "may I trust this green" but "what do I do after a red". SHORTEN-BEFORE-RAISE was applied to
+  // it first — seven lines to five — and the long telling stays out of the guide
+  // (docs/picture-check-cost.md §8 carries the measurement). Six lines: 669 -> 675.
+  maxLines: 675,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -795,7 +801,9 @@ export const LIMITS = {
   // shortening step — the first draft ran 57 and was cut rather than bought headroom for, and
   // its closing clause ("a red of this kind never points at whoever triggers it") was DROPPED
   // here because the retrospective's own Lehre already carries it: 6425 -> 6464.
-  maxWords: 6464,
+  // 15.09.2026: the red-restarts-the-whole-proof pitfall justified beside maxLines measures 63
+  // words after its tightening: 6464 -> 6527.
+  maxWords: 6527,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,
