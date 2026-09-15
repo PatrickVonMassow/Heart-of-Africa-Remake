@@ -3009,6 +3009,15 @@ export function PlaceScene() {
     )
     p.x = rx
     p.z = rz
+    // Dev-only hook for the headless verification (CLAUDE.md §7.2): how often the
+    // traveller's movement has actually been RESOLVED. A suite that holds a key
+    // needs that number and not the browser's own animation callbacks, which keep
+    // ticking when this scene does not — counting those would let a stalled scene
+    // pass for a man who was stopped by something. Monotonic while the game runs.
+    if (import.meta.env.DEV) {
+      const win = window as unknown as Record<string, number>
+      win.__placeResolves = (win.__placeResolves ?? 0) + 1
+    }
 
     // Stall watch (work-order 604): holding a movement input while the position
     // does not advance is what being wedged looks like. It only INFORMS — the

@@ -154,42 +154,52 @@ async function pushUntilClear(maxMs = 15000) {
  *  walk stalls in open ground, well short of its target. And arriving at a distance
  *  is not the same as being STOPPED at it: a traveller walking through a body that
  *  does not resolve passes through `reach` on his way past. So the key stays held
- *  for `settleFrames` further RENDERED frames, which without the body would carry
- *  him a quarter of a metre per frame beyond it and redden the caller's assert. */
+ *  for `settleFrames` further RESOLVED frames, which without the body would carry
+ *  him a quarter of a metre per frame beyond it and redden the caller's assert.
+ *
+ *  The frames counted are the scene's OWN resolves (`window.__placeResolves`), never
+ *  the browser's animation callbacks: those keep ticking while a stalled scene moves
+ *  nobody, and three of them against an unchanged position would prove nothing.
+ *
+ *  Returns what happened, because a window that simply elapsed is not a stop: the
+ *  caller has to be able to fail on `settled === false` rather than measure a
+ *  position that was never held against anything. */
 async function pushUntilWithin(target, reach, { settleFrames = 3, maxMs = 40000 } = {}) {
-  // The render loop, counted: requestAnimationFrame drives it, so a tick here is a
-  // frame in which the resolver ran. Installed once and left standing.
-  await page.evaluate(() => {
-    if (window.__renderTicks !== undefined) return
-    window.__renderTicks = 0
-    const tick = () => {
-      window.__renderTicks++
-      requestAnimationFrame(tick)
-    }
-    requestAnimationFrame(tick)
-  })
   const t0 = Date.now()
   await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW' })))
-  let arrivedAtFrame = null
-  while (Date.now() - t0 < maxMs) {
-    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW' })))
-    await page.waitForTimeout(80)
-    const now = await page.evaluate(
+  const read = () =>
+    page.evaluate(
       ({ x, z }) => ({
         distance: Math.hypot(window.__placePlayer.x - x, window.__placePlayer.z - z),
-        frames: window.__renderTicks,
+        resolves: window.__placeResolves ?? 0,
       }),
       target,
     )
-    if (now.distance > reach) {
-      arrivedAtFrame = null
+  let arrivedAt = null
+  let last = await read()
+  let settled = false
+  while (Date.now() - t0 < maxMs) {
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW' })))
+    await page.waitForTimeout(80)
+    last = await read()
+    if (last.distance > reach) {
+      arrivedAt = null
       continue
     }
-    if (arrivedAtFrame === null) arrivedAtFrame = now.frames
-    else if (now.frames - arrivedAtFrame >= settleFrames) break
+    if (arrivedAt === null) arrivedAt = last.resolves
+    else if (last.resolves - arrivedAt >= settleFrames) {
+      settled = true
+      break
+    }
   }
   await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyW' })))
   await page.waitForTimeout(120)
+  return {
+    settled,
+    heldFrames: arrivedAt === null ? 0 : last.resolves - arrivedAt,
+    distance: last.distance,
+    seconds: +((Date.now() - t0) / 1000).toFixed(1),
+  }
 }
 
 /** Hold forward at the river until the settlement hands the traveller back to
@@ -724,7 +734,14 @@ if (section('chief-body')) {
     // Walk at him until he is REACHED, never for a fixed number of input frames:
     // the resolve that carries the traveller runs once per RENDER frame, and this
     // scene's headless cadence starves a counted push long before his body.
-    await pushUntilWithin(contact, contact.r + 0.35 + 0.05)
+    const walkIn = await pushUntilWithin(contact, contact.r + 0.35 + 0.05)
+    // The window must have been SPENT walking into him, not merely elapsed.
+    check(
+      'Chief: the traveller keeps walking into him over further resolved frames',
+      walkIn.settled,
+      JSON.stringify(walkIn),
+    )
+    if (!walkIn.settled) throw new Error('The traveller never came to rest against the chief')
     const stopped = await page.evaluate(({ x, z, nx, nz }) => {
       const p = window.__placePlayer
       return { distance: Math.hypot(p.x - x, p.z - z), side: (p.x - x) * nx + (p.z - z) * nz }
