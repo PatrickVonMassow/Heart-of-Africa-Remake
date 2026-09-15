@@ -960,3 +960,29 @@ fällt; die Kette weiß an dieser Stelle beides.
 Nicht als Punkt eingereiht wegen des Infrastruktur-Freezes: kein Spielerimpakt,
 keine stehende Blockade — der Weg existiert und wurde gegangen. Kommt es
 wieder, gehört es zu Punkt 1123, der schon zwei Defekte derselben Familie trägt.
+
+## Der Bildschirm-Wächter verweigert jeden Zug, wenn die Sitzung im Arbeitsverzeichnis steht (15.09.2026)
+
+Der Stop-Wächter liest `.claude/dashboard-state.json` AUS DEM VERZEICHNIS, in dem
+er läuft. Ein Arbeitsverzeichnis eines Punktes hat eine eigene, praktisch leere
+Fassung dieser Datei — ohne `dashboardPath` und ohne Veröffentlichungs-Eintrag.
+Steht die Sitzung dort, findet er keine Registrierung und meldet "BATCH DASHBOARD
+NOT REGISTERED", obwohl Board, Fokus und Registrierung im Haupt-Checkout tadellos
+stehen und derselbe Wächter von dort grün ist.
+
+Gemessen am 15.09.2026: der Wächter hat vier Züge hintereinander verweigert.
+Aus dem Haupt-Checkout mit derselben Sitzungs-ID auf stdin war er still; aus dem
+Arbeitsverzeichnis blockierte er. Nachregistrieren HILFT DORT NICHT — `--synced`
+verweigert im Arbeitsverzeichnis mit "this board was never published", weil auch
+der Veröffentlichungs-Eintrag pro Checkout liegt.
+
+Die Reparatur ist, das Arbeitsverzeichnis der Sitzung im Haupt-Checkout zu
+lassen und Befehle für den Punkt-Checkout mit `git -C` oder in einer Subshell zu
+fahren, statt mit `cd` dorthin zu wandern. Das deckt sich mit der stehenden
+Notiz "Session cwd stays in main tree".
+
+Nicht als Punkt eingereiht wegen des Infrastruktur-Freezes: kein Spielerimpakt,
+und der Weg daran vorbei ist eine Verhaltensregel, keine Änderung. Kommt es
+wieder, wäre der billige Weg, den Marker aus dem gemeinsamen Git-Verzeichnis zu
+lesen statt aus dem laufenden Checkout — die Registrierung gilt ohnehin für die
+ganze Batch, nicht für einen Checkout.

@@ -581,7 +581,10 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „‚Hängt, abbrechen‘ darf nie allein auf einer hinterlegten Dauer stehen, und ein
   **stilles Protokoll** ist kein Stillstand — viele Läufe schreiben erst je fertigem Abschnitt.
   Lies, was der Lauf **sonst** erzeugt: Dateien, Kindprozesse, Stände. Drucken Plan **und**
-  Messung nebeneinander, muss dabeistehen, **welche** die Abbruchschranke benutzt."
+  Messung nebeneinander, muss dabeistehen, **welche** die Abbruchschranke benutzt.
+  Und gespiegelt: Ein hinterlegtes **Budget** bricht den gesunden Lauf ab, weil das Gemessene
+  unter ihm wächst. Schreib neben jede solche Zahl, **woran** sie gemessen wurde, und leite sie
+  aus einem zweiten, gleich teuren Fall ab, statt sie zu schätzen."
 
 - **Die Schranke verlangt genau das, was gerade entsteht.** Sie lässt nicht aufhören, solange
   ein Nachweis fehlt — und der Nachweis ist der Lauf, der noch zwei Stunden braucht.
@@ -664,4 +667,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: bfbf5d956dcbee0ec9f3eedb17dec6c462df80576c6f9d2b62879f71e44a1162 -->
+<!-- GUIDE-FINGERPRINT: efc78466bc5bf28726421b6139e9eb41262e52ff7e1d35838a074e5c981c98c6 -->

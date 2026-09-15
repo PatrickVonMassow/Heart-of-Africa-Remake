@@ -65,6 +65,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 14.09. | Eine Karte erklärte die laufende Zwei-Backend-LARGE für verwaist und ordnete an, sie neu aufzusetzen — tot war nur ihr Besitzer, der Lauf stand nach 34 Minuten in den langen Suiten; ihre zwei Roten hatte er längst selbst an Punkt 1078 gebucht (§3.272, Spiegel von §3.155/§3.170) |
 | 12.09. abends | Wiedergänger von §3.231: Der LARGE-Lauf eines Punktes starb nach 6 m 53 s an einem 20-Sekunden-Timeout in einer Unit-Datei — diesmal war der Störer kein fremder Committer, sondern eine PFLICHT derselben Sitzung. Der Stop-Hook forderte wegen einer Parallel-Sitzung `batch-doctor --gate`, und dessen Tor fährt `test:unit`, `build` und `lint` im Hauptbaum, während der Worktree-Lauf mit genau derselben Unit-Suite beginnt. Der Runner druckte sein eigenes Urteil mit — »UNDER LOAD — a timeout failure under load is not evidence of a broken test« —, also wusste er, dass die Maschine nicht ruhig war, und lief trotzdem an. Die In-Flight-Markierung, die es gewusst hätte, liest der Doctor nicht (Backlog 12.09.) |
 | 14.09. abends | Ein einziger roter Prüfpunkt hielt einen Punkt einen Tag fest — und war ein Fehlalarm: Gleich gemessen liest er auf Merge-Basis 37/30, auf `main` 48/39 und auf dem Kandidaten **50** volle Krüge, alle grün; nur im vollen Pass null. Die Baseline-Klassifikation fährt die Baseline standalone und den Kandidaten im Pass und druckt die Differenz als »REAL REGRESSION«. Der Prüfpunkt erklärt sich seit dem 10.09. selbst für nicht aussagekräftig — die Erklärung erreicht die Leiter, aber nicht den Exit-Code (§3.273, Punkt 1127) |
+| 15.09. nachts | §3.270 ist eingetreten, wie es dort vorhergesagt stand — eine Ebene tiefer: Nicht das Job-Limit, sondern das Zeitbudget EINES Testfalls war aufgebraucht. Der Fall wurde auf dem Server bei 180 Sekunden abgebrochen und riss den ganzen `fast`-Job mit; daneben stand seine eigene Messung von 46,5 Sekunden, geschrieben, bevor die Erwachsenenarbeit in das nachgespielte Dorf einzog. Nachgemessen kostet er 91,2 Sekunden, auf dem Server mindestens 217. Der Test war nie geändert worden — gewachsen ist das Spiel unter ihm, und der Kommentar hat lautlos mitgealtert |
 | 13.08. | Der Nachprüfer findet eine echte zweite Klippe im geheilten Mechanismus — und jede der fünf gemessenen Kuren verschlechtert gesunde Dörfer stärker, als der Fehler schadet: Befund wird gebucht statt behoben (§3.115) |
 | 20.08. | Der Dokumentschnitt strich Regeln als »von einem Wächter abgedeckt«, ohne einen einzigen Wächter darauf zu prüfen — die Kontextanzeige verschwand, der Nutzer fand es (§3.134); eine vom Nutzer gesetzte Rangfolge wurde in einer Nacht zweimal maschinell überholt, ohne dass irgendwo ein Grund stand (Punkt 614); zwei Werkzeuge derselben Bauart am falschen Ort gemessen — im Hauptbaum gebaut und geprüft, während der Prozess die Arbeit in den isolierten Bereich schickt (§3.137) |
 | 21.08. | Ein Tor verlangte eine Freigabe, die seine eigenen Werkzeuge nicht herstellen können — der HIGH-Punkt war gemergt, geprüft und freigegeben, und der Zugausgang wies ihn trotzdem ab (§3.153) |
@@ -1573,7 +1574,7 @@ stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die s
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Montag, 14.09.2026, 21:50 · Quellen-Fingerprint: `bfbf5d956dcb…`
+Zuletzt aktualisiert: Dienstag, 15.09.2026, 02:45 · Quellen-Fingerprint: `efc78466bc5b…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1613,7 +1614,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to the OpenAI lane, GPT-6 Astra), and review is cross-vendor, not Fable-by-default | 6 | hoch | — (Regel/Memory) | ◐ Regel |
 | Iterate on the new feature's OWN test first; the full regression runs once at the end, never as the debugging loop | 2 | mittel | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 79 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 80 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | wait-command-guard.mjs | ✔ Mechanismus |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | \"Gib ab\" / \"abgeben\" means hand the batch to a SUCCESSOR session so the context does not overflow — it never means pause or stop the batch | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1679,8 +1680,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 96 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 133 Prozess-/Meta-TASKS-Punkte (davon 65 offen).
 
-<!-- RETRO-FINGERPRINT: bfbf5d956dcbee0ec9f3eedb17dec6c462df80576c6f9d2b62879f71e44a1162 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-14T19:50:01.899Z -->
+<!-- RETRO-FINGERPRINT: efc78466bc5bf28726421b6139e9eb41262e52ff7e1d35838a074e5c981c98c6 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-15T00:45:55.003Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -6917,6 +6918,28 @@ etwas Wachsendem steht — Job-Timeout, Dokumentbudget, Kontextfenster —, geh�
 in die Ausgabe, nicht nur das Urteil. Das Limit steht jetzt auf 25 Minuten, mit der Messung
 im Kommentar daneben und der ausdrücklichen Auflage, beim nächsten Annähern die Suite
 billiger zu machen statt die Zahl ein zweites Mal zu heben.
+
+ES IST AM 15.09.2026 GENAU SO EINGETRETEN, eine Ebene tiefer. Diesmal war die Decke nicht
+das Job-Limit, sondern das Zeitbudget EINES Testfalls: Der Fall, der beweist, dass die
+Bummelphase der Kinderrunde nicht ewig laufen kann, wurde auf dem Server bei seinen 180
+Sekunden abgebrochen und riss den ganzen `fast`-Job mit. Neben dem Budget stand seine eigene
+Messung — 46,5 Sekunden, geschrieben, bevor die Botengänge und Grabaufgaben der Erwachsenen
+in das nachgespielte Dorf einzogen. Nachgemessen auf dem ruhigen Rechner kostet derselbe Fall
+91,2 Sekunden, also das Doppelte. Der Test war nie geändert worden; gewachsen ist das Spiel
+unter ihm.
+
+Bemerkenswert ist, was NICHT passiert ist: Der Kommentar hat gelogen, ohne je falsch
+geschrieben worden zu sein. Er war am Tag seiner Messung richtig und ist es Commit für
+Commit weniger geworden, und nichts im Repositorium liest eine solche Zahl je wieder nach.
+Der Nachbarfall in derselben Datei, gleich teuer und mit 300 Sekunden ausgestattet, ist nie
+abgebrochen — er war die Eichung, aus der die neue Zahl abgeleitet wurde, statt sie zu raten.
+Der Beweis kam vom Server selbst: Der reparierte Fall brauchte dort mindestens 217 Sekunden.
+Die alten 180 konnten ihn nie halten.
+
+**Zusatzlehre:** Eine gemessene Zahl, die als Budget in den Code geschrieben wird, altert mit
+dem, was sie misst, und ihr Kommentar altert lautlos mit. Wo eine solche Zahl steht, gehört
+neben sie, WORAN sie gemessen wurde — ein zweiter, gleich teurer Fall taugt als Eichung
+besser als jede Schätzung. Und ein Rot dieser Art zeigt nie auf den Punkt, der es auslöst.
 
 
 ### 3.271 Die Regel sagt »nur lesen«, der Wächter verlangt eine volle Suite
