@@ -77,6 +77,43 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
+- [ ] 1130. The eight `Entscheidungsprotokoll:` cards under "Von dir zu klären" read short and
+  plainly, and the place that DEFINES the card shape says they must — as prose, not as a gate
+  (user 15.09.2026, ranked here by the user; the card texts are authored by GPT-6 Astra).
+  The order, verbatim: "Die Entscheidungsprotokoll-Karten sind mir alle zu ausführlich und
+  technisch. Ersetze die Text durch kurze, leicht verständliche." On where the rule goes:
+  "Kannst du auch ablegen, dass die kurz und einfach sein sollen? Besser nicht als Guard, sonst
+  haben wir wieder mehr Infrastruktur und es kann wieder zum Abprallen an Toren kommen, die
+  Prozesse bremsen. Vielleicht einfach an der Stelle, an der definiert wird, dass solche Karten
+  angelegt werden, mit dazuschreibem, dass sie kurz und leicht verständlich sein sollen." On the
+  author: "Lasse Astra die Texte schreiben."
+  MEASURED 15.09.2026 at 7da2207d2. `.batch-dashboard.html` (~144-217) carries eight such cards.
+  Six run four paragraphs of 60-110 words; two ("Kinderlauf-Grenzwert im Gedränge", "Astra
+  schreibt den nächsten Kommunikationspunkt") squeeze the whole record into ONE paragraph. They
+  name internals the reader has no use for — a test file name, a village seed, a shader
+  constant, "Baseline-Klassifikation", "Worktree", "Trailer", a CLI version, raw second counts.
+  The user reads this board on a phone and knows the game, not the code.
+  FINAL STATE (a) the eight cards carry Astra-authored German texts: four paragraphs, one to two
+  short sentences each, at most ~90 words per card, no file/test/identifier/constant names and
+  no number that means nothing to the reader. Titles, card order and the two non-decision cards
+  ("Transkript-Aufbewahrung", "Kairo zum Start") stay untouched. The four labels the shape
+  requires stay: `Entscheidung:`, `Evidenz:`, `Folge:` and the verbatim `Deine Möglichkeiten:
+  die Entscheidung stehen lassen, oder sie zurücknehmen — exakte Veto-Aktion:`. It is a PURE
+  REWORDING: no decision is changed, weakened or dropped, and every veto action still names the
+  same reversal, so nothing already recorded needs re-deciding.
+  (b) the demand is written down where the card is defined, in three places, one or two
+  sentences each: the doc comment above `isAdvisoryDecisionRecord` and the `decisionRecordPattern`
+  remedy string in `scripts/vdzk-admissibility-core.mjs`, and `docs/batch-autonomy.md` where the
+  `Entscheidungsprotokoll:` card is introduced — the latter saying explicitly that it is NOT
+  enforced.
+  NOT THIS, by the user's own words: no length check, no word count, no regex, no new judge
+  branch, no guard, no ledger field, no test that measures brevity. `judgeAutomatedCard` keeps
+  exactly the branches it has today, and `scripts/vdzk-admissibility-core.test.mjs` stays green
+  untouched — if a test had to change, a gate was added and the point is wrong.
+  Cross-vendor: Astra writes the texts (`scripts/ask-astra.mjs`), Claude reviews them against
+  this spec and lands them.
+  Bundle: Chat & Tafel.
+
 - [ ] 1124. The clay impression is used by a Space press anywhere on the map instead of
   being clicked at Bandiagara (user 14.09.2026, ranked here by the user).
   The order, verbatim: "Auch bei der Clay Impression of a Rock soll es bei Space keine

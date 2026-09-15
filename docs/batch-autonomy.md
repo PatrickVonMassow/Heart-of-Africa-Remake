@@ -20,6 +20,14 @@ choice supported by the evidence, continues, and puts a card headed
 evidence, consequence, and exact retroactive-veto action. A question card is a
 record for later veto, not a lock on the queue.
 
+**The card is SHORT and plainly understandable** (user 15.09.2026, after eight of
+them had grown into four dense paragraphs apiece): one or two short sentences per
+label, no file names, no test names, no identifiers, no version strings, and no
+number that means nothing to its reader — who knows the game, not the code, and
+reads this on a phone. That is deliberately NOT enforced: no length check, no word
+count, no judge branch. A gate here would bounce writers and slow the lane, and the
+demand is easier to follow than to measure.
+
 Only two classes may wait without a restart clock:
 
 1. the user explicitly ordered the batch to stop; and
