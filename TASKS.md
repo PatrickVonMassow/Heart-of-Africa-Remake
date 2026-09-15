@@ -15660,3 +15660,44 @@ to land than a mechanism that needs a review.
   Refs: scripts/batch-claim.mjs, scripts/batch-in-flight.mjs, scripts/verify/run-wait.mjs,
   scripts/verify/run-all.mjs, scripts/verify/run-logged.mjs
   Bundle: Session- & Repo-Hygiene
+
+- [ ] 1134. The full regression runs once per BUNDLE on main, not once per point —
+  and the same suite stops running four times inside one LARGE.
+  MEASURED 15.09.2026 over the window 01.09.–15.09.: 40 merged `feat/` branches, 103
+  recorded verification runs, 49 of them carrying FAIL lines or a non-zero exit — and
+  NOT ONE clean case of "a feature broke standing functionality and only the full
+  regression found it". The 49 reds fall into four classes: pre-existing (point 1065
+  spent 23 full LARGE runs / 16.2 machine-hours without a single red touching its own
+  work), load or flake (1072 printed "REAL REGRESSION (green on baseline, red now)" and
+  was 3 of 3 green on a quiet machine), test defect (1126, 1127, run-wait calling
+  healthy runs hung), and exactly one branch suspicion — 1056 — whose trail led to a
+  LATENT defect reported on 07.09. and running today as point 1131, not to anything the
+  branch built. The only escape onto `main` in the window was a type-check error caught
+  by `tsc`, the cheapest gate of all.
+  THE FOUR-EYES VOTE (Claude Opus 5 and GPT-6 Astra blind from identical input, folded by
+  Fable 5.1; 33 + 22 entries, all ids accounted for): the full regression runs ONCE per
+  bundle on `main` after the last merge. Per point the cheap gate stays binding — tsc,
+  lint, build, unit, audit, the point's own `--section` rung — and so does the
+  two-backend PICTURE judgement on its branch (point 1126's "never one PICTURE" is not
+  weakened). The cheap gate blocks a merge; the bundle run never does.
+  THE BIGGER LEVER IS ACROSS THE QUESTION: inside ONE LARGE, `polish` runs FOUR times —
+  first pass, flake retry, two baseline passes. Three of them go, independent of how
+  often the regression runs. With the baseline passes gone, the label "REAL REGRESSION
+  (green on baseline, red now)" becomes "SUSPECT", and a baseline comparison survives
+  only as a hand-run of one suspicious section.
+  FINAL STATE — prose and deletions, no new mechanism: `scripts/verify/README.md` and
+  `VERIFICATION_LADDER` in `scripts/point-brief-core.mjs` say when the full run happens,
+  the automatic baseline pass is gone, the label is renamed, and no run is shared between
+  two branches that touch the same suite or subsystem. Add no guard, no router, no ledger
+  field — this point is a deletion.
+  COUNTER-EVIDENCE THE CHANGE MUST CARRY: 10.09., point 1065 — the narrow rung was green
+  twelve times while the full suite was red on the same two checks; the causes were a
+  rarely cast subject and two merges of `main` since the last green rung. That argues for
+  a full run on the tree that actually LANDS, which is the bundle model, not for one per
+  feature.
+  MEASUREMENT LIMIT, stated: verification logs die with their worktree, so the run count
+  covers the main checkout and the six surviving worktrees only; the classification rests
+  on the findings carrier's 441 entries, not on the logs alone.
+  Criticality: medium — no player impact; it buys back hours of machine time per point
+  (14.09.: 599 minutes of verification wall clock in 28 runs for ONE point).
+  Bundle: Session- & Repo-Hygiene
