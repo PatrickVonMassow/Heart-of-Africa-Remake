@@ -2,7 +2,7 @@
 // it (docs/communication-poc-spec.md).
 //
 // THIS IS A SYSTEM, NOT A ONE-OFF. An item carries a FORM ID, a place carries a
-// SOCKET that names the same form, and the use key at proximity resolves the
+// SOCKET that names the same form, and an inventory click at proximity resolves the
 // two. The clay impression the chief pays with and the rock at the foot of the
 // Bandiagara escarpment are the first pair; a pyramid or the Sphinx must later
 // be a DATA LINE below, never a second mechanism.
@@ -70,7 +70,7 @@ export function socketPosition(socket: FormSocket): LatLon {
   return { lat: landmark.lat, lon: landmark.lon }
 }
 
-/** What a press of the use key with the carried forms amounts to. */
+/** What using the carried forms from the inventory amounts to. */
 export type FormUse =
   /** A matching, open socket is within reach — the form fits. */
   | { kind: 'fits'; socket: FormSocket }

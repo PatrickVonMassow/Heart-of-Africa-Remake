@@ -351,18 +351,16 @@ if (section('communication-errand')) {
     await page.waitForFunction(() => window.__game.getState().mode === 'travel', null, { timeout: 20000 })
 
     // THE OTHER END OF THE DIRECTION. The words said where; the clay says what
-    // to do there. This is driven through the REAL use key on the REAL keyboard
-    // — the wiring from keydown to store is exactly what a unit test cannot
-    // reach, and the socket's coordinate is read from the world module the
-    // scene draws the escarpment from, never copied into this script.
+    // to do there. Click the REAL inventory button in the rendered scene.
+    // The socket's coordinate comes from the world module that draws the
+    // escarpment, never from a copy in this script.
     const talus = await page.evaluate(async () => {
       const forms = await import('/src/world/forms.ts')
       const socket = forms.FORM_SOCKETS.find((x) => x.id === 'bandiagara-talus')
       return { ...forms.socketPosition(socket), id: socket.id, form: socket.form }
     })
-    // A random event's dialog blocks the use key by design, so the roulette is
-    // switched off for this block and put back after it: what is under test is
-    // the key, not the odds.
+    // Keep random-event dialogs out of the inventory click sequence, restoring
+    // their setting after the block.
     const eventsWere = await page.evaluate(() => {
       const was = window.__balance.randomEventsEnabled
       window.__balance.randomEventsEnabled = false
@@ -371,9 +369,9 @@ if (section('communication-errand')) {
     // WHAT THE TOAST SAID IS RECORDED AS IT IS SET, not read back afterwards.
     // The HUD clears a toast by itself after a few seconds; on a loaded machine
     // the read can arrive after that expiry and report an empty toast for a
-    // press that answered perfectly well — a flake in the probe, not in the
+    // click that answered perfectly well — a flake in the probe, not in the
     // game. It cost this section a first-attempt red on 05.09.2026.
-    const pressUseKey = async () => {
+    const clickForm = async () => {
       await page.evaluate(() => {
         const g = window.__game.getState()
         g.setToast(null)
@@ -385,7 +383,7 @@ if (section('communication-errand')) {
             if (s.toast && s.toast !== prev.toast) window.__toastLog.push(s.toast)
           })
       })
-      await page.keyboard.press('Space')
+      await page.locator('[data-form="rock-relief"]').click()
       return page.evaluate(() => {
         const s = window.__game.getState()
         return {
@@ -408,22 +406,22 @@ if (section('communication-errand')) {
     // A wrong place answers, and answers with a SENTENCE — the rule the player
     // has to be able to carry to the next lock.
     await jump(talus.lat + reachDeg * 4, talus.lon, 600)
-    const miss = await pressUseKey()
+    const miss = await clickForm()
     // The detail rides ON the FAIL line: the runner echoes only those lines, and
     // the `console errors:` list below never reaches a run log.
-    const pressDetail = (r) =>
+    const clickDetail = (r) =>
       `said ${JSON.stringify(r.said)}, spent ${JSON.stringify(r.spent)}, mode ${r.mode}, ` +
       `dialog ${JSON.stringify(r.dialog)}`
     const missOk = miss.said.includes(strings.noFit) && !miss.spent.includes('bandiagara-talus')
     console.log(
-      `${missOk ? 'PASS' : 'FAIL'}  the use key clear of the escarpment answers in the traveller's own voice` +
-        (missOk ? '' : ` — ${pressDetail(miss)}`),
+      `${missOk ? 'PASS' : 'FAIL'}  the inventory click clear of the escarpment answers in the traveller's own voice` +
+        (missOk ? '' : ` — ${clickDetail(miss)}`),
     )
     if (!missOk) {
-      errors.push(`a use ${(reachDeg * 4).toFixed(2)}° off the talus foot: ${pressDetail(miss)}`)
+      errors.push(`an inventory click ${(reachDeg * 4).toFixed(2)}° off the talus foot: ${clickDetail(miss)}`)
     }
 
-    // And at the foot of the wall it fits. The frame is taken BEFORE the press,
+    // And at the foot of the wall it fits. The frame is taken BEFORE the click,
     // so the picture shows the place the claim is about rather than the journal
     // that opens on top of it — and a step wider than the erratic's frame,
     // because the evidence here is the traveller standing at the FOOT of the
@@ -436,27 +434,27 @@ if (section('communication-errand')) {
       label: `the talus foot below the Bandiagara escarpment, where the ${strings.name} fits`,
     })
     await page.evaluate(() => window.__ui.getState().setTravelZoom(0.5))
-    const fitted = await pressUseKey()
+    const fitted = await clickForm()
     const fittedOk =
       fitted.said.includes(strings.solved) &&
       fitted.spent.includes('bandiagara-talus') &&
       fitted.keys.includes('journal.mouldFitted')
     console.log(
-      `${fittedOk ? 'PASS' : 'FAIL'}  the use key at the talus foot fits the impression and solves the puzzle` +
-        (fittedOk ? '' : ` — ${pressDetail(fitted)}`),
+      `${fittedOk ? 'PASS' : 'FAIL'}  the inventory click at the talus foot fits the impression and solves the puzzle` +
+        (fittedOk ? '' : ` — ${clickDetail(fitted)}`),
     )
-    if (!fittedOk) errors.push(`the use key at the talus foot: ${pressDetail(fitted)}`)
+    if (!fittedOk) errors.push(`the inventory click at the talus foot: ${clickDetail(fitted)}`)
 
     // A spent socket answers like a wrong place, and writes no second page.
-    const again = await pressUseKey()
+    const again = await clickForm()
     const againOk =
       again.said.includes(strings.noFit) &&
       again.keys.filter((k) => k === 'journal.mouldFitted').length === 1
     console.log(
-      `${againOk ? 'PASS' : 'FAIL'}  a second press at the spent socket answers like a wrong place` +
-        (againOk ? '' : ` — ${pressDetail(again)}`),
+      `${againOk ? 'PASS' : 'FAIL'}  a second click at the spent socket answers like a wrong place` +
+        (againOk ? '' : ` — ${clickDetail(again)}`),
     )
-    if (!againOk) errors.push(`a second press at the spent socket: ${pressDetail(again)}`)
+    if (!againOk) errors.push(`a second click at the spent socket: ${clickDetail(again)}`)
 
     await page.evaluate((was) => {
       window.__balance.randomEventsEnabled = was
