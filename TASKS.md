@@ -77,6 +77,129 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
+- [ ] 1135. The verification run stops repeating itself: one pass per suite, no automatic
+  flake retry, no automatic baseline pass (user order 15.09.2026, FIRST of three, verbatim:
+  "Okay, setze das so um und reihe es als nächstes in der Queue ein").
+  MEASURED: inside ONE LARGE, `polish` (28 min) ran FOUR times — first pass, flake retry and
+  two baseline passes. This point deletes three of those four, and it pays off whatever the
+  regression's CADENCE turns out to be, which is why the user put it first.
+  FINAL STATE:
+  1. A LARGE runs each suite ONCE. The automatic baseline passes are gone; the comparison
+     runs against a CLASSIFIED baseline FILE, one entry per check, each carrying its date and
+     its owning point — that file is the open remainder of point 1104. The bundle run keeps it
+     current: an entry that has gone green is struck. No blanket standing exemption.
+  2. The automatic flake retry in LARGE is off. A red stands and is classified. Confirmed
+     flakes move into the baseline file. A HAND retry of the SMALLEST affected check stays
+     allowed as diagnosis — CLAUDE.md §7.2 is unchanged: a retry is SUSPECT and covers nothing.
+  3. Runs are serialized: while a LARGE runs, nothing else does. Prose in
+     `scripts/verify/README.md`, NO lockfile and NO guard.
+  4. The label "REAL REGRESSION (green on baseline, red now)" becomes SUSPECT, unconfirmed. A
+     suspicion is settled ONLY by three narrow rungs of the affected section on a quiet machine
+     under equal starting conditions, never by another full regression.
+  5. `nonPredictive` checks report but do NOT set the exit code (that is point 1127 — if it has
+     landed, check and refer, never duplicate it). `run-wait` stops calling healthy runs hung;
+     instead a wall-clock ceiling per suite and a hand abort.
+  NO NEW INFRASTRUCTURE: deleted runs, a renamed label, a file 1104 already owes, README prose.
+  VERIFICATION: unit for the changed run logic. A LARGE on the next bundle state shows the
+  saving on the wall clock but is NOT part of this point's acceptance.
+  Criticality: medium — no player impact; the largest measured saving with no coverage risk.
+  Bundle: Session- & Repo-Hygiene
+
+- [ ] 1134. The full regression becomes the BUNDLE's gate, not the feature's (user order
+  15.09.2026, SECOND of three, after 1135 and before 1136).
+  MEASURED over 01.09.–15.09.: 40 merged `feat/` branches, 103 recorded verification runs, 49 of
+  them carrying FAIL lines or a non-zero exit — and NOT ONE clean case of "a feature broke
+  standing functionality and only the full regression found it". The 49 reds are pre-existing
+  (1065 spent 23 full LARGE runs / 16.2 machine-hours without a single red touching its own
+  work), load or flake (1072 printed "REAL REGRESSION (green on baseline, red now)" and was 3 of
+  3 green on a quiet machine), test defects (1126, 1127, run-wait calling healthy runs hung), or
+  the single branch suspicion 1056, whose trail led to a LATENT defect reported on 07.09. and
+  landed today as point 1131. The only escape onto `main` in the window was a type-check error
+  caught by `tsc`, the cheapest gate of all.
+  FINAL STATE:
+  1. `scripts/verify/README.md` and `VERIFICATION_LADDER` in `scripts/point-brief-core.mjs` say
+     the same thing: finishing a `feat/` point is CHEAP GATE + PICTURE, not LARGE. The cheap gate
+     is binding and listed exhaustively: tsc, lint, build, unit (vitest jsdom), audit on a
+     lockfile change, the point's own `--section` rung, plus the two-backend picture judgement.
+     ONLY that gate blocks a merge.
+  2. The opposing duty "LARGE after every feature" is REMOVED from ladder AND README — without
+     that step the new rule stands as prose beside a contradicting ladder.
+  3. The LARGE regression runs once per bundle ON MAIN after the last merge. The bundle tree IS
+     main; NO integration or test tree is built (that would be the workflow abstraction CLAUDE.md
+     §2 forbids). Temporarily red main is covered by §7.2 and by there being exactly one owner.
+  4. The bundle boundary is a prose trigger, no automatism: a bundle closes as soon as ONE holds —
+     3–5 finished points, OR three days or the end of a day, OR a point touches a core area, OR
+     before a demo or release. NO minimum bundle size; a single finished point may keep its own
+     closing run, and no finished branch waits for an unfinished large bundle.
+  5. NOT bundled: core touches (tick loop, scheduler, save format, renderer/backend binding — a
+     prose list that grows ONLY after an actual core red) and branches touching the same suite or
+     subsystem (already written verbatim in 1126). A diff argument may add a single case.
+  6. After every merge of main into the branch, every conflict resolution and every further
+     change, the affected rung is climbed AGAIN; `tsc` runs on the ACTUALLY merged state, and
+     older branch green does not count. The bundle run starts only after all intended merges.
+  7. The two-backend picture judgement stays per point on its branch and is never shared,
+     bundled, moved into the bundle run or replaced by a bundle picture (1126: "never one
+     PICTURE"). Section rungs may run mostly on WebGPU; the bundle run always runs on BOTH.
+  8. A later red bundle run rolls no merged point back; it is attributed under §7.2 or filed as a
+     point. A red is NEVER charged to "the bundle" — a bundle owns nothing and closes nothing. An
+     interaction with no single owner gets an integration point naming its participants.
+     Attribution runs over diff, section rung and bisect across main's merge commits, never over
+     a second tree.
+  9. FALSIFICATION CRITERION as a paragraph of README prose: the rule falls back to "per feature"
+     the moment ONE clean case appears — a branch broke standing functionality and only the full
+     regression found it. Re-measure after 40 further merges. The lead figure is wall clock per
+     point, read once per bundle from the run.json files (target profile 1112: regression exactly
+     once, zero side effects; counter-profile 1056: 599 min, 28 runs). Machine time and wall clock
+     stay separate.
+  10. At the merge to main the point's closing run.json is COPIED into the main checkout's
+     `local/verify-logs/` (a `cp` inside the existing merge step, no ledger field) — that closes
+     the named measurement limit that logs of merged branches die with their worktree.
+  11. Whoever passes the rule on passes the measurement limit with it: "zero cases" is the result
+     of ONE window, 103 runs are not an independent sample, 49 red runs are not 49 defects, and
+     1065 and 1131 travel along as counter-evidence.
+  PREREQUISITE: point 1089 (charging a foreign red to its own point) must be finished BEFORE the
+  first bundle — on 12.09. ONE run produced eleven repair specifications across six old points;
+  without 1089 a bundle red cannot be attributed. If 1089 is open it is pulled ahead of this
+  point, NOT duplicated here.
+  NO NEW INFRASTRUCTURE: README prose, one deletion in the ladder, one `cp`. No guard, no router,
+  no ledger field, no test tree.
+  Criticality: medium — no player impact; it buys back hours of machine time per point
+  (14.09.: 599 minutes of verification wall clock in 28 runs for ONE point).
+  Bundle: Session- & Repo-Hygiene
+
+- [ ] 1136. A rung that saw nothing gives no all-clear: a subject-dependent check names how
+  many subjects it actually saw (user order 15.09.2026, THIRD of three).
+  WHY IT BELONGS TO THE OTHER TWO: it covers the ONLY measured counter-example to the change.
+  On 10.09.2026 the narrow rung `polish --section=adult-errands` was green TWELVE times while
+  the full suite went red on exactly two checks. Measured cause: the check measures a rarely
+  cast subject — run alone the section sees many errands, inside the full pass it saw ONE, the
+  fetch phase 33 of about 2000 ticks. Those twelve green rungs were never all-clears, they were
+  NON-MEASUREMENTS. While that holds, the cheap gate of point 1134 does not carry.
+  FINAL STATE:
+  1. Subject-dependent checks CREATE the rare situation deliberately — the actor and the fetch
+     phase through the existing test hooks — and PROVE they reached it. That is the cheaper and
+     provable way and it comes first.
+  2. Every subject-dependent check prints the number of subjects it ACTUALLY saw. Below a named
+     minimum the verdict is NOT COVERING, not green. A non-covering check is neither red nor
+     green: it says the question is open.
+  3. FALLBACK, only where 1 cannot create the situation for a section: that one section gets the
+     tick and seed budget of the full run, so rung and suite measure the same thing — and if the
+     rung thereby costs more than it is worth, it is deleted WITHOUT replacement and the check
+     stays the bundle's business.
+  4. The scope is expressly LIMITED to the measured subject-dependent checks, not spread over
+     every suite. The sample count already stands in the log; this is an evaluation, not a guard.
+  5. A few additional starting states are allowed; one fixed scenario does not replace natural
+     variance, which is why the broad closing run stays.
+  BOUNDARY: the water-errand defect itself belongs to point 1131 and is NOT treated here — it is
+  only the evidence that "no regression findings" does not mean "no defects".
+  Where to start: `src/scenes/place/adultWork.ts` and the adult-errands section of
+  `scripts/verify/polish.mjs`. If `polish` is split by topic (point 1129), the affected checks
+  move with it; the split itself belongs to 1129 and is not duplicated here.
+  VERIFICATION: unit for the sample evaluation; the affected `--section` on WebGPU, then read
+  once against the next bundle run to see whether rung and suite now say the same thing.
+  Criticality: medium — no player impact; without it the cheap gate of 1134 rests on non-measurements.
+  Bundle: Session- & Repo-Hygiene
+
 - [ ] 1133. A commissioned authoring run dies with the session that started it, and takes
   its uncommitted work with it.
   MEASURED 15.09.2026: the first `scripts/author-astra.mjs --point 1131` was started at 19:08
@@ -15629,45 +15752,4 @@ to land than a mechanism that needs a review.
   promises a clean release that a pid-dead owner does not deliver.
   Refs: scripts/batch-claim.mjs, scripts/batch-in-flight.mjs, scripts/verify/run-wait.mjs,
   scripts/verify/run-all.mjs, scripts/verify/run-logged.mjs
-  Bundle: Session- & Repo-Hygiene
-
-- [ ] 1134. The full regression runs once per BUNDLE on main, not once per point —
-  and the same suite stops running four times inside one LARGE.
-  MEASURED 15.09.2026 over the window 01.09.–15.09.: 40 merged `feat/` branches, 103
-  recorded verification runs, 49 of them carrying FAIL lines or a non-zero exit — and
-  NOT ONE clean case of "a feature broke standing functionality and only the full
-  regression found it". The 49 reds fall into four classes: pre-existing (point 1065
-  spent 23 full LARGE runs / 16.2 machine-hours without a single red touching its own
-  work), load or flake (1072 printed "REAL REGRESSION (green on baseline, red now)" and
-  was 3 of 3 green on a quiet machine), test defect (1126, 1127, run-wait calling
-  healthy runs hung), and exactly one branch suspicion — 1056 — whose trail led to a
-  LATENT defect reported on 07.09. and running today as point 1131, not to anything the
-  branch built. The only escape onto `main` in the window was a type-check error caught
-  by `tsc`, the cheapest gate of all.
-  THE FOUR-EYES VOTE (Claude Opus 5 and GPT-6 Astra blind from identical input, folded by
-  Fable 5.1; 33 + 22 entries, all ids accounted for): the full regression runs ONCE per
-  bundle on `main` after the last merge. Per point the cheap gate stays binding — tsc,
-  lint, build, unit, audit, the point's own `--section` rung — and so does the
-  two-backend PICTURE judgement on its branch (point 1126's "never one PICTURE" is not
-  weakened). The cheap gate blocks a merge; the bundle run never does.
-  THE BIGGER LEVER IS ACROSS THE QUESTION: inside ONE LARGE, `polish` runs FOUR times —
-  first pass, flake retry, two baseline passes. Three of them go, independent of how
-  often the regression runs. With the baseline passes gone, the label "REAL REGRESSION
-  (green on baseline, red now)" becomes "SUSPECT", and a baseline comparison survives
-  only as a hand-run of one suspicious section.
-  FINAL STATE — prose and deletions, no new mechanism: `scripts/verify/README.md` and
-  `VERIFICATION_LADDER` in `scripts/point-brief-core.mjs` say when the full run happens,
-  the automatic baseline pass is gone, the label is renamed, and no run is shared between
-  two branches that touch the same suite or subsystem. Add no guard, no router, no ledger
-  field — this point is a deletion.
-  COUNTER-EVIDENCE THE CHANGE MUST CARRY: 10.09., point 1065 — the narrow rung was green
-  twelve times while the full suite was red on the same two checks; the causes were a
-  rarely cast subject and two merges of `main` since the last green rung. That argues for
-  a full run on the tree that actually LANDS, which is the bundle model, not for one per
-  feature.
-  MEASUREMENT LIMIT, stated: verification logs die with their worktree, so the run count
-  covers the main checkout and the six surviving worktrees only; the classification rests
-  on the findings carrier's 441 entries, not on the logs alone.
-  Criticality: medium — no player impact; it buys back hours of machine time per point
-  (14.09.: 599 minutes of verification wall clock in 28 runs for ONE point).
   Bundle: Session- & Repo-Hygiene
