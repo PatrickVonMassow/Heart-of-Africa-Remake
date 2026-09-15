@@ -1028,3 +1028,20 @@ Punkt gezeigt werden und ihn erneut anfassen. Nicht als Punkt eingereiht wegen
 des Infrastruktur-Freezes: kein Spielerimpakt, und der erste Blick auf den
 Zweig- und Hakenstand fängt es ab. Der billige Weg wäre, die Zeile beim
 Zustellen zu berechnen statt beim Sitzungsstart.
+
+## Die Kleinauftrags-Lehre fehlt in der Anleitung, weil deren Kürzebudget voll ist (15.09.2026)
+
+Gemessen 15.09.2026 an 31f20246d: `docs/analysis_de/retrospektive-zusammenarbeit.md` §3.273
+trägt die neue Klasse — eine Zwei-Minuten-Textänderung zahlt den vollen Preis eines
+Arbeitsauftragspunktes, weil das Board-Tor Karte → Punktnummer → TASKS-Eintrag plus
+Bündeltabelle verkettet. Ein passender Fallstrick samt Prompt war für
+`docs/analysis_de/vibe-coding-anleitung.md` geschrieben und wurde wieder entfernt:
+`guide-brevity-guard` hat ihn bei 684/675 Zeilen und 6630/6527 Wörtern abgewiesen, und die
+Hausregel lautet, an anderer Stelle zu kürzen statt das Budget zu heben. Die Durchsicht der
+Anleitung selbst ist bezeugt (`retro-refresh --guide-reviewed`).
+
+Nicht eingereiht nach der Aufnahmeregel aus CLAUDE.md §2: kein Spielerimpakt, kein Sicherheits-
+oder Datenrisiko, keine Blockade, und es löscht nichts. Offen, sobald jemand ohnehin in der
+Anleitung arbeitet: eine kompakte Fassung des Fallstricks, bezahlt aus rund 9 Zeilen / 103
+Wörtern eines bestehenden Eintrags, danach die Obergrenzen exakt auf die neue Messung ohne
+Spielraum.

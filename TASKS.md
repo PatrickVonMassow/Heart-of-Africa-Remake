@@ -141,6 +141,44 @@ put it is the mistake this line exists to stop.
   §7.1 criterion 15 (lively settlements) is measured on exactly this.
   Bundle: Dorfleben.
 
+- [ ] 1132. The landed chief-walk work has no covering picture run on either backend, and four
+  webgpu/flow records of 13./14.09. carry no verdict (verification debt of point 1076).
+  MEASURED 15.09.2026 at 942806b02. `node scripts/render-verify-guard.mjs --status` prints
+  `pending render paths: (none)` and names a covering `collision` run per lane — webgpu
+  @12:16:09Z, webgl @12:19:35Z, both exit 0 with 6 screenshots. NEITHER RUN CAN COVER THIS
+  WORK: the chief-walk merge `712b689aa` is of 14:03:54 and the verify-script edit
+  `6c777423f` ("Wait for the settlement to resolve, never for the wall clock") of 14:19:42,
+  both AFTER the last shutter. The `(none)` is an artefact of the baseline having advanced to
+  `31f20246d` past those commits; the reading that matters is the standing deferral at
+  942806b, which says in its own words that the chief's coverage is open and "die naechste
+  Sitzung faehrt collision auf beiden Bahnen".
+  THE RENDER PATHS THE WORK TOUCHED: `src/scenes/place/{PlaceScene.tsx,chiefPresence.ts,
+  chiefWalk.ts,collision.ts,layout.ts}` and `scripts/verify/{collision.mjs,flow.mjs}`.
+  THE FOUR RECORDS ARE A SEPARATE DEBT and are only "not blocking" because that same deferral
+  covers this HEAD: webgpu/flow @2026-09-13T16:45:36.824Z and @2026-09-14T05:22:45.174Z are
+  unaccounted reds ("the run failed without reporting a single red"), and
+  @2026-09-13T16:47:42.549Z and @2026-09-14T05:25:12.689Z are their SUSPECT retries. Under
+  CLAUDE.md §7.2 a retry covers nothing and a red closes only when its cause is fixed,
+  charged to its owning point, or filed — none of the four has been.
+  Final state:
+  - `VERIFY_GL=webgpu node scripts/verify/run-all.mjs collision` and the same with
+    `VERIFY_GL=webgl` have both run green at a HEAD that contains `6c777423f`, on a quiet
+    machine, and their frames have been LOOKED AT — the chief standing, walking out and
+    meeting the player reads correctly in the picture on both lanes, not merely exit 0.
+  - Each of the four webgpu/flow records has a recorded verdict: cause fixed, charged to its
+    owning point, or filed as its own point. `render-verify-guard --status` names none of
+    them as unaccounted afterwards.
+  - The standing deferral at 942806b is consumed rather than renewed, and the board's
+    decision card "Den Bildlauf fahre ich nicht jetzt" is closed with what the run showed.
+  Test: no production code is expected to change. Should a frame show a real defect, it is
+  charged to point 1076 or filed as its own point rather than repaired silently here.
+  Refs: scripts/render-verify-guard.mjs, scripts/verify/collision.mjs, scripts/verify/flow.mjs,
+  src/scenes/place/chiefWalk.ts, src/scenes/place/chiefPresence.ts, commits 712b689aa and
+  6c777423f, CLAUDE.md §7.2
+  Criticality: medium — it certifies nothing false today, but the chief's meeting is the
+  communication mechanic's last landed change and it stands unphotographed on both lanes.
+  Bundle: Dorfleben.
+
 - [ ] 1082. A child climbing the village boulder becomes something the player actually
   sees (user 09.09.2026, 05:04 — the same report twice).
   Point 1080 was filed on 08.09.2026 because the user never saw the climb; it landed in the
