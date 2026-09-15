@@ -354,8 +354,14 @@ export function lastProgressAtFor({ logPath = null, recordPath = null, markPath 
   // folded it in could have any other run's pictures vouch for the one it is
   // judging — for ever, and for a selection that takes no frames at all. The
   // frames are read by the WRITER instead, about its own run, while it is the
-  // run that is going; see the sampler in run-logged.mjs for what still bounds
-  // that. Here, nothing that another run could have written is evidence.
+  // run that is going; run-logged.mjs states what of that remains. Here, nothing
+  // another run could have written is evidence.
+  //
+  // WHY LOSING THEM COSTS THIS READER NOTHING (Astra review round 5 asked): the
+  // mark and the log live in the SAME directory, so the case where the writer
+  // cannot stamp its mark while frames keep arriving is the case where it cannot
+  // append its log either — and a run whose own log has failed is not a run this
+  // probe can rescue by reading somebody else's pictures.
   const marks = []
   const mark = markPath === undefined ? progressMarkPathFor(logPath ?? recordPath) : markPath
   for (const path of [mark, logPath]) {

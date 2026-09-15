@@ -347,15 +347,17 @@ function runVerify() {
   // alone, from what the child actually produced, and nothing a reader does can
   // move it. `--status` and `--await` read the FIELD, never the file's mtime.
   let recordedProgressAt = 0
+  /** Stamp the mark, and SAY whether it happened. */
   function markProgress(at) {
-    if (at - recordedProgressAt < PROGRESS_RECORD_MS) return
     // THE THROTTLE ADVANCES ONLY ON A WRITE THAT HAPPENED (Astra review round 3).
     // Advancing it on a FAILED touch would leave the last good mark standing as
     // the run's newest word about itself, and a run whose marker went unwritable
     // while it worked would be reported hung one lease later. A failure is
-    // simply not a mark: the next tick tries again, and the log and the frames
-    // answer for the run in the meantime.
-    if (touchProgressMark(logPath)) recordedProgressAt = at
+    // simply not a mark: the next tick tries again.
+    if (at - recordedProgressAt < PROGRESS_RECORD_MS) return false
+    if (!touchProgressMark(logPath)) return false
+    recordedProgressAt = at
+    return true
   }
   markProgress(started)
 
@@ -364,19 +366,24 @@ function runVerify() {
   // FRAMES advance the whole time, so the writer samples its own frame count —
   // sampled here, by the run itself, rather than read by whoever is waiting.
   //
-  // RESIDUAL, NAMED, AND NOW CONFINED TO THIS ONE PLACE (Astra review rounds 1
-  // and 4). Frames carry NO run identity — `verification/` is shared and
-  // `framesWrittenSince` says so — so a SECOND verify run's pictures would raise
-  // this sample too and could vouch for a run that is in fact wedged. Three
-  // things bound it, and none of them is a comment: the sampler runs only while
-  // THIS run is going and stops with it; a second run does not normally overlap,
-  // because `large-run-wait.mjs` makes a LARGE wait for a running LARGE (measured
-  // 16.09.2026 — a single-suite run launched beside one waited instead of running
-  // alongside) and `run-wait.mjs` refuses to resolve a wait when two runs are
-  // live; and a mark this sampler raises falsely is corrected by the next real
-  // one. What is gone is the unbounded version: no READER folds the shared
-  // directory into its verdict any more. Closing it completely needs a frame that
-  // names its run — a change to every suite's shutter, not to this file.
+  // THE RESIDUAL, STATED WITHOUT A BOUND IT DOES NOT HAVE (Astra review rounds 1,
+  // 4 and 5). Frames carry NO run identity — `verification/` is shared and
+  // `framesWrittenSince` says so — so another verify run's pictures raise this
+  // sample too. A run that is genuinely WEDGED keeps this wrapper and this
+  // sampler alive, and a succession of other runs taking pictures can keep its
+  // mark moving for as long as they last. Round 5 is right that nothing corrects
+  // that from inside: a wedged run never produces a real mark of its own. So the
+  // hung verdict can be DELAYED, for as long as somebody else keeps
+  // photographing.
+  //
+  // It is kept anyway, deliberately. The defect this point exists for is the
+  // opposite one and is not hypothetical: healthy runs were ENDED, twice in one
+  // evening, and the release stood behind the covering run they would have
+  // produced. Between a detector that occasionally fires late and one that
+  // reliably kills the thing it watches, this project has already paid for the
+  // second. Closing it properly needs a frame that names its run — a change to
+  // every suite's shutter, not to this file — and until then the reader's own
+  // verdict (run-record.mjs) touches nothing another run could have written.
   //
   // BY MTIME, NOT BY COUNT (Astra review round 2). `framesWrittenSince` counts
   // DISTINCT names on purpose — a both-backends run photographs the same 93
@@ -387,10 +394,13 @@ function runVerify() {
   const frameTick = baseRecord.expectedFrames > 0
     ? setInterval(() => {
       const now = newestFrameMtimeMs({ since: started })
-      if (typeof now === 'number' && now > frameMark) {
-        frameMark = now
-        markProgress(Date.now())
-      }
+      // AN OBSERVATION IS CONSUMED ONLY WHEN IT HAS BEEN RECORDED (Astra review
+      // round 5). Advancing `frameMark` before the stamp meant a throttled or
+      // failed write threw the observation away: the next tick saw the same
+      // newest frame, took it for no progress, and only a LATER frame could
+      // ever try again. The mark now moves with the write, so a tick that could
+      // not record retries on the next one.
+      if (typeof now === 'number' && now > frameMark && markProgress(Date.now())) frameMark = now
     }, FRAME_SAMPLE_MS)
     : null
   frameTick?.unref?.()
