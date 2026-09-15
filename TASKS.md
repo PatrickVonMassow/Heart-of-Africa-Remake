@@ -128,46 +128,6 @@ put it is the mistake this line exists to stop.
   (`VERIFICATION_LADDER`), docs/picture-check-cost.md
   Bundle: Testinfrastruktur.
 
-- [ ] 1129. `polish` is split by theme, so a red costs only its own theme (split out of
-  point 1126 on 15.09.2026, which delivered its other three parts the same day).
-  MEASURED: `scripts/verify/polish.mjs` is 7,447 lines and 27 declared sections, runs
-  ~28 min per backend, and carries the rotating flakes. It is the one object that makes
-  every red of the LARGE tier expensive: point 1126's measurement of 14.09.2026 found it
-  running FOUR times inside a single LARGE run — first pass, flake retry, two baseline
-  passes.
-  Point 1126 made a red repeat only its own SECTION, which is the repair loop. This point
-  makes the COVERING PROOF cheap too: a green theme stays green, and only the red theme's
-  own pass has to be run again.
-  Final state:
-  - The 27 sections are split by THEME into separate suite files under `scripts/verify/`,
-    each with its own name in `DEV_SUITES`. Same checks, same section names, same
-    screenshots, no change to coverage.
-  - The boot prologue and the shared helpers (`nextFrames`, `stepUntil`, `goToPlace`,
-    `probeSilhouetteFooting`, the frame shutter, the console-error gate) move ABOVE the
-    themes into one shared module the theme files import; a section is a block scope, so
-    nothing two themes use may live inside one of them (`scripts/verify/README.md`,
-    "A section is a BLOCK SCOPE").
-  - FIVE SECTIONS DO NOT STAGE THEIR OWN PLACE TODAY and must, before they can move:
-    `giza-skyline` (it relies on the boot standing in Cairo), `panorama-slope-footing`,
-    `settlement-edge`, `children-bank-game`, `children-boulder-climb`. A section that
-    reads a scene the block before it staged passes in the whole run and fails alone —
-    README, "The one recurring defect".
-  - Everything that NAMES the suite follows in the same commit: `tiers.mjs`
-    (`DEV_SUITES`, and `SMALL_SUITES` if it is affected), `machine-load-core.mjs`,
-    `run-wait-core.mjs` (the per-suite expectations and `SEPTEMBER_BANDS`),
-    `render-verify-charges.mjs`, the work order's `Diff → browser-suite mapping`
-    paragraph, `scripts/verify/README.md`, `docs/acceptance-evidence.md`.
-  - NOTHING IS DELETED OR SOFTENED: no check is removed or weakened, the per-point
-    two-backend picture check is unchanged, and the sum of the themes covers exactly what
-    `polish` covered.
-  - The proof is every theme suite green on BOTH backends, with the screenshot set
-    identical to what `polish` wrote before the split.
-  Touches: scripts/verify/polish.mjs (split), scripts/verify/tiers.mjs,
-  scripts/verify/machine-load-core.mjs, scripts/verify/run-wait-core.mjs,
-  scripts/render-verify-charges.mjs, scripts/verify/README.md, TASKS.md (the diff→suite
-  paragraph), docs/acceptance-evidence.md
-  Bundle: Testinfrastruktur.
-
 - [ ] 1076. The chief's first door press tells of his walk instead of a deciphered message,
   and he gets a body (user 08.09.2026).
   Two defects at the same hut, both measured on 08.09.2026.
@@ -918,6 +878,46 @@ put it is the mistake this line exists to stop.
   tag plus `poc` dynamically, but a tag push alone does not trigger it. Then VERIFY
   that /v0.3/ and /poc/ serve the new state, and FREEZE the tag: it is never
   re-pointed.
+
+- [ ] 1129. `polish` is split by theme, so a red costs only its own theme (split out of
+  point 1126 on 15.09.2026, which delivered its other three parts the same day).
+  MEASURED: `scripts/verify/polish.mjs` is 7,447 lines and 27 declared sections, runs
+  ~28 min per backend, and carries the rotating flakes. It is the one object that makes
+  every red of the LARGE tier expensive: point 1126's measurement of 14.09.2026 found it
+  running FOUR times inside a single LARGE run — first pass, flake retry, two baseline
+  passes.
+  Point 1126 made a red repeat only its own SECTION, which is the repair loop. This point
+  makes the COVERING PROOF cheap too: a green theme stays green, and only the red theme's
+  own pass has to be run again.
+  Final state:
+  - The 27 sections are split by THEME into separate suite files under `scripts/verify/`,
+    each with its own name in `DEV_SUITES`. Same checks, same section names, same
+    screenshots, no change to coverage.
+  - The boot prologue and the shared helpers (`nextFrames`, `stepUntil`, `goToPlace`,
+    `probeSilhouetteFooting`, the frame shutter, the console-error gate) move ABOVE the
+    themes into one shared module the theme files import; a section is a block scope, so
+    nothing two themes use may live inside one of them (`scripts/verify/README.md`,
+    "A section is a BLOCK SCOPE").
+  - FIVE SECTIONS DO NOT STAGE THEIR OWN PLACE TODAY and must, before they can move:
+    `giza-skyline` (it relies on the boot standing in Cairo), `panorama-slope-footing`,
+    `settlement-edge`, `children-bank-game`, `children-boulder-climb`. A section that
+    reads a scene the block before it staged passes in the whole run and fails alone —
+    README, "The one recurring defect".
+  - Everything that NAMES the suite follows in the same commit: `tiers.mjs`
+    (`DEV_SUITES`, and `SMALL_SUITES` if it is affected), `machine-load-core.mjs`,
+    `run-wait-core.mjs` (the per-suite expectations and `SEPTEMBER_BANDS`),
+    `render-verify-charges.mjs`, the work order's `Diff → browser-suite mapping`
+    paragraph, `scripts/verify/README.md`, `docs/acceptance-evidence.md`.
+  - NOTHING IS DELETED OR SOFTENED: no check is removed or weakened, the per-point
+    two-backend picture check is unchanged, and the sum of the themes covers exactly what
+    `polish` covered.
+  - The proof is every theme suite green on BOTH backends, with the screenshot set
+    identical to what `polish` wrote before the split.
+  Touches: scripts/verify/polish.mjs (split), scripts/verify/tiers.mjs,
+  scripts/verify/machine-load-core.mjs, scripts/verify/run-wait-core.mjs,
+  scripts/render-verify-charges.mjs, scripts/verify/README.md, TASKS.md (the diff→suite
+  paragraph), docs/acceptance-evidence.md
+  Bundle: Testinfrastruktur.
 
 - [ ] 1116. Repair pre-existing crossbrowser check: chromium-mobile no console errors on
   mobile (filed automatically by a LARGE run on 12.09.2026 under point 1089's ownership
