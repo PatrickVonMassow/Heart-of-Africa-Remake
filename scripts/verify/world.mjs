@@ -371,7 +371,24 @@ if (section('communication-errand')) {
     // the read can arrive after that expiry and report an empty toast for a
     // click that answered perfectly well — a flake in the probe, not in the
     // game. It cost this section a first-attempt red on 05.09.2026.
-    const clickForm = async () => {
+    const at = () =>
+      page.evaluate(async () => {
+        const geo = await import('/src/world/geo.ts')
+        const s = window.__game.getState()
+        return geo.worldToLatLon(s.pos.x, s.pos.z)
+      })
+    // THE CURRENT SWEEPS HIM WHILE HE WAITS. `driftCurrent` moves the idle
+    // traveller downstream every frame (design.md §11), and the Bandiagara
+    // talus lies in that drift: measured 15.09.2026, three idle seconds carried
+    // him 0.14° — half the 0.30° reach — and a slow first click let him leave
+    // it altogether. A keypress used to beat the drift; a click, which waits
+    // for the button to be actionable, does not. So the act stands him where it
+    // is about to be JUDGED as its last step before pressing, and the reading
+    // pair below proves he was still there.
+    const clickForm = async (standAt) => {
+      await page.evaluate(([la, lo]) => {
+        window.__game.getState().debugJumpTo(la, lo)
+      }, [standAt.lat, standAt.lon])
       await page.evaluate(() => {
         const g = window.__game.getState()
         g.setToast(null)
@@ -387,12 +404,6 @@ if (section('communication-errand')) {
       // against the LIVE position, so a red that says "no fit" has two very
       // different causes — he was never brought there, or the click itself
       // moved him — and only the pair of readings tells them apart.
-      const at = () =>
-        page.evaluate(async () => {
-          const geo = await import('/src/world/geo.ts')
-          const s = window.__game.getState()
-          return geo.worldToLatLon(s.pos.x, s.pos.z)
-        })
       const before = await at()
       await page.locator('[data-form="rock-relief"]').click()
       const after = await at()
@@ -421,9 +432,10 @@ if (section('communication-errand')) {
     })
 
     // A wrong place answers, and answers with a SENTENCE — the rule the player
-    // has to be able to carry to the next lock.
-    await jump(talus.lat + reachDeg * 4, talus.lon, 600)
-    const miss = await clickForm()
+    // has to be able to carry to the next lock. Four reaches off the foot is far
+    // enough that the drift cannot carry him back into the socket.
+    const offTalus = { lat: talus.lat + reachDeg * 4, lon: talus.lon }
+    const miss = await clickForm(offTalus)
     // The detail rides ON the FAIL line: the runner echoes only those lines, and
     // the `console errors:` list below never reaches a run log.
     const place = (ll) => `${ll.lat.toFixed(4)}/${ll.lon.toFixed(4)}`
@@ -453,7 +465,7 @@ if (section('communication-errand')) {
       label: `the talus foot below the Bandiagara escarpment, where the ${strings.name} fits`,
     })
     await page.evaluate(() => window.__ui.getState().setTravelZoom(0.5))
-    const fitted = await clickForm()
+    const fitted = await clickForm(talus)
     const fittedOk =
       fitted.said.includes(strings.solved) &&
       fitted.spent.includes('bandiagara-talus') &&
@@ -465,7 +477,7 @@ if (section('communication-errand')) {
     if (!fittedOk) errors.push(`the inventory click at the talus foot: ${clickDetail(fitted)}`)
 
     // A spent socket answers like a wrong place, and writes no second page.
-    const again = await clickForm()
+    const again = await clickForm(talus)
     const againOk =
       again.said.includes(strings.noFit) &&
       again.keys.filter((k) => k === 'journal.mouldFitted').length === 1
