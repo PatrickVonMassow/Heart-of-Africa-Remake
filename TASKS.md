@@ -842,48 +842,6 @@ put it is the mistake this line exists to stop.
   has never itself been run.
   Bundle: Dorfleben.
 
-- [ ] 1133. The water landmarks are photographed where the shutter aims them: two frames lose
-  their subject downstream between the jump and the exposure.
-  THIS POINT DEMANDS RENDERED PROOF: its deliverable is frames that contain their subject on
-  both lanes.
-  MEASURED 15.09.2026 at e4152269c. In one WebGPU pass `world` frame
-  `11-worldmodel-khartoum-confluence` and `enrichments` frame `72-water-victoria-falls` both
-  report "its subject is not in the rendered picture: off the left and bottom edge of the
-  frame", each of them TWICE, which the runner reads as a candidate REAL failure. Both are
-  OLDER than the branch that met them: the same frame failed the same way in the large run of
-  10.09.2026 (`local/verify-logs/2026-09-10T13-53-15-807-large.log`) and the falls in that of
-  11.09.2026, on work that touched neither.
-  WHAT IS MEASURED, and it does not yet name the cause. The traveller MOVES while nothing
-  touches him: in the browser, after `debugJumpTo` put him exactly on the Bandiagara talus, three
-  idle seconds carried him 0.14° and a slow first click carried him out of the 0.30° form reach
-  altogether (which is why point 1124 now stands him at the socket as its last step). The
-  obvious suspect is `driftCurrent` (design.md §11), which sweeps an idle traveller downstream
-  every frame — and BOTH failing subjects sit on water: `sampleTerrain` reads `water` at the
-  Khartoum confluence with a current of 0.20°/s north and 0.13°/s west, and at Victoria Falls
-  with 1.07°/s east.
-  BUT THE SUSPECT DOES NOT FIT CLEANLY, and saying so is cheaper than discovering it twice. In
-  the unit world the talus itself is `savanna` with a current of exactly zero, so whatever moved
-  him there was NOT this current — either the browser's terrain at that coordinate differs from
-  the unit world's, or a second mover exists. And `71-water-nile-aswan` sits in a 0.31°/s
-  current and does not fail. So the first act is to MEASURE, in the browser, the traveller's
-  position and the terrain under him between the jump and the shutter at all three coordinates,
-  and to let that reading name the cause.
-  Final state:
-  - The traveller's position between the jump and the shutter is MEASURED at both coordinates,
-    and the reading decides the fix rather than this text.
-  - Both frames contain their named subject on both backends over three repeat runs.
-  - The repair is in the CHECK, never in the current: the drift is design.md §11 and stays.
-  - The two entries this point carries in `scripts/render-verify-charges.mjs` are removed with
-    it, so the charge dies with its point.
-  Test: the two frames themselves are the test — the shutter already refuses a mis-aimed frame
-  (point 375), so a green `world` and a green `enrichments` on both lanes IS the proof.
-  Refs: scripts/verify/world.mjs (`landmark-frames`), scripts/verify/enrichments.mjs (the
-  §7.1 pt. 21 water frames), src/state/store.ts (`driftCurrent`), design.md §11,
-  scripts/render-verify-charges.mjs, CLAUDE.md §7.2
-  Criticality: medium — it blocks no player, but it reds the covering proof of every point
-  whose diff maps to `world` or `enrichments`, and a red that nobody owns stops a landing.
-  Bundle: Testinfrastruktur.
-
 - [ ] 1129. `polish` is split by theme, so a red costs only its own theme (split out of
   point 1126 on 15.09.2026, which delivered its other three parts the same day).
   MEASURED: `scripts/verify/polish.mjs` is 7,447 lines and 27 declared sections, runs
