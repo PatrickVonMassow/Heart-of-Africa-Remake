@@ -425,8 +425,19 @@ export function pollBudget({
  * shell call at 600 s, so past BLOCKING_LIMIT_MS the completion notification of
  * a background run is the only mechanism that carries.
  */
-export function waitPlan({ expectedMs = null, limitMs = BLOCKING_LIMIT_MS } = {}) {
-  const expected = Number.isFinite(expectedMs) && expectedMs > 0 ? expectedMs : null
+export function waitPlan({ expectedMs = null, limitMs = BLOCKING_LIMIT_MS, observedHighMs = null } = {}) {
+  // FOREGROUND OR BACKGROUND IS DECIDED ON WHAT THE RUN REALLY COSTS (point
+  // 1137). The §1 plan is the sum of July per-suite medians and is measured to
+  // be a third to two thirds of the assembled run: on that figure alone a whole
+  // `polish` pass reads as 5 min 41 s and is advised into a 9-minute blocking
+  // call, while six measured passes took 9.9-61.5 min. The advice was therefore
+  // wrong for nearly every polish run, and its timeout returned STILL RUNNING —
+  // which is the moment a healthy run starts to look broken. Where §7 has
+  // measured this SHAPE of run, its high end decides; the printed expectation
+  // stays the plan, because that is what it is.
+  const observed = Number.isFinite(observedHighMs) && observedHighMs > 0 ? observedHighMs : null
+  const planned = Number.isFinite(expectedMs) && expectedMs > 0 ? expectedMs : null
+  const expected = observed !== null && planned !== null ? Math.max(observed, planned) : (planned ?? observed)
   if (expected === null) {
     return {
       shape: 'background',

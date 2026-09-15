@@ -126,7 +126,10 @@ expected to take, how long it really took last time, how many frames it owes, an
 — the decision that matters — whether it may be **one blocking foreground call**
 at all, or is longer
 than a shell call may run and has to go to the **background**, where the harness'
-own completion notification announces the exit.
+own completion notification announces the exit. That last decision is taken on
+the **§7 band** where one exists, not on the §1 plan (point 1137): a whole
+`polish` pass plans at 5 min 41 s and measures at 9.9–61.5, and advising a
+blocking call for it returns `STILL RUNNING` every time.
 
 **2. Await it.**
 

@@ -32,6 +32,7 @@ import {
   formatObservedBand,
   formatReceipt,
   nextWaitMs,
+  observedBand,
   planRun,
   pollBudget,
   waitPlan,
@@ -50,6 +51,10 @@ import {
 } from './run-record.mjs'
 import { claimWait, finishWait, waitStatus } from '../wait-lease.mjs'
 import { PROGRESS_LEASE_MS, runIdFromLog } from '../wait-lease-core.mjs'
+
+/** The high end of a §7 band, in ms — what this SHAPE of run really cost at its
+ *  slowest. Null when nothing measured this shape, which leaves the plan alone. */
+const bandHighMs = (band) => (Number.isFinite(band?.highMin) ? Math.round(band.highMin * 60_000) : null)
 
 const USAGE = [
   'usage:',
@@ -155,7 +160,7 @@ function printReceipt(record) {
 /** `--plan`: the decision that belongs BEFORE the run, not after it. */
 function doPlan(argv) {
   const plan = planRun({ argv, verifyGl: process.env.VERIFY_GL })
-  const how = waitPlan({ expectedMs: plan.expectedMs })
+  const how = waitPlan({ expectedMs: plan.expectedMs, observedHighMs: bandHighMs(plan.observedBand) })
   console.log(`# plan: ${plan.suites.length} suite(s) over ${plan.passes.length} backend pass(es) — ${plan.backends.join(' + ')}`)
   console.log(`  suites:   ${plan.suites.join(', ') || '(none)'}`)
   console.log(`  expected: ${formatDuration(plan.expectedMs)} (measured medians, docs/picture-check-cost.md §1)`)
@@ -219,7 +224,14 @@ async function doAwait(logArg, timeoutS) {
   }
   const budget = Number.isFinite(timeoutS) && timeoutS > 0
     ? timeoutS * 1000
-    : (waitPlan({ expectedMs: record.expectedRuntimeMs ?? null }).timeoutMs ?? 590_000)
+    : (waitPlan({
+      expectedMs: record.expectedRuntimeMs ?? null,
+      observedHighMs: bandHighMs(observedBand({
+        isLargeEquivalent: String(record.tier ?? '') === 'large' || (record.tier === null && (record.args ?? []).length === 0),
+        passes: (record.backends ?? []).length || 1,
+        suites: record.suites ?? [],
+      })),
+    }).timeoutMs ?? 590_000)
   console.log(
     `# awaiting ${record.command ?? 'the run'} (pid ${record.pid ?? '?'}) — expected ` +
       `${formatDuration(record.expectedRuntimeMs ?? null)}, giving it ${formatDuration(budget)}. Nothing is being polled.`,

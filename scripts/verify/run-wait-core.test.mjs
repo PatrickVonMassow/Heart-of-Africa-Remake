@@ -347,6 +347,26 @@ describe('waitPlan — blocking call or completion notification', () => {
   it('refuses to invent an interval for an unmeasured selection', () => {
     expect(waitPlan({ expectedMs: null }).shape).toBe('background')
   })
+
+  // POINT 1137 — the advice the plan used to give for a whole `polish` pass:
+  // 5 min 41 s from the §1 medians, so FOREGROUND, on a run six measurements put
+  // at 9.9-61.5 min. The blocking call then returned STILL RUNNING, and a healthy
+  // run started to look broken. Where §7 measured this shape, its high end decides.
+  it('sends a run to the background on what it REALLY costs, not on the short plan', () => {
+    const plan = waitPlan({ expectedMs: 340_900, observedHighMs: Math.round(61.5 * 60_000) })
+    expect(plan.shape).toBe('background')
+    expect(plan.expectedMs).toBe(Math.round(61.5 * 60_000))
+  })
+
+  it('leaves the plan alone where nothing measured that shape', () => {
+    expect(waitPlan({ expectedMs: 34_400, observedHighMs: null }).shape).toBe('blocking')
+  })
+
+  it('never lets a band SHORTEN a plan that is already longer', () => {
+    const plan = waitPlan({ expectedMs: 2_536_000, observedHighMs: 60_000 })
+    expect(plan.shape).toBe('background')
+    expect(plan.expectedMs).toBe(2_536_000)
+  })
 })
 
 describe('backendsFrom — read from the run, never guessed', () => {
