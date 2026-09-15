@@ -986,3 +986,23 @@ und der Weg daran vorbei ist eine Verhaltensregel, keine Änderung. Kommt es
 wieder, wäre der billige Weg, den Marker aus dem gemeinsamen Git-Verzeichnis zu
 lesen statt aus dem laufenden Checkout — die Registrierung gilt ohnehin für die
 ganze Batch, nicht für einen Checkout.
+
+## Die Wartehilfe erklärt einen gesunden Bild-Lauf für hängend (15.09.2026)
+
+`run-wait.mjs --await` meldet "HUNG" und rät zum Abbruch, sobald ein Lauf das
+2,5-fache seiner ERWARTUNG überschreitet. Für `polish` ist diese Erwartung
+5m 41s aus der Median-Tabelle — derselbe Aufruf druckt zwei Zeilen darüber
+seine eigene Beobachtungsreihe: 9,9 bis 61,5 Minuten, Median 55,2, über sechs
+Läufe. Die Abbruchschwelle liegt damit bei 14 Minuten, also unterhalb der
+Hälfte dessen, was das Werkzeug selbst als typisch ausweist.
+
+Gemessen am 15.09.2026: der Alleinlauf der Bild-Suite wurde nach 18m 16s als
+hängend erfasst, während er alle drei Minuten ein Bild schrieb und der
+GPU-Prozess auf 68 % stand. Gefolgt wäre der Rat, einen gesunden Lauf
+abzuwürgen — und ein Abbruch deckt nichts, also hätte er den Lauf ein zweites
+Mal gekostet.
+
+Nicht als Punkt eingereiht wegen des Infrastruktur-Freezes: kein Spielerimpakt,
+und der Weg daran vorbei ist gemessenes Urteil statt Gehorsam. Der billige Weg
+wäre, die Schwelle an die BEOBACHTETE Bandbreite zu hängen statt an die
+Median-Tabelle, wo beide ohnehin nebeneinander gedruckt werden.
