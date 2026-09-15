@@ -5495,7 +5495,14 @@ if (section('adult-errands')) {
             // bought no strictness and cost the ORDER check its window: one errand
             // runs at a time, and a fill held longer leaves the next check waiting
             // for the errand after it.
-            if (!(v[i].filling >= 0.25)) continue
+            // AND NOT PAST THE PLATEAU EITHER. The comment above had the window
+            // right and the condition kept only its lower half: after 0.76 the dip
+            // ramps back out, so a sample at 0.92 reads a y-scale of 0.93 on a
+            // figure that is drawing exactly as designed, and the squat check calls
+            // that a defect. Measured on WebGL 2, 15.09.2026: first pass red at
+            // "y-scale 0.9294 at fill 0.9245", green on the retry — a correct
+            // product reddened by the sampler's own window.
+            if (!(v[i].filling >= 0.25 && v[i].filling <= 0.76)) continue
             let near = Infinity
             for (let j = 0; j < v.length; j++) {
               if (j === i) continue
