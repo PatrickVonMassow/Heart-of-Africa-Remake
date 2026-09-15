@@ -61,3 +61,26 @@ jar, both tasks released, no forced speech and no assertion errors. Focused
 tests also cover arrival at both stand spots and delivery while a child holds
 the report. The hold and expiry rules are unchanged. Browser rendering and
 full scene verification remain the reviewing session's responsibility.
+
+## Why the errand sometimes worked
+
+The blockade is not a fixed property of the layout. Both working spots sit on a
+circle of `JOIN_STAND_OFF` = 2.4 m around the stand, and `facingSpot` takes the
+opposite side and rejects anything closer than 2 × `WORK_ARRIVE_RADIUS` = 2.2 m
+to the sender's spot, so the two spots are never drawn on top of each other.
+What decides is where the SENDER happens to stand when the errand is handed out.
+In the replayed case the carrier stopped 1.09 m short of its spot — just inside
+the old 1.1 m tolerance — and therefore 0.51 m beside the still-standing sender,
+who could not get past its solid body and re-picked the same deflection every
+frame.
+
+So the defect hits a share of the errands rather than all of them, which agrees
+with the user's own observation that water-fetching had worked before. Its
+VISIBILITY is far higher than its rate: only ONE water errand runs at a time, a
+blocked one holds until the 300-second expiry, and a successful round trip takes
+about 57.5 s (replay: order at 342.1 s, report at 399.6 s). At a one-in-three
+failure rate roughly 72 % of play time already carries no water errand at all.
+
+The exact per-errand rate is not measured here; the replay harness of 72dc3907c
+can produce it from a seed and start-position sweep of the baseline. That
+measurement is recorded in `docs/backlog.md` and is not a condition of this fix.
