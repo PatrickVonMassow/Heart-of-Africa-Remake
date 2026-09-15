@@ -29055,3 +29055,33 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   "Test und Wächter hingen an ihrer Umgebung, nicht am Verhalten".
   Bundle: Testinfrastruktur — it edits `scripts/cut-account-core.test.mjs` and the cut document,
   which no other open point of this bundle writes, so it may run beside any of them.
+
+- [x] 1131. Nobody in the village fetches water, and the two standing at the water place just
+  stand there (user 15.09.2026, two reports, ranked here directly behind his previous
+  front-order 1124).
+  The reports, verbatim: "Neuer Bugreport \"KeinWasserholen.zip\" unter Backup in local" and,
+  as his addendum: "WasserstelleGefundenKeinerHolt.zip - die Stelle habe ich gefunden (war die
+  vorher auch schon da?), aber die zwei stehen da nur und holen kein Wasser."
+  THE EVIDENCE IS IN THE REPOSITORY: `local/KeinWasserholen.zip` and
+  `local/WasserstelleGefundenKeinerHolt.zip` (copied from the backup 15.09.2026, 16:26; the
+  folder is ignored, so they travel with the checkout and not with git).
+  NOT YET MEASURED — that is this point's first act: read both dumps, name the settlement and
+  seed, and say whether the water errand is never dispatched, dispatched and never walked, or
+  walked and never reported. The water errand and its hold rules are the subject of the
+  decisions already standing on the board ("Ein gestautes Wort darf seine Aufgabe nicht
+  überleben"), so check whether a hold or a task expiry swallows the errand before blaming the
+  dispatcher.
+  TWO MEASUREMENTS ALREADY ON RECORD point at this exact spot and belong in the first reading.
+  `docs/backlog.md` "Das Wasserpaar findet im ersten Anlauf nicht zusammen" (14.09.2026): the
+  WebGL 2 run of `polish --section=adult-errands` was red on its first attempt with "no carrier
+  reached the fill phase in 180 s" and "[ASSERT] adult-pair-never-met — water-back: villager 1
+  expired still on his way to the walk word; the pair never assembled" — that is the user's
+  picture exactly, and an EXPIRY, which is why the hold/expiry check above comes before the
+  dispatcher. `docs/backlog.md` "Wasserholen der Erwachsenen ist ein Kreislauf ohne Ziel"
+  (07.09.2026) holds the second half: the full jar is cast out of nothing and `water-out` ends at
+  the water without ever returning full.
+  ALSO ANSWER HIS QUESTION in the closing report — was the water place there before? — from the
+  history of the settlement layout, not from memory.
+  Criticality: medium — the village reads as inhabited only while its people do their work, and
+  §7.1 criterion 15 (lively settlements) is measured on exactly this.
+  Bundle: Dorfleben.
