@@ -120,6 +120,27 @@ put it is the mistake this line exists to stop.
   under a key the player pressed to enter a village.
   Bundle: Kommunikation.
 
+- [ ] 1131. Nobody in the village fetches water, and the two standing at the water place just
+  stand there (user 15.09.2026, two reports, ranked here directly behind his previous
+  front-order 1124).
+  The reports, verbatim: "Neuer Bugreport \"KeinWasserholen.zip\" unter Backup in local" and,
+  as his addendum: "WasserstelleGefundenKeinerHolt.zip - die Stelle habe ich gefunden (war die
+  vorher auch schon da?), aber die zwei stehen da nur und holen kein Wasser."
+  THE EVIDENCE IS IN THE REPOSITORY: `local/KeinWasserholen.zip` and
+  `local/WasserstelleGefundenKeinerHolt.zip` (copied from the backup 15.09.2026, 16:26; the
+  folder is ignored, so they travel with the checkout and not with git).
+  NOT YET MEASURED — that is this point's first act: read both dumps, name the settlement and
+  seed, and say whether the water errand is never dispatched, dispatched and never walked, or
+  walked and never reported. The water errand and its hold rules are the subject of the
+  decisions already standing on the board ("Ein gestautes Wort darf seine Aufgabe nicht
+  überleben"), so check whether a hold or a task expiry swallows the errand before blaming the
+  dispatcher.
+  ALSO ANSWER HIS QUESTION in the closing report — was the water place there before? — from the
+  history of the settlement layout, not from memory.
+  Criticality: medium — the village reads as inhabited only while its people do their work, and
+  §7.1 criterion 15 (lively settlements) is measured on exactly this.
+  Bundle: Dorfleben.
+
 - [ ] 1082. A child climbing the village boulder becomes something the player actually
   sees (user 09.09.2026, 05:04 — the same report twice).
   Point 1080 was filed on 08.09.2026 because the user never saw the climb; it landed in the
