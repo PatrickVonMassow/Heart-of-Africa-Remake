@@ -77,57 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1076. The chief's first door press tells of his walk instead of a deciphered message,
-  and he gets a body (user 08.09.2026).
-  Two defects at the same hut, both measured on 08.09.2026.
-
-  PART A — THE FIRST PRESS WRITES THE WRONG ENTRY. `callChiefOut` sets the toast and calls
-  `tellChiefHint`, which writes `journal.titles.chiefHint` plus `journal.hintRaw` and
-  immediately reveals `journal.hintDecoded` — a "Deciphered! … latitude … degrees north"
-  text left over from the spoken-hint mechanic. The chief shares no language and speaks only
-  through the drums (design.md §13.4), so a deciphered message cannot exist here; the walk
-  itself gets no journal entry at all.
-  Final state:
-  - The first press at the chief's hut writes ONE journal entry, in both languages and with
-    the §15 emotional markup: the chief steps out of his hut, walks to his drummer, and the
-    player is evidently meant to follow. No deciphered message and no coordinates.
-  - The dead hint mechanic is DELETED rather than rewritten: `tellChiefHint` and
-    `revealDecoded` are called by nothing else, and `hintsGiven`/`decodedGiven` are read only
-    by the checkpoint. The keys they carry go with them, in both language files.
-  - Every later press at the hut behaves exactly as it does today.
-
-  PART B — THE CHIEF HAS NO BODY. The player resolves only against `layout.colliders`; the
-  seated drummer is in that set (r 0.8), while the chief figure only writes `group.position`
-  per frame and is neither a collider nor an `InhabitantBody` — one walks straight through him.
-  Final state:
-  - The chief is solid wherever he stands and wherever he walks, in both perspectives.
-  - Nobody is wedged by him: the gap between the hut collider (r 3.35) and the chief in his
-    standing place (`CHIEF_STAND_OFFSET` 1.6) stays walkable, and `withinGiveReach` and
-    `nextChiefAction` keep reaching him.
-
-  Test. Vitest: the first press writes exactly the new entry and no decoded text; the hint
-  functions and their keys are gone from the store and from both language files (i18n
-  parity); the chief's body follows his position, the hut-to-chief gap stays walkable, and
-  the reach checks still resolve. Browser (collision lane, WebGPU): one frame in which the
-  player is stopped at the chief in front of his hut, screenshot under verification/ with the
-  subject declared (the player blocked at the chief's body).
-  Quotes:
-  Nutzer, 08.09.2026 10:00: »Folgende Änderungen beim Häuptling: Wenn man das erst Mal an
-  seiner Hütte SPACE auslöst, erscheint aktuell ein Tagebucheintrag, der fälschlicherweise
-  etwas von einer entschlüsselten Nachricht erzählt - vermutlich eine Altlast. Stattdessen
-  soll ein Eintrag kommen, de besagt, dass der Häuptling aus seiner Hütte heraus tritt, zu
-  seinem Trommler läuft und man ihm anscheinend folgen soll: Der Häuptlingsfigur fehlt eine
-  Kollisionserkennung. Hole diese nach. Reihe das direkt vor 690 ein.«
-  Refs: src/state/store.ts (`callChiefOut`, `tellChiefHint`, `revealDecoded`, `hintsGiven`,
-  `decodedGiven` and the checkpoint that reads them), src/i18n/en.ts and src/i18n/de.ts
-  (`journal.titles.chiefHint`, `journal.hintRaw`, `journal.hintDecoded`),
-  src/scenes/place/chiefMeeting.ts, src/scenes/place/PlaceScene.tsx (the chief group, the
-  collider resolve), src/scenes/place/layout.ts (the collider set), design.md §13.4, §15
-  Author lane: astra.
-  Why the lane: the communication mechanic is authored by Astra (user 08.09.2026); the
-  rendered picture, the browser suites and the landing stay in the main session.
-  Bundle: Dorfleben.
-
 - [ ] 1124. The clay impression is used by a Space press anywhere on the map instead of
   being clicked at Bandiagara (user 14.09.2026, ranked here by the user).
   The order, verbatim: "Auch bei der Clay Impression of a Rock soll es bei Space keine
