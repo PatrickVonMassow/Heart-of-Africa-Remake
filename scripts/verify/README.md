@@ -159,9 +159,12 @@ mark**: `run-logged.mjs` touches a zero-byte `<log>.progress` from what its chil
 really emitted and from sampling the newest frame's mtime — by mtime, because a
 both-backends run overwrites the same 93 names and a count would stop rising
 while the pictures kept coming. The mark is a file of its own so that neither a
-reader's bookkeeping can pass for the run's progress (`--status` rewrites the run
-record when it counts a poll) nor a reader's read-modify-write can drop a fresh
-mark. `--await` and `--status` ask the same question and give the same
+reader's bookkeeping can pass for the run's progress nor a reader's
+read-modify-write can drop a fresh mark, and the verdict takes the **newest** of
+the run's own writings — the mark, the log, the frames — so that a marker which
+stops being writable cannot outvote a run that is still working. The run RECORD
+is deliberately not among them: `--status` rewrites it when it counts a poll, and
+nothing a reader writes is evidence that the run is alive. `--await` and `--status` ask the same question and give the same
 answer: a run that is still writing is `SLOW`, never `HUNG`. The clock alone could
 never say it: the §1 plan is measured to be a third to two thirds of the real
 cost, so the hung mark for a whole `polish` pass falls at 14 minutes against a

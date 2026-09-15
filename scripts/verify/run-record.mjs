@@ -331,35 +331,39 @@ export function newestFrameMtimeMs({ dir = FRAME_DIR, since = null } = {}) {
 export function lastProgressAtFor({
   logPath = null, recordPath = null, frameDir = FRAME_DIR, since = null, markPath = undefined,
 } = {}) {
-  // THE WRITER'S OWN MARK WINS, AND IT IS A FILE OF ITS OWN (Astra review rounds
-  // 1 and 2). Two things had to be true at once. A reader must not be able to
-  // manufacture the life it is looking for — `countPoll` rewrites the run
-  // record, so the record FILE's mtime meant polling a wedged run renewed it for
-  // ever. And the writer's mark must not share a read-modify-write with that
-  // poll: a poll that read the record, was overtaken by the writer, and then
-  // wrote its stale copy back would silently DROP a fresh mark. So the mark is a
-  // zero-byte file nobody else ever writes, and its mtime is the whole answer.
-  const mark = markPath === undefined ? progressMarkPathFor(logPath ?? recordPath) : markPath
-  if (mark) {
-    try {
-      return statSync(resolveIn(mark)).mtimeMs
-    } catch {
-      /* no mark yet — fall through to the weaker signals below */
-    }
-  }
-  // FALLBACK, for a run that predates the mark: the file marks and the frames.
-  // Both are weaker — the frame directory is shared, so a second concurrent
-  // run's pictures would vouch for this one — which is why the writer owns the
-  // mark above and this branch only serves old runs.
+  // ONLY WHAT THE RUN ITSELF WROTE COUNTS — the LATEST of it (Astra review
+  // rounds 1 to 3). Three rules, each paid for by a finding:
+  //
+  // NOTHING A READER WRITES IS EVIDENCE. `countPoll` rewrites the run RECORD, so
+  // taking that file's mtime let a reader manufacture the life it was looking
+  // for: poll a wedged run often enough and it never reports hung. The record is
+  // therefore not consulted here at all, and `recordPath` serves only to derive
+  // the mark's name when no log path was given.
+  //
+  // THE MARK IS A FILE OF ITS OWN. Kept as a field inside the record it would
+  // share a read-modify-write with that same poll, and a poll that read the
+  // record, was overtaken by the writer and wrote its stale copy back would
+  // silently DROP a fresh mark.
+  //
+  // AND IT IS A MAXIMUM, NOT A PREFERENCE. A mark that stops being writable
+  // freezes at its last value; preferring it blindly would then let a stale file
+  // outvote a log and frames that are still moving, and condemn a healthy run
+  // after one lease. Every source below is written by the RUN — the wrapper
+  // appends the log, the suites take the frames — so the newest of them is the
+  // run's last sign of life.
   const marks = []
-  for (const path of [logPath, recordPath]) {
+  const mark = markPath === undefined ? progressMarkPathFor(logPath ?? recordPath) : markPath
+  for (const path of [mark, logPath]) {
     if (typeof path !== 'string' || path.trim() === '') continue
     try {
       marks.push(statSync(resolveIn(path)).mtimeMs)
     } catch {
-      /* an absent log or record is not a progress mark */
+      /* an absent mark or log is not a progress mark */
     }
   }
+  // The frames are the one shared source: the directory carries no run identity,
+  // so a second concurrent run's pictures would vouch for this one. What bounds
+  // it is written beside the sampler in run-logged.mjs.
   const frames = newestFrameMtimeMs({ dir: frameDir, since })
   if (frames !== null) marks.push(frames)
   return marks.length > 0 ? Math.max(...marks) : null

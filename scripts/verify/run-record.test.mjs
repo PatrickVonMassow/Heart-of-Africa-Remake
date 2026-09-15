@@ -142,22 +142,38 @@ describe('the last sign of life (point 1137)', () => {
     expect(at).toBeGreaterThan(stale.getTime())
   })
 
-  // ASTRA REVIEW ROUNDS 1 AND 2 — `countPoll` rewrites the run record, so a
-  // reader that took the record FILE's mtime for progress could manufacture the
-  // life it was looking for; and a mark kept INSIDE that record would be dropped
-  // whenever a poll's read-modify-write overtook the writer's. The mark is
-  // therefore a file of its own that nothing but the run ever writes.
-  it('reads the WRITER\'S OWN mark, which no reader\'s bookkeeping can move', () => {
+  // ASTRA REVIEW ROUNDS 1 TO 3 — `countPoll` rewrites the run RECORD, so a reader
+  // that took that file's mtime for progress could manufacture the life it was
+  // looking for; a mark kept INSIDE the record would be dropped whenever a
+  // poll's read-modify-write overtook the writer's; and a mark PREFERRED over
+  // everything else would freeze a healthy run the moment its marker stopped
+  // being writable. So: a file of its own, and the NEWEST of the run's own
+  // writings decides.
+  it('never takes the run RECORD for progress — a poll writes that file', () => {
     const dir = tmp()
     const log = join(dir, 'run.log')
+    const record = join(dir, 'run.log.run.json')
+    const stale = new Date(Date.now() - 45 * 60_000)
     writeFileSync(log, 'x')
+    utimesSync(log, stale, stale)
+    writeFileSync(record, '{}')
+    // The record was touched a moment ago, as a counted poll would touch it.
+    // The run itself has said nothing for 45 minutes, and that is the answer.
+    expect(lastProgressAtFor({ logPath: log, recordPath: record, frameDir: join(dir, 'absent') }))
+      .toBeLessThan(Date.now() - 40 * 60_000)
+  })
+
+  it('takes the newest of the run\'s OWN writings, so a frozen mark cannot condemn it', () => {
+    const dir = tmp()
+    const log = join(dir, 'run.log')
     const mark = join(dir, 'run.log.progress')
     writeFileSync(mark, '')
     const stale = new Date(Date.now() - 45 * 60_000)
     utimesSync(mark, stale, stale)
-    // The log was touched a moment ago; the writer's mark says the run has in
-    // fact said nothing for 45 minutes, and the mark is what counts.
-    expect(lastProgressAtFor({ logPath: log })).toBeLessThan(Date.now() - 40 * 60_000)
+    // The marker went unwritable 45 minutes ago; the log is still moving.
+    writeFileSync(log, 'x')
+    expect(lastProgressAtFor({ logPath: log, frameDir: join(dir, 'absent') }))
+      .toBeGreaterThan(Date.now() - 60_000)
   })
 
   it('derives the mark from the log and from the record path alike', () => {

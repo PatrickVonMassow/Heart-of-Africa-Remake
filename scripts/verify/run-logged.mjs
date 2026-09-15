@@ -349,8 +349,13 @@ function runVerify() {
   let recordedProgressAt = 0
   function markProgress(at) {
     if (at - recordedProgressAt < PROGRESS_RECORD_MS) return
-    recordedProgressAt = at
-    touchProgressMark(logPath)
+    // THE THROTTLE ADVANCES ONLY ON A WRITE THAT HAPPENED (Astra review round 3).
+    // Advancing it on a FAILED touch would leave the last good mark standing as
+    // the run's newest word about itself, and a run whose marker went unwritable
+    // while it worked would be reported hung one lease later. A failure is
+    // simply not a mark: the next tick tries again, and the log and the frames
+    // answer for the run in the meantime.
+    if (touchProgressMark(logPath)) recordedProgressAt = at
   }
   markProgress(started)
 
