@@ -508,7 +508,12 @@ export const LIMITS = {
   // production, and neither asks how each side was MEASURED. Written at four lines after the
   // shortening step this rule demands — a first draft at six was cut by a third before any
   // raise. The long telling stays in the retrospective (3.273). Five lines: 661 -> 666.
-  maxLines: 666,
+  // RAISED 15.09.2026: the MIRROR of the aged-expectation entry it joins, and the half that
+  // entry never carried. It says a stored DURATION must not alone declare a running job hung;
+  // this says a stored BUDGET aborts the healthy run once the measured thing grows under it.
+  // It was FOLDED into that entry rather than given one of its own, because it is the same
+  // reader question. The long telling stays in the retrospective (3.270). Three lines: 666 -> 669.
+  maxLines: 669,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -786,7 +791,11 @@ export const LIMITS = {
   // 14.09.2026 (fourth): the unlike-for-unlike comparison entry justified beside maxLines
   // measures 56 words after the shortening step — the first draft ran 73 and was cut rather
   // than bought headroom for: 6369 -> 6425.
-  maxWords: 6425,
+  // 15.09.2026: the stale-budget half justified beside maxLines measures 39 words after the
+  // shortening step — the first draft ran 57 and was cut rather than bought headroom for, and
+  // its closing clause ("a red of this kind never points at whoever triggers it") was DROPPED
+  // here because the retrospective's own Lehre already carries it: 6425 -> 6464.
+  maxWords: 6464,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,
