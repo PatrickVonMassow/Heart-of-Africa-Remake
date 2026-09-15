@@ -28681,3 +28681,162 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   measured cause and a derived remedy.
   Refs: src/scenes/place/tagShuffle.test.ts, docs/backlog.md
   Bundle: Testinfrastruktur.
+
+- [x] 1056. The excavation becomes a real place: it says what it is for, and its earth is
+  ground the village walks over (user 04.09.2026, watching the merged digging work; point
+  1057 folded in here 07.09.2026 on the user's instruction to bundle points that would
+  otherwise each buy their own regression run).
+  PARKED 14.09.2026 BEHIND POINT 1127, on the user's instruction after asking whether this
+  point profits from doing 1127 first. Its code stands finished on
+  `feat/1056-dig-site-purpose-and-ground` (34 files, +1404/-284); what it cannot get is a
+  green run, because the pass reds on a check whose own author declared the reading
+  meaningless. Its last commits had begun to work AROUND that check from inside this
+  feature branch — the branch also touches `scripts/verify/polish.mjs` and
+  `scripts/verify/baseline-classify.mjs`, which is 1127's ground — so landing it as it
+  stands would hide the infrastructure defect instead of fixing it. ON RESUMPTION: sync
+  main, re-examine whether those stand-down commits can come back out, then ONE covering
+  run. No two-backend LARGE is bought for this point until 1127 has landed.
+  ONE OBJECT, TWO COMPLAINTS FROM THE SAME MORNING. The dig site says nothing about its
+  purpose (PART A) and its earth behaves like nothing at all (PART B). Both are judged by the same
+  evidence — a village frame holding the excavations, on both backends — and both edit the
+  dig-site meshes, `layout.ts`, `adultWork.ts` and the place scene's actor heights, which is
+  why the bundle already forbids working them beside each other. Landed apart, the second
+  would re-photograph the ground the first had just rebuilt, and PART A's left-behind RESULT and
+  PART B's raised earth occupy the very same patch. PART A and PART B are the two former points,
+  unchanged in substance; either half may be cut back out if the branch does not converge.
+
+  PART A — THE ADULTS DIG FOR NO VISIBLE REASON, AND THE PICTURE NEVER SAYS WHAT COMES OUT.
+  The user asked what the adults are digging FOR and found no answer in the scene: "Sie
+  scheinen zum Selbstzweck zu graben. Was graben sie aus?" The reason exists in the code
+  and nowhere else. Every site is placed as a KIND with a real purpose — a store pit
+  against a compound wall, a post hole beside a lane, turned ground at the outer edge of
+  the worked land — but the kind is only a placement rule. All three render the same
+  round hole; only the patch is a little wider. No post is ever set, no store is ever
+  sunk, no ground is ever planted, and the pair's bout ends with the hole a little deeper
+  and the spoil a little higher and nothing else. The excavation also resets when the
+  village is re-entered, so a returning player finds untouched ground where he watched
+  men work. This is the 13.08.2026 complaint of point 690 in a new place — "Selbst wenn
+  ich diese Übersetzungen sehe, erkenne ich keinen Sinn hinter den Handlungen" — and it
+  costs the DIG lesson its footing: a word demonstrated on a purposeless act is a word
+  the player has no reason to trust.
+  Final state:
+  - THE VILLAGE KEEPS TWO EXCAVATIONS, NOT THREE (user 07.09.2026, aspect 6 of the
+    shore-call card). Two carry the distinction completely: `adultWork.ts` asks only for
+    `digSites.length >= 2` before the second dig situation, so the DIG lesson is untouched
+    and the third site is variety, not meaning. Both remaining sites sit as far from the
+    water as their placement rules allow, in the village half turned away from the shore, so
+    the diggers and the shore game share less ground. The field-edge turned ground is the
+    only freely placeable kind and therefore stays; the second is one of the two kinds
+    anchored near the middle (the store pit at a compound, the post hole beside a lane), and
+    the remaining kind is dropped. Nothing of this is visible today — all three render the
+    same round hole — so the removal alone changes no picture.
+  - A standing player can tell, without text and without the concept overlay, what each
+    of the two excavations is FOR. Each kind carries its own answer in the scene beside
+    it, and the two no longer read as one repeated hole.
+  - A finished bout leaves a RESULT, not only a deeper hole: what the pair was digging
+    for is there to be seen when they walk away.
+  - The turned patch is worked ground, not a pit — its shape says what is done to it.
+  - The DIG lesson is untouched: two bouts at two different sites, the invitation and the
+    site word, both still held while a child can hear, and the aim of the site word still
+    lands on the excavation itself.
+  - Design and code agree afterwards: `design.md` §7 states what the digging is for in the
+    world, not only that it teaches a word.
+  PART B — THE SPOIL HEAP BURIES THE DIGGERS, AND EVERYONE ELSE WALKS STRAIGHT THROUGH IT.
+  Three causes, each read off the shipped code:
+  - The heap's SIDE is fixed. It sits at a constant local offset in a group rotated by an
+    angle derived from the site's own coordinates, so it grows where it grows no matter who
+    stands there.
+  - The initiator walks into the MIDDLE of the pit — `startJointWalk` sets his goal to the
+    site centre and he stops within `WORK_ARRIVE_RADIUS` of it, while the heap's centre lies
+    about 1.19 m out at `DIG_SITE_RADIUS` 0.9. He digs himself in.
+  - NOTHING collides with the excavation. The collider set is finished before the dig sites
+    are placed at all, and neither pit nor heap is ever added, so villagers, children and the
+    player pass through the earth.
+  The user decided the shape of the remedy and the reason for it: a collider is NOT the
+  answer, because an impassable heap wedges figures — the player included — into corners. The
+  heap becomes a LOCAL RAISING OF THE GROUND that everyone walks up and over, the way the
+  height profile outside a settlement already works. Today a settlement is flat: every actor's
+  Y is set independently and lands at zero (the bank children's climb is the one exception),
+  while outdoors the figure rides `sampleTerrain(...).height`. So this half brings a place its
+  first ground height, and it must arrive as ONE source every actor reads, not as a second
+  scatter of Y assignments.
+  Final state:
+  - The heap never grows on a side somebody is standing on — the digging pair's places are
+    chosen away from it, and the initiator works from the rim instead of the middle.
+  - Nobody walks through the heap: villagers, children and the player ride over it, in both
+    perspectives, and the first-person camera rises and falls smoothly rather than stepping.
+  - One ground-height source for a place, read by every actor and by the camera; a flat
+    settlement keeps behaving exactly as it does today.
+  - Nothing in a settlement becomes impassable through this point — no new collider, and no
+    figure can be wedged by the earth.
+
+  Test (ONE picture run for both halves — this is why they are one point). Vitest: for PART A,
+  each dig-site kind carries its own distinct furniture, a completed bout adds the result to
+  the site, and a village lays out exactly two dig sites, both on the side of the settlement
+  away from the water; for PART B, the ground-height source and the standing-place choice — a
+  pair never takes a place inside the heap's footprint, and the height is zero everywhere no
+  excavation reaches. Browser (polish lane, both backends): one village frame in which the
+  two sites are visibly different things AND a figure is carried over the raised earth;
+  screenshots of it (verification/, subject declared: the two excavations with a villager
+  walking over the spoil).
+  Criticality: high — PART A is the second time the player has read village work as meaningless,
+  and the first time cost the whole communication slice a rebuild; PART B's defect is visible in
+  the very picture the player is meant to learn from, and its remedy touches every actor's
+  height in a place, which is the error-prone half.
+  Quotes:
+  Nutzer, 04.09.2026 08:40: »Was ist der inhaltliche Grund fürs Graben der Erwachsenen?
+  Bisher ist keiner erkennbar. Sie scheinen zum Selbstzweck zu graben. Was graben sie
+  aus?«
+  Nutzer, 04.09.2026 08:47: »Reihe einen Punkt direkt vor 690 ein, der das sichtbar
+  macht.«
+  Nutzer, 07.09.2026 19:08: »Setze alle 6 Punkte so um, wie jetzt in der Karte beschrieben.
+  Fasse dabei sinnvoll Punkte zusammen, sodass nicht alles in einzelnen Tasks steht, von
+  denen jeder für sich einen teuren Regressionstest benötigt. Evtl. Passen manche der 6
+  Aspekte ja auch als Zusatz an noch offene Punkte in der Queue.« — Aspekt 6 (drei
+  Grabungsstellen auf zwei, beide vom Fluss abgewandt) ist hier eingehängt statt als eigener
+  Punkt: dieselben Dateien, derselbe Zweig, derselbe Bildlauf.
+  Nutzer, 04.09.2026 09:05: »Die Erwachsenen sollten nicht in dem entstehenden Erdhaufen
+  stehen. Zum einen graben sie sich damit manchmal quasi selbst ein und zum anderen laufen
+  sie später ohne Clipping-Abfrage hindurch.«
+  Nutzer, 04.09.2026 09:05: »Der Erdhaufen ist nicht unpassierbar, sondern er ist eine lokale
+  Erhöhung des Bodens, über den die Figuren laufen — so wie bei dem Höhenprofil in der
+  Vogelperspektive.«
+  Nutzer, 04.09.2026 09:14: »Setze beides — Höhenprofil statt Kollision und die Leute dem
+  Haufen ausweichen zu lassen — als neuen Punkt um und reihe ihn direkt vor 690 ein.«
+  Nutzer, 07.09.2026 19:25: »Kannst du weitere Zusammenführungen von offenen Punkten zur
+  Kommunikationsmechanik vornehmen, um Regressionsdurchläufe einzusparen?« — daraufhin ist
+  der frühere Punkt 1057 hier als PART B eingefaltet worden.
+  Refs: src/scenes/place/PlaceScene.tsx (`DigSites`, the player mesh's fixed Y),
+  src/scenes/place/digSiteAppearance.ts, src/scenes/place/layout.ts (the kind-anchored
+  placement, the collider set), src/scenes/place/adultWork.ts (the durable work record,
+  `startJointWalk`, `joinSpot`, `JOIN_STAND_OFF`), src/scenes/place/PlaceLife.tsx (every
+  actor's `position.set`), src/scenes/travel/TravelScene.tsx (how the outdoor height profile
+  carries a figure), design.md §7
+  STATE ON 14.09.2026 (measured, carried over from the session that had to hand over):
+  On the merge candidate 781b14a84, `polish` fails on WebGL 2 TWICE with the SAME check —
+  "a villager is seen digging, and the jar goes down EMPTY and comes back FULL" (204 / 174
+  samples at the dig pose, 201 / 205 with the empty jar, 0 with the full one). The runner
+  calls it a CANDIDATE REAL FAILURE; the two other reds rotated between the runs and read as
+  load. Baseline run 1/2 of the pre-state f799ad619885 is GREEN (269 checks, 0 red), so this
+  is the branch's own defect, not a pre-existing one — unlike the 12:02 run, whose baseline
+  died on an unhandled TypeError and therefore gave no verdict at all. The check carries its
+  own `nonPredictive()` since 10.09.2026: run alone it was green twice (61 full-jar samples),
+  in the full pass zero — the narrow rung proves nothing here.
+  SUSPICION TRAIL, not verified: `src/scenes/place/adultWork.ts`. `startJointWalk` now puts
+  the initiator on `initiator.standSpot` instead of the pit centre and bails without one
+  (`if (!partner || !site || !initiator.standSpot) return`); the place comes from
+  `digStandingPlaces(selected.site, view.standable)`, which can return null where `joinSpot`
+  still found a place. Swallowed dig situations can starve the water errand in the shared
+  window — the earlier run's phase counts fit: `water-out:send` ×10588 against
+  `water-out:fill` ×13.
+  STILL TO RECORD (deliberately not committed while a picture run held the quiet machine):
+  the cross-vendor review of GPT-6 Astra on commit 23495d52e, verdict merge, no findings —
+  `node scripts/mechanism-review.mjs --record 23495d52e35e081afe531b6ade033ff6354fc630
+  --model "GPT-6 Astra" --verdict merge --mode review --point 1056 --pass 1/1
+  --pass-files "scripts/verify/polish.mjs"` with the recorded evidence text.
+  DO NOT TIDY AWAY: the two uncommitted document stamps in the main tree
+  (`docs/analysis_de/vibe-coding-anleitung.md`, fingerprint attestation 03b60d37, and a
+  timestamp in `docs/analysis_de/retrospektive-zusammenarbeit.md`) are the predecessor's work;
+  `batch-doctor --repair` would quarantine them into a stash. The 144 freshly written
+  `verification/` frames in the point's worktree come from a RED run and are not evidence.
+  Bundle: Dorfleben.
