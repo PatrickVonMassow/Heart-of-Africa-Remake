@@ -78,6 +78,7 @@ kind is MOVED to the front in the same turn that files it; leaving it where appe
 put it is the mistake this line exists to stop.
 
 - [ ] 1137. The picture gate is unusable: a suite never gets past the dev server.
+  Bundle: Testinfrastruktur — it rewrites nothing of the game, only the harness.
   Criticality: high. BLOCKING CONDITION: it blocks the release and every lane that touches a
   render path — `render-verify-guard` demands a covering run that currently cannot be produced
   at all, so the poc publication of the current `main` and each render point stand still
