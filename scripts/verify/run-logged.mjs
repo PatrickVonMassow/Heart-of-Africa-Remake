@@ -73,6 +73,13 @@ import { PROGRESS_LEASE_MS } from '../wait-lease-core.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, '..', '..')
+/** How often the writer's progress mark may be rewritten into the record. The
+ *  wait reads it against a 15-minute lease, so a minute of granularity is far
+ *  finer than any verdict needs and keeps the record's writes rare. */
+const PROGRESS_RECORD_MS = 60_000
+/** How often the writer counts its own frames — the only sign of life a long
+ *  render suite gives, because its output does not leave `run-all` until it ends. */
+const FRAME_SAMPLE_MS = 30_000
 const PROGRESS_EMIT_MS = 60_000
 const RUNNER_STARTED_AT = Date.now() - Math.round(process.uptime() * 1000)
 
@@ -299,6 +306,9 @@ function runVerify() {
     finishedAt: null,
     exitCode: null,
     framesWritten: null,
+    // The writer's own progress mark (point 1137). Present from the first write
+    // so a reader never has to guess whether the field exists yet.
+    lastProgressAt: started,
     receipt: null,
   }
   writeRecord(recordPath, baseRecord)
@@ -333,12 +343,56 @@ function runVerify() {
   const progress = outputProgressState()
   let lastProgressMark = progress.mark
 
+  // WHOSE PROGRESS IS IT (point 1137, Astra review round 1)? The WRITER's. A
+  // reader that inferred progress from the record's MTIME would be fooled by its
+  // own bookkeeping: `countPoll` rewrites the record, so polling a wedged run
+  // renewed its apparent life for ever. The mark below is set by this process
+  // alone, from what the child actually produced, and nothing a reader does can
+  // move it. `--status` and `--await` read the FIELD, never the file's mtime.
+  let recordedProgressAt = started
+  let framesSeen = baseRecord.expectedFrames > 0 ? (framesWrittenSince(started) ?? 0) : 0
+  function markProgress(at) {
+    if (at - recordedProgressAt < PROGRESS_RECORD_MS) return
+    recordedProgressAt = at
+    const current = readRecord(recordPath)
+    // Only a RUNNING record is stamped: the closing write owns the finished one,
+    // and a late tick must not reopen it.
+    if (current && current.status === 'running') writeRecord(recordPath, { ...current, lastProgressAt: at })
+  }
+
+  // THE STRETCH THE OUTPUT CANNOT SEE. `run-all.mjs` captures a suite's output,
+  // so between two suite lines a 55-minute `polish` says nothing at all. Its
+  // FRAMES advance the whole time, so the writer samples its own frame count —
+  // sampled here, by the run itself, rather than read by whoever is waiting.
+  //
+  // RESIDUAL, NAMED (Astra review round 1). Frames carry NO run identity — the
+  // directory is shared and `framesWrittenSince` says so — so a SECOND verify
+  // run's pictures would also raise this count and could vouch for a wedged run
+  // for as long as that second run lasts. What bounds it: `large-run-wait.mjs`
+  // makes a LARGE wait for a running LARGE, `run-wait.mjs` refuses to resolve a
+  // wait when two runs are live, and the quiet-machine check reports a second
+  // run as load. The unbounded version of the defect is the one that is gone —
+  // a masked wedge now surfaces when the masking run ends, where a false HUNG
+  // killed a healthy run outright. Closing it completely needs a frame that
+  // names its run, which is a change to every suite's shutter, not to this file.
+  const frameTick = baseRecord.expectedFrames > 0
+    ? setInterval(() => {
+      const now = framesWrittenSince(started)
+      if (typeof now === 'number' && now > framesSeen) {
+        framesSeen = now
+        markProgress(Date.now())
+      }
+    }, FRAME_SAMPLE_MS)
+    : null
+  frameTick?.unref?.()
+
   function consume(chunk) {
     const text = String(chunk)
     rawChars += text.length
     log.write(text)
     const progressAt = Date.now()
     advanceOutputProgress(progress, text)
+    markProgress(progressAt)
     if (progress.mark !== lastProgressMark && progressAt - lastProgressEmittedAt >= PROGRESS_EMIT_MS) {
       lastProgressEmittedAt = progressAt
       lastProgressMark = progress.mark
@@ -376,6 +430,7 @@ function runVerify() {
   }
 
   child.on('close', (code, signal) => {
+    if (frameTick) clearInterval(frameTick)
     if (pending !== '') {
       lines.push(pending)
       if (own.stream || (!own.quiet && select(pending))) console.log(pending)

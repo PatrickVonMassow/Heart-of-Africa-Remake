@@ -31,6 +31,7 @@ import {
   waitPlan,
 } from './run-wait-core.mjs'
 import { DEV_SUITES, SMALL_SUITES } from './tiers.mjs'
+import { PROGRESS_LEASE_MS } from '../wait-lease-core.mjs'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 
@@ -262,6 +263,28 @@ describe('pollBudget — five looks, then block or call it hung', () => {
   it('calls a run HUNG past the factor, whatever the poll count', () => {
     const v = pollBudget({ polls: 1, expectedMs: 100_000, elapsedMs: 100_000 * HUNG_FACTOR + 1 })
     expect(v.verdict).toBe('hung')
+  })
+
+  // ASTRA REVIEW ROUND 1 — the counted poll told the caller to kill a run on the
+  // clock alone, which is exactly the verdict the wait had stopped giving. One
+  // path saying "slow" while the other says "kill it" is no repair at all.
+  it('says SLOW, not hung, while the run is still writing', () => {
+    const v = pollBudget({ polls: 1, expectedMs: 100_000, elapsedMs: 100_000 * HUNG_FACTOR + 1, silentForMs: 60_000 })
+    expect(v.verdict).toBe('slow')
+    expect(v.message).toMatch(/--await/)
+    expect(v.message).not.toMatch(/HUNG/)
+  })
+
+  it('still calls it hung once the silence outlasts the progress lease', () => {
+    const v = pollBudget({
+      polls: 1, expectedMs: 100_000, elapsedMs: 100_000 * HUNG_FACTOR + 1, silentForMs: PROGRESS_LEASE_MS + 1,
+    })
+    expect(v.verdict).toBe('hung')
+  })
+
+  it('never turns silence into an EARLY hung verdict', () => {
+    expect(pollBudget({ polls: 1, expectedMs: 100_000, elapsedMs: 10_000, silentForMs: PROGRESS_LEASE_MS * 10 }).verdict)
+      .toBe('poll')
   })
 
   it('does not invent a hang when nothing was measured', () => {

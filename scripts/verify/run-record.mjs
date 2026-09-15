@@ -328,12 +328,26 @@ export function newestFrameMtimeMs({ dir = FRAME_DIR, since = null } = {}) {
  * Returns null when nothing could be read at all, which callers treat as
  * "nobody looked" and not as "nothing happened".
  */
-export function lastProgressAtFor({ logPath = null, recordPath = null, frameDir = FRAME_DIR, since = null } = {}) {
+export function lastProgressAtFor({
+  logPath = null, recordPath = null, frameDir = FRAME_DIR, since = null, record = undefined,
+} = {}) {
+  // THE WRITER'S OWN MARK WINS, AND IS THE ONLY ONE A POLL CANNOT MOVE (Astra
+  // review round 1). `countPoll` rewrites the record, so reading the record
+  // FILE's mtime let a reader manufacture the progress it was looking for —
+  // poll a wedged run often enough and it never reports hung. `lastProgressAt`
+  // is written by run-logged.mjs alone, from what the child really produced.
+  const carried = recordPath !== null && record === undefined ? readRecord(resolveIn(recordPath)) : record
+  const own = carried?.lastProgressAt
+  if (typeof own === 'number' && Number.isFinite(own)) return own
+  // FALLBACK, for a record written before the field existed: the file marks and
+  // the frames. Both are weaker — the frame directory is shared, so a second
+  // concurrent run's pictures would vouch for this one — which is why the writer
+  // owns the mark above and this branch only serves old records.
   const marks = []
   for (const path of [logPath, recordPath]) {
     if (typeof path !== 'string' || path.trim() === '') continue
     try {
-      marks.push(statSync(isAbsolute(path) ? path : join(ROOT, path)).mtimeMs)
+      marks.push(statSync(resolveIn(path)).mtimeMs)
     } catch {
       /* an absent log or record is not a progress mark */
     }
@@ -342,3 +356,5 @@ export function lastProgressAtFor({ logPath = null, recordPath = null, frameDir 
   if (frames !== null) marks.push(frames)
   return marks.length > 0 ? Math.max(...marks) : null
 }
+
+const resolveIn = (path) => (isAbsolute(path) ? path : join(ROOT, path))

@@ -191,6 +191,38 @@ describe('--await: one blocking call, and no poll counted', () => {
     expect(res.stdout).toMatch(/STILL WORKING/)
   })
 
+  // ASTRA REVIEW ROUND 1, end to end: the counted poll reads the WRITER's mark out
+  // of the record, so counting the poll cannot manufacture the life it reports.
+  it('the counted poll calls a still-writing run SLOW, not hung', () => {
+    const startedAt = Date.now() - 40 * 60_000
+    const { dir, log } = fixture({
+      ...finished,
+      status: 'running',
+      pid: process.pid,
+      expectedRuntimeMs: 60_000,
+      startedAt,
+      lastProgressAt: Date.now() - 60_000,
+    })
+    const res = run(['--status', log], { HOA_FRAME_DIR: join(dir, 'no-frames') })
+    expect(res.stdout).toMatch(/SLOW, not hung/)
+    expect(res.status).toBe(0)
+  })
+
+  it('the counted poll still says HUNG once the writer\'s mark has gone stale', () => {
+    const startedAt = Date.now() - 40 * 60_000
+    const { dir, log } = fixture({
+      ...finished,
+      status: 'running',
+      pid: process.pid,
+      expectedRuntimeMs: 60_000,
+      startedAt,
+      lastProgressAt: startedAt,
+    })
+    const res = run(['--status', log], { HOA_FRAME_DIR: join(dir, 'no-frames') })
+    expect(res.stdout).toMatch(/HUNG/)
+    expect(res.status).toBe(4)
+  })
+
   it('refuses to guess which of two live runs it is waiting for', () => {
     const dir = mkdtempSync(join(tmpdir(), 'hoa-runwait-two-'))
     for (const name of ['2026-09-03T00-10-00-000-large', '2026-09-03T00-40-00-000-docs']) {
@@ -226,15 +258,17 @@ describe('--status: the ONE counted poll', () => {
     expect(spent.stdout).toMatch(/--await/)
   })
 
-  it('calls a run hung past the measured factor, with a non-zero exit', () => {
-    const { log } = fixture({
+  it('calls a SILENT run hung past the measured factor, with a non-zero exit', () => {
+    const startedAt = Date.now() - 40 * 60_000
+    const { dir, log } = fixture({
       ...finished,
       status: 'running',
       pid: process.pid,
-      startedAt: Date.now() - 600_000,
+      startedAt,
       expectedRuntimeMs: 60_000,
+      lastProgressAt: startedAt,
     })
-    const res = run(['--status', log])
+    const res = run(['--status', log], { HOA_FRAME_DIR: join(dir, 'no-frames') })
     expect(res.status).toBe(4)
     expect(res.stdout).toMatch(/HUNG/)
   })

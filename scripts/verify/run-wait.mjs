@@ -264,7 +264,9 @@ async function doAwait(logArg, timeoutS) {
   // question. A run that has written something within the progress lease is
   // SLOW — the word for it is the STILL RUNNING line below, not HUNG.
   const status = waitStatus()
-  const progressAt = lastProgressAtFor({ logPath: current?.log ?? null, recordPath: path, since: current?.startedAt ?? null })
+  const progressAt = lastProgressAtFor({
+    logPath: current?.log ?? null, recordPath: path, record: current, since: current?.startedAt ?? null,
+  })
   const silent = progressAt === null || Date.now() - progressAt >= PROGRESS_LEASE_MS
   const hung = status.hung.some((lease) => lease.runId === runId) ||
     (silent && Number.isFinite(current?.expectedRuntimeMs) && current.expectedRuntimeMs > 0 &&
@@ -303,11 +305,18 @@ function doStatus(logArg) {
     return exitOf(fresh)
   }
   const counted = countPoll(path) ?? record
+  // COUNTING THE POLL MUST NOT MANUFACTURE THE PROGRESS IT THEN READS (Astra
+  // review round 1): `countPoll` rewrites the record, so the mark is read from
+  // the WRITER's own field in it, never from the file's mtime.
+  const progressAt = lastProgressAtFor({
+    logPath: counted.log ?? null, recordPath: path, record: counted, since: counted.startedAt ?? null,
+  })
   const verdict = pollBudget({
     polls: counted.polls,
     running: true,
     expectedMs: counted.expectedRuntimeMs ?? null,
     elapsedMs: elapsedMs(counted),
+    silentForMs: progressAt === null ? null : Math.max(0, Date.now() - progressAt),
   })
   console.log(
     `RUNNING  ${counted.command ?? '?'} — ${formatDuration(elapsedMs(counted))} elapsed of an expected ` +

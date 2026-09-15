@@ -176,6 +176,8 @@ export function leaseProgress(lease) {
   const logPath = lease?.logPath ?? null
   const recordPath = lease?.recordPath ?? (logPath ? recordPathFor(logPath) : null)
   if (!logPath && !recordPath) return null
+  // The run's OWN mark where the record carries one — a poll's bookkeeping must
+  // never be able to pass for the run's progress (Astra review round 1).
   return lastProgressAtFor({ logPath, recordPath, since: lease?.startedAt ?? null })
 }
 

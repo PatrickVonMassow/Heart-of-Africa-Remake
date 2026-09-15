@@ -153,8 +153,13 @@ the two ways out. The count is printed in the receipt, so the rule is visible in
 the transcript rather than remembered.
 
 **Long is not hung (point 1137).** Past **2.5 ×** its expectation a run is
-*overdue*. It is *hung* only when it is ALSO silent — nothing written to its log,
-its record or a frame for a whole 15-minute progress lease. The clock alone could
+*overdue*. It is *hung* only when it is ALSO silent — nothing produced for a
+whole 15-minute progress lease. That silence is judged on the **writer's own
+mark**: `run-logged.mjs` stamps `lastProgressAt` into the record from what its
+child really emitted and from its own frame sampling, so a reader's bookkeeping
+can never pass for the run's progress (`--status` rewrites the record when it
+counts a poll). `--await` and `--status` ask the same question and give the same
+answer: a run that is still writing is `SLOW`, never `HUNG`. The clock alone could
 never say it: the §1 plan is measured to be a third to two thirds of the real
 cost, so the hung mark for a whole `polish` pass falls at 14 minutes against a
 measured 9.9–61.5, and on 15.09.2026 a run that had already written 34 of its 21

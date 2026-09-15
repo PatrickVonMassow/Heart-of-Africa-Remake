@@ -140,6 +140,25 @@ describe('the last sign of life (point 1137)', () => {
     expect(at).toBeGreaterThan(stale.getTime())
   })
 
+  // ASTRA REVIEW ROUND 1 — `countPoll` rewrites the record, so a reader that took
+  // the record FILE's mtime for progress could manufacture the life it was
+  // looking for: poll a wedged run often enough and it never reports hung.
+  it('prefers the WRITER\'S OWN mark, which no reader\'s bookkeeping can move', () => {
+    const dir = tmp()
+    const log = join(dir, 'run.log')
+    writeFileSync(log, 'x')
+    const written = Date.now() - 45 * 60_000
+    expect(lastProgressAtFor({ logPath: log, record: { lastProgressAt: written } })).toBe(written)
+  })
+
+  it('falls back to the file marks only for a record that carries no mark', () => {
+    const dir = tmp()
+    const log = join(dir, 'run.log')
+    writeFileSync(log, 'x')
+    expect(lastProgressAtFor({ logPath: log, record: null, frameDir: join(dir, 'absent') }))
+      .toBeGreaterThan(Date.now() - 60_000)
+  })
+
   it('ignores a path it cannot stat instead of counting it as silence', () => {
     const dir = tmp()
     const log = join(dir, 'run.log')
