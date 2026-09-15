@@ -19,6 +19,7 @@
 // The module is pure: no three, no scene. `PlaceLife` gives it the live village
 // and carries out what comes back.
 
+import { DIG_ARRIVE_RADIUS, digStandingPlaces } from './placeGround'
 import { SpeechFloor } from '../../communication/speechFloor'
 import { balance } from '../../config/balance'
 import type { ConceptId } from '../../communication/lexicon'
@@ -44,6 +45,8 @@ export interface ErrandPoint { x: number; z: number }
 
 export interface DigSite extends ErrandPoint {
   kind: 'pit' | 'postHole' | 'patch'
+  /** Layout-selected orientation gives the heap and purpose props free ground. */
+  rotation?: number
 }
 
 export interface AdultWorkGeography {
@@ -131,10 +134,12 @@ export interface AdultTask extends ErrandPoint {
 }
 
 export interface DigSiteProgress {
-  /** Worker-seconds accumulated at this site during the visit. */
+  /** Worker-seconds accumulated at this site across visits. */
   dug: number
-  /** Completed tool strikes accumulated at this site during the visit. */
+  /** Completed tool strikes accumulated at this site across visits. */
   strikes: number
+  /** At least one pair has finished its bout here. */
+  completed?: boolean
 }
 
 export interface AdultWorkState {
@@ -170,7 +175,7 @@ function joinSpot(view: AdultWorkView, site: ErrandPoint, rand: () => number): E
   return null
 }
 
-export function createAdultWork(count: number, cfg: AdultWorkConfig): AdultWorkState {
+export function createAdultWork(count: number, cfg: AdultWorkConfig, progress: readonly DigSiteProgress[] = []): AdultWorkState {
   return {
     clock: 0,
     emitted: [],
@@ -179,13 +184,18 @@ export function createAdultWork(count: number, cfg: AdultWorkConfig): AdultWorkS
     staged: {},
     next: cfg.intervalSeconds,
     cursor: 0,
-    siteProgress: {},
+    siteProgress: Object.fromEntries(progress.map((p, i) => [i, { ...p }])),
     standJars: 0,
   }
 }
 
 export function taskOf(state: AdultWorkState, index: number): AdultTask | null {
   return state.tasks[index] ?? null
+}
+
+export function workArrivalRadius(task: AdultTask): number {
+  return task.siteIndex !== null && (task.phase === 'site' || task.phase === 'dig')
+    ? DIG_ARRIVE_RADIUS : WORK_ARRIVE_RADIUS
 }
 
 export function goalOf(task: AdultTask): ErrandPoint {
@@ -206,6 +216,7 @@ export function digProgressOf(state: AdultWorkState, siteCount: number): DigSite
   return Array.from({ length: siteCount }, (_, i) => ({
     dug: state.siteProgress[i]?.dug ?? 0,
     strikes: state.siteProgress[i]?.strikes ?? 0,
+    ...(state.siteProgress[i]?.completed ? { completed: true } : {}),
   }))
 }
 
@@ -336,10 +347,10 @@ function startJointWalk(state: AdultWorkState, initiator: AdultTask, geography: 
   if (initiator.partner === null || initiator.siteIndex === null) return
   const partner = state.tasks[initiator.partner]
   const site = geography.digSites[initiator.siteIndex]
-  if (!partner || !site) return
+  if (!partner || !site || !initiator.standSpot) return
   initiator.phase = 'site'
-  initiator.x = site.x
-  initiator.z = site.z
+  initiator.x = initiator.standSpot.x
+  initiator.z = initiator.standSpot.z
   initiator.arrived = false
   initiator.owes = true
   initiator.pendingWord = {
@@ -457,7 +468,7 @@ export function stepAdultWork(
     }
 
     const goal = goalOf(t)
-    if (!t.arrived && Math.hypot(me.x - goal.x, me.z - goal.z) <= WORK_ARRIVE_RADIUS) {
+    if (!t.arrived && Math.hypot(me.x - goal.x, me.z - goal.z) <= workArrivalRadius(t)) {
       t.arrived = true
       t.dug = 0
     }
@@ -517,7 +528,10 @@ export function stepAdultWork(
       const progress = (state.siteProgress[t.siteIndex] ??= { dug: 0, strikes: 0 })
       progress.dug += dt
       if (digStrikeCrossed(before, t.dug, i * 0.37)) progress.strikes++
-      if (t.dug >= cfg.digSeconds) clearPair(state, i)
+      if (t.dug >= cfg.digSeconds) {
+        progress.completed = true
+        clearPair(state, i)
+      }
     } else if (t.arrived && t.phase === 'fetch' && !t.via) {
       // ARRIVING AT THE WATER OPENS THE FILL, IT DOES NOT END THE ERRAND. The
       // jar used to flip to 'fullJar' at the next casting, with nothing shown in
@@ -625,12 +639,13 @@ export function stepAdultWork(
       const start = (state.staged[id] ?? 0) + (id === 'dig-second' ? 1 : 0)
       const selected = digSiteFor(state, view, start, who)
       if (!selected) continue
-      const spot = joinSpot(view, selected.site, rand)
-      if (!spot) continue
+      const spots = digStandingPlaces(selected.site, view.standable)
+      if (!spots) continue
+      const [initiatorSpot, spot] = spots
 
       const partnerAt = view.villagers[mate]
       state.tasks[who] = {
-        situation: id, phase: 'invite', carry: 'digTool', role: 'initiator', partner: mate, orderedBy: null, standSpot: null,
+        situation: id, phase: 'invite', carry: 'digTool', role: 'initiator', partner: mate, orderedBy: null, standSpot: initiatorSpot,
         siteIndex: selected.index, x: partnerAt.x, z: partnerAt.z, arrived: false, dug: 0,
         owes: true, say: null, via: null, age: 0,
       }

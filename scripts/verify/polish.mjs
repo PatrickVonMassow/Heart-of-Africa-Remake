@@ -24,7 +24,9 @@ import {
   shuffleWindows,
   traceLiveness,
 } from './childMotionMetric.mjs'
+import { DIG_PICTURE, digPictureUnmounted, digPictureView, captureSpoilWalk } from './digSitePicture.mjs'
 import { sectionGate } from './sections.mjs'
+import { onBaselineLane } from './baseline-classify-core.mjs'
 import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
 
@@ -5459,32 +5461,6 @@ if (section('adult-errands')) {
         : 'NO ADULT SPOKE IN THE WINDOW — nothing was measured',
     )
 
-    // The picture: a villager standing at the ground work it was sent to.
-    const spot = await page.evaluate(() => {
-      const s = window.__placeErrands()
-      const site = s.geography.digSites[0]
-      return site ? { x: site.x, z: site.z } : null
-    })
-    if (spot) {
-      await page.evaluate(({ x, z }) => {
-        const p = window.__placePlayer
-        // Six metres short of the patch, on the village-centre side of it, and
-        // TURNED TO IT: the yaw convention here is the one the rest of this
-        // suite uses (atan2 of the NEGATED offset), because the camera looks
-        // down its own −Z.
-        const bearing = Math.atan2(x, z)
-        p.x = x - Math.sin(bearing) * 6
-        p.z = z - Math.cos(bearing) * 6
-        p.yaw = Math.atan2(-(x - p.x), -(z - p.z))
-        p.pitch = -0.12
-      }, spot)
-      await nextFrames(6)
-      await frame('483-village-errands', {
-        local: { x: spot.x, y: 0.6, z: spot.z },
-        label: 'the ground work the adults teach digging at, off the village middle',
-      })
-    }
-
     // --- THE FILL READS AS FETCHING, NOT AS FALLING (work-order 1085) ---------
     // Four re-aimed cameras all read the old fill as a man face-down in the
     // river, so what is photographed here is the FIGURE, not another angle on
@@ -6249,6 +6225,100 @@ if (section('adult-errands')) {
       )
     }
   }
+
+  // The shared excavation picture has its own measured composition, within the
+  // same adult-errands run. Seed 12 puts a store pit and patch 6.38 m apart with
+  // an open standing view (the layout unit test pins both the view and crossing).
+  //
+  // IT ASKS THE BUILD WHETHER IT CAN BE PHOTOGRAPHED AT ALL. The baseline
+  // classifier runs THIS suite file against the PRE-CHANGE app, which has no
+  // durable dig record — and an unguarded call to it threw an uncaught
+  // TypeError that killed the whole baseline run after 225 of 274 checks, twice
+  // (measured 14.09.2026). A died baseline yields no verdict, so every red of
+  // this suite then defaults to "real regression" and the point is held by a
+  // crash rather than by evidence. Skipping the block instead leaves the other
+  // 225 checks classifiable, which is the entire purpose of the baseline lane.
+  // ONLY THE BASELINE LANE MAY STAND THE BLOCK DOWN. The exemption exists for
+  // the PRE-change app, which has no durable dig record; on the candidate the
+  // same missing capability IS the regression this block is here to catch, and
+  // a silent SKIP would report it as green (GPT-6 Astra, cross-vendor review of
+  // 23495d5, 14.09.2026). `baseline-classify.mjs` sets the marker when it spawns
+  // the suite inside the baseline checkout, and nothing else sets it.
+  const baselineLane = onBaselineLane(process.env)
+  const digPictureSupported = await page.evaluate(
+    () => typeof window.__game.getState().recordVillageDig === 'function',
+  )
+  if (!digPictureSupported && baselineLane) {
+    console.log('  SKIP  the excavation picture — this BASELINE build has no durable dig record to pose it from')
+  }
+  if (!digPictureSupported && !baselineLane) {
+    check(
+      'the build carries the durable dig record the excavation picture is posed from',
+      false,
+      'window.__game.getState().recordVillageDig is not a function, and this is not the baseline lane',
+    )
+  }
+  if (digPictureSupported) {
+  const digPictureSaved = await page.evaluate(() => {
+    const g = window.__game.getState()
+    const saved = { seed: g.seed, progress: g.villageDigProgress, conceptLabels: window.__ui.getState().speechConceptLabels,
+      interval: window.__balance.villageLife.adultErrands.intervalSeconds }
+    if (g.placeId) g.leavePlace()
+    return saved
+  })
+  await page.waitForFunction(digPictureUnmounted, null, { timeout: 30000 })
+  try {
+    await page.evaluate(({ placeId, seed }) => {
+      window.__ui.getState().setSpeechConceptLabels(false)
+      window.__game.setState({ seed })
+      // Load finished bouts through the durable game path. A single accelerated
+      // three-second bout is only six worker-seconds, not the full 18 required
+      // for a 0.54 m mound. Both the drawn meshes and live ground read this save.
+      window.__game.getState().recordVillageDig(placeId, [
+        { dug: 18, strikes: 12, completed: true }, { dug: 18, strikes: 12, completed: true },
+      ])
+      window.__balance.villageLife.adultErrands.intervalSeconds = 10000
+      window.__game.getState().enterPlace(placeId)
+    }, DIG_PICTURE)
+    const mounted = await page.waitForFunction(() => window.__placeWalkers?.sample && window.__placeErrands,
+      null, { timeout: 40000 }).then(() => true).catch(() => false)
+    check('the composed excavation village mounts with a sampled inhabitant', mounted)
+    if (mounted) {
+      const sites = await page.evaluate(() => window.__placeErrands().geography.digSites)
+      const view = digPictureView(sites)
+      check('the excavation picture has two distinct nearby sites', !!view, JSON.stringify(sites))
+      if (view) {
+        await page.evaluate((view) => {
+          Object.assign(window.__placePlayer, view)
+          window.__game.getState().setJournalOpen(false)
+          window.__speech?.clear()
+        }, view)
+        await nextFrames(6)
+        const route = await page.evaluate(async () => {
+          const { digLocalToWorld, spoilOffset, placeGroundHeight } = await import('/src/scenes/place/placeGround.ts')
+          const layout = window.__placeLayout
+          const site = layout.digSites.find((s) => s.kind === 'patch')
+          const start = digLocalToWorld(site, spoilOffset(site), -1.6)
+          const end = digLocalToWorld(site, spoilOffset(site), 1.6)
+          const ground = { bank: layout.bank, sites: layout.digSites, progress: window.__placeErrands().digProgress }
+          if (Math.abs(placeGroundHeight(ground, start.x, start.z)) > 0.001) return null
+          return { who: 0, start, end }
+        })
+        check('the spoil crossing starts on flat ground', !!route, JSON.stringify(route))
+        if (route) await captureSpoilWalk(page, check, frame, nextFrames, route)
+      }
+    }
+  } finally {
+    await page.evaluate(() => window.__game.getState().leavePlace())
+    await page.waitForFunction(digPictureUnmounted, null, { timeout: 30000 })
+    await page.evaluate((saved) => {
+      window.__game.setState({ seed: saved.seed, villageDigProgress: saved.progress })
+      window.__ui.getState().setSpeechConceptLabels(saved.conceptLabels)
+      window.__balance.villageLife.adultErrands.intervalSeconds = saved.interval
+    }, digPictureSaved)
+  }
+  }
+
 }
 
 // --- Head clearance under the eaves (design.md §2.6, work-order 349) ----------

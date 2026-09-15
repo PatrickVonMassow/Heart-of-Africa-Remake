@@ -28,6 +28,8 @@ import {
   type PlaceRiverBank,
 } from './riverBank'
 import { balance } from '../../config/balance'
+import { digLocalToWorld, digStandingPlaces, spoilCentre, SPOIL_RADIUS_X } from './placeGround'
+import { digFurnitureFootprints } from './digSiteAppearance'
 import { WORK_ARRIVE_RADIUS } from './adultWork'
 import { devAssert } from '../../systems/devAssert'
 import type { BuildingType } from '../../state/ui'
@@ -103,7 +105,7 @@ export interface PlaceLayout {
    * a turned patch at the edge of the worked ground. Digging in the middle of
    * the village square is what made the old picture read as meaningless.
    */
-  digSites: Array<{ x: number; z: number; kind: 'pit' | 'postHole' | 'patch' }>
+  digSites: Array<{ x: number; z: number; kind: 'pit' | 'postHole' | 'patch'; rotation?: number }>
   /**
    * The walkable river bank (work-order 482), where the settlement stands on a
    * river: which way the water lies, which way it runs, and the three points on
@@ -1897,14 +1899,14 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   // villagers dig — a store pit, a post hole and a patch turned over. They are
   // placed like every other loose object (free ground, off the lanes, seeded by
   // the same generator) and they carry NO collider: a shallow pit is walked
-  // over, and the villager working it must be able to stand IN it.
+  // over. The pair works from safe places on the rim.
   //
   // THEY LEAVE THE MIDDLE (work-order 688). The first placement swept the whole
   // open ground from 5 m out, which put men digging on the village square beside
   // a boulder that stood there for no reason — the picture the user read as
   // meaningless on 13.08.2026. Each kind now stands where its own work belongs:
   // the store pit at a compound edge, the post hole beside a lane, the turned
-  // patch out at the edge of the worked ground. All three keep clear of
+  // patch out at the edge of the worked ground. Both sites keep clear of
   // `CENTRAL_GROUND_RADIUS`, the open middle the fire, the pounder and the
   // talkers share.
   const digSites: PlaceLayout['digSites'] = []
@@ -1935,42 +1937,67 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
       // last compound rather than between them.
       patch: (x, z) => Math.hypot(x, z) >= radius * DIG_SITE_FIELD_BAND,
     }
-    const kinds: Array<PlaceLayout['digSites'][number]['kind']> = ['pit', 'postHole', 'patch']
-    for (const kind of kinds) {
-      // TWO PASSES, AND THE ORDER OF THEM IS THE RULE. The first asks for the
-      // spot the work belongs at; the second drops that and takes any spot
-      // outside the middle. What is NEVER dropped is the central ground and the
-      // children's earshot — those are what the point is about — while the
-      // anchor is what a ksar, the densest plan there is, cannot always give:
-      // measured at tuareg-village, no ground beside a lane there is both free
-      // and outside the middle, and a village short of a work site is worse than
-      // a post hole away from its lane.
-      for (const anchored of [true, false]) {
-        // A deterministic golden-angle sweep over the ground outside the middle.
-        for (let i = 0; i < 240 && !digSites.some((s) => s.kind === kind); i++) {
-          const a = rand() * Math.PI * 2 + i * 2.399963
-          const r = CENTRAL_GROUND_RADIUS + DIG_SITE_RADIUS + (i % 24) * 0.62
+    // Rank all candidates by distance inland, then retain the first that fits
+    // its purpose. Riverless villages have no shore half to clear.
+    const angle = rand() * Math.PI * 2
+    const inland = (p: { x: number; z: number }) => bank
+      ? -(p.x * bank.nx + p.z * bank.nz) : Math.hypot(p.x, p.z)
+    const siteCandidates = (radialStep: number, bearings: number) => {
+      const out: Array<{ x: number; z: number }> = []
+      for (let r = CENTRAL_GROUND_RADIUS + DIG_SITE_RADIUS; r < radius - 1.5; r += radialStep) {
+        for (let bearing = 0; bearing < bearings; bearing++) {
+          const a = angle + bearing * Math.PI * 2 / bearings
           const x = Math.cos(a) * r
           const z = Math.sin(a) * r
-          if (!isFree(x, z, 2.4, DIG_SITE_RADIUS) || onLane(x, z, DIG_SITE_RADIUS + 0.4)) continue
-          if (digSites.some((s) => Math.hypot(s.x - x, s.z - z) < 3)) continue
-          if (!standingClear(colliders, x, z, WALKER_RADIUS)) continue
-          if (toChildren(x, z) < earshot) continue
-          if (anchored && !belongs[kind](x, z)) continue
-          digSites.push({ x, z, kind })
+          if (bank && x * bank.nx + z * bank.nz >= -DIG_SITE_RADIUS) continue
+          out.push({ x, z })
         }
       }
-      // A kind the two passes could not place leaves the village short of a work
-      // site — and with fewer than two sites the joined dig cannot be shown at
-      // all. `layout.test.ts` sweeps every village at every seed and finds all
-      // three, so this firing means a plan changed under the rule rather than an
-      // ordinary unlucky draw (GPT-5.6 Sol, first cross-vendor round, B3).
-      devAssert(
-        digSites.some((s) => s.kind === kind),
-        'dig-site-missing',
-        () => `${place.id}: no ${kind} could be placed outside the middle and clear of the children`,
-      )
+      return out.sort((a, b) => inland(b) - inland(a))
     }
+    const candidates = siteCandidates(0.4, 96)
+    const standable = (x: number, z: number) =>
+      Math.hypot(x, z) < radius - WALKER_RADIUS && standingClear(colliders, x, z, WALKER_RADIUS)
+    const placeSite = (kind: PlaceLayout['digSites'][number]['kind'], points = candidates) => {
+      for (const p of points) {
+        const { x, z } = p
+        if (!belongs[kind](x, z)) continue
+        if (!isFree(x, z, 2.4, DIG_SITE_RADIUS) || onLane(x, z, DIG_SITE_RADIUS + 0.4)) continue
+        if (digSites.some((s) => Math.hypot(s.x - x, s.z - z) < 6)) continue
+        if (toChildren(x, z) < earshot) continue
+        // Turn the whole working arrangement to fit the available ground;
+        // an arbitrary coordinate-derived heap side must not cost a site.
+        for (let turn = 0; turn < 12; turn++) {
+          const site = { x, z, kind, rotation: x * 2.3 + z + turn * Math.PI / 6 }
+          const heap = spoilCentre(site)
+          // Reserve room for the whole mound, without adding an obstacle.
+          if (Math.hypot(heap.x, heap.z) + SPOIL_RADIUS_X >= radius - 0.5) continue
+          if (!standingClear(colliders, heap.x, heap.z, SPOIL_RADIUS_X)) continue
+          if (digFurnitureFootprints(kind).some((prop) => {
+            const at = digLocalToWorld(site, prop.x, prop.z)
+            return Math.hypot(at.x, at.z) + prop.radius >= radius - 0.5
+              || !standingClear(colliders, at.x, at.z, prop.radius)
+          })) continue
+          if (!standable(x, z) || !digStandingPlaces(site, standable)) continue
+          digSites.push(site)
+          return true
+        }
+      }
+      return false
+    }
+    // Keep the storage purpose where a compound gives it room; a lane post is
+    // the anchored alternative in a dense plan. The planting bed always stays.
+    let anchored = placeSite('pit') || placeSite('postHole')
+    // A narrow strip beside a compound can fall between the coarse samples.
+    // Refine the search before declaring the purpose impossible; no rule yields.
+    if (!anchored) {
+      const refined = siteCandidates(0.1, 720)
+      anchored = placeSite('pit', refined) || placeSite('postHole', refined)
+    }
+    const field = placeSite('patch') || placeSite('patch', siteCandidates(0.1, 720))
+    devAssert(anchored && field, 'dig-site-missing',
+      () => `${place.id}: no two inland work sites fit their anchors and safe rim positions`)
+
   }
 
 

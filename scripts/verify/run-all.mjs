@@ -15,7 +15,7 @@ import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { killTree, launchServer } from './_server.mjs'
-import { allChecks, changeRelatedness, countCheckLines, failedChecks, formatRepeatReport, repeatSignature } from './baseline-classify-core.mjs'
+import { allChecks, changeRelatedness, clearInheritedBaselineLane, countCheckLines, failedChecks, formatRepeatReport, repeatSignature } from './baseline-classify-core.mjs'
 import {
   LEVEL, annotateResult, annotateStageFailure, decideRun, formatLoadReport, onLoadMode,
 } from './machine-load-core.mjs'
@@ -41,6 +41,13 @@ import { classifyRedSuites } from './red-ownership.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const chargedPoints = new Set()
+
+// A REGRESSION PASS IS NEVER THE BASELINE LANE. Dropped from this process's own
+// environment, so no child — suite, retry, cross-browser check or Vitest — can
+// inherit a stale marker and stand a block down where a missing capability IS
+// the regression. Only baseline-classify.mjs writes the marker, on the suites it
+// spawns itself.
+clearInheritedBaselineLane(process.env)
 
 // Hybrid test architecture: the fast, deterministic Vitest layer (jsdom, no
 // browser) runs first (`unit` stage below) and covers all pure logic, store
