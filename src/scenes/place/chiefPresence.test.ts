@@ -123,8 +123,13 @@ describe('the passage at his hut', () => {
           const x = cx + Math.sin(a) * standOff
           const z = cz + Math.cos(a) * standOff
           if (!free(x, z)) continue
+          // Up to the contact itself: a flat 0.1 step left the last centimetres
+          // before his hem unread, and a prop there would stop the traveller
+          // before ever reaching the body this case promises he can reach.
+          const steps = Math.max(1, Math.ceil(walked / 0.1))
           let lane = true
-          for (let t = 0.1; t <= walked + 1e-9 && lane; t += 0.1) {
+          for (let i = 1; i <= steps && lane; i++) {
+            const t = (walked * i) / steps
             lane = free(x + (cx - x) * t, z + (cz - z) * t)
           }
           if (lane) { found = true; break }

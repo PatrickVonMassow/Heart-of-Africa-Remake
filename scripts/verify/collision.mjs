@@ -144,23 +144,49 @@ async function pushUntilClear(maxMs = 15000) {
   await page.waitForTimeout(120)
 }
 
-/** Hold forward until the traveller's feet are within `reach` of a fixed point (or a
- *  generous window). Same reason as pushUntilClear above: how far a held key walks is
- *  decided by the RENDER cadence, not by the number of presses — and the settlement
- *  scene under headless WebGPU draws about a third of a frame per second (measured
- *  15.09.2026: three frames in nine seconds). A fixed count of 40 ms presses then buys
- *  one or two steps and the walk stalls in open ground, well short of its target. */
-async function pushUntilWithin(target, reach, maxMs = 25000) {
+/** Hold forward until the traveller's feet are within `reach` of a fixed point and
+ *  STAY there while he keeps walking into it (or a generous window elapses).
+ *
+ *  Two measurements shape this. How far a held key walks is decided by the RENDER
+ *  cadence, not by the number of presses — this settlement under headless WebGPU
+ *  draws about a third of a frame per second (measured 15.09.2026: three frames in
+ *  nine seconds), so a fixed count of 40 ms presses buys one or two steps and the
+ *  walk stalls in open ground, well short of its target. And arriving at a distance
+ *  is not the same as being STOPPED at it: a traveller walking through a body that
+ *  does not resolve passes through `reach` on his way past. So the key stays held
+ *  for `settleFrames` further RENDERED frames, which without the body would carry
+ *  him a quarter of a metre per frame beyond it and redden the caller's assert. */
+async function pushUntilWithin(target, reach, { settleFrames = 3, maxMs = 40000 } = {}) {
+  // The render loop, counted: requestAnimationFrame drives it, so a tick here is a
+  // frame in which the resolver ran. Installed once and left standing.
+  await page.evaluate(() => {
+    if (window.__renderTicks !== undefined) return
+    window.__renderTicks = 0
+    const tick = () => {
+      window.__renderTicks++
+      requestAnimationFrame(tick)
+    }
+    requestAnimationFrame(tick)
+  })
   const t0 = Date.now()
   await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW' })))
+  let arrivedAtFrame = null
   while (Date.now() - t0 < maxMs) {
     await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW' })))
     await page.waitForTimeout(80)
-    const distance = await page.evaluate(
-      ({ x, z }) => Math.hypot(window.__placePlayer.x - x, window.__placePlayer.z - z),
+    const now = await page.evaluate(
+      ({ x, z }) => ({
+        distance: Math.hypot(window.__placePlayer.x - x, window.__placePlayer.z - z),
+        frames: window.__renderTicks,
+      }),
       target,
     )
-    if (distance <= reach) break
+    if (now.distance > reach) {
+      arrivedAtFrame = null
+      continue
+    }
+    if (arrivedAtFrame === null) arrivedAtFrame = now.frames
+    else if (now.frames - arrivedAtFrame >= settleFrames) break
   }
   await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyW' })))
   await page.waitForTimeout(120)
@@ -663,8 +689,13 @@ if (section('chief-body')) {
       // (STAND_OFF - r - 0.35) / STAND_OFF of the line — sample exactly that,
       // never the last stretch he is meant to be stopped in.
       const walked = (STAND_OFF - chief.r - 0.35) / STAND_OFF
+      // Sampled to the CONTACT itself: stepping by a flat 0.1 left the last
+      // three centimetres before his body unread, which is exactly where a prop
+      // would stop the traveller early and redden the block on its own geometry.
+      const laneSteps = Math.max(1, Math.ceil(walked / 0.1))
       const laneClear = (x, z) => {
-        for (let t = 0.1; t <= walked + 1e-9; t += 0.1) {
+        for (let i = 1; i <= laneSteps; i++) {
+          const t = (walked * i) / laneSteps
           if (!free(x + (chief.x - x) * t, z + (chief.z - z) * t)) return false
         }
         return true
