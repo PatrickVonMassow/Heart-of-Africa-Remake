@@ -340,7 +340,9 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   im dritten die Ursache: Die Prüfmechanik findet ihre eigenen Fehler, der Zulauf hat keine
   Grenze, das Projekt arbeitet an sich selbst.
   → *Prompt:* „Ein Befund wird nur Arbeitspunkt bei Nutzerwirkung, Risiko, echter Blockade oder
-  Vereinfachung. Sonst in eine gesammelte, **nicht blockierende** Liste."
+  Vereinfachung. Sonst in eine gesammelte, **nicht blockierende** Liste. Ein **übernommener**
+  Befund ist ein Befund, keine Messung: miss ihn gegen den **jetzigen** Stand nach, bevor er ein
+  Punkt wird — Zeitangaben in **einer** Zeitzone."
 
 - **Der Befund stirbt mit dem Gespräch — oder liegt dreimal abgelegt ganz hinten.**
   → *Prompt:* „Sichere Befunde mit einem billigen Kommando, das immer schreibt, und einer Prüfung,
@@ -380,7 +382,10 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   Delegaten für fremd: Die Übergabe nannte ihn nur im Text.
   → *Prompt:* „Trag jede wirksame Angabe in das **Feld**, das der Mechanismus liest; laufen beide
   auseinander, schlägt eine Prüfung fehl. Priorisiere das **Ziel**, und sag bei jeder
-  Sortierregel, was mit dem **Altbestand** geschieht: nachräumen oder liegen lassen."
+  Sortierregel, was mit dem **Altbestand** geschieht: nachräumen oder liegen lassen. Dein
+  **Arbeitsauftrag** ist selbst so ein Feld: Wächter leiten Pflichten aus seinen Sätzen ab, und
+  eine **Verneinung** in der Überschrift ist dort kein Stil, sondern ein Schalter — fordere eine
+  Pflicht **positiv** ein."
 
 - **Die Begründung, die sich im eigenen Dokument widerlegt.** Ein Sicherheitsargument und sein
   Gegenbeweis standen drei Abschnitte auseinander; vier Prüfrunden sahen je eine Hälfte, weil der
@@ -439,7 +444,10 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 - **Die Kur ist teurer als der Fehler.** Eine Regel, die ein seltenes Fehlverhalten sicher
   unterbindet, verbiegt alles andere mit.
   → *Prompt:* „Ein bestätigter Befund verpflichtet zur **Untersuchung**, nicht zur Änderung: Miss
-  die Kur gegen gesunde Fälle. Ist sie teurer, **buche** den Fehler mit Zahlen und verworfener Kur."
+  die Kur gegen gesunde Fälle. Ist sie teurer, **buche** den Fehler mit Zahlen und verworfener Kur.
+  Dasselbe gilt für deinen **Ablauf**: Zwingt die Kette aus Tor, Nummer und Tabelle jede
+  Zweiminutensache in einen Stundenvorgang, fehlt der **kleine Weg** — reine Prosa, die nur du
+  liest, wird **gemacht**, nicht eingereiht."
 
 - **Die Reihenfolge wird gerankt, nicht befolgt.** Die KI fängt Neues an, während halbfertige
   Zweige liegen; die Sortierprüfungen prüfen die Liste, nie den Punkt in Arbeit.
@@ -673,4 +681,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 01d7479e905e51ac57b3a2104c6fd700c707f418e2b3426264d3130147a9b57d -->
+<!-- GUIDE-FINGERPRINT: 937eadb420bc597dfadf83020f268071b84a905b1ccd4f5d783258e29f9c3759 -->
