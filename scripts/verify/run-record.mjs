@@ -24,7 +24,10 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 export const ROOT = join(HERE, '..', '..')
 
 /** Where the frames land — the one directory every suite's shutter writes to. */
-export const FRAME_DIR = join(ROOT, 'verification')
+/** `HOA_FRAME_DIR` redirects it, on the same grounds as `HOA_WAIT_LEASE_PATH`:
+ *  a fixture must be able to ask about frames without the live repository's
+ *  own `verification/` answering for it. */
+export const FRAME_DIR = process.env.HOA_FRAME_DIR || join(ROOT, 'verification')
 
 /** A written frame, as opposed to the README that shares the directory. */
 const FRAME_FILE = /\.(png|jpg|jpeg)$/i
@@ -284,4 +287,58 @@ export function countPoll(path) {
 /** Does this checkout have a frame directory at all (a worktree may not)? */
 export function frameDirExists() {
   return existsSync(FRAME_DIR)
+}
+
+/** The newest mtime among the frame files, or null when the directory cannot be
+ *  read. The render suites write frames THROUGHOUT their run, so this is the one
+ *  heartbeat a suite emits before it ends — `run-all.mjs` captures a suite's
+ *  output and prints its result line only once the suite is over. */
+export function newestFrameMtimeMs({ dir = FRAME_DIR, since = null } = {}) {
+  let names = []
+  try {
+    names = readdirSync(dir).filter((n) => FRAME_FILE.test(n))
+  } catch {
+    return null
+  }
+  // A frame OLDER than the run is a frame the run did not take: counting it
+  // would let yesterday's pictures vouch for today's wedge.
+  const floor = typeof since === 'number' && Number.isFinite(since) ? since : -Infinity
+  let newest = null
+  for (const name of names) {
+    try {
+      const { mtimeMs } = statSync(join(dir, name))
+      if (mtimeMs < floor) continue
+      if (newest === null || mtimeMs > newest) newest = mtimeMs
+    } catch {
+      /* a file that vanished mid-scan says nothing about progress */
+    }
+  }
+  return newest
+}
+
+/**
+ * WHEN DID THIS RUN LAST SHOW A SIGN OF LIFE (point 1137)?
+ *
+ * The newest of three marks, because no single one covers a whole run: the LOG
+ * grows at every stage and suite boundary, the RECORD is rewritten when the run
+ * starts and ends, and the FRAMES advance inside a long render suite, which is
+ * the stretch the log cannot see. Anything unreadable is left out rather than
+ * counted as silence — a probe that cannot see is not evidence of a wedge.
+ *
+ * Returns null when nothing could be read at all, which callers treat as
+ * "nobody looked" and not as "nothing happened".
+ */
+export function lastProgressAtFor({ logPath = null, recordPath = null, frameDir = FRAME_DIR, since = null } = {}) {
+  const marks = []
+  for (const path of [logPath, recordPath]) {
+    if (typeof path !== 'string' || path.trim() === '') continue
+    try {
+      marks.push(statSync(isAbsolute(path) ? path : join(ROOT, path)).mtimeMs)
+    } catch {
+      /* an absent log or record is not a progress mark */
+    }
+  }
+  const frames = newestFrameMtimeMs({ dir: frameDir, since })
+  if (frames !== null) marks.push(frames)
+  return marks.length > 0 ? Math.max(...marks) : null
 }

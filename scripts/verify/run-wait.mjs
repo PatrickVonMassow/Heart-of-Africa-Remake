@@ -41,6 +41,7 @@ import {
   activeRecordPath,
   countPoll,
   elapsedMs,
+  lastProgressAtFor,
   liveRecordPaths,
   logDir,
   readRecord,
@@ -48,7 +49,7 @@ import {
   runIsLive,
 } from './run-record.mjs'
 import { claimWait, finishWait, waitStatus } from '../wait-lease.mjs'
-import { runIdFromLog } from '../wait-lease-core.mjs'
+import { PROGRESS_LEASE_MS, runIdFromLog } from '../wait-lease-core.mjs'
 
 const USAGE = [
   'usage:',
@@ -243,9 +244,18 @@ async function doAwait(logArg, timeoutS) {
   const waited = elapsedMs(current) ?? budget
   // The crossing is now EVIDENCE, not advice: the registry journals it once and
   // says whether this run has passed its hung mark.
-  const status = waitStatus({ lastProgressAt: current?.startedAt ?? null })
+  //
+  // WHAT THE RUN ITSELF SAYS COMES FIRST (point 1137). This used to hand the
+  // registry the run's own START time as its "last progress", which made every
+  // long run look silent since the second it began; the registry now probes the
+  // lease's log, record and frames, and this call's own fallback asks the same
+  // question. A run that has written something within the progress lease is
+  // SLOW — the word for it is the STILL RUNNING line below, not HUNG.
+  const status = waitStatus()
+  const progressAt = lastProgressAtFor({ logPath: current?.log ?? null, recordPath: path, since: current?.startedAt ?? null })
+  const silent = progressAt === null || Date.now() - progressAt >= PROGRESS_LEASE_MS
   const hung = status.hung.some((lease) => lease.runId === runId) ||
-    (Number.isFinite(current?.expectedRuntimeMs) && current.expectedRuntimeMs > 0 &&
+    (silent && Number.isFinite(current?.expectedRuntimeMs) && current.expectedRuntimeMs > 0 &&
       waited > current.expectedRuntimeMs * 2.5)
   console.log(
     `STILL RUNNING after ${formatDuration(waited)} — this call's ${formatDuration(budget)} is spent, the run is not. ` +
@@ -254,10 +264,17 @@ async function doAwait(logArg, timeoutS) {
   )
   if (hung) {
     console.log(
-      `HUNG — ${formatDuration(waited)} is past 2.5x this run's expectation. The wait has been recorded as hung and ` +
-        'the batch emergency lane will treat it as a standstill; end the run rather than waiting again.',
+      `HUNG — ${formatDuration(waited)} is past 2.5x this run's expectation AND it has written nothing for ` +
+        `${formatDuration(PROGRESS_LEASE_MS)}. The wait has been recorded as hung and the batch emergency lane will ` +
+        'treat it as a standstill; end the run rather than waiting again.',
     )
     return 5
+  }
+  if (progressAt !== null) {
+    console.log(
+      `# STILL WORKING — last sign of life ${formatDuration(Date.now() - progressAt)} ago (its log, record or a ` +
+        'frame it wrote). Long is not hung: wait again rather than ending it.',
+    )
   }
   return 3
 }

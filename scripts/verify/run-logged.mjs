@@ -66,10 +66,13 @@ import { cacheEnvironment, cleanWorktree, findGreenReceipt, formatCachedGreen } 
 import { waitForLargeRun } from './large-run-wait.mjs'
 import { LADDER_STATUS, formatLadderRefusal } from './ladder-core.mjs'
 import { ladderCheck } from './ladder.mjs'
+// ONE DEFINITION OF THE PROGRESS LEASE (point 1137): this wrapper renews it, and
+// the wait registry decides against it. Two copies of the same 15 minutes is how
+// they drift apart.
+import { PROGRESS_LEASE_MS } from '../wait-lease-core.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, '..', '..')
-const PROGRESS_LEASE_MS = 15 * 60_000
 const PROGRESS_EMIT_MS = 60_000
 const RUNNER_STARTED_AT = Date.now() - Math.round(process.uptime() * 1000)
 
