@@ -1574,7 +1574,7 @@ stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die s
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Dienstag, 15.09.2026, 15:43 · Quellen-Fingerprint: `a14cd688cb26…`
+Zuletzt aktualisiert: Dienstag, 15.09.2026, 15:51 · Quellen-Fingerprint: `df5ff0e382ca…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1614,7 +1614,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to the OpenAI lane, GPT-6 Astra), and review is cross-vendor, not Fable-by-default | 6 | hoch | — (Regel/Memory) | ◐ Regel |
 | Iterate on the new feature's OWN test first; the full regression runs once at the end, never as the debugging loop | 2 | mittel | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 80 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 81 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | wait-command-guard.mjs | ✔ Mechanismus |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | \"Gib ab\" / \"abgeben\" means hand the batch to a SUCCESSOR session so the context does not overflow — it never means pause or stop the batch | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1680,8 +1680,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 96 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 133 Prozess-/Meta-TASKS-Punkte (davon 65 offen).
 
-<!-- RETRO-FINGERPRINT: a14cd688cb269aaadad6599e55b03f0fcca9e171b6f82aaef33ca40b1b76cc43 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-15T13:43:33.474Z -->
+<!-- RETRO-FINGERPRINT: df5ff0e382ca5e89b408216403f52a1c3edd208c2314e489cb71e036a5686d9a -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-15T13:51:06.171Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
