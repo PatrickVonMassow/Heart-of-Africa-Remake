@@ -1028,3 +1028,20 @@ Punkt gezeigt werden und ihn erneut anfassen. Nicht als Punkt eingereiht wegen
 des Infrastruktur-Freezes: kein Spielerimpakt, und der erste Blick auf den
 Zweig- und Hakenstand fängt es ab. Der billige Weg wäre, die Zeile beim
 Zustellen zu berechnen statt beim Sitzungsstart.
+
+## Vier Ortsmarken stapeln sich am Kilimandscharo (15.09.2026)
+
+Beim Nachhalten der aufgefrischten Abnahmebilder gesehen, WebGL-2-Spur,
+`verification/13-worldmodel-kilimanjaro.png`: „Unknown village", zweimal
+„Unknown mountain" und „Unknown landmark" überlagern einander, zwei davon sind
+am linken Bildrand abgeschnitten, und der Kompatibilitätshinweis druckt
+zusätzlich quer durch die oberste Marke. Dasselbe Bild steht seit dem letzten
+Stand unverändert im Archiv — es ist kein Rückfall, sondern der bisherige
+Zustand.
+
+Wirkung: an einer dichten Landmarkengruppe wird die Beschriftung unlesbar; der
+Spieler kann nicht zuordnen, welcher Name zu welchem Berg gehört. Nicht als
+Punkt eingereiht: kein blockierender Defekt, keine Datenfrage, und die Marken
+verlieren ihre Überlappung, sobald der Spieler einen Schritt weitergeht. Der
+billige Weg wäre, überlappende Marken gegeneinander auszublenden statt sie zu
+versetzen.
