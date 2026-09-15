@@ -92,11 +92,39 @@ put it is the mistake this line exists to stop.
   decisions already standing on the board ("Ein gestautes Wort darf seine Aufgabe nicht
   überleben"), so check whether a hold or a task expiry swallows the errand before blaming the
   dispatcher.
+  TWO MEASUREMENTS ALREADY ON RECORD point at this exact spot and belong in the first reading.
+  `docs/backlog.md` "Das Wasserpaar findet im ersten Anlauf nicht zusammen" (14.09.2026): the
+  WebGL 2 run of `polish --section=adult-errands` was red on its first attempt with "no carrier
+  reached the fill phase in 180 s" and "[ASSERT] adult-pair-never-met — water-back: villager 1
+  expired still on his way to the walk word; the pair never assembled" — that is the user's
+  picture exactly, and an EXPIRY, which is why the hold/expiry check above comes before the
+  dispatcher. `docs/backlog.md` "Wasserholen der Erwachsenen ist ein Kreislauf ohne Ziel"
+  (07.09.2026) holds the second half: the full jar is cast out of nothing and `water-out` ends at
+  the water without ever returning full.
   ALSO ANSWER HIS QUESTION in the closing report — was the water place there before? — from the
   history of the settlement layout, not from memory.
   Criticality: medium — the village reads as inhabited only while its people do their work, and
   §7.1 criterion 15 (lively settlements) is measured on exactly this.
   Bundle: Dorfleben.
+
+- [ ] 1133. A commissioned authoring run dies with the session that started it, and takes
+  its uncommitted work with it.
+  MEASURED 15.09.2026: the first `scripts/author-astra.mjs --point 1131` was started at 19:08
+  from a Bash tool shell without `setsid` (parent PID 3147048, piped through `tee`). Within
+  eight minutes parent and child were both gone; `local/1131-astra-author.log` ends at
+  "pushed 384ec4c while the run continues" — no closing line, no verdict, no commit. The
+  entire work product sat UNCOMMITTED in the worktree: a finished reproduction harness that
+  drives the reported village through the real movement loop. It was rescued by hand as
+  72dc3907c and the run restarted behind `setsid`; nothing but that hand rescue stood between
+  the work and the bin.
+  THE FIX IS A DELETION, not a new mechanism: `author-astra.mjs` re-executes itself detached
+  (setsid, own session, output to its log) when it is not already a session leader, so no
+  caller has to remember it and no caller can get it wrong. The caller keeps the same command
+  and the same log path. Check what the script already does about its own process group
+  before adding anything — this point must not grow a supervisor, a ledger field or a guard.
+  Criticality: high — it is not the point's own work that is lost but a commissioned agent's,
+  and the loss is silent: the log's last line claims the run continues.
+  Bundle: Session- & Repo-Hygiene.
 
 - [ ] 1082. A child climbing the village boulder becomes something the player actually
   sees (user 09.09.2026, 05:04 — the same report twice).
@@ -633,39 +661,6 @@ put it is the mistake this line exists to stop.
   Criticality: high — this is the feature the release exists for, and the user is the one who
   keeps hitting the bugs.
   Bundle: Verständigung.
-
-- [ ] 1075. A unit test measures a file OUTSIDE the repository, so writing a memory reddens
-  `main` and blocks every push (measured 07.09.2026, 22:24, on a quiet machine).
-  WHAT HAPPENS. `scripts/cut-account-core.test.mjs:677-684` reads the live
-  `~/.claude/projects/-workspace-hoa/memory/MEMORY.md` (and the two `CLAUDE.md` files) and
-  asserts that the ceilings table of `docs/document-cut-757.md` quotes their CURRENT line and
-  word counts. MEMORY.md is not in the repository and is rewritten whenever any session saves,
-  edits or deletes a memory. This evening the table said "765 words" and the tokenizer reported
-  764: `Tests 1 failed | 56 passed`, reproduced standalone in 1.14 s at load 5.8, so it is not
-  a load artefact.
-  WHAT IT COSTS. The pre-push gate runs the unit suite for every push to `main`, so from the
-  moment a memory is written NO push to main succeeds until somebody edits that table by hand.
-  Tonight it stopped six commits, and the gate's honest retry-under-load rule paid for the full
-  suite twice before saying so. Nothing warns anybody: the memory write and the red are in
-  different files, on different days, in different sessions.
-  FINAL STATE — the test stops measuring the environment, and the choice is named in the commit:
-  either the assertion drops the two files it does not own and keeps only what the repository
-  contains, or the counts are read from a snapshot the repository DOES own and the ceilings
-  table is regenerated from it by the same command that writes it. What must not survive is a
-  hand-maintained number in a document that tracks a file outside the checkout.
-  VERIFIABLE: pure Vitest — writing, changing and deleting a memory leaves the suite green, and
-  a real ceilings breach still reds. `npx vitest run scripts/cut-account-core.test.mjs` green
-  before and after a memory write.
-  QUEUE RANK: BEFORE the release (machine-filed, urgency stated as rule 1d requires): it blocks
-  every push to `main` and therefore every landing, and the blockade returns on its own the next
-  time any session writes a memory.
-  Criticality: high, frequency HIGH — no correctness of the game is touched, but the batch
-  cannot deliver anything while it holds, and it re-arms itself.
-  Refs: scripts/cut-account-core.test.mjs (the ceilings block), docs/document-cut-757.md (the
-  table), scripts/pre-push-gate.mjs (the caller that turns it into a blockade), guide pitfall
-  "Test und Wächter hingen an ihrer Umgebung, nicht am Verhalten".
-  Bundle: Testinfrastruktur — it edits `scripts/cut-account-core.test.mjs` and the cut document,
-  which no other open point of this bundle writes, so it may run beside any of them.
 
 - [ ] 633. The release's closing run — two regressions with the cleanup between them (user
   11.08.2026, splitting point 174: "Dafür scheint mir die Schätzung von 1 h viel zu wenig

@@ -550,14 +550,14 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Ein Rückfall meldet, **welche Zusage er aussetzt**. Vergleiche **Regel gegen Ist**,
   nicht Ist gegen Plausibilität. Prüffrage: Welche Vereinbarung bricht er still?"
 
-- **Die lange Messung hing am Leben der Sitzung, die sie bestellt hat.** Endet das Fenster, das
-  einen langen Prüflauf startete, stirbt er mitten drin — und zwar **wie ein Fehlschlag**:
-  Abbruchcode gesetzt, Protokoll mitten im Satz zu Ende. Hat er vorher **echte Rote** gefunden,
-  sind die hinterher **nicht mehr einzuordnen**.
+- **Der lange Lauf hing am Leben der Sitzung, die ihn bestellt hat.** Endet das Fenster, stirbt
+  er mittendrin — **wie ein Fehlschlag**: Abbruchcode gesetzt, Protokoll mitten im Satz. Echte
+  Rote sind dann **nicht mehr einzuordnen**, und ein beauftragter Helfer, der erst am Ende
+  committet, hinterlässt **nichts**.
   → *Prompt:* „Was **länger dauert als ein Zug**, startest du **abgekoppelt** — im **Werkzeug**,
-  nicht als Merkregel. Ein Lauf ohne Schlussurteil heißt *abgebrochen*, nicht *rot* — **auch
-  wenn er Fehlschläge nennt**. Was seine Lesart entscheidet, gehört in den **Datensatz**, nicht
-  nur ins Terminal."
+  nicht als Merkregel; ein Helfer committet **jeden Schritt sofort**. Ein Lauf ohne Schlussurteil
+  heißt *abgebrochen*, nicht *rot*. Ob er lebt, sagt der **Prozess**, nie sein Protokoll; die
+  Lesart gehört in den **Datensatz**."
 
 - **Die Schranke aus zwei Hälften, von denen nur eine ein Polster bekam.** Dieselbe Messung,
   zwei Kriterien: eins ließ vier von neunzig durchgehen, das andere färbte bei einem rot.
@@ -681,4 +681,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 937eadb420bc597dfadf83020f268071b84a905b1ccd4f5d783258e29f9c3759 -->
+<!-- GUIDE-FINGERPRINT: b1f3841b18b7138feb1de8504b2b5adbc488ea3cb43e12d32fd1b096ec970866 -->

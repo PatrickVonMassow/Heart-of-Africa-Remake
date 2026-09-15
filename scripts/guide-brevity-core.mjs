@@ -815,7 +815,10 @@ export const LIMITS = {
   // words after its tightening: 6464 -> 6527.
   // 15.09.2026, later: the three folded lesson classes justified beside maxLines measure 91
   // words: 6527 -> 6618.
-  maxWords: 6618,
+  // 15.09.2026, evening: the lost-agent-work half was folded INTO the long-run entry rather
+  // than added beside it, and paying for it out of that entry's own wording left the guide one
+  // word shorter than before — the ceiling follows it down: 6618 -> 6617.
+  maxWords: 6617,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,
