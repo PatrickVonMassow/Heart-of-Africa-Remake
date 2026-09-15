@@ -798,6 +798,50 @@ put it is the mistake this line exists to stop.
   that /v0.3/ and /poc/ serve the new state, and FREEZE the tag: it is never
   re-pointed.
 
+- [ ] 1132. The chief's collision check was amended seven seconds after the last run of it, so
+  no frame proves the check that guards him today, and four webgpu/flow records of 13./14.09.
+  still owe a verdict (verification debt of point 1076). THIS POINT DEMANDS RENDERED PROOF:
+  its deliverable is two suite runs whose frames are looked at.
+  MEASURED 15.09.2026 at 20756b89a. WHAT IS ALREADY PROVEN, and is NOT what this point is for:
+  the chief-walk work IS photographed on both lanes. `.claude/render-verify-state.json` records
+  `collision` at HEAD `712b689aa` — the chief-walk merge itself — webgpu @12:16:09Z and webgl
+  @12:19:35Z, both exit 0 with the same six frames, `53-collision-chief-body.png` among them.
+  A first reading of this debt put those runs BEFORE the merge and called the work
+  unphotographed; that was a timezone error — the run stamps are UTC and the commit times
+  +0200 — and it is recorded here so the corrected measurement is the one that survives.
+  WHAT IS ACTUALLY OPEN: `6c777423f` ("Wait for the settlement to resolve, never for the wall
+  clock") landed at 12:19:42Z, SEVEN SECONDS after the WebGL run finished, and it rewrites
+  `scripts/verify/collision.mjs` (30 insertions, 15 deletions) and updates
+  `verification/53-collision-chief-body.png`. So both green runs exercised the OLD check. The
+  amended check — the one that now decides whether the chief is judged at all — has never run
+  on either lane, and the frame in the repository was written by hand rather than by it.
+  THE FOUR RECORDS ARE A SEPARATE DEBT and are only "not blocking" because a deferral covers
+  this HEAD: webgpu/flow @2026-09-13T16:45:36.824Z and @2026-09-14T05:22:45.174Z are
+  unaccounted reds ("the run failed without reporting a single red"), and
+  @2026-09-13T16:47:42.549Z and @2026-09-14T05:25:12.689Z are their SUSPECT retries. Under
+  CLAUDE.md §7.2 a retry covers nothing and a red closes only when its cause is fixed, charged
+  to its owning point, or filed — none of the four has been.
+  Final state:
+  - `VERIFY_GL=webgpu node scripts/verify/run-all.mjs collision` and the same with
+    `VERIFY_GL=webgl` have both run green at a HEAD that CONTAINS `6c777423f`, on a quiet
+    machine, and their frames have been LOOKED AT — the chief standing, walking out and
+    meeting the player reads correctly in the picture on both lanes, not merely exit 0.
+  - `verification/53-collision-chief-body.png` is the frame the amended check wrote, not a
+    hand-updated one.
+  - Each of the four webgpu/flow records has a recorded verdict: cause fixed, charged to its
+    owning point, or filed as its own point. `render-verify-guard --status` names none of them
+    as unaccounted afterwards.
+  - The standing deferral is consumed rather than renewed, and the board's decision card "Den
+    Bildlauf fahre ich nicht jetzt" is closed with what the runs showed.
+  Test: no production code is expected to change. Should a frame show a real defect, it is
+  charged to point 1076 or filed as its own point rather than repaired silently here.
+  Refs: scripts/render-verify-guard.mjs, .claude/render-verify-state.json,
+  scripts/verify/collision.mjs, src/scenes/place/chiefWalk.ts, commits 712b689aa and
+  6c777423f, CLAUDE.md §7.2
+  Criticality: medium — it certifies nothing false today, but the check that guards the chief
+  has never itself been run.
+  Bundle: Dorfleben.
+
 - [ ] 1129. `polish` is split by theme, so a red costs only its own theme (split out of
   point 1126 on 15.09.2026, which delivered its other three parts the same day).
   MEASURED: `scripts/verify/polish.mjs` is 7,447 lines and 27 declared sections, runs
