@@ -383,19 +383,36 @@ if (section('communication-errand')) {
             if (s.toast && s.toast !== prev.toast) window.__toastLog.push(s.toast)
           })
       })
+      // WHERE HE STOOD IS READ ON BOTH SIDES OF THE CLICK. The act resolves
+      // against the LIVE position, so a red that says "no fit" has two very
+      // different causes — he was never brought there, or the click itself
+      // moved him — and only the pair of readings tells them apart.
+      const at = () =>
+        page.evaluate(async () => {
+          const geo = await import('/src/world/geo.ts')
+          const s = window.__game.getState()
+          return geo.worldToLatLon(s.pos.x, s.pos.z)
+        })
+      const before = await at()
       await page.locator('[data-form="rock-relief"]').click()
-      return page.evaluate(() => {
-        const s = window.__game.getState()
-        return {
-          said: window.__toastLog,
-          spent: s.spentSockets,
-          keys: s.journal.map((e) => e.text.key),
-          // Reported on a failure so a red names its own cause instead of
-          // sending the next reader back to the browser.
-          mode: s.mode,
-          dialog: window.__ui.getState().dialog ?? null,
-        }
-      })
+      const after = await at()
+      return page.evaluate(
+        ([b, a]) => {
+          const s = window.__game.getState()
+          return {
+            said: window.__toastLog,
+            spent: s.spentSockets,
+            keys: s.journal.map((e) => e.text.key),
+            // Reported on a failure so a red names its own cause instead of
+            // sending the next reader back to the browser.
+            mode: s.mode,
+            dialog: window.__ui.getState().dialog ?? null,
+            before: b,
+            after: a,
+          }
+        },
+        [before, after],
+      )
     }
     const strings = await page.evaluate(async () => {
       const i18n = await import('/src/i18n/index.ts')
@@ -409,9 +426,11 @@ if (section('communication-errand')) {
     const miss = await clickForm()
     // The detail rides ON the FAIL line: the runner echoes only those lines, and
     // the `console errors:` list below never reaches a run log.
+    const place = (ll) => `${ll.lat.toFixed(4)}/${ll.lon.toFixed(4)}`
     const clickDetail = (r) =>
       `said ${JSON.stringify(r.said)}, spent ${JSON.stringify(r.spent)}, mode ${r.mode}, ` +
-      `dialog ${JSON.stringify(r.dialog)}`
+      `dialog ${JSON.stringify(r.dialog)}, stood at ${place(r.before)} and after the click ` +
+      `at ${place(r.after)} (the talus is at ${place(talus)})`
     const missOk = miss.said.includes(strings.noFit) && !miss.spent.includes('bandiagara-talus')
     console.log(
       `${missOk ? 'PASS' : 'FAIL'}  the inventory click clear of the escarpment answers in the traveller's own voice` +
