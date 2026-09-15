@@ -1574,7 +1574,7 @@ stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die s
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Dienstag, 15.09.2026, 12:11 · Quellen-Fingerprint: `01d7479e905e…`
+Zuletzt aktualisiert: Dienstag, 15.09.2026, 15:43 · Quellen-Fingerprint: `a14cd688cb26…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1582,7 +1582,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Problemklasse (Memory) | Anläufe | Schwere (heuristisch) | Maßnahme (Guard-Treffer) | Status |
 |---|---|---|---|---|
 | Always use background-wait time for prep on upcoming tickets — autonomously, guaranteed by a mechanism, never on a reminder | 2 | mittel | prep-arm-hook.mjs, prep-guard.mjs | ✔ Mechanismus |
-| An analysis over a moving set is run only when it is executed immediately in the same run — never produced and parked | 5 | hoch | — (Regel/Memory) | ◐ Regel |
+| An analysis over a moving set is run only when it is executed immediately in the same run — never produced and parked | 6 | hoch | — (Regel/Memory) | ◐ Regel |
 | OFFEN, attended-only: Punkt 542 scharfschalten — vier gebaute Guards hängen in keiner Hook-Kette | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | User's rulings on the point-205 plausibility audit (what to fix vs. accept, 21.07.2026) | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | For code audits/reviews, mix in a DIFFERENT model than the one that wrote the code — different blind spots find more bugs | 1 | niedrig | model-guard.mjs | ✔ Mechanismus |
@@ -1680,8 +1680,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 96 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 133 Prozess-/Meta-TASKS-Punkte (davon 65 offen).
 
-<!-- RETRO-FINGERPRINT: 01d7479e905e51ac57b3a2104c6fd700c707f418e2b3426264d3130147a9b57d -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-15T10:11:02.555Z -->
+<!-- RETRO-FINGERPRINT: a14cd688cb269aaadad6599e55b03f0fcca9e171b6f82aaef33ca40b1b76cc43 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-15T13:43:33.474Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -7069,3 +7069,25 @@ gegeneinander prüft; einen Widerspruch findet man nur, indem man die Bedingung 
 messen, um das es geht — hier am Arbeitsbaum, in dem der Lauf läuft, nicht am Hauptbaum.
 Und wo zwei Schranken einander widersprechen, ist das kein Bedienfehler: Es gehört gemessen,
 abgelegt und als Defekt behandelt, statt in jedem Zug neu beantwortet zu werden.
+
+### 3.273 Der Apparat für Punkte, angewandt auf zwei Sätze Text
+
+Am 15.09.2026 bat der Nutzer darum, die acht Entscheidungsprotokoll-Karten kürzer und
+verständlicher zu schreiben, und nannte Astra als Autor. Daraus wurde ein nummerierter
+Punkt mit Bündeleintrag, Stundenschätzung, zwei Astra-Runden und einer Gegenlesung. Seine
+Antwort: »Das ganze war gar nicht als so große Sache geplant, mit neuem Task, der 1h
+dauert.«
+
+Die Ursache liegt nicht allein im Urteil der Sitzung, sondern in der Kette der Schranken.
+Das Board-Tor verweigert JEDE zustandsändernde Handlung, solange keine laufende Karte
+steht; eine laufende Karte verlangt eine Punktnummer; eine Punktnummer verlangt einen
+Eintrag in der Arbeitsliste und in der Bündeltabelle, sonst rötet der Push. Eine
+Textänderung von zwei Minuten wird so zwangsläufig zu einem Vorgang mit sechs
+Nebenbuchungen — nicht weil jemand das entschieden hätte, sondern weil kein Weg daran
+vorbeiführt.
+
+**Lehre:** Ein Durchsetzer, der für die große Arbeit geschrieben wurde, braucht einen Weg
+für die kleine. Fehlt er, zahlt jede Kleinigkeit den vollen Preis, und der Nutzer sieht
+eine Stundenaufgabe, wo er um einen Satz gebeten hat. Reine Prosa, die nur der Nutzer
+liest, gehört gemacht und veröffentlicht — nicht eingereiht. Und die Nennung eines Modells
+ist eine Wegweisung, keine Bitte um ein Vier-Augen-Verfahren.
