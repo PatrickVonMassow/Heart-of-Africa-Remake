@@ -77,57 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1126. The full proof runs once, and a red repeats only its own rung (user 14.09.2026,
-  after asking why a feature costs more verification than development).
-  MEASURED ON 14.09.2026, from `local/verify-logs/*.run.json` in every worktree and from
-  `.claude/render-verify-state.json`. On that one day the repository spent **599 minutes of
-  verification wall clock in 28 runs**, practically all of it on ONE point (1056). Five
-  two-backend LARGE runs for that same point: 09:21 (4 min, aborted), 09:26 (9 min, aborted),
-  09:41 (159 min, exit 1), 14:02 (208 min, exit 1), 17:50 (still in backend 1 of 2 at 133 min).
-  Every red restarted the whole proof instead of repairing on the rung the red check itself
-  printed. Inside the last run `polish` runs FOUR times — first pass, flake retry, two baseline
-  passes on the merge base — at ~28 min each. For comparison, all fifteen NON-covering suites
-  of the tier together cost ~16 min per backend: the breadth of the tier is not the cost.
-  The rule against this already exists and was broken four times in one day:
-  `VERIFICATION_LADDER` in `scripts/point-brief-core.mjs` says "THE FULL PROOF RUNS EXACTLY
-  ONCE, ON THE EXACT MERGE CANDIDATE".
-  Final state:
-  - PART A — A RED NEVER RESTARTS THE FULL RUN. Repair happens on the printed `--section`
-    (median 2.9 min on `polish`), and the full proof runs exactly once on the exact merge
-    candidate. This is the existing rule made enforceable rather than a new one; measured
-    saving on 14.09.2026 alone: about eight hours.
-  - PART B — FLAKE RETRY AND BASELINE CLASSIFICATION WORK ON THE SECTION, NOT THE SUITE.
-    Today the retry re-runs all 274 `polish` checks to re-ask ONE check, and the baseline
-    classification runs the whole suite twice on the merge base. The same question answered
-    by three `--section` runs costs ~9 min instead of ~84. NAMED RISK: a failure that only
-    appears in the full suite's sequence would read as absent on the section, so the
-    narrowing applies to DIAGNOSIS ONLY — a covering proof stays whole and unfiltered.
-  - PART C — `polish` IS SPLIT BY THEME. 7,383 lines, 254 checks, ~28 min, and it carries
-    the rotating flakes; it is the one object that makes every red expensive. Split by theme,
-    a red costs only its own theme. Same checks, different files, no change to coverage.
-    SPLIT OUT AS POINT 1129 ON 15.09.2026, verbatim and with nothing dropped: it moves 7,383
-    lines across four new files, updates the ~40 places that name the suite, and owes the
-    two-backend `polish` pass as its own proof — so landing it here would have held A, B and
-    D, whose measured saving is about eight hours on 14.09.2026 alone, behind that refactor.
-  - PART D — THE REGRESSION IS SHARED ACROSS SEVERAL FINISHED BRANCHES. `scripts/verify/README.md`
-    already allows it word for word ("a shared final regression over several finished branches
-    may replace the repeated REGRESSION, never that picture"), and folding 1057 into 1056 on
-    07.09.2026 was the same user instruction. What is NEVER shared is the two-backend PICTURE
-    check per point; it stays on the branch before the merge.
-  - NOTHING IS DELETED OR SOFTENED: no suite is removed, no check is weakened, no red is waved
-    through as cosmetic, and the per-point picture check keeps both backends. A and D apply
-    rules that already exist; B and C shrink existing mechanism rather than adding new one,
-    which is what the infrastructure freeze of 01.09.2026 permits.
-  NOT THE LEVER, so that nobody measures it again: parallelism. The host has 16 cores at load
-  1.38, but the expensive suites are the picture suites, the GPU is a serialised device
-  (`scripts/verify/README.md`, "GPU 44 %"), and load already moves a suite's runtime by 19 %.
-  Only the cheap suites could run in parallel, and together they are 16 minutes.
-  Touches: scripts/verify/baseline-classify.mjs, scripts/verify/baseline-classify-core.mjs,
-  scripts/verify/run-logged.mjs (the retry path), scripts/verify/polish.mjs (the split),
-  scripts/verify/tiers.mjs, scripts/verify/README.md, scripts/point-brief-core.mjs
-  (`VERIFICATION_LADDER`), docs/picture-check-cost.md
-  Bundle: Testinfrastruktur.
-
 - [ ] 1076. The chief's first door press tells of his walk instead of a deciphered message,
   and he gets a body (user 08.09.2026).
   Two defects at the same hut, both measured on 08.09.2026.
