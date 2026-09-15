@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process'
 import { chmodSync, mkdtempSync, mkdirSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import {
   SCAN_LIMIT,
   activeRecordPath,
@@ -165,16 +165,32 @@ describe('the last sign of life (point 1137)', () => {
   // so any other run's pictures could have vouched for the one being judged, for
   // ever, and even for a selection that takes no frames at all. The frames are
   // the WRITER's business, about its own run, while that run is going.
-  it('never lets the shared frame directory speak for a run', () => {
+  it('never lets the shared frame directory speak for a run', async () => {
+    // POINTED AT THE REAL `FRAME_DIR`, or the fixture proves nothing (Astra
+    // coverage pass): a probe regressed to reading the shared directory would
+    // pass against a temporary one it never consults. The module reads
+    // `HOA_FRAME_DIR` at import, so the check needs its own module instance.
     const dir = tmp()
     const frames = join(dir, 'frames')
     mkdirSync(frames, { recursive: true })
+    writeFileSync(join(frames, '07-somebody-elses.png'), 'x')
     const log = join(dir, 'run.log')
     const stale = new Date(Date.now() - 45 * 60_000)
     writeFileSync(log, 'x')
     utimesSync(log, stale, stale)
-    writeFileSync(join(frames, '07-somebody-elses.png'), 'x')
-    expect(lastProgressAtFor({ logPath: log })).toBeLessThan(Date.now() - 40 * 60_000)
+    const before = process.env.HOA_FRAME_DIR
+    process.env.HOA_FRAME_DIR = frames
+    try {
+      vi.resetModules()
+      const fresh = await import('./run-record.mjs')
+      expect(fresh.FRAME_DIR).toBe(frames)
+      expect(fresh.newestFrameMtimeMs()).toBeGreaterThan(Date.now() - 60_000)
+      expect(fresh.lastProgressAtFor({ logPath: log })).toBeLessThan(Date.now() - 40 * 60_000)
+    } finally {
+      if (before === undefined) delete process.env.HOA_FRAME_DIR
+      else process.env.HOA_FRAME_DIR = before
+      vi.resetModules()
+    }
   })
 
   it('derives the mark from the log and from the record path alike', () => {
