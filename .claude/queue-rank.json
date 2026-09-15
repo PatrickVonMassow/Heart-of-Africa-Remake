@@ -1339,15 +1339,33 @@
       "origin": "user",
       "place": "ahead"
     },
-    "1131": {
-      "at": "2026-09-15T14:53:46.297Z",
-      "why": "The user's own two bug reports of 15.09.2026 that nobody fetches water and that the two at the water place merely stand there; he ranked it himself directly behind his earlier front-order 1124",
-      "origin": "user",
-      "place": "ahead"
-    },
     "1133": {
       "at": "2026-09-15T17:16:22.791Z",
       "why": "Es verliert die Arbeit jedes beauftragten Autorenlaufs, und heute traf es einen schon fertigen Befund — jeder weitere Lauf vor dem Fix riskiert denselben stillen Verlust.",
+      "origin": "machine",
+      "place": "ahead"
+    },
+    "1134": {
+      "at": "2026-09-15T21:54:14.530Z",
+      "why": "Nutzerauftrag vom 15.09.2026, im Punkttext woertlich zitiert, ausdruecklich als naechstes eingereiht",
+      "origin": "user",
+      "place": "ahead"
+    },
+    "1135": {
+      "at": "2026-09-15T21:54:14.420Z",
+      "why": "Nutzerauftrag vom 15.09.2026, im Punkttext woertlich zitiert, ausdruecklich als naechstes eingereiht",
+      "origin": "user",
+      "place": "ahead"
+    },
+    "1136": {
+      "at": "2026-09-15T21:54:14.639Z",
+      "why": "Nutzerauftrag vom 15.09.2026, im Punkttext woertlich zitiert, ausdruecklich als naechstes eingereiht",
+      "origin": "user",
+      "place": "ahead"
+    },
+    "1137": {
+      "at": "2026-09-15T22:13:39.899Z",
+      "why": "Blockiert das Bild-Tor und damit Release und jeden Renderpunkt; Criticality high im Punkt genannt",
       "origin": "machine",
       "place": "ahead"
     }
@@ -1382,7 +1400,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-15T18:46:51.130Z",
+    "at": "2026-09-15T22:13:39.911Z",
     "points": [
       174,
       184,
@@ -1781,9 +1799,12 @@
       1123,
       1125,
       1129,
-      1131,
       1132,
-      1133
+      1133,
+      1134,
+      1135,
+      1136,
+      1137
     ]
   }
 }
