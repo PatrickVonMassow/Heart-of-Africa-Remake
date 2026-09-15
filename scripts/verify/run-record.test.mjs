@@ -1,7 +1,7 @@
 // The run record (point 592): the file that makes a verify run one checkable
 // object, so awaiting it replaces re-reading its log.
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, mkdirSync, utimesSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdtempSync, mkdirSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { describe, it, expect } from 'vitest'
@@ -14,13 +14,13 @@ import {
   lastProgressAtFor,
   latestRecordPath,
   newestFrameMtimeMs,
+  openProgressMark,
   progressMarkPathFor,
   pidAlive,
   readRecord,
   logDir,
   recordPathFor,
   runIsLive,
-  touchProgressMark,
   writeRecord,
 } from './run-record.mjs'
 
@@ -184,12 +184,36 @@ describe('the last sign of life (point 1137)', () => {
     expect(progressMarkPathFor(null)).toBeNull()
   })
 
-  it('stamps the mark, and says so rather than throwing when it cannot', () => {
+  // ASTRA REVIEW ROUNDS 6 TO 9 — the descriptor is the repair. A mark RE-CREATED
+  // on every stamp can start failing halfway through a run while the log, opened
+  // in the same directory at the same moment, writes on; every attempt to bridge
+  // that asymmetry put a second writer into the log. Held open, the two fail
+  // together or not at all.
+  it('opens the mark once and moves it, without touching the directory again', () => {
     const dir = tmp()
     const log = join(dir, 'run.log')
-    expect(touchProgressMark(log)).toBe(true)
-    expect(lastProgressAtFor({ logPath: log })).toBeGreaterThan(Date.now() - 60_000)
-    expect(touchProgressMark(join(dir, 'absent', 'run.log'))).toBe(false)
+    const mark = openProgressMark(log)
+    expect(mark).not.toBeNull()
+    const early = lastProgressAtFor({ logPath: log })
+    expect(early).toBeGreaterThan(Date.now() - 60_000)
+    const later = Date.now() + 5 * 60_000
+    expect(mark.stamp(later)).toBe(true)
+    expect(lastProgressAtFor({ logPath: log })).toBeGreaterThan(early)
+    // The stamp survives a directory that will take no NEW entry, which is the
+    // case that defeated a re-created mark.
+    chmodSync(dir, 0o500)
+    try {
+      expect(mark.stamp(later + 60_000)).toBe(true)
+    } finally {
+      chmodSync(dir, 0o700)
+      mark.close()
+    }
+  })
+
+  it('answers null rather than throwing when the mark cannot be opened at all', () => {
+    expect(openProgressMark(join(tmp(), 'absent', 'run.log'))).toBeNull()
+    expect(openProgressMark('')).toBeNull()
+    expect(openProgressMark(null)).toBeNull()
   })
 
   it('falls back to the file marks only for a run that carries no mark', () => {

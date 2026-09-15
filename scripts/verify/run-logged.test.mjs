@@ -252,20 +252,17 @@ describe('run-logged default launch — the run-identity re-exec (point 700, Sol
   )
 })
 
-// ASTRA REVIEW ROUND 6 — a marker that cannot be written must not read as a run
-// that has stopped: the two failures are not one, and a healthy silent picture
-// suite would otherwise go a whole lease without a sign of life.
-describe('the progress mark falls back to the log when it cannot be written', () => {
-  it('writes its sign of life into the log instead, and keeps running', () => {
+// ASTRA REVIEW ROUNDS 6 TO 9 — the mark is opened ONCE and held, so it cannot
+// start failing halfway through a run while the log carries on. A directory that
+// will take no new entry is exactly that case.
+describe('the progress mark survives a directory that takes no new file', () => {
+  it('keeps moving its mark, and leaves the log uncorrupted', () => {
     const ROOT = join(dirname(WRAPPER), '..', '..')
-    const relDir = join('local', `runlogged-markfail-${process.pid}`)
+    const relDir = join('local', `runlogged-markhold-${process.pid}`)
     const dir = join(ROOT, relDir)
-    const relLog = join(relDir, 'markfail.log')
+    const relLog = join(relDir, 'markhold.log')
     try {
       mkdirSync(dir, { recursive: true })
-      // The marker's own path, occupied by a DIRECTORY: `writeFileSync` on it
-      // fails exactly as an unwritable marker would.
-      mkdirSync(join(ROOT, `${relLog}.progress`), { recursive: true })
       const res = spawnSync(process.execPath, [WRAPPER, 'world', '--section=__no_such_section__', '--log-file', relLog], {
         windowsHide: true,
         encoding: 'utf8',
@@ -273,8 +270,10 @@ describe('the progress mark falls back to the log when it cannot be written', ()
         env: { ...process.env, VERIFY_NO_WAIT: '1', VERIFY_LOG_DIR: relDir, HOA_ACTIVITY_JOURNAL_PATH: join(dir, 'activity.jsonl') },
       })
       expect(res.status, res.stderr).toBe(1)
-      const log = readFileSync(join(ROOT, relLog), 'utf8')
-      expect(log).toContain('is not writable, so this line is the run')
+      // The mark exists beside the log, and nothing of the writer's own is in
+      // the log itself — the whole reason the descriptor replaced a fallback.
+      expect(readdirSync(dir)).toContain('markhold.log.progress')
+      expect(readFileSync(join(ROOT, relLog), 'utf8')).not.toContain('sign of life')
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }

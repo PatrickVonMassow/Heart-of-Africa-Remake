@@ -57,7 +57,7 @@ import {
   showWindow,
 } from './run-digest-core.mjs'
 import { backendsFrom, buildReceipt, formatReceipt, planRun } from './run-wait-core.mjs'
-import { framesWrittenSince, gitPosition, newestFrameMtimeMs, progressMarkPathFor, readRecord, recordPathFor, selfCommandLine, touchProgressMark, writeRecord } from './run-record.mjs'
+import { framesWrittenSince, gitPosition, newestFrameMtimeMs, openProgressMark, readRecord, recordPathFor, selfCommandLine, writeRecord } from './run-record.mjs'
 import { emitActivity } from '../batch-activity-journal.mjs'
 import { ACTIVITY_EVENTS } from '../batch-activity-journal-core.mjs'
 import { budgetToolOutput } from '../tool-output-budget-core.mjs'
@@ -349,61 +349,22 @@ function runVerify() {
   let lastProgressMark = progress.mark
 
   // WHOSE PROGRESS IS IT (point 1137, Astra review round 1)? The WRITER's. A
-  // reader that inferred progress from the record's MTIME would be fooled by its
-  // own bookkeeping: `countPoll` rewrites the record, so polling a wedged run
-  // renewed its apparent life for ever. The mark below is set by this process
-  // alone, from what the child actually produced, and nothing a reader does can
-  // move it. `--status` and `--await` read the FIELD, never the file's mtime.
+  // reader that inferred progress from the run RECORD's mtime would be fooled by
+  // its own bookkeeping: `countPoll` rewrites that record, so polling a wedged
+  // run renewed its apparent life for ever. The mark below is moved by this
+  // process alone, from what the child actually produced, and nothing a reader
+  // does can move it.
   let recordedProgressAt = 0
-  /**
-   * Act on ONE observation that the run is alive, and say whether that
-   * observation was CONSUMED.
-   *
-   * CONSUMED IS NOT "WRITTEN" (Astra review rounds 7 and 8). `log.write` queues,
-   * so nothing here can promise the bytes landed; what speaks for the run is the
-   * MTIME of its mark or its log, read by whoever is waiting. This answer says
-   * only whether the observation has been acted on and need not be offered
-   * again — false means "come back", and every false is bounded by something
-   * that changes on its own, or the sampler would offer one frame for ever.
-   */
+  // The mark, opened ONCE and held. run-record.mjs says why the descriptor
+  // matters; here it means `noteProgress` has exactly one thing to do and
+  // nothing to fall back to. A mark that could not be opened at all leaves the
+  // LOG as the run's sign of life, which is what it was before this point.
+  const mark = openProgressMark(logPath)
+  /** Act on one observation that the run is alive; false means "offer it again". */
   function noteProgress(at) {
-    // TOO SOON. A line a minute is the rate; the caller retries.
     if (at - recordedProgressAt < PROGRESS_RECORD_MS) return false
-    // THE MARK IS THE ORDINARY PATH, and the throttle advances only on a write
-    // that happened (round 3): advancing it on a failed touch would leave the
-    // last good mark standing as the run's newest word about itself, and a run
-    // whose marker went unwritable while it worked would be called hung one
-    // lease later.
-    if (touchProgressMark(logPath)) {
-      recordedProgressAt = at
-      return true
-    }
-    // A MARK THAT CANNOT BE WRITTEN FALLS BACK TO THE LOG (round 6). The two
-    // live in one directory, but that does NOT make their failures one: a
-    // read-only marker, or a directory that will take no new file, leaves the
-    // log's ALREADY OPEN descriptor writing happily. Left there, a healthy
-    // silent picture suite would have gone a whole lease without a sign of life
-    // and been called hung — the exact defect this point removes. A `#` line is
-    // what every log parser here ignores and every reader can see.
-    //
-    // ONLY AT A LINE BOUNDARY (round 7). `consume` writes the child's raw
-    // chunks, which end mid-line as often as not; a line pushed in between would
-    // turn `FA` + `IL  polish …` into `FA# still running…` and cost the saved log
-    // the very result line it exists to carry. `pending` is empty exactly when
-    // the log sits between lines — and the caller updates it BEFORE asking
-    // (round 8), or this would read the state of the chunk before last.
-    if (pending !== '') return false
+    if (!mark?.stamp(at)) return false
     recordedProgressAt = at
-    try {
-      log.write(`# still running — the progress mark ${forDisplay(progressMarkPathFor(logPath))} is not writable, so this line is the run's sign of life\n`)
-    } catch {
-      /* a log that cannot take a line says nothing; the stream's own error
-         handler reports it, and this run has no third place to speak */
-    }
-    // CONSUMED EITHER WAY (round 8). Answering false here would leave the frame
-    // that prompted it unconsumed, and the sampler would offer that same frame
-    // every minute for ever — appending a line each time, and refreshing the log
-    // that the lease is measured against. One observation, one attempt.
     return true
   }
   noteProgress(started)
@@ -438,7 +399,7 @@ function runVerify() {
   // stops rising while the pictures keep coming. A run producing frames the
   // whole time would have gone silent for a whole suite and been called hung.
   let frameMark = newestFrameMtimeMs({ since: started }) ?? 0
-  const frameTick = baseRecord.expectedFrames > 0
+  const frameTick = baseRecord.expectedFrames > 0 && mark
     ? setInterval(() => {
       const now = newestFrameMtimeMs({ since: started })
       // AN OBSERVATION IS CONSUMED ONLY WHEN IT HAS BEEN RECORDED (Astra review
@@ -479,10 +440,6 @@ function runVerify() {
       if (own.stream) console.log(line)
       else if (!own.quiet && kind) console.log(line)
     }
-    // AFTER `pending`, NEVER BEFORE (Astra review round 8). The note's fallback
-    // asks whether the log sits between lines; asked before this split it would
-    // read the state of the chunk BEFORE last, and could append straight after a
-    // chunk ending in `FA`.
     noteProgress(progressAt)
   }
 
@@ -501,6 +458,7 @@ function runVerify() {
 
   child.on('close', (code, signal) => {
     if (frameTick) clearInterval(frameTick)
+    mark?.close()
     if (pending !== '') {
       lines.push(pending)
       if (own.stream || (!own.quiet && select(pending))) console.log(pending)

@@ -155,8 +155,9 @@ the transcript rather than remembered.
 **Long is not hung (point 1137).** Past **2.5 ×** its expectation a run is
 *overdue*. It is *hung* only when it is ALSO silent — nothing produced for a
 whole 15-minute progress lease. That silence is judged on the **writer's own
-mark**: `run-logged.mjs` touches a zero-byte `<log>.progress` from what its child
-really emitted and from sampling the newest frame's mtime — by mtime, because a
+mark**: `run-logged.mjs` opens a zero-byte `<log>.progress` once, holds the
+descriptor for the run, and moves its mtime from what its child really emitted
+and from sampling the newest frame's mtime — by mtime, because a
 both-backends run overwrites the same 93 names and a count would stop rising
 while the pictures kept coming. The mark is a file of its own so that neither a
 reader's bookkeeping can pass for the run's progress nor a reader's
@@ -168,10 +169,11 @@ it counts a poll, and nothing a reader writes is evidence that the run is alive.
 And the FRAME DIRECTORY, because `verification/` is shared and carries no run
 identity: a reader that folded it in could have any other run's pictures vouch
 for the one it is judging. The frames are read by the writer instead, about its
-own run, while that run is going. And a writer that cannot stamp its mark at all
-— a read-only marker, a directory that will take no new file — writes its sign of
-life into the log as a `#` line, whose descriptor is already open: the two
-failures are not one failure. `--await` and `--status` ask the same question and give the same
+own run, while that run is going. The descriptor is why there is no
+fallback: a mark re-created on every stamp could start failing halfway through a
+run — a read-only file, a directory that will take no new entry — while the log,
+opened in the same directory at the same moment, wrote on. Held open, the two
+fail together or not at all, and nothing but the child ever writes into the log. `--await` and `--status` ask the same question and give the same
 answer: a run that is still writing is `SLOW`, never `HUNG`. The clock alone could
 never say it: the §1 plan is measured to be a third to two thirds of the real
 cost, so the hung mark for a whole `polish` pass falls at 14 minutes against a

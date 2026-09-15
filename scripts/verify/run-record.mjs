@@ -13,7 +13,7 @@
 // proves to the batch guard that a session is waiting rather than idling).
 // Every read is failure-tolerant: an absent or unreadable record means "nothing
 // known", never a false verdict.
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
+import { closeSync, existsSync, futimesSync, mkdirSync, openSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { dirname, isAbsolute, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -357,13 +357,12 @@ export function lastProgressAtFor({ logPath = null, recordPath = null, markPath 
   // run that is going; run-logged.mjs states what of that remains. Here, nothing
   // another run could have written is evidence.
   //
-  // WHY LOSING THEM COSTS THIS READER NOTHING (Astra review rounds 5 and 6): a
-  // writer that cannot stamp its mark — a read-only marker, a directory that can
-  // no longer take a new file — can still APPEND its log, whose descriptor is
-  // already open. It does exactly that, with a `#` line, so the run keeps a sign
-  // of life this probe can read without anybody else's pictures. The two failures
-  // are not one failure, which is why the writer carries the fallback rather than
-  // this reader carrying a source it cannot attribute.
+  // WHY LOSING THEM COSTS THIS READER NOTHING (Astra review rounds 5 to 9): the
+  // writer holds its mark OPEN for the run, in the same directory and from the
+  // same moment as the log. The case that worried the review — a mark that stops
+  // being writable while the log carries on — cannot arise between two held
+  // descriptors, so the run always has a sign of life this probe can read
+  // without borrowing anybody else's pictures.
   const marks = []
   const mark = markPath === undefined ? progressMarkPathFor(logPath ?? recordPath) : markPath
   for (const path of [mark, logPath]) {
@@ -387,15 +386,49 @@ export function progressMarkPathFor(logPath) {
   return `${logPath.replace(/\.run\.json$/, '')}.progress`
 }
 
-/** Stamp the mark. Only run-logged.mjs calls this, and a failure is silent: a
- *  run must never die because it could not say it was alive. */
-export function touchProgressMark(logPath) {
+/**
+ * OPEN the mark and keep the descriptor, for as long as the run lasts.
+ *
+ * Only run-logged.mjs calls this. The descriptor is the whole point (Astra
+ * review rounds 6 to 9): a mark re-CREATED on every stamp can start failing
+ * halfway through a run — a read-only file, a directory that will take no new
+ * entry — while the log, whose descriptor was opened at the same moment in the
+ * same directory, writes on happily. Every repair for that asymmetry put a
+ * second writer into the log and cost three review rounds of line corruption
+ * and self-renewing leases. An open descriptor removes the asymmetry instead:
+ * the mark and the log now fail together or not at all, and there is nothing to
+ * fall back to.
+ *
+ * Null when the mark cannot be opened at all — which is the case where the log
+ * could not have been created either, so the run has larger problems than this.
+ */
+export function openProgressMark(logPath) {
   const path = progressMarkPathFor(logPath)
-  if (!path) return false
+  if (!path) return null
+  let fd
   try {
-    writeFileSync(resolveIn(path), '')
-    return true
+    fd = openSync(resolveIn(path), 'w')
   } catch {
-    return false
+    return null
+  }
+  return {
+    path,
+    /** Move the mark to `at`. False means the stamp did not happen. */
+    stamp(at = Date.now()) {
+      const when = new Date(at)
+      try {
+        futimesSync(fd, when, when)
+        return true
+      } catch {
+        return false
+      }
+    },
+    close() {
+      try {
+        closeSync(fd)
+      } catch {
+        /* already gone — nothing to release */
+      }
+    },
   }
 }
