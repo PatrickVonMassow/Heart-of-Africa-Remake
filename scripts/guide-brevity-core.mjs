@@ -529,7 +529,10 @@ export const LIMITS = {
   // (§3.273, into "Die Kur ist teurer als der Fehler"). Drafted as three standalone entries this
   // is far more; folded it measures +8 lines / +91 words, and the ceilings follow that
   // measurement exactly, with no headroom. 675 -> 683.
-  maxLines: 683,
+  // 15.09.2026, night: the question-read-as-an-order pitfall (§3.276) was paid for out of four
+  // existing entries rather than added on top, and they gave back more than it takes — the
+  // ceiling follows the guide down: 683 -> 682.
+  maxLines: 682,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -818,7 +821,10 @@ export const LIMITS = {
   // 15.09.2026, evening: the lost-agent-work half was folded INTO the long-run entry rather
   // than added beside it, and paying for it out of that entry's own wording left the guide one
   // word shorter than before — the ceiling follows it down: 6618 -> 6617.
-  maxWords: 6617,
+  // 15.09.2026, night: the question-read-as-an-order pitfall (§3.276) measures 62 words, and the
+  // four entries tightened to pay for it gave back 63 — the ceiling follows the measurement down
+  // by the difference: 6617 -> 6616.
+  maxWords: 6616,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,

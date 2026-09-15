@@ -321,9 +321,8 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   das Modell wie ein Mangel.
   → *Prompt:* „Leite das Fenster jeder Messung aus dem **Gegenstand** ab: nach Zeit, nie nach
   Anzahl. Nenne dem **prüfenden Modell selbst** jedes weggelassene Material, nicht nur dem
-  Aufrufer, und melde die **Abdeckung**; ein Urteil über halbem Material ist **Teilprüfung**.
-  Ein Urteil gilt dem **Zuschnitt**, den du lieferst: Stimmt er nicht, korrigier ihn und **frag
-  neu** — überstimm nie den Prüfer."
+  Aufrufer, und melde die **Abdeckung**; ein Urteil über halbem Material ist **Teilprüfung**. Es gilt dem **Zuschnitt**,
+  den du lieferst: Stimmt er nicht, korrigier ihn und **frag neu** — überstimm nie den Prüfer."
 
 - **„Läuft der noch?" mit „ist die Ausgabe frisch?" beantwortet.** Frische belegt nur, dass jemand
   gearbeitet *hat*: Ein **fertiger** Lauf hinterlässt frische Dateien wie ein arbeitender, ein
@@ -382,10 +381,9 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   Delegaten für fremd: Die Übergabe nannte ihn nur im Text.
   → *Prompt:* „Trag jede wirksame Angabe in das **Feld**, das der Mechanismus liest; laufen beide
   auseinander, schlägt eine Prüfung fehl. Priorisiere das **Ziel**, und sag bei jeder
-  Sortierregel, was mit dem **Altbestand** geschieht: nachräumen oder liegen lassen. Dein
-  **Arbeitsauftrag** ist selbst so ein Feld: Wächter leiten Pflichten aus seinen Sätzen ab, und
-  eine **Verneinung** in der Überschrift ist dort kein Stil, sondern ein Schalter — fordere eine
-  Pflicht **positiv** ein."
+  Sortierregel, was mit dem **Altbestand** geschieht. Dein **Arbeitsauftrag** ist selbst so ein
+  Feld: Wächter leiten Pflichten aus seinen Sätzen ab, und eine **Verneinung** in der Überschrift
+  ist dort ein Schalter — fordere eine Pflicht **positiv** ein."
 
 - **Die Begründung, die sich im eigenen Dokument widerlegt.** Ein Sicherheitsargument und sein
   Gegenbeweis standen drei Abschnitte auseinander; vier Prüfrunden sahen je eine Hälfte, weil der
@@ -515,9 +513,9 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   Rückstand beim Abtragen: Wer ihn behebt, fasst die Datei an und schuldet neu.
   → *Prompt:* „Binde jede Prüfpflicht an den **einzelnen Beitrag**, nie an einen offenen Zeitraum,
   und buch ein Veto gegen den **Befund**: trenne **gelesen** von bloß berührt, quittiere eine
-  Reparaturkette am **Endzustand** als einen Beitrag, mach neue Befunde derselben Datei zum
-  eigenen Ticket. Eine Verweigerung nennt ihren **Grund**, nie ihren Bestand; sieht eine Pflicht
-  unerfüllbar aus, prüf zuerst dein **Messgerät**."
+  Reparaturkette am **Endzustand** als einen Beitrag, mach neue Befunde derselben Datei zum eigenen Ticket. Eine
+  Verweigerung nennt ihren **Grund**, nie ihren Bestand; sieht eine Pflicht unerfüllbar aus,
+  prüf zuerst dein **Messgerät**."
 
 - **Zwei Prüfungen, die einander widersprechen — Gehorsam sieht aus wie ein Verstoß.** Die eine verlangt,
   freie Kapazität zu nutzen; die andere duldet keine Änderung, während sie läuft. Wer der ersten folgt,
@@ -551,13 +549,11 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   nicht Ist gegen Plausibilität. Prüffrage: Welche Vereinbarung bricht er still?"
 
 - **Der lange Lauf hing am Leben der Sitzung, die ihn bestellt hat.** Endet das Fenster, stirbt
-  er mittendrin — **wie ein Fehlschlag**: Abbruchcode gesetzt, Protokoll mitten im Satz. Echte
-  Rote sind dann **nicht mehr einzuordnen**, und ein beauftragter Helfer, der erst am Ende
-  committet, hinterlässt **nichts**.
+  er mittendrin — **wie ein Fehlschlag**, und ein Helfer, der erst am Ende committet, hinterlässt
+  **nichts**.
   → *Prompt:* „Was **länger dauert als ein Zug**, startest du **abgekoppelt** — im **Werkzeug**,
   nicht als Merkregel; ein Helfer committet **jeden Schritt sofort**. Ein Lauf ohne Schlussurteil
-  heißt *abgebrochen*, nicht *rot*. Ob er lebt, sagt der **Prozess**, nie sein Protokoll; die
-  Lesart gehört in den **Datensatz**."
+  heißt *abgebrochen*, nicht *rot*; ob er lebt, sagt der **Prozess**, nie sein Protokoll."
 
 - **Die Schranke aus zwei Hälften, von denen nur eine ein Polster bekam.** Dieselbe Messung,
   zwei Kriterien: eins ließ vier von neunzig durchgehen, das andere färbte bei einem rot.
@@ -586,13 +582,10 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 - **Die gemessene Dauer von damals tötet den gesunden Lauf von heute.** Die Prüfung wächst weiter,
   ihre hinterlegte Erwartung nicht — und das Werkzeug erklärt einen rechnenden Lauf für hängend.
-  → *Prompt:* „‚Hängt, abbrechen‘ darf nie allein auf einer hinterlegten Dauer stehen, und ein
-  **stilles Protokoll** ist kein Stillstand — viele Läufe schreiben erst je fertigem Abschnitt.
-  Lies, was der Lauf **sonst** erzeugt: Dateien, Kindprozesse, Stände. Drucken Plan **und**
-  Messung nebeneinander, muss dabeistehen, **welche** die Abbruchschranke benutzt.
-  Und gespiegelt: Ein hinterlegtes **Budget** bricht den gesunden Lauf ab, weil das Gemessene
-  unter ihm wächst. Schreib neben jede solche Zahl, **woran** sie gemessen wurde, und leite sie
-  aus einem zweiten, gleich teuren Fall ab, statt sie zu schätzen."
+  → *Prompt:* „‚Hängt, abbrechen‘ steht nie allein auf einer hinterlegten Dauer, und ein
+  **stilles Protokoll** ist kein Stillstand. Lies, was der Lauf **sonst** erzeugt: Dateien,
+  Kindprozesse, Stände. Neben jede Schranke gehört, **woran** sie gemessen wurde — abgeleitet
+  aus einem zweiten, gleich teuren Fall, nicht geschätzt."
 
 - **Die Schranke verlangt genau das, was gerade entsteht.** Sie lässt nicht aufhören, solange
   ein Nachweis fehlt — und der Nachweis ist der Lauf, der noch zwei Stunden braucht.
@@ -643,6 +636,12 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   schreib mir auf, welche Annahme nicht trägt. Eine begründete Zurückweisung ist ein
   Ergebnis, kein Fehlschlag."
 
+- **Deine Frage wird als Auftrag gelesen — die Rückfrage danach als Abbruchbefehl.** „Was ist da
+  los?" wird zu „nimm das in Arbeit", „wieso machst du das?" zum Stoppsignal. Gesagt hast du
+  keins von beidem, und das zweite kostet am meisten: Stillstand schlägt jede falsche Antwort.
+  → *Prompt:* „Eine **Frage ist nur eine Frage**: beantworte sie, hör dort auf. Anhalten **nur**
+  auf ausdrückliche Anweisung, die du wörtlich zitierst."
+
 ---
 
 ## Drei Meta-Regeln, die alles zusammenhalten
@@ -681,4 +680,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: b1f3841b18b7138feb1de8504b2b5adbc488ea3cb43e12d32fd1b096ec970866 -->
+<!-- GUIDE-FINGERPRINT: fb9a75e13b51dd471f9313d12dc06ca14d54b6f20bde31fb985b8bca0fd481bf -->

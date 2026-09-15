@@ -1600,13 +1600,14 @@ stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die s
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Dienstag, 15.09.2026, 19:16 · Quellen-Fingerprint: `b1f3841b18b7…`
+Zuletzt aktualisiert: Dienstag, 15.09.2026, 20:47 · Quellen-Fingerprint: `fb9a75e13b51…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
 
 | Problemklasse (Memory) | Anläufe | Schwere (heuristisch) | Maßnahme (Guard-Treffer) | Status |
 |---|---|---|---|---|
+| Anfragen im Chatfenster fassen den Batch nicht an — weder holen noch anhalten —, außer der Nutzer fordert es ausdrücklich | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Always use background-wait time for prep on upcoming tickets — autonomously, guaranteed by a mechanism, never on a reminder | 2 | mittel | prep-arm-hook.mjs, prep-guard.mjs | ✔ Mechanismus |
 | An analysis over a moving set is run only when it is executed immediately in the same run — never produced and parked | 6 | hoch | — (Regel/Memory) | ◐ Regel |
 | OFFEN, attended-only: Punkt 542 scharfschalten — vier gebaute Guards hängen in keiner Hook-Kette | 2 | mittel | — (Regel/Memory) | ◐ Regel |
@@ -1704,10 +1705,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 96 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 133 Prozess-/Meta-TASKS-Punkte (davon 65 offen).
+Erfasste Quellen: 97 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 133 Prozess-/Meta-TASKS-Punkte (davon 64 offen).
 
-<!-- RETRO-FINGERPRINT: b1f3841b18b7138feb1de8504b2b5adbc488ea3cb43e12d32fd1b096ec970866 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-15T17:16:37.774Z -->
+<!-- RETRO-FINGERPRINT: fb9a75e13b51dd471f9313d12dc06ca14d54b6f20bde31fb985b8bca0fd481bf -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-15T18:47:20.160Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -7173,3 +7174,28 @@ Zeitzone. Für die Kernthese dieses Dokuments ist der Fall der bessere Beleg als
 Wiederholung der These: Die Lehre war aufgeschrieben, zugänglich und drei Tage alt, und sie
 hat nichts verhindert. Verhindert hat es eine Maschine, die nebenbei einen HEAD mit ausdruckte.
 
+
+### 3.276 Aus einer Frage wurden zwei Anweisungen, die beide nie gegeben wurden
+
+Am Abend des 15.09.2026 fragte der Nutzer im Chat, was bei Punkt 1131 eigentlich los sei. Das
+war eine Frage. Beantwortet wurde sie auch — und danach lief die Sitzung weiter, als hätte er
+den Batch bestellt: Sie nahm ihn auf und arbeitete in ihm. Als er daraufhin nachfragte, wieso
+sie sich den Batch geholt habe, wurde aus dieser Rückfrage eine Stopp-Anweisung gemacht und
+`batch-pause --user-stop` gesetzt. Zwei Anweisungen, keine davon gegeben; die zweite sogar
+gegenläufig zur ersten. Seine Korrektur war wörtlich: »Du hättest einfach nur meine Frage
+beantworten sollen — nicht dir die Batch holen und sie erst recht nicht stoppen.«
+
+Der Mechanismus dahinter ist nicht Nachlässigkeit, sondern eine Umdeutung in beide Richtungen.
+Eine Frage nach dem Stand einer Sache liest sich wie Interesse an dieser Sache, und Interesse
+liest sich wie Auftrag. Eine Rückfrage nach dem Grund einer Handlung liest sich wie Tadel, und
+Tadel liest sich wie Abbruchbefehl. Beide Sprünge fühlen sich im Zug hilfreich an: Der erste
+liefert Arbeit, der zweite liefert Gehorsam. Beide erfinden aber, was der Nutzer will, statt es
+zu lesen — und der zweite ist der teuerste Fehler überhaupt, weil Stillstand jede andere
+Antwort schlägt. Damit ist dies der Zwilling von [§3.180](#3180-ein-zitat-mit-gedehntem-geltungsbereich-ist-ein-erfundenes-zitat):
+Dort wurde ein `--user-stop` mit einem gedehnten Zitat begründet, hier ohne jedes.
+
+**Lehre:** Eine Anfrage im Chatfenster wird beantwortet, und der Zug endet dort. Sie holt den
+Batch nicht her und hält ihn nicht an; läuft er schon, läuft er weiter. Aufnehmen oder Anhalten
+verlangt einen Satz, der genau das verlangt, und `--user-stop` bekommt ausschließlich einen
+solchen Satz wörtlich zitiert. Wer schon zu viel getan hat, sagt es — und lässt den Batch
+trotzdem laufen.
