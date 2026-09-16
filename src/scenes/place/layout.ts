@@ -1540,15 +1540,15 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     if (compoundFences.has(f)) for (const c of run) compoundColliders.add(c)
   }
   const fenceColliderCount = colliders.length - fenceColliderStart
-  // The two entries the play rocks occupy are remembered, because the stage they
-  // draw is derived from bank points that have not settled yet: once they have,
-  // the settled pair is written back into these same slots rather than appended
-  // a second time.
-  const playRockSlots: number[] = []
-  if (playRocks) {
-    playRockSlots.push(colliders.length, colliders.length + 1)
-    colliders.push({ x: playRocks.upstream.x, z: playRocks.upstream.z, r: playRocks.r })
-    colliders.push({ x: playRocks.downstream.x, z: playRocks.downstream.z, r: playRocks.r })
+  // Keep the rock bodies themselves: opening a fence gate below changes the
+  // number of colliders before them. Once the bank settles, these same bodies
+  // move with it without adding a second pair or overwriting another prop.
+  const playRockColliders = playRocks ? {
+    upstream: { x: playRocks.upstream.x, z: playRocks.upstream.z, r: playRocks.r },
+    downstream: { x: playRocks.downstream.x, z: playRocks.downstream.z, r: playRocks.r },
+  } : null
+  if (playRockColliders) {
+    colliders.push(playRockColliders.upstream, playRockColliders.downstream)
   }
   if (place.kind === 'village') {
     // The fire pit alone (work-order 604). The cook used to carry a collider of
@@ -1577,9 +1577,9 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   // placed BEFORE the children's quarter is searched, so the quarter is fitted
   // around it exactly as it is around the other adult places.
   let waterStand: PlaceLayout['waterStand'] = null
-  /** Where the stand's own collider sits, so it can be taken out again if the
-   *  water path it was placed for is discarded further down. */
-  let standColliderAt = -1
+  /** Retain the stand's body across fence splices, so it can be removed if
+   *  the water path it was placed for is discarded further down. */
+  let standCollider: Collider | null = null
   if (place.kind === 'village' && waterPath && bank) {
     const standClear = colliderBuckets(colliders, WATER_STAND_RADIUS)
     const walkClear = colliderBuckets(colliders, WALKER_RADIUS)
@@ -1621,8 +1621,8 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
       if (waterStand) break
     }
     if (waterStand) {
-      standColliderAt = colliders.length
-      colliders.push({ x: waterStand.x, z: waterStand.z, r: WATER_STAND_RADIUS })
+      standCollider = { x: waterStand.x, z: waterStand.z, r: WATER_STAND_RADIUS }
+      colliders.push(standCollider)
     }
   }
 
@@ -1788,7 +1788,11 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
       // Fail closed if a future plan breaks the invariant: never draw through
       // a solid body or leave a stand that no carrier can serve.
       waterPath = null
-      if (standColliderAt >= 0) colliders.splice(standColliderAt, 1)
+      if (standCollider) {
+        const at = colliders.indexOf(standCollider)
+        if (at >= 0) colliders.splice(at, 1)
+        standCollider = null
+      }
       waterStand = null
     } else {
       waterPath.head = head
@@ -1893,8 +1897,9 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     // the search would have an endpoint refuse a step because of a rock that
     // would have taken the same step. Left in, the silent three-metre search can
     // run out without finding free ground that was there all along.
-    const staged = new Set(playRockSlots)
-    const probe = playRockSlots.length ? colliders.filter((_, i) => !staged.has(i)) : colliders
+    const probe = playRockColliders
+      ? colliders.filter((c) => c !== playRockColliders.upstream && c !== playRockColliders.downstream)
+      : colliders
     settleBankPoints(bank, (x, z) => spawnPointFree(probe, x, z, WALKER_RADIUS))
     // AND THE STAGE FOLLOWS THE BANK IT IS DERIVED FROM. Settling may pull the
     // endpoints inland; the play rocks were computed before it, so trusting them
@@ -1904,12 +1909,12 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     // exactly why this is re-derived rather than trusted: a divergence that never
     // happens has no symptom until the day it does, and then it is a player
     // standing between two banks.
-    if (playRocks) {
+    if (playRocks && playRockColliders) {
       const settled = bankPlayRocks(bank)
       playRocks.upstream = settled.upstream
       playRocks.downstream = settled.downstream
-      colliders[playRockSlots[0]] = { x: settled.upstream.x, z: settled.upstream.z, r: playRocks.r }
-      colliders[playRockSlots[1]] = { x: settled.downstream.x, z: settled.downstream.z, r: playRocks.r }
+      Object.assign(playRockColliders.upstream, settled.upstream)
+      Object.assign(playRockColliders.downstream, settled.downstream)
     }
   }
 

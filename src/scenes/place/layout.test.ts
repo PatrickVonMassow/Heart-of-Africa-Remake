@@ -14,8 +14,10 @@ import {
   DIG_SITE_FIELD_BAND,
   PLAY_ROCK_SPAN,
   PLACE_RADIUS,
+  VILLAGE_FIRE,
   WATER_PATH_HEAD_RADII,
   WATER_PATH_WIDTH,
+  WATER_STAND_RADIUS,
   WAY_OUT_HALF_WIDTH,
   WAY_OUT_INNER,
   WAY_OUT_OUTER,
@@ -37,6 +39,7 @@ import { mulberry32 } from '../../world/noise'
 import { balance } from '../../config/balance'
 import { setupGeodata } from '../../test/geodata'
 import { REGION_PLACE_STYLES, VILLAGE_PLANS } from './regionStyles'
+import { VILLAGE_SPOTS } from './lifeSpots'
 
 // The landmark boulder is placed against the REAL terrain (it refuses every wet
 // spot — work-order 585), so this file needs the elevation dataset the browser
@@ -570,7 +573,34 @@ describe('the village water path (work-order 688)', () => {
     }
   })
 
-  it.each([7, 1337, 2987912600])('seed %i: the compound crossing is a drawn gate with matching collision', (seed) => {
+  const gatedSeeds = [7, 1337, 2987912600, 2861293141]
+
+  it.each(gatedSeeds)('seed %i: gate rebuilding preserves village props and exactly two settled rock colliders', (seed) => {
+    const layout = buildLayout('bambara-village', seed)
+    const props = [
+      { x: VILLAGE_FIRE[0], z: VILLAGE_FIRE[1], r: 1.3 },
+      { x: -8.5, z: -7, r: 1.0 }, // loom
+      { x: VILLAGE_SPOTS.talkers[0], z: VILLAGE_SPOTS.talkers[1], r: 0.85 },
+      { x: VILLAGE_SPOTS.pounder[0], z: VILLAGE_SPOTS.pounder[1], r: 0.55 },
+      { x: VILLAGE_SPOTS.drummer[0], z: VILLAGE_SPOTS.drummer[1], r: 0.8 },
+      { x: VILLAGE_SPOTS.well[0], z: VILLAGE_SPOTS.well[1], r: 0.75 },
+    ]
+    for (const prop of props) expect(layout.colliders).toContainEqual(prop)
+    expect(layout.waterStand).not.toBeNull()
+    expect(layout.colliders).toContainEqual({ ...layout.waterStand!, r: WATER_STAND_RADIUS })
+
+    expect(layout.playRocks).not.toBeNull()
+    const rocks = layout.playRocks!
+    const rockColliders = layout.colliders.filter((c) =>
+      (c.kind === undefined || c.kind === 'circle') && c.r === rocks.r,
+    )
+    expect(rockColliders).toHaveLength(2)
+    for (const rock of [rocks.upstream, rocks.downstream]) {
+      expect(rockColliders).toContainEqual({ x: rock.x, z: rock.z, r: rocks.r })
+    }
+  })
+
+  it.each(gatedSeeds)('seed %i: the compound crossing is a drawn gate with matching collision', (seed) => {
     const layout = buildLayout('bambara-village', seed)
     const { head, foot } = layout.waterPath!
     const line: Array<[number, number]> = [[head.x, head.z], [foot.x, foot.z]]
