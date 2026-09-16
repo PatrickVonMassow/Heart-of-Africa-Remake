@@ -161,6 +161,81 @@ put it is the mistake this line exists to stop.
   pointer-lock effect and the keyboard-guard key list; it is worked after 1139, which edits
   the same place-scene key handling, and never beside it.
 
+- [ ] 1141. The settlement edge band cannot be measured at the maasai village: the same
+  check reds on `main` itself (measured 16.09.2026 on a quiet machine, WebGPU, twice per
+  tree). `polish --section=settlement-edge` fails at `maasai-village (dry): the inside
+  ground crop could be measured — crop off-frame`, and the baseline classification places
+  the fault on `main`, not on the branch that found it: on `origin/main` 893110333 the
+  section failed at that check in both its first leg and its own retry
+  (`local/verify-baseline/893110333ddf/local/verify-logs/2026-09-16T14-51-17-971-polish.log`),
+  exactly as it did on `feat/1138-wedged-adults` f948bdbf7
+  (`.claude/worktrees/point-1138/local/verify-logs/2026-09-16T14-26-09-272-polish.log`).
+  The earlier covering run of the same branch had failed once at `bambara-village (wet)`'s
+  OUTSIDE crop and once at the maasai INSIDE crop, which the load heuristic read as a flake
+  signature; on the quiet machine the maasai check is reproducible and the bambara one is not.
+  AND IT DOES NOT SHOW UP IN A WHOLE PASS. Measured the same evening on the same tree:
+  both covering passes over collision, polish and settings — WebGPU
+  (`local/verify-logs/2026-09-16T16-09-28-256-…`) and WebGL 2
+  (`…T16-49-27-151-…`) — ran this very check GREEN, 280 pass 0 fail each. So the red
+  belongs to the ISOLATED SECTION RUN, four times out of four, and the whole pass, twice
+  out of twice, does not see it: what differs is the history the block arrives with, since
+  `--section` runs that block's own setup and nothing before it. That difference is the
+  first thing to measure, and it is why the red charge is scoped and not a licence.
+  WHAT THE MESSAGE DOES NOT SAY: the failing line is `bandRatio(ndc) === null`
+  (`scripts/verify/polish.mjs` :2996), and `bandRatio` returns null for TWO different
+  causes — a crop rectangle that falls outside the viewport (`groundSamples`) AND a
+  toggled-off reading of zero luminance (`!(off > 0)`). Both print "crop off-frame", so
+  the recorded evidence cannot say which one happened; the preceding `settledLuma(ndc)`
+  read of the SAME crop had succeeded, which makes the zero-luminance branch the likelier
+  of the two and the wording the reason nobody can tell.
+  FINAL STATE: the maasai village's dry inside crop is measurable again on both backends,
+  and the two causes carry DIFFERENT messages, each printing what it measured (the crop
+  rectangle against the viewport, or the off-reading that came back zero) — so the next
+  red of this check is classifiable from its record alone. Whether the picture itself is
+  at fault (a black ground band at that place and season) or the crop geometry is, is what
+  the split message answers first; the fix follows the cause and never the assertion.
+  VERIFIABLE: `polish --section=settlement-edge` green on WebGPU and on WebGL 2 on a quiet
+  machine, and a Vitest case over the two null paths of the reading helper so each carries
+  its own wording.
+  Criticality: high — it is a red on `main` that every render point's picture proof runs
+  into, and while it stands the `polish` suite can only be judged through a red charge.
+  Refs: scripts/verify/polish.mjs, scripts/render-verify-charges.mjs
+  Bundle: Testinfrastruktur.
+
+- [ ] 1142. The picture check's coverage record dies with the worktree it was earned in
+  (measured 16.09.2026 on the landing of 1138). Both covering passes of that point ran in
+  `.claude/worktrees/point-1138` — WebGPU and WebGL 2 over collision, polish and settings,
+  green but for one red charged to an open point on each lane — and the runner wrote their
+  records into THAT checkout's own `.claude/render-verify-state.json`, which is untracked.
+  `scripts/worktree-cleanup.mjs` then removed the worktree at the end of the landing, as the
+  working method requires, and with it the only machine-readable proof that the picture had
+  been judged. `render-verify-guard` on `main` therefore reported "RENDER CHANGE NOT VERIFIED
+  ON EITHER BACKEND" over the very commits whose picture had just been judged on both, and
+  the session had to close the gap with a logged deferral — an exception that says the
+  picture is UNCONFIRMED when it had in fact been confirmed.
+  WHY IT BITES EVERY POINT: the working method puts every point in its own worktree and ends
+  the branch with the merge, so this is the ordinary path, not an accident of this landing.
+  The run's own log and `.run.json` sidecar go the same way — `local/verify-logs/` inside the
+  worktree is a real directory, not a link — so after the cleanup neither the receipt nor the
+  log exists to read back. The same evening's baseline classification is the counter-example
+  that shows what is lost: it could only be made because that checkout still stood.
+  FINAL STATE: a covering run earned on a branch survives the branch. The record and the run
+  log are written where the repository keeps them for every checkout — the main tree's
+  `.claude/` and `local/verify-logs/` — or the cleanup migrates them before it removes the
+  worktree; and the guard reads a run by the COMMIT it names, which after a merge is an
+  ancestor of `main`, rather than by the checkout it happened to run in. Deciding between
+  those two is the point's first job; both are small and only one of them may be built.
+  VERIFIABLE: Vitest over the state path resolution — a runner started in a worktree records
+  into the repository's state, not the worktree's — plus a drill that runs a section in a
+  worktree, removes the worktree with the project's own command, and asserts that the guard
+  on `main` still reads the run and its log.
+  Criticality: high — it does not break the game, but it destroys the evidence the render
+  gate exists to keep, and it turns every honest landing into a deferral that reads like an
+  unverified one.
+  Refs: scripts/render-verify-guard.mjs, scripts/verify/run-logged.mjs, scripts/verify/run-record.mjs,
+  scripts/worktree-cleanup.mjs
+  Bundle: Testinfrastruktur.
+
 - [ ] 1135. The verification run stops repeating itself: one pass per suite, no automatic
   flake retry, no automatic baseline pass (user order 15.09.2026, FIRST of three, verbatim:
   "Okay, setze das so um und reihe es als nächstes in der Queue ein").
@@ -15868,43 +15943,3 @@ to land than a mechanism that needs a review.
   scripts/verify/run-all.mjs, scripts/verify/run-logged.mjs
   Bundle: Session- & Repo-Hygiene
 
-- [ ] 1141. The settlement edge band cannot be measured at the maasai village: the same
-  check reds on `main` itself (measured 16.09.2026 on a quiet machine, WebGPU, twice per
-  tree). `polish --section=settlement-edge` fails at `maasai-village (dry): the inside
-  ground crop could be measured — crop off-frame`, and the baseline classification places
-  the fault on `main`, not on the branch that found it: on `origin/main` 893110333 the
-  section failed at that check in both its first leg and its own retry
-  (`local/verify-baseline/893110333ddf/local/verify-logs/2026-09-16T14-51-17-971-polish.log`),
-  exactly as it did on `feat/1138-wedged-adults` f948bdbf7
-  (`.claude/worktrees/point-1138/local/verify-logs/2026-09-16T14-26-09-272-polish.log`).
-  The earlier covering run of the same branch had failed once at `bambara-village (wet)`'s
-  OUTSIDE crop and once at the maasai INSIDE crop, which the load heuristic read as a flake
-  signature; on the quiet machine the maasai check is reproducible and the bambara one is not.
-  AND IT DOES NOT SHOW UP IN A WHOLE PASS. Measured the same evening on the same tree:
-  both covering passes over collision, polish and settings — WebGPU
-  (`local/verify-logs/2026-09-16T16-09-28-256-…`) and WebGL 2
-  (`…T16-49-27-151-…`) — ran this very check GREEN, 280 pass 0 fail each. So the red
-  belongs to the ISOLATED SECTION RUN, four times out of four, and the whole pass, twice
-  out of twice, does not see it: what differs is the history the block arrives with, since
-  `--section` runs that block's own setup and nothing before it. That difference is the
-  first thing to measure, and it is why the red charge is scoped and not a licence.
-  WHAT THE MESSAGE DOES NOT SAY: the failing line is `bandRatio(ndc) === null`
-  (`scripts/verify/polish.mjs` :2996), and `bandRatio` returns null for TWO different
-  causes — a crop rectangle that falls outside the viewport (`groundSamples`) AND a
-  toggled-off reading of zero luminance (`!(off > 0)`). Both print "crop off-frame", so
-  the recorded evidence cannot say which one happened; the preceding `settledLuma(ndc)`
-  read of the SAME crop had succeeded, which makes the zero-luminance branch the likelier
-  of the two and the wording the reason nobody can tell.
-  FINAL STATE: the maasai village's dry inside crop is measurable again on both backends,
-  and the two causes carry DIFFERENT messages, each printing what it measured (the crop
-  rectangle against the viewport, or the off-reading that came back zero) — so the next
-  red of this check is classifiable from its record alone. Whether the picture itself is
-  at fault (a black ground band at that place and season) or the crop geometry is, is what
-  the split message answers first; the fix follows the cause and never the assertion.
-  VERIFIABLE: `polish --section=settlement-edge` green on WebGPU and on WebGL 2 on a quiet
-  machine, and a Vitest case over the two null paths of the reading helper so each carries
-  its own wording.
-  Criticality: high — it is a red on `main` that every render point's picture proof runs
-  into, and while it stands the `polish` suite can only be judged through a red charge.
-  Refs: scripts/verify/polish.mjs, scripts/render-verify-charges.mjs
-  Bundle: Testinfrastruktur.
