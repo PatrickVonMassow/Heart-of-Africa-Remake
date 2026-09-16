@@ -28,3 +28,26 @@
    and task retirement after placement. No second timer or walker path planner
    was added. Browser suites and the moving-adult picture comparison on both
    backends remain the reviewing session's responsibility, per the commission.
+
+## Verification
+
+Code candidate: `b5ffc5172d40c0f312e0a956f11eeedd2fc9d9f7`.
+
+- `npm run build`: passed (exit 0).
+- `npm run lint`: passed (exit 0).
+- `npm run test:unit`: failed (exit 1), 501 files passed, one failed;
+  15,517 tests passed, two failed, six skipped. The failures were unchanged
+  `bankGame.test.ts` cases at lines 291 and 882, each exceeding 20 seconds
+  (21.890 s and 22.535 s). The escape and caller tests passed.
+- Diagnostic rerun of only those two bank-game cases: both passed without
+  changes, in 11.777 s and 12.987 s. Command:
+  `npx vitest run src/scenes/place/bankGame.test.ts -t 'calls ROCK once with nobody arriving|walks round the traveller instead of stopping the game'`.
+  Multiple independent Vitest runs were active during the full gate; contention
+  is a plausible cause, not an established baseline verdict. This diagnostic
+  does not convert the full gate to green. No timeout, assertion, or bank-game
+  code was changed.
+- Browser suites: not run, as instructed. The reviewer owns the reported-seed
+  village picture comparison on WebGPU and WebGL 2.
+
+The review clarification sufficed; no specification blocker remains. The full
+unit gate remains open because of the two timeouts above.
