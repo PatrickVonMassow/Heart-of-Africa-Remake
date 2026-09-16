@@ -121,6 +121,19 @@ put it is the mistake this line exists to stop.
   5. `nonPredictive` checks report but do NOT set the exit code (that is point 1127 — if it has
      landed, check and refer, never duplicate it). `run-wait` stops calling healthy runs hung;
      instead a wall-clock ceiling per suite and a hand abort.
+  6. The backend sequence does NOT stop at a red whose own accounting says it does not hold.
+     MEASURED 16.09.2026 on `feat/1137-picture-gate-hung-verdict` (d7ba6543e), log
+     `local/verify-logs/2026-09-16T05-20-58-440-large.log`: the WebGL 2 pass ran all 25 suites to
+     the end, classified its three reds as PRE-EXISTING against the merge-base and concluded
+     "own or unresolved: none; regression verdict unchanged" — and still exited 1, so
+     `scripts/verify/run-all.mjs:173-177` printed "not proceeding to the remaining backend(s)"
+     and the WebGPU pass never started. While ANY pre-existing red stands — three do, charged to
+     the OPEN points 603, 938 and 1009 — a both-backend LARGE is structurally unreachable, which
+     is exactly what CLAUDE.md §5 demands once per bundle and at closing; it blocks point 633 and
+     point 174. FINAL STATE: the sequencer proceeds to the remaining backend when the failed
+     pass's verdict is "charged elsewhere / verdict unchanged", and the run fails at its END
+     rather than at the backend boundary. A red that DOES hold still stops the sequence.
+     This is a deletion of one early exit, not a new mechanism.
   NO NEW INFRASTRUCTURE: deleted runs, a renamed label, a file 1104 already owes, README prose.
   VERIFICATION: unit for the changed run logic. A LARGE on the next bundle state shows the
   saving on the wall clock but is NOT part of this point's acceptance.
