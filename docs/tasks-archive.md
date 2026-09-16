@@ -29085,3 +29085,25 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Criticality: medium — the village reads as inhabited only while its people do their work, and
   §7.1 criterion 15 (lively settlements) is measured on exactly this.
   Bundle: Dorfleben.
+
+- [x] 1137. The picture gate is unusable: a suite never gets past the dev server.
+  Bundle: Testinfrastruktur — it rewrites nothing of the game, only the harness.
+  Criticality: high. BLOCKING CONDITION: it blocks the release and every lane that touches a
+  render path — `render-verify-guard` demands a covering run that currently cannot be produced
+  at all, so the poc publication of the current `main` and each render point stand still
+  behind it.
+  MEASURED 15./16.09.2026 on `main` d02cce8: two independent `polish` runs on WebGPU both stop
+  immediately after the line `# starting dev server` and never write a single section line.
+  The first (by hand, `scripts/verify/run-all.mjs`, pid 4167627) still stood there after 3 min
+  with 11 live Chrome processes and port 34197 listening. The second, through the wrapper
+  (`scripts/verify/run-logged.mjs polish`, log
+  `local/verify-logs/2026-09-15T21-55-42-681-polish.log`), was classed HUNG by `run-wait` after
+  17m 28s — past 2.5x the 5m 41s expectation — and was ended. The GPU preflight PASSES in both
+  runs (WebGL 2 and WebGPU ready, ANGLE/D3D12 on an RTX 4070 Ti) and the machine was quiet
+  (load 0.30, 11 GB free), so neither the host nor the GPU explains it.
+  NOT YET SEPARATED: whether it hangs for every suite or only `polish`, whether WebGL 2 shows
+  the same picture, and whether the dev server answers a plain request while it hangs. Start
+  there — one narrow section (`npm test -- polish --section=list`, then a single section) says
+  more in two minutes than another full pass.
+  FINAL STATE: a covering picture run completes again on both backends, or the blockade is
+  understood and named. As long as it stands, no render point can close.
