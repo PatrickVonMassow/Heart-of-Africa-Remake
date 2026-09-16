@@ -697,9 +697,11 @@ function collidersNearRun(
 /** A continuous corridor: each 0.1 m sample is widened by half a step,
  * so even a grazing box corner between samples cannot touch the drawn lane. */
 function clearCorridor(colliders: readonly Collider[], head: BankPoint, foot: BankPoint, halfWidth: number): boolean {
-  const steps = Math.max(1, Math.ceil(Math.hypot(foot.x - head.x, foot.z - head.z) / 0.1))
-  const clearance = halfWidth + Math.hypot(foot.x - head.x, foot.z - head.z) / steps / 2
+  const length = Math.hypot(foot.x - head.x, foot.z - head.z)
+  const steps = Math.max(1, Math.ceil(length / 0.1))
+  const clearance = halfWidth + length / steps / 2
   const near = collidersNearRun(colliders, head.x, head.z, foot.x, foot.z, clearance)
+  if (near.length === 0) return true
   for (let k = 0; k <= steps; k++) {
     const x = head.x + (foot.x - head.x) * k / steps
     const z = head.z + (foot.z - head.z) * k / steps

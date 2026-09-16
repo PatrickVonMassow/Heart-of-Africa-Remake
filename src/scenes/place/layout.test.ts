@@ -13,6 +13,7 @@ import {
   DIG_SITE_ANCHOR_REACH,
   DIG_SITE_FIELD_BAND,
   PLAY_ROCK_SPAN,
+  PLACE_RADIUS,
   WATER_PATH_HEAD_RADII,
   WATER_PATH_WIDTH,
   WAY_OUT_HALF_WIDTH,
@@ -26,7 +27,7 @@ import {
   type Interactive,
   type DwellingDef,
 } from './layout'
-import { spawnPointFree, standingClear, PLAYER_RADIUS, WALKER_RADIUS, type Collider } from './collision'
+import { boxCollider, spawnPointFree, standingClear, PLAYER_RADIUS, WALKER_RADIUS, type Collider } from './collision'
 import { ANIMAL_RADIUS, animalAnchors } from './animalSpots'
 import { closestOnPolyline } from './lanePlan'
 import { PLACES, placeById } from '../../world/geo'
@@ -529,7 +530,7 @@ describe('the village water path (work-order 688)', () => {
   ])]
   let riverVillages: string[] = []
   beforeAll(() => {
-    riverVillages = VILLAGES.filter((p) => buildRiverBank(p, 28)).map((p) => p.id)
+    riverVillages = VILLAGES.filter((p) => buildRiverBank(p, PLACE_RADIUS)).map((p) => p.id)
     expect(riverVillages).toContain('bambara-village')
   })
 
@@ -566,6 +567,43 @@ describe('the village water path (work-order 688)', () => {
           }
         }
       }
+    }
+  })
+
+  it.each([7, 1337, 2987912600])('seed %i: the compound crossing is a drawn gate with matching collision', (seed) => {
+    const layout = buildLayout('bambara-village', seed)
+    const { head, foot } = layout.waterPath!
+    const line: Array<[number, number]> = [[head.x, head.z], [foot.x, foot.z]]
+    let crossedGates = 0
+    for (const fence of layout.fences) {
+      const run = fenceColliders(fence)
+      expect(layout.colliders).toEqual(expect.arrayContaining(run))
+      for (let i = 0; i < run.length; i++) {
+        if (run[i].kind === 'segment') continue
+        const a = fence.posts[i]
+        const b = fence.posts[(i + 1) % fence.posts.length]
+        // A gap crossed by the lane must have no bridging wall collider.
+        for (let k = 0; k <= 100; k++) {
+          const x = a[0] + (b[0] - a[0]) * k / 100
+          const z = a[1] + (b[1] - a[1]) * k / 100
+          if (closestOnPolyline(line, x, z).dist < WATER_PATH_WIDTH / 2) {
+            crossedGates++
+            break
+          }
+        }
+      }
+    }
+    expect(crossedGates, 'the lane actually passes through a compound opening').toBeGreaterThan(0)
+    // Woven panels use these exact half-extents in PlaceScene's Fences mesh.
+    // A gate-end panel turns toward the next surviving post; test its corners
+    // too, so rotating that last short panel cannot hide a drawn obstruction.
+    const drawn = fencePanels(layout.fences).filter((p) => p.kind === 'woven')
+      .map((p) => boxCollider(p.x, p.z, 0.41, 0.035, p.rot, 0))
+    const steps = Math.ceil(Math.hypot(foot.x - head.x, foot.z - head.z) / 0.025)
+    for (let k = 0; k <= steps; k++) {
+      const x = head.x + (foot.x - head.x) * k / steps
+      const z = head.z + (foot.z - head.z) * k / steps
+      expect(standingClear(drawn, x, z, WATER_PATH_WIDTH / 2)).toBe(true)
     }
   })
 

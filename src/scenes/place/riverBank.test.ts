@@ -503,16 +503,11 @@ describe('the village water stand can be walked up to (work-order 1087)', () => 
         expect(open).toBeGreaterThanOrEqual(9)
       }
     }
-    // Not every sweep, because a village whose head search gives up its water
-    // path keeps no stand either — but most of them, so a silent collapse of the
-    // placement still reads here.
-    expect(checked).toBeGreaterThan(riverVillages.length * 20 * 0.7)
+    expect(checked).toBe(riverVillages.length * 20)
   })
 
   it('gives every river village that fetches water a stand at all', () => {
-    // A river village with no usable WATER PATH fetches nothing and rightly has
-    // no stand (point 1045 owns the walk it cannot find); every village that
-    // does fetch must have one, or the return leg has nowhere to go.
+    // Every river village needs both the walk and its return destination.
     let fetching = 0
     for (const id of riverVillages) {
       for (let seed = 1; seed <= 20; seed++) {
@@ -522,7 +517,7 @@ describe('the village water stand can be walked up to (work-order 1087)', () => 
         expect(layout.waterStand, `${id} seed ${seed}: a water path but no stand`).toBeTruthy()
       }
     }
-    expect(fetching).toBeGreaterThan(riverVillages.length * 20 * 0.7)
+    expect(fetching).toBe(riverVillages.length * 20)
   })
 
   it('never stands one in a drawn lane', () => {
