@@ -51,3 +51,20 @@ Code candidate: `b5ffc5172d40c0f312e0a956f11eeedd2fc9d9f7`.
 
 The review clarification sufficed; no specification blocker remains. The full
 unit gate remains open because of the two timeouts above.
+
+## Second-leg review: finding 1
+
+Confirmed and fixed: a spawn-free pinned position was accepted without movement,
+including a nearby standing-clear pocket cell on the grid rung. Escape ring
+searches now require `balance.walkerUnstuckMinDistance` (calibratable, initially
+0.6 m), and the grid scan rejects cells below the same minimum. Ordinary spawn
+nudging retains its zero-distance behavior. Only the home anchor is exempt.
+
+Added regression cases for an already-free pinned body, calibration across near
+and wide searches, a standing-clear grid pocket inside walls beyond both ring
+searches, and a nearby home fallback when no cell satisfies the minimum. Both
+production caller blocks now exercise the spawn-free and grid-pocket cases and
+assert the body's displacement against the configured minimum after the window.
+
+Validation: `npm run test:unit -- src/scenes/place/collision.test.ts
+src/scenes/place/PlaceLife.escape.test.ts` passed: 2 files, 47 tests, 1.40 s.

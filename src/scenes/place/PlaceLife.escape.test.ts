@@ -55,9 +55,14 @@ function escapeStep(actor: 'walker' | 'errand') {
 }
 
 const rungs: Array<{ rung: 'near' | 'wide' | 'grid' | 'home'; colliders: Collider[]; radius: number }> = [
+  { rung: 'near', colliders: [], radius: 40 },
   { rung: 'near', colliders: [{ x: 0, z: 0, r: 1 }], radius: 40 },
   { rung: 'wide', colliders: [{ x: 0, z: 0, r: 9 }], radius: 40 },
   { rung: 'grid', colliders: [boxCollider(0, 0, 20, 20, 0)], radius: 40 },
+  { rung: 'grid', colliders: [
+    boxCollider(-10.4, 0, 9.6, 20, 0), boxCollider(10.4, 0, 9.6, 20, 0),
+    boxCollider(0, -10.4, 20, 9.6, 0), boxCollider(0, 10.4, 20, 9.6, 0),
+  ], radius: 40 },
   { rung: 'home', colliders: [boxCollider(0, 0, 20, 20, 0)], radius: 10 },
 ]
 
@@ -97,6 +102,7 @@ it.each(rungs)('both steppers place the body via $rung after the configured wind
       const body = walker ? s : me
       expect([body.x, body.z]).toEqual(expected.pos)
       expect([body.x, body.z]).not.toEqual([0, 0])
+      expect(Math.hypot(body.x, body.z)).toBeGreaterThanOrEqual(balance.walkerUnstuckMinDistance)
       const retire = rung === 'grid' || rung === 'home'
       if (walker) {
         expect(s.pinned).toBe(0)

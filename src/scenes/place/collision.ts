@@ -6,6 +6,7 @@
 // through which the camera could clip into the walls. Resolution pushes the
 // mover out along the contact normal, which yields natural sliding.
 
+import { balance } from '../../config/balance'
 import type { PlaceNavGrid } from './routing'
 
 export interface CircleCollider {
@@ -285,7 +286,8 @@ export function spawnPointFree(
  *  When none is found within `maxRings`, `found` is false and the position falls
  *  back to the original — so a caller can tell "relocated / already free" from
  *  "gave up" instead of resetting an unstuck counter over a walker that never
- *  moved (the pinned-forever bug). */
+ *  moved (the pinned-forever bug). Escape callers can require `minDistance`
+ *  from the input; ordinary spawn placement keeps its zero-distance default. */
 export function tryNudgeToFree(
   colliders: Collider[],
   x: number,
@@ -293,8 +295,9 @@ export function tryNudgeToFree(
   radius: number,
   step: number = radius * 2,
   maxRings = 12,
+  minDistance = 0,
 ): { pos: [number, number]; found: boolean } {
-  if (spawnPointFree(colliders, x, z, radius, step)) return { pos: [x, z], found: true }
+  if (minDistance === 0 && spawnPointFree(colliders, x, z, radius, step)) return { pos: [x, z], found: true }
   for (let ring = 1; ring <= maxRings; ring++) {
     const rr = ring * step
     const n = ESCAPE_DIRECTIONS * ring // denser sampling on the larger rings
@@ -302,6 +305,7 @@ export function tryNudgeToFree(
       const a = (i / n) * Math.PI * 2
       const px = x + Math.cos(a) * rr
       const pz = z + Math.sin(a) * rr
+      if ((px - x) ** 2 + (pz - z) ** 2 < minDistance ** 2) continue
       if (spawnPointFree(colliders, px, pz, radius, step)) return { pos: [px, pz], found: true }
     }
   }
@@ -309,7 +313,8 @@ export function tryNudgeToFree(
 }
 
 /** A wedged inhabitant always gets a placement, even when both ring searches
- *  fail. The caller supplies its fixed, known-free anchor as the last resort. */
+ *  fail. Every search must displace it by the configured minimum; only the
+ *  caller's fixed, known-free anchor is exempt as the last resort. */
 export function escapeToFree(
   colliders: Collider[],
   x: number,
@@ -318,9 +323,10 @@ export function escapeToFree(
   nav: PlaceNavGrid,
   homeAnchor: readonly [number, number],
 ): { pos: [number, number]; rung: 'near' | 'wide' | 'grid' | 'home' } {
-  const near = tryNudgeToFree(colliders, x, z, radius)
+  const minDistance = balance.walkerUnstuckMinDistance
+  const near = tryNudgeToFree(colliders, x, z, radius, undefined, undefined, minDistance)
   if (near.found) return { pos: near.pos, rung: 'near' }
-  const wide = tryNudgeToFree(colliders, x, z, radius, undefined, 24)
+  const wide = tryNudgeToFree(colliders, x, z, radius, undefined, 24, minDistance)
   if (wide.found) return { pos: wide.pos, rung: 'wide' }
 
   // Scan all free cells: a local routing search can also exhaust its rings.
@@ -332,6 +338,7 @@ export function escapeToFree(
       if (!nav.free[i * nav.n + j]) continue
       const pz = nav.min + j * nav.cell
       const d = (px - x) ** 2 + (pz - z) ** 2
+      if (d < minDistance ** 2) continue
       if (d < distance) {
         nearest = [px, pz]
         distance = d
