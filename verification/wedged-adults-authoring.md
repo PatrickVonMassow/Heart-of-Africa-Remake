@@ -13,3 +13,10 @@
    array, independent of its mutable walking position. The memo test moves
    every villager and checks that the nudged anchors remain fixed. No dwelling
    ownership is introduced; walkers already have `def.home.door`.
+
+3. Both steppers call `escapeToFree` in `collision.ts`: default rings, 24 rings,
+   then the nearest free nav cell by Euclidean distance, or the caller's anchor
+   if the grid has no free cell. Both assign the placement before retiring an
+   errand. The port and village `<Walkers>` calls both have `radius` and `bank`
+   in scope and now pass them to build the escape grid. Pure unit tests cover
+   each rung, including enclosure beyond both searches.

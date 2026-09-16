@@ -30,7 +30,7 @@ function sceneMovement() {
     NPC_RADIUS: collision.WALKER_RADIUS, WAYPOINT_RADIUS: 1.2,
   }
   const move = new Function(...Object.keys(deps), 'env', `
-    const {people, work, idle, rand, namedPlaces, rim, colliders, radius, bank,
+    const {people, spawnAnchors, work, idle, rand, namedPlaces, rim, colliders, radius, bank,
       nav, bodies, bodySet, separationWorld, yaws, dt, cfg} = env;
     ${movement}
   `)
@@ -84,6 +84,7 @@ it.each([0.1, 1 / 30, 1 / 60, 1 / 107])('completes the first reported village wa
   }
   const env = {
     people, work, idle, rand, bodies, bodySet, dt, cfg,
+    spawnAnchors: people.map(({ x, z }) => ({ x, z })),
     namedPlaces: [layout.waterPath!.head, ...layout.digSites],
     rim: layout.radius - collision.WALKER_RADIUS * 2,
     colliders: layout.colliders, radius: layout.radius, bank: layout.bank,

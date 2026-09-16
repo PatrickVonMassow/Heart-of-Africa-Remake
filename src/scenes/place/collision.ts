@@ -6,6 +6,8 @@
 // through which the camera could clip into the walls. Resolution pushes the
 // mover out along the contact normal, which yields natural sliding.
 
+import type { PlaceNavGrid } from './routing'
+
 export interface CircleCollider {
   kind?: 'circle'
   x: number
@@ -304,6 +306,41 @@ export function tryNudgeToFree(
     }
   }
   return { pos: [x, z], found: false }
+}
+
+/** A wedged inhabitant always gets a placement, even when both ring searches
+ *  fail. The caller supplies its fixed, known-free anchor as the last resort. */
+export function escapeToFree(
+  colliders: Collider[],
+  x: number,
+  z: number,
+  radius: number,
+  nav: PlaceNavGrid,
+  homeAnchor: readonly [number, number],
+): { pos: [number, number]; rung: 'near' | 'wide' | 'grid' | 'home' } {
+  const near = tryNudgeToFree(colliders, x, z, radius)
+  if (near.found) return { pos: near.pos, rung: 'near' }
+  const wide = tryNudgeToFree(colliders, x, z, radius, undefined, 24)
+  if (wide.found) return { pos: wide.pos, rung: 'wide' }
+
+  // Scan all free cells: a local routing search can also exhaust its rings.
+  let nearest: [number, number] | null = null
+  let distance = Infinity
+  for (let i = 0; i < nav.n; i++) {
+    const px = nav.min + i * nav.cell
+    for (let j = 0; j < nav.n; j++) {
+      if (!nav.free[i * nav.n + j]) continue
+      const pz = nav.min + j * nav.cell
+      const d = (px - x) ** 2 + (pz - z) ** 2
+      if (d < distance) {
+        nearest = [px, pz]
+        distance = d
+      }
+    }
+  }
+  return nearest
+    ? { pos: nearest, rung: 'grid' }
+    : { pos: [homeAnchor[0], homeAnchor[1]], rung: 'home' }
 }
 
 /**

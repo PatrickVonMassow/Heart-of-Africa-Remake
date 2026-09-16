@@ -5,6 +5,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   boxCollider,
+  escapeToFree,
   hasEscapeDirection,
   nudgeToFree,
   nudgeWhere,
@@ -15,6 +16,7 @@ import {
   WALKER_RADIUS,
   type Collider,
 } from './collision'
+import { buildPlaceNavGrid } from './routing'
 
 const R = WALKER_RADIUS
 
@@ -118,6 +120,51 @@ describe('tryNudgeToFree (point 198 — report whether a free spot was actually 
     const r = tryNudgeToFree([{ x: 0, z: 0, r: 1 }], 0, 0, R, undefined, 0)
     expect(r.found).toBe(false)
     expect(r.pos).toEqual([0, 0])
+  })
+})
+
+describe('escapeToFree — every failed search escalates to placement', () => {
+  const home = [35, 0] as const
+
+  it('uses the default search before a grid cell or the home anchor', () => {
+    const colliders = tightRing()
+    const nav = buildPlaceNavGrid({ radius: 40 }, colliders, R)
+    const escape = escapeToFree(colliders, 0, 0, R, nav, home)
+    expect(escape).toEqual({ pos: tryNudgeToFree(colliders, 0, 0, R).pos, rung: 'near' })
+    expect(escape.pos).not.toEqual([0, 0])
+    expect(spawnPointFree(colliders, ...escape.pos, R)).toBe(true)
+  })
+
+  it('reaches the widened search when all default rings are blocked', () => {
+    const colliders = [{ x: 0, z: 0, r: 9 }]
+    const nav = buildPlaceNavGrid({ radius: 40 }, colliders, R)
+    expect(tryNudgeToFree(colliders, 0, 0, R).found).toBe(false)
+    const escape = escapeToFree(colliders, 0, 0, R, nav, home)
+    expect(escape).toEqual({ pos: tryNudgeToFree(colliders, 0, 0, R, undefined, 24).pos, rung: 'wide' })
+    expect(spawnPointFree(colliders, ...escape.pos, R)).toBe(true)
+  })
+
+  it('places an enclosed body on the nearest free grid cell when both searches fail', () => {
+    const colliders = [boxCollider(0, 0, 20, 20, 0)]
+    const nav = buildPlaceNavGrid({ radius: 40 }, colliders, R)
+    expect(tryNudgeToFree(colliders, 0, 0, R).found).toBe(false)
+    expect(tryNudgeToFree(colliders, 0, 0, R, undefined, 24).found).toBe(false)
+    const escape = escapeToFree(colliders, 0, 0, R, nav, home)
+    expect(escape.rung).toBe('grid')
+    expect(escape.pos).not.toEqual([0, 0])
+    expect(standingClear(colliders, ...escape.pos, R)).toBe(true)
+    const distances = Array.from(nav.free, (free, k) => free
+      ? Math.hypot(nav.min + Math.floor(k / nav.n) * nav.cell, nav.min + (k % nav.n) * nav.cell)
+      : Infinity)
+    expect(Math.hypot(...escape.pos)).toBeCloseTo(Math.min(...distances), 10)
+  })
+
+  it('places the body at the caller anchor when the entire grid is blocked', () => {
+    const colliders = [boxCollider(0, 0, 20, 20, 0)]
+    const nav = buildPlaceNavGrid({ radius: 10 }, colliders, R)
+    expect(nav.free.some(Boolean)).toBe(false)
+    expect(escapeToFree(colliders, 0, 0, R, nav, home)).toEqual({ pos: home, rung: 'home' })
+    expect(spawnPointFree(colliders, ...home, R)).toBe(true)
   })
 })
 
