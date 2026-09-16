@@ -581,6 +581,16 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Zähle nicht, wie viel du ZUGETEILT hast, sondern wie oft die Übergabe wirklich
   stattfand — belege es an der Spur des Beauftragten, nicht an deiner eigenen Tabelle."
 
+- **Der Helfer arbeitet in einer Kopie, die deine Unterlagen nicht enthält.** Du verweist in der
+  Aufgabe auf eine Datei — einen Fehlerbericht, einen Screenshot, ein Protokoll —, und der Helfer
+  findet sie nicht: Sie ist von der Versionsverwaltung ausgeschlossen, also reist sie nicht in
+  seine isolierte Kopie mit. Das Gute daran: Ein Helfer, der das meldet statt zu raten, hat dir
+  Arbeit gespart.
+  → *Prompt:* „Bevor du eine Aufgabe übergibst, prüfe für **jeden Pfad**, den sie nennt, ob der
+  Helfer ihn in SEINER Kopie öffnen kann. Nenne ausgeschlossene Dateien mit **vollem Pfad** auf
+  das Original, statt sie zu kopieren oder zu verlinken — ein Verweis auf ein ganzes Verzeichnis
+  wird beim Aufräumen zur Löschfalle."
+
 - **Die gemessene Dauer von damals tötet den gesunden Lauf von heute.** Die Prüfung wächst weiter,
   ihre hinterlegte Erwartung nicht — und das Werkzeug erklärt einen rechnenden Lauf für hängend.
   → *Prompt:* „‚Hängt, abbrechen‘ steht nie allein auf einer hinterlegten Dauer, und ein
@@ -681,4 +691,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 00ee00290e28f084cf0031a2e14a3f94099f0353b1d3bedb0cdd42c215bff998 -->
+<!-- GUIDE-FINGERPRINT: 15c5191b6008590875e85c38b55b61bdc75c10c620100455b668397d101738d9 -->
