@@ -29158,3 +29158,33 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Bundle: Dorfleben — it edits the two steppers in `PlaceLife.tsx` and the escape in
   `collision.ts`, the same place-scene paths 1080, 1081, 1082 and 1125 reach, so it is worked
   before them and never beside them.
+
+- [x] 1139. Placing a guess moves from Space to E: the use key and the guess key no longer
+  compete (user 16.09.2026, verbatim: "SPACE sowohl zum Ablegen einer Vermutung bzgl. des
+  gesagten Worts, als auch zum Benutzen (z. B. bei der Häuptlings-Hütte) stehen manchmal im
+  Konflikt zueinander. Wie viel Aufwand ist es, das Ablegen einer Vermutung auf E umzulegen
+  (soll dann in der GUI auch so angezeigt werden)?" and "Reihe das mit SPACE und E hinter 1138
+  ein."). It stands directly behind 1138.
+  WHY IT COLLIDES TODAY: design.md §21 makes everything Space can mean ONE candidate list, and
+  the nearest in reach wins. A spoken word's label is a candidate beside the chief's hut and the
+  enterable buildings, so at the chief's hut the word wins the key from the hut, or the hut
+  from the word, by a step's distance.
+  FINAL STATE: Space uses (enter a building, call the chief); E places a guess for the targeted
+  word. The one Space handler in the place scene (`src/scenes/place/PlaceScene.tsx`, the
+  `onKeyPress('Space', …)` effect) becomes two handlers over the same candidate list filtered by
+  key: Space takes the `interactive` and `chief` payloads, E takes the `label` payloads. The
+  per-frame highlight and prompt follow the same split, so the hut's "Space" prompt and the
+  word's "E" invite can stand at once. The invite text (`speechGuess.invite`, en and de) names
+  E; design.md §21 and §13.4 state the two keys and drop the one-list rule for the guess;
+  `KeyE` joins `GAME_KEY_CODES` in `src/systems/keyboardGuard.ts`. GAMEPAD: button A keeps
+  BOTH meanings for now (the §17.5 map has no free face button; recommendation of 16.09.2026,
+  calibratable) — the arbitration between hut and word therefore stays on the pad only, and
+  design.md §17.5 says so in one sentence.
+  VERIFIABLE: Vitest over the key split — a word label and the chief's hut both in reach: Space
+  calls the chief and never opens the guess, E opens the guess and never calls the chief; the
+  localization parity test covers the new invite in both languages. Plus the existing browser
+  checks that press Space to open a guess move to E and stay green on WebGPU.
+  Criticality: medium — player-visible in the village the communication mechanic lives in;
+  a wrong split would silence the guess, so the Vitest pair is the gate.
+  Bundle: Steuerung & Performance — it edits the place scene's key handling and the
+  keyboard-guard key list, which no other open point touches.
