@@ -70,6 +70,59 @@ export function pickForKeyPress<T extends { kind: UseKind }>(
   return pickUseCandidate(forPress, options.held ?? null)
 }
 
+/**
+ * The standing picks a settlement carries — one per key that has a tie to hold
+ * (work-order point 1139). They are SEPARATE histories on purpose: the use key
+ * decides over the doors and the chief, the pad over the whole list, and a press
+ * on one input may never move the target the other input is holding.
+ */
+export interface KeyPicks {
+  /** What the keyboard's use key is holding. */
+  use: string | null
+  /** What the pad's A button is holding — a word included. */
+  pad: string | null
+}
+
+/** Nothing held yet: the state a settlement is entered with. */
+export const NO_KEY_PICKS: KeyPicks = { use: null, pad: null }
+
+/**
+ * Carry both picks one frame against the live candidates, and hand back what
+ * each key would act on right now — the use key's winner for the bottom prompt,
+ * the guess key's for the note's invitation.
+ */
+export function advanceKeyPicks<T extends { kind: UseKind }>(
+  candidates: readonly UseCandidate<T>[],
+  picks: KeyPicks,
+): { picks: KeyPicks; use: UseCandidate<T> | null; guess: UseCandidate<T> | null } {
+  const use = pickForKeyPress(candidates, 'use', { held: picks.use })
+  const pad = pickForKeyPress(candidates, 'use', { pad: true, held: picks.pad })
+  return {
+    picks: { use: use?.key ?? null, pad: pad?.key ?? null },
+    use,
+    guess: pickForKeyPress(candidates, 'guess'),
+  }
+}
+
+/**
+ * A press: what it acts on, and the picks it leaves behind. It writes only the
+ * history of the input it CAME FROM — a pad press that moved the pad's pick must
+ * not move what the keyboard's use key is holding, or the next Space press acts
+ * on something the player never aimed at.
+ */
+export function pressKey<T extends { kind: UseKind }>(
+  candidates: readonly UseCandidate<T>[],
+  key: 'use' | 'guess',
+  source: 'keyboard' | 'gamepad' | 'touch',
+  picks: KeyPicks,
+): { winner: UseCandidate<T> | null; picks: KeyPicks } {
+  if (key === 'guess') return { winner: pickForKeyPress(candidates, 'guess'), picks }
+  const pad = source === 'gamepad'
+  const winner = pickForKeyPress(candidates, 'use', { pad, held: pad ? picks.pad : picks.use })
+  if (!winner) return { winner: null, picks }
+  return { winner, picks: pad ? { ...picks, pad: winner.key } : { ...picks, use: winner.key } }
+}
+
 /** One thing a key could mean, and how far the player stands from it. */
 export interface UseCandidate<T = unknown> {
   /** Identity across kinds — the key the hold is remembered by. */

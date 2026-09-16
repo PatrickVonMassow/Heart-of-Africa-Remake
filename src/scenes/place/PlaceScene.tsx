@@ -149,7 +149,15 @@ import { bankPlayRocksView, type PlaceRiverBank } from './riverBank'
 import { scatterGrassTufts } from './groundScatter'
 import { clearEdgeBand, setEdgeBandBoundary, setEdgeBandLook } from '../../render/edgeBand'
 import { devAssert } from '../../systems/devAssert'
-import { GUESS_KEY_CODE, USE_KEY_CODE, pickForKeyPress, type UseCandidate } from './useKeyTarget'
+import {
+  GUESS_KEY_CODE,
+  NO_KEY_PICKS,
+  USE_KEY_CODE,
+  advanceKeyPicks,
+  pressKey,
+  type KeyPicks,
+  type UseCandidate,
+} from './useKeyTarget'
 import { buildLayout, chiefStandingSpot, interactiveCircleRadius, doorCandidates, fencePanels, isOnLane, PLACE_RADIUS, SPAWN_INSET, VILLAGE_FIRE, type Interactive, type PathDef, type DwellingDef, type FenceDef, type PlaceLayout } from './layout'
 import {
   COOK_SHELTER,
@@ -2811,12 +2819,12 @@ export function PlaceScene() {
   // the player read and the thing SPACE does are one and the same. The guess key
   // needs no such hold: the speech channel offers at most ONE word at a time and
   // decides that choice itself (speechTarget.ts), so there is no tie to keep.
-  const useKeyPick = useRef<string | null>(null)
-  // The PAD decides over the whole list, so it needs a standing pick OF ITS OWN
-  // (review of 16.09.2026): the use key's pick has never seen a word, and lending
-  // it to button A would let a door take a word the pad was holding a hand's
-  // breadth away — the flicker TARGET_HOLD exists to stop.
-  const padKeyPick = useRef<string | null>(null)
+  // The PAD carries a pick of its OWN beside it (review of 16.09.2026): it
+  // decides over the whole list, the use key's pick has never seen a word, and
+  // lending one to the other would let a door take a word the pad was holding a
+  // hand's breadth away — the flicker TARGET_HOLD exists to stop. A press writes
+  // only the history of the input it came from; `pressKey` owns that rule.
+  const keyPicks = useRef<KeyPicks>(NO_KEY_PICKS)
   // PlaceScene stays mounted across placeId changes and the handler's effect
   // only re-subscribes on setPrompt, so read the CURRENT layout through a ref.
   const layoutRef = useRef(layout)
@@ -2880,18 +2888,13 @@ export function PlaceScene() {
       // A real key press — and a tapped prompt, which names SPACE and must do
       // what it names — uses only; the PAD keeps both meanings (design.md §17.5)
       // and decides on its own standing pick.
-      const pad = keyPressSource(e) === 'gamepad'
-      const winner = pickForKeyPress(all, 'use', {
-        pad,
-        held: pad ? padKeyPick.current : useKeyPick.current,
-      })
+      const { winner, picks } = pressKey(all, 'use', keyPressSource(e), keyPicks.current)
+      keyPicks.current = picks
       if (!winner) return
-      if (pad) padKeyPick.current = winner.key
       if (winner.payload.kind === 'speech') {
         openSpeechGuessRef.current(winner.payload.label)
         return
       }
-      useKeyPick.current = winner.key
       if (winner.payload.kind === 'interactive') openBuildingRef.current(winner.payload.interactive)
       else actOnChief(winner.payload.target, layoutRef.current)
     }, { preventDefault: true })
@@ -2905,10 +2908,11 @@ export function PlaceScene() {
   // over the targeted speaker's head and nothing else, so the hut at the
   // player's feet can no longer take it away from him — nor he from the hut.
   useEffect(() => {
-    const off = onKeyPress(GUESS_KEY_CODE, () => {
+    const off = onKeyPress(GUESS_KEY_CODE, (e) => {
       if (useUi.getState().dialog) return
       const p = player.current
-      const winner = pickForKeyPress(settlementUseCandidates(layoutRef.current, p.x, p.z), 'guess')
+      const all = settlementUseCandidates(layoutRef.current, p.x, p.z)
+      const { winner } = pressKey(all, 'guess', keyPressSource(e), keyPicks.current)
       if (winner?.payload.kind !== 'speech') return
       openSpeechGuessRef.current(winner.payload.label)
     }, { preventDefault: true })
@@ -3149,12 +3153,9 @@ export function PlaceScene() {
     // proximity only ARMS the use key + shows the prompt; entry is the discrete
     // Space press (which reselects against the live position through the same
     // helper), never walking in.
-    const all = settlementUseCandidates(layout, p.x, p.z)
-    const winner = pickForKeyPress(all, 'use', { held: useKeyPick.current })
-    useKeyPick.current = winner?.key ?? null
-    // The pad's own pick is carried the same way, over the whole list, so button
-    // A holds a word across the frames it would otherwise flicker away from.
-    padKeyPick.current = pickForKeyPress(all, 'use', { pad: true, held: padKeyPick.current })?.key ?? null
+    const frame = advanceKeyPicks(settlementUseCandidates(layout, p.x, p.z), keyPicks.current)
+    keyPicks.current = frame.picks
+    const winner = frame.use
     const strings = getStrings()
     // At the chief's hut the key names the HUT while he is inside it, and the
     // MAN once he stands in front of it (design.md §12).
@@ -3173,7 +3174,7 @@ export function PlaceScene() {
     const uiNow = useUi.getState()
     if (uiNow.prompt !== prompt) setPrompt(prompt)
     // The note's own invitation, armed by the guess key's own reach alone.
-    const guessArmed = pickForKeyPress(all, 'guess') !== null
+    const guessArmed = frame.guess !== null
     if (uiNow.guessKeyArmed !== guessArmed) uiNow.setGuessKeyArmed(guessArmed)
   })
 

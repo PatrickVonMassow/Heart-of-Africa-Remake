@@ -9,10 +9,12 @@
 import { describe, expect, it } from 'vitest'
 import { TARGET_HOLD, labelPresentation } from '../../communication/speechTarget'
 import {
+  advanceKeyPicks,
   candidatesForKey,
   keyForUseKind,
   pickForKeyPress,
   pickUseCandidate,
+  pressKey,
   type UseCandidate,
   type UseKind,
 } from './useKeyTarget'
@@ -203,6 +205,47 @@ describe('the use key and the guess key no longer compete (point 1139)', () => {
     // The pad has no free face button, so there the old arbitration survives.
     expect(pickForKeyPress([chief(2), word(0.5)], 'use', { pad: true })?.payload.kind).toBe('speech')
     expect(pickForKeyPress([chief(0.5), word(2)], 'use', { pad: true })?.payload.kind).toBe('chief')
+  })
+
+  it('keeps the two histories apart across presses (review 16.09.2026)', () => {
+    // The wiring itself, not the rule alone: the scene carries ONE picks object
+    // through the frame and through every press, so a test that never touches it
+    // could not see a pad press overwriting what the keyboard holds.
+    const hutA: Kinded = { ...hut(1.0), key: 'door:a' }
+    const hutB: Kinded = { ...hut(1.0 - TARGET_HOLD + 0.01), key: 'door:b' }
+    const all = [hutA, hutB, word(1.0)]
+    // A frame carries both picks: the keyboard's over the doors, the pad's over
+    // the whole list — and here the word is what the pad sees as nearest.
+    const first = advanceKeyPicks(all, { use: 'door:a', pad: 'speech:villager-1' })
+    expect(first.picks).toEqual({ use: 'door:a', pad: 'speech:villager-1' })
+    expect(first.use?.key).toBe('door:a')
+    expect(first.guess?.key).toBe('speech:villager-1')
+    // A PAD press moves the pad's history and leaves the keyboard's standing.
+    const padPress = pressKey(all, 'use', 'gamepad', first.picks)
+    expect(padPress.winner?.key).toBe('speech:villager-1')
+    expect(padPress.picks).toEqual({ use: 'door:a', pad: 'speech:villager-1' })
+    // With the word gone the pad falls to the nearer door — and STILL may not
+    // hand that door to the keyboard, which is holding the other one.
+    const withoutWord = [hutA, hutB]
+    const padAgain = pressKey(withoutWord, 'use', 'gamepad', padPress.picks)
+    expect(padAgain.winner?.key).toBe('door:b')
+    expect(padAgain.picks).toEqual({ use: 'door:a', pad: 'door:b' })
+    // And the keyboard's own press still acts on the door it was holding.
+    const keyPress = pressKey(withoutWord, 'use', 'keyboard', padAgain.picks)
+    expect(keyPress.winner?.key).toBe('door:a')
+    expect(keyPress.picks).toEqual({ use: 'door:a', pad: 'door:b' })
+  })
+
+  it('leaves both histories alone when a key finds nothing, and when E answers', () => {
+    const held = { use: 'door:a', pad: 'speech:villager-1' }
+    // Out of every reach: a press that does nothing may not forget what is held.
+    const nothing = pressKey([hut(DOOR_TRIGGER_RADIUS + 5)], 'use', 'keyboard', held)
+    expect(nothing.winner).toBeNull()
+    expect(nothing.picks).toEqual(held)
+    // The guess key has no history of its own to write.
+    const guess = pressKey([hut(0.3), word(2)], 'guess', 'keyboard', held)
+    expect(guess.winner?.key).toBe('speech:villager-1')
+    expect(guess.picks).toEqual(held)
   })
 
   it('holds the PAD on a word a door is about to take by a hair (review 16.09.2026)', () => {
