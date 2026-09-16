@@ -2,6 +2,7 @@
 // a gift and distant panorama wildlife, design.md §17/§2). Dev server only.
 import { launchVerifyBrowser, waitForStable, waitForReadingStable, waitForSceneBuilt, assertBackend } from './_browser.mjs'
 import { frameShutter, capturePixels, waitForSceneReady } from './frameSubject.mjs'
+import { installColliderProbe } from './colliderProbe.mjs'
 import { judgeFootingSeries, judgePitchSeries, MIN_SLOPED_SAMPLES } from './footingSeries.mjs'
 import { judgeStanceSlip } from './stanceSlip.mjs'
 import {
@@ -135,6 +136,8 @@ const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
 // it stands in, the building it is aimed at, the overlay it documents — and the
 // shutter proves that subject is in the picture before the file is written.
 const frame = frameShutter(page, OUT)
+// The collider geometry the staged-wedge section reads with (scripts/verify/colliderProbe.mjs).
+await installColliderProbe(page)
 const errors = []
 page.on('console', (m) => {
   if (m.type() === 'error') errors.push(m.text())
@@ -5263,6 +5266,198 @@ if (section('children-boulder-climb')) {
 //
 // The village is the PoC's own (the Bambara village); the ground work is in
 // every village.
+// --- No adult stays wedged (work-order 1138) ---------------------------------
+// The user photographed two adults pressed into the corner between a dwelling's
+// wall and a fence panel, still there frame after frame. The escape ladder that
+// answers it is pinned in Vitest over the pure decision and over the production
+// blocks themselves; what only the real settlement can settle is that nobody
+// stays put in the layout the report was taken in — those pockets are drawn by
+// THAT village at THAT seed, and no synthetic collider set stands in for them.
+//
+// The trace is taken INSIDE the page, one entry per rendered frame: a stepper
+// that is freed and wedges again between two readings would otherwise be read as
+// a body that never moved, and the crossing of the process boundary is exactly
+// what would hide it. The window is several times the escape's own, so a body
+// still on its spot at the end has outlasted every rung of the ladder.
+if (section('wedged-adults')) {
+  await page.evaluate(() => {
+    const g = window.__game.getState()
+    if (g.placeId) g.leavePlace()
+  })
+  await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
+  // HIS seed, put back afterwards: the settlement layout is derived from place
+  // plus seed, so this is the village he stood in and not merely one of the same
+  // people — and every section after this one would otherwise read a world it
+  // never asked for.
+  const bootSeed = await page.evaluate(() => window.__game.getState().seed)
+  await page.evaluate(() => window.__game.setState({ seed: 3321422240 }))
+  await page.evaluate(() => window.__game.getState().enterPlace('bambara-village'))
+  const live = await page
+    .waitForFunction(
+      () =>
+        window.__game.getState().placeId === 'bambara-village' &&
+        !!window.__placeErrands &&
+        !!window.__placeWalkers,
+      null,
+      { timeout: 40000 },
+    )
+    .then(() => true)
+    .catch(() => false)
+  check('the reported village publishes both of its adult steppers', live)
+  if (live) {
+    await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+    // The knobs the claim is measured against are the game's own, read from the
+    // running build rather than restated here.
+    const knob = await page.evaluate(() => ({
+      seconds: window.__balance.walkerUnstuckSeconds,
+      minDistance: window.__balance.walkerUnstuckMinDistance,
+    }))
+    const readBodies = (frames) =>
+      page.evaluate(
+        (n) =>
+          new Promise((resolve) => {
+            const log = []
+            const read = () => [
+              ...(window.__placeWalkers?.states ?? []).map((s, i) => ({ who: `walker ${i}`, x: s.x, z: s.z })),
+              ...(window.__placeErrands?.().villagers ?? []).map((v, i) => ({ who: `errand ${i}`, x: v.x, z: v.z })),
+            ]
+            const tick = () => {
+              log.push({ t: performance.now(), bodies: read() })
+              if (log.length >= n) resolve(log)
+              else requestAnimationFrame(tick)
+            }
+            requestAnimationFrame(tick)
+          }),
+        frames,
+      )
+    // Displacement measured against the FIRST reading of each body, over the
+    // whole window — the largest distance it ever reached, so a body that walks
+    // out and comes back is not read as one that never left.
+    const walkedOf = (log) => {
+      const start = new Map(log[0].bodies.map((b) => [b.who, b]))
+      const out = new Map()
+      for (const sample of log) {
+        for (const b of sample.bodies) {
+          const from = start.get(b.who)
+          if (!from) continue
+          const d = Math.hypot(b.x - from.x, b.z - from.z)
+          if (d > (out.get(b.who) ?? -1)) out.set(b.who, d)
+        }
+      }
+      return out
+    }
+    const trace = await readBodies(1200)
+    const seconds = (trace.at(-1).t - trace[0].t) / 1000
+    check(
+      'the trace outlasts the escape window it has to outlast',
+      seconds >= knob.seconds * 3,
+      `${seconds.toFixed(1)} s against a ${knob.seconds} s window`,
+    )
+    const counted = trace[0].bodies
+    // Non-vacuous: a village that published no stepper would satisfy the next
+    // check having measured nothing at all.
+    check(
+      'the trace reads both steppers of the village',
+      counted.some((b) => b.who.startsWith('walker')) && counted.some((b) => b.who.startsWith('errand')),
+      `${counted.filter((b) => b.who.startsWith('walker')).length} household walkers, `
+        + `${counted.filter((b) => b.who.startsWith('errand')).length} errand villagers`,
+    )
+    const walked = walkedOf(trace)
+    const pinned = [...walked.entries()].filter(([, d]) => d < knob.minDistance)
+    check(
+      'no adult of the reported village is still on the spot it started from',
+      pinned.length === 0,
+      pinned.length
+        ? pinned.map(([who, d]) => `${who} moved ${d.toFixed(2)} m`).join(', ')
+        : `${walked.size} adults, the least mobile of them ${Math.min(...walked.values()).toFixed(2)} m`,
+    )
+    // THE REPORTED PICTURE, STAGED WHERE THE REPORT WAS MADE: the village's own
+    // tightest slot between two different bodies — a hut wall and a fence run is
+    // exactly such a pair — with a household walker set down in it. What the
+    // pair of frames then shows is the reported corner with an adult pressed
+    // into it and, one window later, the same corner with the adult gone. The
+    // subject of both shutters is the SLOT, which stays in the picture whether
+    // the body is still in it or not (point 375).
+    const wedge = await page.evaluate(() => {
+      const cs = window.__placeColliders ?? []
+      const sample = (c) =>
+        c.kind === 'segment'
+          ? Array.from({ length: 9 }, (_, i) => [c.x1 + ((c.x2 - c.x1) * i) / 8, c.z1 + ((c.z2 - c.z1) * i) / 8])
+          : [[c.x, c.z]]
+      let best = null
+      for (let i = 0; i < cs.length; i++)
+        for (let j = i + 1; j < cs.length; j++) {
+          for (const [ax, az] of sample(cs[i]))
+            for (const [bx, bz] of sample(cs[j])) {
+              const gap =
+                Math.hypot(ax - bx, az - bz) - window.__colliderSize(cs[i]) - window.__colliderSize(cs[j])
+              if (gap < 0) continue // colliders that merge into one body are no slot
+              if (!best || gap < best.gap) best = { gap, x: (ax + bx) / 2, z: (az + bz) / 2 }
+            }
+        }
+      return best
+    })
+    check(
+      'the reported village has a tightest slot to stage the report in',
+      !!wedge,
+      wedge ? `gap ${wedge.gap.toFixed(2)} m at ${wedge.x.toFixed(1)},${wedge.z.toFixed(1)}` : 'none',
+    )
+    if (wedge) {
+      // Standing between the slot and the village centre and looking back at it:
+      // the open side of a pocket between a hut and a fence run is the side the
+      // settlement lies on, so a camera placed there sees the body rather than
+      // the wall that pinned it.
+      const put = await page.evaluate((at) => {
+        const s = window.__placeWalkers?.states?.[0]
+        if (!s) return null
+        s.x = at.x
+        s.z = at.z
+        const p = window.__placePlayer
+        const len = Math.hypot(at.x, at.z) || 1
+        p.x = at.x - (at.x / len) * 6
+        p.z = at.z - (at.z / len) * 6
+        // Place-camera yaw 0 looks toward -Z, so aim with the +PI complement.
+        p.yaw = Math.atan2(at.x - p.x, at.z - p.z) + Math.PI
+        p.pitch = -0.1
+        return { x: s.x, z: s.z }
+      }, wedge)
+      check('a household walker can be set down in it', !!put)
+      if (put) {
+        await nextFrames(2)
+        await frame('1138-wedged-adults-before', {
+          local: { x: wedge.x, y: 0.9, z: wedge.z },
+          label: "an adult set down in the reported village's tightest slot",
+        })
+        // Long enough for every rung of the ladder to have answered, measured on
+        // the game's own window rather than on a frame count.
+        const freeing = await readBodies(600)
+        const out = freeing.at(-1).bodies.find((b) => b.who === 'walker 0')
+        const seconds2 = (freeing.at(-1).t - freeing[0].t) / 1000
+        await frame('1138-wedged-adults-after', {
+          local: { x: wedge.x, y: 0.9, z: wedge.z },
+          label: 'the same slot after the escape window, with the adult out of it',
+        })
+        const got = out ? Math.hypot(out.x - put.x, out.z - put.z) : 0
+        check(
+          'and the adult put into it is out of it again within the escape window',
+          got >= knob.minDistance && seconds2 >= knob.seconds,
+          `${got.toFixed(2)} m in ${seconds2.toFixed(1)} s, against ${knob.minDistance} m after ${knob.seconds} s`,
+        )
+        // NOT a clearance check on the freed body: a household walker walks
+        // THROUGH its own door and stands inside the dwelling, so "clear of every
+        // collider" reds on correct behaviour (measured 16.09.2026, clearance
+        // -1.75 m inside a hut). That the placement itself lands on free ground
+        // is asserted where it is decided — collision.test.ts over every rung.
+      }
+    }
+  }
+  await page.evaluate(() => {
+    const g = window.__game.getState()
+    if (g.placeId) g.leavePlace()
+  })
+  await page.evaluate((seed) => window.__game.setState({ seed }), bootSeed)
+}
+
 if (section('adult-errands')) {
   await page.evaluate(() => {
     const g = window.__game.getState()

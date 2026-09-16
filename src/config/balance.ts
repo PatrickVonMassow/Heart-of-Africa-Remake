@@ -17,6 +17,9 @@ export interface BalanceConfig {
    *  has a walk target) before it is teleport-nudged to the nearest free spot
    *  (point 155) — a small invisible correction, inhabitants only. */
   walkerUnstuckSeconds: number
+  /** Calibratable minimum displacement in metres for an inhabitant's escape
+   *  search. The caller's home anchor is exempt as the final fallback. */
+  walkerUnstuckMinDistance: number
   /** The PLAYER's own escape from a wedge (work-order 604): the key frees him,
    *  the detection only tells him the key exists. The lengths are calibrated for
    *  the walking scale of a settlement; the bird's-eye view scales them by the
@@ -885,6 +888,7 @@ export const balance: BalanceConfig = {
   placeWalkSpeed: 10,
   placeStrafeFactor: 0.8,
   walkerUnstuckSeconds: 4, // an inhabitant wedged this long is teleport-nudged free (point 155)
+  walkerUnstuckMinDistance: 0.6, // calibratable: one adult body width out of the pinned position
   unstuck: {
     // Calibratable: half a metre is well under one walking step, so a man who
     // really is wedged never crosses it while a man edging along a wall does;

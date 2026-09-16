@@ -57,7 +57,7 @@ import { useGame } from '../../state/store'
 import { START_YEAR, balance } from '../../config/balance'
 import { climbBoulder } from './looseRocks'
 import type { RegionPlaceStyle } from './regionStyles'
-import { nudgeToFree, nudgeWhere, PLAYER_RADIUS, resolveMove, spawnPointFree, standingClear, tryNudgeToFree, WALKER_RADIUS, type Collider } from './collision'
+import { escapeToFree, nudgeToFree, nudgeWhere, PLAYER_RADIUS, resolveMove, spawnPointFree, standingClear, tryNudgeToFree, WALKER_RADIUS, type Collider } from './collision'
 import { utteranceOf } from '../../communication/lexicon'
 import { insidePlace } from './boundary'
 import { playRockFlank } from './playRockSurface'
@@ -2208,6 +2208,8 @@ function Walkers({
   cloth,
   count,
   colliders,
+  radius,
+  bank,
 }: {
   seed: number
   homes: HomeDef[]
@@ -2215,8 +2217,15 @@ function Walkers({
   cloth: string[]
   count: number
   colliders: Collider[]
+  radius: number
+  bank: PlaceRiverBank | null
 }) {
   const groundHeight = usePlaceGround()
+  // Used only to place a wedged body; ordinary walker routes stay unchanged.
+  const nav = useMemo(
+    () => buildPlaceNavGrid({ radius, bank }, colliders, NPC_RADIUS),
+    [radius, bank, colliders],
+  )
   const defs = useMemo(() => {
     const rand = mulberry32((seed + 60601) >>> 0)
     const n = Math.min(count, homes.length)
@@ -2403,25 +2412,15 @@ function Walkers({
       // Belt-and-braces unstuck (point 155): the waypoint-skip above frees most
       // blocks, but a walker wedged in a pocket keeps cycling waypoints while
       // physically pinned. When it has not actually moved for the calibratable
-      // window, teleport-nudge it to the nearest free spot — inhabitants only,
-      // a small invisible correction, never the player.
+      // window, place it on free ground — inhabitants only, never the player.
       if (Math.hypot(s.x - oldX, s.z - oldZ) < step * 0.1) {
         s.pinned += dt
         if (s.pinned > balance.walkerUnstuckSeconds) {
-          // Escalate rather than silently no-op (point 198): the nudge used to
-          // return the ORIGINAL point when its search found nothing while the
-          // caller reset the counter anyway, so a walker with no free spot
-          // nearby stayed pinned forever. Try the ring search, WIDEN it once,
-          // and if there is still no free spot, RETIRE the errand (advance to a
-          // new target) — a stuck walker always makes progress now.
-          const near = tryNudgeToFree(colliders, s.x, s.z, NPC_RADIUS)
-          const r = near.found ? near : tryNudgeToFree(colliders, s.x, s.z, NPC_RADIUS, undefined, 24)
-          if (r.found) {
-            s.x = r.pos[0]
-            s.z = r.pos[1]
-          } else {
-            s.seg++ // no reachable free spot here — pick a new errand target
-          }
+          const escape = escapeToFree(colliders, s.x, s.z, NPC_RADIUS, nav, def.home.door)
+          s.x = escape.pos[0]
+          s.z = escape.pos[1]
+          // Retire an unreachable errand only after placing the body.
+          if (escape.rung === 'grid' || escape.rung === 'home') s.seg++
           s.pinned = 0
           s.stuck = 0
         }
@@ -2552,7 +2551,7 @@ function ErrandVillagers({
     return out
   }, [geography])
 
-  const { people, work, rand } = useMemo(() => {
+  const { people, spawnAnchors, work, rand } = useMemo(() => {
     const r = mulberry32((seed + 30011) >>> 0)
     const spawn = Array.from({ length: count }, (_, i) => {
       const a = (i / Math.max(1, count)) * Math.PI * 2
@@ -2561,6 +2560,8 @@ function ErrandVillagers({
     })
     return {
       people: spawn,
+      // Keep the resolved spawn independently of the positions the frame loop moves.
+      spawnAnchors: spawn.map(({ x, z }) => ({ x, z })),
       work: createAdultWork(count, balance.villageLife.adultErrands, useGame.getState().villageDigProgress[placeId]),
       rand: r,
     }
@@ -2823,20 +2824,21 @@ function ErrandVillagers({
           // Facing where it WALKS, which on a route is the waypoint rather than
           // the destination behind the huts.
           yaws.current[i] = Math.atan2(ax, az)
-          // Wedged (point 155): nudge free, and if that fails give the errand up
-          // rather than let a villager stand pressed against a wall for ever.
+          // Use the same escape ladder as the household walkers.
           if (moved < step * 0.25) {
             state.stuck += dt
             if (state.stuck > balance.walkerUnstuckSeconds) {
+              const anchor = spawnAnchors[i]
+              const escape = escapeToFree(colliders, me.x, me.z, NPC_RADIUS, nav, [anchor.x, anchor.z])
+              me.x = escape.pos[0]
+              me.z = escape.pos[1]
               // A route planned from where it no longer stands is worthless.
               state.route = null
               state.routeTo = null
-              const free = tryNudgeToFree(colliders, me.x, me.z, NPC_RADIUS)
-              if (free.found) {
-                me.x = free.pos[0]
-                me.z = free.pos[1]
-              } else if (task) clearTask(work, i)
-              else state.target = null
+              if (escape.rung === 'grid' || escape.rung === 'home') {
+                if (task) clearTask(work, i)
+                else state.target = null
+              }
               state.stuck = 0
             }
           } else {
@@ -3643,7 +3645,7 @@ export function PlaceLife({
             <Porters seed={localSeed} stops={buildings} cloth={style.cloth} colliders={colliders} count={1 + size} />
             <Traders seed={localSeed} cloth={style.cloth} />
             <Talkers x={PORT_TALKERS[0]} z={PORT_TALKERS[1]} cloth={style.cloth} />
-            <Walkers seed={localSeed} homes={homes} errands={errands} cloth={style.cloth} count={2 + size * 2} colliders={colliders} />
+            <Walkers seed={localSeed} homes={homes} errands={errands} cloth={style.cloth} count={2 + size * 2} colliders={colliders} radius={radius} bank={bank} />
           </SpeechFloorContext.Provider>
         </InhabitantBodiesContext.Provider>
         </LimbDetailContext.Provider>
@@ -3687,7 +3689,7 @@ export function PlaceLife({
             count={Math.max(1, Math.round(balance.villageLife.adultErrands.villagerCount * presence))}
           />
           <Goats seed={localSeed} count={pen ? 4 : 3} pen={pen} colliders={colliders} />
-          <Walkers seed={localSeed} homes={homes} errands={errands} cloth={style.cloth} count={Math.max(1, Math.round(5 * presence))} colliders={colliders} />
+          <Walkers seed={localSeed} homes={homes} errands={errands} cloth={style.cloth} count={Math.max(1, Math.round(5 * presence))} colliders={colliders} radius={radius} bank={bank} />
           {/* Inhabitant/prop interactions (design.md §19). */}
           <FireTender x={firePos[0] - 1.3} z={firePos[1] - 0.7} cloth={style.cloth[2 % style.cloth.length]} />
           <Talkers x={VILLAGE_SPOTS.talkers[0]} z={VILLAGE_SPOTS.talkers[1]} cloth={style.cloth} />
