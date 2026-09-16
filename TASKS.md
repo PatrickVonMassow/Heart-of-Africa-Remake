@@ -187,6 +187,65 @@ put it is the mistake this line exists to stop.
   pointer-lock effect and the keyboard-guard key list; it is worked after 1139, which edits
   the same place-scene key handling, and never beside it.
 
+- [ ] 1143. The weaver stands in the trading post's wall: the "stuck adult" of the 16.09.2026 evening
+  report is the fixed weaver vignette, whose loom stands where the seeded trading post is
+  placed, so her body is drawn inside the market hut's wall (user 16.09.2026, verbatim:
+  "Neuer Bugreport unter C:\Users\Patri\Documents\Developing\hoa\local (über backup
+  erreichbar). Reihe das als vor 1141 ein.", report title "Festklemmend", report text "Wieder
+  ein festklemmender Erwachsener"). ORDER: the user placed it BEFORE 1141.
+  THE EVIDENCE IS IN THE REPOSITORY: `local/Festklemmend.zip`, unpacked beside it in
+  `local/Festklemmend/` (copied from the backup 16.09.2026, 23:19; the folder is ignored, so it
+  travels with the checkout and not with git). Taken on production build a5e98ec — the current
+  `main`, which already carries the 1138 escape ladder — on WebGPU, seed 1838110026,
+  `bambara-village`, day 0.00, viewport 1382x984 @dpr 1.25. The overlay holds only HUD (the
+  off-screen "Market Hut" label is the nearest building); the wildlife section reads "0 animals".
+  WHAT THE PICTURE SHOWS: one adult figure (dark head, yellow cone body, one arm) standing
+  between the loom frame on its left and a large mud wall directly behind it, the body touching
+  the wall. It is NOT a walker: it is the `Weaver` vignette (`src/scenes/place/PlaceLife.tsx`
+  :505-533, mounted at :3661), drawn at the fixed loom spot (-8.5, -7) with her figure 0.55 m in
+  front of the loom toward the village centre, i.e. at (-8.08, -6.65). She never moves by design,
+  so no escape ladder (1138) and no stall detector can ever touch her — the user reads a person
+  pressed into a wall for the whole visit.
+  MEASURED 16.09.2026 (`buildLayout('bambara-village', 1838110026)`): the trading post
+  (`interactives` type `market`) stands at (-5.21, -5.76); its collider radius is 2.9 and its
+  drawn wall radius 2.6 (`MARKET_HUT.r`, `src/scenes/place/roofClearance.ts:79`). The weaver's
+  figure centre is 3.00 m from it — 0.10 m inside the collider and 0.40 m off the wall face, so
+  her 0.3 m body touches the wall. The loom centre is 0.61 m outside the collider. Swept over
+  seeds 1..1500 for the three villages, the weaver's figure lies inside a building collider on
+  97.5 % (bambara), 96.7 % (maasai) and 97.5 % (swahili) of all seeds, every time the market
+  hut; the loom frame itself clips it on ~95 %. Seeds 1, 2, 3, 4, 7 reproduce it in bambara.
+  CAUSE READ OUT OF THE CODE — measure it, do not trust it. `src/scenes/place/layout.ts`
+  :803-811 places the trading post at `[jitter(-6, 2), jitter(-6, 2)]` for the compound plan
+  (the other plans have their own spots), i.e. within ±1 m of (-6, -6), which is 2.69 m from the
+  loom spot (-8.5, -7) — less than the hut's own 2.9 m collider. The only correction applied is
+  the 7.25 m window gap to the chief's hut (:812-818). `isFree` (:848-887) keeps every LATER
+  dwelling, fence post and dressing off the `lifeSpots` (:851), but the functional buildings are
+  placed BEFORE that predicate exists and are never tested against the life spots; the loom
+  collider is only appended afterwards (:1522). The same exposure is already recorded for fences
+  in `docs/backlog.md` (entry "Zaunzuege gegen die Requisitenplaetze", the well at (9, 8.5));
+  this point is its measured building-side twin.
+  FINAL STATE: on every seed of every village, no fixed adult station of
+  `villageAdultStations` (`src/scenes/place/lifeSpots.ts:26-40`) — loom AND weaver figure,
+  talkers, pounder, drummer, well — has its prop or its figure body overlapping any building
+  collider or drawn wall, nor any fence post (fold the backlog entry in if it costs nothing
+  more than the same test). The trading post is fitted AROUND the life spots the way the water
+  stand is fitted around the adult places (:1535-1549), or the loom is moved to a spot the
+  plan keeps free — the author measures which of the two keeps the layouts of the tested
+  seeds intact (the seeded stream is shared; a dropped `rand()` reshuffles every village,
+  :820-826) and says so in the commit. The weaver faces her loom with open ground behind her.
+  VERIFIABLE: Vitest over `buildLayout` for the three villages across ≥ 300 seeds — every
+  adult-station prop collider and figure circle clear of every dwelling, interactive and fence
+  collider by at least a walker's width — the sweep above is the red test today. Plus the
+  `polish` village section photographing the weaver at the reported seed 1838110026 on both
+  backends, with the market hut's wall visibly clear behind her.
+  Criticality: high — player-visible in nearly every village on the current `main`, in the
+  village §7.1 criterion 15 is measured on, and reported by the user from a real session as
+  the third "stuck inhabitant" report in a row (1138's "third head at the hut wall with no
+  body in front of it" is likely this same figure).
+  Bundle: Dorfleben — it edits the village layout in `layout.ts` and the life spots, the same
+  place-scene paths 1080, 1081, 1082 and 1125 reach, so it is worked before them and never
+  beside them.
+
 - [ ] 1141. The settlement edge band cannot be measured at the maasai village: the same
   check reds on `main` itself (measured 16.09.2026 on a quiet machine, WebGPU, twice per
   tree). `polish --section=settlement-edge` fails at `maasai-village (dry): the inside

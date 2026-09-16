@@ -833,7 +833,12 @@ export const LIMITS = {
   // 16.09.2026: the claim-checked-against-nothing clause justified beside maxLines measures 24
   // words after its fold — "name the list you looked in, and read it after the run, not in the
   // middle of it". The long telling stays in the retrospective (§3.279): 6616 -> 6640.
-  maxWords: 6640,
+  // 17.09.2026: the pipe-exit-code lesson arrived as a six-line paragraph of its own and was
+  // FOLDED into the gate prompt that already forbids hiding a failure — "lies kein Ergebnis am
+  // Rückgabewert einer Pipe ab: beweise es am Ziel" — and two neighbouring entries were
+  // tightened while doing it, so the guide comes out one word shorter than the old ceiling and
+  // the ceiling follows it down: 6640 -> 6639.
+  maxWords: 6639,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,
