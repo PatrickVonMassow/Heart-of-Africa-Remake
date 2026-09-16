@@ -136,6 +136,18 @@ describe('language parity (design.md §17: further languages only need a new fil
     expect(de.months).toHaveLength(12)
     expect(en.months).toHaveLength(12)
   })
+
+  // The invitation over a speaker's head NAMES the key the player presses, and
+  // that key became E (point 1139). A dictionary still saying Space would send
+  // him to the key that now enters the hut he is standing at — the very
+  // collision the split removed.
+  it('invites the guess on E in both languages, and names no other key', () => {
+    for (const [tag, dict] of [['en', en], ['de', de]] as const) {
+      const invite = dict.speechGuess.invite
+      expect(invite, `${tag} invite names E`).toMatch(/\bE\b/)
+      expect(invite, `${tag} invite names no other key`).not.toMatch(/space|klick|click|leertaste/i)
+    }
+  })
 })
 
 describe('format functions (design.md §17)', () => {

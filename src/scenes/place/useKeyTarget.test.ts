@@ -1,13 +1,23 @@
-// ONE candidate list for the use key (work-order point 691). SPACE means
-// several things in a settlement — a functional door, the utterance over a
-// speaker's head, and the rest of the rebuild as it lands — and the player must
-// be able to tell WHICH from the picture alone. The rules under test are the
-// three the spec names: the nearest candidate wins, a candidate out of its OWN
-// reach never wins, and a tie holds the standing pick.
+// ONE candidate list for the settlement's action keys (work-order points
+// 691/1139). A settlement offers several things at once — a functional door,
+// the chief, the utterance over a speaker's head — and the player must be able
+// to tell WHICH key means WHICH from the picture alone. The rules under test
+// are the three of point 691 — the nearest candidate wins, a candidate out of
+// its OWN reach never wins, a tie holds the standing pick — and the split of
+// point 1139: SPACE uses, E guesses, and the pad's one button keeps both.
 
 import { describe, expect, it } from 'vitest'
 import { TARGET_HOLD, labelPresentation } from '../../communication/speechTarget'
-import { pickUseCandidate, type UseCandidate } from './useKeyTarget'
+import {
+  advanceKeyPicks,
+  candidatesForKey,
+  keyForUseKind,
+  pickForKeyPress,
+  pickUseCandidate,
+  pressKey,
+  type UseCandidate,
+  type UseKind,
+} from './useKeyTarget'
 import { DOOR_TRIGGER_RADIUS, doorCandidates, type Interactive, type PlaceLayout } from './layout'
 import { balance } from '../../config/balance'
 
@@ -127,5 +137,147 @@ describe('the doors as use-key candidates (point 691)', () => {
   it('skips an interactive with no door at all, and an absent layout', () => {
     expect(doorCandidates(layoutOf([{ type: 'chief', pos: [0, 0] }]), 0, 0)).toEqual([])
     expect(doorCandidates(null, 0, 0)).toEqual([])
+  })
+})
+
+// The two keys of point 1139. The user met the collision the split exists to
+// remove: SPACE at the chief's hut opened the guess at a word spoken beside it,
+// or the hut swallowed the guess — a step's distance decided which. The cases
+// below are that exact standing: a hut and a word BOTH in reach at once.
+describe('the use key and the guess key no longer compete (point 1139)', () => {
+  /** A settlement candidate as the scene builds it: the kind decides the key. */
+  type Kinded = UseCandidate<{ kind: UseKind }>
+  const hut = (distance: number): Kinded => ({
+    key: 'door:chief-hut',
+    distance,
+    range: DOOR_TRIGGER_RADIUS,
+    payload: { kind: 'interactive' },
+  })
+  const chief = (distance: number): Kinded => ({
+    key: 'chief:drummer',
+    distance,
+    range: balance.communication.chiefTalkReach,
+    payload: { kind: 'chief' },
+  })
+  const word = (distance: number): Kinded => ({
+    key: 'speech:villager-1',
+    distance,
+    range: balance.communication.hearingRadius,
+    payload: { kind: 'speech' },
+  })
+
+  it('sorts every kind onto the key that acts on it', () => {
+    expect(keyForUseKind('interactive')).toBe('use')
+    expect(keyForUseKind('chief')).toBe('use')
+    expect(keyForUseKind('speech')).toBe('guess')
+  })
+
+  it('gives SPACE the chief and never the word, with both in reach', () => {
+    // The word is NEARER — under the one list of point 691 it took the key.
+    const both = [chief(2), word(0.5)]
+    expect(pickForKeyPress(both, 'use')?.payload.kind).toBe('chief')
+    expect(candidatesForKey(both, 'use').map((c) => c.key)).toEqual(['chief:drummer'])
+  })
+
+  it('gives E the word and never the hut or the chief, with both in reach', () => {
+    // And the hut is nearer here, which used to silence the note entirely.
+    const both = [hut(0.3), chief(2), word(4)]
+    expect(pickForKeyPress(both, 'guess')?.payload.kind).toBe('speech')
+    expect(candidatesForKey(both, 'guess').map((c) => c.key)).toEqual(['speech:villager-1'])
+  })
+
+  it('arms neither key for what only the other one can reach', () => {
+    // A word alone: SPACE does nothing at all rather than opening the guess.
+    expect(pickForKeyPress([word(1)], 'use')).toBeNull()
+    // A hut alone: E does nothing rather than entering it.
+    expect(pickForKeyPress([hut(0.3), chief(2)], 'guess')).toBeNull()
+  })
+
+  it('keeps the use key out of reach of a word standing in its own', () => {
+    // Out of the hut's reach, in the word's: neither key may act on the hut,
+    // and SPACE may not fall back onto the word because nothing else answers.
+    const far = [hut(DOOR_TRIGGER_RADIUS + 3), word(2)]
+    expect(pickForKeyPress(far, 'use')).toBeNull()
+    expect(pickForKeyPress(far, 'guess')?.payload.kind).toBe('speech')
+  })
+
+  it("lets the PAD's A button keep both meanings, nearest wins (design.md §17.5)", () => {
+    // The pad has no free face button, so there the old arbitration survives.
+    expect(pickForKeyPress([chief(2), word(0.5)], 'use', { pad: true })?.payload.kind).toBe('speech')
+    expect(pickForKeyPress([chief(0.5), word(2)], 'use', { pad: true })?.payload.kind).toBe('chief')
+  })
+
+  it('keeps the two histories apart across presses (review 16.09.2026)', () => {
+    // The RULE the scene's one picks object is carried by — that a press writes
+    // only its own input's history. This layer cannot see the scene's wiring at
+    // all (the pad's whole path is proved in scripts/verify/gamepad.mjs,
+    // section guess-key); what it holds is the rule that wiring must obey.
+    const hutA: Kinded = { ...hut(1.0), key: 'door:a' }
+    const hutB: Kinded = { ...hut(1.0 - TARGET_HOLD + 0.01), key: 'door:b' }
+    const all = [hutA, hutB, word(1.0)]
+    // A frame carries both picks: the keyboard's over the doors, the pad's over
+    // the whole list — and here the word is what the pad sees as nearest.
+    const first = advanceKeyPicks(all, { use: 'door:a', pad: 'speech:villager-1' })
+    expect(first.picks).toEqual({ use: 'door:a', pad: 'speech:villager-1' })
+    expect(first.use?.key).toBe('door:a')
+    expect(first.guess?.key).toBe('speech:villager-1')
+    // A PAD press moves the pad's history and leaves the keyboard's standing.
+    const padPress = pressKey(all, 'use', 'gamepad', first.picks)
+    expect(padPress.winner?.key).toBe('speech:villager-1')
+    expect(padPress.picks).toEqual({ use: 'door:a', pad: 'speech:villager-1' })
+    // With the word gone the pad falls to the nearer door — and STILL may not
+    // hand that door to the keyboard, which is holding the other one.
+    const withoutWord = [hutA, hutB]
+    const padAgain = pressKey(withoutWord, 'use', 'gamepad', padPress.picks)
+    expect(padAgain.winner?.key).toBe('door:b')
+    expect(padAgain.picks).toEqual({ use: 'door:a', pad: 'door:b' })
+    // And the keyboard's own press still acts on the door it was holding.
+    const keyPress = pressKey(withoutWord, 'use', 'keyboard', padAgain.picks)
+    expect(keyPress.winner?.key).toBe('door:a')
+    expect(keyPress.picks).toEqual({ use: 'door:a', pad: 'door:b' })
+  })
+
+  it('leaves both histories alone when a key finds nothing, and when E answers', () => {
+    const held = { use: 'door:a', pad: 'speech:villager-1' }
+    // Out of every reach: a press that does nothing may not forget what is held.
+    const nothing = pressKey([hut(DOOR_TRIGGER_RADIUS + 5)], 'use', 'keyboard', held)
+    expect(nothing.winner).toBeNull()
+    expect(nothing.picks).toEqual(held)
+    // The guess key has no history of its own to write.
+    const guess = pressKey([hut(0.3), word(2)], 'guess', 'keyboard', held)
+    expect(guess.winner?.key).toBe('speech:villager-1')
+    expect(guess.picks).toEqual(held)
+  })
+
+  it('holds the PAD on a word a door is about to take by a hair (review 16.09.2026)', () => {
+    // The pad's standing pick has to be its OWN: the use key's pick never sees a
+    // word, so lending it to button A would hand the door a word held a hand's
+    // breadth away — the flicker TARGET_HOLD exists to stop, and the whole
+    // reason the pad keeps both meanings at all.
+    const near = [hut(1.0 - TARGET_HOLD + 0.01), word(1.0)]
+    expect(pickForKeyPress(near, 'use', { pad: true, held: 'speech:villager-1' })?.key).toBe('speech:villager-1')
+    // A door that really is nearer still takes it, hold or no hold.
+    const nearer = [hut(1.0 - TARGET_HOLD - 0.01), word(1.0)]
+    expect(pickForKeyPress(nearer, 'use', { pad: true, held: 'speech:villager-1' })?.key).toBe('door:chief-hut')
+    // And the held word is ignored by the KEYBOARD's use key, which cannot act
+    // on a word at all — it takes the door instead of nothing.
+    expect(pickForKeyPress(near, 'use', { held: 'speech:villager-1' })?.key).toBe('door:chief-hut')
+  })
+
+  it('still holds the use key on its standing pick, and the guess needs no hold', () => {
+    // Two doors a hand's breadth apart: the held one keeps the key (point 691).
+    const rival: Kinded = { ...hut(1.0 - TARGET_HOLD + 0.01), key: 'door:market' }
+    const held = pickForKeyPress([hut(1.0), rival], 'use', { held: 'door:chief-hut' })
+    expect(held?.key).toBe('door:chief-hut')
+    // The speech channel offers ONE word at a time, so the guess key has no tie
+    // to keep: what it takes is whatever that channel is offering.
+    expect(pickForKeyPress([word(3)], 'guess')?.key).toBe('speech:villager-1')
+  })
+
+  it('leaves the note inviting while a hut owns the use key (point 1139)', () => {
+    // The regression the split had to remove from the PICTURE: the highlight
+    // now follows the guess key's own reach, not who won one shared key.
+    expect(labelPresentation(null, 'villager-1', true)).toEqual({ targetedId: 'villager-1', hiddenId: null })
+    expect(labelPresentation(null, 'villager-1', false)).toEqual({ targetedId: null, hiddenId: null })
   })
 })

@@ -957,11 +957,11 @@ if (section('speech-guess')) {
     const p = window.__placePlayer
     return p ? { x: p.x, z: p.z, yaw: p.yaw, pitch: p.pitch } : null
   })
-  // Stage ONE speaker a few steps in front of the player: the use key takes the
-  // NEAREST candidate, so standing near him is what the highlight is for — and
-  // at a distance a player really walks up to, since the note's size follows it.
-  // The spot is open ground away from every door, so the speaker really is what
-  // SPACE means here and not a hut the player happens to be standing at.
+  // Stage ONE speaker a few steps in front of the player: the guess key takes the
+  // NEAREST word, so standing near him is what the highlight is for — and at a
+  // distance a player really walks up to, since the note's size follows it. The
+  // spot is open ground away from every door, so the bottom prompt stays empty
+  // here and the note carries the only invitation on screen (point 1139).
   const staged = await page.evaluate((u) => {
     const scene = window.__placeScene
     const p = window.__placePlayer
@@ -1017,29 +1017,32 @@ if (section('speech-guess')) {
       highlight.strayInvites === 0,
     `invite ${JSON.stringify(highlight.invite)}, invitations on unhighlighted notes ${highlight.strayInvites}`,
   )
-  // What the invitation NAMES is the key the player presses (point 691): a note
-  // that still said "click" would send him to a handler that no longer exists.
+  // What the invitation NAMES is the key the player presses (points 691/1139):
+  // a note still saying "click" would send him to a handler that no longer
+  // exists, and one still saying SPACE would send him to the key that now
+  // enters the hut he is standing at.
   check(
-    'the invitation names the use key, never a click (point 691)',
-    /space/i.test(highlight.invite) && !/click|klick/i.test(highlight.invite),
+    'the invitation names the guess key E, never SPACE and never a click (point 1139)',
+    /\bE\b/.test(highlight.invite) && !/click|klick|space|leertaste/i.test(highlight.invite),
     `invite ${JSON.stringify(highlight.invite)}`,
   )
-  // The arbitration decided for the speaker, so the bottom prompt — the OTHER
-  // hint slot — stands empty: two hints at once is what point 691 removed.
+  // The guess key is armed by the word alone (point 1139), and out here in the
+  // open there is nothing for the use key to do — so the bottom prompt, the
+  // OTHER hint slot, stands empty beside the note's invitation.
   const useKey = await page.evaluate(() => ({
-    owner: window.__ui.getState().useKeyOwner,
+    guessKeyArmed: window.__ui.getState().guessKeyArmed,
     prompt: window.__ui.getState().prompt,
   }))
   check(
-    'the speaker owns the use key here, and the door prompt is empty with it (point 691)',
-    useKey.owner === 'speech' && useKey.prompt === null,
+    'the word arms the guess key here, and no door prompt stands with it (point 1139)',
+    useKey.guessKeyArmed === true && useKey.prompt === null,
     JSON.stringify(useKey),
   )
   await frame('148-speech-guess-invitation', {
     element: '.speech-label.targeted',
     label: 'the highlighted note of the nearest speaker, inviting the guess',
   })
-  // The use key owns the guess now (point 691), so the mouse must be PROVED
+  // A key owns the guess now (point 691), so the mouse must be PROVED
   // dead: a point of the settlement view a click can actually land on — the
   // notes are drawn in an overlay of their own, and a click that hit one would
   // prove nothing about the canvas the player clicks.
@@ -1063,8 +1066,8 @@ if (section('speech-guess')) {
       afterClick === false,
       `guess dialog after the click: ${afterClick}`,
     )
-    // And the note that survives that click is still the one SPACE means, so
-    // the invitation the player just read has not gone stale.
+    // And the note that survives that click is still the one E means, so the
+    // invitation the player just read has not gone stale.
     const stillTargeted = await page.evaluate(
       () => document.querySelector('.speech-label.targeted')?.getAttribute('data-speaker') ?? null,
     )
@@ -1074,7 +1077,7 @@ if (section('speech-guess')) {
       `highlighted ${JSON.stringify(stillTargeted)}`,
     )
     const lockBefore = await page.evaluate(() => ({ ...window.__placeLock }))
-    await page.keyboard.press('Space')
+    await page.keyboard.press('KeyE')
     await nextFrames(2)
     const opened = await page.evaluate(() => {
       const dialog = document.querySelector('.dialog.speech-guess')
@@ -1090,7 +1093,7 @@ if (section('speech-guess')) {
       }
     })
     check(
-      'SPACE opens the guess for the highlighted speaker (point 691)',
+      'E opens the guess for the highlighted speaker (point 1139)',
       opened.open && opened.spoken.join(' ') === highlight.syllables.join(' '),
       `${JSON.stringify(opened.spoken)} against the note's ${JSON.stringify(highlight.syllables)}`,
     )
@@ -1139,7 +1142,7 @@ if (section('speech-guess')) {
       `grabs ${lockBefore.grabs} → ${saved.lock.grabs}`,
     )
     // And Escape leaves the note exactly as it was.
-    await page.keyboard.press('Space')
+    await page.keyboard.press('KeyE')
     await nextFrames(2)
     const reopened = await page.evaluate(() => !!document.querySelector('.dialog.speech-guess'))
     if (reopened) await page.keyboard.type(' and never mind')
@@ -7261,6 +7264,59 @@ if (section('chief-to-drummer')) {
     JSON.stringify(named),
   )
 
+  // 1b. THE COLLISION THE TWO KEYS REMOVED (point 1139, user 16.09.2026). The
+  //     player stands before the drummer with the drummer's own word standing
+  //     over his head: under the one candidate list of point 691 the word and
+  //     the man took the key from each other by a step's distance, and whichever
+  //     lost went silent. Both offers must now stand AT ONCE — the bottom prompt
+  //     naming what SPACE does, the note inviting E — and E must take the word
+  //     without touching the man.
+  // The note is chosen in the scene's OWN frame loop, so the label appearing in
+  // the channel is not yet the note standing over his head — wait for the key it
+  // arms, not for a clock, and read the diagnostic only if the wait ran out.
+  const bothStood = await page
+    .waitForFunction(
+      () =>
+        window.__ui.getState().guessKeyArmed === true &&
+        !!document.querySelector('.speech-label.targeted .speech-invite') &&
+        !!document.querySelector('.prompt')?.textContent,
+      null,
+      { timeout: 10000 },
+    )
+    .then(() => true)
+    .catch(() => false)
+  const bothOffers = await page.evaluate(() => ({
+    prompt: document.querySelector('.prompt')?.textContent ?? null,
+    invite: document.querySelector('.speech-label.targeted .speech-invite')?.textContent ?? null,
+    targeted: document.querySelector('.speech-label.targeted')?.getAttribute('data-speaker') ?? null,
+    guessKeyArmed: window.__ui.getState().guessKeyArmed,
+  }))
+  check(
+    'the man and his word offer their keys at the same time (point 1139)',
+    bothStood &&
+      !!bothOffers.prompt &&
+      bothOffers.guessKeyArmed === true &&
+      bothOffers.targeted === 'drummer' &&
+      /\bE\b/.test(bothOffers.invite ?? ''),
+    JSON.stringify(bothOffers),
+  )
+  await frame('151b-two-keys-at-the-drummer', {
+    local: { x: drummer.x, y: 1.4, z: drummer.z },
+    label: "the drummer, his word inviting E over his head while the bottom prompt still offers SPACE at the man himself",
+  })
+  await page.keyboard.press('KeyE')
+  const guessAtDrummer = await page
+    .waitForFunction(() => !!document.querySelector('.dialog.speech-guess'), null, { timeout: 15000 })
+    .then(() => true)
+    .catch(() => false)
+  check(
+    'E takes the word and leaves the man to SPACE (point 1139)',
+    guessAtDrummer && (await page.evaluate(() => window.__game.getState().chiefOutside[window.__game.getState().placeId] !== true)),
+    guessAtDrummer ? 'the chief came out of his hut on the guess key' : 'no guess dialog opened at the drummer',
+  )
+  await page.evaluate(() => window.__ui.getState().setDialog(null))
+  await nextFrames(2)
+
   // 2. The use key at the HUT sends him out — and he walks to the drummer.
   if (hut?.door) {
     await standAt({ x: hut.door[0], z: hut.door[1] }, { x: hut.pos[0], z: hut.pos[1] })
@@ -7339,14 +7395,15 @@ if (section('chief-to-drummer')) {
       (want) => (document.querySelector('.prompt')?.textContent ?? '').includes(want),
       askLabel,
     )
-    // What owned the key instead, read only when the wait ran out: this check
-    // failed once on a stale note of the drummer's holding SPACE, and "no
-    // prompt" alone did not say so.
+    // What stood there instead, read only when the wait ran out: this check
+    // failed once on a stale note of the drummer's holding SPACE — which the
+    // two keys of point 1139 make impossible — and "no prompt" alone did not
+    // say so.
     const armedWhy = armed
       ? null
       : await page.evaluate(() => ({
           prompt: document.querySelector('.prompt')?.textContent ?? null,
-          owner: window.__ui.getState().useKeyOwner,
+          guessKeyArmed: window.__ui.getState().guessKeyArmed,
           dialog: window.__ui.getState().dialog,
           speaking: window.__speech?.labels().map((l) => l.speakerId) ?? null,
           chief: window.__chief,
@@ -7391,24 +7448,22 @@ if (section('chief-to-drummer')) {
       const { getStrings } = await import('/src/i18n/index.ts')
       return getStrings().labels.repeatDrumMessage
     })
-    // Waited for BY NAME, exactly like the ask above. The nearest candidate owns
-    // the use key (point 691), so a villager whose own note stands a step nearer
-    // holds it for a moment — and while he does the bottom prompt is empty,
-    // because his note carries the invitation instead. Read in a single instant
-    // that is a coin toss; what the point promises is that the offer STANDS
-    // while the player stands there.
+    // Waited for BY NAME, exactly like the ask above. A spoken word can no longer
+    // take the prompt away from the drummer (point 1139: the word answers E, the
+    // drummer SPACE), but the chief's own minute still runs — the offer must
+    // STAND while the player stands there, which is what the wait asks.
     const offered = await stepUntil(
       (want) => (document.querySelector('.prompt')?.textContent ?? '').includes(want),
       repeatLabel,
     )
-    // Read only when the wait ran out, and it names WHICH of the two reds it
-    // was: another speaker held the key, or the chief's own minute had run out
-    // under the player and he was already walking home.
+    // Read only when the wait ran out, and it names what stood there instead:
+    // the chief's own minute had run out under the player and he was already
+    // walking home, or no candidate armed the key at all.
     const offeredWhy = offered
       ? null
       : await page.evaluate(() => ({
           prompt: document.querySelector('.prompt')?.textContent ?? null,
-          owner: window.__ui.getState().useKeyOwner,
+          guessKeyArmed: window.__ui.getState().guessKeyArmed,
           speaking: window.__speech?.labels().map((l) => l.speakerId) ?? null,
           chief: window.__chief,
           heard: window.__game.getState().drumMessageHeard,

@@ -9,6 +9,16 @@ when their area is touched anyway or a triage says otherwise.
 Format: one line per finding — `- YYYY-MM-DD <source> — <finding>`.
 
 <!-- entries -->
+- 2026-09-16 point 1139 landing (`scripts/verify/baseline-classify.mjs`, `scripts/render-verify-guard.mjs`)
+  — a classification run records its BASELINE measurement into the point's own render-verify
+  state, so the branch inherits reds that belong to the code WITHOUT its change. Measured today:
+  the classifier's `polish` pass over the baseline printed "the invitation names the guess key E",
+  "E opens the guess for the highlighted speaker" and six further point-1139/588 checks as reds —
+  which is exactly right for code that does not carry the change, and exactly wrong as a red of
+  the branch. The guard then offers only fix / charge / file for them, and none of the three fits
+  a measurement of the old code. It did not block here (no render path pending at that HEAD) and
+  the covering runs of both lanes were recorded separately, so this is collected, not a point.
+
 - 2026-09-13 point 1072 landing (`scripts/verify/run-wait.mjs`) — a healthy LARGE was reported
   HUNG and recorded as a batch standstill. The run record's `expectedRuntimeMs` covers the SUITE
   time only (42m 16s here), but a run that ends with red suites then enters its baseline

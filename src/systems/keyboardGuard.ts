@@ -44,6 +44,7 @@ export const GAME_KEY_CODES: readonly string[] = [
   'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
   // The use key, the journal and the rest of the playing keys.
   'Space', 'Tab',
+  'KeyE', // place a guess at the targeted word (design.md §13.4/§17.5)
   'KeyG', // dig
   'KeyM', // map
   'KeyC', // camp
