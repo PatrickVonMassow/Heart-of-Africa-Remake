@@ -5263,6 +5263,171 @@ if (section('children-boulder-climb')) {
 //
 // The village is the PoC's own (the Bambara village); the ground work is in
 // every village.
+// --- No adult stays wedged (work-order 1138) ---------------------------------
+// The user photographed two adults pressed into the corner between a dwelling's
+// wall and a fence panel, still there frame after frame. The escape ladder that
+// answers it is pinned in Vitest over the pure decision and over the production
+// blocks themselves; what only the real settlement can settle is that nobody
+// stays put in the layout the report was taken in — those pockets are drawn by
+// THAT village at THAT seed, and no synthetic collider set stands in for them.
+//
+// The trace is taken INSIDE the page, one entry per rendered frame: a stepper
+// that is freed and wedges again between two readings would otherwise be read as
+// a body that never moved, and the crossing of the process boundary is exactly
+// what would hide it. The window is several times the escape's own, so a body
+// still on its spot at the end has outlasted every rung of the ladder.
+if (section('wedged-adults')) {
+  await page.evaluate(() => {
+    const g = window.__game.getState()
+    if (g.placeId) g.leavePlace()
+  })
+  await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
+  // HIS seed, put back afterwards: the settlement layout is derived from place
+  // plus seed, so this is the village he stood in and not merely one of the same
+  // people — and every section after this one would otherwise read a world it
+  // never asked for.
+  const bootSeed = await page.evaluate(() => window.__game.getState().seed)
+  await page.evaluate(() => window.__game.setState({ seed: 3321422240 }))
+  await page.evaluate(() => window.__game.getState().enterPlace('bambara-village'))
+  const live = await page
+    .waitForFunction(
+      () =>
+        window.__game.getState().placeId === 'bambara-village' &&
+        !!window.__placeErrands &&
+        !!window.__placeWalkers,
+      null,
+      { timeout: 40000 },
+    )
+    .then(() => true)
+    .catch(() => false)
+  check('the reported village publishes both of its adult steppers', live)
+  if (live) {
+    await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+    // The knobs the claim is measured against are the game's own, read from the
+    // running build rather than restated here.
+    const knob = await page.evaluate(() => ({
+      seconds: window.__balance.walkerUnstuckSeconds,
+      minDistance: window.__balance.walkerUnstuckMinDistance,
+    }))
+    const readBodies = (frames) =>
+      page.evaluate(
+        (n) =>
+          new Promise((resolve) => {
+            const log = []
+            const read = () => [
+              ...(window.__placeWalkers?.states ?? []).map((s, i) => ({ who: `walker ${i}`, x: s.x, z: s.z })),
+              ...(window.__placeErrands?.().villagers ?? []).map((v, i) => ({ who: `errand ${i}`, x: v.x, z: v.z })),
+            ]
+            const tick = () => {
+              log.push({ t: performance.now(), bodies: read() })
+              if (log.length >= n) resolve(log)
+              else requestAnimationFrame(tick)
+            }
+            requestAnimationFrame(tick)
+          }),
+        frames,
+      )
+    // Displacement measured against the FIRST reading of each body, over the
+    // whole window — the largest distance it ever reached, so a body that walks
+    // out and comes back is not read as one that never left.
+    const walkedOf = (log) => {
+      const start = new Map(log[0].bodies.map((b) => [b.who, b]))
+      const out = new Map()
+      for (const sample of log) {
+        for (const b of sample.bodies) {
+          const from = start.get(b.who)
+          if (!from) continue
+          const d = Math.hypot(b.x - from.x, b.z - from.z)
+          if (d > (out.get(b.who) ?? -1)) out.set(b.who, d)
+        }
+      }
+      return out
+    }
+    const trace = await readBodies(1200)
+    const seconds = (trace.at(-1).t - trace[0].t) / 1000
+    check(
+      'the trace outlasts the escape window it has to outlast',
+      seconds >= knob.seconds * 3,
+      `${seconds.toFixed(1)} s against a ${knob.seconds} s window`,
+    )
+    const counted = trace[0].bodies
+    // Non-vacuous: a village that published no stepper would satisfy the next
+    // check having measured nothing at all.
+    check(
+      'the trace reads both steppers of the village',
+      counted.some((b) => b.who.startsWith('walker')) && counted.some((b) => b.who.startsWith('errand')),
+      `${counted.filter((b) => b.who.startsWith('walker')).length} household walkers, `
+        + `${counted.filter((b) => b.who.startsWith('errand')).length} errand villagers`,
+    )
+    const walked = walkedOf(trace)
+    const pinned = [...walked.entries()].filter(([, d]) => d < knob.minDistance)
+    check(
+      'no adult of the reported village is still on the spot it started from',
+      pinned.length === 0,
+      pinned.length
+        ? pinned.map(([who, d]) => `${who} moved ${d.toFixed(2)} m`).join(', ')
+        : `${walked.size} adults, the least mobile of them ${Math.min(...walked.values()).toFixed(2)} m`,
+    )
+    // THE PICTURE THE REPORT WAS MADE OF: the adult that came closest to staying
+    // put, photographed twice from ONE standing spot with a window between the
+    // shutters — so the pair shows a body that moved rather than a claim that it
+    // did. The subject is the GROUND SPOT it stood on, which stays in the frame
+    // whether the adult is still on it or not (point 375).
+    let least = null
+    for (const [who, d] of walked) if (!least || d < least.d) least = { who, d }
+    const spot = least ? trace.at(-1).bodies.find((b) => b.who === least.who) : null
+    if (spot) {
+      // Standing between the corner and the village centre and looking back at
+      // it: the open side of a pocket between a hut and a fence run is the side
+      // the settlement lies on, so a camera placed there has the body in view
+      // rather than the wall that pinned it.
+      await page.evaluate((at) => {
+        const p = window.__placePlayer
+        const len = Math.hypot(at.x, at.z) || 1
+        p.x = at.x - (at.x / len) * 6
+        p.z = at.z - (at.z / len) * 6
+        // Place-camera yaw 0 looks toward -Z, so aim with the +PI complement.
+        p.yaw = Math.atan2(at.x - p.x, at.z - p.z) + Math.PI
+        p.pitch = -0.1
+      }, spot)
+      await nextFrames(2)
+      const before = await page.evaluate(
+        (who) => {
+          const all = [
+            ...(window.__placeWalkers?.states ?? []).map((s, i) => ({ who: `walker ${i}`, x: s.x, z: s.z })),
+            ...(window.__placeErrands?.().villagers ?? []).map((v, i) => ({ who: `errand ${i}`, x: v.x, z: v.z })),
+          ]
+          return all.find((b) => b.who === who) ?? null
+        },
+        least.who,
+      )
+      await frame('1138-wedged-adults-before', {
+        local: { x: spot.x, y: 0.9, z: spot.z },
+        label: 'the corner the least mobile adult of the reported village was measured in',
+      })
+      const second = await readBodies(600)
+      const after = second.at(-1).bodies.find((b) => b.who === least.who) ?? null
+      await frame('1138-wedged-adults-after', {
+        local: { x: spot.x, y: 0.9, z: spot.z },
+        label: 'the same corner one escape window later, with the adults moved on',
+      })
+      const between = before && after ? Math.hypot(after.x - before.x, after.z - before.z) : 0
+      check(
+        'and it moves between the two shutters',
+        between >= knob.minDistance,
+        `${between.toFixed(2)} m between the frames`,
+      )
+    } else {
+      check('an adult was found to photograph the report at', false, 'no stepper in the trace')
+    }
+  }
+  await page.evaluate(() => {
+    const g = window.__game.getState()
+    if (g.placeId) g.leavePlace()
+  })
+  await page.evaluate((seed) => window.__game.setState({ seed }), bootSeed)
+}
+
 if (section('adult-errands')) {
   await page.evaluate(() => {
     const g = window.__game.getState()
