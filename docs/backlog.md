@@ -1156,3 +1156,28 @@ Hängend-Urteil zu spät oder falsch **melden** — und eine Meldung tötet nich
 Der Infrastruktur-Freeze (CLAUDE.md §2) arbeitet an einem Infrastrukturdefekt
 nur, wenn er reproduzierbar blockiert oder eine falsche Freigabe erlaubt; beides
 trifft auf den Rest nicht zu.
+
+## `--help` startet auf den beiden schwersten Einstiegen einen vollen Prüflauf (16.09.2026)
+
+Beim Bearbeiten von Punkt 1137 selbst aufgelaufen: `node
+scripts/verify/run-logged.mjs --help` und `node scripts/verify/run-all.mjs
+--help` geben keine Hilfe aus, sondern starten die volle LARGE-Regression über
+beide Grafikwege — gemessen rund zwei Stunden. `parseArgs` in
+`scripts/verify/tiers.mjs` sammelt jedes `-`-Argument nur in `flags` ein; damit
+bleibt `filter` leer und `tier` null, und genau das ist die Signatur des
+vollen Laufs (`fullRun`, `isLargeEquivalent`). `run-logged.mjs` reicht alles
+weiter, was es nicht selbst verbraucht, also auch `--help`.
+
+Verschärfend ist die Uneinheitlichkeit: `scripts/verify/run-wait.mjs --help`
+gibt eine ordentliche Hilfe aus. Wer sie dort lernt, probiert sie beim Nachbarn.
+
+Wirkung am 16.09.2026: ein ungewollter LARGE-Lauf, der dem echten Lauf desselben
+Punktes die Maschine streitig machte und dessen Ruhe-Annahme entwertete. Weil
+der Aufruf in `head -40` lief, wäre er zusätzlich mitten im Lauf über ein
+geschlossenes Rohr gestorben.
+
+Nicht als Punkt eingereiht: kein Spielerimpakt, keine Datenfrage, keine
+Blockade, und der Lauf wird korrekt aufgezeichnet — es gibt keine falsche
+Freigabe. Der billige Weg wäre eine Zeile in beiden Einstiegen, die `--help`
+und `-h` vor jeder Arbeit abfängt und die Nutzungszeile druckt, die in
+`run-logged.mjs` bereits im Kopfkommentar steht.
