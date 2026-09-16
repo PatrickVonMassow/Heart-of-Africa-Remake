@@ -1,13 +1,20 @@
-// ONE candidate list for the use key (work-order point 691). SPACE means
-// several things in a settlement — a functional door, the utterance over a
-// speaker's head, and the rest of the rebuild as it lands — and the player must
-// be able to tell WHICH from the picture alone. The rules under test are the
-// three the spec names: the nearest candidate wins, a candidate out of its OWN
-// reach never wins, and a tie holds the standing pick.
+// ONE candidate list for the settlement's action keys (work-order points
+// 691/1139). A settlement offers several things at once — a functional door,
+// the chief, the utterance over a speaker's head — and the player must be able
+// to tell WHICH key means WHICH from the picture alone. The rules under test
+// are the three of point 691 — the nearest candidate wins, a candidate out of
+// its OWN reach never wins, a tie holds the standing pick — and the split of
+// point 1139: SPACE uses, E guesses, and the pad's one button keeps both.
 
 import { describe, expect, it } from 'vitest'
 import { TARGET_HOLD, labelPresentation } from '../../communication/speechTarget'
-import { pickUseCandidate, type UseCandidate } from './useKeyTarget'
+import {
+  candidatesForKey,
+  keyForUseKind,
+  pickForKeyPress,
+  pickUseCandidate,
+  type UseCandidate,
+} from './useKeyTarget'
 import { DOOR_TRIGGER_RADIUS, doorCandidates, type Interactive, type PlaceLayout } from './layout'
 import { balance } from '../../config/balance'
 
@@ -127,5 +134,89 @@ describe('the doors as use-key candidates (point 691)', () => {
   it('skips an interactive with no door at all, and an absent layout', () => {
     expect(doorCandidates(layoutOf([{ type: 'chief', pos: [0, 0] }]), 0, 0)).toEqual([])
     expect(doorCandidates(null, 0, 0)).toEqual([])
+  })
+})
+
+// The two keys of point 1139. The user met the collision the split exists to
+// remove: SPACE at the chief's hut opened the guess at a word spoken beside it,
+// or the hut swallowed the guess — a step's distance decided which. The cases
+// below are that exact standing: a hut and a word BOTH in reach at once.
+describe('the use key and the guess key no longer compete (point 1139)', () => {
+  /** A settlement candidate as the scene builds it: the kind decides the key. */
+  const hut = (distance: number): UseCandidate<{ kind: 'interactive' }> => ({
+    key: 'door:chief-hut',
+    distance,
+    range: DOOR_TRIGGER_RADIUS,
+    payload: { kind: 'interactive' },
+  })
+  const chief = (distance: number): UseCandidate<{ kind: 'chief' }> => ({
+    key: 'chief:drummer',
+    distance,
+    range: balance.communication.chiefTalkReach,
+    payload: { kind: 'chief' },
+  })
+  const word = (distance: number): UseCandidate<{ kind: 'speech' }> => ({
+    key: 'speech:villager-1',
+    distance,
+    range: balance.communication.hearingRadius,
+    payload: { kind: 'speech' },
+  })
+
+  it('sorts every kind onto the key that acts on it', () => {
+    expect(keyForUseKind('interactive')).toBe('use')
+    expect(keyForUseKind('chief')).toBe('use')
+    expect(keyForUseKind('speech')).toBe('guess')
+  })
+
+  it('gives SPACE the chief and never the word, with both in reach', () => {
+    // The word is NEARER — under the one list of point 691 it took the key.
+    const both = [chief(2), word(0.5)]
+    expect(pickForKeyPress(both, 'use')?.payload.kind).toBe('chief')
+    expect(candidatesForKey(both, 'use').map((c) => c.key)).toEqual(['chief:drummer'])
+  })
+
+  it('gives E the word and never the hut or the chief, with both in reach', () => {
+    // And the hut is nearer here, which used to silence the note entirely.
+    const both = [hut(0.3), chief(2), word(4)]
+    expect(pickForKeyPress(both, 'guess')?.payload.kind).toBe('speech')
+    expect(candidatesForKey(both, 'guess').map((c) => c.key)).toEqual(['speech:villager-1'])
+  })
+
+  it('arms neither key for what only the other one can reach', () => {
+    // A word alone: SPACE does nothing at all rather than opening the guess.
+    expect(pickForKeyPress([word(1)], 'use')).toBeNull()
+    // A hut alone: E does nothing rather than entering it.
+    expect(pickForKeyPress([hut(0.3), chief(2)], 'guess')).toBeNull()
+  })
+
+  it('keeps the use key out of reach of a word standing in its own', () => {
+    // Out of the hut's reach, in the word's: neither key may act on the hut,
+    // and SPACE may not fall back onto the word because nothing else answers.
+    const far = [hut(DOOR_TRIGGER_RADIUS + 3), word(2)]
+    expect(pickForKeyPress(far, 'use')).toBeNull()
+    expect(pickForKeyPress(far, 'guess')?.payload.kind).toBe('speech')
+  })
+
+  it("lets the PAD's A button keep both meanings, nearest wins (design.md §17.5)", () => {
+    // The pad has no free face button, so there the old arbitration survives.
+    expect(pickForKeyPress([chief(2), word(0.5)], 'use', { pad: true })?.payload.kind).toBe('speech')
+    expect(pickForKeyPress([chief(0.5), word(2)], 'use', { pad: true })?.payload.kind).toBe('chief')
+  })
+
+  it('still holds the use key on its standing pick, and the guess needs no hold', () => {
+    // Two doors a hand's breadth apart: the held one keeps the key (point 691).
+    const rival: UseCandidate<{ kind: 'interactive' }> = { ...hut(1.0 - TARGET_HOLD + 0.01), key: 'door:market' }
+    const held = pickForKeyPress([hut(1.0), rival], 'use', { held: 'door:chief-hut' })
+    expect(held?.key).toBe('door:chief-hut')
+    // The speech channel offers ONE word at a time, so the guess key has no tie
+    // to keep: what it takes is whatever that channel is offering.
+    expect(pickForKeyPress([word(3)], 'guess')?.key).toBe('speech:villager-1')
+  })
+
+  it('leaves the note inviting while a hut owns the use key (point 1139)', () => {
+    // The regression the split had to remove from the PICTURE: the highlight
+    // now follows the guess key's own reach, not who won one shared key.
+    expect(labelPresentation(null, 'villager-1', true)).toEqual({ targetedId: 'villager-1', hiddenId: null })
+    expect(labelPresentation(null, 'villager-1', false)).toEqual({ targetedId: null, hiddenId: null })
   })
 })

@@ -37,12 +37,36 @@ export function isKeyDown(code: string): boolean {
 }
 
 /**
+ * What really produced a keydown. The game keeps ONE input path (design.md
+ * §17.5): gamepad buttons and the touch layer's tappable prompt re-enter the
+ * keyboard pipeline as synthetic keydowns, so every key handler serves them
+ * unchanged. A handler that must tell the three apart asks keyPressSource() —
+ * the pad's A button carries BOTH meanings of the settlement keys, because the
+ * §17.5 button map has no free face button for the guess (point 1139).
+ */
+export type KeyPressSource = 'keyboard' | 'gamepad' | 'touch'
+
+// WeakMap, not a flag on the event: the mark dies with the event object, and a
+// handler can never read it off a LATER press.
+const syntheticSource = new WeakMap<KeyboardEvent, KeyPressSource>()
+
+/**
  * Re-enter the keyboard pipeline with a synthetic keydown, so every existing
  * key handler serves alternative inputs (gamepad buttons, a tapped touch
- * prompt) unchanged — one input path, not two (design.md §17.5).
+ * prompt) unchanged — one input path, not two (design.md §17.5). The source is
+ * carried with the event; it defaults to the tapped prompt, the other synthetic
+ * sender.
  */
-export function dispatchSyntheticKey(code: string): void {
-  if (typeof window !== 'undefined') window.dispatchEvent(new KeyboardEvent('keydown', { code }))
+export function dispatchSyntheticKey(code: string, source: Exclude<KeyPressSource, 'keyboard'> = 'touch'): void {
+  if (typeof window === 'undefined') return
+  const event = new KeyboardEvent('keydown', { code })
+  syntheticSource.set(event, source)
+  window.dispatchEvent(event)
+}
+
+/** Which input produced this keydown; an unmarked event is a real key press. */
+export function keyPressSource(e: KeyboardEvent): KeyPressSource {
+  return syntheticSource.get(e) ?? 'keyboard'
 }
 
 /**
@@ -90,14 +114,22 @@ export interface KeyPressOptions {
   preventDefault?: boolean
 }
 
-/** Register a keydown handler for a specific code; returns unsubscribe. */
-export function onKeyPress(code: string, cb: () => void, options: KeyPressOptions = {}): () => void {
+/**
+ * Register a keydown handler for a specific code; returns unsubscribe. The
+ * handler is given the event, so one that cares WHERE the press came from can
+ * ask keyPressSource() — most do not and take no argument at all.
+ */
+export function onKeyPress(
+  code: string,
+  cb: (e: KeyboardEvent) => void,
+  options: KeyPressOptions = {},
+): () => void {
   const handler = (e: KeyboardEvent) => {
     if (isTypingTarget(e)) return
     if (options.ignoreModified && (e.ctrlKey || e.altKey || e.metaKey)) return
     if (e.code !== code) return
     if (options.preventDefault) e.preventDefault()
-    cb()
+    cb(e)
   }
   window.addEventListener('keydown', handler)
   return () => window.removeEventListener('keydown', handler)
@@ -203,7 +235,7 @@ function pollGamepadButtons(): void {
       const down = pad.buttons[i]?.pressed ?? false
       if (down && !gamepadButtonDown[i]) {
         gamepadEngaged = true // a button press is always deliberate
-        dispatchSyntheticKey(GAMEPAD_BUTTON_KEYS[i])
+        dispatchSyntheticKey(GAMEPAD_BUTTON_KEYS[i], 'gamepad')
       }
       gamepadButtonDown[i] = down
     }

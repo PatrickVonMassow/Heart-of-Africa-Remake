@@ -16,6 +16,7 @@ import {
   onTouchEngage,
   isTouchEngaged,
   dispatchSyntheticKey,
+  keyPressSource,
   wheelTargetsScene,
 } from './input'
 
@@ -218,6 +219,20 @@ describe('dispatchSyntheticKey (design.md §17.5: gamepad/touch share the keyboa
     const off = onKeyPress('Space', cb)
     dispatchSyntheticKey('Space')
     expect(cb).toHaveBeenCalledTimes(1)
+    off()
+  })
+
+  // Point 1139: the pad's A button keeps BOTH settlement meanings while the
+  // keyboard's Space gives the guess to E, so the handler has to be able to
+  // tell a pad press from a real one — and a tapped prompt from both.
+  it('carries WHERE the press came from, and calls a real key press keyboard', () => {
+    const seen: string[] = []
+    const off = onKeyPress('Space', (e) => seen.push(keyPressSource(e)))
+    dispatchSyntheticKey('Space', 'gamepad')
+    dispatchSyntheticKey('Space', 'touch')
+    dispatchSyntheticKey('Space')
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Space' }))
+    expect(seen).toEqual(['gamepad', 'touch', 'touch', 'keyboard'])
     off()
   })
 })
