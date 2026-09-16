@@ -99,6 +99,130 @@ put it is the mistake this line exists to stop.
   FINAL STATE: a covering picture run completes again on both backends, or the blockade is
   understood and named. As long as it stands, no render point can close.
 
+- [ ] 1138. The adults are wedged: a villager whose escape search finds nothing keeps standing
+  where it is (user 16.09.2026, verbatim: "Außerdem: Neuer Bugreport unter
+  C:\Users\Patri\Documents\Developing\hoa\local (über backup zugreifbar).", report title "Die
+  Erwachsenen sind eingeklemmt"). It stands directly BEHIND 1137 and at the front of everything
+  else: the village it happens in is the one that carries the communication mechanic, and adults
+  that do not move do not teach — but its own proof is a picture, and 1137 owns whether a
+  picture run can be produced at all.
+  THE EVIDENCE IS IN THE REPOSITORY: `local/ErwachseneEingeklemmt.zip`, unpacked beside it
+  (copied from the backup 16.09.2026, 10:16; the folder is ignored, so it travels with the
+  checkout and not with git). Taken on production build 13ad4a7 — the current `main` — on
+  WebGPU, seed 3321422240, `bambara-village`, day 34.13, viewport 2752x1152 @dpr 1.25.
+  WHAT THE PICTURE SHOWS: two adult figures (one red, one purple) pressed into the corner
+  between a dwelling's outer wall and a fence panel, close enough that their bodies overlap the
+  fence; a third head sits at the hut wall with no body in front of it. The child at the fire is
+  unaffected. The overlay holds only HUD, and the wildlife section reads "0 animals" because the
+  report was taken inside a village — so the archive says nothing about the wedged adults
+  themselves. That is the SECOND stuck-inhabitant report that can only be answered by re-running
+  the seed; point 680 is what would end that, and this point is its second measured reason.
+  CAUSE ALREADY READ OUT OF THE CODE — measure it, do not trust it. Both village steppers in
+  `src/scenes/place/PlaceLife.tsx` escape a wedge by `tryNudgeToFree`, and both treat a FAILED
+  search as "give the errand up":
+  - `Walkers` (:2408-2427) tries the ring search, WIDENS it once to `maxRings=24`, and only then
+    advances the waypoint.
+  - `ErrandVillagers` (:2828-2844) tries it ONCE at the default ring count and, when nothing is
+    found, clears the task or the target — and LEAVES THE BODY WHERE IT IS.
+  A new target does not free a body that is physically enclosed: the next frame walks it at a
+  wall, `resolveMove` slides it nowhere, the stuck timer refills, the search fails again. The
+  comment at :2826-2827 says the escape exists so that no villager "stand[s] pressed against a
+  wall for ever", and that is exactly the state it leaves behind. `tryNudgeToFree` demands BOTH
+  `standingClear` and `hasEscapeDirection` (`src/scenes/place/collision.ts:270-307`), so a pocket
+  between a hut and a fence run is rejected rather than escaped from.
+  SECOND SUSPECT ON THE SAME PICTURE: `Walkers` does not path-plan. `ErrandVillagers` builds a
+  nav grid from the same colliders and routes around geometry (:2577-2580, :2777-2795); `Walkers`
+  walks straight at its waypoint and owns nothing but collider sliding and the 1.4 s waypoint
+  skip (:2393-2401). A hut or a fence run standing between the door and the errand point is the
+  case that produces the pocket in the first place.
+  FINAL STATE: no inhabitant remains within epsilon of its position past a bounded window. A
+  failed escape search ESCALATES — widen, then place the body on the nearest cell the nav grid
+  already knows to be free, then, as the last rung, back to its own hut door — instead of
+  clearing a target and leaving the body pinned. The two steppers answer a wedge the same way;
+  the asymmetry between them is deleted, not documented.
+  VERIFIABLE: Vitest over the pure escape decision — a body enclosed so that no ring is free
+  yields a placement rather than a cleared target, and the widened rung is reached. Plus the
+  `polish` village section photographing the reported corner on both backends at the reported
+  seed, with the adults moving between two shutters.
+  Criticality: high — player-visible on the current `main`, in the village §7.1 criterion 15 is
+  measured on, and reported by the user from a real session.
+  Bundle: Dorfleben — it edits the two steppers in `PlaceLife.tsx` and the escape in
+  `collision.ts`, the same place-scene paths 1080, 1081, 1082 and 1125 reach, so it is worked
+  before them and never beside them.
+
+- [ ] 1139. Placing a guess moves from Space to E: the use key and the guess key no longer
+  compete (user 16.09.2026, verbatim: "SPACE sowohl zum Ablegen einer Vermutung bzgl. des
+  gesagten Worts, als auch zum Benutzen (z. B. bei der Häuptlings-Hütte) stehen manchmal im
+  Konflikt zueinander. Wie viel Aufwand ist es, das Ablegen einer Vermutung auf E umzulegen
+  (soll dann in der GUI auch so angezeigt werden)?" and "Reihe das mit SPACE und E hinter 1138
+  ein."). It stands directly behind 1138.
+  WHY IT COLLIDES TODAY: design.md §21 makes everything Space can mean ONE candidate list, and
+  the nearest in reach wins. A spoken word's label is a candidate beside the chief's hut and the
+  enterable buildings, so at the chief's hut the word wins the key from the hut, or the hut
+  from the word, by a step's distance.
+  FINAL STATE: Space uses (enter a building, call the chief); E places a guess for the targeted
+  word. The one Space handler in the place scene (`src/scenes/place/PlaceScene.tsx`, the
+  `onKeyPress('Space', …)` effect) becomes two handlers over the same candidate list filtered by
+  key: Space takes the `interactive` and `chief` payloads, E takes the `label` payloads. The
+  per-frame highlight and prompt follow the same split, so the hut's "Space" prompt and the
+  word's "E" invite can stand at once. The invite text (`speechGuess.invite`, en and de) names
+  E; design.md §21 and §13.4 state the two keys and drop the one-list rule for the guess;
+  `KeyE` joins `GAME_KEY_CODES` in `src/systems/keyboardGuard.ts`. GAMEPAD: button A keeps
+  BOTH meanings for now (the §17.5 map has no free face button; recommendation of 16.09.2026,
+  calibratable) — the arbitration between hut and word therefore stays on the pad only, and
+  design.md §17.5 says so in one sentence.
+  VERIFIABLE: Vitest over the key split — a word label and the chief's hut both in reach: Space
+  calls the chief and never opens the guess, E opens the guess and never calls the chief; the
+  localization parity test covers the new invite in both languages. Plus the existing browser
+  checks that press Space to open a guess move to E and stay green on WebGPU.
+  Criticality: medium — player-visible in the village the communication mechanic lives in;
+  a wrong split would silence the guess, so the Vitest pair is the gate.
+  Bundle: Steuerung & Performance — it edits the place scene's key handling and the
+  keyboard-guard key list, which no other open point touches.
+
+- [ ] 1140. The settlement's cursor mode stops trapping the player: inventory by number keys,
+  the lock back after every dialog, and the mode named on screen (user 16.09.2026, verbatim:
+  "Die Inventar-Gegenstände lassen sich nur aufrufen, wenn man einen Cursor hat. Das ist nur
+  der Fall, wenn der Fokus von der Steuerung weg ist - erreichbar über ESC, oder manchmal
+  automatisch, z. B: wenn man in der Market Hut etwas kauft. Danach geht er auch nicht
+  automatisch auf die Steuerung der Spielfigur zurück. Weder das Wechseln vom Fokus auf den
+  Cursor-Modus noch das Zurückwechseln in den Modus zur Steuerung der Spielfigur ist
+  intuitiv." and "Setze deine Vorschläge zum Fokus um. Reihe das nach 1138 ein."). It stands
+  behind 1138 and 1139.
+  WHY IT HAPPENS TODAY: the first-person view holds the pointer for mouse-look
+  (`src/scenes/place/pointerLock.ts`, design.md §21). A modal dialog releases it; only the
+  closing of the `speechGuess` dialog grabs it back (the `useUi.subscribe` in the pointer-lock
+  effect of `src/scenes/place/PlaceScene.tsx`). After `trade`, `bazaar`, `agency`, `camp` and
+  `drumMessage` the cursor stays free, and nothing on screen says which mode the player is in.
+  The inventory bar (`InventoryBar` in `src/ui/Hud.tsx`) is click-only, so using an item
+  FORCES the mode change. Outside settlements there is no lock, so the problem does not arise.
+  FINAL STATE, three parts that belong together:
+  1. INVENTORY BY KEY: Digit1–Digit9 trigger the first nine slots of the inventory bar in
+     both views, each slot shows its digit small in a corner, and the digits join
+     `GAME_KEY_CODES` in `src/systems/keyboardGuard.ts`; the gamepad reaches the slots by the
+     d-pad (left/right selects, the selected slot is highlighted, A does NOT use it — A stays
+     the use key). A slot that has no item ignores its key.
+  2. THE LOCK COMES BACK AFTER EVERY DIALOG: the `speechGuess` rule in the pointer-lock effect
+     applies to every dialog kind — the closing click carries the user activation the request
+     needs. Where the browser refuses (Chrome holds the lock back for about a second after an
+     Escape release), the deliberate click on the view remains the fallback, as today.
+  3. THE MODE IS NAMED: while the settlement view is NOT pointer-locked, a small HUD hint says
+     "Click the view to steer" (de: "Klick ins Bild: Steuerung"); while it IS locked, a
+     fainter hint says "Esc: cursor" (de: "Esc: Mauszeiger"). Both come from the language
+     files, both languages together, and both hide under browser automation exactly as the
+     lock itself is skipped there.
+  Not part of this point: rebinding Escape, which the browser itself uses to release the lock.
+  VERIFIABLE: Vitest (jsdom) over the HUD — a Digit key uses the matching slot and an empty
+  slot ignores it; the pointer-lock decision counter (`pointerLockProbe.grabs`) rises once for
+  every dialog kind that closes, not only for the guess; the mode hint renders the locked and
+  the unlocked text from both language files. Plus one `polish` village frame on WebGPU
+  showing the slot digits and the unlocked hint.
+  Criticality: medium — player-visible in every settlement visit, reported by the user from
+  real sessions; nothing red depends on it.
+  Bundle: Steuerung & Performance — it edits the HUD's inventory bar, the place scene's
+  pointer-lock effect and the keyboard-guard key list; it is worked after 1139, which edits
+  the same place-scene key handling, and never beside it.
+
 - [ ] 1135. The verification run stops repeating itself: one pass per suite, no automatic
   flake retry, no automatic baseline pass (user order 15.09.2026, FIRST of three, verbatim:
   "Okay, setze das so um und reihe es als nächstes in der Queue ein").
@@ -121,6 +245,19 @@ put it is the mistake this line exists to stop.
   5. `nonPredictive` checks report but do NOT set the exit code (that is point 1127 — if it has
      landed, check and refer, never duplicate it). `run-wait` stops calling healthy runs hung;
      instead a wall-clock ceiling per suite and a hand abort.
+  6. The backend sequence does NOT stop at a red whose own accounting says it does not hold.
+     MEASURED 16.09.2026 on `feat/1137-picture-gate-hung-verdict` (d7ba6543e), log
+     `local/verify-logs/2026-09-16T05-20-58-440-large.log`: the WebGL 2 pass ran all 25 suites to
+     the end, classified its three reds as PRE-EXISTING against the merge-base and concluded
+     "own or unresolved: none; regression verdict unchanged" — and still exited 1, so
+     `scripts/verify/run-all.mjs:173-177` printed "not proceeding to the remaining backend(s)"
+     and the WebGPU pass never started. While ANY pre-existing red stands — three do, charged to
+     the OPEN points 603, 938 and 1009 — a both-backend LARGE is structurally unreachable, which
+     is exactly what CLAUDE.md §5 demands once per bundle and at closing; it blocks point 633 and
+     point 174. FINAL STATE: the sequencer proceeds to the remaining backend when the failed
+     pass's verdict is "charged elsewhere / verdict unchanged", and the run fails at its END
+     rather than at the backend boundary. A red that DOES hold still stops the sequence.
+     This is a deletion of one early exit, not a new mechanism.
   NO NEW INFRASTRUCTURE: deleted runs, a renamed label, a file 1104 already owes, README prose.
   VERIFICATION: unit for the changed run logic. A LARGE on the next bundle state shows the
   saving on the wall clock but is NOT part of this point's acceptance.

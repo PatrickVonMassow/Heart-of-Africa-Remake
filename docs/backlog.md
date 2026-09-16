@@ -1181,3 +1181,20 @@ Blockade, und der Lauf wird korrekt aufgezeichnet — es gibt keine falsche
 Freigabe. Der billige Weg wäre eine Zeile in beiden Einstiegen, die `--help`
 und `-h` vor jeder Arbeit abfängt und die Nutzungszeile druckt, die in
 `run-logged.mjs` bereits im Kopfkommentar steht.
+
+## Der Warteschlangen-Neubau überschreibt die Prosa der aktuellen Karte (16.09.2026)
+
+`node scripts/board-queue.mjs` baut die Warteschlange aus dem Arbeitsauftrag neu — und ersetzt
+dabei den Text der Karte unter „Woran ich gerade arbeite" durch die abgeleitete Zeile aus der
+In-Flight-Markierung (`point <N>: current work · Wartestellung: <englischer --waiting-on-Text>`).
+Am 16.09.2026 ist das in einer Sitzung zweimal passiert: einmal nach dem Nachziehen von drei
+Zeitschätzungen, einmal nach einer Kartenänderung. Beide Male stand danach englischer
+Werkzeug-Jargon auf einer Seite, die der Nutzer auf dem Telefon liest, und der eigentliche
+Status war weg.
+
+Folge: Nach jedem `board-queue.mjs` muss der Status der aktuellen Karte von Hand neu geschrieben
+werden. Wer das vergisst, veröffentlicht eine Karte, die nicht mehr sagt, was läuft.
+
+Nicht blockierend — der Status lässt sich sofort wiederherstellen. Die saubere Lösung wäre, dass
+der Neubau die Prosa der aktuellen Karte gar nicht anfasst; das ist aber eine Änderung am
+Board-Werkzeug und fällt unter den Infrastruktur-Stopp, solange es nur Nacharbeit kostet.

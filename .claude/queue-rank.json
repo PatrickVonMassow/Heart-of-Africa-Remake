@@ -1368,6 +1368,24 @@
       "why": "Blockiert das Bild-Tor und damit Release und jeden Renderpunkt; Criticality high im Punkt genannt",
       "origin": "machine",
       "place": "ahead"
+    },
+    "1138": {
+      "at": "2026-09-16T08:20:52.902Z",
+      "why": "Bugreport des Nutzers vom 16.09.2026 aus einer echten Sitzung, sichtbar auf dem aktuellen main im Dorf der Sprachmechanik",
+      "origin": "user",
+      "place": "ahead"
+    },
+    "1139": {
+      "at": "2026-09-16T09:31:57.524Z",
+      "why": "Nutzerauftrag 16.09.2026 11:01: das Space/E-Thema direkt hinter 1138 einreihen",
+      "origin": "user",
+      "place": "ahead"
+    },
+    "1140": {
+      "at": "2026-09-16T09:45:09.383Z",
+      "why": "Nutzerauftrag 16.09.2026 11:44: die Fokus-Vorschläge umsetzen und nach 1138 einreihen",
+      "origin": "user",
+      "place": "ahead"
     }
   },
   "boundary": {
@@ -1400,7 +1418,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-15T22:13:39.911Z",
+    "at": "2026-09-16T09:45:09.398Z",
     "points": [
       174,
       184,
@@ -1804,7 +1822,10 @@
       1134,
       1135,
       1136,
-      1137
+      1137,
+      1138,
+      1139,
+      1140
     ]
   }
 }
