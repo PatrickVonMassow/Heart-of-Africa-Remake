@@ -302,7 +302,14 @@ if (section('guess-key')) {
   )
   await closeGuess()
   // 3. And the PAD's A button still carries both meanings, because it has no
-  //    button of its own for the guess.
+  //    button of its own for the guess. The dialog must be SHUT before the
+  //    button is pulsed: `pulseButtonUntil` reads its condition first, so an
+  //    open dialog would report a success no button ever produced.
+  check(
+    'the guess is shut again before the pad is asked',
+    (await page.evaluate(guessOpen)) === false,
+    JSON.stringify(await offering()),
+  )
   const openedByPad = await pulseButtonUntil(0, guessOpen)
   check(
     'button A still reaches the word the keyboard gave up (design.md §17.5)',

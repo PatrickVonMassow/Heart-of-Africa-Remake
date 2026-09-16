@@ -7264,6 +7264,59 @@ if (section('chief-to-drummer')) {
     JSON.stringify(named),
   )
 
+  // 1b. THE COLLISION THE TWO KEYS REMOVED (point 1139, user 16.09.2026). The
+  //     player stands before the drummer with the drummer's own word standing
+  //     over his head: under the one candidate list of point 691 the word and
+  //     the man took the key from each other by a step's distance, and whichever
+  //     lost went silent. Both offers must now stand AT ONCE — the bottom prompt
+  //     naming what SPACE does, the note inviting E — and E must take the word
+  //     without touching the man.
+  // The note is chosen in the scene's OWN frame loop, so the label appearing in
+  // the channel is not yet the note standing over his head — wait for the key it
+  // arms, not for a clock, and read the diagnostic only if the wait ran out.
+  const bothStood = await page
+    .waitForFunction(
+      () =>
+        window.__ui.getState().guessKeyArmed === true &&
+        !!document.querySelector('.speech-label.targeted .speech-invite') &&
+        !!document.querySelector('.prompt')?.textContent,
+      null,
+      { timeout: 10000 },
+    )
+    .then(() => true)
+    .catch(() => false)
+  const bothOffers = await page.evaluate(() => ({
+    prompt: document.querySelector('.prompt')?.textContent ?? null,
+    invite: document.querySelector('.speech-label.targeted .speech-invite')?.textContent ?? null,
+    targeted: document.querySelector('.speech-label.targeted')?.getAttribute('data-speaker') ?? null,
+    guessKeyArmed: window.__ui.getState().guessKeyArmed,
+  }))
+  check(
+    'the man and his word offer their keys at the same time (point 1139)',
+    bothStood &&
+      !!bothOffers.prompt &&
+      bothOffers.guessKeyArmed === true &&
+      bothOffers.targeted === 'drummer' &&
+      /\bE\b/.test(bothOffers.invite ?? ''),
+    JSON.stringify(bothOffers),
+  )
+  await frame('151b-two-keys-at-the-drummer', {
+    local: { x: drummer.x, y: 1.4, z: drummer.z },
+    label: "the drummer, his word inviting E over his head while the bottom prompt still offers SPACE at the man himself",
+  })
+  await page.keyboard.press('KeyE')
+  const guessAtDrummer = await page
+    .waitForFunction(() => !!document.querySelector('.dialog.speech-guess'), null, { timeout: 15000 })
+    .then(() => true)
+    .catch(() => false)
+  check(
+    'E takes the word and leaves the man to SPACE (point 1139)',
+    guessAtDrummer && (await page.evaluate(() => window.__game.getState().chiefOutside[window.__game.getState().placeId] !== true)),
+    guessAtDrummer ? 'the chief came out of his hut on the guess key' : 'no guess dialog opened at the drummer',
+  )
+  await page.evaluate(() => window.__ui.getState().setDialog(null))
+  await nextFrames(2)
+
   // 2. The use key at the HUT sends him out — and he walks to the drummer.
   if (hut?.door) {
     await standAt({ x: hut.door[0], z: hut.door[1] }, { x: hut.pos[0], z: hut.pos[1] })
