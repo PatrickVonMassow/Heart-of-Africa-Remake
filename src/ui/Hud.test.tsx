@@ -835,3 +835,53 @@ describe('inventory keyboard and gamepad access', () => {
     expect(dig).not.toHaveBeenCalled()
   })
 })
+
+
+describe('settlement cursor mode hint', () => {
+  const pointerDescriptor = Object.getOwnPropertyDescriptor(document, 'pointerLockElement')
+  const webdriverDescriptor = Object.getOwnPropertyDescriptor(navigator, 'webdriver')
+  const lock = (element: Element | null) => {
+    Object.defineProperty(document, 'pointerLockElement', { configurable: true, value: element })
+    fireEvent(document, new Event('pointerlockchange'))
+  }
+  beforeEach(() => {
+    Object.defineProperty(navigator, 'webdriver', { configurable: true, value: false })
+    Object.defineProperty(document, 'pointerLockElement', { configurable: true, value: null })
+    useGame.setState({ mode: 'place', placeId: 'cairo' })
+  })
+  afterEach(() => {
+    if (pointerDescriptor) Object.defineProperty(document, 'pointerLockElement', pointerDescriptor)
+    else Reflect.deleteProperty(document, 'pointerLockElement')
+    if (webdriverDescriptor) Object.defineProperty(navigator, 'webdriver', webdriverDescriptor)
+    else Reflect.deleteProperty(navigator, 'webdriver')
+  })
+
+  it.each([en, de])('names both actual lock states in $lang', (strings) => {
+    useLocale.getState().setLang(strings.lang)
+    const { container, getByText } = render(<Hud />)
+    expect(getByText(strings.hud.cursorModeUnlocked)).toBeInTheDocument()
+    const canvas = document.createElement('canvas')
+    lock(canvas)
+    expect(getByText(strings.hud.cursorModeLocked)).toHaveClass('cursor-mode-locked')
+    lock(null)
+    expect(getByText(strings.hud.cursorModeUnlocked)).not.toHaveClass('cursor-mode-locked')
+    act(() => useGame.setState({ mode: 'travel', placeId: null }))
+    expect(container.querySelector('.cursor-mode-hint')).toBeNull()
+  })
+
+  it('reads a lock already held at mount and updates the language live', () => {
+    Object.defineProperty(document, 'pointerLockElement', { configurable: true, value: document.createElement('canvas') })
+    const { getByText } = render(<Hud />)
+    expect(getByText(en.hud.cursorModeLocked)).toBeInTheDocument()
+    act(() => useLocale.getState().setLang('de'))
+    expect(getByText(de.hud.cursorModeLocked)).toBeInTheDocument()
+  })
+
+  it('hides both hints under browser automation, matching the lock skip', () => {
+    Object.defineProperty(navigator, 'webdriver', { configurable: true, value: true })
+    const { container } = render(<Hud />)
+    expect(container.querySelector('.cursor-mode-hint')).toBeNull()
+    lock(document.createElement('canvas'))
+    expect(container.querySelector('.cursor-mode-hint')).toBeNull()
+  })
+})

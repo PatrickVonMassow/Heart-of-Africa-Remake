@@ -465,6 +465,22 @@ textarea {
 
 /* --- Prompt + toast ------------------------------------------------------ */
 
+.cursor-mode-hint {
+  position: absolute;
+  top: 64px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: var(--hud-bg);
+  color: var(--hud-text);
+  font-size: 12px;
+  pointer-events: none;
+}
+.cursor-mode-locked {
+  opacity: 0.5;
+}
+
 .prompt {
   position: absolute;
   bottom: 64px;

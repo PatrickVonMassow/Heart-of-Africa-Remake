@@ -191,6 +191,23 @@ function InventoryBar() {
   )
 }
 
+function CursorModeHint() {
+  const t = useStrings()
+  const mode = useGame((s) => s.mode)
+  const [locked, setLocked] = useState(() => document.pointerLockElement != null)
+  useEffect(() => {
+    const sync = () => setLocked(document.pointerLockElement != null)
+    document.addEventListener('pointerlockchange', sync)
+    sync()
+    return () => document.removeEventListener('pointerlockchange', sync)
+  }, [])
+  // Match the settlement's deliberate skip of the OS lock under automation.
+  if (mode !== 'place' || navigator.webdriver) return null
+  return <div className={`cursor-mode-hint${locked ? ' cursor-mode-locked' : ''}`}>
+    {locked ? t.hud.cursorModeLocked : t.hud.cursorModeUnlocked}
+  </div>
+}
+
 function Toast() {
   const toast = useGame((s) => s.toast)
   const setToast = useGame((s) => s.setToast)
@@ -622,6 +639,7 @@ export function Hud() {
       <FpsCounter />
       {/* Health bar top-right, below the status bar, at the FPS-counter height. */}
       <InventoryBar />
+      <CursorModeHint />
       {/* Bottom-right: camp (only where allowed), map and journal buttons. */}
       <div className="hud-bottom-right">
         {showCamp && (

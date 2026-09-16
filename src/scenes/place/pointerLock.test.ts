@@ -4,8 +4,8 @@
 // headless check reads, since pointer lock is deliberately never engaged under
 // automation.
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { pointerLockProbe, releasePointerLock, requestPlacePointerLock } from './pointerLock'
-import { useUi } from '../../state/ui'
+import { pointerLockProbe, releasePointerLock, requestPlacePointerLock, restorePointerLockAfterDialogs } from './pointerLock'
+import { useUi, type Dialog } from '../../state/ui'
 
 const canvas = () => document.querySelector('canvas') as HTMLCanvasElement
 
@@ -76,5 +76,75 @@ describe('taking and giving back the pointer (point 588)', () => {
     Object.defineProperty(document, 'pointerLockElement', { value: canvas(), configurable: true })
     requestPlacePointerLock(canvas())
     expect(request).not.toHaveBeenCalled()
+  })
+})
+
+
+// Exhaustive by kind: a new dialog must join this regression table.
+const dialogs = {
+  trade: { kind: 'trade', building: 'market' },
+  bazaar: { kind: 'bazaar' },
+  agency: { kind: 'agency' },
+  camp: { kind: 'camp', scope: 'village', placeId: 'maasai-village' },
+  drumMessage: { kind: 'drumMessage' },
+  speechGuess: { kind: 'speechGuess', speakerId: 'kid-1', atoms: ['ba-ba'] },
+} satisfies Record<NonNullable<Dialog>['kind'], NonNullable<Dialog>>
+
+describe('restoring settlement steering after dialogs', () => {
+  it.each([...Object.values(dialogs), { kind: 'camp', scope: 'free', campId: 1 } as const])(
+    'requests exactly once when $kind closes', (dialog) => {
+      Object.defineProperty(navigator, 'webdriver', { value: true, configurable: true })
+      const off = restorePointerLockAfterDialogs(canvas())
+      try {
+        useUi.getState().setDialog(dialog)
+        expect(pointerLockProbe.grabs).toBe(0)
+        useUi.getState().setDialog(null)
+        expect(pointerLockProbe.grabs).toBe(1)
+        useUi.getState().setDialog(null)
+        useUi.setState({ prompt: 'unchanged lock' })
+        expect(pointerLockProbe.grabs).toBe(1)
+      } finally {
+        off()
+      }
+    },
+  )
+
+  it('does not request during dialog replacement or after scene cleanup', () => {
+    const off = restorePointerLockAfterDialogs(canvas())
+    useUi.getState().setDialog(dialogs.trade)
+    useUi.getState().setDialog(dialogs.bazaar)
+    expect(pointerLockProbe.grabs).toBe(0)
+    off()
+    useUi.getState().setDialog(null)
+    expect(pointerLockProbe.grabs).toBe(0)
+  })
+
+  it('respects full-screen overlays even when a dialog closes', () => {
+    const off = restorePointerLockAfterDialogs(canvas())
+    try {
+      useUi.getState().setDialog(dialogs.trade)
+      document.body.insertAdjacentHTML('beforeend', '<div class="overlay"></div>')
+      useUi.getState().setDialog(null)
+      expect(pointerLockProbe.grabs).toBe(0)
+    } finally {
+      off()
+    }
+  })
+
+  it('tolerates a refused request and lets the next deliberate request retry', async () => {
+    const request = vi.fn().mockRejectedValueOnce(new Error('Escape cooldown')).mockResolvedValueOnce(undefined)
+    canvas().requestPointerLock = request
+    const off = restorePointerLockAfterDialogs(canvas())
+    try {
+      useUi.getState().setDialog(dialogs.trade)
+      useUi.getState().setDialog(null)
+      await Promise.resolve()
+      expect(pointerLockProbe.grabs).toBe(1)
+      expect(document.pointerLockElement).toBeNull()
+      requestPlacePointerLock(canvas())
+      expect(request).toHaveBeenCalledTimes(2)
+    } finally {
+      off()
+    }
   })
 })
