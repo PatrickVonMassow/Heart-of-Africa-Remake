@@ -123,6 +123,11 @@ put it is the mistake this line exists to stop.
   of the work order on 16.09.2026, while point 1139 stood in its closing verification.
   Refs: src/scenes/place/layout.ts (the `clearRun` sweep and the head ladder),
   src/scenes/place/layout.test.ts (`NO_STRAIGHT_WALK`)
+  READ THE COMMENT AT THE FAILING BRANCH FIRST, it contradicts itself (found 16.09.2026 while
+  preparing this point): above the `if (!head)` arm layout.ts still claims "Nothing shipped
+  reaches this — `layout.test.ts` sweeps every river village at every seed and finds a head for
+  each", and the very next lines name the layouts that DO reach it. The first sentence is stale
+  and goes with the fix; a reader who trusts it looks for the defect somewhere else entirely.
   Author lane: astra.
   Why the lane: the communication mechanic is authored by Astra (user 08.09.2026); the
   rendered picture, the browser suites and the landing stay in the main session.
