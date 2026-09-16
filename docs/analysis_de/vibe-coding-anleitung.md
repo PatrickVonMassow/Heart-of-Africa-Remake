@@ -176,21 +176,18 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   beschreibt**. Wer entscheidet, ob **ein anderer anfangen darf**, misst einen **Handelnden** —
   Prozess oder Handle, nie Textsuche oder Dateien: **Arbeit ist kein Arbeiter.** Aus totem
   **Besitzer** folgt **Übernahme**, nie Neustart.“
-- **Die Sonde kann ihr Nein nicht erreichen.** Die Prüfung könnte „tot“ sagen — aber nur, wenn man
-  ihr den Beweis übergibt, und genau dieser Aufrufer übergibt ihn nicht. Ihr „lebt noch“ ist dann
-  der einzig mögliche Satz.
-  → *Prompt:* „Frag zu jeder Prüfung: **Kann sie mit den Eingaben dieses Aufrufers das negative
-  Urteil überhaupt erreichen?** Wo nein, ist ihr Grün eine Tautologie. Und einen Fix an einer
-  gemeinsamen Funktion prüfst du an **allen** Aufrufstellen, nicht nur an der, die dich biss. Und
-  lies ihre **Ausnahmen**: Setzt derselbe Mechanismus, dessen Schaden sie melden soll, das Flag,
-  das sie freistellt, schweigt sie genau dann, wenn es zählt.“
+- **Die Sonde kann ihr Nein nicht erreichen.** Die Prüfung könnte „tot“ sagen — aber nur mit einem
+  Beweis, den genau dieser Aufrufer nie übergibt. Ihr „lebt noch“ ist der einzig mögliche Satz.
+  → *Prompt:* „Frag zu jeder Prüfung: **Kann sie mit diesen Eingaben ihr Nein überhaupt erreichen?** Wo nein, ist ihr Grün eine Tautologie. Einen Fix an gemeinsamem
+  Code prüfst du an **allen** Aufrufstellen, nicht nur der, die dich biss. Lies ihre
+  **Ausnahmen**: Setzt der Mechanismus, dessen Schaden sie meldet, selbst ihr Freistellungs-Flag,
+  schweigt sie, wenn es zählt. Und ein Urteil braucht einen **Empfänger**: Was bei
+  grünem Lauf nur auf stderr meldet, liest niemand.“
 
 - **Neue Features zerbrechen alte.** Eine Änderung repariert X und bricht das unbeobachtete Y.
   → *Prompt:* „Prüfe jede Mechanik auch im **Danach-Zustand** und erzwing nach jedem
   Zusammenführen die schnelle Testschicht. Bau ‚Invarianten' ein, die im Entwicklungsmodus laut
-  meckern — jeder Testlauf wird zum Detektor. **Laut heißt rot, nicht stderr:** Eine Zusicherung,
-  die nur druckt, während der Lauf grün bleibt, hat keinen Empfänger — unsere lief so wochenlang
-  in jedem grünen Durchgang mit und wurde erst zufällig gelesen."
+  meckern — jeder Testlauf wird zum Detektor."
 
 - **Angeblich behoben, im Präsens behauptet.** Der Fix gilt als fertig, das Symptom bleibt.
   → *Prompt:* „Fertig ist ein Fix, wenn das **Symptom am Ort des Symptoms** weg ist **und** der
