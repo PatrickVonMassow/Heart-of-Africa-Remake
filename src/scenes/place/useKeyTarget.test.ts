@@ -205,6 +205,21 @@ describe('the use key and the guess key no longer compete (point 1139)', () => {
     expect(pickForKeyPress([chief(0.5), word(2)], 'use', { pad: true })?.payload.kind).toBe('chief')
   })
 
+  it('holds the PAD on a word a door is about to take by a hair (review 16.09.2026)', () => {
+    // The pad's standing pick has to be its OWN: the use key's pick never sees a
+    // word, so lending it to button A would hand the door a word held a hand's
+    // breadth away — the flicker TARGET_HOLD exists to stop, and the whole
+    // reason the pad keeps both meanings at all.
+    const near = [hut(1.0 - TARGET_HOLD + 0.01), word(1.0)]
+    expect(pickForKeyPress(near, 'use', { pad: true, held: 'speech:villager-1' })?.key).toBe('speech:villager-1')
+    // A door that really is nearer still takes it, hold or no hold.
+    const nearer = [hut(1.0 - TARGET_HOLD - 0.01), word(1.0)]
+    expect(pickForKeyPress(nearer, 'use', { pad: true, held: 'speech:villager-1' })?.key).toBe('door:chief-hut')
+    // And the held word is ignored by the KEYBOARD's use key, which cannot act
+    // on a word at all — it takes the door instead of nothing.
+    expect(pickForKeyPress(near, 'use', { held: 'speech:villager-1' })?.key).toBe('door:chief-hut')
+  })
+
   it('still holds the use key on its standing pick, and the guess needs no hold', () => {
     // Two doors a hand's breadth apart: the held one keeps the key (point 691).
     const rival: Kinded = { ...hut(1.0 - TARGET_HOLD + 0.01), key: 'door:market' }

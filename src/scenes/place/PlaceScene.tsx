@@ -2812,6 +2812,11 @@ export function PlaceScene() {
   // needs no such hold: the speech channel offers at most ONE word at a time and
   // decides that choice itself (speechTarget.ts), so there is no tie to keep.
   const useKeyPick = useRef<string | null>(null)
+  // The PAD decides over the whole list, so it needs a standing pick OF ITS OWN
+  // (review of 16.09.2026): the use key's pick has never seen a word, and lending
+  // it to button A would let a door take a word the pad was holding a hand's
+  // breadth away — the flicker TARGET_HOLD exists to stop.
+  const padKeyPick = useRef<string | null>(null)
   // PlaceScene stays mounted across placeId changes and the handler's effect
   // only re-subscribes on setPrompt, so read the CURRENT layout through a ref.
   const layoutRef = useRef(layout)
@@ -2873,12 +2878,15 @@ export function PlaceScene() {
       const p = player.current
       const all = settlementUseCandidates(layoutRef.current, p.x, p.z)
       // A real key press — and a tapped prompt, which names SPACE and must do
-      // what it names — uses only; the PAD keeps both meanings (design.md §17.5).
+      // what it names — uses only; the PAD keeps both meanings (design.md §17.5)
+      // and decides on its own standing pick.
+      const pad = keyPressSource(e) === 'gamepad'
       const winner = pickForKeyPress(all, 'use', {
-        pad: keyPressSource(e) === 'gamepad',
-        held: useKeyPick.current,
+        pad,
+        held: pad ? padKeyPick.current : useKeyPick.current,
       })
       if (!winner) return
+      if (pad) padKeyPick.current = winner.key
       if (winner.payload.kind === 'speech') {
         openSpeechGuessRef.current(winner.payload.label)
         return
@@ -3144,6 +3152,9 @@ export function PlaceScene() {
     const all = settlementUseCandidates(layout, p.x, p.z)
     const winner = pickForKeyPress(all, 'use', { held: useKeyPick.current })
     useKeyPick.current = winner?.key ?? null
+    // The pad's own pick is carried the same way, over the whole list, so button
+    // A holds a word across the frames it would otherwise flicker away from.
+    padKeyPick.current = pickForKeyPress(all, 'use', { pad: true, held: padKeyPick.current })?.key ?? null
     const strings = getStrings()
     // At the chief's hut the key names the HUT while he is inside it, and the
     // MAN once he stands in front of it (design.md §12).
