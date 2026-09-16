@@ -20,3 +20,11 @@
    errand. The port and village `<Walkers>` calls both have `radius` and `bank`
    in scope and now pass them to build the escape grid. Pure unit tests cover
    each rung, including enclosure beyond both searches.
+
+4. Walker navigation remains unchanged; its grid is read only by the escape
+   helper. The existing `balance.walkerUnstuckSeconds` bounds both steppers.
+   Tests execute the production escape blocks with a non-default window and
+   all four outcomes, asserting body placement, timer reset, route invalidation,
+   and task retirement after placement. No second timer or walker path planner
+   was added. Browser suites and the moving-adult picture comparison on both
+   backends remain the reviewing session's responsibility, per the commission.

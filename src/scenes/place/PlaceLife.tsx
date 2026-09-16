@@ -2412,8 +2412,7 @@ function Walkers({
       // Belt-and-braces unstuck (point 155): the waypoint-skip above frees most
       // blocks, but a walker wedged in a pocket keeps cycling waypoints while
       // physically pinned. When it has not actually moved for the calibratable
-      // window, teleport-nudge it to the nearest free spot — inhabitants only,
-      // a small invisible correction, never the player.
+      // window, place it on free ground — inhabitants only, never the player.
       if (Math.hypot(s.x - oldX, s.z - oldZ) < step * 0.1) {
         s.pinned += dt
         if (s.pinned > balance.walkerUnstuckSeconds) {
