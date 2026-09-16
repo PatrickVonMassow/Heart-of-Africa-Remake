@@ -90,6 +90,12 @@ Füllstand empfiehlt ein leeres Modell.
    > Pipeline ablehnen würde** — sonst ist die Prüfung keine Absicherung, sondern
    > eine Fehlermail. Überdecke nie einen Fehlschlag — zeig mir den Output."
 
+   Und traue dem Rückgabewert nicht, wenn du den Befehl durch eine Pipe schickst:
+   `git push … | tail -6` liefert die Null von `tail`, nicht die des Pushes. Ein
+   abgelehnter Upload sieht dann exakt wie ein geglückter aus. Schreib die Ausgabe
+   in eine Datei und beweise das Ergebnis am Ziel — beim Upload also am
+   **entfernten Stand**, nicht am Rückgabewert.
+
 5. **Regeln mechanisch erzwingen — nicht auf Vorsätze vertrauen (das Kernprinzip).**
    Unter Druck fällt genau der nicht-erzwungene Schritt weg; warte **nicht** auf den
    zweiten Schaden.
@@ -681,4 +687,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 2bb0c6102d7c437a0da61e2d75dc346d796c9f7985bae21815665b67fbb970ce -->
+<!-- GUIDE-FINGERPRINT: 61c785b97b48ff557f98b1765d1a377d616fb107faa1ea337020fa357e6163b2 -->
