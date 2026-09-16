@@ -842,7 +842,6 @@ export const RED_CHARGES = [
   {
     point: 1102,
     suite: 'polish',
-    backend: 'webgl',
     kind: 'check',
     match: /^the drums were still speaking when the picture was taken/i,
     why:
@@ -851,10 +850,14 @@ export const RED_CHARGES = [
       + 'SUSPECT and covering no backend. It is the first time this check has failed in the kept '
       + 'logs, and 1102 is the point that owns it — the frame is aimed by stopwatch and fires '
       + 'after the drum message has already ended, which is point 521\'s defect mirrored (521 '
-      + 'shoots too EARLY after a jump; this one too LATE). Suite- and lane-scoped to what was '
-      + 'measured: nothing here excuses the same check on WebGPU, where it has never been seen. '
-      + 'The charge dies with 1102, which waits on the speaking state the game already holds '
-      + 'instead of on a duration.',
+      + 'shoots too EARLY after a jump; this one too LATE). '
+      + 'THE LANE SCOPING IS GONE 16.09.2026: the same check failed once and passed on the retry '
+      + 'on WEBGPU too (point 1139\'s `polish --section=chief-to-drummer`, machine state '
+      + 'unreadable — no GPU busy counter on this host). The race is downstream of everything a '
+      + 'point can change before it: the shutter opens after the message has STARTED, and what '
+      + 'runs out is the performance, so nothing earlier in the block moves it. One cause, both '
+      + 'lanes. The charge dies with 1102, which waits on the speaking state the game already '
+      + 'holds instead of on a duration.',
   },
   {
     point: 521,
