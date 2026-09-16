@@ -14,6 +14,7 @@ import {
   pickForKeyPress,
   pickUseCandidate,
   type UseCandidate,
+  type UseKind,
 } from './useKeyTarget'
 import { DOOR_TRIGGER_RADIUS, doorCandidates, type Interactive, type PlaceLayout } from './layout'
 import { balance } from '../../config/balance'
@@ -143,19 +144,20 @@ describe('the doors as use-key candidates (point 691)', () => {
 // below are that exact standing: a hut and a word BOTH in reach at once.
 describe('the use key and the guess key no longer compete (point 1139)', () => {
   /** A settlement candidate as the scene builds it: the kind decides the key. */
-  const hut = (distance: number): UseCandidate<{ kind: 'interactive' }> => ({
+  type Kinded = UseCandidate<{ kind: UseKind }>
+  const hut = (distance: number): Kinded => ({
     key: 'door:chief-hut',
     distance,
     range: DOOR_TRIGGER_RADIUS,
     payload: { kind: 'interactive' },
   })
-  const chief = (distance: number): UseCandidate<{ kind: 'chief' }> => ({
+  const chief = (distance: number): Kinded => ({
     key: 'chief:drummer',
     distance,
     range: balance.communication.chiefTalkReach,
     payload: { kind: 'chief' },
   })
-  const word = (distance: number): UseCandidate<{ kind: 'speech' }> => ({
+  const word = (distance: number): Kinded => ({
     key: 'speech:villager-1',
     distance,
     range: balance.communication.hearingRadius,
@@ -205,7 +207,7 @@ describe('the use key and the guess key no longer compete (point 1139)', () => {
 
   it('still holds the use key on its standing pick, and the guess needs no hold', () => {
     // Two doors a hand's breadth apart: the held one keeps the key (point 691).
-    const rival: UseCandidate<{ kind: 'interactive' }> = { ...hut(1.0 - TARGET_HOLD + 0.01), key: 'door:market' }
+    const rival: Kinded = { ...hut(1.0 - TARGET_HOLD + 0.01), key: 'door:market' }
     const held = pickForKeyPress([hut(1.0), rival], 'use', { held: 'door:chief-hut' })
     expect(held?.key).toBe('door:chief-hut')
     // The speech channel offers ONE word at a time, so the guess key has no tie
