@@ -840,6 +840,26 @@ export const RED_CHARGES = [
       'owns it.',
   },
   {
+    point: 1119,
+    suite: 'polish',
+    backend: 'webgl',
+    kind: 'check',
+    match: /^the arriving runner/i,
+    why:
+      'THE RED POINT 1119 WAS FILED TO OWN, reaching the ledger 16.09.2026 with its second '
+      + 'measurement. The check belongs to point 1106, which is CLOSED and can take no entry — '
+      + 'that is why 1119 exists at all, and until now the red it owns had no way into this file. '
+      + 'Measured today on the WebGL 2 half of point 1139\'s covering pass, machine state '
+      + 'unreadable (no GPU busy counter on this host): all three arrival checks of '
+      + '`--section=children-bank-game` read the hold to "ended false" with 0 readings, and the '
+      + 'retry of the same section ran 27 pass / 0 fail — the same red-then-green signature 1119 '
+      + 'records from 12.09.2026, where it read 137 readings and "ended false" under a measured '
+      + 'load. Scoped to the lane and the section it has been seen in: nothing here excuses these '
+      + 'checks on WebGPU, where the same pass ran them green. The charge dies with 1119, whose '
+      + 'first step is the throttle probe that decides between the check\'s frame budget and the '
+      + 'arrival hold itself.',
+  },
+  {
     point: 1102,
     suite: 'polish',
     kind: 'check',
