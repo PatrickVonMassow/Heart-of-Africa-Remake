@@ -77,8 +77,9 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1045. Two village layouts have no straight walk to the water, so they teach no RIVER
-  at all (measured 02.09.2026 while answering the cross-vendor findings of point 688).
+- [ ] 1045. The puzzle village has no straight walk to the water in a third of its seeds, so
+  it teaches no RIVER at all (measured 02.09.2026 while answering the cross-vendor findings of
+  point 688; the share re-measured 16.09.2026 over 124 seeds).
   Point 688 fits the village water path by sweeping its head until the straight walk to
   the water clears the settlement's fabric as it is DRAWN — dwellings at their true shape,
   boxes at their corners, the compound fence panels, the pen, the play rocks, the props.
