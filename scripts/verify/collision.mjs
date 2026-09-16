@@ -8,6 +8,7 @@
 import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
 import { frameShutter } from './frameSubject.mjs'
 import { sectionGate } from './sections.mjs'
+import { installColliderProbe } from './colliderProbe.mjs'
 import { fileURLToPath } from 'node:url'
 
 // A fixed dev seed makes the procedural settlement layout deterministic so the
@@ -41,34 +42,8 @@ const check = (name, ok, detail) => {
 
 const browser = await launchVerifyBrowser()
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
-// Shared helpers for all three collider shapes: circle, oriented box and the
-// fence panel's capsule around a segment (point 413). A shape this helper does
-// not know reads every point as NaN-blocked, so it must track collision.ts.
-await page.addInitScript(() => {
-  window.__clearanceTo = (c, x, z) => {
-    if (c.kind === 'box') {
-      const sin = Math.sin(c.rot)
-      const cos = Math.cos(c.rot)
-      const dx = x - c.x
-      const dz = z - c.z
-      const lx = cos * dx - sin * dz
-      const lz = sin * dx + cos * dz
-      const qx = Math.max(-c.hx, Math.min(c.hx, lx))
-      const qz = Math.max(-c.hz, Math.min(c.hz, lz))
-      if (qx === lx && qz === lz) return -Math.min(c.hx - Math.abs(lx), c.hz - Math.abs(lz))
-      return Math.hypot(lx - qx, lz - qz)
-    }
-    if (c.kind === 'segment') {
-      const ex = c.x2 - c.x1
-      const ez = c.z2 - c.z1
-      const l2 = ex * ex + ez * ez
-      const t = l2 < 1e-12 ? 0 : Math.max(0, Math.min(1, ((x - c.x1) * ex + (z - c.z1) * ez) / l2))
-      return Math.hypot(x - (c.x1 + ex * t), z - (c.z1 + ez * t)) - c.r
-    }
-    return Math.hypot(x - c.x, z - c.z) - c.r
-  }
-  window.__colliderSize = (c) => (c.kind === 'box' ? Math.max(c.hx, c.hz) : c.r)
-})
+// The collider geometry every suite reads with (scripts/verify/colliderProbe.mjs).
+await installColliderProbe(page)
 // A virtual standard-mapped pad (work-order 610), so the unstuck section can
 // prove the escape is reachable without a keyboard. Nothing is pressed and no
 // axis is pushed, so the deliberate-input guard keeps it dormant for every other

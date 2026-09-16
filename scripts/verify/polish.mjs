@@ -2,6 +2,7 @@
 // a gift and distant panorama wildlife, design.md §17/§2). Dev server only.
 import { launchVerifyBrowser, waitForStable, waitForReadingStable, waitForSceneBuilt, assertBackend } from './_browser.mjs'
 import { frameShutter, capturePixels, waitForSceneReady } from './frameSubject.mjs'
+import { installColliderProbe } from './colliderProbe.mjs'
 import { judgeFootingSeries, judgePitchSeries, MIN_SLOPED_SAMPLES } from './footingSeries.mjs'
 import { judgeStanceSlip } from './stanceSlip.mjs'
 import {
@@ -135,6 +136,8 @@ const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
 // it stands in, the building it is aimed at, the overlay it documents — and the
 // shutter proves that subject is in the picture before the file is written.
 const frame = frameShutter(page, OUT)
+// The collider geometry the staged-wedge section reads with (scripts/verify/colliderProbe.mjs).
+await installColliderProbe(page)
 const errors = []
 page.on('console', (m) => {
   if (m.type() === 'error') errors.push(m.text())
@@ -5368,20 +5371,47 @@ if (section('wedged-adults')) {
         ? pinned.map(([who, d]) => `${who} moved ${d.toFixed(2)} m`).join(', ')
         : `${walked.size} adults, the least mobile of them ${Math.min(...walked.values()).toFixed(2)} m`,
     )
-    // THE PICTURE THE REPORT WAS MADE OF: the adult that came closest to staying
-    // put, photographed twice from ONE standing spot with a window between the
-    // shutters — so the pair shows a body that moved rather than a claim that it
-    // did. The subject is the GROUND SPOT it stood on, which stays in the frame
-    // whether the adult is still on it or not (point 375).
-    let least = null
-    for (const [who, d] of walked) if (!least || d < least.d) least = { who, d }
-    const spot = least ? trace.at(-1).bodies.find((b) => b.who === least.who) : null
-    if (spot) {
-      // Standing between the corner and the village centre and looking back at
-      // it: the open side of a pocket between a hut and a fence run is the side
-      // the settlement lies on, so a camera placed there has the body in view
-      // rather than the wall that pinned it.
-      await page.evaluate((at) => {
+    // THE REPORTED PICTURE, STAGED WHERE THE REPORT WAS MADE: the village's own
+    // tightest slot between two different bodies — a hut wall and a fence run is
+    // exactly such a pair — with a household walker set down in it. What the
+    // pair of frames then shows is the reported corner with an adult pressed
+    // into it and, one window later, the same corner with the adult gone. The
+    // subject of both shutters is the SLOT, which stays in the picture whether
+    // the body is still in it or not (point 375).
+    const wedge = await page.evaluate(() => {
+      const cs = window.__placeColliders ?? []
+      const sample = (c) =>
+        c.kind === 'segment'
+          ? Array.from({ length: 9 }, (_, i) => [c.x1 + ((c.x2 - c.x1) * i) / 8, c.z1 + ((c.z2 - c.z1) * i) / 8])
+          : [[c.x, c.z]]
+      let best = null
+      for (let i = 0; i < cs.length; i++)
+        for (let j = i + 1; j < cs.length; j++) {
+          for (const [ax, az] of sample(cs[i]))
+            for (const [bx, bz] of sample(cs[j])) {
+              const gap =
+                Math.hypot(ax - bx, az - bz) - window.__colliderSize(cs[i]) - window.__colliderSize(cs[j])
+              if (gap < 0) continue // colliders that merge into one body are no slot
+              if (!best || gap < best.gap) best = { gap, x: (ax + bx) / 2, z: (az + bz) / 2 }
+            }
+        }
+      return best
+    })
+    check(
+      'the reported village has a tightest slot to stage the report in',
+      !!wedge,
+      wedge ? `gap ${wedge.gap.toFixed(2)} m at ${wedge.x.toFixed(1)},${wedge.z.toFixed(1)}` : 'none',
+    )
+    if (wedge) {
+      // Standing between the slot and the village centre and looking back at it:
+      // the open side of a pocket between a hut and a fence run is the side the
+      // settlement lies on, so a camera placed there sees the body rather than
+      // the wall that pinned it.
+      const put = await page.evaluate((at) => {
+        const s = window.__placeWalkers?.states?.[0]
+        if (!s) return null
+        s.x = at.x
+        s.z = at.z
         const p = window.__placePlayer
         const len = Math.hypot(at.x, at.z) || 1
         p.x = at.x - (at.x / len) * 6
@@ -5389,36 +5419,36 @@ if (section('wedged-adults')) {
         // Place-camera yaw 0 looks toward -Z, so aim with the +PI complement.
         p.yaw = Math.atan2(at.x - p.x, at.z - p.z) + Math.PI
         p.pitch = -0.1
-      }, spot)
-      await nextFrames(2)
-      const before = await page.evaluate(
-        (who) => {
-          const all = [
-            ...(window.__placeWalkers?.states ?? []).map((s, i) => ({ who: `walker ${i}`, x: s.x, z: s.z })),
-            ...(window.__placeErrands?.().villagers ?? []).map((v, i) => ({ who: `errand ${i}`, x: v.x, z: v.z })),
-          ]
-          return all.find((b) => b.who === who) ?? null
-        },
-        least.who,
-      )
-      await frame('1138-wedged-adults-before', {
-        local: { x: spot.x, y: 0.9, z: spot.z },
-        label: 'the corner the least mobile adult of the reported village was measured in',
-      })
-      const second = await readBodies(600)
-      const after = second.at(-1).bodies.find((b) => b.who === least.who) ?? null
-      await frame('1138-wedged-adults-after', {
-        local: { x: spot.x, y: 0.9, z: spot.z },
-        label: 'the same corner one escape window later, with the adults moved on',
-      })
-      const between = before && after ? Math.hypot(after.x - before.x, after.z - before.z) : 0
-      check(
-        'and it moves between the two shutters',
-        between >= knob.minDistance,
-        `${between.toFixed(2)} m between the frames`,
-      )
-    } else {
-      check('an adult was found to photograph the report at', false, 'no stepper in the trace')
+        return { x: s.x, z: s.z }
+      }, wedge)
+      check('a household walker can be set down in it', !!put)
+      if (put) {
+        await nextFrames(2)
+        await frame('1138-wedged-adults-before', {
+          local: { x: wedge.x, y: 0.9, z: wedge.z },
+          label: "an adult set down in the reported village's tightest slot",
+        })
+        // Long enough for every rung of the ladder to have answered, measured on
+        // the game's own window rather than on a frame count.
+        const freeing = await readBodies(600)
+        const out = freeing.at(-1).bodies.find((b) => b.who === 'walker 0')
+        const seconds2 = (freeing.at(-1).t - freeing[0].t) / 1000
+        await frame('1138-wedged-adults-after', {
+          local: { x: wedge.x, y: 0.9, z: wedge.z },
+          label: 'the same slot after the escape window, with the adult out of it',
+        })
+        const got = out ? Math.hypot(out.x - put.x, out.z - put.z) : 0
+        check(
+          'and the adult put into it is out of it again within the escape window',
+          got >= knob.minDistance && seconds2 >= knob.seconds,
+          `${got.toFixed(2)} m in ${seconds2.toFixed(1)} s, against ${knob.minDistance} m after ${knob.seconds} s`,
+        )
+        // NOT a clearance check on the freed body: a household walker walks
+        // THROUGH its own door and stands inside the dwelling, so "clear of every
+        // collider" reds on correct behaviour (measured 16.09.2026, clearance
+        // -1.75 m inside a hut). That the placement itself lands on free ground
+        // is asserted where it is decided — collision.test.ts over every rung.
+      }
     }
   }
   await page.evaluate(() => {
