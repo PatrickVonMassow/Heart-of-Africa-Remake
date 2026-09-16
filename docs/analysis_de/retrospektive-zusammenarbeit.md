@@ -223,6 +223,10 @@ Der `render-verify-guard` zeichnet einen bestandenen Lauf HEAD-gebunden auf. Ich
 
 **Lehre:** Jeder maschinell getrackte Nachweis gilt für den Zustand, gegen den er lief. Die Zweig-Vorprüfung verhindert, Kaputtes zu mergen — den Guard klärt nur ein Lauf gegen den **Zielzustand**.
 
+Am 16.09. kam die zweite Hälfte derselben Klasse dazu, und sie ist die unangenehmere: Der Nachweis ist nicht nur zustands-, sondern **ortsgebunden**. Beide deckenden Durchgänge eines Punktes liefen in seinem Worktree, der Läufer schrieb Datensatz und Log in genau diesen Checkout, und das vom Arbeitsverfahren geforderte Aufräumen nach dem Merge löschte beides. Auf main stand danach »RENDER CHANGE NOT VERIFIED ON EITHER BACKEND« über denselben Commits, deren Bild eine Stunde zuvor auf beiden Backends geurteilt worden war — und der einzige verbleibende Weg war eine protokollierte Ausnahme, die das Bild als *unbestätigt* ausweist, obwohl es bestätigt war. Das ist kein Unfall dieser Landung, sondern der Normalweg: Jeder Punkt bekommt seinen Worktree, und der Merge beendet den Zweig.
+
+**Lehre:** Ein Beleg gehört dorthin, wo das Repository ihn für jeden Checkout aufbewahrt — nicht in den Baum, den das eigene Verfahren anschließend löscht. Und ein Gate, das den Beleg am CHECKOUT statt am COMMIT festmacht, verliert ihn genau in dem Moment, in dem die Arbeit fertig ist (Punkt 1142).
+
 ### 3.12 Ein Test kodiert eine veränderliche Vorgabe fest
 
 Ein Kantenenergie-Check des Bodens fiel, nachdem SSAO per Nutzerentscheid im Standard ausging: Die Schwelle war **mit** SSAO kalibriert worden. Das Produkt war nicht regrediert — der Test hatte einen damaligen Default eingebacken. Getrennt wurde das durch eine **Baseline auf dem Vor-Änderungs-Stand**; der Fix war die Rekalibrierung auf den ausgelieferten Default, am Bild verifiziert statt blind abgesenkt.
@@ -1604,7 +1608,7 @@ stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die s
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 16.09.2026, 14:38 · Quellen-Fingerprint: `15c5191b6008…`
+Zuletzt aktualisiert: Mittwoch, 16.09.2026, 19:46 · Quellen-Fingerprint: `0c4425b5a4f7…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1709,10 +1713,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 97 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 134 Prozess-/Meta-TASKS-Punkte (davon 65 offen).
+Erfasste Quellen: 97 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 135 Prozess-/Meta-TASKS-Punkte (davon 66 offen).
 
-<!-- RETRO-FINGERPRINT: 15c5191b6008590875e85c38b55b61bdc75c10c620100455b668397d101738d9 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-16T12:38:24.819Z -->
+<!-- RETRO-FINGERPRINT: 0c4425b5a4f777eb8d57d3a13806d72e4c8d663a03b53d2bdea79615dc48f0b9 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-16T17:46:41.230Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
