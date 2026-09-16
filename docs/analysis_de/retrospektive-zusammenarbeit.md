@@ -68,6 +68,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 15.09. nachts | §3.270 ist eingetreten, wie es dort vorhergesagt stand — eine Ebene tiefer: Nicht das Job-Limit, sondern das Zeitbudget EINES Testfalls war aufgebraucht. Der Fall wurde auf dem Server bei 180 Sekunden abgebrochen und riss den ganzen `fast`-Job mit; daneben stand seine eigene Messung von 46,5 Sekunden, geschrieben, bevor die Erwachsenenarbeit in das nachgespielte Dorf einzog. Nachgemessen kostet er 91,2 Sekunden, auf dem Server mindestens 217. Der Test war nie geändert worden — gewachsen ist das Spiel unter ihm, und der Kommentar hat lautlos mitgealtert |
 | 16.09. früh | Der Beweislauf aus §3.277 lief erstmals wieder durch — 25 Suiten, 118 min, 145 Bilder — und brach danach an der eigenen Urteilszeile vorbei ab: Seine drei Roten hatte er selbst gegen die Merge-Basis als vorbestehend klassifiziert, an die offenen Punkte 603/938/1009 gebucht und mit »own or unresolved: none; regression verdict unchanged« quittiert. Der Teildurchgang endete trotzdem mit 1, und die Backend-Reihenfolge liest nur den Rückgabewert — der WebGPU-Durchgang, auf dem die Blockade gemessen worden war, begann nie. Solange irgendein fremdgebuchtes Rot steht, ist ein Zwei-Backend-Lauf damit **nie** erreichbar, also auch der Abschlussdurchlauf und der Release-Tag nicht (§3.278, Punkt 1135 Ziffer 6) |
 | 16.09. vormittags | Auf eine Nutzerfrage las ich das Protokoll des noch laufenden WebGPU-Durchgangs, fand »CANDIDATE REAL FAILURE« über einem Weltbild und meldete es als Rot, das keinem offenen Punkt gehört. Es gehört seit dem 26.08. Punkt 627 — dasselbe Bild, dieselbe Formulierung, auf WebGPU/Compatibility, gemessen über vier Läufe auf ruhiger Maschine. Die Kandidaten-Zeile schreibt die Suite WÄHREND des Laufs, die Zuordnung fällt an seinem ENDE: Ein Urteil mitten im Lauf gelesen ist das Urteil vor der Stufe, der es gehört — beinahe ein Doppelpunkt vor dem Release (§3.279) |
+| 16.09. abends | Zwei Wiedergänger in einer Sitzung, beide an fremdem Werkzeug gemessen: Der Stop-Hook forderte wegen einer Parallel-Sitzung erneut `batch-doctor --gate`, dessen Tor sechs Minuten Unit-Suite neben dem laufenden Deckungslauf fuhr und genau EINE Datei fand — die Zustandsdatei des Closing-Wächters, die sich selbst mitschreibt; Committen genügte, das Urteil sprang auf `consistent` (drittes Auftreten von §3.271/§3.267, die In-Flight-Markierung liest der Doctor weiterhin nicht). Und die Vier-Augen-Prüfung wies zweimal nach, dass die neuen Unit-Fälle des Punktes 1139 auch bei ZURÜCKGEDREHTER Szenen-Verdrahtung grün geblieben wären — derselbe Riss wie §3.252, nur eine Ebene höher: Die Regel war geprüft, der Aufruf nicht. Der Beweis zog danach dorthin, wo die Taste wirklich drückbar ist (virtuelles Gamepad im Dorf) |
 | 13.08. | Der Nachprüfer findet eine echte zweite Klippe im geheilten Mechanismus — und jede der fünf gemessenen Kuren verschlechtert gesunde Dörfer stärker, als der Fehler schadet: Befund wird gebucht statt behoben (§3.115) |
 | 20.08. | Der Dokumentschnitt strich Regeln als »von einem Wächter abgedeckt«, ohne einen einzigen Wächter darauf zu prüfen — die Kontextanzeige verschwand, der Nutzer fand es (§3.134); eine vom Nutzer gesetzte Rangfolge wurde in einer Nacht zweimal maschinell überholt, ohne dass irgendwo ein Grund stand (Punkt 614); zwei Werkzeuge derselben Bauart am falschen Ort gemessen — im Hauptbaum gebaut und geprüft, während der Prozess die Arbeit in den isolierten Bereich schickt (§3.137) |
 | 21.08. | Ein Tor verlangte eine Freigabe, die seine eigenen Werkzeuge nicht herstellen können — der HIGH-Punkt war gemergt, geprüft und freigegeben, und der Zugausgang wies ihn trotzdem ab (§3.153) |
@@ -1608,7 +1609,7 @@ stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die s
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 16.09.2026, 19:46 · Quellen-Fingerprint: `0c4425b5a4f7…`
+Zuletzt aktualisiert: Mittwoch, 16.09.2026, 21:22 · Quellen-Fingerprint: `0871e7943c2f…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1715,8 +1716,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 97 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 135 Prozess-/Meta-TASKS-Punkte (davon 66 offen).
 
-<!-- RETRO-FINGERPRINT: 0c4425b5a4f777eb8d57d3a13806d72e4c8d663a03b53d2bdea79615dc48f0b9 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-16T17:46:41.230Z -->
+<!-- RETRO-FINGERPRINT: 0871e7943c2fcc73bc0488d38bdbd1aff3344de295622628b85183076b5faad5 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-16T19:22:34.014Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
