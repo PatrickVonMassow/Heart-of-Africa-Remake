@@ -192,7 +192,8 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 - **Angeblich behoben, im Präsens behauptet.** Der Fix gilt als fertig, das Symptom bleibt.
   → *Prompt:* „Fertig ist ein Fix, wenn das **Symptom am Ort des Symptoms** weg ist **und** der
   gleiche Versuch am **alten Stand** noch durchgeht. Was du im **Präsens** behauptest, sieh vorher
-  nach. Zweimal festgebissen: wechsle das Modell."
+  nach — auch ‚das gehört zu nichts Bekanntem': **nenn die Liste, in der du nachgesehen hast**, und
+  lies sie nach dem Lauf, nicht mitten darin. Zweimal festgebissen: wechsle das Modell."
 
 - **Fehlalarm behoben — echter Alarm gleich mit.** Die Prüfung wird schärfer, alles grün — nur
   schlägt sie auch nicht mehr an, wenn sie sollte.
@@ -680,4 +681,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: e1718ab87260def678a88d848abea4a314a544c0b04b158030634cc3e38c37ce -->
+<!-- GUIDE-FINGERPRINT: 6456e51bbe7a98ff23053fa287550294886e49025100b8922088b02e1c299e4f -->

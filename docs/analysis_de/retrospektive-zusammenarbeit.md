@@ -67,6 +67,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 14.09. abends | Ein einziger roter Prüfpunkt hielt einen Punkt einen Tag fest — und war ein Fehlalarm: Gleich gemessen liest er auf Merge-Basis 37/30, auf `main` 48/39 und auf dem Kandidaten **50** volle Krüge, alle grün; nur im vollen Pass null. Die Baseline-Klassifikation fährt die Baseline standalone und den Kandidaten im Pass und druckt die Differenz als »REAL REGRESSION«. Der Prüfpunkt erklärt sich seit dem 10.09. selbst für nicht aussagekräftig — die Erklärung erreicht die Leiter, aber nicht den Exit-Code (§3.273, Punkt 1127) |
 | 15.09. nachts | §3.270 ist eingetreten, wie es dort vorhergesagt stand — eine Ebene tiefer: Nicht das Job-Limit, sondern das Zeitbudget EINES Testfalls war aufgebraucht. Der Fall wurde auf dem Server bei 180 Sekunden abgebrochen und riss den ganzen `fast`-Job mit; daneben stand seine eigene Messung von 46,5 Sekunden, geschrieben, bevor die Erwachsenenarbeit in das nachgespielte Dorf einzog. Nachgemessen kostet er 91,2 Sekunden, auf dem Server mindestens 217. Der Test war nie geändert worden — gewachsen ist das Spiel unter ihm, und der Kommentar hat lautlos mitgealtert |
 | 16.09. früh | Der Beweislauf aus §3.277 lief erstmals wieder durch — 25 Suiten, 118 min, 145 Bilder — und brach danach an der eigenen Urteilszeile vorbei ab: Seine drei Roten hatte er selbst gegen die Merge-Basis als vorbestehend klassifiziert, an die offenen Punkte 603/938/1009 gebucht und mit »own or unresolved: none; regression verdict unchanged« quittiert. Der Teildurchgang endete trotzdem mit 1, und die Backend-Reihenfolge liest nur den Rückgabewert — der WebGPU-Durchgang, auf dem die Blockade gemessen worden war, begann nie. Solange irgendein fremdgebuchtes Rot steht, ist ein Zwei-Backend-Lauf damit **nie** erreichbar, also auch der Abschlussdurchlauf und der Release-Tag nicht (§3.278, Punkt 1135 Ziffer 6) |
+| 16.09. vormittags | Auf eine Nutzerfrage las ich das Protokoll des noch laufenden WebGPU-Durchgangs, fand »CANDIDATE REAL FAILURE« über einem Weltbild und meldete es als Rot, das keinem offenen Punkt gehört. Es gehört seit dem 26.08. Punkt 627 — dasselbe Bild, dieselbe Formulierung, auf WebGPU/Compatibility, gemessen über vier Läufe auf ruhiger Maschine. Die Kandidaten-Zeile schreibt die Suite WÄHREND des Laufs, die Zuordnung fällt an seinem ENDE: Ein Urteil mitten im Lauf gelesen ist das Urteil vor der Stufe, der es gehört — beinahe ein Doppelpunkt vor dem Release (§3.279) |
 | 13.08. | Der Nachprüfer findet eine echte zweite Klippe im geheilten Mechanismus — und jede der fünf gemessenen Kuren verschlechtert gesunde Dörfer stärker, als der Fehler schadet: Befund wird gebucht statt behoben (§3.115) |
 | 20.08. | Der Dokumentschnitt strich Regeln als »von einem Wächter abgedeckt«, ohne einen einzigen Wächter darauf zu prüfen — die Kontextanzeige verschwand, der Nutzer fand es (§3.134); eine vom Nutzer gesetzte Rangfolge wurde in einer Nacht zweimal maschinell überholt, ohne dass irgendwo ein Grund stand (Punkt 614); zwei Werkzeuge derselben Bauart am falschen Ort gemessen — im Hauptbaum gebaut und geprüft, während der Prozess die Arbeit in den isolierten Bereich schickt (§3.137) |
 | 21.08. | Ein Tor verlangte eine Freigabe, die seine eigenen Werkzeuge nicht herstellen können — der HIGH-Punkt war gemergt, geprüft und freigegeben, und der Zugausgang wies ihn trotzdem ab (§3.153) |
@@ -1601,7 +1602,7 @@ stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die s
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 16.09.2026, 09:21 · Quellen-Fingerprint: `e1718ab87260…`
+Zuletzt aktualisiert: Mittwoch, 16.09.2026, 10:20 · Quellen-Fingerprint: `6456e51bbe7a…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1708,8 +1709,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 97 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 134 Prozess-/Meta-TASKS-Punkte (davon 65 offen).
 
-<!-- RETRO-FINGERPRINT: e1718ab87260def678a88d848abea4a314a544c0b04b158030634cc3e38c37ce -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-16T07:21:25.196Z -->
+<!-- RETRO-FINGERPRINT: 6456e51bbe7a98ff23053fa287550294886e49025100b8922088b02e1c299e4f -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-16T08:20:59.689Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -7274,3 +7275,39 @@ Abbruchbedingung ist daraufhin zu lesen, ob ein Zustand existiert, in dem sie **
 hält: Ein Tor, das ein vorbestehendes, fremdgebuchtes Rot zum Abbruch nimmt, ist nicht streng,
 sondern unerfüllbar, sobald so ein Rot einmal länger steht. Gebucht als Punkt 1135, Ziffer 6 —
 als Löschung eines frühen Ausstiegs, nicht als neuer Mechanismus.
+
+### 3.279 Ich las das Urteil aus dem laufenden Protokoll und übersah das Register
+
+Zweieinhalb Stunden nach §3.278, am Vormittag des 16.09.2026, fragte der Nutzer, was mit dem
+Punkt los sei. Zur Antwort las ich das Protokoll des noch laufenden WebGPU-Durchgangs mit und
+fand dort über einem Weltbild — dem Zusammenfluss bei Khartum — die Zeile **»FAIL (twice, SAME
+check) world — CANDIDATE REAL FAILURE«**. Ich hielt sie fest: ein Rot, das keinem offenen Punkt
+gehört, das auf dem WebGL-2-Durchgang desselben Standes nicht gestanden hatte, und das eine
+Ursache oder einen eigenen Punkt braucht, bevor die Belegkette sauber ist. So stand es im
+Befundträger und so stand es in meiner Antwort an den Nutzer.
+
+Es war seit drei Wochen beantwortet. `scripts/render-verify-charges.mjs` trägt genau dieses Bild,
+genau diese Formulierung — »its subject is not in the rendered picture: off the left and bottom
+edge of the frame« —, gebucht an den offenen Punkt 627, seit dem 26.08.2026 gemessen auf ruhiger
+Maschine über vier Läufe in zwei Sitzungen, ausdrücklich auf WebGPU/Compatibility begrenzt. Auch
+mein zweites »Argument« stand dort schon: dass dieselbe Suite auf WebGL 2 alle sieben Bilder
+besteht, ist keine neue Beobachtung, sondern der Teil der aufgezeichneten Signatur, der die
+Buchung überhaupt erst auf WebGPU begrenzt.
+
+Der Mechanismus des Irrtums ist eine Reihenfolge. Die Kandidaten-Zeile schreibt die Suite,
+während sie läuft; die Zuordnung an ein Register rechnet die Stufe darüber, wenn der Durchgang
+endet. Ein Protokoll mitten im Lauf gelesen liefert deshalb systematisch das Urteil VOR der Stufe,
+der das Urteil gehört — und ich habe diesen Zwischenstand für das Ergebnis genommen. Der
+Stop-Hook derselben Sitzung wusste es besser und druckte es mit: »world red EVALUATED as open
+point 627's WebGPU/compatibility signature«.
+
+Dieselbe Sitzung hatte drei Minuten zuvor einen Nutzer-Bugreport korrekt gegen den Bestand
+geprüft, bevor sie ihn einreihte, und dabei einen echten Fast-Duplikat-Fall (1131) ausgeschlossen.
+Die Prüfung war also da — sie galt nur dem, was der Nutzer meldete, nicht dem, was ich selbst fand.
+Ein zweiter Punkt vor dem Release, für ein Rot, das längst einen Besitzer hat, wäre genau die
+Re-Mechanisierung, die CLAUDE.md §2 »duplicates are closed, not re-mechanized« verbietet.
+
+**Lehre:** Ein Rot ist nicht herrenlos, weil das laufende Protokoll es einen Kandidaten nennt.
+Wer eine Zuordnung behauptet — »gehört keinem offenen Punkt« —, nennt das Register, das er dafür
+gelesen hat; die Abfrage kostet einen Griff. Und was ich selbst finde, unterliegt derselben
+Bestandsprüfung wie das, was der Nutzer meldet.

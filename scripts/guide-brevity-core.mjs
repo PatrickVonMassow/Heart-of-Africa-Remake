@@ -532,7 +532,13 @@ export const LIMITS = {
   // 15.09.2026, night: the question-read-as-an-order pitfall (§3.276) was paid for out of four
   // existing entries rather than added on top, and they gave back more than it takes — the
   // ceiling follows the guide down: 683 -> 682.
-  maxLines: 682,
+  // RAISED 16.09.2026 by the claim-checked-against-nothing clause (§3.279), FOLDED into the
+  // entry that already teaches "what you assert in the present tense, look up first" rather
+  // than opening an entry of its own — it is the same reader question, one clause wider: a
+  // verdict about what a fault BELONGS TO is also a present-tense claim, and a log read while
+  // the run is still going is the intermediate state, not the result. SHORTEN-BEFORE-RAISE was
+  // applied hard: drafted as a standalone pitfall at nine lines, it lands at one. 682 -> 683.
+  maxLines: 683,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -824,7 +830,10 @@ export const LIMITS = {
   // 15.09.2026, night: the question-read-as-an-order pitfall (§3.276) measures 62 words, and the
   // four entries tightened to pay for it gave back 63 — the ceiling follows the measurement down
   // by the difference: 6617 -> 6616.
-  maxWords: 6616,
+  // 16.09.2026: the claim-checked-against-nothing clause justified beside maxLines measures 24
+  // words after its fold — "name the list you looked in, and read it after the run, not in the
+  // middle of it". The long telling stays in the retrospective (§3.279): 6616 -> 6640.
+  maxWords: 6640,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,
