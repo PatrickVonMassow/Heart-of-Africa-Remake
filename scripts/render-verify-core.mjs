@@ -74,6 +74,7 @@ export const NON_RENDER_VERIFY = new Set([
   'baseline-classify-core.mjs',
   'baseline-classify.mjs',
   'childMotionMetric.mjs', // the children's shuffle/rescue verdict over a recorded trace; polish.mjs and the replay test record it
+  'colliderProbe.mjs', // the collider geometry the suites read with; collision.mjs and polish.mjs hand it their page
   'cropLuma.mjs', // how a ground crop's pixels become one reading; polish.mjs captures them
   'digSitePicture.mjs', // excavation composition and hold checks; polish.mjs supplies the browser page
   'docs.mjs',
