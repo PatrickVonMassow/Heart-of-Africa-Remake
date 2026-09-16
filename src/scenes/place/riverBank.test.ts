@@ -551,24 +551,16 @@ describe('the village water stand can be walked up to (work-order 1087)', () => 
     }
   })
 
-  it('keeps no stand in a village whose water path was given up', () => {
-    // The stand is placed while every bank still has a PROVISIONAL path, and the
-    // head search may discard that path further down — which left a water stand
-    // and its collider standing in a village no adult ever fetches water in.
-    // Measured 12.09.2026 at bambara-village, seeds 2 and 7.
-    let seenWithoutPath = 0
+  it('retains the water path and stand at every river village seed', () => {
     for (const id of riverVillages) {
       for (let seed = 1; seed <= 40; seed++) {
         const layout = buildLayout(id, seed)
-        if (!layout.waterPath) {
-          seenWithoutPath++
-          expect(layout.waterStand, `${id} seed ${seed}: a stand with no water path`).toBeNull()
-        }
+        expect(layout.waterPath, `${id} seed ${seed}`).not.toBeNull()
+        expect(layout.waterStand, `${id} seed ${seed}`).not.toBeNull()
       }
     }
-    // The case is only worth its runtime while such a village exists at all.
-    expect(seenWithoutPath).toBeGreaterThan(0)
   })
+
 })
 
 // --- The round trip fits inside the errand's backstop (work-order 1087) -----
