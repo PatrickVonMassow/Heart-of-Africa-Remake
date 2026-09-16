@@ -113,3 +113,19 @@ Second runs change only the report suffix to `-2`. Logs and JSON reports remain
 in that ignored benchmark directory. An initial baseline launch with a relative
 config path failed before collecting tests; correcting it to the absolute path
 above produced the measured runs.
+
+## Second-leg final gates
+
+Verified candidate: `2b7a5e38e` (production code at `d186d4f84`). These results
+supersede the first-leg open unit gate recorded above.
+
+- `npm run test:unit`: exit 0; 502 files passed, 15,526 tests passed,
+  6 skipped; 333.16 s. The complete bank-game file passed all 54 tests within
+  this full run as well (88.215 s).
+- `npm run build`: exit 0; TypeScript and Vite production build passed.
+- `npm run lint`: exit 0; oxlint passed.
+- Browser suites and rendered-picture review: not run, assigned to the reviewer
+  by the authoring commission.
+
+Both review findings are answered. No authoring blocker or specification
+question remains. The final commit changes only this verification record.
