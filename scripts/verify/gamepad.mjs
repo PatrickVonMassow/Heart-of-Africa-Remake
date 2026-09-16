@@ -221,6 +221,97 @@ if (section('position-query')) {
   await page.evaluate(() => window.__setLang('en'))
 }
 
+// --- The two settlement keys on the pad (design.md §13.4/§17.5, point 1139) ------
+// SPACE uses and E guesses on the KEYBOARD, but the §17.5 button map has no free
+// face button, so button A still means both. Only a browser can answer this: the
+// split lives in the place scene's handlers and its frame loop, and a pure test
+// of the decision helpers would pass with that wiring reverted — which is exactly
+// what the four-eyes review of 16.09.2026 held against the unit layer.
+if (section('guess-key')) {
+  await enterNubianVillage()
+  const UTTERANCE = 'ba-BA-ba-BA' // RIVER, as the shipped lexicon beats it
+  // Stand the traveller a few steps from a speaking villager, in the open: no
+  // door is in reach there, so what answers a key is the WORD or nothing.
+  const staged = await page.evaluate((u) => {
+    const scene = window.__placeScene
+    const p = window.__placePlayer
+    if (!scene || !p) return false
+    let figure = null
+    scene.traverse((o) => {
+      if (!figure && o.name === 'inhabitant') figure = o
+    })
+    if (!figure) return false
+    figure.updateWorldMatrix(true, false)
+    const e = figure.matrixWorld.elements
+    p.x = e[12] + 4
+    p.z = e[14]
+    p.pitch = 0
+    p.yaw = Math.atan2(e[12] - p.x, e[14] - p.z) + Math.PI
+    // A note shows only over speech the player has already heard, and a long
+    // lifetime keeps this block off the expiry clock.
+    window.__game.getState().hearUtterance(u)
+    window.__game.getState().setUtteranceHypothesis(u, '')
+    figure.name = 'guess-probe-figure'
+    const ok = window.__speech?.speak('pad-guess-speaker', [u], 'guess-probe-figure', 120) === true
+    figure.name = 'inhabitant'
+    return ok
+  }, UTTERANCE)
+  check('a villager can be staged to speak beside the player', staged, `staged ${staged}`)
+  const guessOpen = () => !!document.querySelector('.dialog.speech-guess')
+  const closeGuess = async () => {
+    await page.evaluate(() => window.__ui.getState().setDialog(null))
+    await page.waitForTimeout(150)
+  }
+  // What the SCENE says it is offering, read when a press answered nothing: a
+  // key that found no word says so here rather than leaving "nothing happened".
+  const offering = () =>
+    page.evaluate(() => ({
+      guessKeyArmed: window.__ui.getState().guessKeyArmed,
+      prompt: window.__ui.getState().prompt,
+      dialog: window.__ui.getState().dialog,
+      targeted: document.querySelector('.speech-label.targeted')?.getAttribute('data-speaker') ?? null,
+      labels: window.__speech?.labels().map((l) => l.speakerId) ?? null,
+      player: { x: window.__placePlayer?.x, z: window.__placePlayer?.z },
+    }))
+  // The note has to STAND before a key can mean it: the target is chosen in the
+  // scene's own frame loop, not by the staging call.
+  const armed = await page
+    .waitForFunction(() => window.__ui.getState().guessKeyArmed === true, null, { timeout: 15000 })
+    .then(() => true)
+    .catch(() => false)
+  check('the staged word arms the guess key', armed, armed ? '' : JSON.stringify(await offering()))
+  // 1. The keyboard's use key no longer reaches the word — the collision the
+  //    split removed, seen from the side that had to LOSE something.
+  await page.keyboard.press('Space')
+  await page.waitForTimeout(400)
+  check(
+    'SPACE leaves the word alone now (point 1139)',
+    (await page.evaluate(guessOpen)) === false,
+    'the use key opened the guess',
+  )
+  // 2. E is what places the guess.
+  await page.keyboard.press('KeyE')
+  const openedByE = await page
+    .waitForFunction(() => !!document.querySelector('.dialog.speech-guess'), null, { timeout: 10000 })
+    .then(() => true)
+    .catch(() => false)
+  check(
+    'E places the guess at the spoken word (point 1139)',
+    openedByE,
+    openedByE ? '' : `no guess dialog appeared — ${JSON.stringify(await offering())}`,
+  )
+  await closeGuess()
+  // 3. And the PAD's A button still carries both meanings, because it has no
+  //    button of its own for the guess.
+  const openedByPad = await pulseButtonUntil(0, guessOpen)
+  check(
+    'button A still reaches the word the keyboard gave up (design.md §17.5)',
+    openedByPad,
+    openedByPad ? '' : `A opened no guess — ${JSON.stringify(await offering())}`,
+  )
+  await closeGuess()
+}
+
 // A selected section that never executed is a FAILURE, not a quiet pass: it is
 // the one way a --section run could report green having verified nothing.
 const unrun = sections.unrun()

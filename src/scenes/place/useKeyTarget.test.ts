@@ -208,9 +208,10 @@ describe('the use key and the guess key no longer compete (point 1139)', () => {
   })
 
   it('keeps the two histories apart across presses (review 16.09.2026)', () => {
-    // The wiring itself, not the rule alone: the scene carries ONE picks object
-    // through the frame and through every press, so a test that never touches it
-    // could not see a pad press overwriting what the keyboard holds.
+    // The RULE the scene's one picks object is carried by — that a press writes
+    // only its own input's history. This layer cannot see the scene's wiring at
+    // all (the pad's whole path is proved in scripts/verify/gamepad.mjs,
+    // section guess-key); what it holds is the rule that wiring must obey.
     const hutA: Kinded = { ...hut(1.0), key: 'door:a' }
     const hutB: Kinded = { ...hut(1.0 - TARGET_HOLD + 0.01), key: 'door:b' }
     const all = [hutA, hutB, word(1.0)]
