@@ -15989,3 +15989,36 @@ to land than a mechanism that needs a review.
   scripts/verify/run-all.mjs, scripts/verify/run-logged.mjs
   Bundle: Session- & Repo-Hygiene
 
+
+- [ ] 1144. Three of six probed village layouts leave no way out of the settlement,
+  and the dev assertion that says so has been firing unread (measured 17.09.2026 while
+  reviewing point 1045). `buildLayout` ends with
+  `const wayOut = pickWayOut(colliders, radius, bank)` and a `devAssert(wayOut !== null,
+  'way-out-missing', …)` at `layout.ts` ~1794. That assertion fires, and the same three
+  layouts fail IDENTICALLY on `main` and on `feat/1045-village-water-path`, so the gate
+  work is not the cause and the defect is older than it:
+  `bambara-village@2861293141`, `mandinka-village@1716508768` and
+  `mandinka-village@3170420543` all return `wayOut === null`, against three that return a
+  bearing (`bambara-village` at 2987912600, 7 and 1337). Point 1045 saw this ONCE over its
+  124-seed sweep and filed it verbatim as "recorded here, not diagnosed"; the six-pair
+  probe says the share is far larger than one in 124, and it is not confined to one people.
+  WHAT IS NOT YET KNOWN, and is the first half of this point: what the player actually
+  loses. `wayOut` is read twice further down — the flora and the loose rocks standing ON
+  the crossing are cleared with `onWayOut(...)` — so a null bearing may mean only that no
+  lane is swept clear, or it may mean the built fabric really does ring the place with no
+  gap a walker fits through. Measure that against the collider set at `WALKER_RADIUS`
+  before choosing a repair; the assertion's own text ("the built fabric leaves no crossing
+  of the boundary free") claims the second, and has never been checked.
+  Final state:
+  - Either every village layout carries a way out, or the cases that cannot are named with
+    a measured reason and the assertion stops claiming more than it knows.
+  - The dev assertion no longer fires in a green suite run: today `layout.test.ts` prints
+    it five times and passes anyway, which is exactly how it stayed unread.
+  Test: Vitest over the layout — sweep the river villages and assert `wayOut !== null`
+  (or the named, measured exception), plus a walker-radius check that the crossing the
+  bearing names is really free. No picture check unless the repair moves the fabric.
+  Criticality: medium until the player impact is measured; high if the second reading holds
+  and the player can be shut inside a settlement.
+  Refs: src/scenes/place/layout.ts (`pickWayOut`, the `way-out-missing` devAssert, `onWayOut`),
+  src/scenes/place/layout.test.ts
+  Bundle: Dorfleben
