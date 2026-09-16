@@ -2,7 +2,7 @@
 // dialogs, start/victory overlays and the debug menu. All player-visible
 // text comes from the language files (design.md §17 localization).
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import { healthState, listCheckpoints, canCampHere, useGame, type EquipmentId } from '../state/store'
 import { TREASURE_IDS } from '../systems/economy'
 import type { FindId } from '../world/finds'
@@ -147,29 +147,33 @@ function InventoryBar() {
     })),
   ]
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const inventoryBlocked = () => useUi.getState().dialog !== null || document.querySelector('.overlay') !== null
+  const activateSlot = useEffectEvent((index: number, e: KeyboardEvent) => {
+    if (e.repeat || inventoryBlocked()) return
+    slots[index]?.activate?.()
+  })
+  const selectSlot = useEffectEvent((direction: number, e: KeyboardEvent) => {
+    if (keyPressSource(e) !== 'gamepad' || inventoryBlocked() || slots.length === 0) return
+    setSelectedId((id) => {
+      const index = slots.findIndex((slot) => slot.id === id)
+      const next = index < 0 ? (direction > 0 ? 0 : slots.length - 1)
+        : (index + direction + slots.length) % slots.length
+      return slots[next].id
+    })
+  })
   useEffect(() => {
-    const blocked = () => useUi.getState().dialog !== null || document.querySelector('.overlay') !== null
+    // Effect events read the current localized slots without rebinding on movement.
     const offDigits = Array.from({ length: 9 }, (_, i) => onKeyPress(`Digit${i + 1}`, (e) => {
-      if (e.repeat || blocked()) return
-      slots[i]?.activate?.()
+      activateSlot(i, e)
     }, { exactModifiers: {} }))
-    const select = (direction: number) => (e: KeyboardEvent) => {
-      if (keyPressSource(e) !== 'gamepad' || blocked() || slots.length === 0) return
-      setSelectedId((id) => {
-        const index = slots.findIndex((slot) => slot.id === id)
-        const next = index < 0 ? (direction > 0 ? 0 : slots.length - 1)
-          : (index + direction + slots.length) % slots.length
-        return slots[next].id
-      })
-    }
-    const offLeft = onKeyPress('ArrowLeft', select(-1))
-    const offRight = onKeyPress('ArrowRight', select(1))
+    const offLeft = onKeyPress('ArrowLeft', (e) => selectSlot(-1, e))
+    const offRight = onKeyPress('ArrowRight', (e) => selectSlot(1, e))
     return () => {
       offDigits.forEach((off) => off())
       offLeft()
       offRight()
     }
-  }, [slots])
+  }, [])
 
   if (itemCount === 0) return null
   return (

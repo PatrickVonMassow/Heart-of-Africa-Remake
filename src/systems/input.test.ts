@@ -6,6 +6,7 @@
 import { describe, it, expect, afterEach, vi } from 'vitest'
 import {
   onKeyPress,
+  isKeyDown,
   moveAxes,
   setTouchStick,
   touchMove,
@@ -229,6 +230,20 @@ describe('touch stick and look/pinch accumulators (design.md §17.5)', () => {
 })
 
 describe('dispatchSyntheticKey (design.md §17.5: gamepad/touch share the keyboard pipeline)', () => {
+  it('keeps synthetic d-pad selection out of held movement without releasing a real arrow', () => {
+    dispatchSyntheticKey('ArrowLeft', 'gamepad')
+    dispatchSyntheticKey('ArrowRight', 'gamepad')
+    expect(isKeyDown('ArrowLeft')).toBe(false)
+    expect(isKeyDown('ArrowRight')).toBe(false)
+    expect(moveAxes()).toEqual({ x: 0, y: 0 })
+    press('ArrowRight')
+    dispatchSyntheticKey('ArrowRight', 'gamepad')
+    expect(isKeyDown('ArrowRight')).toBe(true)
+    expect(moveAxes()).toEqual({ x: 1, y: 0 })
+    release('ArrowRight')
+    expect(moveAxes()).toEqual({ x: 0, y: 0 })
+  })
+
   it('re-enters the pipeline as an ordinary keydown, reaching onKeyPress handlers', () => {
     // Space is the use key (design.md §17.5): the gamepad A button and the
     // tappable touch prompt both dispatch it through this one path.

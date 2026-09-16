@@ -25,7 +25,9 @@ if (typeof window !== 'undefined') {
     // (Ctrl+W/T/N) ignore this — the keyboard lock below is what covers them.
     if (preventsBrowserChord(e, { typing })) e.preventDefault()
     if (typing) return
-    pressed.add(e.code)
+    // Synthetic pad/touch presses are actions, not held physical keys. They
+    // have no keyup: recording a d-pad arrow here would latch movement forever.
+    if (keyPressSource(e) === 'keyboard') pressed.add(e.code)
   })
   window.addEventListener('keyup', (e) => pressed.delete(e.code))
   window.addEventListener('blur', () => pressed.clear())

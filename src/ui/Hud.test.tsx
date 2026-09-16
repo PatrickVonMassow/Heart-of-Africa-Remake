@@ -856,8 +856,9 @@ describe('settlement cursor mode hint', () => {
     else Reflect.deleteProperty(navigator, 'webdriver')
   })
 
-  it.each([en, de])('names both actual lock states in $lang', (strings) => {
-    useLocale.getState().setLang(strings.lang)
+  it.each(['en', 'de'] as const)('names both actual lock states in %s', (lang) => {
+    const strings = lang === 'en' ? en : de
+    useLocale.getState().setLang(lang)
     const { container, getByText } = render(<Hud />)
     expect(getByText(strings.hud.cursorModeUnlocked)).toBeInTheDocument()
     const canvas = document.createElement('canvas')
