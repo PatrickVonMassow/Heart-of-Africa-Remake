@@ -538,7 +538,11 @@ export const LIMITS = {
   // verdict about what a fault BELONGS TO is also a present-tense claim, and a log read while
   // the run is still going is the intermediate state, not the result. SHORTEN-BEFORE-RAISE was
   // applied hard: drafted as a standalone pitfall at nine lines, it lands at one. 682 -> 683.
-  maxLines: 683,
+  // 17.09.2026: the receiver lesson — a dev assertion that only prints while the run stays green
+  // has no reader — was FOLDED into "Die Sonde kann ihr Nein nicht erreichen", whose subject is
+  // the same check that cannot deliver a verdict, and that entry was tightened to pay for it, so
+  // the guide comes out one line shorter than the old ceiling: 683 -> 682.
+  maxLines: 682,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -838,7 +842,9 @@ export const LIMITS = {
   // Rückgabewert einer Pipe ab: beweise es am Ziel" — and two neighbouring entries were
   // tightened while doing it, so the guide comes out one word shorter than the old ceiling and
   // the ceiling follows it down: 6640 -> 6639.
-  maxWords: 6639,
+  // 17.09.2026: the receiver lesson folded into the probe entry (see maxLines) bought its words
+  // back inside that entry, and the guide lands one word under the old ceiling: 6639 -> 6638.
+  maxWords: 6638,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,
