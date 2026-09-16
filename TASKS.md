@@ -15880,6 +15880,14 @@ to land than a mechanism that needs a review.
   The earlier covering run of the same branch had failed once at `bambara-village (wet)`'s
   OUTSIDE crop and once at the maasai INSIDE crop, which the load heuristic read as a flake
   signature; on the quiet machine the maasai check is reproducible and the bambara one is not.
+  AND IT DOES NOT SHOW UP IN A WHOLE PASS. Measured the same evening on the same tree:
+  both covering passes over collision, polish and settings — WebGPU
+  (`local/verify-logs/2026-09-16T16-09-28-256-…`) and WebGL 2
+  (`…T16-49-27-151-…`) — ran this very check GREEN, 280 pass 0 fail each. So the red
+  belongs to the ISOLATED SECTION RUN, four times out of four, and the whole pass, twice
+  out of twice, does not see it: what differs is the history the block arrives with, since
+  `--section` runs that block's own setup and nothing before it. That difference is the
+  first thing to measure, and it is why the red charge is scoped and not a licence.
   WHAT THE MESSAGE DOES NOT SAY: the failing line is `bandRatio(ndc) === null`
   (`scripts/verify/polish.mjs` :2996), and `bandRatio` returns null for TWO different
   causes — a crop rectangle that falls outside the viewport (`groundSamples`) AND a
