@@ -198,6 +198,7 @@ function InventoryBar() {
 function CursorModeHint() {
   const t = useStrings()
   const mode = useGame((s) => s.mode)
+  const touchActive = useUi((s) => s.touchActive)
   const [locked, setLocked] = useState(() => document.pointerLockElement != null)
   useEffect(() => {
     const sync = () => setLocked(document.pointerLockElement != null)
@@ -205,8 +206,14 @@ function CursorModeHint() {
     sync()
     return () => document.removeEventListener('pointerlockchange', sync)
   }, [])
-  // Match the settlement's deliberate skip of the OS lock under automation.
-  if (mode !== 'place' || navigator.webdriver) return null
+  // Match the settlement's deliberate skip of the OS lock under automation, and
+  // stay silent on touch, where there is no cursor to take and "click the view"
+  // names nothing the player has (§17.5 drives the settlement by the overlay).
+  // OPEN: hiding it under automation — which design.md §21/the point both ask
+  // for, since the lock never engages there and every settlement frame would
+  // otherwise gain a permanent "click the view" pill — leaves this hint with no
+  // picture evidence on either backend. Its placement is judged by CSS reading.
+  if (mode !== 'place' || navigator.webdriver || touchActive) return null
   return <div className={`cursor-mode-hint${locked ? ' cursor-mode-locked' : ''}`}>
     {locked ? t.hud.cursorModeLocked : t.hud.cursorModeUnlocked}
   </div>

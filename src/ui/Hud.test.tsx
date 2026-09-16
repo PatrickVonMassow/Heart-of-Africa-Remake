@@ -870,6 +870,22 @@ describe('settlement cursor mode hint', () => {
     expect(container.querySelector('.cursor-mode-hint')).toBeNull()
   })
 
+  it('says nothing under automation or on touch, where there is no cursor to take', () => {
+    useUi.setState({ touchActive: false })
+    const { container, rerender } = render(<Hud />)
+    expect(container.querySelector('.cursor-mode-hint')).not.toBeNull()
+    act(() => useUi.setState({ touchActive: true }))
+    rerender(<Hud />)
+    expect(container.querySelector('.cursor-mode-hint')).toBeNull()
+    act(() => useUi.setState({ touchActive: false }))
+    rerender(<Hud />)
+    expect(container.querySelector('.cursor-mode-hint')).not.toBeNull()
+    Object.defineProperty(navigator, 'webdriver', { configurable: true, value: true })
+    rerender(<Hud />)
+    act(() => useGame.setState({ mode: 'place', placeId: 'cairo' }))
+    expect(container.querySelector('.cursor-mode-hint')).toBeNull()
+  })
+
   it('reads a lock already held at mount and updates the language live', () => {
     Object.defineProperty(document, 'pointerLockElement', { configurable: true, value: document.createElement('canvas') })
     const { getByText } = render(<Hud />)
