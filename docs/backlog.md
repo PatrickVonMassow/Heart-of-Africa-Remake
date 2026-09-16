@@ -1198,3 +1198,27 @@ werden. Wer das vergisst, veröffentlicht eine Karte, die nicht mehr sagt, was l
 Nicht blockierend — der Status lässt sich sofort wiederherstellen. Die saubere Lösung wäre, dass
 der Neubau die Prosa der aktuellen Karte gar nicht anfasst; das ist aber eine Änderung am
 Board-Werkzeug und fällt unter den Infrastruktur-Stopp, solange es nur Nacharbeit kostet.
+
+## Der Arbeitsbaum eines beauftragten Agenten sieht den Fehlerbericht nicht (16.09.2026)
+
+Der Auftrag zu Punkt 1138 nennt `local/ErwachseneEingeklemmt.zip` als das zu messende Bild —
+und der Astra-Autorenlauf hat die Arbeit verweigert, weil die Datei fehlte. `local/` ist
+git-ignoriert, also bekommt ein frischer `git worktree add` sie nie, und
+`scripts/worktree-bootstrap.mjs` verlinkt ausschließlich `node_modules`.
+
+Ein Symlink auf das ganze Verzeichnis löst es NICHT: `.gitignore` Zeile 221 lautet `/local/`
+mit Schrägstrich, was ein Verzeichnis trifft, einen Symlink aber nicht — der Arbeitsbaum zeigte
+`?? local`, und `author-astra.mjs` startet auf einem schmutzigen Baum gar nicht erst. Von Hand
+aufgelöst mit einem echten `local/`-Verzeichnis, das Symlinks auf die beiden Beweis-Einträge
+enthält.
+
+Jeder künftige Punkt, der einen übergebenen Fehlerbericht misst (680, 1082 …), läuft in
+dieselbe Wand. Der saubere Weg ist Dokumentation, nicht ein Link: `scripts/point-brief.mjs`
+sollte `local/`-Pfade als absoluten Pfad des Haupt-Checkouts ausgeben, den ein Agent direkt
+lesen kann. Ein Symlink auf das ganze Verzeichnis darf NICHT leichtfertig dazukommen —
+`scripts/worktree-cleanup.mjs` existiert, weil `rm -rf` bzw. `git worktree remove` dem
+`node_modules`-Link am 29.07.2026 zweimal in den Hauptbaum gefolgt ist, und in `local/` liegen
+die unwiederbringlichen Fehlerberichte des Nutzers.
+
+Nicht als Punkt eingereiht: der Handgriff dauert Sekunden und ist hier beschrieben; die Blockade
+ist damit aufgehoben, und der Infrastruktur-Stopp gilt weiter.

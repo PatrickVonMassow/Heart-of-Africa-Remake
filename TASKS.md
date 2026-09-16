@@ -180,6 +180,17 @@ put it is the mistake this line exists to stop.
      `GAME_KEY_CODES` in `src/systems/keyboardGuard.ts`; the gamepad reaches the slots by the
      d-pad (left/right selects, the selected slot is highlighted, A does NOT use it — A stays
      the use key). A slot that has no item ignores its key.
+     THE NUMBER ROW IS OCCUPIED TODAY and is freed in the same commit: the whole row
+     (Digit1–Digit0, Minus, Equal) jumps the debug calendar by month
+     (`MONTH_KEYS` in `src/systems/season.ts`, registered `ignoreModified` in
+     `src/ui/Hud.tsx` because point 601 handed Ctrl+row back to the browser). The plain digits
+     belong to the player-facing inventory; the debug months move AS A WHOLE ROW to Shift+row
+     (decision 16.09.2026: Shift is bound by no browser and no OS on any platform, while the
+     user-proposed Alt+row is Firefox/Linux tab switching, ChromeOS shelf launching and a
+     Mod1+digit binding in several Linux window managers). The month registration therefore
+     needs an exact-modifier option instead of `ignoreModified`, `design.md` §21.1 states the
+     chord, and the point-601 HUD tests move with it. Shift stays selectable as the label
+     modifier (`src/ui/ctrlHold.ts`); holding it names labels and does not swallow digits.
   2. THE LOCK COMES BACK AFTER EVERY DIALOG: the `speechGuess` rule in the pointer-lock effect
      applies to every dialog kind — the closing click carries the user activation the request
      needs. Where the browser refuses (Chrome holds the lock back for about a second after an
