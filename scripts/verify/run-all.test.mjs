@@ -71,6 +71,23 @@ async function run({ outputs = [known], records = [{}], tasks = '- [ ] 603. grou
   return { attempts, saved, classifiedCalls, log: printed.join('\n'), status: exitCode }
 }
 
+describe('the log says which suite is running (point 1137)', () => {
+  it('names the suite BEFORE it spawns, so a long suite is not a dead log', async () => {
+    const result = await run({ suite: 'polish', outputs: ['PASS  a check'] })
+    const arrow = result.log.split('\n').findIndex((l) => l.startsWith('# → polish'))
+    const verdict = result.log.split('\n').findIndex((l) => l.startsWith('PASS  polish'))
+    expect(arrow).toBeGreaterThanOrEqual(0)
+    expect(arrow).toBeLessThan(verdict)
+    expect(result.log).toContain('its PASS/FAIL line arrives when the suite ENDS')
+  })
+
+  it('marks a retry spawn as one, so two arrows are not read as two suites', async () => {
+    const result = await run({ outputs: [unknown, 'PASS  a check'], tasks: '- [ ] 999. unrelated' })
+    expect(result.log).toContain('# → settings running')
+    expect(result.log).toContain('# → settings (retry) running')
+  })
+})
+
 describe('run-all owned-red retry', () => {
   it('runs an owned failure once, names its owner, and keeps the run red and accounted for', async () => {
     const result = await run()

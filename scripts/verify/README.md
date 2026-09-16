@@ -126,7 +126,10 @@ expected to take, how long it really took last time, how many frames it owes, an
 — the decision that matters — whether it may be **one blocking foreground call**
 at all, or is longer
 than a shell call may run and has to go to the **background**, where the harness'
-own completion notification announces the exit.
+own completion notification announces the exit. That last decision is taken on
+the **§7 band** where one exists, not on the §1 plan (point 1137): a whole
+`polish` pass plans at 5 min 41 s and measures at 9.9–61.5, and advising a
+blocking call for it returns `STILL RUNNING` every time.
 
 **2. Await it.**
 
@@ -145,10 +148,46 @@ node scripts/verify/run-wait.mjs --status [<log>]
 ```
 
 The first wait is **0.9 × the measured median**, not 30 s; five looks are the
-whole budget; past **2.5 ×** the expectation the run is *hung*, not slow. Each
-`--status` raises the count, says how many are left, and names the two ways out.
-The count is printed in the receipt, so the rule is visible in the transcript
-rather than remembered.
+whole budget. Each `--status` raises the count, says how many are left, and names
+the two ways out. The count is printed in the receipt, so the rule is visible in
+the transcript rather than remembered.
+
+**Long is not hung (point 1137).** Past **2.5 ×** its expectation a run is
+*overdue*. It is *hung* only when it is ALSO silent — nothing produced for a
+whole 15-minute progress lease. That silence is judged on the **writer's own
+mark**: `run-logged.mjs` opens a zero-byte `<log>.progress` once, holds the
+descriptor for the run, and moves its mtime from what its child really emitted
+and from sampling the newest frame's mtime — by mtime, because a
+both-backends run overwrites the same 93 names and a count would stop rising
+while the pictures kept coming. The mark is a file of its own so that neither a
+reader's bookkeeping can pass for the run's progress nor a reader's
+read-modify-write can drop a fresh mark, and the verdict takes the **newest** of
+the run's own writings — the mark and the log — so that a marker which stops
+being writable cannot outvote a run that is still working. Two things are
+deliberately NOT among them. The run RECORD, because `--status` rewrites it when
+it counts a poll, and nothing a reader writes is evidence that the run is alive.
+And the FRAME DIRECTORY, because `verification/` is shared and carries no run
+identity: a reader that folded it in could have any other run's pictures vouch
+for the one it is judging. The frames are read by the writer instead, about its
+own run, while that run is going. The descriptor is why there is no
+fallback: a mark re-created on every stamp had to create a directory entry on
+every stamp, and a directory that stops taking new entries mid-run leaves the
+log's own descriptor writing on. Held open, that case is gone and nothing but the
+child ever writes into the log. What is NOT claimed is that the two can never
+fail apart — an explicit timestamp update does not share an ordinary write's
+permission checks, so a marker whose ownership changes under a running run can
+still refuse the stamp. Then the run is judged by its log alone, which is where
+it stood before this point, and the residual is collected in
+`docs/backlog.md`. `--await` and `--status` ask the same question and give the same
+answer: a run that is still writing is `SLOW`, never `HUNG`. The clock alone could
+never say it: the §1 plan is measured to be a third to two thirds of the real
+cost, so the hung mark for a whole `polish` pass falls at 14 minutes against a
+measured 9.9–61.5, and on 15.09.2026 a run that had already written 34 of its 21
+expected frames was reported hung and ended — with it the only covering picture
+run the release was waiting for. The frames are the heartbeat that matters here:
+`run-all.mjs` captures a suite's output and prints its `PASS`/`FAIL` line only
+when the suite ENDS, so it now also prints a `# → <suite>` line before it starts
+one. A log standing still at `# → polish` for fifty minutes is the suite working.
 
 **The receipt.** `run-logged.mjs` writes a RUN RECORD beside the log
 (`<log>.run.json`) before it spawns anything and closes it with a structured

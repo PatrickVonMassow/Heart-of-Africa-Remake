@@ -28,7 +28,7 @@ import {
   waitThresholds,
   waitTimeoutDecision,
 } from './wait-lease-core.mjs'
-import { readRecord, recordPathFor } from './verify/run-record.mjs'
+import { lastProgressAtFor, readRecord, recordPathFor } from './verify/run-record.mjs'
 
 /** Signalling the wrong process is the failure mode this whole point is about,
  *  so a pid is only signalled when its recorded start time still matches. The
@@ -169,19 +169,39 @@ export function finishWait({
   return result
 }
 
+/** The last sign of life of the run ONE lease names — its log, its record and
+ *  the frames it has been writing. Null when the lease names no paths, which
+ *  leaves the verdict where it was before this probe existed. */
+export function leaseProgress(lease) {
+  const logPath = lease?.logPath ?? null
+  const recordPath = lease?.recordPath ?? (logPath ? recordPathFor(logPath) : null)
+  if (!logPath && !recordPath) return null
+  // The run's OWN mark where the record carries one — a poll's bookkeeping must
+  // never be able to pass for the run's progress (Astra review round 1).
+  return lastProgressAtFor({ logPath, recordPath })
+}
+
 /**
  * Where every live wait stands. This is what the launcher, the emergency core
  * and a human all read: the overdue and hung marks per lease, and the alarm
  * that two live waits from one session raises on its own.
  */
-export function waitStatus({ now = Date.now(), path = registryPath(), lastProgressAt = null, journalPath = null } = {}) {
+export function waitStatus({
+  now = Date.now(), path = registryPath(), lastProgressAt = null, journalPath = null,
+  progressOf = leaseProgress,
+} = {}) {
   const registry = readRegistry(path)
   const alarm = concurrentWaitAlarm({ registry, now, probePid: liveProbe, runTerminal: runTerminalFor })
   const leases = []
   let changed = false
   const next = []
   for (const lease of registry.leases) {
-    const decision = waitTimeoutDecision({ lease, now, lastProgressAt })
+    // PER LEASE, NOT PER CALL (point 1137). One `lastProgressAt` applied to every
+    // lease would answer a wedged run with a busy one's heartbeat, so the probe
+    // is asked about THIS lease's own log, record and frames. An explicit
+    // argument still wins — that is how a fixture pins the answer.
+    const progressAt = lastProgressAt ?? progressOf(lease)
+    const decision = waitTimeoutDecision({ lease, now, lastProgressAt: progressAt })
     for (const event of decision.events) {
       journal(ACTIVITY_EVENTS.VERIFICATION_WAIT_TIMEOUT, { lease, cause: event.cause, evidence: event.evidence, at: now, journalPath })
       changed = true

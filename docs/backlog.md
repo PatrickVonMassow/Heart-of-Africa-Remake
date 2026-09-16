@@ -24,6 +24,11 @@ Format: one line per finding — `- YYYY-MM-DD <source> — <finding>`.
   log shows the classification banner. Collected rather than queued: it mis-advises, it does not
   block — judgment overrode it here — and the infrastructure freeze of CLAUDE.md §2 keeps it out of
   the work order until it actually costs a run.
+  CLOSED by point 1137 (16.09.2026): it did cost a run two days later, twice, and became the
+  blockade in front of the release. The repair is neither of the two directions above but the one
+  they share: the hung verdict now needs SILENCE as well as the clock — no log line, no record
+  update and no frame for a whole 15-minute progress lease — so the classification phase, a long
+  `polish` pass and every other long-but-working run report OVERDUE instead of HUNG.
 - 2026-09-13 point 1072 LARGE (WebGPU, `polish`, feat/1072 at 5a5c8d7a5) — the suite went red on
   its first attempt and clean on the retry, so the run is recorded SUSPECT and covers nothing
   (CLAUDE.md §7.2). Three of its reds have owners and one family has none. Owned: `leaving after
@@ -1061,6 +1066,121 @@ als Punkt eingereiht: kein Spielerimpakt, keine Datenfrage, kein Blocker; die
 Messung kostet einen ruhigen Rechner für einen Sweep, den niemand braucht,
 solange der Rundgang gelingt. Der billige Weg wäre, die Quote beim nächsten
 ohnehin fälligen Baseline-Lauf mitzuzählen.
+
+## Der 45-Minuten-Riegel je Suite steht unter dem gemessenen Band (16.09.2026)
+
+Aus Punkt 1137 mitgemessen, noch nie ausgelöst: `run-all.mjs` tötet eine Suite
+nach `SUITE_TIMEOUT_MS` = 45 min mit SIGKILL und der Zeile „KILLED after 45 min
+wall timeout (hung, not slow)". Ein ganzer `polish`-Durchgang wurde im September
+mit 9,9–61,5 min gemessen (docs/picture-check-cost.md §7). Das Band gilt für den
+ganzen Durchgang samt Bau-, Lint- und Unit-Stufe, die Suite selbst liegt
+darunter — in 314 abgelegten Läufen steht die Zeile kein einziges Mal. Aber es
+ist dieselbe Familie wie der Hängend-Befund: eine feste Zahl gegen eine Laufzeit,
+die niemand nachgemessen hat, und im Zweifel stirbt der gesunde Lauf.
+
+Wirkung: keine gemessene — kein Lauf hat den Riegel je berührt. Nicht als Punkt
+eingereiht: kein Spielerimpakt, keine Datenfrage, keine Blockade, und der
+Infrastruktur-Freeze hält ihn draußen, bis er wirklich einen Lauf kostet. Der
+billige Weg wäre, ihn gegen dieselbe Stillstandsprobe zu tauschen, die der
+Hängend-Befund jetzt benutzt, statt die Zahl zu erhöhen.
+
+## Geparkte Zweige zählen als lebende Agentenlanes (16.09.2026)
+
+`batch-doctor --gate` hat am 16.09. ein rotes `npm run test:unit` als
+„INCONCLUSIVE (load)" eingestuft und dabei fünf Arbeitsbäume als „live agent
+worktree(s)" genannt — `point-1049`, `point-1133`, `point-834`, `point-847`,
+`point-901`. In keinem davon lief ein Prozess; es sind geparkte Zweige offener
+Punkte, der jüngste vom 15.09., der älteste vom 23.08. Gezählt wird ihre bloße
+Existenz, nicht ihre Arbeit.
+
+Wirkung: das Tor kann auf diesem Rechner kein rotes Urteil mehr fällen, solange
+irgendein Zweig geparkt ist — ein Rot wird immer als Last erklärt. Nicht als
+Punkt eingereiht: es macht ein Urteil weicher, statt eines zu fälschen, und die
+Last-Einstufung ist genau die Vorsicht, die die Retrospektive §3.22/§3.48
+verlangt. Der billige Weg wäre, denselben Lebendtest zu benutzen, den
+`batch-in-flight.mjs --agent-check` schon fährt: ein Arbeitsbaum ohne laufenden
+Prozess und ohne fortschreitenden Zweig ist geparkt, nicht belegt.
+
+## Ein festgefahrener Lauf kann von fremden Bildern am Leben gehalten werden (16.09.2026)
+
+Aus fünf Prüfrunden zu Punkt 1137, von GPT-6 Astra gefunden und nicht
+geschlossen: Der Prüfläufer erkennt einen festgefahrenen Lauf daran, dass dieser
+eine ganze Viertelstunde lang nichts mehr geschrieben hat. Weil eine lange
+Bildsuite zwischen ihrer Startzeile und ihrer Ergebniszeile nichts ins Log
+schreibt, tastet der Lauf zusätzlich seine eigenen Bilder ab — und
+`verification/` ist ein gemeinsames Verzeichnis ohne Laufkennung. Ein wirklich
+festgefahrener Lauf hält seinen Aufseher am Leben; nimmt in dieser Zeit ein
+anderer Lauf Bilder auf, wandert die Fortschrittsmarke des festgefahrenen mit.
+Von innen korrigiert das nichts, denn ein festgefahrener Lauf schreibt nie eine
+eigene echte Marke.
+
+Wirkung: das Hängend-Urteil kann sich verzögern, solange jemand anders
+fotografiert — es fällt nicht falsch, es fällt später. Die lesende Seite ist
+davon frei: sie sieht nur Marke und Log des Laufs, nach dem sie gefragt wird.
+Nicht als Punkt eingereiht: die entgegengesetzte Störung ist die teure und die
+belegte — an einem Abend wurden zwei kerngesunde Läufe beendet und die
+Veröffentlichung stand hinter dem deckenden Bildlauf still, den sie erzeugt
+hätten. Ein Melder, der gelegentlich spät anschlägt, ist einem vorzuziehen, der
+zuverlässig tötet, was er beobachtet. Der saubere Weg wäre ein Bild, das seinen
+Lauf benennt — eine Änderung an jedem Suite-Auslöser, nicht am Prüfläufer.
+
+## Eine Marke, deren Besitzer sich mitten im Lauf ändert, bleibt stehen (16.09.2026)
+
+Aus der zehnten Prüfrunde zu Punkt 1137, von GPT-6 Astra gefunden und bewusst
+nicht geschlossen: Der Lauf hält seine Fortschrittsmarke offen und verschiebt
+ihren Zeitstempel über den Dateideskriptor. Ein ausdrückliches Setzen des
+Zeitstempels unterliegt aber nicht denselben Rechteprüfungen wie ein gewöhnliches
+Schreiben — ändert jemand mitten im Lauf den Besitzer der Markendatei, verweigert
+das System das Setzen, während das Log weiter Bytes annimmt. Der Lauf wird dann
+allein an seinem Log gemessen; eine lange, stille Bildsuite könnte so nach einer
+Viertelstunde als hängend gemeldet werden.
+
+Wirkung: eine Falschmeldung, kein getöteter Lauf — das Hängend-Urteil berichtet,
+es beendet nichts. Voraussetzung ist ein Eingriff von außen an einer Datei, die
+dem Lauf gehört. Nicht als Punkt eingereiht: kein Spielerimpakt, keine
+Datenfrage, keine Blockade — und die Brücken, die in den Runden sechs bis neun
+für genau diese Klasse gebaut wurden, haben jedes Mal mehr gekostet als der Fall,
+den sie abdeckten (zerschnittene Ergebniszeilen im Log, eine Frist, die sich
+selbst erneuerte, verlorene Beobachtungen). Der billige Weg wäre, gar keinen zu
+bauen und die Meldung zu lesen, wie sie gemeint ist.
+
+## Zehn Prüfrunden an einem Punkt: die Abbruchentscheidung (16.09.2026)
+
+Punkt 1137 hat zehn kreuzverlagerte Prüfrunden durchlaufen; jede fand etwas
+Echtes, und die Voraussetzungen wurden von Runde zu Runde enger — von einer
+veralteten Kostentabelle über eine Umfrage, die ihre eigene Akte neu schreibt,
+bis zu einem Besitzerwechsel an einer Datei mitten im Lauf. Abgebrochen wurde
+nach Runde zehn, mit folgender Begründung: Alles, was einen **gesunden Lauf
+beenden** kann, ist repariert und durch Tests festgehalten. Was bleibt, lässt das
+Hängend-Urteil zu spät oder falsch **melden** — und eine Meldung tötet nichts.
+Der Infrastruktur-Freeze (CLAUDE.md §2) arbeitet an einem Infrastrukturdefekt
+nur, wenn er reproduzierbar blockiert oder eine falsche Freigabe erlaubt; beides
+trifft auf den Rest nicht zu.
+
+## `--help` startet auf den beiden schwersten Einstiegen einen vollen Prüflauf (16.09.2026)
+
+Beim Bearbeiten von Punkt 1137 selbst aufgelaufen: `node
+scripts/verify/run-logged.mjs --help` und `node scripts/verify/run-all.mjs
+--help` geben keine Hilfe aus, sondern starten die volle LARGE-Regression über
+beide Grafikwege — gemessen rund zwei Stunden. `parseArgs` in
+`scripts/verify/tiers.mjs` sammelt jedes `-`-Argument nur in `flags` ein; damit
+bleibt `filter` leer und `tier` null, und genau das ist die Signatur des
+vollen Laufs (`fullRun`, `isLargeEquivalent`). `run-logged.mjs` reicht alles
+weiter, was es nicht selbst verbraucht, also auch `--help`.
+
+Verschärfend ist die Uneinheitlichkeit: `scripts/verify/run-wait.mjs --help`
+gibt eine ordentliche Hilfe aus. Wer sie dort lernt, probiert sie beim Nachbarn.
+
+Wirkung am 16.09.2026: ein ungewollter LARGE-Lauf, der dem echten Lauf desselben
+Punktes die Maschine streitig machte und dessen Ruhe-Annahme entwertete. Weil
+der Aufruf in `head -40` lief, wäre er zusätzlich mitten im Lauf über ein
+geschlossenes Rohr gestorben.
+
+Nicht als Punkt eingereiht: kein Spielerimpakt, keine Datenfrage, keine
+Blockade, und der Lauf wird korrekt aufgezeichnet — es gibt keine falsche
+Freigabe. Der billige Weg wäre eine Zeile in beiden Einstiegen, die `--help`
+und `-h` vor jeder Arbeit abfängt und die Nutzungszeile druckt, die in
+`run-logged.mjs` bereits im Kopfkommentar steht.
 
 ## Der Warteschlangen-Neubau überschreibt die Prosa der aktuellen Karte (16.09.2026)
 

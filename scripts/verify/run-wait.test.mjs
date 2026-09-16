@@ -1,7 +1,7 @@
 // The awaiting CLI (point 592). The exit paths are what matters here — a mode
 // that silently fell through into another would be the same class of bug the
 // `--show` cases of run-logged.test.mjs were written for.
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, utimesSync, writeFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -146,18 +146,83 @@ describe('--await: one blocking call, and no poll counted', () => {
     expect(run(['--await', log, '--timeout', '1'], env).status).toBe(3)
   })
 
-  it('calls the wait HUNG past 2.5x the expectation rather than advising again', () => {
+  it('calls the wait HUNG past 2.5x the expectation once the run has gone SILENT', () => {
+    // Older than the progress lease, so its silence is what the verdict rests on.
+    const startedAt = Date.now() - 40 * 60_000
     const { log } = fixture({
       ...finished,
       status: 'running',
       pid: process.pid,
       expectedRuntimeMs: 60_000,
-      startedAt: Date.now() - 10 * 60_000,
+      startedAt,
     })
+    // The run's own files carry its last sign of life, so the fixture ages them
+    // past the progress lease: that is what "silent" means here.
+    const stale = new Date(startedAt)
+    for (const path of [log, `${log}.run.json`]) utimesSync(path, stale, stale)
     const res = run(['--await', log, '--timeout', '1'])
     expect(res.status).toBe(5)
     expect(res.stdout).toMatch(/HUNG/)
     expect(res.stdout).toMatch(/emergency lane/)
+  })
+
+  // POINT 1137 — the picture gate's blockade in one case. A `polish` pass is
+  // planned at 5 min 41 s and measured at 9.9-61.5, so a healthy run crosses
+  // 2.5x its estimate long before it is done; on 15.09.2026 one that had already
+  // written 34 frames was reported HUNG and ended, and the release stood still
+  // behind it. A run that is still writing is SLOW.
+  it('does NOT call a run hung while it is still stamping its mark', () => {
+    const startedAt = Date.now() - 40 * 60_000
+    const { log } = fixture({
+      ...finished,
+      status: 'running',
+      pid: process.pid,
+      expectedRuntimeMs: 60_000,
+      startedAt,
+    })
+    const stale = new Date(startedAt)
+    for (const path of [log, `${log}.run.json`]) utimesSync(path, stale, stale)
+    // The run itself said something a moment ago — its frame sampling stamped
+    // the mark — while its log has been quiet for the whole suite.
+    writeFileSync(`${log}.progress`, '')
+    const res = run(['--await', log, '--timeout', '1'])
+    expect(res.status).toBe(3)
+    expect(res.stdout).not.toMatch(/HUNG/)
+    expect(res.stdout).toMatch(/STILL WORKING/)
+  })
+
+  // ASTRA REVIEW ROUND 1, end to end: the counted poll reads the WRITER's mark out
+  // of the record, so counting the poll cannot manufacture the life it reports.
+  it('the counted poll calls a still-writing run SLOW, not hung', () => {
+    const startedAt = Date.now() - 40 * 60_000
+    const { log } = fixture({
+      ...finished,
+      status: 'running',
+      pid: process.pid,
+      expectedRuntimeMs: 60_000,
+      startedAt,
+    })
+    writeFileSync(`${log}.progress`, '')
+    const res = run(['--status', log])
+    expect(res.stdout).toMatch(/SLOW, not hung/)
+    expect(res.status).toBe(0)
+  })
+
+  it('the counted poll still says HUNG once the writer\'s mark has gone stale', () => {
+    const startedAt = Date.now() - 40 * 60_000
+    const { log } = fixture({
+      ...finished,
+      status: 'running',
+      pid: process.pid,
+      expectedRuntimeMs: 60_000,
+      startedAt,
+    })
+    const stale = new Date(startedAt)
+    writeFileSync(`${log}.progress`, '')
+    utimesSync(`${log}.progress`, stale, stale)
+    const res = run(['--status', log])
+    expect(res.stdout).toMatch(/HUNG/)
+    expect(res.status).toBe(4)
   })
 
   it('refuses to guess which of two live runs it is waiting for', () => {
@@ -195,14 +260,18 @@ describe('--status: the ONE counted poll', () => {
     expect(spent.stdout).toMatch(/--await/)
   })
 
-  it('calls a run hung past the measured factor, with a non-zero exit', () => {
+  it('calls a SILENT run hung past the measured factor, with a non-zero exit', () => {
+    const startedAt = Date.now() - 40 * 60_000
     const { log } = fixture({
       ...finished,
       status: 'running',
       pid: process.pid,
-      startedAt: Date.now() - 600_000,
+      startedAt,
       expectedRuntimeMs: 60_000,
     })
+    const stale = new Date(startedAt)
+    writeFileSync(`${log}.progress`, '')
+    utimesSync(`${log}.progress`, stale, stale)
     const res = run(['--status', log])
     expect(res.status).toBe(4)
     expect(res.stdout).toMatch(/HUNG/)

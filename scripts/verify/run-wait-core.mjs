@@ -27,6 +27,7 @@
 // process work — the record file, the frame scan, the blocking wait — lives in
 // run-wait.mjs and run-logged.mjs.
 import { laneFor, parseArgs, planBackends, selectBackend, suitesFor } from './tiers.mjs'
+import { PROGRESS_LEASE_MS } from '../wait-lease-core.mjs'
 
 /**
  * MEASURED median wall clock per suite, in SECONDS, on the WebGL 2 lane —
@@ -378,6 +379,8 @@ export function pollBudget({
   expectedMs = null,
   elapsedMs = null,
   maxPolls = MAX_POLLS,
+  silentForMs = null,
+  silenceMs = PROGRESS_LEASE_MS,
 } = {}) {
   const count = Number.isFinite(polls) && polls > 0 ? Math.floor(polls) : 0
   const expected = Number.isFinite(expectedMs) && expectedMs > 0 ? expectedMs : null
@@ -386,15 +389,31 @@ export function pollBudget({
   if (!running) {
     return { verdict: 'finished', polls: count, remaining, message: 'the run is over — read its receipt, do not poll again.' }
   }
-  if (expected !== null && elapsed !== null && elapsed > expected * HUNG_FACTOR) {
+  // THE COUNTED POLL ASKS THE SAME QUESTION AS THE WAIT (point 1137, Astra review
+  // round 1). This path used to reach `hung` on the clock alone and tell the
+  // caller to kill the run — the very verdict the wait stopped giving — so a
+  // healthy `polish` looked at with `--status` was condemned anyway. Silence is
+  // the second condition here too; a run that is still writing is SLOW.
+  const silent = Number.isFinite(silentForMs) ? silentForMs >= silenceMs : true
+  if (silent && expected !== null && elapsed !== null && elapsed > expected * HUNG_FACTOR) {
     return {
       verdict: 'hung',
       polls: count,
       remaining,
       message:
         `HUNG: ${formatDuration(elapsed)} elapsed against an expected ${formatDuration(expected)} ` +
-        `(more than ${HUNG_FACTOR}×). Treat it as hung: read the log's tail, kill it, and start again — ` +
-        'do not keep waiting.',
+        `(more than ${HUNG_FACTOR}×), and nothing written for ${formatDuration(silentForMs ?? silenceMs)}. ` +
+        "Treat it as hung: read the log's tail, kill it, and start again — do not keep waiting.",
+    }
+  }
+  if (!silent && expected !== null && elapsed !== null && elapsed > expected * HUNG_FACTOR) {
+    return {
+      verdict: 'slow',
+      polls: count,
+      remaining,
+      message:
+        `SLOW, not hung: ${formatDuration(elapsed)} elapsed against an expected ${formatDuration(expected)}, but it ` +
+        `wrote something ${formatDuration(silentForMs ?? 0)} ago. Await it (\`--await\`) rather than ending it.`,
     }
   }
   if (remaining === 0) {
@@ -425,8 +444,19 @@ export function pollBudget({
  * shell call at 600 s, so past BLOCKING_LIMIT_MS the completion notification of
  * a background run is the only mechanism that carries.
  */
-export function waitPlan({ expectedMs = null, limitMs = BLOCKING_LIMIT_MS } = {}) {
-  const expected = Number.isFinite(expectedMs) && expectedMs > 0 ? expectedMs : null
+export function waitPlan({ expectedMs = null, limitMs = BLOCKING_LIMIT_MS, observedHighMs = null } = {}) {
+  // FOREGROUND OR BACKGROUND IS DECIDED ON WHAT THE RUN REALLY COSTS (point
+  // 1137). The §1 plan is the sum of July per-suite medians and is measured to
+  // be a third to two thirds of the assembled run: on that figure alone a whole
+  // `polish` pass reads as 5 min 41 s and is advised into a 9-minute blocking
+  // call, while six measured passes took 9.9-61.5 min. The advice was therefore
+  // wrong for nearly every polish run, and its timeout returned STILL RUNNING —
+  // which is the moment a healthy run starts to look broken. Where §7 has
+  // measured this SHAPE of run, its high end decides; the printed expectation
+  // stays the plan, because that is what it is.
+  const observed = Number.isFinite(observedHighMs) && observedHighMs > 0 ? observedHighMs : null
+  const planned = Number.isFinite(expectedMs) && expectedMs > 0 ? expectedMs : null
+  const expected = observed !== null && planned !== null ? Math.max(observed, planned) : (planned ?? observed)
   if (expected === null) {
     return {
       shape: 'background',

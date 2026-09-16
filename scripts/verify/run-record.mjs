@@ -13,7 +13,7 @@
 // proves to the batch guard that a session is waiting rather than idling).
 // Every read is failure-tolerant: an absent or unreadable record means "nothing
 // known", never a false verdict.
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync } from 'node:fs'
+import { closeSync, existsSync, futimesSync, mkdirSync, openSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { dirname, isAbsolute, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -24,7 +24,10 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 export const ROOT = join(HERE, '..', '..')
 
 /** Where the frames land — the one directory every suite's shutter writes to. */
-export const FRAME_DIR = join(ROOT, 'verification')
+/** `HOA_FRAME_DIR` redirects it, on the same grounds as `HOA_WAIT_LEASE_PATH`:
+ *  a fixture must be able to ask about frames without the live repository's
+ *  own `verification/` answering for it. */
+export const FRAME_DIR = process.env.HOA_FRAME_DIR || join(ROOT, 'verification')
 
 /** A written frame, as opposed to the README that shares the directory. */
 const FRAME_FILE = /\.(png|jpg|jpeg)$/i
@@ -284,4 +287,154 @@ export function countPoll(path) {
 /** Does this checkout have a frame directory at all (a worktree may not)? */
 export function frameDirExists() {
   return existsSync(FRAME_DIR)
+}
+
+/** The newest mtime among the frame files, or null when the directory cannot be
+ *  read. The render suites write frames THROUGHOUT their run, so this is the one
+ *  heartbeat a suite emits before it ends — `run-all.mjs` captures a suite's
+ *  output and prints its result line only once the suite is over. */
+export function newestFrameMtimeMs({ dir = FRAME_DIR, since = null } = {}) {
+  let names = []
+  try {
+    names = readdirSync(dir).filter((n) => FRAME_FILE.test(n))
+  } catch {
+    return null
+  }
+  // A frame OLDER than the run is a frame the run did not take: counting it
+  // would let yesterday's pictures vouch for today's wedge.
+  const floor = typeof since === 'number' && Number.isFinite(since) ? since : -Infinity
+  let newest = null
+  for (const name of names) {
+    try {
+      const { mtimeMs } = statSync(join(dir, name))
+      if (mtimeMs < floor) continue
+      if (newest === null || mtimeMs > newest) newest = mtimeMs
+    } catch {
+      /* a file that vanished mid-scan says nothing about progress */
+    }
+  }
+  return newest
+}
+
+/**
+ * WHEN DID THIS RUN LAST SHOW A SIGN OF LIFE (point 1137)?
+ *
+ * The newest of three marks, because no single one covers a whole run: the LOG
+ * grows at every stage and suite boundary, the RECORD is rewritten when the run
+ * starts and ends, and the FRAMES advance inside a long render suite, which is
+ * the stretch the log cannot see. Anything unreadable is left out rather than
+ * counted as silence — a probe that cannot see is not evidence of a wedge.
+ *
+ * Returns null when nothing could be read at all, which callers treat as
+ * "nobody looked" and not as "nothing happened".
+ */
+export function lastProgressAtFor({ logPath = null, recordPath = null, markPath = undefined } = {}) {
+  // ONLY WHAT THE RUN ITSELF WROTE COUNTS — the LATEST of it (Astra review
+  // rounds 1 to 3). Three rules, each paid for by a finding:
+  //
+  // NOTHING A READER WRITES IS EVIDENCE. `countPoll` rewrites the run RECORD, so
+  // taking that file's mtime let a reader manufacture the life it was looking
+  // for: poll a wedged run often enough and it never reports hung. The record is
+  // therefore not consulted here at all, and `recordPath` serves only to derive
+  // the mark's name when no log path was given.
+  //
+  // THE MARK IS A FILE OF ITS OWN. Kept as a field inside the record it would
+  // share a read-modify-write with that same poll, and a poll that read the
+  // record, was overtaken by the writer and wrote its stale copy back would
+  // silently DROP a fresh mark.
+  //
+  // AND IT IS A MAXIMUM, NOT A PREFERENCE. A mark that stops being writable
+  // freezes at its last value; preferring it blindly would then let a stale file
+  // outvote a log that is still moving, and condemn a healthy run after one
+  // lease. Both sources below belong to ONE run — the wrapper stamps the mark
+  // and appends the log — so the newest of them is that run's last sign of life.
+  //
+  // THE FRAMES ARE NOT AMONG THEM, AND THAT IS THE POINT (Astra review round 4).
+  // `verification/` is shared and carries no run identity, so a reader that
+  // folded it in could have any other run's pictures vouch for the one it is
+  // judging — for ever, and for a selection that takes no frames at all. The
+  // frames are read by the WRITER instead, about its own run, while it is the
+  // run that is going; run-logged.mjs states what of that remains. Here, nothing
+  // another run could have written is evidence.
+  //
+  // WHY LOSING THEM COSTS THIS READER NOTHING (Astra review rounds 5 to 9): the
+  // writer holds its mark OPEN for the run, in the same directory and from the
+  // same moment as the log. The case that worried the review — a mark that stops
+  // being writable while the log carries on — cannot arise between two held
+  // descriptors, so the run always has a sign of life this probe can read
+  // without borrowing anybody else's pictures.
+  const marks = []
+  const mark = markPath === undefined ? progressMarkPathFor(logPath ?? recordPath) : markPath
+  for (const path of [mark, logPath]) {
+    if (typeof path !== 'string' || path.trim() === '') continue
+    try {
+      marks.push(statSync(resolveIn(path)).mtimeMs)
+    } catch {
+      /* an absent mark or log is not a progress mark */
+    }
+  }
+  return marks.length > 0 ? Math.max(...marks) : null
+}
+
+const resolveIn = (path) => (isAbsolute(path) ? path : join(ROOT, path))
+
+/** The writer's progress mark, beside the log it belongs to. A zero-byte file
+ *  whose MTIME is the whole message: one writer, one write, no read-modify-write,
+ *  and therefore nothing a concurrent reader can lose. */
+export function progressMarkPathFor(logPath) {
+  if (typeof logPath !== 'string' || logPath.trim() === '') return null
+  return `${logPath.replace(/\.run\.json$/, '')}.progress`
+}
+
+/**
+ * OPEN the mark and keep the descriptor, for as long as the run lasts.
+ *
+ * Only run-logged.mjs calls this. The descriptor is the whole point (Astra
+ * review rounds 6 to 10): a mark re-CREATED on every stamp had to create a
+ * directory entry on every stamp, and a directory that stops taking new entries
+ * halfway through a run leaves the log's own descriptor writing on happily.
+ * Every repair for that asymmetry put a second writer into the log and cost
+ * three review rounds of split result lines and self-renewing leases. An open
+ * descriptor removes the case instead, and there is nothing to fall back to.
+ *
+ * It does NOT make the two inseparable, and the comment should not pretend
+ * otherwise: `futimes` is an explicit timestamp update, not an ordinary write,
+ * so a marker whose ownership changes under a running run can still refuse the
+ * stamp while the log accepts bytes. `stamp` answers false there and the run is
+ * judged by its log alone — where it stood before this point. Collected in
+ * docs/backlog.md rather than bridged, because every bridge built for it so far
+ * cost more than the case it covered.
+ *
+ * Null when the mark cannot be opened at all — which is the case where the log
+ * could not have been created either, so the run has larger problems than this.
+ */
+export function openProgressMark(logPath) {
+  const path = progressMarkPathFor(logPath)
+  if (!path) return null
+  let fd
+  try {
+    fd = openSync(resolveIn(path), 'w')
+  } catch {
+    return null
+  }
+  return {
+    path,
+    /** Move the mark to `at`. False means the stamp did not happen. */
+    stamp(at = Date.now()) {
+      const when = new Date(at)
+      try {
+        futimesSync(fd, when, when)
+        return true
+      } catch {
+        return false
+      }
+    },
+    close() {
+      try {
+        closeSync(fd)
+      } catch {
+        /* already gone — nothing to release */
+      }
+    },
+  }
 }

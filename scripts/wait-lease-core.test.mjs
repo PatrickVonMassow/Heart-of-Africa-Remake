@@ -13,6 +13,7 @@ import {
   waitThresholds,
   waitTimeoutDecision,
 } from './wait-lease-core.mjs'
+import { PROGRESS_LEASE_MS } from './wait-lease-core.mjs'
 
 const T0 = 1_800_000_000_000
 const alive = () => true
@@ -262,6 +263,34 @@ describe('waitTimeoutDecision (union entry U12)', () => {
     expect(second.state).toBe('hung')
     expect(second.events).toEqual([])
     expect(second.recovery).toBeNull()
+  })
+
+  it('leaves a run that is still writing SLOW, not hung (point 1137)', () => {
+    // The `polish` incident of 15.09.2026 in one assertion: the run is past 2.5x
+    // an estimate the project has measured to be a third of the real cost, and it
+    // has just written a frame. Overdue says "long"; hung would end it.
+    const now = T0 + 51 * 60_000
+    const decision = waitTimeoutDecision({ lease: bounded(), now, lastProgressAt: now - 60_000 })
+    expect(decision.state).toBe('overdue')
+    expect(decision.recovery).toBeNull()
+    expect(decision.events.map((e) => e.cause)).toEqual(['wait-deadline-crossed'])
+  })
+
+  it('still calls a run hung once its silence outlasts the progress lease', () => {
+    const now = T0 + 51 * 60_000
+    const decision = waitTimeoutDecision({ lease: bounded(), now, lastProgressAt: now - PROGRESS_LEASE_MS - 1 })
+    expect(decision.state).toBe('hung')
+    expect(decision.recovery).toMatchObject({ reason: 'verification-wait-hung' })
+  })
+
+  it('treats "nobody looked" as the old verdict rather than as proof of life', () => {
+    expect(waitTimeoutDecision({ lease: bounded(), now: T0 + 51 * 60_000, lastProgressAt: null }).state).toBe('hung')
+  })
+
+  it('never turns progress into an EARLY hung verdict — the clock still has to cross', () => {
+    const now = T0 + 10 * 60_000
+    expect(waitTimeoutDecision({ lease: bounded(), now, lastProgressAt: now - PROGRESS_LEASE_MS - 1 }).state)
+      .toBe('running')
   })
 
   it('reports an unknown lease instead of guessing a state', () => {

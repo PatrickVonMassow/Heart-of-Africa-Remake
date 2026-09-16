@@ -140,6 +140,25 @@ describe('waitStatus (union entries U11 and U12)', () => {
     expect(again.leases[0].recovery).toBeNull()
   })
 
+  // POINT 1137 — the probe the registry lacked. A lease names its run's log, and
+  // a run that is still writing to it is SLOW, not hung. Without this the
+  // registry judged every long run by a clock alone, and ended the healthy ones.
+  it('asks the LEASE\'S OWN run whether it is still writing before calling it hung', () => {
+    const log = join(dir, 'run.log')
+    writeFileSync(log, 'starting dev server\n')
+    const now = T0 + 3 * 60 * 60_000
+    // The log was touched a minute ago in the fixture's clock — inside the lease.
+    const fresh = () => now - 60_000
+    claimWait({ sessionId: 'owner', runId: 'run-a', logPath: log, pid: process.pid, expectedRuntimeMs: 10 * 60_000, now: T0, path, journalPath })
+    const alive = waitStatus({ now, path, journalPath, progressOf: fresh })
+    expect(alive.leases[0].state).toBe('overdue')
+    expect(alive.recoveryRequested).toBe(false)
+    // The same lease, silent for longer than the progress lease, still reports hung.
+    const silent = waitStatus({ now, path, journalPath, progressOf: () => now - 30 * 60_000 })
+    expect(silent.leases[0].state).toBe('hung')
+    expect(silent.recoveryRequested).toBe(true)
+  })
+
   it('raises the incident alarm when one session holds several live waits', () => {
     writeRegistry(
       {

@@ -38,6 +38,13 @@ export const WAIT_EXPECTATION_FLOOR_MS = 5 * 60 * 1000
 /** Beyond this multiple of its own expectation a run is not slow, it is hung. */
 export const HUNG_EXPECTATION_FACTOR = 2.5
 
+/**
+ * THE PROGRESS LEASE — how long a run may show no sign of life before its
+ * silence counts as evidence. One definition: `scripts/verify/run-logged.mjs`
+ * renews the same 15 minutes from here.
+ */
+export const PROGRESS_LEASE_MS = 15 * 60_000
+
 /** A lease whose pid died is released within one probe; this grace only keeps a
  *  lease that was written moments ago from being reaped before its writer has
  *  reported its own pid as running. */
@@ -287,14 +294,32 @@ export function concurrentWaitAlarm({ registry, now = Date.now(), probePid, runT
  * that is checked every two seconds still journals one overdue line and asks
  * for one recovery.
  */
-export function waitTimeoutDecision({ lease, now = Date.now(), lastProgressAt = null } = {}) {
+export function waitTimeoutDecision({
+  lease, now = Date.now(), lastProgressAt = null, silenceMs = PROGRESS_LEASE_MS,
+} = {}) {
   const entry = normaliseLease(lease)
   if (!entry) return { state: 'unknown', events: [], recovery: null, lease: null }
   const events = []
   const next = { ...entry }
   let state = 'running'
+  // A RUN THAT IS STILL PRODUCING EVIDENCE IS SLOW, NEVER HUNG (point 1137).
+  //
+  // The hung mark is 2.5x an estimate the project has MEASURED to be a third to
+  // two thirds of the real cost (`SEPTEMBER_BANDS` in run-wait-core.mjs): the
+  // plan for a whole `polish` pass is 5 min 41 s against a measured 9.9-61.5,
+  // so the mark falls at 14 minutes and every healthy pass crosses it. On
+  // 15.09.2026 that is exactly what happened — a `polish` run that had already
+  // written 34 of its 21 expected frames was reported HUNG at 17 min 28 s and
+  // ended, and with it the only covering picture run the release was waiting
+  // for. Elapsed time alone cannot tell a wedged run from a long one; SILENCE
+  // can. So the clock still decides when a run is OVERDUE, and the hung verdict
+  // additionally requires that the run has produced nothing - no output, no
+  // record update, no frame - for a whole progress lease. `lastProgressAt` of
+  // null is "nobody looked", which leaves the old verdict untouched.
+  const progress = finite(lastProgressAt)
+  const progressing = progress !== null && now - progress < silenceMs
   if (finite(entry.deadlineAt) !== null && now >= entry.deadlineAt) state = 'overdue'
-  if (finite(entry.hungAt) !== null && now >= entry.hungAt) state = 'hung'
+  if (finite(entry.hungAt) !== null && now >= entry.hungAt && !progressing) state = 'hung'
   const evidence = {
     runId: entry.runId,
     subject: entry.subject,

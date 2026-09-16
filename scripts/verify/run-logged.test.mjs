@@ -4,12 +4,13 @@
 // first way, the `--show` branch printed its window and then fell through
 // into the spawn — so asking a question about a finished log started a full
 // LARGE regression behind the answer. These cases pin the exit paths.
-import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { spawn, spawnSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, it, expect } from 'vitest'
+import { lastProgressAtFor } from './run-record.mjs'
 import { parseActivityJournal } from '../batch-activity-journal-core.mjs'
 import { commandNamesRun } from '../batch-in-flight.mjs'
 import { ORDINARY_OUTPUT_BUDGET } from '../tool-output-budget-core.mjs'
@@ -250,6 +251,47 @@ describe('run-logged default launch — the run-identity re-exec (point 700, Sol
     },
     60_000,
   )
+})
+
+// ASTRA REVIEW ROUNDS 6 TO 9 — the mark is opened ONCE and held, so it cannot
+// start failing halfway through a run while the log carries on. A directory that
+// will take no new entry is exactly that case.
+describe('the progress mark survives a directory that takes no new file', () => {
+  it('keeps moving its mark, and leaves the log uncorrupted', () => {
+    const ROOT = join(dirname(WRAPPER), '..', '..')
+    const relDir = join('local', `runlogged-markhold-${process.pid}`)
+    const dir = join(ROOT, relDir)
+    const relLog = join(relDir, 'markhold.log')
+    try {
+      mkdirSync(dir, { recursive: true })
+      const res = spawnSync(process.execPath, [WRAPPER, 'world', '--section=__no_such_section__', '--log-file', relLog], {
+        windowsHide: true,
+        encoding: 'utf8',
+        timeout: 60_000,
+        env: { ...process.env, VERIFY_NO_WAIT: '1', VERIFY_LOG_DIR: relDir, HOA_ACTIVITY_JOURNAL_PATH: join(dir, 'activity.jsonl') },
+      })
+      expect(res.status, res.stderr).toBe(1)
+      // WHAT THIS LEVEL CAN SHOW, and what it leaves to the unit contract
+      // (Astra coverage pass): here, that a real wrapper run opens the mark
+      // BESIDE its log, that the reader resolves the run's progress to that
+      // mark, and that nothing of the writer's own reaches the log — the whole
+      // reason the held descriptor replaced a fallback that wrote into it. That
+      // the mark keeps MOVING, and keeps moving when the directory will take no
+      // new entry, is `openProgressMark`'s own test in run-record.test.mjs: it
+      // needs a run longer than the writer's one-minute throttle, which this
+      // deliberately instant failure is not.
+      expect(readdirSync(dir)).toContain('markhold.log.progress')
+      expect(readFileSync(join(ROOT, relLog), 'utf8')).not.toContain('sign of life')
+      const markAt = statSync(join(ROOT, `${relLog}.progress`)).mtimeMs
+      const logAt = statSync(join(ROOT, relLog)).mtimeMs
+      // The newest of the run's own two writings, and nothing else.
+      expect(lastProgressAtFor({ logPath: join(ROOT, relLog) })).toBe(Math.max(markAt, logAt))
+      const record = JSON.parse(readFileSync(join(dir, readdirSync(dir).find((n) => n.endsWith('.run.json'))), 'utf8'))
+      expect(markAt).toBeGreaterThanOrEqual(record.startedAt - 1000)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
 })
 
 describe('the ladder escape carries a REASON', () => {

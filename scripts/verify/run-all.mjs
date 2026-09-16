@@ -220,6 +220,12 @@ function runSuite(name, baseUrl, retryAfter = '', onlySection = '') {
   const before = readRenderState()?.runs
   const previous = new Set((Array.isArray(before) ? before : []).map(runIdentity))
   const startedAt = Date.now()
+  // SAY WHICH SUITE IS RUNNING, BEFORE IT RUNS (point 1137). `spawnSync` captures
+  // the suite's whole output, so the result line below is the FIRST thing the log
+  // learns about a suite - and a 55-minute `polish` therefore left the log
+  // standing at `# starting dev server` for its entire length. Twice on
+  // 15.09.2026 a reader took that silence for a hang and ended a healthy run.
+  console.log(`# → ${name}${onlySection ? ` [--section=${onlySection}]` : ''}${retryAfter ? ' (retry)' : ''} running — its PASS/FAIL line arrives when the suite ENDS`)
   const res = spawnSync(process.execPath, [join(HERE, `${name}.mjs`)], {
     windowsHide: true,
     encoding: 'utf8',
