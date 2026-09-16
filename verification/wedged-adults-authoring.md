@@ -68,3 +68,48 @@ assert the body's displacement against the configured minimum after the window.
 
 Validation: `npm run test:unit -- src/scenes/place/collision.test.ts
 src/scenes/place/PlaceLife.escape.test.ts` passed: 2 files, 47 tests, 1.40 s.
+
+## Second-leg review: finding 2
+
+Measured on 2026-09-16, serially, in branch/main/main/branch order. Every run
+executed the whole `src/scenes/place/bankGame.test.ts` file alone and passed all
+54 tests. No other gate was launched by this author during these measurements.
+The branch candidate was `d186d4f8480317fcbdeac03e7666bfc11726a552`; the baseline
+was `origin/main` at `893110333ddff9f00867b5eb76f0a125edcf4839`.
+
+| Run | Vitest duration | Test execution | ROCK case (previous timeout) | Traveller case (previous timeout) |
+| --- | ---: | ---: | ---: | ---: |
+| Branch 1 | 74.24 s | 72.95 s | 9.447 s | 9.896 s |
+| Main 1 | 73.59 s | 72.36 s | 9.153 s | 10.045 s |
+| Main 2 | 73.58 s | 72.30 s | 9.423 s | 9.863 s |
+| Branch 2 | 73.28 s | 72.05 s | 9.447 s | 9.949 s |
+
+Verdict: no reproducible slowdown of this suite on the branch. The branch's
+mean wall time was 73.76 s against main's 73.585 s (+0.24%), with the second
+branch run faster than either baseline run. Both former timeout cases remain
+around 9–10 s, not the prior loaded run's 21–23 s. The measured result supports
+load contention as the earlier timeout cause; it does not claim to recreate or
+quantify that historical load.
+
+`bankGame.test.ts` exercises pure simulation and does not mount `Walkers`.
+These whole-file timings rule out a material bank-game regression attributable
+to its added mount-time navigation grid. They do not measure place-mount cost.
+The bank-game implementation, test file, Vitest configuration and lockfile are
+identical to this baseline. No timeout or test assertion was relaxed.
+
+Reproduction: the baseline's `src`, `scripts`, package files, TypeScript configs
+and `vitest.config.ts` were extracted with `git archive` into the ignored
+`local/wedged-adults-benchmark/main` directory inside this worktree; no branch
+switch or other checkout was used. Both trees resolved the same installed
+dependencies. Branch command: `npm run test:unit --
+src/scenes/place/bankGame.test.ts --reporter=default --reporter=json
+--outputFile.json=local/wedged-adults-benchmark/branch-1.json`. Baseline command:
+`npx vitest run src/scenes/place/bankGame.test.ts --root
+local/wedged-adults-benchmark/main --config
+/workspace/hoa/.claude/worktrees/point-1138/local/wedged-adults-benchmark/main/vitest.config.ts
+--reporter=default --reporter=json
+--outputFile.json=/workspace/hoa/.claude/worktrees/point-1138/local/wedged-adults-benchmark/main-1.json`.
+Second runs change only the report suffix to `-2`. Logs and JSON reports remain
+in that ignored benchmark directory. An initial baseline launch with a relative
+config path failed before collecting tests; correcting it to the absolute path
+above produced the measured runs.
