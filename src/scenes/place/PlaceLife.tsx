@@ -62,7 +62,7 @@ import { utteranceOf } from '../../communication/lexicon'
 import { insidePlace } from './boundary'
 import { playRockFlank } from './playRockSurface'
 import { standsOnGroundPlate, type PlaceRiverBank } from './riverBank'
-import { buildPlaceNavGrid, findPlaceRoute, navClearBetween, navRestrict, type NavPoint } from './routing'
+import { advancePlaceRoute, buildPlaceNavGrid, findPlaceRoute, navClearBetween, navRestrict, type NavPoint } from './routing'
 import { absorbSeparation, createTagGame, stepTagGame, type TagChild } from './tagGame'
 import {
   bankChildCanSeparate,
@@ -2782,12 +2782,7 @@ function ErrandVillagers({
           }
           let aim: ErrandPoint = goal
           if (state.route) {
-            while (
-              state.route.length > 1 &&
-              Math.hypot(state.route[0].x - me.x, state.route[0].z - me.z) <= WAYPOINT_RADIUS
-            ) {
-              state.route.shift()
-            }
+            advancePlaceRoute(nav, me, state.route, WAYPOINT_RADIUS)
             // Back on the open line: drop the route and walk at the goal again,
             // so the figure never trudges a detour it has already got past.
             if (navClearBetween(nav, me.x, me.z, goal.x, goal.z)) {

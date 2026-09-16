@@ -9,6 +9,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   NAV_CELL,
+  advancePlaceRoute,
   buildPlaceNavGrid,
   findPlaceRoute,
   navClearBetween,
@@ -61,6 +62,20 @@ describe('the free-ground grid', () => {
 
   it('keeps a straight walk straight: one waypoint, the goal itself', () => {
     expect(findPlaceRoute(grid, { x: 0, z: 6 }, { x: 5, z: 9 })).toEqual([{ x: 5, z: 9 }])
+  })
+
+  it('keeps a nearby turn until the next leg clears the wall', () => {
+    const turn = { x: 7, z: -1 }
+    const goal = { x: 7, z: 1 }
+    const route = [turn, goal]
+    const from = { x: 6, z: -1 }
+    expect(navClearBetween(grid, from.x, from.z, goal.x, goal.z)).toBe(false)
+    advancePlaceRoute(grid, from, route, 1.2)
+    expect(route).toEqual([turn, goal])
+    advancePlaceRoute(grid, turn, route, 1.2)
+    expect(route).toEqual([goal])
+    advancePlaceRoute(grid, goal, route, 1.2)
+    expect(route).toEqual([goal])
   })
 
   it('reports no route where there is none', () => {
@@ -234,9 +249,7 @@ describe('a villager sent to the BANK gets there (work-order 483)', () => {
       }
       let aim = to as { x: number; z: number }
       if (route) {
-        while (route.length > 1 && Math.hypot(route[0].x - me.x, route[0].z - me.z) <= 1.2) {
-          route.shift()
-        }
+        advancePlaceRoute(grid, me, route, 1.2)
         if (navClearBetween(grid, me.x, me.z, to.x, to.z)) route = null
         else aim = route[0]
       }
@@ -269,6 +282,14 @@ describe('a villager sent to the BANK gets there (work-order 483)', () => {
         expect(walk(layout, from, target), `from ${from.x.toFixed(1)},${from.z.toFixed(1)}`).not.toBeNull()
       }
     }
+  })
+
+  it.each([7, 1337, 2987912600])('walks the restored water lane in both directions (seed %i)', (seed) => {
+    const layout = buildLayout(ROCK_VILLAGE_ID, seed)
+    expect(layout.waterPath).not.toBeNull()
+    const { head, foot } = layout.waterPath!
+    expect(walk(layout, head, foot)).not.toBeNull()
+    expect(walk(layout, foot, head)).not.toBeNull()
   })
 
   it('the grid is finer than the walker is wide, so consecutive free cells connect', () => {

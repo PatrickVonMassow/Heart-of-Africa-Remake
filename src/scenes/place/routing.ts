@@ -192,6 +192,17 @@ function nearestFreeCell(grid: PlaceNavGrid, x: number, z: number, rings: number
   return -1
 }
 
+/** Pass a nearby turn only when the next leg is already walkable. A radius
+ * alone can cut a corner through a fence, especially after a new gate changes
+ * the shortest route. Mutates the remaining route used by the scene. */
+export function advancePlaceRoute(grid: PlaceNavGrid, from: NavPoint, route: NavPoint[], arrivalRadius: number): void {
+  while (route.length > 1
+    && Math.hypot(route[0].x - from.x, route[0].z - from.z) <= arrivalRadius
+    && navClearBetween(grid, from.x, from.z, route[1].x, route[1].z)) {
+    route.shift()
+  }
+}
+
 /**
  * The waypoints from `from` to `to` over free ground, or null when no route
  * exists (the target is walled off, or neither end is near open ground).
