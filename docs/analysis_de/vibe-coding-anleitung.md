@@ -88,13 +88,8 @@ Füllstand empfiehlt ein leeres Modell.
    > null Fehler, Warnungen und bekannte Lücken melden, und ein Fehlschlag muss die
    > Weiterarbeit blockieren, und **kein Stand darf hochgeladen werden, den die
    > Pipeline ablehnen würde** — sonst ist die Prüfung keine Absicherung, sondern
-   > eine Fehlermail. Überdecke nie einen Fehlschlag — zeig mir den Output."
-
-   Und traue dem Rückgabewert nicht, wenn du den Befehl durch eine Pipe schickst:
-   `git push … | tail -6` liefert die Null von `tail`, nicht die des Pushes. Ein
-   abgelehnter Upload sieht dann exakt wie ein geglückter aus. Schreib die Ausgabe
-   in eine Datei und beweise das Ergebnis am Ziel — beim Upload also am
-   **entfernten Stand**, nicht am Rückgabewert.
+   > eine Fehlermail. Überdecke nie einen Fehlschlag — zeig mir den Output, und lies
+   > kein Ergebnis am Rückgabewert einer **Pipe** ab: beweise es am Ziel."
 
 5. **Regeln mechanisch erzwingen — nicht auf Vorsätze vertrauen (das Kernprinzip).**
    Unter Druck fällt genau der nicht-erzwungene Schritt weg; warte **nicht** auf den
@@ -596,11 +591,10 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 - **Die Schranke verlangt genau das, was gerade entsteht.** Sie lässt nicht aufhören, solange
   ein Nachweis fehlt — und der Nachweis ist der Lauf, der noch zwei Stunden braucht.
-  Verweigerung und eigene Abhilfe laufen gegeneinander.
   → *Prompt:* „Eine Schranke, die einen Nachweis fordert, muss ‚wird gerade erstellt' als
-  eigenen Zustand **durchlassen** — sonst verbietet sie ihre eigene Erfüllung. Und misst sie am
+  eigenen Zustand **durchlassen** — sonst verbietet sie ihre eigene Erfüllung. Misst sie am
   **falschen Gegenstand**, ist sie nie erfüllbar: Widersprechen sich zwei Schranken, ist das ein
-  **Defekt**, kein Bedienfehler — messen, ablegen, nicht in jedem Zug neu beantworten."
+  **Defekt** — messen, ablegen, nicht in jedem Zug neu beantworten."
 
 - **Ein Rot, das bei gleichem Code kommt und geht, ist ein Befund über deine MESSUNG.** Eine
   Stichprobe aus einem langen Vorgang trifft den Defekt mal und verfehlt ihn mal.
@@ -620,7 +614,7 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 - **Du nimmst einen geteilten Eintrag heraus — was darauf stand, bleibt stehen.** Wer eine
   Ausnahmeliste oder einen Kulissenwert löscht, sieht den Eintrag, nicht seine Nutzer. Das Rot
-  kommt dann im Tor — und steht das Tor hinter dem Merge, steht auch dein Hauptzweig halb
+  kommt dann im Tor — steht es hinter dem Merge, steht dein Hauptzweig halb
   gelandet da.
   → *Prompt:* „Löschen ist **Umbau**: Entfernst du einen geteilten Eintrag, such im selben Zug,
   **wer auf ihm steht**. Benutzt eine Testkulisse **lebende Daten**, schreib das über sie. Und
@@ -637,8 +631,8 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 - **Der Auftrag kam ohne Code zurück — und das war richtig.** Wenn das zweite Modell die
   Aufgabe zurückweist, statt sie zu bauen, meldet euer Werkzeug einen Fehlschlag: nichts
-  committet, keine Tests grün. Genau dann lohnt sich das Lesen am meisten, denn oft steckt
-  dort ein Widerspruch in eurer eigenen Aufgabenstellung.
+  committet, keine Tests grün. Genau dann lohnt das Lesen am meisten: oft steckt
+  dort ein Widerspruch in eurer Aufgabenstellung.
   → *Prompt:* „Wenn die Aufgabe sich nicht widerspruchsfrei bauen lässt, **baue sie nicht** —
   schreib mir auf, welche Annahme nicht trägt. Eine begründete Zurückweisung ist ein
   Ergebnis, kein Fehlschlag."
