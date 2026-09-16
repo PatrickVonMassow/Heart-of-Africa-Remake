@@ -77,57 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1138. The adults are wedged: a villager whose escape search finds nothing keeps standing
-  where it is (user 16.09.2026, verbatim: "Außerdem: Neuer Bugreport unter
-  C:\Users\Patri\Documents\Developing\hoa\local (über backup zugreifbar).", report title "Die
-  Erwachsenen sind eingeklemmt"). It stands directly BEHIND 1137 and at the front of everything
-  else: the village it happens in is the one that carries the communication mechanic, and adults
-  that do not move do not teach — but its own proof is a picture, and 1137 owns whether a
-  picture run can be produced at all.
-  THE EVIDENCE IS IN THE REPOSITORY: `local/ErwachseneEingeklemmt.zip`, unpacked beside it
-  (copied from the backup 16.09.2026, 10:16; the folder is ignored, so it travels with the
-  checkout and not with git). Taken on production build 13ad4a7 — the current `main` — on
-  WebGPU, seed 3321422240, `bambara-village`, day 34.13, viewport 2752x1152 @dpr 1.25.
-  WHAT THE PICTURE SHOWS: two adult figures (one red, one purple) pressed into the corner
-  between a dwelling's outer wall and a fence panel, close enough that their bodies overlap the
-  fence; a third head sits at the hut wall with no body in front of it. The child at the fire is
-  unaffected. The overlay holds only HUD, and the wildlife section reads "0 animals" because the
-  report was taken inside a village — so the archive says nothing about the wedged adults
-  themselves. That is the SECOND stuck-inhabitant report that can only be answered by re-running
-  the seed; point 680 is what would end that, and this point is its second measured reason.
-  CAUSE ALREADY READ OUT OF THE CODE — measure it, do not trust it. Both village steppers in
-  `src/scenes/place/PlaceLife.tsx` escape a wedge by `tryNudgeToFree`, and both treat a FAILED
-  search as "give the errand up":
-  - `Walkers` (:2408-2427) tries the ring search, WIDENS it once to `maxRings=24`, and only then
-    advances the waypoint.
-  - `ErrandVillagers` (:2828-2844) tries it ONCE at the default ring count and, when nothing is
-    found, clears the task or the target — and LEAVES THE BODY WHERE IT IS.
-  A new target does not free a body that is physically enclosed: the next frame walks it at a
-  wall, `resolveMove` slides it nowhere, the stuck timer refills, the search fails again. The
-  comment at :2826-2827 says the escape exists so that no villager "stand[s] pressed against a
-  wall for ever", and that is exactly the state it leaves behind. `tryNudgeToFree` demands BOTH
-  `standingClear` and `hasEscapeDirection` (`src/scenes/place/collision.ts:270-307`), so a pocket
-  between a hut and a fence run is rejected rather than escaped from.
-  SECOND SUSPECT ON THE SAME PICTURE: `Walkers` does not path-plan. `ErrandVillagers` builds a
-  nav grid from the same colliders and routes around geometry (:2577-2580, :2777-2795); `Walkers`
-  walks straight at its waypoint and owns nothing but collider sliding and the 1.4 s waypoint
-  skip (:2393-2401). A hut or a fence run standing between the door and the errand point is the
-  case that produces the pocket in the first place.
-  FINAL STATE: no inhabitant remains within epsilon of its position past a bounded window. A
-  failed escape search ESCALATES — widen, then place the body on the nearest cell the nav grid
-  already knows to be free, then, as the last rung, back to its own hut door — instead of
-  clearing a target and leaving the body pinned. The two steppers answer a wedge the same way;
-  the asymmetry between them is deleted, not documented.
-  VERIFIABLE: Vitest over the pure escape decision — a body enclosed so that no ring is free
-  yields a placement rather than a cleared target, and the widened rung is reached. Plus the
-  `polish` village section photographing the reported corner on both backends at the reported
-  seed, with the adults moving between two shutters.
-  Criticality: high — player-visible on the current `main`, in the village §7.1 criterion 15 is
-  measured on, and reported by the user from a real session.
-  Bundle: Dorfleben — it edits the two steppers in `PlaceLife.tsx` and the escape in
-  `collision.ts`, the same place-scene paths 1080, 1081, 1082 and 1125 reach, so it is worked
-  before them and never beside them.
-
 - [ ] 1139. Placing a guess moves from Space to E: the use key and the guess key no longer
   compete (user 16.09.2026, verbatim: "SPACE sowohl zum Ablegen einer Vermutung bzgl. des
   gesagten Worts, als auch zum Benutzen (z. B. bei der Häuptlings-Hütte) stehen manchmal im
