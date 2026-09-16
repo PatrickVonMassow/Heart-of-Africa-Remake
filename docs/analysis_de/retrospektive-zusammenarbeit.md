@@ -759,6 +759,8 @@ Die Isolation, die parallele Agenten überhaupt erst möglich macht, ist also zu
 
 **Lehre:** Jeder neue Test bekommt seine Pfade eingespritzt, nie gelesen. Und die Prüffrage vor dem Abgeben lautet nicht „ist er grün?", sondern „wäre er auch im Hauptbaum grün, mit allem Laufzeitzustand, der dort liegt?"
 
+**Nachtrag 16.09.2026 — dieselbe Lücke, diesmal beim LESEN statt beim Prüfen.** Der Auftrag zu Punkt 1138 nennt den übergebenen Fehlerbericht unter `local/` als das zu messende Bild. Der beauftragte Autorenlauf hat die Arbeit verweigert, weil die Datei in seinem Nebenbaum nicht existiert: `local/` ist git-ignoriert, also bekommt ein frischer `git worktree add` sie nie, und der Bootstrap verlinkt allein `node_modules`. Neu an dieser Ausprägung ist zweierlei. Erstens hat die Isolation hier nicht ein falsches Grün erzeugt, sondern eine ehrliche Verweigerung — der Agent hat eskaliert statt zu raten, und genau das hat den Schaden auf zehn Minuten begrenzt. Zweitens war der naheliegende Handgriff eine Falle: Ein Symlink auf das ganze Verzeichnis greift nicht, weil die Ignorier-Regel `/local/` mit Schrägstrich ein Verzeichnis trifft, einen Symlink aber nicht — der Baum galt danach als schmutzig, und der Autorenlauf startet darauf gar nicht erst. Und ein Verzeichnis-Symlink wäre ohnehin die falsche Antwort: Dieselbe Bauform hat am 29.07.2026 zweimal das `node_modules` des Hauptbaums gelöscht, und in `local/` liegen die unwiederbringlichen Fehlerberichte des Nutzers. Der Ausweg ist Dokumentation statt Verlinkung — der Auftrag soll `local/`-Pfade als absoluten Pfad des Haupt-Checkouts nennen, den ein Agent lesen darf, ohne dass irgendetwas in seinen Baum kopiert wird.
+
 ### 3.69 Die Sonde, die ihren eigenen Blick misst
 
 Die frisch gebaute Lebendigkeits-Prüfung sollte einen delegierten Agenten an seinem ERGEBNIS beurteilen statt an seinem Protokoll — die Lehre aus dem Agenten, der nach 59 stillen Minuten für tot erklärt wurde und arbeitete. Gemessen datierte sie vier Git-Dateien, also den letzten Git-BEFEHL, nicht die letzte Bearbeitung. Ein Agent, der zwanzig Minuten Quelltext schreibt, ohne git aufzurufen, galt wieder als still; ein eigener Blick in seinen Arbeitsbaum konnte die Uhr zurücksetzen. Die Korrektur fiel beim ersten Anlauf zu kurz aus: Git meldet ein KOMPLETT NEUES Verzeichnis standardmäßig nur als Verzeichnis, und dessen Zeitstempel bewegt sich nicht, wenn darin eine Datei geändert wird — die Lücke bestand für jeden neu angelegten Ordner fort.
@@ -1602,7 +1604,7 @@ stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die s
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 16.09.2026, 10:34 · Quellen-Fingerprint: `00ee00290e28…`
+Zuletzt aktualisiert: Mittwoch, 16.09.2026, 14:38 · Quellen-Fingerprint: `15c5191b6008…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1643,7 +1645,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to the OpenAI lane, GPT-6 Astra), and review is cross-vendor, not Fable-by-default | 6 | hoch | — (Regel/Memory) | ◐ Regel |
 | Iterate on the new feature's OWN test first; the full regression runs once at the end, never as the debugging loop | 2 | mittel | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 83 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 84 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | wait-command-guard.mjs | ✔ Mechanismus |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | \"Gib ab\" / \"abgeben\" means hand the batch to a SUCCESSOR session so the context does not overflow — it never means pause or stop the batch | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1709,8 +1711,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 97 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 134 Prozess-/Meta-TASKS-Punkte (davon 65 offen).
 
-<!-- RETRO-FINGERPRINT: 00ee00290e28f084cf0031a2e14a3f94099f0353b1d3bedb0cdd42c215bff998 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-16T08:34:58.348Z -->
+<!-- RETRO-FINGERPRINT: 15c5191b6008590875e85c38b55b61bdc75c10c620100455b668397d101738d9 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-16T12:38:24.819Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
