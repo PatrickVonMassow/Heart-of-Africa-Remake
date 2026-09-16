@@ -188,7 +188,9 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 - **Neue Features zerbrechen alte.** Eine Änderung repariert X und bricht das unbeobachtete Y.
   → *Prompt:* „Prüfe jede Mechanik auch im **Danach-Zustand** und erzwing nach jedem
   Zusammenführen die schnelle Testschicht. Bau ‚Invarianten' ein, die im Entwicklungsmodus laut
-  meckern — jeder Testlauf wird zum Detektor."
+  meckern — jeder Testlauf wird zum Detektor. **Laut heißt rot, nicht stderr:** Eine Zusicherung,
+  die nur druckt, während der Lauf grün bleibt, hat keinen Empfänger — unsere lief so wochenlang
+  in jedem grünen Durchgang mit und wurde erst zufällig gelesen."
 
 - **Angeblich behoben, im Präsens behauptet.** Der Fix gilt als fertig, das Symptom bleibt.
   → *Prompt:* „Fertig ist ein Fix, wenn das **Symptom am Ort des Symptoms** weg ist **und** der
@@ -681,4 +683,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 61c785b97b48ff557f98b1765d1a377d616fb107faa1ea337020fa357e6163b2 -->
+<!-- GUIDE-FINGERPRINT: 4a79adf7379f57b3d6ee3bded71ea708d7f394bbc53e84826481a961281e9e90 -->
