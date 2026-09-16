@@ -78,6 +78,16 @@ describe('the free-ground grid', () => {
     expect(route).toEqual([goal])
   })
 
+  it('leaves an exactly reached turn for a goal whose cell needed substitution', () => {
+    const turn = { x: 7, z: -1 }
+    const goal = { x: 6.65, z: 0 }
+    expect(navPointFree(grid, goal.x, goal.z)).toBe(false)
+    expect(findPlaceRoute(grid, turn, goal)).not.toBeNull()
+    const route = [turn, goal]
+    advancePlaceRoute(grid, turn, route, 1.2)
+    expect(route).toEqual([goal])
+  })
+
   it('reports no route where there is none', () => {
     const boxed = buildPlaceNavGrid({ radius: 20 }, [{ x: 8, z: 0, r: 3 }], R)
     expect(findPlaceRoute(boxed, { x: 0, z: 0 }, { x: 8, z: 0 })).toBeNull()
@@ -256,7 +266,7 @@ describe('a villager sent to the BANK gets there (work-order 483)', () => {
       const ax = aim.x - me.x
       const az = aim.z - me.z
       const ad = Math.hypot(ax, az) || 1
-      const step = balance.villageLife.adultErrands.pace * dt
+      const step = Math.min(balance.villageLife.adultErrands.pace * dt, ad)
       const wantX = me.x + (ax / ad) * step
       const wantZ = me.z + (az / ad) * step
       if (!insidePlace(bounds, wantX, wantZ, R * 2)) continue

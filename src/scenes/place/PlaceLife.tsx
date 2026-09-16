@@ -2793,7 +2793,9 @@ function ErrandVillagers({
           const ax = aim.x - me.x
           const az = aim.z - me.z
           const ad = Math.hypot(ax, az) || 1
-          const step = Math.max(0, cfg.pace) * dt
+          // Land on the turn instead of oscillating across it when the next
+          // exact goal is standable but falls in a blocked navigation cell.
+          const step = Math.min(Math.max(0, cfg.pace) * dt, ad)
           // Point 657: a child (or anyone else) standing on the straight line is
           // walked ROUND — these strolls cross the children's play ground, and a
           // walker that discovered a body only by pressing on it is what the

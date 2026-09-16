@@ -525,7 +525,7 @@ describe('no settlement carries a lone teaching stone any more (work-order 688)'
 describe('the village water path (work-order 688)', () => {
   const random = mulberry32(1045)
   const waterSeeds = [...new Set([
-    ...SEEDS, REPORTED_SEED, WEDGE_SEED, 2987912600,
+    ...SEEDS, REPORTED_SEED, WEDGE_SEED, 1239784450, 2987912600,
     ...Array.from({ length: 120 }, () => Math.floor(random() * 0x100000000)),
   ])]
   let riverVillages: string[] = []
