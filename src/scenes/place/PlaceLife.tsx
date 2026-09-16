@@ -2561,6 +2561,8 @@ function ErrandVillagers({
     })
     return {
       people: spawn,
+      // Keep the resolved spawn independently of the positions the frame loop moves.
+      spawnAnchors: spawn.map(({ x, z }) => ({ x, z })),
       work: createAdultWork(count, balance.villageLife.adultErrands, useGame.getState().villageDigProgress[placeId]),
       rand: r,
     }
