@@ -5370,6 +5370,23 @@ Build order, chosen so no two parallel agents own the same file:
   now does. They stay separate points because each has its own suspected cause, but they
   are ONE measurement: the quiet-machine repeat run this point owes is taken for all four
   at once rather than paid three more times.
+  NARROWED 16.09.2026 (point 1137's covering both-backend LARGE, quiet machine, merge
+  candidate 154b54c15, WebGL 2 lane): `flow` is now THE red that stops a both-backend
+  LARGE dead. It failed BOTH attempts with `page.reload: Timeout 30000ms exceeded`
+  waiting for `networkidle` (`scripts/verify/flow.mjs:118`, the reload AFTER
+  `localStorage.clear()`), printed 0 pass / 0 fail and no named check, and the runner
+  classed it UNCLASSIFIED — so the charge table cannot match it and the run closes "own
+  or unresolved". Because lane 1 went red the run NEVER PROCEEDED to the WebGPU lane:
+  while this stands, no single invocation can produce a both-backend picture, which is
+  exactly what the release proof needs. That makes this the most valuable of the flake
+  sites above, not merely the most reproducible.
+  WHAT THIS RULES OUT: the cause documented in flow.mjs' own header comment — the Kokoro
+  model download holding `networkidle` open — does NOT apply here. The TTS cache was
+  COMPLETE in that worktree (`.cache/tts/.complete` present, 14 files), so
+  `installTtsCache` ran strict and served from disk rather than reaching the CDN. The
+  documented fix is already in place and the suite timed out anyway; look past it. The
+  fix this point already names stands and is cause-independent: wait for the app's own
+  ready signal instead of `networkidle`.
 
 - [ ] 309. Serving-model degradation: repair + tripwire (user 25.07.2026). REPAIR: the
   late-evening session of 24.07 ran silently on Haiku 4.5 (proven by the Co-Authored-By
