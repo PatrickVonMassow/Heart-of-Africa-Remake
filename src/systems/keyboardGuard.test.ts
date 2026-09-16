@@ -27,6 +27,8 @@ describe('the bound-key set (design.md §17.5/§21.1)', () => {
       expect(isGameKeyCode(code)).toBe(true)
     }
     for (const code of MONTH_KEYS) expect(isGameKeyCode(code)).toBe(true)
+    for (let i = 1; i <= 9; i++) expect(GAME_KEY_CODES).toContain(`Digit${i}`)
+    expect(new Set(GAME_KEY_CODES).size).toBe(GAME_KEY_CODES.length)
   })
 
   it('leaves the keys the game does not bind to the browser', () => {

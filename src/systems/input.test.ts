@@ -68,6 +68,23 @@ describe('onKeyPress (design.md §17)', () => {
     release('KeyM')
   })
 
+  it('matches exact modifiers, including plain keys and rejecting combined chords', () => {
+    const plain = vi.fn()
+    const shifted = vi.fn()
+    const offPlain = onKeyPress('Digit3', plain, { exactModifiers: {} })
+    const offShift = onKeyPress('Digit3', shifted, { exactModifiers: { shiftKey: true } })
+    for (let mask = 0; mask < 16; mask++) {
+      window.dispatchEvent(new KeyboardEvent('keydown', {
+        code: 'Digit3', shiftKey: !!(mask & 1), ctrlKey: !!(mask & 2),
+        altKey: !!(mask & 4), metaKey: !!(mask & 8),
+      }))
+    }
+    expect(plain).toHaveBeenCalledTimes(1)
+    expect(shifted).toHaveBeenCalledTimes(1)
+    offPlain()
+    offShift()
+  })
+
   // Work-order 691: the use key opens a dialog whose field takes the keyboard
   // at once, and the very press that opened it went on to type its own space
   // into that field — every reading began with a blank.
