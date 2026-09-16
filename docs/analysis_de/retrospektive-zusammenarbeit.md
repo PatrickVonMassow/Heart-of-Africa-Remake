@@ -1600,7 +1600,7 @@ stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die s
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 16.09.2026, 00:24 · Quellen-Fingerprint: `3788c9e90cfa…`
+Zuletzt aktualisiert: Mittwoch, 16.09.2026, 02:19 · Quellen-Fingerprint: `744019bf5754…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1707,8 +1707,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 97 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 134 Prozess-/Meta-TASKS-Punkte (davon 65 offen).
 
-<!-- RETRO-FINGERPRINT: 3788c9e90cfaaee21c13bf8a428cb4e50a3c50686ed67c07d7eef4017cdbac57 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-15T22:24:39.443Z -->
+<!-- RETRO-FINGERPRINT: 744019bf575434448f712664263488f4feed65927143d3087c306dffda70be36 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-16T00:19:04.838Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -7199,3 +7199,41 @@ Batch nicht her und hält ihn nicht an; läuft er schon, läuft er weiter. Aufne
 verlangt einen Satz, der genau das verlangt, und `--user-stop` bekommt ausschließlich einen
 solchen Satz wörtlich zitiert. Wer schon zu viel getan hat, sagt es — und lässt den Batch
 trotzdem laufen.
+
+### 3.277 Der Beweislauf starb an seinem Start, nicht an seiner Sache
+
+Gemessen in der Nacht zum 16.09.2026, ausgerechnet an Punkt 1137 — dem Punkt, dessen ganzer
+Gegenstand es ist, dass ein gesunder Prüflauf nicht mehr fälschlich für hängend erklärt wird. Sein
+eigener deckender Beweis kam dreimal nicht zustande, und kein einziges Mal an der Sache.
+
+Der erste Lauf stand als `exitCode 1` in seiner Akte, nach 250 Sekunden, und sein Protokoll bricht
+nach `PASS test-types` mitten im Satz ab. Das liest sich wie eine rote Unit-Stufe. Nachgemessen ist
+die Unit-Stufe grün — 501 Dateien, 15.515 Prüfungen, 323 Sekunden. Genau daran ist der Fall zu
+erkennen: Der Lauf war nach 250 Sekunden tot, die Stufe, die er angeblich nicht bestand, dauert
+323. Er hat sie nie zu Ende gesehen. Er ist mit der Sitzung gestorben, die ihn gestartet hatte.
+Der zweite Anlauf entstand aus einer Frage nach der Hilfe: `run-logged.mjs --help` druckt keine
+Hilfe, sondern startet die volle Zwei-Backend-Regression — und weil der Aufruf in `head -40` lief,
+wäre er zusätzlich an einem Rohr gestorben, das sich vor ihm schließt.
+
+Das Verräterische ist die Buchführung. Alle drei Fälle stehen im selben Feld: `finished`,
+`exitCode 1`. Ein Tod am START wird exakt so verbucht wie ein Scheitern in der SACHE. Aus der
+Entfernung sind „der Beweis ist rot" und „der Beweis hat nie stattgefunden" nicht zu
+unterscheiden, und die erste Lesart schickt einen auf Fehlersuche in grünem Code. Die
+Kostentabelle wusste es längst und niemand hat sie als Befund gelesen: fünf LARGE-Läufe liefen
+durch (115–121 min), acht brachen früh ab (0,4–42,1 min, Median 4,6). Die Abbrüche sind die
+Mehrheit — und keiner ist je danach gefragt worden, woran er starb.
+
+Dazu kommt die Tafel. Sie sagte „Die volle Bildprüfung läuft" mit einer Voraussage bis 04:00, für
+einen Prozess, der seit Stunden tot war. Diese Zusage war beim Start geschrieben und danach von
+nichts mehr überprüft worden — eine Messung, die zur Erinnerung verkommen ist.
+
+Das ist der Zwilling von [§3.112](#3112-eine-sitzung-kann-ihren-eigenen-prüflauf-zerreißen): Dort
+zerreißt eine Sitzung ihren Lauf durch Repository-Operationen, hier zerreißt sie ihn schon
+dadurch, dass sie endet.
+
+**Lehre:** Ein Beweislauf, der seine Sitzung nicht überlebt, beweist nichts — er wird abgekoppelt
+gestartet (`setsid`, in eine Datei, nie in ein Rohr, das sich vor ihm schließen kann). Und bevor
+ein rotes Urteil als Befund über das Produkt gelesen wird, ist zu prüfen, ob der Lauf seine Sache
+überhaupt erreicht hat: Seine Dauer gegen die Stufe halten, an der er angeblich scheiterte. Eine
+Tafelaussage über einen laufenden Prozess ist schließlich nur so viel wert wie ihre letzte
+Messung.
