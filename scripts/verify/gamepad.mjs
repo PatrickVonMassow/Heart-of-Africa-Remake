@@ -85,6 +85,20 @@ const pulseButtonUntil = async (index, cond, timeout = 15000) => {
   return ok
 }
 
+// Frames DRAWN, not milliseconds elapsed: what a key press has to outlast is the
+// scene's own loop, and a wall-clock pause spanning a stall proves nothing about
+// it (the rule scripts/verify/fixedWaits.mjs keeps).
+const nextFrames = (n) =>
+  page.evaluate(
+    (count) =>
+      new Promise((resolve) => {
+        let left = count
+        const tick = () => (left-- > 0 ? requestAnimationFrame(tick) : resolve())
+        requestAnimationFrame(tick)
+      }),
+    n,
+  )
+
 // SHARED STAGING (point 566). The two village blocks both need to be standing in
 // the NORTHERN village — one to address its elder, one to have the position query
 // answer "North" — so entering it is a helper each of them calls, not something
@@ -260,7 +274,7 @@ if (section('guess-key')) {
   const guessOpen = () => !!document.querySelector('.dialog.speech-guess')
   const closeGuess = async () => {
     await page.evaluate(() => window.__ui.getState().setDialog(null))
-    await page.waitForTimeout(150)
+    await page.waitForFunction(() => !document.querySelector('.dialog.speech-guess'), null, { timeout: 10000 })
   }
   // What the SCENE says it is offering, read when a press answered nothing: a
   // key that found no word says so here rather than leaving "nothing happened".
@@ -283,7 +297,10 @@ if (section('guess-key')) {
   // 1. The keyboard's use key no longer reaches the word — the collision the
   //    split removed, seen from the side that had to LOSE something.
   await page.keyboard.press('Space')
-  await page.waitForTimeout(400)
+  // Frames, not a pause: the press is handled synchronously and the scene draws
+  // what followed from it, so two drawn frames are the whole window in which a
+  // dialog it opened could appear.
+  await nextFrames(2)
   check(
     'SPACE leaves the word alone now (point 1139)',
     (await page.evaluate(guessOpen)) === false,
