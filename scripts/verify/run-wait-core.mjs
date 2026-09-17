@@ -27,7 +27,9 @@
 // process work — the record file, the frame scan, the blocking wait — lives in
 // run-wait.mjs and run-logged.mjs.
 import { laneFor, parseArgs, planBackends, selectBackend, suitesFor } from './tiers.mjs'
-import { PROGRESS_LEASE_MS } from '../wait-lease-core.mjs'
+import {
+  PROGRESS_LEASE_MS, SUITE_CEILING_MS, WAIT_EXPECTATION_FLOOR_MS, WAIT_LEASE_CAP_MS,
+} from '../wait-lease-core.mjs'
 
 /**
  * MEASURED median wall clock per suite, in SECONDS, on the WebGL 2 lane —
@@ -234,12 +236,26 @@ export const MAX_POLLS = 5
  * outlived the mechanism that would have ended it; below that it is SLOW, and
  * ending it is a HAND decision, never this tool's.
  */
-export const SUITE_CEILING_MS = Number(process.env.VERIFY_SUITE_TIMEOUT_MS) || 45 * 60 * 1000
+export { SUITE_CEILING_MS } from '../wait-lease-core.mjs'
 
-/** Past this wall-clock mark a run is HUNG, not slow: its own plan plus one
- *  whole suite ceiling. Never below the ceiling itself. */
-export const hungMarkMs = (expectedMs = null) =>
-  SUITE_CEILING_MS + Math.max(0, Number.isFinite(expectedMs) && expectedMs > 0 ? expectedMs : 0)
+/**
+ * Past this wall-clock mark a run is HUNG, not slow: its own plan plus one whole
+ * suite ceiling, bounded exactly as the lease bounds it.
+ *
+ * ONE CALCULATION, TWO READERS. The counted poll and the lease used to compute
+ * this mark separately, and at the edges they disagreed: with the ceiling raised
+ * to two hours the lease called a silent run hung at 120 minutes while `--status`
+ * still answered `poll` at 121, and a negative override could put the poll's mark
+ * BEFORE the run's own estimate (cross-vendor review, 17.09.2026). The cap and
+ * the non-negative clamp come from the lease, so the two cannot drift apart.
+ */
+export const hungMarkMs = (expectedMs = null, ceilingMs = SUITE_CEILING_MS) => {
+  // The floor too: an UNMEASURED run is not one with a plan of zero, and the
+  // lease has always read it that way.
+  const expected = Math.max(Number.isFinite(expectedMs) && expectedMs > 0 ? expectedMs : 0, WAIT_EXPECTATION_FLOOR_MS)
+  const ceiling = Math.max(0, Number.isFinite(ceilingMs) ? ceilingMs : 0)
+  return Math.min(expected + ceiling, WAIT_LEASE_CAP_MS)
+}
 
 /**
  * The longest a single blocking call may run here. The harness caps a shell
