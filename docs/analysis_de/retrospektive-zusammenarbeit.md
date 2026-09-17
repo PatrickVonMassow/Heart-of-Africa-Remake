@@ -70,6 +70,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 16.09. vormittags | Auf eine Nutzerfrage las ich das Protokoll des noch laufenden WebGPU-Durchgangs, fand »CANDIDATE REAL FAILURE« über einem Weltbild und meldete es als Rot, das keinem offenen Punkt gehört. Es gehört seit dem 26.08. Punkt 627 — dasselbe Bild, dieselbe Formulierung, auf WebGPU/Compatibility, gemessen über vier Läufe auf ruhiger Maschine. Die Kandidaten-Zeile schreibt die Suite WÄHREND des Laufs, die Zuordnung fällt an seinem ENDE: Ein Urteil mitten im Lauf gelesen ist das Urteil vor der Stufe, der es gehört — beinahe ein Doppelpunkt vor dem Release (§3.279) |
 | 17.09. nachts | Die Layout-Suite lief mit 1029 gruenen Faellen durch und druckte dabei fuenfmal »[ASSERT] way-out-missing«: In drei von sechs geprueften Dorf-Layouts findet die Ortsgrenze keine freie Querung — auf `main` und auf dem Branch identisch, also seit Wochen in jedem gruenen Lauf und nie gelesen, weil `devAssert` auf stderr schreibt statt den Lauf rot zu faerben. Punkt 1045 hatte den Befund selbst einmal gesehen und als »recorded here, not diagnosed« im eigenen Fliesstext abgelegt — ein Versprechen ohne Schuldner, jetzt Punkt 1144 (§3.280) |
 | 16.09. abends | Zwei Wiedergänger in einer Sitzung, beide an fremdem Werkzeug gemessen: Der Stop-Hook forderte wegen einer Parallel-Sitzung erneut `batch-doctor --gate`, dessen Tor sechs Minuten Unit-Suite neben dem laufenden Deckungslauf fuhr und genau EINE Datei fand — die Zustandsdatei des Closing-Wächters, die sich selbst mitschreibt; Committen genügte, das Urteil sprang auf `consistent` (drittes Auftreten von §3.271/§3.267, die In-Flight-Markierung liest der Doctor weiterhin nicht). Und die Vier-Augen-Prüfung wies zweimal nach, dass die neuen Unit-Fälle des Punktes 1139 auch bei ZURÜCKGEDREHTER Szenen-Verdrahtung grün geblieben wären — derselbe Riss wie §3.252, nur eine Ebene höher: Die Regel war geprüft, der Aufruf nicht. Der Beweis zog danach dorthin, wo die Taste wirklich drückbar ist (virtuelles Gamepad im Dorf) |
+| 17.09. | Ein einziges verfehltes Prüfbild kostet einen ganzen Beweislauf: `frameSubject.mjs` WIRFT, wenn der Gegenstand aus dem Bild gewandert ist, node beendet sich, und aus einem buchbaren Roten wird eine Absturzaufzeichnung, die niemandem gehört und die jede spätere Sitzung von Hand freizeichnen muss. Zwei Bilder tun das inzwischen auf `main` selbst — die Victoria-Fälle und der Zusammenfluss bei Khartum, beide »off the left and bottom edge« —, und drei solcher Aufzeichnungen standen auf `main`, als Punkt 1140 landete. Punkt 375 verlangt zu Recht, dass ein Bild zeigt, was sein Name behauptet; den Prozess zu töten stand nie in dieser Entscheidung (Punkt 1145) |
 | 13.08. | Der Nachprüfer findet eine echte zweite Klippe im geheilten Mechanismus — und jede der fünf gemessenen Kuren verschlechtert gesunde Dörfer stärker, als der Fehler schadet: Befund wird gebucht statt behoben (§3.115) |
 | 20.08. | Der Dokumentschnitt strich Regeln als »von einem Wächter abgedeckt«, ohne einen einzigen Wächter darauf zu prüfen — die Kontextanzeige verschwand, der Nutzer fand es (§3.134); eine vom Nutzer gesetzte Rangfolge wurde in einer Nacht zweimal maschinell überholt, ohne dass irgendwo ein Grund stand (Punkt 614); zwei Werkzeuge derselben Bauart am falschen Ort gemessen — im Hauptbaum gebaut und geprüft, während der Prozess die Arbeit in den isolierten Bereich schickt (§3.137) |
 | 21.08. | Ein Tor verlangte eine Freigabe, die seine eigenen Werkzeuge nicht herstellen können — der HIGH-Punkt war gemergt, geprüft und freigegeben, und der Zugausgang wies ihn trotzdem ab (§3.153) |
@@ -1610,7 +1611,7 @@ stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die s
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 17.09.2026, 08:53 · Quellen-Fingerprint: `c3fe02cb696b…`
+Zuletzt aktualisiert: Donnerstag, 17.09.2026, 14:20 · Quellen-Fingerprint: `a6b86e5f62bc…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1717,8 +1718,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 97 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 135 Prozess-/Meta-TASKS-Punkte (davon 66 offen).
 
-<!-- RETRO-FINGERPRINT: c3fe02cb696ba93d436d42511f2dfd88431dcabdfc10c6ea53e4bb1e1c0b21a4 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-17T06:53:59.594Z -->
+<!-- RETRO-FINGERPRINT: a6b86e5f62bc453e0d7b1fef1b27cc4a2ff64d3126be25efa334aaeec2d2ccb4 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-17T12:20:36.537Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -7383,3 +7384,30 @@ folgenlos«. Und wer eine solche Regel als Verbot anwendet, liest einmal den Cod
 sie durchsetzt, bevor er Arbeit deswegen zurückstellt: Die Gegenprobe kostet eine Minute,
 das stille Befolgen kostet dauerhaft. Die Korrektur gehört in dieselbe Notiz zurück, sonst
 erbt die Nachfolgesitzung den Aberglauben statt der Messung.
+
+### 3.282 Ein verfehltes Bild tötet den Prozess statt seine Prüfung
+
+Punkt 375 hat entschieden, dass ein Prüfbild zeigen muss, was sein Name behauptet — ein
+mis-gezieltes Bild wird nicht geschrieben. Die Umsetzung geht einen Schritt weiter, als die
+Entscheidung reichte: `scripts/verify/frameSubject.mjs` **wirft**, node beendet sich, und
+der Lauf stirbt, statt zu berichten.
+
+Der Unterschied ist nicht kosmetisch. Ein Rot gehört jemandem: Es steht mit Namen im
+Protokoll, lässt sich an einen offenen Punkt buchen, und der Lauf deckt seine Spur trotzdem,
+wenn der Rest grün ist. Ein Absturz gehört niemandem — er trägt kein Rot, das man buchen
+könnte, deckt kein Backend, und jede spätere Sitzung muss ihn einzeln von Hand
+freizeichnen. Aus einem fehlerhaften Prüfpunkt wird so ein Verlust von Dutzenden gültiger
+Bilder und, bei der Basislinien-Einstufung, von zwei kompletten Vergleichsläufen.
+
+Beim Landen von Punkt 1140 kam das dreifach zusammen: Zwei Bilder verfehlen ihren
+Gegenstand schon auf `main` selbst (die Victoria-Fälle in `enrichments`, der Zusammenfluss
+bei Khartum in `world`, beide »off the left and bottom edge«), drei Absturzaufzeichnungen
+davon standen unfreigezeichnet im Register, und die Einstufung, die beweisen sollte, dass
+die Fälle vorbestehend sind, stürzte selbst an genau derselben Stelle ab — ihr Ergebnis
+war trotzdem eindeutig, aber nur, weil ihr Vergleich zweimal auf demselben Weg starb.
+
+**Lehre:** Die Härte einer Prüfung gehört in ihr Urteil, nicht in ihren Kontrollfluss. Wer
+eine Regel durchsetzt, indem er den Prozess beendet, tauscht einen benennbaren Fehler gegen
+einen herrenlosen ein und macht den Rest des Beweises gleich mit wertlos. Und eine
+Werkzeugkette, die ihre eigenen Prüfläufe so verliert, misst am Ende sich selbst statt das
+Spiel.
