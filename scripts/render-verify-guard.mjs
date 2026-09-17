@@ -98,11 +98,20 @@ export function commitMissing(sha) {
 }
 
 /** Shared evidence is scoped to commits, never to the checkout that wrote it.
- *  A merge preserves a clean ancestor's proof only while the render files are
+ *  A merge preserves an ancestor's proof only while the render files are
  *  unchanged. Commit timestamps cannot answer that: a merge can postdate a run
  *  without changing its picture, or introduce a conflict resolution it never saw.
  *  Legacy records remain visible for red accounting, but cannot prove coverage
- *  without a commit. Unreadable Git evidence grants no coverage. */
+ *  without a commit. Unreadable Git evidence grants no coverage.
+ *
+ *  A DIRTY tree does not by itself disqualify a run, and must not: `dirty` is
+ *  what the recorder calls evidence and deliberately not a gate
+ *  (render-verify-recorder.mjs), and 42 of the 48 green runs in the live
+ *  window carry it — the owner's checkout holds the board and the work order
+ *  while the picture is judged. What the render diff cannot be fooled by is the
+ *  case that matters: a run whose OWN render edit was still uncommitted names
+ *  the commit before it, so committing that edit makes the difference visible
+ *  and the proof falls away. */
 export function coverageForHead(records, head, { cwd = REPO_ROOT } = {}) {
   const ancestry = new Map()
   const matching = new Map()
@@ -124,7 +133,7 @@ export function coverageForHead(records, head, { cwd = REPO_ROOT } = {}) {
   return {
     runs: (Array.isArray(records) ? records : []).filter((r) => !r?.head || isAncestor(r.head)),
     matchesTree(run) {
-      if (run?.dirty !== false || !isAncestor(run?.head)) return false
+      if (!isAncestor(run?.head)) return false
       if (!matching.has(run.head)) {
         try {
           // Diff against the working tree too: staged and unstaged render edits

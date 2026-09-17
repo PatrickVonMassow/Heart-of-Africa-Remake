@@ -124,7 +124,10 @@ describe('coverage follows the verified commit', () => {
     git('merge', '--no-ff', '-qm', 'merge fixture', 'fixture')
     expect(git('rev-parse', 'HEAD')).not.toBe(verified)
     expect(judged()).toEqual(run) // the merge postdates the run
-    expect(judged([{ ...run, dirty: true }])).toBeNull()
+    // A dirty tree stays evidence, not a gate: the render diff against the
+    // named commit is what proves the picture, and the owner's checkout is
+    // routinely dirty with board and work-order files while it is judged.
+    expect(judged([{ ...run, dirty: true }])).toEqual({ ...run, dirty: true })
     expect(judged([{ ...run, head: null }])).toBeNull()
     expect(judged([{ ...run, head: 'f'.repeat(40) }])).toBeNull()
     expect(judged([{ ...run, head: baseline }])).toBeNull()

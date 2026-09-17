@@ -992,6 +992,11 @@ Nicht als Punkt eingereiht wegen des Infrastruktur-Freezes: kein Spielerimpakt,
 keine stehende Blockade — der Weg existiert und wurde gegangen. Kommt es
 wieder, gehört es zu Punkt 1123, der schon zwei Defekte derselben Familie trägt.
 
+ERLEDIGT (17.09.2026): es kam wieder und wurde als Punkt 1142 gefahren.
+Laufdatensatz und Protokoll liegen jetzt im Haupt-Checkout, und der Wächter
+liest einen Lauf über den Commit, den er nennt — nach dem Merge ein Vorfahr von
+`main`.
+
 ## Der Bildschirm-Wächter verweigert jeden Zug, wenn die Sitzung im Arbeitsverzeichnis steht (15.09.2026)
 
 Der Stop-Wächter liest `.claude/dashboard-state.json` AUS DEM VERZEICHNIS, in dem
