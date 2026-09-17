@@ -336,22 +336,34 @@ function runSuite(name, baseUrl, onlySection = '') {
   // reader of this ledger does, and without it the same red arrives twice: once
   // keyed `undefined` from the record, once keyed properly from the output.
   const keyOf = (red) => red.key ?? checkFromName(red.name).key
-  const chargedByKey = new Map(reds.filter((red) => ownedSet.has(red)).map((red) => [keyOf(red), red]))
+  const underKey = new Map()
+  for (const red of reds) {
+    const list = underKey.get(keyOf(red)) ?? []
+    list.push(red)
+    underKey.set(keyOf(red), list)
+  }
   const row = ({ key, name: check, fromRecord }) => {
-    const charged = chargedByKey.get(key)
-    const point = charged ? pointOf(charged) : null
+    // EVERY OCCURRENCE, NOT THE FIRST OWNED ONE. The key folds the measurement
+    // out of a check's identity while a `detailMatch` charge reads exactly that
+    // measurement, so two reds under one key can differ in ownership. One of
+    // them being charged says nothing about the other.
+    const occurrences = underKey.get(key) ?? []
+    const charged = occurrences.length > 0 && occurrences.every((red) => ownedSet.has(red))
+    const point = charged ? pointOf(occurrences[0]) : null
     return {
       suite: name,
       check,
       key,
       point,
-      elsewhere: Boolean(charged),
+      elsewhere: charged,
       title: charged ? `point ${point} — ${check}` : '',
       reason: charged
         ? `charged to open point ${point}`
-        : fromRecord
-          ? 'not in the classified baseline — no open point owns it'
-          : 'printed by the suite but carried by no charged record entry — ownership unresolved',
+        : occurrences.some((red) => ownedSet.has(red))
+          ? 'charged for one reading of this check but not for every one recorded here'
+          : fromRecord
+            ? 'not in the classified baseline — no open point owns it'
+            : 'printed by the suite but carried by no charged record entry — ownership unresolved',
     }
   }
   const rows = []
@@ -382,7 +394,11 @@ function runSuite(name, baseUrl, onlySection = '') {
   // ACCOUNTED FOR IS A STATEMENT ABOUT EVERY RED THIS PASS HAS, printed or
   // recorded — not about the record's half of them (Astra finding P1).
   const allOwned = rows.length > 0 && rows.every((r) => r.elsewhere)
-  return { ok, out, unresolved: !complete, allOwned, points, partial: record?.partial === true, rows, stale }
+  // A GREEN HEADLINE OVER A RECORD THAT CARRIES REDS IS NOT A GREEN.
+  if (ok && rows.length > 0) {
+    console.log(`FAIL  ${name.padEnd(12)} — the printed line says PASS, but this run's own record carries ${rows.length} red(s); the record decides`)
+  }
+  return { ok: ok && rows.length === 0, out, unresolved: !complete, allOwned, points, partial: record?.partial === true, rows, stale }
 }
 
 // ONE PASS PER SUITE (point 1135, user order 15.09.2026). The automatic flake
@@ -439,7 +455,10 @@ function runCrossBrowser(baseUrl, depth) {
   const out = (res.stdout ?? '') + (res.stderr ?? '')
   const { pass, fail } = countCheckLines(out)
   const skip = (out.match(/^SKIP/gm) ?? []).length
-  const ok = res.status === 0
+  // NOT THE EXIT CODE ALONE (Astra finding P1, round 2): the failing checks are
+  // already counted here, and a child that prints them and exits 0 was reported
+  // as a pass whose reds nothing then owned.
+  const ok = res.status === 0 && fail === 0
   console.log(`${ok ? 'PASS' : 'FAIL'}  crossbrowser  ${pass} pass, ${fail} fail, ${skip} skip (${depth}, exit ${res.status})`)
   // Always surface the per-engine backend + any skips; on failure also the FAILs.
   for (const line of out.split('\n')) {

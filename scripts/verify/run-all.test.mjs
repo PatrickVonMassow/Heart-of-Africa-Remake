@@ -22,7 +22,8 @@ const source = readFileSync(runnerUrl, 'utf8')
   .replaceAll('import.meta.url', JSON.stringify(runnerUrl.href))
 
 async function run({ outputs = [known], records = [{}], tasks = '- [ ] 603. ground repair',
-  backend = 'webgl', suite = 'settings', previous = [], spawnError = null, large = false } = {}) {
+  backend = 'webgl', suite = 'settings', previous = [], spawnError = null, large = false,
+  exitStatus = null } = {}) {
   const printed = []
   const exit = new Error('runner exited')
   let exitCode
@@ -33,7 +34,7 @@ async function run({ outputs = [known], records = [{}], tasks = '- [ ] 603. grou
     const i = attempts.length
     attempts.push(options)
     const out = outputs[Math.min(i, outputs.length - 1)]
-    const status = out.includes('FAIL') || out.includes('ERR:') ? 1 : 0
+    const status = exitStatus ?? (out.includes('FAIL') || out.includes('ERR:') ? 1 : 0)
     const stamp = Date.now()
     if (records[i] !== null) saved.push({
       suite, backend, startedAt: stamp, at: stamp, exit: status,
@@ -359,5 +360,56 @@ describe('what the ledger classification must not lose (Astra review, 17.09.2026
   it('still strikes a charge whose check only ever passed', async () => {
     const result = await run({ outputs: [`PASS  ${ground} — laplacian mean 1.42\n${unknown}`] })
     expect(result.log).toContain('STRIKE  settings')
+  })
+})
+
+// ROUND 2 OF THE SAME REVIEW: three paths that turned a red into a pass.
+describe('no path turns a red into a pass (Astra review round 2, 17.09.2026)', () => {
+  it('reds a suite whose printed line says PASS while its record carries reds', async () => {
+    // The measured shape: an `ERR:` line with no `console errors: <n>` summary,
+    // and an exit code of 0. The printed line cannot see it; the record can.
+    const result = await run({
+      exitStatus: 0,
+      outputs: ['PASS  a check\nERR: TypeError: r.dispose is not a function'],
+      records: [{ exit: 0, reds: [{ name: 'console error: TypeError: r.dispose is not a function', kind: 'console' }] }],
+      tasks: '',
+    })
+    expect(result.log).toContain("the printed line says PASS, but this run's own record carries 1 red(s)")
+    expect(result.log).toContain('POINT REDS HOLD')
+    expect(result.status).toBe(1)
+  })
+
+  it('leaves a genuinely green suite green', async () => {
+    const result = await run({ outputs: ['PASS  a check\nconsole errors: 0'] })
+    expect(result.log).not.toContain('the record decides')
+    expect(result.status).toBe(0)
+  })
+
+  it('does not let ONE owned reading of a check exempt an unowned one', async () => {
+    // The live charge for point 694 is DETAIL-scoped, and a check's key folds
+    // the measurement away — so these two reds share a key while only the first
+    // one's measurement matches the charge. The second must still hold.
+    const walk = 'no child walks without getting anywhere'
+    const result = await run({
+      suite: 'polish',
+      tasks: '- [ ] 694. child walking',
+      outputs: [`FAIL  ${walk} — worst child 3 at 12.5s, 1.29 m walked inside 0.32 m`],
+      records: [{ reds: [
+        { name: walk, key: 'k', kind: 'check', detail: 'worst child 3 at 12.5s, 1.29 m walked inside 0.32 m' },
+        { name: walk, key: 'k', kind: 'check', detail: 'worst child 7 at 44.0s, 0.02 m walked inside 9.9 m' },
+      ] }],
+    })
+    expect(result.log).toContain('POINT REDS HOLD')
+    expect(result.log).toContain('but not for every one recorded here')
+    expect(result.status).toBe(1)
+  })
+
+  it('reds a crossbrowser child that printed failing checks and exited 0', async () => {
+    const result = await run({ large: true, suite: 'crossbrowser', exitStatus: 0, outputs: [
+      'FAIL  chromium-mobile no console errors on mobile — getSupportedExtensions on null\nPASS  the page loads',
+    ] })
+    expect(result.log).toContain('FAIL  crossbrowser')
+    expect(result.log).toContain('POINT REDS HOLD')
+    expect(result.status).toBe(1)
   })
 })
