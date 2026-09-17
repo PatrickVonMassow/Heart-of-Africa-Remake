@@ -444,6 +444,16 @@ describe('an unlooked-at red is still a red (Astra review round 3, 17.09.2026)',
     expect(result.status).toBe(1)
   })
 
+  it('reds a crossbrowser child whose console errors arrive as a bare COUNT', async () => {
+    // `console errors: 1` with no ERR: text builds no named check, so the named
+    // reds are empty and the child exits 0 — a red with nothing to call it by.
+    const result = await run({ large: true, suite: 'crossbrowser', exitStatus: 0, outputs: [
+      'PASS  the page loads\nconsole errors: 1',
+    ] })
+    expect(result.log).toContain('FAIL  crossbrowser')
+    expect(result.status).toBe(1)
+  })
+
   it('reds a crossbrowser child whose only red is a console error and exits 0', async () => {
     const result = await run({ large: true, suite: 'crossbrowser', exitStatus: 0, outputs: [
       'PASS  the page loads\nERR: boom at http://localhost:1/a.ts:1:2',

@@ -466,7 +466,14 @@ function runCrossBrowser(baseUrl, depth) {
   // reds nothing then owned. `failedChecks` is the right reading rather than the
   // FAIL-line count, because a console error is a red that prints no FAIL line.
   const failing = failedChecks(out)
-  const ok = res.status === 0 && failing.length === 0
+  // A BARE COUNT IS A RED WITH NO NAME (Astra, round 4). `consoleErrorChecks`
+  // deliberately ignores `console errors: <n>` without the texts — there is no
+  // identity to build from a number — so a child printing the count and exiting
+  // 0 had no named red and passed. `runSuite` has always read the count as well;
+  // this reads it the same way.
+  const countMatch = out.match(/console errors: (\d+)/i)
+  const countedErrors = countMatch ? Number(countMatch[1]) : 0
+  const ok = res.status === 0 && failing.length === 0 && countedErrors === 0
   console.log(`${ok ? 'PASS' : 'FAIL'}  crossbrowser  ${pass} pass, ${fail} fail, ${skip} skip (${depth}, exit ${res.status})`)
   // Always surface the per-engine backend + any skips; on failure also the FAILs.
   for (const line of out.split('\n')) {
