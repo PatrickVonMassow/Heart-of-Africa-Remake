@@ -1610,7 +1610,7 @@ stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die s
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 17.09.2026, 08:33 · Quellen-Fingerprint: `3aabec95db84…`
+Zuletzt aktualisiert: Donnerstag, 17.09.2026, 08:53 · Quellen-Fingerprint: `c3fe02cb696b…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1707,7 +1707,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Every GUI/rendering fix must be verified on BOTH WebGPU and WebGL2 before it counts as done — never mark a render fix done on one path | 2 | mittel | render-verify-guard.mjs | ✔ Mechanismus |
 | A resumed batch session must check the previous owner's PROCESS before working — the launcher's \"provably dead\" verdict was wrong and double-spawned | 2 | mittel | render-verify-guard.mjs | ✔ Mechanismus |
 | Rotating verify AND unit failures under a running agent pool are LOAD, not bugs — 8 of 12 unit runs red from load alone; judge a red only on a quiet machine | 13 | hoch | render-verify-guard.mjs | ✔ Mechanismus |
-| The named \"version release\" process and its trigger — queue/run a version release for a version the user names (full closing → user approval → tag → mirror poc → publish /TAG/ and /poc/) | 4 | hoch | lock-release-hook.mjs | ✔ Mechanismus |
+| The named \"version release\" process and its trigger — queue/run a version release for a version the user names (full closing → user approval → tag → mirror poc → publish /TAG/ and /poc/) | 5 | hoch | lock-release-hook.mjs | ✔ Mechanismus |
 | Standing licence to move, REMOVE or ADD villages when it helps — but every change must be checked against the other requirements first, and the check has already caught a real bug | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | A VS Code restart restarts the devcontainer — every process inside dies, PPID 1 proves nothing | 13 | hoch | container-ask-guard.mjs | ✔ Mechanismus |
 | Keep the visual QA eye open for functionally-fine but weird-LOOKING oddities, not just functional bugs | 2 | mittel | — (Regel/Memory) | ◐ Regel |
@@ -1717,8 +1717,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 97 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 135 Prozess-/Meta-TASKS-Punkte (davon 66 offen).
 
-<!-- RETRO-FINGERPRINT: 3aabec95db8489099df6f59d2a1907cdf829226fa1af1f49cafb45c4296e8796 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-17T06:33:42.873Z -->
+<!-- RETRO-FINGERPRINT: c3fe02cb696ba93d436d42511f2dfd88431dcabdfc10c6ea53e4bb1e1c0b21a4 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-17T06:53:59.594Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam

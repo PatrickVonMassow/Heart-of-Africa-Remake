@@ -255,20 +255,9 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 - **Regeln und Wächter verrotten — nur merkt es niemand.** Eine Absicherung greift enger als ihr
   Satz, oder weiter; mehrere richtige Regeln können durch ihre Lücke etwas verbieten — und Warten
   sieht dabei wie Sorgfalt aus.
-  → *Prompt:* „Schreib die **Erlaubnis im selben Satz wie ihre Grenze**. Leg Satz und Code
-  periodisch **nebeneinander**, zieh **den Code auf den Satz**, und frag: **Welcher naheliegende
-  Fall wird von keiner Regel erfasst?**"
-
-- **Die gemerkte Lehre ist breiter als ihre Messung — und verbietet dann Harmloses.** Aus einem
-  echten Vorfall wird ein Merksatz, der mehr umfasst als das, was gemessen wurde. Beim nächsten
-  Lesen ist er keine Vermutung mehr, sondern eine Regel; und weil ihr Befolgen nie fehlschlägt,
-  meldet niemand den Preis. So wird aus einer Messung ein Aberglaube, der Arbeit zurückstellt.
-  → *Prompt:* „Schreib jede Lehre **mit der Grenze ihrer Messung im selben Satz** — nicht »das
-  Repository muss stillhalten«, sondern »der **eigene** Arbeitsbaum muss stillhalten, Fremdes ist
-  folgenlos«. Und bevor du wegen eines Merksatzes **Arbeit zurückstellst**, lies **den Code, der
-  ihn durchsetzt**: Die Gegenprobe kostet eine Minute, das stille Befolgen kostet dauerhaft.
-  Was du dabei richtigstellst, gehört **in dieselbe Notiz zurück** — sonst erbt der Nächste den
-  Aberglauben statt der Messung."
+  → *Prompt:* „Schreib die **Erlaubnis im selben Satz wie ihre Grenze**, Lehren ebenso. Leg
+  Satz und Code **nebeneinander**, zieh **den Code auf den Satz**, frag: **Welcher
+  naheliegende Fall wird von keiner Regel erfasst?**“
 
 - **Der genannte Ausweg trägt nicht:** Er schadet, tritt nie ein, ist längst getan — oder es gibt
   ihn als Befehl gar nicht. Dann hat die Sperre recht, und übrig bleiben Handarbeit und das
@@ -691,4 +680,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 3aabec95db8489099df6f59d2a1907cdf829226fa1af1f49cafb45c4296e8796 -->
+<!-- GUIDE-FINGERPRINT: c3fe02cb696ba93d436d42511f2dfd88431dcabdfc10c6ea53e4bb1e1c0b21a4 -->
