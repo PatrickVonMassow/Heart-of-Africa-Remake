@@ -77,62 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1045. The puzzle village has no straight walk to the water in a third of its seeds, so
-  it teaches no RIVER at all (measured 02.09.2026 while answering the cross-vendor findings of
-  point 688; the share re-measured 16.09.2026 over 124 seeds).
-  Point 688 fits the village water path by sweeping its head until the straight walk to
-  the water clears the settlement's fabric as it is DRAWN — dwellings at their true shape,
-  boxes at their corners, the compound fence panels, the pen, the play rocks, the props.
-  A village that can give no such walk gives NO water path, which is the point's own rule:
-  a track drawn through a wall teaches the wrong thing, and no teaching beats a wrong one.
-  Measured at `abf2faf49` over nine villages at six seeds, two layouts pay that price —
-  bambara-village at seeds 7 and 1337 — and there both water situations are simply absent:
-  no jar goes down, no jar comes back, and the word RIVER is never taught in that village.
-  BOTH OF THEM ARE THE PUZZLE VILLAGE, and the seed is the axis, not the village (measured
-  10.09.2026 on the user's question): the slice is bound to bambara-village
-  (`communicationRock.ts` ~21 `ROCK_VILLAGE_ID`, `store.ts` ~632 `DRUM_MESSAGE_VILLAGE`) and
-  the world seed is DRAWN at every start (`store.ts` ~618, `?seed=` is a dev switch alone).
-  So this is not a village the player never sees — it is a THIRD of all drawn seeds in which
-  the village that must teach RIVER never teaches it, before a drum message built on that word.
-  THE SHARE IS MEASURED, and it is far worse than the six swept seeds said (16.09.2026, from
-  the user's report `local/WiederKeinWasserholen.zip`, build f7a866e, seed 2987912600, replayed
-  with `buildLayout('bambara-village', 2987912600)`: `waterPath` null, `waterStand` null — no
-  adult fetches water and no jar stand stands beside the fire). A 124-seed sweep (7, 1337, both
-  reported seeds and 120 pseudo-random) gives 41 of 124 Bambara layouts with no water path:
-  ~33 %. The 1131 fix touched the arrival radius and the body avoidance, never the layout,
-  which is why the stand the user saw at an earlier seed is gone at this one. The same sweep
-  fired `devAssert` way-out-missing once (the built fabric leaves no free crossing of the
-  boundary) — recorded here, not diagnosed.
-  This point's earlier claim that the slice's village "is NOT among them" held for the
-  suites' fixed seeds only and is withdrawn. `layout.test.ts` names the two, so a third one
-  appearing goes red.
-  Final state:
-  - Every river village carries a water path, and none of them draws it through a wall.
-  - One of the two ways is taken and written down: either the track may BEND once at the
-    gap between two compounds (it is a worn footpath, not a surveyed road), or the
-    compound builder opens a GATE where the lane crosses its ring, the way a real
-    compound has one.
-  - The named-exception list in `layout.test.ts` is deleted with the cause.
-  Test: Vitest over the layout — every river village at every swept seed carries a water
-  path whose whole run clears the FULL collider set at the drawn lane's half-width, with
-  no exception list. Picture check on both backends: the track where it passes a compound.
-  Criticality: high — it costs one of the two adult words entirely, in the village the
-  player IS given, in about a THIRD of all drawn seeds (raised from medium on 10.09.2026;
-  the share measured 16.09.2026 over 124 seeds, see above).
-  QUEUE: FIRST. User order 16.09.2026 20:24, verbatim: "Ziehe 1045 vor." — moved to the head
-  of the work order on 16.09.2026, while point 1139 stood in its closing verification.
-  Refs: src/scenes/place/layout.ts (the `clearRun` sweep and the head ladder),
-  src/scenes/place/layout.test.ts (`NO_STRAIGHT_WALK`)
-  READ THE COMMENT AT THE FAILING BRANCH FIRST, it contradicts itself (found 16.09.2026 while
-  preparing this point): above the `if (!head)` arm layout.ts still claims "Nothing shipped
-  reaches this — `layout.test.ts` sweeps every river village at every seed and finds a head for
-  each", and the very next lines name the layouts that DO reach it. The first sentence is stale
-  and goes with the fix; a reader who trusts it looks for the defect somewhere else entirely.
-  Author lane: astra.
-  Why the lane: the communication mechanic is authored by Astra (user 08.09.2026); the
-  rendered picture, the browser suites and the landing stay in the main session.
-  Bundle: Dorfleben.
-
 - [ ] 1140. The settlement's cursor mode stops trapping the player: inventory by number keys,
   the lock back after every dialog, and the mode named on screen (user 16.09.2026, verbatim:
   "Die Inventar-Gegenstände lassen sich nur aufrufen, wenn man einen Cursor hat. Das ist nur
@@ -186,6 +130,65 @@ put it is the mistake this line exists to stop.
   Bundle: Steuerung & Performance — it edits the HUD's inventory bar, the place scene's
   pointer-lock effect and the keyboard-guard key list; it is worked after 1139, which edits
   the same place-scene key handling, and never beside it.
+
+- [ ] 1143. The weaver stands in the trading post's wall: the "stuck adult" of the 16.09.2026 evening
+  report is the fixed weaver vignette, whose loom stands where the seeded trading post is
+  placed, so her body is drawn inside the market hut's wall (user 16.09.2026, verbatim:
+  "Neuer Bugreport unter C:\Users\Patri\Documents\Developing\hoa\local (über backup
+  erreichbar). Reihe das als vor 1141 ein.", report title "Festklemmend", report text "Wieder
+  ein festklemmender Erwachsener"). ORDER: the user placed it BEFORE 1141.
+  THE EVIDENCE IS IN THE REPOSITORY: `local/Festklemmend.zip`, unpacked beside it in
+  `local/Festklemmend/` (copied from the backup 16.09.2026, 23:19; the folder is ignored, so it
+  travels with the checkout and not with git). Taken on production build a5e98ec — the current
+  `main`, which already carries the 1138 escape ladder — on WebGPU, seed 1838110026,
+  `bambara-village`, day 0.00, viewport 1382x984 @dpr 1.25. The overlay holds only HUD (the
+  off-screen "Market Hut" label is the nearest building); the wildlife section reads "0 animals".
+  WHAT THE PICTURE SHOWS: one adult figure (dark head, yellow cone body, one arm) standing
+  between the loom frame on its left and a large mud wall directly behind it, the body touching
+  the wall. It is NOT a walker: it is the `Weaver` vignette (`src/scenes/place/PlaceLife.tsx`
+  :505-533, mounted at :3661), drawn at the fixed loom spot (-8.5, -7) with her figure 0.55 m in
+  front of the loom toward the village centre, i.e. at (-8.08, -6.65). She never moves by design,
+  so no escape ladder (1138) and no stall detector can ever touch her — the user reads a person
+  pressed into a wall for the whole visit.
+  MEASURED 16.09.2026 (`buildLayout('bambara-village', 1838110026)`): the trading post
+  (`interactives` type `market`) stands at (-5.21, -5.76); its collider radius is 2.9 and its
+  drawn wall radius 2.6 (`MARKET_HUT.r`, `src/scenes/place/roofClearance.ts:79`). The weaver's
+  figure centre is 3.00 m from it — 0.10 m inside the collider and 0.40 m off the wall face, so
+  her 0.3 m body touches the wall. The loom centre is 0.61 m outside the collider. Swept over
+  seeds 1..1500 for the three villages, the weaver's figure lies inside a building collider on
+  97.5 % (bambara), 96.7 % (maasai) and 97.5 % (swahili) of all seeds, every time the market
+  hut; the loom frame itself clips it on ~95 %. Seeds 1, 2, 3, 4, 7 reproduce it in bambara.
+  CAUSE READ OUT OF THE CODE — measure it, do not trust it. `src/scenes/place/layout.ts`
+  :803-811 places the trading post at `[jitter(-6, 2), jitter(-6, 2)]` for the compound plan
+  (the other plans have their own spots), i.e. within ±1 m of (-6, -6), which is 2.69 m from the
+  loom spot (-8.5, -7) — less than the hut's own 2.9 m collider. The only correction applied is
+  the 7.25 m window gap to the chief's hut (:812-818). `isFree` (:848-887) keeps every LATER
+  dwelling, fence post and dressing off the `lifeSpots` (:851), but the functional buildings are
+  placed BEFORE that predicate exists and are never tested against the life spots; the loom
+  collider is only appended afterwards (:1522). The same exposure is already recorded for fences
+  in `docs/backlog.md` (entry "Zaunzuege gegen die Requisitenplaetze", the well at (9, 8.5));
+  this point is its measured building-side twin.
+  FINAL STATE: on every seed of every village, no fixed adult station of
+  `villageAdultStations` (`src/scenes/place/lifeSpots.ts:26-40`) — loom AND weaver figure,
+  talkers, pounder, drummer, well — has its prop or its figure body overlapping any building
+  collider or drawn wall, nor any fence post (fold the backlog entry in if it costs nothing
+  more than the same test). The trading post is fitted AROUND the life spots the way the water
+  stand is fitted around the adult places (:1535-1549), or the loom is moved to a spot the
+  plan keeps free — the author measures which of the two keeps the layouts of the tested
+  seeds intact (the seeded stream is shared; a dropped `rand()` reshuffles every village,
+  :820-826) and says so in the commit. The weaver faces her loom with open ground behind her.
+  VERIFIABLE: Vitest over `buildLayout` for the three villages across ≥ 300 seeds — every
+  adult-station prop collider and figure circle clear of every dwelling, interactive and fence
+  collider by at least a walker's width — the sweep above is the red test today. Plus the
+  `polish` village section photographing the weaver at the reported seed 1838110026 on both
+  backends, with the market hut's wall visibly clear behind her.
+  Criticality: high — player-visible in nearly every village on the current `main`, in the
+  village §7.1 criterion 15 is measured on, and reported by the user from a real session as
+  the third "stuck inhabitant" report in a row (1138's "third head at the hut wall with no
+  body in front of it" is likely this same figure).
+  Bundle: Dorfleben — it edits the village layout in `layout.ts` and the life spots, the same
+  place-scene paths 1080, 1081, 1082 and 1125 reach, so it is worked before them and never
+  beside them.
 
 - [ ] 1141. The settlement edge band cannot be measured at the maasai village: the same
   check reds on `main` itself (measured 16.09.2026 on a quiet machine, WebGPU, twice per
@@ -15930,3 +15933,36 @@ to land than a mechanism that needs a review.
   scripts/verify/run-all.mjs, scripts/verify/run-logged.mjs
   Bundle: Session- & Repo-Hygiene
 
+
+- [ ] 1144. Three of six probed village layouts leave no way out of the settlement,
+  and the dev assertion that says so has been firing unread (measured 17.09.2026 while
+  reviewing point 1045). `buildLayout` ends with
+  `const wayOut = pickWayOut(colliders, radius, bank)` and a `devAssert(wayOut !== null,
+  'way-out-missing', …)` at `layout.ts` ~1794. That assertion fires, and the same three
+  layouts fail IDENTICALLY on `main` and on `feat/1045-village-water-path`, so the gate
+  work is not the cause and the defect is older than it:
+  `bambara-village@2861293141`, `mandinka-village@1716508768` and
+  `mandinka-village@3170420543` all return `wayOut === null`, against three that return a
+  bearing (`bambara-village` at 2987912600, 7 and 1337). Point 1045 saw this ONCE over its
+  124-seed sweep and filed it verbatim as "recorded here, not diagnosed"; the six-pair
+  probe says the share is far larger than one in 124, and it is not confined to one people.
+  WHAT IS NOT YET KNOWN, and is the first half of this point: what the player actually
+  loses. `wayOut` is read twice further down — the flora and the loose rocks standing ON
+  the crossing are cleared with `onWayOut(...)` — so a null bearing may mean only that no
+  lane is swept clear, or it may mean the built fabric really does ring the place with no
+  gap a walker fits through. Measure that against the collider set at `WALKER_RADIUS`
+  before choosing a repair; the assertion's own text ("the built fabric leaves no crossing
+  of the boundary free") claims the second, and has never been checked.
+  Final state:
+  - Either every village layout carries a way out, or the cases that cannot are named with
+    a measured reason and the assertion stops claiming more than it knows.
+  - The dev assertion no longer fires in a green suite run: today `layout.test.ts` prints
+    it five times and passes anyway, which is exactly how it stayed unread.
+  Test: Vitest over the layout — sweep the river villages and assert `wayOut !== null`
+  (or the named, measured exception), plus a walker-radius check that the crossing the
+  bearing names is really free. No picture check unless the repair moves the fabric.
+  Criticality: medium until the player impact is measured; high if the second reading holds
+  and the player can be shut inside a settlement.
+  Refs: src/scenes/place/layout.ts (`pickWayOut`, the `way-out-missing` devAssert, `onWayOut`),
+  src/scenes/place/layout.test.ts
+  Bundle: Dorfleben

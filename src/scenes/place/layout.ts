@@ -694,6 +694,35 @@ function collidersNearRun(
   return out
 }
 
+/** A continuous corridor: each 0.1 m sample is widened by half a step,
+ * so even a grazing box corner between samples cannot touch the drawn lane. */
+function clearCorridor(colliders: readonly Collider[], head: BankPoint, foot: BankPoint, halfWidth: number): boolean {
+  const length = Math.hypot(foot.x - head.x, foot.z - head.z)
+  const steps = Math.max(1, Math.ceil(length / 0.1))
+  const clearance = halfWidth + length / steps / 2
+  const near = collidersNearRun(colliders, head.x, head.z, foot.x, foot.z, clearance)
+  if (near.length === 0) return true
+  for (let k = 0; k <= steps; k++) {
+    const x = head.x + (foot.x - head.x) * k / steps
+    const z = head.z + (foot.z - head.z) * k / steps
+    if (!standingClear(near, x, z, clearance)) return false
+  }
+  return true
+}
+
+/** Open the compound where the water lane crosses its ring. Remove both ends
+ * of each obstructing panel; surviving posts still carry their short drawn
+ * panels, and fenceColliders leaves the resulting gap open. */
+function waterGate(fence: FenceDef, head: BankPoint, foot: BankPoint): FenceDef {
+  const removed = new Set<number>()
+  fenceColliders(fence).forEach((panel, i) => {
+    if (clearCorridor([panel], head, foot, WATER_PATH_WIDTH / 2)) return
+    removed.add(i)
+    if (panel.kind === 'segment') removed.add((i + 1) % fence.posts.length)
+  })
+  return { ...fence, posts: fence.posts.filter((_, i) => !removed.has(i)) }
+}
+
 /** Side of one bucket of `colliderBuckets`, in metres. Wide enough that a
  *  settlement fills a few dozen buckets, narrow enough that one holds a handful
  *  of bodies. */
@@ -828,6 +857,7 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
 
   const dwellings: DwellingDef[] = []
   const fences: FenceDef[] = []
+  const compoundFences = new Set<FenceDef>()
   const paths: PathDef[] = []
   const errands: Array<[number, number]> = []
   let pen: PlaceLayout['pen'] = null
@@ -1303,10 +1333,12 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
         const openingAngle = Math.atan2(-cz, -cx)
         if (walled) {
           // Fence around the compound, opening toward the plaza.
-          fences.push({
+          const fence: FenceDef = {
             kind: style.fence === 'stone' ? 'stone' : 'woven',
             posts: fenceRing(cx, cz, ring, style.fence === 'stone' ? 1.0 : 0.9, [[openingAngle, 0.7]]),
-          })
+          }
+          fences.push(fence)
+          compoundFences.add(fence)
         }
         const gx = cx + Math.cos(openingAngle) * ring
         const gz = cz + Math.sin(openingAngle) * ring
@@ -1500,16 +1532,23 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
         colliders.push({ x: d.x, z: d.z, r: dwellingCircleRadius(d, style) ?? d.r + 0.3 })
     }
   }
-  for (const f of fences) colliders.push(...fenceColliders(f))
-  // The two entries the play rocks occupy are remembered, because the stage they
-  // draw is derived from bank points that have not settled yet: once they have,
-  // the settled pair is written back into these same slots rather than appended
-  // a second time.
-  const playRockSlots: number[] = []
-  if (playRocks) {
-    playRockSlots.push(colliders.length, colliders.length + 1)
-    colliders.push({ x: playRocks.upstream.x, z: playRocks.upstream.z, r: playRocks.r })
-    colliders.push({ x: playRocks.downstream.x, z: playRocks.downstream.z, r: playRocks.r })
+  const fenceColliderStart = colliders.length
+  const compoundColliders = new Set<Collider>()
+  for (const f of fences) {
+    const run = fenceColliders(f)
+    colliders.push(...run)
+    if (compoundFences.has(f)) for (const c of run) compoundColliders.add(c)
+  }
+  const fenceColliderCount = colliders.length - fenceColliderStart
+  // Keep the rock bodies themselves: opening a fence gate below changes the
+  // number of colliders before them. Once the bank settles, these same bodies
+  // move with it without adding a second pair or overwriting another prop.
+  const playRockColliders = playRocks ? {
+    upstream: { x: playRocks.upstream.x, z: playRocks.upstream.z, r: playRocks.r },
+    downstream: { x: playRocks.downstream.x, z: playRocks.downstream.z, r: playRocks.r },
+  } : null
+  if (playRockColliders) {
+    colliders.push(playRockColliders.upstream, playRockColliders.downstream)
   }
   if (place.kind === 'village') {
     // The fire pit alone (work-order 604). The cook used to carry a collider of
@@ -1538,9 +1577,9 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   // placed BEFORE the children's quarter is searched, so the quarter is fitted
   // around it exactly as it is around the other adult places.
   let waterStand: PlaceLayout['waterStand'] = null
-  /** Where the stand's own collider sits, so it can be taken out again if the
-   *  water path it was placed for is discarded further down. */
-  let standColliderAt = -1
+  /** Retain the stand's body across fence splices, so it can be removed if
+   *  the water path it was placed for is discarded further down. */
+  let standCollider: Collider | null = null
   if (place.kind === 'village' && waterPath && bank) {
     const standClear = colliderBuckets(colliders, WATER_STAND_RADIUS)
     const walkClear = colliderBuckets(colliders, WALKER_RADIUS)
@@ -1582,8 +1621,8 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
       if (waterStand) break
     }
     if (waterStand) {
-      standColliderAt = colliders.length
-      colliders.push({ x: waterStand.x, z: waterStand.z, r: WATER_STAND_RADIUS })
+      standCollider = { x: waterStand.x, z: waterStand.z, r: WATER_STAND_RADIUS }
+      colliders.push(standCollider)
     }
   }
 
@@ -1684,20 +1723,9 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   // bends round three huts, and a straight one is also what reads as a path to
   // the river from inside the village.
   if (waterPath) {
-    // THE WALK IS TESTED AGAINST THE FABRIC AS IT IS DRAWN — ALL OF IT. It used
-    // to be tested against the dwellings as CIRCLES of radius `d.r`, which a
-    // box, a warehouse and a mosque all reach past at their corners, and the
-    // compound fences were not in the reckoning at all, so an accepted track
-    // could cross a drawn wall. It asks `standingClear` now, over the whole
-    // collider set — the same predicate the carrier's own step obeys.
-    //
-    // AND WHERE THAT LEAVES NO WALK, THERE IS NO PATH, which is this point's own
-    // rule: a track drawn through a wall teaches the wrong thing, and no
-    // teaching beats a wrong one. Measured over nine villages at six seeds, two
-    // layouts pay that price — bambara at 7 and at 1337 — and the village the
-    // communication slice is actually played in is not one of them. Work-order
-    // 1045 removes the cause rather than the rule: either the track may bend
-    // once at the gap, or the compound builder opens a gate where it crosses.
+    // Gate option (work-order 1045): prefer the existing clear walk. If only
+    // compound walls prevent it, open their rings at the crossing. Buildings,
+    // pens, props and the children's places remain obstacles in both searches.
     // TWO CLEARANCES, EACH WITH ITS OWN REASON. Against solid fabric the rule is
     // that the DRAWN track never overlaps it — half the lane's width — and the
     // carrier walking its middle is narrower than that, so nothing further is
@@ -1707,30 +1735,14 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     const drawnHalf = WATER_PATH_WIDTH / 2
     const laneClearance = drawnHalf + WALKER_RADIUS
     const foot = waterPath.foot
-    const clearRun = (head: BankPoint) => {
-      // AND IT NEVER CROSSES THE CHILDREN'S RUNNING LANE. A carrier walking
-      // through the middle of a run would be read as part of the game, and the
-      // two teachings have to stay separable. Sampled along the whole walk, not
-      // only at its foot: the straight line from the village middle to the water
-      // cuts the lane's chord even when both of its ENDS lie clear of it.
-      // SAMPLED BY LENGTH, NOT BY A FIXED COUNT. Forty-eight samples over a
-      // twenty-metre walk leave gaps of 0.4 m, and a fence post or a box corner
-      // that overlaps the lane by less than that slips between two of them
-      // (GPT-5.6 Sol, confirming round, path clearance). A step of a tenth of a
-      // metre is finer than the thinnest body in the set.
+    const clearRun = (head: BankPoint, solids: readonly Collider[]) => {
+      if (!clearCorridor(solids, head, foot, drawnHalf)) return false
       const runLength = Math.hypot(foot.x - head.x, foot.z - head.z)
       const steps = Math.max(48, Math.ceil(runLength / 0.1))
-      // The fabric this walk could possibly meet, once per candidate rather than
-      // once per sample: three hundred samples over a settlement's whole collider
-      // set, for every bearing of the sweep, was the single most expensive thing
-      // in the layout. `collidersNearRun` throws away only what the corridor
-      // cannot reach, so the answer is the same one.
-      const near = collidersNearRun(colliders, head.x, head.z, foot.x, foot.z, drawnHalf)
       for (let t = 0; t <= steps; t++) {
         const x = head.x + (foot.x - head.x) * (t / steps)
         const z = head.z + (foot.z - head.z) * (t / steps)
-        if (inBankPlayLane(playRocks, x, z, laneClearance)) return false
-        if (!standingClear(near, x, z, drawnHalf)) return false
+        if (inBankPlayLane(playRocks, x, z, laneClearance + runLength / steps / 2)) return false
       }
       return true
     }
@@ -1741,44 +1753,46 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     // steps, and at each bearing a little nearer and a little further out — the
     // first head that gives a clear walk wins, so the track stays as near the
     // direct line as the plan and the children's lane allow.
-    let head: BankPoint | null = null
-    for (let step = 0; step <= WATER_PATH_HEAD_SWEEP && !head; step++) {
-      for (const sign of step === 0 ? [1] : [-1, 1]) {
-        const a = base + sign * step * (Math.PI / 180)
-        for (const r of WATER_PATH_HEAD_RADII) {
-          const cand = { x: Math.cos(a) * r, z: Math.sin(a) * r }
-          if (!isFree(cand.x, cand.z, 2.0, WALKER_RADIUS)) continue
-          // NO ADULT VOICE INSIDE THE CHILDREN'S EARSHOT (item 6): both water
-          // carriers speak at the head, so the head keeps the hearing radius from
-          // the quarter the children roam.
-          if (inPlayEarshot(cand.x, cand.z)) continue
-          if (!clearRun(cand)) continue
-          head = cand
-          break
+    const findHead = (solids: readonly Collider[]): BankPoint | null => {
+      for (let step = 0; step <= WATER_PATH_HEAD_SWEEP; step++) {
+        for (const sign of step === 0 ? [1] : [-1, 1]) {
+          const a = base + sign * step * (Math.PI / 180)
+          for (const r of WATER_PATH_HEAD_RADII) {
+            const cand = { x: Math.cos(a) * r, z: Math.sin(a) * r }
+            if (!isFree(cand.x, cand.z, 2.0, WALKER_RADIUS)) continue
+            if (inPlayEarshot(cand.x, cand.z)) continue
+            if (clearRun(cand, solids)) return cand
+          }
         }
-        if (head) break
+      }
+      return null
+    }
+    let head = findHead(colliders)
+    if (!head && compoundFences.size > 0) {
+      const fixed = colliders.filter((c) => !compoundColliders.has(c))
+      const candidate = findHead(fixed)
+      if (candidate) {
+        const gated = fences.map((f) => compoundFences.has(f) ? waterGate(f, candidate, foot) : f)
+        const fenceRun = gated.flatMap(fenceColliders)
+        // Validate the rebuilt run before committing either the drawn posts or
+        // the colliders. No invisible wall and no erased collision-only wall.
+        if (clearRun(candidate, [...fixed, ...fenceRun])) {
+          head = candidate
+          fences.splice(0, fences.length, ...gated)
+          colliders.splice(fenceColliderStart, fenceColliderCount, ...fenceRun)
+        }
       }
     }
-    // A settlement that can give no clear walk gives NO water path at all: an
-    // adult whose RIVER falls on a track through the children's running lane
-    // teaches the wrong thing, and no teaching beats a wrong one. Its adults then
-    // keep only their digging, exactly as a village without a river does.
-    // Nothing shipped reaches this — `layout.test.ts` sweeps every river village
-    // at every seed and finds a head for each.
+    devAssert(head !== null, 'water-path-missing', () => `${place.id}@${seed}: no clear water lane, even with compound gates`)
     if (!head) {
-      // MEASURED, NAMED, AND NOT ASSERTED. Two of the swept layouts reach this,
-      // and an alarm that fires on a known, filed condition is one its reader
-      // learns to skip. `layout.test.ts` names exactly which layouts pay it and
-      // points at work-order 1045; a THIRD one appearing is what that case
-      // catches.
+      // Fail closed if a future plan breaks the invariant: never draw through
+      // a solid body or leave a stand that no carrier can serve.
       waterPath = null
-      // AND THE STAND GOES WITH IT. It is placed further up, while every bank
-      // still has a provisional path, so a settlement whose head search finds no
-      // clear walk kept a water stand no adult ever visits — furniture with a
-      // collider and no errand behind it. Measured 12.09.2026: bambara-village
-      // at seeds 2 and 7.
-      if (standColliderAt >= 0) colliders.splice(standColliderAt, 1)
-      standColliderAt = -1
+      if (standCollider) {
+        const at = colliders.indexOf(standCollider)
+        if (at >= 0) colliders.splice(at, 1)
+        standCollider = null
+      }
       waterStand = null
     } else {
       waterPath.head = head
@@ -1883,8 +1897,9 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     // the search would have an endpoint refuse a step because of a rock that
     // would have taken the same step. Left in, the silent three-metre search can
     // run out without finding free ground that was there all along.
-    const staged = new Set(playRockSlots)
-    const probe = playRockSlots.length ? colliders.filter((_, i) => !staged.has(i)) : colliders
+    const probe = playRockColliders
+      ? colliders.filter((c) => c !== playRockColliders.upstream && c !== playRockColliders.downstream)
+      : colliders
     settleBankPoints(bank, (x, z) => spawnPointFree(probe, x, z, WALKER_RADIUS))
     // AND THE STAGE FOLLOWS THE BANK IT IS DERIVED FROM. Settling may pull the
     // endpoints inland; the play rocks were computed before it, so trusting them
@@ -1894,12 +1909,12 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     // exactly why this is re-derived rather than trusted: a divergence that never
     // happens has no symptom until the day it does, and then it is a player
     // standing between two banks.
-    if (playRocks) {
+    if (playRocks && playRockColliders) {
       const settled = bankPlayRocks(bank)
       playRocks.upstream = settled.upstream
       playRocks.downstream = settled.downstream
-      colliders[playRockSlots[0]] = { x: settled.upstream.x, z: settled.upstream.z, r: playRocks.r }
-      colliders[playRockSlots[1]] = { x: settled.downstream.x, z: settled.downstream.z, r: playRocks.r }
+      Object.assign(playRockColliders.upstream, settled.upstream)
+      Object.assign(playRockColliders.downstream, settled.downstream)
     }
   }
 

@@ -29188,3 +29188,59 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   a wrong split would silence the guess, so the Vitest pair is the gate.
   Bundle: Steuerung & Performance — it edits the place scene's key handling and the
   keyboard-guard key list, which no other open point touches.
+
+- [x] 1045. The puzzle village has no straight walk to the water in a third of its seeds, so
+  it teaches no RIVER at all (measured 02.09.2026 while answering the cross-vendor findings of
+  point 688; the share re-measured 16.09.2026 over 124 seeds).
+  Point 688 fits the village water path by sweeping its head until the straight walk to
+  the water clears the settlement's fabric as it is DRAWN — dwellings at their true shape,
+  boxes at their corners, the compound fence panels, the pen, the play rocks, the props.
+  A village that can give no such walk gives NO water path, which is the point's own rule:
+  a track drawn through a wall teaches the wrong thing, and no teaching beats a wrong one.
+  Measured at `abf2faf49` over nine villages at six seeds, two layouts pay that price —
+  bambara-village at seeds 7 and 1337 — and there both water situations are simply absent:
+  no jar goes down, no jar comes back, and the word RIVER is never taught in that village.
+  BOTH OF THEM ARE THE PUZZLE VILLAGE, and the seed is the axis, not the village (measured
+  10.09.2026 on the user's question): the slice is bound to bambara-village
+  (`communicationRock.ts` ~21 `ROCK_VILLAGE_ID`, `store.ts` ~632 `DRUM_MESSAGE_VILLAGE`) and
+  the world seed is DRAWN at every start (`store.ts` ~618, `?seed=` is a dev switch alone).
+  So this is not a village the player never sees — it is a THIRD of all drawn seeds in which
+  the village that must teach RIVER never teaches it, before a drum message built on that word.
+  THE SHARE IS MEASURED, and it is far worse than the six swept seeds said (16.09.2026, from
+  the user's report `local/WiederKeinWasserholen.zip`, build f7a866e, seed 2987912600, replayed
+  with `buildLayout('bambara-village', 2987912600)`: `waterPath` null, `waterStand` null — no
+  adult fetches water and no jar stand stands beside the fire). A 124-seed sweep (7, 1337, both
+  reported seeds and 120 pseudo-random) gives 41 of 124 Bambara layouts with no water path:
+  ~33 %. The 1131 fix touched the arrival radius and the body avoidance, never the layout,
+  which is why the stand the user saw at an earlier seed is gone at this one. The same sweep
+  fired `devAssert` way-out-missing once (the built fabric leaves no free crossing of the
+  boundary) — recorded here, not diagnosed.
+  This point's earlier claim that the slice's village "is NOT among them" held for the
+  suites' fixed seeds only and is withdrawn. `layout.test.ts` names the two, so a third one
+  appearing goes red.
+  Final state:
+  - Every river village carries a water path, and none of them draws it through a wall.
+  - One of the two ways is taken and written down: either the track may BEND once at the
+    gap between two compounds (it is a worn footpath, not a surveyed road), or the
+    compound builder opens a GATE where the lane crosses its ring, the way a real
+    compound has one.
+  - The named-exception list in `layout.test.ts` is deleted with the cause.
+  Test: Vitest over the layout — every river village at every swept seed carries a water
+  path whose whole run clears the FULL collider set at the drawn lane's half-width, with
+  no exception list. Picture check on both backends: the track where it passes a compound.
+  Criticality: high — it costs one of the two adult words entirely, in the village the
+  player IS given, in about a THIRD of all drawn seeds (raised from medium on 10.09.2026;
+  the share measured 16.09.2026 over 124 seeds, see above).
+  QUEUE: FIRST. User order 16.09.2026 20:24, verbatim: "Ziehe 1045 vor." — moved to the head
+  of the work order on 16.09.2026, while point 1139 stood in its closing verification.
+  Refs: src/scenes/place/layout.ts (the `clearRun` sweep and the head ladder),
+  src/scenes/place/layout.test.ts (`NO_STRAIGHT_WALK`)
+  READ THE COMMENT AT THE FAILING BRANCH FIRST, it contradicts itself (found 16.09.2026 while
+  preparing this point): above the `if (!head)` arm layout.ts still claims "Nothing shipped
+  reaches this — `layout.test.ts` sweeps every river village at every seed and finds a head for
+  each", and the very next lines name the layouts that DO reach it. The first sentence is stale
+  and goes with the fix; a reader who trusts it looks for the defect somewhere else entirely.
+  Author lane: astra.
+  Why the lane: the communication mechanic is authored by Astra (user 08.09.2026); the
+  rendered picture, the browser suites and the landing stay in the main session.
+  Bundle: Dorfleben.

@@ -88,7 +88,8 @@ Füllstand empfiehlt ein leeres Modell.
    > null Fehler, Warnungen und bekannte Lücken melden, und ein Fehlschlag muss die
    > Weiterarbeit blockieren, und **kein Stand darf hochgeladen werden, den die
    > Pipeline ablehnen würde** — sonst ist die Prüfung keine Absicherung, sondern
-   > eine Fehlermail. Überdecke nie einen Fehlschlag — zeig mir den Output."
+   > eine Fehlermail. Überdecke nie einen Fehlschlag — zeig mir den Output, und lies
+   > kein Ergebnis am Rückgabewert einer **Pipe** ab: beweise es am Ziel."
 
 5. **Regeln mechanisch erzwingen — nicht auf Vorsätze vertrauen (das Kernprinzip).**
    Unter Druck fällt genau der nicht-erzwungene Schritt weg; warte **nicht** auf den
@@ -175,14 +176,13 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   beschreibt**. Wer entscheidet, ob **ein anderer anfangen darf**, misst einen **Handelnden** —
   Prozess oder Handle, nie Textsuche oder Dateien: **Arbeit ist kein Arbeiter.** Aus totem
   **Besitzer** folgt **Übernahme**, nie Neustart.“
-- **Die Sonde kann ihr Nein nicht erreichen.** Die Prüfung könnte „tot“ sagen — aber nur, wenn man
-  ihr den Beweis übergibt, und genau dieser Aufrufer übergibt ihn nicht. Ihr „lebt noch“ ist dann
-  der einzig mögliche Satz.
-  → *Prompt:* „Frag zu jeder Prüfung: **Kann sie mit den Eingaben dieses Aufrufers das negative
-  Urteil überhaupt erreichen?** Wo nein, ist ihr Grün eine Tautologie. Und einen Fix an einer
-  gemeinsamen Funktion prüfst du an **allen** Aufrufstellen, nicht nur an der, die dich biss. Und
-  lies ihre **Ausnahmen**: Setzt derselbe Mechanismus, dessen Schaden sie melden soll, das Flag,
-  das sie freistellt, schweigt sie genau dann, wenn es zählt.“
+- **Die Sonde kann ihr Nein nicht erreichen.** Die Prüfung könnte „tot“ sagen — aber nur mit einem
+  Beweis, den genau dieser Aufrufer nie übergibt. Ihr „lebt noch“ ist der einzig mögliche Satz.
+  → *Prompt:* „Frag zu jeder Prüfung: **Kann sie mit diesen Eingaben ihr Nein überhaupt erreichen?** Wo nein, ist ihr Grün eine Tautologie. Einen Fix an gemeinsamem
+  Code prüfst du an **allen** Aufrufstellen, nicht nur der, die dich biss. Lies ihre
+  **Ausnahmen**: Setzt der Mechanismus, dessen Schaden sie meldet, selbst ihr Freistellungs-Flag,
+  schweigt sie, wenn es zählt. Und ein Urteil braucht einen **Empfänger**: Was bei
+  grünem Lauf nur auf stderr meldet, liest niemand.“
 
 - **Neue Features zerbrechen alte.** Eine Änderung repariert X und bricht das unbeobachtete Y.
   → *Prompt:* „Prüfe jede Mechanik auch im **Danach-Zustand** und erzwing nach jedem
@@ -255,9 +255,9 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 - **Regeln und Wächter verrotten — nur merkt es niemand.** Eine Absicherung greift enger als ihr
   Satz, oder weiter; mehrere richtige Regeln können durch ihre Lücke etwas verbieten — und Warten
   sieht dabei wie Sorgfalt aus.
-  → *Prompt:* „Schreib die **Erlaubnis im selben Satz wie ihre Grenze**. Leg Satz und Code
-  periodisch **nebeneinander**, zieh **den Code auf den Satz**, und frag: **Welcher naheliegende
-  Fall wird von keiner Regel erfasst?**"
+  → *Prompt:* „Schreib die **Erlaubnis im selben Satz wie ihre Grenze**, Lehren ebenso. Leg
+  Satz und Code **nebeneinander**, zieh **den Code auf den Satz**, frag: **Welcher
+  naheliegende Fall wird von keiner Regel erfasst?**“
 
 - **Der genannte Ausweg trägt nicht:** Er schadet, tritt nie ein, ist längst getan — oder es gibt
   ihn als Befehl gar nicht. Dann hat die Sperre recht, und übrig bleiben Handarbeit und das
@@ -590,11 +590,10 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 - **Die Schranke verlangt genau das, was gerade entsteht.** Sie lässt nicht aufhören, solange
   ein Nachweis fehlt — und der Nachweis ist der Lauf, der noch zwei Stunden braucht.
-  Verweigerung und eigene Abhilfe laufen gegeneinander.
   → *Prompt:* „Eine Schranke, die einen Nachweis fordert, muss ‚wird gerade erstellt' als
-  eigenen Zustand **durchlassen** — sonst verbietet sie ihre eigene Erfüllung. Und misst sie am
+  eigenen Zustand **durchlassen** — sonst verbietet sie ihre eigene Erfüllung. Misst sie am
   **falschen Gegenstand**, ist sie nie erfüllbar: Widersprechen sich zwei Schranken, ist das ein
-  **Defekt**, kein Bedienfehler — messen, ablegen, nicht in jedem Zug neu beantworten."
+  **Defekt** — messen, ablegen, nicht in jedem Zug neu beantworten."
 
 - **Ein Rot, das bei gleichem Code kommt und geht, ist ein Befund über deine MESSUNG.** Eine
   Stichprobe aus einem langen Vorgang trifft den Defekt mal und verfehlt ihn mal.
@@ -614,7 +613,7 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 - **Du nimmst einen geteilten Eintrag heraus — was darauf stand, bleibt stehen.** Wer eine
   Ausnahmeliste oder einen Kulissenwert löscht, sieht den Eintrag, nicht seine Nutzer. Das Rot
-  kommt dann im Tor — und steht das Tor hinter dem Merge, steht auch dein Hauptzweig halb
+  kommt dann im Tor — steht es hinter dem Merge, steht dein Hauptzweig halb
   gelandet da.
   → *Prompt:* „Löschen ist **Umbau**: Entfernst du einen geteilten Eintrag, such im selben Zug,
   **wer auf ihm steht**. Benutzt eine Testkulisse **lebende Daten**, schreib das über sie. Und
@@ -631,8 +630,8 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 - **Der Auftrag kam ohne Code zurück — und das war richtig.** Wenn das zweite Modell die
   Aufgabe zurückweist, statt sie zu bauen, meldet euer Werkzeug einen Fehlschlag: nichts
-  committet, keine Tests grün. Genau dann lohnt sich das Lesen am meisten, denn oft steckt
-  dort ein Widerspruch in eurer eigenen Aufgabenstellung.
+  committet, keine Tests grün. Genau dann lohnt das Lesen am meisten: oft steckt
+  dort ein Widerspruch in eurer Aufgabenstellung.
   → *Prompt:* „Wenn die Aufgabe sich nicht widerspruchsfrei bauen lässt, **baue sie nicht** —
   schreib mir auf, welche Annahme nicht trägt. Eine begründete Zurückweisung ist ein
   Ergebnis, kein Fehlschlag."
@@ -681,4 +680,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 0871e7943c2fcc73bc0488d38bdbd1aff3344de295622628b85183076b5faad5 -->
+<!-- GUIDE-FINGERPRINT: c3fe02cb696ba93d436d42511f2dfd88431dcabdfc10c6ea53e4bb1e1c0b21a4 -->

@@ -9,6 +9,22 @@ when their area is touched anyway or a triage says otherwise.
 Format: one line per finding — `- YYYY-MM-DD <source> — <finding>`.
 
 <!-- entries -->
+- 2026-09-17 batch owner (01:26 and 08:05, `.claude/batch-launcher.log` "stopping on SIGTERM")
+  — a `kill` sent from inside the container to headless Chrome processes (orphans reparented
+  to PID 1, or a process group holding the detached logged run) stopped the WHOLE container
+  within seconds, twice in one morning, with the WSL VM alive the second time. A suite that
+  closes Chrome through Playwright survives. Operating rule recorded in the owner memory:
+  never signal Chrome from inside; abandon a run with `batch-in-flight.mjs --clear` and let
+  the wrapper run out. Point 1069 should record the trigger as the signal, not the suite;
+  point 1064 covers the missing container restart policy. PROMOTE to a point if it recurs
+  without a kill.
+- 2026-09-17 context handover (`scripts/batch-in-flight.mjs` ~1286, `assessTransfer`)
+  — a declared logged run is judged transferable only when its record's HEAD equals
+  `currentHeadOf({cwd})`, the MAIN tree's HEAD, so a run on a point's worktree can never
+  transfer: `--prepare --context` blocks with "its run covers HEAD <branch tip>, not the
+  <main HEAD> being handed over", and of its four named ways out only ABANDON works, which
+  throws the run away (measured twice: 01:23 by the predecessor, 08:03 by this session).
+  Simplification: compare against the declared `--branch` tip when the declaration names one.
 - 2026-09-16 point 1139 landing (`scripts/verify/baseline-classify.mjs`, `scripts/render-verify-guard.mjs`)
   — a classification run records its BASELINE measurement into the point's own render-verify
   state, so the branch inherits reds that belong to the code WITHOUT its change. Measured today:
@@ -1192,6 +1208,14 @@ Freigabe. Der billige Weg wäre eine Zeile in beiden Einstiegen, die `--help`
 und `-h` vor jeder Arbeit abfängt und die Nutzungszeile druckt, die in
 `run-logged.mjs` bereits im Kopfkommentar steht.
 
+WIEDERHOLUNG AM 17.09.2026, und zwar genau auf dem hier beschriebenen Weg: Die
+Nachfolgesitzung kannte `run-wait.mjs --help`, probierte es beim Nachbarn
+`run-all.mjs` und startete einen vollen Lauf, den sie nach rund 40 Sekunden
+abbrach. Zweimal in zwölf Stunden, von zwei verschiedenen Sitzungen, ist keine
+Unachtsamkeit mehr, sondern die vorhergesagte Wirkung. Der Eintrag wird nicht
+verdoppelt; die Lehre steht jetzt zusätzlich im Gedächtnis, wo sie vor dem
+Aufruf gelesen wird, statt nur hier, wo sie danach gefunden wird.
+
 ## Der Warteschlangen-Neubau überschreibt die Prosa der aktuellen Karte (16.09.2026)
 
 `node scripts/board-queue.mjs` baut die Warteschlange aus dem Arbeitsauftrag neu — und ersetzt
@@ -1232,3 +1256,33 @@ die unwiederbringlichen Fehlerberichte des Nutzers.
 
 Nicht als Punkt eingereiht: der Handgriff dauert Sekunden und ist hier beschrieben; die Blockade
 ist damit aufgehoben, und der Infrastruktur-Stopp gilt weiter.
+
+## Der Unit-Lauf liest eine Datei außerhalb jedes Checkouts und stirbt an ihr (17.09.2026)
+
+Der Bildlauf zu Punkt 1045 starb nach 7m 04s in der Unit-Stufe, ohne ein
+einziges Bild zu zeichnen: `scripts/guard-hooks.test.mjs > doc-budget-guard >
+ALLOWS documents within budget` erwartete `clean` und bekam `would-block`.
+Ursache war keine Codeänderung, sondern eine Zeile in `MEMORY.md`, die die
+Sitzung während des Laufs hinzufügte und zwei Minuten später wieder entfernte.
+`scripts/doc-budget-core.mjs` führt `MEMORY.md` (Ort `project-memory`) unter den
+Dokumenten, die es LIVE vermisst; für diese zwei Minuten lag die Datei über
+ihrem Budget, und der Test, der nur prüft, ob der Wächter überhaupt
+durchlässt, ging mit ihr rot. Derselbe Baum lief danach in 1,9 s grün.
+
+Die Absicherung, die genau das verhindern soll, konnte es nicht sehen:
+`scripts/repository-integrity.mjs` prüft HEAD, Index, eigenen Branch-Ref und
+geteilte Config des laufenden Arbeitsbaums. `MEMORY.md` liegt in
+`~/.claude/projects/…/memory/`, außerhalb jedes Checkouts — kein Ref, kein
+Index, kein Arbeitsbaum hat sich bewegt. Der Lauf ist an dieser Stelle also
+nicht hermetisch: jede Sitzung, die ihr Gedächtnis pflegt, kann eine fremde
+Verifikation umbringen, und der Befund nennt dabei ein Dokument, das mit der
+geprüften Änderung nichts zu tun hat.
+
+Nicht als Punkt eingereiht: kein Spielerimpakt und keine falsche Freigabe — der
+Lauf wird korrekt rot und korrekt aufgezeichnet. Die Kosten sind Maschinenzeit
+und eine irreführende Fehlermeldung. Zwei billige Wege stehen offen, falls es
+wiederkommt: den Budget-Fall des Wächtertests gegen eine FESTE Vorrichtung
+laufen lassen statt gegen die lebenden Dokumente, oder `MEMORY.md` aus der
+live vermessenen Liste nehmen und ihr Budget allein im Stop-Hook prüfen.
+Bis dahin gilt die Regel, die jetzt im Gedächtnis steht: Während eines Laufs
+wird gelesen — auch im Gedächtnisverzeichnis.
