@@ -14,7 +14,7 @@ const cleanEnv = withoutGitLocalEnvironment()
 
 function node(cwd, code, extraEnv = {}) {
   return execFileSync(process.execPath, ['--input-type=module', '-e', code], {
-    cwd, encoding: 'utf8', timeout: 20_000,
+    windowsHide: true, cwd, encoding: 'utf8', timeout: 20_000,
     env: { ...cleanEnv, HOA_REPO_ROOT: cwd, ...extraEnv },
   }).trim()
 }
@@ -25,7 +25,7 @@ function fixture({ runner = false } = {}) {
   const linked = join(main, '.claude', 'worktrees', 'point-fixture')
   mkdirSync(join(main, '.claude'), { recursive: true })
   const git = (...args) => execFileSync('git', ['-C', main, ...args], {
-    env: cleanEnv, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
+    windowsHide: true, env: cleanEnv, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
   }).trim()
   git('init', '-q', '-b', 'main')
   git('config', 'user.name', 'Fixture')
@@ -42,7 +42,7 @@ function fixture({ runner = false } = {}) {
       import { execFileSync, spawnSync } from 'node:child_process';
       const section = process.argv.find(a => a.startsWith('--section='))?.split('=')[1] || '';
       execFileSync(process.execPath, ['scripts/verify/settings.mjs'], {
-        stdio: 'inherit', env: { ...process.env, VERIFY_SECTION: section }
+        windowsHide: true, stdio: 'inherit', env: { ...process.env, VERIFY_SECTION: section }
       });
     `)
     writeFileSync(join(main, 'scripts/verify/settings.mjs'), `
@@ -64,7 +64,7 @@ function fixture({ runner = false } = {}) {
 
 function cleanup(main, linked) {
   return execFileSync(process.execPath, [join(SOURCE, 'worktree-cleanup.mjs'), linked], {
-    cwd: main, env: { ...cleanEnv, HOA_REPO_ROOT: main }, encoding: 'utf8', timeout: 20_000,
+    windowsHide: true, cwd: main, env: { ...cleanEnv, HOA_REPO_ROOT: main }, encoding: 'utf8', timeout: 20_000,
   })
 }
 
@@ -160,7 +160,7 @@ describe('coverage follows the verified commit', () => {
     const run = (backend, args = []) => {
       const result = spawnSync(process.execPath,
       [join(linked, 'scripts/verify/run-logged.mjs'), 'settings', '--again', ...args],
-      { cwd: linked, env: { ...env, VERIFY_GL: backend }, encoding: 'utf8', timeout: 20_000 })
+      { windowsHide: true, cwd: linked, env: { ...env, VERIFY_GL: backend }, encoding: 'utf8', timeout: 20_000 })
       expect(result.status, result.stdout + result.stderr).toBe(0)
     }
     run('webgpu', ['--section=evidence', '--log-file', relative(linked, join(main, 'local/verify-logs/section.log'))])
@@ -184,12 +184,12 @@ describe('coverage follows the verified commit', () => {
       expect(readFileSync(record.log, 'utf8')).toContain('PASS  fixture evidence')
       expect(record.cmdline).toContain(record.log)
       const shown = execFileSync(process.execPath, [join(main, 'scripts/verify/run-logged.mjs'), '--show', record.log], {
-        cwd: main, env: { ...env, HOA_REPO_ROOT: main }, encoding: 'utf8', timeout: 20_000,
+        windowsHide: true, cwd: main, env: { ...env, HOA_REPO_ROOT: main }, encoding: 'utf8', timeout: 20_000,
       })
       expect(shown).toContain('PASS  fixture evidence')
     }
     const status = execFileSync(process.execPath, [join(main, 'scripts/render-verify-guard.mjs'), '--status'], {
-      cwd: main, env: { ...env, HOA_REPO_ROOT: main }, encoding: 'utf8', timeout: 20_000,
+      windowsHide: true, cwd: main, env: { ...env, HOA_REPO_ROOT: main }, encoding: 'utf8', timeout: 20_000,
     })
     expect(status.match(/covered by settings/g)).toHaveLength(2)
     const guardModule = pathToFileURL(join(main, 'scripts/render-verify-guard.mjs')).href
