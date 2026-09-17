@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { execFileSync, spawnSync } from 'node:child_process'
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { join, relative, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { withoutGitLocalEnvironment } from './repo-paths.mjs'
 import { coverageForHead } from './render-verify-guard.mjs'
@@ -163,7 +163,7 @@ describe('coverage follows the verified commit', () => {
       { cwd: linked, env: { ...env, VERIFY_GL: backend }, encoding: 'utf8', timeout: 20_000 })
       expect(result.status, result.stdout + result.stderr).toBe(0)
     }
-    run('webgpu', ['--section=evidence'])
+    run('webgpu', ['--section=evidence', '--log-file', relative(linked, join(main, 'local/verify-logs/section.log'))])
     for (const backend of ['webgpu', 'webgl']) run(backend)
     const statePath = join(main, '.claude/render-verify-state.json')
     const state = JSON.parse(readFileSync(statePath, 'utf8'))
@@ -188,6 +188,10 @@ describe('coverage follows the verified commit', () => {
       })
       expect(shown).toContain('PASS  fixture evidence')
     }
+    const status = execFileSync(process.execPath, [join(main, 'scripts/render-verify-guard.mjs'), '--status'], {
+      cwd: main, env: { ...env, HOA_REPO_ROOT: main }, encoding: 'utf8', timeout: 20_000,
+    })
+    expect(status.match(/covered by settings/g)).toHaveLength(2)
     const guardModule = pathToFileURL(join(main, 'scripts/render-verify-guard.mjs')).href
     const coreModule = pathToFileURL(join(main, 'scripts/render-verify-core.mjs')).href
     const result = JSON.parse(node(main, `

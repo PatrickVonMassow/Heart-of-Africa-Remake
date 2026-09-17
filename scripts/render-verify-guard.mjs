@@ -13,9 +13,9 @@
 // How the gate clears, mechanically:
 //   VERIFY_GL=webgpu node scripts/verify/run-all.mjs <suite>   # exit 0 recorded
 //   VERIFY_GL=webgl  node scripts/verify/run-all.mjs <suite>   # exit 0 recorded
-// A run only counts if it finished AFTER the last edit of any changed render
-// file (an earlier run cannot have seen the final code). When both backends are
-// covered the guard advances the verified baseline (clearedHead) by itself —
+// Coverage names a clean ancestor commit whose render files still match this
+// checkout, so a merge preserves proof and later render edits invalidate it.
+// When both backends are covered the guard advances the baseline by itself —
 // no manual ritual.
 //
 // A run counts as covering when it is CLEAN (exit 0) or ACCOUNTED FOR (point

@@ -66,10 +66,10 @@ import { cacheEnvironment, cleanWorktree, findGreenReceipt, formatCachedGreen } 
 import { waitForLargeRun } from './large-run-wait.mjs'
 import { LADDER_STATUS, formatLadderRefusal } from './ladder-core.mjs'
 import { ladderCheck } from './ladder.mjs'
+import { REPO_ROOT } from '../repo-paths.mjs'
 // ONE DEFINITION OF THE PROGRESS LEASE (point 1137): this wrapper renews it, and
 // the wait registry decides against it. Two copies of the same 15 minutes is how
 // they drift apart.
-import { REPO_ROOT } from '../repo-paths.mjs'
 import { PROGRESS_LEASE_MS } from '../wait-lease-core.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -590,7 +590,7 @@ else {
     if (cached) console.log(formatCachedGreen({ ...cached, path: forDisplay(cached.path) }))
     else {
       await waitForLargeRun()
-      if (own.logFile) runVerify()
+      if (own.logFile && isAbsolute(own.logFile)) runVerify()
       else reexecWithLogPath()
     }
   }
