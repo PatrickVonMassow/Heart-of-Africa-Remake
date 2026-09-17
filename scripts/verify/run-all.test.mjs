@@ -21,10 +21,9 @@ const source = readFileSync(runnerUrl, 'utf8')
   .replace(/^import[\s\S]*?from ['"][^'"]+['"]\r?\n/gm, '')
   .replaceAll('import.meta.url', JSON.stringify(runnerUrl.href))
 
-async function run({ outputs = [known], records = [{}], tasks = '- [ ] 603. ground repair', noRetry = false,
-  backend = 'webgl', suite = 'settings', previous = [], spawnError = null, large = false, verdict = 'pre-existing' } = {}) {
+async function run({ outputs = [known], records = [{}], tasks = '- [ ] 603. ground repair',
+  backend = 'webgl', suite = 'settings', previous = [], spawnError = null, large = false } = {}) {
   const printed = []
-  const classifiedCalls = []
   const exit = new Error('runner exited')
   let exitCode
   const saved = [...previous]
@@ -50,25 +49,16 @@ async function run({ outputs = [known], records = [{}], tasks = '- [ ] 603. grou
     readRenderState: () => ({ runs: saved }), readTasksAll: () => tasks,
     launchServer: async () => ({ base: 'http://test', child: null }), killTree: () => {},
     needsGpuBackendProbe: () => false,
-    classifyRedSuites: (reds) => {
-      classifiedCalls.push(reds)
-      return { rows: reds.flatMap((red) => ownership.redOwnership({
-        suite: red.suite, backend, failed: red.failed,
-        report: ownership.baselineReport({ suite: red.suite, backend, baseline: 'a'.repeat(40), head: 'b'.repeat(40),
-          classified: red.failed.map((c) => ({ check: c.name, key: c.key, verdict })), logs: [] }),
-        filed: red.failed.map((c) => ownership.redRequestTitle(red.suite, c.name)),
-      })), unresolved: reds.filter((r) => r.unresolved).map((r) => `${r.suite}: incomplete run`) }
-    },
     console: { log: (...args) => printed.push(args.join(' ')) },
     process: {
       execPath: 'node', argv: ['node', 'run-all.mjs', ...(large ? ['large'] : []), suite],
-      env: { RVA_SKIP_PREFLIGHT: large ? '1' : '0', VERIFY_GL: backend, VERIFY_NO_RETRY: noRetry ? '1' : '0', VERIFY_ON_LOAD: 'off', RVA_LADDER_ASKED: '1' },
+      env: { RVA_SKIP_PREFLIGHT: large ? '1' : '0', VERIFY_GL: backend, VERIFY_ON_LOAD: 'off', RVA_LADDER_ASKED: '1' },
       exit: (code) => { exitCode = code; throw exit },
     },
   }
   try { await runInNewContext(`(async () => {${source}\n})()`, context) }
   catch (error) { if (error !== exit) throw error }
-  return { attempts, saved, classifiedCalls, log: printed.join('\n'), status: exitCode }
+  return { attempts, saved, log: printed.join('\n'), status: exitCode }
 }
 
 describe('the log says which suite is running (point 1137)', () => {
@@ -80,33 +70,39 @@ describe('the log says which suite is running (point 1137)', () => {
     expect(arrow).toBeLessThan(verdict)
     expect(result.log).toContain('its PASS/FAIL line arrives when the suite ENDS')
   })
-
-  it('marks a retry spawn as one, so two arrows are not read as two suites', async () => {
-    const result = await run({ outputs: [unknown, 'PASS  a check'], tasks: '- [ ] 999. unrelated' })
-    expect(result.log).toContain('# → settings running')
-    expect(result.log).toContain('# → settings (retry) running')
-  })
 })
 
-describe('run-all owned-red retry', () => {
+// POINT 1135: one pass per suite. The automatic flake retry is gone, so the
+// attempt count no longer depends on who owns the red — only the VERDICT does.
+describe('one pass per suite (point 1135)', () => {
   it('runs an owned failure once, names its owner, and keeps the run red and accounted for', async () => {
     const result = await run()
     expect(result.attempts).toHaveLength(1)
-    expect(result.log).toContain('ACCOUNTED FOR  settings — retry skipped; all reds charged to open points 603')
+    expect(result.log).toContain('ACCOUNTED FOR  settings — every red is charged to open point(s) 603')
     expect(result.log).toContain('1 SUITE(S) FAILED — 1 suites run — reds charged to open points 603')
     expect(result.status).toBe(1)
     expect(result.saved[0].exit).toBe(1)
     expect(runVerdict(result.saved[0], { openPoints: [603] }).status).toBe('accounted')
   })
 
+  it('runs an UNOWNED failure once too — the retry that used to ask again is deleted', async () => {
+    const result = await run({ outputs: [unknown] })
+    expect(result.attempts).toHaveLength(1)
+    expect(result.log).not.toContain('retry')
+    expect(result.log).toContain('POINT REDS HOLD')
+    expect(result.status).toBe(1)
+  })
+
+  it('never marks its own spawn as a retry, whatever the calling shell exported', async () => {
+    const result = await run({ outputs: [unknown] })
+    expect(result.attempts[0].env[RETRY_ENV]).toBe('')
+    expect(result.log).not.toContain('(retry) running')
+  })
+
   // THE FIXTURE NAMES LIVE LEDGER ENTRIES, and that is the coupling to watch: a
   // charge dies with its point, so retiring one silently turns a charged red here
-  // into an uncharged one, the suite is no longer accounted for, run-all retries,
-  // and this test reds on `attempts` — which is what it did on 13.09.2026 when
-  // point 1087's two entries left the ledger with the point. Pick reds whose
+  // into an uncharged one and this test reds on the verdict line. Pick reds whose
   // owners are OPEN, and re-aim this fixture when you retire one of them.
-  // 642 owns both season readings through one alternation, which is what makes
-  // "once" measurable at all; 1102 owns the drums on the WebGL lane this runs on.
   it('names every owner once in numeric order when several defects share a suite', async () => {
     const out = [
       'FAIL  the drums were still speaking when the picture was taken — stopped',
@@ -115,48 +111,31 @@ describe('run-all owned-red retry', () => {
     ].join('\n')
     const result = await run({ suite: 'polish', outputs: [out], tasks: '- [ ] 642. settle deadline\n- [ ] 1102. drums' })
     expect(result.attempts).toHaveLength(1)
-    expect(result.log).toContain('all reds charged to open points 642, 1102; suite stays red')
+    expect(result.log).toContain('every red is charged to open point(s) 642, 1102; suite stays red')
     expect(result.log).toContain('1 SUITE(S) FAILED — 1 suites run — reds charged to open points 642, 1102')
   })
 
   it('does not describe a partial record as accounted-for coverage', async () => {
     const result = await run({ records: [{ partial: true, section: 'ground-detail' }] })
     expect(result.attempts).toHaveLength(1)
-    expect(result.log).toContain('PARTIAL  settings — retry skipped')
+    expect(result.log).toContain('PARTIAL  settings — every red is charged')
     expect(result.log).not.toContain('ACCOUNTED FOR')
     expect(runVerdict(result.saved[0], { openPoints: [603] }).covers).toBe(false)
   })
 
-  it('retries a mixed red set and carries the original failures into a successful retry', async () => {
-    const result = await run({ outputs: [`${known}\n${unknown}`, 'PASS  repaired for this attempt'] })
-    expect(result.attempts).toHaveLength(2)
-    expect(result.attempts[1].env[RETRY_ENV]).toContain('a new defect')
-    expect(result.attempts[1].env[RETRY_ENV]).toContain(ground)
-    expect(result.log).toContain('PASSED ON RETRY')
-    expect(result.log).not.toContain('retry skipped')
-    expect(result.log).toContain('reds charged to open points 603')
-    expect(result.status).toBe(0) // Existing retry exit semantics; recorder marks SUSPECT.
-  })
-
-  it('keeps the double-failure report for an unowned red', async () => {
-    const result = await run({ outputs: [unknown] })
-    expect(result.attempts).toHaveLength(2)
-    expect(result.log).toContain('retry settings once')
+  it.each(['- [x] 603. ground repaired', '- [ ] 603. DEFERRED ground repair', ''])('holds when the owner is not open: %s', async (tasks) => {
+    const result = await run({ tasks })
+    expect(result.attempts).toHaveLength(1)
+    expect(result.log).toContain('POINT REDS HOLD')
     expect(result.status).toBe(1)
   })
 
-  it.each(['- [x] 603. ground repaired', '- [ ] 603. DEFERRED ground repair', ''])('retries when the owner is not open: %s', async (tasks) => {
-    const result = await run({ tasks })
-    expect(result.attempts).toHaveLength(2)
-    expect(result.log).not.toContain('retry skipped')
-  })
-
-  it('keeps strict mode and clean runs at one attempt', async () => {
-    expect((await run({ outputs: [unknown], noRetry: true })).attempts).toHaveLength(1)
+  it('keeps a clean run at one attempt and charges nothing', async () => {
     const clean = await run({ outputs: ['PASS  all checks'] })
     expect(clean.attempts).toHaveLength(1)
     expect(clean.status).toBe(0)
     expect(clean.log).not.toContain('charged to open points')
+    expect(clean.log).not.toContain('POINT REDS')
   })
 
   it.each([
@@ -169,15 +148,19 @@ describe('run-all owned-red retry', () => {
     { startedAt: 0 },
     { backend: 'webgpu' },
     { exit: 2 },
-    { reds: [{ name: ground, kind: 'check', point: 603 }, { name: 'console error: new error', kind: 'console' }] },
-  ])('retries missing, incomplete, crashed or unowned evidence: %j', async (record) => {
-    expect((await run({ records: [record] })).attempts).toHaveLength(2)
+  ])('holds missing, incomplete, crashed or unowned evidence in ONE pass: %j', async (record) => {
+    const result = await run({ records: [record] })
+    expect(result.attempts).toHaveLength(1)
+    expect(result.log).toContain('POINT REDS HOLD')
   })
 
-  it('does not use a stale record or a spawn failure to skip a retry', async () => {
+  it('does not use a stale record or a spawn failure as this pass\'s evidence', async () => {
     const previous = [{ suite: 'settings', backend: 'webgl', startedAt: 0, at: 1, exit: 1, reds: [{ name: ground, point: 603 }] }]
-    expect((await run({ previous, records: [null] })).attempts).toHaveLength(2)
-    expect((await run({ spawnError: { code: 'ENOBUFS' } })).attempts).toHaveLength(2)
+    const stale = await run({ previous, records: [null] })
+    expect(stale.attempts).toHaveLength(1)
+    expect(stale.log).toContain('ownership unresolved')
+    const broken = await run({ spawnError: { code: 'ENOBUFS' } })
+    expect(broken.log).toContain('ownership unresolved')
   })
 
   it.each(['compatibility', 'core', null])('respects the WebGPU feature level: %s', async (featureLevel) => {
@@ -186,60 +169,70 @@ describe('run-all owned-red retry', () => {
       suite: 'enrichments', backend: 'webgpu', outputs: [`FAIL  ${name} — no growth`],
       records: [{ featureLevel, reds: [{ name, kind: 'check' }] }], tasks: '- [ ] 938. dressing repair',
     })
-    expect(result.attempts).toHaveLength(featureLevel === 'compatibility' ? 1 : 2)
-    if (featureLevel === 'compatibility') expect(result.log).toContain('open points 938')
+    expect(result.attempts).toHaveLength(1)
+    if (featureLevel === 'compatibility') {
+      expect(result.log).toContain('open points 938')
+      expect(result.log).toContain('POINT REDS DO NOT HOLD')
+    } else {
+      expect(result.log).toContain('POINT REDS HOLD')
+    }
   })
 })
 
-
-describe('LARGE automatically resolves red ownership in its own report', () => {
-  it('surfaces advisory observations without retrying, charging or classifying them as reds', async () => {
+describe('the classified baseline is the charge ledger, not a second set of passes (point 1135)', () => {
+  it('surfaces advisory observations without charging or classifying them as reds', async () => {
     const advisory = 'NON-PREDICTIVE  jar — 0 with the full one  [NON-PREDICTIVE in full suite: observed fail; sampling differs]'
     const result = await run({ large: true, suite: 'polish', outputs: [`PASS  another check\n${advisory}`] })
     expect(result.status).toBe(0)
     expect(result.attempts).toHaveLength(1)
-    expect(result.classifiedCalls).toEqual([])
     expect(result.saved[0].reds).toEqual([])
     expect(result.log).toContain(advisory)
     expect(result.log).not.toContain('CANDIDATE REAL FAILURE')
   })
 
-  it('classifies and files a pre-existing red, releases that red, and keeps regression exit 1', async () => {
+  it('classifies a charged red from the ledger alone, and keeps the regression exit 1', async () => {
     const result = await run({ large: true })
-    expect(result.classifiedCalls).toHaveLength(1)
-    expect(result.log).toContain('POINT REDS DO NOT HOLD — charged elsewhere: "Repair pre-existing settings check:')
+    expect(result.attempts).toHaveLength(1)
+    expect(result.log).toContain('POINT REDS DO NOT HOLD — charged elsewhere: "point 603 — first-person ground shows micro-detail')
+    expect(result.log).toContain('regression verdict unchanged')
     expect(result.status).toBe(1)
   })
 
-  it.each(['real-regression', 'baseline-flaky', 'baseline-died', 'inconclusive'])('keeps %s holding', async (verdict) => {
-    const result = await run({ large: true, verdict })
+  it('spawns no baseline pass on a LARGE — the extra passes are deleted', async () => {
+    const result = await run({ large: true })
+    expect(result.log).not.toContain('baseline classification')
+    expect(result.attempts).toHaveLength(1)
+  })
+
+  it('holds a red no ledger entry names', async () => {
+    const result = await run({ large: true, outputs: [unknown], tasks: '' })
     expect(result.log).toContain('POINT REDS HOLD')
-    expect(result.log).toContain(`(${verdict})`)
+    expect(result.log).toContain('not in the classified baseline')
     expect(result.status).toBe(1)
-  })
-
-  it('retains the rotating failures next to a stable red for baseline classification', async () => {
-    const result = await run({ large: true, tasks: '', outputs: [`${known}\n${unknown}`, known] })
-    expect(result.classifiedCalls[0][0].failed.map((c) => c.name)).toEqual([ground, 'a new defect'])
   })
 
   it('holds a crashed record even if its named check predates the branch', async () => {
-    const result = await run({ large: true, noRetry: true, records: [{ crashed: true, crashSource: 'uncaught-exception' }] })
+    const result = await run({ large: true, records: [{ crashed: true, crashSource: 'uncaught-exception' }] })
     expect(result.log).toContain('POINT REDS HOLD')
     expect(result.log).toContain('incomplete run')
   })
 
-  it('does no baseline work for green runs or unrequested narrow reds', async () => {
-    expect((await run({ large: true, outputs: ['PASS  all checks'] })).classifiedCalls).toHaveLength(0)
-    expect((await run()).classifiedCalls).toHaveLength(0)
+  it('says nothing about ownership for a green run', async () => {
+    expect((await run({ large: true, outputs: ['PASS  all checks'] })).log).not.toContain('POINT REDS')
   })
 
-  it('includes crossbrowser in ownership classification', async () => {
+  it('includes crossbrowser, which carries no run record of its own', async () => {
     const result = await run({ large: true, suite: 'crossbrowser', outputs: [
       'FAIL  chromium-mobile no console errors on mobile — getSupportedExtensions on null\n1 CROSS-BROWSER/MOBILE CHECK(S) FAILED',
     ] })
-    expect(result.classifiedCalls[0][0]).toMatchObject({ suite: 'crossbrowser', depth: 'standard', unresolved: false })
-    expect(result.log).toContain('POINT REDS DO NOT HOLD')
+    expect(result.log).toContain('POINT REDS HOLD')
+    expect(result.log).toContain('crossbrowser: chromium-mobile no console errors on mobile')
     expect(result.status).toBe(1)
+  })
+
+  it('strikes a charged entry whose check has gone green in this very pass', async () => {
+    const result = await run({ outputs: [`PASS  ${ground} — laplacian mean 1.42\n${unknown}`] })
+    expect(result.log).toContain(`STRIKE  settings     "${ground}" PASSED here but is still charged to open point 603`)
+    expect(result.log).toContain('scripts/render-verify-charges.mjs')
   })
 })
