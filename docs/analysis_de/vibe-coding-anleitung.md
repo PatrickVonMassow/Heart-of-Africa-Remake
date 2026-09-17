@@ -176,14 +176,13 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   beschreibt**. Wer entscheidet, ob **ein anderer anfangen darf**, misst einen **Handelnden** —
   Prozess oder Handle, nie Textsuche oder Dateien: **Arbeit ist kein Arbeiter.** Aus totem
   **Besitzer** folgt **Übernahme**, nie Neustart.“
-- **Die Sonde kann ihr Nein nicht erreichen.** Die Prüfung könnte „tot“ sagen — aber nur, wenn man
-  ihr den Beweis übergibt, und genau dieser Aufrufer übergibt ihn nicht. Ihr „lebt noch“ ist dann
-  der einzig mögliche Satz.
-  → *Prompt:* „Frag zu jeder Prüfung: **Kann sie mit den Eingaben dieses Aufrufers das negative
-  Urteil überhaupt erreichen?** Wo nein, ist ihr Grün eine Tautologie. Und einen Fix an einer
-  gemeinsamen Funktion prüfst du an **allen** Aufrufstellen, nicht nur an der, die dich biss. Und
-  lies ihre **Ausnahmen**: Setzt derselbe Mechanismus, dessen Schaden sie melden soll, das Flag,
-  das sie freistellt, schweigt sie genau dann, wenn es zählt.“
+- **Die Sonde kann ihr Nein nicht erreichen.** Die Prüfung könnte „tot“ sagen — aber nur mit einem
+  Beweis, den genau dieser Aufrufer nie übergibt. Ihr „lebt noch“ ist der einzig mögliche Satz.
+  → *Prompt:* „Frag zu jeder Prüfung: **Kann sie mit diesen Eingaben ihr Nein überhaupt erreichen?** Wo nein, ist ihr Grün eine Tautologie. Einen Fix an gemeinsamem
+  Code prüfst du an **allen** Aufrufstellen, nicht nur der, die dich biss. Lies ihre
+  **Ausnahmen**: Setzt der Mechanismus, dessen Schaden sie meldet, selbst ihr Freistellungs-Flag,
+  schweigt sie, wenn es zählt. Und ein Urteil braucht einen **Empfänger**: Was bei
+  grünem Lauf nur auf stderr meldet, liest niemand.“
 
 - **Neue Features zerbrechen alte.** Eine Änderung repariert X und bricht das unbeobachtete Y.
   → *Prompt:* „Prüfe jede Mechanik auch im **Danach-Zustand** und erzwing nach jedem
@@ -681,4 +680,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 61c785b97b48ff557f98b1765d1a377d616fb107faa1ea337020fa357e6163b2 -->
+<!-- GUIDE-FINGERPRINT: 4a79adf7379f57b3d6ee3bded71ea708d7f394bbc53e84826481a961281e9e90 -->

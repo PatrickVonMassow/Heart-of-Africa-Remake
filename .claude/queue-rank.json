@@ -1386,6 +1386,12 @@
       "why": "Nutzerauftrag 16.09.2026 23:18, verbatim: 'Reihe das als vor 1141 ein.' — eigener Bugreport mit eigener Positionsangabe",
       "origin": "user",
       "place": "ahead"
+    },
+    "1144": {
+      "at": "2026-09-16T22:48:11.705Z",
+      "why": "Last is right: its first act is measuring what the player actually loses, and the whole layout path in front of it (1143, then 1045's neighbours) writes the same file.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1418,7 +1424,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-16T22:02:33.916Z",
+    "at": "2026-09-16T22:48:11.716Z",
     "points": [
       174,
       184,
@@ -1825,7 +1831,8 @@
       1140,
       1141,
       1142,
-      1143
+      1143,
+      1144
     ]
   }
 }
