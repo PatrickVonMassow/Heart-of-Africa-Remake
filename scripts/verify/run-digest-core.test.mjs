@@ -425,3 +425,22 @@ describe('the run keeps its own bookkeeping demands (point 1135)', () => {
     expect(classifyLine(line)).toBe('final')
   })
 })
+
+describe('the budget yields to the run\'s bookkeeping, not the other way round (point 1135)', () => {
+  it('keeps STRIKE, POINT REDS and ACCOUNTED FOR when a hundred echoes press on the budget', () => {
+    const entries = [
+      { line: 'STRIKE  settings     "a check" PASSED here but is still charged to open point 603', priority: 'low' },
+      { line: 'ACCOUNTED FOR  settings — every red is charged to open point(s) 603', priority: 'low' },
+      { line: 'POINT REDS DO NOT HOLD — charged elsewhere: "point 603 — a check"', priority: 'low' },
+      ...Array.from({ length: 120 }, (_, i) => ({ line: `      FAIL  echo ${i}`, priority: 'low' })),
+    ]
+    const { kept } = applyBudget(entries, 10)
+    expect(kept).toHaveLength(10)
+    // The budget drops from the FRONT once the low-priority lines are gone, and
+    // these three stand at the very front: without the protection they are the
+    // first to go, whatever class they carry.
+    for (const line of entries.slice(0, 3).map((e) => e.line)) {
+      expect(kept.map((e) => e.line)).toContain(line)
+    }
+  })
+})

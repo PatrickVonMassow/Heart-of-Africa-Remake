@@ -173,7 +173,11 @@ describe('--await: one blocking call, and no poll counted', () => {
   // written 34 frames was reported HUNG and ended, and the release stood still
   // behind it. A run that is still writing is SLOW.
   it('does NOT call a run hung while it is still stamping its mark', () => {
-    const startedAt = Date.now() - 40 * 60_000
+    // PAST THE CEILING, so silence is the only thing left that could condemn it
+    // (cross-vendor review round 4): at 40 minutes against a 46-minute ceiling
+    // the clock alone already spared this run, and the test proved nothing about
+    // the progress mark it is named for.
+    const startedAt = Date.now() - 90 * 60_000
     const { log } = fixture({
       ...finished,
       status: 'running',

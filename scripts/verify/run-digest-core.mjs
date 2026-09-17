@@ -208,7 +208,15 @@ export function applyBudget(entries, maxKeptLines) {
   // supplies no raw tail either, so the reader was left with a green that did not
   // mean what it looked like. There are a handful of these per run at most: the
   // budget yields to them rather than the other way round.
-  const declaredLimitation = (e) => /^NON-PREDICTIVE\b/.test(String(e?.line ?? '').trimStart())
+  // The same protection covers the run's OWN BOOKKEEPING (point 1135, cross-vendor
+  // review round 4): `STRIKE` names a ledger entry to remove, `POINT REDS` is the
+  // ownership verdict and `ACCOUNTED FOR` says a red suite's reds all have an
+  // owner. Classifying them `final` was not enough — once the low-priority lines
+  // are gone the budget drops from the FRONT whatever the class, so a STRIKE
+  // followed by a hundred failure echoes vanished. Like NON-PREDICTIVE there are
+  // a handful of these per run at most.
+  const declaredLimitation = (e) =>
+    /^(NON-PREDICTIVE|STRIKE|POINT REDS|ACCOUNTED FOR)\b/.test(String(e?.line ?? '').trimStart())
   for (const e of list) {
     if (over === 0) break
     if (priorityOf(e) === 'low' && !declaredLimitation(e)) {

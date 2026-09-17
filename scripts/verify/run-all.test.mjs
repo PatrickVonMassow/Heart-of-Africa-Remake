@@ -23,13 +23,17 @@ const source = readFileSync(runnerUrl, 'utf8')
 
 async function run({ outputs = [known], records = [{}], tasks = '- [ ] 603. ground repair',
   backend = 'webgl', suite = 'settings', previous = [], spawnError = null, large = false,
-  exitStatus = null } = {}) {
+  exitStatus = null, preflight = false } = {}) {
   const printed = []
   const exit = new Error('runner exited')
   let exitCode
   const saved = [...previous]
   const attempts = []
-  const spawnSync = (_cmd, args, options) => {
+  const spawnSync = (cmd, args, options) => {
+    // The preflight stages are SHELL calls — `spawnSync('npm run build', opts)` —
+    // so `args` is the options object there, not an argv array. They fail, which
+    // is how a failed non-suite stage is exercised.
+    if (!Array.isArray(args)) return { status: 1, stdout: `${cmd} failed`, stderr: '' }
     if (!args[0].endsWith(`/${suite}.mjs`)) return { status: args[0].endsWith('/crossbrowser.mjs') ? 0 : 1, stdout: '', stderr: '' }
     const i = attempts.length
     attempts.push(options)
@@ -52,8 +56,14 @@ async function run({ outputs = [known], records = [{}], tasks = '- [ ] 603. grou
     needsGpuBackendProbe: () => false,
     console: { log: (...args) => printed.push(args.join(' ')) },
     process: {
-      execPath: 'node', argv: ['node', 'run-all.mjs', ...(large ? ['large'] : []), suite],
-      env: { RVA_SKIP_PREFLIGHT: large ? '1' : '0', VERIFY_GL: backend, VERIFY_ON_LOAD: 'off', RVA_LADDER_ASKED: '1' },
+      execPath: 'node', argv: ['node', 'run-all.mjs', ...(large ? ['large'] : []), suite, ...(preflight ? ['build'] : [])],
+      env: {
+        RVA_SKIP_PREFLIGHT: large || !preflight ? '1' : '0', VERIFY_GL: backend,
+        VERIFY_ON_LOAD: 'off', RVA_LADDER_ASKED: '1',
+        // A STALE EXPORT IN THE CALLING SHELL — the very thing the runner must
+        // neutralise, so the fixture always carries one.
+        [RETRY_ENV]: 'a stale retry marker from an earlier shell',
+      },
       exit: (code) => { exitCode = code; throw exit },
     },
   }
@@ -258,10 +268,13 @@ describe('a red that does not hold lets the other backend run (point 1135)', () 
   })
 
   it('exits 1 when a stage that is not a suite failed, whatever the reds say', async () => {
-    // `build` is one of the filter names, and the fixture's spawn answers every
-    // non-suite command with exit 1.
-    const result = await run({ large: true, suite: 'settings', outputs: ['PASS  all checks'] })
-    expect(result.status).toBe(0)
+    // The preflight runs, and the fixture answers every non-suite command with
+    // exit 1 — so `build` fails while the suite's own reds are all charged. A
+    // stage no ledger can name must never reach the charged-red exit code.
+    const result = await run({ preflight: true })
+    expect(result.log).toContain('FAIL  build')
+    expect(result.status).toBe(1)
+    expect(result.status).not.toBe(ownership.EXIT_NOT_HELD)
   })
 })
 

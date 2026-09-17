@@ -161,7 +161,12 @@ for a whole 15-minute progress lease. Point 1135 replaced the old **2.5 ×
 expectation** mark with that ceiling, because the expectation is the thing that
 was wrong: below the ceiling a silent run is STILL RUNNING and ending it is a
 HAND decision, never the tool's. The two-hour lease cap remains the absolute
-backstop above both. That silence is judged on the **writer's own
+backstop above both. **The ceiling is read from the environment of whoever is
+LOOKING**, because the run does not record the timeout it was launched with and
+adding that field is the ledger growth the infrastructure freeze forbids — so a
+run launched with a raised `VERIFY_SUITE_TIMEOUT_MS` must be inspected from a
+shell exporting the same value, or the wait holds it to the house default. Both
+readers take it the same way, so the poll and the lease can never disagree. That silence is judged on the **writer's own
 mark**: `run-logged.mjs` opens a zero-byte `<log>.progress` once, holds the
 descriptor for the run, and moves its mtime from what its child really emitted
 and from sampling the newest frame's mtime — by mtime, because a

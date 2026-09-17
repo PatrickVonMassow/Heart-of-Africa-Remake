@@ -46,8 +46,16 @@ export const WAIT_EXPECTATION_FLOOR_MS = 5 * 60 * 1000
  * KILLS a suite). Past its plan by a whole suite ceiling a run has outlived the
  * mechanism that would have ended it; below it, ending the run is a hand
  * decision. `WAIT_LEASE_CAP_MS` remains the absolute backstop above both.
+ *
+ * THE CEILING IS READ FROM THE OBSERVER'S ENVIRONMENT, which is a stated limit,
+ * not an oversight: the run does not record the timeout it was launched with,
+ * and adding that field is exactly the ledger growth the infrastructure freeze
+ * forbids. So a run launched with a RAISED `VERIFY_SUITE_TIMEOUT_MS` must be
+ * inspected from a shell that exports the same value, or the wait holds it to
+ * the house default. Both readers — this one and run-wait-core.mjs — take it the
+ * same way, so they can never disagree with each other.
  */
-export const SUITE_CEILING_MS = 45 * 60 * 1000
+export const SUITE_CEILING_MS = Number(process.env.VERIFY_SUITE_TIMEOUT_MS) || 45 * 60 * 1000
 
 /**
  * THE PROGRESS LEASE — how long a run may show no sign of life before its
