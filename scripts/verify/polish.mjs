@@ -5461,6 +5461,116 @@ if (section('wedged-adults')) {
   await page.evaluate((seed) => window.__game.setState({ seed }), bootSeed)
 }
 
+// The fixed weaver in the user's "Festklemmend" report, not a moving adult.
+// Run on each backend with the ordinary polish launcher; the frame declares
+// the live figure as its subject and leaves the trading post in the background.
+if (section('village-stations')) {
+  const bootSeed = await page.evaluate(() => window.__game.getState().seed)
+  try {
+    await page.evaluate(() => {
+      const g = window.__game.getState()
+      if (g.placeId) g.leavePlace()
+    })
+    await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
+    await page.evaluate(() => {
+      window.__game.setState({ seed: 1838110026 })
+      window.__game.getState().enterPlace('bambara-village')
+      window.__game.getState().setJournalOpen(false)
+    })
+    await page.waitForFunction(() =>
+      window.__game.getState().placeId === 'bambara-village' &&
+      !!window.__placeScene?.getObjectByName('village-weaver-body'), null, { timeout: 40000 })
+    await waitForSceneBuilt(page)
+    const staged = await page.evaluate(() => {
+      const scene = window.__placeScene
+      const layout = window.__placeLayout
+      const loom = scene.getObjectByName('village-weaver')
+      const figure = scene.getObjectByName('village-weaver-body')
+      const at = (object) => {
+        object.updateWorldMatrix(true, false)
+        const e = object.matrixWorld.elements
+        return { x: e[12], y: e[13], z: e[14] }
+      }
+      const prop = at(loom)
+      const body = at(figure)
+      const buildings = layout.colliders.slice(0, layout.interactives.length + layout.dwellings.length)
+      const gap = (point, radius) => Math.min(...buildings.map(c => window.__clearanceTo(c, point.x, point.z) - radius))
+      const e = figure.matrixWorld.elements
+      const facesLoom = e[8] * (prop.x - body.x) + e[10] * (prop.z - body.z) > 0
+      // The point wants the trading post's wall VISIBLY CLEAR BEHIND her, so
+      // ONE frame has to carry both: the stand goes to the SIDE of the pair
+      // and the view is aimed between them. Square to the pair the loom falls
+      // BESIDE her instead of in front of her, and the open ground between her
+      // and the wall is what the picture shows. Reject a stand or sight line
+      // inside a building or fence; the reported seed may have one there.
+      const p = window.__placePlayer
+      const market = layout.interactives.find(it => it.type === 'market')
+      const otherBodies = layout.colliders.filter(c => !(c.x === prop.x && c.z === prop.z && c.r === 1))
+      const clear = (x, z) => Math.min(...otherBodies.map(c => window.__clearanceTo(c, x, z)))
+      const toMarket = Math.atan2(market.pos[0] - body.x, market.pos[1] - body.z)
+      const span = Math.hypot(market.pos[0] - body.x, market.pos[1] - body.z)
+      const aim = { x: body.x + (market.pos[0] - body.x) * 0.4, z: body.z + (market.pos[1] - body.z) * 0.4 }
+      // A hut further off needs the lens further back to hold both in one frame.
+      const stand = Math.min(9, Math.max(4.5, span * 1.1))
+      let cameraGap = -Infinity
+      let framed = null
+      for (let k = 0; k < 24; k++) {
+        // Square to the pair first, then swing AWAY from the hut in steps:
+        // that closes the two together, at the price of the loom drifting in
+        // front of her, so the squarest stand that frames both wins.
+        const angle = toMarket + (k % 2 ? -1 : 1) * (Math.PI / 2 + Math.floor(k / 2) * Math.PI / 24)
+        const x = body.x + Math.sin(angle) * stand
+        const z = body.z + Math.cos(angle) * stand
+        if (clear(x, z) < 0.35) continue
+        let visible = true
+        for (let step = 1; step <= 16; step++) {
+          const t = step / 16
+          if (clear(x + (body.x - x) * t, z + (body.z - z) * t) < 0.1) visible = false
+        }
+        if (!visible) continue
+        const vx = aim.x - x
+        const vz = aim.z - z
+        const reach = Math.hypot(vx, vz)
+        const offAxis = (px, pz) => {
+          const ax = px - x
+          const az = pz - z
+          return Math.abs(Math.atan2((ax * vz - az * vx) / reach, (ax * vx + az * vz) / reach) * 180 / Math.PI)
+        }
+        // Half of the 50-degree vertical fov spreads to about 33 degrees over a
+        // wide frame; 26 keeps both subjects clear of the very edge.
+        const bodyOff = offAxis(body.x, body.z)
+        const marketOff = offAxis(market.pos[0], market.pos[1])
+        if (bodyOff > 26 || marketOff > 26) continue
+        p.x = x
+        p.z = z
+        p.yaw = Math.atan2(aim.x - p.x, aim.z - p.z) + Math.PI
+        p.pitch = -0.1
+        cameraGap = clear(x, z)
+        framed = { bodyOff: +bodyOff.toFixed(1), marketOff: +marketOff.toFixed(1) }
+        break
+      }
+      return { body, propGap: gap(prop, 1), bodyGap: gap(body, 0.3), cameraGap, facesLoom, framed }
+    })
+    check('the reported weaver and loom have a walker-wide gap to the village buildings',
+      staged.propGap >= 0.6 && staged.bodyGap >= 0.6, JSON.stringify(staged))
+    check('the weaver faces her loom', staged.facesLoom)
+    check('the weaver photograph stands on open ground', staged.cameraGap >= 0.35, `${staged.cameraGap.toFixed(2)} m`)
+    check('one frame carries the weaver and the trading-post wall together',
+      !!staged.framed, JSON.stringify(staged.framed))
+    await nextFrames(3)
+    if (staged.cameraGap >= 0.35) await frame('1143-village-weaver-clear-of-market', {
+      local: { x: staged.body.x, y: staged.body.y + 0.9, z: staged.body.z },
+      label: 'the reported-seed weaver at her loom seen from the side, with open ground between her and the trading-post wall',
+    })
+  } finally {
+    await page.evaluate((seed) => {
+      const g = window.__game.getState()
+      if (g.placeId) g.leavePlace()
+      window.__game.setState({ seed })
+    }, bootSeed)
+  }
+}
+
 if (section('adult-errands')) {
   await page.evaluate(() => {
     const g = window.__game.getState()

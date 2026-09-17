@@ -134,7 +134,7 @@ import {
   LOW_DRUM,
   type DrumGeometry,
 } from './drummerPose'
-import { PORT_TALKERS, VILLAGE_SPOTS, villageAdultStations, type PlayGround } from './lifeSpots'
+import { LOOM_SPOT, WEAVER_OFFSET, weaverStance, PORT_TALKERS, VILLAGE_SPOTS, villageAdultStations, type PlayGround } from './lifeSpots'
 import { drummerFacing } from './chiefWalk'
 import { DRUMMER_SPEAKER_ID } from './chiefPresence'
 import { queuedDrummerVoice, setDrummerVoice } from './drummerVoice'
@@ -505,10 +505,11 @@ function Cook({ x, z, cloth }: { x: number; z: number; cloth: string }) {
 function Weaver({ x, z, cloth, weave }: { x: number; z: number; cloth: string; weave: string }) {
   const groundHeight = usePlaceGround()
   // A body the passers-by go round (point 578).
-  useStandingBody(x, z)
+  const body = weaverStance([x, z])
+  useStandingBody(body.x, body.z)
   const facing = Math.atan2(-x, -z)
   return (
-    <group position={[x, groundHeight(x, z), z]} rotation={[0, facing, 0]}>
+    <group name="village-weaver" position={[x, groundHeight(x, z), z]} rotation={[0, facing, 0]}>
       {/* Loom frame */}
       {[-0.55, 0.55].map((px) => (
         <mesh key={px} position={[px, 0.75, 0]} castShadow>
@@ -525,7 +526,7 @@ function Weaver({ x, z, cloth, weave }: { x: number; z: number; cloth: string; w
         <boxGeometry args={[0.95, 0.85, 0.03]} />
         <meshStandardMaterial color={weave} roughness={0.95} side={THREE.DoubleSide} />
       </mesh>
-      <group position={[0, 0, 0.55]}>
+      <group name="village-weaver-body" position={[0, 0, WEAVER_OFFSET]} rotation={[0, body.yaw - facing, 0]}>
         <Figure cloth={cloth} />
       </group>
     </group>
@@ -3655,7 +3656,7 @@ export function PlaceLife({
         <InhabitantBodiesContext.Provider value={inhabitantBodies}>
           <SpeechFloorContext.Provider value={speechFloor}>
           <Cook x={firePos[0] + 1.2} z={firePos[1] + 1.0} cloth={style.cloth[0]} />
-          <Weaver x={-8.5} z={-7} cloth={style.cloth[1 % style.cloth.length]} weave={style.bandColor} />
+          <Weaver x={LOOM_SPOT[0]} z={LOOM_SPOT[1]} cloth={style.cloth[1 % style.cloth.length]} weave={style.bandColor} />
           <Kids
             childBodies={childBodies}
             x={ground.x}
