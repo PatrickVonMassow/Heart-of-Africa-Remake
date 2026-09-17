@@ -288,7 +288,7 @@ put it is the mistake this line exists to stop.
   what was measured). No new guard, ledger field or abstraction.
   Criticality: medium — a player-visible layout defect, no data or progress at risk.
   Position: directly before 1082, by the user's order (17.09.2026, 20:51).
-  Bundle: unbundled (HUD).
+  Bundle: Steuerung & Performance.
 
 - [ ] 1082. A child climbing the village boulder becomes something the player actually
   sees (user 09.09.2026, 05:04 — the same report twice).
