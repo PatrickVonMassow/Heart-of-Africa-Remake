@@ -413,3 +413,30 @@ describe('no path turns a red into a pass (Astra review round 2, 17.09.2026)', (
     expect(result.status).toBe(1)
   })
 })
+
+// ROUND 3: two narrower readings of the same mistake — a red that exists but is
+// never looked at, so the pass calls itself green.
+describe('an unlooked-at red is still a red (Astra review round 3, 17.09.2026)', () => {
+  it('holds reds carried by a record too incomplete to charge them', async () => {
+    const result = await run({
+      exitStatus: 0,
+      outputs: ['PASS  a check\nconsole errors: 0'],
+      records: [{ exit: 0, terminalVerdict: false, reds: [{ name: ground, kind: 'check', point: 603 }] }],
+    })
+    // Incomplete: the reds hold rather than charge, and the pass is not green.
+    expect(result.log).toContain("the printed line says PASS, but this run's own record carries 1 red(s)")
+    expect(result.log).toContain('POINT REDS HOLD')
+    expect(result.log).toContain('the run record is incomplete, so no charge may be accepted for it')
+    expect(result.log).toContain('incomplete run or unnamed failure')
+    expect(result.status).toBe(1)
+  })
+
+  it('reds a crossbrowser child whose only red is a console error and exits 0', async () => {
+    const result = await run({ large: true, suite: 'crossbrowser', exitStatus: 0, outputs: [
+      'PASS  the page loads\nERR: boom at http://localhost:1/a.ts:1:2',
+    ] })
+    expect(result.log).toContain('FAIL  crossbrowser')
+    expect(result.log).toContain('POINT REDS HOLD')
+    expect(result.status).toBe(1)
+  })
+})

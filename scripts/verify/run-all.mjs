@@ -313,7 +313,8 @@ function runSuite(name, baseUrl, onlySection = '') {
   const openPoints = new Set(chargeablePoints(readTasksAll()))
   const complete = record && record.exit === res.status && record.asserted === true &&
     record.terminalVerdict === true && !isCrashedRun(record) && !isIncompleteRecording(record)
-  const reds = complete && Array.isArray(record.reds) ? record.reds : []
+  const recordedReds = Array.isArray(record?.reds) ? record.reds : []
+  const reds = complete ? recordedReds : []
   const ownedReds = reds.filter((red) => owned(red, name, record.backend, record.featureLevel, openPoints))
   const points = [...new Set(ownedReds.map((red) => openPoints.has(red.point)
     ? red.point
@@ -361,14 +362,19 @@ function runSuite(name, baseUrl, onlySection = '') {
         ? `charged to open point ${point}`
         : occurrences.some((red) => ownedSet.has(red))
           ? 'charged for one reading of this check but not for every one recorded here'
-          : fromRecord
-            ? 'not in the classified baseline — no open point owns it'
-            : 'printed by the suite but carried by no charged record entry — ownership unresolved',
+          : !complete
+            ? 'the run record is incomplete, so no charge may be accepted for it — ownership unresolved'
+            : fromRecord
+              ? 'not in the classified baseline — no open point owns it'
+              : 'printed by the suite but carried by no charged record entry — ownership unresolved',
     }
   }
   const rows = []
   const seenRows = new Set()
-  for (const red of reds) {
+  // EVERY RED THE RECORD CARRIES, complete or not. An incomplete record charges
+  // nothing — `ownedSet` is empty then — so its reds arrive here holding, which
+  // is the only honest reading of a measurement that did not finish.
+  for (const red of recordedReds) {
     const key = keyOf(red)
     if (seenRows.has(key)) continue
     seenRows.add(key)
@@ -383,7 +389,7 @@ function runSuite(name, baseUrl, onlySection = '') {
   // defect, not a standing exemption, so the pass that sees the check PASS says
   // so and names the file to strike it from. Reported, never rewritten here: the
   // ledger is source, and a run that edits its own tree would dirty a landing.
-  const redKeys = new Set([...reds.map(keyOf), ...printed.map((check) => check.key)])
+  const redKeys = new Set([...recordedReds.map(keyOf), ...printed.map((check) => check.key)])
   const stale = complete
     ? allChecks(out)
       .filter((c) => c.status === 'PASS' && !redKeys.has(c.key))
@@ -455,17 +461,19 @@ function runCrossBrowser(baseUrl, depth) {
   const out = (res.stdout ?? '') + (res.stderr ?? '')
   const { pass, fail } = countCheckLines(out)
   const skip = (out.match(/^SKIP/gm) ?? []).length
-  // NOT THE EXIT CODE ALONE (Astra finding P1, round 2): the failing checks are
-  // already counted here, and a child that prints them and exits 0 was reported
-  // as a pass whose reds nothing then owned.
-  const ok = res.status === 0 && fail === 0
+  // NOT THE EXIT CODE ALONE (Astra, rounds 2 and 3): the reds are already parsed
+  // here, and a child that prints them and exits 0 was reported as a pass whose
+  // reds nothing then owned. `failedChecks` is the right reading rather than the
+  // FAIL-line count, because a console error is a red that prints no FAIL line.
+  const failing = failedChecks(out)
+  const ok = res.status === 0 && failing.length === 0
   console.log(`${ok ? 'PASS' : 'FAIL'}  crossbrowser  ${pass} pass, ${fail} fail, ${skip} skip (${depth}, exit ${res.status})`)
   // Always surface the per-engine backend + any skips; on failure also the FAILs.
   for (const line of out.split('\n')) {
     if (/backend:|^SKIP/.test(line)) console.log('      ' + line.trim())
     else if (!ok && /^FAIL\s{2,}\S/.test(line)) console.log('      ' + line.trim())
   }
-  if (!ok) redSuites.push({ suite: 'crossbrowser', failed: failedChecks(out), checks: allChecks(out).length, runs: 1, depth, rows: [],
+  if (!ok) redSuites.push({ suite: 'crossbrowser', failed: failing, checks: allChecks(out).length, runs: 1, depth, rows: [],
     unresolved: Boolean(res.error || res.signal) || !/^\d+ CROSS-BROWSER\/MOBILE CHECK\(S\) FAILED$/m.test(out) })
   return ok
 }
