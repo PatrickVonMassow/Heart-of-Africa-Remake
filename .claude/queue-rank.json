@@ -1374,6 +1374,18 @@
       "why": "Stehende Blockade auf main selbst: der Wächter nennt polish.mjs seit der Landung von 1141 als offenen Renderpfad, jeder von main geschnittene Zweig erbt die Forderung nach einer Zwei-Backend-Bildprüfung, und 633 wie 174 stehen dahinter.",
       "origin": "machine",
       "place": "ahead"
+    },
+    "1148": {
+      "at": "2026-09-17T22:26:04.054Z",
+      "why": "Nutzerbericht vom 17.09.2026, 21:48 — im Cursor-Modus bringt erst mehrfaches Klicken die Steuerung zurück; die Platzierung hinter 1146 folgt derselben Meldung.",
+      "origin": "user",
+      "place": "ahead"
+    },
+    "1149": {
+      "at": "2026-09-17T22:26:04.143Z",
+      "why": "Nutzerauftrag vom 17.09.2026, 21:53, mit ausdrücklich genannter Platzierung: »Dann reihe das nach 1082 ein, ja.«",
+      "origin": "user",
+      "place": "ahead"
     }
   },
   "boundary": {
@@ -1406,7 +1418,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-17T22:18:16.303Z",
+    "at": "2026-09-17T22:26:04.153Z",
     "points": [
       174,
       184,
@@ -1811,7 +1823,9 @@
       1144,
       1145,
       1146,
-      1147
+      1147,
+      1148,
+      1149
     ]
   }
 }
