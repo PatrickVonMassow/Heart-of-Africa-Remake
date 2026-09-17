@@ -2,6 +2,24 @@
 // between PlaceLife (rendering) and the layout builder (colliders and
 // keep-clear zones in PlaceScene).
 
+import { WALKER_RADIUS } from './collision'
+
+/** Inside the open meeting ground, clear of the seeded trading-post band. */
+export const LOOM_SPOT: [number, number] = [0, -3]
+export const WEAVER_OFFSET = 0.55
+
+/** A prop's local +Z points towards the village centre. */
+export function inwardStationBody(spot: readonly [number, number], offset: number) {
+  const yaw = Math.atan2(-spot[0], -spot[1])
+  return { x: spot[0] + Math.sin(yaw) * offset, z: spot[1] + Math.cos(yaw) * offset, r: WALKER_RADIUS }
+}
+
+/** The body is on the village side of the frame, looking back at the loom. */
+export function weaverStance(spot: readonly [number, number] = LOOM_SPOT) {
+  const body = inwardStationBody(spot, WEAVER_OFFSET)
+  return { ...body, yaw: Math.atan2(spot[0] - body.x, spot[1] - body.z) }
+}
+
 export const VILLAGE_SPOTS = {
   talkers: [4.6, 5.6] as [number, number],
   pounder: [-7, 1.2] as [number, number],
@@ -31,11 +49,36 @@ export function villageAdultStations(firePos: readonly [number, number]): Array<
     VILLAGE_SPOTS.drummer,
     VILLAGE_SPOTS.well,
     [VILLAGE_SPOTS.well[0] - 1.1, VILLAGE_SPOTS.well[1]], // the water-carrier's stop
-    [-8.5, -7], // the weaver at her loom
+    LOOM_SPOT, // the weaver at her loom
     [fx, fz], // the fire itself
     [fx + 1.2, fz + 1.0], // the cook
     [fx - 1.3, fz - 0.7], // the fire tender
     [fx + 0.7, fz + 1.8], // the bundle-carrier's stop
+  ]
+}
+
+/** Solid props, shared by layout collision and the keep-clear footprints. */
+export function villageLifeProps(fire: readonly [number, number]) {
+  return [
+    { x: fire[0], z: fire[1], r: 1.3 },
+    { x: LOOM_SPOT[0], z: LOOM_SPOT[1], r: 1 },
+    { x: VILLAGE_SPOTS.talkers[0], z: VILLAGE_SPOTS.talkers[1], r: 0.85 },
+    { x: VILLAGE_SPOTS.pounder[0], z: VILLAGE_SPOTS.pounder[1], r: 0.55 },
+    { x: VILLAGE_SPOTS.drummer[0], z: VILLAGE_SPOTS.drummer[1], r: 0.8 },
+    { x: VILLAGE_SPOTS.well[0], z: VILLAGE_SPOTS.well[1], r: 0.75 },
+  ]
+}
+
+/** The prop alone does not cover every figure: reserve the actual body spots too. */
+export function villageLifeFootprints(fire: readonly [number, number]) {
+  return [
+    ...villageLifeProps(fire),
+    weaverStance(),
+    inwardStationBody(VILLAGE_SPOTS.pounder, -0.55),
+    ...[-0.5, 0.5].map(dx => ({ x: VILLAGE_SPOTS.talkers[0] + dx, z: VILLAGE_SPOTS.talkers[1], r: WALKER_RADIUS })),
+    { x: VILLAGE_SPOTS.drummer[0], z: VILLAGE_SPOTS.drummer[1], r: WALKER_RADIUS },
+    { x: VILLAGE_SPOTS.well[0] - 1.1, z: VILLAGE_SPOTS.well[1], r: WALKER_RADIUS },
+    ...[[1.2, 1], [-1.3, -0.7], [0.7, 1.8]].map(([dx, dz]) => ({ x: fire[0] + dx, z: fire[1] + dz, r: WALKER_RADIUS })),
   ]
 }
 

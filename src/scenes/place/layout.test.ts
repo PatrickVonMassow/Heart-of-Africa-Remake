@@ -39,7 +39,7 @@ import { mulberry32 } from '../../world/noise'
 import { balance } from '../../config/balance'
 import { setupGeodata } from '../../test/geodata'
 import { REGION_PLACE_STYLES, VILLAGE_PLANS } from './regionStyles'
-import { VILLAGE_SPOTS } from './lifeSpots'
+import { LOOM_SPOT, VILLAGE_SPOTS } from './lifeSpots'
 
 // The landmark boulder is placed against the REAL terrain (it refuses every wet
 // spot — work-order 585), so this file needs the elevation dataset the browser
@@ -579,7 +579,7 @@ describe('the village water path (work-order 688)', () => {
     const layout = buildLayout('bambara-village', seed)
     const props = [
       { x: VILLAGE_FIRE[0], z: VILLAGE_FIRE[1], r: 1.3 },
-      { x: -8.5, z: -7, r: 1.0 }, // loom
+      { x: LOOM_SPOT[0], z: LOOM_SPOT[1], r: 1.0 }, // loom
       { x: VILLAGE_SPOTS.talkers[0], z: VILLAGE_SPOTS.talkers[1], r: 0.85 },
       { x: VILLAGE_SPOTS.pounder[0], z: VILLAGE_SPOTS.pounder[1], r: 0.55 },
       { x: VILLAGE_SPOTS.drummer[0], z: VILLAGE_SPOTS.drummer[1], r: 0.8 },

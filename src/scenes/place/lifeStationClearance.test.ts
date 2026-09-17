@@ -3,14 +3,14 @@ import { setupGeodata } from '../../test/geodata'
 import { PLACES } from '../../world/geo'
 import { standingClear, WALKER_RADIUS } from './collision'
 import { buildLayout, fenceColliders, VILLAGE_FIRE } from './layout'
-import { VILLAGE_SPOTS } from './lifeSpots'
+import { LOOM_SPOT, VILLAGE_SPOTS } from './lifeSpots'
 
 beforeAll(setupGeodata)
 
 // The renderer's prop radii and figure offsets, independently of placement.
 function stationBodies() {
   const fire = VILLAGE_FIRE
-  const loom = [-8.5, -7]
+  const loom = LOOM_SPOT
   const inward = (p: readonly number[], offset: number) => {
     const distance = Math.hypot(p[0], p[1])
     return { x: p[0] - p[0] / distance * offset, z: p[1] - p[1] / distance * offset, r: WALKER_RADIUS }

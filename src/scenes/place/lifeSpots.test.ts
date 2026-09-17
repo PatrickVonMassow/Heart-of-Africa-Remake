@@ -7,6 +7,10 @@
 
 import { describe, expect, it } from 'vitest'
 import {
+  LOOM_SPOT,
+  WEAVER_OFFSET,
+  weaverStance,
+  villageLifeFootprints,
   FABRIC_REACH,
   MIN_FABRIC,
   MIN_OPENNESS,
@@ -40,6 +44,16 @@ function nearestStation(x: number, z: number, fire: readonly [number, number] = 
 }
 
 describe('the adult stations', () => {
+  it('keeps the weaver facing her loom from the village side', () => {
+    const body = weaverStance()
+    expect(Math.hypot(body.x - LOOM_SPOT[0], body.z - LOOM_SPOT[1])).toBeCloseTo(WEAVER_OFFSET)
+    expect(Math.hypot(body.x, body.z)).toBeLessThan(Math.hypot(...LOOM_SPOT))
+    expect(body.x + Math.sin(body.yaw) * WEAVER_OFFSET).toBeCloseTo(LOOM_SPOT[0])
+    expect(body.z + Math.cos(body.yaw) * WEAVER_OFFSET).toBeCloseTo(LOOM_SPOT[1])
+    expect(villageLifeFootprints(FIRE)).toContainEqual(body)
+    expect(villageAdultStations(FIRE)).toContainEqual(LOOM_SPOT)
+  })
+
   it('names the fixed vignettes, and moves the three at the fire with it', () => {
     const here = villageAdultStations([0, 0])
     const there = villageAdultStations([10, 10])
@@ -159,7 +173,10 @@ describe('the children play against the village, not behind it (point 524)', () 
       const a = (i / 10) * Math.PI * 2
       return [Math.cos(a) * 12, Math.sin(a) * 12]
     })
-    const g = childPlayGround(villageAdultStations(FIRE), WALK, PLAY, HEARING, { fabric: huts })
+    // This synthetic ring includes an adult on its north-west edge. Keep that
+    // fixture independent of where the live village now seats its weaver.
+    const stations = villageAdultStations(FIRE).map(p => p === LOOM_SPOT ? [-8.5, -7] as [number, number] : p)
+    const g = childPlayGround(stations, WALK, PLAY, HEARING, { fabric: huts })
     expect(g.clearance).toBeGreaterThanOrEqual(HEARING)
     expect(g.fabric).toBeGreaterThanOrEqual(MIN_FABRIC)
     // Its far edge does not reach out past the built ring by more than the reach

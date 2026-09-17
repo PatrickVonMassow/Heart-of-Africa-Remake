@@ -7,7 +7,7 @@
 import { placeById } from '../../world/geo'
 import { mulberry32 } from '../../world/noise'
 import { REGION_PLACE_STYLES, VILLAGE_PLANS, type RegionPlaceStyle } from './regionStyles'
-import { PORT_TALKERS, VILLAGE_SPOTS, childPlayGround, villageAdultStations, type PlayGround } from './lifeSpots'
+import { PORT_TALKERS, VILLAGE_SPOTS, childPlayGround, villageAdultStations, villageLifeProps, villageLifeFootprints, type PlayGround } from './lifeSpots'
 import { boxCollider, nudgeToFree, spawnPointFree, standingClear, PLAYER_RADIUS, WALKER_RADIUS, CHIEF_BODY_RADIUS, type Collider } from './collision'
 import { CHIEF_HUT, MARKET_HUT, dwellingRoofProfile, hutRoofProfile, roofStandOff } from './roofClearance'
 import { windingPoints, laneSlots, closestOnPolyline, bendAround, type LaneSlot } from './lanePlan'
@@ -333,6 +333,16 @@ export function dwellingCircleRadius(d: DwellingDef, style: RegionPlaceStyle): n
   const body = DWELLING_BODY[d.kind]
   if (!body) return null
   return Math.max(body(d), dwellingRoofStandOff(d, style))
+}
+
+/** The same full footprint is used when accepting and colliding a dwelling. */
+function dwellingCollider(d: DwellingDef, style: RegionPlaceStyle): Collider {
+  switch (d.kind) {
+    case 'box': return boxCollider(d.x, d.z, d.r, d.r * 0.875, d.rot)
+    case 'warehouse': return boxCollider(d.x, d.z, d.r, 2.3, d.rot)
+    case 'mosque': return boxCollider(d.x, d.z, d.r, d.r * 0.8, d.rot)
+    default: return { x: d.x, z: d.z, r: dwellingCircleRadius(d, style) ?? d.r + 0.3 }
+  }
 }
 
 /** Stand-off this dwelling's own ROOF demands, 0 where its rim hangs clear. */
@@ -814,6 +824,10 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
       }
     : null
 
+  const lifeFootprints = place.kind === 'village' ? villageLifeFootprints(VILLAGE_FIRE) : []
+  const clearsLife = (obstacles: readonly Collider[]) =>
+    lifeFootprints.every(body => standingClear(obstacles, body.x, body.z, body.r + 2 * WALKER_RADIUS))
+
   const interactives: Interactive[] = []
   if (place.kind === 'village') {
     // Villages carry the chief's hut and a trading post that barters the
@@ -844,6 +858,31 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
       const nz = dChief > 1e-6 ? (marketPos[1] - chiefPos[1]) / dChief : 0.8
       marketPos[0] = chiefPos[0] + nx * 7.25
       marketPos[1] = chiefPos[1] + nz * 7.25
+    }
+    // Keep every original seed draw and accept an already-clear spot unchanged.
+    // Some street plans put the market near the talkers; fit those rare cases
+    // around the full stations before any lanes or dwellings depend on its door.
+    const marketRadius = interactiveCircleRadius('market', style)
+    const marketFits = (x: number, z: number) =>
+      clearsLife([{ x, z, r: marketRadius }]) &&
+      Math.hypot(x - chiefPos[0], z - chiefPos[1]) >= 7.25 - 1e-9 &&
+      Math.hypot(x, z) + marketRadius < radius - 1
+    if (!marketFits(...marketPos)) {
+      const original = [...marketPos]
+      let fitted = false
+      for (let distance = 0.25; distance <= radius && !fitted; distance += 0.25) {
+        for (let k = 0; k < 64; k++) {
+          const angle = k * Math.PI * 2 / 64
+          const x = original[0] + Math.cos(angle) * distance
+          const z = original[1] + Math.sin(angle) * distance
+          if (!marketFits(x, z)) continue
+          marketPos[0] = x
+          marketPos[1] = z
+          fitted = true
+          break
+        }
+      }
+      if (!fitted) throw new Error(`${placeId}: no trading-post spot clear of the adult stations`)
     }
     interactives.push({ type: 'market', pos: marketPos, door: hutDoor(marketPos) })
     // The retired village elder's two position draws (point 1052). The whole
@@ -983,6 +1022,7 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
       floors,
       door: doorAt(x, z, doorSeat, facing),
     }
+    if (!clearsLife([dwellingCollider(d, style)])) return null
     dwellings.push(d)
     return d
   }
@@ -1423,7 +1463,10 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
       }
       // Fill the block: infill houses between the lanes keep the ksar dense,
       // each fronting its nearest lane.
-      for (let t = 0; t < 40 && dwellings.filter((d) => d.kind === 'box').length < 11; t++) {
+      // A station can displace an infill house. Preserve the original draw
+      // budget unless the block would fall below its eight-house minimum.
+      const boxCount = () => dwellings.filter(d => d.kind === 'box').length
+      for (let t = 0; (t < 40 || (t < 240 && boxCount() < 8)) && boxCount() < 11; t++) {
         const x = (rand() < 0.5 ? -1 : 1) * (2.5 + rand() * 7)
         const z = -8 + rand() * 21
         const r = 1.25 + rand() * 0.25
@@ -1505,6 +1548,22 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     )
   }
 
+  // Open the actual panel run around stations, including the bodies offset
+  // from their props. Removing both ends leaves a gate in drawing AND collision.
+  // Recheck after splicing: the surviving minimum spacing defines panel spans.
+  for (const f of fences) {
+    while (f.posts.length) {
+      const removed = new Set<number>()
+      fenceColliders(f).forEach((panel, i) => {
+        if (clearsLife([panel])) return
+        removed.add(i)
+        if (panel.kind === 'segment') removed.add((i + 1) % f.posts.length)
+      })
+      if (!removed.size) break
+      f.posts = f.posts.filter((_, i) => !removed.has(i))
+    }
+  }
+
   // --- Collision set: every solid object becomes one or more circles ------
   const colliders: Collider[] = []
   interactives.forEach((it) => {
@@ -1516,22 +1575,7 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
       colliders.push({ x: it.pos[0], z: it.pos[1], r: interactiveCircleRadius(it.type, style) })
     }
   })
-  for (const d of dwellings) {
-    switch (d.kind) {
-      case 'box':
-        colliders.push(boxCollider(d.x, d.z, d.r, d.r * 0.875, d.rot))
-        break
-      case 'warehouse':
-        colliders.push(boxCollider(d.x, d.z, d.r, 2.3, d.rot))
-        break
-      case 'mosque':
-        colliders.push(boxCollider(d.x, d.z, d.r, d.r * 0.8, d.rot))
-        break
-      default:
-        // Round bodies: the wall, widened where the roof overhangs low (349).
-        colliders.push({ x: d.x, z: d.z, r: dwellingCircleRadius(d, style) ?? d.r + 0.3 })
-    }
-  }
+  for (const d of dwellings) colliders.push(dwellingCollider(d, style))
   const fenceColliderStart = colliders.length
   const compoundColliders = new Set<Collider>()
   for (const f of fences) {
@@ -1551,21 +1595,9 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     colliders.push(playRockColliders.upstream, playRockColliders.downstream)
   }
   if (place.kind === 'village') {
-    // The fire pit alone (work-order 604). The cook used to carry a collider of
-    // her own 1.56 m from the fire's centre, which overlapped the fire's 1.3 m by
-    // a finger's breadth — and the notch where two circles cross is narrower than
-    // a walker, so an errand villager sent past the fire was caught in it. Her own
-    // collider bought nothing: she kneels INSIDE the fire's stand-off (1.3 + the
-    // traveller's 0.35), so nobody could reach her spot in the first place.
-    colliders.push({ x: VILLAGE_FIRE[0], z: VILLAGE_FIRE[1], r: 1.3 })
-    colliders.push({ x: -8.5, z: -7, r: 1.0 }) // weaver's loom
-    // Village-life props (design.md §19; positions from PlaceLife).
-    colliders.push({ x: VILLAGE_SPOTS.talkers[0], z: VILLAGE_SPOTS.talkers[1], r: 0.85 })
-    colliders.push({ x: VILLAGE_SPOTS.pounder[0], z: VILLAGE_SPOTS.pounder[1], r: 0.55 })
-    // The drummer sits behind TWO drums now (point 486), so his blob covers the
-    // pair the renderer draws, not the single drum it used to be.
-    colliders.push({ x: VILLAGE_SPOTS.drummer[0], z: VILLAGE_SPOTS.drummer[1], r: 0.8 })
-    colliders.push({ x: VILLAGE_SPOTS.well[0], z: VILLAGE_SPOTS.well[1], r: 0.75 })
+    // The props include the fire's stand-off; figure bodies are registered by
+    // PlaceLife, so the kneeling cook needs no overlapping static collider.
+    colliders.push(...villageLifeProps(VILLAGE_FIRE))
   } else {
     colliders.push({ x: PORT_TALKERS[0], z: PORT_TALKERS[1], r: 0.85 }) // chatting pair
   }
