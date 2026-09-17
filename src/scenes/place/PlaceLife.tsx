@@ -62,7 +62,7 @@ import { utteranceOf } from '../../communication/lexicon'
 import { insidePlace } from './boundary'
 import { playRockFlank } from './playRockSurface'
 import { standsOnGroundPlate, type PlaceRiverBank } from './riverBank'
-import { buildPlaceNavGrid, findPlaceRoute, navClearBetween, navRestrict, type NavPoint } from './routing'
+import { advancePlaceRoute, buildPlaceNavGrid, findPlaceRoute, navClearBetween, navRestrict, type NavPoint } from './routing'
 import { absorbSeparation, createTagGame, stepTagGame, type TagChild } from './tagGame'
 import {
   bankChildCanSeparate,
@@ -2782,12 +2782,7 @@ function ErrandVillagers({
           }
           let aim: ErrandPoint = goal
           if (state.route) {
-            while (
-              state.route.length > 1 &&
-              Math.hypot(state.route[0].x - me.x, state.route[0].z - me.z) <= WAYPOINT_RADIUS
-            ) {
-              state.route.shift()
-            }
+            advancePlaceRoute(nav, me, state.route, WAYPOINT_RADIUS)
             // Back on the open line: drop the route and walk at the goal again,
             // so the figure never trudges a detour it has already got past.
             if (navClearBetween(nav, me.x, me.z, goal.x, goal.z)) {
@@ -2798,7 +2793,9 @@ function ErrandVillagers({
           const ax = aim.x - me.x
           const az = aim.z - me.z
           const ad = Math.hypot(ax, az) || 1
-          const step = Math.max(0, cfg.pace) * dt
+          // Land on the turn instead of oscillating across it when the next
+          // exact goal is standable but falls in a blocked navigation cell.
+          const step = Math.min(Math.max(0, cfg.pace) * dt, ad)
           // Point 657: a child (or anyone else) standing on the straight line is
           // walked ROUND — these strolls cross the children's play ground, and a
           // walker that discovered a body only by pressing on it is what the
