@@ -1642,5 +1642,5 @@ export const START_MONEY = 250
 export const START_YEAR = 1890
 /** Start provisions in days (5 weeks, from the checkpoint table example in design.md §18). */
 export const START_FOOD_DAYS = 35
-/** Start gifts (design.md §18 table example shows 2). */
-export const START_GIFTS = 2
+/** Start gifts: none (user decision 17.09.2026); the port bazaar sells them. */
+export const START_GIFTS = 0

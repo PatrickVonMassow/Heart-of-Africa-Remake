@@ -45,7 +45,7 @@ describe('fixed design values (not tunable)', () => {
   it('starting money, provisions and gifts', () => {
     expect(START_MONEY).toBe(250)
     expect(START_FOOD_DAYS).toBe(35)
-    expect(START_GIFTS).toBe(2)
+    expect(START_GIFTS).toBe(0)
   })
 })
 

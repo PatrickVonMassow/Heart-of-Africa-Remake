@@ -77,106 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1143. The weaver stands in the trading post's wall: the "stuck adult" of the 16.09.2026 evening
-  report is the fixed weaver vignette, whose loom stands where the seeded trading post is
-  placed, so her body is drawn inside the market hut's wall (user 16.09.2026, verbatim:
-  "Neuer Bugreport unter C:\Users\Patri\Documents\Developing\hoa\local (über backup
-  erreichbar). Reihe das als vor 1141 ein.", report title "Festklemmend", report text "Wieder
-  ein festklemmender Erwachsener"). ORDER: the user placed it BEFORE 1141.
-  THE EVIDENCE IS IN THE REPOSITORY: `local/Festklemmend.zip`, unpacked beside it in
-  `local/Festklemmend/` (copied from the backup 16.09.2026, 23:19; the folder is ignored, so it
-  travels with the checkout and not with git). Taken on production build a5e98ec — the current
-  `main`, which already carries the 1138 escape ladder — on WebGPU, seed 1838110026,
-  `bambara-village`, day 0.00, viewport 1382x984 @dpr 1.25. The overlay holds only HUD (the
-  off-screen "Market Hut" label is the nearest building); the wildlife section reads "0 animals".
-  WHAT THE PICTURE SHOWS: one adult figure (dark head, yellow cone body, one arm) standing
-  between the loom frame on its left and a large mud wall directly behind it, the body touching
-  the wall. It is NOT a walker: it is the `Weaver` vignette (`src/scenes/place/PlaceLife.tsx`
-  :505-533, mounted at :3661), drawn at the fixed loom spot (-8.5, -7) with her figure 0.55 m in
-  front of the loom toward the village centre, i.e. at (-8.08, -6.65). She never moves by design,
-  so no escape ladder (1138) and no stall detector can ever touch her — the user reads a person
-  pressed into a wall for the whole visit.
-  MEASURED 16.09.2026 (`buildLayout('bambara-village', 1838110026)`): the trading post
-  (`interactives` type `market`) stands at (-5.21, -5.76); its collider radius is 2.9 and its
-  drawn wall radius 2.6 (`MARKET_HUT.r`, `src/scenes/place/roofClearance.ts:79`). The weaver's
-  figure centre is 3.00 m from it — 0.10 m inside the collider and 0.40 m off the wall face, so
-  her 0.3 m body touches the wall. The loom centre is 0.61 m outside the collider. Swept over
-  seeds 1..1500 for the three villages, the weaver's figure lies inside a building collider on
-  97.5 % (bambara), 96.7 % (maasai) and 97.5 % (swahili) of all seeds, every time the market
-  hut; the loom frame itself clips it on ~95 %. Seeds 1, 2, 3, 4, 7 reproduce it in bambara.
-  CAUSE READ OUT OF THE CODE — measure it, do not trust it. `src/scenes/place/layout.ts`
-  :803-811 places the trading post at `[jitter(-6, 2), jitter(-6, 2)]` for the compound plan
-  (the other plans have their own spots), i.e. within ±1 m of (-6, -6), which is 2.69 m from the
-  loom spot (-8.5, -7) — less than the hut's own 2.9 m collider. The only correction applied is
-  the 7.25 m window gap to the chief's hut (:812-818). `isFree` (:848-887) keeps every LATER
-  dwelling, fence post and dressing off the `lifeSpots` (:851), but the functional buildings are
-  placed BEFORE that predicate exists and are never tested against the life spots; the loom
-  collider is only appended afterwards (:1522). The same exposure is already recorded for fences
-  in `docs/backlog.md` (entry "Zaunzuege gegen die Requisitenplaetze", the well at (9, 8.5));
-  this point is its measured building-side twin.
-  FINAL STATE: on every seed of every village, no fixed adult station of
-  `villageAdultStations` (`src/scenes/place/lifeSpots.ts:26-40`) — loom AND weaver figure,
-  talkers, pounder, drummer, well — has its prop or its figure body overlapping any building
-  collider or drawn wall, nor any fence post (fold the backlog entry in if it costs nothing
-  more than the same test). The trading post is fitted AROUND the life spots the way the water
-  stand is fitted around the adult places (:1535-1549), or the loom is moved to a spot the
-  plan keeps free — the author measures which of the two keeps the layouts of the tested
-  seeds intact (the seeded stream is shared; a dropped `rand()` reshuffles every village,
-  :820-826) and says so in the commit. The weaver faces her loom with open ground behind her.
-  VERIFIABLE: Vitest over `buildLayout` for the three villages across ≥ 300 seeds — every
-  adult-station prop collider and figure circle clear of every dwelling, interactive and fence
-  collider by at least a walker's width — the sweep above is the red test today. Plus the
-  `polish` village section photographing the weaver at the reported seed 1838110026 on both
-  backends, with the market hut's wall visibly clear behind her.
-  Criticality: high — player-visible in nearly every village on the current `main`, in the
-  village §7.1 criterion 15 is measured on, and reported by the user from a real session as
-  the third "stuck inhabitant" report in a row (1138's "third head at the hut wall with no
-  body in front of it" is likely this same figure).
-  Bundle: Dorfleben — it edits the village layout in `layout.ts` and the life spots, the same
-  place-scene paths 1080, 1081, 1082 and 1125 reach, so it is worked before them and never
-  beside them.
-
-- [ ] 1141. The settlement edge band cannot be measured at the maasai village: the same
-  check reds on `main` itself (measured 16.09.2026 on a quiet machine, WebGPU, twice per
-  tree). `polish --section=settlement-edge` fails at `maasai-village (dry): the inside
-  ground crop could be measured — crop off-frame`, and the baseline classification places
-  the fault on `main`, not on the branch that found it: on `origin/main` 893110333 the
-  section failed at that check in both its first leg and its own retry
-  (`local/verify-baseline/893110333ddf/local/verify-logs/2026-09-16T14-51-17-971-polish.log`),
-  exactly as it did on `feat/1138-wedged-adults` f948bdbf7
-  (`.claude/worktrees/point-1138/local/verify-logs/2026-09-16T14-26-09-272-polish.log`).
-  The earlier covering run of the same branch had failed once at `bambara-village (wet)`'s
-  OUTSIDE crop and once at the maasai INSIDE crop, which the load heuristic read as a flake
-  signature; on the quiet machine the maasai check is reproducible and the bambara one is not.
-  AND IT DOES NOT SHOW UP IN A WHOLE PASS. Measured the same evening on the same tree:
-  both covering passes over collision, polish and settings — WebGPU
-  (`local/verify-logs/2026-09-16T16-09-28-256-…`) and WebGL 2
-  (`…T16-49-27-151-…`) — ran this very check GREEN, 280 pass 0 fail each. So the red
-  belongs to the ISOLATED SECTION RUN, four times out of four, and the whole pass, twice
-  out of twice, does not see it: what differs is the history the block arrives with, since
-  `--section` runs that block's own setup and nothing before it. That difference is the
-  first thing to measure, and it is why the red charge is scoped and not a licence.
-  WHAT THE MESSAGE DOES NOT SAY: the failing line is `bandRatio(ndc) === null`
-  (`scripts/verify/polish.mjs` :2996), and `bandRatio` returns null for TWO different
-  causes — a crop rectangle that falls outside the viewport (`groundSamples`) AND a
-  toggled-off reading of zero luminance (`!(off > 0)`). Both print "crop off-frame", so
-  the recorded evidence cannot say which one happened; the preceding `settledLuma(ndc)`
-  read of the SAME crop had succeeded, which makes the zero-luminance branch the likelier
-  of the two and the wording the reason nobody can tell.
-  FINAL STATE: the maasai village's dry inside crop is measurable again on both backends,
-  and the two causes carry DIFFERENT messages, each printing what it measured (the crop
-  rectangle against the viewport, or the off-reading that came back zero) — so the next
-  red of this check is classifiable from its record alone. Whether the picture itself is
-  at fault (a black ground band at that place and season) or the crop geometry is, is what
-  the split message answers first; the fix follows the cause and never the assertion.
-  VERIFIABLE: `polish --section=settlement-edge` green on WebGPU and on WebGL 2 on a quiet
-  machine, and a Vitest case over the two null paths of the reading helper so each carries
-  its own wording.
-  Criticality: high — it is a red on `main` that every render point's picture proof runs
-  into, and while it stands the `polish` suite can only be judged through a red charge.
-  Refs: scripts/verify/polish.mjs, scripts/render-verify-charges.mjs
-  Bundle: Testinfrastruktur.
-
 - [ ] 1142. The picture check's coverage record dies with the worktree it was earned in
   (measured 16.09.2026 on the landing of 1138). Both covering passes of that point ran in
   `.claude/worktrees/point-1138` — WebGPU and WebGL 2 over collision, polish and settings,
@@ -365,6 +265,30 @@ put it is the mistake this line exists to stop.
   Criticality: high — it is not the point's own work that is lost but a commissioned agent's,
   and the loss is silent: the log's last line claims the run continues.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1146. The steering hints "Click the view to steer" and "Esc: cursor" move down to
+  the height of the inventory bar (user 17.09.2026, 20:51).
+  Today the pill `.cursor-mode-hint` (`src/index.css` ~L473) sits centred at `bottom: 108px`,
+  well above the inventory bar, which is anchored at `bottom: 12px` on the left
+  (`.inventory-bar`, ~L187). The user wants the hint lower, on the same height as the
+  inventory. TARGET: the hint's vertical band coincides with the inventory bar's band —
+  same bottom edge, its own horizontal place beside the bar, never overlapping a slot.
+  THE MULTI-LINE CASE IS PART OF THE POINT: the bar wraps (`flex-wrap: wrap`,
+  `max-width: 60vw`) once enough slots are carried — reachable in play by buying up to
+  `inventoryCapacity` (20) items in the port — and the hint must then align with the
+  two-line bar (its bottom edge on the bar's bottom, and still outside the bar's box), not
+  stay where a one-line bar would end. Decide the alignment by the rendered rectangles of
+  both elements, not by a constant: measure `.inventory-bar` and `.cursor-mode-hint`
+  bounding boxes with one slot, and again with the bar wrapped, at the default viewport and
+  a narrow one (both backends where a picture is taken). Both language strings stay as they
+  are. Evidence note: `Hud.tsx` ~L216 hides the hint under `navigator.webdriver`, so a
+  Playwright frame cannot show it; the OPEN comment there records that its placement is
+  judged by CSS reading. Measure the rectangles on the right layer (Vitest/jsdom cannot lay
+  out; a browser test needs the hint visible — choose the smallest honest path, and record
+  what was measured). No new guard, ledger field or abstraction.
+  Criticality: medium — a player-visible layout defect, no data or progress at risk.
+  Position: directly before 1082, by the user's order (17.09.2026, 20:51).
+  Bundle: unbundled (HUD).
 
 - [ ] 1082. A child climbing the village boulder becomes something the player actually
   sees (user 09.09.2026, 05:04 — the same report twice).

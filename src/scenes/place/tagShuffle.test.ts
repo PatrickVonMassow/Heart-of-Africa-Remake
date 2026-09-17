@@ -1152,12 +1152,12 @@ describe('and the gate SEES a child that is wedged (point 656)', () => {
     // openness floor shrank bambara@2972259115 from 6.5 m to 4.0 m, and
     // work-order 1047 put a FIFTH child on every quarter, which crowds the wall
     // again — bambara@49 fell from 18 placements to 7.
-    // Re-scanned at five children over the three river villages at sixty seeds,
-    // against every gate this block asserts: four grounds still show the whole
-    // contrast, and bambara@21 shows it most strongly — 18 placements, two of
-    // them refused by the stricter rule, 25.5 rescues a child-minute against the
-    // stricter rule's 4.5.
-    const v = village('bambara-village', 21, undefined, { pen: { r, carry } })
+    // Reserving the adult stations changes the fabric again: bambara@21 no
+    // longer separates the two pen rules, and the old detector sees too much
+    // of its trace. Re-scanned seeds 12..40 against the whole fixture block:
+    // seed 22 retains every comparison, including the cadence check. All
+    // assertion thresholds stay unchanged.
+    const v = village('bambara-village', 22, undefined, { pen: { r, carry } })
     const paths: Track[][] = v.children.map(() => [])
     for (let t = 0; t < seconds; t += 1 / 60) {
       frame(v, 1 / 60)
@@ -1168,7 +1168,7 @@ describe('and the gate SEES a child that is wedged (point 656)', () => {
       // it round a passer-by would leave that child inside a collider — a broken
       // settlement rather than a wedged one. Asking for a clear yard of r + 1.6 m
       // all round was stricter than that and, with the bank round's children
-      // walking their quarter together, it refused nearly every re-pen — 4.5
+      // walking their quarter together, it refused nearly every re-pen — 1.5
       // rescues a child-minute where the wall-band rule produces 25.5, which is
       // the construction losing its grip on the symptom rather than the gate
       // losing sight of it.
@@ -1223,8 +1223,8 @@ describe('and the gate SEES a child that is wedged (point 656)', () => {
     const r = shuffleWindows(penned)
     const rescues = rescueRate(penned)
 
-    // The gate bites: the penned child walks and gets nowhere over a third of
-    // its judged time (32.6 %), and is carried out of its yard 25.5 times a
+    // The gate bites: the penned child walks and gets nowhere over a quarter of
+    // its judged time (28.2 %), and is carried out of its yard 25.5 times a
     // minute — 76.5 metres of it. Read on the WHOLE village, the same trace
     // fails on the per-child gates and would have been diluted by four healthy
     // siblings without them.
@@ -1270,8 +1270,8 @@ describe('and the gate SEES a child that is wedged (point 656)', () => {
     // spans a carry is refused rather than guessed at — so a little over half
     // the trace can be judged (re-measured at five children, judgedShare
     // 0.523-0.554 across the cadences), and what survives is a scatter of short
-    // continuous stretches whose share swings a little with the cadence: 32.56 /
-    // 32.95 / 32.50 / 34.16 / 33.89 %. The one thing that does NOT swing is the
+    // continuous stretches whose share swings a little with the cadence: 28.24 /
+    // 28.01 / 29.37 / 28.73 / 31.21 %. The one thing that does NOT swing is the
     // answer the gate reads — every cadence is RED by a factor of at least a
     // hundred — and the rescue rate below, which counts the very carries that
     // made the trace unjudgeable, is red by a factor of four at all of them.

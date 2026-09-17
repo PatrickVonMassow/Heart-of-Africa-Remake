@@ -1521,29 +1521,6 @@ export const RED_CHARGES = [
       + 'drift by design. The charge dies with 1121.',
   },
   {
-    point: 1141,
-    suite: 'polish',
-    backend: 'webgpu',
-    featureLevel: 'compatibility',
-    kind: 'check',
-    // NO detailMatch: the printed detail is the fixed words "crop off-frame",
-    // which carry no measurement to narrow on — and which 1141 exists to split
-    // into the two causes that share them. Scoped to the WebGPU compatibility
-    // lane, the only one it has been measured on — both records read off runs on
-    // this host, which records no other level. On WebGL 2 and on a core adapter
-    // it stays a real red until it has been measured there.
-    match: /^maasai-village \(dry\): the inside ground crop could be measured/i,
-    why:
-      'FILED AS 1141 ON 16.09.2026 OUT OF THE BASELINE CLASSIFICATION THAT FOUND IT ON MAIN. '
-      + 'polish --section=settlement-edge reds at this check on origin/main 893110333 in both its '
-      + 'first leg and its own retry (local/verify-baseline/893110333ddf/local/verify-logs/'
-      + '2026-09-16T14-51-17-971-polish.log) and identically on feat/1138-wedged-adults f948bdbf7 '
-      + '(.claude/worktrees/point-1138/local/verify-logs/2026-09-16T14-26-09-272-polish.log), both '
-      + 'runs on the same quiet machine. It therefore predates 1138, whose escape ladder moves '
-      + 'inhabitant BODIES while this check reads colliders, flora and rocks only. 1141 owns '
-      + 'deciding FIRST which of bandRatio\'s two null paths is hit, and the charge dies with it.',
-  },
-  {
     point: 642,
     suite: 'polish',
     backend: 'webgl',
