@@ -1335,3 +1335,23 @@ freie Taste übrig, was genau der Grund war, A nicht doppelt zu belegen. Der
 billige Weg, falls es stört: eine Schultertaste oder ein kurzer Druck auf L3
 benutzt den gewählten Platz. Das ist eine Belegungsentscheidung des Nutzers,
 kein Mangel, den ich allein entscheiden sollte.
+
+## Der Hänge-Detektor liest die Polish-Suite falsch, die erst am Ende schreibt (17.09.2026)
+
+Gemessen 17.09.2026 (Befund aus dem Träger, 17:40): `run-wait --await` erklärte
+einen gesunden vollen Polish-Lauf nach 19m04s für hängend („written nothing for
+15m00s") und meldete der Notfallspur einen Stillstand. Der Lauf arbeitete in
+diesem Moment (Chrome-Renderer bei 67 % CPU, GPU-Prozess bei 33 %) und endete
+danach normal. Die Ursache ist strukturell: Polish schreibt konstruktionsbedingt
+nur eine Zeile am Start und die PASS/FAIL-Zeile am Ende, und sein gemessenes
+Band liegt bei 9,9–61,5 min (Median 55,2). Ein Schweigedetektor von 15 min kann
+für diese Suite nie richtig liegen.
+
+Nicht als Punkt eingereiht (Befundaufnahme CLAUDE.md §2, Infrastruktur-Freeze):
+Der Lauf selbst war grün, das Fehlurteil hat keine Landung blockiert und keine
+falsche Freigabe erzeugt. Falls es stört, ist der billige Weg, die Regel
+abzuschalten, nicht sie umzubauen: den Schweigedetektor für Polish aussetzen
+oder ihm die Frames unter `verification/` als Fortschrittssignal geben, statt
+das Log. Kosten, wenn es bleibt: die meistgelaufene Suite wird bei jedem vollen
+Durchgang als Stillstand gemeldet, und der Bediener lernt, das Urteil zu
+ignorieren.
