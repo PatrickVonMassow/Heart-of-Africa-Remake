@@ -9,17 +9,25 @@
 //                               explicit focus confirm/set or a --synced review
 //   tool-activity.json        — last tool-call timestamp (focus freshness)
 //
+// All five resolve against the SHARED checkout, never the worktree a process was
+// started in: one host runs one batch, so its board, focus and activity are
+// singletons. Resolving them per checkout gave a session whose cwd had moved
+// into a point's worktree a second, empty state file beside the live one — the
+// Stop guard then read no registered dashboard and refused every turn, and
+// boardFilePath fell back to the worktree's stale tracked copy of the board,
+// which is the very "stale copy" the resolver below exists to prevent.
+//
 // State writes are atomic (tmp + rename) because the PostToolUse heartbeat can
 // write concurrently with a CLI command in the same turn.
 import { readFileSync, writeFileSync, renameSync, rmSync } from 'node:fs'
 import { createHash } from 'node:crypto'
-import { REPO_ROOT, repoPath } from './repo-paths.mjs'
+import { REPO_ROOT, commonRepoPath } from './repo-paths.mjs'
 
 export { REPO_ROOT }
-export const STATE_PATH = repoPath('.claude/dashboard-state.json')
-export const FOCUS_PATH = repoPath('.claude/current-focus.json')
-export const PENDING_PATH = repoPath('.claude/focus-check-pending.json')
-export const ACTIVITY_PATH = repoPath('.claude/tool-activity.json')
+export const STATE_PATH = commonRepoPath('.claude/dashboard-state.json')
+export const FOCUS_PATH = commonRepoPath('.claude/current-focus.json')
+export const PENDING_PATH = commonRepoPath('.claude/focus-check-pending.json')
+export const ACTIVITY_PATH = commonRepoPath('.claude/tool-activity.json')
 
 /** Where the board lives when no path has been registered yet. */
 export const BOARD_FILE_DEFAULT = '.batch-dashboard.html'
@@ -31,7 +39,7 @@ export const BOARD_FILE_DEFAULT = '.batch-dashboard.html'
  */
 export function boardFilePath(state = readJson(STATE_PATH)) {
   const rel = (state && typeof state === 'object' && state.dashboardPath) || BOARD_FILE_DEFAULT
-  return repoPath(rel)
+  return commonRepoPath(rel)
 }
 
 /** Parse a JSON file; null when absent/unreadable/torn (caller decides). */
