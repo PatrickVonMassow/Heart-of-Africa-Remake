@@ -322,3 +322,42 @@ describe('the both-backend sequencer (point 1135)', () => {
     expect(result.status).toBe(0)
   })
 })
+
+// THE THREE DEFECTS THE CROSS-VENDOR REVIEW OF 17.09.2026 FOUND (GPT-6 Astra,
+// pass 3/5 of 264cac0). Each one is a way the deleted retry's safety net used to
+// cover for the runner, and each is pinned here rather than remembered.
+describe('what the ledger classification must not lose (Astra review, 17.09.2026)', () => {
+  it('holds a red the suite PRINTED that the run record does not carry', async () => {
+    // The record knows only the charged failure; the output also shows an
+    // uncharged one. Reading the record alone reported "nothing holds".
+    const result = await run({
+      outputs: [`${known}\n${unknown}`],
+      records: [{ reds: [{ name: ground, kind: 'check', point: 603 }] }],
+    })
+    expect(result.log).toContain('POINT REDS HOLD')
+    expect(result.log).toContain('a new defect')
+    expect(result.log).toContain('carried by no charged record entry')
+    expect(result.log).not.toContain('ACCOUNTED FOR')
+    expect(result.status).toBe(1)
+  })
+
+  it('survives a suite killed at the wall timeout instead of throwing on it', async () => {
+    const result = await run({ spawnError: { code: 'ETIMEDOUT' } })
+    expect(result.log).toContain('KILLED after')
+    expect(result.log).toContain('POINT REDS HOLD')
+    expect(result.status).toBe(1)
+  })
+
+  it('never asks to strike a charge whose check also FAILED in the same run', async () => {
+    // `allChecks` keeps the FIRST reading of a key, so a PASS printed before the
+    // FAIL used to recommend striking the entry the run had just failed on.
+    const result = await run({ outputs: [`PASS  ${ground} — laplacian mean 1.42\n${known}`] })
+    expect(result.log).not.toContain('STRIKE')
+    expect(result.log).toContain('ACCOUNTED FOR')
+  })
+
+  it('still strikes a charge whose check only ever passed', async () => {
+    const result = await run({ outputs: [`PASS  ${ground} — laplacian mean 1.42\n${unknown}`] })
+    expect(result.log).toContain('STRIKE  settings')
+  })
+})

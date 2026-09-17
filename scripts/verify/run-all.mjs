@@ -15,7 +15,7 @@ import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { killTree, launchServer } from './_server.mjs'
-import { allChecks, clearInheritedBaselineLane, countCheckLines, failedChecks } from './baseline-classify-core.mjs'
+import { allChecks, checkFromName, clearInheritedBaselineLane, countCheckLines, failedChecks } from './baseline-classify-core.mjs'
 import {
   LEVEL, annotateResult, annotateStageFailure, decideRun, formatLoadReport, onLoadMode,
 } from './machine-load-core.mjs'
@@ -270,7 +270,7 @@ function runSuite(name, baseUrl, onlySection = '') {
   })
   if (res.error && res.error.code === 'ETIMEDOUT') {
     console.log(`FAIL  ${name.padEnd(12)} — KILLED after ${Math.round(SUITE_TIMEOUT_MS / 60000)} min wall timeout (hung, not slow — raise VERIFY_SUITE_TIMEOUT_MS if this was a genuine slow-green run)`)
-    return { ok: false, out: '' }
+    return { ok: false, out: '', unresolved: true, allOwned: false, points: [], partial: false, rows: [], stale: [] }
   }
   const out = (res.stdout ?? '') + (res.stderr ?? '')
   // COUNT THE RESULT LINES BY THE RULE THAT KNOWS THEM (`CHECK_LINE`), not by a
@@ -330,31 +330,59 @@ function runSuite(name, baseUrl, onlySection = '') {
     ? red.point
     : chargeFor(red, { suite: name, backend: record.backend, featureLevel: record.featureLevel })?.point ?? null)
   const ownedSet = new Set(ownedReds)
-  const rows = reds.map((red) => {
-    const elsewhere = ownedSet.has(red)
-    const point = elsewhere ? pointOf(red) : null
+  const printed = failedChecks(out)
+  // A RECORD ENTRY MAY CARRY NO KEY — older records and hand-written ones name
+  // the check and nothing else. Deriving it from the name is what every other
+  // reader of this ledger does, and without it the same red arrives twice: once
+  // keyed `undefined` from the record, once keyed properly from the output.
+  const keyOf = (red) => red.key ?? checkFromName(red.name).key
+  const chargedByKey = new Map(reds.filter((red) => ownedSet.has(red)).map((red) => [keyOf(red), red]))
+  const row = ({ key, name: check, fromRecord }) => {
+    const charged = chargedByKey.get(key)
+    const point = charged ? pointOf(charged) : null
     return {
       suite: name,
-      check: red.name,
-      key: red.key,
+      check,
+      key,
       point,
-      elsewhere,
-      title: elsewhere ? `point ${point} — ${red.name}` : '',
-      reason: elsewhere ? `charged to open point ${point}` : 'not in the classified baseline — no open point owns it',
+      elsewhere: Boolean(charged),
+      title: charged ? `point ${point} — ${check}` : '',
+      reason: charged
+        ? `charged to open point ${point}`
+        : fromRecord
+          ? 'not in the classified baseline — no open point owns it'
+          : 'printed by the suite but carried by no charged record entry — ownership unresolved',
     }
-  })
+  }
+  const rows = []
+  const seenRows = new Set()
+  for (const red of reds) {
+    const key = keyOf(red)
+    if (seenRows.has(key)) continue
+    seenRows.add(key)
+    rows.push(row({ key, name: red.name, fromRecord: true }))
+  }
+  for (const check of printed) {
+    if (seenRows.has(check.key)) continue
+    seenRows.add(check.key)
+    rows.push(row({ key: check.key, name: check.name, fromRecord: false }))
+  }
   // AN ENTRY THAT HAS GONE GREEN IS STRUCK (point 1135). A charge is a named
   // defect, not a standing exemption, so the pass that sees the check PASS says
   // so and names the file to strike it from. Reported, never rewritten here: the
   // ledger is source, and a run that edits its own tree would dirty a landing.
+  const redKeys = new Set([...reds.map(keyOf), ...printed.map((check) => check.key)])
   const stale = complete
     ? allChecks(out)
-      .filter((c) => c.status === 'PASS')
+      .filter((c) => c.status === 'PASS' && !redKeys.has(c.key))
       .map((c) => ({ check: c.name, charge: chargeFor({ name: c.name, key: c.key, kind: 'check', detail: c.detail },
         { suite: name, backend: record.backend, featureLevel: record.featureLevel }) }))
       .filter((s) => s.charge && openPoints.has(s.charge.point))
     : []
-  return { ok, out, unresolved: !complete, allOwned: reds.length > 0 && ownedReds.length === reds.length, points, partial: record?.partial === true, rows, stale }
+  // ACCOUNTED FOR IS A STATEMENT ABOUT EVERY RED THIS PASS HAS, printed or
+  // recorded — not about the record's half of them (Astra finding P1).
+  const allOwned = rows.length > 0 && rows.every((r) => r.elsewhere)
+  return { ok, out, unresolved: !complete, allOwned, points, partial: record?.partial === true, rows, stale }
 }
 
 // ONE PASS PER SUITE (point 1135, user order 15.09.2026). The automatic flake
