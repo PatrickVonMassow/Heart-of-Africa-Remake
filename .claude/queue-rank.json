@@ -1380,10 +1380,45 @@
       "why": "Last is right: its first act is measuring what the player actually loses, and the whole layout path in front of it (1143, then 1045's neighbours) writes the same file.",
       "origin": "machine",
       "place": "last"
+    },
+    "1145": {
+      "at": "2026-09-17T12:44:32.014Z",
+      "why": "Hinter die Veroeffentlichung gerueckt: der Punkt ist maschinell eingereiht und seine Dringlichkeit ist mittel — die Bilder sieht kein Spieler, und der Verlust trifft nur die Beweisfuehrung, die sich mit Freizeichnungen von Hand weiterschleppen laesst.",
+      "origin": "machine",
+      "place": "last"
     }
   },
+  "boundary": {
+    "at": "2026-08-21T00:55:14.962Z",
+    "points": [
+      336,
+      553,
+      596,
+      633,
+      659,
+      660,
+      663,
+      690,
+      708,
+      715,
+      719,
+      733,
+      735,
+      736,
+      738,
+      739,
+      746,
+      747,
+      750,
+      759,
+      760,
+      762,
+      764
+    ],
+    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
+  },
   "settled": {
-    "at": "2026-09-16T22:48:11.716Z",
+    "at": "2026-09-17T12:44:32.022Z",
     "points": [
       174,
       184,
@@ -1789,36 +1824,8 @@
       1141,
       1142,
       1143,
-      1144
+      1144,
+      1145
     ]
-  },
-  "boundary": {
-    "at": "2026-08-21T00:55:14.962Z",
-    "points": [
-      336,
-      553,
-      596,
-      633,
-      659,
-      660,
-      663,
-      690,
-      708,
-      715,
-      719,
-      733,
-      735,
-      736,
-      738,
-      739,
-      746,
-      747,
-      750,
-      759,
-      760,
-      762,
-      764
-    ],
-    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   }
 }
