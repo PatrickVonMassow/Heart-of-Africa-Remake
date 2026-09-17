@@ -16,3 +16,24 @@ these rejected shots cannot serve as an accepted band measurement.
 Evidence supplied by the reviewer:
 `local/verify-logs/2026-09-17T16-21-03-306-polish.log` (section run, RED).
 This is the reviewer's browser observation, not an author-run browser result.
+
+## Finding 2: one window for settling and measurement
+
+Replaced the two-frame absolute-epsilon settle with a sliding window of
+`READ_COUNT + CONFIRM_READS` crops, each separated by the existing
+`READ_GAP_MS` and `READ_GAP_FRAMES` conditions. The unchanged shot guard admits
+the window, and that same window supplies the measurement. There is no second
+epsilon or projected duration to tune apart from the guard. The 40-read limit
+is only a failure net; reaching it no longer accepts an unsettled last reading.
+
+This uses the proposed shot-timescale approach without predicting a future
+shot's frame pacing. A past settle cannot guarantee a future shot's drift.
+Reusing the certified reads gives the consistency test an exact invariant:
+every accepted measurement passes the original guard on its own full window.
+The ON/OFF/ON order, ratio assertions and 0.01 drift bar are unchanged.
+The loop only waits for crop stability; it does not retry a failed ratio.
+
+Vitest covers the old epsilon admitting a rejected monotonic trend, convergence
+in both directions, consistency near the relative bar at several luminances,
+failure on persistent drift, partial-crop defects, rain, black crops, off-frame
+diagnostics and starved gaps. Existing reading and drift cases remain intact.

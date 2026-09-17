@@ -44,7 +44,10 @@
 // spaces them by both frames and the page's own elapsed time, because a streak
 // lingers ~0.7 s and twelve frames can be 0.2 s.
 //
-// THE SETTLE LOOP NEEDS THE SAME TWO PROPERTIES, and gets them a different way.
+// THE ORIGINAL SINGLE-PICTURE SETTLE needed the same two properties and got
+// them a different way (retained below as settleReading and its fixtures).
+// The live settle now uses full shot windows in edgeBandSettle.mjs: even a
+// rain-robust single-picture statistic did not fix its too-short time interval.
 // It reads one picture at a time, so it has no time axis to reject a streak in —
 // and a spatial median would make it blind in exactly the way described above:
 // it would call a crop settled while a leak was still arriving in the near rows.
@@ -208,11 +211,11 @@ export function shotReading(reads) {
  *
  * `shotReading` drops anything that reaches a minority of the reads, which is
  * what makes the rain harmless — and it would drop a real defect ARRIVING
- * mid-shot just as silently. The settle loop is the first defence and it is
- * one-sided (`settleReading`), so a BRIGHTENING that begins after the settle and
- * covers part of the crop could slip in unseen.
+ * mid-shot just as silently. The original one-sided single-picture settle
+ * (`settleReading`) could miss a BRIGHTENING over part of the crop. The live
+ * settle now uses this guard on the full window before measuring that window.
  *
- * This is the second defence, and it is sign-agnostic: read the first half and
+ * This defence is sign-agnostic: read the first half and
  * the last half separately. Each sub-window is still rain-robust — a streak
  * reaches one of three and the median drops it — so a crossing does not move
  * either half, while anything that ARRIVES and STAYS moves the second and not
