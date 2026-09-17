@@ -1345,33 +1345,9 @@
       "origin": "user",
       "place": "ahead"
     },
-    "1135": {
-      "at": "2026-09-15T21:54:14.420Z",
-      "why": "Nutzerauftrag vom 15.09.2026, im Punkttext woertlich zitiert, ausdruecklich als naechstes eingereiht",
-      "origin": "user",
-      "place": "ahead"
-    },
     "1136": {
       "at": "2026-09-15T21:54:14.639Z",
       "why": "Nutzerauftrag vom 15.09.2026, im Punkttext woertlich zitiert, ausdruecklich als naechstes eingereiht",
-      "origin": "user",
-      "place": "ahead"
-    },
-    "1141": {
-      "at": "2026-09-16T17:46:24.024Z",
-      "why": "Jeder isolierte Sektionslauf von polish faellt heute an dieser Stelle aus, und der Sektionslauf ist die billige Sprosse, mit der jeder Renderpunkt repariert wird — wer sie nicht nutzen kann, zahlt stattdessen den ganzen Durchgang.",
-      "origin": "machine",
-      "place": "ahead"
-    },
-    "1142": {
-      "at": "2026-09-16T17:46:24.119Z",
-      "why": "Jede Landung aus einem Arbeitsbaum verliert heute den Nachweis ihres Bildlaufs und endet in einer Aufschub-Ausnahme, die wie ein ungeprueftes Bild aussieht — das trifft die naechste Landung, nicht erst die Veroeffentlichung.",
-      "origin": "machine",
-      "place": "ahead"
-    },
-    "1143": {
-      "at": "2026-09-16T22:02:33.908Z",
-      "why": "Nutzerauftrag 16.09.2026 23:18, verbatim: 'Reihe das als vor 1141 ein.' — eigener Bugreport mit eigener Positionsangabe",
       "origin": "user",
       "place": "ahead"
     },
@@ -1386,39 +1362,22 @@
       "why": "Hinter die Veroeffentlichung gerueckt: der Punkt ist maschinell eingereiht und seine Dringlichkeit ist mittel — die Bilder sieht kein Spieler, und der Verlust trifft nur die Beweisfuehrung, die sich mit Freizeichnungen von Hand weiterschleppen laesst.",
       "origin": "machine",
       "place": "last"
+    },
+    "1146": {
+      "at": "2026-09-17T21:40:56.098Z",
+      "why": "Vom Nutzer am 17.09.2026 um 20:51 selbst angefordert — die Steuerhinweise sollen auf die Höhe der Inventarleiste rücken; ein Nutzerwunsch steht vor dem Release, ohne Dringlichkeitsnachweis.",
+      "origin": "user",
+      "place": "ahead"
+    },
+    "1147": {
+      "at": "2026-09-17T21:42:17.944Z",
+      "why": "Stehende Blockade auf main selbst: der Wächter nennt polish.mjs seit der Landung von 1141 als offenen Renderpfad, jeder von main geschnittene Zweig erbt die Forderung nach einer Zwei-Backend-Bildprüfung, und 633 wie 174 stehen dahinter.",
+      "origin": "machine",
+      "place": "ahead"
     }
   },
-  "boundary": {
-    "at": "2026-08-21T00:55:14.962Z",
-    "points": [
-      336,
-      553,
-      596,
-      633,
-      659,
-      660,
-      663,
-      690,
-      708,
-      715,
-      719,
-      733,
-      735,
-      736,
-      738,
-      739,
-      746,
-      747,
-      750,
-      759,
-      760,
-      762,
-      764
-    ],
-    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
-  },
   "settled": {
-    "at": "2026-09-17T12:44:32.022Z",
+    "at": "2026-09-17T21:40:56.108Z",
     "points": [
       174,
       184,
@@ -1819,13 +1778,39 @@
       1132,
       1133,
       1134,
-      1135,
       1136,
-      1141,
-      1142,
-      1143,
       1144,
-      1145
+      1145,
+      1146
     ]
+  },
+  "boundary": {
+    "at": "2026-08-21T00:55:14.962Z",
+    "points": [
+      336,
+      553,
+      596,
+      633,
+      659,
+      660,
+      663,
+      690,
+      708,
+      715,
+      719,
+      733,
+      735,
+      736,
+      738,
+      739,
+      746,
+      747,
+      750,
+      759,
+      760,
+      762,
+      764
+    ],
+    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   }
 }

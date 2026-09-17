@@ -1611,7 +1611,7 @@ stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die s
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 17.09.2026, 15:34 · Quellen-Fingerprint: `6c306504a0f7…`
+Zuletzt aktualisiert: Donnerstag, 17.09.2026, 23:41 · Quellen-Fingerprint: `2c1cd871cd92…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1634,7 +1634,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | F6 bug-report zips the user hands over are saved into the repo's git-ignored local/ folder — search there first, not only Downloads | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | A newly found problem goes into an EXISTING bundle point first; a new standalone point is the exception, and may instead re-cut the bundles | 1 | niedrig | bundle-first-guard.mjs, point-proof-guard.mjs | ✔ Mechanismus |
 | Work packages are SPOKEN by name, never by letter — the user cannot read \"bundle H\"; the letter stays only as an internal ID | 1 | niedrig | bundle-first-guard.mjs | ✔ Mechanismus |
-| Jede Chat-Antwort mit einem Zeitstempel nach deutscher Zeit (Europe/Berlin, DST-korrekt) beginnen | 9 | hoch | timestamp-guard.mjs | ✔ Mechanismus |
+| Jede Chat-Antwort mit einem Zeitstempel nach deutscher Zeit (Europe/Berlin, DST-korrekt) beginnen | 10 | hoch | timestamp-guard.mjs | ✔ Mechanismus |
 | CLAUDE.md §7.1 references design.md instead of retelling it; future doc edits must preserve the verifiable conditions, script mappings, numbering and checked numbers | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Autonomously insert a full CLOSING cycle (regression + dead-code/stale-doc cleanup + .md audit) when warranted — after extensive rework or many small completed tasks — without waiting for the user to ask | 1 | niedrig | closing-guard.mjs | ✔ Mechanismus |
 | hoa commit messages must not reference the TASKS point (\"Point N\") | 1 | niedrig | commit-scope-guard.mjs, point-proof-guard.mjs | ✔ Mechanismus |
@@ -1716,10 +1716,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 97 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 135 Prozess-/Meta-TASKS-Punkte (davon 66 offen).
+Erfasste Quellen: 97 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 135 Prozess-/Meta-TASKS-Punkte (davon 65 offen).
 
-<!-- RETRO-FINGERPRINT: 6c306504a0f7fb6d9efed0c69327964e47289703ac7610ab89ea006eaf7d8d03 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-17T13:34:32.224Z -->
+<!-- RETRO-FINGERPRINT: 2c1cd871cd926a67514ae6b92b0cfa2023c95683720f59489c03bdb06b0b59ab -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-17T21:41:08.271Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -7411,3 +7411,62 @@ eine Regel durchsetzt, indem er den Prozess beendet, tauscht einen benennbaren F
 einen herrenlosen ein und macht den Rest des Beweises gleich mit wertlos. Und eine
 Werkzeugkette, die ihre eigenen Prüfläufe so verliert, misst am Ende sich selbst statt das
 Spiel.
+
+### 3.283 Vierundzwanzig Wege, an einem Rot vorbeizusehen
+
+Punkt 1135 hat dem Prüflauf drei von vier Durchgängen weggenommen: die automatische
+Flatter-Wiederholung und die beiden Vergleichsläufe gegen den alten Stand. Die
+Gegenlesung durch das Fremdmodell fand daraufhin in sechs Runden **24 echte Mängel** —
+und fast jeder einzelne hatte dieselbe Form. Nicht »die Prüfung urteilt falsch«, sondern:
+*ein Rot war da, und keine Codestelle hat es angesehen.*
+
+Die Liste liest sich wie Variationen eines Themas. Ein Lauf endet mit 0, während sein
+eigenes Protokoll Fehler trägt — die gedruckte Zeile kann das nicht sehen, das Protokoll
+schon, und niemand fragte es. Eine Konsolenzahl ohne Text baut keine Identität, also
+erschien sie in keiner Zuordnungszeile und hielt niemanden auf. Ein verbuchtes Messergebnis
+deckte ein zweites, nicht verbuchtes desselben Checks, weil der Schlüssel die Messung
+wegfaltet, die Buchung aber genau sie liest. Eine Suite, die vor ihrem ersten Namen starb,
+wurde als sauberer Baum gemeldet. Und ein `console errors: 0` in der ersten Zeile löschte
+ein `console errors: 1` in der zweiten, weil ein Regex den ersten Treffer nimmt.
+
+Das Muster dahinter ist allgemeiner als dieser Prüfer. Ein Beleg existiert, aber der Pfad,
+der über ihn urteilt, liest ihn nicht — und weil Lesen und Urteilen an verschiedenen
+Stellen stehen, fällt die Lücke nie auf: Das Urteil ist wohlgeformt, nur eben über weniger
+Material als vorhanden. Die automatische Wiederholung hatte das lange verdeckt. Sie war
+teuer und stumpf, aber sie fragte jedes Rot ein zweites Mal, und dabei fiel manches auf,
+das der erste Durchgang verschluckt hatte. Wer sie löscht, muss die Buchführung darunter
+auf jede einzelne dieser Lücken prüfen — sonst spart er die Minuten und verliert die Fehler.
+
+**Lehre:** Wer einen Sicherungslauf entfernt, hat nicht die Aufgabe, die *Ersatzlogik* zu
+bauen, sondern die Aufgabe, jeden Weg aufzuzählen, auf dem ein Beleg entstehen und
+ungelesen bleiben kann — gedruckt, gezählt, aufgezeichnet, unvollständig, namenlos,
+entdoppelt. Und jede dieser Lücken gehört durch einen Test festgenagelt, der rot wird,
+sobald man die Reparatur zurücknimmt: Bei 24 Funden in sechs Runden ist die
+Mutationsprobe das einzige, was »behoben« von »ich glaube, behoben« unterscheidet.
+
+### 3.284 Ich brach die Regel, die ich im selben Zug aufgeschrieben hatte
+
+Punkt 1135 schreibt als eigenen Abschnitt in die Prüf-Anleitung: *Läuft eine Vollprüfung,
+läuft sonst nichts.* Kein Schloss, kein Wächter, ausdrücklich nur Prosa — weil ein Urteil,
+das unter fremder Last entsteht, kein Beleg ist.
+
+Wenige Minuten später habe ich die Landung desselben Punktes gestartet, deren schnelles Tor
+Build, Lint und 15.770 Unit-Tests fährt — und daneben, im selben Atemzug,
+`batch-doctor --gate`, der seinerseits eine volle Unit-Suite startet. Die Prozessliste zeigte
+zwei Vitest-Bäume nebeneinander. Das Ergebnis stand im Protokoll des Doktors, in seinen
+eigenen Worten: `npm run test:unit FAILED but the verdict is INCONCLUSIVE (load)`. Die
+Messung, für die ich ihn gestartet hatte, konnte er nicht liefern — wegen mir.
+
+Bemerkenswert ist nicht der Fehler, sondern seine Nähe zur Regel. Ich hatte die Prosa nicht
+vergessen; ich hatte sie kurz vorher selbst formuliert. Sie stand nur in der falschen Form
+im Kopf — als Aussage über *Suiten*, und was ich startete, hieß »Doktor« und »Landung«.
+Eine Regel, die ihren Gegenstand über seinen Namen führt, greift genau dann nicht, wenn er
+einen anderen Namen trägt.
+
+**Lehre:** Die Regel heißt nicht »keine zweite Suite«, sondern **»kein zweiter
+Maschinenverbraucher«** — und das ist jeder Befehl, der Build, Lint oder Unit fährt, wie
+immer er heißt: Landung, Doktor, Pre-Push-Tor, Bildstabilität. Vor dem Start eines
+Werkzeugs gehört die Frage »was fährt das unter der Haube?« zur Regel dazu; die
+Prozessliste beantwortet sie in einer Sekunde. Und wo die Prosa bewusst ohne Wächter
+auskommt, trägt sie diese Aufzählung im Satz, sonst schützt sie nur vor dem Fall, den ihr
+Autor gerade vor Augen hatte.

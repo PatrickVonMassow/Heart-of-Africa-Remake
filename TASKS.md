@@ -15796,3 +15796,32 @@ to land than a mechanism that needs a review.
   Refs: src/scenes/place/layout.ts (`pickWayOut`, the `way-out-missing` devAssert, `onWayOut`),
   src/scenes/place/layout.test.ts
   Bundle: Dorfleben
+
+- [ ] 1147. The render window has stood open since point 1141's landing, and every landing
+  since pays for it. MEASURED 17.09.2026 while landing point 1135: `render-verify-guard
+  --status` names `scripts/verify/polish.mjs` as a PENDING render path against baseline
+  `bac394d`, on `main` itself. The two commits that opened it — `dd876c600` "Distinguish
+  settlement edge reading failures" and `1f8b5d9bb` "Settle ground crops over the window
+  used to measure each shot" — are point 1141's, landed earlier the same day; no covering
+  run on either backend was recorded after them. Point 1135's branch inherited both by being
+  cut from `main`, so its guard demanded a both-backend picture for a change it never made,
+  and so will every branch cut from `main` until the window closes.
+  WHY IT IS NOT 1142: 1142 repaired the MECHANISM — a covering record no longer dies with
+  the worktree it was earned in. It did not, and could not, re-earn the record 1141's
+  landing failed to leave. This point owes that one measurement, nothing more.
+  FINAL STATE: one covering `polish` run per backend on a quiet machine at the current
+  `main`, its frames judged by eye, and the guard's baseline advanced by the run itself. If
+  the run is red, every red is charged to its open point or filed; a deferral is NOT the
+  answer here, because nothing suggests either backend cannot be judged headless.
+  THREE RECORDED CRASHES ride along and are NOT this point's to explain — webgpu/polish
+  @2026-09-15T21:55:39, webgpu/polish @2026-09-15T22:13:38, webgl/flow @2026-09-15T23:16:03.
+  A crash carries no red anybody can own. Either the covering run moves the window past
+  them, or their kept logs in `local/verify-logs/` are read and signed off with
+  `render-verify-guard --crashed`; a signed-off crash is never a pass.
+  VERIFICATION: the guard's own `--status` prints no pending render path afterwards, and the
+  run records show one covering pass per backend later than the last edit of `polish.mjs`.
+  Criticality: high — it is a standing blockade, not a defect: it sits on `main`, it fires on
+  every branch cut from it, and it stands between the batch and both point 633 and point 174.
+  Refs: scripts/render-verify-guard.mjs, scripts/render-verify-core.mjs, scripts/verify/polish.mjs,
+  points 1141, 1142, 1135
+  Bundle: Testinfrastruktur
