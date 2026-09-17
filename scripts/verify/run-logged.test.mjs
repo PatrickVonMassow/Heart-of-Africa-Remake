@@ -10,7 +10,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, it, expect } from 'vitest'
-import { lastProgressAtFor } from './run-record.mjs'
+import { lastProgressAtFor, logDir } from './run-record.mjs'
 import { parseActivityJournal } from '../batch-activity-journal-core.mjs'
 import { commandNamesRun } from '../batch-in-flight.mjs'
 import { ORDINARY_OUTPUT_BUDGET } from '../tool-output-budget-core.mjs'
@@ -154,11 +154,10 @@ describe('run-logged --show', () => {
 
 describe('run-logged default launch — the run-identity re-exec (point 700, Sol round 4)', () => {
   it("re-execs itself so the record writer's argv names the log path", () => {
-    // VERIFY_LOG_DIR is ROOT-relative by contract (run-record.mjs logDir);
+    // VERIFY_LOG_DIR is shared-root-relative (run-record.mjs logDir);
     // local/ is git-ignored, so the fixture leaves no stray file behind.
-    const ROOT = join(dirname(WRAPPER), '..', '..')
     const relDir = join('local', `runlogged-reexec-${process.pid}`)
-    const dir = join(ROOT, relDir)
+    const dir = logDir({ VERIFY_LOG_DIR: relDir })
     try {
       // An unknown --section dies inside run-all BEFORE anything is built or
       // booted (point 566) — the cheapest real run there is: the wrapper still
@@ -211,9 +210,8 @@ describe('run-logged default launch — the run-identity re-exec (point 700, Sol
     'reproduces a signal-killed child instead of flattening it to exit 1 (Sol round 5)',
     async () => {
       if (process.platform === 'win32') return // POSIX signal semantics
-      const ROOT = join(dirname(WRAPPER), '..', '..')
       const relDir = join('local', `runlogged-signal-${process.pid}`)
-      const dir = join(ROOT, relDir)
+      const dir = logDir({ VERIFY_LOG_DIR: relDir })
       try {
         const shim = spawn(process.execPath, [WRAPPER, 'world', '--section=__no_such_section__'], {
           windowsHide: true,
@@ -258,10 +256,9 @@ describe('run-logged default launch — the run-identity re-exec (point 700, Sol
 // will take no new entry is exactly that case.
 describe('the progress mark survives a directory that takes no new file', () => {
   it('keeps moving its mark, and leaves the log uncorrupted', () => {
-    const ROOT = join(dirname(WRAPPER), '..', '..')
     const relDir = join('local', `runlogged-markhold-${process.pid}`)
-    const dir = join(ROOT, relDir)
-    const relLog = join(relDir, 'markhold.log')
+    const dir = logDir({ VERIFY_LOG_DIR: relDir })
+    const relLog = join(dir, 'markhold.log')
     try {
       mkdirSync(dir, { recursive: true })
       const res = spawnSync(process.execPath, [WRAPPER, 'world', '--section=__no_such_section__', '--log-file', relLog], {
@@ -281,11 +278,11 @@ describe('the progress mark survives a directory that takes no new file', () => 
       // needs a run longer than the writer's one-minute throttle, which this
       // deliberately instant failure is not.
       expect(readdirSync(dir)).toContain('markhold.log.progress')
-      expect(readFileSync(join(ROOT, relLog), 'utf8')).not.toContain('sign of life')
-      const markAt = statSync(join(ROOT, `${relLog}.progress`)).mtimeMs
-      const logAt = statSync(join(ROOT, relLog)).mtimeMs
+      expect(readFileSync(relLog, 'utf8')).not.toContain('sign of life')
+      const markAt = statSync(`${relLog}.progress`).mtimeMs
+      const logAt = statSync(relLog).mtimeMs
       // The newest of the run's own two writings, and nothing else.
-      expect(lastProgressAtFor({ logPath: join(ROOT, relLog) })).toBe(Math.max(markAt, logAt))
+      expect(lastProgressAtFor({ logPath: relLog })).toBe(Math.max(markAt, logAt))
       const record = JSON.parse(readFileSync(join(dir, readdirSync(dir).find((n) => n.endsWith('.run.json'))), 'utf8'))
       expect(markAt).toBeGreaterThanOrEqual(record.startedAt - 1000)
     } finally {

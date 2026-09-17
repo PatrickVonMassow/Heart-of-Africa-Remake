@@ -5,6 +5,7 @@ import { chmodSync, mkdtempSync, mkdirSync, utimesSync, writeFileSync } from 'no
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { describe, it, expect, vi } from 'vitest'
+import { repositoryCommonRoot } from '../repo-paths.mjs'
 import {
   SCAN_LIMIT,
   activeRecordPath,
@@ -288,9 +289,9 @@ describe('countPoll — the only thing that moves the counter', () => {
   })
 })
 
-describe('the log directory belongs to the checkout the process was GIVEN', () => {
-  it('defaults to this checkout', () => {
-    expect(logDir({})).toBe(join(resolve(process.cwd()), 'local', 'verify-logs'))
+describe('the log directory belongs to the shared repository', () => {
+  it('defaults to the common checkout', () => {
+    expect(logDir({})).toBe(join(repositoryCommonRoot(), 'local', 'verify-logs'))
   })
 
   // The module is loaded in a CHILD, because the root is resolved once per

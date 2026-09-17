@@ -57,7 +57,7 @@ import {
   showWindow,
 } from './run-digest-core.mjs'
 import { backendsFrom, buildReceipt, formatReceipt, planRun } from './run-wait-core.mjs'
-import { framesWrittenSince, gitPosition, newestFrameMtimeMs, openProgressMark, readRecord, recordPathFor, selfCommandLine, writeRecord } from './run-record.mjs'
+import { framesWrittenSince, gitPosition, logDir, newestFrameMtimeMs, openProgressMark, readRecord, recordPathFor, selfCommandLine, writeRecord } from './run-record.mjs'
 import { emitActivity } from '../batch-activity-journal.mjs'
 import { ACTIVITY_EVENTS } from '../batch-activity-journal-core.mjs'
 import { budgetToolOutput } from '../tool-output-budget-core.mjs'
@@ -69,10 +69,11 @@ import { ladderCheck } from './ladder.mjs'
 // ONE DEFINITION OF THE PROGRESS LEASE (point 1137): this wrapper renews it, and
 // the wait registry decides against it. Two copies of the same 15 minutes is how
 // they drift apart.
+import { REPO_ROOT } from '../repo-paths.mjs'
 import { PROGRESS_LEASE_MS } from '../wait-lease-core.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const ROOT = join(HERE, '..', '..')
+const ROOT = REPO_ROOT || join(HERE, '..', '..')
 /** How often the writer's progress mark may be re-stamped. The wait reads it
  *  against a 15-minute lease, so a minute of granularity is far finer than any
  *  verdict needs and keeps the writes rare. */
@@ -113,7 +114,7 @@ function logPathFor(args, own) {
   if (own.logFile) return isAbsolute(own.logFile) ? own.logFile : join(ROOT, own.logFile)
   const stamp = new Date().toISOString().replace(/[:.]/g, '-').replace(/Z$/, '')
   const label = args.filter((a) => !a.startsWith('-')).join('-').replace(/[^\w.-]/g, '_') || 'verify'
-  const dir = process.env.VERIFY_LOG_DIR ? join(ROOT, process.env.VERIFY_LOG_DIR) : join(ROOT, 'local', 'verify-logs')
+  const dir = logDir()
   return join(dir, `${stamp}-${label}.log`)
 }
 
@@ -293,7 +294,7 @@ function runVerify() {
     branch: where.branch,
     cleanAtStart: cleanWorktree(ROOT),
     cacheEnvironment: cacheEnvironment(),
-    log: shown,
+    log: logPath,
     startedAt: started,
     expectedRuntimeMs: plan.expectedMs,
     expectedFrames: plan.expectedFrames,
@@ -530,9 +531,9 @@ function runVerify() {
 // The termination is now REPRODUCED instead — see the close handler.
 function reexecWithLogPath() {
   const logPath = logPathFor(forward, own)
-  // The DISPLAY form (ROOT-relative where possible): it is what the record's
-  // `log` field will carry, so argv word and recorded path compare equal.
-  const child = spawn(process.execPath, [...process.argv.slice(1), '--log-file', forDisplay(logPath)], {
+  // The absolute path survives checkout removal and is the same identity
+  // carried by the record and the writer's command line.
+  const child = spawn(process.execPath, [...process.argv.slice(1), '--log-file', logPath], {
     windowsHide: true,
     stdio: 'inherit',
     env: process.env,
@@ -581,7 +582,7 @@ else {
     process.exitCode = 1
   } else {
     const cached = findGreenReceipt({
-      dir: join(ROOT, process.env.VERIFY_LOG_DIR || 'local/verify-logs'),
+      dir: logDir(),
       argv: forward, head: gitPosition().head, verifyGl: process.env.VERIFY_GL,
       environment: cacheEnvironment(),
       again: own.again, clean: cleanWorktree(ROOT),
