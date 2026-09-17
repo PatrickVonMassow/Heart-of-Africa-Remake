@@ -146,9 +146,10 @@ describe('--await: one blocking call, and no poll counted', () => {
     expect(run(['--await', log, '--timeout', '1'], env).status).toBe(3)
   })
 
-  it('calls the wait HUNG past 2.5x the expectation once the run has gone SILENT', () => {
+  it('calls the wait HUNG past its wall-clock ceiling once the run has gone SILENT', () => {
     // Older than the progress lease, so its silence is what the verdict rests on.
-    const startedAt = Date.now() - 40 * 60_000
+    // Past the ceiling too: the plan plus one 45-minute suite ceiling (point 1135).
+    const startedAt = Date.now() - 90 * 60_000
     const { log } = fixture({
       ...finished,
       status: 'running',
@@ -194,7 +195,7 @@ describe('--await: one blocking call, and no poll counted', () => {
   // ASTRA REVIEW ROUND 1, end to end: the counted poll reads the WRITER's mark out
   // of the record, so counting the poll cannot manufacture the life it reports.
   it('the counted poll calls a still-writing run SLOW, not hung', () => {
-    const startedAt = Date.now() - 40 * 60_000
+    const startedAt = Date.now() - 90 * 60_000
     const { log } = fixture({
       ...finished,
       status: 'running',
@@ -209,7 +210,7 @@ describe('--await: one blocking call, and no poll counted', () => {
   })
 
   it('the counted poll still says HUNG once the writer\'s mark has gone stale', () => {
-    const startedAt = Date.now() - 40 * 60_000
+    const startedAt = Date.now() - 90 * 60_000
     const { log } = fixture({
       ...finished,
       status: 'running',
@@ -260,8 +261,8 @@ describe('--status: the ONE counted poll', () => {
     expect(spent.stdout).toMatch(/--await/)
   })
 
-  it('calls a SILENT run hung past the measured factor, with a non-zero exit', () => {
-    const startedAt = Date.now() - 40 * 60_000
+  it('calls a SILENT run hung past its wall-clock ceiling, with a non-zero exit', () => {
+    const startedAt = Date.now() - 90 * 60_000
     const { log } = fixture({
       ...finished,
       status: 'running',

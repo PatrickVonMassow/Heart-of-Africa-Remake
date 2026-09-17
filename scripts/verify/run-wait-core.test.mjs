@@ -8,7 +8,7 @@ import {
   BLOCKING_LIMIT_MS,
   COUNTED_SUITE_FRAMES,
   FIRST_WAIT_FRACTION,
-  HUNG_FACTOR,
+  SUITE_CEILING_MS,
   MAX_POLLS,
   MIN_WAIT_MS,
   SEPTEMBER_BANDS,
@@ -260,16 +260,23 @@ describe('pollBudget — five looks, then block or call it hung', () => {
     expect(v.message).toMatch(/hung/)
   })
 
-  it('calls a run HUNG past the factor, whatever the poll count', () => {
-    const v = pollBudget({ polls: 1, expectedMs: 100_000, elapsedMs: 100_000 * HUNG_FACTOR + 1 })
+  it('calls a run HUNG past the ceiling, whatever the poll count', () => {
+    const v = pollBudget({ polls: 1, expectedMs: 100_000, elapsedMs: 100_000 + SUITE_CEILING_MS + 1 })
     expect(v.verdict).toBe('hung')
+  })
+
+  // THE 15.09.2026 CASE, pinned: a `polish` pass planned at 5 min 41 s, running
+  // healthily for 17 min 28 s, was condemned by the old 2.5x mark at 14 min.
+  it('leaves a run that has merely outrun a low estimate at poll, not hung', () => {
+    const v = pollBudget({ polls: 1, expectedMs: 341_000, elapsedMs: 17 * 60_000 + 28_000, silentForMs: PROGRESS_LEASE_MS + 1 })
+    expect(v.verdict).toBe('poll')
   })
 
   // ASTRA REVIEW ROUND 1 — the counted poll told the caller to kill a run on the
   // clock alone, which is exactly the verdict the wait had stopped giving. One
   // path saying "slow" while the other says "kill it" is no repair at all.
   it('says SLOW, not hung, while the run is still writing', () => {
-    const v = pollBudget({ polls: 1, expectedMs: 100_000, elapsedMs: 100_000 * HUNG_FACTOR + 1, silentForMs: 60_000 })
+    const v = pollBudget({ polls: 1, expectedMs: 100_000, elapsedMs: 100_000 + SUITE_CEILING_MS + 1, silentForMs: 60_000 })
     expect(v.verdict).toBe('slow')
     expect(v.message).toMatch(/--await/)
     expect(v.message).not.toMatch(/HUNG/)
@@ -277,7 +284,7 @@ describe('pollBudget — five looks, then block or call it hung', () => {
 
   it('still calls it hung once the silence outlasts the progress lease', () => {
     const v = pollBudget({
-      polls: 1, expectedMs: 100_000, elapsedMs: 100_000 * HUNG_FACTOR + 1, silentForMs: PROGRESS_LEASE_MS + 1,
+      polls: 1, expectedMs: 100_000, elapsedMs: 100_000 + SUITE_CEILING_MS + 1, silentForMs: PROGRESS_LEASE_MS + 1,
     })
     expect(v.verdict).toBe('hung')
   })
@@ -287,8 +294,11 @@ describe('pollBudget — five looks, then block or call it hung', () => {
       .toBe('poll')
   })
 
-  it('does not invent a hang when nothing was measured', () => {
-    expect(pollBudget({ polls: 1, expectedMs: null, elapsedMs: 9_000_000 }).verdict).toBe('poll')
+  // An unmeasured run is not exempt — it simply has no plan to add, so the bare
+  // suite ceiling is its whole mark. Below it, nothing is condemned.
+  it('holds an unmeasured run to the bare suite ceiling', () => {
+    expect(pollBudget({ polls: 1, expectedMs: null, elapsedMs: SUITE_CEILING_MS - 1 }).verdict).toBe('poll')
+    expect(pollBudget({ polls: 1, expectedMs: null, elapsedMs: SUITE_CEILING_MS + 1 }).verdict).toBe('hung')
   })
 })
 

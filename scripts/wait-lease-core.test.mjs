@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  HUNG_EXPECTATION_FACTOR,
+  SUITE_CEILING_MS,
   LEASE_SETTLE_MS,
   WAIT_EXPECTATION_FLOOR_MS,
   WAIT_LEASE_CAP_MS,
@@ -215,11 +215,18 @@ describe('concurrentWaitAlarm (union entry U11)', () => {
 })
 
 describe('waitThresholds (union entry U12)', () => {
-  it('derives both marks from the run estimate', () => {
+  it('puts the overdue mark at the estimate and the hung mark a whole suite ceiling beyond it', () => {
     const { deadlineAt, hungAt, expectationMs } = waitThresholds({ startedAt: T0, expectedRuntimeMs: 20 * 60_000 })
     expect(expectationMs).toBe(20 * 60_000)
     expect(deadlineAt).toBe(T0 + 20 * 60_000)
-    expect(hungAt).toBe(T0 + 20 * 60_000 * HUNG_EXPECTATION_FACTOR)
+    expect(hungAt).toBe(T0 + 20 * 60_000 + SUITE_CEILING_MS)
+  })
+
+  // THE 15.09.2026 CASE, pinned: a `polish` pass planned at 5 min 41 s and
+  // running healthily for 17 min 28 s was called hung by the old 2.5x mark.
+  it('does not condemn a run that merely outran an estimate the house measures low', () => {
+    const { hungAt } = waitThresholds({ startedAt: T0, expectedRuntimeMs: 341_000 })
+    expect(T0 + 17 * 60_000 + 28_000).toBeLessThan(hungAt)
   })
 
   it('applies the floor when nothing has been measured', () => {
@@ -256,20 +263,20 @@ describe('waitTimeoutDecision (union entry U12)', () => {
   })
 
   it('asks for recovery exactly once at the hung mark', () => {
-    const first = waitTimeoutDecision({ lease: bounded(), now: T0 + 51 * 60_000 })
+    const first = waitTimeoutDecision({ lease: bounded(), now: T0 + 66 * 60_000 })
     expect(first.state).toBe('hung')
     expect(first.recovery).toMatchObject({ reason: 'verification-wait-hung', runId: bounded().runId })
-    const second = waitTimeoutDecision({ lease: first.lease, now: T0 + 52 * 60_000 })
+    const second = waitTimeoutDecision({ lease: first.lease, now: T0 + 67 * 60_000 })
     expect(second.state).toBe('hung')
     expect(second.events).toEqual([])
     expect(second.recovery).toBeNull()
   })
 
   it('leaves a run that is still writing SLOW, not hung (point 1137)', () => {
-    // The `polish` incident of 15.09.2026 in one assertion: the run is past 2.5x
-    // an estimate the project has measured to be a third of the real cost, and it
-    // has just written a frame. Overdue says "long"; hung would end it.
-    const now = T0 + 51 * 60_000
+    // The `polish` incident of 15.09.2026 in one assertion: the run is past its
+    // whole ceiling and has just written a frame. Overdue says "long"; hung
+    // would end it.
+    const now = T0 + 66 * 60_000
     const decision = waitTimeoutDecision({ lease: bounded(), now, lastProgressAt: now - 60_000 })
     expect(decision.state).toBe('overdue')
     expect(decision.recovery).toBeNull()
@@ -277,14 +284,14 @@ describe('waitTimeoutDecision (union entry U12)', () => {
   })
 
   it('still calls a run hung once its silence outlasts the progress lease', () => {
-    const now = T0 + 51 * 60_000
+    const now = T0 + 66 * 60_000
     const decision = waitTimeoutDecision({ lease: bounded(), now, lastProgressAt: now - PROGRESS_LEASE_MS - 1 })
     expect(decision.state).toBe('hung')
     expect(decision.recovery).toMatchObject({ reason: 'verification-wait-hung' })
   })
 
   it('treats "nobody looked" as the old verdict rather than as proof of life', () => {
-    expect(waitTimeoutDecision({ lease: bounded(), now: T0 + 51 * 60_000, lastProgressAt: null }).state).toBe('hung')
+    expect(waitTimeoutDecision({ lease: bounded(), now: T0 + 66 * 60_000, lastProgressAt: null }).state).toBe('hung')
   })
 
   it('never turns progress into an EARLY hung verdict — the clock still has to cross', () => {

@@ -35,8 +35,19 @@ export const WAIT_LEASE_CAP_MS = 2 * 60 * 60 * 1000
  *  the moment it starts. */
 export const WAIT_EXPECTATION_FLOOR_MS = 5 * 60 * 1000
 
-/** Beyond this multiple of its own expectation a run is not slow, it is hung. */
-export const HUNG_EXPECTATION_FACTOR = 2.5
+/**
+ * THE HUNG MARK IS A WALL-CLOCK CEILING, NOT A MULTIPLE (point 1135).
+ *
+ * A multiple of the `--plan` estimate put the mark at 14 minutes for a `polish`
+ * pass measured at 9.9-61.5, so every healthy pass crossed it; on 15.09.2026 one
+ * that had written 34 of its 21 expected frames was declared HUNG at 17 min 28 s
+ * and ended. The mark is now the run's own plan plus the ceiling the runner
+ * itself enforces (`VERIFY_SUITE_TIMEOUT_MS`, 45 minutes, at which run-all.mjs
+ * KILLS a suite). Past its plan by a whole suite ceiling a run has outlived the
+ * mechanism that would have ended it; below it, ending the run is a hand
+ * decision. `WAIT_LEASE_CAP_MS` remains the absolute backstop above both.
+ */
+export const SUITE_CEILING_MS = 45 * 60 * 1000
 
 /**
  * THE PROGRESS LEASE — how long a run may show no sign of life before its
@@ -173,13 +184,13 @@ export function waitThresholds({
   expectedRuntimeMs = 0,
   capMs = WAIT_LEASE_CAP_MS,
   floorMs = WAIT_EXPECTATION_FLOOR_MS,
-  factor = HUNG_EXPECTATION_FACTOR,
+  ceilingMs = SUITE_CEILING_MS,
 } = {}) {
   const start = finite(startedAt)
   if (start === null) return { deadlineAt: null, hungAt: null, expectationMs: null }
   const expectation = Math.max(finite(expectedRuntimeMs) ?? 0, floorMs)
   const deadlineAt = Math.min(start + expectation, start + capMs)
-  const hungAt = Math.min(start + Math.round(expectation * factor), start + capMs)
+  const hungAt = Math.min(start + expectation + Math.max(0, ceilingMs), start + capMs)
   return { deadlineAt, hungAt: Math.max(hungAt, deadlineAt), expectationMs: expectation }
 }
 

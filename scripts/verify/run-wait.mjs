@@ -31,6 +31,7 @@ import {
   formatDuration,
   formatObservedBand,
   formatReceipt,
+  hungMarkMs,
   nextWaitMs,
   observedBand,
   planRun,
@@ -266,9 +267,11 @@ async function doAwait(logArg, timeoutS) {
   const status = waitStatus()
   const progressAt = lastProgressAtFor({ logPath: current?.log ?? null, recordPath: path })
   const silent = progressAt === null || Date.now() - progressAt >= PROGRESS_LEASE_MS
-  const hung = status.hung.some((lease) => lease.runId === runId) ||
-    (silent && Number.isFinite(current?.expectedRuntimeMs) && current.expectedRuntimeMs > 0 &&
-      waited > current.expectedRuntimeMs * 2.5)
+  // THE SAME WALL-CLOCK CEILING THE LEASE USES (point 1135): the run's own plan
+  // plus one suite ceiling, never a multiple of an estimate the house measures
+  // low. Below it a silent run is STILL RUNNING, and ending it is a hand call.
+  const ceiling = hungMarkMs(Number.isFinite(current?.expectedRuntimeMs) ? current.expectedRuntimeMs : null)
+  const hung = status.hung.some((lease) => lease.runId === runId) || (silent && waited > ceiling)
   console.log(
     `STILL RUNNING after ${formatDuration(waited)} — this call's ${formatDuration(budget)} is spent, the run is not. ` +
       'Do NOT start a poll loop: let the background run\'s completion notification announce the exit, then read ' +
@@ -276,9 +279,9 @@ async function doAwait(logArg, timeoutS) {
   )
   if (hung) {
     console.log(
-      `HUNG — ${formatDuration(waited)} is past 2.5x this run's expectation AND it has written nothing for ` +
-        `${formatDuration(PROGRESS_LEASE_MS)}. The wait has been recorded as hung and the batch emergency lane will ` +
-        'treat it as a standstill; end the run rather than waiting again.',
+      `HUNG — ${formatDuration(waited)} is past this run's ceiling of ${formatDuration(ceiling)} (its plan plus one ` +
+        `suite ceiling) AND it has written nothing for ${formatDuration(PROGRESS_LEASE_MS)}. The wait has been recorded ` +
+        'as hung and the batch emergency lane will treat it as a standstill; end the run BY HAND rather than waiting again.',
     )
     return 5
   }
