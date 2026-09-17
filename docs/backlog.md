@@ -9,6 +9,22 @@ when their area is touched anyway or a triage says otherwise.
 Format: one line per finding — `- YYYY-MM-DD <source> — <finding>`.
 
 <!-- entries -->
+- 2026-09-17 batch owner (01:26 and 08:05, `.claude/batch-launcher.log` "stopping on SIGTERM")
+  — a `kill` sent from inside the container to headless Chrome processes (orphans reparented
+  to PID 1, or a process group holding the detached logged run) stopped the WHOLE container
+  within seconds, twice in one morning, with the WSL VM alive the second time. A suite that
+  closes Chrome through Playwright survives. Operating rule recorded in the owner memory:
+  never signal Chrome from inside; abandon a run with `batch-in-flight.mjs --clear` and let
+  the wrapper run out. Point 1069 should record the trigger as the signal, not the suite;
+  point 1064 covers the missing container restart policy. PROMOTE to a point if it recurs
+  without a kill.
+- 2026-09-17 context handover (`scripts/batch-in-flight.mjs` ~1286, `assessTransfer`)
+  — a declared logged run is judged transferable only when its record's HEAD equals
+  `currentHeadOf({cwd})`, the MAIN tree's HEAD, so a run on a point's worktree can never
+  transfer: `--prepare --context` blocks with "its run covers HEAD <branch tip>, not the
+  <main HEAD> being handed over", and of its four named ways out only ABANDON works, which
+  throws the run away (measured twice: 01:23 by the predecessor, 08:03 by this session).
+  Simplification: compare against the declared `--branch` tip when the declaration names one.
 - 2026-09-16 point 1139 landing (`scripts/verify/baseline-classify.mjs`, `scripts/render-verify-guard.mjs`)
   — a classification run records its BASELINE measurement into the point's own render-verify
   state, so the branch inherits reds that belong to the code WITHOUT its change. Measured today:
