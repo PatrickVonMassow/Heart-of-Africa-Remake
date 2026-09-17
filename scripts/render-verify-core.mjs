@@ -80,6 +80,7 @@ export const NON_RENDER_VERIFY = new Set([
   'docs.mjs',
   'eavesColumn.mjs', // the head-clearance verdict over a recorded window; polish.mjs records it
   'edgeBandReading.mjs', // crop measurements and failure details; polish.mjs captures the frames
+  'edgeBandSettle.mjs', // shot-window settle decisions with injected reads/gaps; polish.mjs drives the browser
   'fixedWaits.mjs',
   'footingSeries.mjs', // the slope-footing verdict; polish.mjs hands it the samples
   'frameSubject-core.mjs',
