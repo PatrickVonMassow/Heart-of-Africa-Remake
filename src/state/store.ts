@@ -500,7 +500,7 @@ export function startState(seed: number, placeId: string = startPlaceId()) {
     day: 0,
     money: START_MONEY,
     foodDays: START_FOOD_DAYS,
-    // Start gifts (design.md §18 table: 2) — neutral copper trinkets.
+    // No start gifts (START_GIFTS is 0): the bazaar sells copper trinkets.
     gifts: { gold: 0, silver: 0, emerald: 0, copper: START_GIFTS, ivory: 0 } as Record<Material, number>,
     // The expedition sets out without tools (user decision 17.09.2026): every
     // piece of equipment is bought in the port. canteenFill 1 below stays inert
