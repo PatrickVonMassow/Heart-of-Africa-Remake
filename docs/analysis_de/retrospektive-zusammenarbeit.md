@@ -1611,7 +1611,7 @@ stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die s
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Freitag, 18.09.2026, 00:26 · Quellen-Fingerprint: `3b153aeb1efc…`
+Zuletzt aktualisiert: Freitag, 18.09.2026, 01:31 · Quellen-Fingerprint: `bddcab2da7c0…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1652,7 +1652,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to the OpenAI lane, GPT-6 Astra), and review is cross-vendor, not Fable-by-default | 6 | hoch | — (Regel/Memory) | ◐ Regel |
 | Iterate on the new feature's OWN test first; the full regression runs once at the end, never as the debugging loop | 2 | mittel | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 85 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 86 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | wait-command-guard.mjs | ✔ Mechanismus |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | \"Gib ab\" / \"abgeben\" means hand the batch to a SUCCESSOR session so the context does not overflow — it never means pause or stop the batch | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1718,8 +1718,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 97 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 135 Prozess-/Meta-TASKS-Punkte (davon 65 offen).
 
-<!-- RETRO-FINGERPRINT: 3b153aeb1efc26dd6a7f9196cf496c01273318be0b2ccdfa8bb3d49048c2f990 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-17T22:26:04.390Z -->
+<!-- RETRO-FINGERPRINT: bddcab2da7c05a7387c2f9d7ee66c3123a41b272964bfb6196fc8c44a2cc62d3 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-17T23:31:27.756Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -7470,3 +7470,32 @@ Werkzeugs gehört die Frage »was fährt das unter der Haube?« zur Regel dazu; 
 Prozessliste beantwortet sie in einer Sekunde. Und wo die Prosa bewusst ohne Wächter
 auskommt, trägt sie diese Aufzählung im Satz, sonst schützt sie nur vor dem Fall, den ihr
 Autor gerade vor Augen hatte.
+
+### 3.285 Der Aufräumer nahm dem laufenden Lauf sein Beweismaterial
+
+Zweimal innerhalb einer Stunde, am 18.09. um 01:22 und um 01:31, hat `batch-doctor` die
+Bilddateien weggeräumt, die ein in diesem Moment laufender `polish`-Lauf gerade selbst
+schrieb. Seine Begründung lautete jedes Mal, unverändert: unversionierte Änderungen aus
+einem Parallelsitzungs-Fenster ließen sich keinem Autor zuordnen. Beim ersten Mal traf es
+31 Bilder, beim zweiten drei weitere.
+
+Die Zuordnung war aber nicht unklar, sondern messbar: Der Lauf hatte seinen eigenen
+Datensatz mit `cleanAtStart: true` angelegt — der Baum war bei seinem Start sauber —, er war
+über `batch-in-flight` angemeldet, und sein Prozess lief. Alles, was seither in
+`verification/` entstand, waren genau seine Bilder. Der Aufräumer hat diese drei Belege
+nicht gelesen; er hat nur gesehen, dass der Baum schmutzig ist und dass kürzlich eine zweite
+Sitzung Werkzeuge gerufen hatte.
+
+Der Schaden liegt nicht im Verlust — jeder Stash ist rückholbar — sondern in der Streuung.
+Die Bildserie einer Deckungsmessung lag am Ende in zwei Quarantäne-Stashes und im
+Arbeitsbaum verteilt. Wer das nicht bemerkt, öffnet nach dem Lauf die Bilder, die zufällig
+noch da sind, und hält sie für die Serie. Das ist die gefährliche Form: keine Fehlermeldung,
+kein Rot, nur ein Urteil über weniger Material, als der Lauf erzeugt hat — und damit eine
+Deckung, deren Bilder niemand vollständig gesehen hat.
+
+**Lehre:** Eine Aufräummechanik darf das Produkt einer **laufenden, angemeldeten** Messung
+nicht als herrenlos behandeln. Beide Belege liegen im Baum: die Anmeldung, die den Lauf
+benennt, und der Prozess, der noch lebt. Allgemeiner gilt dieselbe Richtung wie in 3.284,
+nur von der anderen Seite: Dort war der Fehler, neben einer laufenden Messung einen zweiten
+Verbraucher zu starten; hier ist er, einer laufenden Messung im Vorbeigehen die Beweise
+einzusammeln. Was aufräumt, muss vorher fragen, ob gerade jemand arbeitet.
