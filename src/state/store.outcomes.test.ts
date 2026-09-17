@@ -106,7 +106,9 @@ describe('applyEventOutcome — robbery, afflictions, weather (design.md §14/§
 
   it('a waterfall sweep halves gifts, drops a non-shovel item and cuts provisions', () => {
     g().debugAddGift('gold')
-    g().debugAddGift('gold') // gold now 2, copper starts at 2
+    g().debugAddGift('gold')
+    g().debugAddGift('copper')
+    g().debugAddGift('copper') // the empty start pack is stocked here: gold 2, copper 2
     g().debugAddEquipment('machete')
     g().debugAddEquipment('shovel')
     const food0 = g().foodDays
