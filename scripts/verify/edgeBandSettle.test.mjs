@@ -86,6 +86,45 @@ describe('settlement edge settle / shot consistency', () => {
     expect(s.result).toEqual({ value: 100 })
   })
 
+  it('certifies actual frame-bound windows on cold and changing frame pacing', async () => {
+    async function drawing(frameMs) {
+      let elapsed = 0
+      const reads = []
+      const elapsedGaps = []
+      const result = await settledEdgeShot({
+        gap: async (ms, frames) => {
+          // Model the production gap's BOTH conditions, not a 600 ms sleep.
+          const duration = Math.max(ms, frames * frameMs(reads.length))
+          elapsedGaps.push(duration)
+          elapsed += duration
+          return true
+        },
+        read: async () => {
+          // The same slow drying trend, eventually converged. At warm pacing
+          // its shot fits under the bar; cold drawing exposes more drift.
+          const value = crop(73.4 + 0.18 * Math.min(elapsed / 1000, 30))
+          reads.push(value)
+          return { value }
+        },
+      })
+      return { result, reads, elapsedGaps }
+    }
+
+    const warm = await drawing(() => 1000 / 60)
+    expect(warm.reads).toHaveLength(windowSize)
+    expect(warm.result.value).not.toBeNull()
+    for (const frameMs of [() => 300, i => i < 3 ? 1000 / 60 : 300]) {
+      const cold = await drawing(frameMs)
+      expect(cold.elapsedGaps.some(ms => ms > READ_GAP_MS)).toBe(true)
+      expect(shotDrift(cold.reads.slice(0, windowSize))).toBeGreaterThan(SHOT_DRIFT_BAR)
+      expect(cold.reads.length).toBeGreaterThan(windowSize)
+      expect(cold.result.value).not.toBeNull()
+      const certified = cold.reads.slice(-windowSize)
+      expect(shotDrift(certified)).toBeLessThanOrEqual(SHOT_DRIFT_BAR)
+      expect(cold.result).toEqual(edgeShotReading(certified))
+    }
+  })
+
   it('reports zero luminance when a black crop never settles to a valid shot', async () => {
     const s = await sample(() => crop(0))
     expect(s.result.value).toBeNull()

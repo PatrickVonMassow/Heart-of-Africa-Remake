@@ -37,3 +37,19 @@ Vitest covers the old epsilon admitting a rejected monotonic trend, convergence
 in both directions, consistency near the relative bar at several luminances,
 failure on persistent drift, partial-crop defects, rain, black crops, off-frame
 diagnostics and starved gaps. Existing reading and drift cases remain intact.
+
+## Finding 3: isolated versus whole-pass timing
+
+The reviewer reports four isolated failures and two whole-pass successes. The
+place order is the same: maasai dry follows bambara wet, the largest season
+swing. Earlier whole-pass visits warm the place's shaders and textures; the
+isolated run first draws it here. With both a millisecond and frame minimum,
+slower drawing lengthens the gap and exposes more drying between shot halves.
+This explains why a wall-time projection based only on 600 ms would be unsafe.
+
+The repair uses that actual gap for every read, including the first after a
+strength change. No place or season is special-cased. A Vitest fixture drives
+the same trend through warm, cold and changing frame pacing: the warm first
+window passes, the cold first windows fail, and only later guard-certified
+windows become measurements. This is a deterministic timing-model regression;
+the reviewer still owns the browser section run and both-backend picture.
