@@ -128,7 +128,7 @@ import { phrasePlan } from '../../communication/speaking'
 import { speechLabelSeconds, type SpeechLabel } from '../../communication/speechLabel'
 import { drumMessagePlan } from '../../communication/drumMessage'
 import { playDrumMessage, playSpeech, playThunder } from '../../systems/ambience'
-import { releasePointerLock, requestPlacePointerLock } from './pointerLock'
+import { releasePointerLock, requestPlacePointerLock, restorePointerLockAfterDialogs } from './pointerLock'
 import { ActorLabels } from '../ActorLabels'
 import { markActor } from '../actorLabelSource'
 import { resolveMove, standingClear, PLAYER_RADIUS, CHIEF_BODY_RADIUS } from './collision'
@@ -2722,12 +2722,9 @@ export function PlaceScene() {
     const grab = () => requestPlacePointerLock(el)
     grab() // engage immediately on entry (activation from the walk-in keypress)
     const onClick = () => grab()
-    // The lock comes back when the guess dialog closes (point 588): the button
-    // click carries the user activation the request needs, so the player is not
-    // left having to click the ground again to walk on.
-    const offDialog = useUi.subscribe((s, prev) => {
-      if (prev.dialog?.kind === 'speechGuess' && s.dialog === null) grab()
-    })
+    // Every dialog returns to steering on its closing click. If the browser
+    // refuses the request after Escape, the canvas click remains the fallback.
+    const offDialog = restorePointerLockAfterDialogs(el)
     // The FIRST movement after the lock returns is dropped: the browser reports
     // the jump from wherever the cursor sat as a movement, and the view would
     // swing round the moment the dialog closes.

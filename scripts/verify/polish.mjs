@@ -7571,11 +7571,14 @@ if (section('artefact-give')) {
       const el = document.querySelector(sel)
       if (!el) return null
       const { getStrings } = await import('/src/i18n/index.ts')
-      return { tag: el.tagName, text: el.textContent, expected: getStrings().finds.rockArtefact }
+      return {
+        tag: el.tagName, text: el.textContent, expected: getStrings().finds.rockArtefact,
+        shortcut: el.querySelector('.inv-digit')?.textContent ?? '',
+      }
     }, FIND)
     check(
       'the find stands in the inventory bar under its own localized name',
-      !!inBar && inBar.tag === 'BUTTON' && inBar.text === inBar.expected && inBar.text.length > 0,
+      !!inBar && inBar.tag === 'BUTTON' && inBar.text === inBar.shortcut + inBar.expected && inBar.expected.length > 0,
       JSON.stringify(inBar),
     )
     await frame('149-artefact-in-the-bar', {

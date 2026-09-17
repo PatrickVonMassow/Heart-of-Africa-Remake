@@ -43,6 +43,13 @@ export function requestPlacePointerLock(el: Element): void {
   }
 }
 
+/** Restore mouse-look on any dialog's closing activation; return scene cleanup. */
+export function restorePointerLockAfterDialogs(el: Element): () => void {
+  return useUi.subscribe((state, previous) => {
+    if (previous.dialog !== null && state.dialog === null) requestPlacePointerLock(el)
+  })
+}
+
 // Dev hook for the headless verification (CLAUDE.md §7.2).
 if (import.meta.env.DEV && typeof window !== 'undefined') {
   ;(window as unknown as Record<string, unknown>).__placeLock = pointerLockProbe

@@ -218,6 +218,8 @@ export const en: Strings = {
   },
 
   hud: {
+    cursorModeLocked: 'Esc: cursor',
+    cursorModeUnlocked: 'Click the view to steer',
     journalToggle: 'Journal (Tab)',
     campToggle: 'Camp (C)',
     mapToggle: 'Map (M)',

@@ -6,6 +6,7 @@
 import { describe, it, expect, afterEach, vi } from 'vitest'
 import {
   onKeyPress,
+  isKeyDown,
   moveAxes,
   setTouchStick,
   touchMove,
@@ -66,6 +67,23 @@ describe('onKeyPress (design.md §17)', () => {
     offPlain()
     release('Digit3')
     release('KeyM')
+  })
+
+  it('matches exact modifiers, including plain keys and rejecting combined chords', () => {
+    const plain = vi.fn()
+    const shifted = vi.fn()
+    const offPlain = onKeyPress('Digit3', plain, { exactModifiers: {} })
+    const offShift = onKeyPress('Digit3', shifted, { exactModifiers: { shiftKey: true } })
+    for (let mask = 0; mask < 16; mask++) {
+      window.dispatchEvent(new KeyboardEvent('keydown', {
+        code: 'Digit3', shiftKey: !!(mask & 1), ctrlKey: !!(mask & 2),
+        altKey: !!(mask & 4), metaKey: !!(mask & 8),
+      }))
+    }
+    expect(plain).toHaveBeenCalledTimes(1)
+    expect(shifted).toHaveBeenCalledTimes(1)
+    offPlain()
+    offShift()
   })
 
   // Work-order 691: the use key opens a dialog whose field takes the keyboard
@@ -212,6 +230,20 @@ describe('touch stick and look/pinch accumulators (design.md §17.5)', () => {
 })
 
 describe('dispatchSyntheticKey (design.md §17.5: gamepad/touch share the keyboard pipeline)', () => {
+  it('keeps synthetic d-pad selection out of held movement without releasing a real arrow', () => {
+    dispatchSyntheticKey('ArrowLeft', 'gamepad')
+    dispatchSyntheticKey('ArrowRight', 'gamepad')
+    expect(isKeyDown('ArrowLeft')).toBe(false)
+    expect(isKeyDown('ArrowRight')).toBe(false)
+    expect(moveAxes()).toEqual({ x: 0, y: 0 })
+    press('ArrowRight')
+    dispatchSyntheticKey('ArrowRight', 'gamepad')
+    expect(isKeyDown('ArrowRight')).toBe(true)
+    expect(moveAxes()).toEqual({ x: 1, y: 0 })
+    release('ArrowRight')
+    expect(moveAxes()).toEqual({ x: 0, y: 0 })
+  })
+
   it('re-enters the pipeline as an ordinary keydown, reaching onKeyPress handlers', () => {
     // Space is the use key (design.md §17.5): the gamepad A button and the
     // tappable touch prompt both dispatch it through this one path.

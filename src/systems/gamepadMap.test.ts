@@ -26,6 +26,12 @@ describe('gamepad button map (design.md §17.5)', () => {
     }
   })
 
+  it('selects inventory with the d-pad while A stays the use key', () => {
+    expect(GAMEPAD_BUTTON_KEYS[14]).toBe('ArrowLeft')
+    expect(GAMEPAD_BUTTON_KEYS[15]).toBe('ArrowRight')
+    expect(GAMEPAD_BUTTON_KEYS[0]).toBe('Space')
+  })
+
   it('binds the escape from a wedge to a button (work-order 610)', () => {
     const bound = Object.entries(GAMEPAD_BUTTON_KEYS).filter(([, code]) => code === UNSTUCK_KEY_CODE)
     expect(bound).toHaveLength(1)

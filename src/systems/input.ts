@@ -25,7 +25,9 @@ if (typeof window !== 'undefined') {
     // (Ctrl+W/T/N) ignore this — the keyboard lock below is what covers them.
     if (preventsBrowserChord(e, { typing })) e.preventDefault()
     if (typing) return
-    pressed.add(e.code)
+    // Synthetic pad/touch presses are actions, not held physical keys. They
+    // have no keyup: recording a d-pad arrow here would latch movement forever.
+    if (keyPressSource(e) === 'keyboard') pressed.add(e.code)
   })
   window.addEventListener('keyup', (e) => pressed.delete(e.code))
   window.addEventListener('blur', () => pressed.clear())
@@ -92,6 +94,8 @@ export function wheelTargetsScene(target: EventTarget | null): boolean {
 }
 
 export interface KeyPressOptions {
+  /** Match exactly these modifiers; omitted flags must be false. {} means plain. */
+  exactModifiers?: Partial<Pick<KeyboardEvent, 'ctrlKey' | 'altKey' | 'metaKey' | 'shiftKey'>>
   /**
    * Ignore a press carrying Ctrl, Alt or Meta (work-order 601). For a key whose
    * CHORD is left to the browser — the calendar row of §21.1, see
@@ -128,6 +132,11 @@ export function onKeyPress(
     if (isTypingTarget(e)) return
     if (options.ignoreModified && (e.ctrlKey || e.altKey || e.metaKey)) return
     if (e.code !== code) return
+    if (options.exactModifiers) {
+      for (const flag of ['ctrlKey', 'altKey', 'metaKey', 'shiftKey'] as const) {
+        if (e[flag] !== (options.exactModifiers[flag] ?? false)) return
+      }
+    }
     if (options.preventDefault) e.preventDefault()
     cb(e)
   }
@@ -224,6 +233,8 @@ export const GAMEPAD_BUTTON_KEYS: Record<number, string> = {
   // §17.5's map leaves free, and it sits under the thumb that was pushing him
   // into the wedge.
   10: UNSTUCK_KEY_CODE,
+  14: 'ArrowLeft', // D-pad: inventory selection; A remains the use key.
+  15: 'ArrowRight',
 }
 const gamepadButtonDown: Record<number, boolean> = {}
 

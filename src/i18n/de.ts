@@ -217,6 +217,8 @@ export const de: Strings = {
   },
 
   hud: {
+    cursorModeLocked: 'Esc: Mauszeiger',
+    cursorModeUnlocked: 'Klick ins Bild: Steuerung',
     journalToggle: 'Tagebuch (Tab)',
     campToggle: 'Lager (C)',
     mapToggle: 'Karte (M)',
