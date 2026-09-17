@@ -68,13 +68,15 @@ it('restores the seed even when the shutter fails', async () => {
   expect(state.placeId).toBeNull()
 })
 
-it('stands opposite the trading post, so its wall closes the picture behind her', async () => {
+it('stands to the side of the pair, so one frame carries her and the hut', async () => {
   const { player, body, market, checks } = await photograph()
-  // The camera is on the far side of the figure from the hut: seen from there,
-  // the hut lies beyond her instead of off-frame beside the lens.
+  // A side stand, not the loom-axis shot: from there the loom falls beside her
+  // and the wall closes the picture behind her instead of hiding off-frame.
   const toCamera = { x: player.x - body.x, z: player.z - body.z }
   const toMarket = { x: market.x - body.x, z: market.z - body.z }
-  expect(toCamera.x * toMarket.x + toCamera.z * toMarket.z).toBeLessThan(0)
+  const cosine = (toCamera.x * toMarket.x + toCamera.z * toMarket.z) /
+    (Math.hypot(toCamera.x, toCamera.z) * Math.hypot(toMarket.x, toMarket.z))
+  expect(Math.abs(Math.acos(cosine) * 180 / Math.PI)).toBeGreaterThan(45)
   expect(checks[3]).toMatchObject({ pass: true })
 })
 
