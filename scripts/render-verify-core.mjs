@@ -1197,14 +1197,14 @@ export function sawCodeSince(run, since) {
 }
 
 export function coveringRun(runs, backend, since, options) {
-  const { featureLevel = null, openPoints = null } = options ?? {}
+  const { featureLevel = null, openPoints = null, matchesTree = null } = options ?? {}
   if (!Array.isArray(runs)) return null
   let best = null
   for (const r of runs) {
     if (!r || r.backend !== backend) continue
     if (!runVerdict(r, { openPoints }).covers) continue
     if (featureLevel && r.featureLevel !== featureLevel) continue
-    if (!sawCodeSince(r, since)) continue
+    if (matchesTree ? !matchesTree(r) : !sawCodeSince(r, since)) continue
     // RANKED BY THE STAMP A RUN CAN BE NAMED BY (review finding, 28.08.2026,
     // round 14). `number(r.at)` is 0 for a record dated only by `startedAt`, so
     // such a run lost to every older one and the gate read the wrong "latest".
@@ -1825,6 +1825,7 @@ export function evaluate(input) {
     changedRenderPaths = [],
     latestChangeAt = 0,
     runs = [],
+    matchesTree = null,
     deferral = null,
     openPoints = null,
     ledger = RED_CHARGES,
@@ -1845,7 +1846,7 @@ export function evaluate(input) {
   }
 
   const since = Number.isFinite(latestChangeAt) ? latestChangeAt : 0
-  const opts = { openPoints, ledger, incompleteClosures, crashClosures }
+  const opts = { openPoints, ledger, incompleteClosures, crashClosures, matchesTree }
   // Two backends only where the two backends can DIFFER; otherwise one passing
   // run is the whole proof, and the second is a picture inspection bought for
   // nothing (user 26.07.2026).

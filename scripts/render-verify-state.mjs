@@ -1,6 +1,6 @@
 // Shared state I/O for the render-verify (both-backends) toolchain
 // (render-verify-guard, render-verify-recorder). One JSON state file under
-// .claude/, git-ignored:
+// the main checkout's .claude/, git-ignored, surviving linked-worktree cleanup:
 //
 //   render-verify-state.json — { clearedHead,              legacy scalar baseline (mirror)
 //                                clearedHeads: {branch:sha}, per-BRANCH verified baselines
@@ -13,10 +13,10 @@
 // self-report. Writes are atomic (tmp + rename, via dashboard-state.mjs)
 // because a suite's exit handler can race the Stop-hook in the same moment.
 import { readJson, writeJsonAtomic, REPO_ROOT } from './dashboard-state.mjs'
-import { repoPath } from './repo-paths.mjs'
+import { commonRepoPath } from './repo-paths.mjs'
 
 export { REPO_ROOT }
-export const RENDER_STATE_PATH = repoPath('.claude/render-verify-state.json')
+export const RENDER_STATE_PATH = commonRepoPath('.claude/render-verify-state.json')
 
 /** Keep only the most recent run records (a bounded evidence window). */
 export const MAX_RUNS = 40

@@ -15,13 +15,13 @@
 // known", never a false verdict.
 import { closeSync, existsSync, futimesSync, mkdirSync, openSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
-import { dirname, isAbsolute, join } from 'node:path'
+import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { tryWriteJsonAtomic } from '../atomic-write.mjs'
-import { REPO_ROOT } from '../repo-paths.mjs'
+import { REPO_ROOT, COMMON_REPO_ROOT } from '../repo-paths.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-export const ROOT = join(HERE, '..', '..')
+export const ROOT = REPO_ROOT || join(HERE, '..', '..')
 
 /** Where the frames land — the one directory every suite's shutter writes to. */
 /** `HOA_FRAME_DIR` redirects it, on the same grounds as `HOA_WAIT_LEASE_PATH`:
@@ -32,18 +32,10 @@ export const FRAME_DIR = process.env.HOA_FRAME_DIR || join(ROOT, 'verification')
 /** A written frame, as opposed to the README that shares the directory. */
 const FRAME_FILE = /\.(png|jpg|jpeg)$/i
 
-/** The checkout whose RUNS this process is speaking about. The module's own
- *  location is the wrong answer for a fixture: a test that executes a script
- *  from this checkout with cwd and HOA_REPO_ROOT in a temporary repository
- *  would read the LIVE checkout's run records. That is how the attended
- *  context-ceiling hook found a running verification during its own unit run
- *  and swallowed the notice its test was asserting (measured 26.08.2026).
- *  Resolved once per process, so no hook pays a git call per invocation. */
-const RUN_ROOT = REPO_ROOT || ROOT
-
-/** The log directory the wrapper writes into (VERIFY_LOG_DIR overrides it). */
+/** Logs and receipts outlive their checkout. Explicit directories remain available
+ *  for fixtures; relative overrides are rooted in the shared checkout too. */
 export function logDir(env = process.env) {
-  return env.VERIFY_LOG_DIR ? join(RUN_ROOT, env.VERIFY_LOG_DIR) : join(RUN_ROOT, 'local', 'verify-logs')
+  return resolve(COMMON_REPO_ROOT() || ROOT, env.VERIFY_LOG_DIR || 'local/verify-logs')
 }
 
 /** The record sits beside its log and carries its name, so the two can never

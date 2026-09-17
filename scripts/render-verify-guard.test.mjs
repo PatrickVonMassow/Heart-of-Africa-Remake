@@ -61,6 +61,7 @@ describe('gatherRenderVerifyInputs — the happy path it must keep', () => {
       changedRenderPaths: ['src/render/a.ts'],
       latestChangeAt: 1000,
       runs: [],
+      matchesTree: expect.any(Function),
       deferral: undefined,
       openPoints: [506],
       sessionId: 'sid',
@@ -585,7 +586,7 @@ describe('render-verify-guard --status — what it prints about a run it cannot 
         execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '-m', 'a render change'], { cwd: root, windowsHide: true })
         cleared = clearedHead
       }
-      let resolved = typeof state === 'function' ? state(Date.now()) : state
+      let resolved = typeof state === 'function' ? state(Date.now(), execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8', windowsHide: true }).trim()) : state
       if (cleared !== null) resolved = { ...resolved, clearedHeads: { main: cleared } }
       mkdirSync(join(root, '.claude'), { recursive: true })
       writeFileSync(join(root, '.claude', 'render-verify-state.json'), JSON.stringify(resolved))
@@ -621,7 +622,7 @@ describe('render-verify-guard --status — what it prints about a run it cannot 
       }
       // Same clock rule as inTempRepo: a state written as a function is called
       // after the last git call, so a record dated "now" cannot predate `since`.
-      let resolved = typeof state === 'function' ? state(Date.now()) : state
+      let resolved = typeof state === 'function' ? state(Date.now(), execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8', windowsHide: true }).trim()) : state
       if (cleared !== null) resolved = { ...resolved, clearedHeads: { main: cleared } }
       mkdirSync(join(root, '.claude'), { recursive: true })
       writeFileSync(join(root, '.claude', 'render-verify-state.json'), JSON.stringify(resolved))
@@ -681,7 +682,8 @@ describe('render-verify-guard --status — what it prints about a run it cannot 
             // the render edit, so WebGL 2 really covers and the block is about
             // this one record rather than about a missing run.
             { backend: 'webgpu', suite: 'settings', at: now, exit: 0, asserted: true, screenshotCount: 9, truncated: true, droppedLines: 115 },
-            { backend: 'webgl', suite: 'settings', at: now + 1000, exit: 0, asserted: true, screenshotCount: 9 },
+            { backend: 'webgl', suite: 'settings', at: now + 1000, exit: 0, asserted: true, screenshotCount: 9, dirty: false,
+              head: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8', windowsHide: true }).trim() },
           ],
         }),
       )
@@ -865,12 +867,12 @@ describe('render-verify-guard --status — what it prints about a run it cannot 
   // the earlier record all the same, so the inspection said "covered" about a
   // gate that was shut.
   it('names an open red that a later covering run hides from the per-backend line', () => {
-    const out = inTempRepo({
+    const out = inTempRepo((_now, head) => ({
       runs: [
         { backend: 'webgpu', suite: 'polish', at: 1500, exit: 1, reds: [{ name: 'a check nobody filed', kind: 'check', point: null }] },
-        { backend: 'webgpu', suite: 'polish', at: 1600, exit: 0, asserted: true },
+        { backend: 'webgpu', suite: 'polish', at: 1600, exit: 0, asserted: true, head, dirty: false },
       ],
-    })
+    }))
     expect(out).toMatch(/covered by polish/)
     expect(out).toMatch(/unaccounted red: webgpu\/polish .* "a check nobody filed"/)
     // AND IT SAYS WHETHER IT IS BLOCKING (review finding, 28.08.2026, round 22).

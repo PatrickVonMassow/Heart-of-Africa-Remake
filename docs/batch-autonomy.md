@@ -3058,7 +3058,9 @@ point-210 sea-coast fix was "done" after a WebGL2-only check while the WebGPU
 picture was still stepped — the fix never touched the water shader's path), so
 the rule is machine-enforced by `scripts/render-verify-guard.mjs` (Stop hook;
 decision logic in `render-verify-core.mjs`, Vitest-covered; state in the
-git-ignored `.claude/render-verify-state.json`).
+git-ignored `.claude/render-verify-state.json` of the MAIN checkout, which a
+linked worktree writes into too, so the record outlives the worktree it was
+earned in).
 
 How it works, mechanically:
 
@@ -3066,9 +3068,11 @@ How it works, mechanically:
   `scripts/verify/_browser.mjs` arms `scripts/render-verify-recorder.mjs` on
   every browser-suite launch; at process exit it records backend, suite, exit
   code, whether `assertBackend` CONFIRMED the backend, and the screenshots the
-  run actually wrote. Only an exit-0 record counts as coverage, and only if it
-  finished AFTER the last edit of any changed render file (an earlier run never
-  saw the final code).
+  run actually wrote. Only an exit-0 record counts as coverage, and only if the
+  COMMIT it names is an ancestor of HEAD whose render files still match the
+  working tree. The commit, not the clock, is the identity: a merge preserves
+  the proof it carries in, a later render edit destroys it, and a run from an
+  unmerged sibling branch never counted in the first place.
 - **The gate fires on committed render changes.** At turn-end the Stop hook
   diffs the verified baseline (`clearedHead`) against HEAD; if the diff touches
   the render set (`src/render/**`, `src/scenes/**`, `src/ui/**`, `src/App.tsx`,
