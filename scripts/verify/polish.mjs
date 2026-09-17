@@ -5461,6 +5461,70 @@ if (section('wedged-adults')) {
   await page.evaluate((seed) => window.__game.setState({ seed }), bootSeed)
 }
 
+// The fixed weaver in the user's "Festklemmend" report, not a moving adult.
+// Run on each backend with the ordinary polish launcher; the frame declares
+// the live figure as its subject and leaves the trading post in the background.
+if (section('village-stations')) {
+  const bootSeed = await page.evaluate(() => window.__game.getState().seed)
+  try {
+    await page.evaluate(() => {
+      const g = window.__game.getState()
+      if (g.placeId) g.leavePlace()
+    })
+    await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
+    await page.evaluate(() => {
+      window.__game.setState({ seed: 1838110026 })
+      window.__game.getState().enterPlace('bambara-village')
+      window.__game.getState().setJournalOpen(false)
+    })
+    await page.waitForFunction(() =>
+      window.__game.getState().placeId === 'bambara-village' &&
+      !!window.__placeScene?.getObjectByName('village-weaver-body'), null, { timeout: 40000 })
+    await waitForSceneBuilt(page)
+    const staged = await page.evaluate(() => {
+      const scene = window.__placeScene
+      const layout = window.__placeLayout
+      const loom = scene.getObjectByName('village-weaver')
+      const figure = scene.getObjectByName('village-weaver-body')
+      const at = (object) => {
+        object.updateWorldMatrix(true, false)
+        const e = object.matrixWorld.elements
+        return { x: e[12], y: e[13], z: e[14] }
+      }
+      const prop = at(loom)
+      const body = at(figure)
+      const buildings = layout.colliders.slice(0, layout.interactives.length + layout.dwellings.length)
+      const gap = (point, radius) => Math.min(...buildings.map(c => window.__clearanceTo(c, point.x, point.z) - radius))
+      const e = figure.matrixWorld.elements
+      const facesLoom = e[8] * (prop.x - body.x) + e[10] * (prop.z - body.z) > 0
+      // Side view: the frame, figure and open ground behind her are separate
+      // in projection. The market wall remains visible beyond the loom.
+      const p = window.__placePlayer
+      p.x = body.x + 4
+      p.z = prop.z + 0.3
+      p.yaw = Math.atan2(body.x - p.x, body.z - p.z) + Math.PI
+      p.pitch = -0.1
+      const cameraGap = Math.min(...layout.colliders.map(c => window.__clearanceTo(c, p.x, p.z)))
+      return { body, propGap: gap(prop, 1), bodyGap: gap(body, 0.3), cameraGap, facesLoom }
+    })
+    check('the reported weaver and loom have a walker-wide gap to the village buildings',
+      staged.propGap >= 0.6 && staged.bodyGap >= 0.6, JSON.stringify(staged))
+    check('the weaver faces her loom', staged.facesLoom)
+    check('the weaver photograph stands on open ground', staged.cameraGap >= 0.35, `${staged.cameraGap.toFixed(2)} m`)
+    await nextFrames(3)
+    await frame('1143-village-weaver-clear-of-market', {
+      local: { x: staged.body.x, y: staged.body.y + 0.9, z: staged.body.z },
+      label: 'the reported-seed weaver facing her loom, with open ground separating her from the trading-post wall',
+    })
+  } finally {
+    await page.evaluate((seed) => {
+      const g = window.__game.getState()
+      if (g.placeId) g.leavePlace()
+      window.__game.setState({ seed })
+    }, bootSeed)
+  }
+}
+
 if (section('adult-errands')) {
   await page.evaluate(() => {
     const g = window.__game.getState()
