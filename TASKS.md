@@ -15966,3 +15966,27 @@ to land than a mechanism that needs a review.
   Refs: src/scenes/place/layout.ts (`pickWayOut`, the `way-out-missing` devAssert, `onWayOut`),
   src/scenes/place/layout.test.ts
   Bundle: Dorfleben
+
+- [ ] 1145. Repair pre-existing enrichments check: the Victoria Falls frame never reaches its
+  own subject (filed 17.09.2026 from point 1140's covering picture pass, under point 1089's
+  ownership rule; classified PRE-EXISTING by two baseline runs on f347b652d).
+  `72-water-victoria-falls` fails the point-375 frame-subject check on WebGPU and is red on
+  `main` itself, so it reds every `enrichments` pass and every LARGE that contains one. The
+  measurement: the subject sits at lat -17.92, lon 25.85 (world 258.5, 179.2), the traveller
+  stood at world (298.51, 158.17) — 4.52 degrees away — the projection landed at ndc
+  (-4.26, -3.70), off the left and bottom edge, and the camera had NOT settled after
+  15010 ms of polling. So the run is not merely mis-aimed: the travel never arrived, and the
+  wait gave up on a camera still moving. Decide WHICH of the two it is before repairing —
+  a travel that stops short is a game defect, a wait that expires on a settling camera is a
+  suite defect, and the two have opposite repairs.
+  Final state:
+  - The frame is written and contains the falls, or it is declared a general view with its
+    measured reason (point 375 allows exactly that, and nothing else).
+  - `npm test -- enrichments` runs green on both backends without this check failing.
+  Test: Playwright — `enrichments --section=rivers` as the rung, then the whole suite on the
+  affected backend; if the cause is the travel, a Vitest case over the arrival condition.
+  Criticality: medium — no player sees this frame, but it keeps the suite red for every point
+  that has to run it, which is how point 1065 lost 23 LARGE runs.
+  Refs: scripts/verify/enrichments.mjs (around the `72-water-victoria-falls` capture),
+  scripts/verify/frameSubject.mjs, point 375, point 1089, point 1115.
+  Bundle: Testinfrastruktur.
