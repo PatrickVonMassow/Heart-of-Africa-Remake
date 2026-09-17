@@ -395,7 +395,23 @@ bar blinks (`.health-low`) below a third of max health and stops
 above it, the canteen blinks (`.canteen-blink`) below a third of its
 fill (§6.1), and an
 `.affliction-badge` renders left of the bar for each active affliction
-(`src/ui/Hud.test.tsx`). The map is NOT an inventory item (point 93):
+(`src/ui/Hud.test.tsx`). The inventory bar carries its own KEYS
+(point 1140): the first nine slots print their digit in a corner and
+answer Digit1-Digit9 in both views, an empty slot ignoring its key,
+and the d-pad selects a slot while A stays the use key — the number
+row's debug month jumps moved to Shift+row so the plain digits belong
+to the player (design.md §21.1). While the settlement view holds no
+pointer lock a `.cursor-mode-hint` names the way back to steering, the
+same hint fainter once locked, both texts from the language files and
+both silent under browser automation and touch, exactly as the lock
+itself is skipped there. Verifiable: `src/ui/Hud.test.tsx` (the digit
+badges, the key using the matching slot, the empty slot ignoring it,
+both hint texts from both language files), `src/systems/input.test.ts`
+(the exact-modifier match, the pad press that is no held key),
+`src/systems/keyboardGuard.test.ts` (the digits are game keys while
+Ctrl+digit stays the browser's), and the bar's digits stand in the
+picture (`scripts/verify/polish.mjs`, screenshot 149).
+The map is NOT an inventory item (point 93):
 the bottom-right button row holds camp / map / journal in that order,
 the always-present MAP button opens the overview without any
 possession check, and the CAMP button shows only where a camp can be
@@ -1854,6 +1870,11 @@ virtual gamepad and asserts that pre-engagement axis drift moves
 nothing, stick travel movement, right-stick turning in the
 first-person view, the A-button interaction (mapped to the SPACE use key)
 and Y-button journal toggle, and the position-query toast in both languages.
+The d-pad reaches the inventory bar (point 1140): left and right move
+the selection, the selected slot is highlighted, and A remains the use
+key rather than a second way to spend an item
+(`src/systems/gamepadMap.test.ts`, `src/systems/input.test.ts`,
+`src/ui/Hud.test.tsx`).
 The touch/tablet layer of `design.md` §17.5 (point 84) holds as a
 third input source with zero change to desktop play: a virtual stick,
 a right-half look/steer drag surface with two-finger pinch zoom, a
