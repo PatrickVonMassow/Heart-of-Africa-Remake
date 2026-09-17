@@ -77,40 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1142. The picture check's coverage record dies with the worktree it was earned in
-  (measured 16.09.2026 on the landing of 1138). Both covering passes of that point ran in
-  `.claude/worktrees/point-1138` — WebGPU and WebGL 2 over collision, polish and settings,
-  green but for one red charged to an open point on each lane — and the runner wrote their
-  records into THAT checkout's own `.claude/render-verify-state.json`, which is untracked.
-  `scripts/worktree-cleanup.mjs` then removed the worktree at the end of the landing, as the
-  working method requires, and with it the only machine-readable proof that the picture had
-  been judged. `render-verify-guard` on `main` therefore reported "RENDER CHANGE NOT VERIFIED
-  ON EITHER BACKEND" over the very commits whose picture had just been judged on both, and
-  the session had to close the gap with a logged deferral — an exception that says the
-  picture is UNCONFIRMED when it had in fact been confirmed.
-  WHY IT BITES EVERY POINT: the working method puts every point in its own worktree and ends
-  the branch with the merge, so this is the ordinary path, not an accident of this landing.
-  The run's own log and `.run.json` sidecar go the same way — `local/verify-logs/` inside the
-  worktree is a real directory, not a link — so after the cleanup neither the receipt nor the
-  log exists to read back. The same evening's baseline classification is the counter-example
-  that shows what is lost: it could only be made because that checkout still stood.
-  FINAL STATE: a covering run earned on a branch survives the branch. The record and the run
-  log are written where the repository keeps them for every checkout — the main tree's
-  `.claude/` and `local/verify-logs/` — or the cleanup migrates them before it removes the
-  worktree; and the guard reads a run by the COMMIT it names, which after a merge is an
-  ancestor of `main`, rather than by the checkout it happened to run in. Deciding between
-  those two is the point's first job; both are small and only one of them may be built.
-  VERIFIABLE: Vitest over the state path resolution — a runner started in a worktree records
-  into the repository's state, not the worktree's — plus a drill that runs a section in a
-  worktree, removes the worktree with the project's own command, and asserts that the guard
-  on `main` still reads the run and its log.
-  Criticality: high — it does not break the game, but it destroys the evidence the render
-  gate exists to keep, and it turns every honest landing into a deferral that reads like an
-  unverified one.
-  Refs: scripts/render-verify-guard.mjs, scripts/verify/run-logged.mjs, scripts/verify/run-record.mjs,
-  scripts/worktree-cleanup.mjs
-  Bundle: Testinfrastruktur.
-
 - [ ] 1135. The verification run stops repeating itself: one pass per suite, no automatic
   flake retry, no automatic baseline pass (user order 15.09.2026, FIRST of three, verbatim:
   "Okay, setze das so um und reihe es als nächstes in der Queue ein").
