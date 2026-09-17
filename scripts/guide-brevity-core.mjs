@@ -542,7 +542,15 @@ export const LIMITS = {
   // has no reader — was FOLDED into "Die Sonde kann ihr Nein nicht erreichen", whose subject is
   // the same check that cannot deliver a verdict, and that entry was tightened to pay for it, so
   // the guide comes out one line shorter than the old ceiling: 683 -> 682.
-  maxLines: 682,
+  // RAISED 17.09.2026 by TWO genuinely new tips that no existing entry could hold (§3.283,
+  // §3.284). Neither is a variation of a tip already there: the first is about REMOVING a
+  // safety run — the reader's own next step, once a doubled pass looks wasteful — and the
+  // enumeration it demands (every way a fault can arise and go unread) exists nowhere else;
+  // the second is the machine-load rule failing over the NAME of the tool rather than over
+  // forgetfulness, which the existing load entries do not reach. SHORTEN-BEFORE-RAISE was
+  // applied to both: drafted at 24 lines together, they land at 14, and each risk sits inside
+  // the four-line limit. The long telling stays in the retrospective. 682 -> 696.
+  maxLines: 696,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -844,7 +852,12 @@ export const LIMITS = {
   // the ceiling follows it down: 6640 -> 6639.
   // 17.09.2026: the receiver lesson folded into the probe entry (see maxLines) bought its words
   // back inside that entry, and the guide lands one word under the old ceiling: 6639 -> 6638.
-  maxWords: 6638,
+  // RAISED 17.09.2026 by the same two new tips justified at maxLines (§3.283, §3.284). Measured
+  // as the audit counts them: 251 words as first drafted, 88 paid back by rewriting both entries
+  // down to the four-line risk limit, 163 the net raise. Nothing else was tightened for it — the
+  // neighbouring entries have been cut for three earlier raises already, and cutting a claim to
+  // buy a tip is the loosening this rule forbids. 6638 -> 6801.
+  maxWords: 6801,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,

@@ -642,6 +642,20 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Eine **Frage ist nur eine Frage**: beantworte sie, hör dort auf. Anhalten **nur**
   auf ausdrückliche Anweisung, die du wörtlich zitierst."
 
+- **Ihr streicht einen teuren Doppel-Lauf — und verliert Fehler, die nur er gesehen hat.**
+  Eine automatische Wiederholung jedes roten Laufs ist stumpf und teuer, fragt aber jeden Fehler
+  ein zweites Mal. Fällt sie weg, zeigt sich, wie oft ein Fehler zwar entsteht, aber von keiner
+  Stelle angesehen wird — hier fand die Gegenlesung danach **24** solcher Stellen.
+  → *Prompt:* „Bevor du einen Sicherungslauf entfernst: **zähl mir jeden Weg auf**, auf dem ein
+  Fehler entstehen und ungelesen bleiben kann. Für jeden einen Test, der **rot wird, wenn man
+  die Reparatur zurücknimmt**."
+
+- **Zwei Läufe gleichzeitig — und beide Messungen sind wertlos.** Unter fremder Last werden
+  Prüfläufe rot, ohne dass etwas kaputt ist. Der Fehler passiert über den **Namen**: Die Regel
+  steht als „keine zweite Suite" im Kopf, und was ihr startet, heißt „Landung" oder „Push".
+  → *Prompt:* „Sag mir vor dem Start: **was fährt das unter der Haube?** Läuft schon etwas mit
+  Build, Lint oder Tests, **warte**. Die Regel heißt **‚kein zweiter Maschinenverbraucher'**."
+
 ---
 
 ## Drei Meta-Regeln, die alles zusammenhalten
@@ -680,4 +694,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 6c306504a0f7fb6d9efed0c69327964e47289703ac7610ab89ea006eaf7d8d03 -->
+<!-- GUIDE-FINGERPRINT: 2c1cd871cd926a67514ae6b92b0cfa2023c95683720f59489c03bdb06b0b59ab -->
