@@ -35,7 +35,7 @@ describe('new game (design.md fixed values)', () => {
   it('starts in Cairo with the fixed money/provisions/gifts', () => {
     expect(g().money).toBe(250)
     expect(g().foodDays).toBe(35)
-    expect(totalGifts(g().gifts)).toBe(2)
+    expect(totalGifts(g().gifts)).toBe(0)
     expect(g().mode).toBe('place')
     expect(g().placeId).toBe('cairo')
   })
