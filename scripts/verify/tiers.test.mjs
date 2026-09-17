@@ -53,7 +53,7 @@ describe('GPU backend preflight selection', () => {
     const source = await readFile('scripts/verify/run-all.mjs', 'utf8')
     const probe = source.indexOf('gpuBackendVerdict(await probeGpuBackends())')
     const server = source.indexOf('const server = needsDevServer(devPick)')
-    const suiteLoop = source.indexOf('results.push(runSuiteWithRetry(s, server.base))')
+    const suiteLoop = source.indexOf('results.push(runSuiteOnce(s, server.base))')
 
     expect(probe).toBeGreaterThan(0)
     expect(probe).toBeLessThan(server)

@@ -1,37 +1,42 @@
-// Ownership is baseline evidence, never the filename/name overlap hint.
-import { checkFromName } from './baseline-classify-core.mjs'
+// WHETHER A RED HOLDS THE RUN — the pure half, decided against the CLASSIFIED
+// BASELINE rather than against a second set of suite passes (point 1135).
+//
+// The classified baseline is `scripts/render-verify-charges.mjs`: one entry per
+// known-red check, each naming the OPEN work-order point that owns it and
+// carrying, in its own `why`, the date and the run it was measured on. A red the
+// ledger names is charged elsewhere and says nothing about the change under
+// test; a red it does not name HOLDS. That lookup costs nothing, which is why
+// the automatic baseline passes — up to two whole extra passes of every red
+// suite of every LARGE — could be deleted without weakening the gate.
+//
+// `scripts/verify/baseline-classify.mjs` still measures a red against the
+// pre-change tree. It is a HAND diagnosis for a red that is genuinely in doubt,
+// asked for by name, never run automatically for every red of every pass.
 
-export const wantsBaseline = ({ isLargeEquivalent = false, baseline = false, env = {} }) =>
-  isLargeEquivalent || baseline || env.VERIFY_BASELINE === '1'
+/**
+ * THE EXIT CODE OF A PASS THAT IS RED AND HOLDS NOTHING (point 1135).
+ *
+ * A backend pass exits with this instead of 1 when every red it produced is
+ * charged elsewhere and nothing is unresolved — "own or unresolved: none;
+ * regression verdict unchanged". It is still a FAILING exit: every reader that
+ * asks `status !== 0` is unaffected. What it buys is the ONE reader that has to
+ * tell the two apart — the both-backend sequencer, which used to stop at the
+ * first red pass and therefore never started the second backend at all while
+ * any pre-existing red stood. Measured 16.09.2026 on feat/1137: the WebGL 2
+ * pass ran all 25 suites, charged its three reds elsewhere, exited 1, and the
+ * WebGPU pass never ran — which made the both-backend LARGE that CLAUDE.md §5
+ * requires structurally unreachable.
+ */
+export const EXIT_NOT_HELD = 2
 
-export function distinctReds(...lists) {
-  return [...new Map(lists.flat().map((check) => [check.key, check])).values()]
-}
-
-// Stable across branches, measurements, backends and repeated runs. The suite
-// disambiguates identical labels; the classifier's key is the check identity.
-export function redRequestTitle(suite, check) {
-  return `Repair pre-existing ${suite} check: ${checkFromName(check).key}`
-}
+/** Does this run want the HAND baseline diagnosis? A LARGE no longer does:
+ *  point 1135 deleted the automatic baseline passes, so only an explicit
+ *  `--baseline` / `VERIFY_BASELINE=1` asks for one. */
+export const wantsBaseline = ({ baseline = false, env = {} }) =>
+  baseline || env.VERIFY_BASELINE === '1'
 
 export function baselineReport({ suite, backend, baseline, head, classified, logs }) {
   return { version: 1, suite, backend, baseline, head, classified, logs }
-}
-
-export function redOwnership({ suite, backend, failed, report, filed = [] }) {
-  const valid = report?.version === 1 && report.suite === suite && report.backend === backend &&
-    /^[a-f0-9]{40}$/.test(report.baseline ?? '') && /^[a-f0-9]{40}$/.test(report.head ?? '') &&
-    report.baseline !== report.head && Array.isArray(report.classified)
-  const deposited = new Set(filed)
-  return distinctReds(failed).map((check) => {
-    const matches = valid ? report.classified.filter((c) => c?.key === check.key &&
-      checkFromName(c.check).key === check.key) : []
-    const verdict = matches.length === 1 ? matches[0].verdict : 'inconclusive'
-    const title = redRequestTitle(suite, check.name)
-    const elsewhere = verdict === 'pre-existing' && deposited.has(title)
-    return { suite, check: check.name, key: check.key, verdict, title, elsewhere,
-      reason: verdict === 'pre-existing' && !elsewhere ? 'filing failed or not attempted' : verdict }
-  })
 }
 
 export function formatOwnershipVerdict({ rows, unresolved = [] }) {

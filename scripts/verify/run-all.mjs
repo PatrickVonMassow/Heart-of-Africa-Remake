@@ -15,13 +15,15 @@ import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { killTree, launchServer } from './_server.mjs'
-import { allChecks, changeRelatedness, clearInheritedBaselineLane, countCheckLines, failedChecks, formatRepeatReport, repeatSignature } from './baseline-classify-core.mjs'
+import {
+  allChecks, checkFromName, clearInheritedBaselineLane, consoleErrorChecks, countCheckLines, failedChecks, parseCheckLines,
+} from './baseline-classify-core.mjs'
 import {
   LEVEL, annotateResult, annotateStageFailure, decideRun, formatLoadReport, onLoadMode,
 } from './machine-load-core.mjs'
 import { readMachine } from './machine-load.mjs'
 import {
-  RETRY_ENV, chargeablePoints, chargeFor, formatSuspectEnv, isCrashedRun,
+  RETRY_ENV, chargeablePoints, chargeFor, isCrashedRun,
   isIncompleteRecording, owned, runIdentity,
 } from '../render-verify-core.mjs'
 import { readRenderState } from '../render-verify-state.mjs'
@@ -34,13 +36,22 @@ import {
 } from './tiers.mjs'
 import { LADDER_STATUS, formatLadderRefusal } from './ladder-core.mjs'
 import { ladderCheck } from './ladder.mjs'
-import { SECTION_ENV, listNonPredictive, listSections, narrowDiagnosis, planSectionRun, resolveSelection } from './sections.mjs'
+import { SECTION_ENV, listSections, planSectionRun, resolveSelection } from './sections.mjs'
 import { readFileSync } from 'node:fs'
-import { distinctReds, formatOwnershipVerdict, wantsBaseline } from './red-ownership-core.mjs'
-import { classifyRedSuites } from './red-ownership.mjs'
+import { EXIT_NOT_HELD, formatOwnershipVerdict, wantsBaseline } from './red-ownership-core.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const chargedPoints = new Set()
+
+/** EVERY `console errors: <n>` line the output carries, not the first (point
+ *  1135, cross-vendor review round 5): a suite printing `0` for one page and
+ *  `1` for the next was read as clean by a first-match regex. The tally is the
+ *  LARGEST reading, so a later zero cannot erase an earlier red. */
+function countedConsoleErrors(out) {
+  let most = 0
+  for (const m of String(out ?? '').matchAll(/console errors: (\d+)/gi)) most = Math.max(most, Number(m[1]))
+  return most
+}
 
 // A REGRESSION PASS IS NEVER THE BASELINE LANE. Dropped from this process's own
 // environment, so no child — suite, retry, cross-browser check or Vitest — can
@@ -164,6 +175,15 @@ if (backendPlan.length > 0) {
         ...(pass.webglOnlyCovered ? { RVA_WEBGL_COVERED: '1' } : {}),
       },
     }).status ?? 1
+  // A RED THAT DOES NOT HOLD DOES NOT STOP THE SEQUENCE (point 1135). A pass
+  // that ends "own or unresolved: none; regression verdict unchanged" has
+  // already said its reds belong elsewhere, and stopping there cost the run the
+  // OTHER backend entirely — CLAUDE.md §5 asks for both once per bundle and at
+  // the closing, and while any pre-existing red stood that was unreachable.
+  // So the sequence runs on and the run FAILS AT ITS END. A red that DOES hold
+  // still stops it: there is nothing to learn from a second backend about a
+  // defect the first one has already pinned on this change.
+  const notHeld = []
   for (const [i, pass] of backendPlan.entries()) {
     const label = pass.backend === 'webgpu' ? 'WebGPU' : 'WebGL 2'
     const shape = pass.skipPreflight
@@ -171,10 +191,22 @@ if (backendPlan.length > 0) {
       : 'full, with preflight'
     console.log(`\n===== LARGE regression — backend ${i + 1}/${backendPlan.length}: ${label} (${shape}) =====`)
     const status = runBackend(pass)
+    if (status === EXIT_NOT_HELD) {
+      notHeld.push(label)
+      console.log(
+        `\nThe ${label} pass is RED, and its own accounting charges every red elsewhere — regression verdict unchanged. ` +
+          'Continuing to the remaining backend(s); this run fails at its END (point 1135).',
+      )
+      continue
+    }
     if (status !== 0) {
-      console.log(`\nLARGE FAILED on the ${label} backend — not proceeding to the remaining backend(s).`)
+      console.log(`\nLARGE FAILED on the ${label} backend — a red that HOLDS; not proceeding to the remaining backend(s).`)
       process.exit(status)
     }
+  }
+  if (notHeld.length > 0) {
+    console.log(`\nLARGE FAILED AT ITS END — red on ${notHeld.join(' and ')}, every red charged elsewhere. Every planned backend ran; none was skipped.`)
+    process.exit(EXIT_NOT_HELD)
   }
   process.exit(0)
 }
@@ -213,10 +245,11 @@ if (loadMode !== 'off') {
 // run (the staged-drama suites poll until state on a slow WebGPU backend) is
 // NEVER killed for merely being slow. Configurable via VERIFY_SUITE_TIMEOUT_MS.
 const SUITE_TIMEOUT_MS = Number(process.env.VERIFY_SUITE_TIMEOUT_MS) || 45 * 60 * 1000
-/** `retryAfter` is the env value that marks this spawn as the RETRY of a failed
- *  attempt (point 640) — blank for a first attempt, which also neutralises a
- *  stale export in the calling shell. */
-function runSuite(name, baseUrl, retryAfter = '', onlySection = '') {
+/** ONE PASS OF ONE SUITE. Since point 1135 the runner makes no second attempt
+ *  of its own: `RETRY_ENV` is written BLANK so a stale export in the calling
+ *  shell cannot stamp this first attempt SUSPECT, and a HAND retry of the
+ *  smallest affected check stays the diagnosis (CLAUDE.md §7.2). */
+function runSuite(name, baseUrl, onlySection = '') {
   const before = readRenderState()?.runs
   const previous = new Set((Array.isArray(before) ? before : []).map(runIdentity))
   const startedAt = Date.now()
@@ -225,7 +258,7 @@ function runSuite(name, baseUrl, retryAfter = '', onlySection = '') {
   // learns about a suite - and a 55-minute `polish` therefore left the log
   // standing at `# starting dev server` for its entire length. Twice on
   // 15.09.2026 a reader took that silence for a hang and ended a healthy run.
-  console.log(`# → ${name}${onlySection ? ` [--section=${onlySection}]` : ''}${retryAfter ? ' (retry)' : ''} running — its PASS/FAIL line arrives when the suite ENDS`)
+  console.log(`# → ${name}${onlySection ? ` [--section=${onlySection}]` : ''} running — its PASS/FAIL line arrives when the suite ENDS`)
   const res = spawnSync(process.execPath, [join(HERE, `${name}.mjs`)], {
     windowsHide: true,
     encoding: 'utf8',
@@ -237,7 +270,7 @@ function runSuite(name, baseUrl, retryAfter = '', onlySection = '') {
     env: {
       ...process.env,
       ...(baseUrl ? { BASE_URL: baseUrl } : {}),
-      [RETRY_ENV]: retryAfter,
+      [RETRY_ENV]: '',
       // ONE BLOCK OF THE SUITE, for a diagnosis run that needs no more (point
       // 1126). Blank restores whatever the pass itself selected, so a normal
       // spawn is untouched; the suite's own gate stamps the record PARTIAL.
@@ -249,15 +282,14 @@ function runSuite(name, baseUrl, retryAfter = '', onlySection = '') {
   })
   if (res.error && res.error.code === 'ETIMEDOUT') {
     console.log(`FAIL  ${name.padEnd(12)} — KILLED after ${Math.round(SUITE_TIMEOUT_MS / 60000)} min wall timeout (hung, not slow — raise VERIFY_SUITE_TIMEOUT_MS if this was a genuine slow-green run)`)
-    return { ok: false, out: '' }
+    return { ok: false, out: '', unresolved: true, allOwned: false, points: [], partial: false, rows: [], stale: [] }
   }
   const out = (res.stdout ?? '') + (res.stderr ?? '')
   // COUNT THE RESULT LINES BY THE RULE THAT KNOWS THEM (`CHECK_LINE`), not by a
   // bare `^FAIL` prefix: flow.mjs closes with `FAILURES: <n>`, which a prefix
   // match counts as a failing check nobody can name.
   const { pass, fail } = countCheckLines(out)
-  const errMatch = out.match(/console errors: (\d+)/i)
-  const consoleErrors = errMatch ? Number(errMatch[1]) : 0
+  const consoleErrors = countedConsoleErrors(out)
   const ok = res.status === 0 && fail === 0 && consoleErrors === 0
   // A narrowed spawn says so on its own result line: a reader who sees only the
   // headline must never mistake one block's tally for the suite's (point 1126).
@@ -292,160 +324,176 @@ function runSuite(name, baseUrl, retryAfter = '', onlySection = '') {
   const openPoints = new Set(chargeablePoints(readTasksAll()))
   const complete = record && record.exit === res.status && record.asserted === true &&
     record.terminalVerdict === true && !isCrashedRun(record) && !isIncompleteRecording(record)
-  const reds = complete && Array.isArray(record.reds) ? record.reds : []
+  const recordedReds = Array.isArray(record?.reds) ? record.reds : []
+  const reds = complete ? recordedReds : []
   const ownedReds = reds.filter((red) => owned(red, name, record.backend, record.featureLevel, openPoints))
   const points = [...new Set(ownedReds.map((red) => openPoints.has(red.point)
     ? red.point
     : chargeFor(red, { suite: name, backend: record.backend, featureLevel: record.featureLevel }).point,
   ))].sort((a, b) => a - b)
   for (const point of points) chargedPoints.add(point)
-  return { ok, out, unresolved: !complete, allOwned: reds.length > 0 && ownedReds.length === reds.length, points, partial: record?.partial === true }
-}
-
-// Auto-retry a failed BROWSER suite once (point 200 — general flake resilience).
-// The suites drive a real-time RAF simulation whose staging can miss its window
-// under full-regression load, and each run tends to surface a DIFFERENT rare
-// intermittent — so a single retry almost always clears a rotating flake, while
-// a REAL failure fails BOTH runs and is still reported. The root-cause fix stays
-// the point-200 sim-clock/condition polling; this only stops one transient from
-// failing the whole regression.
-//
-// THE RETRY IS NOT AN ANSWER (point 640). The "PASSED ON RETRY" line was prose in
-// a log nobody re-reads, and a run that passed only the second time was worth as
-// much to the gate as one that never failed. So the retry now also carries the
-// first attempt's failing checks into its own run record, which is stamped
-// SUSPECT and covers no backend: the red stays open until a CAUSE closes it —
-// named and fixed, charged to the open point that owns it, or filed as one.
-//
-// A double failure is TRIAGED, not asserted (point 294). "Failed twice" used to
-// print "a real failure, not a flake", which is not what two failures prove: on
-// 27.07.2026 `enrichments` failed two staging checks, then a completely
-// different one on the retry, on a loaded machine — the signature of load, and
-// none of the three checks had anything to do with the change. So the verdict is
-// read from the failing check NAMES (baseline-classify-core.mjs): the SAME check
-// twice is a candidate real failure, disjoint sets are load. Whether the check
-// even touches the diff is printed beside it as a weak second signal.
-// A RED WHOSE OWNER IS KNOWN BUYS NO SECOND PASS (point 1113, user 12.09.2026).
-// The retry answers one question — transient or defect? — and for a red that a
-// named OPEN point already owns in the charge ledger that question is answered.
-// So a suite whose run record carries reds and whose reds are ALL owned runs
-// once, says which points own them, and stays red; ONE uncharged red keeps the
-// retry. The decision reads the suite's own record (feature level, capture cuts
-// and repeated identities are lost by parsing output), and every doubt — a
-// missing, stale, crashed, truncated or non-terminal record — falls back to the
-// retry. Measured on point 1112's closing: three red suites cost six passes.
-/** A suite's own source, read once per pass: the declarations that decide
- *  whether a diagnosis run may be narrowed live in it. Unreadable source means
- *  no sections, which means no narrowing — never a wrong one. */
-const suiteSources = new Map()
-function suiteSource(name) {
-  if (!suiteSources.has(name)) {
-    let text = ''
-    try {
-      text = readFileSync(join(HERE, `${name}.mjs`), 'utf8')
-    } catch {
-      /* not sectioned, or not a file suite — narrowDiagnosis then answers `whole` */
+  // THE CLASSIFICATION THIS RUN MAKES, AND SINCE POINT 1135 THE ONLY ONE IT
+  // MAKES. The automatic baseline passes are gone; the charge ledger
+  // (scripts/render-verify-charges.mjs) IS the classified baseline — one entry
+  // per check, each naming the OPEN point that owns it and carrying the date it
+  // was measured in its own `why`. A red the ledger names is charged elsewhere;
+  // a red it does not name holds, and no second pass is spent asking.
+  const pointOf = (red) => (openPoints.has(red.point)
+    ? red.point
+    : chargeFor(red, { suite: name, backend: record.backend, featureLevel: record.featureLevel })?.point ?? null)
+  const ownedSet = new Set(ownedReds)
+  const printed = failedChecks(out)
+  // A RECORD ENTRY MAY CARRY NO KEY — older records and hand-written ones name
+  // the check and nothing else. Deriving it from the name is what every other
+  // reader of this ledger does, and without it the same red arrives twice: once
+  // keyed `undefined` from the record, once keyed properly from the output.
+  const keyOf = (red) => red.key ?? checkFromName(red.name).key
+  // EVERY OCCURRENCE THE RUN PRODUCED, recorded AND printed, undeduplicated.
+  // `failedChecks` folds repeats away by key and the key folds the measurement
+  // away, so a printed second reading of a charged check — a DIFFERENT
+  // measurement under the same name — was invisible here while a `detailMatch`
+  // charge reads exactly that measurement (Astra, round 5).
+  const printedOccurrences = [
+    ...parseCheckLines(out).filter((c) => c.status === 'FAIL'),
+    ...consoleErrorChecks(out),
+  ]
+  const ownedPrinted = (check) => complete &&
+    owned({ name: check.name, key: check.key, kind: check.kind ?? 'check', detail: check.detail },
+      name, record.backend, record.featureLevel, openPoints)
+  const recordedKeys = new Set(recordedReds.map(keyOf))
+  const underKey = new Map()
+  const add = (key, entry) => {
+    const list = underKey.get(key) ?? []
+    list.push(entry)
+    underKey.set(key, list)
+  }
+  for (const red of reds) add(keyOf(red), { owned: ownedSet.has(red), point: () => pointOf(red) })
+  for (const check of printedOccurrences) {
+    add(check.key, { owned: ownedPrinted(check), point: () => chargeFor(check, { suite: name, backend: record?.backend, featureLevel: record?.featureLevel })?.point ?? null })
+  }
+  const row = ({ key, name: check, fromRecord }) => {
+    // EVERY OCCURRENCE, NOT THE FIRST OWNED ONE. The key folds the measurement
+    // out of a check's identity while a `detailMatch` charge reads exactly that
+    // measurement, so two reds under one key can differ in ownership. One of
+    // them being charged says nothing about the other.
+    const occurrences = underKey.get(key) ?? []
+    // A CHARGE RESTS ON THE RECORD. A red the suite printed but the record does
+    // not carry is a disagreement between the two, and a disagreement charges
+    // nothing — which is also what the runner did before the retry was deleted.
+    const charged = recordedKeys.has(key) && occurrences.length > 0 && occurrences.every((entry) => entry.owned)
+    const point = charged ? occurrences[0].point() : null
+    return {
+      suite: name,
+      check,
+      key,
+      point,
+      elsewhere: charged,
+      title: charged ? `point ${point} — ${check}` : '',
+      reason: charged
+        ? `charged to open point ${point}`
+        : occurrences.some((entry) => entry.owned)
+          ? 'charged for one reading of this check but not for every one this run produced'
+          : !complete
+            ? 'the run record is incomplete, so no charge may be accepted for it — ownership unresolved'
+            : fromRecord
+              ? 'not in the classified baseline — no open point owns it'
+              : 'printed by the suite but carried by no charged record entry — ownership unresolved',
     }
-    suiteSources.set(name, text)
   }
-  return suiteSources.get(name)
-}
-
-/** May this suite's retry be narrowed to the blocks that went red, and to which
- *  (point 1126)? The decision itself is pure (scripts/verify/sections.mjs). */
-function narrowRetry(name, failures) {
-  const source = suiteSource(name)
-  return narrowDiagnosis({
-    failures,
-    declared: listSections(source),
-    nonPredictive: listNonPredictive(source),
-    suite: name,
-  })
-}
-
-/** Run the named blocks of one suite, one spawn each, and fold the results into
- *  the shape a single `runSuite` returns. Always PARTIAL: it is a diagnosis, and
- *  no fold of blocks is ever the suite's own coverage. */
-function runSections(name, baseUrl, retryAfter, sections) {
-  const parts = sections.map((only) => runSuite(name, baseUrl, retryAfter, only))
-  return {
-    ok: parts.every((p) => p.ok),
-    out: parts.map((p) => p.out).join('\n'),
-    unresolved: parts.some((p) => p.unresolved),
-    allOwned: parts.length > 0 && parts.every((p) => p.allOwned),
-    points: [...new Set(parts.flatMap((p) => p.points))].sort((a, b) => a - b),
-    partial: true,
+  const rows = []
+  const seenRows = new Set()
+  // EVERY RED THE RECORD CARRIES, complete or not. An incomplete record charges
+  // nothing — `ownedSet` is empty then — so its reds arrive here holding, which
+  // is the only honest reading of a measurement that did not finish.
+  for (const red of recordedReds) {
+    const key = keyOf(red)
+    if (seenRows.has(key)) continue
+    seenRows.add(key)
+    rows.push(row({ key, name: red.name, fromRecord: true }))
   }
+  for (const check of printed) {
+    if (seenRows.has(check.key)) continue
+    seenRows.add(check.key)
+    rows.push(row({ key: check.key, name: check.name, fromRecord: false }))
+  }
+  // A NAMELESS CONSOLE RED CAN BORROW NOBODY'S OWNERSHIP (Astra, round 5).
+  // `console errors: <n>` without the texts builds no identity, so it appeared in
+  // no row at all — and a pass whose only NAMED red was charged then reported
+  // that nothing held. A charge names a check; a number names none.
+  const namedConsoleReds = rows.filter((r) => /^console error:/i.test(String(r.check))).length
+  if (consoleErrors > namedConsoleReds) {
+    const nameless = consoleErrors - namedConsoleReds
+    rows.push({
+      suite: name,
+      check: `${nameless} console error(s) reported only as a COUNT`,
+      key: `${name}:console-count`,
+      point: null,
+      elsewhere: false,
+      title: '',
+      reason: 'a number carries no identity, so no ledger entry can own it — read the log for the texts',
+    })
+  }
+  // AN ENTRY THAT HAS GONE GREEN IS STRUCK (point 1135). A charge is a named
+  // defect, not a standing exemption, so the pass that sees the check PASS says
+  // so and names the file to strike it from. Reported, never rewritten here: the
+  // ledger is source, and a run that edits its own tree would dirty a landing.
+  const redKeys = new Set([...recordedReds.map(keyOf), ...printed.map((check) => check.key)])
+  const stale = complete
+    ? allChecks(out)
+      .filter((c) => c.status === 'PASS' && !redKeys.has(c.key))
+      .map((c) => ({ check: c.name, charge: chargeFor({ name: c.name, key: c.key, kind: 'check', detail: c.detail },
+        { suite: name, backend: record.backend, featureLevel: record.featureLevel }) }))
+      .filter((s) => s.charge && openPoints.has(s.charge.point))
+    : []
+  // ACCOUNTED FOR IS A STATEMENT ABOUT EVERY RED THIS PASS HAS, printed or
+  // recorded — not about the record's half of them (Astra finding P1).
+  const allOwned = rows.length > 0 && rows.every((r) => r.elsewhere)
+  // A GREEN HEADLINE OVER A RECORD THAT CARRIES REDS IS NOT A GREEN.
+  if (ok && rows.length > 0) {
+    console.log(`FAIL  ${name.padEnd(12)} — the printed line says PASS, but this run's own record carries ${rows.length} red(s); the record decides`)
+  }
+  return { ok: ok && rows.length === 0, out, unresolved: !complete, allOwned, points, partial: record?.partial === true, rows, stale }
 }
 
-const RETRY_ENABLED = process.env.VERIFY_NO_RETRY !== '1'
-/** Suites that stayed red, kept for automatic LARGE baseline classification below.
- *  `runs` is 1 when retry is disabled or every red has an open owner. */
+// ONE PASS PER SUITE (point 1135, user order 15.09.2026). The automatic flake
+// retry is GONE. It was point 200's answer to a rotating staging flake, and by
+// 15.09.2026 it was the larger half of a measured waste: inside ONE LARGE the
+// 28-minute `polish` ran four times — first pass, flake retry, two baseline
+// passes — and the retry's own question ("transient or defect?") was answered
+// twice over by the charge ledger for every red that has an owner.
+//
+// WHAT REPLACES IT. A red STANDS and is classified against the charge ledger,
+// which is the classified baseline: a red the ledger names is charged to its
+// open point, a red it does not name holds the run. A confirmed flake moves
+// INTO the ledger as its own entry rather than being re-rolled every pass.
+// A HAND retry of the SMALLEST affected check stays allowed as diagnosis, and
+// CLAUDE.md §7.2 is unchanged by this: such a retry is SUSPECT and covers
+// nothing. `scripts/verify/baseline-classify.mjs <suite>` is still the tool
+// that measures a red against the pre-change tree — by hand, when a red is
+// actually in doubt, never automatically for every red of every LARGE.
+/** Suites that stayed red, kept for the end-of-run classification below. */
 const redSuites = []
-function runSuiteWithRetry(name, baseUrl) {
-  const first = runSuite(name, baseUrl)
-  if (first.ok) return true
-  if (first.allOwned) {
-    console.log(`${first.partial ? 'PARTIAL' : 'ACCOUNTED FOR'}  ${name} — retry skipped; all reds charged to open points ${first.points.join(', ')}; suite stays red`)
-    redSuites.push({ suite: name, failed: failedChecks(first.out), checks: allChecks(first.out).length, runs: 1, unresolved: first.unresolved })
-    return false
-  }
-  if (!RETRY_ENABLED) {
-    // Strict mode (the closing's flake-free gate): no retry, so no repeat
-    // signature exists — say that rather than imply one.
-    redSuites.push({ suite: name, failed: failedChecks(first.out), checks: allChecks(first.out).length, runs: 1, unresolved: first.unresolved })
-    return false
-  }
-  // THE RETRY ASKS ITS QUESTION ON THE RED BLOCKS, NOT THE WHOLE SUITE (point
-  // 1126). Every failing check already names the block that re-runs it alone, so
-  // re-asking "transient or defect?" costs those blocks rather than all 274 of
-  // `polish`'s checks. `narrowDiagnosis` refuses the narrowing wherever the
-  // narrow reading would not be the suite's, and then this is the pass it always
-  // was.
-  const narrow = narrowRetry(name, failedChecks(first.out))
-  if (narrow.whole) {
-    console.log(`↻ retry ${name} once — a first-try failure may be a rotating staging flake (point 200); whole pass: ${narrow.why}`)
-  } else {
+function runSuiteOnce(name, baseUrl) {
+  const result = runSuite(name, baseUrl)
+  for (const entry of result.stale) {
     console.log(
-      `↻ retry ${name} on its ${narrow.sections.length} red block(s) only — ${narrow.sections.join(', ')} ` +
-        '(point 1126): a whole pass answers "transient or defect?" no better than the blocks that went red',
+      `STRIKE  ${name.padEnd(12)} "${entry.check}" PASSED here but is still charged to open point ` +
+        `${entry.charge.point} — strike that entry from scripts/render-verify-charges.mjs (point 1135)`,
     )
   }
-  // The retry carries what the first attempt failed on, so its own run record is
-  // stamped SUSPECT (point 640) and cannot be the covering evidence for a landing.
-  const suspect = formatSuspectEnv(failedChecks(first.out))
-  const second = narrow.whole ? runSuite(name, baseUrl, suspect) : runSections(name, baseUrl, suspect, narrow.sections)
-  if (second.ok) {
-    console.log(
-      `⚠ PASSED ON RETRY  ${name}${narrow.whole ? '' : ` (blocks ${narrow.sections.join(', ')})`} — recorded SUSPECT: it covers no backend, because "it passed the ` +
-        'second time" is consistent with a fixed defect, a rare one, a timing race and an idle ' +
-        'machine alike. Close it by a CAUSE (fix it), by CHARGING it in ' +
-        'scripts/render-verify-charges.mjs to the open point that owns it, or by filing it as an ' +
-        `open point. Is it load? Measure: node scripts/throttle-probe.mjs ${name} --section=<name> --runs 8`,
-    )
-    return true
+  if (result.ok) return true
+  if (result.allOwned) {
+    console.log(`${result.partial ? 'PARTIAL' : 'ACCOUNTED FOR'}  ${name} — every red is charged to open point(s) ${result.points.join(', ')}; suite stays red`)
   }
-  const signature = repeatSignature({ first: first.out, second: second.out })
-  const interesting = signature.stable.length ? signature.stable : [...signature.onlyFirst, ...signature.onlySecond]
-  const relatedness = changeRelatedness({ checks: interesting, changedFiles: changedFiles() })
-  for (const line of formatRepeatReport({ suite: name, signature, relatedness })) console.log(line)
-  redSuites.push({ suite: name, failed: distinctReds(failedChecks(first.out), failedChecks(second.out)), unresolved: first.unresolved || second.unresolved, checks: Math.max(allChecks(first.out).length, allChecks(second.out).length), runs: 2, verdict: signature.verdict })
+  redSuites.push({
+    suite: name,
+    failed: failedChecks(result.out),
+    checks: allChecks(result.out).length,
+    runs: 1,
+    unresolved: result.unresolved,
+    rows: result.rows,
+  })
   return false
-}
-
-// The files this branch changed against its merge-base — the weak relatedness
-// signal's input. Read once, failure-tolerant: no git, no answer, and the report
-// then says nothing rather than something wrong.
-let changedFilesCache = null
-function changedFiles() {
-  if (changedFilesCache) return changedFilesCache
-  const root = join(HERE, '..', '..')
-  let base = spawnSync('git', ['merge-base', 'HEAD', 'main'], { windowsHide: true, cwd: root, encoding: 'utf8' })
-  if (base.status !== 0) base = spawnSync('git', ['merge-base', 'HEAD', 'origin/main'], { windowsHide: true, cwd: root, encoding: 'utf8' })
-  if (base.status !== 0) return (changedFilesCache = [])
-  const diff = spawnSync('git', ['diff', '--name-only', base.stdout.trim(), '--'], { windowsHide: true, cwd: root, encoding: 'utf8' })
-  changedFilesCache = diff.status === 0 ? diff.stdout.split('\n').map((l) => l.trim()).filter(Boolean) : []
-  return changedFilesCache
 }
 
 // Cross-browser functional smoke (point 213): a SHORT check on Firefox + WebKit
@@ -461,14 +509,25 @@ function runCrossBrowser(baseUrl, depth) {
   const out = (res.stdout ?? '') + (res.stderr ?? '')
   const { pass, fail } = countCheckLines(out)
   const skip = (out.match(/^SKIP/gm) ?? []).length
-  const ok = res.status === 0
+  // NOT THE EXIT CODE ALONE (Astra, rounds 2 and 3): the reds are already parsed
+  // here, and a child that prints them and exits 0 was reported as a pass whose
+  // reds nothing then owned. `failedChecks` is the right reading rather than the
+  // FAIL-line count, because a console error is a red that prints no FAIL line.
+  const failing = failedChecks(out)
+  // A BARE COUNT IS A RED WITH NO NAME (Astra, round 4). `consoleErrorChecks`
+  // deliberately ignores `console errors: <n>` without the texts — there is no
+  // identity to build from a number — so a child printing the count and exiting
+  // 0 had no named red and passed. `runSuite` has always read the count as well;
+  // this reads it the same way.
+  const countedErrors = countedConsoleErrors(out)
+  const ok = res.status === 0 && failing.length === 0 && countedErrors === 0
   console.log(`${ok ? 'PASS' : 'FAIL'}  crossbrowser  ${pass} pass, ${fail} fail, ${skip} skip (${depth}, exit ${res.status})`)
   // Always surface the per-engine backend + any skips; on failure also the FAILs.
   for (const line of out.split('\n')) {
     if (/backend:|^SKIP/.test(line)) console.log('      ' + line.trim())
     else if (!ok && /^FAIL\s{2,}\S/.test(line)) console.log('      ' + line.trim())
   }
-  if (!ok) redSuites.push({ suite: 'crossbrowser', failed: failedChecks(out), checks: allChecks(out).length, runs: 1, depth,
+  if (!ok) redSuites.push({ suite: 'crossbrowser', failed: failing, checks: allChecks(out).length, runs: 1, depth, rows: [],
     unresolved: Boolean(res.error || res.signal) || !/^\d+ CROSS-BROWSER\/MOBILE CHECK\(S\) FAILED$/m.test(out) })
   return ok
 }
@@ -589,7 +648,7 @@ try {
       ? await launchServer('npm run dev', 'dev', join(HERE, '..', '..'))
       : { child: null, base: undefined }
     dev = server.child
-    for (const s of devPick) results.push(runSuiteWithRetry(s, server.base))
+    for (const s of devPick) results.push(runSuiteOnce(s, server.base))
     if (wantCross) {
       const depth = process.env.CROSSBROWSER_DEPTH ?? (tier === 'small' ? 'minimal' : 'standard')
       results.push(runCrossBrowser(server.base, depth))
@@ -614,32 +673,54 @@ if (wantPreview) {
     try {
       const server = await launchServer('npm run preview', 'preview', join(HERE, '..', '..'))
       preview = server.child
-      results.push(runSuiteWithRetry('preview', server.base))
+      results.push(runSuiteOnce('preview', server.base))
     } finally {
       killTree(preview)
     }
   }
 }
 
+// THE CLASSIFICATION IS A FILE LOOKUP, NOT A SECOND SET OF PASSES (point 1135).
+// Every red already carries the verdict its own run made against the charge
+// ledger; all that is left here is to say it in one place. A red with no ledger
+// entry HOLDS — that is the whole gate, and it costs no machine minutes.
 let ownership = null
-if (wantBaseline && redSuites.length > 0) {
-  console.log(`\n===== baseline classification — ${redSuites.length} red suite(s) =====`)
-  ownership = classifyRedSuites(redSuites, { backend: VERIFY_GL })
-}
-else if (redSuites.length > 0) {
-  console.log(`\n# ${redSuites.length} suite(s) stayed red — to label each red REAL REGRESSION vs PRE-EXISTING,`)
-  console.log(`# re-run with --baseline (or VERIFY_BASELINE=1), or classify one suite directly:`)
-  console.log(`#   node scripts/verify/baseline-classify.mjs ${redSuites[0].suite}`)
+if (redSuites.length > 0) {
+  const rows = redSuites.flatMap((red) => (red.rows?.length
+    ? red.rows
+    // No usable run record, so the run made no classification: the checks are
+    // named from the output and every one of them holds. Never a green.
+    : red.failed.map((check) => ({ suite: red.suite, check: check.name, key: check.key, point: null,
+      elsewhere: false, title: '', reason: 'no complete run record — ownership unresolved' }))))
+  ownership = {
+    rows,
+    // AN UNNAMED FAILURE IS ONE NOTHING NAMED — not one the OUTPUT did not name.
+    // `failed` is parsed from the printed lines alone, so a red suite whose reds
+    // live only in its run record (fully charged and accounted for) was reported
+    // as unnamed as well, which held the run and stopped the backend sequence
+    // over a red its own accounting had settled (Astra, 17.09.2026).
+    unresolved: redSuites.filter((red) => red.unresolved || (red.failed.length === 0 && (red.rows?.length ?? 0) === 0))
+      .map((red) => `${red.suite}: incomplete run or unnamed failure`),
+  }
+  if (wantBaseline) {
+    console.log(`\n# --baseline is a HAND diagnosis since point 1135 — it no longer runs inside the pass.`)
+    console.log(`# To measure one red against the pre-change tree: node scripts/verify/baseline-classify.mjs ${redSuites[0].suite}`)
+  }
 }
 
 const failed = results.filter((r) => !r).length
 const charges = [...chargedPoints].sort((a, b) => a - b)
 console.log(`\n${failed === 0 ? 'ALL GREEN' : failed + ' SUITE(S) FAILED'} — ${results.length} suites run` +
   (charges.length ? ` — reds charged to open points ${charges.join(', ')}` : ''))
-if (ownership) console.log(formatOwnershipVerdict({
-  rows: ownership.rows,
-  unresolved: [...ownership.unresolved, ...(failed > redSuites.length ? ['other failed stages: see regression report'] : [])],
-}))
+// The stages that are not suites — build, lint, unit, the GPU preflight — are
+// unresolved by construction: no charge ledger names them.
+const otherStages = failed > redSuites.length ? ['other failed stages: see regression report'] : []
+const unresolved = ownership ? [...ownership.unresolved, ...otherStages] : otherStages
+if (ownership) console.log(formatOwnershipVerdict({ rows: ownership.rows, unresolved }))
+// DOES THIS PASS'S RED HOLD? The answer the backend sequencer above reads off
+// the exit code — nothing else in the house tells the two reds apart, and both
+// are failures (point 1135).
+const holds = ownership === null || ownership.rows.some((r) => !r.elsewhere) || unresolved.length > 0
 // Say it again at the END, where the verdict is read (point 566): a green
 // headline from a one-section run must never be quoted as the suite's.
 if (section) console.log(`PARTIAL — only section "${section}" of ${filter[0]} ran; the suite is NOT covered by this run`)
@@ -655,4 +736,4 @@ if (loadMode !== 'off') {
     green: failed === 0,
   })) console.log(line)
 }
-process.exit(failed === 0 ? 0 : 1)
+process.exit(failed === 0 ? 0 : holds ? 1 : EXIT_NOT_HELD)

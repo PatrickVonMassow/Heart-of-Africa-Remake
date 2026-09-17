@@ -27,6 +27,7 @@ import {
   BACKENDS,
   NON_RENDER_VERIFY,
   featureLevelOf,
+  DELETED_NON_RENDER_VERIFY,
   isRenderPath,
   isBackendSensitivePath,
   coveringRun,
@@ -4096,5 +4097,20 @@ describe('the shipped charge ledger', () => {
     )
     expect(chargeFor(leak, { suite: 'polish', backend: 'webgl' })).toBeNull()
     expect(chargeFor(leak, { suite: 'polish', backend: 'webgpu' })).toBeNull()
+  })
+})
+
+describe('DELETED_NON_RENDER_VERIFY — a deletion is a change too (point 1135)', () => {
+  it('keeps the removal of a browser-free helper out of the render lane', () => {
+    expect(isRenderPath('scripts/verify/red-ownership.mjs')).toBe(false)
+  })
+
+  it('names only files that are really gone, so it cannot shadow a live suite', () => {
+    const present = new Set(readdirSync(VERIFY_DIR))
+    expect([...DELETED_NON_RENDER_VERIFY].filter((f) => present.has(f))).toEqual([])
+  })
+
+  it('still sends a real suite to both backends', () => {
+    expect(isRenderPath('scripts/verify/polish.mjs')).toBe(true)
   })
 })

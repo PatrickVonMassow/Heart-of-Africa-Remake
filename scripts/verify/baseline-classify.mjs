@@ -4,7 +4,8 @@
 //
 // Re-runs the failed suite against the PRE-CHANGE baseline (the branch's
 // merge-base with main by default) and labels every check that is red now:
-// REAL REGRESSION (green on the baseline) vs PRE-EXISTING / STALE ASSUMPTION
+// SUSPECT (green on the baseline, red now — a suspicion, point 1135) vs
+// PRE-EXISTING / STALE ASSUMPTION
 // (already red there). That triage used to be a manual baseline diff — it was
 // done by hand on 24.07.2026 for the SSAO ground-edge check (stale assumption)
 // and the proximity-call fade (pre-existing, point 292).
@@ -25,11 +26,13 @@
 //   --report-file <f>  write structured classification for the run report
 //   --keep              keep the baseline worktree even on success (it is reused
 //                       anyway; this only skips the retention prune)
-//   --strict            exit 1 when a REAL REGRESSION was found (default: 0 —
+//   --strict            exit 1 when a SUSPECT check was found (default: 0 —
 //                       this is a triage aid, the suite result stays the gate)
 //
-// run-all calls this only for suites that stayed RED: automatically on LARGE,
-// or with --baseline / VERIFY_BASELINE=1 on smaller runs. The checkout is a REUSED git
+// SINCE POINT 1135 NOTHING CALLS THIS AUTOMATICALLY. The LARGE's baseline passes
+// are deleted: a red is classified against the charge ledger, which is the
+// classified baseline. This command remains the HAND diagnosis for a red that is
+// genuinely in doubt, asked for by name. The checkout is a REUSED git
 // worktree under the git-ignored local/verify-baseline/, sharing the repo's
 // node_modules through Node's ancestor resolution (no second install).
 //
@@ -74,6 +77,17 @@ const INFRA_PATHS = [
 
 /** How many baseline checkouts to keep around (each is a full worktree). */
 const KEEP_BASELINES = 2
+
+/**
+ * IS THE CURRENT TREE ACTUALLY CLEAN? Only when the run named no failing check
+ * AND ended cleanly. A suite that crashes or is killed at its wall timeout names
+ * nothing and exits non-zero (or not at all), and reading that as "nothing is
+ * failing" turned a dead lane into a clean bill of health — exit 0 even under
+ * `--strict` (cross-vendor review, 17.09.2026). A red with no name is still a
+ * red; what is impossible there is the classification, not the failure.
+ */
+export const currentRunIsClean = ({ failed = [], exitCode = 0 } = {}) =>
+  failed.length === 0 && exitCode === 0
 
 export function parseWrapperArgs(argv) {
   const out = { suite: null, ref: null, runs: 2, keep: false, strict: false, currentOut: null, currentContext: 'unknown', reportFile: null, currentChecks: 0, failed: [] }
@@ -260,6 +274,10 @@ async function main() {
   // bare names (`--failed`) carry no result lines, and a yardstick counted from
   // lines that do not exist would be a wrong one rather than a missing one.
   let currentOutput = ''
+  // The exit code of the run measured HERE. Supplied failures (`--failed`,
+  // `--current-out`) come from a run this process never saw, so it stays 0 for
+  // them: the caller already judged that run's exit.
+  let currentExit = 0
   if (opts.currentOut && existsSync(opts.currentOut)) {
     currentOutput = readFileSync(opts.currentOut, 'utf8')
     currentFailed = failedChecks(currentOutput)
@@ -281,11 +299,20 @@ async function main() {
       currentOutput = run.out
       currentFailed = run.failed
       currentCheckCount = run.checks.length
+      currentExit = run.exitCode
     } finally {
       killTree(server?.child)
     }
   }
   if (currentFailed.length === 0) {
+    if (!currentRunIsClean({ failed: currentFailed, exitCode: currentExit })) {
+      console.log(
+        `baseline-classify: the CURRENT run of ${opts.suite} ended with exit ${currentExit ?? 'unknown'} and named no failing ` +
+          'check — a crash or a wall-timeout kill, not a clean tree. Nothing can be classified against a run that ' +
+          'printed no red; read its log and fix the lane first.',
+      )
+      process.exit(1)
+    }
     console.log('baseline-classify: nothing is failing in this tree — nothing to classify.')
     process.exit(0)
   }

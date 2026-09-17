@@ -67,6 +67,23 @@ export function featureLevelOf(info) {
  * it imports playwright or the shared browser/boot helpers) and fails when this
  * list drifts from the files.
  */
+/**
+ * BROWSER-FREE SUITES THAT NO LONGER EXIST.
+ *
+ * This classification reads CHANGED PATHS, and a deletion is a change: when
+ * point 1135 removed `red-ownership.mjs` and its entry from the live list in one
+ * commit, the removal of a module that never opened a page began reading as a
+ * render edit, and the guard demanded both-backend picture coverage for it —
+ * measured on that point's own branch (cross-vendor review, 17.09.2026).
+ *
+ * Kept SEPARATE from the live list so the "lists no script that no longer
+ * exists" check stays exactly as strict as it was: an entry here is a fact about
+ * the past, and its presence is never evidence about the tree.
+ */
+export const DELETED_NON_RENDER_VERIFY = new Set([
+  'red-ownership.mjs', // point 1135: the baseline-pass spawner; it never opened a page
+])
+
 export const NON_RENDER_VERIFY = new Set([
   '_server.mjs', // vite start/stop plumbing shared by the runner and the classifier
   'animalShare.mjs', // the animal-vs-water decision layer; enrichments.mjs feeds it pixels
@@ -93,8 +110,7 @@ export const NON_RENDER_VERIFY = new Set([
   'liveness.mjs', // main-thread liveness ATTRIBUTION; the suites do the driving
   'machine-load-core.mjs',
   'machine-load.mjs',
-  'red-ownership-core.mjs', // baseline evidence determines ownership; it draws nothing
-  'red-ownership.mjs', // classifier and finding subprocesses; it opens no page
+  'red-ownership-core.mjs', // whether a red holds, read off the charge ledger; it draws nothing
   'report-archive-names.mjs', // the names the F6 archive checks print; report.mjs does the downloading
   'run-all.mjs',
   'run-digest-core.mjs', // which of a run's OUTPUT lines the caller reads; it draws nothing
@@ -162,7 +178,7 @@ export function isRenderPath(path) {
   // guard that sends you on pointless errands is one you learn to wave through.
   if (/^scripts\/verify\/.+\.test\.mjs$/.test(p)) return false
   const suite = p.match(/^scripts\/verify\/([^/]+\.mjs)$/)
-  if (suite && !NON_RENDER_VERIFY.has(suite[1])) return true
+  if (suite && !NON_RENDER_VERIFY.has(suite[1]) && !DELETED_NON_RENDER_VERIFY.has(suite[1])) return true
   return false
 }
 

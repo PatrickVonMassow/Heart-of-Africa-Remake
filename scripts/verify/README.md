@@ -74,7 +74,8 @@ What the caller still sees — the constraint the selection is built around is
 that a **failing run stays fully diagnosable**:
 
 - LIVE, while it runs: the runner's own structured lines only — the per-suite
-  `PASS/FAIL/SKIP` verdicts, the stage headings, the retry/flake notices, the
+  `PASS/FAIL/SKIP` verdicts, the stage headings, the `ACCOUNTED FOR` / `STRIKE`
+  notices, the
   indented `FAIL …` / `ERR: …` echoes (vitest's own ` FAIL  file > case` lines
   wear that shape too). About one line per suite, so a background poll shows
   progress and a red suite names itself the moment it goes red.
@@ -152,9 +153,20 @@ whole budget. Each `--status` raises the count, says how many are left, and name
 the two ways out. The count is printed in the receipt, so the rule is visible in
 the transcript rather than remembered.
 
-**Long is not hung (point 1137).** Past **2.5 ×** its expectation a run is
-*overdue*. It is *hung* only when it is ALSO silent — nothing produced for a
-whole 15-minute progress lease. That silence is judged on the **writer's own
+**Long is not hung (points 1137, 1135).** Past its expectation a run is
+*overdue*. It is *hung* only past its **wall-clock ceiling** — its own plan plus
+the 45-minute suite ceiling `run-all.mjs` already enforces by KILLING a suite
+(`VERIFY_SUITE_TIMEOUT_MS`) — and only when it is ALSO silent, nothing produced
+for a whole 15-minute progress lease. Point 1135 replaced the old **2.5 ×
+expectation** mark with that ceiling, because the expectation is the thing that
+was wrong: below the ceiling a silent run is STILL RUNNING and ending it is a
+HAND decision, never the tool's. The two-hour lease cap remains the absolute
+backstop above both. **The ceiling is read from the environment of whoever is
+LOOKING**, because the run does not record the timeout it was launched with and
+adding that field is the ledger growth the infrastructure freeze forbids — so a
+run launched with a raised `VERIFY_SUITE_TIMEOUT_MS` must be inspected from a
+shell exporting the same value, or the wait holds it to the house default. Both
+readers take it the same way, so the poll and the lease can never disagree. That silence is judged on the **writer's own
 mark**: `run-logged.mjs` opens a zero-byte `<log>.progress` once, holds the
 descriptor for the run, and moves its mtime from what its child really emitted
 and from sampling the newest frame's mtime — by mtime, because a
@@ -179,12 +191,13 @@ permission checks, so a marker whose ownership changes under a running run can
 still refuse the stamp. Then the run is judged by its log alone, which is where
 it stood before this point, and the residual is collected in
 `docs/backlog.md`. `--await` and `--status` ask the same question and give the same
-answer: a run that is still writing is `SLOW`, never `HUNG`. The clock alone could
-never say it: the §1 plan is measured to be a third to two thirds of the real
-cost, so the hung mark for a whole `polish` pass falls at 14 minutes against a
-measured 9.9–61.5, and on 15.09.2026 a run that had already written 34 of its 21
-expected frames was reported hung and ended — with it the only covering picture
-run the release was waiting for. The frames are the heartbeat that matters here:
+answer: a run that is still writing is `SLOW`, never `HUNG`. A MULTIPLE of the
+plan could never say it either: the §1 plan is measured to be a third to two
+thirds of the real cost, so the old 2.5 × mark for a whole `polish` pass fell at
+14 minutes against a measured 9.9–61.5, and on 15.09.2026 a run that had already
+written 34 of its 21 expected frames was reported hung and ended — with it the
+only covering picture run the release was waiting for. That is the measurement
+the wall-clock ceiling of point 1135 answers. The frames are the heartbeat that matters here:
 `run-all.mjs` captures a suite's output and prints its `PASS`/`FAIL` line only
 when the suite ENDS, so it now also prints a `# → <suite>` line before it starts
 one. A log standing still at `# → polish` for fifty minutes is the suite working.
@@ -586,7 +599,11 @@ no rung:
   beside the check — the narrow PASS then says so on its own line, and the ladder
   never counts that rung as climbed. It does not refuse the pass either:
   enforcing a rung that lies buys false confidence instead of time, so the ladder
-  steps aside and the waiver is recorded with the run.
+  steps aside and the waiver is recorded with the run. **A non-predictive reading
+  REPORTS but does not set the exit code** — that half is point 1127's, already
+  shipped: the declaration reaches the count, so the check no longer reds the
+  very pass it declared itself meaningless in, and it keeps its full force
+  standalone. Referred to here, never re-built.
 
 Everything fails OPEN. A ladder that cannot read the tree (no `main` to compare
 against, an unreadable ledger, a missing mapping) lets the run start and says so.
@@ -712,21 +729,23 @@ green rung could ever clear — because a refusal an author cannot answer by
 working costs more than the run it saved. `--no-ladder "<why>"` waives it and
 records what it waived.
 
-### The diagnosis runs on the block, the PROOF stays whole (point 1126)
+### The diagnosis runs on the block, the PROOF stays whole (points 1126, 1135)
 
-Two mechanisms re-ask a red's one question — transient, or defect? — and both
+Two mechanisms re-asked a red's one question — transient, or defect? — and both
 asked it by replaying the whole suite. Inside the last LARGE run of 14.09.2026
 `polish` ran FOUR times at ~28 min each: first pass, flake retry, two baseline
-passes on the merge base. The same question answered on the blocks costs about
-nine minutes instead of eighty-four.
+passes on the merge base.
 
-- **The flake retry** (point 200) spawns the blocks the red checks named, one
-  each, instead of the pass. It stays SUSPECT and covers no backend exactly as
-  the whole retry did.
-- **The baseline classification** (point 294) runs each of its passes on those
-  same blocks. Its died-early yardstick (point 418) is re-measured on the same
-  blocks, and answers "unknown" rather than wrong when the failures arrived as
-  bare `--failed` names with no output to count.
+**Point 1135 deleted three of those four.** The flake retry is gone entirely and
+the baseline passes no longer run inside a pass at all — the classification is a
+lookup in the charge ledger (below). What remains of this section is the HAND
+diagnosis, and it is still narrowed to the block:
+
+- **The baseline classification** (point 294), run BY HAND when a red is
+  genuinely in doubt, runs each of its passes on the blocks the red checks
+  named rather than on the suite. Its died-early yardstick (point 418) is
+  re-measured on the same blocks, and answers "unknown" rather than wrong when
+  the failures arrived as bare `--failed` names with no output to count.
 
 `narrowDiagnosis` in `sections.mjs` decides it, and **refuses the narrowing
 wherever the narrow reading would not be the suite's**: a red that names no
@@ -1143,53 +1162,70 @@ gate.
 A red is now read, not asserted. Two signals, both decided in the pure module
 `baseline-classify-core.mjs` (pinned by `baseline-classify.test.mjs`):
 
-**1. The repeat signature — free, always on, EXCEPT where the question is already
-answered (point 1113).** A failed browser suite is retried once (point 200) —
-unless every red in its own run record is charged to an OPEN point in
-`scripts/render-verify-charges.mjs`. The retry exists to tell a transient from a
-defect, and for a red a named open point already owns there is nothing left to
-tell: the suite runs once, prints `ACCOUNTED FOR <suite> — retry skipped; all reds
-charged to open points <N, …>; suite stays red`, and the run's closing line repeats
-those points, so the price of the open defects is read on every run. ONE uncharged
-red in the set keeps the retry exactly as below. The suite stays RED and the record
-stays ACCOUNTED FOR — a charge is not a pass. The runner used to conclude from "it failed twice" that this
-was "a real failure, not a flake". That is not what two failures prove: on
-27.07.2026 `enrichments` failed two staging checks, then a completely different
-one (the crocodile eye knobs) on the retry, on a machine carrying a unit run and
-two agents — and none of the three checks had anything to do with the change
-under test. So the verdict now comes from the failing check NAMES:
+**ONE PASS PER SUITE (point 1135, user order 15.09.2026).** A LARGE runs each
+suite exactly once. There is no automatic flake retry and no automatic baseline
+pass. Measured inside one LARGE of 14.09.2026: the 28-minute `polish` ran four
+times — first pass, flake retry, two baseline passes — and this deletes three of
+the four. The saving is paid whatever cadence the regression settles on, which is
+why the user put this point first of three.
 
-| Both runs failed at… | Verdict |
-|---|---|
-| the SAME check | `CANDIDATE REAL FAILURE` — it reproduces; find out whether the change caused it |
-| DISJOINT checks | `LOAD/FLAKE SIGNATURE` — the fingerprint of a busy machine, not of a defect; re-run the suite alone on a quiet machine before believing it |
-| no parseable FAIL line (crash, wall-timeout kill) | `UNCLASSIFIED` — say so, never guess |
+**1. The charge ledger IS the classified baseline.** `scripts/render-verify-charges.mjs`
+holds one entry per known-red check, each naming the OPEN work-order point that
+owns it and carrying, in its own `why`, the date and the run it was measured on.
+A red the ledger names is **charged elsewhere** and says nothing about the change
+under test; a red it does not name **HOLDS**. That is the whole classification,
+and it costs no machine minutes — which is why the extra passes could go without
+weakening the gate.
 
-Check identity folds measured numbers away (`12 vultures circle` is the same
-check as `9 vultures circle`), and the console-error texts count as pseudo-checks
-so the console-gated suites (`world`, `i18n`) can be triaged at all. Each check
-is annotated with whether its name touches the branch diff — a weak
-corroborating hint, never a verdict.
-
-**2. The baseline classification — automatic for LARGE reds, opt-in for smaller runs.**
-
-A LARGE run compares every suite that stayed red against its merge-base, including
-crossbrowser at the same depth. Both attempts' reds are retained, even when some
-rotate beside a stable failure. Only a `pre-existing` classification charges a
-check elsewhere. The report deposits one request per check through
-`finding.mjs --request … --once --spec-file … --why-file …` into the main
-checkout's findings carrier; the owner drains and numbers it. Title identity
-survives repeated runs, concurrent reports and already numbered requests.
-
-The closing `POINT REDS` line names the charged requests and the point's own or
-unresolved reds. Real regressions, flaky/dead/inconclusive baselines, incomplete
-current runs and filing failures keep holding the point. Filename overlap remains
-a hint. The full regression retains its red exit and its coverage requirements;
-charging a check does not make the suite green.
+Every red run ends with the `POINT REDS` line:
 
 ```
-npm test                              # LARGE classifies suites that stayed red
-VERIFY_BASELINE=1 npm run test:small   # same, via the environment
+POINT REDS DO NOT HOLD — charged elsewhere: "point 603 — first-person ground shows micro-detail (edge energy)"
+  — own or unresolved: none; regression verdict unchanged
+```
+
+A suite whose reds are ALL charged also prints `ACCOUNTED FOR <suite> — every red
+is charged to open point(s) <N, …>; suite stays red`, and the closing line repeats
+those points, so the price of the open defects is read on every run. **A charge is
+not a pass**: the suite stays RED, the record stays ACCOUNTED FOR, and the run
+exits non-zero. An incomplete, crashed or missing run record is `ownership
+unresolved` and holds — never a green.
+
+**No blanket standing exemption.** An entry is a named defect with a live owner,
+not a permanent excuse. A run that sees a charged check **PASS** prints
+
+```
+STRIKE  settings     "<check>" PASSED here but is still charged to open point 603
+        — strike that entry from scripts/render-verify-charges.mjs (point 1135)
+```
+
+and the bundle's LARGE is where that bookkeeping is done. A charge also dies with
+its point: the moment the owning point is ticked, its entries stop clearing
+anything. Confirmed flakes move INTO the ledger as their own entry rather than
+being re-rolled by a retry every pass.
+
+**RUNS ARE SERIALIZED: while a LARGE runs, nothing else does.** One LARGE owns
+the machine — no second suite, no `--section` run, no other worktree's pass
+beside it. This is a HOUSE RULE, written here and nowhere else: there is no
+lockfile and no guard for it (point 1135), because a timing verdict taken while
+something else was on the machine is not evidence, and the load report at the top
+of every run already says so out loud. The one mechanical help is point 1104's
+admission check in `run-logged.mjs`, which finds a live LARGE in the process
+table and WAITS instead of starting beside it; `VERIFY_NO_WAIT=1` is the named
+escape for an operator who knows the found run is finished work.
+
+**2. A HAND retry is still allowed, and is still SUSPECT.** Re-running the
+SMALLEST affected check as diagnosis is fine — CLAUDE.md §7.2 is unchanged by
+this point: a retry is SUSPECT and covers nothing. What is gone is the runner
+doing it for you, on every red, of every pass.
+
+**3. The baseline classification — BY HAND, never inside a pass.**
+
+`baseline-classify.mjs` still measures a red against the pre-change tree. Nothing
+calls it automatically any more; it is asked for by name when a red is genuinely
+in doubt.
+
+```
 node scripts/verify/baseline-classify.mjs enrichments          # one suite, on demand
 node scripts/verify/baseline-classify.mjs polish --ref HEAD~1  # against a named commit
 ```
@@ -1199,7 +1235,12 @@ It re-runs the failing suite against the pre-change baseline (the merge-base wit
 `local/verify-baseline/<sha>` — no second `npm install`: Node resolves
 `node_modules` up the ancestor directories, and the checkout lives inside the
 repo. At most two baselines are kept. Each currently failing check comes back as
-**REAL REGRESSION** (green on the baseline), **PRE-EXISTING / STALE ASSUMPTION**
+**SUSPECT — green on baseline, red now; UNCONFIRMED** (point 1135: a suspicion,
+never a finding — the baseline is measured standalone and the candidate in-pass,
+so the two readings are not of the same thing, and the label says so. It is
+settled by three narrow `--section` rungs of the affected block on a QUIET
+machine under equal starting conditions, never by another full regression),
+**PRE-EXISTING / STALE ASSUMPTION**
 (already red there — the 24.07. SSAO ground-edge and proximity-fade cases),
 **UNSTABLE ON BASELINE** (it flaked there too, so the baseline decides nothing —
 which is why the baseline runs twice by default, `--runs n`),
@@ -1228,9 +1269,14 @@ evidence either way: every run's stdout+stderr is written to
 `local/verify-baseline-logs/<suite>-baseline-<sha>-run<n>.log` (and
 `<suite>-current.log`) before anything is judged — a sibling of the checkouts, so
 the retention prune can never delete it. The yardstick is the current run's check
-count: `run-all` passes it as `--current-checks <n>`, and a direct run measures it
-itself. With `--strict`, a died or resultless baseline exits 1 like a real
-regression — it produced no triage at all.
+count, which this command measures itself by running the suite in THIS tree
+first; `--current-checks <n>` supplies it for a caller that already has the
+number, and `--failed`/`--current-out` hand over the failing checks the same way.
+Since point 1135 the runner is not such a caller: nothing passes them
+automatically any more. A current run that names no failing check but ends
+non-zero — a crash, a wall-timeout kill — is NOT a clean tree and exits 1 rather
+than reporting one. With `--strict`, a died or resultless baseline exits 1 like a
+SUSPECT check — it produced no triage at all.
 
 It runs the CURRENT check against the BASELINE app, so only the product differs
 — and it prints what can bend that reading: a suite file that changed since the

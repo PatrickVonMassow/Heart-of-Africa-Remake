@@ -74,8 +74,13 @@ const BANNER = /^={3,}/
  *  `NON-PREDICTIVE` (point 1086) is the same class one step finer: the check
  *  above it passed narrowly and has DECLARED that its reading does not predict
  *  the suite's own. Losing that also hands the reader a pass. */
-const FINAL = /^(ALL GREEN\b|\d+\s+SUITE\(S\) FAILED\b|DEFERRED\b|LARGE FAILED\b|PARTIAL\b|NON-PREDICTIVE\b)/
-/** `↻ retry world once…`, `⚠ PASSED ON RETRY  world …` */
+const FINAL = /^(ALL GREEN\b|\d+\s+SUITE\(S\) FAILED\b|DEFERRED\b|LARGE FAILED\b|PARTIAL\b|NON-PREDICTIVE\b|ACCOUNTED FOR\b|STRIKE\b|POINT REDS\b)/
+/** The run's own bookkeeping demands (point 1135). `ACCOUNTED FOR` says a red
+ *  suite's reds all have an owner, `STRIKE` names a ledger entry whose check has
+ *  gone green, and `POINT REDS` is the run's ownership verdict — each of them a
+ *  conclusion about a headline above it, so each belongs with FINAL rather than
+ *  in the droppable bulk. The old `↻`/`⚠` retry notices are gone with the retry
+ *  itself. */
 const FLAKE = /^[↻⚠]/
 /** The runner's indented failure echo (`      FAIL …`, `      ERR: …`,
  *  `      | <crash tail>`) — and vitest's own ` FAIL  file > case` lines, which
@@ -203,7 +208,16 @@ export function applyBudget(entries, maxKeptLines) {
   // supplies no raw tail either, so the reader was left with a green that did not
   // mean what it looked like. There are a handful of these per run at most: the
   // budget yields to them rather than the other way round.
-  const declaredLimitation = (e) => /^NON-PREDICTIVE\b/.test(String(e?.line ?? '').trimStart())
+  // The same protection covers the run's OWN BOOKKEEPING (point 1135, cross-vendor
+  // review): `PARTIAL` says the green above it covers ONE section, `STRIKE` names
+  // a ledger entry to remove, `POINT REDS` is the
+  // ownership verdict and `ACCOUNTED FOR` says a red suite's reds all have an
+  // owner. Classifying them `final` was not enough — once the low-priority lines
+  // are gone the budget drops from the FRONT whatever the class, so a STRIKE
+  // followed by a hundred failure echoes vanished. Like NON-PREDICTIVE there are
+  // a handful of these per run at most.
+  const declaredLimitation = (e) =>
+    /^(NON-PREDICTIVE|PARTIAL|STRIKE|POINT REDS|ACCOUNTED FOR)\b/.test(String(e?.line ?? '').trimStart())
   for (const e of list) {
     if (over === 0) break
     if (priorityOf(e) === 'low' && !declaredLimitation(e)) {

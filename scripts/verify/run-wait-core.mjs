@@ -27,7 +27,9 @@
 // process work — the record file, the frame scan, the blocking wait — lives in
 // run-wait.mjs and run-logged.mjs.
 import { laneFor, parseArgs, planBackends, selectBackend, suitesFor } from './tiers.mjs'
-import { PROGRESS_LEASE_MS } from '../wait-lease-core.mjs'
+import {
+  PROGRESS_LEASE_MS, SUITE_CEILING_MS, WAIT_EXPECTATION_FLOOR_MS, WAIT_LEASE_CAP_MS,
+} from '../wait-lease-core.mjs'
 
 /**
  * MEASURED median wall clock per suite, in SECONDS, on the WebGL 2 lane —
@@ -216,8 +218,44 @@ export const MIN_WAIT_MS = 10_000
 /** After this many counted polls the run is awaited blocking or called hung. */
 export const MAX_POLLS = 5
 
-/** Past this multiple of the expected runtime a run is HUNG, not slow. */
-export const HUNG_FACTOR = 2.5
+/**
+ * THE WALL-CLOCK CEILING, NOT A MULTIPLE OF AN ESTIMATE (point 1135).
+ *
+ * The hung mark used to be 2.5x the `--plan` estimate, and the project has
+ * MEASURED that estimate to be a third to two thirds of the real cost: the plan
+ * for a whole `polish` pass is 5 min 41 s against a measured 9.9-61.5 min, so
+ * the mark fell at 14 minutes and every healthy pass crossed it. On 15.09.2026
+ * a `polish` run that had already written 34 of its 21 expected frames was
+ * reported HUNG at 17 min 28 s and ended, and with it the only covering picture
+ * run the release was waiting for.
+ *
+ * A wrong estimate must not decide it. The ceiling is the one the runner itself
+ * enforces — `VERIFY_SUITE_TIMEOUT_MS` in run-all.mjs, 45 minutes, at which a
+ * suite is KILLED — added to whatever this run was planned to cost. Past its
+ * plan by a whole suite ceiling AND silent for a progress lease, a run has
+ * outlived the mechanism that would have ended it; below that it is SLOW, and
+ * ending it is a HAND decision, never this tool's.
+ */
+export { SUITE_CEILING_MS } from '../wait-lease-core.mjs'
+
+/**
+ * Past this wall-clock mark a run is HUNG, not slow: its own plan plus one whole
+ * suite ceiling, bounded exactly as the lease bounds it.
+ *
+ * ONE CALCULATION, TWO READERS. The counted poll and the lease used to compute
+ * this mark separately, and at the edges they disagreed: with the ceiling raised
+ * to two hours the lease called a silent run hung at 120 minutes while `--status`
+ * still answered `poll` at 121, and a negative override could put the poll's mark
+ * BEFORE the run's own estimate (cross-vendor review, 17.09.2026). The cap and
+ * the non-negative clamp come from the lease, so the two cannot drift apart.
+ */
+export const hungMarkMs = (expectedMs = null, ceilingMs = SUITE_CEILING_MS) => {
+  // The floor too: an UNMEASURED run is not one with a plan of zero, and the
+  // lease has always read it that way.
+  const expected = Math.max(Number.isFinite(expectedMs) && expectedMs > 0 ? expectedMs : 0, WAIT_EXPECTATION_FLOOR_MS)
+  const ceiling = Math.max(0, Number.isFinite(ceilingMs) ? ceilingMs : 0)
+  return Math.min(expected + ceiling, WAIT_LEASE_CAP_MS)
+}
 
 /**
  * The longest a single blocking call may run here. The harness caps a shell
@@ -368,8 +406,9 @@ export function nextWaitMs({ polls = 0, expectedMs = null, elapsedMs = 0, limitM
 }
 
 /**
- * THE POLL BUDGET. `running:false` ends it; past HUNG_FACTOR × expected the run
- * is hung rather than slow; at MAX_POLLS the loop is over either way. Returns
+ * THE POLL BUDGET. `running:false` ends it; past the wall-clock hung mark — the
+ * run's own plan plus one suite ceiling — a SILENT run is hung rather than slow;
+ * at MAX_POLLS the loop is over either way. Returns
  * the verdict and the sentence that says what to do instead — the message is
  * part of the decision because a budget nobody is told about is a counter.
  */
@@ -395,24 +434,27 @@ export function pollBudget({
   // healthy `polish` looked at with `--status` was condemned anyway. Silence is
   // the second condition here too; a run that is still writing is SLOW.
   const silent = Number.isFinite(silentForMs) ? silentForMs >= silenceMs : true
-  if (silent && expected !== null && elapsed !== null && elapsed > expected * HUNG_FACTOR) {
+  const ceiling = hungMarkMs(expected)
+  const pastCeiling = elapsed !== null && elapsed > ceiling
+  if (silent && pastCeiling) {
     return {
       verdict: 'hung',
       polls: count,
       remaining,
       message:
-        `HUNG: ${formatDuration(elapsed)} elapsed against an expected ${formatDuration(expected)} ` +
-        `(more than ${HUNG_FACTOR}×), and nothing written for ${formatDuration(silentForMs ?? silenceMs)}. ` +
-        "Treat it as hung: read the log's tail, kill it, and start again — do not keep waiting.",
+        `HUNG: ${formatDuration(elapsed)} elapsed, past the ceiling of ${formatDuration(ceiling)} ` +
+        `(its plan${expected === null ? ' (none)' : ` of ${formatDuration(expected)}`} plus one suite ceiling of ` +
+        `${formatDuration(SUITE_CEILING_MS)}), and nothing written for ${formatDuration(silentForMs ?? silenceMs)}. ` +
+        "Read the log's tail and end it by hand.",
     }
   }
-  if (!silent && expected !== null && elapsed !== null && elapsed > expected * HUNG_FACTOR) {
+  if (!silent && pastCeiling) {
     return {
       verdict: 'slow',
       polls: count,
       remaining,
       message:
-        `SLOW, not hung: ${formatDuration(elapsed)} elapsed against an expected ${formatDuration(expected)}, but it ` +
+        `SLOW, not hung: ${formatDuration(elapsed)} elapsed, past the ceiling of ${formatDuration(ceiling)}, but it ` +
         `wrote something ${formatDuration(silentForMs ?? 0)} ago. Await it (\`--await\`) rather than ending it.`,
     }
   }

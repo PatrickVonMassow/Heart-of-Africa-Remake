@@ -14,6 +14,9 @@ const CLI = join(HERE, 'run-wait.mjs')
 /** Every invocation keeps its wait lease and its journal in a throwaway
  *  directory: a unit run must not write into the live batch's registry, and
  *  two fixtures must not inherit each other's lease. */
+/** The house suite ceiling, pinned for the child so no fixture reads the shell. */
+const CEILING_MS = 45 * 60_000
+
 function run(args, env = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'hoa-runwait-env-'))
   return spawnSync(process.execPath, [CLI, ...args], {
@@ -24,6 +27,7 @@ function run(args, env = {}) {
       ...process.env,
       HOA_WAIT_LEASE_PATH: join(dir, 'wait-leases.json'),
       HOA_ACTIVITY_JOURNAL_PATH: join(dir, 'activity.jsonl'),
+      VERIFY_SUITE_TIMEOUT_MS: String(CEILING_MS),
       ...env,
     },
   })
@@ -146,9 +150,10 @@ describe('--await: one blocking call, and no poll counted', () => {
     expect(run(['--await', log, '--timeout', '1'], env).status).toBe(3)
   })
 
-  it('calls the wait HUNG past 2.5x the expectation once the run has gone SILENT', () => {
+  it('calls the wait HUNG past its wall-clock ceiling once the run has gone SILENT', () => {
     // Older than the progress lease, so its silence is what the verdict rests on.
-    const startedAt = Date.now() - 40 * 60_000
+    // Past the ceiling too: the plan plus one 45-minute suite ceiling (point 1135).
+    const startedAt = Date.now() - 90 * 60_000
     const { log } = fixture({
       ...finished,
       status: 'running',
@@ -172,7 +177,11 @@ describe('--await: one blocking call, and no poll counted', () => {
   // written 34 frames was reported HUNG and ended, and the release stood still
   // behind it. A run that is still writing is SLOW.
   it('does NOT call a run hung while it is still stamping its mark', () => {
-    const startedAt = Date.now() - 40 * 60_000
+    // PAST THE CEILING, so silence is the only thing left that could condemn it
+    // (cross-vendor review round 4): at 40 minutes against a 46-minute ceiling
+    // the clock alone already spared this run, and the test proved nothing about
+    // the progress mark it is named for.
+    const startedAt = Date.now() - 90 * 60_000
     const { log } = fixture({
       ...finished,
       status: 'running',
@@ -194,7 +203,7 @@ describe('--await: one blocking call, and no poll counted', () => {
   // ASTRA REVIEW ROUND 1, end to end: the counted poll reads the WRITER's mark out
   // of the record, so counting the poll cannot manufacture the life it reports.
   it('the counted poll calls a still-writing run SLOW, not hung', () => {
-    const startedAt = Date.now() - 40 * 60_000
+    const startedAt = Date.now() - 90 * 60_000
     const { log } = fixture({
       ...finished,
       status: 'running',
@@ -209,7 +218,7 @@ describe('--await: one blocking call, and no poll counted', () => {
   })
 
   it('the counted poll still says HUNG once the writer\'s mark has gone stale', () => {
-    const startedAt = Date.now() - 40 * 60_000
+    const startedAt = Date.now() - 90 * 60_000
     const { log } = fixture({
       ...finished,
       status: 'running',
@@ -260,8 +269,8 @@ describe('--status: the ONE counted poll', () => {
     expect(spent.stdout).toMatch(/--await/)
   })
 
-  it('calls a SILENT run hung past the measured factor, with a non-zero exit', () => {
-    const startedAt = Date.now() - 40 * 60_000
+  it('calls a SILENT run hung past its wall-clock ceiling, with a non-zero exit', () => {
+    const startedAt = Date.now() - 90 * 60_000
     const { log } = fixture({
       ...finished,
       status: 'running',
