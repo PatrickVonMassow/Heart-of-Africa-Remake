@@ -16,7 +16,7 @@ import {
 } from './tagFrameReading.mjs'
 import { judgeEavesColumn, judgeShelterRoof } from './eavesColumn.mjs'
 import { FUSE_CROWD_SHARE, FUSE_HARD, FUSE_TOLERANCE, judgeLabelFusion, mergeFusionReadings } from './labelFusion.mjs'
-import { READ_COUNT, READ_GAP_FRAMES, CONFIRM_READS, READ_GAP_NET_MS, READ_GAP_MS, SHOT_DRIFT_BAR, luminanceSamples, settleReading, shotDrift, shotReading } from './cropLuma.mjs'
+import { READ_GAP_FRAMES, READ_GAP_NET_MS, READ_GAP_MS } from './cropLuma.mjs'
 import {
   CHILD_MOTION,
   holdsAGame,
@@ -26,6 +26,8 @@ import {
   traceLiveness,
 } from './childMotionMetric.mjs'
 import { DIG_PICTURE, digPictureUnmounted, digPictureView, captureSpoilWalk } from './digSitePicture.mjs'
+import { groundSamples as readGroundSamples, bandRatio as readBandRatio } from './edgeBandReading.mjs'
+import { settledEdgeShot } from './edgeBandSettle.mjs'
 import { sectionGate } from './sections.mjs'
 import { onBaselineLane } from './baseline-classify-core.mjs'
 import { fileURLToPath } from 'node:url'
@@ -2742,21 +2744,7 @@ if (section('settlement-edge')) {
    *  neither is possible once a read has been collapsed to one number.
    *  cropLuma.mjs carries the reasoning and cropLuma.test.mjs pins it. */
   const groundSamples = async (buf, ndc, w, h) => {
-    const view = page.viewportSize()
-    const left = Math.round(((ndc.x + 1) / 2) * view.width - w / 2)
-    const top = Math.round(((1 - ndc.y) / 2) * view.height - h / 2)
-    if (left < 0 || top < 0 || left + w > view.width || top + h > view.height) return null
-    const { data, info } = await sharp(buf).extract({ left, top, width: w, height: h }).raw().toBuffer({ resolveWithObject: true })
-    return luminanceSamples(data, info)
-  }
-
-  /** The crop's SETTLE reading (cropLuma.mjs): the crop's mean with its
-   *  brightest fifth dropped, so a rain streak cannot end the wait early and a
-   *  band leak arriving over part of the crop still holds it open. It compares
-   *  the picture with itself; it never measures the band. */
-  const groundLuma = async (buf, ndc, w, h) => {
-    const samples = await groundSamples(buf, ndc, w, h)
-    return samples === null ? null : settleReading(samples)
+    return readGroundSamples(buf, ndc, page.viewportSize(), w, h)
   }
 
   /** Aim the camera at a ground point ahead by bisecting the pitch on the
@@ -2864,22 +2852,6 @@ if (section('settlement-edge')) {
     await settleFrames(8)
   }
 
-  /** Read the crop until it stops moving: the settlement's own state settles on
-   *  entry and the wet ground keeps SOAKING through a storm (§19.13), so the
-   *  measurement waits on the picture rather than on a guessed number of
-   *  milliseconds. Returns the settled reading (or the last one taken). */
-  const settledLuma = async (ndc, eps = 0.3) => {
-    let prev = null
-    for (let i = 0; i < 40; i++) {
-      await settleFrames(2)
-      const cur = await groundLuma(await capturePixels(page, 'settled ground luma'), ndc, 150, 46)
-      if (cur === null) return null
-      if (prev !== null && Math.abs(cur - prev) < eps) return cur
-      prev = cur
-    }
-    return prev
-  }
-
   /** The band's OWN effect on a crop: its luminance with the edge drawn over
    *  its luminance with the edge switched off from the debug menu's own value,
    *  same camera, same frame content. Attribution, not correlation — the
@@ -2888,8 +2860,8 @@ if (section('settlement-edge')) {
    *  the live proof that the calibratable strength lands without a reload. */
   const bandRatio = async (ndc) => {
     // Point 549: three frames were not the band arriving, they were three frames.
-    // Each shot waits for the crop to STOP MOVING on the new strength and then
-    // takes three reads of it — the rains draw over the ground and TRAA jitters
+    // That repair waited for the crop to STOP MOVING on the new strength and
+    // then took three reads — the rains draw over the ground and TRAA jitters
     // it, so a single frame samples that noise instead of measuring the band.
     // The measured spread of `capetown (wet)` across five runs was 6.5 luminance
     // points on an unchanged scene, straddling its own 0.04 bar.
@@ -2904,42 +2876,28 @@ if (section('settlement-edge')) {
     // leak over 8 of the 46 rows reads ×0.968 on the mean and ×1.000 on the
     // spatial median). Five reads, so a streak surviving into two of them still
     // cannot reach the middle value.
+    //
+    // The isolated WebGPU run exposed a THIRD missing-reading cause: maasai
+    // dry had healthy inside luminance (ON 73.4, OFF 107.5), but drift of
+    // 1.29% / 1.25%. The two-frame absolute settle admitted a slow trend that
+    // the full shot rejected. Wait on the shot's OWN timescale and statistic,
+    // keeping its 1% bar: edgeBandSettle.mjs advances a full window until its
+    // rain-robust halves agree, then measures those same certified reads.
+    // This includes the actual frame-bound gap on a cold first draw; a fixed
+    // 600 ms projection would underestimate it. No later capture can undo the
+    // certificate, and exhausting the wait now fails instead of falling through.
     const shot = async (strength) => {
       await page.evaluate((s) => { window.__balance.placeEdgeBand.strength = s }, strength)
-      if ((await settledLuma(ndc, 0.2)) === null) return null
-      const reads = []
-      for (let i = 0; i < READ_COUNT + CONFIRM_READS; i++) {
-        // A starved gap is a FAILED shot, not a faster one: reads that are not
-        // far enough apart are not independent pictures, and the rain rejection
-        // is exactly what that independence buys.
-        if (i > 0 && !(await readGap())) return null
-        const cur = await groundSamples(await capturePixels(page, 'edge-band ground luma'), ndc, 150, 46)
-        if (cur === null) return null
-        reads.push(cur)
-      }
-      // A scene that changed WHILE the shot was taken is not a shot. The
-      // per-pixel median would erase a defect arriving in a minority of the
-      // reads exactly as it erases the rain, and the settle loop ahead of it is
-      // one-sided — so the two halves of the shot are compared, each still
-      // rain-robust, and a disagreement fails the shot instead of averaging it
-      // away.
-      const drift = shotDrift(reads)
-      if (drift === null || drift > SHOT_DRIFT_BAR) {
-        console.log(`# shot REJECTED — the crop moved ${(drift * 100).toFixed(3)} % between its first and last reads (bar ${(SHOT_DRIFT_BAR * 100).toFixed(1)} %)`)
-        return null
-      }
-      // The confirmation read is the guard's, not the measurement's.
-      return shotReading(reads.slice(0, READ_COUNT))
+      return settledEdgeShot({
+        gap: readGap,
+        read: async () => groundSamples(await capturePixels(page, 'edge-band ground luma'), ndc, 150, 46),
+      })
     }
     // ON, OFF, ON — and the two ONs averaged. In the rains the ground SOAKS
     // while the shots are taken (the §19.13 wet accumulation keeps darkening
     // it), which biased a plain on/off pair by more than the edge itself; a
     // symmetric triple cancels that linear drift instead of racing it.
-    const on1 = await shot(1)
-    const off = await shot(0)
-    const on2 = await shot(1)
-    if (on1 === null || on2 === null || !(off > 0)) return null
-    return (on1 + on2) / 2 / off
+    return readBandRatio(shot)
   }
 
   const readGround = async (id, wetness, seasonName, shoot) => {
@@ -2991,17 +2949,14 @@ if (section('settlement-edge')) {
         check(`${id} (${seasonName}): the ${s.name} ground crop is in the picture`, false, `ndc ${JSON.stringify(ndc)}`)
         return null
       }
-      // Wait out the season change and, in the rains, the soak that keeps
-      // building — on the PICTURE, not on a stopwatch — before the pair is taken.
-      if (await settledLuma(ndc) === null) {
-        check(`${id} (${seasonName}): the ${s.name} ground crop is measurable`, false, 'crop off-frame')
+      // Every ON/OFF/ON shot waits on its own complete crop window, including
+      // the first after the season change or a new camera aim.
+      const ratio = await bandRatio(ndc)
+      if (ratio.value === null) {
+        check(`${id} (${seasonName}): the ${s.name} ground crop could be measured`, false, ratio.detail)
         return null
       }
-      out[s.name] = await bandRatio(ndc)
-      if (out[s.name] === null) {
-        check(`${id} (${seasonName}): the ${s.name} ground crop could be measured`, false, 'crop off-frame')
-        return null
-      }
+      out[s.name] = ratio.value
     }
     if (shoot) {
       // Human-viewable evidence, composed so the edge is READABLE rather than
