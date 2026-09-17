@@ -1269,9 +1269,14 @@ evidence either way: every run's stdout+stderr is written to
 `local/verify-baseline-logs/<suite>-baseline-<sha>-run<n>.log` (and
 `<suite>-current.log`) before anything is judged — a sibling of the checkouts, so
 the retention prune can never delete it. The yardstick is the current run's check
-count: `run-all` passes it as `--current-checks <n>`, and a direct run measures it
-itself. With `--strict`, a died or resultless baseline exits 1 like a real
-regression — it produced no triage at all.
+count, which this command measures itself by running the suite in THIS tree
+first; `--current-checks <n>` supplies it for a caller that already has the
+number, and `--failed`/`--current-out` hand over the failing checks the same way.
+Since point 1135 the runner is not such a caller: nothing passes them
+automatically any more. A current run that names no failing check but ends
+non-zero — a crash, a wall-timeout kill — is NOT a clean tree and exits 1 rather
+than reporting one. With `--strict`, a died or resultless baseline exits 1 like a
+SUSPECT check — it produced no triage at all.
 
 It runs the CURRENT check against the BASELINE app, so only the product differs
 — and it prints what can bend that reading: a suite file that changed since the
