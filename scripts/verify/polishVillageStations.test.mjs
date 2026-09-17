@@ -22,10 +22,11 @@ async function photograph({ marketX = -5.21, marketRadius = 2.9, failFrame = fal
   vi.stubGlobal('__game', { getState: () => state, setState: update => Object.assign(state, update) })
   vi.stubGlobal('__placeScene', { getObjectByName: name => name === 'village-weaver' ? loom : body })
   vi.stubGlobal('__placeLayout', {
-    interactives: [{ type: 'market' }], dwellings: [],
+    interactives: [{ type: 'market', pos: [marketX, -5.76] }], dwellings: [],
     colliders: [{ x: marketX, z: -5.76, r: marketRadius }],
   })
-  vi.stubGlobal('__placePlayer', {})
+  const player = {}
+  vi.stubGlobal('__placePlayer', player)
   vi.stubGlobal('__clearanceTo', (c, x, z) => Math.hypot(x - c.x, z - c.z) - c.r)
   const checks = []
   const frames = []
@@ -42,13 +43,13 @@ async function photograph({ marketX = -5.21, marketRadius = 2.9, failFrame = fal
       async () => {}, async () => {},
     )
   } catch (caught) { error = caught }
-  return { state, checks, frames, error }
+  return { state, checks, frames, error, player, body: { x: 0, z: -2.45 }, market: { x: marketX, z: -5.76 } }
 }
 
 it('photographs the live figure at the reported seed and restores the original world seed', async () => {
   const { state, checks, frames, error } = await photograph()
   expect(error).toBeUndefined()
-  expect(checks.map(c => c.pass)).toEqual([true, true, true])
+  expect(checks.map(c => c.pass)).toEqual([true, true, true, true])
   expect(frames).toHaveLength(1)
   expect(frames[0]).toMatchObject({ seed: 1838110026, place: 'bambara-village', subject: { local: { x: 0, y: 0.9, z: -2.45 } } })
   expect(state.seed).toBe(42)
@@ -67,9 +68,20 @@ it('restores the seed even when the shutter fails', async () => {
   expect(state.placeId).toBeNull()
 })
 
+it('stands opposite the trading post, so its wall closes the picture behind her', async () => {
+  const { player, body, market, checks } = await photograph()
+  // The camera is on the far side of the figure from the hut: seen from there,
+  // the hut lies beyond her instead of off-frame beside the lens.
+  const toCamera = { x: player.x - body.x, z: player.z - body.z }
+  const toMarket = { x: market.x - body.x, z: market.z - body.z }
+  expect(toCamera.x * toMarket.x + toCamera.z * toMarket.z).toBeLessThan(0)
+  expect(checks[3]).toMatchObject({ pass: true })
+})
+
 it('refuses a photograph when every candidate camera stand is blocked', async () => {
   const { checks, frames, state } = await photograph({ marketRadius: 20 })
   expect(checks[2].pass).toBe(false)
+  expect(checks[3].pass).toBe(false)
   expect(frames).toEqual([])
   expect(state.seed).toBe(42)
 })

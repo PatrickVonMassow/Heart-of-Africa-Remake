@@ -5497,15 +5497,23 @@ if (section('village-stations')) {
       const gap = (point, radius) => Math.min(...buildings.map(c => window.__clearanceTo(c, point.x, point.z) - radius))
       const e = figure.matrixWorld.elements
       const facesLoom = e[8] * (prop.x - body.x) + e[10] * (prop.z - body.z) > 0
-      // Prefer an oblique view from the village side. Reject a stand or sight
-      // line inside a building/fence; the reported seed may have one there.
+      // The point wants the trading post's wall VISIBLY CLEAR BEHIND her, so
+      // the stand goes OPPOSITE the hut: its wall then closes the picture
+      // behind the figure instead of standing off-frame beside the camera.
+      // Reject a stand or sight line inside a building/fence; the reported
+      // seed may have one there.
       const p = window.__placePlayer
+      const market = layout.interactives.find(it => it.type === 'market')
       const otherBodies = layout.colliders.filter(c => !(c.x === prop.x && c.z === prop.z && c.r === 1))
       const clear = (x, z) => Math.min(...otherBodies.map(c => window.__clearanceTo(c, x, z)))
-      const inward = Math.atan2(body.x - prop.x, body.z - prop.z)
+      const away = Math.atan2(body.x - market.pos[0], body.z - market.pos[1])
       let cameraGap = -Infinity
+      let marketOffAxis = 180
+      let marketBehind = 0
       for (let k = 0; k < 32; k++) {
-        const angle = inward + Math.PI / 3 + k * Math.PI / 16
+        // Sweep out from dead-opposite in both directions, so the first free
+        // stand is the one that frames the hut most squarely behind her.
+        const angle = away + (k % 2 ? -1 : 1) * Math.ceil(k / 2) * Math.PI / 32
         const x = body.x + Math.sin(angle) * 4
         const z = body.z + Math.cos(angle) * 4
         if (clear(x, z) < 0.35) continue
@@ -5515,19 +5523,35 @@ if (section('village-stations')) {
           if (clear(x + (body.x - x) * t, z + (body.z - z) * t) < 0.1) visible = false
         }
         if (!visible) continue
+        const vx = body.x - x
+        const vz = body.z - z
+        const reach = Math.hypot(vx, vz)
+        const mx = market.pos[0] - x
+        const mz = market.pos[1] - z
+        const along = (mx * vx + mz * vz) / reach
+        const cross = (mx * vz - mz * vx) / reach
+        const off = Math.abs(Math.atan2(cross, along) * 180 / Math.PI)
+        // Half of the 50-degree vertical fov spreads to about 33 degrees across
+        // a wide frame; 22 keeps the hut clear of the very edge.
+        if (along <= reach || off > 22) continue
         p.x = x
         p.z = z
         p.yaw = Math.atan2(body.x - p.x, body.z - p.z) + Math.PI
         p.pitch = -0.1
         cameraGap = clear(x, z)
+        marketOffAxis = off
+        marketBehind = along - reach
         break
       }
-      return { body, propGap: gap(prop, 1), bodyGap: gap(body, 0.3), cameraGap, facesLoom }
+      return { body, propGap: gap(prop, 1), bodyGap: gap(body, 0.3), cameraGap, facesLoom, marketOffAxis, marketBehind }
     })
     check('the reported weaver and loom have a walker-wide gap to the village buildings',
       staged.propGap >= 0.6 && staged.bodyGap >= 0.6, JSON.stringify(staged))
     check('the weaver faces her loom', staged.facesLoom)
     check('the weaver photograph stands on open ground', staged.cameraGap >= 0.35, `${staged.cameraGap.toFixed(2)} m`)
+    check('the trading post closes the picture behind her',
+      staged.marketBehind > 0 && staged.marketOffAxis <= 22,
+      `${staged.marketBehind.toFixed(2)} m beyond her, ${staged.marketOffAxis.toFixed(1)} deg off the view axis`)
     await nextFrames(3)
     if (staged.cameraGap >= 0.35) await frame('1143-village-weaver-clear-of-market', {
       local: { x: staged.body.x, y: staged.body.y + 0.9, z: staged.body.z },
