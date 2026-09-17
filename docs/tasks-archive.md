@@ -29357,3 +29357,44 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Bundle: Dorfleben — it edits the village layout in `layout.ts` and the life spots, the same
   place-scene paths 1080, 1081, 1082 and 1125 reach, so it is worked before them and never
   beside them.
+
+- [x] 1141. The settlement edge band cannot be measured at the maasai village: the same
+  check reds on `main` itself (measured 16.09.2026 on a quiet machine, WebGPU, twice per
+  tree). `polish --section=settlement-edge` fails at `maasai-village (dry): the inside
+  ground crop could be measured — crop off-frame`, and the baseline classification places
+  the fault on `main`, not on the branch that found it: on `origin/main` 893110333 the
+  section failed at that check in both its first leg and its own retry
+  (`local/verify-baseline/893110333ddf/local/verify-logs/2026-09-16T14-51-17-971-polish.log`),
+  exactly as it did on `feat/1138-wedged-adults` f948bdbf7
+  (`.claude/worktrees/point-1138/local/verify-logs/2026-09-16T14-26-09-272-polish.log`).
+  The earlier covering run of the same branch had failed once at `bambara-village (wet)`'s
+  OUTSIDE crop and once at the maasai INSIDE crop, which the load heuristic read as a flake
+  signature; on the quiet machine the maasai check is reproducible and the bambara one is not.
+  AND IT DOES NOT SHOW UP IN A WHOLE PASS. Measured the same evening on the same tree:
+  both covering passes over collision, polish and settings — WebGPU
+  (`local/verify-logs/2026-09-16T16-09-28-256-…`) and WebGL 2
+  (`…T16-49-27-151-…`) — ran this very check GREEN, 280 pass 0 fail each. So the red
+  belongs to the ISOLATED SECTION RUN, four times out of four, and the whole pass, twice
+  out of twice, does not see it: what differs is the history the block arrives with, since
+  `--section` runs that block's own setup and nothing before it. That difference is the
+  first thing to measure, and it is why the red charge is scoped and not a licence.
+  WHAT THE MESSAGE DOES NOT SAY: the failing line is `bandRatio(ndc) === null`
+  (`scripts/verify/polish.mjs` :2996), and `bandRatio` returns null for TWO different
+  causes — a crop rectangle that falls outside the viewport (`groundSamples`) AND a
+  toggled-off reading of zero luminance (`!(off > 0)`). Both print "crop off-frame", so
+  the recorded evidence cannot say which one happened; the preceding `settledLuma(ndc)`
+  read of the SAME crop had succeeded, which makes the zero-luminance branch the likelier
+  of the two and the wording the reason nobody can tell.
+  FINAL STATE: the maasai village's dry inside crop is measurable again on both backends,
+  and the two causes carry DIFFERENT messages, each printing what it measured (the crop
+  rectangle against the viewport, or the off-reading that came back zero) — so the next
+  red of this check is classifiable from its record alone. Whether the picture itself is
+  at fault (a black ground band at that place and season) or the crop geometry is, is what
+  the split message answers first; the fix follows the cause and never the assertion.
+  VERIFIABLE: `polish --section=settlement-edge` green on WebGPU and on WebGL 2 on a quiet
+  machine, and a Vitest case over the two null paths of the reading helper so each carries
+  its own wording.
+  Criticality: high — it is a red on `main` that every render point's picture proof runs
+  into, and while it stands the `polish` suite can only be judged through a red charge.
+  Refs: scripts/verify/polish.mjs, scripts/render-verify-charges.mjs
+  Bundle: Testinfrastruktur.
