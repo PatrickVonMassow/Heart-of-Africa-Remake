@@ -4,7 +4,8 @@
 //
 // Re-runs the failed suite against the PRE-CHANGE baseline (the branch's
 // merge-base with main by default) and labels every check that is red now:
-// REAL REGRESSION (green on the baseline) vs PRE-EXISTING / STALE ASSUMPTION
+// SUSPECT (green on the baseline, red now — a suspicion, point 1135) vs
+// PRE-EXISTING / STALE ASSUMPTION
 // (already red there). That triage used to be a manual baseline diff — it was
 // done by hand on 24.07.2026 for the SSAO ground-edge check (stale assumption)
 // and the proximity-call fade (pre-existing, point 292).
@@ -25,11 +26,13 @@
 //   --report-file <f>  write structured classification for the run report
 //   --keep              keep the baseline worktree even on success (it is reused
 //                       anyway; this only skips the retention prune)
-//   --strict            exit 1 when a REAL REGRESSION was found (default: 0 —
+//   --strict            exit 1 when a SUSPECT check was found (default: 0 —
 //                       this is a triage aid, the suite result stays the gate)
 //
-// run-all calls this only for suites that stayed RED: automatically on LARGE,
-// or with --baseline / VERIFY_BASELINE=1 on smaller runs. The checkout is a REUSED git
+// SINCE POINT 1135 NOTHING CALLS THIS AUTOMATICALLY. The LARGE's baseline passes
+// are deleted: a red is classified against the charge ledger, which is the
+// classified baseline. This command remains the HAND diagnosis for a red that is
+// genuinely in doubt, asked for by name. The checkout is a REUSED git
 // worktree under the git-ignored local/verify-baseline/, sharing the repo's
 // node_modules through Node's ancestor resolution (no second install).
 //

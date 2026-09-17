@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { runInNewContext } from 'node:vm'
 import { describe, expect, it } from 'vitest'
-import { allChecks, failedChecks, repeatSignature } from './baseline-classify-core.mjs'
+import { allChecks, failedChecks } from './baseline-classify-core.mjs'
 import { chargeReds } from '../render-verify-core.mjs'
 import { listNonPredictive, makeSectionGate } from './sections.mjs'
 
@@ -34,7 +34,6 @@ describe('the declared jar assertion through polish output and red consumers', (
     expect(allChecks(out)).toEqual([])
     expect(failedChecks(out)).toEqual([])
     expect(chargeReds(failedChecks(out), { suite: 'polish', backend: 'webgl' })).toEqual([])
-    expect(repeatSignature({ first: out, second: out }).verdict).not.toBe('candidate-real')
   })
 
   it.each([
@@ -43,7 +42,6 @@ describe('the declared jar assertion through polish output and red consumers', (
     const { failures, out } = observe({ ...samples, partial: true })
     expect(failures).toBe(1)
     expect(failedChecks(out).map((c) => c.name)).toEqual([jarName])
-    expect(repeatSignature({ first: out, second: out }).verdict).toBe('candidate-real')
   })
 
   it('passes standalone with full-jar observations and retains the ladder warning', () => {
