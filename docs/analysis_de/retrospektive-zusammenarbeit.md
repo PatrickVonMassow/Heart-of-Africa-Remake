@@ -1610,7 +1610,7 @@ stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die s
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 17.09.2026, 08:12 · Quellen-Fingerprint: `3ee1bb9e638c…`
+Zuletzt aktualisiert: Donnerstag, 17.09.2026, 08:53 · Quellen-Fingerprint: `c3fe02cb696b…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1706,8 +1706,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Headless probes must screenshot the DEFAULT zoom too (zoom-gated dressing like haze only shows there); headless WebGPU is impossible, so WebGPU-only branches stay user-checked | 2 | mittel | render-verify-guard.mjs | ✔ Mechanismus |
 | Every GUI/rendering fix must be verified on BOTH WebGPU and WebGL2 before it counts as done — never mark a render fix done on one path | 2 | mittel | render-verify-guard.mjs | ✔ Mechanismus |
 | A resumed batch session must check the previous owner's PROCESS before working — the launcher's \"provably dead\" verdict was wrong and double-spawned | 2 | mittel | render-verify-guard.mjs | ✔ Mechanismus |
-| Rotating verify AND unit failures under a running agent pool are LOAD, not bugs — 8 of 12 unit runs red from load alone; judge a red only on a quiet machine | 11 | hoch | render-verify-guard.mjs | ✔ Mechanismus |
-| The named \"version release\" process and its trigger — queue/run a version release for a version the user names (full closing → user approval → tag → mirror poc → publish /TAG/ and /poc/) | 4 | hoch | lock-release-hook.mjs | ✔ Mechanismus |
+| Rotating verify AND unit failures under a running agent pool are LOAD, not bugs — 8 of 12 unit runs red from load alone; judge a red only on a quiet machine | 13 | hoch | render-verify-guard.mjs | ✔ Mechanismus |
+| The named \"version release\" process and its trigger — queue/run a version release for a version the user names (full closing → user approval → tag → mirror poc → publish /TAG/ and /poc/) | 5 | hoch | lock-release-hook.mjs | ✔ Mechanismus |
 | Standing licence to move, REMOVE or ADD villages when it helps — but every change must be checked against the other requirements first, and the check has already caught a real bug | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | A VS Code restart restarts the devcontainer — every process inside dies, PPID 1 proves nothing | 13 | hoch | container-ask-guard.mjs | ✔ Mechanismus |
 | Keep the visual QA eye open for functionally-fine but weird-LOOKING oddities, not just functional bugs | 2 | mittel | — (Regel/Memory) | ◐ Regel |
@@ -1717,8 +1717,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 97 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 135 Prozess-/Meta-TASKS-Punkte (davon 66 offen).
 
-<!-- RETRO-FINGERPRINT: 3ee1bb9e638c7a7307b6465960f0820e6dc808f95f33d298b57401d5fefa1956 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-17T06:12:55.858Z -->
+<!-- RETRO-FINGERPRINT: c3fe02cb696ba93d436d42511f2dfd88431dcabdfc10c6ea53e4bb1e1c0b21a4 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-17T06:53:59.594Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -7352,3 +7352,34 @@ Produktdefekte das Gegenteil dessen, was die Zusicherung verspricht. Und: Ein Ne
 gehört beim Finden in die Arbeitsordnung, nicht in den Fließtext des Punktes, der ihn
 nebenbei gesehen hat. »Recorded here, not diagnosed« ist kein Ablageort, sondern ein
 Versprechen ohne Schuldner (Punkt 1144).
+
+### 3.281 Eine zu weit geschriebene Lehre verbietet irgendwann eine harmlose Handlung
+
+Im Gedächtnis stand seit dem 01.09.2026 der Satz, das Repository müsse stillhalten,
+solange eine Suite läuft — belegt durch einen Buchhaltungs-Commit auf `main`, der einen
+LARGE-Lauf nach vier Minuten umgebracht hatte. Der Satz stimmt in seinem Kern. Er war nur
+weiter geschrieben, als die Messung reichte.
+
+Am 17.09.2026 habe ich ihn deshalb auf das Board angewandt: Die Veröffentlichung schreibt
+einen Commit auf einen eigenen Zweig, also — so mein Schluss — bewegt sie einen Ref, also
+gefährdet sie den laufenden Bildlauf. Ich habe das dem Nutzer als selbst erzeugtes Risiko
+gemeldet und war bereit, Board-Arbeit zurückzustellen. Erst das Nachlesen im Code zeigte,
+dass `assertRepositoryUnchanged` ausschließlich den **eigenen** Worktree prüft: HEAD, Index,
+eigener Branch-Ref, geteilte Config. Jeder fremde Ref — ein `main`-Commit, der Board-Commit
+— wird als `REPOSITORY INTEGRITY (informational)` gedruckt und lässt den Lauf grün. Der
+Bildlauf war die ganze Zeit ungefährdet; gefährlich ist allein der Push auf `main`, und zwar
+aus einem ganz anderen Grund: sein Pre-Push-Tor ist selbst ein voller Build-, Lint-, Audit-
+und Unit-Lauf und nimmt der Maschine die Ruhe.
+
+Der Schaden war diesmal klein — eine falsche Warnung und ein paar Minuten. Die Form ist es
+nicht. Eine Lehre, die breiter formuliert ist als ihre Messung, wird beim nächsten Lesen
+nicht als Vermutung erkannt, sondern als Regel befolgt; und weil das Befolgen nie
+fehlschlägt, meldet sich auch nie jemand. So wird aus einer Messung ein Aberglaube, der
+Handlungen kostet, ohne je Rechenschaft abzulegen.
+
+**Lehre:** Eine Lehre trägt die Grenze ihrer Messung im Satz — nicht »das Repository muss
+stillhalten«, sondern »der eigene Worktree muss stillhalten, fremde Refs sind
+folgenlos«. Und wer eine solche Regel als Verbot anwendet, liest einmal den Code nach, der
+sie durchsetzt, bevor er Arbeit deswegen zurückstellt: Die Gegenprobe kostet eine Minute,
+das stille Befolgen kostet dauerhaft. Die Korrektur gehört in dieselbe Notiz zurück, sonst
+erbt die Nachfolgesitzung den Aberglauben statt der Messung.
