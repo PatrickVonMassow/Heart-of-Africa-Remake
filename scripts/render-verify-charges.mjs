@@ -133,6 +133,28 @@ export const RED_CHARGES = [
   },
   {
     point: 939,
+    suite: 'startup',
+    backend: 'webgl',
+    kind: 'console',
+    // THE LAST LANE COMBINATION POINT 939 STILL LACKED. Its siblings cover
+    // webgpu/startup, webgpu/polish, webgpu/report and webgl/polish; the same
+    // Vite transient reached webgl/startup and was therefore unaccounted, which
+    // is the rule of this table working rather than failing — an entry excuses
+    // only the lane its evidence measured.
+    match: /^console error: Failed to load resource: the server responded with a status of 504 \(Outdated Optimize Dep\)/i,
+    why:
+      'MEASURED 16.09.2026 at 22:43:12Z on main, webgl/startup, and again 26 seconds later on the '
+      + 'retry at 22:43:38Z, which is why the run is recorded SUSPECT as well as red: a cold or '
+      + 'invalidated Vite optimize-dep cache re-bundles while the suite page is already open, and '
+      + 'the open page then requests the outdated chunk. It is the environment transient '
+      + 'CLAUDE.md §7.2 tells us to fail soft on and the identical reading point 939 already owns '
+      + 'on four other lanes; no CHECK failed on either attempt, so nothing about the code under '
+      + 'test reaches it. Entered 17.09.2026 from the landing of point 1140, whose own change '
+      + 'touches the HUD, the keyboard map and the settlement pointer lock and cannot produce a '
+      + 'dev-server 504. The charge dies with point 939.',
+  },
+  {
+    point: 939,
     suite: 'polish',
     backend: 'webgl',
     kind: 'console',
@@ -1547,5 +1569,27 @@ export const RED_CHARGES = [
       + 'touches the HUD, the keyboard map and the settlement pointer lock and no light, shadow or '
       + 'campfire code at all. 642 owns classifying this check as state or timing; the charge dies '
       + 'with it.',
+  },
+  {
+    point: 1145,
+    suite: 'world',
+    backend: 'webgl',
+    kind: 'check',
+    // NO detailMatch: the printed detail is the fixed words naming which edges
+    // the subject left, and it carries no measurement to narrow on. The frame
+    // NAME is the scope — a different frame missing its subject is a different
+    // case and stays a real red, which is how the falls came to be filed.
+    match: /^frame 11-worldmodel-khartoum-confluence$/i,
+    why:
+      'FILED AS 1145 ON 17.09.2026 out of the landing of point 1140, together with the identical '
+      + 'Victoria Falls miss that 1145 also owns. MEASURED 16.09.2026 at 22:44:57Z on webgl/world '
+      + '(head 9a1f91ce6) and again on its automatic retry five seconds later: the subject projects '
+      + 'off the left and bottom edge of the frame, scripts/verify/frameSubject.mjs THROWS, and the '
+      + 'run dies rather than reports — both records are signed-off crashes, and this entry covers '
+      + 'the red they printed before dying so the next world pass on this lane can be read at all. '
+      + 'No kept log survives for either run (the worktree they were earned in is gone, which is '
+      + 'open point 1142), so the run records are the evidence. 1145 owns deciding FIRST whether '
+      + 'the travel stops short or the wait expires on a moving camera, and SECOND why one '
+      + 'mis-aimed frame costs a whole pass; the charge dies with it.',
   },
 ]

@@ -1313,3 +1313,23 @@ kein Sicherheitsrisiko, keine Blockade und keine falsche Freigabe — die Suite
 schlägt korrekt fehl, wenn eine Aufnahme oder die Konsole rot wird. Der billige
 Weg, falls es wieder stört: die Verdikt-Zeile einer suite ohne `check()` nennen
 lassen, was stattdessen lief (Aufnahmen, Fehlertor), statt eine Null zu drucken.
+
+## Das Steuerkreuz wählt einen Inventarplatz, den nichts benutzen kann (17.09.2026)
+
+Punkt 1140 gibt dem Gamepad Zugang zur Inventarleiste: Steuerkreuz links und
+rechts wandern durch die Plätze, der gewählte Platz bekommt einen Rahmen. Nur
+benutzen kann ihn niemand — die Spezifikation des Punktes sagt ausdrücklich
+„A bleibt die Benutzen-Taste", und A löst weiter den Rateversuch aus. Die
+Auswahl ist damit eine Anzeige ohne Wirkung.
+
+Das ist keine Regression: Vor 1140 war die Leiste reine Mausbedienung, ein
+Gamepad-Spieler kam also genausowenig an einen Gegenstand. Der Punkt hat den
+Zustand nicht verschlechtert, sondern nur sichtbar gemacht.
+
+Nicht als Punkt eingereiht (Befundaufnahme CLAUDE.md §2): Der Autor hat die
+Vorgabe wörtlich umgesetzt, und die fehlende Benutzen-Taste ist eine
+Gestaltungsentscheidung, keine Fehlfunktion — §17.5 lässt dem Steuerkreuz keine
+freie Taste übrig, was genau der Grund war, A nicht doppelt zu belegen. Der
+billige Weg, falls es stört: eine Schultertaste oder ein kurzer Druck auf L3
+benutzt den gewählten Platz. Das ist eine Belegungsentscheidung des Nutzers,
+kein Mangel, den ich allein entscheiden sollte.
