@@ -29432,3 +29432,44 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Refs: scripts/render-verify-guard.mjs, scripts/verify/run-logged.mjs, scripts/verify/run-record.mjs,
   scripts/worktree-cleanup.mjs
   Bundle: Testinfrastruktur.
+
+- [x] 1135. The verification run stops repeating itself: one pass per suite, no automatic
+  flake retry, no automatic baseline pass (user order 15.09.2026, FIRST of three, verbatim:
+  "Okay, setze das so um und reihe es als nächstes in der Queue ein").
+  MEASURED: inside ONE LARGE, `polish` (28 min) ran FOUR times — first pass, flake retry and
+  two baseline passes. This point deletes three of those four, and it pays off whatever the
+  regression's CADENCE turns out to be, which is why the user put it first.
+  FINAL STATE:
+  1. A LARGE runs each suite ONCE. The automatic baseline passes are gone; the comparison
+     runs against a CLASSIFIED baseline FILE, one entry per check, each carrying its date and
+     its owning point — that file is the open remainder of point 1104. The bundle run keeps it
+     current: an entry that has gone green is struck. No blanket standing exemption.
+  2. The automatic flake retry in LARGE is off. A red stands and is classified. Confirmed
+     flakes move into the baseline file. A HAND retry of the SMALLEST affected check stays
+     allowed as diagnosis — CLAUDE.md §7.2 is unchanged: a retry is SUSPECT and covers nothing.
+  3. Runs are serialized: while a LARGE runs, nothing else does. Prose in
+     `scripts/verify/README.md`, NO lockfile and NO guard.
+  4. The label "REAL REGRESSION (green on baseline, red now)" becomes SUSPECT, unconfirmed. A
+     suspicion is settled ONLY by three narrow rungs of the affected section on a quiet machine
+     under equal starting conditions, never by another full regression.
+  5. `nonPredictive` checks report but do NOT set the exit code (that is point 1127 — if it has
+     landed, check and refer, never duplicate it). `run-wait` stops calling healthy runs hung;
+     instead a wall-clock ceiling per suite and a hand abort.
+  6. The backend sequence does NOT stop at a red whose own accounting says it does not hold.
+     MEASURED 16.09.2026 on `feat/1137-picture-gate-hung-verdict` (d7ba6543e), log
+     `local/verify-logs/2026-09-16T05-20-58-440-large.log`: the WebGL 2 pass ran all 25 suites to
+     the end, classified its three reds as PRE-EXISTING against the merge-base and concluded
+     "own or unresolved: none; regression verdict unchanged" — and still exited 1, so
+     `scripts/verify/run-all.mjs:173-177` printed "not proceeding to the remaining backend(s)"
+     and the WebGPU pass never started. While ANY pre-existing red stands — three do, charged to
+     the OPEN points 603, 938 and 1009 — a both-backend LARGE is structurally unreachable, which
+     is exactly what CLAUDE.md §5 demands once per bundle and at closing; it blocks point 633 and
+     point 174. FINAL STATE: the sequencer proceeds to the remaining backend when the failed
+     pass's verdict is "charged elsewhere / verdict unchanged", and the run fails at its END
+     rather than at the backend boundary. A red that DOES hold still stops the sequence.
+     This is a deletion of one early exit, not a new mechanism.
+  NO NEW INFRASTRUCTURE: deleted runs, a renamed label, a file 1104 already owes, README prose.
+  VERIFICATION: unit for the changed run logic. A LARGE on the next bundle state shows the
+  saving on the wall clock but is NOT part of this point's acceptance.
+  Criticality: medium — no player impact; the largest measured saving with no coverage risk.
+  Bundle: Session- & Repo-Hygiene
