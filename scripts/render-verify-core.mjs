@@ -79,6 +79,7 @@ export const NON_RENDER_VERIFY = new Set([
   'digSitePicture.mjs', // excavation composition and hold checks; polish.mjs supplies the browser page
   'docs.mjs',
   'eavesColumn.mjs', // the head-clearance verdict over a recorded window; polish.mjs records it
+  'edgeBandReading.mjs', // crop measurements and failure details; polish.mjs captures the frames
   'fixedWaits.mjs',
   'footingSeries.mjs', // the slope-footing verdict; polish.mjs hands it the samples
   'frameSubject-core.mjs',
