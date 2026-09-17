@@ -1208,6 +1208,14 @@ Freigabe. Der billige Weg wäre eine Zeile in beiden Einstiegen, die `--help`
 und `-h` vor jeder Arbeit abfängt und die Nutzungszeile druckt, die in
 `run-logged.mjs` bereits im Kopfkommentar steht.
 
+WIEDERHOLUNG AM 17.09.2026, und zwar genau auf dem hier beschriebenen Weg: Die
+Nachfolgesitzung kannte `run-wait.mjs --help`, probierte es beim Nachbarn
+`run-all.mjs` und startete einen vollen Lauf, den sie nach rund 40 Sekunden
+abbrach. Zweimal in zwölf Stunden, von zwei verschiedenen Sitzungen, ist keine
+Unachtsamkeit mehr, sondern die vorhergesagte Wirkung. Der Eintrag wird nicht
+verdoppelt; die Lehre steht jetzt zusätzlich im Gedächtnis, wo sie vor dem
+Aufruf gelesen wird, statt nur hier, wo sie danach gefunden wird.
+
 ## Der Warteschlangen-Neubau überschreibt die Prosa der aktuellen Karte (16.09.2026)
 
 `node scripts/board-queue.mjs` baut die Warteschlange aus dem Arbeitsauftrag neu — und ersetzt
@@ -1248,3 +1256,33 @@ die unwiederbringlichen Fehlerberichte des Nutzers.
 
 Nicht als Punkt eingereiht: der Handgriff dauert Sekunden und ist hier beschrieben; die Blockade
 ist damit aufgehoben, und der Infrastruktur-Stopp gilt weiter.
+
+## Der Unit-Lauf liest eine Datei außerhalb jedes Checkouts und stirbt an ihr (17.09.2026)
+
+Der Bildlauf zu Punkt 1045 starb nach 7m 04s in der Unit-Stufe, ohne ein
+einziges Bild zu zeichnen: `scripts/guard-hooks.test.mjs > doc-budget-guard >
+ALLOWS documents within budget` erwartete `clean` und bekam `would-block`.
+Ursache war keine Codeänderung, sondern eine Zeile in `MEMORY.md`, die die
+Sitzung während des Laufs hinzufügte und zwei Minuten später wieder entfernte.
+`scripts/doc-budget-core.mjs` führt `MEMORY.md` (Ort `project-memory`) unter den
+Dokumenten, die es LIVE vermisst; für diese zwei Minuten lag die Datei über
+ihrem Budget, und der Test, der nur prüft, ob der Wächter überhaupt
+durchlässt, ging mit ihr rot. Derselbe Baum lief danach in 1,9 s grün.
+
+Die Absicherung, die genau das verhindern soll, konnte es nicht sehen:
+`scripts/repository-integrity.mjs` prüft HEAD, Index, eigenen Branch-Ref und
+geteilte Config des laufenden Arbeitsbaums. `MEMORY.md` liegt in
+`~/.claude/projects/…/memory/`, außerhalb jedes Checkouts — kein Ref, kein
+Index, kein Arbeitsbaum hat sich bewegt. Der Lauf ist an dieser Stelle also
+nicht hermetisch: jede Sitzung, die ihr Gedächtnis pflegt, kann eine fremde
+Verifikation umbringen, und der Befund nennt dabei ein Dokument, das mit der
+geprüften Änderung nichts zu tun hat.
+
+Nicht als Punkt eingereiht: kein Spielerimpakt und keine falsche Freigabe — der
+Lauf wird korrekt rot und korrekt aufgezeichnet. Die Kosten sind Maschinenzeit
+und eine irreführende Fehlermeldung. Zwei billige Wege stehen offen, falls es
+wiederkommt: den Budget-Fall des Wächtertests gegen eine FESTE Vorrichtung
+laufen lassen statt gegen die lebenden Dokumente, oder `MEMORY.md` aus der
+live vermessenen Liste nehmen und ihr Budget allein im Stop-Hook prüfen.
+Bis dahin gilt die Regel, die jetzt im Gedächtnis steht: Während eines Laufs
+wird gelesen — auch im Gedächtnisverzeichnis.
