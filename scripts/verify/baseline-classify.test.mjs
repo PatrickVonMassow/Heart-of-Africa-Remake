@@ -22,7 +22,7 @@ import {
   onBaselineLane,
   suiteLaneEnv,
 } from './baseline-classify-core.mjs'
-import { parseWrapperArgs } from './baseline-classify.mjs'
+import { currentRunIsClean, parseWrapperArgs } from './baseline-classify.mjs'
 
 // The live 27.07.2026 case: enrichments failed twice at DIFFERENT checks.
 const RUN_1 = [
@@ -620,5 +620,20 @@ describe('the pass drops an inherited baseline marker', () => {
   it('leaves run-all with no baseline-lane write of its own', () => {
     const source = readFileSync('scripts/verify/run-all.mjs', 'utf8')
     expect(source).not.toMatch(/VERIFY_BASELINE_LANE\s*:/)
+  })
+})
+
+// A CURRENT RUN THAT DIED BEFORE NAMING ANYTHING IS NOT A CLEAN TREE — the CLI's
+// false-clean path (cross-vendor review, 17.09.2026).
+describe('the current tree must actually be clean to be called clean', () => {
+  it('calls a run that named nothing clean only when it also ended cleanly', () => {
+    expect(currentRunIsClean({ failed: [], exitCode: 0 })).toBe(true)
+    expect(currentRunIsClean({ failed: [], exitCode: 1 })).toBe(false)
+    expect(currentRunIsClean({ failed: [], exitCode: null })).toBe(false)
+  })
+
+  it('says nothing about a run that DID name a failing check — that is the ordinary path', () => {
+    expect(currentRunIsClean({ failed: [{ key: 'a' }], exitCode: 1 })).toBe(false)
+    expect(currentRunIsClean({ failed: [{ key: 'a' }], exitCode: 0 })).toBe(false)
   })
 })

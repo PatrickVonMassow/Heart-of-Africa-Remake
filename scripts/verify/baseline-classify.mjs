@@ -78,6 +78,17 @@ const INFRA_PATHS = [
 /** How many baseline checkouts to keep around (each is a full worktree). */
 const KEEP_BASELINES = 2
 
+/**
+ * IS THE CURRENT TREE ACTUALLY CLEAN? Only when the run named no failing check
+ * AND ended cleanly. A suite that crashes or is killed at its wall timeout names
+ * nothing and exits non-zero (or not at all), and reading that as "nothing is
+ * failing" turned a dead lane into a clean bill of health — exit 0 even under
+ * `--strict` (cross-vendor review, 17.09.2026). A red with no name is still a
+ * red; what is impossible there is the classification, not the failure.
+ */
+export const currentRunIsClean = ({ failed = [], exitCode = 0 } = {}) =>
+  failed.length === 0 && exitCode === 0
+
 export function parseWrapperArgs(argv) {
   const out = { suite: null, ref: null, runs: 2, keep: false, strict: false, currentOut: null, currentContext: 'unknown', reportFile: null, currentChecks: 0, failed: [] }
   for (let i = 0; i < argv.length; i++) {
@@ -263,6 +274,10 @@ async function main() {
   // bare names (`--failed`) carry no result lines, and a yardstick counted from
   // lines that do not exist would be a wrong one rather than a missing one.
   let currentOutput = ''
+  // The exit code of the run measured HERE. Supplied failures (`--failed`,
+  // `--current-out`) come from a run this process never saw, so it stays 0 for
+  // them: the caller already judged that run's exit.
+  let currentExit = 0
   if (opts.currentOut && existsSync(opts.currentOut)) {
     currentOutput = readFileSync(opts.currentOut, 'utf8')
     currentFailed = failedChecks(currentOutput)
@@ -284,11 +299,20 @@ async function main() {
       currentOutput = run.out
       currentFailed = run.failed
       currentCheckCount = run.checks.length
+      currentExit = run.exitCode
     } finally {
       killTree(server?.child)
     }
   }
   if (currentFailed.length === 0) {
+    if (!currentRunIsClean({ failed: currentFailed, exitCode: currentExit })) {
+      console.log(
+        `baseline-classify: the CURRENT run of ${opts.suite} ended with exit ${currentExit ?? 'unknown'} and named no failing ` +
+          'check — a crash or a wall-timeout kill, not a clean tree. Nothing can be classified against a run that ' +
+          'printed no red; read its log and fix the lane first.',
+      )
+      process.exit(1)
+    }
     console.log('baseline-classify: nothing is failing in this tree — nothing to classify.')
     process.exit(0)
   }
