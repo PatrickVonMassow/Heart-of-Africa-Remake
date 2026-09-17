@@ -259,6 +259,17 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   periodisch **nebeneinander**, zieh **den Code auf den Satz**, und frag: **Welcher naheliegende
   Fall wird von keiner Regel erfasst?**"
 
+- **Die gemerkte Lehre ist breiter als ihre Messung — und verbietet dann Harmloses.** Aus einem
+  echten Vorfall wird ein Merksatz, der mehr umfasst als das, was gemessen wurde. Beim nächsten
+  Lesen ist er keine Vermutung mehr, sondern eine Regel; und weil ihr Befolgen nie fehlschlägt,
+  meldet niemand den Preis. So wird aus einer Messung ein Aberglaube, der Arbeit zurückstellt.
+  → *Prompt:* „Schreib jede Lehre **mit der Grenze ihrer Messung im selben Satz** — nicht »das
+  Repository muss stillhalten«, sondern »der **eigene** Arbeitsbaum muss stillhalten, Fremdes ist
+  folgenlos«. Und bevor du wegen eines Merksatzes **Arbeit zurückstellst**, lies **den Code, der
+  ihn durchsetzt**: Die Gegenprobe kostet eine Minute, das stille Befolgen kostet dauerhaft.
+  Was du dabei richtigstellst, gehört **in dieselbe Notiz zurück** — sonst erbt der Nächste den
+  Aberglauben statt der Messung."
+
 - **Der genannte Ausweg trägt nicht:** Er schadet, tritt nie ein, ist längst getan — oder es gibt
   ihn als Befehl gar nicht. Dann hat die Sperre recht, und übrig bleiben Handarbeit und das
   Übergehen der Prüfung — die zwei Wege, gegen die sie gebaut wurde.
@@ -680,4 +691,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 3ee1bb9e638c7a7307b6465960f0820e6dc808f95f33d298b57401d5fefa1956 -->
+<!-- GUIDE-FINGERPRINT: 3aabec95db8489099df6f59d2a1907cdf829226fa1af1f49cafb45c4296e8796 -->
