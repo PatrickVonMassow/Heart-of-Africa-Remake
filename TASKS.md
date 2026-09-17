@@ -244,6 +244,42 @@ put it is the mistake this line exists to stop.
   Position: directly before 1082, by the user's order (17.09.2026, 20:51).
   Bundle: Steuerung & Performance.
 
+- [ ] 1148. Unlocked cursor mode needs one click, not several, to return steering (user
+  report 17.09.2026, 21:48, verbatim: "Im Modus »Click the view to steer« bewirkt erst
+  mehrfaches Klicken, dass man wieder steuern kann.").
+  Final state: in the settlement's unlocked cursor mode (HUD pill 'Click the view to steer')
+  ONE click on the view returns mouse-look; a click the browser refuses does not leave the
+  player clicking again.
+  Measured on main at ef5806ff4: requestPlacePointerLock swallows the request's rejection
+  (r.catch(() => {})) and nothing listens to pointerlockerror. Chromium refuses a
+  requestPointerLock() issued within roughly one second after the player left the lock with
+  Escape ('The user has exited the lock before this request was completed'); a click inside
+  that window fails silently and the player clicks once more. This is the most likely reading
+  of 'erst mehrfaches Klicken'; the game currently cannot tell it from any other refusal. The
+  Escape release and the dialog-close re-grab in restorePointerLockAfterDialogs both leave the
+  browser in that cooldown.
+  Work: (1) listen for pointerlockerror / the rejected promise in the place scene's lock
+  effect; on a refusal with no .overlay and no dialog open, retry the request once after the
+  cooldown (about 1.1 s; the click's transient activation still covers it in Chromium), and
+  drop the retry if the scene leaves place, a dialog opens, or the lock is granted meanwhile;
+  keep navigator.webdriver on the decision-only path. (2) Count the refusal in
+  pointerLockProbe (refusals beside grabs/releases) for the dev hook; no new guard, no ledger.
+  (3) Vitest on pointerLock.ts: a refused request records a refusal and schedules exactly one
+  retry; the retry is dropped when a dialog opens; no retry under webdriver. (4) Attended
+  check in real Chrome on WebGPU (the lock never engages headless): Escape, click within one
+  second -> steering returns without a second click; Escape, wait two seconds, click -> first
+  click steers. Record the result in the point's evidence. (5) If the attended check shows the
+  first click landing on a HUD element instead of gl.domElement, fix the layering instead and
+  say so.
+  BOUNDS THE USER NAMED: no new guard, ledger field or workflow abstraction (infrastructure
+  freeze 01.09.2026); pointer lock stays skipped under navigator.webdriver.
+  Criticality: medium — reproducible player impact in the cursor mode point 1140 introduced,
+  and the refusal is invisible to the game because it is swallowed.
+  Refs: src/scenes/place/pointerLock.ts, src/scenes/place/PlaceScene.tsx (pointer-lock effect
+  ~l.2717), src/scenes/place/pointerLock.test.ts; follow-up of 1140 (closed). It reads the
+  `.cursor-mode-hint` rule that 1146 edits, so it is worked AFTER 1146 and never beside it.
+  Bundle: Steuerung & Performance
+
 - [ ] 1082. A child climbing the village boulder becomes something the player actually
   sees (user 09.09.2026, 05:04 — the same report twice).
   Point 1080 was filed on 08.09.2026 because the user never saw the climb; it landed in the
@@ -363,6 +399,61 @@ put it is the mistake this line exists to stop.
   Why the lane: the verification IS the work here — the deliverable is a judged rendered
   frame at shipped values, taken and judged in the main session.
   Bundle: Dorfleben.
+
+- [ ] 1149. Small village stones raise the ground instead of blocking the walk (user order
+  17.09.2026, 21:50 and 21:53, verbatim: "Im Rahmen von welchem Punkt wird erledigt, dass man
+  an Kieselsteinen im Dorf nicht mehr hängenbleibt, sondern darüber läuft, wie über
+  ausgegrabenen Sand?" — "Man soll nicht einfach hindurchlaufen können, sondern sie sollen als
+  Erhöhung behandelt werden. Ich dachte es war geplant, das im Rahmen der analogen Umsetzung
+  für Sandhaufen einzubauen. Dann reihe das nach 1082 ein, ja.").
+  Final state: a small scattered stone in a settlement is neither a wall nor air. The player
+  and every villager walk UP AND OVER it the way they already ride the spoil heap of an
+  excavation (closed point 1057): the stone raises the ground locally, the first-person camera
+  rises and falls smoothly, nobody stops at it and nobody passes through it.
+  Measured on main at ef5806ff4: every scattered rock, whatever its size, gets a collider of
+  0.35 + 0.5 * scale metres (looseRockRadius, pushed at layout.ts ~1905). At instance scale
+  0.3 the stone's top is about 0.16 m (ROCK_TOP_UNITS * scale) - a pebble - yet its collider
+  reaches half a metre, so the player snags on it. The spoil heap, by contrast, never enters
+  the collider set: spoilHeightAt is a smooth compact dome that placeGroundHeight adds to the
+  bank height, and every actor plus the camera read that one source.
+  Work:
+  - A stone whose top lies below a step height (estimate, calibratable, in
+    src/config/balance.ts under CLAUDE.md §2 / design.md §14; propose 0.30 m, about knee
+    height) becomes a GROUND RAISE and loses its collider: placeGroundHeight also takes the
+    maximum over these stones, each as a smooth compact dome with zero height and slope at its
+    edge, sized to the DRAWN stone (its mesh radius at that scale), peaking at ROCK_TOP_UNITS *
+    scale so the foot stands on the visible top. The renderer keeps drawing the same instance.
+  - A stone at or above that height stays exactly what it is today: a collider of
+    looseRockRadius and, above climbableRockTop, a candidate for the children's climb.
+    climbBoulder must never pick a stone that has become ground (1082 raises climbableRockTop
+    anyway; keep the two thresholds ordered, ground < climb, and assert it in dev).
+  - One classification, one place: looseRocks.ts answers whether a stone is walked over or
+    walked around; layout.ts and placeGround.ts read that answer. No second scatter of Y
+    assignments, no new collider kind.
+  - Villager routes and the dig-site / water-path / play-lane placement keep testing against
+    the collider set; a stone that became ground simply drops out of that set, so the layout
+    must be re-measured on the shipped seeds (Bambara 7 and 1337 among them) to confirm no site
+    or path moved.
+  - Tests: Vitest on placeGround.ts - height is zero outside every small stone's footprint,
+    peaks at the stone's top at its centre, and a stone above the step height contributes
+    nothing; Vitest on looseRocks.ts - the classification and the ordered thresholds; the
+    collider set contains no stone below the step height. Playwright on the polish lane - a
+    frame with the first-person footing carried over a small stone, judged on both backends.
+  BOUNDS THE USER NAMED: placement directly behind 1082 (user decision 17.09.2026, 21:53); no
+  new collider kind, no new guard or ledger field (infrastructure freeze 01.09.2026); the
+  child's climb stone stays a collider — only stones below the step height change.
+  DESIGN CHANGE IN THE SAME COMMIT: design.md §16 (settlement collision) gains one sentence —
+  small stones and spoil are ground raises, large stones are obstacles; and
+  docs/acceptance-criteria-detail.md criterion 16 names the step threshold.
+  Criticality: medium — reproducible player impact; the walk snags on knee-low stones.
+  Refs: src/scenes/place/looseRocks.ts (looseRockRadius, looseRock, climbBoulder),
+  src/scenes/place/layout.ts (~l.1905 rock colliders), src/scenes/place/placeGround.ts
+  (spoilHeightAt, placeGroundHeight), src/render/flora.ts (ROCK_TOP_UNITS ~l.323),
+  src/scenes/place/PlaceScene.tsx (~l.3125 footing), src/scenes/place/PlaceLife.tsx
+  (usePlaceGround); follows the closed 1057; AFTER 1082 and never beside it (both edit the
+  scatter's size and the climb selection in looseRocks.ts and the loose-rock colliders in
+  layout.ts).
+  Bundle: Dorfleben
 
 - [ ] 1109. The catcher group stands as one group at its rock; the tap is a moment, not a post.
   USER ORDER 11.09.2026 on the bank game (`src/scenes/place/bankGame.ts`), queued DIRECTLY
