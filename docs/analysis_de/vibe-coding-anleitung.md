@@ -184,16 +184,6 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   schweigt sie, wenn es zählt. Und ein Urteil braucht einen **Empfänger**: Was bei
   grünem Lauf nur auf stderr meldet, liest niemand.“
 
-- **Die Prüfung beendet den Prozess, statt rot zu werden.** Eine Regel wird durchgesetzt,
-  indem der Lauf abstürzt — und damit ist nicht ein Prüfpunkt rot, sondern der ganze Beweis
-  weg: Ein Rot trägt einen Namen, gehört jemandem und lässt den Rest des Laufs gültig
-  bleiben; ein Absturz gehört niemandem, deckt nichts und muss später von Hand
-  freigezeichnet werden.
-  → *Prompt:* „Eine Prüfung sagt **nein**, sie **stirbt** nicht. Wirf nur, wenn ohne die
-  Bedingung nichts Weiteres mehr messbar ist — sonst lass den Prüfpunkt fehlschlagen und den
-  Lauf zu Ende laufen. Prüffrage vor jedem `throw` in Testwerkzeug: **Was verliert der Lauf,
-  wenn ich hier aussteige — und wem gehört der Fehler danach noch?**"
-
 - **Neue Features zerbrechen alte.** Eine Änderung repariert X und bricht das unbeobachtete Y.
   → *Prompt:* „Prüfe jede Mechanik auch im **Danach-Zustand** und erzwing nach jedem
   Zusammenführen die schnelle Testschicht. Bau ‚Invarianten' ein, die im Entwicklungsmodus laut
@@ -690,4 +680,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: a6b86e5f62bc453e0d7b1fef1b27cc4a2ff64d3126be25efa334aaeec2d2ccb4 -->
+<!-- GUIDE-FINGERPRINT: c3fe02cb696ba93d436d42511f2dfd88431dcabdfc10c6ea53e4bb1e1c0b21a4 -->
