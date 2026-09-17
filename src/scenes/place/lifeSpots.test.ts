@@ -173,10 +173,7 @@ describe('the children play against the village, not behind it (point 524)', () 
       const a = (i / 10) * Math.PI * 2
       return [Math.cos(a) * 12, Math.sin(a) * 12]
     })
-    // This synthetic ring includes an adult on its north-west edge. Keep that
-    // fixture independent of where the live village now seats its weaver.
-    const stations = villageAdultStations(FIRE).map(p => p === LOOM_SPOT ? [-8.5, -7] as [number, number] : p)
-    const g = childPlayGround(stations, WALK, PLAY, HEARING, { fabric: huts })
+    const g = childPlayGround(villageAdultStations(FIRE), WALK, PLAY, HEARING, { fabric: huts })
     expect(g.clearance).toBeGreaterThanOrEqual(HEARING)
     expect(g.fabric).toBeGreaterThanOrEqual(MIN_FABRIC)
     // Its far edge does not reach out past the built ring by more than the reach

@@ -5497,14 +5497,31 @@ if (section('village-stations')) {
       const gap = (point, radius) => Math.min(...buildings.map(c => window.__clearanceTo(c, point.x, point.z) - radius))
       const e = figure.matrixWorld.elements
       const facesLoom = e[8] * (prop.x - body.x) + e[10] * (prop.z - body.z) > 0
-      // Side view: the frame, figure and open ground behind her are separate
-      // in projection. The market wall remains visible beyond the loom.
+      // Prefer an oblique view from the village side. Reject a stand or sight
+      // line inside a building/fence; the reported seed may have one there.
       const p = window.__placePlayer
-      p.x = body.x + 4
-      p.z = prop.z + 0.3
-      p.yaw = Math.atan2(body.x - p.x, body.z - p.z) + Math.PI
-      p.pitch = -0.1
-      const cameraGap = Math.min(...layout.colliders.map(c => window.__clearanceTo(c, p.x, p.z)))
+      const otherBodies = layout.colliders.filter(c => !(c.x === prop.x && c.z === prop.z && c.r === 1))
+      const clear = (x, z) => Math.min(...otherBodies.map(c => window.__clearanceTo(c, x, z)))
+      const inward = Math.atan2(body.x - prop.x, body.z - prop.z)
+      let cameraGap = -Infinity
+      for (let k = 0; k < 32; k++) {
+        const angle = inward + Math.PI / 3 + k * Math.PI / 16
+        const x = body.x + Math.sin(angle) * 4
+        const z = body.z + Math.cos(angle) * 4
+        if (clear(x, z) < 0.35) continue
+        let visible = true
+        for (let step = 1; step <= 16; step++) {
+          const t = step / 16
+          if (clear(x + (body.x - x) * t, z + (body.z - z) * t) < 0.1) visible = false
+        }
+        if (!visible) continue
+        p.x = x
+        p.z = z
+        p.yaw = Math.atan2(body.x - p.x, body.z - p.z) + Math.PI
+        p.pitch = -0.1
+        cameraGap = clear(x, z)
+        break
+      }
       return { body, propGap: gap(prop, 1), bodyGap: gap(body, 0.3), cameraGap, facesLoom }
     })
     check('the reported weaver and loom have a walker-wide gap to the village buildings',
@@ -5512,7 +5529,7 @@ if (section('village-stations')) {
     check('the weaver faces her loom', staged.facesLoom)
     check('the weaver photograph stands on open ground', staged.cameraGap >= 0.35, `${staged.cameraGap.toFixed(2)} m`)
     await nextFrames(3)
-    await frame('1143-village-weaver-clear-of-market', {
+    if (staged.cameraGap >= 0.35) await frame('1143-village-weaver-clear-of-market', {
       local: { x: staged.body.x, y: staged.body.y + 0.9, z: staged.body.z },
       label: 'the reported-seed weaver facing her loom, with open ground separating her from the trading-post wall',
     })

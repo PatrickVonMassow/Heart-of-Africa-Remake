@@ -11,7 +11,7 @@ const run = new (Object.getPrototypeOf(async function () {}).constructor)(
 
 afterEach(() => vi.unstubAllGlobals())
 
-async function photograph({ marketX = -5.21, failFrame = false } = {}) {
+async function photograph({ marketX = -5.21, marketRadius = 2.9, failFrame = false } = {}) {
   const state = { seed: 42, placeId: 'cairo', leavePlace() { this.placeId = null }, enterPlace(id) { this.placeId = id }, setJournalOpen() {} }
   const matrix = (x, z, yaw = 0) => ({
     updateWorldMatrix() {},
@@ -23,7 +23,7 @@ async function photograph({ marketX = -5.21, failFrame = false } = {}) {
   vi.stubGlobal('__placeScene', { getObjectByName: name => name === 'village-weaver' ? loom : body })
   vi.stubGlobal('__placeLayout', {
     interactives: [{ type: 'market' }], dwellings: [],
-    colliders: [{ x: marketX, z: -5.76, r: 2.9 }],
+    colliders: [{ x: marketX, z: -5.76, r: marketRadius }],
   })
   vi.stubGlobal('__placePlayer', {})
   vi.stubGlobal('__clearanceTo', (c, x, z) => Math.hypot(x - c.x, z - c.z) - c.r)
@@ -65,4 +65,11 @@ it('restores the seed even when the shutter fails', async () => {
   expect(error?.message).toBe('shutter failed')
   expect(state.seed).toBe(42)
   expect(state.placeId).toBeNull()
+})
+
+it('refuses a photograph when every candidate camera stand is blocked', async () => {
+  const { checks, frames, state } = await photograph({ marketRadius: 20 })
+  expect(checks[2].pass).toBe(false)
+  expect(frames).toEqual([])
+  expect(state.seed).toBe(42)
 })

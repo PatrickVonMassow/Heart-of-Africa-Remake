@@ -19,7 +19,7 @@ function stationBodies() {
     { x: loom[0], z: loom[1], r: 1 },
     inward(loom, 0.55),
     ...Object.entries(VILLAGE_SPOTS).map(([name, p]) => ({
-      x: p[0], z: p[1], r: { talkers: 0.85, pounder: 0.55, drummer: 0.8, well: 0.75 }[name]!,
+      x: p[0], z: p[1], r: { talkers: 0.85, pounder: 0.55, drummer: 0.8, well: 0.75 }[name as keyof typeof VILLAGE_SPOTS],
     })),
     ...[-0.5, 0.5].map(dx => ({ x: VILLAGE_SPOTS.talkers[0] + dx, z: VILLAGE_SPOTS.talkers[1], r: WALKER_RADIUS })),
     inward(VILLAGE_SPOTS.pounder, -0.55),

@@ -4,8 +4,8 @@
 
 import { WALKER_RADIUS } from './collision'
 
-/** Inside the open meeting ground, clear of the seeded trading-post band. */
-export const LOOM_SPOT: [number, number] = [0, -3]
+/** Keep the established adult/hearing geography; fit the buildings around it. */
+export const LOOM_SPOT: [number, number] = [-8.5, -7]
 export const WEAVER_OFFSET = 0.55
 
 /** A prop's local +Z points towards the village centre. */

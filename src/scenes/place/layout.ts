@@ -825,7 +825,7 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     : null
 
   const lifeFootprints = place.kind === 'village' ? villageLifeFootprints(VILLAGE_FIRE) : []
-  const clearsLife = (obstacles: readonly Collider[]) =>
+  const clearsLife = (obstacles: Collider[]) =>
     lifeFootprints.every(body => standingClear(obstacles, body.x, body.z, body.r + 2 * WALKER_RADIUS))
 
   const interactives: Interactive[] = []
@@ -860,8 +860,8 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
       marketPos[1] = chiefPos[1] + nz * 7.25
     }
     // Keep every original seed draw and accept an already-clear spot unchanged.
-    // Some street plans put the market near the talkers; fit those rare cases
-    // around the full stations before any lanes or dwellings depend on its door.
+    // The original market band crosses the loom. Fit its full collider around
+    // the props and figures before any lanes or dwellings depend on its door.
     const marketRadius = interactiveCircleRadius('market', style)
     const marketFits = (x: number, z: number) =>
       clearsLife([{ x, z, r: marketRadius }]) &&
