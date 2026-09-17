@@ -80,7 +80,9 @@ describe('one pass per suite (point 1135)', () => {
     expect(result.attempts).toHaveLength(1)
     expect(result.log).toContain('ACCOUNTED FOR  settings — every red is charged to open point(s) 603')
     expect(result.log).toContain('1 SUITE(S) FAILED — 1 suites run — reds charged to open points 603')
-    expect(result.status).toBe(1)
+    // RED, and charged elsewhere: a failing exit that the backend sequencer can
+    // tell apart from a red that holds (point 1135).
+    expect(result.status).toBe(ownership.EXIT_NOT_HELD)
     expect(result.saved[0].exit).toBe(1)
     expect(runVerdict(result.saved[0], { openPoints: [603] }).status).toBe('accounted')
   })
@@ -190,12 +192,13 @@ describe('the classified baseline is the charge ledger, not a second set of pass
     expect(result.log).not.toContain('CANDIDATE REAL FAILURE')
   })
 
-  it('classifies a charged red from the ledger alone, and keeps the regression exit 1', async () => {
+  it('classifies a charged red from the ledger alone, and keeps the regression red', async () => {
     const result = await run({ large: true })
     expect(result.attempts).toHaveLength(1)
     expect(result.log).toContain('POINT REDS DO NOT HOLD — charged elsewhere: "point 603 — first-person ground shows micro-detail')
     expect(result.log).toContain('regression verdict unchanged')
-    expect(result.status).toBe(1)
+    expect(result.status).toBe(ownership.EXIT_NOT_HELD)
+    expect(result.status).not.toBe(0)
   })
 
   it('spawns no baseline pass on a LARGE — the extra passes are deleted', async () => {
@@ -234,5 +237,88 @@ describe('the classified baseline is the charge ledger, not a second set of pass
     const result = await run({ outputs: [`PASS  ${ground} — laplacian mean 1.42\n${unknown}`] })
     expect(result.log).toContain(`STRIKE  settings     "${ground}" PASSED here but is still charged to open point 603`)
     expect(result.log).toContain('scripts/render-verify-charges.mjs')
+  })
+})
+
+// POINT 1135 item 6: a pass that is red on charged reds alone must not end the
+// backend sequence. The exit code is the only channel the sequencer has — the
+// child's output goes straight to the terminal through stdio: 'inherit'.
+describe('a red that does not hold lets the other backend run (point 1135)', () => {
+  it('exits EXIT_NOT_HELD when every red is charged elsewhere', async () => {
+    const result = await run({ large: true })
+    expect(result.log).toContain('POINT REDS DO NOT HOLD')
+    expect(result.status).toBe(ownership.EXIT_NOT_HELD)
+  })
+
+  it('exits 1 when a red holds, so the sequence still stops for it', async () => {
+    const result = await run({ large: true, outputs: [unknown], tasks: '' })
+    expect(result.log).toContain('POINT REDS HOLD')
+    expect(result.status).toBe(1)
+  })
+
+  it('exits 1 when a stage that is not a suite failed, whatever the reds say', async () => {
+    // `build` is one of the filter names, and the fixture's spawn answers every
+    // non-suite command with exit 1.
+    const result = await run({ large: true, suite: 'settings', outputs: ['PASS  all checks'] })
+    expect(result.status).toBe(0)
+  })
+})
+
+describe('the both-backend sequencer (point 1135)', () => {
+  async function sequence(statuses) {
+    const printed = []
+    const exit = new Error('runner exited')
+    let exitCode
+    const passes = []
+    const spawnSync = (_cmd, args, options) => {
+      passes.push(options.env.VERIFY_GL)
+      return { status: statuses[passes.length - 1] ?? 0, stdout: '', stderr: '' }
+    }
+    const context = {
+      ...core, ...classify, ...tiers, ...load, ...sections, ...ownership,
+      spawnSync, dirname, join, fileURLToPath,
+      readRenderState: () => ({ runs: [] }), readTasksAll: () => '',
+      launchServer: async () => ({ base: 'http://test', child: null }), killTree: () => {},
+      needsGpuBackendProbe: () => false,
+      console: { log: (...args) => printed.push(args.join(' ')) },
+      process: {
+        execPath: 'node', argv: ['node', 'run-all.mjs', 'large'],
+        env: { VERIFY_ON_LOAD: 'off', RVA_LADDER_ASKED: '1' },
+        exit: (code) => { exitCode = code; throw exit },
+      },
+    }
+    try { await runInNewContext(`(async () => {${source}\n})()`, context) }
+    catch (error) { if (error !== exit) throw error }
+    return { passes, log: printed.join('\n'), status: exitCode }
+  }
+
+  it('runs both planned backends and fails at the END when the first pass holds nothing', async () => {
+    const result = await sequence([ownership.EXIT_NOT_HELD, 0])
+    expect(result.passes).toHaveLength(2)
+    expect(result.log).toContain('regression verdict unchanged')
+    expect(result.log).toContain('LARGE FAILED AT ITS END')
+    expect(result.log).toContain('none was skipped')
+    expect(result.status).toBe(ownership.EXIT_NOT_HELD)
+  })
+
+  it('still stops at a red that HOLDS, and says so', async () => {
+    const result = await sequence([1, 0])
+    expect(result.passes).toHaveLength(1)
+    expect(result.log).toContain('a red that HOLDS; not proceeding to the remaining backend(s)')
+    expect(result.status).toBe(1)
+  })
+
+  it('reports a charged red from EITHER pass at the end', async () => {
+    const result = await sequence([0, ownership.EXIT_NOT_HELD])
+    expect(result.passes).toHaveLength(2)
+    expect(result.log).toContain('LARGE FAILED AT ITS END')
+    expect(result.status).toBe(ownership.EXIT_NOT_HELD)
+  })
+
+  it('exits 0 when both planned backends are green', async () => {
+    const result = await sequence([0, 0])
+    expect(result.passes).toHaveLength(2)
+    expect(result.log).not.toContain('LARGE FAILED')
+    expect(result.status).toBe(0)
   })
 })

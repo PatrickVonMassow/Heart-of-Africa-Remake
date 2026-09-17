@@ -36,7 +36,7 @@ import { LADDER_STATUS, formatLadderRefusal } from './ladder-core.mjs'
 import { ladderCheck } from './ladder.mjs'
 import { SECTION_ENV, listSections, planSectionRun, resolveSelection } from './sections.mjs'
 import { readFileSync } from 'node:fs'
-import { formatOwnershipVerdict, wantsBaseline } from './red-ownership-core.mjs'
+import { EXIT_NOT_HELD, formatOwnershipVerdict, wantsBaseline } from './red-ownership-core.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const chargedPoints = new Set()
@@ -163,6 +163,15 @@ if (backendPlan.length > 0) {
         ...(pass.webglOnlyCovered ? { RVA_WEBGL_COVERED: '1' } : {}),
       },
     }).status ?? 1
+  // A RED THAT DOES NOT HOLD DOES NOT STOP THE SEQUENCE (point 1135). A pass
+  // that ends "own or unresolved: none; regression verdict unchanged" has
+  // already said its reds belong elsewhere, and stopping there cost the run the
+  // OTHER backend entirely — CLAUDE.md §5 asks for both once per bundle and at
+  // the closing, and while any pre-existing red stood that was unreachable.
+  // So the sequence runs on and the run FAILS AT ITS END. A red that DOES hold
+  // still stops it: there is nothing to learn from a second backend about a
+  // defect the first one has already pinned on this change.
+  const notHeld = []
   for (const [i, pass] of backendPlan.entries()) {
     const label = pass.backend === 'webgpu' ? 'WebGPU' : 'WebGL 2'
     const shape = pass.skipPreflight
@@ -170,10 +179,22 @@ if (backendPlan.length > 0) {
       : 'full, with preflight'
     console.log(`\n===== LARGE regression — backend ${i + 1}/${backendPlan.length}: ${label} (${shape}) =====`)
     const status = runBackend(pass)
+    if (status === EXIT_NOT_HELD) {
+      notHeld.push(label)
+      console.log(
+        `\nThe ${label} pass is RED, and its own accounting charges every red elsewhere — regression verdict unchanged. ` +
+          'Continuing to the remaining backend(s); this run fails at its END (point 1135).',
+      )
+      continue
+    }
     if (status !== 0) {
-      console.log(`\nLARGE FAILED on the ${label} backend — not proceeding to the remaining backend(s).`)
+      console.log(`\nLARGE FAILED on the ${label} backend — a red that HOLDS; not proceeding to the remaining backend(s).`)
       process.exit(status)
     }
+  }
+  if (notHeld.length > 0) {
+    console.log(`\nLARGE FAILED AT ITS END — red on ${notHeld.join(' and ')}, every red charged elsewhere. Every planned backend ran; none was skipped.`)
+    process.exit(EXIT_NOT_HELD)
   }
   process.exit(0)
 }
@@ -577,10 +598,15 @@ const failed = results.filter((r) => !r).length
 const charges = [...chargedPoints].sort((a, b) => a - b)
 console.log(`\n${failed === 0 ? 'ALL GREEN' : failed + ' SUITE(S) FAILED'} — ${results.length} suites run` +
   (charges.length ? ` — reds charged to open points ${charges.join(', ')}` : ''))
-if (ownership) console.log(formatOwnershipVerdict({
-  rows: ownership.rows,
-  unresolved: [...ownership.unresolved, ...(failed > redSuites.length ? ['other failed stages: see regression report'] : [])],
-}))
+// The stages that are not suites — build, lint, unit, the GPU preflight — are
+// unresolved by construction: no charge ledger names them.
+const otherStages = failed > redSuites.length ? ['other failed stages: see regression report'] : []
+const unresolved = ownership ? [...ownership.unresolved, ...otherStages] : otherStages
+if (ownership) console.log(formatOwnershipVerdict({ rows: ownership.rows, unresolved }))
+// DOES THIS PASS'S RED HOLD? The answer the backend sequencer above reads off
+// the exit code — nothing else in the house tells the two reds apart, and both
+// are failures (point 1135).
+const holds = ownership === null || ownership.rows.some((r) => !r.elsewhere) || unresolved.length > 0
 // Say it again at the END, where the verdict is read (point 566): a green
 // headline from a one-section run must never be quoted as the suite's.
 if (section) console.log(`PARTIAL — only section "${section}" of ${filter[0]} ran; the suite is NOT covered by this run`)
@@ -596,4 +622,4 @@ if (loadMode !== 'off') {
     green: failed === 0,
   })) console.log(line)
 }
-process.exit(failed === 0 ? 0 : 1)
+process.exit(failed === 0 ? 0 : holds ? 1 : EXIT_NOT_HELD)
