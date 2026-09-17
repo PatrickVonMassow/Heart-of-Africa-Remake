@@ -1286,3 +1286,30 @@ laufen lassen statt gegen die lebenden Dokumente, oder `MEMORY.md` aus der
 live vermessenen Liste nehmen und ihr Budget allein im Stop-Hook prüfen.
 Bis dahin gilt die Regel, die jetzt im Gedächtnis steht: Während eines Laufs
 wird gelesen — auch im Gedächtnisverzeichnis.
+
+## Die i18n-Suite meldet „0 pass, 0 fail", obwohl sie prüft (17.09.2026)
+
+Im Beweislauf zu Punkt 1140 meldete `scripts/verify/i18n.mjs` auf WebGPU als
+VOLLE Suite `PASS i18n 0 pass, 0 fail, 0 console-errors`. Ich habe die Zeile
+zweimal als „diese Suite hat nichts geprüft" gelesen und sie so an den Nutzer
+gemeldet, bevor ich ihre Quelle aufschlug.
+
+Das war falsch. Die Suite hat bewusst keine `check()`-Aufrufe — ihr eigener
+Kommentar sagt es: die Textasserts sind nach Vitest gezogen, und was in ihr
+bleibt, braucht einen echten Browser. Geprüft wird durch drei Dinge, die der
+Zähler nicht zählt: die fünf Verschluss-Aufnahmen (der Shutter von Punkt 375
+wirft, wenn das Element nicht auf dem Schirm steht, statt ein Bild als Beleg
+für einen nie geöffneten Dialog abzulegen), das Konsolenfehler-Tor (`exit 1`
+bei jedem Fehler) und die Wache gegen einen ausgewählten Abschnitt, der nie
+ausgeführt wurde.
+
+Kein Deckungsloch, sondern ein Lesefehler-Risiko in der Verdikt-Zeile: „0 pass,
+0 fail" ist für einen Leser nicht von einer Nullprüfung zu unterscheiden, und
+die Verwechslung führt geradewegs zu einer falschen Rot- oder Leermeldung über
+eine Suite, die ihre Arbeit getan hat.
+
+Nicht als Punkt eingereiht (Befundaufnahme CLAUDE.md §2): kein Spielerimpakt,
+kein Sicherheitsrisiko, keine Blockade und keine falsche Freigabe — die Suite
+schlägt korrekt fehl, wenn eine Aufnahme oder die Konsole rot wird. Der billige
+Weg, falls es wieder stört: die Verdikt-Zeile einer suite ohne `check()` nennen
+lassen, was stattdessen lief (Aufnahmen, Fehlertor), statt eine Null zu drucken.
