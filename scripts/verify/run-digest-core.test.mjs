@@ -428,18 +428,24 @@ describe('the run keeps its own bookkeeping demands (point 1135)', () => {
 
 describe('the budget yields to the run\'s bookkeeping, not the other way round (point 1135)', () => {
   it('keeps STRIKE, POINT REDS and ACCOUNTED FOR when a hundred echoes press on the budget', () => {
+    // THE KINDS `applyBudget` ACTUALLY READS (`priorityOf` reads `kind`, not
+    // `priority`): the bookkeeping lines classify `final` and the echoes `echo`,
+    // so all of them are HIGH priority and the first eviction loop passes them
+    // by. Only the second loop can reach them — which is the loop the protection
+    // has to survive.
     const entries = [
-      { line: 'STRIKE  settings     "a check" PASSED here but is still charged to open point 603', priority: 'low' },
-      { line: 'ACCOUNTED FOR  settings — every red is charged to open point(s) 603', priority: 'low' },
-      { line: 'POINT REDS DO NOT HOLD — charged elsewhere: "point 603 — a check"', priority: 'low' },
-      ...Array.from({ length: 120 }, (_, i) => ({ line: `      FAIL  echo ${i}`, priority: 'low' })),
+      { kind: classifyLine('STRIKE  settings     "a check" PASSED here'), line: 'STRIKE  settings     "a check" PASSED here but is still charged to open point 603' },
+      { kind: 'final', line: 'ACCOUNTED FOR  settings — every red is charged to open point(s) 603' },
+      { kind: 'final', line: 'POINT REDS DO NOT HOLD — charged elsewhere: "point 603 — a check"' },
+      { kind: 'final', line: 'PARTIAL — only section "ground-detail" of settings ran' },
+      ...Array.from({ length: 120 }, (_, i) => ({ kind: 'echo', line: `      FAIL  echo ${i}` })),
     ]
     const { kept } = applyBudget(entries, 10)
     expect(kept).toHaveLength(10)
     // The budget drops from the FRONT once the low-priority lines are gone, and
-    // these three stand at the very front: without the protection they are the
+    // these four stand at the very front: without the protection they are the
     // first to go, whatever class they carry.
-    for (const line of entries.slice(0, 3).map((e) => e.line)) {
+    for (const line of entries.slice(0, 4).map((e) => e.line)) {
       expect(kept.map((e) => e.line)).toContain(line)
     }
   })

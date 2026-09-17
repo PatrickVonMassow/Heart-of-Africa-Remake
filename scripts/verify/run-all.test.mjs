@@ -56,7 +56,7 @@ async function run({ outputs = [known], records = [{}], tasks = '- [ ] 603. grou
     needsGpuBackendProbe: () => false,
     console: { log: (...args) => printed.push(args.join(' ')) },
     process: {
-      execPath: 'node', argv: ['node', 'run-all.mjs', ...(large ? ['large'] : []), suite, ...(preflight ? ['build'] : [])],
+      execPath: 'node', argv: ['node', 'run-all.mjs', ...(large ? ['large'] : []), suite, ...(preflight ? ['lint'] : [])],
       env: {
         RVA_SKIP_PREFLIGHT: large || !preflight ? '1' : '0', VERIFY_GL: backend,
         VERIFY_ON_LOAD: 'off', RVA_LADDER_ASKED: '1',
@@ -268,13 +268,29 @@ describe('a red that does not hold lets the other backend run (point 1135)', () 
   })
 
   it('exits 1 when a stage that is not a suite failed, whatever the reds say', async () => {
-    // The preflight runs, and the fixture answers every non-suite command with
-    // exit 1 — so `build` fails while the suite's own reds are all charged. A
-    // stage no ledger can name must never reach the charged-red exit code.
+    // `lint` fails and does NOT stop the pass, so the suite runs too and its
+    // reds are all charged. A stage no ledger can name must never let the run
+    // reach the charged-red exit code.
     const result = await run({ preflight: true })
-    expect(result.log).toContain('FAIL  build')
+    expect(result.log).toContain('FAIL  lint')
+    expect(result.log).toContain('ACCOUNTED FOR  settings')
+    expect(result.log).toContain('other failed stages')
     expect(result.status).toBe(1)
     expect(result.status).not.toBe(ownership.EXIT_NOT_HELD)
+  })
+
+  it('does not call a fully charged record-only red an unnamed failure', async () => {
+    // The reds live in the record and the printed output names none of them, so
+    // the old "no printed failure" test reported an unnamed failure beside its
+    // own ACCOUNTED FOR line and held the run.
+    const result = await run({
+      exitStatus: 0,
+      outputs: ['PASS  a check\nconsole errors: 0'],
+      records: [{ exit: 0, reds: [{ name: ground, kind: 'check', point: 603 }] }],
+    })
+    expect(result.log).toContain('POINT REDS DO NOT HOLD')
+    expect(result.log).not.toContain('unnamed failure')
+    expect(result.status).toBe(ownership.EXIT_NOT_HELD)
   })
 })
 

@@ -694,7 +694,12 @@ if (redSuites.length > 0) {
       elsewhere: false, title: '', reason: 'no complete run record — ownership unresolved' }))))
   ownership = {
     rows,
-    unresolved: redSuites.filter((red) => red.unresolved || red.failed.length === 0)
+    // AN UNNAMED FAILURE IS ONE NOTHING NAMED — not one the OUTPUT did not name.
+    // `failed` is parsed from the printed lines alone, so a red suite whose reds
+    // live only in its run record (fully charged and accounted for) was reported
+    // as unnamed as well, which held the run and stopped the backend sequence
+    // over a red its own accounting had settled (Astra, 17.09.2026).
+    unresolved: redSuites.filter((red) => red.unresolved || (red.failed.length === 0 && (red.rows?.length ?? 0) === 0))
       .map((red) => `${red.suite}: incomplete run or unnamed failure`),
   }
   if (wantBaseline) {
