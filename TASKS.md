@@ -106,34 +106,6 @@ put it is the mistake this line exists to stop.
   points 1141, 1142, 1135
   Bundle: Testinfrastruktur
 
-- [ ] 1150. The doctor's quarantine takes the frames away from a RUNNING picture run
-  (measured 18.09.2026, twice in one hour, 01:22 and 01:31). The covering WebGPU `polish`
-  run for point 1147 was drawing (pid 661900, its own record says `cleanAtStart: true`, the
-  wait was declared through `batch-in-flight`), and `batch-doctor` classified the
-  `verification/*.png` IT had just written as "uncommitted changes during/after a
-  parallel-session window — they cannot be attributed to one author" and stashed them: 31
-  frames first, three more nine minutes later.
-  WHY IT IS WRONG: the attribution is measurable, not ambiguous. The tree was clean when the
-  run started, the run is declared, and the files that appeared since are exactly its frames.
-  IMPACT: the picture series of a running COVERAGE measurement is scattered over two
-  quarantine stashes and the working tree. Whoever does not notice judges half a series or
-  none, and may sign a coverage whose frames nobody ever looked at — a false approval, which
-  is why this is filed under the infrastructure freeze rather than deferred to the backlog.
-  It was survived here only by copying all 34 frames out of the repository before the second
-  quarantine.
-  FINAL STATE: a quarantine no longer touches files that a LIVE, DECLARED verification is
-  writing itself. The decision has both halves available to it in the tree: the
-  `batch-in-flight` declaration naming the run, and that run's pid still alive. Everything
-  else it quarantines as before; a declaration whose process is gone protects nothing.
-  VERIFICATION: a unit test over the doctor's decision core — a dirty `verification/` file
-  plus a live declared run is NOT planned for quarantine, the same file without a live
-  declaration still is.
-  Criticality: high — it destroys the evidence of the most expensive measurement the batch
-  makes, and it did so twice unprompted.
-  Refs: scripts/batch-doctor.mjs, scripts/batch-in-flight.mjs, points 1147, 1142
-  Bundle: Testinfrastruktur
-
-
 - [ ] 1134. The full regression becomes the BUNDLE's gate, not the feature's (user order
   15.09.2026, SECOND of three, after 1135 and before 1136).
   MEASURED over 01.09.–15.09.: 40 merged `feat/` branches, 103 recorded verification runs, 49 of
@@ -947,6 +919,33 @@ put it is the mistake this line exists to stop.
   tag plus `poc` dynamically, but a tag push alone does not trigger it. Then VERIFY
   that /v0.3/ and /poc/ serve the new state, and FREEZE the tag: it is never
   re-pointed.
+
+- [ ] 1150. The doctor's quarantine takes the frames away from a RUNNING picture run
+  (measured 18.09.2026, twice in one hour, 01:22 and 01:31). The covering WebGPU `polish`
+  run for point 1147 was drawing (pid 661900, its own record says `cleanAtStart: true`, the
+  wait was declared through `batch-in-flight`), and `batch-doctor` classified the
+  `verification/*.png` IT had just written as "uncommitted changes during/after a
+  parallel-session window — they cannot be attributed to one author" and stashed them: 31
+  frames first, three more nine minutes later.
+  WHY IT IS WRONG: the attribution is measurable, not ambiguous. The tree was clean when the
+  run started, the run is declared, and the files that appeared since are exactly its frames.
+  IMPACT: the picture series of a running COVERAGE measurement is scattered over two
+  quarantine stashes and the working tree. Whoever does not notice judges half a series or
+  none, and may sign a coverage whose frames nobody ever looked at — a false approval, which
+  is why this is filed under the infrastructure freeze rather than deferred to the backlog.
+  It was survived here only by copying all 34 frames out of the repository before the second
+  quarantine.
+  FINAL STATE: a quarantine no longer touches files that a LIVE, DECLARED verification is
+  writing itself. The decision has both halves available to it in the tree: the
+  `batch-in-flight` declaration naming the run, and that run's pid still alive. Everything
+  else it quarantines as before; a declaration whose process is gone protects nothing.
+  VERIFICATION: a unit test over the doctor's decision core — a dirty `verification/` file
+  plus a live declared run is NOT planned for quarantine, the same file without a live
+  declaration still is.
+  Criticality: high — it destroys the evidence of the most expensive measurement the batch
+  makes, and it did so twice unprompted.
+  Refs: scripts/batch-doctor.mjs, scripts/batch-in-flight.mjs, points 1147, 1142
+  Bundle: Testinfrastruktur
 
 - [ ] 1145. A frame-subject miss KILLS the whole run instead of failing one check, and two
   frames now do it on `main` itself (filed 17.09.2026 from point 1140's covering passes;

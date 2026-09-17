@@ -656,6 +656,17 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Sag mir vor dem Start: **was fährt das unter der Haube?** Läuft schon etwas mit
   Build, Lint oder Tests, **warte**. Die Regel heißt **‚kein zweiter Maschinenverbraucher'**."
 
+- **Euer Aufräumer räumt weg, woran gerade gearbeitet wird.** Automatische Hygiene sieht einen
+  unordentlichen Stand und schafft ihn beiseite — auch dann, wenn diese Unordnung das
+  **Zwischenergebnis eines laufenden Laufs** ist. Hier traf es zweimal in einer Stunde die
+  Bilder, die ein Prüflauf in genau diesem Moment schrieb. Nichts ging verloren, aber das
+  Material lag danach verstreut, und wer das nicht merkt, beurteilt am Ende die Hälfte und
+  hält sie für das Ganze. Das ist die gefährliche Sorte Fehler: keine Meldung, kein Rot, nur
+  ein Urteil über zu wenig Material.
+  → *Prompt:* „Bevor dein Aufräumer etwas beiseiteschafft: **prüf, ob gerade jemand arbeitet.**
+  Läuft ein angemeldeter Lauf, gehört sein frisch geschriebenes Material ihm — lass es liegen.
+  Und sag mir hinterher, **was** du weggeräumt hast, nicht nur **dass** du aufgeräumt hast."
+
 ---
 
 ## Drei Meta-Regeln, die alles zusammenhalten
@@ -694,4 +705,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 3b153aeb1efc26dd6a7f9196cf496c01273318be0b2ccdfa8bb3d49048c2f990 -->
+<!-- GUIDE-FINGERPRINT: 9cc5f66dae6d1ded6373dbf3a41ccea288085ec9a31c49f64a7c6ba462b0c295 -->
