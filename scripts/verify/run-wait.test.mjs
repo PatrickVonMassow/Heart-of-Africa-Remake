@@ -14,6 +14,9 @@ const CLI = join(HERE, 'run-wait.mjs')
 /** Every invocation keeps its wait lease and its journal in a throwaway
  *  directory: a unit run must not write into the live batch's registry, and
  *  two fixtures must not inherit each other's lease. */
+/** The house suite ceiling, pinned for the child so no fixture reads the shell. */
+const CEILING_MS = 45 * 60_000
+
 function run(args, env = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'hoa-runwait-env-'))
   return spawnSync(process.execPath, [CLI, ...args], {
@@ -24,6 +27,7 @@ function run(args, env = {}) {
       ...process.env,
       HOA_WAIT_LEASE_PATH: join(dir, 'wait-leases.json'),
       HOA_ACTIVITY_JOURNAL_PATH: join(dir, 'activity.jsonl'),
+      VERIFY_SUITE_TIMEOUT_MS: String(CEILING_MS),
       ...env,
     },
   })

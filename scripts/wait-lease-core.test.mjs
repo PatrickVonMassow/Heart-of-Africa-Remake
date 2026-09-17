@@ -214,18 +214,32 @@ describe('concurrentWaitAlarm (union entry U11)', () => {
   })
 })
 
+/** The house ceiling, named so no fixture measures the shell it runs in. */
+const CEILING = 45 * 60_000
+
 describe('waitThresholds (union entry U12)', () => {
   it('puts the overdue mark at the estimate and the hung mark a whole suite ceiling beyond it', () => {
-    const { deadlineAt, hungAt, expectationMs } = waitThresholds({ startedAt: T0, expectedRuntimeMs: 20 * 60_000 })
+    const { deadlineAt, hungAt, expectationMs } = waitThresholds({ startedAt: T0, expectedRuntimeMs: 20 * 60_000, ceilingMs: CEILING })
     expect(expectationMs).toBe(20 * 60_000)
     expect(deadlineAt).toBe(T0 + 20 * 60_000)
-    expect(hungAt).toBe(T0 + 20 * 60_000 + SUITE_CEILING_MS)
+    expect(hungAt).toBe(T0 + 20 * 60_000 + CEILING)
+  })
+
+  it('defaults the ceiling to the house 45 minutes, and lets the environment raise it', () => {
+    expect(SUITE_CEILING_MS).toBe(Number(process.env.VERIFY_SUITE_TIMEOUT_MS) || 45 * 60_000)
+    const raised = waitThresholds({ startedAt: T0, expectedRuntimeMs: 20 * 60_000, ceilingMs: 90 * 60_000 })
+    expect(raised.hungAt).toBe(T0 + Math.min(110 * 60_000, WAIT_LEASE_CAP_MS))
+  })
+
+  it('never lets the ceiling push a wedged run past the absolute cap', () => {
+    const { hungAt } = waitThresholds({ startedAt: T0, expectedRuntimeMs: 90 * 60_000, ceilingMs: 90 * 60_000 })
+    expect(hungAt).toBe(T0 + WAIT_LEASE_CAP_MS)
   })
 
   // THE 15.09.2026 CASE, pinned: a `polish` pass planned at 5 min 41 s and
   // running healthily for 17 min 28 s was called hung by the old 2.5x mark.
   it('does not condemn a run that merely outran an estimate the house measures low', () => {
-    const { hungAt } = waitThresholds({ startedAt: T0, expectedRuntimeMs: 341_000 })
+    const { hungAt } = waitThresholds({ startedAt: T0, expectedRuntimeMs: 341_000, ceilingMs: CEILING })
     expect(T0 + 17 * 60_000 + 28_000).toBeLessThan(hungAt)
   })
 
@@ -235,7 +249,7 @@ describe('waitThresholds (union entry U12)', () => {
   })
 
   it('caps an absurd estimate, so no wait can buy unlimited silence', () => {
-    const { deadlineAt, hungAt } = waitThresholds({ startedAt: T0, expectedRuntimeMs: 99 * 60 * 60_000 })
+    const { deadlineAt, hungAt } = waitThresholds({ startedAt: T0, expectedRuntimeMs: 99 * 60 * 60_000, ceilingMs: CEILING })
     expect(deadlineAt).toBe(T0 + WAIT_LEASE_CAP_MS)
     expect(hungAt).toBe(T0 + WAIT_LEASE_CAP_MS)
   })
@@ -243,7 +257,7 @@ describe('waitThresholds (union entry U12)', () => {
 
 describe('waitTimeoutDecision (union entry U12)', () => {
   const bounded = () => {
-    const { deadlineAt, hungAt } = waitThresholds({ startedAt: T0, expectedRuntimeMs: 20 * 60_000 })
+    const { deadlineAt, hungAt } = waitThresholds({ startedAt: T0, expectedRuntimeMs: 20 * 60_000, ceilingMs: CEILING })
     return lease({ deadlineAt, hungAt })
   }
 
