@@ -15,7 +15,9 @@ import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { killTree, launchServer } from './_server.mjs'
-import { allChecks, checkFromName, clearInheritedBaselineLane, countCheckLines, failedChecks } from './baseline-classify-core.mjs'
+import {
+  allChecks, checkFromName, clearInheritedBaselineLane, consoleErrorChecks, countCheckLines, failedChecks, parseCheckLines,
+} from './baseline-classify-core.mjs'
 import {
   LEVEL, annotateResult, annotateStageFailure, decideRun, formatLoadReport, onLoadMode,
 } from './machine-load-core.mjs'
@@ -40,6 +42,16 @@ import { EXIT_NOT_HELD, formatOwnershipVerdict, wantsBaseline } from './red-owne
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const chargedPoints = new Set()
+
+/** EVERY `console errors: <n>` line the output carries, not the first (point
+ *  1135, cross-vendor review round 5): a suite printing `0` for one page and
+ *  `1` for the next was read as clean by a first-match regex. The tally is the
+ *  LARGEST reading, so a later zero cannot erase an earlier red. */
+function countedConsoleErrors(out) {
+  let most = 0
+  for (const m of String(out ?? '').matchAll(/console errors: (\d+)/gi)) most = Math.max(most, Number(m[1]))
+  return most
+}
 
 // A REGRESSION PASS IS NEVER THE BASELINE LANE. Dropped from this process's own
 // environment, so no child — suite, retry, cross-browser check or Vitest — can
@@ -277,8 +289,7 @@ function runSuite(name, baseUrl, onlySection = '') {
   // bare `^FAIL` prefix: flow.mjs closes with `FAILURES: <n>`, which a prefix
   // match counts as a failing check nobody can name.
   const { pass, fail } = countCheckLines(out)
-  const errMatch = out.match(/console errors: (\d+)/i)
-  const consoleErrors = errMatch ? Number(errMatch[1]) : 0
+  const consoleErrors = countedConsoleErrors(out)
   const ok = res.status === 0 && fail === 0 && consoleErrors === 0
   // A narrowed spawn says so on its own result line: a reader who sees only the
   // headline must never mistake one block's tally for the suite's (point 1126).
@@ -337,11 +348,28 @@ function runSuite(name, baseUrl, onlySection = '') {
   // reader of this ledger does, and without it the same red arrives twice: once
   // keyed `undefined` from the record, once keyed properly from the output.
   const keyOf = (red) => red.key ?? checkFromName(red.name).key
+  // EVERY OCCURRENCE THE RUN PRODUCED, recorded AND printed, undeduplicated.
+  // `failedChecks` folds repeats away by key and the key folds the measurement
+  // away, so a printed second reading of a charged check — a DIFFERENT
+  // measurement under the same name — was invisible here while a `detailMatch`
+  // charge reads exactly that measurement (Astra, round 5).
+  const printedOccurrences = [
+    ...parseCheckLines(out).filter((c) => c.status === 'FAIL'),
+    ...consoleErrorChecks(out),
+  ]
+  const ownedPrinted = (check) => complete &&
+    owned({ name: check.name, key: check.key, kind: check.kind ?? 'check', detail: check.detail },
+      name, record.backend, record.featureLevel, openPoints)
+  const recordedKeys = new Set(recordedReds.map(keyOf))
   const underKey = new Map()
-  for (const red of reds) {
-    const list = underKey.get(keyOf(red)) ?? []
-    list.push(red)
-    underKey.set(keyOf(red), list)
+  const add = (key, entry) => {
+    const list = underKey.get(key) ?? []
+    list.push(entry)
+    underKey.set(key, list)
+  }
+  for (const red of reds) add(keyOf(red), { owned: ownedSet.has(red), point: () => pointOf(red) })
+  for (const check of printedOccurrences) {
+    add(check.key, { owned: ownedPrinted(check), point: () => chargeFor(check, { suite: name, backend: record?.backend, featureLevel: record?.featureLevel })?.point ?? null })
   }
   const row = ({ key, name: check, fromRecord }) => {
     // EVERY OCCURRENCE, NOT THE FIRST OWNED ONE. The key folds the measurement
@@ -349,8 +377,11 @@ function runSuite(name, baseUrl, onlySection = '') {
     // measurement, so two reds under one key can differ in ownership. One of
     // them being charged says nothing about the other.
     const occurrences = underKey.get(key) ?? []
-    const charged = occurrences.length > 0 && occurrences.every((red) => ownedSet.has(red))
-    const point = charged ? pointOf(occurrences[0]) : null
+    // A CHARGE RESTS ON THE RECORD. A red the suite printed but the record does
+    // not carry is a disagreement between the two, and a disagreement charges
+    // nothing — which is also what the runner did before the retry was deleted.
+    const charged = recordedKeys.has(key) && occurrences.length > 0 && occurrences.every((entry) => entry.owned)
+    const point = charged ? occurrences[0].point() : null
     return {
       suite: name,
       check,
@@ -360,8 +391,8 @@ function runSuite(name, baseUrl, onlySection = '') {
       title: charged ? `point ${point} — ${check}` : '',
       reason: charged
         ? `charged to open point ${point}`
-        : occurrences.some((red) => ownedSet.has(red))
-          ? 'charged for one reading of this check but not for every one recorded here'
+        : occurrences.some((entry) => entry.owned)
+          ? 'charged for one reading of this check but not for every one this run produced'
           : !complete
             ? 'the run record is incomplete, so no charge may be accepted for it — ownership unresolved'
             : fromRecord
@@ -384,6 +415,23 @@ function runSuite(name, baseUrl, onlySection = '') {
     if (seenRows.has(check.key)) continue
     seenRows.add(check.key)
     rows.push(row({ key: check.key, name: check.name, fromRecord: false }))
+  }
+  // A NAMELESS CONSOLE RED CAN BORROW NOBODY'S OWNERSHIP (Astra, round 5).
+  // `console errors: <n>` without the texts builds no identity, so it appeared in
+  // no row at all — and a pass whose only NAMED red was charged then reported
+  // that nothing held. A charge names a check; a number names none.
+  const namedConsoleReds = rows.filter((r) => /^console error:/i.test(String(r.check))).length
+  if (consoleErrors > namedConsoleReds) {
+    const nameless = consoleErrors - namedConsoleReds
+    rows.push({
+      suite: name,
+      check: `${nameless} console error(s) reported only as a COUNT`,
+      key: `${name}:console-count`,
+      point: null,
+      elsewhere: false,
+      title: '',
+      reason: 'a number carries no identity, so no ledger entry can own it — read the log for the texts',
+    })
   }
   // AN ENTRY THAT HAS GONE GREEN IS STRUCK (point 1135). A charge is a named
   // defect, not a standing exemption, so the pass that sees the check PASS says
@@ -471,8 +519,7 @@ function runCrossBrowser(baseUrl, depth) {
   // identity to build from a number — so a child printing the count and exiting
   // 0 had no named red and passed. `runSuite` has always read the count as well;
   // this reads it the same way.
-  const countMatch = out.match(/console errors: (\d+)/i)
-  const countedErrors = countMatch ? Number(countMatch[1]) : 0
+  const countedErrors = countedConsoleErrors(out)
   const ok = res.status === 0 && failing.length === 0 && countedErrors === 0
   console.log(`${ok ? 'PASS' : 'FAIL'}  crossbrowser  ${pass} pass, ${fail} fail, ${skip} skip (${depth}, exit ${res.status})`)
   // Always surface the per-engine backend + any skips; on failure also the FAILs.

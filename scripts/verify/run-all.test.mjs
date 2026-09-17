@@ -408,12 +408,12 @@ describe('no path turns a red into a pass (Astra review round 2, 17.09.2026)', (
       tasks: '- [ ] 694. child walking',
       outputs: [`FAIL  ${walk} — worst child 3 at 12.5s, 1.29 m walked inside 0.32 m`],
       records: [{ reds: [
-        { name: walk, key: 'k', kind: 'check', detail: 'worst child 3 at 12.5s, 1.29 m walked inside 0.32 m' },
-        { name: walk, key: 'k', kind: 'check', detail: 'worst child 7 at 44.0s, 0.02 m walked inside 9.9 m' },
+        { name: walk, kind: 'check', detail: 'worst child 3 at 12.5s, 1.29 m walked inside 0.32 m' },
+        { name: walk, kind: 'check', detail: 'worst child 7 at 44.0s, 0.02 m walked inside 9.9 m' },
       ] }],
     })
     expect(result.log).toContain('POINT REDS HOLD')
-    expect(result.log).toContain('but not for every one recorded here')
+    expect(result.log).toContain('but not for every one this run produced')
     expect(result.status).toBe(1)
   })
 
@@ -459,6 +459,45 @@ describe('an unlooked-at red is still a red (Astra review round 3, 17.09.2026)',
       'PASS  the page loads\nERR: boom at http://localhost:1/a.ts:1:2',
     ] })
     expect(result.log).toContain('FAIL  crossbrowser')
+    expect(result.log).toContain('POINT REDS HOLD')
+    expect(result.status).toBe(1)
+  })
+})
+
+// ROUND 5: three more ways a red slipped through the accounting.
+describe('a red with no name still holds (Astra review round 5, 17.09.2026)', () => {
+  it('reads the LARGEST console tally, not the first line that mentions one', async () => {
+    const result = await run({
+      exitStatus: 0,
+      outputs: ['PASS  a check\nconsole errors: 0\nPASS  another\nconsole errors: 1'],
+      records: [{ exit: 0 }],
+      tasks: '',
+    })
+    expect(result.log).toContain('1 console-errors')
+    expect(result.status).toBe(1)
+  })
+
+  it('holds a console count that no ERR: text names, beside a charged failure', async () => {
+    // The named red is charged; the count is not, and a number can own nothing.
+    const result = await run({ outputs: [`${known}\nconsole errors: 1`] })
+    expect(result.log).toContain('POINT REDS HOLD')
+    expect(result.log).toContain('console error(s) reported only as a COUNT')
+    expect(result.status).toBe(1)
+  })
+
+  it('does not let a charged measurement cover a second PRINTED measurement of the same check', async () => {
+    // The parser folds repeats away by key and the key folds the measurement
+    // away, so only the occurrence-level test can see the second reading.
+    const walk = 'no child walks without getting anywhere'
+    const result = await run({
+      suite: 'polish',
+      tasks: '- [ ] 694. child walking',
+      outputs: [
+        `FAIL  ${walk} — worst child 3 at 12.5s, 1.29 m walked inside 0.32 m\n` +
+        `FAIL  ${walk} — worst child 7 at 44.0s, 0.02 m walked inside 9.9 m`,
+      ],
+      records: [{ reds: [{ name: walk, kind: 'check', detail: 'worst child 3 at 12.5s, 1.29 m walked inside 0.32 m' }] }],
+    })
     expect(result.log).toContain('POINT REDS HOLD')
     expect(result.status).toBe(1)
   })
