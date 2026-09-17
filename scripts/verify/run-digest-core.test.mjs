@@ -414,3 +414,14 @@ describe('a declared limitation outranks the line budget', () => {
     expect(kept.map((e) => e.line)).toContain(entries[0].line)
   })
 })
+
+describe('the run keeps its own bookkeeping demands (point 1135)', () => {
+  it.each([
+    'ACCOUNTED FOR  settings — every red is charged to open point(s) 603; suite stays red',
+    'STRIKE  settings     "a check" PASSED here but is still charged to open point 603',
+    'POINT REDS HOLD — charged elsewhere: none — own or unresolved: settings: a new defect',
+    'LARGE FAILED AT ITS END — red on WebGL 2, every red charged elsewhere.',
+  ])('keeps %s out of the droppable bulk', (line) => {
+    expect(classifyLine(line)).toBe('final')
+  })
+})

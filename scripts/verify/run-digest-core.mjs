@@ -74,8 +74,13 @@ const BANNER = /^={3,}/
  *  `NON-PREDICTIVE` (point 1086) is the same class one step finer: the check
  *  above it passed narrowly and has DECLARED that its reading does not predict
  *  the suite's own. Losing that also hands the reader a pass. */
-const FINAL = /^(ALL GREEN\b|\d+\s+SUITE\(S\) FAILED\b|DEFERRED\b|LARGE FAILED\b|PARTIAL\b|NON-PREDICTIVE\b)/
-/** `↻ retry world once…`, `⚠ PASSED ON RETRY  world …` */
+const FINAL = /^(ALL GREEN\b|\d+\s+SUITE\(S\) FAILED\b|DEFERRED\b|LARGE FAILED\b|PARTIAL\b|NON-PREDICTIVE\b|ACCOUNTED FOR\b|STRIKE\b|POINT REDS\b)/
+/** The run's own bookkeeping demands (point 1135). `ACCOUNTED FOR` says a red
+ *  suite's reds all have an owner, `STRIKE` names a ledger entry whose check has
+ *  gone green, and `POINT REDS` is the run's ownership verdict — each of them a
+ *  conclusion about a headline above it, so each belongs with FINAL rather than
+ *  in the droppable bulk. The old `↻`/`⚠` retry notices are gone with the retry
+ *  itself. */
 const FLAKE = /^[↻⚠]/
 /** The runner's indented failure echo (`      FAIL …`, `      ERR: …`,
  *  `      | <crash tail>`) — and vitest's own ` FAIL  file > case` lines, which
