@@ -626,7 +626,13 @@ function speakBankUtterance(
   if (reach.audible) {
     useGame.getState().hearUtterance(utterance)
     if (anchor) {
-      speakOverhead(`kid-${said.speaker}`, [utterance], anchor, { floor: true, seconds: speechLabelSeconds(1), reach: options.radius })
+      // THE NOTE LASTS AS LONG AS THE MOMENT DOES (work-order 1082). A word said
+      // in passing is gone in `labelSeconds`, but the boulder's ROCK belongs to
+      // the picture of a child standing on a stone: it is READ OFF that moment's
+      // own hold rather than written down a second time in the balance file, so
+      // lengthening the stand can never leave the child up there wordless.
+      const seconds = Math.max(speechLabelSeconds(1), said.hold ?? 0)
+      speakOverhead(`kid-${said.speaker}`, [utterance], anchor, { floor: true, seconds, reach: options.radius })
     }
   }
   // A TOUCH BRINGS ITS OWN ARM. Its hand has to land on a drawn flank, and the
@@ -3437,6 +3443,7 @@ export function PlaceLife({
   playRocks,
   playGround,
   rocks,
+  climbRock,
   pen,
   colliders,
   radius,
@@ -3478,6 +3485,9 @@ export function PlaceLife({
    *  the adults' work sites can be placed clear of it. */
   playGround: PlayGround | null
   rocks: Array<[number, number, number]>
+  /** Which of those boulders the layout derived for the climb (work-order 1082),
+   *  or null where it left no room and the round must search for one. */
+  climbRock: [number, number, number] | null
   pen: PenDef | null
   colliders: Collider[]
   /** The settlement's walkable radius — the children's play area (point 480). */
@@ -3610,14 +3620,15 @@ export function PlaceLife({
     // from meaning only a game target, so without one this settlement keeps the
     // old tag round just as a riverless village does.
     //
-    // A STONE THAT CAN BE STOOD ON (work-order 1080). The child climbs this one,
-    // so nearness alone is the wrong choice: the scatter draws its instance
-    // scale from 0.3 to 1.0, and on the small end of that a boulder is a pebble
-    // a child would step over. The nearest CLIMBABLE stone therefore wins, and
-    // where a settlement has none the tallest one it has is taken rather than
-    // the whole off-game ROCK being dropped — a low step still reads as getting
-    // up onto a rock, an unreachable guard reads as nothing at all.
-    const boulder = climbBoulder(rocks, playGround, balance.villageLife.bankGame.climbableRockTop)
+    // A STONE THAT CAN BE STOOD ON (work-order 1080), AND ONE PLACED TO BE
+    // CLIMBED (work-order 1082). The layout derives it — just off the rim of the
+    // children's own quarter, at the top of the scatter's size range — and the
+    // round is handed that one; the search below it stays as the fallback for a
+    // fabric that left no room, taking the nearest climbable stone or, failing
+    // that, the tallest the settlement has, rather than dropping the whole
+    // off-game ROCK: a low step still reads as getting up onto a rock, an
+    // unreachable guard reads as nothing at all.
+    const boulder = climbBoulder(rocks, playGround, balance.villageLife.bankGame.climbableRockTop, climbRock)
     if (!boulder) return null
     return {
       upstream: playRocks.upstream,
@@ -3631,7 +3642,7 @@ export function PlaceLife({
       boulder,
       roam: { x: playGround.x, z: playGround.z, radius: playGround.radius },
     }
-  }, [bank, playRocks, rocks, playGround])
+  }, [bank, playRocks, rocks, climbRock, playGround])
 
   // A village always carries a play ground (`layout.ts` builds one for every
   // settlement of that kind); the fallback keeps a malformed layout from taking

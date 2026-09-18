@@ -419,8 +419,17 @@ export function gesturePose(s: GestureState): FigurePose {
     }
     case 'indicate': {
       // The arm leaves straight ahead and travels onto the bearing, then holds:
-      // "that way", not "that spot". Sweep over the first 60 % of the gesture.
-      const sweep = smoothstep(u / 0.6)
+      // "that way", not "that spot".
+      //
+      // THE SWEEP RIDES ITS OWN SECONDS, not a fraction of whatever length the
+      // caller asked for (work-order 1082). Read as 60 % of the duration, an
+      // arm asked to stay out for the seven seconds a child stands on a stone
+      // travelled onto the bearing in slow motion for four of them — a sweep so
+      // slow it reads as a figure losing its balance rather than as pointing.
+      // At the kind's own length the two readings are identical, so nothing
+      // about an ordinary "that way" changes; a LONGER gesture now sweeps at
+      // that same pace and then simply holds the aim for the rest.
+      const sweep = smoothstep(s.t / (GESTURE_DURATIONS.indicate * 0.6))
       arm = armAim(s.bearing * sweep, s.elevation * sweep)
       lean = 0.03
       break

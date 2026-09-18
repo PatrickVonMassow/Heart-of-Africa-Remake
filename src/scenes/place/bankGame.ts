@@ -539,6 +539,13 @@ function stepClimb(
         moment: 'boulder',
         speaker: i,
         gesture: 'indicate',
+        // …AND THE ARM STAYS OUT FOR THE WHOLE STAND (work-order 1082). Fired
+        // once at its own length the gesture was over in under three seconds of
+        // a stand that lasts seven, so a player who looked up at the word found
+        // a child standing still and nothing pointing at anything. The hold is
+        // the stand's own length, and the label over its head is read off the
+        // same number at the call site — one duration, three things riding it.
+        hold: cfg.climbHoldSeconds,
         aim: {
           x: b.x + ((c.footX - b.x) / away) * b.radius,
           y: b.height,
@@ -1390,6 +1397,11 @@ function stepRoam(
       c.goalFor = 0
     }
   }
+  // THE GROUP NOTICES (work-order 1082). Something has to pull the eye BEFORE
+  // the word does: the climb was one gesture fired on arrival, and a player not
+  // already watching that child had nothing to look up for. While one of them
+  // stands up there the others turn their FACING toward the stone.
+  const watched = s.children.some((c) => c.climb === 'top')
   for (let i = 0; i < s.children.length; i++) {
     const c = s.children[i]
     c.goalFor += dt
@@ -1471,6 +1483,18 @@ function stepRoam(
     )
     // Carried on from the way it really went, deflections included.
     c.roamHeading = c.heading
+    // …and it looks over while it walks. A TURN ONLY: the heading, the pace and
+    // the distance walked are untouched, so the child-motion floor and the
+    // shuffle gate measure exactly what they measured before — a child that
+    // stopped to watch would be the defect this is meant to avoid, not the
+    // effect it is after.
+    if (watched) {
+      c.facing = turnToward(
+        c.facing,
+        Math.atan2(stage.boulder.x - c.x, stage.boulder.z - c.z),
+        cfg.turnRate * dt,
+      )
+    }
   }
 }
 

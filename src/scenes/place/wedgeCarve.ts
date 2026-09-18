@@ -136,6 +136,30 @@ function bounds(c: Collider): { x: number; z: number; reach: number } {
 }
 
 /**
+ * Would a NEW collider of `reach` at (x, z) become half of a PINCH PAIR?
+ *
+ * The same closest-approach test `buildWedgeCarve` preselects its pairs with, so
+ * a placement this answers false for cannot carve a sub-passage slot out of
+ * anybody's ground. Placement code asks it BEFORE putting something down
+ * (work-order 1082: the stone a child climbs stands beside the children's own
+ * quarter, and a stone that narrows a corridor there is paid for twice — once in
+ * the carved ground and once in the shuffle the squeeze produces).
+ */
+export function pinchesPassage(
+  colliders: readonly Collider[],
+  x: number,
+  z: number,
+  reach: number,
+  moverRadius: number,
+  passage = WEDGE_PASSAGE,
+): boolean {
+  return colliders.some((c) => {
+    const b = bounds(c)
+    return Math.hypot(b.x - x, b.z - z) - b.reach - reach - 2 * moverRadius < passage
+  })
+}
+
+/**
  * Build the wedge carve for one play ground: `carved(x, z)` answers beside the
  * static blocked(), true where the point stands in a sub-passage slot between
  * two boundaries. Only pairs that can pinch at all — their closest approach

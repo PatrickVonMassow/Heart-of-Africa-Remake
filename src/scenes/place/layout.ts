@@ -12,7 +12,8 @@ import { boxCollider, nudgeToFree, spawnPointFree, standingClear, PLAYER_RADIUS,
 import { CHIEF_HUT, MARKET_HUT, dwellingRoofProfile, hutRoofProfile, roofStandOff } from './roofClearance'
 import { windingPoints, laneSlots, closestOnPolyline, bendAround, type LaneSlot } from './lanePlan'
 import { buildGizaLayout } from './gizaSite'
-import { looseRockRadius } from './looseRocks'
+import { CLIMB_ROCK_SCALE, deriveClimbRock, looseRockRadius } from './looseRocks'
+import { pinchesPassage } from './wedgeCarve'
 import { ROCK_FOOTPRINT_UNITS } from '../../world/communicationRock'
 import {
   BANK_FADE_ANGLE,
@@ -93,6 +94,16 @@ export interface PlaceLayout {
   flora: Array<{ x: number; z: number; h: number }>
   /** Scattered boulders (solid, part of the collision set). */
   rocks: Array<[number, number, number]>
+  /**
+   * The one stone in that scatter a child climbs to name ROCK outside the game
+   * (work-order 1082), derived rather than searched for: just outside the rim of
+   * the children's quarter, at the top of the scatter's size range. It is an
+   * ORDINARY entry of `rocks` — drawn and collided with like every other — and
+   * this field only says WHICH one. Null where the settlement carries no
+   * children's quarter, or where its fabric left no room beside it; the round
+   * then falls back to its own search (`climbBoulder`).
+   */
+  climbRock: [number, number, number] | null
   /**
    * Ground work in a village (work-order point 483): a store pit being sunk, a
    * post hole beside the lane, a patch of earth turned over. They are where the
@@ -1904,6 +1915,41 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   for (const t of flora) colliders.push({ x: t.x, z: t.z, r: 0.45 })
   for (const [x, z, s] of rocks) colliders.push({ x, z, r: looseRockRadius(s) })
 
+  // THE STONE THE CHILDREN CLIMB (work-order 1082), derived LAST — after the
+  // scatter and WITHOUT drawing from the seeded stream, so every other object in
+  // the settlement stays exactly where it was: the point is the climb's
+  // visibility, not a reshuffled village. It joins `rocks` as an ordinary entry
+  // — one renderer, one collider, one stand height for all of them — and the
+  // round is told which one it is rather than searching for it (`climbBoulder`).
+  //
+  // AND IT NARROWS NOTHING. A stone put down a metre off a hut is half of a
+  // pinch: `wedgeCarve` reads that gap as a sub-passage, carves the slot out of
+  // the children's ground, and the shuffle gate then measures the group
+  // squeezing along what is left. MEASURED on the first cut of this derivation:
+  // at bambara-village/2972259115 the stone stood 1.05 m off a hut, the open
+  // west ground the wedge suite pins as healthy was carved, and the shuffle
+  // share rose to 0.282 % against a 0.25 % gate. It therefore keeps the carve's
+  // own corridor clear of every boundary already standing — the built fabric and
+  // the dressing alike, which is why it is derived after both.
+  const climbRock = playGround
+    ? deriveClimbRock(
+        playGround,
+        bank ? { x: bank.bank.x, z: bank.bank.z } : null,
+        WALKER_RADIUS,
+        (x, z, r) =>
+          isFree(x, z, 2, r) &&
+          !onLane(x, z, r) &&
+          clearOfDressing(x, z, r) &&
+          !onWayOut(wayOut, radius, x, z, r) &&
+          Math.hypot(x, z) < radius - r &&
+          !pinchesPassage(colliders, x, z, r, WALKER_RADIUS),
+      )
+    : null
+  if (climbRock) {
+    rocks.push(climbRock)
+    colliders.push({ x: climbRock[0], z: climbRock[1], r: looseRockRadius(CLIMB_ROCK_SCALE) })
+  }
+
   // NO COLLIDER STANDS AT THE WATER (work-order 584). Work-order 482 had fenced
   // the waterline with an invisible panel so the last step could not carry the
   // traveller out of the settlement; what the player met was a wall in the
@@ -2056,5 +2102,5 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   }
 
 
-  return { radius, spawnZ: radius - SPAWN_INSET, interactives, dwellings, fences, paths, flora, rocks, digSites, bank, playRocks, waterPath, waterStand, playGround, wayOut, pen, errands, colliders }
+  return { radius, spawnZ: radius - SPAWN_INSET, interactives, dwellings, fences, paths, flora, rocks, climbRock, digSites, bank, playRocks, waterPath, waterStand, playGround, wayOut, pen, errands, colliders }
 }

@@ -1392,9 +1392,20 @@ export const balance: BalanceConfig = {
       // small part of a roaming phase, so the group keeps wandering and the
       // child-motion floor (25 m per played minute against a measured 102 m) is
       // untouched.
+      //
+      // AND THE STAND IS LONG ENOUGH TO BE FOUND (work-order 1082). 2.8 s was
+      // still the length of a glance: the user reported the climb missing a
+      // SECOND time, at shipped values, and the picture that had signed 1080 off
+      // was taken with this number forced to 25 s. Seven seconds is the estimate
+      // that lets a player who looks over when the word falls turn, find the
+      // group and see what the child is standing on before it steps down; the
+      // word over its head is derived from this number rather than written down
+      // again (`speakBankUtterance`), so the two cannot drift apart. Together
+      // ~8.6 s per naming against a cycle of minutes: still a small part of a
+      // roaming phase.
       climbApproach: 0.15,
       climbRiseSeconds: 0.9,
-      climbHoldSeconds: 2.8,
+      climbHoldSeconds: 7,
       climbSinkSeconds: 0.7,
       // A stone whose top is lower than this is a pebble: a child steps OVER it
       // rather than onto it, and the climb would read as a stumble. It is a
@@ -1409,7 +1420,21 @@ export const balance: BalanceConfig = {
       // are genuinely too low to stand on. At 0.20 m the nearest stone wins in
       // every shipped layout, which is what the round wants: the stone the
       // children are next to anyway.
-      climbableRockTop: 0.2,
+      //
+      // THE COMPETITION IS OVER (work-order 1082), so the floor could be raised
+      // where the note above could not raise it: the layout now DERIVES the
+      // climbing stone instead of searching for one, and this number governs
+      // only the fallback for a fabric that left no room. RE-MEASURED over the
+      // 110 shipped village/seed layouts the 0.20 m note was measured on (22
+      // villages x 5 seeds): every one of them carries a derived stone, top
+      // 0.53 m, 96 of them standing 1.2 m outside the rim of the children's
+      // quarter and the rest out to 6.0 m. What the pre-1082 search picked in those same
+      // layouts was a stone of 0.20-0.52 m, 5.2-21.7 m from the quarter centre,
+      // and 31 of the 110 were below 0.30 m — a pebble. 0.50 m is just under the
+      // 0.5296 m a scale-1.0 instance guarantees, so the fallback can no longer
+      // take a pebble while a real stone stands in the scatter; below that it
+      // takes the tallest the settlement has, exactly as before.
+      climbableRockTop: 0.5,
       // AND THE PHASE ITSELF IS BOUNDED, because the watch above is not enough:
       // it resets on ANY gain, so a child creeping toward a stone it can never
       // quite reach neither arrives nor fails, and the roaming phase then has no
