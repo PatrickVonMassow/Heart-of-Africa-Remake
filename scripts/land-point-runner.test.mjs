@@ -30,6 +30,7 @@ import { join } from 'node:path'
 import { afterAll, describe, it, expect } from 'vitest'
 import {
   branchRepairHint,
+  carryRunRecords,
   cleanupEvidence,
   deleteLandedBranch,
   listWorktrees,
@@ -846,5 +847,44 @@ describe('the landing settles the now-card before it publishes', () => {
     // A second pass over an already-settled source is the same answer, which is
     // what makes the by-hand repair and the automatic one safe to combine.
     expect(settleActiveWork({ number: 1088, focusPath, declarationPath, setFocus: refuse }).settled).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// THE RECORDS THAT USED TO DIE WITH THE WORKTREE (point 1134).
+describe('carryRunRecords', () => {
+  const writeRecord = (dir, name, branch) => {
+    mkdirSync(dir, { recursive: true })
+    writeFileSync(join(dir, name), JSON.stringify({ branch, command: 'verify docs', exitCode: 0 }))
+  }
+
+  it("copies the landed branch's run records into the main checkout", () => {
+    const { root, own, other } = scene()
+    writeRecord(join(own, 'local', 'verify-logs'), 'stamp-docs.log.run.json', 'feat/608-x')
+    writeRecord(join(own, 'local', 'verify-logs'), 'stamp-polish.log.run.json', 'feat/608-x')
+    // Another point's tree is not this landing's business …
+    writeRecord(join(other, 'local', 'verify-logs'), 'stamp-world.log.run.json', 'feat/590-y')
+    // … and neither is a record the branch did not produce.
+    writeRecord(join(own, 'local', 'verify-logs'), 'stamp-main.log.run.json', 'main')
+
+    const copied = carryRunRecords({ branch: 'feat/608-x', cwd: root, mainRoot: root })
+    expect(copied.sort()).toEqual(['stamp-docs.log.run.json', 'stamp-polish.log.run.json'])
+    const dest = join(root, 'local', 'verify-logs')
+    expect(JSON.parse(readFileSync(join(dest, 'stamp-docs.log.run.json'), 'utf8')).branch).toBe('feat/608-x')
+    expect(() => readFileSync(join(dest, 'stamp-world.log.run.json'), 'utf8')).toThrow()
+    expect(() => readFileSync(join(dest, 'stamp-main.log.run.json'), 'utf8')).toThrow()
+  })
+
+  it('is idempotent, and never throws when there is nothing to carry', () => {
+    const { root, own } = scene()
+    writeRecord(join(own, 'local', 'verify-logs'), 'stamp-docs.log.run.json', 'feat/608-x')
+    expect(carryRunRecords({ branch: 'feat/608-x', cwd: root, mainRoot: root })).toEqual(['stamp-docs.log.run.json'])
+    // A second landing pass finds the record already there and leaves it alone.
+    expect(carryRunRecords({ branch: 'feat/608-x', cwd: root, mainRoot: root })).toEqual([])
+    // A branch with no worktree, and a tree with no logs, are both a quiet no-op:
+    // this is bookkeeping, and it may never be the reason a landing goes red.
+    expect(carryRunRecords({ branch: 'feat/does-not-exist', cwd: root, mainRoot: root })).toEqual([])
+    expect(carryRunRecords({ branch: 'feat/590-y', cwd: root, mainRoot: root })).toEqual([])
+    expect(carryRunRecords({ cwd: root, mainRoot: root })).toEqual([])
   })
 })

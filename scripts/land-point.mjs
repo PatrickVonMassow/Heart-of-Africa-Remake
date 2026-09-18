@@ -25,7 +25,7 @@
 // the failure mode this command exists to remove.
 import { execFile, execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { existsSync, readFileSync, statSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { REPO_ROOT } from './repo-paths.mjs'
 import { isMainModule } from './is-main.mjs'
@@ -55,6 +55,7 @@ import {
   auditNeeded,
   boardPublishNeeded,
   childWords,
+  closingRunRecords,
   foldResult,
   formatLandingVerdict,
   gateConcurrency,
@@ -298,6 +299,66 @@ function lockHolderAlive(reason) {
   if (!m) return null
   const probe = probePid(Number(m[1]))
   return probe && typeof probe.exists === 'boolean' ? probe.exists : null
+}
+
+/**
+ * COPY THE LANDED POINT'S RUN RECORDS INTO THE MAIN CHECKOUT (point 1134).
+ *
+ * The I/O half of `closingRunRecords`, run inside the merge step, while the
+ * branch's worktree still exists — the cleanup step deletes it a few minutes
+ * later, and with it every `run.json` that could say what this point cost.
+ *
+ * IT NEVER FAILS THE LANDING. Every error is swallowed on purpose: this is
+ * bookkeeping for a measurement, and a chain that stopped half-merged because a
+ * `cp` could not write is exactly the half state the landing exists to avoid.
+ * What it did is reported in the merge step's own detail line, so a copy that
+ * silently did nothing is still visible.
+ */
+export function carryRunRecords({ branch, cwd = REPO_ROOT, mainRoot = REPO_ROOT } = {}) {
+  const dest = join(mainRoot, 'local', 'verify-logs')
+  const copied = []
+  let trees = []
+  try {
+    trees = listWorktrees({ cwd })
+  } catch {
+    return copied
+  }
+  for (const w of trees) {
+    const path = String(w?.path ?? '')
+    if (!path || resolve(path) === resolve(mainRoot) || String(w?.branch ?? '') !== String(branch ?? '')) continue
+    const dir = join(path, 'local', 'verify-logs')
+    let names = []
+    try {
+      names = readdirSync(dir)
+    } catch {
+      continue
+    }
+    let existing = []
+    try {
+      existing = readdirSync(dest)
+    } catch {
+      /* the destination is created below */
+    }
+    const entries = names
+      .filter((n) => n.endsWith('.run.json'))
+      .map((n) => {
+        try {
+          return { name: n, record: JSON.parse(readFileSync(join(dir, n), 'utf8')) }
+        } catch {
+          return { name: n, record: null }
+        }
+      })
+    for (const name of closingRunRecords({ entries, branch, existing })) {
+      try {
+        mkdirSync(dest, { recursive: true })
+        copyFileSync(join(dir, name), join(dest, name))
+        copied.push(name)
+      } catch {
+        /* an unwritable record is not worth a red landing */
+      }
+    }
+  }
+  return copied
 }
 
 /**
@@ -820,7 +881,10 @@ async function main(argv) {
         const recorded = recordLandingStage({ repoDir: REPO_ROOT, batchId, stage: 'merge', evidence: { at: Date.now(), mergeSha: git(['rev-parse', 'HEAD']), publicationId: landingId } })
         if (!recorded.ok) throw new Error(`landing journal refused merge evidence: ${recorded.reason}`)
       }
-      step('merge', VERDICT.ok, `${branch} -> main`)
+      // The branch's run records outlive its worktree only if they are copied
+      // now — the cleanup step below deletes the tree they live in (point 1134).
+      const carried = carryRunRecords({ branch })
+      step('merge', VERDICT.ok, `${branch} -> main${carried.length ? ` · ${carried.length} run record(s) kept` : ''}`)
     } catch (e) {
       // A conflicted merge is ABORTED, not left in the index: a half-merged main
       // is the worst half state this chain could leave, and the session that has
