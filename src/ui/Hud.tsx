@@ -2,7 +2,7 @@
 // dialogs, start/victory overlays and the debug menu. All player-visible
 // text comes from the language files (design.md §17 localization).
 
-import { useEffect, useEffectEvent, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from 'react'
 import { healthState, listCheckpoints, canCampHere, useGame, type EquipmentId } from '../state/store'
 import { TREASURE_IDS } from '../systems/economy'
 import type { FindId } from '../world/finds'
@@ -25,6 +25,7 @@ import { dispatchSyntheticKey, keyPressSource, onKeyPress, onTouchEngage } from 
 import { benchmarkFromUrl, startBenchmarkSafely } from '../systems/startBenchmark'
 import { getStrings, useStrings } from '../i18n'
 import { UNSTUCK_KEY_CODE, UNSTUCK_KEY_LABEL } from '../systems/unstuck'
+import { planCursorHint, type HintPlacement } from './cursorHintPlacement'
 
 function InventoryBar() {
   const t = useStrings()
@@ -200,12 +201,48 @@ function CursorModeHint() {
   const mode = useGame((s) => s.mode)
   const touchActive = useUi((s) => s.touchActive)
   const [locked, setLocked] = useState(() => document.pointerLockElement != null)
+  // Where in the band it stands (point 1160): centred, or yielded beside the bar
+  // where a wide inventory and the buttons leave the centre no room. The
+  // decision reads the rendered rectangles; `cursorHintPlacement.ts` owns it.
+  const hintRef = useRef<HTMLDivElement>(null)
+  const [placement, setPlacement] = useState<HintPlacement>({ mode: 'centre' })
   useEffect(() => {
     const sync = () => setLocked(document.pointerLockElement != null)
     document.addEventListener('pointerlockchange', sync)
     sync()
     return () => document.removeEventListener('pointerlockchange', sync)
   }, [])
+  useLayoutEffect(() => {
+    const el = hintRef.current
+    const row = el?.parentElement
+    if (!el || !row) return
+    const measure = () => {
+      const r = row.getBoundingClientRect()
+      const bar = row.querySelector('.inventory-bar')?.getBoundingClientRect()
+      const right = row.querySelector('.hud-bottom-right')?.getBoundingClientRect()
+      setPlacement(planCursorHint({
+        row: { left: r.left, right: r.right },
+        leftEnd: bar ? bar.right : r.left,
+        rightStart: right ? right.left : r.right,
+        // Out of flow and never wrapped, so this width is the text's own
+        // whatever placement it currently has.
+        width: el.getBoundingClientRect().width,
+      }))
+    }
+    measure()
+    // The row keeps its size while the bar inside it grows, so the GROUPS are
+    // what has to be watched, not the row alone. The hint itself is watched for
+    // the language switch, which changes the text and nothing else.
+    const ro = new ResizeObserver(measure)
+    for (const box of [row, row.querySelector('.hud-bottom-left'), row.querySelector('.hud-bottom-right'), el]) {
+      if (box) ro.observe(box)
+    }
+    window.addEventListener('resize', measure)
+    return () => {
+      ro.disconnect()
+      window.removeEventListener('resize', measure)
+    }
+  }, [t])
   // Match the settlement's deliberate skip of the OS lock under automation, and
   // stay silent on touch, where there is no cursor to take and "click the view"
   // names nothing the player has (§17.5 drives the settlement by the overlay).
@@ -214,7 +251,13 @@ function CursorModeHint() {
   // otherwise gain a permanent "click the view" pill — leaves this hint with no
   // picture evidence on either backend. Its placement is judged by CSS reading.
   if (mode !== 'place' || navigator.webdriver || touchActive) return null
-  return <div className={`cursor-mode-hint${locked ? ' cursor-mode-locked' : ''}`}>
+  const classes = ['cursor-mode-hint', `cursor-mode-${placement.mode}`]
+  if (locked) classes.push('cursor-mode-locked')
+  return <div
+    ref={hintRef}
+    className={classes.join(' ')}
+    style={placement.mode === 'beside' ? { left: `${placement.left}px` } : undefined}
+  >
     {locked ? t.hud.cursorModeLocked : t.hud.cursorModeUnlocked}
   </div>
 }
@@ -649,13 +692,14 @@ export function Hud() {
       <StatusBar />
       <FpsCounter />
       {/* Health bar top-right, below the status bar, at the FPS-counter height. */}
-      {/* The bottom band is ONE row (point 1146): the inventory bar with the
-          steering hint beside it on the left, the buttons on the right, so flex
-          decides both their shared bottom edge and their clearance. */}
+      {/* The bottom band is ONE row (point 1146): the inventory bar on the left,
+          the buttons on the right, so flex decides both their shared bottom edge
+          and their clearance. The steering hint is the row's own child and out
+          of flow (point 1160), so it can stand at the viewport's centre without
+          either group moving for it. */}
       <div className="hud-bottom-row">
         <div className="hud-bottom-left">
           <InventoryBar />
-          <CursorModeHint />
         </div>
         {/* Bottom-right: camp (only where allowed), map and journal buttons. */}
         <div className="hud-bottom-right">
@@ -682,6 +726,7 @@ export function Hud() {
             {t.hud.journalToggle}
           </button>
         </div>
+        <CursorModeHint />
       </div>
       <Prompt />
       {touchActive && <TouchControls />}

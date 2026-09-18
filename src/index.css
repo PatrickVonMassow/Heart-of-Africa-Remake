@@ -491,20 +491,36 @@ textarea {
 
 /* --- Prompt + toast ------------------------------------------------------ */
 
-/* At the inventory bar's height, beside it (point 1146, user 17.09.2026). It is
-   a flex item of `.hud-bottom-left`, so the bar decides where the hint starts
-   and the row decides that both end on the same bottom edge. It never shrinks
-   into the bar's box (`flex: 0 0 auto`), and out of the top centre column it no
-   longer collides with the toast or the WebGL-fallback notice, which was the
-   reason it used to sit at 108px. */
+/* CENTRED in the viewport at the inventory bar's height (point 1160, user
+   18.09.2026, "sofern es der Platz zulässt"), keeping the shared bottom edge
+   point 1146 gave it. It is the row's own child and ABSOLUTE, so it centres on
+   the row — whose 12px margins are equal, making the row's centre the screen's
+   — without either group shifting for it, and `bottom: 0` is the row's content
+   bottom, which is exactly where `align-items: flex-end` puts both groups.
+   Out of the top centre column it still does not collide with the toast or the
+   WebGL-fallback notice, which was the reason it used to sit at 108px.
+   Where the bar and the buttons leave the centre no room it YIELDS to its 1146
+   place beside the bar (`.cursor-mode-beside`, offset measured, not guessed),
+   and where neither fits it steps aside entirely (`.cursor-mode-hidden`) —
+   still laid out, because its own width is what the measurement reads. */
 .cursor-mode-hint {
-  flex: 0 0 auto;
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
   padding: 4px 8px;
   border-radius: 4px;
   background: var(--hud-bg);
   color: var(--hud-text);
   font-size: 12px;
   pointer-events: none;
+}
+.cursor-mode-hint.cursor-mode-beside {
+  transform: none; /* `left` carries the measured offset from the row's start */
+}
+.cursor-mode-hint.cursor-mode-hidden {
+  visibility: hidden;
 }
 .cursor-mode-locked {
   opacity: 0.5;

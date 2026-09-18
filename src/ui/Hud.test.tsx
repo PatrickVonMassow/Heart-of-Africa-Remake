@@ -894,6 +894,17 @@ describe('settlement cursor mode hint', () => {
     expect(getByText(de.hud.cursorModeLocked)).toBeInTheDocument()
   })
 
+  it('stands in the row itself, centred, not in the bar\'s left group (point 1160)', () => {
+    const { container } = render(<Hud />)
+    const hint = container.querySelector('.cursor-mode-hint')
+    expect(hint).not.toBeNull()
+    expect(container.querySelector('.hud-bottom-left .cursor-mode-hint')).toBeNull()
+    expect(hint!.parentElement).toBe(container.querySelector('.hud-bottom-row'))
+    // Nothing is measurable in jsdom, so the CSS's own centring stands.
+    expect(hint).toHaveClass('cursor-mode-centre')
+    expect(hint!.getAttribute('style')).toBeNull()
+  })
+
   it('hides both hints under browser automation, matching the lock skip', () => {
     Object.defineProperty(navigator, 'webdriver', { configurable: true, value: true })
     const { container } = render(<Hud />)
