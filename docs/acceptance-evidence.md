@@ -404,7 +404,12 @@ to the player (design.md §21.1). While the settlement view holds no
 pointer lock a `.cursor-mode-hint` names the way back to steering, the
 same hint fainter once locked, both texts from the language files and
 both silent under browser automation and touch, exactly as the lock
-itself is skipped there. Verifiable: `src/ui/Hud.test.tsx` (the digit
+itself is skipped there. That hint sits at the INVENTORY BAR's height
+(point 1146, user 17.09.2026): the bottom band is one flex row — the bar
+with the hint beside it, the camp/map/journal buttons at the right end —
+so their bottom edges coincide by layout and a bar that wraps to a
+second line grows upwards without moving the hint. Verifiable:
+`src/ui/Hud.test.tsx` (the digit
 badges, the key using the matching slot, the empty slot ignoring it,
 both hint texts from both language files), `src/systems/input.test.ts`
 (the exact-modifier match, the pad press that is no held key),
@@ -422,7 +427,11 @@ stripped. Verifiable: `src/ui/Hud.test.tsx` (map button left of
 journal, camp shown/hidden per mode, `canCampHere` pure);
 `src/ui/Dialogs.test.tsx` (no map good in any shop listing);
 `src/state/store.saveload.test.ts` (legacy map-item strip);
-`scripts/verify/enrichments.mjs` (button-row order + non-overlap).
+`scripts/verify/enrichments.mjs` (button-row order + non-overlap; and
+the rendered rectangles of bar, slots and hint sharing one bottom edge
+with one slot and with the bar wrapped, at the default and a narrow
+viewport — the hint measured on a probe of its own class, because the
+real one is silent under automation).
 
 Hold-Ctrl naming (§17.8, point 342). Verifiable, pure: the qualifies
 predicate sweeps the FULL rosters — every fauna species in
