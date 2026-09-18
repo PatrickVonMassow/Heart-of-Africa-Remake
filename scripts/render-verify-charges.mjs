@@ -133,6 +133,28 @@ export const RED_CHARGES = [
   },
   {
     point: 939,
+    suite: 'startup',
+    backend: 'webgl',
+    kind: 'console',
+    // THE LAST LANE COMBINATION POINT 939 STILL LACKED. Its siblings cover
+    // webgpu/startup, webgpu/polish, webgpu/report and webgl/polish; the same
+    // Vite transient reached webgl/startup and was therefore unaccounted, which
+    // is the rule of this table working rather than failing — an entry excuses
+    // only the lane its evidence measured.
+    match: /^console error: Failed to load resource: the server responded with a status of 504 \(Outdated Optimize Dep\)/i,
+    why:
+      'MEASURED 16.09.2026 at 22:43:12Z on main, webgl/startup, and again 26 seconds later on the '
+      + 'retry at 22:43:38Z, which is why the run is recorded SUSPECT as well as red: a cold or '
+      + 'invalidated Vite optimize-dep cache re-bundles while the suite page is already open, and '
+      + 'the open page then requests the outdated chunk. It is the environment transient '
+      + 'CLAUDE.md §7.2 tells us to fail soft on and the identical reading point 939 already owns '
+      + 'on four other lanes; no CHECK failed on either attempt, so nothing about the code under '
+      + 'test reaches it. Entered 17.09.2026 from the landing of point 1140, whose own change '
+      + 'touches the HUD, the keyboard map and the settlement pointer lock and cannot produce a '
+      + 'dev-server 504. The charge dies with point 939.',
+  },
+  {
+    point: 939,
     suite: 'polish',
     backend: 'webgl',
     kind: 'console',
@@ -840,9 +862,28 @@ export const RED_CHARGES = [
       'owns it.',
   },
   {
-    point: 1102,
+    point: 1119,
     suite: 'polish',
     backend: 'webgl',
+    kind: 'check',
+    match: /^the arriving runner/i,
+    why:
+      'THE RED POINT 1119 WAS FILED TO OWN, reaching the ledger 16.09.2026 with its second '
+      + 'measurement. The check belongs to point 1106, which is CLOSED and can take no entry — '
+      + 'that is why 1119 exists at all, and until now the red it owns had no way into this file. '
+      + 'Measured today on the WebGL 2 half of point 1139\'s covering pass, machine state '
+      + 'unreadable (no GPU busy counter on this host): all three arrival checks of '
+      + '`--section=children-bank-game` read the hold to "ended false" with 0 readings, and the '
+      + 'retry of the same section ran 27 pass / 0 fail — the same red-then-green signature 1119 '
+      + 'records from 12.09.2026, where it read 137 readings and "ended false" under a measured '
+      + 'load. Scoped to the lane and the section it has been seen in: nothing here excuses these '
+      + 'checks on WebGPU, where the same pass ran them green. The charge dies with 1119, whose '
+      + 'first step is the throttle probe that decides between the check\'s frame budget and the '
+      + 'arrival hold itself.',
+  },
+  {
+    point: 1102,
+    suite: 'polish',
     kind: 'check',
     match: /^the drums were still speaking when the picture was taken/i,
     why:
@@ -851,10 +892,14 @@ export const RED_CHARGES = [
       + 'SUSPECT and covering no backend. It is the first time this check has failed in the kept '
       + 'logs, and 1102 is the point that owns it — the frame is aimed by stopwatch and fires '
       + 'after the drum message has already ended, which is point 521\'s defect mirrored (521 '
-      + 'shoots too EARLY after a jump; this one too LATE). Suite- and lane-scoped to what was '
-      + 'measured: nothing here excuses the same check on WebGPU, where it has never been seen. '
-      + 'The charge dies with 1102, which waits on the speaking state the game already holds '
-      + 'instead of on a duration.',
+      + 'shoots too EARLY after a jump; this one too LATE). '
+      + 'THE LANE SCOPING IS GONE 16.09.2026: the same check failed once and passed on the retry '
+      + 'on WEBGPU too (point 1139\'s `polish --section=chief-to-drummer`, machine state '
+      + 'unreadable — no GPU busy counter on this host). The race is downstream of everything a '
+      + 'point can change before it: the shutter opens after the message has STARTED, and what '
+      + 'runs out is the performance, so nothing earlier in the block moves it. One cause, both '
+      + 'lanes. The charge dies with 1102, which waits on the speaking state the game already '
+      + 'holds instead of on a duration.',
   },
   {
     point: 521,
@@ -1250,9 +1295,15 @@ export const RED_CHARGES = [
     // deliberately owns the whole of it: a tread that the one-second series puts
     // under a tenth of a percent is the transient this charge is for, whatever
     // the cut hides. The threshold sentence is a constant the check prints.
+    // THE INDEX ADMITS THE SENTINEL -1 (widened 17.09.2026, see the second
+    // measurement in `why`). A one-second series that found NO offending window
+    // at all prints `worst child -1` instead of a real index — strictly weaker
+    // than the composition already charged here, and the group-share cap of a
+    // tenth of a percent still binds, so a sustained tread cannot slip through
+    // on the widened index.
     detailReadsPrefix: true,
     detailMatch:
-      /^worst child \d+ at \d+\.\d+ % of its own judged time; group 0\.0\d % \(\d+ of [1-9]\d* 1s windows, [\d.]+ judged child-seconds\)\. Least judgeable child \d+ at [\d.]+ %, group [\d.]+ % of [\d.]+ traced\./i,
+      /^worst child -?\d+ at \d+\.\d+ % of its own judged time; group 0\.0\d % \(\d+ of [1-9]\d* 1s windows, [\d.]+ judged child-seconds\)\. Least judgeable child \d+ at [\d.]+ %, group [\d.]+ % of [\d.]+ traced\./i,
     why:
       'MEASURED 07.09.2026 on main at bd050ddf8, VERIFY_GL=webgl polish (log '
       + 'local/verify-logs/2026-09-07T05-44-35-994-polish.log): worst child 0 at 0.34 % of its own '
@@ -1269,7 +1320,17 @@ export const RED_CHARGES = [
       + 'of a tenth of a percent or more — is a different composition and stays a real red. The '
       + 'burst reading cannot be scoped because it lies past the cut; this entry therefore owns the '
       + 'transient whatever the cut hides, and point 1068 owes the throttle probe that says whether '
-      + 'it is load or a defect. The charge dies with that point.',
+      + 'it is load or a defect. The charge dies with that point. '
+      + 'SECOND MEASUREMENT, 17.09.2026 on feat/1140-cursor-mode-lock, VERIFY_GL=webgl (log '
+      + '.claude/worktrees/point-1140/local/verify-logs/2026-09-17T10-34-43-933-docs-i18n-flow-'
+      + 'collision-polish-settings-enrichments.log): the MIRROR composition — worst child -1 at '
+      + '0.00 %, group 0.00 % (0 of 5730 one-second windows), while the burst series behind the '
+      + 'cut read worst child 3 at 0.28 %. The one-second series is wholly clean here, so this '
+      + 'is the weakest red the check can print; the run\'s own quiet-machine line said MACHINE '
+      + 'NOT QUIET (busy) and its section retry passed clean with 8 checks. Point 1140, whose run '
+      + 'this was, touches the HUD, the keyboard map and the settlement pointer lock and no '
+      + 'child, errand or motion code. 1068 now has two shapes for its throttle probe to '
+      + 'explain.',
   },
   {
     point: 1010,
@@ -1458,5 +1519,54 @@ export const RED_CHARGES = [
       + 'skew fell on the fill checks (2/8). The cause is in the check: polish.mjs ~6047 chooses '
       + 'the fleck nearest the bank, then waits nextFrames(6) before the shutter, and the flecks '
       + 'drift by design. The charge dies with 1121.',
+  },
+  {
+    point: 642,
+    suite: 'polish',
+    backend: 'webgl',
+    kind: 'check',
+    // NO detailMatch. The printed measurement is one lit-minus-shadow number per
+    // ring stone, and the ledger's own rule forbids matching a measured number —
+    // there is no wording left to narrow on once the numbers are out. The scope
+    // is therefore the check, the suite and the WebGL 2 lane, which is exactly
+    // the case point 642 already names in its own text.
+    match: /^fire shadows ON: the ground behind a ring stone is measurably darker than beside it/i,
+    why:
+      'THE CASE POINT 642 NAMES BY NAME: "the goat\'s planted foot and \'fire shadows ON\' both red '
+      + 'on WebGL 2 at 00:34, taken while a WebGPU polish run and two building agents shared the '
+      + 'machine, and both green on the same commit at 05:50 on a quiet one". MEASURED AGAIN '
+      + '17.09.2026 on feat/1140-cursor-mode-lock c8c11373b, VERIFY_GL=webgl, log '
+      + '.claude/worktrees/point-1140/local/verify-logs/2026-09-17T10-40-42-933-docs-i18n-flow-'
+      + 'collision-polish-settings-enrichments.log: lit-minus-shadow per stone [1.3, -1.3, 0] — two '
+      + 'of three stones read at or above zero and one reads negative — on a run whose own quiet-'
+      + 'machine check printed MACHINE NOT QUIET (busy), and the runner\'s section retry passed '
+      + 'clean (2 pass, 0 fail) minutes later on the same commit. The sibling WebGL 2 pass of the '
+      + 'same hour reddened a DIFFERENT load-sensitive polish check (children-motion) and likewise '
+      + 'passed its retry, which is the signature of load rather than of a shadow defect. Point 1140 '
+      + 'touches the HUD, the keyboard map and the settlement pointer lock and no light, shadow or '
+      + 'campfire code at all. 642 owns classifying this check as state or timing; the charge dies '
+      + 'with it.',
+  },
+  {
+    point: 1145,
+    suite: 'world',
+    backend: 'webgl',
+    kind: 'check',
+    // NO detailMatch: the printed detail is the fixed words naming which edges
+    // the subject left, and it carries no measurement to narrow on. The frame
+    // NAME is the scope — a different frame missing its subject is a different
+    // case and stays a real red, which is how the falls came to be filed.
+    match: /^frame 11-worldmodel-khartoum-confluence$/i,
+    why:
+      'FILED AS 1145 ON 17.09.2026 out of the landing of point 1140, together with the identical '
+      + 'Victoria Falls miss that 1145 also owns. MEASURED 16.09.2026 at 22:44:57Z on webgl/world '
+      + '(head 9a1f91ce6) and again on its automatic retry five seconds later: the subject projects '
+      + 'off the left and bottom edge of the frame, scripts/verify/frameSubject.mjs THROWS, and the '
+      + 'run dies rather than reports — both records are signed-off crashes, and this entry covers '
+      + 'the red they printed before dying so the next world pass on this lane can be read at all. '
+      + 'No kept log survives for either run (the worktree they were earned in is gone, which is '
+      + 'open point 1142), so the run records are the evidence. 1145 owns deciding FIRST whether '
+      + 'the travel stops short or the wait expires on a moving camera, and SECOND why one '
+      + 'mis-aimed frame costs a whole pass; the charge dies with it.',
   },
 ]

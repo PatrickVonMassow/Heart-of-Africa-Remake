@@ -57,12 +57,12 @@ import { useGame } from '../../state/store'
 import { START_YEAR, balance } from '../../config/balance'
 import { climbBoulder } from './looseRocks'
 import type { RegionPlaceStyle } from './regionStyles'
-import { nudgeToFree, nudgeWhere, PLAYER_RADIUS, resolveMove, spawnPointFree, standingClear, tryNudgeToFree, WALKER_RADIUS, type Collider } from './collision'
+import { escapeToFree, nudgeToFree, nudgeWhere, PLAYER_RADIUS, resolveMove, spawnPointFree, standingClear, tryNudgeToFree, WALKER_RADIUS, type Collider } from './collision'
 import { utteranceOf } from '../../communication/lexicon'
 import { insidePlace } from './boundary'
 import { playRockFlank } from './playRockSurface'
 import { standsOnGroundPlate, type PlaceRiverBank } from './riverBank'
-import { buildPlaceNavGrid, findPlaceRoute, navClearBetween, navRestrict, type NavPoint } from './routing'
+import { advancePlaceRoute, buildPlaceNavGrid, findPlaceRoute, navClearBetween, navRestrict, type NavPoint } from './routing'
 import { absorbSeparation, createTagGame, stepTagGame, type TagChild } from './tagGame'
 import {
   bankChildCanSeparate,
@@ -88,6 +88,7 @@ import {
   type SpokenSituation,
 } from './childSituations'
 import {
+  ADULT_SITUATIONS,
   carryOf,
   clearTask,
   createAdultWork,
@@ -96,6 +97,7 @@ import {
   goalOf,
   stepAdultWork,
   taskOf,
+  type AdultSituationId,
   type AdultWorkGeography,
   type AdultWorkView,
   type DigSite,
@@ -134,7 +136,7 @@ import {
   LOW_DRUM,
   type DrumGeometry,
 } from './drummerPose'
-import { PORT_TALKERS, VILLAGE_SPOTS, villageAdultStations, type PlayGround } from './lifeSpots'
+import { LOOM_SPOT, WEAVER_OFFSET, weaverStance, PORT_TALKERS, VILLAGE_SPOTS, villageAdultStations, type PlayGround } from './lifeSpots'
 import { drummerFacing } from './chiefWalk'
 import { DRUMMER_SPEAKER_ID } from './chiefPresence'
 import { queuedDrummerVoice, setDrummerVoice } from './drummerVoice'
@@ -505,10 +507,11 @@ function Cook({ x, z, cloth }: { x: number; z: number; cloth: string }) {
 function Weaver({ x, z, cloth, weave }: { x: number; z: number; cloth: string; weave: string }) {
   const groundHeight = usePlaceGround()
   // A body the passers-by go round (point 578).
-  useStandingBody(x, z)
+  const body = weaverStance([x, z])
+  useStandingBody(body.x, body.z)
   const facing = Math.atan2(-x, -z)
   return (
-    <group position={[x, groundHeight(x, z), z]} rotation={[0, facing, 0]}>
+    <group name="village-weaver" position={[x, groundHeight(x, z), z]} rotation={[0, facing, 0]}>
       {/* Loom frame */}
       {[-0.55, 0.55].map((px) => (
         <mesh key={px} position={[px, 0.75, 0]} castShadow>
@@ -525,7 +528,7 @@ function Weaver({ x, z, cloth, weave }: { x: number; z: number; cloth: string; w
         <boxGeometry args={[0.95, 0.85, 0.03]} />
         <meshStandardMaterial color={weave} roughness={0.95} side={THREE.DoubleSide} />
       </mesh>
-      <group position={[0, 0, 0.55]}>
+      <group name="village-weaver-body" position={[0, 0, WEAVER_OFFSET]} rotation={[0, body.yaw - facing, 0]}>
         <Figure cloth={cloth} />
       </group>
     </group>
@@ -2208,6 +2211,8 @@ function Walkers({
   cloth,
   count,
   colliders,
+  radius,
+  bank,
 }: {
   seed: number
   homes: HomeDef[]
@@ -2215,8 +2220,15 @@ function Walkers({
   cloth: string[]
   count: number
   colliders: Collider[]
+  radius: number
+  bank: PlaceRiverBank | null
 }) {
   const groundHeight = usePlaceGround()
+  // Used only to place a wedged body; ordinary walker routes stay unchanged.
+  const nav = useMemo(
+    () => buildPlaceNavGrid({ radius, bank }, colliders, NPC_RADIUS),
+    [radius, bank, colliders],
+  )
   const defs = useMemo(() => {
     const rand = mulberry32((seed + 60601) >>> 0)
     const n = Math.min(count, homes.length)
@@ -2403,25 +2415,15 @@ function Walkers({
       // Belt-and-braces unstuck (point 155): the waypoint-skip above frees most
       // blocks, but a walker wedged in a pocket keeps cycling waypoints while
       // physically pinned. When it has not actually moved for the calibratable
-      // window, teleport-nudge it to the nearest free spot — inhabitants only,
-      // a small invisible correction, never the player.
+      // window, place it on free ground — inhabitants only, never the player.
       if (Math.hypot(s.x - oldX, s.z - oldZ) < step * 0.1) {
         s.pinned += dt
         if (s.pinned > balance.walkerUnstuckSeconds) {
-          // Escalate rather than silently no-op (point 198): the nudge used to
-          // return the ORIGINAL point when its search found nothing while the
-          // caller reset the counter anyway, so a walker with no free spot
-          // nearby stayed pinned forever. Try the ring search, WIDEN it once,
-          // and if there is still no free spot, RETIRE the errand (advance to a
-          // new target) — a stuck walker always makes progress now.
-          const near = tryNudgeToFree(colliders, s.x, s.z, NPC_RADIUS)
-          const r = near.found ? near : tryNudgeToFree(colliders, s.x, s.z, NPC_RADIUS, undefined, 24)
-          if (r.found) {
-            s.x = r.pos[0]
-            s.z = r.pos[1]
-          } else {
-            s.seg++ // no reachable free spot here — pick a new errand target
-          }
+          const escape = escapeToFree(colliders, s.x, s.z, NPC_RADIUS, nav, def.home.door)
+          s.x = escape.pos[0]
+          s.z = escape.pos[1]
+          // Retire an unreachable errand only after placing the body.
+          if (escape.rung === 'grid' || escape.rung === 'home') s.seg++
           s.pinned = 0
           s.stuck = 0
         }
@@ -2552,7 +2554,7 @@ function ErrandVillagers({
     return out
   }, [geography])
 
-  const { people, work, rand } = useMemo(() => {
+  const { people, spawnAnchors, work, rand } = useMemo(() => {
     const r = mulberry32((seed + 30011) >>> 0)
     const spawn = Array.from({ length: count }, (_, i) => {
       const a = (i / Math.max(1, count)) * Math.PI * 2
@@ -2561,6 +2563,8 @@ function ErrandVillagers({
     })
     return {
       people: spawn,
+      // Keep the resolved spawn independently of the positions the frame loop moves.
+      spawnAnchors: spawn.map(({ x, z }) => ({ x, z })),
       work: createAdultWork(count, balance.villageLife.adultErrands, useGame.getState().villageDigProgress[placeId]),
       rand: r,
     }
@@ -2781,12 +2785,7 @@ function ErrandVillagers({
           }
           let aim: ErrandPoint = goal
           if (state.route) {
-            while (
-              state.route.length > 1 &&
-              Math.hypot(state.route[0].x - me.x, state.route[0].z - me.z) <= WAYPOINT_RADIUS
-            ) {
-              state.route.shift()
-            }
+            advancePlaceRoute(nav, me, state.route, WAYPOINT_RADIUS)
             // Back on the open line: drop the route and walk at the goal again,
             // so the figure never trudges a detour it has already got past.
             if (navClearBetween(nav, me.x, me.z, goal.x, goal.z)) {
@@ -2797,7 +2796,9 @@ function ErrandVillagers({
           const ax = aim.x - me.x
           const az = aim.z - me.z
           const ad = Math.hypot(ax, az) || 1
-          const step = Math.max(0, cfg.pace) * dt
+          // Land on the turn instead of oscillating across it when the next
+          // exact goal is standable but falls in a blocked navigation cell.
+          const step = Math.min(Math.max(0, cfg.pace) * dt, ad)
           // Point 657: a child (or anyone else) standing on the straight line is
           // walked ROUND — these strolls cross the children's play ground, and a
           // walker that discovered a body only by pressing on it is what the
@@ -2823,20 +2824,21 @@ function ErrandVillagers({
           // Facing where it WALKS, which on a route is the waypoint rather than
           // the destination behind the huts.
           yaws.current[i] = Math.atan2(ax, az)
-          // Wedged (point 155): nudge free, and if that fails give the errand up
-          // rather than let a villager stand pressed against a wall for ever.
+          // Use the same escape ladder as the household walkers.
           if (moved < step * 0.25) {
             state.stuck += dt
             if (state.stuck > balance.walkerUnstuckSeconds) {
+              const anchor = spawnAnchors[i]
+              const escape = escapeToFree(colliders, me.x, me.z, NPC_RADIUS, nav, [anchor.x, anchor.z])
+              me.x = escape.pos[0]
+              me.z = escape.pos[1]
               // A route planned from where it no longer stands is worthless.
               state.route = null
               state.routeTo = null
-              const free = tryNudgeToFree(colliders, me.x, me.z, NPC_RADIUS)
-              if (free.found) {
-                me.x = free.pos[0]
-                me.z = free.pos[1]
-              } else if (task) clearTask(work, i)
-              else state.target = null
+              if (escape.rung === 'grid' || escape.rung === 'home') {
+                if (task) clearTask(work, i)
+                else state.target = null
+              }
               state.stuck = 0
             }
           } else {
@@ -3056,6 +3058,26 @@ function ErrandVillagers({
         }
       }),
     })
+    // PUTS THE VILLAGE'S OWN CASTING QUEUE ON ONE SITUATION (work-order 1136).
+    // The water errand is held by ONE carrier at a time and waits its turn in a
+    // fair round-robin behind the two digging situations, so a fixed sample
+    // window can miss it entirely: measured 10.09.2026, the `adult-errands`
+    // rung saw MANY errands run alone and exactly ONE inside the full pass, and
+    // the twelve green climbs before it had measured nothing.
+    //
+    // This does NOT stage the errand. It moves the cursor to the named
+    // situation and lets the next step cast NOW; whether the situation is
+    // castable at all, who is free to take it, where the two of them stand and
+    // every phase afterwards stay the game's own. A hook that assembled the
+    // tasks itself would be a drill recreating the aftermath, and would stay
+    // green over a casting that no longer works.
+    w.__placeCastErrand = (id: AdultSituationId) => {
+      const at = ADULT_SITUATIONS.indexOf(id)
+      if (at < 0) return false
+      work.cursor = at
+      work.next = 0
+      return true
+    }
     // Pins one villager into the fill pose at a given progress, or releases him
     // with `null`. It is the only thing that dips anybody today: the errand
     // still flips 'emptyJar' to 'fullJar' with no act in between, which is
@@ -3069,6 +3091,7 @@ function ErrandVillagers({
     }
     return () => {
       delete w.__placeErrands
+      delete w.__placeCastErrand
       delete w.__placeForceFill
     }
   }, [work, people, geography])
@@ -3643,7 +3666,7 @@ export function PlaceLife({
             <Porters seed={localSeed} stops={buildings} cloth={style.cloth} colliders={colliders} count={1 + size} />
             <Traders seed={localSeed} cloth={style.cloth} />
             <Talkers x={PORT_TALKERS[0]} z={PORT_TALKERS[1]} cloth={style.cloth} />
-            <Walkers seed={localSeed} homes={homes} errands={errands} cloth={style.cloth} count={2 + size * 2} colliders={colliders} />
+            <Walkers seed={localSeed} homes={homes} errands={errands} cloth={style.cloth} count={2 + size * 2} colliders={colliders} radius={radius} bank={bank} />
           </SpeechFloorContext.Provider>
         </InhabitantBodiesContext.Provider>
         </LimbDetailContext.Provider>
@@ -3656,7 +3679,7 @@ export function PlaceLife({
         <InhabitantBodiesContext.Provider value={inhabitantBodies}>
           <SpeechFloorContext.Provider value={speechFloor}>
           <Cook x={firePos[0] + 1.2} z={firePos[1] + 1.0} cloth={style.cloth[0]} />
-          <Weaver x={-8.5} z={-7} cloth={style.cloth[1 % style.cloth.length]} weave={style.bandColor} />
+          <Weaver x={LOOM_SPOT[0]} z={LOOM_SPOT[1]} cloth={style.cloth[1 % style.cloth.length]} weave={style.bandColor} />
           <Kids
             childBodies={childBodies}
             x={ground.x}
@@ -3687,7 +3710,7 @@ export function PlaceLife({
             count={Math.max(1, Math.round(balance.villageLife.adultErrands.villagerCount * presence))}
           />
           <Goats seed={localSeed} count={pen ? 4 : 3} pen={pen} colliders={colliders} />
-          <Walkers seed={localSeed} homes={homes} errands={errands} cloth={style.cloth} count={Math.max(1, Math.round(5 * presence))} colliders={colliders} />
+          <Walkers seed={localSeed} homes={homes} errands={errands} cloth={style.cloth} count={Math.max(1, Math.round(5 * presence))} colliders={colliders} radius={radius} bank={bank} />
           {/* Inhabitant/prop interactions (design.md §19). */}
           <FireTender x={firePos[0] - 1.3} z={firePos[1] - 0.7} cloth={style.cloth[2 % style.cloth.length]} />
           <Talkers x={VILLAGE_SPOTS.talkers[0]} z={VILLAGE_SPOTS.talkers[1]} cloth={style.cloth} />

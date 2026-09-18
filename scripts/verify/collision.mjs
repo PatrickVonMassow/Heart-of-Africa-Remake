@@ -8,6 +8,7 @@
 import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
 import { frameShutter } from './frameSubject.mjs'
 import { sectionGate } from './sections.mjs'
+import { installColliderProbe } from './colliderProbe.mjs'
 import { fileURLToPath } from 'node:url'
 
 // A fixed dev seed makes the procedural settlement layout deterministic so the
@@ -41,34 +42,8 @@ const check = (name, ok, detail) => {
 
 const browser = await launchVerifyBrowser()
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
-// Shared helpers for all three collider shapes: circle, oriented box and the
-// fence panel's capsule around a segment (point 413). A shape this helper does
-// not know reads every point as NaN-blocked, so it must track collision.ts.
-await page.addInitScript(() => {
-  window.__clearanceTo = (c, x, z) => {
-    if (c.kind === 'box') {
-      const sin = Math.sin(c.rot)
-      const cos = Math.cos(c.rot)
-      const dx = x - c.x
-      const dz = z - c.z
-      const lx = cos * dx - sin * dz
-      const lz = sin * dx + cos * dz
-      const qx = Math.max(-c.hx, Math.min(c.hx, lx))
-      const qz = Math.max(-c.hz, Math.min(c.hz, lz))
-      if (qx === lx && qz === lz) return -Math.min(c.hx - Math.abs(lx), c.hz - Math.abs(lz))
-      return Math.hypot(lx - qx, lz - qz)
-    }
-    if (c.kind === 'segment') {
-      const ex = c.x2 - c.x1
-      const ez = c.z2 - c.z1
-      const l2 = ex * ex + ez * ez
-      const t = l2 < 1e-12 ? 0 : Math.max(0, Math.min(1, ((x - c.x1) * ex + (z - c.z1) * ez) / l2))
-      return Math.hypot(x - (c.x1 + ex * t), z - (c.z1 + ez * t)) - c.r
-    }
-    return Math.hypot(x - c.x, z - c.z) - c.r
-  }
-  window.__colliderSize = (c) => (c.kind === 'box' ? Math.max(c.hx, c.hz) : c.r)
-})
+// The collider geometry every suite reads with (scripts/verify/colliderProbe.mjs).
+await installColliderProbe(page)
 // A virtual standard-mapped pad (work-order 610), so the unstuck section can
 // prove the escape is reachable without a keyboard. Nothing is pressed and no
 // axis is pushed, so the deliberate-input guard keeps it dormant for every other
@@ -808,6 +783,100 @@ if (section('drawn-colliders')) {
       ? truncated.map((m) => `${m.name}: ${m.wants} wanted, ${m.capacity} drawn`).join('; ')
       : `${instances.length} instanced runs, all within their buffers`,
   )
+
+  // === THE WATER TRACK AGAINST THE COMPOUND IT MEETS (work-order 1045) =========
+  // The lane used to be ABANDONED wherever a compound ring stood across it, and a
+  // third of the Bambara seeds then taught no RIVER at all. The ring is opened at
+  // the crossing now, so the track runs THROUGH the compound the way a worn
+  // footpath does. The unit layer proves the collider gap; only the drawn scene
+  // can show that the gap is an OPENING and not a hole with a wall still in it.
+  //
+  // WHAT IT PHOTOGRAPHS DEPENDS ON THE SEED, AND IT SAYS WHICH (point 1136). The
+  // lane is pinned to 42, where no compound stands across the Bambara water path
+  // at all — so this shoots the track's nearest meeting with a compound ring and
+  // NAMES it: an opening the track runs through, or a wall it runs clear past.
+  // A gated seed (`VERIFY_SEED=7`) puts the gate itself in front of the lens.
+  const meeting = await page.evaluate(() => {
+    const l = window.__placeLayout
+    if (!l?.waterPath) return { reason: 'this village draws no water path' }
+    const { head, foot } = l.waterPath
+    const len = Math.hypot(foot.x - head.x, foot.z - head.z)
+    const ux = (foot.x - head.x) / len
+    const uz = (foot.z - head.z) / len
+    const along = (x, z) => Math.max(0, Math.min(len, (x - head.x) * ux + (z - head.z) * uz))
+    // A panel is DRAWN as a segment collider between its two posts; a post pair
+    // with no such collider is the gap. Read from the drawn set rather than from
+    // the builder's intent, because the drawn set is what the player walks into.
+    const bridged = (a, b) => l.colliders.some((c) => c.kind === 'segment'
+      && ((Math.hypot(c.x1 - a[0], c.z1 - a[1]) < 0.01 && Math.hypot(c.x2 - b[0], c.z2 - b[1]) < 0.01)
+        || (Math.hypot(c.x1 - b[0], c.z1 - b[1]) < 0.01 && Math.hypot(c.x2 - a[0], c.z2 - a[1]) < 0.01)))
+    let gate = null
+    let nearest = null
+    for (const f of l.fences) {
+      for (let i = 0; i < f.posts.length; i++) {
+        const a = f.posts[i]
+        const b = f.posts[(i + 1) % f.posts.length]
+        const open = !bridged(a, b)
+        for (let k = 0; k <= 60; k++) {
+          const x = a[0] + (b[0] - a[0]) * k / 60
+          const z = a[1] + (b[1] - a[1]) * k / 60
+          const t = along(x, z)
+          const d = Math.hypot(x - (head.x + ux * t), z - (head.z + uz * t))
+          if (!nearest || d < nearest.d) nearest = { t, d, open }
+          // 0.8 m is half the drawn lane: inside that the track and the opening
+          // overlap, which is the crossing the point is about.
+          if (open && d < 0.8 && (!gate || t < gate.t)) gate = { t, d }
+        }
+      }
+    }
+    const met = gate ?? nearest
+    if (!met) return { reason: 'this settlement draws no compound ring' }
+    const subject = { x: head.x + ux * met.t, z: head.z + uz * met.t }
+    // Stand back UP the lane, as far as the ground stays free, so the opening and
+    // the track leading into it are both in the picture. The walk back may pass
+    // the head — the lane only BEGINS there, the plaza behind it is walkable too,
+    // and the collider probe is what says where that stops being true.
+    let back = 0
+    for (let d = 0.25; d <= 8; d += 0.25) {
+      const x = subject.x - ux * d
+      const z = subject.z - uz * d
+      if (!window.__placeColliders.every((c) => window.__clearanceTo(c, x, z) > 0.45)) break
+      back = d
+    }
+    return {
+      through: !!gate,
+      t: met.t,
+      gap: met.d,
+      back,
+      subject,
+      camera: { x: subject.x - ux * back, z: subject.z - uz * back },
+    }
+  })
+  check(
+    'PoC village: the water track meets a compound ring, with free ground up the lane to photograph it from',
+    meeting?.back >= 1.5,
+    meeting?.reason
+      ?? `${meeting.through ? 'through an opening' : 'clear past a wall'}, ${meeting.t.toFixed(1)} m down the lane, `
+        + `${meeting.gap.toFixed(2)} m off the lane's middle, camera ${meeting.back.toFixed(2)} m back`,
+  )
+  if (meeting?.back >= 1.5) {
+    await page.evaluate((m) => {
+      const p = window.__placePlayer
+      p.x = m.camera.x
+      p.z = m.camera.z
+      // design.md §17.5: pitch 0 is the horizon and + looks up, so a little DOWN
+      // — the track lies on the ground and has to be in the frame with the ring.
+      p.yaw = Math.atan2(-(m.subject.x - p.x), -(m.subject.z - p.z))
+      p.pitch = -0.2
+      window.__game.getState().setToast(null)
+    }, meeting)
+    await shot('1045-water-track-at-the-compound', {
+      local: { x: meeting.subject.x, y: 0.5, z: meeting.subject.z },
+      label: meeting.through
+        ? 'the water track running through the opening in the compound ring, seen from up the lane'
+        : 'the water track running clear past the compound ring, seen from up the lane',
+    })
+  }
 }
 
 if (section('play-rocks')) {

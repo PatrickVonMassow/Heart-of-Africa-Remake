@@ -55,7 +55,15 @@ import {
 } from './backdrop'
 import { createBackdropMaterial } from './backdropMaterial'
 import { mulberry32 } from '../../world/noise'
-import { consumeTouchLook, gamepadLook, gamepadMove, isKeyDown, onKeyPress, touchMove } from '../../systems/input'
+import {
+  consumeTouchLook,
+  gamepadLook,
+  gamepadMove,
+  isKeyDown,
+  keyPressSource,
+  onKeyPress,
+  touchMove,
+} from '../../systems/input'
 import { SkyDome } from '../../render/sky'
 import { PlaceRain } from './PlaceRain'
 import { setSkyOvercast, skyOvercast } from '../../render/skyOvercast'
@@ -120,7 +128,7 @@ import { phrasePlan } from '../../communication/speaking'
 import { speechLabelSeconds, type SpeechLabel } from '../../communication/speechLabel'
 import { drumMessagePlan } from '../../communication/drumMessage'
 import { playDrumMessage, playSpeech, playThunder } from '../../systems/ambience'
-import { releasePointerLock, requestPlacePointerLock } from './pointerLock'
+import { releasePointerLock, requestPlacePointerLock, restorePointerLockAfterDialogs } from './pointerLock'
 import { ActorLabels } from '../ActorLabels'
 import { markActor } from '../actorLabelSource'
 import { resolveMove, standingClear, PLAYER_RADIUS, CHIEF_BODY_RADIUS } from './collision'
@@ -141,7 +149,15 @@ import { bankPlayRocksView, type PlaceRiverBank } from './riverBank'
 import { scatterGrassTufts } from './groundScatter'
 import { clearEdgeBand, setEdgeBandBoundary, setEdgeBandLook } from '../../render/edgeBand'
 import { devAssert } from '../../systems/devAssert'
-import { pickUseCandidate, type UseCandidate } from './useKeyTarget'
+import {
+  GUESS_KEY_CODE,
+  NO_KEY_PICKS,
+  USE_KEY_CODE,
+  advanceKeyPicks,
+  pressKey,
+  type KeyPicks,
+  type UseCandidate,
+} from './useKeyTarget'
 import { buildLayout, chiefStandingSpot, interactiveCircleRadius, doorCandidates, fencePanels, isOnLane, PLACE_RADIUS, SPAWN_INSET, VILLAGE_FIRE, type Interactive, type PathDef, type DwellingDef, type FenceDef, type PlaceLayout } from './layout'
 import {
   COOK_SHELTER,
@@ -2354,20 +2370,21 @@ function GizaAmbient({ anchors }: { anchors: Array<{ x: number; z: number; role:
 
 // --- Scene --------------------------------------------------------------------
 
-/** Everything the use key can mean where the player stands (work-order point 691). */
+/** Everything the two settlement keys can mean where the player stands
+ *  (work-order points 691/1139). */
 type UseAction =
   | { kind: 'interactive'; interactive: Interactive }
   | { kind: 'speech'; label: SpeechLabel }
   | { kind: 'chief'; target: ChiefTarget; action: ChiefAction }
 
 /**
- * ONE candidate list for the use key (work-order point 691): the functional
- * doors and the utterance over the nearest speaker's head, each with its own
- * reach, all measured on the ground plane in place units against the LIVE
- * player position. `pickUseCandidate` then decides which of them SPACE means —
- * so the highlight, the hint and the key press can never describe three
- * different things. A dig site, the chief's own socket and the rest of the
- * rebuild join this list here.
+ * ONE candidate list for both settlement keys (work-order point 691): the
+ * functional doors and the utterance over the nearest speaker's head, each with
+ * its own reach, all measured on the ground plane in place units against the
+ * LIVE player position. `pickForKeyPress` splits it along the key that acts on
+ * each kind (point 1139) and decides which candidate THAT key means — so a key's highlight, its hint and what it does can never
+ * describe three different things. A dig site, the chief's own socket and the
+ * rest of the rebuild join this list here.
  */
 function settlementUseCandidates(layout: PlaceLayout | null, x: number, z: number): UseCandidate<UseAction>[] {
   const game = useGame.getState()
@@ -2705,12 +2722,9 @@ export function PlaceScene() {
     const grab = () => requestPlacePointerLock(el)
     grab() // engage immediately on entry (activation from the walk-in keypress)
     const onClick = () => grab()
-    // The lock comes back when the guess dialog closes (point 588): the button
-    // click carries the user activation the request needs, so the player is not
-    // left having to click the ground again to walk on.
-    const offDialog = useUi.subscribe((s, prev) => {
-      if (prev.dialog?.kind === 'speechGuess' && s.dialog === null) grab()
-    })
+    // Every dialog returns to steering on its closing click. If the browser
+    // refuses the request after Escape, the canvas click remains the fallback.
+    const offDialog = restorePointerLockAfterDialogs(el)
     // The FIRST movement after the lock returns is dropped: the browser reports
     // the jump from wherever the cursor sat as a movement, and the view would
     // swing round the moment the dialog closes.
@@ -2787,10 +2801,11 @@ export function PlaceScene() {
     setDialog({ kind: 'speechGuess', speakerId: label.speakerId, atoms: [...label.atoms] })
   }
 
-  // Use key (Space, design.md §2.3/§17.5): acts on the NEAREST candidate in its
-  // own reach — the functional building at whose door the traveller stands, the
-  // chief called out of his hut, or the utterance over a speaker's head. Refs
-  // keep the two openers stable for the one-shot subscription.
+  // The two settlement keys (design.md §2.3/§13.4/§17.5): SPACE USES — the
+  // functional building at whose door the traveller stands, the chief called out
+  // of his hut — and E GUESSES at the utterance over a speaker's head. Each acts
+  // on the nearest candidate of its own kind still in its own reach. Refs keep
+  // the two openers stable for the one-shot subscriptions.
   const openBuildingRef = useRef(openBuilding)
   openBuildingRef.current = openBuilding
   const openSpeechGuessRef = useRef(openSpeechGuess)
@@ -2798,8 +2813,15 @@ export function PlaceScene() {
   // The standing pick, so a tie holds it rather than flickering between two
   // things a step apart (TARGET_HOLD). The frame loop keeps it; the key press
   // re-decides against the LIVE position with the same held key, so the prompt
-  // the player read and the thing SPACE does are one and the same.
-  const useKeyPick = useRef<string | null>(null)
+  // the player read and the thing SPACE does are one and the same. The guess key
+  // needs no such hold: the speech channel offers at most ONE word at a time and
+  // decides that choice itself (speechTarget.ts), so there is no tie to keep.
+  // The PAD carries a pick of its OWN beside it (review of 16.09.2026): it
+  // decides over the whole list, the use key's pick has never seen a word, and
+  // lending one to the other would let a door take a word the pad was holding a
+  // hand's breadth away — the flicker TARGET_HOLD exists to stop. A press writes
+  // only the history of the input it came from; `pressKey` owns that rule.
+  const keyPicks = useRef<KeyPicks>(NO_KEY_PICKS)
   // PlaceScene stays mounted across placeId changes and the handler's effect
   // only re-subscribes on setPrompt, so read the CURRENT layout through a ref.
   const layoutRef = useRef(layout)
@@ -2853,25 +2875,49 @@ export function PlaceScene() {
   }, [])
 
   useEffect(() => {
-    const off = onKeyPress('Space', () => {
+    const off = onKeyPress(USE_KEY_CODE, (e) => {
       if (useUi.getState().dialog) return
       // Select against the LIVE player position, not the last rendered frame's
       // `nearRef`: a synchronous keydown after a teleport/fast step used to act
       // on the frame-lagged candidate and open the previously-near building.
       const p = player.current
-      const winner = pickUseCandidate(settlementUseCandidates(layoutRef.current, p.x, p.z), useKeyPick.current)
+      const all = settlementUseCandidates(layoutRef.current, p.x, p.z)
+      // A real key press — and a tapped prompt, which names SPACE and must do
+      // what it names — uses only; the PAD keeps both meanings (design.md §17.5)
+      // and decides on its own standing pick.
+      const { winner, picks } = pressKey(all, 'use', keyPressSource(e), keyPicks.current)
+      keyPicks.current = picks
       if (!winner) return
-      useKeyPick.current = winner.key
+      if (winner.payload.kind === 'speech') {
+        openSpeechGuessRef.current(winner.payload.label)
+        return
+      }
       if (winner.payload.kind === 'interactive') openBuildingRef.current(winner.payload.interactive)
-      else if (winner.payload.kind === 'chief') actOnChief(winner.payload.target, layoutRef.current)
-      else openSpeechGuessRef.current(winner.payload.label)
+      else actOnChief(winner.payload.target, layoutRef.current)
     }, { preventDefault: true })
     return () => {
       off()
       setPrompt(null)
-      useUi.getState().setUseKeyOwner(null)
     }
   }, [setPrompt])
+
+  // The guess key (E, design.md §13.4, work-order point 1139): it means the word
+  // over the targeted speaker's head and nothing else, so the hut at the
+  // player's feet can no longer take it away from him — nor he from the hut.
+  useEffect(() => {
+    const off = onKeyPress(GUESS_KEY_CODE, (e) => {
+      if (useUi.getState().dialog) return
+      const p = player.current
+      const all = settlementUseCandidates(layoutRef.current, p.x, p.z)
+      const { winner } = pressKey(all, 'guess', keyPressSource(e), keyPicks.current)
+      if (winner?.payload.kind !== 'speech') return
+      openSpeechGuessRef.current(winner.payload.label)
+    }, { preventDefault: true })
+    return () => {
+      off()
+      useUi.getState().setGuessKeyArmed(false)
+    }
+  }, [])
 
   useFrame(({ clock, scene }, rawDt) => {
     if (!layout) return
@@ -3096,24 +3142,27 @@ export function PlaceScene() {
       if (lastSurface) wfh.lastFootstepSurface = lastSurface
     }
 
-    // What the Space use key would act on (design.md §2.3, work-order point
-    // 691): ONE candidate list — the functional door the traveller stands at
-    // and the utterance over the nearest speaker's head — and the nearest of
-    // them still in its own reach wins. Door proximity only ARMS the key + shows
-    // the prompt; entry is the discrete Space press (which reselects against the
-    // live position through the same helper), never walking in.
-    const winner = pickUseCandidate(settlementUseCandidates(layout, p.x, p.z), useKeyPick.current)
-    useKeyPick.current = winner?.key ?? null
+    // What the two settlement keys would act on (design.md §2.3/§13.4,
+    // work-order points 691/1139): ONE candidate list — the functional door the
+    // traveller stands at, the chief, and the utterance over the nearest
+    // speaker's head — split along the key that acts on each kind, and the
+    // nearest candidate of a key still in its own reach wins THAT key. Door
+    // proximity only ARMS the use key + shows the prompt; entry is the discrete
+    // Space press (which reselects against the live position through the same
+    // helper), never walking in.
+    const frame = advanceKeyPicks(settlementUseCandidates(layout, p.x, p.z), keyPicks.current)
+    keyPicks.current = frame.picks
+    const winner = frame.use
     const strings = getStrings()
     // At the chief's hut the key names the HUT while he is inside it, and the
     // MAN once he stands in front of it (design.md §12).
     const near = winner?.payload.kind === 'interactive' ? winner.payload.interactive : null
-    // The hint belongs to the WINNER: while a door owns the key the speaker's
-    // note carries no invitation, and while the speaker owns it the bottom
-    // prompt is empty and his own note invites the guess instead. At the chief
-    // and at his drummer the prompt names what the key would DO — ask, repeat,
-    // call him back — because the same key at the same man means all three at
-    // different points of his round trip.
+    // Each key carries its OWN hint (point 1139): the bottom prompt names what
+    // SPACE would use, the highlighted note invites E, and at the chief's hut
+    // with a word spoken beside it both stand at once — which is the whole point
+    // of the two keys. At the chief and at his drummer the prompt names what the
+    // key would DO — ask, repeat, call him back — because the same key at the
+    // same man means all three at different points of his round trip.
     const prompt = near
       ? strings.prompts.interact(interactiveLabel(strings, near.type))
       : winner?.payload.kind === 'chief'
@@ -3121,8 +3170,9 @@ export function PlaceScene() {
         : null
     const uiNow = useUi.getState()
     if (uiNow.prompt !== prompt) setPrompt(prompt)
-    const owner = winner ? (winner.payload.kind === 'speech' ? 'speech' : 'interactive') : null
-    if (uiNow.useKeyOwner !== owner) uiNow.setUseKeyOwner(owner)
+    // The note's own invitation, armed by the guess key's own reach alone.
+    const guessArmed = frame.guess !== null
+    if (uiNow.guessKeyArmed !== guessArmed) uiNow.setGuessKeyArmed(guessArmed)
   })
 
   if (!place || !layout || !groundPlate) return null

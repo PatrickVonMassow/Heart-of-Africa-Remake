@@ -25,7 +25,7 @@
 // the failure mode this command exists to remove.
 import { execFile, execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { existsSync, readFileSync, statSync } from 'node:fs'
+import { constants as FS, copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { REPO_ROOT } from './repo-paths.mjs'
 import { isMainModule } from './is-main.mjs'
@@ -55,6 +55,7 @@ import {
   auditNeeded,
   boardPublishNeeded,
   childWords,
+  closingRunRecords,
   foldResult,
   formatLandingVerdict,
   gateConcurrency,
@@ -298,6 +299,117 @@ function lockHolderAlive(reason) {
   if (!m) return null
   const probe = probePid(Number(m[1]))
   return probe && typeof probe.exists === 'boolean' ? probe.exists : null
+}
+
+/**
+ * COPY THE LANDED POINT'S RUN RECORDS INTO THE MAIN CHECKOUT (point 1134).
+ *
+ * The I/O half of `closingRunRecords`, run inside the merge step, while the
+ * branch's worktree still exists — the cleanup step deletes it a few minutes
+ * later, and with it every `run.json` that could say what this point cost.
+ *
+ * IT NEVER FAILS THE LANDING. Every error is swallowed on purpose: this is
+ * bookkeeping for a measurement, and a chain that stopped half-merged because a
+ * `cp` could not write is exactly the half state the landing exists to avoid.
+ *
+ * THREE THINGS IT REFUSES TO DO, each because the alternative is worse than not
+ * carrying a record at all (Astra, four-eyes pass 1/3):
+ * - It reads only REGULAR files. A `*.run.json` that is a FIFO — or a symlink to
+ *   one — would block `readFileSync` for ever, and a landing that hangs after the
+ *   merge is not a landing that failed safely.
+ * - It copies with `COPYFILE_EXCL`, so the never-overwrite rule is enforced by the
+ *   WRITE and not merely by the preceding listing. A destination that cannot be
+ *   listed answers `existing = []`, and without the flag that unreadable listing
+ *   would license replacing a complete record with a truncated one.
+ * - It counts what it could NOT carry — a failed copy, an unreadable record, and
+ *   equally a DISCOVERY that failed (an unlistable worktree set or logs
+ *   directory, a stat that answered anything but "absent") — and returns that
+ *   count, so the merge line can tell "nothing to carry" from "the carry failed"
+ *   instead of printing the ordinary green either way. An ABSENT logs directory
+ *   is not a failure: a point with no browser run has none.
+ */
+export function carryRunRecords({ branch, cwd = REPO_ROOT, mainRoot = REPO_ROOT } = {}) {
+  const dest = join(mainRoot, 'local', 'verify-logs')
+  const copied = []
+  let failed = 0
+  let trees = []
+  try {
+    trees = listWorktrees({ cwd })
+  } catch {
+    // The tree list is the only way to FIND the records, so losing it is a
+    // discovery failure like any other, not "this point ran nothing".
+    return { copied, failed: failed + 1 }
+  }
+  // A MISSING entry is the ordinary case — a point with no browser run has no
+  // logs directory at all. Anything ELSE (permissions, a broken link, an I/O
+  // error) means records may exist and were not seen, and a silent skip there
+  // prints the ordinary green over a real loss (Astra, confirming pass 1/3).
+  //
+  // THE PREDICATE IS SIDE-EFFECT FREE, and the caller decides what a verdict
+  // costs (Astra, round 4): counting inside it charged ONE unreachable record
+  // twice — once for the stat that could not judge it, once for the copy that
+  // then failed on the same entry.
+  const regularity = (file) => {
+    try {
+      return lstatSync(file).isFile() ? 'file' : 'other'
+    } catch (e) {
+      return e && e.code === 'ENOENT' ? 'absent' : 'unreadable'
+    }
+  }
+  for (const w of trees) {
+    const path = String(w?.path ?? '')
+    if (!path || resolve(path) === resolve(mainRoot) || String(w?.branch ?? '') !== String(branch ?? '')) continue
+    const dir = join(path, 'local', 'verify-logs')
+    let names = []
+    try {
+      names = readdirSync(dir)
+    } catch (e) {
+      if (!(e && e.code === 'ENOENT')) failed += 1
+      continue
+    }
+    // ONLY A REGULAR FILE COUNTS AS "already carried" (Astra, round 3). A
+    // directory or a dangling symlink wearing a record's name would otherwise
+    // exclude the source silently, and the cleanup would then delete the only
+    // real copy while the landing reported nothing lost.
+    // Nothing is CHARGED here: an entry this filter drops is charged once, by
+    // the copy that then fails on it.
+    let existing = []
+    try {
+      existing = readdirSync(dest).filter((n) => regularity(join(dest, n)) === 'file')
+    } catch (e) {
+      if (!(e && e.code === 'ENOENT')) failed += 1
+      /* the destination is created below */
+    }
+    const entries = []
+    for (const n of names) {
+      if (!n.endsWith('.run.json')) continue
+      const kind = regularity(join(dir, n))
+      if (kind === 'unreadable') failed += 1
+      if (kind !== 'file') continue
+      try {
+        entries.push({ name: n, record: JSON.parse(readFileSync(join(dir, n), 'utf8')) })
+      } catch {
+        // An unreadable record is not attributable, so it is not carried — but it
+        // is COUNTED, because silence here reads as "this point ran nothing".
+        failed += 1
+      }
+    }
+    for (const name of closingRunRecords({ entries, branch, existing })) {
+      try {
+        mkdirSync(dest, { recursive: true })
+        copyFileSync(join(dir, name), join(dest, name), FS.COPYFILE_EXCL)
+        copied.push(name)
+      } catch (e) {
+        // EEXIST means somebody carried it between the listing and the copy —
+        // which is the outcome this function wanted anyway. It is only that when
+        // what stands there is a READABLE RECORD; anything else occupying the
+        // name is a record this landing could not keep, and is counted.
+        if (e && e.code === 'EEXIST' && regularity(join(dest, name)) === 'file') continue
+        failed += 1
+      }
+    }
+  }
+  return { copied, failed }
 }
 
 /**
@@ -820,7 +932,19 @@ async function main(argv) {
         const recorded = recordLandingStage({ repoDir: REPO_ROOT, batchId, stage: 'merge', evidence: { at: Date.now(), mergeSha: git(['rev-parse', 'HEAD']), publicationId: landingId } })
         if (!recorded.ok) throw new Error(`landing journal refused merge evidence: ${recorded.reason}`)
       }
-      step('merge', VERDICT.ok, `${branch} -> main`)
+      // The branch's run records outlive its worktree only if they are copied
+      // now — the cleanup step below deletes the tree they live in (point 1134).
+      // It is bookkeeping, so it gets its OWN catch: an exception escaping into
+      // the handler below would abort-and-report a merge that already succeeded.
+      let carried = { copied: [], failed: 0 }
+      try {
+        carried = carryRunRecords({ branch })
+      } catch (e) {
+        carried = { copied: [], failed: 0, error: `${(e && e.message) || e}`.split('\n')[0] }
+      }
+      const kept = carried.copied.length ? ` · ${carried.copied.length} run record(s) kept` : ''
+      const lost = carried.failed || carried.error ? ` · ${carried.failed || 1} run record(s) NOT kept` : ''
+      step('merge', VERDICT.ok, `${branch} -> main${kept}${lost}`)
     } catch (e) {
       // A conflicted merge is ABORTED, not left in the index: a half-merged main
       // is the worst half state this chain could leave, and the session that has

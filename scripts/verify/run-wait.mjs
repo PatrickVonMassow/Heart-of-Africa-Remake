@@ -31,7 +31,9 @@ import {
   formatDuration,
   formatObservedBand,
   formatReceipt,
+  hungMarkMs,
   nextWaitMs,
+  observedBand,
   planRun,
   pollBudget,
   waitPlan,
@@ -41,6 +43,7 @@ import {
   activeRecordPath,
   countPoll,
   elapsedMs,
+  lastProgressAtFor,
   liveRecordPaths,
   logDir,
   readRecord,
@@ -48,7 +51,11 @@ import {
   runIsLive,
 } from './run-record.mjs'
 import { claimWait, finishWait, waitStatus } from '../wait-lease.mjs'
-import { runIdFromLog } from '../wait-lease-core.mjs'
+import { PROGRESS_LEASE_MS, runIdFromLog } from '../wait-lease-core.mjs'
+
+/** The high end of a §7 band, in ms — what this SHAPE of run really cost at its
+ *  slowest. Null when nothing measured this shape, which leaves the plan alone. */
+const bandHighMs = (band) => (Number.isFinite(band?.highMin) ? Math.round(band.highMin * 60_000) : null)
 
 const USAGE = [
   'usage:',
@@ -154,7 +161,7 @@ function printReceipt(record) {
 /** `--plan`: the decision that belongs BEFORE the run, not after it. */
 function doPlan(argv) {
   const plan = planRun({ argv, verifyGl: process.env.VERIFY_GL })
-  const how = waitPlan({ expectedMs: plan.expectedMs })
+  const how = waitPlan({ expectedMs: plan.expectedMs, observedHighMs: bandHighMs(plan.observedBand) })
   console.log(`# plan: ${plan.suites.length} suite(s) over ${plan.passes.length} backend pass(es) — ${plan.backends.join(' + ')}`)
   console.log(`  suites:   ${plan.suites.join(', ') || '(none)'}`)
   console.log(`  expected: ${formatDuration(plan.expectedMs)} (measured medians, docs/picture-check-cost.md §1)`)
@@ -218,7 +225,14 @@ async function doAwait(logArg, timeoutS) {
   }
   const budget = Number.isFinite(timeoutS) && timeoutS > 0
     ? timeoutS * 1000
-    : (waitPlan({ expectedMs: record.expectedRuntimeMs ?? null }).timeoutMs ?? 590_000)
+    : (waitPlan({
+      expectedMs: record.expectedRuntimeMs ?? null,
+      observedHighMs: bandHighMs(observedBand({
+        isLargeEquivalent: String(record.tier ?? '') === 'large' || (record.tier === null && (record.args ?? []).length === 0),
+        passes: (record.backends ?? []).length || 1,
+        suites: record.suites ?? [],
+      })),
+    }).timeoutMs ?? 590_000)
   console.log(
     `# awaiting ${record.command ?? 'the run'} (pid ${record.pid ?? '?'}) — expected ` +
       `${formatDuration(record.expectedRuntimeMs ?? null)}, giving it ${formatDuration(budget)}. Nothing is being polled.`,
@@ -243,10 +257,21 @@ async function doAwait(logArg, timeoutS) {
   const waited = elapsedMs(current) ?? budget
   // The crossing is now EVIDENCE, not advice: the registry journals it once and
   // says whether this run has passed its hung mark.
-  const status = waitStatus({ lastProgressAt: current?.startedAt ?? null })
-  const hung = status.hung.some((lease) => lease.runId === runId) ||
-    (Number.isFinite(current?.expectedRuntimeMs) && current.expectedRuntimeMs > 0 &&
-      waited > current.expectedRuntimeMs * 2.5)
+  //
+  // WHAT THE RUN ITSELF SAYS COMES FIRST (point 1137). This used to hand the
+  // registry the run's own START time as its "last progress", which made every
+  // long run look silent since the second it began; the registry now probes the
+  // lease's log, record and frames, and this call's own fallback asks the same
+  // question. A run that has written something within the progress lease is
+  // SLOW — the word for it is the STILL RUNNING line below, not HUNG.
+  const status = waitStatus()
+  const progressAt = lastProgressAtFor({ logPath: current?.log ?? null, recordPath: path })
+  const silent = progressAt === null || Date.now() - progressAt >= PROGRESS_LEASE_MS
+  // THE SAME WALL-CLOCK CEILING THE LEASE USES (point 1135): the run's own plan
+  // plus one suite ceiling, never a multiple of an estimate the house measures
+  // low. Below it a silent run is STILL RUNNING, and ending it is a hand call.
+  const ceiling = hungMarkMs(Number.isFinite(current?.expectedRuntimeMs) ? current.expectedRuntimeMs : null)
+  const hung = status.hung.some((lease) => lease.runId === runId) || (silent && waited > ceiling)
   console.log(
     `STILL RUNNING after ${formatDuration(waited)} — this call's ${formatDuration(budget)} is spent, the run is not. ` +
       'Do NOT start a poll loop: let the background run\'s completion notification announce the exit, then read ' +
@@ -254,10 +279,17 @@ async function doAwait(logArg, timeoutS) {
   )
   if (hung) {
     console.log(
-      `HUNG — ${formatDuration(waited)} is past 2.5x this run's expectation. The wait has been recorded as hung and ` +
-        'the batch emergency lane will treat it as a standstill; end the run rather than waiting again.',
+      `HUNG — ${formatDuration(waited)} is past this run's ceiling of ${formatDuration(ceiling)} (its plan plus one ` +
+        `suite ceiling) AND it has written nothing for ${formatDuration(PROGRESS_LEASE_MS)}. The wait has been recorded ` +
+        'as hung and the batch emergency lane will treat it as a standstill; end the run BY HAND rather than waiting again.',
     )
     return 5
+  }
+  if (progressAt !== null) {
+    console.log(
+      `# STILL WORKING — last sign of life ${formatDuration(Date.now() - progressAt)} ago (its log, record or a ` +
+        'frame it wrote). Long is not hung: wait again rather than ending it.',
+    )
   }
   return 3
 }
@@ -274,11 +306,16 @@ function doStatus(logArg) {
     return exitOf(fresh)
   }
   const counted = countPoll(path) ?? record
+  // COUNTING THE POLL MUST NOT MANUFACTURE THE PROGRESS IT THEN READS (Astra
+  // review rounds 1 and 2): `countPoll` rewrites the record, so the mark is read
+  // from the writer's own marker FILE, which nothing but the run ever writes.
+  const progressAt = lastProgressAtFor({ logPath: counted.log ?? null, recordPath: path })
   const verdict = pollBudget({
     polls: counted.polls,
     running: true,
     expectedMs: counted.expectedRuntimeMs ?? null,
     elapsedMs: elapsedMs(counted),
+    silentForMs: progressAt === null ? null : Math.max(0, Date.now() - progressAt),
   })
   console.log(
     `RUNNING  ${counted.command ?? '?'} — ${formatDuration(elapsedMs(counted))} elapsed of an expected ` +

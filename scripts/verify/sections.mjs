@@ -131,6 +131,54 @@ export function listNonPredictive(source) {
   return out
 }
 
+/**
+ * HOW MANY SUBJECTS A CHECK ACTUALLY SAW (point 1136, user order 15.09.2026).
+ *
+ * WHY. `nonPredictive` below declares, once and for all, that a check's narrow
+ * reading cannot predict the suite's. That is the FALLBACK. The cheaper and
+ * provable answer is to CREATE the rare situation and then say how often it was
+ * really reached — because a check that saw nothing gives no all-clear, and a
+ * green over zero observations is a NON-MEASUREMENT dressed as evidence.
+ * Measured 10.09.2026: `polish --section=adult-errands` was green twelve times
+ * while the full pass went red on the same material, because alone it saw many
+ * water errands and inside the pass it saw ONE.
+ *
+ * So a subject-dependent check hands its own sample count in, beside a NAMED
+ * minimum, and three outcomes become possible instead of two:
+ *   · seen >= minimum, assertion holds  → PASS
+ *   · seen >= minimum, assertion broken → FAIL
+ *   · seen <  minimum                   → NOT-COVERING: neither red nor green.
+ *     The question is OPEN. The observed reading is printed beside the count so
+ *     a reader can see what was seen, but it decides nothing.
+ *
+ * This is an EVALUATION, not a guard: it prints its verdict where the check
+ * prints its own, and nothing downstream is made to enforce it.
+ *
+ * Returns null when a check declares no coverage (every check that is not
+ * subject-dependent), otherwise { seen, minimum, what, covering }. Throws on a
+ * malformed declaration — a coverage claim that cannot be read is worse than
+ * none, because it would silently stop evaluating.
+ */
+export function coverageVerdict(coverage) {
+  if (coverage === null || coverage === undefined) return null
+  // THE TYPE IS CHECKED BEFORE ANY CONVERSION (GPT-6 Astra, cross-vendor round).
+  // `Number()` coerces before it validates: `true` becomes 1 and `null` becomes
+  // 0, so a malformed declaration would have MANUFACTURED a count — one subject
+  // against a minimum of one, reported as covering — which is precisely the
+  // silent non-measurement this whole mechanism exists to refuse.
+  const seen = coverage.subjects
+  const minimum = coverage.minimum
+  if (typeof seen !== 'number' || !Number.isInteger(seen) || seen < 0) {
+    throw new TypeError(`coverage needs a whole subject count, got ${JSON.stringify(coverage.subjects)}`)
+  }
+  if (typeof minimum !== 'number' || !Number.isInteger(minimum) || minimum < 1) {
+    throw new TypeError(`coverage needs a named minimum of at least 1, got ${JSON.stringify(coverage.minimum)}`)
+  }
+  const what = typeof coverage.what === 'string' ? coverage.what.trim() : ''
+  if (what === '') throw new TypeError('coverage needs to NAME what it counted, e.g. { what: "water errands" }')
+  return { seen, minimum, what, covering: seen >= minimum }
+}
+
 /** The requested name reduced to its comparable form; '' and null both mean
  *  "no request", i.e. run the whole suite. */
 function normalise(requested) {
@@ -219,6 +267,8 @@ export function makeSectionGate({ sections = [], requested = null, suite = 'the 
   // The checks this run has been told cannot predict the suite's own reading,
   // by check name (point 1086). Declared inside the block they belong to.
   const nonPredictiveChecks = new Map()
+  // The checks that ran but saw too few subjects to answer (point 1136).
+  const notCovering = []
   const gate = {
     /** True while ONE section was selected — the run proves nothing about the rest. */
     partial: verdict.partial,
@@ -250,22 +300,49 @@ export function makeSectionGate({ sections = [], requested = null, suite = 'the 
      * A declared check retains full force when its section runs alone. In the
      * whole suite the observation is advisory, even when it happens to pass.
      * Neither downstream FAIL scrapers nor PASS counters may credit it there.
+     *
+     * `coverage` is a subject-dependent check's own sample count beside its
+     * named minimum (point 1136). It is MEASURED, so it outranks the static
+     * NON-PREDICTIVE declaration: a check that saw too few subjects said
+     * nothing this run, whatever anyone declared about it beforehand. Below the
+     * minimum the verdict is NOT-COVERING — counted as neither a pass nor a
+     * failure, in a narrow run exactly as in the whole suite, because a
+     * non-measurement is a non-measurement in both.
      */
-    checkResult(check, ok) {
+    checkResult(check, ok, coverage = null) {
+      const name = String(check ?? '')
+      const cover = coverageVerdict(coverage)
+      if (cover && !cover.covering) {
+        notCovering.push({ check: name, section: current, ...cover })
+        return {
+          status: 'NOT-COVERING',
+          failed: false,
+          note:
+            `  [NOT COVERING: ${cover.seen} of a needed ${cover.minimum} ${cover.what} seen; ` +
+            `the observed ${ok ? 'pass' : 'fail'} decides nothing and the question stays open]`,
+        }
+      }
       const why = nonPredictiveChecks.get(String(check ?? ''))
+      // A COVERING CHECK STILL PRINTS ITS COUNT. The point of the count is that
+      // a reader never has to take "green" on trust, so it is written whether
+      // it cleared the minimum or not.
+      const counted = cover ? `  [covering: ${cover.seen} ${cover.what} seen, ${cover.minimum} needed]` : ''
       if (why && !verdict.partial) {
         return {
           status: 'NON-PREDICTIVE',
           failed: false,
-          note: `  [NON-PREDICTIVE in full suite: observed ${ok ? 'pass' : 'fail'}; ${why}]`,
+          note: `  [NON-PREDICTIVE in full suite: observed ${ok ? 'pass' : 'fail'}; ${why}]${counted}`,
         }
       }
       return {
         status: ok ? 'PASS' : 'FAIL',
         failed: !ok,
-        note: why && ok ? `  [NON-PREDICTIVE narrowly: ${why}]` : '',
+        note: (why && ok ? `  [NON-PREDICTIVE narrowly: ${why}]` : '') + counted,
       }
     },
+    /** Every check this run could not answer for want of subjects (point 1136),
+     *  so the suite can name them where it prints its own summary. */
+    notCovering: () => notCovering.map((n) => ({ ...n })),
     /** The section a check being printed right now sits in. */
     currentSection: () => current,
     ran: () => [...ran],

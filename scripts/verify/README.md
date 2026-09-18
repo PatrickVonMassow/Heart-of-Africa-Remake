@@ -74,7 +74,8 @@ What the caller still sees — the constraint the selection is built around is
 that a **failing run stays fully diagnosable**:
 
 - LIVE, while it runs: the runner's own structured lines only — the per-suite
-  `PASS/FAIL/SKIP` verdicts, the stage headings, the retry/flake notices, the
+  `PASS/FAIL/SKIP` verdicts, the stage headings, the `ACCOUNTED FOR` / `STRIKE`
+  notices, the
   indented `FAIL …` / `ERR: …` echoes (vitest's own ` FAIL  file > case` lines
   wear that shape too). About one line per suite, so a background poll shows
   progress and a red suite names itself the moment it goes red.
@@ -126,7 +127,10 @@ expected to take, how long it really took last time, how many frames it owes, an
 — the decision that matters — whether it may be **one blocking foreground call**
 at all, or is longer
 than a shell call may run and has to go to the **background**, where the harness'
-own completion notification announces the exit.
+own completion notification announces the exit. That last decision is taken on
+the **§7 band** where one exists, not on the §1 plan (point 1137): a whole
+`polish` pass plans at 5 min 41 s and measures at 9.9–61.5, and advising a
+blocking call for it returns `STILL RUNNING` every time.
 
 **2. Await it.**
 
@@ -145,10 +149,58 @@ node scripts/verify/run-wait.mjs --status [<log>]
 ```
 
 The first wait is **0.9 × the measured median**, not 30 s; five looks are the
-whole budget; past **2.5 ×** the expectation the run is *hung*, not slow. Each
-`--status` raises the count, says how many are left, and names the two ways out.
-The count is printed in the receipt, so the rule is visible in the transcript
-rather than remembered.
+whole budget. Each `--status` raises the count, says how many are left, and names
+the two ways out. The count is printed in the receipt, so the rule is visible in
+the transcript rather than remembered.
+
+**Long is not hung (points 1137, 1135).** Past its expectation a run is
+*overdue*. It is *hung* only past its **wall-clock ceiling** — its own plan plus
+the 45-minute suite ceiling `run-all.mjs` already enforces by KILLING a suite
+(`VERIFY_SUITE_TIMEOUT_MS`) — and only when it is ALSO silent, nothing produced
+for a whole 15-minute progress lease. Point 1135 replaced the old **2.5 ×
+expectation** mark with that ceiling, because the expectation is the thing that
+was wrong: below the ceiling a silent run is STILL RUNNING and ending it is a
+HAND decision, never the tool's. The two-hour lease cap remains the absolute
+backstop above both. **The ceiling is read from the environment of whoever is
+LOOKING**, because the run does not record the timeout it was launched with and
+adding that field is the ledger growth the infrastructure freeze forbids — so a
+run launched with a raised `VERIFY_SUITE_TIMEOUT_MS` must be inspected from a
+shell exporting the same value, or the wait holds it to the house default. Both
+readers take it the same way, so the poll and the lease can never disagree. That silence is judged on the **writer's own
+mark**: `run-logged.mjs` opens a zero-byte `<log>.progress` once, holds the
+descriptor for the run, and moves its mtime from what its child really emitted
+and from sampling the newest frame's mtime — by mtime, because a
+both-backends run overwrites the same 93 names and a count would stop rising
+while the pictures kept coming. The mark is a file of its own so that neither a
+reader's bookkeeping can pass for the run's progress nor a reader's
+read-modify-write can drop a fresh mark, and the verdict takes the **newest** of
+the run's own writings — the mark and the log — so that a marker which stops
+being writable cannot outvote a run that is still working. Two things are
+deliberately NOT among them. The run RECORD, because `--status` rewrites it when
+it counts a poll, and nothing a reader writes is evidence that the run is alive.
+And the FRAME DIRECTORY, because `verification/` is shared and carries no run
+identity: a reader that folded it in could have any other run's pictures vouch
+for the one it is judging. The frames are read by the writer instead, about its
+own run, while that run is going. The descriptor is why there is no
+fallback: a mark re-created on every stamp had to create a directory entry on
+every stamp, and a directory that stops taking new entries mid-run leaves the
+log's own descriptor writing on. Held open, that case is gone and nothing but the
+child ever writes into the log. What is NOT claimed is that the two can never
+fail apart — an explicit timestamp update does not share an ordinary write's
+permission checks, so a marker whose ownership changes under a running run can
+still refuse the stamp. Then the run is judged by its log alone, which is where
+it stood before this point, and the residual is collected in
+`docs/backlog.md`. `--await` and `--status` ask the same question and give the same
+answer: a run that is still writing is `SLOW`, never `HUNG`. A MULTIPLE of the
+plan could never say it either: the §1 plan is measured to be a third to two
+thirds of the real cost, so the old 2.5 × mark for a whole `polish` pass fell at
+14 minutes against a measured 9.9–61.5, and on 15.09.2026 a run that had already
+written 34 of its 21 expected frames was reported hung and ended — with it the
+only covering picture run the release was waiting for. That is the measurement
+the wall-clock ceiling of point 1135 answers. The frames are the heartbeat that matters here:
+`run-all.mjs` captures a suite's output and prints its `PASS`/`FAIL` line only
+when the suite ENDS, so it now also prints a `# → <suite>` line before it starts
+one. A log standing still at `# → polish` for fifty minutes is the suite working.
 
 **The receipt.** `run-logged.mjs` writes a RUN RECORD beside the log
 (`<log>.run.json`) before it spawns anything and closes it with a structured
@@ -330,9 +382,14 @@ waiting past that signal. This does not kill the runner or classify the red.
 
 ### Regression tiers (point 173)
 
-Each point lands after the full fast gates, its covering tier suites and the
-picture check. The **both-backend LARGE runs once per bundle and at closing**,
-not once per point. Choose the covering suites from the tier map below:
+A `feat/` point lands after the CHEAP GATE and its picture — `tsc`, lint, build,
+unit, `audit-check.mjs` on a lockfile change, its own cheapest covering rung
+(its `--section` block, or the whole suite where that suite declares none) and
+the two-backend picture judgement — and nothing else blocks that merge. The
+**both-backend LARGE runs once per bundle and at closing**, on `main`, after the
+last merge; "The full regression is the BUNDLE's gate" below is the whole rule,
+its measurement and its falsification criterion. Choose the covering suites for
+the bundle run from the tier map below:
 
 | Tier | Command | Backend | Browser suites | Preview | What it really costs |
 |------|---------|---------|----------------|---------|----------------------|
@@ -547,7 +604,48 @@ no rung:
   beside the check — the narrow PASS then says so on its own line, and the ladder
   never counts that rung as climbed. It does not refuse the pass either:
   enforcing a rung that lies buys false confidence instead of time, so the ladder
-  steps aside and the waiver is recorded with the run.
+  steps aside and the waiver is recorded with the run. **A non-predictive reading
+  REPORTS but does not set the exit code** — that half is point 1127's, already
+  shipped: the declaration reaches the count, so the check no longer reds the
+  very pass it declared itself meaningless in, and it keeps its full force
+  standalone. Referred to here, never re-built.
+
+#### A rung that saw nothing gives no all-clear (point 1136)
+
+`nonPredictive` above is the FALLBACK, and it was the wrong first answer: it
+declares, once and for all, that a reading cannot be trusted, and then nothing
+ever measures whether it could. The cheaper and provable way is to **create the
+rare situation and say how often it was really reached**:
+
+1. **The check creates its own subject.** `adult-errands` no longer waits for
+   the village to send a water carrier — one errand runs at a time and it waits
+   its turn behind two digging situations, which is why a fixed window saw many
+   alone and ONE inside the pass. `window.__placeCastErrand('water-out')` puts
+   the village's OWN casting queue back on the water whenever no carrier is out.
+   It stages nothing: whether the situation is castable, who is free, where the
+   two of them stand and every phase afterwards stay the game's, so a casting
+   that stopped working still goes red. A separate check proves the creation
+   reached its subject, rather than leaving every reading below it quietly at
+   zero.
+2. **The subject count decides a THIRD verdict.** A subject-dependent check
+   hands `{ subjects, minimum, what }` to `check()` beside its assertion. Below
+   the named minimum the line reads `NOT-COVERING`: counted as neither a pass
+   nor a failure, in a narrow run exactly as in the whole suite, because a
+   non-measurement is a non-measurement in both. The observed reading is printed
+   beside the count and decides nothing — the question stays OPEN. Above the
+   minimum the check decides normally and still prints what it saw, so nobody
+   has to take a green on trust. `coverageVerdict` in `sections.mjs` is the pure
+   decision; the run names every open question again beside its verdict, and
+   `run-all.mjs` and the digest carry those lines out like the PARTIAL banner.
+3. **Where creation is impossible**, the section gets the tick and seed budget
+   of the full run so rung and suite measure the same thing — and if the rung
+   then costs more than it is worth, it is deleted without replacement and the
+   check stays the bundle's business. `nonPredictive` remains for that case.
+
+This is an EVALUATION, not a guard, and its scope is the measured
+subject-dependent checks — it is not spread over every suite. One fixed scenario
+does not replace natural variance either, which is why the broad closing run
+stays as it was.
 
 Everything fails OPEN. A ladder that cannot read the tree (no `main` to compare
 against, an unreadable ledger, a missing mapping) lets the run start and says so.
@@ -673,21 +771,23 @@ green rung could ever clear — because a refusal an author cannot answer by
 working costs more than the run it saved. `--no-ladder "<why>"` waives it and
 records what it waived.
 
-### The diagnosis runs on the block, the PROOF stays whole (point 1126)
+### The diagnosis runs on the block, the PROOF stays whole (points 1126, 1135)
 
-Two mechanisms re-ask a red's one question — transient, or defect? — and both
+Two mechanisms re-asked a red's one question — transient, or defect? — and both
 asked it by replaying the whole suite. Inside the last LARGE run of 14.09.2026
 `polish` ran FOUR times at ~28 min each: first pass, flake retry, two baseline
-passes on the merge base. The same question answered on the blocks costs about
-nine minutes instead of eighty-four.
+passes on the merge base.
 
-- **The flake retry** (point 200) spawns the blocks the red checks named, one
-  each, instead of the pass. It stays SUSPECT and covers no backend exactly as
-  the whole retry did.
-- **The baseline classification** (point 294) runs each of its passes on those
-  same blocks. Its died-early yardstick (point 418) is re-measured on the same
-  blocks, and answers "unknown" rather than wrong when the failures arrived as
-  bare `--failed` names with no output to count.
+**Point 1135 deleted three of those four.** The flake retry is gone entirely and
+the baseline passes no longer run inside a pass at all — the classification is a
+lookup in the charge ledger (below). What remains of this section is the HAND
+diagnosis, and it is still narrowed to the block:
+
+- **The baseline classification** (point 294), run BY HAND when a red is
+  genuinely in doubt, runs each of its passes on the blocks the red checks
+  named rather than on the suite. Its died-early yardstick (point 418) is
+  re-measured on the same blocks, and answers "unknown" rather than wrong when
+  the failures arrived as bare `--failed` names with no output to count.
 
 `narrowDiagnosis` in `sections.mjs` decides it, and **refuses the narrowing
 wherever the narrow reading would not be the suite's**: a red that names no
@@ -696,39 +796,107 @@ over half the blocks, where paying the boot prologue that often costs more than
 the one pass. This narrows what is ASKED, never what is CREDITED — a `--section`
 run is PARTIAL, and the covering proof stays whole and unfiltered.
 
-### One REGRESSION for several finished branches — never one PICTURE (point 1126)
+### The full regression is the BUNDLE's gate, not the feature's (point 1134)
 
-The brief's ladder has allowed this for a long time (`VERIFICATION_LADDER` in
-`scripts/point-brief-core.mjs`): *"a shared final regression over several
-finished branches may replace the repeated REGRESSION, never that picture."*
-Folding point 1057 into 1056 on 07.09.2026 was the same instruction, given by
-hand. It is written down here so it is a procedure rather than a memory.
+**What finishes a `feat/` point.** The cheap gate plus the picture — and the
+list is exhaustive, so that nobody has to guess what blocks a merge:
 
-**What may be shared.** Two or more branches that are FINISHED — implemented,
-unit-green, and each judged on its own picture — are merged into one tree, and
-the LARGE regression runs ONCE on that tree. The alternative is the same set of
-suites run once per branch for a delta the merge will combine anyway.
+| The gate | When |
+|---|---|
+| `npm run typecheck:test` / `tsc` | always |
+| `npm run lint` | always |
+| `npm run build` | always |
+| `npm run test:unit` | always |
+| `node scripts/audit-check.mjs` | only when the lockfile changed |
+| the point's own CHEAPEST COVERING rung | always — its `--section` block, or the whole suite where that suite declares no sections (`startup`, `benchmark`, `docs` and the other unsectioned ones refuse `--section`, so the suite itself IS their cheapest rung) |
+| the two-backend PICTURE judgement | always for a change that can move the picture |
 
-**What is never shared.** The two-backend PICTURE check of each point, which
-stays ON ITS OWN BRANCH, before the merge. A picture is a judgement about what a
-change LOOKS like; a shared tree cannot say which change produced a frame.
+**Only that gate blocks the merge.** The both-backend LARGE is not part of it.
 
-**How.**
+**Why.** Measured over 01.09.–15.09.2026: **40** merged `feat/` branches, **103**
+recorded verification runs, **49** of them carrying FAIL lines or a non-zero
+exit — and **not one clean case** of "a feature broke standing functionality and
+only the full regression found it". The 49 reds were pre-existing (point 1065
+spent 23 full LARGE runs / 16.2 machine-hours without a single red touching its
+own work), load or flake (1072 printed `REAL REGRESSION (green on baseline, red
+now)` and was 3 of 3 green on a quiet machine), test defects (1126, 1127,
+`run-wait` calling healthy runs hung), or the single branch suspicion 1056, whose
+trail led to a latent defect reported on 07.09. and landed as point 1131. The one
+escape onto `main` in the whole window was a type-check error, caught by `tsc` —
+the cheapest gate there is.
 
-1. Each branch finishes its own work and its own both-backend picture check, and
-   reports the `git HEAD` it judged.
-2. Merge `main` into each branch, then merge the finished branches into one
-   integration tree — in practice the first branch, with the others merged into
-   it (`scripts/fold-point.mjs` for a point that is folded outright).
-3. Run the LARGE regression ONCE there, on the exact tree that will land, and
-   report that `git rev-parse HEAD`.
-4. Land the points from that tree. A red in the shared run is charged like any
-   other red — to the point that owns it, never to "the bundle".
+**Where the LARGE runs instead.** Once per bundle, **on `main`, after the last
+merge**. The bundle tree IS `main`: no integration tree and no test tree is built
+for it — that would be exactly the workflow abstraction CLAUDE.md §2 forbids, and
+it would also cost the merge a second time. A temporarily red `main` is covered
+by CLAUDE.md §7.2 and by there being exactly one owner.
 
-**When NOT to.** Where one branch's red would make the other's result
-unreadable — two branches editing the same suite, or the same subsystem — the
-shared run buys a cheaper answer to a question nobody can then attribute. Run
-them separately and say why.
+**Where the bundle boundary is.** A prose trigger, deliberately no automatism. A
+bundle closes as soon as ONE of these holds:
+
+- three to five finished points,
+- three days, or the end of a day,
+- a point touches a core area,
+- a demo or a release is due.
+
+There is **no minimum bundle size**: a single finished point may keep its own
+closing run, and no finished branch waits for an unfinished large bundle.
+
+**What is NOT bundled.**
+
+- **Core touches** — the tick loop, the scheduler, the save format, the
+  renderer/backend binding. This is a prose list, and it grows only after an
+  actual core red, never on suspicion.
+- **Branches touching the same suite or subsystem**, which is the rule point 1126
+  already wrote down above: where one branch's red would make the other's result
+  unreadable, the shared run buys a cheaper answer nobody can attribute. Run them
+  separately and say why. A diff argument may add a single further case.
+
+**Every merge re-climbs the rung.** After every merge of `main` into the branch,
+every conflict resolution and every further change, the affected rung is climbed
+AGAIN, and `tsc` runs on the ACTUALLY merged state; an older branch green does
+not count. The bundle run starts only once every intended merge has happened.
+
+**The picture stays with its point.** The two-backend picture judgement is made
+per point, on its own branch, before the merge. It is never shared, bundled,
+moved into the bundle run, or replaced by a bundle picture — point 1126's "never
+one PICTURE" is unchanged by this point. A picture is a judgement about what a
+change LOOKS like, and a bundled tree cannot say which change produced a frame.
+
+**A red bundle run rolls nothing back.** A merged point stays merged. The red is
+attributed under CLAUDE.md §7.2 or filed as its own point, and it is **never**
+charged to "the bundle" — a bundle owns nothing and closes nothing. Attribution
+runs over the diff, the section rung, and `git bisect` across `main`'s merge
+commits; never over a second tree. An interaction with no single owner gets an
+integration point that NAMES its participants. "Never over a second tree" is
+about not BUILDING one to hold the bundle: `baseline-classify.mjs` below still
+re-runs a red's own blocks in its detached read-only baseline checkout, and a
+bundle red asked by hand names the merge commit it measures against (`--ref`)
+rather than a merge base, which on `main` would resolve to the commit under
+test.
+
+**The lead figure is wall clock per point**, read once per bundle from the
+`run.json` files rather than estimated: the target profile is point 1112
+(regression exactly once, zero side effects), the counter-profile is point 1056
+(599 min in 28 runs). Machine time and wall clock stay separate numbers.
+
+**FALSIFICATION.** This rule falls back to "per feature" the moment ONE clean
+case appears: a branch broke standing functionality and only the full regression
+found it. Re-measure after 40 further merges.
+
+**And the measurement limit is passed on with the rule**, because a number that
+outlives its caveat is how one window's reading becomes a house rule nobody can
+argue with: "zero cases" is the result of ONE window, 103 runs are not an
+independent sample, 49 red runs are not 49 defects, and points 1065 and 1131
+travel along as counter-evidence.
+
+**The closing run record survives the worktree.** A branch's `run.json` files
+live in its own git-ignored `local/verify-logs/`, so they used to die with the
+worktree the landing removes — which is why the measurement above had to be
+reconstructed by hand. `scripts/land-point.mjs` now COPIES the landed point's own
+run records into the main checkout's `local/verify-logs/` inside the existing
+merge step. It is a `cp`, not a ledger: nothing reads it but the next person
+measuring.
 
 ## A spawn that never ran is not a rejection (points 573/606)
 
@@ -1104,53 +1272,70 @@ gate.
 A red is now read, not asserted. Two signals, both decided in the pure module
 `baseline-classify-core.mjs` (pinned by `baseline-classify.test.mjs`):
 
-**1. The repeat signature — free, always on, EXCEPT where the question is already
-answered (point 1113).** A failed browser suite is retried once (point 200) —
-unless every red in its own run record is charged to an OPEN point in
-`scripts/render-verify-charges.mjs`. The retry exists to tell a transient from a
-defect, and for a red a named open point already owns there is nothing left to
-tell: the suite runs once, prints `ACCOUNTED FOR <suite> — retry skipped; all reds
-charged to open points <N, …>; suite stays red`, and the run's closing line repeats
-those points, so the price of the open defects is read on every run. ONE uncharged
-red in the set keeps the retry exactly as below. The suite stays RED and the record
-stays ACCOUNTED FOR — a charge is not a pass. The runner used to conclude from "it failed twice" that this
-was "a real failure, not a flake". That is not what two failures prove: on
-27.07.2026 `enrichments` failed two staging checks, then a completely different
-one (the crocodile eye knobs) on the retry, on a machine carrying a unit run and
-two agents — and none of the three checks had anything to do with the change
-under test. So the verdict now comes from the failing check NAMES:
+**ONE PASS PER SUITE (point 1135, user order 15.09.2026).** A LARGE runs each
+suite exactly once. There is no automatic flake retry and no automatic baseline
+pass. Measured inside one LARGE of 14.09.2026: the 28-minute `polish` ran four
+times — first pass, flake retry, two baseline passes — and this deletes three of
+the four. The saving is paid whatever cadence the regression settles on, which is
+why the user put this point first of three.
 
-| Both runs failed at… | Verdict |
-|---|---|
-| the SAME check | `CANDIDATE REAL FAILURE` — it reproduces; find out whether the change caused it |
-| DISJOINT checks | `LOAD/FLAKE SIGNATURE` — the fingerprint of a busy machine, not of a defect; re-run the suite alone on a quiet machine before believing it |
-| no parseable FAIL line (crash, wall-timeout kill) | `UNCLASSIFIED` — say so, never guess |
+**1. The charge ledger IS the classified baseline.** `scripts/render-verify-charges.mjs`
+holds one entry per known-red check, each naming the OPEN work-order point that
+owns it and carrying, in its own `why`, the date and the run it was measured on.
+A red the ledger names is **charged elsewhere** and says nothing about the change
+under test; a red it does not name **HOLDS**. That is the whole classification,
+and it costs no machine minutes — which is why the extra passes could go without
+weakening the gate.
 
-Check identity folds measured numbers away (`12 vultures circle` is the same
-check as `9 vultures circle`), and the console-error texts count as pseudo-checks
-so the console-gated suites (`world`, `i18n`) can be triaged at all. Each check
-is annotated with whether its name touches the branch diff — a weak
-corroborating hint, never a verdict.
-
-**2. The baseline classification — automatic for LARGE reds, opt-in for smaller runs.**
-
-A LARGE run compares every suite that stayed red against its merge-base, including
-crossbrowser at the same depth. Both attempts' reds are retained, even when some
-rotate beside a stable failure. Only a `pre-existing` classification charges a
-check elsewhere. The report deposits one request per check through
-`finding.mjs --request … --once --spec-file … --why-file …` into the main
-checkout's findings carrier; the owner drains and numbers it. Title identity
-survives repeated runs, concurrent reports and already numbered requests.
-
-The closing `POINT REDS` line names the charged requests and the point's own or
-unresolved reds. Real regressions, flaky/dead/inconclusive baselines, incomplete
-current runs and filing failures keep holding the point. Filename overlap remains
-a hint. The full regression retains its red exit and its coverage requirements;
-charging a check does not make the suite green.
+Every red run ends with the `POINT REDS` line:
 
 ```
-npm test                              # LARGE classifies suites that stayed red
-VERIFY_BASELINE=1 npm run test:small   # same, via the environment
+POINT REDS DO NOT HOLD — charged elsewhere: "point 603 — first-person ground shows micro-detail (edge energy)"
+  — own or unresolved: none; regression verdict unchanged
+```
+
+A suite whose reds are ALL charged also prints `ACCOUNTED FOR <suite> — every red
+is charged to open point(s) <N, …>; suite stays red`, and the closing line repeats
+those points, so the price of the open defects is read on every run. **A charge is
+not a pass**: the suite stays RED, the record stays ACCOUNTED FOR, and the run
+exits non-zero. An incomplete, crashed or missing run record is `ownership
+unresolved` and holds — never a green.
+
+**No blanket standing exemption.** An entry is a named defect with a live owner,
+not a permanent excuse. A run that sees a charged check **PASS** prints
+
+```
+STRIKE  settings     "<check>" PASSED here but is still charged to open point 603
+        — strike that entry from scripts/render-verify-charges.mjs (point 1135)
+```
+
+and the bundle's LARGE is where that bookkeeping is done. A charge also dies with
+its point: the moment the owning point is ticked, its entries stop clearing
+anything. Confirmed flakes move INTO the ledger as their own entry rather than
+being re-rolled by a retry every pass.
+
+**RUNS ARE SERIALIZED: while a LARGE runs, nothing else does.** One LARGE owns
+the machine — no second suite, no `--section` run, no other worktree's pass
+beside it. This is a HOUSE RULE, written here and nowhere else: there is no
+lockfile and no guard for it (point 1135), because a timing verdict taken while
+something else was on the machine is not evidence, and the load report at the top
+of every run already says so out loud. The one mechanical help is point 1104's
+admission check in `run-logged.mjs`, which finds a live LARGE in the process
+table and WAITS instead of starting beside it; `VERIFY_NO_WAIT=1` is the named
+escape for an operator who knows the found run is finished work.
+
+**2. A HAND retry is still allowed, and is still SUSPECT.** Re-running the
+SMALLEST affected check as diagnosis is fine — CLAUDE.md §7.2 is unchanged by
+this point: a retry is SUSPECT and covers nothing. What is gone is the runner
+doing it for you, on every red, of every pass.
+
+**3. The baseline classification — BY HAND, never inside a pass.**
+
+`baseline-classify.mjs` still measures a red against the pre-change tree. Nothing
+calls it automatically any more; it is asked for by name when a red is genuinely
+in doubt.
+
+```
 node scripts/verify/baseline-classify.mjs enrichments          # one suite, on demand
 node scripts/verify/baseline-classify.mjs polish --ref HEAD~1  # against a named commit
 ```
@@ -1160,7 +1345,13 @@ It re-runs the failing suite against the pre-change baseline (the merge-base wit
 `local/verify-baseline/<sha>` — no second `npm install`: Node resolves
 `node_modules` up the ancestor directories, and the checkout lives inside the
 repo. At most two baselines are kept. Each currently failing check comes back as
-**REAL REGRESSION** (green on the baseline), **PRE-EXISTING / STALE ASSUMPTION**
+**SUSPECT — green on baseline, red now; UNCONFIRMED** (point 1135: a suspicion,
+never a finding — the baseline is measured standalone and the candidate in-pass,
+so the two readings are not of the same thing, and the label says so. It is
+settled by three narrow `--section` rungs of the affected block on a QUIET
+machine under equal starting conditions — three runs of the whole affected suite
+where that suite declares no sections — never by another full regression),
+**PRE-EXISTING / STALE ASSUMPTION**
 (already red there — the 24.07. SSAO ground-edge and proximity-fade cases),
 **UNSTABLE ON BASELINE** (it flaked there too, so the baseline decides nothing —
 which is why the baseline runs twice by default, `--runs n`),
@@ -1189,9 +1380,14 @@ evidence either way: every run's stdout+stderr is written to
 `local/verify-baseline-logs/<suite>-baseline-<sha>-run<n>.log` (and
 `<suite>-current.log`) before anything is judged — a sibling of the checkouts, so
 the retention prune can never delete it. The yardstick is the current run's check
-count: `run-all` passes it as `--current-checks <n>`, and a direct run measures it
-itself. With `--strict`, a died or resultless baseline exits 1 like a real
-regression — it produced no triage at all.
+count, which this command measures itself by running the suite in THIS tree
+first; `--current-checks <n>` supplies it for a caller that already has the
+number, and `--failed`/`--current-out` hand over the failing checks the same way.
+Since point 1135 the runner is not such a caller: nothing passes them
+automatically any more. A current run that names no failing check but ends
+non-zero — a crash, a wall-timeout kill — is NOT a clean tree and exits 1 rather
+than reporting one. With `--strict`, a died or resultless baseline exits 1 like a
+SUSPECT check — it produced no triage at all.
 
 It runs the CURRENT check against the BASELINE app, so only the product differs
 — and it prints what can bend that reading: a suite file that changed since the

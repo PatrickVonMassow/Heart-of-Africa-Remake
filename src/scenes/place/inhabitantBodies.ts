@@ -298,13 +298,11 @@ export function stepRoundBodies(
   const dist = Math.hypot(dx, dz)
   if (!crosses(fromX, fromZ, toX, toZ)) return { x: toX, z: toZ }
   if (!(dist > 1e-9)) return { x: fromX, z: fromZ }
-  const both = (x: number, z: number) => blocked(x, z) || occupiedAt(x, z)
+  // Reject a crossing while choosing the bearing, so another bearing is tried.
+  // Testing only its endpoint picked the same unsweepable deflection forever
+  // beside a stationary water carrier, then rejected it below on every frame.
+  const both = (x: number, z: number) => blocked(x, z) || occupiedAt(x, z) || crosses(fromX, fromZ, x, z)
   const r = deflectedStep(fromX, fromZ, Math.atan2(dx, dz), dist, both, Math.max(dist, selfRadius * 2))
-  // The deflected step is swept by the same rule: `deflectedStep` probes its
-  // target and lookahead POINTS, so a long deflected jump could cross a second
-  // body sideways. A crossing deflection is refused — the figure waits the
-  // frame out and retries against the bodies' next positions.
-  if (!r.moved || crosses(fromX, fromZ, r.x, r.z)) return { x: fromX, z: fromZ }
   return { x: r.x, z: r.z }
 }
 

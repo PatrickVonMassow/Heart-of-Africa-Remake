@@ -9,6 +9,32 @@ when their area is touched anyway or a triage says otherwise.
 Format: one line per finding — `- YYYY-MM-DD <source> — <finding>`.
 
 <!-- entries -->
+- 2026-09-17 batch owner (01:26 and 08:05, `.claude/batch-launcher.log` "stopping on SIGTERM")
+  — a `kill` sent from inside the container to headless Chrome processes (orphans reparented
+  to PID 1, or a process group holding the detached logged run) stopped the WHOLE container
+  within seconds, twice in one morning, with the WSL VM alive the second time. A suite that
+  closes Chrome through Playwright survives. Operating rule recorded in the owner memory:
+  never signal Chrome from inside; abandon a run with `batch-in-flight.mjs --clear` and let
+  the wrapper run out. Point 1069 should record the trigger as the signal, not the suite;
+  point 1064 covers the missing container restart policy. PROMOTE to a point if it recurs
+  without a kill.
+- 2026-09-17 context handover (`scripts/batch-in-flight.mjs` ~1286, `assessTransfer`)
+  — a declared logged run is judged transferable only when its record's HEAD equals
+  `currentHeadOf({cwd})`, the MAIN tree's HEAD, so a run on a point's worktree can never
+  transfer: `--prepare --context` blocks with "its run covers HEAD <branch tip>, not the
+  <main HEAD> being handed over", and of its four named ways out only ABANDON works, which
+  throws the run away (measured twice: 01:23 by the predecessor, 08:03 by this session).
+  Simplification: compare against the declared `--branch` tip when the declaration names one.
+- 2026-09-16 point 1139 landing (`scripts/verify/baseline-classify.mjs`, `scripts/render-verify-guard.mjs`)
+  — a classification run records its BASELINE measurement into the point's own render-verify
+  state, so the branch inherits reds that belong to the code WITHOUT its change. Measured today:
+  the classifier's `polish` pass over the baseline printed "the invitation names the guess key E",
+  "E opens the guess for the highlighted speaker" and six further point-1139/588 checks as reds —
+  which is exactly right for code that does not carry the change, and exactly wrong as a red of
+  the branch. The guard then offers only fix / charge / file for them, and none of the three fits
+  a measurement of the old code. It did not block here (no render path pending at that HEAD) and
+  the covering runs of both lanes were recorded separately, so this is collected, not a point.
+
 - 2026-09-13 point 1072 landing (`scripts/verify/run-wait.mjs`) — a healthy LARGE was reported
   HUNG and recorded as a batch standstill. The run record's `expectedRuntimeMs` covers the SUITE
   time only (42m 16s here), but a run that ends with red suites then enters its baseline
@@ -24,6 +50,11 @@ Format: one line per finding — `- YYYY-MM-DD <source> — <finding>`.
   log shows the classification banner. Collected rather than queued: it mis-advises, it does not
   block — judgment overrode it here — and the infrastructure freeze of CLAUDE.md §2 keeps it out of
   the work order until it actually costs a run.
+  CLOSED by point 1137 (16.09.2026): it did cost a run two days later, twice, and became the
+  blockade in front of the release. The repair is neither of the two directions above but the one
+  they share: the hung verdict now needs SILENCE as well as the clock — no log line, no record
+  update and no frame for a whole 15-minute progress lease — so the classification phase, a long
+  `polish` pass and every other long-but-working run report OVERDUE instead of HUNG.
 - 2026-09-13 point 1072 LARGE (WebGPU, `polish`, feat/1072 at 5a5c8d7a5) — the suite went red on
   its first attempt and clean on the retry, so the run is recorded SUSPECT and covers nothing
   (CLAUDE.md §7.2). Three of its reds have owners and one family has none. Owned: `leaving after
@@ -275,6 +306,8 @@ Nutzer-Auftrag, priorisiert, Begruendung Kommunikationsmechanik: 'Zudem macht de
 ## NUTZER-AUFTRAG 07.09.2026: eigener spaeterer Task fuer das Clipping von Lebens-Requisiten (07.09.2026) — EINGEREIHT als Punkt 1093 (10.09.2026)
 
 Nutzer-Auftrag: 'reihe einen weiteren Task fuer das Clipping-Problem ein, der spaeter erledigt wird' — also NICHT priorisiert, eigener Punkt, nach dem Brunnen-Fix. Befund dazu (gemessen in layout.ts): die festen Requisitenplaetze VILLAGE_SPOTS werden gegen WOHNBAUTEN freigehalten (isFree Z774 prueft jeden Kandidaten gegen lifeSpots), aber ZAEUNE werden ohne jede Lebens-Requisiten-Pruefung gesetzt: fences.push an Z1108, Z1113, Z1229 (Gehoeftring), Z1293 und Z1335 (Steinring r 17.5 um (0,0.5)) konsultiert lifeSpots nirgends. Deshalb kann ein Gehoeftring quer durch einen festen Requisitenplatz laufen — im Report hoa-state-2026-09-07-1702816850 traf es den Brunnen bei (9, 8.5). Der Brunnen verschwindet zwar mit dem prioritaeren Auftrag, die Exposition bleibt aber fuer Sprecherpaar (4.6,5.6), Stampferin (-7,1.2), Trommler (-2.2,0.2) und Weberin (-8.5,-7) bestehen. Aufgabe: Zaunzuege gegen die Requisitenplaetze pruefen (Zaun weglassen, Ring verschieben oder Platz aus dem Plan heraus setzen wie beim Wasserpfad), plus ein Test ueber mehrere Seeds, dass kein Requisiten-Collider einen Zaunpfosten oder eine Wohnbaute schneidet.
+
+Building and fence clearance implemented with point 1143: `layout.ts` opens fence panels around the full prop and figure footprints. `lifeStationClearance.test.ts` covers 300 seeds each for Bambara, Maasai and Swahili, plus representative seeds for every village plan. The `polish` section `village-stations` stages the reported weaver for both-backend picture review.
 
 ## Clipping trifft die Kommunikationslehre nicht — 1045 tut es (07.09.2026)
 
@@ -961,6 +994,11 @@ Nicht als Punkt eingereiht wegen des Infrastruktur-Freezes: kein Spielerimpakt,
 keine stehende Blockade — der Weg existiert und wurde gegangen. Kommt es
 wieder, gehört es zu Punkt 1123, der schon zwei Defekte derselben Familie trägt.
 
+ERLEDIGT (17.09.2026): es kam wieder und wurde als Punkt 1142 gefahren.
+Laufdatensatz und Protokoll liegen jetzt im Haupt-Checkout, und der Wächter
+liest einen Lauf über den Commit, den er nennt — nach dem Merge ein Vorfahr von
+`main`.
+
 ## Der Bildschirm-Wächter verweigert jeden Zug, wenn die Sitzung im Arbeitsverzeichnis steht (15.09.2026)
 
 Der Stop-Wächter liest `.claude/dashboard-state.json` AUS DEM VERZEICHNIS, in dem
@@ -1045,3 +1083,298 @@ Punkt eingereiht: kein blockierender Defekt, keine Datenfrage, und die Marken
 verlieren ihre Überlappung, sobald der Spieler einen Schritt weitergeht. Der
 billige Weg wäre, überlappende Marken gegeneinander auszublenden statt sie zu
 versetzen.
+
+## Die Fehlerquote des Wasserauftrags ist nicht gemessen (15.09.2026)
+
+Aus dem Code des 1131-Zweigs abgeleitet, kein Sweep gefahren: Die Blockade am
+Wasserstand trifft einen Teil der Aufträge, nicht alle — sie hängt daran, wo der
+Sender bei der Vergabe zufällig steht, nicht an der Lage der beiden Standplätze
+zueinander. Wie groß dieser Teil ist, steht nicht fest. Der Wiederholungs-
+Harnisch aus `72dc3907c` kann die Quote über einen Seed- und Startpositions-
+Sweep der Baseline liefern.
+
+Wirkung: keine — die Reparatur von Punkt 1131 hebt die Blockade unabhängig von
+ihrer Häufigkeit auf, und die Quote beträfe allein die Nachbetrachtung. Nicht
+als Punkt eingereiht: kein Spielerimpakt, keine Datenfrage, kein Blocker; die
+Messung kostet einen ruhigen Rechner für einen Sweep, den niemand braucht,
+solange der Rundgang gelingt. Der billige Weg wäre, die Quote beim nächsten
+ohnehin fälligen Baseline-Lauf mitzuzählen.
+
+## Der 45-Minuten-Riegel je Suite steht unter dem gemessenen Band (16.09.2026)
+
+Aus Punkt 1137 mitgemessen, noch nie ausgelöst: `run-all.mjs` tötet eine Suite
+nach `SUITE_TIMEOUT_MS` = 45 min mit SIGKILL und der Zeile „KILLED after 45 min
+wall timeout (hung, not slow)". Ein ganzer `polish`-Durchgang wurde im September
+mit 9,9–61,5 min gemessen (docs/picture-check-cost.md §7). Das Band gilt für den
+ganzen Durchgang samt Bau-, Lint- und Unit-Stufe, die Suite selbst liegt
+darunter — in 314 abgelegten Läufen steht die Zeile kein einziges Mal. Aber es
+ist dieselbe Familie wie der Hängend-Befund: eine feste Zahl gegen eine Laufzeit,
+die niemand nachgemessen hat, und im Zweifel stirbt der gesunde Lauf.
+
+Wirkung: keine gemessene — kein Lauf hat den Riegel je berührt. Nicht als Punkt
+eingereiht: kein Spielerimpakt, keine Datenfrage, keine Blockade, und der
+Infrastruktur-Freeze hält ihn draußen, bis er wirklich einen Lauf kostet. Der
+billige Weg wäre, ihn gegen dieselbe Stillstandsprobe zu tauschen, die der
+Hängend-Befund jetzt benutzt, statt die Zahl zu erhöhen.
+
+## Geparkte Zweige zählen als lebende Agentenlanes (16.09.2026)
+
+`batch-doctor --gate` hat am 16.09. ein rotes `npm run test:unit` als
+„INCONCLUSIVE (load)" eingestuft und dabei fünf Arbeitsbäume als „live agent
+worktree(s)" genannt — `point-1049`, `point-1133`, `point-834`, `point-847`,
+`point-901`. In keinem davon lief ein Prozess; es sind geparkte Zweige offener
+Punkte, der jüngste vom 15.09., der älteste vom 23.08. Gezählt wird ihre bloße
+Existenz, nicht ihre Arbeit.
+
+Wirkung: das Tor kann auf diesem Rechner kein rotes Urteil mehr fällen, solange
+irgendein Zweig geparkt ist — ein Rot wird immer als Last erklärt. Nicht als
+Punkt eingereiht: es macht ein Urteil weicher, statt eines zu fälschen, und die
+Last-Einstufung ist genau die Vorsicht, die die Retrospektive §3.22/§3.48
+verlangt. Der billige Weg wäre, denselben Lebendtest zu benutzen, den
+`batch-in-flight.mjs --agent-check` schon fährt: ein Arbeitsbaum ohne laufenden
+Prozess und ohne fortschreitenden Zweig ist geparkt, nicht belegt.
+
+## Ein festgefahrener Lauf kann von fremden Bildern am Leben gehalten werden (16.09.2026)
+
+Aus fünf Prüfrunden zu Punkt 1137, von GPT-6 Astra gefunden und nicht
+geschlossen: Der Prüfläufer erkennt einen festgefahrenen Lauf daran, dass dieser
+eine ganze Viertelstunde lang nichts mehr geschrieben hat. Weil eine lange
+Bildsuite zwischen ihrer Startzeile und ihrer Ergebniszeile nichts ins Log
+schreibt, tastet der Lauf zusätzlich seine eigenen Bilder ab — und
+`verification/` ist ein gemeinsames Verzeichnis ohne Laufkennung. Ein wirklich
+festgefahrener Lauf hält seinen Aufseher am Leben; nimmt in dieser Zeit ein
+anderer Lauf Bilder auf, wandert die Fortschrittsmarke des festgefahrenen mit.
+Von innen korrigiert das nichts, denn ein festgefahrener Lauf schreibt nie eine
+eigene echte Marke.
+
+Wirkung: das Hängend-Urteil kann sich verzögern, solange jemand anders
+fotografiert — es fällt nicht falsch, es fällt später. Die lesende Seite ist
+davon frei: sie sieht nur Marke und Log des Laufs, nach dem sie gefragt wird.
+Nicht als Punkt eingereiht: die entgegengesetzte Störung ist die teure und die
+belegte — an einem Abend wurden zwei kerngesunde Läufe beendet und die
+Veröffentlichung stand hinter dem deckenden Bildlauf still, den sie erzeugt
+hätten. Ein Melder, der gelegentlich spät anschlägt, ist einem vorzuziehen, der
+zuverlässig tötet, was er beobachtet. Der saubere Weg wäre ein Bild, das seinen
+Lauf benennt — eine Änderung an jedem Suite-Auslöser, nicht am Prüfläufer.
+
+## Eine Marke, deren Besitzer sich mitten im Lauf ändert, bleibt stehen (16.09.2026)
+
+Aus der zehnten Prüfrunde zu Punkt 1137, von GPT-6 Astra gefunden und bewusst
+nicht geschlossen: Der Lauf hält seine Fortschrittsmarke offen und verschiebt
+ihren Zeitstempel über den Dateideskriptor. Ein ausdrückliches Setzen des
+Zeitstempels unterliegt aber nicht denselben Rechteprüfungen wie ein gewöhnliches
+Schreiben — ändert jemand mitten im Lauf den Besitzer der Markendatei, verweigert
+das System das Setzen, während das Log weiter Bytes annimmt. Der Lauf wird dann
+allein an seinem Log gemessen; eine lange, stille Bildsuite könnte so nach einer
+Viertelstunde als hängend gemeldet werden.
+
+Wirkung: eine Falschmeldung, kein getöteter Lauf — das Hängend-Urteil berichtet,
+es beendet nichts. Voraussetzung ist ein Eingriff von außen an einer Datei, die
+dem Lauf gehört. Nicht als Punkt eingereiht: kein Spielerimpakt, keine
+Datenfrage, keine Blockade — und die Brücken, die in den Runden sechs bis neun
+für genau diese Klasse gebaut wurden, haben jedes Mal mehr gekostet als der Fall,
+den sie abdeckten (zerschnittene Ergebniszeilen im Log, eine Frist, die sich
+selbst erneuerte, verlorene Beobachtungen). Der billige Weg wäre, gar keinen zu
+bauen und die Meldung zu lesen, wie sie gemeint ist.
+
+## Zehn Prüfrunden an einem Punkt: die Abbruchentscheidung (16.09.2026)
+
+Punkt 1137 hat zehn kreuzverlagerte Prüfrunden durchlaufen; jede fand etwas
+Echtes, und die Voraussetzungen wurden von Runde zu Runde enger — von einer
+veralteten Kostentabelle über eine Umfrage, die ihre eigene Akte neu schreibt,
+bis zu einem Besitzerwechsel an einer Datei mitten im Lauf. Abgebrochen wurde
+nach Runde zehn, mit folgender Begründung: Alles, was einen **gesunden Lauf
+beenden** kann, ist repariert und durch Tests festgehalten. Was bleibt, lässt das
+Hängend-Urteil zu spät oder falsch **melden** — und eine Meldung tötet nichts.
+Der Infrastruktur-Freeze (CLAUDE.md §2) arbeitet an einem Infrastrukturdefekt
+nur, wenn er reproduzierbar blockiert oder eine falsche Freigabe erlaubt; beides
+trifft auf den Rest nicht zu.
+
+## `--help` startet auf den beiden schwersten Einstiegen einen vollen Prüflauf (16.09.2026)
+
+Beim Bearbeiten von Punkt 1137 selbst aufgelaufen: `node
+scripts/verify/run-logged.mjs --help` und `node scripts/verify/run-all.mjs
+--help` geben keine Hilfe aus, sondern starten die volle LARGE-Regression über
+beide Grafikwege — gemessen rund zwei Stunden. `parseArgs` in
+`scripts/verify/tiers.mjs` sammelt jedes `-`-Argument nur in `flags` ein; damit
+bleibt `filter` leer und `tier` null, und genau das ist die Signatur des
+vollen Laufs (`fullRun`, `isLargeEquivalent`). `run-logged.mjs` reicht alles
+weiter, was es nicht selbst verbraucht, also auch `--help`.
+
+Verschärfend ist die Uneinheitlichkeit: `scripts/verify/run-wait.mjs --help`
+gibt eine ordentliche Hilfe aus. Wer sie dort lernt, probiert sie beim Nachbarn.
+
+Wirkung am 16.09.2026: ein ungewollter LARGE-Lauf, der dem echten Lauf desselben
+Punktes die Maschine streitig machte und dessen Ruhe-Annahme entwertete. Weil
+der Aufruf in `head -40` lief, wäre er zusätzlich mitten im Lauf über ein
+geschlossenes Rohr gestorben.
+
+Nicht als Punkt eingereiht: kein Spielerimpakt, keine Datenfrage, keine
+Blockade, und der Lauf wird korrekt aufgezeichnet — es gibt keine falsche
+Freigabe. Der billige Weg wäre eine Zeile in beiden Einstiegen, die `--help`
+und `-h` vor jeder Arbeit abfängt und die Nutzungszeile druckt, die in
+`run-logged.mjs` bereits im Kopfkommentar steht.
+
+WIEDERHOLUNG AM 17.09.2026, und zwar genau auf dem hier beschriebenen Weg: Die
+Nachfolgesitzung kannte `run-wait.mjs --help`, probierte es beim Nachbarn
+`run-all.mjs` und startete einen vollen Lauf, den sie nach rund 40 Sekunden
+abbrach. Zweimal in zwölf Stunden, von zwei verschiedenen Sitzungen, ist keine
+Unachtsamkeit mehr, sondern die vorhergesagte Wirkung. Der Eintrag wird nicht
+verdoppelt; die Lehre steht jetzt zusätzlich im Gedächtnis, wo sie vor dem
+Aufruf gelesen wird, statt nur hier, wo sie danach gefunden wird.
+
+## Der Warteschlangen-Neubau überschreibt die Prosa der aktuellen Karte (16.09.2026)
+
+`node scripts/board-queue.mjs` baut die Warteschlange aus dem Arbeitsauftrag neu — und ersetzt
+dabei den Text der Karte unter „Woran ich gerade arbeite" durch die abgeleitete Zeile aus der
+In-Flight-Markierung (`point <N>: current work · Wartestellung: <englischer --waiting-on-Text>`).
+Am 16.09.2026 ist das in einer Sitzung zweimal passiert: einmal nach dem Nachziehen von drei
+Zeitschätzungen, einmal nach einer Kartenänderung. Beide Male stand danach englischer
+Werkzeug-Jargon auf einer Seite, die der Nutzer auf dem Telefon liest, und der eigentliche
+Status war weg.
+
+Folge: Nach jedem `board-queue.mjs` muss der Status der aktuellen Karte von Hand neu geschrieben
+werden. Wer das vergisst, veröffentlicht eine Karte, die nicht mehr sagt, was läuft.
+
+Nicht blockierend — der Status lässt sich sofort wiederherstellen. Die saubere Lösung wäre, dass
+der Neubau die Prosa der aktuellen Karte gar nicht anfasst; das ist aber eine Änderung am
+Board-Werkzeug und fällt unter den Infrastruktur-Stopp, solange es nur Nacharbeit kostet.
+
+## Der Arbeitsbaum eines beauftragten Agenten sieht den Fehlerbericht nicht (16.09.2026)
+
+Der Auftrag zu Punkt 1138 nennt `local/ErwachseneEingeklemmt.zip` als das zu messende Bild —
+und der Astra-Autorenlauf hat die Arbeit verweigert, weil die Datei fehlte. `local/` ist
+git-ignoriert, also bekommt ein frischer `git worktree add` sie nie, und
+`scripts/worktree-bootstrap.mjs` verlinkt ausschließlich `node_modules`.
+
+Ein Symlink auf das ganze Verzeichnis löst es NICHT: `.gitignore` Zeile 221 lautet `/local/`
+mit Schrägstrich, was ein Verzeichnis trifft, einen Symlink aber nicht — der Arbeitsbaum zeigte
+`?? local`, und `author-astra.mjs` startet auf einem schmutzigen Baum gar nicht erst. Von Hand
+aufgelöst mit einem echten `local/`-Verzeichnis, das Symlinks auf die beiden Beweis-Einträge
+enthält.
+
+Jeder künftige Punkt, der einen übergebenen Fehlerbericht misst (680, 1082 …), läuft in
+dieselbe Wand. Der saubere Weg ist Dokumentation, nicht ein Link: `scripts/point-brief.mjs`
+sollte `local/`-Pfade als absoluten Pfad des Haupt-Checkouts ausgeben, den ein Agent direkt
+lesen kann. Ein Symlink auf das ganze Verzeichnis darf NICHT leichtfertig dazukommen —
+`scripts/worktree-cleanup.mjs` existiert, weil `rm -rf` bzw. `git worktree remove` dem
+`node_modules`-Link am 29.07.2026 zweimal in den Hauptbaum gefolgt ist, und in `local/` liegen
+die unwiederbringlichen Fehlerberichte des Nutzers.
+
+Nicht als Punkt eingereiht: der Handgriff dauert Sekunden und ist hier beschrieben; die Blockade
+ist damit aufgehoben, und der Infrastruktur-Stopp gilt weiter.
+
+## Der Unit-Lauf liest eine Datei außerhalb jedes Checkouts und stirbt an ihr (17.09.2026)
+
+Der Bildlauf zu Punkt 1045 starb nach 7m 04s in der Unit-Stufe, ohne ein
+einziges Bild zu zeichnen: `scripts/guard-hooks.test.mjs > doc-budget-guard >
+ALLOWS documents within budget` erwartete `clean` und bekam `would-block`.
+Ursache war keine Codeänderung, sondern eine Zeile in `MEMORY.md`, die die
+Sitzung während des Laufs hinzufügte und zwei Minuten später wieder entfernte.
+`scripts/doc-budget-core.mjs` führt `MEMORY.md` (Ort `project-memory`) unter den
+Dokumenten, die es LIVE vermisst; für diese zwei Minuten lag die Datei über
+ihrem Budget, und der Test, der nur prüft, ob der Wächter überhaupt
+durchlässt, ging mit ihr rot. Derselbe Baum lief danach in 1,9 s grün.
+
+Die Absicherung, die genau das verhindern soll, konnte es nicht sehen:
+`scripts/repository-integrity.mjs` prüft HEAD, Index, eigenen Branch-Ref und
+geteilte Config des laufenden Arbeitsbaums. `MEMORY.md` liegt in
+`~/.claude/projects/…/memory/`, außerhalb jedes Checkouts — kein Ref, kein
+Index, kein Arbeitsbaum hat sich bewegt. Der Lauf ist an dieser Stelle also
+nicht hermetisch: jede Sitzung, die ihr Gedächtnis pflegt, kann eine fremde
+Verifikation umbringen, und der Befund nennt dabei ein Dokument, das mit der
+geprüften Änderung nichts zu tun hat.
+
+Nicht als Punkt eingereiht: kein Spielerimpakt und keine falsche Freigabe — der
+Lauf wird korrekt rot und korrekt aufgezeichnet. Die Kosten sind Maschinenzeit
+und eine irreführende Fehlermeldung. Zwei billige Wege stehen offen, falls es
+wiederkommt: den Budget-Fall des Wächtertests gegen eine FESTE Vorrichtung
+laufen lassen statt gegen die lebenden Dokumente, oder `MEMORY.md` aus der
+live vermessenen Liste nehmen und ihr Budget allein im Stop-Hook prüfen.
+Bis dahin gilt die Regel, die jetzt im Gedächtnis steht: Während eines Laufs
+wird gelesen — auch im Gedächtnisverzeichnis.
+
+## Die i18n-Suite meldet „0 pass, 0 fail", obwohl sie prüft (17.09.2026)
+
+Im Beweislauf zu Punkt 1140 meldete `scripts/verify/i18n.mjs` auf WebGPU als
+VOLLE Suite `PASS i18n 0 pass, 0 fail, 0 console-errors`. Ich habe die Zeile
+zweimal als „diese Suite hat nichts geprüft" gelesen und sie so an den Nutzer
+gemeldet, bevor ich ihre Quelle aufschlug.
+
+Das war falsch. Die Suite hat bewusst keine `check()`-Aufrufe — ihr eigener
+Kommentar sagt es: die Textasserts sind nach Vitest gezogen, und was in ihr
+bleibt, braucht einen echten Browser. Geprüft wird durch drei Dinge, die der
+Zähler nicht zählt: die fünf Verschluss-Aufnahmen (der Shutter von Punkt 375
+wirft, wenn das Element nicht auf dem Schirm steht, statt ein Bild als Beleg
+für einen nie geöffneten Dialog abzulegen), das Konsolenfehler-Tor (`exit 1`
+bei jedem Fehler) und die Wache gegen einen ausgewählten Abschnitt, der nie
+ausgeführt wurde.
+
+Kein Deckungsloch, sondern ein Lesefehler-Risiko in der Verdikt-Zeile: „0 pass,
+0 fail" ist für einen Leser nicht von einer Nullprüfung zu unterscheiden, und
+die Verwechslung führt geradewegs zu einer falschen Rot- oder Leermeldung über
+eine Suite, die ihre Arbeit getan hat.
+
+Nicht als Punkt eingereiht (Befundaufnahme CLAUDE.md §2): kein Spielerimpakt,
+kein Sicherheitsrisiko, keine Blockade und keine falsche Freigabe — die Suite
+schlägt korrekt fehl, wenn eine Aufnahme oder die Konsole rot wird. Der billige
+Weg, falls es wieder stört: die Verdikt-Zeile einer suite ohne `check()` nennen
+lassen, was stattdessen lief (Aufnahmen, Fehlertor), statt eine Null zu drucken.
+
+## Das Steuerkreuz wählt einen Inventarplatz, den nichts benutzen kann (17.09.2026)
+
+Punkt 1140 gibt dem Gamepad Zugang zur Inventarleiste: Steuerkreuz links und
+rechts wandern durch die Plätze, der gewählte Platz bekommt einen Rahmen. Nur
+benutzen kann ihn niemand — die Spezifikation des Punktes sagt ausdrücklich
+„A bleibt die Benutzen-Taste", und A löst weiter den Rateversuch aus. Die
+Auswahl ist damit eine Anzeige ohne Wirkung.
+
+Das ist keine Regression: Vor 1140 war die Leiste reine Mausbedienung, ein
+Gamepad-Spieler kam also genausowenig an einen Gegenstand. Der Punkt hat den
+Zustand nicht verschlechtert, sondern nur sichtbar gemacht.
+
+Nicht als Punkt eingereiht (Befundaufnahme CLAUDE.md §2): Der Autor hat die
+Vorgabe wörtlich umgesetzt, und die fehlende Benutzen-Taste ist eine
+Gestaltungsentscheidung, keine Fehlfunktion — §17.5 lässt dem Steuerkreuz keine
+freie Taste übrig, was genau der Grund war, A nicht doppelt zu belegen. Der
+billige Weg, falls es stört: eine Schultertaste oder ein kurzer Druck auf L3
+benutzt den gewählten Platz. Das ist eine Belegungsentscheidung des Nutzers,
+kein Mangel, den ich allein entscheiden sollte.
+
+## Der Hänge-Detektor liest die Polish-Suite falsch, die erst am Ende schreibt (17.09.2026)
+
+Gemessen 17.09.2026 (Befund aus dem Träger, 17:40): `run-wait --await` erklärte
+einen gesunden vollen Polish-Lauf nach 19m04s für hängend („written nothing for
+15m00s") und meldete der Notfallspur einen Stillstand. Der Lauf arbeitete in
+diesem Moment (Chrome-Renderer bei 67 % CPU, GPU-Prozess bei 33 %) und endete
+danach normal. Die Ursache ist strukturell: Polish schreibt konstruktionsbedingt
+nur eine Zeile am Start und die PASS/FAIL-Zeile am Ende, und sein gemessenes
+Band liegt bei 9,9–61,5 min (Median 55,2). Ein Schweigedetektor von 15 min kann
+für diese Suite nie richtig liegen.
+
+Nicht als Punkt eingereiht (Befundaufnahme CLAUDE.md §2, Infrastruktur-Freeze):
+Der Lauf selbst war grün, das Fehlurteil hat keine Landung blockiert und keine
+falsche Freigabe erzeugt. Falls es stört, ist der billige Weg, die Regel
+abzuschalten, nicht sie umzubauen: den Schweigedetektor für Polish aussetzen
+oder ihm die Frames unter `verification/` als Fortschrittssignal geben, statt
+das Log. Kosten, wenn es bleibt: die meistgelaufene Suite wird bei jedem vollen
+Durchgang als Stillstand gemeldet, und der Bediener lernt, das Urteil zu
+ignorieren.
+
+## Die Laufprotokolle eines Branches sterben gar nicht mit seinem Worktree (18.09.2026)
+
+Gemessen 18.09.2026 beim Bau von Punkt 1134. Der Punkt bestellt, die `run.json`
+eines gelandeten Punktes beim Merge in das Haupt-Checkout zu kopieren, weil
+`local/verify-logs/` ignoriert und pro Worktree sei und die Protokolle mit dem
+Baum verschwänden. Der Kopierschritt ist gebaut und liegt auf `main` — er hat
+bei seiner eigenen Landung aber NICHTS zu tun gefunden: alle fünf `run.json` der
+Branch-Läufe lagen bereits unter `/workspace/hoa/local/verify-logs/`, obwohl
+jeder Lauf mit cwd im Worktree gestartet wurde. Die Quittung der Läufe nennt
+denselben Hauptbaum-Pfad.
+
+Nicht als Punkt eingereiht (Befundaufnahme CLAUDE.md §2, Infrastruktur-Freeze):
+kein Spielerbelang, keine Blockade, keine falsche Freigabe — der Kopierschritt
+ist in dieser Konfiguration schlicht ein No-op und schadet nicht. Offen bleibt
+die Frage, für welche Lauf-Formen die im Punkt genannte Messgrenze überhaupt
+gilt; wer sie das nächste Mal braucht, misst sie an einer Suite, die ihr Log
+tatsächlich im Worktree anlegt, statt sie aus dem Punkttext zu übernehmen.

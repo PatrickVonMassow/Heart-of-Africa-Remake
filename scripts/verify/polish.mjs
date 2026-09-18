@@ -2,6 +2,7 @@
 // a gift and distant panorama wildlife, design.md §17/§2). Dev server only.
 import { launchVerifyBrowser, waitForStable, waitForReadingStable, waitForSceneBuilt, assertBackend } from './_browser.mjs'
 import { frameShutter, capturePixels, waitForSceneReady } from './frameSubject.mjs'
+import { installColliderProbe } from './colliderProbe.mjs'
 import { judgeFootingSeries, judgePitchSeries, MIN_SLOPED_SAMPLES } from './footingSeries.mjs'
 import { judgeStanceSlip } from './stanceSlip.mjs'
 import {
@@ -15,7 +16,7 @@ import {
 } from './tagFrameReading.mjs'
 import { judgeEavesColumn, judgeShelterRoof } from './eavesColumn.mjs'
 import { FUSE_CROWD_SHARE, FUSE_HARD, FUSE_TOLERANCE, judgeLabelFusion, mergeFusionReadings } from './labelFusion.mjs'
-import { READ_COUNT, READ_GAP_FRAMES, CONFIRM_READS, READ_GAP_NET_MS, READ_GAP_MS, SHOT_DRIFT_BAR, luminanceSamples, settleReading, shotDrift, shotReading } from './cropLuma.mjs'
+import { READ_GAP_FRAMES, READ_GAP_NET_MS, READ_GAP_MS } from './cropLuma.mjs'
 import {
   CHILD_MOTION,
   holdsAGame,
@@ -25,6 +26,8 @@ import {
   traceLiveness,
 } from './childMotionMetric.mjs'
 import { DIG_PICTURE, digPictureUnmounted, digPictureView, captureSpoilWalk } from './digSitePicture.mjs'
+import { groundSamples as readGroundSamples, bandRatio as readBandRatio } from './edgeBandReading.mjs'
+import { settledEdgeShot } from './edgeBandSettle.mjs'
 import { sectionGate } from './sections.mjs'
 import { onBaselineLane } from './baseline-classify-core.mjs'
 import { fileURLToPath } from 'node:url'
@@ -44,15 +47,19 @@ const OUT = fileURLToPath(new URL('../../verification/', import.meta.url))
 // scripts/verify/sections.mjs, so an unknown one is refused with the list of the
 // real ones — and the run is stamped PARTIAL, never counted as suite coverage.
 const sections = sectionGate()
-const { section, nonPredictive } = sections
+const { section } = sections
 if (sections.banner()) console.log(sections.banner())
 
 let failures = 0
-const check = (name, ok, detail) => {
+// `coverage` is a SUBJECT-DEPENDENT check's own sample count beside its named
+// minimum (work-order 1136): `{ subjects, minimum, what }`. Below the minimum
+// the line reads NOT-COVERING instead of green — the check saw too little to
+// answer, which is neither a defect nor an all-clear.
+const check = (name, ok, detail, coverage = null) => {
   // The section tag goes AFTER the ' — ' separator: the check's NAME is its
   // identity for the red ledger and the baseline classifier and must not change.
   const tail = [detail, sections.tag().trim()].filter(Boolean).join('  ')
-  const { status, failed, note } = sections.checkResult(name, ok)
+  const { status, failed, note } = sections.checkResult(name, ok, coverage)
   console.log(`${status}  ${name}${tail ? ' — ' + tail : ''}${note}`)
   if (failed) failures++
 }
@@ -135,6 +142,8 @@ const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
 // it stands in, the building it is aimed at, the overlay it documents — and the
 // shutter proves that subject is in the picture before the file is written.
 const frame = frameShutter(page, OUT)
+// The collider geometry the staged-wedge section reads with (scripts/verify/colliderProbe.mjs).
+await installColliderProbe(page)
 const errors = []
 page.on('console', (m) => {
   if (m.type() === 'error') errors.push(m.text())
@@ -954,11 +963,11 @@ if (section('speech-guess')) {
     const p = window.__placePlayer
     return p ? { x: p.x, z: p.z, yaw: p.yaw, pitch: p.pitch } : null
   })
-  // Stage ONE speaker a few steps in front of the player: the use key takes the
-  // NEAREST candidate, so standing near him is what the highlight is for — and
-  // at a distance a player really walks up to, since the note's size follows it.
-  // The spot is open ground away from every door, so the speaker really is what
-  // SPACE means here and not a hut the player happens to be standing at.
+  // Stage ONE speaker a few steps in front of the player: the guess key takes the
+  // NEAREST word, so standing near him is what the highlight is for — and at a
+  // distance a player really walks up to, since the note's size follows it. The
+  // spot is open ground away from every door, so the bottom prompt stays empty
+  // here and the note carries the only invitation on screen (point 1139).
   const staged = await page.evaluate((u) => {
     const scene = window.__placeScene
     const p = window.__placePlayer
@@ -1014,29 +1023,32 @@ if (section('speech-guess')) {
       highlight.strayInvites === 0,
     `invite ${JSON.stringify(highlight.invite)}, invitations on unhighlighted notes ${highlight.strayInvites}`,
   )
-  // What the invitation NAMES is the key the player presses (point 691): a note
-  // that still said "click" would send him to a handler that no longer exists.
+  // What the invitation NAMES is the key the player presses (points 691/1139):
+  // a note still saying "click" would send him to a handler that no longer
+  // exists, and one still saying SPACE would send him to the key that now
+  // enters the hut he is standing at.
   check(
-    'the invitation names the use key, never a click (point 691)',
-    /space/i.test(highlight.invite) && !/click|klick/i.test(highlight.invite),
+    'the invitation names the guess key E, never SPACE and never a click (point 1139)',
+    /\bE\b/.test(highlight.invite) && !/click|klick|space|leertaste/i.test(highlight.invite),
     `invite ${JSON.stringify(highlight.invite)}`,
   )
-  // The arbitration decided for the speaker, so the bottom prompt — the OTHER
-  // hint slot — stands empty: two hints at once is what point 691 removed.
+  // The guess key is armed by the word alone (point 1139), and out here in the
+  // open there is nothing for the use key to do — so the bottom prompt, the
+  // OTHER hint slot, stands empty beside the note's invitation.
   const useKey = await page.evaluate(() => ({
-    owner: window.__ui.getState().useKeyOwner,
+    guessKeyArmed: window.__ui.getState().guessKeyArmed,
     prompt: window.__ui.getState().prompt,
   }))
   check(
-    'the speaker owns the use key here, and the door prompt is empty with it (point 691)',
-    useKey.owner === 'speech' && useKey.prompt === null,
+    'the word arms the guess key here, and no door prompt stands with it (point 1139)',
+    useKey.guessKeyArmed === true && useKey.prompt === null,
     JSON.stringify(useKey),
   )
   await frame('148-speech-guess-invitation', {
     element: '.speech-label.targeted',
     label: 'the highlighted note of the nearest speaker, inviting the guess',
   })
-  // The use key owns the guess now (point 691), so the mouse must be PROVED
+  // A key owns the guess now (point 691), so the mouse must be PROVED
   // dead: a point of the settlement view a click can actually land on — the
   // notes are drawn in an overlay of their own, and a click that hit one would
   // prove nothing about the canvas the player clicks.
@@ -1060,8 +1072,8 @@ if (section('speech-guess')) {
       afterClick === false,
       `guess dialog after the click: ${afterClick}`,
     )
-    // And the note that survives that click is still the one SPACE means, so
-    // the invitation the player just read has not gone stale.
+    // And the note that survives that click is still the one E means, so the
+    // invitation the player just read has not gone stale.
     const stillTargeted = await page.evaluate(
       () => document.querySelector('.speech-label.targeted')?.getAttribute('data-speaker') ?? null,
     )
@@ -1071,7 +1083,7 @@ if (section('speech-guess')) {
       `highlighted ${JSON.stringify(stillTargeted)}`,
     )
     const lockBefore = await page.evaluate(() => ({ ...window.__placeLock }))
-    await page.keyboard.press('Space')
+    await page.keyboard.press('KeyE')
     await nextFrames(2)
     const opened = await page.evaluate(() => {
       const dialog = document.querySelector('.dialog.speech-guess')
@@ -1087,7 +1099,7 @@ if (section('speech-guess')) {
       }
     })
     check(
-      'SPACE opens the guess for the highlighted speaker (point 691)',
+      'E opens the guess for the highlighted speaker (point 1139)',
       opened.open && opened.spoken.join(' ') === highlight.syllables.join(' '),
       `${JSON.stringify(opened.spoken)} against the note's ${JSON.stringify(highlight.syllables)}`,
     )
@@ -1136,7 +1148,7 @@ if (section('speech-guess')) {
       `grabs ${lockBefore.grabs} → ${saved.lock.grabs}`,
     )
     // And Escape leaves the note exactly as it was.
-    await page.keyboard.press('Space')
+    await page.keyboard.press('KeyE')
     await nextFrames(2)
     const reopened = await page.evaluate(() => !!document.querySelector('.dialog.speech-guess'))
     if (reopened) await page.keyboard.type(' and never mind')
@@ -2736,21 +2748,7 @@ if (section('settlement-edge')) {
    *  neither is possible once a read has been collapsed to one number.
    *  cropLuma.mjs carries the reasoning and cropLuma.test.mjs pins it. */
   const groundSamples = async (buf, ndc, w, h) => {
-    const view = page.viewportSize()
-    const left = Math.round(((ndc.x + 1) / 2) * view.width - w / 2)
-    const top = Math.round(((1 - ndc.y) / 2) * view.height - h / 2)
-    if (left < 0 || top < 0 || left + w > view.width || top + h > view.height) return null
-    const { data, info } = await sharp(buf).extract({ left, top, width: w, height: h }).raw().toBuffer({ resolveWithObject: true })
-    return luminanceSamples(data, info)
-  }
-
-  /** The crop's SETTLE reading (cropLuma.mjs): the crop's mean with its
-   *  brightest fifth dropped, so a rain streak cannot end the wait early and a
-   *  band leak arriving over part of the crop still holds it open. It compares
-   *  the picture with itself; it never measures the band. */
-  const groundLuma = async (buf, ndc, w, h) => {
-    const samples = await groundSamples(buf, ndc, w, h)
-    return samples === null ? null : settleReading(samples)
+    return readGroundSamples(buf, ndc, page.viewportSize(), w, h)
   }
 
   /** Aim the camera at a ground point ahead by bisecting the pitch on the
@@ -2858,22 +2856,6 @@ if (section('settlement-edge')) {
     await settleFrames(8)
   }
 
-  /** Read the crop until it stops moving: the settlement's own state settles on
-   *  entry and the wet ground keeps SOAKING through a storm (§19.13), so the
-   *  measurement waits on the picture rather than on a guessed number of
-   *  milliseconds. Returns the settled reading (or the last one taken). */
-  const settledLuma = async (ndc, eps = 0.3) => {
-    let prev = null
-    for (let i = 0; i < 40; i++) {
-      await settleFrames(2)
-      const cur = await groundLuma(await capturePixels(page, 'settled ground luma'), ndc, 150, 46)
-      if (cur === null) return null
-      if (prev !== null && Math.abs(cur - prev) < eps) return cur
-      prev = cur
-    }
-    return prev
-  }
-
   /** The band's OWN effect on a crop: its luminance with the edge drawn over
    *  its luminance with the edge switched off from the debug menu's own value,
    *  same camera, same frame content. Attribution, not correlation — the
@@ -2882,8 +2864,8 @@ if (section('settlement-edge')) {
    *  the live proof that the calibratable strength lands without a reload. */
   const bandRatio = async (ndc) => {
     // Point 549: three frames were not the band arriving, they were three frames.
-    // Each shot waits for the crop to STOP MOVING on the new strength and then
-    // takes three reads of it — the rains draw over the ground and TRAA jitters
+    // That repair waited for the crop to STOP MOVING on the new strength and
+    // then took three reads — the rains draw over the ground and TRAA jitters
     // it, so a single frame samples that noise instead of measuring the band.
     // The measured spread of `capetown (wet)` across five runs was 6.5 luminance
     // points on an unchanged scene, straddling its own 0.04 bar.
@@ -2898,42 +2880,28 @@ if (section('settlement-edge')) {
     // leak over 8 of the 46 rows reads ×0.968 on the mean and ×1.000 on the
     // spatial median). Five reads, so a streak surviving into two of them still
     // cannot reach the middle value.
+    //
+    // The isolated WebGPU run exposed a THIRD missing-reading cause: maasai
+    // dry had healthy inside luminance (ON 73.4, OFF 107.5), but drift of
+    // 1.29% / 1.25%. The two-frame absolute settle admitted a slow trend that
+    // the full shot rejected. Wait on the shot's OWN timescale and statistic,
+    // keeping its 1% bar: edgeBandSettle.mjs advances a full window until its
+    // rain-robust halves agree, then measures those same certified reads.
+    // This includes the actual frame-bound gap on a cold first draw; a fixed
+    // 600 ms projection would underestimate it. No later capture can undo the
+    // certificate, and exhausting the wait now fails instead of falling through.
     const shot = async (strength) => {
       await page.evaluate((s) => { window.__balance.placeEdgeBand.strength = s }, strength)
-      if ((await settledLuma(ndc, 0.2)) === null) return null
-      const reads = []
-      for (let i = 0; i < READ_COUNT + CONFIRM_READS; i++) {
-        // A starved gap is a FAILED shot, not a faster one: reads that are not
-        // far enough apart are not independent pictures, and the rain rejection
-        // is exactly what that independence buys.
-        if (i > 0 && !(await readGap())) return null
-        const cur = await groundSamples(await capturePixels(page, 'edge-band ground luma'), ndc, 150, 46)
-        if (cur === null) return null
-        reads.push(cur)
-      }
-      // A scene that changed WHILE the shot was taken is not a shot. The
-      // per-pixel median would erase a defect arriving in a minority of the
-      // reads exactly as it erases the rain, and the settle loop ahead of it is
-      // one-sided — so the two halves of the shot are compared, each still
-      // rain-robust, and a disagreement fails the shot instead of averaging it
-      // away.
-      const drift = shotDrift(reads)
-      if (drift === null || drift > SHOT_DRIFT_BAR) {
-        console.log(`# shot REJECTED — the crop moved ${(drift * 100).toFixed(3)} % between its first and last reads (bar ${(SHOT_DRIFT_BAR * 100).toFixed(1)} %)`)
-        return null
-      }
-      // The confirmation read is the guard's, not the measurement's.
-      return shotReading(reads.slice(0, READ_COUNT))
+      return settledEdgeShot({
+        gap: readGap,
+        read: async () => groundSamples(await capturePixels(page, 'edge-band ground luma'), ndc, 150, 46),
+      })
     }
     // ON, OFF, ON — and the two ONs averaged. In the rains the ground SOAKS
     // while the shots are taken (the §19.13 wet accumulation keeps darkening
     // it), which biased a plain on/off pair by more than the edge itself; a
     // symmetric triple cancels that linear drift instead of racing it.
-    const on1 = await shot(1)
-    const off = await shot(0)
-    const on2 = await shot(1)
-    if (on1 === null || on2 === null || !(off > 0)) return null
-    return (on1 + on2) / 2 / off
+    return readBandRatio(shot)
   }
 
   const readGround = async (id, wetness, seasonName, shoot) => {
@@ -2985,17 +2953,14 @@ if (section('settlement-edge')) {
         check(`${id} (${seasonName}): the ${s.name} ground crop is in the picture`, false, `ndc ${JSON.stringify(ndc)}`)
         return null
       }
-      // Wait out the season change and, in the rains, the soak that keeps
-      // building — on the PICTURE, not on a stopwatch — before the pair is taken.
-      if (await settledLuma(ndc) === null) {
-        check(`${id} (${seasonName}): the ${s.name} ground crop is measurable`, false, 'crop off-frame')
+      // Every ON/OFF/ON shot waits on its own complete crop window, including
+      // the first after the season change or a new camera aim.
+      const ratio = await bandRatio(ndc)
+      if (ratio.value === null) {
+        check(`${id} (${seasonName}): the ${s.name} ground crop could be measured`, false, ratio.detail)
         return null
       }
-      out[s.name] = await bandRatio(ndc)
-      if (out[s.name] === null) {
-        check(`${id} (${seasonName}): the ${s.name} ground crop could be measured`, false, 'crop off-frame')
-        return null
-      }
+      out[s.name] = ratio.value
     }
     if (shoot) {
       // Human-viewable evidence, composed so the edge is READABLE rather than
@@ -5263,6 +5228,308 @@ if (section('children-boulder-climb')) {
 //
 // The village is the PoC's own (the Bambara village); the ground work is in
 // every village.
+// --- No adult stays wedged (work-order 1138) ---------------------------------
+// The user photographed two adults pressed into the corner between a dwelling's
+// wall and a fence panel, still there frame after frame. The escape ladder that
+// answers it is pinned in Vitest over the pure decision and over the production
+// blocks themselves; what only the real settlement can settle is that nobody
+// stays put in the layout the report was taken in — those pockets are drawn by
+// THAT village at THAT seed, and no synthetic collider set stands in for them.
+//
+// The trace is taken INSIDE the page, one entry per rendered frame: a stepper
+// that is freed and wedges again between two readings would otherwise be read as
+// a body that never moved, and the crossing of the process boundary is exactly
+// what would hide it. The window is several times the escape's own, so a body
+// still on its spot at the end has outlasted every rung of the ladder.
+if (section('wedged-adults')) {
+  await page.evaluate(() => {
+    const g = window.__game.getState()
+    if (g.placeId) g.leavePlace()
+  })
+  await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
+  // HIS seed, put back afterwards: the settlement layout is derived from place
+  // plus seed, so this is the village he stood in and not merely one of the same
+  // people — and every section after this one would otherwise read a world it
+  // never asked for.
+  const bootSeed = await page.evaluate(() => window.__game.getState().seed)
+  await page.evaluate(() => window.__game.setState({ seed: 3321422240 }))
+  await page.evaluate(() => window.__game.getState().enterPlace('bambara-village'))
+  const live = await page
+    .waitForFunction(
+      () =>
+        window.__game.getState().placeId === 'bambara-village' &&
+        !!window.__placeErrands &&
+        !!window.__placeWalkers,
+      null,
+      { timeout: 40000 },
+    )
+    .then(() => true)
+    .catch(() => false)
+  check('the reported village publishes both of its adult steppers', live)
+  if (live) {
+    await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+    // The knobs the claim is measured against are the game's own, read from the
+    // running build rather than restated here.
+    const knob = await page.evaluate(() => ({
+      seconds: window.__balance.walkerUnstuckSeconds,
+      minDistance: window.__balance.walkerUnstuckMinDistance,
+    }))
+    const readBodies = (frames) =>
+      page.evaluate(
+        (n) =>
+          new Promise((resolve) => {
+            const log = []
+            const read = () => [
+              ...(window.__placeWalkers?.states ?? []).map((s, i) => ({ who: `walker ${i}`, x: s.x, z: s.z })),
+              ...(window.__placeErrands?.().villagers ?? []).map((v, i) => ({ who: `errand ${i}`, x: v.x, z: v.z })),
+            ]
+            const tick = () => {
+              log.push({ t: performance.now(), bodies: read() })
+              if (log.length >= n) resolve(log)
+              else requestAnimationFrame(tick)
+            }
+            requestAnimationFrame(tick)
+          }),
+        frames,
+      )
+    // Displacement measured against the FIRST reading of each body, over the
+    // whole window — the largest distance it ever reached, so a body that walks
+    // out and comes back is not read as one that never left.
+    const walkedOf = (log) => {
+      const start = new Map(log[0].bodies.map((b) => [b.who, b]))
+      const out = new Map()
+      for (const sample of log) {
+        for (const b of sample.bodies) {
+          const from = start.get(b.who)
+          if (!from) continue
+          const d = Math.hypot(b.x - from.x, b.z - from.z)
+          if (d > (out.get(b.who) ?? -1)) out.set(b.who, d)
+        }
+      }
+      return out
+    }
+    const trace = await readBodies(1200)
+    const seconds = (trace.at(-1).t - trace[0].t) / 1000
+    check(
+      'the trace outlasts the escape window it has to outlast',
+      seconds >= knob.seconds * 3,
+      `${seconds.toFixed(1)} s against a ${knob.seconds} s window`,
+    )
+    const counted = trace[0].bodies
+    // Non-vacuous: a village that published no stepper would satisfy the next
+    // check having measured nothing at all.
+    check(
+      'the trace reads both steppers of the village',
+      counted.some((b) => b.who.startsWith('walker')) && counted.some((b) => b.who.startsWith('errand')),
+      `${counted.filter((b) => b.who.startsWith('walker')).length} household walkers, `
+        + `${counted.filter((b) => b.who.startsWith('errand')).length} errand villagers`,
+    )
+    const walked = walkedOf(trace)
+    const pinned = [...walked.entries()].filter(([, d]) => d < knob.minDistance)
+    check(
+      'no adult of the reported village is still on the spot it started from',
+      pinned.length === 0,
+      pinned.length
+        ? pinned.map(([who, d]) => `${who} moved ${d.toFixed(2)} m`).join(', ')
+        : `${walked.size} adults, the least mobile of them ${Math.min(...walked.values()).toFixed(2)} m`,
+    )
+    // THE REPORTED PICTURE, STAGED WHERE THE REPORT WAS MADE: the village's own
+    // tightest slot between two different bodies — a hut wall and a fence run is
+    // exactly such a pair — with a household walker set down in it. What the
+    // pair of frames then shows is the reported corner with an adult pressed
+    // into it and, one window later, the same corner with the adult gone. The
+    // subject of both shutters is the SLOT, which stays in the picture whether
+    // the body is still in it or not (point 375).
+    const wedge = await page.evaluate(() => {
+      const cs = window.__placeColliders ?? []
+      const sample = (c) =>
+        c.kind === 'segment'
+          ? Array.from({ length: 9 }, (_, i) => [c.x1 + ((c.x2 - c.x1) * i) / 8, c.z1 + ((c.z2 - c.z1) * i) / 8])
+          : [[c.x, c.z]]
+      let best = null
+      for (let i = 0; i < cs.length; i++)
+        for (let j = i + 1; j < cs.length; j++) {
+          for (const [ax, az] of sample(cs[i]))
+            for (const [bx, bz] of sample(cs[j])) {
+              const gap =
+                Math.hypot(ax - bx, az - bz) - window.__colliderSize(cs[i]) - window.__colliderSize(cs[j])
+              if (gap < 0) continue // colliders that merge into one body are no slot
+              if (!best || gap < best.gap) best = { gap, x: (ax + bx) / 2, z: (az + bz) / 2 }
+            }
+        }
+      return best
+    })
+    check(
+      'the reported village has a tightest slot to stage the report in',
+      !!wedge,
+      wedge ? `gap ${wedge.gap.toFixed(2)} m at ${wedge.x.toFixed(1)},${wedge.z.toFixed(1)}` : 'none',
+    )
+    if (wedge) {
+      // Standing between the slot and the village centre and looking back at it:
+      // the open side of a pocket between a hut and a fence run is the side the
+      // settlement lies on, so a camera placed there sees the body rather than
+      // the wall that pinned it.
+      const put = await page.evaluate((at) => {
+        const s = window.__placeWalkers?.states?.[0]
+        if (!s) return null
+        s.x = at.x
+        s.z = at.z
+        const p = window.__placePlayer
+        const len = Math.hypot(at.x, at.z) || 1
+        p.x = at.x - (at.x / len) * 6
+        p.z = at.z - (at.z / len) * 6
+        // Place-camera yaw 0 looks toward -Z, so aim with the +PI complement.
+        p.yaw = Math.atan2(at.x - p.x, at.z - p.z) + Math.PI
+        p.pitch = -0.1
+        return { x: s.x, z: s.z }
+      }, wedge)
+      check('a household walker can be set down in it', !!put)
+      if (put) {
+        await nextFrames(2)
+        await frame('1138-wedged-adults-before', {
+          local: { x: wedge.x, y: 0.9, z: wedge.z },
+          label: "an adult set down in the reported village's tightest slot",
+        })
+        // Long enough for every rung of the ladder to have answered, measured on
+        // the game's own window rather than on a frame count.
+        const freeing = await readBodies(600)
+        const out = freeing.at(-1).bodies.find((b) => b.who === 'walker 0')
+        const seconds2 = (freeing.at(-1).t - freeing[0].t) / 1000
+        await frame('1138-wedged-adults-after', {
+          local: { x: wedge.x, y: 0.9, z: wedge.z },
+          label: 'the same slot after the escape window, with the adult out of it',
+        })
+        const got = out ? Math.hypot(out.x - put.x, out.z - put.z) : 0
+        check(
+          'and the adult put into it is out of it again within the escape window',
+          got >= knob.minDistance && seconds2 >= knob.seconds,
+          `${got.toFixed(2)} m in ${seconds2.toFixed(1)} s, against ${knob.minDistance} m after ${knob.seconds} s`,
+        )
+        // NOT a clearance check on the freed body: a household walker walks
+        // THROUGH its own door and stands inside the dwelling, so "clear of every
+        // collider" reds on correct behaviour (measured 16.09.2026, clearance
+        // -1.75 m inside a hut). That the placement itself lands on free ground
+        // is asserted where it is decided — collision.test.ts over every rung.
+      }
+    }
+  }
+  await page.evaluate(() => {
+    const g = window.__game.getState()
+    if (g.placeId) g.leavePlace()
+  })
+  await page.evaluate((seed) => window.__game.setState({ seed }), bootSeed)
+}
+
+// The fixed weaver in the user's "Festklemmend" report, not a moving adult.
+// Run on each backend with the ordinary polish launcher; the frame declares
+// the live figure as its subject and leaves the trading post in the background.
+if (section('village-stations')) {
+  const bootSeed = await page.evaluate(() => window.__game.getState().seed)
+  try {
+    await page.evaluate(() => {
+      const g = window.__game.getState()
+      if (g.placeId) g.leavePlace()
+    })
+    await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
+    await page.evaluate(() => {
+      window.__game.setState({ seed: 1838110026 })
+      window.__game.getState().enterPlace('bambara-village')
+      window.__game.getState().setJournalOpen(false)
+    })
+    await page.waitForFunction(() =>
+      window.__game.getState().placeId === 'bambara-village' &&
+      !!window.__placeScene?.getObjectByName('village-weaver-body'), null, { timeout: 40000 })
+    await waitForSceneBuilt(page)
+    const staged = await page.evaluate(() => {
+      const scene = window.__placeScene
+      const layout = window.__placeLayout
+      const loom = scene.getObjectByName('village-weaver')
+      const figure = scene.getObjectByName('village-weaver-body')
+      const at = (object) => {
+        object.updateWorldMatrix(true, false)
+        const e = object.matrixWorld.elements
+        return { x: e[12], y: e[13], z: e[14] }
+      }
+      const prop = at(loom)
+      const body = at(figure)
+      const buildings = layout.colliders.slice(0, layout.interactives.length + layout.dwellings.length)
+      const gap = (point, radius) => Math.min(...buildings.map(c => window.__clearanceTo(c, point.x, point.z) - radius))
+      const e = figure.matrixWorld.elements
+      const facesLoom = e[8] * (prop.x - body.x) + e[10] * (prop.z - body.z) > 0
+      // The point wants the trading post's wall VISIBLY CLEAR BEHIND her, so
+      // ONE frame has to carry both: the stand goes to the SIDE of the pair
+      // and the view is aimed between them. Square to the pair the loom falls
+      // BESIDE her instead of in front of her, and the open ground between her
+      // and the wall is what the picture shows. Reject a stand or sight line
+      // inside a building or fence; the reported seed may have one there.
+      const p = window.__placePlayer
+      const market = layout.interactives.find(it => it.type === 'market')
+      const otherBodies = layout.colliders.filter(c => !(c.x === prop.x && c.z === prop.z && c.r === 1))
+      const clear = (x, z) => Math.min(...otherBodies.map(c => window.__clearanceTo(c, x, z)))
+      const toMarket = Math.atan2(market.pos[0] - body.x, market.pos[1] - body.z)
+      const span = Math.hypot(market.pos[0] - body.x, market.pos[1] - body.z)
+      const aim = { x: body.x + (market.pos[0] - body.x) * 0.4, z: body.z + (market.pos[1] - body.z) * 0.4 }
+      // A hut further off needs the lens further back to hold both in one frame.
+      const stand = Math.min(9, Math.max(4.5, span * 1.1))
+      let cameraGap = -Infinity
+      let framed = null
+      for (let k = 0; k < 24; k++) {
+        // Square to the pair first, then swing AWAY from the hut in steps:
+        // that closes the two together, at the price of the loom drifting in
+        // front of her, so the squarest stand that frames both wins.
+        const angle = toMarket + (k % 2 ? -1 : 1) * (Math.PI / 2 + Math.floor(k / 2) * Math.PI / 24)
+        const x = body.x + Math.sin(angle) * stand
+        const z = body.z + Math.cos(angle) * stand
+        if (clear(x, z) < 0.35) continue
+        let visible = true
+        for (let step = 1; step <= 16; step++) {
+          const t = step / 16
+          if (clear(x + (body.x - x) * t, z + (body.z - z) * t) < 0.1) visible = false
+        }
+        if (!visible) continue
+        const vx = aim.x - x
+        const vz = aim.z - z
+        const reach = Math.hypot(vx, vz)
+        const offAxis = (px, pz) => {
+          const ax = px - x
+          const az = pz - z
+          return Math.abs(Math.atan2((ax * vz - az * vx) / reach, (ax * vx + az * vz) / reach) * 180 / Math.PI)
+        }
+        // Half of the 50-degree vertical fov spreads to about 33 degrees over a
+        // wide frame; 26 keeps both subjects clear of the very edge.
+        const bodyOff = offAxis(body.x, body.z)
+        const marketOff = offAxis(market.pos[0], market.pos[1])
+        if (bodyOff > 26 || marketOff > 26) continue
+        p.x = x
+        p.z = z
+        p.yaw = Math.atan2(aim.x - p.x, aim.z - p.z) + Math.PI
+        p.pitch = -0.1
+        cameraGap = clear(x, z)
+        framed = { bodyOff: +bodyOff.toFixed(1), marketOff: +marketOff.toFixed(1) }
+        break
+      }
+      return { body, propGap: gap(prop, 1), bodyGap: gap(body, 0.3), cameraGap, facesLoom, framed }
+    })
+    check('the reported weaver and loom have a walker-wide gap to the village buildings',
+      staged.propGap >= 0.6 && staged.bodyGap >= 0.6, JSON.stringify(staged))
+    check('the weaver faces her loom', staged.facesLoom)
+    check('the weaver photograph stands on open ground', staged.cameraGap >= 0.35, `${staged.cameraGap.toFixed(2)} m`)
+    check('one frame carries the weaver and the trading-post wall together',
+      !!staged.framed, JSON.stringify(staged.framed))
+    await nextFrames(3)
+    if (staged.cameraGap >= 0.35) await frame('1143-village-weaver-clear-of-market', {
+      local: { x: staged.body.x, y: staged.body.y + 0.9, z: staged.body.z },
+      label: 'the reported-seed weaver at her loom seen from the side, with open ground between her and the trading-post wall',
+    })
+  } finally {
+    await page.evaluate((seed) => {
+      const g = window.__game.getState()
+      if (g.placeId) g.leavePlace()
+      window.__game.setState({ seed })
+    }, bootSeed)
+  }
+}
+
 if (section('adult-errands')) {
   await page.evaluate(() => {
     const g = window.__game.getState()
@@ -5280,15 +5547,10 @@ if (section('adult-errands')) {
     e.dwellSeconds = 1
     e.digSeconds = 3
     e.pace = 6
-    // Keep the measured ten-adult standalone setup. This fixed sample window
-    // does not provide equivalent jar observations inside the full suite; the
-    // jar check below declares that limitation instead of claiming coverage.
+    // Keep the measured ten-adult standalone setup. How many errands this
+    // window then sees is no longer left to luck: it casts them itself and
+    // counts them (work-order 1136).
     e.villagerCount = 10
-    // THE DIP IS HELD LONG ENOUGH TO BE CAUGHT (work-order 1087). At its played
-    // value the fill lasts well under two seconds, which a polling check can
-    // walk straight past; this stretches the hold for the capture and changes
-    // nothing about the act itself.
-    window.__balance.bankFillSeconds = 8
   })
   await page.evaluate(() => window.__game.getState().enterPlace('bambara-village'))
   const live = await page
@@ -5358,7 +5620,22 @@ if (section('adult-errands')) {
       ? { key: `${first.last.id}/${first.last.concept}/${first.last.speaker}`, age: first.last.age }
       : null
     for (let i = 0; i < 240; i++) {
-      const now = await page.evaluate(() => window.__placeErrands())
+      // THE RARE SITUATION IS CREATED, NOT WAITED FOR (work-order 1136). ONE
+      // water errand runs at a time and it waits its turn behind the two
+      // digging situations, so this window used to depend on the village
+      // happening to send a carrier: alone it saw many, inside the full pass it
+      // saw ONE, and twelve green climbs had measured nothing. Whenever no
+      // water errand is running, the village's own casting queue is put back on
+      // it — and the casting, the two men it picks and every phase after it
+      // stay the game's.
+      const now = await page.evaluate(() => {
+        const errands = window.__placeErrands()
+        const running = errands.villagers.some(
+          (v) => v.work && (v.work.situation === 'water-out' || v.work.situation === 'water-back'),
+        )
+        if (!running) window.__placeCastErrand('water-out')
+        return errands
+      })
       for (const [id, n] of Object.entries(now.staged ?? {})) {
         staged[id] = Math.max(staged[id] ?? 0, n ?? 0)
       }
@@ -5425,23 +5702,52 @@ if (section('adult-errands')) {
           .map(([k, n]) => `${k}×${n}`)
           .join(', ')}), ${atWork} villager-samples at work`,
     )
-    // MEASURED 10.09.2026: this reading does not survive the pass. Run alone,
-    // the section always saw enough errands — twelve green climbs on 09.09.,
-    // 18 pass and 0 fail. Inside the full suite the same window cast ONE errand,
-    // with the fetch phase at 33 of about 2000 phase ticks, and the pass failed
-    // here. The fixed 240-sample window does NOT measure equivalent activity
-    // in both contexts. Keep the standalone assertion; the full-suite reading
-    // is advisory and cannot decide the exit or enter the red ledger. A narrow
-    // green still promises nothing about the pass, so the ladder refuses it.
-    nonPredictive(
-      'a villager is seen digging, and the jar goes down EMPTY and comes back FULL',
-      'run alone this window casts many errands; inside the full pass it cast ONE, fetch phase 33 of ~2000 ticks (10.09.2026)',
+    // HOW MANY WATER ERRANDS THE WINDOW REALLY SAW (work-order 1136). The
+    // errand is now cast on purpose above rather than hoped for, so the honest
+    // reading is the number that was actually cast — `water-out` is staged once
+    // per casting by the game itself, which is why it is read here and not
+    // counted by the sampler.
+    //
+    // TWO, not one. The check below asserts a ROUND TRIP — the jar goes down
+    // empty and comes back full — so a single errand caught mid-way proves
+    // nothing, and one completed errand could still be a fluke of where the
+    // window happened to open. Below two the verdict is NOT COVERING: the
+    // window said nothing about the jar, which is neither a defect nor an
+    // all-clear. That is exactly the state twelve green climbs used to report
+    // as green on 09.09.2026.
+    const errandsCast = staged['water-out'] ?? 0
+    // WHAT THE JAR ASSERTION NEEDS IS A COMPLETED ROUND TRIP, not a casting
+    // (GPT-6 Astra, cross-vendor round): the game stages 'water-back' at the
+    // moment the fill ends and the carrier turns for home, so it counts the
+    // trips that actually had an empty leg AND a full one. ONE is the honest
+    // floor — one round trip is exactly the evidence the assertion asks for,
+    // and the measured blockade of 10.09.2026 had none: its single errand was
+    // 33 of about 2000 ticks into the fetch when the window closed.
+    const roundTrips = staged['water-back'] ?? 0
+    // AND THE CREATION IS PROVED, not assumed. A hook that stopped working would
+    // otherwise leave every reading below at zero and the block would simply go
+    // quiet about it.
+    check(
+      'the deliberate casting really sends carriers to the water (work-order 1136)',
+      errandsCast > 0,
+      `${errandsCast} water errand(s) cast over 240 samples, ${roundTrips} of them turned for home`,
+    )
+    // DIGGING IS ITS OWN CHECK AND CARRIES NO WATER COVERAGE (GPT-6 Astra,
+    // cross-vendor round). Bundled into the jar assertion it inherited the water
+    // errand's sample count, so a broken digging animation in a window with few
+    // errands would have read NOT-COVERING instead of red — and the DIG
+    // utterance beside it cannot see an animation at all. The dig situations are
+    // cast every round and depend on no carrier, so this one simply asserts.
+    check(
+      'a villager is seen digging (work-order 688)',
+      dug > 0,
+      `${dug} villager-samples at the dig pose`,
     )
     check(
-      'a villager is seen digging, and the jar goes down EMPTY and comes back FULL',
-      dug > 0 && carriedEmpty > 0 && carriedFull > 0,
-      `${dug} villager-samples at the dig pose, ${carriedEmpty} with the empty jar, ` +
-        `${carriedFull} with the full one`,
+      'and the jar goes down EMPTY and comes back FULL',
+      carriedEmpty > 0 && carriedFull > 0,
+      `${carriedEmpty} villager-samples with the empty jar, ${carriedFull} with the full one`,
+      { subjects: roundTrips, minimum: 1, what: 'completed water round trips' },
     )
     // BOTH WORDS ARE ACTUALLY HEARD. Nothing here used to require either of them:
     // the staging, digging and carrying checks are satisfied by animation alone,
@@ -5453,12 +5759,18 @@ if (section('adult-errands')) {
       (heard.RIVER ?? 0) > 0 && (heard.DIG ?? 0) > 0,
       `RIVER ×${heard.RIVER ?? 0}, DIG ×${heard.DIG ?? 0} over 240 samples`,
     )
+    // ITS SUBJECT IS THE UTTERANCE, so a silent window measures nothing here
+    // either (work-order 1136). It used to report that in the detail line and
+    // then fail anyway, charging a red to a village that may be working
+    // perfectly; a window that heard nobody now says the question is open.
+    const heardTotal = Object.values(heard).reduce((a, b) => a + b, 0)
     check(
       'and no adult word ever falls inside the children`s earshot',
       Number.isFinite(nearestBankVoice) && nearestBankVoice > 10,
       Number.isFinite(nearestBankVoice)
         ? `nearest utterance to the children: ${nearestVoiceWhat}`
         : 'NO ADULT SPOKE IN THE WINDOW — nothing was measured',
+      { subjects: heardTotal, minimum: 1, what: 'adult words' },
     )
 
     // --- THE FILL READS AS FETCHING, NOT AS FALLING (work-order 1085) ---------
@@ -5480,12 +5792,31 @@ if (section('adult-errands')) {
     // reached the water. The errand dips now, so the check waits for a carrier
     // in the 'fill' phase and photographs HIM, at the spot he is really standing
     // on. The pin stays, and only holds that same man still for the shutter.
+    // THE DIP IS HELD LONG ENOUGH TO BE CAUGHT (work-order 1087). At its played
+    // value the fill lasts well under two seconds, which a polling check can
+    // walk straight past; this stretches the hold for the capture and changes
+    // nothing about the act itself.
+    // IT IS STRETCHED HERE AND NOT AT THE TOP OF THE BLOCK (work-order 1136).
+    // Held at eight seconds for the whole visit, the fill dominated the round
+    // trip and the sample window above saw two errands where it now sees
+    // several — a photographic convenience was quietly throttling the very
+    // subject the window is counting.
+    await page.evaluate(() => {
+      window.__balance.bankFillSeconds = 8
+    })
     const posed = await page
       .waitForFunction(
         () => {
           if (typeof window.__placeForceFill !== 'function') return null
           const errands = window.__placeErrands()
           const v = errands.villagers
+          // THE WAIT CREATES ITS SUBJECT TOO (work-order 1136). Three minutes of
+          // polling for an errand the fair queue may not send is the same
+          // non-measurement the sample window above had; the queue is put back
+          // on the water whenever no carrier is out.
+          if (!v.some((p) => p.work && (p.work.situation === 'water-out' || p.work.situation === 'water-back'))) {
+            window.__placeCastErrand('water-out')
+          }
           for (let i = 0; i < v.length; i++) {
             if (v[i].work?.phase !== 'fill') continue
             // A QUARTER OF THE WAY IN — and that is already the FULL depth, not a
@@ -5495,7 +5826,14 @@ if (section('adult-errands')) {
             // bought no strictness and cost the ORDER check its window: one errand
             // runs at a time, and a fill held longer leaves the next check waiting
             // for the errand after it.
-            if (!(v[i].filling >= 0.25)) continue
+            // AND NOT PAST THE PLATEAU EITHER. The comment above had the window
+            // right and the condition kept only its lower half: after 0.76 the dip
+            // ramps back out, so a sample at 0.92 reads a y-scale of 0.93 on a
+            // figure that is drawing exactly as designed, and the squat check calls
+            // that a defect. Measured on WebGL 2, 15.09.2026: first pass red at
+            // "y-scale 0.9294 at fill 0.9245", green on the retry — a correct
+            // product reddened by the sampler's own window.
+            if (!(v[i].filling >= 0.25 && v[i].filling <= 0.76)) continue
             let near = Infinity
             for (let j = 0; j < v.length; j++) {
               if (j === i) continue
@@ -7059,6 +7397,59 @@ if (section('chief-to-drummer')) {
     JSON.stringify(named),
   )
 
+  // 1b. THE COLLISION THE TWO KEYS REMOVED (point 1139, user 16.09.2026). The
+  //     player stands before the drummer with the drummer's own word standing
+  //     over his head: under the one candidate list of point 691 the word and
+  //     the man took the key from each other by a step's distance, and whichever
+  //     lost went silent. Both offers must now stand AT ONCE — the bottom prompt
+  //     naming what SPACE does, the note inviting E — and E must take the word
+  //     without touching the man.
+  // The note is chosen in the scene's OWN frame loop, so the label appearing in
+  // the channel is not yet the note standing over his head — wait for the key it
+  // arms, not for a clock, and read the diagnostic only if the wait ran out.
+  const bothStood = await page
+    .waitForFunction(
+      () =>
+        window.__ui.getState().guessKeyArmed === true &&
+        !!document.querySelector('.speech-label.targeted .speech-invite') &&
+        !!document.querySelector('.prompt')?.textContent,
+      null,
+      { timeout: 10000 },
+    )
+    .then(() => true)
+    .catch(() => false)
+  const bothOffers = await page.evaluate(() => ({
+    prompt: document.querySelector('.prompt')?.textContent ?? null,
+    invite: document.querySelector('.speech-label.targeted .speech-invite')?.textContent ?? null,
+    targeted: document.querySelector('.speech-label.targeted')?.getAttribute('data-speaker') ?? null,
+    guessKeyArmed: window.__ui.getState().guessKeyArmed,
+  }))
+  check(
+    'the man and his word offer their keys at the same time (point 1139)',
+    bothStood &&
+      !!bothOffers.prompt &&
+      bothOffers.guessKeyArmed === true &&
+      bothOffers.targeted === 'drummer' &&
+      /\bE\b/.test(bothOffers.invite ?? ''),
+    JSON.stringify(bothOffers),
+  )
+  await frame('151b-two-keys-at-the-drummer', {
+    local: { x: drummer.x, y: 1.4, z: drummer.z },
+    label: "the drummer, his word inviting E over his head while the bottom prompt still offers SPACE at the man himself",
+  })
+  await page.keyboard.press('KeyE')
+  const guessAtDrummer = await page
+    .waitForFunction(() => !!document.querySelector('.dialog.speech-guess'), null, { timeout: 15000 })
+    .then(() => true)
+    .catch(() => false)
+  check(
+    'E takes the word and leaves the man to SPACE (point 1139)',
+    guessAtDrummer && (await page.evaluate(() => window.__game.getState().chiefOutside[window.__game.getState().placeId] !== true)),
+    guessAtDrummer ? 'the chief came out of his hut on the guess key' : 'no guess dialog opened at the drummer',
+  )
+  await page.evaluate(() => window.__ui.getState().setDialog(null))
+  await nextFrames(2)
+
   // 2. The use key at the HUT sends him out — and he walks to the drummer.
   if (hut?.door) {
     await standAt({ x: hut.door[0], z: hut.door[1] }, { x: hut.pos[0], z: hut.pos[1] })
@@ -7137,14 +7528,15 @@ if (section('chief-to-drummer')) {
       (want) => (document.querySelector('.prompt')?.textContent ?? '').includes(want),
       askLabel,
     )
-    // What owned the key instead, read only when the wait ran out: this check
-    // failed once on a stale note of the drummer's holding SPACE, and "no
-    // prompt" alone did not say so.
+    // What stood there instead, read only when the wait ran out: this check
+    // failed once on a stale note of the drummer's holding SPACE — which the
+    // two keys of point 1139 make impossible — and "no prompt" alone did not
+    // say so.
     const armedWhy = armed
       ? null
       : await page.evaluate(() => ({
           prompt: document.querySelector('.prompt')?.textContent ?? null,
-          owner: window.__ui.getState().useKeyOwner,
+          guessKeyArmed: window.__ui.getState().guessKeyArmed,
           dialog: window.__ui.getState().dialog,
           speaking: window.__speech?.labels().map((l) => l.speakerId) ?? null,
           chief: window.__chief,
@@ -7189,24 +7581,22 @@ if (section('chief-to-drummer')) {
       const { getStrings } = await import('/src/i18n/index.ts')
       return getStrings().labels.repeatDrumMessage
     })
-    // Waited for BY NAME, exactly like the ask above. The nearest candidate owns
-    // the use key (point 691), so a villager whose own note stands a step nearer
-    // holds it for a moment — and while he does the bottom prompt is empty,
-    // because his note carries the invitation instead. Read in a single instant
-    // that is a coin toss; what the point promises is that the offer STANDS
-    // while the player stands there.
+    // Waited for BY NAME, exactly like the ask above. A spoken word can no longer
+    // take the prompt away from the drummer (point 1139: the word answers E, the
+    // drummer SPACE), but the chief's own minute still runs — the offer must
+    // STAND while the player stands there, which is what the wait asks.
     const offered = await stepUntil(
       (want) => (document.querySelector('.prompt')?.textContent ?? '').includes(want),
       repeatLabel,
     )
-    // Read only when the wait ran out, and it names WHICH of the two reds it
-    // was: another speaker held the key, or the chief's own minute had run out
-    // under the player and he was already walking home.
+    // Read only when the wait ran out, and it names what stood there instead:
+    // the chief's own minute had run out under the player and he was already
+    // walking home, or no candidate armed the key at all.
     const offeredWhy = offered
       ? null
       : await page.evaluate(() => ({
           prompt: document.querySelector('.prompt')?.textContent ?? null,
-          owner: window.__ui.getState().useKeyOwner,
+          guessKeyArmed: window.__ui.getState().guessKeyArmed,
           speaking: window.__speech?.labels().map((l) => l.speakerId) ?? null,
           chief: window.__chief,
           heard: window.__game.getState().drumMessageHeard,
@@ -7314,11 +7704,14 @@ if (section('artefact-give')) {
       const el = document.querySelector(sel)
       if (!el) return null
       const { getStrings } = await import('/src/i18n/index.ts')
-      return { tag: el.tagName, text: el.textContent, expected: getStrings().finds.rockArtefact }
+      return {
+        tag: el.tagName, text: el.textContent, expected: getStrings().finds.rockArtefact,
+        shortcut: el.querySelector('.inv-digit')?.textContent ?? '',
+      }
     }, FIND)
     check(
       'the find stands in the inventory bar under its own localized name',
-      !!inBar && inBar.tag === 'BUTTON' && inBar.text === inBar.expected && inBar.text.length > 0,
+      !!inBar && inBar.tag === 'BUTTON' && inBar.text === inBar.shortcut + inBar.expected && inBar.expected.length > 0,
       JSON.stringify(inBar),
     )
     await frame('149-artefact-in-the-bar', {
@@ -7437,6 +7830,17 @@ if (section('artefact-give')) {
 // the one way a --section run could report green having verified nothing.
 const unrun = sections.unrun()
 if (unrun) check('the selected section actually ran', false, unrun)
+
+// WHAT THIS RUN COULD NOT ANSWER (work-order 1136). A check that saw too few
+// subjects is neither red nor green, so its exit code says nothing about it —
+// which is why the open questions are named again beside the verdict, where a
+// reader of the summary cannot walk past them.
+for (const n of sections.notCovering()) {
+  console.log(
+    `NOT-COVERING  ${n.check} — ${n.seen} of a needed ${n.minimum} ${n.what} seen` +
+      `${n.section ? `  [section: ${n.section}]` : ''}`,
+  )
+}
 
 console.log('console errors:', errors.length)
 for (const e of errors) console.log('ERR:', e.slice(0, 300))

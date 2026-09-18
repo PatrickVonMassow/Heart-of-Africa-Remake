@@ -13,8 +13,11 @@ import {
   DIG_SITE_ANCHOR_REACH,
   DIG_SITE_FIELD_BAND,
   PLAY_ROCK_SPAN,
+  PLACE_RADIUS,
+  VILLAGE_FIRE,
   WATER_PATH_HEAD_RADII,
   WATER_PATH_WIDTH,
+  WATER_STAND_RADIUS,
   WAY_OUT_HALF_WIDTH,
   WAY_OUT_INNER,
   WAY_OUT_OUTER,
@@ -26,15 +29,17 @@ import {
   type Interactive,
   type DwellingDef,
 } from './layout'
-import { spawnPointFree, standingClear, PLAYER_RADIUS, WALKER_RADIUS, type Collider } from './collision'
+import { boxCollider, spawnPointFree, standingClear, PLAYER_RADIUS, WALKER_RADIUS, type Collider } from './collision'
 import { ANIMAL_RADIUS, animalAnchors } from './animalSpots'
 import { closestOnPolyline } from './lanePlan'
 import { PLACES, placeById } from '../../world/geo'
 import { ROCK_VILLAGE_ID, ROCK_FOOTPRINT_UNITS, communicationRockSite } from '../../world/communicationRock'
-import { inBankPlayLane } from './riverBank'
+import { buildRiverBank, inBankPlayLane } from './riverBank'
+import { mulberry32 } from '../../world/noise'
 import { balance } from '../../config/balance'
 import { setupGeodata } from '../../test/geodata'
 import { REGION_PLACE_STYLES, VILLAGE_PLANS } from './regionStyles'
+import { LOOM_SPOT, VILLAGE_SPOTS } from './lifeSpots'
 
 // The landmark boulder is placed against the REAL terrain (it refuses every wet
 // spot — work-order 585), so this file needs the elevation dataset the browser
@@ -521,51 +526,122 @@ describe('no settlement carries a lone teaching stone any more (work-order 688)'
 // carriers speak, a foot at the river where neither does, and a walk between the
 // two that crosses neither a building nor the children's running lane.
 describe('the village water path (work-order 688)', () => {
-  const RIVER_VILLAGES = ['nubian-village', 'bambara-village', 'mandinka-village']
+  const random = mulberry32(1045)
+  const waterSeeds = [...new Set([
+    ...SEEDS, REPORTED_SEED, WEDGE_SEED, 1239784450, 2987912600,
+    ...Array.from({ length: 120 }, () => Math.floor(random() * 0x100000000)),
+  ])]
+  let riverVillages: string[] = []
+  beforeAll(() => {
+    riverVillages = VILLAGES.filter((p) => buildRiverBank(p, PLACE_RADIUS)).map((p) => p.id)
+    expect(riverVillages).toContain('bambara-village')
+  })
 
-  /**
-   * THE TWO LAYOUTS THAT PAY FOR THE RULE, named rather than tolerated.
-   *
-   * The walk to the water is tested against the settlement's fabric as it is
-   * DRAWN, compound fences included, and a village that can give no clear
-   * straight walk gives no water path at all — a track through a wall teaches
-   * the wrong thing, and no teaching beats a wrong one. Measured over nine
-   * villages at six seeds, exactly these two have no such walk at any bearing.
-   * The village the communication slice is played in is not among them.
-   *
-   * Work-order 1045 removes the cause: the track may bend once at the gap, or
-   * the compound opens a gate where the lane crosses it. Until then this list
-   * IS the deficiency — and a third entry appearing is what these cases catch.
-   */
-  const NO_STRAIGHT_WALK = new Set(['bambara-village@7', 'bambara-village@1337'])
-  const owesAPath = (id: string, seed: number) => !NO_STRAIGHT_WALK.has(`${id}@${seed}`)
-
-  it('exists exactly where there is a bank and a clear straight walk to it', () => {
+  it('exists exactly where there is a bank', () => {
     for (const p of PLACES) {
       const layout = buildLayout(p.id, 42)
       expect(!!layout.waterPath, p.id).toBe(!!layout.bank)
     }
   })
 
-  it('is missing at exactly the two layouts that have no straight walk (work-order 1045)', () => {
-    const missing = []
-    for (const id of RIVER_VILLAGES) {
-      for (const seed of SEEDS) {
-        if (!buildLayout(id, seed).waterPath) missing.push(`${id}@${seed}`)
+  it.each(waterSeeds)('seed %i: every river village has a drawn, unobstructed water path and stand', (seed) => {
+    for (const id of riverVillages) {
+      const layout = buildLayout(id, seed)
+      const label = `${id}@${seed}`
+      expect(layout.waterPath, label).not.toBeNull()
+      expect(layout.waterStand, label).not.toBeNull()
+      const path = layout.waterPath!
+      const lane = layout.paths.find((p) => p.width === WATER_PATH_WIDTH
+        && p.points[0][0] === path.head.x && p.points[0][1] === path.head.z)
+      expect(lane, label).toBeDefined()
+      expect(lane!.points.at(-1), label).toEqual([path.foot.x, path.foot.z])
+      for (let i = 1; i < lane!.points.length; i++) {
+        const [ax, az] = lane!.points[i - 1]
+        const [bx, bz] = lane!.points[i]
+        const steps = Math.ceil(Math.hypot(bx - ax, bz - az) / 0.025)
+        for (let k = 0; k <= steps; k++) {
+          const x = ax + (bx - ax) * k / steps
+          const z = az + (bz - az) * k / steps
+          if (!standingClear(layout.colliders, x, z, lane!.width / 2)) {
+            expect.fail(`${label}: drawn water lane hits a collider at ${x}, ${z}`)
+          }
+          if (inBankPlayLane(layout.playRocks, x, z, WALKER_RADIUS + lane!.width / 2)) {
+            expect.fail(`${label}: water lane crosses the children's run at ${x}, ${z}`)
+          }
+        }
       }
     }
-    expect(missing.sort()).toEqual([...NO_STRAIGHT_WALK].sort())
+  })
+
+  const gatedSeeds = [7, 1337, 2987912600, 2861293141]
+
+  it.each(gatedSeeds)('seed %i: gate rebuilding preserves village props and exactly two settled rock colliders', (seed) => {
+    const layout = buildLayout('bambara-village', seed)
+    const props = [
+      { x: VILLAGE_FIRE[0], z: VILLAGE_FIRE[1], r: 1.3 },
+      { x: LOOM_SPOT[0], z: LOOM_SPOT[1], r: 1.0 }, // loom
+      { x: VILLAGE_SPOTS.talkers[0], z: VILLAGE_SPOTS.talkers[1], r: 0.85 },
+      { x: VILLAGE_SPOTS.pounder[0], z: VILLAGE_SPOTS.pounder[1], r: 0.55 },
+      { x: VILLAGE_SPOTS.drummer[0], z: VILLAGE_SPOTS.drummer[1], r: 0.8 },
+      { x: VILLAGE_SPOTS.well[0], z: VILLAGE_SPOTS.well[1], r: 0.75 },
+    ]
+    for (const prop of props) expect(layout.colliders).toContainEqual(prop)
+    expect(layout.waterStand).not.toBeNull()
+    expect(layout.colliders).toContainEqual({ ...layout.waterStand!, r: WATER_STAND_RADIUS })
+
+    expect(layout.playRocks).not.toBeNull()
+    const rocks = layout.playRocks!
+    const rockColliders = layout.colliders.filter((c) =>
+      (c.kind === undefined || c.kind === 'circle') && c.r === rocks.r,
+    )
+    expect(rockColliders).toHaveLength(2)
+    for (const rock of [rocks.upstream, rocks.downstream]) {
+      expect(rockColliders).toContainEqual({ x: rock.x, z: rock.z, r: rocks.r })
+    }
+  })
+
+  it.each(gatedSeeds)('seed %i: the compound crossing is a drawn gate with matching collision', (seed) => {
+    const layout = buildLayout('bambara-village', seed)
+    const { head, foot } = layout.waterPath!
+    const line: Array<[number, number]> = [[head.x, head.z], [foot.x, foot.z]]
+    let crossedGates = 0
+    for (const fence of layout.fences) {
+      const run = fenceColliders(fence)
+      expect(layout.colliders).toEqual(expect.arrayContaining(run))
+      for (let i = 0; i < run.length; i++) {
+        if (run[i].kind === 'segment') continue
+        const a = fence.posts[i]
+        const b = fence.posts[(i + 1) % fence.posts.length]
+        // A gap crossed by the lane must have no bridging wall collider.
+        for (let k = 0; k <= 100; k++) {
+          const x = a[0] + (b[0] - a[0]) * k / 100
+          const z = a[1] + (b[1] - a[1]) * k / 100
+          if (closestOnPolyline(line, x, z).dist < WATER_PATH_WIDTH / 2) {
+            crossedGates++
+            break
+          }
+        }
+      }
+    }
+    expect(crossedGates, 'the lane actually passes through a compound opening').toBeGreaterThan(0)
+    // Woven panels use these exact half-extents in PlaceScene's Fences mesh.
+    // A gate-end panel turns toward the next surviving post; test its corners
+    // too, so rotating that last short panel cannot hide a drawn obstruction.
+    const drawn = fencePanels(layout.fences).filter((p) => p.kind === 'woven')
+      .map((p) => boxCollider(p.x, p.z, 0.41, 0.035, p.rot, 0))
+    const steps = Math.ceil(Math.hypot(foot.x - head.x, foot.z - head.z) / 0.025)
+    for (let k = 0; k <= steps; k++) {
+      const x = head.x + (foot.x - head.x) * k / steps
+      const z = head.z + (foot.z - head.z) * k / steps
+      expect(standingClear(drawn, x, z, WATER_PATH_WIDTH / 2)).toBe(true)
+    }
   })
 
   it.each(SEEDS)('seed %i: runs from the village out to the water', (seed) => {
-    for (const id of RIVER_VILLAGES) {
+    for (const id of riverVillages) {
       const layout = buildLayout(id, seed)
       const path = layout.waterPath
       const bank = layout.bank
-      if (!owesAPath(id, seed)) {
-        expect(path, `${id}@${seed} is a known 1045 layout and must stay pathless`).toBeNull()
-        continue
-      }
       expect(path, id).not.toBeNull()
       if (!path || !bank) continue
       // The head stands in the village, at the sweep's own radius, on free
@@ -585,11 +661,10 @@ describe('the village water path (work-order 688)', () => {
   })
 
   it.each(SEEDS)('seed %i: meets the bank OUTSIDE the children`s stretch', (seed) => {
-    for (const id of RIVER_VILLAGES) {
+    for (const id of riverVillages) {
       const layout = buildLayout(id, seed)
       const path = layout.waterPath
       const rocks = layout.playRocks
-      if (!owesAPath(id, seed)) continue
       expect(path, id).not.toBeNull()
       expect(rocks, id).not.toBeNull()
       if (!path || !rocks) continue
@@ -613,12 +688,9 @@ describe('the village water path (work-order 688)', () => {
   })
 
   it.each(SEEDS)('seed %i: is a drawn lane nothing is built on', (seed) => {
-    for (const id of RIVER_VILLAGES) {
+    for (const id of riverVillages) {
       const layout = buildLayout(id, seed)
       const path = layout.waterPath
-      // A pathless layout has nothing to draw; which layouts those are is
-      // pinned by its own case above.
-      if (!owesAPath(id, seed)) continue
       expect(path, id).not.toBeNull()
       if (!path) continue
       const lane = layout.paths.find(

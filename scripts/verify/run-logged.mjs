@@ -57,7 +57,7 @@ import {
   showWindow,
 } from './run-digest-core.mjs'
 import { backendsFrom, buildReceipt, formatReceipt, planRun } from './run-wait-core.mjs'
-import { framesWrittenSince, gitPosition, readRecord, recordPathFor, selfCommandLine, writeRecord } from './run-record.mjs'
+import { framesWrittenSince, gitPosition, logDir, newestFrameMtimeMs, openProgressMark, readRecord, recordPathFor, selfCommandLine, writeRecord } from './run-record.mjs'
 import { emitActivity } from '../batch-activity-journal.mjs'
 import { ACTIVITY_EVENTS } from '../batch-activity-journal-core.mjs'
 import { budgetToolOutput } from '../tool-output-budget-core.mjs'
@@ -66,10 +66,21 @@ import { cacheEnvironment, cleanWorktree, findGreenReceipt, formatCachedGreen } 
 import { waitForLargeRun } from './large-run-wait.mjs'
 import { LADDER_STATUS, formatLadderRefusal } from './ladder-core.mjs'
 import { ladderCheck } from './ladder.mjs'
+import { REPO_ROOT } from '../repo-paths.mjs'
+// ONE DEFINITION OF THE PROGRESS LEASE (point 1137): this wrapper renews it, and
+// the wait registry decides against it. Two copies of the same 15 minutes is how
+// they drift apart.
+import { PROGRESS_LEASE_MS } from '../wait-lease-core.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const ROOT = join(HERE, '..', '..')
-const PROGRESS_LEASE_MS = 15 * 60_000
+const ROOT = REPO_ROOT || join(HERE, '..', '..')
+/** How often the writer's progress mark may be re-stamped. The wait reads it
+ *  against a 15-minute lease, so a minute of granularity is far finer than any
+ *  verdict needs and keeps the writes rare. */
+const PROGRESS_RECORD_MS = 60_000
+/** How often the writer counts its own frames — the only sign of life a long
+ *  render suite gives, because its output does not leave `run-all` until it ends. */
+const FRAME_SAMPLE_MS = 30_000
 const PROGRESS_EMIT_MS = 60_000
 const RUNNER_STARTED_AT = Date.now() - Math.round(process.uptime() * 1000)
 
@@ -103,7 +114,7 @@ function logPathFor(args, own) {
   if (own.logFile) return isAbsolute(own.logFile) ? own.logFile : join(ROOT, own.logFile)
   const stamp = new Date().toISOString().replace(/[:.]/g, '-').replace(/Z$/, '')
   const label = args.filter((a) => !a.startsWith('-')).join('-').replace(/[^\w.-]/g, '_') || 'verify'
-  const dir = process.env.VERIFY_LOG_DIR ? join(ROOT, process.env.VERIFY_LOG_DIR) : join(ROOT, 'local', 'verify-logs')
+  const dir = logDir()
   return join(dir, `${stamp}-${label}.log`)
 }
 
@@ -252,6 +263,14 @@ function runVerify() {
   const logPath = logPathFor(forward, own)
   mkdirSync(dirname(logPath), { recursive: true })
   const log = createWriteStream(logPath, { flags: 'a' })
+  // A LOG THAT FAILS MUST NOT KILL THE RUN (Astra review round 7). `write`
+  // queues, so a filesystem error surfaces on the stream and, unhandled, throws
+  // out of the process — ending a picture run that may be an hour in. It is
+  // reported on stderr, where it cannot be mistaken for run output, and the run
+  // goes on: losing the log is bad, losing the run is what this point is about.
+  log.on('error', (err) => {
+    process.stderr.write(`# the run log ${logPath} could not be written: ${err?.message ?? err}\n`)
+  })
   const shown = forDisplay(logPath)
   const command = `verify ${forward.join(' ') || '(default: LARGE)'}`
 
@@ -275,7 +294,7 @@ function runVerify() {
     branch: where.branch,
     cleanAtStart: cleanWorktree(ROOT),
     cacheEnvironment: cacheEnvironment(),
-    log: shown,
+    log: logPath,
     startedAt: started,
     expectedRuntimeMs: plan.expectedMs,
     expectedFrames: plan.expectedFrames,
@@ -330,6 +349,71 @@ function runVerify() {
   const progress = outputProgressState()
   let lastProgressMark = progress.mark
 
+  // WHOSE PROGRESS IS IT (point 1137, Astra review round 1)? The WRITER's. A
+  // reader that inferred progress from the run RECORD's mtime would be fooled by
+  // its own bookkeeping: `countPoll` rewrites that record, so polling a wedged
+  // run renewed its apparent life for ever. The mark below is moved by this
+  // process alone, from what the child actually produced, and nothing a reader
+  // does can move it.
+  let recordedProgressAt = 0
+  // The mark, opened ONCE and held. run-record.mjs says why the descriptor
+  // matters; here it means `noteProgress` has exactly one thing to do and
+  // nothing to fall back to. A mark that could not be opened at all leaves the
+  // LOG as the run's sign of life, which is what it was before this point.
+  const mark = openProgressMark(logPath)
+  /** Act on one observation that the run is alive; false means "offer it again". */
+  function noteProgress(at) {
+    if (at - recordedProgressAt < PROGRESS_RECORD_MS) return false
+    if (!mark?.stamp(at)) return false
+    recordedProgressAt = at
+    return true
+  }
+  noteProgress(started)
+
+  // THE STRETCH THE OUTPUT CANNOT SEE. `run-all.mjs` captures a suite's output,
+  // so between two suite lines a 55-minute `polish` says nothing at all. Its
+  // FRAMES advance the whole time, so the writer samples its own frame count —
+  // sampled here, by the run itself, rather than read by whoever is waiting.
+  //
+  // THE RESIDUAL, STATED WITHOUT A BOUND IT DOES NOT HAVE (Astra review rounds 1,
+  // 4 and 5). Frames carry NO run identity — `verification/` is shared and
+  // `framesWrittenSince` says so — so another verify run's pictures raise this
+  // sample too. A run that is genuinely WEDGED keeps this wrapper and this
+  // sampler alive, and a succession of other runs taking pictures can keep its
+  // mark moving for as long as they last. Round 5 is right that nothing corrects
+  // that from inside: a wedged run never produces a real mark of its own. So the
+  // hung verdict can be DELAYED, for as long as somebody else keeps
+  // photographing.
+  //
+  // It is kept anyway, deliberately. The defect this point exists for is the
+  // opposite one and is not hypothetical: healthy runs were ENDED, twice in one
+  // evening, and the release stood behind the covering run they would have
+  // produced. Between a detector that occasionally fires late and one that
+  // reliably kills the thing it watches, this project has already paid for the
+  // second. Closing it properly needs a frame that names its run — a change to
+  // every suite's shutter, not to this file — and until then the reader's own
+  // verdict (run-record.mjs) touches nothing another run could have written.
+  //
+  // BY MTIME, NOT BY COUNT (Astra review round 2). `framesWrittenSince` counts
+  // DISTINCT names on purpose — a both-backends run photographs the same 93
+  // files twice — so on the second backend pass, and on every retry, the count
+  // stops rising while the pictures keep coming. A run producing frames the
+  // whole time would have gone silent for a whole suite and been called hung.
+  let frameMark = newestFrameMtimeMs({ since: started }) ?? 0
+  const frameTick = baseRecord.expectedFrames > 0 && mark
+    ? setInterval(() => {
+      const now = newestFrameMtimeMs({ since: started })
+      // AN OBSERVATION IS CONSUMED ONLY WHEN IT HAS BEEN RECORDED (Astra review
+      // round 5). Advancing `frameMark` before the stamp meant a throttled or
+      // failed write threw the observation away: the next tick saw the same
+      // newest frame, took it for no progress, and only a LATER frame could
+      // ever try again. The mark now moves with the write, so a tick that could
+      // not record retries on the next one.
+      if (typeof now === 'number' && now > frameMark && noteProgress(Date.now())) frameMark = now
+    }, FRAME_SAMPLE_MS)
+    : null
+  frameTick?.unref?.()
+
   function consume(chunk) {
     const text = String(chunk)
     rawChars += text.length
@@ -357,6 +441,7 @@ function runVerify() {
       if (own.stream) console.log(line)
       else if (!own.quiet && kind) console.log(line)
     }
+    noteProgress(progressAt)
   }
 
   child.stdout.on('data', consume)
@@ -373,6 +458,8 @@ function runVerify() {
   }
 
   child.on('close', (code, signal) => {
+    if (frameTick) clearInterval(frameTick)
+    mark?.close()
     if (pending !== '') {
       lines.push(pending)
       if (own.stream || (!own.quiet && select(pending))) console.log(pending)
@@ -444,9 +531,9 @@ function runVerify() {
 // The termination is now REPRODUCED instead — see the close handler.
 function reexecWithLogPath() {
   const logPath = logPathFor(forward, own)
-  // The DISPLAY form (ROOT-relative where possible): it is what the record's
-  // `log` field will carry, so argv word and recorded path compare equal.
-  const child = spawn(process.execPath, [...process.argv.slice(1), '--log-file', forDisplay(logPath)], {
+  // The absolute path survives checkout removal and is the same identity
+  // carried by the record and the writer's command line.
+  const child = spawn(process.execPath, [...process.argv.slice(1), '--log-file', logPath], {
     windowsHide: true,
     stdio: 'inherit',
     env: process.env,
@@ -495,7 +582,7 @@ else {
     process.exitCode = 1
   } else {
     const cached = findGreenReceipt({
-      dir: join(ROOT, process.env.VERIFY_LOG_DIR || 'local/verify-logs'),
+      dir: logDir(),
       argv: forward, head: gitPosition().head, verifyGl: process.env.VERIFY_GL,
       environment: cacheEnvironment(),
       again: own.again, clean: cleanWorktree(ROOT),
@@ -503,7 +590,7 @@ else {
     if (cached) console.log(formatCachedGreen({ ...cached, path: forDisplay(cached.path) }))
     else {
       await waitForLargeRun()
-      if (own.logFile) runVerify()
+      if (own.logFile && isAbsolute(own.logFile)) runVerify()
       else reexecWithLogPath()
     }
   }

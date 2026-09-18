@@ -414,3 +414,39 @@ describe('a declared limitation outranks the line budget', () => {
     expect(kept.map((e) => e.line)).toContain(entries[0].line)
   })
 })
+
+describe('the run keeps its own bookkeeping demands (point 1135)', () => {
+  it.each([
+    'ACCOUNTED FOR  settings — every red is charged to open point(s) 603; suite stays red',
+    'STRIKE  settings     "a check" PASSED here but is still charged to open point 603',
+    'POINT REDS HOLD — charged elsewhere: none — own or unresolved: settings: a new defect',
+    'LARGE FAILED AT ITS END — red on WebGL 2, every red charged elsewhere.',
+  ])('keeps %s out of the droppable bulk', (line) => {
+    expect(classifyLine(line)).toBe('final')
+  })
+})
+
+describe('the budget yields to the run\'s bookkeeping, not the other way round (point 1135)', () => {
+  it('keeps STRIKE, POINT REDS and ACCOUNTED FOR when a hundred echoes press on the budget', () => {
+    // THE KINDS `applyBudget` ACTUALLY READS (`priorityOf` reads `kind`, not
+    // `priority`): the bookkeeping lines classify `final` and the echoes `echo`,
+    // so all of them are HIGH priority and the first eviction loop passes them
+    // by. Only the second loop can reach them — which is the loop the protection
+    // has to survive.
+    const entries = [
+      { kind: classifyLine('STRIKE  settings     "a check" PASSED here'), line: 'STRIKE  settings     "a check" PASSED here but is still charged to open point 603' },
+      { kind: 'final', line: 'ACCOUNTED FOR  settings — every red is charged to open point(s) 603' },
+      { kind: 'final', line: 'POINT REDS DO NOT HOLD — charged elsewhere: "point 603 — a check"' },
+      { kind: 'final', line: 'PARTIAL — only section "ground-detail" of settings ran' },
+      ...Array.from({ length: 120 }, (_, i) => ({ kind: 'echo', line: `      FAIL  echo ${i}` })),
+    ]
+    const { kept } = applyBudget(entries, 10)
+    expect(kept).toHaveLength(10)
+    // The budget drops from the FRONT once the low-priority lines are gone, and
+    // these four stand at the very front: without the protection they are the
+    // first to go, whatever class they carry.
+    for (const line of entries.slice(0, 4).map((e) => e.line)) {
+      expect(kept.map((e) => e.line)).toContain(line)
+    }
+  })
+})

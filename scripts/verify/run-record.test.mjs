@@ -1,17 +1,22 @@
 // The run record (point 592): the file that makes a verify run one checkable
 // object, so awaiting it replaces re-reading its log.
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, mkdirSync, utimesSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdtempSync, mkdirSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
+import { repositoryCommonRoot } from '../repo-paths.mjs'
 import {
   SCAN_LIMIT,
   activeRecordPath,
   countPoll,
   elapsedMs,
   framesWrittenSince,
+  lastProgressAtFor,
   latestRecordPath,
+  newestFrameMtimeMs,
+  openProgressMark,
+  progressMarkPathFor,
   pidAlive,
   readRecord,
   logDir,
@@ -107,6 +112,143 @@ describe('framesWrittenSince — the half the shutter cannot see', () => {
   })
 })
 
+describe('the last sign of life (point 1137)', () => {
+  it('reads the NEWEST frame, because a long suite writes frames and no log line', () => {
+    const dir = tmp()
+    const old = new Date(Date.now() - 600_000)
+    writeFileSync(join(dir, '01-a.png'), 'x')
+    utimesSync(join(dir, '01-a.png'), old, old)
+    writeFileSync(join(dir, '02-b.png'), 'x')
+    const newest = newestFrameMtimeMs({ dir })
+    expect(newest).toBeGreaterThan(old.getTime())
+    expect(newest).toBeLessThanOrEqual(Date.now() + 1000)
+  })
+
+  it('answers null when there is nothing to look at, rather than a false silence', () => {
+    expect(newestFrameMtimeMs({ dir: join(tmp(), 'absent') })).toBeNull()
+    expect(newestFrameMtimeMs({ dir: tmp() })).toBeNull()
+    expect(lastProgressAtFor({})).toBeNull()
+  })
+
+  // ASTRA REVIEW ROUNDS 1 TO 3 — `countPoll` rewrites the run RECORD, so a reader
+  // that took that file's mtime for progress could manufacture the life it was
+  // looking for; a mark kept INSIDE the record would be dropped whenever a
+  // poll's read-modify-write overtook the writer's; and a mark PREFERRED over
+  // everything else would freeze a healthy run the moment its marker stopped
+  // being writable. So: a file of its own, and the NEWEST of the run's own
+  // writings decides.
+  it('never takes the run RECORD for progress — a poll writes that file', () => {
+    const dir = tmp()
+    const log = join(dir, 'run.log')
+    const record = join(dir, 'run.log.run.json')
+    const stale = new Date(Date.now() - 45 * 60_000)
+    writeFileSync(log, 'x')
+    utimesSync(log, stale, stale)
+    writeFileSync(record, '{}')
+    // The record was touched a moment ago, as a counted poll would touch it.
+    // The run itself has said nothing for 45 minutes, and that is the answer.
+    expect(lastProgressAtFor({ logPath: log, recordPath: record })).toBeLessThan(Date.now() - 40 * 60_000)
+  })
+
+  it('takes the newest of the run\'s OWN writings, so a frozen mark cannot condemn it', () => {
+    const dir = tmp()
+    const log = join(dir, 'run.log')
+    const mark = join(dir, 'run.log.progress')
+    writeFileSync(mark, '')
+    const stale = new Date(Date.now() - 45 * 60_000)
+    utimesSync(mark, stale, stale)
+    // The marker went unwritable 45 minutes ago; the log is still moving.
+    writeFileSync(log, 'x')
+    expect(lastProgressAtFor({ logPath: log })).toBeGreaterThan(Date.now() - 60_000)
+  })
+
+  // ASTRA REVIEW ROUND 4 — `verification/` is shared and carries no run identity,
+  // so any other run's pictures could have vouched for the one being judged, for
+  // ever, and even for a selection that takes no frames at all. The frames are
+  // the WRITER's business, about its own run, while that run is going.
+  it('never lets the shared frame directory speak for a run', async () => {
+    // POINTED AT THE REAL `FRAME_DIR`, or the fixture proves nothing (Astra
+    // coverage pass): a probe regressed to reading the shared directory would
+    // pass against a temporary one it never consults. The module reads
+    // `HOA_FRAME_DIR` at import, so the check needs its own module instance.
+    const dir = tmp()
+    const frames = join(dir, 'frames')
+    mkdirSync(frames, { recursive: true })
+    writeFileSync(join(frames, '07-somebody-elses.png'), 'x')
+    const log = join(dir, 'run.log')
+    const stale = new Date(Date.now() - 45 * 60_000)
+    writeFileSync(log, 'x')
+    utimesSync(log, stale, stale)
+    const before = process.env.HOA_FRAME_DIR
+    process.env.HOA_FRAME_DIR = frames
+    try {
+      vi.resetModules()
+      const fresh = await import('./run-record.mjs')
+      expect(fresh.FRAME_DIR).toBe(frames)
+      expect(fresh.newestFrameMtimeMs()).toBeGreaterThan(Date.now() - 60_000)
+      expect(fresh.lastProgressAtFor({ logPath: log })).toBeLessThan(Date.now() - 40 * 60_000)
+    } finally {
+      if (before === undefined) delete process.env.HOA_FRAME_DIR
+      else process.env.HOA_FRAME_DIR = before
+      vi.resetModules()
+    }
+  })
+
+  it('derives the mark from the log and from the record path alike', () => {
+    expect(progressMarkPathFor('/x/y/run.log')).toBe('/x/y/run.log.progress')
+    expect(progressMarkPathFor('/x/y/run.log.run.json')).toBe('/x/y/run.log.progress')
+    expect(progressMarkPathFor('')).toBeNull()
+    expect(progressMarkPathFor(null)).toBeNull()
+  })
+
+  // ASTRA REVIEW ROUNDS 6 TO 9 — the descriptor is the repair. A mark RE-CREATED
+  // on every stamp can start failing halfway through a run while the log, opened
+  // in the same directory at the same moment, writes on; every attempt to bridge
+  // that asymmetry put a second writer into the log. Held open, the two fail
+  // together or not at all.
+  it('opens the mark once and moves it, without touching the directory again', () => {
+    const dir = tmp()
+    const log = join(dir, 'run.log')
+    const mark = openProgressMark(log)
+    expect(mark).not.toBeNull()
+    const early = lastProgressAtFor({ logPath: log })
+    expect(early).toBeGreaterThan(Date.now() - 60_000)
+    const later = Date.now() + 5 * 60_000
+    expect(mark.stamp(later)).toBe(true)
+    expect(lastProgressAtFor({ logPath: log })).toBeGreaterThan(early)
+    // The stamp survives a directory that will take no NEW entry, which is the
+    // case that defeated a re-created mark.
+    chmodSync(dir, 0o500)
+    try {
+      expect(mark.stamp(later + 60_000)).toBe(true)
+    } finally {
+      chmodSync(dir, 0o700)
+      mark.close()
+    }
+  })
+
+  it('answers null rather than throwing when the mark cannot be opened at all', () => {
+    expect(openProgressMark(join(tmp(), 'absent', 'run.log'))).toBeNull()
+    expect(openProgressMark('')).toBeNull()
+    expect(openProgressMark(null)).toBeNull()
+  })
+
+  it('falls back to the file marks only for a run that carries no mark', () => {
+    const dir = tmp()
+    const log = join(dir, 'run.log')
+    writeFileSync(log, 'x')
+    expect(lastProgressAtFor({ logPath: log })).toBeGreaterThan(Date.now() - 60_000)
+  })
+
+  it('ignores a path it cannot stat instead of counting it as silence', () => {
+    const dir = tmp()
+    const log = join(dir, 'run.log')
+    writeFileSync(log, 'x')
+    expect(lastProgressAtFor({ logPath: log, recordPath: join(dir, 'gone.run.json') }))
+      .toBeGreaterThan(Date.now() - 60_000)
+  })
+})
+
 describe('is the run still going?', () => {
   it('reads its own process as alive and a garbage pid as unknown', () => {
     expect(pidAlive(process.pid)).toBe(true)
@@ -147,9 +289,9 @@ describe('countPoll — the only thing that moves the counter', () => {
   })
 })
 
-describe('the log directory belongs to the checkout the process was GIVEN', () => {
-  it('defaults to this checkout', () => {
-    expect(logDir({})).toBe(join(resolve(process.cwd()), 'local', 'verify-logs'))
+describe('the log directory belongs to the shared repository', () => {
+  it('defaults to the common checkout', () => {
+    expect(logDir({})).toBe(join(repositoryCommonRoot(), 'local', 'verify-logs'))
   })
 
   // The module is loaded in a CHILD, because the root is resolved once per

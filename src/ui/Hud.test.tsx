@@ -3,8 +3,8 @@
 // defeat-overlay render (health.mjs) into React Testing Library checks. The
 // InventoryBar/overlays are internal to Hud, so the whole HUD is rendered
 // (three-free; the R3F scene is never mounted here).
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { render, fireEvent } from '@testing-library/react'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { render, fireEvent, act } from '@testing-library/react'
 import { Hud, LoadMenu } from './Hud'
 import { en } from '../i18n/en'
 import { de } from '../i18n/de'
@@ -12,6 +12,8 @@ import { useLocale } from '../i18n'
 import { UNSTUCK_KEY_CODE, UNSTUCK_KEY_LABEL } from '../systems/unstuck'
 import { useGame, canCampHere } from '../state/store'
 import { START_YEAR } from '../config/balance'
+import { dispatchSyntheticKey, GAMEPAD_BUTTON_KEYS } from '../systems/input'
+import { ctrlHeld, subscribeCtrlHold } from './ctrlHold'
 import { MONTH_KEYS } from '../systems/season'
 import { useUi } from '../state/ui'
 import { freshGame, withWorld, jumpTo, terrainAt, g, COORD } from '../test/store'
@@ -384,7 +386,7 @@ describe('InventoryBar quest find (design.md §6)', () => {
     render(<Hud />)
     const btn = findButton()
     expect(btn).toBeTruthy()
-    expect(btn?.textContent).toBe(en.finds.rockArtefact)
+    expect(btn).toHaveAccessibleName(en.finds.rockArtefact)
     // It ACTS on a click, like medicine and the shovel — not a passive label.
     expect(btn?.tagName).toBe('BUTTON')
     expect(btn?.getAttribute('title')).toBe(en.hud.findTooltip)
@@ -394,7 +396,7 @@ describe('InventoryBar quest find (design.md §6)', () => {
     useLocale.getState().setLang('de')
     useGame.setState({ rockArtefact: 'carried' })
     render(<Hud />)
-    expect(findButton()?.textContent).toBe(de.finds.rockArtefact)
+    expect(findButton()).toHaveAccessibleName(de.finds.rockArtefact)
     expect(findButton()?.getAttribute('title')).toBe(de.hud.findTooltip)
   })
 
@@ -691,10 +693,35 @@ describe('month keys (design.md §21.1 — stepping the seasons)', () => {
     window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Equal', altKey: true, cancelable: true }))
     window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Digit1', metaKey: true, cancelable: true }))
     expect(useGame.getState().day).toBe(before)
-    // The PLAIN press still jumps, exactly as before.
+    // Plain digits belong to inventory; Shift alone jumps the month.
     window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Digit3', cancelable: true }))
+    expect(useGame.getState().day).toBe(before)
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Digit3', shiftKey: true, cancelable: true }))
     expect(monthOf()).toBe(2) // March
     expect(useGame.getState().day).not.toBe(before)
+  })
+
+  it('moves the entire month row to Shift alone, also while Shift names labels', () => {
+    useUi.getState().setLabelModifier('shift')
+    const offLabels = subscribeCtrlHold(() => {})
+    const { unmount } = render(<Hud />)
+    try {
+      for (const [i, code] of MONTH_KEYS.entries()) {
+        const before = g().day
+        for (const mods of [{}, { shiftKey: true, ctrlKey: true }, { shiftKey: true, altKey: true }, { shiftKey: true, metaKey: true }]) {
+          fireEvent.keyDown(window, { code, ...mods })
+          expect(g().day).toBe(before)
+        }
+        fireEvent.keyDown(window, { code, shiftKey: true })
+        expect(ctrlHeld()).toBe(true)
+        const date = new Date(Date.UTC(START_YEAR, 0, 1) + g().day * 86400000)
+        expect(date.getUTCMonth()).toBe(i)
+      }
+    } finally {
+      unmount()
+      offLabels()
+      useUi.getState().setLabelModifier('ctrl')
+    }
   })
 
   it('jumps the store to that month, keeping the year', () => {
@@ -704,5 +731,174 @@ describe('month keys (design.md §21.1 — stepping the seasons)', () => {
     const d = new Date(Date.UTC(START_YEAR, 0, 1) + useGame.getState().day * 86400000)
     expect(d.getUTCMonth()).toBe(11)
     expect(d.getUTCFullYear()).toBe(START_YEAR + 2) // the expedition keeps its year
+  })
+})
+
+
+describe('inventory keyboard and gamepad access', () => {
+  afterEach(() => vi.restoreAllMocks())
+
+  it.each(['travel', 'place'] as const)('uses the matching displayed slot in %s without moving the date', (mode) => {
+    useGame.setState({ mode, placeId: mode === 'place' ? 'cairo' : null,
+      equipment: { medicine: 2, shovel: 1 }, afflictions: { ...g().afflictions, fever: true } })
+    const { container } = render(<Hud />)
+    const before = g().day
+    const slots = container.querySelector('.inventory-bar')!.children
+    expect(slots[0].querySelector('.inv-digit')).toHaveTextContent('1')
+    expect(slots[1].querySelector('.inv-digit')).toHaveTextContent('2')
+    fireEvent.keyDown(window, { code: 'Digit1' })
+    expect(g().equipment.medicine).toBe(1)
+    expect(g().afflictions.fever).toBe(false)
+    const dig = vi.spyOn(g(), 'dig').mockImplementation(() => {})
+    fireEvent.keyDown(window, { code: 'Digit2' })
+    expect(dig).toHaveBeenCalledTimes(1)
+    fireEvent.keyDown(window, { code: 'Digit9' })
+    expect(dig).toHaveBeenCalledTimes(1)
+    expect(g().equipment.medicine).toBe(1)
+    expect(g().day).toBe(before)
+  })
+
+  it('shares the visible localized order across passive gear, forms, finds and treasures, numbering only nine', () => {
+    useGame.setState({ mode: 'travel', placeId: null, equipment: { canteen: 1, shovel: 1 }, carriedForms: ['rock-relief'],
+      rockArtefact: 'carried', treasures: { gold: 1, silver: 1, emerald: 1, copper: 1, ivory: 1, statue: 1 } })
+    const form = vi.spyOn(g(), 'useCarriedForm').mockImplementation(() => {})
+    const find = vi.spyOn(g(), 'handArtefactToChief').mockImplementation(() => {})
+    const present = vi.spyOn(g(), 'presentValuable').mockImplementation(() => {})
+    const dig = vi.spyOn(g(), 'dig').mockImplementation(() => {})
+    const { container } = render(<Hud />)
+    for (const lang of ['en', 'de'] as const) {
+      act(() => useLocale.getState().setLang(lang))
+      const slots = [...container.querySelector('.inventory-bar')!.children]
+      expect(slots).toHaveLength(10)
+      expect(container.querySelectorAll('.inv-digit')).toHaveLength(9)
+      const shovelIndex = slots.findIndex((slot) => slot.getAttribute('data-eq') === 'shovel')
+      fireEvent.keyDown(window, { code: `Digit${shovelIndex + 1}` })
+      fireEvent.keyDown(window, { code: 'Digit3' })
+      fireEvent.keyDown(window, { code: 'Digit4' })
+      const t = lang === 'en' ? en : de
+      const treasures = Object.keys(g().treasures) as (keyof typeof t.treasures)[]
+      treasures.sort((a, b) => t.treasures[a].localeCompare(t.treasures[b], lang))
+      for (let i = 5; i <= 9; i++) {
+        fireEvent.keyDown(window, { code: `Digit${i}` })
+        expect(present).toHaveBeenLastCalledWith(treasures[i - 5])
+      }
+    }
+    expect(dig).toHaveBeenCalledTimes(2)
+    expect(form).toHaveBeenCalledTimes(2)
+    expect(find).toHaveBeenCalledTimes(2)
+    expect(present).toHaveBeenCalledTimes(10)
+    fireEvent.keyDown(window, { code: 'Digit0' })
+    expect(present).toHaveBeenCalledTimes(10)
+  })
+
+  it('ignores empty and passive slots, repeats, browser chords, typing and open dialogs', () => {
+    const dig = vi.spyOn(g(), 'dig').mockImplementation(() => {})
+    const { rerender } = render(<Hud />)
+    fireEvent.keyDown(window, { code: 'Digit1' })
+    act(() => useGame.setState({ equipment: { canteen: 1, shovel: 1 } }))
+    rerender(<Hud />)
+    fireEvent.keyDown(window, { code: 'Digit1' })
+    for (const mods of [{ repeat: true }, { ctrlKey: true }, { altKey: true }, { metaKey: true }, { shiftKey: true }]) {
+      fireEvent.keyDown(window, { code: 'Digit2', ...mods })
+    }
+    const input = document.createElement('input')
+    document.body.append(input)
+    fireEvent.keyDown(input, { code: 'Digit2' })
+    input.remove()
+    act(() => useUi.getState().setDialog({ kind: 'agency' }))
+    fireEvent.keyDown(window, { code: 'Digit2' })
+    expect(dig).not.toHaveBeenCalled()
+  })
+
+  it('selects and highlights slots from the d-pad without using them or taking A', () => {
+    useGame.setState({ equipment: { medicine: 1, shovel: 1 } })
+    const dig = vi.spyOn(g(), 'dig').mockImplementation(() => {})
+    const medicine = vi.spyOn(g(), 'useMedicine').mockImplementation(() => {})
+    const { container, unmount } = render(<Hud />)
+    const selected = () => container.querySelector('.inv-selected')?.getAttribute('data-eq')
+    const pad = (button: number) => act(() => dispatchSyntheticKey(GAMEPAD_BUTTON_KEYS[button], 'gamepad'))
+    fireEvent.keyDown(window, { code: 'ArrowRight' })
+    expect(selected()).toBeUndefined()
+    pad(15)
+    expect(selected()).toBe('medicine')
+    pad(15)
+    expect(selected()).toBe('shovel')
+    pad(0)
+    expect(dig).not.toHaveBeenCalled()
+    pad(14)
+    expect(selected()).toBe('medicine')
+    pad(14)
+    expect(selected()).toBe('shovel')
+    expect(medicine).not.toHaveBeenCalled()
+    unmount()
+    fireEvent.keyDown(window, { code: 'Digit2' })
+    expect(dig).not.toHaveBeenCalled()
+  })
+})
+
+
+describe('settlement cursor mode hint', () => {
+  const pointerDescriptor = Object.getOwnPropertyDescriptor(document, 'pointerLockElement')
+  const webdriverDescriptor = Object.getOwnPropertyDescriptor(navigator, 'webdriver')
+  const lock = (element: Element | null) => {
+    Object.defineProperty(document, 'pointerLockElement', { configurable: true, value: element })
+    fireEvent(document, new Event('pointerlockchange'))
+  }
+  beforeEach(() => {
+    Object.defineProperty(navigator, 'webdriver', { configurable: true, value: false })
+    Object.defineProperty(document, 'pointerLockElement', { configurable: true, value: null })
+    useGame.setState({ mode: 'place', placeId: 'cairo' })
+  })
+  afterEach(() => {
+    if (pointerDescriptor) Object.defineProperty(document, 'pointerLockElement', pointerDescriptor)
+    else Reflect.deleteProperty(document, 'pointerLockElement')
+    if (webdriverDescriptor) Object.defineProperty(navigator, 'webdriver', webdriverDescriptor)
+    else Reflect.deleteProperty(navigator, 'webdriver')
+  })
+
+  it.each(['en', 'de'] as const)('names both actual lock states in %s', (lang) => {
+    const strings = lang === 'en' ? en : de
+    useLocale.getState().setLang(lang)
+    const { container, getByText } = render(<Hud />)
+    expect(getByText(strings.hud.cursorModeUnlocked)).toBeInTheDocument()
+    const canvas = document.createElement('canvas')
+    lock(canvas)
+    expect(getByText(strings.hud.cursorModeLocked)).toHaveClass('cursor-mode-locked')
+    lock(null)
+    expect(getByText(strings.hud.cursorModeUnlocked)).not.toHaveClass('cursor-mode-locked')
+    act(() => useGame.setState({ mode: 'travel', placeId: null }))
+    expect(container.querySelector('.cursor-mode-hint')).toBeNull()
+  })
+
+  it('says nothing under automation or on touch, where there is no cursor to take', () => {
+    useUi.setState({ touchActive: false })
+    const { container, rerender } = render(<Hud />)
+    expect(container.querySelector('.cursor-mode-hint')).not.toBeNull()
+    act(() => useUi.setState({ touchActive: true }))
+    rerender(<Hud />)
+    expect(container.querySelector('.cursor-mode-hint')).toBeNull()
+    act(() => useUi.setState({ touchActive: false }))
+    rerender(<Hud />)
+    expect(container.querySelector('.cursor-mode-hint')).not.toBeNull()
+    Object.defineProperty(navigator, 'webdriver', { configurable: true, value: true })
+    rerender(<Hud />)
+    act(() => useGame.setState({ mode: 'place', placeId: 'cairo' }))
+    expect(container.querySelector('.cursor-mode-hint')).toBeNull()
+  })
+
+  it('reads a lock already held at mount and updates the language live', () => {
+    Object.defineProperty(document, 'pointerLockElement', { configurable: true, value: document.createElement('canvas') })
+    const { getByText } = render(<Hud />)
+    expect(getByText(en.hud.cursorModeLocked)).toBeInTheDocument()
+    act(() => useLocale.getState().setLang('de'))
+    expect(getByText(de.hud.cursorModeLocked)).toBeInTheDocument()
+  })
+
+  it('hides both hints under browser automation, matching the lock skip', () => {
+    Object.defineProperty(navigator, 'webdriver', { configurable: true, value: true })
+    const { container } = render(<Hud />)
+    expect(container.querySelector('.cursor-mode-hint')).toBeNull()
+    lock(document.createElement('canvas'))
+    expect(container.querySelector('.cursor-mode-hint')).toBeNull()
   })
 })

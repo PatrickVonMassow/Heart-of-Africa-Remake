@@ -128,6 +128,8 @@ export interface Strings {
   }
 
   hud: {
+    cursorModeLocked: string
+    cursorModeUnlocked: string
     journalToggle: string
     campToggle: string
     mapToggle: string

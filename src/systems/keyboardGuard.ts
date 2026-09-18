@@ -23,7 +23,7 @@ import { MONTH_KEYS } from './season'
 
 /**
  * The calendar keys of §21.1: the month row and the year steps. The game binds
- * them PLAIN — there is no Ctrl+digit anywhere in it — which is why they are
+ * months with Shift and years plain, never Ctrl/Alt/Meta — which is why they are
  * named apart from the rest (see PREVENTED_CHORD_CODES).
  */
 const CALENDAR_KEY_CODES: readonly string[] = [
@@ -42,8 +42,11 @@ export const GAME_KEY_CODES: readonly string[] = [
   // Movement (§17.5): WASD and the arrow keys, in both perspectives.
   'KeyW', 'KeyA', 'KeyS', 'KeyD',
   'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
+  // Inventory slots, in their displayed order; plain digits only.
+  ...MONTH_KEYS.slice(0, 9),
   // The use key, the journal and the rest of the playing keys.
   'Space', 'Tab',
+  'KeyE', // place a guess at the targeted word (design.md §13.4/§17.5)
   'KeyG', // dig
   'KeyM', // map
   'KeyC', // camp
@@ -56,7 +59,7 @@ export const GAME_KEY_CODES: readonly string[] = [
   // reload, which is why the bug report sits on F6.
   'F1', 'F2', 'F3', 'F4', 'F6', 'F8', 'F9',
   // The month row and the year steps (§21.1).
-  ...CALENDAR_KEY_CODES,
+  ...CALENDAR_KEY_CODES.filter((code) => !/^Digit[1-9]$/.test(code)),
 ]
 
 const GAME_KEY_SET = new Set(GAME_KEY_CODES)
@@ -68,14 +71,10 @@ export function isGameKeyCode(code: string): boolean {
 
 /**
  * The codes whose modifier chord is taken from the browser. Prevention is for
- * keys the game ACTS ON under a modifier; a key that is bound plain AND stands
- * down while Ctrl/Alt/Meta is held does not earn it — the chord does nothing in
- * the game, so it belongs to the browser. That is the calendar row of §21.1:
- * bound plain, and registered `ignoreModified` (src/ui/Hud.tsx), so swallowing
- * Ctrl+1–9 and the keyboard zoom (Ctrl +/−/0) would protect nothing and cost
- * the player two of the browser's most-used chords. Both halves are needed —
- * with only the plain binding, one press would do two things at once. They stay
- * in the LOCK set, which takes whole keys rather than chords.
+ * keys the game acts on under Ctrl/Alt. Inventory digits require no modifiers,
+ * debug months require Shift alone, and year keys ignore Ctrl/Alt/Meta. Thus
+ * Ctrl+1–9 and browser zoom keep their meaning. The row stays in the LOCK set,
+ * which takes whole keys rather than chords.
  */
 export const PREVENTED_CHORD_CODES: readonly string[] = GAME_KEY_CODES.filter(
   (c) => !CALENDAR_KEY_SET.has(c),
@@ -105,7 +104,7 @@ export function shouldLockKeyboard(state: { fullscreen: boolean; pointerLocked: 
 /**
  * Is this keydown a browser chord the game must swallow? True for a modifier
  * chord on a key of PREVENTED_CHORD_CODES, so an unbound key (Ctrl+R,
- * Ctrl+Shift+I) and the plain-bound calendar row keep their browser meaning.
+ * Ctrl+Shift+I) and the calendar and inventory row keep their browser meaning.
  * Never inside a form control: the debug fields and the bug-report description
  * keep Ctrl+A/C/V.
  *

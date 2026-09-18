@@ -529,7 +529,38 @@ export const LIMITS = {
   // (§3.273, into "Die Kur ist teurer als der Fehler"). Drafted as three standalone entries this
   // is far more; folded it measures +8 lines / +91 words, and the ceilings follow that
   // measurement exactly, with no headroom. 675 -> 683.
-  maxLines: 683,
+  // 15.09.2026, night: the question-read-as-an-order pitfall (§3.276) was paid for out of four
+  // existing entries rather than added on top, and they gave back more than it takes — the
+  // ceiling follows the guide down: 683 -> 682.
+  // RAISED 16.09.2026 by the claim-checked-against-nothing clause (§3.279), FOLDED into the
+  // entry that already teaches "what you assert in the present tense, look up first" rather
+  // than opening an entry of its own — it is the same reader question, one clause wider: a
+  // verdict about what a fault BELONGS TO is also a present-tense claim, and a log read while
+  // the run is still going is the intermediate state, not the result. SHORTEN-BEFORE-RAISE was
+  // applied hard: drafted as a standalone pitfall at nine lines, it lands at one. 682 -> 683.
+  // 17.09.2026: the receiver lesson — a dev assertion that only prints while the run stays green
+  // has no reader — was FOLDED into "Die Sonde kann ihr Nein nicht erreichen", whose subject is
+  // the same check that cannot deliver a verdict, and that entry was tightened to pay for it, so
+  // the guide comes out one line shorter than the old ceiling: 683 -> 682.
+  // RAISED 17.09.2026 by TWO genuinely new tips that no existing entry could hold (§3.283,
+  // §3.284). Neither is a variation of a tip already there: the first is about REMOVING a
+  // safety run — the reader's own next step, once a doubled pass looks wasteful — and the
+  // enumeration it demands (every way a fault can arise and go unread) exists nowhere else;
+  // the second is the machine-load rule failing over the NAME of the tool rather than over
+  // forgetfulness, which the existing load entries do not reach. SHORTEN-BEFORE-RAISE was
+  // applied to both: drafted at 24 lines together, they land at 14, and each risk sits inside
+  // the four-line limit. The long telling stays in the retrospective. 682 -> 696.
+  // RAISED 18.09.2026 by the measured net of ONE genuinely new claim, FOLDED rather than given
+  // an entry of its own: automatic hygiene that clears away what a RUNNING job is in the middle
+  // of writing — here a doctor quarantine twice took the frames a picture run was drawing, with
+  // no error and no red, leaving a judgement made on half the material. It went into "Zwei Läufe
+  // gleichzeitig", whose subject is already the machine being disturbed under a run, and that
+  // entry's own sentence about the NAME was tightened to pay part of it, so the risk half stays
+  // inside its four lines. THE PRIOR ATTEMPT (facb68f3e) drafted it standalone at seven lines,
+  // hit this ceiling and DROPPED the lesson instead of folding it — dropping is not a review
+  // outcome the house rule offers, and the fingerprint it reverted is restored with this fold.
+  // Net: +2 lines / +18 words. 696 -> 698.
+  maxLines: 698,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -815,7 +846,30 @@ export const LIMITS = {
   // words after its tightening: 6464 -> 6527.
   // 15.09.2026, later: the three folded lesson classes justified beside maxLines measure 91
   // words: 6527 -> 6618.
-  maxWords: 6618,
+  // 15.09.2026, evening: the lost-agent-work half was folded INTO the long-run entry rather
+  // than added beside it, and paying for it out of that entry's own wording left the guide one
+  // word shorter than before — the ceiling follows it down: 6618 -> 6617.
+  // 15.09.2026, night: the question-read-as-an-order pitfall (§3.276) measures 62 words, and the
+  // four entries tightened to pay for it gave back 63 — the ceiling follows the measurement down
+  // by the difference: 6617 -> 6616.
+  // 16.09.2026: the claim-checked-against-nothing clause justified beside maxLines measures 24
+  // words after its fold — "name the list you looked in, and read it after the run, not in the
+  // middle of it". The long telling stays in the retrospective (§3.279): 6616 -> 6640.
+  // 17.09.2026: the pipe-exit-code lesson arrived as a six-line paragraph of its own and was
+  // FOLDED into the gate prompt that already forbids hiding a failure — "lies kein Ergebnis am
+  // Rückgabewert einer Pipe ab: beweise es am Ziel" — and two neighbouring entries were
+  // tightened while doing it, so the guide comes out one word shorter than the old ceiling and
+  // the ceiling follows it down: 6640 -> 6639.
+  // 17.09.2026: the receiver lesson folded into the probe entry (see maxLines) bought its words
+  // back inside that entry, and the guide lands one word under the old ceiling: 6639 -> 6638.
+  // RAISED 17.09.2026 by the same two new tips justified at maxLines (§3.283, §3.284). Measured
+  // as the audit counts them: 251 words as first drafted, 88 paid back by rewriting both entries
+  // down to the four-line risk limit, 163 the net raise. Nothing else was tightened for it — the
+  // neighbouring entries have been cut for three earlier raises already, and cutting a claim to
+  // buy a tip is the loosening this rule forbids. 6638 -> 6801.
+  // RAISED 18.09.2026 with the line ceiling above by the same fold — the running-job hygiene
+  // claim folded into "Zwei Läufe gleichzeitig". Measured net +18 words. 6801 -> 6819.
+  maxWords: 6819,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,

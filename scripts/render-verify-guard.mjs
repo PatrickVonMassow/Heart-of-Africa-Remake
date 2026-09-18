@@ -13,9 +13,9 @@
 // How the gate clears, mechanically:
 //   VERIFY_GL=webgpu node scripts/verify/run-all.mjs <suite>   # exit 0 recorded
 //   VERIFY_GL=webgl  node scripts/verify/run-all.mjs <suite>   # exit 0 recorded
-// A run only counts if it finished AFTER the last edit of any changed render
-// file (an earlier run cannot have seen the final code). When both backends are
-// covered the guard advances the verified baseline (clearedHead) by itself —
+// Coverage names a clean ancestor commit whose render files still match this
+// checkout, so a merge preserves proof and later render edits invalidate it.
+// When both backends are covered the guard advances the baseline by itself —
 // no manual ritual.
 //
 // A run counts as covering when it is CLEAN (exit 0) or ACCOUNTED FOR (point
@@ -38,7 +38,7 @@
 //   node scripts/render-verify-guard.mjs --incomplete "<backend>/<suite>" --evidence "<why>"
 //   node scripts/render-verify-guard.mjs --crashed "<backend>/<suite>" --evidence "<what the log shows>"
 import { readFileSync, statSync } from 'node:fs'
-import { execSync } from 'node:child_process'
+import { execFileSync, execSync } from 'node:child_process'
 import { resolve } from 'node:path'
 import {
   REPO_ROOT,
@@ -94,6 +94,59 @@ export function commitMissing(sha) {
     return /Not a valid object name|could not be found|bad file|unknown revision/i.test(
       String(e.stderr ?? e.message ?? e),
     )
+  }
+}
+
+/** Shared evidence is scoped to commits, never to the checkout that wrote it.
+ *  A merge preserves an ancestor's proof only while the render files are
+ *  unchanged. Commit timestamps cannot answer that: a merge can postdate a run
+ *  without changing its picture, or introduce a conflict resolution it never saw.
+ *  Legacy records remain visible for red accounting, but cannot prove coverage
+ *  without a commit. Unreadable Git evidence grants no coverage.
+ *
+ *  A DIRTY tree does not by itself disqualify a run, and must not: `dirty` is
+ *  what the recorder calls evidence and deliberately not a gate
+ *  (render-verify-recorder.mjs), and 42 of the 48 green runs in the live
+ *  window carry it — the owner's checkout holds the board and the work order
+ *  while the picture is judged. What the render diff cannot be fooled by is the
+ *  case that matters: a run whose OWN render edit was still uncommitted names
+ *  the commit before it, so committing that edit makes the difference visible
+ *  and the proof falls away. */
+export function coverageForHead(records, head, { cwd = REPO_ROOT } = {}) {
+  const ancestry = new Map()
+  const matching = new Map()
+  const gitRead = (args) => execFileSync('git', args, {
+    cwd, encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'], timeout: 8000,
+  }).trim()
+  const isAncestor = (sha) => {
+    if (typeof sha !== 'string' || !/^[a-f0-9]{7,64}$/i.test(sha)) return false
+    if (!ancestry.has(sha)) {
+      try {
+        gitRead(['merge-base', '--is-ancestor', sha, head])
+        ancestry.set(sha, true)
+      } catch {
+        ancestry.set(sha, false)
+      }
+    }
+    return ancestry.get(sha)
+  }
+  return {
+    runs: (Array.isArray(records) ? records : []).filter((r) => !r?.head || isAncestor(r.head)),
+    matchesTree(run) {
+      if (!isAncestor(run?.head)) return false
+      if (!matching.has(run.head)) {
+        try {
+          // Diff against the working tree too: staged and unstaged render edits
+          // must invalidate the proof even when HEAD itself is unchanged.
+          const changed = gitRead(['diff', '--name-only', run.head, '--']).split('\n')
+          const untracked = gitRead(['ls-files', '--others', '--exclude-standard']).split('\n')
+          matching.set(run.head, ![...changed, ...untracked].some(isRenderPath))
+        } catch {
+          matching.set(run.head, false)
+        }
+      }
+      return matching.get(run.head)
+    },
   }
 }
 
@@ -222,6 +275,7 @@ export function gatherRenderVerifyInputs({ sessionId = '', deps = {} } = {}) {
     baselineGone = commitMissing,
     workOrder = readTasksAll,
     guardDuty = gatherGuardDutyContext,
+    coverageOf = coverageForHead,
   } = deps
   // Hard singleton: a session that does not own the live batch lock stands down.
   if (heldByOther(sessionId)) {
@@ -276,6 +330,7 @@ export function gatherRenderVerifyInputs({ sessionId = '', deps = {} } = {}) {
   } catch {
     /* unreadable work order — nothing is chargeable */
   }
+  const coverage = coverageOf(state.runs, head)
   return {
     applicable: true,
     head,
@@ -288,7 +343,8 @@ export function gatherRenderVerifyInputs({ sessionId = '', deps = {} } = {}) {
       clearedHead: cleared,
       changedRenderPaths: paths,
       latestChangeAt: paths.length ? changeTimeOf(paths, head, base) : 0,
-      runs: state.runs,
+      runs: coverage.runs,
+      matchesTree: coverage.matchesTree,
       deferral: state.deferral,
       openPoints,
       // The signed-off broken RECORDINGS and CRASHES (point 734) — not
@@ -751,7 +807,8 @@ if (arg === 'status' || arg === '--status') {
     console.log(`pending render paths: ${paths.length ? paths.join(', ') : '(none)'}`)
     const since = paths.length ? latestChangeAt(paths, head, base) : 0
     const openPoints = chargeablePoints(readTasksAll())
-    const openRecords = unexplainedRuns(state.runs, since, {
+    const coverage = coverageForHead(state.runs, head)
+    const openRecords = unexplainedRuns(coverage.runs, since, {
       openPoints,
       incompleteClosures: state.incompleteClosures,
       crashClosures: state.crashClosures,
@@ -798,7 +855,7 @@ if (arg === 'status' || arg === '--status') {
       return 'outside the current window — owed, not blocking'
     }
     for (const b of BACKENDS) {
-      const run = coveringRun(state.runs, b, since, { openPoints })
+      const run = coveringRun(coverage.runs, b, since, { openPoints, matchesTree: coverage.matchesTree })
       const verdict = run ? runVerdict(run, { openPoints }) : null
       console.log(
         run

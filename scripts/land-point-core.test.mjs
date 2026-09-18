@@ -10,6 +10,7 @@ import { evaluateTasksArchive } from './tasks-archive-guard-core.mjs'
 import { evaluateCommitTrailers, POLICY_NEUTRAL } from './model-guard-core.mjs'
 import { openFingerprintOfTasks } from './board-currency-core.mjs'
 import {
+  closingRunRecords,
   AUDIT_TRIGGER_FILES,
   GATE_COMMANDS,
   LANDING_STEPS,
@@ -653,5 +654,73 @@ describe('the one summary', () => {
       { id: 'gate', verdict: VERDICT.notReached },
     ]
     expect(formatLandingVerdict({ number: 594, branch: 'b', results: partial }).join('\n')).toMatch(/INCOMPLETE/)
+  })
+})
+
+describe("the landed point's run records (point 1134)", () => {
+  const rec = (name, branch) => ({ name, record: { branch } })
+
+  it('carries the records whose own branch field names the landed branch', () => {
+    const entries = [
+      rec('2026-09-18T01-00-00-000-polish.log.run.json', 'feat/1134-bundle-gate'),
+      rec('2026-09-18T02-00-00-000-docs.log.run.json', 'feat/1134-bundle-gate'),
+      rec('2026-09-17T09-00-00-000-world.log.run.json', 'main'),
+    ]
+    expect(closingRunRecords({ entries, branch: 'feat/1134-bundle-gate' })).toEqual([
+      '2026-09-18T01-00-00-000-polish.log.run.json',
+      '2026-09-18T02-00-00-000-docs.log.run.json',
+    ])
+  })
+
+  it('takes only run records — a log or a progress file is not one', () => {
+    const entries = [
+      { name: '2026-09-18T01-00-00-000-polish.log', record: { branch: 'b' } },
+      { name: '2026-09-18T01-00-00-000-polish.log.progress', record: { branch: 'b' } },
+      rec('2026-09-18T01-00-00-000-polish.log.run.json', 'b'),
+    ]
+    expect(closingRunRecords({ entries, branch: 'b' })).toEqual(['2026-09-18T01-00-00-000-polish.log.run.json'])
+  })
+
+  it('skips a name the destination already holds rather than overwriting it', () => {
+    // The stamped names are unique per run, so a collision means the record is
+    // already carried — and a re-copy could only replace a complete record with
+    // a truncated one.
+    const entries = [rec('a.log.run.json', 'b'), rec('c.log.run.json', 'b')]
+    expect(closingRunRecords({ entries, branch: 'b', existing: ['a.log.run.json'] })).toEqual(['c.log.run.json'])
+  })
+
+  it('carries nothing it cannot attribute, and never throws', () => {
+    expect(closingRunRecords({ entries: [{ name: 'x.log.run.json', record: null }], branch: 'b' })).toEqual([])
+    expect(closingRunRecords({ entries: [rec('x.log.run.json', 'b')], branch: '' })).toEqual([])
+    expect(closingRunRecords({})).toEqual([])
+    expect(closingRunRecords({ entries: null, branch: 'b' })).toEqual([])
+  })
+
+  it('does not throw on a record whose own fields refuse to become strings', () => {
+    // `String(value)` is NOT total, and this runs after git has already merged:
+    // an exception here would report a failed merge over a completed one
+    // (Astra, four-eyes pass 1/3). Both of these throw under `String(…)`.
+    const hostile = Object.create(null)
+    hostile.toString = null
+    expect(() =>
+      closingRunRecords({
+        entries: [
+          { name: hostile, record: { branch: 'b' } },
+          { name: 'x.log.run.json', record: { branch: hostile } },
+          { name: 'y.log.run.json', record: { branch: 'b' } },
+        ],
+        branch: 'b',
+        existing: [hostile],
+      }),
+    ).not.toThrow()
+    expect(
+      closingRunRecords({
+        entries: [
+          { name: 'x.log.run.json', record: { branch: hostile } },
+          { name: 'y.log.run.json', record: { branch: 'b' } },
+        ],
+        branch: 'b',
+      }),
+    ).toEqual(['y.log.run.json'])
   })
 })

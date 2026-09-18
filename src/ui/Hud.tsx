@@ -2,7 +2,7 @@
 // dialogs, start/victory overlays and the debug menu. All player-visible
 // text comes from the language files (design.md §17 localization).
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import { healthState, listCheckpoints, canCampHere, useGame, type EquipmentId } from '../state/store'
 import { TREASURE_IDS } from '../systems/economy'
 import type { FindId } from '../world/finds'
@@ -21,7 +21,7 @@ import { MapOverlay } from './MapOverlay'
 import { StateDump } from './StateDump'
 import { BenchmarkOverlay } from './BenchmarkOverlay'
 import { TouchControls } from './TouchControls'
-import { dispatchSyntheticKey, onKeyPress, onTouchEngage } from '../systems/input'
+import { dispatchSyntheticKey, keyPressSource, onKeyPress, onTouchEngage } from '../systems/input'
 import { benchmarkFromUrl, startBenchmarkSafely } from '../systems/startBenchmark'
 import { getStrings, useStrings } from '../i18n'
 import { UNSTUCK_KEY_CODE, UNSTUCK_KEY_LABEL } from '../systems/unstuck'
@@ -81,8 +81,6 @@ function InventoryBar() {
     }
   }, [itemCount])
 
-  if (itemCount === 0) return null
-
   // Medicine and shovel are used by clicking them on the spot (design.md §17);
   // the rest act by mere possession (rifle/rope/machete/canoe) or show a
   // reading (canteen fill), so they are passive labels, not buttons. (The map
@@ -114,76 +112,111 @@ function InventoryBar() {
     canteenFill <= 0 ? ' canteen-empty' : canteenFill < 0.05 ? ' canteen-crit' : canteenFill < 1 / 3 ? ' canteen-low' : ''
   const canteenBlink = canteenFill < 1 / 3 ? ' canteen-blink' : ''
 
+  // One list defines display order and actions for both clicks and number keys.
+  const slots: {
+    id: string
+    label: string
+    title: string
+    className?: string
+    equipment?: EquipmentId
+    form?: string
+    find?: FindId
+    activate?: () => void
+  }[] = [
+    ...owned.map((e) => ({
+      id: e,
+      equipment: e,
+      label: e === 'canteen' ? `${t.equipment.canteen} ${canteenPct}%`
+        : e === 'medicine' ? `${t.equipment.medicine} (${equipment.medicine})` : t.equipment[e],
+      title: e === 'canteen' ? t.hud.canteenTooltip : clickable(e) ? t.hud.useTooltip : t.hud.passiveTooltip,
+      className: e === 'canteen' ? `canteen${canteenGlow}${canteenBlink}` : active.has(e) ? 'inv-active' : '',
+      activate: clickable(e) ? () => activateItem(e) : undefined,
+    })),
+    ...ownedForms.map((id) => ({
+      id, form: id, label: t.forms[id],
+      title: mode === 'travel' ? t.hud.useTooltip : t.hud.passiveTooltip,
+      activate: mode === 'travel' ? () => useGame.getState().useCarriedForm() : undefined,
+    })),
+    ...ownedFinds.map((id) => ({
+      id, find: id, label: t.finds[id], title: t.hud.findTooltip,
+      activate: () => useGame.getState().handArtefactToChief(),
+    })),
+    ...ownedTreasures.map((id) => ({
+      id, label: `${t.treasures[id]} (${treasures[id]})`, title: t.hud.presentTooltip,
+      activate: () => useGame.getState().presentValuable(id),
+    })),
+  ]
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const inventoryBlocked = () => useUi.getState().dialog !== null || document.querySelector('.overlay') !== null
+  const activateSlot = useEffectEvent((index: number, e: KeyboardEvent) => {
+    if (e.repeat || inventoryBlocked()) return
+    slots[index]?.activate?.()
+  })
+  const selectSlot = useEffectEvent((direction: number, e: KeyboardEvent) => {
+    if (keyPressSource(e) !== 'gamepad' || inventoryBlocked() || slots.length === 0) return
+    setSelectedId((id) => {
+      const index = slots.findIndex((slot) => slot.id === id)
+      const next = index < 0 ? (direction > 0 ? 0 : slots.length - 1)
+        : (index + direction + slots.length) % slots.length
+      return slots[next].id
+    })
+  })
+  useEffect(() => {
+    // Effect events read the current localized slots without rebinding on movement.
+    const offDigits = Array.from({ length: 9 }, (_, i) => onKeyPress(`Digit${i + 1}`, (e) => {
+      activateSlot(i, e)
+    }, { exactModifiers: {} }))
+    const offLeft = onKeyPress('ArrowLeft', (e) => selectSlot(-1, e))
+    const offRight = onKeyPress('ArrowRight', (e) => selectSlot(1, e))
+    return () => {
+      offDigits.forEach((off) => off())
+      offLeft()
+      offRight()
+    }
+  }, [])
+
+  if (itemCount === 0) return null
   return (
     <div className="inventory-bar" ref={barRef}>
-      {owned.map((e) => {
-        const activeCls = active.has(e) ? ' inv-active' : ''
-        if (e === 'canteen') {
-          return (
-            <span key={e} data-eq={e} className={`inv-item canteen${canteenGlow}${canteenBlink}`} title={t.hud.canteenTooltip}>
-              {t.equipment.canteen} {canteenPct}%
-            </span>
-          )
+      {slots.map((slot, i) => {
+        const props = {
+          'data-eq': slot.equipment,
+          'data-form': slot.form,
+          'data-find': slot.find,
+          className: `${slot.activate ? '' : 'inv-item '}${slot.className ?? ''}${slot.id === selectedId ? ' inv-selected' : ''}`.trim(),
+          title: slot.title,
         }
-        if (clickable(e)) {
-          const label = e === 'medicine' ? `${t.equipment.medicine} (${equipment.medicine})` : t.equipment[e]
-          return (
-            <button key={e} data-eq={e} className={activeCls.trim()} onClick={() => activateItem(e)} title={t.hud.useTooltip}>
-              {label}
-            </button>
-          )
-        }
-        // Passive gear: its effect follows possession (design.md §11/§14).
-        return (
-          <span key={e} data-eq={e} className={`inv-item${activeCls}`} title={t.hud.passiveTooltip}>
-            {t.equipment[e]}
-          </span>
-        )
+        const content = <>{i < 9 && <span className="inv-digit" aria-hidden="true">{i + 1}</span>}{slot.label}</>
+        return slot.activate
+          ? <button key={slot.id} {...props} onClick={slot.activate}>{content}</button>
+          : <span key={slot.id} {...props}>{content}</span>
       })}
-      {/* A form is pressed against the place it might fit — the same act as
-          digging with the shovel, and out on the map only. */}
-      {ownedForms.map((id) =>
-        mode === 'travel' ? (
-          <button
-            key={id}
-            data-form={id}
-            onClick={() => useGame.getState().useCarriedForm()}
-            title={t.hud.useTooltip}
-          >
-            {t.forms[id]}
-          </button>
-        ) : (
-          <span key={id} data-form={id} className="inv-item" title={t.hud.passiveTooltip}>
-            {t.forms[id]}
-          </span>
-        ),
-      )}
-      {/* A quest find is HANDED OVER by being used: the click lays it in the
-          chief's hands where he stands before the traveller (design.md §6).
-          OPEN: the point asks the find to carry "a Ctrl-hold label like every
-          other acting thing". The §17.8 hold layer names what is DRAWN in the
-          scene and has no HUD counterpart, and the bar already prints the
-          find's own name — so what it carries here is its acting tooltip. A
-          hold layer over the HUD would be a mechanism of its own and needs its
-          own point. */}
-      {ownedFinds.map((id) => (
-        <button
-          key={id}
-          data-find={id}
-          onClick={() => useGame.getState().handArtefactToChief()}
-          title={t.hud.findTooltip}
-        >
-          {t.finds[id]}
-        </button>
-      ))}
-      {/* Presenting a valuable to a village provokes the §8 reaction. */}
-      {ownedTreasures.map((id) => (
-        <button key={id} onClick={() => useGame.getState().presentValuable(id)} title={t.hud.presentTooltip}>
-          {t.treasures[id]} ({treasures[id]})
-        </button>
-      ))}
     </div>
   )
+}
+
+function CursorModeHint() {
+  const t = useStrings()
+  const mode = useGame((s) => s.mode)
+  const touchActive = useUi((s) => s.touchActive)
+  const [locked, setLocked] = useState(() => document.pointerLockElement != null)
+  useEffect(() => {
+    const sync = () => setLocked(document.pointerLockElement != null)
+    document.addEventListener('pointerlockchange', sync)
+    sync()
+    return () => document.removeEventListener('pointerlockchange', sync)
+  }, [])
+  // Match the settlement's deliberate skip of the OS lock under automation, and
+  // stay silent on touch, where there is no cursor to take and "click the view"
+  // names nothing the player has (§17.5 drives the settlement by the overlay).
+  // OPEN: hiding it under automation — which design.md §21/the point both ask
+  // for, since the lock never engages there and every settlement frame would
+  // otherwise gain a permanent "click the view" pill — leaves this hint with no
+  // picture evidence on either backend. Its placement is judged by CSS reading.
+  if (mode !== 'place' || navigator.webdriver || touchActive) return null
+  return <div className={`cursor-mode-hint${locked ? ' cursor-mode-locked' : ''}`}>
+    {locked ? t.hud.cursorModeLocked : t.hud.cursorModeUnlocked}
+  </div>
 }
 
 function Toast() {
@@ -545,9 +578,8 @@ export function Hud() {
       // Silent at the window's edge: nothing moved, so say nothing.
       if (g.day !== before) useGame.getState().setToast(st.formatDateShort(g.day, START_YEAR))
     }
-    // The calendar row keeps its chords with the BROWSER (work-order 601: the
-    // keyboard zoom and the tab jumps), so these handlers must ignore a
-    // modified press — otherwise Ctrl+3 switches the tab AND jumps to March.
+    // Browser zoom/tab chords stay with the browser; plain digits use inventory.
+    // The complete debug month row requires Shift alone.
     const calendarKey = { ignoreModified: true }
     const offYears = [
       onKeyPress('BracketRight', () => jumpYear(1), calendarKey),
@@ -560,7 +592,7 @@ export function Hud() {
         useGame.getState().debugJumpToMonth(i + 1)
         const s = getStrings()
         useGame.getState().setToast(`${s.months[i]} ${s.formatDateShort(useGame.getState().day, START_YEAR).slice(6)}`)
-      }, calendarKey),
+      }, { exactModifiers: { shiftKey: true } }),
     )
     const offEsc = onKeyPress('Escape', () => {
       // A running benchmark comes first: Esc aborts it and the runner restores
@@ -618,6 +650,7 @@ export function Hud() {
       <FpsCounter />
       {/* Health bar top-right, below the status bar, at the FPS-counter height. */}
       <InventoryBar />
+      <CursorModeHint />
       {/* Bottom-right: camp (only where allowed), map and journal buttons. */}
       <div className="hud-bottom-right">
         {showCamp && (

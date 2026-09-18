@@ -45,7 +45,7 @@ async function report(argv, section = '', { suiteSource = 'no sections here', cu
 it('carries the runner context all the way to each printed regression claim', async () => {
   const result = await report(['--failed', 'jar', '--current-context', 'in-pass'])
   expect(result.runs).toHaveLength(1)
-  expect(result.text).toContain('REAL REGRESSION (green on baseline, red now) — NOT LIKE-FOR-LIKE (baseline standalone, candidate in-pass; causation unproven)')
+  expect(result.text).toContain('SUSPECT — green on baseline, red now; UNCONFIRMED (settle it with three narrow --section rungs on a quiet machine, not another full pass) — NOT LIKE-FOR-LIKE (baseline standalone, candidate in-pass; causation unproven)')
 })
 
 it.each([['--failed', 'jar'], ['--current-out', '/logs/large.log']])('keeps supplied failures of unknown context qualified: %j', async (...argv) => {
@@ -59,7 +59,7 @@ it.each(['', 'adult-errands'])('uses matching context when it actually runs both
   expect(result.runs).toHaveLength(2)
   const context = section ? 'standalone section "adult-errands"' : 'standalone'
   expect(result.text).toContain(`baseline ${context}, candidate ${context}`)
-  expect(result.text).toContain('REAL REGRESSION (green on baseline, red now)')
+  expect(result.text).toContain('SUSPECT — green on baseline, red now; UNCONFIRMED (settle it with three narrow --section rungs on a quiet machine, not another full pass)')
   expect(result.text).not.toContain('causation unproven')
 })
 

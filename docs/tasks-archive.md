@@ -29022,3 +29022,578 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Criticality: medium — this is the PoC's one solvable puzzle, and today it can solve itself
   under a key the player pressed to enter a village.
   Bundle: Kommunikation.
+
+- [x] 1075. A unit test measures a file OUTSIDE the repository, so writing a memory reddens
+  `main` and blocks every push (measured 07.09.2026, 22:24, on a quiet machine).
+  WHAT HAPPENS. `scripts/cut-account-core.test.mjs:677-684` reads the live
+  `~/.claude/projects/-workspace-hoa/memory/MEMORY.md` (and the two `CLAUDE.md` files) and
+  asserts that the ceilings table of `docs/document-cut-757.md` quotes their CURRENT line and
+  word counts. MEMORY.md is not in the repository and is rewritten whenever any session saves,
+  edits or deletes a memory. This evening the table said "765 words" and the tokenizer reported
+  764: `Tests 1 failed | 56 passed`, reproduced standalone in 1.14 s at load 5.8, so it is not
+  a load artefact.
+  WHAT IT COSTS. The pre-push gate runs the unit suite for every push to `main`, so from the
+  moment a memory is written NO push to main succeeds until somebody edits that table by hand.
+  Tonight it stopped six commits, and the gate's honest retry-under-load rule paid for the full
+  suite twice before saying so. Nothing warns anybody: the memory write and the red are in
+  different files, on different days, in different sessions.
+  FINAL STATE — the test stops measuring the environment, and the choice is named in the commit:
+  either the assertion drops the two files it does not own and keeps only what the repository
+  contains, or the counts are read from a snapshot the repository DOES own and the ceilings
+  table is regenerated from it by the same command that writes it. What must not survive is a
+  hand-maintained number in a document that tracks a file outside the checkout.
+  VERIFIABLE: pure Vitest — writing, changing and deleting a memory leaves the suite green, and
+  a real ceilings breach still reds. `npx vitest run scripts/cut-account-core.test.mjs` green
+  before and after a memory write.
+  QUEUE RANK: BEFORE the release (machine-filed, urgency stated as rule 1d requires): it blocks
+  every push to `main` and therefore every landing, and the blockade returns on its own the next
+  time any session writes a memory.
+  Criticality: high, frequency HIGH — no correctness of the game is touched, but the batch
+  cannot deliver anything while it holds, and it re-arms itself.
+  Refs: scripts/cut-account-core.test.mjs (the ceilings block), docs/document-cut-757.md (the
+  table), scripts/pre-push-gate.mjs (the caller that turns it into a blockade), guide pitfall
+  "Test und Wächter hingen an ihrer Umgebung, nicht am Verhalten".
+  Bundle: Testinfrastruktur — it edits `scripts/cut-account-core.test.mjs` and the cut document,
+  which no other open point of this bundle writes, so it may run beside any of them.
+
+- [x] 1131. Nobody in the village fetches water, and the two standing at the water place just
+  stand there (user 15.09.2026, two reports, ranked here directly behind his previous
+  front-order 1124).
+  The reports, verbatim: "Neuer Bugreport \"KeinWasserholen.zip\" unter Backup in local" and,
+  as his addendum: "WasserstelleGefundenKeinerHolt.zip - die Stelle habe ich gefunden (war die
+  vorher auch schon da?), aber die zwei stehen da nur und holen kein Wasser."
+  THE EVIDENCE IS IN THE REPOSITORY: `local/KeinWasserholen.zip` and
+  `local/WasserstelleGefundenKeinerHolt.zip` (copied from the backup 15.09.2026, 16:26; the
+  folder is ignored, so they travel with the checkout and not with git).
+  NOT YET MEASURED — that is this point's first act: read both dumps, name the settlement and
+  seed, and say whether the water errand is never dispatched, dispatched and never walked, or
+  walked and never reported. The water errand and its hold rules are the subject of the
+  decisions already standing on the board ("Ein gestautes Wort darf seine Aufgabe nicht
+  überleben"), so check whether a hold or a task expiry swallows the errand before blaming the
+  dispatcher.
+  TWO MEASUREMENTS ALREADY ON RECORD point at this exact spot and belong in the first reading.
+  `docs/backlog.md` "Das Wasserpaar findet im ersten Anlauf nicht zusammen" (14.09.2026): the
+  WebGL 2 run of `polish --section=adult-errands` was red on its first attempt with "no carrier
+  reached the fill phase in 180 s" and "[ASSERT] adult-pair-never-met — water-back: villager 1
+  expired still on his way to the walk word; the pair never assembled" — that is the user's
+  picture exactly, and an EXPIRY, which is why the hold/expiry check above comes before the
+  dispatcher. `docs/backlog.md` "Wasserholen der Erwachsenen ist ein Kreislauf ohne Ziel"
+  (07.09.2026) holds the second half: the full jar is cast out of nothing and `water-out` ends at
+  the water without ever returning full.
+  ALSO ANSWER HIS QUESTION in the closing report — was the water place there before? — from the
+  history of the settlement layout, not from memory.
+  Criticality: medium — the village reads as inhabited only while its people do their work, and
+  §7.1 criterion 15 (lively settlements) is measured on exactly this.
+  Bundle: Dorfleben.
+
+- [x] 1137. The picture gate is unusable: a suite never gets past the dev server.
+  Bundle: Testinfrastruktur — it rewrites nothing of the game, only the harness.
+  Criticality: high. BLOCKING CONDITION: it blocks the release and every lane that touches a
+  render path — `render-verify-guard` demands a covering run that currently cannot be produced
+  at all, so the poc publication of the current `main` and each render point stand still
+  behind it.
+  MEASURED 15./16.09.2026 on `main` d02cce8: two independent `polish` runs on WebGPU both stop
+  immediately after the line `# starting dev server` and never write a single section line.
+  The first (by hand, `scripts/verify/run-all.mjs`, pid 4167627) still stood there after 3 min
+  with 11 live Chrome processes and port 34197 listening. The second, through the wrapper
+  (`scripts/verify/run-logged.mjs polish`, log
+  `local/verify-logs/2026-09-15T21-55-42-681-polish.log`), was classed HUNG by `run-wait` after
+  17m 28s — past 2.5x the 5m 41s expectation — and was ended. The GPU preflight PASSES in both
+  runs (WebGL 2 and WebGPU ready, ANGLE/D3D12 on an RTX 4070 Ti) and the machine was quiet
+  (load 0.30, 11 GB free), so neither the host nor the GPU explains it.
+  NOT YET SEPARATED: whether it hangs for every suite or only `polish`, whether WebGL 2 shows
+  the same picture, and whether the dev server answers a plain request while it hangs. Start
+  there — one narrow section (`npm test -- polish --section=list`, then a single section) says
+  more in two minutes than another full pass.
+  FINAL STATE: a covering picture run completes again on both backends, or the blockade is
+  understood and named. As long as it stands, no render point can close.
+
+- [x] 1138. The adults are wedged: a villager whose escape search finds nothing keeps standing
+  where it is (user 16.09.2026, verbatim: "Außerdem: Neuer Bugreport unter
+  C:\Users\Patri\Documents\Developing\hoa\local (über backup zugreifbar).", report title "Die
+  Erwachsenen sind eingeklemmt"). It stands directly BEHIND 1137 and at the front of everything
+  else: the village it happens in is the one that carries the communication mechanic, and adults
+  that do not move do not teach — but its own proof is a picture, and 1137 owns whether a
+  picture run can be produced at all.
+  THE EVIDENCE IS IN THE REPOSITORY: `local/ErwachseneEingeklemmt.zip`, unpacked beside it
+  (copied from the backup 16.09.2026, 10:16; the folder is ignored, so it travels with the
+  checkout and not with git). Taken on production build 13ad4a7 — the current `main` — on
+  WebGPU, seed 3321422240, `bambara-village`, day 34.13, viewport 2752x1152 @dpr 1.25.
+  WHAT THE PICTURE SHOWS: two adult figures (one red, one purple) pressed into the corner
+  between a dwelling's outer wall and a fence panel, close enough that their bodies overlap the
+  fence; a third head sits at the hut wall with no body in front of it. The child at the fire is
+  unaffected. The overlay holds only HUD, and the wildlife section reads "0 animals" because the
+  report was taken inside a village — so the archive says nothing about the wedged adults
+  themselves. That is the SECOND stuck-inhabitant report that can only be answered by re-running
+  the seed; point 680 is what would end that, and this point is its second measured reason.
+  CAUSE ALREADY READ OUT OF THE CODE — measure it, do not trust it. Both village steppers in
+  `src/scenes/place/PlaceLife.tsx` escape a wedge by `tryNudgeToFree`, and both treat a FAILED
+  search as "give the errand up":
+  - `Walkers` (:2408-2427) tries the ring search, WIDENS it once to `maxRings=24`, and only then
+    advances the waypoint.
+  - `ErrandVillagers` (:2828-2844) tries it ONCE at the default ring count and, when nothing is
+    found, clears the task or the target — and LEAVES THE BODY WHERE IT IS.
+  A new target does not free a body that is physically enclosed: the next frame walks it at a
+  wall, `resolveMove` slides it nowhere, the stuck timer refills, the search fails again. The
+  comment at :2826-2827 says the escape exists so that no villager "stand[s] pressed against a
+  wall for ever", and that is exactly the state it leaves behind. `tryNudgeToFree` demands BOTH
+  `standingClear` and `hasEscapeDirection` (`src/scenes/place/collision.ts:270-307`), so a pocket
+  between a hut and a fence run is rejected rather than escaped from.
+  SECOND SUSPECT ON THE SAME PICTURE: `Walkers` does not path-plan. `ErrandVillagers` builds a
+  nav grid from the same colliders and routes around geometry (:2577-2580, :2777-2795); `Walkers`
+  walks straight at its waypoint and owns nothing but collider sliding and the 1.4 s waypoint
+  skip (:2393-2401). A hut or a fence run standing between the door and the errand point is the
+  case that produces the pocket in the first place.
+  FINAL STATE: no inhabitant remains within epsilon of its position past a bounded window. A
+  failed escape search ESCALATES — widen, then place the body on the nearest cell the nav grid
+  already knows to be free, then, as the last rung, back to its own hut door — instead of
+  clearing a target and leaving the body pinned. The two steppers answer a wedge the same way;
+  the asymmetry between them is deleted, not documented.
+  VERIFIABLE: Vitest over the pure escape decision — a body enclosed so that no ring is free
+  yields a placement rather than a cleared target, and the widened rung is reached. Plus the
+  `polish` village section photographing the reported corner on both backends at the reported
+  seed, with the adults moving between two shutters.
+  Criticality: high — player-visible on the current `main`, in the village §7.1 criterion 15 is
+  measured on, and reported by the user from a real session.
+  Bundle: Dorfleben — it edits the two steppers in `PlaceLife.tsx` and the escape in
+  `collision.ts`, the same place-scene paths 1080, 1081, 1082 and 1125 reach, so it is worked
+  before them and never beside them.
+
+- [x] 1139. Placing a guess moves from Space to E: the use key and the guess key no longer
+  compete (user 16.09.2026, verbatim: "SPACE sowohl zum Ablegen einer Vermutung bzgl. des
+  gesagten Worts, als auch zum Benutzen (z. B. bei der Häuptlings-Hütte) stehen manchmal im
+  Konflikt zueinander. Wie viel Aufwand ist es, das Ablegen einer Vermutung auf E umzulegen
+  (soll dann in der GUI auch so angezeigt werden)?" and "Reihe das mit SPACE und E hinter 1138
+  ein."). It stands directly behind 1138.
+  WHY IT COLLIDES TODAY: design.md §21 makes everything Space can mean ONE candidate list, and
+  the nearest in reach wins. A spoken word's label is a candidate beside the chief's hut and the
+  enterable buildings, so at the chief's hut the word wins the key from the hut, or the hut
+  from the word, by a step's distance.
+  FINAL STATE: Space uses (enter a building, call the chief); E places a guess for the targeted
+  word. The one Space handler in the place scene (`src/scenes/place/PlaceScene.tsx`, the
+  `onKeyPress('Space', …)` effect) becomes two handlers over the same candidate list filtered by
+  key: Space takes the `interactive` and `chief` payloads, E takes the `label` payloads. The
+  per-frame highlight and prompt follow the same split, so the hut's "Space" prompt and the
+  word's "E" invite can stand at once. The invite text (`speechGuess.invite`, en and de) names
+  E; design.md §21 and §13.4 state the two keys and drop the one-list rule for the guess;
+  `KeyE` joins `GAME_KEY_CODES` in `src/systems/keyboardGuard.ts`. GAMEPAD: button A keeps
+  BOTH meanings for now (the §17.5 map has no free face button; recommendation of 16.09.2026,
+  calibratable) — the arbitration between hut and word therefore stays on the pad only, and
+  design.md §17.5 says so in one sentence.
+  VERIFIABLE: Vitest over the key split — a word label and the chief's hut both in reach: Space
+  calls the chief and never opens the guess, E opens the guess and never calls the chief; the
+  localization parity test covers the new invite in both languages. Plus the existing browser
+  checks that press Space to open a guess move to E and stay green on WebGPU.
+  Criticality: medium — player-visible in the village the communication mechanic lives in;
+  a wrong split would silence the guess, so the Vitest pair is the gate.
+  Bundle: Steuerung & Performance — it edits the place scene's key handling and the
+  keyboard-guard key list, which no other open point touches.
+
+- [x] 1045. The puzzle village has no straight walk to the water in a third of its seeds, so
+  it teaches no RIVER at all (measured 02.09.2026 while answering the cross-vendor findings of
+  point 688; the share re-measured 16.09.2026 over 124 seeds).
+  Point 688 fits the village water path by sweeping its head until the straight walk to
+  the water clears the settlement's fabric as it is DRAWN — dwellings at their true shape,
+  boxes at their corners, the compound fence panels, the pen, the play rocks, the props.
+  A village that can give no such walk gives NO water path, which is the point's own rule:
+  a track drawn through a wall teaches the wrong thing, and no teaching beats a wrong one.
+  Measured at `abf2faf49` over nine villages at six seeds, two layouts pay that price —
+  bambara-village at seeds 7 and 1337 — and there both water situations are simply absent:
+  no jar goes down, no jar comes back, and the word RIVER is never taught in that village.
+  BOTH OF THEM ARE THE PUZZLE VILLAGE, and the seed is the axis, not the village (measured
+  10.09.2026 on the user's question): the slice is bound to bambara-village
+  (`communicationRock.ts` ~21 `ROCK_VILLAGE_ID`, `store.ts` ~632 `DRUM_MESSAGE_VILLAGE`) and
+  the world seed is DRAWN at every start (`store.ts` ~618, `?seed=` is a dev switch alone).
+  So this is not a village the player never sees — it is a THIRD of all drawn seeds in which
+  the village that must teach RIVER never teaches it, before a drum message built on that word.
+  THE SHARE IS MEASURED, and it is far worse than the six swept seeds said (16.09.2026, from
+  the user's report `local/WiederKeinWasserholen.zip`, build f7a866e, seed 2987912600, replayed
+  with `buildLayout('bambara-village', 2987912600)`: `waterPath` null, `waterStand` null — no
+  adult fetches water and no jar stand stands beside the fire). A 124-seed sweep (7, 1337, both
+  reported seeds and 120 pseudo-random) gives 41 of 124 Bambara layouts with no water path:
+  ~33 %. The 1131 fix touched the arrival radius and the body avoidance, never the layout,
+  which is why the stand the user saw at an earlier seed is gone at this one. The same sweep
+  fired `devAssert` way-out-missing once (the built fabric leaves no free crossing of the
+  boundary) — recorded here, not diagnosed.
+  This point's earlier claim that the slice's village "is NOT among them" held for the
+  suites' fixed seeds only and is withdrawn. `layout.test.ts` names the two, so a third one
+  appearing goes red.
+  Final state:
+  - Every river village carries a water path, and none of them draws it through a wall.
+  - One of the two ways is taken and written down: either the track may BEND once at the
+    gap between two compounds (it is a worn footpath, not a surveyed road), or the
+    compound builder opens a GATE where the lane crosses its ring, the way a real
+    compound has one.
+  - The named-exception list in `layout.test.ts` is deleted with the cause.
+  Test: Vitest over the layout — every river village at every swept seed carries a water
+  path whose whole run clears the FULL collider set at the drawn lane's half-width, with
+  no exception list. Picture check on both backends: the track where it passes a compound.
+  Criticality: high — it costs one of the two adult words entirely, in the village the
+  player IS given, in about a THIRD of all drawn seeds (raised from medium on 10.09.2026;
+  the share measured 16.09.2026 over 124 seeds, see above).
+  QUEUE: FIRST. User order 16.09.2026 20:24, verbatim: "Ziehe 1045 vor." — moved to the head
+  of the work order on 16.09.2026, while point 1139 stood in its closing verification.
+  Refs: src/scenes/place/layout.ts (the `clearRun` sweep and the head ladder),
+  src/scenes/place/layout.test.ts (`NO_STRAIGHT_WALK`)
+  READ THE COMMENT AT THE FAILING BRANCH FIRST, it contradicts itself (found 16.09.2026 while
+  preparing this point): above the `if (!head)` arm layout.ts still claims "Nothing shipped
+  reaches this — `layout.test.ts` sweeps every river village at every seed and finds a head for
+  each", and the very next lines name the layouts that DO reach it. The first sentence is stale
+  and goes with the fix; a reader who trusts it looks for the defect somewhere else entirely.
+  Author lane: astra.
+  Why the lane: the communication mechanic is authored by Astra (user 08.09.2026); the
+  rendered picture, the browser suites and the landing stay in the main session.
+  Bundle: Dorfleben.
+
+- [x] 1140. The settlement's cursor mode stops trapping the player: inventory by number keys,
+  the lock back after every dialog, and the mode named on screen (user 16.09.2026, verbatim:
+  "Die Inventar-Gegenstände lassen sich nur aufrufen, wenn man einen Cursor hat. Das ist nur
+  der Fall, wenn der Fokus von der Steuerung weg ist - erreichbar über ESC, oder manchmal
+  automatisch, z. B: wenn man in der Market Hut etwas kauft. Danach geht er auch nicht
+  automatisch auf die Steuerung der Spielfigur zurück. Weder das Wechseln vom Fokus auf den
+  Cursor-Modus noch das Zurückwechseln in den Modus zur Steuerung der Spielfigur ist
+  intuitiv." and "Setze deine Vorschläge zum Fokus um. Reihe das nach 1138 ein."). It stands
+  behind 1138 and 1139.
+  WHY IT HAPPENS TODAY: the first-person view holds the pointer for mouse-look
+  (`src/scenes/place/pointerLock.ts`, design.md §21). A modal dialog releases it; only the
+  closing of the `speechGuess` dialog grabs it back (the `useUi.subscribe` in the pointer-lock
+  effect of `src/scenes/place/PlaceScene.tsx`). After `trade`, `bazaar`, `agency`, `camp` and
+  `drumMessage` the cursor stays free, and nothing on screen says which mode the player is in.
+  The inventory bar (`InventoryBar` in `src/ui/Hud.tsx`) is click-only, so using an item
+  FORCES the mode change. Outside settlements there is no lock, so the problem does not arise.
+  FINAL STATE, three parts that belong together:
+  1. INVENTORY BY KEY: Digit1–Digit9 trigger the first nine slots of the inventory bar in
+     both views, each slot shows its digit small in a corner, and the digits join
+     `GAME_KEY_CODES` in `src/systems/keyboardGuard.ts`; the gamepad reaches the slots by the
+     d-pad (left/right selects, the selected slot is highlighted, A does NOT use it — A stays
+     the use key). A slot that has no item ignores its key.
+     THE NUMBER ROW IS OCCUPIED TODAY and is freed in the same commit: the whole row
+     (Digit1–Digit0, Minus, Equal) jumps the debug calendar by month
+     (`MONTH_KEYS` in `src/systems/season.ts`, registered `ignoreModified` in
+     `src/ui/Hud.tsx` because point 601 handed Ctrl+row back to the browser). The plain digits
+     belong to the player-facing inventory; the debug months move AS A WHOLE ROW to Shift+row
+     (decision 16.09.2026: Shift is bound by no browser and no OS on any platform, while the
+     user-proposed Alt+row is Firefox/Linux tab switching, ChromeOS shelf launching and a
+     Mod1+digit binding in several Linux window managers). The month registration therefore
+     needs an exact-modifier option instead of `ignoreModified`, `design.md` §21.1 states the
+     chord, and the point-601 HUD tests move with it. Shift stays selectable as the label
+     modifier (`src/ui/ctrlHold.ts`); holding it names labels and does not swallow digits.
+  2. THE LOCK COMES BACK AFTER EVERY DIALOG: the `speechGuess` rule in the pointer-lock effect
+     applies to every dialog kind — the closing click carries the user activation the request
+     needs. Where the browser refuses (Chrome holds the lock back for about a second after an
+     Escape release), the deliberate click on the view remains the fallback, as today.
+  3. THE MODE IS NAMED: while the settlement view is NOT pointer-locked, a small HUD hint says
+     "Click the view to steer" (de: "Klick ins Bild: Steuerung"); while it IS locked, a
+     fainter hint says "Esc: cursor" (de: "Esc: Mauszeiger"). Both come from the language
+     files, both languages together, and both hide under browser automation exactly as the
+     lock itself is skipped there.
+  Not part of this point: rebinding Escape, which the browser itself uses to release the lock.
+  VERIFIABLE: Vitest (jsdom) over the HUD — a Digit key uses the matching slot and an empty
+  slot ignores it; the pointer-lock decision counter (`pointerLockProbe.grabs`) rises once for
+  every dialog kind that closes, not only for the guess; the mode hint renders the locked and
+  the unlocked text from both language files. Plus one `polish` village frame on WebGPU
+  showing the slot digits and the unlocked hint.
+  Criticality: medium — player-visible in every settlement visit, reported by the user from
+  real sessions; nothing red depends on it.
+  Bundle: Steuerung & Performance — it edits the HUD's inventory bar, the place scene's
+  pointer-lock effect and the keyboard-guard key list; it is worked after 1139, which edits
+  the same place-scene key handling, and never beside it.
+
+- [x] 1143. The weaver stands in the trading post's wall: the "stuck adult" of the 16.09.2026 evening
+  report is the fixed weaver vignette, whose loom stands where the seeded trading post is
+  placed, so her body is drawn inside the market hut's wall (user 16.09.2026, verbatim:
+  "Neuer Bugreport unter C:\Users\Patri\Documents\Developing\hoa\local (über backup
+  erreichbar). Reihe das als vor 1141 ein.", report title "Festklemmend", report text "Wieder
+  ein festklemmender Erwachsener"). ORDER: the user placed it BEFORE 1141.
+  THE EVIDENCE IS IN THE REPOSITORY: `local/Festklemmend.zip`, unpacked beside it in
+  `local/Festklemmend/` (copied from the backup 16.09.2026, 23:19; the folder is ignored, so it
+  travels with the checkout and not with git). Taken on production build a5e98ec — the current
+  `main`, which already carries the 1138 escape ladder — on WebGPU, seed 1838110026,
+  `bambara-village`, day 0.00, viewport 1382x984 @dpr 1.25. The overlay holds only HUD (the
+  off-screen "Market Hut" label is the nearest building); the wildlife section reads "0 animals".
+  WHAT THE PICTURE SHOWS: one adult figure (dark head, yellow cone body, one arm) standing
+  between the loom frame on its left and a large mud wall directly behind it, the body touching
+  the wall. It is NOT a walker: it is the `Weaver` vignette (`src/scenes/place/PlaceLife.tsx`
+  :505-533, mounted at :3661), drawn at the fixed loom spot (-8.5, -7) with her figure 0.55 m in
+  front of the loom toward the village centre, i.e. at (-8.08, -6.65). She never moves by design,
+  so no escape ladder (1138) and no stall detector can ever touch her — the user reads a person
+  pressed into a wall for the whole visit.
+  MEASURED 16.09.2026 (`buildLayout('bambara-village', 1838110026)`): the trading post
+  (`interactives` type `market`) stands at (-5.21, -5.76); its collider radius is 2.9 and its
+  drawn wall radius 2.6 (`MARKET_HUT.r`, `src/scenes/place/roofClearance.ts:79`). The weaver's
+  figure centre is 3.00 m from it — 0.10 m inside the collider and 0.40 m off the wall face, so
+  her 0.3 m body touches the wall. The loom centre is 0.61 m outside the collider. Swept over
+  seeds 1..1500 for the three villages, the weaver's figure lies inside a building collider on
+  97.5 % (bambara), 96.7 % (maasai) and 97.5 % (swahili) of all seeds, every time the market
+  hut; the loom frame itself clips it on ~95 %. Seeds 1, 2, 3, 4, 7 reproduce it in bambara.
+  CAUSE READ OUT OF THE CODE — measure it, do not trust it. `src/scenes/place/layout.ts`
+  :803-811 places the trading post at `[jitter(-6, 2), jitter(-6, 2)]` for the compound plan
+  (the other plans have their own spots), i.e. within ±1 m of (-6, -6), which is 2.69 m from the
+  loom spot (-8.5, -7) — less than the hut's own 2.9 m collider. The only correction applied is
+  the 7.25 m window gap to the chief's hut (:812-818). `isFree` (:848-887) keeps every LATER
+  dwelling, fence post and dressing off the `lifeSpots` (:851), but the functional buildings are
+  placed BEFORE that predicate exists and are never tested against the life spots; the loom
+  collider is only appended afterwards (:1522). The same exposure is already recorded for fences
+  in `docs/backlog.md` (entry "Zaunzuege gegen die Requisitenplaetze", the well at (9, 8.5));
+  this point is its measured building-side twin.
+  FINAL STATE: on every seed of every village, no fixed adult station of
+  `villageAdultStations` (`src/scenes/place/lifeSpots.ts:26-40`) — loom AND weaver figure,
+  talkers, pounder, drummer, well — has its prop or its figure body overlapping any building
+  collider or drawn wall, nor any fence post (fold the backlog entry in if it costs nothing
+  more than the same test). The trading post is fitted AROUND the life spots the way the water
+  stand is fitted around the adult places (:1535-1549), or the loom is moved to a spot the
+  plan keeps free — the author measures which of the two keeps the layouts of the tested
+  seeds intact (the seeded stream is shared; a dropped `rand()` reshuffles every village,
+  :820-826) and says so in the commit. The weaver faces her loom with open ground behind her.
+  VERIFIABLE: Vitest over `buildLayout` for the three villages across ≥ 300 seeds — every
+  adult-station prop collider and figure circle clear of every dwelling, interactive and fence
+  collider by at least a walker's width — the sweep above is the red test today. Plus the
+  `polish` village section photographing the weaver at the reported seed 1838110026 on both
+  backends, with the market hut's wall visibly clear behind her.
+  Criticality: high — player-visible in nearly every village on the current `main`, in the
+  village §7.1 criterion 15 is measured on, and reported by the user from a real session as
+  the third "stuck inhabitant" report in a row (1138's "third head at the hut wall with no
+  body in front of it" is likely this same figure).
+  Bundle: Dorfleben — it edits the village layout in `layout.ts` and the life spots, the same
+  place-scene paths 1080, 1081, 1082 and 1125 reach, so it is worked before them and never
+  beside them.
+
+- [x] 1141. The settlement edge band cannot be measured at the maasai village: the same
+  check reds on `main` itself (measured 16.09.2026 on a quiet machine, WebGPU, twice per
+  tree). `polish --section=settlement-edge` fails at `maasai-village (dry): the inside
+  ground crop could be measured — crop off-frame`, and the baseline classification places
+  the fault on `main`, not on the branch that found it: on `origin/main` 893110333 the
+  section failed at that check in both its first leg and its own retry
+  (`local/verify-baseline/893110333ddf/local/verify-logs/2026-09-16T14-51-17-971-polish.log`),
+  exactly as it did on `feat/1138-wedged-adults` f948bdbf7
+  (`.claude/worktrees/point-1138/local/verify-logs/2026-09-16T14-26-09-272-polish.log`).
+  The earlier covering run of the same branch had failed once at `bambara-village (wet)`'s
+  OUTSIDE crop and once at the maasai INSIDE crop, which the load heuristic read as a flake
+  signature; on the quiet machine the maasai check is reproducible and the bambara one is not.
+  AND IT DOES NOT SHOW UP IN A WHOLE PASS. Measured the same evening on the same tree:
+  both covering passes over collision, polish and settings — WebGPU
+  (`local/verify-logs/2026-09-16T16-09-28-256-…`) and WebGL 2
+  (`…T16-49-27-151-…`) — ran this very check GREEN, 280 pass 0 fail each. So the red
+  belongs to the ISOLATED SECTION RUN, four times out of four, and the whole pass, twice
+  out of twice, does not see it: what differs is the history the block arrives with, since
+  `--section` runs that block's own setup and nothing before it. That difference is the
+  first thing to measure, and it is why the red charge is scoped and not a licence.
+  WHAT THE MESSAGE DOES NOT SAY: the failing line is `bandRatio(ndc) === null`
+  (`scripts/verify/polish.mjs` :2996), and `bandRatio` returns null for TWO different
+  causes — a crop rectangle that falls outside the viewport (`groundSamples`) AND a
+  toggled-off reading of zero luminance (`!(off > 0)`). Both print "crop off-frame", so
+  the recorded evidence cannot say which one happened; the preceding `settledLuma(ndc)`
+  read of the SAME crop had succeeded, which makes the zero-luminance branch the likelier
+  of the two and the wording the reason nobody can tell.
+  FINAL STATE: the maasai village's dry inside crop is measurable again on both backends,
+  and the two causes carry DIFFERENT messages, each printing what it measured (the crop
+  rectangle against the viewport, or the off-reading that came back zero) — so the next
+  red of this check is classifiable from its record alone. Whether the picture itself is
+  at fault (a black ground band at that place and season) or the crop geometry is, is what
+  the split message answers first; the fix follows the cause and never the assertion.
+  VERIFIABLE: `polish --section=settlement-edge` green on WebGPU and on WebGL 2 on a quiet
+  machine, and a Vitest case over the two null paths of the reading helper so each carries
+  its own wording.
+  Criticality: high — it is a red on `main` that every render point's picture proof runs
+  into, and while it stands the `polish` suite can only be judged through a red charge.
+  Refs: scripts/verify/polish.mjs, scripts/render-verify-charges.mjs
+  Bundle: Testinfrastruktur.
+
+- [x] 1142. The picture check's coverage record dies with the worktree it was earned in
+  (measured 16.09.2026 on the landing of 1138). Both covering passes of that point ran in
+  `.claude/worktrees/point-1138` — WebGPU and WebGL 2 over collision, polish and settings,
+  green but for one red charged to an open point on each lane — and the runner wrote their
+  records into THAT checkout's own `.claude/render-verify-state.json`, which is untracked.
+  `scripts/worktree-cleanup.mjs` then removed the worktree at the end of the landing, as the
+  working method requires, and with it the only machine-readable proof that the picture had
+  been judged. `render-verify-guard` on `main` therefore reported "RENDER CHANGE NOT VERIFIED
+  ON EITHER BACKEND" over the very commits whose picture had just been judged on both, and
+  the session had to close the gap with a logged deferral — an exception that says the
+  picture is UNCONFIRMED when it had in fact been confirmed.
+  WHY IT BITES EVERY POINT: the working method puts every point in its own worktree and ends
+  the branch with the merge, so this is the ordinary path, not an accident of this landing.
+  The run's own log and `.run.json` sidecar go the same way — `local/verify-logs/` inside the
+  worktree is a real directory, not a link — so after the cleanup neither the receipt nor the
+  log exists to read back. The same evening's baseline classification is the counter-example
+  that shows what is lost: it could only be made because that checkout still stood.
+  FINAL STATE: a covering run earned on a branch survives the branch. The record and the run
+  log are written where the repository keeps them for every checkout — the main tree's
+  `.claude/` and `local/verify-logs/` — or the cleanup migrates them before it removes the
+  worktree; and the guard reads a run by the COMMIT it names, which after a merge is an
+  ancestor of `main`, rather than by the checkout it happened to run in. Deciding between
+  those two is the point's first job; both are small and only one of them may be built.
+  VERIFIABLE: Vitest over the state path resolution — a runner started in a worktree records
+  into the repository's state, not the worktree's — plus a drill that runs a section in a
+  worktree, removes the worktree with the project's own command, and asserts that the guard
+  on `main` still reads the run and its log.
+  Criticality: high — it does not break the game, but it destroys the evidence the render
+  gate exists to keep, and it turns every honest landing into a deferral that reads like an
+  unverified one.
+  Refs: scripts/render-verify-guard.mjs, scripts/verify/run-logged.mjs, scripts/verify/run-record.mjs,
+  scripts/worktree-cleanup.mjs
+  Bundle: Testinfrastruktur.
+
+- [x] 1135. The verification run stops repeating itself: one pass per suite, no automatic
+  flake retry, no automatic baseline pass (user order 15.09.2026, FIRST of three, verbatim:
+  "Okay, setze das so um und reihe es als nächstes in der Queue ein").
+  MEASURED: inside ONE LARGE, `polish` (28 min) ran FOUR times — first pass, flake retry and
+  two baseline passes. This point deletes three of those four, and it pays off whatever the
+  regression's CADENCE turns out to be, which is why the user put it first.
+  FINAL STATE:
+  1. A LARGE runs each suite ONCE. The automatic baseline passes are gone; the comparison
+     runs against a CLASSIFIED baseline FILE, one entry per check, each carrying its date and
+     its owning point — that file is the open remainder of point 1104. The bundle run keeps it
+     current: an entry that has gone green is struck. No blanket standing exemption.
+  2. The automatic flake retry in LARGE is off. A red stands and is classified. Confirmed
+     flakes move into the baseline file. A HAND retry of the SMALLEST affected check stays
+     allowed as diagnosis — CLAUDE.md §7.2 is unchanged: a retry is SUSPECT and covers nothing.
+  3. Runs are serialized: while a LARGE runs, nothing else does. Prose in
+     `scripts/verify/README.md`, NO lockfile and NO guard.
+  4. The label "REAL REGRESSION (green on baseline, red now)" becomes SUSPECT, unconfirmed. A
+     suspicion is settled ONLY by three narrow rungs of the affected section on a quiet machine
+     under equal starting conditions, never by another full regression.
+  5. `nonPredictive` checks report but do NOT set the exit code (that is point 1127 — if it has
+     landed, check and refer, never duplicate it). `run-wait` stops calling healthy runs hung;
+     instead a wall-clock ceiling per suite and a hand abort.
+  6. The backend sequence does NOT stop at a red whose own accounting says it does not hold.
+     MEASURED 16.09.2026 on `feat/1137-picture-gate-hung-verdict` (d7ba6543e), log
+     `local/verify-logs/2026-09-16T05-20-58-440-large.log`: the WebGL 2 pass ran all 25 suites to
+     the end, classified its three reds as PRE-EXISTING against the merge-base and concluded
+     "own or unresolved: none; regression verdict unchanged" — and still exited 1, so
+     `scripts/verify/run-all.mjs:173-177` printed "not proceeding to the remaining backend(s)"
+     and the WebGPU pass never started. While ANY pre-existing red stands — three do, charged to
+     the OPEN points 603, 938 and 1009 — a both-backend LARGE is structurally unreachable, which
+     is exactly what CLAUDE.md §5 demands once per bundle and at closing; it blocks point 633 and
+     point 174. FINAL STATE: the sequencer proceeds to the remaining backend when the failed
+     pass's verdict is "charged elsewhere / verdict unchanged", and the run fails at its END
+     rather than at the backend boundary. A red that DOES hold still stops the sequence.
+     This is a deletion of one early exit, not a new mechanism.
+  NO NEW INFRASTRUCTURE: deleted runs, a renamed label, a file 1104 already owes, README prose.
+  VERIFICATION: unit for the changed run logic. A LARGE on the next bundle state shows the
+  saving on the wall clock but is NOT part of this point's acceptance.
+  Criticality: medium — no player impact; the largest measured saving with no coverage risk.
+  Bundle: Session- & Repo-Hygiene
+
+- [x] 1147. The render window has stood open since point 1141's landing, and every landing
+  since pays for it. MEASURED 17.09.2026 while landing point 1135: `render-verify-guard
+  --status` names `scripts/verify/polish.mjs` as a PENDING render path against baseline
+  `bac394d`, on `main` itself. The two commits that opened it — `dd876c600` "Distinguish
+  settlement edge reading failures" and `1f8b5d9bb` "Settle ground crops over the window
+  used to measure each shot" — are point 1141's, landed earlier the same day; no covering
+  run on either backend was recorded after them. Point 1135's branch inherited both by being
+  cut from `main`, so its guard demanded a both-backend picture for a change it never made,
+  and so will every branch cut from `main` until the window closes.
+  WHY IT IS NOT 1142: 1142 repaired the MECHANISM — a covering record no longer dies with
+  the worktree it was earned in. It did not, and could not, re-earn the record 1141's
+  landing failed to leave. This point owes that one measurement, nothing more.
+  FINAL STATE: one covering `polish` run per backend on a quiet machine at the current
+  `main`, its frames judged by eye, and the guard's baseline advanced by the run itself. If
+  the run is red, every red is charged to its open point or filed; a deferral is NOT the
+  answer here, because nothing suggests either backend cannot be judged headless.
+  THREE RECORDED CRASHES ride along and are NOT this point's to explain — webgpu/polish
+  @2026-09-15T21:55:39, webgpu/polish @2026-09-15T22:13:38, webgl/flow @2026-09-15T23:16:03.
+  A crash carries no red anybody can own. Either the covering run moves the window past
+  them, or their kept logs in `local/verify-logs/` are read and signed off with
+  `render-verify-guard --crashed`; a signed-off crash is never a pass.
+  VERIFICATION: the guard's own `--status` prints no pending render path afterwards, and the
+  run records show one covering pass per backend later than the last edit of `polish.mjs`.
+  Criticality: high — it is a standing blockade, not a defect: it sits on `main`, it fires on
+  every branch cut from it, and it stands between the batch and both point 633 and point 174.
+  Refs: scripts/render-verify-guard.mjs, scripts/render-verify-core.mjs, scripts/verify/polish.mjs,
+  points 1141, 1142, 1135
+  Bundle: Testinfrastruktur
+
+- [x] 1134. The full regression becomes the BUNDLE's gate, not the feature's (user order
+  15.09.2026, SECOND of three, after 1135 and before 1136).
+  MEASURED over 01.09.–15.09.: 40 merged `feat/` branches, 103 recorded verification runs, 49 of
+  them carrying FAIL lines or a non-zero exit — and NOT ONE clean case of "a feature broke
+  standing functionality and only the full regression found it". The 49 reds are pre-existing
+  (1065 spent 23 full LARGE runs / 16.2 machine-hours without a single red touching its own
+  work), load or flake (1072 printed "REAL REGRESSION (green on baseline, red now)" and was 3 of
+  3 green on a quiet machine), test defects (1126, 1127, run-wait calling healthy runs hung), or
+  the single branch suspicion 1056, whose trail led to a LATENT defect reported on 07.09. and
+  landed today as point 1131. The only escape onto `main` in the window was a type-check error
+  caught by `tsc`, the cheapest gate of all.
+  FINAL STATE:
+  1. `scripts/verify/README.md` and `VERIFICATION_LADDER` in `scripts/point-brief-core.mjs` say
+     the same thing: finishing a `feat/` point is CHEAP GATE + PICTURE, not LARGE. The cheap gate
+     is binding and listed exhaustively: tsc, lint, build, unit (vitest jsdom), audit on a
+     lockfile change, the point's own `--section` rung, plus the two-backend picture judgement.
+     ONLY that gate blocks a merge.
+  2. The opposing duty "LARGE after every feature" is REMOVED from ladder AND README — without
+     that step the new rule stands as prose beside a contradicting ladder.
+  3. The LARGE regression runs once per bundle ON MAIN after the last merge. The bundle tree IS
+     main; NO integration or test tree is built (that would be the workflow abstraction CLAUDE.md
+     §2 forbids). Temporarily red main is covered by §7.2 and by there being exactly one owner.
+  4. The bundle boundary is a prose trigger, no automatism: a bundle closes as soon as ONE holds —
+     3–5 finished points, OR three days or the end of a day, OR a point touches a core area, OR
+     before a demo or release. NO minimum bundle size; a single finished point may keep its own
+     closing run, and no finished branch waits for an unfinished large bundle.
+  5. NOT bundled: core touches (tick loop, scheduler, save format, renderer/backend binding — a
+     prose list that grows ONLY after an actual core red) and branches touching the same suite or
+     subsystem (already written verbatim in 1126). A diff argument may add a single case.
+  6. After every merge of main into the branch, every conflict resolution and every further
+     change, the affected rung is climbed AGAIN; `tsc` runs on the ACTUALLY merged state, and
+     older branch green does not count. The bundle run starts only after all intended merges.
+  7. The two-backend picture judgement stays per point on its branch and is never shared,
+     bundled, moved into the bundle run or replaced by a bundle picture (1126: "never one
+     PICTURE"). Section rungs may run mostly on WebGPU; the bundle run always runs on BOTH.
+  8. A later red bundle run rolls no merged point back; it is attributed under §7.2 or filed as a
+     point. A red is NEVER charged to "the bundle" — a bundle owns nothing and closes nothing. An
+     interaction with no single owner gets an integration point naming its participants.
+     Attribution runs over diff, section rung and bisect across main's merge commits, never over
+     a second tree.
+  9. FALSIFICATION CRITERION as a paragraph of README prose: the rule falls back to "per feature"
+     the moment ONE clean case appears — a branch broke standing functionality and only the full
+     regression found it. Re-measure after 40 further merges. The lead figure is wall clock per
+     point, read once per bundle from the run.json files (target profile 1112: regression exactly
+     once, zero side effects; counter-profile 1056: 599 min, 28 runs). Machine time and wall clock
+     stay separate.
+  10. At the merge to main the point's closing run.json is COPIED into the main checkout's
+     `local/verify-logs/` (a `cp` inside the existing merge step, no ledger field) — that closes
+     the named measurement limit that logs of merged branches die with their worktree.
+  11. Whoever passes the rule on passes the measurement limit with it: "zero cases" is the result
+     of ONE window, 103 runs are not an independent sample, 49 red runs are not 49 defects, and
+     1065 and 1131 travel along as counter-evidence.
+  PREREQUISITE: point 1089 (charging a foreign red to its own point) must be finished BEFORE the
+  first bundle — on 12.09. ONE run produced eleven repair specifications across six old points;
+  without 1089 a bundle red cannot be attributed. If 1089 is open it is pulled ahead of this
+  point, NOT duplicated here.
+  NO NEW INFRASTRUCTURE: README prose, one deletion in the ladder, one `cp`. No guard, no router,
+  no ledger field, no test tree.
+  Criticality: medium — no player impact; it buys back hours of machine time per point
+  (14.09.: 599 minutes of verification wall clock in 28 runs for ONE point).
+  Bundle: Session- & Repo-Hygiene
+
+- [x] 1136. A rung that saw nothing gives no all-clear: a subject-dependent check names how
+  many subjects it actually saw (user order 15.09.2026, THIRD of three).
+  WHY IT BELONGS TO THE OTHER TWO: it covers the ONLY measured counter-example to the change.
+  On 10.09.2026 the narrow rung `polish --section=adult-errands` was green TWELVE times while
+  the full suite went red on exactly two checks. Measured cause: the check measures a rarely
+  cast subject — run alone the section sees many errands, inside the full pass it saw ONE, the
+  fetch phase 33 of about 2000 ticks. Those twelve green rungs were never all-clears, they were
+  NON-MEASUREMENTS. While that holds, the cheap gate of point 1134 does not carry.
+  FINAL STATE:
+  1. Subject-dependent checks CREATE the rare situation deliberately — the actor and the fetch
+     phase through the existing test hooks — and PROVE they reached it. That is the cheaper and
+     provable way and it comes first.
+  2. Every subject-dependent check prints the number of subjects it ACTUALLY saw. Below a named
+     minimum the verdict is NOT COVERING, not green. A non-covering check is neither red nor
+     green: it says the question is open.
+  3. FALLBACK, only where 1 cannot create the situation for a section: that one section gets the
+     tick and seed budget of the full run, so rung and suite measure the same thing — and if the
+     rung thereby costs more than it is worth, it is deleted WITHOUT replacement and the check
+     stays the bundle's business.
+  4. The scope is expressly LIMITED to the measured subject-dependent checks, not spread over
+     every suite. The sample count already stands in the log; this is an evaluation, not a guard.
+  5. A few additional starting states are allowed; one fixed scenario does not replace natural
+     variance, which is why the broad closing run stays.
+  BOUNDARY: the water-errand defect itself belongs to point 1131 and is NOT treated here — it is
+  only the evidence that "no regression findings" does not mean "no defects".
+  Where to start: `src/scenes/place/adultWork.ts` and the adult-errands section of
+  `scripts/verify/polish.mjs`. If `polish` is split by topic (point 1129), the affected checks
+  move with it; the split itself belongs to 1129 and is not duplicated here.
+  VERIFICATION: unit for the sample evaluation; the affected `--section` on WebGPU, then read
+  once against the next bundle run to see whether rung and suite now say the same thing.
+  Criticality: medium — no player impact; without it the cheap gate of 1134 rests on non-measurements.
+  Bundle: Session- & Repo-Hygiene

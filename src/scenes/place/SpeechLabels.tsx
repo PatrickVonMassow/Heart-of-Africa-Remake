@@ -94,8 +94,8 @@ export function SpeechLabels() {
   // run has NOT taught yet as much as about the others.
   const conceptLabels = useUi((s) => s.speechConceptLabels)
   const dialog = useUi((s) => s.dialog)
-  // Which candidate the use key would act on right now (point 691).
-  const useKeyOwner = useUi((s) => s.useKeyOwner)
+  // Whether the guess key has a word to act on right now (point 1139).
+  const guessKeyArmed = useUi((s) => s.guessKeyArmed)
   const scene = useThree((s) => s.scene)
   const camera = useThree((s) => s.camera)
   const size = useThree((s) => s.size)
@@ -156,13 +156,13 @@ export function SpeechLabels() {
     }
   }, [scene, camera, size])
 
-  // While a modal stands open SPACE does nothing, so no note may still invite
-  // it — and the guess dialog shows its own utterance, so the note it was
-  // opened from is not drawn a second time behind it. The highlight and the
-  // invitation also stand down while the use key belongs to something else,
-  // a door the player is standing at (point 691): a note that invited a press
-  // SPACE will not make is a bug, not a detail.
-  const { targetedId, hiddenId } = labelPresentation(dialog, labels.targetId, useKeyOwner === 'speech')
+  // While a modal stands open E does nothing, so no note may still invite it —
+  // and the guess dialog shows its own utterance, so the note it was opened
+  // from is not drawn a second time behind it. The highlight and the invitation
+  // otherwise follow the guess key's OWN target (point 1139): the door at the
+  // player's feet takes Space, not E, so the word keeps its invitation while
+  // the bottom prompt offers the hut.
+  const { targetedId, hiddenId } = labelPresentation(dialog, labels.targetId, guessKeyArmed)
 
   return (
     <>

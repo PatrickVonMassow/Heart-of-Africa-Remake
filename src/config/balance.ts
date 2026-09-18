@@ -17,6 +17,9 @@ export interface BalanceConfig {
    *  has a walk target) before it is teleport-nudged to the nearest free spot
    *  (point 155) — a small invisible correction, inhabitants only. */
   walkerUnstuckSeconds: number
+  /** Calibratable minimum displacement in metres for an inhabitant's escape
+   *  search. The caller's home anchor is exempt as the final fallback. */
+  walkerUnstuckMinDistance: number
   /** The PLAYER's own escape from a wedge (work-order 604): the key frees him,
    *  the detection only tells him the key exists. The lengths are calibrated for
    *  the walking scale of a settlement; the bird's-eye view scales them by the
@@ -52,6 +55,8 @@ export interface BalanceConfig {
   /** How many filled jars the village water stand holds before a new delivery
    *  replaces the oldest (work-order 1087). */
   waterStandCapacity: number
+  /** Arrival tolerance at the separate working spots beside the water stand. */
+  waterStandArrivalRadius: number
   /** The settlement edge painted on the ground (design.md §2.6, point 352/488):
    *  where the swept, trodden ground gives way to open land. The band's PLACE is
    *  never configured — it sits at the boundary the leave check reads
@@ -883,6 +888,7 @@ export const balance: BalanceConfig = {
   placeWalkSpeed: 10,
   placeStrafeFactor: 0.8,
   walkerUnstuckSeconds: 4, // an inhabitant wedged this long is teleport-nudged free (point 155)
+  walkerUnstuckMinDistance: 0.6, // calibratable: one adult body width out of the pinned position
   unstuck: {
     // Calibratable: half a metre is well under one walking step, so a man who
     // really is wedged never crosses it while a man edging along a wall does;
@@ -910,6 +916,9 @@ export const balance: BalanceConfig = {
   // Calibratable: three standing jars. The fourth delivery replaces the oldest,
   // which is what lets the stand need no consumer.
   waterStandCapacity: 3,
+  // Calibratable: stop within 0.3 m of the assigned spot. The generic 1.1 m
+  // tolerance let a waiting carrier occupy the sender's approach lane.
+  waterStandArrivalRadius: 0.3,
   placeEdgeBand: {
     // Calibratable: ~8 m of give-way at a slightly softened 0.8 strength —
     // tuned by the operator in play on 27.08.2026: the wider, gentler ramp
@@ -1633,5 +1642,5 @@ export const START_MONEY = 250
 export const START_YEAR = 1890
 /** Start provisions in days (5 weeks, from the checkpoint table example in design.md §18). */
 export const START_FOOD_DAYS = 35
-/** Start gifts (design.md §18 table example shows 2). */
-export const START_GIFTS = 2
+/** Start gifts: none (user decision 17.09.2026); the port bazaar sells them. */
+export const START_GIFTS = 0

@@ -231,7 +231,7 @@ export function dayOfYearJump(day: number, delta: number, startYear: number): nu
 }
 
 /** The number row, left to right: on a German keyboard 1..9 0 ß ´ — twelve
- *  adjacent keys for the twelve months (design.md §21.1). Physical `code`s,
+ *  adjacent keys, held with Shift, for the twelve months (design.md §21.1). Physical `code`s,
  *  so the mapping follows the ROW, not the layout's characters. */
 export const MONTH_KEYS = [
   'Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6',

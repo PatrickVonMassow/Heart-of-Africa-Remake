@@ -14,7 +14,7 @@
 //   2. THE BASELINE COMPARISON (point 294 proper). A check that is already red
 //      on the pre-change baseline is PRE-EXISTING or a stale check assumption
 //      (the 24.07. SSAO ground-edge and proximity-call-fade cases); one that is
-//      green on the baseline and red now is a REAL REGRESSION. Re-running a
+//      green on the baseline and red now is SUSPECT — a suspicion, never a
 //      browser suite against a baseline checkout is expensive, so the wrapper
 //      (baseline-classify.mjs) runs automatically for LARGE reds, opt-in for
 //      smaller runs, and only for the checks that
@@ -139,7 +139,7 @@ const CONSOLE_PREFIX = 'console error:'
  *  `src/systems/devAssert.ts` prints `[ASSERT] <code> — <detail>`, so cutting
  *  here would key every dev-assert error differently from its own baseline form
  *  — and run-all hands console names through `--failed`, so a PRE-EXISTING
- *  assert would be reported as a REAL REGRESSION. Each side splits the way its
+ *  assert would be reported as SUSPECT. Each side splits the way its
  *  own producer does; that is what makes the keys meet. */
 export function checkFromName(name) {
   let label = String(name ?? '').trim().replace(/^(?:PASS|FAIL)\s{2,}/, '')
@@ -218,129 +218,14 @@ export function allChecks(output) {
   return out
 }
 
-const byKey = (list) => new Map(list.map((c) => [c.key, c]))
-
-/**
- * What TWO runs of the same suite mean together (the point of the live case).
- *
- *   flake-cleared   — the retry was green: one transient, already handled.
- *   candidate-real  — at least one check failed in BOTH runs. Only a CANDIDATE:
- *                     it says the failure reproduces, not yet that the change
- *                     caused it — that is what the baseline comparison decides.
- *   load-signature  — both runs failed, but at DISJOINT checks. The load
- *                     fingerprint; not evidence of a defect.
- *   unknown         — a run failed without a parseable FAIL line: a crash or a
- *                     wall-timeout kill (a console-error-only red HAS names —
- *                     see consoleErrorChecks). Nothing can be concluded from
- *                     names that do not exist, so say so rather than guess.
- *
- * `firstFailed`/`secondFailed` are the raw suite outputs (strings) or already
- * parsed check lists; `secondRan`/`secondOk` describe the retry when no output
- * is available (retry disabled, suite killed).
- */
-export function repeatSignature({ first, second, secondRan = true, secondOk = false }) {
-  const a = Array.isArray(first) ? first : failedChecks(first)
-  const b = Array.isArray(second) ? second : failedChecks(second)
-  if (secondRan && secondOk) {
-    return { verdict: 'flake-cleared', stable: [], onlyFirst: a, onlySecond: [], headline: 'cleared on the retry — one transient' }
-  }
-  if (!secondRan) {
-    return {
-      verdict: 'unknown',
-      stable: [],
-      onlyFirst: a,
-      onlySecond: [],
-      headline: 'only ONE run — no repeat signature (retry disabled or the suite was killed)',
-    }
-  }
-  if (a.length === 0 || b.length === 0) {
-    const both = a.length === 0 && b.length === 0
-    const which = both ? 'neither run' : a.length === 0 ? 'run 1' : 'run 2'
-    return {
-      verdict: 'unknown',
-      stable: [],
-      onlyFirst: a,
-      onlySecond: b,
-      headline: `${which} printed ${both ? 'a' : 'no'} FAIL line at all — a crash or a wall-timeout kill; read the output`,
-    }
-  }
-  const mapB = byKey(b)
-  const stable = a.filter((c) => mapB.has(c.key))
-  if (stable.length > 0) {
-    const keys = new Set(stable.map((c) => c.key))
-    const onlyFirst = a.filter((c) => !keys.has(c.key))
-    const onlySecond = b.filter((c) => !keys.has(c.key))
-    const rotating = onlyFirst.length + onlySecond.length
-    return {
-      verdict: 'candidate-real',
-      stable,
-      onlyFirst,
-      onlySecond,
-      headline:
-        `the SAME check failed twice (${stable.map((c) => c.name).join('; ')}) — a candidate REAL failure` +
-        (rotating > 0 ? `; the other ${rotating} rotated between the runs and read as load` : ''),
-    }
-  }
-  return {
-    verdict: 'load-signature',
-    stable: [],
-    onlyFirst: a,
-    onlySecond: b,
-    headline: 'both runs failed but at DIFFERENT checks — the signature of machine LOAD, not of a defect',
-  }
-}
-
-const STOPWORDS = new Set([
-  'the', 'and', 'not', 'with', 'its', 'it', 'does', 'do', 'has', 'have', 'when', 'while', 'from', 'for',
-  'that', 'this', 'into', 'over', 'under', 'after', 'before', 'never', 'always', 'still', 'only', 'one',
-  'two', 'all', 'each', 'per', 'was', 'were', 'must', 'can', 'out', 'off', 'but', 'than', 'then', 'there',
-  'here', 'them', 'they', 'his', 'her', 'are', 'any', 'own', 'both', 'same', 'more', 'less', 'least',
-  'most', 'stays', 'stay', 'keeps', 'keep', 'goes', 'test', 'tests', 'check', 'checks', 'src', 'scripts',
-  'verify', 'index', 'mjs', 'test.ts', 'tsx', 'json',
-])
-
-/** A crude suffix stem, enough that "streamed" and "Streaming" meet. */
-const stem = (w) => {
-  if (w.length > 5 && w.endsWith('ing')) return w.slice(0, -3)
-  if (w.length > 5 && w.endsWith('ed')) return w.slice(0, -2)
-  if (w.length > 4 && w.endsWith('s')) return w.slice(0, -1)
-  return w
-}
-
-function words(text) {
-  return String(text ?? '')
-    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
-    .toLowerCase()
-    .split(/[^a-z0-9]+/)
-    .map(stem)
-    .filter((w) => w.length >= 4 && !STOPWORDS.has(w))
-}
-
-/**
- * The WEAK corroborating signal: does the failing check's NAME share a word with
- * the paths the change touched? A red in a check that has nothing to do with the
- * diff is more likely load or pre-existing; one that names the changed system is
- * more likely the change. It is a hint, never a verdict — `related: null` means
- * "no changed-file list", and a false is not innocence.
- */
-export function changeRelatedness({ checks, changedFiles }) {
-  const list = (checks ?? []).map((c) => (typeof c === 'string' ? checkFromName(c) : c))
-  if (!changedFiles || changedFiles.length === 0) {
-    return list.map((c) => ({ check: c.name, key: c.key, related: null, tokens: [] }))
-  }
-  const fileWords = new Set()
-  for (const f of changedFiles) for (const w of words(f)) fileWords.add(w)
-  return list.map((c) => {
-    const tokens = [...new Set(words(c.name).filter((w) => fileWords.has(w)))]
-    return { check: c.name, key: c.key, related: tokens.length > 0, tokens }
-  })
-}
-
 /**
  * The point-294 classification proper: what a check that is red NOW was on the
  * pre-change baseline.
  *
- *   real-regression — green on the baseline, red now: the change did it.
+ *   real-regression — green on the baseline, red now. A SUSPICION (point 1135),
+ *                     not a finding: the reading is only as like-for-like as the
+ *                     two contexts were, and it is settled by three narrow rungs
+ *                     of the affected section on a quiet machine.
  *   pre-existing    — red on the baseline too: a pre-existing defect or a stale
  *                     check assumption, NOT this change's doing.
  *   baseline-flaky  — the baseline ran it twice with DIFFERENT outcomes. The
@@ -501,40 +386,19 @@ export function foldBaselineRuns(outputs, { currentCheckCount = 0 } = {}) {
 }
 
 const VERDICT_LABEL = {
-  'real-regression': 'REAL REGRESSION (green on baseline, red now)',
+  // A SUSPICION, NOT A VERDICT (point 1135). "REAL REGRESSION" read as a
+  // finding and held finished branches: point 1056 lost a day to one, and point
+  // 1127 measured why — the baseline is taken standalone and the candidate
+  // in-pass, so the two readings are not of the same thing. What the comparison
+  // actually saw is "green there, red here", and that is what it now says.
+  // A suspicion is SETTLED only by three narrow rungs of the affected section on
+  // a quiet machine under equal starting conditions — never by another full
+  // regression, which re-rolls every other check beside it.
+  'real-regression': 'SUSPECT — green on baseline, red now; UNCONFIRMED (settle it with three narrow --section rungs on a quiet machine, not another full pass)',
   'pre-existing': 'PRE-EXISTING / STALE ASSUMPTION (already red on baseline)',
   'baseline-flaky': 'UNSTABLE ON BASELINE (it flakes there too — the baseline decides nothing)',
   'baseline-died': 'NOT CLASSIFIED — the BASELINE RUN DIED before reaching this check (the lane broke; this is NOT "newer than the baseline")',
   inconclusive: 'INCONCLUSIVE (the check did not run on a baseline that reached the end — it is newer than the baseline)',
-}
-
-/** The repeat-signature verdict as printable lines (deterministic, no colour). */
-export function formatRepeatReport({ suite, signature, relatedness = [] }) {
-  const relByKey = new Map(relatedness.map((r) => [r.key, r]))
-  const name = (c) => {
-    const r = relByKey.get(c.key)
-    if (!r || r.related === null) return c.name
-    return r.related ? `${c.name} [touches the diff: ${r.tokens.join(', ')}]` : `${c.name} [unrelated to the changed files]`
-  }
-  const lines = []
-  const head = {
-    'candidate-real': `FAIL (twice, SAME check)  ${suite} — CANDIDATE REAL FAILURE`,
-    'load-signature': `FAIL (twice, DIFFERENT checks)  ${suite} — LOAD/FLAKE SIGNATURE, not evidence of a defect`,
-    'flake-cleared': `PASSED ON RETRY  ${suite}`,
-    unknown: `FAIL  ${suite} — UNCLASSIFIED`,
-  }[signature.verdict]
-  lines.push(head)
-  lines.push(`      ${signature.headline}`)
-  if (signature.stable.length) lines.push(`      failed in BOTH runs: ${signature.stable.map(name).join('; ')}`)
-  if (signature.onlyFirst.length) lines.push(`      run 1 only: ${signature.onlyFirst.map(name).join('; ')}`)
-  if (signature.onlySecond.length) lines.push(`      run 2 only: ${signature.onlySecond.map(name).join('; ')}`)
-  if (signature.verdict === 'load-signature') {
-    lines.push('      house rule: judge a red only on a QUIET machine — re-run this suite alone before believing it.')
-  }
-  if (signature.verdict === 'candidate-real') {
-    lines.push(`      to decide whether the CHANGE caused it: node scripts/verify/baseline-classify.mjs ${suite}`)
-  }
-  return lines
 }
 
 /** The baseline classification as printable lines. */

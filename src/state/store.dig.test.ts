@@ -77,7 +77,9 @@ describe('bazaar buy guards in a port (design.md §10)', () => {
 
   it('buying into a full pack is refused with the inventory-full toast', () => {
     g().enterPlace('cairo')
-    balance.inventoryCapacity = 2 // fresh pack already holds 2 gift trinkets
+    balance.inventoryCapacity = 2
+    g().debugAddGift('copper')
+    g().debugAddGift('copper') // the expedition starts empty, so fill the pack first
     const money0 = g().money
     g().buyTreasure('copper') // affordable and traded in the North
     expect(g().treasures.copper).toBe(0)

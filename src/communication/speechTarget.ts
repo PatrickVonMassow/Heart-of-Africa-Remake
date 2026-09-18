@@ -60,12 +60,12 @@ export interface LabelPresentation {
 }
 
 /**
- * How the notes are drawn (points 588/691). SPACE is ignored while ANY dialog is
- * open, so a highlight and its invitation would promise something the game will
- * not do — no dialog, no target. The same holds when the use key belongs to
- * ANOTHER candidate, a door the player is standing at: the highlight and the
- * hint follow the winner, and a note that invited a press SPACE will not make
- * is a bug rather than a detail.
+ * How the notes are drawn (points 588/691/1139). The guess key is ignored while
+ * ANY dialog is open, so a highlight and its invitation would promise something
+ * the game will not do — no dialog, no target. The same holds when no word is
+ * in reach of that key: a note that invited a press E will not answer is a bug
+ * rather than a detail. A door at the player's feet no longer silences it — the
+ * use key and the guess key stopped competing when they became two keys.
  *
  * The guess dialog additionally REPLACES the note it was opened from: it shows
  * the same syllables, larger and in the middle of the screen, and the note
@@ -74,9 +74,9 @@ export interface LabelPresentation {
 export function labelPresentation(
   dialog: { kind: string; speakerId?: string } | null | undefined,
   targetId: string | null,
-  speechOwnsUseKey: boolean,
+  guessKeyArmed: boolean,
 ): LabelPresentation {
-  if (!dialog) return { targetedId: speechOwnsUseKey ? targetId : null, hiddenId: null }
+  if (!dialog) return { targetedId: guessKeyArmed ? targetId : null, hiddenId: null }
   return {
     targetedId: null,
     hiddenId: dialog.kind === 'speechGuess' ? (dialog.speakerId ?? null) : null,

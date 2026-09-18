@@ -311,6 +311,48 @@ export function gateConcurrency({ strays = [], probeOk = true, force = null } = 
   return { mode: 'parallel', reason: 'the machine is free of competing runs', blockers: [] }
 }
 
+// ── The landed point's run records (point 1134) ──────────────────────────────
+
+/**
+ * WHICH OF A BRANCH'S RUN RECORDS THE LANDING CARRIES INTO THE MAIN CHECKOUT.
+ *
+ * `local/verify-logs/` is git-ignored and therefore PER WORKTREE: a branch's
+ * `run.json` records die with the worktree the landing removes minutes later.
+ * That is the named measurement limit behind point 1134 — the 01.09.-15.09.
+ * window it argues from had to be reconstructed by hand, because the runs that
+ * would have answered it had already been deleted with their trees.
+ *
+ * So the landing copies them. It is a `cp` and nothing else: no ledger field, no
+ * reader, no schema — the only consumer is the next person who measures what a
+ * point cost. Which is also why the rule is this blunt: a record whose own
+ * `branch` field names the landed branch belongs to this point.
+ *
+ * A name already present in the destination is SKIPPED rather than overwritten.
+ * The stamped names are unique per run, so a collision means the record is
+ * already carried, and re-copying it could only replace a complete record with a
+ * truncated one.
+ *
+ * TOTAL, AND LITERALLY SO (Astra, four-eyes pass 1/3). It reads only fields that
+ * are ALREADY strings, because `String(value)` is not total: a record whose JSON
+ * happens to be `{"branch": {"toString": null}}` makes the coercion THROW, and an
+ * exception raised here reaches the landing's merge handler AFTER git has merged
+ * — which would report a failed merge over a completed one. A name or a branch
+ * field that is not a string is simply not a match.
+ */
+export function closingRunRecords({ entries = [], branch, existing = [] } = {}) {
+  const want = typeof branch === 'string' ? branch : ''
+  if (!want) return []
+  const have = new Set((Array.isArray(existing) ? existing : []).filter((n) => typeof n === 'string'))
+  const out = []
+  for (const e of Array.isArray(entries) ? entries : []) {
+    const name = e?.name
+    if (typeof name !== 'string' || !name.endsWith('.run.json') || have.has(name)) continue
+    if (e?.record?.branch !== want) continue
+    out.push(name)
+  }
+  return [...new Set(out)].sort()
+}
+
 // ── The tick and the archive move, as one transition ─────────────────────────
 
 /** Where a point's block ends: the next point, or the next `##` section. */

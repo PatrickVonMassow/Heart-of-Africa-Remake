@@ -391,7 +391,14 @@ export const DOC_BUDGETS = [
     // Raised by 93 measured words: §7 now specifies the two village
     // excavation purposes, persistent results, and passable ground rise. These
     // requested world behaviours were absent from the equipment table.
-    maxWords: 29056,
+    // RAISED by the 104 measured words of the SECOND settlement action key
+    // (point 1139, user 16.09.2026): placing a guess leaves the one candidate
+    // list of §17.5 and moves onto E, so §13.4 must name the key that places a
+    // reading, §17.5 must say what its use key no longer carries, and the
+    // gamepad bullet must record that button A keeps both meanings because the
+    // face buttons are all taken. A key the player presses that no section
+    // names is unplayable — this is a new decision, not a longer telling.
+    maxWords: 29160,
     // A hundred words across 28k: design.md is edited section by section and a genuine
     // new decision runs 40–215 measured words, so the slack absorbs the rewording that
     // accompanies one and refuses the disappearance of a whole section without a

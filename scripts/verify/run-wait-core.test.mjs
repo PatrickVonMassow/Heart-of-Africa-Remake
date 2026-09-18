@@ -4,11 +4,12 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, it, expect } from 'vitest'
+import { waitThresholds } from '../wait-lease-core.mjs'
 import {
   BLOCKING_LIMIT_MS,
   COUNTED_SUITE_FRAMES,
   FIRST_WAIT_FRACTION,
-  HUNG_FACTOR,
+  hungMarkMs,
   MAX_POLLS,
   MIN_WAIT_MS,
   SEPTEMBER_BANDS,
@@ -31,6 +32,7 @@ import {
   waitPlan,
 } from './run-wait-core.mjs'
 import { DEV_SUITES, SMALL_SUITES } from './tiers.mjs'
+import { PROGRESS_LEASE_MS } from '../wait-lease-core.mjs'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 
@@ -259,13 +261,58 @@ describe('pollBudget — five looks, then block or call it hung', () => {
     expect(v.message).toMatch(/hung/)
   })
 
-  it('calls a run HUNG past the factor, whatever the poll count', () => {
-    const v = pollBudget({ polls: 1, expectedMs: 100_000, elapsedMs: 100_000 * HUNG_FACTOR + 1 })
+  it('calls a run HUNG past the ceiling, whatever the poll count', () => {
+    const v = pollBudget({ polls: 1, expectedMs: 100_000, elapsedMs: hungMarkMs(100_000) + 1 })
     expect(v.verdict).toBe('hung')
   })
 
-  it('does not invent a hang when nothing was measured', () => {
-    expect(pollBudget({ polls: 1, expectedMs: null, elapsedMs: 9_000_000 }).verdict).toBe('poll')
+  // THE 15.09.2026 CASE, pinned: a `polish` pass planned at 5 min 41 s, running
+  // healthily for 17 min 28 s, was condemned by the old 2.5x mark at 14 min.
+  it('leaves a run that has merely outrun a low estimate at poll, not hung', () => {
+    const v = pollBudget({ polls: 1, expectedMs: 341_000, elapsedMs: 17 * 60_000 + 28_000, silentForMs: PROGRESS_LEASE_MS + 1 })
+    expect(v.verdict).toBe('poll')
+  })
+
+  // ASTRA REVIEW ROUND 1 — the counted poll told the caller to kill a run on the
+  // clock alone, which is exactly the verdict the wait had stopped giving. One
+  // path saying "slow" while the other says "kill it" is no repair at all.
+  it('says SLOW, not hung, while the run is still writing', () => {
+    const v = pollBudget({ polls: 1, expectedMs: 100_000, elapsedMs: hungMarkMs(100_000) + 1, silentForMs: 60_000 })
+    expect(v.verdict).toBe('slow')
+    expect(v.message).toMatch(/--await/)
+    expect(v.message).not.toMatch(/HUNG/)
+  })
+
+  it('still calls it hung once the silence outlasts the progress lease', () => {
+    const v = pollBudget({
+      polls: 1, expectedMs: 100_000, elapsedMs: hungMarkMs(100_000) + 1, silentForMs: PROGRESS_LEASE_MS + 1,
+    })
+    expect(v.verdict).toBe('hung')
+  })
+
+  it('never turns silence into an EARLY hung verdict', () => {
+    expect(pollBudget({ polls: 1, expectedMs: 100_000, elapsedMs: 10_000, silentForMs: PROGRESS_LEASE_MS * 10 }).verdict)
+      .toBe('poll')
+  })
+
+  // An unmeasured run is not exempt — it is held to the expectation FLOOR plus
+  // the ceiling, exactly as the lease holds it. Below that, nothing is condemned.
+  it('holds an unmeasured run to the floor plus the suite ceiling', () => {
+    expect(pollBudget({ polls: 1, expectedMs: null, elapsedMs: hungMarkMs(null) - 1 }).verdict).toBe('poll')
+    expect(pollBudget({ polls: 1, expectedMs: null, elapsedMs: hungMarkMs(null) + 1 }).verdict).toBe('hung')
+  })
+
+  // ONE CALCULATION, TWO READERS (cross-vendor review, 17.09.2026). The counted
+  // poll and the lease decide the same question, and at the edges they disagreed:
+  // a two-hour ceiling put the lease's mark at the cap while the poll ran past
+  // it, and a negative override could put the poll's mark before the estimate.
+  it('agrees with the lease on every estimate and ceiling, sane or not', () => {
+    for (const expected of [null, 0, 1, 341_000, 20 * 60_000, 90 * 60_000, 99 * 60 * 60_000, -7, Number.NaN]) {
+      for (const ceiling of [0, -5, 45 * 60_000, 2 * 60 * 60_000, 99 * 60 * 60_000]) {
+        expect(hungMarkMs(expected, ceiling))
+          .toBe(waitThresholds({ startedAt: 0, expectedRuntimeMs: expected ?? 0, ceilingMs: ceiling }).hungAt)
+      }
+    }
   })
 })
 
@@ -346,6 +393,26 @@ describe('waitPlan — blocking call or completion notification', () => {
 
   it('refuses to invent an interval for an unmeasured selection', () => {
     expect(waitPlan({ expectedMs: null }).shape).toBe('background')
+  })
+
+  // POINT 1137 — the advice the plan used to give for a whole `polish` pass:
+  // 5 min 41 s from the §1 medians, so FOREGROUND, on a run six measurements put
+  // at 9.9-61.5 min. The blocking call then returned STILL RUNNING, and a healthy
+  // run started to look broken. Where §7 measured this shape, its high end decides.
+  it('sends a run to the background on what it REALLY costs, not on the short plan', () => {
+    const plan = waitPlan({ expectedMs: 340_900, observedHighMs: Math.round(61.5 * 60_000) })
+    expect(plan.shape).toBe('background')
+    expect(plan.expectedMs).toBe(Math.round(61.5 * 60_000))
+  })
+
+  it('leaves the plan alone where nothing measured that shape', () => {
+    expect(waitPlan({ expectedMs: 34_400, observedHighMs: null }).shape).toBe('blocking')
+  })
+
+  it('never lets a band SHORTEN a plan that is already longer', () => {
+    const plan = waitPlan({ expectedMs: 2_536_000, observedHighMs: 60_000 })
+    expect(plan.shape).toBe('background')
+    expect(plan.expectedMs).toBe(2_536_000)
   })
 })
 

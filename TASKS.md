@@ -77,36 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1131. Nobody in the village fetches water, and the two standing at the water place just
-  stand there (user 15.09.2026, two reports, ranked here directly behind his previous
-  front-order 1124).
-  The reports, verbatim: "Neuer Bugreport \"KeinWasserholen.zip\" unter Backup in local" and,
-  as his addendum: "WasserstelleGefundenKeinerHolt.zip - die Stelle habe ich gefunden (war die
-  vorher auch schon da?), aber die zwei stehen da nur und holen kein Wasser."
-  THE EVIDENCE IS IN THE REPOSITORY: `local/KeinWasserholen.zip` and
-  `local/WasserstelleGefundenKeinerHolt.zip` (copied from the backup 15.09.2026, 16:26; the
-  folder is ignored, so they travel with the checkout and not with git).
-  NOT YET MEASURED — that is this point's first act: read both dumps, name the settlement and
-  seed, and say whether the water errand is never dispatched, dispatched and never walked, or
-  walked and never reported. The water errand and its hold rules are the subject of the
-  decisions already standing on the board ("Ein gestautes Wort darf seine Aufgabe nicht
-  überleben"), so check whether a hold or a task expiry swallows the errand before blaming the
-  dispatcher.
-  TWO MEASUREMENTS ALREADY ON RECORD point at this exact spot and belong in the first reading.
-  `docs/backlog.md` "Das Wasserpaar findet im ersten Anlauf nicht zusammen" (14.09.2026): the
-  WebGL 2 run of `polish --section=adult-errands` was red on its first attempt with "no carrier
-  reached the fill phase in 180 s" and "[ASSERT] adult-pair-never-met — water-back: villager 1
-  expired still on his way to the walk word; the pair never assembled" — that is the user's
-  picture exactly, and an EXPIRY, which is why the hold/expiry check above comes before the
-  dispatcher. `docs/backlog.md` "Wasserholen der Erwachsenen ist ein Kreislauf ohne Ziel"
-  (07.09.2026) holds the second half: the full jar is cast out of nothing and `water-out` ends at
-  the water without ever returning full.
-  ALSO ANSWER HIS QUESTION in the closing report — was the water place there before? — from the
-  history of the settlement layout, not from memory.
-  Criticality: medium — the village reads as inhabited only while its people do their work, and
-  §7.1 criterion 15 (lively settlements) is measured on exactly this.
-  Bundle: Dorfleben.
-
 - [ ] 1133. A commissioned authoring run dies with the session that started it, and takes
   its uncommitted work with it.
   MEASURED 15.09.2026: the first `scripts/author-astra.mjs --point 1131` was started at 19:08
@@ -122,9 +92,80 @@ put it is the mistake this line exists to stop.
   caller has to remember it and no caller can get it wrong. The caller keeps the same command
   and the same log path. Check what the script already does about its own process group
   before adding anything — this point must not grow a supervisor, a ledger field or a guard.
+  THE LOG CONTRACT — the answer to the 15.09. escalation (main session, 18.09.2026). The
+  first commission refused the point because "output to its log" named a log that does not
+  exist: the script inherits stdout/stderr, and `local/1131-astra-author.log` was made by the
+  CALLER’s `tee`. So THE SCRIPT OWNS THE LOG. Its destination is
+  `local/<point>-<lane>-author.log` — the path the callers already write by hand — and
+  `--log <path>` overrides it; it is appended to, never truncated. THE CALL STAYS BLOCKING
+  AND ITS OUTPUT STAYS VISIBLE: the parent waits for the detached child and streams that file
+  to its own stdout as it grows, so a caller sees what it sees today and `| tee` becomes
+  unnecessary without becoming wrong. When the parent dies the child keeps running in its own
+  session and keeps writing to the same file. Same argv, same cwd, same exit code; no
+  supervisor, no ledger field, no guard.
   Criticality: high — it is not the point's own work that is lost but a commissioned agent's,
   and the loss is silent: the log's last line claims the run continues.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1146. The steering hints "Click the view to steer" and "Esc: cursor" move down to
+  the height of the inventory bar (user 17.09.2026, 20:51).
+  Today the pill `.cursor-mode-hint` (`src/index.css` ~L473) sits centred at `bottom: 108px`,
+  well above the inventory bar, which is anchored at `bottom: 12px` on the left
+  (`.inventory-bar`, ~L187). The user wants the hint lower, on the same height as the
+  inventory. TARGET: the hint's vertical band coincides with the inventory bar's band —
+  same bottom edge, its own horizontal place beside the bar, never overlapping a slot.
+  THE MULTI-LINE CASE IS PART OF THE POINT: the bar wraps (`flex-wrap: wrap`,
+  `max-width: 60vw`) once enough slots are carried — reachable in play by buying up to
+  `inventoryCapacity` (20) items in the port — and the hint must then align with the
+  two-line bar (its bottom edge on the bar's bottom, and still outside the bar's box), not
+  stay where a one-line bar would end. Decide the alignment by the rendered rectangles of
+  both elements, not by a constant: measure `.inventory-bar` and `.cursor-mode-hint`
+  bounding boxes with one slot, and again with the bar wrapped, at the default viewport and
+  a narrow one (both backends where a picture is taken). Both language strings stay as they
+  are. Evidence note: `Hud.tsx` ~L216 hides the hint under `navigator.webdriver`, so a
+  Playwright frame cannot show it; the OPEN comment there records that its placement is
+  judged by CSS reading. Measure the rectangles on the right layer (Vitest/jsdom cannot lay
+  out; a browser test needs the hint visible — choose the smallest honest path, and record
+  what was measured). No new guard, ledger field or abstraction.
+  Criticality: medium — a player-visible layout defect, no data or progress at risk.
+  Position: directly before 1082, by the user's order (17.09.2026, 20:51).
+  Bundle: Steuerung & Performance.
+
+- [ ] 1148. Unlocked cursor mode needs one click, not several, to return steering (user
+  report 17.09.2026, 21:48, verbatim: "Im Modus »Click the view to steer« bewirkt erst
+  mehrfaches Klicken, dass man wieder steuern kann.").
+  Final state: in the settlement's unlocked cursor mode (HUD pill 'Click the view to steer')
+  ONE click on the view returns mouse-look; a click the browser refuses does not leave the
+  player clicking again.
+  Measured on main at ef5806ff4: requestPlacePointerLock swallows the request's rejection
+  (r.catch(() => {})) and nothing listens to pointerlockerror. Chromium refuses a
+  requestPointerLock() issued within roughly one second after the player left the lock with
+  Escape ('The user has exited the lock before this request was completed'); a click inside
+  that window fails silently and the player clicks once more. This is the most likely reading
+  of 'erst mehrfaches Klicken'; the game currently cannot tell it from any other refusal. The
+  Escape release and the dialog-close re-grab in restorePointerLockAfterDialogs both leave the
+  browser in that cooldown.
+  Work: (1) listen for pointerlockerror / the rejected promise in the place scene's lock
+  effect; on a refusal with no .overlay and no dialog open, retry the request once after the
+  cooldown (about 1.1 s; the click's transient activation still covers it in Chromium), and
+  drop the retry if the scene leaves place, a dialog opens, or the lock is granted meanwhile;
+  keep navigator.webdriver on the decision-only path. (2) Count the refusal in
+  pointerLockProbe (refusals beside grabs/releases) for the dev hook; no new guard, no ledger.
+  (3) Vitest on pointerLock.ts: a refused request records a refusal and schedules exactly one
+  retry; the retry is dropped when a dialog opens; no retry under webdriver. (4) Attended
+  check in real Chrome on WebGPU (the lock never engages headless): Escape, click within one
+  second -> steering returns without a second click; Escape, wait two seconds, click -> first
+  click steers. Record the result in the point's evidence. (5) If the attended check shows the
+  first click landing on a HUD element instead of gl.domElement, fix the layering instead and
+  say so.
+  BOUNDS THE USER NAMED: no new guard, ledger field or workflow abstraction (infrastructure
+  freeze 01.09.2026); pointer lock stays skipped under navigator.webdriver.
+  Criticality: medium — reproducible player impact in the cursor mode point 1140 introduced,
+  and the refusal is invisible to the game because it is swallowed.
+  Refs: src/scenes/place/pointerLock.ts, src/scenes/place/PlaceScene.tsx (pointer-lock effect
+  ~l.2717), src/scenes/place/pointerLock.test.ts; follow-up of 1140 (closed). It reads the
+  `.cursor-mode-hint` rule that 1146 edits, so it is worked AFTER 1146 and never beside it.
+  Bundle: Steuerung & Performance
 
 - [ ] 1082. A child climbing the village boulder becomes something the player actually
   sees (user 09.09.2026, 05:04 — the same report twice).
@@ -245,6 +286,61 @@ put it is the mistake this line exists to stop.
   Why the lane: the verification IS the work here — the deliverable is a judged rendered
   frame at shipped values, taken and judged in the main session.
   Bundle: Dorfleben.
+
+- [ ] 1149. Small village stones raise the ground instead of blocking the walk (user order
+  17.09.2026, 21:50 and 21:53, verbatim: "Im Rahmen von welchem Punkt wird erledigt, dass man
+  an Kieselsteinen im Dorf nicht mehr hängenbleibt, sondern darüber läuft, wie über
+  ausgegrabenen Sand?" — "Man soll nicht einfach hindurchlaufen können, sondern sie sollen als
+  Erhöhung behandelt werden. Ich dachte es war geplant, das im Rahmen der analogen Umsetzung
+  für Sandhaufen einzubauen. Dann reihe das nach 1082 ein, ja.").
+  Final state: a small scattered stone in a settlement is neither a wall nor air. The player
+  and every villager walk UP AND OVER it the way they already ride the spoil heap of an
+  excavation (closed point 1057): the stone raises the ground locally, the first-person camera
+  rises and falls smoothly, nobody stops at it and nobody passes through it.
+  Measured on main at ef5806ff4: every scattered rock, whatever its size, gets a collider of
+  0.35 + 0.5 * scale metres (looseRockRadius, pushed at layout.ts ~1905). At instance scale
+  0.3 the stone's top is about 0.16 m (ROCK_TOP_UNITS * scale) - a pebble - yet its collider
+  reaches half a metre, so the player snags on it. The spoil heap, by contrast, never enters
+  the collider set: spoilHeightAt is a smooth compact dome that placeGroundHeight adds to the
+  bank height, and every actor plus the camera read that one source.
+  Work:
+  - A stone whose top lies below a step height (estimate, calibratable, in
+    src/config/balance.ts under CLAUDE.md §2 / design.md §14; propose 0.30 m, about knee
+    height) becomes a GROUND RAISE and loses its collider: placeGroundHeight also takes the
+    maximum over these stones, each as a smooth compact dome with zero height and slope at its
+    edge, sized to the DRAWN stone (its mesh radius at that scale), peaking at ROCK_TOP_UNITS *
+    scale so the foot stands on the visible top. The renderer keeps drawing the same instance.
+  - A stone at or above that height stays exactly what it is today: a collider of
+    looseRockRadius and, above climbableRockTop, a candidate for the children's climb.
+    climbBoulder must never pick a stone that has become ground (1082 raises climbableRockTop
+    anyway; keep the two thresholds ordered, ground < climb, and assert it in dev).
+  - One classification, one place: looseRocks.ts answers whether a stone is walked over or
+    walked around; layout.ts and placeGround.ts read that answer. No second scatter of Y
+    assignments, no new collider kind.
+  - Villager routes and the dig-site / water-path / play-lane placement keep testing against
+    the collider set; a stone that became ground simply drops out of that set, so the layout
+    must be re-measured on the shipped seeds (Bambara 7 and 1337 among them) to confirm no site
+    or path moved.
+  - Tests: Vitest on placeGround.ts - height is zero outside every small stone's footprint,
+    peaks at the stone's top at its centre, and a stone above the step height contributes
+    nothing; Vitest on looseRocks.ts - the classification and the ordered thresholds; the
+    collider set contains no stone below the step height. Playwright on the polish lane - a
+    frame with the first-person footing carried over a small stone, judged on both backends.
+  BOUNDS THE USER NAMED: placement directly behind 1082 (user decision 17.09.2026, 21:53); no
+  new collider kind, no new guard or ledger field (infrastructure freeze 01.09.2026); the
+  child's climb stone stays a collider — only stones below the step height change.
+  DESIGN CHANGE IN THE SAME COMMIT: design.md §16 (settlement collision) gains one sentence —
+  small stones and spoil are ground raises, large stones are obstacles; and
+  docs/acceptance-criteria-detail.md criterion 16 names the step threshold.
+  Criticality: medium — reproducible player impact; the walk snags on knee-low stones.
+  Refs: src/scenes/place/looseRocks.ts (looseRockRadius, looseRock, climbBoulder),
+  src/scenes/place/layout.ts (~l.1905 rock colliders), src/scenes/place/placeGround.ts
+  (spoilHeightAt, placeGroundHeight), src/render/flora.ts (ROCK_TOP_UNITS ~l.323),
+  src/scenes/place/PlaceScene.tsx (~l.3125 footing), src/scenes/place/PlaceLife.tsx
+  (usePlaceGround); follows the closed 1057; AFTER 1082 and never beside it (both edit the
+  scatter's size and the climb selection in looseRocks.ts and the loose-rock colliders in
+  layout.ts).
+  Bundle: Dorfleben
 
 - [ ] 1109. The catcher group stands as one group at its rock; the tap is a moment, not a post.
   USER ORDER 11.09.2026 on the bank game (`src/scenes/place/bankGame.ts`), queued DIRECTLY
@@ -392,45 +488,6 @@ put it is the mistake this line exists to stop.
   src/config/balance.ts, design.md §13.4
   Criticality: medium — a player-visible teaching defect in the slice the release exists for,
   reported from a real session, and reproducible on every bout.
-  Bundle: Dorfleben.
-
-- [ ] 1045. Two village layouts have no straight walk to the water, so they teach no RIVER
-  at all (measured 02.09.2026 while answering the cross-vendor findings of point 688).
-  Point 688 fits the village water path by sweeping its head until the straight walk to
-  the water clears the settlement's fabric as it is DRAWN — dwellings at their true shape,
-  boxes at their corners, the compound fence panels, the pen, the play rocks, the props.
-  A village that can give no such walk gives NO water path, which is the point's own rule:
-  a track drawn through a wall teaches the wrong thing, and no teaching beats a wrong one.
-  Measured at `abf2faf49` over nine villages at six seeds, two layouts pay that price —
-  bambara-village at seeds 7 and 1337 — and there both water situations are simply absent:
-  no jar goes down, no jar comes back, and the word RIVER is never taught in that village.
-  BOTH OF THEM ARE THE PUZZLE VILLAGE, and the seed is the axis, not the village (measured
-  10.09.2026 on the user's question): the slice is bound to bambara-village
-  (`communicationRock.ts` ~21 `ROCK_VILLAGE_ID`, `store.ts` ~632 `DRUM_MESSAGE_VILLAGE`) and
-  the world seed is DRAWN at every start (`store.ts` ~618, `?seed=` is a dev switch alone).
-  So this is not a village the player never sees — it is two of six drawn seeds in which the
-  village that must teach RIVER never teaches it, before a drum message built on that word.
-  This point's earlier claim that the slice's village "is NOT among them" held for the
-  suites' fixed seeds only and is withdrawn. `layout.test.ts` names the two, so a third one
-  appearing goes red.
-  Final state:
-  - Every river village carries a water path, and none of them draws it through a wall.
-  - One of the two ways is taken and written down: either the track may BEND once at the
-    gap between two compounds (it is a worn footpath, not a surveyed road), or the
-    compound builder opens a GATE where the lane crosses its ring, the way a real
-    compound has one.
-  - The named-exception list in `layout.test.ts` is deleted with the cause.
-  Test: Vitest over the layout — every river village at every swept seed carries a water
-  path whose whole run clears the FULL collider set at the drawn lane's half-width, with
-  no exception list. Picture check on both backends: the track where it passes a compound.
-  Criticality: high — it costs one of the two adult words entirely, in the village the
-  player IS given, in two of six drawn seeds (raised from medium on 10.09.2026 with the
-  measurement above; the "not in the one the player is given" reading was wrong).
-  Refs: src/scenes/place/layout.ts (the `clearRun` sweep and the head ladder),
-  src/scenes/place/layout.test.ts (`NO_STRAIGHT_WALK`)
-  Author lane: astra.
-  Why the lane: the communication mechanic is authored by Astra (user 08.09.2026); the
-  rendered picture, the browser suites and the landing stay in the main session.
   Bundle: Dorfleben.
 
 - [ ] 1093. A compound fence may be drawn straight through a fixed life prop (user
@@ -662,39 +719,6 @@ put it is the mistake this line exists to stop.
   keeps hitting the bugs.
   Bundle: Verständigung.
 
-- [ ] 1075. A unit test measures a file OUTSIDE the repository, so writing a memory reddens
-  `main` and blocks every push (measured 07.09.2026, 22:24, on a quiet machine).
-  WHAT HAPPENS. `scripts/cut-account-core.test.mjs:677-684` reads the live
-  `~/.claude/projects/-workspace-hoa/memory/MEMORY.md` (and the two `CLAUDE.md` files) and
-  asserts that the ceilings table of `docs/document-cut-757.md` quotes their CURRENT line and
-  word counts. MEMORY.md is not in the repository and is rewritten whenever any session saves,
-  edits or deletes a memory. This evening the table said "765 words" and the tokenizer reported
-  764: `Tests 1 failed | 56 passed`, reproduced standalone in 1.14 s at load 5.8, so it is not
-  a load artefact.
-  WHAT IT COSTS. The pre-push gate runs the unit suite for every push to `main`, so from the
-  moment a memory is written NO push to main succeeds until somebody edits that table by hand.
-  Tonight it stopped six commits, and the gate's honest retry-under-load rule paid for the full
-  suite twice before saying so. Nothing warns anybody: the memory write and the red are in
-  different files, on different days, in different sessions.
-  FINAL STATE — the test stops measuring the environment, and the choice is named in the commit:
-  either the assertion drops the two files it does not own and keeps only what the repository
-  contains, or the counts are read from a snapshot the repository DOES own and the ceilings
-  table is regenerated from it by the same command that writes it. What must not survive is a
-  hand-maintained number in a document that tracks a file outside the checkout.
-  VERIFIABLE: pure Vitest — writing, changing and deleting a memory leaves the suite green, and
-  a real ceilings breach still reds. `npx vitest run scripts/cut-account-core.test.mjs` green
-  before and after a memory write.
-  QUEUE RANK: BEFORE the release (machine-filed, urgency stated as rule 1d requires): it blocks
-  every push to `main` and therefore every landing, and the blockade returns on its own the next
-  time any session writes a memory.
-  Criticality: high, frequency HIGH — no correctness of the game is touched, but the batch
-  cannot deliver anything while it holds, and it re-arms itself.
-  Refs: scripts/cut-account-core.test.mjs (the ceilings block), docs/document-cut-757.md (the
-  table), scripts/pre-push-gate.mjs (the caller that turns it into a blockade), guide pitfall
-  "Test und Wächter hingen an ihrer Umgebung, nicht am Verhalten".
-  Bundle: Testinfrastruktur — it edits `scripts/cut-account-core.test.mjs` and the cut document,
-  which no other open point of this bundle writes, so it may run beside any of them.
-
 - [ ] 633. The release's closing run — two regressions with the cleanup between them (user
   11.08.2026, splitting point 174: "Dafür scheint mir die Schätzung von 1 h viel zu wenig
   zu sein"). 174 carried the whole release in one card estimated at ~1 h, which was true
@@ -782,6 +806,121 @@ put it is the mistake this line exists to stop.
   tag plus `poc` dynamically, but a tag push alone does not trigger it. Then VERIFY
   that /v0.3/ and /poc/ serve the new state, and FREEZE the tag: it is never
   re-pointed.
+
+- [ ] 1150. The doctor's quarantine takes the frames away from a RUNNING picture run
+  (measured 18.09.2026, twice in one hour, 01:22 and 01:31). The covering WebGPU `polish`
+  run for point 1147 was drawing (pid 661900, its own record says `cleanAtStart: true`, the
+  wait was declared through `batch-in-flight`), and `batch-doctor` classified the
+  `verification/*.png` IT had just written as "uncommitted changes during/after a
+  parallel-session window — they cannot be attributed to one author" and stashed them: 31
+  frames first, three more nine minutes later.
+  WHY IT IS WRONG: the attribution is measurable, not ambiguous. The tree was clean when the
+  run started, the run is declared, and the files that appeared since are exactly its frames.
+  IMPACT: the picture series of a running COVERAGE measurement is scattered over two
+  quarantine stashes and the working tree. Whoever does not notice judges half a series or
+  none, and may sign a coverage whose frames nobody ever looked at — a false approval, which
+  is why this is filed under the infrastructure freeze rather than deferred to the backlog.
+  It was survived here only by copying all 34 frames out of the repository before the second
+  quarantine.
+  FINAL STATE: a quarantine no longer touches files that a LIVE, DECLARED verification is
+  writing itself. The decision has both halves available to it in the tree: the
+  `batch-in-flight` declaration naming the run, and that run's pid still alive. Everything
+  else it quarantines as before; a declaration whose process is gone protects nothing.
+  VERIFICATION: a unit test over the doctor's decision core — a dirty `verification/` file
+  plus a live declared run is NOT planned for quarantine, the same file without a live
+  declaration still is.
+  Criticality: high — it destroys the evidence of the most expensive measurement the batch
+  makes, and it did so twice unprompted.
+  Refs: scripts/batch-doctor.mjs, scripts/batch-in-flight.mjs, points 1147, 1142
+  Bundle: Testinfrastruktur
+
+- [ ] 1151. A water-coloured body stands in the SKY at the Maasai village, and only on
+  WebGPU (found 18.09.2026 by point 1147's picture judgement). In
+  `verification/488-village-edge-band.png` drawn on WEBGPU a slate-blue, hard-edged
+  truncated cone with a dark top rim stands in the gap between two mountains, about as tall
+  as they are. It OCCLUDES the mountain behind it and is OCCLUDED by the one in front, so it
+  is real geometry at mid-distance, not haze or a cloud, and its colour matches the water
+  colour `[0.2, 0.42, 0.6]` in `src/world/terrain.ts`.
+  WHAT THE SECOND BACKEND SETTLES: the SAME frame redrawn on WEBGL 2 shows CLEAR SKY in that
+  gap, with the mountains identical in shape and position. So this is NOT a world-model,
+  elevation or backdrop-height defect — either of those would draw on both backends — but a
+  defect of the WebGPU material/TSL path. It sits on the EVERYDAY backend, the one the
+  player actually gets (§7.2), while the regression lane is clean.
+  WHY NO RUN CAUGHT IT: both runs reported ALL GREEN. No check looks at that part of the
+  sky; the edge-band probe measures the swept ground, not the horizon above it.
+  FINAL STATE: the gap between the mountains at the Maasai village carries sky on WebGPU as
+  it does on WebGL 2. The CAUSE is named in the commit rather than the symptom hidden — do
+  not simply move the camera or the probe.
+  VERIFICATION: the WebGPU `488-village-edge-band` frame shows no such body, judged by eye,
+  and a check that would have caught it — a Vitest assertion over whatever the diagnosis
+  names, or a frame check that reads the sky band above the horizon.
+  Criticality: high — a large wrong object in the sky of a place the player walks to, on the
+  backend the player uses, which every green run so far has failed to see.
+  Refs: src/scenes/place/backdrop.ts, src/scenes/place/backdropMaterial.ts,
+  src/world/terrain.ts, scripts/verify/polish.mjs, point 1147
+  Bundle: Dorfleben.
+
+- [ ] 1152. Flat, unshaded discs lie on the river surface at the Bambara village (found
+  18.09.2026 by point 1147's picture judgement, WebGPU frames of the run
+  2026-09-17T23:43:17Z, exit 0, ALL GREEN). In `verification/482-village-river-bank.png` two
+  pale low-poly ellipses lie on the water; the same shape recurs in
+  `1085-village-adult-fills-a-jar.png` and `1106-arriving-runner-hand-on-the-far-stone.png`.
+  Enlarged five times they are flat and uniformly lit, with visible facet edges, NO shading
+  gradient, NO specular, NO reflection and NO contact shadow, while the water around them
+  carries full specular streaks — they read as paper cut-outs rather than as anything in the
+  world.
+  WHAT IS NOT ESTABLISHED, AND MUST NOT BE GUESSED: what they are MEANT to be. Candidates
+  are a sandbank or shoal, a foam or lily patch, and a wildlife LOD. The first work of this
+  point is to NAME the object, because the fix differs completely between them.
+  BACKEND: ANSWERED, and the answer is BOTH. The covering WebGL 2 run
+  (2026-09-18T00:32:58Z, GREEN, exit 0, 58 frames) redrew
+  `verification/482-village-river-bank.png` with the SAME two discs in the same positions and
+  the same flat, unshaded appearance. So unlike point 1151 — filed the same hour and proven
+  WebGPU-only by exactly this comparison — this one is backend-independent and lives in the
+  scene or its geometry, not in a material path.
+  FINAL STATE: whatever lies on that water reads as part of the world — lit by the same
+  light as the water, or removed if it has no business being there.
+  VERIFICATION: the three named frames judged by eye on the backend(s) the diagnosis
+  implicates, plus a test on the layer the fix touches.
+  Criticality: medium — it is visible wherever the player walks to a village river, but it
+  misleads no mechanic.
+  Refs: src/scenes/place/riverBank.ts, scripts/verify/polish.mjs, point 1147
+  Bundle: Dorfleben.
+
+- [ ] 1145. A frame-subject miss KILLS the whole run instead of failing one check, and two
+  frames now do it on `main` itself (filed 17.09.2026 from point 1140's covering passes;
+  the falls half classified PRE-EXISTING by two baseline runs on f347b652d).
+  TWO FRAMES, ONE SHAPE. `72-water-victoria-falls` (enrichments): the subject sits at
+  lat -17.92, lon 25.85, the traveller stood 4.52 degrees away, the projection landed at
+  ndc (-4.26, -3.70) off the left and bottom edge, and the camera had NOT settled after
+  15010 ms of polling. `11-worldmodel-khartoum-confluence` (world, WebGL 2, 16.09.2026):
+  the same wording, off the same two edges. Both times `frameSubject.mjs` THROWS, node
+  exits, and the run dies rather than reports — so it covers no backend, no red in it can
+  be charged, and only a hand-signed crash sign-off gets it off the guard's list. Three
+  such crashed records stood on `main` when 1140 landed.
+  SO THERE ARE TWO QUESTIONS, and the second is the expensive one:
+  1. WHY THESE TWO FRAMES MISS. A travel that stops short is a game defect; a wait that
+     expires on a camera still moving is a suite defect. The printed evidence names both
+     (4.52 degrees away AND not settled), so decide it by measurement before repairing —
+     the two have opposite repairs.
+  2. WHY ONE MIS-AIMED FRAME COSTS A WHOLE PASS. Point 375 rightly refuses to write a frame
+     that does not show what its name claims; killing the process is not part of that
+     ruling, and it converts a one-check failure into an unownable crash record that every
+     later session has to sign off by hand.
+  Final state:
+  - Both frames are written and contain their subject, or each is declared a general view
+    with its measured reason (point 375 allows exactly that, and nothing else).
+  - A frame-subject miss FAILS ITS CHECK and lets the suite finish, so the run reports,
+    covers its backend where the rest is green, and its red can be charged like any other.
+  Test: Playwright — `enrichments --section=rivers` and `world` as the rungs, then each
+  whole suite on the affected backend; plus a Vitest case over the frame-subject verdict
+  proving a miss returns a failing check rather than throwing.
+  Criticality: medium for the picture, high for the evidence — no player sees these frames,
+  but each miss destroys a whole pass's coverage, which is how point 1065 lost 23 LARGE runs.
+  Refs: scripts/verify/frameSubject.mjs (the throw at the end of captureFrame),
+  scripts/verify/enrichments.mjs, scripts/verify/world.mjs, scripts/render-verify-charges.mjs,
+  point 375, point 1089, point 1115, point 1142.
+  Bundle: Testinfrastruktur.
 
 - [ ] 1132. The chief's collision check was amended seven seconds after the last run of it, so
   no frame proves the check that guards him today, and four webgpu/flow records of 13./14.09.
@@ -1103,6 +1242,18 @@ put it is the mistake this line exists to stop.
   entry scoped to the measured composition (the one-second reading red while the 0.5 s burst
   reading stands at 0.00 %), so the WebGL 2 lane can be read again. The charge dies with this
   point and decides nothing about the cause.
+  FIRST PAIRED READING, 18.09.2026 on main c57a1c2c9, WebGL 2, the same check twice in one hour.
+  UNDER LOAD (a main push ran its full gate beside the picture run; load average 6.7): worst child
+  1 at 0.99 % of its own judged time, group 0.20 % (11 of 5785 one-second windows, 133.3 judged
+  child-seconds), worst window 14.4 s having walked 1.40 m inside 0.24 m. That group share is ABOVE
+  the tenth-of-a-percent cap this point's charge entry deliberately draws, so it stayed unaccounted
+  and red. QUIET, the same block alone 40 minutes later: worst child 1 at 0.34 %, group 0.07 %
+  (4 of 5850 windows, 196.0 judged child-seconds), burst reading 0.00 % — exactly the composition
+  already charged here, and the runner said so ("every red is charged to open point 1068"). The
+  full quiet WebGL 2 pass afterwards was GREEN on this check, and the same block on WebGPU was
+  green in the same window. So the composition SCALES WITH LOAD: quiet it stays under the cap,
+  loaded it jumps over it. This is one pair, not the eight-run probe this point still owes, but it
+  is the first measured statement about what the load moves.
   Final state:
   - The throttle probe says whether it is load or a defect, and the eight results are printed.
   - Whichever it is: the charge is removed by a fix, or it is kept with the measurement that
@@ -5173,6 +5324,23 @@ Build order, chosen so no two parallel agents own the same file:
   now does. They stay separate points because each has its own suspected cause, but they
   are ONE measurement: the quiet-machine repeat run this point owes is taken for all four
   at once rather than paid three more times.
+  NARROWED 16.09.2026 (point 1137's covering both-backend LARGE, quiet machine, merge
+  candidate 154b54c15, WebGL 2 lane): `flow` is now THE red that stops a both-backend
+  LARGE dead. It failed BOTH attempts with `page.reload: Timeout 30000ms exceeded`
+  waiting for `networkidle` (`scripts/verify/flow.mjs:118`, the reload AFTER
+  `localStorage.clear()`), printed 0 pass / 0 fail and no named check, and the runner
+  classed it UNCLASSIFIED — so the charge table cannot match it and the run closes "own
+  or unresolved". Because lane 1 went red the run NEVER PROCEEDED to the WebGPU lane:
+  while this stands, no single invocation can produce a both-backend picture, which is
+  exactly what the release proof needs. That makes this the most valuable of the flake
+  sites above, not merely the most reproducible.
+  WHAT THIS RULES OUT: the cause documented in flow.mjs' own header comment — the Kokoro
+  model download holding `networkidle` open — does NOT apply here. The TTS cache was
+  COMPLETE in that worktree (`.cache/tts/.complete` present, 14 files), so
+  `installTtsCache` ran strict and served from disk rather than reaching the CDN. The
+  documented fix is already in place and the suite timed out anyway; look past it. The
+  fix this point already names stands and is cause-independent: wait for the app's own
+  ready signal instead of `networkidle`.
 
 - [ ] 309. Serving-model degradation: repair + tripwire (user 25.07.2026). REPAIR: the
   late-evening session of 24.07 ran silently on Haiku 4.5 (proven by the Co-Authored-By
@@ -15693,3 +15861,37 @@ to land than a mechanism that needs a review.
   Refs: scripts/batch-claim.mjs, scripts/batch-in-flight.mjs, scripts/verify/run-wait.mjs,
   scripts/verify/run-all.mjs, scripts/verify/run-logged.mjs
   Bundle: Session- & Repo-Hygiene
+
+
+- [ ] 1144. Three of six probed village layouts leave no way out of the settlement,
+  and the dev assertion that says so has been firing unread (measured 17.09.2026 while
+  reviewing point 1045). `buildLayout` ends with
+  `const wayOut = pickWayOut(colliders, radius, bank)` and a `devAssert(wayOut !== null,
+  'way-out-missing', …)` at `layout.ts` ~1794. That assertion fires, and the same three
+  layouts fail IDENTICALLY on `main` and on `feat/1045-village-water-path`, so the gate
+  work is not the cause and the defect is older than it:
+  `bambara-village@2861293141`, `mandinka-village@1716508768` and
+  `mandinka-village@3170420543` all return `wayOut === null`, against three that return a
+  bearing (`bambara-village` at 2987912600, 7 and 1337). Point 1045 saw this ONCE over its
+  124-seed sweep and filed it verbatim as "recorded here, not diagnosed"; the six-pair
+  probe says the share is far larger than one in 124, and it is not confined to one people.
+  WHAT IS NOT YET KNOWN, and is the first half of this point: what the player actually
+  loses. `wayOut` is read twice further down — the flora and the loose rocks standing ON
+  the crossing are cleared with `onWayOut(...)` — so a null bearing may mean only that no
+  lane is swept clear, or it may mean the built fabric really does ring the place with no
+  gap a walker fits through. Measure that against the collider set at `WALKER_RADIUS`
+  before choosing a repair; the assertion's own text ("the built fabric leaves no crossing
+  of the boundary free") claims the second, and has never been checked.
+  Final state:
+  - Either every village layout carries a way out, or the cases that cannot are named with
+    a measured reason and the assertion stops claiming more than it knows.
+  - The dev assertion no longer fires in a green suite run: today `layout.test.ts` prints
+    it five times and passes anyway, which is exactly how it stayed unread.
+  Test: Vitest over the layout — sweep the river villages and assert `wayOut !== null`
+  (or the named, measured exception), plus a walker-radius check that the crossing the
+  bearing names is really free. No picture check unless the repair moves the fabric.
+  Criticality: medium until the player impact is measured; high if the second reading holds
+  and the player can be shut inside a settlement.
+  Refs: src/scenes/place/layout.ts (`pickWayOut`, the `way-out-missing` devAssert, `onWayOut`),
+  src/scenes/place/layout.test.ts
+  Bundle: Dorfleben
