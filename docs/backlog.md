@@ -1378,3 +1378,26 @@ ist in dieser Konfiguration schlicht ein No-op und schadet nicht. Offen bleibt
 die Frage, für welche Lauf-Formen die im Punkt genannte Messgrenze überhaupt
 gilt; wer sie das nächste Mal braucht, misst sie an einer Suite, die ihr Log
 tatsächlich im Worktree anlegt, statt sie aus dem Punkttext zu übernehmen.
+
+## Fünf `feat/`-Branches überleben ihren Merge, zwei davon mit ungemergter Arbeit
+
+Gemessen 18.09.2026 auf `main` d8e1e6129. `git worktree list` und `git branch`
+nennen `feat/1049-queue-order-rule`, `feat/834-durable-authoring-lane`,
+`feat/847-brevity-guard-gaps`, `feat/901-superseded-ci-run` und
+`feat/1133-detached-authoring-run` — jeweils mit Worktree und Remote-Branch.
+CLAUDE.md §6 sagt: der Merge beendet den Branch.
+
+Zwei tragen Substanz, die niemand gemergt hat. `feat/847` hält 622 Zeilen über
+`scripts/guide-brevity-core.mjs` und dessen Test, sein Punkt 847 ist noch OFFEN,
+und `main` ist seit dem 23.08. in mindestens fünf Commits durch dieselbe Datei
+gelaufen — der Branch ist ein Monat Divergenz. `feat/834` hält 12402 Zeilen über
+54 Dateien, während sein Punkt in `docs/tasks-archive.md` als erledigt steht: was
+834 gelandet hat, war nicht dieser Branch. Die beiden anderen halten je einen
+Datensatz in `.claude/mechanism-reviews.jsonl`.
+
+Nicht als Punkt eingereiht (Befundaufnahme CLAUDE.md §2, Infrastruktur-Freeze):
+kein Spielerbelang, keine Blockade, keine falsche Freigabe — alle fünf sind
+gepusht, es geht nichts verloren. Was fehlt, ist die Unterscheidbarkeit: ein
+Leser sieht den aufgegebenen Branches nicht an, dass sie aufgegeben sind. Wer
+847 anfasst, prüft zuerst, ob die 622 Zeilen gegen das heutige `main` überhaupt
+noch tragen, statt sie zu mergen.

@@ -1368,6 +1368,12 @@
       "why": "Nutzerauftrag vom 17.09.2026, 21:53, mit ausdrücklich genannter Platzierung: »Dann reihe das nach 1082 ein, ja.«",
       "origin": "user",
       "place": "ahead"
+    },
+    "1153": {
+      "at": "2026-09-18T05:28:45.689Z",
+      "why": "Low criticality and no player impact: it costs the operator calls at a landing, and every open point ahead of it is closer to the picture.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1400,7 +1406,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-18T03:42:03.002Z",
+    "at": "2026-09-18T05:28:45.701Z",
     "points": [
       174,
       184,
@@ -1807,7 +1813,8 @@
       1149,
       1150,
       1151,
-      1152
+      1152,
+      1153
     ]
   }
 }
