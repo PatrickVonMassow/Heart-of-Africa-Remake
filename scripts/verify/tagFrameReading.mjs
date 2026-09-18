@@ -125,24 +125,36 @@ export const WALL_CLEARANCE = 3.5
  * Returns `{ ok, reason }` — `reason` naming the FIRST rule that failed, so a
  * red run says which one and with what number.
  */
+/**
+ * ONE CHILD, as the frame shows it: whole, inside the frame, unoccluded, drawn
+ * where the state says it is, and big enough to read as a person.
+ *
+ * Extracted from `judgeTagStandpoint` so a picture of ONE child is judged by the
+ * very same bar as the pair (work-order 1082: the child standing on the boulder
+ * it has just named). `who` names the figure in the reason a red run prints.
+ */
+export function judgeChildFigure(c, who) {
+  if (!c || !c.ndcFeet || !c.ndcHead) return { ok: false, reason: `${who} is behind the camera` }
+  for (const p of [c.ndcFeet, c.ndcHead]) {
+    if (Math.abs(p[0]) > FRAME_MARGIN || Math.abs(p[1]) > FRAME_MARGIN)
+      return { ok: false, reason: `${who} sits outside the inner ${FRAME_MARGIN} of the frame` }
+  }
+  if (c.occluded > 0)
+    return { ok: false, reason: `${who} is occluded at ${c.occluded}/${AXIS_SAMPLES.length} of its height` }
+  if (c.confirmed < MIN_CONFIRMED_SAMPLES)
+    return { ok: false, reason: `${who} is not drawn on its sight line (${c.confirmed} confirmed samples)` }
+  if (!(c.pixels >= MIN_CHILD_PIXELS))
+    return { ok: false, reason: `${who} reads ${Math.round(c.pixels)} px, below the ${MIN_CHILD_PIXELS} px floor` }
+  return { ok: true, reason: `${who} reads whole and unoccluded at ${Math.round(c.pixels)} px` }
+}
+
 export function judgeTagStandpoint(reading) {
   const { clear, behind, gap, nearestWall, children } = reading
   if (!clear) return { ok: false, reason: 'the sight line to the pair is obstructed' }
   if (!Array.isArray(children) || children.length < 2) return { ok: false, reason: 'the chase has no pair to photograph' }
   for (let i = 0; i < children.length; i++) {
-    const c = children[i]
-    const who = i === 0 ? 'the chaser' : 'the quarry'
-    if (!c || !c.ndcFeet || !c.ndcHead) return { ok: false, reason: `${who} is behind the camera` }
-    for (const p of [c.ndcFeet, c.ndcHead]) {
-      if (Math.abs(p[0]) > FRAME_MARGIN || Math.abs(p[1]) > FRAME_MARGIN)
-        return { ok: false, reason: `${who} sits outside the inner ${FRAME_MARGIN} of the frame` }
-    }
-    if (c.occluded > 0)
-      return { ok: false, reason: `${who} is occluded at ${c.occluded}/${AXIS_SAMPLES.length} of its height` }
-    if (c.confirmed < MIN_CONFIRMED_SAMPLES)
-      return { ok: false, reason: `${who} is not drawn on its sight line (${c.confirmed} confirmed samples)` }
-    if (!(c.pixels >= MIN_CHILD_PIXELS))
-      return { ok: false, reason: `${who} reads ${Math.round(c.pixels)} px, below the ${MIN_CHILD_PIXELS} px floor` }
+    const verdict = judgeChildFigure(children[i], i === 0 ? 'the chaser' : 'the quarry')
+    if (!verdict.ok) return verdict
   }
   // Two figures, not one silhouette holding two children.
   const apart = MIN_SEPARATION_FACTOR * ((children[0].pixels + children[1].pixels) / 2)

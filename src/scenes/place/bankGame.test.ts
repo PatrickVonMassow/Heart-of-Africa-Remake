@@ -29,6 +29,7 @@ import {
   bankVoiceRegister,
   bankChildBodyLift,
   bankChildTouching,
+  bankLabelSeconds,
   createBankGame,
   insideStrangerBerth,
   otherEnd,
@@ -812,6 +813,76 @@ describe('the children`s game at the bank (point 687)', () => {
       // Nobody may shove it off the stone while it is up there.
       expect(bankChildCanSeparate({ ...c, climb: 'top' } as typeof c)).toBe(false)
     }
+  })
+
+  it('carries the stand`s own length on the word, so word, arm and stand are ONE duration', () => {
+    // WORK-ORDER 1082. The note over the child's head lasted `labelSeconds` and
+    // the stand `climbHoldSeconds`: 2.6 against 2.8, in agreement only by
+    // accident of their values, so lengthening the stand alone would have left a
+    // child standing wordless on a stone. The utterance now CARRIES the hold and
+    // the scene reads the label's length off it.
+    const world = openWorld()
+    const b = STAGE.boulder
+    for (const seed of SEEDS) {
+      const rand = mulberry32(seed)
+      const s = createBankGame([{ x: b.x - 6, z: b.z + 4 }], rand, CFG)
+      let said: BankUtterance | null = null
+      for (let t = 0; t < 120 && !said; t += 1 / 60) {
+        const u = stepBankGame(s, 1 / 60, CFG, STAGE, world, rand)
+        if (u?.moment === 'boulder') said = u
+      }
+      expect(said).not.toBeNull()
+      expect(said!.hold).toBe(CFG.climbHoldSeconds)
+      // The note lasts exactly the stand, whatever the stand is set to — and
+      // never less than an ordinary word.
+      expect(bankLabelSeconds(said!, 2.6)).toBe(CFG.climbHoldSeconds)
+      expect(bankLabelSeconds({ ...said!, hold: 12 }, 2.6)).toBe(12)
+      expect(bankLabelSeconds({ ...said!, hold: undefined }, 2.6)).toBe(2.6)
+      expect(bankLabelSeconds({ ...said!, hold: 0.4 }, 2.6)).toBe(2.6)
+    }
+  })
+
+  it('turns the rest of the group toward the stone while one of them stands on it — a turn only', () => {
+    // WORK-ORDER 1082, part C: something has to pull the eye BEFORE the word
+    // does. The others look over while the climber is up there, and they look
+    // over WITHOUT stopping: no walk is interrupted, which is the thing the
+    // child-motion floor and the shuffle gate would have paid for.
+    const world = openWorld()
+    const b = STAGE.boulder
+    let watchedFrames = 0
+    for (const seed of SEEDS) {
+      const rand = mulberry32(seed)
+      const spots = Array.from({ length: 5 }, (_, i) => ({
+        x: STAGE.roam.x + Math.cos((i / 5) * Math.PI * 2) * 2.4,
+        z: STAGE.roam.z + Math.sin((i / 5) * Math.PI * 2) * 2.4,
+      }))
+      const s = createBankGame(spots, rand, CFG)
+      let aimedAtTheStone = 0
+      let looked = 0
+      for (let t = 0; t < 180; t += 1 / 60) {
+        const walkedBefore = s.children.map((c) => c.walked)
+        stepBankGame(s, 1 / 60, CFG, STAGE, world, rand)
+        if (s.phase !== 'roam' || !s.children.some((c) => c.climb === 'top')) continue
+        watchedFrames++
+        for (let i = 0; i < s.children.length; i++) {
+          const c = s.children[i]
+          if (c.climb !== 'none') continue
+          looked++
+          // THE TURN: its facing closes on the stone rather than on the way it
+          // is walking.
+          const toStone = Math.atan2(b.x - c.x, b.z - c.z)
+          const off = Math.abs(Math.atan2(Math.sin(c.facing - toStone), Math.cos(c.facing - toStone)))
+          if (off < 0.35) aimedAtTheStone++
+          // AND NOBODY STOPS FOR IT: a child that was walking keeps walking.
+          if (c.pace > 0) expect(c.walked).toBeGreaterThan(walkedBefore[i])
+        }
+      }
+      // Over a stand of seconds every onlooker comes round to it: measured
+      // 3121-3193 of 3368 onlooker frames across the five seeds, the remainder
+      // being the turn itself at the start of each stand.
+      expect(aimedAtTheStone).toBeGreaterThan(looked * 0.8)
+    }
+    expect(watchedFrames).toBeGreaterThan(60)
   })
 
   it('holds a tagged child in its posture, and moves it only between runs', () => {

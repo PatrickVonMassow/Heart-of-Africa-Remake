@@ -3325,6 +3325,7 @@ export function PlaceScene() {
           playRocks={layout.playRocks}
           playGround={layout.playGround}
           rocks={layout.rocks}
+          climbRock={layout.climbRock}
           firePos={[-3.5, 2.5]}
           homes={layout.dwellings
             .filter((d) => d.kind === 'hut' || d.kind === 'box')

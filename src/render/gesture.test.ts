@@ -286,6 +286,30 @@ describe('all four gestures READ — each moves, and each moves differently', ()
     expect(indicateYaws[2]).toBeLessThanOrEqual(bearing + 1e-6)
   })
 
+  it('an INDICATE given a long duration sweeps at its own pace and then HOLDS', () => {
+    // WORK-ORDER 1082. The sweep used to ride a FRACTION of the duration, so an
+    // arm asked to stay out for the seven seconds a child stands on a stone
+    // travelled onto its bearing in slow motion for four of them. It now rides
+    // its own seconds: the ordinary gesture is unchanged, and the long one
+    // reaches the same aim at the same moment and keeps it.
+    const bearing = 1.0
+    const long = startGesture('indicate', { bearing, duration: 7 })
+    const ordinary = startGesture('indicate', { bearing })
+    const sweepDone = GESTURE_DURATIONS.indicate * 0.6
+    expect(gesturePose({ ...long, t: sweepDone }).left.yaw).toBeCloseTo(
+      gesturePose({ ...ordinary, t: sweepDone }).left.yaw,
+      9,
+    )
+    // …and it is STILL out at the bearing five seconds later, which is the whole
+    // point: something is pointing at the stone for as long as the child is up
+    // on it.
+    const held = gesturePose({ ...long, t: 6 }).left.yaw
+    expect(held).toBeCloseTo(gesturePose({ ...long, t: sweepDone }).left.yaw, 6)
+    expect(advanceGesture({ ...long, t: 6 }, 1 / 60).kind).toBe('indicate')
+    // The pose is genuinely up through the hold, not faded to rest.
+    expect(gestureEnvelope({ ...long, t: 6 })).toBeGreaterThan(0.5)
+  })
+
   it('a BECKON leans in and a REFUSE leans away — point 351 reads posture the same way', () => {
     expect(midPose('beckon').lean).toBeGreaterThan(0)
     expect(midPose('refuse').lean).toBeLessThan(0)

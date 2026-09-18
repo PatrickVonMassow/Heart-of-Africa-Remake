@@ -35,6 +35,8 @@ import { closestOnPolyline } from './lanePlan'
 import { PLACES, placeById } from '../../world/geo'
 import { ROCK_VILLAGE_ID, ROCK_FOOTPRINT_UNITS, communicationRockSite } from '../../world/communicationRock'
 import { buildRiverBank, inBankPlayLane } from './riverBank'
+import { CLIMB_ROCK_TOP, climbBoulder, looseRock } from './looseRocks'
+import { pinchesPassage } from './wedgeCarve'
 import { mulberry32 } from '../../world/noise'
 import { balance } from '../../config/balance'
 import { setupGeodata } from '../../test/geodata'
@@ -1005,5 +1007,61 @@ describe('every settlement keeps one way out free (work-order 688)', () => {
       expect(layout.flora.length, `${id} seed ${seed}: flora`).toBeGreaterThanOrEqual(6)
       expect(layout.rocks.length, `${id} seed ${seed}: rocks`).toBeGreaterThanOrEqual(11)
     }
+  })
+})
+
+// THE STONE A CHILD CLIMBS IS PLACED BY THE LAYOUT (work-order 1082). Point 1080
+// searched the scatter for it — the nearest instance above a height floor — and
+// the user reported the climb missing a second time: at the low end of the
+// scatter's size range the "climb" is a step onto a pebble, and raising the floor
+// alone sent the climber metres off. So the stone is DERIVED, the way the two
+// play rocks are, and what must hold is that every village gets one, that it
+// stands where the round can reach it, and that it narrows nothing.
+describe.each(SEEDS)('the derived climbing stone (seed %i)', (seed) => {
+  it.each(VILLAGES.map((p) => [p.id] as const))('%s: carries one beside the children`s quarter', (id) => {
+    const layout = buildLayout(id, seed)
+    const quarter = layout.playGround
+    expect(quarter, `${id}: a village carries a children's quarter`).toBeTruthy()
+    const derived = layout.climbRock
+    expect(derived, `${id} seed ${seed}: a derived climbing stone`).not.toBeNull()
+    const stone = looseRock(derived!)
+    // The round is handed THAT stone rather than searching for one.
+    const chosen = climbBoulder(layout.rocks, quarter!, balance.villageLife.bankGame.climbableRockTop, derived)
+    expect(chosen).toEqual(stone)
+    // It is an ORDINARY entry of the scatter: drawn with the rest, and its
+    // collider is the one the climb's approach stops outside of.
+    expect(layout.rocks).toContain(derived)
+    const circles = layout.colliders.filter((c): c is Collider & { r: number } => 'r' in c)
+    const collider = circles.find((c) => Math.hypot(c.x - stone.x, c.z - stone.z) < 1e-9)
+    expect(collider?.r).toBeCloseTo(stone.radius, 9)
+    // High enough to be a climb rather than a step, every time.
+    expect(stone.height).toBeCloseTo(CLIMB_ROCK_TOP, 9)
+    expect(stone.height).toBeGreaterThan(balance.villageLife.bankGame.climbableRockTop)
+    // OUTSIDE the quarter — the group roams on open ground, not between
+    // boulders — and still within a short walk of its rim.
+    const away = Math.hypot(stone.x - quarter!.x, stone.z - quarter!.z)
+    expect(away).toBeGreaterThanOrEqual(quarter!.radius + stone.radius + WALKER_RADIUS)
+    expect(away - quarter!.radius - stone.radius - WALKER_RADIUS).toBeLessThanOrEqual(6)
+    // Clear of the children's running lane and of the walk down to the water,
+    // the two routes the round itself uses.
+    expect(inBankPlayLane(layout.playRocks, stone.x, stone.z, stone.radius)).toBe(false)
+    if (layout.bank) {
+      const route = closestOnPolyline(
+        [[quarter!.x, quarter!.z], [layout.bank.bank.x, layout.bank.bank.z]],
+        stone.x,
+        stone.z,
+      ).dist
+      expect(route).toBeGreaterThan(stone.radius)
+    }
+    // And on a lane nobody walks it off: the settlement's own paths stay clear.
+    for (const path of layout.paths) {
+      const d = closestOnPolyline(path.points, stone.x, stone.z).dist
+      expect(d, `${id} seed ${seed}: stone on a lane`).toBeGreaterThan(path.width / 2)
+    }
+    // IT NARROWS NOTHING: no boundary already standing is near enough to make
+    // the stone half of a pinch pair, which is what would carve a slot out of
+    // the children's own ground and squeeze the group along it.
+    const others = layout.colliders.filter((c) => c !== collider)
+    expect(pinchesPassage(others, stone.x, stone.z, stone.radius, WALKER_RADIUS)).toBe(false)
   })
 })

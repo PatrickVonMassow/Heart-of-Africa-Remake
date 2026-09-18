@@ -183,6 +183,8 @@ export function buildGizaLayout(_seed: number): PlaceLayout {
     paths: [],
     flora: [],
     rocks: [],
+    // No children's quarter here, so no stone for one to climb.
+    climbRock: null,
     digSites: [], // and the ground work of point 483 is village life, not a monument's
     bank: null, // the plateau stands well clear of the Nile (work-order 482)
     playRocks: null, // and with no bank there is no children's stretch (687)
