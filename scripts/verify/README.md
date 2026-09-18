@@ -610,6 +610,43 @@ no rung:
   very pass it declared itself meaningless in, and it keeps its full force
   standalone. Referred to here, never re-built.
 
+#### A rung that saw nothing gives no all-clear (point 1136)
+
+`nonPredictive` above is the FALLBACK, and it was the wrong first answer: it
+declares, once and for all, that a reading cannot be trusted, and then nothing
+ever measures whether it could. The cheaper and provable way is to **create the
+rare situation and say how often it was really reached**:
+
+1. **The check creates its own subject.** `adult-errands` no longer waits for
+   the village to send a water carrier — one errand runs at a time and it waits
+   its turn behind two digging situations, which is why a fixed window saw many
+   alone and ONE inside the pass. `window.__placeCastErrand('water-out')` puts
+   the village's OWN casting queue back on the water whenever no carrier is out.
+   It stages nothing: whether the situation is castable, who is free, where the
+   two of them stand and every phase afterwards stay the game's, so a casting
+   that stopped working still goes red. A separate check proves the creation
+   reached its subject, rather than leaving every reading below it quietly at
+   zero.
+2. **The subject count decides a THIRD verdict.** A subject-dependent check
+   hands `{ subjects, minimum, what }` to `check()` beside its assertion. Below
+   the named minimum the line reads `NOT-COVERING`: counted as neither a pass
+   nor a failure, in a narrow run exactly as in the whole suite, because a
+   non-measurement is a non-measurement in both. The observed reading is printed
+   beside the count and decides nothing — the question stays OPEN. Above the
+   minimum the check decides normally and still prints what it saw, so nobody
+   has to take a green on trust. `coverageVerdict` in `sections.mjs` is the pure
+   decision; the run names every open question again beside its verdict, and
+   `run-all.mjs` and the digest carry those lines out like the PARTIAL banner.
+3. **Where creation is impossible**, the section gets the tick and seed budget
+   of the full run so rung and suite measure the same thing — and if the rung
+   then costs more than it is worth, it is deleted without replacement and the
+   check stays the bundle's business. `nonPredictive` remains for that case.
+
+This is an EVALUATION, not a guard, and its scope is the measured
+subject-dependent checks — it is not spread over every suite. One fixed scenario
+does not replace natural variance either, which is why the broad closing run
+stays as it was.
+
 Everything fails OPEN. A ladder that cannot read the tree (no `main` to compare
 against, an unreadable ledger, a missing mapping) lets the run start and says so.
 On `main` only uncommitted work counts as an edit, which keeps a fresh clone and
