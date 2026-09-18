@@ -1339,18 +1339,6 @@
       "origin": "machine",
       "place": "ahead"
     },
-    "1134": {
-      "at": "2026-09-15T21:54:14.530Z",
-      "why": "Nutzerauftrag vom 15.09.2026, im Punkttext woertlich zitiert, ausdruecklich als naechstes eingereiht",
-      "origin": "user",
-      "place": "ahead"
-    },
-    "1136": {
-      "at": "2026-09-15T21:54:14.639Z",
-      "why": "Nutzerauftrag vom 15.09.2026, im Punkttext woertlich zitiert, ausdruecklich als naechstes eingereiht",
-      "origin": "user",
-      "place": "ahead"
-    },
     "1144": {
       "at": "2026-09-16T22:48:11.705Z",
       "why": "Last is right: its first act is measuring what the player actually loses, and the whole layout path in front of it (1143, then 1045's neighbours) writes the same file.",
@@ -1367,12 +1355,6 @@
       "at": "2026-09-17T21:40:56.098Z",
       "why": "Vom Nutzer am 17.09.2026 um 20:51 selbst angefordert — die Steuerhinweise sollen auf die Höhe der Inventarleiste rücken; ein Nutzerwunsch steht vor dem Release, ohne Dringlichkeitsnachweis.",
       "origin": "user",
-      "place": "ahead"
-    },
-    "1147": {
-      "at": "2026-09-17T21:42:17.944Z",
-      "why": "Stehende Blockade auf main selbst: der Wächter nennt polish.mjs seit der Landung von 1141 als offenen Renderpfad, jeder von main geschnittene Zweig erbt die Forderung nach einer Zwei-Backend-Bildprüfung, und 633 wie 174 stehen dahinter.",
-      "origin": "machine",
       "place": "ahead"
     },
     "1148": {
@@ -1418,7 +1400,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-18T00:36:30.037Z",
+    "at": "2026-09-18T03:42:03.002Z",
     "points": [
       174,
       184,
@@ -1818,15 +1800,14 @@
       1129,
       1132,
       1133,
-      1134,
-      1136,
       1144,
       1145,
       1146,
-      1147,
       1148,
       1149,
-      1150
+      1150,
+      1151,
+      1152
     ]
   }
 }
