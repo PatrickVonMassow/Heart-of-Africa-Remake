@@ -1116,50 +1116,42 @@ if (section('hud-bottom-row')) {
   check('the map button sits left of the journal button (point 93)', btnRow.hasMap && btnRow.hasJournal && btnRow.mapLeftOfJournal, JSON.stringify(btnRow))
   check('the bottom-right buttons do not overlap (point 93)', !btnRow.overlapMapJournal && !btnRow.overlapCampMap, JSON.stringify(btnRow))
 
-  // --- Point 1146: the steering hint sits at the inventory bar's height -------
-  // WHAT IS MEASURED, and why it is measured this way: the real `.cursor-mode-hint`
-  // is hidden under `navigator.webdriver` (Hud.tsx ~L216, its own OPEN note), so no
-  // Playwright frame can carry it. The CSS RULE is therefore measured on a PROBE
-  // that carries the same class inside the same `.hud-bottom-left` row, against the
-  // REAL inventory bar — the rendered rectangles of both, never a constant. The
-  // inventory is set directly (no F3: that would also change travel speed for every
-  // later section) and restored afterwards.
+  // --- Point 1160: the steering hint stands at the VIEWPORT's centre ---------
+  // WHAT IS MEASURED, and why it is measured this way: the real
+  // `.cursor-mode-hint` hides under `navigator.webdriver` (Hud.tsx, its own OPEN
+  // note), so point 1146 had to judge its CSS on a probe. This judges the REAL
+  // element instead, behind a throwaway mask of that one flag: it is set false,
+  // the HUD is re-rendered through the touch flag it already subscribes to, and
+  // both are put back afterwards. The mask is safe here because every other
+  // reader of the flag sits in a CLICK handler (the pointer-lock request), and
+  // nothing clicks in this block. The rectangles are the rendered ones —
+  // the hint, the real inventory bar and the real button group — never a
+  // constant. The inventory is set directly (no F3: that would also change
+  // travel speed for every later section) and restored afterwards.
   const HINT_VIEWPORTS = [
     { name: 'default', width: 1440, height: 900 },
     { name: 'narrow', width: 900, height: 700 },
   ]
-  await page.evaluate(async () => {
-    const { getStrings } = await import('/src/i18n/index.ts')
+  await page.evaluate(() => {
     const g = window.__game
-    window.__hint1146 = {
+    window.__hint1160 = {
       before: (({ equipment, treasures, carriedForms, rockArtefact }) => ({
         equipment, treasures, carriedForms, rockArtefact,
       }))(g.getState()),
     }
-    const strings = getStrings()
-    // The LONGER of the two hint strings is the worst case for the clearance.
-    const text = [strings.hud.cursorModeLocked, strings.hud.cursorModeUnlocked].sort(
-      (a, b) => b.length - a.length,
-    )[0]
-    const row = document.querySelector('.hud-bottom-left')
-    if (!row) return
-    const probe = document.createElement('div')
-    probe.className = 'cursor-mode-hint'
-    probe.textContent = text
-    row.appendChild(probe)
-    window.__hint1146.probe = probe
-    window.__hint1146.text = text
+    // The mask is an OWN property shadowing the prototype getter, so taking it
+    // off again is a delete — nothing about the real flag is overwritten.
+    Object.defineProperty(navigator, 'webdriver', { configurable: true, get: () => false })
   })
-  /** One reading: both rectangles, every slot rectangle, and the right-hand row. */
+  /** One reading of the whole band: the hint, the bar, every slot, the buttons. */
   const readHintBand = (wrapped) =>
     page.evaluate(async (wrap) => {
       const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
-      const [{ EQUIPMENT_IDS }, { TREASURE_IDS }] = await Promise.all([
+      const [{ EQUIPMENT_IDS }, { TREASURE_IDS }, { useUi }] = await Promise.all([
         import('/src/state/store.ts'),
         import('/src/systems/economy.ts'),
+        import('/src/state/ui.ts'),
       ])
-      const probe = window.__hint1146?.probe
-      if (!probe) return { why: 'no .hud-bottom-left row' }
       const equipment = {}
       const treasures = {}
       for (const t of TREASURE_IDS) treasures[t] = wrap ? 1 : 0
@@ -1167,37 +1159,53 @@ if (section('hud-bottom-row')) {
       else equipment.shovel = 1
       const want = wrap ? EQUIPMENT_IDS.length + TREASURE_IDS.length : 1
       window.__game.setState({ equipment, treasures, carriedForms: [], rockArtefact: 'buried' })
+      // The hint reads `navigator.webdriver` at RENDER time, so the mask only
+      // shows once React renders again: the touch flag it subscribes to is
+      // toggled and put straight back.
+      useUi.setState({ touchActive: true })
+      useUi.setState({ touchActive: false })
       // Poll on the rendered state, not on a fixed wait (point 249): the bar
-      // re-renders and its ResizeObserver republishes the height.
+      // re-renders and its ResizeObserver republishes the height, and the
+      // hint's own placement observer answers one layout later.
       const t0 = Date.now()
-      let bar = null, slots = []
+      let bar = null, slots = [], hint = null
       while (Date.now() - t0 < 10000) {
         bar = document.querySelector('.inventory-bar')
+        hint = document.querySelector('.cursor-mode-hint')
         slots = [...document.querySelectorAll('.inventory-bar > button, .inventory-bar > .inv-item')]
-        if (bar && slots.length === want) break
+        if (bar && hint && slots.length === want) break
         await sleep(100)
       }
       if (!bar || !slots.length) return { why: `no inventory bar (${slots.length}/${want} slots)` }
-      // The real hint is the row's LAST child (Hud.tsx renders it after the bar);
-      // React re-mounts the bar behind a foreign node, so re-append to that place.
-      bar.parentElement.appendChild(probe)
+      if (!hint) return { why: 'the steering hint did not render under the mask' }
+      await sleep(150) // let the placement observer settle on these rectangles
+      const row = document.querySelector('.hud-bottom-row')
       const b = bar.getBoundingClientRect()
-      const h = probe.getBoundingClientRect()
+      const h = hint.getBoundingClientRect()
+      const r = row.getBoundingClientRect()
       const rowH = slots[0].getBoundingClientRect().height
       const right = document.querySelector('.hud-bottom-right')?.getBoundingClientRect() ?? null
-      const hits = (r) => !(h.right <= r.left || h.left >= r.right || h.bottom <= r.top || h.top >= r.bottom)
-      const barHits = (r) => !(b.right <= r.left || b.left >= r.right || b.bottom <= r.top || b.top >= r.bottom)
+      const shown = getComputedStyle(hint).visibility !== 'hidden'
+      const hits = (rect) => !(h.right <= rect.left || h.left >= rect.right || h.bottom <= rect.top || h.top >= rect.bottom)
+      const barHits = (rect) => !(b.right <= rect.left || b.left >= rect.right || b.bottom <= rect.top || b.top >= rect.bottom)
       return {
         slots: slots.length,
         barRows: +(b.height / rowH).toFixed(2),
         wrapped: b.height > rowH * 1.5,
-        // THE POINT'S TARGET: one bottom edge for both rectangles.
+        // THE POINT'S TARGET: the hint's centre on the row's centre, which the
+        // row's equal 12px margins make the viewport's centre.
+        shown,
+        placement: hint.className.match(/cursor-mode-(centre|beside|hidden)/)?.[1] ?? null,
+        offCentre: +((h.left + h.right) / 2 - (r.left + r.right) / 2).toFixed(1),
+        // Point 1146's own target, kept: one bottom edge for hint and bar.
         bottomGap: +(h.bottom - b.bottom).toFixed(1),
-        // Beside the bar, outside its box, and clear of every single slot.
+        // It belongs to the ROW now, not to the bar's group (point 1160).
+        inRow: hint.parentElement === row,
+        inLeftGroup: !!hint.closest('.hud-bottom-left'),
         beside: h.left >= b.right - 0.5,
-        overlapsBar: hits(b),
-        overlapsSlot: slots.some((el) => hits(el.getBoundingClientRect())),
-        overlapsButtons: right ? hits(right) : false,
+        overlapsBar: shown && hits(b),
+        overlapsSlot: shown && slots.some((el) => hits(el.getBoundingClientRect())),
+        overlapsButtons: shown && right ? hits(right) : false,
         // The one row also has to keep the BAR off the buttons: the left group
         // shrinks against `margin-left: auto` instead of walking under them.
         barOverlapsButtons: right ? barHits(right) : false,
@@ -1206,11 +1214,13 @@ if (section('hud-bottom-row')) {
         vw: window.innerWidth,
       }
     }, wrapped)
+  /** True of every placement: in the row, on the bar's bottom edge, overlapping nothing. */
   const bandOk = (r) =>
     !!r &&
     !r.why &&
+    r.inRow &&
+    !r.inLeftGroup &&
     Math.abs(r.bottomGap) <= 1 &&
-    r.beside &&
     !r.overlapsBar &&
     !r.overlapsSlot &&
     !r.overlapsButtons &&
@@ -1222,24 +1232,33 @@ if (section('hud-bottom-row')) {
     const one = await readHintBand(false)
     const many = await readHintBand(true)
     check(
-      `the steering hint shares the inventory bar's bottom edge with ONE slot, ${vp.name} viewport (point 1146)`,
-      bandOk(one) && one.slots === 1 && !one.wrapped,
+      `the steering hint stands at the viewport's centre on the bar's bottom edge, ${vp.name} viewport (point 1160)`,
+      bandOk(one) && one.slots === 1 && !one.wrapped && one.shown &&
+        one.placement === 'centre' && Math.abs(one.offCentre) <= 1,
       JSON.stringify(one),
     )
     check(
-      `the steering hint stays on that bottom edge when the bar WRAPS, ${vp.name} viewport (point 1146)`,
-      bandOk(many) && many.wrapped,
+      `the steering hint YIELDS instead of overlapping when the bar wraps, ${vp.name} viewport (point 1160)`,
+      bandOk(many) && many.wrapped && many.placement !== 'centre' &&
+        (many.placement === 'hidden' ? !many.shown : many.shown && many.beside),
       JSON.stringify(many),
     )
   }
-  // Put the page back the way the later sections expect it: default viewport,
-  // the probe gone, the traveller's own inventory restored.
+  // The picture the user asked for: default viewport, one slot, hint centred.
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.waitForFunction(() => window.innerWidth === 1440, null, { timeout: 10000 }).catch(() => {})
+  await readHintBand(false)
+  await shot('1160-steering-hint-centred', {
+    element: '.cursor-mode-hint',
+    label: 'the steering hint centred in the bottom band, bar left and buttons right',
+  })
+  // Put the page back the way the later sections expect it: the automation flag
+  // as it was, the traveller's own inventory restored.
   await page.evaluate(() => {
-    window.__hint1146?.probe?.remove()
-    if (window.__hint1146?.before) window.__game.setState(window.__hint1146.before)
-    delete window.__hint1146
+    const saved = window.__hint1160
+    delete navigator.webdriver
+    if (saved?.before) window.__game.setState(saved.before)
+    delete window.__hint1160
   })
 }
 
