@@ -1434,3 +1434,11 @@ fasst die Maschine währenddessen nicht an.
   whose every red has an owner. Non-blocking: `render-verify-guard` was clean for point
   1146's merge with exactly this state. Same shape for every section-tagged charge in the
   ledger (point 1119's `polish` entry among them).
+
+- **Ein deckender Bildlauf verliert seinen Beleg an die nächste Diagnose-Sprosse** (gemessen
+  18.09.2026). `scripts/render-verify-core.mjs` liest den JÜNGSTEN Lauf je Grafiklinie, nicht den
+  jüngsten DECKENDEN: Acht Abschnittsläufe einer Drossel-Sonde haben den halbstündigen deckenden
+  Lauf, der unmittelbar davor grün stand, als Beleg gelöscht, und der teure Lauf musste ein
+  zweites Mal fahren. Die Reihenfolge-Regel dagegen steht in der Rückschau (§3.290: erst
+  diagnostizieren, dann beweisen); der Lesefehler selbst wartet hier, weil er nur eine
+  Wiederholung kostet und nichts Falsches durchlässt (Infrastruktur-Freeze 01.09.2026).

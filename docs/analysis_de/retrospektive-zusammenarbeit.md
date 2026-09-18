@@ -1425,7 +1425,7 @@ Wo zwei Einstiege existieren, fragen beide, und genau einmal pro Lauf. Und jede 
 braucht vor ihrem ersten Einsatz einen Probelauf am eigenen Material: Beide Defekte hier haben
 kein Test gefunden, sondern die Gegenlese und der erste echte Gebrauch.
 
-### Der Nachweis lebt im letzten Lauf, nicht im besten
+### 3.290 Der Nachweis lebt im letzten Lauf, nicht im besten
 
 Gemessen am 18.09.2026, beim Bildnachweis eines gelandeten Punktes: Beide deckenden Suiten-Läufe
 standen grün bzw. mit verbuchten Roten im Protokoll — und die Schranke verlangte den Lauf
