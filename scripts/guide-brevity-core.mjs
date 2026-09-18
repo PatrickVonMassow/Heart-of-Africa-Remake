@@ -571,7 +571,11 @@ export const LIMITS = {
   // draft to four after this ceiling refused the first attempt — the refusal is what produced
   // the shorter and better version, and the PER-ENTRY ceiling then cut it again from five
   // lines to three. Net: +3 lines / +29 words. 698 -> 701.
-  maxLines: 701,
+  // 18.09.2026: the measured-overage lesson (a user's number that breaches a limit is reported
+  // with its number, never quietly shrunk) went into the retrospective and reached the guide as
+  // ONE folded clause on the nearest pitfall, paid for by compressing four entries. Net: -1
+  // line / +-0 words. 701 -> 700 — the ceiling follows the measurement DOWN as well as up.
+  maxLines: 700,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
