@@ -131,6 +131,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 15.09. nachmittags | Ein neu eingereihter Punkt erzaehlte der Maschine das Gegenteil von sich selbst: Seine Ueberschrift »has no covering picture run« las der Bildpflicht-Klassierer als VERNEINUNG, der Punkt, dessen einziger Zweck zwei Bildlaeufe sind, wies sich damit als bildfrei aus. Gefangen von einer angehefteten Pruefung, die die exakte Menge solcher Zeilen festhaelt statt ihrer Anzahl; die Korrektur war ein positiv formulierter Satz (§3.274) |
 | 15.09. nachmittags | Und derselbe Punkt trug eine falsche Tatsache: Die deckenden Laeufe lagen scheinbar zwei Stunden VOR dem Merge, den sie decken sollten — Laufstempel in UTC gegen Commit-Zeiten in +0200 gelesen. Beide liefen am Merge-HEAD selbst, mit je sechs Bildern auf beiden Bahnen. Aufgefallen beilaeufig, weil eine Wartequittung ihren HEAD mit ausdruckte. Wortwoertlich die Lehre aus §3.253, drei Tage alt und von mir wiederholt (§3.275) |
 | 15.09. abends | Der beauftragte Autorenlauf zu Punkt 1131 hing ohne `setsid` an der Schale, die ihn startete, und starb mit ihr — sein Protokoll behauptet bis zuletzt »while the run continues«. Ungesichert im Arbeitsbaum lag seine ganze Ausbeute: ein fertiger Reproduktionsstand des gemeldeten Dorfes, gerettet nur, weil ich zufaellig hinsah. Beide Vorsichtsmassnahmen — nach jedem Schritt committen, lange Laeufe abkoppeln — standen geschrieben und adressierten beide den AUFRUFER; Punkt 1133 verschiebt die zweite in den Startpfad des Werkzeugs (§3.106-Nachtrag) |
+| 18.09. vormittags | Ein Ein-Wort-Fix am Zeitstempel-Hook landete auf dem Zweig von Punkt 1155, weil die Sitzung „Current branch: main" aus ihrem Startschnappschuss glaubte, statt den Zweig des Arbeitsbaums zu messen; Cherry-Pick auf main, Revert auf dem Zweig, und der neue Test fiel im Push-Tor erst noch am `windowsHide`-Audit durch (§3.288) |
 
 Muster: Ab dem 22.07. explodiert die Commit-Rate (Delegation) — und genau dann häufen sich die Infrastruktur-Vorfälle. **Skalierung der Autonomie erzeugt eine eigene Problemklasse, die die Feature-Arbeit zeitweise überholt.**
 
@@ -1637,7 +1638,7 @@ stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die s
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Freitag, 18.09.2026, 10:38 · Quellen-Fingerprint: `2d163f8f5bb3…`
+Zuletzt aktualisiert: Freitag, 18.09.2026, 12:07 · Quellen-Fingerprint: `993735df15bb…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1744,8 +1745,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 97 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 135 Prozess-/Meta-TASKS-Punkte (davon 64 offen).
 
-<!-- RETRO-FINGERPRINT: 2d163f8f5bb3cfd03e2dc60ef49411b7582885b817396faccb42be816ac2eef1 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-18T08:38:59.280Z -->
+<!-- RETRO-FINGERPRINT: 993735df15bb8e7b312b4a2c31814e47a75e127abb419178cd4e85dc4d5083e7 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-18T10:07:52.761Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -7593,3 +7594,27 @@ das ein eigener Punkt. Das ist der gefährlichere Zwilling von „geschätzt sta
 (3.56): Dort fehlt die Messung, hier ist sie da — und wird gegen den Auftraggeber gewendet.
 Still kleiner drehen ist kein Kompromiss, sondern eine nicht ausgeführte Anweisung mit
 grünem Haken.
+
+### 3.288 Der Zweig im Arbeitsbaum war eine Annahme aus dem Sitzungsanfang
+
+Am 18.09.2026 um 11:29 bat der Nutzer, einen Stop-Hook dauerhaft zu reparieren, der nach
+jeder Antwort einen fehlenden Zeitstempel meldete, obwohl jede Antwort gestempelt war. Die
+Ursache war schnell gefunden: Der Hook las den ERSTEN Textblock des Zuges, und seit die
+Fokus-Ansicht Zwischennotizen vor Tool-Aufrufen verlangt, ist dieser Block nie die Antwort.
+Die Reparatur ist ein Wort im Skript, ein Test dazu, die Live-Kopie nachgezogen.
+
+Der Fehler lag daneben: Die Sitzung hatte am Anfang „Current branch: main" gelesen und den
+Commit ohne Nachmessen abgesetzt. Die Vorgängersitzung hatte den Haupt-Arbeitsbaum aber auf
+den Zweig von Punkt 1155 gestellt. Der Hook-Commit landete dort, wurde brav gepusht — und
+der Push-Ankunfts-Guard lobte ihn sogar als gerettete Arbeit. Erst die Vorbereitung des
+main-Pushes zeigte den Zweignamen. Die Korrektur kostete einen Cherry-Pick auf main, einen
+Revert auf dem Zweig (ein Force-Push ist ohne Zustimmung tabu) und eine Revert-Nachricht mit
+einem erfundenen vollen Hash, weil der Kopf des Commits nur die Kurzform kannte. Nebenbei
+fiel der neue Test beim Push-Tor durch, weil er `spawnSync` ohne `windowsHide` rief — der
+Audit unter `scripts/` kennt keine Ausnahme für Tests.
+
+**Lehre:** Ein Sitzungsstart-Schnappschuss ist keine Messung (3.56, [[measure-dont-assume]]).
+Vor dem ersten Commit gehört `git branch --show-current` in denselben Aufruf wie `git status`;
+ein Hauptbaum auf einem Feature-Zweig ist ein Zustand, den der Vorgänger hinterlassen darf und
+der Nachfolger prüfen muss. Und ein Hash in einer Commit-Nachricht wird aus `git rev-parse`
+gelesen, nie aus dem Kopf verlängert.

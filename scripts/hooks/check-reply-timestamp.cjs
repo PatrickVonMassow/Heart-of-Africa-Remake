@@ -21,10 +21,13 @@ function main() {
   const transcriptPath = payload && payload.transcript_path;
   if (!transcriptPath || !fs.existsSync(transcriptPath)) return;
 
-  // The user-visible reply of the current turn begins at the FIRST assistant
-  // text block AFTER the most recent real user prompt (tool results also arrive
-  // as type "user" entries but carry tool_result blocks, not text/string).
-  let firstText = null;
+  // The user-visible reply of the current turn is the LAST assistant text block
+  // AFTER the most recent real user prompt (tool results also arrive as type
+  // "user" entries but carry tool_result blocks, not text/string). Earlier text
+  // blocks of the same turn are progress notes written between tool calls; the
+  // harness asks for them and they carry no timestamp, so checking the FIRST
+  // block flagged every reply that ran a tool (false positive, 18.09.2026).
+  let lastText = null;
   let lines;
   try { lines = fs.readFileSync(transcriptPath, 'utf8').split('\n'); } catch { return; }
   for (const line of lines) {
@@ -36,18 +39,18 @@ function main() {
     if (entry.type === 'user') {
       const isRealPrompt = typeof content === 'string'
         || (Array.isArray(content) && content.some((c) => c && c.type === 'text'));
-      if (isRealPrompt) firstText = null; // new turn — start looking again
+      if (isRealPrompt) lastText = null; // new turn — start looking again
       continue;
     }
-    if (entry.type !== 'assistant' || firstText !== null) continue;
+    if (entry.type !== 'assistant') continue;
     if (!Array.isArray(content)) continue;
     const textBlock = content.find(
       (c) => c && c.type === 'text' && typeof c.text === 'string' && c.text.trim() !== '',
     );
-    if (textBlock) firstText = textBlock.text.trim();
+    if (textBlock) lastText = textBlock.text.trim();
   }
-  if (firstText === null) return;
-  if (TIMESTAMP_RE.test(firstText)) return;
+  if (lastText === null) return;
+  if (TIMESTAMP_RE.test(lastText)) return;
 
   process.stdout.write(JSON.stringify({
     systemMessage:
