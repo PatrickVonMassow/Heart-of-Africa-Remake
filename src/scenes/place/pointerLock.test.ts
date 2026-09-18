@@ -93,6 +93,20 @@ describe('recovering a refused settlement lock', () => {
     expect(request).toHaveBeenCalledTimes(13)
   })
 
+  it('drops an ask whose turn came only after the window had passed', async () => {
+    // A suspended tab or a blocked event loop delivers the callback late; the
+    // cursor must not be taken out of nowhere when it finally arrives.
+    const request = vi.fn().mockRejectedValue(new Error('Escape cooldown'))
+    canvas().requestPointerLock = request
+    lock.request()
+    await Promise.resolve()
+    expect(vi.getTimerCount()).toBe(1)
+    vi.setSystemTime(Date.now() + 60000) // the tab was away; no timer ran
+    await vi.advanceTimersByTimeAsync(250)
+    expect(request).toHaveBeenCalledTimes(1)
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
   it('lets an impatient second click extend the recovery rather than postpone it', async () => {
     const request = vi.fn().mockRejectedValue(new Error('Escape cooldown'))
     canvas().requestPointerLock = request

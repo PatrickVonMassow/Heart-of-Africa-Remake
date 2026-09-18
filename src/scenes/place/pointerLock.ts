@@ -92,7 +92,11 @@ export function createPlacePointerLock(el: Element): { request: () => void; disp
       // Paced by the REFUSAL, so a slow answer never overlaps the next ask.
       retry = setTimeout(() => {
         retry = undefined
-        if (canRetry()) attempt(until)
+        // The deadline is checked again HERE, not only where the ask was
+        // scheduled: a suspended tab or a blocked event loop can deliver this
+        // callback long after the window, and an ask that late would take the
+        // cursor out of nowhere.
+        if (canRetry() && Date.now() <= until) attempt(until)
         else cancel()
       }, RETRY_STEP_MS)
     }
