@@ -129,13 +129,15 @@ textarea {
 /* --- Inventory bar -------------------------------------------------------- */
 
 /* Bottom-right row: camp/journal buttons with the health bar at the far right. */
+/* The row's right-hand group: pushed to the right end by `margin-left: auto`,
+   which is also what the left group shrinks against instead of overlapping it. */
 .hud-bottom-right {
-  position: absolute;
-  right: 12px;
-  bottom: 12px;
+  margin-left: auto;
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   gap: 8px;
+  pointer-events: auto;
 }
 
 /* Health status inside the status bar's right end (design.md §17.1): the
@@ -184,10 +186,34 @@ textarea {
   }
 }
 
-.inventory-bar {
+/* THE BOTTOM BAND IS ONE ROW (point 1146): the inventory bar with the steering
+   hint beside it on the left, the camp/map/journal buttons on the right. The row
+   is what puts them on ONE height — `align-items: flex-end` makes every bottom
+   edge coincide, so a bar that wraps to a second line grows UPWARDS and nothing
+   below it moves — and it is also what keeps them apart, because the right-hand
+   group is a flex sibling rather than a second absolute box that can be walked
+   under. Neither alignment nor clearance rests on a constant.
+   The row is a layout box only: it spans the full width, so it must not swallow
+   clicks on the scene between the two groups. */
+.hud-bottom-row {
   position: absolute;
   left: 12px;
+  right: 12px;
   bottom: 12px;
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  pointer-events: none;
+}
+.hud-bottom-left {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  min-width: 0;
+  pointer-events: auto;
+}
+
+.inventory-bar {
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
@@ -465,16 +491,14 @@ textarea {
 
 /* --- Prompt + toast ------------------------------------------------------ */
 
-/* Above the prompt, not below the status bar: the toast and the WebGL-fallback
-   notice own the top centre column (top 56px), and a toast wraps to several
-   lines — the long health report does — so anything parked under them collides
-   exactly when a dialog closes and its toast fires, which is the moment this
-   hint exists for. */
+/* At the inventory bar's height, beside it (point 1146, user 17.09.2026). It is
+   a flex item of `.hud-bottom-left`, so the bar decides where the hint starts
+   and the row decides that both end on the same bottom edge. It never shrinks
+   into the bar's box (`flex: 0 0 auto`), and out of the top centre column it no
+   longer collides with the toast or the WebGL-fallback notice, which was the
+   reason it used to sit at 108px. */
 .cursor-mode-hint {
-  position: absolute;
-  bottom: 108px;
-  left: 50%;
-  transform: translateX(-50%);
+  flex: 0 0 auto;
   padding: 4px 8px;
   border-radius: 4px;
   background: var(--hud-bg);
@@ -584,7 +608,7 @@ textarea {
   padding-left: calc(10px + env(safe-area-inset-left, 0px));
   padding-right: calc(10px + env(safe-area-inset-right, 0px));
 }
-.game-root.touch-active .hud-bottom-right {
+.game-root.touch-active .hud-bottom-row {
   right: calc(12px + env(safe-area-inset-right, 0px));
 }
 @media (max-height: 700px) {

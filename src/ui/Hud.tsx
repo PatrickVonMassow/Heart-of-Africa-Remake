@@ -649,32 +649,39 @@ export function Hud() {
       <StatusBar />
       <FpsCounter />
       {/* Health bar top-right, below the status bar, at the FPS-counter height. */}
-      <InventoryBar />
-      <CursorModeHint />
-      {/* Bottom-right: camp (only where allowed), map and journal buttons. */}
-      <div className="hud-bottom-right">
-        {showCamp && (
-          <button className="hud-button camp-toggle" onClick={() => {
-            if (useUi.getState().dialog) return
-            const g = useGame.getState()
-            if (!canCampHere(g)) return
-            if (g.mode === 'travel') g.pitchOrOpenCamp()
-            else g.openVillageCamp()
+      {/* The bottom band is ONE row (point 1146): the inventory bar with the
+          steering hint beside it on the left, the buttons on the right, so flex
+          decides both their shared bottom edge and their clearance. */}
+      <div className="hud-bottom-row">
+        <div className="hud-bottom-left">
+          <InventoryBar />
+          <CursorModeHint />
+        </div>
+        {/* Bottom-right: camp (only where allowed), map and journal buttons. */}
+        <div className="hud-bottom-right">
+          {showCamp && (
+            <button className="hud-button camp-toggle" onClick={() => {
+              if (useUi.getState().dialog) return
+              const g = useGame.getState()
+              if (!canCampHere(g)) return
+              if (g.mode === 'travel') g.pitchOrOpenCamp()
+              else g.openVillageCamp()
+            }}>
+              {t.hud.campToggle}
+            </button>
+          )}
+          <button className="hud-button map-toggle" onClick={() => {
+            if (!useUi.getState().dialog) useUi.getState().toggleMap()
           }}>
-            {t.hud.campToggle}
+            {t.hud.mapToggle}
           </button>
-        )}
-        <button className="hud-button map-toggle" onClick={() => {
-          if (!useUi.getState().dialog) useUi.getState().toggleMap()
-        }}>
-          {t.hud.mapToggle}
-        </button>
-        <button className="hud-button journal-toggle" onClick={() => {
-          const g = useGame.getState()
-          g.setJournalOpen(!g.journalOpen)
-        }}>
-          {t.hud.journalToggle}
-        </button>
+          <button className="hud-button journal-toggle" onClick={() => {
+            const g = useGame.getState()
+            g.setJournalOpen(!g.journalOpen)
+          }}>
+            {t.hud.journalToggle}
+          </button>
+        </div>
       </div>
       <Prompt />
       {touchActive && <TouchControls />}
