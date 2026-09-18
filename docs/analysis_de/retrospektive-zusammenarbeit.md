@@ -60,6 +60,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 11.09. nachts | Zwei Werkzeuge antworten mit Gewissheit auf Fragen, die sie nie gemessen haben: `ci-gate-verdict.mjs` läuft nur im Runner, ignoriert die Flags eines Handaufrufs und druckt bei leerer Umgebung »CI gate passed« — zweimal geglaubt; `run-wait` erklärt einen gesunden `polish`-Lauf nach 20 Minuten für tot, weil seine Schwelle die Modell-Erwartung von 5m41s statt des eigenen gemessenen Medians von 55 min multipliziert, und befiehlt das Töten (§3.263, Punkte 1099/1101) |
 | 12.09. | Der beauftragte Autor schrieb zweimal nichts und hatte zweimal recht: einmal, weil der Punkttext eine Wortüberlappungs-Heuristik zur Freigabe-Evidenz erklärte, deren eigener Kommentar sagt, ein Nein beweise keine Unschuld; einmal, weil der Unterbau des Punktes ungebaut war. Das Werkzeug meldete beide Male PROBLEMS — »NOTHING WAS COMMITTED«, »gates not green« —, also den Fehlschlag der Spur, wo die Spur genau das getan hatte, wofür sie existiert (§3.266, Punkte 1089/1073) |
 | 18.09. | Derselbe Punkt zweimal zurückgewiesen — und beim zweiten Mal traf die Zurückweisung meine eigene Antwort auf die erste: Der fremde Autor baute nach, dass die vom Aufrufer gehaltene Umlenkung genau die Protokolldatei leert, die das Skript künftig selbst führen soll, und danach jede Zeile in sich selbst zurückschreibt — vier Kopien nach drei Durchläufen. Wer eine Eskalation beantwortet, schreibt selbst eine Spezifikation (§3.266 Nachtrag, Punkt 1133) |
+| 18.09. abends | Ein abgehakter Fix hielt nicht: Die Reparatur von Punkt 1148 ruhte auf einer nie gemessenen Browser-Sperrfrist und zählte ihren einzigen Nachfrage-Versuch vom Klick statt vom Escape — sie landete also genau bei schnellem Klick zu früh und erzeugte den gemeldeten Fehler mit. Die Nachfolge-Reparatur ruht auf keiner Zahl mehr, und ihr Punkt bleibt bis zur Beobachtung des Nutzers offen (§3.291) |
 | 13.09. | Ein Punkt zog seine eigenen Rot-Ladungen zurück, wie es die Regel verlangt — zwei Tests standen noch auf ihnen und wurden erst im Tor der LANDUNG rot, als der Merge schon auf main lag: Das Register erzwingt »kein Eintrag ohne offenen Punkt«, niemand erzwingt »kein Test ohne seinen Eintrag« (§3.268). Dieselbe Sitzung wies drei Fremd-Rot nach: gegen die Zweigwurzel gemessen sind alle drei auch auf main rot, und das Rätsel am Schutthang ist dort nicht sporadisch, sondern reproduziert jedes Mal |
 | 13.09. abends | Vier CI-Läufe eines Zweigs starben als »cancelled« — ein Wort, das weder Ursache noch Reparatur nennt und das kein Push heilen kann. Es war das 15-Minuten-Limit des `fast`-Jobs: Die letzten beiden GRÜNEN Läufe, einer davon auf main, brauchten 14 m 41 s und 14 m 45 s, also rund fünfzehn Sekunden Luft. Der nächste Punkt, der irgendeinen Test hinzufügt, musste auflaufen, egal welcher. Sichtbar wurde es erst im Schrittprotokoll: install/build/lint/audit grün, `unit: cancelled`, »The operation was canceled« nach 15 m 13 s (§3.270) |
 | 14.09. | Nach einer Parallelsitzung verlangte ein Stop-Hook `batch-doctor --gate` vor JEDER weiteren Batch-Arbeit — dessen Tor fährt eine volle Unit-Suite, neben dem laufenden Zwei-Backend-Bildlauf auf derselben Maschine. Gefunden hat der Doktor genau eine Datei: die Review-Zeile, die dieselbe Sitzung vier Minuten zuvor geschrieben hatte. Sie zu committen genügte, das Urteil sprang auf `consistent`, die Unit-Suite wurde nie gebraucht; ihr Abbruch ließ zwei verwaiste vitest-Worker neben dem Bildlauf zurück (§3.271, Wiedergänger von §3.267) |
@@ -1653,7 +1654,7 @@ stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die s
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Freitag, 18.09.2026, 20:15 · Quellen-Fingerprint: `ee8499746bbf…`
+Zuletzt aktualisiert: Freitag, 18.09.2026, 21:40 · Quellen-Fingerprint: `88ed24623d31…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1758,10 +1759,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 97 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 7 Revert-/Reapply-Commits · 135 Prozess-/Meta-TASKS-Punkte (davon 64 offen).
+Erfasste Quellen: 97 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 7 Revert-/Reapply-Commits · 136 Prozess-/Meta-TASKS-Punkte (davon 65 offen).
 
-<!-- RETRO-FINGERPRINT: ee8499746bbf54a6648a02a302594c3c296603568e4c071e04cbdea22df5d791 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-18T18:15:45.611Z -->
+<!-- RETRO-FINGERPRINT: 88ed24623d31a4c3177e40758fcbf794fb4a630d9caefa31ab7af1122dc11b81 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-18T19:40:16.764Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -7660,3 +7661,39 @@ umstellen — sonst entsteht kein Schweigen, sondern eine Lüge. Das ist die Umk
 Urteil an eine Stelle, an der niemand nachsieht) und derselbe Familienfehler wie 3.283. Ein
 weiches Grün gehört nicht in dasselbe Feld wie ein echtes: Entweder trägt die Konklusion das
 Urteil, oder der Leser muss den Ort lesen, an den es tatsächlich geschrieben wird.
+
+### 3.291 Die Reparatur ruhte auf einer Browser-Konstante, die niemand gemessen hatte
+
+Punkt 1148 reparierte den gemeldeten Fehler „erst mehrfaches Klicken stellt die Steuerung
+wieder her" mit einem einzigen Nachfrage-Versuch 1,1 Sekunden nach einer abgelehnten
+Zeigersperre — sorgfältig gebaut, mit Entdopplung, mit Abbruch bei Dialog, Überlagerung,
+Gewährung und Szenenwechsel, mit 36 Testfällen festgenagelt, und abgehakt. Am 18.09.2026 hat
+der Nutzer es auf dem ausgelieferten Stand selbst geprüft: „Schneller Klick funktioniert nach
+wie vor nicht."
+
+Die 1,1 Sekunden waren eine **angenommene** Zahl. Zwei Annahmen steckten in ihr, und beide
+waren falsch. Die erste: dass die Sperrfrist des Browsers kürzer sei als dieser eine feste
+Abstand — gemessen hat sie niemand, und sie ließ sich auf dieser Maschine auch nicht messen,
+weil ein echtes Escape aus der Automatisierung heraus unerreichbar ist. Die zweite, und sie
+wiegt schwerer: der Abstand wurde vom **Klick** aus gezählt, während die Frist des Browsers
+vom **Escape** aus läuft. Damit landete der einzige Versuch genau dann am frühesten, wenn der
+Spieler am schnellsten klickte — also exakt im gemeldeten Fall. Wurde er abgelehnt, fragte
+nichts mehr nach; und ein weiterer Klick fügte keinen Versuch hinzu, sondern ersetzte den noch
+ausstehenden. Der gemeldete Satz „erst mehrfaches Klicken" war keine Randerscheinung des
+Fehlers, sondern seine genaue Beschreibung — und der Mechanismus, der ihn beheben sollte,
+erzeugte ihn mit.
+
+Was das Nachfolge-Punkt 1158 anders machte, ist nicht mehr Sorgfalt, sondern eine andere
+Reihenfolge. Zuerst wurde gemessen, was messbar war — der Klick ins Bild trifft die Zeichenfläche
+(80 von 81 Rasterpunkten), und eine per Zeitgeber ausgelöste Sperranfrage ohne frische
+Nutzergeste wird von Chrome gewährt —, womit zwei der drei Verdächtigen aus 1148 ausschieden.
+Und dann wurde die Reparatur so gebaut, dass sie **auf keiner unbekannten Zahl mehr ruht**:
+sie fragt alle 250 ms weiter, bis zu 3 Sekunden, statt einmal zu einem geratenen Zeitpunkt.
+
+**Lehre:** Wenn eine Reparatur eine Zahl braucht, die man nicht messen kann, ist die Zahl nicht
+das Problem — die Abhängigkeit von ihr ist es. Man baut dann nicht die beste Schätzung ein,
+sondern einen Mechanismus, der über den ganzen plausiblen Bereich trägt. Und: ein Punkt, dessen
+Urteil eine Beobachtung des Nutzers ist, wird nicht auf einen plausiblen Mechanismus hin
+abgehakt. 1158 ist deshalb gemergt, aber **offen** — die zwei Beobachtungen stehen aus. Das ist
+die Familie von 3.283 und 3.289 (ein Grün, das nichts bedeutet, wird als Freigabe gelesen), hier
+aber eine Stufe früher: nicht das Signal war falsch, sondern die Annahme, auf der es ruhte.
