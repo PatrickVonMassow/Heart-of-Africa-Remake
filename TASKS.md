@@ -581,6 +581,34 @@ put it is the mistake this line exists to stop.
   Refs: src/scenes/place/tagGame.ts, src/scenes/place/PlaceLife.tsx, src/scenes/place/lifeSpots.ts
   Bundle: Dorfleben.
 
+- [ ] 1157. The weaver at the village loom works instead of standing frozen (user bug
+  report 18.09.2026, local/ErwachsenerStehtStill.zip: "Warum bewegt sich diese Figur
+  nicht?", seed 394349866, Bambara Village, day 3.54, WebGPU, medium).
+  The report's picture shows the weaver figure beside the standing loom with both
+  arms hanging, and `Weaver` in `src/scenes/place/PlaceLife.tsx` carries no
+  `useFrame` at all — the only village adult station without a working motion,
+  while the pounder, the fire tender, the water carrier and the drummer all move.
+  design.md §15 names weaving among the everyday activities that make a settlement
+  read as alive. Final state:
+
+  1. The weaver works the loom in a visible, continuous cycle: one hand carries a
+     shuttle across the warp and back while the other beats the weft down, and the
+     body leans slightly into each beat — the same arm-pose mechanism the pounder
+     uses (`FigurePose`, `armAim`), so the hands ride the tool and never hang beside
+     a cloth that changes by itself.
+  2. The half-finished cloth grows with the work: its woven part rises by a small,
+     calibratable amount per completed pass and resets when it reaches the top beam,
+     so a player who watches for half a minute sees progress, not a loop on a
+     fixed picture.
+  3. The cycle is a place-clock animation like the pounder's — frame-time driven,
+     unaffected by the wall clock, and it stops with the scene when the place is
+     paused.
+  4. Passers-by still walk round the weaver's body (point 578); the station's
+     clearance and the weaver's stance (`weaverStance`) are unchanged.
+  5. Proof: a Vitest on the pose cycle (both arms move over a period, the cloth
+     height advances and wraps) and a Playwright picture from the report's standpoint
+     in Bambara Village on WebGPU where two frames a second apart differ at the
+     weaver's arms and shuttle.
 - [ ] 659. The whole communication chain, played through and judged by what reaches the
   PLAYER — A SIX-EYES ALL-ROUND REVIEW.
   ON HOLD (user 13.08.2026, 22:25: »Stoppe 659 erstmal — der macht erstmal keinen Sinn, wenn wir
