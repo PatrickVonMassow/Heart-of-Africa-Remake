@@ -1333,12 +1333,6 @@
       "origin": "user",
       "place": "ahead"
     },
-    "1133": {
-      "at": "2026-09-15T17:16:22.791Z",
-      "why": "Es verliert die Arbeit jedes beauftragten Autorenlaufs, und heute traf es einen schon fertigen Befund — jeder weitere Lauf vor dem Fix riskiert denselben stillen Verlust.",
-      "origin": "machine",
-      "place": "ahead"
-    },
     "1144": {
       "at": "2026-09-16T22:48:11.705Z",
       "why": "Last is right: its first act is measuring what the player actually loses, and the whole layout path in front of it (1143, then 1045's neighbours) writes the same file.",
@@ -1406,7 +1400,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-18T05:28:45.701Z",
+    "at": "2026-09-18T06:52:24.655Z",
     "points": [
       174,
       184,
@@ -1805,7 +1799,6 @@
       1125,
       1129,
       1132,
-      1133,
       1144,
       1145,
       1146,
