@@ -1638,7 +1638,7 @@ stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die s
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Freitag, 18.09.2026, 12:07 · Quellen-Fingerprint: `993735df15bb…`
+Zuletzt aktualisiert: Freitag, 18.09.2026, 12:47 · Quellen-Fingerprint: `dba78b27c116…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1743,10 +1743,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 97 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 135 Prozess-/Meta-TASKS-Punkte (davon 64 offen).
+Erfasste Quellen: 97 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 7 Revert-/Reapply-Commits · 135 Prozess-/Meta-TASKS-Punkte (davon 64 offen).
 
-<!-- RETRO-FINGERPRINT: 993735df15bb8e7b312b4a2c31814e47a75e127abb419178cd4e85dc4d5083e7 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-18T10:07:52.761Z -->
+<!-- RETRO-FINGERPRINT: dba78b27c116798f7ce4a5b88eccbed569bfdbcd45cbc64ec604654269c566f7 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-18T10:47:31.972Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -7618,3 +7618,30 @@ Vor dem ersten Commit gehört `git branch --show-current` in denselben Aufruf wi
 ein Hauptbaum auf einem Feature-Zweig ist ein Zustand, den der Vorgänger hinterlassen darf und
 der Nachfolger prüfen muss. Und ein Hash in einer Commit-Nachricht wird aus `git rev-parse`
 gelesen, nie aus dem Kopf verlängert.
+
+### 3.289 Ein absichtlich bedeutungsloses Grün wurde als Freigabe gelesen
+
+Am 18.09.2026 um 12:34 startete diese Sitzung mit der Übergabezeile „CI-TERMINAL-HANDOFF:
+origin/feat/1155-drum-message-loudness:868ca4587:CI:35332061604 concluded GREEN; continue the
+batch immediately." Genau dieser Lauf hatte protokolliert: `GATE_OUTCOMES: install=success
+build=success lint=success audit=success unit=failure`, dazu „CI gate FAILED: unit" und
+`commit status failure → HTTP 201`. Die Unit-Suite war echt und reproduzierbar rot —
+`src/config/balance.test.ts` nagelte den Sprachpegel auf 2 fest, während der Punkt ihn auf 3
+angehoben hatte. Der Batch bekam davon nichts mit und wurde zum Weitermachen aufgefordert.
+
+Die Mechanik ist in zwei Stücken je für sich vernünftig und zusammen falsch. `ci.yml` setzt
+auf `feat/**`-Pushes jeden Schritt auf `continue-on-error`, damit ein Zweiglauf keine Mail
+auslöst; die Laufkonklusion ist dort **absichtlich** immer grün, und das wahre Urteil schreibt
+`scripts/ci-gate-verdict.mjs` als COMMIT-STATUS. Der Beobachter auf der anderen Seite,
+`scripts/ci-status-guard.mjs`, fragt ausschließlich `/actions/runs` ab (L253–L262) und leitet
+in `observeCiWait` sein Urteil aus der Laufkonklusion ab (`ci-status-guard-core.mjs` L318:
+`state === 'success' ? 'green' : 'red'`). Einen Commit-Status liest im ganzen Guard keine
+Zeile. Damit meldet jeder rote Zweiglauf dem Batch Grün, und CLAUDE.md §7.2 („ci-status-guard
+covers every pushed ref, waiting for concluded green CI") gilt in Wahrheit nur für `main`.
+
+**Lehre:** Wer ein Signal absichtlich entwertet, muss jeden Leser dieses Signals mit
+umstellen — sonst entsteht kein Schweigen, sondern eine Lüge. Das ist die Umkehrung von 3.278
+(dort sprach das Tor sein Urteil und handelte nach dem Rückgabewert; hier schreibt es sein
+Urteil an eine Stelle, an der niemand nachsieht) und derselbe Familienfehler wie 3.283. Ein
+weiches Grün gehört nicht in dasselbe Feld wie ein echtes: Entweder trägt die Konklusion das
+Urteil, oder der Leser muss den Ort lesen, an den es tatsächlich geschrieben wird.
