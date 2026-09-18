@@ -1401,3 +1401,24 @@ gepusht, es geht nichts verloren. Was fehlt, ist die Unterscheidbarkeit: ein
 Leser sieht den aufgegebenen Branches nicht an, dass sie aufgegeben sind. Wer
 847 anfasst, prüft zuerst, ob die 622 Zeilen gegen das heutige `main` überhaupt
 noch tragen, statt sie zu mergen.
+
+## Die Lastmessung starb mit der Sitzung, die sie gestartet hatte
+
+Gemessen 18.09.2026. `scripts/throttle-probe.mjs polish --section=children-motion
+--runs 8` lief seit 07:04 als übergebener Lauf der Vorgängersitzung. Er hing ohne
+`setsid` an deren Shell (PID 1971198 unter zsh 1971197 unter der Sitzung 1501826).
+Als diese Sitzung endete, endete auch die Sonde — nach vier von acht Läufen.
+
+Die vier vorhandenen Läufe liegen unter
+`local/throttle-probe/polish-children-motion-2026-09-18T05-04-42-790Z/` und sind
+alle grün (`8 pass, 0 fail, exit 0`). Der fünfte Lauf (05:31:28Z) reddete mit null
+Bildern, während mein eigenes main-Push-Tor die Maschine belegte — derselbe Fehler,
+den §3.267 der Retrospektive beschreibt. Ein Urteil trägt die Messung damit nicht:
+vier Grün sind weder eine Bestätigung noch eine Entlastung des Rot, das Punkt 1068
+gehört.
+
+Nicht als eigener Punkt eingereiht: Punkt 1133 behebt genau diese Todesklasse für
+beauftragte Läufe und wird gerade geschrieben; die offene Messung selbst gehört
+Punkt 1068. Festgehalten ist hier nur, dass ein Messlauf dieselbe Kopplung hat wie
+ein Autorenlauf — wer die Sonde das nächste Mal startet, koppelt sie ab, und er
+fasst die Maschine währenddessen nicht an.
