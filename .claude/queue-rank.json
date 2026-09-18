@@ -1345,12 +1345,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "1146": {
-      "at": "2026-09-17T21:40:56.098Z",
-      "why": "Vom Nutzer am 17.09.2026 um 20:51 selbst angefordert — die Steuerhinweise sollen auf die Höhe der Inventarleiste rücken; ein Nutzerwunsch steht vor dem Release, ohne Dringlichkeitsnachweis.",
-      "origin": "user",
-      "place": "ahead"
-    },
     "1148": {
       "at": "2026-09-17T22:26:04.054Z",
       "why": "Nutzerbericht vom 17.09.2026, 21:48 — im Cursor-Modus bringt erst mehrfaches Klicken die Steuerung zurück; die Platzierung hinter 1146 folgt derselben Meldung.",
@@ -1370,10 +1364,10 @@
       "place": "last"
     },
     "1154": {
-      "at": "2026-09-18T07:52:08.095Z",
-      "why": "Die flow-Suite ist auf jedem Branch rot, solange sie steht — jeder Punkt, der auf flow abbildet, erbt das Rot.",
+      "at": "2026-09-18T08:16:36.900Z",
+      "why": "Das Rot ist seit heute im Ledger auf 1154 verrechnet, also blockiert es keine Bahn mehr; es ist echte Testinfrastruktur-Hygiene und hat vor der Auslieferung nichts zu suchen.",
       "origin": "machine",
-      "place": "ahead"
+      "place": "last"
     },
     "1155": {
       "at": "2026-09-18T07:52:07.998Z",
@@ -1382,8 +1376,37 @@
       "place": "ahead"
     }
   },
+  "boundary": {
+    "at": "2026-08-21T00:55:14.962Z",
+    "points": [
+      336,
+      553,
+      596,
+      633,
+      659,
+      660,
+      663,
+      690,
+      708,
+      715,
+      719,
+      733,
+      735,
+      736,
+      738,
+      739,
+      746,
+      747,
+      750,
+      759,
+      760,
+      762,
+      764
+    ],
+    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
+  },
   "settled": {
-    "at": "2026-09-18T06:52:24.655Z",
+    "at": "2026-09-18T08:16:36.910Z",
     "points": [
       174,
       184,
@@ -1784,42 +1807,14 @@
       1132,
       1144,
       1145,
-      1146,
       1148,
       1149,
       1150,
       1151,
       1152,
-      1153
+      1153,
+      1154,
+      1155
     ]
-  },
-  "boundary": {
-    "at": "2026-08-21T00:55:14.962Z",
-    "points": [
-      336,
-      553,
-      596,
-      633,
-      659,
-      660,
-      663,
-      690,
-      708,
-      715,
-      719,
-      733,
-      735,
-      736,
-      738,
-      739,
-      746,
-      747,
-      750,
-      759,
-      760,
-      762,
-      764
-    ],
-    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   }
 }

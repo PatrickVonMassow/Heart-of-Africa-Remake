@@ -1422,3 +1422,15 @@ beauftragte Läufe und wird gerade geschrieben; die offene Messung selbst gehör
 Punkt 1068. Festgehalten ist hier nur, dass ein Messlauf dieselbe Kopplung hat wie
 ein Autorenlauf — wer die Sonde das nächste Mal startet, koppelt sie ab, und er
 fasst die Maschine währenddessen nicht an.
+
+- **A charged red printed with its section tag is only half accounted for.** Measured
+  18.09.2026 on a whole `flow` pass at `ddb5e7e32`: the run record strips the generated
+  section tag into its own field, so its red is keyed `# starting gifts`, while
+  `failedChecks(out)` keeps the tag and keys the same red
+  `# starting gifts [--section=core-loop]`. The ledger entry matches BOTH names — the
+  charge itself is fine — but the printed key is absent from `recordedKeys`, so
+  `run-all.mjs` (~L388) builds it a second row and reports "charged for one reading of
+  this check but not for every one this run produced". `allOwned` is then false for a pass
+  whose every red has an owner. Non-blocking: `render-verify-guard` was clean for point
+  1146's merge with exactly this state. Same shape for every section-tagged charge in the
+  ledger (point 1119's `polish` entry among them).

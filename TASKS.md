@@ -77,6 +77,42 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
+- [ ] 1155. The chief's drum message becomes a calibratable balance value and gets louder,
+  and the village speech with it (user 18.09.2026, 07:50: "Sie sollen 2,5 mal so laut sein.
+  Im Rahmen vom gleichen Punkt auch die Sprache 1,5 mal so laut machen").
+  MEASURED STATE: the message drums have no balance value at all. Their envelope level is
+  the literal `1.8` in `src/communication/drumMessage.ts` L77 —
+  `const peak = 1.8 * Math.max(0, options.volume ?? balance.ambienceVolume)` — and
+  `PlaceScene.tsx` L546 calls `drumMessagePlan()` with no options, so in play the factor
+  below it is the global `balance.ambienceVolume` (0.1). `ambience.ts` `playDrumMessage()`
+  hangs the strikes straight on the `ambientBus`; the message has no layer gain of its own
+  (the `drumBed.villageGain` 0.42 belongs to the meaningless BED, not to the message).
+  Village speech, by contrast, already has its parameter: `balance.communication.speechVolume`,
+  today 2, on its own bus (`ambience.ts` L491).
+  Final state:
+  - The drum message's envelope level is a named, calibratable value in
+    `balance.communication.*` (the `1.8` leaves `drumMessage.ts`), and it stands at 2.5×
+    what it is today.
+  - `balance.communication.speechVolume` stands at 1.5× its present value.
+  - The headroom the present numbers were calibrated for is RE-MEASURED, not assumed: the
+    graph test's worst case is 0.977 of full scale today (`balance.ts` ~L1578), so 2.5× on
+    the drums and 1.5× on speech can clip. Report the measured worst case; if it exceeds
+    full scale, say so with the number and name what absorbs it rather than quietly scaling
+    the user's factors down.
+  - The pinned calibrations follow the new numbers instead of blocking them:
+    `ambience.test.ts` (the speech-against-drums ratio, measured 1.71× today) and
+    `ambience.speech.test.ts` L360.
+  Test: Vitest over the audio graph — the new balance value reaches the strike envelope,
+  both factors are what the user asked for, and the worst-case sum is measured and asserted
+  against full scale. A listening pass is the user's, not the suite's.
+  There is nothing to see, so no picture check is required.
+  Criticality: medium — the player cannot hear the PoC's one message properly today, and
+  the change is a handful of numbers with one real risk (clipping).
+  Refs: src/communication/drumMessage.ts L77, src/systems/ambience.ts (playDrumMessage,
+  L491), src/config/balance.ts (communication.speechVolume L1579, ambienceVolume L942),
+  src/systems/ambience.test.ts, src/systems/ambience.speech.test.ts L360
+  Bundle: Kommunikation.
+
 - [ ] 1148. Unlocked cursor mode needs one click, not several, to return steering (user
   report 17.09.2026, 21:48, verbatim: "Im Modus »Click the view to steer« bewirkt erst
   mehrfaches Klicken, dass man wieder steuern kann.").
@@ -15903,44 +15939,9 @@ to land than a mechanism that needs a review.
   Test: the suite's own rung — `npm test -- flow --section=core-loop` on both backends.
   These two numbers live in the browser suite alone, and nothing visible moves,
   so no picture check is required.
-  Criticality: medium — no player impact, but the bundle's own gate cannot be green while
-  a covered suite carries an unowned red, and every point that maps to `flow` inherits it.
+  Criticality: medium — no player impact, and since 18.09.2026 the red is charged to this
+  point in `scripts/render-verify-charges.mjs`, so it blocks no lane; what remains is that
+  every `flow` run carries two failures nobody is measuring anything from.
   Refs: scripts/verify/flow.mjs (L145, L162-L166), src/state/store.ts L508,
   src/config/balance.ts L1645
   Bundle: Testinfrastruktur.
-
-- [ ] 1155. The chief's drum message becomes a calibratable balance value and gets louder,
-  and the village speech with it (user 18.09.2026, 07:50: "Sie sollen 2,5 mal so laut sein.
-  Im Rahmen vom gleichen Punkt auch die Sprache 1,5 mal so laut machen").
-  MEASURED STATE: the message drums have no balance value at all. Their envelope level is
-  the literal `1.8` in `src/communication/drumMessage.ts` L77 —
-  `const peak = 1.8 * Math.max(0, options.volume ?? balance.ambienceVolume)` — and
-  `PlaceScene.tsx` L546 calls `drumMessagePlan()` with no options, so in play the factor
-  below it is the global `balance.ambienceVolume` (0.1). `ambience.ts` `playDrumMessage()`
-  hangs the strikes straight on the `ambientBus`; the message has no layer gain of its own
-  (the `drumBed.villageGain` 0.42 belongs to the meaningless BED, not to the message).
-  Village speech, by contrast, already has its parameter: `balance.communication.speechVolume`,
-  today 2, on its own bus (`ambience.ts` L491).
-  Final state:
-  - The drum message's envelope level is a named, calibratable value in
-    `balance.communication.*` (the `1.8` leaves `drumMessage.ts`), and it stands at 2.5×
-    what it is today.
-  - `balance.communication.speechVolume` stands at 1.5× its present value.
-  - The headroom the present numbers were calibrated for is RE-MEASURED, not assumed: the
-    graph test's worst case is 0.977 of full scale today (`balance.ts` ~L1578), so 2.5× on
-    the drums and 1.5× on speech can clip. Report the measured worst case; if it exceeds
-    full scale, say so with the number and name what absorbs it rather than quietly scaling
-    the user's factors down.
-  - The pinned calibrations follow the new numbers instead of blocking them:
-    `ambience.test.ts` (the speech-against-drums ratio, measured 1.71× today) and
-    `ambience.speech.test.ts` L360.
-  Test: Vitest over the audio graph — the new balance value reaches the strike envelope,
-  both factors are what the user asked for, and the worst-case sum is measured and asserted
-  against full scale. A listening pass is the user's, not the suite's.
-  There is nothing to see, so no picture check is required.
-  Criticality: medium — the player cannot hear the PoC's one message properly today, and
-  the change is a handful of numbers with one real risk (clipping).
-  Refs: src/communication/drumMessage.ts L77, src/systems/ambience.ts (playDrumMessage,
-  L491), src/config/balance.ts (communication.speechVolume L1579, ambienceVolume L942),
-  src/systems/ambience.test.ts, src/systems/ambience.speech.test.ts L360
-  Bundle: Kommunikation.
