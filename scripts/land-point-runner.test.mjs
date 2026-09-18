@@ -952,6 +952,27 @@ describe('carryRunRecords', () => {
     expect(out.failed).toBe(1)
   })
 
+  // Astra, round 4: a predicate with a side effect charged ONE unreachable
+  // record twice — once for the stat that could not judge it, once for the copy
+  // that then failed on the same entry.
+  it('counts an unreachable destination entry exactly once', () => {
+    const { root, own } = scene()
+    const dest = join(root, 'local', 'verify-logs')
+    writeRecord(join(own, 'local', 'verify-logs'), 'stamp-docs.log.run.json', 'feat/608-x')
+    mkdirSync(dest, { recursive: true })
+    writeFileSync(join(dest, 'stamp-docs.log.run.json'), 'THE COMPLETE ONE')
+    // Readable but not searchable: readdir answers, every lstat of a child does not.
+    chmodSync(dest, 0o600)
+    try {
+      const out = carryRunRecords({ branch: 'feat/608-x', cwd: root, mainRoot: root })
+      expect(out.copied).toEqual([])
+      expect(out.failed).toBe(1)
+    } finally {
+      chmodSync(dest, 0o700)
+    }
+    expect(readFileSync(join(dest, 'stamp-docs.log.run.json'), 'utf8')).toBe('THE COMPLETE ONE')
+  })
+
   // Astra, confirming pass 1/3: an unreadable SOURCE is not "nothing to carry".
   it('counts a discovery that failed, and not a logs directory that is simply absent', () => {
     const { root, own } = scene()

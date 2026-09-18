@@ -340,16 +340,20 @@ export function carryRunRecords({ branch, cwd = REPO_ROOT, mainRoot = REPO_ROOT 
     // discovery failure like any other, not "this point ran nothing".
     return { copied, failed: failed + 1 }
   }
-  // A MISSING directory is the ordinary case — a point with no browser run has
-  // none. Anything ELSE (permissions, a broken link, an I/O error) means records
-  // may exist and were not seen, and a silent skip there prints the ordinary
-  // green over a real loss (Astra, confirming pass 1/3).
-  const isRegular = (file) => {
+  // A MISSING entry is the ordinary case — a point with no browser run has no
+  // logs directory at all. Anything ELSE (permissions, a broken link, an I/O
+  // error) means records may exist and were not seen, and a silent skip there
+  // prints the ordinary green over a real loss (Astra, confirming pass 1/3).
+  //
+  // THE PREDICATE IS SIDE-EFFECT FREE, and the caller decides what a verdict
+  // costs (Astra, round 4): counting inside it charged ONE unreachable record
+  // twice — once for the stat that could not judge it, once for the copy that
+  // then failed on the same entry.
+  const regularity = (file) => {
     try {
-      return lstatSync(file).isFile()
+      return lstatSync(file).isFile() ? 'file' : 'other'
     } catch (e) {
-      if (!(e && e.code === 'ENOENT')) failed += 1
-      return false
+      return e && e.code === 'ENOENT' ? 'absent' : 'unreadable'
     }
   }
   for (const w of trees) {
@@ -367,9 +371,11 @@ export function carryRunRecords({ branch, cwd = REPO_ROOT, mainRoot = REPO_ROOT 
     // directory or a dangling symlink wearing a record's name would otherwise
     // exclude the source silently, and the cleanup would then delete the only
     // real copy while the landing reported nothing lost.
+    // Nothing is CHARGED here: an entry this filter drops is charged once, by
+    // the copy that then fails on it.
     let existing = []
     try {
-      existing = readdirSync(dest).filter((n) => isRegular(join(dest, n)))
+      existing = readdirSync(dest).filter((n) => regularity(join(dest, n)) === 'file')
     } catch (e) {
       if (!(e && e.code === 'ENOENT')) failed += 1
       /* the destination is created below */
@@ -377,7 +383,9 @@ export function carryRunRecords({ branch, cwd = REPO_ROOT, mainRoot = REPO_ROOT 
     const entries = []
     for (const n of names) {
       if (!n.endsWith('.run.json')) continue
-      if (!isRegular(join(dir, n))) continue
+      const kind = regularity(join(dir, n))
+      if (kind === 'unreadable') failed += 1
+      if (kind !== 'file') continue
       try {
         entries.push({ name: n, record: JSON.parse(readFileSync(join(dir, n), 'utf8')) })
       } catch {
@@ -396,7 +404,7 @@ export function carryRunRecords({ branch, cwd = REPO_ROOT, mainRoot = REPO_ROOT 
         // which is the outcome this function wanted anyway. It is only that when
         // what stands there is a READABLE RECORD; anything else occupying the
         // name is a record this landing could not keep, and is counted.
-        if (e && e.code === 'EEXIST' && isRegular(join(dest, name))) continue
+        if (e && e.code === 'EEXIST' && regularity(join(dest, name)) === 'file') continue
         failed += 1
       }
     }
