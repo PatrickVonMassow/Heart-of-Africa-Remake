@@ -363,10 +363,15 @@ export function carryRunRecords({ branch, cwd = REPO_ROOT, mainRoot = REPO_ROOT 
       if (!(e && e.code === 'ENOENT')) failed += 1
       continue
     }
+    // ONLY A REGULAR FILE COUNTS AS "already carried" (Astra, round 3). A
+    // directory or a dangling symlink wearing a record's name would otherwise
+    // exclude the source silently, and the cleanup would then delete the only
+    // real copy while the landing reported nothing lost.
     let existing = []
     try {
-      existing = readdirSync(dest)
-    } catch {
+      existing = readdirSync(dest).filter((n) => isRegular(join(dest, n)))
+    } catch (e) {
+      if (!(e && e.code === 'ENOENT')) failed += 1
       /* the destination is created below */
     }
     const entries = []
@@ -388,8 +393,11 @@ export function carryRunRecords({ branch, cwd = REPO_ROOT, mainRoot = REPO_ROOT 
         copied.push(name)
       } catch (e) {
         // EEXIST means somebody carried it between the listing and the copy —
-        // which is the outcome this function wanted anyway, not a failure.
-        if (!(e && e.code === 'EEXIST')) failed += 1
+        // which is the outcome this function wanted anyway. It is only that when
+        // what stands there is a READABLE RECORD; anything else occupying the
+        // name is a record this landing could not keep, and is counted.
+        if (e && e.code === 'EEXIST' && isRegular(join(dest, name))) continue
+        failed += 1
       }
     }
   }

@@ -939,6 +939,19 @@ describe('carryRunRecords', () => {
     expect(out.failed).toBe(0)
   })
 
+  // Astra, round 3: the destination listing answers NAMES, not records.
+  it('does not read a directory in the destination as a record it already kept', () => {
+    const { root, own } = scene()
+    const dest = join(root, 'local', 'verify-logs')
+    writeRecord(join(own, 'local', 'verify-logs'), 'stamp-docs.log.run.json', 'feat/608-x')
+    mkdirSync(join(dest, 'stamp-docs.log.run.json'), { recursive: true })
+    const out = carryRunRecords({ branch: 'feat/608-x', cwd: root, mainRoot: root })
+    // Nothing was kept — and the landing SAYS so, instead of printing the
+    // ordinary green while the cleanup removes the only real copy.
+    expect(out.copied).toEqual([])
+    expect(out.failed).toBe(1)
+  })
+
   // Astra, confirming pass 1/3: an unreadable SOURCE is not "nothing to carry".
   it('counts a discovery that failed, and not a logs directory that is simply absent', () => {
     const { root, own } = scene()
