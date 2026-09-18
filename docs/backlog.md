@@ -1442,3 +1442,16 @@ fasst die Maschine währenddessen nicht an.
   zweites Mal fahren. Die Reihenfolge-Regel dagegen steht in der Rückschau (§3.290: erst
   diagnostizieren, dann beweisen); der Lesefehler selbst wartet hier, weil er nur eine
   Wiederholung kostet und nichts Falsches durchlässt (Infrastruktur-Freeze 01.09.2026).
+
+- **Die WebGL-2-Aufnahme des `speech-guess`-Abschnitts zeigt keine Siedlung** (gemessen
+  18.09.2026 auf diesem Rechner, auf `feat/1158` UND als Kontrolle auf unverändertem `main`).
+  Dasselbe Bild: unter WebGPU steht das Massai-Dorf da — Hütten, Feuer, Bewohner, Gelände —,
+  unter WebGL 2 ist die Fläche leer und trägt nur Statusleiste, Kompatibilitätshinweis, den
+  Rate-Dialog und die untere HUD-Zeile. Die FPS-Anzeige liest 1 FPS auf dem Zweig und 0 FPS
+  auf `main`, die Szene erreicht auf der ANGLE-Kette dieses Rechners also womöglich schlicht
+  ihr erstes gezeichnetes Bild nicht, statt defekt leer zu sein. Der Abschnitt bleibt dabei
+  GRÜN: seine Prüfungen lesen das DOM, nie das Bild. Nicht als Punkt eingereiht, weil die
+  regulären Both-Backend-LARGE-Läufe auf WebGL 2 sonst brauchbare Bilder liefern — spräche das
+  Gegenteil, wäre es ein Auslieferungsfehler der Fallback-Linie und gehörte sofort nach vorn.
+  Festgehalten ist: die WebGL-2-Aufnahme DIESES Abschnitts taugt derzeit nicht als Bildbeleg,
+  und wer sie das nächste Mal braucht, prüft zuerst, ob die Szene überhaupt gezeichnet war.
