@@ -10,11 +10,22 @@ const dirs = []
 const processes = new Set()
 const waitFor = (check) => vi.waitFor(check, { timeout: 10_000, interval: 20 })
 
-function fixture({ lane = 'astra', override = false, detached = false, shell = false, exitCode = 0 } = {}) {
-  const cwd = mkdtempSync(join(tmpdir(), 'hoa-author-session-'))
-  dirs.push(cwd)
+function fixture({ lane = 'astra', override = false, worktree = false, detached = false, shell = false, exitCode = 0 } = {}) {
+  const main = mkdtempSync(join(tmpdir(), 'hoa-author-session-'))
+  dirs.push(main)
+  const cwd = worktree ? join(main, '.claude/worktrees/point-1133') : main
+  if (worktree) {
+    for (const args of [
+      ['init'],
+      ['-c', 'core.hooksPath=/dev/null', '-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'commit', '--allow-empty', '-m', 'Fixture'],
+      ['worktree', 'add', '--detach', cwd],
+    ]) {
+      const result = spawnSync('git', args, { cwd: main, encoding: 'utf8', windowsHide: true })
+      expect(result.status, result.stderr).toBe(0)
+    }
+  }
   const script = join(cwd, 'commission.mjs')
-  const log = join(cwd, override ? 'custom log/output.log' : `local/1133-${lane}-author.log`)
+  const log = override ? join(cwd, 'custom log/output.log') : join(main, `local/1133-${lane}-author.log`)
   const release = join(cwd, 'release')
   const ready = join(cwd, 'ready.json')
   writeFileSync(script, `
@@ -22,7 +33,7 @@ function fixture({ lane = 'astra', override = false, detached = false, shell = f
     import { existsSync, writeFileSync } from 'node:fs'
     import { spawnSync } from 'node:child_process'
     const code = await startAuthoringSession({ point: '1133', lane: ${JSON.stringify(lane)},
-      logPath: ${JSON.stringify(override ? log : '')} })
+      logPath: ${JSON.stringify(override === 'relative' ? 'custom log/output.log' : override ? log : '')} })
     if (code !== null) process.exitCode = code
     else {
       const identity = { pid: process.pid, cwd: process.cwd(), argv: process.argv.slice(2),
@@ -51,7 +62,7 @@ function fixture({ lane = 'astra', override = false, detached = false, shell = f
     child.once('error', reject)
     child.once('close', (code, signal) => done({ code, signal }))
   })
-  return { cwd, log, release, ready, args, child, closed, stdout: () => stdout, stderr: () => stderr }
+  return { cwd, main, log, release, ready, args, child, closed, stdout: () => stdout, stderr: () => stderr }
 }
 
 async function running(run) {
@@ -75,6 +86,32 @@ afterEach(async () => {
 })
 
 describe('authoring session and log ownership', () => {
+  it.each(['astra', 'fable'])('keeps the default %s log in the main checkout after worktree removal', async (lane) => {
+    const run = fixture({ lane, worktree: true })
+    await running(run)
+    expect(run.stdout().split('\n')[0]).toBe(`author-${lane}: log ${run.log} (append)`)
+    expect(existsSync(join(run.cwd, 'local'))).toBe(false)
+    writeFileSync(run.release, '')
+    expect((await run.closed).code).toBe(0)
+    const removed = spawnSync('git', ['worktree', 'remove', '--force', run.cwd], {
+      cwd: run.main, encoding: 'utf8', windowsHide: true,
+    })
+    expect(removed.status, removed.stderr).toBe(0)
+    expect(existsSync(run.cwd)).toBe(false)
+    expect(readFileSync(run.log, 'utf8')).toBe(run.stdout())
+    expect(readFileSync(run.log, 'utf8')).toContain('\nDONE\n')
+  })
+
+  it.each(['absolute', 'relative'])('keeps an explicit %s log path in the caller worktree', async (override) => {
+    const run = fixture({ worktree: true, override })
+    await running(run)
+    expect(run.stdout().split('\n')[0]).toBe(`author-astra: log ${run.log} (append)`)
+    expect(existsSync(join(run.main, 'local'))).toBe(false)
+    writeFileSync(run.release, '')
+    expect((await run.closed).code).toBe(0)
+    expect(readFileSync(run.log, 'utf8')).toBe(run.stdout())
+  })
+
   it.each([0, 7])('waits, streams both outputs once and propagates exit %i', async (exitCode) => {
     const run = fixture({ exitCode })
     const identity = await running(run)

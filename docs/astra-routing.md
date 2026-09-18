@@ -112,8 +112,10 @@ node scripts/author-astra.mjs --point 651 --findings f.md   # the second leg: an
 ```
 
 Run the command alone, without `setsid`, `tee` or shell redirection. The script
-detaches itself and appends to `local/<point>-<lane>-author.log` in the current
-worktree; `--log <path>` overrides that destination. Its first line names the
+detaches itself and appends to `local/<point>-<lane>-author.log` in the main
+checkout, so the log survives removal of the point's worktree. `--log <path>`
+overrides that destination; relative paths resolve from the caller's current
+directory. Its first line names the
 log. The caller waits, streams new log bytes to stdout and returns the child's
 exit code. If the caller dies, the detached run keeps writing to the same log.
 Redirecting stdout to a different file is supported. Piping through `tee` or

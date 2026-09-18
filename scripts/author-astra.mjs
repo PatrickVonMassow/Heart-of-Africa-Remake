@@ -515,7 +515,13 @@ const AUTHOR_LANE_CONFIG = Object.freeze({
  * Node's detached spawn calls setsid on POSIX; the model's existing timeout
  * group remains separate. A caller owns only the wait and the log reader. */
 export async function startAuthoringSession({ point, lane, logPath = '' }) {
-  const log = resolve(logPath || `local/${point}-${lane}-author.log`)
+  const cwd = process.cwd()
+  const common = logPath ? '' : git(['rev-parse', '--path-format=absolute', '--git-common-dir'], { cwd })
+  // Landing removes the point's worktree; keep the default log in its owning
+  // checkout. Explicit paths remain the caller's choice, relative to its cwd.
+  const log = logPath
+    ? resolve(cwd, logPath)
+    : resolve(mainCheckoutFrom(common, cwd) ?? cwd, `local/${point}-${lane}-author.log`)
   const session = spawnSync('ps', ['-o', 'sid=', '-p', String(process.pid)], { encoding: 'utf8', windowsHide: true })
   if (session.error || session.status !== 0 || !/^\d+$/.test(session.stdout.trim())) {
     throw new Error('cannot determine the authoring session id; POSIX setsid support is required')
@@ -597,7 +603,7 @@ export const usage = ({ commandName = 'author-astra', model = ASTRA_MODEL_NAME, 
     `landing belong to the ${reviewerLabel} session that called it, which is what keeps two vendors on the`,
     'point and neither reviewing itself.',
     '',
-    `The script appends to local/<point>-${commandName === 'author-fable' ? 'fable' : 'astra'}-author.log (--log overrides it).`,
+    `The script appends to local/<point>-${commandName === 'author-fable' ? 'fable' : 'astra'}-author.log in the main checkout (--log overrides it).`,
     'It detaches itself, waits for completion and streams the log to stdout.',
     'Use the command alone: no setsid, tee or redirection is needed.',
     'Redirecting or piping through tee onto that SAME log path destroys it and is unsupported.',
