@@ -947,6 +947,57 @@ put it is the mistake this line exists to stop.
   Refs: scripts/batch-doctor.mjs, scripts/batch-in-flight.mjs, points 1147, 1142
   Bundle: Testinfrastruktur
 
+- [ ] 1151. A water-coloured body stands in the SKY at the Maasai village, and only on
+  WebGPU (found 18.09.2026 by point 1147's picture judgement). In
+  `verification/488-village-edge-band.png` drawn on WEBGPU a slate-blue, hard-edged
+  truncated cone with a dark top rim stands in the gap between two mountains, about as tall
+  as they are. It OCCLUDES the mountain behind it and is OCCLUDED by the one in front, so it
+  is real geometry at mid-distance, not haze or a cloud, and its colour matches the water
+  colour `[0.2, 0.42, 0.6]` in `src/world/terrain.ts`.
+  WHAT THE SECOND BACKEND SETTLES: the SAME frame redrawn on WEBGL 2 shows CLEAR SKY in that
+  gap, with the mountains identical in shape and position. So this is NOT a world-model,
+  elevation or backdrop-height defect — either of those would draw on both backends — but a
+  defect of the WebGPU material/TSL path. It sits on the EVERYDAY backend, the one the
+  player actually gets (§7.2), while the regression lane is clean.
+  WHY NO RUN CAUGHT IT: both runs reported ALL GREEN. No check looks at that part of the
+  sky; the edge-band probe measures the swept ground, not the horizon above it.
+  FINAL STATE: the gap between the mountains at the Maasai village carries sky on WebGPU as
+  it does on WebGL 2. The CAUSE is named in the commit rather than the symptom hidden — do
+  not simply move the camera or the probe.
+  VERIFICATION: the WebGPU `488-village-edge-band` frame shows no such body, judged by eye,
+  and a check that would have caught it — a Vitest assertion over whatever the diagnosis
+  names, or a frame check that reads the sky band above the horizon.
+  Criticality: high — a large wrong object in the sky of a place the player walks to, on the
+  backend the player uses, which every green run so far has failed to see.
+  Refs: src/scenes/place/backdrop.ts, src/scenes/place/backdropMaterial.ts,
+  src/world/terrain.ts, scripts/verify/polish.mjs, point 1147
+  Bundle: Dorfleben.
+
+- [ ] 1152. Flat, unshaded discs lie on the river surface at the Bambara village (found
+  18.09.2026 by point 1147's picture judgement, WebGPU frames of the run
+  2026-09-17T23:43:17Z, exit 0, ALL GREEN). In `verification/482-village-river-bank.png` two
+  pale low-poly ellipses lie on the water; the same shape recurs in
+  `1085-village-adult-fills-a-jar.png` and `1106-arriving-runner-hand-on-the-far-stone.png`.
+  Enlarged five times they are flat and uniformly lit, with visible facet edges, NO shading
+  gradient, NO specular, NO reflection and NO contact shadow, while the water around them
+  carries full specular streaks — they read as paper cut-outs rather than as anything in the
+  world.
+  WHAT IS NOT ESTABLISHED, AND MUST NOT BE GUESSED: what they are MEANT to be. Candidates
+  are a sandbank or shoal, a foam or lily patch, and a wildlife LOD. The first work of this
+  point is to NAME the object, because the fix differs completely between them.
+  BACKEND STILL OPEN: the WebGL 2 counterpart had not been redrawn when this was filed.
+  Read `verification/482-village-river-bank.png` from the covering WebGL run
+  (2026-09-18T00:32:58Z) before assuming it affects both backends — point 1151, filed the
+  same hour, turned out to be WebGPU-only exactly this way.
+  FINAL STATE: whatever lies on that water reads as part of the world — lit by the same
+  light as the water, or removed if it has no business being there.
+  VERIFICATION: the three named frames judged by eye on the backend(s) the diagnosis
+  implicates, plus a test on the layer the fix touches.
+  Criticality: medium — it is visible wherever the player walks to a village river, but it
+  misleads no mechanic.
+  Refs: src/scenes/place/riverBank.ts, scripts/verify/polish.mjs, point 1147
+  Bundle: Dorfleben.
+
 - [ ] 1145. A frame-subject miss KILLS the whole run instead of failing one check, and two
   frames now do it on `main` itself (filed 17.09.2026 from point 1140's covering passes;
   the falls half classified PRE-EXISTING by two baseline runs on f347b652d).

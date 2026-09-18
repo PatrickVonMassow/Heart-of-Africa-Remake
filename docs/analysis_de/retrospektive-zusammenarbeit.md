@@ -193,6 +193,12 @@ Gelöst in zwei Schichten: die WebGPU-Verify-Lane mit `assertBackend` (ein still
 
 **Lehre:** Konfigurationsmatrizen (Backend × Zoom × Sprache × Jahreszeit) explizit aufspannen; „auf einer Konfiguration grün" ist nicht „fertig"; und Ist-Zustands-Annahmen der Infrastruktur asserten statt glauben.
 
+**Nachtrag 18.09.2026 — die zweite Bahn widerlegt nicht nur Grün, sondern auch eine Ursache.** Die drei Lehrstücke oben haben eine gemeinsame Form: auf einer Bahn grün, auf der anderen kaputt. Heute Nacht kam die andere Hälfte dazu. Bei der Bildbegutachtung des deckenden WebGPU-Durchgangs stand im Bild `488-village-edge-band` ein schiefergrauer Körper von Berghöhe im Himmel zwischen zwei Bergflanken — er verdeckte den hinteren Berg und wurde vom vorderen verdeckt, war also echte Geometrie, und seine Farbe traf auf drei Stellen die Wasserfarbe des Geländes. Daraus ließ sich eine saubere, plausible Ursache erzählen: Die Kulisse behält die FARBE einer Geländezelle und gibt ihr die überhöhte HÖHE ihrer Umgebung, also wird ein See im Rift Valley als wasserfarbener Berg gezeichnet. Die Erzählung passte zu Farbe, Form, Ort und sogar zum Kommentar im Kulissen-Code.
+
+Sie war falsch, und **ein einziger Blick auf dasselbe Bild der zweiten Bahn** hat das gezeigt: auf WebGL 2 ist die Lücke klarer Himmel, bei pixelgleichen Bergen. Ein Fehler des Weltmodells oder der Kulissenhöhe hätte auf beiden Bahnen gezeichnet; es ist der WebGPU-Materialpfad. Ohne den zweiten Durchgang wäre ein Punkt eingereiht worden, der einen Autor in die Kulisse geschickt hätte — in eine Datei, die nichts damit zu tun hat.
+
+**Lehre:** Der Wert der Regressionsbahn liegt nicht nur darin, Fehler zu FINDEN, die die erste übersieht, sondern darin, **Ursachenerzählungen zu widerlegen**, die ein Einzelbild nahelegt. Ein Bild erzeugt bereitwillig eine Diagnose — Farbe, Form und Ort reichen für eine überzeugende Geschichte —, und die billigste Gegenprobe dafür ist das gleiche Bild auf der anderen Bahn. Deshalb gehört sie VOR die Diagnose, nicht danach. Zweitens: Beide Läufe meldeten ALL GREEN, weil keine Prüfung in diesen Teil des Himmels sieht — die Randstreifen-Sonde misst den gefegten Boden, nicht den Horizont darüber. Ein Prüffeld ist immer auch die Aussage, wohin NICHT geschaut wird.
+
 ### 3.7 Feature-Regressionen im Spielcode
 
 Mehrere Ketten, in denen ein Fix das nächste Problem erzeugte: die Krokodil-Saga über sieben Punkte und ~49 Commits; ein neuer Elefanten-Collider brach das Trampeln; eine Mündungs-Überbrückung ließ das Nil-Band durch einen See scheinen; „Wildlife-Dramen feuern gar nicht mehr" — eine ganze Systemklasse still regrediert. Prägend war früh, dass die Reise-Kollision nur das *Anhalten* am Hindernis testete, nicht das *Wieder-Wegsteuern*: Der Spieler klebte fest, die Regression blieb grün.
@@ -1611,7 +1617,7 @@ stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die s
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Freitag, 18.09.2026, 02:36 · Quellen-Fingerprint: `9cc5f66dae6d…`
+Zuletzt aktualisiert: Freitag, 18.09.2026, 02:53 · Quellen-Fingerprint: `283dcf68729a…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1718,8 +1724,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 97 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 135 Prozess-/Meta-TASKS-Punkte (davon 65 offen).
 
-<!-- RETRO-FINGERPRINT: 9cc5f66dae6d1ded6373dbf3a41ccea288085ec9a31c49f64a7c6ba462b0c295 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-18T00:36:35.906Z -->
+<!-- RETRO-FINGERPRINT: 283dcf68729a108f5eddedac9b0fc56a0d4cc9ed3b8803a184643745e9c7f4f3 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-18T00:53:35.669Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
