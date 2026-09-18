@@ -1345,12 +1345,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "1148": {
-      "at": "2026-09-17T22:26:04.054Z",
-      "why": "Nutzerbericht vom 17.09.2026, 21:48 — im Cursor-Modus bringt erst mehrfaches Klicken die Steuerung zurück; die Platzierung hinter 1146 folgt derselben Meldung.",
-      "origin": "user",
-      "place": "ahead"
-    },
     "1149": {
       "at": "2026-09-17T22:26:04.143Z",
       "why": "Nutzerauftrag vom 17.09.2026, 21:53, mit ausdrücklich genannter Platzierung: »Dann reihe das nach 1082 ein, ja.«",
@@ -1369,9 +1363,21 @@
       "origin": "machine",
       "place": "last"
     },
+    "1156": {
+      "at": "2026-09-18T13:01:39.650Z",
+      "why": "The user ranked it directly after point 1125 himself on 18.09.2026, 14:26.",
+      "origin": "user",
+      "place": "ahead"
+    },
     "1157": {
       "at": "2026-09-18T11:26:34.291Z",
       "why": "User 18.09.2026 13:24: file the still-weaver bug report directly after point 690",
+      "origin": "user",
+      "place": "ahead"
+    },
+    "1158": {
+      "at": "2026-09-18T13:01:39.541Z",
+      "why": "The residual of the user's own bug report of 17.09.2026: 1148 landed the fix, this is the attended observation that says whether his report is really answered.",
       "origin": "user",
       "place": "ahead"
     }
@@ -1406,7 +1412,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-18T11:26:34.300Z",
+    "at": "2026-09-18T13:01:39.663Z",
     "points": [
       174,
       184,
@@ -1807,7 +1813,6 @@
       1132,
       1144,
       1145,
-      1148,
       1149,
       1150,
       1151,
@@ -1815,7 +1820,8 @@
       1153,
       1154,
       1156,
-      1157
+      1157,
+      1158
     ]
   }
 }
