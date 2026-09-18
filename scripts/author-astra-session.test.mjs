@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { writeState as writeFableState } from './fable-switch-core.mjs'
 
 const moduleUrl = pathToFileURL(resolve('scripts/author-astra.mjs')).href
 const dirs = []
@@ -196,8 +197,16 @@ describe('authoring session and log ownership', () => {
     writeFileSync(log, 'prior commission\n')
     const records = join(cwd, 'reviews.jsonl')
     writeFileSync(records, '')
+    // The real switch state is git-ignored, so in a checkout without one the CLI
+    // refused for the missing switch before it ever reached the worktree - the
+    // ordering this test is about. The fixture carries its own state instead.
+    const fableSwitch = join(cwd, 'fable-switch.json')
+    writeFileSync(fableSwitch, JSON.stringify(writeFableState(lane === 'fable' ? 'on' : 'off', { why: 'test decision', by: 'test', now: 1 })))
     const result = spawnSync(process.execPath, [resolve(`scripts/author-${lane}.mjs`), '--point', '1133', '--log', log], {
-      cwd, encoding: 'utf8', windowsHide: true, env: { ...process.env, HOA_REPO_ROOT: process.cwd(), AUTHOR_REVIEW_RECORDS_FILE: records },
+      cwd,
+      encoding: 'utf8',
+      windowsHide: true,
+      env: { ...process.env, HOA_REPO_ROOT: process.cwd(), AUTHOR_REVIEW_RECORDS_FILE: records, FABLE_SWITCH_FILE: fableSwitch },
     })
     expect(result.status, result.stderr).toBe(2)
     expect(result.stdout.split('\n')[0]).toBe(`author-${lane}: log ${log} (append)`)
