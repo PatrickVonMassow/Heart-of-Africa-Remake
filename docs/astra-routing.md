@@ -111,6 +111,17 @@ node scripts/author-astra.mjs --point 651 --dry-run  # the prompt and the argv, 
 node scripts/author-astra.mjs --point 651 --findings f.md   # the second leg: answer the review
 ```
 
+Run the command alone, without `setsid`, `tee` or shell redirection. The script
+detaches itself and appends to `local/<point>-<lane>-author.log` in the main
+checkout, so the log survives removal of the point's worktree. `--log <path>`
+overrides that destination; relative paths resolve from the caller's current
+directory. Its first line names the
+log. The caller waits, streams new log bytes to stdout and returns the child's
+exit code. If the caller dies, the detached run keeps writing to the same log.
+Redirecting stdout to a different file is supported. Piping through `tee` or
+redirecting onto the script's own log destroys it and is unsupported; the script
+does not detect that mistake. Help, routing, examination and dry runs create no log.
+
 <!-- rule:model-policy@4f05875b -->
 **The cut is a function, not a taste.** CLAUDE.md §6 is the single prose source
 for the authoring and escalation policy. `scripts/author-routing-core.mjs`
