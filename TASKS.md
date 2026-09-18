@@ -92,6 +92,17 @@ put it is the mistake this line exists to stop.
   caller has to remember it and no caller can get it wrong. The caller keeps the same command
   and the same log path. Check what the script already does about its own process group
   before adding anything — this point must not grow a supervisor, a ledger field or a guard.
+  THE LOG CONTRACT — the answer to the 15.09. escalation (main session, 18.09.2026). The
+  first commission refused the point because "output to its log" named a log that does not
+  exist: the script inherits stdout/stderr, and `local/1131-astra-author.log` was made by the
+  CALLER’s `tee`. So THE SCRIPT OWNS THE LOG. Its destination is
+  `local/<point>-<lane>-author.log` — the path the callers already write by hand — and
+  `--log <path>` overrides it; it is appended to, never truncated. THE CALL STAYS BLOCKING
+  AND ITS OUTPUT STAYS VISIBLE: the parent waits for the detached child and streams that file
+  to its own stdout as it grows, so a caller sees what it sees today and `| tee` becomes
+  unnecessary without becoming wrong. When the parent dies the child keeps running in its own
+  session and keeps writing to the same file. Same argv, same cwd, same exit code; no
+  supervisor, no ledger field, no guard.
   Criticality: high — it is not the point's own work that is lost but a commissioned agent's,
   and the loss is silent: the log's last line claims the run continues.
   Bundle: Session- & Repo-Hygiene.
