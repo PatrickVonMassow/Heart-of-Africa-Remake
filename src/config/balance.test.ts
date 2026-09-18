@@ -188,7 +188,8 @@ describe('village speech (design.md §13.4)', () => {
       speechChildPitchHz: 210,
       speechStereoWidth: 0.6,
       speechPitchInterval: 1.68,
-      speechVolume: 2,
+      speechVolume: 3,
+      drumMessagePeak: 4.5,
       labelHeadroom: 0.25,
       giveReach: 2.6,
       chiefWalkSpeed: 1.4,
@@ -253,14 +254,20 @@ describe('village speech (design.md §13.4)', () => {
     // communication PoC is learned from them.
     expect(balance.communication.speechVolume).toBeGreaterThan(0)
     // The deployed 1.5 remained too quiet even after its earlier drum-relative
-    // calibration. Point 673 raises the default above that failed value and
-    // measures it against the remaining shipped mix in ambience.test.ts.
+    // calibration. Point 673 raised the default above that failed value and
+    // measured it against the remaining shipped mix in ambience.test.ts; the
+    // user then asked for 1.5x that on 18.09.2026, 07:50.
     expect(balance.communication.speechVolume).toBeGreaterThan(1.5)
-    expect(balance.communication.speechVolume).toBe(2)
-    // It is the ONE level allowed above the drums it must carry through: louder
-    // than "everything else", quieter than the footsteps right at the ear.
+    expect(balance.communication.speechVolume).toBe(1.5 * 2)
+    // The chief's message carries its own level beside it, 2.5x the 1.8 that
+    // used to sit as a literal in drumMessagePlan (same instruction).
+    expect(balance.communication.drumMessagePeak).toBe(2.5 * 1.8)
+    // It is the ONE level allowed above the drums it must carry through, and
+    // it now stands ABOVE the footsteps at the ear as well — a consequence of
+    // the user's factor, recorded rather than capped: lowering it here would
+    // undo the instruction, and the mixed overage is point 1156's.
     expect(balance.communication.speechVolume).toBeGreaterThan(balance.ambientVolume)
-    expect(balance.communication.speechVolume).toBeLessThanOrEqual(balance.footstepVolume)
+    expect(balance.communication.speechVolume).toBeGreaterThan(balance.footstepVolume)
     // …and the three sliders that existed before are untouched (point 577 §3).
     expect(balance.ambienceVolume).toBe(0.1)
     expect(balance.ambientVolume).toBe(0.5)
