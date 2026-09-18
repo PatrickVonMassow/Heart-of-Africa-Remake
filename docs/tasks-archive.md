@@ -29700,3 +29700,39 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   L491), src/config/balance.ts (communication.speechVolume L1579, ambienceVolume L942),
   src/systems/ambience.test.ts, src/systems/ambience.speech.test.ts L360
   Bundle: Kommunikation.
+
+- [x] 1148. Unlocked cursor mode needs one click, not several, to return steering (user
+  report 17.09.2026, 21:48, verbatim: "Im Modus »Click the view to steer« bewirkt erst
+  mehrfaches Klicken, dass man wieder steuern kann.").
+  Final state: in the settlement's unlocked cursor mode (HUD pill 'Click the view to steer')
+  ONE click on the view returns mouse-look; a click the browser refuses does not leave the
+  player clicking again.
+  Measured on main at ef5806ff4: requestPlacePointerLock swallows the request's rejection
+  (r.catch(() => {})) and nothing listens to pointerlockerror. Chromium refuses a
+  requestPointerLock() issued within roughly one second after the player left the lock with
+  Escape ('The user has exited the lock before this request was completed'); a click inside
+  that window fails silently and the player clicks once more. This is the most likely reading
+  of 'erst mehrfaches Klicken'; the game currently cannot tell it from any other refusal. The
+  Escape release and the dialog-close re-grab in restorePointerLockAfterDialogs both leave the
+  browser in that cooldown.
+  Work: (1) listen for pointerlockerror / the rejected promise in the place scene's lock
+  effect; on a refusal with no .overlay and no dialog open, retry the request once after the
+  cooldown (about 1.1 s; the click's transient activation still covers it in Chromium), and
+  drop the retry if the scene leaves place, a dialog opens, or the lock is granted meanwhile;
+  keep navigator.webdriver on the decision-only path. (2) Count the refusal in
+  pointerLockProbe (refusals beside grabs/releases) for the dev hook; no new guard, no ledger.
+  (3) Vitest on pointerLock.ts: a refused request records a refusal and schedules exactly one
+  retry; the retry is dropped when a dialog opens; no retry under webdriver. (4) Attended
+  check in real Chrome on WebGPU (the lock never engages headless): Escape, click within one
+  second -> steering returns without a second click; Escape, wait two seconds, click -> first
+  click steers. Record the result in the point's evidence. (5) If the attended check shows the
+  first click landing on a HUD element instead of gl.domElement, fix the layering instead and
+  say so.
+  BOUNDS THE USER NAMED: no new guard, ledger field or workflow abstraction (infrastructure
+  freeze 01.09.2026); pointer lock stays skipped under navigator.webdriver.
+  Criticality: medium — reproducible player impact in the cursor mode point 1140 introduced,
+  and the refusal is invisible to the game because it is swallowed.
+  Refs: src/scenes/place/pointerLock.ts, src/scenes/place/PlaceScene.tsx (pointer-lock effect
+  ~l.2717), src/scenes/place/pointerLock.test.ts; follow-up of 1140 (closed). It reads the
+  `.cursor-mode-hint` rule that 1146 edits, so it is worked AFTER 1146 and never beside it.
+  Bundle: Steuerung & Performance
