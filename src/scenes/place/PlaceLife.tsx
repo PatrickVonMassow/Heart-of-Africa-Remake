@@ -77,6 +77,7 @@ import {
   type BankChild,
   type BankEnd,
   type BankStage,
+  bankLabelSeconds,
   type BankUtterance,
   type BankWorld,
 } from './bankGame'
@@ -631,7 +632,7 @@ function speakBankUtterance(
       // the picture of a child standing on a stone: it is READ OFF that moment's
       // own hold rather than written down a second time in the balance file, so
       // lengthening the stand can never leave the child up there wordless.
-      const seconds = Math.max(speechLabelSeconds(1), said.hold ?? 0)
+      const seconds = bankLabelSeconds(said, speechLabelSeconds(1))
       speakOverhead(`kid-${said.speaker}`, [utterance], anchor, { floor: true, seconds, reach: options.radius })
     }
   }

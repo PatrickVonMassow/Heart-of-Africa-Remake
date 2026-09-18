@@ -12,6 +12,7 @@ import {
   MIN_CHILD_PIXELS,
   OCCLUDED_RATIO,
   describeReading,
+  judgeChildFigure,
   judgeTagStandpoint,
 } from './tagFrameReading.mjs'
 import { judgeEavesColumn, judgeShelterRoof } from './eavesColumn.mjs'
@@ -5049,21 +5050,19 @@ if (section('children-boulder-climb')) {
   // approach finish, and cutting it would stage away the very moment this
   // section exists to photograph.
   //
-  // AND THE HOLD IS STRETCHED FOR THE SHUTTER. The child stands on the stone for
-  // `climbHoldSeconds` — a few seconds, which is what a player needs and what
-  // the unit suite pins at its shipped length. The shutter's own readiness wait
-  // is longer than that: the first take of this frame passed its subject test
-  // and photographed an empty stone, because the child had climbed down again
-  // while the scene was being judged finished. The hold is therefore held open
-  // for the picture and put back afterwards. Nothing about the climb itself is
-  // staged: the approach, the rise, the word and the descent are the shipped
-  // ones, and this section proves them from the round's own state before the
-  // shutter opens.
+  //
+  // AND THE HOLD IS NOT TOUCHED (work-order 1082). It used to be forced to 25 s
+  // to give the shutter's five-second readiness wait room, and THAT staging was
+  // the defect: the accepted picture proved the mechanic ran, never that a player
+  // could see it, and the user reported the climb missing a second time at
+  // shipped values. The stand is now the shipped one, the readiness wait is taken
+  // BEFORE the climb rather than during it, and the frame is declared as the
+  // moment it is (`settle: false`) — the same way every other frame of a moment
+  // in this file is taken.
   const shippedClimbRoam = await page.evaluate(() => {
     const b = window.__balance.villageLife.bankGame
-    const was = { roamSeconds: b.roamSeconds, climbHoldSeconds: b.climbHoldSeconds }
+    const was = { roamSeconds: b.roamSeconds }
     b.roamSeconds = 8
-    b.climbHoldSeconds = 25
     return was
   })
   await goToPlace('bambara-village')
@@ -5137,6 +5136,12 @@ if (section('children-boulder-climb')) {
       return best
     }, { b: boulder, sun: PLACE_SUN_XZ })
     check('the camera has ground to stand on off the children`s approach', !!stood, JSON.stringify(stood))
+    // THE PICTURE IS WAITED FOR ONCE, HERE — before the climb, not between the
+    // top of it and the shutter (the same order the tag standpoint takes, and for
+    // the same reason). The stand lasts its shipped seconds, and a five-second
+    // readiness wait started after the child is up there would photograph the
+    // empty stone it climbed down from.
+    await waitForSceneReady(page).catch(() => {})
     // THE CLIMB ITSELF, waited for on the round's own state. The roaming phase
     // is the shipped one: the guard holds the cycle until the boulder is named,
     // so a visit that begins in `roam` reaches this without any staging.
@@ -5176,20 +5181,93 @@ if (section('children-boulder-climb')) {
         `${over.toFixed(3)} m off the centre, feet at ${onTop.c.lift.toFixed(2)} m ` +
           `against a stone ${onTop.boulder.height.toFixed(2)} m high`,
       )
-      // …and the drawn figure really is up there, which is the half a state read
-      // cannot answer: the child's own body, at the height the round put it.
-      const drawn = await page.evaluate((y) => {
-        const t = window.__placeTag()
-        const i = (t.children ?? []).findIndex((c) => c.climb === 'top')
-        const hit = window.__placeRayHit ? window.__placeRayHit(t.children[i].x, y, t.children[i].z) : null
-        return hit ? { name: hit.hitName ?? 'sky', ratio: hit.hitDistance == null ? Infinity : hit.hitDistance / hit.targetDistance } : null
-      }, boulder.height + 0.5)
+      // …AND THE FRAME IS JUDGED, NOT MERELY TAKEN (work-order 1082). A ray that
+      // reaches the child proves nothing about how much of the picture it is:
+      // the standpoint here is one a player occupies, seven metres off on the
+      // ground, so the figure is measured the way the game of tag's own
+      // standpoint is — projected through the LIVE camera, probed along its whole
+      // axis against the rendered scene, and put to the same bar
+      // (`judgeChildFigure`: whole, inside the frame, unoccluded, drawn where the
+      // state says it is, and at least MIN_CHILD_PIXELS tall). The feet are at
+      // the child's LIFT, not on the ground — it is standing on a stone.
+      const view = page.viewportSize()
+      const reading = await page.evaluate(
+        ({ KID_HEIGHT, AXIS_SAMPLES, OCCLUDED_RATIO, CONFIRMED_RATIO, height }) => {
+          const t = window.__placeTag()
+          const cam = window.__placeCamera
+          if (!t || !cam || !window.__placeRayHit) return null
+          const i = (t.children ?? []).findIndex((c) => c.climb === 'top')
+          if (i < 0) return { i: -1 }
+          const c = t.children[i]
+          // The SAME matrix math the frame shutter projects a `local` subject
+          // with (scripts/verify/frameSubject.mjs) — no THREE in the page here.
+          const apply = (e, v) =>
+            [0, 1, 2, 3].map((r) => e[r] * v[0] + e[r + 4] * v[1] + e[r + 8] * v[2] + e[r + 12] * v[3])
+          const ndc = (x, y, z) => {
+            const eyeAt = apply(cam.matrixWorldInverse.elements, [x, y, z, 1])
+            const clip = apply(cam.projectionMatrix.elements, eyeAt)
+            const w = clip[3]
+            if (!(w > 0) || clip[2] / w >= 1) return null
+            return [clip[0] / w, clip[1] / w]
+          }
+          const ndcFeet = ndc(c.x, c.lift, c.z)
+          const ndcHead = ndc(c.x, c.lift + KID_HEIGHT, c.z)
+          let occluded = 0
+          let confirmed = 0
+          for (const f of AXIS_SAMPLES) {
+            const hit = window.__placeRayHit(c.x, c.lift + KID_HEIGHT * f, c.z)
+            if (hit.hitDistance == null) continue
+            const ratio = hit.hitDistance / hit.targetDistance
+            if (ratio < OCCLUDED_RATIO) occluded++
+            else if (ratio <= CONFIRMED_RATIO) confirmed++
+          }
+          // The word the climb exists for, over that same child's head — read off
+          // the live label channel and its drawn anchor, not assumed from the fact
+          // that the round said it.
+          const label = (window.__speech?.labels() ?? []).find((l) => l.speakerId === `kid-${i}`)
+          return {
+            i,
+            climb: c.climb,
+            child: ndcFeet && ndcHead
+              ? { pixels: (Math.abs(ndcHead[1] - ndcFeet[1]) / 2) * height, occluded, confirmed, ndcFeet, ndcHead }
+              : { pixels: 0, occluded, confirmed, ndcFeet: null, ndcHead: null },
+            word: label ? { atoms: label.atoms, screen: window.__speech?.anchorScreen(label.speakerId) ?? null } : null,
+            view: { w: window.innerWidth, h: window.innerHeight },
+          }
+        },
+        {
+          KID_HEIGHT,
+          AXIS_SAMPLES,
+          OCCLUDED_RATIO,
+          CONFIRMED_RATIO,
+          height: view?.height ?? 900,
+        },
+      )
+      const verdict = reading && reading.i >= 0
+        ? judgeChildFigure(reading.child, 'the child on the stone')
+        : { ok: false, reason: 'nobody is standing on the stone any more' }
       check(
-        'and nothing stands between the camera and the child on the stone',
-        !!drawn && drawn.ratio > 0.9,
-        JSON.stringify(drawn),
+        `the climb is photographable from a standpoint on the ground: the child reads whole, unoccluded and at ` +
+          `least ${MIN_CHILD_PIXELS} px tall at the SHIPPED hold`,
+        verdict.ok,
+        verdict.reason,
+      )
+      // AND THE WORD IS UP IN THE SAME FRAME. The stand and the note over the
+      // child's head are one duration (`climbHoldSeconds`), so a picture with the
+      // child up and the word gone would mean that coupling has come apart.
+      const word = reading?.word ?? null
+      check(
+        'and its word stands over its head, inside the picture',
+        !!word && Array.isArray(word.atoms) && word.atoms.length === 1 && !!word.screen &&
+          word.screen.x > 0 && word.screen.x < reading.view.w &&
+          word.screen.y > 0 && word.screen.y < reading.view.h,
+        JSON.stringify(word),
       )
       await frame('187-child-on-the-boulder', {
+        // A MOMENT, not a settled scene: the child is up there for the seconds it
+        // is up there, and a five-second quiet window would photograph the
+        // aftermath. The readiness wait was taken before the climb.
+        settle: false,
         local: { x: onTop.c.x, z: onTop.c.z, y: onTop.boulder.height + 0.55 },
         label: 'a village child standing on the ordinary boulder it has just named, with its word over its head',
       })
@@ -5204,9 +5282,7 @@ if (section('children-boulder-climb')) {
     }
   }
   await page.evaluate((was) => {
-    const b = window.__balance.villageLife.bankGame
-    b.roamSeconds = was.roamSeconds
-    b.climbHoldSeconds = was.climbHoldSeconds
+    window.__balance.villageLife.bankGame.roamSeconds = was.roamSeconds
   }, shippedClimbRoam)
   await page.evaluate(() => window.__game.getState().leavePlace())
   await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })

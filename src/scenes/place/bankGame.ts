@@ -106,6 +106,21 @@ export interface BankUtterance {
   at: BankAim
 }
 
+/**
+ * How long the note over a speaker's head stands for one bank utterance: never
+ * shorter than an ordinary word, and as long as the MOMENT's own hold where it
+ * has one (work-order 1082).
+ *
+ * The boulder's ROCK belongs to the picture of a child standing on a stone, and
+ * that stand is `climbHoldSeconds` long. Reading the note's length off the same
+ * number the gesture and the stand ride means the three cannot drift apart —
+ * which is exactly what had happened: a 2.8 s stand and a 2.6 s note agreed only
+ * by accident of their values.
+ */
+export function bankLabelSeconds(said: BankUtterance, oneWord: number): number {
+  return Math.max(oneWord, said.hold ?? 0)
+}
+
 /** One child. The body and its walking are the tag game's; the round adds who
  *  it is this run and whether it is out of play. */
 export interface BankChild extends TagChild {
@@ -1472,6 +1487,7 @@ function stepRoam(
       if (radial > 0) c.roamHeading = Math.atan2(dx - 2 * radial * nx, dz - 2 * radial * nz)
     }
     const look = cfg.reachDistance
+    const facingBefore = c.facing
     drive(
       s,
       i,
@@ -1487,10 +1503,12 @@ function stepRoam(
     // the distance walked are untouched, so the child-motion floor and the
     // shuffle gate measure exactly what they measured before — a child that
     // stopped to watch would be the defect this is meant to avoid, not the
-    // effect it is after.
+    // effect it is after. The turn REPLACES the walk's own facing for these
+    // seconds rather than fighting it: applied on top, the two equal steps left
+    // the head swivelling between the stone and the way the feet were going.
     if (watched) {
       c.facing = turnToward(
-        c.facing,
+        facingBefore,
         Math.atan2(stage.boulder.x - c.x, stage.boulder.z - c.z),
         cfg.turnRate * dt,
       )
