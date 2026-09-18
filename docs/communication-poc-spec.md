@@ -192,7 +192,14 @@ ending before everybody rises and walks back toward the roaming quarter.
 Three readings are closed deliberately. `ROCK` cannot be learned as "made it",
 because the catcher taps his own rock and names it at the start of a run with
 nobody arriving, and because a child climbs an ordinary scattered boulder in the
-village — no part of the game — and names that while the group roams.
+village — no part of the game — and names that while the group roams. That stone
+is PLACED rather than looked for: the layout puts one boulder of the scatter's
+full size just outside the rim of the children's quarter, clear of the huts, the
+lanes, the way to the water and the running lane, so the climb happens where the
+group is and on something worth climbing. The child stands on it long enough to
+be found by a player who looks over at the word (`climbHoldSeconds`), its word
+and its pointing arm last exactly that long, and the rest of the group turns to
+look while it stands — without any of them stopping.
 
 THE HAND IS ON THE STONE WHILE THE WORD FALLS. The tap is a CONTACT, not a
 gesture toward a stone: before he speaks, the tapper walks from his waiting
