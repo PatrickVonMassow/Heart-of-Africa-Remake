@@ -15902,3 +15902,69 @@ to land than a mechanism that needs a review.
   Criticality: low — no player impact, but the bookkeeping of every landed point hangs on it,
   and today its only exit is the waiver.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1154. The core-loop flow suite still expects the start kit that was removed on
+  17.09.2026, so `flow` cannot go green on any branch (measured 18.09.2026 on `main`
+  d5d9681c3 and on point 1146's branch: the SAME two checks, 30 pass / 2 fail, WebGPU).
+  MEASURED STATE: `scripts/verify/flow.mjs` `--section=core-loop` asserts
+  `2 starting gifts` (L145) and `Shovel bought (−$20)` — the latter expecting
+  `equipment.shovel === 2` and `money === 230` (L166) because "the demo start kit already
+  holds one shovel". Both statements stopped being true when the expedition lost its
+  starting goods: commit d56f0ac94 set every tool to zero (`src/state/store.ts` L508) and
+  1026ce475 set `START_GIFTS` to 0 (`src/config/balance.ts` L1645, "Start gifts: none
+  (user decision 17.09.2026)"). Neither commit followed the browser suite, so the red is
+  a stale EXPECTATION, not a product defect — the start state the checks around them read
+  (Cairo, $250, 35 days) still passes. The red owns no point today: the run record prints
+  it as "not in the classified baseline — no open point owns it", which is why it is filed
+  here rather than charged.
+  Final state:
+  - `flow --section=core-loop` is green on `main` on both backends with no charge entry:
+    the gift check reads the value the start state really carries, and the shovel purchase
+    check reads one shovel and $230 from a kitless start.
+  - Any other suite assertion that still names the removed start kit is found in the same
+    sweep and corrected with it (grep the verify suites for `shovel`, `gifts`,
+    `start kit`), or named as deliberately unaffected.
+  Test: the suite's own rung — `npm test -- flow --section=core-loop` on both backends.
+  These two numbers live in the browser suite alone, and nothing visible moves,
+  so no picture check is required.
+  Criticality: medium — no player impact, but the bundle's own gate cannot be green while
+  a covered suite carries an unowned red, and every point that maps to `flow` inherits it.
+  Refs: scripts/verify/flow.mjs (L145, L162-L166), src/state/store.ts L508,
+  src/config/balance.ts L1645
+  Bundle: Testinfrastruktur.
+
+- [ ] 1155. The chief's drum message becomes a calibratable balance value and gets louder,
+  and the village speech with it (user 18.09.2026, 07:50: "Sie sollen 2,5 mal so laut sein.
+  Im Rahmen vom gleichen Punkt auch die Sprache 1,5 mal so laut machen").
+  MEASURED STATE: the message drums have no balance value at all. Their envelope level is
+  the literal `1.8` in `src/communication/drumMessage.ts` L77 —
+  `const peak = 1.8 * Math.max(0, options.volume ?? balance.ambienceVolume)` — and
+  `PlaceScene.tsx` L546 calls `drumMessagePlan()` with no options, so in play the factor
+  below it is the global `balance.ambienceVolume` (0.1). `ambience.ts` `playDrumMessage()`
+  hangs the strikes straight on the `ambientBus`; the message has no layer gain of its own
+  (the `drumBed.villageGain` 0.42 belongs to the meaningless BED, not to the message).
+  Village speech, by contrast, already has its parameter: `balance.communication.speechVolume`,
+  today 2, on its own bus (`ambience.ts` L491).
+  Final state:
+  - The drum message's envelope level is a named, calibratable value in
+    `balance.communication.*` (the `1.8` leaves `drumMessage.ts`), and it stands at 2.5×
+    what it is today.
+  - `balance.communication.speechVolume` stands at 1.5× its present value.
+  - The headroom the present numbers were calibrated for is RE-MEASURED, not assumed: the
+    graph test's worst case is 0.977 of full scale today (`balance.ts` ~L1578), so 2.5× on
+    the drums and 1.5× on speech can clip. Report the measured worst case; if it exceeds
+    full scale, say so with the number and name what absorbs it rather than quietly scaling
+    the user's factors down.
+  - The pinned calibrations follow the new numbers instead of blocking them:
+    `ambience.test.ts` (the speech-against-drums ratio, measured 1.71× today) and
+    `ambience.speech.test.ts` L360.
+  Test: Vitest over the audio graph — the new balance value reaches the strike envelope,
+  both factors are what the user asked for, and the worst-case sum is measured and asserted
+  against full scale. A listening pass is the user's, not the suite's.
+  There is nothing to see, so no picture check is required.
+  Criticality: medium — the player cannot hear the PoC's one message properly today, and
+  the change is a handful of numbers with one real risk (clipping).
+  Refs: src/communication/drumMessage.ts L77, src/systems/ambience.ts (playDrumMessage,
+  L491), src/config/balance.ts (communication.speechVolume L1579, ambienceVolume L942),
+  src/systems/ambience.test.ts, src/systems/ambience.speech.test.ts L360
+  Bundle: Kommunikation.

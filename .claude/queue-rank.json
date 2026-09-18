@@ -1368,36 +1368,19 @@
       "why": "Low criticality and no player impact: it costs the operator calls at a landing, and every open point ahead of it is closer to the picture.",
       "origin": "machine",
       "place": "last"
+    },
+    "1154": {
+      "at": "2026-09-18T07:52:08.095Z",
+      "why": "Die flow-Suite ist auf jedem Branch rot, solange sie steht — jeder Punkt, der auf flow abbildet, erbt das Rot.",
+      "origin": "machine",
+      "place": "ahead"
+    },
+    "1155": {
+      "at": "2026-09-18T07:52:07.998Z",
+      "why": "Der Nutzer hat es am 18.09.2026 um 07:50 ausdrücklich als Nächstes eingereiht; es ist die einzige Botschaft des PoC und heute zu leise, um sie zu hören.",
+      "origin": "user",
+      "place": "ahead"
     }
-  },
-  "boundary": {
-    "at": "2026-08-21T00:55:14.962Z",
-    "points": [
-      336,
-      553,
-      596,
-      633,
-      659,
-      660,
-      663,
-      690,
-      708,
-      715,
-      719,
-      733,
-      735,
-      736,
-      738,
-      739,
-      746,
-      747,
-      750,
-      759,
-      760,
-      762,
-      764
-    ],
-    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
     "at": "2026-09-18T06:52:24.655Z",
@@ -1809,5 +1792,34 @@
       1152,
       1153
     ]
+  },
+  "boundary": {
+    "at": "2026-08-21T00:55:14.962Z",
+    "points": [
+      336,
+      553,
+      596,
+      633,
+      659,
+      660,
+      663,
+      690,
+      708,
+      715,
+      719,
+      733,
+      735,
+      736,
+      738,
+      739,
+      746,
+      747,
+      750,
+      759,
+      760,
+      762,
+      764
+    ],
+    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   }
 }

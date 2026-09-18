@@ -1569,4 +1569,35 @@ export const RED_CHARGES = [
       + 'the travel stops short or the wait expires on a moving camera, and SECOND why one '
       + 'mis-aimed frame costs a whole pass; the charge dies with it.',
   },
+  {
+    point: 1154,
+    suite: 'flow',
+    kind: 'check',
+    match: /^2 starting gifts\b/i,
+    why:
+      'THE EXPEDITION LOST ITS STARTING GOODS AND THE SUITE WAS NEVER TOLD. Measured 18.09.2026 '
+      + 'on webgpu/flow AND webgl/flow at point 1146\'s branch head 87c3a6ad3, and identically on '
+      + '`main` d5d9681c3 minutes apart: 30 pass, 2 fail, the same two checks on both lanes and on '
+      + 'both trees. `flow.mjs` L145 asserts that the start state carries two gifts, which stopped '
+      + 'being true when commit 1026ce475 set START_GIFTS to 0 (src/config/balance.ts L1645, "Start '
+      + 'gifts: none (user decision 17.09.2026)"). The checks AROUND it — Cairo, $250, 35 days — '
+      + 'still pass, so this is a stale expectation and not a product defect. NOT LANE-SCOPED and '
+      + 'NOT detail-scoped: the cause is a constant in the game config, it reads the same whichever '
+      + 'renderer holds the canvas, and the printed detail carries no measurement to narrow on. '
+      + 'The charge dies with point 1154, which reads the numbers the kitless start really carries.',
+  },
+  {
+    point: 1154,
+    suite: 'flow',
+    kind: 'check',
+    match: /^Shovel bought/i,
+    why:
+      'THE SECOND HALF OF THE SAME STALE EXPECTATION, measured in the same four runs of '
+      + '18.09.2026 (webgpu and webgl, branch and `main`). `flow.mjs` L166 buys one shovel and then '
+      + 'asserts TWO of them and $230, on the comment that "the demo start kit already holds one '
+      + 'shovel" — commit d56f0ac94 set every tool to zero (src/state/store.ts L508), so the '
+      + 'purchase now lands on one. The buy itself works: the price check and the buy-grid '
+      + 'alignment check on the same dialog pass. Unscoped for the reason the entry above gives. '
+      + 'The charge dies with point 1154.',
+  },
 ]
