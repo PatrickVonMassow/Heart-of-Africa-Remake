@@ -1425,6 +1425,21 @@ Wo zwei Einstiege existieren, fragen beide, und genau einmal pro Lauf. Und jede 
 braucht vor ihrem ersten Einsatz einen Probelauf am eigenen Material: Beide Defekte hier haben
 kein Test gefunden, sondern die Gegenlese und der erste echte Gebrauch.
 
+### Der Nachweis lebt im letzten Lauf, nicht im besten
+
+Gemessen am 18.09.2026, beim Bildnachweis eines gelandeten Punktes: Beide deckenden Suiten-Läufe
+standen grün bzw. mit verbuchten Roten im Protokoll — und die Schranke verlangte den Lauf
+trotzdem erneut. Der Grund war nicht der Beweis, sondern seine Buchführung: Sie liest den
+JÜNGSTEN Lauf je Grafiklinie, und dazwischen hatten acht Diagnose-Läufe eines einzelnen
+Prüfblocks denselben Zähler beschrieben. Acht billige, richtige, hilfreiche Messungen haben
+einen halbstündigen Beweis unsichtbar gemacht; die Reparatur war, den teuren Lauf ein zweites
+Mal zu fahren und danach nichts mehr anzufassen.
+
+**Lehre:** Wer eine Schranke mit einem Lauf bedient, muss wissen, WAS sie liest — den letzten
+Lauf, den besten, den jüngsten deckenden. Solange das der letzte ist, gilt: erst diagnostizieren,
+dann beweisen, und nach dem Beweis keine Sprosse mehr. Das ist keine Regel über Läufe, sondern
+über Reihenfolge, und sie kostet sonst genau die Zeit, die die billige Sprosse gespart hat.
+
 ## 4. Die Guards als Immunsystem
 
 Jedes Guard-Skript ist die geronnene Lösung eines real aufgetretenen, wiederholten Problems.
