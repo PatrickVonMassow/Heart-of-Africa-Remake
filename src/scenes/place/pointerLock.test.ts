@@ -38,7 +38,7 @@ describe('recovering a refused settlement lock', () => {
     document.dispatchEvent(new Event('pointerlockchange'))
   }
 
-  it.each(['promise', 'event', 'throw'])('retries a %s refusal only once after 1.1 seconds', async (signal) => {
+  it.each(['promise', 'event', 'throw'])('asks again 250 ms after a %s refusal, and keeps asking', async (signal) => {
     // The event-only API returns void in older browsers, unlike the DOM typings.
     const request = vi.fn().mockImplementation(() => {
       if (signal === 'promise') return Promise.reject(new Error('Escape cooldown'))
@@ -50,16 +50,60 @@ describe('recovering a refused settlement lock', () => {
     await Promise.resolve()
     expect(pointerLockProbe.refusals).toBe(1)
     expect(vi.getTimerCount()).toBe(1)
-    await vi.advanceTimersByTimeAsync(1099)
+    await vi.advanceTimersByTimeAsync(249)
     expect(request).toHaveBeenCalledTimes(1)
     await vi.advanceTimersByTimeAsync(1)
     expect(request).toHaveBeenCalledTimes(2)
     if (signal === 'event') errorEvent()
+    await Promise.resolve()
     expect(pointerLockProbe.refusals).toBe(2)
-    await vi.advanceTimersByTimeAsync(5000)
-    expect(request).toHaveBeenCalledTimes(2)
     expect(pointerLockProbe.grabs).toBe(2)
+    // A refused retry arms the next one: one shot was what left the quick click
+    // stranded inside the browser's refusal period (work-order point 1158).
+    expect(vi.getTimerCount()).toBe(1)
+  })
+
+  it('returns steering on ONE click though the browser refuses for over a second', async () => {
+    // The refusal period runs from the ESCAPE, not from the click, and its length
+    // is the browser's to choose — 1.5 s here stands for ANY period longer than
+    // one fixed retry delay. That is what stranded the quick click: a single ask
+    // 1.1 s after it was refused too, and nothing asked again (point 1158).
+    const clickedAt = Date.now()
+    const request = vi.fn().mockImplementation(() => {
+      if (Date.now() - clickedAt < 1500) return Promise.reject(new Error('Escape cooldown'))
+      setLock(canvas())
+      return Promise.resolve(undefined)
+    })
+    canvas().requestPointerLock = request
+    lock.request()
+    await vi.advanceTimersByTimeAsync(1600)
+    expect(document.pointerLockElement).toBe(canvas())
     expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('gives up when the bounded recovery window runs out', async () => {
+    const request = vi.fn().mockRejectedValue(new Error('Escape cooldown'))
+    canvas().requestPointerLock = request
+    lock.request()
+    // The opening ask plus one every 250 ms up to the 3 s window.
+    await vi.advanceTimersByTimeAsync(3000)
+    expect(request).toHaveBeenCalledTimes(13)
+    expect(vi.getTimerCount()).toBe(0)
+    await vi.advanceTimersByTimeAsync(10000)
+    expect(request).toHaveBeenCalledTimes(13)
+  })
+
+  it('lets an impatient second click extend the recovery rather than postpone it', async () => {
+    const request = vi.fn().mockRejectedValue(new Error('Escape cooldown'))
+    canvas().requestPointerLock = request
+    lock.request()
+    await vi.advanceTimersByTimeAsync(100)
+    expect(request).toHaveBeenCalledTimes(1)
+    lock.request() // the impatient second click, before the pending ask is due
+    await vi.advanceTimersByTimeAsync(250)
+    // The second click did not swallow the recovery it interrupted.
+    expect(request).toHaveBeenCalledTimes(3)
+    expect(vi.getTimerCount()).toBe(1)
   })
 
   it.each(['event-first', 'promise-first'])('deduplicates the event and rejected promise (%s)', async (order) => {
@@ -72,11 +116,11 @@ describe('recovering a refused settlement lock', () => {
     errorEvent()
     expect(pointerLockProbe.refusals).toBe(1)
     expect(vi.getTimerCount()).toBe(1)
-    await vi.advanceTimersByTimeAsync(1100)
+    await vi.advanceTimersByTimeAsync(250)
     errorEvent()
     expect(pointerLockProbe.refusals).toBe(2)
     expect(request).toHaveBeenCalledTimes(2)
-    expect(vi.getTimerCount()).toBe(0)
+    expect(vi.getTimerCount()).toBe(1)
   })
 
   it.each(['dialog', 'scene cleanup', 'lock granted', 'overlay'])('drops the retry on %s', async (reason) => {
@@ -98,7 +142,7 @@ describe('recovering a refused settlement lock', () => {
     } else {
       document.body.insertAdjacentHTML('beforeend', '<div class="overlay"></div>')
     }
-    await vi.advanceTimersByTimeAsync(1100)
+    await vi.advanceTimersByTimeAsync(3100)
     expect(request).toHaveBeenCalledTimes(1)
     expect(pointerLockProbe.refusals).toBe(1)
     expect(vi.getTimerCount()).toBe(0)
@@ -119,7 +163,7 @@ describe('recovering a refused settlement lock', () => {
     await Promise.resolve()
     expect(pointerLockProbe.refusals).toBe(1)
     expect(vi.getTimerCount()).toBe(0)
-    await vi.advanceTimersByTimeAsync(1100)
+    await vi.advanceTimersByTimeAsync(3100)
     expect(request).toHaveBeenCalledTimes(1)
   })
 
@@ -170,7 +214,7 @@ describe('recovering a refused settlement lock', () => {
       useUi.getState().setDialog(null)
       await Promise.resolve()
       expect(pointerLockProbe.refusals).toBe(1)
-      await vi.advanceTimersByTimeAsync(1100)
+      await vi.advanceTimersByTimeAsync(250)
       expect(request).toHaveBeenCalledTimes(2)
       expect(vi.getTimerCount()).toBe(0)
     } finally {
