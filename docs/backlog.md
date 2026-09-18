@@ -1455,3 +1455,14 @@ fasst die Maschine währenddessen nicht an.
   Gegenteil, wäre es ein Auslieferungsfehler der Fallback-Linie und gehörte sofort nach vorn.
   Festgehalten ist: die WebGL-2-Aufnahme DIESES Abschnitts taugt derzeit nicht als Bildbeleg,
   und wer sie das nächste Mal braucht, prüft zuerst, ob die Szene überhaupt gezeichnet war.
+
+- **Die Anfängeranleitung steht exakt auf ihrer Obergrenze und hat für die Lehre vom
+  18.09.2026 keinen Platz** (gemessen an diesem Tag): 700 Zeilen und 6847 Wörter sind das
+  Budget, und die Datei liegt genau darauf — jeder neue Fallstrick, auch ein auf sechs Zeilen
+  gekürzter, reißt beide Grenzen. Die Lehre selbst ist vollständig in der Retrospektive
+  festgehalten (§3.291: eine Reparatur, die auf einer nie gemessenen Browser-Konstante ruht,
+  und ein nur vom Nutzer beurteilbarer Fehler, der auf einen plausiblen Mechanismus hin
+  abgehakt wurde). Was hier wartet, ist der redaktionelle Durchgang, den der Wächter selbst
+  verlangt: einen bestehenden Eintrag in die Retrospektive hinüberkürzen, damit ein Platz
+  frei wird. Nicht als Punkt eingereiht, weil nichts Falsches im Bestand steht — es fehlt
+  nur eine Ergänzung.

@@ -660,22 +660,6 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   Build, Lint oder Tests, **warte** und **räum nichts weg**. Die Regel heißt **‚kein zweiter
   Maschinenverbraucher'**."
 
-- **Die Reparatur steht auf einer Zahl, die niemand gemessen hat.** „Der Browser sperrt
-  ungefähr eine Sekunde" — also wird ein einziger Versuch nach 1,1 Sekunden eingebaut, sauber
-  getestet, abgehakt. Der gemeldete Fehler blieb: die Frist lief ab einem anderen Zeitpunkt als
-  gedacht, und der eine Versuch fiel genau bei den schnellen Nutzern noch hinein. Die Zahl war
-  nicht das Problem — dass die Reparatur von ihr abhing, war es.
-  → *Prompt:* „Wenn deine Lösung eine **Zahl braucht, die du nicht messen kannst**: bau nicht
-  deine beste Schätzung ein, sondern etwas, das über den **ganzen plausiblen Bereich** trägt
-  (mehrmals nachfragen statt einmal), und **sag mir, welche Annahme du nicht prüfen konntest**."
-
-- **Ein Fehler, den nur du sehen kannst, wird auf einen plausiblen Mechanismus hin abgehakt.**
-  Der Fix sah richtig aus, die Tests waren grün, der Punkt galt als erledigt — geprüft hatte
-  ihn nur niemand dort, wo er auftrat. Beim nächsten Mal warst du es, der ihn wiederfand.
-  → *Prompt:* „Wenn nur **ich** beurteilen kann, ob der Fehler weg ist, dann ist der Punkt erst
-  **nach meiner Beobachtung** erledigt. Liefere die Reparatur aus, lass den Punkt **offen** und
-  sag mir **genau**, was ich klicken und worauf ich achten soll."
-
 ---
 
 ## Drei Meta-Regeln, die alles zusammenhalten
