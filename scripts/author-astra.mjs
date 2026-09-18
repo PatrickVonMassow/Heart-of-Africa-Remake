@@ -516,7 +516,7 @@ const AUTHOR_LANE_CONFIG = Object.freeze({
  * group remains separate. A caller owns only the wait and the log reader. */
 export async function startAuthoringSession({ point, lane, logPath = '' }) {
   const log = resolve(logPath || `local/${point}-${lane}-author.log`)
-  const session = spawnSync('ps', ['-o', 'sid=', '-p', String(process.pid)], { encoding: 'utf8' })
+  const session = spawnSync('ps', ['-o', 'sid=', '-p', String(process.pid)], { encoding: 'utf8', windowsHide: true })
   if (session.error || session.status !== 0 || !/^\d+$/.test(session.stdout.trim())) {
     throw new Error('cannot determine the authoring session id; POSIX setsid support is required')
   }
@@ -551,7 +551,7 @@ export async function startAuthoringSession({ point, lane, logPath = '' }) {
 
   let offset = fstatSync(fd).size
   const child = spawn(process.execPath, [...process.execArgv, ...process.argv.slice(1)], {
-    cwd: process.cwd(), env: process.env, detached: true, stdio: ['ignore', fd, fd],
+    cwd: process.cwd(), env: process.env, windowsHide: true, detached: true, stdio: ['ignore', fd, fd],
   })
   let finished = false
   let failure = null

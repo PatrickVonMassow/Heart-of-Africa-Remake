@@ -26,7 +26,7 @@ function fixture({ lane = 'astra', override = false, detached = false, shell = f
     if (code !== null) process.exitCode = code
     else {
       const identity = { pid: process.pid, cwd: process.cwd(), argv: process.argv.slice(2),
-        sid: Number(spawnSync('ps', ['-o', 'sid=', '-p', String(process.pid)], { encoding: 'utf8' }).stdout) }
+        sid: Number(spawnSync('ps', ['-o', 'sid=', '-p', String(process.pid)], { encoding: 'utf8', windowsHide: true }).stdout) }
       writeFileSync(${JSON.stringify(ready)}, JSON.stringify(identity))
       console.log('ready: stdout')
       console.error('ready: stderr')
@@ -41,7 +41,7 @@ function fixture({ lane = 'astra', override = false, detached = false, shell = f
   const args = [script, '--findings', 'a file with spaces.md', '--timeout', '1234']
   const command = shell ? 'bash' : process.execPath
   const commandArgs = shell ? ['-c', '"$@" & wait', 'caller', process.execPath, ...args] : args
-  const child = spawn(command, commandArgs, { cwd, detached: detached || shell, stdio: ['ignore', 'pipe', 'pipe'] })
+  const child = spawn(command, commandArgs, { cwd, windowsHide: true, detached: detached || shell, stdio: ['ignore', 'pipe', 'pipe'] })
   processes.add(child.pid)
   let stdout = ''
   let stderr = ''
@@ -132,7 +132,7 @@ describe('authoring session and log ownership', () => {
     writeFileSync(run.release, '')
     expect((await run.closed).code).toBe(0)
     const before = readFileSync(run.log, 'utf8')
-    const second = spawnSync(process.execPath, run.args, { cwd: run.cwd, encoding: 'utf8' })
+    const second = spawnSync(process.execPath, run.args, { cwd: run.cwd, encoding: 'utf8', windowsHide: true })
     expect(second.status, second.stderr).toBe(0)
     expect(second.stdout).toBe(before)
     expect(readFileSync(run.log, 'utf8')).toBe(before + second.stdout)
@@ -142,12 +142,12 @@ describe('authoring session and log ownership', () => {
     const cwd = mkdtempSync(join(tmpdir(), 'hoa-author-help-'))
     dirs.push(cwd)
     const script = resolve('scripts/author-astra.mjs')
-    const help = spawnSync(process.execPath, [script, '--help'], { cwd, encoding: 'utf8' })
+    const help = spawnSync(process.execPath, [script, '--help'], { cwd, encoding: 'utf8', windowsHide: true })
     expect(help.status).toBe(0)
     expect(help.stdout).toContain('[--log <path>]')
     expect(help.stdout).toContain('SAME log path destroys it')
     expect(existsSync(join(cwd, 'local'))).toBe(false)
-    const missing = spawnSync(process.execPath, [script, '--point', '1133', '--log'], { cwd, encoding: 'utf8' })
+    const missing = spawnSync(process.execPath, [script, '--point', '1133', '--log'], { cwd, encoding: 'utf8', windowsHide: true })
     expect(missing.status).toBe(2)
     expect(missing.stderr).toContain('--log needs a path')
   })
@@ -157,8 +157,10 @@ describe('authoring session and log ownership', () => {
     dirs.push(cwd)
     const log = join(cwd, 'chosen log.txt')
     writeFileSync(log, 'prior commission\n')
+    const records = join(cwd, 'reviews.jsonl')
+    writeFileSync(records, '')
     const result = spawnSync(process.execPath, [resolve(`scripts/author-${lane}.mjs`), '--point', '1133', '--log', log], {
-      cwd, encoding: 'utf8', env: { ...process.env, HOA_REPO_ROOT: process.cwd() },
+      cwd, encoding: 'utf8', windowsHide: true, env: { ...process.env, HOA_REPO_ROOT: process.cwd(), AUTHOR_REVIEW_RECORDS_FILE: records },
     })
     expect(result.status, result.stderr).toBe(2)
     expect(result.stdout.split('\n')[0]).toBe(`author-${lane}: log ${log} (append)`)
