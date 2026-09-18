@@ -88,6 +88,7 @@ import {
   type SpokenSituation,
 } from './childSituations'
 import {
+  ADULT_SITUATIONS,
   carryOf,
   clearTask,
   createAdultWork,
@@ -96,6 +97,7 @@ import {
   goalOf,
   stepAdultWork,
   taskOf,
+  type AdultSituationId,
   type AdultWorkGeography,
   type AdultWorkView,
   type DigSite,
@@ -3056,6 +3058,26 @@ function ErrandVillagers({
         }
       }),
     })
+    // PUTS THE VILLAGE'S OWN CASTING QUEUE ON ONE SITUATION (work-order 1136).
+    // The water errand is held by ONE carrier at a time and waits its turn in a
+    // fair round-robin behind the two digging situations, so a fixed sample
+    // window can miss it entirely: measured 10.09.2026, the `adult-errands`
+    // rung saw MANY errands run alone and exactly ONE inside the full pass, and
+    // the twelve green climbs before it had measured nothing.
+    //
+    // This does NOT stage the errand. It moves the cursor to the named
+    // situation and lets the next step cast NOW; whether the situation is
+    // castable at all, who is free to take it, where the two of them stand and
+    // every phase afterwards stay the game's own. A hook that assembled the
+    // tasks itself would be a drill recreating the aftermath, and would stay
+    // green over a casting that no longer works.
+    w.__placeCastErrand = (id: AdultSituationId) => {
+      const at = ADULT_SITUATIONS.indexOf(id)
+      if (at < 0) return false
+      work.cursor = at
+      work.next = 0
+      return true
+    }
     // Pins one villager into the fill pose at a given progress, or releases him
     // with `null`. It is the only thing that dips anybody today: the errand
     // still flips 'emptyJar' to 'fullJar' with no act in between, which is
@@ -3069,6 +3091,7 @@ function ErrandVillagers({
     }
     return () => {
       delete w.__placeErrands
+      delete w.__placeCastErrand
       delete w.__placeForceFill
     }
   }, [work, people, geography])
