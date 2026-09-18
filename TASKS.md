@@ -100,9 +100,22 @@ put it is the mistake this line exists to stop.
   `--log <path>` overrides it; it is appended to, never truncated. THE CALL STAYS BLOCKING
   AND ITS OUTPUT STAYS VISIBLE: the parent waits for the detached child and streams that file
   to its own stdout as it grows, so a caller sees what it sees today and `| tee` becomes
-  unnecessary without becoming wrong. When the parent dies the child keeps running in its own
+  unnecessary — see the `tee` answer below. When the parent dies the child keeps running in its own
   session and keeps writing to the same file. Same argv, same cwd, same exit code; no
   supervisor, no ledger field, no guard.
+  THE `tee` ANSWER (main session, 18.09.2026, after the second commission REPRODUCED the
+  conflict). The line above was wrong and the escalation is right: a caller’s
+  `| tee <the script’s own log path>` truncates that log when it opens it, and then the
+  streamed file is fed back into itself — one child write became four copies after three
+  streaming iterations in the reproduction. So the caller’s redirection GOES; it does not
+  merely become unnecessary. The whole command is `node scripts/author-astra.mjs --point <N>`
+  and nothing else — no `setsid`, no `tee`, no `>`. The script streams its log to stdout
+  unconditionally; a caller redirecting stdout to its OWN, DIFFERENT file stays fine and needs
+  no detection. Same-path `tee` is NOT supported and is NOT detected: working out where a
+  pipe eventually lands is the supervisor this point must not grow. Instead the run’s FIRST
+  line names the log path, and the usage text says that redirecting onto that same path
+  destroys it. Every call site in the repository and in docs/ that still writes
+  `setsid … | tee` is updated in the SAME commit — that deletion is half the point.
   Criticality: high — it is not the point's own work that is lost but a commissioned agent's,
   and the loss is silent: the log's last line claims the run continues.
   Bundle: Session- & Repo-Hygiene.
@@ -15895,3 +15908,40 @@ to land than a mechanism that needs a review.
   Refs: src/scenes/place/layout.ts (`pickWayOut`, the `way-out-missing` devAssert, `onWayOut`),
   src/scenes/place/layout.test.ts
   Bundle: Dorfleben
+
+- [ ] 1153. A landed point's board bookkeeping has a door that locks behind it, and the
+  running proof for its closing work cannot be declared (two findings, both measured
+  18.09.2026 on point 1136; filed as one because they are the same attribution question).
+  MEASURED STATE, FIRST HALF: `board.mjs done <point>` needs a current-work card and
+  `board.mjs promote` needs a queue card, but a ticked point has no queue card — the queue
+  is derived from TASKS.md. Whoever writes the gap card (`board.mjs none`) before the done
+  card is locked out: `done` says "no current-work card", `promote` says "no queue card",
+  and a `board-queue.mjs set` is discarded again at render time. `dashboard-guard` then
+  refuses permanently with `[erledigt-missing]`, and the only VISIBLE way out is
+  `--waive-audit` — exactly the audit that check exists for. A way out does exist and is
+  named nowhere: `board.mjs closing <point> --title "<subject>"` restores the current-work
+  card for a ticked point, after which `done <point> --none "<reason>"` writes the done card
+  and the gap card in one call.
+  MEASURED STATE, SECOND HALF: an in-flight declaration may only name a point that is OPEN
+  in the work order ("evidence item 1 names point 1136, which is not open"), and without a
+  point it refuses as well ("cannot be attributed to a point"). A run doing a landed point's
+  closing work — the full polish covering pass the render guard demands — therefore cannot be
+  declared at all: the declaration must be deleted before the board can be published, which
+  makes a live run invisible against the standing rule that waiting is visible. The
+  wait-marker hook re-writes the declaration on every tool call while the run lives, so the
+  delete and the publish must stand in ONE shell call or the caller circles. Together they
+  cost about a dozen calls on 18.09.2026.
+  Final state:
+  - An in-flight declaration may name a point that carries a closing card even when the work
+    order has already ticked it; the derived current-work section renders it against that
+    card instead of against the queue. Nothing else changes.
+  - `board.mjs none` refuses while a freshly ticked point still has no done card, and names
+    the `done` call that is due first — the cheap half, which prevents the lockout instead of
+    repairing it afterwards.
+  - The refusals of `done` and `promote` name the `closing` way out. Pure text, no mechanism.
+  Test: Vitest over board-core — the `none`-before-`done` order must fail or stay
+  recoverable, the in-flight attribution must accept a closing-card point, and both refusal
+  texts must name the way out. No browser run, no picture.
+  Criticality: low — no player impact, but the bookkeeping of every landed point hangs on it,
+  and today its only exit is the waiver.
+  Bundle: Session- & Repo-Hygiene.
