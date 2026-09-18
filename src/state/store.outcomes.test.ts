@@ -108,14 +108,15 @@ describe('applyEventOutcome — robbery, afflictions, weather (design.md §14/§
     g().debugAddGift('gold')
     g().debugAddGift('gold')
     g().debugAddGift('copper')
-    g().debugAddGift('copper') // the empty start pack is stocked here: gold 2, copper 2
+    g().debugAddGift('copper') // on top of the start pack: gold 2, copper START_GIFTS + 2
     g().debugAddEquipment('machete')
     g().debugAddEquipment('shovel')
+    const copper0 = g().gifts.copper
     const food0 = g().foodDays
     vi.spyOn(Math, 'random').mockReturnValue(0.9) // deterministic drop index / wound roll
     g().applyEventOutcome({ kind: 'waterfallSweep', result: 'swept' })
     expect(g().gifts.gold).toBe(1)
-    expect(g().gifts.copper).toBe(1)
+    expect(g().gifts.copper).toBe(Math.floor(copper0 / 2))
     expect(g().equipment.machete ?? 0).toBe(0) // the droppable item is swept away
     expect(g().equipment.shovel ?? 0).toBe(1) // the goal tool is never dropped
     expect(g().foodDays).toBeLessThan(food0)

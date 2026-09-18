@@ -500,12 +500,13 @@ export function startState(seed: number, placeId: string = startPlaceId()) {
     day: 0,
     money: START_MONEY,
     foodDays: START_FOOD_DAYS,
-    // No start gifts (START_GIFTS is 0): the bazaar sells copper trinkets.
+    // Start gifts are copper trinkets (START_GIFTS, user decision 18.09.2026):
+    // villages trade in gifts only, so a giftless start locked every village buy.
     gifts: { gold: 0, silver: 0, emerald: 0, copper: START_GIFTS, ivory: 0 } as Record<Material, number>,
-    // The expedition sets out without tools (user decision 17.09.2026): every
-    // piece of equipment is bought in the port. canteenFill 1 below stays inert
-    // until a canteen is owned. Money/start place stay the design.md fixed values.
-    equipment: { shovel: 0, rope: 0, machete: 0, rifle: 0, medicine: 0, canteen: 0 } as Partial<Record<EquipmentId, number>>,
+    // The expedition sets out with a rifle and a full canteen (user decision
+    // 18.09.2026, revising 17.09.2026); shovel, rope, machete, medicine and canoe
+    // are bought in the port. Money/start place stay the design.md fixed values.
+    equipment: { shovel: 0, rope: 0, machete: 0, rifle: 1, medicine: 0, canteen: 1 } as Partial<Record<EquipmentId, number>>,
     treasures: { gold: 0, silver: 0, emerald: 0, copper: 0, ivory: 0, statue: 0 } as Record<TreasureId, number>,
     treasureSites: generateTreasureSites(seed),
     graveyardIvoryLeft: balance.economy.graveyardIvory,

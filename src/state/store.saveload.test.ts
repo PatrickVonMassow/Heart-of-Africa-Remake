@@ -7,7 +7,7 @@
 // DOM-only and stays in the Playwright E2E; the underlying data is asserted here
 // via the exported listCheckpoints().
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { balance } from '../config/balance'
+import { balance, START_GIFTS } from '../config/balance'
 import { listCheckpoints, type CheckpointMeta } from './store'
 import { g, freshGame, withWorld } from '../test/store'
 import { KNOWN_FROM_START_PLACES } from '../world/geo'
@@ -233,24 +233,27 @@ describe('listCheckpoints row shape (design.md §18 table columns)', () => {
       foodDays: 12,
       health: 45,
     })
-    // Gifts flow through as a numeric total (start = none).
+    // Gifts flow through as a numeric total (the start pack's copper trinkets).
     expect(typeof first.gifts).toBe('number')
-    expect(first.gifts).toBe(0)
-    expect(second.gifts).toBe(0)
+    expect(first.gifts).toBe(START_GIFTS)
+    expect(second.gifts).toBe(START_GIFTS)
   })
 })
 
 describe('demo start preset (point 104)', () => {
-  it('a new game starts with an empty pack (user decision 17.09.2026)', () => {
+  it('a new game starts with a rifle, a full canteen and copper gifts (user decision 18.09.2026)', () => {
     // Direct newGame — NOT freshGame, which strips the pack for the
     // mechanics-focused tests above.
     localStorage.clear()
     g().newGame()
     const s = g()
-    for (const item of ['shovel', 'rope', 'machete', 'rifle', 'medicine', 'canteen', 'canoe'] as const) {
+    for (const item of ['shovel', 'rope', 'machete', 'medicine', 'canoe'] as const) {
       expect(s.equipment[item] ?? 0, item).toBe(0)
     }
-    expect(s.canteenFill).toBe(1) // inert until a canteen is bought
+    expect(s.equipment.rifle).toBe(1)
+    expect(s.equipment.canteen).toBe(1)
+    expect(s.canteenFill).toBe(1)
+    expect(s.gifts).toEqual({ gold: 0, silver: 0, emerald: 0, copper: START_GIFTS, ivory: 0 })
     // The design.md fixed values stay untouched.
     expect(s.money).toBe(250)
     expect(s.placeId).toBe('cairo')

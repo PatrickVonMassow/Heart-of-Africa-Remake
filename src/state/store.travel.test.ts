@@ -6,7 +6,7 @@
 // Playwright E2E.
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { CULTURAL_LANDMARKS } from '../world/data/landmarks'
-import { balance } from '../config/balance'
+import { balance, START_GIFTS } from '../config/balance'
 import { totalGifts } from './store'
 import { g, freshGame, withWorld, jumpTo, terrainAt, COORD } from '../test/store'
 import { isBlocked } from '../world/terrain'
@@ -35,7 +35,7 @@ describe('new game (design.md fixed values)', () => {
   it('starts in Cairo with the fixed money/provisions/gifts', () => {
     expect(g().money).toBe(250)
     expect(g().foodDays).toBe(35)
-    expect(totalGifts(g().gifts)).toBe(0)
+    expect(totalGifts(g().gifts)).toBe(START_GIFTS)
     expect(g().mode).toBe('place')
     expect(g().placeId).toBe('cairo')
   })

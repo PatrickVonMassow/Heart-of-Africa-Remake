@@ -1655,5 +1655,7 @@ export const START_MONEY = 250
 export const START_YEAR = 1890
 /** Start provisions in days (5 weeks, from the checkpoint table example in design.md §18). */
 export const START_FOOD_DAYS = 35
-/** Start gifts: none (user decision 17.09.2026); the port bazaar sells them. */
-export const START_GIFTS = 0
+/** Start gifts in copper (user decision 18.09.2026, revising the giftless start
+ *  of 17.09.2026): villages trade in gifts only, so the expedition can buy there
+ *  before it has visited a bazaar. */
+export const START_GIFTS = 10
