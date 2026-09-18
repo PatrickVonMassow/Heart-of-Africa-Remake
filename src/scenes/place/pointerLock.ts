@@ -13,8 +13,8 @@
 
 import { useUi } from '../../state/ui'
 
-/** Dev counters: how often the game asked for the lock, and gave it up. */
-export const pointerLockProbe = { grabs: 0, releases: 0 }
+/** Dev counters: lock requests, releases, and browser refusals. */
+export const pointerLockProbe = { grabs: 0, releases: 0, refusals: 0 }
 
 /** Gives the cursor back — a modal is taking over. */
 export function releasePointerLock(): void {
@@ -28,7 +28,10 @@ export function releasePointerLock(): void {
  * dialog. Under browser automation the decision is recorded and the real lock
  * skipped, for the reason in the file header.
  */
-export function requestPlacePointerLock(el: Element): void {
+export function requestPlacePointerLock(
+  el: Element,
+  onRefusal: () => void = () => { pointerLockProbe.refusals++ },
+): void {
   if (typeof document === 'undefined') return
   if (document.querySelector('.overlay')) return
   if (useUi.getState().dialog) return
@@ -37,16 +40,78 @@ export function requestPlacePointerLock(el: Element): void {
   if (document.pointerLockElement === el) return
   try {
     const r = (el as HTMLElement).requestPointerLock() as unknown as Promise<void> | undefined
-    if (r && typeof r.catch === 'function') r.catch(() => {})
+    if (r && typeof r.catch === 'function') void r.catch(onRefusal)
   } catch {
-    /* pointer lock unavailable — the game stays playable via keyboard */
+    onRefusal()
+  }
+}
+
+/** Own refusal recovery for one mounted place scene; dispose before leaving it. */
+export function createPlacePointerLock(el: Element): { request: () => void; dispose: () => void } {
+  let disposed = false
+  let retry: ReturnType<typeof setTimeout> | undefined
+  let pendingRefusal: (() => void) | undefined
+
+  const cancel = () => {
+    if (retry !== undefined) clearTimeout(retry)
+    retry = undefined
+    pendingRefusal = undefined
+  }
+  const canRetry = () => !disposed && !navigator.webdriver && !document.pointerLockElement
+    && !document.querySelector('.overlay') && !useUi.getState().dialog
+
+  const attempt = (allowRetry: boolean) => {
+    if (disposed) return
+    cancel()
+    let refused = false
+    const onRefusal = () => {
+      // Promise-capable browsers can also fire pointerlockerror for this request.
+      if (refused) return
+      refused = true
+      pointerLockProbe.refusals++
+      if (pendingRefusal !== onRefusal || !allowRetry || !canRetry()) return
+      // Escape briefly prevents re-grabbing in Chromium. Keep this bounded to
+      // one retry per activation, including when the retry itself is refused.
+      retry = setTimeout(() => {
+        retry = undefined
+        if (canRetry()) attempt(false)
+        else cancel()
+      }, 1100)
+    }
+    // Automation records the decision without a native request or error handler.
+    if (canRetry()) pendingRefusal = onRefusal
+    requestPlacePointerLock(el, onRefusal)
+  }
+  const request = () => attempt(true)
+  const onError = () => pendingRefusal?.()
+  const onChange = () => {
+    if (document.pointerLockElement) cancel()
+  }
+  const offUi = useUi.subscribe((state) => {
+    if (state.dialog) cancel()
+  })
+  document.addEventListener('pointerlockerror', onError)
+  document.addEventListener('pointerlockchange', onChange)
+
+  return {
+    request,
+    dispose: () => {
+      disposed = true
+      cancel()
+      offUi()
+      document.removeEventListener('pointerlockerror', onError)
+      document.removeEventListener('pointerlockchange', onChange)
+    },
   }
 }
 
 /** Restore mouse-look on any dialog's closing activation; return scene cleanup. */
-export function restorePointerLockAfterDialogs(el: Element): () => void {
+export function restorePointerLockAfterDialogs(
+  el: Element,
+  request: () => void = () => requestPlacePointerLock(el),
+): () => void {
   return useUi.subscribe((state, previous) => {
-    if (previous.dialog !== null && state.dialog === null) requestPlacePointerLock(el)
+    if (previous.dialog !== null && state.dialog === null) request()
   })
 }
 
