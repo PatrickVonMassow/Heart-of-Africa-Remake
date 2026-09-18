@@ -1370,8 +1370,8 @@
       "place": "ahead"
     },
     "1158": {
-      "at": "2026-09-18T13:01:39.541Z",
-      "why": "The residual of the user's own bug report of 17.09.2026: 1148 landed the fix, this is the attended observation that says whether his report is really answered.",
+      "at": "2026-09-18T16:42:47.077Z",
+      "why": "Der Nutzer hat die Probe selbst gefahren, sie ist fehlgeschlagen, und er verlangt die Ursachensuche als Nächstes.",
       "origin": "user",
       "place": "ahead"
     },
@@ -1380,39 +1380,16 @@
       "why": "Der Nutzer hat den Punkt am 18.09.2026 ausdrücklich als nächsten Auftrag verlangt (über eine Partnersitzung weitergereicht, weil diese Sitzung den Stapel hielt).",
       "origin": "user",
       "place": "ahead"
+    },
+    "1160": {
+      "at": "2026-09-18T16:42:46.916Z",
+      "why": "Der Nutzer hat die zentrierte Anzeige am 18.09.2026 ausdrücklich verlangt, nachdem er den Hinweis auf dem veröffentlichten Stand gesehen hat.",
+      "origin": "user",
+      "place": "ahead"
     }
   },
-  "boundary": {
-    "at": "2026-08-21T00:55:14.962Z",
-    "points": [
-      336,
-      553,
-      596,
-      633,
-      659,
-      660,
-      663,
-      690,
-      708,
-      715,
-      719,
-      733,
-      735,
-      736,
-      738,
-      739,
-      746,
-      747,
-      750,
-      759,
-      760,
-      762,
-      764
-    ],
-    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
-  },
   "settled": {
-    "at": "2026-09-18T14:51:19.261Z",
+    "at": "2026-09-18T16:42:46.933Z",
     "points": [
       174,
       184,
@@ -1821,7 +1798,37 @@
       1156,
       1157,
       1158,
-      1159
+      1159,
+      1160
     ]
+  },
+  "boundary": {
+    "at": "2026-08-21T00:55:14.962Z",
+    "points": [
+      336,
+      553,
+      596,
+      633,
+      659,
+      660,
+      663,
+      690,
+      708,
+      715,
+      719,
+      733,
+      735,
+      736,
+      738,
+      739,
+      746,
+      747,
+      750,
+      759,
+      760,
+      762,
+      764
+    ],
+    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   }
 }

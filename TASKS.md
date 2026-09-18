@@ -77,6 +77,64 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
+- [ ] 1158. The one-click return from the Escape cooldown is confirmed in a real browser
+  (residual of point 1148, landed 18.09.2026). IT STANDS AT THE FRONT AGAIN, and it is no
+  longer a question for the user: he took the observation himself on the deployed build the
+  same afternoon and it FAILED — 18.09.2026, ~18:02, verbatim: "Ich habe es getestet:
+  Schneller Klick funktioniert nach wie vor nicht." (It had been moved out of the front
+  earlier that day only because he was away and could not observe; he has.) So step (3)
+  below is now the work: the Escape-cooldown reading behind 1148 was wrong or incomplete,
+  and the REAL cause is measured and fixed rather than guessed. Step (2), the two-second
+  click, was not reported as failing.
+  WHAT TO MEASURE, since the fix must name a cause: (a) whether the quick request is refused
+  at all (`pointerLockProbe.refusals`, `pointerlockerror`, the promise rejection and its
+  DOMException message), silently dropped, or granted and lost again; (b) whether the bounded
+  1.1 s retry fires and what its own result is — refused again means the cooldown is longer
+  than assumed or the retry needs a fresh user activation, granted means the
+  `pointerlockchange` settling path or the HUD's locked state is what fails; (c) whether the
+  quick click lands on `gl.domElement` at all or on a HUD element above it (step (5) below:
+  `.hud-bottom-left` has `pointer-events: auto`, so a click near the inventory bar or the
+  hint never reaches the canvas). The production build exposes no `window.__placeLock` and
+  the user tested production, so the tool is a dev build or a console listener on
+  `pointerlockerror`/`pointerlockchange`.
+  THE TICK STILL NEEDS BOTH ATTENDED OBSERVATIONS. After the fix is deployed, the user is
+  asked for one more pair of observations through the board card.
+  Final state: the user's report of 17.09.2026, 21:48 — "Im Modus »Click the view to
+  steer« bewirkt erst mehrfaches Klicken, dass man wieder steuern kann." — is either
+  confirmed fixed or its real cause is found and fixed, judged by ONE attended observation
+  in a real Chrome on WebGPU.
+  WHY IT IS ITS OWN POINT. 1148 built and landed the fix: one bounded retry 1.1 s after a
+  refused pointer-lock request, with its dedup, its cancellation on dialog/overlay/grant/
+  scene-exit and the webdriver skip, all pinned by 36 Vitest cases. Its step (4) asked for an
+  attended check, and that step could not run in the batch. The reason was MEASURED on
+  18.09.2026 rather than assumed: pointer lock DOES engage in headless system Chrome once
+  `navigator.webdriver` is masked (a trusted Playwright click locked the canvas), but
+  Playwright's synthetic Escape never reaches Chromium's pointer-lock exit — the lock simply
+  stays held — and a programmatic `document.exitPointerLock()` leaves no cooldown at all, so
+  ONE click returns steering in 100 ms even on the unfixed main. The refusal 1148 repairs
+  cannot be produced without a human pressing Escape.
+  Work: (1) in an attended Chrome on WebGPU, enter a settlement, take the lock, press Escape
+  and click the view again WITHIN one second: steering must return without a second click.
+  (2) Repeat with a two-second wait before the click: the first click must steer. Record both
+  results. (3) If the first click still fails, the Escape-cooldown reading was wrong: measure
+  what actually happens — `pointerLockProbe.refusals` counts the browser's refusals since
+  1148 — and check whether the click lands on a HUD element instead of `gl.domElement`, which
+  is the layering case 1148 step (5) named; fix THAT and say so. (4) If both observations
+  pass, tick and say so.
+  BOUNDS THE USER NAMED: no new guard, ledger field or workflow abstraction (infrastructure
+  freeze 01.09.2026); pointer lock stays skipped under `navigator.webdriver`, and the
+  webdriver mask used for the measurement above stays a throwaway probe — it is NOT added to
+  a suite.
+  NO LONGER ATTENDED-GATED FOR ITS DIAGNOSIS (18.09.2026). It was, while the only open
+  question was "does it still happen"; the user has answered that, so the measurement and the
+  fix are ordinary batch work and belong to whoever takes this point. Only the final
+  CONFIRMATION stays attended — the two observations above, on the deployed build.
+  Criticality: medium — it is the confirmation that a reported, player-visible bug is really
+  gone; without it 1148 is a plausible fix, not a proven one.
+  Refs: src/scenes/place/pointerLock.ts (`createPlacePointerLock`), its test, and the
+  pointer-lock effect in src/scenes/place/PlaceScene.tsx; follow-up of 1148 (closed).
+  Bundle: Steuerung & Performance.
+
 - [ ] 1159. The run's start language can be chosen from the URL, exactly as the start
   place already can (user order 18.09.2026, relayed through a peer session because this
   session held the batch lock, verbatim: "Neuer Task, direkt als Nächstes: einen
@@ -113,6 +171,39 @@ put it is the mistake this line exists to stop.
   Refs: src/config/startPlace.ts, src/config/startPlace.test.ts, src/i18n/index.ts,
   src/state/store.ts
   Bundle: Testinfrastruktur.
+
+- [ ] 1160. The steering hint stands in the middle of the bottom band, not beside the
+  inventory bar (user order 18.09.2026, ~18:03, after seeing point 1146 on the deployed
+  build, verbatim: "Und noch eine Änderung: Der neu eingeführte Hinweis \"Click the view to
+  steer\" bzw. \"Esc: cursor\" soll zentriert angezeigt werden (sofern es der Platz zulässt)
+  - nicht linksbündig.").
+  MEASURED STATE: point 1146 put the hint into the bottom row's LEFT group, next to the
+  inventory bar, so it reads as left-aligned — which is what he is objecting to.
+  Final state:
+  - In the settlement the cursor-mode hint is horizontally CENTRED in the viewport at the
+    bottom band's height, keeping the bottom edge it shares with the inventory bar and the
+    buttons (point 1146). It stays a child of `.hud-bottom-row`, so the row still decides
+    that shared edge, but it leaves the `.hud-bottom-left` flex group: a middle slot — a
+    centre element with `flex: 1` and `justify-content: center` between `.hud-bottom-left`
+    and `.hud-bottom-right`, or `left: 50%` with a half-width translate inside the row,
+    whichever keeps 1146's own tests for the bottom edge honest — places it at the centre.
+  - "AS LONG AS THE SPACE ALLOWS" is measured, not guessed: where the inventory bar plus the
+    right-hand buttons leave no room at the centre — a narrow viewport, a long inventory —
+    the hint YIELDS instead of overlapping. It may then fall back to its 1146 place beside
+    the bar, or hide; the decision reads the measured widths rather than a breakpoint
+    somebody picked.
+  - `pointer-events: none` stays. Both languages already carry the strings; nothing changes
+    in the language files.
+  Test. A Vitest/HUD assertion that the hint element is no longer inside `.hud-bottom-left`
+  and sits in the centre slot, plus a browser picture on the everyday backend at default zoom
+  showing the hint centred beneath the view with the bar left and the buttons right. NOTE: the
+  hint hides under `navigator.webdriver` (1146's own OPEN item), so the placement is judged
+  the way 1146 judged it, unless the picture can be taken with the throwaway webdriver mask
+  point 1158's measurement used.
+  Criticality: low — a placement the user asked for; nothing is unreachable without it.
+  Refs: the hint markup and CSS of point 1146 (`.hud-bottom-row`, `.hud-bottom-left`), its
+  tests.
+  Bundle: Steuerung & Performance.
 
 - [ ] 1149. Small village stones raise the ground instead of blocking the walk (user order
   17.09.2026, 21:50 and 21:53, verbatim: "Im Rahmen von welchem Punkt wird erledigt, dass man
@@ -607,47 +698,6 @@ put it is the mistake this line exists to stop.
   Criticality: high — this is the feature the release exists for, and the user is the one who
   keeps hitting the bugs.
   Bundle: Verständigung.
-
-- [ ] 1158. The one-click return from the Escape cooldown is confirmed in a real browser
-  (residual of point 1148, landed 18.09.2026). MOVED OUT OF THE FRONT on 18.09.2026 by
-  the user, who is not at home and cannot take the attended observation now: it waits here,
-  ahead of the closing run 633, and is tracked as a "Von dir zu klären" card until he can
-  run it. The batch takes the points behind it in the meantime.
-  Final state: the user's report of 17.09.2026, 21:48 — "Im Modus »Click the view to
-  steer« bewirkt erst mehrfaches Klicken, dass man wieder steuern kann." — is either
-  confirmed fixed or its real cause is found and fixed, judged by ONE attended observation
-  in a real Chrome on WebGPU.
-  WHY IT IS ITS OWN POINT. 1148 built and landed the fix: one bounded retry 1.1 s after a
-  refused pointer-lock request, with its dedup, its cancellation on dialog/overlay/grant/
-  scene-exit and the webdriver skip, all pinned by 36 Vitest cases. Its step (4) asked for an
-  attended check, and that step could not run in the batch. The reason was MEASURED on
-  18.09.2026 rather than assumed: pointer lock DOES engage in headless system Chrome once
-  `navigator.webdriver` is masked (a trusted Playwright click locked the canvas), but
-  Playwright's synthetic Escape never reaches Chromium's pointer-lock exit — the lock simply
-  stays held — and a programmatic `document.exitPointerLock()` leaves no cooldown at all, so
-  ONE click returns steering in 100 ms even on the unfixed main. The refusal 1148 repairs
-  cannot be produced without a human pressing Escape.
-  Work: (1) in an attended Chrome on WebGPU, enter a settlement, take the lock, press Escape
-  and click the view again WITHIN one second: steering must return without a second click.
-  (2) Repeat with a two-second wait before the click: the first click must steer. Record both
-  results. (3) If the first click still fails, the Escape-cooldown reading was wrong: measure
-  what actually happens — `pointerLockProbe.refusals` counts the browser's refusals since
-  1148 — and check whether the click lands on a HUD element instead of `gl.domElement`, which
-  is the layering case 1148 step (5) named; fix THAT and say so. (4) If both observations
-  pass, tick and say so.
-  BOUNDS THE USER NAMED: no new guard, ledger field or workflow abstraction (infrastructure
-  freeze 01.09.2026); pointer lock stays skipped under `navigator.webdriver`, and the
-  webdriver mask used for the measurement above stays a throwaway probe — it is NOT added to
-  a suite.
-  ATTENDED-GATED: it cannot be delegated to a headless batch run; an attended session takes
-  it from here. A HEADLESS BATCH SESSION THAT REACHES THIS POINT SKIPS IT and takes the next
-  open point instead — it stands at the front for the USER's reading, because it is his bug,
-  not because the batch can advance it.
-  Criticality: medium — it is the confirmation that a reported, player-visible bug is really
-  gone; without it 1148 is a plausible fix, not a proven one.
-  Refs: src/scenes/place/pointerLock.ts (`createPlacePointerLock`), its test, and the
-  pointer-lock effect in src/scenes/place/PlaceScene.tsx; follow-up of 1148 (closed).
-  Bundle: Steuerung & Performance.
 
 - [ ] 633. The release's closing run — two regressions with the cleanup between them (user
   11.08.2026, splitting point 174: "Dafür scheint mir die Schätzung von 1 h viel zu wenig
