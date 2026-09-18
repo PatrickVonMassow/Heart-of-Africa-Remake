@@ -92,10 +92,18 @@ CALL and TALK are utterance registers with separate reach, loudness and falloff.
 ## Panning and mixing
 
 Compensated panning preserves the mono sum and never reduces stereo power.
-Speech has its own volume, 2. Falloff 4 carries 73.5% at 3 m and 20% at the
-10 m rim. Including the louder child synthesis and panned channel required
-reducing the envelope peak from 1.8 to 0.85: the conservative mixed-output
-bound falls from 1.780 to 0.977, speech at 3 m and the rim remains louder.
+Speech has its own volume, 3 since 18.09.2026 — 1.5 times the former 2, on the
+user's instruction. Falloff 4 carries 73.5% at 3 m and 20% at the 10 m rim.
+Including the louder child synthesis and panned channel required reducing the
+envelope peak from 1.8 to 0.85: the conservative mixed-output bound fell from
+1.780 to 0.977, speech at 3 m and the rim remains louder.
+
+The chief's drum message carries its own level, `communication.drumMessagePeak`,
+2.5 times the 1.8 that used to sit as a literal in `drumMessagePlan`. The two
+raises put the conservative mixed-output bound back over full scale: 1.336 with
+the debug drum bed and 1.242 without it, 2.52 dB and 1.88 dB over. Nothing in
+the graph absorbs that — there is no master limiter — so point 1156 carries it.
+The measured factors are not to be scaled back to hide the overage.
 
 ## The speech floor
 
