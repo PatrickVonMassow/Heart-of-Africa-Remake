@@ -46,6 +46,22 @@ export function requestPlacePointerLock(
   }
 }
 
+// HOW LONG THE RECOVERY KEEPS TRYING, and how often (work-order point 1158).
+// After the player leaves the lock with Escape, the browser refuses a re-grab
+// for a short period — and that period runs from the ESCAPE, not from the click
+// that asks for the lock back. A single retry timed from the click therefore
+// lands EARLIEST exactly when the player clicks FASTEST, which is the case that
+// was reported as still broken: the one attempt falls inside the refusal period
+// too, and nothing tries again until the next click. So the recovery is a
+// bounded SEQUENCE rather than one shot — it asks again every step until the
+// browser grants the lock or the window since the last deliberate request runs
+// out — and it no longer rests on any assumption about how long that refusal
+// period is. MEASURED 18.09.2026 in system Chrome (headless=new, WebGPU): a
+// timer-driven request carrying no fresh user gesture IS granted, so the
+// attempts need no further click from the player.
+const RETRY_STEP_MS = 250
+const RECOVERY_WINDOW_MS = 3000
+
 /** Own refusal recovery for one mounted place scene; dispose before leaving it. */
 export function createPlacePointerLock(el: Element): { request: () => void; dispose: () => void } {
   let disposed = false
@@ -60,7 +76,10 @@ export function createPlacePointerLock(el: Element): { request: () => void; disp
   const canRetry = () => !disposed && !navigator.webdriver && !document.pointerLockElement
     && !document.querySelector('.overlay') && !useUi.getState().dialog
 
-  const attempt = (allowRetry: boolean) => {
+  // `until` is the timestamp the sequence gives up at; a deliberate request
+  // opens a fresh window, so an impatient second click extends the recovery
+  // instead of replacing the one attempt that was still to come.
+  const attempt = (until: number) => {
     if (disposed) return
     cancel()
     let refused = false
@@ -69,20 +88,23 @@ export function createPlacePointerLock(el: Element): { request: () => void; disp
       if (refused) return
       refused = true
       pointerLockProbe.refusals++
-      if (pendingRefusal !== onRefusal || !allowRetry || !canRetry()) return
-      // Escape briefly prevents re-grabbing in Chromium. Keep this bounded to
-      // one retry per activation, including when the retry itself is refused.
+      if (pendingRefusal !== onRefusal || !canRetry() || Date.now() + RETRY_STEP_MS > until) return
+      // Paced by the REFUSAL, so a slow answer never overlaps the next ask.
       retry = setTimeout(() => {
         retry = undefined
-        if (canRetry()) attempt(false)
+        // The deadline is checked again HERE, not only where the ask was
+        // scheduled: a suspended tab or a blocked event loop can deliver this
+        // callback long after the window, and an ask that late would take the
+        // cursor out of nowhere.
+        if (canRetry() && Date.now() <= until) attempt(until)
         else cancel()
-      }, 1100)
+      }, RETRY_STEP_MS)
     }
     // Automation records the decision without a native request or error handler.
     if (canRetry()) pendingRefusal = onRefusal
     requestPlacePointerLock(el, onRefusal)
   }
-  const request = () => attempt(true)
+  const request = () => attempt(Date.now() + RECOVERY_WINDOW_MS)
   const onError = () => pendingRefusal?.()
   const onChange = () => {
     if (document.pointerLockElement) cancel()
