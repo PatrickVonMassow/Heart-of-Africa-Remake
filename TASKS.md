@@ -77,6 +77,43 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
+- [ ] 1158. The one-click return from the Escape cooldown is confirmed in a real browser
+  (residual of point 1148, landed 18.09.2026; moved to the front because it is the
+  confirmation of a user-reported bug).
+  Final state: the user's report of 17.09.2026, 21:48 — "Im Modus »Click the view to
+  steer« bewirkt erst mehrfaches Klicken, dass man wieder steuern kann." — is either
+  confirmed fixed or its real cause is found and fixed, judged by ONE attended observation
+  in a real Chrome on WebGPU.
+  WHY IT IS ITS OWN POINT. 1148 built and landed the fix: one bounded retry 1.1 s after a
+  refused pointer-lock request, with its dedup, its cancellation on dialog/overlay/grant/
+  scene-exit and the webdriver skip, all pinned by 36 Vitest cases. Its step (4) asked for an
+  attended check, and that step could not run in the batch. The reason was MEASURED on
+  18.09.2026 rather than assumed: pointer lock DOES engage in headless system Chrome once
+  `navigator.webdriver` is masked (a trusted Playwright click locked the canvas), but
+  Playwright's synthetic Escape never reaches Chromium's pointer-lock exit — the lock simply
+  stays held — and a programmatic `document.exitPointerLock()` leaves no cooldown at all, so
+  ONE click returns steering in 100 ms even on the unfixed main. The refusal 1148 repairs
+  cannot be produced without a human pressing Escape.
+  Work: (1) in an attended Chrome on WebGPU, enter a settlement, take the lock, press Escape
+  and click the view again WITHIN one second: steering must return without a second click.
+  (2) Repeat with a two-second wait before the click: the first click must steer. Record both
+  results. (3) If the first click still fails, the Escape-cooldown reading was wrong: measure
+  what actually happens — `pointerLockProbe.refusals` counts the browser's refusals since
+  1148 — and check whether the click lands on a HUD element instead of `gl.domElement`, which
+  is the layering case 1148 step (5) named; fix THAT and say so. (4) If both observations
+  pass, tick and say so.
+  BOUNDS THE USER NAMED: no new guard, ledger field or workflow abstraction (infrastructure
+  freeze 01.09.2026); pointer lock stays skipped under `navigator.webdriver`, and the
+  webdriver mask used for the measurement above stays a throwaway probe — it is NOT added to
+  a suite.
+  ATTENDED-GATED: it cannot be delegated to a headless batch run; an attended session takes
+  it from here.
+  Criticality: medium — it is the confirmation that a reported, player-visible bug is really
+  gone; without it 1148 is a plausible fix, not a proven one.
+  Refs: src/scenes/place/pointerLock.ts (`createPlacePointerLock`), its test, and the
+  pointer-lock effect in src/scenes/place/PlaceScene.tsx; follow-up of 1148 (closed).
+  Bundle: Steuerung & Performance.
+
 - [ ] 1082. A child climbing the village boulder becomes something the player actually
   sees (user 09.09.2026, 05:04 — the same report twice).
   Point 1080 was filed on 08.09.2026 because the user never saw the climb; it landed in the
@@ -399,6 +436,39 @@ put it is the mistake this line exists to stop.
   Criticality: medium — a player-visible teaching defect in the slice the release exists for,
   reported from a real session, and reproducible on every bout.
   Bundle: Dorfleben.
+
+- [ ] 1156. Two voices at once now clip the master, and nothing in the graph absorbs it.
+  (ranked directly after 1125 by the user, 18.09.2026, 14:26.)
+  MEASURED STATE (18.09.2026, on point 1155's branch): the graph test's conservative worst
+  case — two close child `talk` voices, the whole ambience floor and a footstep coincided on
+  one sample — is 1.336 of full scale with the debug drum bed and 1.242 without it
+  (`src/systems/ambience.test.ts`, "measures headroom for 2 close child 'talk' voices"),
+  that is 2.52 dB and 1.88 dB OVER. It was 0.977 before point 1155 raised the village speech
+  to 1.5x on the user's instruction of 18.09.2026, 07:50; the instruction stands and is not
+  what is in question here. The graph has no limiter: `buildGraph()` hangs the ambient,
+  footstep and speech buses straight on a `master` at 0.5 and that on `ctx.destination`
+  (`src/systems/ambience.ts` L477-L492), so the overage is a hard clip at the destination.
+  design.md carries no mix-headroom or limiter concept at all — grep finds none in §19/§20 —
+  so this is a MISSING DESIGN CONCEPT, not a forgotten implementation.
+  Final state:
+  - The village mix cannot exceed full scale, and the way it cannot is written into
+    design.md §19 first: what the limiter is, where it sits, and what it may cost the
+    transients of a footstep and a drum strike.
+  - The user's factors are untouched. A limiter that quietly undoes the 1.5x on speech or
+    the 2.5x on the drum message is the wrong answer to this point.
+  - The graph test measures the worst case THROUGH the new stage and asserts it under full
+    scale again, and the 2.52 dB / 1.88 dB figures above are named as what it had to absorb.
+  Test: Vitest over the audio graph — the worst-case sum through the limiter is under full
+  scale, and a single close voice is NOT audibly pulled down by it (the limiter must not
+  become a loudness change in disguise). A listening pass is the user's.
+  There is nothing to see, so no picture check is required.
+  Criticality: medium — reproducible player impact (audible distortion whenever two
+  villagers speak close by at once), but only in the coincidence case; one voice at 0.932
+  still clears.
+  Refs: src/systems/ambience.ts (buildGraph L477-L492), src/systems/ambience.test.ts
+  ("measures headroom for 2 close child voices"), src/config/balance.ts
+  (communication.speechVolume, communication.drumMessagePeak), design.md §19
+  Bundle: Kommunikation.
 
 - [ ] 1093. A compound fence may be drawn straight through a fixed life prop (user
   07.09.2026, "reihe einen weiteren Task fuer das Clipping-Problem ein, der spaeter
@@ -745,38 +815,6 @@ put it is the mistake this line exists to stop.
   tag plus `poc` dynamically, but a tag push alone does not trigger it. Then VERIFY
   that /v0.3/ and /poc/ serve the new state, and FREEZE the tag: it is never
   re-pointed.
-
-- [ ] 1156. Two voices at once now clip the master, and nothing in the graph absorbs it.
-  MEASURED STATE (18.09.2026, on point 1155's branch): the graph test's conservative worst
-  case — two close child `talk` voices, the whole ambience floor and a footstep coincided on
-  one sample — is 1.336 of full scale with the debug drum bed and 1.242 without it
-  (`src/systems/ambience.test.ts`, "measures headroom for 2 close child 'talk' voices"),
-  that is 2.52 dB and 1.88 dB OVER. It was 0.977 before point 1155 raised the village speech
-  to 1.5x on the user's instruction of 18.09.2026, 07:50; the instruction stands and is not
-  what is in question here. The graph has no limiter: `buildGraph()` hangs the ambient,
-  footstep and speech buses straight on a `master` at 0.5 and that on `ctx.destination`
-  (`src/systems/ambience.ts` L477-L492), so the overage is a hard clip at the destination.
-  design.md carries no mix-headroom or limiter concept at all — grep finds none in §19/§20 —
-  so this is a MISSING DESIGN CONCEPT, not a forgotten implementation.
-  Final state:
-  - The village mix cannot exceed full scale, and the way it cannot is written into
-    design.md §19 first: what the limiter is, where it sits, and what it may cost the
-    transients of a footstep and a drum strike.
-  - The user's factors are untouched. A limiter that quietly undoes the 1.5x on speech or
-    the 2.5x on the drum message is the wrong answer to this point.
-  - The graph test measures the worst case THROUGH the new stage and asserts it under full
-    scale again, and the 2.52 dB / 1.88 dB figures above are named as what it had to absorb.
-  Test: Vitest over the audio graph — the worst-case sum through the limiter is under full
-  scale, and a single close voice is NOT audibly pulled down by it (the limiter must not
-  become a loudness change in disguise). A listening pass is the user's.
-  There is nothing to see, so no picture check is required.
-  Criticality: medium — reproducible player impact (audible distortion whenever two
-  villagers speak close by at once), but only in the coincidence case; one voice at 0.932
-  still clears.
-  Refs: src/systems/ambience.ts (buildGraph L477-L492), src/systems/ambience.test.ts
-  ("measures headroom for 2 close child voices"), src/config/balance.ts
-  (communication.speechVolume, communication.drumMessagePeak), design.md §19
-  Bundle: Kommunikation.
 
 - [ ] 1150. The doctor's quarantine takes the frames away from a RUNNING picture run
   (measured 18.09.2026, twice in one hour, 01:22 and 01:31). The covering WebGPU `polish`
