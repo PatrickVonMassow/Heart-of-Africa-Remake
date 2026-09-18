@@ -651,10 +651,12 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   die Reparatur zurücknimmt**."
 
 - **Zwei Läufe gleichzeitig — und beide Messungen sind wertlos.** Unter fremder Last werden
-  Prüfläufe rot, ohne dass etwas kaputt ist. Der Fehler passiert über den **Namen**: Die Regel
-  steht als „keine zweite Suite" im Kopf, und was ihr startet, heißt „Landung" oder „Push".
+  Prüfläufe rot, ohne dass etwas kaputt ist; schlimmer noch räumt automatische Hygiene das
+  Material weg, das ein Lauf gerade schreibt — kein Rot, nur ein Urteil über die Hälfte. Der
+  Fehler passiert über den **Namen**: „keine zweite Suite" heißt bei euch „Landung" oder „Push".
   → *Prompt:* „Sag mir vor dem Start: **was fährt das unter der Haube?** Läuft schon etwas mit
-  Build, Lint oder Tests, **warte**. Die Regel heißt **‚kein zweiter Maschinenverbraucher'**."
+  Build, Lint oder Tests, **warte** und **räum nichts weg**. Die Regel heißt **‚kein zweiter
+  Maschinenverbraucher'**."
 
 ---
 
@@ -694,4 +696,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 3b153aeb1efc26dd6a7f9196cf496c01273318be0b2ccdfa8bb3d49048c2f990 -->
+<!-- GUIDE-FINGERPRINT: 9cc5f66dae6d1ded6373dbf3a41ccea288085ec9a31c49f64a7c6ba462b0c295 -->

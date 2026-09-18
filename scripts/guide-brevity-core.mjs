@@ -550,7 +550,17 @@ export const LIMITS = {
   // forgetfulness, which the existing load entries do not reach. SHORTEN-BEFORE-RAISE was
   // applied to both: drafted at 24 lines together, they land at 14, and each risk sits inside
   // the four-line limit. The long telling stays in the retrospective. 682 -> 696.
-  maxLines: 696,
+  // RAISED 18.09.2026 by the measured net of ONE genuinely new claim, FOLDED rather than given
+  // an entry of its own: automatic hygiene that clears away what a RUNNING job is in the middle
+  // of writing — here a doctor quarantine twice took the frames a picture run was drawing, with
+  // no error and no red, leaving a judgement made on half the material. It went into "Zwei Läufe
+  // gleichzeitig", whose subject is already the machine being disturbed under a run, and that
+  // entry's own sentence about the NAME was tightened to pay part of it, so the risk half stays
+  // inside its four lines. THE PRIOR ATTEMPT (facb68f3e) drafted it standalone at seven lines,
+  // hit this ceiling and DROPPED the lesson instead of folding it — dropping is not a review
+  // outcome the house rule offers, and the fingerprint it reverted is restored with this fold.
+  // Net: +2 lines / +18 words. 696 -> 698.
+  maxLines: 698,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -857,7 +867,9 @@ export const LIMITS = {
   // down to the four-line risk limit, 163 the net raise. Nothing else was tightened for it — the
   // neighbouring entries have been cut for three earlier raises already, and cutting a claim to
   // buy a tip is the loosening this rule forbids. 6638 -> 6801.
-  maxWords: 6801,
+  // RAISED 18.09.2026 with the line ceiling above by the same fold — the running-job hygiene
+  // claim folded into "Zwei Läufe gleichzeitig". Measured net +18 words. 6801 -> 6819.
+  maxWords: 6819,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,
