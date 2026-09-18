@@ -18,9 +18,10 @@
 // The decisions are pure and tested (author-astra-core.mjs, author-routing-core.mjs);
 // this half does the process work, the git work and the push, and fails LOUD.
 import { spawn, spawnSync } from 'node:child_process'
-import { readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join, relative, sep } from 'node:path'
+import { closeSync, fstatSync, mkdirSync, openSync, readFileSync, readSync, rmSync, writeFileSync } from 'node:fs'
+import { constants, tmpdir } from 'node:os'
+import { dirname, join, relative, resolve, sep } from 'node:path'
+import { once } from 'node:events'
 import { isMainModule } from './is-main.mjs'
 import { mainCheckoutFrom } from './main-checkout-core.mjs'
 import { REPO_ROOT } from './repo-paths.mjs'
@@ -510,10 +511,79 @@ const AUTHOR_LANE_CONFIG = Object.freeze({
   }),
 })
 
+/** Re-exec only the commissioner that still belongs to its caller's session.
+ * Node's detached spawn calls setsid on POSIX; the model's existing timeout
+ * group remains separate. A caller owns only the wait and the log reader. */
+export async function startAuthoringSession({ point, lane, logPath = '' }) {
+  const log = resolve(logPath || `local/${point}-${lane}-author.log`)
+  const session = spawnSync('ps', ['-o', 'sid=', '-p', String(process.pid)], { encoding: 'utf8' })
+  if (session.error || session.status !== 0 || !/^\d+$/.test(session.stdout.trim())) {
+    throw new Error('cannot determine the authoring session id; POSIX setsid support is required')
+  }
+  mkdirSync(dirname(log), { recursive: true })
+  const fd = openSync(log, 'a+')
+  if (Number(session.stdout.trim()) === process.pid) {
+    // Already detached (including daemon-owned callers): retain this PID so
+    // their cancellation group still names the commissioner. Mirror its writes
+    // to stdout unless stdout is already this log, as in our own re-exec.
+    const target = fstatSync(fd)
+    const stdout = fstatSync(1)
+    const alreadyLogging = target.dev === stdout.dev && target.ino === stdout.ino
+    const visible = process.stdout.write.bind(process.stdout)
+    const write = (chunk, encoding, callback) => {
+      if (typeof encoding === 'function') { callback = encoding; encoding = undefined }
+      const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk, encoding)
+      writeFileSync(fd, bytes)
+      if (!alreadyLogging) return visible(bytes, callback)
+      if (callback) callback()
+      return true
+    }
+    process.stdout.write = write
+    process.stderr.write = write
+    console.log(`author-${lane}: log ${log} (append)`)
+    return null
+  }
+
+  let offset = fstatSync(fd).size
+  const child = spawn(process.execPath, [...process.execArgv, ...process.argv.slice(1)], {
+    cwd: process.cwd(), env: process.env, detached: true, stdio: ['ignore', fd, fd],
+  })
+  let finished = false
+  let failure = null
+  let exitCode = 1
+  child.once('error', (error) => { failure = error; finished = true })
+  child.once('exit', (code, signal) => {
+    exitCode = code ?? (128 + (constants.signals[signal] || 0))
+    finished = true
+  })
+  const buffer = Buffer.alloc(64 * 1024)
+  try {
+    // Snapshot each pass: concurrent appends cannot make one pass unbounded.
+    // Start at the old EOF, so a repeated commission never replays old output.
+    let lastPass
+    do {
+      lastPass = finished
+      const end = fstatSync(fd).size
+      while (offset < end) {
+        const count = readSync(fd, buffer, 0, Math.min(buffer.length, end - offset), offset)
+        if (!count) break
+        offset += count
+        if (!process.stdout.write(Buffer.from(buffer.subarray(0, count)))) await once(process.stdout, 'drain')
+      }
+      if (lastPass) break
+      await new Promise((done) => setTimeout(done, 100))
+    } while (!lastPass)
+    if (failure) throw failure
+    return exitCode
+  } finally {
+    closeSync(fd)
+  }
+}
+
 export const usage = ({ commandName = 'author-astra', model = ASTRA_MODEL_NAME, reviewerLabel = 'Claude' } = {}) =>
   [
     'usage: node scripts/author-astra.mjs --point <N> [--findings <file>] [--rounds <n>] [--timeout <ms>]',
-    '           [--anyway] [--dry-run]',
+    '           [--log <path>] [--anyway] [--dry-run]',
     '       node scripts/author-astra.mjs --routing (--point <N> [--rounds <n>] | --all)',
     '',
     `${model} AUTHORS the point in THIS worktree, on THIS branch, committing at every step;`,
@@ -521,6 +591,12 @@ export const usage = ({ commandName = 'author-astra', model = ASTRA_MODEL_NAME, 
     'lint) on its own work and merges nothing: the REVIEW, the browser suites, the picture and the',
     `landing belong to the ${reviewerLabel} session that called it, which is what keeps two vendors on the`,
     'point and neither reviewing itself.',
+    '',
+    `The script appends to local/<point>-${commandName === 'author-fable' ? 'fable' : 'astra'}-author.log (--log overrides it).`,
+    'It detaches itself, waits for completion and streams the log to stdout.',
+    'Use the command alone: no setsid, tee or redirection is needed.',
+    'Redirecting or piping through tee onto that SAME log path destroys it and is unsupported.',
+    'Redirecting stdout to a different file is supported. Read-only modes create no log.',
     '',
     'The lane is decided by the point itself (--routing shows why). A point the routing gives to',
     'another lane is refused unless --anyway is given, and the share switch can turn the whole',
@@ -536,6 +612,7 @@ export async function runAuthoringCli({ authorLane = 'astra', argv = process.arg
     '--findings',
     '--rounds',
     '--timeout',
+    '--log',
     '--anyway',
     '--dry-run',
     '--routing',
@@ -566,6 +643,10 @@ export async function runAuthoringCli({ authorLane = 'astra', argv = process.arg
       process.exit(2)
     }
     const roundsOverride = argv.includes('--rounds') ? roundsValue : undefined
+    if (argv.includes('--log') && !flag('--log')) {
+      console.error(`${commandName}: --log needs a path.`)
+      process.exit(2)
+    }
     const fableState = currentFableState()
 
     // THE ROUTING REPORT: read-only, no allowance spent, no state touched.
@@ -615,7 +696,7 @@ export async function runAuthoringCli({ authorLane = 'astra', argv = process.arg
     }
 
     const point = flag('--point')
-    if (!point) {
+    if (!/^\d+$/.test(point)) {
       console.error(`${commandName}: --point <N> is required.\n`)
       console.error(usage(config))
       process.exit(2)
@@ -673,6 +754,14 @@ export async function runAuthoringCli({ authorLane = 'astra', argv = process.arg
           `--spec-examination <sound|amended>`,
       )
       process.exit(4)
+    }
+
+    if (!argv.includes('--dry-run')) {
+      const exitCode = await startAuthoringSession({ point, lane: config.lane, logPath: flag('--log') })
+      if (exitCode !== null) {
+        process.exitCode = exitCode
+        return
+      }
     }
 
     // WHERE THIS RUN WOULD WRITE, asked before anything is spent.
