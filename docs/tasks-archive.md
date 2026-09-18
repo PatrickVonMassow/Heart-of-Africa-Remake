@@ -29564,3 +29564,36 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Criticality: medium — no player impact; it buys back hours of machine time per point
   (14.09.: 599 minutes of verification wall clock in 28 runs for ONE point).
   Bundle: Session- & Repo-Hygiene
+
+- [x] 1136. A rung that saw nothing gives no all-clear: a subject-dependent check names how
+  many subjects it actually saw (user order 15.09.2026, THIRD of three).
+  WHY IT BELONGS TO THE OTHER TWO: it covers the ONLY measured counter-example to the change.
+  On 10.09.2026 the narrow rung `polish --section=adult-errands` was green TWELVE times while
+  the full suite went red on exactly two checks. Measured cause: the check measures a rarely
+  cast subject — run alone the section sees many errands, inside the full pass it saw ONE, the
+  fetch phase 33 of about 2000 ticks. Those twelve green rungs were never all-clears, they were
+  NON-MEASUREMENTS. While that holds, the cheap gate of point 1134 does not carry.
+  FINAL STATE:
+  1. Subject-dependent checks CREATE the rare situation deliberately — the actor and the fetch
+     phase through the existing test hooks — and PROVE they reached it. That is the cheaper and
+     provable way and it comes first.
+  2. Every subject-dependent check prints the number of subjects it ACTUALLY saw. Below a named
+     minimum the verdict is NOT COVERING, not green. A non-covering check is neither red nor
+     green: it says the question is open.
+  3. FALLBACK, only where 1 cannot create the situation for a section: that one section gets the
+     tick and seed budget of the full run, so rung and suite measure the same thing — and if the
+     rung thereby costs more than it is worth, it is deleted WITHOUT replacement and the check
+     stays the bundle's business.
+  4. The scope is expressly LIMITED to the measured subject-dependent checks, not spread over
+     every suite. The sample count already stands in the log; this is an evaluation, not a guard.
+  5. A few additional starting states are allowed; one fixed scenario does not replace natural
+     variance, which is why the broad closing run stays.
+  BOUNDARY: the water-errand defect itself belongs to point 1131 and is NOT treated here — it is
+  only the evidence that "no regression findings" does not mean "no defects".
+  Where to start: `src/scenes/place/adultWork.ts` and the adult-errands section of
+  `scripts/verify/polish.mjs`. If `polish` is split by topic (point 1129), the affected checks
+  move with it; the split itself belongs to 1129 and is not duplicated here.
+  VERIFICATION: unit for the sample evaluation; the affected `--section` on WebGPU, then read
+  once against the next bundle run to see whether rung and suite now say the same thing.
+  Criticality: medium — no player impact; without it the cheap gate of 1134 rests on non-measurements.
+  Bundle: Session- & Repo-Hygiene
