@@ -1070,12 +1070,13 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
       // The gains are the calibrated defaults; only the debug audition switch differs.
       expect(balance.ambienceVolume).toBe(0.1)
       expect(balance.ambientVolume).toBe(0.5)
-      expect(balance.communication.speechVolume).toBe(2)
+      expect(balance.communication.speechVolume).toBe(3)
       expect(balance.drumBed.villageGain).toBe(0.42)
       const { drums, speech } = measure()
       expect(drums).toBeGreaterThan(0)
-      // MEASURED: 1.71× the drum beat (0.323 against 0.189) at the pinned
-      // synthesis lower bound. Under 1 is the reported bug; a shout is no fix either.
+      // RE-MEASURED at speechVolume 3 (user 18.09.2026): 2.56× the drum beat
+      // (0.4845 against 0.189) at the pinned synthesis lower bound; it was 1.71×
+      // at speechVolume 2. Under 1 is the reported bug; a shout is no fix either.
       expect(speech / drums).toBeGreaterThanOrEqual(1.6)
       expect(speech / drums).toBeLessThanOrEqual(4)
     })
@@ -1146,9 +1147,35 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
     expect(drumLayer).toHaveLength(1)
     expect(drums).toBeGreaterThan(0)
     const output = (count * speech + ambience + drums + footstep) * master.gain.value
-    // Re-measured: 1.780 at the former envelope peak 1.8; 0.977 at 0.85.
-    if (register === 'talk') expect(output).toBeCloseTo(0.97678411396, 5)
-    expect(output).toBeLessThan(1)
+    // The bed is a DEBUG audition (balance.drumBed.enabled is false in play), so
+    // the sum the player can actually reach leaves it out.
+    const deployed = (count * speech + ambience + footstep) * master.gain.value
+
+    // RE-MEASURED at speechVolume 3 (user 18.09.2026, 07:50). It was 0.977 at
+    // speechVolume 2, and 1.780 before that at the former envelope peak 1.8.
+    //
+    // THIS WORST CASE NOW EXCEEDS FULL SCALE AND IS REPORTED, NOT SILENTLY
+    // SCALED BACK: the user asked for 1.5× on speech, and 1.5 × 0.977 is 1.34
+    // whatever else is true. NOTHING in the graph absorbs it — there is no
+    // master limiter, so the destination hard-clips. Point 1156 carries that
+    // (design.md has no mix-headroom concept; it is an open design item).
+    //
+    // What the number IS, so the limiter point has a target: this sum is
+    // deliberately conservative. It coincides the peaks of two close child
+    // voices, the whole ambience floor and a footstep on one sample, and reads
+    // speech at the 2.8 UPPER bound of the four rendered carriers (1.99–2.67).
+    if (register === 'talk') {
+      expect(output).toBeCloseTo(1.33605117094, 5)
+      expect(deployed).toBeCloseTo(1.24155117094, 5)
+      // 2.52 dB over full scale with the debug bed, 1.88 dB without it.
+      expect(20 * Math.log10(output)).toBeCloseTo(2.5165, 3)
+      expect(20 * Math.log10(deployed)).toBeCloseTo(1.879, 3)
+    }
+    // One voice — the reachable everyday case — still clears full scale.
+    if (register === 'call') {
+      expect(output).toBeCloseTo(0.93187573184, 5)
+      expect(output).toBeLessThan(1)
+    }
   })
 
   // Point 673 follows the shipped drum silence, so the calibration that closes
@@ -1177,8 +1204,10 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
     // Lower bound from all four rendered carriers (1.99–2.67), through the
     // live speech/master buses. At 3 m speech still clears the conservative
     // sum of every deployed layer, and exceeds the former falloff-24 mix.
+    // RE-MEASURED at speechVolume 3 (user 18.09.2026, 07:50): each figure is
+    // exactly 1.5× its value at speechVolume 2 (0.323 / 0.2375 / 0.0646).
     expect(ambienceFloor).toBeCloseTo(0.2275, 10)
-    const expected = new Map([[0, 0.323], [3, 0.2375], [10, 0.0646]])
+    const expected = new Map([[0, 0.4845], [3, 0.35625], [10, 0.0969]])
     expect(speechPeak).toBeCloseTo(expected.get(distance)!, 8)
     const master = speechBus.connected[0] as FakeGain
     expect(master.connected[0]).toBe(ctx.destination)

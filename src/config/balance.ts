@@ -862,6 +862,11 @@ export interface BalanceConfig {
      *  syllables are the one sound the player must hear, so `ambientVolume`
      *  ("everything else") no longer touches them. */
     speechVolume: number
+    /** Envelope peak of ONE chief's drum-message strike, before the ambience
+     *  volume under it (`drumMessagePlan`). The message is the PoC's one piece
+     *  of long-range speech, so it carries its own level rather than the
+     *  meaningless bed's `drumBed.villageGain`. */
+    drumMessagePeak: number
     /** The gap between a speaker's own crown and its note, in settlement units. */
     labelHeadroom: number
     /** How close the traveller must stand to the chief, in settlement units, for
@@ -1573,10 +1578,15 @@ export const balance: BalanceConfig = {
     speechPitchInterval: 1.68,
     // Independent speech bus. Re-measured with child carriers and compensated
     // stereo: the envelope peak was reduced for headroom (speaking.ts), while
-    // falloff 4 still lifts speech at 3 m and at the hearing rim. The graph test
-    // measures 0.2375 before the master at 3 m over a 0.2275 village floor,
-    // and 0.977 worst-case output with two panned children, drums and a step.
-    speechVolume: 2,
+    // falloff 4 still lifts speech at 3 m and at the hearing rim.
+    // 1.5x its former 2 on the user's instruction of 18.09.2026, 07:50.
+    // MEASURED HEADROOM: see the graph test in src/systems/ambience.test.ts.
+    speechVolume: 3,
+    // 2.5x its former 1.8 on the same instruction — the literal used to sit in
+    // drumMessage.ts, where nothing could calibrate it. The strikes ride the
+    // ambient bus, so the message never coincides with close village speech on
+    // one carrier; the graph test measures both sums separately.
+    drumMessagePeak: 4.5,
     // A hand's breadth over the head, no more (point 582). The note used to
     // hang at a flat 2.3 m over the speaker's FEET — 0.85 m over a grown
     // villager's head and about twice a child's own height over a child's — so

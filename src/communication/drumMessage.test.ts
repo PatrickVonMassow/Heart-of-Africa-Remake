@@ -45,9 +45,34 @@ describe('the message itself', () => {
 })
 
 describe('the drum plan says what the village speaks', () => {
-  it('keeps the original drum level when speech headroom is recalibrated', () => {
-    for (const strike of drumMessagePlan().strikes) expect(strike.peak).toBeCloseTo(0.18)
-    for (const strike of drumMessagePlan({ volume: 0.5 }).strikes) expect(strike.peak).toBeCloseTo(0.9)
+  it('takes its level from the balance value, not from a literal in the code', () => {
+    // The level used to be a `1.8` inside drumMessagePlan, where nothing could
+    // calibrate it. It is `balance.communication.drumMessagePeak` now, and the
+    // plan follows it: change the value and every strike moves with it.
+    for (const strike of drumMessagePlan().strikes) {
+      expect(strike.peak).toBeCloseTo(balance.communication.drumMessagePeak * balance.ambienceVolume)
+    }
+    const held = balance.communication.drumMessagePeak
+    try {
+      balance.communication.drumMessagePeak = held * 2
+      for (const strike of drumMessagePlan().strikes) expect(strike.peak).toBeCloseTo(held * 2 * balance.ambienceVolume)
+    } finally {
+      balance.communication.drumMessagePeak = held
+    }
+    // An explicit volume still overrides the ambience volume under it.
+    for (const strike of drumMessagePlan({ volume: 0.5 }).strikes) {
+      expect(strike.peak).toBeCloseTo(balance.communication.drumMessagePeak * 0.5)
+    }
+  })
+
+  it('stands at the loudness the user asked for on 18.09.2026', () => {
+    // "Sie sollen 2,5 mal so laut sein. Im Rahmen vom gleichen Punkt auch die
+    // Sprache 1,5 mal so laut machen." The two factors, against the values they
+    // were applied to, so a later edit cannot quietly undo the instruction.
+    expect(balance.communication.drumMessagePeak).toBeCloseTo(2.5 * 1.8)
+    expect(balance.communication.speechVolume).toBeCloseTo(1.5 * 2)
+    // …and that is what a strike really carries, at the shipped ambience volume.
+    for (const strike of drumMessagePlan().strikes) expect(strike.peak).toBeCloseTo(0.45)
   })
 
   it('beats each concept as its spoken sequence, concept for concept', () => {
