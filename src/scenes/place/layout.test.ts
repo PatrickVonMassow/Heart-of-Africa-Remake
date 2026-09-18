@@ -29,7 +29,7 @@ import {
   type Interactive,
   type DwellingDef,
 } from './layout'
-import { boxCollider, spawnPointFree, standingClear, PLAYER_RADIUS, WALKER_RADIUS, type Collider } from './collision'
+import { boxCollider, spawnPointFree, standingClear, PLAYER_RADIUS, WALKER_RADIUS, type CircleCollider, type Collider } from './collision'
 import { ANIMAL_RADIUS, animalAnchors } from './animalSpots'
 import { closestOnPolyline } from './lanePlan'
 import { PLACES, placeById } from '../../world/geo'
@@ -1031,7 +1031,8 @@ describe.each(SEEDS)('the derived climbing stone (seed %i)', (seed) => {
     // It is an ORDINARY entry of the scatter: drawn with the rest, and its
     // collider is the one the climb's approach stops outside of.
     expect(layout.rocks).toContain(derived)
-    const circles = layout.colliders.filter((c): c is Collider & { r: number } => 'r' in c)
+    // A SEGMENT carries `r` too, but no centre — circle is `r` WITH a centre.
+    const circles = layout.colliders.filter((c): c is CircleCollider => 'r' in c && 'x' in c)
     const collider = circles.find((c) => Math.hypot(c.x - stone.x, c.z - stone.z) < 1e-9)
     expect(collider?.r).toBeCloseTo(stone.radius, 9)
     // High enough to be a climb rather than a step, every time.
