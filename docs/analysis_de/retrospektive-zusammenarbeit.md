@@ -59,6 +59,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 11.09. nachts | Die Verweigerung der billigen Sprosse saß in der Wrapper-Datei, während der Einstiegsbefehl, den dieselbe README als gewöhnlich dokumentiert, niemanden fragte — der deckende Lauf des Punktes selbst lief an ihr vorbei; und beim ersten ernsthaften Gebrauch verweigerte sie ihren eigenen Deckungslauf, weil ein Branchwechsel eine mtime bewegt hatte, ohne ein Byte zu ändern (§3.265, Punkt 1086) |
 | 11.09. nachts | Zwei Werkzeuge antworten mit Gewissheit auf Fragen, die sie nie gemessen haben: `ci-gate-verdict.mjs` läuft nur im Runner, ignoriert die Flags eines Handaufrufs und druckt bei leerer Umgebung »CI gate passed« — zweimal geglaubt; `run-wait` erklärt einen gesunden `polish`-Lauf nach 20 Minuten für tot, weil seine Schwelle die Modell-Erwartung von 5m41s statt des eigenen gemessenen Medians von 55 min multipliziert, und befiehlt das Töten (§3.263, Punkte 1099/1101) |
 | 12.09. | Der beauftragte Autor schrieb zweimal nichts und hatte zweimal recht: einmal, weil der Punkttext eine Wortüberlappungs-Heuristik zur Freigabe-Evidenz erklärte, deren eigener Kommentar sagt, ein Nein beweise keine Unschuld; einmal, weil der Unterbau des Punktes ungebaut war. Das Werkzeug meldete beide Male PROBLEMS — »NOTHING WAS COMMITTED«, »gates not green« —, also den Fehlschlag der Spur, wo die Spur genau das getan hatte, wofür sie existiert (§3.266, Punkte 1089/1073) |
+| 18.09. | Derselbe Punkt zweimal zurückgewiesen — und beim zweiten Mal traf die Zurückweisung meine eigene Antwort auf die erste: Der fremde Autor baute nach, dass die vom Aufrufer gehaltene Umlenkung genau die Protokolldatei leert, die das Skript künftig selbst führen soll, und danach jede Zeile in sich selbst zurückschreibt — vier Kopien nach drei Durchläufen. Wer eine Eskalation beantwortet, schreibt selbst eine Spezifikation (§3.266 Nachtrag, Punkt 1133) |
 | 13.09. | Ein Punkt zog seine eigenen Rot-Ladungen zurück, wie es die Regel verlangt — zwei Tests standen noch auf ihnen und wurden erst im Tor der LANDUNG rot, als der Merge schon auf main lag: Das Register erzwingt »kein Eintrag ohne offenen Punkt«, niemand erzwingt »kein Test ohne seinen Eintrag« (§3.268). Dieselbe Sitzung wies drei Fremd-Rot nach: gegen die Zweigwurzel gemessen sind alle drei auch auf main rot, und das Rätsel am Schutthang ist dort nicht sporadisch, sondern reproduziert jedes Mal |
 | 13.09. abends | Vier CI-Läufe eines Zweigs starben als »cancelled« — ein Wort, das weder Ursache noch Reparatur nennt und das kein Push heilen kann. Es war das 15-Minuten-Limit des `fast`-Jobs: Die letzten beiden GRÜNEN Läufe, einer davon auf main, brauchten 14 m 41 s und 14 m 45 s, also rund fünfzehn Sekunden Luft. Der nächste Punkt, der irgendeinen Test hinzufügt, musste auflaufen, egal welcher. Sichtbar wurde es erst im Schrittprotokoll: install/build/lint/audit grün, `unit: cancelled`, »The operation was canceled« nach 15 m 13 s (§3.270) |
 | 14.09. | Nach einer Parallelsitzung verlangte ein Stop-Hook `batch-doctor --gate` vor JEDER weiteren Batch-Arbeit — dessen Tor fährt eine volle Unit-Suite, neben dem laufenden Zwei-Backend-Bildlauf auf derselben Maschine. Gefunden hat der Doktor genau eine Datei: die Review-Zeile, die dieselbe Sitzung vier Minuten zuvor geschrieben hatte. Sie zu committen genügte, das Urteil sprang auf `consistent`, die Unit-Suite wurde nie gebraucht; ihr Abbruch ließ zwei verwaiste vitest-Worker neben dem Bildlauf zurück (§3.271, Wiedergänger von §3.267) |
@@ -1529,6 +1530,25 @@ keine Buchung. Das ist gefährlicher als es klingt: Was als Fehlschlag gebucht w
 nächsten Mal vermieden, und der billigste Weg, eine Zurückweisung zu vermeiden, ist, den
 widersprüchlichen Auftrag doch zu bauen.
 
+**Nachtrag 18.09.2026 — die dritte Zurückweisung traf meine eigene Antwort.** Derselbe
+Punkt 1133 kam an einem Tag zweimal zurück. Der erste Lauf am 15.09. hielt fest, dass die
+Aufgabe »schreibt in sein Protokoll« verlangte, während ein solches Protokoll gar nicht
+existierte: Das Skript erbt stdout, und die zitierte Protokolldatei entstand allein dadurch,
+dass der Aufrufer die Ausgabe nebenher umlenkte. Ich schrieb daraufhin den Vertrag fest —
+eigener Pfad, anhängend, Aufruf bleibt blockierend und sichtbar — und beauftragte neu. Der
+zweite Lauf wies auch das zurück, und zwar nicht mit einem Einwand, sondern mit einem
+Versuch: Er baute den Fall nach und maß, dass die Umlenkung des Aufrufers auf genau diesen
+Pfad die Datei beim Öffnen leert und der gestreamte Inhalt danach in sich selbst
+zurückläuft — aus einem Schreibvorgang wurden nach drei Durchläufen vier Kopien. Mein
+eigener Satz »wird überflüssig, ohne falsch zu werden« war die Lücke.
+
+Das ist die Steigerung dieser Klasse, nicht ihre Wiederholung. Beim ersten Mal war die
+Spezifikation unvollständig; beim zweiten Mal war die **Antwort auf die Lücke** selbst
+widersprüchlich, und der fremde Autor hat den Widerspruch reproduziert statt ihn zu
+behaupten. Wer eine Eskalation beantwortet, ist in derselben Lage wie der, der den Punkt
+ursprünglich geschrieben hat: Auch die Antwort ist eine Spezifikation und verdient dieselbe
+Prüfung. Der Bericht meldete auch diesmal »NOTHING WAS COMMITTED« als Problem.
+
 **Lehre:** Eine Spur, die eine Spezifikation zurückweisen darf, muss diese Zurückweisung auch
 benennen können — sonst ist die Erlaubnis nur auf dem Papier. Ein Lauf ohne Commit ist nicht
 automatisch ein leerer Lauf; die Frage ist, ob er eine Begründung mitbringt, die den Auftrag
@@ -1617,7 +1637,7 @@ stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die s
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Freitag, 18.09.2026, 07:15 · Quellen-Fingerprint: `66b4c7548c33…`
+Zuletzt aktualisiert: Freitag, 18.09.2026, 07:30 · Quellen-Fingerprint: `eb9d4a780fda…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1724,8 +1744,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 97 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 135 Prozess-/Meta-TASKS-Punkte (davon 64 offen).
 
-<!-- RETRO-FINGERPRINT: 66b4c7548c33ef4d890c3a70374a5e86ba3964d27be40c2348dd0fab93f0210b -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-18T05:15:23.630Z -->
+<!-- RETRO-FINGERPRINT: eb9d4a780fdaf44f8fcc3d74bdcf19385a67842ef2fe05c0516686feee04dbbe -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-18T05:30:01.309Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam

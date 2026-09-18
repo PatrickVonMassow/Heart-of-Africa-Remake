@@ -1378,3 +1378,47 @@ ist in dieser Konfiguration schlicht ein No-op und schadet nicht. Offen bleibt
 die Frage, für welche Lauf-Formen die im Punkt genannte Messgrenze überhaupt
 gilt; wer sie das nächste Mal braucht, misst sie an einer Suite, die ihr Log
 tatsächlich im Worktree anlegt, statt sie aus dem Punkttext zu übernehmen.
+
+## Fünf `feat/`-Branches überleben ihren Merge, zwei davon mit ungemergter Arbeit
+
+Gemessen 18.09.2026 auf `main` d8e1e6129. `git worktree list` und `git branch`
+nennen `feat/1049-queue-order-rule`, `feat/834-durable-authoring-lane`,
+`feat/847-brevity-guard-gaps`, `feat/901-superseded-ci-run` und
+`feat/1133-detached-authoring-run` — jeweils mit Worktree und Remote-Branch.
+CLAUDE.md §6 sagt: der Merge beendet den Branch.
+
+Zwei tragen Substanz, die niemand gemergt hat. `feat/847` hält 622 Zeilen über
+`scripts/guide-brevity-core.mjs` und dessen Test, sein Punkt 847 ist noch OFFEN,
+und `main` ist seit dem 23.08. in mindestens fünf Commits durch dieselbe Datei
+gelaufen — der Branch ist ein Monat Divergenz. `feat/834` hält 12402 Zeilen über
+54 Dateien, während sein Punkt in `docs/tasks-archive.md` als erledigt steht: was
+834 gelandet hat, war nicht dieser Branch. Die beiden anderen halten je einen
+Datensatz in `.claude/mechanism-reviews.jsonl`.
+
+Nicht als Punkt eingereiht (Befundaufnahme CLAUDE.md §2, Infrastruktur-Freeze):
+kein Spielerbelang, keine Blockade, keine falsche Freigabe — alle fünf sind
+gepusht, es geht nichts verloren. Was fehlt, ist die Unterscheidbarkeit: ein
+Leser sieht den aufgegebenen Branches nicht an, dass sie aufgegeben sind. Wer
+847 anfasst, prüft zuerst, ob die 622 Zeilen gegen das heutige `main` überhaupt
+noch tragen, statt sie zu mergen.
+
+## Die Lastmessung starb mit der Sitzung, die sie gestartet hatte
+
+Gemessen 18.09.2026. `scripts/throttle-probe.mjs polish --section=children-motion
+--runs 8` lief seit 07:04 als übergebener Lauf der Vorgängersitzung. Er hing ohne
+`setsid` an deren Shell (PID 1971198 unter zsh 1971197 unter der Sitzung 1501826).
+Als diese Sitzung endete, endete auch die Sonde — nach vier von acht Läufen.
+
+Die vier vorhandenen Läufe liegen unter
+`local/throttle-probe/polish-children-motion-2026-09-18T05-04-42-790Z/` und sind
+alle grün (`8 pass, 0 fail, exit 0`). Der fünfte Lauf (05:31:28Z) reddete mit null
+Bildern, während mein eigenes main-Push-Tor die Maschine belegte — derselbe Fehler,
+den §3.267 der Retrospektive beschreibt. Ein Urteil trägt die Messung damit nicht:
+vier Grün sind weder eine Bestätigung noch eine Entlastung des Rot, das Punkt 1068
+gehört.
+
+Nicht als eigener Punkt eingereiht: Punkt 1133 behebt genau diese Todesklasse für
+beauftragte Läufe und wird gerade geschrieben; die offene Messung selbst gehört
+Punkt 1068. Festgehalten ist hier nur, dass ein Messlauf dieselbe Kopplung hat wie
+ein Autorenlauf — wer die Sonde das nächste Mal startet, koppelt sie ab, und er
+fasst die Maschine währenddessen nicht an.
