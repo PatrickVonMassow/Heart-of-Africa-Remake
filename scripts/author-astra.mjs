@@ -530,11 +530,16 @@ export async function startAuthoringSession({ point, lane, logPath = '' }) {
     const stdout = fstatSync(1)
     const alreadyLogging = target.dev === stdout.dev && target.ino === stdout.ino
     const visible = process.stdout.write.bind(process.stdout)
+    let visibleOpen = !alreadyLogging
+    process.stdout.on('error', (error) => {
+      if (error.code !== 'EPIPE') throw error
+      visibleOpen = false
+    })
     const write = (chunk, encoding, callback) => {
       if (typeof encoding === 'function') { callback = encoding; encoding = undefined }
       const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk, encoding)
       writeFileSync(fd, bytes)
-      if (!alreadyLogging) return visible(bytes, callback)
+      if (visibleOpen) return visible(bytes, callback)
       if (callback) callback()
       return true
     }
@@ -1034,7 +1039,7 @@ export async function runAuthoringCli({ authorLane = 'astra', argv = process.arg
     }))
     // 0 only for a clean run that produced work; 3 says "look at this before you
     // treat it as a delivery", which is what a script chaining on it must see.
-    process.exit(judged.clean ? 0 : 3)
+    process.exitCode = judged.clean ? 0 : 3
   } catch (e) {
     console.error(`${commandName} failed: ${(e && e.message) || e}`)
     process.exit(1)

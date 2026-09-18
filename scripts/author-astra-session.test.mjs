@@ -34,7 +34,7 @@ function fixture({ lane = 'astra', override = false, detached = false, shell = f
         if (!existsSync(${JSON.stringify(release)})) return
         clearInterval(timer)
         process.stdout.write('é'.repeat(100_000) + '\\nDONE\\n')
-        process.exit(${exitCode})
+        process.exitCode = ${exitCode}
       }, 20)
     }
   `)
@@ -109,6 +109,23 @@ describe('authoring session and log ownership', () => {
     expect(run.stdout()).toBe(readFileSync(run.log, 'utf8'))
   })
 
+  it('keeps an existing session leader logging when its stdout reader disappears', async () => {
+    const run = fixture({ detached: true })
+    await running(run)
+    run.child.stdout.destroy()
+    writeFileSync(run.release, '')
+    expect((await run.closed).code).toBe(0)
+    expect(readFileSync(run.log, 'utf8')).toContain('é'.repeat(100_000) + '\nDONE\n')
+  })
+
+  it('returns the conventional signal exit code after the commissioned child is terminated', async () => {
+    const run = fixture()
+    const identity = await running(run)
+    process.kill(identity.pid, 'SIGTERM')
+    expect(await run.closed).toEqual({ code: 143, signal: null })
+    expect(run.stdout()).toBe(readFileSync(run.log, 'utf8'))
+  })
+
   it('appends a second invocation without replaying the first invocation', async () => {
     const run = fixture({ lane: 'fable' })
     await running(run)
@@ -133,5 +150,20 @@ describe('authoring session and log ownership', () => {
     const missing = spawnSync(process.execPath, [script, '--point', '1133', '--log'], { cwd, encoding: 'utf8' })
     expect(missing.status).toBe(2)
     expect(missing.stderr).toContain('--log needs a path')
+  })
+
+  it.each(['astra', 'fable'])('uses log ownership in the real %s CLI before refusing an invalid worktree', (lane) => {
+    const cwd = mkdtempSync(join(tmpdir(), 'hoa-author-cli-log-'))
+    dirs.push(cwd)
+    const log = join(cwd, 'chosen log.txt')
+    writeFileSync(log, 'prior commission\n')
+    const result = spawnSync(process.execPath, [resolve(`scripts/author-${lane}.mjs`), '--point', '1133', '--log', log], {
+      cwd, encoding: 'utf8', env: { ...process.env, HOA_REPO_ROOT: process.cwd() },
+    })
+    expect(result.status, result.stderr).toBe(2)
+    expect(result.stdout.split('\n')[0]).toBe(`author-${lane}: log ${log} (append)`)
+    expect(result.stdout).toContain('refusing to start')
+    expect(result.stderr).toBe('')
+    expect(readFileSync(log, 'utf8')).toBe('prior commission\n' + result.stdout)
   })
 })
