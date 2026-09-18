@@ -5,7 +5,7 @@
 // and refused as recorded coverage (that half lives with the recorder's reader,
 // scripts/render-verify-core.test.mjs).
 import { describe, it, expect } from 'vitest'
-import { narrowDiagnosis, sectionOfLine, sectionsForLines, listNonPredictive, listSections, makeSectionGate, planSectionRun, resolveSelection, resultSection, SECTION_ENV } from './sections.mjs'
+import { coverageVerdict, narrowDiagnosis, sectionOfLine, sectionsForLines, listNonPredictive, listSections, makeSectionGate, planSectionRun, resolveSelection, resultSection, SECTION_ENV } from './sections.mjs'
 import { runVerdict } from '../render-verify-core.mjs'
 import { sectionTag } from '../section-tag-core.mjs'
 
@@ -312,6 +312,98 @@ describe('a check that declares it cannot predict the suite’s own reading', ()
     const gate = makeSectionGate({ sections: ['x'], requested: null, suite: 'polish' })
     expect(() => gate.nonPredictive('', 'why')).toThrow(/CHECK NAME/)
     expect(() => gate.nonPredictive('a check', '  ')).toThrow(/reason/)
+  })
+})
+
+describe('a check that says how many subjects it actually saw (point 1136)', () => {
+  const gateWith = (requested = null) => {
+    const gate = makeSectionGate({ sections: ['adult-errands'], requested, suite: 'polish' })
+    gate.section('adult-errands')
+    return gate
+  }
+  const jar = 'the jar goes down EMPTY and comes back FULL'
+
+  it('reads a well-formed declaration and decides covering by the named minimum', () => {
+    expect(coverageVerdict({ subjects: 3, minimum: 2, what: 'water errands' }))
+      .toEqual({ seen: 3, minimum: 2, what: 'water errands', covering: true })
+    expect(coverageVerdict({ subjects: 2, minimum: 2, what: 'water errands' }).covering).toBe(true)
+    expect(coverageVerdict({ subjects: 1, minimum: 2, what: 'water errands' }).covering).toBe(false)
+    expect(coverageVerdict({ subjects: 0, minimum: 1, what: 'adult words' }).covering).toBe(false)
+  })
+
+  it('is null for every check that declares no coverage', () => {
+    expect(coverageVerdict(null)).toBe(null)
+    expect(coverageVerdict(undefined)).toBe(null)
+  })
+
+  it('refuses a declaration it cannot read, rather than quietly stopping to evaluate', () => {
+    expect(() => coverageVerdict({ subjects: 1.5, minimum: 2, what: 'errands' })).toThrow(/whole subject count/)
+    expect(() => coverageVerdict({ subjects: -1, minimum: 2, what: 'errands' })).toThrow(/whole subject count/)
+    expect(() => coverageVerdict({ subjects: 'many', minimum: 2, what: 'errands' })).toThrow(/whole subject count/)
+    expect(() => coverageVerdict({ subjects: 3, minimum: 0, what: 'errands' })).toThrow(/named minimum/)
+    expect(() => coverageVerdict({ subjects: 3, minimum: 2, what: '  ' })).toThrow(/NAME what it counted/)
+  })
+
+  it('never CONVERTS a malformed count into a valid one', () => {
+    // `Number(true)` is 1 and `Number(null)` is 0, so coercing before validating
+    // manufactured a covering claim out of a broken declaration — one subject
+    // against a minimum of one (GPT-6 Astra, cross-vendor round).
+    expect(() => coverageVerdict({ subjects: true, minimum: true, what: 'errands' })).toThrow(/whole subject count/)
+    expect(() => coverageVerdict({ subjects: null, minimum: 2, what: 'errands' })).toThrow(/whole subject count/)
+    expect(() => coverageVerdict({ subjects: [3], minimum: 2, what: 'errands' })).toThrow(/whole subject count/)
+    expect(() => coverageVerdict({ subjects: '3', minimum: 2, what: 'errands' })).toThrow(/whole subject count/)
+    expect(() => coverageVerdict({ subjects: 3, minimum: true, what: 'errands' })).toThrow(/named minimum/)
+    expect(() => coverageVerdict({ subjects: 3, minimum: '2', what: 'errands' })).toThrow(/named minimum/)
+    expect(() => coverageVerdict({ subjects: 3, minimum: 2, what: 7 })).toThrow(/NAME what it counted/)
+  })
+
+  it('is NEITHER red nor green below the minimum, and says what it saw', () => {
+    for (const ok of [true, false]) {
+      const gate = gateWith()
+      const r = gate.checkResult(jar, ok, { subjects: 1, minimum: 2, what: 'water errands' })
+      expect(r).toMatchObject({ status: 'NOT-COVERING', failed: false })
+      expect(r.note).toContain('1 of a needed 2 water errands seen')
+      expect(r.note).toContain(`the observed ${ok ? 'pass' : 'fail'} decides nothing`)
+    }
+  })
+
+  it('does the same in a NARROW run — a non-measurement is one in both contexts', () => {
+    const r = gateWith('adult-errands').checkResult(jar, true, { subjects: 0, minimum: 2, what: 'water errands' })
+    expect(r).toMatchObject({ status: 'NOT-COVERING', failed: false })
+  })
+
+  it('decides normally once the minimum is met, and still prints the count', () => {
+    for (const ok of [true, false]) {
+      const r = gateWith().checkResult(jar, ok, { subjects: 4, minimum: 2, what: 'water errands' })
+      expect(r).toMatchObject({ status: ok ? 'PASS' : 'FAIL', failed: !ok })
+      expect(r.note).toContain('[covering: 4 water errands seen, 2 needed]')
+    }
+  })
+
+  it('outranks a NON-PREDICTIVE declaration, because it is measured and that is declared', () => {
+    const gate = gateWith()
+    gate.nonPredictive(jar, 'the pass casts one errand where the section casts many')
+    expect(gate.checkResult(jar, true, { subjects: 0, minimum: 2, what: 'water errands' }).status).toBe('NOT-COVERING')
+    // With the subjects actually there, the old declaration still speaks.
+    const r = gate.checkResult(jar, true, { subjects: 5, minimum: 2, what: 'water errands' })
+    expect(r.status).toBe('NON-PREDICTIVE')
+    expect(r.note).toContain('[covering: 5 water errands seen')
+  })
+
+  it('collects the open questions so the suite can name them beside its verdict', () => {
+    const gate = gateWith()
+    gate.checkResult(jar, true, { subjects: 1, minimum: 2, what: 'water errands' })
+    gate.checkResult('another check', true, { subjects: 9, minimum: 2, what: 'water errands' })
+    gate.checkResult('a third', false, { subjects: 0, minimum: 1, what: 'adult words' })
+    expect(gate.notCovering()).toEqual([
+      { check: jar, section: 'adult-errands', seen: 1, minimum: 2, what: 'water errands', covering: false },
+      { check: 'a third', section: 'adult-errands', seen: 0, minimum: 1, what: 'adult words', covering: false },
+    ])
+  })
+
+  it('leaves every check that declares no coverage exactly as it was', () => {
+    expect(gateWith().checkResult('the lanes meet the gate', true)).toEqual({ status: 'PASS', failed: false, note: '' })
+    expect(gateWith().notCovering()).toEqual([])
   })
 })
 

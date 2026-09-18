@@ -300,8 +300,12 @@ function runSuite(name, baseUrl, onlySection = '') {
   // and a green that does not mean what it looks like is exactly the thing a
   // reader must not miss. Lifted out as a CONCLUSION about the headline, the
   // same class as the PARTIAL banner.
+  // A NOT-COVERING CHECK MUST BE SEEN FOR THE SAME REASON (work-order 1136):
+  // it is counted as neither a pass nor a failure, so the headline above is
+  // silent about it, and a question the run left OPEN must not read as green.
   for (const line of out.split('\n')) {
     if (line.includes('[NON-PREDICTIVE')) console.log(`NON-PREDICTIVE  ${name.padEnd(12)} ${line.trim()}`)
+    else if (/^NOT-COVERING\s{2,}/.test(line)) console.log(`NOT-COVERING  ${name.padEnd(12)} ${line.trim().slice('NOT-COVERING'.length).trim()}`)
   }
   if (!ok) {
     for (const line of out.split('\n')) if (/^FAIL\s{2,}\S|^ERR:/.test(line)) console.log('      ' + line)

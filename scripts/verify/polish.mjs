@@ -47,15 +47,19 @@ const OUT = fileURLToPath(new URL('../../verification/', import.meta.url))
 // scripts/verify/sections.mjs, so an unknown one is refused with the list of the
 // real ones — and the run is stamped PARTIAL, never counted as suite coverage.
 const sections = sectionGate()
-const { section, nonPredictive } = sections
+const { section } = sections
 if (sections.banner()) console.log(sections.banner())
 
 let failures = 0
-const check = (name, ok, detail) => {
+// `coverage` is a SUBJECT-DEPENDENT check's own sample count beside its named
+// minimum (work-order 1136): `{ subjects, minimum, what }`. Below the minimum
+// the line reads NOT-COVERING instead of green — the check saw too little to
+// answer, which is neither a defect nor an all-clear.
+const check = (name, ok, detail, coverage = null) => {
   // The section tag goes AFTER the ' — ' separator: the check's NAME is its
   // identity for the red ledger and the baseline classifier and must not change.
   const tail = [detail, sections.tag().trim()].filter(Boolean).join('  ')
-  const { status, failed, note } = sections.checkResult(name, ok)
+  const { status, failed, note } = sections.checkResult(name, ok, coverage)
   console.log(`${status}  ${name}${tail ? ' — ' + tail : ''}${note}`)
   if (failed) failures++
 }
@@ -5543,15 +5547,10 @@ if (section('adult-errands')) {
     e.dwellSeconds = 1
     e.digSeconds = 3
     e.pace = 6
-    // Keep the measured ten-adult standalone setup. This fixed sample window
-    // does not provide equivalent jar observations inside the full suite; the
-    // jar check below declares that limitation instead of claiming coverage.
+    // Keep the measured ten-adult standalone setup. How many errands this
+    // window then sees is no longer left to luck: it casts them itself and
+    // counts them (work-order 1136).
     e.villagerCount = 10
-    // THE DIP IS HELD LONG ENOUGH TO BE CAUGHT (work-order 1087). At its played
-    // value the fill lasts well under two seconds, which a polling check can
-    // walk straight past; this stretches the hold for the capture and changes
-    // nothing about the act itself.
-    window.__balance.bankFillSeconds = 8
   })
   await page.evaluate(() => window.__game.getState().enterPlace('bambara-village'))
   const live = await page
@@ -5621,7 +5620,22 @@ if (section('adult-errands')) {
       ? { key: `${first.last.id}/${first.last.concept}/${first.last.speaker}`, age: first.last.age }
       : null
     for (let i = 0; i < 240; i++) {
-      const now = await page.evaluate(() => window.__placeErrands())
+      // THE RARE SITUATION IS CREATED, NOT WAITED FOR (work-order 1136). ONE
+      // water errand runs at a time and it waits its turn behind the two
+      // digging situations, so this window used to depend on the village
+      // happening to send a carrier: alone it saw many, inside the full pass it
+      // saw ONE, and twelve green climbs had measured nothing. Whenever no
+      // water errand is running, the village's own casting queue is put back on
+      // it — and the casting, the two men it picks and every phase after it
+      // stay the game's.
+      const now = await page.evaluate(() => {
+        const errands = window.__placeErrands()
+        const running = errands.villagers.some(
+          (v) => v.work && (v.work.situation === 'water-out' || v.work.situation === 'water-back'),
+        )
+        if (!running) window.__placeCastErrand('water-out')
+        return errands
+      })
       for (const [id, n] of Object.entries(now.staged ?? {})) {
         staged[id] = Math.max(staged[id] ?? 0, n ?? 0)
       }
@@ -5688,23 +5702,52 @@ if (section('adult-errands')) {
           .map(([k, n]) => `${k}×${n}`)
           .join(', ')}), ${atWork} villager-samples at work`,
     )
-    // MEASURED 10.09.2026: this reading does not survive the pass. Run alone,
-    // the section always saw enough errands — twelve green climbs on 09.09.,
-    // 18 pass and 0 fail. Inside the full suite the same window cast ONE errand,
-    // with the fetch phase at 33 of about 2000 phase ticks, and the pass failed
-    // here. The fixed 240-sample window does NOT measure equivalent activity
-    // in both contexts. Keep the standalone assertion; the full-suite reading
-    // is advisory and cannot decide the exit or enter the red ledger. A narrow
-    // green still promises nothing about the pass, so the ladder refuses it.
-    nonPredictive(
-      'a villager is seen digging, and the jar goes down EMPTY and comes back FULL',
-      'run alone this window casts many errands; inside the full pass it cast ONE, fetch phase 33 of ~2000 ticks (10.09.2026)',
+    // HOW MANY WATER ERRANDS THE WINDOW REALLY SAW (work-order 1136). The
+    // errand is now cast on purpose above rather than hoped for, so the honest
+    // reading is the number that was actually cast — `water-out` is staged once
+    // per casting by the game itself, which is why it is read here and not
+    // counted by the sampler.
+    //
+    // TWO, not one. The check below asserts a ROUND TRIP — the jar goes down
+    // empty and comes back full — so a single errand caught mid-way proves
+    // nothing, and one completed errand could still be a fluke of where the
+    // window happened to open. Below two the verdict is NOT COVERING: the
+    // window said nothing about the jar, which is neither a defect nor an
+    // all-clear. That is exactly the state twelve green climbs used to report
+    // as green on 09.09.2026.
+    const errandsCast = staged['water-out'] ?? 0
+    // WHAT THE JAR ASSERTION NEEDS IS A COMPLETED ROUND TRIP, not a casting
+    // (GPT-6 Astra, cross-vendor round): the game stages 'water-back' at the
+    // moment the fill ends and the carrier turns for home, so it counts the
+    // trips that actually had an empty leg AND a full one. ONE is the honest
+    // floor — one round trip is exactly the evidence the assertion asks for,
+    // and the measured blockade of 10.09.2026 had none: its single errand was
+    // 33 of about 2000 ticks into the fetch when the window closed.
+    const roundTrips = staged['water-back'] ?? 0
+    // AND THE CREATION IS PROVED, not assumed. A hook that stopped working would
+    // otherwise leave every reading below at zero and the block would simply go
+    // quiet about it.
+    check(
+      'the deliberate casting really sends carriers to the water (work-order 1136)',
+      errandsCast > 0,
+      `${errandsCast} water errand(s) cast over 240 samples, ${roundTrips} of them turned for home`,
+    )
+    // DIGGING IS ITS OWN CHECK AND CARRIES NO WATER COVERAGE (GPT-6 Astra,
+    // cross-vendor round). Bundled into the jar assertion it inherited the water
+    // errand's sample count, so a broken digging animation in a window with few
+    // errands would have read NOT-COVERING instead of red — and the DIG
+    // utterance beside it cannot see an animation at all. The dig situations are
+    // cast every round and depend on no carrier, so this one simply asserts.
+    check(
+      'a villager is seen digging (work-order 688)',
+      dug > 0,
+      `${dug} villager-samples at the dig pose`,
     )
     check(
-      'a villager is seen digging, and the jar goes down EMPTY and comes back FULL',
-      dug > 0 && carriedEmpty > 0 && carriedFull > 0,
-      `${dug} villager-samples at the dig pose, ${carriedEmpty} with the empty jar, ` +
-        `${carriedFull} with the full one`,
+      'and the jar goes down EMPTY and comes back FULL',
+      carriedEmpty > 0 && carriedFull > 0,
+      `${carriedEmpty} villager-samples with the empty jar, ${carriedFull} with the full one`,
+      { subjects: roundTrips, minimum: 1, what: 'completed water round trips' },
     )
     // BOTH WORDS ARE ACTUALLY HEARD. Nothing here used to require either of them:
     // the staging, digging and carrying checks are satisfied by animation alone,
@@ -5716,12 +5759,18 @@ if (section('adult-errands')) {
       (heard.RIVER ?? 0) > 0 && (heard.DIG ?? 0) > 0,
       `RIVER ×${heard.RIVER ?? 0}, DIG ×${heard.DIG ?? 0} over 240 samples`,
     )
+    // ITS SUBJECT IS THE UTTERANCE, so a silent window measures nothing here
+    // either (work-order 1136). It used to report that in the detail line and
+    // then fail anyway, charging a red to a village that may be working
+    // perfectly; a window that heard nobody now says the question is open.
+    const heardTotal = Object.values(heard).reduce((a, b) => a + b, 0)
     check(
       'and no adult word ever falls inside the children`s earshot',
       Number.isFinite(nearestBankVoice) && nearestBankVoice > 10,
       Number.isFinite(nearestBankVoice)
         ? `nearest utterance to the children: ${nearestVoiceWhat}`
         : 'NO ADULT SPOKE IN THE WINDOW — nothing was measured',
+      { subjects: heardTotal, minimum: 1, what: 'adult words' },
     )
 
     // --- THE FILL READS AS FETCHING, NOT AS FALLING (work-order 1085) ---------
@@ -5743,12 +5792,31 @@ if (section('adult-errands')) {
     // reached the water. The errand dips now, so the check waits for a carrier
     // in the 'fill' phase and photographs HIM, at the spot he is really standing
     // on. The pin stays, and only holds that same man still for the shutter.
+    // THE DIP IS HELD LONG ENOUGH TO BE CAUGHT (work-order 1087). At its played
+    // value the fill lasts well under two seconds, which a polling check can
+    // walk straight past; this stretches the hold for the capture and changes
+    // nothing about the act itself.
+    // IT IS STRETCHED HERE AND NOT AT THE TOP OF THE BLOCK (work-order 1136).
+    // Held at eight seconds for the whole visit, the fill dominated the round
+    // trip and the sample window above saw two errands where it now sees
+    // several — a photographic convenience was quietly throttling the very
+    // subject the window is counting.
+    await page.evaluate(() => {
+      window.__balance.bankFillSeconds = 8
+    })
     const posed = await page
       .waitForFunction(
         () => {
           if (typeof window.__placeForceFill !== 'function') return null
           const errands = window.__placeErrands()
           const v = errands.villagers
+          // THE WAIT CREATES ITS SUBJECT TOO (work-order 1136). Three minutes of
+          // polling for an errand the fair queue may not send is the same
+          // non-measurement the sample window above had; the queue is put back
+          // on the water whenever no carrier is out.
+          if (!v.some((p) => p.work && (p.work.situation === 'water-out' || p.work.situation === 'water-back'))) {
+            window.__placeCastErrand('water-out')
+          }
           for (let i = 0; i < v.length; i++) {
             if (v[i].work?.phase !== 'fill') continue
             // A QUARTER OF THE WAY IN — and that is already the FULL depth, not a
@@ -7762,6 +7830,17 @@ if (section('artefact-give')) {
 // the one way a --section run could report green having verified nothing.
 const unrun = sections.unrun()
 if (unrun) check('the selected section actually ran', false, unrun)
+
+// WHAT THIS RUN COULD NOT ANSWER (work-order 1136). A check that saw too few
+// subjects is neither red nor green, so its exit code says nothing about it —
+// which is why the open questions are named again beside the verdict, where a
+// reader of the summary cannot walk past them.
+for (const n of sections.notCovering()) {
+  console.log(
+    `NOT-COVERING  ${n.check} — ${n.seen} of a needed ${n.minimum} ${n.what} seen` +
+      `${n.section ? `  [section: ${n.section}]` : ''}`,
+  )
+}
 
 console.log('console errors:', errors.length)
 for (const e of errors) console.log('ERR:', e.slice(0, 300))

@@ -73,8 +73,11 @@ const BANNER = /^={3,}/
  *  ONE section, and a digest that loses it hands the reader a suite pass.
  *  `NON-PREDICTIVE` (point 1086) is the same class one step finer: the check
  *  above it passed narrowly and has DECLARED that its reading does not predict
- *  the suite's own. Losing that also hands the reader a pass. */
-const FINAL = /^(ALL GREEN\b|\d+\s+SUITE\(S\) FAILED\b|DEFERRED\b|LARGE FAILED\b|PARTIAL\b|NON-PREDICTIVE\b|ACCOUNTED FOR\b|STRIKE\b|POINT REDS\b)/
+ *  the suite's own. Losing that also hands the reader a pass. `NOT-COVERING`
+ *  (work-order 1136) is the measured version of the same thing: the check ran,
+ *  saw too few subjects to answer, and counts as neither red nor green — so the
+ *  exit code carries nothing about it and only this line does. */
+const FINAL = /^(ALL GREEN\b|\d+\s+SUITE\(S\) FAILED\b|DEFERRED\b|LARGE FAILED\b|PARTIAL\b|NON-PREDICTIVE\b|NOT-COVERING\b|ACCOUNTED FOR\b|STRIKE\b|POINT REDS\b)/
 /** The run's own bookkeeping demands (point 1135). `ACCOUNTED FOR` says a red
  *  suite's reds all have an owner, `STRIKE` names a ledger entry whose check has
  *  gone green, and `POINT REDS` is the run's ownership verdict — each of them a
@@ -217,7 +220,7 @@ export function applyBudget(entries, maxKeptLines) {
   // followed by a hundred failure echoes vanished. Like NON-PREDICTIVE there are
   // a handful of these per run at most.
   const declaredLimitation = (e) =>
-    /^(NON-PREDICTIVE|PARTIAL|STRIKE|POINT REDS|ACCOUNTED FOR)\b/.test(String(e?.line ?? '').trimStart())
+    /^(NON-PREDICTIVE|NOT-COVERING|PARTIAL|STRIKE|POINT REDS|ACCOUNTED FOR)\b/.test(String(e?.line ?? '').trimStart())
   for (const e of list) {
     if (over === 0) break
     if (priorityOf(e) === 'low' && !declaredLimitation(e)) {
