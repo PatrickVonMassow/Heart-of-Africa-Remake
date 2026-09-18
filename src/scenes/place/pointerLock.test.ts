@@ -14,6 +14,7 @@ beforeEach(() => {
   useUi.getState().setDialog(null)
   pointerLockProbe.grabs = 0
   pointerLockProbe.releases = 0
+  pointerLockProbe.refusals = 0
   Object.defineProperty(document, 'pointerLockElement', { value: null, configurable: true })
   Object.defineProperty(navigator, 'webdriver', { value: false, configurable: true })
 })
@@ -76,6 +77,19 @@ describe('taking and giving back the pointer (point 588)', () => {
     Object.defineProperty(document, 'pointerLockElement', { value: canvas(), configurable: true })
     requestPlacePointerLock(canvas())
     expect(request).not.toHaveBeenCalled()
+  })
+
+  it('records a rejected request', async () => {
+    canvas().requestPointerLock = vi.fn().mockRejectedValue(new Error('Escape cooldown'))
+    requestPlacePointerLock(canvas())
+    await Promise.resolve()
+    expect(pointerLockProbe.refusals).toBe(1)
+  })
+
+  it('records a synchronous refusal', () => {
+    canvas().requestPointerLock = vi.fn(() => { throw new Error('Unavailable') })
+    expect(() => requestPlacePointerLock(canvas())).not.toThrow()
+    expect(pointerLockProbe.refusals).toBe(1)
   })
 })
 

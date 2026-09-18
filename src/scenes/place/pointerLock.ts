@@ -13,8 +13,8 @@
 
 import { useUi } from '../../state/ui'
 
-/** Dev counters: how often the game asked for the lock, and gave it up. */
-export const pointerLockProbe = { grabs: 0, releases: 0 }
+/** Dev counters: lock requests, releases, and browser refusals. */
+export const pointerLockProbe = { grabs: 0, releases: 0, refusals: 0 }
 
 /** Gives the cursor back — a modal is taking over. */
 export function releasePointerLock(): void {
@@ -28,7 +28,10 @@ export function releasePointerLock(): void {
  * dialog. Under browser automation the decision is recorded and the real lock
  * skipped, for the reason in the file header.
  */
-export function requestPlacePointerLock(el: Element): void {
+export function requestPlacePointerLock(
+  el: Element,
+  onRefusal: () => void = () => { pointerLockProbe.refusals++ },
+): void {
   if (typeof document === 'undefined') return
   if (document.querySelector('.overlay')) return
   if (useUi.getState().dialog) return
@@ -37,9 +40,9 @@ export function requestPlacePointerLock(el: Element): void {
   if (document.pointerLockElement === el) return
   try {
     const r = (el as HTMLElement).requestPointerLock() as unknown as Promise<void> | undefined
-    if (r && typeof r.catch === 'function') r.catch(() => {})
+    if (r && typeof r.catch === 'function') void r.catch(onRefusal)
   } catch {
-    /* pointer lock unavailable — the game stays playable via keyboard */
+    onRefusal()
   }
 }
 
