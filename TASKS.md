@@ -6434,6 +6434,17 @@ Build order, chosen so no two parallel agents own the same file:
       since 513 a `feat/**` run concludes green by construction, so for a branch ref
       the commit status `ci/gate (branch)` read at the merge is the coverage, not
       the guard.
+      A THIRD READER, measured 18.09.2026 and belonging to (a): the session WAKE-UP
+      prompt does not merely fail to see the red — it asserts the opposite.
+      `scripts/batch-autostart-core.mjs` L812-L825 (`ciTerminalPrompt`) branches on
+      `result.verdict`/`result.state`, and that state comes from the run conclusion
+      through `observeCiWait` (`ci-status-guard-core.mjs` L318), so run 35332061604 —
+      which logged `unit=failure`, printed "CI gate FAILED: unit" and wrote a FAILING
+      commit status — started the successor session with "concluded GREEN; continue the
+      batch immediately." The unit red was real and deterministic (a pinned balance
+      calibration against point 1155's raised levels), and the session only found it by
+      running the suite itself. So (a) must also make the wake-up prompt read
+      `ci/gate (branch)`: on a branch ref it may say "the run finished", never "GREEN".
   (b) A FAILURE BEFORE THE VERDICT STEP IS NOT A GREEN. `checkout` and `setup-node` carry
       no `id`, so if one fails soft on a branch, every later step — including
       `node scripts/ci-gate-verdict.mjs`, whose file was never checked out — fails soft,
