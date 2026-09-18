@@ -383,8 +383,9 @@ waiting past that signal. This does not kill the runner or classify the red.
 ### Regression tiers (point 173)
 
 A `feat/` point lands after the CHEAP GATE and its picture — `tsc`, lint, build,
-unit, `audit-check.mjs` on a lockfile change, its own `--section` rung and the
-two-backend picture judgement — and nothing else blocks that merge. The
+unit, `audit-check.mjs` on a lockfile change, its own cheapest covering rung
+(its `--section` block, or the whole suite where that suite declares none) and
+the two-backend picture judgement — and nothing else blocks that merge. The
 **both-backend LARGE runs once per bundle and at closing**, on `main`, after the
 last merge; "The full regression is the BUNDLE's gate" below is the whole rule,
 its measurement and its falsification criterion. Choose the covering suites for
@@ -1311,7 +1312,8 @@ repo. At most two baselines are kept. Each currently failing check comes back as
 never a finding — the baseline is measured standalone and the candidate in-pass,
 so the two readings are not of the same thing, and the label says so. It is
 settled by three narrow `--section` rungs of the affected block on a QUIET
-machine under equal starting conditions, never by another full regression),
+machine under equal starting conditions — three runs of the whole affected suite
+where that suite declares no sections — never by another full regression),
 **PRE-EXISTING / STALE ASSUMPTION**
 (already red there — the 24.07. SSAO ground-edge and proximity-fade cases),
 **UNSTABLE ON BASELINE** (it flaked there too, so the baseline decides nothing —

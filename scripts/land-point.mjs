@@ -321,9 +321,12 @@ function lockHolderAlive(reason) {
  *   WRITE and not merely by the preceding listing. A destination that cannot be
  *   listed answers `existing = []`, and without the flag that unreadable listing
  *   would license replacing a complete record with a truncated one.
- * - It counts what it could NOT carry and returns that count, so the merge line
- *   can tell "nothing to carry" from "the carry failed" instead of printing the
- *   ordinary green either way.
+ * - It counts what it could NOT carry — a failed copy, an unreadable record, and
+ *   equally a DISCOVERY that failed (an unlistable worktree set or logs
+ *   directory, a stat that answered anything but "absent") — and returns that
+ *   count, so the merge line can tell "nothing to carry" from "the carry failed"
+ *   instead of printing the ordinary green either way. An ABSENT logs directory
+ *   is not a failure: a point with no browser run has none.
  */
 export function carryRunRecords({ branch, cwd = REPO_ROOT, mainRoot = REPO_ROOT } = {}) {
   const dest = join(mainRoot, 'local', 'verify-logs')
@@ -333,12 +336,19 @@ export function carryRunRecords({ branch, cwd = REPO_ROOT, mainRoot = REPO_ROOT 
   try {
     trees = listWorktrees({ cwd })
   } catch {
-    return { copied, failed }
+    // The tree list is the only way to FIND the records, so losing it is a
+    // discovery failure like any other, not "this point ran nothing".
+    return { copied, failed: failed + 1 }
   }
+  // A MISSING directory is the ordinary case — a point with no browser run has
+  // none. Anything ELSE (permissions, a broken link, an I/O error) means records
+  // may exist and were not seen, and a silent skip there prints the ordinary
+  // green over a real loss (Astra, confirming pass 1/3).
   const isRegular = (file) => {
     try {
       return lstatSync(file).isFile()
-    } catch {
+    } catch (e) {
+      if (!(e && e.code === 'ENOENT')) failed += 1
       return false
     }
   }
@@ -349,7 +359,8 @@ export function carryRunRecords({ branch, cwd = REPO_ROOT, mainRoot = REPO_ROOT 
     let names = []
     try {
       names = readdirSync(dir)
-    } catch {
+    } catch (e) {
+      if (!(e && e.code === 'ENOENT')) failed += 1
       continue
     }
     let existing = []

@@ -1023,9 +1023,14 @@ describe('the verification ladder', () => {
     // The gate is EXHAUSTIVE, so it is listed rather than gestured at: a reader
     // who cannot tell what blocks the merge reaches for the run that covers all.
     expect(text).toMatch(/CHEAP GATE PLUS THE PICTURE, NOT A LARGE/)
-    for (const rung of ['`tsc`', '`npm run lint`', '`npm run build`', '`npm run test:unit`', 'audit-check.mjs', '`--section` rung', 'two-backend PICTURE']) {
+    for (const rung of ['`tsc`', '`npm run lint`', '`npm run build`', '`npm run test:unit`', 'audit-check.mjs', 'two-backend PICTURE']) {
       expect(text, rung).toContain(rung)
     }
+    // The rung a point owes must be NAMEABLE for every suite: `startup`,
+    // `benchmark` and `docs` refuse `--section`, so the suite itself is theirs
+    // (Astra, confirming pass 3/3).
+    expect(text).toMatch(/CHEAPEST COVERING rung/)
+    expect(text).toMatch(/its `--section` block, or the whole suite where that suite declares none/)
     expect(text).toMatch(/Only that gate blocks the merge/)
     // The whole set moves to the BUNDLE — on main, after the last merge, in no
     // second tree (CLAUDE.md §2 forbids the workflow abstraction an integration
@@ -1206,8 +1211,11 @@ describe('the orientation block', () => {
     // Point 1134: the whole suite set is the BUNDLE's run, so the block must not
     // hand the point a per-feature LARGE beside a ladder that has just removed it.
     expect(text).toMatch(/WHAT THIS POINT OWES IS THE CHEAP GATE/)
-    expect(text).toMatch(/THE WHOLE SUITE SET — world, unfiltered —/)
-    expect(text).toMatch(/is the BUNDLE run on `main` after the last merge, and is NOT this point's gate/)
+    expect(text).toMatch(/the covering suite\(s\) here: world/)
+    // The bundle's run is the WHOLE set on BOTH backends — never this point's
+    // covering suites under a bundle heading (Astra, confirming pass 2/3).
+    expect(text).toMatch(/THE BOTH-BACKEND LARGE IS NOT THIS POINT'S GATE/)
+    expect(text).toMatch(/over the WHOLE suite set and both backends — never just the suites/)
     expect(text).not.toMatch(/THE FINAL PROOF IS SEPARATE AND WHOLE-SUITE/)
     expect(text).toMatch(/recorded PARTIAL/)
   })
@@ -1225,7 +1233,7 @@ describe('the orientation block', () => {
     // ONE rule about the whole suite set, stated once, in the same direction.
     expect(brief.brief).not.toMatch(/THE FINAL PROOF IS SEPARATE AND WHOLE-SUITE/)
     expect(brief.brief).toMatch(/CHEAP GATE PLUS THE PICTURE, NOT A LARGE/)
-    expect(brief.brief).toMatch(/is the BUNDLE run on `main` after the last merge/)
+    expect(brief.brief).toMatch(/THE BOTH-BACKEND LARGE IS NOT THIS POINT'S GATE/)
   })
 
   it('names suite/--section PAIRS, one per suite, since a multi-suite diff has no single pair', () => {
@@ -1243,7 +1251,7 @@ describe('the orientation block', () => {
     }).join('\n')
     expect(text).toContain('npm test -- world --section=<one of>')
     expect(text).toContain('npm test -- enrichments --section=<one of>')
-    expect(text).toMatch(/THE WHOLE SUITE SET — world, enrichments, unfiltered —/)
+    expect(text).toMatch(/the covering suite\(s\) here: world, enrichments/)
   })
 
   it('says so when a planned suite has no sections, rather than leaving a silent gap', () => {

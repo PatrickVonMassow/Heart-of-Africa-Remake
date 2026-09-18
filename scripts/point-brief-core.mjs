@@ -1196,9 +1196,11 @@ export function orientationBlock({ files = [], dirs = [], check = null, sections
       '      node scripts/audit-check.mjs ON A LOCKFILE CHANGE, and the cheapest rung above that',
       '      covers the change (the whole suite where it declares no sections) — plus the',
       '      two-backend PICTURE judgement where one is owed.',
-      `THE WHOLE SUITE SET — ${planned.length ? `${planned.join(', ')}, unfiltered` : 'the covering suite(s), unfiltered'} —`,
-      'is the BUNDLE run on `main` after the last merge, and is NOT this point\'s gate. A --section run',
-      'is recorded PARTIAL and counts as no coverage whatever its exit code, there as here.',
+      `      the covering suite(s) here: ${planned.length ? planned.join(', ') : 'decide them from the diff'}`,
+      'THE BOTH-BACKEND LARGE IS NOT THIS POINT\'S GATE. It is the BUNDLE\'s, run once on `main`',
+      'after the last merge, over the WHOLE suite set and both backends — never just the suites',
+      'above. A --section run is recorded PARTIAL and counts as no coverage whatever its exit',
+      'code, there as here.',
       'The Vitest layer runs ALWAYS, whatever this says.',
     )
   }
