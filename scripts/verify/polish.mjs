@@ -6429,47 +6429,60 @@ if (section('adult-errands')) {
       // foam the standpoint can actually SEE — so the frame's subject IS the
       // thing that showed the direction.
       //
-      // NEAR IS NOT THE SAME AS IN FRONT (red of 18.09.2026, twice on WebGPU:
-      // "its subject is not in the rendered picture: off the right edge of the
-      // frame"). The flecks lie in a long band ALONG the river, and the waterline
-      // is over 28 m out, so the fleck nearest the bank spot can sit far
-      // downstream — well outside any field of view, while the camera keeps
-      // looking straight out along the bank normal. Which fleck drifts nearest at
-      // the shutter is chance, which is why this passed for weeks and then failed.
-      // Choose by what the camera is pointed at instead: in front of the
-      // standpoint, within the half-angle a frame holds with room to spare, and
-      // among those the closest one. The camera pose is left exactly as it was —
-      // the seam reading below stands at this same spot and must not move.
-      const aim = await page.evaluate((r) => {
+      // NEAR IS NOT THE SAME AS IN THE PICTURE (red of 18.09.2026, three times
+      // on WebGPU: "off the right edge", then "off the bottom edge"). The flecks
+      // lie in a long band ALONG the river, so the one nearest the bank spot can
+      // sit far downstream or steeply below the eye, while the camera keeps
+      // looking straight out along the bank normal. Which fleck drifts nearest
+      // at the shutter is chance, which is why this passed for weeks and then
+      // failed. Nothing short of the real projection settles it, so this asks the
+      // place camera itself, with the SAME matrix math the shutter judges a
+      // `local` subject with (scripts/verify/frameSubject.mjs), and keeps the
+      // fleck that sits well inside the picture. The camera pose is left exactly
+      // as it was — the seam reading below stands at this same spot.
+      await page.evaluate((r) => {
         const p = window.__placePlayer
         p.x = r.bank.x - r.normal.x * 1.4
         p.z = r.bank.z - r.normal.z * 1.4
         p.yaw = Math.atan2(-r.normal.x, -r.normal.z)
         p.pitch = -0.16
-        const flecks = window.__placeRiver().flecks
-        const forwardX = -r.normal.x
-        const forwardZ = -r.normal.z
+      }, river)
+      // The matrices follow the pose only on the next drawn frames; projecting
+      // before that would aim at where the camera USED to look.
+      await nextFrames(6)
+      const aim = await page.evaluate(() => {
+        const cam = window.__placeCamera
+        const p = window.__placePlayer
+        if (!cam || !cam.projectionMatrix || !cam.matrixWorldInverse) return null
+        const apply = (e, v) =>
+          [0, 1, 2, 3].map((i) => e[i] * v[0] + e[i + 4] * v[1] + e[i + 8] * v[2] + e[i + 12] * v[3])
+        const ndcOf = (x, y, z) => {
+          const eye = apply(cam.matrixWorldInverse.elements, [x, y, z, 1])
+          const clip = apply(cam.projectionMatrix.elements, eye)
+          if (!(clip[3] > 0)) return null
+          return { x: clip[0] / clip[3], y: clip[1] / clip[3], z: clip[2] / clip[3] }
+        }
         let best = null
         let bestScore = Infinity
-        for (const f of flecks) {
-          const dx = f.x - p.x
-          const dz = f.z - p.z
-          const ahead = dx * forwardX + dz * forwardZ
-          if (ahead <= 0) continue
-          const aside = Math.abs(dx * -forwardZ + dz * forwardX)
-          // tan(24°) — comfortably inside the horizontal half-FOV, so the shutter
-          // is never asked to hold a subject at the very rim of the picture.
-          if (aside > ahead * 0.45) continue
-          // Sideways offset decides, distance breaks the tie: a patch dead ahead
-          // 200 m downstream reads as water, not as the foam at this bank.
-          const score = aside + Math.hypot(dx, dz) * 0.05
+        for (const f of window.__placeRiver().flecks) {
+          // The subject is declared 15 cm above the patch, so that is the point
+          // that has to be in the picture.
+          const ndc = ndcOf(f.x, f.y + 0.15, f.z)
+          if (!ndc || ndc.z >= 1) continue
+          // On screen at all — and the score below then pulls the choice toward
+          // the middle, so a patch at the very rim, one drift step from the next
+          // red, only ever wins when the picture holds nothing better.
+          if (Math.abs(ndc.x) > 0.9 || Math.abs(ndc.y) > 0.9) continue
+          // Centred decides, nearness breaks the tie: a patch dead ahead 200 m
+          // downstream reads as water, not as the foam at this bank.
+          const score = Math.hypot(ndc.x, ndc.y) + Math.hypot(f.x - p.x, f.z - p.z) * 0.002
           if (score < bestScore) {
             bestScore = score
             best = f
           }
         }
         return best
-      }, river)
+      })
       await nextFrames(6)
       await frame('482-village-river-bank', {
         local: aim ? { x: aim.x, y: aim.y + 0.15, z: aim.z } : { x: river.bank.x, y: 0.4, z: river.bank.z },
