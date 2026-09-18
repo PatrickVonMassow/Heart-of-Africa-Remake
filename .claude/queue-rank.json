@@ -1393,11 +1393,17 @@
       "origin": "user",
       "place": "ahead"
     },
-    "1162": {
-      "at": "2026-09-18T20:25:19.262Z",
-      "why": "Der Wächter verweigert JEDEN Merge, solange die Bildschuld steht — jede Landung vor der Auslieferung wartet auf diesen einen Lauf, die Auslieferung selbst eingeschlossen.",
+    "1163": {
+      "at": "2026-09-18T23:49:52.580Z",
+      "why": "Kosmetik ohne Spielwirkung, unter allem was heute blockiert — hinten ist richtig.",
       "origin": "machine",
-      "place": "ahead"
+      "place": "last"
+    },
+    "1164": {
+      "at": "2026-09-18T23:49:52.672Z",
+      "why": "Kosmetik ohne Spielwirkung, unter allem was heute blockiert — hinten ist richtig.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1430,7 +1436,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-18T20:25:19.280Z",
+    "at": "2026-09-18T23:49:52.682Z",
     "points": [
       174,
       184,
@@ -1842,7 +1848,8 @@
       1159,
       1160,
       1161,
-      1162
+      1163,
+      1164
     ]
   }
 }

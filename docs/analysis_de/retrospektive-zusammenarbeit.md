@@ -1655,7 +1655,7 @@ stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die s
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Freitag, 18.09.2026, 22:24 · Quellen-Fingerprint: `9607ac7dba24…`
+Zuletzt aktualisiert: Samstag, 19.09.2026, 01:50 · Quellen-Fingerprint: `e952d7b08629…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1762,8 +1762,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 97 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 7 Revert-/Reapply-Commits · 136 Prozess-/Meta-TASKS-Punkte (davon 65 offen).
 
-<!-- RETRO-FINGERPRINT: 9607ac7dba24ca0fc20baa17ba1dbae5aedc5eb94260db7da9ab74614c7eda6d -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-18T20:24:35.428Z -->
+<!-- RETRO-FINGERPRINT: e952d7b08629c1d3c40cb9a26fb8ac0d982f6164c9e36b25c3f83a2ec1959be1 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-18T23:50:08.256Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -7732,3 +7732,39 @@ von `main` — die Tafel galt als nicht registriert und die eigene Prüfdatei-Ä
 ungeprüfte Renderschuld von `main`. Drei Zugenden gingen dafür drauf. Die Merkregel dazu
 stand längst geschrieben; gestellt habe ich mir die Falle selbst, mit einem `cd` in den
 Worktree.
+
+### 3.293 Der Prüfpunkt wählte sein Motiv anders, als er es beurteilt
+
+Die deckende Bildprüfung von Punkt 1162 fiel an einer Stelle durch, die mit dem Punkt
+nichts zu tun hatte: Das Bild der Flussbank zeigte seinen Gegenstand nicht, „rechts
+außerhalb des Rahmens". Die Prüfung stellt die Kamera ans Ufer, lässt sie über das
+Wasser blicken und erklärt als Motiv den Schaumfleck, der dem Uferpunkt am nächsten
+liegt. Beurteilt wird das Bild dann aber nicht danach, was nah ist, sondern danach, wo
+der Auslöser den Punkt in die Projektion rechnet.
+
+Zwischen beidem liegt der ganze Defekt. Die Flecken treiben in einem langen Band
+LÄNGS des Flusses, die Wasserlinie liegt über 28 Meter draußen — der nächstgelegene
+Fleck kann also weit flussab sitzen, ein Drittel einer Vierteldrehung neben der
+Blickachse. Welcher Fleck im Moment des Auslösens der nächste ist, ist Zufall. Deshalb
+lief die Prüfung wochenlang grün und wurde dann zweimal hintereinander rot: nichts am
+Produkt hatte sich geändert, nur die Würfel waren anders gefallen.
+
+Mein erster Versuch war ein zweiter Stellvertreter: Ich wählte den nächsten Fleck VOR
+dem Standpunkt, innerhalb eines Winkels, den ich für sicher hielt. Der nächste Lauf
+tauschte prompt den rechten Rand gegen den unteren. Eine Heuristik kann nicht wissen,
+wohin die Ortskamera einen Punkt tatsächlich legt — dafür gibt es genau eine Autorität,
+und das ist die Projektion selbst. Erst die dritte Fassung fragt sie: dieselbe
+Matrizenrechnung, mit der der Auslöser ein `local`-Motiv beurteilt, angewandt auf jeden
+Fleck, und behalten wird der, der gut im Bild sitzt.
+
+Die übertragbare Lehre: Wählt eine Prüfung ihren Gegenstand nach einem Stellvertreter
+(Nähe, Reihenfolge, Index) und beurteilt ihn nach einem anderen Maßstab (der Projektion),
+dann ist sie ein Flackergenerator — und zwar einer, der dem Produkt die Schuld gibt.
+Auswahl und Urteil gehören auf dieselbe Rechnung. Zwei Läufe à 26 Minuten haben das hier
+gekostet, plus einen dritten, der am falschen Rand scheiterte.
+
+Am selben Abend ein zweiter, billigerer Fehler von mir: Ich startete die deckende Prüfung
+mit dem nackten Läufer statt über seinen Wrapper — die Zeile, die der Wächter selbst
+abdruckt. Der Lauf berichtete vollständig, hinterließ aber kein Log und keinen
+abgeschlossenen Datensatz und wurde als Absturz verbucht; 26 Minuten für nichts. Wer den
+Lauf besitzt, besitzt seinen Nachweis: `npm test -- <suite>`, nie `run-all.mjs` von Hand.
