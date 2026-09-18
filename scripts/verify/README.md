@@ -770,7 +770,7 @@ list is exhaustive, so that nobody has to guess what blocks a merge:
 | `npm run build` | always |
 | `npm run test:unit` | always |
 | `node scripts/audit-check.mjs` | only when the lockfile changed |
-| the point's OWN `--section` rung | always — the block that covers the change |
+| the point's own CHEAPEST COVERING rung | always — its `--section` block, or the whole suite where that suite declares no sections (`startup`, `benchmark`, `docs` and the other unsectioned ones refuse `--section`, so the suite itself IS their cheapest rung) |
 | the two-backend PICTURE judgement | always for a change that can move the picture |
 
 **Only that gate blocks the merge.** The both-backend LARGE is not part of it.
@@ -830,7 +830,12 @@ attributed under CLAUDE.md §7.2 or filed as its own point, and it is **never**
 charged to "the bundle" — a bundle owns nothing and closes nothing. Attribution
 runs over the diff, the section rung, and `git bisect` across `main`'s merge
 commits; never over a second tree. An interaction with no single owner gets an
-integration point that NAMES its participants.
+integration point that NAMES its participants. "Never over a second tree" is
+about not BUILDING one to hold the bundle: `baseline-classify.mjs` below still
+re-runs a red's own blocks in its detached read-only baseline checkout, and a
+bundle red asked by hand names the merge commit it measures against (`--ref`)
+rather than a merge base, which on `main` would resolve to the commit under
+test.
 
 **The lead figure is wall clock per point**, read once per bundle from the
 `run.json` files rather than estimated: the target profile is point 1112

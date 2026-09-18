@@ -330,17 +330,24 @@ export function gateConcurrency({ strays = [], probeOk = true, force = null } = 
  * A name already present in the destination is SKIPPED rather than overwritten.
  * The stamped names are unique per run, so a collision means the record is
  * already carried, and re-copying it could only replace a complete record with a
- * truncated one. Total: never throws; an unreadable record is simply not carried.
+ * truncated one.
+ *
+ * TOTAL, AND LITERALLY SO (Astra, four-eyes pass 1/3). It reads only fields that
+ * are ALREADY strings, because `String(value)` is not total: a record whose JSON
+ * happens to be `{"branch": {"toString": null}}` makes the coercion THROW, and an
+ * exception raised here reaches the landing's merge handler AFTER git has merged
+ * — which would report a failed merge over a completed one. A name or a branch
+ * field that is not a string is simply not a match.
  */
 export function closingRunRecords({ entries = [], branch, existing = [] } = {}) {
-  const want = String(branch ?? '')
+  const want = typeof branch === 'string' ? branch : ''
   if (!want) return []
-  const have = new Set(Array.isArray(existing) ? existing.map(String) : [])
+  const have = new Set((Array.isArray(existing) ? existing : []).filter((n) => typeof n === 'string'))
   const out = []
   for (const e of Array.isArray(entries) ? entries : []) {
-    const name = String(e?.name ?? '')
-    if (!name.endsWith('.run.json') || have.has(name)) continue
-    if (String(e?.record?.branch ?? '') !== want) continue
+    const name = e?.name
+    if (typeof name !== 'string' || !name.endsWith('.run.json') || have.has(name)) continue
+    if (e?.record?.branch !== want) continue
     out.push(name)
   }
   return [...new Set(out)].sort()

@@ -24,7 +24,7 @@
 // `land-cleanup-core.mjs` assumes — the lock line, the dirtiness, and above all
 // WITHOUT its own look becoming the evidence (point 629).
 import { execFileSync } from 'node:child_process'
-import { chmodSync, mkdtempSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, it, expect } from 'vitest'
@@ -867,8 +867,9 @@ describe('carryRunRecords', () => {
     // … and neither is a record the branch did not produce.
     writeRecord(join(own, 'local', 'verify-logs'), 'stamp-main.log.run.json', 'main')
 
-    const copied = carryRunRecords({ branch: 'feat/608-x', cwd: root, mainRoot: root })
-    expect(copied.sort()).toEqual(['stamp-docs.log.run.json', 'stamp-polish.log.run.json'])
+    const out = carryRunRecords({ branch: 'feat/608-x', cwd: root, mainRoot: root })
+    expect(out.copied.sort()).toEqual(['stamp-docs.log.run.json', 'stamp-polish.log.run.json'])
+    expect(out.failed).toBe(0)
     const dest = join(root, 'local', 'verify-logs')
     expect(JSON.parse(readFileSync(join(dest, 'stamp-docs.log.run.json'), 'utf8')).branch).toBe('feat/608-x')
     expect(() => readFileSync(join(dest, 'stamp-world.log.run.json'), 'utf8')).toThrow()
@@ -878,13 +879,69 @@ describe('carryRunRecords', () => {
   it('is idempotent, and never throws when there is nothing to carry', () => {
     const { root, own } = scene()
     writeRecord(join(own, 'local', 'verify-logs'), 'stamp-docs.log.run.json', 'feat/608-x')
-    expect(carryRunRecords({ branch: 'feat/608-x', cwd: root, mainRoot: root })).toEqual(['stamp-docs.log.run.json'])
+    expect(carryRunRecords({ branch: 'feat/608-x', cwd: root, mainRoot: root }).copied).toEqual([
+      'stamp-docs.log.run.json',
+    ])
     // A second landing pass finds the record already there and leaves it alone.
-    expect(carryRunRecords({ branch: 'feat/608-x', cwd: root, mainRoot: root })).toEqual([])
+    const again = carryRunRecords({ branch: 'feat/608-x', cwd: root, mainRoot: root })
+    expect(again.copied).toEqual([])
+    expect(again.failed).toBe(0)
     // A branch with no worktree, and a tree with no logs, are both a quiet no-op:
     // this is bookkeeping, and it may never be the reason a landing goes red.
-    expect(carryRunRecords({ branch: 'feat/does-not-exist', cwd: root, mainRoot: root })).toEqual([])
-    expect(carryRunRecords({ branch: 'feat/590-y', cwd: root, mainRoot: root })).toEqual([])
-    expect(carryRunRecords({ cwd: root, mainRoot: root })).toEqual([])
+    expect(carryRunRecords({ branch: 'feat/does-not-exist', cwd: root, mainRoot: root }).copied).toEqual([])
+    expect(carryRunRecords({ branch: 'feat/590-y', cwd: root, mainRoot: root }).copied).toEqual([])
+    expect(carryRunRecords({ cwd: root, mainRoot: root }).copied).toEqual([])
+  })
+
+  // Astra, four-eyes pass 1/3: the listing is not the guarantee, the WRITE is.
+  it('never replaces a record the destination already holds, even if it cannot list it', () => {
+    const { root, own } = scene()
+    const dest = join(root, 'local', 'verify-logs')
+    writeRecord(join(own, 'local', 'verify-logs'), 'stamp-docs.log.run.json', 'feat/608-x')
+    mkdirSync(dest, { recursive: true })
+    writeFileSync(join(dest, 'stamp-docs.log.run.json'), 'THE COMPLETE ONE')
+    // The listing is made unreadable, which is exactly the case where a
+    // listing-only rule would license the overwrite.
+    chmodSync(dest, 0o300)
+    try {
+      const out = carryRunRecords({ branch: 'feat/608-x', cwd: root, mainRoot: root })
+      expect(out.copied).toEqual([])
+    } finally {
+      chmodSync(dest, 0o700)
+    }
+    expect(readFileSync(join(dest, 'stamp-docs.log.run.json'), 'utf8')).toBe('THE COMPLETE ONE')
+  })
+
+  it('counts what it could not carry instead of reporting the ordinary green', () => {
+    const { root, own } = scene()
+    const logs = join(own, 'local', 'verify-logs')
+    writeRecord(logs, 'stamp-docs.log.run.json', 'feat/608-x')
+    writeFileSync(join(logs, 'stamp-broken.log.run.json'), '{ not json')
+    const out = carryRunRecords({ branch: 'feat/608-x', cwd: root, mainRoot: root })
+    expect(out.copied).toEqual(['stamp-docs.log.run.json'])
+    expect(out.failed).toBe(1)
+  })
+
+  // A FIFO named like a record would block readFileSync for ever, and a landing
+  // that HANGS after the merge is worse than one that carried nothing.
+  it('does not read a record-shaped entry that is not a regular file', () => {
+    const { root, own } = scene()
+    const logs = join(own, 'local', 'verify-logs')
+    mkdirSync(logs, { recursive: true })
+    let madeFifo = false
+    try {
+      execFileSync('mkfifo', [join(logs, 'stamp-fifo.log.run.json')], { windowsHide: true })
+      madeFifo = true
+    } catch {
+      /* no mkfifo on this host — the regular-file rule is still asserted below */
+    }
+    writeRecord(logs, 'stamp-docs.log.run.json', 'feat/608-x')
+    // Without the regular-file rule this call never returns on a host with
+    // mkfifo; where the host has none, the case still asserts that a
+    // record-shaped name only counts when it is a readable regular file.
+    const out = carryRunRecords({ branch: 'feat/608-x', cwd: root, mainRoot: root })
+    expect(out.copied).toEqual(['stamp-docs.log.run.json'])
+    expect(out.failed).toBe(0)
+    if (!madeFifo) expect(existsSync(join(logs, 'stamp-fifo.log.run.json'))).toBe(false)
   })
 })

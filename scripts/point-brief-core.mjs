@@ -885,7 +885,8 @@ export const VERIFICATION_LADDER = [
   '- WHAT FINISHES A `feat/` POINT IS THE CHEAP GATE PLUS THE PICTURE, NOT A LARGE (point 1134,',
   '  user order 15.09.2026). The gate is binding and this list is EXHAUSTIVE: `tsc`, `npm run',
   '  lint`, `npm run build`, `npm run test:unit`, `node scripts/audit-check.mjs` on a LOCKFILE',
-  '  change, the point\'s OWN `--section` rung, and the two-backend PICTURE judgement. Only that',
+  '  change, the point\'s own CHEAPEST COVERING rung — its `--section` block, or the whole suite',
+  '  where that suite declares none — and the two-backend PICTURE judgement. Only that',
   '  gate blocks the merge. The both-backend LARGE is the BUNDLE\'s gate: it runs ONCE per bundle,',
   '  on `main`, after the last merge — never once per feature, and never in a second tree.',
   '  MEASURED 01.09.-15.09.2026: 40 merged `feat/` branches, 103 recorded runs, 49 of them red,',
@@ -1190,10 +1191,14 @@ export function orientationBlock({ files = [], dirs = [], check = null, sections
       )
     }
     out.push(
-      'THE FINAL PROOF IS SEPARATE AND WHOLE-SUITE (point 595), run ONCE on the exact merge candidate:',
-      `      ${planned.length ? `${planned.join(', ')} — unfiltered` : 'the covering suite(s) — unfiltered'}`,
-      'plus the full fast gate (npm run build, npm run lint, npm run test:unit). A --section run is',
-      'recorded PARTIAL and counts as no coverage whatever its exit code.',
+      'WHAT THIS POINT OWES IS THE CHEAP GATE (point 1134), run ONCE on the exact merge candidate:',
+      '      npm run typecheck:test, npm run build, npm run lint, npm run test:unit,',
+      '      node scripts/audit-check.mjs ON A LOCKFILE CHANGE, and the cheapest rung above that',
+      '      covers the change (the whole suite where it declares no sections) — plus the',
+      '      two-backend PICTURE judgement where one is owed.',
+      `THE WHOLE SUITE SET — ${planned.length ? `${planned.join(', ')}, unfiltered` : 'the covering suite(s), unfiltered'} —`,
+      'is the BUNDLE run on `main` after the last merge, and is NOT this point\'s gate. A --section run',
+      'is recorded PARTIAL and counts as no coverage whatever its exit code, there as here.',
       'The Vitest layer runs ALWAYS, whatever this says.',
     )
   }

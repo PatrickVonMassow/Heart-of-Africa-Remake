@@ -695,4 +695,32 @@ describe("the landed point's run records (point 1134)", () => {
     expect(closingRunRecords({})).toEqual([])
     expect(closingRunRecords({ entries: null, branch: 'b' })).toEqual([])
   })
+
+  it('does not throw on a record whose own fields refuse to become strings', () => {
+    // `String(value)` is NOT total, and this runs after git has already merged:
+    // an exception here would report a failed merge over a completed one
+    // (Astra, four-eyes pass 1/3). Both of these throw under `String(…)`.
+    const hostile = Object.create(null)
+    hostile.toString = null
+    expect(() =>
+      closingRunRecords({
+        entries: [
+          { name: hostile, record: { branch: 'b' } },
+          { name: 'x.log.run.json', record: { branch: hostile } },
+          { name: 'y.log.run.json', record: { branch: 'b' } },
+        ],
+        branch: 'b',
+        existing: [hostile],
+      }),
+    ).not.toThrow()
+    expect(
+      closingRunRecords({
+        entries: [
+          { name: 'x.log.run.json', record: { branch: hostile } },
+          { name: 'y.log.run.json', record: { branch: 'b' } },
+        ],
+        branch: 'b',
+      }),
+    ).toEqual(['y.log.run.json'])
+  })
 })

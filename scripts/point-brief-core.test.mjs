@@ -1203,9 +1203,29 @@ describe('the orientation block', () => {
     expect(text).toMatch(/THE ITERATION CHECK SET/)
     expect(text).not.toMatch(/THE CHECK THAT PROVES IT/)
     expect(text).toMatch(/never the acceptance/)
-    expect(text).toMatch(/THE FINAL PROOF IS SEPARATE AND WHOLE-SUITE/)
-    expect(text).toMatch(/world — unfiltered/)
+    // Point 1134: the whole suite set is the BUNDLE's run, so the block must not
+    // hand the point a per-feature LARGE beside a ladder that has just removed it.
+    expect(text).toMatch(/WHAT THIS POINT OWES IS THE CHEAP GATE/)
+    expect(text).toMatch(/THE WHOLE SUITE SET — world, unfiltered —/)
+    expect(text).toMatch(/is the BUNDLE run on `main` after the last merge, and is NOT this point's gate/)
+    expect(text).not.toMatch(/THE FINAL PROOF IS SEPARATE AND WHOLE-SUITE/)
     expect(text).toMatch(/recorded PARTIAL/)
+  })
+
+  // The two blocks are GENERATED SEPARATELY and read TOGETHER, which is how one
+  // of them kept demanding a per-feature LARGE while the other had dropped it
+  // (Astra, pass 2/3 on this point). So they are asserted in one breath.
+  it('does not let the ladder and the orientation contradict each other (point 1134)', () => {
+    const brief = buildBrief({
+      tasksText: '- [ ] 400. A render point.\n  It touches `src/world/rivers.ts` and can move the picture.\n',
+      number: 400,
+      readTree: () => ({ files, dirs, check, sections: { world: ['rivers', 'coast'] } }),
+    })
+    expect(brief.render).toBe(true)
+    // ONE rule about the whole suite set, stated once, in the same direction.
+    expect(brief.brief).not.toMatch(/THE FINAL PROOF IS SEPARATE AND WHOLE-SUITE/)
+    expect(brief.brief).toMatch(/CHEAP GATE PLUS THE PICTURE, NOT A LARGE/)
+    expect(brief.brief).toMatch(/is the BUNDLE run on `main` after the last merge/)
   })
 
   it('names suite/--section PAIRS, one per suite, since a multi-suite diff has no single pair', () => {
@@ -1223,7 +1243,7 @@ describe('the orientation block', () => {
     }).join('\n')
     expect(text).toContain('npm test -- world --section=<one of>')
     expect(text).toContain('npm test -- enrichments --section=<one of>')
-    expect(text).toMatch(/world, enrichments — unfiltered/)
+    expect(text).toMatch(/THE WHOLE SUITE SET — world, enrichments, unfiltered —/)
   })
 
   it('says so when a planned suite has no sections, rather than leaving a silent gap', () => {
