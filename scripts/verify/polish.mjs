@@ -5547,15 +5547,10 @@ if (section('adult-errands')) {
     e.dwellSeconds = 1
     e.digSeconds = 3
     e.pace = 6
-    // Keep the measured ten-adult standalone setup. This fixed sample window
-    // does not provide equivalent jar observations inside the full suite; the
-    // jar check below declares that limitation instead of claiming coverage.
+    // Keep the measured ten-adult standalone setup. How many errands this
+    // window then sees is no longer left to luck: it casts them itself and
+    // counts them (work-order 1136).
     e.villagerCount = 10
-    // THE DIP IS HELD LONG ENOUGH TO BE CAUGHT (work-order 1087). At its played
-    // value the fill lasts well under two seconds, which a polling check can
-    // walk straight past; this stretches the hold for the capture and changes
-    // nothing about the act itself.
-    window.__balance.bankFillSeconds = 8
   })
   await page.evaluate(() => window.__game.getState().enterPlace('bambara-village'))
   const live = await page
@@ -5780,6 +5775,18 @@ if (section('adult-errands')) {
     // reached the water. The errand dips now, so the check waits for a carrier
     // in the 'fill' phase and photographs HIM, at the spot he is really standing
     // on. The pin stays, and only holds that same man still for the shutter.
+    // THE DIP IS HELD LONG ENOUGH TO BE CAUGHT (work-order 1087). At its played
+    // value the fill lasts well under two seconds, which a polling check can
+    // walk straight past; this stretches the hold for the capture and changes
+    // nothing about the act itself.
+    // IT IS STRETCHED HERE AND NOT AT THE TOP OF THE BLOCK (work-order 1136).
+    // Held at eight seconds for the whole visit, the fill dominated the round
+    // trip and the sample window above saw two errands where it now sees
+    // several — a photographic convenience was quietly throttling the very
+    // subject the window is counting.
+    await page.evaluate(() => {
+      window.__balance.bankFillSeconds = 8
+    })
     const posed = await page
       .waitForFunction(
         () => {
