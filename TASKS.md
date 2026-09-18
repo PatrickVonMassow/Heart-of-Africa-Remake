@@ -584,6 +584,7 @@ put it is the mistake this line exists to stop.
 - [ ] 1157. The weaver at the village loom works instead of standing frozen (user bug
   report 18.09.2026, local/ErwachsenerStehtStill.zip: "Warum bewegt sich diese Figur
   nicht?", seed 394349866, Bambara Village, day 3.54, WebGPU, medium).
+  Bundle: Dorfleben
   The report's picture shows the weaver figure beside the standing loom with both
   arms hanging, and `Weaver` in `src/scenes/place/PlaceLife.tsx` carries no
   `useFrame` at all — the only village adult station without a working motion,
