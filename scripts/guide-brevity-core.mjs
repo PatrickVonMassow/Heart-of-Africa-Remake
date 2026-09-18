@@ -560,7 +560,18 @@ export const LIMITS = {
   // hit this ceiling and DROPPED the lesson instead of folding it — dropping is not a review
   // outcome the house rule offers, and the fingerprint it reverted is restored with this fold.
   // Net: +2 lines / +18 words. 696 -> 698.
-  maxLines: 698,
+  //
+  // RAISED AGAIN 18.09.2026, also by a FOLD: answering an escalation is itself writing a
+  // specification. Point 1133 was refused twice in one day, and the SECOND refusal hit not the
+  // point text but my answer to the first — the other model reproduced and MEASURED the
+  // contradiction (a tee onto the log the script was to own truncates it and then feeds the
+  // stream back into itself) instead of asserting it. The guide already taught that a reasoned
+  // refusal is a result; what it did not teach is that the correction earns the same reading.
+  // Folded into that very entry rather than given one of its own, and cut from a nine-line
+  // draft to four after this ceiling refused the first attempt — the refusal is what produced
+  // the shorter and better version, and the PER-ENTRY ceiling then cut it again from five
+  // lines to three. Net: +3 lines / +29 words. 698 -> 701.
+  maxLines: 701,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -869,7 +880,7 @@ export const LIMITS = {
   // buy a tip is the loosening this rule forbids. 6638 -> 6801.
   // RAISED 18.09.2026 with the line ceiling above by the same fold — the running-job hygiene
   // claim folded into "Zwei Läufe gleichzeitig". Measured net +18 words. 6801 -> 6819.
-  maxWords: 6819,
+  maxWords: 6848,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,

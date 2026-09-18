@@ -635,6 +635,9 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Wenn die Aufgabe sich nicht widerspruchsfrei bauen lässt, **baue sie nicht** —
   schreib mir auf, welche Annahme nicht trägt. Eine begründete Zurückweisung ist ein
   Ergebnis, kein Fehlschlag."
+  Und **deine Nachbesserung ist selbst eine Aufgabenstellung**: Hier traf die zweite
+  Zurückweisung meine Antwort auf die erste.
+  → *Prompt:* Ergänze: „Lies meine **Nachbesserung** so kritisch wie die Aufgabe selbst."
 
 - **Deine Frage wird als Auftrag gelesen — die Rückfrage danach als Abbruchbefehl.** „Was ist da
   los?" wird zu „nimm das in Arbeit", „wieso machst du das?" zum Stoppsignal. Gesagt hast du
@@ -696,4 +699,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 66b4c7548c33ef4d890c3a70374a5e86ba3964d27be40c2348dd0fab93f0210b -->
+<!-- GUIDE-FINGERPRINT: eb9d4a780fdaf44f8fcc3d74bdcf19385a67842ef2fe05c0516686feee04dbbe -->
