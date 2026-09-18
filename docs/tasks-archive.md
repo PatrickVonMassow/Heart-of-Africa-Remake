@@ -29597,3 +29597,46 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   once against the next bundle run to see whether rung and suite now say the same thing.
   Criticality: medium — no player impact; without it the cheap gate of 1134 rests on non-measurements.
   Bundle: Session- & Repo-Hygiene
+
+- [x] 1133. A commissioned authoring run dies with the session that started it, and takes
+  its uncommitted work with it.
+  MEASURED 15.09.2026: the first `scripts/author-astra.mjs --point 1131` was started at 19:08
+  from a Bash tool shell without `setsid` (parent PID 3147048, piped through `tee`). Within
+  eight minutes parent and child were both gone; `local/1131-astra-author.log` ends at
+  "pushed 384ec4c while the run continues" — no closing line, no verdict, no commit. The
+  entire work product sat UNCOMMITTED in the worktree: a finished reproduction harness that
+  drives the reported village through the real movement loop. It was rescued by hand as
+  72dc3907c and the run restarted behind `setsid`; nothing but that hand rescue stood between
+  the work and the bin.
+  THE FIX IS A DELETION, not a new mechanism: `author-astra.mjs` re-executes itself detached
+  (setsid, own session, output to its log) when it is not already a session leader, so no
+  caller has to remember it and no caller can get it wrong. The caller keeps the same command
+  and the same log path. Check what the script already does about its own process group
+  before adding anything — this point must not grow a supervisor, a ledger field or a guard.
+  THE LOG CONTRACT — the answer to the 15.09. escalation (main session, 18.09.2026). The
+  first commission refused the point because "output to its log" named a log that does not
+  exist: the script inherits stdout/stderr, and `local/1131-astra-author.log` was made by the
+  CALLER’s `tee`. So THE SCRIPT OWNS THE LOG. Its destination is
+  `local/<point>-<lane>-author.log` — the path the callers already write by hand — and
+  `--log <path>` overrides it; it is appended to, never truncated. THE CALL STAYS BLOCKING
+  AND ITS OUTPUT STAYS VISIBLE: the parent waits for the detached child and streams that file
+  to its own stdout as it grows, so a caller sees what it sees today and `| tee` becomes
+  unnecessary — see the `tee` answer below. When the parent dies the child keeps running in its own
+  session and keeps writing to the same file. Same argv, same cwd, same exit code; no
+  supervisor, no ledger field, no guard.
+  THE `tee` ANSWER (main session, 18.09.2026, after the second commission REPRODUCED the
+  conflict). The line above was wrong and the escalation is right: a caller’s
+  `| tee <the script’s own log path>` truncates that log when it opens it, and then the
+  streamed file is fed back into itself — one child write became four copies after three
+  streaming iterations in the reproduction. So the caller’s redirection GOES; it does not
+  merely become unnecessary. The whole command is `node scripts/author-astra.mjs --point <N>`
+  and nothing else — no `setsid`, no `tee`, no `>`. The script streams its log to stdout
+  unconditionally; a caller redirecting stdout to its OWN, DIFFERENT file stays fine and needs
+  no detection. Same-path `tee` is NOT supported and is NOT detected: working out where a
+  pipe eventually lands is the supervisor this point must not grow. Instead the run’s FIRST
+  line names the log path, and the usage text says that redirecting onto that same path
+  destroys it. Every call site in the repository and in docs/ that still writes
+  `setsid … | tee` is updated in the SAME commit — that deletion is half the point.
+  Criticality: high — it is not the point's own work that is lost but a commissioned agent's,
+  and the loss is silent: the log's last line claims the run continues.
+  Bundle: Session- & Repo-Hygiene.
