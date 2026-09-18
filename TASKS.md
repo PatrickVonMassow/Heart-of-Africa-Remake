@@ -985,10 +985,12 @@ put it is the mistake this line exists to stop.
   WHAT IS NOT ESTABLISHED, AND MUST NOT BE GUESSED: what they are MEANT to be. Candidates
   are a sandbank or shoal, a foam or lily patch, and a wildlife LOD. The first work of this
   point is to NAME the object, because the fix differs completely between them.
-  BACKEND STILL OPEN: the WebGL 2 counterpart had not been redrawn when this was filed.
-  Read `verification/482-village-river-bank.png` from the covering WebGL run
-  (2026-09-18T00:32:58Z) before assuming it affects both backends — point 1151, filed the
-  same hour, turned out to be WebGPU-only exactly this way.
+  BACKEND: ANSWERED, and the answer is BOTH. The covering WebGL 2 run
+  (2026-09-18T00:32:58Z, GREEN, exit 0, 58 frames) redrew
+  `verification/482-village-river-bank.png` with the SAME two discs in the same positions and
+  the same flat, unshaded appearance. So unlike point 1151 — filed the same hour and proven
+  WebGPU-only by exactly this comparison — this one is backend-independent and lives in the
+  scene or its geometry, not in a material path.
   FINAL STATE: whatever lies on that water reads as part of the world — lit by the same
   light as the water, or removed if it has no business being there.
   VERIFICATION: the three named frames judged by eye on the backend(s) the diagnosis
