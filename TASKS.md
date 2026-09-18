@@ -107,7 +107,9 @@ put it is the mistake this line exists to stop.
   webdriver mask used for the measurement above stays a throwaway probe — it is NOT added to
   a suite.
   ATTENDED-GATED: it cannot be delegated to a headless batch run; an attended session takes
-  it from here.
+  it from here. A HEADLESS BATCH SESSION THAT REACHES THIS POINT SKIPS IT and takes the next
+  open point instead — it stands at the front for the USER's reading, because it is his bug,
+  not because the batch can advance it.
   Criticality: medium — it is the confirmation that a reported, player-visible bug is really
   gone; without it 1148 is a plausible fix, not a proven one.
   Refs: src/scenes/place/pointerLock.ts (`createPlacePointerLock`), its test, and the
