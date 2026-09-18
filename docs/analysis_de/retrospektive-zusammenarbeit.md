@@ -1617,7 +1617,7 @@ stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die s
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Freitag, 18.09.2026, 04:06 · Quellen-Fingerprint: `527f6299198d…`
+Zuletzt aktualisiert: Freitag, 18.09.2026, 05:39 · Quellen-Fingerprint: `849e024c54ee…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1724,8 +1724,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 97 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 135 Prozess-/Meta-TASKS-Punkte (davon 64 offen).
 
-<!-- RETRO-FINGERPRINT: 527f6299198d1b2e8426a7476c04228b294d2b883f03c30cd62930c69d9d8b0b -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-18T02:06:03.005Z -->
+<!-- RETRO-FINGERPRINT: 849e024c54ee28da893b04772cbd03b18aabe33777303806e2d7f38b97cd35f8 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-18T03:39:23.993Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -7505,3 +7505,34 @@ benennt, und der Prozess, der noch lebt. Allgemeiner gilt dieselbe Richtung wie 
 nur von der anderen Seite: Dort war der Fehler, neben einer laufenden Messung einen zweiten
 Verbraucher zu starten; hier ist er, einer laufenden Messung im Vorbeigehen die Beweise
 einzusammeln. Was aufräumt, muss vorher fragen, ob gerade jemand arbeitet.
+
+### 3.286 Die Verweigerung kannte den Ausweg und nannte ihn nicht
+
+Beim Abschluss von Punkt 1136 am 18.09. habe ich die Board-Karten in der falschen
+Reihenfolge geschrieben: erst die Lücken-Karte (`board.mjs none`), dann die Erledigt-Karte.
+Danach ging es scheinbar nicht mehr weiter. `board.mjs done` antwortete »no current-work
+card«, `board.mjs promote` antwortete »no queue card« — und eine Warteschlangenkarte kann ein
+abgehakter Punkt nicht mehr bekommen, weil die Warteschlange aus dem Arbeitsauftrag
+abgeleitet wird. Der `dashboard-guard` verweigerte ab da dauerhaft mit `[erledigt-missing]`,
+und der einzige Ausweg, den irgendein Text nannte, war `--waive-audit`: das Übergehen genau
+der Prüfung, die gerade ihre Arbeit tat.
+
+Der Ausweg existierte die ganze Zeit. `board.mjs closing <punkt> --title "<Betreff>"` stellt
+für einen bereits abgehakten Punkt wieder eine Aktuell-Karte her — dafür ist die Karte da —,
+und danach schreibt `done <punkt> --none "<grund>"` beide Karten in einem Zug. Gefunden habe
+ich ihn nicht in den beiden Verweigerungen, sondern in einer dritten, unbeteiligten: der
+`board-first`-Wächter bot `closing` als eine von drei Möglichkeiten an, als ich etwas ganz
+anderes tun wollte.
+
+Dazu kam eine zweite Schleife derselben Art. Solange ein Lauf lebt, meldet ein Hook die
+In-Flight-Erklärung bei **jedem** Werkzeugaufruf neu an, und `board-publish` verweigert,
+solange diese Erklärung keinen offenen Punkt nennt. `--clear` und `board-publish` als zwei
+Aufrufe heben sich deshalb gegenseitig auf; sie müssen in **einem** Shell-Aufruf stehen. Auch
+das stand nirgends — man findet es, indem man sich dreimal im Kreis dreht.
+
+**Lehre:** Eine Verweigerung, die den Zustand prüfen kann, kann meistens auch den Weg zurück
+benennen. Tut sie es nicht, ist der einzige sichtbare Ausweg die Notausstiegs-Flagge — und
+dann wird sie benutzt, und der Audit hat nichts mehr gemessen. Das gehört in denselben
+Satzbau wie 3.201: zwei Schranken, deren Bedingungen sich gegenseitig ausschließen, sind kein
+Sonderfall, sondern der Normalfall, sobald zwei Mechaniken denselben Zustand lesen. Beide
+Löcher sind als Anfragen im Findings-Träger eingereiht.
