@@ -105,6 +105,12 @@ the debug drum bed and 1.242 without it, 2.52 dB and 1.88 dB over. Nothing in
 the graph absorbs that — there is no master limiter — so point 1156 carries it.
 The measured factors are not to be scaled back to hide the overage.
 
+The message is measured in the GRAPH, not only in its plan: its loudest strike
+(head and stick click on one sample) reaches the destination at 0.135 over the
+0.114 village floor, 0.249 together — clear of full scale on its own. It shares
+the master with the speech bus, so a strike falling on the two-voice worst case
+above still adds to it; that coincidence belongs to point 1156.
+
 ## The speech floor
 
 One situation speaks at a time within the player's earshot. Its word and visible

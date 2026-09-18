@@ -1583,9 +1583,12 @@ export const balance: BalanceConfig = {
     // MEASURED HEADROOM: see the graph test in src/systems/ambience.test.ts.
     speechVolume: 3,
     // 2.5x its former 1.8 on the same instruction — the literal used to sit in
-    // drumMessage.ts, where nothing could calibrate it. The strikes ride the
-    // ambient bus, so the message never coincides with close village speech on
-    // one carrier; the graph test measures both sums separately.
+    // drumMessage.ts, where nothing could calibrate it. MEASURED IN THE GRAPH,
+    // not in the plan (src/systems/ambience.test.ts): the loudest strike reaches
+    // the destination at 0.135 over the 0.114 village floor, so the message on
+    // its own clears full scale. The ambient bus and the speech bus meet at the
+    // one master, so a strike landing on the two-voice worst case still adds to
+    // it — that coincidence is point 1156's, not a reason to lower this value.
     drumMessagePeak: 4.5,
     // A hand's breadth over the head, no more (point 582). The note used to
     // hang at a flat 2.3 m over the speaker's FEET — 0.85 m over a grown

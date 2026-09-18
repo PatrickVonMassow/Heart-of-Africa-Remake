@@ -1178,6 +1178,46 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
     }
   })
 
+  // The message drums were raised 2.5x in the same change, so what the GRAPH
+  // carries is measured here and not inferred from the plan: the strike peak
+  // above is a planner number, this is the sum that reaches the destination.
+  it("measures headroom for the chief's drum message over the village floor", () => {
+    setAmbienceScene({ region: 'central', mode: 'place', placeKind: 'village', nearVillage: false })
+    refreshAmbienceVolume()
+    const { ambienceFloor, ambientBus } = villageFloor()
+    const master = ambientBus.connected[0] as FakeGain
+    expect(master.connected[0]).toBe(ctx.destination)
+
+    const plan = drumMessagePlan()
+    const voices = spoken(() => playDrumMessage(plan))
+    expect(voices).toHaveLength(plan.strikes.length * 2)
+
+    // A strike is a head and its stick click on the SAME sample, so those two
+    // peaks coincide by construction; two different strikes never do — their
+    // offsets are the speech plan's, and only the previous ring bleeds in.
+    let strike = 0
+    for (let i = 0; i < plan.strikes.length; i++) {
+      const head = Math.max(...envelopeOf(voices[i * 2]).gain.events.map((e) => e.value ?? 0))
+      const click = Math.max(...envelopeOf(voices[i * 2 + 1]).gain.events.map((e) => e.value ?? 0))
+      strike = Math.max(strike, head + click)
+    }
+    // The balance value reaches the graph, not just the plan.
+    expect(strike).toBeCloseTo(balance.communication.drumMessagePeak * balance.ambienceVolume * 1.2, 10)
+
+    const message = strike * ambientBus.gain.value
+    const output = (message + ambienceFloor) * master.gain.value
+    // MEASURED at drumMessagePeak 4.5: the loudest strike carries 0.135 past
+    // the master over a 0.11375 village floor, so the message alone clears full
+    // scale with room to spare — it was 0.054 at the former literal 1.8.
+    expect(message * master.gain.value).toBeCloseTo(0.135, 10)
+    expect(output).toBeCloseTo(0.24875, 8)
+    expect(output).toBeLessThan(1)
+    // It does NOT clear it in coincidence: the strikes and the speech bus meet
+    // at this same master, so a strike landing on the two-voice worst case above
+    // adds its 0.135 to that 1.242. Point 1156 owns the missing limiter; the
+    // user's factors stay as asked.
+  })
+
   // Point 673 follows the shipped drum silence, so the calibration that closes
   // it measures the DEPLOYED village mix rather than turning the dormant bed
   // back on. The floor is deliberately conservative: all remaining active
