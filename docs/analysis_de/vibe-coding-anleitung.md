@@ -44,8 +44,7 @@ Lege **zwei** Modelle fest, mit klaren Rollen:
 
 Ein zweites Modell nützt nicht, weil es *besser* ist, sondern weil es **andere blinde
 Flecken** hat. Die **Obergrenze** zieht die **Sichtbarkeit des Fehlers**: Was den Ablauf
-steuert oder Arbeit vernichten kann, wird gegengeprüft; was ein schneller Test
-zeigt, nie.
+steuert oder Arbeit vernichten kann, wird gegengeprüft; was ein schneller Test zeigt, nie.
 
 **Kontingent ist nicht austauschbar.** Ist ein Modell knapp, behalte ihm vor, was **nur** es
 kann; Code zu schreiben, der größte Verbraucher, geht ans andere. Ein Verteiler ohne
@@ -157,19 +156,20 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 ## Die häufigsten Fallstricke → und was hilft
 
 - **Grüner Test, falsches Bild.** Er prüfte einen Hilfswert oder *stellt her*, was die Handlung
-  bewirkt hätte — und ist für immer grün.
+  bewirkt hätte — dauerhaft grün.
   → *Prompt:* „Eine sichtbare Änderung ist erst fertig, wenn sie am **echten gerenderten Bild**
   geprüft wurde. Zu jeder Prüfung: **Welche Zeile ruft die Sache auf — und was bliebe grün, wenn
-  sie kaputt wäre?** Zeit darf ein Test abkürzen, den **Aufruf** nie. Ist die **Ausgabe** das
-  Produkt, lies sie am **echten Bestand**. Und das Bild beantwortet nicht nur ‚stimmt es?‘,
-  sondern **wozu tut die Figur das — sieht man es ihr an?“ *(Sieht das richtig aus?)*
+  sie kaputt wäre?** Zeit darf ein Test abkürzen, den **Aufruf** nie; ist er nicht
+  ausführbar, **miss warum** und mach den Rest zur **eigenen Aufgabe**. Ist die
+  **Ausgabe** das Produkt, lies sie am **echten Bestand**. Und das Bild sagt nicht nur ‚stimmt
+  es?‘, sondern **wozu die Figur das tut?“ *(Sieht das richtig aus?)*
 - **Dem Test geht der Gegenstand unter den Füßen weg.** Er hält seinen Prüfling an einer
   Koordinate, einem Vorgabewert oder einer Simulation fest. Zieht der Prüfling um, fragt er
-  weiter — nur über nichts mehr. Ein Rot meldet sich; ein leerer nicht, ein leeres Bild ebenso wenig.
+  weiter — nur über nichts mehr. Ein Rot meldet sich; ein leerer Prüfling nicht.
   → *Prompt:* „**Verlegst** du etwas, ist das Anpassen der roten Stellen nur die Hälfte: Sieh
   jede übrige Zusage desselben Blocks an, ob sie **noch über etwas urteilt**. Leite den Prüfling
   **ab** statt ihn zu nennen, sonst prüf seine **Zugehörigkeit** mit — beim Bild seine Lage
-  im Auslösemoment. Und **stell die Gelegenheit her**, statt zu warten.“
+  im Auslösemoment. **Stell die Gelegenheit her** statt zu warten.“
 - **Der Fühler misst sich selbst.** Er erneuert beim Nachsehen seinen Messwert oder liest, was
   ein Testlauf schreibt: Totes wirkt lebendig, der Nächste bleibt draußen.
   → *Prompt:* „Ein Lebenszeichen kommt nur aus einer Quelle, die der **Beobachter nicht
@@ -698,4 +698,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 3be0584d669ff8e639697bfc5279dedc2b06d66ea3963268b653ad8c6b3e088a -->
+<!-- GUIDE-FINGERPRINT: bfdfc300ca5e93a2362f23ddcf308b49613f4d32a6cdfe5f3b65103e7a2bc434 -->

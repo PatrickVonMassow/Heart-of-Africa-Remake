@@ -576,6 +576,10 @@ export const LIMITS = {
   // ONE folded clause on the nearest pitfall, paid for by compressing four entries. Net: -1
   // line / +-0 words. 701 -> 700 — the ceiling follows the measurement DOWN as well as up.
   maxLines: 700,
+  // 18.09.2026, second fold of the day: the lesson that a check the test environment CANNOT
+  // perform is measured and filed as its own visible task, not carried as a footnote, reached
+  // the guide as one clause on "Gruener Test, falsches Bild" and was paid for inside the same
+  // two entries. Net: +-0 lines / -1 word. The line ceiling stays at 700.
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -884,7 +888,9 @@ export const LIMITS = {
   // buy a tip is the loosening this rule forbids. 6638 -> 6801.
   // RAISED 18.09.2026 with the line ceiling above by the same fold — the running-job hygiene
   // claim folded into "Zwei Läufe gleichzeitig". Measured net +18 words. 6801 -> 6819.
-  maxWords: 6848,
+  // LOWERED 18.09.2026 by the fold described at the line ceiling above: the new clause cost
+  // 16 words and the compression of the two entries that carry it gave back 17. 6848 -> 6847.
+  maxWords: 6847,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,
