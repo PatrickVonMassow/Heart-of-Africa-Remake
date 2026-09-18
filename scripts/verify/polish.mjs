@@ -5715,22 +5715,39 @@ if (section('adult-errands')) {
     // window said nothing about the jar, which is neither a defect nor an
     // all-clear. That is exactly the state twelve green climbs used to report
     // as green on 09.09.2026.
-    const errandsSeen = staged['water-out'] ?? 0
-    const jarCoverage = { subjects: errandsSeen, minimum: 2, what: 'water errands' }
+    const errandsCast = staged['water-out'] ?? 0
+    // WHAT THE JAR ASSERTION NEEDS IS A COMPLETED ROUND TRIP, not a casting
+    // (GPT-6 Astra, cross-vendor round): the game stages 'water-back' at the
+    // moment the fill ends and the carrier turns for home, so it counts the
+    // trips that actually had an empty leg AND a full one. ONE is the honest
+    // floor — one round trip is exactly the evidence the assertion asks for,
+    // and the measured blockade of 10.09.2026 had none: its single errand was
+    // 33 of about 2000 ticks into the fetch when the window closed.
+    const roundTrips = staged['water-back'] ?? 0
     // AND THE CREATION IS PROVED, not assumed. A hook that stopped working would
     // otherwise leave every reading below at zero and the block would simply go
     // quiet about it.
     check(
       'the deliberate casting really sends carriers to the water (work-order 1136)',
-      errandsSeen > 0,
-      `${errandsSeen} water errand(s) cast over 240 samples`,
+      errandsCast > 0,
+      `${errandsCast} water errand(s) cast over 240 samples, ${roundTrips} of them turned for home`,
+    )
+    // DIGGING IS ITS OWN CHECK AND CARRIES NO WATER COVERAGE (GPT-6 Astra,
+    // cross-vendor round). Bundled into the jar assertion it inherited the water
+    // errand's sample count, so a broken digging animation in a window with few
+    // errands would have read NOT-COVERING instead of red — and the DIG
+    // utterance beside it cannot see an animation at all. The dig situations are
+    // cast every round and depend on no carrier, so this one simply asserts.
+    check(
+      'a villager is seen digging (work-order 688)',
+      dug > 0,
+      `${dug} villager-samples at the dig pose`,
     )
     check(
-      'a villager is seen digging, and the jar goes down EMPTY and comes back FULL',
-      dug > 0 && carriedEmpty > 0 && carriedFull > 0,
-      `${dug} villager-samples at the dig pose, ${carriedEmpty} with the empty jar, ` +
-        `${carriedFull} with the full one`,
-      jarCoverage,
+      'and the jar goes down EMPTY and comes back FULL',
+      carriedEmpty > 0 && carriedFull > 0,
+      `${carriedEmpty} villager-samples with the empty jar, ${carriedFull} with the full one`,
+      { subjects: roundTrips, minimum: 1, what: 'completed water round trips' },
     )
     // BOTH WORDS ARE ACTUALLY HEARD. Nothing here used to require either of them:
     // the staging, digging and carrying checks are satisfied by animation alone,
