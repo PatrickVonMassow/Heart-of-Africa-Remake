@@ -16032,3 +16032,34 @@ to land than a mechanism that needs a review.
   Refs: scripts/verify/flow.mjs (L145, L162-L166), src/state/store.ts L508,
   src/config/balance.ts L1645
   Bundle: Testinfrastruktur.
+
+- [ ] 1162. A landed render change carries no covering picture, and blocks every merge
+  behind it (measured 18.09.2026, 22:07, by `guard-preflight --for merge`: the
+  render-verify-guard is the ONLY guard that would refuse — the other twenty are clean).
+  MEASURED STATE: the landing of 18.09.2026, 21:09 brought four render commits onto
+  `main` — the climbing stone a child gets onto and its collider (33ae91068, cf4e11676,
+  24add0638) and the monument site's layout field (3d708c802) — touching
+  `src/scenes/place/PlaceScene.tsx`, `PlaceLife.tsx`, `bankGame.ts`, `gizaSite.ts` and
+  `src/render/gesture.ts`. The last runs on either backend (18:59-19:09, both) were
+  `--section=speech-guess` runs: recorded PARTIAL, and a PARTIAL run covers nothing
+  whatever its exit code. So the stone a child climbs on has never been judged in a
+  picture at its shipped values, and no `feat/` branch can land until one exists.
+  The debt is NOT this point's own making: it belongs to the climbing-stone point, whose
+  picture was owed on its branch. It is filed separately because that point is closed and
+  a closed point cannot be charged.
+  Final state:
+  - A covering `polish` run on BOTH backends stands on `main` — clean, or red with every
+    red charged to an open point — taken after the last render-file edit, and its frames
+    of the settlement with the stone are INSPECTED, not merely green.
+  - What the frames show is reported in words: the stone stands where the layout puts it,
+    a child that climbs it is ON it rather than inside or beside it, and the narrowed
+    collider has not left a gap the walk falls through.
+  - Any red the run finds is closed the three ways point 640 allows; none is retried away.
+  Test: the run IS the test — `VERIFY_GL=webgpu node scripts/verify/run-all.mjs polish`
+  and `VERIFY_GL=webgl node scripts/verify/run-all.mjs polish`, on a quiet machine.
+  Criticality: high — it is not a defect but a BLOCKADE: every following point's landing
+  waits behind it, and the longer it stands the more render commits pile up behind one
+  unjudged picture.
+  Refs: scripts/render-verify-guard.mjs, scripts/render-verify-charges.mjs, the commits
+  33ae91068, cf4e11676, 24add0638, 3d708c802
+  Bundle: Testinfrastruktur.
