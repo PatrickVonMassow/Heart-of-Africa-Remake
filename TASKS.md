@@ -1184,6 +1184,21 @@ put it is the mistake this line exists to stop.
   green in the same window. So the composition SCALES WITH LOAD: quiet it stays under the cap,
   loaded it jumps over it. This is one pair, not the eight-run probe this point still owes, but it
   is the first measured statement about what the load moves.
+  THE EIGHT-RUN PROBE, 18.09.2026 on main a4877b189 (`node scripts/throttle-probe.mjs polish
+  --section=children-motion --backend webgl --runs 8`, one of sixteen cores, about a quarter of a
+  core, shared with three busy processes): 0 of 8 runs red, SKEW RATE 0 %. Squeezing the CPU does
+  NOT reproduce it, which is the opposite of what the paired reading above suggested — so the load
+  that moves this composition is not the load a core limit imposes.
+  AND THE THIRD FULL-PASS SHAPE, the same day on the same commit (log
+  `local/verify-logs/2026-09-18T15-22-15-911-polish.log`): worst child 0 at 0.56 %, group 0.11 %
+  (6 of 5780 one-second windows), burst series wholly clean at 0.00 %. Charged here — the entry's
+  group-share scope widened from 0.0x to 0.1x for it, and no further, so a sustained tread at
+  0.2 % and up stays a real red exactly as before. WHAT THAT MEASUREMENT RULES OUT: the WHOLE
+  polish suite ran GREEN on WebGPU at the SAME commit half an hour earlier (290 checks), and the
+  children-motion block alone on WebGL 2 at that commit was green in 1 m 28 s. Neither the code
+  under it nor CPU pressure explains the red; what the red run alone has is the thirty minutes of
+  suite that ran before it IN THE SAME BROWSER, and that is now the one hypothesis left to test —
+  run the block alone after a long pass in the same page, rather than in a fresh one.
   Final state:
   - The throttle probe says whether it is load or a defect, and the eight results are printed.
   - Whichever it is: the charge is removed by a fix, or it is kept with the measurement that

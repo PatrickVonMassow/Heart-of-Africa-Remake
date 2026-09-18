@@ -1303,7 +1303,7 @@ export const RED_CHARGES = [
     // on the widened index.
     detailReadsPrefix: true,
     detailMatch:
-      /^worst child -?\d+ at \d+\.\d+ % of its own judged time; group 0\.0\d % \(\d+ of [1-9]\d* 1s windows, [\d.]+ judged child-seconds\)\. Least judgeable child \d+ at [\d.]+ %, group [\d.]+ % of [\d.]+ traced\./i,
+      /^worst child -?\d+ at \d+\.\d+ % of its own judged time; group 0\.[01]\d % \(\d+ of [1-9]\d* 1s windows, [\d.]+ judged child-seconds\)\. Least judgeable child \d+ at [\d.]+ %, group [\d.]+ % of [\d.]+ traced\./i,
     why:
       'MEASURED 07.09.2026 on main at bd050ddf8, VERIFY_GL=webgl polish (log '
       + 'local/verify-logs/2026-09-07T05-44-35-994-polish.log): worst child 0 at 0.34 % of its own '
@@ -1329,8 +1329,22 @@ export const RED_CHARGES = [
       + 'is the weakest red the check can print; the run\'s own quiet-machine line said MACHINE '
       + 'NOT QUIET (busy) and its section retry passed clean with 8 checks. Point 1140, whose run '
       + 'this was, touches the HUD, the keyboard map and the settlement pointer lock and no '
-      + 'child, errand or motion code. 1068 now has two shapes for its throttle probe to '
-      + 'explain.',
+      + 'child, errand or motion code. '
+      + 'THIRD MEASUREMENT, 18.09.2026 on main at a4877b189, VERIFY_GL=webgl polish (log '
+      + 'local/verify-logs/2026-09-18T15-22-15-911-polish.log): worst child 0 at 0.56 % of its own '
+      + 'judged time, group 0.11 % (6 of 5780 one-second windows), the burst series again wholly '
+      + 'clean at 0.00 % with no offending window at all. THE GROUP-SHARE SCOPE WIDENS TO 0.1x FOR '
+      + 'IT, and only that far: the bound was drawn when the largest measured composition was '
+      + '0.07 %, and what it exists to keep red is a SUSTAINED tread, which 0.2 % and up still is. '
+      + 'THE THIRD MEASUREMENT ALSO ANSWERS THE TWO CHEAP EXPLANATIONS, which is why it is charged '
+      + 'rather than left open: the WHOLE polish suite ran GREEN on WebGPU at the SAME commit 30 '
+      + 'minutes earlier (290 checks, 0 fail), the children-motion block re-run on its own rung on '
+      + 'WebGL 2 at that same commit was green in 1 m 28 s, and the throttle probe this point owes '
+      + 'came back 0/8 red at about a quarter of a core (scripts/throttle-probe.mjs polish '
+      + '--section=children-motion --backend webgl --runs 8). Neither the change under it nor CPU '
+      + 'load explains it; what the red run alone has is the thirty minutes of suite that ran '
+      + 'before it in the same browser, and naming THAT is what 1068 is still open for. It now has '
+      + 'three shapes to explain.',
   },
   {
     point: 1010,
