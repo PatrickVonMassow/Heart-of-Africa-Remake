@@ -1360,3 +1360,21 @@ oder ihm die Frames unter `verification/` als Fortschrittssignal geben, statt
 das Log. Kosten, wenn es bleibt: die meistgelaufene Suite wird bei jedem vollen
 Durchgang als Stillstand gemeldet, und der Bediener lernt, das Urteil zu
 ignorieren.
+
+## Die Laufprotokolle eines Branches sterben gar nicht mit seinem Worktree (18.09.2026)
+
+Gemessen 18.09.2026 beim Bau von Punkt 1134. Der Punkt bestellt, die `run.json`
+eines gelandeten Punktes beim Merge in das Haupt-Checkout zu kopieren, weil
+`local/verify-logs/` ignoriert und pro Worktree sei und die Protokolle mit dem
+Baum verschwänden. Der Kopierschritt ist gebaut und liegt auf `main` — er hat
+bei seiner eigenen Landung aber NICHTS zu tun gefunden: alle fünf `run.json` der
+Branch-Läufe lagen bereits unter `/workspace/hoa/local/verify-logs/`, obwohl
+jeder Lauf mit cwd im Worktree gestartet wurde. Die Quittung der Läufe nennt
+denselben Hauptbaum-Pfad.
+
+Nicht als Punkt eingereiht (Befundaufnahme CLAUDE.md §2, Infrastruktur-Freeze):
+kein Spielerbelang, keine Blockade, keine falsche Freigabe — der Kopierschritt
+ist in dieser Konfiguration schlicht ein No-op und schadet nicht. Offen bleibt
+die Frage, für welche Lauf-Formen die im Punkt genannte Messgrenze überhaupt
+gilt; wer sie das nächste Mal braucht, misst sie an einer Suite, die ihr Log
+tatsächlich im Worktree anlegt, statt sie aus dem Punkttext zu übernehmen.
