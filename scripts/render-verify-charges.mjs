@@ -1343,8 +1343,12 @@ export const RED_CHARGES = [
       + 'came back 0/8 red at about a quarter of a core (scripts/throttle-probe.mjs polish '
       + '--section=children-motion --backend webgl --runs 8). Neither the change under it nor CPU '
       + 'load explains it; what the red run alone has is the thirty minutes of suite that ran '
-      + 'before it in the same browser, and naming THAT is what 1068 is still open for. It now has '
-      + 'three shapes to explain.',
+      + 'before it in the same browser, and naming THAT is what 1068 is still open for. AND THE VERY '
+      + 'NEXT FULL WEBGL 2 PASS, one commit later at 3720013d0 (log '
+      + 'local/verify-logs/2026-09-18T16-41-50-415-polish.log), was GREEN on this check and on '
+      + 'the whole suite — so the composition is a transient even at the length of a full pass, '
+      + 'and this charge is a record of a red that happened, not of one that reproduces. It now '
+      + 'has three shapes to explain.',
   },
   {
     point: 1010,

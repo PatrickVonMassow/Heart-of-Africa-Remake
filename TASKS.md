@@ -1249,6 +1249,11 @@ put it is the mistake this line exists to stop.
   under it nor CPU pressure explains the red; what the red run alone has is the thirty minutes of
   suite that ran before it IN THE SAME BROWSER, and that is now the one hypothesis left to test —
   run the block alone after a long pass in the same page, rather than in a fresh one.
+  AND THE NEXT FULL PASS WAS GREEN, one commit later on the same backend and the same day
+  (log `local/verify-logs/2026-09-18T16-41-50-415-polish.log`, 27 m 02 s, exit 0, on a machine
+  the runner itself called busy). So a full pass does not reproduce it either: four full
+  WebGL 2 passes are now on record for this check, three green and one red. Whatever this
+  point finally names, it is a transient of that order and not a standing defect.
   Final state:
   - The throttle probe says whether it is load or a defect, and the eight results are printed.
   - Whichever it is: the charge is removed by a fix, or it is kept with the measurement that
