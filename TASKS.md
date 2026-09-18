@@ -1231,6 +1231,18 @@ put it is the mistake this line exists to stop.
   entry scoped to the measured composition (the one-second reading red while the 0.5 s burst
   reading stands at 0.00 %), so the WebGL 2 lane can be read again. The charge dies with this
   point and decides nothing about the cause.
+  FIRST PAIRED READING, 18.09.2026 on main c57a1c2c9, WebGL 2, the same check twice in one hour.
+  UNDER LOAD (a main push ran its full gate beside the picture run; load average 6.7): worst child
+  1 at 0.99 % of its own judged time, group 0.20 % (11 of 5785 one-second windows, 133.3 judged
+  child-seconds), worst window 14.4 s having walked 1.40 m inside 0.24 m. That group share is ABOVE
+  the tenth-of-a-percent cap this point's charge entry deliberately draws, so it stayed unaccounted
+  and red. QUIET, the same block alone 40 minutes later: worst child 1 at 0.34 %, group 0.07 %
+  (4 of 5850 windows, 196.0 judged child-seconds), burst reading 0.00 % — exactly the composition
+  already charged here, and the runner said so ("every red is charged to open point 1068"). The
+  full quiet WebGL 2 pass afterwards was GREEN on this check, and the same block on WebGPU was
+  green in the same window. So the composition SCALES WITH LOAD: quiet it stays under the cap,
+  loaded it jumps over it. This is one pair, not the eight-run probe this point still owes, but it
+  is the first measured statement about what the load moves.
   Final state:
   - The throttle probe says whether it is load or a defect, and the eight results are printed.
   - Whichever it is: the charge is removed by a fix, or it is kept with the measurement that
