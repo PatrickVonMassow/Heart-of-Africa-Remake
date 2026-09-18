@@ -382,9 +382,14 @@ waiting past that signal. This does not kill the runner or classify the red.
 
 ### Regression tiers (point 173)
 
-Each point lands after the full fast gates, its covering tier suites and the
-picture check. The **both-backend LARGE runs once per bundle and at closing**,
-not once per point. Choose the covering suites from the tier map below:
+A `feat/` point lands after the CHEAP GATE and its picture — `tsc`, lint, build,
+unit, `audit-check.mjs` on a lockfile change, its own cheapest covering rung
+(its `--section` block, or the whole suite where that suite declares none) and
+the two-backend picture judgement — and nothing else blocks that merge. The
+**both-backend LARGE runs once per bundle and at closing**, on `main`, after the
+last merge; "The full regression is the BUNDLE's gate" below is the whole rule,
+its measurement and its falsification criterion. Choose the covering suites for
+the bundle run from the tier map below:
 
 | Tier | Command | Backend | Browser suites | Preview | What it really costs |
 |------|---------|---------|----------------|---------|----------------------|
@@ -754,39 +759,107 @@ over half the blocks, where paying the boot prologue that often costs more than
 the one pass. This narrows what is ASKED, never what is CREDITED — a `--section`
 run is PARTIAL, and the covering proof stays whole and unfiltered.
 
-### One REGRESSION for several finished branches — never one PICTURE (point 1126)
+### The full regression is the BUNDLE's gate, not the feature's (point 1134)
 
-The brief's ladder has allowed this for a long time (`VERIFICATION_LADDER` in
-`scripts/point-brief-core.mjs`): *"a shared final regression over several
-finished branches may replace the repeated REGRESSION, never that picture."*
-Folding point 1057 into 1056 on 07.09.2026 was the same instruction, given by
-hand. It is written down here so it is a procedure rather than a memory.
+**What finishes a `feat/` point.** The cheap gate plus the picture — and the
+list is exhaustive, so that nobody has to guess what blocks a merge:
 
-**What may be shared.** Two or more branches that are FINISHED — implemented,
-unit-green, and each judged on its own picture — are merged into one tree, and
-the LARGE regression runs ONCE on that tree. The alternative is the same set of
-suites run once per branch for a delta the merge will combine anyway.
+| The gate | When |
+|---|---|
+| `npm run typecheck:test` / `tsc` | always |
+| `npm run lint` | always |
+| `npm run build` | always |
+| `npm run test:unit` | always |
+| `node scripts/audit-check.mjs` | only when the lockfile changed |
+| the point's own CHEAPEST COVERING rung | always — its `--section` block, or the whole suite where that suite declares no sections (`startup`, `benchmark`, `docs` and the other unsectioned ones refuse `--section`, so the suite itself IS their cheapest rung) |
+| the two-backend PICTURE judgement | always for a change that can move the picture |
 
-**What is never shared.** The two-backend PICTURE check of each point, which
-stays ON ITS OWN BRANCH, before the merge. A picture is a judgement about what a
-change LOOKS like; a shared tree cannot say which change produced a frame.
+**Only that gate blocks the merge.** The both-backend LARGE is not part of it.
 
-**How.**
+**Why.** Measured over 01.09.–15.09.2026: **40** merged `feat/` branches, **103**
+recorded verification runs, **49** of them carrying FAIL lines or a non-zero
+exit — and **not one clean case** of "a feature broke standing functionality and
+only the full regression found it". The 49 reds were pre-existing (point 1065
+spent 23 full LARGE runs / 16.2 machine-hours without a single red touching its
+own work), load or flake (1072 printed `REAL REGRESSION (green on baseline, red
+now)` and was 3 of 3 green on a quiet machine), test defects (1126, 1127,
+`run-wait` calling healthy runs hung), or the single branch suspicion 1056, whose
+trail led to a latent defect reported on 07.09. and landed as point 1131. The one
+escape onto `main` in the whole window was a type-check error, caught by `tsc` —
+the cheapest gate there is.
 
-1. Each branch finishes its own work and its own both-backend picture check, and
-   reports the `git HEAD` it judged.
-2. Merge `main` into each branch, then merge the finished branches into one
-   integration tree — in practice the first branch, with the others merged into
-   it (`scripts/fold-point.mjs` for a point that is folded outright).
-3. Run the LARGE regression ONCE there, on the exact tree that will land, and
-   report that `git rev-parse HEAD`.
-4. Land the points from that tree. A red in the shared run is charged like any
-   other red — to the point that owns it, never to "the bundle".
+**Where the LARGE runs instead.** Once per bundle, **on `main`, after the last
+merge**. The bundle tree IS `main`: no integration tree and no test tree is built
+for it — that would be exactly the workflow abstraction CLAUDE.md §2 forbids, and
+it would also cost the merge a second time. A temporarily red `main` is covered
+by CLAUDE.md §7.2 and by there being exactly one owner.
 
-**When NOT to.** Where one branch's red would make the other's result
-unreadable — two branches editing the same suite, or the same subsystem — the
-shared run buys a cheaper answer to a question nobody can then attribute. Run
-them separately and say why.
+**Where the bundle boundary is.** A prose trigger, deliberately no automatism. A
+bundle closes as soon as ONE of these holds:
+
+- three to five finished points,
+- three days, or the end of a day,
+- a point touches a core area,
+- a demo or a release is due.
+
+There is **no minimum bundle size**: a single finished point may keep its own
+closing run, and no finished branch waits for an unfinished large bundle.
+
+**What is NOT bundled.**
+
+- **Core touches** — the tick loop, the scheduler, the save format, the
+  renderer/backend binding. This is a prose list, and it grows only after an
+  actual core red, never on suspicion.
+- **Branches touching the same suite or subsystem**, which is the rule point 1126
+  already wrote down above: where one branch's red would make the other's result
+  unreadable, the shared run buys a cheaper answer nobody can attribute. Run them
+  separately and say why. A diff argument may add a single further case.
+
+**Every merge re-climbs the rung.** After every merge of `main` into the branch,
+every conflict resolution and every further change, the affected rung is climbed
+AGAIN, and `tsc` runs on the ACTUALLY merged state; an older branch green does
+not count. The bundle run starts only once every intended merge has happened.
+
+**The picture stays with its point.** The two-backend picture judgement is made
+per point, on its own branch, before the merge. It is never shared, bundled,
+moved into the bundle run, or replaced by a bundle picture — point 1126's "never
+one PICTURE" is unchanged by this point. A picture is a judgement about what a
+change LOOKS like, and a bundled tree cannot say which change produced a frame.
+
+**A red bundle run rolls nothing back.** A merged point stays merged. The red is
+attributed under CLAUDE.md §7.2 or filed as its own point, and it is **never**
+charged to "the bundle" — a bundle owns nothing and closes nothing. Attribution
+runs over the diff, the section rung, and `git bisect` across `main`'s merge
+commits; never over a second tree. An interaction with no single owner gets an
+integration point that NAMES its participants. "Never over a second tree" is
+about not BUILDING one to hold the bundle: `baseline-classify.mjs` below still
+re-runs a red's own blocks in its detached read-only baseline checkout, and a
+bundle red asked by hand names the merge commit it measures against (`--ref`)
+rather than a merge base, which on `main` would resolve to the commit under
+test.
+
+**The lead figure is wall clock per point**, read once per bundle from the
+`run.json` files rather than estimated: the target profile is point 1112
+(regression exactly once, zero side effects), the counter-profile is point 1056
+(599 min in 28 runs). Machine time and wall clock stay separate numbers.
+
+**FALSIFICATION.** This rule falls back to "per feature" the moment ONE clean
+case appears: a branch broke standing functionality and only the full regression
+found it. Re-measure after 40 further merges.
+
+**And the measurement limit is passed on with the rule**, because a number that
+outlives its caveat is how one window's reading becomes a house rule nobody can
+argue with: "zero cases" is the result of ONE window, 103 runs are not an
+independent sample, 49 red runs are not 49 defects, and points 1065 and 1131
+travel along as counter-evidence.
+
+**The closing run record survives the worktree.** A branch's `run.json` files
+live in its own git-ignored `local/verify-logs/`, so they used to die with the
+worktree the landing removes — which is why the measurement above had to be
+reconstructed by hand. `scripts/land-point.mjs` now COPIES the landed point's own
+run records into the main checkout's `local/verify-logs/` inside the existing
+merge step. It is a `cp`, not a ledger: nothing reads it but the next person
+measuring.
 
 ## A spawn that never ran is not a rejection (points 573/606)
 
@@ -1239,7 +1312,8 @@ repo. At most two baselines are kept. Each currently failing check comes back as
 never a finding — the baseline is measured standalone and the candidate in-pass,
 so the two readings are not of the same thing, and the label says so. It is
 settled by three narrow `--section` rungs of the affected block on a QUIET
-machine under equal starting conditions, never by another full regression),
+machine under equal starting conditions — three runs of the whole affected suite
+where that suite declares no sections — never by another full regression),
 **PRE-EXISTING / STALE ASSUMPTION**
 (already red there — the 24.07. SSAO ground-edge and proximity-fade cases),
 **UNSTABLE ON BASELINE** (it flaked there too, so the baseline decides nothing —

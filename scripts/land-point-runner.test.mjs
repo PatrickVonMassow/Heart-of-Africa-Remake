@@ -30,6 +30,7 @@ import { join } from 'node:path'
 import { afterAll, describe, it, expect } from 'vitest'
 import {
   branchRepairHint,
+  carryRunRecords,
   cleanupEvidence,
   deleteLandedBranch,
   listWorktrees,
@@ -846,5 +847,148 @@ describe('the landing settles the now-card before it publishes', () => {
     // A second pass over an already-settled source is the same answer, which is
     // what makes the by-hand repair and the automatic one safe to combine.
     expect(settleActiveWork({ number: 1088, focusPath, declarationPath, setFocus: refuse }).settled).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// THE RECORDS THAT USED TO DIE WITH THE WORKTREE (point 1134).
+describe('carryRunRecords', () => {
+  const writeRecord = (dir, name, branch) => {
+    mkdirSync(dir, { recursive: true })
+    writeFileSync(join(dir, name), JSON.stringify({ branch, command: 'verify docs', exitCode: 0 }))
+  }
+
+  it("copies the landed branch's run records into the main checkout", () => {
+    const { root, own, other } = scene()
+    writeRecord(join(own, 'local', 'verify-logs'), 'stamp-docs.log.run.json', 'feat/608-x')
+    writeRecord(join(own, 'local', 'verify-logs'), 'stamp-polish.log.run.json', 'feat/608-x')
+    // Another point's tree is not this landing's business …
+    writeRecord(join(other, 'local', 'verify-logs'), 'stamp-world.log.run.json', 'feat/590-y')
+    // … and neither is a record the branch did not produce.
+    writeRecord(join(own, 'local', 'verify-logs'), 'stamp-main.log.run.json', 'main')
+
+    const out = carryRunRecords({ branch: 'feat/608-x', cwd: root, mainRoot: root })
+    expect(out.copied.sort()).toEqual(['stamp-docs.log.run.json', 'stamp-polish.log.run.json'])
+    expect(out.failed).toBe(0)
+    const dest = join(root, 'local', 'verify-logs')
+    expect(JSON.parse(readFileSync(join(dest, 'stamp-docs.log.run.json'), 'utf8')).branch).toBe('feat/608-x')
+    expect(() => readFileSync(join(dest, 'stamp-world.log.run.json'), 'utf8')).toThrow()
+    expect(() => readFileSync(join(dest, 'stamp-main.log.run.json'), 'utf8')).toThrow()
+  })
+
+  it('is idempotent, and never throws when there is nothing to carry', () => {
+    const { root, own } = scene()
+    writeRecord(join(own, 'local', 'verify-logs'), 'stamp-docs.log.run.json', 'feat/608-x')
+    expect(carryRunRecords({ branch: 'feat/608-x', cwd: root, mainRoot: root }).copied).toEqual([
+      'stamp-docs.log.run.json',
+    ])
+    // A second landing pass finds the record already there and leaves it alone.
+    const again = carryRunRecords({ branch: 'feat/608-x', cwd: root, mainRoot: root })
+    expect(again.copied).toEqual([])
+    expect(again.failed).toBe(0)
+    // A branch with no worktree, and a tree with no logs, are both a quiet no-op:
+    // this is bookkeeping, and it may never be the reason a landing goes red.
+    expect(carryRunRecords({ branch: 'feat/does-not-exist', cwd: root, mainRoot: root }).copied).toEqual([])
+    expect(carryRunRecords({ branch: 'feat/590-y', cwd: root, mainRoot: root }).copied).toEqual([])
+    expect(carryRunRecords({ cwd: root, mainRoot: root }).copied).toEqual([])
+  })
+
+  // Astra, four-eyes pass 1/3: the listing is not the guarantee, the WRITE is.
+  it('never replaces a record the destination already holds, even if it cannot list it', () => {
+    const { root, own } = scene()
+    const dest = join(root, 'local', 'verify-logs')
+    writeRecord(join(own, 'local', 'verify-logs'), 'stamp-docs.log.run.json', 'feat/608-x')
+    mkdirSync(dest, { recursive: true })
+    writeFileSync(join(dest, 'stamp-docs.log.run.json'), 'THE COMPLETE ONE')
+    // The listing is made unreadable, which is exactly the case where a
+    // listing-only rule would license the overwrite.
+    chmodSync(dest, 0o300)
+    try {
+      const out = carryRunRecords({ branch: 'feat/608-x', cwd: root, mainRoot: root })
+      expect(out.copied).toEqual([])
+    } finally {
+      chmodSync(dest, 0o700)
+    }
+    expect(readFileSync(join(dest, 'stamp-docs.log.run.json'), 'utf8')).toBe('THE COMPLETE ONE')
+  })
+
+  it('counts what it could not carry instead of reporting the ordinary green', () => {
+    const { root, own } = scene()
+    const logs = join(own, 'local', 'verify-logs')
+    writeRecord(logs, 'stamp-docs.log.run.json', 'feat/608-x')
+    writeFileSync(join(logs, 'stamp-broken.log.run.json'), '{ not json')
+    const out = carryRunRecords({ branch: 'feat/608-x', cwd: root, mainRoot: root })
+    expect(out.copied).toEqual(['stamp-docs.log.run.json'])
+    expect(out.failed).toBe(1)
+  })
+
+  // A FIFO named like a record would block readFileSync FOR EVER, and a landing
+  // that hangs after the merge is worse than one that carried nothing. The
+  // fixture here is a DIRECTORY rather than a FIFO on purpose (Astra, confirming
+  // pass 1/3): it is portable, and — decisively — removing the regular-file
+  // guard makes this case FAIL instead of HANG, which a FIFO fixture cannot do.
+  it('does not read a record-shaped entry that is not a regular file', () => {
+    const { root, own } = scene()
+    const logs = join(own, 'local', 'verify-logs')
+    writeRecord(logs, 'stamp-docs.log.run.json', 'feat/608-x')
+    mkdirSync(join(logs, 'stamp-dir.log.run.json'), { recursive: true })
+    const out = carryRunRecords({ branch: 'feat/608-x', cwd: root, mainRoot: root })
+    expect(out.copied).toEqual(['stamp-docs.log.run.json'])
+    // Without the guard the directory is READ, which throws EISDIR and would be
+    // counted as an unreadable record instead of being passed over entirely.
+    expect(out.failed).toBe(0)
+  })
+
+  // Astra, round 3: the destination listing answers NAMES, not records.
+  it('does not read a directory in the destination as a record it already kept', () => {
+    const { root, own } = scene()
+    const dest = join(root, 'local', 'verify-logs')
+    writeRecord(join(own, 'local', 'verify-logs'), 'stamp-docs.log.run.json', 'feat/608-x')
+    mkdirSync(join(dest, 'stamp-docs.log.run.json'), { recursive: true })
+    const out = carryRunRecords({ branch: 'feat/608-x', cwd: root, mainRoot: root })
+    // Nothing was kept — and the landing SAYS so, instead of printing the
+    // ordinary green while the cleanup removes the only real copy.
+    expect(out.copied).toEqual([])
+    expect(out.failed).toBe(1)
+  })
+
+  // Astra, round 4: a predicate with a side effect charged ONE unreachable
+  // record twice — once for the stat that could not judge it, once for the copy
+  // that then failed on the same entry.
+  it('counts an unreachable destination entry exactly once', () => {
+    const { root, own } = scene()
+    const dest = join(root, 'local', 'verify-logs')
+    writeRecord(join(own, 'local', 'verify-logs'), 'stamp-docs.log.run.json', 'feat/608-x')
+    mkdirSync(dest, { recursive: true })
+    writeFileSync(join(dest, 'stamp-docs.log.run.json'), 'THE COMPLETE ONE')
+    // Readable but not searchable: readdir answers, every lstat of a child does not.
+    chmodSync(dest, 0o600)
+    try {
+      const out = carryRunRecords({ branch: 'feat/608-x', cwd: root, mainRoot: root })
+      expect(out.copied).toEqual([])
+      expect(out.failed).toBe(1)
+    } finally {
+      chmodSync(dest, 0o700)
+    }
+    expect(readFileSync(join(dest, 'stamp-docs.log.run.json'), 'utf8')).toBe('THE COMPLETE ONE')
+  })
+
+  // Astra, confirming pass 1/3: an unreadable SOURCE is not "nothing to carry".
+  it('counts a discovery that failed, and not a logs directory that is simply absent', () => {
+    const { root, own } = scene()
+    const logs = join(own, 'local', 'verify-logs')
+    writeRecord(logs, 'stamp-docs.log.run.json', 'feat/608-x')
+    chmodSync(logs, 0o300)
+    try {
+      const blind = carryRunRecords({ branch: 'feat/608-x', cwd: root, mainRoot: root })
+      expect(blind.copied).toEqual([])
+      expect(blind.failed).toBe(1)
+    } finally {
+      chmodSync(logs, 0o700)
+    }
+    // …while a tree that simply never ran a suite stays a quiet, honest zero.
+    const quiet = carryRunRecords({ branch: 'feat/590-y', cwd: root, mainRoot: root })
+    expect(quiet.copied).toEqual([])
+    expect(quiet.failed).toBe(0)
   })
 })
