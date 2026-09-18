@@ -789,6 +789,38 @@ put it is the mistake this line exists to stop.
   that /v0.3/ and /poc/ serve the new state, and FREEZE the tag: it is never
   re-pointed.
 
+- [ ] 1156. Two voices at once now clip the master, and nothing in the graph absorbs it.
+  MEASURED STATE (18.09.2026, on point 1155's branch): the graph test's conservative worst
+  case — two close child `talk` voices, the whole ambience floor and a footstep coincided on
+  one sample — is 1.336 of full scale with the debug drum bed and 1.242 without it
+  (`src/systems/ambience.test.ts`, "measures headroom for 2 close child 'talk' voices"),
+  that is 2.52 dB and 1.88 dB OVER. It was 0.977 before point 1155 raised the village speech
+  to 1.5x on the user's instruction of 18.09.2026, 07:50; the instruction stands and is not
+  what is in question here. The graph has no limiter: `buildGraph()` hangs the ambient,
+  footstep and speech buses straight on a `master` at 0.5 and that on `ctx.destination`
+  (`src/systems/ambience.ts` L477-L492), so the overage is a hard clip at the destination.
+  design.md carries no mix-headroom or limiter concept at all — grep finds none in §19/§20 —
+  so this is a MISSING DESIGN CONCEPT, not a forgotten implementation.
+  Final state:
+  - The village mix cannot exceed full scale, and the way it cannot is written into
+    design.md §19 first: what the limiter is, where it sits, and what it may cost the
+    transients of a footstep and a drum strike.
+  - The user's factors are untouched. A limiter that quietly undoes the 1.5x on speech or
+    the 2.5x on the drum message is the wrong answer to this point.
+  - The graph test measures the worst case THROUGH the new stage and asserts it under full
+    scale again, and the 2.52 dB / 1.88 dB figures above are named as what it had to absorb.
+  Test: Vitest over the audio graph — the worst-case sum through the limiter is under full
+  scale, and a single close voice is NOT audibly pulled down by it (the limiter must not
+  become a loudness change in disguise). A listening pass is the user's.
+  There is nothing to see, so no picture check is required.
+  Criticality: medium — reproducible player impact (audible distortion whenever two
+  villagers speak close by at once), but only in the coincidence case; one voice at 0.932
+  still clears.
+  Refs: src/systems/ambience.ts (buildGraph L477-L492), src/systems/ambience.test.ts
+  ("measures headroom for 2 close child voices"), src/config/balance.ts
+  (communication.speechVolume, communication.drumMessagePeak), design.md §19
+  Bundle: Kommunikation.
+
 - [ ] 1150. The doctor's quarantine takes the frames away from a RUNNING picture run
   (measured 18.09.2026, twice in one hour, 01:22 and 01:31). The covering WebGPU `polish`
   run for point 1147 was drawing (pid 661900, its own record says `cleanAtStart: true`, the

@@ -128,7 +128,7 @@ Füllstand empfiehlt ein leeres Modell.
 ## Automatische Tests — und ihre Tiefe abstufen
 
 Automatische Tests sind das Rückgrat; ohne sie ist „Vibe Coding" ein Blindflug. Nicht jede
-Änderung braucht die volle Batterie — sonst wird Testen umgangen. **Abgestufte Umfänge**:
+Änderung braucht alles — sonst wird Testen umgangen. **Abgestufte Umfänge**:
 
 - **Schnell (nach JEDER Änderung):** die Unit-Schicht ohne Browser — Logik und Zustand.
   Sekunden, und kein Browser-Timing kann sie flackern lassen.
@@ -213,7 +213,9 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   Messung danebensteht, erklärt sie gesunde Arbeit für tot.
   → *Prompt:* „Laufzeiten und Kosten nur **gemessen**; jede Schwelle rechnet mit der
   **Messung**. Und ein Werkzeug **verweigert**, was es nicht bedienen kann, statt ein
-  ‚in Ordnung' zu erfinden."
+  ‚in Ordnung' zu erfinden. Reißt **meine** Zahl eine Schranke: nenn den
+  Messwert und **was ihn auffängt** — dreh sie nie still zurück, nicht
+  getarnt als Bremse."
 
 - **Das Kontingent ist die Grenze, nicht die Zeit.** Der Verbrauch hängt an der Kontextgröße,
   nicht an den Stunden.
@@ -514,9 +516,9 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   Rückstand beim Abtragen: Wer ihn behebt, fasst die Datei an und schuldet neu.
   → *Prompt:* „Binde jede Prüfpflicht an den **einzelnen Beitrag**, nie an einen offenen Zeitraum,
   und buch ein Veto gegen den **Befund**: trenne **gelesen** von bloß berührt, quittiere eine
-  Reparaturkette am **Endzustand** als einen Beitrag, mach neue Befunde derselben Datei zum eigenen Ticket. Eine
-  Verweigerung nennt ihren **Grund**, nie ihren Bestand; sieht eine Pflicht unerfüllbar aus,
-  prüf zuerst dein **Messgerät**."
+  Reparaturkette am **Endzustand** als einen Beitrag, mach neue Befunde derselben Datei zum eigenen
+  Ticket. Eine Verweigerung nennt ihren **Grund**, nie ihren Bestand; sieht eine Pflicht
+  unerfüllbar aus, prüf zuerst dein **Messgerät**."
 
 - **Zwei Prüfungen, die einander widersprechen — Gehorsam sieht aus wie ein Verstoß.** Die eine verlangt,
   freie Kapazität zu nutzen; die andere duldet keine Änderung, während sie läuft. Wer der ersten folgt,
@@ -535,8 +537,8 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 - **Die Anweisung hebt ihre eigene Voraussetzung auf.** Ein Ablauf verlangt, erst eine Markierung
   zu setzen und sie dann zu veröffentlichen — doch Veröffentlichen zählt als Arbeit, und Arbeit
-  löscht die Markierung. Dieselbe Falle als Sperre: Ihr Notausgang musste eine Datei schreiben —
-  genau das untersagte sie.
+  löscht die Markierung. Dieselbe Falle als Sperre: Ihr Notausgang musste schreiben — genau das
+  untersagte sie.
   → *Prompt:* „Spiel jede neue Durchsetzung als **wörtlichen Gehorsam** durch und probier ihren
   Notausgang **unter** der Sperre. Zerstört die Folge ihre Voraussetzung, oder setzt der Ausweg
   eine Fähigkeit voraus, die die Sperre entzieht? Nimmt deine **Ausnahme** nur die **Prüfung**
@@ -628,16 +630,13 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Bündle nur, wenn beide Hälften **plausibel im selben Lauf** grün werden; bleibt
   eine wiederholt rot, **trenne sie wieder** und liefere die fertige aus."
 
-- **Der Auftrag kam ohne Code zurück — und das war richtig.** Wenn das zweite Modell die
-  Aufgabe zurückweist, statt sie zu bauen, meldet euer Werkzeug einen Fehlschlag: nichts
-  committet, keine Tests grün. Genau dann lohnt das Lesen am meisten: oft steckt
-  dort ein Widerspruch in eurer Aufgabenstellung.
-  → *Prompt:* „Wenn die Aufgabe sich nicht widerspruchsfrei bauen lässt, **baue sie nicht** —
-  schreib mir auf, welche Annahme nicht trägt. Eine begründete Zurückweisung ist ein
-  Ergebnis, kein Fehlschlag."
-  Und **deine Nachbesserung ist selbst eine Aufgabenstellung**: Hier traf die zweite
-  Zurückweisung meine Antwort auf die erste.
-  → *Prompt:* Ergänze: „Lies meine **Nachbesserung** so kritisch wie die Aufgabe selbst."
+- **Der Auftrag kam ohne Code zurück — und das war richtig.** Weist das zweite Modell die
+  Aufgabe zurück, statt sie zu bauen, meldet euer Werkzeug Fehlschlag: nichts committet,
+  keine Tests grün. Genau dann lohnt das Lesen: oft steckt dort ein Widerspruch in eurer
+  Aufgabe — und **deine Nachbesserung ist selbst eine**.
+  → *Prompt:* „Lässt die Aufgabe sich nicht widerspruchsfrei bauen, **baue sie nicht** — schreib
+  auf, welche Annahme nicht trägt. Eine begründete Zurückweisung ist ein Ergebnis, kein
+  Fehlschlag. Lies meine **Nachbesserung** so kritisch wie die Aufgabe selbst."
 
 - **Deine Frage wird als Auftrag gelesen — die Rückfrage danach als Abbruchbefehl.** „Was ist da
   los?" wird zu „nimm das in Arbeit", „wieso machst du das?" zum Stoppsignal. Gesagt hast du
@@ -699,4 +698,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: eb9d4a780fdaf44f8fcc3d74bdcf19385a67842ef2fe05c0516686feee04dbbe -->
+<!-- GUIDE-FINGERPRINT: 2d163f8f5bb3cfd03e2dc60ef49411b7582885b817396faccb42be816ac2eef1 -->

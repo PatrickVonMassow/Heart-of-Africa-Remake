@@ -7556,3 +7556,40 @@ dann wird sie benutzt, und der Audit hat nichts mehr gemessen. Das gehört in de
 Satzbau wie 3.201: zwei Schranken, deren Bedingungen sich gegenseitig ausschließen, sind kein
 Sonderfall, sondern der Normalfall, sobald zwei Mechaniken denselben Zustand lesen. Beide
 Löcher sind als Anfragen im Findings-Träger eingereiht.
+
+### 3.287 Die gemessene Grenze wäre beinahe gegen die Anweisung des Nutzers verwendet worden
+
+Der Nutzer hat am 18.09.2026 um 07:50 zwei Zahlen angesagt: die Trommelbotschaft des
+Häuptlings soll 2,5 mal so laut sein, die Dorfsprache 1,5 mal. Beides sind reine
+Balance-Werte; die Umsetzung ist eine Handvoll Zeilen. Der Punkt selbst hat die Falle
+vorweggenommen und ausdrücklich verlangt, den Kopfraum **nachzumessen** statt ihn
+anzunehmen — und genau da lag die Versuchung.
+
+Die Messung: Der konservative Ungünstigstfall des Klanggraphen — zwei nahe Kinderstimmen,
+der ganze Umgebungsboden und ein Schritt auf demselben Sample, Sprache an der oberen
+Schranke der vier gerenderten Träger — stand vorher bei 0,977 der Vollaussteuerung. Mit dem
+1,5-fachen Sprachpegel steht er bei 1,336; ohne das Debug-Trommelbett, also im
+ausgelieferten Mix, bei 1,242. Das sind 2,52 beziehungsweise 1,88 dB **über** Vollaussteuerung.
+Der bestehende Test hatte genau dafür eine Zusage: `expect(output).toBeLessThan(1)`.
+
+Der bequeme Weg wäre gewesen, den Faktor auf etwa 1,2 zu setzen, die Zusage grün zu lassen
+und „erledigt" zu melden. Der Nutzer hätte nichts davon erfahren: Er hört keinen Unterschied
+zwischen 1,2 und 1,5 heraus, wenn ihm niemand sagt, dass 1,5 gar nicht eingebaut wurde. Der
+zweitbequeme Weg wäre gewesen, ungefragt einen Begrenzer in den Graphen zu hängen — das ist
+dasselbe Zurückdrehen unter anderem Namen, und es erfindet nebenbei ein System, das
+`design.md` überhaupt nicht kennt.
+
+Gemacht wurde stattdessen: Die Faktoren stehen exakt so, wie angesagt. Der Test nagelt die
+Überschreitung samt dB fest, statt sie zu verstecken; die `toBeLessThan(1)`-Zusage bleibt für
+den erreichbaren Einzelstimmen-Fall (0,932) bestehen. Der fehlende Begrenzer ist als eigener
+Punkt eingereiht — maschinell eingereiht, mittlere Kritikalität, also hinter dem Release-Punkt
+und nicht davor. Und die Entscheidung steht als Karte mit exakter Veto-Aktion auf dem Board,
+weil sie dem Nutzer gehört und nicht mir.
+
+**Lehre:** Wo eine Anweisung des Nutzers auf eine harte Schranke trifft, ist die Schranke
+die Nachricht, nicht der Korrekturfaktor. Eine gemessene Überschreitung wird mit ihrer Zahl
+gemeldet, und es wird benannt, was sie auffangen soll; fehlt das Auffangende im Entwurf, ist
+das ein eigener Punkt. Das ist der gefährlichere Zwilling von „geschätzt statt gemessen"
+(3.56): Dort fehlt die Messung, hier ist sie da — und wird gegen den Auftraggeber gewendet.
+Still kleiner drehen ist kein Kompromiss, sondern eine nicht ausgeführte Anweisung mit
+grünem Haken.
