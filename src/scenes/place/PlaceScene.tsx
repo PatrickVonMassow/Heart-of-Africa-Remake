@@ -128,7 +128,7 @@ import { phrasePlan } from '../../communication/speaking'
 import { speechLabelSeconds, type SpeechLabel } from '../../communication/speechLabel'
 import { drumMessagePlan } from '../../communication/drumMessage'
 import { playDrumMessage, playSpeech, playThunder } from '../../systems/ambience'
-import { releasePointerLock, requestPlacePointerLock, restorePointerLockAfterDialogs } from './pointerLock'
+import { createPlacePointerLock, releasePointerLock, restorePointerLockAfterDialogs } from './pointerLock'
 import { ActorLabels } from '../ActorLabels'
 import { markActor } from '../actorLabelSource'
 import { resolveMove, standingClear, PLAYER_RADIUS, CHIEF_BODY_RADIUS } from './collision'
@@ -2719,12 +2719,12 @@ export function PlaceScene() {
     ;(document.activeElement as HTMLElement | null)?.blur?.()
     // The rules of who owns the cursor — the overlay and dialog exceptions, and
     // the deliberate skip under browser automation — live in ./pointerLock.
-    const grab = () => requestPlacePointerLock(el)
+    const lock = createPlacePointerLock(el)
+    const grab = lock.request
     grab() // engage immediately on entry (activation from the walk-in keypress)
     const onClick = () => grab()
-    // Every dialog returns to steering on its closing click. If the browser
-    // refuses the request after Escape, the canvas click remains the fallback.
-    const offDialog = restorePointerLockAfterDialogs(el)
+    // Dialog-close and canvas clicks both retry once after an Escape refusal.
+    const offDialog = restorePointerLockAfterDialogs(el, grab)
     // The FIRST movement after the lock returns is dropped: the browser reports
     // the jump from wherever the cursor sat as a movement, and the view would
     // swing round the moment the dialog closes.
@@ -2765,6 +2765,7 @@ export function PlaceScene() {
       window.removeEventListener('mousemove', onMove)
       document.removeEventListener('pointerlockchange', onLockChange)
       offDialog()
+      lock.dispose()
       if (document.pointerLockElement === el) document.exitPointerLock()
     }
   }, [gl])
