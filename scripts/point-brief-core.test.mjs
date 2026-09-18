@@ -1000,14 +1000,51 @@ describe('the verification ladder', () => {
     expect(text).toMatch(/WHOLE suite/)
   })
 
-  it('binds the final proof to the merge candidate and to a reported git HEAD', () => {
-    const text = VERIFICATION_LADDER.join('\n')
-    expect(text).toMatch(/EXACTLY ONCE/)
+  // The ladder is a WRAPPED list of lines, so a rule's wording is pinned on the
+  // FLATTENED text: pinning a wrap point makes a re-wrap look like a deleted rule.
+  const flat = () => VERIFICATION_LADDER.join(' ').replace(/\s+/g, ' ')
+
+  it('binds the gate to the merge candidate and to a reported git HEAD', () => {
+    const text = flat()
+    expect(text).toMatch(/THE GATE RUNS ON THE EXACT MERGE CANDIDATE/)
     expect(text).toMatch(/Merge `main` INTO your/)
     expect(text).toMatch(/git rev-parse HEAD/)
+    // Point 1134: an older branch green does not survive a sync — every merge of
+    // main, every conflict resolution and every further change re-climbs the rung.
+    expect(text).toMatch(/AFTER EVERY merge of `main`/)
+    expect(text).toMatch(/an older branch green does not count/)
     // The shared final regression must not be read as licence to merge first and
     // photograph afterwards — that block-loop cost ~30 turns on 24.07.2026.
     expect(text).toMatch(/PICTURE proof stays ON THE BRANCH/)
+  })
+
+  it('finishes a feature point with the cheap gate plus the picture, never a LARGE (point 1134)', () => {
+    const text = flat()
+    // The gate is EXHAUSTIVE, so it is listed rather than gestured at: a reader
+    // who cannot tell what blocks the merge reaches for the run that covers all.
+    expect(text).toMatch(/CHEAP GATE PLUS THE PICTURE, NOT A LARGE/)
+    for (const rung of ['`tsc`', '`npm run lint`', '`npm run build`', '`npm run test:unit`', 'audit-check.mjs', '`--section` rung', 'two-backend PICTURE']) {
+      expect(text, rung).toContain(rung)
+    }
+    expect(text).toMatch(/Only that gate blocks the merge/)
+    // The whole set moves to the BUNDLE — on main, after the last merge, in no
+    // second tree (CLAUDE.md §2 forbids the workflow abstraction an integration
+    // tree would be).
+    expect(text).toMatch(/BUNDLE's gate: it runs ONCE per bundle, on `main`, after the last merge/)
+    expect(text).toMatch(/never once per feature, and never in a second tree/)
+    // The picture never travels with it.
+    expect(text).toMatch(/never shared, bundled, moved into the bundle run/)
+  })
+
+  it('carries the measurement AND its limits, so the rule can be falsified', () => {
+    const text = flat()
+    expect(text).toMatch(/40 merged `feat\/` branches, 103 recorded runs, 49 of them red/)
+    // A number without its limit is how one window's reading outlives it: the
+    // sample caveat and the counter-evidence travel in the same rung.
+    expect(text).toMatch(/103 runs are not an independent sample/)
+    expect(text).toMatch(/49 red runs are not 49 defects/)
+    expect(text).toMatch(/1065 and 1131/)
+    expect(text).toMatch(/falls back to per-feature the moment ONE clean case appears/)
   })
 
   it('states that a red is a red, with no cosmetic class to wave one through', () => {

@@ -870,10 +870,30 @@ export function isRenderPoint(spec) {
  * it does NOT prove, why the whole-suite/both-backend picture proof is stated in
  * the same breath, and why "a red is a red" stands here rather than a
  * critical-versus-cosmetic class nobody could apply honestly.
+ *
+ * WHERE THE WHOLE SET IS OWED (point 1134, user order 15.09.2026). The ladder
+ * used to end at "the full proof runs once, on the merge candidate", which read
+ * as a LARGE per feature. It is not: a `feat/` point is finished by the cheap
+ * gate plus its two-backend picture, and the both-backend LARGE is the BUNDLE's
+ * gate, run once on `main` after the last merge. The measurement that bought
+ * that — and its limits — is carried in the rung itself rather than left in the
+ * work order, because whoever reads the rule has to be able to falsify it.
  */
 export const VERIFICATION_LADDER = [
   'THE VERIFICATION LADDER — THIS POINT CAN MOVE THE PICTURE (point 595). Climb it; do not',
   'start at the top:',
+  '- WHAT FINISHES A `feat/` POINT IS THE CHEAP GATE PLUS THE PICTURE, NOT A LARGE (point 1134,',
+  '  user order 15.09.2026). The gate is binding and this list is EXHAUSTIVE: `tsc`, `npm run',
+  '  lint`, `npm run build`, `npm run test:unit`, `node scripts/audit-check.mjs` on a LOCKFILE',
+  '  change, the point\'s OWN `--section` rung, and the two-backend PICTURE judgement. Only that',
+  '  gate blocks the merge. The both-backend LARGE is the BUNDLE\'s gate: it runs ONCE per bundle,',
+  '  on `main`, after the last merge — never once per feature, and never in a second tree.',
+  '  MEASURED 01.09.-15.09.2026: 40 merged `feat/` branches, 103 recorded runs, 49 of them red,',
+  '  and NOT ONE case of a feature breaking standing functionality that only the full regression',
+  '  found; the single escape onto `main` was a type error caught by `tsc`, the cheapest gate',
+  '  there is. THE LIMIT TRAVELS WITH THE RULE: that is ONE window, 103 runs are not an',
+  '  independent sample, 49 red runs are not 49 defects, and points 1065 and 1131 ride along as',
+  '  counter-evidence. It falls back to per-feature the moment ONE clean case appears.',
   '- EVERY RUNG HAS A PRICE, AND IT IS PRINTED. `node scripts/verify/run-wait.mjs --plan',
   '  <tier|suite>` answers before you start: the planned expectation from the July per-suite',
   '  medians, and under it the MEASURED band the same shape of run really fell in',
@@ -893,25 +913,28 @@ export const VERIFICATION_LADDER = [
   '  2. then the ONE suite that covers the change — `npm test -- <suite>`; MEASURED for `polish`:',
   '     9.9-61.5 min, median 55.2 over 6 runs — about NINETEEN times the section rung on the',
   '     medians, for the same localised finding.',
-  '  3. the whole set only for the final proof — MEASURED 115.3-120.9 min, both backends.',
+  '  3. the whole set is the BUNDLE run, never this point\'s gate — MEASURED 115.3-120.9 min,',
+  '     both backends.',
   '  The unit layer has the SAME ladder, not a second rule: a path filter',
   '  (`npx vitest run <path>`), `vitest --changed` and `tsc --incremental` are legal while you',
   '  are repairing.',
   '  An iteration run is never CREDITED as coverage, so let an expensive suite STOP at its',
-  '  first failure while you iterate; run it to completion only for the final proof.',
+  '  first failure while you iterate; run it to completion only for the bundle run.',
   '- AN INCREMENTAL GREEN IS NEVER AN ACCEPTANCE. A `--section` run is recorded PARTIAL and',
   '  `runVerdict` refuses it as coverage whatever its exit code; a path-filtered unit run',
-  '  proves that path and nothing around it. The proof is the FULL fast gate (`npm run build`,',
-  '  `npm run lint`, `npm run test:unit`) plus the WHOLE suite, unfiltered.',
-  '- THE FULL PROOF RUNS EXACTLY ONCE, ON THE EXACT MERGE CANDIDATE. Merge `main` INTO your',
-  '  branch FIRST, then verify that tree — the one that will land — and REPORT the `git HEAD`',
-  '  you verified (`git rev-parse HEAD`), which is the evidence that the verified tree is the',
-  '  merged one. Verifying before the sync proves a tree nobody merges; merging FIRST and',
-  '  verifying afterwards cost ~30 turns of a block-loop on 24.07.2026, so the both-backend',
-  '  PICTURE proof stays ON THE BRANCH, before the merge — a shared final regression over',
-  '  several finished branches may replace the repeated REGRESSION, never that picture.',
+  '  proves that path and nothing around it. What the POINT owes is the cheap gate above; what',
+  '  the BUNDLE owes is the WHOLE suite set, unfiltered, on both backends.',
+  '- THE GATE RUNS ON THE EXACT MERGE CANDIDATE. Merge `main` INTO your branch FIRST, then gate',
+  '  that tree — the one that will land — and REPORT the `git HEAD` you gated',
+  '  (`git rev-parse HEAD`), which is the evidence that the gated tree is the merged one.',
+  '  AFTER EVERY merge of `main`, every conflict resolution and every further change the',
+  '  affected rung is climbed AGAIN and `tsc` runs on the ACTUALLY merged state; an older',
+  '  branch green does not count. Verifying before the sync proves a tree nobody merges; and',
+  '  merging FIRST and photographing afterwards cost ~30 turns of a block-loop on 24.07.2026,',
+  '  so the both-backend PICTURE proof stays ON THE BRANCH, before the merge, PER POINT —',
+  '  never shared, bundled, moved into the bundle run or replaced by a bundle picture.',
   '- A RED REPEATS ONLY ITS OWN RUNG (point 1126, user 14.09.2026). A failing check PRINTS the',
-  '  block that re-runs it, so repair happens THERE and the full proof still runs exactly once.',
+  '  block that re-runs it, so repair happens THERE and the bundle run still runs exactly once.',
   '  Restarting the whole proof after a red cost 599 minutes of machine time on 14.09.2026 for',
   '  one point. The ladder refuses it now: a whole pass whose last whole run went red is blocked',
   '  until the blocks that run named are green again — `--no-ladder "<why>"` where the block',
