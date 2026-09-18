@@ -71,6 +71,18 @@ describe('the jar assertion once its subject is created rather than hoped for', 
     expect(failures).toBe(errands === 0 ? 1 : 0)
   })
 
+  it.each([0, 1])('withholds a POSITIVE reading below the minimum too (%i errand(s))', (errands) => {
+    // The below-minimum cases above all carry a failing reading, so a
+    // regression that only suppressed REDS while still emitting a green for a
+    // positive reading under the minimum would have passed them (GPT-6 Astra,
+    // cross-vendor round). An undercovered pass is the more dangerous half: it
+    // is the twelve green climbs of 09.09.2026 in miniature.
+    const { out, notCovering } = observe({ errands, dug: 9, carriedEmpty: 9, carriedFull: 9 })
+    expect(allChecks(out).map((c) => c.name)).not.toContain(JAR)
+    expect(out).toMatch(/^NOT-COVERING {2}/m)
+    expect(notCovering.map((n) => n.check)).toEqual([JAR])
+  })
+
   it('fails loudly when the deliberate casting sent nobody at all', () => {
     const { out } = observe({ errands: 0 })
     expect(failedChecks(out).map((c) => c.name)).toEqual([CAST])
