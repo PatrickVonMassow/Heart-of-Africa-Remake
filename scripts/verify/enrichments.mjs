@@ -1132,6 +1132,13 @@ if (section('hud-bottom-row')) {
     { name: 'default', width: 1440, height: 900 },
     { name: 'narrow', width: 900, height: 700 },
   ]
+  // The hint exists only IN a settlement (design.md §17.5 drives the bird's-eye
+  // view with the cursor), so the section brings its own one — point 566.
+  await page.evaluate(() => window.__game.getState().enterPlace('cairo'))
+  await page
+    .waitForFunction(() => window.__game.getState().placeId === 'cairo' && !!window.__placeLayout, null, { timeout: 30000 })
+    .catch(() => {})
+  await page.waitForTimeout(500)
   await page.evaluate(() => {
     const g = window.__game
     window.__hint1160 = {
@@ -1162,8 +1169,13 @@ if (section('hud-bottom-row')) {
       // The hint reads `navigator.webdriver` at RENDER time, so the mask only
       // shows once React renders again: the touch flag it subscribes to is
       // toggled and put straight back.
+      // Two setStates in one tick collapse into one render whose snapshot never
+      // changed, and React then bails out — the mask would never be read. Each
+      // half therefore gets its own frame.
       useUi.setState({ touchActive: true })
+      await new Promise((r) => requestAnimationFrame(r))
       useUi.setState({ touchActive: false })
+      await new Promise((r) => requestAnimationFrame(r))
       // Poll on the rendered state, not on a fixed wait (point 249): the bar
       // re-renders and its ResizeObserver republishes the height, and the
       // hint's own placement observer answers one layout later.
@@ -1177,7 +1189,15 @@ if (section('hud-bottom-row')) {
         await sleep(100)
       }
       if (!bar || !slots.length) return { why: `no inventory bar (${slots.length}/${want} slots)` }
-      if (!hint) return { why: 'the steering hint did not render under the mask' }
+      if (!hint) {
+        // Name the condition that kept it away instead of only its absence.
+        return {
+          why: 'the steering hint did not render',
+          mode: window.__game.getState().mode,
+          webdriver: navigator.webdriver,
+          touchActive: useUi.getState().touchActive,
+        }
+      }
       await sleep(150) // let the placement observer settle on these rectangles
       const row = document.querySelector('.hud-bottom-row')
       const b = bar.getBoundingClientRect()
