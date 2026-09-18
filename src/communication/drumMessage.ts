@@ -73,8 +73,10 @@ export function chiefMessagePhrase(lect?: LectId): Phrase {
  */
 export function drumMessagePlan(options: SpeechOptions = {}, lect?: LectId): DrumMessagePlan {
   // Speech shares the timing, but its measured vowel/panner headroom must not
-  // recalibrate the message drums. Preserve their original envelope level.
-  const peak = 1.8 * Math.max(0, options.volume ?? balance.ambienceVolume)
+  // recalibrate the message drums: the message carries its OWN calibratable
+  // level (`balance.communication.drumMessagePeak`).
+  const peak = balance.communication.drumMessagePeak *
+    Math.max(0, options.volume ?? balance.ambienceVolume)
   const atoms = chiefMessagePhrase(lect)
   const plan = phrasePlan(atoms, 0, options)
   const perAtom = atoms.map((atom) => tonesOf(atom).length)

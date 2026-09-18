@@ -86,7 +86,10 @@ const SYLLABLE_DUTY = 0.62
  * Speech volume and hearing falloff are the calibratable loudness controls.
  */
 // Re-measured with 210/352.8 Hz children and width 0.6: the former 1.8
-// exceeded full scale (1.780 conservative mixed peak); 0.85 leaves 0.977.
+// exceeded full scale (1.780 conservative mixed peak); 0.85 left 0.977.
+// Since the speech bus went to 3 on 18.09.2026 that same conservative peak is
+// 1.336 again — over full scale, and point 1156 carries the missing limiter.
+// Lowering THIS constant is not the fix: it would undo the user's 1.5x.
 const SPEECH_PEAK = 0.85
 
 /**
