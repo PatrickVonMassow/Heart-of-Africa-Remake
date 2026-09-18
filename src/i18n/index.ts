@@ -5,13 +5,9 @@
 
 import { create } from 'zustand'
 import type { Strings } from './types'
-import { de } from './de'
-import { en } from './en'
+import { DICTIONARIES, type Lang } from './dictionaries'
 
-export type Lang = 'de' | 'en'
-
-export const DICTIONARIES: Record<Lang, Strings> = { de, en }
-export const LANGUAGES = Object.keys(DICTIONARIES) as Lang[]
+export { DICTIONARIES, LANGUAGES, type Lang } from './dictionaries'
 
 interface LocaleState {
   lang: Lang
