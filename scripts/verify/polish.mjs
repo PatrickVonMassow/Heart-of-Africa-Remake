@@ -6425,9 +6425,21 @@ if (section('adult-errands')) {
         `${forward} of ${moved} moving patches went downstream, ${backward} against it`,
       )
 
-      // Stand at the bank looking out over the water, and photograph the patch
-      // of foam nearest the spot — so the frame's subject IS the thing that
-      // showed the direction.
+      // Stand at the bank looking out over the water, and photograph a patch of
+      // foam the standpoint can actually SEE — so the frame's subject IS the
+      // thing that showed the direction.
+      //
+      // NEAR IS NOT THE SAME AS IN FRONT (red of 18.09.2026, twice on WebGPU:
+      // "its subject is not in the rendered picture: off the right edge of the
+      // frame"). The flecks lie in a long band ALONG the river, and the waterline
+      // is over 28 m out, so the fleck nearest the bank spot can sit far
+      // downstream — well outside any field of view, while the camera keeps
+      // looking straight out along the bank normal. Which fleck drifts nearest at
+      // the shutter is chance, which is why this passed for weeks and then failed.
+      // Choose by what the camera is pointed at instead: in front of the
+      // standpoint, within the half-angle a frame holds with room to spare, and
+      // among those the closest one. The camera pose is left exactly as it was —
+      // the seam reading below stands at this same spot and must not move.
       const aim = await page.evaluate((r) => {
         const p = window.__placePlayer
         p.x = r.bank.x - r.normal.x * 1.4
@@ -6435,12 +6447,24 @@ if (section('adult-errands')) {
         p.yaw = Math.atan2(-r.normal.x, -r.normal.z)
         p.pitch = -0.16
         const flecks = window.__placeRiver().flecks
+        const forwardX = -r.normal.x
+        const forwardZ = -r.normal.z
         let best = null
-        let bestD = Infinity
+        let bestScore = Infinity
         for (const f of flecks) {
-          const d = Math.hypot(f.x - r.bank.x, f.z - r.bank.z)
-          if (d < bestD) {
-            bestD = d
+          const dx = f.x - p.x
+          const dz = f.z - p.z
+          const ahead = dx * forwardX + dz * forwardZ
+          if (ahead <= 0) continue
+          const aside = Math.abs(dx * -forwardZ + dz * forwardX)
+          // tan(24°) — comfortably inside the horizontal half-FOV, so the shutter
+          // is never asked to hold a subject at the very rim of the picture.
+          if (aside > ahead * 0.45) continue
+          // Sideways offset decides, distance breaks the tie: a patch dead ahead
+          // 200 m downstream reads as water, not as the foam at this bank.
+          const score = aside + Math.hypot(dx, dz) * 0.05
+          if (score < bestScore) {
+            bestScore = score
             best = f
           }
         }
