@@ -39,7 +39,8 @@ describe('recovering a refused settlement lock', () => {
   }
 
   it.each(['promise', 'event', 'throw'])('retries a %s refusal only once after 1.1 seconds', async (signal) => {
-    const request = vi.fn(() => {
+    // The event-only API returns void in older browsers, unlike the DOM typings.
+    const request = vi.fn().mockImplementation(() => {
       if (signal === 'promise') return Promise.reject(new Error('Escape cooldown'))
       if (signal === 'throw') throw new Error('Escape cooldown')
     })
