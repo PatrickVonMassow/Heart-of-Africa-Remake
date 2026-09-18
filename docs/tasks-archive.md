@@ -29640,3 +29640,27 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Criticality: high — it is not the point's own work that is lost but a commissioned agent's,
   and the loss is silent: the log's last line claims the run continues.
   Bundle: Session- & Repo-Hygiene.
+
+- [x] 1146. The steering hints "Click the view to steer" and "Esc: cursor" move down to
+  the height of the inventory bar (user 17.09.2026, 20:51).
+  Today the pill `.cursor-mode-hint` (`src/index.css` ~L473) sits centred at `bottom: 108px`,
+  well above the inventory bar, which is anchored at `bottom: 12px` on the left
+  (`.inventory-bar`, ~L187). The user wants the hint lower, on the same height as the
+  inventory. TARGET: the hint's vertical band coincides with the inventory bar's band —
+  same bottom edge, its own horizontal place beside the bar, never overlapping a slot.
+  THE MULTI-LINE CASE IS PART OF THE POINT: the bar wraps (`flex-wrap: wrap`,
+  `max-width: 60vw`) once enough slots are carried — reachable in play by buying up to
+  `inventoryCapacity` (20) items in the port — and the hint must then align with the
+  two-line bar (its bottom edge on the bar's bottom, and still outside the bar's box), not
+  stay where a one-line bar would end. Decide the alignment by the rendered rectangles of
+  both elements, not by a constant: measure `.inventory-bar` and `.cursor-mode-hint`
+  bounding boxes with one slot, and again with the bar wrapped, at the default viewport and
+  a narrow one (both backends where a picture is taken). Both language strings stay as they
+  are. Evidence note: `Hud.tsx` ~L216 hides the hint under `navigator.webdriver`, so a
+  Playwright frame cannot show it; the OPEN comment there records that its placement is
+  judged by CSS reading. Measure the rectangles on the right layer (Vitest/jsdom cannot lay
+  out; a browser test needs the hint visible — choose the smallest honest path, and record
+  what was measured). No new guard, ledger field or abstraction.
+  Criticality: medium — a player-visible layout defect, no data or progress at risk.
+  Position: directly before 1082, by the user's order (17.09.2026, 20:51).
+  Bundle: Steuerung & Performance.
