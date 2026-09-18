@@ -212,6 +212,13 @@ function CursorModeHint() {
     sync()
     return () => document.removeEventListener('pointerlockchange', sync)
   }, [])
+  // Match the settlement's deliberate skip of the OS lock under automation, and
+  // stay silent on touch, where there is no cursor to take and "click the view"
+  // names nothing the player has (§17.5 drives the settlement by the overlay).
+  // Read BEFORE the placement effect, which has to re-attach the moment the hint
+  // appears: an effect watching the strings alone kept the early return of the
+  // render in which there was no element yet, and then never measured at all.
+  const shown = mode === 'place' && !navigator.webdriver && !touchActive
   useLayoutEffect(() => {
     const el = hintRef.current
     const row = el?.parentElement
@@ -242,15 +249,12 @@ function CursorModeHint() {
       ro.disconnect()
       window.removeEventListener('resize', measure)
     }
-  }, [t])
-  // Match the settlement's deliberate skip of the OS lock under automation, and
-  // stay silent on touch, where there is no cursor to take and "click the view"
-  // names nothing the player has (§17.5 drives the settlement by the overlay).
+  }, [t, shown, locked])
   // OPEN: hiding it under automation — which design.md §21/the point both ask
   // for, since the lock never engages there and every settlement frame would
   // otherwise gain a permanent "click the view" pill — leaves this hint with no
   // picture evidence on either backend. Its placement is judged by CSS reading.
-  if (mode !== 'place' || navigator.webdriver || touchActive) return null
+  if (!shown) return null
   const classes = ['cursor-mode-hint', `cursor-mode-${placement.mode}`]
   if (locked) classes.push('cursor-mode-locked')
   return <div
