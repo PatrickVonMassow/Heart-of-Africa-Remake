@@ -161,15 +161,20 @@ export function listNonPredictive(source) {
  */
 export function coverageVerdict(coverage) {
   if (coverage === null || coverage === undefined) return null
-  const seen = Number(coverage.subjects)
-  const minimum = Number(coverage.minimum)
-  if (!Number.isInteger(seen) || seen < 0) {
+  // THE TYPE IS CHECKED BEFORE ANY CONVERSION (GPT-6 Astra, cross-vendor round).
+  // `Number()` coerces before it validates: `true` becomes 1 and `null` becomes
+  // 0, so a malformed declaration would have MANUFACTURED a count — one subject
+  // against a minimum of one, reported as covering — which is precisely the
+  // silent non-measurement this whole mechanism exists to refuse.
+  const seen = coverage.subjects
+  const minimum = coverage.minimum
+  if (typeof seen !== 'number' || !Number.isInteger(seen) || seen < 0) {
     throw new TypeError(`coverage needs a whole subject count, got ${JSON.stringify(coverage.subjects)}`)
   }
-  if (!Number.isInteger(minimum) || minimum < 1) {
+  if (typeof minimum !== 'number' || !Number.isInteger(minimum) || minimum < 1) {
     throw new TypeError(`coverage needs a named minimum of at least 1, got ${JSON.stringify(coverage.minimum)}`)
   }
-  const what = String(coverage.what ?? '').trim()
+  const what = typeof coverage.what === 'string' ? coverage.what.trim() : ''
   if (what === '') throw new TypeError('coverage needs to NAME what it counted, e.g. { what: "water errands" }')
   return { seen, minimum, what, covering: seen >= minimum }
 }

@@ -344,6 +344,19 @@ describe('a check that says how many subjects it actually saw (point 1136)', () 
     expect(() => coverageVerdict({ subjects: 3, minimum: 2, what: '  ' })).toThrow(/NAME what it counted/)
   })
 
+  it('never CONVERTS a malformed count into a valid one', () => {
+    // `Number(true)` is 1 and `Number(null)` is 0, so coercing before validating
+    // manufactured a covering claim out of a broken declaration — one subject
+    // against a minimum of one (GPT-6 Astra, cross-vendor round).
+    expect(() => coverageVerdict({ subjects: true, minimum: true, what: 'errands' })).toThrow(/whole subject count/)
+    expect(() => coverageVerdict({ subjects: null, minimum: 2, what: 'errands' })).toThrow(/whole subject count/)
+    expect(() => coverageVerdict({ subjects: [3], minimum: 2, what: 'errands' })).toThrow(/whole subject count/)
+    expect(() => coverageVerdict({ subjects: '3', minimum: 2, what: 'errands' })).toThrow(/whole subject count/)
+    expect(() => coverageVerdict({ subjects: 3, minimum: true, what: 'errands' })).toThrow(/named minimum/)
+    expect(() => coverageVerdict({ subjects: 3, minimum: '2', what: 'errands' })).toThrow(/named minimum/)
+    expect(() => coverageVerdict({ subjects: 3, minimum: 2, what: 7 })).toThrow(/NAME what it counted/)
+  })
+
   it('is NEITHER red nor green below the minimum, and says what it saw', () => {
     for (const ok of [true, false]) {
       const gate = gateWith()
