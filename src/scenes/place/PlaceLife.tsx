@@ -3082,7 +3082,7 @@ function ErrandVillagers({
           drawn: { squatY: g ? g.scale.y : null, handY, headAspect },
           carry: carryOf(work, i),
           work: task
-            ? { situation: task.situation, phase: task.phase, x: task.x, z: task.z, arrived: task.arrived }
+            ? { situation: task.situation, phase: task.phase, siteIndex: task.siteIndex, x: task.x, z: task.z, arrived: task.arrived }
             : null,
         }
       }),

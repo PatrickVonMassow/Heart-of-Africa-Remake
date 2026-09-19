@@ -5866,6 +5866,18 @@ if (section('adult-errands')) {
     const staged = {}
     const heard = {}
     let dug = 0
+    // THE STROKE BELONGS TO THE RIM (work-order 1125). The geometry is pinned in
+    // Vitest; what the live scene settles is that the village really carries it
+    // out — every body at the dig pose stands at its OWN pit's working rim, and
+    // a pair at one pit has the hole BETWEEN them rather than standing shoulder
+    // to shoulder over the same arc.
+    const rimLimit = await page.evaluate(() => {
+      const e = window.__balance.villageLife.adultErrands
+      return e.digStandDistance + e.digStandTolerance
+    })
+    const offRim = []
+    const sideBySide = []
+    let pairsSeen = 0
     let carriedEmpty = 0
     let carriedFull = 0
     let atWork = 0
@@ -5900,11 +5912,27 @@ if (section('adult-errands')) {
       for (const [id, n] of Object.entries(now.staged ?? {})) {
         staged[id] = Math.max(staged[id] ?? 0, n ?? 0)
       }
+      const atPit = new Map()
       for (const v of now.villagers) {
-        if (v.digging) dug++
+        if (v.digging) {
+          dug++
+          const site = v.work?.siteIndex == null ? null : now.geography.digSites[v.work.siteIndex]
+          const away = site ? Math.hypot(v.x - site.x, v.z - site.z) : null
+          if (away === null || away > rimLimit) {
+            offRim.push(`sample ${i}: a body at the dig pose ${away === null ? 'with no site' : `${away.toFixed(2)} m`} from its pit`)
+          }
+          if (site) atPit.set(v.work.siteIndex, [...(atPit.get(v.work.siteIndex) ?? []), v])
+        }
         if (v.carry === 'emptyJar') carriedEmpty++
         if (v.carry === 'fullJar') carriedFull++
         if (v.work) atWork++
+      }
+      for (const [siteIndex, pair] of atPit) {
+        if (pair.length !== 2) continue
+        pairsSeen++
+        const site = now.geography.digSites[siteIndex]
+        const middle = Math.hypot((pair[0].x + pair[1].x) / 2 - site.x, (pair[0].z + pair[1].z) / 2 - site.z)
+        if (middle > rimLimit) sideBySide.push(`sample ${i}: the two bodies' middle is ${middle.toFixed(2)} m off their pit`)
       }
       // AND NO ADULT VOICE EVER FALLS INSIDE THE CHILDREN'S EARSHOT (the spec's
       // own rule). The speaker is read WHERE HE STOOD WHEN HE SPOKE — only on
@@ -6003,6 +6031,16 @@ if (section('adult-errands')) {
       'a villager is seen digging (work-order 688)',
       dug > 0,
       `${dug} villager-samples at the dig pose`,
+    )
+    check(
+      'and every stroke falls at its own pit\u2019s working rim (work-order 1125)',
+      dug > 0 && offRim.length === 0,
+      offRim.length ? offRim.slice(0, 4).join('; ') : `${dug} villager-samples, none further than ${rimLimit.toFixed(2)} m from its pit`,
+    )
+    check(
+      'and a pair at one pit works it from opposite sides, the hole between them',
+      pairsSeen > 0 && sideBySide.length === 0,
+      sideBySide.length ? sideBySide.slice(0, 4).join('; ') : `${pairsSeen} samples of a full pair at one pit`,
     )
     check(
       'and the jar goes down EMPTY and comes back FULL',
@@ -6572,6 +6610,69 @@ if (section('adult-errands')) {
       })
     }
     await letThemWalk()
+
+    // --- The digging pair at its pit (work-order 1125) ------------------------
+    // The measurements above say WHERE the two stand; this is the one picture
+    // that says what the player sees of it. The pair is caught while both are
+    // really at the stroke, the settlement is held still only once the moment
+    // exists, and the lens is aimed at the hole they share.
+    const digging = await page
+      .waitForFunction(
+        () => {
+          const e = window.__placeErrands()
+          const pits = new Map()
+          for (const v of e.villagers) {
+            if (!v.digging || v.work?.siteIndex == null) continue
+            pits.set(v.work.siteIndex, [...(pits.get(v.work.siteIndex) ?? []), { x: v.x, z: v.z }])
+          }
+          for (const [siteIndex, pair] of pits) {
+            if (pair.length !== 2) continue
+            return { siteIndex, site: e.geography.digSites[siteIndex], pair }
+          }
+          return null
+        },
+        null,
+        { timeout: 40000 },
+      )
+      .then((h) => h.jsonValue())
+      .catch(() => null)
+    check('a full digging pair stands at one pit for the shutter (work-order 1125)', !!digging, JSON.stringify(digging))
+    if (digging) {
+      await holdStill()
+      // Far enough back and tilted down enough that the full-grown spoil mound
+      // beside the pit cannot stand in front of the two men.
+      const lens = await placeCamera(digging.site, 6.5, -0.26)
+      check(
+        'and the ground takes a lens with a clear line to their pit',
+        !!lens,
+        lens ? `bearing ${lens.bearing.toFixed(2)} rad` : 'all 12 bearings refused or blocked',
+      )
+      if (lens) {
+        await nextFrames(3)
+        // BOTH MEN ARE STILL AT THE HOLE AT THE SHUTTER. A pair whose bout ended
+        // between the aim and the exposure leaves a picture of bare earth, and
+        // the frame's own subject test cannot tell the difference.
+        const held = await page.evaluate((at) => {
+          const e = window.__placeErrands()
+          const still = e.villagers.filter((v) => v.digging && v.work?.siteIndex === at)
+          return {
+            count: still.length,
+            away: still.map((v) => Math.hypot(v.x - e.geography.digSites[at].x, v.z - e.geography.digSites[at].z)),
+            span: still.length === 2 ? Math.hypot(still[0].x - still[1].x, still[0].z - still[1].z) : null,
+          }
+        }, digging.siteIndex)
+        check(
+          'and both are still at the stroke, on opposite sides of the hole',
+          held.count === 2 && held.away.every((d) => d <= rimLimit) && held.span > rimLimit,
+          JSON.stringify(held),
+        )
+        await frame('1125-dig-pair-at-the-working-rim', {
+          local: { x: digging.site.x, y: 0.9, z: digging.site.z },
+          label: 'the two village adults digging one pit from opposite sides of its rim, the hole between them',
+        })
+      }
+      await letThemWalk()
+    }
 
     // --- The river itself (work-order 482) ------------------------------------
     // Two things only the live scene can settle: that the water is DRAWN in the
