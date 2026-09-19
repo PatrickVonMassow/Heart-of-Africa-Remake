@@ -123,7 +123,7 @@ function run(v: AdultWorkView, seconds: number, cfg = CFG): { state: AdultWorkSt
         carrier: ends[word.speaker]?.carrier ?? null,
         at: { x: v.villagers[word.speaker].x, z: v.villagers[word.speaker].z },
         phases: state.tasks.map((task) => task?.phase ?? null),
-        digging: state.tasks.map((_, i) => isDigging(state, i)),
+        digging: state.tasks.map((_, i) => isDigging(state, i, v)),
       })
     }
   }
@@ -540,8 +540,8 @@ describe('DIG is a summons said twice', () => {
     const atSite = stepAdultWork(state, v, utteranceSeconds(4) + balance.communication.consequenceSeconds, CFG, () => 0.5)
     expect(atSite).toMatchObject({ concept: 'DIG', speaker: initiator, purpose: 'site' })
     expect(atSite?.aim).toEqual({ x: site.x, y: 0, z: site.z })
-    expect(isDigging(state, initiator)).toBe(true)
-    expect(isDigging(state, partner)).toBe(true)
+    expect(isDigging(state, initiator, v)).toBe(true)
+    expect(isDigging(state, partner, v)).toBe(true)
   })
 
   it('keeps both real tools through the invitation, walk, and whole stroke', () => {
@@ -622,11 +622,11 @@ describe('DIG is a summons said twice', () => {
     audibleToChild = true
     expect(stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)).toBeNull()
     expect(taskOf(state, initiator)).toMatchObject({ phase: 'site', owes: true, hushed: true })
-    expect(isDigging(state, initiator)).toBe(false)
+    expect(isDigging(state, initiator, v)).toBe(false)
     audibleToChild = false
     expect(stepAdultWork(state, v, utteranceSeconds(4) + balance.communication.consequenceSeconds, CFG, () => 0.5)?.purpose).toBe('site')
-    expect(isDigging(state, initiator)).toBe(true)
-    expect(isDigging(state, partner)).toBe(true)
+    expect(isDigging(state, initiator, v)).toBe(true)
+    expect(isDigging(state, partner, v)).toBe(true)
   })
 
   it('holds the site word when a bystander enters the hole after staging', () => {
@@ -647,13 +647,109 @@ describe('DIG is a summons said twice', () => {
 
     expect(stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)).toBeNull()
     expect(taskOf(state, initiator)).toMatchObject({ phase: 'site', owes: true, hushed: true })
-    expect(isDigging(state, initiator)).toBe(false)
+    expect(isDigging(state, initiator, v)).toBe(false)
 
     v.villagers[bystander].x = 40
     v.villagers[bystander].z = 40
     expect(stepAdultWork(state, v, utteranceSeconds(4) + balance.communication.consequenceSeconds, CFG, () => 0.5)?.purpose).toBe('site')
-    expect(isDigging(state, initiator)).toBe(true)
-    expect(isDigging(state, partner)).toBe(true)
+    expect(isDigging(state, initiator, v)).toBe(true)
+    expect(isDigging(state, partner, v)).toBe(true)
+  })
+})
+
+describe('both diggers work the rim of their own site', () => {
+  const RIM_SLACK = balance.villageLife.adultErrands.digStandTolerance
+
+  function seeded(seed: number): () => number {
+    let s = (seed * 2654435761) >>> 0
+    return () => {
+      s = (Math.imul(s, 1664525) + 1013904223) >>> 0
+      return s / 0x100000000
+    }
+  }
+
+  /** A village of four adults and three sites, all shifted by the seed: the
+   *  defect of work-order 1125 was every bout, so the sweep has to see the
+   *  same answer at every layout it can reach. */
+  function scattered(rand: () => number): AdultWorkView {
+    const v = riverless(view(4, Array.from({ length: 4 }, () => ({ x: (rand() - 0.5) * 26, z: (rand() - 0.5) * 26 }))))
+    v.geography.digSites = [
+      { x: -11 + (rand() - 0.5) * 9, z: 2 + (rand() - 0.5) * 9, kind: 'pit' },
+      { x: -16 + (rand() - 0.5) * 9, z: -1 + (rand() - 0.5) * 9, kind: 'postHole' },
+      { x: -4 + (rand() - 0.5) * 9, z: -19 + (rand() - 0.5) * 9, kind: 'patch' },
+    ]
+    return v
+  }
+
+  it('holds every digging body inside its working rim across many seeds', () => {
+    let seen = 0
+    for (let seed = 1; seed <= 40; seed++) {
+      const rand = seeded(seed)
+      const v = scattered(rand)
+      const state = createAdultWork(v.villagers.length, CFG)
+      const dt = 1 / 60
+      for (let elapsed = 0; elapsed < 120; elapsed += dt) {
+        walkFrame(state, v, dt)
+        stepAdultWork(state, v, dt, CFG, rand)
+        for (let i = 0; i < v.villagers.length; i++) {
+          const task = taskOf(state, i)
+          if (!task || task.phase !== 'dig' || task.siteIndex === null) continue
+          const site = v.geography.digSites[task.siteIndex]
+          const away = Math.hypot(v.villagers[i].x - site.x, v.villagers[i].z - site.z)
+          expect(away).toBeLessThanOrEqual(DIG_RIM_DISTANCE + RIM_SLACK)
+          expect(isDigging(state, i, v)).toBe(true)
+          seen++
+        }
+      }
+    }
+    // The sweep is worthless if it never reached a bout.
+    expect(seen).toBeGreaterThan(1000)
+  })
+
+  it('stands the pair across the hole rather than shoulder to shoulder', () => {
+    for (let seed = 1; seed <= 40; seed++) {
+      const rand = seeded(seed)
+      const v = scattered(rand)
+      const state = createAdultWork(v.villagers.length, CFG)
+      const dt = 1 / 60
+      let checked = 0
+      for (let elapsed = 0; elapsed < 120 && checked === 0; elapsed += dt) {
+        walkFrame(state, v, dt)
+        stepAdultWork(state, v, dt, CFG, rand)
+        const first = state.tasks.findIndex((t) => t?.phase === 'dig' && t.role === 'initiator')
+        if (first < 0) continue
+        const mate = taskOf(state, first)!.partner!
+        const site = v.geography.digSites[taskOf(state, first)!.siteIndex!]
+        const one = v.villagers[first]
+        const other = v.villagers[mate]
+        // The hole is BETWEEN them: the midpoint of the two bodies is the site.
+        expect(Math.hypot((one.x + other.x) / 2 - site.x, (one.z + other.z) / 2 - site.z)).toBeLessThanOrEqual(RIM_SLACK)
+        expect(Math.hypot(one.x - other.x, one.z - other.z)).toBeGreaterThan(DIG_RIM_DISTANCE)
+        checked++
+      }
+      expect(checked).toBe(1)
+    }
+  })
+
+  it('lets a body that ended up away from its site stand idle instead of digging', () => {
+    const v = riverless(view(4))
+    const state = stageDig(v)
+    const initiator = initiatorOf(state)
+    const partner = taskOf(state, initiator)!.partner!
+    putAtGoal(state, v, initiator)
+    stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
+    putAtGoal(state, v, initiator)
+    putAtGoal(state, v, partner)
+    stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
+    stepAdultWork(state, v, utteranceSeconds(4) + balance.communication.consequenceSeconds, CFG, () => 0.5)
+    expect(isDigging(state, partner, v)).toBe(true)
+
+    // The old join stand, 2.4 m out: a full stroke there hoed unbroken ground.
+    const site = v.geography.digSites[taskOf(state, partner)!.siteIndex!]
+    v.villagers[partner].x = site.x + JOIN_STAND_OFF
+    v.villagers[partner].z = site.z
+    expect(isDigging(state, partner, v)).toBe(false)
+    expect(isDigging(state, initiator, v)).toBe(true)
   })
 })
 

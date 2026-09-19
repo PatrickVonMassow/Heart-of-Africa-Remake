@@ -2953,7 +2953,7 @@ function ErrandVillagers({
           pose.lean = dip.lean
           pose.turn = dip.turn
         }
-      } else if (isDigging(work, i)) {
+      } else if (isDigging(work, i, view)) {
         state.dug += dt
         const siteIndex = task?.siteIndex
         const site = siteIndex === null || siteIndex === undefined ? null : geography.digSites[siteIndex]
@@ -3072,7 +3072,7 @@ function ErrandVillagers({
           x: p.x,
           z: p.z,
           free: p.free,
-          digging: isDigging(work, i),
+          digging: isDigging(work, i, view),
           filling: forcedFill.current?.who === i
             ? forcedFill.current.progress
             : task && task.arrived && task.phase === 'fill'
@@ -3123,7 +3123,7 @@ function ErrandVillagers({
       delete w.__placeCastErrand
       delete w.__placeForceFill
     }
-  }, [work, people, geography])
+  }, [work, people, geography, view])
 
   return (
     <>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clearOfSpoil, digEarthFlight, DIG_ARRIVE_RADIUS, DIG_RIM_DISTANCE, digLocalToWorld, digStandingPlaces, placeGroundHeight, spoilCentre, spoilHeightAt, SPOIL_RADIUS_X } from './placeGround'
+import { atDigStand, clearOfSpoil, digEarthFlight, DIG_ARRIVE_RADIUS, DIG_RIM_DISTANCE, digLocalToWorld, digStandingPlaces, placeGroundHeight, spoilCentre, spoilHeightAt, SPOIL_RADIUS_X } from './placeGround'
 import type { DigSite } from './adultWork'
 import { looseRockTop } from './looseRocks'
 import { ROCK_RADIUS_UNITS } from '../../render/flora'
@@ -83,7 +83,9 @@ describe('the digging pair works from the rim', () => {
       const s = { x, z: 3, kind }
       const spots = digStandingPlaces(s, () => true)!
       expect(spots).not.toBeNull()
-      expect(Math.hypot(spots[0].x - spots[1].x, spots[0].z - spots[1].z)).toBeGreaterThan(1.3)
+      // Straight across the hole from each other wherever the ground allows
+      // (work-order 1125), which on open ground is every orientation.
+      expect(Math.hypot(spots[0].x - spots[1].x, spots[0].z - spots[1].z)).toBeCloseTo(DIG_RIM_DISTANCE * 2)
       for (const p of spots) {
         expect(Math.hypot(p.x - s.x, p.z - s.z)).toBeCloseTo(DIG_RIM_DISTANCE)
         for (let a = 0; a < 7; a += 0.2) {
@@ -117,6 +119,22 @@ it('throws earth onto the full-grown mound for both excavation sizes', () => {
 it('uses the layout-selected orientation for the heap and work positions', () => {
   const s = { ...site, rotation: 0 }
   expect(spoilCentre(s)).toEqual({ x: s.x + 1.65, z: s.z })
-  const pair = digStandingPlaces(s, () => true)!
-  expect(pair.every((p) => p.x < s.x)).toBe(true)
+  const [one, other] = digStandingPlaces(s, () => true)!
+  // The hole lies BETWEEN the two men (work-order 1125), and neither of them
+  // stands on the heap's side of it.
+  expect((one.x + other.x) / 2).toBeCloseTo(s.x)
+  expect((one.z + other.z) / 2).toBeCloseTo(s.z)
+  for (const p of [one, other]) {
+    expect(p.x).toBeLessThanOrEqual(s.x)
+    expect(clearOfSpoil(s, p.x, p.z)).toBe(true)
+  }
+})
+
+it('keeps a body at the rim on the stroke and one away from the site off it', () => {
+  const s = { ...site, rotation: 0 }
+  const [one] = digStandingPlaces(s, () => true)!
+  expect(atDigStand(s, one.x, one.z)).toBe(true)
+  // The old 2.4 m approach stand is NOT a dig stand (work-order 1125).
+  expect(atDigStand(s, s.x + 2.4, s.z)).toBe(false)
+  expect(atDigStand(s, s.x, s.z)).toBe(true)
 })

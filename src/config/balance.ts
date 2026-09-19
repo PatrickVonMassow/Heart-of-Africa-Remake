@@ -819,6 +819,13 @@ export interface BalanceConfig {
       dwellSeconds: number
       /** How long a bout of visible digging lasts. */
       digSeconds: number
+      /** Where a digger stands to work a site: metres from the site centre
+       *  (work-order 1125). Both members of a pair stand on this rim, on
+       *  opposite bearings, facing each other across the hole. */
+      digStandDistance: number
+      /** Slack on that stand before a body counts as away from the pit and
+       *  stops playing the stroke (work-order 1125). */
+      digStandTolerance: number
       /** Backstop: an errand never outlives this, however the walk goes. */
       errandSeconds: number
       /** Seconds of NO headway toward the target after which the errand is let
@@ -1527,6 +1534,16 @@ export const balance: BalanceConfig = {
       intervalSpread: 0.35,
       dwellSeconds: 6,
       digSeconds: 9, // several strokes of the digging motion, plainly readable
+      // THE WORKING RIM (work-order 1125), calibratable: the drawn mouth's
+      // broken ground reaches 1.01 m out (layout `DIG_SITE_RADIUS` 0.9 m, drawn
+      // to r x 1.12 in `DigSites`), and a hoe held in both hands adds about
+      // 0.64 m of reach. A man standing here has the blade in the hole and his
+      // own feet on unbroken ground.
+      digStandDistance: 1.65,
+      // Arrival slack (0.25 m) plus the shove of a body squeezing past, so a
+      // nudged digger keeps working instead of flickering between poses. It
+      // stays well inside the 2.4 m approach stand, which is NOT a dig stand.
+      digStandTolerance: 0.45,
       // Backstop only: a blocked walk lets go instead of pinning. It has to
       // OUTLAST the longest errand the catalogue can order, or the villager is
       // released halfway and the errand teaches nothing.
