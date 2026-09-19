@@ -5,7 +5,7 @@
 // third time as a literal in `layout.ts`. What the round needs is a stone that
 // can be STOOD on, at the size the renderer draws it.
 
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { balance } from '../../config/balance'
 import { ROCK_RADIUS_UNITS, ROCK_TOP_UNITS } from '../../render/flora'
 import {
@@ -209,5 +209,32 @@ describe('a stone is either ground or an obstacle', () => {
     const real: [number, number, number] = [9, 0, 1]
     const chosen = climbBoulder([...pebbles, real], QUARTER, balance.villageLife.bankGame.climbableRockTop)
     expect(chosen?.x).toBe(9)
+  })
+})
+
+// THE ORDERING GUARD RUNS ON THE PATH THE GAME TAKES (GPT-6 Astra, cross-vendor
+// review of ca89d72). Every shipped settlement hands `climbBoulder` a derived
+// stone, so a guard sitting behind that early return would fire in tests and
+// never in play.
+describe('the ordered-thresholds guard', () => {
+  const derived: [number, number, number] = [4, 4, CLIMB_ROCK_SCALE]
+
+  afterEach(() => {
+    balance.placeStepOverTop = 0.3
+    ;(window as unknown as { __assertLog?: unknown[] }).__assertLog = []
+  })
+
+  it('fires when the step height is raised past the climbable top, derived stone or not', () => {
+    const log = () => ((window as unknown as { __assertLog?: Array<{ code: string }> }).__assertLog ?? [])
+    ;(window as unknown as { __assertLog?: unknown[] }).__assertLog = []
+    balance.placeStepOverTop = balance.villageLife.bankGame.climbableRockTop + 0.1
+    climbBoulder([derived], QUARTER, balance.villageLife.bankGame.climbableRockTop, derived)
+    expect(log().some((e) => e.code === 'rock-thresholds-unordered')).toBe(true)
+  })
+
+  it('stays quiet at the shipped values', () => {
+    ;(window as unknown as { __assertLog?: unknown[] }).__assertLog = []
+    climbBoulder([derived], QUARTER, balance.villageLife.bankGame.climbableRockTop, derived)
+    expect(((window as unknown as { __assertLog?: Array<{ code: string }> }).__assertLog ?? []).length).toBe(0)
   })
 })

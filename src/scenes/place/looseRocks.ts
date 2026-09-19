@@ -93,20 +93,25 @@ export function climbBoulder(
   minTop: number,
   derived: readonly [number, number, number] | null = null,
 ): LooseRock | null {
-  // The derived stone wins outright: it is the tallest instance the scatter
-  // draws and it stands a few paces off the quarter, so no search can improve
-  // on it (work-order 1082).
-  if (derived) return looseRock(derived)
   // THE TWO CALIBRATED THRESHOLDS STAY ORDERED (work-order 1149): a stone the
   // walk rides over is not a stone a child climbs onto. Were the step height
   // ever raised past the climb floor, every candidate the search prefers would
   // already be ground. The two BALANCE values are what must stay ordered — the
   // floor handed in here may be anything a caller wants to measure with.
+  //
+  // CHECKED BEFORE THE DERIVED STONE IS HANDED BACK, not after: every shipped
+  // settlement carries a derived stone, so an assertion behind that return
+  // would never run in the game at all (GPT-6 Astra, cross-vendor review of
+  // ca89d72).
   devAssert(
     balance.placeStepOverTop < balance.villageLife.bankGame.climbableRockTop,
     'rock-thresholds-unordered',
     () => `step-over top ${balance.placeStepOverTop} m is not below the climbable top ${balance.villageLife.bankGame.climbableRockTop} m`,
   )
+  // The derived stone wins outright: it is the tallest instance the scatter
+  // draws and it stands a few paces off the quarter, so no search can improve
+  // on it (work-order 1082).
+  if (derived) return looseRock(derived)
   let nearestClimbable: LooseRock | null = null
   let nearest = Infinity
   let tallest: LooseRock | null = null
