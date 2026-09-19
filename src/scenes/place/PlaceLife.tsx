@@ -4,7 +4,7 @@
 // other and with the props: pairs stand in conversation, a fire tender stokes
 // the fire, food is fetched from the huts and cooked over it, grain is
 // pounded in a mortar, a drummer waits for the chief's message, and water is
-// carried from the well.
+// carried from the well where the village has one (point 1092).
 // Pure animation, no mechanics.
 
 import { usePlaceGround } from './PlaceGroundContext'
