@@ -13,7 +13,7 @@ it('draws the exact walking profile as work grows, at every vertex and site orie
       let peak = 0
       for (let i = 0; i < positions.count; i++) {
         const p = digLocalToWorld(site, positions.getX(i), positions.getZ(i))
-        const height = placeGroundHeight({ bank: null, sites: [site], progress: [progress] }, p.x, p.z)
+        const height = placeGroundHeight({ bank: null, sites: [site], progress: [progress], rocks: [] }, p.x, p.z)
         expect(positions.getY(i) - 0.004).toBeCloseTo(height, 6)
         peak = Math.max(peak, height)
       }

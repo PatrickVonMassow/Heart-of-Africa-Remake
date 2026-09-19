@@ -1448,6 +1448,10 @@ spawn-freedom helpers (`spawnPointFree`/`nudgeToFree`) are pure-tested
 (`src/scenes/place/collision.test.ts`) and every place's errand points
 sweep spawn-free across seeds (`src/scenes/place/layout.test.ts`); live,
 no walker stays pinned past the window (`scripts/verify/collision.mjs`);
+a stone below the step height holds no collider and raises the walking surface
+instead, with the live camera riding up onto one and back down
+(`scripts/verify/polish.mjs` section `stone-step`,
+`verification/1149-village-stone-step.png`);
 the application runs without console errors (`scripts/verify/collision.mjs`).
 
 The swept move and the fence panels (point 413) are pinned in the fast layer.

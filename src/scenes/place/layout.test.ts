@@ -1,5 +1,5 @@
 import { digFurnitureFootprints } from './digSiteAppearance'
-import { digLocalToWorld, digStandingPlaces, spoilCentre, SPOIL_RADIUS_X } from './placeGround'
+import { digLocalToWorld, digStandingPlaces, placeGroundHeight, spoilCentre, SPOIL_RADIUS_X } from './placeGround'
 // Pure layout invariants (design.md §2.6/§4.5, point 15): ports grow an
 // organic lane fabric whose buildings front the lanes with their door side,
 // villages follow their people's period-accurate organising principle, and
@@ -34,8 +34,8 @@ import { ANIMAL_RADIUS, animalAnchors } from './animalSpots'
 import { closestOnPolyline } from './lanePlan'
 import { PLACES, placeById } from '../../world/geo'
 import { ROCK_VILLAGE_ID, ROCK_FOOTPRINT_UNITS, communicationRockSite } from '../../world/communicationRock'
-import { buildRiverBank, inBankPlayLane } from './riverBank'
-import { CLIMB_ROCK_TOP, climbBoulder, looseRock } from './looseRocks'
+import { bankGroundHeight, buildRiverBank, inBankPlayLane } from './riverBank'
+import { CLIMB_ROCK_TOP, climbBoulder, looseRock, looseRockIsGround, looseRockRadius, looseRockTop } from './looseRocks'
 import { pinchesPassage } from './wedgeCarve'
 import { mulberry32 } from '../../world/noise'
 import { balance } from '../../config/balance'
@@ -1007,6 +1007,38 @@ describe('every settlement keeps one way out free (work-order 688)', () => {
       expect(layout.flora.length, `${id} seed ${seed}: flora`).toBeGreaterThanOrEqual(6)
       expect(layout.rocks.length, `${id} seed ${seed}: rocks`).toBeGreaterThanOrEqual(11)
     }
+  })
+})
+
+// A STONE IS EITHER GROUND OR AN OBSTACLE (work-order 1149). The user walked
+// into knee-low pebbles: every scattered stone claimed a collider of at least
+// half a metre, however small the thing the player saw. The classification is
+// pinned in `looseRocks.test.ts`; what must hold HERE is that the settlement's
+// own collider set obeys it — over the shipped villages and seeds, so no plan
+// keeps a stone that both raises the ground and blocks it.
+describe.each(SEEDS)('the loose stones in the collider set (seed %i)', (seed) => {
+  it.each(VILLAGES.map((p) => [p.id] as const))('%s: carries only the stones that are walked around', (id) => {
+    const layout = buildLayout(id, seed)
+    const circles = layout.colliders.filter((c): c is CircleCollider => 'r' in c && 'x' in c)
+    let walkedOver = 0
+    for (const [x, z, scale] of layout.rocks) {
+      const collider = circles.find((c) => Math.hypot(c.x - x, c.z - z) < 1e-9 && Math.abs(c.r - looseRockRadius(scale)) < 1e-9)
+      if (looseRockIsGround(scale)) {
+        walkedOver++
+        // It left the collider set — this is the snag the point removes…
+        expect(collider, `${id} seed ${seed}: stone of scale ${scale} still blocks the walk`).toBeUndefined()
+        // …and the walking surface carries the foot over it instead.
+        expect(placeGroundHeight({ bank: layout.bank, sites: [], progress: [], rocks: layout.rocks }, x, z))
+          .toBeCloseTo(bankGroundHeight(layout.bank, x, z) + looseRockTop(scale), 9)
+      } else {
+        expect(collider, `${id} seed ${seed}: stone of scale ${scale} lost its collider`).toBeTruthy()
+        expect(placeGroundHeight({ bank: layout.bank, sites: [], progress: [], rocks: layout.rocks }, x, z))
+          .toBeCloseTo(bankGroundHeight(layout.bank, x, z), 9)
+      }
+    }
+    // The scatter really does draw stones on both sides of the cut, so the
+    // check is answering about a real settlement rather than an empty case.
+    expect(walkedOver, `${id} seed ${seed}: no small stone in the scatter at all`).toBeGreaterThan(0)
   })
 })
 

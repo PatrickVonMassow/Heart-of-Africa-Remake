@@ -16,6 +16,7 @@ import {
   splitFoliage,
   PLAY_ROCK_HEIGHT_UNITS,
   ROCK_TOP_UNITS,
+  ROCK_RADIUS_UNITS,
 } from './flora'
 import type * as THREE from 'three/webgpu'
 import { FLORA_COLOR_LIFT, seasonTintCpu } from './seasonTint'
@@ -116,6 +117,18 @@ describe('the children`s large play rocks', () => {
     // …and it sits ON the ground rather than floating over it, which is what
     // makes the top height a height above the ground the child walked in on.
     expect(minY).toBeLessThan(0.02)
+  })
+
+  // …and its declared SIDEWAYS reach, which a walked-over stone raises the
+  // ground across (work-order 1149). Same reason as the height: the rise is
+  // sized from the constant, the player sees the mesh.
+  it('declares the scattered boulder`s footprint as the mesh actually has it', () => {
+    const { maxR } = extents(buildRock())
+    // Covers the drawn stone whole…
+    expect(maxR).toBeLessThanOrEqual(ROCK_RADIUS_UNITS)
+    // …and hugs it: a rise sized far wider than the silhouette would lift a
+    // foot standing on the grass beside the stone.
+    expect(maxR).toBeGreaterThan(ROCK_RADIUS_UNITS * 0.95)
   })
 
   it('uses the detailed mesh only for the large instances and remains seeded', () => {

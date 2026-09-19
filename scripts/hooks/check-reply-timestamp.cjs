@@ -5,22 +5,39 @@
 // NEVER blocks (no decision/continue fields) — a soft reminder only, so the
 // batch and subagent sessions are never stalled by this hook.
 // Fail-soft by design: any read/parse problem exits 0 with no output.
-// Live install: C:\Users\Patri\.claude\hooks\check-reply-timestamp.cjs
+// Live install: /home/node/.claude/hooks/check-reply-timestamp.cjs; C:\Users\Patri\.claude\hooks\check-reply-timestamp.cjs
 // Versioned copy: scripts/hooks/check-reply-timestamp.cjs in the hoa repo.
 'use strict';
 
 const fs = require('fs');
+const { setTimeout: delay } = require('timers/promises');
 
 const TIMESTAMP_RE = /^\*\*[A-Za-zÄÖÜäöüß]+, \d{2}\.\d{2}\.\d{4}, \d{2}:\d{2}\*\*/;
 
-function main() {
+async function main() {
   let input = '';
   try { input = fs.readFileSync(0, 'utf8'); } catch { return; }
   let payload;
   try { payload = JSON.parse(input); } catch { return; }
+  // Measured 18.09.2026: Stop outran the asynchronous transcript append and judged
+  // an unstamped progress note instead of the stamped reply on tool-using turns.
+  const reply = payload && payload.last_assistant_message;
+  if (typeof reply === 'string' && reply.length > 0) {
+    if (!TIMESTAMP_RE.test(reply.trim())) nudge();
+    return;
+  }
   const transcriptPath = payload && payload.transcript_path;
-  if (!transcriptPath || !fs.existsSync(transcriptPath)) return;
+  if (!transcriptPath) return;
 
+  for (let attempt = 0; attempt <= 3; attempt++) {
+    if (attempt > 0) await delay(250);
+    const lastText = readLastText(transcriptPath);
+    if (lastText === null || TIMESTAMP_RE.test(lastText)) return;
+  }
+  nudge();
+}
+
+function readLastText(transcriptPath) {
   // The user-visible reply of the current turn is the LAST assistant text block
   // AFTER the most recent real user prompt (tool results also arrive as type
   // "user" entries but carry tool_result blocks, not text/string). Earlier text
@@ -29,7 +46,7 @@ function main() {
   // block flagged every reply that ran a tool (false positive, 18.09.2026).
   let lastText = null;
   let lines;
-  try { lines = fs.readFileSync(transcriptPath, 'utf8').split('\n'); } catch { return; }
+  try { lines = fs.readFileSync(transcriptPath, 'utf8').split('\n'); } catch { return null; }
   for (const line of lines) {
     if (!line.trim()) continue;
     let entry;
@@ -49,9 +66,10 @@ function main() {
     );
     if (textBlock) lastText = textBlock.text.trim();
   }
-  if (lastText === null) return;
-  if (TIMESTAMP_RE.test(lastText)) return;
+  return lastText;
+}
 
+function nudge() {
   process.stdout.write(JSON.stringify({
     systemMessage:
       'Chat-Zeitstempel-Regel verletzt: Die letzte Antwort begann NICHT mit dem ' +
@@ -60,4 +78,4 @@ function main() {
   }) + '\n');
 }
 
-main();
+main().catch(() => {}); // Read/timer failures must never block a turn.

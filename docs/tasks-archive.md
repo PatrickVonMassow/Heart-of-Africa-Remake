@@ -29957,3 +29957,135 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Refs: the hint markup and CSS of point 1146 (`.hud-bottom-row`, `.hud-bottom-left`), its
   tests.
   Bundle: Steuerung & Performance.
+
+- [x] 1165. The document-cut account stands on session transcripts the platform deletes after
+  thirty days; one of them is already gone, so `npm run test:unit` is RED on `main` and no point
+  can land. MEASURED 19.09.2026 on HEAD 1c85eb805: the same gate was GREEN at 04:38 and RED at
+  04:52 with five failures in `scripts/cut-account-core.test.mjs`, every one of them
+  `ENOENT … /-workspace-hoa--claude-worktrees-agent-a3d55aa0d296e011a/ffafb607-4609-4d8c-8ac9-49fc0bd74ea4.jsonl`
+  — the SUBAGENT floor transcript named in `docs/document-cut-757.md`, deleted DURING that
+  session by the 30-day `cleanupPeriodDays` cleanup the board card "Transkript-Aufbewahrung"
+  predicted. The second named file, the OWNER floor
+  `~/.claude/projects/-workspace-hoa/3141e458-63d3-4825-81bf-f135a96a50b4.jsonl`, was last written
+  20.08.2026 and falls out on the same clock, so the remaining evidence is hours, not weeks, from
+  the same fate. The test is not wrong — it refuses a claim whose evidence it cannot read, and its
+  all-or-nothing anchor exists because per-file skipping once let a stale owner reading pass. What
+  is wrong is that the only evidence lives outside the repository, where it expires.
+  FINAL STATE, three parts, all mandatory.
+  - (1) THE EVIDENCE MOVES INTO THE REPOSITORY BEFORE IT EXPIRES. A script writes, for every
+    floor `docs/document-cut-757.md` names whose transcript is STILL READABLE, an attestation
+    holding the verbatim usage row the floor was taken from, the rows the kind and session checks
+    read, the transcript path and the date it was read. It reads a real file or it refuses — it
+    never composes a row. Run it for the owner floor and COMMIT the attestation in the same
+    commit, while the transcript still exists.
+  - (2) THE DOCUMENT STOPS CLAIMING WHAT CANNOT BE RE-DERIVED. `docs/document-cut-757.md` marks
+    each floor LIVE or EXPIRED. The subagent floor is EXPIRED: its transcript went on 19.09.2026
+    under the 30-day cleanup, its number stands on the commit that recorded it, and the document
+    says plainly that it can no longer be re-derived on this machine. The stated numbers and the
+    gap of 4,078 do NOT change — this is a statement about evidence, not a re-measurement.
+  - (3) THE TEST JUDGES BY THAT MARKING. On the batch machine every floor must be backed by a
+    readable transcript, else by a committed attestation, else by an EXPIRED marking that carries
+    a date and an attesting commit git can resolve and whose commit date precedes the expiry. A
+    floor marked LIVE whose transcript is missing still FAILS: the anti-fabrication property the
+    all-or-nothing anchor protects is unchanged, and a floor with none of the three fails.
+  TESTS. Vitest in `scripts/cut-account-core.test.mjs` and the new script's own test: a LIVE floor
+  with a readable transcript re-derives as today; a LIVE floor whose transcript is missing fails;
+  an EXPIRED floor with date and resolvable attesting commit passes; an EXPIRED floor with no
+  date, no commit, or a commit dated after the expiry fails; an attestation that does not match
+  its transcript fails. `npm run test:unit` GREEN on the merge candidate is the acceptance.
+  BOUNDS: no new guard, ledger field or router (infrastructure freeze) — this repairs an existing
+  check whose evidence expired. It does NOT touch `~/.claude/settings.json`: raising
+  `cleanupPeriodDays` is the user's decision and stands on the board card.
+  Criticality: high — it blocks every landing in the batch.
+  Bundle: Session- & Repo-Hygiene.
+
+- [x] 1161. The timestamp nudge fires after every reply that used a tool, because the hook
+  reads the transcript before the reply has landed in it (user report 18.09.2026, 20:07,
+  verbatim: "Es kommt immer noch nach jeder deiner Nachrichten \"Stop says: Chat-Zeitstempel-Regel
+  verletzt: …\" Müsste das nicht schon behoben sein?").
+  MEASURED in session d3ba9c58, so the cause is not guessed: every finished turn's last
+  assistant text in the transcript DOES begin with the stamp; replaying the live hook on the
+  transcript cut right after that entry gives NO nudge; yet the live Stop run 174 ms after the
+  final message did nudge, while the project's blocking timestamp-guard in the same Stop pass
+  did not. The transcript is appended asynchronously and this hook outruns it, so it judges the
+  turn's progress note instead of the reply — which is why it fires on exactly the tool-using
+  replies. The installed CLI (2.1.273) declares `last_assistant_message` as an optional field
+  of the Stop payload.
+  Final state: scripts/hooks/check-reply-timestamp.cjs judges, in this order, (a)
+  payload.last_assistant_message when it is a non-empty string — nudge iff its trimmed text
+  fails TIMESTAMP_RE, then return; (b) otherwise the transcript as today, but if the judged
+  text fails the regex, re-read the transcript up to three times 250 ms apart and nudge only if
+  the last read still fails (bounded, well inside the 15 s hook timeout), so an append that
+  lands late never flags a stamped reply. Still never blocks, still fail-soft. Comment states
+  the measured cause in two lines. Tests in check-reply-timestamp.test.mjs: payload text
+  stamped → silent even when the transcript's last text is an unstamped note; payload text
+  unstamped → nudge even when the transcript's last text is stamped; no payload field and
+  transcript whose final stamped entry is appended ~300 ms after the hook starts → silent.
+  Then the LIVE install /home/node/.claude/hooks/check-reply-timestamp.cjs is replaced by the
+  versioned copy (protected path: attended edit, the user is present), and the header comment's
+  'Live install' line names the container path beside the Windows one. Evidence: the next
+  replies of the user's session no longer show the nudge.
+  BOUNDS THE USER NAMED: no new guard or ledger field (infrastructure freeze) — this repairs an
+  existing hook's false positive that the user is reproducibly hit by.
+  WHERE IT STANDS: the carrier routed it as a plain TASKS append, which would have put it
+  behind 409 points; it is placed here instead because the user meets this false alarm after
+  every single reply. Move it back if that is not wanted.
+  Criticality: low — no player impact, but it is noise on every one of the user's turns and it
+  trains him to ignore a guard that is meant to be read.
+  Refs: scripts/hooks/check-reply-timestamp.cjs, its test, and the live install named above.
+  Bundle: Session- & Repo-Hygiene.
+
+- [x] 1149. Small village stones raise the ground instead of blocking the walk (user order
+  17.09.2026, 21:50 and 21:53, verbatim: "Im Rahmen von welchem Punkt wird erledigt, dass man
+  an Kieselsteinen im Dorf nicht mehr hängenbleibt, sondern darüber läuft, wie über
+  ausgegrabenen Sand?" — "Man soll nicht einfach hindurchlaufen können, sondern sie sollen als
+  Erhöhung behandelt werden. Ich dachte es war geplant, das im Rahmen der analogen Umsetzung
+  für Sandhaufen einzubauen. Dann reihe das nach 1082 ein, ja.").
+  Final state: a small scattered stone in a settlement is neither a wall nor air. The player
+  and every villager walk UP AND OVER it the way they already ride the spoil heap of an
+  excavation (closed point 1057): the stone raises the ground locally, the first-person camera
+  rises and falls smoothly, nobody stops at it and nobody passes through it.
+  Measured on main at ef5806ff4: every scattered rock, whatever its size, gets a collider of
+  0.35 + 0.5 * scale metres (looseRockRadius, pushed at layout.ts ~1905). At instance scale
+  0.3 the stone's top is about 0.16 m (ROCK_TOP_UNITS * scale) - a pebble - yet its collider
+  reaches half a metre, so the player snags on it. The spoil heap, by contrast, never enters
+  the collider set: spoilHeightAt is a smooth compact dome that placeGroundHeight adds to the
+  bank height, and every actor plus the camera read that one source.
+  Work:
+  - A stone whose top lies below a step height (estimate, calibratable, in
+    src/config/balance.ts under CLAUDE.md §2 / design.md §14; propose 0.30 m, about knee
+    height) becomes a GROUND RAISE and loses its collider: placeGroundHeight also takes the
+    maximum over these stones, each as a smooth compact dome with zero height and slope at its
+    edge, sized to the DRAWN stone (its mesh radius at that scale), peaking at ROCK_TOP_UNITS *
+    scale so the foot stands on the visible top. The renderer keeps drawing the same instance.
+  - A stone at or above that height stays exactly what it is today: a collider of
+    looseRockRadius and, above climbableRockTop, a candidate for the children's climb.
+    climbBoulder must never pick a stone that has become ground (1082 raises climbableRockTop
+    anyway; keep the two thresholds ordered, ground < climb, and assert it in dev).
+  - One classification, one place: looseRocks.ts answers whether a stone is walked over or
+    walked around; layout.ts and placeGround.ts read that answer. No second scatter of Y
+    assignments, no new collider kind.
+  - Villager routes and the dig-site / water-path / play-lane placement keep testing against
+    the collider set; a stone that became ground simply drops out of that set, so the layout
+    must be re-measured on the shipped seeds (Bambara 7 and 1337 among them) to confirm no site
+    or path moved.
+  - Tests: Vitest on placeGround.ts - height is zero outside every small stone's footprint,
+    peaks at the stone's top at its centre, and a stone above the step height contributes
+    nothing; Vitest on looseRocks.ts - the classification and the ordered thresholds; the
+    collider set contains no stone below the step height. Playwright on the polish lane - a
+    frame with the first-person footing carried over a small stone, judged on both backends.
+  BOUNDS THE USER NAMED: placement directly behind 1082 (user decision 17.09.2026, 21:53); no
+  new collider kind, no new guard or ledger field (infrastructure freeze 01.09.2026); the
+  child's climb stone stays a collider — only stones below the step height change.
+  DESIGN CHANGE IN THE SAME COMMIT: design.md §16 (settlement collision) gains one sentence —
+  small stones and spoil are ground raises, large stones are obstacles; and
+  docs/acceptance-criteria-detail.md criterion 16 names the step threshold.
+  Criticality: medium — reproducible player impact; the walk snags on knee-low stones.
+  Refs: src/scenes/place/looseRocks.ts (looseRockRadius, looseRock, climbBoulder),
+  src/scenes/place/layout.ts (~l.1905 rock colliders), src/scenes/place/placeGround.ts
+  (spoilHeightAt, placeGroundHeight), src/render/flora.ts (ROCK_TOP_UNITS ~l.323),
+  src/scenes/place/PlaceScene.tsx (~l.3125 footing), src/scenes/place/PlaceLife.tsx
+  (usePlaceGround); follows the closed 1057; AFTER 1082 and never beside it (both edit the
+  scatter's size and the climb selection in looseRocks.ts and the loose-rock colliders in
+  layout.ts).
+  Bundle: Dorfleben

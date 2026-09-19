@@ -5,7 +5,7 @@ Each line names what left an always-loaded document and its surviving authority.
 The five entries awaiting the user's ruling — U6, U45 part 1, U48, U55 and U65
 — remain unchanged in substance and are therefore not cut entries below.
 
-## The two floors, both now measured
+## The two measured floors and their surviving evidence
 
 Two floors are involved here and they are NOT interchangeable. Both are the
 first assistant message of a real transcript, summed as `input_tokens +
@@ -13,10 +13,32 @@ cache_read_input_tokens + cache_creation_input_tokens`, taken before that
 session's first tool call.
 
 FLOOR owner :: 20.08.2026 :: `~/.claude/projects/-workspace-hoa/3141e458-63d3-4825-81bf-f135a96a50b4.jsonl`
-:: `2 + 22,579 + 21,034 = 43,615`
+:: `2 + 22,579 + 21,034 = 43,615` :: LIVE
 
 FLOOR subagent :: 20.08.2026 :: `~/.claude/projects/-workspace-hoa--claude-worktrees-agent-a3d55aa0d296e011a/ffafb607-4609-4d8c-8ac9-49fc0bd74ea4.jsonl`
-:: `2 + 21,417 + 18,118 = 39,537`
+:: `2 + 21,417 + 18,118 = 39,537` :: EXPIRED :: 19.09.2026 :: 78a5d1a771c46d3d054398625c986e628a3e3dc1
+
+The owner transcript was LIVE when read on 19.09.2026. Its committed
+attestation, `docs/document-cut-757-evidence/owner.json`, preserves the verbatim
+first usage row, the preceding same-session user row used to establish kind,
+and the earliest timestamp row found by scanning the entire transcript. Source
+line numbers, the transcript hash, its path and the read time accompany them.
+`node scripts/cut-account-attest.mjs` captures every still-readable named floor;
+a named kind can be supplied to require that file. Missing files produce no
+attestation, and existing attestations are never overwritten.
+
+The subagent transcript EXPIRED on 19.09.2026 under the platform's 30-day
+cleanup. Its number stands on commit
+`78a5d1a771c46d3d054398625c986e628a3e3dc1` (20.08.2026), which recorded it;
+it can no longer be re-derived on this machine. This changes the evidence
+status, not either stated number or their gap.
+
+The check re-derives a readable transcript, otherwise uses a committed
+attestation, otherwise requires EXPIRED with a date and a resolvable attesting
+commit dated before that expiry day (UTC). LIVE with a missing transcript fails
+on the batch machine even if an attestation survives: its status must be updated
+to EXPIRED. While a transcript remains readable its attestation must match it
+exactly; after deletion the committed capture remains a re-derivable witness.
 
 The owner reading is the one point 757 owed and point 761 took: the first
 batch-owner session started after the cut landed, reading its own transcript.
@@ -68,12 +90,13 @@ out to be document-related too, which nothing here shows.
 
 Two claims here are ATTRIBUTED, not measured, and are marked so on purpose. The
 first is the hook-and-runbook share of the gap, bounded above; that is why it is
-written as a bound. What the tests DO establish is the two things that could
-otherwise be faked: each reading's session KIND, from two independent signals
+written as a bound. For surviving evidence the tests establish two things that could
+otherwise be faked: the reading's session KIND, from two independent signals
 that must agree — the working directory, since a delegated author runs in an
 isolation worktree and the owner in the main checkout, and the batch-resume
 prompt — and its FRESHNESS, so neither can be a transcript from before the cut.
-No test weighs the hook's share against the other differences. The second
+The EXPIRED subagent reading now rests on the dated commit above, not a fresh
+transcript check. No test weighs the hook's share against the other differences. The second
 attributed claim is the ~4 bytes per token these documents run at, a ratio taken
 from their character counts rather than a tokenizer reading. Both would need a
 per-session record of the harness share to become measurements, and that record
