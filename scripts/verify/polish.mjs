@@ -3979,6 +3979,12 @@ if (section('children-bank-game')) {
     b.tapPauseSeconds = 9
     return was
   })
+  const cycleWaitSeconds = await page.evaluate(() => {
+    const b = window.__balance.villageLife.bankGame
+    return b.roamSeconds + b.roamGuardSeconds + b.gatherSeconds + b.partSeconds + b.endPauseSeconds +
+      window.__balance.villageLife.tag.childCount *
+      (b.regroupSeconds + b.runSeconds + b.tapPauseSeconds + b.tapReturnSeconds + 2 * b.utteranceGapSeconds)
+  })
   await goToPlace('bambara-village')
   const staged = await page
     .waitForFunction(
@@ -4287,18 +4293,11 @@ if (section('children-bank-game')) {
     // core at a 6/8 skew rate, every one of the six reds this check and no
     // other.
     //
-    // The budget is therefore PLAYED SECONDS. 150 of them, against a worst
-    // measured wait of 79.7 s: replayed in the fast layer at this section's own
-    // shortened roam (`src/scenes/place/tagShuffle.test.ts`), the longest gap
-    // between two runs in the bambara village at the verification's seed is
-    // 79.7 s of played time and the first run from a cold start falls at 71.3 s.
-    //
-    // The wall clock keeps one job only — telling a DEAD PAGE from a round that
-    // played its budget without opening a run. Those are different findings and
-    // they get different messages: a page that has stopped stepping buys no
-    // played time at all, so it is caught by the played clock STANDING STILL,
-    // never by a deadline the game's own progress has to beat.
-    const RUN_WAIT_PLAYED_S = 150
+    // The observation budget follows the configured cycle: longer station
+    // walks and the tapper's return can put two first runs over 150 s apart.
+    // This changes only how long the spectator waits, not the crossing gate.
+    // A stalled played clock remains a separate failure from spending this budget.
+    const RUN_WAIT_PLAYED_S = cycleWaitSeconds
     const RUN_WAIT_STALL_MS = 90000
     const RUN_WAIT_WALL_MS = 1800000
     let runPhase = null
@@ -4329,8 +4328,7 @@ if (section('children-bank-game')) {
       // roam shortened as above): 84 cycle-first runs, and at the OLD 45 s window
       // six of them carried no crossing at all — the check was a coin toss, not a
       // measurement, and it had gone green on luck. The budget above covers the
-      // wait: the longest gap between two cycle-first runs measured over those
-      // layouts is 61 s, against 150.
+      // wait, including the longer regroup and tap-return intervals.
       let sawGather = false
       for (;;) {
         const now = await readRound()
@@ -4923,6 +4921,62 @@ if (section('children-bank-game')) {
           : `no hold offered a frame to shoot (aimed: ${tapAimed}) — the picture would have ` +
             'been taken after the hand had already left the stone',
       )
+    }
+
+    // Retain the actual first charge frame with several catchers. The latch
+    // stops only after the tapper's return; it never moves or assigns a child.
+    await restoreEarshotStance()
+    await page.evaluate(() => window.__placeHoldCharge(true))
+    try {
+      const start = await page.evaluate(() => window.__placeTag().playedClock)
+      let charged = null
+      for (;;) {
+        const now = await page.evaluate(() => window.__placeTag())
+        if (now.chargeHeld) {
+          charged = now.catcherLine
+          break
+        }
+        if (now.playedClock - start >= cycleWaitSeconds) break
+        // A slow renderer buys less game time; only a stopped clock times out.
+        const advanced = await page.waitForFunction((was) => {
+          const t = window.__placeTag()
+          return t.chargeHeld || t.playedClock > was
+        }, now.playedClock, { timeout: 90000, polling: 'raf' }).then(() => true).catch(() => false)
+        if (!advanced) break
+      }
+      const reach = await page.evaluate(() => window.__balance.villageLife.bankGame.reachDistance)
+      check(
+        'the charge starts with every catcher back in one line before its rock',
+        !!charged && charged.children.length >= 2 && charged.children.every((c) =>
+          Math.hypot(c.x - c.station.x, c.z - c.station.z) <= reach * 0.6),
+        JSON.stringify(charged),
+      )
+      if (charged) {
+        // Frame the whole line and the stone behind it, from the running ground.
+        const subject = await page.evaluate((line) => {
+          const p = window.__placePlayer
+          const L = window.__placeLayout.playRocks
+          const other = Math.hypot(L.upstream.x - line.rock.x, L.upstream.z - line.rock.z) < 0.01
+            ? L.downstream : L.upstream
+          const dx = other.x - line.rock.x
+          const dz = other.z - line.rock.z
+          const len = Math.hypot(dx, dz)
+          const target = { x: line.rock.x + dx / len * 1.5, y: 0.7, z: line.rock.z + dz / len * 1.5 }
+          p.x = line.rock.x + dx / len * 8 - dz / len * 3
+          p.z = line.rock.z + dz / len * 8 + dx / len * 3
+          p.yaw = Math.atan2(-(target.x - p.x), -(target.z - p.z))
+          p.pitch = -0.1
+          return target
+        }, charged)
+        await nextFrames(2)
+        await frame('1109-catcher-line-at-charge-start', {
+          local: subject,
+          label: `${charged.children.length} catchers together before their rock at charge start; child ${charged.tapper} has stepped back from the tap`,
+        })
+      }
+    } finally {
+      await page.evaluate(() => window.__placeHoldCharge(false))
+      await restoreEarshotStance()
     }
 
     // ARRIVAL CONTACT (work-order 1106). Follow one spoken runner by identity

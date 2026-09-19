@@ -71,6 +71,7 @@ import {
   createBankGame,
   otherEnd,
   rockAt,
+  stationAt,
   insideStrangerBerth,
   stepBankGame,
   bankVoiceRegister,
@@ -960,6 +961,8 @@ function Kids({
      *  the touch (work-order 1065). */
     heardFrom: number | null
   } | null>(null)
+  // Dev-only shutter latch: retain an actual charge boundary, without staging bodies.
+  const chargeCapture = useRef({ armed: false, held: false })
   const arrivalOpenings = useRef<Array<typeof tapOpening.current>>([])
   const poses = useRef<Array<RefObject<FigurePose | null>>>([])
   if (poses.current.length !== count) {
@@ -981,6 +984,7 @@ function Kids({
   }
 
   useFrame((_, rawDt) => {
+    if (import.meta.env.DEV && chargeCapture.current.held) return
     const dt = Math.min(rawDt, 0.1)
     const cfg = balance.villageLife.childSpeech
     let spoken: BankUtterance | null = null
@@ -992,6 +996,7 @@ function Kids({
       world.stranger = placePlayerPosition.active
         ? { x: placePlayerPosition.x, z: placePlayerPosition.z, radius: PLAYER_RADIUS }
         : null
+      const wasReturning = round.bank.returnFor !== null
       spoken = stepBankGame(
         round.bank,
         dt,
@@ -1000,6 +1005,10 @@ function Kids({
         world,
         round.rand,
       )
+      if (import.meta.env.DEV && chargeCapture.current.armed && wasReturning &&
+          round.bank.returnFor === null && round.bank.children.filter((c) => c.role === 'catcher').length >= 2) {
+        chargeCapture.current.held = true
+      }
     } else if (game && speech) {
       // The view the situations read the game through, refreshed in place.
       view.playing = game.playing
@@ -1154,6 +1163,7 @@ function Kids({
     if (!import.meta.env.DEV) return
     const w = window as unknown as Record<string, unknown>
     const bank = round.bank
+    w.__placeHoldCharge = (armed: boolean) => { chargeCapture.current = { armed, held: false } }
     // ONE HOOK FOR BOTH ROUNDS. The live child-motion check reads this shape,
     // and it must not have to know which game a settlement plays: the bank round
     // reports its own catcher, quarry, tags and clocks under the same names.
@@ -1168,6 +1178,15 @@ function Kids({
       /** The bank round's own phase, for a check that wants to know what it is
        *  looking at; absent in the tag round. */
       phase: bank ? bank.phase : null,
+      chargeHeld: chargeCapture.current.held,
+      catcherLine: bank && stage ? {
+        rock: rockAt(stage, otherEnd(bank.from)),
+        tapper: bank.tapper,
+        children: bank.children.flatMap((c, i) => c.role === 'catcher' ? [{
+          index: i, x: c.x, z: c.z,
+          station: stationAt(stage, otherEnd(bank.from), bank.children.slice(0, i).filter((kid) => kid.role === 'catcher').length, balance.villageLife.bankGame),
+        }] : []),
+      } : null,
       /** The direction this run was announced in (work-order 1073), so a check
        *  can WAIT for the call it means to photograph instead of shooting the
        *  stretch and hoping. Null between runs, and in the tag round. The word
@@ -1337,6 +1356,8 @@ function Kids({
       ground: { x, z, radius: playRadius },
     })
     return () => {
+      delete w.__placeHoldCharge
+      chargeCapture.current = { armed: false, held: false }
       delete w.__placeTag
       delete w.__placeTapHand
       delete w.__placeArrivalHand

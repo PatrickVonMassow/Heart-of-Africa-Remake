@@ -272,8 +272,13 @@ export interface BankRoundConfig {
   runSeconds: number
   /** How long everybody holds at the stations while the catcher taps ROCK. */
   tapPauseSeconds: number
+  /** Backstop and settling radius for the tapper's short walk into the line. */
+  tapReturnSeconds: number
+  catcherStationDistance: number
   /** How long an arriving runner rests its hand on the far stone. */
   arrivalHoldSeconds: number
+  /** Bound on queuing for stone contact, separate from the group's walk backstop. */
+  arrivalApproachSeconds: number
   /** Backstop on the walk between two runs. */
   regroupSeconds: number
   /** How long the group walks toward its roaming quarter before roaming again. */
@@ -371,6 +376,8 @@ export interface BankState {
    *  Chosen when the walk to the stations begins, because the walk is what has
    *  to take it there (work-order 1065). */
   tapper: number
+  /** Turns assigned at the stone this cycle, including unreachable silent turns. */
+  tapTurns: number[]
   /** Children whose boulder approach made no progress this roaming phase. */
   failedClimbers: number[]
   /** Whether the boulder has already been named this roaming phase. */
@@ -412,6 +419,8 @@ export interface BankState {
    *  word that never falls is a pause the player cannot read, and it made the
    *  hold useless as the window in which the tap is measured (08.09.2026). */
   tapFor: number
+  /** Remaining walk-back time; null once the catcher line is free to charge. */
+  returnFor: number | null
   /** Seconds left before the caught children rise at the end of a cycle. */
   endFor: number
   /** The first arrival of this run has reached the speech output. */
@@ -740,6 +749,7 @@ export function createBankGame(
     caller: -1,
     climber: -1,
     tapper: -1,
+    tapTurns: children.map(() => 0),
     failedClimbers: [],
     namedBoulder: false,
     abandonedBoulder: false,
@@ -754,6 +764,7 @@ export function createBankGame(
     pending: [],
     sinceSaid: Infinity,
     tapFor: 0,
+    returnFor: null,
     endFor: 0,
     arrivalSpoken: false,
     speech: createProducerWatch(),
@@ -949,6 +960,7 @@ function openCycle(s: BankState, stage: BankStage, cfg: BankConfig, world: BankW
   })
   s.phase = 'gather'
   s.phaseFor = cfg.gatherSeconds
+  s.tapTurns.fill(0)
   s.tapper = caller
   s.direction = null
   s.runsThisCycle = 0
@@ -995,9 +1007,11 @@ function openRun(s: BankState, stage: BankStage, cfg: BankConfig, world: BankWor
   // The hold belongs to the WORD, and the word is offered further down only if
   // the hand reaches the stone — so it is armed there, not here.
   s.tapFor = 0
+  s.returnFor = cfg.tapReturnSeconds
   s.arrivalSpoken = false
   // The stations are behind them: no run, roam or parting walk follows a route.
   for (const c of s.children) clearPath(c)
+  if (s.tapper >= 0) s.tapTurns[s.tapper]++
   s.runsThisCycle++
   s.runs++
   for (const c of s.children) {
@@ -1058,7 +1072,7 @@ function openRun(s: BankState, stage: BankStage, cfg: BankConfig, world: BankWor
 
 /** Ends the run: the sides swap — the survivors start where they arrived — and
  *  the children caught in it join the catchers for the next one. */
-function endRun(s: BankState, stage: BankStage, cfg: BankConfig): void {
+function endRun(s: BankState, cfg: BankConfig): void {
   const cycleEnded = runners(s).length === 0 || s.runsThisCycle >= s.children.length
   for (const c of s.children) {
     c.arrived = false
@@ -1087,7 +1101,8 @@ function endRun(s: BankState, stage: BankStage, cfg: BankConfig): void {
   // The stone the next run is towards is the one that gets tapped, so the child
   // sent to it is picked here — before the walk, which is what carries it there.
   const waiting = catchers(s)
-  s.tapper = waiting.length > 0 ? nearestOf(s, waiting, rockAt(stage, otherEnd(s.from))) : -1
+  s.tapper = waiting.reduce((chosen, i) =>
+    chosen < 0 || s.tapTurns[i] < s.tapTurns[chosen] ? i : chosen, -1)
 }
 
 /** Back to roaming: everybody is a runner again, and a climber is picked for the
@@ -1098,6 +1113,7 @@ function openRoam(s: BankState, cfg: BankConfig, rand: () => number): void {
   for (const c of s.children) clearPath(c)
   s.direction = null
   s.tapFor = 0
+  s.returnFor = null
   s.endFor = 0
   s.caller = -1
   s.namedBoulder = false
@@ -1181,6 +1197,7 @@ function advanceBankGame(
   const holdsEndThisStep = s.phase === 'part' && s.endFor > 0
   if (holdsTapThisStep) s.tapFor = Math.max(0, s.tapFor - dt)
   else if (holdsEndThisStep) s.endFor = Math.max(0, s.endFor - dt)
+  else if (s.phase === 'run' && s.returnFor !== null) s.returnFor = Math.max(0, s.returnFor - dt)
   else s.phaseFor -= dt
   // The off-game ROCK guard is part of every roaming phase, not an optional
   // attempt. The river call waits until the boulder has actually been climbed
@@ -1246,8 +1263,9 @@ function advanceBankGame(
       break
     case 'run':
       // The tap owns a visible held-standing interval, including its opening
-      // frame. Only after it expires does either side charge.
+      // frame. The tapper then walks into its line while everybody else holds.
       if (openedRun || holdsTapThisStep) stepHeld(s, dt, cfg, stage, world)
+      else if (s.returnFor !== null) stepTapReturn(s, dt, cfg, stage, world)
       else stepRun(s, dt, cfg, stage, world)
       break
     case 'part':
@@ -1539,7 +1557,8 @@ function inPlace(
       if (!reach || Math.abs(reach.gap) > TOUCH_GAP) return false
       continue
     }
-    if (dist(c, stationAt(stage, end, slot, cfg)) > cfg.reachDistance) return false
+    const radius = c.role === 'catcher' ? cfg.catcherStationDistance : cfg.reachDistance
+    if (dist(c, stationAt(stage, end, slot, cfg)) > radius) return false
   }
   return true
 }
@@ -1706,7 +1725,8 @@ function stepStations(
       // it would stop exactly where the old defect stood.
       const reach = touchReach(stage, wait, c)
       c.settled = !!reach && Math.abs(reach.gap) <= TOUCH_GAP
-    } else if (away <= cfg.reachDistance * 0.6) c.settled = true
+    } else if (c.role === 'catcher') c.settled = away <= cfg.catcherStationDistance
+    else if (away <= cfg.reachDistance * 0.6) c.settled = true
     else if (away > cfg.reachDistance) c.settled = false
     // The walk DOWN to the bank is a run — the whole group sets off at the call
     // — while the shuffle between two runs is a walk.
@@ -1715,7 +1735,7 @@ function stepStations(
       clearPath(c)
       drive(s, i, null, false, dt, cfg, world)
     } else {
-      drive(s, i, wayTo(c, to, dt, world), running, dt, cfg, world, tapping)
+      drive(s, i, wayTo(c, to, dt, world), running, dt, cfg, world, tapping || c.role === 'catcher')
     }
   }
 }
@@ -1789,7 +1809,7 @@ function chooseQuarry(s: BankState, self: number, cfg: BankConfig): number {
 
 /** Finish a safe runner's approach without extending the run or its catch window.
  * Occupied stands wait their turn; an obstructed approach expires silently at
- * the regroup backstop. Only actual contact may offer the word. */
+ * its own approach bound. Only actual contact may offer the word. */
 function stepArrival(
   s: BankState, i: number, dt: number, cfg: BankConfig, stage: BankStage, world: BankWorld,
 ): boolean {
@@ -1913,7 +1933,7 @@ function stepRun(
           }
         }
       }
-      c.arrival = stand ? { end: to, stand, approachFor: cfg.regroupSeconds, holdFor: null } : null
+      c.arrival = stand ? { end: to, stand, approachFor: cfg.arrivalApproachSeconds, holdFor: null } : null
     }
   }
 
@@ -1943,7 +1963,24 @@ function stepRun(
 
   // A run ENDS when every runner has either touched the far rock or been tagged
   // — and the backstop closes it where a child could not get there at all.
-  if (free(s).length === 0 || s.phaseFor <= 0) endRun(s, stage, cfg)
+  if (free(s).length === 0 || s.phaseFor <= 0) endRun(s, cfg)
+}
+
+/** The stone is a moment, never a separate starting post for one catcher. */
+function stepTapReturn(s: BankState, dt: number, cfg: BankConfig, stage: BankStage, world: BankWorld): void {
+  const slot = catchers(s).indexOf(s.tapper)
+  const to = stationAt(stage, otherEnd(s.from), Math.max(0, slot), cfg)
+  const settled = slot < 0 || dist(s.children[s.tapper], to) <= cfg.catcherStationDistance
+  if (settled || s.returnFor === 0) {
+    s.returnFor = null
+    for (const c of s.children) clearPath(c)
+    // Keep the ready line for this frame; the next step starts the charge.
+    stepHeld(s, dt, cfg, stage, world)
+    return
+  }
+  for (let i = 0; i < s.children.length; i++) {
+    drive(s, i, i === s.tapper ? to : null, false, dt, cfg, world, true)
+  }
 }
 
 /** Holds every child in the posture the visible moment requires. These are
@@ -2001,7 +2038,7 @@ function assertRoundSound(s: BankState, cfg: BankConfig): void {
   )
   devAssert(
     s.phaseFor <= Math.max(cfg.roamSeconds * (1 + cfg.roamSpread), cfg.gatherSeconds, cfg.runSeconds, cfg.regroupSeconds, cfg.partSeconds) + 1e-6 &&
-      s.tapFor <= cfg.tapPauseSeconds + 1e-6 && s.endFor <= cfg.endPauseSeconds + 1e-6,
+      s.tapFor <= cfg.tapPauseSeconds + 1e-6 && (s.returnFor ?? 0) <= cfg.tapReturnSeconds + 1e-6 && s.endFor <= cfg.endPauseSeconds + 1e-6,
     'bank-phase-overrun',
     () => `phase ${s.phase} has ${s.phaseFor.toFixed(1)}s left, more than its own length`,
   )

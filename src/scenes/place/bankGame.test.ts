@@ -344,7 +344,8 @@ describe('the children`s game at the bank (point 687)', () => {
       roamGoalSeconds: 0.05,
       utteranceGapSeconds: 0,
     }
-    const { log } = replay(120, { seed: 23, cfg })
+    // Two cycles include the longer gather/regroup backstops.
+    const { log } = replay(300, { seed: 23, cfg })
     let guarded = false
     let calls = 0
     for (const u of log.said) {
@@ -606,6 +607,7 @@ describe('the children`s game at the bank (point 687)', () => {
       gatherSeconds: 0.1,
       runSeconds: 0.1,
       regroupSeconds: 0.1,
+      tapReturnSeconds: 0.1,
       partSeconds: 0.1,
       catchDistance: -1,
     }
@@ -1336,6 +1338,38 @@ describe('arriving runners name the far stone by contact', () => {
     expect(c.nudges).toBe(0)
   })
 
+  it.each([0.7, 2.3])('expires an occupied stone queue silently after %s seconds while regroup still has time', (seconds) => {
+    const cfg = { ...CFG, arrivalApproachSeconds: seconds }
+    const { s, rand } = arriving([{ x: 8, z: 0 }], cfg)
+    const world = openWorld()
+    const dt = 1 / 60
+    stepBankGame(s, dt, cfg, STAGE, world, rand)
+    const c = s.children[1]
+    expect(s.phase).toBe('regroup')
+    expect(c.arrival?.approachFor).toBe(seconds)
+    const stand = c.arrival!.stand
+    world.occupied = (_self, _partner, x, z) => dist({ x, z }, stand) < world.childRadius * 2
+    const start = { x: c.x, z: c.z }
+    let elapsed = 0
+    while (c.arrival && elapsed < seconds + dt * 2) {
+      const word = stepBankGame(s, dt, cfg, STAGE, world, rand)
+      elapsed += dt
+      expect(word?.moment).not.toBe('arrival')
+      expect(bankChildTouching(s, 1)).toBe(false)
+      if (c.arrival) {
+        expect({ x: c.x, z: c.z }).toEqual(start)
+        expect(c.held).toBe(true)
+        expect(c.pace).toBe(0)
+      }
+    }
+    expect(c.arrival).toBeNull()
+    expect(elapsed).toBeGreaterThanOrEqual(seconds - 1e-9)
+    expect(elapsed).toBeLessThanOrEqual(seconds + dt)
+    expect(s.phase).toBe('regroup')
+    expect(s.phaseFor).toBeGreaterThan(cfg.regroupSeconds - seconds - dt * 2)
+    expect(s.tags).toBe(0)
+  })
+
   it('arrives silently when the far flank is blocked', () => {
     const { s, rand } = arriving([{ x: 8, z: 0 }])
     const world = { ...openWorld(), blocked: (x: number, z: number) => dist({ x, z }, STAGE.downstream) < 1.7 }
@@ -1492,4 +1526,183 @@ it('queues the bank call through an adult consequence, then calls while the carr
   expect(stepBankGame(state, 0.1, cfg, STAGE, world, rand)?.moment).toBe('call')
   expect(state.phase).toBe('gather')
   expect(floor.forcedCount).toBe(0)
+})
+
+describe('catchers regroup together and share the tap', () => {
+  function endingRun(cfg: BankConfig) {
+    const rand = mulberry32(1109)
+    const s = createBankGame([
+      stationAt(STAGE, 'upstream', 0, cfg),
+      { x: 4, z: 0 },
+      stationAt(STAGE, 'downstream', 0, cfg),
+    ], rand, cfg)
+    s.phase = 'run'
+    s.phaseFor = 0
+    s.direction = 'DOWNSTREAM'
+    s.from = 'upstream'
+    s.runsThisCycle = 1
+    s.children[0].role = 'catcher'
+    s.children[0].madeTag = true
+    s.children[1].role = 'out'
+    s.children[1].crouched = true
+    stepBankGame(s, 1 / 60, cfg, STAGE, openWorld(), rand)
+    expect(s.phase).toBe('regroup')
+    expect(s.children[1].role).toBe('catcher')
+    return { s, rand }
+  }
+
+  it('waits past the old deadline for a mid-stretch catcher to reach its station', () => {
+    const cfg = { ...CFG, walkPace: 0.5, utteranceGapSeconds: 0, catchDistance: -1 }
+    const { s, rand } = endingRun(cfg)
+    const station = stationAt(STAGE, 'upstream', 1, cfg)
+    let elapsed = 0
+    while (s.phase === 'regroup' && elapsed < cfg.regroupSeconds) {
+      const before = dist(s.children[1], station)
+      stepBankGame(s, 1 / 60, cfg, STAGE, openWorld(), rand)
+      elapsed += 1 / 60
+      if (before > cfg.reachDistance) expect(s.phase).toBe('regroup')
+    }
+    expect(elapsed).toBeGreaterThan(14)
+    expect(elapsed).toBeLessThan(cfg.regroupSeconds)
+    expect(s.phase).toBe('run')
+    expect(dist(s.children[1], station)).toBeLessThanOrEqual(cfg.reachDistance * 0.6)
+  })
+
+  it('opens at the backstop when a catcher genuinely cannot arrive', () => {
+    const cfg = { ...CFG, walkPace: 0, utteranceGapSeconds: 0, catchDistance: -1 }
+    const { s, rand } = endingRun(cfg)
+    const stranded = { x: s.children[1].x, z: s.children[1].z }
+    for (let elapsed = 0; elapsed < cfg.regroupSeconds - 0.1; elapsed += 1 / 60) {
+      stepBankGame(s, 1 / 60, cfg, STAGE, openWorld(), rand)
+      expect(s.phase).toBe('regroup')
+    }
+    for (let i = 0; i < 10 && s.phase === 'regroup'; i++) stepBankGame(s, 1 / 60, cfg, STAGE, openWorld(), rand)
+    expect(s.phase).toBe('run')
+    expect(dist(s.children[1], stranded)).toBe(0)
+  })
+
+  it('assigns successive turns to the least-used catcher, with index breaking ties', () => {
+    const cfg = { ...CFG, utteranceGapSeconds: 0, catchDistance: -1 }
+    const { s, rand } = endingRun(cfg)
+    expect(s.tapper).toBe(0)
+    for (let t = 0; t < cfg.regroupSeconds + 1 && s.phase === 'regroup'; t += 1 / 60) {
+      stepBankGame(s, 1 / 60, cfg, STAGE, openWorld(), rand)
+    }
+    expect(s.tapTurns).toEqual([1, 0, 0])
+    s.tapFor = 0
+    s.returnFor = null
+    s.phaseFor = 0
+    stepBankGame(s, 1 / 60, cfg, STAGE, openWorld(), rand)
+    expect(s.phase).toBe('regroup')
+    expect(s.tapper).toBe(1)
+  })
+})
+
+describe('the tapper walks back into the catcher line before the charge', () => {
+  function readyGroup(catcherCount: number, cfg: BankConfig) {
+    const rand = mulberry32(1109)
+    const spots = Array.from({ length: catcherCount }, (_, slot) => stationAt(STAGE, 'upstream', slot, cfg))
+    spots.push(stationAt(STAGE, 'downstream', 0, cfg))
+    const s = createBankGame(spots, rand, cfg)
+    s.phase = catcherCount === 1 ? 'gather' : 'regroup'
+    s.phaseFor = cfg.regroupSeconds
+    s.from = 'downstream'
+    s.tapper = catcherCount - 1
+    s.children.forEach((c, i) => { c.role = i < catcherCount ? 'catcher' : 'runner' })
+    const touch = touchStand(STAGE, 'upstream', openWorld().blocked)!
+    Object.assign(s.children[s.tapper], { x: touch.x, z: touch.z })
+    return { s, rand, touch }
+  }
+
+  it.each([1, 3])('returns the tapper to its own station with %i catchers', (count) => {
+    const cfg = { ...CFG, utteranceGapSeconds: 0, catchDistance: -1 }
+    const { s, rand, touch } = readyGroup(count, cfg)
+    const held = s.children.map((c) => ({ x: c.x, z: c.z }))
+    const world = openWorld()
+    let tap: BankUtterance | null = null
+    for (let i = 0; i < 10 && !tap; i++) {
+      const word = stepBankGame(s, 1 / 60, cfg, STAGE, world, rand)
+      if (word?.moment === 'tap') tap = word
+    }
+    expect(tap?.speaker).toBe(s.tapper)
+    expect(Math.abs(touchReach(STAGE, 'upstream', s.children[s.tapper])!.gap)).toBeLessThanOrEqual(TOUCH_GAP)
+    let walkedBack = false
+    for (let t = 0; t < cfg.tapPauseSeconds + cfg.tapReturnSeconds + 1 && s.returnFor !== null; t += 1 / 60) {
+      stepBankGame(s, 1 / 60, cfg, STAGE, world, rand)
+      s.children.forEach((c, i) => {
+        if (i !== s.tapper) {
+          expect(dist(c, held[i])).toBe(0)
+          expect(c.held).toBe(true)
+        } else if (!c.held) {
+          walkedBack = true
+          expect(s.tapFor).toBe(0)
+          expect(c.pace).toBe(cfg.walkPace)
+        }
+      })
+      expect(s.phaseFor).toBe(cfg.runSeconds)
+    }
+    expect(walkedBack).toBe(true)
+    expect(s.returnFor).toBeNull()
+    expect(s.phase).toBe('run')
+    s.children.slice(0, count).forEach((c, slot) => {
+      expect(dist(c, stationAt(STAGE, 'upstream', slot, cfg))).toBeLessThanOrEqual(cfg.reachDistance * 0.6)
+      expect(dist(c, touch)).toBeGreaterThan(world.childRadius * 2)
+      expect(Math.abs(touchReach(STAGE, 'upstream', c)!.gap)).toBeGreaterThan(TOUCH_GAP)
+    })
+    const runner = s.children[count]
+    stepBankGame(s, 1 / 60, cfg, STAGE, world, rand)
+    expect(runner.held).toBe(false)
+    expect(dist(runner, held[count])).toBeGreaterThan(0)
+  })
+
+  it('releases an obstructed return at the short backstop without teleporting', () => {
+    const cfg = { ...CFG, utteranceGapSeconds: 0, catchDistance: -1, walkPace: 0 }
+    const { s, rand, touch } = readyGroup(2, cfg)
+    const world = openWorld()
+    for (let i = 0; i < 3; i++) stepBankGame(s, 1 / 60, cfg, STAGE, world, rand)
+    while (s.tapFor > 0) stepBankGame(s, 1 / 60, cfg, STAGE, world, rand)
+    let elapsed = 0
+    while (s.returnFor !== null && elapsed < cfg.tapReturnSeconds + 1) {
+      stepBankGame(s, 1 / 60, cfg, STAGE, world, rand)
+      elapsed += 1 / 60
+    }
+    expect(elapsed).toBeGreaterThanOrEqual(cfg.tapReturnSeconds)
+    expect(s.returnFor).toBeNull()
+    expect(dist(s.children[s.tapper], touch)).toBe(0)
+    expect(s.phaseFor).toBe(cfg.runSeconds)
+    stepBankGame(s, 1 / 60, cfg, STAGE, world, rand)
+    expect(s.phaseFor).toBeLessThan(cfg.runSeconds)
+  })
+})
+
+it('starts natural first and follow-up charges with the whole catcher group off the touch spot', () => {
+  const cfg = { ...CFG, roamSeconds: 0.1, roamSpread: 0, utteranceGapSeconds: 0 }
+  let returning = false
+  let firstCharges = 0
+  let groupCharges = 0
+  let lastTapper = -1
+  replay(360, { cfg, observe: (s, word) => {
+    if (word?.moment === 'call') {
+      expect(s.tapTurns.every((turns) => turns === 0)).toBe(true)
+      lastTapper = -1
+    }
+    if (word?.moment === 'tap') {
+      if (s.children.filter((c) => c.role === 'catcher').length >= 2) expect(s.tapper).not.toBe(lastTapper)
+      lastTapper = s.tapper
+    }
+    if (returning && s.returnFor === null && s.phase === 'run') {
+      const end = otherEnd(s.from)
+      const touch = touchStand(STAGE, end, openWorld().blocked)!
+      const group = s.children.filter((c) => c.role === 'catcher')
+      if (group.length === 1) firstCharges++
+      else groupCharges++
+      group.forEach((c, slot) => {
+        expect(dist(c, stationAt(STAGE, end, slot, cfg))).toBeLessThanOrEqual(cfg.reachDistance * 0.6)
+        expect(dist(c, touch)).toBeGreaterThan(openWorld().childRadius * 2)
+      })
+    }
+    returning = s.returnFor !== null
+  } })
+  expect(firstCharges).toBeGreaterThan(0)
+  expect(groupCharges).toBeGreaterThan(0)
 })
