@@ -30228,3 +30228,52 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   what the children's quarter is placed against, stay freed. The picture check therefore
   photographs what is really there: the quarter with no well anywhere, judged on both
   backends (WebGPU and WebGL 2).
+
+- [x] 1125. The second adult of a dig pair swings at untouched ground metres from the pit
+  (user 14.09.2026, ranked here by the user).
+  Reported as "Der Erwachsene graebt an der falschen Stelle" with the state archive
+  `hoa-state-2026-09-14-1093434877` (bambara-village, seed 1093434877, build 09b96e7,
+  WebGPU): one adult stands at the pit with his tool in the hole while his partner plays the
+  same full dig stroke several metres away, blade in the air over flat, unbroken ground. The
+  spoken word on the sheet at that moment is DIG.
+  MEASURED 14.09.2026 in `src/scenes/place/adultWork.ts` at 09b96e7b1:
+  - The pair is created at ~632-641. The initiator's target is the PARTNER; the partner's
+    target is `joinSpot(site)`, a stand at `JOIN_STAND_OFF` 2.4 m from the site centre (~159,
+    ~162-171).
+  - `startJointWalk` (~335-353) then moves ONLY the initiator onto the site centre
+    (`initiator.x = site.x`, `initiator.z = site.z`, ~341-342) and merely clears the
+    partner's `arrived` flag. The partner keeps the 2.4 m join stand as his goal.
+  - Arrival is granted within `WORK_ARRIVE_RADIUS` 1.1 m of that goal (~157, ~460-462), so
+    the partner comes to rest 1.3–3.5 m from the centre.
+  - `startDigging` (~355-366) sets `partner.phase = 'dig'` and `partner.arrived = true`
+    regardless of where he stopped, and `isDigging` (~195-198) tests only the phase and that
+    flag — so `PlaceLife.tsx` (~2894) plays the full `digPose` for him wherever he stands.
+  - The drawn pit is `DIG_SITE_RADIUS` 0.9 m (`layout.ts` ~214; a `patch` is ×1.35) with
+    broken ground out to r·1.12 (`PlaceScene.tsx` ~1545). The partner is therefore ALWAYS
+    outside the excavation — this is every dig bout, not an unlucky seed.
+  design.md §13.4 requires the opposite: "the initiator says DIG again while indicating the
+  hole, and only then do BOTH dig with tools in hand". A stroke that lands in open ground
+  teaches the player nothing about the word it is supposed to carry.
+  Final state:
+  - Once the site word has fallen, BOTH adults stand at the pit's working rim — a stand
+    derived from the drawn pit radius plus the tool's reach, held in `src/config/balance.ts`
+    as a calibratable value. `JOIN_STAND_OFF` keeps its own job: the approach stand while the
+    invitation and the site word are spoken.
+  - The two stand on opposite bearings of that rim, facing each other across the hole, and
+    NEITHER stands in it — the initiator's current `x = site.x, z = site.z` puts him on the
+    centre of the excavation and goes with this.
+  - A figure outside the working rim does not play the dig stroke: a future regression reads
+    as a villager standing idle, never as one hoeing untouched ground.
+  Test: Vitest in `src/scenes/place/adultWork.test.ts` — drive a bout to `phase === 'dig'`
+  over many seeds and assert for BOTH members of the pair that the villager is inside the
+  working rim of his site, and that nothing reports `isDigging` outside it. No browser tier
+  is needed: the positions are logic and the rendered stroke follows them; the picture is
+  judged once at the landing.
+  Refs: src/scenes/place/adultWork.ts (`JOIN_STAND_OFF` ~159, `joinSpot` ~162, `goalOf` ~191,
+  `isDigging` ~195, `startJointWalk` ~335, `startDigging` ~355, arrival ~460, pair creation
+  ~632), src/scenes/place/PlaceLife.tsx (~2894), src/scenes/place/layout.ts
+  (`DIG_SITE_RADIUS` ~214), src/scenes/place/PlaceScene.tsx (`DigSites` ~1519),
+  src/config/balance.ts, design.md §13.4
+  Criticality: medium — a player-visible teaching defect in the slice the release exists for,
+  reported from a real session, and reproducible on every bout.
+  Bundle: Dorfleben.
