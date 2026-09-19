@@ -15927,3 +15927,35 @@ to land than a mechanism that needs a review.
   Criticality: low — a small wrong thing in a picture the player stands in front of.
   Refs: verification/687-bank-play-rocks.png
   Bundle: Siedlungsgeometrie.
+
+- [ ] 1166. A runner that cannot reach its station freezes the whole bank round for a minute
+  (measured 19.09.2026 while reviewing point 1109; reproducible, and it is what the player
+  sees).
+  MEASURED STATE: in `nubian-village` at seed 42 the regroup between two runs ends TWICE in
+  400 played seconds on its backstop instead of on the group's arrival — 62.05 s of children
+  standing still, both times. The cause is named and it is NOT the catchers: at both
+  expiries child 3 is a RUNNER standing 2.68 m from its station, beyond the unchanged 2.2 m
+  `reachDistance`, while the waiting catcher is long since settled (0.58 m at the shipped
+  0.6 m tolerance, 0.19 m at the 0.2 m one that was tried). The runner never closes the last
+  half metre, so `inPlace` never becomes true and the clock has to end the phase. Measured at
+  both tolerances, so the catcher calibration of 1109 neither caused it nor cures it, and the
+  other three river villages show nothing of the kind (`docs/catcher-station-replay.md`).
+  WHY IT IS ITS OWN POINT NOW: 1109 raised the regroup backstop from 14 s to 60 s, which is
+  right for a group that has to walk the full stretch — but it also turned this blockage from
+  a 14-second hitch into a minute of frozen children, which is the defect class the user has
+  reported more than once.
+  Final state:
+  - The runner reaches its station in `nubian-village` at seed 42, or the round stops waiting
+    for a child that provably cannot arrive; either way no regroup in the four replayed river
+    villages ends on the backstop.
+  - Which of the two it was is named in the commit, and the cause is MEASURED before it is
+    fixed: whether the station itself is unreachable (inside a collider, behind a hut) or
+    whether the walk to it fails.
+  - `docs/catcher-station-replay.md` records the nubian row without a backstop expiry.
+  Test: extend the 1109 regression in `tagShuffle.test.ts` ("regroups on arrival before the
+  backstop") to `['nubian-village', 42]`; it must pass with the case included.
+  Criticality: medium — a minute of motionless children in one shipped village, in the scene
+  the player is invited to watch.
+  Refs: docs/catcher-station-replay.md, src/scenes/place/bankGame.ts (`inPlace`,
+  `stepStations`), src/scenes/place/tagShuffle.test.ts.
+  Bundle: Dorfleben.
