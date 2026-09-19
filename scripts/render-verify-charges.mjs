@@ -1636,4 +1636,20 @@ export const RED_CHARGES = [
       + 'the canvas. The charge dies with point 1156, which puts the limiter into design.md \u00a719 '
       + 'and then into the graph.',
   },
+  {
+    point: 1145,
+    suite: 'enrichments',
+    kind: 'check',
+    match: /^frame 72-water-victoria-falls — its subject is not in the rendered picture/i,
+    why:
+      'POINT 1145 FILED THIS EXACT FRAME AND CLASSIFIED IT PRE-EXISTING. Measured again '
+      + '19.09.2026 on the covering enrichments pass (webgpu, 45 pass / 1 fail) at main dd1e6a6b, '
+      + 'wording unchanged from the 17.09.2026 filing: the subject sits at lat -17.92, lon 25.85 '
+      + 'and the projection lands off the left and bottom edge. The frame is written in the '
+      + '`rivers` section, which runs long before anything this branch touched, and two baseline '
+      + 'runs on f347b652d already classified the falls half PRE-EXISTING. NOT backend-scoped: '
+      + 'the miss is a travel/camera-settling question, not a renderer one. The charge dies with '
+      + 'point 1145, which decides by measurement whether the travel stops short or the settle '
+      + 'wait expires, and repairs that.',
+  },
 ]
