@@ -294,17 +294,17 @@ describe('the finished answer is what the player heard', () => {
     expect(useUi.getState().drumPerformance).toBeNull()
   })
 
-  it('reopens an already heard answer only after the repeat finishes', () => {
-    g().receiveDrumMessage('answer')
+  it.each(['errand', 'answer'] as const)('reopens an already heard %s only after the repeat finishes', (message) => {
+    g().receiveDrumMessage(message)
     const pages = g().journal.length
-    const plan = drumMessagePlan('answer')
+    const plan = drumMessagePlan(message)
     render(<DrumMessageWatcher />)
     act(() => useUi.getState().startDrumMessage(plan))
     act(() => vi.advanceTimersByTime(Math.ceil(plan.duration * 1000) - 1))
-    expect(g().drumMessageHeard.answer).toBe(true)
+    expect(g().drumMessageHeard[message]).toBe(true)
     expect(useUi.getState().dialog).toBeNull()
     act(() => vi.advanceTimersByTime(1))
-    expect(useUi.getState().dialog).toEqual({ kind: 'drumMessage', message: 'answer' })
+    expect(useUi.getState().dialog).toEqual({ kind: 'drumMessage', message })
     expect(useUi.getState().drumPerformance).toBeNull()
     expect(g().journal).toHaveLength(pages)
   })

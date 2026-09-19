@@ -8205,10 +8205,11 @@ if (section('chief-to-drummer')) {
 
     // 6. Once it has been heard, the same key offers the REPEAT.
     const heard = await page
-      .waitForFunction(() => window.__game.getState().drumMessageHeard.errand === true, null, { timeout: 40000 })
+      .waitForFunction(() => window.__game.getState().drumMessageHeard.errand === true &&
+        window.__ui.getState().drumPerformance === null, null, { timeout: 40000 })
       .then(() => true)
       .catch(() => false)
-    check('the message enters the heard memory once it has been beaten out', heard, 'never recorded')
+    check('the message enters the heard memory once it has been beaten out', heard, 'never recorded or drumPerformance still running')
     await page.evaluate(() => window.__ui.getState().setDialog(null))
     await standAt(inFrontOf({ x: stood.drummer[0], z: stood.drummer[1] }, 2), mid)
     const repeatLabel = await page.evaluate(async () => {
