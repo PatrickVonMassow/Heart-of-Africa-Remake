@@ -27,7 +27,7 @@ describe('the drum picture window', () => {
 it('a declared non-predictive drum window cannot satisfy the narrow ladder', () => {
   const check = 'the drums are still speaking at the shutter'
   const verdict = narrowDiagnosis({
-    failures: [{ line: `FAIL  ${check} [--section=chief-to-drummer]`, section: 'chief-to-drummer', check }],
+    failures: [{ name: check, detail: '[--section=chief-to-drummer]' }],
     declared: ['chief-to-drummer', 'artefact-give', 'town-plan'],
     nonPredictive: [{ section: 'chief-to-drummer', check, why: 'the message is shorter than the capture window' }],
   })

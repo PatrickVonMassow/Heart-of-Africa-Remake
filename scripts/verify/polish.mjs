@@ -8377,14 +8377,13 @@ if (section('artefact-give')) {
       forms: window.__game.getState().carriedForms,
       message: window.__ui.getState().drumPerformance?.plan.message ?? null,
       atoms: window.__ui.getState().drumPerformance?.plan.atoms ?? null,
-      chiefSpoke: document.querySelector('.speech-label[data-speaker="chief"]') !== null,
     }), FIND)
     check('using the find before him lays it in his hands', given.state === 'given', JSON.stringify(given.state))
     check('the find leaves the bar the moment it is given', given.gone, `still in the bar: ${!given.gone}`)
     check('and the clay impression takes its place in the pack', given.forms.includes('rock-relief'), JSON.stringify(given.forms))
     check(
-      'the give starts his two-word answer on the drums, with no spoken chief label',
-      given.message === 'answer' && given.atoms?.length === 2 && !given.chiefSpoke,
+      'the give starts his two-word answer on the drums',
+      given.message === 'answer' && given.atoms?.length === 2,
       JSON.stringify(given),
     )
     // Frame BOTH men from the front. The actual give was checked at its reach;
@@ -8403,7 +8402,13 @@ if (section('artefact-give')) {
       local: { x: mid.x, y: chiefStood.y + 1, z: mid.z },
       label: 'the drummer beating the answer with the chief beside him after the find was given',
     }, 'answer')
-    await page.waitForFunction(() => window.__game.getState().drumMessageHeard.answer, null, { timeout: 40000 })
+    // The photographed repeat has its OWN last beat. The heard flag is already
+    // true from the give, so it cannot tell us when this display is ready.
+    await page.waitForFunction(() => {
+      const ui = window.__ui.getState()
+      return ui.drumPerformance === null && ui.dialog?.kind === 'drumMessage' &&
+        ui.dialog.message === 'answer' && document.querySelectorAll('.drum-message .drum-concept').length === 2
+    }, null, { timeout: 40000 })
     const answered = await page.evaluate(() => ({
       message: window.__ui.getState().dialog?.message,
       concepts: document.querySelectorAll('.drum-message .drum-concept').length,

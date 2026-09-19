@@ -11,13 +11,14 @@ import { en } from '../i18n/en'
 import { de } from '../i18n/de'
 import { useLocale } from '../i18n'
 import { useUi } from '../state/ui'
-import { freshGame, g } from '../test/store'
+import { freshGame, g, standBeforeChief } from '../test/store'
 import { drumMessagePhrase, drumMessagePlan } from '../communication/drumMessage'
 import { utteranceOf } from '../communication/lexicon'
 import { hypothesisFor } from '../communication/heard'
 import { NO_READING } from '../communication/speechLabel'
 import { DRUM_MESSAGE_VILLAGE, useGame } from '../state/store'
 import { nextChiefAction } from '../scenes/place/chiefMeeting'
+import { setChiefWalkState } from '../scenes/place/chiefPresence'
 
 const DIG = utteranceOf('DIG')
 const RIVER = utteranceOf('RIVER')
@@ -267,6 +268,46 @@ describe('the answer display', () => {
 describe('the finished answer is what the player heard', () => {
   beforeEach(() => vi.useFakeTimers())
   afterEach(() => vi.useRealTimers())
+
+  it('releases a give deferred behind the errand and waits for the answer itself', () => {
+    useGame.setState({ mode: 'place', placeId: DRUM_MESSAGE_VILLAGE, chiefOutside: { [DRUM_MESSAGE_VILLAGE]: true }, rockArtefact: 'carried' })
+    setChiefWalkState({ phase: 'at-drummer', progress: 1, at: 0, drumOnArrival: false })
+    standBeforeChief()
+    render(<DrumMessageWatcher />)
+    act(() => g().requestDrumMessage())
+    const errand = useUi.getState().drumPerformance!
+    act(() => g().handArtefactToChief())
+    expect(g().rockArtefact).toBe('given')
+    expect(useUi.getState().drumPerformance).toBe(errand)
+    act(() => vi.advanceTimersByTime(Math.ceil(errand.plan.duration * 1000)))
+    expect(g().drumMessageHeard).toEqual({ errand: true, answer: false })
+    expect(useUi.getState().dialog).toEqual({ kind: 'drumMessage', message: 'errand' })
+    const answer = useUi.getState().drumPerformance!
+    expect(answer.plan.message).toBe('answer')
+    act(() => useUi.getState().setDialog(null))
+    act(() => vi.advanceTimersByTime(Math.ceil(answer.plan.duration * 1000) - 1))
+    expect(g().communication.heard[utteranceOf('DOWNSTREAM')]).toBeUndefined()
+    expect(useUi.getState().dialog).toBeNull()
+    act(() => vi.advanceTimersByTime(1))
+    expect(g().drumMessageHeard).toEqual({ errand: true, answer: true })
+    expect(useUi.getState().dialog).toEqual({ kind: 'drumMessage', message: 'answer' })
+    expect(useUi.getState().drumPerformance).toBeNull()
+  })
+
+  it('reopens an already heard answer only after the repeat finishes', () => {
+    g().receiveDrumMessage('answer')
+    const pages = g().journal.length
+    const plan = drumMessagePlan('answer')
+    render(<DrumMessageWatcher />)
+    act(() => useUi.getState().startDrumMessage(plan))
+    act(() => vi.advanceTimersByTime(Math.ceil(plan.duration * 1000) - 1))
+    expect(g().drumMessageHeard.answer).toBe(true)
+    expect(useUi.getState().dialog).toBeNull()
+    act(() => vi.advanceTimersByTime(1))
+    expect(useUi.getState().dialog).toEqual({ kind: 'drumMessage', message: 'answer' })
+    expect(useUi.getState().drumPerformance).toBeNull()
+    expect(g().journal).toHaveLength(pages)
+  })
 
   it.each([null, { kind: 'trade', building: 'market' }] as const)('records only after its last beat and respects an existing dialog: %s', (dialog) => {
     const plan = drumMessagePlan('answer')
