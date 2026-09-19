@@ -13,12 +13,15 @@ cache_read_input_tokens + cache_creation_input_tokens`, taken before that
 session's first tool call.
 
 FLOOR owner :: 20.08.2026 :: `~/.claude/projects/-workspace-hoa/3141e458-63d3-4825-81bf-f135a96a50b4.jsonl`
-:: `2 + 22,579 + 21,034 = 43,615` :: LIVE
+:: `2 + 22,579 + 21,034 = 43,615` :: EXPIRED :: 19.09.2026 :: 0bb3b56ecd114f6dbb7e8860eaa059e6a09d13e5
 
 FLOOR subagent :: 20.08.2026 :: `~/.claude/projects/-workspace-hoa--claude-worktrees-agent-a3d55aa0d296e011a/ffafb607-4609-4d8c-8ac9-49fc0bd74ea4.jsonl`
 :: `2 + 21,417 + 18,118 = 39,537` :: EXPIRED :: 19.09.2026 :: 78a5d1a771c46d3d054398625c986e628a3e3dc1
 
-The owner transcript was LIVE when read on 19.09.2026. Its committed
+The owner transcript EXPIRED on 19.09.2026 as well, hours after it was last
+read: its number stands on commit
+`0bb3b56ecd114f6dbb7e8860eaa059e6a09d13e5` (20.08.2026), which measured it, and
+on the committed attestation taken while the file was still readable. That
 attestation, `docs/document-cut-757-evidence/owner.json`, preserves the verbatim
 first usage row, the preceding same-session user row used to establish kind,
 and the earliest timestamp row found by scanning the entire transcript. Source
