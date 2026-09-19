@@ -6787,6 +6787,15 @@ if (section('adult-errands')) {
 // than off the sampler that computes it.
 if (section('stone-step')) {
   await goToPlace('bambara-village')
+  // The first-person player is installed a frame or two after the layout is
+  // published; reading it before that is what an unguarded `__placePlayer.x`
+  // throws on.
+  const walking = await page
+    .waitForFunction(() => !!window.__placePlayer && !!window.__placeCamera && !!window.__placeLayout, null, { timeout: 40000 })
+    .then(() => true)
+    .catch(() => false)
+  check('the village stands with a first-person player in it', walking)
+  if (walking) {
   const stone = await page.evaluate(async () => {
     const { looseRockIsGround, looseRockTop } = await import('/src/scenes/place/looseRocks.ts')
     const { standingClear, PLAYER_RADIUS } = await import('/src/scenes/place/collision.ts')
@@ -6803,6 +6812,11 @@ if (section('stone-step')) {
     let best = null
     for (const [x, z, scale] of layout.rocks) {
       if (!looseRockIsGround(scale)) continue
+      // WELL INSIDE THE SETTLEMENT. The scatter reaches past the walkable rim
+      // (`6 + rand() * (radius + 6)` in layout.ts), and standing a player out
+      // there ends the visit: the place unmounts under the camera, which is
+      // exactly what the first cut of this section measured as "no player".
+      if (Math.hypot(x, z) > layout.radius * 0.8) continue
       if (bare(x, z) !== 0 || bare(x - 1, z) !== 0 || bare(x + 1, z) !== 0) continue
       const clear = standingClear(layout.colliders, x, z, PLAYER_RADIUS)
       if (!clear) continue
@@ -6814,7 +6828,7 @@ if (section('stone-step')) {
         )
         if (blocked) break
       }
-      if (!best || room > best.room) best = { x, z, scale, room, top: looseRockTop(scale) }
+      if (!best || room > best.room) best = { x, z, scale, room, top: looseRockTop(scale), out: Math.hypot(x, z), rim: layout.radius }
     }
     return best
   })
@@ -6827,20 +6841,35 @@ if (section('stone-step')) {
     // Three standpoints on one line through the stone: outside its rise, on its
     // centre, and outside it again on the far side.
     const reach = stone.top > 0 ? 0.9 : 0
-    const readAt = async (dx) => {
-      await page.evaluate(({ x, z, dx }) => {
+    // The scene may remount between two standpoints — the module imports above
+    // run through the dev server — so every standpoint waits for the player it
+    // is about to move rather than assuming the last one's is still there.
+    const stand = async (x, z, yaw, pitch) => {
+      await page
+        .waitForFunction(() => !!window.__placePlayer && !!window.__placeCamera, null, { timeout: 30000 })
+        .catch(() => {})
+      return page.evaluate(({ x, z, yaw, pitch }) => {
         const p = window.__placePlayer
-        p.x = x + dx
+        if (!p) return false
+        p.x = x
         p.z = z
-        p.yaw = dx < 0 ? Math.PI / 2 : -Math.PI / 2
-        p.pitch = -0.2
-      }, { x: stone.x, z: stone.z, dx })
+        p.yaw = yaw
+        p.pitch = pitch
+        return true
+      }, { x, z, yaw, pitch })
+    }
+    const readAt = async (dx) => {
+      const stood = await stand(stone.x + dx, stone.z, dx < 0 ? Math.PI / 2 : -Math.PI / 2, -0.2)
+      if (!stood) return null
       await nextFrames(4)
       return page.evaluate(() => window.__placeCamera?.position.y ?? null)
     }
     const before = await readAt(-reach)
     const on = await readAt(0)
     const after = await readAt(reach)
+    const answered = before !== null && on !== null && after !== null
+    check('the live camera answers at all three standpoints', answered, JSON.stringify({ before, on, after }))
+    if (answered) {
     // The camera stands the stone's own drawn top higher at its centre than on
     // the open ground a pace away, and comes back down on the other side. The
     // tolerance carries the idle sway that keeps the camera alive at rest.
@@ -6853,20 +6882,15 @@ if (section('stone-step')) {
     )
     // …and the picture of the thing itself: the player's own view, two paces
     // short of the stone he is about to walk over.
-    await page.evaluate(({ x, z }) => {
-      const p = window.__placePlayer
-      const back = 2.2
-      p.x = x - back
-      p.z = z
-      p.yaw = Math.atan2(x - p.x, z - p.z) + Math.PI
-      p.pitch = -0.32
-      window.__game.getState().setJournalOpen(false)
-    }, stone)
+    await stand(stone.x - 2.2, stone.z, Math.atan2(2.2, 0) + Math.PI, -0.32)
+    await page.evaluate(() => window.__game.getState().setJournalOpen(false))
     await nextFrames(6)
     await frame('1149-village-stone-step', {
       local: { x: stone.x, y: stone.top / 2, z: stone.z },
       label: 'the small stone in the village the walk is carried over',
     })
+    }
+  }
   }
 }
 
