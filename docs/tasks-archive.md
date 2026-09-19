@@ -29957,3 +29957,44 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Refs: the hint markup and CSS of point 1146 (`.hud-bottom-row`, `.hud-bottom-left`), its
   tests.
   Bundle: Steuerung & Performance.
+
+- [x] 1165. The document-cut account stands on session transcripts the platform deletes after
+  thirty days; one of them is already gone, so `npm run test:unit` is RED on `main` and no point
+  can land. MEASURED 19.09.2026 on HEAD 1c85eb805: the same gate was GREEN at 04:38 and RED at
+  04:52 with five failures in `scripts/cut-account-core.test.mjs`, every one of them
+  `ENOENT … /-workspace-hoa--claude-worktrees-agent-a3d55aa0d296e011a/ffafb607-4609-4d8c-8ac9-49fc0bd74ea4.jsonl`
+  — the SUBAGENT floor transcript named in `docs/document-cut-757.md`, deleted DURING that
+  session by the 30-day `cleanupPeriodDays` cleanup the board card "Transkript-Aufbewahrung"
+  predicted. The second named file, the OWNER floor
+  `~/.claude/projects/-workspace-hoa/3141e458-63d3-4825-81bf-f135a96a50b4.jsonl`, was last written
+  20.08.2026 and falls out on the same clock, so the remaining evidence is hours, not weeks, from
+  the same fate. The test is not wrong — it refuses a claim whose evidence it cannot read, and its
+  all-or-nothing anchor exists because per-file skipping once let a stale owner reading pass. What
+  is wrong is that the only evidence lives outside the repository, where it expires.
+  FINAL STATE, three parts, all mandatory.
+  - (1) THE EVIDENCE MOVES INTO THE REPOSITORY BEFORE IT EXPIRES. A script writes, for every
+    floor `docs/document-cut-757.md` names whose transcript is STILL READABLE, an attestation
+    holding the verbatim usage row the floor was taken from, the rows the kind and session checks
+    read, the transcript path and the date it was read. It reads a real file or it refuses — it
+    never composes a row. Run it for the owner floor and COMMIT the attestation in the same
+    commit, while the transcript still exists.
+  - (2) THE DOCUMENT STOPS CLAIMING WHAT CANNOT BE RE-DERIVED. `docs/document-cut-757.md` marks
+    each floor LIVE or EXPIRED. The subagent floor is EXPIRED: its transcript went on 19.09.2026
+    under the 30-day cleanup, its number stands on the commit that recorded it, and the document
+    says plainly that it can no longer be re-derived on this machine. The stated numbers and the
+    gap of 4,078 do NOT change — this is a statement about evidence, not a re-measurement.
+  - (3) THE TEST JUDGES BY THAT MARKING. On the batch machine every floor must be backed by a
+    readable transcript, else by a committed attestation, else by an EXPIRED marking that carries
+    a date and an attesting commit git can resolve and whose commit date precedes the expiry. A
+    floor marked LIVE whose transcript is missing still FAILS: the anti-fabrication property the
+    all-or-nothing anchor protects is unchanged, and a floor with none of the three fails.
+  TESTS. Vitest in `scripts/cut-account-core.test.mjs` and the new script's own test: a LIVE floor
+  with a readable transcript re-derives as today; a LIVE floor whose transcript is missing fails;
+  an EXPIRED floor with date and resolvable attesting commit passes; an EXPIRED floor with no
+  date, no commit, or a commit dated after the expiry fails; an attestation that does not match
+  its transcript fails. `npm run test:unit` GREEN on the merge candidate is the acceptance.
+  BOUNDS: no new guard, ledger field or router (infrastructure freeze) — this repairs an existing
+  check whose evidence expired. It does NOT touch `~/.claude/settings.json`: raising
+  `cleanupPeriodDays` is the user's decision and stands on the board card.
+  Criticality: high — it blocks every landing in the batch.
+  Bundle: Session- & Repo-Hygiene.
