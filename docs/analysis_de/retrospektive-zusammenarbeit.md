@@ -63,6 +63,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 18.09. abends | Ein abgehakter Fix hielt nicht: Die Reparatur von Punkt 1148 ruhte auf einer nie gemessenen Browser-Sperrfrist und zählte ihren einzigen Nachfrage-Versuch vom Klick statt vom Escape — sie landete also genau bei schnellem Klick zu früh und erzeugte den gemeldeten Fehler mit. Die Nachfolge-Reparatur ruht auf keiner Zahl mehr, und ihr Punkt bleibt bis zur Beobachtung des Nutzers offen (§3.291) |
 | 18.09. spät | Eine tote Messung landete beinahe als funktionierend: Der Effekt, der die Rechtecke für den zentrierten Steuerungshinweis liest, hing an den Sprachtexten statt an der Bedingung, die über das Element selbst entscheidet — er nahm seinen frühen Rücksprung und wurde nie wieder angestoßen. Grün war die Prüfung trotzdem, weil der CSS-Vorgabewert im geräumigen Fall zufällig dasselbe Ergebnis hat wie die Messung; erst der enge Fall trennte beide (§3.292) |
 | 19.09. | Eine Bildprüfung lag rot, obwohl das Produkt stimmte: Ihre Bühne suchte freie Sicht bis auf den Brunnenplatz, den der Punkt gerade aus der Freihalteliste genommen hatte — das Dorf hatte darauf weitergebaut, die letzte Stützstelle der Sichtlinie lag in einer neuen Hütte. Die Ursache nannte erst der Vergleich der Kollisionssätze im Knoten, nicht der nächste Browserlauf (§3.294) |
+| 19.09. abends | Die CI war rot, wo dieselbe Suite hier grün fährt: Das Abbruch-Protokoll nahm den zuletzt gepushten Stand aus der Notiz, die der Arbeiter nach dem Push schreibt — wird er dazwischen getötet, nennt das Protokoll eine Spitze, die nicht steht. Der vorhandene Prüffall hoffte auf das Rennen und war auch gegen den unreparierten Stand grün (§3.295) |
 | 13.09. | Ein Punkt zog seine eigenen Rot-Ladungen zurück, wie es die Regel verlangt — zwei Tests standen noch auf ihnen und wurden erst im Tor der LANDUNG rot, als der Merge schon auf main lag: Das Register erzwingt »kein Eintrag ohne offenen Punkt«, niemand erzwingt »kein Test ohne seinen Eintrag« (§3.268). Dieselbe Sitzung wies drei Fremd-Rot nach: gegen die Zweigwurzel gemessen sind alle drei auch auf main rot, und das Rätsel am Schutthang ist dort nicht sporadisch, sondern reproduziert jedes Mal |
 | 13.09. abends | Vier CI-Läufe eines Zweigs starben als »cancelled« — ein Wort, das weder Ursache noch Reparatur nennt und das kein Push heilen kann. Es war das 15-Minuten-Limit des `fast`-Jobs: Die letzten beiden GRÜNEN Läufe, einer davon auf main, brauchten 14 m 41 s und 14 m 45 s, also rund fünfzehn Sekunden Luft. Der nächste Punkt, der irgendeinen Test hinzufügt, musste auflaufen, egal welcher. Sichtbar wurde es erst im Schrittprotokoll: install/build/lint/audit grün, `unit: cancelled`, »The operation was canceled« nach 15 m 13 s (§3.270) |
 | 14.09. | Nach einer Parallelsitzung verlangte ein Stop-Hook `batch-doctor --gate` vor JEDER weiteren Batch-Arbeit — dessen Tor fährt eine volle Unit-Suite, neben dem laufenden Zwei-Backend-Bildlauf auf derselben Maschine. Gefunden hat der Doktor genau eine Datei: die Review-Zeile, die dieselbe Sitzung vier Minuten zuvor geschrieben hatte. Sie zu committen genügte, das Urteil sprang auf `consistent`, die Unit-Suite wurde nie gebraucht; ihr Abbruch ließ zwei verwaiste vitest-Worker neben dem Bildlauf zurück (§3.271, Wiedergänger von §3.267) |
@@ -1657,7 +1658,7 @@ stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die s
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Samstag, 19.09.2026, 17:58 · Quellen-Fingerprint: `e2d0f62f520e…`
+Zuletzt aktualisiert: Samstag, 19.09.2026, 19:04 · Quellen-Fingerprint: `8da4c331dc86…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1764,8 +1765,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 97 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 7 Revert-/Reapply-Commits · 136 Prozess-/Meta-TASKS-Punkte (davon 64 offen).
 
-<!-- RETRO-FINGERPRINT: e2d0f62f520eaf30f15a70acdeb23024362cacb93bb341d6fd9fb3db3fbe683b -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-19T15:58:25.766Z -->
+<!-- RETRO-FINGERPRINT: 8da4c331dc86341675c5074abe5b7fcfa3a4428730d45a90414b5231dc2ea078 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-19T17:04:13.345Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -7824,3 +7825,27 @@ umzudeuten.
 mit auf — und prüft bei jeder Änderung, ob die Änderung selbst eine davon aufhebt. Und
 eine rote Bühne wird zuerst gemessen, nicht neu geraten: Die deterministische Geometrie
 liegt im Knoten in Sekunden offen, wo der Browserlauf nur ein weiteres Nein liefert.
+
+### 3.295 Das Protokoll glaubte der Notiz des Arbeiters statt der Sache selbst
+
+Die CI meldete am 19.09.2026 einen roten Unit-Schritt auf `main`, den dieselbe Suite auf
+dieser Maschine grün fährt. Der Fall: Beim Abbruch eines beauftragten Arbeiters schreibt
+der Daemon ins Protokoll, welchen Stand dieser zuletzt gepusht hat — und nahm dafür die
+Notiz, die der Arbeiter SELBST nach dem Push hinterlegt. Wird er zwischen Push und Notiz
+getötet, hinkt die Notiz einen Commit hinterher, und das Protokoll nennt eine Spitze, die
+nicht steht. Auf der langsamen Maschine der CI passiert das, hier fast nie.
+
+Der Prüffall dafür stand schon da und war trotzdem grün: Er pflanzte keine veraltete
+Notiz, sondern hoffte auf das Rennen. Als ich eine veraltete Notiz pflanzte, schrieb der
+noch lebende Arbeiter sie vor dem Abbruch korrekt zurück — der Prüffall bestand also auch
+gegen den UNREPARIERTEN Daemon. Erst die Reihenfolge machte ihn zum Nachweis: erst den
+Arbeiter töten, dann die Notiz pflanzen, dann abbrechen. Gegen den alten Stand ist er rot,
+gegen den neuen grün.
+
+Die Reparatur wechselt die Autorität: Was gepusht ist, sagt die Remote-Tracking-Referenz,
+die der Push selbst bewegt — nicht der Zettel daneben.
+
+**Lehre:** Wer den Zustand einer fremden Arbeit protokolliert, liest die Sache, die sich
+mit der Tat ändert, nicht die Meldung, die jemand danach darüber schreibt. Und ein
+Prüffall, der ein Rennen abbildet, ist erst dann ein Nachweis, wenn er gegen den alten
+Stand ROT ist — sonst hält er nur fest, dass das Rennen heute anders ausging.
