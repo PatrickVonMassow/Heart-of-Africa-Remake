@@ -1374,12 +1374,12 @@ export const balance: BalanceConfig = {
       // 7.93-18.62 s (Mandinka@99), with no backstop. At 0.2 m, Bambara@42
       // stalls for 62.05 s: crowd/collider jostle can keep the last 20 cm out
       // of reach. 0.6 m still fits well inside the 1.32 m charge-frame bar
-      // (reachDistance * 0.6). Nubian@42's runner blockage persists at both
-      // radii; its waiting catcher reaches its station at either tolerance.
+      // (reachDistance * 0.6). Stone queues have their own timeout below.
       catcherStationDistance: 0.6,
       // Calibratable: one ROCK atom plus a beat with the hand resting on the flank.
       arrivalHoldSeconds: 1.5,
-      // Calibratable against occupied stone queues in 400 s village replays at shipped and 8 s roaming; expires well before the group's walk backstop.
+      // Calibratable: 14 s bounds occupied stone queues in 400 s village replays
+      // at shipped and 8 s roaming, well before the group's walk backstop.
       arrivalApproachSeconds: 14,
       // Calibratable: catchers walk the full stretch after the sides swap.
       regroupSeconds: 60,

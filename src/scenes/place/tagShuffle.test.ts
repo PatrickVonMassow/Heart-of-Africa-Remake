@@ -1479,38 +1479,47 @@ describe('the children`s bank round can reach its own stage (work-order 687)', (
     ['mandinka-village', 99],
   ]
 
-  // Nubian@42 was also measured: its runner 3 remains outside reachDistance
-  // at two backstops at BOTH 0.2 m and 0.6 m; that is a separate runner blockage.
-  // These cases isolate catcher arrival with all runner stations reachable.
-  it.each([
-    ['bambara-village', 42],
-    ['bambara-village', 2972259115],
-    ['mandinka-village', 99],
-  ] as const)('%s at seed %i regroups on arrival before the backstop', async (placeId, seed) => {
-    const v = village(placeId, seed)
-    const bank = v.bank!
-    const dt = 1 / 60
-    const segments: number[] = []
-    let began: number | null = null
-    let expired = false
-    // Two or more cycles with the shipped timings and the whole village's
-    // moving bodies. The second Bambara@42 cycle exposed the minute-long stall.
-    for (let step = 0; step < 400 * 60; step++) {
-      const before = bank.phase
-      frame(v, dt)
-      if (bank.phase === 'regroup' && before !== 'regroup') began = bank.clock
-      if (bank.phase === 'regroup' && bank.phaseFor <= 0) expired = true
-      if (before === 'regroup' && bank.phase !== 'regroup') {
-        segments.push(bank.clock - began!)
-        began = null
+  describe.each([
+    ['shipped roaming', BANK_CFG.roamSeconds, BANK_CFG.roamGuardSeconds],
+    ['shortened roaming', 8, 8],
+  ] as const)('%s', (_setting, roamSeconds, roamGuardSeconds) => {
+    it.each(RIVER_VILLAGES)('%s at seed %i regroups on arrival before the backstop', async (placeId, seed) => {
+      const shippedRoam = BANK_CFG.roamSeconds
+      const shippedGuard = BANK_CFG.roamGuardSeconds
+      try {
+        BANK_CFG.roamSeconds = roamSeconds
+        BANK_CFG.roamGuardSeconds = roamGuardSeconds
+        const v = village(placeId, seed)
+        const bank = v.bank!
+        const dt = 1 / 60
+        const segments: number[] = []
+        let began: number | null = null
+        let expired = false
+        // Replay both shipped roaming and the polish section's 8 s roaming:
+        // the shorter interval exposes occupied stone queues between runs.
+        for (let step = 0; step < 400 * 60; step++) {
+          const before = bank.phase
+          frame(v, dt)
+          if (bank.phase === 'regroup' && before !== 'regroup') began = bank.clock
+          if (bank.phase === 'regroup' && bank.phaseFor <= 0) expired = true
+          if (before === 'regroup' && bank.phase !== 'regroup') {
+            segments.push(bank.clock - began!)
+            began = null
+          }
+          if ((step + 1) % 1200 === 0) await new Promise((resolve) => setTimeout(resolve, 0))
+        }
+        const unfinished = began === null ? 0 : bank.clock - began
+        const measured = JSON.stringify({ placeId, seed, roamSeconds, roamGuardSeconds, segments, unfinished, expired })
+        expect(segments.length, measured).toBeGreaterThanOrEqual(4)
+        expect(expired, measured).toBe(false)
+        // Also catch expiry on the transition frame, or an unfinished last regroup.
+        expect(Math.max(...segments, unfinished), measured).toBeLessThan(BANK_CFG.regroupSeconds)
+      } finally {
+        BANK_CFG.roamSeconds = shippedRoam
+        BANK_CFG.roamGuardSeconds = shippedGuard
       }
-      if ((step + 1) % 1200 === 0) await new Promise((resolve) => setTimeout(resolve, 0))
-    }
-    expect(segments.length).toBeGreaterThanOrEqual(4)
-    expect(expired, JSON.stringify({ placeId, seed, segments })).toBe(false)
-    // Also catch expiry on the transition frame, or an unfinished last regroup.
-    expect(Math.max(...segments, began === null ? 0 : bank.clock - began)).toBeLessThan(BANK_CFG.regroupSeconds)
-  }, 60_000)
+    }, 60_000)
+  })
 
   for (const [placeId, seed] of RIVER_VILLAGES) {
     it(`${placeId} at seed ${seed} lets the children stand on every part of the stage`, () => {
