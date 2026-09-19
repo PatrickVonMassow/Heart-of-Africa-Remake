@@ -203,6 +203,14 @@ put it is the mistake this line exists to stop.
   fewer stations make the children's quarter (481.4) easier to place in exactly the village
   where the room is tightest.
   Bundle: Dorfleben.
+  THE SPOT IS NOT EMPTY — THE VILLAGE CLOSED OVER IT (measured 19.09.2026). The well left
+  the keep-clear list as this point asks, so the procedural fabric may build on the ground it
+  held: at the section's seed a family hut (r 1.72) stands 0.46 m off the old centre, and
+  three smaller props shifted with the seed stream. That is the intended consequence of the
+  spot becoming ordinary village ground, not a defect — the freed ADULT STATIONS, which are
+  what the children's quarter is placed against, stay freed. The picture check therefore
+  photographs what is really there: the quarter with no well anywhere, judged on both
+  backends (WebGPU and WebGL 2).
 
 - [ ] 1125. The second adult of a dig pair swings at untouched ground metres from the pit
   (user 14.09.2026, ranked here by the user).
