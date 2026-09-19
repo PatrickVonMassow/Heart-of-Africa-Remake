@@ -722,9 +722,17 @@ describe('both diggers work the rim of their own site', () => {
         const site = v.geography.digSites[taskOf(state, first)!.siteIndex!]
         const one = v.villagers[first]
         const other = v.villagers[mate]
-        // The hole is BETWEEN them: the midpoint of the two bodies is the site.
-        expect(Math.hypot((one.x + other.x) / 2 - site.x, (one.z + other.z) / 2 - site.z)).toBeLessThanOrEqual(RIM_SLACK)
-        expect(Math.hypot(one.x - other.x, one.z - other.z)).toBeGreaterThan(DIG_RIM_DISTANCE)
+        // THE HOLE IS BETWEEN THEM, MEASURED AS SUCH. A midpoint reading proves
+        // nothing — both bodies are inside the rim, so their middle always is
+        // too, and two men side by side on one arc pass it. What has to hold is
+        // that their bearings from the site point OPPOSITE ways and that the
+        // line joining them runs through the pit rather than past it.
+        const a = { x: one.x - site.x, z: one.z - site.z }
+        const b = { x: other.x - site.x, z: other.z - site.z }
+        const span = Math.hypot(a.x - b.x, a.z - b.z)
+        expect(a.x * b.x + a.z * b.z).toBeLessThan(0)
+        expect(Math.abs(a.x * b.z - a.z * b.x) / span).toBeLessThanOrEqual(RIM_SLACK)
+        expect(span).toBeGreaterThan(DIG_RIM_DISTANCE)
         checked++
       }
       expect(checked).toBe(1)

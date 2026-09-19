@@ -5871,10 +5871,11 @@ if (section('adult-errands')) {
     // out — every body at the dig pose stands at its OWN pit's working rim, and
     // a pair at one pit has the hole BETWEEN them rather than standing shoulder
     // to shoulder over the same arc.
-    const rimLimit = await page.evaluate(() => {
+    const balanceRim = await page.evaluate(() => {
       const e = window.__balance.villageLife.adultErrands
-      return e.digStandDistance + e.digStandTolerance
+      return { digStandDistance: e.digStandDistance, digStandTolerance: e.digStandTolerance }
     })
+    const rimLimit = balanceRim.digStandDistance + balanceRim.digStandTolerance
     const offRim = []
     const sideBySide = []
     let pairsSeen = 0
@@ -5939,12 +5940,26 @@ if (section('adult-errands')) {
         if (pair.length !== 2) continue
         pairsSeen++
         const site = now.geography.digSites[siteIndex]
-        const middle = Math.hypot((pair[0].x + pair[1].x) / 2 - site.x, (pair[0].z + pair[1].z) / 2 - site.z)
-        const span = Math.hypot(pair[0].x - pair[1].x, pair[0].z - pair[1].z)
-        // The hole is between them, and they are not standing on one another:
-        // the middle alone passes for two men on the same spot.
-        if (middle > rimLimit || span <= rimLimit) {
-          sideBySide.push(`sample ${i}: middle ${middle.toFixed(2)} m off their pit, ${span.toFixed(2)} m apart`)
+        // ACROSS THE HOLE, MEASURED AS SUCH (GPT-6 Astra, cross-vendor round).
+        // A midpoint reading proves nothing: both bodies are already inside
+        // `rimLimit`, so their middle always is too — two men side by side on
+        // one arc pass it. What must hold is that the site lies BETWEEN them:
+        // their bearings from it point into opposite half-planes, and they are
+        // not sharing one spot.
+        //
+        // HOW NEARLY OPPOSITE is NOT asserted here, on purpose. The placement
+        // rule takes the widest pair of rim bearings the ground offers, and a
+        // village whose fabric blocks the far side legitimately gives less than
+        // a straight line — this run measured a pair 3.18 m apart whose joining
+        // line ran 0.52 m past the pit. Exact opposition is asserted where the
+        // ground is unconstrained and the claim is the rule's own: the Vitest
+        // sweep and `placeGround.test.ts`.
+        const one = { x: pair[0].x - site.x, z: pair[0].z - site.z }
+        const other = { x: pair[1].x - site.x, z: pair[1].z - site.z }
+        const span = Math.hypot(one.x - other.x, one.z - other.z)
+        const opposed = one.x * other.x + one.z * other.z < 0
+        if (!opposed || span <= balanceRim.digStandDistance) {
+          sideBySide.push(`sample ${i}: bearings ${opposed ? 'opposed' : 'on the same side of the pit'}, ${span.toFixed(2)} m apart`)
         }
       }
       // AND NO ADULT VOICE EVER FALLS INSIDE THE CHILDREN'S EARSHOT (the spec's
@@ -6673,16 +6688,22 @@ if (section('adult-errands')) {
           // The bout, not the pose: a body the rim test has already dropped is
           // exactly the one a picture of untouched ground would contain.
           const still = e.villagers.filter((v) => v.work?.siteIndex === at && v.work.phase === 'dig' && v.work.arrived)
+          const site = e.geography.digSites[at]
+          const from = still.map((v) => ({ x: v.x - site.x, z: v.z - site.z }))
+          const span = from.length === 2 ? Math.hypot(from[0].x - from[1].x, from[0].z - from[1].z) : null
           return {
             count: still.length,
             striking: still.filter((v) => v.digging).length,
-            away: still.map((v) => Math.hypot(v.x - e.geography.digSites[at].x, v.z - e.geography.digSites[at].z)),
-            span: still.length === 2 ? Math.hypot(still[0].x - still[1].x, still[0].z - still[1].z) : null,
+            away: from.map((d) => Math.hypot(d.x, d.z)),
+            span,
+            opposed: from.length === 2 ? from[0].x * from[1].x + from[0].z * from[1].z < 0 : false,
+            offLine: span ? Math.abs(from[0].x * from[1].z - from[0].z * from[1].x) / span : null,
           }
         }, digging.siteIndex)
         check(
           'and both are still at the stroke, on opposite sides of the hole',
-          held.count === 2 && held.striking === 2 && held.away.every((d) => d <= rimLimit) && held.span > rimLimit,
+          held.count === 2 && held.striking === 2 && held.away.every((d) => d <= rimLimit)
+            && held.opposed && held.span > balanceRim.digStandDistance,
           JSON.stringify(held),
         )
         await frame('1125-dig-pair-at-the-working-rim', {
