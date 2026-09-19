@@ -240,10 +240,13 @@ export const FLOOR_KINDS = Object.freeze(['owner', 'subagent'])
 /**
  * One floor reading, as the document writes it:
  *
- *   FLOOR <kind> :: <date> :: `<transcript path>` :: `<a> + <b> + <c> = <sum>`
+ *   FLOOR <kind> :: <date> :: `<transcript path>` :: `<a> + <b> + <c> = <sum>` :: LIVE
+ *   (or append `:: EXPIRED :: DD.MM.YYYY :: <attesting commit>` to the sum)
  *
  * The reading may wrap after any `::`, which is why the shape is matched against
- * the paragraph rather than a single line. The three summands are
+ * the paragraph rather than a single line; evidence metadata follows the sum
+ * on the same line. Missing metadata stays null so the judge can refuse it.
+ * The three summands are
  * `input_tokens`, `cache_read_input_tokens` and `cache_creation_input_tokens` of
  * the FIRST assistant message, and they are carried instead of the total alone
  * so a later reader can re-derive the number from the named transcript rather
@@ -251,7 +254,7 @@ export const FLOOR_KINDS = Object.freeze(['owner', 'subagent'])
  * cannot excuse: it is what a copied-over figure looks like.
  */
 const FLOOR_RE =
-  /FLOOR\s+([a-z]+)\s*::\s*([\d.]+)\s*::\s*`([^`]+)`\s*::\s*`\s*([\d,]+)\s*\+\s*([\d,]+)\s*\+\s*([\d,]+)\s*=\s*([\d,]+)\s*`/g
+  /FLOOR\s+([a-z]+)\s*::\s*([\d.]+)\s*::\s*`([^`]+)`\s*::\s*`\s*([\d,]+)\s*\+\s*([\d,]+)\s*\+\s*([\d,]+)\s*=\s*([\d,]+)\s*`([^\n]*)/g
 
 const num = (s) => Number(String(s).replace(/,/g, ''))
 
@@ -266,12 +269,16 @@ export function parseFloorReadings(text) {
     const [, kind, date, transcript, a, b, c] = m
     const summands = [num(a), num(b), num(c)]
     const stated = num(m[7])
+    const [status, expiredAt, attestingCommit] = m[8].split('::').slice(1).map((s) => s.trim())
     readings.push({
       kind,
       date,
       transcript,
       summands,
       stated,
+      status: status || null,
+      expiredAt: expiredAt || null,
+      attestingCommit: attestingCommit || null,
       total: summands.reduce((x, y) => x + y, 0),
       adds: summands.reduce((x, y) => x + y, 0) === stated,
     })
