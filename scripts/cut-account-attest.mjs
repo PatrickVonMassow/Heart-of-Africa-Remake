@@ -103,7 +103,7 @@ function readOptional(path) {
 
 export function verifyFloorEvidence(reading, { repo, root, home = homedir() }) {
   requireEvidence(['LIVE', 'EXPIRED'].includes(reading.status), 'floor needs LIVE or EXPIRED status')
-  const git = (args) => execFileSync('git', args, { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
+  const git = (args) => execFileSync('git', args, { windowsHide: true, cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
   if (reading.status === 'EXPIRED') {
     const match = /^(\d{2})\.(\d{2})\.(\d{4})$/.exec(reading.expiredAt ?? '')
     requireEvidence(match, 'EXPIRED floor needs an expiry date')
@@ -120,7 +120,7 @@ export function verifyFloorEvidence(reading, { repo, root, home = homedir() }) {
   const captured = readOptional(resolve(repo, path))
   if (captured !== null) {
     // An index entry is not durable evidence. Require the exact bytes in HEAD.
-    const committed = execFileSync('git', ['show', `HEAD:${path}`], { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+    const committed = execFileSync('git', ['show', `HEAD:${path}`], { windowsHide: true, cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
     requireEvidence(committed === captured, 'attestation must match committed HEAD content')
     validateAttestation(reading, JSON.parse(captured), { root, ...(source === null ? {} : { source }) })
   }
@@ -134,7 +134,7 @@ export function verifyFloorEvidence(reading, { repo, root, home = homedir() }) {
 }
 
 export function writeFloorAttestations({ repo = process.cwd(), home = homedir(), kind } = {}) {
-  const common = execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], { cwd: repo, encoding: 'utf8' })
+  const common = execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], { windowsHide: true, cwd: repo, encoding: 'utf8' })
   const root = mainCheckoutFrom(common, repo) ?? repo
   const readings = parseFloorReadings(readFileSync(resolve(repo, 'docs/document-cut-757.md'), 'utf8'))
   if (kind) requireEvidence(FLOOR_KINDS.includes(kind), 'expected owner or subagent')

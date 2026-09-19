@@ -85,7 +85,7 @@ describe('captureFloor', () => {
 describe('writeFloorAttestations', () => {
   it('writes only readable named floors, refuses explicit missing input and never overwrites evidence', () => {
     const f = fixture()
-    execFileSync('git', ['init', '-q'], { cwd: f.root })
+    execFileSync('git', ['init', '-q'], { windowsHide: true, cwd: f.root })
     mkdirSync(join(f.root, 'docs'))
     writeFileSync(join(f.root, 'docs/document-cut-757.md'), [
       `FLOOR owner :: 20.08.2026 :: \`${f.transcript}\` :: \`2 + 3 + 4 = 9\` :: LIVE`,

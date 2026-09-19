@@ -502,7 +502,7 @@ describe('docs/document-cut-757.md — the measured floors', () => {
       const path = attestationPath(reading.kind)
       if (!existsSync(resolve(ROOT, path))) continue
       const text = readFileSync(resolve(ROOT, path), 'utf8')
-      expect(execFileSync('git', ['show', `HEAD:${path}`], { cwd: ROOT, encoding: 'utf8' })).toBe(text)
+      expect(execFileSync('git', ['show', `HEAD:${path}`], { windowsHide: true, cwd: ROOT, encoding: 'utf8' })).toBe(text)
       expect(() => validateAttestation(reading, JSON.parse(text))).not.toThrow()
     }
   })
@@ -703,7 +703,7 @@ describe('floor evidence survival', () => {
     const repo = mkdtempSync(resolve(tmpdir(), 'cut-evidence-'))
     dirs.push(repo)
     const git = (args, date = '2026-08-20T04:00:00Z') => execFileSync('git', args, {
-      cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true, cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
       env: { ...process.env, GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date },
     }).trim()
     git(['init', '-q'])
