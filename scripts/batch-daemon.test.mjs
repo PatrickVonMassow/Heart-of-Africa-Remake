@@ -347,6 +347,25 @@ describe('the daemon lifecycle in the sandbox', () => {
   }, 25_000)
 
   it('cancels the attempt, preserves the branch, and journals the last pushed SHA', async () => {
+    // THE CASE CI CAUGHT (run 35453901104, 19.09.2026), staged deterministically:
+    // `status.json` is the worker's own note, written AFTER its push, so a worker
+    // killed between the two leaves a sha one commit behind the branch it pushed.
+    // The worker is stopped FIRST — otherwise it rewrites the note correctly
+    // before the cancel and the drill would pass on the unfixed daemon — then the
+    // stale note is planted, and only then is the attempt cancelled.
+    const store0 = openStateStore({ repoDir: repo, batchId: BATCH })
+    const attemptDir0 = join(store0.dir, 'attempts', 'a1')
+    const statusPath = join(attemptDir0, 'status.json')
+    const workerPid = readJsonIfAny(join(attemptDir0, 'lease.json'))?.lease?.holder?.pid
+    expect(Number.isFinite(workerPid)).toBe(true)
+    process.kill(workerPid, 'SIGKILL')
+    const dead = Date.now() + 10_000
+    while (Date.now() < dead) {
+      try { process.kill(workerPid, 0) } catch { break }
+      await sleep(100)
+    }
+    const planted = git(['rev-parse', 'feat/stub~1'], originDir)
+    writeFileSync(statusPath, `${JSON.stringify({ sha: planted })}\n`)
     const cancelled = await request('cancel-attempt', { attemptId: 'a1', requestId: 'cx-1', reason: 'drill over' })
     expect(cancelled.ok, cancelled.reason).toBe(true)
     expect(cancelled.result.branchPreserved).toBe(true)
@@ -363,6 +382,7 @@ describe('the daemon lifecycle in the sandbox', () => {
     // died before writing its status — satisfied every assertion here. The
     // record must name the tip that actually stands.
     expect(cancelled.result.lastPushedSha).toBe(tipAtCancel)
+    expect(cancelled.result.lastPushedSha).not.toBe(planted)
     await sleep(2500) // two stub work intervals: time enough for an uncancelled worker to push again
     expect(git(['rev-parse', 'feat/stub'], originDir)).toBe(tipAtCancel)
     // The on-disk lease was REVOKED before any signal: even a worker that had

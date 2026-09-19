@@ -33,6 +33,7 @@
 // the peer to cross. If any owner, type, mode or uid cannot be established, the
 // server returns a refusal and closes the connection without running a verb.
 import { closeSync, chmodSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, realpathSync, statSync, unlinkSync, writeSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
 import { createServer, createConnection } from 'node:net'
 import { dirname, join, resolve, sep } from 'node:path'
 import { isMainModule } from './is-main.mjs'
@@ -625,6 +626,7 @@ async function serve(args) {
           }
         }
         const status = readJsonIfAny(attemptPaths(worker.dir).statusPath)
+        const pushedSha = pushedShaOf(worker, status?.sha ?? null)
         const record = attemptStateRecord({
           state: 'cancelled',
           reason: String(reason || 'cancelled'),
@@ -632,14 +634,14 @@ async function serve(args) {
           fence: request.fence,
           at: nowMs(),
           lastCommit: status?.sha ?? null,
-          lastPushedSha: status?.sha ?? null,
+          lastPushedSha: pushedSha,
         })
         if (record.ok) recordAttemptState(attemptId, worker.pointId, record.record, request.fence)
         const released = releaseWorktree({ claims: worktreeClaims, worktree: worker.worktree, attempt: { batchId: args.batch, pointId: worker.pointId, attemptId } })
         if (released.ok) worktreeClaims = released.claims
         leases.delete(attemptId)
         workers.delete(attemptId)
-        return { ok: true, attemptId, branchPreserved: true, lastPushedSha: status?.sha ?? null }
+        return { ok: true, attemptId, branchPreserved: true, lastPushedSha: pushedSha }
       }),
 
     'adopt-attempt': (request) =>
@@ -782,6 +784,32 @@ async function serve(args) {
    *  The verdict is the identity probe, never the status file alone; and a
    *  revocation that could not be persisted is reported, because a caller that
    *  releases state over it would leave a live worker holding a valid lease. */
+  /**
+   * What a STOPPED worker really pushed. Its own `status.json` is a note it
+   * writes after the push, so a worker killed between the two leaves a sha one
+   * commit behind the branch — and the cancel record then names a tip that does
+   * not stand (CI run 35453901104, 19.09.2026). Its remote-tracking ref is moved
+   * by the push ITSELF, so it cannot lag that way; the status sha remains the
+   * fallback for a worker that never pushed or has no upstream.
+   */
+  function pushedShaOf(worker, statusSha) {
+    const inWorktree = (args) => execFileSync('git', ['-c', 'core.hooksPath=', ...args], {
+      cwd: worker.worktree, encoding: 'utf8', windowsHide: true, timeout: 10000,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim()
+    try {
+      // Not `@{upstream}`: a worker pushes with `git push origin <branch>` and
+      // sets no tracking, so the upstream is usually unset. The remote-tracking
+      // ref is moved by that push all the same, which is what this reads.
+      const branch = inWorktree(['rev-parse', '--abbrev-ref', 'HEAD'])
+      if (!branch || branch === 'HEAD') return statusSha ?? null
+      const sha = inWorktree(['rev-parse', `refs/remotes/origin/${branch}`])
+      return /^[0-9a-f]{40}$/.test(sha) ? sha : (statusSha ?? null)
+    } catch {
+      return statusSha ?? null
+    }
+  }
+
   async function stopWorker(worker, why) {
     const paths = attemptPaths(worker.dir)
     let revoked = true
@@ -882,7 +910,7 @@ async function serve(args) {
           fence: currentFence,
           at: nowMs(),
           lastCommit: status?.sha ?? null,
-          lastPushedSha: status?.sha ?? null,
+          lastPushedSha: pushedShaOf(worker, status?.sha ?? null),
         })
         if (record.ok && !journalCorrupt) recordAttemptState(attemptId, worker.pointId, record.record)
       }
