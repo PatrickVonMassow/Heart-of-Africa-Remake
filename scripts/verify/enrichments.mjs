@@ -1282,13 +1282,29 @@ if (section('hud-bottom-row')) {
     label: 'the steering hint centred in the bottom band, bar left and buttons right',
   })
   // Put the page back the way the later sections expect it: the automation flag
-  // as it was, the traveller's own inventory restored.
-  await page.evaluate(() => {
+  // as it was, the traveller's own inventory restored. Taking the mask off is
+  // not enough on its own — the hint reads the flag at RENDER time, so without a
+  // rerender it would survive the mask into every later section. The same touch
+  // toggle that showed it takes it away again, one frame per half.
+  await page.evaluate(async () => {
+    const { useUi } = await import('/src/state/ui.ts')
     const saved = window.__hint1160
     delete navigator.webdriver
     if (saved?.before) window.__game.setState(saved.before)
     delete window.__hint1160
+    useUi.setState({ touchActive: true })
+    await new Promise((r) => requestAnimationFrame(r))
+    useUi.setState({ touchActive: false })
+    await new Promise((r) => requestAnimationFrame(r))
   })
+  await page
+    .waitForFunction(() => !document.querySelector('.cursor-mode-hint'), null, { timeout: 10000 })
+    .catch(() => {})
+  check(
+    'the automation mask leaves no steering hint behind for the later sections (point 1160)',
+    await page.evaluate(() => navigator.webdriver === true && !document.querySelector('.cursor-mode-hint')),
+    'hint still rendered after the mask was taken off',
+  )
 }
 
 // --- Lion: carcass consumed, lion moves on (§7.1.12) -------------------------
