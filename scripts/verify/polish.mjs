@@ -5610,24 +5610,36 @@ if (section('bambara-no-well')) {
       const layout = window.__placeLayout
       const near = (c) => Math.hypot(c.x - spot[0], c.z - spot[1]) < 1e-6
       const clear = (x, z) => Math.min(...layout.colliders.map((c) => window.__clearanceTo(c, x, z)))
-      // Stand about five metres off the former spot, looking INWARD across it,
-      // so the frame shows the open ground with the village behind it.
+      // The spot is ORDINARY VILLAGE GROUND now, not a reserved clearing: it
+      // left the keep-clear list with the well, so the procedural fabric may
+      // grow over it — at this seed a family hut does. Whatever stands there is
+      // the SUBJECT of the picture, so the sight line is judged against every
+      // OTHER collider; only something in between may spoil the frame.
+      const onSpot = layout.colliders.filter((c) => window.__clearanceTo(c, spot[0], spot[1]) < 0.5)
+      const between = layout.colliders.filter((c) => !onSpot.includes(c))
+      const sight = (x, z) => Math.min(...between.map((c) => window.__clearanceTo(c, x, z)))
+      // Stand off the former spot, looking INWARD across it, so the frame shows
+      // the ground the well left with the village behind it. The farthest
+      // workable stand wins: it shows the quarter, not one wall.
       const outward = Math.atan2(spot[0], spot[1])
       const p = window.__placePlayer
       let stand = null
-      for (let k = 0; k < 24 && !stand; k++) {
-        const angle = outward + (k % 2 ? -1 : 1) * Math.floor((k + 1) / 2) * (Math.PI / 12)
-        const x = spot[0] + Math.sin(angle) * 5
-        const z = spot[1] + Math.cos(angle) * 5
-        if (Math.hypot(x, z) > layout.radius - 1) continue
-        if (clear(x, z) < 0.35) continue
-        let visible = true
-        for (let step = 1; step <= 16; step++) {
-          const t = step / 16
-          if (clear(x + (spot[0] - x) * t, z + (spot[1] - z) * t) < 0.1) visible = false
+      for (const range of [9, 7, 5]) {
+        for (let k = 0; k < 24 && !stand; k++) {
+          const angle = outward + (k % 2 ? -1 : 1) * Math.floor((k + 1) / 2) * (Math.PI / 12)
+          const x = spot[0] + Math.sin(angle) * range
+          const z = spot[1] + Math.cos(angle) * range
+          if (Math.hypot(x, z) > layout.radius - 1) continue
+          if (clear(x, z) < 0.35) continue
+          let visible = true
+          for (let step = 1; step <= 16; step++) {
+            const t = step / 16
+            if (sight(x + (spot[0] - x) * t, z + (spot[1] - z) * t) < 0.1) visible = false
+          }
+          if (!visible) continue
+          stand = { x, z, range, gap: clear(x, z) }
         }
-        if (!visible) continue
-        stand = { x, z, gap: clear(x, z) }
+        if (stand) break
       }
       if (stand) {
         p.x = stand.x
@@ -5641,13 +5653,14 @@ if (section('bambara-no-well')) {
         colliders: layout.colliders.filter((c) => near(c) && c.r === 0.75).length,
         carrierColliders: layout.colliders.filter(
           (c) => Math.hypot(c.x - (spot[0] - 1.1), c.z - spot[1]) < 1e-6).length,
+        onSpot: onSpot.length,
         stand,
       }
     }, WELL_NAME)
     check('the communication village draws no well', !staged.drawn, JSON.stringify(staged))
     check('its collider set holds no well and no water-carrier stop',
       staged.colliders === 0 && staged.carrierColliders === 0, JSON.stringify(staged))
-    check('the photograph of the former well spot stands on open ground',
+    check('the camera stands clear of the village and sees the former well spot',
       !!staged.stand && staged.stand.gap >= 0.35, JSON.stringify(staged.stand))
     if (staged.stand) {
       await nextFrames(3)
@@ -5655,7 +5668,8 @@ if (section('bambara-no-well')) {
       // subject sits a chest's height over the former well spot.
       await frame('1092-bambara-former-well-spot', {
         local: { x: staged.spot.x, y: 0.9, z: staged.spot.z },
-        label: 'the bambara village at the spot where the well stood, now open ground',
+        label: 'the bambara village at the spot where the well stood: no well '
+          + 'anywhere, and a family hut on the ground the well left free',
       })
     }
   } finally {
