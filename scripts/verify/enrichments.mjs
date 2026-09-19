@@ -1138,7 +1138,16 @@ if (section('hud-bottom-row')) {
   await page
     .waitForFunction(() => window.__game.getState().placeId === 'cairo' && !!window.__placeLayout, null, { timeout: 30000 })
     .catch(() => {})
-  await page.waitForTimeout(500)
+  // Poll on the band being rendered, not on a fixed wait (point 249): the HUD's
+  // bottom row is what every reading below measures against.
+  await page
+    .waitForFunction(
+      () => !!document.querySelector('.hud-bottom-row .inventory-bar') &&
+        !!document.querySelector('.hud-bottom-row .hud-bottom-right'),
+      null,
+      { timeout: 30000 },
+    )
+    .catch(() => {})
   await page.evaluate(() => {
     const g = window.__game
     window.__hint1160 = {
