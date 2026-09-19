@@ -90,8 +90,8 @@ put it is the mistake this line exists to stop.
   no journal reopen — everything the first message has. A player who opens the journal on the
   new entry has already missed the answer and can never see it again; the entry itself promises
   "two words I must work out" and gives him nowhere to look at them. design.md §13.4 says the
-  chief speaks THROUGH HIS DRUMMER, and the give happens beside the drummer, yet this one answer
-  bypasses the drums. docs/communication-poc-spec.md ("Where the digging happens") is stale: it
+  chief speaks THROUGH HIS DRUMMER, yet this one answer bypasses the drums.
+  docs/communication-poc-spec.md ("Where the digging happens") is stale: it
   still says the acknowledgement "uses only ROCK and DIG", while commit 66e2a8122 (06.09.2026)
   changed it to RIVER · DOWNSTREAM; design.md is silent on the answer's form.
   Final state:
@@ -102,10 +102,9 @@ put it is the mistake this line exists to stop.
     lexicon through `phraseOf`, and the strike plan is the same `drumMessagePlan` fed the other
     list. Which message is CURRENT is one pure function of game state: the answer once
     `rockArtefact === 'given'`, the errand before.
-  - The hand-over itself beats the answer, and THE GIVE RULE ITSELF DOES NOT CHANGE (resolved
-    19.09.2026 after the authoring lane escalated the contradiction, and this replaces the earlier
-    "he is out in the open beside his drummer by the give rule"): design.md §6/§13.4 lets the
-    traveller give whenever the chief is OUT IN THE OPEN and within reach, which by `chiefOutside`
+  - The hand-over itself beats the answer, and THE GIVE RULE ITSELF DOES NOT CHANGE: design.md
+    §6/§13.4 lets the traveller give whenever the chief is OUT IN THE OPEN and within reach,
+    which by `chiefOutside`
     is EVERY phase of his walk — `walking-out`, `at-drummer` and `walking-back` alike. Giving is
     never refused for standing in the wrong phase and no new refusal is invented. What the give
     does is make the ANSWER the current message and ask for the drums the way the use key does, so
@@ -115,8 +114,8 @@ put it is the mistake this line exists to stop.
     as a call does) and the answer is beaten the moment he reaches the drummer. The mould is handed
     over wordlessly in the same move as now, in every phase. The chief speaks NOTHING over his head
     for the give; `speakChiefPhrase` for the reward and its subscription in PlaceScene.tsx go.
-  - DRUMS ALREADY BEATING ARE NEVER CUT OFF AND NEVER SWALLOW THE ANSWER (resolved 19.09.2026, same
-    escalation): `startDrumMessage` returns the state unchanged while a performance runs, so a give
+  - DRUMS ALREADY BEATING ARE NEVER CUT OFF AND NEVER SWALLOW THE ANSWER: `startDrumMessage`
+    returns the state unchanged while a performance runs, so a give
     during the errand would today lose the answer in silence — the very defect this point exists to
     end. The give still ALWAYS succeeds; the answer is DEFERRED and RELEASED when the running
     message ends, which is the village's own standing rule for a word that cannot be said yet
@@ -159,14 +158,12 @@ put it is the mistake this line exists to stop.
     round-trip; DrumMessage.test.tsx / JournalPanel.test.tsx cover the two reopens and the
     dialog's message choice; chiefReply.test.ts is folded into drumMessage.test.ts or deleted with
     its module. The polish section `chief-to-drummer` stays green; if a frame exists for the
-    hand-over it is retaken with the drums PROVABLY still beating the answer (the §7.2 rule of
-    point 1102). SUCH A FRAME EXISTS and it is built on the deleted behaviour: `150-artefact-chiefs-answer`
-    in scripts/verify/polish.mjs (~8446) re-speaks the chief's atoms over his head with a 120 s
-    lifetime purely to survive the shutter wait, then checks `.speech-label[data-speaker="chief"]`
-    is still standing. That hold and that check go with `speakChiefPhrase`; the frame is retaken on
-    the DRUMS — the drummer beating the answer with the chief beside him — and it waits on the
-    speaking state the game already holds (`drumPerformance`), never on a duration, so the shutter
-    cannot open after the message has ended.
+    hand-over frame `150-artefact-chiefs-answer` (scripts/verify/polish.mjs ~8446) shows the DRUMS
+    — the drummer beating the answer with the chief beside him — and waits on the speaking state
+    the game already holds (`drumPerformance`), never on a duration, so the shutter cannot open
+    after the message has ended (the §7.2 rule of point 1102). The block that re-speaks the chief's
+    atoms over his head with a 120 s lifetime to survive the shutter wait, and the check on
+    `.speech-label[data-speaker="chief"]`, go with `speakChiefPhrase`.
   - No new balance value unless the answer's drums need one; `drumMessagePeak`, pace and pause
     are shared with the errand.
   Refs: src/communication/drumMessage.ts, src/communication/chiefReply.ts (deleted or reduced to
