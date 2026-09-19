@@ -29924,3 +29924,36 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Refs: src/config/startPlace.ts, src/config/startPlace.test.ts, src/i18n/index.ts,
   src/state/store.ts
   Bundle: Testinfrastruktur.
+
+- [x] 1160. The steering hint stands in the middle of the bottom band, not beside the
+  inventory bar (user order 18.09.2026, ~18:03, after seeing point 1146 on the deployed
+  build, verbatim: "Und noch eine Änderung: Der neu eingeführte Hinweis \"Click the view to
+  steer\" bzw. \"Esc: cursor\" soll zentriert angezeigt werden (sofern es der Platz zulässt)
+  - nicht linksbündig.").
+  MEASURED STATE: point 1146 put the hint into the bottom row's LEFT group, next to the
+  inventory bar, so it reads as left-aligned — which is what he is objecting to.
+  Final state:
+  - In the settlement the cursor-mode hint is horizontally CENTRED in the viewport at the
+    bottom band's height, keeping the bottom edge it shares with the inventory bar and the
+    buttons (point 1146). It stays a child of `.hud-bottom-row`, so the row still decides
+    that shared edge, but it leaves the `.hud-bottom-left` flex group: a middle slot — a
+    centre element with `flex: 1` and `justify-content: center` between `.hud-bottom-left`
+    and `.hud-bottom-right`, or `left: 50%` with a half-width translate inside the row,
+    whichever keeps 1146's own tests for the bottom edge honest — places it at the centre.
+  - "AS LONG AS THE SPACE ALLOWS" is measured, not guessed: where the inventory bar plus the
+    right-hand buttons leave no room at the centre — a narrow viewport, a long inventory —
+    the hint YIELDS instead of overlapping. It may then fall back to its 1146 place beside
+    the bar, or hide; the decision reads the measured widths rather than a breakpoint
+    somebody picked.
+  - `pointer-events: none` stays. Both languages already carry the strings; nothing changes
+    in the language files.
+  Test. A Vitest/HUD assertion that the hint element is no longer inside `.hud-bottom-left`
+  and sits in the centre slot, plus a browser picture on the everyday backend at default zoom
+  showing the hint centred beneath the view with the bar left and the buttons right. NOTE: the
+  hint hides under `navigator.webdriver` (1146's own OPEN item), so the placement is judged
+  the way 1146 judged it, unless the picture can be taken with the throwaway webdriver mask
+  point 1158's measurement used.
+  Criticality: low — a placement the user asked for; nothing is unreachable without it.
+  Refs: the hint markup and CSS of point 1146 (`.hud-bottom-row`, `.hud-bottom-left`), its
+  tests.
+  Bundle: Steuerung & Performance.
