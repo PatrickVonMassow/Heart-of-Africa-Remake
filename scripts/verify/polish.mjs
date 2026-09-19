@@ -5550,6 +5550,123 @@ if (section('wedged-adults')) {
   await page.evaluate((seed) => window.__game.setState({ seed }), bootSeed)
 }
 
+// THE WELL LEFT ONE VILLAGE (point 1092). The communication village fetches its
+// water from the river, so its well is gone — prop, collider and jar carrier —
+// while every other village keeps its own. A CONTROL VILLAGE is visited first:
+// without it "no object named village-well" would be green for a renamed prop
+// as much as for a removed one.
+//
+// The layout's KEEP-CLEAR list is not on `window` (it lives inside
+// `buildLayout`), so what this section can see is the collider set and the
+// drawn scene; the keep-clear half is asserted in
+// `src/scenes/place/lifeSpots.test.ts`.
+//
+// It stands BEFORE `village-stations` rather than after it because
+// `polishVillageStations.test.mjs` runs that section by slicing the source
+// between its header and `adult-errands`: a section in between is swept into
+// the slice and run against the stub.
+if (section('bambara-no-well')) {
+  const bootSeed = await page.evaluate(() => window.__game.getState().seed)
+  const WELL_NAME = 'village-well'
+  const enterVillage = async (id) => {
+    await page.evaluate(() => {
+      const g = window.__game.getState()
+      if (g.placeId) g.leavePlace()
+    })
+    await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
+    await page.evaluate((placeId) => {
+      window.__game.setState({ seed: 1838110026 })
+      window.__game.getState().enterPlace(placeId)
+      window.__game.getState().setJournalOpen(false)
+    }, id)
+    await page.waitForFunction(
+      (placeId) => window.__game.getState().placeId === placeId && !!window.__placeLayout,
+      id, { timeout: 40000 })
+    await waitForSceneBuilt(page)
+  }
+  // The well's spot and its collider radius, as the layout builds them — the
+  // colliders carry the raw `VILLAGE_SPOTS` coordinates, unscaled.
+  const wellState = () => page.evaluate((name) => {
+    const spot = window.__placeSpots.well
+    const near = (c) => Math.hypot(c.x - spot[0], c.z - spot[1]) < 1e-6
+    return {
+      spot: { x: spot[0], z: spot[1] },
+      drawn: !!window.__placeScene?.getObjectByName(name),
+      colliders: window.__placeLayout.colliders.filter((c) => near(c) && c.r === 0.75).length,
+      // The jar carrier's stop, a body length to the -x side of the well.
+      carrierColliders: window.__placeLayout.colliders.filter(
+        (c) => Math.hypot(c.x - (spot[0] - 1.1), c.z - spot[1]) < 1e-6).length,
+    }
+  }, WELL_NAME)
+  try {
+    await enterVillage('hausa-village')
+    const control = await wellState()
+    check('the control village still draws its well and keeps its collider',
+      control.drawn && control.colliders === 1, JSON.stringify(control))
+
+    await enterVillage('bambara-village')
+    const staged = await page.evaluate((name) => {
+      const spot = window.__placeSpots.well
+      const layout = window.__placeLayout
+      const near = (c) => Math.hypot(c.x - spot[0], c.z - spot[1]) < 1e-6
+      const clear = (x, z) => Math.min(...layout.colliders.map((c) => window.__clearanceTo(c, x, z)))
+      // Stand about five metres off the former spot, looking INWARD across it,
+      // so the frame shows the open ground with the village behind it.
+      const outward = Math.atan2(spot[0], spot[1])
+      const p = window.__placePlayer
+      let stand = null
+      for (let k = 0; k < 24 && !stand; k++) {
+        const angle = outward + (k % 2 ? -1 : 1) * Math.floor((k + 1) / 2) * (Math.PI / 12)
+        const x = spot[0] + Math.sin(angle) * 5
+        const z = spot[1] + Math.cos(angle) * 5
+        if (Math.hypot(x, z) > layout.radius - 1) continue
+        if (clear(x, z) < 0.35) continue
+        let visible = true
+        for (let step = 1; step <= 16; step++) {
+          const t = step / 16
+          if (clear(x + (spot[0] - x) * t, z + (spot[1] - z) * t) < 0.1) visible = false
+        }
+        if (!visible) continue
+        stand = { x, z, gap: clear(x, z) }
+      }
+      if (stand) {
+        p.x = stand.x
+        p.z = stand.z
+        p.yaw = Math.atan2(spot[0] - p.x, spot[1] - p.z) + Math.PI
+        p.pitch = -0.1
+      }
+      return {
+        spot: { x: spot[0], z: spot[1] },
+        drawn: !!window.__placeScene?.getObjectByName(name),
+        colliders: layout.colliders.filter((c) => near(c) && c.r === 0.75).length,
+        carrierColliders: layout.colliders.filter(
+          (c) => Math.hypot(c.x - (spot[0] - 1.1), c.z - spot[1]) < 1e-6).length,
+        stand,
+      }
+    }, WELL_NAME)
+    check('the communication village draws no well', !staged.drawn, JSON.stringify(staged))
+    check('its collider set holds no well and no water-carrier stop',
+      staged.colliders === 0 && staged.carrierColliders === 0, JSON.stringify(staged))
+    check('the photograph of the former well spot stands on open ground',
+      !!staged.stand && staged.stand.gap >= 0.35, JSON.stringify(staged.stand))
+    if (staged.stand) {
+      await nextFrames(3)
+      // The settlement floor is the flat y=0 plane its props stand on, so the
+      // subject sits a chest's height over the former well spot.
+      await frame('1092-bambara-former-well-spot', {
+        local: { x: staged.spot.x, y: 0.9, z: staged.spot.z },
+        label: 'the bambara village at the spot where the well stood, now open ground',
+      })
+    }
+  } finally {
+    await page.evaluate((seed) => {
+      const g = window.__game.getState()
+      if (g.placeId) g.leavePlace()
+      window.__game.setState({ seed })
+    }, bootSeed)
+  }
+}
+
 // The fixed weaver in the user's "Festklemmend" report, not a moving adult.
 // Run on each backend with the ordinary polish launcher; the frame declares
 // the live figure as its subject and leaves the trading post in the background.
@@ -5651,118 +5768,6 @@ if (section('village-stations')) {
       local: { x: staged.body.x, y: staged.body.y + 0.9, z: staged.body.z },
       label: 'the reported-seed weaver at her loom seen from the side, with open ground between her and the trading-post wall',
     })
-  } finally {
-    await page.evaluate((seed) => {
-      const g = window.__game.getState()
-      if (g.placeId) g.leavePlace()
-      window.__game.setState({ seed })
-    }, bootSeed)
-  }
-}
-
-// THE WELL LEFT ONE VILLAGE (point 1092). The communication village fetches its
-// water from the river, so its well is gone — prop, collider and jar carrier —
-// while every other village keeps its own. A CONTROL VILLAGE is visited first:
-// without it "no object named village-well" would be green for a renamed prop
-// as much as for a removed one.
-//
-// The layout's KEEP-CLEAR list is not on `window` (it lives inside
-// `buildLayout`), so what this section can see is the collider set and the
-// drawn scene; the keep-clear half is asserted in
-// `src/scenes/place/lifeSpots.test.ts`.
-if (section('bambara-no-well')) {
-  const bootSeed = await page.evaluate(() => window.__game.getState().seed)
-  const WELL_NAME = 'village-well'
-  const enterVillage = async (id) => {
-    await page.evaluate(() => {
-      const g = window.__game.getState()
-      if (g.placeId) g.leavePlace()
-    })
-    await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
-    await page.evaluate((placeId) => {
-      window.__game.setState({ seed: 1838110026 })
-      window.__game.getState().enterPlace(placeId)
-      window.__game.getState().setJournalOpen(false)
-    }, id)
-    await page.waitForFunction(
-      (placeId) => window.__game.getState().placeId === placeId && !!window.__placeLayout,
-      id, { timeout: 40000 })
-    await waitForSceneBuilt(page)
-  }
-  // The well's spot and its collider radius, as the layout builds them — the
-  // colliders carry the raw `VILLAGE_SPOTS` coordinates, unscaled.
-  const wellState = () => page.evaluate((name) => {
-    const spot = window.__placeSpots.well
-    const near = (c) => Math.hypot(c.x - spot[0], c.z - spot[1]) < 1e-6
-    return {
-      spot: { x: spot[0], z: spot[1] },
-      drawn: !!window.__placeScene?.getObjectByName(name),
-      colliders: window.__placeLayout.colliders.filter((c) => near(c) && c.r === 0.75).length,
-      // The jar carrier's stop, a body length to the -x side of the well.
-      carrierColliders: window.__placeLayout.colliders.filter(
-        (c) => Math.hypot(c.x - (spot[0] - 1.1), c.z - spot[1]) < 1e-6).length,
-    }
-  }, WELL_NAME)
-  try {
-    await enterVillage('hausa-village')
-    const control = await wellState()
-    check('the control village still draws its well and keeps its collider',
-      control.drawn && control.colliders === 1, JSON.stringify(control))
-
-    await enterVillage('bambara-village')
-    const staged = await page.evaluate((name) => {
-      const spot = window.__placeSpots.well
-      const layout = window.__placeLayout
-      const near = (c) => Math.hypot(c.x - spot[0], c.z - spot[1]) < 1e-6
-      const clear = (x, z) => Math.min(...layout.colliders.map((c) => window.__clearanceTo(c, x, z)))
-      // Stand about five metres off the former spot, looking INWARD across it,
-      // so the frame shows the open ground with the village behind it.
-      const outward = Math.atan2(spot[0], spot[1])
-      const p = window.__placePlayer
-      let stand = null
-      for (let k = 0; k < 24 && !stand; k++) {
-        const angle = outward + (k % 2 ? -1 : 1) * Math.floor((k + 1) / 2) * (Math.PI / 12)
-        const x = spot[0] + Math.sin(angle) * 5
-        const z = spot[1] + Math.cos(angle) * 5
-        if (Math.hypot(x, z) > layout.radius - 1) continue
-        if (clear(x, z) < 0.35) continue
-        let visible = true
-        for (let step = 1; step <= 16; step++) {
-          const t = step / 16
-          if (clear(x + (spot[0] - x) * t, z + (spot[1] - z) * t) < 0.1) visible = false
-        }
-        if (!visible) continue
-        stand = { x, z, gap: clear(x, z) }
-      }
-      if (stand) {
-        p.x = stand.x
-        p.z = stand.z
-        p.yaw = Math.atan2(spot[0] - p.x, spot[1] - p.z) + Math.PI
-        p.pitch = -0.1
-      }
-      return {
-        spot: { x: spot[0], z: spot[1] },
-        drawn: !!window.__placeScene?.getObjectByName(name),
-        colliders: layout.colliders.filter((c) => near(c) && c.r === 0.75).length,
-        carrierColliders: layout.colliders.filter(
-          (c) => Math.hypot(c.x - (spot[0] - 1.1), c.z - spot[1]) < 1e-6).length,
-        stand,
-      }
-    }, WELL_NAME)
-    check('the communication village draws no well', !staged.drawn, JSON.stringify(staged))
-    check('its collider set holds no well and no water-carrier stop',
-      staged.colliders === 0 && staged.carrierColliders === 0, JSON.stringify(staged))
-    check('the photograph of the former well spot stands on open ground',
-      !!staged.stand && staged.stand.gap >= 0.35, JSON.stringify(staged.stand))
-    if (staged.stand) {
-      await nextFrames(3)
-      // The settlement floor is the flat y=0 plane its props stand on, so the
-      // subject sits a chest's height over the former well spot.
-      await frame('1092-bambara-former-well-spot', {
-        local: { x: staged.spot.x, y: 0.9, z: staged.spot.z },
-        label: 'the bambara village at the spot where the well stood, now open ground',
-      })
-    }
   } finally {
     await page.evaluate((seed) => {
       const g = window.__game.getState()
