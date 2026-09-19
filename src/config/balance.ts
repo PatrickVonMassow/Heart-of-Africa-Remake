@@ -1367,7 +1367,14 @@ export const balance: BalanceConfig = {
       tapPauseSeconds: 1.5,
       // Calibratable: a short walk back into the catcher line, clear of the touch spot.
       tapReturnSeconds: 6,
-      catcherStationDistance: 0.2,
+      // Calibratable: 400 s village replays at 0.6 m give regroup ranges of
+      // 7.47-12.90 s (Bambara@42), 7.87-8.40 s (Bambara@2972259115), and
+      // 7.93-18.62 s (Mandinka@99), with no backstop. At 0.2 m, Bambara@42
+      // stalls for 62.05 s: crowd/collider jostle can keep the last 20 cm out
+      // of reach. 0.6 m still fits well inside the 1.32 m charge-frame bar
+      // (reachDistance * 0.6). Nubian@42's runner blockage persists at both
+      // radii; its waiting catcher reaches its station at either tolerance.
+      catcherStationDistance: 0.6,
       // Calibratable: one ROCK atom plus a beat with the hand resting on the flank.
       arrivalHoldSeconds: 1.5,
       // Calibratable: catchers walk the full stretch after the sides swap.
