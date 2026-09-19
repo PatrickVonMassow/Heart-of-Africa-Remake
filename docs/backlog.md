@@ -1495,3 +1495,15 @@ fasst die Maschine währenddessen nicht an.
   trotzdem hier steht: eine Falschmeldung, die von einem echten Tafel-Fehler nicht zu
   unterscheiden ist, stumpft den Wächter ab — und ein abgestumpfter Wächter ist schlimmer
   als keiner.
+
+- **Die Browser-Prüfung des Steuerungshinweises übt ihren Resize-Beobachter nicht**
+  (Kreuz-Prüfung GPT-6 Astra, 19.09.2026, zu Punkt 1160): Jede Messung im Abschnitt
+  `hud-bottom-row` schaltet den Touch-Schalter um und baut den Hinweis damit neu auf —
+  *nachdem* Inventarbreite und Ansichtsgröße schon verändert sind. Die Platzierung steht
+  deshalb jedes Mal aus der ersten Layout-Messung fest, und die Prüfungen blieben grün,
+  wenn man `ResizeObserver` und den `resize`-Zuhörer aus `Hud.tsx` ersatzlos entfernte.
+  Was fehlt, sind Prüfungen, die den Hinweis MONTIERT lassen, während sich Gruppenbreite,
+  Ansichtsgröße, Sprache und Sperrzustand ändern. Nicht als Punkt eingereiht: reine
+  Testabdeckung, kein Spielerimpakt — das Verhalten selbst ist auf beiden Backends am Bild
+  belegt (`verification/1160-steering-hint-centred.png`). Wer es aufgreift, prüft zuerst,
+  ob der Touch-Umschalter überhaupt nötig bleibt, sobald die Automatik-Maske steht.
