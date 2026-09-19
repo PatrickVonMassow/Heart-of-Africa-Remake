@@ -736,7 +736,9 @@ export interface BalanceConfig {
       runSeconds: number
       /** Visible held-standing pause while the catcher taps ROCK. */
       tapPauseSeconds: number
+      /** Backstop for the tapper's short walk into the line. */
       tapReturnSeconds: number
+      /** Settling radius for the catchers at their stations. */
       catcherStationDistance: number
       arrivalHoldSeconds: number
       /** Backstop on the walk between two runs. */
