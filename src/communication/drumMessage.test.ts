@@ -10,7 +10,9 @@ import { SEQUENCE_LENGTH, sequenceOf, tonesOf, utteranceOf } from './lexicon'
 import { NO_READING } from './speechLabel'
 import {
   CHIEF_MESSAGE_CONCEPTS,
-  chiefMessagePhrase,
+  CHIEF_ANSWER_CONCEPTS,
+  currentDrumMessage,
+  drumMessagePhrase,
   drumMessageElements,
   drumMessagePlan,
   drumStrikeAt,
@@ -40,7 +42,7 @@ describe('the message itself', () => {
   })
 
   it('takes its atoms from the lexicon, never a literal of its own', () => {
-    expect(chiefMessagePhrase()).toEqual(CHIEF_MESSAGE_CONCEPTS.map((c) => utteranceOf(c)))
+    expect(drumMessagePhrase()).toEqual(CHIEF_MESSAGE_CONCEPTS.map((c) => utteranceOf(c)))
   })
 })
 
@@ -60,7 +62,7 @@ describe('the drum plan says what the village speaks', () => {
       balance.communication.drumMessagePeak = held
     }
     // An explicit volume still overrides the ambience volume under it.
-    for (const strike of drumMessagePlan({ volume: 0.5 }).strikes) {
+    for (const strike of drumMessagePlan('errand', { volume: 0.5 }).strikes) {
       expect(strike.peak).toBeCloseTo(balance.communication.drumMessagePeak * 0.5)
     }
   })
@@ -169,7 +171,7 @@ describe('drumStrikeAt (what the drummer shows on his hands)', () => {
 describe('the message display reads the journal notes themselves', () => {
   it('shows one element per concept, in message order', () => {
     const elements = drumMessageElements(emptyMemory())
-    expect(elements.map((e) => e.utterance)).toEqual(chiefMessagePhrase())
+    expect(elements.map((e) => e.utterance)).toEqual(drumMessagePhrase())
     expect(elements.map((e) => e.index)).toEqual(CHIEF_MESSAGE_CONCEPTS.map((_, i) => i))
   })
 
@@ -182,10 +184,39 @@ describe('the message display reads the journal notes themselves', () => {
 
   it('shows the reading written for that utterance — the journal one', () => {
     const dig = utteranceOf('DIG')
-    let memory = observePhrase(emptyMemory(), chiefMessagePhrase(), 3)
+    let memory = observePhrase(emptyMemory(), drumMessagePhrase(), 3)
     memory = setHypothesis(memory, dig, 'dig!')
     const element = drumMessageElements(memory).find((e) => e.utterance === dig)
     expect(element?.reading).toBe('dig!')
     expect(element?.unread).toBe(false)
+  })
+})
+
+
+describe('the answer on the same drums', () => {
+  it('says where, with the direction pair reversed and no third word', () => {
+    expect(CHIEF_ANSWER_CONCEPTS).toEqual(['RIVER', 'DOWNSTREAM'])
+    expect(sequenceOf('DOWNSTREAM')).toEqual(sequenceOf('UPSTREAM').map((t) => t === 'low' ? 'high' : 'low'))
+  })
+
+  it.each(['buried', 'carried', 'given'] as const)('chooses the message for %s', (rockArtefact) => {
+    expect(currentDrumMessage({ rockArtefact })).toBe(rockArtefact === 'given' ? 'answer' : 'errand')
+  })
+
+  it.each(['errand', 'answer'] as const)('beats %s from the lexicon with the shared pace, pause and level', (message) => {
+    const concepts = message === 'answer' ? CHIEF_ANSWER_CONCEPTS : CHIEF_MESSAGE_CONCEPTS
+    const plan = drumMessagePlan(message)
+    expect(plan.message).toBe(message)
+    expect(plan.atoms).toEqual(concepts.map((c) => utteranceOf(c)))
+    expect(plan.strikes).toHaveLength(concepts.length * SEQUENCE_LENGTH)
+    concepts.forEach((concept, i) => {
+      const strikes = plan.strikes.filter((s) => s.conceptIndex === i)
+      expect(strikes.map((s) => s.drum)).toEqual([...sequenceOf(concept)])
+      expect(strikes[0].at).toBeCloseTo(i * (SEQUENCE_LENGTH * balance.communication.syllableSeconds + balance.communication.phrasePauseSeconds))
+    })
+    for (const strike of plan.strikes) expect(strike.peak).toBeCloseTo(balance.communication.drumMessagePeak * balance.ambienceVolume)
+    const last = plan.strikes.at(-1)!
+    expect(plan.duration).toBeCloseTo(last.at + last.duration)
+    expect(drumMessageElements(emptyMemory(), message).map((e) => e.utterance)).toEqual(plan.atoms)
   })
 })

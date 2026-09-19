@@ -12,7 +12,7 @@ import { de } from '../i18n/de'
 import { useLocale } from '../i18n'
 import { useUi } from '../state/ui'
 import { freshGame, g } from '../test/store'
-import { chiefMessagePhrase, drumMessagePlan } from '../communication/drumMessage'
+import { drumMessagePhrase, drumMessagePlan } from '../communication/drumMessage'
 import { utteranceOf } from '../communication/lexicon'
 import { hypothesisFor } from '../communication/heard'
 import { NO_READING } from '../communication/speechLabel'
@@ -48,7 +48,7 @@ const syllables = () =>
 describe('the message display (design.md §13.4)', () => {
   it('shows the four drummed concepts in the order they were beaten', () => {
     render(<DrumMessageDialog />)
-    expect(syllables()).toEqual([...chiefMessagePhrase()])
+    expect(syllables()).toEqual([...drumMessagePhrase()])
   })
 
   it('shows ??? over a concept the player has not read yet', () => {
@@ -155,7 +155,7 @@ describe('the message can always be reopened (point 486)', () => {
     useUi.getState().setDialog({ kind: 'drumMessage' })
     render(<Dialogs />)
     expect(document.querySelector('.dialog.drum-message')).toBeInTheDocument()
-    expect(syllables()).toEqual([...chiefMessagePhrase()])
+    expect(syllables()).toEqual([...drumMessagePhrase()])
   })
 })
 

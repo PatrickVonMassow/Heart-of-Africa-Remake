@@ -1,5 +1,5 @@
-// The chief's drum message (design.md §13.4, docs/communication-poc-spec.md,
-// work-order point 486): the four concepts the drums send, the strike plan the
+// The chief's drum messages (design.md §13.4, docs/communication-poc-spec.md,
+// work-order point 486): the concept lists the drums send, the strike plan the
 // drummer beats them with, and the elements the message display shows.
 //
 // The sequences are NEVER re-authored here. The message is a list of CONCEPTS;
@@ -20,7 +20,7 @@ import { phrasePlan, type SpeechOptions } from './speaking'
 
 /**
  * The message: "River. Upstream. Rock. Dig."
- * Built only from the five-word lexicon the player can observe beforehand.
+ * Built only from the village lexicon the player can observe beforehand.
  */
 export const CHIEF_MESSAGE_CONCEPTS: readonly ConceptId[] = [
   'RIVER',
@@ -28,6 +28,22 @@ export const CHIEF_MESSAGE_CONCEPTS: readonly ConceptId[] = [
   'ROCK',
   'DIG',
 ]
+
+/**
+ * The answer says WHERE and no more: river, with the current. The wordless
+ * mould carries what to do there, so there is no third word. Silence teaches
+ * nothing; the absence of DIG is not a clue. DOWNSTREAM is UPSTREAM's tonal
+ * mirror, taught at the bank but unused in the errand: the answer turns on
+ * the direction pair the player was meant to notice.
+ */
+export const CHIEF_ANSWER_CONCEPTS: readonly ConceptId[] = ['RIVER', 'DOWNSTREAM']
+
+export type DrumMessageId = 'errand' | 'answer'
+
+/** The give alone changes which message the chief sends or repeats. */
+export function currentDrumMessage(state: { rockArtefact: 'buried' | 'carried' | 'given' }): DrumMessageId {
+  return state.rockArtefact === 'given' ? 'answer' : 'errand'
+}
 
 /** Which of the two drums a strike lands on: the large low one or the small high one. */
 export type DrumId = 'low' | 'high'
@@ -39,7 +55,7 @@ export interface DrumStrike {
   at: number
   /** Seconds the strike rings — the syllable's own sounding length. */
   duration: number
-  /** Index into CHIEF_MESSAGE_CONCEPTS: the concept this beat belongs to. */
+  /** Index into the selected concept list: the concept this beat belongs to. */
   conceptIndex: number
   /** Index of the syllable within that concept's sequence. */
   syllableIndex: number
@@ -49,6 +65,8 @@ export interface DrumStrike {
 
 /** The whole message as it is beaten out. */
 export interface DrumMessagePlan {
+  /** Retained while it sounds, even if the give changes the current message. */
+  message: DrumMessageId
   /** The atoms, in order — exactly the spoken ones. */
   atoms: Phrase
   /** Every strike in playing order. */
@@ -58,8 +76,8 @@ export interface DrumMessagePlan {
 }
 
 /** The atoms of the message in the given lect — the spoken phrase, unchanged. */
-export function chiefMessagePhrase(lect?: LectId): Phrase {
-  return phraseOf(CHIEF_MESSAGE_CONCEPTS, lect)
+export function drumMessagePhrase(message: DrumMessageId = 'errand', lect?: LectId): Phrase {
+  return phraseOf(message === 'answer' ? CHIEF_ANSWER_CONCEPTS : CHIEF_MESSAGE_CONCEPTS, lect)
 }
 
 /**
@@ -71,13 +89,13 @@ export function chiefMessagePhrase(lect?: LectId): Phrase {
  * Every syllable becomes one strike: a low syllable on the large drum, a high
  * one on the small drum, and nothing else encodes anything.
  */
-export function drumMessagePlan(options: SpeechOptions = {}, lect?: LectId): DrumMessagePlan {
+export function drumMessagePlan(message: DrumMessageId = 'errand', options: SpeechOptions = {}, lect?: LectId): DrumMessagePlan {
   // Speech shares the timing, but its measured vowel/panner headroom must not
   // recalibrate the message drums: the message carries its OWN calibratable
   // level (`balance.communication.drumMessagePeak`).
   const peak = balance.communication.drumMessagePeak *
     Math.max(0, options.volume ?? balance.ambienceVolume)
-  const atoms = chiefMessagePhrase(lect)
+  const atoms = drumMessagePhrase(message, lect)
   const plan = phrasePlan(atoms, 0, options)
   const perAtom = atoms.map((atom) => tonesOf(atom).length)
   const strikes: DrumStrike[] = []
@@ -98,7 +116,7 @@ export function drumMessagePlan(options: SpeechOptions = {}, lect?: LectId): Dru
     })
     syllableIndex++
   }
-  return { atoms, strikes, duration: plan.duration }
+  return { message, atoms, strikes, duration: plan.duration }
 }
 
 /**
@@ -140,9 +158,10 @@ export interface DrumMessageElement {
  */
 export function drumMessageElements(
   memory: CommunicationMemory,
+  message: DrumMessageId = 'errand',
   lect?: LectId,
 ): DrumMessageElement[] {
-  return chiefMessagePhrase(lect).map((utterance, index) => {
+  return drumMessagePhrase(message, lect).map((utterance, index) => {
     const note = hypothesisFor(memory, utterance)
     return { index, utterance, reading: note === '' ? NO_READING : note, unread: note === '' }
   })

@@ -6,7 +6,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { hasHeard, heardUtterances, hypothesisFor } from '../communication/heard'
 import { utteranceOf } from '../communication/lexicon'
-import { chiefMessagePhrase } from '../communication/drumMessage'
+import { drumMessagePhrase } from '../communication/drumMessage'
 import { isSpeechLabelVisible, labelReadings, NO_READING } from '../communication/speechLabel'
 import { g, freshGame, useGame, withWorld } from '../test/store'
 
@@ -169,7 +169,7 @@ describe("the chief's drum message (design.md §13.4)", () => {
     g().receiveDrumMessage()
     expect(g().drumMessageHeard).toBe(true)
     const heard = heardUtterances(g().communication).map((h) => h.utterance)
-    for (const atom of chiefMessagePhrase()) {
+    for (const atom of drumMessagePhrase()) {
       expect(heard).toContain(atom)
       expect(g().communication.heard[atom].firstHeardDay).toBe(40)
     }
@@ -201,7 +201,7 @@ describe("the chief's drum message (design.md §13.4)", () => {
     expect(g().drumMessageHeard).toBe(false)
     expect(g().loadCheckpoint()).toBe(true)
     expect(g().drumMessageHeard).toBe(true)
-    expect(hasHeard(g().communication, chiefMessagePhrase()[0])).toBe(true)
+    expect(hasHeard(g().communication, drumMessagePhrase()[0])).toBe(true)
   })
 
   it('a snapshot from before the drums existed simply never heard them', () => {

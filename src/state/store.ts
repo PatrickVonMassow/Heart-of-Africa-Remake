@@ -29,7 +29,7 @@ import {
   setHypothesis, type CommunicationMemory,
 } from '../communication/heard'
 import type { Phrase, UtteranceId } from '../communication/lexicon'
-import { chiefMessagePhrase } from '../communication/drumMessage'
+import { drumMessagePhrase } from '../communication/drumMessage'
 import { chiefRewardPhrase } from '../communication/chiefReply'
 import { ROCK_VILLAGE_ID, isAtCommunicationRock } from '../world/communicationRock'
 import { chiefWalkState, resetChiefWalk, setChiefWalkState, withinGiveReach } from '../scenes/place/chiefPresence'
@@ -720,7 +720,7 @@ export const useGame = create<GameState>()((set, get) => ({
   // written once — hearing the drums a second time adds no second page.
   receiveDrumMessage: () => {
     const s = get()
-    const heard = observePhrase(s.communication, chiefMessagePhrase(), Math.floor(s.day), heardIn(s))
+    const heard = observePhrase(s.communication, drumMessagePhrase(), Math.floor(s.day), heardIn(s))
     set({ communication: heard, drumMessageHeard: true })
     if (s.drumMessageHeard) return
     get().addEntry(
