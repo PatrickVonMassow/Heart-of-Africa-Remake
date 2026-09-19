@@ -751,6 +751,37 @@ describe('both diggers work the rim of their own site', () => {
     expect(isDigging(state, partner, v)).toBe(false)
     expect(isDigging(state, initiator, v)).toBe(true)
   })
+
+  it('credits the excavation nothing for a body that is standing idle', () => {
+    const v = riverless(view(4))
+    const state = stageDig(v)
+    const initiator = initiatorOf(state)
+    const partner = taskOf(state, initiator)!.partner!
+    putAtGoal(state, v, initiator)
+    stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
+    putAtGoal(state, v, initiator)
+    putAtGoal(state, v, partner)
+    stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
+    stepAdultWork(state, v, utteranceSeconds(4) + balance.communication.consequenceSeconds, CFG, () => 0.5)
+    const siteIndex = taskOf(state, partner)!.siteIndex!
+    const site = v.geography.digSites[siteIndex]
+
+    const dugSoFar = () => digProgressOf(state, v.geography.digSites.length)[siteIndex].dug
+
+    // Both at the rim: the hole takes both men's seconds.
+    const dt = 1 / 60
+    const withPair = dugSoFar()
+    stepAdultWork(state, v, dt, CFG, () => 0.5)
+    expect(dugSoFar() - withPair).toBeCloseTo(dt * 2)
+
+    // One of them displaced: his stroke stops, and so does his credit. A hole
+    // that kept deepening under an idle body would complete without being dug.
+    v.villagers[partner].x = site.x + JOIN_STAND_OFF
+    v.villagers[partner].z = site.z
+    const alone = dugSoFar()
+    stepAdultWork(state, v, dt, CFG, () => 0.5)
+    expect(dugSoFar() - alone).toBeCloseTo(dt)
+  })
 })
 
 describe('digging records work at the site', () => {
@@ -866,10 +897,13 @@ describe('task lifecycle safeguards', () => {
       stepAdultWork(state, v, 0.1, CFG, () => 0.5)
     }
     expect(state.tasks.filter(Boolean)).toHaveLength(2)
-    // Complete this pair's final work phase, then let the catalogue retry.
-    for (const i of [first, partner]) Object.assign(state.tasks[i]!, {
-      phase: 'dig', arrived: true, owes: false, dug: CFG.digSeconds,
-    })
+    // Complete this pair's final work phase, then let the catalogue retry. Both
+    // bodies go to their own rim stand first: the excavation only takes work
+    // from a man who is standing at it (work-order 1125).
+    for (const i of [first, partner]) {
+      Object.assign(state.tasks[i]!, { phase: 'dig', arrived: true, owes: false, dug: CFG.digSeconds })
+      putAtGoal(state, v, i)
+    }
     stepAdultWork(state, v, 0.1, CFG, () => 0.5)
     expect(state.tasks[first]).toBeNull()
     for (let clock = 0; clock < 2; clock += 0.1) {

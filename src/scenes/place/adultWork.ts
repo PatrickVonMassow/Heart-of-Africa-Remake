@@ -535,7 +535,11 @@ export function stepAdultWork(
     }
     t.age += dt
 
-    if (t.phase === 'dig' && t.arrived && t.siteIndex !== null) {
+    // THE HOLE DEEPENS ONLY UNDER A STROKE THAT IS REALLY PLAYED (work-order
+    // 1125, GPT-6 Astra cross-vendor round). Gating the pose on the working rim
+    // and the accounting on phase alone would have let a displaced body stand
+    // idle while its excavation filled up and completed underneath him.
+    if (isDigging(state, i, view) && t.siteIndex !== null) {
       const before = t.dug
       t.dug += dt
       const progress = (state.siteProgress[t.siteIndex] ??= { dug: 0, strikes: 0 })
