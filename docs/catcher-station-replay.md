@@ -55,7 +55,7 @@ to point 514.
 
 - Eight targeted village replays: passed (129.20 s).
 - `npx vitest run src/scenes/place/bankGame.test.ts src/scenes/place/tagShuffle.test.ts`: passed, 2 files / 109 tests (371.70 s).
-- `npm run test:unit`: pending.
+- `npm run test:unit`: passed, 511 files / 16,077 tests, 6 skipped (440.67 s).
 - `npm run build`: passed.
 - `npm run lint`: passed.
 - `npm run typecheck:test`: passed.
