@@ -6033,16 +6033,6 @@ if (section('adult-errands')) {
       `${dug} villager-samples at the dig pose`,
     )
     check(
-      'and every stroke falls at its own pit\u2019s working rim (work-order 1125)',
-      dug > 0 && offRim.length === 0,
-      offRim.length ? offRim.slice(0, 4).join('; ') : `${dug} villager-samples, none further than ${rimLimit.toFixed(2)} m from its pit`,
-    )
-    check(
-      'and a pair at one pit works it from opposite sides, the hole between them',
-      pairsSeen > 0 && sideBySide.length === 0,
-      sideBySide.length ? sideBySide.slice(0, 4).join('; ') : `${pairsSeen} samples of a full pair at one pit`,
-    )
-    check(
       'and the jar goes down EMPTY and comes back FULL',
       carriedEmpty > 0 && carriedFull > 0,
       `${carriedEmpty} villager-samples with the empty jar, ${carriedFull} with the full one`,
@@ -6070,6 +6060,19 @@ if (section('adult-errands')) {
         ? `nearest utterance to the children: ${nearestVoiceWhat}`
         : 'NO ADULT SPOKE IN THE WINDOW — nothing was measured',
       { subjects: heardTotal, minimum: 1, what: 'adult words' },
+    )
+    // AND THE STROKE FALLS AT THE RIM (work-order 1125). It sits outside the
+    // jar block on purpose: `polishJarCoverage.test.mjs` executes that block's
+    // own source, and a reading of its own belongs beside it, not inside it.
+    check(
+      'and every stroke falls at its own pit\u2019s working rim (work-order 1125)',
+      dug > 0 && offRim.length === 0,
+      offRim.length ? offRim.slice(0, 4).join('; ') : `${dug} villager-samples, none further than ${rimLimit.toFixed(2)} m from its pit`,
+    )
+    check(
+      'and a pair at one pit works it from opposite sides, the hole between them',
+      pairsSeen > 0 && sideBySide.length === 0,
+      sideBySide.length ? sideBySide.slice(0, 4).join('; ') : `${pairsSeen} samples of a full pair at one pit`,
     )
 
     // --- THE FILL READS AS FETCHING, NOT AS FALLING (work-order 1085) ---------
