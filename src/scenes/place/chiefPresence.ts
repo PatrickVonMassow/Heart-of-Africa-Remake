@@ -1,9 +1,8 @@
 // The chief's own object in the settlement scene (design.md §13.4).
 //
-// He is met OUTSIDE now, so what he says is spoken over his head like any
-// other villager's word — and that needs the object he is drawn as. The figure
-// is drawn deep in the PlaceScene tree, so what it must tell the rest of the
-// game meets here rather than through a prop chain.
+// He is met outside. The figure is drawn deep in the PlaceScene tree, so its
+// anchor and live position meet here rather than through a prop chain. His
+// answer is carried by the drummer; he speaks no reward over this anchor.
 //
 // It also carries where he STANDS, because the find from the boulder is given
 // by USING the inventory item before him: the give reach is measured on the

@@ -254,6 +254,7 @@ export const en: Strings = {
     speakToChief: 'Speak to the chief',
     askForDrumMessage: 'Ask the chief for his message',
     repeatDrumMessage: 'Have the message beaten again',
+    repeatDrumAnswer: "Have the answer beaten again",
     callChiefBack: 'Call the chief back',
     askDrummer: 'Ask the drummer',
     chief: 'Chief',
@@ -276,6 +277,7 @@ export const en: Strings = {
     firstHeard: (date: string) => `First heard ${date}`,
     firstHeardIn: (date: string, place: string) => `First heard ${date} in ${place}`,
     reopenDrumMessage: "Read the chief's drum message again",
+    reopenDrumAnswer: "Read the chief's answer on the drums again",
   },
 
   speechGuess: {
@@ -289,6 +291,8 @@ export const en: Strings = {
   },
 
   drumMessage: {
+    answerTitle: "The Chief's Answer on the Drums",
+    answerHint: "His answer: two words, one after another. Above each stands my own reading — click one to change it; it is the same note my book holds.",
     title: "The Chief's Message on the Drums",
     hint: 'Four words, one after another. Above each stands my own reading — click one to change it; it is the same note my book holds.',
     readingFor: (utterance: string) => `My reading of ${utterance}`,
@@ -781,6 +785,7 @@ export const en: Strings = {
       monumentReturn: (p: TextParams) => `${PLACES[p.place as string]} Once More`,
       chiefWalk: 'The Chief Sets Out',
       drumMessage: 'The Drums Speak',
+      drumAnswer: "The Drums Answer",
       rockArtefact: 'At the Foot of the Great Rock',
       artefactGiven: 'Into the Hands of the Chief',
       mouldFitted: 'The Clay Finds Its Rock',
@@ -998,12 +1003,13 @@ export const en: Strings = {
     },
     chiefWalk:
       '[awe]The chief stepped out of his hut and walked across to his drummer.[/awe] [pause]He offered no words I could understand. [somber]Yet his purpose seemed plain enough:[/somber] [emph]I was meant to follow.[/emph]',
+    drumAnswer: "[awe]Two words came from the drums in answer to the find.[/awe] [pause]Both were familiar from the village. I have written their beats down, with my own reading above each; [somber]what they mean together is still mine to work out.[/somber]",
     drumMessage:
       '[awe]The chief called his drummer, and two drums spoke for him — a great one and a small one.[/awe] [pause]Four words, each of four beats, each parted from the next by the same short silence — deep for the low syllable, bright for the high one. [excited]I know these words. I have heard every one of them in the lanes and at the water.[/excited] [pause]I have written them down in the order they were beaten; what they ask of me I must read for myself.',
     rockArtefact:
       "[excited]Four words, and they were an errand after all.[/excited] I followed the water against its own pull until a block of stone stood on the bank — the kind of thing the children name at their own two rocks, and the only one up here. [pause]The drums had said no more than that: water, against the pull, stone, dig. Everything else about it I had to find for myself. [pause]Three spans down my shovel met something that was not stone: hammered metal on worn wood, sealed in the river's own clay. [awe]It has lain here longer than the village has stood.[/awe] [pause]I did not open it further. [somber]It is not mine to open.[/somber]",
     artefactGiven:
-      "[breath]I carried it back down the river and laid it in the chief's hands.[/breath] [pause]He turned it over once and spoke two words over it. [excited]Both of them I had heard before — one wherever the water is meant, and one among the calls the children throw at each other when they run.[/excited] [pause]What the two say together I must work out for myself; nobody here will say it in a tongue of mine. [pause]Then he took a thing of baked clay from beside the drums and put it into my hands without a single word over it. [pause]It is flat at the back and hollowed at the front, and the hollow is no bowl: it is the shape of a piece of rock, taken off it the way a seal takes a signet. [awe]A form that wants to go INTO something, not onto it.[/awe] [pause][somber]We share no language.[pause] And yet he has given me two words and a shape, and both are meant for someone who has been listening.[/somber]",
+      "[breath]I carried it back down the river and laid it in the chief's hands.[/breath] [pause]He laid the find beside the drums and had his drummer answer — two words on the drums. [excited]Both of them I had heard before in the village.[/excited] [pause]What the two say together I must work out for myself; nobody here will say it in a tongue of mine. [pause]Then he took a thing of baked clay from beside the drums and put it into my hands without a single word over it. [pause]It is flat at the back and hollowed at the front, and the hollow is no bowl: it is the shape of a piece of rock, taken off it the way a seal takes a signet. [awe]A form that wants to go INTO something, not onto it.[/awe] [pause][somber]We share no language.[pause] And yet he has given me two words and a shape, and both are meant for someone who has been listening.[/somber]",
     mouldFitted:
       "[whisper]This time I followed the water the way it wants to go, until the land stood up in a long wall of stone above the plain.[/whisper] [pause]I did not climb to the little chambers on the face — they are graves and granaries, and no business of mine. [pause]At the foot of the wall, on the ground where the people live, one weathered block carried a relief I had already held in my hands: the clay went against it and sat into it without a hair's play. [pause][awe]Something behind the stone gave — a weight shifting, a long breath of cold air out of the ground.[/awe] [pause][excited]So this is what the words were for.[/excited] [pause][somber]What lies behind it is for another day.[/somber]",
     digNothing: '[weary]I dug at this spot, but the sand yielded nothing except stones and old roots.[/weary]',

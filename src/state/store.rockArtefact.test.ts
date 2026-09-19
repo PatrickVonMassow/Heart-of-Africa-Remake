@@ -8,7 +8,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { balance } from '../config/balance'
 import { g, freshGame, withWorld, useGame, standBeforeChief, leaveTheChief } from '../test/store'
 import { communicationRockSite } from '../world/communicationRock'
-import { chiefRewardPhrase } from '../communication/chiefReply'
+import { drumMessagePhrase } from '../communication/drumMessage'
 import { hasHeard, hypothesisFor } from '../communication/heard'
 import { utteranceOf } from '../communication/lexicon'
 import { DRUM_MESSAGE_VILLAGE } from './store'
@@ -109,12 +109,12 @@ describe('giving the find to the chief', () => {
     expect(g().journal.at(-1)?.title.key).toBe('journal.titles.artefactGiven')
   })
 
-  it('he acknowledges it in his OWN tongue, recorded like any speech of his', () => {
+  it('the give alone records no unheard answer atoms', () => {
     carriedIntoTheVillage()
     g().debugSet({ day: 60 })
     g().handArtefactToChief()
-    for (const atom of chiefRewardPhrase()) {
-      expect(hasHeard(g().communication, atom)).toBe(true)
+    for (const atom of drumMessagePhrase('answer')) {
+      expect(hasHeard(g().communication, atom)).toBe(false)
     }
     // Nothing is translated for the player: an utterance he wrote no note for
     // stays without one.

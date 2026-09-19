@@ -173,6 +173,7 @@ export interface Strings {
     askForDrumMessage: string
     /** The same key once the message has been heard: it beats it out again. */
     repeatDrumMessage: string
+    repeatDrumAnswer: string
     /** Use-key prompt at the chief or his drummer while he walks home (§13.4). */
     callChiefBack: string
     /** Use-key prompt at the drummer while the chief is in his hut (§13.4). */
@@ -209,6 +210,7 @@ export interface Strings {
     firstHeardIn(date: string, place: string): string
     /** Button that reopens the chief's drum message (point 486). */
     reopenDrumMessage: string
+    reopenDrumAnswer: string
   }
 
   /** Guessing a meaning where it is spoken (design.md §13.4, points 588/691):
@@ -233,6 +235,8 @@ export interface Strings {
   /** The chief's drum message and its reopenable display (design.md §13.4,
    *  docs/communication-poc-spec.md, point 486). */
   drumMessage: {
+    answerTitle: string
+    answerHint: string
     title: string
     /** Line above the concepts: the readings are the player's own, and editable. */
     hint: string
@@ -788,6 +792,7 @@ export interface Strings {
       chiefWalk: string
       /** The chief's drum message (design.md §13.4, point 486). */
       drumMessage: string
+      drumAnswer: string
       /** Dug up at the foot of the landmark boulder (point 487). */
       rockArtefact: string
       /** The artefact laid in the chief's hands, and what he pays for it. */
@@ -856,6 +861,7 @@ export interface Strings {
     chiefWalk: string
     /** The chief's drums beat his message out (design.md §13.4, point 486). */
     drumMessage: string
+    drumAnswer: string
     /** The dig at the boulder the drum message sends the traveller to (point 487). */
     rockArtefact: string
     /** Handing the artefact to the chief: two words back, and a thing of clay

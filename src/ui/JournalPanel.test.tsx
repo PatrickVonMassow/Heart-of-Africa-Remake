@@ -7,6 +7,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { act, fireEvent, render } from '@testing-library/react'
+import { useUi } from '../state/ui'
 import { JournalPanel } from './JournalPanel'
 import { hypothesisFor } from '../communication/heard'
 import { compareUtterances, utteranceOf } from '../communication/lexicon'
@@ -331,5 +332,44 @@ describe('first heard names its village (point 579)', () => {
     const line = firstHeardText()
     expect(line).toBe(en.journalPanel.firstHeard(en.formatDate(Math.floor(g().day), START_YEAR)))
     expect(line).not.toMatch(/\?|—|unknown|\bin\s*$/i)
+  })
+})
+
+
+describe('each heard drum message stays reopenable', () => {
+  it.each(['en', 'de'] as const)('offers both messages separately in %s', (lang) => {
+    useLocale.getState().setLang(lang)
+    const t = lang === 'de' ? de : en
+    g().receiveDrumMessage('errand')
+    g().receiveDrumMessage('answer')
+    const panel = render(<JournalPanel />)
+    openObservationsTab()
+    const errand = panel.getByText(t.journalPanel.reopenDrumMessage)
+    const answer = panel.getByText(t.journalPanel.reopenDrumAnswer)
+    for (let i = 0; i < 2; i++) {
+      fireEvent.click(answer)
+      expect(useUi.getState().dialog).toEqual({ kind: 'drumMessage', message: 'answer' })
+      useUi.getState().setDialog(null)
+      fireEvent.click(errand)
+      expect(useUi.getState().dialog).toEqual({ kind: 'drumMessage', message: 'errand' })
+      useUi.getState().setDialog(null)
+    }
+  })
+
+  it('offers only the answer if only the answer has been heard', () => {
+    g().receiveDrumMessage('answer')
+    const panel = render(<JournalPanel />)
+    openObservationsTab()
+    expect(panel.queryByText(en.journalPanel.reopenDrumMessage)).toBeNull()
+    expect(panel.getByText(en.journalPanel.reopenDrumAnswer)).toBeInTheDocument()
+  })
+
+  it('does not offer the answer just because the find has been given', () => {
+    useGame.setState({ rockArtefact: 'given' })
+    g().receiveDrumMessage('errand')
+    const panel = render(<JournalPanel />)
+    openObservationsTab()
+    expect(panel.queryByText(en.journalPanel.reopenDrumAnswer)).toBeNull()
+    expect(panel.getByText(en.journalPanel.reopenDrumMessage)).toBeInTheDocument()
   })
 })
