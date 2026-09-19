@@ -277,6 +277,8 @@ export interface BankRoundConfig {
   catcherStationDistance: number
   /** How long an arriving runner rests its hand on the far stone. */
   arrivalHoldSeconds: number
+  /** Bound on queuing for stone contact, separate from the group's walk backstop. */
+  arrivalApproachSeconds: number
   /** Backstop on the walk between two runs. */
   regroupSeconds: number
   /** How long the group walks toward its roaming quarter before roaming again. */
@@ -1807,7 +1809,7 @@ function chooseQuarry(s: BankState, self: number, cfg: BankConfig): number {
 
 /** Finish a safe runner's approach without extending the run or its catch window.
  * Occupied stands wait their turn; an obstructed approach expires silently at
- * the regroup backstop. Only actual contact may offer the word. */
+ * its own approach bound. Only actual contact may offer the word. */
 function stepArrival(
   s: BankState, i: number, dt: number, cfg: BankConfig, stage: BankStage, world: BankWorld,
 ): boolean {
@@ -1931,7 +1933,7 @@ function stepRun(
           }
         }
       }
-      c.arrival = stand ? { end: to, stand, approachFor: cfg.regroupSeconds, holdFor: null } : null
+      c.arrival = stand ? { end: to, stand, approachFor: cfg.arrivalApproachSeconds, holdFor: null } : null
     }
   }
 

@@ -741,6 +741,8 @@ export interface BalanceConfig {
       /** Settling radius for the catchers at their stations. */
       catcherStationDistance: number
       arrivalHoldSeconds: number
+      /** Bound on queuing for stone contact, separate from the group's walk backstop. */
+      arrivalApproachSeconds: number
       /** Backstop on the walk between two runs. */
       regroupSeconds: number
       /** How long the group walks toward its roaming quarter before roaming again. */
@@ -1377,6 +1379,8 @@ export const balance: BalanceConfig = {
       catcherStationDistance: 0.6,
       // Calibratable: one ROCK atom plus a beat with the hand resting on the flank.
       arrivalHoldSeconds: 1.5,
+      // Calibratable against occupied stone queues in 400 s village replays at shipped and 8 s roaming; expires well before the group's walk backstop.
+      arrivalApproachSeconds: 14,
       // Calibratable: catchers walk the full stretch after the sides swap.
       regroupSeconds: 60,
       partSeconds: 8,

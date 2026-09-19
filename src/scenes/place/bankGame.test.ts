@@ -1338,6 +1338,38 @@ describe('arriving runners name the far stone by contact', () => {
     expect(c.nudges).toBe(0)
   })
 
+  it.each([0.7, 2.3])('expires an occupied stone queue silently after %s seconds while regroup still has time', (seconds) => {
+    const cfg = { ...CFG, arrivalApproachSeconds: seconds }
+    const { s, rand } = arriving([{ x: 8, z: 0 }], cfg)
+    const world = openWorld()
+    const dt = 1 / 60
+    stepBankGame(s, dt, cfg, STAGE, world, rand)
+    const c = s.children[1]
+    expect(s.phase).toBe('regroup')
+    expect(c.arrival?.approachFor).toBe(seconds)
+    const stand = c.arrival!.stand
+    world.occupied = (_self, _partner, x, z) => dist({ x, z }, stand) < world.childRadius * 2
+    const start = { x: c.x, z: c.z }
+    let elapsed = 0
+    while (c.arrival && elapsed < seconds + dt * 2) {
+      const word = stepBankGame(s, dt, cfg, STAGE, world, rand)
+      elapsed += dt
+      expect(word?.moment).not.toBe('arrival')
+      expect(bankChildTouching(s, 1)).toBe(false)
+      if (c.arrival) {
+        expect({ x: c.x, z: c.z }).toEqual(start)
+        expect(c.held).toBe(true)
+        expect(c.pace).toBe(0)
+      }
+    }
+    expect(c.arrival).toBeNull()
+    expect(elapsed).toBeGreaterThanOrEqual(seconds - 1e-9)
+    expect(elapsed).toBeLessThanOrEqual(seconds + dt)
+    expect(s.phase).toBe('regroup')
+    expect(s.phaseFor).toBeGreaterThan(cfg.regroupSeconds - seconds - dt * 2)
+    expect(s.tags).toBe(0)
+  })
+
   it('arrives silently when the far flank is blocked', () => {
     const { s, rand } = arriving([{ x: 8, z: 0 }])
     const world = { ...openWorld(), blocked: (x: number, z: number) => dist({ x, z }, STAGE.downstream) < 1.7 }
