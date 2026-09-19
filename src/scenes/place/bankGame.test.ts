@@ -1641,3 +1641,35 @@ describe('the tapper walks back into the catcher line before the charge', () => 
     expect(s.phaseFor).toBeLessThan(cfg.runSeconds)
   })
 })
+
+it('starts natural first and follow-up charges with the whole catcher group off the touch spot', () => {
+  const cfg = { ...CFG, roamSeconds: 0.1, roamSpread: 0, utteranceGapSeconds: 0 }
+  let returning = false
+  let firstCharges = 0
+  let groupCharges = 0
+  let lastTapper = -1
+  replay(360, { cfg, observe: (s, word) => {
+    if (word?.moment === 'call') {
+      expect(s.tapTurns.every((turns) => turns === 0)).toBe(true)
+      lastTapper = -1
+    }
+    if (word?.moment === 'tap') {
+      if (s.children.filter((c) => c.role === 'catcher').length >= 2) expect(s.tapper).not.toBe(lastTapper)
+      lastTapper = s.tapper
+    }
+    if (returning && s.returnFor === null && s.phase === 'run') {
+      const end = otherEnd(s.from)
+      const touch = touchStand(STAGE, end, openWorld().blocked)!
+      const group = s.children.filter((c) => c.role === 'catcher')
+      if (group.length === 1) firstCharges++
+      else groupCharges++
+      group.forEach((c, slot) => {
+        expect(dist(c, stationAt(STAGE, end, slot, cfg))).toBeLessThanOrEqual(cfg.reachDistance * 0.6)
+        expect(dist(c, touch)).toBeGreaterThan(openWorld().childRadius * 2)
+      })
+    }
+    returning = s.returnFor !== null
+  } })
+  expect(firstCharges).toBeGreaterThan(0)
+  expect(groupCharges).toBeGreaterThan(0)
+})

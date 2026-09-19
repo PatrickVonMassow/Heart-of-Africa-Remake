@@ -4925,6 +4925,50 @@ if (section('children-bank-game')) {
       )
     }
 
+    // Retain the actual first charge frame with several catchers. The latch
+    // stops only after the tapper's return; it never moves or assigns a child.
+    await restoreEarshotStance()
+    await page.evaluate(() => window.__placeHoldCharge(true))
+    try {
+      const charged = await page.waitForFunction(() => {
+        const t = window.__placeTag()
+        return t.chargeHeld ? t.catcherLine : null
+      }, null, { timeout: 240000 }).then((h) => h.jsonValue()).catch(() => null)
+      const reach = await page.evaluate(() => window.__balance.villageLife.bankGame.reachDistance)
+      check(
+        'the charge starts with every catcher back in one line before its rock',
+        !!charged && charged.children.length >= 2 && charged.children.every((c) =>
+          Math.hypot(c.x - c.station.x, c.z - c.station.z) <= reach * 0.6),
+        JSON.stringify(charged),
+      )
+      if (charged) {
+        // Frame the whole line and the stone behind it, from the running ground.
+        const subject = await page.evaluate((line) => {
+          const p = window.__placePlayer
+          const L = window.__placeLayout.playRocks
+          const other = Math.hypot(L.upstream.x - line.rock.x, L.upstream.z - line.rock.z) < 0.01
+            ? L.downstream : L.upstream
+          const dx = other.x - line.rock.x
+          const dz = other.z - line.rock.z
+          const len = Math.hypot(dx, dz)
+          const target = { x: line.rock.x + dx / len * 1.5, y: 0.7, z: line.rock.z + dz / len * 1.5 }
+          p.x = line.rock.x + dx / len * 8 - dz / len * 3
+          p.z = line.rock.z + dz / len * 8 + dx / len * 3
+          p.yaw = Math.atan2(-(target.x - p.x), -(target.z - p.z))
+          p.pitch = -0.1
+          return target
+        }, charged)
+        await nextFrames(2)
+        await frame('1109-catcher-line-at-charge-start', {
+          local: subject,
+          label: `${charged.children.length} catchers together before their rock at charge start; child ${charged.tapper} has stepped back from the tap`,
+        })
+      }
+    } finally {
+      await page.evaluate(() => window.__placeHoldCharge(false))
+      await restoreEarshotStance()
+    }
+
     // ARRIVAL CONTACT (work-order 1106). Follow one spoken runner by identity
     // through the side swap and to the far side of its own hold. Another
     // runner naming the same stone cannot replace this trace halfway through.
