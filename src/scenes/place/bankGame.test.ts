@@ -607,6 +607,7 @@ describe('the children`s game at the bank (point 687)', () => {
       gatherSeconds: 0.1,
       runSeconds: 0.1,
       regroupSeconds: 0.1,
+      tapReturnSeconds: 0.1,
       partSeconds: 0.1,
       catchDistance: -1,
     }

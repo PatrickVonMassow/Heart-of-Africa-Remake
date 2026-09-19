@@ -1573,7 +1573,12 @@ describe('the children`s bank round can reach its own stage (work-order 687)', (
     // The window the section opens, and the budget it gives a cycle-first run to
     // come, both in played seconds.
     const LANE_WINDOW_S = 120
-    const RUN_BUDGET_S = 150
+    // The observer must allow the longer station walks and every return in a
+    // cycle. The crossing and motion gates below retain their original bars.
+    const RUN_BUDGET_S = SECTION_ROAM_S + SECTION_GUARD_S + BANK_CFG.gatherSeconds +
+      BANK_CFG.partSeconds + BANK_CFG.endPauseSeconds + balance.villageLife.tag.childCount *
+      (BANK_CFG.regroupSeconds + BANK_CFG.runSeconds + BANK_CFG.tapPauseSeconds +
+       BANK_CFG.tapReturnSeconds + 2 * BANK_CFG.utteranceGapSeconds)
     const shippedRoam = BANK_CFG.roamSeconds
     const shippedGuard = BANK_CFG.roamGuardSeconds
     try {
@@ -1628,11 +1633,7 @@ describe('the children`s bank round can reach its own stage (work-order 687)', (
         // a cold start and between any two of them.
         let worstWait = opens.length > 0 ? opens[0] : Infinity
         for (let i = 1; i < opens.length; i++) worstWait = Math.max(worstWait, opens[i] - opens[i - 1])
-        expect({ placeId, seed, inBudget: worstWait <= RUN_BUDGET_S }).toEqual({
-          placeId,
-          seed,
-          inBudget: true,
-        })
+        expect(worstWait, JSON.stringify({ placeId, seed, opens })).toBeLessThanOrEqual(RUN_BUDGET_S)
         // ...and every window that fits whole inside the replay carries a
         // crossing, counted exactly as the browser counts it: inside the run
         // phase only, with the side forgotten on leaving it and a metre of
