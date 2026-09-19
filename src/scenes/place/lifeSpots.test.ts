@@ -20,7 +20,11 @@ import {
   VILLAGE_SPOTS,
   childPlayGround,
   villageAdultStations,
+  villageHasWell,
+  villageKeepClearSpots,
+  villageLifeProps,
 } from './lifeSpots'
+import { ROCK_VILLAGE_ID } from '../../world/communicationRock'
 import { balance } from '../../config/balance'
 import { PLACE_RADIUS, buildLayout, builtFabric } from './layout'
 import { standingClear, WALKER_RADIUS } from './collision'
@@ -29,18 +33,20 @@ import { isWithinHearing } from '../../communication/heard'
 
 /** The village fire of the shipped settlement scene (PlaceScene). */
 const FIRE: [number, number] = [-3.5, 2.5]
+/** A village that keeps its well — every one but the communication village. */
+const WELL_VILLAGE = 'hausa-village'
 /** The walkable rim the chase is given: the settlement minus two body radii. */
 const WALK = PLACE_RADIUS - 0.6
 const HEARING = balance.communication.hearingRadius
 const PLAY = balance.villageLife.tag.playRadius
 
 function ground(fire: readonly [number, number] = FIRE, walk = WALK, play = PLAY) {
-  return childPlayGround(villageAdultStations(fire), walk, play, HEARING)
+  return childPlayGround(villageAdultStations(fire, WELL_VILLAGE), walk, play, HEARING)
 }
 
 /** Distance from a point to the nearest adult station. */
 function nearestStation(x: number, z: number, fire: readonly [number, number] = FIRE): number {
-  return Math.min(...villageAdultStations(fire).map(([sx, sz]) => Math.hypot(x - sx, z - sz)))
+  return Math.min(...villageAdultStations(fire, WELL_VILLAGE).map(([sx, sz]) => Math.hypot(x - sx, z - sz)))
 }
 
 describe('the adult stations', () => {
@@ -50,13 +56,13 @@ describe('the adult stations', () => {
     expect(Math.hypot(body.x, body.z)).toBeLessThan(Math.hypot(...LOOM_SPOT))
     expect(body.x + Math.sin(body.yaw) * WEAVER_OFFSET).toBeCloseTo(LOOM_SPOT[0])
     expect(body.z + Math.cos(body.yaw) * WEAVER_OFFSET).toBeCloseTo(LOOM_SPOT[1])
-    expect(villageLifeFootprints(FIRE)).toContainEqual(body)
-    expect(villageAdultStations(FIRE)).toContainEqual(LOOM_SPOT)
+    expect(villageLifeFootprints(FIRE, WELL_VILLAGE)).toContainEqual(body)
+    expect(villageAdultStations(FIRE, WELL_VILLAGE)).toContainEqual(LOOM_SPOT)
   })
 
   it('names the fixed vignettes, and moves the three at the fire with it', () => {
-    const here = villageAdultStations([0, 0])
-    const there = villageAdultStations([10, 10])
+    const here = villageAdultStations([0, 0], WELL_VILLAGE)
+    const there = villageAdultStations([10, 10], WELL_VILLAGE)
     expect(here.length).toBe(there.length)
     expect(here).toContainEqual(VILLAGE_SPOTS.talkers)
     expect(here).toContainEqual(VILLAGE_SPOTS.well)
@@ -67,6 +73,68 @@ describe('the adult stations', () => {
   })
 })
 
+/**
+ * The well leaves ONE village (user 07./10.09.2026): the communication village,
+ * whose adults fetch their water from the river on the water path (point 1087),
+ * so a second water source there is redundant and reads against the teaching.
+ * Every other village keeps its well — prop, stations and collider alike.
+ */
+describe('the well leaves the communication village (point 1092)', () => {
+  const carriesWell = (spots: ReadonlyArray<readonly [number, number]>) =>
+    spots.some(([x, z]) => x === VILLAGE_SPOTS.well[0] && z === VILLAGE_SPOTS.well[1])
+  /** The water-carrier's stop, a body length to the -x side of the well. */
+  const carriesWaterCarrier = (spots: ReadonlyArray<readonly [number, number]>) =>
+    spots.some(([x, z]) => x === VILLAGE_SPOTS.well[0] - 1.1 && z === VILLAGE_SPOTS.well[1])
+
+  it('names exactly the communication village, by its own id and not a copy of it', () => {
+    expect(villageHasWell(ROCK_VILLAGE_ID)).toBe(false)
+    expect(villageHasWell(WELL_VILLAGE)).toBe(true)
+    expect(villageHasWell('mongo-village')).toBe(true)
+  })
+
+  it('drops the well and its water-carrier from the adult stations there only', () => {
+    const rock = villageAdultStations(FIRE, ROCK_VILLAGE_ID)
+    const other = villageAdultStations(FIRE, WELL_VILLAGE)
+    expect(carriesWell(rock)).toBe(false)
+    expect(carriesWaterCarrier(rock)).toBe(false)
+    expect(carriesWell(other)).toBe(true)
+    expect(carriesWaterCarrier(other)).toBe(true)
+    // Two stations fewer, and nothing else moved: the children's quarter gains
+    // the room, the other vignettes stay where they stood.
+    expect(rock).toHaveLength(other.length - 2)
+    expect(other.filter((s) => !carriesWell([s]) && !carriesWaterCarrier([s]))).toEqual(rock)
+  })
+
+  it('drops the well from the keep-clear spots there only', () => {
+    expect(carriesWell(villageKeepClearSpots(ROCK_VILLAGE_ID))).toBe(false)
+    expect(carriesWell(villageKeepClearSpots(WELL_VILLAGE))).toBe(true)
+    expect(villageKeepClearSpots(WELL_VILLAGE)).toEqual(Object.values(VILLAGE_SPOTS))
+    expect(villageKeepClearSpots(ROCK_VILLAGE_ID)).toHaveLength(
+      villageKeepClearSpots(WELL_VILLAGE).length - 1,
+    )
+  })
+
+  it('drops the well collider and its body footprint there only', () => {
+    const body = { x: VILLAGE_SPOTS.well[0] - 1.1, z: VILLAGE_SPOTS.well[1], r: WALKER_RADIUS }
+    const prop = { x: VILLAGE_SPOTS.well[0], z: VILLAGE_SPOTS.well[1], r: 0.75 }
+    expect(villageLifeProps(FIRE, ROCK_VILLAGE_ID)).not.toContainEqual(prop)
+    expect(villageLifeFootprints(FIRE, ROCK_VILLAGE_ID)).not.toContainEqual(prop)
+    expect(villageLifeFootprints(FIRE, ROCK_VILLAGE_ID)).not.toContainEqual(body)
+    expect(villageLifeProps(FIRE, WELL_VILLAGE)).toContainEqual(prop)
+    expect(villageLifeFootprints(FIRE, WELL_VILLAGE)).toContainEqual(body)
+    // The rest of the village is untouched, not merely shorter.
+    expect(villageLifeProps(FIRE, ROCK_VILLAGE_ID)).toEqual(
+      villageLifeProps(FIRE, WELL_VILLAGE).filter((c) => c.x !== prop.x || c.z !== prop.z),
+    )
+  })
+
+  it('leaves the built collider set of that village without a well', () => {
+    const prop = { x: VILLAGE_SPOTS.well[0], z: VILLAGE_SPOTS.well[1], r: 0.75 }
+    expect(buildLayout(ROCK_VILLAGE_ID, 42).colliders).not.toContainEqual(prop)
+    expect(buildLayout(WELL_VILLAGE, 42).colliders).toContainEqual(prop)
+  })
+})
+
 describe('the children play out of the adults’ earshot (point 481.4)', () => {
   it('clears every adult station by the hearing radius, from anywhere on the ground', () => {
     const g = ground()
@@ -74,7 +142,7 @@ describe('the children play out of the adults’ earshot (point 481.4)', () => {
     // The claim spelled out: the nearest point of the ground to any station is
     // still outside hearing.
     expect(nearestStation(g.x, g.z) - g.radius).toBeGreaterThanOrEqual(HEARING)
-    for (const [sx, sz] of villageAdultStations(FIRE)) {
+    for (const [sx, sz] of villageAdultStations(FIRE, WELL_VILLAGE)) {
       const nearestOnGround = Math.max(0, Math.hypot(sx - g.x, sz - g.z) - g.radius)
       expect(isWithinHearing(nearestOnGround, HEARING)).toBe(false)
     }
@@ -132,7 +200,7 @@ describe('the children play out of the adults’ earshot (point 481.4)', () => {
     // Everything but the adults' own corner is blocked: the ground still keeps
     // its distance and reports the openness it had to accept, rather than
     // moving into earshot for a clear view.
-    const g = childPlayGround(villageAdultStations(FIRE), WALK, PLAY, HEARING, {
+    const g = childPlayGround(villageAdultStations(FIRE, WELL_VILLAGE), WALK, PLAY, HEARING, {
       free: (x, z) => Math.hypot(x - 4.6, z - 5.6) < 8,
     })
     expect(g.clearance).toBeGreaterThanOrEqual(HEARING)
@@ -173,7 +241,7 @@ describe('the children play against the village, not behind it (point 524)', () 
       const a = (i / 10) * Math.PI * 2
       return [Math.cos(a) * 12, Math.sin(a) * 12]
     })
-    const g = childPlayGround(villageAdultStations(FIRE), WALK, PLAY, HEARING, { fabric: huts })
+    const g = childPlayGround(villageAdultStations(FIRE, WELL_VILLAGE), WALK, PLAY, HEARING, { fabric: huts })
     expect(g.clearance).toBeGreaterThanOrEqual(HEARING)
     expect(g.fabric).toBeGreaterThanOrEqual(MIN_FABRIC)
     // Its far edge does not reach out past the built ring by more than the reach
@@ -186,7 +254,7 @@ describe('the children play against the village, not behind it (point 524)', () 
       const a = (i / 10) * Math.PI * 2
       return [Math.cos(a) * 12, Math.sin(a) * 12]
     })
-    const g = childPlayGround(villageAdultStations(FIRE), WALK, PLAY, HEARING, { fabric: huts })
+    const g = childPlayGround(villageAdultStations(FIRE, WELL_VILLAGE), WALK, PLAY, HEARING, { fabric: huts })
     // Smaller than the ground the rim would have allowed, because it had to come
     // in to the huts — and still a game of tag.
     expect(g.radius).toBeGreaterThanOrEqual(MIN_PLAY_RADIUS)

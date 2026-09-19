@@ -135,6 +135,7 @@ interface Crowd {
 
 function crowd(
   set: InhabitantSet,
+  placeId: string,
   layout: PlaceLayout,
   seed: number,
   /** Where the errand villagers stroll, when the case wants them somewhere
@@ -158,7 +159,7 @@ function crowd(
   const sep = balance.villageLife.separation
 
   // The vignette adults: they push the passers-by aside and never give way.
-  const stations = villageAdultStations(FIRE)
+  const stations = villageAdultStations(FIRE, placeId)
   const standing = claimBodies(set, stations.length, { fixed: true })
   stations.forEach(([x, z], i) => {
     standing[i].x = x
@@ -490,6 +491,7 @@ function village(
   })
   const others = crowd(
     set,
+    placeId,
     layout,
     localSeed,
     options.adultsAmongTheChildren ? { x: ground.x, z: ground.z, radius: ground.radius } : undefined,

@@ -7,7 +7,7 @@
 import { placeById } from '../../world/geo'
 import { mulberry32 } from '../../world/noise'
 import { REGION_PLACE_STYLES, VILLAGE_PLANS, type RegionPlaceStyle } from './regionStyles'
-import { PORT_TALKERS, VILLAGE_SPOTS, childPlayGround, villageAdultStations, villageLifeProps, villageLifeFootprints, type PlayGround } from './lifeSpots'
+import { PORT_TALKERS, childPlayGround, villageAdultStations, villageKeepClearSpots, villageLifeProps, villageLifeFootprints, type PlayGround } from './lifeSpots'
 import { boxCollider, nudgeToFree, spawnPointFree, standingClear, PLAYER_RADIUS, WALKER_RADIUS, CHIEF_BODY_RADIUS, type Collider } from './collision'
 import { CHIEF_HUT, MARKET_HUT, dwellingRoofProfile, hutRoofProfile, roofStandOff } from './roofClearance'
 import { windingPoints, laneSlots, closestOnPolyline, bendAround, type LaneSlot } from './lanePlan'
@@ -835,7 +835,7 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
       }
     : null
 
-  const lifeFootprints = place.kind === 'village' ? villageLifeFootprints(VILLAGE_FIRE) : []
+  const lifeFootprints = place.kind === 'village' ? villageLifeFootprints(VILLAGE_FIRE, placeId) : []
   const clearsLife = (obstacles: Collider[]) =>
     lifeFootprints.every(body => standingClear(obstacles, body.x, body.z, body.r + 2 * WALKER_RADIUS))
 
@@ -916,7 +916,7 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   // Keep the southern spawn corridor (x≈0, z>6), interactives and the
   // life-prop spots (PlaceLife) clear.
   const lifeSpots: Array<[number, number]> =
-    place.kind === 'village' ? Object.values(VILLAGE_SPOTS) : [PORT_TALKERS]
+    place.kind === 'village' ? villageKeepClearSpots(placeId) : [PORT_TALKERS]
   // No solid body may grow THROUGH a fence (work-order 604): where a hut or a
   // shed crosses a palisade, the slot left on either side of the crossing is
   // narrower than a man, and a traveller pressed into it cannot walk out. The
@@ -1608,7 +1608,7 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   if (place.kind === 'village') {
     // The props include the fire's stand-off; figure bodies are registered by
     // PlaceLife, so the kneeling cook needs no overlapping static collider.
-    colliders.push(...villageLifeProps(VILLAGE_FIRE))
+    colliders.push(...villageLifeProps(VILLAGE_FIRE, placeId))
   } else {
     colliders.push({ x: PORT_TALKERS[0], z: PORT_TALKERS[1], r: 0.85 }) // chatting pair
   }
@@ -1687,7 +1687,7 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   const playGround: PlaceLayout['playGround'] =
     place.kind === 'village'
       ? childPlayGround(
-          villageAdultStations(VILLAGE_FIRE),
+          villageAdultStations(VILLAGE_FIRE, placeId),
           Math.max(1, radius - WALKER_RADIUS * 2),
           balance.villageLife.tag.playRadius,
           balance.communication.hearingRadius,
