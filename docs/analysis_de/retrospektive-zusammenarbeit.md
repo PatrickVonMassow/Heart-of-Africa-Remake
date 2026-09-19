@@ -1656,7 +1656,7 @@ stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die s
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Samstag, 19.09.2026, 04:21 · Quellen-Fingerprint: `94153add572b…`
+Zuletzt aktualisiert: Samstag, 19.09.2026, 11:37 · Quellen-Fingerprint: `9e74017dc690…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1761,10 +1761,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 97 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 7 Revert-/Reapply-Commits · 136 Prozess-/Meta-TASKS-Punkte (davon 65 offen).
+Erfasste Quellen: 97 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 7 Revert-/Reapply-Commits · 136 Prozess-/Meta-TASKS-Punkte (davon 64 offen).
 
-<!-- RETRO-FINGERPRINT: 94153add572bee7ca8cc2eb8bb86e2cee138ffffcada253289f152f661949ed5 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-19T02:21:41.791Z -->
+<!-- RETRO-FINGERPRINT: 9e74017dc6905018c659ab4c34595ecb52503b0e4e2a9766c2a97f3e8e42f3d9 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-19T09:37:03.756Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -7769,3 +7769,26 @@ mit dem nackten Läufer statt über seinen Wrapper — die Zeile, die der Wächt
 abdruckt. Der Lauf berichtete vollständig, hinterließ aber kein Log und keinen
 abgeschlossenen Datensatz und wurde als Absturz verbucht; 26 Minuten für nichts. Wer den
 Lauf besitzt, besitzt seinen Nachweis: `npm test -- <suite>`, nie `run-all.mjs` von Hand.
+
+### 3.200 Zweimal richtig gemessen, zweimal die falsche Einstellung gemessen
+
+Am Ufer-Spiel der Kinder brauchte ein Punkt vier Prüfrunden statt einer, und die ersten
+drei scheiterten nicht an Nachlässigkeit, sondern an einer Messung, die sauber war und am
+falschen Ort stand. Der Punkt hebt die Notbremse der Sammelphase von 14 auf 60 Sekunden.
+Die Browserprüfung wurde daraufhin rot — die Kinder legten zu wenig Weg zurück. Die erste
+Erklärung (ein zu enger Anstellradius) wurde in vier Dörfern nachgemessen und behoben; die
+Prüfung blieb rot. Die zweite Messung fand im selben Dorf nichts mehr, obwohl die Prüfung
+dort genau das meldete.
+
+Der Grund: Die Prüfung verkürzt für ihre Beobachtung die Umherstreif-Zeit von 55 auf
+8 Sekunden. Unter dieser Einstellung laufen die Zyklen dicht, und erst dort zeigte sich die
+eigentliche Ursache — die Warteschlange am Stein borgte sich dieselbe Notbremse, aus einem
+kurzen Stocken wurde eine Minute Stillstand. Beide vorherigen Messungen waren korrekt und
+beantworteten eine Frage, die niemand gestellt hatte: Sie liefen unter den ausgelieferten
+Werten, die rote Prüfung lief unter ihren eigenen.
+
+**Lehre:** Wer eine rote Prüfung im schnellen Prüflauf nachstellt, stellt zuerst deren
+KONFIGURATION her, nicht nur deren Dorf und Saatzahl. Und eine Kennzahl, die eine Prüfung
+setzt (hier die verkürzte Streifzeit), gehört in die Regression, die sie absichert — die
+neue Prüfung fährt beide Einstellungen, damit sich die nächste Ursache nicht wieder hinter
+einer langen Umherstreif-Phase verstecken kann.

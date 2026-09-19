@@ -277,7 +277,9 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 - **Der rote Test klagt den Falschen an.** Prüfungen veralten; ein Rot täuscht gefährlich.
   → *Prompt:* „Verlang auf ein Rot hin erst ein **Experiment**: Produkt oder Messung? Gemessen
   wird nur an einem eingeschwungenen Zustand, dessen Bereitschaft der **Gegenstand** meldet, nie
-  eine Uhr — und schlag auch fehl, wenn der Wert *unerwartet* ausschlägt."
+  eine Uhr — und schlag auch fehl, wenn der Wert *unerwartet* ausschlägt. Stell ein Rot immer
+  unter **seiner eigenen Einstellung** nach: Eine Prüfung, die Werte für ihre Beobachtung
+  verstellt, findet Fehler, die unter den ausgelieferten Werten unsichtbar bleiben."
 
 - **Derselbe Fakt steht an fünf Stellen — und veraltet an vier.**
   → *Prompt:* „Gib jedem Fakt genau **einen** verbindlichen Ort; alle anderen verweisen darauf.
@@ -698,4 +700,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 94153add572bee7ca8cc2eb8bb86e2cee138ffffcada253289f152f661949ed5 -->
+<!-- GUIDE-FINGERPRINT: 9e74017dc6905018c659ab4c34595ecb52503b0e4e2a9766c2a97f3e8e42f3d9 -->
