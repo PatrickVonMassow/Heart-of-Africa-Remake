@@ -168,50 +168,6 @@ put it is the mistake this line exists to stop.
   board with the observation instructions, the batch has moved on, and 1158 is ticked only
   after the user's answer on that card.
 
-- [ ] 1092. The well leaves the one village that already fetches its water from the river
-  (user 07.09.2026, narrowed by the user on 10.09.2026).
-  The order, verbatim on 07.09.2026: "Zudem macht der Brunnen in dem Dorf ohnehin wenig
-  Sinn, wenn die Erwachsenen immer zum Fluss laufen. Entferne ihn komplett aus dem Dorf
-  (priorisierter Fix fuer Kommunikationsmechanik)." It was triggered by the report
-  `hoa-state-2026-09-07-1702816850` (bambara-village), "Brunnen haengt im Zaun". It sat in
-  `docs/backlog.md` from 07.09. until 10.09.2026 and never became a point; that is why it
-  stands here now, and the collision half of the same evening is point 1093.
-  THE SCOPE IS ONE VILLAGE, NOT THE PROP (user 10.09.2026): "Den Brunnen aber nur aus
-  Bambar entfernen — da ist er redundant, weil der Fluss schon zum Wasserholen genutzt
-  wird. In den anderen Doerfern kann er bleiben." So `VILLAGE_SPOTS.well` STAYS, the `Well`
-  component stays, and only the village the communication slice is played in loses it: its
-  adults teach RIVER on the water path, which makes a second water source there redundant
-  and the teaching harder to read.
-  Final state:
-  - In `ROCK_VILLAGE_ID` alone there is no well: not in the keep-clear list, not as a
-    collider, not among the adult stations, not drawn, and no jar walker heading for it.
-  - Every other village is untouched, prop, stations and collider alike.
-  - The exception is written against `ROCK_VILLAGE_ID`, not against a fresh string, so it
-    follows the slice if the puzzle village ever moves.
-  - The jar walker is DELETED rather than re-aimed (decision 07.09.2026): every jar journey
-    in that village then belongs to the errand adults on the water path (point 1087), and
-    the teaching gains no silent third jar carrier beside it.
-  Test: Vitest — the adult stations, the keep-clear list and the collider set of
-  `ROCK_VILLAGE_ID` hold no well while another village's are unchanged, mutation-checked.
-  Picture check: one frame from the bambara village showing the former well spot empty.
-  Refs: src/scenes/place/lifeSpots.ts (`VILLAGE_SPOTS.well` ~9, `villageAdultStations` ~26
-  with the well and the water-carrier's stop), src/scenes/place/layout.ts (the life-spot
-  list ~763, the well collider ~1453, the place-bound branch at ~973 as the precedent),
-  src/scenes/place/PlaceLife.tsx (`Well` ~1667, its rendering ~3066, the jar `TaskWalker`
-  ~3078), src/world/communicationRock.ts (`ROCK_VILLAGE_ID` ~21)
-  Criticality: medium — a player-visible prop the user asked twice to be gone, and two
-  fewer stations make the children's quarter (481.4) easier to place in exactly the village
-  where the room is tightest.
-  Bundle: Dorfleben.
-  THE SPOT IS NOT EMPTY — THE VILLAGE CLOSED OVER IT (measured 19.09.2026). The well left
-  the keep-clear list as this point asks, so the procedural fabric may build on the ground it
-  held: at the section's seed a family hut (r 1.72) stands 0.46 m off the old centre, and
-  three smaller props shifted with the seed stream. That is the intended consequence of the
-  spot becoming ordinary village ground, not a defect — the freed ADULT STATIONS, which are
-  what the children's quarter is placed against, stay freed. The picture check therefore
-  photographs what is really there: the quarter with no well anywhere, judged on both
-  backends (WebGPU and WebGL 2).
-
 - [ ] 1125. The second adult of a dig pair swings at untouched ground metres from the pit
   (user 14.09.2026, ranked here by the user).
   Reported as "Der Erwachsene graebt an der falschen Stelle" with the state archive
