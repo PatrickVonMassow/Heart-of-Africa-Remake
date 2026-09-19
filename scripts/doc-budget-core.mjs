@@ -210,7 +210,11 @@ export const DOC_BUDGETS = [
     // destination is now 579 lines / 5599 words by this guard's tokenizer; this measured raise holds the
     // moved rules without giving their always-loaded source room to regrow.
     maxLines: 581,
-    maxWords: 5616,
+    // RAISED by the 19 measured words criterion 16 owes the step height: a
+    // scattered stone below `balance.placeStepOverTop` is ground rather than an
+    // obstacle (work-order 1149), which is a rule the criterion did not carry
+    // and cannot be read off the ones it did.
+    maxWords: 5635,
     // Forty words for thirty-two criteria — the destination of the §7.1 cut edits one
     // criterion at a time, and one criterion's rewording is well inside that.
     slackWords: 40,
@@ -398,7 +402,12 @@ export const DOC_BUDGETS = [
     // gamepad bullet must record that button A keeps both meanings because the
     // face buttons are all taken. A key the player presses that no section
     // names is unplayable — this is a new decision, not a longer telling.
-    maxWords: 29160,
+    // RAISED by the 46 measured words of the §2.6 collision rule that a stone
+    // below a calibratable step height is GROUND, walked over the way an
+    // excavation's spoil is, rather than an obstacle (user order 17.09.2026,
+    // work-order 1149). A new decision about what collides, not a longer
+    // telling of the bullet it stands in.
+    maxWords: 29206,
     // A hundred words across 28k: design.md is edited section by section and a genuine
     // new decision runs 40–215 measured words, so the slack absorbs the rewording that
     // accompanies one and refuses the disappearance of a whole section without a
