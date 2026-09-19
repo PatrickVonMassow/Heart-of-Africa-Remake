@@ -1493,3 +1493,72 @@ it('queues the bank call through an adult consequence, then calls while the carr
   expect(state.phase).toBe('gather')
   expect(floor.forcedCount).toBe(0)
 })
+
+describe('catchers regroup together and share the tap', () => {
+  function endingRun(cfg: BankConfig) {
+    const rand = mulberry32(1109)
+    const s = createBankGame([
+      stationAt(STAGE, 'upstream', 0, cfg),
+      { x: 4, z: 0 },
+      stationAt(STAGE, 'downstream', 0, cfg),
+    ], rand, cfg)
+    s.phase = 'run'
+    s.phaseFor = 0
+    s.direction = 'DOWNSTREAM'
+    s.from = 'upstream'
+    s.runsThisCycle = 1
+    s.children[0].role = 'catcher'
+    s.children[0].madeTag = true
+    s.children[1].role = 'out'
+    s.children[1].crouched = true
+    stepBankGame(s, 1 / 60, cfg, STAGE, openWorld(), rand)
+    expect(s.phase).toBe('regroup')
+    expect(s.children[1].role).toBe('catcher')
+    return { s, rand }
+  }
+
+  it('waits past the old deadline for a mid-stretch catcher to reach its station', () => {
+    const cfg = { ...CFG, walkPace: 0.5, utteranceGapSeconds: 0, catchDistance: -1 }
+    const { s, rand } = endingRun(cfg)
+    const station = stationAt(STAGE, 'upstream', 1, cfg)
+    let elapsed = 0
+    while (s.phase === 'regroup' && elapsed < cfg.regroupSeconds) {
+      const before = dist(s.children[1], station)
+      stepBankGame(s, 1 / 60, cfg, STAGE, openWorld(), rand)
+      elapsed += 1 / 60
+      if (before > cfg.reachDistance) expect(s.phase).toBe('regroup')
+    }
+    expect(elapsed).toBeGreaterThan(14)
+    expect(elapsed).toBeLessThan(cfg.regroupSeconds)
+    expect(s.phase).toBe('run')
+    expect(dist(s.children[1], station)).toBeLessThanOrEqual(cfg.reachDistance * 0.6)
+  })
+
+  it('opens at the backstop when a catcher genuinely cannot arrive', () => {
+    const cfg = { ...CFG, walkPace: 0, utteranceGapSeconds: 0, catchDistance: -1 }
+    const { s, rand } = endingRun(cfg)
+    const stranded = { x: s.children[1].x, z: s.children[1].z }
+    for (let elapsed = 0; elapsed < cfg.regroupSeconds - 0.1; elapsed += 1 / 60) {
+      stepBankGame(s, 1 / 60, cfg, STAGE, openWorld(), rand)
+      expect(s.phase).toBe('regroup')
+    }
+    for (let i = 0; i < 10 && s.phase === 'regroup'; i++) stepBankGame(s, 1 / 60, cfg, STAGE, openWorld(), rand)
+    expect(s.phase).toBe('run')
+    expect(dist(s.children[1], stranded)).toBe(0)
+  })
+
+  it('assigns successive turns to the least-used catcher, with index breaking ties', () => {
+    const cfg = { ...CFG, utteranceGapSeconds: 0, catchDistance: -1 }
+    const { s, rand } = endingRun(cfg)
+    expect(s.tapper).toBe(0)
+    for (let t = 0; t < cfg.regroupSeconds + 1 && s.phase === 'regroup'; t += 1 / 60) {
+      stepBankGame(s, 1 / 60, cfg, STAGE, openWorld(), rand)
+    }
+    expect(s.tapTurns).toEqual([1, 0, 0])
+    s.tapFor = 0
+    s.phaseFor = 0
+    stepBankGame(s, 1 / 60, cfg, STAGE, openWorld(), rand)
+    expect(s.phase).toBe('regroup')
+    expect(s.tapper).toBe(1)
+  })
+})

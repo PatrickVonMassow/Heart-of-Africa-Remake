@@ -1336,23 +1336,18 @@ export const balance: BalanceConfig = {
     bankGame: {
       roamSeconds: 55,
       roamSpread: 0.25,
-      // The stretch is ~20 m and a child crosses it at a run in some six
-      // seconds; the walk down from the quarter is longer, hence the wider
-      // backstop on the gather. MEASURED on the three river villages, replayed
-      // in `tagShuffle.test.ts`: the whole group is at its stations after 19.9 s
-      // (nubian), 22.9 s (bambara) and 34.5 s (mandinka, whose quarter lies
-      // across the built ground from its water). At 30 s the mandinka run opened
-      // on a group still walking — the clock ending a phase that is meant to end
-      // on its condition — so the backstop carries a third again over the
-      // slowest walk measured.
-      gatherSeconds: 45,
+      // Calibratable backstops: allow a full-stretch walk plus a hut detour.
+      // The group normally opens on arrival; these only release a blocked child.
+      // Gather previously needed 34.5 s in Mandinka even at a run.
+      gatherSeconds: 60,
       runSeconds: 20,
       // One complete atom lasts 1.2 s. The extra beat lets the player connect
       // the catcher's held indication to ROCK before either side charges.
       tapPauseSeconds: 1.5,
       // Calibratable: one ROCK atom plus a beat with the hand resting on the flank.
       arrivalHoldSeconds: 1.5,
-      regroupSeconds: 14,
+      // Calibratable: catchers walk the full stretch after the sides swap.
+      regroupSeconds: 60,
       partSeconds: 8,
       endPauseSeconds: 3,
       // Arrival/safe radius from the centre, outside the collider and footprint.

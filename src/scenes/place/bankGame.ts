@@ -371,6 +371,8 @@ export interface BankState {
    *  Chosen when the walk to the stations begins, because the walk is what has
    *  to take it there (work-order 1065). */
   tapper: number
+  /** Turns assigned at the stone this cycle, including unreachable silent turns. */
+  tapTurns: number[]
   /** Children whose boulder approach made no progress this roaming phase. */
   failedClimbers: number[]
   /** Whether the boulder has already been named this roaming phase. */
@@ -740,6 +742,7 @@ export function createBankGame(
     caller: -1,
     climber: -1,
     tapper: -1,
+    tapTurns: children.map(() => 0),
     failedClimbers: [],
     namedBoulder: false,
     abandonedBoulder: false,
@@ -949,6 +952,7 @@ function openCycle(s: BankState, stage: BankStage, cfg: BankConfig, world: BankW
   })
   s.phase = 'gather'
   s.phaseFor = cfg.gatherSeconds
+  s.tapTurns.fill(0)
   s.tapper = caller
   s.direction = null
   s.runsThisCycle = 0
@@ -998,6 +1002,7 @@ function openRun(s: BankState, stage: BankStage, cfg: BankConfig, world: BankWor
   s.arrivalSpoken = false
   // The stations are behind them: no run, roam or parting walk follows a route.
   for (const c of s.children) clearPath(c)
+  if (s.tapper >= 0) s.tapTurns[s.tapper]++
   s.runsThisCycle++
   s.runs++
   for (const c of s.children) {
@@ -1058,7 +1063,7 @@ function openRun(s: BankState, stage: BankStage, cfg: BankConfig, world: BankWor
 
 /** Ends the run: the sides swap — the survivors start where they arrived — and
  *  the children caught in it join the catchers for the next one. */
-function endRun(s: BankState, stage: BankStage, cfg: BankConfig): void {
+function endRun(s: BankState, cfg: BankConfig): void {
   const cycleEnded = runners(s).length === 0 || s.runsThisCycle >= s.children.length
   for (const c of s.children) {
     c.arrived = false
@@ -1087,7 +1092,8 @@ function endRun(s: BankState, stage: BankStage, cfg: BankConfig): void {
   // The stone the next run is towards is the one that gets tapped, so the child
   // sent to it is picked here — before the walk, which is what carries it there.
   const waiting = catchers(s)
-  s.tapper = waiting.length > 0 ? nearestOf(s, waiting, rockAt(stage, otherEnd(s.from))) : -1
+  s.tapper = waiting.reduce((chosen, i) =>
+    chosen < 0 || s.tapTurns[i] < s.tapTurns[chosen] ? i : chosen, -1)
 }
 
 /** Back to roaming: everybody is a runner again, and a climber is picked for the
@@ -1539,7 +1545,8 @@ function inPlace(
       if (!reach || Math.abs(reach.gap) > TOUCH_GAP) return false
       continue
     }
-    if (dist(c, stationAt(stage, end, slot, cfg)) > cfg.reachDistance) return false
+    const radius = cfg.reachDistance * (c.role === 'catcher' ? 0.6 : 1)
+    if (dist(c, stationAt(stage, end, slot, cfg)) > radius) return false
   }
   return true
 }
@@ -1707,7 +1714,7 @@ function stepStations(
       const reach = touchReach(stage, wait, c)
       c.settled = !!reach && Math.abs(reach.gap) <= TOUCH_GAP
     } else if (away <= cfg.reachDistance * 0.6) c.settled = true
-    else if (away > cfg.reachDistance) c.settled = false
+    else if (away > cfg.reachDistance * (c.role === 'catcher' ? 0.6 : 1)) c.settled = false
     // The walk DOWN to the bank is a run — the whole group sets off at the call
     // — while the shuffle between two runs is a walk.
     const running = s.phase === 'gather' && !c.settled && away > cfg.reachDistance
@@ -1943,7 +1950,7 @@ function stepRun(
 
   // A run ENDS when every runner has either touched the far rock or been tagged
   // — and the backstop closes it where a child could not get there at all.
-  if (free(s).length === 0 || s.phaseFor <= 0) endRun(s, stage, cfg)
+  if (free(s).length === 0 || s.phaseFor <= 0) endRun(s, cfg)
 }
 
 /** Holds every child in the posture the visible moment requires. These are
