@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { mkdtempSync, writeFileSync, rmSync, readFileSync } from 'node:fs'
+import { mkdtempSync, writeFileSync, rmSync, readFileSync, mkdirSync, existsSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { captureFloor, floorWitnesses, validateAttestation, validateFloorWitnesses } from './cut-account-attest.mjs'
+import { captureFloor, floorWitnesses, validateAttestation, validateFloorWitnesses, writeFloorAttestations } from './cut-account-attest.mjs'
 
 const dirs = []
 afterEach(() => { for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true }) })
@@ -77,5 +78,30 @@ describe('captureFloor', () => {
     const witnesses = floorWitnesses(text)
     expect(witnesses.earliest.line).toBe(4)
     expect(() => validateFloorWitnesses(f.reading, witnesses, f.root)).not.toThrow()
+  })
+})
+
+
+describe('writeFloorAttestations', () => {
+  it('writes only readable named floors, refuses explicit missing input and never overwrites evidence', () => {
+    const f = fixture()
+    execFileSync('git', ['init', '-q'], { cwd: f.root })
+    mkdirSync(join(f.root, 'docs'))
+    writeFileSync(join(f.root, 'docs/document-cut-757.md'), [
+      `FLOOR owner :: 20.08.2026 :: \`${f.transcript}\` :: \`2 + 3 + 4 = 9\` :: LIVE`,
+      `FLOOR subagent :: 20.08.2026 :: \`${f.root}/missing.jsonl\` :: \`2 + 1 + 1 = 4\` :: EXPIRED`,
+    ].join('\n'))
+    expect(writeFloorAttestations({ repo: f.root })).toEqual([
+      'owner: wrote docs/document-cut-757-evidence/owner.json',
+      'subagent: missing transcript; no attestation written',
+    ])
+    const path = join(f.root, 'docs/document-cut-757-evidence/owner.json')
+    const saved = readFileSync(path, 'utf8')
+    expect(JSON.parse(saved).witnesses).toEqual(floorWitnesses(f.source))
+    expect(existsSync(join(f.root, 'docs/document-cut-757-evidence/subagent.json'))).toBe(false)
+    expect(() => writeFloorAttestations({ repo: f.root, kind: 'subagent' })).toThrow(/ENOENT/)
+    expect(() => writeFloorAttestations({ repo: f.root, kind: 'owner' })).toThrow(/EEXIST/)
+    expect(() => writeFloorAttestations({ repo: f.root, kind: 'invented' })).toThrow(/expected owner or subagent/)
+    expect(readFileSync(path, 'utf8')).toBe(saved)
   })
 })

@@ -240,10 +240,13 @@ export const FLOOR_KINDS = Object.freeze(['owner', 'subagent'])
 /**
  * One floor reading, as the document writes it:
  *
- *   FLOOR <kind> :: <date> :: `<transcript path>` :: `<a> + <b> + <c> = <sum>`
+ *   FLOOR <kind> :: <date> :: `<transcript path>` :: `<a> + <b> + <c> = <sum>` :: LIVE
+ *   (or append `:: EXPIRED :: DD.MM.YYYY :: <attesting commit>` to the sum)
  *
  * The reading may wrap after any `::`, which is why the shape is matched against
- * the paragraph rather than a single line. The three summands are
+ * the paragraph rather than a single line; evidence metadata follows the sum
+ * on the same line. Missing metadata stays null so the judge can refuse it.
+ * The three summands are
  * `input_tokens`, `cache_read_input_tokens` and `cache_creation_input_tokens` of
  * the FIRST assistant message, and they are carried instead of the total alone
  * so a later reader can re-derive the number from the named transcript rather
