@@ -61,6 +61,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 12.09. | Der beauftragte Autor schrieb zweimal nichts und hatte zweimal recht: einmal, weil der Punkttext eine Wortüberlappungs-Heuristik zur Freigabe-Evidenz erklärte, deren eigener Kommentar sagt, ein Nein beweise keine Unschuld; einmal, weil der Unterbau des Punktes ungebaut war. Das Werkzeug meldete beide Male PROBLEMS — »NOTHING WAS COMMITTED«, »gates not green« —, also den Fehlschlag der Spur, wo die Spur genau das getan hatte, wofür sie existiert (§3.266, Punkte 1089/1073) |
 | 18.09. | Derselbe Punkt zweimal zurückgewiesen — und beim zweiten Mal traf die Zurückweisung meine eigene Antwort auf die erste: Der fremde Autor baute nach, dass die vom Aufrufer gehaltene Umlenkung genau die Protokolldatei leert, die das Skript künftig selbst führen soll, und danach jede Zeile in sich selbst zurückschreibt — vier Kopien nach drei Durchläufen. Wer eine Eskalation beantwortet, schreibt selbst eine Spezifikation (§3.266 Nachtrag, Punkt 1133) |
 | 18.09. abends | Ein abgehakter Fix hielt nicht: Die Reparatur von Punkt 1148 ruhte auf einer nie gemessenen Browser-Sperrfrist und zählte ihren einzigen Nachfrage-Versuch vom Klick statt vom Escape — sie landete also genau bei schnellem Klick zu früh und erzeugte den gemeldeten Fehler mit. Die Nachfolge-Reparatur ruht auf keiner Zahl mehr, und ihr Punkt bleibt bis zur Beobachtung des Nutzers offen (§3.291) |
+| 18.09. spät | Eine tote Messung landete beinahe als funktionierend: Der Effekt, der die Rechtecke für den zentrierten Steuerungshinweis liest, hing an den Sprachtexten statt an der Bedingung, die über das Element selbst entscheidet — er nahm seinen frühen Rücksprung und wurde nie wieder angestoßen. Grün war die Prüfung trotzdem, weil der CSS-Vorgabewert im geräumigen Fall zufällig dasselbe Ergebnis hat wie die Messung; erst der enge Fall trennte beide (§3.292) |
 | 13.09. | Ein Punkt zog seine eigenen Rot-Ladungen zurück, wie es die Regel verlangt — zwei Tests standen noch auf ihnen und wurden erst im Tor der LANDUNG rot, als der Merge schon auf main lag: Das Register erzwingt »kein Eintrag ohne offenen Punkt«, niemand erzwingt »kein Test ohne seinen Eintrag« (§3.268). Dieselbe Sitzung wies drei Fremd-Rot nach: gegen die Zweigwurzel gemessen sind alle drei auch auf main rot, und das Rätsel am Schutthang ist dort nicht sporadisch, sondern reproduziert jedes Mal |
 | 13.09. abends | Vier CI-Läufe eines Zweigs starben als »cancelled« — ein Wort, das weder Ursache noch Reparatur nennt und das kein Push heilen kann. Es war das 15-Minuten-Limit des `fast`-Jobs: Die letzten beiden GRÜNEN Läufe, einer davon auf main, brauchten 14 m 41 s und 14 m 45 s, also rund fünfzehn Sekunden Luft. Der nächste Punkt, der irgendeinen Test hinzufügt, musste auflaufen, egal welcher. Sichtbar wurde es erst im Schrittprotokoll: install/build/lint/audit grün, `unit: cancelled`, »The operation was canceled« nach 15 m 13 s (§3.270) |
 | 14.09. | Nach einer Parallelsitzung verlangte ein Stop-Hook `batch-doctor --gate` vor JEDER weiteren Batch-Arbeit — dessen Tor fährt eine volle Unit-Suite, neben dem laufenden Zwei-Backend-Bildlauf auf derselben Maschine. Gefunden hat der Doktor genau eine Datei: die Review-Zeile, die dieselbe Sitzung vier Minuten zuvor geschrieben hatte. Sie zu committen genügte, das Urteil sprang auf `consistent`, die Unit-Suite wurde nie gebraucht; ihr Abbruch ließ zwei verwaiste vitest-Worker neben dem Bildlauf zurück (§3.271, Wiedergänger von §3.267) |
@@ -1654,7 +1655,7 @@ stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die s
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Freitag, 18.09.2026, 21:40 · Quellen-Fingerprint: `88ed24623d31…`
+Zuletzt aktualisiert: Samstag, 19.09.2026, 01:50 · Quellen-Fingerprint: `e952d7b08629…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1761,8 +1762,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 97 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 7 Revert-/Reapply-Commits · 136 Prozess-/Meta-TASKS-Punkte (davon 65 offen).
 
-<!-- RETRO-FINGERPRINT: 88ed24623d31a4c3177e40758fcbf794fb4a630d9caefa31ab7af1122dc11b81 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-18T19:40:16.764Z -->
+<!-- RETRO-FINGERPRINT: e952d7b08629c1d3c40cb9a26fb8ac0d982f6164c9e36b25c3f83a2ec1959be1 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-18T23:50:08.256Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -7697,3 +7698,73 @@ Urteil eine Beobachtung des Nutzers ist, wird nicht auf einen plausiblen Mechani
 abgehakt. 1158 ist deshalb gemergt, aber **offen** — die zwei Beobachtungen stehen aus. Das ist
 die Familie von 3.283 und 3.289 (ein Grün, das nichts bedeutet, wird als Freigabe gelesen), hier
 aber eine Stufe früher: nicht das Signal war falsch, sondern die Annahme, auf der es ruhte.
+
+### 3.292 Die Messung lief nie, und der Vorgabewert stimmte zufällig
+
+Der zentrierte Steuerungshinweis (Punkt 1160) soll ausweichen, wo Gürtelleiste und
+Knöpfe die Bildmitte belegen. Die Entscheidung dafür liest die gerenderten Rechtecke,
+und sie steht in einem reinen Modul mit sieben grünen Testfällen. Trotzdem war die erste
+Browser-Prüfung an zwei Stellen rot — und zwar an genau den beiden, für die das
+Ausweichen überhaupt existiert.
+
+Die Ursache lag nicht in der Entscheidung, sondern davor: der Effekt, der die Rechtecke
+misst, hing an den Sprachtexten. Auf dem Render, in dem es den Hinweis noch gar nicht
+gab, nahm er seinen frühen Rücksprung — und als der Hinweis erschien, lief nichts, was
+ihn erneut angestoßen hätte. Der Beobachter wurde nie angehängt, die Messung nie
+ausgeführt, und die Platzierung blieb auf dem CSS-Vorgabewert stehen: mittig.
+
+Das Tückische ist der Vorgabewert. Im geräumigen Fall IST mittig richtig, also war die
+erste Prüfung grün — sie hat aber nichts geprüft, sondern nur bestätigt, dass zwei Wege
+zum selben Ergebnis führen, wenn nichts dazwischenkommt. Sichtbar wurde der Defekt erst
+im engen Fall, wo sich der Vorgabewert und das gemessene Ergebnis trennen. Wäre die
+Prüfung auf den geräumigen Fall beschränkt geblieben, wäre eine tote Messung als
+funktionierend gelandet.
+
+Zwei übertragbare Lehren. Erstens: Wo eine Vorgabe und ein gemessenes Ergebnis im
+Normalfall übereinstimmen, beweist der Normalfall nichts — die Prüfung muss den Fall
+enthalten, in dem sie auseinandergehen. Zweitens: Eine Bedingung, die entscheidet, OB
+ein Element gerendert wird, gehört in die Abhängigkeiten des Effekts, der dieses Element
+misst; sonst hängt der Effekt an einem Zustand, den es noch nicht gab.
+
+Im selben Abend ein Wiedergänger, kein neues Problem: Das Arbeitsverzeichnis der Sitzung
+rutschte in einen Worktree, und die Stop-Wächter lasen von dort den Zweig-HEAD statt den
+von `main` — die Tafel galt als nicht registriert und die eigene Prüfdatei-Änderung als
+ungeprüfte Renderschuld von `main`. Drei Zugenden gingen dafür drauf. Die Merkregel dazu
+stand längst geschrieben; gestellt habe ich mir die Falle selbst, mit einem `cd` in den
+Worktree.
+
+### 3.293 Der Prüfpunkt wählte sein Motiv anders, als er es beurteilt
+
+Die deckende Bildprüfung von Punkt 1162 fiel an einer Stelle durch, die mit dem Punkt
+nichts zu tun hatte: Das Bild der Flussbank zeigte seinen Gegenstand nicht, „rechts
+außerhalb des Rahmens". Die Prüfung stellt die Kamera ans Ufer, lässt sie über das
+Wasser blicken und erklärt als Motiv den Schaumfleck, der dem Uferpunkt am nächsten
+liegt. Beurteilt wird das Bild dann aber nicht danach, was nah ist, sondern danach, wo
+der Auslöser den Punkt in die Projektion rechnet.
+
+Zwischen beidem liegt der ganze Defekt. Die Flecken treiben in einem langen Band
+LÄNGS des Flusses, die Wasserlinie liegt über 28 Meter draußen — der nächstgelegene
+Fleck kann also weit flussab sitzen, ein Drittel einer Vierteldrehung neben der
+Blickachse. Welcher Fleck im Moment des Auslösens der nächste ist, ist Zufall. Deshalb
+lief die Prüfung wochenlang grün und wurde dann zweimal hintereinander rot: nichts am
+Produkt hatte sich geändert, nur die Würfel waren anders gefallen.
+
+Mein erster Versuch war ein zweiter Stellvertreter: Ich wählte den nächsten Fleck VOR
+dem Standpunkt, innerhalb eines Winkels, den ich für sicher hielt. Der nächste Lauf
+tauschte prompt den rechten Rand gegen den unteren. Eine Heuristik kann nicht wissen,
+wohin die Ortskamera einen Punkt tatsächlich legt — dafür gibt es genau eine Autorität,
+und das ist die Projektion selbst. Erst die dritte Fassung fragt sie: dieselbe
+Matrizenrechnung, mit der der Auslöser ein `local`-Motiv beurteilt, angewandt auf jeden
+Fleck, und behalten wird der, der gut im Bild sitzt.
+
+Die übertragbare Lehre: Wählt eine Prüfung ihren Gegenstand nach einem Stellvertreter
+(Nähe, Reihenfolge, Index) und beurteilt ihn nach einem anderen Maßstab (der Projektion),
+dann ist sie ein Flackergenerator — und zwar einer, der dem Produkt die Schuld gibt.
+Auswahl und Urteil gehören auf dieselbe Rechnung. Zwei Läufe à 26 Minuten haben das hier
+gekostet, plus einen dritten, der am falschen Rand scheiterte.
+
+Am selben Abend ein zweiter, billigerer Fehler von mir: Ich startete die deckende Prüfung
+mit dem nackten Läufer statt über seinen Wrapper — die Zeile, die der Wächter selbst
+abdruckt. Der Lauf berichtete vollständig, hinterließ aber kein Log und keinen
+abgeschlossenen Datensatz und wurde als Absturz verbucht; 26 Minuten für nichts. Wer den
+Lauf besitzt, besitzt seinen Nachweis: `npm test -- <suite>`, nie `run-all.mjs` von Hand.
