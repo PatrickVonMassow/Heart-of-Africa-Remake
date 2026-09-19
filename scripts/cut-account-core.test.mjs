@@ -2,9 +2,9 @@
 // document: the account only does its job if it holds TODAY, so the shipped
 // docs/document-cut-757.md is judged here against the real filesystem and the
 // really wired hook chains, not only against synthetic input.
-import { describe, it, expect, vi } from 'vitest'
-import { readFileSync, existsSync, realpathSync } from 'node:fs'
-import { homedir } from 'node:os'
+import { describe, it, expect, vi, afterEach } from 'vitest'
+import { readFileSync, existsSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
+import { homedir, tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 import {
   ACCOUNTS,
@@ -23,6 +23,7 @@ import {
   userTreeRootOf,
   wiredGuards,
 } from './cut-account-core.mjs'
+import { verifyFloorEvidence, attestationPath, validateAttestation, captureFloor } from './cut-account-attest.mjs'
 import { DOC_BUDGETS, measure, evaluateDocBudgets } from './doc-budget-core.mjs'
 import { mainCheckoutFrom } from './main-checkout-core.mjs'
 import { execFileSync } from 'node:child_process'
@@ -486,146 +487,24 @@ describe('docs/document-cut-757.md — the measured floors', () => {
     expect(inWords).toHaveLength(1)
   })
 
-  // Where the transcripts are still on this machine the figures are not merely
-  // well-formed, they are re-derived. On any other machine both files are absent
-  // and the case is a refused read, exactly like the external destinations above.
-  //
-  // WHY BOTH, and not "each one that happens to exist": skipping an absent file
-  // individually let a fabricated or stale owner reading pass on the very
-  // machine that can check it, as long as the subagent file was still there.
-  // Absence is only evidence-free where NEITHER can be read, so the anchor
-  // demands the whole set or nothing.
-  const jsonl = (path) =>
-    readFileSync(path, 'utf8')
-      .split('\n')
-      .filter(Boolean)
-      .map((l) => {
-        try {
-          return JSON.parse(l)
-        } catch {
-          return null
-        }
-      })
+  it('marks every floor LIVE or EXPIRED', () => {
+    for (const reading of readings) expect(['LIVE', 'EXPIRED']).toContain(reading.status)
+  })
 
-  it('re-derives every floor from its own transcript on the batch machine', () => {
-    if (!existsSync(MEMORY_DIR)) return // refused read: not the batch machine
-    for (const r of readings) {
-      const path = fullPath(r.transcript)
-      expect(existsSync(path), `transcript named for the ${r.kind} floor is missing`).toBe(true)
-      const first = jsonl(path).find((o) => o?.type === 'assistant' && o?.message?.usage)
-      expect(first, `no assistant message with usage in ${r.transcript}`).toBeTruthy()
-      const u = first.message.usage
-      expect([
-        u.input_tokens ?? 0,
-        u.cache_read_input_tokens ?? 0,
-        u.cache_creation_input_tokens ?? 0,
-      ]).toEqual(r.summands)
+  it('backs every floor with a transcript, committed attestation or dated expiry on the batch machine', () => {
+    if (!existsSync(MEMORY_DIR)) return // Fixed anchor: never skip individual missing floors.
+    for (const reading of readings) {
+      expect(() => verifyFloorEvidence(reading, { repo: ROOT, root: MAIN_ROOT })).not.toThrow()
     }
   })
 
-  // THE USAGE ROW IS THE EVIDENCE. Every check below reads the SAME row the floor
-  // was taken from, because evidence spliced together out of several rows —
-  // usage here, a timestamp there, a session id somewhere else — is exactly what
-  // a fabricated transcript looks like (review 5d09ed4).
-  const usageRowOf = (r) =>
-    jsonl(fullPath(r.transcript)).find((o) => o?.type === 'assistant' && o?.message?.usage)
-
-  // Timestamps are compared as INSTANTS, never as strings: these files mix `Z`
-  // with `+02:00`, and a lexicographic sort put a stale local-offset stamp after
-  // a fresh UTC one, hiding the very row the check exists to catch.
-  const earliestInstant = (r) => {
-    const times = jsonl(fullPath(r.transcript))
-      .map((o) => o?.timestamp)
-      .filter(Boolean)
-      .map((t) => new Date(t).getTime())
-      .filter((n) => !Number.isNaN(n))
-    return times.length ? Math.min(...times) : null
-  }
-
-  // AFFIRMATIVE KIND. `cwd` must BE the repository root or lie inside its
-  // worktree directory — anything else is an unknown tree, not "the main
-  // checkout" — and the prompt must agree. Disagreement fails rather than
-  // picking a winner.
-  it('takes each floor from a transcript of the kind it claims', () => {
-    if (!existsSync(MEMORY_DIR)) return // refused read: not the batch machine
-    for (const r of readings) {
-      const rows = jsonl(fullPath(r.transcript))
-      const usage = rows.findIndex((o) => o?.type === 'assistant' && o?.message?.usage)
-      expect(usage, `no usage row in ${r.transcript}`).toBeGreaterThanOrEqual(0)
-      // THE KIND ROW MUST BELONG TO THE SAME SESSION AND COME FIRST. Read from an
-      // independently chosen row, the kind was spliceable: an owner-looking user
-      // row copied into another transcript satisfied it while every
-      // same-usage-row check still passed (review 82e9ae0).
-      const sid = rows[usage].sessionId
-      const idx = rows.findIndex(
-        (o, i) => i < usage && o?.type === 'user' && o?.cwd && o?.sessionId === sid,
-      )
-      expect(
-        idx,
-        `no user row with a cwd from session ${sid} before the usage row of ${r.transcript}`,
-      ).toBeGreaterThanOrEqual(0)
-      const first = rows[idx]
-      const c = first.message.content
-      const prompt = typeof c === 'string' ? c : c.map((x) => x.text ?? '').join('\n')
-      // Canonicalize where the directory still EXISTS, so a symlinked checkout is
-      // judged by what it points at. A finished agent's worktree is removed by
-      // design, so its recorded path cannot be resolved — that one falls back to
-      // the lexical form, and the residual is that a symlink in a path that no
-      // longer exists cannot be seen through. The root always exists.
-      const canon = (path) => {
-        try {
-          return realpathSync(path)
-        } catch {
-          return path
-        }
-      }
-      // ABSOLUTE FIRST, canonical second. Canonicalizing before the check undid
-      // it: a recorded `.` resolved to the runner's own root and was accepted as
-      // owner evidence, so the core's refusal of relative paths never saw it
-      // (review 9d1cfcb). The unit cases pass paths straight in and could not
-      // catch this — it lives only on the integration path.
-      expect(
-        String(first.cwd).startsWith('/'),
-        `${r.transcript} records a relative cwd (${first.cwd}), which is no evidence of any tree`,
-      ).toBe(true)
-      const kind = sessionKindOf({ cwd: canon(first.cwd), prompt, root: realpathSync(MAIN_ROOT) })
-      expect(
-        kind,
-        `cwd and prompt disagree, or the tree is neither, for ${r.transcript}`,
-      ).not.toBeNull()
-      expect(kind, `${r.transcript} is not an ${r.kind} transcript`).toBe(r.kind)
-    }
-  })
-
-  it('takes each floor from a session that began after the cut landed', () => {
-    if (!existsSync(MEMORY_DIR)) return // refused read: not the batch machine
-    for (const r of readings) {
-      const earliest = earliestInstant(r)
-      expect(earliest, `no usable timestamps in ${r.transcript}`).not.toBeNull()
-      expect(
-        earliest,
-        `${r.transcript} predates the cut — it cannot measure it`,
-      ).toBeGreaterThan(new Date(CUT_LANDED_AT).getTime())
-    }
-  })
-
-  it('writes each floor under the date the row it was read from carries', () => {
-    if (!existsSync(MEMORY_DIR)) return // refused read: not the batch machine
-    for (const r of readings) {
-      const row = usageRowOf(r)
-      expect(row?.timestamp, `the usage row of ${r.transcript} carries no timestamp`).toBeTruthy()
-      expect(berlinDateOf(row.timestamp), `the date written for the ${r.kind} floor`).toBe(r.date)
-    }
-  })
-
-  // A copied or spliced file is still the wrong evidence: the id on the row the
-  // figure came from must be the id in the filename.
-  it('names each transcript by the session its usage row records', () => {
-    if (!existsSync(MEMORY_DIR)) return // refused read: not the batch machine
-    for (const r of readings) {
-      const id = r.transcript.split('/').pop().replace(/\.jsonl$/, '')
-      const row = usageRowOf(r)
-      expect(row?.sessionId, `the usage row of ${r.transcript} records a different session`).toBe(id)
+  it('re-derives committed witnesses even on a runner without the user tree', () => {
+    for (const reading of readings) {
+      const path = attestationPath(reading.kind)
+      if (!existsSync(resolve(ROOT, path))) continue
+      const text = readFileSync(resolve(ROOT, path), 'utf8')
+      expect(execFileSync('git', ['show', `HEAD:${path}`], { cwd: ROOT, encoding: 'utf8' })).toBe(text)
+      expect(() => validateAttestation(reading, JSON.parse(text))).not.toThrow()
     }
   })
 
@@ -813,5 +692,94 @@ describe('CUT_LANDED_AT', () => {
       return
     }
     expect(new Date(CUT_LANDED_AT).getTime()).toBe(new Date(run(['log', '-1', '--format=%cI', CUT_COMMIT])).getTime())
+  })
+})
+
+// Exercise the production evidence reader against real disposable files and git
+// commits; a stubbed resolver would not prove that expiry actually resolves git.
+describe('floor evidence survival', () => {
+  const dirs = []
+  afterEach(() => { for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true }) })
+  function fixture() {
+    const repo = mkdtempSync(resolve(tmpdir(), 'cut-evidence-'))
+    dirs.push(repo)
+    const git = (args, date = '2026-08-20T04:00:00Z') => execFileSync('git', args, {
+      cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
+      env: { ...process.env, GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date },
+    }).trim()
+    git(['init', '-q'])
+    git(['config', 'user.name', 'Evidence test'])
+    git(['config', 'user.email', 'test@example.invalid'])
+    git(['-c', 'core.hooksPath=/dev/null', 'commit', '--allow-empty', '-qm', 'Recorded floor'])
+    const commit = git(['rev-parse', 'HEAD'])
+    const transcript = resolve(repo, 'floor-session.jsonl')
+    const source = [
+      { timestamp: '2026-08-20T03:00:00Z' },
+      { type: 'user', sessionId: 'floor-session', cwd: repo, timestamp: '2026-08-20T03:00:00Z', message: { content: '[batch-resume]' } },
+      { type: 'assistant', sessionId: 'floor-session', timestamp: '2026-08-20T03:01:00Z', message: { usage: { input_tokens: 2, cache_read_input_tokens: 3, cache_creation_input_tokens: 4 } } },
+    ].map(JSON.stringify).join('\n')
+    writeFileSync(transcript, source)
+    const [reading] = parseFloorReadings(`FLOOR owner :: 20.08.2026 :: \`${transcript}\` :: \`2 + 3 + 4 = 9\` :: LIVE`)
+    const options = { repo, root: repo }
+    const expired = { ...reading, status: 'EXPIRED', expiredAt: '19.09.2026', attestingCommit: commit }
+    return { repo, git, transcript, source, reading, expired, options }
+  }
+
+  it('re-derives a LIVE floor and rejects it if its real usage changes', () => {
+    const f = fixture()
+    expect(verifyFloorEvidence(f.reading, f.options)).toBe('transcript')
+    writeFileSync(f.transcript, f.source.replace('"input_tokens":2', '"input_tokens":99'))
+    expect(() => verifyFloorEvidence(f.reading, f.options)).toThrow(/summands/)
+  })
+
+  it('fails a missing LIVE transcript without durable evidence', () => {
+    const f = fixture()
+    rmSync(f.transcript)
+    expect(() => verifyFloorEvidence(f.reading, f.options)).toThrow(/LIVE.*missing/)
+  })
+
+  it('passes EXPIRED with a date and resolvable earlier commit', () => {
+    const f = fixture()
+    rmSync(f.transcript)
+    expect(verifyFloorEvidence(f.expired, f.options)).toBe('expired')
+  })
+
+  it.each([
+    ['missing date', { expiredAt: null }],
+    ['invalid date', { expiredAt: '31.02.2026' }],
+    ['missing commit', { attestingCommit: null }],
+    ['unresolvable commit', { attestingCommit: 'abcdefabcdef' }],
+    ['commit after expiry', { expiredAt: '19.08.2026' }],
+    ['commit on expiry day', { expiredAt: '20.08.2026' }],
+    ['unmarked floor', { status: null }],
+  ])('fails %s even if the transcript remains readable', (_name, change) => {
+    const f = fixture()
+    expect(() => verifyFloorEvidence({ ...f.expired, ...change }, f.options)).toThrow()
+    rmSync(f.transcript)
+    expect(() => verifyFloorEvidence({ ...f.expired, ...change }, f.options)).toThrow()
+  })
+
+  it('requires committed attestation bytes and uses them after expiry', () => {
+    const f = fixture()
+    const path = attestationPath(f.reading.kind)
+    mkdirSync(resolve(f.repo, 'docs/document-cut-757-evidence'), { recursive: true })
+    const text = JSON.stringify(captureFloor(f.reading, f.options))
+    writeFileSync(resolve(f.repo, path), text)
+    f.git(['add', path])
+    rmSync(f.transcript)
+    expect(() => verifyFloorEvidence(f.reading, f.options)).toThrow() // staged is not committed
+    f.git(['-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'Preserve witness'])
+    expect(verifyFloorEvidence(f.reading, f.options)).toBe('attestation')
+    writeFileSync(resolve(f.repo, path), text + '\n')
+    expect(() => verifyFloorEvidence(f.reading, f.options)).toThrow(/committed HEAD/)
+    writeFileSync(resolve(f.repo, path), text)
+    writeFileSync(f.transcript, f.source + '\n')
+    expect(() => verifyFloorEvidence(f.reading, f.options)).toThrow(/does not match/)
+  })
+
+  it('does not hide a bad surviving transcript behind EXPIRED', () => {
+    const f = fixture()
+    writeFileSync(f.transcript, '{}')
+    expect(() => verifyFloorEvidence(f.expired, f.options)).toThrow(/usage/)
   })
 })

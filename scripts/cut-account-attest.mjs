@@ -92,6 +92,47 @@ export function validateAttestation(reading, attestation, { root = attestation.r
   }
 }
 
+// A missing file is the only condition that permits another evidence source.
+// Permission errors, corrupt JSON and a mismatching witness must remain failures.
+function readOptional(path) {
+  try { return readFileSync(path, 'utf8') } catch (error) {
+    if (error.code === 'ENOENT') return null
+    throw error
+  }
+}
+
+export function verifyFloorEvidence(reading, { repo, root, home = homedir() }) {
+  requireEvidence(['LIVE', 'EXPIRED'].includes(reading.status), 'floor needs LIVE or EXPIRED status')
+  const git = (args) => execFileSync('git', args, { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
+  if (reading.status === 'EXPIRED') {
+    const match = /^(\d{2})\.(\d{2})\.(\d{4})$/.exec(reading.expiredAt ?? '')
+    requireEvidence(match, 'EXPIRED floor needs an expiry date')
+    const iso = `${match[3]}-${match[2]}-${match[1]}`
+    const expiry = Date.parse(`${iso}T00:00:00Z`)
+    requireEvidence(Number.isFinite(expiry) && new Date(expiry).toISOString().slice(0, 10) === iso, 'invalid expiry date')
+    requireEvidence(/^[a-f0-9]{7,40}$/.test(reading.attestingCommit ?? ''), 'EXPIRED floor needs an attesting commit')
+    const commit = git(['rev-parse', '--verify', `${reading.attestingCommit}^{commit}`])
+    const committedAt = Date.parse(git(['show', '-s', '--format=%cI', commit]))
+    requireEvidence(committedAt < expiry, 'attesting commit must precede expiry')
+  }
+  const source = readOptional(expandDestination(reading.transcript, home))
+  const path = attestationPath(reading.kind)
+  const captured = readOptional(resolve(repo, path))
+  if (captured !== null) {
+    // An index entry is not durable evidence. Require the exact bytes in HEAD.
+    const committed = execFileSync('git', ['show', `HEAD:${path}`], { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+    requireEvidence(committed === captured, 'attestation must match committed HEAD content')
+    validateAttestation(reading, JSON.parse(captured), { root, ...(source === null ? {} : { source }) })
+  }
+  if (source !== null) {
+    validateFloorWitnesses(reading, floorWitnesses(source), root)
+    return 'transcript'
+  }
+  if (captured !== null) return 'attestation'
+  requireEvidence(reading.status === 'EXPIRED', `LIVE ${reading.kind} transcript missing without committed attestation`)
+  return 'expired'
+}
+
 export function writeFloorAttestations({ repo = process.cwd(), home = homedir(), kind } = {}) {
   const common = execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], { cwd: repo, encoding: 'utf8' })
   const root = mainCheckoutFrom(common, repo) ?? repo

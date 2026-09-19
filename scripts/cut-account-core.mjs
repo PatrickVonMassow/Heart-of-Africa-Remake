@@ -251,7 +251,7 @@ export const FLOOR_KINDS = Object.freeze(['owner', 'subagent'])
  * cannot excuse: it is what a copied-over figure looks like.
  */
 const FLOOR_RE =
-  /FLOOR\s+([a-z]+)\s*::\s*([\d.]+)\s*::\s*`([^`]+)`\s*::\s*`\s*([\d,]+)\s*\+\s*([\d,]+)\s*\+\s*([\d,]+)\s*=\s*([\d,]+)\s*`/g
+  /FLOOR\s+([a-z]+)\s*::\s*([\d.]+)\s*::\s*`([^`]+)`\s*::\s*`\s*([\d,]+)\s*\+\s*([\d,]+)\s*\+\s*([\d,]+)\s*=\s*([\d,]+)\s*`([^\n]*)/g
 
 const num = (s) => Number(String(s).replace(/,/g, ''))
 
@@ -266,12 +266,16 @@ export function parseFloorReadings(text) {
     const [, kind, date, transcript, a, b, c] = m
     const summands = [num(a), num(b), num(c)]
     const stated = num(m[7])
+    const [status, expiredAt, attestingCommit] = m[8].split('::').slice(1).map((s) => s.trim())
     readings.push({
       kind,
       date,
       transcript,
       summands,
       stated,
+      status: status || null,
+      expiredAt: expiredAt || null,
+      attestingCommit: attestingCommit || null,
       total: summands.reduce((x, y) => x + y, 0),
       adds: summands.reduce((x, y) => x + y, 0) === stated,
     })
