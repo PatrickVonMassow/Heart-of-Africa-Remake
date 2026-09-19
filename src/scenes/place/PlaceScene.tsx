@@ -2488,6 +2488,7 @@ export function PlaceScene() {
     bank: layout?.bank ?? null,
     sites: layout?.digSites ?? [],
     progress: placeId ? useGame.getState().villageDigProgress[placeId] ?? [] : [],
+    rocks: layout?.rocks ?? [],
   }), [layout, placeId])
   const shownProgress = useRef(ground.progress)
   useEffect(() => {

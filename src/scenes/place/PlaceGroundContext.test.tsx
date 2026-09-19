@@ -5,7 +5,7 @@ import { spoilCentre, type PlaceGround } from './placeGround'
 import { placeCameraPose } from '../../systems/lookPitch'
 
 it('shares live work with every mounted sampler without a React render between strokes', () => {
-  const ground: PlaceGround = { bank: null, sites: [{ x: 5, z: -3, kind: 'patch' }], progress: [] }
+  const ground: PlaceGround = { bank: null, sites: [{ x: 5, z: -3, kind: 'patch' }], progress: [], rocks: [] }
   const samplers: Array<(x: number, z: number) => number> = []
   function Probe() { samplers.push(usePlaceGround()); return null }
   const view = render(<PlaceGroundContext.Provider value={ground}><Probe /><Probe /><Probe /></PlaceGroundContext.Provider>)

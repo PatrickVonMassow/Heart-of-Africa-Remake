@@ -1,11 +1,16 @@
 import type { DigSite, DigSiteProgress, ErrandPoint } from './adultWork'
 import { digSiteAppearance } from './digSiteAppearance'
+import { looseRockRise } from './looseRocks'
 import { bankGroundHeight, type PlaceRiverBank } from './riverBank'
 
 export interface PlaceGround {
   bank: PlaceRiverBank | null
   sites: readonly DigSite[]
   progress: readonly DigSiteProgress[]
+  /** The settlement's whole rock scatter, as `layout.rocks` holds it. The low
+   *  ones among them raise this surface (work-order 1149); `looseRockRise`
+   *  makes that cut, so this list is passed on unfiltered. */
+  rocks: readonly (readonly [number, number, number])[]
 }
 
 export const DIG_RIM_DISTANCE = 1.65
@@ -59,6 +64,12 @@ export function placeGroundHeight(ground: PlaceGround, x: number, z: number): nu
   let raised = 0
   for (let i = 0; i < ground.sites.length; i++) {
     raised = Math.max(raised, spoilHeightAt(ground.sites[i], ground.progress[i], x, z))
+  }
+  // …and the stones low enough to be walked over rather than around
+  // (work-order 1149). The MAXIMUM, as with the spoil: two rises that overlap
+  // carry the foot over the higher one instead of adding up into a step.
+  for (let i = 0; i < ground.rocks.length; i++) {
+    raised = Math.max(raised, looseRockRise(ground.rocks[i], x, z))
   }
   return bankGroundHeight(ground.bank, x, z) + raised
 }

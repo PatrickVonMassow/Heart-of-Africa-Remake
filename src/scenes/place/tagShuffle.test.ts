@@ -1275,8 +1275,17 @@ describe('and the gate SEES a child that is wedged (point 656)', () => {
     expect(holdsAGame(traceLiveness(paths))).toBe(true)
     const asItWas = oldMeasure(penned, 2, 2, 0.5)
     expect(asItWas.windows).toBeGreaterThan(1000) // it really did look
-    expect(asItWas.share).toBeLessThan(0.05) // and it saw a tenth of the truth
-    expect(r.share).toBeGreaterThan(asItWas.share * 4)
+    // …and it saw a fraction of the truth. BOTH numbers move with the
+    // settlement's geometry, which is why the relation is pinned and only the
+    // ceiling is a recorded value. Measured on this trace: 0.044 against 0.279
+    // before work-order 1149, 0.064 against 0.270 after it — the pebbles the
+    // pen village scattered at seed 24 stopped being obstacles, so the penned
+    // child edges a little further and the old window counts a little more of
+    // it. The factor is what carries the claim, and it is kept at three rather
+    // than the four the 6.4 of 1082 allowed: at 4.2 the next geometry change
+    // would redden this line without anything being wrong with either measure.
+    expect(asItWas.share).toBeLessThan(0.08)
+    expect(r.share).toBeGreaterThan(asItWas.share * 3)
   })
 
   it('and says the same thing about that ONE recorded trace at any frame cadence', () => {
