@@ -19,7 +19,7 @@
 // The module is pure: no three, no scene. `PlaceLife` gives it the live village
 // and carries out what comes back.
 
-import { DIG_ARRIVE_RADIUS, digStandingPlaces } from './placeGround'
+import { atDigStand, DIG_ARRIVE_RADIUS, digStandingPlaces } from './placeGround'
 import { SpeechFloor } from '../../communication/speechFloor'
 import { balance } from '../../config/balance'
 import type { ConceptId } from '../../communication/lexicon'
@@ -207,9 +207,17 @@ export function goalOf(task: AdultTask): ErrandPoint {
   return task.via ?? { x: task.x, z: task.z }
 }
 
-export function isDigging(state: AdultWorkState, index: number): boolean {
+/** THE STROKE BELONGS TO THE RIM (work-order 1125). Phase and arrival say the
+ *  bout has begun; the body's own place says whether its blade can reach the
+ *  hole. A figure that ended up away from its site stands idle, so a future
+ *  regression reads as a villager doing nothing rather than as one hoeing
+ *  untouched ground. */
+export function isDigging(state: AdultWorkState, index: number, view: AdultWorkView): boolean {
   const t = state.tasks[index]
-  return !!t && t.phase === 'dig' && t.arrived
+  if (!t || t.phase !== 'dig' || !t.arrived || t.siteIndex === null) return false
+  const site = view.geography.digSites[t.siteIndex]
+  const me = view.villagers[index]
+  return !!site && !!me && atDigStand(site, me.x, me.z)
 }
 
 export function carryOf(state: AdultWorkState, index: number): AdultCarry {
@@ -527,7 +535,11 @@ export function stepAdultWork(
     }
     t.age += dt
 
-    if (t.phase === 'dig' && t.arrived && t.siteIndex !== null) {
+    // THE HOLE DEEPENS ONLY UNDER A STROKE THAT IS REALLY PLAYED (work-order
+    // 1125, GPT-6 Astra cross-vendor round). Gating the pose on the working rim
+    // and the accounting on phase alone would have let a displaced body stand
+    // idle while its excavation filled up and completed underneath him.
+    if (isDigging(state, i, view) && t.siteIndex !== null) {
       const before = t.dug
       t.dug += dt
       const progress = (state.siteProgress[t.siteIndex] ??= { dug: 0, strikes: 0 })

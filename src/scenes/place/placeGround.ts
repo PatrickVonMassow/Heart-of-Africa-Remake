@@ -2,6 +2,7 @@ import type { DigSite, DigSiteProgress, ErrandPoint } from './adultWork'
 import { digSiteAppearance } from './digSiteAppearance'
 import { looseRockRise } from './looseRocks'
 import { bankGroundHeight, type PlaceRiverBank } from './riverBank'
+import { balance } from '../../config/balance'
 
 export interface PlaceGround {
   bank: PlaceRiverBank | null
@@ -13,7 +14,10 @@ export interface PlaceGround {
   rocks: readonly (readonly [number, number, number])[]
 }
 
-export const DIG_RIM_DISTANCE = 1.65
+/** The working rim of a dig site: where a digger stands so that his blade
+ *  reaches the hole and his feet stay on unbroken ground (work-order 1125).
+ *  The metres themselves are calibratable and live in `balance`. */
+export const DIG_RIM_DISTANCE = balance.villageLife.adultErrands.digStandDistance
 export const DIG_ARRIVE_RADIUS = 0.25
 /** Full-grown footprint, including a body's width and arrival slack. */
 export const DIG_WORK_CLEARANCE = 0.35 + DIG_ARRIVE_RADIUS
@@ -80,16 +84,51 @@ export function clearOfSpoil(site: DigSite, x: number, z: number, margin = DIG_W
   return Math.hypot(x - c.x, z - c.z) > SPOIL_RADIUS_X + margin
 }
 
-/** Two reachable rim positions on the side opposite the spoil. Casting fails
- * if the fabric cannot give both bodies room; it never sends one into the pit. */
+/** Two bodies at one place block each other, and neither is then counted as
+ *  arrived (work-order 1087). */
+const MIN_STAND_GAP = 1.3
+
+/** Is this body at the site's working rim, blade in the hole and feet on
+ *  unbroken ground? A figure outside it does not play the dig stroke, so a
+ *  future regression reads as a villager standing idle rather than as one
+ *  hoeing untouched earth (work-order 1125). */
+export function atDigStand(site: ErrandPoint, x: number, z: number): boolean {
+  return Math.hypot(x - site.x, z - site.z)
+    <= DIG_RIM_DISTANCE + balance.villageLife.adultErrands.digStandTolerance
+}
+
+/** Two reachable rim positions on the side opposite the spoil, as nearly
+ * ACROSS THE HOLE from each other as the ground allows (work-order 1125): the
+ * pair works one excavation facing each other, not shoulder to shoulder over
+ * the same arc. Among the pairs that face each other equally well, the one
+ * that keeps both men furthest from the spoil heap wins. Casting fails if the
+ * fabric cannot give both bodies room; it never sends one into the pit. */
 export function digStandingPlaces(site: DigSite, standable: (x: number, z: number) => boolean): [ErrandPoint, ErrandPoint] | null {
-  const spots: ErrandPoint[] = []
+  const heap = spoilCentre(site)
+  const usable: Array<{ a: number; p: ErrandPoint; fromHeap: number }> = []
   for (let k = 0; k < 24; k++) {
     const a = Math.PI + (k % 2 ? -1 : 1) * Math.ceil(k / 2) * Math.PI / 12
     const p = digLocalToWorld(site, Math.cos(a) * DIG_RIM_DISTANCE, Math.sin(a) * DIG_RIM_DISTANCE)
     if (!clearOfSpoil(site, p.x, p.z) || !standable(p.x, p.z)) continue
-    if (spots.every((s) => Math.hypot(p.x - s.x, p.z - s.z) > 1.3)) spots.push(p)
-    if (spots.length === 2) return [spots[0], spots[1]]
+    usable.push({ a, p, fromHeap: Math.hypot(p.x - heap.x, p.z - heap.z) })
   }
-  return null
+  let best: [ErrandPoint, ErrandPoint] | null = null
+  let bestScore = -Infinity
+  for (let i = 0; i < usable.length; i++) {
+    for (let j = i + 1; j < usable.length; j++) {
+      const one = usable[i]
+      const other = usable[j]
+      if (Math.hypot(one.p.x - other.p.x, one.p.z - other.p.z) <= MIN_STAND_GAP) continue
+      // Straight across the hole is PI apart; the weight keeps one bearing step
+      // (30 degrees) worth more than any reachable gain in heap distance.
+      const turn = Math.abs(one.a - other.a) % (Math.PI * 2)
+      const apart = turn > Math.PI ? Math.PI * 2 - turn : turn
+      const score = apart * 100 + Math.min(one.fromHeap, other.fromHeap)
+      if (score > bestScore) {
+        bestScore = score
+        best = [one.p, other.p]
+      }
+    }
+  }
+  return best
 }
