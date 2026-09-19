@@ -272,6 +272,9 @@ export interface BankRoundConfig {
   runSeconds: number
   /** How long everybody holds at the stations while the catcher taps ROCK. */
   tapPauseSeconds: number
+  /** Backstop and settling radius for the tapper's short walk into the line. */
+  tapReturnSeconds: number
+  catcherStationDistance: number
   /** How long an arriving runner rests its hand on the far stone. */
   arrivalHoldSeconds: number
   /** Backstop on the walk between two runs. */
@@ -414,6 +417,8 @@ export interface BankState {
    *  word that never falls is a pause the player cannot read, and it made the
    *  hold useless as the window in which the tap is measured (08.09.2026). */
   tapFor: number
+  /** Remaining walk-back time; null once the catcher line is free to charge. */
+  returnFor: number | null
   /** Seconds left before the caught children rise at the end of a cycle. */
   endFor: number
   /** The first arrival of this run has reached the speech output. */
@@ -757,6 +762,7 @@ export function createBankGame(
     pending: [],
     sinceSaid: Infinity,
     tapFor: 0,
+    returnFor: null,
     endFor: 0,
     arrivalSpoken: false,
     speech: createProducerWatch(),
@@ -999,6 +1005,7 @@ function openRun(s: BankState, stage: BankStage, cfg: BankConfig, world: BankWor
   // The hold belongs to the WORD, and the word is offered further down only if
   // the hand reaches the stone — so it is armed there, not here.
   s.tapFor = 0
+  s.returnFor = cfg.tapReturnSeconds
   s.arrivalSpoken = false
   // The stations are behind them: no run, roam or parting walk follows a route.
   for (const c of s.children) clearPath(c)
@@ -1104,6 +1111,7 @@ function openRoam(s: BankState, cfg: BankConfig, rand: () => number): void {
   for (const c of s.children) clearPath(c)
   s.direction = null
   s.tapFor = 0
+  s.returnFor = null
   s.endFor = 0
   s.caller = -1
   s.namedBoulder = false
@@ -1187,6 +1195,7 @@ function advanceBankGame(
   const holdsEndThisStep = s.phase === 'part' && s.endFor > 0
   if (holdsTapThisStep) s.tapFor = Math.max(0, s.tapFor - dt)
   else if (holdsEndThisStep) s.endFor = Math.max(0, s.endFor - dt)
+  else if (s.phase === 'run' && s.returnFor !== null) s.returnFor = Math.max(0, s.returnFor - dt)
   else s.phaseFor -= dt
   // The off-game ROCK guard is part of every roaming phase, not an optional
   // attempt. The river call waits until the boulder has actually been climbed
@@ -1252,8 +1261,9 @@ function advanceBankGame(
       break
     case 'run':
       // The tap owns a visible held-standing interval, including its opening
-      // frame. Only after it expires does either side charge.
+      // frame. The tapper then walks into its line while everybody else holds.
       if (openedRun || holdsTapThisStep) stepHeld(s, dt, cfg, stage, world)
+      else if (s.returnFor !== null) stepTapReturn(s, dt, cfg, stage, world)
       else stepRun(s, dt, cfg, stage, world)
       break
     case 'part':
@@ -1545,7 +1555,7 @@ function inPlace(
       if (!reach || Math.abs(reach.gap) > TOUCH_GAP) return false
       continue
     }
-    const radius = cfg.reachDistance * (c.role === 'catcher' ? 0.6 : 1)
+    const radius = c.role === 'catcher' ? cfg.catcherStationDistance : cfg.reachDistance
     if (dist(c, stationAt(stage, end, slot, cfg)) > radius) return false
   }
   return true
@@ -1713,8 +1723,9 @@ function stepStations(
       // it would stop exactly where the old defect stood.
       const reach = touchReach(stage, wait, c)
       c.settled = !!reach && Math.abs(reach.gap) <= TOUCH_GAP
-    } else if (away <= cfg.reachDistance * 0.6) c.settled = true
-    else if (away > cfg.reachDistance * (c.role === 'catcher' ? 0.6 : 1)) c.settled = false
+    } else if (c.role === 'catcher') c.settled = away <= cfg.catcherStationDistance
+    else if (away <= cfg.reachDistance * 0.6) c.settled = true
+    else if (away > cfg.reachDistance) c.settled = false
     // The walk DOWN to the bank is a run — the whole group sets off at the call
     // — while the shuffle between two runs is a walk.
     const running = s.phase === 'gather' && !c.settled && away > cfg.reachDistance
@@ -1722,7 +1733,7 @@ function stepStations(
       clearPath(c)
       drive(s, i, null, false, dt, cfg, world)
     } else {
-      drive(s, i, wayTo(c, to, dt, world), running, dt, cfg, world, tapping)
+      drive(s, i, wayTo(c, to, dt, world), running, dt, cfg, world, tapping || c.role === 'catcher')
     }
   }
 }
@@ -1953,6 +1964,23 @@ function stepRun(
   if (free(s).length === 0 || s.phaseFor <= 0) endRun(s, cfg)
 }
 
+/** The stone is a moment, never a separate starting post for one catcher. */
+function stepTapReturn(s: BankState, dt: number, cfg: BankConfig, stage: BankStage, world: BankWorld): void {
+  const slot = catchers(s).indexOf(s.tapper)
+  const to = stationAt(stage, otherEnd(s.from), Math.max(0, slot), cfg)
+  const settled = slot < 0 || dist(s.children[s.tapper], to) <= cfg.catcherStationDistance
+  if (settled || s.returnFor === 0) {
+    s.returnFor = null
+    for (const c of s.children) clearPath(c)
+    // Keep the ready line for this frame; the next step starts the charge.
+    stepHeld(s, dt, cfg, stage, world)
+    return
+  }
+  for (let i = 0; i < s.children.length; i++) {
+    drive(s, i, i === s.tapper ? to : null, false, dt, cfg, world, true)
+  }
+}
+
 /** Holds every child in the posture the visible moment requires. These are
  *  commanded standing frames, so the stall watches read them as held. */
 function stepHeld(s: BankState, dt: number, cfg: BankConfig, stage: BankStage, world: BankWorld): void {
@@ -2008,7 +2036,7 @@ function assertRoundSound(s: BankState, cfg: BankConfig): void {
   )
   devAssert(
     s.phaseFor <= Math.max(cfg.roamSeconds * (1 + cfg.roamSpread), cfg.gatherSeconds, cfg.runSeconds, cfg.regroupSeconds, cfg.partSeconds) + 1e-6 &&
-      s.tapFor <= cfg.tapPauseSeconds + 1e-6 && s.endFor <= cfg.endPauseSeconds + 1e-6,
+      s.tapFor <= cfg.tapPauseSeconds + 1e-6 && (s.returnFor ?? 0) <= cfg.tapReturnSeconds + 1e-6 && s.endFor <= cfg.endPauseSeconds + 1e-6,
     'bank-phase-overrun',
     () => `phase ${s.phase} has ${s.phaseFor.toFixed(1)}s left, more than its own length`,
   )

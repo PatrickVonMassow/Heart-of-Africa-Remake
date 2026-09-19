@@ -184,7 +184,8 @@ catcher. Two rocks stand at the ends of a stretch of bank, one upstream and one
 downstream, in the play rocks' own size. The runners gather at one, the
 catcher waits at the other, the direction is announced before each run, the
 catcher steps to his stone, LAYS HIS HAND ON IT and names `ROCK` while everybody
-holds at the stones, whoever reaches the far rock calls `ROCK`, and whoever is
+holds at the stones. The catcher then steps back into his group before the run;
+whoever reaches the far rock calls `ROCK`, and whoever is
 caught drops out where he stands. Sides swap every run, so the announced word alternates by construction.
 When no free runner is left, the caught children stay crouched for a readable
 ending before everybody rises and walks back toward the roaming quarter.

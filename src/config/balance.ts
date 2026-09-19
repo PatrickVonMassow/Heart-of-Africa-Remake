@@ -725,6 +725,8 @@ export interface BalanceConfig {
       runSeconds: number
       /** Visible held-standing pause while the catcher taps ROCK. */
       tapPauseSeconds: number
+      tapReturnSeconds: number
+      catcherStationDistance: number
       arrivalHoldSeconds: number
       /** Backstop on the walk between two runs. */
       regroupSeconds: number
@@ -1344,6 +1346,9 @@ export const balance: BalanceConfig = {
       // One complete atom lasts 1.2 s. The extra beat lets the player connect
       // the catcher's held indication to ROCK before either side charges.
       tapPauseSeconds: 1.5,
+      // Calibratable: a short walk back into the catcher line, clear of the touch spot.
+      tapReturnSeconds: 6,
+      catcherStationDistance: 0.2,
       // Calibratable: one ROCK atom plus a beat with the hand resting on the flank.
       arrivalHoldSeconds: 1.5,
       // Calibratable: catchers walk the full stretch after the sides swap.
