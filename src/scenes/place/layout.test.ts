@@ -585,7 +585,7 @@ describe('the village water path (work-order 688)', () => {
       { x: VILLAGE_SPOTS.talkers[0], z: VILLAGE_SPOTS.talkers[1], r: 0.85 },
       { x: VILLAGE_SPOTS.pounder[0], z: VILLAGE_SPOTS.pounder[1], r: 0.55 },
       { x: VILLAGE_SPOTS.drummer[0], z: VILLAGE_SPOTS.drummer[1], r: 0.8 },
-      { x: VILLAGE_SPOTS.well[0], z: VILLAGE_SPOTS.well[1], r: 0.75 },
+      // No well here: this village draws its water from the river (point 1092).
     ]
     for (const prop of props) expect(layout.colliders).toContainEqual(prop)
     expect(layout.waterStand).not.toBeNull()

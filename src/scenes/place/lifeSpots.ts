@@ -3,6 +3,7 @@
 // keep-clear zones in PlaceScene).
 
 import { WALKER_RADIUS } from './collision'
+import { ROCK_VILLAGE_ID } from '../../world/communicationRock'
 
 /** Keep the established adult/hearing geography; fit the buildings around it. */
 export const LOOM_SPOT: [number, number] = [-8.5, -7]
@@ -31,6 +32,26 @@ export const VILLAGE_SPOTS = {
 export const PORT_TALKERS: [number, number] = [6, 6]
 
 /**
+ * Whether a village carries a well at all (user 07./10.09.2026). The
+ * communication village fetches its water from the river — its errand adults
+ * teach RIVER on the water path (point 1087) — so a second water source there
+ * is redundant and makes the teaching harder to read. Every other village keeps
+ * its well. The exception is bound to `ROCK_VILLAGE_ID` rather than a fresh
+ * string, so it follows the communication slice if that village ever moves.
+ */
+export function villageHasWell(placeId: string): boolean {
+  return placeId !== ROCK_VILLAGE_ID
+}
+
+/** The fixed life-prop spots a village's buildings are kept clear of. Derived
+ *  from `VILLAGE_SPOTS` so a new prop is covered without a second list. */
+export function villageKeepClearSpots(placeId: string): Array<[number, number]> {
+  return Object.entries(VILLAGE_SPOTS)
+    .filter(([name]) => name !== 'well' || villageHasWell(placeId))
+    .map(([, spot]) => spot)
+}
+
+/**
  * Where the ADULTS of a village stand: the fixed vignettes of §19.10 — the pair
  * talking, the pounder, the drummer, the well, the weaver, and the three around
  * the fire. The errand walkers are deliberately NOT here: they cross the whole
@@ -40,15 +61,22 @@ export const PORT_TALKERS: [number, number] = [6, 6]
  * play far enough from the adults that the §13.4 hearing range separates the
  * two groups — among the children the player hears the children, among the
  * adults the adults, and in the middle of the village no babble of both.
+ *
+ * The well and its water-carrier drop out where `villageHasWell` says no.
  */
-export function villageAdultStations(firePos: readonly [number, number]): Array<[number, number]> {
+export function villageAdultStations(
+  firePos: readonly [number, number],
+  placeId: string,
+): Array<[number, number]> {
   const [fx, fz] = firePos
+  const well: Array<[number, number]> = villageHasWell(placeId)
+    ? [VILLAGE_SPOTS.well, [VILLAGE_SPOTS.well[0] - 1.1, VILLAGE_SPOTS.well[1]]] // the water-carrier's stop
+    : []
   return [
     VILLAGE_SPOTS.talkers,
     VILLAGE_SPOTS.pounder,
     VILLAGE_SPOTS.drummer,
-    VILLAGE_SPOTS.well,
-    [VILLAGE_SPOTS.well[0] - 1.1, VILLAGE_SPOTS.well[1]], // the water-carrier's stop
+    ...well,
     LOOM_SPOT, // the weaver at her loom
     [fx, fz], // the fire itself
     [fx + 1.2, fz + 1.0], // the cook
@@ -58,26 +86,30 @@ export function villageAdultStations(firePos: readonly [number, number]): Array<
 }
 
 /** Solid props, shared by layout collision and the keep-clear footprints. */
-export function villageLifeProps(fire: readonly [number, number]) {
+export function villageLifeProps(fire: readonly [number, number], placeId: string) {
   return [
     { x: fire[0], z: fire[1], r: 1.3 },
     { x: LOOM_SPOT[0], z: LOOM_SPOT[1], r: 1 },
     { x: VILLAGE_SPOTS.talkers[0], z: VILLAGE_SPOTS.talkers[1], r: 0.85 },
     { x: VILLAGE_SPOTS.pounder[0], z: VILLAGE_SPOTS.pounder[1], r: 0.55 },
     { x: VILLAGE_SPOTS.drummer[0], z: VILLAGE_SPOTS.drummer[1], r: 0.8 },
-    { x: VILLAGE_SPOTS.well[0], z: VILLAGE_SPOTS.well[1], r: 0.75 },
+    ...(villageHasWell(placeId)
+      ? [{ x: VILLAGE_SPOTS.well[0], z: VILLAGE_SPOTS.well[1], r: 0.75 }]
+      : []),
   ]
 }
 
 /** The prop alone does not cover every figure: reserve the actual body spots too. */
-export function villageLifeFootprints(fire: readonly [number, number]) {
+export function villageLifeFootprints(fire: readonly [number, number], placeId: string) {
   return [
-    ...villageLifeProps(fire),
+    ...villageLifeProps(fire, placeId),
     weaverStance(),
     inwardStationBody(VILLAGE_SPOTS.pounder, -0.55),
     ...[-0.5, 0.5].map(dx => ({ x: VILLAGE_SPOTS.talkers[0] + dx, z: VILLAGE_SPOTS.talkers[1], r: WALKER_RADIUS })),
     { x: VILLAGE_SPOTS.drummer[0], z: VILLAGE_SPOTS.drummer[1], r: WALKER_RADIUS },
-    { x: VILLAGE_SPOTS.well[0] - 1.1, z: VILLAGE_SPOTS.well[1], r: WALKER_RADIUS },
+    ...(villageHasWell(placeId)
+      ? [{ x: VILLAGE_SPOTS.well[0] - 1.1, z: VILLAGE_SPOTS.well[1], r: WALKER_RADIUS }]
+      : []),
     ...[[1.2, 1], [-1.3, -0.7], [0.7, 1.8]].map(([dx, dz]) => ({ x: fire[0] + dx, z: fire[1] + dz, r: WALKER_RADIUS })),
   ]
 }

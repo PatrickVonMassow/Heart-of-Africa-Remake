@@ -135,6 +135,7 @@ interface Crowd {
 
 function crowd(
   set: InhabitantSet,
+  placeId: string,
   layout: PlaceLayout,
   seed: number,
   /** Where the errand villagers stroll, when the case wants them somewhere
@@ -158,7 +159,7 @@ function crowd(
   const sep = balance.villageLife.separation
 
   // The vignette adults: they push the passers-by aside and never give way.
-  const stations = villageAdultStations(FIRE)
+  const stations = villageAdultStations(FIRE, placeId)
   const standing = claimBodies(set, stations.length, { fixed: true })
   stations.forEach(([x, z], i) => {
     standing[i].x = x
@@ -490,6 +491,7 @@ function village(
   })
   const others = crowd(
     set,
+    placeId,
     layout,
     localSeed,
     options.adultsAmongTheChildren ? { x: ground.x, z: ground.z, radius: ground.radius } : undefined,
@@ -1134,7 +1136,7 @@ interface PenEvidence {
  *  replays it WITHOUT the pen, to measure what a healthy child of this same
  *  village walks. */
 const PEN_VILLAGE = 'bambara-village'
-const PEN_SEED = 24
+const PEN_SEED = 59
 
 describe('and the gate SEES a child that is wedged (point 656)', () => {
   /** The reported settlement with one child penned: a wall thrown up round it
@@ -1169,6 +1171,12 @@ describe('and the gate SEES a child that is wedged (point 656)', () => {
     // is contrasted with sees 5.5 % of the trace, over the 5 % this block pins as
     // "a tenth of the truth"). Re-scanned seeds 12..70 the same way: seed 24
     // retains every comparison, thresholds again unchanged.
+    // A FOURTH move: the well left this village (point 1092), so two adult
+    // stations and a collider went with it, the children's quarter shifted, and
+    // seed 24 no longer produces a single re-pen the strict rule refuses — the
+    // very contrast this case is built on. Re-scanned seeds 12..90 against the
+    // whole fixture block: 59, 64, 70 and 78 retain every comparison; 59 is
+    // taken. All assertion thresholds stay unchanged.
     const v = village(PEN_VILLAGE, PEN_SEED, undefined, { pen: { r, carry } })
     const paths: Track[][] = v.children.map(() => [])
     for (let t = 0; t < seconds; t += 1 / 60) {

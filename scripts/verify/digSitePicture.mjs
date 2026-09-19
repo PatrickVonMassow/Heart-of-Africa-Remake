@@ -1,6 +1,11 @@
 // One fixed village composition for the two purpose cues and walkable spoil.
 // The layout/clearance test pins this choice without running a browser.
-export const DIG_PICTURE = { placeId: 'bambara-village', seed: 12 }
+// Re-picked when the well left this village (point 1092): the dig search reads
+// the collider set, so one collider fewer moved both holes and seed 12's near
+// corner fell outside the frame. 2427 is the candidate closest to what seed 12
+// composed — two cues of 98 and 120 px over 334 px of earth, a 0.64 gap between
+// the holes — with the whole composition back inside the frame.
+export const DIG_PICTURE = { placeId: 'bambara-village', seed: 2427 }
 
 export function digPictureUnmounted() {
   return !window.__game.getState().placeId && !window.__placeWalkers && !window.__placeErrands

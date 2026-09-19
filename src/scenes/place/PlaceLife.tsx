@@ -4,7 +4,7 @@
 // other and with the props: pairs stand in conversation, a fire tender stokes
 // the fire, food is fetched from the huts and cooked over it, grain is
 // pounded in a mortar, a drummer waits for the chief's message, and water is
-// carried from the well.
+// carried from the well where the village has one (point 1092).
 // Pure animation, no mechanics.
 
 import { usePlaceGround } from './PlaceGroundContext'
@@ -138,7 +138,7 @@ import {
   LOW_DRUM,
   type DrumGeometry,
 } from './drummerPose'
-import { LOOM_SPOT, WEAVER_OFFSET, weaverStance, PORT_TALKERS, VILLAGE_SPOTS, villageAdultStations, type PlayGround } from './lifeSpots'
+import { LOOM_SPOT, WEAVER_OFFSET, weaverStance, PORT_TALKERS, VILLAGE_SPOTS, villageAdultStations, villageHasWell, type PlayGround } from './lifeSpots'
 import { drummerFacing } from './chiefWalk'
 import { DRUMMER_SPEAKER_ID } from './chiefPresence'
 import { queuedDrummerVoice, setDrummerVoice } from './drummerVoice'
@@ -1997,10 +1997,11 @@ function FireTender({ x, z, cloth }: { x: number; z: number; cloth: string }) {
   )
 }
 
-/** Village well: stone ring with a wooden frame and bucket. */
+/** Village well: stone ring with a wooden frame and bucket. Named so a scene
+ *  check can tell the prop's presence from its absence (point 1092). */
 function Well({ x, z }: { x: number; z: number }) {
   return (
-    <group position={[x, 0, z]}>
+    <group name="village-well" position={[x, 0, z]}>
       {Array.from({ length: 9 }, (_, i) => {
         const a = (i / 9) * Math.PI * 2
         return (
@@ -3565,6 +3566,11 @@ export function PlaceLife({
   // here, not per figure: a settlement mounts a couple of dozen of them.
   const limbSegments = useUi(effectiveFigureLimbSegments)
 
+  // Whether this village has a well at all (point 1092) — the same answer the
+  // layout's colliders and keep-clear spots are built from, so the drawn prop
+  // and the reserved ground cannot disagree.
+  const hasWell = villageHasWell(placeId)
+
   // Seasonal presence (point 142, "the young men are gone"): the adult walkers
   // thin in a people's away season — the Maasai at the dry-season highland
   // camps (PERIOD), the Tuareg on the autumn caravan, the Sahel farmers out at
@@ -3683,11 +3689,11 @@ export function PlaceLife({
   // a settlement whose own layout puts a figure at its origin is not reported.
   const placementAnchors = useMemo<PlaceSpot[]>(() => {
     const out: PlaceSpot[] = homes.map((h) => ({ x: h.x, z: h.z }))
-    for (const [ax, az] of villageAdultStations(firePos)) out.push({ x: ax, z: az })
+    for (const [ax, az] of villageAdultStations(firePos, placeId)) out.push({ x: ax, z: az })
     for (const [ex, ez] of errands) out.push({ x: ex, z: ez })
     for (const [bx, bz] of buildings) out.push({ x: bx, z: bz })
     return out
-  }, [homes, firePos, errands, buildings])
+  }, [homes, firePos, errands, buildings, placeId])
   useUnplacedInhabitantWatch(placeId, placementAnchors)
 
   if (kind === 'port') {
@@ -3749,7 +3755,7 @@ export function PlaceLife({
           <Talkers x={VILLAGE_SPOTS.talkers[0]} z={VILLAGE_SPOTS.talkers[1]} cloth={style.cloth} />
           <Pounder x={VILLAGE_SPOTS.pounder[0]} z={VILLAGE_SPOTS.pounder[1]} cloth={style.cloth[0]} />
           <Drummer x={VILLAGE_SPOTS.drummer[0]} z={VILLAGE_SPOTS.drummer[1]} cloth={style.cloth[1 % style.cloth.length]} />
-          <Well x={VILLAGE_SPOTS.well[0]} z={VILLAGE_SPOTS.well[1]} />
+          {hasWell && <Well x={VILLAGE_SPOTS.well[0]} z={VILLAGE_SPOTS.well[1]} />}
           {homes.length > 0 && (
             <TaskWalker
               home={homes[0]}
@@ -3760,7 +3766,10 @@ export function PlaceLife({
               startDelay={4}
             />
           )}
-          {homes.length > 1 && (
+          {/* The jar carrier belongs to the well. Where there is none, every jar
+              journey is the errand adults' on the water path (point 1087) and
+              no silent third carrier walks beside the teaching. */}
+          {hasWell && homes.length > 1 && (
             <TaskWalker
               home={homes[1]}
               target={[VILLAGE_SPOTS.well[0] - 1.1, VILLAGE_SPOTS.well[1]]}
