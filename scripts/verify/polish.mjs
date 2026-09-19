@@ -6818,14 +6818,21 @@ if (section('stone-step')) {
       // there ends the visit: the place unmounts under the camera, which is
       // exactly what the first cut of this section measured as "no player".
       if (Math.hypot(x, z) > layout.radius * 0.8) continue
-      if (bare(x, z) !== 0 || bare(x - 1, z) !== 0 || bare(x + 1, z) !== 0) continue
-      // NO SECOND STONE UNDER THE READING (GPT-6 Astra, cross-vendor review of
-      // d261418). The rise is measured against the open ground on either side,
-      // so another walked-over stone reaching one of those two feet would lift
-      // the baseline and make correct behaviour read as a wrong rise.
+      // NOTHING ELSE UNDER THE WHOLE CROSSING (GPT-6 Astra, cross-vendor
+      // reviews of d261418 and 7885fe1). Every height this section reads —
+      // the three standpoints AND the two resting eyes of the walk, which lie
+      // further out than the standpoints — must stand on ground that is flat
+      // but for THIS stone. A second walked-over stone, a shore or an
+      // excavation anywhere along that line lifts a baseline and turns correct
+      // behaviour into a wrong rise, so the whole line is checked rather than
+      // the three points that happen to be read first.
       const others = layout.rocks.filter((r) => r[0] !== x || r[1] !== z)
       const foreign = (px, pz) => others.reduce((m, r) => Math.max(m, looseRockRise(r, px, pz)), 0)
-      if (foreign(x, z) !== 0 || foreign(x - 1, z) !== 0 || foreign(x + 1, z) !== 0) continue
+      let lineClear = true
+      for (let dx = -2; dx <= 1.6 && lineClear; dx += 0.2) {
+        if (bare(x + dx, z) !== 0 || foreign(x + dx, z) !== 0) lineClear = false
+      }
+      if (!lineClear) continue
       const clear = standingClear(layout.colliders, x, z, PLAYER_RADIUS)
       if (!clear) continue
       // How much open ground surrounds it, measured the way the player meets it.
