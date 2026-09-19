@@ -116,6 +116,7 @@ export function verifyFloorEvidence(reading, { repo, root, home = homedir() }) {
     requireEvidence(committedAt < expiry, 'attesting commit must precede expiry')
   }
   const source = readOptional(expandDestination(reading.transcript, home))
+  requireEvidence(reading.status !== 'LIVE' || source !== null, `LIVE ${reading.kind} transcript missing`)
   const path = attestationPath(reading.kind)
   const captured = readOptional(resolve(repo, path))
   if (captured !== null) {
@@ -129,7 +130,6 @@ export function verifyFloorEvidence(reading, { repo, root, home = homedir() }) {
     return 'transcript'
   }
   if (captured !== null) return 'attestation'
-  requireEvidence(reading.status === 'EXPIRED', `LIVE ${reading.kind} transcript missing without committed attestation`)
   return 'expired'
 }
 

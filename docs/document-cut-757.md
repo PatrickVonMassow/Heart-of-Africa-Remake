@@ -35,9 +35,10 @@ status, not either stated number or their gap.
 
 The check re-derives a readable transcript, otherwise uses a committed
 attestation, otherwise requires EXPIRED with a date and a resolvable attesting
-commit dated before that expiry day (UTC). LIVE without either source fails on
-the batch machine. While a transcript remains readable its attestation must
-match it exactly; after deletion the committed capture is the durable witness.
+commit dated before that expiry day (UTC). LIVE with a missing transcript fails
+on the batch machine even if an attestation survives: its status must be updated
+to EXPIRED. While a transcript remains readable its attestation must match it
+exactly; after deletion the committed capture remains a re-derivable witness.
 
 The owner reading is the one point 757 owed and point 761 took: the first
 batch-owner session started after the cut landed, reading its own transcript.

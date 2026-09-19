@@ -766,14 +766,15 @@ describe('floor evidence survival', () => {
     writeFileSync(resolve(f.repo, path), text)
     f.git(['add', path])
     rmSync(f.transcript)
-    expect(() => verifyFloorEvidence(f.reading, f.options)).toThrow() // staged is not committed
+    expect(() => verifyFloorEvidence(f.expired, f.options)).toThrow() // staged is not committed
     f.git(['-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'Preserve witness'])
-    expect(verifyFloorEvidence(f.reading, f.options)).toBe('attestation')
+    expect(verifyFloorEvidence(f.expired, f.options)).toBe('attestation')
+    expect(() => verifyFloorEvidence(f.reading, f.options)).toThrow(/LIVE.*missing/)
     writeFileSync(resolve(f.repo, path), text + '\n')
-    expect(() => verifyFloorEvidence(f.reading, f.options)).toThrow(/committed HEAD/)
+    expect(() => verifyFloorEvidence(f.expired, f.options)).toThrow(/committed HEAD/)
     writeFileSync(resolve(f.repo, path), text)
     writeFileSync(f.transcript, f.source + '\n')
-    expect(() => verifyFloorEvidence(f.reading, f.options)).toThrow(/does not match/)
+    expect(() => verifyFloorEvidence(f.expired, f.options)).toThrow(/does not match/)
   })
 
   it('does not hide a bad surviving transcript behind EXPIRED', () => {
