@@ -5,9 +5,20 @@
 // third time as a literal in `layout.ts`. What the round needs is a stone that
 // can be STOOD on, at the size the renderer draws it.
 
-import { describe, expect, it } from 'vitest'
-import { ROCK_TOP_UNITS } from '../../render/flora'
-import { CLIMB_ROCK_SCALE, CLIMB_ROCK_TOP, climbBoulder, deriveClimbRock, looseRock, looseRockRadius } from './looseRocks'
+import { afterEach, describe, expect, it } from 'vitest'
+import { balance } from '../../config/balance'
+import { ROCK_RADIUS_UNITS, ROCK_TOP_UNITS } from '../../render/flora'
+import {
+  CLIMB_ROCK_SCALE,
+  CLIMB_ROCK_TOP,
+  climbBoulder,
+  deriveClimbRock,
+  looseRock,
+  looseRockIsGround,
+  looseRockRadius,
+  looseRockRise,
+  looseRockTop,
+} from './looseRocks'
 import { WEDGE_PASSAGE } from './wedgeCarve'
 
 const QUARTER = { x: 0, z: 0 }
@@ -37,21 +48,23 @@ describe('the settlement`s loose boulders', () => {
     expect(ROCK_TOP_UNITS * pebble[2]).toBeLessThan(0.3)
   })
 
-  it('keeps the guard on a settlement of pebbles by taking the tallest it has', () => {
+  it('keeps the guard on a settlement of small stones by taking the tallest it has', () => {
     const chosen = climbBoulder(
       [
-        [1, 0, 0.3],
-        [9, 0, 0.45],
-        [2, 2, 0.31],
+        [1, 0, 0.6],
+        [9, 0, 0.75],
+        [2, 2, 0.62],
       ],
       QUARTER,
       0.9,
     )
     // Nothing clears the bar, so the round still gets a stone rather than the
-    // whole bank game being dropped for want of one.
+    // whole bank game being dropped for want of one. All three stand above the
+    // step height: since work-order 1149 a stone BELOW it is ground, and the
+    // fallback may not stand a child on ground (pinned below).
     expect(chosen).not.toBeNull()
     expect(chosen!.x).toBe(9)
-    expect(chosen!.height).toBeCloseTo(ROCK_TOP_UNITS * 0.45, 9)
+    expect(chosen!.height).toBeCloseTo(ROCK_TOP_UNITS * 0.75, 9)
   })
 
   it('has nothing to offer a settlement with no loose stone at all', () => {
@@ -136,5 +149,92 @@ describe('the derived climbing stone', () => {
     expect(rock).not.toBeNull()
     expect(Math.hypot(rock[0] - wall.x, rock[1] - wall.z) - looseRockRadius(CLIMB_ROCK_SCALE) - 2)
       .toBeGreaterThan(WEDGE_PASSAGE)
+  })
+})
+
+// WALKED OVER OR WALKED AROUND (work-order 1149). The user's report: the walk
+// snags on pebbles. The cut itself is one comparison, but BOTH sides of the
+// settlement read it — the collider set and the walking surface — so it is
+// pinned here, at the one place that answers it.
+describe('a stone is either ground or an obstacle', () => {
+  it('makes the cut at the step height and keeps the two thresholds ordered', () => {
+    const step = balance.placeStepOverTop
+    const climb = balance.villageLife.bankGame.climbableRockTop
+    // A stone the walk rides over can never be one a child climbs onto.
+    expect(step).toBeLessThan(climb)
+    // The scatter's own range, at the ends and across the cut.
+    expect(looseRockIsGround(0.3)).toBe(true)
+    expect(looseRockIsGround(1)).toBe(false)
+    expect(looseRockIsGround(CLIMB_ROCK_SCALE)).toBe(false)
+    // Exactly AT the step height a stone is still an obstacle: the cut is
+    // "below the step", measured against the stone's own drawn top.
+    const s = 0.5
+    expect(looseRockIsGround(s, looseRockTop(s))).toBe(false)
+    expect(looseRockIsGround(s, looseRockTop(s) + 1e-9)).toBe(true)
+  })
+
+  it('raises a smooth, compact dome under a walked-over stone and nothing beside it', () => {
+    const pebble: [number, number, number] = [6, -2, 0.3]
+    const top = looseRockTop(0.3)
+    expect(looseRockRise(pebble, 6, -2)).toBeCloseTo(top, 9)
+    // Zero height AND zero slope at the drawn stone's edge: the foot leaves the
+    // rise where the stone ends, without a step.
+    const r = ROCK_RADIUS_UNITS * 0.3
+    expect(looseRockRise(pebble, 6 + r, -2)).toBe(0)
+    expect(looseRockRise(pebble, 6 + r * 0.999, -2)).toBeLessThan(top * 1e-4)
+    expect(looseRockRise(pebble, 6.6, -2)).toBe(0)
+    // Continuous across the whole crossing: no step anywhere, edge included.
+    // A millimetre of travel may not move the foot by more than two.
+    let last = 0
+    for (let d = -r - 0.05; d <= r + 0.05; d += 0.001) {
+      const h = looseRockRise(pebble, 6 + d, -2)
+      expect(Math.abs(h - last)).toBeLessThan(0.002)
+      last = h
+    }
+    expect(last).toBe(0)
+  })
+
+  it('raises nothing under a stone that is walked around', () => {
+    const boulder: [number, number, number] = [6, -2, 1]
+    expect(looseRockIsGround(1)).toBe(false)
+    expect(looseRockRise(boulder, 6, -2)).toBe(0)
+    expect(looseRockRise(boulder, 6.2, -2)).toBe(0)
+  })
+
+  it('never offers a stone that became ground as the one to climb', () => {
+    const pebbles: Array<[number, number, number]> = [[1, 0, 0.3], [2, 0, 0.35], [-1, 1, 0.4]]
+    // Not even as the fallback: a settlement of nothing but pebbles has no
+    // climbing stone at all, rather than a child standing on the ground.
+    expect(climbBoulder(pebbles, QUARTER, balance.villageLife.bankGame.climbableRockTop)).toBeNull()
+    const real: [number, number, number] = [9, 0, 1]
+    const chosen = climbBoulder([...pebbles, real], QUARTER, balance.villageLife.bankGame.climbableRockTop)
+    expect(chosen?.x).toBe(9)
+  })
+})
+
+// THE ORDERING GUARD RUNS ON THE PATH THE GAME TAKES (GPT-6 Astra, cross-vendor
+// review of ca89d72). Every shipped settlement hands `climbBoulder` a derived
+// stone, so a guard sitting behind that early return would fire in tests and
+// never in play.
+describe('the ordered-thresholds guard', () => {
+  const derived: [number, number, number] = [4, 4, CLIMB_ROCK_SCALE]
+
+  afterEach(() => {
+    balance.placeStepOverTop = 0.3
+    ;(window as unknown as { __assertLog?: unknown[] }).__assertLog = []
+  })
+
+  it('fires when the step height is raised past the climbable top, derived stone or not', () => {
+    const log = () => ((window as unknown as { __assertLog?: Array<{ code: string }> }).__assertLog ?? [])
+    ;(window as unknown as { __assertLog?: unknown[] }).__assertLog = []
+    balance.placeStepOverTop = balance.villageLife.bankGame.climbableRockTop + 0.1
+    climbBoulder([derived], QUARTER, balance.villageLife.bankGame.climbableRockTop, derived)
+    expect(log().some((e) => e.code === 'rock-thresholds-unordered')).toBe(true)
+  })
+
+  it('stays quiet at the shipped values', () => {
+    ;(window as unknown as { __assertLog?: unknown[] }).__assertLog = []
+    climbBoulder([derived], QUARTER, balance.villageLife.bankGame.climbableRockTop, derived)
+    expect(((window as unknown as { __assertLog?: Array<{ code: string }> }).__assertLog ?? []).length).toBe(0)
   })
 })

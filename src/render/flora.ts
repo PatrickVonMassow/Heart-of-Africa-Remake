@@ -322,6 +322,20 @@ export function buildRock(): THREE.BufferGeometry {
 const DODECAHEDRON_TOP = (1 + Math.sqrt(5)) / 2 / Math.sqrt(3)
 export const ROCK_TOP_UNITS = 0.5 * DODECAHEDRON_TOP * 0.62 + 0.24
 
+/**
+ * How far the scattered boulder's DRAWN silhouette reaches sideways, in the
+ * mesh's own units: the radius `buildRock` builds its dodecahedron at, which
+ * its X axis keeps untouched (Z is squashed to 0.8 of it). No vertex of the
+ * rotated solid quite reaches it — the widest is 0.4884 — so this is the drawn
+ * stone's own footprint, rounded OUT rather than in.
+ *
+ * A stone low enough to be walked over raises the ground exactly this far
+ * (work-order 1149), so the rise covers the whole silhouette and still ends
+ * within a few centimetres of it — never lifting a foot standing on the open
+ * grass beside it. `flora.test.ts` pins both halves against the geometry.
+ */
+export const ROCK_RADIUS_UNITS = 0.5
+
 /** Native height of the settlement-scale play-rock mesh. Its instance scale is
  *  still derived from its footprint, so renderer and collider stay coupled. */
 export const PLAY_ROCK_HEIGHT_UNITS = 1.05

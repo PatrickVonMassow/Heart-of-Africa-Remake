@@ -37,7 +37,7 @@ it('keeps the picture fixture walkable, distinct, and in a standing camera proje
     }
   }
   const patch = l.digSites[1]
-  const ground = { bank: l.bank, sites: l.digSites, progress: l.digSites.map(() => ({ dug: 18, strikes: 12, completed: true })) }
+  const ground = { bank: l.bank, sites: l.digSites, progress: l.digSites.map(() => ({ dug: 18, strikes: 12, completed: true })), rocks: l.rocks }
   for (let i = 0; i <= 32; i++) {
     const p = digLocalToWorld(patch, spoilOffset(patch), -1.6 + i / 10)
     expect(standingClear(l.colliders, p.x, p.z, 0.3)).toBe(true)

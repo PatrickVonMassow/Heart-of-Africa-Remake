@@ -195,7 +195,9 @@ oriented boxes (exact corners, no gaps) and the clearance keeps the camera's nea
 out of every wall — pressing against one must never show its inside. A move is SWEPT from
 the previous position (point 413): it stops at the first collider's near edge and slides,
 never landing beyond it; a fence collides as the panel run the picture draws (a capsule
-per panel, not a circle per post); each animal collides with the others. No inhabitant is
+per panel, not a circle per post); each animal collides with the others. A scattered stone is an
+obstacle only above the step height `balance.placeStepOverTop` (0.30 m, calibratable):
+below it it holds no collider and raises the walking surface instead, as spoil does. No inhabitant is
 ever stuck (point 155): every walker errand target and animal grazing anchor has a clear
 standing circle AND an escape direction against the FULL collider set, else nudged to the
 nearest free spot; a walker pinned past `balance.walkerUnstuckSeconds` (debug-editable) is

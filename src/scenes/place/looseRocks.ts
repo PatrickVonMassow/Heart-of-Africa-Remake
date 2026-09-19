@@ -9,7 +9,9 @@
 // a boulder that is one size to the renderer and another to the round puts the
 // child inside the rock or in the air above it.
 
-import { ROCK_TOP_UNITS } from '../../render/flora'
+import { balance } from '../../config/balance'
+import { ROCK_TOP_UNITS, ROCK_RADIUS_UNITS } from '../../render/flora'
+import { devAssert } from '../../systems/devAssert'
 
 /** A scattered boulder as everything but the renderer needs it: where it is, how
  *  far its collider reaches, and how high a child stands when it climbs on. */
@@ -25,6 +27,44 @@ export interface LooseRock {
  *  than clipping its silhouette. */
 export function looseRockRadius(s: number): number {
   return 0.35 + s * 0.5
+}
+
+/** How high a scattered boulder's top stands above the ground it sits on, in
+ *  metres, at instance scale `s`. */
+export function looseRockTop(s: number): number {
+  return ROCK_TOP_UNITS * s
+}
+
+/**
+ * IS THIS STONE GROUND OR AN OBSTACLE? The one answer the whole settlement
+ * reads (work-order 1149) — `layout.ts` builds the collider set from it and
+ * `placeGround.ts` the walking surface, so a stone can never be both.
+ *
+ * The scatter's instance scale runs 0.3 to 1.0 and tops with it, 0.16-0.53 m,
+ * while every one of them claimed a collider of at least half a metre: the
+ * player and the villagers snagged on pebbles that stand no higher than an
+ * ankle. Below the step height a stone is GROUND — it raises the surface under
+ * the walk the way an excavation's spoil does, and nothing collides with it.
+ * At or above it nothing changes: collider, and above `climbableRockTop` a
+ * candidate for the children's climb.
+ */
+export function looseRockIsGround(s: number, stepTop = balance.placeStepOverTop): boolean {
+  return looseRockTop(s) < stepTop
+}
+
+/**
+ * The rise a WALKED-OVER stone puts under the foot at (`x`, `z`): a smooth,
+ * compact dome peaking at the stone's own drawn top and reaching zero height
+ * AND zero slope at the edge of its drawn silhouette, exactly like the spoil
+ * heap of an excavation (`spoilHeightAt`). A stone that is an obstacle raises
+ * nothing — it is walked around, not over — so this answers 0 for it and the
+ * caller never has to filter first.
+ */
+export function looseRockRise([x, z, s]: readonly [number, number, number], px: number, pz: number): number {
+  if (!looseRockIsGround(s)) return 0
+  const r = ROCK_RADIUS_UNITS * s
+  const q = Math.max(0, 1 - (Math.hypot(px - x, pz - z) / r) ** 2)
+  return looseRockTop(s) * q * q
 }
 
 /** One entry of the layout's rock scatter, as the rest of the game sees it. */
@@ -53,6 +93,21 @@ export function climbBoulder(
   minTop: number,
   derived: readonly [number, number, number] | null = null,
 ): LooseRock | null {
+  // THE TWO CALIBRATED THRESHOLDS STAY ORDERED (work-order 1149): a stone the
+  // walk rides over is not a stone a child climbs onto. Were the step height
+  // ever raised past the climb floor, every candidate the search prefers would
+  // already be ground. The two BALANCE values are what must stay ordered — the
+  // floor handed in here may be anything a caller wants to measure with.
+  //
+  // CHECKED BEFORE THE DERIVED STONE IS HANDED BACK, not after: every shipped
+  // settlement carries a derived stone, so an assertion behind that return
+  // would never run in the game at all (GPT-6 Astra, cross-vendor review of
+  // ca89d72).
+  devAssert(
+    balance.placeStepOverTop < balance.villageLife.bankGame.climbableRockTop,
+    'rock-thresholds-unordered',
+    () => `step-over top ${balance.placeStepOverTop} m is not below the climbable top ${balance.villageLife.bankGame.climbableRockTop} m`,
+  )
   // The derived stone wins outright: it is the tallest instance the scatter
   // draws and it stands a few paces off the quarter, so no search can improve
   // on it (work-order 1082).
@@ -61,6 +116,10 @@ export function climbBoulder(
   let nearest = Infinity
   let tallest: LooseRock | null = null
   for (const entry of rocks) {
+    // A stone that became ground is no candidate at all, not even for the
+    // fallback: climbing it would be a step onto the surface the child is
+    // already walking on.
+    if (looseRockIsGround(entry[2])) continue
     const rock = looseRock(entry)
     if (tallest === null || rock.height > tallest.height) tallest = rock
     if (rock.height < minTop) continue

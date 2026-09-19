@@ -13,6 +13,17 @@ export interface BalanceConfig {
   placeWalkSpeed: number
   /** Speed factor for strafing and walking backward inside places (design.md §2). */
   placeStrafeFactor: number
+  /**
+   * How high a scattered stone's top may stand, in metres, and still be GROUND
+   * rather than an obstacle (design.md §16, work-order 1149). A stone below it
+   * raises the ground under the walk the way an excavation's spoil does — the
+   * player and every villager ride up and over it — and it leaves the collider
+   * set. A stone at or above it keeps its collider and stays something to walk
+   * around. Calibratable (CLAUDE.md §2, design.md §14) and strictly below
+   * `villageLife.bankGame.climbableRockTop`, so no stone is ground and climbing
+   * stone at once.
+   */
+  placeStepOverTop: number
   /** Seconds an inhabitant may be physically pinned (no real movement while it
    *  has a walk target) before it is teleport-nudged to the nearest free spot
    *  (point 155) — a small invisible correction, inhabitants only. */
@@ -892,6 +903,12 @@ export const balance: BalanceConfig = {
   travelSpeed: 5.6, // reduced 30% from 8 for a calmer overland pace
   placeWalkSpeed: 10,
   placeStrafeFactor: 0.8,
+  // Educated guess (CLAUDE.md §2): 0.30 m is about knee height on a grown body,
+  // the step a walker takes without breaking stride. The scatter draws its
+  // instance scale from 0.3 to 1.0, so tops run 0.16-0.53 m: everything up to
+  // scale ~0.57 becomes ground and the taller half stays an obstacle, while the
+  // derived climbing stone (scale 1, top 0.53 m) stays well clear of it.
+  placeStepOverTop: 0.3,
   walkerUnstuckSeconds: 4, // an inhabitant wedged this long is teleport-nudged free (point 155)
   walkerUnstuckMinDistance: 0.6, // calibratable: one adult body width out of the pinned position
   unstuck: {

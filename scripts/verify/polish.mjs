@@ -6751,7 +6751,7 @@ if (section('adult-errands')) {
           const site = layout.digSites.find((s) => s.kind === 'patch')
           const start = digLocalToWorld(site, spoilOffset(site), -1.6)
           const end = digLocalToWorld(site, spoilOffset(site), 1.6)
-          const ground = { bank: layout.bank, sites: layout.digSites, progress: window.__placeErrands().digProgress }
+          const ground = { bank: layout.bank, sites: layout.digSites, progress: window.__placeErrands().digProgress, rocks: layout.rocks }
           if (Math.abs(placeGroundHeight(ground, start.x, start.z)) > 0.001) return null
           return { who: 0, start, end }
         })
@@ -6770,6 +6770,208 @@ if (section('adult-errands')) {
   }
   }
 
+}
+
+// --- The walk over a small stone (design.md §2.6, work-order 1149) ------------
+// The user's report: "man bleibt an Kieselsteinen im Dorf hängen" — every
+// scattered stone claimed a collider of at least half a metre, however small the
+// thing the player saw, so an ankle-high pebble stopped him dead. A stone below
+// the step height is GROUND now: it raises the walking surface the way an
+// excavation's spoil does and holds no collider at all.
+//
+// The arithmetic is pinned in the unit layer (looseRocks/placeGround/layout
+// tests). What only the RENDERED scene can answer is the two halves the player
+// actually meets: does the shipped settlement really let him stand where the
+// stone is, and does the live camera ride up onto it and down again — read off
+// `window.__placeCamera`, the same camera the frame is taken through, rather
+// than off the sampler that computes it.
+if (section('stone-step')) {
+  await goToPlace('bambara-village')
+  // The first-person player is installed a frame or two after the layout is
+  // published; reading it before that is what an unguarded `__placePlayer.x`
+  // throws on.
+  const walking = await page
+    .waitForFunction(() => !!window.__placePlayer && !!window.__placeCamera && !!window.__placeLayout, null, { timeout: 40000 })
+    .then(() => true)
+    .catch(() => false)
+  check('the village stands with a first-person player in it', walking)
+  if (walking) {
+  const stone = await page.evaluate(async () => {
+    const { looseRockIsGround, looseRockRise, looseRockTop } = await import('/src/scenes/place/looseRocks.ts')
+    const { standingClear, PLAYER_RADIUS } = await import('/src/scenes/place/collision.ts')
+    const { placeGroundHeight } = await import('/src/scenes/place/placeGround.ts')
+    const { ROCK_RADIUS_UNITS } = await import('/src/render/flora.ts')
+    const layout = window.__placeLayout
+    if (!layout) return null
+    // The settlement's surface WITHOUT its stones: the shore slopes and worked
+    // earth rises, and a stone standing on either would hide its own rise in
+    // the reading below.
+    const bare = (x, z) => placeGroundHeight({ bank: layout.bank, sites: layout.digSites, progress: [], rocks: [] }, x, z)
+    // The clearest walked-over stone the settlement has: standable, on flat
+    // ground away from the bank, and with room for the player to walk in at it
+    // from outside its own rise — so nothing but the stone is under the camera.
+    let best = null
+    for (const [x, z, scale] of layout.rocks) {
+      if (!looseRockIsGround(scale)) continue
+      // WELL INSIDE THE SETTLEMENT. The scatter reaches past the walkable rim
+      // (`6 + rand() * (radius + 6)` in layout.ts), and standing a player out
+      // there ends the visit: the place unmounts under the camera, which is
+      // exactly what the first cut of this section measured as "no player".
+      if (Math.hypot(x, z) > layout.radius * 0.8) continue
+      // NOTHING ELSE UNDER THE WHOLE CROSSING (GPT-6 Astra, cross-vendor
+      // reviews of d261418 and 7885fe1). Every height this section reads —
+      // the three standpoints AND the two resting eyes of the walk, which lie
+      // further out than the standpoints — must stand on ground that is flat
+      // but for THIS stone. A second walked-over stone, a shore or an
+      // excavation anywhere along that line lifts a baseline and turns correct
+      // behaviour into a wrong rise, so the whole line is checked rather than
+      // the three points that happen to be read first.
+      const others = layout.rocks.filter((r) => r[0] !== x || r[1] !== z)
+      const foreign = (px, pz) => others.reduce((m, r) => Math.max(m, looseRockRise(r, px, pz)), 0)
+      let lineClear = true
+      for (let dx = -2; dx <= 1.6 && lineClear; dx += 0.2) {
+        if (bare(x + dx, z) !== 0 || foreign(x + dx, z) !== 0) lineClear = false
+      }
+      if (!lineClear) continue
+      const clear = standingClear(layout.colliders, x, z, PLAYER_RADIUS)
+      if (!clear) continue
+      // How much open ground surrounds it, measured the way the player meets it.
+      let room = 0
+      for (; room < 6; room += 0.25) {
+        const blocked = [0, Math.PI / 2, Math.PI, -Math.PI / 2].some(
+          (a) => !standingClear(layout.colliders, x + Math.sin(a) * (room + 0.25), z + Math.cos(a) * (room + 0.25), PLAYER_RADIUS),
+        )
+        if (blocked) break
+      }
+      if (!best || room > best.room) {
+        best = { x, z, scale, room, top: looseRockTop(scale), foot: ROCK_RADIUS_UNITS * scale, out: Math.hypot(x, z), rim: layout.radius }
+      }
+    }
+    return best
+  })
+  check(
+    'the village scatters a stone low enough to be walked over, on ground the player can stand on',
+    !!stone && stone.room >= 1.5,
+    JSON.stringify(stone),
+  )
+  if (stone) {
+    // Three standpoints on one line through the stone: outside its rise, on its
+    // centre, and outside it again on the far side.
+    const reach = stone.top > 0 ? 0.9 : 0
+    // The scene may remount between two standpoints — the module imports above
+    // run through the dev server — so every standpoint waits for the player it
+    // is about to move rather than assuming the last one's is still there.
+    const stand = async (x, z, yaw, pitch) => {
+      await page
+        .waitForFunction(() => !!window.__placePlayer && !!window.__placeCamera, null, { timeout: 30000 })
+        .catch(() => {})
+      return page.evaluate(({ x, z, yaw, pitch }) => {
+        const p = window.__placePlayer
+        if (!p) return false
+        p.x = x
+        p.z = z
+        p.yaw = yaw
+        p.pitch = pitch
+        return true
+      }, { x, z, yaw, pitch })
+    }
+    const readAt = async (dx) => {
+      const stood = await stand(stone.x + dx, stone.z, dx < 0 ? Math.PI / 2 : -Math.PI / 2, -0.2)
+      if (!stood) return null
+      await nextFrames(4)
+      return page.evaluate(() => window.__placeCamera?.position.y ?? null)
+    }
+    const before = await readAt(-reach)
+    const on = await readAt(0)
+    const after = await readAt(reach)
+    const answered = before !== null && on !== null && after !== null
+    check('the live camera answers at all three standpoints', answered, JSON.stringify({ before, on, after }))
+    if (answered) {
+    // The camera stands the stone's own drawn top higher at its centre than on
+    // the open ground a pace away, and comes back down on the other side. The
+    // tolerance carries the idle sway that keeps the camera alive at rest.
+    const rise = on - (before + after) / 2
+    check(
+      'the camera rides up onto the small stone and back down again',
+      Math.abs(rise - stone.top) < 0.04 && Math.abs(before - after) < 0.04,
+      `rise ${rise.toFixed(3)} m against a stone ${stone.top.toFixed(3)} m high ` +
+        `(eye ${before.toFixed(3)} / ${on.toFixed(3)} / ${after.toFixed(3)} m)`,
+    )
+    // THE WALK ITSELF, on the game's own movement input (GPT-6 Astra,
+    // cross-vendor review of d261418). Three standpoints prove the surface; the
+    // reported bug is that the walk STOPS at the stone, and only a held key
+    // crossing it can answer that. The player starts a pace short of the stone,
+    // aimed across it, and walks until he is past it or the window runs out.
+    const WALK_FROM = 1.6
+    // AT A WALKING PACE, not the shipped sprint. `placeWalkSpeed` is 10 m/s and
+    // a headless frame is tens of milliseconds, so a crossing at shipped speed
+    // can step clean over a pebble's whole footprint between two samples — the
+    // measurement would then have nothing on the stone to read. The value is a
+    // debug-menu one (§21) and is put back afterwards.
+    const shippedPace = await page.evaluate(() => {
+      const was = window.__balance.placeWalkSpeed
+      window.__balance.placeWalkSpeed = 1.2
+      return was
+    })
+    await stand(stone.x - WALK_FROM, stone.z, Math.atan2(WALK_FROM, 0) + Math.PI, 0)
+    await nextFrames(4)
+    // The two STANDING readings of this crossing, before and after: a walking
+    // camera bobs with the stride, so the height on open ground is read at
+    // rest, never off a sample taken mid-step.
+    const startEye = await page.evaluate(() => window.__placeCamera?.position.y ?? null)
+    const track = []
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW' })))
+    for (let i = 0; i < 120; i++) {
+      await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW' })))
+      await nextFrames(1)
+      const at = await page.evaluate(() => {
+        const p = window.__placePlayer
+        return p ? { x: p.x, z: p.z, eye: window.__placeCamera?.position.y ?? null } : null
+      })
+      if (!at) break
+      track.push(at)
+      if (at.x > stone.x + 0.8) break
+    }
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyW' })))
+    await page.evaluate((was) => { window.__balance.placeWalkSpeed = was }, shippedPace)
+    await nextFrames(20)
+    const restEye = await page.evaluate(() => window.__placeCamera?.position.y ?? null)
+    const crossed = track.length > 0 && track[track.length - 1].x > stone.x + 0.5
+    check(
+      'a held walk carries the player over the stone rather than stopping at it',
+      crossed,
+      `from ${(stone.x - WALK_FROM).toFixed(2)} to ${(track.at(-1)?.x ?? NaN).toFixed(2)} ` +
+        `across a stone at ${stone.x.toFixed(2)} in ${track.length} steps`,
+    )
+    if (crossed) {
+      // And the walk RIDES it: the eye rose while he stood on the stone and was
+      // back on the open ground once he was past it. Judged on the frames that
+      // really fell inside the stone's own footprint — a crossing sampled only
+      // beside it has seen nothing, which is a coverage verdict and not a red.
+      const onStone = track.filter((t) => Math.hypot(t.x - stone.x, t.z - stone.z) <= stone.foot)
+      const peak = onStone.length ? Math.max(...onStone.map((t) => t.eye)) : startEye
+      check(
+        'the eye rises while he stands on the stone and comes back down past it',
+        peak - startEye > stone.top * 0.4 && Math.abs(restEye - startEye) < 0.03,
+        `flat ${startEye.toFixed(3)} m, peak ${peak.toFixed(3)} m, at rest past it ` +
+          `${restEye.toFixed(3)} m, over a stone ${stone.top.toFixed(3)} m high, ` +
+          `${track.length} frames sampled`,
+        { subjects: onStone.length, minimum: 1, what: 'frames sampled on the stone itself' },
+      )
+    }
+
+    // …and the picture of the thing itself: the player's own view, two paces
+    // short of the stone he is about to walk over.
+    await stand(stone.x - 2.2, stone.z, Math.atan2(2.2, 0) + Math.PI, -0.32)
+    await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+    await nextFrames(6)
+    await frame('1149-village-stone-step', {
+      local: { x: stone.x, y: stone.top / 2, z: stone.z },
+      label: 'the small stone in the village the walk is carried over',
+    })
+    }
+  }
+  }
 }
 
 // --- Head clearance under the eaves (design.md §2.6, work-order 349) ----------

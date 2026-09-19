@@ -12,7 +12,7 @@ import { boxCollider, nudgeToFree, spawnPointFree, standingClear, PLAYER_RADIUS,
 import { CHIEF_HUT, MARKET_HUT, dwellingRoofProfile, hutRoofProfile, roofStandOff } from './roofClearance'
 import { windingPoints, laneSlots, closestOnPolyline, bendAround, type LaneSlot } from './lanePlan'
 import { buildGizaLayout } from './gizaSite'
-import { CLIMB_ROCK_SCALE, deriveClimbRock, looseRockRadius } from './looseRocks'
+import { CLIMB_ROCK_SCALE, deriveClimbRock, looseRockIsGround, looseRockRadius } from './looseRocks'
 import { pinchesPassage } from './wedgeCarve'
 import { ROCK_FOOTPRINT_UNITS } from '../../world/communicationRock'
 import {
@@ -1911,9 +1911,16 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   for (let i = rocks.length - 1; i >= 0; i--)
     if (onWayOut(wayOut, radius, rocks[i][0], rocks[i][1], looseRockRadius(rocks[i][2]))) rocks.splice(i, 1)
 
-  // ... and the loose dressing joins them once it has been scattered.
+  // ... and the loose dressing joins them once it has been scattered — every
+  // stone the walk goes AROUND. A stone below the step height is walked OVER
+  // instead (work-order 1149): `placeGround.ts` raises the surface under it and
+  // it enters no collider set, so neither the player nor a villager snags on a
+  // pebble. `looseRockIsGround` is the single answer both sides read.
   for (const t of flora) colliders.push({ x: t.x, z: t.z, r: 0.45 })
-  for (const [x, z, s] of rocks) colliders.push({ x, z, r: looseRockRadius(s) })
+  for (const [x, z, s] of rocks) {
+    if (looseRockIsGround(s)) continue
+    colliders.push({ x, z, r: looseRockRadius(s) })
+  }
 
   // THE STONE THE CHILDREN CLIMB (work-order 1082), derived LAST — after the
   // scatter and WITHOUT drawing from the seeded stream, so every other object in
