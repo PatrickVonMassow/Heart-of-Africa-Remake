@@ -1309,12 +1309,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "1125": {
-      "at": "2026-09-14T11:25:29.496Z",
-      "why": "User 14.09.2026 ranked it directly behind 1092 with the order itself",
-      "origin": "user",
-      "place": "ahead"
-    },
     "1144": {
       "at": "2026-09-16T22:48:11.705Z",
       "why": "Last is right: its first act is measuring what the player actually loses, and the whole layout path in front of it (1143, then 1045's neighbours) writes the same file.",
@@ -1374,6 +1368,12 @@
       "why": "Ein kleiner, aber in jedem Dorf sichtbarer Geometriefehler an der Hüttentür; er blockiert nichts und wartet hinter der bereits geordneten Arbeit.",
       "origin": "machine",
       "place": "last"
+    },
+    "1168": {
+      "at": "2026-09-19T20:37:05.654Z",
+      "why": "User order 19.09.2026, 19:00: the chief's drummed answer is done directly next, ahead of everything else",
+      "origin": "user",
+      "place": "ahead"
     }
   },
   "boundary": {
@@ -1406,7 +1406,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-19T15:58:24.873Z",
+    "at": "2026-09-19T20:37:05.664Z",
     "points": [
       174,
       184,
@@ -1799,7 +1799,6 @@
       1121,
       1122,
       1123,
-      1125,
       1129,
       1132,
       1144,
@@ -1814,7 +1813,8 @@
       1158,
       1163,
       1164,
-      1167
+      1167,
+      1168
     ]
   }
 }
