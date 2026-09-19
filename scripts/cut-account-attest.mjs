@@ -114,6 +114,17 @@ export function verifyFloorEvidence(reading, { repo, root, home = homedir() }) {
     const commit = git(['rev-parse', '--verify', `${reading.attestingCommit}^{commit}`])
     const committedAt = Date.parse(git(['show', '-s', '--format=%cI', commit]))
     requireEvidence(committedAt < expiry, 'attesting commit must precede expiry')
+    const stated = reading.stated.toLocaleString('en-US')
+    let document
+    try {
+      document = git(['show', `${commit}:docs/document-cut-757.md`])
+    } catch (cause) {
+      throw new Error(`attesting commit ${reading.attestingCommit}: cannot read docs/document-cut-757.md for stated total ${stated}`, { cause })
+    }
+    // Early revisions recorded the total in prose, before FLOOR lines existed.
+    // Match a complete number so a different, larger total cannot attest it.
+    requireEvidence(document.match(/\d[\d,]*/g)?.includes(stated),
+      `attesting commit ${reading.attestingCommit}: docs/document-cut-757.md does not contain stated total ${stated}`)
   }
   const source = readOptional(expandDestination(reading.transcript, home))
   requireEvidence(reading.status !== 'LIVE' || source !== null, `LIVE ${reading.kind} transcript missing`)

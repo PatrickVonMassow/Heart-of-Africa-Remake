@@ -699,7 +699,7 @@ describe('CUT_LANDED_AT', () => {
 describe('floor evidence survival', () => {
   const dirs = []
   afterEach(() => { for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true }) })
-  function fixture() {
+  function fixture(document = 'The recorded floor was 9 tokens.\n') {
     const repo = mkdtempSync(resolve(tmpdir(), 'cut-evidence-'))
     dirs.push(repo)
     const git = (args, date = '2026-08-20T04:00:00Z') => execFileSync('git', args, {
@@ -709,6 +709,11 @@ describe('floor evidence survival', () => {
     git(['init', '-q'])
     git(['config', 'user.name', 'Evidence test'])
     git(['config', 'user.email', 'test@example.invalid'])
+    if (document !== null) {
+      mkdirSync(resolve(repo, 'docs'))
+      writeFileSync(resolve(repo, 'docs/document-cut-757.md'), document)
+      git(['add', 'docs/document-cut-757.md'])
+    }
     git(['-c', 'core.hooksPath=/dev/null', 'commit', '--allow-empty', '-qm', 'Recorded floor'])
     const commit = git(['rev-parse', 'HEAD'])
     const transcript = resolve(repo, 'floor-session.jsonl')
@@ -737,10 +742,28 @@ describe('floor evidence survival', () => {
     expect(() => verifyFloorEvidence(f.reading, f.options)).toThrow(/LIVE.*missing/)
   })
 
-  it('passes EXPIRED with a date and resolvable earlier commit', () => {
-    const f = fixture()
+  it('passes EXPIRED when the earlier commit records the stated total only in prose', () => {
+    const f = fixture('The subagent floor was 39,537 tokens.\n')
     rmSync(f.transcript)
-    expect(verifyFloorEvidence(f.expired, f.options)).toBe('expired')
+    // Neither the current document nor HEAD needs to retain the historical total.
+    writeFileSync(resolve(f.repo, 'docs/document-cut-757.md'), 'The transcript has expired.\n')
+    f.git(['add', 'docs/document-cut-757.md'])
+    f.git(['-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'Update current account'])
+    expect(verifyFloorEvidence({ ...f.expired, stated: 39537 }, f.options)).toBe('expired')
+  })
+
+  it.each([
+    ['a different total', 'The subagent floor was 39,538 tokens.\n'],
+    ['a larger total containing the digits', 'The subagent floor was 139,537 tokens.\n'],
+    ['no account document', null],
+  ])('fails EXPIRED when the earlier commit has %s', (_name, document) => {
+    const f = fixture(document)
+    rmSync(f.transcript)
+    // A correct total in the working tree cannot repair the named commit.
+    mkdirSync(resolve(f.repo, 'docs'), { recursive: true })
+    writeFileSync(resolve(f.repo, 'docs/document-cut-757.md'), 'The subagent floor was 39,537 tokens.\n')
+    expect(() => verifyFloorEvidence({ ...f.expired, stated: 39537 }, f.options))
+      .toThrow(new RegExp(`attesting commit ${f.expired.attestingCommit}: .*stated total 39,537`))
   })
 
   it.each([
