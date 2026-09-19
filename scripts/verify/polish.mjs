@@ -5912,14 +5912,22 @@ if (section('adult-errands')) {
       for (const [id, n] of Object.entries(now.staged ?? {})) {
         staged[id] = Math.max(staged[id] ?? 0, n ?? 0)
       }
+      // THE POPULATION IS THE GAME'S OWN STATEMENT THAT THE BOUT HAS BEGUN —
+      // phase and arrival — NOT `digging`. `digging` already carries the rim
+      // test, so a reading taken over it could never fail: the very body that
+      // would prove the defect is the one it drops (GPT-6 Astra, cross-vendor
+      // round). Read over the bout instead, both halves are real: the village
+      // brings BOTH men to the rim, and the stroke therefore plays.
       const atPit = new Map()
       for (const v of now.villagers) {
-        if (v.digging) {
-          dug++
-          const site = v.work?.siteIndex == null ? null : now.geography.digSites[v.work.siteIndex]
+        if (v.digging) dug++
+        if (v.work?.phase === 'dig' && v.work.arrived) {
+          const site = v.work.siteIndex == null ? null : now.geography.digSites[v.work.siteIndex]
           const away = site ? Math.hypot(v.x - site.x, v.z - site.z) : null
           if (away === null || away > rimLimit) {
-            offRim.push(`sample ${i}: a body at the dig pose ${away === null ? 'with no site' : `${away.toFixed(2)} m`} from its pit`)
+            offRim.push(`sample ${i}: a body in its dig bout ${away === null ? 'with no site' : `${away.toFixed(2)} m`} from its pit`)
+          } else if (!v.digging) {
+            offRim.push(`sample ${i}: a body at its pit's rim, ${away.toFixed(2)} m out, playing no stroke`)
           }
           if (site) atPit.set(v.work.siteIndex, [...(atPit.get(v.work.siteIndex) ?? []), v])
         }
@@ -5932,7 +5940,12 @@ if (section('adult-errands')) {
         pairsSeen++
         const site = now.geography.digSites[siteIndex]
         const middle = Math.hypot((pair[0].x + pair[1].x) / 2 - site.x, (pair[0].z + pair[1].z) / 2 - site.z)
-        if (middle > rimLimit) sideBySide.push(`sample ${i}: the two bodies' middle is ${middle.toFixed(2)} m off their pit`)
+        const span = Math.hypot(pair[0].x - pair[1].x, pair[0].z - pair[1].z)
+        // The hole is between them, and they are not standing on one another:
+        // the middle alone passes for two men on the same spot.
+        if (middle > rimLimit || span <= rimLimit) {
+          sideBySide.push(`sample ${i}: middle ${middle.toFixed(2)} m off their pit, ${span.toFixed(2)} m apart`)
+        }
       }
       // AND NO ADULT VOICE EVER FALLS INSIDE THE CHILDREN'S EARSHOT (the spec's
       // own rule). The speaker is read WHERE HE STOOD WHEN HE SPOKE — only on
@@ -6065,9 +6078,9 @@ if (section('adult-errands')) {
     // jar block on purpose: `polishJarCoverage.test.mjs` executes that block's
     // own source, and a reading of its own belongs beside it, not inside it.
     check(
-      'and every stroke falls at its own pit\u2019s working rim (work-order 1125)',
+      'and every dig bout is worked from its own pit\u2019s working rim (work-order 1125)',
       dug > 0 && offRim.length === 0,
-      offRim.length ? offRim.slice(0, 4).join('; ') : `${dug} villager-samples, none further than ${rimLimit.toFixed(2)} m from its pit`,
+      offRim.length ? offRim.slice(0, 4).join('; ') : `${dug} villager-samples at the stroke, every bout inside ${rimLimit.toFixed(2)} m of its pit`,
     )
     check(
       'and a pair at one pit works it from opposite sides, the hole between them',
@@ -6657,16 +6670,19 @@ if (section('adult-errands')) {
         // the frame's own subject test cannot tell the difference.
         const held = await page.evaluate((at) => {
           const e = window.__placeErrands()
-          const still = e.villagers.filter((v) => v.digging && v.work?.siteIndex === at)
+          // The bout, not the pose: a body the rim test has already dropped is
+          // exactly the one a picture of untouched ground would contain.
+          const still = e.villagers.filter((v) => v.work?.siteIndex === at && v.work.phase === 'dig' && v.work.arrived)
           return {
             count: still.length,
+            striking: still.filter((v) => v.digging).length,
             away: still.map((v) => Math.hypot(v.x - e.geography.digSites[at].x, v.z - e.geography.digSites[at].z)),
             span: still.length === 2 ? Math.hypot(still[0].x - still[1].x, still[0].z - still[1].z) : null,
           }
         }, digging.siteIndex)
         check(
           'and both are still at the stroke, on opposite sides of the hole',
-          held.count === 2 && held.away.every((d) => d <= rimLimit) && held.span > rimLimit,
+          held.count === 2 && held.striking === 2 && held.away.every((d) => d <= rimLimit) && held.span > rimLimit,
           JSON.stringify(held),
         )
         await frame('1125-dig-pair-at-the-working-rim', {
