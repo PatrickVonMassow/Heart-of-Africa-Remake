@@ -15828,3 +15828,31 @@ to land than a mechanism that needs a review.
   Criticality: low — a small wrong thing in a picture the player stands in front of.
   Refs: verification/687-bank-play-rocks.png
   Bundle: Siedlungsgeometrie.
+
+- [ ] 1167. The hut wall grows into the doorway as a bright wedge (seen 19.09.2026 in the
+  covering polish frame `verification/1092-bambara-former-well-spot.png`, WebGPU, and in the
+  WebGL 2 frame of the same section — both GREEN runs; the point that took the frame only
+  brought the camera close to a hut).
+  MEASURED STATE, read on the frame at 3x: a family hut's doorway is a FLAT dark recess laid
+  against a CYLINDRICAL wall. The cylinder bulges outward most at the middle of the door's
+  chord, so the wall surface stands IN FRONT of the flat door plane there and is drawn as a
+  bright, wall-textured wedge that rises from the threshold to roughly two thirds of the
+  door's height. The opening reads as a doorway with a spike of wall growing up through it.
+  It is not a backend artefact: both lanes show it, and it is visible at ordinary walking
+  distance in every village, because every family hut carries the same door.
+  Final state:
+  - No hut doorway shows wall surface inside its opening from any angle a walking player
+    can reach: the opening is cut out of the wall geometry, or the door plane sits behind
+    the cylinder's inner radius, whichever the hut's construction makes simpler.
+  - The fix is made where the door is built, once, so every hut kind that uses it follows;
+    no per-village exception list.
+  Test: Vitest over the hut geometry — no point of the door's opening lies inside the wall
+  solid — at several hut radii, mutation-checked.
+  Picture check: one frame standing in front of a hut door at walking distance on BOTH
+  backends, the opening dark through its whole height.
+  Criticality: medium — reproducible player impact in a picture the player walks up to in
+  every settlement.
+  Refs: verification/1092-bambara-former-well-spot.png, src/scenes/place/PlaceLife.tsx and
+  the dwelling/roof geometry in src/scenes/place/roofClearance.ts and layout.ts
+  (`DwellingKind` 'hut', its door at `d.door`)
+  Bundle: Siedlungsgeometrie.
