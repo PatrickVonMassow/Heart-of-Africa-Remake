@@ -6797,9 +6797,10 @@ if (section('stone-step')) {
   check('the village stands with a first-person player in it', walking)
   if (walking) {
   const stone = await page.evaluate(async () => {
-    const { looseRockIsGround, looseRockTop } = await import('/src/scenes/place/looseRocks.ts')
+    const { looseRockIsGround, looseRockRise, looseRockTop } = await import('/src/scenes/place/looseRocks.ts')
     const { standingClear, PLAYER_RADIUS } = await import('/src/scenes/place/collision.ts')
     const { placeGroundHeight } = await import('/src/scenes/place/placeGround.ts')
+    const { ROCK_RADIUS_UNITS } = await import('/src/render/flora.ts')
     const layout = window.__placeLayout
     if (!layout) return null
     // The settlement's surface WITHOUT its stones: the shore slopes and worked
@@ -6818,6 +6819,13 @@ if (section('stone-step')) {
       // exactly what the first cut of this section measured as "no player".
       if (Math.hypot(x, z) > layout.radius * 0.8) continue
       if (bare(x, z) !== 0 || bare(x - 1, z) !== 0 || bare(x + 1, z) !== 0) continue
+      // NO SECOND STONE UNDER THE READING (GPT-6 Astra, cross-vendor review of
+      // d261418). The rise is measured against the open ground on either side,
+      // so another walked-over stone reaching one of those two feet would lift
+      // the baseline and make correct behaviour read as a wrong rise.
+      const others = layout.rocks.filter((r) => r[0] !== x || r[1] !== z)
+      const foreign = (px, pz) => others.reduce((m, r) => Math.max(m, looseRockRise(r, px, pz)), 0)
+      if (foreign(x, z) !== 0 || foreign(x - 1, z) !== 0 || foreign(x + 1, z) !== 0) continue
       const clear = standingClear(layout.colliders, x, z, PLAYER_RADIUS)
       if (!clear) continue
       // How much open ground surrounds it, measured the way the player meets it.
@@ -6828,7 +6836,9 @@ if (section('stone-step')) {
         )
         if (blocked) break
       }
-      if (!best || room > best.room) best = { x, z, scale, room, top: looseRockTop(scale), out: Math.hypot(x, z), rim: layout.radius }
+      if (!best || room > best.room) {
+        best = { x, z, scale, room, top: looseRockTop(scale), foot: ROCK_RADIUS_UNITS * scale, out: Math.hypot(x, z), rim: layout.radius }
+      }
     }
     return best
   })
@@ -6880,6 +6890,69 @@ if (section('stone-step')) {
       `rise ${rise.toFixed(3)} m against a stone ${stone.top.toFixed(3)} m high ` +
         `(eye ${before.toFixed(3)} / ${on.toFixed(3)} / ${after.toFixed(3)} m)`,
     )
+    // THE WALK ITSELF, on the game's own movement input (GPT-6 Astra,
+    // cross-vendor review of d261418). Three standpoints prove the surface; the
+    // reported bug is that the walk STOPS at the stone, and only a held key
+    // crossing it can answer that. The player starts a pace short of the stone,
+    // aimed across it, and walks until he is past it or the window runs out.
+    const WALK_FROM = 1.6
+    // AT A WALKING PACE, not the shipped sprint. `placeWalkSpeed` is 10 m/s and
+    // a headless frame is tens of milliseconds, so a crossing at shipped speed
+    // can step clean over a pebble's whole footprint between two samples — the
+    // measurement would then have nothing on the stone to read. The value is a
+    // debug-menu one (§21) and is put back afterwards.
+    const shippedPace = await page.evaluate(() => {
+      const was = window.__balance.placeWalkSpeed
+      window.__balance.placeWalkSpeed = 1.2
+      return was
+    })
+    await stand(stone.x - WALK_FROM, stone.z, Math.atan2(WALK_FROM, 0) + Math.PI, 0)
+    await nextFrames(4)
+    // The two STANDING readings of this crossing, before and after: a walking
+    // camera bobs with the stride, so the height on open ground is read at
+    // rest, never off a sample taken mid-step.
+    const startEye = await page.evaluate(() => window.__placeCamera?.position.y ?? null)
+    const track = []
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW' })))
+    for (let i = 0; i < 120; i++) {
+      await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW' })))
+      await nextFrames(1)
+      const at = await page.evaluate(() => {
+        const p = window.__placePlayer
+        return p ? { x: p.x, z: p.z, eye: window.__placeCamera?.position.y ?? null } : null
+      })
+      if (!at) break
+      track.push(at)
+      if (at.x > stone.x + 0.8) break
+    }
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyW' })))
+    await page.evaluate((was) => { window.__balance.placeWalkSpeed = was }, shippedPace)
+    await nextFrames(20)
+    const restEye = await page.evaluate(() => window.__placeCamera?.position.y ?? null)
+    const crossed = track.length > 0 && track[track.length - 1].x > stone.x + 0.5
+    check(
+      'a held walk carries the player over the stone rather than stopping at it',
+      crossed,
+      `from ${(stone.x - WALK_FROM).toFixed(2)} to ${(track.at(-1)?.x ?? NaN).toFixed(2)} ` +
+        `across a stone at ${stone.x.toFixed(2)} in ${track.length} steps`,
+    )
+    if (crossed) {
+      // And the walk RIDES it: the eye rose while he stood on the stone and was
+      // back on the open ground once he was past it. Judged on the frames that
+      // really fell inside the stone's own footprint — a crossing sampled only
+      // beside it has seen nothing, which is a coverage verdict and not a red.
+      const onStone = track.filter((t) => Math.hypot(t.x - stone.x, t.z - stone.z) <= stone.foot)
+      const peak = onStone.length ? Math.max(...onStone.map((t) => t.eye)) : startEye
+      check(
+        'the eye rises while he stands on the stone and comes back down past it',
+        peak - startEye > stone.top * 0.4 && Math.abs(restEye - startEye) < 0.03,
+        `flat ${startEye.toFixed(3)} m, peak ${peak.toFixed(3)} m, at rest past it ` +
+          `${restEye.toFixed(3)} m, over a stone ${stone.top.toFixed(3)} m high, ` +
+          `${track.length} frames sampled`,
+        { subjects: onStone.length, minimum: 1, what: 'frames sampled on the stone itself' },
+      )
+    }
+
     // …and the picture of the thing itself: the player's own view, two paces
     // short of the stone he is about to walk over.
     await stand(stone.x - 2.2, stone.z, Math.atan2(2.2, 0) + Math.PI, -0.32)
