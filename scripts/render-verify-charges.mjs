@@ -1618,4 +1618,22 @@ export const RED_CHARGES = [
       + 'alignment check on the same dialog pass. Unscoped for the reason the entry above gives. '
       + 'The charge dies with point 1154.',
   },
+  {
+    point: 1156,
+    suite: 'voice',
+    kind: 'check',
+    match: /^deployed and drum-audition speech leave the master audibly below full scale/i,
+    why:
+      'THE MASTER REALLY DOES CLIP AND POINT 1156 OWNS IT. Measured 19.09.2026 on webgpu+webgl '
+      + 'voice in the SMALL tier at branch head ff28041f4 (withDrums peak 1.0213) and minutes later '
+      + 'on `main` 9bf608dc1 on webgl alone (withDrums peak 1.0218) — the same check, the same '
+      + 'overage, on both trees and both lanes. That is exactly what point 1156 describes: since '
+      + 'the village speech went to 1.5x on 18.09.2026 the speech and drum buses hang straight on '
+      + 'a master at 0.5 with no limiter (src/systems/ambience.ts L477-L492), so the sum passes '
+      + 'full scale and hard-clips at the destination. This is a REAL product defect, not a stale '
+      + 'expectation, and the entry only stops it from reading as a verdict on unrelated changes. '
+      + 'NOT backend-scoped: the graph is Web Audio and reads the same whichever renderer holds '
+      + 'the canvas. The charge dies with point 1156, which puts the limiter into design.md \u00a719 '
+      + 'and then into the graph.',
+  },
 ]

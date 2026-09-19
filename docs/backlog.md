@@ -1466,3 +1466,32 @@ fasst die Maschine währenddessen nicht an.
   verlangt: einen bestehenden Eintrag in die Retrospektive hinüberkürzen, damit ein Platz
   frei wird. Nicht als Punkt eingereiht, weil nichts Falsches im Bestand steht — es fehlt
   nur eine Ergänzung.
+
+- **Der Worktree von Punkt 834 überlebt seinen Abschluss und verfälscht die Lastmessung**
+  (gemessen 18.09.2026, 22:13): `docs/tasks-archive.md` führt 834 als abgeschlossen, doch
+  `.claude/worktrees/point-834` und `feat/834-durable-authoring-lane` bestehen weiter — mit
+  122 Commits, die nicht in `main` sind. Nach CLAUDE.md §6 beendet der Merge den Branch;
+  hier ist er weder entfernt noch offensichtlich gemergt, und ob der Punkt über einen
+  anderen Branch geschlossen wurde oder hier ungemergte Arbeit liegt, ist ungeprüft.
+  Gemessene Folge, nicht nur Kosmetik: `batch-doctor` zählt die vier vorhandenen Worktrees
+  (1049, 834, 847, 901) als laufende Agenten und hat sein Tor deshalb am selben Abend als
+  INCONCLUSIVE gemeldet, statt den Zustand von `main` zu beurteilen. Für 1049, 847 und 901
+  ist diese Zählung richtig — die Punkte sind offen, die Branches geparkt; nur 834 ist
+  falsch. Nicht als Punkt eingereiht, weil nichts am Spiel dranhängt und die Sperre sich von
+  selbst löst, sobald die Maschine ruhig ist. Wer es aufräumt, prüft ZUERST, wohin die 122
+  Commits gehören — ein blindes `worktree-cleanup` verwirft sie.
+
+- **Der Tafel-Wächter und sein eigener Stop-Hook widersprechen sich im Übergabezustand**
+  (gemessen 18.09.2026, 22:22-22:25, viermal hintereinander): `node
+  scripts/dashboard-guard.mjs` endet mit 0 und schweigt, `--synced .batch-dashboard.html`
+  quittiert „dashboard registered at HEAD 7c0cad4" samt Integritätsschnappschüssen für 411
+  Karten — und der Stop-Hook desselben Wächters meldet im selben Zug BATCH DASHBOARD NOT
+  REGISTERED. Unterschied zum Normalfall: die Tafel steht im Übergabezustand, also ohne
+  Now-Karte, und `focus.mjs show` meldet `declared focus : -` bei `pivot check: clear`.
+  Verdacht, ungeprüft und als Verdacht notiert: der Stop-Pfad verlangt eine Fokus-NUMMER,
+  die es in diesem Zustand per Konstruktion nicht gibt, während der CLI-Pfad das leere Feld
+  annimmt. Nicht als Punkt eingereiht: es blockiert nichts, und unter dem
+  Infrastruktur-Einfrieren wird kein Wächter umgebaut, nur weil er im Weg steht. Warum es
+  trotzdem hier steht: eine Falschmeldung, die von einem echten Tafel-Fehler nicht zu
+  unterscheiden ist, stumpft den Wächter ab — und ein abgestumpfter Wächter ist schlimmer
+  als keiner.
