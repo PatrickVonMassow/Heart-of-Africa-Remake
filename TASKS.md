@@ -77,6 +77,43 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
+- [ ] 1161. The timestamp nudge fires after every reply that used a tool, because the hook
+  reads the transcript before the reply has landed in it (user report 18.09.2026, 20:07,
+  verbatim: "Es kommt immer noch nach jeder deiner Nachrichten \"Stop says: Chat-Zeitstempel-Regel
+  verletzt: …\" Müsste das nicht schon behoben sein?").
+  MEASURED in session d3ba9c58, so the cause is not guessed: every finished turn's last
+  assistant text in the transcript DOES begin with the stamp; replaying the live hook on the
+  transcript cut right after that entry gives NO nudge; yet the live Stop run 174 ms after the
+  final message did nudge, while the project's blocking timestamp-guard in the same Stop pass
+  did not. The transcript is appended asynchronously and this hook outruns it, so it judges the
+  turn's progress note instead of the reply — which is why it fires on exactly the tool-using
+  replies. The installed CLI (2.1.273) declares `last_assistant_message` as an optional field
+  of the Stop payload.
+  Final state: scripts/hooks/check-reply-timestamp.cjs judges, in this order, (a)
+  payload.last_assistant_message when it is a non-empty string — nudge iff its trimmed text
+  fails TIMESTAMP_RE, then return; (b) otherwise the transcript as today, but if the judged
+  text fails the regex, re-read the transcript up to three times 250 ms apart and nudge only if
+  the last read still fails (bounded, well inside the 15 s hook timeout), so an append that
+  lands late never flags a stamped reply. Still never blocks, still fail-soft. Comment states
+  the measured cause in two lines. Tests in check-reply-timestamp.test.mjs: payload text
+  stamped → silent even when the transcript's last text is an unstamped note; payload text
+  unstamped → nudge even when the transcript's last text is stamped; no payload field and
+  transcript whose final stamped entry is appended ~300 ms after the hook starts → silent.
+  Then the LIVE install /home/node/.claude/hooks/check-reply-timestamp.cjs is replaced by the
+  versioned copy (protected path: attended edit, the user is present), and the header comment's
+  'Live install' line names the container path beside the Windows one. Evidence: the next
+  replies of the user's session no longer show the nudge.
+  BOUNDS THE USER NAMED: no new guard or ledger field (infrastructure freeze) — this repairs an
+  existing hook's false positive that the user is reproducibly hit by.
+  WHERE IT STANDS: the carrier routed it as a plain TASKS append, which would have put it
+  behind 409 points; it is placed here instead because the user meets this false alarm after
+  every single reply. Move it back if that is not wanted.
+  Criticality: low — no player impact, but it is noise on every one of the user's turns and it
+  trains him to ignore a guard that is meant to be read.
+  Refs: scripts/hooks/check-reply-timestamp.cjs, its test, and the live install named above.
+  Bundle: Session- & Repo-Hygiene.
+
+
 - [ ] 1158. The one-click return from the Escape cooldown is confirmed in a real browser
   (residual of point 1148, landed 18.09.2026). IT STANDS AT THE FRONT AGAIN, and it is no
   longer a question for the user: he took the observation himself on the deployed build the
@@ -155,43 +192,18 @@ put it is the mistake this line exists to stop.
   the period's length. 40 Vitest cases; cross-vendor review by GPT-6 Astra found the
   missing execution-time deadline check, which is fixed and pinned. WHAT REMAINS is
   exactly steps (1) and (2) on the deployed build, which only the user can take.
-
-- [ ] 1161. The timestamp nudge fires after every reply that used a tool, because the hook
-  reads the transcript before the reply has landed in it (user report 18.09.2026, 20:07,
-  verbatim: "Es kommt immer noch nach jeder deiner Nachrichten \"Stop says: Chat-Zeitstempel-Regel
-  verletzt: …\" Müsste das nicht schon behoben sein?").
-  MEASURED in session d3ba9c58, so the cause is not guessed: every finished turn's last
-  assistant text in the transcript DOES begin with the stamp; replaying the live hook on the
-  transcript cut right after that entry gives NO nudge; yet the live Stop run 174 ms after the
-  final message did nudge, while the project's blocking timestamp-guard in the same Stop pass
-  did not. The transcript is appended asynchronously and this hook outruns it, so it judges the
-  turn's progress note instead of the reply — which is why it fires on exactly the tool-using
-  replies. The installed CLI (2.1.273) declares `last_assistant_message` as an optional field
-  of the Stop payload.
-  Final state: scripts/hooks/check-reply-timestamp.cjs judges, in this order, (a)
-  payload.last_assistant_message when it is a non-empty string — nudge iff its trimmed text
-  fails TIMESTAMP_RE, then return; (b) otherwise the transcript as today, but if the judged
-  text fails the regex, re-read the transcript up to three times 250 ms apart and nudge only if
-  the last read still fails (bounded, well inside the 15 s hook timeout), so an append that
-  lands late never flags a stamped reply. Still never blocks, still fail-soft. Comment states
-  the measured cause in two lines. Tests in check-reply-timestamp.test.mjs: payload text
-  stamped → silent even when the transcript's last text is an unstamped note; payload text
-  unstamped → nudge even when the transcript's last text is stamped; no payload field and
-  transcript whose final stamped entry is appended ~300 ms after the hook starts → silent.
-  Then the LIVE install /home/node/.claude/hooks/check-reply-timestamp.cjs is replaced by the
-  versioned copy (protected path: attended edit, the user is present), and the header comment's
-  'Live install' line names the container path beside the Windows one. Evidence: the next
-  replies of the user's session no longer show the nudge.
-  BOUNDS THE USER NAMED: no new guard or ledger field (infrastructure freeze) — this repairs an
-  existing hook's false positive that the user is reproducibly hit by.
-  WHERE IT STANDS: the carrier routed it as a plain TASKS append, which would have put it
-  behind 409 points; it is placed here instead because the user meets this false alarm after
-  every single reply. Move it back if that is not wanted.
-  Criticality: low — no player impact, but it is noise on every one of the user's turns and it
-  trains him to ignore a guard that is meant to be read.
-  Refs: scripts/hooks/check-reply-timestamp.cjs, its test, and the live install named above.
-  Bundle: Session- & Repo-Hygiene.
-
+  THE ATTENDED OBSERVATION NEVER HOLDS THE BATCH (user order 18.09.2026, 22:21, verbatim:
+  "Zu 1158: Ich bin jetzt erstmal weg - wenn es so weit ist, dass ich nachtesten kann, nicht
+  auf mich warten, sondern die Batch weitermachen und mir eine Karte unter Von dir zu klären
+  dafür einstellen."). Amend point 1158 (no new point): the attended observation does NOT
+  hold the batch. When 1158's fix is deployed and the point reaches the step that needs the
+  user's attended check, the owner does not wait for the user. Instead: (1) file a card under
+  'Von dir zu klären' naming exactly what the user should observe (the quick click after
+  Escape and the two-second click), which deployed build/revision to test, and what pass and
+  fail look like; (2) keep the batch advancing with the next point in work-order order;
+  (3) only the tick of 1158 waits for the card's answer. Final state: the card exists on the
+  board with the observation instructions, the batch has moved on, and 1158 is ticked only
+  after the user's answer on that card.
 
 - [ ] 1149. Small village stones raise the ground instead of blocking the walk (user order
   17.09.2026, 21:50 and 21:53, verbatim: "Im Rahmen von welchem Punkt wird erledigt, dass man
