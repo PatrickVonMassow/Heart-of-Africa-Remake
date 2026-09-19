@@ -1195,12 +1195,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "1092": {
-      "at": "2026-09-10T18:32:34.225Z",
-      "why": "Nutzer-Auftrag 07.09.2026, am 10.09.2026 auf bambara-village eingegrenzt und ausdruecklich direkt hinter 1082 eingereiht.",
-      "origin": "user",
-      "place": "ahead"
-    },
     "1093": {
       "at": "2026-09-10T18:32:34.316Z",
       "why": "Nutzer-Auftrag 07.09.2026 ('reihe einen weiteren Task fuer das Clipping-Problem ein'), am 10.09.2026 bekraeftigt: 'das Kollisionsproblem muss behoben werden'.",
@@ -1266,12 +1260,6 @@
       "why": "Maschinell eingereiht und nicht dringend: kein Spielerimpakt, es kostet nur dem Bildbeweis seine Aussage. Es steht direkt hinter dem Release und vor 1087, das einen Rahmen derselben Handlung schuldet",
       "origin": "machine",
       "place": "last"
-    },
-    "1109": {
-      "at": "2026-09-11T14:06:21.099Z",
-      "why": "Deine Anweisung vom 11.09.2026: 'Setze es so um, wie du es vorschlaegst. Reihe das direkt vor 1092 ein.'",
-      "origin": "user",
-      "place": "ahead"
     },
     "1111": {
       "at": "2026-09-11T15:32:01.606Z",
@@ -1339,12 +1327,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "1149": {
-      "at": "2026-09-17T22:26:04.143Z",
-      "why": "Nutzerauftrag vom 17.09.2026, 21:53, mit ausdrücklich genannter Platzierung: »Dann reihe das nach 1082 ein, ja.«",
-      "origin": "user",
-      "place": "ahead"
-    },
     "1153": {
       "at": "2026-09-18T05:28:45.689Z",
       "why": "Low criticality and no player impact: it costs the operator calls at a landing, and every open point ahead of it is closer to the picture.",
@@ -1375,12 +1357,6 @@
       "origin": "user",
       "place": "ahead"
     },
-    "1161": {
-      "at": "2026-09-18T19:28:20.939Z",
-      "why": "Der Nutzer hat die falsche Mahnung am 18.09.2026, 20:07 selbst gemeldet — sie trifft ihn nach jeder Antwort mit Werkzeugeinsatz.",
-      "origin": "user",
-      "place": "ahead"
-    },
     "1163": {
       "at": "2026-09-18T23:49:52.580Z",
       "why": "Kosmetik ohne Spielwirkung, unter allem was heute blockiert — hinten ist richtig.",
@@ -1390,6 +1366,12 @@
     "1164": {
       "at": "2026-09-18T23:49:52.672Z",
       "why": "Kosmetik ohne Spielwirkung, unter allem was heute blockiert — hinten ist richtig.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1167": {
+      "at": "2026-09-19T15:58:24.864Z",
+      "why": "Ein kleiner, aber in jedem Dorf sichtbarer Geometriefehler an der Hüttentür; er blockiert nichts und wartet hinter der bereits geordneten Arbeit.",
       "origin": "machine",
       "place": "last"
     }
@@ -1424,7 +1406,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-19T01:37:27.820Z",
+    "at": "2026-09-19T15:58:24.873Z",
     "points": [
       174,
       184,
@@ -1795,7 +1777,6 @@
       1079,
       1081,
       1084,
-      1092,
       1093,
       1094,
       1095,
@@ -1807,7 +1788,6 @@
       1101,
       1102,
       1108,
-      1109,
       1111,
       1114,
       1115,
@@ -1824,7 +1804,6 @@
       1132,
       1144,
       1145,
-      1149,
       1150,
       1151,
       1152,
@@ -1833,9 +1812,9 @@
       1156,
       1157,
       1158,
-      1161,
       1163,
-      1164
+      1164,
+      1167
     ]
   }
 }
