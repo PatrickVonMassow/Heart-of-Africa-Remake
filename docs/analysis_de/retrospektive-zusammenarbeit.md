@@ -62,6 +62,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 18.09. | Derselbe Punkt zweimal zurückgewiesen — und beim zweiten Mal traf die Zurückweisung meine eigene Antwort auf die erste: Der fremde Autor baute nach, dass die vom Aufrufer gehaltene Umlenkung genau die Protokolldatei leert, die das Skript künftig selbst führen soll, und danach jede Zeile in sich selbst zurückschreibt — vier Kopien nach drei Durchläufen. Wer eine Eskalation beantwortet, schreibt selbst eine Spezifikation (§3.266 Nachtrag, Punkt 1133) |
 | 18.09. abends | Ein abgehakter Fix hielt nicht: Die Reparatur von Punkt 1148 ruhte auf einer nie gemessenen Browser-Sperrfrist und zählte ihren einzigen Nachfrage-Versuch vom Klick statt vom Escape — sie landete also genau bei schnellem Klick zu früh und erzeugte den gemeldeten Fehler mit. Die Nachfolge-Reparatur ruht auf keiner Zahl mehr, und ihr Punkt bleibt bis zur Beobachtung des Nutzers offen (§3.291) |
 | 18.09. spät | Eine tote Messung landete beinahe als funktionierend: Der Effekt, der die Rechtecke für den zentrierten Steuerungshinweis liest, hing an den Sprachtexten statt an der Bedingung, die über das Element selbst entscheidet — er nahm seinen frühen Rücksprung und wurde nie wieder angestoßen. Grün war die Prüfung trotzdem, weil der CSS-Vorgabewert im geräumigen Fall zufällig dasselbe Ergebnis hat wie die Messung; erst der enge Fall trennte beide (§3.292) |
+| 19.09. | Eine Bildprüfung lag rot, obwohl das Produkt stimmte: Ihre Bühne suchte freie Sicht bis auf den Brunnenplatz, den der Punkt gerade aus der Freihalteliste genommen hatte — das Dorf hatte darauf weitergebaut, die letzte Stützstelle der Sichtlinie lag in einer neuen Hütte. Die Ursache nannte erst der Vergleich der Kollisionssätze im Knoten, nicht der nächste Browserlauf (§3.294) |
 | 13.09. | Ein Punkt zog seine eigenen Rot-Ladungen zurück, wie es die Regel verlangt — zwei Tests standen noch auf ihnen und wurden erst im Tor der LANDUNG rot, als der Merge schon auf main lag: Das Register erzwingt »kein Eintrag ohne offenen Punkt«, niemand erzwingt »kein Test ohne seinen Eintrag« (§3.268). Dieselbe Sitzung wies drei Fremd-Rot nach: gegen die Zweigwurzel gemessen sind alle drei auch auf main rot, und das Rätsel am Schutthang ist dort nicht sporadisch, sondern reproduziert jedes Mal |
 | 13.09. abends | Vier CI-Läufe eines Zweigs starben als »cancelled« — ein Wort, das weder Ursache noch Reparatur nennt und das kein Push heilen kann. Es war das 15-Minuten-Limit des `fast`-Jobs: Die letzten beiden GRÜNEN Läufe, einer davon auf main, brauchten 14 m 41 s und 14 m 45 s, also rund fünfzehn Sekunden Luft. Der nächste Punkt, der irgendeinen Test hinzufügt, musste auflaufen, egal welcher. Sichtbar wurde es erst im Schrittprotokoll: install/build/lint/audit grün, `unit: cancelled`, »The operation was canceled« nach 15 m 13 s (§3.270) |
 | 14.09. | Nach einer Parallelsitzung verlangte ein Stop-Hook `batch-doctor --gate` vor JEDER weiteren Batch-Arbeit — dessen Tor fährt eine volle Unit-Suite, neben dem laufenden Zwei-Backend-Bildlauf auf derselben Maschine. Gefunden hat der Doktor genau eine Datei: die Review-Zeile, die dieselbe Sitzung vier Minuten zuvor geschrieben hatte. Sie zu committen genügte, das Urteil sprang auf `consistent`, die Unit-Suite wurde nie gebraucht; ihr Abbruch ließ zwei verwaiste vitest-Worker neben dem Bildlauf zurück (§3.271, Wiedergänger von §3.267) |
@@ -1656,7 +1657,7 @@ stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die s
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Samstag, 19.09.2026, 11:37 · Quellen-Fingerprint: `9e74017dc690…`
+Zuletzt aktualisiert: Samstag, 19.09.2026, 17:58 · Quellen-Fingerprint: `e2d0f62f520e…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1697,7 +1698,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to the OpenAI lane, GPT-6 Astra), and review is cross-vendor, not Fable-by-default | 6 | hoch | — (Regel/Memory) | ◐ Regel |
 | Iterate on the new feature's OWN test first; the full regression runs once at the end, never as the debugging loop | 2 | mittel | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 87 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 88 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | wait-command-guard.mjs | ✔ Mechanismus |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | \"Gib ab\" / \"abgeben\" means hand the batch to a SUCCESSOR session so the context does not overflow — it never means pause or stop the batch | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1763,8 +1764,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 97 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 7 Revert-/Reapply-Commits · 136 Prozess-/Meta-TASKS-Punkte (davon 64 offen).
 
-<!-- RETRO-FINGERPRINT: 9e74017dc6905018c659ab4c34595ecb52503b0e4e2a9766c2a97f3e8e42f3d9 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-19T09:37:03.756Z -->
+<!-- RETRO-FINGERPRINT: e2d0f62f520eaf30f15a70acdeb23024362cacb93bb341d6fd9fb3db3fbe683b -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-19T15:58:25.766Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -7792,3 +7793,34 @@ KONFIGURATION her, nicht nur deren Dorf und Saatzahl. Und eine Kennzahl, die ein
 setzt (hier die verkürzte Streifzeit), gehört in die Regression, die sie absichert — die
 neue Prüfung fährt beide Einstellungen, damit sich die nächste Ursache nicht wieder hinter
 einer langen Umherstreif-Phase verstecken kann.
+
+### 3.294 Die Bühne der Bildprüfung stand auf einer Annahme, die der Punkt selbst aufhob
+
+Punkt 1092 nimmt einem Dorf seinen Brunnen. Seine Bildprüfung suchte einen Standpunkt
+mit freier Sicht auf den Brunnenplatz und tastete die Sichtlinie bis zum Platz selbst
+ab. Sie fand keinen einzigen brauchbaren Standpunkt und der Punkt lag rot, während am
+Produkt nichts falsch war.
+
+Der Grund steht im Punkttext: Der Platz verlässt mit dem Brunnen die Freihalteliste.
+Damit ist er gewöhnlicher Dorfboden, und das Dorf baut darauf weiter — bei der Saatzahl
+des Abschnitts steht dort jetzt eine Familienhütte, 0,46 m neben der alten Mitte. Die
+letzte Stützstelle der Sichtlinie liegt also IN einem Körper, und jeder Kandidat fiel an
+genau dieser Stelle durch. Die Bühne prüfte eine Annahme — „der Platz bleibt frei" —,
+die der Punkt in demselben Zug aufhob, für den die Bühne gebaut war.
+
+Gefunden wurde das nicht am Bild, sondern an einer Messung: Der Kollisionssatz beider
+Dörfer, im Knoten gegeneinander gehalten, nannte den neuen Körper mit Radius und Abstand
+und zeigte zugleich, dass der Saatstrom drei weitere Requisiten verschoben hat. Das
+kostete anderthalb Minuten; das Raten am Bild hätte mehrere Läufe zu je 40 Sekunden
+gekostet und die Hütte nie benannt.
+
+Zwei Sachen wurden daraufhin getrennt. Was auf dem Platz steht, ist der GEGENSTAND des
+Bildes, nicht sein Hindernis: Die Sichtlinie wird jetzt gegen alle ÜBRIGEN Körper
+beurteilt. Und die Abweichung von der Vorgabe des Punktes — „ein Bild, das den früheren
+Brunnenplatz leer zeigt" — wurde im Punktblock festgehalten, statt sie stillschweigend
+umzudeuten.
+
+**Lehre:** Wer die Bühne einer Bildprüfung baut, schreibt ihre Annahmen über die Welt
+mit auf — und prüft bei jeder Änderung, ob die Änderung selbst eine davon aufhebt. Und
+eine rote Bühne wird zuerst gemessen, nicht neu geraten: Die deterministische Geometrie
+liegt im Knoten in Sekunden offen, wo der Browserlauf nur ein weiteres Nein liefert.
