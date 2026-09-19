@@ -1,5 +1,5 @@
 // Preserve the floor witnesses while the platform's expiring transcript exists.
-// Run: node scripts/cut-account-attest.mjs [owner|subagent]
+// Usage: node scripts/cut-account-attest.mjs [owner|subagent]
 import { readFileSync, writeFileSync, mkdirSync, realpathSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
