@@ -77,43 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1159. The run's start language can be chosen from the URL, exactly as the start
-  place already can (user order 18.09.2026, relayed through a peer session because this
-  session held the batch lock, verbatim: "Neuer Task, direkt als Nächstes: einen
-  URL-Parameter für dir Start-Sprache einführen - analog zu dem für das Start-Dorf" — he
-  asked for it NEXT, which is why it stands at the head of the queue rather than at the
-  end of the append).
-  MEASURED STATE: the game always starts in English — `useLocale` is created with
-  `lang: 'en'` (src/i18n/index.ts) — and German is reachable only through the debug menu's
-  runtime switch. Every fresh load meant to show the German build costs a manual switch
-  first, which makes a German screenshot, journal entry or read-aloud check needlessly
-  expensive. `?start=<placeId>` (src/config/startPlace.ts, read in src/state/store.ts)
-  already solves this for the start place and is the pattern to copy.
-  Final state:
-  - A new pure module `src/config/startLang.ts` beside it exports `LANG_PARAM = 'lang'`
-    and `startLangFromUrl(search: string): Lang | null`. It answers only for a value that
-    is one of `LANGUAGES` (src/i18n/index.ts) and null otherwise, so an unknown, empty or
-    wrongly-cased value opens the ordinary game instead of a broken one. Pure: no store,
-    no `window` — the caller passes the search string, as `startPlaceFromUrl` does.
-  - `useLocale`'s initial `lang` reads it once at creation and falls back to `'en'`,
-    guarded so an import without a `window` keeps working. The debug-menu switch still
-    overrides it at runtime; nothing else about the language runtime changes.
-  - Like `?start` and `?bench`, and unlike the DEV-only `?seed`, it works in the
-    PRODUCTION build, because the deployed page is what the user tests.
-  - Its header comment says what `startPlace.ts` says: design.md §17 keeps English as the
-    default and this does not change it — only an explicit parameter moves it, for one
-    load.
-  - Both parameters combine: `?start=bambara-village&lang=de` opens the Bambara village
-    with a German HUD.
-  Test. Vitest beside `src/config/startPlace.test.ts`: every entry of `LANGUAGES`
-  accepted, unknown/empty/miscased values null, the parameter read next to other query
-  parameters, and the locale store really initialising from it. No browser run and no
-  picture check: on the default URL nothing visible moves.
-  Criticality: low — a testing convenience with no player-visible change on the plain URL.
-  Refs: src/config/startPlace.ts, src/config/startPlace.test.ts, src/i18n/index.ts,
-  src/state/store.ts
-  Bundle: Testinfrastruktur.
-
 - [ ] 1158. The one-click return from the Escape cooldown is confirmed in a real browser
   (residual of point 1148, landed 18.09.2026). IT STANDS AT THE FRONT AGAIN, and it is no
   longer a question for the user: he took the observation himself on the deployed build the
