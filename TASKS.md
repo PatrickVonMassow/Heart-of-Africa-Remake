@@ -77,6 +77,43 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
+- [ ] 1170. Every inventory item answers its click and its digit key with a sentence in the
+  view, in the open and in a settlement alike, and such a sentence is never hidden behind the
+  journal (user 20.09.2026, ordered to the front and started at once: "Den Task, an dem du
+  gerade arbeitest, parken und sofort mit diesem neuen beginnen."). The shovel in the open is
+  the model: pressed where nothing is buried it says so in a toast, with no journal entry.
+  Final state: (1) EVERY slot of the inventory bar is a button whose click and digit key
+  (Digit1-Digit9) reach one handler, in the bird's-eye world and in a settlement; where the
+  item acts (medicine cures, the shovel digs in the open, a form presses against a socket in
+  the open, a find goes to the chief, a treasure is shown in a village) the existing action
+  runs unchanged, and where it cannot act right now the traveller says why in a toast (the
+  shovel's lane: `toast`, never a journal entry — "ein Tagebucheintrag wäre übertrieben").
+  (2) The answers, one English and one German text each under the language files' `toasts`:
+  rifle — in the open: he shoulders it by himself the moment danger threatens; in a
+  settlement: he has no wish to threaten anyone here. Rope — in the open off a mountain: it
+  comes into use by itself on a climb; on a mountain: it is already taking his weight; in a
+  settlement: nothing here to climb. Machete — in the open off jungle: it swings by itself
+  where the jungle closes in; in jungle: it is already clearing the way; in a settlement: he
+  will not swing a blade among people. Canoe — in the open on land: it is launched by itself
+  at a river or lake; on water: it is already carrying him; in a settlement: no water here to
+  launch it. Canteen — both views: he drinks from it as thirst demands and it fills itself at
+  fresh water. Shovel — in a settlement: he does not dig up the ground people live on. A
+  carried form — in a settlement: he presses it against stone out in the open, not here. A
+  treasure — in the open: nobody out here to show it to; in a port: the bazaar trades it and
+  does not admire it; in a village whose people neither revere nor reject the material: they
+  look at it without interest (today that click marks the village as shown and says nothing).
+  Medicine keeps its two answers (none left / not needed). (3) The toast stacks above EVERY
+  panel and overlay — journal, map, debug menu, dialog backdrop — so the chief's "steps out
+  of his hut" sentence is legible while the journal opens on the same act (today `.toast` has
+  no z-index and the journal's 16778000 covers it). (4) Tests: `src/ui/Hud.test.tsx` covers
+  each item×view pair above by click AND digit key (expected `toast` text, journal length
+  unchanged), the store test covers the indifferent-treasure answer, and a Playwright
+  assertion in the HUD-covering suite opens the journal, raises a toast and proves
+  `document.elementFromPoint` at the toast's centre is the toast. (5) `design.md` §17.1's
+  inventory sentence, `docs/acceptance-criteria-detail.md` §9 and
+  `docs/acceptance-evidence.md` §9 state the final behaviour in the same commit. Nothing
+  else changes: tooltips, glow, sort order and the shovel's open-world answers stay.
+
 - [ ] 1158. The one-click return from the Escape cooldown is confirmed in a real browser
   (residual of point 1148, landed 18.09.2026). IT STANDS AT THE FRONT AGAIN, and it is no
   longer a question for the user: he took the observation himself on the deployed build the
