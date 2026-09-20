@@ -191,6 +191,27 @@ export const RED_CHARGES = [
   },
   {
     point: 939,
+    suite: 'voice',
+    backend: 'webgl',
+    kind: 'console',
+    // THE SAME VITE TRANSIENT REACHING THE VOICE LANE, and it needs its own
+    // entry because every entry here excuses only the lane its evidence
+    // measured.
+    match: /^console error: Failed to load resource: the server responded with a status of 504 \(Outdated Optimize Dep\)/i,
+    why:
+      'MEASURED 20.09.2026 at 03:54:26Z on main (443fec985), webgl/voice: the run recorded exactly '
+      + 'one red, this 504, while every CHECK it ran passed — the read-aloud, the auto-narration, '
+      + 'the stereo separation and the limiter ceiling — and all three frames were written. It is '
+      + 'a cold or invalidated Vite optimize-dep cache re-bundling while the suite page is already '
+      + 'open, the environment transient CLAUDE.md §7.2 tells us to fail soft on, and the identical '
+      + 'reading point 939 already owns on webgpu/startup, webgpu/report, webgpu/polish, '
+      + 'webgpu/settings, webgl/startup and webgl/polish. Nothing of the code under test reaches '
+      + 'it. The run was also taken on a LOADED machine and the runner said so itself, so it is '
+      + 'not treated as a timing verdict; the charge covers the transient, not the machine. The '
+      + 'charge dies with point 939.',
+  },
+  {
+    point: 939,
     suite: 'settings',
     backend: 'webgpu',
     featureLevel: 'compatibility',

@@ -15,6 +15,7 @@ import { readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { execFileSync, execSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { isAbsolute, join } from 'node:path'
+import { WAIT_LEASE_PATH } from './wait-lease-core.mjs'
 import {
   planRemediation,
   needsRepair,
@@ -118,12 +119,22 @@ try {
   /* unknown — leave false */
 }
 
+// THE WAIT REGISTRY IS MACHINE STATE, NOT AUTHOR WORK. `.claude/wait-leases.json`
+// is written by the wait mechanism itself while a suite runs and cleared when it
+// ends; no author ever edits it. Counting it as an unattributable change made the
+// doctor plan a quarantine for the lease of the very run the owner was waiting on,
+// and `pendingRepair` then blocked every Stop of that session — measured 20.09.2026
+// during the point 1094 picture run.
 let dirtyFiles = []
 try {
   dirtyFiles = git(['status', '--porcelain'])
     .split('\n')
     .filter(Boolean)
-    .map((l) => l.slice(3))
+    // NOT slice(3): the git helper trims its whole output, so the leading space of
+    // an unstaged first line (" M path") is already gone and a fixed cut ate the
+    // path's first character — every dirty list started with a mangled name.
+    .map((l) => l.replace(/^[ MADRCU?!]{1,2} +/, ''))
+    .filter((f) => f !== WAIT_LEASE_PATH)
 } catch {
   /* unreadable status */
 }
