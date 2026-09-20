@@ -67,7 +67,7 @@ const makeRound = new Function(...Object.keys(roundDeps), 'props', `
 `)
 
 describe('each settlement stages exactly one children’s game', () => {
-  it.each(PLACES.map(p => [p.id, p.kind] as const))('%s selects from its kind and bank', (id, kind) => {
+  it.each(PLACES.filter(p => p.kind === 'port' || p.kind === 'village').map(p => [p.id, p.kind] as const))('%s selects from its kind and bank', (id, kind) => {
     if (kind !== 'port' && kind !== 'village') return
     const { layout, games } = render(id, kind)
     expect(games).toHaveLength(1)

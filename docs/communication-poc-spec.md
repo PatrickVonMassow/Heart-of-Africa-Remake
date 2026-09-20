@@ -184,7 +184,7 @@ caught drops out where he stands. Sides swap every run, so the announced word al
 When no free runner is left, the caught children stay crouched for a readable
 ending before everybody rises and walks back toward the roaming quarter.
 
-Three readings are closed deliberately. `ROCK` cannot be learned as "made it",
+`ROCK` is grounded beyond arrival at a target. It cannot be learned as "made it",
 because the catcher taps his own rock and names it at the start of a run with
 nobody arriving, and because a child climbs an ordinary scattered boulder in the
 village — no part of the game — and names that while the group roams. That stone
@@ -254,8 +254,7 @@ order is not given at all, and the errand simply waits for the next round.
 
 THE WATER READING IS ACCEPTED, NOT CLOSED. A player may read the second RIVER as
 WATER. The chief's message carries just as well as `WATER · UPSTREAM · ROCK ·
-DIG`, so the reading is left standing — unlike the three readings ROCK closes
-deliberately.
+DIG`, so the reading is left standing. ROCK must still transfer beyond a game target.
 
 DIG is said twice in each of two paired
 bouts at different excavations: an initiator first walks to a free adult and

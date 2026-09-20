@@ -1,11 +1,11 @@
 # How Africa Communicated around 1890 (design.md §13.4)
 
-Research basis for the future communication/hint mechanic: what encoded-meaning
-systems really existed in the game's world, how each of them encoded, and where.
-Written BEFORE the mechanic is decided (TASKS/design.md §13.4), so the design
-can follow the history instead of inventing it. Sibling of `climate-1890.md`
-and `peoples-1890.md`, and held to the same standard: sourced, with the
-evidence quality marked per claim, and gaps stated rather than filled.
+Historical research for communication work-order points 686–692 and later
+regional extensions: what encoded-meaning systems existed around 1890, how
+they encoded and where. The village slice is decided in design.md §13.4 and
+`communication-poc-spec.md`; the research proposals below do not override it.
+Other regional teaching remains outside the built slice. Evidence quality and
+gaps are marked rather than filled.
 
 Evidence markers: **PERIOD** (pre-1910 eyewitness) · **MODERN** (present-day
 scholarship) · **RETRO-APPLIED** (later fieldwork projected back onto 1890,
@@ -258,8 +258,8 @@ preference; the decision is the user's):
    throughout. This zone carries the Chants-of-Sennaar heart of the mechanic.
 3. **The ideographic Cross-River pocket** (could fold into 2 as its coastal
    south-east): an invented nsibidi-like tiered ideography — public tier
-   learnable by observation, restricted tier gated by trust/initiation, which
-   maps beautifully onto the game's existing gift/friendship systems.
+   learnable by observation, with historical restrictions by trust/initiation.
+   That restriction supplies no prerequisite for the built village message.
 4. **The signal East+South**: fanfares, named-drum repertoires, bead colour
    codes, object messages — honest CODES, learnable as codes, and a deliberate
    mechanical contrast (here a lookup table is the historically accurate
@@ -274,9 +274,10 @@ differently, which keeps five-times-the-same-puzzle off the table.
 Cross-River pocket folded into the tonal West+Centre as its coastal south-east
 — so the game carries the script North, the tonal West+Centre and the signal
 East+South. The nsibidi-like tiered ideography is not dropped by that: it lives
-on inside zone 2 as that coast's own medium, its restricted tier still gated by
-the gift/friendship systems. The MECHANIC itself — how a player learns a zone —
-remains the user's open question.
+on inside zone 2 as a proposed coastal medium. This is the recorded regional
+direction, not a gift gate or a second implemented lect. The village now teaches
+six words through bank play, adult work and the drummer (design.md §13.4);
+teaching mechanics for the other regions remain open.
 
 ---
 

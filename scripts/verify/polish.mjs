@@ -3543,9 +3543,7 @@ if (section('children-tag')) {
 // are per-frame — an alternation, a single stalled step, a moment of overlap —
 // and a sampling loop that crosses the process boundary between readings would
 // step straight over them.
-if (section('children-motion')) {
-  // Keep the same motion thresholds on both games, including the port staging.
-  for (const motionPlace of ['bambara-village', 'maasai-village', 'cairo']) {
+async function checkChildrenMotion(motionPlace) {
   await page.evaluate(() => {
     const g = window.__game.getState()
     if (g.placeId) g.leavePlace()
@@ -3923,7 +3921,13 @@ if (section('children-motion')) {
   await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
   await page.evaluate((seed) => window.__game.setState({ seed }), bootSeed)
 }
+
+if (section('children-motion')) {
+  // Keep the same motion thresholds on both games, including the port staging.
+  for (const motionPlace of ['bambara-village', 'maasai-village', 'cairo']) {
+    await checkChildrenMotion(motionPlace)
   }
+}
 
 // --- The children's game at the river bank (work-order point 687) -------------
 // The round itself is pinned in the fast layer: `src/scenes/place/bankGame.test.ts`

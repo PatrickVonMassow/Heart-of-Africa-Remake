@@ -1252,8 +1252,8 @@ function Kids({
     w.__placeTapHand = () => readTouchHand('tap')
     w.__placeArrivalHand = (speaker?: number) => readTouchHand('arrival', speaker)
 
-    // What the group has SAID so far this visit (point 481), by situation — a
-    // live check can read the coverage the pure tests pin.
+    // Compatibility probe for the retired tag catalogue; bank speech is
+    // observed through the bank round and the shared speech channel.
     w.__placeChildSpeech = () => ({
       staged: {},
       last: null,
@@ -3603,19 +3603,19 @@ export function PlaceLife({
         <LimbDetailContext.Provider value={limbSegments}>
           <InhabitantBodiesContext.Provider value={inhabitantBodies}>
           <SpeechFloorContext.Provider value={speechFloor}>
-          <Kids
-            childBodies={childBodies}
-            x={ground.x}
-            z={ground.z}
-            playRadius={ground.radius}
-            count={kidCount}
-            seed={localSeed}
-            cloth={style.cloth}
-            colliders={colliders}
-            radius={radius}
-            stage={null}
-            bank={bank}
-          />
+            <Kids
+              childBodies={childBodies}
+              x={ground.x}
+              z={ground.z}
+              playRadius={ground.radius}
+              count={kidCount}
+              seed={localSeed}
+              cloth={style.cloth}
+              colliders={colliders}
+              radius={radius}
+              stage={null}
+              bank={bank}
+            />
             <Porters seed={localSeed} stops={buildings} cloth={style.cloth} colliders={colliders} count={1 + size} />
             <Traders seed={localSeed} cloth={style.cloth} />
             <Talkers x={PORT_TALKERS[0]} z={PORT_TALKERS[1]} cloth={style.cloth} />
@@ -3634,19 +3634,19 @@ export function PlaceLife({
           <Cook x={firePos[0] + 1.2} z={firePos[1] + 1.0} cloth={style.cloth[0]} />
           <Weaver x={LOOM_SPOT[0]} z={LOOM_SPOT[1]} cloth={style.cloth[1 % style.cloth.length]} weave={style.bandColor} />
           {(!bank || bankStage) && (
-          <Kids
-            childBodies={childBodies}
-            x={ground.x}
-            z={ground.z}
-            playRadius={ground.radius}
-            count={kidCount}
-            seed={localSeed}
-            cloth={style.cloth}
-            colliders={colliders}
-            radius={radius}
-            stage={bankStage}
-            bank={bank}
-          />
+            <Kids
+              childBodies={childBodies}
+              x={ground.x}
+              z={ground.z}
+              playRadius={ground.radius}
+              count={kidCount}
+              seed={localSeed}
+              cloth={style.cloth}
+              colliders={colliders}
+              radius={radius}
+              stage={bankStage}
+              bank={bank}
+            />
           )}
           {/* Adults teach RIVER and DIG through water errands and paired digging. */}
           <ErrandVillagers

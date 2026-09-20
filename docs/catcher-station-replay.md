@@ -1,5 +1,8 @@
 # Catcher station and arrival queue calibration
 
+Bank-game calibration evidence for work-order 687 and its follow-ups; point 690
+retains this game in bank villages and its existing motion verification.
+
 Measured on 2026-09-19 with the `village` and `frame` harness in
 `src/scenes/place/tagShuffle.test.ts`: 400 simulated seconds per case at 60 Hz,
 five children, layout colliders and the moving village crowd. Each segment

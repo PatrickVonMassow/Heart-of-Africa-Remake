@@ -1684,19 +1684,18 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   // The fabric as the quarter's search asks about it, bucketed once: the search
   // samples thousands of points and each used to walk the whole collider set.
   const standableAt = colliderBuckets(colliders, WALKER_RADIUS)
-  const playGround: PlaceLayout['playGround'] =
-    childPlayGround(
-          place.kind === 'village'
-            ? villageAdultStations(VILLAGE_FIRE, placeId)
-            : portAdultStations((seed ^ hash) >>> 0),
-          Math.max(1, radius - WALKER_RADIUS * 2),
-          balance.villageLife.tag.playRadius,
-          balance.communication.hearingRadius,
-          {
-            free: (px, pz) => standingClear(standableAt(px, pz), px, pz, WALKER_RADIUS),
-            fabric: fabricOf(dwellings, interactives),
-          },
-        )
+  const playGround = childPlayGround(
+    place.kind === 'village'
+      ? villageAdultStations(VILLAGE_FIRE, placeId)
+      : portAdultStations((seed ^ hash) >>> 0),
+    Math.max(1, radius - WALKER_RADIUS * 2),
+    balance.villageLife.tag.playRadius,
+    balance.communication.hearingRadius,
+    {
+      free: (px, pz) => standingClear(standableAt(px, pz), px, pz, WALKER_RADIUS),
+      fabric: fabricOf(dwellings, interactives),
+    },
+  )
   /** Whether a body of radius `r` would stand in the children's quarter. */
   const inPlayGround = (x: number, z: number, r: number) =>
     !!playGround && Math.hypot(x - playGround.x, z - playGround.z) < playGround.radius + r
