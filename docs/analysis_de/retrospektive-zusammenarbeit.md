@@ -1658,7 +1658,7 @@ stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die s
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Sonntag, 20.09.2026, 05:58 · Quellen-Fingerprint: `27189b3bc9d5…`
+Zuletzt aktualisiert: Sonntag, 20.09.2026, 18:43 · Quellen-Fingerprint: `814c7ecdf06d…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1755,7 +1755,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Every GUI/rendering fix must be verified on BOTH WebGPU and WebGL2 before it counts as done — never mark a render fix done on one path | 2 | mittel | render-verify-guard.mjs | ✔ Mechanismus |
 | A resumed batch session must check the previous owner's PROCESS before working — the launcher's \"provably dead\" verdict was wrong and double-spawned | 2 | mittel | render-verify-guard.mjs | ✔ Mechanismus |
 | Rotating verify AND unit failures under a running agent pool are LOAD, not bugs — 8 of 12 unit runs red from load alone; judge a red only on a quiet machine | 13 | hoch | render-verify-guard.mjs | ✔ Mechanismus |
-| The named \"version release\" process and its trigger — queue/run a version release for a version the user names (full closing → user approval → tag → mirror poc → publish /TAG/ and /poc/) | 5 | hoch | lock-release-hook.mjs | ✔ Mechanismus |
+| The named \"version release\" process and its trigger — queue/run a version release for a version the user names (full closing → user approval → tag → mirror poc → publish /TAG/ and /poc/) | 6 | hoch | lock-release-hook.mjs | ✔ Mechanismus |
 | Standing licence to move, REMOVE or ADD villages when it helps — but every change must be checked against the other requirements first, and the check has already caught a real bug | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | A VS Code restart restarts the devcontainer — every process inside dies, PPID 1 proves nothing | 13 | hoch | container-ask-guard.mjs | ✔ Mechanismus |
 | Keep the visual QA eye open for functionally-fine but weird-LOOKING oddities, not just functional bugs | 2 | mittel | — (Regel/Memory) | ◐ Regel |
@@ -1765,8 +1765,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 97 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 7 Revert-/Reapply-Commits · 136 Prozess-/Meta-TASKS-Punkte (davon 64 offen).
 
-<!-- RETRO-FINGERPRINT: 27189b3bc9d54128979b32ed15b6221ab5d84af4fc5c18d8d9e8b3adccb26e22 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-20T03:58:41.853Z -->
+<!-- RETRO-FINGERPRINT: 814c7ecdf06d4f6898f7d5afaf36e1887a33336dc6faed58b172a53c44786e1c -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-20T16:43:01.679Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -7849,3 +7849,31 @@ die der Push selbst bewegt — nicht der Zettel daneben.
 mit der Tat ändert, nicht die Meldung, die jemand danach darüber schreibt. Und ein
 Prüffall, der ein Rennen abbildet, ist erst dann ein Nachweis, wenn er gegen den alten
 Stand ROT ist — sonst hält er nur fest, dass das Rennen heute anders ausging.
+
+### 3.296 Der Wächter hielt an einer Entscheidung fest, die der Nutzer längst geändert hatte
+
+Der Auftrag war klein: das `poc`-Tag auf den aktuellen main-Stand setzen und
+veröffentlichen, ausdrücklich ohne Closing-Lauf. Der `closing-guard` verweigerte genau
+das. Sein Grund war keine Prüfung, die etwas gemessen hätte, sondern eine Prämisse im
+Quelltext — `poc` spiegele immer das neueste Versions-Tag, also sei ein poc-Push ein
+Release-Akt. Diese Prämisse war einmal eine Nutzerentscheidung (24.07.2026). Sie galt
+schon am 16.09. nicht mehr, und am 17.09. auch nicht: beide Male hat der Nutzer `poc`
+direkt auf main gesetzt, beide Male wurde der Wächter mit dreizehn Verzichts-Schritten
+umgangen, die seine eigene Abweisung als Heilmittel anbietet — und beide Male blieb die
+Prämisse stehen.
+
+Ein Umgehungsritual, das zweimal funktioniert hat, sieht aus wie eine Lösung. Es ist das
+Gegenteil: Es macht die Abweisung folgenlos und nimmt damit den einzigen Anlass weg, bei
+dem jemand die Prämisse gelesen hätte. Der Wächter blockierte weiter, die Regel blieb
+falsch, und der Preis war jedes Mal derselbe Aufwand.
+
+Diesmal wurde die Prämisse geändert statt umgangen: `isVersionTagCommand` kennt `poc`
+nicht mehr, nur noch `vX.Y` und Bulk-Tag-Pushes. Die Kopplung, die der Nutzer wirklich
+will, läuft einseitig — ein neues Versions-Tag zieht `poc` nach, aber `poc` darf voraus
+sein — und sie steht jetzt an den drei Stellen, an denen sie gelesen wird: im Kopf des
+Wächters, im Pages-Workflow und im Owner-Runbook.
+
+**Lehre:** Wenn ein Wächter eine Nutzerentscheidung als Konstante einbaut, muss die
+Entscheidung dort auch wieder herausgenommen werden können — und ein Verzichtspfad, der
+die Abweisung billig macht, verhindert genau das. Zweimal derselbe Verzicht ist kein
+Sonderfall mehr, sondern der Beweis, dass die Regel nicht mehr stimmt.
