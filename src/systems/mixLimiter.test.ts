@@ -13,6 +13,19 @@ import {
 const throughCurve = (curve: Float32Array, x: number) =>
   readCurveTable(curve, x / MIX_LIMITER_DOMAIN) * MIX_LIMITER_DOMAIN
 
+/** The OTHER shape a browser's interpolation takes: Blink evaluates
+ *  `a + t*(b-a)` where Gecko weights both neighbours. The specification
+ *  promises neither, so the ceiling has to hold through both. */
+const throughCurveBlink = (curve: Float32Array, x: number) => {
+  const f = Math.fround
+  const unit = Math.max(-1, Math.min(1, x / MIX_LIMITER_DOMAIN))
+  const position = f(f(f(unit + 1) / 2) * (curve.length - 1))
+  const low = Math.floor(position)
+  const high = Math.min(curve.length - 1, low + 1)
+  const t = f(position - low)
+  return f(curve[low] + f(t * f(curve[high] - curve[low]))) * MIX_LIMITER_DOMAIN
+}
+
 describe('the mix limiter curve (point 1156 — design.md §19.1)', () => {
   const held = { ...balance.mixLimiter }
   afterEach(() => {
@@ -154,24 +167,41 @@ describe('the mix limiter curve (point 1156 — design.md §19.1)', () => {
       balance.mixLimiter.ceiling = 0.95
       const curve = mixLimiterCurve()
       expect(throughCurve(curve, 1.7114522457122803)).toBeLessThanOrEqual(0.95)
-      // Every sample of the table, at the interpolation's worst weighting.
+      expect(throughCurveBlink(curve, 1.7114522457122803)).toBeLessThanOrEqual(0.95)
+      // Every sample of the table, at the interpolation's worst weighting, in
+      // both of the shapes a browser's interpolation takes.
       for (let i = 0; i < curve.length - 1; i++) {
         for (const t of [0, 0.25, 0.5, 0.75, 1]) {
           const position = (i + t) / (curve.length - 1)
           const x = (position * 2 - 1) * MIX_LIMITER_DOMAIN
           expect(Math.abs(throughCurve(curve, x))).toBeLessThanOrEqual(0.95)
+          expect(Math.abs(throughCurveBlink(curve, x))).toBeLessThanOrEqual(0.95)
         }
       }
     })
 
+    // Rounds 2 and 4 of the review, one after the other: first the inward
+    // rounding used a RELATIVE step, then the interpolation margin did, and
+    // both are worth nothing among the subnormals, where the spacing is
+    // absolute. A ceiling of 1e-44 was exceeded at an INTERPOLATED point —
+    // neighbours three minimum units apart weighting to four at t = 0.5 —
+    // which is why the points BETWEEN the samples are walked here too.
     it('holds a subnormal ceiling too, where a relative step is worth nothing', () => {
-      for (const ceiling of [2e-45, 1.4e-45, 7e-45, 1e-40]) {
+      for (const ceiling of [2e-45, 1.4e-45, 7e-45, 1e-44, 1e-40]) {
         balance.mixLimiter.threshold = 0
         balance.mixLimiter.ceiling = ceiling
         const curve = mixLimiterCurve(129)
         for (const v of curve) expect(Math.abs(v) * MIX_LIMITER_DOMAIN).toBeLessThanOrEqual(ceiling)
+        for (let i = 0; i < curve.length - 1; i++) {
+          for (const t of [0, 0.25, 0.5, 0.75, 1]) {
+            const x = (((i + t) / (curve.length - 1)) * 2 - 1) * MIX_LIMITER_DOMAIN
+            expect(Math.abs(throughCurve(curve, x))).toBeLessThanOrEqual(ceiling)
+            expect(Math.abs(throughCurveBlink(curve, x))).toBeLessThanOrEqual(ceiling)
+          }
+        }
         for (const x of [-3, -1, 1, 3]) {
           expect(Math.abs(throughCurve(curve, x))).toBeLessThanOrEqual(ceiling)
+          expect(Math.abs(throughCurveBlink(curve, x))).toBeLessThanOrEqual(ceiling)
         }
       }
     })

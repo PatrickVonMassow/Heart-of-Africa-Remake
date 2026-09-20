@@ -77,18 +77,25 @@ export function mixLimiterCurve(points: number = MIX_LIMITER_CURVE_POINTS): Floa
 
 /** The largest magnitude the TABLE may hold, which is not simply the ceiling
  *  scaled into the domain. The browser reads the table by weighting the two
- *  neighbours in FLOAT32 and adding them, and each of those three operations
- *  rounds: `a*(1-t) + b*t` can come out a couple of ulps ABOVE both a and b —
+ *  neighbours in FLOAT32 and adding them, and each of those operations rounds,
+ *  so the interpolation can come out a couple of ulps ABOVE both neighbours —
  *  measured, at threshold 0.85 / ceiling 0.95, two neighbours of
  *  0.4749999940395355 interpolating to 0.4750000238418579, which is past the
- *  ceiling after the post-gain. Two roundings of half an ulp each is the whole
- *  error, so four ulps of room covers it with margin to spare. */
+ *  ceiling after the post-gain.
+ *
+ *  The room for it is counted in BIT STEPS, not as a fraction. A relative
+ *  margin says nothing among the subnormals, where the spacing is absolute and
+ *  a ceiling of 1e-44 was still exceeded by neighbours three minimum units
+ *  apart; stepping the pattern is the same rule in both regimes. Six steps
+ *  against an error of at most a couple leaves room for an implementation that
+ *  rounds somewhere we have not modelled. */
 function tableBound(): number {
-  return (limitBounds().ceiling / MIX_LIMITER_DOMAIN) * (1 - INTERPOLATION_HEADROOM)
+  let bound = Math.fround(limitBounds().ceiling / MIX_LIMITER_DOMAIN)
+  for (let i = 0; i < INTERPOLATION_STEPS; i++) bound = stepTowardZero(bound)
+  return bound
 }
 
-/** Four float32 ulps, relative. */
-const INTERPOLATION_HEADROOM = 2 ** -21
+const INTERPOLATION_STEPS = 6
 
 /** A `Float32Array` stores to the NEAREST float32, which can round a value UP —
  *  and a value rounded up at the curve's own extreme would stand a hair ABOVE
@@ -125,12 +132,17 @@ const FLOAT32_BITS = new Uint32Array(FLOAT32_VIEW.buffer)
 export function readCurveTable(curve: Float32Array, input: number): number {
   if (!Number.isFinite(input)) return 0
   const unit = Math.max(-1, Math.min(1, input))
-  const position = ((unit + 1) / 2) * (curve.length - 1)
+  const position = Math.fround(Math.fround(Math.fround(unit + 1) / 2) * (curve.length - 1))
   const low = Math.floor(position)
   const high = Math.min(curve.length - 1, low + 1)
   // FLOAT32, step for step, because that is what the audio thread does. The
   // same read in float64 returned 0.949999988079071 where the browser returns
   // 0.9500000476837158 — it HID a ceiling violation instead of finding it.
+  // This is a REPRESENTATIVE float32 model, not one browser's: Gecko weights
+  // both neighbours as below, Blink evaluates `a + t*(b-a)`, and neither is
+  // promised by the specification. What makes the ceiling hold is the margin
+  // `tableBound` reserves, which covers either form — and the real browser is
+  // measured by the audio suite, against the ceiling and with no allowance.
   const t = Math.fround(position - low)
   return Math.fround(Math.fround(curve[low] * Math.fround(1 - t)) + Math.fround(curve[high] * t))
 }
