@@ -373,9 +373,35 @@ export interface Strings {
     bought(name: string): string
     notEnoughMoney: string
     digNoShovel: string
+    /** The shovel was used inside a settlement, where he will not dig. */
+    digInSettlement: string
     /** A carried form fits nothing where the traveller stands — his own voice,
      *  never silence: a wrong or a spent place is how he learns the rule. */
     formNoFit: string
+    /** A carried form was used inside a settlement: sockets stand outside. */
+    formInSettlement: string
+    /** Gear that works by possession alone answers a press instead of acting:
+     *  what it does by itself out in the open, that it is doing it right now,
+     *  and why it has no business inside a settlement (design.md §17.1). */
+    rifleReady: string
+    rifleInSettlement: string
+    ropeReady: string
+    ropeInUse: string
+    ropeInSettlement: string
+    macheteReady: string
+    macheteInUse: string
+    macheteInSettlement: string
+    canoeReady: string
+    canoeInUse: string
+    canoeInSettlement: string
+    /** The canteen drinks and refills on its own, in both views. */
+    canteenReady: string
+    /** A treasure was presented where nobody can look at it (design.md §8):
+     *  out in the open, at a bazaar that only trades, or before villagers whose
+     *  region neither reveres nor rejects the material. */
+    valuableNobodyHere: string
+    valuableBazaar: string
+    valuableIndifferent: string
     /** The dummy success of this proof of concept: a form has found its socket
      *  and the PoC's puzzle is solved. */
     pocSolved: string

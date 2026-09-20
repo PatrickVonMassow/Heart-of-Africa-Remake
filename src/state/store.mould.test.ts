@@ -133,11 +133,11 @@ describe('pressing the impression against the world', () => {
     expect(bodyKeys().filter((k) => k === 'journal.mouldFitted')).toHaveLength(1)
   })
 
-  it('is a travel action: inside a settlement it does nothing', () => {
+  it('is a travel action: inside a settlement it answers instead of pressing', () => {
     g().enterPlace(DRUM_MESSAGE_VILLAGE)
     g().setToast(null)
     g().useCarriedForm()
-    expect(g().toast).toBeNull()
+    expect(g().toast).toBe(getStrings().toasts.formInSettlement)
     expect(g().spentSockets).toEqual([])
   })
 
