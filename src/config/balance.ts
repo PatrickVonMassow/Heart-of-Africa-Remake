@@ -112,6 +112,19 @@ export interface BalanceConfig {
    *  slider over the single ambience volume, so the birds can be turned down on
    *  their own. 1 = the design gain, 0 = silent. */
   birdsongVolume: number
+  /** The last stage of the audio graph (design.md §19.1): a fixed transfer
+   *  curve between the master gain and the destination, so no coincidence of
+   *  buses can leave the mix above full scale. Both values are ESTIMATES
+   *  (calibratable, CLAUDE.md §2) chosen from the measured worst case of 1.336:
+   *  the mix is identity below `threshold` and bends smoothly towards — never
+   *  onto — `ceiling` above it. `threshold` sits above the everyday single
+   *  close voice (0.932) so nothing normal is shaped at all; `ceiling` leaves
+   *  0.45 dB of true-peak room under full scale for the shaper's own
+   *  reconstruction ripple. */
+  mixLimiter: {
+    threshold: number
+    ceiling: number
+  }
   /** The optional meaningless village drum BED (not the message drums). It is
    *  silent by default so it cannot be mistaken for communication; the switch
    *  and every calibration value remain exposed in the debug menu. */
@@ -978,6 +991,12 @@ export const balance: BalanceConfig = {
   footstepVolume: 2, // footsteps twice as loud as the rest (user request)
   ambientVolume: 0.5, // every other ambient sound half as loud (user request)
   birdsongVolume: 1, // per-source birdsong slider (point 153); 1 = design gain
+  mixLimiter: {
+    // Estimates (calibratable): clear of the 0.932 single close voice, and a
+    // ceiling with true-peak room under full scale. Point 1156.
+    threshold: 0.85,
+    ceiling: 0.95,
+  },
   drumBed: {
     // Message drums bypass this switch. The meaningless ambient bed ships off.
     enabled: false,
