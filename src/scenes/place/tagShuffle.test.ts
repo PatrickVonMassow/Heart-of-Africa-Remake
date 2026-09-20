@@ -711,10 +711,27 @@ describe('the seed spread stops where a foreign village IS the statement (work-o
     const src = readFileSync(resolve(process.cwd(), 'src/scenes/place/riverBank.test.ts'), 'utf8')
     const start = src.indexOf("it('a village away from every river has none")
     expect(start, 'the boundary assertion has been renamed or removed from riverBank.test.ts').toBeGreaterThan(-1)
-    const body = src.slice(start, src.indexOf('\n  })', start))
+    // COMMENTED OUT IS DELETED, as far as this boundary is concerned
+    // (cross-vendor finding, GPT-6 Astra, 20.09.2026). Matching the raw source
+    // accepted `// expect(withBank)…` — the three assertions would still read as
+    // present while nothing ran them, which is exactly the silent emptying this
+    // check exists to catch. So the body is stripped of its comments first.
+    const body = src
+      .slice(start, src.indexOf('\n  })', start))
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/(^|[^:])\/\/.*$/gm, '$1')
     expect(body, 'the riverless village it names').toContain("expect(withBank).not.toContain('maasai-village')")
     expect(body, 'the second riverless village it names').toContain("expect(withBank).not.toContain('san-village')")
     expect(body, 'and the riverside village it contrasts them with').toContain('expect(withBank).toContain(ROCK_VILLAGE_ID)')
+  })
+
+  // AND THE STRIPPER ITSELF IS PINNED, so the check above cannot quietly lose
+  // its teeth again: a commented-out assertion must not survive the stripping.
+  it('reads a commented-out assertion as gone', () => {
+    const strip = (t: string) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
+    expect(strip("    // expect(withBank).not.toContain('san-village')")).not.toContain('expect(withBank)')
+    expect(strip("    /* expect(withBank).not.toContain('san-village') */")).not.toContain('expect(withBank)')
+    expect(strip("    expect(withBank).not.toContain('san-village') // kept")).toContain('expect(withBank)')
   })
 })
 
@@ -1820,37 +1837,11 @@ describe('the children`s bank round can reach its own stage (work-order 687)', (
    * of 55.0 and does not get to its first run until 265.8 s, seed 4 roams 280.2 s
    * (first run 310.5 s) and seed 7 roams 227.9 s — all three abandon the boulder.
    * Seed 21 carries the case now, on the axis the player is actually dealt.
+   * THE REPLAY ITSELF IS SHARED (work-order 1094). It is driven from a case
+   * list so the seed spread and the one foreign layout that carries its own
+   * statement can stand in SEPARATE cases without a second copy of the loop.
    */
-  it('bounds the roaming phase, so a run always comes (work-order 687)', async () => {
-    const CASES: Array<[string, number]> = [
-      ['bambara-village', 42],
-      ['bambara-village', 7],
-      ['bambara-village', 21],
-      ['bambara-village', 236333330],
-      // THE CASE THAT PROVES THE FOLD BELOW, and the only one of the five that
-      // does. Swept out of 120 village/seed layouts against the UNBOUNDED code:
-      // here every roam that ENDS inside the window stays within the cap (45.9 s
-      // against 55.0 s) while the roam the window CLOSES in has already run
-      // 55.4 s, and a run had opened long before (38.6 s). It is therefore the
-      // one layout where the exit-only measurement reads green on a round that
-      // is over its bound — which is what made the test unable to fail.
-      // THE ONE FOREIGN LAYOUT THE SEED SPREAD KEEPS (work-order 1094), and it
-      // is kept by MEASUREMENT rather than by omission: bambara has no layout
-      // that can replace it. Seeds 1-120 were swept against the unbounded code
-      // (`roamSeconds` 8, `roamGuardSeconds` lifted so no roam is ever abandoned
-      // on the clock, 400 replayed seconds each), reading the longest ENDED roam
-      // and the roam the window CLOSES in apart. Not one of the 120 shows the
-      // combination this case is built on — an ended roam inside the 55.0 s cap
-      // beside a closing roam over it, with a run already opened. Only two
-      // bambara seeds close in an over-cap roam at all, 86 (closing 136.1 s) and
-      // 117 (closing 115.1 s), and BOTH also carry an ended roam over the cap
-      // (184.7 s and 94.5 s), which the exit-only measurement catches on its own.
-      // Deleting this entry would therefore delete the only witness that makes
-      // the fold necessary. It is an assertion where the foreign layout IS the
-      // statement, exactly like the riverless village in `riverBank.test.ts`,
-      // and work-order 1094 leaves that shape standing by name.
-      ['mandinka-village', 58],
-    ]
+  const boundsRoaming = async (CASES: Array<[string, number]>) => {
     const shippedRoam = BANK_CFG.roamSeconds
     try {
       // The browser section shortens the roam exactly this way (debug menu §21),
@@ -1906,18 +1897,41 @@ describe('the children`s bank round can reach its own stage (work-order 687)', (
     } finally {
       BANK_CFG.roamSeconds = shippedRoam
     }
-    // Five cases of 400 replayed seconds each, and the budget is the neighbour
-    // replay's rule rather than a guess.
-    // RE-MEASURED 15.09.2026, after CI run 34909464052 aborted this case at its
-    // 180 s and took the whole job down: the replay costs 91.2 s alone on the
-    // batch host — TWICE the 46.5 s that stood here, because the adults' errands
-    // and dig tasks have joined the replayed village since. At the runner's
-    // measured 1.55x that is 141 s, so the 180 s left 39 s of headroom and the
-    // suite's worker contention ate it.
-    // The neighbour above is the calibration: 88.8 s here, re-measured the same
-    // hour and still the 85.5 s it claims, carries 300 s and has never been
-    // aborted. The same cost therefore gets the same number.
-  }, 300_000)
+  }
+
+  // THE BUDGET IS PER CASE, and it comes from the measurement the five-case
+  // version left behind: 91.2 s of replay on the batch host for five cases, so
+  // about 18 s each, and at the runner's measured 1.55x about 29 s each. The
+  // four-case spread therefore carries 240 s and the single foreign layout 120 s
+  // — the same headroom per case that the 300 s gave five, after CI run
+  // 34909464052 aborted the 180 s version and took the whole job down.
+  it('bounds the roaming phase, so a run always comes (work-order 687)', () =>
+    boundsRoaming([
+      ['bambara-village', 42],
+      ['bambara-village', 7],
+      ['bambara-village', 21],
+      ['bambara-village', 236333330],
+    ]), 240_000)
+
+  /**
+   * THE ONE FOREIGN LAYOUT THE SEED SPREAD KEEPS (work-order 1094), in its own
+   * case so the spread above names bambara alone. It is kept by MEASUREMENT
+   * rather than by omission: bambara has no layout that can replace it. Seeds
+   * 1-120 were swept against the unbounded code (`roamSeconds` 8,
+   * `roamGuardSeconds` lifted so no roam is ever abandoned on the clock, 400
+   * replayed seconds each), reading the longest ENDED roam and the roam the
+   * window CLOSES in apart. Not one of the 120 shows the combination this case
+   * is built on — an ended roam inside the 55.0 s cap beside a closing roam over
+   * it, with a run already opened. Only two bambara seeds close in an over-cap
+   * roam at all, 86 (closing 136.1 s) and 117 (closing 115.1 s), and BOTH also
+   * carry an ended roam over the cap (184.7 s and 94.5 s), which the exit-only
+   * measurement catches on its own. Deleting this entry would therefore delete
+   * the only witness that makes the fold necessary: it is an assertion where the
+   * foreign layout IS the statement, exactly like the riverless village in
+   * `riverBank.test.ts`, and work-order 1094 leaves that shape standing by name.
+   */
+  it('keeps the one foreign layout that proves the fold (work-order 687)', () =>
+    boundsRoaming([['mandinka-village', 58]]), 120_000)
 
   for (const [placeId, seed] of RIVER_VILLAGES) {
     it(`${placeId} at seed ${seed} walks the group down to the bank and runs the stretch`, () => {
