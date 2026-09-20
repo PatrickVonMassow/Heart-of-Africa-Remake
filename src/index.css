@@ -273,19 +273,11 @@ textarea {
 
 /* The camp/journal toggles are laid out by their flex row (.hud-bottom-right). */
 
-/* Passive inventory items and the canteen reading are labels, not buttons. */
-.inventory-bar .inv-item {
-  background: var(--hud-bg);
-  border: 1px solid var(--hud-border);
-  color: var(--hud-text);
-  font-size: 14px;
-  padding: 6px 10px;
-  border-radius: 4px;
-}
+/* Every inventory slot is a button: the ones that cannot act here answer in a
+   toast instead of doing nothing, so none of them is a bare label any more. */
 
-/* Number shortcuts share the displayed slot order, including passive gear. */
-.inventory-bar > button,
-.inventory-bar > .inv-item {
+/* Number shortcuts share the displayed slot order. */
+.inventory-bar > button {
   position: relative;
   padding-right: 20px;
 }
@@ -304,19 +296,19 @@ textarea {
 
 /* Canteen fill colour cue (design.md §6): yellow and blinking under a third,
    red under 5 %, still blinking when empty. */
-.inventory-bar .inv-item.canteen.canteen-low {
+.inventory-bar .canteen.canteen-low {
   border-color: #d8b13a;
   color: #e7c752;
 }
-.inventory-bar .inv-item.canteen.canteen-crit {
+.inventory-bar .canteen.canteen-crit {
   border-color: #c0392b;
   color: #e0715f;
 }
-.inventory-bar .inv-item.canteen.canteen-empty {
+.inventory-bar .canteen.canteen-empty {
   border-color: #c0392b;
   color: #e0715f;
 }
-.inventory-bar .inv-item.canteen.canteen-blink {
+.inventory-bar .canteen.canteen-blink {
   animation: canteen-blink 0.7s steps(1, end) infinite;
 }
 
@@ -329,8 +321,7 @@ textarea {
 
 /* Item "in use" glow: a carried item currently taking effect (canoe on water,
    machete in jungle, rope on a mountain, medicine while afflicted) lights up in
-   the inventory bar (both passive labels and clickable buttons). */
-.inventory-bar .inv-item.inv-active,
+   the inventory bar. */
 .inventory-bar button.inv-active {
   border-color: #6fc36a;
   color: #b6efb0;
@@ -565,14 +556,13 @@ textarea {
 
 /* On touch the stuck hint is a tappable button — the only route to the escape
    key for a player with no keyboard (work-order 610). Visually identical to the
-   plain toast, with a comfortable tap target, and ABOVE the touch layer
-   (z-index 5) so the look surface cannot swallow the tap. */
+   plain toast, with a comfortable tap target; `.toast` already lifts it above
+   the touch layer and every panel, so the look surface cannot swallow the tap. */
 .toast-tappable {
   color: inherit;
   font: inherit;
   cursor: pointer;
   min-height: 44px;
-  z-index: 6;
 }
 
 /* Touch controls (design.md §17.5, point 84): a transparent full-screen layer;
@@ -701,6 +691,10 @@ textarea {
   border-color: var(--hud-accent);
 }
 
+/* The toast is the traveller's answer to what the player just did, so it must
+   never end up BEHIND what that same act opened: it stacks above the journal,
+   the map, the debug menu and the modal dialogs (all below 16779000+1), and
+   above the touch layer, so the sentence stays legible whatever is on screen. */
 .toast {
   position: absolute;
   top: 56px;
@@ -713,6 +707,7 @@ textarea {
   font-size: 14px;
   max-width: 70vw;
   text-align: center;
+  z-index: 16780000;
 }
 
 /* --- Journal ------------------------------------------------------------- */

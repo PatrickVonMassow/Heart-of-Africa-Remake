@@ -1594,12 +1594,29 @@ export const useGame = create<GameState>()((set, get) => ({
    *  village, and the reaction goes into the journal. */
   presentValuable: (treasure) => {
     const s = get()
-    const place = s.placeId ? placeById(s.placeId) : null
-    if (!place || place.kind !== 'village') return
     if ((s.treasures[treasure] ?? 0) <= 0) return
+    const strings = getStrings()
+    const place = s.mode === 'place' && s.placeId ? placeById(s.placeId) : null
+    // Showing a treasure needs somebody who looks at it: nobody is out on the
+    // map, a bazaar only puts a price on it, and the monument site is as empty
+    // of onlookers as the open country around it.
+    // OPEN: the work order enumerates the open, the port and the village; the
+    // monument is the third place kind and needs an answer of its own.
+    if (!place) {
+      set({ toast: strings.toasts.valuableNobodyHere })
+      return
+    }
+    if (place.kind === 'port') {
+      set({ toast: strings.toasts.valuableBazaar })
+      return
+    }
+    if (place.kind !== 'village') {
+      set({ toast: strings.toasts.valuableNobodyAtMonument })
+      return
+    }
     const id = place.id
     if (s.valuableShown[id]) {
-      set({ toast: getStrings().toasts.valuableAlreadyShown })
+      set({ toast: strings.toasts.valuableAlreadyShown })
       return
     }
     const values = REGION_VALUES[place.region]
@@ -1615,6 +1632,10 @@ export const useGame = create<GameState>()((set, get) => ({
         { key: 'journal.titles.valuableReaction' },
         { key: 'journal.valuableRevered', params: { people: place.peopleId ?? id, treasure } },
       )
+    } else {
+      // Neither revered nor rejected here: the showing still counts, but the
+      // reaction is a shrug — a toast, not a journal entry.
+      set({ toast: strings.toasts.valuableIndifferent })
     }
   },
 
@@ -1880,7 +1901,13 @@ export const useGame = create<GameState>()((set, get) => ({
 
   dig: () => {
     const s = get()
-    if (s.mode !== 'travel' || s.victory) return
+    if (s.victory) return
+    // Inside a settlement the shovel answers instead of acting: the ground
+    // there belongs to the people living on it.
+    if (s.mode !== 'travel') {
+      set({ toast: getStrings().toasts.digInSettlement })
+      return
+    }
     if ((s.equipment.shovel ?? 0) <= 0) {
       set({ toast: getStrings().toasts.digNoShovel })
       return
@@ -1974,9 +2001,14 @@ export const useGame = create<GameState>()((set, get) => ({
   // be able to carry the rule to the next lock.
   useCarriedForm: () => {
     const s = get()
-    if (s.mode !== 'travel' || s.victory || s.defeat) return
+    if (s.victory || s.defeat) return
     // Nothing in the pack to press against anything: not a miss, a non-action.
     if (s.carriedForms.length === 0) return
+    // Every socket stands out in the open, so a settlement gets an answer.
+    if (s.mode !== 'travel') {
+      set({ toast: getStrings().toasts.formInSettlement })
+      return
+    }
     const cur = worldToLatLon(s.pos.x, s.pos.z)
     const use = resolveFormUse({
       lat: cur.lat,

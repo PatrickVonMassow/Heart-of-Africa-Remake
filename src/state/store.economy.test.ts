@@ -358,6 +358,43 @@ describe('presented valuables (design.md §8)', () => {
     g().presentValuable('silver')
     expect(journalKeys()).toContain('journal.valuableRejected')
   })
+
+  it('a material the region neither reveres nor rejects earns an indifferent look, no entry', () => {
+    // North reveres gold and emerald and rejects silver: copper leaves it cold.
+    g().debugAddTreasure('copper')
+    g().enterPlace('nubian-village')
+    const before = g().journal.length
+    g().presentValuable('copper')
+    expect(g().toast).toBe(getStrings().toasts.valuableIndifferent)
+    // The village still counts as shown — the shrug was its one reaction.
+    expect(g().valuableShown['nubian-village']).toBe(true)
+    expect(g().journal).toHaveLength(before)
+  })
+
+  it('answers outside a village: nobody out on the map, a bazaar that only trades', () => {
+    g().debugAddTreasure('gold')
+    g().leavePlace() // the expedition starts inside its port of arrival
+    g().presentValuable('gold')
+    expect(g().toast).toBe(getStrings().toasts.valuableNobodyHere)
+
+    g().enterPlace('cairo')
+    g().presentValuable('gold')
+    expect(g().toast).toBe(getStrings().toasts.valuableBazaar)
+    expect(g().valuableShown.cairo).toBeUndefined()
+    expect(journalKeys()).not.toContain('journal.valuableRevered')
+  })
+
+  it('the monument site gets its own answer — the bazaar belongs to the ports', () => {
+    // Giza is the third place kind (world/geo PLACE_KINDS). It holds no market,
+    // so the port's "the bazaar trades it" would be a plain lie there.
+    g().debugAddTreasure('gold')
+    g().enterPlace('giza')
+    const before = g().journal.length
+    g().presentValuable('gold')
+    expect(g().toast).toBe(getStrings().toasts.valuableNobodyAtMonument)
+    expect(g().valuableShown.giza).toBeUndefined()
+    expect(g().journal).toHaveLength(before)
+  })
 })
 
 describe('settlement currency split (design.md §9/§10)', () => {

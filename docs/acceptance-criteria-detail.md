@@ -124,7 +124,10 @@ movement-penalty reason, pt. 4) render CENTRED inside the status bar; each stat 
 its symbol with the localized word as tooltip and the date reads DD.MM.YYYY; the inventory
 item currently in use glows, and the health bar with its affliction badges sits inside the
 bar's right end per §17.1 (never covered by the journal). Holding Ctrl names animals,
-people and usable objects on screen (§17.8).
+people and usable objects on screen (§17.8). Every inventory slot is a button whose click
+and digit key reach one handler in both views: the item acts where it can, and where it
+cannot the traveller says why in a toast, never in the journal; that toast stacks above
+every panel and dialog.
 
 ## 10. Goal scaffolding.
 
