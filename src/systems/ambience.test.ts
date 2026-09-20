@@ -1237,6 +1237,9 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
       expect(throughLimiter(master, deployed)).toBeCloseTo(0.94992, 5)
       expect(throughLimiter(master, output)).toBeLessThan(1)
       expect(throughLimiter(master, deployed)).toBeLessThan(1)
+      // WHAT THE COINCIDENCE PAYS, which design.md §19.1 states as "some 3 dB
+      // down": the stage is not transparent here and does not claim to be.
+      expect(-20 * Math.log10(throughLimiter(master, output) / output)).toBeCloseTo(2.962, 3)
     }
     // One voice — the reachable everyday case — cleared full scale before the
     // limiter and must not be pulled DOWN by it: what the curve takes off it is
