@@ -53,7 +53,6 @@ import {
   standingClear,
   WALKER_RADIUS,
 } from './collision'
-import { childSteer, createChildSpeech, stepChildSpeech, type SituationView } from './childSituations'
 import {
   claimBodies,
   groundOccupied,
@@ -482,8 +481,6 @@ function village(
   const bank: BankState | null = stage ? createBankGame(spots, rand, BANK_CFG) : null
   const game = bank ? null : createTagGame(spots, rand, balance.villageLife.tag)
   const children: TagChild[] = bank ? bank.children : game!.children
-  const speech = createChildSpeech(count, balance.villageLife.childSpeech)
-  const speechRand = mulberry32((localSeed + 7717) >>> 0)
   const bankRand = mulberry32((localSeed + 9931) >>> 0)
   const set = createInhabitantSet()
   const bodies = claimBodies(set, count, { scale: KID_SCALE })
@@ -513,30 +510,15 @@ function village(
       balance.villageLife.separation.bodyRadius * KID_SCALE,
       (b) => kidBodies.has(b),
     )
-  const view: SituationView = {
-    playing: false,
-    chaser: -1,
-    target: -1,
-    immune: -1,
-    children,
-    ground: { x: ground.x, z: ground.z, radius: ground.radius },
-    // What THERE points at, exactly as `PlaceLife` sets it: the settlement's own
-    // middle, well outside the play ground. It was missing here, so the one
-    // situation that reads it could never have been replayed.
-    farMark: { x: 0, z: 0 },
-  }
   return {
     game,
     bank,
     children,
     bankRand,
     stage,
-    speech,
-    speechRand,
     world: world as BankWorld,
     set,
     bodies,
-    view,
     others,
     layout,
     ground,
@@ -549,20 +531,14 @@ function village(
   }
 }
 
-/** One frame of the settlement, in `PlaceLife`'s own order: what was said steers
- *  the chase, the chase moves the children, the bodies are all written and then
+/** One frame of the settlement, in `PlaceLife`'s own order: the game moves the children, the bodies are all written and then
  *  separated as one group — and the rest of the settlement moves through the
  *  same registry after them, as the vignettes mounted below the children do. */
 function frame(v: ReturnType<typeof village>, dt: number): void {
-  const cfg = balance.villageLife.childSpeech
   if (v.bank) {
     stepBankGame(v.bank, dt, BANK_CFG, v.stage!, v.world, v.bankRand)
   } else {
-    v.view.playing = v.game!.playing
-    v.view.chaser = v.game!.chaser
-    v.view.target = v.game!.target
-    v.view.immune = v.game!.immuneFor > 0 ? v.game!.immune : -1
-    stepTagGame(v.game!, dt, balance.villageLife.tag, v.world, (i) => childSteer(v.speech, v.view, i, cfg))
+    stepTagGame(v.game!, dt, balance.villageLife.tag, v.world)
   }
   for (let i = 0; i < v.children.length; i++) {
     v.bodies[i].x = v.children[i].x
@@ -586,7 +562,6 @@ function frame(v: ReturnType<typeof village>, dt: number): void {
     absorbSeparation(v.children[i], v.bodies[i])
   }
   v.others.step(dt, v.clock())
-  if (!v.bank) stepChildSpeech(v.speech, v.view, dt, cfg, v.speechRand)
 }
 
 interface Track extends ChildMotionSample {

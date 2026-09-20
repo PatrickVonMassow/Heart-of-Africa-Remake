@@ -3544,6 +3544,8 @@ if (section('children-tag')) {
 // and a sampling loop that crosses the process boundary between readings would
 // step straight over them.
 if (section('children-motion')) {
+  // Keep the same motion thresholds on both games, including the port staging.
+  for (const motionPlace of ['bambara-village', 'maasai-village', 'cairo']) {
   await page.evaluate(() => {
     const g = window.__game.getState()
     if (g.placeId) g.leavePlace()
@@ -3555,16 +3557,16 @@ if (section('children-motion')) {
   // it did not ask for.
   const bootSeed = await page.evaluate(() => window.__game.getState().seed)
   await page.evaluate(() => window.__game.setState({ seed: 2972259115 }))
-  await page.evaluate(() => window.__game.getState().enterPlace('bambara-village'))
+  await page.evaluate(id => window.__game.getState().enterPlace(id), motionPlace)
   const live = await page
     .waitForFunction(
-      () => window.__game.getState().placeId === 'bambara-village' && !!window.__placeTag,
-      null,
+      id => window.__game.getState().placeId === id && !!window.__placeTag,
+      motionPlace,
       { timeout: 40000 },
     )
     .then(() => true)
     .catch(() => false)
-  check('the reported village publishes its live game of tag', live)
+  check(`${motionPlace} publishes its live children's game`, live)
   if (live) {
     await page.evaluate(() => window.__game.getState().setJournalOpen(false))
     // AND IT MUST REALLY BE PLAYING (point 656). The wait's result used to be
@@ -3899,7 +3901,7 @@ if (section('children-motion')) {
     })
     if (aimed) {
       await nextFrames(2)
-      await frame('648-village-children', {
+      await frame(motionPlace === 'bambara-village' ? '648-village-children' : `690-${motionPlace}-children`, {
         local: { x: aimed.cx, y: 0.8, z: aimed.cz },
         label: `the children at their game of tag (${aimed.seen} of ${aimed.of} in the clear)`,
       })
@@ -3921,6 +3923,7 @@ if (section('children-motion')) {
   await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
   await page.evaluate((seed) => window.__game.setState({ seed }), bootSeed)
 }
+  }
 
 // --- The children's game at the river bank (work-order point 687) -------------
 // The round itself is pinned in the fast layer: `src/scenes/place/bankGame.test.ts`

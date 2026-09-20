@@ -207,27 +207,6 @@ const BANK_GAME_FIELDS: ReadonlyArray<{
 ]
 
 /**
- * Every calibratable value of what the children SAY at that game (work-order
- * point 481): how often a situation is staged, how long its following action
- * runs, and how readily a call is refused. Same table shape as the chase's, for
- * the same reason — the completeness is visible at a glance.
- */
-const CHILD_SPEECH_FIELDS: ReadonlyArray<{
-  key: keyof typeof balance.villageLife.childSpeech
-  label: DebugLabelKey
-  step: number
-  min: number
-  max?: number
-}> = [
-  { key: 'intervalSeconds', label: 'childSpeechInterval', step: 0.5, min: 0.5 },
-  { key: 'intervalSpread', label: 'childSpeechSpread', step: 0.05, min: 0, max: 1 },
-  { key: 'actionSeconds', label: 'childSpeechAction', step: 0.5, min: 0.5 },
-  { key: 'actionPace', label: 'childSpeechPace', step: 0.1, min: 0.1 },
-  { key: 'refusalChance', label: 'childSpeechRefusal', step: 0.05, min: 0, max: 1 },
-  { key: 'replySeconds', label: 'childSpeechReply', step: 0.5, min: 0 },
-]
-
-/**
  * Every calibratable value of what the ADULTS do at their errands (work-order
  * point 483): how often one is staged, how long a villager stays where it was
  * sent, how long a bout of digging lasts, and how many villagers are out on
@@ -704,8 +683,6 @@ export function DebugMenu() {
       ...tableRows(BANK_GAME_FIELDS, (f) => balance.villageLife.bankGame[f.key],
         (f, v) => { balance.villageLife.bankGame[f.key] = v }),
       // What the children SAY at that game (point 481).
-      ...tableRows(CHILD_SPEECH_FIELDS, (f) => balance.villageLife.childSpeech[f.key],
-        (f, v) => { balance.villageLife.childSpeech[f.key] = v }),
       // What the ADULTS do at their errands (point 483).
       ...tableRows(ADULT_ERRAND_FIELDS, (f) => balance.villageLife.adultErrands[f.key],
         (f, v) => { balance.villageLife.adultErrands[f.key] = v }),
