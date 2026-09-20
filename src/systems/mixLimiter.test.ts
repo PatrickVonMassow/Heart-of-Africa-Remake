@@ -86,6 +86,24 @@ describe('the mix limiter curve (point 1156 — design.md §19.1)', () => {
     expect(limitMixSample(0.2)).toBe(0.2)
   })
 
+  // Four-eyes review (GPT-6 Astra, 20.09.2026) on the first cut of this stage.
+  it('answers a non-finite sample with silence rather than passing it on', () => {
+    for (const x of [NaN, Infinity, -Infinity]) expect(limitMixSample(x)).toBe(0)
+    // One NaN written into the table would poison every sample read through it.
+    balance.mixLimiter.ceiling = NaN
+    expect(Number.isFinite(limitMixSample(1.3))).toBe(true)
+    expect(mixLimiterCurve(65).every((v) => Number.isFinite(v))).toBe(true)
+    balance.mixLimiter.threshold = NaN
+    balance.mixLimiter.ceiling = 0.9
+    expect(limitMixSample(1.3)).toBeLessThanOrEqual(0.9)
+    expect(mixLimiterCurve(65).every((v) => Number.isFinite(v))).toBe(true)
+  })
+
+  it('reads a non-finite input off the table as silence too', () => {
+    const curve = mixLimiterCurve()
+    for (const x of [NaN, Infinity, -Infinity]) expect(readCurveTable(curve, x)).toBe(0)
+  })
+
   describe('the deployed table', () => {
     it('is odd, so silence stays silent', () => {
       const curve = mixLimiterCurve()
@@ -100,6 +118,23 @@ describe('the mix limiter curve (point 1156 — design.md §19.1)', () => {
       for (const x of [0, 0.25, 0.5, 0.932, 1, 1.24155117094, 1.33605117094, 1.9]) {
         expect(throughCurve(curve, x)).toBeCloseTo(limitMixSample(x), 5)
         expect(throughCurve(curve, -x)).toBeCloseTo(-limitMixSample(x), 5)
+      }
+    })
+
+    // Four-eyes review (GPT-6 Astra, 20.09.2026): a Float32Array stores to the
+    // NEAREST float32, so at threshold 0.7 / ceiling 0.8 the stored edge came
+    // back as 0.4000000059604645 and the stage delivered 0.800000011920929 —
+    // a hair ABOVE the ceiling, which is the one thing it promises never
+    // happens. The table rounds inward now, at every calibration.
+    it('never stores a value the ceiling does not cover, at any calibration', () => {
+      for (const [threshold, ceiling] of [[0.7, 0.8], [0.85, 0.95], [0.1, 0.3], [0.5, 0.5], [0.33, 0.97]]) {
+        balance.mixLimiter.threshold = threshold
+        balance.mixLimiter.ceiling = ceiling
+        const curve = mixLimiterCurve()
+        for (const v of curve) expect(Math.abs(v) * MIX_LIMITER_DOMAIN).toBeLessThanOrEqual(ceiling)
+        for (const x of [-12, -3, -1, 1, 3, 12]) {
+          expect(Math.abs(throughCurve(curve, x))).toBeLessThanOrEqual(ceiling)
+        }
       }
     })
 

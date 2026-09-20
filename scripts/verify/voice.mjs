@@ -374,15 +374,13 @@ if (section('village-stereo')) {
     sampling.ok && adult[0] > adult[1] + 4 && child[1] > child[0] + 4,
     sampling.ok ? JSON.stringify(measured.deployed) : sampling.detail)
   // Under the limiter the bound is no longer full scale but the stage's own
-  // ceiling, and a real browser is where that is worth asserting: the shaper's
-  // oversampling is the one part of the stage jsdom cannot model, so its
-  // reconstruction ripple is measured here rather than assumed away. The small
-  // allowance is that ripple; a clip would be a whole decibel past it.
-  const ceilingRoom = 1.01
+  // ceiling, and a real browser is where that is worth asserting: jsdom models
+  // the table, this measures what a real WaveShaper hands the destination. The
+  // shaper does not oversample, so the bound is exact and gets no allowance.
   check('deployed and drum-audition speech leave the mix limiter below its ceiling',
     measured.heldDrums === false && measured.ceiling > 0 && measured.ceiling < 1 &&
       [measured.deployed, measured.withDrums].every((mix) =>
-        mix.peak > 0.02 && mix.peak < Math.min(1, measured.ceiling * ceilingRoom)),
+        mix.peak > 0.02 && mix.peak <= measured.ceiling),
     JSON.stringify(measured))
 }
 

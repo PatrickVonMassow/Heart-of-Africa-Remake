@@ -32,8 +32,11 @@ export const MIX_LIMITER_CURVE_POINTS = 2049
  *  halves meet with the same gradient — the knee opens smoothly out of the
  *  identity rather than cornering into it. */
 export function limitMixSample(x: number): number {
-  const ceiling = Math.max(0, balance.mixLimiter.ceiling)
-  const threshold = Math.max(0, Math.min(balance.mixLimiter.threshold, ceiling))
+  // A non-finite sample has no bounded image, and a single NaN written into the
+  // table would poison every sample the shaper reads through it. Silence is the
+  // one answer that keeps the promise.
+  if (!Number.isFinite(x)) return 0
+  const { ceiling, threshold } = limitBounds()
   const magnitude = Math.abs(x)
   if (magnitude <= threshold) return x
   const head = ceiling - threshold
@@ -41,6 +44,21 @@ export function limitMixSample(x: number): number {
   if (head <= 0) return sign * threshold
   return sign * (threshold + head * Math.tanh((magnitude - threshold) / head))
 }
+
+/** The two calibrated values, made usable: the debug menu (§21) hands out
+ *  whatever was typed, and a non-finite or crossed pair must still leave a
+ *  bounded curve rather than a table of NaN. */
+function limitBounds(): { ceiling: number; threshold: number } {
+  const raw = balance.mixLimiter
+  const ceiling = Number.isFinite(raw.ceiling) ? Math.max(0, raw.ceiling) : DEFAULT_CEILING
+  const wanted = Number.isFinite(raw.threshold) ? Math.max(0, raw.threshold) : DEFAULT_CEILING
+  return { ceiling, threshold: Math.min(wanted, ceiling) }
+}
+
+/** The fallback for a value that is not a number at all. It is the safe end of
+ *  the range: a threshold AT the ceiling limits hard rather than smoothly, and
+ *  never above it. */
+const DEFAULT_CEILING = 0.95
 
 /** The table the `WaveShaper` carries: `limitMixSample` over the scaled domain.
  *  The browser reads it with linear interpolation, and the knee is concave, so
@@ -50,10 +68,24 @@ export function mixLimiterCurve(points: number = MIX_LIMITER_CURVE_POINTS): Floa
   const curve = new Float32Array(points)
   for (let i = 0; i < points; i++) {
     const unit = (2 * i) / (points - 1) - 1
-    curve[i] = limitMixSample(unit * MIX_LIMITER_DOMAIN) / MIX_LIMITER_DOMAIN
+    curve[i] = storeInward(limitMixSample(unit * MIX_LIMITER_DOMAIN) / MIX_LIMITER_DOMAIN)
   }
   return curve
 }
+
+/** A `Float32Array` stores to the NEAREST float32, which can round a value UP —
+ *  and a value rounded up at the curve's own extreme would stand a hair ABOVE
+ *  the ceiling, which is exactly the one thing the stage promises never happens.
+ *  So the table rounds INWARD instead, towards zero, at a cost of one float32
+ *  ulp (about 1.2e-7 relative) on a value the ear cannot tell apart anyway. */
+function storeInward(value: number): number {
+  const nearest = Math.fround(value)
+  if (Math.abs(nearest) <= Math.abs(value)) return nearest
+  return Math.fround(value - Math.sign(value) * Math.abs(value) * FLOAT32_ULP)
+}
+
+/** One step of the float32 mantissa: 2^-23. */
+const FLOAT32_ULP = 2 ** -23
 
 /** How the browser reads a shaper's table: indexed over an input of ±1 with
  *  linear interpolation, and an input outside that range clamped to the table's
@@ -61,6 +93,7 @@ export function mixLimiterCurve(points: number = MIX_LIMITER_CURVE_POINTS): Floa
  *  `curve` the shaper really carries and applying the gains around it — rather
  *  than re-evaluating the formula beside the graph. */
 export function readCurveTable(curve: Float32Array, input: number): number {
+  if (!Number.isFinite(input)) return 0
   const unit = Math.max(-1, Math.min(1, input))
   const position = ((unit + 1) / 2) * (curve.length - 1)
   const low = Math.floor(position)

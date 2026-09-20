@@ -987,6 +987,26 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
         expect(codes().join(' ')).toContain('speech-inaudible')
       })
 
+      // Four-eyes review (GPT-6 Astra, 20.09.2026): the master stopped being
+      // the last node when the mix limiter landed (point 1156), and a check
+      // that reads only up to the master would pass while a limiter calibrated
+      // to a zero ceiling silences the destination just as completely.
+      it('FIRES on a zero limiter CEILING — the end of the chain moved', () => {
+        ctx.currentTime = 310
+        const heldCeiling = balance.mixLimiter.ceiling
+        balance.mixLimiter.ceiling = 0
+        speak()
+        balance.mixLimiter.ceiling = heldCeiling
+        expect(codes().join(' ')).toContain('speech-inaudible')
+      })
+
+      it('says nothing at the shipped limiter calibration', () => {
+        ctx.currentTime = 315
+        expect(balance.mixLimiter.ceiling).toBeGreaterThan(0)
+        speak()
+        expect(codes()).toEqual([])
+      })
+
       it('FIRES on a plan that carries syllables at no level at all', () => {
         ctx.currentTime = 320
         // Not reachable through `phrasePlan` — it returns no syllables for an
@@ -1104,7 +1124,9 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
     const shaper = limiterIn.connected[0] as FakeShaper
     const limiterOut = shaper.connected[0] as FakeGain
     expect(ctx.shapers).toContain(shaper)
-    expect(shaper.oversample).toBe('4x')
+    // 'none' is load-bearing: an oversampling shaper resamples after the curve
+    // has bounded the sample, and that filter may overshoot the ceiling.
+    expect(shaper.oversample).toBe('none')
     expect(limiterOut.connected[0]).toBe(ctx.destination)
     expect(limiterIn.gain.value * limiterOut.gain.value).toBeCloseTo(1, 12)
     return readCurveTable(shaper.curve!, sum * limiterIn.gain.value) * limiterOut.gain.value

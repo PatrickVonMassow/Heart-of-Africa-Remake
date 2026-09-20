@@ -118,9 +118,9 @@ export interface BalanceConfig {
    *  (calibratable, CLAUDE.md §2) chosen from the measured worst case of 1.336:
    *  the mix is identity below `threshold` and bends smoothly towards — never
    *  onto — `ceiling` above it. `threshold` sits above the everyday single
-   *  close voice (0.932) so nothing normal is shaped at all; `ceiling` leaves
-   *  0.45 dB of true-peak room under full scale for the shaper's own
-   *  reconstruction ripple. */
+   *  close voice (0.932) so nothing normal is shaped at all; `ceiling` keeps
+   *  0.45 dB under full scale, which is where a mix is mastered to and what the
+   *  destination may then be handed at most. */
   mixLimiter: {
     threshold: number
     ceiling: number

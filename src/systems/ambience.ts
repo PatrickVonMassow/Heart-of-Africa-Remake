@@ -6,7 +6,7 @@
 import type { PlaceKind, RegionId } from '../world/geo'
 import { balance } from '../config/balance'
 import { devAssert } from './devAssert'
-import { MIX_LIMITER_DOMAIN, mixLimiterCurve } from './mixLimiter'
+import { MIX_LIMITER_DOMAIN, limitMixSample, mixLimiterCurve } from './mixLimiter'
 import type { Tone } from '../communication/lexicon'
 import { phrasePlan, utterancePlan, type SpeechPlan, type SpeechVoice, type SpeechOptions } from '../communication/speaking'
 import type { DrumId, DrumMessagePlan } from '../communication/drumMessage'
@@ -491,10 +491,15 @@ function buildGraph() {
   limiterIn.gain.value = 1 / MIX_LIMITER_DOMAIN
   const shaper = ctx.createWaveShaper()
   shaper.curve = mixLimiterCurve()
-  // Shaping generates harmonics above the sample rate; oversampling keeps them
-  // from folding back as aliases. The ceiling carries true-peak room for the
-  // ripple the resampling adds in return.
-  shaper.oversample = '4x'
+  // NO OVERSAMPLING, deliberately. Oversampling would spare the shaped peaks
+  // some foldover, but it resamples AFTER the curve has bounded the sample, and
+  // the Web Audio specification leaves that filter to the implementation — it
+  // may overshoot, and then nothing here can still promise what leaves the
+  // stage. With 'none' the curve IS the output, sample for sample, so the
+  // ceiling is a guarantee rather than an expectation. The aliasing paid for it
+  // is small and rare: the curve is the identity below the threshold, so only
+  // the brief top of a coincidence is shaped at all, and the knee is smooth.
+  shaper.oversample = 'none'
   limiterOut = ctx.createGain()
   limiterOut.gain.value = MIX_LIMITER_DOMAIN
   master.connect(limiterIn)
@@ -1078,14 +1083,21 @@ export function playSpeech(plan: SpeechPlan): void {
   // the destination is not readable through the Web Audio API. That end is held
   // by the live browser check, which listens to what the output really carries
   // (`scripts/verify/settings.mjs`).
+  //
+  // THE END OF THE CHAIN MOVED (point 1156): the master is no longer the last
+  // node, so a level read at the master is one stage short of the truth. A
+  // limiter calibrated to a zero ceiling silences the destination exactly the
+  // way a zero bus did, and this check must see it.
   const chain = speechBus ? speechBus.gain.value * master.gain.value : master.gain.value
+  const leaving = limitMixSample(peak * chain * route.monoGain)
   devAssert(
-    peak * chain * route.monoGain > 0 || balance.communication.speechVolume <= 0,
+    leaving > 0 || balance.communication.speechVolume <= 0,
     'speech-inaudible',
     () =>
-      `${plan.syllables.length} syllables leave the graph at ${(peak * chain).toExponential(2)} ` +
+      `${plan.syllables.length} syllables leave the graph at ${leaving.toExponential(2)} ` +
       `(peak ${peak.toFixed(3)}, speech bus ${(speechBus?.gain.value ?? 1).toFixed(3)}, ` +
-      `master ${master?.gain.value.toFixed(3)}) while the speech volume is ${balance.communication.speechVolume}`,
+      `master ${master?.gain.value.toFixed(3)}, mix limiter ceiling ` +
+      `${balance.mixLimiter.ceiling}) while the speech volume is ${balance.communication.speechVolume}`,
   )
   // Counted SEPARATELY from `spoken`, so the live gate proves audio was really
   // scheduled at a positive level — not merely that a counter moved.
