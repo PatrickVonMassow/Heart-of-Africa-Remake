@@ -717,8 +717,11 @@ describe('the seed spread stops where a foreign village IS the statement (work-o
   // the stripper a body that looked like live code. With the whole file
   // stripped, a commented-out case simply has no name left to find.
   const stripComments = (text: string) => text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
-  /** Every runner switch in `text` that would keep a case from running. */
-  const disablers = (text: string) => text.match(/\b(?:x(?:describe|it|test)|(?:describe|it|test)\.(?:skip|todo|only|skipIf|runIf|concurrent\.skip))\b/g) ?? []
+  /** Every runner switch in `text` that would keep a case from running. The
+   *  modifier chain is matched WHOLE — `describe.sequential.skip` is as much a
+   *  skip as `describe.skip` (fourth cross-vendor round). */
+  const disablers = (text: string) =>
+    text.match(/\b(?:x(?:describe|it|test)|(?:describe|it|test)(?:\.[A-Za-z]+)*\.(?:skip|todo|only|skipIf|runIf))\b/g) ?? []
   it('leaves riverBank.test.ts naming the riverless villages', () => {
     const src = stripComments(readFileSync(resolve(process.cwd(), 'src/scenes/place/riverBank.test.ts'), 'utf8'))
     const start = src.indexOf("it('a village away from every river has none")
@@ -757,7 +760,14 @@ describe('the seed spread stops where a foreign village IS the statement (work-o
     expect(disablers("  it.only('a village away from every river has none', () => {")).toEqual(['it.only'])
     expect(disablers("  xit('a village away from every river has none', () => {")).toEqual(['xit'])
     expect(disablers("  it.todo('a village away from every river has none')")).toEqual(['it.todo'])
+    expect(disablers("describe.sequential.skip('a village away from every river has none', () => {")).toEqual([
+      'describe.sequential.skip',
+    ])
+    expect(disablers("  it.concurrent.only('a village away from every river has none', () => {")).toEqual([
+      'it.concurrent.only',
+    ])
     expect(disablers("  it('a village away from every river has none', () => {")).toEqual([])
+    expect(disablers("  it.each(RIVERLESS)('%s has no bank', () => {")).toEqual([])
   })
 })
 
