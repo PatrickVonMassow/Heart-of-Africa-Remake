@@ -185,9 +185,8 @@ grave and the unspecific word a non-knowing chief offers instead;
 taught the direction system retired on 05.09.2026 (design.md §13.2).
 
 THE VILLAGE SPEECH (§13.4, docs/communication-poc-spec.md, work-order points
-477–488 and their successors 579/580/582/588/589). Pure Vitest throughout —
-nothing in the mechanic needs a browser, and the one thing that does (the note
-landing over the figure the scene drew) is the polish suite below:
+686–692 and their landed follow-ups). Vitest covers logic and state; the
+browser sections judge the drawn teaching, motion, interaction and sound:
 
 - `src/communication/lexicon.test.ts` — the six concepts (`RIVER`, `UPSTREAM`,
   `DOWNSTREAM`, `ROCK`, `DIG`, `CHIEF`) and the spec's table
@@ -210,15 +209,14 @@ landing over the figure the scene drew) is the polish suite below:
   `src/communication/speechTarget.test.ts` — the note
   over the head carries the player's own reading or `???`, one per atom in
   spoken order, rides on the SPEAKER'S OWN height (point 582), never accumulates;
-  and the click goes to the NEAREST speaker, a tie held rather than flickering,
+  and E opens the targeted audible speaker, a tie held rather than flickering,
   with no invitation while a dialog stands open (point 588).
 - `src/scenes/place/bankGame.test.ts` (work-order 687) — the children's ONE game
-  at the river bank, which teaches four of the five words: the cycle's phases in
+  at the river bank, which teaches four of the six words: the cycle's phases in
   order, the caller of RIVER as the first catcher, the announced direction
   alternating with the side swap, ROCK called once with nobody arriving (the
   catcher's tap) and once outside the game altogether (a child naming an ordinary
-  village boulder while the group roams), a direction word called once with no
-  rock as its target (the parting walk along the bank), the run and cycle ending
+  village boulder while the group roams), the run and cycle ending
   exactly as the spec states, no utterance reducing a playing child's pace, and a
   tagged child holding its crouch until the run ends.
 - `src/scenes/place/bankStage.test.ts` (work-order 687) — the stage the game is
@@ -236,12 +234,18 @@ landing over the figure the scene drew) is the polish suite below:
   silhouette measured from the mesh the scene instances, at its own scale and
   yaw: no vertex stands outside the reported surface, and the widest ring sits
   well above the ground, which is why the collider is not the drawn span.
-- `src/scenes/place/mutedTeaching.test.ts` (work-order 686) — the removed
-  eleven-concept catalogues stage nothing: neither the children's old situations
-  nor the adults' old errands speak or steer. The adults' own teaching of RIVER
-  and DIG is owed by work-order point 688 and is not claimed here.
+- `src/scenes/place/PlaceLife.games.test.ts` — every shipped settlement mounts
+  exactly one game; banks select bank play only in villages, ports and bankless
+  villages select silent tag. `lifeSpots.test.ts` measures the derived ground's
+  clearance from its own vignettes, including every port at three seeds.
+- `src/scenes/place/adultWork.test.ts` — dispatched water errands and paired DIG
+  invitations, arrival words, visible consequences and child-earshot deferral.
+  `digSiteAppearance.test.ts` covers the work's purpose and completed result;
+  `adultWork.test.ts` covers the empty jar, held dip and filled return.
+- `src/communication/speechFloor.test.ts` — audible exchanges take turns,
+  unavailable situations yield, and queued words are released before expiry.
 - `src/scenes/place/speechChannel.test.ts` — the scene speaks over a named
-  figure, holds the click target, and never accumulates standing text.
+  figure, holds the speaker target, and never accumulates standing text.
 - `src/systems/ambience.test.ts` (`playSpeech`) — the syllables reach the audio
   clock on the speech bus, under the single §21 ambience volume (point 577).
 - `src/state/store.communication.test.ts` — hearing recorded on the in-game day
@@ -258,7 +262,7 @@ landing over the figure the scene drew) is the polish suite below:
 In the browser, `scripts/verify/polish.mjs` proves what the picture owes: section
 `speech-hypothesis` speaks over a figure the scene really drew and measures the
 note against that figure's own head (`146-speech-hypothesis-label`), and section
-`speech-guess` the click invitation and the opened dialog
+`speech-guess` the E invitation and the opened dialog
 (`148-speech-guess-invitation`, `149-speech-guess-dialog`).
 
 AND THAT THE TEACHING HAND TOUCHES WHAT IT NAMES (work-order 1065). The same
@@ -324,31 +328,24 @@ the front in `04-chief-outside-his-hut.png`; and the same `polish.mjs` section
 photographs them again in `151-chief-beside-his-drummer.png`, with the drums
 still speaking at the shutter.
 
-THE ERRAND'S END (docs/communication-poc-spec.md, point 487). Understood, the
-message sends the traveller out of the village: in the BIRD'S-EYE view, up the
-Niger, to the erratic on its bank, where the shovel he already carries recovers
-what lies buried at its foot. The dig check reads `communicationRockSite` — the
-one function the renderer places the block from — so the spot the picture shows
-and the spot that yields are the same value, and a dig anywhere else yields the
-ordinary nothing. The find rides OUTSIDE the inventory capacity: it is a puzzle
-token, not trade goods, so a full pack can never strand the errand. Carried back
-into the chief's own village it is laid in his hands, and that hand-over is what
-solves the puzzle — he answers with ROCK · DIG, two concepts the
-village has already taught, recorded like any other speech of his people and
-shown with the player's OWN notes over them. Nothing is translated for him,
-here least of all.
-Verifiable: pure Vitest. `src/world/communicationRock.test.ts` sweeps the seeds
-for the dig reach covering the drawn block and nothing off it, and for one run's
-boulder not answering for another's; `src/communication/chiefReply.test.ts` that
-the acknowledgment introduces no concept the village does not teach and speaks
-the lexicon's own atoms; `src/state/store.rockArtefact.test.ts` the dig branch,
-the once-only ground, the full pack, the hand-over guards (wrong place, wrong
-mode, nothing dug up, twice), the chronicle in both languages with its markup,
-and the checkpoint round trip incl. a snapshot from before the boulder was dug.
-In the browser, `scripts/verify/world.mjs` drives the whole loop against the
-placement the SCENE drew (`window.__communicationRock`): a dig clear of the
-erratic recovers nothing, a dig at it recovers the artefact and journals it, and
-the hand-over in the village closes the loop — green on both backends.
+THE ERRAND AND ITS ANSWER. The player follows the river upstream in the
+bird's-eye view and digs at the rendered boulder. The find is an inventory item
+outside trading and pack capacity. Using it before the outdoor chief gives it
+to him; using it elsewhere leaves it in the pack and explains why. He lays it
+beside the drums and answers `RIVER · DOWNSTREAM`, handing over the clay
+impression wordlessly. Both drum messages are remembered only at their own last
+beat, become repeatable and reopen from the journal with the player's readings.
+The clay form fits the matching socket at Bandiagara's talus foot; that fit ends
+the puzzle.
+Verifiable: `src/world/communicationRock.test.ts` pins the rendered dig site;
+`src/communication/drumMessage.test.ts` pins the two-word answer;
+`src/state/store.rockArtefact.test.ts` covers the inventory hand-over guards;
+`src/state/store.communication.test.ts` covers message memory and repeats;
+`src/state/store.mould.test.ts` and `src/world/forms.test.ts` cover the reward,
+its matching socket and the journal observation in both languages.
+Browser `world` covers the travel errand, and `polish` sections `artefact-give`
+and `chief-to-drummer` cover the outdoor giving and drum staging. Browser
+verdicts belong to the reviewing run; these references describe what is tested.
 
 ## 8. Chronicle/journal.
 
@@ -508,7 +505,7 @@ Verifiable:
 `src/state/store.hints.test.ts` asserts that the deciphered latitude
 and longitude equal the actual grave position and that non-knowing
 chiefs point to the knowing people; `scripts/verify/flow.mjs` plays
-the full loop (gift → lesson → deciphered latitude, the East leg for
+the inherited hint loop (chief → recorded latitude, the East leg for
 the longitude, then the dig).
 
 ## 11. Game graphics.
@@ -1334,7 +1331,7 @@ in the real walk loop and the place is left within 1.5 m of the drawn line
 488-port-edge-band / 488-monument-edge-band).
 
 THE CHILDREN PLAY A GAME OF TAG (§19.10, points 480/351) WHERE THE SETTLEMENT
-STANDS ON NO RIVER. Since the five-word rebuild a riverside village plays the
+STANDS ON NO RIVER. In the rebuilt mechanic a riverside village plays the
 bank round instead (§7), and this chase is what the children play everywhere
 else. One of them is IT and chases the others; whoever is caught becomes the new IT, and any number plays.
 It is a CHASE, not a route — nothing here holds a ring, an orbit or a tour of
@@ -1391,23 +1388,15 @@ against the built fabric (`src/scenes/place/lifeSpots.test.ts` pins that for
 every shipped village) (`scripts/verify/polish.mjs`, screenshot
 480-village-tag).
 
-THE CHASE ITSELF TEACHES NOTHING, AND SAYS SO (points 686/687). It once carried
-twelve staged situations teaching six general concepts — COME, GO_THERE, FOLLOW,
-HERE, THERE and NO — and the user could learn nothing from them: "Ich erkenne da
-kein Fangspiel … Das Herumschicken wirkt wie zum Selbstzweck eingeführt". The
-diagnosis was that the design had forced six lessons onto a game that cannot
-carry them, and the rebuild replaced all of it with FIVE words taught in two
-places (§7): the children's bank round, and the adults at their own work. The
-catalogue is therefore GONE, not merely unused — `childSituations.ts` keeps its
-exported types and stages nothing, and the twelve-situation suite that pinned the
-old curriculum was deleted with the curriculum. What replaced it is the bank
-round, and its evidence stands under §7 rather than being restated here.
-Verifiable: `src/scenes/place/mutedTeaching.test.ts` asserts that the adapter
-stages NOTHING — the one claim this paragraph now makes — and the browser tripwire
-in `scripts/verify/polish.mjs` goes red the moment anything is staged again, so
-the emptiness is measured live and not merely asserted in a unit. Point 688 fills
-the adults' half; when it lands, this paragraph is replaced by what they teach,
-not extended.
+CLASSIC TAG IS SILENT in every port and every bankless village. A bank village
+stages only the teaching bank round. `PlaceLife.games.test.ts` executes the
+scene composition and game initialization for all shipped settlements;
+`tagGame.test.ts` covers pursuit, stamina, role transfer and progress rescue.
+`tagShuffle.test.ts` retains the reported standstill regression and shared body
+separation. The browser `children-motion` section applies the existing motion
+metric to a bank village, a bankless village and a port. The scene publishes the
+same live motion probe for both games, so moving tag does not retire its gate.
+The bank round and adult teaching evidence are under §7.
 THE VILLAGE'S PRODUCERS ARE ALARMED FOR THE LONG RUN (point 589): the children's
 play at the chase and their speech at the bank round each carry a watch of
 the dev-assert channel's long-run family (`watchProducer`,
@@ -1432,9 +1421,9 @@ intact plan silenced further down (`src/systems/ambience.test.ts`). The separati
 in `src/scenes/place/lifeSpots.test.ts` (every adult station outside the hearing
 radius of the whole play ground, swept over the fire's position, shrinking rather
 than giving up), and the chase's side of it in
-`src/scenes/place/tagGame.test.ts` (a claim steers a runner and never the chaser,
-the floor pace holds under any claim, the break moves only who was told to, and
-the group stays inside an off-centre ground while the game still resolves).
+`src/scenes/place/tagGame.test.ts` (the group stays inside its off-centre
+ground, catches transfer the role, stamina ends pursuits and a complete progress
+window detects oscillation even when it crosses the old anchor radius).
 
 ## 16. Collision inside settlements.
 

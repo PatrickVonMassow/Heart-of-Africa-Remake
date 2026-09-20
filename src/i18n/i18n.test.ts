@@ -298,3 +298,15 @@ describe('German typography: the Gedankenstrich is an en dash (point 420)', () =
     }
   })
 })
+
+describe('the rebuilt communication journal', () => {
+  it.each([en, de])('keeps the chief ungated and the drum reading the player’s own', strings => {
+    const arrival = strings.journal.villageFirstVisit({ place: 'bambara-village', people: 'unknown' })
+    expect(arrival).not.toMatch(/goodwill|Wohlwollen/)
+    expect(arrival).toMatch(/call him outside|ihn herausrufen/)
+    const find = strings.journal.rockArtefact
+    expect(find).not.toMatch(/water, against the pull, stone, dig|Wasser, gegen den Zug, Stein, graben/)
+    expect(find).toMatch(/my reading|Meine Deutung/)
+    expect(stripVoiceMarkup(find)).not.toContain('[')
+  })
+})
