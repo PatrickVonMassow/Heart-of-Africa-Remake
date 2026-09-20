@@ -8304,6 +8304,14 @@ if (section('modal-above-labels')) {
 // for it. The map plate and the debug menu can never reach the top-centre
 // strip, so their layering is read off the computed z-index rather than from
 // pretended geometry.
+//
+// AND THE WAIT IS ON THE TOAST, NEVER ON THE CLOCK. A toast dismisses itself
+// after 3.5 s (Hud.tsx), and a fixed settle that a loaded machine stretches
+// past that reads an EMPTY screen and blames the code: measured twice on
+// 20.09.2026, once as "the press raised no toast" and once as a sentence that
+// was null the instant after it was set. Every step here therefore RAISES the
+// sentence and then waits frame by frame for the element to be there, and the
+// measurement is taken without another await in between.
 if (section('toast-above-panels')) {
   await page.evaluate(() => window.__game.getState().enterPlace('cairo'))
   await page
@@ -8314,9 +8322,19 @@ if (section('toast-above-panels')) {
     const t = getStrings().toasts
     return { rifleInSettlement: t.rifleInSettlement, chiefStepsOut: t.chiefStepsOut }
   })
+
   const pressed = await page.evaluate(async () => {
     const g = () => window.__game.getState()
-    const settle = () => new Promise((res) => requestAnimationFrame(() => setTimeout(res, 80)))
+    const frame = () => new Promise((res) => requestAnimationFrame(res))
+    // Wait for the CONDITION, not a span of time.
+    const until = async (probe, frames = 240) => {
+      for (let i = 0; i < frames; i++) {
+        const v = probe()
+        if (v) return v
+        await frame()
+      }
+      return null
+    }
     window.__ui.getState().setDialog(null)
     if (window.__ui.getState().mapOpen) window.__ui.getState().toggleMap()
     g().debugAddEquipment('rifle')
@@ -8326,62 +8344,83 @@ if (section('toast-above-panels')) {
     // A sentence still standing from an earlier section would let a press that
     // reached nothing look like an answer, so the field starts EMPTY.
     g().setToast(null)
-    await settle()
-    const journalOpen = !!document.querySelector('.journal')
-    const slot = document.querySelector('.inventory-bar [data-eq="rifle"]')
-    if (!slot) return { ok: false, why: 'no rifle slot in the inventory bar', journalOpen }
+    const journal = await until(() => document.querySelector('.journal'))
+    const slot = await until(() => document.querySelector('.inventory-bar [data-eq="rifle"]'))
+    if (!journal || !slot) return { ok: false, why: 'journal or rifle slot missing', journal: !!journal, slot: !!slot }
     const wasEmpty = !document.querySelector('.toast')
     slot.click()
-    await settle()
-    const toast = document.querySelector('.toast')
-    return { ok: true, journalOpen, wasEmpty, text: toast ? toast.textContent : null }
+    const toast = await until(() => document.querySelector('.toast'))
+    return {
+      ok: true, wasEmpty, tag: slot.tagName,
+      text: toast ? toast.textContent : null, storeToast: g().toast, mode: g().mode, placeId: g().placeId,
+    }
   })
-  check('the inventory press answers with the rifle\'s own sentence while the journal is open',
-    pressed.ok && pressed.journalOpen && pressed.wasEmpty && pressed.text === strings.rifleInSettlement,
+  check("the inventory press answers with the rifle's own sentence while the journal is open",
+    pressed.ok && pressed.wasEmpty && pressed.tag === 'BUTTON' && pressed.text === strings.rifleInSettlement,
     JSON.stringify({ ...pressed, expected: strings.rifleInSettlement }))
 
   const layering = await page.evaluate(async (chiefSentence) => {
     const g = () => window.__game.getState()
-    const settle = () => new Promise((res) => requestAnimationFrame(() => setTimeout(res, 80)))
-    // The longest answer in the game, so the centred toast really reaches the
-    // right-hand journal panel: without that overlap the hit test says nothing.
-    g().setToast(chiefSentence)
-    await settle()
-    const toast = document.querySelector('.toast')
-    const journal = document.querySelector('.journal')
-    if (!toast || !journal) return { ok: false, why: 'toast or journal missing', toast: !!toast, journal: !!journal }
+    const frame = () => new Promise((res) => requestAnimationFrame(res))
+    const until = async (probe, frames = 240) => {
+      for (let i = 0; i < frames; i++) {
+        const v = probe()
+        if (v) return v
+        await frame()
+      }
+      return null
+    }
+    // Raise the sentence afresh before EVERY measurement: it dismisses itself
+    // after 3.5 s, and the measurement must never race that timer.
+    const raise = async () => {
+      g().setToast(null)
+      await frame()
+      g().setToast(chiefSentence)
+      return until(() => document.querySelector('.toast'))
+    }
+    const onTopAt = (toast, x, y) => {
+      const hit = document.elementFromPoint(Math.round(x), Math.round(y))
+      return toast === hit || toast.contains(hit)
+    }
+    g().setJournalOpen(true)
+    const journal = await until(() => document.querySelector('.journal'))
+    if (!journal) return { ok: false, why: 'the journal did not open' }
+
+    // 1) Over the journal panel, inside the overlap of the two rectangles.
+    let toast = await raise()
+    if (!toast) return { ok: false, why: 'the sentence never reached the screen', storeToast: g().toast }
     const r = toast.getBoundingClientRect()
     const j = journal.getBoundingClientRect()
     const ox = [Math.max(r.left, j.left), Math.min(r.right, j.right)]
     const oy = [Math.max(r.top, j.top), Math.min(r.bottom, j.bottom)]
     const overlap = { w: ox[1] - ox[0], h: oy[1] - oy[0] }
-    const onTopAt = (x, y) => {
-      const hit = document.elementFromPoint(Math.round(x), Math.round(y))
-      return toast === hit || toast.contains(hit)
-    }
     const overlaps = overlap.w > 0 && overlap.h > 0
-    const overJournal = overlaps && onTopAt((ox[0] + ox[1]) / 2, (oy[0] + oy[1]) / 2)
-    const zOf = (sel) => {
-      const el = document.querySelector(sel)
-      return el ? Number.parseInt(getComputedStyle(el).zIndex, 10) : null
-    }
-    const journalZ = zOf('.journal')
+    const overJournal = overlaps && onTopAt(toast, (ox[0] + ox[1]) / 2, (oy[0] + oy[1]) / 2)
     const toastZ = Number.parseInt(getComputedStyle(toast).zIndex, 10)
-    // The map plate sits bottom-left and the debug menu is its own panel; both
-    // are out of the toast's strip, so they are judged by layer, not geometry.
+    const journalZ = Number.parseInt(getComputedStyle(journal).zIndex, 10)
+
+    // 2) The map plate: bottom-left, out of the toast's strip, so it is judged
+    //    by layer rather than by geometry it can never reach.
     window.__ui.getState().toggleMap()
-    await settle()
-    const mapZ = zOf('.map-overlay')
+    const map = await until(() => document.querySelector('.map-overlay'))
+    const mapZ = map ? Number.parseInt(getComputedStyle(map).zIndex, 10) : null
     window.__ui.getState().toggleMap()
+
+    // 3) Under the modal backdrop, which spans the whole viewport — there the
+    //    toast's own centre is a real sample.
     window.__ui.getState().setDialog({ kind: 'agency' })
-    await settle()
-    const backdrop = !!document.querySelector('.dialog-backdrop')
-    const dialogZ = zOf('.dialog-backdrop')
-    const overDialog = onTopAt(r.left + r.width / 2, r.top + r.height / 2)
+    const backdrop = await until(() => document.querySelector('.dialog-backdrop'))
+    const dialogZ = backdrop ? Number.parseInt(getComputedStyle(backdrop).zIndex, 10) : null
+    toast = await raise()
+    const r2 = toast ? toast.getBoundingClientRect() : null
+    const overDialog = !!(toast && r2 && onTopAt(toast, r2.left + r2.width / 2, r2.top + r2.height / 2))
     window.__ui.getState().setDialog(null)
     g().setJournalOpen(false)
     g().setToast(null)
-    return { ok: true, rect: r.toJSON(), journalRect: j.toJSON(), overlap, overlaps, overJournal, backdrop, overDialog, toastZ, journalZ, mapZ, dialogZ }
+    return {
+      ok: true, rect: r.toJSON(), journalRect: j.toJSON(), overlap, overlaps, overJournal,
+      backdrop: !!backdrop, overDialog, toastZ, journalZ, mapZ, dialogZ,
+    }
   }, strings.chiefStepsOut)
   check('the toast really overlaps the journal panel, so the hit test can say something',
     layering.ok && layering.overlaps, JSON.stringify(layering))
@@ -8393,16 +8432,19 @@ if (section('toast-above-panels')) {
     JSON.stringify(layering))
 
   // The picture the acceptance criterion is judged on: the sentence standing
-  // legible ACROSS the open journal, which is what the numbers above assert.
+  // legible ACROSS the open journal. The shutter takes its own time, so the
+  // sentence is held up for it instead of dismissing itself mid-exposure.
   await page.evaluate((sentence) => {
     window.__game.getState().setJournalOpen(true)
     window.__game.getState().setToast(sentence)
+    window.__holdToast = setInterval(() => window.__game.getState().setToast(sentence), 500)
   }, strings.chiefStepsOut)
   await shot('1170-toast-over-journal', {
     element: '.toast',
     label: "the traveller's answer standing over the opened journal",
   })
   await page.evaluate(() => {
+    clearInterval(window.__holdToast)
     window.__game.getState().setJournalOpen(false)
     window.__game.getState().setToast(null)
   })
