@@ -1524,11 +1524,21 @@ describe('the children`s bank round can reach its own stage (work-order 687)', (
   // layer had covered the bambara village at the child-motion report's seed
   // only, and the layout the picture check actually walks — a different one —
   // was the one whose route across the village could not be planned.
+  // AND THE OTHER TWO ARE SEEDS, NOT VILLAGES (work-order 1094). They were the
+  // nubian and the mandinka layout, on the reasoning that one settlement proves
+  // nothing about the next — true, and beside the point: the round that TEACHES
+  // is played in `ROCK_VILLAGE_ID`, and what varies for the player there is the
+  // world SEED, drawn afresh at every start. The two replacements are chosen by
+  // measurement over bambara seeds 1-30 (400 replayed seconds each, the guard's
+  // bound lifted so the layout rather than the bound is read): seed 9 is the
+  // FASTEST layout of the sweep to its first run (22.0 s) and seed 23 one of the
+  // slowest that still gets there in the ordinary way (89.3 s), so the pair
+  // spans the range the player is really dealt instead of two foreign corners.
   const RIVER_VILLAGES: Array<[string, number]> = [
     ['bambara-village', 42],
     ['bambara-village', 2972259115],
-    ['nubian-village', 42],
-    ['mandinka-village', 99],
+    ['bambara-village', 9],
+    ['bambara-village', 23],
   ]
 
   describe.each([
@@ -1663,11 +1673,15 @@ describe('the children`s bank round can reach its own stage (work-order 687)', (
    * green on luck, which is exactly what it did until it did not.
    */
   it('carries a child past a planted traveller in every cycle-first run window (work-order 687)', async () => {
+    // THE SAME FOUR LAYOUTS THE STAGE CASES ABOVE USE, and for the same reason
+    // (work-order 1094): the teaching round is played in `ROCK_VILLAGE_ID`, so
+    // the spread runs over its SEEDS rather than over settlements the player
+    // never learns a word in.
     const CASES: Array<[string, number]> = [
       ['bambara-village', 42],
       ['bambara-village', 2972259115],
-      ['nubian-village', 42],
-      ['mandinka-village', 99],
+      ['bambara-village', 9],
+      ['bambara-village', 23],
     ]
     // What the browser section sets while it watches, and why: see
     // `scripts/verify/polish.mjs`, section `children-bank-game`.
@@ -1795,15 +1809,23 @@ describe('the children`s bank round can reach its own stage (work-order 687)', (
    *
    * The three layouts below are the ones that showed it, and they are here by
    * measurement: at this section's shortened roam the guard spent 136 s of
-   * overtime in bambara@7, 206 s in mandinka@99, and in bambara@236333330 it
-   * NEVER named the boulder at all (275 s to abandon). The ordinary case is
-   * beside them so the bound is not only proved where it bites.
+   * overtime in bambara@7 and in bambara@236333330 it NEVER named the boulder
+   * at all (275 s to abandon). The ordinary case is beside them so the bound is
+   * not only proved where it bites.
+   *
+   * THE FOREIGN LAYOUT IS GONE, AND ITS PROPERTY IS NOT (work-order 1094). The
+   * long-overtime case used to be mandinka@99 at 206 s, in a village nobody
+   * learns the language in. Re-swept over bambara seeds 1-30 with the guard's
+   * bound lifted, 400 replayed seconds each: seed 21 roams 237.2 s against a cap
+   * of 55.0 and does not get to its first run until 265.8 s, seed 4 roams 280.2 s
+   * (first run 310.5 s) and seed 7 roams 227.9 s — all three abandon the boulder.
+   * Seed 21 carries the case now, on the axis the player is actually dealt.
    */
   it('bounds the roaming phase, so a run always comes (work-order 687)', async () => {
     const CASES: Array<[string, number]> = [
       ['bambara-village', 42],
       ['bambara-village', 7],
-      ['mandinka-village', 99],
+      ['bambara-village', 21],
       ['bambara-village', 236333330],
       // THE CASE THAT PROVES THE FOLD BELOW, and the only one of the five that
       // does. Swept out of 120 village/seed layouts against the UNBOUNDED code:
@@ -1812,6 +1834,18 @@ describe('the children`s bank round can reach its own stage (work-order 687)', (
       // 55.4 s, and a run had opened long before (38.6 s). It is therefore the
       // one layout where the exit-only measurement reads green on a round that
       // is over its bound — which is what made the test unable to fail.
+      // THE ONE FOREIGN LAYOUT THE SEED SPREAD KEEPS (work-order 1094), and it
+      // is kept by measurement rather than by omission. Bambara seeds 1-30 were
+      // re-swept against the unbounded code, 400 replayed seconds each, reading
+      // the longest ENDED roam and the roam the window CLOSES in separately: not
+      // one of the thirty shows the combination this case is built on — an ended
+      // roam inside the cap beside a closing roam over it, with a run already
+      // opened. Every bambara layout that goes over the cap goes over it in a
+      // roam that also ENDS, which the exit-only measurement would have caught.
+      // Deleting this entry would therefore delete the only witness that makes
+      // the fold necessary, so it stays until a bambara seed is found that
+      // carries the same property — an assertion where the foreign layout IS the
+      // statement, exactly like the riverless village in `riverBank.test.ts`.
       ['mandinka-village', 58],
     ]
     const shippedRoam = BANK_CFG.roamSeconds
