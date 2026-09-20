@@ -21,10 +21,16 @@ beforeEach(() => {
 
 describe('recovering a refused settlement lock', () => {
   let lock: ReturnType<typeof createPlacePointerLock>
+  let keydown: (event: KeyboardEvent) => void
 
   beforeEach(() => {
     vi.useFakeTimers()
+    const listen = vi.spyOn(window, 'addEventListener')
     lock = createPlacePointerLock(canvas())
+    // jsdom cannot manufacture trusted input. Call the registered boundary with
+    // a trusted event shape; separate cases dispatch real synthetic DOM events.
+    keydown = listen.mock.calls.find(([type]) => String(type) === 'keydown')![1] as typeof keydown
+    listen.mockRestore()
   })
 
   afterEach(() => {
@@ -37,6 +43,147 @@ describe('recovering a refused settlement lock', () => {
     Object.defineProperty(document, 'pointerLockElement', { value: element, configurable: true })
     document.dispatchEvent(new Event('pointerlockchange'))
   }
+  const press = (overrides: Partial<KeyboardEvent> = {}) => keydown({
+    code: 'KeyW', isTrusted: true, target: document.body, ...overrides,
+  } as KeyboardEvent)
+
+  it.each(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowLeft', 'ArrowDown', 'ArrowRight'])(
+    'uses fresh %s activation after timer requests are all refused', async (code) => {
+      let inUserEvent = false
+      const request = vi.fn(() => {
+        if (!inUserEvent) return Promise.reject(new DOMException('A user gesture is required', 'NotAllowedError'))
+        setLock(canvas())
+        return Promise.resolve()
+      })
+      canvas().requestPointerLock = request
+      lock.request() // one quick click
+      await vi.advanceTimersByTimeAsync(5000)
+      expect(document.pointerLockElement).toBeNull()
+      expect(request).toHaveBeenCalledTimes(13)
+      expect(vi.getTimerCount()).toBe(0)
+      inUserEvent = true
+      press({ code }) // the player walks; no second click
+      inUserEvent = false
+      expect(document.pointerLockElement).toBe(canvas())
+      expect(request).toHaveBeenCalledTimes(14)
+      await vi.advanceTimersByTimeAsync(5000)
+      expect(request).toHaveBeenCalledTimes(14)
+      expect(vi.getTimerCount()).toBe(0)
+    },
+  )
+
+  it('uses the next movement press while a silent request is still pending', async () => {
+    canvas().requestPointerLock = vi.fn().mockImplementationOnce(() => new Promise<void>(() => {}))
+      .mockImplementation(() => { setLock(canvas()); return Promise.resolve() })
+    lock.request()
+    await vi.advanceTimersByTimeAsync(100)
+    press()
+    expect(document.pointerLockElement).toBe(canvas())
+    expect(canvas().requestPointerLock).toHaveBeenCalledTimes(2)
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('keeps recovery pending if the first real movement press is still refused', async () => {
+    const request = vi.fn().mockRejectedValue(new Error('Still cooling down'))
+    canvas().requestPointerLock = request
+    lock.request()
+    press()
+    await vi.advanceTimersByTimeAsync(5000)
+    request.mockImplementation(() => { setLock(canvas()); return Promise.resolve() })
+    press()
+    expect(document.pointerLockElement).toBe(canvas())
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it.each([
+    { isTrusted: false }, { repeat: true }, { defaultPrevented: true },
+    { ctrlKey: true }, { altKey: true }, { metaKey: true }, { code: 'Space' },
+    { code: 'KeyJ' }, { target: document.createElement('input') },
+    { target: document.createElement('textarea') }, { target: document.createElement('select') },
+    { target: document.createElement('button') }, { target: document.createElement('div') },
+  ])('ignores input that is not a fresh gameplay activation: %j', async (event) => {
+    canvas().requestPointerLock = vi.fn()
+    lock.request()
+    await vi.advanceTimersByTimeAsync(5000)
+    press(event)
+    expect(canvas().requestPointerLock).toHaveBeenCalledTimes(13)
+    expect(vi.getTimerCount()).toBe(0)
+    press({ shiftKey: true }) // running still qualifies
+    expect(canvas().requestPointerLock).toHaveBeenCalledTimes(14)
+  })
+
+  it('ignores synthetic key events and mouse movement', async () => {
+    canvas().requestPointerLock = vi.fn()
+    lock.request()
+    await vi.advanceTimersByTimeAsync(5000)
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW' }))
+    canvas().dispatchEvent(new MouseEvent('mousemove', { bubbles: true }))
+    expect(canvas().requestPointerLock).toHaveBeenCalledTimes(13)
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it.each(['Escape', 'dialog', 'overlay', 'blur', 'hidden', 'HUD click', 'grant then Escape', 'scene cleanup'])(
+    'cancels both timer and activation recovery on %s', async (reason) => {
+      canvas().requestPointerLock = vi.fn()
+      lock.request()
+      if (reason === 'Escape') press({ code: 'Escape' })
+      else if (reason === 'dialog') {
+        useUi.getState().setDialog(dialogs.trade)
+        useUi.getState().setDialog(null)
+      } else if (reason === 'overlay') {
+        document.body.insertAdjacentHTML('beforeend', '<div class="overlay"></div>')
+        press()
+        document.querySelector('.overlay')!.remove()
+      } else if (reason === 'blur') window.dispatchEvent(new Event('blur'))
+      else if (reason === 'hidden') {
+        const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(true)
+        document.dispatchEvent(new Event('visibilitychange'))
+        hidden.mockRestore()
+      } else if (reason === 'HUD click') {
+        document.body.dispatchEvent(new Event('pointerdown', { bubbles: true }))
+      } else if (reason === 'grant then Escape') {
+        setLock(canvas())
+        setLock(null)
+      } else lock.dispose()
+      await vi.advanceTimersByTimeAsync(5000)
+      press()
+      expect(canvas().requestPointerLock).toHaveBeenCalledTimes(1)
+      expect(vi.getTimerCount()).toBe(0)
+    },
+  )
+
+  it('does not request on movement without a pending return', () => {
+    canvas().requestPointerLock = vi.fn()
+    press()
+    expect(canvas().requestPointerLock).not.toHaveBeenCalled()
+  })
+
+  it.each(['inserted', 'class changed'])('retires expired recovery when an overlay is %s and later removed', async (kind) => {
+    canvas().requestPointerLock = vi.fn()
+    const overlay = document.createElement('div')
+    if (kind === 'class changed') document.body.append(overlay)
+    lock.request()
+    await vi.advanceTimersByTimeAsync(5000)
+    overlay.className = 'overlay'
+    if (kind === 'inserted') document.body.append(overlay)
+    await Promise.resolve() // deliver the DOM mutation while the overlay is open
+    overlay.remove()
+    press()
+    expect(canvas().requestPointerLock).toHaveBeenCalledTimes(13)
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('removes its input listeners on disposal', () => {
+    const offWindow = vi.spyOn(window, 'removeEventListener')
+    const offDocument = vi.spyOn(document, 'removeEventListener')
+    lock.dispose()
+    expect(offWindow).toHaveBeenCalledWith('keydown', keydown)
+    expect(offWindow).toHaveBeenCalledWith('pointerdown', expect.any(Function))
+    expect(offWindow).toHaveBeenCalledWith('blur', expect.any(Function))
+    expect(offDocument).toHaveBeenCalledWith('visibilitychange', expect.any(Function))
+    offWindow.mockRestore()
+    offDocument.mockRestore()
+  })
 
   it.each(['promise', 'event', 'throw'])('asks again 250 ms after a %s refusal, and keeps asking', async (signal) => {
     // The event-only API returns void in older browsers, unlike the DOM typings.
@@ -227,6 +374,7 @@ describe('recovering a refused settlement lock', () => {
     lock.request()
     errorEvent()
     await vi.advanceTimersByTimeAsync(5000)
+    press()
     expect(request).not.toHaveBeenCalled()
     expect(pointerLockProbe.grabs).toBe(1)
     expect(pointerLockProbe.refusals).toBe(0)
