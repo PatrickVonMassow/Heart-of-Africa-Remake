@@ -1,19 +1,17 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { balance } from '../config/balance'
-import { MIX_LIMITER_CURVE_POINTS, MIX_LIMITER_DOMAIN, limitMixSample, mixLimiterCurve } from './mixLimiter'
+import {
+  MIX_LIMITER_CURVE_POINTS,
+  MIX_LIMITER_DOMAIN,
+  limitMixSample,
+  mixLimiterCurve,
+  readCurveTable,
+} from './mixLimiter'
 
-/** What the browser does with the table: the curve is sampled over ±1 and read
- *  with linear interpolation, and an input outside that range is clamped to the
- *  table's end. Tests read the DEPLOYED table through this, so what is asserted
- *  is the mix that really leaves the stage. */
-export function throughCurve(curve: Float32Array, x: number): number {
-  const unit = Math.max(-1, Math.min(1, x / MIX_LIMITER_DOMAIN))
-  const position = ((unit + 1) / 2) * (curve.length - 1)
-  const low = Math.floor(position)
-  const high = Math.min(curve.length - 1, low + 1)
-  const fraction = position - low
-  return (curve[low] + (curve[high] - curve[low]) * fraction) * MIX_LIMITER_DOMAIN
-}
+/** The whole stage as it is deployed: scaled into the shaper's ±1 domain, read
+ *  off the table, and scaled back out. */
+const throughCurve = (curve: Float32Array, x: number) =>
+  readCurveTable(curve, x / MIX_LIMITER_DOMAIN) * MIX_LIMITER_DOMAIN
 
 describe('the mix limiter curve (point 1156 — design.md §19.1)', () => {
   const held = { ...balance.mixLimiter }

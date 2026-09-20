@@ -6,6 +6,7 @@
 import type { PlaceKind, RegionId } from '../world/geo'
 import { balance } from '../config/balance'
 import { devAssert } from './devAssert'
+import { MIX_LIMITER_DOMAIN, mixLimiterCurve } from './mixLimiter'
 import type { Tone } from '../communication/lexicon'
 import { phrasePlan, utterancePlan, type SpeechPlan, type SpeechVoice, type SpeechOptions } from '../communication/speaking'
 import type { DrumId, DrumMessagePlan } from '../communication/drumMessage'
@@ -46,6 +47,10 @@ const SURF_BASE = 0.26
 
 let ctx: AudioContext | null = null
 let master: GainNode | null = null
+// The mix limiter's output (design.md §19.1, point 1156). It is the LAST node
+// before the destination, so it — not the master — is what the graph really
+// delivers, and a browser analyser tapping the output must tap it here.
+let limiterOut: GainNode | null = null
 // THREE sub-buses under the master so footsteps, the village speech and every
 // other ambient sound can be balanced against each other (design.md §19.1/§20;
 // user request): footsteps ×2, all else ×0.5. Every layer/emitter routes through
@@ -477,7 +482,25 @@ function buildGraph() {
   if (!ctx) return
   master = ctx.createGain()
   master.gain.value = 0.5
-  master.connect(ctx.destination)
+  // THE LAST STAGE (design.md §19.1, point 1156): the master feeds the limiter
+  // and the limiter feeds the destination — nothing else may sit between them,
+  // or a bus would reach the output unbounded. The shaper's curve is indexed
+  // over an input of ±1, so the sum is scaled into that domain and back out
+  // again around it.
+  const limiterIn = ctx.createGain()
+  limiterIn.gain.value = 1 / MIX_LIMITER_DOMAIN
+  const shaper = ctx.createWaveShaper()
+  shaper.curve = mixLimiterCurve()
+  // Shaping generates harmonics above the sample rate; oversampling keeps them
+  // from folding back as aliases. The ceiling carries true-peak room for the
+  // ripple the resampling adds in return.
+  shaper.oversample = '4x'
+  limiterOut = ctx.createGain()
+  limiterOut.gain.value = MIX_LIMITER_DOMAIN
+  master.connect(limiterIn)
+  limiterIn.connect(shaper)
+  shaper.connect(limiterOut)
+  limiterOut.connect(ctx.destination)
   // Footstep, ambient and speech sub-buses (design.md §19.1/§20): footsteps
   // twice as loud, every other ambient sound half as loud, the village speech on
   // its own level, all three under the master volume.
@@ -1195,9 +1218,10 @@ if (import.meta.env.DEV && typeof window !== 'undefined') {
     // Village speech (design.md §13.4): speak an utterance/phrase from a given
     // distance, and read what was actually scheduled.
     speak: (utterance: string, distance: number, options: SpeechOptions = {}) => playSpeech(utterancePlan(utterance, distance, options)),
-    // Native browser analysers tap the deployed output after every bus.
+    // Native browser analysers tap the deployed output after every bus AND
+    // after the mix limiter (point 1156) — the node the destination hears.
     context: () => ctx,
-    output: () => master,
+    output: () => limiterOut ?? master,
     speakPhrase: (phrase: string[], distance: number) => playSpeech(phrasePlan(phrase, distance)),
     speechProbe: () => ({ ...(speechProbe ?? { spoken: 0, syllables: 0, lastPeak: 0 }) }),
   }

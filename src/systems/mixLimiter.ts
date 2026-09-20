@@ -54,3 +54,16 @@ export function mixLimiterCurve(points: number = MIX_LIMITER_CURVE_POINTS): Floa
   }
   return curve
 }
+
+/** How the browser reads a shaper's table: indexed over an input of ±1 with
+ *  linear interpolation, and an input outside that range clamped to the table's
+ *  end. The tests measure THROUGH the deployed stage with this — reading the
+ *  `curve` the shaper really carries and applying the gains around it — rather
+ *  than re-evaluating the formula beside the graph. */
+export function readCurveTable(curve: Float32Array, input: number): number {
+  const unit = Math.max(-1, Math.min(1, input))
+  const position = ((unit + 1) / 2) * (curve.length - 1)
+  const low = Math.floor(position)
+  const high = Math.min(curve.length - 1, low + 1)
+  return curve[low] + (curve[high] - curve[low]) * (position - low)
+}

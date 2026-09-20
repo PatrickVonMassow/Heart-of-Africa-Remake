@@ -35,6 +35,7 @@ import { balance } from '../config/balance'
 import { phraseOf, utteranceOf, SEQUENCE_LENGTH } from '../communication/lexicon'
 import { phrasePlan, utterancePlan, registerOptions } from '../communication/speaking'
 import { resetDevAsserts } from './devAssert'
+import { readCurveTable } from './mixLimiter'
 import { drumMessagePlan } from '../communication/drumMessage'
 
 describe('village drum bed phrase selection', () => {
@@ -344,6 +345,10 @@ class FakeOscillator extends FakeNode {
     this.stoppedAt = t
   }
 }
+class FakeShaper extends FakeNode {
+  curve: Float32Array | null = null
+  oversample = 'none'
+}
 class FakeBuffer {
   data: Float32Array
   constructor(len: number) {
@@ -400,6 +405,12 @@ class FakeCtx {
   }
   createBiquadFilter() {
     return new FakeFilter()
+  }
+  shapers: FakeShaper[] = []
+  createWaveShaper() {
+    const w = new FakeShaper()
+    this.shapers.push(w)
+    return w
   }
   /** Every oscillator the engine ever built — the spoken syllables among them. */
   oscillators: FakeOscillator[] = []
@@ -1084,6 +1095,21 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
 
   })
 
+  /** The DEPLOYED last stage (point 1156): walk master → limiter → destination
+   *  and carry a sum through it, reading the table the shaper really holds. It
+   *  asserts the topology on the way, so a stage that fell out of the graph
+   *  fails here rather than quietly measuring the unlimited sum. */
+  const throughLimiter = (master: FakeGain, sum: number) => {
+    const limiterIn = master.connected[0] as FakeGain
+    const shaper = limiterIn.connected[0] as FakeShaper
+    const limiterOut = shaper.connected[0] as FakeGain
+    expect(ctx.shapers).toContain(shaper)
+    expect(shaper.oversample).toBe('4x')
+    expect(limiterOut.connected[0]).toBe(ctx.destination)
+    expect(limiterIn.gain.value * limiterOut.gain.value).toBeCloseTo(1, 12)
+    return readCurveTable(shaper.curve!, sum * limiterIn.gain.value) * limiterOut.gain.value
+  }
+
   const villageFloor = () => {
     // Find the ambient bus through a real ambient emitter, then select layer
     // nodes by their setTarget ramps rather than assuming graph build order.
@@ -1120,7 +1146,6 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
     const panner = compensation.connected[0] as FakePanner
     const bus = panner.connected[0] as FakeGain
     const master = bus.connected[0] as FakeGain
-    expect(master.connected[0]).toBe(ctx.destination)
     const panAngle = (panner.pan.value + 1) * Math.PI / 4
     // Upper bound measured on all four rendered carriers, including the new
     // 352.8 Hz vowel (2.671). The old 1.7 lower bound hid the peak load.
@@ -1154,27 +1179,40 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
     // RE-MEASURED at speechVolume 3 (user 18.09.2026, 07:50). It was 0.977 at
     // speechVolume 2, and 1.780 before that at the former envelope peak 1.8.
     //
-    // THIS WORST CASE NOW EXCEEDS FULL SCALE AND IS REPORTED, NOT SILENTLY
-    // SCALED BACK: the user asked for 1.5× on speech, and 1.5 × 0.977 is 1.34
-    // whatever else is true. NOTHING in the graph absorbs it — there is no
-    // master limiter, so the destination hard-clips. Point 1156 carries that
-    // (design.md has no mix-headroom concept; it is an open design item).
+    // THE SUM ITSELF STILL EXCEEDS FULL SCALE, AND IS NOT SILENTLY SCALED BACK:
+    // the user asked for 1.5x on speech, and 1.5 x 0.977 is 1.34 whatever else
+    // is true. What point 1156 changed is what happens to it — the mix limiter
+    // (design.md §19.1) is now the last stage, so this is what the buses carry
+    // INTO it, not what leaves the graph.
     //
-    // What the number IS, so the limiter point has a target: this sum is
+    // What the number IS, so the limiter's target is on the record: this sum is
     // deliberately conservative. It coincides the peaks of two close child
     // voices, the whole ambience floor and a footstep on one sample, and reads
-    // speech at the 2.8 UPPER bound of the four rendered carriers (1.99–2.67).
+    // speech at the 2.8 UPPER bound of the four rendered carriers (1.99-2.67).
     if (register === 'talk') {
       expect(output).toBeCloseTo(1.33605117094, 5)
       expect(deployed).toBeCloseTo(1.24155117094, 5)
-      // 2.52 dB over full scale with the debug bed, 1.88 dB without it.
+      // 2.52 dB over full scale with the debug bed, 1.88 dB without it — the
+      // two overages the limiter had to absorb.
       expect(20 * Math.log10(output)).toBeCloseTo(2.5165, 3)
       expect(20 * Math.log10(deployed)).toBeCloseTo(1.879, 3)
+      // AND WHAT LEAVES THE GRAPH, measured through the deployed stage: both
+      // are under full scale again, with the ceiling's true-peak room to spare.
+      expect(throughLimiter(master, output)).toBeCloseTo(0.94999, 5)
+      expect(throughLimiter(master, deployed)).toBeCloseTo(0.94992, 5)
+      expect(throughLimiter(master, output)).toBeLessThan(1)
+      expect(throughLimiter(master, deployed)).toBeLessThan(1)
     }
-    // One voice — the reachable everyday case — still clears full scale.
+    // One voice — the reachable everyday case — cleared full scale before the
+    // limiter and must not be pulled DOWN by it: what the curve takes off it is
+    // an order of magnitude under the ~1 dB a listener can hear at all, so the
+    // stage is not a loudness change in disguise.
     if (register === 'call') {
       expect(output).toBeCloseTo(0.93187573184, 5)
       expect(output).toBeLessThan(1)
+      const limited = throughLimiter(master, output)
+      expect(limited).toBeLessThan(output)
+      expect(-20 * Math.log10(limited / output)).toBeLessThan(0.25)
     }
   })
 
@@ -1186,7 +1224,6 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
     refreshAmbienceVolume()
     const { ambienceFloor, ambientBus } = villageFloor()
     const master = ambientBus.connected[0] as FakeGain
-    expect(master.connected[0]).toBe(ctx.destination)
 
     const plan = drumMessagePlan()
     const voices = spoken(() => playDrumMessage(plan))
@@ -1212,10 +1249,19 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
     expect(message * master.gain.value).toBeCloseTo(0.135, 10)
     expect(output).toBeCloseTo(0.24875, 8)
     expect(output).toBeLessThan(1)
-    // It does NOT clear it in coincidence: the strikes and the speech bus meet
-    // at this same master, so a strike landing on the two-voice worst case above
-    // adds its 0.135 to that 1.242. Point 1156 owns the missing limiter; the
-    // user's factors stay as asked.
+    // A strike on its own does not reach the limiter's threshold at all, so
+    // the message is not shaped — the user's 2.5x on the drums stays untouched.
+    // (The identity holds to the table's float32 resolution, not bit for bit:
+    // the deployed curve is a sampled Float32Array, as it is in the browser.)
+    expect(throughLimiter(master, output)).toBeCloseTo(output, 12)
+    // It does NOT clear full scale in coincidence: the strikes and the speech
+    // bus meet at this same master, so a strike landing on the two-voice worst
+    // case above adds its 0.135 to that 1.242. THAT is the sum the limiter
+    // exists for, and it leaves the graph under full scale.
+    const coincidence = output + 1.24155117094
+    expect(coincidence).toBeGreaterThan(1)
+    expect(throughLimiter(master, coincidence)).toBeLessThan(1)
+    expect(throughLimiter(master, coincidence)).toBeCloseTo(0.95, 4)
   })
 
   // Point 673 follows the shipped drum silence, so the calibration that closes
@@ -1250,8 +1296,11 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
     const expected = new Map([[0, 0.4845], [3, 0.35625], [10, 0.0969]])
     expect(speechPeak).toBeCloseTo(expected.get(distance)!, 8)
     const master = speechBus.connected[0] as FakeGain
-    expect(master.connected[0]).toBe(ctx.destination)
     expect(speechPeak * master.gain.value).toBeCloseTo(expected.get(distance)! * 0.5, 8)
+    // Everyday speech is far under the limiter's threshold and leaves the
+    // graph exactly as the buses mixed it (point 1156).
+    expect(throughLimiter(master, speechPeak * master.gain.value))
+      .toBeCloseTo(expected.get(distance)! * 0.5, 8)
     if (distance <= 3) expect(marginDb).toBeGreaterThan(0)
     if (distance > 0) {
       const former = 1.8 * 0.1 * 2 * SYLLABLE_SYNTHESIS_GAIN / (1 + 24 * (distance / 10) ** 2)
