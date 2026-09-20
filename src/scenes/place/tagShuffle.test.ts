@@ -1835,25 +1835,20 @@ describe('the children`s bank round can reach its own stage (work-order 687)', (
       // one layout where the exit-only measurement reads green on a round that
       // is over its bound — which is what made the test unable to fail.
       // THE ONE FOREIGN LAYOUT THE SEED SPREAD KEEPS (work-order 1094), and it
-      // is kept by measurement rather than by omission. Bambara seeds 1-30 were
-      // re-swept against the unbounded code, 400 replayed seconds each, reading
-      // the longest ENDED roam and the roam the window CLOSES in separately: not
-      // one of the thirty shows the combination this case is built on — an ended
-      // roam inside the cap beside a closing roam over it, with a run already
-      // opened. Every bambara layout that goes over the cap goes over it in a
-      // roam that also ENDS, which the exit-only measurement would have caught.
+      // is kept by MEASUREMENT rather than by omission: bambara has no layout
+      // that can replace it. Seeds 1-120 were swept against the unbounded code
+      // (`roamSeconds` 8, `roamGuardSeconds` lifted so no roam is ever abandoned
+      // on the clock, 400 replayed seconds each), reading the longest ENDED roam
+      // and the roam the window CLOSES in apart. Not one of the 120 shows the
+      // combination this case is built on — an ended roam inside the 55.0 s cap
+      // beside a closing roam over it, with a run already opened. Only two
+      // bambara seeds close in an over-cap roam at all, 86 (closing 136.1 s) and
+      // 117 (closing 115.1 s), and BOTH also carry an ended roam over the cap
+      // (184.7 s and 94.5 s), which the exit-only measurement catches on its own.
       // Deleting this entry would therefore delete the only witness that makes
-      // the fold necessary, so it stays until a bambara seed is found that
-      // carries the same property — an assertion where the foreign layout IS the
-      // statement, exactly like the riverless village in `riverBank.test.ts`.
-      // OPEN: work-order 1094 asks the converted cases to name NO foreign
-      // village, and this one still does. The search was bounded at seed 30 by
-      // measurement cost (about a minute of replay per seed); seeds 31-120 have
-      // not been swept. Widen the sweep with the same instrument — 400 replayed
-      // seconds at `roamSeconds` 8 and the guard's bound lifted, reading the
-      // longest ENDED roam and the CLOSING roam apart — and swap this entry for
-      // the first bambara seed whose ended roam stays inside the 55.0 s cap
-      // while its closing roam is over it and a run has already opened.
+      // the fold necessary. It is an assertion where the foreign layout IS the
+      // statement, exactly like the riverless village in `riverBank.test.ts`,
+      // and work-order 1094 leaves that shape standing by name.
       ['mandinka-village', 58],
     ]
     const shippedRoam = BANK_CFG.roamSeconds
