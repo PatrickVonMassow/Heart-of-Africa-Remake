@@ -8434,6 +8434,16 @@ if (section('toast-above-panels')) {
   // The picture the acceptance criterion is judged on: the sentence standing
   // legible ACROSS the open journal. The shutter takes its own time, so the
   // sentence is held up for it instead of dismissing itself mid-exposure.
+  //
+  // AND THE SETTLEMENT BEHIND IT MUST BE DRAWN. The declared subject is an HTML
+  // element, so the shutter's subject check says nothing about the 3-D scene:
+  // measured 20.09.2026 on WebGL 2, this frame came back as bare sky with the
+  // floating shop labels hanging in it, the toast legible over an empty world.
+  // Wait for the place layout, its labels and the finished draw first.
+  await page
+    .waitForFunction(() => !!window.__placeLayout && !!document.querySelector('.map-label'), null, { timeout: 30000 })
+    .catch(() => {})
+  await waitForSceneReady(page)
   await page.evaluate((sentence) => {
     window.__game.getState().setJournalOpen(true)
     window.__game.getState().setToast(sentence)
