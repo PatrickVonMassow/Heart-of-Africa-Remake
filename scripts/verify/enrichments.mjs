@@ -8288,6 +8288,55 @@ if (section('modal-above-labels')) {
   check('a modal dialog covers the in-scene labels', zorder.ok && zorder.dialogOnTop, JSON.stringify(zorder))
 }
 
+// --- The traveller answers above every panel (point 1170) --------------------
+// Pressing an inventory item answers in a toast. That sentence must never end
+// up BEHIND what the same act opened, so the toast outranks the journal panel
+// and a modal backdrop — the backdrop covers the whole viewport, the toast's
+// own centre included, which is what makes the hit test say something.
+if (section('toast-above-panels')) {
+  await page.evaluate(() => window.__game.getState().enterPlace('cairo'))
+  await page
+    .waitForFunction((want) => window.__game.getState().placeId === want, 'cairo', { timeout: 30000 })
+    .catch(() => {})
+  const layering = await page.evaluate(async () => {
+    const g = () => window.__game.getState()
+    const settle = () => new Promise((res) => requestAnimationFrame(() => setTimeout(res, 80)))
+    window.__ui.getState().setDialog(null)
+    if (window.__ui.getState().mapOpen) window.__ui.getState().toggleMap()
+    g().debugAddEquipment('rifle')
+    await settle()
+    const slot = document.querySelector('.inventory-bar [data-eq="rifle"]')
+    if (!slot) return { ok: false, why: 'no rifle slot in the inventory bar' }
+    // The journal stands OPEN before the item is pressed: the case the point
+    // names, where the same act both opens a panel and raises a sentence.
+    g().setJournalOpen(true)
+    await settle()
+    const journalOpen = !!document.querySelector('.journal')
+    slot.click()
+    await settle()
+    const toast = document.querySelector('.toast')
+    if (!toast) return { ok: false, why: 'the pressed item raised no toast', journalOpen }
+    const r = toast.getBoundingClientRect()
+    const cx = Math.round(r.left + r.width / 2)
+    const cy = Math.round(r.top + r.height / 2)
+    const toastOnTop = () => {
+      const hit = document.elementFromPoint(cx, cy)
+      return toast === hit || toast.contains(hit)
+    }
+    const overJournal = toastOnTop()
+    window.__ui.getState().setDialog({ kind: 'agency' })
+    await settle()
+    const backdrop = !!document.querySelector('.dialog-backdrop')
+    const overDialog = toastOnTop()
+    window.__ui.getState().setDialog(null)
+    g().setJournalOpen(false)
+    return { ok: true, journalOpen, overJournal, backdrop, overDialog, text: toast.textContent }
+  })
+  check('pressing a carried item answers in a toast while the journal is open', layering.ok && layering.journalOpen, JSON.stringify(layering))
+  check('the toast is hit-tested on top with the journal open', layering.ok && layering.overJournal, JSON.stringify(layering))
+  check('the toast is hit-tested on top under a modal backdrop', layering.ok && layering.backdrop && layering.overDialog, JSON.stringify(layering))
+}
+
 // --- A settlement's bird's-eye vicinity is never empty (point 102, part b) ------
 // Leaving Cairo (arid north, where the natural chunk spawn is sparse) must still
 // leave at least vicinityMinAnimals region-typical grazers within vicinityRadius
