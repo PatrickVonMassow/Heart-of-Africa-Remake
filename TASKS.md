@@ -15747,3 +15747,31 @@ to land than a mechanism that needs a review.
   the dwelling/roof geometry in src/scenes/place/roofClearance.ts and layout.ts
   (`DwellingKind` 'hut', its door at `d.door`)
   Bundle: Siedlungsgeometrie.
+
+- [ ] 1169. The children shuffle on the spot above the gate on roughly a tenth of the world
+  seeds (measured 20.09.2026 while point 1094 moved the teaching checks onto the seed axis;
+  reproducible, no browser needed).
+  MEASURED STATE: `shuffleWindows` over `play('bambara-village', seed, 60)` — the very
+  instrument the shipped gate uses (`scripts/verify/childMotionMetric.mjs`) — run over
+  bambara seeds 1-60. Six of the sixty read the WORST child ABOVE the shipped 0.25 % gate:
+  seed 27 at 0.367 %, seed 30 at 1.299 %, seed 33 at 0.282 %, seed 35 at 0.311 %, seed 40 at
+  0.254 % and seed 50 at 0.254 %. Seed 30 is five times the gate. Every other measure of
+  those layouts is healthy — the least judgeable child 0.966-0.983, no carry, no rescue, no
+  overlap — so this is the shuffling itself and not a metric artefact.
+  WHY IT WAS INVISIBLE: the sample that judges this varied the VILLAGE (bambara, maasai,
+  swahili) and pinned the seed. The player learns the language in `ROCK_VILLAGE_ID` alone
+  and is dealt a fresh seed at every start, so the axis that reaches him went unjudged.
+  Point 1094 put the sample on the seed axis and this fell out of it; 1094 deletes test
+  breadth and builds nothing, which is why the fix is its own point.
+  Final state: no bambara seed of 1-60 reads the worst child above the shipped gate over the
+  judged minute, and the sample in `tagShuffle.test.ts` carries at least one of the six
+  seeds above so the repair cannot be read off a lucky layout.
+  Test: Vitest — the six seeds above run inside the gate, mutation-checked; the existing
+  three-seed sample keeps its cases.
+  Refs: src/scenes/place/tagShuffle.test.ts (`PLACES`, `the children never shuffle on the
+  spot`), scripts/verify/childMotionMetric.mjs (`shuffleWindows`, `CHILD_MOTION.shareGate`),
+  src/scenes/place/bankGame.ts and src/scenes/place/childSituations.ts (the round the
+  children play in this village)
+  Criticality: medium — it is the user's own report of 648/656, alive on about a tenth of
+  the worlds he can be dealt, and it is player-visible wherever it fires.
+  Bundle: Dorfleben.
