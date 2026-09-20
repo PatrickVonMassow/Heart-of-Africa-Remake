@@ -1658,7 +1658,7 @@ stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die s
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Sonntag, 20.09.2026, 04:30 · Quellen-Fingerprint: `cd95513bac5e…`
+Zuletzt aktualisiert: Sonntag, 20.09.2026, 05:12 · Quellen-Fingerprint: `c8ed494d7fd2…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1709,7 +1709,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | All journal texts (de + en) must carry emotional voice markup; English read-aloud runs via Kokoro TTS | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Immer auf Deutsch mit dem Nutzer kommunizieren, und immer in der Du-Form — nie siezen | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | After every change, npm run lint (oxlint) and npm audit must be clean — zero lint errors/warnings, zero CVEs. Standing user directive. | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
-| A push to main runs build+lint+audit+unit — never push main while a browser regression is drawing | 2 | mittel | push-arrival-guard.mjs | ✔ Mechanismus |
+| A push to main runs build+lint+audit+unit — never push main while a browser regression is drawing | 3 | mittel | push-arrival-guard.mjs | ✔ Mechanismus |
 | hoa PERMANENT process — delegate as much implementation as possible to worktree-isolated subagents; keep only picture-verify + merge at the main session; run a pool of parallel agents on non-overlapping files | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | State only what was just measured, with its reading time; never assert machine/repo state from a plausible model | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Before building, triage difficulty × criticality; HIGH/critical work gets a second, different model — in which FORM (blind-parallel vs. review) is normative in CLAUDE.md §6, not here | 3 | mittel | criticality-review-guard.mjs, model-guard.mjs | ✔ Mechanismus |
@@ -1765,8 +1765,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 97 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 7 Revert-/Reapply-Commits · 136 Prozess-/Meta-TASKS-Punkte (davon 64 offen).
 
-<!-- RETRO-FINGERPRINT: cd95513bac5e327a569573f6f776902def0402b619a89b4ff35b66583259d336 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-20T02:30:17.239Z -->
+<!-- RETRO-FINGERPRINT: c8ed494d7fd293100cfa41b4b06c47a169f778a17300c3c3280d2de47071bf24 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-20T03:12:45.180Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
