@@ -8391,6 +8391,21 @@ if (section('toast-above-panels')) {
   check('the toast outranks the journal, the map plate and the dialog layer by computed z-index',
     layering.ok && layering.toastZ > layering.journalZ && layering.toastZ > layering.mapZ && layering.toastZ > layering.dialogZ,
     JSON.stringify(layering))
+
+  // The picture the acceptance criterion is judged on: the sentence standing
+  // legible ACROSS the open journal, which is what the numbers above assert.
+  await page.evaluate((sentence) => {
+    window.__game.getState().setJournalOpen(true)
+    window.__game.getState().setToast(sentence)
+  }, strings.chiefStepsOut)
+  await shot('1170-toast-over-journal', {
+    element: '.toast',
+    label: "the traveller's answer standing over the opened journal",
+  })
+  await page.evaluate(() => {
+    window.__game.getState().setJournalOpen(false)
+    window.__game.getState().setToast(null)
+  })
 }
 
 // --- A settlement's bird's-eye vicinity is never empty (point 102, part b) ------
