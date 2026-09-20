@@ -168,39 +168,6 @@ put it is the mistake this line exists to stop.
   board with the observation instructions, the batch has moved on, and 1158 is ticked only
   after the user's answer on that card.
 
-- [ ] 1156. Two voices at once now clip the master, and nothing in the graph absorbs it.
-  (ranked directly after 1125 by the user, 18.09.2026, 14:26.)
-  MEASURED STATE (18.09.2026, on point 1155's branch): the graph test's conservative worst
-  case — two close child `talk` voices, the whole ambience floor and a footstep coincided on
-  one sample — is 1.336 of full scale with the debug drum bed and 1.242 without it
-  (`src/systems/ambience.test.ts`, "measures headroom for 2 close child 'talk' voices"),
-  that is 2.52 dB and 1.88 dB OVER. It was 0.977 before point 1155 raised the village speech
-  to 1.5x on the user's instruction of 18.09.2026, 07:50; the instruction stands and is not
-  what is in question here. The graph has no limiter: `buildGraph()` hangs the ambient,
-  footstep and speech buses straight on a `master` at 0.5 and that on `ctx.destination`
-  (`src/systems/ambience.ts` L477-L492), so the overage is a hard clip at the destination.
-  design.md carries no mix-headroom or limiter concept at all — grep finds none in §19/§20 —
-  so this is a MISSING DESIGN CONCEPT, not a forgotten implementation.
-  Final state:
-  - The village mix cannot exceed full scale, and the way it cannot is written into
-    design.md §19 first: what the limiter is, where it sits, and what it may cost the
-    transients of a footstep and a drum strike.
-  - The user's factors are untouched. A limiter that quietly undoes the 1.5x on speech or
-    the 2.5x on the drum message is the wrong answer to this point.
-  - The graph test measures the worst case THROUGH the new stage and asserts it under full
-    scale again, and the 2.52 dB / 1.88 dB figures above are named as what it had to absorb.
-  Test: Vitest over the audio graph — the worst-case sum through the limiter is under full
-  scale, and a single close voice is NOT audibly pulled down by it (the limiter must not
-  become a loudness change in disguise). A listening pass is the user's.
-  There is nothing to see, so no picture check is required.
-  Criticality: medium — reproducible player impact (audible distortion whenever two
-  villagers speak close by at once), but only in the coincidence case; one voice at 0.932
-  still clears.
-  Refs: src/systems/ambience.ts (buildGraph L477-L492), src/systems/ambience.test.ts
-  ("measures headroom for 2 close child voices"), src/config/balance.ts
-  (communication.speechVolume, communication.drumMessagePeak), design.md §19
-  Bundle: Kommunikation.
-
 - [ ] 1093. A compound fence may be drawn straight through a fixed life prop (user
   07.09.2026, "reihe einen weiteren Task fuer das Clipping-Problem ein, der spaeter
   erledigt wird"; restated 10.09.2026 alongside the decision that keeps the well elsewhere).
