@@ -1846,6 +1846,14 @@ describe('the children`s bank round can reach its own stage (work-order 687)', (
       // the fold necessary, so it stays until a bambara seed is found that
       // carries the same property — an assertion where the foreign layout IS the
       // statement, exactly like the riverless village in `riverBank.test.ts`.
+      // OPEN: work-order 1094 asks the converted cases to name NO foreign
+      // village, and this one still does. The search was bounded at seed 30 by
+      // measurement cost (about a minute of replay per seed); seeds 31-120 have
+      // not been swept. Widen the sweep with the same instrument — 400 replayed
+      // seconds at `roamSeconds` 8 and the guard's bound lifted, reading the
+      // longest ENDED roam and the CLOSING roam apart — and swap this entry for
+      // the first bambara seed whose ended roam stays inside the 55.0 s cap
+      // while its closing roam is over it and a run has already opened.
       ['mandinka-village', 58],
     ]
     const shippedRoam = BANK_CFG.roamSeconds
