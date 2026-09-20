@@ -142,6 +142,28 @@ describe('the mix limiter curve (point 1156 — design.md §19.1)', () => {
     // RELATIVE ulp, which is worth nothing among the subnormals, where the
     // spacing is absolute — at ceiling 2e-45 the stored edge still came back
     // above it, on both signs. The step is one of the bit pattern now.
+    // Round 3: inward-rounded neighbours bound the EXACT interpolation, but the
+    // browser's is not exact — it weights both neighbours in float32 and adds
+    // them, and those three roundings can land a couple of ulps above both. The
+    // reviewer reproduced it from Gecko's WaveShaperNode arithmetic at exactly
+    // this input, where two neighbours of 0.4749999940395355 came out as
+    // 0.4750000238418579 — 0.9500000476837158 past the post-gain, over the
+    // ceiling. The table now reserves four ulps for it.
+    it('holds the ceiling through the browser\'s own float32 interpolation', () => {
+      balance.mixLimiter.threshold = 0.85
+      balance.mixLimiter.ceiling = 0.95
+      const curve = mixLimiterCurve()
+      expect(throughCurve(curve, 1.7114522457122803)).toBeLessThanOrEqual(0.95)
+      // Every sample of the table, at the interpolation's worst weighting.
+      for (let i = 0; i < curve.length - 1; i++) {
+        for (const t of [0, 0.25, 0.5, 0.75, 1]) {
+          const position = (i + t) / (curve.length - 1)
+          const x = (position * 2 - 1) * MIX_LIMITER_DOMAIN
+          expect(Math.abs(throughCurve(curve, x))).toBeLessThanOrEqual(0.95)
+        }
+      }
+    })
+
     it('holds a subnormal ceiling too, where a relative step is worth nothing', () => {
       for (const ceiling of [2e-45, 1.4e-45, 7e-45, 1e-40]) {
         balance.mixLimiter.threshold = 0

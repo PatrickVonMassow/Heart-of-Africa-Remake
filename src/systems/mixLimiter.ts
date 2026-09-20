@@ -66,12 +66,29 @@ const DEFAULT_CEILING = 0.95
  *  ceiling. */
 export function mixLimiterCurve(points: number = MIX_LIMITER_CURVE_POINTS): Float32Array<ArrayBuffer> {
   const curve = new Float32Array(points)
+  const bound = tableBound()
   for (let i = 0; i < points; i++) {
     const unit = (2 * i) / (points - 1) - 1
-    curve[i] = storeInward(limitMixSample(unit * MIX_LIMITER_DOMAIN) / MIX_LIMITER_DOMAIN)
+    const shaped = limitMixSample(unit * MIX_LIMITER_DOMAIN) / MIX_LIMITER_DOMAIN
+    curve[i] = storeInward(Math.min(bound, Math.max(-bound, shaped)))
   }
   return curve
 }
+
+/** The largest magnitude the TABLE may hold, which is not simply the ceiling
+ *  scaled into the domain. The browser reads the table by weighting the two
+ *  neighbours in FLOAT32 and adding them, and each of those three operations
+ *  rounds: `a*(1-t) + b*t` can come out a couple of ulps ABOVE both a and b —
+ *  measured, at threshold 0.85 / ceiling 0.95, two neighbours of
+ *  0.4749999940395355 interpolating to 0.4750000238418579, which is past the
+ *  ceiling after the post-gain. Two roundings of half an ulp each is the whole
+ *  error, so four ulps of room covers it with margin to spare. */
+function tableBound(): number {
+  return (limitBounds().ceiling / MIX_LIMITER_DOMAIN) * (1 - INTERPOLATION_HEADROOM)
+}
+
+/** Four float32 ulps, relative. */
+const INTERPOLATION_HEADROOM = 2 ** -21
 
 /** A `Float32Array` stores to the NEAREST float32, which can round a value UP —
  *  and a value rounded up at the curve's own extreme would stand a hair ABOVE
@@ -111,5 +128,9 @@ export function readCurveTable(curve: Float32Array, input: number): number {
   const position = ((unit + 1) / 2) * (curve.length - 1)
   const low = Math.floor(position)
   const high = Math.min(curve.length - 1, low + 1)
-  return curve[low] + (curve[high] - curve[low]) * (position - low)
+  // FLOAT32, step for step, because that is what the audio thread does. The
+  // same read in float64 returned 0.949999988079071 where the browser returns
+  // 0.9500000476837158 — it HID a ceiling violation instead of finding it.
+  const t = Math.fround(position - low)
+  return Math.fround(Math.fround(curve[low] * Math.fround(1 - t)) + Math.fround(curve[high] * t))
 }

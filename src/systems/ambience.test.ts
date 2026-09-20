@@ -1314,9 +1314,10 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
     expect(output).toBeLessThan(1)
     // A strike on its own does not reach the limiter's threshold at all, so
     // the message is not shaped — the user's 2.5x on the drums stays untouched.
-    // (The identity holds to the table's float32 resolution, not bit for bit:
-    // the deployed curve is a sampled Float32Array, as it is in the browser.)
-    expect(throughLimiter(master, output)).toBeCloseTo(output, 12)
+    // (The identity holds to the stage's float32 resolution, not bit for bit:
+    // the deployed curve is a sampled Float32Array read with float32
+    // arithmetic, exactly as the audio thread reads it.)
+    expect(Math.abs(throughLimiter(master, output) - output) / output).toBeLessThan(1e-6)
     // It does NOT clear full scale in coincidence: the strikes and the speech
     // bus meet at this same master, so a strike landing on the two-voice worst
     // case above adds its 0.135 to that 1.242. THAT is the sum the limiter
@@ -1363,7 +1364,7 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
     // Everyday speech is far under the limiter's threshold and leaves the
     // graph exactly as the buses mixed it (point 1156).
     expect(throughLimiter(master, speechPeak * master.gain.value))
-      .toBeCloseTo(expected.get(distance)! * 0.5, 8)
+      .toBeCloseTo(expected.get(distance)! * 0.5, 6)
     if (distance <= 3) expect(marginDb).toBeGreaterThan(0)
     if (distance > 0) {
       const former = 1.8 * 0.1 * 2 * SYLLABLE_SYNTHESIS_GAIN / (1 + 24 * (distance / 10) ** 2)
