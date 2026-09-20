@@ -407,7 +407,15 @@ export const DOC_BUDGETS = [
     // excavation's spoil is, rather than an obstacle (user order 17.09.2026,
     // work-order 1149). A new decision about what collides, not a longer
     // telling of the bullet it stands in.
-    maxWords: 29206,
+    // RAISED by the 202 measured words of the §19.1 mix-headroom rule
+    // (work-order 1156): the document carried NO headroom or limiter concept
+    // at all, while the measured village worst case stood 1.88 dB past full
+    // scale and hard-clipped at the destination. A missing concept, not a
+    // longer telling — and it must name what the stage is, that it is the last
+    // one, that it is not a level control, and what it costs the top of a
+    // footstep or a drum strike, because a reader cannot infer any of that
+    // from a number.
+    maxWords: 29408,
     // A hundred words across 28k: design.md is edited section by section and a genuine
     // new decision runs 40–215 measured words, so the slack absorbs the rewording that
     // accompanies one and refuses the disappearance of a whole section without a

@@ -314,8 +314,9 @@ if (section('auto-narration')) {
   await page.waitForTimeout(400)
 }
 
-// Village speech uses native analysers on the DEPLOYED master, after the
-// per-utterance panner, speech bus and master gain. This is the audio/WebGL lane.
+// Village speech uses native analysers on the DEPLOYED output, after the
+// per-utterance panner, speech bus, master gain AND the mix limiter that ends
+// the graph (point 1156). This is the audio/WebGL lane.
 if (section('village-stereo')) {
   await firstGesture()
   const measured = await page.evaluate(async () => {
@@ -356,7 +357,7 @@ if (section('village-stereo')) {
       b.drumBed.enabled = true
       a.refresh()
       const withDrums = await sample(true)
-      return { deployed, withDrums, heldDrums }
+      return { deployed, withDrums, heldDrums, ceiling: b.mixLimiter.ceiling }
     } finally {
       b.drumBed.enabled = heldDrums
       a.setScene({ region: 'central', mode: 'place', placeKind: 'port', nearVillage: false })
@@ -372,8 +373,16 @@ if (section('village-stereo')) {
   check('overlapping adult and child speech reaches opposite stereo sides',
     sampling.ok && adult[0] > adult[1] + 4 && child[1] > child[0] + 4,
     sampling.ok ? JSON.stringify(measured.deployed) : sampling.detail)
-  check('deployed and drum-audition speech leave the master audibly below full scale',
-    measured.heldDrums === false && [measured.deployed, measured.withDrums].every((mix) => mix.peak > 0.02 && mix.peak < 1),
+  // Under the limiter the bound is no longer full scale but the stage's own
+  // ceiling, and a real browser is where that is worth asserting: the shaper's
+  // oversampling is the one part of the stage jsdom cannot model, so its
+  // reconstruction ripple is measured here rather than assumed away. The small
+  // allowance is that ripple; a clip would be a whole decibel past it.
+  const ceilingRoom = 1.01
+  check('deployed and drum-audition speech leave the mix limiter below its ceiling',
+    measured.heldDrums === false && measured.ceiling > 0 && measured.ceiling < 1 &&
+      [measured.deployed, measured.withDrums].every((mix) =>
+        mix.peak > 0.02 && mix.peak < Math.min(1, measured.ceiling * ceilingRoom)),
     JSON.stringify(measured))
 }
 

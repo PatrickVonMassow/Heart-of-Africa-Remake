@@ -46,7 +46,7 @@ export function limitMixSample(x: number): number {
  *  The browser reads it with linear interpolation, and the knee is concave, so
  *  an interpolated value can only fall SHORT of the curve — never past the
  *  ceiling. */
-export function mixLimiterCurve(points: number = MIX_LIMITER_CURVE_POINTS): Float32Array {
+export function mixLimiterCurve(points: number = MIX_LIMITER_CURVE_POINTS): Float32Array<ArrayBuffer> {
   const curve = new Float32Array(points)
   for (let i = 0; i < points; i++) {
     const unit = (2 * i) / (points - 1) - 1
