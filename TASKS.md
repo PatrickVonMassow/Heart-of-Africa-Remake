@@ -113,6 +113,7 @@ put it is the mistake this line exists to stop.
   inventory sentence, `docs/acceptance-criteria-detail.md` §9 and
   `docs/acceptance-evidence.md` §9 state the final behaviour in the same commit. Nothing
   else changes: tooltips, glow, sort order and the shovel's open-world answers stay.
+  Bundle: Steuerung & Performance.
 
 - [ ] 1158. The one-click return from the Escape cooldown is confirmed in a real browser
   (residual of point 1148, landed 18.09.2026). IT STANDS AT THE FRONT AGAIN, and it is no
