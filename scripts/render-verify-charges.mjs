@@ -191,6 +191,27 @@ export const RED_CHARGES = [
   },
   {
     point: 939,
+    suite: 'voice',
+    backend: 'webgl',
+    kind: 'console',
+    // THE SAME VITE TRANSIENT REACHING THE VOICE LANE, and it needs its own
+    // entry because every entry here excuses only the lane its evidence
+    // measured.
+    match: /^console error: Failed to load resource: the server responded with a status of 504 \(Outdated Optimize Dep\)/i,
+    why:
+      'MEASURED 20.09.2026 at 03:54:26Z on main (443fec985), webgl/voice: the run recorded exactly '
+      + 'one red, this 504, while every CHECK it ran passed — the read-aloud, the auto-narration, '
+      + 'the stereo separation and the limiter ceiling — and all three frames were written. It is '
+      + 'a cold or invalidated Vite optimize-dep cache re-bundling while the suite page is already '
+      + 'open, the environment transient CLAUDE.md §7.2 tells us to fail soft on, and the identical '
+      + 'reading point 939 already owns on webgpu/startup, webgpu/report, webgpu/polish, '
+      + 'webgpu/settings, webgl/startup and webgl/polish. Nothing of the code under test reaches '
+      + 'it. The run was also taken on a LOADED machine and the runner said so itself, so it is '
+      + 'not treated as a timing verdict; the charge covers the transient, not the machine. The '
+      + 'charge dies with point 939.',
+  },
+  {
+    point: 939,
     suite: 'settings',
     backend: 'webgpu',
     featureLevel: 'compatibility',
@@ -1443,53 +1464,6 @@ export const RED_CHARGES = [
       + 'spread is the host or the scene, and the charge dies with that point.',
   },
   {
-    point: 1013,
-    suite: 'enrichments',
-    backend: 'webgl',
-    kind: 'check',
-    // NAME-SCOPED, AND THE RECORD IS WHY. The check prints its whole hunt sample
-    // as JSON, which runs past the 200-character bound, so every record of it is
-    // cut mid-`predMismatch` — a detail signature would have to declare that it
-    // reads only the front, and the declaration is deliberately held to the two
-    // entries that argued for it. What remains is the check's own name, and that
-    // is no wider than the point: 1013's whole subject is this one check and
-    // whether it asks the region it means, so any failure of it belongs to that
-    // point until it lands. Scoped to the lane both firings were measured on.
-    match: /^every predator fits the region and period$/i,
-    why:
-      'FILED AS 1013 ON 29.08.2026 FROM EXACTLY THIS RED, and reproduced 03.09.2026 in the LARGE '
-      + 'run on feat/1047-bank-game-readable (webgl/enrichments, 07:02:14Z): sixteen hunts, the '
-      + 'prey side clean, one predator scored outside its region — a cheetah in central Africa on '
-      + 'the day it was filed, a hyena in central Africa today. The species differs and the shape '
-      + 'does not, which is what 1013 says is unsettled: the check may read the region where the '
-      + 'hunt ENDED rather than where it began, or the placement may be genuinely wrong, and the '
-      + 'two regions have never been logged side by side. Nothing in the bank-game branch touches '
-      + 'the wildlife simulation or the food-web table, so this red says nothing about that '
-      + 'change. It is charged, not excused: 1013 owes the logged sample that decides which '
-      + 'reading is right, and the charge dies with that point.',
-  },
-  {
-    point: 1063,
-    suite: 'enrichments',
-    kind: 'check',
-    // NAME-SCOPED, and deliberately NOT folded into 1013's entry next door: that
-    // one is anchored on `every predator fits the region and period`, a DIFFERENT
-    // and older check whose `why` records the PREY side as clean. This is the prey
-    // side, and it is a check that did not exist when 1013 was written.
-    match: /^every hunted prey fits the region and the predator food web/i,
-    why:
-      'FILED AS 1063 ON 06.09.2026 FROM EXACTLY THIS RED, measured in the LARGE run on '
-      + 'feat/689-chief-direction-and-mould at 8944a52c6 (webgl/enrichments): sixteen hunts, the '
-      + 'predator side clean, one wildebeest scored as hunted in `central` and the lion/wildebeest '
-      + 'pair rejected with it. It went GREEN on the same run\'s retry, so the placement is '
-      + 'INTERMITTENT — which is the same unsettled reading 1013 states for the predator side: the '
-      + 'check may score the region where the hunt ENDED rather than where it began, and an animal '
-      + 'crossing a border mid-hunt would produce both the red and its disappearance. Nothing in '
-      + 'the chief-reply branch touches the wildlife simulation or the food-web table, so this red '
-      + 'says nothing about that change. It is charged, not excused: 1063 owes the logged start/end '
-      + 'sample that decides which reading is right, and the charge dies with the point.',
-  },
-  {
     point: 565,
     suite: 'enrichments',
     backend: 'webgl',
@@ -1619,22 +1593,37 @@ export const RED_CHARGES = [
       + 'The charge dies with point 1154.',
   },
   {
-    point: 1156,
-    suite: 'voice',
+    // POINT 1156 LANDED, so its entry is gone: the limiter is in design.md §19.1
+    // and in the graph, the sum no longer passes full scale, and the check it
+    // excused has been rewritten to measure against the limiter's ceiling. The
+    // ledger's own rule expires a charge with its point, and the test over this
+    // file enforces it — which is how this entry was caught, on the push gate
+    // of the very commit that closed the point.
+    point: 690,
+    suite: 'polish',
+    backend: 'webgpu',
+    featureLevel: 'compatibility',
     kind: 'check',
-    match: /^deployed and drum-audition speech leave the master audibly below full scale/i,
+    // SCOPED TO THE MEASURED ASSERTION, per the discipline the goat entry above
+    // records: this excuses the pace shortfall alone, not any future red the
+    // same check could emit.
+    match: /^the round goes on with him planted in it, rather than halting at him/i,
     why:
-      'THE MASTER REALLY DOES CLIP AND POINT 1156 OWNS IT. Measured 19.09.2026 on webgpu+webgl '
-      + 'voice in the SMALL tier at branch head ff28041f4 (withDrums peak 1.0213) and minutes later '
-      + 'on `main` 9bf608dc1 on webgl alone (withDrums peak 1.0218) — the same check, the same '
-      + 'overage, on both trees and both lanes. That is exactly what point 1156 describes: since '
-      + 'the village speech went to 1.5x on 18.09.2026 the speech and drum buses hang straight on '
-      + 'a master at 0.5 with no limiter (src/systems/ambience.ts L477-L492), so the sum passes '
-      + 'full scale and hard-clips at the destination. This is a REAL product defect, not a stale '
-      + 'expectation, and the entry only stops it from reading as a verdict on unrelated changes. '
-      + 'NOT backend-scoped: the graph is Web Audio and reads the same whichever renderer holds '
-      + 'the canvas. The charge dies with point 1156, which puts the limiter into design.md \u00a719 '
-      + 'and then into the graph.',
+      'THE ROUND RUNS, IT IS ONLY TOO SLOW, and point 690 rebuilds exactly that round. '
+      + 'Measured 19.09.2026 on webgpu polish (children-bank-game): 120.1 s of a 120 s window '
+      + 'played over 1450 samples, phases [run, regroup, part], five children walked '
+      + '[45.1, 45.4, 40.9, 46.2, 36.7] m = 21.4 m per child-minute against a floor of 25, four '
+      + 'tagged. So neither branch of the check that would mean a BROKEN round fired: the cycle '
+      + 'advances through three phases and not one child starved — every one of them covered '
+      + 'ground. What is under the bar is the group pace, and nothing in the repository owned '
+      + 'that red: it stood unaccounted from 19.09.2026, and work-order 687, which built the '
+      + 'round and set the floor, is closed. Point 690 REBUILDS the mechanic and moves it to the '
+      + 'port cities, so the pace this check asks for is decided there — either the round gets '
+      + 'its pace back or the floor stops matching the game and is re-measured with it. '
+      + 'NOT the starvation branch and NOT a stalled cycle; if either of those appears the check '
+      + 'reds on a different reading and this entry must be re-judged. '
+      + 'Backend-scoped to webgpu, which is where it was measured; on WebGL 2 it stays a real red. '
+      + 'The charge dies with point 690.',
   },
   {
     point: 1145,

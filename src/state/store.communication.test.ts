@@ -3,12 +3,20 @@
 // game state, his own readings with it, and both survive a save/load round
 // trip. The lexicon and the memory rules themselves are covered in
 // src/communication/*.test.ts — this file pins the STORE wiring.
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { hasHeard, heardUtterances, hypothesisFor } from '../communication/heard'
 import { utteranceOf } from '../communication/lexicon'
-import { chiefMessagePhrase } from '../communication/drumMessage'
+import { drumMessagePhrase } from '../communication/drumMessage'
 import { isSpeechLabelVisible, labelReadings, NO_READING } from '../communication/speechLabel'
-import { g, freshGame, useGame, withWorld } from '../test/store'
+import { g, freshGame, useGame, withWorld, standBeforeChief } from '../test/store'
+
+import { useUi } from './ui'
+import { DRUM_MESSAGE_VILLAGE } from './store'
+import { chiefWalkState, setChiefWalkState } from '../scenes/place/chiefPresence'
+import { chiefTick, type ChiefPhase } from '../scenes/place/chiefWalk'
+import { playDrumMessage } from '../systems/ambience'
+
+vi.mock('../systems/ambience', () => ({ playDrumMessage: vi.fn() }))
 
 withWorld()
 
@@ -161,15 +169,15 @@ describe('the overhead label reads the journal note (design.md §13.4)', () => {
 // they were sent travels with the save so the display stays reopenable.
 describe("the chief's drum message (design.md §13.4)", () => {
   it('a fresh game has not heard the drums', () => {
-    expect(g().drumMessageHeard).toBe(false)
+    expect(g().drumMessageHeard).toEqual({ errand: false, answer: false })
   })
 
   it('records every concept of the message as heard, on the current day', () => {
     g().debugSet({ day: 40.8 })
     g().receiveDrumMessage()
-    expect(g().drumMessageHeard).toBe(true)
+    expect(g().drumMessageHeard).toEqual({ errand: true, answer: false })
     const heard = heardUtterances(g().communication).map((h) => h.utterance)
-    for (const atom of chiefMessagePhrase()) {
+    for (const atom of drumMessagePhrase()) {
       expect(heard).toContain(atom)
       expect(g().communication.heard[atom].firstHeardDay).toBe(40)
     }
@@ -198,10 +206,10 @@ describe("the chief's drum message (design.md §13.4)", () => {
     g().receiveDrumMessage()
     g().saveCheckpoint()
     g().newGame()
-    expect(g().drumMessageHeard).toBe(false)
+    expect(g().drumMessageHeard).toEqual({ errand: false, answer: false })
     expect(g().loadCheckpoint()).toBe(true)
-    expect(g().drumMessageHeard).toBe(true)
-    expect(hasHeard(g().communication, chiefMessagePhrase()[0])).toBe(true)
+    expect(g().drumMessageHeard).toEqual({ errand: true, answer: false })
+    expect(hasHeard(g().communication, drumMessagePhrase()[0])).toBe(true)
   })
 
   it('a snapshot from before the drums existed simply never heard them', () => {
@@ -212,6 +220,102 @@ describe("the chief's drum message (design.md §13.4)", () => {
     delete snaps[snaps.length - 1].drumMessageHeard
     localStorage.setItem(key, JSON.stringify(snaps))
     expect(g().loadCheckpoint()).toBe(true)
-    expect(g().drumMessageHeard).toBe(false)
+    expect(g().drumMessageHeard).toEqual({ errand: false, answer: false })
+  })
+})
+
+
+describe('the hand-over asks for the current drums without changing the give rule', () => {
+  function carryingBeforeChief(phase: ChiefPhase = 'at-drummer') {
+    useGame.setState({ mode: 'place', placeId: DRUM_MESSAGE_VILLAGE, chiefOutside: { [DRUM_MESSAGE_VILLAGE]: true }, rockArtefact: 'carried' })
+    setChiefWalkState({ phase, progress: phase === 'at-drummer' ? 1 : 0.5, at: 0, drumOnArrival: false })
+    standBeforeChief()
+  }
+
+  it('starts the answer immediately beside the drummer, with no premature memory', () => {
+    carryingBeforeChief()
+    g().handArtefactToChief()
+    const running = useUi.getState().drumPerformance!
+    expect(g().rockArtefact).toBe('given')
+    expect(g().carriedForms).toContain('rock-relief')
+    expect(running.plan.atoms).toEqual(drumMessagePhrase('answer'))
+    expect(playDrumMessage).toHaveBeenLastCalledWith(running.plan)
+    expect(g().drumMessageHeard).toEqual({ errand: false, answer: false })
+    expect(heardUtterances(g().communication)).toHaveLength(0)
+    expect(chiefWalkState().at).toBeGreaterThan(0)
+    g().finishDrumMessage()
+    expect(g().drumMessageHeard).toEqual({ errand: false, answer: true })
+    for (const atom of running.plan.atoms) expect(hasHeard(g().communication, atom)).toBe(true)
+  })
+
+  it.each(['walking-out', 'walking-back'] as const)('gives while %s and uses the walk to beat on arrival', (phase) => {
+    carryingBeforeChief(phase)
+    g().handArtefactToChief()
+    expect(g().rockArtefact).toBe('given')
+    expect(g().carriedForms).toContain('rock-relief')
+    expect(useUi.getState().drumPerformance).toBeNull()
+    expect(chiefWalkState()).toMatchObject({ phase: 'walking-out', progress: 0.5, drumOnArrival: true })
+    const step = chiefTick(chiefWalkState(), chiefWalkState().at + 5, { speed: 1, pathLength: 10, staySeconds: 60 })
+    setChiefWalkState(step.walk)
+    expect(step.beatDrums).toBe(true)
+    if (step.beatDrums) g().sendDrumMessage()
+    expect(useUi.getState().drumPerformance?.plan.message).toBe('answer')
+    expect(g().drumMessageHeard.answer).toBe(false)
+  })
+
+  it('finishes the errand without interruption, then releases exactly one answer', () => {
+    carryingBeforeChief()
+    g().requestDrumMessage()
+    const errand = useUi.getState().drumPerformance!
+    const calls = vi.mocked(playDrumMessage).mock.calls.length
+    g().handArtefactToChief()
+    g().requestDrumMessage()
+    expect(useUi.getState().drumPerformance).toBe(errand)
+    expect(useUi.getState().deferredDrumAnswer).toBe(true)
+    expect(playDrumMessage).toHaveBeenCalledTimes(calls)
+    expect(g().drumMessageHeard.answer).toBe(false)
+    g().finishDrumMessage()
+    const answer = useUi.getState().drumPerformance!
+    expect(answer.plan.message).toBe('answer')
+    expect(useUi.getState().deferredDrumAnswer).toBe(false)
+    expect(playDrumMessage).toHaveBeenCalledTimes(calls + 1)
+    expect(g().drumMessageHeard).toEqual({ errand: true, answer: false })
+    expect(hasHeard(g().communication, utteranceOf('DOWNSTREAM'))).toBe(false)
+    g().requestDrumMessage()
+    expect(useUi.getState().drumPerformance).toBe(answer)
+    g().finishDrumMessage()
+    expect(g().drumMessageHeard).toEqual({ errand: true, answer: true })
+    expect(useUi.getState().drumPerformance).toBeNull()
+    expect(playDrumMessage).toHaveBeenCalledTimes(calls + 1)
+  })
+
+  it('repeats the answer after the give, including a call on his way home', () => {
+    carryingBeforeChief()
+    g().handArtefactToChief()
+    g().finishDrumMessage()
+    g().requestDrumMessage()
+    expect(useUi.getState().drumPerformance?.plan.message).toBe('answer')
+    g().finishDrumMessage()
+    setChiefWalkState({ phase: 'walking-back', progress: 0.6, at: 0, drumOnArrival: false })
+    g().requestDrumMessage()
+    expect(chiefWalkState()).toMatchObject({ phase: 'walking-out', drumOnArrival: true })
+  })
+
+  it.each([['errand'], ['answer'], ['errand', 'answer']] as const)('saves independent heard flags and writes each chronicle once: %s', (...messages) => {
+    for (const message of messages) {
+      g().receiveDrumMessage(message)
+      g().receiveDrumMessage(message)
+    }
+    const expected = { errand: messages.some((m) => m === 'errand'), answer: messages.some((m) => m === 'answer') }
+    const entries = g().journal.filter((e) => ['journal.drumMessage', 'journal.drumAnswer'].includes(e.text.key))
+    expect(entries).toHaveLength(messages.length)
+    g().setUtteranceHypothesis(utteranceOf('RIVER'), 'water')
+    g().saveCheckpoint()
+    g().newGame()
+    expect(g().loadCheckpoint()).toBe(true)
+    expect(g().drumMessageHeard).toEqual(expected)
+    expect(hypothesisFor(g().communication, utteranceOf('RIVER'))).toBe('water')
+    for (const message of messages) g().receiveDrumMessage(message)
+    expect(g().journal.filter((e) => ['journal.drumMessage', 'journal.drumAnswer'].includes(e.text.key))).toHaveLength(messages.length)
   })
 })

@@ -8,8 +8,10 @@
 // CLOSING from a plain regression, §7.2 / Maximum-QA Phase 8) were SKIPPED,
 // because the closing steps were tracked by fallible MEMORY, not enforced. This
 // guard makes a version release IMPOSSIBLE while any closing step is unchecked:
-// a PreToolUse hook on the shell tools blocks the tag/poc creation-or-push (and
-// --tags) unless EVERY step below is recorded done FOR THE EXACT COMMIT tagged.
+// a PreToolUse hook on the shell tools blocks the version-tag creation-or-push
+// (and --tags) unless EVERY step below is recorded done FOR THE EXACT COMMIT
+// tagged. The `poc` tag is NOT a release and is not gated — see
+// `isVersionTagCommand` for the one-way dependency (user decision 20.09.2026).
 //
 // The SECOND release act the checklist gates is the CLAIM that a closing is
 // finished — in this repo's machine-readable form, the `[ ]`→`[x]` TICK of a
@@ -66,20 +68,26 @@ const GIT_PUSH = gitVerb('push')
 const PATH_OPTION = /\s(?:-C|--git-dir|--work-tree)(?:\s+|=)\S+/g
 
 /**
- * Does this shell command CREATE or PUSH a version tag (vX.Y) or the `poc` tag?
- * Those are the release acts the closing gates. Matches:
+ * Does this shell command CREATE or PUSH a version tag (vX.Y)?
+ * That is the release act the closing gates. Matches:
  *   git tag [..] vX.Y             (create/move a version tag)
- *   git tag [..] -f? poc          (move poc — it mirrors the newest version tag)
  *   git push <remote> vX.Y        (push a version tag)
- *   git push <remote> poc         (push poc)
  *   git push <remote> +v0.3       (force-update a version tag)
  *   git push <remote> :v0.3       (delete a version tag — a published one, too)
  *   git push .. --tags / --follow-tags   (bulk tag push)
- *   gh release create vX.Y|poc    (a release published straight from the CLI)
- *   any of the above with the tag QUOTED ("v0.3", 'poc') or with git options
+ *   gh release create vX.Y        (a release published straight from the CLI)
+ *   any of the above with the tag QUOTED ("v0.3") or with git options
  *   before the verb (git -C <path>, git -c key=val, git --no-pager)
+ *
+ * `poc` IS NOT GATED (user decision 20.09.2026). The dependency runs one way
+ * only: a NEW version tag pulls `poc` up to it, so a poc move that rides along
+ * with a release is covered by that release's own gate. Ahead of a release the
+ * poc tag is just the current playable build — it may run ahead of the newest
+ * version tag and is moved on request, without a closing. Gating it here
+ * blocked exactly that request and bought nothing.
+ *
  * Deliberately NOT matched: ordinary `git push origin main`, non-version
- * lightweight tags, branch pushes, a version/poc token that only appears in a
+ * lightweight tags, branch pushes, a version token that only appears in a
  * COMMIT MESSAGE, and a REPOSITORY PATH that happens to end in a tag name
  * (`git -C /build/poc push origin main`) — the gate is only for a version
  * RELEASE. Total: any non-string → false.
@@ -112,13 +120,12 @@ export function isVersionTagCommand(command) {
   // Evaluate each command SEGMENT on its own — a `git push origin main` segment
   // must not inherit a `poc`/`vX.Y` token from a sibling segment.
   const segments = c.split(/&&|\|\||;|\||\n/)
-  // A version tag as a bare ARGUMENT (v0.1, v1.0, v12.34), or the poc tag, or a
-  // bulk tag push. Matches quoted or unquoted. Word-bounded so `poctest`/`v0.2-rc`
-  // refspecs don't false-hit. The prefix class carries `+` (force refspec) and
+  // A version tag as a bare ARGUMENT (v0.1, v1.0, v12.34), or a bulk tag push.
+  // Matches quoted or unquoted. Word-bounded so `v0.2-rc` refspecs don't
+  // false-hit. The prefix class carries `+` (force refspec) and
   // `:` (delete refspec): `git push origin +v0.3` and `git push origin :v0.3`
   // are release acts the gate used to wave through (25.07 review, finding c).
   const versionArg = /(^|[\s=/+:])['"]?v\d+\.\d+['"]?($|[\s^~:])/
-  const pocArg = /(^|[\s=/+:])['"]?poc['"]?($|[\s^~:])/
   for (const seg of segments) {
     const s = ` ${seg.trim()} `
     // git may have options before the verb: git -C <path> tag, git -c user=x tag,
@@ -133,10 +140,10 @@ export function isVersionTagCommand(command) {
     if (!isTag && !isPush && !isGhRelease) continue
     if (/\s--(tags|follow-tags)\b/.test(s)) return true
     // A path handed to -C/--git-dir/--work-tree is a LOCATION, never a tag, so it
-    // is dropped before the tag matching: a repository at /build/poc must not
-    // read as the poc tag (25.07 review, finding b).
+    // is dropped before the tag matching: a repository at /build/v0.3 must not
+    // read as that version tag (25.07 review, finding b).
     const args = s.replace(PATH_OPTION, ' ')
-    if (versionArg.test(args) || pocArg.test(args)) return true
+    if (versionArg.test(args)) return true
   }
   return false
 }
@@ -724,7 +731,7 @@ function remedy(missing, retry) {
 /**
  * Top-level PreToolUse decision. Blocks, while any closing step is unsatisfied
  * for the commit at hand (headSha), BOTH release acts:
- *   - a version-tag/poc create-or-push (shell tools), and
+ *   - a version-tag create-or-push (shell tools; `poc` is not a release), and
  *   - the `[ ]`→`[x]` tick of a point whose spec delivers a closing (the
  *     work-order edit that CLAIMS the closing is done).
  * Returns { block: boolean, reason: string }. Total by contract: any thrown

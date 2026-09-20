@@ -55,6 +55,16 @@ describe('dig and the goal loop (design.md §13.3)', () => {
     expect(g().toast).toBe(stripVoiceMarkup(getStrings().journal.digNothing))
     expect(g().treasures).toEqual(treasures0) // nothing gained
   })
+
+  it('inside a settlement the shovel answers instead of digging', () => {
+    g().debugAddEquipment('shovel')
+    g().enterPlace('cairo')
+    const before = g().journal.length
+    g().dig()
+    expect(g().victory).toBe(false)
+    expect(g().toast).toBe(getStrings().toasts.digInSettlement)
+    expect(g().journal).toHaveLength(before) // a toast, never a chronicle page
+  })
 })
 
 describe('bazaar buy guards in a port (design.md §10)', () => {

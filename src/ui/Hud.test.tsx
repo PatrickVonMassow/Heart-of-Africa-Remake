@@ -10,7 +10,7 @@ import { en } from '../i18n/en'
 import { de } from '../i18n/de'
 import { useLocale } from '../i18n'
 import { UNSTUCK_KEY_CODE, UNSTUCK_KEY_LABEL } from '../systems/unstuck'
-import { useGame, canCampHere } from '../state/store'
+import { useGame, canCampHere, type GameState } from '../state/store'
 import { START_YEAR } from '../config/balance'
 import { dispatchSyntheticKey, GAMEPAD_BUTTON_KEYS } from '../systems/input'
 import { ctrlHeld, subscribeCtrlHold } from './ctrlHold'
@@ -735,6 +735,130 @@ describe('month keys (design.md §21.1 — stepping the seasons)', () => {
 })
 
 
+describe('every inventory slot answers a press (design.md §17.1)', () => {
+  // The shovel in the open is the model: pressed where nothing is buried it
+  // says so in a TOAST and writes no chronicle page. Every other slot follows —
+  // where the item cannot act right now, the traveller says why.
+  const pressBoth = (expected: string) => {
+    const { container, unmount } = render(<Hud />)
+    const bar = container.querySelector('.inventory-bar')!
+    // One item under test, so the slot is the first and its key is Digit1.
+    expect(bar.children).toHaveLength(1)
+    const slot = bar.children[0] as HTMLButtonElement
+    expect(slot.tagName).toBe('BUTTON')
+    const journalBefore = g().journal
+    const presses: [string, () => void][] = [
+      ['click', () => fireEvent.click(slot)],
+      ['Digit1', () => fireEvent.keyDown(window, { code: 'Digit1' })],
+    ]
+    for (const [how, press] of presses) {
+      act(() => useGame.setState({ toast: null }))
+      press()
+      expect(g().toast, how).toBe(expected)
+      expect(g().journal, how).toBe(journalBefore) // a toast, never an entry
+    }
+    unmount()
+  }
+  const inTheOpen = (coord: readonly [number, number], state: Partial<GameState>) => {
+    jumpTo(coord[0], coord[1])
+    act(() => useGame.setState({ equipment: {}, ...state }))
+  }
+  const inASettlement = (state: Partial<GameState>, placeId = 'cairo') =>
+    act(() => useGame.setState({ mode: 'place', placeId, equipment: {}, ...state }))
+
+  it('the rifle: it comes up by itself in the open, and threatens nobody in a settlement', () => {
+    inTheOpen(COORD.savanna, { equipment: { rifle: 1 } })
+    pressBoth(en.toasts.rifleReady)
+    inASettlement({ equipment: { rifle: 1 } })
+    pressBoth(en.toasts.rifleInSettlement)
+  })
+
+  it('the rope: it waits for a climb, takes his weight on a mountain, finds nothing to climb indoors', () => {
+    inTheOpen(COORD.savanna, { equipment: { rope: 1 } })
+    pressBoth(en.toasts.ropeReady)
+    inTheOpen(COORD.mountain, { equipment: { rope: 1 } })
+    expect(terrainAt(...COORD.mountain)).toBe('mountain')
+    pressBoth(en.toasts.ropeInUse)
+    inASettlement({ equipment: { rope: 1 } })
+    pressBoth(en.toasts.ropeInSettlement)
+  })
+
+  it('the machete: it waits for the jungle, clears it where it stands, stays sheathed among people', () => {
+    inTheOpen(COORD.savanna, { equipment: { machete: 1 } })
+    pressBoth(en.toasts.macheteReady)
+    inTheOpen(COORD.jungle, { equipment: { machete: 1 } })
+    expect(terrainAt(...COORD.jungle)).toBe('jungle')
+    pressBoth(en.toasts.macheteInUse)
+    inASettlement({ equipment: { machete: 1 } })
+    pressBoth(en.toasts.macheteInSettlement)
+  })
+
+  it('the canoe: it launches itself at water, carries him on it, finds no water in a settlement', () => {
+    inTheOpen(COORD.savanna, { equipment: { canoe: 1 } })
+    pressBoth(en.toasts.canoeReady)
+    inTheOpen(COORD.water, { equipment: { canoe: 1 } })
+    expect(terrainAt(...COORD.water)).toBe('water')
+    pressBoth(en.toasts.canoeInUse)
+    inASettlement({ equipment: { canoe: 1 } })
+    pressBoth(en.toasts.canoeInSettlement)
+  })
+
+  it('the canteen gives the same answer in both views, in the player’s language', () => {
+    inTheOpen(COORD.savanna, { equipment: { canteen: 1 } })
+    pressBoth(en.toasts.canteenReady)
+    inASettlement({ equipment: { canteen: 1 } })
+    pressBoth(en.toasts.canteenReady)
+    act(() => useLocale.getState().setLang('de'))
+    pressBoth(de.toasts.canteenReady)
+  })
+
+  it('the shovel does not dig up the ground people live on', () => {
+    inASettlement({ equipment: { shovel: 1 } })
+    pressBoth(en.toasts.digInSettlement)
+  })
+
+  it('a carried form is pressed against stone out in the open, not in a settlement', () => {
+    inASettlement({ carriedForms: ['rock-relief'] })
+    pressBoth(en.toasts.formInSettlement)
+  })
+
+  it('a treasure: nobody out on the map to show it to, and the bazaar only trades it', () => {
+    inTheOpen(COORD.savanna, { treasures: { ...g().treasures, gold: 1 } })
+    pressBoth(en.toasts.valuableNobodyHere)
+    inASettlement({ treasures: { ...g().treasures, gold: 1 } })
+    pressBoth(en.toasts.valuableBazaar)
+  })
+
+  it('a treasure at the monument site: the bazaar answer belongs to the PORTS alone', () => {
+    // Giza is the third place kind, and the port's "the bazaar trades it" would
+    // be a plain lie there: no market and nobody to show it to.
+    inASettlement({ treasures: { ...g().treasures, gold: 1 } }, 'giza')
+    pressBoth(en.toasts.valuableNobodyAtMonument)
+  })
+
+  it('medicine keeps both its answers: none left, and none needed', () => {
+    // The two answers medicine already had (design.md §17.1) must survive the
+    // one handler every slot now shares — by click AND by digit key.
+    inTheOpen(COORD.savanna, { equipment: { medicine: 1 }, afflictions: { ...g().afflictions, fever: false, wounds: 0 } })
+    pressBoth(en.toasts.medicineNotNeeded)
+    inASettlement({ equipment: { medicine: 1 }, afflictions: { ...g().afflictions, fever: false, wounds: 0 } })
+    pressBoth(en.toasts.medicineNotNeeded)
+  })
+
+  it('a village that neither reveres nor rejects the material looks without interest', () => {
+    // The north reveres gold and emerald and rejects silver: copper leaves it cold.
+    inASettlement({ treasures: { ...g().treasures, copper: 1 } }, 'nubian-village')
+    const { container, unmount } = render(<Hud />)
+    const slot = container.querySelector('.inventory-bar')!.children[0] as HTMLButtonElement
+    const journalBefore = g().journal
+    fireEvent.click(slot)
+    expect(g().toast).toBe(en.toasts.valuableIndifferent)
+    expect(g().journal).toBe(journalBefore)
+    expect(g().valuableShown['nubian-village']).toBe(true)
+    unmount()
+  })
+})
+
 describe('inventory keyboard and gamepad access', () => {
   afterEach(() => vi.restoreAllMocks())
 
@@ -791,7 +915,7 @@ describe('inventory keyboard and gamepad access', () => {
     expect(present).toHaveBeenCalledTimes(10)
   })
 
-  it('ignores empty and passive slots, repeats, browser chords, typing and open dialogs', () => {
+  it('ignores empty slots, repeats, browser chords, typing and open dialogs', () => {
     const dig = vi.spyOn(g(), 'dig').mockImplementation(() => {})
     const { rerender } = render(<Hud />)
     fireEvent.keyDown(window, { code: 'Digit1' })

@@ -6,6 +6,7 @@
 import type { PlaceKind, RegionId } from '../world/geo'
 import { balance } from '../config/balance'
 import { devAssert } from './devAssert'
+import { MIX_LIMITER_DOMAIN, mixLimiterCurve, readCurveTable } from './mixLimiter'
 import type { Tone } from '../communication/lexicon'
 import { phrasePlan, utterancePlan, type SpeechPlan, type SpeechVoice, type SpeechOptions } from '../communication/speaking'
 import type { DrumId, DrumMessagePlan } from '../communication/drumMessage'
@@ -46,6 +47,17 @@ const SURF_BASE = 0.26
 
 let ctx: AudioContext | null = null
 let master: GainNode | null = null
+// The mix limiter's output (design.md §19.1, point 1156). It is the LAST node
+// before the destination, so it — not the master — is what the graph really
+// delivers, and a browser analyser tapping the output must tap it here.
+let limiterOut: GainNode | null = null
+// The shaper carrying the limiter's table, kept so a recalibration can replace
+// it. A curve installed once at startup would make "calibratable" a false
+// claim: the debug menu (§21) edits the two values live, and the stage would go
+// on limiting to whatever it was built with.
+let limiterShaper: WaveShaperNode | null = null
+let limiterIn: GainNode | null = null
+let limiterCalibration: { threshold: number; ceiling: number } | null = null
 // THREE sub-buses under the master so footsteps, the village speech and every
 // other ambient sound can be balanced against each other (design.md §19.1/§20;
 // user request): footsteps ×2, all else ×0.5. Every layer/emitter routes through
@@ -477,7 +489,32 @@ function buildGraph() {
   if (!ctx) return
   master = ctx.createGain()
   master.gain.value = 0.5
-  master.connect(ctx.destination)
+  // THE LAST STAGE (design.md §19.1, point 1156): the master feeds the limiter
+  // and the limiter feeds the destination — nothing else may sit between them,
+  // or a bus would reach the output unbounded. The shaper's curve is indexed
+  // over an input of ±1, so the sum is scaled into that domain and back out
+  // again around it.
+  limiterIn = ctx.createGain()
+  limiterIn.gain.value = 1 / MIX_LIMITER_DOMAIN
+  const shaper = ctx.createWaveShaper()
+  limiterShaper = shaper
+  limiterCalibration = null
+  applyLimiterCalibration()
+  // NO OVERSAMPLING, deliberately. Oversampling would spare the shaped peaks
+  // some foldover, but it resamples AFTER the curve has bounded the sample, and
+  // the Web Audio specification leaves that filter to the implementation — it
+  // may overshoot, and then nothing here can still promise what leaves the
+  // stage. With 'none' the curve IS the output, sample for sample, so the
+  // ceiling is a guarantee rather than an expectation. The aliasing paid for it
+  // is small and rare: the curve is the identity below the threshold, so only
+  // the brief top of a coincidence is shaped at all, and the knee is smooth.
+  shaper.oversample = 'none'
+  limiterOut = ctx.createGain()
+  limiterOut.gain.value = MIX_LIMITER_DOMAIN
+  master.connect(limiterIn)
+  limiterIn.connect(shaper)
+  shaper.connect(limiterOut)
+  limiterOut.connect(ctx.destination)
   // Footstep, ambient and speech sub-buses (design.md §19.1/§20): footsteps
   // twice as loud, every other ambient sound half as loud, the village speech on
   // its own level, all three under the master volume.
@@ -1055,14 +1092,21 @@ export function playSpeech(plan: SpeechPlan): void {
   // the destination is not readable through the Web Audio API. That end is held
   // by the live browser check, which listens to what the output really carries
   // (`scripts/verify/settings.mjs`).
+  //
+  // THE END OF THE CHAIN MOVED (point 1156): the master is no longer the last
+  // node, so a level read at the master is one stage short of the truth. A
+  // limiter calibrated to a zero ceiling silences the destination exactly the
+  // way a zero bus did, and this check must see it.
   const chain = speechBus ? speechBus.gain.value * master.gain.value : master.gain.value
+  const leaving = throughDeployedLimiter(peak * chain * route.monoGain)
   devAssert(
-    peak * chain * route.monoGain > 0 || balance.communication.speechVolume <= 0,
+    leaving > 0 || balance.communication.speechVolume <= 0,
     'speech-inaudible',
     () =>
-      `${plan.syllables.length} syllables leave the graph at ${(peak * chain).toExponential(2)} ` +
+      `${plan.syllables.length} syllables leave the graph at ${leaving.toExponential(2)} ` +
       `(peak ${peak.toFixed(3)}, speech bus ${(speechBus?.gain.value ?? 1).toFixed(3)}, ` +
-      `master ${master?.gain.value.toFixed(3)}) while the speech volume is ${balance.communication.speechVolume}`,
+      `master ${master?.gain.value.toFixed(3)}, mix limiter ceiling ` +
+      `${balance.mixLimiter.ceiling}) while the speech volume is ${balance.communication.speechVolume}`,
   )
   // Counted SEPARATELY from `spoken`, so the live gate proves audio was really
   // scheduled at a positive level — not merely that a counter moved.
@@ -1148,8 +1192,30 @@ export function startAmbience() {
 }
 
 /** Re-apply the gain targets after a volume change in the debug menu. */
+/** What the DEPLOYED last stage makes of a level (point 1156). It reads the
+ *  table the shaper really carries and the gains really set, never the balance
+ *  values beside them: a calibration that has not reached the graph yet must
+ *  not be reported as though it had, and one that HAS reached it must be seen
+ *  even when the balance value has since been put back. */
+function throughDeployedLimiter(level: number): number {
+  if (!limiterShaper?.curve || !limiterIn || !limiterOut) return level
+  return readCurveTable(limiterShaper.curve, level * limiterIn.gain.value) * limiterOut.gain.value
+}
+
+/** Re-cut the limiter's table when its calibration has moved (point 1156). The
+ *  table is 2049 samples, so it is rebuilt only on a real change — a scene
+ *  switch or a volume slider must not pay for one. */
+function applyLimiterCalibration() {
+  if (!limiterShaper) return
+  const { threshold, ceiling } = balance.mixLimiter
+  if (limiterCalibration && limiterCalibration.threshold === threshold && limiterCalibration.ceiling === ceiling) return
+  limiterShaper.curve = mixLimiterCurve()
+  limiterCalibration = { threshold, ceiling }
+}
+
 export function refreshAmbienceVolume() {
   if (!ctx) return
+  applyLimiterCalibration()
   applyScene()
   for (const w of wobbles) w.gain.gain.value = w.baseDepth * balance.ambienceVolume * wobbleExtra(w.name)
   if (ambientBus) ambientBus.gain.value = balance.ambientVolume
@@ -1195,9 +1261,10 @@ if (import.meta.env.DEV && typeof window !== 'undefined') {
     // Village speech (design.md §13.4): speak an utterance/phrase from a given
     // distance, and read what was actually scheduled.
     speak: (utterance: string, distance: number, options: SpeechOptions = {}) => playSpeech(utterancePlan(utterance, distance, options)),
-    // Native browser analysers tap the deployed output after every bus.
+    // Native browser analysers tap the deployed output after every bus AND
+    // after the mix limiter (point 1156) — the node the destination hears.
     context: () => ctx,
-    output: () => master,
+    output: () => limiterOut ?? master,
     speakPhrase: (phrase: string[], distance: number) => playSpeech(phrasePlan(phrase, distance)),
     speechProbe: () => ({ ...(speechProbe ?? { spoken: 0, syllables: 0, lastPeak: 0 }) }),
   }

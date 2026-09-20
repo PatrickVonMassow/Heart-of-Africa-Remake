@@ -1,6 +1,6 @@
 // The chief's drum message on paper (design.md §13.4,
 // docs/communication-poc-spec.md, work-order point 486): after the drums have
-// beaten it out, the seven concepts stand in order with the player's OWN
+// beaten it out, its concepts stand in order with the player's OWN
 // reading above each, every one clickable to change.
 //
 // The reading is not a copy. It is read from — and written straight back into —
@@ -12,7 +12,7 @@
 // player who forgets the message is never locked out of it.
 
 import { useEffect, useState } from 'react'
-import { drumMessageElements } from '../communication/drumMessage'
+import { drumMessageElements, type DrumMessageId } from '../communication/drumMessage'
 import { toneOfSyllable, SYLLABLE_SEPARATOR } from '../communication/lexicon'
 import { useGame } from '../state/store'
 import { useUi } from '../state/ui'
@@ -31,7 +31,7 @@ export function Syllables({ utterance }: { utterance: string }) {
   )
 }
 
-export function DrumMessageDialog() {
+export function DrumMessageDialog({ message = 'errand' }: { message?: DrumMessageId }) {
   const t = useStrings()
   const memory = useGame((s) => s.communication)
   const setHypothesis = useGame((s) => s.setUtteranceHypothesis)
@@ -40,13 +40,13 @@ export function DrumMessageDialog() {
   // the moment it is typed — the journal's field keeps its draft the same way.
   const [drafts, setDrafts] = useState<Record<string, string>>({})
   const [editing, setEditing] = useState<number | null>(null)
-  const elements = drumMessageElements(memory)
+  const elements = drumMessageElements(memory, message)
 
   return (
     <div className="dialog-backdrop">
       <div className="dialog drum-message">
-        <h3>{t.drumMessage.title}</h3>
-        <p className="flavor">{t.drumMessage.hint}</p>
+        <h3>{message === 'answer' ? t.drumMessage.answerTitle : t.drumMessage.title}</h3>
+        <p className="flavor">{message === 'answer' ? t.drumMessage.answerHint : t.drumMessage.hint}</p>
         <ol className="drum-concepts">
           {elements.map((e) => (
             <li className="drum-concept" key={e.utterance}>
@@ -102,13 +102,13 @@ export function DrumMessageWatcher() {
   const beating = useUi((s) => s.drumPerformance)
   useEffect(() => {
     if (!beating) return
-    const remaining = Math.max(0, beating.endsAt - drumClock())
+    const remaining = Math.max(0, Math.ceil(beating.endsAt - drumClock()))
     const timer = setTimeout(() => {
-      useGame.getState().receiveDrumMessage()
-      useUi.getState().clearDrumMessage()
+      if (useUi.getState().drumPerformance !== beating) return
+      useGame.getState().finishDrumMessage()
       if (useUi.getState().dialog === null) {
         if (document.pointerLockElement) document.exitPointerLock()
-        useUi.getState().setDialog({ kind: 'drumMessage' })
+        useUi.getState().setDialog({ kind: 'drumMessage', message: beating.plan.message })
       }
     }, remaining)
     return () => clearTimeout(timer)

@@ -238,7 +238,7 @@ export async function waitForSceneReady(page, opts = {}) {
  * declared subject is not in the picture, or when the scene never finished
  * drawing.
  */
-export async function captureFrame(page, outDir, name, decl, { timeout = DEFAULT_TIMEOUT, scene = {} } = {}) {
+export async function captureFrame(page, outDir, name, decl, { timeout = DEFAULT_TIMEOUT, scene = {}, beforeCapture } = {}) {
   const d = normaliseDeclaration(name, decl)
   const started = Date.now()
   let probe = null
@@ -273,6 +273,9 @@ export async function captureFrame(page, outDir, name, decl, { timeout = DEFAULT
       throw new Error(`frame ${d.frame}: the scene never finished drawing — ${sceneVerdict.reason}`)
     }
   }
+  // A short live action starts only after readiness, so the readiness wait
+  // cannot consume the very performance the frame is meant to show.
+  if (beforeCapture) await beforeCapture()
   const path = `${outDir}${d.frame}.png`
   const options = decl.clip
     ? { path, clip: decl.clip, timeout: CAPTURE_BUDGET_MS }

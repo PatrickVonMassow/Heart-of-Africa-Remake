@@ -1507,3 +1507,15 @@ fasst die Maschine währenddessen nicht an.
   Testabdeckung, kein Spielerimpakt — das Verhalten selbst ist auf beiden Backends am Bild
   belegt (`verification/1160-steering-hint-centred.png`). Wer es aufgreift, prüft zuerst,
   ob der Touch-Umschalter überhaupt nötig bleibt, sobald die Automatik-Maske steht.
+
+## Der Doktor hat keine Prüfung für seine eigene Pfadliste (20.09.2026)
+
+`scripts/batch-doctor.mjs` las die Pfade seiner schmutzigen Dateien mit einem festen
+`slice(3)`, während sein Git-Helfer die ganze Ausgabe trimmt — das erste Zeichen der ersten
+Zeile fiel weg. Der Fehler überlebte, weil die Liste nur GEZÄHLT und nie GELESEN wurde; erst
+eine Ausnahme, die einen Pfad vergleicht, brachte ihn ans Licht (Commit „Keep the doctor from
+quarantining the wait it is standing next to"). Behoben ist er, ungeprüft bleibt er: die
+Extraktion sitzt im Skript, nicht im Kern, und ein Test dafür verlangte einen Export, also
+Umbau. Nicht als Punkt eingereiht: kein Spielerimpakt, und der Defekt ist gemessen behoben
+(dirty=2 → dirty=1 auf demselben Baum). Wer den Kern das nächste Mal ohnehin anfasst, zieht
+die Zeile mit hinüber und prüft sie dort.

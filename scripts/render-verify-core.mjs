@@ -95,6 +95,7 @@ export const NON_RENDER_VERIFY = new Set([
   'cropLuma.mjs', // how a ground crop's pixels become one reading; polish.mjs captures them
   'digSitePicture.mjs', // excavation composition and hold checks; polish.mjs supplies the browser page
   'docs.mjs',
+  'drumFrame.mjs', // the live drum capture window; polish.mjs supplies the browser page
   'eavesColumn.mjs', // the head-clearance verdict over a recorded window; polish.mjs records it
   'edgeBandReading.mjs', // crop measurements and failure details; polish.mjs captures the frames
   'edgeBandSettle.mjs', // shot-window settle decisions with injected reads/gaps; polish.mjs drives the browser

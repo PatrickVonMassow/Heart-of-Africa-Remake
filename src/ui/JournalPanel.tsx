@@ -117,12 +117,20 @@ function Observations() {
       <p className="observations-hint">{t.journalPanel.observationsHint}</p>
       {/* The chief's message is never lost (point 486): once his drums have
           spoken it can be read again from here, wherever the traveller is. */}
-      {drumMessageHeard && (
+      {drumMessageHeard.errand && (
         <button
           className="hud-button reopen-drum-message"
-          onClick={() => setDialog({ kind: 'drumMessage' })}
+          onClick={() => setDialog({ kind: 'drumMessage', message: 'errand' })}
         >
           {t.journalPanel.reopenDrumMessage}
+        </button>
+      )}
+      {drumMessageHeard.answer && (
+        <button
+          className="hud-button reopen-drum-message"
+          onClick={() => setDialog({ kind: 'drumMessage', message: 'answer' })}
+        >
+          {t.journalPanel.reopenDrumAnswer}
         </button>
       )}
       {heard.map((h) => {

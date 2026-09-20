@@ -564,3 +564,22 @@ describe('UNITS_PER_DEGREE', () => {
     expect(Number(m[1])).toBe(UNITS_PER_DEGREE)
   })
 })
+
+
+describe('a live action at the shutter', () => {
+  it('starts after scene readiness and immediately before capture', async () => {
+    const calls = []
+    await captureFrame(fakePage(calls), 'out/', '150-artefact-chiefs-answer', {
+      local: { x: 1, z: 2 }, label: 'the drummer answering beside the chief',
+    }, { beforeCapture: async () => calls.push({ via: 'live-action' }) })
+    expect(calls.map((c) => c.via)).toEqual(['scene-sample', 'live-action', 'page'])
+  })
+
+  it('writes no frame if the live state refuses the shutter', async () => {
+    const calls = []
+    await expect(captureFrame(fakePage(calls), 'out/', '150-artefact-chiefs-answer', {
+      local: { x: 1, z: 2 }, label: 'the drummer answering beside the chief',
+    }, { beforeCapture: async () => { throw new Error('drumPerformance has ended') } })).rejects.toThrow(/drumPerformance/)
+    expect(calls.some((c) => c.via === 'page')).toBe(false)
+  })
+})

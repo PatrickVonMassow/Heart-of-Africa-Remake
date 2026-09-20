@@ -19,7 +19,7 @@ import {
   vertexColor,
 } from 'three/tsl'
 import { FLORA_COLOR_LIFT, SEASON_TINT_U, seasonFoliagePosition, seasonTintNode, setGroundWetness, setSeasonCollapse, setSeasonTint } from '../../render/seasonTint'
-import { DRUM_MESSAGE_VILLAGE, useGame } from '../../state/store'
+import { useGame } from '../../state/store'
 import {
   useUi,
   effectiveShadows,
@@ -99,7 +99,6 @@ import { SpeechLabels } from './SpeechLabels'
 import {
   CHIEF_SPEAKER_ID,
   DRUMMER_SPEAKER_ID,
-  chiefAnchor,
   chiefStandingPosition,
   chiefMovementColliders,
   chiefWalkState,
@@ -112,7 +111,6 @@ import {
 import { nextChiefAction, type ChiefAction, type ChiefTarget } from './chiefMeeting'
 import {
   chiefBesideDrummerSpot,
-  chiefCalled,
   chiefTick,
   chiefWalkFacing,
   chiefWalkPosition,
@@ -120,14 +118,10 @@ import {
 } from './chiefWalk'
 import { drummerNamesChief } from './drummerVoice'
 import { VILLAGE_SPOTS } from './lifeSpots'
-import { forgetSpeechLabel, speakOverhead, speechClock, speechUseCandidate } from './speechChannel'
-import { chiefRewardPhrase } from '../../communication/chiefReply'
-import type { Phrase } from '../../communication/lexicon'
-import { speechBearing } from './speechBearing'
-import { phrasePlan } from '../../communication/speaking'
-import { speechLabelSeconds, type SpeechLabel } from '../../communication/speechLabel'
-import { drumMessagePlan } from '../../communication/drumMessage'
-import { playDrumMessage, playSpeech, playThunder } from '../../systems/ambience'
+import { forgetSpeechLabel, speechClock, speechUseCandidate } from './speechChannel'
+import type { SpeechLabel } from '../../communication/speechLabel'
+import { currentDrumMessage } from '../../communication/drumMessage'
+import { playThunder } from '../../systems/ambience'
 import { createPlacePointerLock, releasePointerLock, restorePointerLockAfterDialogs } from './pointerLock'
 import { ActorLabels } from '../ActorLabels'
 import { markActor } from '../actorLabelSource'
@@ -532,24 +526,6 @@ function VillageHut({
 }
 
 /**
- * The drums go out (design.md §13.4, point 486). The plan the drummer's hands
- * animate from is the plan WebAudio plays, so what sounds and what is seen can
- * never disagree — and a village with nothing to send says so instead.
- */
-function sendDrumMessage(): void {
-  const game = useGame.getState()
-  const strings = getStrings()
-  if (game.placeId !== DRUM_MESSAGE_VILLAGE) {
-    game.setToast(strings.toasts.chiefNoMessage)
-    return
-  }
-  const plan = drumMessagePlan()
-  useUi.getState().startDrumMessage(plan)
-  playDrumMessage(plan)
-  game.setToast(strings.toasts.drumsSending)
-}
-
-/**
  * The use key at the chief's hut, at the chief himself and at his drummer
  * (design.md §12, §13.4). The hut sends him OUT and across to the drummer;
  * out there either man sends the message, repeats it while he stands, and calls
@@ -571,10 +547,9 @@ function actOnChief(target: ChiefTarget, layout: PlaceLayout | null): void {
       // ONE transition for both: beside the drummer it beats the message and
       // begins his minute again, on the way home it turns him round and the
       // drums follow by themselves when he arrives.
-      const step = chiefCalled(chiefWalkState(), speechClock())
-      setChiefWalkState(step.walk)
-      if (step.beatDrums) sendDrumMessage()
-      else game.setToast(strings.toasts.chiefCalledBack)
+      const besideDrummer = chiefWalkState().phase === 'at-drummer'
+      game.requestDrumMessage()
+      if (!besideDrummer) game.setToast(strings.toasts.chiefCalledBack)
       break
     }
     case 'name-chief': {
@@ -588,23 +563,6 @@ function actOnChief(target: ChiefTarget, layout: PlaceLayout | null): void {
     default:
       break
   }
-}
-
-/** What the chief says: sounded at the traveller's own distance and written
- *  over the chief's head, like any other villager's word (design.md §13.4).
- *  The distance is measured to the spot the standing figure registered, so the
- *  voice comes from the man in the picture. */
-function speakChiefPhrase(phrase: Phrase, camera: THREE.Camera): void {
-  const distance =
-    placePlayerPosition.active && chiefStandingPosition.active
-      ? Math.hypot(
-          placePlayerPosition.x - chiefStandingPosition.x,
-          placePlayerPosition.z - chiefStandingPosition.z,
-        )
-      : 0
-  playSpeech(phrasePlan(phrase, distance, { bearing: speechBearing(camera, chiefStandingPosition) }))
-  const anchor = chiefAnchor()
-  if (anchor) speakOverhead(CHIEF_SPEAKER_ID, phrase, anchor, { seconds: speechLabelSeconds(phrase.length) })
 }
 
 /**
@@ -632,7 +590,6 @@ function Chief({
   dress: ColdDress | null
 }) {
   const groundHeight = usePlaceGround()
-  const camera = useThree((state) => state.camera)
   const t = useStrings()
   const group = useRef<THREE.Group>(null)
   // The two ends of his path: the spot beside his own door he has always come
@@ -692,7 +649,7 @@ function Chief({
     setChiefWalkState(step.walk)
     if (step.walk.phase === 'at-drummer' && wasWalking.current) forgetSpeechLabel(DRUMMER_SPEAKER_ID)
     wasWalking.current = step.walk.phase === 'walking-out'
-    if (step.beatDrums) sendDrumMessage()
+    if (step.beatDrums) useGame.getState().sendDrumMessage()
     const [px, pz] = chiefWalkPosition(step.walk, door, beside)
     if (step.walk.phase === 'in-hut') clearChiefStanding()
     else setChiefStanding(px, pz)
@@ -726,18 +683,6 @@ function Chief({
       if (game.placeId && game.chiefOutside[game.placeId]) useGame.setState({ chiefOutside: {} })
     }
   }, -1) // Publish his body before the player resolves movement in either perspective.
-  // His ANSWER to the find (design.md §6): the give is an act on the inventory
-  // item, so the store owns it and the figure that must speak it listens for
-  // it. Only the transition speaks — a settlement re-entered with the find long
-  // given says nothing.
-  useEffect(
-    () =>
-      useGame.subscribe((state, prev) => {
-        if (state.rockArtefact !== 'given' || prev.rockArtefact === 'given') return
-        speakChiefPhrase(chiefRewardPhrase(), camera)
-      }),
-    [camera],
-  )
   return (
     // NOT marked for the §17.8 Ctrl layer: he carries his own standing label
     // below, and the layer would print the same word twice over one man.
@@ -2435,7 +2380,9 @@ function settlementUseCandidates(layout: PlaceLayout | null, x: number, z: numbe
 function chiefPromptLabel(strings: ReturnType<typeof getStrings>, action: ChiefAction): string {
   switch (action) {
     case 'send-message':
-      return useGame.getState().drumMessageHeard
+      return currentDrumMessage(useGame.getState()) === 'answer'
+        ? strings.labels.repeatDrumAnswer
+        : useGame.getState().drumMessageHeard.errand
         ? strings.labels.repeatDrumMessage
         : strings.labels.askForDrumMessage
     case 'call-back':

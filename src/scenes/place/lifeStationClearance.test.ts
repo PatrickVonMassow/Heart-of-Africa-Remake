@@ -54,7 +54,19 @@ describe('fixed village stations leave a walker-wide gap to buildings and fences
     expect(failed.slice(0, 20), `${failed.length} station violations`).toEqual([])
   }, 120_000)
 
+  // EVERY VILLAGE SHIPS, so every village carries the guarantee (work-order
+  // 1093). Four fixed seeds per plan could not see it: the exposed stations —
+  // the talking pair at r 7.2, the pounder at r 7.1, the weaver at (-8.5, -7) —
+  // are reached by a COMPOUND band drawn at cr 13.5-17.5, and where that band
+  // falls is a draw of the seed, not of the plan. So the plan sweep runs a seed
+  // SPREAD as well; the three villages above keep the deeper 300.
+  // Measured 20.09.2026 before this widening: all 22 villages over seeds 1-300
+  // — 6600 layouts — held the gap with no violation, so 40 seeds here pin a
+  // guarantee that was already whole rather than papering over a known hole.
   it.each(PLACES.filter(p => p.kind === 'village').map(p => p.id))('%s: all village plans', id => {
-    for (const seed of [7, 42, 1337, 1838110026]) expect(violations(id, seed)).toEqual([])
-  })
+    const failed: string[] = []
+    for (const seed of [7, 42, 1337, 1838110026]) failed.push(...violations(id, seed))
+    for (let seed = 1; seed <= 40; seed++) failed.push(...violations(id, seed))
+    expect(failed.slice(0, 20), `${failed.length} station violations`).toEqual([])
+  }, 60_000)
 })

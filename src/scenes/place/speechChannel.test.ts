@@ -291,14 +291,12 @@ it('replaces the preceding village note when the floor grants a new word', () =>
 })
 
 it('leaves a note raised outside the floor standing, with its figure', () => {
-  // The chief answers the player and his words are held far longer than a
-  // village word stands (PlaceScene speakChiefPhrase). The village then talks
-  // on. Sweeping every label took his answer down under him, and the picture
-  // check found his head bare while a villager spoke.
-  speakOverhead('chief', [DIG], figure(), { now: 0, seconds: 120 })
+  // The floor clears only labels it owns, preserving an independently raised
+  // note and its anchor when another village word takes the floor.
+  speakOverhead('outside-floor', [DIG], figure(), { now: 0, seconds: 10 })
   speakOverhead('villager-4', [RIVER_UTTERANCE], figure(), { now: 1, floor: true })
   speakOverhead('villager-5', [DIG], figure(), { now: 2, floor: true })
-  expect(speechLabelState().labels.map((l) => l.speakerId).sort()).toEqual(['chief', 'villager-5'])
-  expect(speechAnchor('chief')).not.toBeNull()
+  expect(speechLabelState().labels.map((l) => l.speakerId).sort()).toEqual(['outside-floor', 'villager-5'])
+  expect(speechAnchor('outside-floor')).not.toBeNull()
   expect(speechAnchor('villager-4')).toBeNull()
 })

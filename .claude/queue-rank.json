@@ -1195,18 +1195,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "1093": {
-      "at": "2026-09-10T18:32:34.316Z",
-      "why": "Nutzer-Auftrag 07.09.2026 ('reihe einen weiteren Task fuer das Clipping-Problem ein'), am 10.09.2026 bekraeftigt: 'das Kollisionsproblem muss behoben werden'.",
-      "origin": "user",
-      "place": "ahead"
-    },
-    "1094": {
-      "at": "2026-09-10T18:32:34.412Z",
-      "why": "Nutzer-Auftrag 10.09.2026 20:11: 'Setze deine Empfehlung bzgl. 1045 um' — der Punkt streicht Pruefbreite und gehoert vor die Punkte, deren Stichproben er umstellt.",
-      "origin": "user",
-      "place": "ahead"
-    },
     "1095": {
       "at": "2026-09-10T19:02:17.920Z",
       "why": "Maschinen-Befund ohne Spielerwirkung: die Anleitung verliert Aktualität, nichts blockiert; steht hinter der Release-Arbeit.",
@@ -1333,12 +1321,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "1156": {
-      "at": "2026-09-18T13:01:39.650Z",
-      "why": "The user ranked it directly after point 1125 himself on 18.09.2026, 14:26.",
-      "origin": "user",
-      "place": "ahead"
-    },
     "1157": {
       "at": "2026-09-18T11:26:34.291Z",
       "why": "User 18.09.2026 13:24: file the still-weaver bug report directly after point 690",
@@ -1369,11 +1351,11 @@
       "origin": "machine",
       "place": "last"
     },
-    "1168": {
-      "at": "2026-09-19T20:37:05.654Z",
-      "why": "User order 19.09.2026, 19:00: the chief's drummed answer is done directly next, ahead of everything else",
-      "origin": "user",
-      "place": "ahead"
+    "1169": {
+      "at": "2026-09-20T03:58:25.002Z",
+      "why": "Der Fund gehört hinter den laufenden Umbau der Lehrprüfungen: er wurde von dessen Stichprobe erst sichtbar gemacht, und die reparierten Saatzahlen gehören in genau die Tabelle, die 1094 gerade umstellt.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1406,7 +1388,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-19T20:37:05.664Z",
+    "at": "2026-09-20T15:19:03.511Z",
     "points": [
       174,
       184,
@@ -1777,8 +1759,6 @@
       1079,
       1081,
       1084,
-      1093,
-      1094,
       1095,
       1096,
       1097,
@@ -1808,13 +1788,12 @@
       1152,
       1153,
       1154,
-      1156,
       1157,
       1158,
       1163,
       1164,
       1167,
-      1168
+      1169
     ]
   }
 }

@@ -11,13 +11,14 @@ import { en } from '../i18n/en'
 import { de } from '../i18n/de'
 import { useLocale } from '../i18n'
 import { useUi } from '../state/ui'
-import { freshGame, g } from '../test/store'
-import { chiefMessagePhrase, drumMessagePlan } from '../communication/drumMessage'
+import { freshGame, g, standBeforeChief } from '../test/store'
+import { drumMessagePhrase, drumMessagePlan } from '../communication/drumMessage'
 import { utteranceOf } from '../communication/lexicon'
 import { hypothesisFor } from '../communication/heard'
 import { NO_READING } from '../communication/speechLabel'
-import { DRUM_MESSAGE_VILLAGE } from '../state/store'
+import { DRUM_MESSAGE_VILLAGE, useGame } from '../state/store'
 import { nextChiefAction } from '../scenes/place/chiefMeeting'
+import { setChiefWalkState } from '../scenes/place/chiefPresence'
 
 const DIG = utteranceOf('DIG')
 const RIVER = utteranceOf('RIVER')
@@ -48,7 +49,7 @@ const syllables = () =>
 describe('the message display (design.md §13.4)', () => {
   it('shows the four drummed concepts in the order they were beaten', () => {
     render(<DrumMessageDialog />)
-    expect(syllables()).toEqual([...chiefMessagePhrase()])
+    expect(syllables()).toEqual([...drumMessagePhrase()])
   })
 
   it('shows ??? over a concept the player has not read yet', () => {
@@ -136,7 +137,7 @@ describe('the message can always be reopened (point 486)', () => {
     const button = document.querySelector('.reopen-drum-message') as HTMLButtonElement
     expect(button.textContent).toBe(en.journalPanel.reopenDrumMessage)
     fireEvent.click(button)
-    expect(useUi.getState().dialog).toEqual({ kind: 'drumMessage' })
+    expect(useUi.getState().dialog).toEqual({ kind: 'drumMessage', message: 'errand' })
 
     // Closing it does not consume it — it opens again.
     journal.unmount()
@@ -147,15 +148,15 @@ describe('the message can always be reopened (point 486)', () => {
     render(<JournalPanel />)
     openOverheardTab()
     fireEvent.click(document.querySelector('.reopen-drum-message') as HTMLButtonElement)
-    expect(useUi.getState().dialog).toEqual({ kind: 'drumMessage' })
+    expect(useUi.getState().dialog).toEqual({ kind: 'drumMessage', message: 'errand' })
   })
 
   it('routes the dialog to the message display', () => {
     g().receiveDrumMessage()
-    useUi.getState().setDialog({ kind: 'drumMessage' })
+    useUi.getState().setDialog({ kind: 'drumMessage', message: 'errand' })
     render(<Dialogs />)
     expect(document.querySelector('.dialog.drum-message')).toBeInTheDocument()
-    expect(syllables()).toEqual([...chiefMessagePhrase()])
+    expect(syllables()).toEqual([...drumMessagePhrase()])
   })
 })
 
@@ -176,14 +177,14 @@ describe('the drums are waited out before the message is understood', () => {
     act(() => {
       vi.advanceTimersByTime(plan.duration * 1000 - 50)
     })
-    expect(g().drumMessageHeard).toBe(false)
+    expect(g().drumMessageHeard).toEqual({ errand: false, answer: false })
     expect(useUi.getState().dialog).toBeNull()
 
     act(() => {
       vi.advanceTimersByTime(100)
     })
-    expect(g().drumMessageHeard).toBe(true)
-    expect(useUi.getState().dialog).toEqual({ kind: 'drumMessage' })
+    expect(g().drumMessageHeard).toEqual({ errand: true, answer: false })
+    expect(useUi.getState().dialog).toEqual({ kind: 'drumMessage', message: 'errand' })
     expect(useUi.getState().drumPerformance).toBeNull()
   })
 
@@ -197,7 +198,7 @@ describe('the drums are waited out before the message is understood', () => {
     act(() => {
       vi.advanceTimersByTime(plan.duration * 1000 + 100)
     })
-    expect(g().drumMessageHeard).toBe(true)
+    expect(g().drumMessageHeard).toEqual({ errand: true, answer: false })
     expect(useUi.getState().dialog).toEqual({ kind: 'trade', building: 'market' })
   })
 
@@ -235,6 +236,105 @@ describe('the chief sends the message outdoors (design.md §12/§13.4)', () => {
     expect(beating!.plan).toEqual(plan)
     expect((beating!.endsAt - beating!.startedAt) / 1000).toBeCloseTo(plan.duration, 6)
     // Nothing is understood yet — the drums have only just started.
-    expect(g().drumMessageHeard).toBe(false)
+    expect(g().drumMessageHeard).toEqual({ errand: false, answer: false })
+  })
+})
+
+
+describe('the answer display', () => {
+  it.each(['en', 'de'] as const)('names and displays the answer in %s, independent of the current message', (lang) => {
+    useLocale.getState().setLang(lang)
+    g().receiveDrumMessage('answer')
+    useUi.getState().setDialog({ kind: 'drumMessage', message: 'answer' })
+    const t = lang === 'de' ? de : en
+    render(<Dialogs />)
+    expect(syllables()).toEqual(drumMessagePhrase('answer'))
+    expect(document.querySelector('.drum-message h3')?.textContent).toBe(t.drumMessage.answerTitle)
+    expect(document.querySelector('.drum-message .flavor')?.textContent).toBe(t.drumMessage.answerHint)
+    expect(readings()).toEqual([NO_READING, NO_READING])
+    fireEvent.click(document.querySelectorAll('.drum-concept .reading')[1])
+    fireEvent.change(document.querySelector('.drum-concept .hypothesis')!, { target: { value: 'with the current' } })
+    expect(hypothesisFor(g().communication, utteranceOf('DOWNSTREAM'))).toBe('with the current')
+  })
+
+  it('keeps the errand reopen intact after the give', () => {
+    useGame.setState({ rockArtefact: 'given' })
+    useUi.getState().setDialog({ kind: 'drumMessage', message: 'errand' })
+    render(<Dialogs />)
+    expect(syllables()).toEqual(drumMessagePhrase('errand'))
+  })
+})
+
+describe('the finished answer is what the player heard', () => {
+  beforeEach(() => vi.useFakeTimers())
+  afterEach(() => vi.useRealTimers())
+
+  it('releases a give deferred behind the errand and waits for the answer itself', () => {
+    useGame.setState({ mode: 'place', placeId: DRUM_MESSAGE_VILLAGE, chiefOutside: { [DRUM_MESSAGE_VILLAGE]: true }, rockArtefact: 'carried' })
+    setChiefWalkState({ phase: 'at-drummer', progress: 1, at: 0, drumOnArrival: false })
+    standBeforeChief()
+    render(<DrumMessageWatcher />)
+    act(() => g().requestDrumMessage())
+    const errand = useUi.getState().drumPerformance!
+    act(() => g().handArtefactToChief())
+    expect(g().rockArtefact).toBe('given')
+    expect(useUi.getState().drumPerformance).toBe(errand)
+    act(() => vi.advanceTimersByTime(Math.ceil(errand.plan.duration * 1000)))
+    expect(g().drumMessageHeard).toEqual({ errand: true, answer: false })
+    expect(useUi.getState().dialog).toEqual({ kind: 'drumMessage', message: 'errand' })
+    const answer = useUi.getState().drumPerformance!
+    expect(answer.plan.message).toBe('answer')
+    act(() => useUi.getState().setDialog(null))
+    act(() => vi.advanceTimersByTime(Math.ceil(answer.plan.duration * 1000) - 1))
+    expect(g().communication.heard[utteranceOf('DOWNSTREAM')]).toBeUndefined()
+    expect(useUi.getState().dialog).toBeNull()
+    act(() => vi.advanceTimersByTime(1))
+    expect(g().drumMessageHeard).toEqual({ errand: true, answer: true })
+    expect(useUi.getState().dialog).toEqual({ kind: 'drumMessage', message: 'answer' })
+    expect(useUi.getState().drumPerformance).toBeNull()
+  })
+
+  it.each(['errand', 'answer'] as const)('reopens an already heard %s only after the repeat finishes', (message) => {
+    g().receiveDrumMessage(message)
+    const pages = g().journal.length
+    const plan = drumMessagePlan(message)
+    render(<DrumMessageWatcher />)
+    act(() => useUi.getState().startDrumMessage(plan))
+    act(() => vi.advanceTimersByTime(Math.ceil(plan.duration * 1000) - 1))
+    expect(g().drumMessageHeard[message]).toBe(true)
+    expect(useUi.getState().dialog).toBeNull()
+    act(() => vi.advanceTimersByTime(1))
+    expect(useUi.getState().dialog).toEqual({ kind: 'drumMessage', message })
+    expect(useUi.getState().drumPerformance).toBeNull()
+    expect(g().journal).toHaveLength(pages)
+  })
+
+  it.each([null, { kind: 'trade', building: 'market' }] as const)('records only after its last beat and respects an existing dialog: %s', (dialog) => {
+    const plan = drumMessagePlan('answer')
+    render(<DrumMessageWatcher />)
+    act(() => {
+      useUi.getState().setDialog(dialog)
+      useUi.getState().startDrumMessage(plan)
+    })
+    act(() => vi.advanceTimersByTime(plan.duration * 1000 - 1))
+    expect(g().drumMessageHeard.answer).toBe(false)
+    expect(g().communication.heard[utteranceOf('DOWNSTREAM')]).toBeUndefined()
+    act(() => vi.advanceTimersByTime(2))
+    expect(g().drumMessageHeard).toEqual({ errand: false, answer: true })
+    expect(useUi.getState().dialog).toEqual(dialog ?? { kind: 'drumMessage', message: 'answer' })
+  })
+
+  it('does not record a cancelled performance or resurrect its deferred answer', () => {
+    render(<DrumMessageWatcher />)
+    act(() => useUi.getState().startDrumMessage(drumMessagePlan('errand')))
+    act(() => {
+      useUi.setState({ deferredDrumAnswer: true })
+      useUi.getState().clearDrumMessage()
+    })
+    act(() => vi.advanceTimersByTime(60000))
+    expect(g().drumMessageHeard).toEqual({ errand: false, answer: false })
+    expect(useUi.getState().drumPerformance).toBeNull()
+    expect(useUi.getState().deferredDrumAnswer).toBe(false)
+    expect(useUi.getState().dialog).toBeNull()
   })
 })

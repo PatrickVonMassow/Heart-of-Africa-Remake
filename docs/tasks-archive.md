@@ -30277,3 +30277,236 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Criticality: medium — a player-visible teaching defect in the slice the release exists for,
   reported from a real session, and reproducible on every bout.
   Bundle: Dorfleben.
+
+- [x] 1168. The chief answers the hand-over ON THE DRUMS: a second drum message `RIVER · DOWNSTREAM`,
+  beaten, displayed, repeatable and reopenable exactly like the first (user 19.09.2026, 19:00:
+  "Setze deine empfohlene Variante (also Nr. 1) um. Das soll direkt als nächstes gemacht werden."
+  — IT STANDS AT THE FRONT OF THE WORK ORDER).
+  WHAT IS WRONG TODAY (measured 19.09.2026 on main d38792fce): `handArtefactToChief`
+  (src/state/store.ts) records `chiefRewardPhrase()` = RIVER · DOWNSTREAM into the heard memory,
+  hands over the mould and writes the entry `journal.artefactGiven`; PlaceScene.tsx speaks the two
+  words ONCE over the chief's head (`speakChiefPhrase` on the `rockArtefact` → 'given' transition,
+  about `labelSeconds` + one pause, roughly 3 s), in the same instant the journal entry appears.
+  There is no repeat at the chief or drummer, no message display with the player's readings and
+  no journal reopen — everything the first message has. A player who opens the journal on the
+  new entry has already missed the answer and can never see it again; the entry itself promises
+  "two words I must work out" and gives him nowhere to look at them. design.md §13.4 says the
+  chief speaks THROUGH HIS DRUMMER, yet this one answer bypasses the drums.
+  docs/communication-poc-spec.md ("Where the digging happens") is stale: it
+  still says the acknowledgement "uses only ROCK and DIG", while commit 66e2a8122 (06.09.2026)
+  changed it to RIVER · DOWNSTREAM; design.md is silent on the answer's form.
+  Final state:
+  - The village has TWO drum messages, both pure concept lists side by side in
+    src/communication/drumMessage.ts: the ERRAND `RIVER · UPSTREAM · ROCK · DIG` (unchanged) and
+    the ANSWER `RIVER · DOWNSTREAM` (moved from chiefReply.ts; that module's spoken reward is
+    deleted, not kept beside the drums). Sequences are still never re-authored: both come from the
+    lexicon through `phraseOf`, and the strike plan is the same `drumMessagePlan` fed the other
+    list. Which message is CURRENT is one pure function of game state: the answer once
+    `rockArtefact === 'given'`, the errand before.
+  - The hand-over itself beats the answer, and THE GIVE RULE ITSELF DOES NOT CHANGE: design.md
+    §6/§13.4 lets the traveller give whenever the chief is OUT IN THE OPEN and within reach,
+    which by `chiefOutside`
+    is EVERY phase of his walk — `walking-out`, `at-drummer` and `walking-back` alike. Giving is
+    never refused for standing in the wrong phase and no new refusal is invented. What the give
+    does is make the ANSWER the current message and ask for the drums the way the use key does, so
+    his legs decide only WHEN: given while he stands `at-drummer` the answer starts AT ONCE —
+    strikes, drummer animation and WebAudio from the ONE plan as today; given while he walks it
+    uses the walk's OWN existing mechanism `drumOnArrival` (he turns round on the way home exactly
+    as a call does) and the answer is beaten the moment he reaches the drummer. The mould is handed
+    over wordlessly in the same move as now, in every phase. The chief speaks NOTHING over his head
+    for the give; `speakChiefPhrase` for the reward and its subscription in PlaceScene.tsx go.
+  - DRUMS ALREADY BEATING ARE NEVER CUT OFF AND NEVER SWALLOW THE ANSWER: `startDrumMessage`
+    returns the state unchanged while a performance runs, so a give
+    during the errand would today lose the answer in silence — the very defect this point exists to
+    end. The give still ALWAYS succeeds; the answer is DEFERRED and RELEASED when the running
+    message ends, which is the village's own standing rule for a word that cannot be said yet
+    ("Deferred words are released rather than dropped", docs/communication-poc-spec.md), not a new
+    mechanism. One message at a time keeps sounding: no interruption, no doubled strikes, no
+    refusal the player has to discover — and the heard memory still takes the answer only when its
+    OWN last beat has sounded.
+  - The answer enters the heard memory only when its last beat has sounded (as the errand does,
+    `receiveDrumMessage`), not at the moment of the give, so what the player "heard" is what the
+    drums actually finished. It is recorded like any phrase, untranslated, with the player's own
+    readings; the game supplies and judges no translation (design.md §13.4).
+  - Repeat: while the chief stands his minute beside the drummer after the give, the use key at
+    either man beats the CURRENT message, i.e. the answer, and the prompt names the repeat; the
+    minute restarts on every message as today. Called on his way home he turns round and the
+    drums beat the current message on arrival, as today. Before the give the key beats the errand
+    exactly as today, and nothing about the first message's behaviour changes.
+  - Display: when the answer has been beaten to its end the drum-message dialog opens by itself
+    (unless another dialog is open, as today) and shows the ANSWER's two concepts with the
+    player's readings above them, the same editable notes the journal holds. The journal panel
+    offers a reopen for EACH message that has been heard: the errand button as today plus a
+    second, "Read the chief's answer on the drums again" (EN/DE together). The dialog's title and
+    hint name which message it shows.
+  - State: `drumMessageHeard` becomes per message (the errand and the answer each remembered
+    once), saved and loaded like today, a snapshot without the field having heard neither. The
+    chronicle records each message once; hearing either again adds no page.
+  - Journal text: `journal.artefactGiven` (EN and DE together, §15 markup kept) now says the chief
+    laid the find beside the drums and had his drummer answer — two words on the drums, both
+    heard before in the village — then handed over the clay form wordlessly; the "spoke two words
+    over it" sentence goes. `journal.mouldFitted` stays. All player-visible text stays in the
+    language files.
+  - Documents change with the code in one commit: docs/communication-poc-spec.md gets the answer
+    as a second drum message and loses the stale "uses only ROCK and DIG" / "stands over his own
+    head" sentences; design.md §13.4 states that the chief's answer to the hand-over is the second
+    drum message `RIVER · DOWNSTREAM` plus the wordless form, repeatable and reopenable like the
+    first; the chiefReply.ts header rationale (why DOWNSTREAM, why no third word, silence teaches
+    nothing) survives next to the answer's concept list.
+  - Tests on the right layer (Vitest): drumMessage.test.ts covers both plans and the current-message
+    choice; store.communication.test.ts covers that the give starts the answer and that only the
+    finished answer enters the heard memory, the per-message heard flags and their snapshot
+    round-trip; DrumMessage.test.tsx / JournalPanel.test.tsx cover the two reopens and the
+    dialog's message choice; chiefReply.test.ts is folded into drumMessage.test.ts or deleted with
+    its module. The polish section `chief-to-drummer` stays green; if a frame exists for the
+    hand-over frame `150-artefact-chiefs-answer` (scripts/verify/polish.mjs ~8446) shows the DRUMS
+    — the drummer beating the answer with the chief beside him — and waits on the speaking state
+    the game already holds (`drumPerformance`), never on a duration, so the shutter cannot open
+    after the message has ended (the §7.2 rule of point 1102). The block that re-speaks the chief's
+    atoms over his head with a 120 s lifetime to survive the shutter wait, and the check on
+    `.speech-label[data-speaker="chief"]`, go with `speakChiefPhrase`.
+  - No new balance value unless the answer's drums need one; `drumMessagePeak`, pace and pause
+    are shared with the errand.
+  Refs: src/communication/drumMessage.ts, src/communication/chiefReply.ts (deleted or reduced to
+  data), src/state/store.ts (`handArtefactToChief`, `receiveDrumMessage`, `drumMessageHeard`,
+  snapshot), src/state/ui.ts (`drumPerformance`), src/scenes/place/PlaceScene.tsx
+  (`sendDrumMessage`, `speakChiefPhrase`, `chiefPromptLabel`), src/ui/DrumMessage.tsx,
+  src/ui/JournalPanel.tsx, src/i18n/en.ts + de.ts (`journal.artefactGiven`, `drumMessage.*`,
+  `labels.*`, `journalPanel.*`), docs/communication-poc-spec.md, design.md §13.4.
+  Criticality: high — the end of the communication chain is the release's feature, and the user
+  walked into the gap himself on 19.09.2026.
+  Bundle: Kommunikation.
+
+- [x] 1156. Two voices at once now clip the master, and nothing in the graph absorbs it.
+  (ranked directly after 1125 by the user, 18.09.2026, 14:26.)
+  MEASURED STATE (18.09.2026, on point 1155's branch): the graph test's conservative worst
+  case — two close child `talk` voices, the whole ambience floor and a footstep coincided on
+  one sample — is 1.336 of full scale with the debug drum bed and 1.242 without it
+  (`src/systems/ambience.test.ts`, "measures headroom for 2 close child 'talk' voices"),
+  that is 2.52 dB and 1.88 dB OVER. It was 0.977 before point 1155 raised the village speech
+  to 1.5x on the user's instruction of 18.09.2026, 07:50; the instruction stands and is not
+  what is in question here. The graph has no limiter: `buildGraph()` hangs the ambient,
+  footstep and speech buses straight on a `master` at 0.5 and that on `ctx.destination`
+  (`src/systems/ambience.ts` L477-L492), so the overage is a hard clip at the destination.
+  design.md carries no mix-headroom or limiter concept at all — grep finds none in §19/§20 —
+  so this is a MISSING DESIGN CONCEPT, not a forgotten implementation.
+  Final state:
+  - The village mix cannot exceed full scale, and the way it cannot is written into
+    design.md §19 first: what the limiter is, where it sits, and what it may cost the
+    transients of a footstep and a drum strike.
+  - The user's factors are untouched. A limiter that quietly undoes the 1.5x on speech or
+    the 2.5x on the drum message is the wrong answer to this point.
+  - The graph test measures the worst case THROUGH the new stage and asserts it under full
+    scale again, and the 2.52 dB / 1.88 dB figures above are named as what it had to absorb.
+  Test: Vitest over the audio graph — the worst-case sum through the limiter is under full
+  scale, and a single close voice is NOT audibly pulled down by it (the limiter must not
+  become a loudness change in disguise). A listening pass is the user's.
+  There is nothing to see, so no picture check is required.
+  Criticality: medium — reproducible player impact (audible distortion whenever two
+  villagers speak close by at once), but only in the coincidence case; one voice at 0.932
+  still clears.
+  Refs: src/systems/ambience.ts (buildGraph L477-L492), src/systems/ambience.test.ts
+  ("measures headroom for 2 close child voices"), src/config/balance.ts
+  (communication.speechVolume, communication.drumMessagePeak), design.md §19
+  Bundle: Kommunikation.
+
+- [x] 1093. A compound fence may be drawn straight through a fixed life prop (user
+  07.09.2026, "reihe einen weiteren Task fuer das Clipping-Problem ein, der spaeter
+  erledigt wird"; restated 10.09.2026 alongside the decision that keeps the well elsewhere).
+  Reported as "Brunnen haengt im Zaun" in `hoa-state-2026-09-07-1702816850`, which caught
+  the well at (9, 8.5). Point 1092 removes the well from that one village, so WITHOUT this
+  point the reported case simply moves to the eight villages that keep it.
+  MEASURED IN `layout.ts`: the fixed prop spots are kept free of DWELLINGS only — `isFree`
+  (~772) tests every candidate against `lifeSpots`. Fences are placed with no prop test at
+  all: none of the five `fences.push` sites (~1109, ~1114, ~1230, ~1294, ~1336) consults
+  `lifeSpots`, and the compound ring's own `clears()` (~1193) knows other rings and the
+  functional buildings and nothing else. Exposure by radius is not limited to the well:
+  the talking pair (4.6, 5.6) and the pounder (-7, 1.2) sit at r 7.2 and 7.1, the weaver at
+  (-8.5, -7), all reachable by a compound band at cr 13.5–17.5 with a ring of about 7.
+  Final state: a fence run is judged against the fixed prop spots the way the water path is
+  already judged against the full collider set — the run is dropped, the ring moved, or the
+  spot planned out of the way — and no shipped layout draws a fence through a prop.
+  Test: Vitest over several villages at many seeds — no prop collider intersects a fence
+  post or a dwelling, mutation-checked, with no exception list.
+  BOUNDARY, measured 07.09.2026: this is a picture and walkability defect, not a teaching
+  defect. The water path, the dig sites and the play rocks all test against the collider
+  set already, so none of the three teaching surfaces breaks; that is why the user ranked
+  it behind 1092.
+  Refs: src/scenes/place/layout.ts (`isFree` ~772, the fence sites ~1109/~1114/~1230/~1294/
+  ~1336, `clears` ~1193, the water-path sweep ~1554 as the pattern to copy)
+  Criticality: medium.
+  Bundle: Dorfleben.
+
+- [x] 1094. The teaching checks vary the village and pin the seed, which is the wrong axis
+  (user 10.09.2026, 20:11 — "Setze deine Empfehlung bzgl. 1045 um"). This point DELETES
+  test breadth; it builds nothing.
+  The communication slice runs in one village only (`ROCK_VILLAGE_ID`), while the world seed
+  is DRAWN at every start (`store.ts` ~618, `?seed=` is a dev switch alone). The open
+  teaching points are sampled the other way round: 698 measures the direction call at
+  bambara@42, bambara@2972259115, nubian@42 and mandinka@99; 1081 fails at
+  mandinka-village@99 and also samples maasai; 1043 lets `polish --section=speech-hypothesis`
+  speak over a figure of the maasai village. So behaviour is judged in villages where
+  nobody learns the language in this PoC, while the axis that actually costs the player —
+  the same bambara map at another seed, which is point 1045 — goes unjudged.
+  Final state: in the checks that judge the TEACHING (reach of the call, separation of the
+  children's and the adults' groups, the speech label) the seed spread replaces the village
+  spread — same sample count, all in `ROCK_VILLAGE_ID`, across several seeds. The pattern is
+  already in the house: `riverBank.test.ts` sweeps the running lane over 60 seeds per village.
+  EXPLICITLY UNTOUCHED, so nothing right is deleted with it:
+  - assertions where a foreign village IS the statement — `riverBank.test.ts` ("a village
+    away from every river has no bank") stays word for word;
+  - the general settlement and picture suites (`collision.mjs`, `enrichments.mjs`,
+    `gamepad.mjs`) that do not judge the teaching;
+  - the tag game where a riverless village plays the other round.
+  CONSEQUENCE, stated openly: 1081 fails today at mandinka@99 and reads 0 % at
+  bambara@2972259115, so it may go green with no code change. That is the intended outcome
+  when the bambara seed spread is clean, and 1081 is then CLOSED rather than built; if the
+  spread finds the same crowding in bambara, it is finally measured where it counts.
+  Test: Vitest — the converted cases run over at least four bambara seeds and name no
+  foreign village, mutation-checked; one case pins the untouched `riverBank.test.ts`
+  assertion so the deletion cannot run past its boundary.
+  Refs: src/scenes/place/tagShuffle.test.ts (the sample tables ~693, ~920, ~1441, ~1538,
+  ~1671), src/scenes/place/riverBank.test.ts (~295, the boundary), scripts/verify/polish.mjs
+  (`speech-hypothesis`), src/world/communicationRock.ts (`ROCK_VILLAGE_ID` ~21),
+  src/state/store.ts (`newSeed` ~618)
+  Criticality: medium — it removes work rather than adding it, and it points the remaining
+  work at the village the player is given.
+  Bundle: Dorfleben.
+
+- [x] 1170. Every inventory item answers its click and its digit key with a sentence in the
+  view, in the open and in a settlement alike, and such a sentence is never hidden behind the
+  journal (user 20.09.2026, ordered to the front and started at once: "Den Task, an dem du
+  gerade arbeitest, parken und sofort mit diesem neuen beginnen."). The shovel in the open is
+  the model: pressed where nothing is buried it says so in a toast, with no journal entry.
+  Final state: (1) EVERY slot of the inventory bar is a button whose click and digit key
+  (Digit1-Digit9) reach one handler, in the bird's-eye world and in a settlement; where the
+  item acts (medicine cures, the shovel digs in the open, a form presses against a socket in
+  the open, a find goes to the chief, a treasure is shown in a village) the existing action
+  runs unchanged, and where it cannot act right now the traveller says why in a toast (the
+  shovel's lane: `toast`, never a journal entry — "ein Tagebucheintrag wäre übertrieben").
+  (2) The answers, one English and one German text each under the language files' `toasts`:
+  rifle — in the open: he shoulders it by himself the moment danger threatens; in a
+  settlement: he has no wish to threaten anyone here. Rope — in the open off a mountain: it
+  comes into use by itself on a climb; on a mountain: it is already taking his weight; in a
+  settlement: nothing here to climb. Machete — in the open off jungle: it swings by itself
+  where the jungle closes in; in jungle: it is already clearing the way; in a settlement: he
+  will not swing a blade among people. Canoe — in the open on land: it is launched by itself
+  at a river or lake; on water: it is already carrying him; in a settlement: no water here to
+  launch it. Canteen — both views: he drinks from it as thirst demands and it fills itself at
+  fresh water. Shovel — in a settlement: he does not dig up the ground people live on. A
+  carried form — in a settlement: he presses it against stone out in the open, not here. A
+  treasure — in the open: nobody out here to show it to; in a port: the bazaar trades it and
+  does not admire it; in a village whose people neither revere nor reject the material: they
+  look at it without interest (today that click marks the village as shown and says nothing).
+  Medicine keeps its two answers (none left / not needed). (3) The toast stacks above EVERY
+  panel and overlay — journal, map, debug menu, dialog backdrop — so the chief's "steps out
+  of his hut" sentence is legible while the journal opens on the same act (today `.toast` has
+  no z-index and the journal's 16778000 covers it). (4) Tests: `src/ui/Hud.test.tsx` covers
+  each item×view pair above by click AND digit key (expected `toast` text, journal length
+  unchanged), the store test covers the indifferent-treasure answer, and a Playwright
+  assertion in the HUD-covering suite opens the journal, raises a toast and proves
+  `document.elementFromPoint` at the toast's centre is the toast. (5) `design.md` §17.1's
+  inventory sentence, `docs/acceptance-criteria-detail.md` §9 and
+  `docs/acceptance-evidence.md` §9 state the final behaviour in the same commit. Nothing
+  else changes: tooltips, glow, sort order and the shovel's open-world answers stay.
+  Bundle: Steuerung & Performance.

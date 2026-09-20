@@ -2,6 +2,7 @@
 // a gift and distant panorama wildlife, design.md §17/§2). Dev server only.
 import { launchVerifyBrowser, waitForStable, waitForReadingStable, waitForSceneBuilt, assertBackend } from './_browser.mjs'
 import { frameShutter, capturePixels, waitForSceneReady } from './frameSubject.mjs'
+import { frameSpeakingDrums } from './drumFrame.mjs'
 import { installColliderProbe } from './colliderProbe.mjs'
 import { judgeFootingSeries, judgePitchSeries, MIN_SLOPED_SAMPLES } from './footingSeries.mjs'
 import { judgeStanceSlip } from './stanceSlip.mjs'
@@ -627,7 +628,12 @@ if (section('panorama-wildlife')) {
 // figure's own projected anchor, in the SAME evaluate as the rendered label's
 // DOM box, so no frame passes between deciding and measuring.
 if (section('speech-hypothesis')) {
-  await goToPlace('maasai-village')
+  // THE VILLAGE THE PLAYER LEARNS IN (work-order 1094). The label belongs to the
+  // communication slice, and that slice runs in `ROCK_VILLAGE_ID` alone — judging
+  // it over a maasai figure judged it where nobody in this PoC hears a word worth
+  // a hypothesis. The axis that actually varies for the player is the world SEED,
+  // which is drawn at every start; the village is not.
+  await goToPlace('bambara-village')
   // A SHIPPED word, not a hand-typed shape: RIVER as src/communication/lexicon.ts
   // beats it. A five-syllable literal survived the four-syllable rebuild here and
   // proved the label path for an utterance the game can no longer produce
@@ -8197,25 +8203,18 @@ if (section('chief-to-drummer')) {
 
     // 5. THE PICTURE: chief and drummer from the front, while the drums speak.
     await standAt(front, mid)
-    await frame('151-chief-beside-his-drummer', {
+    await frameSpeakingDrums(page, OUT, '151-chief-beside-his-drummer', {
       local: { x: mid.x, y: 1.4, z: mid.z },
-      label: 'the chief standing beside his drummer, both seen from the front while the message is beaten out',
-    })
-    // The frame is only evidence of the message if the drums were still going
-    // when the shutter opened — a performance that ended during the wait
-    // photographs two men standing about.
-    check(
-      'the drums were still speaking when the picture was taken',
-      await page.evaluate(() => !!window.__ui.getState().drumPerformance),
-      'the message had already ended at the shutter',
-    )
+      label: 'the chief standing beside his drummer, both seen from the front while the errand is beaten out',
+    }, 'errand')
 
     // 6. Once it has been heard, the same key offers the REPEAT.
     const heard = await page
-      .waitForFunction(() => window.__game.getState().drumMessageHeard === true, null, { timeout: 40000 })
+      .waitForFunction(() => window.__game.getState().drumMessageHeard.errand === true &&
+        window.__ui.getState().drumPerformance === null, null, { timeout: 40000 })
       .then(() => true)
       .catch(() => false)
-    check('the message enters the heard memory once it has been beaten out', heard, 'never recorded')
+    check('the message enters the heard memory once it has been beaten out', heard, 'never recorded or drumPerformance still running')
     await page.evaluate(() => window.__ui.getState().setDialog(null))
     await standAt(inFrontOf({ x: stood.drummer[0], z: stood.drummer[1] }, 2), mid)
     const repeatLabel = await page.evaluate(async () => {
@@ -8253,8 +8252,8 @@ if (section('chief-to-drummer')) {
 // --- The find from the boulder is GIVEN by using it (design.md §6, user 06.09.2026) --
 // The whole act, end to end, in the picture: the thing dug up at the erratic
 // stands in the inventory bar under its own localized name, a click before the
-// chief who is out in the open lays it in his hands, his two words stand over
-// HIS head, and the bar loses it. Out of reach the same click gives nothing.
+// chief who is out in the open lays it in his hands, the drums beat his
+// answer, and the bar loses it. Out of reach the same click gives nothing.
 // Only a browser can answer this: the bar is HTML, the chief is a drawn figure,
 // and the reach is measured between the two live positions the scene writes.
 if (section('artefact-give')) {
@@ -8378,92 +8377,50 @@ if (section('artefact-give')) {
     // 3. Face to face it IS the hand-over.
     await standOff(reach * 0.9)
     await page.locator(FIND).click()
-    // His words stand over his head for a few seconds only (speechLabelSeconds),
-    // so the camera steps back for the picture the moment the give is done: from
-    // an arm's length the note alone fills the frame and nothing of the man is
-    // in it. The give itself was judged at the reach it was made from, above.
-    await page.evaluate(
-      ({ at, dir }) => {
-        const g = window.__game.getState()
-        g.setJournalOpen(false) // the hand-over writes a page, which opens the book
-        const p = window.__placePlayer
-        if (!p) return
-        p.x = at.x + dir.x * 7
-        p.z = at.z + dir.z * 7
-        p.yaw = Math.atan2(at.x - p.x, at.z - p.z) + Math.PI
-        p.pitch = 0
-      },
-      { at: chiefStood, dir: outward },
-    )
-    const spoke = await page
-      .waitForFunction(
-        () => document.querySelector('.speech-label[data-speaker="chief"]') !== null,
-        null,
-        { timeout: 20000 },
-      )
-      .then(() => true)
-      .catch(() => false)
     const given = await page.evaluate((sel) => ({
       state: window.__game.getState().rockArtefact,
       gone: document.querySelector(sel) === null,
       forms: window.__game.getState().carriedForms,
-      atoms: window.__speech?.labels().find((l) => l.speakerId === 'chief')?.atoms ?? null,
-      screen: window.__speech?.anchorScreen('chief') ?? null,
-      view: { w: window.innerWidth, h: window.innerHeight },
+      message: window.__ui.getState().drumPerformance?.plan.message ?? null,
+      atoms: window.__ui.getState().drumPerformance?.plan.atoms ?? null,
     }), FIND)
     check('using the find before him lays it in his hands', given.state === 'given', JSON.stringify(given.state))
     check('the find leaves the bar the moment it is given', given.gone, `still in the bar: ${!given.gone}`)
     check('and the clay impression takes its place in the pack', given.forms.includes('rock-relief'), JSON.stringify(given.forms))
     check(
-      'his two words stand over HIS OWN head, inside the picture',
-      spoke && Array.isArray(given.atoms) && given.atoms.length === 2 &&
-        !!given.screen && given.screen.x > 0 && given.screen.x < given.view.w &&
-        given.screen.y > 0 && given.screen.y < given.view.h,
-      JSON.stringify({ spoke, atoms: given.atoms, screen: given.screen }),
+      'the give starts his two-word answer on the drums',
+      given.message === 'answer' && given.atoms?.length === 2,
+      JSON.stringify(given),
     )
-    // HELD OPEN FOR THE SHUTTER, and only for it. The answer that was really
-    // given is measured LIVE in the check above — his own atoms, over his own
-    // anchor, inside the projection — but a note stands its few seconds only
-    // (speechLabelSeconds, pure-tested in Vitest), and it is held past them
-    // exclusively while its speaker is the nearest one (point 588). Composing
-    // this shot walks the traveller seven metres back, which hands that hold to
-    // whichever villager now stands nearer, and the scene-ready wait before a
-    // shutter is longer than the note's own life. So his OWN words go back over
-    // his OWN head with a lifetime that outlasts the wait — the same thing the
-    // speech-hypothesis frame does, and for the same reason. The check below
-    // still refuses a picture with no note in it.
-    if (Array.isArray(given.atoms) && given.atoms.length > 0) {
-      const held = await page.evaluate(
-        (atoms) => window.__speech?.speak('chief', atoms, 'chief', 120) === true,
-        given.atoms,
-      )
-      check('his answer is held over his head for the shutter', held, JSON.stringify(given.atoms))
-    }
-    // Declared on the MAN, not on the note two metres over him: a frame aimed at
-    // the sky still holds the note at its bottom edge, and one was written and
-    // passed that way — the chief himself nowhere in it. His chest is the thing
-    // that cannot be in the picture by accident.
-    await frame('150-artefact-chiefs-answer', {
-      local: { x: chiefStood.x, y: chiefStood.y + 1, z: chiefStood.z },
-      label: 'the chief with his answer standing over his head after the find was given',
-    })
-    // The frame is only evidence if the words were still standing when the
-    // shutter opened — a note that expired during the wait photographs an
-    // empty village.
-    // A red here has exactly two causes and they need different repairs, so the
-    // evidence names which one it was: his note simply ran out (no label left at
-    // all), or another speaker took the target that holds a note against expiry
-    // (point 588) and his went with it.
-    const atShutter = await page.evaluate(() => ({
-      standing: document.querySelector('.speech-label[data-speaker="chief"]') !== null,
-      drawn: [...document.querySelectorAll('.speech-label')].map((e) => e.getAttribute('data-speaker')),
-      held: (window.__speech?.labels() ?? []).map((l) => l.speakerId),
+    // Frame BOTH men from the front. The actual give was checked at its reach;
+    // the picture asks for a normal repeat once the composed scene is ready.
+    const pair = await page.evaluate(() => window.__chief)
+    const mid = { x: (pair.x + pair.drummer[0]) / 2, z: (pair.z + pair.drummer[1]) / 2 }
+    await page.evaluate(({ at, dir }) => {
+      window.__game.getState().setJournalOpen(false)
+      const p = window.__placePlayer
+      p.x = at.x + dir.x * 7
+      p.z = at.z + dir.z * 7
+      p.yaw = Math.atan2(at.x - p.x, at.z - p.z) + Math.PI
+      p.pitch = 0
+    }, { at: mid, dir: outward })
+    await frameSpeakingDrums(page, OUT, '150-artefact-chiefs-answer', {
+      local: { x: mid.x, y: chiefStood.y + 1, z: mid.z },
+      label: 'the drummer beating the answer with the chief beside him after the find was given',
+    }, 'answer')
+    // The photographed repeat has its OWN last beat. The heard flag is already
+    // true from the give, so it cannot tell us when this display is ready.
+    await page.waitForFunction(() => {
+      const ui = window.__ui.getState()
+      return ui.drumPerformance === null && ui.dialog?.kind === 'drumMessage' &&
+        ui.dialog.message === 'answer' && document.querySelectorAll('.drum-message .drum-concept').length === 2
+    }, null, { timeout: 40000 })
+    const answered = await page.evaluate(() => ({
+      message: window.__ui.getState().dialog?.message,
+      concepts: document.querySelectorAll('.drum-message .drum-concept').length,
     }))
-    check(
-      'the words were still over his head when the picture was taken',
-      atShutter.standing,
-      `the label had already expired at the shutter — ${JSON.stringify(atShutter)}`,
-    )
+    check('the finished answer opens its two-concept display', answered.message === 'answer' && answered.concepts === 2, JSON.stringify(answered))
+
   }
 }
 

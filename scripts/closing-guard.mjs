@@ -5,7 +5,8 @@
 //  1. PreToolUse HOOK (wired in .claude/settings.json for the shell tools AND
 //     the editing tools): reads the tool call on stdin and DENIES it while the
 //     closing for the current HEAD is INCOMPLETE, if the call is either
-//       - a command creating or pushing a version tag (vX.Y) or the `poc` tag, or
+//       - a command creating or pushing a version tag (vX.Y) — the `poc` tag is
+//         NOT a release and passes freely (user decision 20.09.2026), or
 //       - a work-order edit TICKING a point whose spec delivers a closing (the
 //         point-224 shape) — the machine-readable "the closing is done" claim.
 //     Any internal error → ALLOW (fail-open: a guard bug must never trap a

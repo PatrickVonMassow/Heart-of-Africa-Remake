@@ -253,6 +253,7 @@ export const de: Strings = {
     speakToChief: 'Mit dem Oberhaupt sprechen',
     askForDrumMessage: 'Das Oberhaupt um seine Botschaft bitten',
     repeatDrumMessage: 'Die Botschaft noch einmal schlagen lassen',
+    repeatDrumAnswer: "Die Antwort noch einmal schlagen lassen",
     callChiefBack: 'Das Oberhaupt zurückrufen',
     askDrummer: 'Den Trommler ansprechen',
     chief: 'Oberhaupt',
@@ -275,6 +276,7 @@ export const de: Strings = {
     firstHeard: (date: string) => `Zuerst gehört am ${date}`,
     firstHeardIn: (date: string, place: string) => `Zuerst gehört am ${date} in ${place}`,
     reopenDrumMessage: 'Die Trommelbotschaft noch einmal lesen',
+    reopenDrumAnswer: "Die Antwort des Oberhaupts auf den Trommeln noch einmal lesen",
   },
 
   speechGuess: {
@@ -288,6 +290,8 @@ export const de: Strings = {
   },
 
   drumMessage: {
+    answerTitle: "Die Antwort des Oberhaupts auf den Trommeln",
+    answerHint: "Seine Antwort: zwei Wörter, eines nach dem anderen. Über jedem steht meine eigene Deutung – anklicken, um sie zu ändern; es ist dieselbe Notiz wie in meinem Buch.",
     title: 'Die Botschaft des Oberhaupts auf den Trommeln',
     hint: 'Vier Wörter, eines nach dem anderen. Über jedem steht meine eigene Deutung – ein Klick darauf ändert sie; es ist dieselbe Notiz, die auch mein Buch führt.',
     readingFor: (utterance: string) => `Meine Deutung von ${utterance}`,
@@ -384,7 +388,25 @@ export const de: Strings = {
     bought: (name) => `${name} gekauft.`,
     notEnoughMoney: 'Nicht genug Geld.',
     digNoShovel: 'Ohne Schaufel in der Hand kann ich nicht graben.',
+    digInSettlement: 'Den Boden, auf dem Menschen leben, grabe ich nicht um.',
     formNoFit: 'Hier ist nichts, das diese Form aufnehmen würde.',
+    formInSettlement: 'Ich presse sie draußen im Freien gegen Stein, nicht hier.',
+    rifleReady: 'Sobald Gefahr droht, nehme ich das Gewehr von selbst an die Schulter.',
+    rifleInSettlement: 'Hier will ich niemanden bedrohen.',
+    ropeReady: 'Beim Aufstieg kommt das Seil von selbst zum Einsatz.',
+    ropeInUse: 'Das Seil hält bereits mein Gewicht.',
+    ropeInSettlement: 'Hier gibt es nichts zu erklettern.',
+    macheteReady: 'Wo der Dschungel dicht wird, schwingt die Machete von selbst.',
+    macheteInUse: 'Die Machete bahnt bereits den Weg.',
+    macheteInSettlement: 'Unter Menschen schwinge ich keine Klinge.',
+    canoeReady: 'An einem Fluss oder See wird das Kanu von selbst zu Wasser gelassen.',
+    canoeInUse: 'Das Kanu trägt mich bereits.',
+    canoeInSettlement: 'Hier ist kein Wasser, auf dem ich es zu Wasser lassen könnte.',
+    canteenReady: 'Ich trinke aus der Feldflasche, wie der Durst es verlangt, und an frischem Wasser füllt sie sich von selbst.',
+    valuableNobodyHere: 'Hier draußen ist niemand, dem ich ihn zeigen könnte.',
+    valuableBazaar: 'Der Basar handelt damit – bewundern tut er ihn nicht.',
+    valuableNobodyAtMonument: 'An diesen Steinen ist niemand, dem ich ihn zeigen könnte.',
+    valuableIndifferent: 'Sie betrachten ihn ohne Interesse.',
     pocSolved: 'Dummy-Meldung: Das Rätsel dieses Proof of Concept ist gelöst.',
     drumsSending: 'Das Oberhaupt ruft seinen Trommler. Die Botschaft geht über das Dorf hinaus.',
     chiefStepsOut:
@@ -780,6 +802,7 @@ export const de: Strings = {
       monumentReturn: (p: TextParams) => `${PLACES[p.place as string]} – noch einmal`,
       chiefWalk: 'Das Oberhaupt geht voraus',
       drumMessage: 'Die Trommeln sprechen',
+      drumAnswer: "Die Trommeln antworten",
       rockArtefact: 'Am Fuß des großen Felsens',
       artefactGiven: 'In die Hände des Oberhaupts',
       mouldFitted: 'Der Ton findet seinen Felsen',
@@ -999,12 +1022,13 @@ export const de: Strings = {
     },
     chiefWalk:
       '[awe]Das Oberhaupt trat aus seiner Hütte und ging hinüber zu seinem Trommler.[/awe] [pause]Er gab mir kein Wort, das ich hätte verstehen können. [somber]Und doch schien seine Absicht deutlich genug:[/somber] [emph]Offenbar sollte ich ihm folgen.[/emph]',
+    drumAnswer: "[awe]Zwei Wörter kamen als Antwort auf den Fund von den Trommeln.[/awe] [pause]Beide kannte ich aus dem Dorf. Ich habe ihre Schläge notiert, mit meiner eigenen Deutung darüber; [somber]was sie zusammen bedeuten, muss ich selbst herausbekommen.[/somber]",
     drumMessage:
       '[awe]Das Oberhaupt rief seinen Trommler, und zwei Trommeln sprachen an seiner Statt – eine große und eine kleine.[/awe] [pause]Vier Wörter zu je vier Schlägen, jedes vom nächsten durch dieselbe kurze Stille getrennt – dumpf für die tiefe Silbe, hell für die hohe. [excited]Ich kenne diese Wörter. Jedes einzelne habe ich in den Gassen und am Wasser gehört.[/excited] [pause]Ich habe sie in der Reihenfolge notiert, in der sie geschlagen wurden; was sie von mir verlangen, muss ich selbst lesen.',
     rockArtefact:
       '[excited]Vier Wörter – und es war doch ein Auftrag.[/excited] Ich bin dem Wasser gegen seinen eigenen Zug gefolgt, bis ein Steinblock am Ufer stand – von der Art, die die Kinder an ihren beiden Felsen benennen, und der einzige hier oben. [pause]Mehr hatten die Trommeln nicht gesagt: Wasser, gegen den Zug, Stein, graben. Alles Übrige daran musste ich selbst finden. [pause]Drei Spann tief stieß mein Spaten auf etwas, das kein Stein war: gehämmertes Metall auf verwittertem Holz, eingeschlossen im Lehm des Flusses. [awe]Es liegt hier länger, als das Dorf steht.[/awe] [pause]Ich habe es nicht weiter geöffnet. [somber]Es steht mir nicht zu, es zu öffnen.[/somber]',
     artefactGiven:
-      '[breath]Ich habe es den Fluss hinab zurückgetragen und dem Oberhaupt in die Hände gelegt.[/breath] [pause]Er drehte es einmal um und sprach zwei Wörter darüber. [excited]Beide hatte ich schon gehört – eines überall dort, wo das Wasser gemeint ist, und eines unter den Rufen, die die Kinder einander zuwerfen, wenn sie laufen.[/excited] [pause]Was die beiden zusammen sagen, muss ich selbst herausbekommen; niemand hier wird es mir in einer meiner Sprachen sagen. [pause]Dann nahm er ein Ding aus gebranntem Ton neben den Trommeln auf und legte es mir in die Hände, ohne ein einziges Wort darüber. [pause]Es ist flach im Rücken und ausgehöhlt an der Vorderseite, und die Höhlung ist keine Schale: Sie ist die Gestalt eines Stücks Fels, ihm abgenommen, wie ein Siegel ein Petschaft abnimmt. [awe]Eine Form, die IN etwas hinein will, nicht auf etwas darauf.[/awe] [pause][somber]Wir haben keine gemeinsame Sprache.[pause] Und doch hat er mir zwei Wörter und eine Gestalt gegeben, und beides ist für jemanden gemeint, der zugehört hat.[/somber]',
+      '[breath]Ich habe es den Fluss hinab zurückgetragen und dem Oberhaupt in die Hände gelegt.[/breath] [pause]Er legte den Fund neben die Trommeln und ließ seinen Trommler antworten – zwei Wörter auf den Trommeln. [excited]Beide hatte ich schon im Dorf gehört.[/excited] [pause]Was die beiden zusammen sagen, muss ich selbst herausbekommen; niemand hier wird es mir in einer meiner Sprachen sagen. [pause]Dann nahm er ein Ding aus gebranntem Ton neben den Trommeln auf und legte es mir in die Hände, ohne ein einziges Wort darüber. [pause]Es ist flach im Rücken und ausgehöhlt an der Vorderseite, und die Höhlung ist keine Schale: Sie ist die Gestalt eines Stücks Fels, ihm abgenommen, wie ein Siegel ein Petschaft abnimmt. [awe]Eine Form, die IN etwas hinein will, nicht auf etwas darauf.[/awe] [pause][somber]Wir haben keine gemeinsame Sprache.[pause] Und doch hat er mir zwei Wörter und eine Gestalt gegeben, und beides ist für jemanden gemeint, der zugehört hat.[/somber]',
     mouldFitted:
       '[whisper]Diesmal bin ich dem Wasser dorthin gefolgt, wohin es selbst will, bis sich das Land in einer langen Wand aus Stein über der Ebene aufrichtete.[/whisper] [pause]Zu den kleinen Kammern in der Wand bin ich nicht hinaufgestiegen – es sind Gräber und Speicher, und sie gehen mich nichts an. [pause]Am Fuß der Wand, auf dem Boden, auf dem die Menschen leben, trug ein verwitterter Block ein Relief, das ich längst in Händen gehalten hatte: Der Ton legte sich dagegen und saß darin ohne ein Haar Spiel. [pause][awe]Hinter dem Stein gab etwas nach – ein Gewicht, das sich verschob, ein langer Zug kalter Luft aus dem Boden.[/awe] [pause][excited]Dafür also waren die Wörter.[/excited] [pause][somber]Was dahinterliegt, ist eine Sache für einen anderen Tag.[/somber]',
     digNothing: '[weary]Ich grub an dieser Stelle, doch der Sand gab nichts preis als Steine und alte Wurzeln.[/weary]',

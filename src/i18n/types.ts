@@ -173,6 +173,7 @@ export interface Strings {
     askForDrumMessage: string
     /** The same key once the message has been heard: it beats it out again. */
     repeatDrumMessage: string
+    repeatDrumAnswer: string
     /** Use-key prompt at the chief or his drummer while he walks home (§13.4). */
     callChiefBack: string
     /** Use-key prompt at the drummer while the chief is in his hut (§13.4). */
@@ -209,6 +210,7 @@ export interface Strings {
     firstHeardIn(date: string, place: string): string
     /** Button that reopens the chief's drum message (point 486). */
     reopenDrumMessage: string
+    reopenDrumAnswer: string
   }
 
   /** Guessing a meaning where it is spoken (design.md §13.4, points 588/691):
@@ -233,6 +235,8 @@ export interface Strings {
   /** The chief's drum message and its reopenable display (design.md §13.4,
    *  docs/communication-poc-spec.md, point 486). */
   drumMessage: {
+    answerTitle: string
+    answerHint: string
     title: string
     /** Line above the concepts: the readings are the player's own, and editable. */
     hint: string
@@ -369,9 +373,37 @@ export interface Strings {
     bought(name: string): string
     notEnoughMoney: string
     digNoShovel: string
+    /** The shovel was used inside a settlement, where he will not dig. */
+    digInSettlement: string
     /** A carried form fits nothing where the traveller stands — his own voice,
      *  never silence: a wrong or a spent place is how he learns the rule. */
     formNoFit: string
+    /** A carried form was used inside a settlement: sockets stand outside. */
+    formInSettlement: string
+    /** Gear that works by possession alone answers a press instead of acting:
+     *  what it does by itself out in the open, that it is doing it right now,
+     *  and why it has no business inside a settlement (design.md §17.1). */
+    rifleReady: string
+    rifleInSettlement: string
+    ropeReady: string
+    ropeInUse: string
+    ropeInSettlement: string
+    macheteReady: string
+    macheteInUse: string
+    macheteInSettlement: string
+    canoeReady: string
+    canoeInUse: string
+    canoeInSettlement: string
+    /** The canteen drinks and refills on its own, in both views. */
+    canteenReady: string
+    /** A treasure was presented where nobody can look at it (design.md §8):
+     *  out in the open, at a bazaar that only trades, or before villagers whose
+     *  region neither reveres nor rejects the material. */
+    valuableNobodyHere: string
+    valuableBazaar: string
+    /** …and the monument site, where no one stands but the stones. */
+    valuableNobodyAtMonument: string
+    valuableIndifferent: string
     /** The dummy success of this proof of concept: a form has found its socket
      *  and the PoC's puzzle is solved. */
     pocSolved: string
@@ -788,6 +820,7 @@ export interface Strings {
       chiefWalk: string
       /** The chief's drum message (design.md §13.4, point 486). */
       drumMessage: string
+      drumAnswer: string
       /** Dug up at the foot of the landmark boulder (point 487). */
       rockArtefact: string
       /** The artefact laid in the chief's hands, and what he pays for it. */
@@ -856,6 +889,7 @@ export interface Strings {
     chiefWalk: string
     /** The chief's drums beat his message out (design.md §13.4, point 486). */
     drumMessage: string
+    drumAnswer: string
     /** The dig at the boulder the drum message sends the traveller to (point 487). */
     rockArtefact: string
     /** Handing the artefact to the chief: two words back, and a thing of clay
