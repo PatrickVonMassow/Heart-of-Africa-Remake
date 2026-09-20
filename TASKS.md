@@ -168,42 +168,6 @@ put it is the mistake this line exists to stop.
   board with the observation instructions, the batch has moved on, and 1158 is ticked only
   after the user's answer on that card.
 
-- [ ] 1094. The teaching checks vary the village and pin the seed, which is the wrong axis
-  (user 10.09.2026, 20:11 — "Setze deine Empfehlung bzgl. 1045 um"). This point DELETES
-  test breadth; it builds nothing.
-  The communication slice runs in one village only (`ROCK_VILLAGE_ID`), while the world seed
-  is DRAWN at every start (`store.ts` ~618, `?seed=` is a dev switch alone). The open
-  teaching points are sampled the other way round: 698 measures the direction call at
-  bambara@42, bambara@2972259115, nubian@42 and mandinka@99; 1081 fails at
-  mandinka-village@99 and also samples maasai; 1043 lets `polish --section=speech-hypothesis`
-  speak over a figure of the maasai village. So behaviour is judged in villages where
-  nobody learns the language in this PoC, while the axis that actually costs the player —
-  the same bambara map at another seed, which is point 1045 — goes unjudged.
-  Final state: in the checks that judge the TEACHING (reach of the call, separation of the
-  children's and the adults' groups, the speech label) the seed spread replaces the village
-  spread — same sample count, all in `ROCK_VILLAGE_ID`, across several seeds. The pattern is
-  already in the house: `riverBank.test.ts` sweeps the running lane over 60 seeds per village.
-  EXPLICITLY UNTOUCHED, so nothing right is deleted with it:
-  - assertions where a foreign village IS the statement — `riverBank.test.ts` ("a village
-    away from every river has no bank") stays word for word;
-  - the general settlement and picture suites (`collision.mjs`, `enrichments.mjs`,
-    `gamepad.mjs`) that do not judge the teaching;
-  - the tag game where a riverless village plays the other round.
-  CONSEQUENCE, stated openly: 1081 fails today at mandinka@99 and reads 0 % at
-  bambara@2972259115, so it may go green with no code change. That is the intended outcome
-  when the bambara seed spread is clean, and 1081 is then CLOSED rather than built; if the
-  spread finds the same crowding in bambara, it is finally measured where it counts.
-  Test: Vitest — the converted cases run over at least four bambara seeds and name no
-  foreign village, mutation-checked; one case pins the untouched `riverBank.test.ts`
-  assertion so the deletion cannot run past its boundary.
-  Refs: src/scenes/place/tagShuffle.test.ts (the sample tables ~693, ~920, ~1441, ~1538,
-  ~1671), src/scenes/place/riverBank.test.ts (~295, the boundary), scripts/verify/polish.mjs
-  (`speech-hypothesis`), src/world/communicationRock.ts (`ROCK_VILLAGE_ID` ~21),
-  src/state/store.ts (`newSeed` ~618)
-  Criticality: medium — it removes work rather than adding it, and it points the remaining
-  work at the village the player is given.
-  Bundle: Dorfleben.
-
 - [ ] 690. The classic game of tag moves to the port cities, and every document describes
   the rebuilt mechanic (user 13.08.2026, playing the deployed communication slice; point 692
   folded in here 07.09.2026).
