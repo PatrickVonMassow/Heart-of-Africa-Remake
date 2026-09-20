@@ -406,6 +406,7 @@ export const en: Strings = {
     canteenReady: 'I drink from the canteen as thirst demands, and at fresh water it fills itself.',
     valuableNobodyHere: 'There is nobody out here to show it to.',
     valuableBazaar: 'The bazaar trades it — it does not admire it.',
+    valuableNobodyAtMonument: 'There is nobody at these stones to show it to.',
     valuableIndifferent: 'They look at it without interest.',
     pocSolved: 'Dummy message: the puzzle of this proof of concept is solved.',
     drumsSending: 'The chief calls his drummer. The message is going out over the village.',

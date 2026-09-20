@@ -506,8 +506,8 @@ journal, for the rifle, rope, machete, canoe, canteen, shovel, a carried
 form and a treasure, in the open and in a settlement
 (`src/ui/Hud.test.tsx`); the store's own refusals — the shovel inside a
 settlement, a form pressed where no socket stands, a treasure shown out on
-the map, at a bazaar or to a village that neither reveres nor rejects the
-material — are covered in `src/state/store.dig.test.ts`,
+the map, at a bazaar, at the monument site or to a village that neither
+reveres nor rejects the material — are covered in `src/state/store.dig.test.ts`,
 `src/state/store.mould.test.ts` and `src/state/store.economy.test.ts`.
 That the answer is never hidden behind what the same act opened is proved
 in the browser: with the journal open and under a modal backdrop,

@@ -401,6 +401,8 @@ export interface Strings {
      *  region neither reveres nor rejects the material. */
     valuableNobodyHere: string
     valuableBazaar: string
+    /** …and the monument site, where no one stands but the stones. */
+    valuableNobodyAtMonument: string
     valuableIndifferent: string
     /** The dummy success of this proof of concept: a form has found its socket
      *  and the PoC's puzzle is solved. */

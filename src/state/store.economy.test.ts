@@ -383,6 +383,18 @@ describe('presented valuables (design.md §8)', () => {
     expect(g().valuableShown.cairo).toBeUndefined()
     expect(journalKeys()).not.toContain('journal.valuableRevered')
   })
+
+  it('the monument site gets its own answer — the bazaar belongs to the ports', () => {
+    // Giza is the third place kind (world/geo PLACE_KINDS). It holds no market,
+    // so the port's "the bazaar trades it" would be a plain lie there.
+    g().debugAddTreasure('gold')
+    g().enterPlace('giza')
+    const before = g().journal.length
+    g().presentValuable('gold')
+    expect(g().toast).toBe(getStrings().toasts.valuableNobodyAtMonument)
+    expect(g().valuableShown.giza).toBeUndefined()
+    expect(g().journal).toHaveLength(before)
+  })
 })
 
 describe('settlement currency split (design.md §9/§10)', () => {

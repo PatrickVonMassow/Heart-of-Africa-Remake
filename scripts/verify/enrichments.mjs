@@ -8291,50 +8291,106 @@ if (section('modal-above-labels')) {
 // --- The traveller answers above every panel (point 1170) --------------------
 // Pressing an inventory item answers in a toast. That sentence must never end
 // up BEHIND what the same act opened, so the toast outranks the journal panel
-// and a modal backdrop — the backdrop covers the whole viewport, the toast's
-// own centre included, which is what makes the hit test say something.
+// and the modal backdrop.
+//
+// WHERE the hit test is taken decides whether it says anything at all. The
+// journal is a RIGHT-hand panel (right: 12px, width 420) and the toast sits
+// centred at the top, so a SHORT sentence does not reach the panel and a hit
+// test at the toast's own centre would pass with the toast buried underneath.
+// The layering half therefore raises the very sentence the point names — the
+// chief stepping out of his hut, the longest of them — REQUIRES the two
+// rectangles to overlap, and samples the middle of that overlap. The modal
+// backdrop spans the whole viewport, so the toast's centre is a real sample
+// for it. The map plate and the debug menu can never reach the top-centre
+// strip, so their layering is read off the computed z-index rather than from
+// pretended geometry.
 if (section('toast-above-panels')) {
   await page.evaluate(() => window.__game.getState().enterPlace('cairo'))
   await page
     .waitForFunction((want) => window.__game.getState().placeId === want, 'cairo', { timeout: 30000 })
     .catch(() => {})
-  const layering = await page.evaluate(async () => {
+  const strings = await page.evaluate(async () => {
+    const { getStrings } = await import('/src/i18n/index.ts')
+    const t = getStrings().toasts
+    return { rifleInSettlement: t.rifleInSettlement, chiefStepsOut: t.chiefStepsOut }
+  })
+  const pressed = await page.evaluate(async () => {
     const g = () => window.__game.getState()
     const settle = () => new Promise((res) => requestAnimationFrame(() => setTimeout(res, 80)))
     window.__ui.getState().setDialog(null)
     if (window.__ui.getState().mapOpen) window.__ui.getState().toggleMap()
     g().debugAddEquipment('rifle')
-    await settle()
-    const slot = document.querySelector('.inventory-bar [data-eq="rifle"]')
-    if (!slot) return { ok: false, why: 'no rifle slot in the inventory bar' }
     // The journal stands OPEN before the item is pressed: the case the point
     // names, where the same act both opens a panel and raises a sentence.
     g().setJournalOpen(true)
+    // A sentence still standing from an earlier section would let a press that
+    // reached nothing look like an answer, so the field starts EMPTY.
+    g().setToast(null)
     await settle()
     const journalOpen = !!document.querySelector('.journal')
+    const slot = document.querySelector('.inventory-bar [data-eq="rifle"]')
+    if (!slot) return { ok: false, why: 'no rifle slot in the inventory bar', journalOpen }
+    const wasEmpty = !document.querySelector('.toast')
     slot.click()
     await settle()
     const toast = document.querySelector('.toast')
-    if (!toast) return { ok: false, why: 'the pressed item raised no toast', journalOpen }
+    return { ok: true, journalOpen, wasEmpty, text: toast ? toast.textContent : null }
+  })
+  check('the inventory press answers with the rifle\'s own sentence while the journal is open',
+    pressed.ok && pressed.journalOpen && pressed.wasEmpty && pressed.text === strings.rifleInSettlement,
+    JSON.stringify({ ...pressed, expected: strings.rifleInSettlement }))
+
+  const layering = await page.evaluate(async (chiefSentence) => {
+    const g = () => window.__game.getState()
+    const settle = () => new Promise((res) => requestAnimationFrame(() => setTimeout(res, 80)))
+    // The longest answer in the game, so the centred toast really reaches the
+    // right-hand journal panel: without that overlap the hit test says nothing.
+    g().setToast(chiefSentence)
+    await settle()
+    const toast = document.querySelector('.toast')
+    const journal = document.querySelector('.journal')
+    if (!toast || !journal) return { ok: false, why: 'toast or journal missing', toast: !!toast, journal: !!journal }
     const r = toast.getBoundingClientRect()
-    const cx = Math.round(r.left + r.width / 2)
-    const cy = Math.round(r.top + r.height / 2)
-    const toastOnTop = () => {
-      const hit = document.elementFromPoint(cx, cy)
+    const j = journal.getBoundingClientRect()
+    const ox = [Math.max(r.left, j.left), Math.min(r.right, j.right)]
+    const oy = [Math.max(r.top, j.top), Math.min(r.bottom, j.bottom)]
+    const overlap = { w: ox[1] - ox[0], h: oy[1] - oy[0] }
+    const onTopAt = (x, y) => {
+      const hit = document.elementFromPoint(Math.round(x), Math.round(y))
       return toast === hit || toast.contains(hit)
     }
-    const overJournal = toastOnTop()
+    const overlaps = overlap.w > 0 && overlap.h > 0
+    const overJournal = overlaps && onTopAt((ox[0] + ox[1]) / 2, (oy[0] + oy[1]) / 2)
+    const zOf = (sel) => {
+      const el = document.querySelector(sel)
+      return el ? Number.parseInt(getComputedStyle(el).zIndex, 10) : null
+    }
+    const journalZ = zOf('.journal')
+    const toastZ = Number.parseInt(getComputedStyle(toast).zIndex, 10)
+    // The map plate sits bottom-left and the debug menu is its own panel; both
+    // are out of the toast's strip, so they are judged by layer, not geometry.
+    window.__ui.getState().toggleMap()
+    await settle()
+    const mapZ = zOf('.map-overlay')
+    window.__ui.getState().toggleMap()
     window.__ui.getState().setDialog({ kind: 'agency' })
     await settle()
     const backdrop = !!document.querySelector('.dialog-backdrop')
-    const overDialog = toastOnTop()
+    const dialogZ = zOf('.dialog-backdrop')
+    const overDialog = onTopAt(r.left + r.width / 2, r.top + r.height / 2)
     window.__ui.getState().setDialog(null)
     g().setJournalOpen(false)
-    return { ok: true, journalOpen, overJournal, backdrop, overDialog, text: toast.textContent }
-  })
-  check('pressing a carried item answers in a toast while the journal is open', layering.ok && layering.journalOpen, JSON.stringify(layering))
-  check('the toast is hit-tested on top with the journal open', layering.ok && layering.overJournal, JSON.stringify(layering))
-  check('the toast is hit-tested on top under a modal backdrop', layering.ok && layering.backdrop && layering.overDialog, JSON.stringify(layering))
+    g().setToast(null)
+    return { ok: true, rect: r.toJSON(), journalRect: j.toJSON(), overlap, overlaps, overJournal, backdrop, overDialog, toastZ, journalZ, mapZ, dialogZ }
+  }, strings.chiefStepsOut)
+  check('the toast really overlaps the journal panel, so the hit test can say something',
+    layering.ok && layering.overlaps, JSON.stringify(layering))
+  check('inside that overlap the toast is what the hit test finds', layering.ok && layering.overJournal, JSON.stringify(layering))
+  check('under a modal backdrop the toast is what the hit test finds',
+    layering.ok && layering.backdrop && layering.overDialog, JSON.stringify(layering))
+  check('the toast outranks the journal, the map plate and the dialog layer by computed z-index',
+    layering.ok && layering.toastZ > layering.journalZ && layering.toastZ > layering.mapZ && layering.toastZ > layering.dialogZ,
+    JSON.stringify(layering))
 }
 
 // --- A settlement's bird's-eye vicinity is never empty (point 102, part b) ------

@@ -405,6 +405,7 @@ export const de: Strings = {
     canteenReady: 'Ich trinke aus der Feldflasche, wie der Durst es verlangt, und an frischem Wasser füllt sie sich von selbst.',
     valuableNobodyHere: 'Hier draußen ist niemand, dem ich ihn zeigen könnte.',
     valuableBazaar: 'Der Basar handelt damit – bewundern tut er ihn nicht.',
+    valuableNobodyAtMonument: 'An diesen Steinen ist niemand, dem ich ihn zeigen könnte.',
     valuableIndifferent: 'Sie betrachten ihn ohne Interesse.',
     pocSolved: 'Dummy-Meldung: Das Rätsel dieses Proof of Concept ist gelöst.',
     drumsSending: 'Das Oberhaupt ruft seinen Trommler. Die Botschaft geht über das Dorf hinaus.',

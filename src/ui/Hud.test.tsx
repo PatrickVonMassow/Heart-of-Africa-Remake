@@ -829,6 +829,22 @@ describe('every inventory slot answers a press (design.md §17.1)', () => {
     pressBoth(en.toasts.valuableBazaar)
   })
 
+  it('a treasure at the monument site: the bazaar answer belongs to the PORTS alone', () => {
+    // Giza is the third place kind, and the port's "the bazaar trades it" would
+    // be a plain lie there: no market and nobody to show it to.
+    inASettlement({ treasures: { ...g().treasures, gold: 1 } }, 'giza')
+    pressBoth(en.toasts.valuableNobodyAtMonument)
+  })
+
+  it('medicine keeps both its answers: none left, and none needed', () => {
+    // The two answers medicine already had (design.md §17.1) must survive the
+    // one handler every slot now shares — by click AND by digit key.
+    inTheOpen(COORD.savanna, { equipment: { medicine: 1 }, afflictions: { ...g().afflictions, fever: false, wounds: 0 } })
+    pressBoth(en.toasts.medicineNotNeeded)
+    inASettlement({ equipment: { medicine: 1 }, afflictions: { ...g().afflictions, fever: false, wounds: 0 } })
+    pressBoth(en.toasts.medicineNotNeeded)
+  })
+
   it('a village that neither reveres nor rejects the material looks without interest', () => {
     // The north reveres gold and emerald and rejects silver: copper leaves it cold.
     inASettlement({ treasures: { ...g().treasures, copper: 1 } }, 'nubian-village')

@@ -1598,13 +1598,20 @@ export const useGame = create<GameState>()((set, get) => ({
     const strings = getStrings()
     const place = s.mode === 'place' && s.placeId ? placeById(s.placeId) : null
     // Showing a treasure needs somebody who looks at it: nobody is out on the
-    // map, and a bazaar only puts a price on it.
+    // map, a bazaar only puts a price on it, and the monument site is as empty
+    // of onlookers as the open country around it.
+    // OPEN: the work order enumerates the open, the port and the village; the
+    // monument is the third place kind and needs an answer of its own.
     if (!place) {
       set({ toast: strings.toasts.valuableNobodyHere })
       return
     }
-    if (place.kind !== 'village') {
+    if (place.kind === 'port') {
       set({ toast: strings.toasts.valuableBazaar })
+      return
+    }
+    if (place.kind !== 'village') {
+      set({ toast: strings.toasts.valuableNobodyAtMonument })
       return
     }
     const id = place.id
