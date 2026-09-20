@@ -255,11 +255,11 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   Start, was **lokal fertig, aber nirgends angekommen** ist.“
 
 - **Regeln und Wächter verrotten — nur merkt es niemand.** Eine Absicherung greift enger als ihr
-  Satz, oder weiter; eine einbetonierte Festlegung von dir gilt weiter, obwohl du längst
-  anders entschieden hast.
-  → *Prompt:* „Schreib die **Erlaubnis im selben Satz wie ihre Grenze**, und frag: **Welcher
-  Fall wird von keiner Regel erfasst?** Sperrt ein Tor eine **ausdrückliche** Anweisung, nenn
-  **die Prämisse und ihr Datum** und **nimm sie heraus**.“
+  Satz, oder weiter; mehrere richtige Regeln können durch ihre Lücke etwas verbieten — und Warten
+  sieht dabei wie Sorgfalt aus.
+  → *Prompt:* „Schreib die **Erlaubnis im selben Satz wie ihre Grenze**, Lehren ebenso. Leg
+  Satz und Code **nebeneinander**, zieh **den Code auf den Satz**, frag: **Welcher
+  naheliegende Fall wird von keiner Regel erfasst?**“
 
 - **Der genannte Ausweg trägt nicht:** Er schadet, tritt nie ein, ist längst getan — oder es gibt
   ihn als Befehl gar nicht. Dann hat die Sperre recht, und übrig bleiben Handarbeit und das
@@ -698,4 +698,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 814c7ecdf06d4f6898f7d5afaf36e1887a33336dc6faed58b172a53c44786e1c -->
+<!-- GUIDE-FINGERPRINT: f82476cc0d48b3a56d88566acbf37adecf09e88800c2399df8143d363535938c -->
