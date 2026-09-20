@@ -168,33 +168,6 @@ put it is the mistake this line exists to stop.
   board with the observation instructions, the batch has moved on, and 1158 is ticked only
   after the user's answer on that card.
 
-- [ ] 1093. A compound fence may be drawn straight through a fixed life prop (user
-  07.09.2026, "reihe einen weiteren Task fuer das Clipping-Problem ein, der spaeter
-  erledigt wird"; restated 10.09.2026 alongside the decision that keeps the well elsewhere).
-  Reported as "Brunnen haengt im Zaun" in `hoa-state-2026-09-07-1702816850`, which caught
-  the well at (9, 8.5). Point 1092 removes the well from that one village, so WITHOUT this
-  point the reported case simply moves to the eight villages that keep it.
-  MEASURED IN `layout.ts`: the fixed prop spots are kept free of DWELLINGS only — `isFree`
-  (~772) tests every candidate against `lifeSpots`. Fences are placed with no prop test at
-  all: none of the five `fences.push` sites (~1109, ~1114, ~1230, ~1294, ~1336) consults
-  `lifeSpots`, and the compound ring's own `clears()` (~1193) knows other rings and the
-  functional buildings and nothing else. Exposure by radius is not limited to the well:
-  the talking pair (4.6, 5.6) and the pounder (-7, 1.2) sit at r 7.2 and 7.1, the weaver at
-  (-8.5, -7), all reachable by a compound band at cr 13.5–17.5 with a ring of about 7.
-  Final state: a fence run is judged against the fixed prop spots the way the water path is
-  already judged against the full collider set — the run is dropped, the ring moved, or the
-  spot planned out of the way — and no shipped layout draws a fence through a prop.
-  Test: Vitest over several villages at many seeds — no prop collider intersects a fence
-  post or a dwelling, mutation-checked, with no exception list.
-  BOUNDARY, measured 07.09.2026: this is a picture and walkability defect, not a teaching
-  defect. The water path, the dig sites and the play rocks all test against the collider
-  set already, so none of the three teaching surfaces breaks; that is why the user ranked
-  it behind 1092.
-  Refs: src/scenes/place/layout.ts (`isFree` ~772, the fence sites ~1109/~1114/~1230/~1294/
-  ~1336, `clears` ~1193, the water-path sweep ~1554 as the pattern to copy)
-  Criticality: medium.
-  Bundle: Dorfleben.
-
 - [ ] 1094. The teaching checks vary the village and pin the seed, which is the wrong axis
   (user 10.09.2026, 20:11 — "Setze deine Empfehlung bzgl. 1045 um"). This point DELETES
   test breadth; it builds nothing.
