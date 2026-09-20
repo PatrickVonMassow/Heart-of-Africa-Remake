@@ -164,10 +164,8 @@ deferral no longer excuses the lost word.
 THE FLOOR CLEARS WHAT THE FLOOR RAISED. One village word at a time is the
 floor's own rule, so the word it grants takes the previous village note down and
 forgets that speaker's figure with it. A note raised OUTSIDE the floor is not the
-floor's to clear: the chief's answer to the player stands for as long as it was
-given, however much the village says meanwhile. Taking every note down instead
-left the chief's head bare the moment any villager spoke, which the picture check
-caught.
+floor's to clear. The chief's answer uses the drums and their message display;
+it raises no speech label.
 
 Speech falls off sharply and is silent outside the hearing radius. The same
 range decision governs sound, observation, overhead note, and gesture: unheard
@@ -256,13 +254,16 @@ while a child is in earshot, preserving the separation between the two teaching
 groups. Each stroke changes the site by deepening the pit, growing the spoil
 and throwing earth.
 
-## The message
+## The messages
 
-`RIVER · UPSTREAM · ROCK · DIG`
+Errand: `RIVER · UPSTREAM · ROCK · DIG`
 
-The large low drum speaks `ba`; the small high drum speaks `BA`. The message is
-four concepts, sixteen strikes, three equal inter-word pauses, and no other
-structure. Afterwards it is displayed with the player's own reading over each
+Answer to the hand-over: `RIVER · DOWNSTREAM`
+
+The large low drum speaks `ba`; the small high drum speaks `BA`. The errand has
+four concepts and sixteen strikes; the answer has two concepts and eight. Both
+use the same pace, level and constant inter-word pause, with no other structure.
+Afterwards each is displayed with the player's own reading over each
 element. Those readings are the journal notes themselves and remain editable.
 
 The message is asked for OUTSIDE, in his village alone, and at the DRUMMER'S
@@ -279,7 +280,9 @@ moment he is back beside them. Back in his hut, the key at the hut starts the
 whole thing over; used while he is outside, the hut does nothing and offers no
 prompt. Entering a settlement always finds him indoors: his walk is scene state
 and is never saved. The message is recorded as heard only after the last beat
-and can then be reopened from the journal.
+and can then be reopened from the journal. Each message is remembered and
+chronicled once, with its own reopen button; repeats add no page. After the give,
+every request and repeat sends the answer.
 
 ## Where the digging happens
 
@@ -298,8 +301,14 @@ his hands. Used anywhere else — no chief out in the open, or too far from him 
 it hands nothing over and one toast says why, and the find stays in the pack.
 The use key at his hut hands nothing over at all: it brings him out, and from
 then on it is the key at either man — the chief or his drummer — that sends the
-drums, while the hut itself answers nothing. His acknowledgement stands over his own head like
-any other villager's word — it uses only ROCK and DIG from the same language.
+drums, while the hut itself answers nothing. The chief lays the find beside the
+drums and has his drummer answer `RIVER · DOWNSTREAM`, handing over the clay
+form wordlessly in the same move. He says nothing over his head. Giving works
+in every outdoor phase: beside the drummer the answer starts at once; on foot
+it arms `drumOnArrival`, turning him round on the way home as a call does. A
+message already beating finishes uninterrupted, then releases the deferred
+answer. Only the answer's own last beat records it as heard. Its display and
+journal reopen show the player's editable readings, just like the errand.
 
 Every later quest find brought to a chief follows the same rule: a found thing
 is an inventory item, and giving it is using that item before him.

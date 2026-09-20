@@ -269,7 +269,7 @@ function CampDialog({ scope, campId, placeId }: { scope: 'free' | 'village'; cam
 export function Dialogs() {
   const dialog = useUi((s) => s.dialog)
   if (!dialog) return null
-  if (dialog.kind === 'drumMessage') return <DrumMessageDialog />
+  if (dialog.kind === 'drumMessage') return <DrumMessageDialog key={dialog.message} message={dialog.message} />
   if (dialog.kind === 'speechGuess') return <SpeechGuessDialog atoms={dialog.atoms} />
   if (dialog.kind === 'bazaar') return <BazaarDialog />
   if (dialog.kind === 'agency') return <AgencyDialog />

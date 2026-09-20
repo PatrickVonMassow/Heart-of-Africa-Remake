@@ -318,7 +318,7 @@ const dialogs = {
   bazaar: { kind: 'bazaar' },
   agency: { kind: 'agency' },
   camp: { kind: 'camp', scope: 'village', placeId: 'maasai-village' },
-  drumMessage: { kind: 'drumMessage' },
+  drumMessage: { kind: 'drumMessage', message: 'errand' },
   speechGuess: { kind: 'speechGuess', speakerId: 'kid-1', atoms: ['ba-ba'] },
 } satisfies Record<NonNullable<Dialog>['kind'], NonNullable<Dialog>>
 

@@ -2,7 +2,7 @@
 
 import { create } from 'zustand'
 import type { UtteranceId } from '../communication/lexicon'
-import type { DrumMessagePlan } from '../communication/drumMessage'
+import type { DrumMessageId, DrumMessagePlan } from '../communication/drumMessage'
 import type { TreasureId } from '../systems/economy'
 import { QUALITY_PRESETS, nextDetailLevel, type DetailLevel } from '../config/quality'
 
@@ -51,7 +51,7 @@ export type Dialog =
   | { kind: 'agency' }
   // The chief's drum message, shown after the drums and reopenable at any time
   // from the journal (design.md §13.4, point 486).
-  | { kind: 'drumMessage' }
+  | { kind: 'drumMessage'; message: DrumMessageId }
   // A guess at what a speaker just said, opened with the use key on him
   // (design.md §13.4, points 588/691). It carries the atoms it was opened FOR,
   // so it outlives the label over the speaker's head.
@@ -194,6 +194,8 @@ export interface UiState {
    * and is saved there.
    */
   drumPerformance: { startedAt: number; endsAt: number; plan: DrumMessagePlan } | null
+  /** A give waits for the running message instead of interrupting it. */
+  deferredDrumAnswer: boolean
   /** Open bazaar bid awaiting accept/decline (design.md §10). */
   bazaarBid: { treasure: TreasureId; amount: number } | null
   setBazaarBid: (bid: { treasure: TreasureId; amount: number } | null) => void
@@ -279,6 +281,7 @@ export const useUi = create<UiState>()((set) => ({
   benchAbort: false,
   bazaarBid: null,
   drumPerformance: null,
+  deferredDrumAnswer: false,
   setBazaarBid: (bazaarBid) => set({ bazaarBid }),
   // A message already being beaten out is never restarted — asking twice while
   // the drums sound would double the strikes over one another.
@@ -294,7 +297,7 @@ export const useUi = create<UiState>()((set) => ({
         },
       }
     }),
-  clearDrumMessage: () => set((s) => (s.drumPerformance ? { drumPerformance: null } : s)),
+  clearDrumMessage: () => set({ drumPerformance: null, deferredDrumAnswer: false }),
   // Closing or switching a dialog always discards a pending bazaar bid.
   setDialog: (dialog) => set({ dialog, bazaarBid: null }),
   setPrompt: (prompt) => set({ prompt }),

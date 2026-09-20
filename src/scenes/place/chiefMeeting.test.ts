@@ -107,7 +107,7 @@ describe('the drums, once he stands there (design.md §13.4)', () => {
     // mistaken for the price of the message.
     useGame.setState({ gifts: NO_GIFTS, honoredFriend: {}, money: 0 })
     expect(Object.values(g().gifts).reduce((a, b) => a + b, 0)).toBe(0)
-    expect(g().drumMessageHeard).toBe(false)
+    expect(g().drumMessageHeard).toEqual({ errand: false, answer: false })
     expect(nextChiefAction('drummer', g(), 'at-drummer')).toBe('send-message')
   })
 })

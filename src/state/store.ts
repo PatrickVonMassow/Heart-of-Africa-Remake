@@ -29,11 +29,11 @@ import {
   setHypothesis, type CommunicationMemory,
 } from '../communication/heard'
 import type { Phrase, UtteranceId } from '../communication/lexicon'
-import { chiefMessagePhrase } from '../communication/drumMessage'
-import { chiefRewardPhrase } from '../communication/chiefReply'
+import { currentDrumMessage, drumMessagePhrase, drumMessagePlan, type DrumMessageId } from '../communication/drumMessage'
+import { playDrumMessage } from '../systems/ambience'
 import { ROCK_VILLAGE_ID, isAtCommunicationRock } from '../world/communicationRock'
 import { chiefWalkState, resetChiefWalk, setChiefWalkState, withinGiveReach } from '../scenes/place/chiefPresence'
-import { chiefStepsOut } from '../scenes/place/chiefWalk'
+import { chiefCalled, chiefStepsOut } from '../scenes/place/chiefWalk'
 import { speechClock } from '../scenes/place/speechChannel'
 import { resolveFormUse, type FormId, type SocketId } from '../world/forms'
 import type { SketchId } from '../journal/sketches'
@@ -167,7 +167,7 @@ export interface GameState {
   /** True once the chief's drums have beaten his message out in full (design.md
    *  §13.4, point 486). It never goes back: the message display stays
    *  reopenable for the rest of the run, so forgetting it locks nobody out. */
-  drumMessageHeard: boolean
+  drumMessageHeard: Record<DrumMessageId, boolean>
   /** The buried thing at the foot of the landmark boulder (point 487): it lies
    *  BURIED until the shovel reaches it at the spot the renderer draws, is
    *  CARRIED from there, and is GIVEN once it lies in the chief's hands — which
@@ -318,7 +318,13 @@ export interface GameState {
   setUtteranceHypothesis: (utterance: UtteranceId, text: string) => void
   /** The chief's drums have finished (point 486): every concept of the message
    *  enters the heard memory and the chronicle records that it was sent. */
-  receiveDrumMessage: () => void
+  receiveDrumMessage: (message?: DrumMessageId) => void
+  /** Request the current message through the chief's existing walk. */
+  requestDrumMessage: () => void
+  /** Beat the current message once he is beside the drummer. */
+  sendDrumMessage: () => void
+  /** The performance's last beat: record it and release a waiting answer. */
+  finishDrumMessage: () => void
   /** Lay the find from the boulder in the chief's hands: the hand-over that
    *  solves the puzzle. It is an ACT ON THE ITEM (design.md §6) — the player
    *  uses it in the inventory bar while the chief stands before him in the
@@ -523,7 +529,7 @@ export function startState(seed: number, placeId: string = startPlaceId()) {
     ],
     journalOpen: true,
     communication: emptyMemory(),
-    drumMessageHeard: false,
+    drumMessageHeard: { errand: false, answer: false },
     rockArtefact: 'buried' as RockArtefactState,
     carriedForms: [] as FormId[],
     spentSockets: [] as SocketId[],
@@ -718,24 +724,59 @@ export const useGame = create<GameState>()((set, get) => ({
   // they are recorded exactly like a villager's phrase: each atom on its own,
   // keeping the day and the note of an earlier hearing. The chronicle entry is
   // written once — hearing the drums a second time adds no second page.
-  receiveDrumMessage: () => {
+  receiveDrumMessage: (message = 'errand') => {
     const s = get()
-    const heard = observePhrase(s.communication, chiefMessagePhrase(), Math.floor(s.day), heardIn(s))
-    set({ communication: heard, drumMessageHeard: true })
-    if (s.drumMessageHeard) return
+    const heard = observePhrase(s.communication, drumMessagePhrase(message), Math.floor(s.day), heardIn(s))
+    set({ communication: heard, drumMessageHeard: { ...s.drumMessageHeard, [message]: true } })
+    if (s.drumMessageHeard[message]) return
     get().addEntry(
-      { key: 'journal.titles.drumMessage' },
-      { key: 'journal.drumMessage' },
+      { key: message === 'answer' ? 'journal.titles.drumAnswer' : 'journal.titles.drumMessage' },
+      { key: message === 'answer' ? 'journal.drumAnswer' : 'journal.drumMessage' },
       'hint',
       'face',
     )
   },
 
-  // The hand-over. It is possible only where the errand was set: in the chief's
-  // own village, with the artefact actually carried. His answer is a PHRASE in
-  // his own tongue, recorded exactly like any other speech of his people —
-  // untranslated, so it reads only to a player who learned the words — and it
-  // says WHERE and no more; the rest he hands over as a shape.
+  requestDrumMessage: () => {
+    const walk = chiefWalkState()
+    const step = chiefCalled(walk, speechClock())
+    // A give on the outward walk must also speak on arrival; the use key has
+    // no action in that phase, but giving remains legal throughout the walk.
+    setChiefWalkState(walk.phase === 'walking-out' ? { ...walk, drumOnArrival: true } : step.walk)
+    if (step.beatDrums) get().sendDrumMessage()
+  },
+
+  sendDrumMessage: () => {
+    const s = get()
+    if (s.mode !== 'place' || s.placeId !== DRUM_MESSAGE_VILLAGE) {
+      set({ toast: getStrings().toasts.chiefNoMessage })
+      return
+    }
+    const message = currentDrumMessage(s)
+    const running = useUi.getState().drumPerformance
+    if (running) {
+      if (message === 'answer' && running.plan.message !== 'answer') {
+        useUi.setState({ deferredDrumAnswer: true })
+      }
+      return
+    }
+    const plan = drumMessagePlan(message)
+    // The minute restarts when the message actually begins, including a
+    // deferred answer, and both sound and hands receive this very plan.
+    setChiefWalkState(chiefCalled(chiefWalkState(), speechClock()).walk)
+    useUi.getState().startDrumMessage(plan)
+    playDrumMessage(plan)
+    set({ toast: getStrings().toasts.drumsSending })
+  },
+
+  finishDrumMessage: () => {
+    const { drumPerformance, deferredDrumAnswer } = useUi.getState()
+    if (!drumPerformance) return
+    get().receiveDrumMessage(drumPerformance.plan.message)
+    useUi.getState().clearDrumMessage()
+    if (deferredDrumAnswer) get().requestDrumMessage()
+  },
+
   callChiefOut: () => {
     const s = get()
     if (s.mode !== 'place' || !s.placeId) return
@@ -776,12 +817,10 @@ export const useGame = create<GameState>()((set, get) => ({
       set({ toast: getStrings().toasts.findNeedsChief })
       return
     }
-    const heard = observePhrase(s.communication, chiefRewardPhrase(), Math.floor(s.day), heardIn(s))
     // What he pays with: a direction in words, and — wordlessly — the clay
     // impression. The impression is the other half of the sentence, so it is
     // handed over in the same move and recorded in the same journal entry.
     set({
-      communication: heard,
       rockArtefact: 'given',
       carriedForms: s.carriedForms.includes(CHIEF_REWARD_FORM)
         ? s.carriedForms
@@ -793,6 +832,7 @@ export const useGame = create<GameState>()((set, get) => ({
       'event',
       'face',
     )
+    get().requestDrumMessage()
   },
 
   moveTravel: (dirX, dirZ, dt) => {
@@ -1458,6 +1498,7 @@ export const useGame = create<GameState>()((set, get) => ({
     // stands HERE, past every read that can throw and against the set that
     // clears the flag, so the two halves of him never part company.
     resetChiefWalk()
+    useUi.getState().clearDrumMessage()
     set({
       mode: 'place',
       placeId: id,
@@ -2070,7 +2111,7 @@ export const useGame = create<GameState>()((set, get) => ({
         // memory rather than a broken one.
         communication: deserializeMemory(snap.communication),
         // A snapshot from before the drums existed simply never heard them.
-        drumMessageHeard: snap.drumMessageHeard ?? false,
+        drumMessageHeard: { errand: snap.drumMessageHeard?.errand === true, answer: snap.drumMessageHeard?.answer === true },
         // A snapshot from before the boulder was dug simply leaves it buried.
         rockArtefact: snap.rockArtefact ?? 'buried',
         // A save written before the forms existed carried neither, and a
@@ -2095,6 +2136,7 @@ export const useGame = create<GameState>()((set, get) => ({
       // runs AFTER the state is in place, so a snapshot that throws half way
       // through leaves both halves as they were rather than one of them.
       resetChiefWalk()
+      useUi.getState().clearDrumMessage()
       return true
     } catch {
       return false
@@ -2107,6 +2149,7 @@ export const useGame = create<GameState>()((set, get) => ({
     // with it (design.md §13.4): the two halves of the chief's state may never
     // be cleared apart, or the hut key answers a phase nobody can see.
     resetChiefWalk()
+    useUi.getState().clearDrumMessage()
     set({ ...startState(newSeed()) })
   },
 
