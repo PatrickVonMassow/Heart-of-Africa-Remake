@@ -30,6 +30,8 @@
 // frame cadence cannot move the share — shown here on a recorded trace read at
 // five cadences, not merely claimed.
 import { describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import {
   CHILD_MOTION,
   groundPath,
@@ -695,12 +697,104 @@ function expectLively(paths: Track[][]): void {
   expect(holdsAGame(live)).toBe(true)
 }
 
-// The reported village and seed first; the others are there because the causes
-// were general and one settlement's layout proves nothing about the next.
+// THE DELETION'S OWN BOUNDARY (work-order 1094). The teaching checks in this
+// file give their VILLAGE spread up for a SEED spread in `ROCK_VILLAGE_ID`: the
+// communication slice runs in that one settlement, while the world seed is drawn
+// at every start, so the seed is the axis that really varies for the player and
+// the village is not. What must NOT travel with that deletion is the statement a
+// foreign village IS. `riverBank.test.ts` asserts that a village away from every
+// river grows no bank, and it can only say so by NAMING such a village; a later
+// sweep that replaced every foreign id in the tree would empty that assertion
+// while leaving it green. So the boundary is pinned rather than remembered.
+describe('the seed spread stops where a foreign village IS the statement (work-order 1094)', () => {
+  // COMMENTED OUT IS DELETED, as far as this boundary is concerned
+  // (cross-vendor findings, GPT-6 Astra, 20.09.2026). Matching the raw source
+  // accepted `// expect(withBank)…` — the three assertions would still read as
+  // present while nothing ran them, which is exactly the silent emptying this
+  // check exists to catch. The stripping runs over the WHOLE file BEFORE the
+  // case is located, because the second gap was the case itself wrapped in a
+  // block comment: cutting the body out first threw the `/*` away and handed
+  // the stripper a body that looked like live code. With the whole file
+  // stripped, a commented-out case simply has no name left to find.
+  const stripComments = (text: string) => text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
+  /** Every runner switch in `text` that would keep a case from running. The
+   *  modifier chain is matched WHOLE — `describe.sequential.skip` is as much a
+   *  skip as `describe.skip` (fourth cross-vendor round). */
+  const disablers = (text: string) =>
+    text.match(/\b(?:x(?:describe|it|test)|(?:describe|it|test)(?:\.[A-Za-z]+)*\.(?:skip|todo|only|skipIf|runIf))\b/g) ?? []
+  it('leaves riverBank.test.ts naming the riverless villages', () => {
+    const src = stripComments(readFileSync(resolve(process.cwd(), 'src/scenes/place/riverBank.test.ts'), 'utf8'))
+    const start = src.indexOf("it('a village away from every river has none")
+    expect(start, 'the boundary assertion has been renamed, removed or commented out in riverBank.test.ts').toBeGreaterThan(-1)
+    const body = src.slice(start, src.indexOf('\n  })', start))
+    expect(body, 'the riverless village it names').toContain("expect(withBank).not.toContain('maasai-village')")
+    expect(body, 'the second riverless village it names').toContain("expect(withBank).not.toContain('san-village')")
+    expect(body, 'and the riverside village it contrasts them with').toContain('expect(withBank).toContain(ROCK_VILLAGE_ID)')
+    // A SKIPPED CASE IS A DELETED ONE TOO (third cross-vendor round, GPT-6
+    // Astra, 20.09.2026): `describe.skip` leaves every text above in place
+    // while nothing runs. The whole file is held to it rather than the one
+    // case, because the switch can sit on any enclosing block — and `.only`
+    // counts as well, since it disables every OTHER case in the file.
+    expect(disablers(src), 'riverBank.test.ts disables cases').toEqual([])
+  })
+
+  // AND THE STRIPPER ITSELF IS PINNED, on the SAME function the check uses, so
+  // the check above cannot quietly lose its teeth again.
+  it('reads a commented-out assertion as gone', () => {
+    const line = "    expect(withBank).not.toContain('san-village')"
+    expect(stripComments(`  //${line}`)).not.toContain('expect(withBank)')
+    expect(stripComments(`  /*${line} */`)).not.toContain('expect(withBank)')
+    // The shape the second round found: a `//` the old guard let through
+    // because a colon stood in front of it.
+    expect(stripComments(`  disabled://${line}`)).not.toContain('expect(withBank)')
+    // ...and a whole case wrapped in a block comment loses its NAME, which is
+    // what the check above looks the body up by.
+    expect(stripComments(`  /* it('a village away from every river has none') {\n${line}\n  } */`))
+      .not.toContain('a village away from every river has none')
+    expect(stripComments(`${line} // kept`)).toContain('expect(withBank)')
+  })
+
+  // AND THE SWITCH DETECTOR THE SAME WAY, on the same function the check calls.
+  it('reads a skipped or narrowed case as disabled', () => {
+    expect(disablers("describe.skip('a village away from every river has none', () => {")).toEqual(['describe.skip'])
+    expect(disablers("  it.only('a village away from every river has none', () => {")).toEqual(['it.only'])
+    expect(disablers("  xit('a village away from every river has none', () => {")).toEqual(['xit'])
+    expect(disablers("  it.todo('a village away from every river has none')")).toEqual(['it.todo'])
+    expect(disablers("describe.sequential.skip('a village away from every river has none', () => {")).toEqual([
+      'describe.sequential.skip',
+    ])
+    expect(disablers("  it.concurrent.only('a village away from every river has none', () => {")).toEqual([
+      'it.concurrent.only',
+    ])
+    expect(disablers("  it('a village away from every river has none', () => {")).toEqual([])
+    expect(disablers("  it.each(RIVERLESS)('%s has no bank', () => {")).toEqual([])
+  })
+})
+
+// THE SAMPLE VARIES THE SEED, NOT THE VILLAGE (work-order 1094). It used to
+// carry the reported bambara layout and then a maasai and a swahili one, on the
+// reasoning that one settlement's layout proves nothing about the next. True,
+// and beside the point: the player of this PoC learns the language in
+// `ROCK_VILLAGE_ID` and nowhere else, while the world SEED is drawn afresh at
+// every start (`store.ts`, `newSeed`). So the spread went across settlements he
+// never plays the teaching round in, and left the axis that really varies for
+// him unjudged. Same sample count, same village, three seeds:
+//  - the seed the production report names,
+//  - 42, the seed the browser lane is pinned to (`scripts/verify/verify-seed.mjs`),
+//  - and 46, which is NOT a comfortable third: swept over bambara seeds 1-60 it
+//    is the WORST layout still inside the gate (0.226 % against 0.25 %), so the
+//    sample's third case is the hardest clean one rather than a lucky one.
+// WHAT THE SWEEP ALSO FOUND, and what this file does NOT hide: six of those
+// sixty seeds read ABOVE the shipped gate — 27 (0.367 %), 30 (1.299 %), 33
+// (0.282 %), 35 (0.311 %), 40 (0.254 %) and 50 (0.254 %). That is the user's own
+// complaint, alive on roughly a tenth of the worlds he can be dealt, and it was
+// invisible for exactly as long as the sample varied the village instead of the
+// seed. It is filed as its own work-order point rather than folded in here: this
+// point deletes test breadth and builds nothing.
 const PLACES: Array<[string, number]> = [
   ['bambara-village', 2972259115],
-  ['maasai-village', 42],
-  ['swahili-village', 99],
+  ['bambara-village', 42],
+  ['bambara-village', 46],
 ]
 
 describe('the children never shuffle on the spot (points 648/656)', () => {
@@ -723,19 +817,20 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
       // the WORST child, because one snagging child among three healthy ones is
       // divided by four in every group average. Re-measured over the restored
       // minute with the bank round (work-order 687): the least judgeable child
-      // 0.983 in all three villages — the missing part is the tail no window can
-      // reach into — and the worst child's share 0.000 / 0.000 / 0.028 %.
+      // 0.983 at all three seeds — the missing part is the tail no window can
+      // reach into — and the worst child's share 0.000 / 0.000 / 0.226 %
+      // (re-measured over the seed spread, work-order 1094).
       expect(r.leastJudged).toBeGreaterThan(CHILD_MOTION.judgedGate)
       expect(r.worstShare).toBeLessThan(CHILD_MOTION.shareGate)
       // AND THE SHORT BURST the one-second window cannot see (point 656): a
       // child that paces on the spot for six tenths of a second between spells
       // of walking never collects the metre a one-second window asks for.
-      // Re-measured with the bank round, worst child: 0.000 / 0.000 / 0.000 %.
+      // Re-measured over the seed spread, worst child: 0.000 / 0.000 / 0.000 %.
       const burst = shuffleWindows(paths, CHILD_MOTION.short)
       expect(burst.worstShare).toBeLessThan(CHILD_MOTION.shareGate)
       // AND THE BURST MEASURE MUST HAVE JUDGED SOMETHING: its share is 0 both
-      // when nothing was bad and when nothing was looked at. Re-measured with
-      // the bank round: 238 judged child-seconds, least judgeable child 0.992.
+      // when nothing was bad and when nothing was looked at. Re-measured over
+      // the seed spread: 297 judged child-seconds, least judgeable child 0.992.
       expect(judgedEnough(burst)).toBe(true)
       expect(judgedEnough(r)).toBe(true)
       // AND NOBODY IS BEING CARRIED (point 656): the rescue teleport is what
@@ -748,9 +843,8 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
       expect(rescues.nudgesPublished).toBe(true)
       expect(rescues.carriedMetresPerChildMinute).toBeLessThan(CHILD_MOTION.carryGate)
       expect(rescues.perChildMinute).toBeLessThan(CHILD_MOTION.rescueGate)
-      // The worst child on its own clock: with the bank round not one rescue
-      // falls in this minute in any of the three villages, and nothing is
-      // carried at all.
+      // The worst child on its own clock: not one rescue falls in this minute at
+      // any of the three seeds, and nothing is carried at all.
       expect(rescues.worstPerChildMinute).toBeLessThan(CHILD_MOTION.worstChildRescueGate)
       expect(rescues.worstCarriedMetresPerChildMinute).toBeLessThan(CHILD_MOTION.worstChildCarryGate)
     })
@@ -909,24 +1003,27 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
     const sep = balance.villageLife.separation
     const kidPair = sep.bodyRadius * KID_SCALE * 2 - sep.slop
     const adultPair = sep.bodyRadius * KID_SCALE + sep.bodyRadius - sep.slop
-    // TWO SETTLEMENTS, because the near-contact witness below is a property of
-    // the LAYOUT and not of the game (work-order 1080). The bar used to be a
-    // single number measured in bambara-village at one seed — 0.64 m, asserted
-    // as "under 3 m" — and the play ground is a corner of the settlement, so
-    // where the adults' work happens to fall is a fact about that corner.
-    // Measured across the shipped villages at their own seeds, the nearest an
-    // adult comes to a child over a minute runs 0.37 m (nubian) to 7.91 m
-    // (mandinka); maasai-village, which plays the other round entirely, sits at
-    // 5.58 m. Any single-village number is therefore an accident, and a change
-    // that merely moves the group's seeded path — this point's climb did — trips
-    // it while the property under test is untouched. So the STALL and the
-    // OVERLAP are asked of both settlements, and the witness is asked of the
-    // village where the two crowds really do meet.
+    // TWO SEEDS, because the near-contact witness below is a property of the
+    // LAYOUT and not of the game (work-order 1080). The bar used to be a single
+    // number measured at one seed — 0.64 m, asserted as "under 3 m" — and the
+    // play ground is a corner of the settlement, so where the adults' work
+    // happens to fall is a fact about that corner.
+    // THE SPREAD RUNS OVER SEEDS, NOT VILLAGES (work-order 1094). It used to
+    // reach into the nubian village for the second sample; the player learns the
+    // language in `ROCK_VILLAGE_ID` alone and is dealt a new SEED at every start,
+    // so a foreign settlement's corner says nothing about the crowd he watches.
+    // Re-measured over bambara seeds 1-60, the nearest an adult comes to a child
+    // over a minute runs 0.37 m to 10.31 m — the same order of accident the
+    // village spread showed, now on the axis that reaches the player. The two
+    // seeds here are the reported layout (4.08 m) and seed 3 (0.37 m), the
+    // lowest-numbered layout of that sweep in which the two crowds really do
+    // meet. So the STALL and the OVERLAP are asked of both, and the witness is
+    // carried by the seed where they meet.
     let nearestOfAll = Infinity
     let adultCount = 0
     for (const [id, seed] of [
       ['bambara-village', 2972259115],
-      ['nubian-village', 42],
+      ['bambara-village', 3],
     ] as Array<[string, number]>) {
       const v = village(id, seed)
       const n = v.children.length
@@ -963,7 +1060,7 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
     }
     // AND THE REST OF THE SETTLEMENT WAS REALLY THERE, close enough for the
     // overlap check above to have had something to judge: an adult body comes
-    // inside a metre of a child in the nubian village. Putting adults INSIDE the
+    // inside a metre of a child at seed 3 (0.37 m). Putting adults INSIDE the
     // children's own ground is the case below.
     expect(adultCount).toBeGreaterThan(10)
     expect(nearestOfAll).toBeLessThan(1)
@@ -1480,11 +1577,21 @@ describe('the children`s bank round can reach its own stage (work-order 687)', (
   // layer had covered the bambara village at the child-motion report's seed
   // only, and the layout the picture check actually walks — a different one —
   // was the one whose route across the village could not be planned.
+  // AND THE OTHER TWO ARE SEEDS, NOT VILLAGES (work-order 1094). They were the
+  // nubian and the mandinka layout, on the reasoning that one settlement proves
+  // nothing about the next — true, and beside the point: the round that TEACHES
+  // is played in `ROCK_VILLAGE_ID`, and what varies for the player there is the
+  // world SEED, drawn afresh at every start. The two replacements are chosen by
+  // measurement over bambara seeds 1-30 (400 replayed seconds each, the guard's
+  // bound lifted so the layout rather than the bound is read): seed 9 is the
+  // FASTEST layout of the sweep to its first run (22.0 s) and seed 23 one of the
+  // slowest that still gets there in the ordinary way (89.3 s), so the pair
+  // spans the range the player is really dealt instead of two foreign corners.
   const RIVER_VILLAGES: Array<[string, number]> = [
     ['bambara-village', 42],
     ['bambara-village', 2972259115],
-    ['nubian-village', 42],
-    ['mandinka-village', 99],
+    ['bambara-village', 9],
+    ['bambara-village', 23],
   ]
 
   describe.each([
@@ -1619,11 +1726,15 @@ describe('the children`s bank round can reach its own stage (work-order 687)', (
    * green on luck, which is exactly what it did until it did not.
    */
   it('carries a child past a planted traveller in every cycle-first run window (work-order 687)', async () => {
+    // THE SAME FOUR LAYOUTS THE STAGE CASES ABOVE USE, and for the same reason
+    // (work-order 1094): the teaching round is played in `ROCK_VILLAGE_ID`, so
+    // the spread runs over its SEEDS rather than over settlements the player
+    // never learns a word in.
     const CASES: Array<[string, number]> = [
       ['bambara-village', 42],
       ['bambara-village', 2972259115],
-      ['nubian-village', 42],
-      ['mandinka-village', 99],
+      ['bambara-village', 9],
+      ['bambara-village', 23],
     ]
     // What the browser section sets while it watches, and why: see
     // `scripts/verify/polish.mjs`, section `children-bank-game`.
@@ -1751,25 +1862,22 @@ describe('the children`s bank round can reach its own stage (work-order 687)', (
    *
    * The three layouts below are the ones that showed it, and they are here by
    * measurement: at this section's shortened roam the guard spent 136 s of
-   * overtime in bambara@7, 206 s in mandinka@99, and in bambara@236333330 it
-   * NEVER named the boulder at all (275 s to abandon). The ordinary case is
-   * beside them so the bound is not only proved where it bites.
+   * overtime in bambara@7 and in bambara@236333330 it NEVER named the boulder
+   * at all (275 s to abandon). The ordinary case is beside them so the bound is
+   * not only proved where it bites.
+   *
+   * THE FOREIGN LAYOUT IS GONE, AND ITS PROPERTY IS NOT (work-order 1094). The
+   * long-overtime case used to be mandinka@99 at 206 s, in a village nobody
+   * learns the language in. Re-swept over bambara seeds 1-30 with the guard's
+   * bound lifted, 400 replayed seconds each: seed 21 roams 237.2 s against a cap
+   * of 55.0 and does not get to its first run until 265.8 s, seed 4 roams 280.2 s
+   * (first run 310.5 s) and seed 7 roams 227.9 s — all three abandon the boulder.
+   * Seed 21 carries the case now, on the axis the player is actually dealt.
+   * THE REPLAY ITSELF IS SHARED (work-order 1094). It is driven from a case
+   * list so the seed spread and the one foreign layout that carries its own
+   * statement can stand in SEPARATE cases without a second copy of the loop.
    */
-  it('bounds the roaming phase, so a run always comes (work-order 687)', async () => {
-    const CASES: Array<[string, number]> = [
-      ['bambara-village', 42],
-      ['bambara-village', 7],
-      ['mandinka-village', 99],
-      ['bambara-village', 236333330],
-      // THE CASE THAT PROVES THE FOLD BELOW, and the only one of the five that
-      // does. Swept out of 120 village/seed layouts against the UNBOUNDED code:
-      // here every roam that ENDS inside the window stays within the cap (45.9 s
-      // against 55.0 s) while the roam the window CLOSES in has already run
-      // 55.4 s, and a run had opened long before (38.6 s). It is therefore the
-      // one layout where the exit-only measurement reads green on a round that
-      // is over its bound — which is what made the test unable to fail.
-      ['mandinka-village', 58],
-    ]
+  const boundsRoaming = async (CASES: Array<[string, number]>) => {
     const shippedRoam = BANK_CFG.roamSeconds
     try {
       // The browser section shortens the roam exactly this way (debug menu §21),
@@ -1825,18 +1933,41 @@ describe('the children`s bank round can reach its own stage (work-order 687)', (
     } finally {
       BANK_CFG.roamSeconds = shippedRoam
     }
-    // Five cases of 400 replayed seconds each, and the budget is the neighbour
-    // replay's rule rather than a guess.
-    // RE-MEASURED 15.09.2026, after CI run 34909464052 aborted this case at its
-    // 180 s and took the whole job down: the replay costs 91.2 s alone on the
-    // batch host — TWICE the 46.5 s that stood here, because the adults' errands
-    // and dig tasks have joined the replayed village since. At the runner's
-    // measured 1.55x that is 141 s, so the 180 s left 39 s of headroom and the
-    // suite's worker contention ate it.
-    // The neighbour above is the calibration: 88.8 s here, re-measured the same
-    // hour and still the 85.5 s it claims, carries 300 s and has never been
-    // aborted. The same cost therefore gets the same number.
-  }, 300_000)
+  }
+
+  // THE BUDGET IS PER CASE, and it comes from the measurement the five-case
+  // version left behind: 91.2 s of replay on the batch host for five cases, so
+  // about 18 s each, and at the runner's measured 1.55x about 29 s each. The
+  // four-case spread therefore carries 240 s and the single foreign layout 120 s
+  // — the same headroom per case that the 300 s gave five, after CI run
+  // 34909464052 aborted the 180 s version and took the whole job down.
+  it('bounds the roaming phase, so a run always comes (work-order 687)', () =>
+    boundsRoaming([
+      ['bambara-village', 42],
+      ['bambara-village', 7],
+      ['bambara-village', 21],
+      ['bambara-village', 236333330],
+    ]), 240_000)
+
+  /**
+   * THE ONE FOREIGN LAYOUT THE SEED SPREAD KEEPS (work-order 1094), in its own
+   * case so the spread above names bambara alone. It is kept by MEASUREMENT
+   * rather than by omission: bambara has no layout that can replace it. Seeds
+   * 1-120 were swept against the unbounded code (`roamSeconds` 8,
+   * `roamGuardSeconds` lifted so no roam is ever abandoned on the clock, 400
+   * replayed seconds each), reading the longest ENDED roam and the roam the
+   * window CLOSES in apart. Not one of the 120 shows the combination this case
+   * is built on — an ended roam inside the 55.0 s cap beside a closing roam over
+   * it, with a run already opened. Only two bambara seeds close in an over-cap
+   * roam at all, 86 (closing 136.1 s) and 117 (closing 115.1 s), and BOTH also
+   * carry an ended roam over the cap (184.7 s and 94.5 s), which the exit-only
+   * measurement catches on its own. Deleting this entry would therefore delete
+   * the only witness that makes the fold necessary: it is an assertion where the
+   * foreign layout IS the statement, exactly like the riverless village in
+   * `riverBank.test.ts`, and work-order 1094 leaves that shape standing by name.
+   */
+  it('keeps the one foreign layout that proves the fold (work-order 687)', () =>
+    boundsRoaming([['mandinka-village', 58]]), 120_000)
 
   for (const [placeId, seed] of RIVER_VILLAGES) {
     it(`${placeId} at seed ${seed} walks the group down to the bank and runs the stretch`, () => {

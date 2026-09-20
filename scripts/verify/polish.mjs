@@ -628,7 +628,12 @@ if (section('panorama-wildlife')) {
 // figure's own projected anchor, in the SAME evaluate as the rendered label's
 // DOM box, so no frame passes between deciding and measuring.
 if (section('speech-hypothesis')) {
-  await goToPlace('maasai-village')
+  // THE VILLAGE THE PLAYER LEARNS IN (work-order 1094). The label belongs to the
+  // communication slice, and that slice runs in `ROCK_VILLAGE_ID` alone — judging
+  // it over a maasai figure judged it where nobody in this PoC hears a word worth
+  // a hypothesis. The axis that actually varies for the player is the world SEED,
+  // which is drawn at every start; the village is not.
+  await goToPlace('bambara-village')
   // A SHIPPED word, not a hand-typed shape: RIVER as src/communication/lexicon.ts
   // beats it. A five-syllable literal survived the four-syllable rebuild here and
   // proved the label path for an utterance the game can no longer produce
