@@ -132,6 +132,12 @@ obtain explicit approval for that tag, create `vX.Y`, and move `poc` to the same
 commit. Tag pushes do not rebuild the Pages targets, so dispatch the deployment
 workflow (or land a later `main` push) and verify both `/vX.Y/` and `/poc/`.
 
+`poc` is NOT a version tag, and the coupling runs one way only (user decision
+20.09.2026): a new `vX.Y` pulls `poc` up to it, but `poc` may run AHEAD of the
+newest version. It is the current playable build, moved to any `main` commit on
+request — no closing run, no approval beyond that request, and `closing-guard`
+does not gate it. Only the version tag itself is a release act.
+
 Freeze code during closing. Merge or park in-flight branches before it begins;
 no author work lands until the closing completes. The machine-readable sequence
 is `CLOSING_STEPS` in `scripts/closing-guard-core.mjs` and is driven with
