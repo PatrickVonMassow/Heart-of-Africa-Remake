@@ -707,31 +707,40 @@ function expectLively(paths: Track[][]): void {
 // sweep that replaced every foreign id in the tree would empty that assertion
 // while leaving it green. So the boundary is pinned rather than remembered.
 describe('the seed spread stops where a foreign village IS the statement (work-order 1094)', () => {
+  // COMMENTED OUT IS DELETED, as far as this boundary is concerned
+  // (cross-vendor findings, GPT-6 Astra, 20.09.2026). Matching the raw source
+  // accepted `// expect(withBank)…` — the three assertions would still read as
+  // present while nothing ran them, which is exactly the silent emptying this
+  // check exists to catch. The stripping runs over the WHOLE file BEFORE the
+  // case is located, because the second gap was the case itself wrapped in a
+  // block comment: cutting the body out first threw the `/*` away and handed
+  // the stripper a body that looked like live code. With the whole file
+  // stripped, a commented-out case simply has no name left to find.
+  const stripComments = (text: string) => text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
   it('leaves riverBank.test.ts naming the riverless villages', () => {
-    const src = readFileSync(resolve(process.cwd(), 'src/scenes/place/riverBank.test.ts'), 'utf8')
+    const src = stripComments(readFileSync(resolve(process.cwd(), 'src/scenes/place/riverBank.test.ts'), 'utf8'))
     const start = src.indexOf("it('a village away from every river has none")
-    expect(start, 'the boundary assertion has been renamed or removed from riverBank.test.ts').toBeGreaterThan(-1)
-    // COMMENTED OUT IS DELETED, as far as this boundary is concerned
-    // (cross-vendor finding, GPT-6 Astra, 20.09.2026). Matching the raw source
-    // accepted `// expect(withBank)…` — the three assertions would still read as
-    // present while nothing ran them, which is exactly the silent emptying this
-    // check exists to catch. So the body is stripped of its comments first.
-    const body = src
-      .slice(start, src.indexOf('\n  })', start))
-      .replace(/\/\*[\s\S]*?\*\//g, '')
-      .replace(/(^|[^:])\/\/.*$/gm, '$1')
+    expect(start, 'the boundary assertion has been renamed, removed or commented out in riverBank.test.ts').toBeGreaterThan(-1)
+    const body = src.slice(start, src.indexOf('\n  })', start))
     expect(body, 'the riverless village it names').toContain("expect(withBank).not.toContain('maasai-village')")
     expect(body, 'the second riverless village it names').toContain("expect(withBank).not.toContain('san-village')")
     expect(body, 'and the riverside village it contrasts them with').toContain('expect(withBank).toContain(ROCK_VILLAGE_ID)')
   })
 
-  // AND THE STRIPPER ITSELF IS PINNED, so the check above cannot quietly lose
-  // its teeth again: a commented-out assertion must not survive the stripping.
+  // AND THE STRIPPER ITSELF IS PINNED, on the SAME function the check uses, so
+  // the check above cannot quietly lose its teeth again.
   it('reads a commented-out assertion as gone', () => {
-    const strip = (t: string) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
-    expect(strip("    // expect(withBank).not.toContain('san-village')")).not.toContain('expect(withBank)')
-    expect(strip("    /* expect(withBank).not.toContain('san-village') */")).not.toContain('expect(withBank)')
-    expect(strip("    expect(withBank).not.toContain('san-village') // kept")).toContain('expect(withBank)')
+    const line = "    expect(withBank).not.toContain('san-village')"
+    expect(stripComments(`  //${line}`)).not.toContain('expect(withBank)')
+    expect(stripComments(`  /*${line} */`)).not.toContain('expect(withBank)')
+    // The shape the second round found: a `//` the old guard let through
+    // because a colon stood in front of it.
+    expect(stripComments(`  disabled://${line}`)).not.toContain('expect(withBank)')
+    // ...and a whole case wrapped in a block comment loses its NAME, which is
+    // what the check above looks the body up by.
+    expect(stripComments(`  /* it('a village away from every river has none') {\n${line}\n  } */`))
+      .not.toContain('a village away from every river has none')
+    expect(stripComments(`${line} // kept`)).toContain('expect(withBank)')
   })
 })
 
