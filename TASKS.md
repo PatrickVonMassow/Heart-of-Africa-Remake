@@ -176,6 +176,30 @@ put it is the mistake this line exists to stop.
   (3) only the tick of 1158 waits for the card's answer. Final state: the card exists on the
   board with the observation instructions, the batch has moved on, and 1158 is ticked only
   after the user's answer on that card.
+  THE 20.09 RETEST RAN ON A BUILD THAT ALREADY CARRIED THE 18.09 FIX — measured
+  20.09.2026, 19:45. The Pages deployment of `800c04774a` concluded success at 16:24:36Z,
+  and that commit contains `b862fcb72`, `06ba6ab51`, `a7f55ce04` and `33dee9f41`; the same
+  deployment rebuilt `/poc/` from `cd275b233`, which contains `33dee9f41` as well. The
+  user's retest fell at 18:56 Berlin = 16:56Z, 31 minutes after that deployment, so the
+  bounded 250 ms sequence was in BOTH the root build and `/poc/` when he took it. The two
+  readings above are therefore not in conflict: step (3) is the work, and the sentence
+  "MEASURED AND FIXED 18.09.2026, awaiting only the two observations" is SUPERSEDED — what
+  is awaited is a new cause and a new fix, and the two observations confirm THAT.
+  THE ONE MEASUREMENT THIS HOST CANNOT TAKE, re-checked 20.09.2026: a native Escape.
+  `DISPLAY=:30` exists, but Xvfb, xvfb-run, xdotool, ydotool, python-xlib and pip3 are all
+  absent, so no X-level key can be faked, and CDP's `Input.dispatchKeyEvent` bypasses the
+  browser-process handler that ends the lock (measured 18.09). A `document.exitPointerLock()`
+  exit is no substitute for it — that is the case the 18.09 timer probe measured, and it is
+  a DIFFERENT case from a user-initiated exit, which is the reading that makes the probe's
+  "granted" result compatible with the player's "refused". Do not spend the point re-trying
+  this measurement.
+  WHAT THE FIX MUST COVER, because neither cause can be excluded from this host: (i) the
+  browser reports NO refusal for the quick ask — no promise rejection, no `pointerlockerror`
+  — in which case the sequence in `createPlacePointerLock` dies after ONE ask, since every
+  further ask hangs off `onRefusal`; and (ii) the browser refuses every ask that carries no
+  fresh user activation once the USER ended the lock, in which case no timer-driven ask can
+  ever succeed and the recovery has to ride on the player's next real input event. A fix
+  that covers only one of the two is not the fix.
 
 - [ ] 690. The classic game of tag moves to the port cities, and every document describes
   the rebuilt mechanic (user 13.08.2026, playing the deployed communication slice; point 692
