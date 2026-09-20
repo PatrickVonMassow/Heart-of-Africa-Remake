@@ -138,6 +138,22 @@ describe('the mix limiter curve (point 1156 — design.md §19.1)', () => {
       }
     })
 
+    // Round 2 of the same review: the first inward rounding stepped by a
+    // RELATIVE ulp, which is worth nothing among the subnormals, where the
+    // spacing is absolute — at ceiling 2e-45 the stored edge still came back
+    // above it, on both signs. The step is one of the bit pattern now.
+    it('holds a subnormal ceiling too, where a relative step is worth nothing', () => {
+      for (const ceiling of [2e-45, 1.4e-45, 7e-45, 1e-40]) {
+        balance.mixLimiter.threshold = 0
+        balance.mixLimiter.ceiling = ceiling
+        const curve = mixLimiterCurve(129)
+        for (const v of curve) expect(Math.abs(v) * MIX_LIMITER_DOMAIN).toBeLessThanOrEqual(ceiling)
+        for (const x of [-3, -1, 1, 3]) {
+          expect(Math.abs(throughCurve(curve, x))).toBeLessThanOrEqual(ceiling)
+        }
+      }
+    })
+
     it('holds the ceiling at its edge too, so a sum past the domain still cannot clip', () => {
       const curve = mixLimiterCurve()
       for (const x of [MIX_LIMITER_DOMAIN, 3, 12]) {

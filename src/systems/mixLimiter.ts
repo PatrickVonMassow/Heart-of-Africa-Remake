@@ -76,16 +76,29 @@ export function mixLimiterCurve(points: number = MIX_LIMITER_CURVE_POINTS): Floa
 /** A `Float32Array` stores to the NEAREST float32, which can round a value UP —
  *  and a value rounded up at the curve's own extreme would stand a hair ABOVE
  *  the ceiling, which is exactly the one thing the stage promises never happens.
- *  So the table rounds INWARD instead, towards zero, at a cost of one float32
- *  ulp (about 1.2e-7 relative) on a value the ear cannot tell apart anyway. */
+ *  So the table rounds INWARD instead: one float32 step towards zero, which the
+ *  ear cannot tell apart from the value it replaces. */
 function storeInward(value: number): number {
   const nearest = Math.fround(value)
   if (Math.abs(nearest) <= Math.abs(value)) return nearest
-  return Math.fround(value - Math.sign(value) * Math.abs(value) * FLOAT32_ULP)
+  return stepTowardZero(nearest)
 }
 
-/** One step of the float32 mantissa: 2^-23. */
-const FLOAT32_ULP = 2 ** -23
+/** The adjacent float32 on the way to zero. Stepping the BIT PATTERN is the
+ *  only step that is right everywhere: a relative nudge is worth nothing among
+ *  the subnormals, where the spacing is absolute, and a calibrated ceiling down
+ *  there would still have been exceeded. */
+function stepTowardZero(value: number): number {
+  FLOAT32_VIEW[0] = value
+  if (FLOAT32_VIEW[0] === 0) return 0
+  // For a positive float the pattern falls towards +0 as the integer falls, and
+  // for a negative one the magnitude bits do the same under the sign bit.
+  FLOAT32_BITS[0] -= 1
+  return FLOAT32_VIEW[0]
+}
+
+const FLOAT32_VIEW = new Float32Array(1)
+const FLOAT32_BITS = new Uint32Array(FLOAT32_VIEW.buffer)
 
 /** How the browser reads a shaper's table: indexed over an input of ±1 with
  *  linear interpolation, and an input outside that range clamped to the table's

@@ -863,6 +863,7 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
   describe('the speech has its own bus, out of reach of "everything else" (point 577)', () => {
     const defaultAmbient = balance.ambientVolume
     const defaultSpeech = balance.communication.speechVolume
+    const defaultCeiling = balance.mixLimiter.ceiling
 
     /** The bus a spoken syllable actually lands on. */
     const speechBusOf = (voice: FakeOscillator): FakeGain => {
@@ -991,20 +992,32 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
       // the last node when the mix limiter landed (point 1156), and a check
       // that reads only up to the master would pass while a limiter calibrated
       // to a zero ceiling silences the destination just as completely.
+      // Round 2 of the same review caught the first answer reading the BALANCE
+      // value while the graph still carried the table it was built with: a
+      // ceiling typed into the debug menu and never applied would have been
+      // reported as silence the player could still hear, and a ceiling applied
+      // and then typed back would have hidden a graph that really was mute. So
+      // the deployed calibration is what is changed here, and what is read.
       it('FIRES on a zero limiter CEILING — the end of the chain moved', () => {
         ctx.currentTime = 310
         const heldCeiling = balance.mixLimiter.ceiling
         balance.mixLimiter.ceiling = 0
-        speak()
+        refreshAmbienceVolume()
         balance.mixLimiter.ceiling = heldCeiling
+        speak()
         expect(codes().join(' ')).toContain('speech-inaudible')
+        refreshAmbienceVolume()
       })
 
-      it('says nothing at the shipped limiter calibration', () => {
+      it('says nothing while the DEPLOYED stage still passes speech', () => {
         ctx.currentTime = 315
         expect(balance.mixLimiter.ceiling).toBeGreaterThan(0)
+        // The balance value alone silences nothing until it reaches the graph.
+        balance.mixLimiter.ceiling = 0
         speak()
+        balance.mixLimiter.ceiling = defaultCeiling
         expect(codes()).toEqual([])
+        refreshAmbienceVolume()
       })
 
       it('FIRES on a plan that carries syllables at no level at all', () => {
@@ -1236,6 +1249,34 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
       expect(limited).toBeLessThan(output)
       expect(-20 * Math.log10(limited / output)).toBeLessThan(0.25)
     }
+  })
+
+  // A calibratable value that only reaches the graph at startup is not
+  // calibratable (four-eyes review, round 2): the debug menu edits the two
+  // limiter values live, so the deployed TABLE has to follow them.
+  it('re-cuts the deployed limiter table when its calibration moves', () => {
+    setAmbienceScene({ region: 'central', mode: 'place', placeKind: 'village', nearVillage: false })
+    refreshAmbienceVolume()
+    const { ambientBus } = villageFloor()
+    const master = ambientBus.connected[0] as FakeGain
+    const held = { ...balance.mixLimiter }
+    const before = throughLimiter(master, 1.3)
+    expect(before).toBeCloseTo(0.94998, 4)
+    expect(before).toBeLessThanOrEqual(held.ceiling)
+
+    balance.mixLimiter.ceiling = 0.6
+    balance.mixLimiter.threshold = 0.5
+    refreshAmbienceVolume()
+    expect(throughLimiter(master, 1.3)).toBeLessThanOrEqual(0.6)
+    // And a refresh that changes nothing leaves the same table in place.
+    const settled = throughLimiter(master, 1.3)
+    refreshAmbienceVolume()
+    expect(throughLimiter(master, 1.3)).toBe(settled)
+
+    balance.mixLimiter.threshold = held.threshold
+    balance.mixLimiter.ceiling = held.ceiling
+    refreshAmbienceVolume()
+    expect(throughLimiter(master, 1.3)).toBeCloseTo(before, 12)
   })
 
   // The message drums were raised 2.5x in the same change, so what the GRAPH

@@ -6,7 +6,7 @@
 import type { PlaceKind, RegionId } from '../world/geo'
 import { balance } from '../config/balance'
 import { devAssert } from './devAssert'
-import { MIX_LIMITER_DOMAIN, limitMixSample, mixLimiterCurve } from './mixLimiter'
+import { MIX_LIMITER_DOMAIN, mixLimiterCurve, readCurveTable } from './mixLimiter'
 import type { Tone } from '../communication/lexicon'
 import { phrasePlan, utterancePlan, type SpeechPlan, type SpeechVoice, type SpeechOptions } from '../communication/speaking'
 import type { DrumId, DrumMessagePlan } from '../communication/drumMessage'
@@ -51,6 +51,13 @@ let master: GainNode | null = null
 // before the destination, so it — not the master — is what the graph really
 // delivers, and a browser analyser tapping the output must tap it here.
 let limiterOut: GainNode | null = null
+// The shaper carrying the limiter's table, kept so a recalibration can replace
+// it. A curve installed once at startup would make "calibratable" a false
+// claim: the debug menu (§21) edits the two values live, and the stage would go
+// on limiting to whatever it was built with.
+let limiterShaper: WaveShaperNode | null = null
+let limiterIn: GainNode | null = null
+let limiterCalibration: { threshold: number; ceiling: number } | null = null
 // THREE sub-buses under the master so footsteps, the village speech and every
 // other ambient sound can be balanced against each other (design.md §19.1/§20;
 // user request): footsteps ×2, all else ×0.5. Every layer/emitter routes through
@@ -487,10 +494,12 @@ function buildGraph() {
   // or a bus would reach the output unbounded. The shaper's curve is indexed
   // over an input of ±1, so the sum is scaled into that domain and back out
   // again around it.
-  const limiterIn = ctx.createGain()
+  limiterIn = ctx.createGain()
   limiterIn.gain.value = 1 / MIX_LIMITER_DOMAIN
   const shaper = ctx.createWaveShaper()
-  shaper.curve = mixLimiterCurve()
+  limiterShaper = shaper
+  limiterCalibration = null
+  applyLimiterCalibration()
   // NO OVERSAMPLING, deliberately. Oversampling would spare the shaped peaks
   // some foldover, but it resamples AFTER the curve has bounded the sample, and
   // the Web Audio specification leaves that filter to the implementation — it
@@ -1089,7 +1098,7 @@ export function playSpeech(plan: SpeechPlan): void {
   // limiter calibrated to a zero ceiling silences the destination exactly the
   // way a zero bus did, and this check must see it.
   const chain = speechBus ? speechBus.gain.value * master.gain.value : master.gain.value
-  const leaving = limitMixSample(peak * chain * route.monoGain)
+  const leaving = throughDeployedLimiter(peak * chain * route.monoGain)
   devAssert(
     leaving > 0 || balance.communication.speechVolume <= 0,
     'speech-inaudible',
@@ -1183,8 +1192,30 @@ export function startAmbience() {
 }
 
 /** Re-apply the gain targets after a volume change in the debug menu. */
+/** What the DEPLOYED last stage makes of a level (point 1156). It reads the
+ *  table the shaper really carries and the gains really set, never the balance
+ *  values beside them: a calibration that has not reached the graph yet must
+ *  not be reported as though it had, and one that HAS reached it must be seen
+ *  even when the balance value has since been put back. */
+function throughDeployedLimiter(level: number): number {
+  if (!limiterShaper?.curve || !limiterIn || !limiterOut) return level
+  return readCurveTable(limiterShaper.curve, level * limiterIn.gain.value) * limiterOut.gain.value
+}
+
+/** Re-cut the limiter's table when its calibration has moved (point 1156). The
+ *  table is 2049 samples, so it is rebuilt only on a real change — a scene
+ *  switch or a volume slider must not pay for one. */
+function applyLimiterCalibration() {
+  if (!limiterShaper) return
+  const { threshold, ceiling } = balance.mixLimiter
+  if (limiterCalibration && limiterCalibration.threshold === threshold && limiterCalibration.ceiling === ceiling) return
+  limiterShaper.curve = mixLimiterCurve()
+  limiterCalibration = { threshold, ceiling }
+}
+
 export function refreshAmbienceVolume() {
   if (!ctx) return
+  applyLimiterCalibration()
   applyScene()
   for (const w of wobbles) w.gain.gain.value = w.baseDepth * balance.ambienceVolume * wobbleExtra(w.name)
   if (ambientBus) ambientBus.gain.value = balance.ambientVolume
