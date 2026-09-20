@@ -81,6 +81,45 @@ describe('recovering a refused settlement lock', () => {
     expect(vi.getTimerCount()).toBe(0)
   })
 
+  it.each(['void', 'pending promise', 'resolved promise'])('recovers a silent %s request without a refusal signal', async (response) => {
+    const clickedAt = Date.now()
+    canvas().requestPointerLock = vi.fn(() => {
+      if (Date.now() - clickedAt >= 1500) setLock(canvas())
+      if (response === 'pending promise') return new Promise<void>(() => {})
+      if (response === 'resolved promise') return Promise.resolve()
+      return undefined as unknown as Promise<void>
+    })
+    lock.request()
+    await vi.advanceTimersByTimeAsync(1600)
+    expect(document.pointerLockElement).toBe(canvas())
+    expect(pointerLockProbe.refusals).toBe(0)
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('bounds recovery even when every request is silently dropped', async () => {
+    const request = vi.fn()
+    canvas().requestPointerLock = request
+    lock.request()
+    await vi.advanceTimersByTimeAsync(13000)
+    expect(request).toHaveBeenCalledTimes(13)
+    expect(pointerLockProbe.refusals).toBe(0)
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('does not let a stale rejection replace a newer attempt or restart recovery', async () => {
+    let rejectFirst!: (reason: Error) => void
+    canvas().requestPointerLock = vi.fn()
+      .mockImplementationOnce(() => new Promise<void>((_resolve, reject) => { rejectFirst = reject }))
+      .mockImplementation(() => { setLock(canvas()); return Promise.resolve() })
+    lock.request()
+    await vi.advanceTimersByTimeAsync(250)
+    setLock(null) // Escape after the grant must leave the cursor free.
+    rejectFirst(new Error('Late refusal'))
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(canvas().requestPointerLock).toHaveBeenCalledTimes(2)
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
   it('gives up when the bounded recovery window runs out', async () => {
     const request = vi.fn().mockRejectedValue(new Error('Escape cooldown'))
     canvas().requestPointerLock = request
@@ -220,7 +259,8 @@ describe('recovering a refused settlement lock', () => {
   })
 
   it('recovers a refused dialog-close request without another click', async () => {
-    const request = vi.fn().mockRejectedValueOnce(new Error('Escape cooldown')).mockResolvedValue(undefined)
+    const request = vi.fn().mockRejectedValueOnce(new Error('Escape cooldown'))
+      .mockImplementation(() => { setLock(canvas()); return Promise.resolve() })
     canvas().requestPointerLock = request
     const off = restorePointerLockAfterDialogs(canvas(), lock.request)
     try {

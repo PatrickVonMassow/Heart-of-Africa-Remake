@@ -46,19 +46,10 @@ export function requestPlacePointerLock(
   }
 }
 
-// HOW LONG THE RECOVERY KEEPS TRYING, and how often (work-order point 1158).
-// After the player leaves the lock with Escape, the browser refuses a re-grab
-// for a short period — and that period runs from the ESCAPE, not from the click
-// that asks for the lock back. A single retry timed from the click therefore
-// lands EARLIEST exactly when the player clicks FASTEST, which is the case that
-// was reported as still broken: the one attempt falls inside the refusal period
-// too, and nothing tries again until the next click. So the recovery is a
-// bounded SEQUENCE rather than one shot — it asks again every step until the
-// browser grants the lock or the window since the last deliberate request runs
-// out — and it no longer rests on any assumption about how long that refusal
-// period is. MEASURED 18.09.2026 in system Chrome (headless=new, WebGPU): a
-// timer-driven request carrying no fresh user gesture IS granted, so the
-// attempts need no further click from the player.
+// Recover for a bounded period after a deliberate request, even if the browser
+// neither grants nor reports a refusal. Only pointerLockElement proves success.
+// The earlier timer probe used exitPointerLock(), which does not establish what
+// the browser permits after a native Escape (work-order point 1158).
 const RETRY_STEP_MS = 250
 const RECOVERY_WINDOW_MS = 3000
 
@@ -88,8 +79,14 @@ export function createPlacePointerLock(el: Element): { request: () => void; disp
       if (refused) return
       refused = true
       pointerLockProbe.refusals++
-      if (pendingRefusal !== onRefusal || !canRetry() || Date.now() + RETRY_STEP_MS > until) return
-      // Paced by the REFUSAL, so a slow answer never overlaps the next ask.
+      if (pendingRefusal === onRefusal && !canRetry()) cancel()
+    }
+    // Arm before the native call: a synchronous grant must cancel this timer.
+    // Refusal signals are diagnostic only; a silent request must not strand it.
+    if (canRetry()) {
+      pendingRefusal = onRefusal
+    }
+    if (canRetry() && Date.now() + RETRY_STEP_MS <= until) {
       retry = setTimeout(() => {
         retry = undefined
         // The deadline is checked again HERE, not only where the ask was
@@ -101,7 +98,6 @@ export function createPlacePointerLock(el: Element): { request: () => void; disp
       }, RETRY_STEP_MS)
     }
     // Automation records the decision without a native request or error handler.
-    if (canRetry()) pendingRefusal = onRefusal
     requestPlacePointerLock(el, onRefusal)
   }
   const request = () => attempt(Date.now() + RECOVERY_WINDOW_MS)
