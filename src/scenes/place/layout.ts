@@ -7,7 +7,7 @@
 import { placeById } from '../../world/geo'
 import { mulberry32 } from '../../world/noise'
 import { REGION_PLACE_STYLES, VILLAGE_PLANS, type RegionPlaceStyle } from './regionStyles'
-import { PORT_TALKERS, childPlayGround, villageAdultStations, villageKeepClearSpots, villageLifeProps, villageLifeFootprints, type PlayGround } from './lifeSpots'
+import { PORT_TALKERS, portAdultStations, childPlayGround, villageAdultStations, villageKeepClearSpots, villageLifeProps, villageLifeFootprints, type PlayGround } from './lifeSpots'
 import { boxCollider, nudgeToFree, spawnPointFree, standingClear, PLAYER_RADIUS, WALKER_RADIUS, CHIEF_BODY_RADIUS, type Collider } from './collision'
 import { CHIEF_HUT, MARKET_HUT, dwellingRoofProfile, hutRoofProfile, roofStandOff } from './roofClearance'
 import { windingPoints, laneSlots, closestOnPolyline, bendAround, type LaneSlot } from './lanePlan'
@@ -1685,9 +1685,10 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   // samples thousands of points and each used to walk the whole collider set.
   const standableAt = colliderBuckets(colliders, WALKER_RADIUS)
   const playGround: PlaceLayout['playGround'] =
-    place.kind === 'village'
-      ? childPlayGround(
-          villageAdultStations(VILLAGE_FIRE, placeId),
+    childPlayGround(
+          place.kind === 'village'
+            ? villageAdultStations(VILLAGE_FIRE, placeId)
+            : portAdultStations((seed ^ hash) >>> 0),
           Math.max(1, radius - WALKER_RADIUS * 2),
           balance.villageLife.tag.playRadius,
           balance.communication.hearingRadius,
@@ -1696,7 +1697,6 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
             fabric: fabricOf(dwellings, interactives),
           },
         )
-      : null
   /** Whether a body of radius `r` would stand in the children's quarter. */
   const inPlayGround = (x: number, z: number, r: number) =>
     !!playGround && Math.hypot(x - playGround.x, z - playGround.z) < playGround.radius + r
@@ -1938,7 +1938,7 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   // share rose to 0.282 % against a 0.25 % gate. It therefore keeps the carve's
   // own corridor clear of every boundary already standing — the built fabric and
   // the dressing alike, which is why it is derived after both.
-  const climbRock = playGround
+  const climbRock = place.kind === 'village' && playGround
     ? deriveClimbRock(
         playGround,
         bank ? { x: bank.bank.x, z: bank.bank.z } : null,

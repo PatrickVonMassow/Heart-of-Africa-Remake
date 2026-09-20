@@ -138,7 +138,7 @@ import {
   LOW_DRUM,
   type DrumGeometry,
 } from './drummerPose'
-import { LOOM_SPOT, WEAVER_OFFSET, weaverStance, PORT_TALKERS, VILLAGE_SPOTS, villageAdultStations, villageHasWell, type PlayGround } from './lifeSpots'
+import { LOOM_SPOT, WEAVER_OFFSET, weaverStance, PORT_TALKERS, portTraderSpots, VILLAGE_SPOTS, villageAdultStations, villageHasWell, type PlayGround } from './lifeSpots'
 import { drummerFacing } from './chiefWalk'
 import { DRUMMER_SPEAKER_ID } from './chiefPresence'
 import { queuedDrummerVoice, setDrummerVoice } from './drummerVoice'
@@ -3378,13 +3378,7 @@ function speakWork(
 /** Standing traders on the plaza that slowly look around. */
 function Traders({ seed, cloth }: { seed: number; cloth: string[] }) {
   const groundHeight = usePlaceGround()
-  const spots = useMemo(() => {
-    const rand = mulberry32((seed + 913) >>> 0)
-    return [
-      { x: 3 + rand() * 2, z: -4 - rand() * 2, phase: rand() * Math.PI * 2 },
-      { x: -4 - rand() * 2, z: -2 - rand() * 2, phase: rand() * Math.PI * 2 },
-    ]
-  }, [seed])
+  const spots = useMemo(() => portTraderSpots(seed), [seed])
   const refs = useRef<Array<THREE.Group | null>>([])
   // Bodies the passers-by go round (point 578).
   useStandingBodies(spots)
