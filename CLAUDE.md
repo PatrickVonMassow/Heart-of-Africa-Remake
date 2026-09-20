@@ -126,7 +126,7 @@ Conditions and evidence share each criterion’s number in `docs/acceptance-crit
 4. **Movement and time.**
 5. **Port city.**
 6. **Village and cultural contact.**
-7. **Language and communication: six tonal words, bank/work teaching, silent tag.**
+7. **Language and communication.** Six tonal words, bank/work teaching, silent tag.
 8. **Chronicle/journal.**
 9. **Status bar.**
 10. **Goal scaffolding.**
