@@ -109,7 +109,7 @@ the recovered inventory find before him yields `RIVER · DOWNSTREAM` and the
 wordless clay impression. Fitting it at Bandiagara's talus-foot socket ends the
 puzzle. Each message is remembered after its last beat and reopenable.
 Persisted readings deliberately break; saving is disabled and no migration is owed.
-Other lects and the research zone cut remain open.
+Only one lect is built; other regional teaching remains outside this slice.
 
 ## 8. Chronicle/journal.
 
