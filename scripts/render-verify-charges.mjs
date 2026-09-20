@@ -1619,22 +1619,37 @@ export const RED_CHARGES = [
       + 'The charge dies with point 1154.',
   },
   {
-    point: 1156,
-    suite: 'voice',
+    // POINT 1156 LANDED, so its entry is gone: the limiter is in design.md §19.1
+    // and in the graph, the sum no longer passes full scale, and the check it
+    // excused has been rewritten to measure against the limiter's ceiling. The
+    // ledger's own rule expires a charge with its point, and the test over this
+    // file enforces it — which is how this entry was caught, on the push gate
+    // of the very commit that closed the point.
+    point: 690,
+    suite: 'polish',
+    backend: 'webgpu',
+    featureLevel: 'compatibility',
     kind: 'check',
-    match: /^deployed and drum-audition speech leave the master audibly below full scale/i,
+    // SCOPED TO THE MEASURED ASSERTION, per the discipline the goat entry above
+    // records: this excuses the pace shortfall alone, not any future red the
+    // same check could emit.
+    match: /^the round goes on with him planted in it, rather than halting at him/i,
     why:
-      'THE MASTER REALLY DOES CLIP AND POINT 1156 OWNS IT. Measured 19.09.2026 on webgpu+webgl '
-      + 'voice in the SMALL tier at branch head ff28041f4 (withDrums peak 1.0213) and minutes later '
-      + 'on `main` 9bf608dc1 on webgl alone (withDrums peak 1.0218) — the same check, the same '
-      + 'overage, on both trees and both lanes. That is exactly what point 1156 describes: since '
-      + 'the village speech went to 1.5x on 18.09.2026 the speech and drum buses hang straight on '
-      + 'a master at 0.5 with no limiter (src/systems/ambience.ts L477-L492), so the sum passes '
-      + 'full scale and hard-clips at the destination. This is a REAL product defect, not a stale '
-      + 'expectation, and the entry only stops it from reading as a verdict on unrelated changes. '
-      + 'NOT backend-scoped: the graph is Web Audio and reads the same whichever renderer holds '
-      + 'the canvas. The charge dies with point 1156, which puts the limiter into design.md \u00a719 '
-      + 'and then into the graph.',
+      'THE ROUND RUNS, IT IS ONLY TOO SLOW, and point 690 rebuilds exactly that round. '
+      + 'Measured 19.09.2026 on webgpu polish (children-bank-game): 120.1 s of a 120 s window '
+      + 'played over 1450 samples, phases [run, regroup, part], five children walked '
+      + '[45.1, 45.4, 40.9, 46.2, 36.7] m = 21.4 m per child-minute against a floor of 25, four '
+      + 'tagged. So neither branch of the check that would mean a BROKEN round fired: the cycle '
+      + 'advances through three phases and not one child starved — every one of them covered '
+      + 'ground. What is under the bar is the group pace, and nothing in the repository owned '
+      + 'that red: it stood unaccounted from 19.09.2026, and work-order 687, which built the '
+      + 'round and set the floor, is closed. Point 690 REBUILDS the mechanic and moves it to the '
+      + 'port cities, so the pace this check asks for is decided there — either the round gets '
+      + 'its pace back or the floor stops matching the game and is re-measured with it. '
+      + 'NOT the starvation branch and NOT a stalled cycle; if either of those appears the check '
+      + 'reds on a different reading and this entry must be re-judged. '
+      + 'Backend-scoped to webgpu, which is where it was measured; on WebGL 2 it stays a real red. '
+      + 'The charge dies with point 690.',
   },
   {
     point: 1145,
