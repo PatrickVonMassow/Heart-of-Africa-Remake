@@ -86,6 +86,15 @@ put it is the mistake this line exists to stop.
   below is now the work: the Escape-cooldown reading behind 1148 was wrong or incomplete,
   and the REAL cause is measured and fixed rather than guessed. Step (2), the two-second
   click, was not reported as failing.
+  RETESTED BY THE USER ON 20.09.2026, 18:56, and it SEPARATES the two steps for the first
+  time, verbatim: "Es funktioniert nach wie vor nicht, wenn man nicht eine Zeit lang vor dem
+  Klicken wartet." So waiting BEFORE the click makes it work and the quick click still does
+  not — step (2) passes, step (1) fails, on the deployed build after 1148 landed. That rules
+  out the click missing the canvas (step (5) / (c)) as the whole cause, because the same
+  click on the same spot succeeds once time has passed, and it points straight at the
+  refusal path: either the bounded 1.1 s retry never fires, or it is refused again because
+  Chrome's cooldown outlasts it or the retry lacks a fresh user activation. Measure (a) and
+  (b) FIRST against that reading.
   WHAT TO MEASURE, since the fix must name a cause: (a) whether the quick request is refused
   at all (`pointerLockProbe.refusals`, `pointerlockerror`, the promise rejection and its
   DOMException message), silently dropped, or granted and lost again; (b) whether the bounded
