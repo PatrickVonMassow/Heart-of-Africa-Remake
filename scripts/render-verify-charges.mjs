@@ -1464,53 +1464,6 @@ export const RED_CHARGES = [
       + 'spread is the host or the scene, and the charge dies with that point.',
   },
   {
-    point: 1013,
-    suite: 'enrichments',
-    backend: 'webgl',
-    kind: 'check',
-    // NAME-SCOPED, AND THE RECORD IS WHY. The check prints its whole hunt sample
-    // as JSON, which runs past the 200-character bound, so every record of it is
-    // cut mid-`predMismatch` — a detail signature would have to declare that it
-    // reads only the front, and the declaration is deliberately held to the two
-    // entries that argued for it. What remains is the check's own name, and that
-    // is no wider than the point: 1013's whole subject is this one check and
-    // whether it asks the region it means, so any failure of it belongs to that
-    // point until it lands. Scoped to the lane both firings were measured on.
-    match: /^every predator fits the region and period$/i,
-    why:
-      'FILED AS 1013 ON 29.08.2026 FROM EXACTLY THIS RED, and reproduced 03.09.2026 in the LARGE '
-      + 'run on feat/1047-bank-game-readable (webgl/enrichments, 07:02:14Z): sixteen hunts, the '
-      + 'prey side clean, one predator scored outside its region — a cheetah in central Africa on '
-      + 'the day it was filed, a hyena in central Africa today. The species differs and the shape '
-      + 'does not, which is what 1013 says is unsettled: the check may read the region where the '
-      + 'hunt ENDED rather than where it began, or the placement may be genuinely wrong, and the '
-      + 'two regions have never been logged side by side. Nothing in the bank-game branch touches '
-      + 'the wildlife simulation or the food-web table, so this red says nothing about that '
-      + 'change. It is charged, not excused: 1013 owes the logged sample that decides which '
-      + 'reading is right, and the charge dies with that point.',
-  },
-  {
-    point: 1063,
-    suite: 'enrichments',
-    kind: 'check',
-    // NAME-SCOPED, and deliberately NOT folded into 1013's entry next door: that
-    // one is anchored on `every predator fits the region and period`, a DIFFERENT
-    // and older check whose `why` records the PREY side as clean. This is the prey
-    // side, and it is a check that did not exist when 1013 was written.
-    match: /^every hunted prey fits the region and the predator food web/i,
-    why:
-      'FILED AS 1063 ON 06.09.2026 FROM EXACTLY THIS RED, measured in the LARGE run on '
-      + 'feat/689-chief-direction-and-mould at 8944a52c6 (webgl/enrichments): sixteen hunts, the '
-      + 'predator side clean, one wildebeest scored as hunted in `central` and the lion/wildebeest '
-      + 'pair rejected with it. It went GREEN on the same run\'s retry, so the placement is '
-      + 'INTERMITTENT — which is the same unsettled reading 1013 states for the predator side: the '
-      + 'check may score the region where the hunt ENDED rather than where it began, and an animal '
-      + 'crossing a border mid-hunt would produce both the red and its disappearance. Nothing in '
-      + 'the chief-reply branch touches the wildlife simulation or the food-web table, so this red '
-      + 'says nothing about that change. It is charged, not excused: 1063 owes the logged start/end '
-      + 'sample that decides which reading is right, and the charge dies with the point.',
-  },
-  {
     point: 565,
     suite: 'enrichments',
     backend: 'webgl',
