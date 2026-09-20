@@ -717,6 +717,8 @@ describe('the seed spread stops where a foreign village IS the statement (work-o
   // the stripper a body that looked like live code. With the whole file
   // stripped, a commented-out case simply has no name left to find.
   const stripComments = (text: string) => text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
+  /** Every runner switch in `text` that would keep a case from running. */
+  const disablers = (text: string) => text.match(/\b(?:x(?:describe|it|test)|(?:describe|it|test)\.(?:skip|todo|only|skipIf|runIf|concurrent\.skip))\b/g) ?? []
   it('leaves riverBank.test.ts naming the riverless villages', () => {
     const src = stripComments(readFileSync(resolve(process.cwd(), 'src/scenes/place/riverBank.test.ts'), 'utf8'))
     const start = src.indexOf("it('a village away from every river has none")
@@ -725,6 +727,12 @@ describe('the seed spread stops where a foreign village IS the statement (work-o
     expect(body, 'the riverless village it names').toContain("expect(withBank).not.toContain('maasai-village')")
     expect(body, 'the second riverless village it names').toContain("expect(withBank).not.toContain('san-village')")
     expect(body, 'and the riverside village it contrasts them with').toContain('expect(withBank).toContain(ROCK_VILLAGE_ID)')
+    // A SKIPPED CASE IS A DELETED ONE TOO (third cross-vendor round, GPT-6
+    // Astra, 20.09.2026): `describe.skip` leaves every text above in place
+    // while nothing runs. The whole file is held to it rather than the one
+    // case, because the switch can sit on any enclosing block — and `.only`
+    // counts as well, since it disables every OTHER case in the file.
+    expect(disablers(src), 'riverBank.test.ts disables cases').toEqual([])
   })
 
   // AND THE STRIPPER ITSELF IS PINNED, on the SAME function the check uses, so
@@ -741,6 +749,15 @@ describe('the seed spread stops where a foreign village IS the statement (work-o
     expect(stripComments(`  /* it('a village away from every river has none') {\n${line}\n  } */`))
       .not.toContain('a village away from every river has none')
     expect(stripComments(`${line} // kept`)).toContain('expect(withBank)')
+  })
+
+  // AND THE SWITCH DETECTOR THE SAME WAY, on the same function the check calls.
+  it('reads a skipped or narrowed case as disabled', () => {
+    expect(disablers("describe.skip('a village away from every river has none', () => {")).toEqual(['describe.skip'])
+    expect(disablers("  it.only('a village away from every river has none', () => {")).toEqual(['it.only'])
+    expect(disablers("  xit('a village away from every river has none', () => {")).toEqual(['xit'])
+    expect(disablers("  it.todo('a village away from every river has none')")).toEqual(['it.todo'])
+    expect(disablers("  it('a village away from every river has none', () => {")).toEqual([])
   })
 })
 
