@@ -30,6 +30,8 @@
 // frame cadence cannot move the share — shown here on a recorded trace read at
 // five cadences, not merely claimed.
 import { describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import {
   CHILD_MOTION,
   groundPath,
@@ -695,12 +697,51 @@ function expectLively(paths: Track[][]): void {
   expect(holdsAGame(live)).toBe(true)
 }
 
-// The reported village and seed first; the others are there because the causes
-// were general and one settlement's layout proves nothing about the next.
+// THE DELETION'S OWN BOUNDARY (work-order 1094). The teaching checks in this
+// file give their VILLAGE spread up for a SEED spread in `ROCK_VILLAGE_ID`: the
+// communication slice runs in that one settlement, while the world seed is drawn
+// at every start, so the seed is the axis that really varies for the player and
+// the village is not. What must NOT travel with that deletion is the statement a
+// foreign village IS. `riverBank.test.ts` asserts that a village away from every
+// river grows no bank, and it can only say so by NAMING such a village; a later
+// sweep that replaced every foreign id in the tree would empty that assertion
+// while leaving it green. So the boundary is pinned rather than remembered.
+describe('the seed spread stops where a foreign village IS the statement (work-order 1094)', () => {
+  it('leaves riverBank.test.ts naming the riverless villages', () => {
+    const src = readFileSync(resolve(process.cwd(), 'src/scenes/place/riverBank.test.ts'), 'utf8')
+    const start = src.indexOf("it('a village away from every river has none")
+    expect(start, 'the boundary assertion has been renamed or removed from riverBank.test.ts').toBeGreaterThan(-1)
+    const body = src.slice(start, src.indexOf('\n  })', start))
+    expect(body, 'the riverless village it names').toContain("expect(withBank).not.toContain('maasai-village')")
+    expect(body, 'the second riverless village it names').toContain("expect(withBank).not.toContain('san-village')")
+    expect(body, 'and the riverside village it contrasts them with').toContain('expect(withBank).toContain(ROCK_VILLAGE_ID)')
+  })
+})
+
+// THE SAMPLE VARIES THE SEED, NOT THE VILLAGE (work-order 1094). It used to
+// carry the reported bambara layout and then a maasai and a swahili one, on the
+// reasoning that one settlement's layout proves nothing about the next. True,
+// and beside the point: the player of this PoC learns the language in
+// `ROCK_VILLAGE_ID` and nowhere else, while the world SEED is drawn afresh at
+// every start (`store.ts`, `newSeed`). So the spread went across settlements he
+// never plays the teaching round in, and left the axis that really varies for
+// him unjudged. Same sample count, same village, three seeds:
+//  - the seed the production report names,
+//  - 42, the seed the browser lane is pinned to (`scripts/verify/verify-seed.mjs`),
+//  - and 46, which is NOT a comfortable third: swept over bambara seeds 1-60 it
+//    is the WORST layout still inside the gate (0.226 % against 0.25 %), so the
+//    sample's third case is the hardest clean one rather than a lucky one.
+// WHAT THE SWEEP ALSO FOUND, and what this file does NOT hide: six of those
+// sixty seeds read ABOVE the shipped gate — 27 (0.367 %), 30 (1.299 %), 33
+// (0.282 %), 35 (0.311 %), 40 (0.254 %) and 50 (0.254 %). That is the user's own
+// complaint, alive on roughly a tenth of the worlds he can be dealt, and it was
+// invisible for exactly as long as the sample varied the village instead of the
+// seed. It is filed as its own work-order point rather than folded in here: this
+// point deletes test breadth and builds nothing.
 const PLACES: Array<[string, number]> = [
   ['bambara-village', 2972259115],
-  ['maasai-village', 42],
-  ['swahili-village', 99],
+  ['bambara-village', 42],
+  ['bambara-village', 46],
 ]
 
 describe('the children never shuffle on the spot (points 648/656)', () => {
@@ -723,19 +764,20 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
       // the WORST child, because one snagging child among three healthy ones is
       // divided by four in every group average. Re-measured over the restored
       // minute with the bank round (work-order 687): the least judgeable child
-      // 0.983 in all three villages — the missing part is the tail no window can
-      // reach into — and the worst child's share 0.000 / 0.000 / 0.028 %.
+      // 0.983 at all three seeds — the missing part is the tail no window can
+      // reach into — and the worst child's share 0.000 / 0.000 / 0.226 %
+      // (re-measured over the seed spread, work-order 1094).
       expect(r.leastJudged).toBeGreaterThan(CHILD_MOTION.judgedGate)
       expect(r.worstShare).toBeLessThan(CHILD_MOTION.shareGate)
       // AND THE SHORT BURST the one-second window cannot see (point 656): a
       // child that paces on the spot for six tenths of a second between spells
       // of walking never collects the metre a one-second window asks for.
-      // Re-measured with the bank round, worst child: 0.000 / 0.000 / 0.000 %.
+      // Re-measured over the seed spread, worst child: 0.000 / 0.000 / 0.000 %.
       const burst = shuffleWindows(paths, CHILD_MOTION.short)
       expect(burst.worstShare).toBeLessThan(CHILD_MOTION.shareGate)
       // AND THE BURST MEASURE MUST HAVE JUDGED SOMETHING: its share is 0 both
-      // when nothing was bad and when nothing was looked at. Re-measured with
-      // the bank round: 238 judged child-seconds, least judgeable child 0.992.
+      // when nothing was bad and when nothing was looked at. Re-measured over
+      // the seed spread: 297 judged child-seconds, least judgeable child 0.992.
       expect(judgedEnough(burst)).toBe(true)
       expect(judgedEnough(r)).toBe(true)
       // AND NOBODY IS BEING CARRIED (point 656): the rescue teleport is what
@@ -748,9 +790,8 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
       expect(rescues.nudgesPublished).toBe(true)
       expect(rescues.carriedMetresPerChildMinute).toBeLessThan(CHILD_MOTION.carryGate)
       expect(rescues.perChildMinute).toBeLessThan(CHILD_MOTION.rescueGate)
-      // The worst child on its own clock: with the bank round not one rescue
-      // falls in this minute in any of the three villages, and nothing is
-      // carried at all.
+      // The worst child on its own clock: not one rescue falls in this minute at
+      // any of the three seeds, and nothing is carried at all.
       expect(rescues.worstPerChildMinute).toBeLessThan(CHILD_MOTION.worstChildRescueGate)
       expect(rescues.worstCarriedMetresPerChildMinute).toBeLessThan(CHILD_MOTION.worstChildCarryGate)
     })
@@ -909,24 +950,27 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
     const sep = balance.villageLife.separation
     const kidPair = sep.bodyRadius * KID_SCALE * 2 - sep.slop
     const adultPair = sep.bodyRadius * KID_SCALE + sep.bodyRadius - sep.slop
-    // TWO SETTLEMENTS, because the near-contact witness below is a property of
-    // the LAYOUT and not of the game (work-order 1080). The bar used to be a
-    // single number measured in bambara-village at one seed — 0.64 m, asserted
-    // as "under 3 m" — and the play ground is a corner of the settlement, so
-    // where the adults' work happens to fall is a fact about that corner.
-    // Measured across the shipped villages at their own seeds, the nearest an
-    // adult comes to a child over a minute runs 0.37 m (nubian) to 7.91 m
-    // (mandinka); maasai-village, which plays the other round entirely, sits at
-    // 5.58 m. Any single-village number is therefore an accident, and a change
-    // that merely moves the group's seeded path — this point's climb did — trips
-    // it while the property under test is untouched. So the STALL and the
-    // OVERLAP are asked of both settlements, and the witness is asked of the
-    // village where the two crowds really do meet.
+    // TWO SEEDS, because the near-contact witness below is a property of the
+    // LAYOUT and not of the game (work-order 1080). The bar used to be a single
+    // number measured at one seed — 0.64 m, asserted as "under 3 m" — and the
+    // play ground is a corner of the settlement, so where the adults' work
+    // happens to fall is a fact about that corner.
+    // THE SPREAD RUNS OVER SEEDS, NOT VILLAGES (work-order 1094). It used to
+    // reach into the nubian village for the second sample; the player learns the
+    // language in `ROCK_VILLAGE_ID` alone and is dealt a new SEED at every start,
+    // so a foreign settlement's corner says nothing about the crowd he watches.
+    // Re-measured over bambara seeds 1-60, the nearest an adult comes to a child
+    // over a minute runs 0.37 m to 10.31 m — the same order of accident the
+    // village spread showed, now on the axis that reaches the player. The two
+    // seeds here are the reported layout (4.08 m) and seed 3 (0.37 m), the
+    // lowest-numbered layout of that sweep in which the two crowds really do
+    // meet. So the STALL and the OVERLAP are asked of both, and the witness is
+    // carried by the seed where they meet.
     let nearestOfAll = Infinity
     let adultCount = 0
     for (const [id, seed] of [
       ['bambara-village', 2972259115],
-      ['nubian-village', 42],
+      ['bambara-village', 3],
     ] as Array<[string, number]>) {
       const v = village(id, seed)
       const n = v.children.length
@@ -963,7 +1007,7 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
     }
     // AND THE REST OF THE SETTLEMENT WAS REALLY THERE, close enough for the
     // overlap check above to have had something to judge: an adult body comes
-    // inside a metre of a child in the nubian village. Putting adults INSIDE the
+    // inside a metre of a child at seed 3 (0.37 m). Putting adults INSIDE the
     // children's own ground is the case below.
     expect(adultCount).toBeGreaterThan(10)
     expect(nearestOfAll).toBeLessThan(1)
