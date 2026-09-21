@@ -3839,7 +3839,25 @@ async function checkChildrenMotion(motionPlace) {
         // shutter cannot see that: the centroid still PROJECTED into the frame,
         // behind a wall. So the standpoint is chosen against the layout — clear
         // of every dwelling, and with a clear line to the children.
-        const huts = window.__placeLayout.dwellings
+        // THE OCCLUDERS ARE THE SETTLEMENT'S OWN SOLID BODIES, not the village
+        // dwellings alone. A port carries no dwellings — its trade houses are
+        // `interactives` with box colliders — so in Cairo this search saw no
+        // obstacle whatever: it read every child as visible THROUGH a wall,
+        // stood the camera inside one, and the frame named after the children
+        // photographed a mud face (point 690). Every body the layout collides
+        // against counts now, as the circle that encloses it; anything smaller
+        // than a child neither hides one nor crowds the camera and is dropped,
+        // so scattered stones do not veto every vantage in the settlement.
+        const huts = [
+          ...window.__placeLayout.dwellings.map((d) => ({ x: d.x, z: d.z, r: d.r })),
+          ...(window.__placeLayout.colliders ?? []).flatMap((c) =>
+            c.kind === 'box'
+              ? [{ x: c.x, z: c.z, r: Math.hypot(c.hx, c.hz) }]
+              : c.kind === 'segment' || c.r === undefined
+                ? []
+                : [{ x: c.x, z: c.z, r: c.r }],
+          ),
+        ].filter((h) => h.r > 0.8)
         const blocks = (ax, az, bx, bz, pad) =>
           huts.some((h) => {
             const dx = bx - ax
@@ -3902,8 +3920,21 @@ async function checkChildrenMotion(motionPlace) {
       p.z = best.sz
       // Look at what is actually visible, and hand the shutter the same point.
       p.yaw = Math.atan2(-(best.vx - p.x), -(best.vz - p.z))
-      return { pose, cx: best.vx, cz: best.vz, seen: best.seen, of: best.of }
+      return { pose, cx: best.vx, cz: best.vz, seen: best.seen, of: best.of, clear: best.clear }
     })
+    // AND THE STANDPOINT IS JUDGED, not merely taken. The search falls back to
+    // the best it found when the game never offers a good moment, and that
+    // fallback used to be silent — which is how a port frame named after the
+    // children came back showing a wall. The same bar the wait holds out for is
+    // now a verdict, so the picture cannot be worthless without the run saying
+    // so (point 690).
+    checkAt(
+      'the children are photographed from a standpoint in the open',
+      !!aimed && aimed.seen >= Math.min(3, aimed.of) && aimed.clear >= 2.5,
+      aimed
+        ? `${aimed.seen} of ${aimed.of} in the clear, ${aimed.clear.toFixed(1)} m of room around the camera`
+        : 'no vantage at all',
+    )
     if (aimed) {
       await nextFrames(2)
       await frame(motionPlace === 'bambara-village' ? '648-village-children' : `690-${motionPlace}-children`, {
