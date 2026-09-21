@@ -421,15 +421,12 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   während fertige, ungesicherte Arbeit danebenliegt.
   → *Prompt:* „Eine **verneinende** Meldung nennt den **gemessenen** Zustand, den sie verneint."
 
-- **Einigkeit und Erfolg sind keine Evidenz.** Modelle liegen gemeinsam daneben, und
-  „es lief durch" beweist den Weg nicht. Fällt ein Messwert unter **allen** Erklärungen gleich
-  aus, trennt er sie nicht — und wo ein Mensch zustimmen kann, sagt ein geglückter Lauf gar
-  nichts über die Automatik: er hat vielleicht nur geklickt.
+- **Einigkeit und Erfolg sind keine Evidenz.** Modelle liegen gemeinsam daneben, und „es lief
+  durch" beweist weder den Weg noch die Automatik.
   → *Prompt:* „Welcher **eine Test** macht die Ursache **sichtbar**? Sag **vor** der Messung,
-  welches Ergebnis welche Erklärung ausschließt. Kann mein **Klick** den Ausgang geändert
-  haben, frag mich, ob ich geklickt habe, bevor du den Lauf als Beleg nimmst."
+  welches Ergebnis welche Erklärung ausschließt."
 
-- **Zwei Aufträge für einen Fehler.** Derselbe Mangel wird arglos ein zweites Mal aufgeschrieben.
+- **Zwei Aufträge für einen Fehler.** Derselbe Mangel wird ein zweites Mal aufgeschrieben.
   → *Prompt:* „Vor jedem neuen Punkt: Such die offenen nach demselben Problem ab und **erweitere**
   den vorhandenen. Verwirfst du einen Zweig, rette, was darin über seinen Auftrag hinausgeht."
 
@@ -443,7 +440,7 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   die **Nachbarschaft** und schreib es als Test."
 
 - **Der erste Fehlschlag macht sich selbst dauerhaft.** Eine wiederkehrende Aufgabe liest ihre
-  eigene Spur, die es beim ersten Lauf nicht gibt — und bricht von da an immer ab.
+  eigene Spur, die es beim ersten Lauf nicht gibt, und bricht fortan ab.
   → *Prompt:* „Prüf jede wiederkehrende Aufgabe gegen den **leeren Zustand**. ‚Übersprungen' ist
   **kein Betriebszustand** — was sie nicht tut, meldet sie laut."
 
