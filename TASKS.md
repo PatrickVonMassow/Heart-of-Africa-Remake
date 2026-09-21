@@ -15792,3 +15792,33 @@ to land than a mechanism that needs a review.
   Criticality: medium — it is the user's own report of 648/656, alive on about a tenth of
   the worlds he can be dealt, and it is player-visible wherever it fires.
   Bundle: Dorfleben.
+
+- [ ] 1171. A bank-game unit test runs into its 20-second timeout on CI and blocks every main
+  push (measured 21.09.2026 while landing the charge for point 1068's WebGPU sighting).
+  WHAT FAILED: CI run 35580966090 for `origin/main` 54033d9f0 concluded "failure" on the
+  `fast` job's unit stage — `src/scenes/place/bankGame.test.ts:1229`, "offers every play-rock
+  ROCK with a solved touch at the speaker`s own spot over a Bambara cycle", `Error: Test timed
+  out in 20000ms`. Everything else was green: 511 of 512 test files, 16,147 tests, 11 skipped.
+  The whole unit layer took 1148 s there.
+  THAT IT IS NOT THE COMMIT'S CONTENT IS MEASURED, NOT ASSUMED. The branch commit eaa481567,
+  which contains 54033d9f0 in full, ran the SAME workflow one minute later and went GREEN. The
+  red commit itself touches `scripts/render-verify-charges.mjs`, its test and `TASKS.md` — not
+  one line of `bankGame`. So the red is a property of the run, not of the diff under it.
+  WHAT IT COSTS, and why this is a point rather than a backlog line: `ci-status-guard` blocks
+  every turn until a fixing push, so an unowned red on main stops the whole batch. It stopped
+  this one.
+  WHAT IS NOT MEASURED, named rather than assumed: how close the test runs to its 20 s on a
+  quiet local machine; whether CI exceeds it reproducibly or only under load; and whether the
+  combinatorial breadth of the case ("every play-rock", a whole Bambara cycle) is what makes it
+  the one case in the layer that can hit a per-test bound.
+  Final state: the test's cost is measured on a quiet host and on CI, and EITHER the case is
+  made cheap enough to sit well inside the bound, OR the bound is raised for it with the
+  measurement that justifies the number. A raised bound with no measurement behind it does not
+  close this point.
+  Test: `npx vitest run src/scenes/place/bankGame.test.ts` timed on a quiet host, the figure
+  printed; then the same case green over three consecutive CI runs.
+  Criticality: medium — no player loses anything, but it blocks the push gate every batch pays
+  at, and an unowned red on main is exactly what the red policy forbids.
+  Refs: src/scenes/place/bankGame.test.ts:1229, src/scenes/place/bankGame.ts, CI run
+  35580966090
+  Bundle: Session- & Repo-Hygiene.
