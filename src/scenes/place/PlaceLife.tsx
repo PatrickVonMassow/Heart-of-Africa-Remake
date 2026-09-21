@@ -570,7 +570,13 @@ function Loom({
   // Both bodies are ones the passers-by go round (point 578). The whole LENGTH
   // of the warp is a collider in the layout, so nothing here has to repeat it.
   useStandingBody(station.weaver.x, station.weaver.z)
-  const helperBody = useInhabitantBodies(1)
+  // He is a vignette figure on an errand of his own: he pushes the passers-by
+  // aside and never gives way himself, and this component writes where he is.
+  const helperBody = useInhabitantBodies(1, {
+    fixed: true,
+    x: station.helperHome.x,
+    z: station.helperHome.z,
+  })
 
   // The loom's own frame: local +Z runs DOWNSTREAM along the warp, and local +X
   // is across it. Which way across the water lies is read off the station
@@ -671,7 +677,7 @@ function Loom({
     }
     // The body he presents to the rest of the village follows him.
     const body = helperBody[0]
-    if (body && group.current) {
+    if (body) {
       body.x = station.helperHome.x + station.fx * picture.helperAt
       body.z = station.helperHome.z + station.fz * picture.helperAt
       body.active = true
