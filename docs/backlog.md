@@ -1634,3 +1634,31 @@ in der Fokuszeile, und 690 ist der NÄCHSTE Punkt in der Reihenfolge — sein Zw
 zehn Commits mit dem Betreff „Complete the authored changes". Wer dort ankommt, übernimmt und
 landet, statt neu zu bauen. Nicht als Punkt eingereiht: kein Spielerimpakt, nichts ist verloren,
 und die Abhilfe ist dieselbe Gewohnheit wie oben — vor jedem Punktbeginn den Bestand ansehen.
+
+## Die Spiegelregel der Trommelsprache ist nicht eindeutig: RIVER und CHIEF (21.09.2026)
+
+Aus einer Nutzerfrage: Wird die Bedeutung der hohen und tiefen BA-Folgen je Spielstart neu
+ausgewürfelt, und könnten flussauf und flussab als Gegenteile gebaut sein? Beides ist
+beantwortet, und die Antwort ist gut — aber sie legt eine Schwäche frei.
+
+Nichts wird ausgewürfelt: Das Lexikon ist eine feste Modulkonstante (`src/communication/
+lexicon.ts`), ohne Seed und ohne Startwahl. Und das Richtungspaar ist bereits doppelt
+motiviert — `UPSTREAM` ba-ba-BA-BA steigt, `DOWNSTREAM` BA-BA-ba-ba fällt, sichtbar gegen die
+Strömung (`src/scenes/place/bankGame.ts`), und die beiden sind exakte Umkehrungen voneinander,
+per Test festgenagelt (`src/communication/lexicon.test.ts`). Das Rätsel erzwingt die Anwendung,
+weil die Häuptlingsantwort nur `DOWNSTREAM` enthält (`src/communication/drumMessage.ts`).
+
+Die Schwäche: Unter der Bauregel — vier Silben, gerade Zahl Hochtöne — gibt es sechs gemischte
+Folgen. `ROCK` BA-ba-ba-BA und `DIG` ba-BA-BA-ba sind Palindrome und stützen die Regel damit
+(kein Gegenteil, also eigener Spiegel). `RIVER` ba-BA-ba-BA und `CHIEF` BA-ba-BA-ba bilden
+jedoch ein Spiegelpaar OHNE Gegensatzbedeutung. Wer aus dem Richtungspaar „Umkehrung heißt
+Gegenteil" verallgemeinert, bekommt dort genau die falsche Hypothese, vor der die Gegenlese vom
+13.08.2026 gewarnt hat.
+
+Nicht als Punkt eingereiht, und das ist die Empfehlung des Befunds selbst: Für `CHIEF` gibt es
+keinen freien Platz. Übrig sind nur die beiden Eintonfolgen, also vier identische Schläge, und
+die sind am schlechtesten hörbar. Eine Änderung bräuchte den Bruch der Längen- und
+Paritätsregel und kostete damit die Zwei-Silben-Verhördistanz, auf der die ganze Hörbarkeit
+steht. Der Code kennt die Lücke und argumentiert an Ort und Stelle damit, dass nur das
+Richtungspaar im selben Atemzug gesagt wird (`lexicon.ts`). Kein Spielerimpakt ist
+reproduzierbar gemessen: Das Rätsel bleibt lösbar, weil es die Richtung erzwingt, nicht rät.
