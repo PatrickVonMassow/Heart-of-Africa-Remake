@@ -219,12 +219,15 @@ export const PLAY_ROCK_SCALE = PLAY_ROCK_SPAN / ROCK_FOOTPRINT_UNITS
  * So the collider is what the rock OCCUPIES WHERE FIGURES ARE: the largest sum
  * of the drawn flank and the figure body carried at that height, over the whole
  * height of an adult, less the walker footprint the colliders are tested with.
- * Measured over both rock seeds it is 1.343 m of clearance, i.e. 1.04 m of
- * collider; 1.05 is that rounded up. `bankStage.test.ts` MEASURES it against
+ * Measured over both rock seeds it is 1.352 m of clearance, i.e. 1.052 m of
+ * collider; 1.06 is that rounded up. `bankStage.test.ts` MEASURES it against
  * the mesh rather than restating it, so a rock rebuilt wider fails there instead
- * of quietly letting a figure into the stone.
+ * of quietly letting a figure into the stone — which is how point 1173 found
+ * this one: each stone is drawn at the YAW of its own place on the bank, so
+ * moving the stage turned a slightly broader flank towards the figures and the
+ * 1.05 measured for the old bearing no longer covered it.
  */
-export const PLAY_ROCK_RADIUS = 1.05
+export const PLAY_ROCK_RADIUS = 1.06
 
 /**
  * Radius of a patch of ground work (work-order point 483), in metres: the pit
@@ -293,7 +296,16 @@ const WATER_STAND_APPROACHES = 16
  *  here rather than imported because the layout must not depend on the errand
  *  module; `layout.test.ts` pins the two together. */
 export const WATER_STAND_WORK_RING = 2.4
-const WATER_STAND_APPROACHES_NEEDED = 9
+/**
+ * What the SEARCH demands, which is deliberately more than the nine bearings
+ * `riverBank.test.ts` holds the finished layout to. The stand is placed before
+ * the loose dressing is scattered, so the search cannot see the boulders and
+ * tufts that will land around it; without a reserve it spends the whole margin
+ * on the ring it measures and the settled layout comes in one bearing short.
+ * Point 1173 measured that on the grown disc, which simply has more ground for
+ * the dressing to fall on.
+ */
+const WATER_STAND_APPROACHES_NEEDED = 11
 /** Its own footprint — three standing jars and the ground they are set on. */
 export const WATER_STAND_RADIUS = 0.6
 /** The bearings the stand is tried on, the one facing the water first: the man
