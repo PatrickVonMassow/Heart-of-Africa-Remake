@@ -770,6 +770,16 @@ const PLACES: Array<[string, number]> = [
   ['bambara-village', 2972259115],
   ['bambara-village', 42],
   ['bambara-village', 46],
+  // AND THE TWO SETTLEMENTS THE SILENT GAME NOW RUNS IN (work-order 690). The
+  // seed spread above stays what 1094 made it — one village, three seeds — and
+  // these two add the axis that spread never had a reason to cover: the tag
+  // round moved OUT of the bank village, so the gate the user's complaint is
+  // judged by has to reach the port and the bankless village it moved to. Both
+  // read clean over the replayed minute, and the low-cadence sweep behind this
+  // (six seeds x 60/30/14 fps) put the port's worst child at 0.056 % against
+  // the 0.25 % gate — no worse than the villages.
+  ['cairo', 2972259115],
+  ['maasai-village', 2972259115],
 ]
 
 describe('the children never shuffle on the spot (points 648/656)', () => {
