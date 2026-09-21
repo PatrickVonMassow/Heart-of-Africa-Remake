@@ -1519,3 +1519,19 @@ Extraktion sitzt im Skript, nicht im Kern, und ein Test dafür verlangte einen E
 Umbau. Nicht als Punkt eingereiht: kein Spielerimpakt, und der Defekt ist gemessen behoben
 (dirty=2 → dirty=1 auf demselben Baum). Wer den Kern das nächste Mal ohnehin anfasst, zieht
 die Zeile mit hinüber und prüft sie dort.
+
+## Der Zeigersperr-Beobachter bleibt über sein Zeitfenster hinaus scharf (21.09.2026)
+
+Die Erholung in `src/scenes/place/pointerLock.ts` (Punkt 1158) hält ihre Absicht
+`wantsLock` absichtlich über das 3-Sekunden-Fenster hinaus, damit eine späte echte
+Bewegungstaste die Sperre noch holen kann, wenn der Browser frische Nutzeraktivierung
+verlangt. Solange diese Absicht steht, bleibt auch der `MutationObserver` verbunden, der
+auf `document.body` mit `subtree: true` und `attributes: true` jede Klassenänderung im
+ganzen Dokument sieht — und die HUD-Elemente ändern ihre Klassen häufig. Aufgelöst wird er
+erst durch Gewährung, Escape, Dialog, Overlay, Fensterwechsel, verborgene Seite, HUD-Klick
+oder Szenenabbau; der Rückruf selbst macht nur ein `querySelector('.overlay')`.
+Nicht als Punkt eingereiht: kein gemessener Spielerimpakt, keine reproduzierbare
+Bildrate-Einbuße, und die Absicht über das Fenster hinaus ist die eigentliche Antwort auf
+die zweite Lesart des Punktes. Wer die Datei das nächste Mal anfasst, misst, ob der
+Beobachter in einer belebten Siedlung spürbar kostet, und engt ihn sonst auf den
+Overlay-Wurzelknoten ein, statt ihn über den ganzen Baum zu legen.
