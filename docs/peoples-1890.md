@@ -2377,11 +2377,12 @@ Since 27.07.2026 (point 367) the record itself sits one document further out,
 in `docs/design-reference.md` §19.15 — same number, same text, still design
 rather than research; design.md §19.15 is the pointer to it.
 
-### 8.1 Loom source check (21.09.2026, point 1157) — build still open
+### 8.1 The weaver's loom: what the sources carry, and what the game adapts
 
-The existing standing loom in `src/scenes/place/PlaceLife.tsx` has no construction
-source recorded here. The proposed replacement needs a separate check before
-its geometry can be treated as a Bambara/Mande reconstruction.
+The standing loom this station replaced had no construction source recorded
+anywhere. The check below was made before the replacement was built, so the part
+of it that IS a Bambara/Mande reconstruction and the part that is a deliberate
+game adaptation can be told apart by anyone reading the code later.
 
 - **PERIOD, but early:** [Mungo Park, *Travels in the Interior Districts of
   Africa* (1799), chapter XXI](https://www.gutenberg.org/cache/epub/74976/pg74976.txt),
@@ -2400,16 +2401,37 @@ its geometry can be treated as a Bambara/Mande reconstruction.
   without describing their loom. Neither passage locates the weaver midway
   between two warp stakes.
 
-**OPEN — point 1157 is not implemented by this research note.** The checked
-passages in the project's existing Park/Caillié sources establish weaving, narrow
-cloth and hand tools, not the requested long, two-ended warp with a midpoint seat.
-That absence does not prove such a build never existed. A construction source or
-an explicit decision to use a gameplay adaptation is still needed. The brief must
-also reconcile its cloth rising to a “top beam” with its replacement long warp.
-Park's account assigns weaving to men; retaining a woman at this station needs
-to be distinguished from claiming that his account supports that casting.
-No loom geometry, animation or teaching behavior has been changed pending those
-decisions.
+**THE SOURCES CARRY** narrow-strip weaving, the shuttle and the reed beater —
+and, in Park, male weavers. They do not carry a two-ended warp with a seat at its
+middle, and neither passage puts a woman at the loom. That absence does not prove
+such a build never existed; it means the sources cannot be cited for one.
+
+**THE GAME ADAPTS, KNOWINGLY** (owner decision, 22.09.2026, after the author's
+escalation). The station as built is a GAMEPLAY ADAPTATION ordered by the user on
+21.09.2026, not a sourced reconstruction, and nothing in this document should be
+read as Park's or Caillié's account of it. Two things depart from the sources and
+each is load-bearing:
+
+- **The seat is at the warp's MIDDLE.** The loom is the second place the player
+  can learn UPSTREAM and DOWNSTREAM, and from the middle BOTH of the weaver's
+  calls send her helper away from her. Seated at an end — which is how the
+  sources' strip loom is worked — one call would be "toward me" and the other
+  "away from me", and the player could learn the pair as come/go and still
+  finish the puzzle.
+- **The weaver is the woman the player reported.** She is kept as the figure of
+  the 18.09.2026 bug report, whose complaint was that she did not move.
+
+**WHAT IS KEPT FROM THE SOURCES.** The cloth is a narrow strip — a hand's width,
+`LOOM_BUILD.stripWidth` — carried by a shuttle thrown across the warp and beaten
+down by a reed on each arrival, and it is taken off when it reaches the stake.
+The strip grows from the weaver's seat ALONG the horizontal warp; nothing rises
+to a top beam, which described the standing frame this station replaced.
+
+**IMPLEMENTATION.** `src/scenes/place/loom.ts` lays the warp on the bank's own
+downstream vector and searches the seat; `src/scenes/place/loomWork.ts` runs the
+weaving cycle and the sparse named tendings; `Loom` in
+`src/scenes/place/PlaceLife.tsx` draws it. The teaching rules are in
+`docs/communication-poc-spec.md`, "The weaver's loom".
 
 ---
 
