@@ -30510,3 +30510,127 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   `docs/acceptance-evidence.md` §9 state the final behaviour in the same commit. Nothing
   else changes: tooltips, glow, sort order and the shovel's open-world answers stay.
   Bundle: Steuerung & Performance.
+
+- [x] 1158. The one-click return from the Escape cooldown is confirmed in a real browser
+  (residual of point 1148, landed 18.09.2026). IT STANDS AT THE FRONT AGAIN, and it is no
+  longer a question for the user: he took the observation himself on the deployed build the
+  same afternoon and it FAILED — 18.09.2026, ~18:02, verbatim: "Ich habe es getestet:
+  Schneller Klick funktioniert nach wie vor nicht." (It had been moved out of the front
+  earlier that day only because he was away and could not observe; he has.) So step (3)
+  below is now the work: the Escape-cooldown reading behind 1148 was wrong or incomplete,
+  and the REAL cause is measured and fixed rather than guessed. Step (2), the two-second
+  click, was not reported as failing.
+  RETESTED BY THE USER ON 20.09.2026, 18:56, and it SEPARATES the two steps for the first
+  time, verbatim: "Es funktioniert nach wie vor nicht, wenn man nicht eine Zeit lang vor dem
+  Klicken wartet." So waiting BEFORE the click makes it work and the quick click still does
+  not — step (2) passes, step (1) fails, on the deployed build after 1148 landed. That rules
+  out the click missing the canvas (step (5) / (c)) as the whole cause, because the same
+  click on the same spot succeeds once time has passed, and it points straight at the
+  refusal path: either the bounded 1.1 s retry never fires, or it is refused again because
+  Chrome's cooldown outlasts it or the retry lacks a fresh user activation. Measure (a) and
+  (b) FIRST against that reading.
+  WHAT TO MEASURE, since the fix must name a cause: (a) whether the quick request is refused
+  at all (`pointerLockProbe.refusals`, `pointerlockerror`, the promise rejection and its
+  DOMException message), silently dropped, or granted and lost again; (b) whether the bounded
+  1.1 s retry fires and what its own result is — refused again means the cooldown is longer
+  than assumed or the retry needs a fresh user activation, granted means the
+  `pointerlockchange` settling path or the HUD's locked state is what fails; (c) whether the
+  quick click lands on `gl.domElement` at all or on a HUD element above it (step (5) below:
+  `.hud-bottom-left` has `pointer-events: auto`, so a click near the inventory bar or the
+  hint never reaches the canvas). The production build exposes no `window.__placeLock` and
+  the user tested production, so the tool is a dev build or a console listener on
+  `pointerlockerror`/`pointerlockchange`.
+  THE TICK STILL NEEDS BOTH ATTENDED OBSERVATIONS. After the fix is deployed, the user is
+  asked for one more pair of observations through the board card.
+  Final state: the user's report of 17.09.2026, 21:48 — "Im Modus »Click the view to
+  steer« bewirkt erst mehrfaches Klicken, dass man wieder steuern kann." — is either
+  confirmed fixed or its real cause is found and fixed, judged by ONE attended observation
+  in a real Chrome on WebGPU.
+  WHY IT IS ITS OWN POINT. 1148 built and landed the fix: one bounded retry 1.1 s after a
+  refused pointer-lock request, with its dedup, its cancellation on dialog/overlay/grant/
+  scene-exit and the webdriver skip, all pinned by 36 Vitest cases. Its step (4) asked for an
+  attended check, and that step could not run in the batch. The reason was MEASURED on
+  18.09.2026 rather than assumed: pointer lock DOES engage in headless system Chrome once
+  `navigator.webdriver` is masked (a trusted Playwright click locked the canvas), but
+  Playwright's synthetic Escape never reaches Chromium's pointer-lock exit — the lock simply
+  stays held — and a programmatic `document.exitPointerLock()` leaves no cooldown at all, so
+  ONE click returns steering in 100 ms even on the unfixed main. The refusal 1148 repairs
+  cannot be produced without a human pressing Escape.
+  Work: (1) in an attended Chrome on WebGPU, enter a settlement, take the lock, press Escape
+  and click the view again WITHIN one second: steering must return without a second click.
+  (2) Repeat with a two-second wait before the click: the first click must steer. Record both
+  results. (3) If the first click still fails, the Escape-cooldown reading was wrong: measure
+  what actually happens — `pointerLockProbe.refusals` counts the browser's refusals since
+  1148 — and check whether the click lands on a HUD element instead of `gl.domElement`, which
+  is the layering case 1148 step (5) named; fix THAT and say so. (4) If both observations
+  pass, tick and say so.
+  BOUNDS THE USER NAMED: no new guard, ledger field or workflow abstraction (infrastructure
+  freeze 01.09.2026); pointer lock stays skipped under `navigator.webdriver`, and the
+  webdriver mask used for the measurement above stays a throwaway probe — it is NOT added to
+  a suite.
+  NO LONGER ATTENDED-GATED FOR ITS DIAGNOSIS (18.09.2026). It was, while the only open
+  question was "does it still happen"; the user has answered that, so the measurement and the
+  fix are ordinary batch work and belong to whoever takes this point. Only the final
+  CONFIRMATION stays attended — the two observations above, on the deployed build.
+  Criticality: medium — it is the confirmation that a reported, player-visible bug is really
+  gone; without it 1148 is a plausible fix, not a proven one.
+  Refs: src/scenes/place/pointerLock.ts (`createPlacePointerLock`), its test, and the
+  pointer-lock effect in src/scenes/place/PlaceScene.tsx; follow-up of 1148 (closed).
+  Bundle: Steuerung & Performance.
+  MEASURED AND FIXED 18.09.2026, awaiting only the two observations. (a)+(c) were
+  measured on this host in system Chrome (headless=new, WebGPU) with a throwaway
+  `navigator.webdriver` mask, not added to any suite: a click into the view LANDS on
+  `gl.domElement` — 80 of 81 viewport grid points hit the canvas, `.hud-bottom-row` is
+  `pointer-events: none` and only its two end groups (258 px left, 178 px right, 30 px
+  tall, at the very bottom) take clicks — so the layering case of 1148 step (5) is RULED
+  OUT; and a timer-driven `requestPointerLock()` carrying no fresh user gesture IS
+  GRANTED, so the retry needed no new activation either. (b) could not be measured: a
+  real Escape is still unreachable from automation and this host has no Xvfb/xdotool to
+  send one, exactly as 1148 recorded. THE CAUSE IS NAMED FROM THE CODE, and it does not
+  depend on how long the browser refuses: the recovery was ONE ask, timed 1.1 s from the
+  CLICK while the browser's refusal period runs from the ESCAPE — so the faster the
+  player clicked, the earlier that single ask landed, and inside the period it was
+  refused too, after which nothing asked again until the next click. A further click did
+  not add an ask, it REPLACED the one still to come. Both together are "only repeated
+  clicking steers again". FIXED: the recovery is a bounded sequence — ask again every
+  250 ms until the lock is granted or 3 s have passed since the last deliberate request,
+  re-checking the deadline when each ask's turn comes — resting on no assumption about
+  the period's length. 40 Vitest cases; cross-vendor review by GPT-6 Astra found the
+  missing execution-time deadline check, which is fixed and pinned. WHAT REMAINS is
+  exactly steps (1) and (2) on the deployed build, which only the user can take.
+  THE ATTENDED OBSERVATION NEVER HOLDS THE BATCH (user order 18.09.2026, 22:21, verbatim:
+  "Zu 1158: Ich bin jetzt erstmal weg - wenn es so weit ist, dass ich nachtesten kann, nicht
+  auf mich warten, sondern die Batch weitermachen und mir eine Karte unter Von dir zu klären
+  dafür einstellen."). Amend point 1158 (no new point): the attended observation does NOT
+  hold the batch. When 1158's fix is deployed and the point reaches the step that needs the
+  user's attended check, the owner does not wait for the user. Instead: (1) file a card under
+  'Von dir zu klären' naming exactly what the user should observe (the quick click after
+  Escape and the two-second click), which deployed build/revision to test, and what pass and
+  fail look like; (2) keep the batch advancing with the next point in work-order order;
+  (3) only the tick of 1158 waits for the card's answer. Final state: the card exists on the
+  board with the observation instructions, the batch has moved on, and 1158 is ticked only
+  after the user's answer on that card.
+  THE 20.09 RETEST RAN ON A BUILD THAT ALREADY CARRIED THE 18.09 FIX — measured
+  20.09.2026, 19:45. The Pages deployment of `800c04774a` concluded success at 16:24:36Z,
+  and that commit contains `b862fcb72`, `06ba6ab51`, `a7f55ce04` and `33dee9f41`; the same
+  deployment rebuilt `/poc/` from `cd275b233`, which contains `33dee9f41` as well. The
+  user's retest fell at 18:56 Berlin = 16:56Z, 31 minutes after that deployment, so the
+  bounded 250 ms sequence was in BOTH the root build and `/poc/` when he took it. The two
+  readings above are therefore not in conflict: step (3) is the work, and the sentence
+  "MEASURED AND FIXED 18.09.2026, awaiting only the two observations" is SUPERSEDED — what
+  is awaited is a new cause and a new fix, and the two observations confirm THAT.
+  THE ONE MEASUREMENT THIS HOST CANNOT TAKE, re-checked 20.09.2026: a native Escape.
+  `DISPLAY=:30` exists, but Xvfb, xvfb-run, xdotool, ydotool, python-xlib and pip3 are all
+  absent, so no X-level key can be faked, and CDP's `Input.dispatchKeyEvent` bypasses the
+  browser-process handler that ends the lock (measured 18.09). A `document.exitPointerLock()`
+  exit is no substitute for it — that is the case the 18.09 timer probe measured, and it is
+  a DIFFERENT case from a user-initiated exit, which is the reading that makes the probe's
+  "granted" result compatible with the player's "refused". Do not spend the point re-trying
+  this measurement.
+  WHAT THE FIX MUST COVER, because neither cause can be excluded from this host: (i) the
+  browser reports NO refusal for the quick ask — no promise rejection, no `pointerlockerror`
+  — in which case the sequence in `createPlacePointerLock` dies after ONE ask, since every
+  further ask hangs off `onRefusal`; and (ii) the browser refuses every ask that carries no
+  fresh user activation once the USER ended the lock, in which case no timer-driven ask can
+  ever succeed and the recovery has to ride on the player's next real input event. A fix
+  that covers only one of the two is not the fix.
