@@ -3570,7 +3570,12 @@ async function checkChildrenMotion(motionPlace) {
   await page.waitForFunction(() => window.__game && window.__balance, null, { timeout: 60000 })
   await page.waitForFunction(() => window.__renderer, null, { timeout: 60000 })
   await assertBackend(page)
-  await page.waitForTimeout(4000)
+  // Settle in DRAWN FRAMES, not on the wall clock (the rule this file states at
+  // `nextFrames`). Everything this block needs is already awaited above as a
+  // condition, so the only thing left to wait for is the reloaded scene actually
+  // drawing — and four rendered frames prove that, while four wall seconds prove
+  // nothing on a renderer that stalled (point 690).
+  await nextFrames(4)
   await page.evaluate(() => {
     window.__balance.randomEventsEnabled = false
     window.__game.getState().setJournalOpen(false)
