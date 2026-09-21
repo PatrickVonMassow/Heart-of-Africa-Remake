@@ -682,7 +682,6 @@ export function DebugMenu() {
       // The children's game at the river bank (point 687).
       ...tableRows(BANK_GAME_FIELDS, (f) => balance.villageLife.bankGame[f.key],
         (f, v) => { balance.villageLife.bankGame[f.key] = v }),
-      // What the children SAY at that game (point 481).
       // What the ADULTS do at their errands (point 483).
       ...tableRows(ADULT_ERRAND_FIELDS, (f) => balance.villageLife.adultErrands[f.key],
         (f, v) => { balance.villageLife.adultErrands[f.key] = v }),
