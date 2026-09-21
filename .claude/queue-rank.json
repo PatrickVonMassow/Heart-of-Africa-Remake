@@ -1369,12 +1369,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "1173": {
-      "at": "2026-09-21T13:54:47.613Z",
-      "why": "Der Nutzer hat den Punkt am 21.09.2026, 14:41 selbst bestellt (»Du kannst auch gerne noch alles etwas mehr auseinanderziehen …«) und er kauft den Platz für die zweite Lehrstation aus 1157, die sonst in eine bereits zu enge Siedlung gebaut würde.",
-      "origin": "user",
-      "place": "ahead"
-    },
     "1174": {
       "at": "2026-09-21T14:46:48.199Z",
       "why": "Nutzerauftrag vom 21.09.2026 mit eigener Platzierung: unmittelbar vor 659, weil die Rundum-Gegenlese der Kommunikationskette einen Mechanismus beurteilen muss, der sich nicht mehr ändert.",
@@ -1394,8 +1388,36 @@
       "place": "ahead"
     }
   },
+  "boundary": {
+    "at": "2026-08-21T00:55:14.962Z",
+    "points": [
+      336,
+      553,
+      596,
+      633,
+      659,
+      660,
+      663,
+      708,
+      715,
+      719,
+      733,
+      735,
+      736,
+      738,
+      739,
+      746,
+      747,
+      750,
+      759,
+      760,
+      762,
+      764
+    ],
+    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
+  },
   "settled": {
-    "at": "2026-09-21T21:12:53.644Z",
+    "at": "2026-09-21T21:30:13.990Z",
     "points": [
       174,
       184,
@@ -1801,38 +1823,9 @@
       1169,
       1171,
       1172,
-      1173,
       1174,
       1175,
       1176
     ]
-  },
-  "boundary": {
-    "at": "2026-08-21T00:55:14.962Z",
-    "points": [
-      336,
-      553,
-      596,
-      633,
-      659,
-      660,
-      663,
-      708,
-      715,
-      719,
-      733,
-      735,
-      736,
-      738,
-      739,
-      746,
-      747,
-      750,
-      759,
-      760,
-      762,
-      764
-    ],
-    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   }
 }

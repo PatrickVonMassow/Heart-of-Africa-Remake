@@ -7970,3 +7970,21 @@ das sagten sie nach der Verschiebung nicht mehr, während sie rot wurden.
 Zweige kommen vor", „die Strecke liegt zwischen ihren zwei Grenzen"), nicht als die Zahl, die
 heute herauskommt. Die Zahl gehört in den Kommentar daneben, wo sie beim nächsten Mal erklärt,
 warum sich etwas bewegt hat, statt einen Lauf zu röten, der nichts gefunden hat.
+
+### 3.300 Ein harmloser Commit riss den Lauf ab, der neben ihm fuhr
+
+Während die Landung von Punkt 1173 ihre Unit-Suite fuhr, wurden auf `main` zwei reine
+Dokumentations-Commits abgesetzt — Retrospektive und Leitfaden-Fingerabdruck. Die
+Integritätsprüfung des Laufs beobachtet nicht den Inhalt, sondern den **Branch-Ref**, und brach
+mit „LIVE REPOSITORY CHANGED WHILE UNIT SUITE RAN" ab. Die Landung stand bei „gate: unit red",
+obwohl kein Test etwas gefunden hatte; der Merge lag bereits auf `main`, und der ganze Lauf —
+gut zehn Minuten — war umsonst.
+
+Der Denkfehler war die Kategorie: „nur Dokumentation" fühlt sich an wie „berührt den Code
+nicht". Die Prüfung fragt aber nicht danach. Für sie ist jede Bewegung des eigenen Zweigs eine
+Veränderung des Objekts, über das sie gerade urteilt — und sie hat recht, denn ein Lauf, dessen
+Grundlage sich unter ihm verschiebt, sagt nichts mehr aus.
+
+**Lehre:** Solange ein Lauf auf dem eigenen Zweig misst, ist **jeder** Commit ein zweiter
+Maschinenverbraucher — auch ein Wort in einer Textdatei. Was während einer Landung anfällt, wird
+gesammelt und danach abgesetzt; die Wartestellung dafür ist ohnehin schon deklariert.
