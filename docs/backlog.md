@@ -9,6 +9,34 @@ when their area is touched anyway or a triage says otherwise.
 Format: one line per finding — `- YYYY-MM-DD <source> — <finding>`.
 
 <!-- entries -->
+- 2026-09-21 Weberin-Gespräch (`docs/peoples-1890.md`, `src/scenes/place/lifeSpots.ts` `LOOM_SPOT`)
+  — die Völker-Doku kennt kein Weben: `grep -rli "weaver|loom" docs` trifft `peoples-1890.md`
+  nicht. `design.md` nennt Weben unter den Alltagstätigkeiten, aber weder Bauform noch Technik
+  sind belegt, und der stehende Rahmen im Dorf ist damit eine reine Setzung. Für Bambara/Mande
+  wäre die lange, flach gespannte Schmalbandkette die zu prüfende Alternative. Kein Spielerimpakt
+  heute; PROMOTE, sobald der Webstuhl eine tragende Rolle bekommt — der unten skizzierte zweite
+  Kanal hängt an einer langen, gerichteten Kette.
+- 2026-09-21 Nutzergespräch (Entwurf, ausdrücklich unbeauftragt: »erstmal nur diskutieren«)
+  — ZWEITER KANAL FÜR `UPSTREAM`/`DOWNSTREAM` AN DER WEBERIN. Der Webstuhl liegt parallel zum
+  Fluss, die Weberin sitzt in der MITTE der Kette und nennt eine Richtung; die Gehilfin geht die
+  Kette entlang in diese Richtung und arbeitet dort. Trägt `design.md`:416 (kein Wort ohne
+  Adressaten, Reaktion und sichtbare Folge) und :412 (eine Richtung wird von einem Körper
+  getragen, nicht berührt); der Sitz in der Mitte schließt die Fehllesung „komm/geh"
+  konstruktiv aus, weil beide Rufe von ihr WEGführen. Der Nutzen ist der Schnitt, nicht die
+  Wiederholung: die einzige Gemeinsamkeit von Uferspiel und Webstuhl ist die Flussachse.
+  ZWEI OFFENE STELLEN: (1) Sichtlinie aufs Wasser gegen 10 m Abstand zur Kinderstrecke
+  (`talk.reach` 10, `BANK_MIN_GAP` 4 / `BANK_MAX_GAP` 14); (2) das flussab-Ende der Kette fällt
+  in dieselbe Hörweite wie `RIVER` am Wasserpfadkopf (Punkt 688 §1). Kehrt außerdem 688 §3 um
+  („The direction words are the children's now") und wäre damit eine Designänderung an
+  `design.md`, `docs/communication-poc-spec.md` und der archivierten 688 gemeinsam. Skizze:
+  https://claude.ai/code/artifact/e74c2571-24b2-4dae-84e0-6b5429c673d3
+  NACHTRAG Nutzer 21.09.2026, 14:29: die prozedurale Dorferzeugung müsste dafür Platz
+  garantieren — zwischen der Weberin samt Gerät und dem Kinderspiel muss der Abstand sicher
+  eingehalten werden, nicht zufällig entstehen. Dazu die Beobachtung, dass es **beim Kinderspiel
+  heute schon manchmal eng** ist; das ist noch nicht mit Seed und Bild gemessen und deshalb
+  hier statt als Punkt. PROMOTE, sobald eine Enge reproduziert ist — dann trägt sie auch die
+  Platzgarantie, denn eine zweite Station an derselben Achse verschärft eine Enge, die es
+  bereits gibt.
 - 2026-09-17 batch owner (01:26 and 08:05, `.claude/batch-launcher.log` "stopping on SIGTERM")
   — a `kill` sent from inside the container to headless Chrome processes (orphans reparented
   to PID 1, or a process group holding the detached logged run) stopped the WHOLE container
