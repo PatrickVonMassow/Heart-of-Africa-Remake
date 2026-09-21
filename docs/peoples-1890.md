@@ -2377,6 +2377,40 @@ Since 27.07.2026 (point 367) the record itself sits one document further out,
 in `docs/design-reference.md` §19.15 — same number, same text, still design
 rather than research; design.md §19.15 is the pointer to it.
 
+### 8.1 Loom source check (21.09.2026, point 1157) — build still open
+
+The existing standing loom in `src/scenes/place/PlaceLife.tsx` has no construction
+source recorded here. The proposed replacement needs a separate check before
+its geometry can be treated as a Bambara/Mande reconstruction.
+
+- **PERIOD, but early:** [Mungo Park, *Travels in the Interior Districts of
+  Africa* (1799), chapter XX](https://www.gutenberg.org/cache/epub/74976/pg74976.txt),
+  the cotton-manufacture passage beginning “The preparation of cotton”. Park
+  describes women spinning, men weaving, a web seldom wider than four inches,
+  and a shuttle with a larger chamber for coarse thread. He compares the loom's
+  principle to European looms. This supports narrow-strip weaving and a shuttle,
+  but does not specify warp length, stakes, heddle supports or the seat's location.
+  His observations precede the game's 1890 setting by roughly a century.
+- **PERIOD, neighbouring context:** [René Caillié, *Travels through Central
+  Africa to Timbuctoo* (1830), vol. I, chapter XI, pp. 303–304](https://www.gutenberg.org/files/69847/69847-h/69847-h.htm),
+  describes Wassoulo cloth at most five inches wide, reed slays (beaters), and
+  shuttles with small bobbins held by wire or reed. He identifies these inhabitants
+  as Foulahs who do not speak Foulah; this is not a Ségou-specific construction
+  account. Chapter XII, p. 323, explicitly reports weaving in Bambara villages,
+  without describing their loom. Neither passage locates the weaver midway
+  between two warp stakes.
+
+**OPEN — point 1157 is not implemented by this research note.** The checked
+passages in the project's existing Park/Caillié sources establish weaving, narrow
+cloth and hand tools, not the requested long, two-ended warp with a midpoint seat.
+That absence does not prove such a build never existed. A construction source or
+an explicit decision to use a gameplay adaptation is still needed. The brief must
+also reconcile its cloth rising to a “top beam” with its replacement long warp.
+Park's account assigns weaving to men; retaining a woman at this station needs
+to be distinguished from claiming that his account supports that casting.
+No loom geometry, animation or teaching behavior has been changed pending those
+decisions.
+
 ---
 
 ## 9. Keeping the cook-fire alight in the rains (TASKS point 256)
