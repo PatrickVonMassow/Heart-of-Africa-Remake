@@ -15822,3 +15822,40 @@ to land than a mechanism that needs a review.
   Refs: src/scenes/place/bankGame.test.ts:1229, src/scenes/place/bankGame.ts, CI run
   35580966090
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1172. The dig-pair picture check finds no adults at all at the shutter and reds the whole
+  `polish` pass (measured 21.09.2026 while landing point 1158).
+  WHAT FAILED: `polish --section=adult-errands`, WebGPU, on `feat/1158-escape-cooldown-return`
+  at eaa481567 — `FAIL and both are still at the stroke, on opposite sides of the hole` with
+  `{"count":0,"striking":0,"away":[],"span":null,"opposed":false,"offLine":null}` (log
+  `local/verify-logs/2026-09-21T09-35-28-998-polish.log`, 303 pass, 1 fail). `count: 0` means
+  the check found NO villager still in the digging bout at the shutter, so the frame beside it
+  photographs bare earth and the frame's own subject test cannot tell the difference.
+  IT IS NOT POINT 1158'S, and that is measured. 1158 changes pointer-lock input handling; its
+  only edit outside `pointerLock.ts` and its test is a comment in `PlaceScene.tsx`. The SAME
+  branch tip ran the whole `polish` suite GREEN on WebGL 2 thirty minutes earlier — 304 checks,
+  0 failures (log `local/verify-logs/2026-09-21T09-02-33-527-collision-polish-settings.log`).
+  IT IS ALSO NOT POINT 1121'S. That point owns a different `adult-errands` red — the river-bank
+  frame aiming at a drifting fleck — and its cause is the aim block at ~6044-6070. This red is
+  the dig-pair block at ~6660-6715, a different check with a different subject.
+  WHAT IS MEASURED SINCE: the same rung re-run ALONE on a quiet machine at the merged tip
+  d3e82342d went green, 39 pass 0 fail in 2m 54s, and the red run printed "UNDER LOAD — NOT
+  AUTHORITATIVE" itself, because two unit suites of the owning session were on the machine at
+  the time. That is consistent with load — and consistent with a rare timing race, which is
+  exactly why a later green closes nothing (point 640). The distinction is NOT measured.
+  WHAT IS NOT MEASURED, named rather than assumed: whether `node scripts/throttle-probe.mjs
+  polish --section=adult-errands --runs 8` reproduces it at a quarter of a core; whether the
+  bout can end between `waitForFunction` picking the pair and the shutter opening three frames
+  later, which is the same shape as 1121's race; and whether the WebGL 2 lane simply never hit
+  the window rather than being immune.
+  Final state: the red has a named cause and either the check no longer races its own subject —
+  the pair it photographs is the pair that is IN the bout at the shutter, re-read at shutter
+  time — or the run is shown to be load and the check left alone with the measurement that
+  shows it. A check weakened into one that would pass on bare earth does not close this point.
+  Test: `node scripts/throttle-probe.mjs polish --section=adult-errands --runs 8` for the
+  reproduction, then `polish --section=adult-errands` green on a quiet machine on both backends.
+  Criticality: medium — no player impact; it costs a whole `polish` pass its meaning and it
+  reds on the everyday WebGPU lane, so every point behind it inherits an unaccounted red.
+  Refs: `scripts/verify/polish.mjs` (~6660-6715, the `held` block and the 1125 frame),
+  `scripts/render-verify-charges.mjs` (the entry filed with this point); sibling of point 1121.
+  Bundle: Testinfrastruktur.

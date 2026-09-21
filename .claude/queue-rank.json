@@ -1362,6 +1362,12 @@
       "why": "Das Rot heilt mit dem naechsten gruenen CI-Lauf von selbst; der Punkt existiert, damit das Rot einen Besitzer hat, nicht weil der Batch darauf wartet — seine Reparatur ist eine Messuebung ohne Spielerwirkung",
       "origin": "machine",
       "place": "last"
+    },
+    "1172": {
+      "at": "2026-09-21T10:54:00.691Z",
+      "why": "Die Ladung im Rot-Register verbucht das Rot ab sofort, also wartet kein Punkt darauf; der Punkt existiert, damit das Rot einen Eigentümer hat, und er gehört zu 1121 ins Bündel Testinfrastruktur.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1394,7 +1400,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-21T09:35:16.203Z",
+    "at": "2026-09-21T10:54:00.700Z",
     "points": [
       174,
       184,
@@ -1800,7 +1806,8 @@
       1164,
       1167,
       1169,
-      1171
+      1171,
+      1172
     ]
   }
 }
