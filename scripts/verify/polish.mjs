@@ -3967,8 +3967,13 @@ async function checkChildrenMotion(motionPlace) {
       const pose = { x: p.x, z: p.z, yaw: p.yaw }
       p.x = best.sx
       p.z = best.sz
-      // Look at what is actually visible, and hand the shutter the same point.
-      p.yaw = Math.atan2(-(best.vx - p.x), -(best.vz - p.z))
+      // LOOK AT WHAT THE FRAME DECLARES. The camera used to face the centroid of
+      // the children it could see, and a centroid is not a thing: in a port,
+      // whose children's quarter is wide, it lands on a warehouse and the
+      // picture centres on a wall with the group scattered around its edges.
+      // Facing the nearest visible child puts a body in the middle of the frame
+      // by construction, and it is the same body the shutter is handed (point 690).
+      p.yaw = Math.atan2(-(best.kx - p.x), -(best.kz - p.z))
       return {
         pose, cx: best.vx, cz: best.vz, kx: best.kx, kz: best.kz,
         seen: best.seen, of: best.of, clear: best.clear, near: best.near,
