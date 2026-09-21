@@ -1,0 +1,208 @@
+import { beforeAll, describe, expect, it } from 'vitest'
+import { setupGeodata } from '../../test/geodata'
+import { PLACES } from '../../world/geo'
+import { balance } from '../../config/balance'
+import { buildLayout } from './layout'
+import { standsOnGroundPlate } from './riverBank'
+import { standingClear, WALKER_RADIUS } from './collision'
+import { loomAround, placeLoom, waterAhead, WARP_BODY_RADIUS, WEAVER_BODY_RADIUS } from './loom'
+
+beforeAll(setupGeodata)
+
+const VILLAGES = PLACES.filter((p) => p.kind === 'village').map((p) => p.id)
+const SEEDS = [7, 42, 1337, 394349866, 1838110026]
+
+/** Every shipped village layout the assertions below are made against. */
+function shippedLooms() {
+  const out: Array<{ id: string; seed: number; layout: ReturnType<typeof buildLayout> }> = []
+  for (const id of VILLAGES) {
+    for (const seed of SEEDS) out.push({ id, seed, layout: buildLayout(id, seed) })
+  }
+  return out
+}
+
+describe('the loom lies on the river’s axis (work-order 1157 item 4)', () => {
+  it('every shipped village layout carries a loom', () => {
+    const missing = shippedLooms().filter(({ layout }) => layout.loom === null)
+      .map(({ id, seed }) => `${id}/${seed}`)
+    expect(missing).toEqual([])
+  })
+
+  it('the warp’s heading is the bank’s downstream heading, not a fixed one', () => {
+    const off: string[] = []
+    for (const { id, seed, layout } of shippedLooms()) {
+      const { loom, bank } = layout
+      if (!loom || !bank) continue
+      // The warp runs from stake to stake; its unit vector must be the bank's
+      // own, to within the floating-point noise of deriving it twice.
+      const dx = loom.downstream.x - loom.upstream.x
+      const dz = loom.downstream.z - loom.upstream.z
+      const length = Math.hypot(dx, dz)
+      const cos = (dx / length) * bank.fx + (dz / length) * bank.fz
+      if (cos < Math.cos(0.02)) off.push(`${id}/${seed}: cos=${cos.toFixed(4)}`)
+      if (!loom.onRiverAxis) off.push(`${id}/${seed}: loom does not claim the river axis`)
+    }
+    expect(off).toEqual([])
+  })
+
+  it('a village with no river lays the warp on the tangent and names no direction', () => {
+    const station = placeLoom({
+      bank: null,
+      nominal: [-8.5, -7],
+      walkRadius: 30,
+      free: () => true,
+      sightClear: () => true,
+      toChildren: () => Infinity,
+      waterPathHead: null,
+      clearance: balance.communication.talk.reach,
+      geometry: balance.villageLife.loom,
+    })
+    expect(station).not.toBeNull()
+    expect(station!.onRiverAxis).toBe(false)
+    // The tangent is perpendicular to the seat's own bearing.
+    const radial = Math.hypot(station!.seat.x, station!.seat.z)
+    const dot = (station!.seat.x / radial) * station!.fx + (station!.seat.z / radial) * station!.fz
+    expect(Math.abs(dot)).toBeLessThan(1e-9)
+  })
+})
+
+describe('the weaver sits in the MIDDLE of the warp (item 5)', () => {
+  it('her seat is the midpoint, in every shipped layout', () => {
+    const off: string[] = []
+    for (const { id, seed, layout } of shippedLooms()) {
+      const loom = layout.loom
+      if (!loom) continue
+      const toUp = Math.hypot(loom.seat.x - loom.upstream.x, loom.seat.z - loom.upstream.z)
+      const toDown = Math.hypot(loom.seat.x - loom.downstream.x, loom.seat.z - loom.downstream.z)
+      if (Math.abs(toUp - toDown) > 1e-6) off.push(`${id}/${seed}: ${toUp.toFixed(3)} vs ${toDown.toFixed(3)}`)
+      if (Math.abs(toUp - balance.villageLife.loom.warpHalf) > 1e-6) {
+        off.push(`${id}/${seed}: half warp ${toUp.toFixed(3)}`)
+      }
+    }
+    expect(off).toEqual([])
+  })
+
+  it('BOTH call targets lie on opposite sides of her, so neither is “toward me”', () => {
+    // This is the whole reason the seat is load-bearing: from an end, one call
+    // would send the helper away and the other toward her, and the player could
+    // learn the pair as come/go and still finish the puzzle.
+    const off: string[] = []
+    for (const { id, seed, layout } of shippedLooms()) {
+      const loom = layout.loom
+      if (!loom) continue
+      const up = { x: loom.tend.upstream.x - loom.seat.x, z: loom.tend.upstream.z - loom.seat.z }
+      const down = { x: loom.tend.downstream.x - loom.seat.x, z: loom.tend.downstream.z - loom.seat.z }
+      if (up.x * down.x + up.z * down.z >= 0) off.push(`${id}/${seed}: both stands on one side`)
+      if (Math.hypot(up.x, up.z) < 1 || Math.hypot(down.x, down.z) < 1) {
+        off.push(`${id}/${seed}: a stand too near the seat to read as a walk`)
+      }
+    }
+    expect(off).toEqual([])
+  })
+})
+
+describe('the station keeps its distance and shows the water (items 9 and 10)', () => {
+  it('clears every place a child speaks, and the water lane’s head, by the talk reach', () => {
+    const reach = balance.communication.talk.reach
+    const off: string[] = []
+    for (const { id, seed, layout } of shippedLooms()) {
+      const { loom, playGround, playRocks, bank, waterPath } = layout
+      if (!loom) continue
+      const childPlaces: Array<{ x: number; z: number; r: number }> = []
+      if (playGround) childPlaces.push({ x: playGround.x, z: playGround.z, r: playGround.radius })
+      for (const p of playRocks ? [playRocks.upstream, playRocks.downstream] : []) {
+        childPlaces.push({ x: p.x, z: p.z, r: 0 })
+      }
+      if (bank) childPlaces.push({ x: bank.bank.x, z: bank.bank.z, r: 0 })
+      for (const at of [loom.seat, loom.upstream, loom.downstream]) {
+        for (const c of childPlaces) {
+          const gap = Math.hypot(at.x - c.x, at.z - c.z) - c.r
+          if (gap < reach) off.push(`${id}/${seed}: ${gap.toFixed(2)} m to a child’s place`)
+        }
+        if (waterPath) {
+          const gap = Math.hypot(at.x - waterPath.head.x, at.z - waterPath.head.z)
+          if (gap < reach) off.push(`${id}/${seed}: ${gap.toFixed(2)} m to the water lane’s head`)
+        }
+      }
+    }
+    expect(off).toEqual([])
+  })
+
+  it('the river is in the picture from the seat', () => {
+    const off: string[] = []
+    for (const { id, seed, layout } of shippedLooms()) {
+      const { loom, bank, colliders } = layout
+      if (!loom || !bank) continue
+      const target = waterAhead(loom.seat, bank)
+      // The seat looks OUT at the water, not across the village at it.
+      const out = bank.distance - (loom.seat.x * bank.nx + loom.seat.z * bank.nz)
+      if (out <= 0) off.push(`${id}/${seed}: the seat is past the waterline`)
+      const steps = Math.ceil(Math.hypot(target.x - loom.seat.x, target.z - loom.seat.z) / 0.25)
+      for (let k = 1; k < steps; k++) {
+        const x = loom.seat.x + ((target.x - loom.seat.x) * k) / steps
+        const z = loom.seat.z + ((target.z - loom.seat.z) * k) / steps
+        // The warp's own colliders lie ON the seat, so they are skipped by
+        // starting one sample in; anything else in the line hides the water.
+        const solids = colliders.filter((c) => {
+          const near = Math.hypot((c as { x: number; z: number }).x - loom.seat.x, (c as { x: number; z: number }).z - loom.seat.z)
+          return !(c.kind === 'segment') && !(Number.isFinite(near) && near < 0.01)
+        })
+        if (!standingClear(solids, x, z, 0.2)) {
+          off.push(`${id}/${seed}: the water is hidden ${(k / steps * 100) | 0}% of the way out`)
+          break
+        }
+      }
+    }
+    expect(off).toEqual([])
+  })
+})
+
+describe('the whole warp is a body the village walks round (item 11)', () => {
+  it('stands on standable ground over its whole length', () => {
+    const off: string[] = []
+    for (const { id, seed, layout } of shippedLooms()) {
+      const { loom, bank, colliders, radius } = layout
+      if (!loom) continue
+      // The loom's OWN two bodies — the warp and the weaver at her seat — are
+      // not obstacles to themselves.
+      const others = colliders.filter((c) =>
+        c.kind === 'segment'
+          ? Math.hypot(c.x1 - loom.upstream.x, c.z1 - loom.upstream.z) > 1e-9
+          : c.kind === 'box' || Math.hypot(c.x - loom.seat.x, c.z - loom.seat.z) > 1e-9,
+      )
+      for (let k = 0; k <= 16; k++) {
+        const x = loom.upstream.x + ((loom.downstream.x - loom.upstream.x) * k) / 16
+        const z = loom.upstream.z + ((loom.downstream.z - loom.upstream.z) * k) / 16
+        if (Math.hypot(x, z) > radius - WALKER_RADIUS) off.push(`${id}/${seed}: warp leaves the settlement`)
+        if (!standsOnGroundPlate(bank, x, z, WARP_BODY_RADIUS)) off.push(`${id}/${seed}: warp on the shore`)
+        if (!standingClear(others, x, z, WARP_BODY_RADIUS)) off.push(`${id}/${seed}: warp through a solid`)
+      }
+    }
+    expect(off.slice(0, 10)).toEqual([])
+  })
+
+  it('the layout carries the warp AND the weaver as colliders', () => {
+    for (const { id, seed, layout } of shippedLooms()) {
+      const loom = layout.loom
+      if (!loom) continue
+      const warp = layout.colliders.find(
+        (c) => c.kind === 'segment' && Math.hypot(c.x1 - loom.upstream.x, c.z1 - loom.upstream.z) < 1e-9,
+      )
+      expect(warp, `${id}/${seed}`).toBeTruthy()
+      const seat = layout.colliders.find(
+        (c) => c.kind !== 'segment' && c.kind !== 'box' && Math.hypot(c.x - loom.seat.x, c.z - loom.seat.z) < 1e-9 && c.r === WEAVER_BODY_RADIUS,
+      )
+      expect(seat, `${id}/${seed}`).toBeTruthy()
+    }
+  })
+})
+
+describe('loomAround is the one geometry both the layout and the scene read', () => {
+  it('lays the stakes and the tending stands off one seat and one axis', () => {
+    const station = loomAround({ x: 2, z: -3 }, 0, 1, { warpHalf: 3, tendStand: 2 }, true)
+    expect(station.upstream).toEqual({ x: 2, z: -6 })
+    expect(station.downstream).toEqual({ x: 2, z: 0 })
+    expect(station.tend.upstream).toEqual({ x: 2, z: -5 })
+    expect(station.tend.downstream).toEqual({ x: 2, z: -1 })
+  })
+})

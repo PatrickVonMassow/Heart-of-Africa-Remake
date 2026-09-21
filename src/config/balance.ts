@@ -860,6 +860,30 @@ export interface BalanceConfig {
        *  effect on the next visit rather than mid-scene. */
       villagerCount: number
     }
+    /** The weaver's loom (work-order 1157): the station that shows weaving AND
+     *  teaches UPSTREAM/DOWNSTREAM a second time, on a walking body instead of
+     *  the children's running groups. */
+    loom: {
+      /** Metres from the weaver's seat to each warp stake — half the stretched
+       *  warp. The seat is its MIDPOINT, so both calls send the helper away. */
+      warpHalf: number
+      /** Metres from the seat at which the helper works when a call sends him
+       *  to one end. Inside `warpHalf`, so he is plainly ON the warp. */
+      tendStand: number
+      /** Seconds of one shuttle pass: across the warp and back again. */
+      passSeconds: number
+      /** Metres of woven strip one completed pass adds to the cloth. */
+      clothPerPass: number
+      /** Seconds between two NAMED tendings. The throws themselves are silent;
+       *  this is the rate the two direction words fall at. */
+      tendIntervalSeconds: number
+      /** Random spread of that interval, 0..1 (0 = a metronome). */
+      tendIntervalSpread: number
+      /** How long the helper works at the end he was sent to. */
+      tendDwellSeconds: number
+      /** The pace he walks the warp at, in metres per second. */
+      helperPace: number
+    }
     /** The body every inhabitant presents to every other (work-order 578). */
     separation: {
       /** Body radius of a figure drawn at scale 1; a child's is this times its
@@ -1585,6 +1609,33 @@ export const balance: BalanceConfig = {
       stallSeconds: 20,
       pace: 1.25, // an unhurried working walk
       villagerCount: 4,
+    },
+    // THE LOOM (work-order 1157). Calibratable starting values (CLAUDE.md §2),
+    // each stated against what it has to hold:
+    //  - 3.2 m of warp either side of the seat makes a 6.4 m stretch. It has to
+    //    be long enough that a helper WALKING to one end reads as a direction
+    //    rather than a step aside, and short enough to fit the room a village
+    //    has left between its huts; the water path's own head sweep works with
+    //    the same order of distance.
+    //  - The helper works at 2.4 m, well inside the stake, so he stands ON the
+    //    warp and not past its end.
+    //  - One pass takes 2.6 s: slow enough to follow the shuttle across by eye,
+    //    quick enough that half a minute of watching shows real progress.
+    //  - 0.11 m of strip per pass fills a 3.2 m side in about 29 passes — 75 s,
+    //    so a player who watches sees the cloth grow and, staying longer, sees
+    //    it taken off and the warp bare again.
+    //  - A named tending every 18 s is "a few times a minute" (item 8): often
+    //    enough to catch in passing, rare enough that the speech labels do not
+    //    become noise beside the children's.
+    loom: {
+      warpHalf: 3.2,
+      tendStand: 2.4,
+      passSeconds: 2.6,
+      clothPerPass: 0.11,
+      tendIntervalSeconds: 18,
+      tendIntervalSpread: 0.35,
+      tendDwellSeconds: 5,
+      helperPace: 1.25, // the errand walk's own unhurried pace
     },
     // The body every inhabitant presents to every other (work-order 578).
     // Calibratable starting values (educated guess, CLAUDE.md §2), stated
