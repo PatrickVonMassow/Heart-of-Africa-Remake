@@ -2908,6 +2908,16 @@ describe('the shipped charge ledger', () => {
   // to make deliberate. The two point-698 crossing entries are the whole list
   // today, and a third one has to be argued for HERE, in this test, before it
   // can charge anything.
+  // THE ARGUMENT FOR THE FOURTH READER, 21.09.2026 — point 1068 on WEBGPU. It
+  // reads a cut measurement for the same reason its WebGL 2 sibling does and no
+  // other: the run record cuts the detail at 200 characters, and the cut falls
+  // inside "In 0.5s bursts: worst ", so the burst reading — the sharpest
+  // discriminator, standing at 0.00 % while the one-second series reddened — is
+  // not in the text a charge can read. It reads the SAME signature as the
+  // sibling, character for character, over the same group-share cap; it is a
+  // separate entry only because the two lanes' evidence is separate. Nothing
+  // about what may be excused widens: what earned the new entry is a measurement
+  // on a lane 1068 had never had a reading printed for, not a looser bound.
   it('lets exactly the declared entries read a cut measurement, and makes each say why', () => {
     const MAX_STORED_DETAIL = 200
     const declaring = RED_CHARGES.filter((c) => c.detailReadsPrefix === true)
@@ -2928,6 +2938,13 @@ describe('the shipped charge ledger', () => {
         '151.4 judged child-seconds). Least judgeable child 4 at 96.9 %, group 96.9 % of 156.3 ' +
         'traced. In 0.5s bursts: worst child -1 at 0.00 %, group 0.00 % of 153.8 judged ' +
         'child-seconds, least judgeable child 4 at 98.5 %. Bad = over 1 m walked inside 0.35 m',
+      // The real WebGPU text, from the run that earned the entry
+      // (local/verify-logs/2026-09-21T08-02-02-116-collision-polish-settings.log).
+      '1068/polish/webgpu':
+        'worst child 0 at 0.34 % of its own judged time; group 0.07 % (4 of 5880 1s windows, ' +
+        '263.5 judged child-seconds). Least judgeable child 4 at 98.1 %, group 98.1 % of 268.5 ' +
+        'traced. In 0.5s bursts: worst child -1 at 0.00 %, group 0.00 % of 266.1 judged ' +
+        'child-seconds, least judgeable child 4 at 99.1 %. Bad = over 1 m walked inside 0.35 m',
     }
     expect(declaring.map((c) => `${c.point}/${c.suite}/${c.backend}`).sort()).toEqual(
       Object.keys(measuredFor).sort(),
