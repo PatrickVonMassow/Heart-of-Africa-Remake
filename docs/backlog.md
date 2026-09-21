@@ -1563,3 +1563,20 @@ was fehlt, ist die Unterscheidung zwischen „der Autor schreibt" und „sein We
 geschrieben". Nicht als Punkt eingereiht: die falsche Richtung ist die harmlose, und die
 Infrastruktur steht unter Einfriergebot. Wer es ohnehin anfasst, schließt regenerierbare
 Ausgabeordner aus der Lebendprüfung aus oder verlangt zusätzlich einen Prozess.
+
+## Ein `--section`-Lauf überschreibt die Vollpass-Bilder mit Kaltstart-Bildern (21.09.2026)
+
+`npm test -- polish --section=speech-guess` schrieb `verification/148-speech-guess-invitation.png`
+neu: 62.900 Bytes, leeres blassgrünes Feld, keine Hütten, keine Berge, kein Feuer, HUD-Zähler
+„1 FPS". Der auf main eingecheckte Stand desselben Bildes, auf DEMSELBEN Backend (WebGL 2,
+gleicher Kompatibilitätshinweis im Bild), ist 624.037 Bytes und zeigt das volle Maasai-Dorf
+bei 52 FPS. Es ist also kein Backend-Unterschied, sondern ein Kaltstart: der Abschnittslauf
+öffnet den Verschluss, bevor die Szene steht, während der Vollpass die Blöcke davor als
+Aufwärmung hat. Die Prüfung selbst bleibt grün, weil ihr erklärtes Subjekt — die Sprechnotiz —
+im Bild ist; nichts meldet den Verlust. `verification/` ist in git verfolgt, also ersetzt ein
+`git add -A` nach einem Abschnittslauf gute Vollpass-Bilder durch Kaltstart-Bilder, und der
+nächste Bildvergleich steht auf dem verschlechterten Stand. Hier waren 76 Dateien betroffen;
+alle wurden mit `git restore verification/` verworfen, bevor gelandet wurde. Nicht als Punkt
+eingereiht: kein Spielerimpakt, und die billigste Abhilfe — ein Abschnittslauf schreibt seine
+Bilder gar nicht erst in den verfolgten Ordner — ist Infrastruktur unter Einfriergebot. Bis
+dahin gilt die Handregel: nach einem `--section`-Lauf nie `verification/` mitcommitten.
