@@ -166,13 +166,14 @@ put it is the mistake this line exists to stop.
   learned here is one the player can carry all the way to the chief's message.
   Author lane: it is a communication-mechanic point whose verification is the work.
 
-  SOURCE CHECK DONE, DECISION TAKEN (owner, 22.09.2026, after the Astra author's escalation
-  recorded in `docs/peoples-1890.md` §8.1 on this point's branch): our Park and Caillié passages
+  SOURCE CHECK DONE, DECISION TAKEN (owner, 22.09.2026, after the Astra author's escalation,
+  recorded on this point's branch in a loom subsection under `docs/peoples-1890.md` §8): our
+  Park and Caillié passages
   carry narrow-strip weaving, the shuttle and the reed beater, and Park assigns weaving to men;
   neither source carries a two-ended warp with a seat at its middle, nor a woman at the loom.
   The picture in items 4–7 is therefore a GAMEPLAY ADAPTATION ordered by the user on 21.09.2026
   (14:41), not a sourced reconstruction, and the point is built as written. The author records
-  that in the same commit: §8.1 loses "build still open" and gains a short "adaptation" note
+  that in the same commit: the loom subsection loses "build still open" and gains a short "adaptation" note
   saying what the sources carry (strip, shuttle, beater, male weavers) and what the game changes
   and why (mid-seat so both calls send the helper away; the weaver kept as the figure the player
   reported). Do not phrase the adaptation as Park's or Caillié's account anywhere in the docs.
