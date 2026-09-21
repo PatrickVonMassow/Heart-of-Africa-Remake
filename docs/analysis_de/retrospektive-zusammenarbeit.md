@@ -1685,7 +1685,7 @@ stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die s
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Montag, 21.09.2026, 20:44 · Quellen-Fingerprint: `81e7f9c4c3b0…`
+Zuletzt aktualisiert: Montag, 21.09.2026, 23:14 · Quellen-Fingerprint: `8f954caaf45e…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1793,8 +1793,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 98 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 7 Revert-/Reapply-Commits · 136 Prozess-/Meta-TASKS-Punkte (davon 64 offen).
 
-<!-- RETRO-FINGERPRINT: 81e7f9c4c3b0b62e6320302982e76c0571704e1136f94c448dca158d7cbdece1 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-21T18:44:26.628Z -->
+<!-- RETRO-FINGERPRINT: 8f954caaf45ed114fb1d566f6dfbdd6aa2807c2112bdee2b0539d3d40c2189a0 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-21T21:14:44.572Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -7933,3 +7933,40 @@ zuständig ist. Wenn mehrere Wächter denselben Beweis absichern, gehört gefrag
 **keiner** von ihnen stellt; die Antwort darauf steht nie in ihren einzelnen Zusagen. Und wenn
 das dritte Nachjustieren an derselben Stelle nicht trägt, ist die vermutete Ursache falsch —
 dann wird sie als eigener Punkt aufgeschrieben, nicht ein viertes Mal justiert.
+
+### 3.298 Der Nachbau war strenger als das Spiel, das er abbildete
+
+Punkt 1173 vergrößerte den begehbaren Bereich einer Siedlung um ein Zehntel. Von sechsundvierzig
+roten Fällen, die das auslöste, waren drei keine Spielfehler, sondern Abweichungen einer
+Simulation von dem Spiel, für das sie einsteht: Die Erwachsenen-Errand-Prüfung hakte Wegpunkte
+nur bei **exakter** Ankunft ab, während die Szene sie mit einem Radius von 1,2 m abhakt; sie
+kannte die Entkommensleiter der Szene nicht; und sie setzte ihr Paar auf einen festen Ort, den
+das Layout nie zugesagt hatte. Solange die Geometrie eng war, fiel keine dieser drei Abweichungen
+auf. Die erste echte Layout-Änderung machte daraus einen Dorfbewohner, der an einem freien Ziel
+zwei Meter davor pendelte, und ein Dorf, in dem nie eine Aufgabe begann — beides sah aus wie ein
+Produktdefekt und war die Messung.
+
+Der Unterschied zu 3.12 ist wichtig: Dort backte ein Test einen **Wert** ein, hier einen
+**Mechanismus**. Ein eingebackener Wert fällt beim Rekalibrieren auf; ein nachgebauter
+Mechanismus, der vom Original abweicht, sieht bei jedem Rot wie ein Fund aus und schickt den
+Arbeiter in die falsche Richtung — hier zwei Stunden lang, durch drei nacheinander auftauchende
+Fälle derselben Ursache.
+
+**Lehre:** Wo ein Test eine Bewegung des Spiels **nachbaut** statt sie aufzurufen, gehört die
+Abweichung benannt und die geteilte Funktion aufgerufen (`advancePlaceRoute`, `escapeToFree`) —
+nicht nachempfunden. Und wenn eine einzige Änderung mehrere rote Fälle in derselben Simulation
+erzeugt, ist die erste Frage nicht, was das Produkt falsch macht, sondern ob die Simulation
+noch dasselbe tut wie die Szene.
+
+### 3.299 Vier Beispielwerte, die nichts mehr fanden
+
+Dieselbe Änderung ließ vier gepinnte Beispiele reißen, die alle nichts über das Produkt aussagten:
+zwei Zählwerte (27 akzeptierte Peilungen, 39 abgewiesene), ein Bildmotiv-Seed, eine Liste von
+Seeds, „deren Weg durch ein Hoftor führt", und eine Engstellen-Koordinate im Kinderquartier. Drei
+davon waren als Beleg gedacht, dass beide Zweige einer Prüfung überhaupt vorkommen — und genau
+das sagten sie nach der Verschiebung nicht mehr, während sie rot wurden.
+
+**Lehre:** Ein Beispiel, das eine Aussage belegen soll, gehört als **Aussage** geschrieben („beide
+Zweige kommen vor", „die Strecke liegt zwischen ihren zwei Grenzen"), nicht als die Zahl, die
+heute herauskommt. Die Zahl gehört in den Kommentar daneben, wo sie beim nächsten Mal erklärt,
+warum sich etwas bewegt hat, statt einen Lauf zu röten, der nichts gefunden hat.

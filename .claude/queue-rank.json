@@ -1,5 +1,11 @@
 {
   "ranked": {
+    "312": {
+      "at": "2026-09-21T21:12:56.442Z",
+      "why": "user 21.09.2026, 21:38: Ziehe 312 vor 633",
+      "origin": "user",
+      "place": "ahead"
+    },
     "336": {
       "at": "2026-08-21T16:06:02.037Z",
       "why": "User ruling 21.08.2026 (only the communication mechanic, then 633 and the release 174), plus the branch decision of the same day: feat/336-croc-staging was deleted because two of two files had moved on main, so nothing is left to fall behind and the rebuild this point demands waits until after the release.",
@@ -1380,39 +1386,16 @@
       "why": "Maschinell eingereiht beim Landen von 690; kein Spielerimpakt, und die Reparatur steht hinter den Bildziel-Punkten derselben Suite.",
       "origin": "machine",
       "place": "last"
+    },
+    "1176": {
+      "at": "2026-09-21T21:12:53.633Z",
+      "why": "user 21.09.2026, 20:21: nach 659, vor 633 — gehoert zu v0.3, weil v0.3 die Kinderspiele einfuehrt",
+      "origin": "user",
+      "place": "ahead"
     }
   },
-  "boundary": {
-    "at": "2026-08-21T00:55:14.962Z",
-    "points": [
-      336,
-      553,
-      596,
-      633,
-      659,
-      660,
-      663,
-      690,
-      708,
-      715,
-      719,
-      733,
-      735,
-      736,
-      738,
-      739,
-      746,
-      747,
-      750,
-      759,
-      760,
-      762,
-      764
-    ],
-    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
-  },
   "settled": {
-    "at": "2026-09-21T15:56:48.726Z",
+    "at": "2026-09-21T21:12:53.644Z",
     "points": [
       174,
       184,
@@ -1566,7 +1549,6 @@
       678,
       680,
       683,
-      690,
       694,
       696,
       698,
@@ -1821,7 +1803,36 @@
       1172,
       1173,
       1174,
-      1175
+      1175,
+      1176
     ]
+  },
+  "boundary": {
+    "at": "2026-08-21T00:55:14.962Z",
+    "points": [
+      336,
+      553,
+      596,
+      633,
+      659,
+      660,
+      663,
+      708,
+      715,
+      719,
+      733,
+      735,
+      736,
+      738,
+      739,
+      746,
+      747,
+      750,
+      759,
+      760,
+      762,
+      764
+    ],
+    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   }
 }
