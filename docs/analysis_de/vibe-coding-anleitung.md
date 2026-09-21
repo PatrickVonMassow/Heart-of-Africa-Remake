@@ -422,9 +422,12 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Eine **verneinende** Meldung nennt den **gemessenen** Zustand, den sie verneint."
 
 - **Einigkeit und Erfolg sind keine Evidenz.** Modelle liegen gemeinsam daneben, und
-  „es lief durch" beweist den Weg nicht.
+  „es lief durch" beweist den Weg nicht. Fällt ein Messwert unter **allen** Erklärungen gleich
+  aus, trennt er sie nicht — und wo ein Mensch zustimmen kann, sagt ein geglückter Lauf gar
+  nichts über die Automatik: er hat vielleicht nur geklickt.
   → *Prompt:* „Welcher **eine Test** macht die Ursache **sichtbar**? Sag **vor** der Messung,
-  welches Ergebnis welche Erklärung ausschließt."
+  welches Ergebnis welche Erklärung ausschließt. Kann mein **Klick** den Ausgang geändert
+  haben, frag mich, ob ich geklickt habe, bevor du den Lauf als Beleg nimmst."
 
 - **Zwei Aufträge für einen Fehler.** Derselbe Mangel wird arglos ein zweites Mal aufgeschrieben.
   → *Prompt:* „Vor jedem neuen Punkt: Such die offenen nach demselben Problem ab und **erweitere**
@@ -703,4 +706,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 8f954caaf45ed114fb1d566f6dfbdd6aa2807c2112bdee2b0539d3d40c2189a0 -->
+<!-- GUIDE-FINGERPRINT: ba6e49c09d43dd55506d878412342a3d33a32cd610110c38376c6ba15ef98cf5 -->
