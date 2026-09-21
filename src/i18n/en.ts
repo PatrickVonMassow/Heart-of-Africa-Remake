@@ -626,12 +626,6 @@ export const en: Strings = {
     bankStrangerBerth: 'Bank game: extra berth for the stranger (m)',
     bankUtteranceGap: 'Bank game: gap between two calls (s)',
     bankSilence: 'Bank game: alarm when nobody speaks for (s)',
-    childSpeechInterval: 'Children: seconds between utterances',
-    childSpeechSpread: 'Children: spread of that interval',
-    childSpeechAction: 'Children: action lasts (s)',
-    childSpeechPace: 'Children: errand pace (m/s)',
-    childSpeechRefusal: 'Children: chance a call is refused',
-    childSpeechReply: 'Children: answer window (s)',
     adultErrandInterval: 'Adults: seconds between errands',
     adultErrandSpread: 'Adults: spread of that interval',
     adultErrandDwell: 'Adults: stay at the errand (s)',
@@ -996,7 +990,7 @@ export const en: Strings = {
       }
       return (
         texts[p.people as string] ??
-        `I have reached the ${name}. Simple huts of clay and reed huddle close to the water, and children run out to meet me, [pause]full of curiosity. The chief resides in the great hut at the center of the village. [somber]If I can win his goodwill,[pause] perhaps he will show me the way.[/somber]`
+        `I have reached the ${name}. Simple huts of clay and reed huddle close to the water, and children run out to meet me, [pause]full of curiosity. The chief resides in the great hut at the center of the village. [somber]I can call him outside,[pause] though I do not yet know what he will tell me.[/somber]`
       )
     },
     // Return vignette (point 170): the situation CHANGED since the last visit —
@@ -1025,7 +1019,7 @@ export const en: Strings = {
     drumMessage:
       '[awe]The chief called his drummer, and two drums spoke for him — a great one and a small one.[/awe] [pause]Four words, each of four beats, each parted from the next by the same short silence — deep for the low syllable, bright for the high one. [excited]I know these words. I have heard every one of them in the lanes and at the water.[/excited] [pause]I have written them down in the order they were beaten; what they ask of me I must read for myself.',
     rockArtefact:
-      "[excited]Four words, and they were an errand after all.[/excited] I followed the water against its own pull until a block of stone stood on the bank — the kind of thing the children name at their own two rocks, and the only one up here. [pause]The drums had said no more than that: water, against the pull, stone, dig. Everything else about it I had to find for myself. [pause]Three spans down my shovel met something that was not stone: hammered metal on worn wood, sealed in the river's own clay. [awe]It has lain here longer than the village has stood.[/awe] [pause]I did not open it further. [somber]It is not mine to open.[/somber]",
+      "[excited]Four words, and they were an errand after all.[/excited] I followed the water against its own pull until a block of stone stood on the bank — the kind of thing the children name at their own two rocks, and the only one up here. [pause]I have kept my reading beside the drum beats in my notes. [pause]Three spans down my shovel met something that was not stone: hammered metal on worn wood, sealed in the river's own clay. [awe]It has lain here longer than the village has stood.[/awe] [pause]I did not open it further. [somber]It is not mine to open.[/somber]",
     artefactGiven:
       "[breath]I carried it back down the river and laid it in the chief's hands.[/breath] [pause]He laid the find beside the drums and had his drummer answer — two words on the drums. [excited]Both of them I had heard before in the village.[/excited] [pause]What the two say together I must work out for myself; nobody here will say it in a tongue of mine. [pause]Then he took a thing of baked clay from beside the drums and put it into my hands without a single word over it. [pause]It is flat at the back and hollowed at the front, and the hollow is no bowl: it is the shape of a piece of rock, taken off it the way a seal takes a signet. [awe]A form that wants to go INTO something, not onto it.[/awe] [pause][somber]We share no language.[pause] And yet he has given me two words and a shape, and both are meant for someone who has been listening.[/somber]",
     mouldFitted:

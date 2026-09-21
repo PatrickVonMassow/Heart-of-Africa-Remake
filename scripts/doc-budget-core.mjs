@@ -223,7 +223,12 @@ export const DOC_BUDGETS = [
     // slot answers its press with a toast, never in the journal, and that toast
     // stacks above every panel (work-order 1170) — a rule the criterion did not
     // carry.
-    maxLines: 582,
+    // RAISED by the 2 measured lines criterion 7 owes the settlement-staging rule:
+    // a bank village stages the bank game only, ports and bankless villages the
+    // silent tag game only, each on its own ground clear of that settlement's adult
+    // vignettes (work-order 690) — a rule the criterion did not carry and one that
+    // cannot be read off the concept list it did.
+    maxLines: 584,
     // RAISED by the 19 measured words criterion 16 owes the step height: a
     // scattered stone below `balance.placeStepOverTop` is ground rather than an
     // obstacle (work-order 1149), which is a rule the criterion did not carry

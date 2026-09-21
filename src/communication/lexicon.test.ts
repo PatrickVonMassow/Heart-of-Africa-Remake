@@ -178,6 +178,20 @@ describe('the opposite pairs mirror each other', () => {
   it('contains only upstream/downstream', () => {
     expect(MIRROR_PAIRS).toEqual([['UPSTREAM', 'DOWNSTREAM']])
   })
+
+  // The documents describe the SHAPE of the language, and that shape is
+  // checkable: the spec claimed three mirror pairs including ROCK/DIG, when
+  // ROCK and DIG are each their own mirror and no pair at all. Pinned here so
+  // the next such sentence is caught by a test rather than by a reader.
+  it('holds two mirror pairs and two sequences that mirror themselves', () => {
+    const mirrorOf = (c: ConceptId) => key(reversed(sequenceOf(c)))
+    const mirrored = CONCEPT_IDS.filter((c) =>
+      CONCEPT_IDS.some((o) => o !== c && key(sequenceOf(o)) === mirrorOf(c)),
+    )
+    const selfMirrored = CONCEPT_IDS.filter((c) => key(sequenceOf(c)) === mirrorOf(c))
+    expect([...mirrored].sort()).toEqual(['CHIEF', 'DOWNSTREAM', 'RIVER', 'UPSTREAM'])
+    expect([...selfMirrored].sort()).toEqual(['DIG', 'ROCK'])
+  })
 })
 
 describe('utterances and phrases', () => {

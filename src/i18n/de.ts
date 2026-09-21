@@ -625,12 +625,6 @@ export const de: Strings = {
     bankStrangerBerth: 'Uferspiel: Zusatzabstand zum Fremden (m)',
     bankUtteranceGap: 'Uferspiel: Pause zwischen Rufen (s)',
     bankSilence: 'Uferspiel: Alarm, wenn niemand spricht (s)',
-    childSpeechInterval: 'Kinder: Sekunden zwischen Äußerungen',
-    childSpeechSpread: 'Kinder: Streuung dieses Abstands',
-    childSpeechAction: 'Kinder: Handlung dauert (s)',
-    childSpeechPace: 'Kinder: Tempo beim Auftrag (m/s)',
-    childSpeechRefusal: 'Kinder: Wahrscheinlichkeit einer Weigerung',
-    childSpeechReply: 'Kinder: Antwortfenster (s)',
     adultErrandInterval: 'Erwachsene: Sekunden zwischen Aufträgen',
     adultErrandSpread: 'Erwachsene: Streuung dieses Abstands',
     adultErrandDwell: 'Erwachsene: Aufenthalt am Ziel (s)',
@@ -997,7 +991,7 @@ export const de: Strings = {
       }
       return (
         texts[p.people as string] ??
-        `Ich habe das ${name} erreicht. Einfache Hütten aus Lehm und Schilf drängen sich am Wasser, und Kinder laufen mir entgegen, [pause]voller Neugier. Der Häuptling residiert in der großen Hütte in der Dorfmitte. [somber]Wenn ich sein Wohlwollen gewinne,[pause] zeigt er mir vielleicht den Weg.[/somber]`
+        `Ich habe das ${name} erreicht. Einfache Hütten aus Lehm und Schilf drängen sich am Wasser, und Kinder laufen mir entgegen, [pause]voller Neugier. Der Häuptling residiert in der großen Hütte in der Dorfmitte. [somber]Ich kann ihn herausrufen,[pause] doch ich weiß noch nicht, was er mir sagen wird.[/somber]`
       )
     },
     // Return vignette (point 170): the situation CHANGED since the last visit –
@@ -1026,7 +1020,7 @@ export const de: Strings = {
     drumMessage:
       '[awe]Das Oberhaupt rief seinen Trommler, und zwei Trommeln sprachen an seiner Statt – eine große und eine kleine.[/awe] [pause]Vier Wörter zu je vier Schlägen, jedes vom nächsten durch dieselbe kurze Stille getrennt – dumpf für die tiefe Silbe, hell für die hohe. [excited]Ich kenne diese Wörter. Jedes einzelne habe ich in den Gassen und am Wasser gehört.[/excited] [pause]Ich habe sie in der Reihenfolge notiert, in der sie geschlagen wurden; was sie von mir verlangen, muss ich selbst lesen.',
     rockArtefact:
-      '[excited]Vier Wörter – und es war doch ein Auftrag.[/excited] Ich bin dem Wasser gegen seinen eigenen Zug gefolgt, bis ein Steinblock am Ufer stand – von der Art, die die Kinder an ihren beiden Felsen benennen, und der einzige hier oben. [pause]Mehr hatten die Trommeln nicht gesagt: Wasser, gegen den Zug, Stein, graben. Alles Übrige daran musste ich selbst finden. [pause]Drei Spann tief stieß mein Spaten auf etwas, das kein Stein war: gehämmertes Metall auf verwittertem Holz, eingeschlossen im Lehm des Flusses. [awe]Es liegt hier länger, als das Dorf steht.[/awe] [pause]Ich habe es nicht weiter geöffnet. [somber]Es steht mir nicht zu, es zu öffnen.[/somber]',
+      '[excited]Vier Wörter – und es war doch ein Auftrag.[/excited] Ich bin dem Wasser gegen seinen eigenen Zug gefolgt, bis ein Steinblock am Ufer stand – von der Art, die die Kinder an ihren beiden Felsen benennen, und der einzige hier oben. [pause]Meine Deutung habe ich neben den Trommelschlägen in meinen Notizen festgehalten. [pause]Drei Spann tief stieß mein Spaten auf etwas, das kein Stein war: gehämmertes Metall auf verwittertem Holz, eingeschlossen im Lehm des Flusses. [awe]Es liegt hier länger, als das Dorf steht.[/awe] [pause]Ich habe es nicht weiter geöffnet. [somber]Es steht mir nicht zu, es zu öffnen.[/somber]',
     artefactGiven:
       '[breath]Ich habe es den Fluss hinab zurückgetragen und dem Oberhaupt in die Hände gelegt.[/breath] [pause]Er legte den Fund neben die Trommeln und ließ seinen Trommler antworten – zwei Wörter auf den Trommeln. [excited]Beide hatte ich schon im Dorf gehört.[/excited] [pause]Was die beiden zusammen sagen, muss ich selbst herausbekommen; niemand hier wird es mir in einer meiner Sprachen sagen. [pause]Dann nahm er ein Ding aus gebranntem Ton neben den Trommeln auf und legte es mir in die Hände, ohne ein einziges Wort darüber. [pause]Es ist flach im Rücken und ausgehöhlt an der Vorderseite, und die Höhlung ist keine Schale: Sie ist die Gestalt eines Stücks Fels, ihm abgenommen, wie ein Siegel ein Petschaft abnimmt. [awe]Eine Form, die IN etwas hinein will, nicht auf etwas darauf.[/awe] [pause][somber]Wir haben keine gemeinsame Sprache.[pause] Und doch hat er mir zwei Wörter und eine Gestalt gegeben, und beides ist für jemanden gemeint, der zugehört hat.[/somber]',
     mouldFitted:

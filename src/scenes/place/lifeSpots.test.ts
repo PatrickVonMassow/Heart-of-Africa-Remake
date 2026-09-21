@@ -17,6 +17,8 @@ import {
   MIN_PLAY_RADIUS,
   SPECTATOR_MARGIN,
   PORT_TALKERS,
+  portAdultStations,
+  portTraderSpots,
   VILLAGE_SPOTS,
   childPlayGround,
   villageAdultStations,
@@ -69,7 +71,7 @@ describe('the adult stations', () => {
     // The fire party moved with the fire; the well did not.
     expect(there).toContainEqual([10, 10])
     expect(there).toContainEqual(VILLAGE_SPOTS.well)
-    expect(PORT_TALKERS).toHaveLength(2) // ports have no children's ground yet
+    expect(PORT_TALKERS).toHaveLength(2)
   })
 })
 
@@ -346,5 +348,40 @@ describe('every shipped village can seat its children (point 524)', () => {
     const fabric = builtFabric(layout)
     expect(fabric.length).toBe(layout.dwellings.length + layout.interactives.length)
     for (const it of layout.interactives) expect(fabric).toContainEqual(it.pos)
+  })
+})
+
+
+describe('port playgrounds clear their own vignettes', () => {
+  it.each(PLACES.filter(p => p.kind === 'port').map(p => p.id))('%s seats a silent game inside the built port', id => {
+    let hash = 0
+    for (const c of id) hash = (hash * 31 + c.charCodeAt(0)) | 0
+    for (const seed of [7, 42, 236333330]) {
+      const layout = buildLayout(id, seed)
+      const g = layout.playGround!
+      expect(g).not.toBeNull()
+      expect(g.clearance).toBeGreaterThanOrEqual(HEARING)
+      expect(g.radius).toBeGreaterThanOrEqual(MIN_PLAY_RADIUS)
+      expect(Math.hypot(g.x, g.z) + g.radius + SPECTATOR_MARGIN).toBeLessThanOrEqual(layout.radius - WALKER_RADIUS * 2 + 1e-6)
+      const stations = portAdultStations((seed ^ hash) >>> 0)
+      for (const [x, z] of stations) {
+        expect(Math.hypot(x - g.x, z - g.z) - g.radius).toBeGreaterThanOrEqual(HEARING)
+      }
+      for (const trader of portTraderSpots((seed ^ hash) >>> 0)) {
+        expect(stations).toContainEqual([trader.x, trader.z])
+      }
+      // Dressing added after the search cannot occupy its free ground.
+      let free = 0, samples = 0
+      for (const ring of [0, 0.35, 0.7, 1]) {
+        for (let k = 0; k < 8; k++) {
+          const angle = k / 8 * Math.PI * 2
+          samples++
+          if (standingClear(layout.colliders, g.x + Math.cos(angle) * g.radius * ring,
+            g.z + Math.sin(angle) * g.radius * ring, WALKER_RADIUS)) free++
+          if (ring === 0) break
+        }
+      }
+      expect(free / samples).toBeCloseTo(g.openness, 6)
+    }
   })
 })

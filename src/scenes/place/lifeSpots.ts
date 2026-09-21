@@ -3,6 +3,7 @@
 // keep-clear zones in PlaceScene).
 
 import { WALKER_RADIUS } from './collision'
+import { mulberry32 } from '../../world/noise'
 import { ROCK_VILLAGE_ID } from '../../world/communicationRock'
 
 /** Keep the established adult/hearing geography; fit the buildings around it. */
@@ -30,6 +31,25 @@ export const VILLAGE_SPOTS = {
 
 /** Chatting pair on the port plaza. */
 export const PORT_TALKERS: [number, number] = [6, 6]
+
+/** The port's standing traders, shared by the drawing and playground search.
+ *  `seed` is the settlement-local seed, as used by PlaceLife. */
+export function portTraderSpots(seed: number) {
+  const rand = mulberry32((seed + 913) >>> 0)
+  return [
+    { x: 3 + rand() * 2, z: -4 - rand() * 2, phase: rand() * Math.PI * 2 },
+    { x: -4 - rand() * 2, z: -2 - rand() * 2, phase: rand() * Math.PI * 2 },
+  ]
+}
+
+/** Moving porters and walkers cross the settlement; only fixed vignettes
+ *  determine the children's hearing clearance, just as in villages. */
+export function portAdultStations(seed: number): Array<[number, number]> {
+  return [
+    ...[-0.5, 0.5].map(dx => [PORT_TALKERS[0] + dx, PORT_TALKERS[1]] as [number, number]),
+    ...portTraderSpots(seed).map(({ x, z }) => [x, z] as [number, number]),
+  ]
+}
 
 /**
  * Whether a village carries a well at all (user 07./10.09.2026). The

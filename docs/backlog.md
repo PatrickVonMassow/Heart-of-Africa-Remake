@@ -1635,6 +1635,27 @@ zehn Commits mit dem Betreff „Complete the authored changes". Wer dort ankommt
 landet, statt neu zu bauen. Nicht als Punkt eingereiht: kein Spielerimpakt, nichts ist verloren,
 und die Abhilfe ist dieselbe Gewohnheit wie oben — vor jedem Punktbeginn den Bestand ansehen.
 
+## Ein Hafenkind trat einmal auf der Stelle — und nur einmal (21.09.2026)
+
+Beim Landen von Punkt 690 las der `children-motion`-Abschnitt auf WebGL 2 in Kairo das
+schlechteste Kind mit 2,80 % seiner beurteilten Zeit (Gruppe 0,56 %, 43 von 5880
+Ein-Sekunden-Fenstern) gegen das Tor von 0,25 %. Das ist genau die Sorte Meldung, die
+Punkt 690 fürchtet — »ein Kind steckt im Hafen fest« —, und deshalb wurde ihr
+nachgegangen, statt sie zu wiederholen, bis sie grün war.
+
+Nachgemessen wurde sie nicht: der reine Nachlauf desselben Spiels — sechs Weltzahlen mal
+60/30/14 Bilder je Sekunde, also achtzehn Wiederholungen je Ort — setzt Kairos
+schlechtestes Kind auf 0,056 %, nicht schlechter als die Dörfer (bambara 0,154 %, maasai
+0,112 %). Der zweite WebGL-2-Lauf desselben Abschnitts an derselben Fassung war grün, der
+WebGPU-Lauf ebenfalls. Die Hafenbühne trägt den Tritt also nicht mit sich.
+
+Was bleibt, ist der bekannte, seltene Zufallstritt der Punkte 1068/1081/1169 — auf einer
+Maschine, deren Ruhe dieser Wirt nicht messen kann (kein GPU-Zähler). Nicht eingereiht:
+kein reproduzierbarer Spielerimpakt, und die Ursache hat bereits drei offene Punkte. Was
+diese Landung dagegen dauerhaft hinterlässt: das Tor läuft jetzt auch über den Hafen und
+das banklose Dorf, und jedes `children-motion`-Urteil nennt die Siedlung, in der es
+gefällt wurde.
+
 ## Die Spiegelregel der Trommelsprache ist nicht eindeutig: RIVER und CHIEF (21.09.2026)
 
 Aus einer Nutzerfrage: Wird die Bedeutung der hohen und tiefen BA-Folgen je Spielstart neu
@@ -1655,10 +1676,14 @@ jedoch ein Spiegelpaar OHNE Gegensatzbedeutung. Wer aus dem Richtungspaar „Umk
 Gegenteil" verallgemeinert, bekommt dort genau die falsche Hypothese, vor der die Gegenlese vom
 13.08.2026 gewarnt hat.
 
-Nicht als Punkt eingereiht, und das ist die Empfehlung des Befunds selbst: Für `CHIEF` gibt es
-keinen freien Platz. Übrig sind nur die beiden Eintonfolgen, also vier identische Schläge, und
-die sind am schlechtesten hörbar. Eine Änderung bräuchte den Bruch der Längen- und
-Paritätsregel und kostete damit die Zwei-Silben-Verhördistanz, auf der die ganze Hörbarkeit
-steht. Der Code kennt die Lücke und argumentiert an Ort und Stelle damit, dass nur das
-Richtungspaar im selben Atemzug gesagt wird (`lexicon.ts`). Kein Spielerimpakt ist
-reproduzierbar gemessen: Das Rätsel bleibt lösbar, weil es die Richtung erzwingt, nicht rät.
+Innerhalb des heutigen Vorrats ist die Lücke nicht zu schließen: Für `CHIEF` gibt es keinen
+freien Platz. Übrig sind nur die beiden Eintonfolgen, also vier identische Schläge, und die sind
+am schlechtesten hörbar. Eine Änderung bräuchte den Bruch der Längen- und Paritätsregel und
+kostete damit die Zwei-Silben-Verhördistanz, auf der die ganze Hörbarkeit steht. Der Code kennt
+die Lücke und argumentiert an Ort und Stelle damit, dass nur das Richtungspaar im selben Atemzug
+gesagt wird (`lexicon.ts`).
+
+WEITERGEFÜHRT ALS PUNKT 1174 (21.09.2026): Der Nutzer hat am selben Tag verlangt, das Vokabular
+je Spielstart zu würfeln. Damit wandert das überzählige Spiegelpaar von Start zu Start, und der
+Punkt hält es mit seiner Regel (b) aus dem Auftrag heraus, wo es am meisten schadet. Was hier
+stehen bleibt, ist die Abzählung, auf der diese Regel steht — nicht mehr eine offene Schwäche.

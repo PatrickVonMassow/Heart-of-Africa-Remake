@@ -1,4 +1,4 @@
-// The village children's game of tag (design.md §19.10, work-order 480/351).
+// The silent game of tag in ports and bankless villages (design.md §19.10, work-order 480/351).
 //
 // They run wild through the settlement, around the huts and past the fire. One
 // of them is IT and chases the others; whoever is caught becomes the new IT.

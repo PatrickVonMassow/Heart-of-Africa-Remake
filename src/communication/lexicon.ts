@@ -1,5 +1,5 @@
 // The tonal lexicon of the village communication slice (design.md §13.4,
-// docs/communication-poc-spec.md): the five concepts, the tone sequence each
+// docs/communication-poc-spec.md): the six concepts, the tone sequence each
 // one is spoken in, and the tone helpers every consumer — villager speech,
 // drums, journal, overhead labels — reads instead of restating them.
 //
@@ -194,8 +194,7 @@ export function toneDistance(a: ToneSequence, b: ToneSequence): number {
  *
  * Not the same as "usable as a concept", which it used to say. The single-tone
  * sequences `ba-ba-ba-ba` and `BA-BA-BA-BA` are well formed by this rule and are
- * deliberately never words — they are two of the three the inventory holds in
- * reserve. Whether a sequence IS a word is `conceptOf`'s question, and it answers
+ * deliberately never words — they are the whole of the inventory's reserve. Whether a sequence IS a word is `conceptOf`'s question, and it answers
  * it against the lexicon rather than by calling this.
  */
 export function isWellFormed(sequence: ToneSequence): boolean {

@@ -4,9 +4,7 @@ The acceptance criteria of CLAUDE.md §7.1 in full. Moved out of that file becau
 sent with EVERY turn of EVERY session and inherited by every delegated subagent, while
 the full wording is needed only when a criterion is worked on or closed — the same move
 the evidence chains made to docs/acceptance-evidence.md, and the same one nos. 20 and 21
-made first. Each section carries its criterion COMPLETE and verbatim, notices included,
-so the move can drop nothing; §7.1 keeps the number, the bold title, one short
-acceptance condition, the `Detail:` pointer and the `Evidence:` line, and THIS file is
+made first. §7.1 keeps the number and title; THIS file is
 what governs where the two differ in detail. A criterion and its detail section change in
 the SAME commit.
 
@@ -87,27 +85,31 @@ the same aligned price-table layout and buy gear back for the local currency per
 
 ## 6. Village and cultural contact.
 
-At least one enterable village with a chief's hut; a culturally correct gift is the
-condition for a hint — not mere observation (`design.md` §12). The village trading post
-barters the baseline goods for gifts and buys gear back for gifts — money has no value
+At least one enterable village with a chief's hut. The use key calls him outside
+without a gift, trust or goodwill precondition (`design.md` §12). The village
+trading post buys and sells baseline goods and gear for gifts; money has no value
 there (§9).
 
 ## 7. Language and communication.
 
-BUILT (`design.md` §13.4, `docs/communication-poc-spec.md`), in `src/communication/`: the
-Bambara village speaks FIVE concepts as four-syllable tone words (`lexicon`); voice and
-gesture carry equally far (`speaking`, `spokenGesture`); what is audible is recorded with
-day and village (`heard`). The children's ONE game at the bank teaches four of them at
-fixed moments of its round, the forbidden readings closed by the catcher's tap, a boulder
-named off the game and the parting call (`scenes/place/bankGame`, `bankStage`). The
-player's OWN reading — never judged — stands over the nearest speaker, written by clicking
-him (`speechLabel`, `speechTarget`, `src/ui/SpeechGuess.tsx`), one note with the journal.
-On earned trust the chief drums the four-concept message (`drumMessage`) and answers the
-artefact untranslated (`chiefReply`). Beside it stands §13.1–13.3 (`src/world/lore.ts`).
+The decided slice (`design.md` §13.4, `docs/communication-poc-spec.md`) teaches
+six four-syllable tonal words: RIVER, UPSTREAM, DOWNSTREAM, ROCK, DIG and CHIEF.
+Bank-game children teach four, adults teach RIVER through a dispatched water
+round trip and DIG through paired work, and the drummer names CHIEF at his hut.
+A bank village stages only the bank game; ports and bankless villages stage
+only silent tag, each on its own ground clear of its adult vignettes.
 
-REMAINDER (§13.4): the ADULTS' half — `RIVER` and `DIG` at their own work, never at the
-bank — is owed by point 688. ONE lect is built; other regions' languages and the
-`communication-1890.md` zone cut stay the user's decision, so §13.2 stays placeholder.
+Sound, gesture, observation and notes share TALK/CALL reach. One audible exchange
+speaks at a time; deferred words are released. **E** edits the targeted speaker's
+reading; the use key calls the chief and requests or repeats his drums outdoors.
+Neither the journal nor the game supplies or judges translations.
+
+Without prerequisites the chief drums `RIVER · UPSTREAM · ROCK · DIG`. Using
+the recovered inventory find before him yields `RIVER · DOWNSTREAM` and the
+wordless clay impression. Fitting it at Bandiagara's talus-foot socket ends the
+puzzle. Each message is remembered after its last beat and reopenable.
+Persisted readings deliberately break; saving is disabled and no migration is owed.
+Only one lect is built; other regional teaching remains outside this slice.
 
 ## 8. Chronicle/journal.
 
@@ -545,8 +547,8 @@ permanently.
 
 ## 31. Settlement orientation and panorama wildlife.
 
-The gift-unlocked building orientation of `design.md` §17.3 holds (pulsing markers on the
-important, enterable buildings after the first accepted gift, persisted per settlement,
+The building orientation of `design.md` §17.3 holds (pulsing markers on the
+important, enterable buildings after meeting the outdoor chief, persisted per settlement,
 announced by a localized toast), as does the §2.5 panorama wildlife (region-typical
 silhouettes drifting beyond the settlement edge — far and small, hazed toward the sky,
 standing on the ground the frame DRAWS under them rather than a monument looming or

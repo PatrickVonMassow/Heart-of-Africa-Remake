@@ -117,9 +117,8 @@ strategy and suite map: `scripts/verify/README.md`.
 
 ### 7.1 Acceptance Criteria (POC target)
 
-Each criterion keeps its number and title here; its condition and its evidence
-live under the same number in `docs/acceptance-criteria-detail.md` and
-`docs/acceptance-evidence.md`, and all affected copies change in one commit.
+Conditions and evidence share each criterion’s number in `docs/acceptance-criteria-detail.md` and
+`docs/acceptance-evidence.md`; affected copies change together.
 
 1. **Build/start.**
 2. **Two perspectives.**
@@ -127,7 +126,7 @@ live under the same number in `docs/acceptance-criteria-detail.md` and
 4. **Movement and time.**
 5. **Port city.**
 6. **Village and cultural contact.**
-7. **Language and communication.**
+7. **Language and communication.** Six tonal words, bank/work teaching, silent tag.
 8. **Chronicle/journal.**
 9. **Status bar.**
 10. **Goal scaffolding.**

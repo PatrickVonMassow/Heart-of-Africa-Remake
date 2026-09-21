@@ -1,14 +1,9 @@
 # The communication PoC (design.md §13.4)
 
-The user's decisions of 13.08.2026 replace the former eleven-word teaching
-design. The playable slice has one six-word tonal language, two teaching
-places, and a four-word message. The child tag situations and the adult errand
-catalogue from the former design are not part of this version.
-
-This document is the reference the work-order points 686–692 cite; it states
-what those decisions left to the build, so the points that carry the rebuild
-cannot each invent their own answer. It replaces the version the finished points
-477–488 were built against, which described the eleven-word design.
+This document governs the communication rebuild in work-order points 686–692
+and its landed follow-ups. The playable slice has one six-word tonal language:
+the children's bank game and the adults' water and digging work teach five
+words; the drummer teaches CHIEF. The errand is a four-word drum message.
 
 ## What the player does
 
@@ -66,8 +61,9 @@ second region can add its own entry without changing consumers.
 
 Reserved and unused: the two single-tone sequences `ba-ba-ba-ba` and
 `BA-BA-BA-BA`. CHIEF took the last spare mixed sequence, RIVER's tonal mirror,
-so all six words now fall into three mirror pairs — RIVER/CHIEF,
-UPSTREAM/DOWNSTREAM and ROCK/DIG. UPSTREAM and DOWNSTREAM remain the
+so the six words fall into two mirror pairs — RIVER/CHIEF and
+UPSTREAM/DOWNSTREAM — and two sequences that are their own mirror, ROCK and
+DIG. UPSTREAM and DOWNSTREAM remain the
 only pair the player hears AS a pair — they are announced against each other in
 the same round of the bank game, while CHIEF is only ever said alone, by the
 drummer pointing at the hut.
@@ -101,15 +97,16 @@ envelope peak from 1.8 to 0.85: the conservative mixed-output bound fell from
 The chief's drum message carries its own level, `communication.drumMessagePeak`,
 2.5 times the 1.8 that used to sit as a literal in `drumMessagePlan`. The two
 raises put the conservative mixed-output bound back over full scale: 1.336 with
-the debug drum bed and 1.242 without it, 2.52 dB and 1.88 dB over. Nothing in
-the graph absorbs that — there is no master limiter — so point 1156 carries it.
+the debug drum bed and 1.242 without it, 2.52 dB and 1.88 dB over. The unprotected graph
+would clip; the final master stage limits those coincidences (point 1156).
 The measured factors are not to be scaled back to hide the overage.
 
 The message is measured in the GRAPH, not only in its plan: its loudest strike
 (head and stick click on one sample) reaches the destination at 0.135 over the
 0.114 village floor, 0.249 together — clear of full scale on its own. It shares
 the master with the speech bus, so a strike falling on the two-voice worst case
-above still adds to it; that coincidence belongs to point 1156.
+above still adds to it; the master limiter bounds that coincidence without
+scaling back the requested levels.
 
 ## The speech floor
 
@@ -174,7 +171,7 @@ falloff remain calibratable under `balance.communication.*`.
 
 ## The children's game at the bank
 
-The children play ONE game, at the river bank, and it teaches four of the five
+The children play ONE game, at the river bank, and it teaches four of the six
 words without a staged lesson (work-order 687). They roam their own quarter out
 of earshot of the adults; at the end of that phase one of them calls `RIVER`,
 points at the water and the group runs to the bank, and that caller is the first
@@ -188,7 +185,7 @@ caught drops out where he stands. Sides swap every run, so the announced word al
 When no free runner is left, the caught children stay crouched for a readable
 ending before everybody rises and walks back toward the roaming quarter.
 
-Three readings are closed deliberately. `ROCK` cannot be learned as "made it",
+`ROCK` is grounded beyond arrival at a target. It cannot be learned as "made it",
 because the catcher taps his own rock and names it at the start of a run with
 nobody arriving, and because a child climbs an ordinary scattered boulder in the
 village — no part of the game — and names that while the group roams. That stone
@@ -220,6 +217,22 @@ same lexicon, heard through the same range rule as any other village speech. The
 phase lengths, the stage's distances and the extra berth the children give the
 traveller are calibratable under `balance.villageLife.bankGame`.
 
+## Silent tag in ports and bankless villages
+
+Every settlement stages exactly one children's game. A village with a bank
+plays the bank game; a village without a bank and every port play classic tag.
+One child is IT, the others flee, and the caught child takes over. Stamina,
+break-offs, body avoidance and progress-based escape remain part of that round.
+Tag never emits speech, overhead words or teaching gestures.
+
+Each settlement's layout derives its own playground against its built fabric
+and colliders, before loose dressing. Its rim clears that settlement's fixed
+adult vignettes by the TALK hearing radius and leaves room for a spectator
+inside the walkable boundary. Ports use their own talkers and standing traders;
+moving inhabitants are avoided by the bodies' shared steering. Bank villages
+use their derived ground as the roaming quarter, alongside the two-rock bank
+stage, with adult work placed clear of the teaching areas.
+
 ## The adults' work
 
 The adults teach RIVER through an errand ONE MAN ORDERS AND ANOTHER RUNS. At the
@@ -242,8 +255,7 @@ order is not given at all, and the errand simply waits for the next round.
 
 THE WATER READING IS ACCEPTED, NOT CLOSED. A player may read the second RIVER as
 WATER. The chief's message carries just as well as `WATER · UPSTREAM · ROCK ·
-DIG`, so the reading is left standing — unlike the three readings ROCK closes
-deliberately.
+DIG`, so the reading is left standing. ROCK must still transfer beyond a game target.
 
 DIG is said twice in each of two paired
 bouts at different excavations: an initiator first walks to a free adult and
@@ -252,7 +264,12 @@ it again before they dig together with tools in hand. A bout with no second
 adult free is retried later, never performed alone. Both DIG utterances wait
 while a child is in earshot, preserving the separation between the two teaching
 groups. Each stroke changes the site by deepening the pit, growing the spoil
-and throwing earth.
+and throwing earth. The work has a visible purpose: a grain-storage pit with
+baskets and a cover, a post hole with its timber, or a planted patch with a
+seedling tray. Completion leaves a covered store, a set post or planted rows.
+The spoil is walkable ground with matching height and collision; the pit and
+its furniture leave the workers reachable. The water path reaches the bank
+through the settlement's actual huts and fence gates, across world seeds.
 
 ## The messages
 
@@ -288,7 +305,7 @@ every request and repeat sends the answer.
 
 The target rock stands outside the village at the river and is reached in the
 bird's-eye view. The player travels upstream, digs at the rendered site, returns
-the recovered artefact to the chief, and completes the puzzle. The village's
+the recovered artefact to the chief, and receives the next message and a clay form. The village's
 play rocks teach a category that applies to this separate boulder.
 
 The artefact remains a single quest object: it is not trade stock, does not use
@@ -310,6 +327,13 @@ message already beating finishes uninterrupted, then releases the deferred
 answer. Only the answer's own last beat records it as heard. Its display and
 journal reopen show the player's editable readings, just like the errand.
 
+The reward is the “Clay Impression of a Rock” / “Tonabdruck eines Felsens”.
+The player follows `RIVER · DOWNSTREAM` to Bandiagara and uses that form at the
+matching socket on a weathered block at the talus foot, below the escarpment.
+Only fitting it there concludes the puzzle; the cliff's graves and granaries
+are not the target. The journal records the observed fit and opening without
+supplying a translation.
+
 Every later quest find brought to a chief follows the same rule: a found thing
 is an inventory item, and giving it is using that item before him.
 
@@ -320,3 +344,11 @@ sequence length changed, six concepts disappeared, and BIG_ROCK became ROCK, so
 old utterance keys no longer identify the current inventory. No migration is
 provided: saving is disabled for this PoC and no serious run depends on those
 readings. The save/load implementation itself remains intact.
+
+## Entering a reading
+
+The targeted audible speaker invites **E**, which opens the player's own reading.
+The use key remains available to huts, the chief and the drummer. A walking
+speaker retains its identity while its note is targeted; the note follows the
+drawn head. A dialog, the journal or the message paper edits the same stored
+reading, and neither speech nor the journal supplies a correct answer.

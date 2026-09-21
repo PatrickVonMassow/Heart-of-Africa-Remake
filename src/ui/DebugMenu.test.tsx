@@ -43,7 +43,6 @@ const DEFAULTS = {
   unstuck: { ...balance.unstuck },
   tag: { ...balance.villageLife.tag },
   bankGame: { ...balance.villageLife.bankGame },
-  childSpeech: { ...balance.villageLife.childSpeech },
   adultErrands: { ...balance.villageLife.adultErrands },
   separation: { ...balance.villageLife.separation },
   startupFreezeBudgetMs: balance.startup.pictureFreezeBudgetMs,
@@ -136,7 +135,6 @@ afterEach(() => {
   Object.assign(balance.unstuck, DEFAULTS.unstuck)
   Object.assign(balance.villageLife.tag, DEFAULTS.tag)
   Object.assign(balance.villageLife.bankGame, DEFAULTS.bankGame)
-  Object.assign(balance.villageLife.childSpeech, DEFAULTS.childSpeech)
   Object.assign(balance.villageLife.adultErrands, DEFAULTS.adultErrands)
   Object.assign(balance.villageLife.separation, DEFAULTS.separation)
   balance.startup.pictureFreezeBudgetMs = DEFAULTS.startupFreezeBudgetMs
@@ -274,11 +272,6 @@ describe('DebugMenu editable fields write through to balance (settings.mjs fillF
     { label: en.debug.bankDodgeDistance, read: () => balance.villageLife.bankGame.dodgeDistance, value: 5 },
     { label: en.debug.bankWalkPace, read: () => balance.villageLife.bankGame.walkPace, value: 1.4 },
     { label: en.debug.bankRoamGuard, read: () => balance.villageLife.bankGame.roamGuardSeconds, value: 30 },
-    // What the children SAY at that game (point 481): the rate of the staged
-    // situations, the life of the action that follows and the refusal chance.
-    { label: en.debug.childSpeechInterval, read: () => balance.villageLife.childSpeech.intervalSeconds, value: 9 },
-    { label: en.debug.childSpeechAction, read: () => balance.villageLife.childSpeech.actionSeconds, value: 7 },
-    { label: en.debug.childSpeechRefusal, read: () => balance.villageLife.childSpeech.refusalChance, value: 0.5 },
     // What the ADULTS do at their errands (point 483): the rate, the two dwell
     // times and the size of the group that runs them.
     { label: en.debug.adultErrandInterval, read: () => balance.villageLife.adultErrands.intervalSeconds, value: 12 },
@@ -908,8 +901,6 @@ const EXPECTED_CONTROLS: Record<DebugGroupId, readonly string[]> = {
     'debug.bankSpacing', 'debug.bankLaneSpacing', 'debug.bankDodgeDistance',
     'debug.bankDodgeReach', 'debug.bankRoamTurn', 'debug.bankRoamGoal', 'debug.bankRoamGuard', 'debug.bankWalkPace', 'debug.bankStrangerBerth',
     'debug.bankUtteranceGap', 'debug.bankSilence',
-    'debug.childSpeechInterval', 'debug.childSpeechSpread', 'debug.childSpeechAction',
-    'debug.childSpeechPace', 'debug.childSpeechRefusal', 'debug.childSpeechReply',
     'debug.adultErrandInterval', 'debug.adultErrandSpread', 'debug.adultErrandDwell',
     'debug.adultErrandDig', 'debug.adultErrandLife', 'debug.adultErrandStall',
     'debug.adultErrandPace', 'debug.adultErrandCount',
@@ -1005,12 +996,12 @@ describe('DebugMenu completeness: every control is present, in its group (point 
     })
   })
 
-  it('carries all 209 controls in total, and none twice', () => {
+  it('carries all 203 controls in total, and none twice', () => {
     render(<DebugMenu />)
     const labels = renderedRowLabels()
     const expected = DEBUG_GROUP_ORDER.flatMap((id) => EXPECTED_CONTROLS[id])
     expect(labels.length).toBe(expected.length)
-    expect(labels.length).toBe(209)
+    expect(labels.length).toBe(203)
     expect(new Set(labels).size).toBe(labels.length)
   })
 
@@ -1057,7 +1048,7 @@ describe('DebugMenu completeness: every control is present, in its group (point 
   it('gives every control a real input, select or button — no label without a control', () => {
     render(<DebugMenu />)
     const rows = [...document.querySelectorAll('.debug-menu .debug-group-body > label')]
-    expect(rows.length).toBe(209)
+    expect(rows.length).toBe(203)
     for (const row of rows) {
       const label = row.querySelector('span')?.textContent ?? '(none)'
       // The renderer row is the one deliberate read-only display (design.md §21.3).
@@ -1111,7 +1102,7 @@ describe('DebugMenu groups collapse and remember their state (point 393)', () =>
     render(<DebugMenu />)
     // Nothing opened: the whole set is still there (hidden), and a value still
     // writes through — the verify suites drive the controls this way.
-    expect(renderedRowLabels().length).toBe(209)
+    expect(renderedRowLabels().length).toBe(203)
     fireEvent.change(numberField(en.debug.travelSpeed), { target: { value: '9' } })
     expect(balance.travelSpeed).toBe(9)
     balance.travelSpeed = DEFAULTS.travelSpeed
@@ -1159,7 +1150,7 @@ describe('DebugMenu filter narrows the whole menu (point 393)', () => {
     typeFilter('croc')
     expect(renderedRowLabels().length).toBeLessThan(149)
     typeFilter('')
-    expect(renderedRowLabels().length).toBe(209)
+    expect(renderedRowLabels().length).toBe(203)
     expect(renderedGroups().filter((g) => g.open).map((g) => g.title)).toEqual([en.debug.groups.tools])
   })
 
@@ -1200,4 +1191,10 @@ describe('matchesDebugFilter (pure)', () => {
     expect(matchesDebugFilter('Walk speed (in places)', 'walk')).toBe(true)
     expect(matchesDebugFilter('Walk speed (in places)', 'crocodile')).toBe(false)
   })
+})
+
+
+it('offers no controls for the retired tag speech catalogue', () => {
+  expect(balance.villageLife).not.toHaveProperty('childSpeech')
+  expect(Object.keys(en.debug).some(key => key.startsWith('childSpeech'))).toBe(false)
 })

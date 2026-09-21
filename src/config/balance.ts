@@ -810,22 +810,7 @@ export interface BalanceConfig {
        *  nothing for this long raises `bank-speech-silent`. */
       roundSilenceSeconds: number
     }
-    /** What the children SAY at their game (work-order point 481). */
-    childSpeech: {
-      /** Seconds between two staged situations. */
-      intervalSeconds: number
-      /** Random spread of that interval, 0..1 (0 = a metronome). */
-      intervalSpread: number
-      /** How long a following action steers the child it falls on. */
-      actionSeconds: number
-      /** The pace a child moves at while carrying out what it was told (m/s). */
-      actionPace: number
-      /** Chance that a call is answered with a refusal instead of obeyed. */
-      refusalChance: number
-      /** How long after a call a refusal still reads as its answer. */
-      replySeconds: number
-    }
-    /** The adults' errands, which teach the five landscape and action concepts
+    /** The adults' water errands and paired digging, which teach RIVER and DIG
      *  (work-order point 483). */
     adultErrands: {
       /** Seconds between two staged errands. */
@@ -1532,19 +1517,6 @@ export const balance: BalanceConfig = {
       // cycle whose boulder proves unreachable says nothing at all. Half again
       // over that, so only a round that has genuinely stopped speaking trips it.
       roundSilenceSeconds: 180,
-    },
-    // What the children SAY (work-order point 481). Calibratable starting
-    // values: an utterance every few seconds is often enough to be heard several
-    // times in one visit and rare enough that the group is not a chatterbox, and
-    // an action outlives the utterance it followed (1.5 s of syllables) so the
-    // player sees the two belong together.
-    childSpeech: {
-      intervalSeconds: 6,
-      intervalSpread: 0.35,
-      actionSeconds: 5,
-      actionPace: 1.6, // a brisk errand walk, well under the chase's trot
-      refusalChance: 0.35,
-      replySeconds: 5,
     },
     // The adults' errands (work-order point 483). Calibratable starting values
     // (educated guess, CLAUDE.md §2): slower than the children's chatter,

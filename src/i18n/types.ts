@@ -647,12 +647,6 @@ export interface Strings {
     bankStrangerBerth: string
     bankUtteranceGap: string
     bankSilence: string
-    childSpeechInterval: string
-    childSpeechSpread: string
-    childSpeechAction: string
-    childSpeechPace: string
-    childSpeechRefusal: string
-    childSpeechReply: string
     adultErrandInterval: string
     adultErrandSpread: string
     adultErrandDwell: string

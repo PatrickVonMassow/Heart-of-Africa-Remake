@@ -1,5 +1,8 @@
 # design.md — reference records (read on demand)
 
+The communication balance reference below applies to work-order points 686–692
+and their follow-ups; the current mechanic is specified in `communication-poc-spec.md`.
+
 Three blocks of `design.md` live here, **verbatim and under their own original
 section numbers** (moved 27.07.2026, work-order point 367). They are reference
 material a reader looks up when the work touches them, not target state read at a
@@ -171,7 +174,7 @@ are adjustable at runtime). The complete set, grouped as the menu presents it:
 - Ambience volume (default 0.1): the master control for the whole soundscape — the noise beds (wind, surf, crowd murmur), their gust/swell modulation and the proximity animal calls all scale under it.
 - Per-source volumes sitting over that master: footsteps, the general ambient bed and the birdsong.
 - The coastal surf fade: the near radius within which the surf plays at full gain and the cutoff distance from the coast beyond which it is exactly silent, so the sea is heard at the shore and in seaside ports but never inland.
-- Village speech (§13.4): the length of one spoken syllable (the constant pace of every utterance), the constant pause between the atoms of a phrase, the hearing radius beyond which an utterance is silent — and unheard, so a gesture seen from too far away teaches nothing — and the sharpness of the fall inside it, which is what keeps two groups of speakers from babbling over each other in the middle of a village. The voices themselves play under the ambience volume above, so that one slider still governs the whole soundscape.
+- Village speech (§13.4): syllable duration and the constant inter-atom pause; TALK/CALL reach, level and falloff shared by sound, observation, notes and gestures; adult and child pitch pairs with a shared interval; camera-relative stereo width; the speech bus volume under the ambience master. The speech floor keeps one audible exchange speaking through its visible consequence, releases deferred words and yields while a situation cannot speak. Bank calls reach the spectator's stand. Tag in ports and bankless villages is silent. The final master limiter bounds coincident speech and drum peaks.
 
 **Provisions, water and health** (§6)
 
