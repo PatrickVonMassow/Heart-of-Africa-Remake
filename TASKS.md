@@ -77,130 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1158. The one-click return from the Escape cooldown is confirmed in a real browser
-  (residual of point 1148, landed 18.09.2026). IT STANDS AT THE FRONT AGAIN, and it is no
-  longer a question for the user: he took the observation himself on the deployed build the
-  same afternoon and it FAILED — 18.09.2026, ~18:02, verbatim: "Ich habe es getestet:
-  Schneller Klick funktioniert nach wie vor nicht." (It had been moved out of the front
-  earlier that day only because he was away and could not observe; he has.) So step (3)
-  below is now the work: the Escape-cooldown reading behind 1148 was wrong or incomplete,
-  and the REAL cause is measured and fixed rather than guessed. Step (2), the two-second
-  click, was not reported as failing.
-  RETESTED BY THE USER ON 20.09.2026, 18:56, and it SEPARATES the two steps for the first
-  time, verbatim: "Es funktioniert nach wie vor nicht, wenn man nicht eine Zeit lang vor dem
-  Klicken wartet." So waiting BEFORE the click makes it work and the quick click still does
-  not — step (2) passes, step (1) fails, on the deployed build after 1148 landed. That rules
-  out the click missing the canvas (step (5) / (c)) as the whole cause, because the same
-  click on the same spot succeeds once time has passed, and it points straight at the
-  refusal path: either the bounded 1.1 s retry never fires, or it is refused again because
-  Chrome's cooldown outlasts it or the retry lacks a fresh user activation. Measure (a) and
-  (b) FIRST against that reading.
-  WHAT TO MEASURE, since the fix must name a cause: (a) whether the quick request is refused
-  at all (`pointerLockProbe.refusals`, `pointerlockerror`, the promise rejection and its
-  DOMException message), silently dropped, or granted and lost again; (b) whether the bounded
-  1.1 s retry fires and what its own result is — refused again means the cooldown is longer
-  than assumed or the retry needs a fresh user activation, granted means the
-  `pointerlockchange` settling path or the HUD's locked state is what fails; (c) whether the
-  quick click lands on `gl.domElement` at all or on a HUD element above it (step (5) below:
-  `.hud-bottom-left` has `pointer-events: auto`, so a click near the inventory bar or the
-  hint never reaches the canvas). The production build exposes no `window.__placeLock` and
-  the user tested production, so the tool is a dev build or a console listener on
-  `pointerlockerror`/`pointerlockchange`.
-  THE TICK STILL NEEDS BOTH ATTENDED OBSERVATIONS. After the fix is deployed, the user is
-  asked for one more pair of observations through the board card.
-  Final state: the user's report of 17.09.2026, 21:48 — "Im Modus »Click the view to
-  steer« bewirkt erst mehrfaches Klicken, dass man wieder steuern kann." — is either
-  confirmed fixed or its real cause is found and fixed, judged by ONE attended observation
-  in a real Chrome on WebGPU.
-  WHY IT IS ITS OWN POINT. 1148 built and landed the fix: one bounded retry 1.1 s after a
-  refused pointer-lock request, with its dedup, its cancellation on dialog/overlay/grant/
-  scene-exit and the webdriver skip, all pinned by 36 Vitest cases. Its step (4) asked for an
-  attended check, and that step could not run in the batch. The reason was MEASURED on
-  18.09.2026 rather than assumed: pointer lock DOES engage in headless system Chrome once
-  `navigator.webdriver` is masked (a trusted Playwright click locked the canvas), but
-  Playwright's synthetic Escape never reaches Chromium's pointer-lock exit — the lock simply
-  stays held — and a programmatic `document.exitPointerLock()` leaves no cooldown at all, so
-  ONE click returns steering in 100 ms even on the unfixed main. The refusal 1148 repairs
-  cannot be produced without a human pressing Escape.
-  Work: (1) in an attended Chrome on WebGPU, enter a settlement, take the lock, press Escape
-  and click the view again WITHIN one second: steering must return without a second click.
-  (2) Repeat with a two-second wait before the click: the first click must steer. Record both
-  results. (3) If the first click still fails, the Escape-cooldown reading was wrong: measure
-  what actually happens — `pointerLockProbe.refusals` counts the browser's refusals since
-  1148 — and check whether the click lands on a HUD element instead of `gl.domElement`, which
-  is the layering case 1148 step (5) named; fix THAT and say so. (4) If both observations
-  pass, tick and say so.
-  BOUNDS THE USER NAMED: no new guard, ledger field or workflow abstraction (infrastructure
-  freeze 01.09.2026); pointer lock stays skipped under `navigator.webdriver`, and the
-  webdriver mask used for the measurement above stays a throwaway probe — it is NOT added to
-  a suite.
-  NO LONGER ATTENDED-GATED FOR ITS DIAGNOSIS (18.09.2026). It was, while the only open
-  question was "does it still happen"; the user has answered that, so the measurement and the
-  fix are ordinary batch work and belong to whoever takes this point. Only the final
-  CONFIRMATION stays attended — the two observations above, on the deployed build.
-  Criticality: medium — it is the confirmation that a reported, player-visible bug is really
-  gone; without it 1148 is a plausible fix, not a proven one.
-  Refs: src/scenes/place/pointerLock.ts (`createPlacePointerLock`), its test, and the
-  pointer-lock effect in src/scenes/place/PlaceScene.tsx; follow-up of 1148 (closed).
-  Bundle: Steuerung & Performance.
-  MEASURED AND FIXED 18.09.2026, awaiting only the two observations. (a)+(c) were
-  measured on this host in system Chrome (headless=new, WebGPU) with a throwaway
-  `navigator.webdriver` mask, not added to any suite: a click into the view LANDS on
-  `gl.domElement` — 80 of 81 viewport grid points hit the canvas, `.hud-bottom-row` is
-  `pointer-events: none` and only its two end groups (258 px left, 178 px right, 30 px
-  tall, at the very bottom) take clicks — so the layering case of 1148 step (5) is RULED
-  OUT; and a timer-driven `requestPointerLock()` carrying no fresh user gesture IS
-  GRANTED, so the retry needed no new activation either. (b) could not be measured: a
-  real Escape is still unreachable from automation and this host has no Xvfb/xdotool to
-  send one, exactly as 1148 recorded. THE CAUSE IS NAMED FROM THE CODE, and it does not
-  depend on how long the browser refuses: the recovery was ONE ask, timed 1.1 s from the
-  CLICK while the browser's refusal period runs from the ESCAPE — so the faster the
-  player clicked, the earlier that single ask landed, and inside the period it was
-  refused too, after which nothing asked again until the next click. A further click did
-  not add an ask, it REPLACED the one still to come. Both together are "only repeated
-  clicking steers again". FIXED: the recovery is a bounded sequence — ask again every
-  250 ms until the lock is granted or 3 s have passed since the last deliberate request,
-  re-checking the deadline when each ask's turn comes — resting on no assumption about
-  the period's length. 40 Vitest cases; cross-vendor review by GPT-6 Astra found the
-  missing execution-time deadline check, which is fixed and pinned. WHAT REMAINS is
-  exactly steps (1) and (2) on the deployed build, which only the user can take.
-  THE ATTENDED OBSERVATION NEVER HOLDS THE BATCH (user order 18.09.2026, 22:21, verbatim:
-  "Zu 1158: Ich bin jetzt erstmal weg - wenn es so weit ist, dass ich nachtesten kann, nicht
-  auf mich warten, sondern die Batch weitermachen und mir eine Karte unter Von dir zu klären
-  dafür einstellen."). Amend point 1158 (no new point): the attended observation does NOT
-  hold the batch. When 1158's fix is deployed and the point reaches the step that needs the
-  user's attended check, the owner does not wait for the user. Instead: (1) file a card under
-  'Von dir zu klären' naming exactly what the user should observe (the quick click after
-  Escape and the two-second click), which deployed build/revision to test, and what pass and
-  fail look like; (2) keep the batch advancing with the next point in work-order order;
-  (3) only the tick of 1158 waits for the card's answer. Final state: the card exists on the
-  board with the observation instructions, the batch has moved on, and 1158 is ticked only
-  after the user's answer on that card.
-  THE 20.09 RETEST RAN ON A BUILD THAT ALREADY CARRIED THE 18.09 FIX — measured
-  20.09.2026, 19:45. The Pages deployment of `800c04774a` concluded success at 16:24:36Z,
-  and that commit contains `b862fcb72`, `06ba6ab51`, `a7f55ce04` and `33dee9f41`; the same
-  deployment rebuilt `/poc/` from `cd275b233`, which contains `33dee9f41` as well. The
-  user's retest fell at 18:56 Berlin = 16:56Z, 31 minutes after that deployment, so the
-  bounded 250 ms sequence was in BOTH the root build and `/poc/` when he took it. The two
-  readings above are therefore not in conflict: step (3) is the work, and the sentence
-  "MEASURED AND FIXED 18.09.2026, awaiting only the two observations" is SUPERSEDED — what
-  is awaited is a new cause and a new fix, and the two observations confirm THAT.
-  THE ONE MEASUREMENT THIS HOST CANNOT TAKE, re-checked 20.09.2026: a native Escape.
-  `DISPLAY=:30` exists, but Xvfb, xvfb-run, xdotool, ydotool, python-xlib and pip3 are all
-  absent, so no X-level key can be faked, and CDP's `Input.dispatchKeyEvent` bypasses the
-  browser-process handler that ends the lock (measured 18.09). A `document.exitPointerLock()`
-  exit is no substitute for it — that is the case the 18.09 timer probe measured, and it is
-  a DIFFERENT case from a user-initiated exit, which is the reading that makes the probe's
-  "granted" result compatible with the player's "refused". Do not spend the point re-trying
-  this measurement.
-  WHAT THE FIX MUST COVER, because neither cause can be excluded from this host: (i) the
-  browser reports NO refusal for the quick ask — no promise rejection, no `pointerlockerror`
-  — in which case the sequence in `createPlacePointerLock` dies after ONE ask, since every
-  further ask hangs off `onRefusal`; and (ii) the browser refuses every ask that carries no
-  fresh user activation once the USER ended the lock, in which case no timer-driven ask can
-  ever succeed and the recovery has to ride on the player's next real input event. A fix
-  that covers only one of the two is not the fix.
-
 - [ ] 690. The classic game of tag moves to the port cities, and every document describes
   the rebuilt mechanic (user 13.08.2026, playing the deployed communication slice; point 692
   folded in here 07.09.2026).
@@ -283,22 +159,86 @@ put it is the mistake this line exists to stop.
   Refs: src/scenes/place/tagGame.ts, src/scenes/place/PlaceLife.tsx, src/scenes/place/lifeSpots.ts
   Bundle: Dorfleben.
 
-- [ ] 1157. The weaver at the village loom works instead of standing frozen (user bug
-  report 18.09.2026, local/ErwachsenerStehtStill.zip: "Warum bewegt sich diese Figur
-  nicht?", seed 394349866, Bambara Village, day 3.54, WebGPU, medium).
+- [ ] 1173. The settlement gets room: a larger walkable area, and the village set back from
+  the river (user 21.09.2026, 14:41: »Du kannst auch gerne noch alles etwas mehr
+  auseinanderziehen - z. B. den ganzen begehbaren Siedlungsbereich etwas vergrößern und das
+  Dorf etwas vom Fluss wegschieben, sodass etwas mehr Abstand zwischen den verschiedenen
+  Akteuren ist.«).
+  Bundle: Dorfleben
+  THE REASON IS MEASURED, not aesthetic. Every teaching voice of the communication slice must
+  clear every other by the hearing radius (point 688 §6, `balance.communication.talk.reach`
+  = 10 m), and the settlement disc is currently so tight that the rule holds by luck rather
+  than by construction: the waterline sits 4 to 14 m outside the built disc
+  (`BANK_MIN_GAP`/`BANK_MAX_GAP` in `src/scenes/place/riverBank.ts`), the children's running
+  stretch lies on that bank, and the adults' stations sit in the same disc. The user reports
+  the consequence from play: »Aktuell ist es beim Kinderspiel manchmal schon eng« (21.09.2026,
+  14:29). Point 1157 adds a SECOND teaching station on the same axis, which makes a tightness
+  that already exists worse. This point buys the room BEFORE that station is built, which is
+  why it stands ahead of 1157.
+
+  Final state:
+
+  1. THE WALKABLE AREA GROWS. The settlement's walkable radius rises by a calibratable factor
+     in `src/config/balance.ts`, and every consumer that derives a position from it — station
+     placement, the play ground, the huts, the collision fabric — follows the value instead of
+     carrying its own constant. No caller keeps a hard-coded radius; the point is done only
+     when the factor alone moves the whole settlement.
+  2. THE VILLAGE MOVES BACK FROM THE WATER. `BANK_MIN_GAP` rises so the built disc keeps a
+     larger margin to the waterline. `BANK_MAX_GAP` rises with it only as far as the walk out
+     to the bank stays a bank of the settlement and does not become a journey — the comment on
+     that constant already states the criterion and keeps it.
+  3. THE CLEARANCE BECOMES A CHECK, NOT A HOPE. The three areas of 688 §6 — the adults' village
+     core, the children's roaming quarter and the bank stage — are asserted to clear each other
+     by at least `talk.reach` in EVERY shipped layout, not just the Bambara one, and a layout
+     that cannot is a failure with a named settlement, not a silent squeeze. Where a layout
+     still cannot give all three, the ADULTS move, exactly as 688 §6 already rules.
+  4. THE RUNNING STRETCH KEEPS ITS SHAPE. The rock-to-rock stretch stays long enough to read as
+     a run from its own end (point 687 §6) and keeps its lane clear of the water path, which
+     meets the bank outside the stretch (688 §5). Growing the disc must not stretch the game
+     into a walk or shrink it into a scuffle: the stretch is derived from the new radius and
+     asserted against both bounds.
+  5. NOTHING ELSE CHANGES SHAPE. Hut spacing, station clearance (point 578) and the collision
+     fabric keep their rules; they follow the larger radius and are not redesigned here.
+  6. Proof: a Vitest over every shipped settlement layout that measures the three areas'
+     mutual distance against `talk.reach` and the stretch against its two bounds, and a
+     Playwright picture from the bank standpoint in Bambara Village on WebGPU showing the
+     children's stretch with room around it. A second picture from the village centre shows
+     the water at its new distance.
+  Criticality: MEDIUM — it moves layout constants many systems read, so its risk is regression
+  in placement rather than a wrong idea.
+
+- [ ] 1157. The weaver works her loom, and her loom teaches the river's two directions (user
+  bug report 18.09.2026, local/ErwachsenerStehtStill.zip: "Warum bewegt sich diese Figur
+  nicht?", seed 394349866, Bambara Village, day 3.54, WebGPU, medium; scope widened by the
+  user 21.09.2026, 14:41: »Ändere 1157 so ab, dass die Weberin in dieser Weise umgesetzt
+  wird.«).
   Bundle: Dorfleben
   The report's picture shows the weaver figure beside the standing loom with both
   arms hanging, and `Weaver` in `src/scenes/place/PlaceLife.tsx` carries no
   `useFrame` at all — the only village adult station without a working motion,
   while the pounder, the fire tender, the water carrier and the drummer all move.
   design.md §15 names weaving among the everyday activities that make a settlement
-  read as alive. Final state:
+  read as alive. The user then decided the station should carry more than life: it becomes the
+  SECOND way the player can learn `UPSTREAM` and `DOWNSTREAM`, beside the children's bank game.
 
-  1. The weaver works the loom in a visible, continuous cycle: one hand carries a
-     shuttle across the warp and back while the other beats the weft down, and the
-     body leans slightly into each beat — the same arm-pose mechanism the pounder
-     uses (`FigurePose`, `armAim`), so the hands ride the tool and never hang beside
-     a cloth that changes by itself.
+  WHY A SECOND WAY IS WORTH BUILDING, so nobody later reads it as redundancy: on the bank the
+  two words hang on RUNNING GROUPS between two rocks; at the loom they hang on ONE PERSON
+  WALKING along a stretched warp. The only feature the two pictures share is the river's axis.
+  That intersection prunes the wrong readings that point 687 §4 has to close one by one — "to
+  the far rock" does not exist at the loom, and left/right survives no change of standpoint.
+
+  THE DESIGN CHANGE THIS CARRIES, and it must land in the same commit as the code: point 688 §3
+  states "The direction words are the children's now". That clause is REVERSED here. `design.md`
+  (the §13.4 teaching passage that lists the three teaching places) and
+  `docs/communication-poc-spec.md` name the loom as a fourth place, and the archived 688 gets a
+  dated note that its §3 was superseded by this point. All copies change together.
+
+  Final state:
+
+  1. THE WEAVER WORKS. She works the loom in a visible, continuous cycle: one hand carries a
+     shuttle across the warp and back while the other beats the weft down, and the body leans
+     slightly into each beat — the same arm-pose mechanism the pounder uses (`FigurePose`,
+     `armAim`), so the hands ride the tool and never hang beside a cloth that changes by itself.
   2. The half-finished cloth grows with the work: its woven part rises by a small,
      calibratable amount per completed pass and resets when it reaches the top beam,
      so a player who watches for half a minute sees progress, not a loop on a
@@ -306,12 +246,60 @@ put it is the mistake this line exists to stop.
   3. The cycle is a place-clock animation like the pounder's — frame-time driven,
      unaffected by the wall clock, and it stops with the scene when the place is
      paused.
-  4. Passers-by still walk round the weaver's body (point 578); the station's
-     clearance and the weaver's stance (`weaverStance`) are unchanged.
-  5. Proof: a Vitest on the pose cycle (both arms move over a period, the cloth
-     height advances and wraps) and a Playwright picture from the report's standpoint
-     in Bambara Village on WebGPU where two frames a second apart differ at the
-     weaver's arms and shuttle.
+  4. THE LOOM LIES ON THE RIVER'S AXIS. The warp is long and stretched between two stakes
+     PARALLEL to the bank, derived from the place's `upstream`/`downstream` bank points, not
+     from a hard-coded heading. The standing frame the scene draws today gives way to this long
+     warp; the small frame of heddles the weaver sits under stays.
+  5. SHE SITS IN THE MIDDLE OF THE WARP, and that is load-bearing rather than decorative: from
+     the middle BOTH of her calls send the helper AWAY from her. Seated at an end, one call
+     would be "toward me" and the other "away from me", and the player could learn the pair as
+     come/go and still finish the puzzle. The seat is asserted, not assumed.
+  6. SHE HAS A HELPER, BECAUSE NOBODY SPEAKS TO NOBODY. `design.md` rules that every utterance
+     has an addressee who reacts and a consequence the player sees, and with nobody to address
+     the words are not spoken at all. A weaver naming her own shuttle throw would break that
+     rule, so the station carries two figures: the weaver at the heddles and a helper who tends
+     the warp.
+  7. THE WORD SITS ON A BODY THAT MOVES THAT WAY. When the warp needs tending — a thread to
+     free, the drag weight to shift, a bundle to fetch — the weaver says `UPSTREAM` or
+     `DOWNSTREAM`, and the helper WALKS that way along the warp and works there. The weaver
+     does not point and does not mime: she names, and the helper's body carries the meaning.
+     This is the children's own grammar (`design.md`: a direction is carried by a moving body,
+     a thing by a touching hand), applied to a different picture.
+  8. IT STAYS SPARSE. A named tending happens a few times a minute, not once per throw: often
+     enough to catch in passing, rare enough that the speech labels do not become noise. The
+     rate is a calibratable balance value. The throws themselves are SILENT.
+  9. THE STATION KEEPS ITS DISTANCE. The loom clears the children's bank stage and the water
+     path's head by at least `balance.communication.talk.reach`, so the direction words never
+     arrive mixed with the children's and `RIVER` is never spoken into the same ear (688 §1,
+     §6). Point 1173 buys the room this needs and lands first; if a shipped layout still cannot
+     give the clearance, the LOOM moves, not the children.
+ 10. THE WATER MUST BE IN THE PICTURE. From the player's standpoint at the loom the river is
+     visible, so the claim that the warp lies on the river's axis is something he can check.
+     A layout that hides the water from the loom fails this point.
+ 11. Passers-by still walk round both figures (point 578); station clearance covers the helper
+     and the whole length of the warp, not only the weaver's body.
+ 12. Proof, on three layers:
+     - Vitest on the pose cycle (both arms move over a period, the cloth height advances and
+       wraps), on the seat (the weaver's position is the warp's midpoint within a tolerance,
+       and both call targets lie on opposite sides of her), on the axis (the warp's heading
+       matches the bank's upstream/downstream heading within a tolerance in every shipped
+       layout), and on the clearances of item 9.
+     - Vitest on the utterances: each named tending emits exactly one atom, the helper's
+       resulting walk is in the named direction, and no utterance falls without a helper
+       present to take it.
+     - Playwright from the report's standpoint in Bambara Village on WebGPU: two frames a
+       second apart differ at the weaver's arms and shuttle; a second picture shows the helper
+       part-way along the warp with the weaver's label overhead and the river in the same
+       frame.
+  Criticality: HIGH — it changes what the taught language is learned from, and a wrong reading
+  learned here is one the player can carry all the way to the chief's message.
+  Author lane: it is a communication-mechanic point whose verification is the work.
+
+  OPEN: `docs/peoples-1890.md` documents no weaving at all — neither the loom's build nor the
+  technique — so the standing frame was never sourced. Before the long warp is built, check the
+  Bambara/Mande narrow-strip loom against our own sources and record it in peoples-1890 §8;
+  if the sources do not carry it, say so in the point rather than inventing a build.
+
 - [ ] 659. The whole communication chain, played through and judged by what reaches the
   PLAYER — A SIX-EYES ALL-ROUND REVIEW.
   ON HOLD (user 13.08.2026, 22:25: »Stoppe 659 erstmal — der macht erstmal keinen Sinn, wenn wir
