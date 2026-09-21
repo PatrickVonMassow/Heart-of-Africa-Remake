@@ -82,29 +82,53 @@ function InventoryBar() {
     }
   }, [itemCount])
 
-  // Medicine and shovel are used by clicking them on the spot (design.md §17);
-  // the rest act by mere possession (rifle/rope/machete/canoe) or show a
-  // reading (canteen fill), so they are passive labels, not buttons. (The map
-  // is no longer an item — it opens from its own button / M, point 93.)
-  const activateItem = (e: EquipmentId) => {
-    const g = useGame.getState()
-    if (e === 'medicine') g.useMedicine()
-    else if (e === 'shovel') g.dig()
-  }
-  const clickable = (e: EquipmentId) => e === 'medicine' || e === 'shovel'
+  // The bird's-eye world is the open; any place is a settlement. Out in the
+  // open the terrain under the traveller decides what his gear is doing.
+  const here = worldToLatLon(pos.x, pos.z)
+  const terrain = mode === 'travel' ? sampleTerrain(here.lat, here.lon, seed).type : null
 
   // An item "in use" glows in the inventory: a carried relief item currently
   // countering the terrain (canoe on water, machete in jungle, rope on a
   // mountain), and medicine while there is a curable affliction (fever/wounds).
   const active = new Set<EquipmentId>()
-  if (mode === 'travel') {
-    const ll = worldToLatLon(pos.x, pos.z)
-    const terrain = sampleTerrain(ll.lat, ll.lon, seed).type
-    if ((terrain === 'water' || terrain === 'ocean') && (equipment.canoe ?? 0) > 0) active.add('canoe')
-    if (terrain === 'jungle' && (equipment.machete ?? 0) > 0) active.add('machete')
-    if (terrain === 'mountain' && (equipment.rope ?? 0) > 0) active.add('rope')
-  }
+  if ((terrain === 'water' || terrain === 'ocean') && (equipment.canoe ?? 0) > 0) active.add('canoe')
+  if (terrain === 'jungle' && (equipment.machete ?? 0) > 0) active.add('machete')
+  if (terrain === 'mountain' && (equipment.rope ?? 0) > 0) active.add('rope')
   if ((equipment.medicine ?? 0) > 0 && (afflictions.fever || afflictions.wounds > 0)) active.add('medicine')
+
+  // Medicine and the shovel act on the spot (design.md §17). The rest work by
+  // mere possession (rifle/rope/machete/canoe) or refill themselves (canteen),
+  // so a press answers in the traveller's voice instead of doing nothing: what
+  // the thing does by itself, that it is doing it right now, or why it has no
+  // place among people. (The map is no longer an item — it opens from its own
+  // button / M, point 93.)
+  const passiveAnswer = (e: EquipmentId): string => {
+    const settlement = mode !== 'travel'
+    switch (e) {
+      case 'rifle':
+        return settlement ? t.toasts.rifleInSettlement : t.toasts.rifleReady
+      case 'rope':
+        return settlement ? t.toasts.ropeInSettlement
+          : terrain === 'mountain' ? t.toasts.ropeInUse : t.toasts.ropeReady
+      case 'machete':
+        return settlement ? t.toasts.macheteInSettlement
+          : terrain === 'jungle' ? t.toasts.macheteInUse : t.toasts.macheteReady
+      case 'canoe':
+        return settlement ? t.toasts.canoeInSettlement
+          : terrain === 'water' || terrain === 'ocean' ? t.toasts.canoeInUse : t.toasts.canoeReady
+      default: // the canteen; medicine and the shovel act instead
+        return t.toasts.canteenReady
+    }
+  }
+  const activateItem = (e: EquipmentId) => {
+    const g = useGame.getState()
+    if (e === 'medicine') g.useMedicine()
+    else if (e === 'shovel') g.dig()
+    else g.setToast(passiveAnswer(e))
+  }
+  // Only these two DO something; the tooltip keeps saying so (point 1170 gives
+  // the others an answer, not an action).
+  const clickable = (e: EquipmentId) => e === 'medicine' || e === 'shovel'
 
   const canteenPct = Math.round(canteenFill * 100)
   // Low-fill cue (design.md §6.1): yellow and BLINKING below a third, red
@@ -114,6 +138,7 @@ function InventoryBar() {
   const canteenBlink = canteenFill < 1 / 3 ? ' canteen-blink' : ''
 
   // One list defines display order and actions for both clicks and number keys.
+  // EVERY slot carries an `activate`: an item that cannot act here answers.
   const slots: {
     id: string
     label: string
@@ -122,7 +147,7 @@ function InventoryBar() {
     equipment?: EquipmentId
     form?: string
     find?: FindId
-    activate?: () => void
+    activate: () => void
   }[] = [
     ...owned.map((e) => ({
       id: e,
@@ -131,12 +156,12 @@ function InventoryBar() {
         : e === 'medicine' ? `${t.equipment.medicine} (${equipment.medicine})` : t.equipment[e],
       title: e === 'canteen' ? t.hud.canteenTooltip : clickable(e) ? t.hud.useTooltip : t.hud.passiveTooltip,
       className: e === 'canteen' ? `canteen${canteenGlow}${canteenBlink}` : active.has(e) ? 'inv-active' : '',
-      activate: clickable(e) ? () => activateItem(e) : undefined,
+      activate: () => activateItem(e),
     })),
     ...ownedForms.map((id) => ({
       id, form: id, label: t.forms[id],
       title: mode === 'travel' ? t.hud.useTooltip : t.hud.passiveTooltip,
-      activate: mode === 'travel' ? () => useGame.getState().useCarriedForm() : undefined,
+      activate: () => useGame.getState().useCarriedForm(),
     })),
     ...ownedFinds.map((id) => ({
       id, find: id, label: t.finds[id], title: t.hud.findTooltip,
@@ -151,7 +176,7 @@ function InventoryBar() {
   const inventoryBlocked = () => useUi.getState().dialog !== null || document.querySelector('.overlay') !== null
   const activateSlot = useEffectEvent((index: number, e: KeyboardEvent) => {
     if (e.repeat || inventoryBlocked()) return
-    slots[index]?.activate?.()
+    slots[index]?.activate()
   })
   const selectSlot = useEffectEvent((direction: number, e: KeyboardEvent) => {
     if (keyPressSource(e) !== 'gamepad' || inventoryBlocked() || slots.length === 0) return
@@ -179,19 +204,20 @@ function InventoryBar() {
   if (itemCount === 0) return null
   return (
     <div className="inventory-bar" ref={barRef}>
-      {slots.map((slot, i) => {
-        const props = {
-          'data-eq': slot.equipment,
-          'data-form': slot.form,
-          'data-find': slot.find,
-          className: `${slot.activate ? '' : 'inv-item '}${slot.className ?? ''}${slot.id === selectedId ? ' inv-selected' : ''}`.trim(),
-          title: slot.title,
-        }
-        const content = <>{i < 9 && <span className="inv-digit" aria-hidden="true">{i + 1}</span>}{slot.label}</>
-        return slot.activate
-          ? <button key={slot.id} {...props} onClick={slot.activate}>{content}</button>
-          : <span key={slot.id} {...props}>{content}</span>
-      })}
+      {slots.map((slot, i) => (
+        <button
+          key={slot.id}
+          data-eq={slot.equipment}
+          data-form={slot.form}
+          data-find={slot.find}
+          className={`${slot.className ?? ''}${slot.id === selectedId ? ' inv-selected' : ''}`.trim()}
+          title={slot.title}
+          onClick={slot.activate}
+        >
+          {i < 9 && <span className="inv-digit" aria-hidden="true">{i + 1}</span>}
+          {slot.label}
+        </button>
+      ))}
     </div>
   )
 }

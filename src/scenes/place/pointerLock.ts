@@ -46,32 +46,35 @@ export function requestPlacePointerLock(
   }
 }
 
-// HOW LONG THE RECOVERY KEEPS TRYING, and how often (work-order point 1158).
-// After the player leaves the lock with Escape, the browser refuses a re-grab
-// for a short period — and that period runs from the ESCAPE, not from the click
-// that asks for the lock back. A single retry timed from the click therefore
-// lands EARLIEST exactly when the player clicks FASTEST, which is the case that
-// was reported as still broken: the one attempt falls inside the refusal period
-// too, and nothing tries again until the next click. So the recovery is a
-// bounded SEQUENCE rather than one shot — it asks again every step until the
-// browser grants the lock or the window since the last deliberate request runs
-// out — and it no longer rests on any assumption about how long that refusal
-// period is. MEASURED 18.09.2026 in system Chrome (headless=new, WebGPU): a
-// timer-driven request carrying no fresh user gesture IS granted, so the
-// attempts need no further click from the player.
+// Recover for a bounded period after a deliberate request, even if the browser
+// neither grants nor reports a refusal. Only pointerLockElement proves success.
+// The earlier timer probe used exitPointerLock(), which does not establish what
+// the browser permits after a native Escape (work-order point 1158).
 const RETRY_STEP_MS = 250
 const RECOVERY_WINDOW_MS = 3000
+const MOVEMENT_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowLeft', 'ArrowDown', 'ArrowRight'])
 
 /** Own refusal recovery for one mounted place scene; dispose before leaving it. */
 export function createPlacePointerLock(el: Element): { request: () => void; dispose: () => void } {
   let disposed = false
   let retry: ReturnType<typeof setTimeout> | undefined
   let pendingRefusal: (() => void) | undefined
+  let wantsLock = false
+  // An overlay may come and go after the timer budget expires. Its appearance
+  // must still retire the intent before a later gameplay key can use it.
+  const overlays = new MutationObserver(() => {
+    if (document.querySelector('.overlay')) cancel()
+  })
 
-  const cancel = () => {
+  const clearAttempt = () => {
     if (retry !== undefined) clearTimeout(retry)
     retry = undefined
     pendingRefusal = undefined
+  }
+  const cancel = () => {
+    clearAttempt()
+    wantsLock = false
+    overlays.disconnect()
   }
   const canRetry = () => !disposed && !navigator.webdriver && !document.pointerLockElement
     && !document.querySelector('.overlay') && !useUi.getState().dialog
@@ -81,39 +84,74 @@ export function createPlacePointerLock(el: Element): { request: () => void; disp
   // instead of replacing the one attempt that was still to come.
   const attempt = (until: number) => {
     if (disposed) return
-    cancel()
+    clearAttempt()
     let refused = false
     const onRefusal = () => {
       // Promise-capable browsers can also fire pointerlockerror for this request.
       if (refused) return
       refused = true
       pointerLockProbe.refusals++
-      if (pendingRefusal !== onRefusal || !canRetry() || Date.now() + RETRY_STEP_MS > until) return
-      // Paced by the REFUSAL, so a slow answer never overlaps the next ask.
+      if (pendingRefusal === onRefusal && !canRetry()) cancel()
+    }
+    // Arm before the native call: a synchronous grant must cancel this timer.
+    // Refusal signals are diagnostic only; a silent request must not strand it.
+    if (canRetry()) {
+      pendingRefusal = onRefusal
+    }
+    if (canRetry() && Date.now() + RETRY_STEP_MS <= until) {
       retry = setTimeout(() => {
         retry = undefined
         // The deadline is checked again HERE, not only where the ask was
         // scheduled: a suspended tab or a blocked event loop can deliver this
         // callback long after the window, and an ask that late would take the
         // cursor out of nowhere.
-        if (canRetry() && Date.now() <= until) attempt(until)
-        else cancel()
+        if (!canRetry()) cancel()
+        else if (Date.now() <= until) attempt(until)
+        else clearAttempt()
       }, RETRY_STEP_MS)
     }
     // Automation records the decision without a native request or error handler.
-    if (canRetry()) pendingRefusal = onRefusal
     requestPlacePointerLock(el, onRefusal)
   }
-  const request = () => attempt(Date.now() + RECOVERY_WINDOW_MS)
+  const request = () => {
+    wantsLock = canRetry()
+    if (wantsLock) overlays.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] })
+    else overlays.disconnect()
+    attempt(Date.now() + RECOVERY_WINDOW_MS)
+  }
   const onError = () => pendingRefusal?.()
-  const onChange = () => {
-    if (document.pointerLockElement) cancel()
+  // A grant completes the intent; a subsequent native Escape must not re-arm it.
+  const onChange = () => cancel()
+  const onKeyDown = (event: KeyboardEvent) => {
+    if (event.code === 'Escape') { cancel(); return }
+    if (!wantsLock) return
+    if (!canRetry()) { cancel(); return }
+    if (!event.isTrusted || event.repeat || event.defaultPrevented
+      || event.ctrlKey || event.altKey || event.metaKey || !MOVEMENT_KEYS.has(event.code)) return
+    // Typing or operating a HUD control must never spend this return intent.
+    const target = event.target
+    if (target && target !== window && target !== document && target !== document.body
+      && target !== document.documentElement && target !== el) return
+    // Native Escape may require fresh activation even after the cooldown. Keep
+    // the intent beyond the timer window, but ask only inside a real gameplay
+    // keydown, not mousemove or synthetic gamepad/touch keyboard events.
+    request()
+  }
+  const onPointerDown = (event: PointerEvent) => {
+    if (event.target !== el) cancel()
+  }
+  const onVisibilityChange = () => {
+    if (document.hidden) cancel()
   }
   const offUi = useUi.subscribe((state) => {
     if (state.dialog) cancel()
   })
   document.addEventListener('pointerlockerror', onError)
   document.addEventListener('pointerlockchange', onChange)
+  document.addEventListener('visibilitychange', onVisibilityChange)
+  window.addEventListener('keydown', onKeyDown)
+  window.addEventListener('pointerdown', onPointerDown)
+  window.addEventListener('blur', cancel)
 
   return {
     request,
@@ -123,6 +161,10 @@ export function createPlacePointerLock(el: Element): { request: () => void; disp
       offUi()
       document.removeEventListener('pointerlockerror', onError)
       document.removeEventListener('pointerlockchange', onChange)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('pointerdown', onPointerDown)
+      window.removeEventListener('blur', cancel)
     },
   }
 }

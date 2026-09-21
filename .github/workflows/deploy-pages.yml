@@ -58,10 +58,16 @@ jobs:
       # tag at its subpath — GitHub allows one Pages site per repository, so
       # every frozen build is a subdirectory of the same artifact, rebuilt from
       # its immutable tag on every deploy. The set is EVERY version tag (vX.Y)
-      # plus `poc` (which always mirrors the NEWEST version tag, user decision
-      # 24.07.2026) — version tags are enumerated DYNAMICALLY so a new release
+      # plus `poc` — version tags are enumerated DYNAMICALLY so a new release
       # needs no workflow edit. Each tag is guarded so the workflow still deploys
       # the ones that exist while another does not.
+      #
+      # `poc` and the version tags are coupled ONE WAY ONLY (user decision
+      # 20.09.2026, replacing 24.07.2026): publishing a NEW version tag pulls
+      # `poc` up to it, but `poc` may run AHEAD of the newest version tag — it
+      # is the current playable build and is moved on request, without a
+      # closing run. So `poc` is not a release and points wherever it was last
+      # set, which is usually a main commit between two versions.
       - name: Build each tag's frozen site (all version tags + poc)
         # The CUDA download is SKIPPED: onnxruntime-node is a transitive server-side
         # dep of kokoro-js that a `vite build` never executes, its postinstall pulls a

@@ -173,8 +173,18 @@ export const DOC_BUDGETS = [
     // they belong in. The word ceiling follows the cut down to the measured 783;
     // the line ceiling stays, because the freed line is exactly what put the index
     // back inside it.
-    maxLines: 51,
-    maxWords: 783,
+    // RAISED on 21.09.2026 by exactly one entry, measured: 52 lines and 803 words
+    // against 51/783. The entry is "Check for an existing branch first", and it is a
+    // genuinely new class — no other line says how to notice that the point you are
+    // about to start already has a live author on its own branch, which cost this
+    // batch a whole rebuild of point 1158 including a full unit suite. Three cut
+    // candidates were examined first and all three hold: fable-sparingly carries the
+    // underivable fact that no detector watches for new Fable versions,
+    // boundary-marker-is-fragile guards the gap point 426 has yet to close, and
+    // watch-for-aesthetic-oddities and verify-default-zoom-and-webgpu are two
+    // different statements rather than a duplicate. Nothing in the index is stale.
+    maxLines: 52,
+    maxWords: 803,
     maxEntryWords: 22,
     // Fifteen words: an index of one-hook lines, where a whole new entry is ~20 words —
     // so the slack cannot hide one, and re-wording an existing hook is free.
@@ -209,12 +219,23 @@ export const DOC_BUDGETS = [
     // Four formerly in-place criteria moved here in the 20.08.2026 cut. The
     // destination is now 579 lines / 5599 words by this guard's tokenizer; this measured raise holds the
     // moved rules without giving their always-loaded source room to regrow.
-    maxLines: 581,
+    // RAISED by the 1 measured line criterion 9 owes the inventory answer: every
+    // slot answers its press with a toast, never in the journal, and that toast
+    // stacks above every panel (work-order 1170) — a rule the criterion did not
+    // carry.
+    // RAISED by the 2 measured lines criterion 7 owes the settlement-staging rule:
+    // a bank village stages the bank game only, ports and bankless villages the
+    // silent tag game only, each on its own ground clear of that settlement's adult
+    // vignettes (work-order 690) — a rule the criterion did not carry and one that
+    // cannot be read off the concept list it did.
+    maxLines: 584,
     // RAISED by the 19 measured words criterion 16 owes the step height: a
     // scattered stone below `balance.placeStepOverTop` is ground rather than an
     // obstacle (work-order 1149), which is a rule the criterion did not carry
     // and cannot be read off the ones it did.
-    maxWords: 5635,
+    // RAISED by the 46 measured words of the inventory-answer rule above
+    // (work-order 1170).
+    maxWords: 5681,
     // Forty words for thirty-two criteria — the destination of the §7.1 cut edits one
     // criterion at a time, and one criterion's rewording is well inside that.
     slackWords: 40,
@@ -415,7 +436,11 @@ export const DOC_BUDGETS = [
     // one, that it is not a level control, and what it costs the top of a
     // footstep or a drum strike, because a reader cannot infer any of that
     // from a number.
-    maxWords: 29410,
+    // RAISED by the 66 measured words §17.1 owes the inventory answer (work-order
+    // 1170): every slot is a button, an item that cannot act says why in a toast
+    // rather than the journal, and the toast outranks every panel — a new rule,
+    // not a longer telling of the click behaviour that stood there.
+    maxWords: 29476,
     // A hundred words across 28k: design.md is edited section by section and a genuine
     // new decision runs 40–215 measured words, so the slack absorbs the rewording that
     // accompanies one and refuses the disappearance of a whole section without a

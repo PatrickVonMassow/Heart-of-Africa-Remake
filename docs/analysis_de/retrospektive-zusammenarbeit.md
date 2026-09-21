@@ -64,6 +64,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 18.09. spät | Eine tote Messung landete beinahe als funktionierend: Der Effekt, der die Rechtecke für den zentrierten Steuerungshinweis liest, hing an den Sprachtexten statt an der Bedingung, die über das Element selbst entscheidet — er nahm seinen frühen Rücksprung und wurde nie wieder angestoßen. Grün war die Prüfung trotzdem, weil der CSS-Vorgabewert im geräumigen Fall zufällig dasselbe Ergebnis hat wie die Messung; erst der enge Fall trennte beide (§3.292) |
 | 19.09. | Eine Bildprüfung lag rot, obwohl das Produkt stimmte: Ihre Bühne suchte freie Sicht bis auf den Brunnenplatz, den der Punkt gerade aus der Freihalteliste genommen hatte — das Dorf hatte darauf weitergebaut, die letzte Stützstelle der Sichtlinie lag in einer neuen Hütte. Die Ursache nannte erst der Vergleich der Kollisionssätze im Knoten, nicht der nächste Browserlauf (§3.294) |
 | 19.09. abends | Die CI war rot, wo dieselbe Suite hier grün fährt: Das Abbruch-Protokoll nahm den zuletzt gepushten Stand aus der Notiz, die der Arbeiter nach dem Push schreibt — wird er dazwischen getötet, nennt das Protokoll eine Spitze, die nicht steht. Der vorhandene Prüffall hoffte auf das Rennen und war auch gegen den unreparierten Stand grün (§3.295) |
+| 21.09. | Ein fertiger Punkt wurde komplett neu gebaut, weil keine der drei Quellen, die die Wiederaufnahme liest — Fokuszeile, Auftrag, Punkt-Brief —, den bereits bestehenden Zweig und Arbeitsbaum nennt; die Lebendprüfung meldete dazu „work output 0 min old" und meinte die Bilder der gerade beendeten Suite, nicht einen arbeitenden Autor (§3.296, Gegenstück zu §3.258) |
 | 13.09. | Ein Punkt zog seine eigenen Rot-Ladungen zurück, wie es die Regel verlangt — zwei Tests standen noch auf ihnen und wurden erst im Tor der LANDUNG rot, als der Merge schon auf main lag: Das Register erzwingt »kein Eintrag ohne offenen Punkt«, niemand erzwingt »kein Test ohne seinen Eintrag« (§3.268). Dieselbe Sitzung wies drei Fremd-Rot nach: gegen die Zweigwurzel gemessen sind alle drei auch auf main rot, und das Rätsel am Schutthang ist dort nicht sporadisch, sondern reproduziert jedes Mal |
 | 13.09. abends | Vier CI-Läufe eines Zweigs starben als »cancelled« — ein Wort, das weder Ursache noch Reparatur nennt und das kein Push heilen kann. Es war das 15-Minuten-Limit des `fast`-Jobs: Die letzten beiden GRÜNEN Läufe, einer davon auf main, brauchten 14 m 41 s und 14 m 45 s, also rund fünfzehn Sekunden Luft. Der nächste Punkt, der irgendeinen Test hinzufügt, musste auflaufen, egal welcher. Sichtbar wurde es erst im Schrittprotokoll: install/build/lint/audit grün, `unit: cancelled`, »The operation was canceled« nach 15 m 13 s (§3.270) |
 | 14.09. | Nach einer Parallelsitzung verlangte ein Stop-Hook `batch-doctor --gate` vor JEDER weiteren Batch-Arbeit — dessen Tor fährt eine volle Unit-Suite, neben dem laufenden Zwei-Backend-Bildlauf auf derselben Maschine. Gefunden hat der Doktor genau eine Datei: die Review-Zeile, die dieselbe Sitzung vier Minuten zuvor geschrieben hatte. Sie zu committen genügte, das Urteil sprang auf `consistent`, die Unit-Suite wurde nie gebraucht; ihr Abbruch ließ zwei verwaiste vitest-Worker neben dem Bildlauf zurück (§3.271, Wiedergänger von §3.267) |
@@ -1445,6 +1446,31 @@ Lauf, den besten, den jüngsten deckenden. Solange das der letzte ist, gilt: ers
 dann beweisen, und nach dem Beweis keine Sprosse mehr. Das ist keine Regel über Läufe, sondern
 über Reihenfolge, und sie kostet sonst genau die Zeit, die die billige Sprosse gespart hat.
 
+### 3.296 Der fertige Punkt war unsichtbar, weil keine gelesene Quelle die Maschine beschreibt
+
+Gemessen am 21.09.2026 bei einer automatischen Batch-Wiederaufnahme. Die Sitzung las, was der
+Auftrag für die Wiederaufnahme vorsieht: die Fokuszeile (`1158: returned to queue`), TASKS.md
+(1158 als ersten offenen Punkt) und den erzeugten Punkt-Brief. Alle drei waren korrekt. Keine
+der drei nennt einen Zweig oder einen Arbeitsbaum — und in `.claude/worktrees/point-1158` lag
+`feat/1158-escape-cooldown-return` mit dem fertigen Fix, 190 Zeilen Tests, vermerkter
+Mechanismus-Prüfung und einem bereits CI-grünen Merge mit `main`. Der Punkt wurde vollständig
+neu gebaut, einschließlich einer vollen Unit-Suite, bis die Prozessliste zufällig den laufenden
+Bildbeweis des anderen Arbeitsbaums zeigte. Erst dann trat der Vergleich der beiden Fassungen
+an die Stelle des Neubaus: Die fremde war die gründlichere, die eigene wurde gelöscht.
+
+Die Lebendprüfung, die es hätte auffangen können, urteilte zweimal „DO NOT REPLACE THIS AGENT:
+work output 0 min old" — die null Minuten alten Dateien waren die 76 Bilder, die seine gerade
+BEENDETE Suite geschrieben hatte. Die Vorsicht ist gewollt (am 30.07.2026 wurde ein lebender
+Autor für tot erklärt und zwei fertige Punkte neu gebaut), aber sie beantwortet eine andere
+Frage als die gestellte: „Hat hier etwas geschrieben?" statt „Arbeitet hier jemand?".
+
+**Lehre:** Auftrag, Fokuszeile und Brief beschreiben die ARBEIT; `git worktree list` und
+`git branch -a` beschreiben die MASCHINE. Wer einen Punkt beginnt, ohne die zweite Gruppe
+gelesen zu haben, kann nicht wissen, ob er ihn beginnt oder wiederholt — und der Neubau sieht
+bis zum Schluss aus wie Fortschritt. Das ist die Kehrseite von §3.258: Dort sperrte ein
+falsch gemessenes Leben die Übergabe, hier verbarg ein falsch gemessenes Leben eine fertige
+Lieferung. Beide Male war die gemessene Größe eine Datei, und gefragt war ein Prozess.
+
 ## 4. Die Guards als Immunsystem
 
 Jedes Guard-Skript ist die geronnene Lösung eines real aufgetretenen, wiederholten Problems.
@@ -1658,7 +1684,7 @@ stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die s
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Sonntag, 20.09.2026, 05:58 · Quellen-Fingerprint: `27189b3bc9d5…`
+Zuletzt aktualisiert: Montag, 21.09.2026, 12:54 · Quellen-Fingerprint: `b361cba7d07d…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1682,6 +1708,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A newly found problem goes into an EXISTING bundle point first; a new standalone point is the exception, and may instead re-cut the bundles | 1 | niedrig | bundle-first-guard.mjs, point-proof-guard.mjs | ✔ Mechanismus |
 | Work packages are SPOKEN by name, never by letter — the user cannot read \"bundle H\"; the letter stays only as an internal ID | 1 | niedrig | bundle-first-guard.mjs | ✔ Mechanismus |
 | Jede Chat-Antwort mit einem Zeitstempel nach deutscher Zeit (Europe/Berlin, DST-korrekt) beginnen | 10 | hoch | timestamp-guard.mjs | ✔ Mechanismus |
+| before starting a point, list worktrees and branches — a live delegated author is invisible to the board and TASKS.md | 1 | niedrig | branch-hygiene-guard.mjs | ✔ Mechanismus |
 | CLAUDE.md §7.1 references design.md instead of retelling it; future doc edits must preserve the verifiable conditions, script mappings, numbering and checked numbers | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Autonomously insert a full CLOSING cycle (regression + dead-code/stale-doc cleanup + .md audit) when warranted — after extensive rework or many small completed tasks — without waiting for the user to ask | 1 | niedrig | closing-guard.mjs | ✔ Mechanismus |
 | hoa commit messages must not reference the TASKS point (\"Point N\") | 1 | niedrig | commit-scope-guard.mjs, point-proof-guard.mjs | ✔ Mechanismus |
@@ -1699,7 +1726,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to the OpenAI lane, GPT-6 Astra), and review is cross-vendor, not Fable-by-default | 6 | hoch | — (Regel/Memory) | ◐ Regel |
 | Iterate on the new feature's OWN test first; the full regression runs once at the end, never as the debugging loop | 2 | mittel | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 89 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 90 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | wait-command-guard.mjs | ✔ Mechanismus |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | \"Gib ab\" / \"abgeben\" means hand the batch to a SUCCESSOR session so the context does not overflow — it never means pause or stop the batch | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1755,7 +1782,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Every GUI/rendering fix must be verified on BOTH WebGPU and WebGL2 before it counts as done — never mark a render fix done on one path | 2 | mittel | render-verify-guard.mjs | ✔ Mechanismus |
 | A resumed batch session must check the previous owner's PROCESS before working — the launcher's \"provably dead\" verdict was wrong and double-spawned | 2 | mittel | render-verify-guard.mjs | ✔ Mechanismus |
 | Rotating verify AND unit failures under a running agent pool are LOAD, not bugs — 8 of 12 unit runs red from load alone; judge a red only on a quiet machine | 13 | hoch | render-verify-guard.mjs | ✔ Mechanismus |
-| The named \"version release\" process and its trigger — queue/run a version release for a version the user names (full closing → user approval → tag → mirror poc → publish /TAG/ and /poc/) | 5 | hoch | lock-release-hook.mjs | ✔ Mechanismus |
+| The named \"version release\" process and its trigger — queue/run a version release for a version the user names (full closing → user approval → tag → mirror poc → publish /TAG/ and /poc/) | 6 | hoch | lock-release-hook.mjs | ✔ Mechanismus |
 | Standing licence to move, REMOVE or ADD villages when it helps — but every change must be checked against the other requirements first, and the check has already caught a real bug | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | A VS Code restart restarts the devcontainer — every process inside dies, PPID 1 proves nothing | 13 | hoch | container-ask-guard.mjs | ✔ Mechanismus |
 | Keep the visual QA eye open for functionally-fine but weird-LOOKING oddities, not just functional bugs | 2 | mittel | — (Regel/Memory) | ◐ Regel |
@@ -1763,10 +1790,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 97 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 7 Revert-/Reapply-Commits · 136 Prozess-/Meta-TASKS-Punkte (davon 64 offen).
+Erfasste Quellen: 98 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 7 Revert-/Reapply-Commits · 136 Prozess-/Meta-TASKS-Punkte (davon 64 offen).
 
-<!-- RETRO-FINGERPRINT: 27189b3bc9d54128979b32ed15b6221ab5d84af4fc5c18d8d9e8b3adccb26e22 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-20T03:58:41.853Z -->
+<!-- RETRO-FINGERPRINT: b361cba7d07da18e188515c0f10e7b7011a0d5a44395c7dfc778eebe893ebc8e -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-21T10:54:08.298Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -7849,3 +7876,31 @@ die der Push selbst bewegt — nicht der Zettel daneben.
 mit der Tat ändert, nicht die Meldung, die jemand danach darüber schreibt. Und ein
 Prüffall, der ein Rennen abbildet, ist erst dann ein Nachweis, wenn er gegen den alten
 Stand ROT ist — sonst hält er nur fest, dass das Rennen heute anders ausging.
+
+### 3.296 Der Wächter hielt an einer Entscheidung fest, die der Nutzer längst geändert hatte
+
+Der Auftrag war klein: das `poc`-Tag auf den aktuellen main-Stand setzen und
+veröffentlichen, ausdrücklich ohne Closing-Lauf. Der `closing-guard` verweigerte genau
+das. Sein Grund war keine Prüfung, die etwas gemessen hätte, sondern eine Prämisse im
+Quelltext — `poc` spiegele immer das neueste Versions-Tag, also sei ein poc-Push ein
+Release-Akt. Diese Prämisse war einmal eine Nutzerentscheidung (24.07.2026). Sie galt
+schon am 16.09. nicht mehr, und am 17.09. auch nicht: beide Male hat der Nutzer `poc`
+direkt auf main gesetzt, beide Male wurde der Wächter mit dreizehn Verzichts-Schritten
+umgangen, die seine eigene Abweisung als Heilmittel anbietet — und beide Male blieb die
+Prämisse stehen.
+
+Ein Umgehungsritual, das zweimal funktioniert hat, sieht aus wie eine Lösung. Es ist das
+Gegenteil: Es macht die Abweisung folgenlos und nimmt damit den einzigen Anlass weg, bei
+dem jemand die Prämisse gelesen hätte. Der Wächter blockierte weiter, die Regel blieb
+falsch, und der Preis war jedes Mal derselbe Aufwand.
+
+Diesmal wurde die Prämisse geändert statt umgangen: `isVersionTagCommand` kennt `poc`
+nicht mehr, nur noch `vX.Y` und Bulk-Tag-Pushes. Die Kopplung, die der Nutzer wirklich
+will, läuft einseitig — ein neues Versions-Tag zieht `poc` nach, aber `poc` darf voraus
+sein — und sie steht jetzt an den drei Stellen, an denen sie gelesen wird: im Kopf des
+Wächters, im Pages-Workflow und im Owner-Runbook.
+
+**Lehre:** Wenn ein Wächter eine Nutzerentscheidung als Konstante einbaut, muss die
+Entscheidung dort auch wieder herausgenommen werden können — und ein Verzichtspfad, der
+die Abweisung billig macht, verhindert genau das. Zweimal derselbe Verzicht ist kein
+Sonderfall mehr, sondern der Beweis, dass die Regel nicht mehr stimmt.

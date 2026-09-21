@@ -57,17 +57,28 @@ describe('constants', () => {
 })
 
 describe('isVersionTagCommand', () => {
-  it('matches creating/moving a version tag or poc', () => {
+  it('matches creating/moving a version tag', () => {
     expect(isVersionTagCommand('git tag -a v0.2 -m "demo" HEAD')).toBe(true)
     expect(isVersionTagCommand('git tag v1.0')).toBe(true)
-    expect(isVersionTagCommand('git tag -f -a poc -m "mirror"')).toBe(true)
   })
-  it('matches pushing a version tag or poc, and bulk tag pushes', () => {
+  it('matches pushing a version tag, and bulk tag pushes', () => {
     expect(isVersionTagCommand('git push origin v0.2')).toBe(true)
-    expect(isVersionTagCommand('git push origin poc --force')).toBe(true)
     expect(isVersionTagCommand('git push origin --tags')).toBe(true)
     expect(isVersionTagCommand('git push --follow-tags origin main')).toBe(true)
     expect(isVersionTagCommand('git push origin v12.34')).toBe(true)
+  })
+  // USER DECISION 20.09.2026: the poc tag is not a release. It may run AHEAD of
+  // the newest version tag and is moved on request without a closing; the
+  // dependency runs the other way only — a new version tag pulls poc up to it,
+  // and that move rides along with the release the gate already covers.
+  it('does NOT match moving or pushing the poc tag', () => {
+    expect(isVersionTagCommand('git tag -f -a poc -m "current build"')).toBe(false)
+    expect(isVersionTagCommand('git push origin poc --force')).toBe(false)
+    expect(isVersionTagCommand('git push origin +poc')).toBe(false)
+    expect(isVersionTagCommand('git push origin :poc')).toBe(false)
+    expect(isVersionTagCommand("git tag 'poc'")).toBe(false)
+    // a bulk push still carries every version tag with it, so it stays gated
+    expect(isVersionTagCommand('git push origin --tags')).toBe(true)
   })
   it('does NOT match ordinary git work or non-version tags', () => {
     expect(isVersionTagCommand('git push origin main')).toBe(false)
@@ -118,9 +129,9 @@ describe('isVersionTagCommand', () => {
       expect(isVersionTagCommand('git tag "v0.3"')).toBe(true)
       expect(isVersionTagCommand("git tag 'v0.3'")).toBe(true)
     })
-    it('matches when poc is quoted', () => {
-      expect(isVersionTagCommand("git tag 'poc'")).toBe(true)
-      expect(isVersionTagCommand('git tag "poc"')).toBe(true)
+    it('does NOT match a quoted poc — it is not a release (user decision 20.09.2026)', () => {
+      expect(isVersionTagCommand("git tag 'poc'")).toBe(false)
+      expect(isVersionTagCommand('git tag "poc"')).toBe(false)
     })
     it('does NOT consume version tag when apostrophe in a quoted string precedes it', () => {
       // "Don't ..." has apostrophe; should not match that with the closing quote of 'v0.3'
@@ -141,8 +152,8 @@ describe('isVersionTagCommand', () => {
       expect(isVersionTagCommand('git --work-tree /build/poc --git-dir /build/poc/.git push origin main')).toBe(false)
     })
     it('still matches the real act from such a checkout', () => {
-      expect(isVersionTagCommand('git -C /build/poc push origin poc')).toBe(true)
-      expect(isVersionTagCommand('git -C /build/poc tag -f poc')).toBe(true)
+      expect(isVersionTagCommand('git -C /build/poc push origin v0.3')).toBe(true)
+      expect(isVersionTagCommand('git -C /build/poc tag -f v0.3')).toBe(true)
       expect(isVersionTagCommand('git --git-dir=/build/poc/.git push origin v0.3')).toBe(true)
     })
   })
@@ -150,8 +161,6 @@ describe('isVersionTagCommand', () => {
     it('matches a forced tag update and a tag deletion', () => {
       expect(isVersionTagCommand('git push origin +v0.3')).toBe(true)
       expect(isVersionTagCommand('git push origin :v0.3')).toBe(true)
-      expect(isVersionTagCommand('git push origin +poc')).toBe(true)
-      expect(isVersionTagCommand('git push origin :poc')).toBe(true)
       expect(isVersionTagCommand('git push origin :refs/tags/v0.3')).toBe(true)
     })
     it('still ignores an ordinary forced branch push', () => {
@@ -163,8 +172,8 @@ describe('isVersionTagCommand', () => {
     it('matches a release act written across continued lines', () => {
       expect(isVersionTagCommand('git tag \\\n  v0.3')).toBe(true)
       expect(isVersionTagCommand('git push origin \\\n  v0.3')).toBe(true)
-      expect(isVersionTagCommand('git push \\\n  origin \\\n  poc')).toBe(true)
-      expect(isVersionTagCommand('git tag \\\r\n  -f poc')).toBe(true)
+      expect(isVersionTagCommand('git push \\\n  origin \\\n  v1.0')).toBe(true)
+      expect(isVersionTagCommand('git tag \\\r\n  -f v1.0')).toBe(true)
     })
     it('still keeps a real newline a segment break', () => {
       expect(isVersionTagCommand('git tag\ngit push origin main')).toBe(false)
@@ -192,10 +201,10 @@ describe('isVersionTagCommand', () => {
       expect(isVersionTagCommand('gh release create v0.3')).toBe(true)
       expect(isVersionTagCommand('gh release create v0.3 --title "Demo"')).toBe(true)
     })
-    it('matches gh release create with poc tag', () => {
-      expect(isVersionTagCommand('gh release create poc')).toBe(true)
+    it('does NOT match gh release create with the poc tag', () => {
+      expect(isVersionTagCommand('gh release create poc')).toBe(false)
     })
-    it('does NOT match gh release without version/poc arg', () => {
+    it('does NOT match gh release without a version arg', () => {
       expect(isVersionTagCommand('gh release create release-1')).toBe(false)
     })
     it('does NOT match other gh commands', () => {
@@ -468,8 +477,8 @@ describe('evaluate — allow/deny', () => {
     expect(r.reason).toMatch(/dead-code/)
     expect(r.reason).toMatch(/md-audit/)
   })
-  it('BLOCKS a poc push on an incomplete closing', () => {
-    expect(evaluate({ command: 'git push origin poc --force', state: null, headSha: HEAD }).block).toBe(true)
+  it('ALLOWS a poc push on an incomplete closing — poc is the current build, not a release', () => {
+    expect(evaluate({ command: 'git push origin poc --force', state: null, headSha: HEAD }).block).toBe(false)
   })
   it('ALLOWS the tag once every step is recorded for the tagged commit', () => {
     expect(evaluate({ command: 'git tag -a v0.3 -m x', state: stateWith(HEAD, ALL_IDS), headSha: HEAD }).block).toBe(false)

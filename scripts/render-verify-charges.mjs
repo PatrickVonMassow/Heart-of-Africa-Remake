@@ -1372,6 +1372,59 @@ export const RED_CHARGES = [
       + 'has three shapes to explain.',
   },
   {
+    point: 1068,
+    suite: 'polish',
+    backend: 'webgpu',
+    // LEVEL-SCOPED because the measurement was taken at that level and only
+    // there: .claude/render-verify-state.json records every WebGPU run at
+    // 6a34fffa2 as featureLevel=compatibility. Without the level this entry
+    // would excuse, on the CORE adapter the player runs, a red nobody has
+    // measured there.
+    featureLevel: 'compatibility',
+    kind: 'check',
+    match: /^no child walks without getting anywhere$/i,
+    // THE SECOND LANE, CHARGED SEPARATELY (21.09.2026). The sibling entry above
+    // owns the WebGL 2 sightings; this one owns the first WebGPU sighting, which
+    // is the comparison point 1068 lists in its own words as NOT measured. It is
+    // a separate entry rather than a dropped `backend` on the sibling for the
+    // reason stated at the top of this file — scope as narrowly as the evidence
+    // allows. An unscoped entry would also excuse a lane nobody has read, and it
+    // would put this lane's measurement under a `why` that never measured it.
+    // The composition, the cut and the cap are the sibling's, unchanged: the
+    // group share under a tenth of a percent, its window count, the judgeability
+    // reading. A sustained tread — a group share of 0.2 % and up, or a red
+    // without the judgeability line — is a different composition and stays red.
+    detailReadsPrefix: true,
+    detailMatch:
+      /^worst child -?\d+ at \d+\.\d+ % of its own judged time; group 0\.[01]\d % \(\d+ of [1-9]\d* 1s windows, [\d.]+ judged child-seconds\)\. Least judgeable child \d+ at [\d.]+ %, group [\d.]+ % of [\d.]+ traced\./i,
+    why:
+      'FIRST WEBGPU SIGHTING OF THE COMPOSITION POINT 1068 ALREADY OWNS, measured 21.09.2026 on '
+      + 'feat/1158-escape-cooldown-return at 6a34fffa2 (log '
+      + 'local/verify-logs/2026-09-21T08-02-02-116-collision-polish-settings.log, the three-suite '
+      + 'WebGPU pass a settlement pointer-lock change owes): worst child 0 at 0.34 % of its own '
+      + 'judged time, group 0.07 % (4 of 5880 one-second windows, 263.5 judged child-seconds), '
+      + 'burst series wholly clean at 0.00 % with no offending window at all, on a lane the run '
+      + 'record puts at featureLevel=compatibility. That is the sibling '
+      + 'entry\'s composition to the digit, on the lane 1068 had never had a reading printed for. '
+      + 'WHY IT IS CHARGED RATHER THAN LEFT OPEN, and what rules out the cheap explanations: the '
+      + 'children-motion block re-run ALONE on the SAME backend at the SAME HEAD was GREEN in '
+      + '2 m 00 s over 8 checks (log local/verify-logs/2026-09-21T08-40-03-361-polish.log), and the '
+      + 'change underneath it is confined to the settlement pointer-lock recovery — no walker, no '
+      + 'path, no motion code is touched by it, and the suite\'s own runner marked the red run NOT '
+      + 'AUTHORITATIVE because the host quiet could not be verified. So this is the transient the '
+      + 'sibling records, on a second lane, and NOT a WebGL 2 property as the scoping there implied. '
+      + 'What it does NOT do is name the cause: the eight-run WebGPU probe 1068 asks for is still '
+      + 'owed, and this charge dies with 1068. '
+      + 'IT DECLARES detailReadsPrefix, for the same reason the sibling does: this measurement is '
+      + 'cut at the 200-character bound, and the cut falls inside the words "In 0.5s bursts: worst ", '
+      + 'so the burst reading — the sharpest discriminator, standing at 0.00 % while the one-second '
+      + 'series reddened — is not in the text a charge can read. The signature stops after the '
+      + 'judgeability reading, well clear of that bound. What the bound removes is the burst series '
+      + 'and the printed threshold sentence: the threshold is a constant the check prints, and a '
+      + 'worse burst series would be a different composition than the one charged here — but it is '
+      + 'unreadable by construction, so this entry owns the whole of it exactly as the sibling does.',
+  },
+  {
     point: 1010,
     suite: 'polish',
     backend: 'webgl',
@@ -1464,53 +1517,6 @@ export const RED_CHARGES = [
       + 'spread is the host or the scene, and the charge dies with that point.',
   },
   {
-    point: 1013,
-    suite: 'enrichments',
-    backend: 'webgl',
-    kind: 'check',
-    // NAME-SCOPED, AND THE RECORD IS WHY. The check prints its whole hunt sample
-    // as JSON, which runs past the 200-character bound, so every record of it is
-    // cut mid-`predMismatch` — a detail signature would have to declare that it
-    // reads only the front, and the declaration is deliberately held to the two
-    // entries that argued for it. What remains is the check's own name, and that
-    // is no wider than the point: 1013's whole subject is this one check and
-    // whether it asks the region it means, so any failure of it belongs to that
-    // point until it lands. Scoped to the lane both firings were measured on.
-    match: /^every predator fits the region and period$/i,
-    why:
-      'FILED AS 1013 ON 29.08.2026 FROM EXACTLY THIS RED, and reproduced 03.09.2026 in the LARGE '
-      + 'run on feat/1047-bank-game-readable (webgl/enrichments, 07:02:14Z): sixteen hunts, the '
-      + 'prey side clean, one predator scored outside its region — a cheetah in central Africa on '
-      + 'the day it was filed, a hyena in central Africa today. The species differs and the shape '
-      + 'does not, which is what 1013 says is unsettled: the check may read the region where the '
-      + 'hunt ENDED rather than where it began, or the placement may be genuinely wrong, and the '
-      + 'two regions have never been logged side by side. Nothing in the bank-game branch touches '
-      + 'the wildlife simulation or the food-web table, so this red says nothing about that '
-      + 'change. It is charged, not excused: 1013 owes the logged sample that decides which '
-      + 'reading is right, and the charge dies with that point.',
-  },
-  {
-    point: 1063,
-    suite: 'enrichments',
-    kind: 'check',
-    // NAME-SCOPED, and deliberately NOT folded into 1013's entry next door: that
-    // one is anchored on `every predator fits the region and period`, a DIFFERENT
-    // and older check whose `why` records the PREY side as clean. This is the prey
-    // side, and it is a check that did not exist when 1013 was written.
-    match: /^every hunted prey fits the region and the predator food web/i,
-    why:
-      'FILED AS 1063 ON 06.09.2026 FROM EXACTLY THIS RED, measured in the LARGE run on '
-      + 'feat/689-chief-direction-and-mould at 8944a52c6 (webgl/enrichments): sixteen hunts, the '
-      + 'predator side clean, one wildebeest scored as hunted in `central` and the lion/wildebeest '
-      + 'pair rejected with it. It went GREEN on the same run\'s retry, so the placement is '
-      + 'INTERMITTENT — which is the same unsettled reading 1013 states for the predator side: the '
-      + 'check may score the region where the hunt ENDED rather than where it began, and an animal '
-      + 'crossing a border mid-hunt would produce both the red and its disappearance. Nothing in '
-      + 'the chief-reply branch touches the wildlife simulation or the food-web table, so this red '
-      + 'says nothing about that change. It is charged, not excused: 1063 owes the logged start/end '
-      + 'sample that decides which reading is right, and the charge dies with the point.',
-  },
-  {
     point: 565,
     suite: 'enrichments',
     backend: 'webgl',
@@ -1536,6 +1542,32 @@ export const RED_CHARGES = [
       + 'It says nothing about the bank-game branch: that change moves village children, bank-game '
       + 'balance values and play-rock geometry, and touches no wildlife anchoring. The charge dies '
       + 'with 565.',
+  },
+  {
+    point: 1172,
+    suite: 'polish',
+    backend: 'webgpu',
+    // Measured on this host, whose WebGPU lane launches with --force-webgpu-compat
+    // and an opengles adapter, so the reading belongs to the compatibility level
+    // and says nothing about a core adapter.
+    featureLevel: 'compatibility',
+    // SHAPE-SCOPED: count 0 means the dig bout had ENDED before the shutter, so
+    // which villager left and by how much is the accident and the staging race
+    // is the defect. Scoped to WebGPU, the only lane it has been measured on;
+    // the same branch tip ran this check green on WebGL 2 thirty minutes
+    // earlier, so it must stay a real red there.
+    match: /^and both are still at the stroke, on opposite sides of the hole\b/i,
+    why:
+      'THE RED POINT 1172 WAS FILED FOR, measured 21.09.2026 on the WebGPU polish pass of '
+      + 'point 1158 (local/verify-logs/2026-09-21T09-35-28-998-polish.log, 303 pass 1 fail, '
+      + 'count 0 striking 0). It is not 1158\'s: that point changes pointer-lock input handling '
+      + 'and its only edit outside pointerLock.ts and its test is a comment in PlaceScene.tsx, '
+      + 'and the SAME tip ran the whole polish suite green on WebGL 2 thirty minutes earlier '
+      + '(304 pass 0 fail). It is not 1121\'s either: that race is the river-bank aim block at '
+      + '~6047, this is the dig-pair block at ~6660. The rung re-run ALONE on a quiet machine '
+      + 'went 39/0, and the red run printed "UNDER LOAD — NOT AUTHORITATIVE" itself — consistent '
+      + 'with load AND with a rare race, which is why the later green closes nothing (point 640). '
+      + 'The charge dies with 1172.',
   },
   {
     point: 1121,

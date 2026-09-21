@@ -497,7 +497,21 @@ rectangles the browser really laid out, sampled over many frames rather
 than one instant, in BOTH scenes — the open savanna
 (`scripts/verify/enrichments.mjs`) and the crowded village at the very
 frame that once showed the defect (`scripts/verify/polish.mjs`; the bar:
-`scripts/verify/labelFusion.mjs`).
+`scripts/verify/labelFusion.mjs`). Every inventory slot answers a press by
+click AND by its digit key, with the expected toast and an unchanged
+journal, for the rifle, rope, machete, canoe, canteen, shovel, a carried
+form and a treasure, in the open and in a settlement
+(`src/ui/Hud.test.tsx`); the store's own refusals — the shovel inside a
+settlement, a form pressed where no socket stands, a treasure shown out on
+the map, at a bazaar, at the monument site or to a village that neither
+reveres nor rejects the material — are covered in `src/state/store.dig.test.ts`,
+`src/state/store.mould.test.ts` and `src/state/store.economy.test.ts`.
+That the answer is never hidden behind what the same act opened is proved
+in the browser: with the journal open and under a modal backdrop,
+`document.elementFromPoint` inside the overlap of the two rectangles is the
+toast, and the same section's frame `1170-toast-over-journal` shows that
+sentence standing across the opened journal
+(`scripts/verify/enrichments.mjs`, section `toast-above-panels`).
 
 ## 10. Goal scaffolding.
 

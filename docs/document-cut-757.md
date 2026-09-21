@@ -117,7 +117,7 @@ guard still enforces the configured ceilings when those files are present.
 | document | current repository measurement | ceiling | headroom |
 | --- | --- | --- | --- |
 | `CLAUDE.md` | 204 lines / 1,460 words / 10,795 B | 205 / 1,468 | **1 line**, 8 words |
-| `MEMORY.md` | outside repository | 51 / 783 | not recorded |
+| `MEMORY.md` | outside repository | 52 / 803 | not recorded |
 | global `CLAUDE.md` | outside repository | 6 / 36 | not recorded |
 
 ### Historical measurements and budget decisions
@@ -156,6 +156,18 @@ because the freed line was exactly what put the index back inside it. On
 three words were tightened out of existing entries, no entry was added or
 retired, and the ceiling was left where it stands. That hand restatement is the
 last of its kind — it was made only to clear the red this point removes.
+On 21.09.2026 the ceilings moved to 52 / 803 for one new entry: how to notice
+that the point you are about to start already has a live author on its own
+branch. The advice below — cut a retired entry rather than widen again — was
+followed first and did not pay: three candidates were examined and all three
+still hold their ground (the Fable entry carries the underivable fact that no
+detector watches for new versions, the boundary marker guards a gap an open
+point has yet to close, and the two picture-judgement entries are two different
+statements rather than a duplicate), and nothing in the index measured stale.
+The cost of the missing entry was measured the same morning: a finished,
+CI-green point was rebuilt from scratch, unit suite included, because no source
+the batch resumption reads names an existing branch.
+
 The 10.09.2026 reading showed zero word headroom for a file designed to gain
 a line per memory. The next raise should cut a retired
 entry rather than widen again.

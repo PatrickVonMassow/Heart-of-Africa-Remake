@@ -1519,3 +1519,90 @@ Extraktion sitzt im Skript, nicht im Kern, und ein Test dafür verlangte einen E
 Umbau. Nicht als Punkt eingereiht: kein Spielerimpakt, und der Defekt ist gemessen behoben
 (dirty=2 → dirty=1 auf demselben Baum). Wer den Kern das nächste Mal ohnehin anfasst, zieht
 die Zeile mit hinüber und prüft sie dort.
+
+## Der Zeigersperr-Beobachter bleibt über sein Zeitfenster hinaus scharf (21.09.2026)
+
+Die Erholung in `src/scenes/place/pointerLock.ts` (Punkt 1158) hält ihre Absicht
+`wantsLock` absichtlich über das 3-Sekunden-Fenster hinaus, damit eine späte echte
+Bewegungstaste die Sperre noch holen kann, wenn der Browser frische Nutzeraktivierung
+verlangt. Solange diese Absicht steht, bleibt auch der `MutationObserver` verbunden, der
+auf `document.body` mit `subtree: true` und `attributes: true` jede Klassenänderung im
+ganzen Dokument sieht — und die HUD-Elemente ändern ihre Klassen häufig. Aufgelöst wird er
+erst durch Gewährung, Escape, Dialog, Overlay, Fensterwechsel, verborgene Seite, HUD-Klick
+oder Szenenabbau; der Rückruf selbst macht nur ein `querySelector('.overlay')`.
+Nicht als Punkt eingereiht: kein gemessener Spielerimpakt, keine reproduzierbare
+Bildrate-Einbuße, und die Absicht über das Fenster hinaus ist die eigentliche Antwort auf
+die zweite Lesart des Punktes. Wer die Datei das nächste Mal anfasst, misst, ob der
+Beobachter in einer belebten Siedlung spürbar kostet, und engt ihn sonst auf den
+Overlay-Wurzelknoten ein, statt ihn über den ganzen Baum zu legen.
+
+## Ein laufender beauftragter Autor ist in keiner Wiederaufnahme-Prüfung sichtbar (21.09.2026)
+
+Die Batch-Wiederaufnahme las `scripts/focus.mjs show` („1158: returned to queue"),
+TASKS.md (1158 als ersten offenen Punkt) und den Punkt-Brief. Alle drei stimmten und
+alle drei waren irreführend: In `.claude/worktrees/point-1158` lag `feat/1158-escape-cooldown-return`
+mit dem fertigen Fix, 190 Zeilen Tests, vermerkter Mechanismus-Prüfung und einem bereits
+CI-grünen Merge mit main. Keine der gelesenen Quellen nennt einen Worktree oder einen
+Branch, also wurde der Punkt komplett neu gebaut — samt voller Unit-Suite —, bis `ps`
+zufällig dessen laufendes `run-all.mjs` zeigte. Die Quelle, die es gesagt hätte, ist
+`git worktree list` beziehungsweise `git branch -a`. Nicht als Punkt eingereiht: kein
+Spielerimpakt, keine Blockade, und die wirksame Abhilfe ist eine Gewohnheit, kein
+Mechanismus — sie steht als Memory-Regel „Check for an existing branch first". Wer die
+Wiederaufnahme ohnehin anfasst, lässt sie den Branch oder Worktree zum Punkt nennen,
+bevor sie ihn als offen anbietet.
+
+## `--agent-check` urteilt „alive" auf Dateien, die eine beendete Suite geschrieben hat (21.09.2026)
+
+Im selben Vorgang meldete `node scripts/batch-in-flight.mjs --agent-check --worktree
+.claude/worktrees/point-1158` zweimal „DO NOT REPLACE THIS AGENT: work output 0 min old
+(working files)", obwohl in der Prozessliste kein Autorprozess mehr stand — die 0 Minuten
+alten Dateien waren die 76 `verification/*.png`, die seine gerade beendete Bild-Suite
+geschrieben hatte. Das Urteil ist bewusst vorsichtig (am 30.07.2026 wurde ein lebender
+Agent für tot erklärt und zwei fertige Punkte neu gebaut), also ist die Richtung richtig;
+was fehlt, ist die Unterscheidung zwischen „der Autor schreibt" und „sein Werkzeug hat
+geschrieben". Nicht als Punkt eingereiht: die falsche Richtung ist die harmlose, und die
+Infrastruktur steht unter Einfriergebot. Wer es ohnehin anfasst, schließt regenerierbare
+Ausgabeordner aus der Lebendprüfung aus oder verlangt zusätzlich einen Prozess.
+
+## Ein `--section`-Lauf überschreibt die Vollpass-Bilder mit Kaltstart-Bildern (21.09.2026)
+
+`npm test -- polish --section=speech-guess` schrieb `verification/148-speech-guess-invitation.png`
+neu: 62.900 Bytes, leeres blassgrünes Feld, keine Hütten, keine Berge, kein Feuer, HUD-Zähler
+„1 FPS". Der auf main eingecheckte Stand desselben Bildes, auf DEMSELBEN Backend (WebGL 2,
+gleicher Kompatibilitätshinweis im Bild), ist 624.037 Bytes und zeigt das volle Maasai-Dorf
+bei 52 FPS. Es ist also kein Backend-Unterschied, sondern ein Kaltstart: der Abschnittslauf
+öffnet den Verschluss, bevor die Szene steht, während der Vollpass die Blöcke davor als
+Aufwärmung hat. Die Prüfung selbst bleibt grün, weil ihr erklärtes Subjekt — die Sprechnotiz —
+im Bild ist; nichts meldet den Verlust. `verification/` ist in git verfolgt, also ersetzt ein
+`git add -A` nach einem Abschnittslauf gute Vollpass-Bilder durch Kaltstart-Bilder, und der
+nächste Bildvergleich steht auf dem verschlechterten Stand. Hier waren 76 Dateien betroffen;
+alle wurden mit `git restore verification/` verworfen, bevor gelandet wurde. Nicht als Punkt
+eingereiht: kein Spielerimpakt, und die billigste Abhilfe — ein Abschnittslauf schreibt seine
+Bilder gar nicht erst in den verfolgten Ordner — ist Infrastruktur unter Einfriergebot. Bis
+dahin gilt die Handregel: nach einem `--section`-Lauf nie `verification/` mitcommitten.
+
+## Fünf verwaiste Autor-Arbeitsbäume stehen ohne Eintrag irgendwo (21.09.2026)
+
+Nachdem der Neubau von Punkt 1158 genau an dieser Blindheit lag, wurde der Bestand gemessen:
+`git worktree list` zeigt fünf Punkt-Arbeitsbäume, und in keinem läuft ein Autorprozess.
+
+| Punkt | Zweig | vor/hinter main | letzter Commit | Punkt offen? |
+| --- | --- | --- | --- | --- |
+| 690 | `feat/690-port-city-tag-game` | +10 / −35 | vor 21 Stunden | ja |
+| 1049 | `feat/1049-queue-order-rule` | +1 / −1550 | vor 3 Wochen | ja |
+| 834 | `feat/834-durable-authoring-lane` | +122 / −3326 | vor 4 Wochen | nein |
+| 847 | `feat/847-brevity-guard-gaps` | +17 / −3518 | vor 4 Wochen | ja |
+| 901 | `feat/901-superseded-ci-run` | +1 / −2003 | vor 3 Wochen | ja |
+
+Der alarmierendste Fall löst sich auf: Punkt 834 ist geschlossen und trägt trotzdem 122 Commits
+mit 12.402 Zeilen, die main nicht hat — aber das Archiv sagt warum. Der Punkt wurde am
+24.08.2026 zerschnitten, weil die Gegenlese von ~12.000 Zeilen in keine Runde passt; die Nähte
+sind die Punkte 889 bis 895, und der Zweig ist das aufbewahrte Material dafür. **Er darf nicht
+gelöscht werden**, und dasselbe gilt für jeden anderen hier, solange seine Arbeit weder gelandet
+noch geprüft verworfen ist.
+
+Was bleibt, ist die Sichtbarkeit: Keine dieser fünf Lagen steht auf dem Board, im Auftrag oder
+in der Fokuszeile, und 690 ist der NÄCHSTE Punkt in der Reihenfolge — sein Zweig trägt bereits
+zehn Commits mit dem Betreff „Complete the authored changes". Wer dort ankommt, übernimmt und
+landet, statt neu zu bauen. Nicht als Punkt eingereiht: kein Spielerimpakt, nichts ist verloren,
+und die Abhilfe ist dieselbe Gewohnheit wie oben — vor jedem Punktbeginn den Bestand ansehen.

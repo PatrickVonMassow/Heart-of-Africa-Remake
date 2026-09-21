@@ -77,44 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1170. Every inventory item answers its click and its digit key with a sentence in the
-  view, in the open and in a settlement alike, and such a sentence is never hidden behind the
-  journal (user 20.09.2026, ordered to the front and started at once: "Den Task, an dem du
-  gerade arbeitest, parken und sofort mit diesem neuen beginnen."). The shovel in the open is
-  the model: pressed where nothing is buried it says so in a toast, with no journal entry.
-  Final state: (1) EVERY slot of the inventory bar is a button whose click and digit key
-  (Digit1-Digit9) reach one handler, in the bird's-eye world and in a settlement; where the
-  item acts (medicine cures, the shovel digs in the open, a form presses against a socket in
-  the open, a find goes to the chief, a treasure is shown in a village) the existing action
-  runs unchanged, and where it cannot act right now the traveller says why in a toast (the
-  shovel's lane: `toast`, never a journal entry — "ein Tagebucheintrag wäre übertrieben").
-  (2) The answers, one English and one German text each under the language files' `toasts`:
-  rifle — in the open: he shoulders it by himself the moment danger threatens; in a
-  settlement: he has no wish to threaten anyone here. Rope — in the open off a mountain: it
-  comes into use by itself on a climb; on a mountain: it is already taking his weight; in a
-  settlement: nothing here to climb. Machete — in the open off jungle: it swings by itself
-  where the jungle closes in; in jungle: it is already clearing the way; in a settlement: he
-  will not swing a blade among people. Canoe — in the open on land: it is launched by itself
-  at a river or lake; on water: it is already carrying him; in a settlement: no water here to
-  launch it. Canteen — both views: he drinks from it as thirst demands and it fills itself at
-  fresh water. Shovel — in a settlement: he does not dig up the ground people live on. A
-  carried form — in a settlement: he presses it against stone out in the open, not here. A
-  treasure — in the open: nobody out here to show it to; in a port: the bazaar trades it and
-  does not admire it; in a village whose people neither revere nor reject the material: they
-  look at it without interest (today that click marks the village as shown and says nothing).
-  Medicine keeps its two answers (none left / not needed). (3) The toast stacks above EVERY
-  panel and overlay — journal, map, debug menu, dialog backdrop — so the chief's "steps out
-  of his hut" sentence is legible while the journal opens on the same act (today `.toast` has
-  no z-index and the journal's 16778000 covers it). (4) Tests: `src/ui/Hud.test.tsx` covers
-  each item×view pair above by click AND digit key (expected `toast` text, journal length
-  unchanged), the store test covers the indifferent-treasure answer, and a Playwright
-  assertion in the HUD-covering suite opens the journal, raises a toast and proves
-  `document.elementFromPoint` at the toast's centre is the toast. (5) `design.md` §17.1's
-  inventory sentence, `docs/acceptance-criteria-detail.md` §9 and
-  `docs/acceptance-evidence.md` §9 state the final behaviour in the same commit. Nothing
-  else changes: tooltips, glow, sort order and the shovel's open-world answers stay.
-  Bundle: Steuerung & Performance.
-
 - [ ] 1158. The one-click return from the Escape cooldown is confirmed in a real browser
   (residual of point 1148, landed 18.09.2026). IT STANDS AT THE FRONT AGAIN, and it is no
   longer a question for the user: he took the observation himself on the deployed build the
@@ -124,6 +86,15 @@ put it is the mistake this line exists to stop.
   below is now the work: the Escape-cooldown reading behind 1148 was wrong or incomplete,
   and the REAL cause is measured and fixed rather than guessed. Step (2), the two-second
   click, was not reported as failing.
+  RETESTED BY THE USER ON 20.09.2026, 18:56, and it SEPARATES the two steps for the first
+  time, verbatim: "Es funktioniert nach wie vor nicht, wenn man nicht eine Zeit lang vor dem
+  Klicken wartet." So waiting BEFORE the click makes it work and the quick click still does
+  not — step (2) passes, step (1) fails, on the deployed build after 1148 landed. That rules
+  out the click missing the canvas (step (5) / (c)) as the whole cause, because the same
+  click on the same spot succeeds once time has passed, and it points straight at the
+  refusal path: either the bounded 1.1 s retry never fires, or it is refused again because
+  Chrome's cooldown outlasts it or the retry lacks a fresh user activation. Measure (a) and
+  (b) FIRST against that reading.
   WHAT TO MEASURE, since the fix must name a cause: (a) whether the quick request is refused
   at all (`pointerLockProbe.refusals`, `pointerlockerror`, the promise rejection and its
   DOMException message), silently dropped, or granted and lost again; (b) whether the bounded
@@ -205,6 +176,30 @@ put it is the mistake this line exists to stop.
   (3) only the tick of 1158 waits for the card's answer. Final state: the card exists on the
   board with the observation instructions, the batch has moved on, and 1158 is ticked only
   after the user's answer on that card.
+  THE 20.09 RETEST RAN ON A BUILD THAT ALREADY CARRIED THE 18.09 FIX — measured
+  20.09.2026, 19:45. The Pages deployment of `800c04774a` concluded success at 16:24:36Z,
+  and that commit contains `b862fcb72`, `06ba6ab51`, `a7f55ce04` and `33dee9f41`; the same
+  deployment rebuilt `/poc/` from `cd275b233`, which contains `33dee9f41` as well. The
+  user's retest fell at 18:56 Berlin = 16:56Z, 31 minutes after that deployment, so the
+  bounded 250 ms sequence was in BOTH the root build and `/poc/` when he took it. The two
+  readings above are therefore not in conflict: step (3) is the work, and the sentence
+  "MEASURED AND FIXED 18.09.2026, awaiting only the two observations" is SUPERSEDED — what
+  is awaited is a new cause and a new fix, and the two observations confirm THAT.
+  THE ONE MEASUREMENT THIS HOST CANNOT TAKE, re-checked 20.09.2026: a native Escape.
+  `DISPLAY=:30` exists, but Xvfb, xvfb-run, xdotool, ydotool, python-xlib and pip3 are all
+  absent, so no X-level key can be faked, and CDP's `Input.dispatchKeyEvent` bypasses the
+  browser-process handler that ends the lock (measured 18.09). A `document.exitPointerLock()`
+  exit is no substitute for it — that is the case the 18.09 timer probe measured, and it is
+  a DIFFERENT case from a user-initiated exit, which is the reading that makes the probe's
+  "granted" result compatible with the player's "refused". Do not spend the point re-trying
+  this measurement.
+  WHAT THE FIX MUST COVER, because neither cause can be excluded from this host: (i) the
+  browser reports NO refusal for the quick ask — no promise rejection, no `pointerlockerror`
+  — in which case the sequence in `createPlacePointerLock` dies after ONE ask, since every
+  further ask hangs off `onRefusal`; and (ii) the browser refuses every ask that carries no
+  fresh user activation once the USER ended the lock, in which case no timer-driven ask can
+  ever succeed and the recovery has to ride on the player's next real input event. A fix
+  that covers only one of the two is not the fix.
 
 - [ ] 690. The classic game of tag moves to the port cities, and every document describes
   the rebuilt mechanic (user 13.08.2026, playing the deployed communication slice; point 692
@@ -956,6 +951,26 @@ put it is the mistake this line exists to stop.
   the runner itself called busy). So a full pass does not reproduce it either: four full
   WebGL 2 passes are now on record for this check, three green and one red. Whatever this
   point finally names, it is a transient of that order and not a standing defect.
+  THE WEBGPU COMPARISON THIS POINT LISTED AS NOT MEASURED IS NOW MEASURED, 21.09.2026 on
+  feat/1158-escape-cooldown-return at 6a34fffa2, in the three-suite WebGPU pass a settlement
+  pointer-lock change owed (log
+  `local/verify-logs/2026-09-21T08-02-02-116-collision-polish-settings.log`): worst child 0 at
+  0.34 % of its own judged time, group 0.07 % (4 of 5880 one-second windows, 263.5 judged
+  child-seconds), burst series wholly clean at 0.00 % with no offending window at all, at recorded
+  featureLevel=compatibility. That is EXACTLY the composition this point already charges — on the
+  other lane, which had never had a reading printed for it.
+  WHAT RULES OUT THE CHEAP EXPLANATIONS HERE: the children-motion block re-run ALONE on the SAME
+  backend at the SAME HEAD was GREEN in 2 m 00 s over 8 checks (log
+  `local/verify-logs/2026-09-21T08-40-03-361-polish.log`); the change beneath it is confined to
+  the settlement pointer-lock recovery, touching no walker, no path and no motion code; and the
+  runner itself marked the red run NOT AUTHORITATIVE because the host quiet could not be verified.
+  SO THE TRANSIENT IS NOT A WEBGL 2 PROPERTY, which is what the charge entry's lane scoping had
+  implied. A SECOND, LANE-SCOPED ENTRY was added the same day rather than dropping the scope from
+  the first: the ledger's own rule is to scope as narrowly as the evidence allows, an unscoped entry
+  would also excuse a lane nobody has read, and each entry now carries the measurement that
+  justifies it. Composition, cut and group-share cap are unchanged on both, so a sustained tread
+  stays a real red. WHAT THIS DOES NOT DO is name the cause, and the eight-run WebGPU probe the
+  Test line below asks for is still owed — this is a fifth shape, not an answer.
   Final state:
   - The throttle probe says whether it is load or a defect, and the eight results are printed.
   - Whichever it is: the charge is removed by a fix, or it is kept with the measurement that
@@ -15777,3 +15792,70 @@ to land than a mechanism that needs a review.
   Criticality: medium — it is the user's own report of 648/656, alive on about a tenth of
   the worlds he can be dealt, and it is player-visible wherever it fires.
   Bundle: Dorfleben.
+
+- [ ] 1171. A bank-game unit test runs into its 20-second timeout on CI and blocks every main
+  push (measured 21.09.2026 while landing the charge for point 1068's WebGPU sighting).
+  WHAT FAILED: CI run 35580966090 for `origin/main` 54033d9f0 concluded "failure" on the
+  `fast` job's unit stage — `src/scenes/place/bankGame.test.ts:1229`, "offers every play-rock
+  ROCK with a solved touch at the speaker`s own spot over a Bambara cycle", `Error: Test timed
+  out in 20000ms`. Everything else was green: 511 of 512 test files, 16,147 tests, 11 skipped.
+  The whole unit layer took 1148 s there.
+  THAT IT IS NOT THE COMMIT'S CONTENT IS MEASURED, NOT ASSUMED. The branch commit eaa481567,
+  which contains 54033d9f0 in full, ran the SAME workflow one minute later and went GREEN. The
+  red commit itself touches `scripts/render-verify-charges.mjs`, its test and `TASKS.md` — not
+  one line of `bankGame`. So the red is a property of the run, not of the diff under it.
+  WHAT IT COSTS, and why this is a point rather than a backlog line: `ci-status-guard` blocks
+  every turn until a fixing push, so an unowned red on main stops the whole batch. It stopped
+  this one.
+  WHAT IS NOT MEASURED, named rather than assumed: how close the test runs to its 20 s on a
+  quiet local machine; whether CI exceeds it reproducibly or only under load; and whether the
+  combinatorial breadth of the case ("every play-rock", a whole Bambara cycle) is what makes it
+  the one case in the layer that can hit a per-test bound.
+  Final state: the test's cost is measured on a quiet host and on CI, and EITHER the case is
+  made cheap enough to sit well inside the bound, OR the bound is raised for it with the
+  measurement that justifies the number. A raised bound with no measurement behind it does not
+  close this point.
+  Test: `npx vitest run src/scenes/place/bankGame.test.ts` timed on a quiet host, the figure
+  printed; then the same case green over three consecutive CI runs.
+  Criticality: medium — no player loses anything, but it blocks the push gate every batch pays
+  at, and an unowned red on main is exactly what the red policy forbids.
+  Refs: src/scenes/place/bankGame.test.ts:1229, src/scenes/place/bankGame.ts, CI run
+  35580966090
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1172. The dig-pair picture check finds no adults at all at the shutter and reds the whole
+  `polish` pass (measured 21.09.2026 while landing point 1158).
+  WHAT FAILED: `polish --section=adult-errands`, WebGPU, on `feat/1158-escape-cooldown-return`
+  at eaa481567 — `FAIL and both are still at the stroke, on opposite sides of the hole` with
+  `{"count":0,"striking":0,"away":[],"span":null,"opposed":false,"offLine":null}` (log
+  `local/verify-logs/2026-09-21T09-35-28-998-polish.log`, 303 pass, 1 fail). `count: 0` means
+  the check found NO villager still in the digging bout at the shutter, so the frame beside it
+  photographs bare earth and the frame's own subject test cannot tell the difference.
+  IT IS NOT POINT 1158'S, and that is measured. 1158 changes pointer-lock input handling; its
+  only edit outside `pointerLock.ts` and its test is a comment in `PlaceScene.tsx`. The SAME
+  branch tip ran the whole `polish` suite GREEN on WebGL 2 thirty minutes earlier — 304 checks,
+  0 failures (log `local/verify-logs/2026-09-21T09-02-33-527-collision-polish-settings.log`).
+  IT IS ALSO NOT POINT 1121'S. That point owns a different `adult-errands` red — the river-bank
+  frame aiming at a drifting fleck — and its cause is the aim block at ~6044-6070. This red is
+  the dig-pair block at ~6660-6715, a different check with a different subject.
+  WHAT IS MEASURED SINCE: the same rung re-run ALONE on a quiet machine at the merged tip
+  d3e82342d went green, 39 pass 0 fail in 2m 54s, and the red run printed "UNDER LOAD — NOT
+  AUTHORITATIVE" itself, because two unit suites of the owning session were on the machine at
+  the time. That is consistent with load — and consistent with a rare timing race, which is
+  exactly why a later green closes nothing (point 640). The distinction is NOT measured.
+  WHAT IS NOT MEASURED, named rather than assumed: whether `node scripts/throttle-probe.mjs
+  polish --section=adult-errands --runs 8` reproduces it at a quarter of a core; whether the
+  bout can end between `waitForFunction` picking the pair and the shutter opening three frames
+  later, which is the same shape as 1121's race; and whether the WebGL 2 lane simply never hit
+  the window rather than being immune.
+  Final state: the red has a named cause and either the check no longer races its own subject —
+  the pair it photographs is the pair that is IN the bout at the shutter, re-read at shutter
+  time — or the run is shown to be load and the check left alone with the measurement that
+  shows it. A check weakened into one that would pass on bare earth does not close this point.
+  Test: `node scripts/throttle-probe.mjs polish --section=adult-errands --runs 8` for the
+  reproduction, then `polish --section=adult-errands` green on a quiet machine on both backends.
+  Criticality: medium — no player impact; it costs a whole `polish` pass its meaning and it
+  reds on the everyday WebGPU lane, so every point behind it inherits an unaccounted red.
+  Refs: `scripts/verify/polish.mjs` (~6660-6715, the `held` block and the 1125 frame),
+  `scripts/render-verify-charges.mjs` (the entry filed with this point); sibling of point 1121.
+  Bundle: Testinfrastruktur.
