@@ -3544,6 +3544,11 @@ if (section('children-tag')) {
 // and a sampling loop that crosses the process boundary between readings would
 // step straight over them.
 async function checkChildrenMotion(motionPlace) {
+  // The loop runs this block once per settlement, so every verdict names the one
+  // it was taken in. The NAME stays the check's identity for the red ledger, so
+  // the settlement rides in the detail (point 690).
+  const checkAt = (name, ok, detail) =>
+    check(name, ok, detail === undefined ? motionPlace : `${motionPlace} — ${detail}`)
   await page.evaluate(() => {
     const g = window.__game.getState()
     if (g.placeId) g.leavePlace()
@@ -3564,7 +3569,7 @@ async function checkChildrenMotion(motionPlace) {
     )
     .then(() => true)
     .catch(() => false)
-  check(`${motionPlace} publishes its live children's game`, live)
+  checkAt('the reported settlement publishes its live children’s game', live)
   if (live) {
     await page.evaluate(() => window.__game.getState().setJournalOpen(false))
     // AND IT MUST REALLY BE PLAYING (point 656). The wait's result used to be
@@ -3574,7 +3579,7 @@ async function checkChildrenMotion(motionPlace) {
       .waitForFunction(() => window.__placeTag().playing, null, { timeout: 40000 })
       .then(() => true)
       .catch(() => false)
-    check('the group is really playing before the trace is taken', playing)
+    checkAt('the group is really playing before the trace is taken', playing)
     const FRAMES = 1200
     const trace = await page.evaluate(
       (frames) =>
@@ -3617,7 +3622,7 @@ async function checkChildrenMotion(motionPlace) {
     )
     const log = trace.log
     const n = log[0]?.c.length ?? 0
-    check(
+    checkAt(
       'the trace covers a real stretch of the game, frame by frame',
       log.length >= FRAMES && n >= 2 && log[log.length - 1].clock - log[0].clock > 5,
       `${log.length} frames, ${n} children, ${(log[log.length - 1].clock - log[0].clock).toFixed(1)}s`,
@@ -3639,7 +3644,7 @@ async function checkChildrenMotion(motionPlace) {
       log.map((f) => ({ ...f.c[k], clock: f.clock, playing: f.playing, playedClock: f.playedClock })),
     )
     const live = traceLiveness(tracks)
-    check(
+    checkAt(
       'and the trace holds a game rather than a break',
       holdsAGame(live),
       `${live.playedSeconds.toFixed(1)}s of ${live.seconds.toFixed(1)}s played ` +
@@ -3668,7 +3673,7 @@ async function checkChildrenMotion(motionPlace) {
       }
       if (bad) overlapFrames++
     }
-    check(
+    checkAt(
       'no two children are ever inside one another, in any frame',
       overlapFrames === 0,
       `${overlapFrames} of ${log.length} frames, worst ${Math.max(0, worstOverlap).toFixed(4)} m inside a ${contact.toFixed(3)} m contact`,
@@ -3690,7 +3695,7 @@ async function checkChildrenMotion(motionPlace) {
         } else run = 0
       }
     }
-    check(
+    checkAt(
       'no child that is walking is held motionless by the settlement',
       longestStall < 0.25,
       `longest stall while commanded to move ${longestStall.toFixed(2)}s`,
@@ -3737,7 +3742,7 @@ async function checkChildrenMotion(motionPlace) {
     // with the ground bar a ratio of the distance walked. Both verdicts are ONE
     // check, because they are one question asked at two scales.
     const burst = shuffleWindows(tracks, CHILD_MOTION.short)
-    check(
+    checkAt(
       'no child walks without getting anywhere',
       // The bar is CHILD-SECONDS of game, not a count of frames: this trace is
       // 1200 rendered frames and buys anything from 20 s of game to a minute
@@ -3783,7 +3788,7 @@ async function checkChildrenMotion(motionPlace) {
     // rescue that really set the child down somewhere else; the rest handed it
     // back the ground it was already standing on.
     const rescues = rescueRate(tracks)
-    check(
+    checkAt(
       'and no child has to be carried out of the settlement’s own geometry',
       rescues.carriedPublished &&
         rescues.nudgesPublished &&
