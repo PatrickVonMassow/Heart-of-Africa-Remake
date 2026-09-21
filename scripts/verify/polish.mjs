@@ -3938,6 +3938,16 @@ async function checkChildrenMotion(motionPlace) {
               const vz = seen.reduce((s, k) => s + k.z, 0) / seen.length
               best.vx = vx
               best.vz = vz
+              // THE NEAREST CHILD IT CAN SEE, which is what the frame DECLARES.
+              // The centroid is where the camera looks; it is not a thing, and a
+              // frame that declares it satisfies the shutter by projecting a
+              // point in empty air — which is how a port frame came back green
+              // with no child in it at all (point 690). A child is a body: if it
+              // is not in the picture the shutter says so and the run reds.
+              const nearest = seen.reduce((a, k) =>
+                Math.hypot(sx - k.x, sz - k.z) < Math.hypot(sx - a.x, sz - a.z) ? k : a)
+              best.kx = nearest.x
+              best.kz = nearest.z
             }
           }
         }
@@ -3959,7 +3969,10 @@ async function checkChildrenMotion(motionPlace) {
       p.z = best.sz
       // Look at what is actually visible, and hand the shutter the same point.
       p.yaw = Math.atan2(-(best.vx - p.x), -(best.vz - p.z))
-      return { pose, cx: best.vx, cz: best.vz, seen: best.seen, of: best.of, clear: best.clear }
+      return {
+        pose, cx: best.vx, cz: best.vz, kx: best.kx, kz: best.kz,
+        seen: best.seen, of: best.of, clear: best.clear, near: best.near,
+      }
     })
     // AND THE STANDPOINT IS JUDGED, not merely taken. The search falls back to
     // the best it found when the game never offers a good moment, and that
@@ -3971,14 +3984,17 @@ async function checkChildrenMotion(motionPlace) {
       'the children are photographed from a standpoint in the open',
       !!aimed && aimed.seen >= Math.min(3, aimed.of) && aimed.clear >= 2.5,
       aimed
-        ? `${aimed.seen} of ${aimed.of} in the clear, ${aimed.clear.toFixed(1)} m of room around the camera`
+        ? `${aimed.seen} of ${aimed.of} in the clear, ${aimed.clear.toFixed(1)} m of room around the camera, ` +
+          `nearest child ${aimed.near.toFixed(1)} m off`
         : 'no vantage at all',
     )
     if (aimed) {
       await nextFrames(2)
       await frame(motionPlace === 'bambara-village' ? '648-village-children' : `690-${motionPlace}-children`, {
-        local: { x: aimed.cx, y: 0.8, z: aimed.cz },
-        label: `the children at their game of tag (${aimed.seen} of ${aimed.of} in the clear)`,
+        local: { x: aimed.kx, y: 0.6, z: aimed.kz },
+        label:
+          `the children at their game of tag (${aimed.seen} of ${aimed.of} in the clear, ` +
+          `nearest at ${aimed.near.toFixed(1)} m)`,
       })
       await page.evaluate((pose) => {
         const p = window.__placePlayer
