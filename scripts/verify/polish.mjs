@@ -3545,10 +3545,12 @@ if (section('children-tag')) {
 // step straight over them.
 async function checkChildrenMotion(motionPlace) {
   // The loop runs this block once per settlement, so every verdict names the one
-  // it was taken in. The NAME stays the check's identity for the red ledger, so
-  // the settlement rides in the detail (point 690).
+  // it was taken in. The NAME stays the check's identity for the red ledger, and
+  // the settlement goes at the END of the detail, never the front: the charge
+  // ledger anchors its `detailMatch` on the first words of the detail, and the
+  // run record cuts the detail at 200 characters (point 690).
   const checkAt = (name, ok, detail) =>
-    check(name, ok, detail === undefined ? motionPlace : `${motionPlace} — ${detail}`)
+    check(name, ok, detail === undefined ? `at ${motionPlace}` : `${detail} — at ${motionPlace}`)
   await page.evaluate(() => {
     const g = window.__game.getState()
     if (g.placeId) g.leavePlace()
