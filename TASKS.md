@@ -15899,15 +15899,27 @@ to land than a mechanism that needs a review.
   and is dealt a fresh seed at every start, so the axis that reaches him went unjudged.
   Point 1094 put the sample on the seed axis and this fell out of it; 1094 deletes test
   breadth and builds nothing, which is why the fix is its own point.
+  AND IT IS NOT THE BANK VILLAGE'S ALONE (measured 21.09.2026 in the browser, on the quiet
+  machine, while point 690 moved the `children-motion` gate onto the port and the bankless
+  village for the first time). Six runs of that section on 690's branch, both backends: four
+  green, two red — and BOTH reds fell on the newly gated settlements, never on bambara.
+  WebGPU at `c05d0e205`: maasai-village worst child 0.25 % (group 0.05 %, 4 of 5910 windows,
+  bursts 0.00 %) and cairo worst child 0.94 % (group 0.31 %, 23 of 5900 windows, bursts
+  0.07 %); WebGL 2 earlier the same day read cairo at 2.80 %. Every red carries the same
+  signature the two standing charges of this class carry — 1.29 m walked inside a quarter of
+  a metre — so it is this defect on a wider stage, not a second one. The silent round is
+  therefore as affected as the bank round, which is what makes this the user's »ein Kind
+  steckt im Hafen fest« before it is reported.
   Final state: no bambara seed of 1-60 reads the worst child above the shipped gate over the
-  judged minute, and the sample in `tagShuffle.test.ts` carries at least one of the six
-  seeds above so the repair cannot be read off a lucky layout.
+  judged minute, the same holds for the port and the bankless village, and the sample in
+  `tagShuffle.test.ts` carries at least one of the six seeds above so the repair cannot be
+  read off a lucky layout.
   Test: Vitest — the six seeds above run inside the gate, mutation-checked; the existing
-  three-seed sample keeps its cases.
+  three-seed sample keeps its cases and gains the silent round's two settlement kinds.
   Refs: src/scenes/place/tagShuffle.test.ts (`PLACES`, `the children never shuffle on the
   spot`), scripts/verify/childMotionMetric.mjs (`shuffleWindows`, `CHILD_MOTION.shareGate`),
-  src/scenes/place/bankGame.ts and src/scenes/place/childSituations.ts (the round the
-  children play in this village)
+  src/scenes/place/bankGame.ts (the bank round) and src/scenes/place/tagGame.ts (the silent
+  round the ports and the bankless villages play)
   Criticality: medium — it is the user's own report of 648/656, alive on about a tenth of
   the worlds he can be dealt, and it is player-visible wherever it fires.
   Bundle: Dorfleben.
