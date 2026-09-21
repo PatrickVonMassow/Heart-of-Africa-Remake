@@ -108,10 +108,12 @@ put it is the mistake this line exists to stop.
      shuttle across the warp and back while the other beats the weft down, and the body leans
      slightly into each beat — the same arm-pose mechanism the pounder uses (`FigurePose`,
      `armAim`), so the hands ride the tool and never hang beside a cloth that changes by itself.
-  2. The half-finished cloth grows with the work: its woven part rises by a small,
-     calibratable amount per completed pass and resets when it reaches the top beam,
-     so a player who watches for half a minute sees progress, not a loop on a
-     fixed picture.
+  2. The half-finished cloth grows with the work: on the horizontal warp the woven strip
+     extends from the weaver's seat along the warp by a small, calibratable length per
+     completed pass, and when it reaches the stake on that side it is taken off and the warp
+     shows bare again, so a player who watches for half a minute sees progress, not a loop on
+     a fixed picture. Nothing "rises": that clause described the standing frame this point
+     replaces.
   3. The cycle is a place-clock animation like the pounder's — frame-time driven,
      unaffected by the wall clock, and it stops with the scene when the place is
      paused.
@@ -164,10 +166,16 @@ put it is the mistake this line exists to stop.
   learned here is one the player can carry all the way to the chief's message.
   Author lane: it is a communication-mechanic point whose verification is the work.
 
-  OPEN: `docs/peoples-1890.md` documents no weaving at all — neither the loom's build nor the
-  technique — so the standing frame was never sourced. Before the long warp is built, check the
-  Bambara/Mande narrow-strip loom against our own sources and record it in peoples-1890 §8;
-  if the sources do not carry it, say so in the point rather than inventing a build.
+  SOURCE CHECK DONE, DECISION TAKEN (owner, 22.09.2026, after the Astra author's escalation
+  recorded in `docs/peoples-1890.md` §8.1 on this point's branch): our Park and Caillié passages
+  carry narrow-strip weaving, the shuttle and the reed beater, and Park assigns weaving to men;
+  neither source carries a two-ended warp with a seat at its middle, nor a woman at the loom.
+  The picture in items 4–7 is therefore a GAMEPLAY ADAPTATION ordered by the user on 21.09.2026
+  (14:41), not a sourced reconstruction, and the point is built as written. The author records
+  that in the same commit: §8.1 loses "build still open" and gains a short "adaptation" note
+  saying what the sources carry (strip, shuttle, beater, male weavers) and what the game changes
+  and why (mid-seat so both calls send the helper away; the weaver kept as the figure the player
+  reported). Do not phrase the adaptation as Park's or Caillié's account anywhere in the docs.
 
 - [ ] 1174. The village vocabulary is rolled per run, under rules that keep the direction pair a
   mirror (user 21.09.2026, drained from the findings carrier; placed here on the user's
