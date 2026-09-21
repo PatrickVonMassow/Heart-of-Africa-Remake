@@ -61,8 +61,9 @@ second region can add its own entry without changing consumers.
 
 Reserved and unused: the two single-tone sequences `ba-ba-ba-ba` and
 `BA-BA-BA-BA`. CHIEF took the last spare mixed sequence, RIVER's tonal mirror,
-so all six words now fall into three mirror pairs — RIVER/CHIEF,
-UPSTREAM/DOWNSTREAM and ROCK/DIG. UPSTREAM and DOWNSTREAM remain the
+so the six words fall into two mirror pairs — RIVER/CHIEF and
+UPSTREAM/DOWNSTREAM — and two sequences that are their own mirror, ROCK and
+DIG. UPSTREAM and DOWNSTREAM remain the
 only pair the player hears AS a pair — they are announced against each other in
 the same round of the bank game, while CHIEF is only ever said alone, by the
 drummer pointing at the hut.
