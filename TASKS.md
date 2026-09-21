@@ -15899,17 +15899,17 @@ to land than a mechanism that needs a review.
   and is dealt a fresh seed at every start, so the axis that reaches him went unjudged.
   Point 1094 put the sample on the seed axis and this fell out of it; 1094 deletes test
   breadth and builds nothing, which is why the fix is its own point.
-  AND IT IS NOT THE BANK VILLAGE'S ALONE (measured 21.09.2026 in the browser, on the quiet
-  machine, while point 690 moved the `children-motion` gate onto the port and the bankless
-  village for the first time). Six runs of that section on 690's branch, both backends: four
-  green, two red — and BOTH reds fell on the newly gated settlements, never on bambara.
-  WebGPU at `c05d0e205`: maasai-village worst child 0.25 % (group 0.05 %, 4 of 5910 windows,
-  bursts 0.00 %) and cairo worst child 0.94 % (group 0.31 %, 23 of 5900 windows, bursts
-  0.07 %); WebGL 2 earlier the same day read cairo at 2.80 %. Every red carries the same
-  signature the two standing charges of this class carry — 1.29 m walked inside a quarter of
-  a metre — so it is this defect on a wider stage, not a second one. The silent round is
-  therefore as affected as the bank round, which is what makes this the user's »ein Kind
-  steckt im Hafen fest« before it is reported.
+  WHAT THE BROWSER ADDED ON 21.09.2026, and what it did NOT: point 690 moved the
+  `children-motion` gate onto the port and the bankless village, and over six runs of that
+  section on its branch, both backends, four went green and two red — WebGPU at `c05d0e205`
+  read maasai-village at 0.25 % and cairo at 0.94 % (group 0.31 %, bursts 0.07 %), WebGL 2
+  earlier read cairo at 2.80 %. Every red carried this class's signature, 1.29 m walked
+  inside a quarter of a metre. It is NOT established that the port shuffles worse than the
+  village: all six reds fell on the SECOND or THIRD settlement of a loop that chained three
+  traces into one browser session and none ever on the first, and giving each settlement a
+  fresh page removed them. That coupling is repaired in 690 and is not this point's; what
+  remains this point's is the shuffling itself, which the seed spread below measures without
+  a browser at all.
   Final state: no bambara seed of 1-60 reads the worst child above the shipped gate over the
   judged minute, the same holds for the port and the bankless village, and the sample in
   `tagShuffle.test.ts` carries at least one of the six seeds above so the repair cannot be
