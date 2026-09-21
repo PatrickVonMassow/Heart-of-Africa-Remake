@@ -209,17 +209,16 @@ put it is the mistake this line exists to stop.
 
 - [ ] 1157. The weaver works her loom, and her loom teaches the river's two directions (user
   bug report 18.09.2026, local/ErwachsenerStehtStill.zip: "Warum bewegt sich diese Figur
-  nicht?", seed 394349866, Bambara Village, day 3.54, WebGPU, medium; scope widened by the
-  user 21.09.2026, 14:41: »Ändere 1157 so ab, dass die Weberin in dieser Weise umgesetzt
-  wird.«).
+  nicht?", seed 394349866, Bambara Village, day 3.54, WebGPU, medium; user 21.09.2026, 14:41:
+  »Ändere 1157 so ab, dass die Weberin in dieser Weise umgesetzt wird.«).
   Bundle: Dorfleben
   The report's picture shows the weaver figure beside the standing loom with both
   arms hanging, and `Weaver` in `src/scenes/place/PlaceLife.tsx` carries no
   `useFrame` at all — the only village adult station without a working motion,
   while the pounder, the fire tender, the water carrier and the drummer all move.
   design.md §15 names weaving among the everyday activities that make a settlement
-  read as alive. The user then decided the station should carry more than life: it becomes the
-  SECOND way the player can learn `UPSTREAM` and `DOWNSTREAM`, beside the children's bank game.
+  read as alive. The station carries more than life: it is the SECOND way the player
+  can learn `UPSTREAM` and `DOWNSTREAM`, beside the children's bank game.
 
   WHY A SECOND WAY IS WORTH BUILDING, so nobody later reads it as redundancy: on the bank the
   two words hang on RUNNING GROUPS between two rocks; at the loom they hang on ONE PERSON
@@ -227,11 +226,11 @@ put it is the mistake this line exists to stop.
   That intersection prunes the wrong readings that point 687 §4 has to close one by one — "to
   the far rock" does not exist at the loom, and left/right survives no change of standpoint.
 
-  THE DESIGN CHANGE THIS CARRIES, and it must land in the same commit as the code: point 688 §3
-  states "The direction words are the children's now". That clause is REVERSED here. `design.md`
-  (the §13.4 teaching passage that lists the three teaching places) and
-  `docs/communication-poc-spec.md` name the loom as a fourth place, and the archived 688 gets a
-  dated note that its §3 was superseded by this point. All copies change together.
+  THE DESIGN CHANGE THIS CARRIES, and it must land in the same commit as the code: the two
+  direction words are taught at the LOOM as well as at the children's bank game, so they are
+  not the children's alone. `design.md` (the §13.4 teaching passage that lists the teaching
+  places) and `docs/communication-poc-spec.md` name the loom as a fourth place, and the archived
+  point 688 gets a dated note beside its §3 that points here. All copies change together.
 
   Final state:
 

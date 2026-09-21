@@ -450,10 +450,13 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   Zweiminutensache in einen Stundenvorgang, fehlt der **kleine Weg** — reine Prosa, die nur du
   liest, wird **gemacht**, nicht eingereiht."
 
-- **Die Reihenfolge wird gerankt, nicht befolgt.** Die KI fängt Neues an, während halbfertige
-  Zweige liegen; die Sortierprüfungen prüfen die Liste, nie den Punkt in Arbeit.
-  → *Prompt:* „Vor jedem **neuen** Punkt: nenn ihn, den vordersten offenen und jeden älteren
-  angefangenen Zweig. Weichst du ab, **begründe es**; leere Angefangenes zuerst."
+- **Die Reihenfolge wird gerankt, nicht befolgt — und der fertige Punkt ist unsichtbar.** Die KI
+  fängt Neues an, während halbfertige Zweige liegen; Liste und Auftrag beschreiben die **Arbeit**,
+  nie die **Maschine**: liegt die fertige Lieferung in einer zweiten Arbeitskopie, baut die KI sie
+  neu.
+  → *Prompt:* „Vor jedem Punkt: **liste Arbeitskopien und Zweige** und nenn den vordersten
+  offenen. Existiert zu diesem Punkt schon einer, **übernimm** ihn; weichst du ab, **begründe es**.
+  Wer fragt, ob jemand arbeitet, misst den **Prozess**, nicht das Alter einer Datei."
 
 - **Die Grenze spricht erst beim Aufhören.** Eine Obergrenze im Schlusscheck lässt jeden Anfang
   durch; und was festhält, gilt als „nicht übergebbar".
@@ -698,4 +701,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: b361cba7d07da18e188515c0f10e7b7011a0d5a44395c7dfc778eebe893ebc8e -->
+<!-- GUIDE-FINGERPRINT: 2b0f42f175cad307386365650919d36a05f27e2e90c196046bcb5eef9728b07c -->
