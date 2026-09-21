@@ -26,6 +26,7 @@
 
 import { SpeechFloor } from '../../communication/speechFloor'
 import { devAssert } from '../../systems/devAssert'
+import { armAim, type FigurePose } from '../../render/gesture'
 import type { ConceptId } from '../../communication/lexicon'
 
 /** The two words the loom teaches. They are also their own concept ids. */
@@ -287,5 +288,40 @@ export function loomPicture(state: LoomWorkState): LoomPicture {
     cloth: state.cloth,
     helperAt: state.errand ? state.errand.at : 0,
     helperWorking: state.errand?.phase === 'work',
+  }
+}
+
+/**
+ * How far to either side of the warp the shuttle travels, in scene units. The
+ * woven strip itself is narrow — Park's four inches — so the shuttle's own
+ * crossing would be a twitch; what the player sees is the THROW, the hand
+ * carrying it out past the selvedge and the other hand taking it. Calibratable
+ * with the rest of the loom, and the value the drawn shuttle rides on.
+ */
+export const SHUTTLE_THROW = 0.16
+
+/** Forward reach from the weaver's shoulders to the warp she works. */
+const WARP_REACH = 0.4
+
+/**
+ * THE HANDS RIDE THE TOOL (item 1). Both arms are written every frame from the
+ * same cycle the cloth grows on, using the pounder's own mechanism: one hand
+ * carries the shuttle across the warp and back, the other beats the weft down
+ * as it lands, and the trunk leans into each beat. Nothing here hangs beside a
+ * cloth that changes by itself — which is the whole defect the report showed.
+ */
+export function loomPose(picture: LoomPicture): FigurePose {
+  const across = picture.shuttle * SHUTTLE_THROW
+  // The carrying hand follows the shuttle out to whichever side it is on; the
+  // beating hand stays in over the reed, moving the other way as it drives.
+  const carry = Math.atan2(across, WARP_REACH)
+  const beat = Math.atan2(-across * 0.3, WARP_REACH)
+  // Elevation is NEGATIVE here: she sits at a warp laid low, so both arms
+  // reach forward and DOWN rather than up as the pounder's do.
+  return {
+    left: armAim(carry, -0.45 + picture.beat * 0.06),
+    right: armAim(beat, -0.38 - picture.beat * 0.22),
+    lean: 0.1 + picture.beat * 0.14,
+    turn: 0,
   }
 }

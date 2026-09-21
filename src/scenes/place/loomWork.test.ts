@@ -4,6 +4,7 @@ import { mulberry32 } from '../../world/noise'
 import {
   createLoomWork,
   loomPicture,
+  loomPose,
   stepLoomWork,
   warpSign,
   type LoomDirection,
@@ -191,5 +192,44 @@ describe('it stays sparse (item 8)', () => {
     expect(perMinute).toBeLessThan(6)
     // And far rarer than the throws themselves, which say nothing.
     expect(state.passes).toBeGreaterThan(said.length * 5)
+  })
+})
+
+describe('the hands ride the tool (item 1)', () => {
+  it('both arms move over one pass, and the trunk leans into the beat', () => {
+    const state = createLoomWork(cfg, mulberry32(59))
+    state.pass = 0
+    const left: number[] = []
+    const right: number[] = []
+    const lean: number[] = []
+    for (let k = 0; k < 32; k++) {
+      stepLoomWork(state, view(), cfg.passSeconds / 32, cfg, mulberry32(61))
+      const pose = loomPose(loomPicture(state))
+      left.push(pose.left.yaw)
+      right.push(pose.right.yaw)
+      lean.push(pose.lean)
+    }
+    // NEITHER arm hangs still — that is the reported defect, stated as a test.
+    expect(Math.max(...left) - Math.min(...left)).toBeGreaterThan(0.4)
+    expect(Math.max(...right) - Math.min(...right)).toBeGreaterThan(0.1)
+    // They swing against each other: the carrying hand goes out, the beating
+    // hand comes in.
+    expect(Math.sign(left[left.indexOf(Math.max(...left))]!)).toBe(1)
+    expect(Math.max(...lean) - Math.min(...lean)).toBeGreaterThan(0.05)
+  })
+
+  it('reaches forward and DOWN to a warp laid low, never up over the head', () => {
+    const state = createLoomWork(cfg, mulberry32(67))
+    for (let k = 0; k < 40; k++) {
+      stepLoomWork(state, view(), cfg.passSeconds / 40, cfg, mulberry32(71))
+      const pose = loomPose(loomPicture(state))
+      // armAim's pitch is -(pi/2 + elevation); a negative elevation is a hand
+      // below the shoulder line, which is where a seated weaver's hands are.
+      for (const arm of [pose.left, pose.right]) {
+        const elevation = -arm.pitch - Math.PI / 2
+        expect(elevation).toBeLessThan(0)
+        expect(elevation).toBeGreaterThan(-1)
+      }
+    }
   })
 })

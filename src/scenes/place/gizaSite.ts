@@ -191,6 +191,7 @@ export function buildGizaLayout(_seed: number): PlaceLayout {
     waterPath: null,
     waterStand: null, // nor a water path to it (688)
     playGround: null, // a monument site has no inhabitants, so no children roam it
+    loom: null, // and no village life to weave (1157)
     wayOut: null, // the bare plateau has no dressing to keep off a crossing (688)
     pen: null,
     errands,

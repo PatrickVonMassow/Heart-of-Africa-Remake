@@ -5,7 +5,14 @@ import { balance } from '../../config/balance'
 import { buildLayout } from './layout'
 import { standsOnGroundPlate } from './riverBank'
 import { standingClear, WALKER_RADIUS } from './collision'
-import { loomAround, placeLoom, waterAhead, WARP_BODY_RADIUS, WEAVER_BODY_RADIUS } from './loom'
+import {
+  HELPER_SIDE_OFFSET,
+  loomAround,
+  placeLoom,
+  waterAhead,
+  WARP_BODY_RADIUS,
+  WEAVER_BODY_RADIUS,
+} from './loom'
 
 beforeAll(setupGeodata)
 
@@ -90,11 +97,18 @@ describe('the weaver sits in the MIDDLE of the warp (item 5)', () => {
     for (const { id, seed, layout } of shippedLooms()) {
       const loom = layout.loom
       if (!loom) continue
-      const up = { x: loom.tend.upstream.x - loom.seat.x, z: loom.tend.upstream.z - loom.seat.z }
-      const down = { x: loom.tend.downstream.x - loom.seat.x, z: loom.tend.downstream.z - loom.seat.z }
-      if (up.x * down.x + up.z * down.z >= 0) off.push(`${id}/${seed}: both stands on one side`)
-      if (Math.hypot(up.x, up.z) < 1 || Math.hypot(down.x, down.z) < 1) {
-        off.push(`${id}/${seed}: a stand too near the seat to read as a walk`)
+      // Along the WARP the two stands lie on opposite sides of the seat...
+      const project = (p: { x: number; z: number }) =>
+        (p.x - loom.seat.x) * loom.fx + (p.z - loom.seat.z) * loom.fz
+      const up = project(loom.tend.upstream)
+      const down = project(loom.tend.downstream)
+      if (up >= 0 || down <= 0) off.push(`${id}/${seed}: stands at ${up.toFixed(2)} / ${down.toFixed(2)}`)
+      // ...and BOTH are further from the weaver than the helper's own place
+      // beside her, so neither call can be read as "come here".
+      const home = Math.hypot(loom.helperHome.x - loom.weaver.x, loom.helperHome.z - loom.weaver.z)
+      for (const stand of [loom.tend.upstream, loom.tend.downstream]) {
+        const away = Math.hypot(stand.x - loom.weaver.x, stand.z - loom.weaver.z)
+        if (away <= home + 1) off.push(`${id}/${seed}: a stand only ${away.toFixed(2)} m from her`)
       }
     }
     expect(off).toEqual([])
@@ -133,19 +147,21 @@ describe('the station keeps its distance and shows the water (items 9 and 10)', 
     for (const { id, seed, layout } of shippedLooms()) {
       const { loom, bank, colliders } = layout
       if (!loom || !bank) continue
-      const target = waterAhead(loom.seat, bank)
-      // The seat looks OUT at the water, not across the village at it.
-      const out = bank.distance - (loom.seat.x * bank.nx + loom.seat.z * bank.nz)
+      const from = loom.weaver
+      const target = waterAhead(from, bank)
+      // The weaver looks OUT at the water, not across the village at it.
+      const out = bank.distance - (from.x * bank.nx + from.z * bank.nz)
       if (out <= 0) off.push(`${id}/${seed}: the seat is past the waterline`)
-      const steps = Math.ceil(Math.hypot(target.x - loom.seat.x, target.z - loom.seat.z) / 0.25)
+      const steps = Math.ceil(Math.hypot(target.x - from.x, target.z - from.z) / 0.25)
       for (let k = 1; k < steps; k++) {
-        const x = loom.seat.x + ((target.x - loom.seat.x) * k) / steps
-        const z = loom.seat.z + ((target.z - loom.seat.z) * k) / steps
+        const x = from.x + ((target.x - from.x) * k) / steps
+        const z = from.z + ((target.z - from.z) * k) / steps
         // The warp's own colliders lie ON the seat, so they are skipped by
         // starting one sample in; anything else in the line hides the water.
+        // The loom's own bodies are not what hides the water from it.
         const solids = colliders.filter((c) => {
-          const near = Math.hypot((c as { x: number; z: number }).x - loom.seat.x, (c as { x: number; z: number }).z - loom.seat.z)
-          return !(c.kind === 'segment') && !(Number.isFinite(near) && near < 0.01)
+          if (c.kind === 'segment') return false
+          return Math.hypot(c.x - from.x, c.z - from.z) > 0.01
         })
         if (!standingClear(solids, x, z, 0.2)) {
           off.push(`${id}/${seed}: the water is hidden ${(k / steps * 100) | 0}% of the way out`)
@@ -168,7 +184,7 @@ describe('the whole warp is a body the village walks round (item 11)', () => {
       const others = colliders.filter((c) =>
         c.kind === 'segment'
           ? Math.hypot(c.x1 - loom.upstream.x, c.z1 - loom.upstream.z) > 1e-9
-          : c.kind === 'box' || Math.hypot(c.x - loom.seat.x, c.z - loom.seat.z) > 1e-9,
+          : c.kind === 'box' || Math.hypot(c.x - loom.weaver.x, c.z - loom.weaver.z) > 1e-9,
       )
       for (let k = 0; k <= 16; k++) {
         const x = loom.upstream.x + ((loom.downstream.x - loom.upstream.x) * k) / 16
@@ -190,7 +206,7 @@ describe('the whole warp is a body the village walks round (item 11)', () => {
       )
       expect(warp, `${id}/${seed}`).toBeTruthy()
       const seat = layout.colliders.find(
-        (c) => c.kind !== 'segment' && c.kind !== 'box' && Math.hypot(c.x - loom.seat.x, c.z - loom.seat.z) < 1e-9 && c.r === WEAVER_BODY_RADIUS,
+        (c) => c.kind !== 'segment' && c.kind !== 'box' && Math.hypot(c.x - loom.weaver.x, c.z - loom.weaver.z) < 1e-9 && c.r === WEAVER_BODY_RADIUS,
       )
       expect(seat, `${id}/${seed}`).toBeTruthy()
     }
@@ -199,10 +215,15 @@ describe('the whole warp is a body the village walks round (item 11)', () => {
 
 describe('loomAround is the one geometry both the layout and the scene read', () => {
   it('lays the stakes and the tending stands off one seat and one axis', () => {
-    const station = loomAround({ x: 2, z: -3 }, 0, 1, { warpHalf: 3, tendStand: 2 }, true)
+    // Warp along +z, water to +x.
+    const station = loomAround({ x: 2, z: -3 }, 0, 1, 1, 0, { warpHalf: 3, tendStand: 2 }, true)
     expect(station.upstream).toEqual({ x: 2, z: -6 })
     expect(station.downstream).toEqual({ x: 2, z: 0 })
-    expect(station.tend.upstream).toEqual({ x: 2, z: -5 })
-    expect(station.tend.downstream).toEqual({ x: 2, z: -1 })
+    // The stakes are ON the warp; the two bodies are beside it, and on
+    // opposite sides — she inland, he between the threads and the water.
+    expect(station.weaver.x).toBeCloseTo(2 - 0.45, 9)
+    expect(station.helperHome.x).toBeCloseTo(2 + HELPER_SIDE_OFFSET, 9)
+    expect(station.tend.upstream).toEqual({ x: 2 + HELPER_SIDE_OFFSET, z: -5 })
+    expect(station.tend.downstream).toEqual({ x: 2 + HELPER_SIDE_OFFSET, z: -1 })
   })
 })

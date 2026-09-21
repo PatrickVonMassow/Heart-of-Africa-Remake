@@ -29,6 +29,18 @@ import type { BankPoint, PlaceRiverBank } from './riverBank'
 /** The weaver's own body radius at her seat under the heddles. */
 export const WEAVER_BODY_RADIUS = 0.3
 
+/**
+ * How far to the side of the warp each of the two bodies sits. She works the
+ * shed at the warp's middle and the threads run past her on both sides, so she
+ * is BESIDE the warp rather than on it — and she is on the INLAND side, with
+ * the water beyond the warp, so a player standing behind her sees the weaver,
+ * her warp and the river in one look (item 10).
+ */
+export const WEAVER_SIDE_OFFSET = 0.45
+
+/** The helper works the far side, between the warp and the water. */
+export const HELPER_SIDE_OFFSET = 0.45
+
 /** The drawn stake at each end of the warp, and its collider. */
 export const WARP_STAKE_RADIUS = 0.12
 
@@ -85,8 +97,16 @@ export interface LoomPlacement {
 }
 
 export interface LoomStation {
-  /** The weaver's seat, and the MIDPOINT of the warp. */
+  /** The MIDPOINT of the warp — the geometric seat the whole station hangs on. */
   seat: BankPoint
+  /** Where the weaver's body is: beside the warp at its midpoint, inland. */
+  weaver: BankPoint
+  /** Where the helper stands while no call has sent him anywhere. */
+  helperHome: BankPoint
+  /** Unit vector ACROSS the warp, pointing toward the water (outward, in a
+   *  settlement with no river). The weaver sits against it, the helper with it. */
+  ax: number
+  az: number
   /** The stake the warp runs to AGAINST the current. */
   upstream: BankPoint
   /** The stake it runs to WITH the current. */
@@ -104,9 +124,17 @@ export interface LoomStation {
   onRiverAxis: boolean
 }
 
-/** A point `d` metres from `seat` along the warp; positive is downstream. */
-function along(station: Pick<LoomStation, 'seat' | 'fx' | 'fz'>, d: number): BankPoint {
-  return { x: station.seat.x + station.fx * d, z: station.seat.z + station.fz * d }
+/** A point `d` metres along the warp and `side` metres across it, from the
+ *  seat. Downstream is positive along; the water is positive across. */
+function at(
+  station: Pick<LoomStation, 'seat' | 'fx' | 'fz' | 'ax' | 'az'>,
+  d: number,
+  side = 0,
+): BankPoint {
+  return {
+    x: station.seat.x + station.fx * d + station.ax * side,
+    z: station.seat.z + station.fz * d + station.az * side,
+  }
 }
 
 /** The whole station laid out around one seat on one axis. */
@@ -114,19 +142,25 @@ export function loomAround(
   seat: BankPoint,
   fx: number,
   fz: number,
+  ax: number,
+  az: number,
   geometry: LoomGeometry,
   onRiverAxis: boolean,
 ): LoomStation {
-  const axis = { seat, fx, fz }
+  const axis = { seat, fx, fz, ax, az }
   return {
     seat,
-    upstream: along(axis, -geometry.warpHalf),
-    downstream: along(axis, geometry.warpHalf),
+    weaver: at(axis, 0, -WEAVER_SIDE_OFFSET),
+    helperHome: at(axis, 0, HELPER_SIDE_OFFSET),
+    upstream: at(axis, -geometry.warpHalf),
+    downstream: at(axis, geometry.warpHalf),
     fx,
     fz,
+    ax,
+    az,
     tend: {
-      upstream: along(axis, -geometry.tendStand),
-      downstream: along(axis, geometry.tendStand),
+      upstream: at(axis, -geometry.tendStand, HELPER_SIDE_OFFSET),
+      downstream: at(axis, geometry.tendStand, HELPER_SIDE_OFFSET),
     },
     onRiverAxis,
   }
@@ -144,22 +178,26 @@ function stationHolds(station: LoomStation, p: LoomPlacement): boolean {
   const steps = Math.max(8, Math.ceil((warpHalf * 2) / 0.4))
   for (let k = 0; k <= steps; k++) {
     const d = -warpHalf + (warpHalf * 2 * k) / steps
-    const at = along(station, d)
-    if (Math.hypot(at.x, at.z) > p.walkRadius) return false
-    if (!p.free(at.x, at.z, WARP_BODY_RADIUS)) return false
+    const on = at(station, d)
+    if (Math.hypot(on.x, on.z) > p.walkRadius) return false
+    if (!p.free(on.x, on.z, WARP_BODY_RADIUS)) return false
   }
-  // The weaver and her helper are bodies of their own beside the threads.
-  if (!p.free(station.seat.x, station.seat.z, WEAVER_BODY_RADIUS)) return false
-  for (const stand of [station.tend.upstream, station.tend.downstream]) {
-    if (!p.free(stand.x, stand.z, WEAVER_BODY_RADIUS)) return false
+  // The weaver and her helper are bodies of their own beside the threads, and
+  // the helper's whole walk between his stands is ground he has to cross.
+  if (!p.free(station.weaver.x, station.weaver.z, WEAVER_BODY_RADIUS)) return false
+  const helperSteps = Math.max(8, Math.ceil((p.geometry.tendStand * 2) / 0.4))
+  for (let k = 0; k <= helperSteps; k++) {
+    const d = -p.geometry.tendStand + (p.geometry.tendStand * 2 * k) / helperSteps
+    const on = at(station, d, HELPER_SIDE_OFFSET)
+    if (!p.free(on.x, on.z, WEAVER_BODY_RADIUS)) return false
   }
   // THE SEPARATION (item 9): the direction words spoken here must not arrive in
   // the same ear as the children's, and RIVER must not arrive in this one. The
   // whole station is held to it, because the helper speaks from neither end
   // but the weaver's word is heard wherever he is walking.
-  for (const at of [station.seat, station.upstream, station.downstream]) {
-    if (p.toChildren(at.x, at.z) < p.clearance) return false
-    if (p.waterPathHead && Math.hypot(at.x - p.waterPathHead.x, at.z - p.waterPathHead.z) < p.clearance) {
+  for (const on of [station.weaver, station.upstream, station.downstream]) {
+    if (p.toChildren(on.x, on.z) < p.clearance) return false
+    if (p.waterPathHead && Math.hypot(on.x - p.waterPathHead.x, on.z - p.waterPathHead.z) < p.clearance) {
       return false
     }
   }
@@ -170,7 +208,7 @@ function stationHolds(station: LoomStation, p: LoomPlacement): boolean {
   // the water — that stand is one of the places the children speak from, so a
   // sight line drawn to it would be a line the loom is already held 10 m away
   // from, and it would answer about a stretch of water she is not looking at.
-  if (p.bank && !p.sightClear(station.seat, waterAhead(station.seat, p.bank), SIGHT_HALF_WIDTH)) {
+  if (p.bank && !p.sightClear(station.weaver, waterAhead(station.weaver, p.bank), SIGHT_HALF_WIDTH)) {
     return false
   }
   return true
@@ -214,7 +252,11 @@ export function placeLoom(p: LoomPlacement): LoomStation | null {
       const a = nominalAngle + sign * step * (Math.PI / 180)
       for (const r of radii) {
         const seat = { x: Math.cos(a) * r, z: Math.sin(a) * r }
-        const station = loomAround(seat, fx, fz, p.geometry, onRiverAxis)
+        // Across the warp, toward the water — or straight outward where the
+        // settlement stands on no river and there is no water to face.
+        const ax = p.bank ? p.bank.nx : Math.cos(a)
+        const az = p.bank ? p.bank.nz : Math.sin(a)
+        const station = loomAround(seat, fx, fz, ax, az, p.geometry, onRiverAxis)
         if (stationHolds(station, p)) return station
       }
     }

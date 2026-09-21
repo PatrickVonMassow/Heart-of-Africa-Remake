@@ -3273,6 +3273,7 @@ export function PlaceScene() {
           buildings={layout.interactives.map((it) => it.pos)}
           playRocks={layout.playRocks}
           playGround={layout.playGround}
+          loom={layout.loom}
           rocks={layout.rocks}
           climbRock={layout.climbRock}
           firePos={[-3.5, 2.5]}

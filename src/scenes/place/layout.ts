@@ -2138,7 +2138,7 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
         z2: loom.downstream.z,
         r: WARP_BODY_RADIUS,
       })
-      colliders.push({ x: loom.seat.x, z: loom.seat.z, r: WEAVER_BODY_RADIUS })
+      colliders.push({ x: loom.weaver.x, z: loom.weaver.z, r: WEAVER_BODY_RADIUS })
     }
   }
 
