@@ -3551,6 +3551,26 @@ async function checkChildrenMotion(motionPlace) {
   // run record cuts the detail at 200 characters (point 690).
   const checkAt = (name, ok, detail) =>
     check(name, ok, detail === undefined ? `at ${motionPlace}` : `${detail} — at ${motionPlace}`)
+  // EACH SETTLEMENT IS MEASURED FROM THE SAME PAGE, not on top of the two before
+  // it. Chaining three 1200-frame traces into one session made the POSITION IN
+  // THE LOOP part of the measurement: across six runs on both backends every red
+  // this gate produced fell on the SECOND or the THIRD settlement and none ever
+  // on the first, while the same games replayed outside a browser read an order
+  // of magnitude below the gate. Leaving a settlement is not tearing its visit
+  // down, so the page is brought back up before each trace — the three readings
+  // are then comparable, which is the whole claim the loop makes (point 690).
+  // `installColliderProbe` rides an init script and survives the reload; the
+  // backend is asserted again, because a silent fallback after a reload would
+  // otherwise go unseen (point 204).
+  await page.reload()
+  await page.waitForFunction(() => window.__game && window.__balance, null, { timeout: 60000 })
+  await page.waitForFunction(() => window.__renderer, null, { timeout: 60000 })
+  await assertBackend(page)
+  await page.waitForTimeout(4000)
+  await page.evaluate(() => {
+    window.__balance.randomEventsEnabled = false
+    window.__game.getState().setJournalOpen(false)
+  })
   await page.evaluate(() => {
     const g = window.__game.getState()
     if (g.placeId) g.leavePlace()
