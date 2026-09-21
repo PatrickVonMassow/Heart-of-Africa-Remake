@@ -2384,8 +2384,8 @@ source recorded here. The proposed replacement needs a separate check before
 its geometry can be treated as a Bambara/Mande reconstruction.
 
 - **PERIOD, but early:** [Mungo Park, *Travels in the Interior Districts of
-  Africa* (1799), chapter XX](https://www.gutenberg.org/cache/epub/74976/pg74976.txt),
-  the cotton-manufacture passage beginning “The preparation of cotton”. Park
+  Africa* (1799), chapter XXI](https://www.gutenberg.org/cache/epub/74976/pg74976.txt),
+  the cotton-manufacture passage containing “The weaving is performed by the men”. Park
   describes women spinning, men weaving, a web seldom wider than four inches,
   and a shuttle with a larger chamber for coarse thread. He compares the loom's
   principle to European looms. This supports narrow-strip weaving and a shuttle,
