@@ -174,11 +174,19 @@ describe('one site, one label (design.md §4.4/§17.2)', () => {
 })
 
 describe('villages keep clearance from rivers (design.md §4.2)', () => {
+  /** The clearance is now 0.492°, past the 0.45° a range-1 bucket search can
+   *  resolve, so the MEASUREMENT has to use the same widened range the nudge
+   *  itself walks on (point 1173). At range 1 every village below reads a
+   *  saturated 0.45 and the rule could not be confirmed at all. */
+  const CLEARANCE_RANGE = 2
+  const villageRiverDistance = (lat: number, lon: number): number =>
+    riverDistance(lat, lon, 4, CLEARANCE_RANGE)
+
   // The river water band reaches ~0.165° from the axis and the village marker
   // footprint ~0.145°, so the clearance keeps every hut dry — a canoe passage
   // carries the traveller past a riverside village, never into its huts.
   it.each(villages.map((v) => [v.id, v] as const))('%s keeps the river clearance', (_id, v) => {
-    expect(riverDistance(v.lat, v.lon)).toBeGreaterThanOrEqual(VILLAGE_RIVER_CLEARANCE_DEG - 1e-9)
+    expect(villageRiverDistance(v.lat, v.lon)).toBeGreaterThanOrEqual(VILLAGE_RIVER_CLEARANCE_DEG - 1e-9)
   })
 
   it('the clearance nudge stays a small shift off each heartland anchor', () => {
@@ -195,9 +203,13 @@ describe('villages keep clearance from rivers (design.md §4.2)', () => {
   // channel — so the RIVER moved onto its real stations, not the village.
   it('the Bambara village lies at the Niger, at the §4.2 clearance minimum', () => {
     const v = placeById('bambara-village')
-    const d = riverDistance(v.lat, v.lon)
+    const d = villageRiverDistance(v.lat, v.lon)
     expect(d).toBeGreaterThanOrEqual(VILLAGE_RIVER_CLEARANCE_DEG - 1e-9)
-    expect(d).toBeLessThanOrEqual(0.45) // pushed off the water, not away from the Niger
+    // Pushed off the water, not away from the Niger: the nudge stops AT the
+    // clearance, so the village stays riverside. The bound tracks the clearance
+    // rather than a fixed number — it used to read 0.45, which was the old
+    // query's saturation point and not a statement about the village (1173).
+    expect(d).toBeLessThanOrEqual(VILLAGE_RIVER_CLEARANCE_DEG + 0.05)
     // The heartland anchor sits ON the corrected channel — the clearance rule
     // does the whole work here, which is what "on the river" means in the model.
     const raw = VILLAGE_HEARTLANDS.find((h) => h.id === 'bambara-village')
@@ -234,9 +246,11 @@ describe('villages keep clearance from rivers (design.md §4.2)', () => {
 
   it('the Nubian village sits clear of the Nile water but stays riverside', () => {
     const v = placeById('nubian-village')
-    const d = riverDistance(v.lat, v.lon)
+    const d = villageRiverDistance(v.lat, v.lon)
     expect(d).toBeGreaterThanOrEqual(VILLAGE_RIVER_CLEARANCE_DEG - 1e-9)
-    expect(d).toBeLessThanOrEqual(0.45) // moved off the water, not away from the Nile
+    // Moved off the water, not away from the Nile — see the Bambara case for
+    // why this bound follows the clearance instead of the old 0.45.
+    expect(d).toBeLessThanOrEqual(VILLAGE_RIVER_CLEARANCE_DEG + 0.05)
     // The anchor genuinely violated the clearance — the rule does real work here.
     const raw = VILLAGE_HEARTLANDS.find((h) => h.id === 'nubian-village')
     expect(riverDistance(raw?.lat ?? 0, raw?.lon ?? 0)).toBeLessThan(VILLAGE_RIVER_CLEARANCE_DEG)
@@ -439,7 +453,9 @@ describe('terrain sampling on real geodata', () => {
     }
     for (const p of PLACES) {
       const margin = p.kind === 'port' ? PORT_RIVER_CLEARANCE_DEG : VILLAGE_RIVER_CLEARANCE_DEG
-      expect(riverDistance(p.lat, p.lon), `place ${p.id}`).toBeGreaterThanOrEqual(margin - 1e-9)
+      // Range 2 like the sweeps above: the village margin now sits past what a
+      // range-1 search resolves, and a saturated read is not a measurement.
+      expect(riverDistance(p.lat, p.lon, 4, 2), `place ${p.id}`).toBeGreaterThanOrEqual(margin - 1e-9)
     }
     expect(riverDistance(ELEPHANT_GRAVEYARD.lat, ELEPHANT_GRAVEYARD.lon)).toBeGreaterThanOrEqual(
       RIVER_WIDTH_DEG + MIN_FOOTPRINT - 1e-9,

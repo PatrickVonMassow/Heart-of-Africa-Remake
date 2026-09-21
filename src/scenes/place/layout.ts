@@ -36,7 +36,14 @@ import { devAssert } from '../../systems/devAssert'
 import type { BuildingType } from '../../state/ui'
 import { pickUseCandidate, type UseCandidate } from './useKeyTarget'
 
-export const PLACE_RADIUS = 28 // walkable radius in meters; leaving it exits the place
+/** The walkable radius the place scene was first built at, and the unit
+ *  `balance.settlementRoom` multiplies. It is a historical base, not a knob:
+ *  the calibratable handle is the factor in `balance.ts` (point 1173). */
+export const PLACE_RADIUS_BASE = 28
+/** Walkable radius in meters; leaving it exits the place. Every consumer reads
+ *  THIS (or the layout's own `radius`, which a port widens) — no caller keeps a
+ *  radius of its own, so the factor alone moves the whole settlement. */
+export const PLACE_RADIUS = PLACE_RADIUS_BASE * balance.settlementRoom
 
 /** How far inside the southern edge a settlement drops the arriving traveller. */
 export const SPAWN_INSET = 10
@@ -1370,7 +1377,7 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
           cx = Math.cos(a) * cr
           cz = Math.sin(a) * cr
         }
-        if (!clears(cx, cz) || cr + ring > PLACE_RADIUS - 2) continue
+        if (!clears(cx, cz) || cr + ring > radius - 2) continue
         placedRings.push({ x: cx, z: cz, a, ring })
         for (const seat of seats) {
           const x = cx + Math.cos(a + seat.angle) * seat.dist

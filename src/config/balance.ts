@@ -213,6 +213,19 @@ export interface BalanceConfig {
   /** Radius (world units) around a place marker in which it can be entered. */
   placeEnterRadius: number
   /**
+   * How much room the settlement scene gives its inhabitants, as a MULTIPLE of
+   * the walkable radius the place scene was first built at (point 1173, user
+   * 21.09.2026). It is the ONE handle on the settlement's size: `PLACE_RADIUS`
+   * is this factor times that base, and station placement, the children's
+   * quarter, the huts and the collision fabric all derive from it.
+   *
+   * CALIBRATABLE, and the reason it exists is measured: at 1.0 every teaching
+   * voice of the communication slice cleared every other by EXACTLY the hearing
+   * radius and no more, and it bought that clearance by shrinking the children's
+   * ground to its floor. Raising it buys the margin back.
+   */
+  settlementRoom: number
+  /**
    * Settlement collision radius as a SHARE of `placeEnterRadius` (design.md
    * §11): the bird's-eye traveller cannot walk through a settlement's
    * footprint. Must stay <= 1 so the "Space to enter" prompt always arms at or
@@ -1035,6 +1048,7 @@ export const balance: BalanceConfig = {
   },
   digRadius: 3,
   placeEnterRadius: 2.5,
+  settlementRoom: 1.25,
   // 0.6 → a 1.5-unit collider around the marker: it matches the drawn cluster
   // (the port's main house plus annex reaches ~1.3 units past the anchor, the
   // village huts ~1.45) and stays inside the river clearance every place keeps

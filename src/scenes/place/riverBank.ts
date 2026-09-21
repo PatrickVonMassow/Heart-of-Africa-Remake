@@ -25,11 +25,14 @@ import { RIVER_WIDTH_DEG } from '../../world/riverWidth'
 import { BACKDROP_SCALE } from './backdrop'
 
 /** The waterline must lie at least this far outside the built disc, so the
- *  centre and every hut stay dry (spec item 1). */
-export const BANK_MIN_GAP = 4
+ *  centre and every hut stay dry (spec item 1). Raised from 4 by point 1173:
+ *  at 4 the last huts of a grown disc stood a stride from the shore, and the
+ *  village's own margin off the water (`VILLAGE_RIVER_CLEARANCE_DEG`) grew
+ *  with it so the larger gap is ground, not a lost bank. */
+export const BANK_MIN_GAP = 8
 /** ... and at most this far, or the walk out to it is no longer a bank of the
  *  settlement but a journey. */
-export const BANK_MAX_GAP = 14
+export const BANK_MAX_GAP = 18
 
 /**
  * Half-width of the shore strip: the ground slopes from the walkable edge down
