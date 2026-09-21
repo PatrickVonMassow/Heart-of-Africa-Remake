@@ -1535,3 +1535,31 @@ Bildrate-Einbuße, und die Absicht über das Fenster hinaus ist die eigentliche 
 die zweite Lesart des Punktes. Wer die Datei das nächste Mal anfasst, misst, ob der
 Beobachter in einer belebten Siedlung spürbar kostet, und engt ihn sonst auf den
 Overlay-Wurzelknoten ein, statt ihn über den ganzen Baum zu legen.
+
+## Ein laufender beauftragter Autor ist in keiner Wiederaufnahme-Prüfung sichtbar (21.09.2026)
+
+Die Batch-Wiederaufnahme las `scripts/focus.mjs show` („1158: returned to queue"),
+TASKS.md (1158 als ersten offenen Punkt) und den Punkt-Brief. Alle drei stimmten und
+alle drei waren irreführend: In `.claude/worktrees/point-1158` lag `feat/1158-escape-cooldown-return`
+mit dem fertigen Fix, 190 Zeilen Tests, vermerkter Mechanismus-Prüfung und einem bereits
+CI-grünen Merge mit main. Keine der gelesenen Quellen nennt einen Worktree oder einen
+Branch, also wurde der Punkt komplett neu gebaut — samt voller Unit-Suite —, bis `ps`
+zufällig dessen laufendes `run-all.mjs` zeigte. Die Quelle, die es gesagt hätte, ist
+`git worktree list` beziehungsweise `git branch -a`. Nicht als Punkt eingereiht: kein
+Spielerimpakt, keine Blockade, und die wirksame Abhilfe ist eine Gewohnheit, kein
+Mechanismus — sie steht als Memory-Regel „Check for an existing branch first". Wer die
+Wiederaufnahme ohnehin anfasst, lässt sie den Branch oder Worktree zum Punkt nennen,
+bevor sie ihn als offen anbietet.
+
+## `--agent-check` urteilt „alive" auf Dateien, die eine beendete Suite geschrieben hat (21.09.2026)
+
+Im selben Vorgang meldete `node scripts/batch-in-flight.mjs --agent-check --worktree
+.claude/worktrees/point-1158` zweimal „DO NOT REPLACE THIS AGENT: work output 0 min old
+(working files)", obwohl in der Prozessliste kein Autorprozess mehr stand — die 0 Minuten
+alten Dateien waren die 76 `verification/*.png`, die seine gerade beendete Bild-Suite
+geschrieben hatte. Das Urteil ist bewusst vorsichtig (am 30.07.2026 wurde ein lebender
+Agent für tot erklärt und zwei fertige Punkte neu gebaut), also ist die Richtung richtig;
+was fehlt, ist die Unterscheidung zwischen „der Autor schreibt" und „sein Werkzeug hat
+geschrieben". Nicht als Punkt eingereiht: die falsche Richtung ist die harmlose, und die
+Infrastruktur steht unter Einfriergebot. Wer es ohnehin anfasst, schließt regenerierbare
+Ausgabeordner aus der Lebendprüfung aus oder verlangt zusätzlich einen Prozess.
