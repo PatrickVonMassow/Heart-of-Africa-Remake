@@ -3896,7 +3896,12 @@ async function checkChildrenMotion(motionPlace) {
         let bestScore = -Infinity
         for (let i = 0; i < 24; i++) {
           const a = (i / 24) * Math.PI * 2
-          for (const dist of [4, 6, 8, 10, 13]) {
+          // SIX METRES IS THE FLOOR, not a preference. A four-metre ring was
+          // tried and the shutter refused the frame it produced — "off the
+          // bottom edge": that close, the group's centre at knee height falls
+          // out under the view, so a standpoint the score loves is one the
+          // picture cannot use (point 690).
+          for (const dist of [6, 8, 10, 13]) {
             const sx = cx + Math.sin(a) * dist
             const sz = cz + Math.cos(a) * dist
             if (Math.hypot(sx, sz) > window.__placeLayout.radius - 2) continue
