@@ -1783,6 +1783,12 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   // quarter's earshot. A carrier's track is a straight worn line, not a lane that
   // bends round three huts, and a straight one is also what reads as a path to
   // the river from inside the village.
+  // Held beyond the block below so the post-settle re-check can ask exactly the
+  // same two questions of exactly the same geometry (point 1173). Both read
+  // `playRocks` through this closure, so they see the stage the settling leaves
+  // rather than the one it started from.
+  let clearRun: ((head: BankPoint, solids: readonly Collider[]) => boolean) | null = null
+  let findHead: ((solids: readonly Collider[]) => BankPoint | null) | null = null
   if (waterPath) {
     // Gate option (work-order 1045): prefer the existing clear walk. If only
     // compound walls prevent it, open their rings at the crossing. Buildings,
@@ -1796,7 +1802,7 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     const drawnHalf = WATER_PATH_WIDTH / 2
     const laneClearance = drawnHalf + WALKER_RADIUS
     const foot = waterPath.foot
-    const clearRun = (head: BankPoint, solids: readonly Collider[]) => {
+    clearRun = (head: BankPoint, solids: readonly Collider[]) => {
       if (!clearCorridor(solids, head, foot, drawnHalf)) return false
       const runLength = Math.hypot(foot.x - head.x, foot.z - head.z)
       const steps = Math.max(48, Math.ceil(runLength / 0.1))
@@ -1814,7 +1820,7 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     // steps, and at each bearing a little nearer and a little further out — the
     // first head that gives a clear walk wins, so the track stays as near the
     // direct line as the plan and the children's lane allow.
-    const findHead = (solids: readonly Collider[]): BankPoint | null => {
+    findHead = (solids: readonly Collider[]): BankPoint | null => {
       for (let step = 0; step <= WATER_PATH_HEAD_SWEEP; step++) {
         for (const sign of step === 0 ? [1] : [-1, 1]) {
           const a = base + sign * step * (Math.PI / 180)
@@ -2014,10 +2020,51 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     // standing between two banks.
     if (playRocks && playRockColliders) {
       const settled = bankPlayRocks(bank)
+      const moved = Math.max(
+        Math.hypot(settled.upstream.x - playRocks.upstream.x, settled.upstream.z - playRocks.upstream.z),
+        Math.hypot(settled.downstream.x - playRocks.downstream.x, settled.downstream.z - playRocks.downstream.z),
+      )
       playRocks.upstream = settled.upstream
       playRocks.downstream = settled.downstream
       Object.assign(playRockColliders.upstream, settled.upstream)
       Object.assign(playRockColliders.downstream, settled.downstream)
+      // AND THE WATER LANE IS ASKED AGAIN (point 1173). The lane was cleared
+      // against the stage as it stood BEFORE this, and 688 §5 requires the two
+      // teachings to stay apart in the layout that actually ships. While the
+      // settling moved nothing the two were the same question; the first stage
+      // it did move — 0.9 m, once the village was pushed off the water — put the
+      // carrier's lane across the children's run. So a stage that moved has its
+      // lane re-cleared, and re-routed where the walk no longer holds.
+      if (moved > 1e-9 && waterPath && clearRun && findHead) {
+        // BY ITS FOOT, not by its width: the plan draws other tracks at the same
+        // width, and the first of those is not the carriers' lane.
+        const atFoot = waterPath.foot
+        const lane = paths.find((pp) => {
+          const end = pp.points.at(-1)
+          return !!end && end[0] === atFoot.x && end[1] === atFoot.z
+        })
+        if (lane && !clearRun(waterPath.head, colliders)) {
+          const again = findHead(colliders)
+          devAssert(
+            again !== null,
+            'water-path-resettled',
+            () => `${place.id}@${seed}: the settled stage leaves no clear water lane`,
+          )
+          if (again) {
+            waterPath.head = again
+            lane.points[0] = [again.x, again.z]
+          } else {
+            paths.splice(paths.indexOf(lane), 1)
+            waterPath = null
+            if (standCollider) {
+              const at = colliders.indexOf(standCollider)
+              if (at >= 0) colliders.splice(at, 1)
+              standCollider = null
+            }
+            waterStand = null
+          }
+        }
+      }
     }
   }
 
