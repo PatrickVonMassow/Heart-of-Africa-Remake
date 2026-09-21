@@ -65,6 +65,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 19.09. | Eine Bildprüfung lag rot, obwohl das Produkt stimmte: Ihre Bühne suchte freie Sicht bis auf den Brunnenplatz, den der Punkt gerade aus der Freihalteliste genommen hatte — das Dorf hatte darauf weitergebaut, die letzte Stützstelle der Sichtlinie lag in einer neuen Hütte. Die Ursache nannte erst der Vergleich der Kollisionssätze im Knoten, nicht der nächste Browserlauf (§3.294) |
 | 19.09. abends | Die CI war rot, wo dieselbe Suite hier grün fährt: Das Abbruch-Protokoll nahm den zuletzt gepushten Stand aus der Notiz, die der Arbeiter nach dem Push schreibt — wird er dazwischen getötet, nennt das Protokoll eine Spitze, die nicht steht. Der vorhandene Prüffall hoffte auf das Rennen und war auch gegen den unreparierten Stand grün (§3.295) |
 | 21.09. | Ein fertiger Punkt wurde komplett neu gebaut, weil keine der drei Quellen, die die Wiederaufnahme liest — Fokuszeile, Auftrag, Punkt-Brief —, den bereits bestehenden Zweig und Arbeitsbaum nennt; die Lebendprüfung meldete dazu „work output 0 min old" und meinte die Bilder der gerade beendeten Suite, nicht einen arbeitenden Autor (§3.296, Gegenstück zu §3.258) |
+| 21.09. abends | Ein Bildbeweis kam sechsmal grün zurück und zeigte zuletzt kein Kind mehr: Der Verschluss prüft, ob der erklärte Gegenstand ins Bild PROJIZIERT, und ein Kind hinter einer Lagerhauswand tut das; die Standpunktsuche modelliert jedes Gebäude als Kreis, was bei runden Hütten stimmt und bei eckigen Speichern nicht. Beide Prüfungen hatten recht mit ihrer eigenen Frage, und zusammen waren sie blind (§3.297) |
 | 13.09. | Ein Punkt zog seine eigenen Rot-Ladungen zurück, wie es die Regel verlangt — zwei Tests standen noch auf ihnen und wurden erst im Tor der LANDUNG rot, als der Merge schon auf main lag: Das Register erzwingt »kein Eintrag ohne offenen Punkt«, niemand erzwingt »kein Test ohne seinen Eintrag« (§3.268). Dieselbe Sitzung wies drei Fremd-Rot nach: gegen die Zweigwurzel gemessen sind alle drei auch auf main rot, und das Rätsel am Schutthang ist dort nicht sporadisch, sondern reproduziert jedes Mal |
 | 13.09. abends | Vier CI-Läufe eines Zweigs starben als »cancelled« — ein Wort, das weder Ursache noch Reparatur nennt und das kein Push heilen kann. Es war das 15-Minuten-Limit des `fast`-Jobs: Die letzten beiden GRÜNEN Läufe, einer davon auf main, brauchten 14 m 41 s und 14 m 45 s, also rund fünfzehn Sekunden Luft. Der nächste Punkt, der irgendeinen Test hinzufügt, musste auflaufen, egal welcher. Sichtbar wurde es erst im Schrittprotokoll: install/build/lint/audit grün, `unit: cancelled`, »The operation was canceled« nach 15 m 13 s (§3.270) |
 | 14.09. | Nach einer Parallelsitzung verlangte ein Stop-Hook `batch-doctor --gate` vor JEDER weiteren Batch-Arbeit — dessen Tor fährt eine volle Unit-Suite, neben dem laufenden Zwei-Backend-Bildlauf auf derselben Maschine. Gefunden hat der Doktor genau eine Datei: die Review-Zeile, die dieselbe Sitzung vier Minuten zuvor geschrieben hatte. Sie zu committen genügte, das Urteil sprang auf `consistent`, die Unit-Suite wurde nie gebraucht; ihr Abbruch ließ zwei verwaiste vitest-Worker neben dem Bildlauf zurück (§3.271, Wiedergänger von §3.267) |
@@ -1684,7 +1685,7 @@ stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die s
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Montag, 21.09.2026, 14:31 · Quellen-Fingerprint: `2b0f42f175ca…`
+Zuletzt aktualisiert: Montag, 21.09.2026, 17:57 · Quellen-Fingerprint: `deb741a649c2…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1792,8 +1793,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 98 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 7 Revert-/Reapply-Commits · 136 Prozess-/Meta-TASKS-Punkte (davon 64 offen).
 
-<!-- RETRO-FINGERPRINT: 2b0f42f175cad307386365650919d36a05f27e2e90c196046bcb5eef9728b07c -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-21T12:31:08.513Z -->
+<!-- RETRO-FINGERPRINT: deb741a649c2e3ae535b9c9173c2b9e372ea799670a280d015a08f2443cf9c8a -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-21T15:57:47.928Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -7904,3 +7905,31 @@ Wächters, im Pages-Workflow und im Owner-Runbook.
 Entscheidung dort auch wieder herausgenommen werden können — und ein Verzichtspfad, der
 die Abweisung billig macht, verhindert genau das. Zweimal derselbe Verzicht ist kein
 Sonderfall mehr, sondern der Beweis, dass die Regel nicht mehr stimmt.
+
+### 3.297 Zwei Prüfungen hatten je recht — und zusammen waren sie blind
+
+Gemessen am 21.09.2026 beim Landen von Punkt 690, der die Kinder-Bewegungsprüfung zum ersten
+Mal auf eine Hafenstadt zog. Sechs Läufe in Kairo meldeten GRÜN, und ihr Bild zeigte erst ein
+fernes Kind und zuletzt gar keines mehr. Kein Wächter hat dabei geirrt. Der Verschluss (Punkt
+375) verweigert einen Rahmen, dessen erklärter Gegenstand nicht ins Bild **projiziert** — ein
+Kind hinter einer Lagerhauswand projiziert einwandfrei. Die Standpunktsuche prüft die Sichtlinie
+gegen jedes feste Ding, modelliert dieses Ding aber als **Kreis** — bei runden Hütten in einem
+13-Meter-Quartier nahe an der Wahrheit, bei einem eckigen Speicher in einem weiten Hafenquartier
+nicht. Jede Prüfung beantwortete ihre eigene Frage richtig. Die Frage, auf die es ankam — ist
+das Kind wirklich zu sehen? —, stellte keine.
+
+Teuer war daran nicht der Defekt, sondern wie lange er wie ein Zielproblem aussah. Sechs Runden
+Nachjustieren gingen drauf: die Hindernismenge erweitert, ein lautes Urteil eingezogen, die Nähe
+statt am Schwerpunkt an den Kindern gemessen, den erklärten Gegenstand von einem Punkt in der
+Luft auf ein Kind umgestellt, seine Höhe korrigiert, die Kamera darauf gerichtet. Jede einzelne
+Änderung war für sich richtig und hat das Bild in den Dörfern messbar verbessert. Keine konnte
+das Hafenbild retten, weil keine die fehlende Frage stellte. Das Dorf hatte den Fehler nie
+gezeigt: Dort fallen beide Näherungen mit der Wirklichkeit fast zusammen, im Hafen treffen sie
+gemeinsam ihren schlechtesten Fall.
+
+**Lehre:** Ein grüner Lauf, dessen Bild seinen Gegenstand nicht enthält, ist schlimmer als ein
+roter — und er entsteht nicht dadurch, dass eine Prüfung falsch ist, sondern dadurch, dass keine
+zuständig ist. Wenn mehrere Wächter denselben Beweis absichern, gehört gefragt, welche Frage
+**keiner** von ihnen stellt; die Antwort darauf steht nie in ihren einzelnen Zusagen. Und wenn
+das dritte Nachjustieren an derselben Stelle nicht trägt, ist die vermutete Ursache falsch —
+dann wird sie als eigener Punkt aufgeschrieben, nicht ein viertes Mal justiert.

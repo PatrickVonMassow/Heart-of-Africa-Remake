@@ -161,7 +161,9 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   geprüft wurde. Zu jeder Prüfung: **Welche Zeile ruft die Sache auf — und was bliebe grün, wenn
   sie kaputt wäre?** Zeit darf ein Test abkürzen, den **Aufruf** nie; ist er nicht
   ausführbar, **miss warum** und mach den Rest zur **eigenen Aufgabe**. Ist die
-  **Ausgabe** das Produkt, lies sie am **echten Bestand**. Und das Bild sagt nicht nur ‚stimmt
+  **Ausgabe** das Produkt, lies sie am **echten Bestand**. Sichern **mehrere** Wächter denselben
+  Beweis, frag, welche Frage **keiner** von ihnen stellt — jeder kann recht haben und alle
+  zusammen blind sein. Und das Bild sagt nicht nur ‚stimmt
   es?‘, sondern **wozu die Figur das tut?“ *(Sieht das richtig aus?)*
 - **Dem Test geht der Gegenstand unter den Füßen weg.** Er hält seinen Prüfling an einer
   Koordinate, einem Vorgabewert oder einer Simulation fest. Zieht der Prüfling um, fragt er
@@ -701,4 +703,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 2b0f42f175cad307386365650919d36a05f27e2e90c196046bcb5eef9728b07c -->
+<!-- GUIDE-FINGERPRINT: deb741a649c2e3ae535b9c9173c2b9e372ea799670a280d015a08f2443cf9c8a -->

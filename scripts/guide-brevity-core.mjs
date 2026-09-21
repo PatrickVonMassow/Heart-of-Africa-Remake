@@ -586,7 +586,13 @@ export const LIMITS = {
   // with the stronger Arbeit/Maschine sentence that subsumes it. A seven-line first draft
   // was cut to four by the PER-ENTRY risk ceiling and then once more by hand. Net: +3 lines
   // / +35 words. 700 -> 703.
-  maxLines: 703,
+  // 21.09.2026, second fold of the day: the lesson that several guards can each be right about
+  // their own question and jointly blind to the one that matters (retrospective §3.297 — a
+  // children's frame that came back GREEN with no child in it, because the shutter asks about
+  // projection and the vantage search models a warehouse as a circle). It got no entry of its
+  // own: it is one clause on "Grüner Test, falsches Bild", whose whole subject is a check that
+  // passes while the picture does not. Net: +2 lines / +22 words. 703 -> 705.
+  maxLines: 705,
   // 18.09.2026, second fold of the day: the lesson that a check the test environment CANNOT
   // perform is measured and filed as its own visible task, not carried as a footnote, reached
   // the guide as one clause on "Gruener Test, falsches Bild" and was paid for inside the same
@@ -903,7 +909,9 @@ export const LIMITS = {
   // 16 words and the compression of the two entries that carry it gave back 17. 6848 -> 6847.
   // 21.09.2026: the invisible-finished-point fold justified beside maxLines measures 35
   // words after both tightenings: 6847 -> 6882.
-  maxWords: 6882,
+  // 21.09.2026 (second): the jointly-blind-guards clause justified beside maxLines measures 22
+  // words: 6882 -> 6904.
+  maxWords: 6904,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,
