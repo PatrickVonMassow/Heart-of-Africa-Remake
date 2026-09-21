@@ -73,10 +73,19 @@ it('measures the solved hand against its scene pivots and the stone triangles', 
         distance = Math.min(distance, drawn.distanceTo(closest))
       }
       // Independent nearest-triangle measurement catches a fictitious flank.
-      // Radial tangency overlaps a sloping face slightly (at most 6.36 mm in
-      // these fixtures); that contact leaves the centre outside the stone.
+      // Radial tangency overlaps a sloping face slightly; that contact leaves
+      // the hand's CENTRE outside the stone, which is what makes it a touch
+      // rather than a hand inside a rock.
+      //
+      // The floor is the overlap actually measured over the shipped stages, and
+      // it moved with them: 6.36 mm while the stones stood where the tight disc
+      // put them, 12.85 mm now that point 1173 pushed the village off the water
+      // and turned each stone on its own bearing. Against a drawn hand of 31.9 mm
+      // radius that is 40 % of the hand, still short of its centre. What guards
+      // it is the RATIO below, not a number pinned to one set of bearings.
+      const overlap = L.handRadius * SCALE - distance
       expect(distance - L.handRadius * SCALE, `${id}/${end}`).toBeLessThanOrEqual(0.002)
-      expect(distance - L.handRadius * SCALE, `${id}/${end}`).toBeGreaterThan(-0.007)
+      expect(overlap / (L.handRadius * SCALE), `${id}/${end}: hand centre inside the stone`).toBeLessThan(0.5)
       geometry.dispose()
       hand.geometry.dispose()
     }

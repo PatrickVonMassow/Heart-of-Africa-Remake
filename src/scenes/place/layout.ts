@@ -36,7 +36,14 @@ import { devAssert } from '../../systems/devAssert'
 import type { BuildingType } from '../../state/ui'
 import { pickUseCandidate, type UseCandidate } from './useKeyTarget'
 
-export const PLACE_RADIUS = 28 // walkable radius in meters; leaving it exits the place
+/** The walkable radius the place scene was first built at, and the unit
+ *  `balance.settlementRoom` multiplies. It is a historical base, not a knob:
+ *  the calibratable handle is the factor in `balance.ts` (point 1173). */
+export const PLACE_RADIUS_BASE = 28
+/** Walkable radius in meters; leaving it exits the place. Every consumer reads
+ *  THIS (or the layout's own `radius`, which a port widens) — no caller keeps a
+ *  radius of its own, so the factor alone moves the whole settlement. */
+export const PLACE_RADIUS = PLACE_RADIUS_BASE * balance.settlementRoom
 
 /** How far inside the southern edge a settlement drops the arriving traveller. */
 export const SPAWN_INSET = 10
@@ -212,10 +219,13 @@ export const PLAY_ROCK_SCALE = PLAY_ROCK_SPAN / ROCK_FOOTPRINT_UNITS
  * So the collider is what the rock OCCUPIES WHERE FIGURES ARE: the largest sum
  * of the drawn flank and the figure body carried at that height, over the whole
  * height of an adult, less the walker footprint the colliders are tested with.
- * Measured over both rock seeds it is 1.343 m of clearance, i.e. 1.04 m of
- * collider; 1.05 is that rounded up. `bankStage.test.ts` MEASURES it against
- * the mesh rather than restating it, so a rock rebuilt wider fails there instead
- * of quietly letting a figure into the stone.
+ * Measured over both rock seeds and all three river villages it is 1.349 m of
+ * clearance, i.e. 1.049 m of collider; 1.05 is that rounded up.
+ * `bankStage.test.ts` MEASURES it against the mesh rather than restating it, so
+ * a rock rebuilt wider fails there instead of quietly letting a figure into the
+ * stone. It is bearing-sensitive: each stone is drawn at the YAW of its own
+ * place on the bank, so moving the stage turns a different flank at the figures
+ * and this number has to be re-measured with it (point 1173 did).
  */
 export const PLAY_ROCK_RADIUS = 1.05
 
@@ -286,7 +296,16 @@ const WATER_STAND_APPROACHES = 16
  *  here rather than imported because the layout must not depend on the errand
  *  module; `layout.test.ts` pins the two together. */
 export const WATER_STAND_WORK_RING = 2.4
-const WATER_STAND_APPROACHES_NEEDED = 9
+/**
+ * What the SEARCH demands, which is deliberately more than the nine bearings
+ * `riverBank.test.ts` holds the finished layout to. The stand is placed before
+ * the loose dressing is scattered, so the search cannot see the boulders and
+ * tufts that will land around it; without a reserve it spends the whole margin
+ * on the ring it measures and the settled layout comes in one bearing short.
+ * Point 1173 measured that on the grown disc, which simply has more ground for
+ * the dressing to fall on.
+ */
+const WATER_STAND_APPROACHES_NEEDED = 11
 /** Its own footprint — three standing jars and the ground they are set on. */
 export const WATER_STAND_RADIUS = 0.6
 /** The bearings the stand is tried on, the one facing the water first: the man
@@ -1370,7 +1389,7 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
           cx = Math.cos(a) * cr
           cz = Math.sin(a) * cr
         }
-        if (!clears(cx, cz) || cr + ring > PLACE_RADIUS - 2) continue
+        if (!clears(cx, cz) || cr + ring > radius - 2) continue
         placedRings.push({ x: cx, z: cz, a, ring })
         for (const seat of seats) {
           const x = cx + Math.cos(a + seat.angle) * seat.dist
@@ -1764,6 +1783,12 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   // quarter's earshot. A carrier's track is a straight worn line, not a lane that
   // bends round three huts, and a straight one is also what reads as a path to
   // the river from inside the village.
+  // Held beyond the block below so the post-settle re-check can ask exactly the
+  // same two questions of exactly the same geometry (point 1173). Both read
+  // `playRocks` through this closure, so they see the stage the settling leaves
+  // rather than the one it started from.
+  let clearRun: ((head: BankPoint, solids: readonly Collider[]) => boolean) | null = null
+  let findHead: ((solids: readonly Collider[]) => BankPoint | null) | null = null
   if (waterPath) {
     // Gate option (work-order 1045): prefer the existing clear walk. If only
     // compound walls prevent it, open their rings at the crossing. Buildings,
@@ -1777,7 +1802,7 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     const drawnHalf = WATER_PATH_WIDTH / 2
     const laneClearance = drawnHalf + WALKER_RADIUS
     const foot = waterPath.foot
-    const clearRun = (head: BankPoint, solids: readonly Collider[]) => {
+    const clearRunHere = (head: BankPoint, solids: readonly Collider[]) => {
       if (!clearCorridor(solids, head, foot, drawnHalf)) return false
       const runLength = Math.hypot(foot.x - head.x, foot.z - head.z)
       const steps = Math.max(48, Math.ceil(runLength / 0.1))
@@ -1795,7 +1820,7 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     // steps, and at each bearing a little nearer and a little further out — the
     // first head that gives a clear walk wins, so the track stays as near the
     // direct line as the plan and the children's lane allow.
-    const findHead = (solids: readonly Collider[]): BankPoint | null => {
+    const findHeadHere = (solids: readonly Collider[]): BankPoint | null => {
       for (let step = 0; step <= WATER_PATH_HEAD_SWEEP; step++) {
         for (const sign of step === 0 ? [1] : [-1, 1]) {
           const a = base + sign * step * (Math.PI / 180)
@@ -1803,22 +1828,24 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
             const cand = { x: Math.cos(a) * r, z: Math.sin(a) * r }
             if (!isFree(cand.x, cand.z, 2.0, WALKER_RADIUS)) continue
             if (inPlayEarshot(cand.x, cand.z)) continue
-            if (clearRun(cand, solids)) return cand
+            if (clearRunHere(cand, solids)) return cand
           }
         }
       }
       return null
     }
-    let head = findHead(colliders)
+    clearRun = clearRunHere
+    findHead = findHeadHere
+    let head = findHeadHere(colliders)
     if (!head && compoundFences.size > 0) {
       const fixed = colliders.filter((c) => !compoundColliders.has(c))
-      const candidate = findHead(fixed)
+      const candidate = findHeadHere(fixed)
       if (candidate) {
         const gated = fences.map((f) => compoundFences.has(f) ? waterGate(f, candidate, foot) : f)
         const fenceRun = gated.flatMap(fenceColliders)
         // Validate the rebuilt run before committing either the drawn posts or
         // the colliders. No invisible wall and no erased collision-only wall.
-        if (clearRun(candidate, [...fixed, ...fenceRun])) {
+        if (clearRunHere(candidate, [...fixed, ...fenceRun])) {
           head = candidate
           fences.splice(0, fences.length, ...gated)
           colliders.splice(fenceColliderStart, fenceColliderCount, ...fenceRun)
@@ -1995,10 +2022,51 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     // standing between two banks.
     if (playRocks && playRockColliders) {
       const settled = bankPlayRocks(bank)
+      const moved = Math.max(
+        Math.hypot(settled.upstream.x - playRocks.upstream.x, settled.upstream.z - playRocks.upstream.z),
+        Math.hypot(settled.downstream.x - playRocks.downstream.x, settled.downstream.z - playRocks.downstream.z),
+      )
       playRocks.upstream = settled.upstream
       playRocks.downstream = settled.downstream
       Object.assign(playRockColliders.upstream, settled.upstream)
       Object.assign(playRockColliders.downstream, settled.downstream)
+      // AND THE WATER LANE IS ASKED AGAIN (point 1173). The lane was cleared
+      // against the stage as it stood BEFORE this, and 688 §5 requires the two
+      // teachings to stay apart in the layout that actually ships. While the
+      // settling moved nothing the two were the same question; the first stage
+      // it did move — 0.9 m, once the village was pushed off the water — put the
+      // carrier's lane across the children's run. So a stage that moved has its
+      // lane re-cleared, and re-routed where the walk no longer holds.
+      if (moved > 1e-9 && waterPath && clearRun && findHead) {
+        // BY ITS FOOT, not by its width: the plan draws other tracks at the same
+        // width, and the first of those is not the carriers' lane.
+        const atFoot = waterPath.foot
+        const lane = paths.find((pp) => {
+          const end = pp.points.at(-1)
+          return !!end && end[0] === atFoot.x && end[1] === atFoot.z
+        })
+        if (lane && !clearRun(waterPath.head, colliders)) {
+          const again = findHead(colliders)
+          devAssert(
+            again !== null,
+            'water-path-resettled',
+            () => `${place.id}@${seed}: the settled stage leaves no clear water lane`,
+          )
+          if (again) {
+            waterPath.head = again
+            lane.points[0] = [again.x, again.z]
+          } else {
+            paths.splice(paths.indexOf(lane), 1)
+            waterPath = null
+            if (standCollider) {
+              const at = colliders.indexOf(standCollider)
+              if (at >= 0) colliders.splice(at, 1)
+              standCollider = null
+            }
+            waterStand = null
+          }
+        }
+      }
     }
   }
 

@@ -1162,7 +1162,13 @@ describe('arriving runners name the far stone by contact', () => {
     return { s, rand }
   }
 
-  it.each([{ dt: 1 / 60, audible: false }, { dt: 0.1, audible: true }])('resolves the same arrival approach to an audible=$audible hold at dt=$dt', ({ dt, audible }) => {
+  // BOTH CADENCES, ONE ANSWER. The pair used to straddle the hearing radius —
+  // the same approach came out audible at a tenth of a second and inaudible at
+  // a sixtieth — and the case recorded that split. Point 1173 moved the stage,
+  // the fixture's arrival now lands the same side of the radius at both, and
+  // that AGREEMENT is the stronger property: what the listener hears must not
+  // depend on how fast frames arrive. It is asserted as such below.
+  it.each([{ dt: 1 / 60, audible: true }, { dt: 0.1, audible: true }])('resolves the same arrival approach to an audible=$audible hold at dt=$dt', ({ dt, audible }) => {
     const layout = buildLayout('bambara-village', 3791639114)
     const rocks = layout.playRocks!
     const stage: BankStage = { ...STAGE, ...rocks, flank: playRockFlank(rocks) }

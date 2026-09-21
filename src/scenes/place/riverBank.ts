@@ -25,11 +25,14 @@ import { RIVER_WIDTH_DEG } from '../../world/riverWidth'
 import { BACKDROP_SCALE } from './backdrop'
 
 /** The waterline must lie at least this far outside the built disc, so the
- *  centre and every hut stay dry (spec item 1). */
-export const BANK_MIN_GAP = 4
+ *  centre and every hut stay dry (spec item 1). Raised from 4 by point 1173:
+ *  at 4 the last huts of a grown disc stood a stride from the shore, and the
+ *  village's own margin off the water (`VILLAGE_RIVER_CLEARANCE_DEG`) grew
+ *  with it so the larger gap is ground, not a lost bank. */
+export const BANK_MIN_GAP = 8
 /** ... and at most this far, or the walk out to it is no longer a bank of the
  *  settlement but a journey. */
-export const BANK_MAX_GAP = 14
+export const BANK_MAX_GAP = 18
 
 /**
  * Half-width of the shore strip: the ground slopes from the walkable edge down
@@ -98,6 +101,46 @@ export const BANK_STAND_INSET = 1.5
  *  inside the plateau by construction, so they can never fall outside the
  *  walkable region however the calibratable river width moves the waterline. */
 export const BANK_STRETCH_ANGLE_FRAC = 0.8
+
+/**
+ * THE LONGEST the rock-to-rock stretch may be, and the shortest it may be
+ * (point 1173 item 4). The stretch used to be a pure ANGLE on the bank, so it
+ * grew with the waterline: pushing the village off the water stretched the
+ * children's run from 19.7 m to 26 m, which is a march rather than a game —
+ * past the frame the start line sees both rocks in (point 687 §6) and past the
+ * register a called word carries at (688).
+ *
+ * So the SPAN is the named quantity now and the angle follows it. The angle can
+ * only ever be pulled IN from `BANK_STRETCH_ANGLE_FRAC`, never pushed out past
+ * the plateau, so a bank too tight to give the minimum reports a stretch below
+ * it and fails a test with its settlement named — it never silently borrows
+ * ground the plateau does not have.
+ */
+export const BANK_STRETCH_MAX_SPAN = 21
+/** ... and below this the run is a scuffle rather than a run (point 687 §6). */
+export const BANK_STRETCH_MIN_SPAN = 14
+
+/**
+ * The bearing each play rock sits at, solved so the chord between the two stays
+ * within `BANK_STRETCH_MAX_SPAN`. The chord grows monotonically with the angle,
+ * so a bisection on (0, max] is exact to within its tolerance; a bank whose
+ * widest permitted angle is already short enough keeps that angle unchanged,
+ * which is why the three river villages below the grown waterline still lay
+ * their stage exactly where they did.
+ */
+export function bankStretchAngle(walkEdge: number): number {
+  const widest = BANK_PLATEAU_ANGLE * BANK_STRETCH_ANGLE_FRAC
+  const spanAt = (a: number): number => 2 * (walkEdge / Math.cos(a) - BANK_STAND_INSET) * Math.sin(a)
+  if (spanAt(widest) <= BANK_STRETCH_MAX_SPAN) return widest
+  let lo = 0
+  let hi = widest
+  for (let i = 0; i < 40; i++) {
+    const mid = (lo + hi) / 2
+    if (spanAt(mid) > BANK_STRETCH_MAX_SPAN) hi = mid
+    else lo = mid
+  }
+  return lo
+}
 
 /** The smallest stand-off any object keeps from the top of the bank, whatever
  *  its own footprint — a tuft of grass has no radius worth the name and must
@@ -475,7 +518,7 @@ export function buildRiverBank(place: PlaceDef, radius: number): PlaceRiverBank 
   // of the bank however the depth is set.
   const wadeEdge = Math.max(walkEdge, outAtDepth({ distance, walkEdge }, balance.bankWadeDepth))
   const frame = { nx, nz, fx, fz }
-  const stretchAngle = BANK_PLATEAU_ANGLE * BANK_STRETCH_ANGLE_FRAC
+  const stretchAngle = bankStretchAngle(walkEdge)
   const stretchR = walkEdge / Math.cos(stretchAngle) - BANK_STAND_INSET
   return {
     riverId,

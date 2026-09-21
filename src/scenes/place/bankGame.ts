@@ -839,7 +839,17 @@ export function touchStand(
     // Try the station bearing first, then neighbouring facets on that same
     // side. The exact flank can be unreachable behind the collider on one
     // bearing while the next facet is reachable; never move the collider.
-    for (const offset of [0, 1, -1, 2, -2, 3, -3]) {
+    //
+    // The fan reaches a QUARTER TURN to each side (point 1173). It used to stop
+    // at 45 deg, which was enough while every stage lay where the tight disc put
+    // it; moving the stage turns each stone on its own bearing, and the mandinka
+    // upstream rock then presented its broadest flank across the whole 45 deg —
+    // no facet reachable, no spot, and a child that could not touch the stone it
+    // names. Nothing here is loosened but the SEARCH: the stand it returns still
+    // has to be free ground and still has to end within `TOUCH_GAP` of the drawn
+    // surface, and the fan stays on the stone's station side so the tap is never
+    // made from the water.
+    for (const offset of [0, 1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6, -6]) {
       const found = touchStand(stage, end, blocked, bearing + offset * Math.PI / 12)
       if (found) return found
     }

@@ -119,15 +119,26 @@ describe('the tapping child reaches the stone it names, in every river village',
   }
 
   it('uses a neighbouring station-side facet when the direct reach is behind the collider', () => {
+    // THE FALLBACK IS DRILLED, NOT WAITED FOR. This used to name the one shipped
+    // stage whose direct bearing happened to be blocked, and point 1173 moved
+    // the stages and took that coincidence away — leaving a test that asserted
+    // a fallback which nothing was asking for any more. So the blockage is
+    // PLACED here: the direct stand is computed, then fenced off, and the search
+    // has to come back with a neighbouring facet on the same side.
     const { stage, layout } = stageOf('bambara-village')
-    const blocked = (x: number, z: number) => !standingClear(layout.colliders, x, z, WALKER_RADIUS)
+    const real = (x: number, z: number) => !standingClear(layout.colliders, x, z, WALKER_RADIUS)
     const rock = rockAt(stage, 'downstream')
     const far = rockAt(stage, 'upstream')
     const direct = Math.atan2(far.x - rock.x, far.z - rock.z)
+    const straight = touchStand(stage, 'downstream', real, direct)
+    expect(straight, 'the direct bearing reaches this stone on open ground').not.toBeNull()
+    // Fence exactly the ground the direct approach would have used.
+    const blocked = (x: number, z: number) =>
+      real(x, z) || Math.hypot(x - straight!.x, z - straight!.z) <= WALKER_RADIUS * 2
     expect(touchStand(stage, 'downstream', blocked, direct)).toBeNull()
     const stand = touchStand(stage, 'downstream', blocked)!
     expect(stand).not.toBeNull()
-    expect(Math.abs(stand.bearing - direct)).toBeLessThanOrEqual(Math.PI / 4)
+    expect(Math.abs(stand.bearing - direct)).toBeLessThanOrEqual(Math.PI / 2)
     expect(blocked(stand.x, stand.z)).toBe(false)
     expect(Math.abs(touchReach(stage, 'downstream', stand)!.gap)).toBeLessThanOrEqual(TOUCH_GAP)
   })

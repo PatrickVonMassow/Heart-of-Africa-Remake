@@ -171,11 +171,19 @@ const PORTS: PlaceDef[] = [
 // a port stays AT the river by design (§4.2 exemption for closeness) but
 // its rendered cluster must not stand IN the band either — a smaller,
 // footprint-only margin.
-// NOTE: geoIndex's riverDistance saturates at ~0.45° — the village clearance
-// must stay below that cap or the world test cannot confirm it (at the
-// shipped widthFactor 1.6 this is 0.442; a factor past ~1.65 needs the cap
-// raised alongside).
-export const VILLAGE_RIVER_CLEARANCE_DEG = RIVER_WIDTH_DEG + 0.17
+// THE MARGIN IS WHAT THE SETTLEMENT SCENE STANDS ON (point 1173, user
+// 21.09.2026: "das Dorf etwas vom Fluss wegschieben"). It is not only a dry
+// footprint on the map — the place scene turns this same margin into the walk
+// from the built disc out to the waterline (`riverBank.ts`, at
+// `BACKDROP_SCALE` degrees per place unit), so a village pushed further off the
+// water gets a wider bank in the settlement it is played in. At 0.17 the
+// waterline stood ~36 m out and the built disc kept 8.1 m of it; 0.20 puts the
+// waterline ~42 m out and leaves the grown disc 11.2 m — the "etwas mehr
+// Abstand" the user asked for, measured rather than eyeballed.
+// NOTE: the queries below resolve to `0.45 × range`, so this margin needs the
+// WIDER range — at range 1 the gradient walk saturates at 0.45° and stops
+// short of any clearance above it, wherever the shipped width factor puts it.
+export const VILLAGE_RIVER_CLEARANCE_DEG = RIVER_WIDTH_DEG + 0.20
 // 0.15: the port cluster (main house ~2.2 world units wide plus annex)
 // reaches ~1.3 units past the anchor — the first 0.1 margin left Khartoum's
 // annex touching the waterline on screen (screenshot 126 caught it).
@@ -187,12 +195,16 @@ export const PORT_RIVER_CLEARANCE_DEG = RIVER_WIDTH_DEG + 0.15
 function clearedOfRivers(lat: number, lon: number, clearance = VILLAGE_RIVER_CLEARANCE_DEG): LatLon {
   let a = lat
   let o = lon
+  // RANGE 2, not the default 1: the query saturates at `0.45 × range`, and a
+  // walk that cannot MEASURE past its own target distance reads a flat
+  // gradient there and halts short of it (point 1173).
+  const RANGE = 2
   for (let i = 0; i < 24; i++) {
-    const d = riverDistanceExact(a, o, 1)
+    const d = riverDistanceExact(a, o, 1, RANGE)
     if (d >= clearance) break
     const e = 0.02
-    const gLat = riverDistanceExact(a + e, o, 1) - riverDistanceExact(a - e, o, 1)
-    const gLon = riverDistanceExact(a, o + e, 1) - riverDistanceExact(a, o - e, 1)
+    const gLat = riverDistanceExact(a + e, o, 1, RANGE) - riverDistanceExact(a - e, o, 1, RANGE)
+    const gLon = riverDistanceExact(a, o + e, 1, RANGE) - riverDistanceExact(a, o - e, 1, RANGE)
     const gl = Math.hypot(gLat, gLon)
     if (gl < 1e-6) {
       a += e // flat gradient (dead centre of a channel): fixed nudge, re-aim

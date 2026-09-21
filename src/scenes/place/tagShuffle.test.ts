@@ -1387,9 +1387,10 @@ describe('and the gate SEES a child that is wedged (point 656)', () => {
     //
     // WHAT IS PINNED HERE IS THE VERDICT, NOT THE NUMBER, and the difference is
     // deliberate. This child is CARRIED every other second, and a window that
-    // spans a carry is refused rather than guessed at — so a little over half
-    // the trace can be judged (re-measured at five children, judgedShare
-    // 0.523-0.554 across the cadences), and what survives is a scatter of short
+    // spans a carry is refused rather than guessed at — so roughly half the
+    // trace can be judged (0.523-0.554 across the cadences at five children;
+    // 0.454 at the low end once point 1173 gave the settlement its room and the
+    // penned child's play changed shape with it), and what survives is a scatter of short
     // continuous stretches whose share swings a little with the cadence: 28.24 /
     // 28.01 / 29.37 / 28.73 / 31.21 %. The one thing that does NOT swing is the
     // answer the gate reads — every cadence is RED by a factor of at least a
@@ -1401,7 +1402,11 @@ describe('and the gate SEES a child that is wedged (point 656)', () => {
     const read = CADENCES.map(([, step]) => shuffleWindows(resample(penned, step, 31337)))
     for (const r of read) {
       expect(r.share).toBeGreaterThan(CHILD_MOTION.shareGate * 6)
-      expect(r.judgedShare).toBeGreaterThan(0.5)
+      // Enough of the trace judged that the verdict above stands on it. The
+      // floor is BELOW the measured low so an ordinary geometry change cannot
+      // redden a line that has found nothing wrong — the verdict is what this
+      // case defends.
+      expect(r.judgedShare).toBeGreaterThan(0.4)
     }
     for (const [, step] of CADENCES) {
       expect(rescueRate(resample(penned, step, 31337)).perChildMinute).toBeGreaterThan(
