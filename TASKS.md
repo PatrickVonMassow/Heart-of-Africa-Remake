@@ -159,22 +159,86 @@ put it is the mistake this line exists to stop.
   Refs: src/scenes/place/tagGame.ts, src/scenes/place/PlaceLife.tsx, src/scenes/place/lifeSpots.ts
   Bundle: Dorfleben.
 
-- [ ] 1157. The weaver at the village loom works instead of standing frozen (user bug
-  report 18.09.2026, local/ErwachsenerStehtStill.zip: "Warum bewegt sich diese Figur
-  nicht?", seed 394349866, Bambara Village, day 3.54, WebGPU, medium).
+- [ ] 1173. The settlement gets room: a larger walkable area, and the village set back from
+  the river (user 21.09.2026, 14:41: »Du kannst auch gerne noch alles etwas mehr
+  auseinanderziehen - z. B. den ganzen begehbaren Siedlungsbereich etwas vergrößern und das
+  Dorf etwas vom Fluss wegschieben, sodass etwas mehr Abstand zwischen den verschiedenen
+  Akteuren ist.«).
+  Bundle: Dorfleben
+  THE REASON IS MEASURED, not aesthetic. Every teaching voice of the communication slice must
+  clear every other by the hearing radius (point 688 §6, `balance.communication.talk.reach`
+  = 10 m), and the settlement disc is currently so tight that the rule holds by luck rather
+  than by construction: the waterline sits 4 to 14 m outside the built disc
+  (`BANK_MIN_GAP`/`BANK_MAX_GAP` in `src/scenes/place/riverBank.ts`), the children's running
+  stretch lies on that bank, and the adults' stations sit in the same disc. The user reports
+  the consequence from play: »Aktuell ist es beim Kinderspiel manchmal schon eng« (21.09.2026,
+  14:29). Point 1157 adds a SECOND teaching station on the same axis, which makes a tightness
+  that already exists worse. This point buys the room BEFORE that station is built, which is
+  why it stands ahead of 1157.
+
+  Final state:
+
+  1. THE WALKABLE AREA GROWS. The settlement's walkable radius rises by a calibratable factor
+     in `src/config/balance.ts`, and every consumer that derives a position from it — station
+     placement, the play ground, the huts, the collision fabric — follows the value instead of
+     carrying its own constant. No caller keeps a hard-coded radius; the point is done only
+     when the factor alone moves the whole settlement.
+  2. THE VILLAGE MOVES BACK FROM THE WATER. `BANK_MIN_GAP` rises so the built disc keeps a
+     larger margin to the waterline. `BANK_MAX_GAP` rises with it only as far as the walk out
+     to the bank stays a bank of the settlement and does not become a journey — the comment on
+     that constant already states the criterion and keeps it.
+  3. THE CLEARANCE BECOMES A CHECK, NOT A HOPE. The three areas of 688 §6 — the adults' village
+     core, the children's roaming quarter and the bank stage — are asserted to clear each other
+     by at least `talk.reach` in EVERY shipped layout, not just the Bambara one, and a layout
+     that cannot is a failure with a named settlement, not a silent squeeze. Where a layout
+     still cannot give all three, the ADULTS move, exactly as 688 §6 already rules.
+  4. THE RUNNING STRETCH KEEPS ITS SHAPE. The rock-to-rock stretch stays long enough to read as
+     a run from its own end (point 687 §6) and keeps its lane clear of the water path, which
+     meets the bank outside the stretch (688 §5). Growing the disc must not stretch the game
+     into a walk or shrink it into a scuffle: the stretch is derived from the new radius and
+     asserted against both bounds.
+  5. NOTHING ELSE CHANGES SHAPE. Hut spacing, station clearance (point 578) and the collision
+     fabric keep their rules; they follow the larger radius and are not redesigned here.
+  6. Proof: a Vitest over every shipped settlement layout that measures the three areas'
+     mutual distance against `talk.reach` and the stretch against its two bounds, and a
+     Playwright picture from the bank standpoint in Bambara Village on WebGPU showing the
+     children's stretch with room around it. A second picture from the village centre shows
+     the water at its new distance.
+  Criticality: MEDIUM — it moves layout constants many systems read, so its risk is regression
+  in placement rather than a wrong idea.
+
+- [ ] 1157. The weaver works her loom, and her loom teaches the river's two directions (user
+  bug report 18.09.2026, local/ErwachsenerStehtStill.zip: "Warum bewegt sich diese Figur
+  nicht?", seed 394349866, Bambara Village, day 3.54, WebGPU, medium; scope widened by the
+  user 21.09.2026, 14:41: »Ändere 1157 so ab, dass die Weberin in dieser Weise umgesetzt
+  wird.«).
   Bundle: Dorfleben
   The report's picture shows the weaver figure beside the standing loom with both
   arms hanging, and `Weaver` in `src/scenes/place/PlaceLife.tsx` carries no
   `useFrame` at all — the only village adult station without a working motion,
   while the pounder, the fire tender, the water carrier and the drummer all move.
   design.md §15 names weaving among the everyday activities that make a settlement
-  read as alive. Final state:
+  read as alive. The user then decided the station should carry more than life: it becomes the
+  SECOND way the player can learn `UPSTREAM` and `DOWNSTREAM`, beside the children's bank game.
 
-  1. The weaver works the loom in a visible, continuous cycle: one hand carries a
-     shuttle across the warp and back while the other beats the weft down, and the
-     body leans slightly into each beat — the same arm-pose mechanism the pounder
-     uses (`FigurePose`, `armAim`), so the hands ride the tool and never hang beside
-     a cloth that changes by itself.
+  WHY A SECOND WAY IS WORTH BUILDING, so nobody later reads it as redundancy: on the bank the
+  two words hang on RUNNING GROUPS between two rocks; at the loom they hang on ONE PERSON
+  WALKING along a stretched warp. The only feature the two pictures share is the river's axis.
+  That intersection prunes the wrong readings that point 687 §4 has to close one by one — "to
+  the far rock" does not exist at the loom, and left/right survives no change of standpoint.
+
+  THE DESIGN CHANGE THIS CARRIES, and it must land in the same commit as the code: point 688 §3
+  states "The direction words are the children's now". That clause is REVERSED here. `design.md`
+  (the §13.4 teaching passage that lists the three teaching places) and
+  `docs/communication-poc-spec.md` name the loom as a fourth place, and the archived 688 gets a
+  dated note that its §3 was superseded by this point. All copies change together.
+
+  Final state:
+
+  1. THE WEAVER WORKS. She works the loom in a visible, continuous cycle: one hand carries a
+     shuttle across the warp and back while the other beats the weft down, and the body leans
+     slightly into each beat — the same arm-pose mechanism the pounder uses (`FigurePose`,
+     `armAim`), so the hands ride the tool and never hang beside a cloth that changes by itself.
   2. The half-finished cloth grows with the work: its woven part rises by a small,
      calibratable amount per completed pass and resets when it reaches the top beam,
      so a player who watches for half a minute sees progress, not a loop on a
@@ -182,12 +246,60 @@ put it is the mistake this line exists to stop.
   3. The cycle is a place-clock animation like the pounder's — frame-time driven,
      unaffected by the wall clock, and it stops with the scene when the place is
      paused.
-  4. Passers-by still walk round the weaver's body (point 578); the station's
-     clearance and the weaver's stance (`weaverStance`) are unchanged.
-  5. Proof: a Vitest on the pose cycle (both arms move over a period, the cloth
-     height advances and wraps) and a Playwright picture from the report's standpoint
-     in Bambara Village on WebGPU where two frames a second apart differ at the
-     weaver's arms and shuttle.
+  4. THE LOOM LIES ON THE RIVER'S AXIS. The warp is long and stretched between two stakes
+     PARALLEL to the bank, derived from the place's `upstream`/`downstream` bank points, not
+     from a hard-coded heading. The standing frame the scene draws today gives way to this long
+     warp; the small frame of heddles the weaver sits under stays.
+  5. SHE SITS IN THE MIDDLE OF THE WARP, and that is load-bearing rather than decorative: from
+     the middle BOTH of her calls send the helper AWAY from her. Seated at an end, one call
+     would be "toward me" and the other "away from me", and the player could learn the pair as
+     come/go and still finish the puzzle. The seat is asserted, not assumed.
+  6. SHE HAS A HELPER, BECAUSE NOBODY SPEAKS TO NOBODY. `design.md` rules that every utterance
+     has an addressee who reacts and a consequence the player sees, and with nobody to address
+     the words are not spoken at all. A weaver naming her own shuttle throw would break that
+     rule, so the station carries two figures: the weaver at the heddles and a helper who tends
+     the warp.
+  7. THE WORD SITS ON A BODY THAT MOVES THAT WAY. When the warp needs tending — a thread to
+     free, the drag weight to shift, a bundle to fetch — the weaver says `UPSTREAM` or
+     `DOWNSTREAM`, and the helper WALKS that way along the warp and works there. The weaver
+     does not point and does not mime: she names, and the helper's body carries the meaning.
+     This is the children's own grammar (`design.md`: a direction is carried by a moving body,
+     a thing by a touching hand), applied to a different picture.
+  8. IT STAYS SPARSE. A named tending happens a few times a minute, not once per throw: often
+     enough to catch in passing, rare enough that the speech labels do not become noise. The
+     rate is a calibratable balance value. The throws themselves are SILENT.
+  9. THE STATION KEEPS ITS DISTANCE. The loom clears the children's bank stage and the water
+     path's head by at least `balance.communication.talk.reach`, so the direction words never
+     arrive mixed with the children's and `RIVER` is never spoken into the same ear (688 §1,
+     §6). Point 1173 buys the room this needs and lands first; if a shipped layout still cannot
+     give the clearance, the LOOM moves, not the children.
+ 10. THE WATER MUST BE IN THE PICTURE. From the player's standpoint at the loom the river is
+     visible, so the claim that the warp lies on the river's axis is something he can check.
+     A layout that hides the water from the loom fails this point.
+ 11. Passers-by still walk round both figures (point 578); station clearance covers the helper
+     and the whole length of the warp, not only the weaver's body.
+ 12. Proof, on three layers:
+     - Vitest on the pose cycle (both arms move over a period, the cloth height advances and
+       wraps), on the seat (the weaver's position is the warp's midpoint within a tolerance,
+       and both call targets lie on opposite sides of her), on the axis (the warp's heading
+       matches the bank's upstream/downstream heading within a tolerance in every shipped
+       layout), and on the clearances of item 9.
+     - Vitest on the utterances: each named tending emits exactly one atom, the helper's
+       resulting walk is in the named direction, and no utterance falls without a helper
+       present to take it.
+     - Playwright from the report's standpoint in Bambara Village on WebGPU: two frames a
+       second apart differ at the weaver's arms and shuttle; a second picture shows the helper
+       part-way along the warp with the weaver's label overhead and the river in the same
+       frame.
+  Criticality: HIGH — it changes what the taught language is learned from, and a wrong reading
+  learned here is one the player can carry all the way to the chief's message.
+  Author lane: it is a communication-mechanic point whose verification is the work.
+
+  OPEN: `docs/peoples-1890.md` documents no weaving at all — neither the loom's build nor the
+  technique — so the standing frame was never sourced. Before the long warp is built, check the
+  Bambara/Mande narrow-strip loom against our own sources and record it in peoples-1890 §8;
+  if the sources do not carry it, say so in the point rather than inventing a build.
+
 - [ ] 659. The whole communication chain, played through and judged by what reaches the
   PLAYER — A SIX-EYES ALL-ROUND REVIEW.
   ON HOLD (user 13.08.2026, 22:25: »Stoppe 659 erstmal — der macht erstmal keinen Sinn, wenn wir
