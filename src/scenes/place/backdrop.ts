@@ -28,13 +28,7 @@ export const BACKDROP_TAPER_SPAN = 5 / 23
 // edge. The disc therefore overhangs the walkable limit, so the player never
 // looks at the plate's own edge from the last step he may take.
 export const BACKDROP_INNER_OFFSET = 12
-// Raised from 14 by point 1173. The disc has to reach round the BANK, not just
-// past the walkable rim: the shore strip it hands the water over to is the
-// chord where the plate crosses the waterline, so pushing the village off the
-// water narrows that chord while the bank's own lobe — an ANGLE on a longer
-// radius — grows wider. At 14 the two crossed and the lobe carried the player
-// onto ground the scene no longer drew.
-export const GROUND_DISC_OVERHANG = 18
+export const GROUND_DISC_OVERHANG = 14
 // The settlement ground disc overhangs the backdrop's inner rim by this many
 // place-units (the difference between the two mounts above).
 export const BACKDROP_DISC_OVERLAP = GROUND_DISC_OVERHANG - BACKDROP_INNER_OFFSET

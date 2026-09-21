@@ -2,11 +2,11 @@
 // The layout/clearance test pins this choice without running a browser.
 // Re-picked when the well left this village (point 1092), and again when point
 // 1173 grew the settlement: the dig search reads the collider set and the
-// walkable radius, so a larger disc moved both holes and spread the pair from
-// 8 m to 10-14 m. Seed 45 is the one candidate in the first 600 that keeps the
+// walkable radius, so a larger disc spread the pair well past the 8 m this was
+// composed at. Seed 58 is the one candidate in the first 600 that keeps the
 // whole composition — both holes, their furniture and the walkable spoil lane —
-// inside the frame at the widened stand-off.
-export const DIG_PICTURE = { placeId: 'bambara-village', seed: 45 }
+// inside the frame at the widened stand-off, at a span of 11.8 m.
+export const DIG_PICTURE = { placeId: 'bambara-village', seed: 58 }
 
 export function digPictureUnmounted() {
   return !window.__game.getState().placeId && !window.__placeWalkers && !window.__placeErrands
@@ -14,8 +14,8 @@ export function digPictureUnmounted() {
 
 /** The span the two holes may be apart and still compose one picture, and how
  *  far back the camera stands for it. Point 1173 grew the settlement, which
- *  pushed the pair from the 6-9 m this was first written for out to 10-14 m;
- *  the STAND-OFF is derived from the span now rather than fixed at 8 m, so the
+ *  spread the pair well past the 6-9 m this was first written for; the
+ *  STAND-OFF is derived from the span now rather than fixed at 8 m, so the
  *  frame holds the pair wherever the disc's size puts it. */
 const DIG_PICTURE_SPAN = { min: 9, max: 14 }
 

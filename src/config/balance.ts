@@ -219,10 +219,17 @@ export interface BalanceConfig {
    * is this factor times that base, and station placement, the children's
    * quarter, the huts and the collision fabric all derive from it.
    *
-   * CALIBRATABLE, and the reason it exists is measured: at 1.0 every teaching
-   * voice of the communication slice cleared every other by EXACTLY the hearing
-   * radius and no more, and it bought that clearance by shrinking the children's
-   * ground to its floor. Raising it buys the margin back.
+   * CALIBRATABLE, and both the reason it exists and its CEILING are measured.
+   * At 1.0 every teaching voice of the communication slice cleared every other
+   * by EXACTLY the hearing radius and no more, and it bought that clearance by
+   * shrinking the children's ground to its 4 m floor.
+   *
+   * The ceiling is `communication.call.reach`: the bank stage moves out with the
+   * waterline while the children's quarter stays among the huts, so a round's
+   * called words have further to carry the wider the settlement is. Measured at
+   * 1.15 a call from the quarter reached the documented spectator stand at 36 m
+   * against a 34 m register and was not heard at all. 1.1 is the last value that
+   * holds it; going past it is a CALL-REACH decision, not a layout one.
    */
   settlementRoom: number
   /**
@@ -1048,7 +1055,7 @@ export const balance: BalanceConfig = {
   },
   digRadius: 3,
   placeEnterRadius: 2.5,
-  settlementRoom: 1.25,
+  settlementRoom: 1.1,
   // 0.6 → a 1.5-unit collider around the marker: it matches the drawn cluster
   // (the port's main house plus annex reaches ~1.3 units past the anchor, the
   // village huts ~1.45) and stays inside the river clearance every place keeps

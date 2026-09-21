@@ -177,13 +177,13 @@ const PORTS: PlaceDef[] = [
 // from the built disc out to the waterline (`riverBank.ts`, at
 // `BACKDROP_SCALE` degrees per place unit), so a village pushed further off the
 // water gets a wider bank in the settlement it is played in. At 0.17 the
-// waterline stood ~36 m out, which a walkable radius grown past ~32 m would
-// have swallowed; 0.22 puts it ~44 m out and leaves the grown disc its
-// `BANK_MIN_GAP`.
+// waterline stood ~36 m out and the built disc kept 8.1 m of it; 0.20 puts the
+// waterline ~42 m out and leaves the grown disc 11.2 m — the "etwas mehr
+// Abstand" the user asked for, measured rather than eyeballed.
 // NOTE: the queries below resolve to `0.45 × range`, so this margin needs the
 // WIDER range — at range 1 the gradient walk saturates at 0.45° and stops
 // short of any clearance above it, wherever the shipped width factor puts it.
-export const VILLAGE_RIVER_CLEARANCE_DEG = RIVER_WIDTH_DEG + 0.22
+export const VILLAGE_RIVER_CLEARANCE_DEG = RIVER_WIDTH_DEG + 0.20
 // 0.15: the port cluster (main house ~2.2 world units wide plus annex)
 // reaches ~1.3 units past the anchor — the first 0.1 margin left Khartoum's
 // annex touching the waterline on screen (screenshot 126 caught it).

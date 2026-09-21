@@ -219,15 +219,15 @@ export const PLAY_ROCK_SCALE = PLAY_ROCK_SPAN / ROCK_FOOTPRINT_UNITS
  * So the collider is what the rock OCCUPIES WHERE FIGURES ARE: the largest sum
  * of the drawn flank and the figure body carried at that height, over the whole
  * height of an adult, less the walker footprint the colliders are tested with.
- * Measured over both rock seeds it is 1.352 m of clearance, i.e. 1.052 m of
- * collider; 1.06 is that rounded up. `bankStage.test.ts` MEASURES it against
- * the mesh rather than restating it, so a rock rebuilt wider fails there instead
- * of quietly letting a figure into the stone — which is how point 1173 found
- * this one: each stone is drawn at the YAW of its own place on the bank, so
- * moving the stage turned a slightly broader flank towards the figures and the
- * 1.05 measured for the old bearing no longer covered it.
+ * Measured over both rock seeds and all three river villages it is 1.349 m of
+ * clearance, i.e. 1.049 m of collider; 1.05 is that rounded up.
+ * `bankStage.test.ts` MEASURES it against the mesh rather than restating it, so
+ * a rock rebuilt wider fails there instead of quietly letting a figure into the
+ * stone. It is bearing-sensitive: each stone is drawn at the YAW of its own
+ * place on the bank, so moving the stage turns a different flank at the figures
+ * and this number has to be re-measured with it (point 1173 did).
  */
-export const PLAY_ROCK_RADIUS = 1.06
+export const PLAY_ROCK_RADIUS = 1.05
 
 /**
  * Radius of a patch of ground work (work-order point 483), in metres: the pit
