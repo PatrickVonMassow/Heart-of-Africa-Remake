@@ -3991,7 +3991,13 @@ async function checkChildrenMotion(motionPlace) {
     if (aimed) {
       await nextFrames(2)
       await frame(motionPlace === 'bambara-village' ? '648-village-children' : `690-${motionPlace}-children`, {
-        local: { x: aimed.kx, y: 0.6, z: aimed.kz },
+        // AT THE CHILD'S HEAD, not its knees. The camera looks slightly upward,
+        // so the group always sits in the lower third of the picture and a
+        // subject declared at 0.6 m fell out under the bottom edge at six metres
+        // — the shutter refused it, which is the mechanism working. A child's
+        // upper body is both safely inside the view and the part of it worth
+        // having in the frame (point 690).
+        local: { x: aimed.kx, y: 1.0, z: aimed.kz },
         label:
           `the children at their game of tag (${aimed.seen} of ${aimed.of} in the clear, ` +
           `nearest at ${aimed.near.toFixed(1)} m)`,
