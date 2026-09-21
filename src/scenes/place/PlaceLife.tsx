@@ -638,6 +638,11 @@ function Loom({
       p.turn = next.turn
     }
 
+    // The station's own clock, published on the group: a check that has to wait
+    // for HALF A PASS waits for this rather than for a second of the wall
+    // clock, which is neither the same thing nor allowed in a suite.
+    if (group.current) group.current.userData.loom = { pass: work.pass, passes: work.passes }
+
     // THE CLOTH grows along the warp from her seat and is taken off at the
     // stake. Scaled rather than rebuilt: one box, one number per frame.
     if (clothMesh.current) {

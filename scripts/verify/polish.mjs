@@ -6024,15 +6024,29 @@ if (section('village-loom')) {
       }
       const first = await frame('1157-village-loom-working-a', {
         local: { x: stand.weaver.x, y: 0.8, z: stand.weaver.z },
-        label: 'the weaver at her long warp, first of two frames a second apart that must differ at her arms and shuttle',
+        label: 'the weaver at her long warp, first of two frames half a pass apart that must differ at her arms and shuttle',
       })
       const shuttleA = await page.evaluate(() => {
         const m = window.__placeScene.getObjectByName('village-loom-shuttle')
         m.updateWorldMatrix(true, false)
         const e = m.matrixWorld.elements
+        window.__loomPassAt = window.__placeScene.getObjectByName('village-loom').userData.loom.pass
         return { x: e[12], y: e[13], z: e[14] }
       })
-      await page.waitForTimeout(1000)
+      // HALF A PASS OF HER OWN CLOCK, not a second of the wall clock: the
+      // shuttle is then at the other side of the warp and both arms have
+      // swapped their work, which is the largest difference the cycle offers.
+      // A fixed pause would be the same picture on a fast machine and three
+      // passes later on a slow one.
+      // A cycle that never advances is the REPORTED DEFECT, so it reads as a
+      // red check here rather than as a harness timeout thrown from the wait.
+      const advanced = await page.waitForFunction(() => {
+        const now = window.__placeScene?.getObjectByName('village-loom')?.userData?.loom?.pass
+        if (typeof now !== 'number') return false
+        const since = (now - window.__loomPassAt + 1) % 1
+        return since >= 0.45
+      }, null, { timeout: 30000 }).then(() => true).catch(() => false)
+      check('her cycle advances by itself, half a pass of her own clock', advanced)
       await nextFrames(2)
       const shuttleB = await page.evaluate(() => {
         const m = window.__placeScene.getObjectByName('village-loom-shuttle')
@@ -6042,7 +6056,7 @@ if (section('village-loom')) {
       })
       const second = await frame('1157-village-loom-working-b', {
         local: { x: stand.weaver.x, y: 0.8, z: stand.weaver.z },
-        label: 'the same weaver one second later, her arms and the shuttle at another point of the same pass',
+        label: 'the same weaver half a pass later, her arms and the shuttle at the other side of the warp',
       })
       const a = await readCrop(first)
       const b = await readCrop(second)
@@ -6054,9 +6068,9 @@ if (section('village-loom')) {
       // The reported defect was a figure that did not move at all, so the bar is
       // the difference between "nothing changed" and "a body worked" — not a
       // tuned pixel count. Anything from a hand crossing the warp clears it.
-      check('two frames a second apart differ where the weaver works', share > 0.002,
+      check('two frames half a pass apart differ where the weaver works', share > 0.002,
         `${(share * 100).toFixed(2)} % of the crop changed`)
-      check('the shuttle is at another place on the warp a second later',
+      check('the shuttle is at another place on the warp half a pass later',
         Math.hypot(shuttleA.x - shuttleB.x, shuttleA.z - shuttleB.z) + Math.abs(shuttleA.y - shuttleB.y) > 0.01,
         JSON.stringify({ shuttleA, shuttleB }))
 

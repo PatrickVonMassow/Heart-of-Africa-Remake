@@ -1629,7 +1629,6 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   // Keep the rock bodies themselves: opening a fence gate below changes the
   // number of colliders before them. Once the bank settles, these same bodies
   // move with it without adding a second pair or overwriting another prop.
-  let loomReservation: { x: number; z: number; r: number } | null = null
   const playRockColliders = playRocks ? {
     upstream: { x: playRocks.upstream.x, z: playRocks.upstream.z, r: playRocks.r },
     downstream: { x: playRocks.downstream.x, z: playRocks.downstream.z, r: playRocks.r },
@@ -1640,15 +1639,17 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   if (place.kind === 'village') {
     // The props include the fire's stand-off; figure bodies are registered by
     // PlaceLife, so the kneeling cook needs no overlapping static collider.
-    const lifeProps = villageLifeProps(VILLAGE_FIRE, placeId)
-    // The loom's NOMINAL ground is reserved like any other station while the
-    // village is planned, so the plan keeps it free and the loom usually stays
-    // where the huts were arranged around it. It is a placeholder, not the
-    // station: the real warp is laid further down, once the bank, the
-    // children's stage and the water lane have all settled, and it takes this
-    // circle's place in the collider set.
-    loomReservation = lifeProps.find((c) => c.x === LOOM_SPOT[0] && c.z === LOOM_SPOT[1]) ?? null
-    colliders.push(...lifeProps)
+    // THE LOOM PUTS NO CIRCLE HERE (work-order 1157). Its nominal ground is
+    // still reserved against the PLAN — `lifeSpots` and `villageLifeFootprints`
+    // both carry it, so the huts are fitted around it as before — but the
+    // collider it contributes is the WARP, and the warp cannot be laid until
+    // the bank, the children's stage and the water lane have settled. It is
+    // pushed there instead of here; nothing is pushed now and spliced out
+    // later, because every index-based read of this array (the buildings, the
+    // fence run) would shift under the splice.
+    colliders.push(...villageLifeProps(VILLAGE_FIRE, placeId).filter(
+      (c) => !(c.x === LOOM_SPOT[0] && c.z === LOOM_SPOT[1]),
+    ))
   } else {
     colliders.push({ x: PORT_TALKERS[0], z: PORT_TALKERS[1], r: 0.85 }) // chatting pair
   }
@@ -2100,19 +2101,23 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   // their ground is what the whole communication slice is arranged around.
   let loom: LoomStation | null = null
   if (place.kind === 'village') {
-    // Its own placeholder is not an obstacle to itself.
-    const around = loomReservation ? colliders.filter((c) => c !== loomReservation) : colliders
     loom = placeLoom({
       bank,
       nominal: LOOM_SPOT,
       walkRadius: radius - WALKER_RADIUS,
       free: (x, z, r) =>
         Math.hypot(x, z) < radius - r &&
-        standingClear(around, x, z, r) &&
+        standingClear(colliders, x, z, r) &&
         standsOnGroundPlate(bank, x, z, r),
-      sightClear: (from, to, halfWidth) => clearCorridor(around, from, to, halfWidth),
+      sightClear: (from, to, halfWidth) => clearCorridor(colliders, from, to, halfWidth),
       toChildren,
       waterPathHead: waterPath ? waterPath.head : null,
+      onWaterLane: (x, z, r) => !!waterPath &&
+        closestOnPolyline(
+          [[waterPath.head.x, waterPath.head.z], [waterPath.foot.x, waterPath.foot.z]],
+          x,
+          z,
+        ).dist < WATER_PATH_WIDTH / 2 + r,
       clearance: balance.communication.talk.reach,
       geometry: balance.villageLife.loom,
     })
@@ -2121,14 +2126,9 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
       'loom-missing',
       () => `${place.id}@${seed}: no ground takes the warp with the water in sight`,
     )
-    // The placeholder circle gives way to the warp's own body: the threads run
-    // at knee height with the drag weight on them, so a passer-by walks round
-    // the whole length rather than through it (item 11, point 578).
-    if (loomReservation) {
-      const at = colliders.indexOf(loomReservation as Collider)
-      if (at >= 0) colliders.splice(at, 1)
-      loomReservation = null
-    }
+    // The warp's own body joins the set: the threads run at knee height with
+    // the drag weight on them, so a passer-by walks round the whole length
+    // rather than through it (item 11, point 578).
     if (loom) {
       colliders.push({
         kind: 'segment',
@@ -2139,6 +2139,16 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
         r: WARP_BODY_RADIUS,
       })
       colliders.push({ x: loom.weaver.x, z: loom.weaver.z, r: WEAVER_BODY_RADIUS })
+      // The errand points were chosen before the warp existed; one that now
+      // stands in it is moved off it, exactly as every other placement's points
+      // are freed (point 155: an errand point must carry a standing walker and
+      // leave him a way out).
+      for (const point of errands) {
+        if (spawnPointFree(colliders, point[0], point[1], WALKER_RADIUS)) continue
+        const freed = nudgeToFree(colliders, point[0], point[1], WALKER_RADIUS)
+        point[0] = freed[0]
+        point[1] = freed[1]
+      }
     }
   }
 

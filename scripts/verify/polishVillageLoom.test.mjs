@@ -41,9 +41,22 @@ async function photograph({ blocked = false, moves = true, called = true, helper
     return { elements: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, p.x, p.y, p.z, 1] }
   } })
   const helper = { position: { x: 0.45, y: 0, z: helperAt }, ...object(() => ({ x: 0.45, y: 0, z: -3 + helperAt })) }
+  // The station's own clock, as the scene publishes it on the loom group.
+  const loomGroup = { userData: { loom: { pass: 0.1, passes: 3 } } }
+  // What "time passes" means here: half a pass of HER clock, and the shuttle
+  // thrown to the other side of the warp with it. A still loom advances neither.
+  const advance = () => {
+    if (!moves) return
+    loomGroup.userData.loom = { pass: 0.62, passes: 3 }
+    shuttle.at = { x: -0.12, y: 0.34, z: -3 }
+  }
   vi.stubGlobal('__game', { getState: () => state, setState: update => Object.assign(state, update) })
   vi.stubGlobal('__placeScene', {
-    getObjectByName: name => name === 'village-loom-shuttle' ? object(() => shuttle.at) : helper,
+    getObjectByName: name => {
+      if (name === 'village-loom-shuttle') return object(() => shuttle.at)
+      if (name === 'village-loom') return loomGroup
+      return helper
+    },
   })
   vi.stubGlobal('__placeLayout', {
     interactives: [], dwellings: [],
@@ -71,8 +84,15 @@ async function photograph({ blocked = false, moves = true, called = true, helper
     () => true,
     {
       evaluate: async (fn, arg) => fn(arg),
-      waitForFunction: async (fn) => { if (!fn()) throw new Error('never became true') },
-      waitForTimeout: async () => { if (moves) shuttle.at = { x: -0.12, y: 0.34, z: -3 } },
+      // A real wait returns when its condition holds; here the world is stepped
+      // between tries, so a condition that never comes true still ends.
+      waitForFunction: async (fn) => {
+        for (let tries = 0; tries < 3; tries++) {
+          if (fn()) return
+          advance()
+        }
+        throw new Error('never became true')
+      },
       viewportSize: () => VIEW,
     },
     (name, pass, detail) => checks.push({ name, pass, detail }),
@@ -98,9 +118,13 @@ it('stands back on the inland side of the warp, looking out at the water', async
 
 it('passes the motion check only when the picture and the shuttle both moved', async () => {
   const moving = await photograph()
+  expect(moving.checks.find(c => c.name.startsWith('her cycle advances')).pass).toBe(true)
   expect(moving.checks.find(c => c.name.startsWith('two frames')).pass).toBe(true)
   expect(moving.checks.find(c => c.name.startsWith('the shuttle is at another')).pass).toBe(true)
+  // A loom whose cycle never advances is the reported defect itself: it must
+  // read as three red checks, not as a timeout thrown out of the wait.
   const still = await photograph({ moves: false })
+  expect(still.checks.find(c => c.name.startsWith('her cycle advances')).pass).toBe(false)
   expect(still.checks.find(c => c.name.startsWith('two frames')).pass).toBe(false)
   expect(still.checks.find(c => c.name.startsWith('the shuttle is at another')).pass).toBe(false)
 })

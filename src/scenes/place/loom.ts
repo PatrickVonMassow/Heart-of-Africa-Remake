@@ -24,6 +24,7 @@
 // The module is pure geometry. It knows nothing of three, of colliders or of
 // the scene: the caller hands it predicates and gets a station back.
 
+import { WALKER_RADIUS } from './collision'
 import type { BankPoint, PlaceRiverBank } from './riverBank'
 
 /** The weaver's own body radius at her seat under the heddles. */
@@ -91,6 +92,10 @@ export interface LoomPlacement {
   /** The village water stand's head, where RIVER is spoken. Null where the
    *  settlement runs no water errand. */
   waterPathHead: BankPoint | null
+  /** Whether a body of this radius would stand on the carriers' drawn water
+   *  lane. The warp is a 6 m wall: laid across the lane it would put a solid
+   *  through the track the scene draws to the river. */
+  onWaterLane: (x: number, z: number, r: number) => boolean
   /** The separation every one of those places is owed: `talk.reach`. */
   clearance: number
   geometry: LoomGeometry
@@ -181,6 +186,20 @@ function stationHolds(station: LoomStation, p: LoomPlacement): boolean {
     const on = at(station, d)
     if (Math.hypot(on.x, on.z) > p.walkRadius) return false
     if (!p.free(on.x, on.z, WARP_BODY_RADIUS)) return false
+    // NOT ACROSS THE CARRIERS' TRACK (work-order 688): the water lane is drawn
+    // ground, and a wall laid over it would stand in the picture of the walk.
+    if (p.onWaterLane(on.x, on.z, WARP_BODY_RADIUS)) return false
+  }
+  // A WAY ROUND EACH END. The warp is a wall six metres long between the
+  // village and its water, and a walker must be able to pass it: the ground
+  // just beyond each stake carries a walker's own body, clear of everything
+  // else. Without this the station can seal the route to the bank against a
+  // hut, which is what the point-483 walk found on the first build.
+  const pastEnd = warpHalf + WARP_BODY_RADIUS + WALKER_RADIUS * 2
+  for (const d of [-pastEnd, pastEnd]) {
+    const on = at(station, d)
+    if (Math.hypot(on.x, on.z) > p.walkRadius) return false
+    if (!p.free(on.x, on.z, WALKER_RADIUS)) return false
   }
   // The weaver and her helper are bodies of their own beside the threads, and
   // the helper's whole walk between his stands is ground he has to cross.

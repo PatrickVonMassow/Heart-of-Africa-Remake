@@ -61,6 +61,7 @@ describe('the loom lies on the river’s axis (work-order 1157 item 4)', () => {
       sightClear: () => true,
       toChildren: () => Infinity,
       waterPathHead: null,
+      onWaterLane: () => false,
       clearance: balance.communication.talk.reach,
       geometry: balance.villageLife.loom,
     })
