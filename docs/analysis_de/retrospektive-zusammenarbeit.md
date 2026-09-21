@@ -64,6 +64,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 18.09. spät | Eine tote Messung landete beinahe als funktionierend: Der Effekt, der die Rechtecke für den zentrierten Steuerungshinweis liest, hing an den Sprachtexten statt an der Bedingung, die über das Element selbst entscheidet — er nahm seinen frühen Rücksprung und wurde nie wieder angestoßen. Grün war die Prüfung trotzdem, weil der CSS-Vorgabewert im geräumigen Fall zufällig dasselbe Ergebnis hat wie die Messung; erst der enge Fall trennte beide (§3.292) |
 | 19.09. | Eine Bildprüfung lag rot, obwohl das Produkt stimmte: Ihre Bühne suchte freie Sicht bis auf den Brunnenplatz, den der Punkt gerade aus der Freihalteliste genommen hatte — das Dorf hatte darauf weitergebaut, die letzte Stützstelle der Sichtlinie lag in einer neuen Hütte. Die Ursache nannte erst der Vergleich der Kollisionssätze im Knoten, nicht der nächste Browserlauf (§3.294) |
 | 19.09. abends | Die CI war rot, wo dieselbe Suite hier grün fährt: Das Abbruch-Protokoll nahm den zuletzt gepushten Stand aus der Notiz, die der Arbeiter nach dem Push schreibt — wird er dazwischen getötet, nennt das Protokoll eine Spitze, die nicht steht. Der vorhandene Prüffall hoffte auf das Rennen und war auch gegen den unreparierten Stand grün (§3.295) |
+| 21.09. | Ein fertiger Punkt wurde komplett neu gebaut, weil keine der drei Quellen, die die Wiederaufnahme liest — Fokuszeile, Auftrag, Punkt-Brief —, den bereits bestehenden Zweig und Arbeitsbaum nennt; die Lebendprüfung meldete dazu „work output 0 min old" und meinte die Bilder der gerade beendeten Suite, nicht einen arbeitenden Autor (§3.296, Gegenstück zu §3.258) |
 | 13.09. | Ein Punkt zog seine eigenen Rot-Ladungen zurück, wie es die Regel verlangt — zwei Tests standen noch auf ihnen und wurden erst im Tor der LANDUNG rot, als der Merge schon auf main lag: Das Register erzwingt »kein Eintrag ohne offenen Punkt«, niemand erzwingt »kein Test ohne seinen Eintrag« (§3.268). Dieselbe Sitzung wies drei Fremd-Rot nach: gegen die Zweigwurzel gemessen sind alle drei auch auf main rot, und das Rätsel am Schutthang ist dort nicht sporadisch, sondern reproduziert jedes Mal |
 | 13.09. abends | Vier CI-Läufe eines Zweigs starben als »cancelled« — ein Wort, das weder Ursache noch Reparatur nennt und das kein Push heilen kann. Es war das 15-Minuten-Limit des `fast`-Jobs: Die letzten beiden GRÜNEN Läufe, einer davon auf main, brauchten 14 m 41 s und 14 m 45 s, also rund fünfzehn Sekunden Luft. Der nächste Punkt, der irgendeinen Test hinzufügt, musste auflaufen, egal welcher. Sichtbar wurde es erst im Schrittprotokoll: install/build/lint/audit grün, `unit: cancelled`, »The operation was canceled« nach 15 m 13 s (§3.270) |
 | 14.09. | Nach einer Parallelsitzung verlangte ein Stop-Hook `batch-doctor --gate` vor JEDER weiteren Batch-Arbeit — dessen Tor fährt eine volle Unit-Suite, neben dem laufenden Zwei-Backend-Bildlauf auf derselben Maschine. Gefunden hat der Doktor genau eine Datei: die Review-Zeile, die dieselbe Sitzung vier Minuten zuvor geschrieben hatte. Sie zu committen genügte, das Urteil sprang auf `consistent`, die Unit-Suite wurde nie gebraucht; ihr Abbruch ließ zwei verwaiste vitest-Worker neben dem Bildlauf zurück (§3.271, Wiedergänger von §3.267) |
@@ -1445,6 +1446,31 @@ Lauf, den besten, den jüngsten deckenden. Solange das der letzte ist, gilt: ers
 dann beweisen, und nach dem Beweis keine Sprosse mehr. Das ist keine Regel über Läufe, sondern
 über Reihenfolge, und sie kostet sonst genau die Zeit, die die billige Sprosse gespart hat.
 
+### 3.296 Der fertige Punkt war unsichtbar, weil keine gelesene Quelle die Maschine beschreibt
+
+Gemessen am 21.09.2026 bei einer automatischen Batch-Wiederaufnahme. Die Sitzung las, was der
+Auftrag für die Wiederaufnahme vorsieht: die Fokuszeile (`1158: returned to queue`), TASKS.md
+(1158 als ersten offenen Punkt) und den erzeugten Punkt-Brief. Alle drei waren korrekt. Keine
+der drei nennt einen Zweig oder einen Arbeitsbaum — und in `.claude/worktrees/point-1158` lag
+`feat/1158-escape-cooldown-return` mit dem fertigen Fix, 190 Zeilen Tests, vermerkter
+Mechanismus-Prüfung und einem bereits CI-grünen Merge mit `main`. Der Punkt wurde vollständig
+neu gebaut, einschließlich einer vollen Unit-Suite, bis die Prozessliste zufällig den laufenden
+Bildbeweis des anderen Arbeitsbaums zeigte. Erst dann trat der Vergleich der beiden Fassungen
+an die Stelle des Neubaus: Die fremde war die gründlichere, die eigene wurde gelöscht.
+
+Die Lebendprüfung, die es hätte auffangen können, urteilte zweimal „DO NOT REPLACE THIS AGENT:
+work output 0 min old" — die null Minuten alten Dateien waren die 76 Bilder, die seine gerade
+BEENDETE Suite geschrieben hatte. Die Vorsicht ist gewollt (am 30.07.2026 wurde ein lebender
+Autor für tot erklärt und zwei fertige Punkte neu gebaut), aber sie beantwortet eine andere
+Frage als die gestellte: „Hat hier etwas geschrieben?" statt „Arbeitet hier jemand?".
+
+**Lehre:** Auftrag, Fokuszeile und Brief beschreiben die ARBEIT; `git worktree list` und
+`git branch -a` beschreiben die MASCHINE. Wer einen Punkt beginnt, ohne die zweite Gruppe
+gelesen zu haben, kann nicht wissen, ob er ihn beginnt oder wiederholt — und der Neubau sieht
+bis zum Schluss aus wie Fortschritt. Das ist die Kehrseite von §3.258: Dort sperrte ein
+falsch gemessenes Leben die Übergabe, hier verbarg ein falsch gemessenes Leben eine fertige
+Lieferung. Beide Male war die gemessene Größe eine Datei, und gefragt war ein Prozess.
+
 ## 4. Die Guards als Immunsystem
 
 Jedes Guard-Skript ist die geronnene Lösung eines real aufgetretenen, wiederholten Problems.
@@ -1658,7 +1684,7 @@ stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die s
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Montag, 21.09.2026, 11:36 · Quellen-Fingerprint: `84d10024c4d6…`
+Zuletzt aktualisiert: Montag, 21.09.2026, 12:15 · Quellen-Fingerprint: `8ec04c7a6130…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1682,6 +1708,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A newly found problem goes into an EXISTING bundle point first; a new standalone point is the exception, and may instead re-cut the bundles | 1 | niedrig | bundle-first-guard.mjs, point-proof-guard.mjs | ✔ Mechanismus |
 | Work packages are SPOKEN by name, never by letter — the user cannot read \"bundle H\"; the letter stays only as an internal ID | 1 | niedrig | bundle-first-guard.mjs | ✔ Mechanismus |
 | Jede Chat-Antwort mit einem Zeitstempel nach deutscher Zeit (Europe/Berlin, DST-korrekt) beginnen | 10 | hoch | timestamp-guard.mjs | ✔ Mechanismus |
+| before starting a point, list worktrees and branches — a live delegated author is invisible to the board and TASKS.md | 1 | niedrig | branch-hygiene-guard.mjs | ✔ Mechanismus |
 | CLAUDE.md §7.1 references design.md instead of retelling it; future doc edits must preserve the verifiable conditions, script mappings, numbering and checked numbers | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Autonomously insert a full CLOSING cycle (regression + dead-code/stale-doc cleanup + .md audit) when warranted — after extensive rework or many small completed tasks — without waiting for the user to ask | 1 | niedrig | closing-guard.mjs | ✔ Mechanismus |
 | hoa commit messages must not reference the TASKS point (\"Point N\") | 1 | niedrig | commit-scope-guard.mjs, point-proof-guard.mjs | ✔ Mechanismus |
@@ -1763,10 +1790,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 97 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 7 Revert-/Reapply-Commits · 136 Prozess-/Meta-TASKS-Punkte (davon 64 offen).
+Erfasste Quellen: 98 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 7 Revert-/Reapply-Commits · 136 Prozess-/Meta-TASKS-Punkte (davon 64 offen).
 
-<!-- RETRO-FINGERPRINT: 84d10024c4d6a90e8eab16402450f15196ba904c0beb4df9d06d83c1e558f773 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-21T09:36:01.444Z -->
+<!-- RETRO-FINGERPRINT: 8ec04c7a61301a79712cacf7195d1a4f0e6aea877697c03ecebd9d4706671e18 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-21T10:15:07.174Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam

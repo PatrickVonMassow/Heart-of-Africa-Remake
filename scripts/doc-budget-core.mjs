@@ -173,8 +173,18 @@ export const DOC_BUDGETS = [
     // they belong in. The word ceiling follows the cut down to the measured 783;
     // the line ceiling stays, because the freed line is exactly what put the index
     // back inside it.
-    maxLines: 51,
-    maxWords: 783,
+    // RAISED on 21.09.2026 by exactly one entry, measured: 52 lines and 803 words
+    // against 51/783. The entry is "Check for an existing branch first", and it is a
+    // genuinely new class — no other line says how to notice that the point you are
+    // about to start already has a live author on its own branch, which cost this
+    // batch a whole rebuild of point 1158 including a full unit suite. Three cut
+    // candidates were examined first and all three hold: fable-sparingly carries the
+    // underivable fact that no detector watches for new Fable versions,
+    // boundary-marker-is-fragile guards the gap point 426 has yet to close, and
+    // watch-for-aesthetic-oddities and verify-default-zoom-and-webgpu are two
+    // different statements rather than a duplicate. Nothing in the index is stale.
+    maxLines: 52,
+    maxWords: 803,
     maxEntryWords: 22,
     // Fifteen words: an index of one-hook lines, where a whole new entry is ~20 words —
     // so the slack cannot hide one, and re-wording an existing hook is free.
