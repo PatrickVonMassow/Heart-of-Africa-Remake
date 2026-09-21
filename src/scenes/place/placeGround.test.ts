@@ -5,6 +5,7 @@ import { looseRockTop } from './looseRocks'
 import { ROCK_RADIUS_UNITS } from '../../render/flora'
 import { bankGroundHeight, buildRiverBank } from './riverBank'
 import { placeById } from '../../world/geo'
+import { PLACE_RADIUS } from './layout'
 
 const site: DigSite = { x: 8, z: -9, kind: 'pit' }
 const full = { dug: 18, strikes: 12, completed: true }
@@ -66,7 +67,7 @@ describe('one walkable place surface', () => {
   })
 
   it('preserves the existing river profile', () => {
-    const bank = buildRiverBank(placeById('bambara-village'), 28)
+    const bank = buildRiverBank(placeById('bambara-village'), PLACE_RADIUS)
     expect(bank).not.toBeNull()
     if (!bank) return
     for (let d = 0; d < bank.distance + 4; d += 0.2) {

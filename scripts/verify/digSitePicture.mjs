@@ -1,24 +1,37 @@
 // One fixed village composition for the two purpose cues and walkable spoil.
 // The layout/clearance test pins this choice without running a browser.
-// Re-picked when the well left this village (point 1092): the dig search reads
-// the collider set, so one collider fewer moved both holes and seed 12's near
-// corner fell outside the frame. 2427 is the candidate closest to what seed 12
-// composed — two cues of 98 and 120 px over 334 px of earth, a 0.64 gap between
-// the holes — with the whole composition back inside the frame.
-export const DIG_PICTURE = { placeId: 'bambara-village', seed: 2427 }
+// Re-picked when the well left this village (point 1092), and again when point
+// 1173 grew the settlement: the dig search reads the collider set and the
+// walkable radius, so a larger disc moved both holes and spread the pair from
+// 8 m to 10-14 m. Seed 45 is the one candidate in the first 600 that keeps the
+// whole composition — both holes, their furniture and the walkable spoil lane —
+// inside the frame at the widened stand-off.
+export const DIG_PICTURE = { placeId: 'bambara-village', seed: 45 }
 
 export function digPictureUnmounted() {
   return !window.__game.getState().placeId && !window.__placeWalkers && !window.__placeErrands
 }
 
+/** The span the two holes may be apart and still compose one picture, and how
+ *  far back the camera stands for it. Point 1173 grew the settlement, which
+ *  pushed the pair from the 6-9 m this was first written for out to 10-14 m;
+ *  the STAND-OFF is derived from the span now rather than fixed at 8 m, so the
+ *  frame holds the pair wherever the disc's size puts it. */
+const DIG_PICTURE_SPAN = { min: 9, max: 14 }
+
 export function digPictureView(sites) {
   if (sites.length !== 2) return null
   const [a, b] = sites
   const span = Math.hypot(b.x - a.x, b.z - a.z)
-  if (span < 6 || span > 9) return null
+  if (span < DIG_PICTURE_SPAN.min || span > DIG_PICTURE_SPAN.max) return null
   const aim = { x: (a.x + b.x) / 2, z: (a.z + b.z) / 2 }
-  const x = aim.x - (b.z - a.z) / span * 8
-  const z = aim.z + (b.x - a.x) / span * 8
+  // Back off with the span: at the 50 deg vertical field of the verification
+  // viewport the horizontal frame is ~73 deg, so half a span of `s` needs about
+  // `s/2 / tan(36.7 deg)` = 0.67 s of depth to sit inside the edge. The factor
+  // below carries that plus the furniture that stands beside each hole.
+  const back = Math.max(8, span * 0.95)
+  const x = aim.x - (b.z - a.z) / span * back
+  const z = aim.z + (b.x - a.x) / span * back
   return { x, z, yaw: Math.atan2(-(aim.x - x), -(aim.z - z)), pitch: -0.17, aim }
 }
 
