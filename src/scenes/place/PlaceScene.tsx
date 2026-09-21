@@ -2671,7 +2671,8 @@ export function PlaceScene() {
     const grab = lock.request
     grab() // engage immediately on entry (activation from the walk-in keypress)
     const onClick = () => grab()
-    // Dialog-close and canvas clicks both retry once after an Escape refusal.
+    // Dialog-close and canvas clicks start bounded recovery; a pending return
+    // can also use the next real movement key if the browser needs activation.
     const offDialog = restorePointerLockAfterDialogs(el, grab)
     // The FIRST movement after the lock returns is dropped: the browser reports
     // the jump from wherever the cursor sat as a movement, and the view would
