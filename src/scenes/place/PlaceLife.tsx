@@ -584,6 +584,7 @@ function Loom({
   const helperPose = useRef<FigurePose | null>(null)
   const helperGait = useRef(0)
   const group = useRef<THREE.Group>(null)
+  const weaverGroup = useRef<THREE.Group>(null)
   const clothMesh = useRef<THREE.Mesh>(null)
   const shuttle = useRef<THREE.Mesh>(null)
   const helper = useRef<THREE.Group>(null)
@@ -676,7 +677,9 @@ function Loom({
       body.active = true
     }
 
-    if (said) speakLoomCall(camera, station, said, group.current)
+    // The reading stands over HER head: she is the one who said it, and the
+    // player has to be able to tell the speaker from the body that answers.
+    if (said) speakLoomCall(camera, station, said, weaverGroup.current)
   })
 
   const half = cfg.warpHalf
@@ -702,7 +705,7 @@ function Loom({
       {/* The half-finished cloth, growing from her seat along the warp. The
           box is a unit deep and SCALED each frame, so its length is one
           number rather than a rebuilt geometry. */}
-      <mesh ref={clothMesh} position={[0, LOOM_BUILD.warpY + 0.006, 0]} castShadow>
+      <mesh ref={clothMesh} name="village-loom-cloth" position={[0, LOOM_BUILD.warpY + 0.006, 0]} castShadow>
         <boxGeometry args={[LOOM_BUILD.stripWidth * 1.06, LOOM_BUILD.clothThickness, 1]} />
         <meshStandardMaterial color={weave} roughness={0.95} side={THREE.DoubleSide} />
       </mesh>
@@ -719,16 +722,16 @@ function Loom({
         <meshStandardMaterial color="#5f4526" roughness={0.95} />
       </mesh>
       {/* The shuttle, riding across the warp in her hand's own rhythm. */}
-      <mesh ref={shuttle} position={[0, LOOM_BUILD.warpY + 0.035, 0.03]} castShadow>
+      <mesh ref={shuttle} name="village-loom-shuttle" position={[0, LOOM_BUILD.warpY + 0.035, 0.03]} castShadow>
         <boxGeometry args={LOOM_BUILD.shuttle} />
         <meshStandardMaterial color="#8a6a3a" roughness={0.9} />
       </mesh>
       {/* The weaver, beside the warp at its middle, facing across it. */}
-      <group position={[-waterSide * WEAVER_SIDE_OFFSET, 0, 0]} rotation={[0, waterSide * Math.PI / 2, 0]}>
+      <group ref={weaverGroup} name="village-weaver-body" position={[-waterSide * WEAVER_SIDE_OFFSET, 0, 0]} rotation={[0, waterSide * Math.PI / 2, 0]}>
         <Figure cloth={cloth} kneel pose={pose} />
       </group>
       {/* Her helper, on the water side of the threads. */}
-      <group ref={helper} position={[waterSide * HELPER_SIDE_OFFSET, 0, 0]}>
+      <group ref={helper} name="village-loom-helper" position={[waterSide * HELPER_SIDE_OFFSET, 0, 0]}>
         <Figure cloth={weave} legs pose={helperPose} gait={helperGait} />
       </group>
     </group>

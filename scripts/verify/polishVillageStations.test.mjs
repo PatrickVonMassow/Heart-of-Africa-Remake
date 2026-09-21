@@ -3,7 +3,9 @@ import { afterEach, expect, it, vi } from 'vitest'
 
 const source = readFileSync('scripts/verify/polish.mjs', 'utf8')
 const start = source.indexOf("if (section('village-stations')) {")
-const end = source.indexOf("\nif (section('adult-errands'))", start)
+// The loom's OWN picture section follows this one and is driven by its own
+// test; this slice stops where it begins.
+const end = source.indexOf("\nif (section('village-loom'))", start)
 if (start < 0 || end < 0) throw new Error('Village station section missing')
 const run = new (Object.getPrototypeOf(async function () {}).constructor)(
   'section', 'page', 'check', 'frame', 'nextFrames', 'waitForSceneBuilt', source.slice(start, end),
@@ -24,6 +26,16 @@ async function photograph({ marketX = -5.21, marketRadius = 2.9, failFrame = fal
   vi.stubGlobal('__placeLayout', {
     interactives: [{ type: 'market', pos: [marketX, -5.76] }], dwellings: [],
     colliders: [{ x: marketX, z: -5.76, r: marketRadius }],
+    // The station as the layout lays it (work-order 1157): a 6.4 m warp on the
+    // z axis, the weaver beside its middle where the stubbed body stands.
+    loom: {
+      seat: { x: 0, z: -3 },
+      weaver: { x: 0, z: -2.45 },
+      upstream: { x: 0, z: -6.2 },
+      downstream: { x: 0, z: 0.2 },
+      fx: 0, fz: 1, ax: 0, az: -1,
+      onRiverAxis: true,
+    },
   })
   const player = {}
   vi.stubGlobal('__placePlayer', player)
