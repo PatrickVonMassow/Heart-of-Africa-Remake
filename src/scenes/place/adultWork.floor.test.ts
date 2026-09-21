@@ -6,13 +6,12 @@ import { mulberry32 } from '../../world/noise'
 import { setupGeodata } from '../../test/geodata'
 import { buildLayout } from './layout'
 import { insidePlace } from './boundary'
-import { nudgeToFree, resolveMove, standingClear, WALKER_RADIUS } from './collision'
+import { escapeToFree, resolveMove, standingClear, WALKER_RADIUS } from './collision'
 import { advancePlaceRoute, buildPlaceNavGrid, findPlaceRoute, navClearBetween, type NavPoint } from './routing'
 
 /** PlaceLife's own waypoint radius: this simulation walks the route the way the
  *  scene walks it, or it measures a walker the game does not have. */
 const WAYPOINT_RADIUS = 1.2
-import { escapeToFree } from './collision'
 import { createAdultWork, goalOf, stepAdultWork, WORK_ARRIVE_RADIUS, type AdultWorkView } from './adultWork'
 
 beforeAll(setupGeodata)
