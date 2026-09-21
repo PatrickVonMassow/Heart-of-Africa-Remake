@@ -3552,13 +3552,17 @@ async function checkChildrenMotion(motionPlace) {
   const checkAt = (name, ok, detail) =>
     check(name, ok, detail === undefined ? `at ${motionPlace}` : `${detail} — at ${motionPlace}`)
   // EACH SETTLEMENT IS MEASURED FROM THE SAME PAGE, not on top of the two before
-  // it. Chaining three 1200-frame traces into one session made the POSITION IN
-  // THE LOOP part of the measurement: across six runs on both backends every red
-  // this gate produced fell on the SECOND or the THIRD settlement and none ever
-  // on the first, while the same games replayed outside a browser read an order
-  // of magnitude below the gate. Leaving a settlement is not tearing its visit
-  // down, so the page is brought back up before each trace — the three readings
-  // are then comparable, which is the whole claim the loop makes (point 690).
+  // it. The loop's claim is that one gate reads three settlements, and that is
+  // only true if the three start alike: chaining three 1200-frame traces into one
+  // session makes a settlement's POSITION IN THE LOOP part of its reading, and
+  // leaving a settlement is not tearing its visit down.
+  // WHAT THIS IS NOT: it is not the cure for the shuffling reds. They correlated
+  // with the loop position — six runs, every red on the second or third
+  // settlement and none on the first — and that correlation is why this was
+  // tried; the WebGL 2 run right after it reddened at maasai-village all the
+  // same, so the hypothesis is REFUTED and recorded as such rather than left
+  // standing as an explanation. The reds are the known transient of points
+  // 1068/1081/1169, charged there (point 690).
   // `installColliderProbe` rides an init script and survives the reload; the
   // backend is asserted again, because a silent fallback after a reload would
   // otherwise go unseen (point 204).
@@ -3892,7 +3896,7 @@ async function checkChildrenMotion(motionPlace) {
         let bestScore = -Infinity
         for (let i = 0; i < 24; i++) {
           const a = (i / 24) * Math.PI * 2
-          for (const dist of [6, 8, 10]) {
+          for (const dist of [4, 6, 8, 10, 13]) {
             const sx = cx + Math.sin(a) * dist
             const sz = cz + Math.cos(a) * dist
             if (Math.hypot(sx, sz) > window.__placeLayout.radius - 2) continue
@@ -3911,10 +3915,20 @@ async function checkChildrenMotion(motionPlace) {
             // what is left to decide is that the children are figures rather
             // than specks.
             const clear = Math.min(room(sx, sz), 4)
-            const score = seen.length * 1000 + clear * 50 - dist
+            // NEARNESS IS MEASURED TO THE CHILDREN, not to their centroid. A
+            // village quarter is 13 m across, so the two were nearly the same
+            // thing; a port's is far wider, and a standpoint 6 m from the middle
+            // of a scattered group stood twenty-odd metres from every child in
+            // it. The frame came back an honest picture of a harbour lane with
+            // one speck in it — its subject present by the letter and absent to
+            // a reader (point 690). What is scored is therefore how far the
+            // SEEN children really are, and it is worth less than seeing one
+            // more of them and more than the last metre of elbow room.
+            const near = seen.reduce((s_, k) => s_ + Math.hypot(sx - k.x, sz - k.z), 0) / seen.length
+            const score = seen.length * 1000 + clear * 50 - near * 30
             if (score > bestScore) {
               bestScore = score
-              best = { sx, sz, seen: seen.length, of: kids.length, clear, dist }
+              best = { sx, sz, seen: seen.length, of: kids.length, clear, dist, near }
               const vx = seen.reduce((s, k) => s + k.x, 0) / seen.length
               const vz = seen.reduce((s, k) => s + k.z, 0) / seen.length
               best.vx = vx
