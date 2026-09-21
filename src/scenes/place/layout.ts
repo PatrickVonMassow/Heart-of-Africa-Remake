@@ -1802,7 +1802,7 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     const drawnHalf = WATER_PATH_WIDTH / 2
     const laneClearance = drawnHalf + WALKER_RADIUS
     const foot = waterPath.foot
-    clearRun = (head: BankPoint, solids: readonly Collider[]) => {
+    const clearRunHere = (head: BankPoint, solids: readonly Collider[]) => {
       if (!clearCorridor(solids, head, foot, drawnHalf)) return false
       const runLength = Math.hypot(foot.x - head.x, foot.z - head.z)
       const steps = Math.max(48, Math.ceil(runLength / 0.1))
@@ -1820,7 +1820,7 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     // steps, and at each bearing a little nearer and a little further out — the
     // first head that gives a clear walk wins, so the track stays as near the
     // direct line as the plan and the children's lane allow.
-    findHead = (solids: readonly Collider[]): BankPoint | null => {
+    const findHeadHere = (solids: readonly Collider[]): BankPoint | null => {
       for (let step = 0; step <= WATER_PATH_HEAD_SWEEP; step++) {
         for (const sign of step === 0 ? [1] : [-1, 1]) {
           const a = base + sign * step * (Math.PI / 180)
@@ -1828,22 +1828,24 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
             const cand = { x: Math.cos(a) * r, z: Math.sin(a) * r }
             if (!isFree(cand.x, cand.z, 2.0, WALKER_RADIUS)) continue
             if (inPlayEarshot(cand.x, cand.z)) continue
-            if (clearRun(cand, solids)) return cand
+            if (clearRunHere(cand, solids)) return cand
           }
         }
       }
       return null
     }
-    let head = findHead(colliders)
+    clearRun = clearRunHere
+    findHead = findHeadHere
+    let head = findHeadHere(colliders)
     if (!head && compoundFences.size > 0) {
       const fixed = colliders.filter((c) => !compoundColliders.has(c))
-      const candidate = findHead(fixed)
+      const candidate = findHeadHere(fixed)
       if (candidate) {
         const gated = fences.map((f) => compoundFences.has(f) ? waterGate(f, candidate, foot) : f)
         const fenceRun = gated.flatMap(fenceColliders)
         // Validate the rebuilt run before committing either the drawn posts or
         // the colliders. No invisible wall and no erased collision-only wall.
-        if (clearRun(candidate, [...fixed, ...fenceRun])) {
+        if (clearRunHere(candidate, [...fixed, ...fenceRun])) {
           head = candidate
           fences.splice(0, fences.length, ...gated)
           colliders.splice(fenceColliderStart, fenceColliderCount, ...fenceRun)
