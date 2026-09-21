@@ -951,6 +951,26 @@ put it is the mistake this line exists to stop.
   the runner itself called busy). So a full pass does not reproduce it either: four full
   WebGL 2 passes are now on record for this check, three green and one red. Whatever this
   point finally names, it is a transient of that order and not a standing defect.
+  THE WEBGPU COMPARISON THIS POINT LISTED AS NOT MEASURED IS NOW MEASURED, 21.09.2026 on
+  feat/1158-escape-cooldown-return at 6a34fffa2, in the three-suite WebGPU pass a settlement
+  pointer-lock change owed (log
+  `local/verify-logs/2026-09-21T08-02-02-116-collision-polish-settings.log`): worst child 0 at
+  0.34 % of its own judged time, group 0.07 % (4 of 5880 one-second windows, 263.5 judged
+  child-seconds), burst series wholly clean at 0.00 % with no offending window at all, at recorded
+  featureLevel=compatibility. That is EXACTLY the composition this point already charges — on the
+  other lane, which had never had a reading printed for it.
+  WHAT RULES OUT THE CHEAP EXPLANATIONS HERE: the children-motion block re-run ALONE on the SAME
+  backend at the SAME HEAD was GREEN in 2 m 00 s over 8 checks (log
+  `local/verify-logs/2026-09-21T08-40-03-361-polish.log`); the change beneath it is confined to
+  the settlement pointer-lock recovery, touching no walker, no path and no motion code; and the
+  runner itself marked the red run NOT AUTHORITATIVE because the host quiet could not be verified.
+  SO THE TRANSIENT IS NOT A WEBGL 2 PROPERTY, which is what the charge entry's lane scoping had
+  implied. A SECOND, LANE-SCOPED ENTRY was added the same day rather than dropping the scope from
+  the first: the ledger's own rule is to scope as narrowly as the evidence allows, an unscoped entry
+  would also excuse a lane nobody has read, and each entry now carries the measurement that
+  justifies it. Composition, cut and group-share cap are unchanged on both, so a sustained tread
+  stays a real red. WHAT THIS DOES NOT DO is name the cause, and the eight-run WebGPU probe the
+  Test line below asks for is still owed — this is a fifth shape, not an answer.
   Final state:
   - The throttle probe says whether it is load or a defect, and the eight results are printed.
   - Whichever it is: the charge is removed by a fix, or it is kept with the measurement that
