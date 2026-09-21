@@ -575,7 +575,13 @@ describe('the village water path (work-order 688)', () => {
     }
   })
 
-  const gatedSeeds = [7, 1337, 2987912600, 2861293141]
+  // Seeds whose water lane actually has to cross a compound wall, so the gate
+  // branch is exercised rather than merely present. Re-picked by point 1173:
+  // the settlement grew, the carriers' lane more often finds a way round the
+  // compounds, and the four seeds that used to need a gate stopped needing one —
+  // which made every case below pass while testing nothing. These two are what
+  // a sweep of the first 2000 seeds still routes through a wall.
+  const gatedSeeds = [330, 762]
 
   it.each(gatedSeeds)('seed %i: gate rebuilding preserves village props and exactly two settled rock colliders', (seed) => {
     const layout = buildLayout('bambara-village', seed)
