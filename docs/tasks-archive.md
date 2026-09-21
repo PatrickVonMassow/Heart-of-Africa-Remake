@@ -30716,3 +30716,51 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Nutzer, 13.08.2026 22:59: »Es ist schade, dass damit das bisherige Fangspiel, bei dem einer Fänger ist, die Gruppe vor ihm wegrennt und ein gefangenes Kind die Fängerrolle übernimmt, komplett wegfällt. Das würde ich zusätzlich als anderes Spiel beibehalten - allerdings nicht für die Dörfer, weil das sonst zu unübersichtlich wird, wenn zwei verschiedene Spiele parallel laufen. Aber in den Hafenstädten können die Kinder dieses klassische Fangspiel spielen.«
   Refs: src/scenes/place/tagGame.ts, src/scenes/place/PlaceLife.tsx, src/scenes/place/lifeSpots.ts
   Bundle: Dorfleben.
+
+- [x] 1173. The settlement gets room: a larger walkable area, and the village set back from
+  the river (user 21.09.2026, 14:41: »Du kannst auch gerne noch alles etwas mehr
+  auseinanderziehen - z. B. den ganzen begehbaren Siedlungsbereich etwas vergrößern und das
+  Dorf etwas vom Fluss wegschieben, sodass etwas mehr Abstand zwischen den verschiedenen
+  Akteuren ist.«).
+  Bundle: Dorfleben
+  THE REASON IS MEASURED, not aesthetic. Every teaching voice of the communication slice must
+  clear every other by the hearing radius (point 688 §6, `balance.communication.talk.reach`
+  = 10 m), and the settlement disc is currently so tight that the rule holds by luck rather
+  than by construction: the waterline sits 4 to 14 m outside the built disc
+  (`BANK_MIN_GAP`/`BANK_MAX_GAP` in `src/scenes/place/riverBank.ts`), the children's running
+  stretch lies on that bank, and the adults' stations sit in the same disc. The user reports
+  the consequence from play: »Aktuell ist es beim Kinderspiel manchmal schon eng« (21.09.2026,
+  14:29). Point 1157 adds a SECOND teaching station on the same axis, which makes a tightness
+  that already exists worse. This point buys the room BEFORE that station is built, which is
+  why it stands ahead of 1157.
+
+  Final state:
+
+  1. THE WALKABLE AREA GROWS. The settlement's walkable radius rises by a calibratable factor
+     in `src/config/balance.ts`, and every consumer that derives a position from it — station
+     placement, the play ground, the huts, the collision fabric — follows the value instead of
+     carrying its own constant. No caller keeps a hard-coded radius; the point is done only
+     when the factor alone moves the whole settlement.
+  2. THE VILLAGE MOVES BACK FROM THE WATER. `BANK_MIN_GAP` rises so the built disc keeps a
+     larger margin to the waterline. `BANK_MAX_GAP` rises with it only as far as the walk out
+     to the bank stays a bank of the settlement and does not become a journey — the comment on
+     that constant already states the criterion and keeps it.
+  3. THE CLEARANCE BECOMES A CHECK, NOT A HOPE. The three areas of 688 §6 — the adults' village
+     core, the children's roaming quarter and the bank stage — are asserted to clear each other
+     by at least `talk.reach` in EVERY shipped layout, not just the Bambara one, and a layout
+     that cannot is a failure with a named settlement, not a silent squeeze. Where a layout
+     still cannot give all three, the ADULTS move, exactly as 688 §6 already rules.
+  4. THE RUNNING STRETCH KEEPS ITS SHAPE. The rock-to-rock stretch stays long enough to read as
+     a run from its own end (point 687 §6) and keeps its lane clear of the water path, which
+     meets the bank outside the stretch (688 §5). Growing the disc must not stretch the game
+     into a walk or shrink it into a scuffle: the stretch is derived from the new radius and
+     asserted against both bounds.
+  5. NOTHING ELSE CHANGES SHAPE. Hut spacing, station clearance (point 578) and the collision
+     fabric keep their rules; they follow the larger radius and are not redesigned here.
+  6. Proof: a Vitest over every shipped settlement layout that measures the three areas'
+     mutual distance against `talk.reach` and the stretch against its two bounds, and a
+     Playwright picture from the bank standpoint in Bambara Village on WebGPU showing the
+     children's stretch with room around it. A second picture from the village centre shows
+     the water at its new distance.
+  Criticality: MEDIUM — it moves layout constants many systems read, so its risk is regression
+  in placement rather than a wrong idea.
