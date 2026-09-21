@@ -15990,3 +15990,35 @@ to land than a mechanism that needs a review.
   Refs: `scripts/verify/polish.mjs` (~6660-6715, the `held` block and the 1125 frame),
   `scripts/render-verify-charges.mjs` (the entry filed with this point); sibling of point 1121.
   Bundle: Testinfrastruktur.
+
+- [ ] 1175. A children's frame can pass green with no child in it: the shutter tests projection,
+  the vantage tests a circle (measured 21.09.2026 while landing point 690).
+  Bundle: Testinfrastruktur
+  MEASURED STATE. `polish --section=children-motion` photographs the children of every staged
+  settlement, and in `cairo` it returned GREEN six times with pictures holding one distant child,
+  then none at all — while both guards said the subject was there. Neither guard is wrong about
+  what it asks; they simply do not ask about occlusion:
+  - the SHUTTER (point 375) refuses a frame whose declared subject does not PROJECT into the
+    picture. A body standing behind a warehouse projects perfectly.
+  - the VANTAGE search models every solid as a CIRCLE and tests the sightline against it. A port
+    warehouse is a box collider; approximated by the circle through its corners it is too round
+    at the faces and too fat at the corners, and the search reads a child behind a long wall as
+    visible.
+  The village never showed it because a village quarter is 13 m across with round huts in it, so
+  the circle model is close to the truth and the group is always near its own centre. A port's
+  children's quarter is 9.5 m in radius inside a settlement of 40 m, its buildings are boxes, and
+  the group scatters — the two approximations meet their worst case together.
+  WHY IT MATTERS BEYOND THE PICTURE: a green run whose frame does not contain its subject is the
+  exact failure `CLAUDE.md` §7.2 exists against, and it is silent. Every settlement this check is
+  ever extended to inherits it.
+  Final state: the frame is refused unless a CHILD IS REALLY DRAWN in it, decided by the renderer
+  rather than by a geometric model of the settlement — the scene's own occlusion answer for the
+  declared child, not a circle the suite keeps its own copy of. A frame the game cannot supply is
+  a red with the settlement named, never a green with a wall in it.
+  Test: the check reds on a staged standpoint whose child is behind a building and passes on one
+  whose child is in the open, both asserted in the same run, so the repair cannot be read off a
+  lucky layout.
+  Criticality: medium — no player impact; it costs every settlement's children's frame its
+  meaning, and it does so silently, which is worse than a red.
+  Refs: `scripts/verify/polish.mjs` (`__pickChildVantage`, the `children-motion` frame),
+  the shutter's subject check (point 375). Sibling of the frame-aim points 1121 and 1125.
