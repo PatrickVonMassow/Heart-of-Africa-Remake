@@ -575,7 +575,18 @@ export const LIMITS = {
   // with its number, never quietly shrunk) went into the retrospective and reached the guide as
   // ONE folded clause on the nearest pitfall, paid for by compressing four entries. Net: -1
   // line / +-0 words. 701 -> 700 — the ceiling follows the measurement DOWN as well as up.
-  maxLines: 700,
+  // RAISED 21.09.2026 by a FOLD, and by the measured net after two tightenings. The
+  // retrospective's newest problem class (§3.296) is that the sources a resumption reads —
+  // work order, focus line, generated brief — describe the WORK and name no branch and no
+  // worktree, so a FINISHED delivery sitting in a second worktree is invisible and gets
+  // rebuilt, which looks like progress to the end. It did not get an entry of its own: it
+  // folded into "Die Reihenfolge wird gerankt, nicht befolgt", whose subject is already
+  // "look at what is started before you start", and the fold paid for itself by replacing
+  // that entry's weaker "die Sortierprüfungen prüfen die Liste, nie den Punkt in Arbeit"
+  // with the stronger Arbeit/Maschine sentence that subsumes it. A seven-line first draft
+  // was cut to four by the PER-ENTRY risk ceiling and then once more by hand. Net: +3 lines
+  // / +35 words. 700 -> 703.
+  maxLines: 703,
   // 18.09.2026, second fold of the day: the lesson that a check the test environment CANNOT
   // perform is measured and filed as its own visible task, not carried as a footnote, reached
   // the guide as one clause on "Gruener Test, falsches Bild" and was paid for inside the same
@@ -890,7 +901,9 @@ export const LIMITS = {
   // claim folded into "Zwei Läufe gleichzeitig". Measured net +18 words. 6801 -> 6819.
   // LOWERED 18.09.2026 by the fold described at the line ceiling above: the new clause cost
   // 16 words and the compression of the two entries that carry it gave back 17. 6848 -> 6847.
-  maxWords: 6847,
+  // 21.09.2026: the invisible-finished-point fold justified beside maxLines measures 35
+  // words after both tightenings: 6847 -> 6882.
+  maxWords: 6882,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,
