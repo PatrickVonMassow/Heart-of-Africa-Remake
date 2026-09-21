@@ -1580,3 +1580,29 @@ alle wurden mit `git restore verification/` verworfen, bevor gelandet wurde. Nic
 eingereiht: kein Spielerimpakt, und die billigste Abhilfe — ein Abschnittslauf schreibt seine
 Bilder gar nicht erst in den verfolgten Ordner — ist Infrastruktur unter Einfriergebot. Bis
 dahin gilt die Handregel: nach einem `--section`-Lauf nie `verification/` mitcommitten.
+
+## Fünf verwaiste Autor-Arbeitsbäume stehen ohne Eintrag irgendwo (21.09.2026)
+
+Nachdem der Neubau von Punkt 1158 genau an dieser Blindheit lag, wurde der Bestand gemessen:
+`git worktree list` zeigt fünf Punkt-Arbeitsbäume, und in keinem läuft ein Autorprozess.
+
+| Punkt | Zweig | vor/hinter main | letzter Commit | Punkt offen? |
+| --- | --- | --- | --- | --- |
+| 690 | `feat/690-port-city-tag-game` | +10 / −35 | vor 21 Stunden | ja |
+| 1049 | `feat/1049-queue-order-rule` | +1 / −1550 | vor 3 Wochen | ja |
+| 834 | `feat/834-durable-authoring-lane` | +122 / −3326 | vor 4 Wochen | nein |
+| 847 | `feat/847-brevity-guard-gaps` | +17 / −3518 | vor 4 Wochen | ja |
+| 901 | `feat/901-superseded-ci-run` | +1 / −2003 | vor 3 Wochen | ja |
+
+Der alarmierendste Fall löst sich auf: Punkt 834 ist geschlossen und trägt trotzdem 122 Commits
+mit 12.402 Zeilen, die main nicht hat — aber das Archiv sagt warum. Der Punkt wurde am
+24.08.2026 zerschnitten, weil die Gegenlese von ~12.000 Zeilen in keine Runde passt; die Nähte
+sind die Punkte 889 bis 895, und der Zweig ist das aufbewahrte Material dafür. **Er darf nicht
+gelöscht werden**, und dasselbe gilt für jeden anderen hier, solange seine Arbeit weder gelandet
+noch geprüft verworfen ist.
+
+Was bleibt, ist die Sichtbarkeit: Keine dieser fünf Lagen steht auf dem Board, im Auftrag oder
+in der Fokuszeile, und 690 ist der NÄCHSTE Punkt in der Reihenfolge — sein Zweig trägt bereits
+zehn Commits mit dem Betreff „Complete the authored changes". Wer dort ankommt, übernimmt und
+landet, statt neu zu bauen. Nicht als Punkt eingereiht: kein Spielerimpakt, nichts ist verloren,
+und die Abhilfe ist dieselbe Gewohnheit wie oben — vor jedem Punktbeginn den Bestand ansehen.
