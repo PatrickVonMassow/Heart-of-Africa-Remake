@@ -1,6 +1,6 @@
 ---
 name: trivial-task
-description: Delivers ONE work-order point the dispatcher has classified as TRIVIAL — a spelled-out final state, few files, no design question, no cross-file mechanism. Exists to carry the user's rule of 19.08.2026 that trivial work runs at MEDIUM effort; load-bearing work keeps the session's High and is NOT sent here.
+description: Delivers ONE work-order point with a spelled-out final state, few files, no design question, no cross-file mechanism. Its MEDIUM effort is no longer an exception: since the user's rule of 22.09.2026 Medium is the tier for all work, so this agent simply matches the session and is a scope description, not a budget cut.
 effort: medium
 tools: ["*"]
 ---

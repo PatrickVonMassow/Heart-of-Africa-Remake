@@ -8359,10 +8359,9 @@ to land than a mechanism that needs a review.
   before a tag and gates nothing: it is a systematic hardening method that belongs to
   the current release's closing, and point 203 carries its extension.
   EXECUTION (user-approved 19.07.2026): run 184 with ULTRACODE (multi-agent
-  Workflow orchestration) on OPUS 4.8, effort HIGH — xhigh for the design/audit
-  phase (the invariant-harness architecture and the five-class sweeps), high for
-  implementation; trivial mechanical sub-stages (the WebGL2 smoke scaffold, blunt
-  test skeletons) may drop to a cheaper model / low effort via per-agent override.
+  Workflow orchestration) on OPUS 4.8. Every stage runs at MEDIUM effort — the
+  July HIGH/xhigh split was superseded on 22.09.2026, when Medium became the tier
+  for all Anthropic-lane work.
   The audit sweeps and the adversarial finding-verification are the reasoning heart
   — keep those on Opus 4.8. First step is the WebGPU lane (Pillar 3); it may be
   pulled forward if needed to verify a play-test fix (e.g. 181's likely
