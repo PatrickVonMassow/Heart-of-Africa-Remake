@@ -646,3 +646,25 @@ export function expectLively(paths: Track[][]): void {
   expect(live.quietestWalkedPerPlayedMinute).toBeGreaterThan(CHILD_MOTION.walkFloor)
   expect(holdsAGame(live)).toBe(true)
 }
+
+// SEED 42 FIRST, because it is the world the BROWSER section judges this round
+// in (`scripts/verify/verify-seed.mjs` pins the verify lane to it). The pure
+// layer had covered the bambara village at the child-motion report's seed
+// only, and the layout the picture check actually walks — a different one —
+// was the one whose route across the village could not be planned.
+// AND THE OTHER TWO ARE SEEDS, NOT VILLAGES (work-order 1094). They were the
+// nubian and the mandinka layout, on the reasoning that one settlement proves
+// nothing about the next — true, and beside the point: the round that TEACHES
+// is played in `ROCK_VILLAGE_ID`, and what varies for the player there is the
+// world SEED, drawn afresh at every start. The two replacements are chosen by
+// measurement over bambara seeds 1-30 (400 replayed seconds each, the guard's
+// bound lifted so the layout rather than the bound is read): seed 9 is the
+// FASTEST layout of the sweep to its first run (22.0 s) and seed 23 one of the
+// slowest that still gets there in the ordinary way (89.3 s), so the pair
+// spans the range the player is really dealt instead of two foreign corners.
+export const RIVER_VILLAGES: Array<[string, number]> = [
+  ['bambara-village', 42],
+  ['bambara-village', 2972259115],
+  ['bambara-village', 9],
+  ['bambara-village', 23],
+]
