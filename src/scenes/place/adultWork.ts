@@ -131,6 +131,9 @@ export interface AdultTask extends ErrandPoint {
   say: { at: ErrandPoint; aim: ErrandPoint } | null
   via: ErrandPoint | null
   age: number
+  /** Best distance on this leg, not distance walked: circling a blocked goal
+   *  must not keep an errand alive. Arrived partners share the walker's fate. */
+  progress?: { goal: ErrandPoint; phase: AdultPhase; best: number; stalled: number }
 }
 
 export interface DigSiteProgress {
@@ -233,21 +236,24 @@ export function digProgressOf(state: AdultWorkState, siteCount: number): DigSite
   }))
 }
 
-function clearPair(state: AdultWorkState, index: number): void {
+type ReleaseReason = 'ordinary' | 'stall'
+
+function clearPair(state: AdultWorkState, index: number, reason: ReleaseReason = 'ordinary'): void {
   const task = state.tasks[index]
   if (task) {
-    assertNoOwedWord(task, index)
-    if (task.partner !== null && state.tasks[task.partner]) assertNoOwedWord(state.tasks[task.partner]!, task.partner)
+    assertNoOwedWord(task, index, reason)
+    if (task.partner !== null && state.tasks[task.partner]) assertNoOwedWord(state.tasks[task.partner]!, task.partner, reason)
     state.floor?.release(task.speechOwner ?? task)
   }
   state.tasks[index] = null
   if (task?.partner !== null && task?.partner !== undefined) state.tasks[task.partner] = null
 }
 
-export function assertNoOwedWord(task: AdultTask, index: number): void {
+export function assertNoOwedWord(task: AdultTask, index: number, reason: ReleaseReason = 'ordinary'): void {
   // TWO DIFFERENT FAILURES, REPORTED APART (work-order 1073). Nothing is
-  // excused here — conflating them is exactly what the old blanket `hushed`
-  // exemption did, and it hid both.
+  // conflated here — the old blanket `hushed` exemption hid both. A deliberate
+  // stall release handles a pair that never met; it NEVER excuses dropping a
+  // word that was already withheld. Ordinary expiry still reports both cases.
   //  · The word's moment HAD come and it was WITHHELD — by the floor, by a
   //    child's ear, or by the one-word-a-frame limit. Somebody owes it and let
   //    the owning task die with it unsaid. That is the loss this point catches.
@@ -261,7 +267,7 @@ export function assertNoOwedWord(task: AdultTask, index: number): void {
     () => `${task.situation}: villager ${index} ran out of time with his ${task.phase} word withheld`,
   )
   devAssert(
-    !task.owes || task.withheld === true,
+    !task.owes || task.withheld === true || reason === 'stall',
     'adult-pair-never-met',
     () => `${task.situation}: villager ${index} expired still on his way to the ${task.phase} word; the pair never assembled`,
   )
@@ -451,6 +457,33 @@ function wordConsequence(state: AdultWorkState, view: AdultWorkView, t: AdultTas
   }
 }
 
+function measureProgress(t: AdultTask, me: AdultWorker, dt: number): void {
+  const goal = goalOf(t)
+  const distance = Math.hypot(me.x - goal.x, me.z - goal.z)
+  // Speech holds, filling and digging are legitimate stationary work. A man
+  // waiting for his partner is released by THAT partner's stalled walk, not by
+  // a clock on his own stationary feet (including the sender's whole round trip).
+  if (t.arrived || distance <= workArrivalRadius(t)) {
+    delete t.progress
+    return
+  }
+  const p = t.progress
+  if (!p || p.phase !== t.phase || p.goal.x !== goal.x || p.goal.z !== goal.z) {
+    t.progress = { goal: { ...goal }, phase: t.phase, best: distance, stalled: dt }
+  } else if (distance < p.best - 1e-6) {
+    p.best = distance
+    p.stalled = 0
+  } else p.stalled += dt
+}
+
+function stallRemaining(t: AdultTask | null, cfg: AdultWorkConfig): number {
+  if (!t?.progress || t.arrived) return Infinity
+  const goal = goalOf(t), p = t.progress
+  // A word can start a new leg within this frame; its old clock cannot kill it.
+  if (p.phase !== t.phase || p.goal.x !== goal.x || p.goal.z !== goal.z) return Infinity
+  return cfg.stallSeconds - p.stalled
+}
+
 export function stepAdultWork(
   state: AdultWorkState,
   view: AdultWorkView,
@@ -464,6 +497,16 @@ export function stepAdultWork(
   state.floor = view.floor ?? state.floor ?? new SpeechFloor(() => ({ x: 0, z: 0, active: false }), () => state.clock)
   if (state.last) state.last.age += dt
   let spoken: SpokenWord | null = null
+
+  // Sample BOTH men before either asks for speech or releases the pair. This
+  // keeps assembly and its deadline independent of villager iteration order.
+  state.tasks.forEach((t, i) => {
+    const me = view.villagers[i]
+    if (t && me) measureProgress(t, me, dt)
+  })
+  state.tasks.forEach((t, i) => {
+    if (t && stallRemaining(t, cfg) <= 0) clearPair(state, i, 'stall')
+  })
 
   for (let i = 0; i < state.tasks.length; i++) {
     const t = state.tasks[i]
@@ -489,7 +532,16 @@ export function stepAdultWork(
     for (let attempt = 0; attempt < 2; attempt++) {
       const ready = readyWord(state, view, t, i)
       if (ready) t.pendingWord = ready
-      const urgent = t.age + dt * 2 >= cfg.errandSeconds
+      const partnerTask = t.partner === null ? null : state.tasks[t.partner]
+      // A previously withheld word keeps its debt. The floor remembers its
+      // earliest deadline, so only pass a walking deadline when release is
+      // imminent: renewed headway can reset a stall clock on any earlier frame.
+      const walkingLife = Math.min(stallRemaining(t, cfg), stallRemaining(partnerTask, cfg))
+      const remaining = Math.min(
+        cfg.errandSeconds - Math.max(t.age, partnerTask?.age ?? 0),
+        walkingLife <= dt * 2 ? walkingLife : Infinity,
+      )
+      const urgent = remaining <= dt * 2
       // A word whose moment has NOT come claims no turn on the floor. The pair
       // walking to its site owes its DIG, but cannot say it yet, so queuing it
       // here would make the floor measure travel instead of speech: the hold
@@ -508,7 +560,6 @@ export function stepAdultWork(
       // before his task runs out is filed as a pair that never met.
       if (t.pendingWord && spoken && !urgent) { t.hushed = !!ready; t.withheld = true }
       if (t.pendingWord && (!spoken || urgent)) {
-        const partnerTask = t.partner === null ? null : state.tasks[t.partner]
         const owner = t.speechOwner ?? partnerTask?.speechOwner ?? {}
         t.speechOwner = owner
         if (partnerTask) partnerTask.speechOwner = owner
@@ -521,7 +572,7 @@ export function stepAdultWork(
           source: { x: me.x, z: me.z, register: 'talk' },
           sources: () => [view.villagers[i], ...(t.partner === null ? [] : [view.villagers[t.partner]])]
             .filter((p) => !!p).map((p) => ({ x: p.x, z: p.z, register: 'talk' as const })),
-          blocked, remaining: cfg.errandSeconds - Math.max(t.age, partnerTask?.age ?? 0), step: dt, ends,
+          blocked, remaining, step: dt, ends,
         })
         t.hushed = !!ready && !allowed
         if (!allowed) t.withheld = true

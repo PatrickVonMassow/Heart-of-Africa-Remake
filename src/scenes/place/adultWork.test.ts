@@ -935,9 +935,11 @@ describe('task lifecycle safeguards', () => {
     const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
     const v = riverless(view(3))
     const state = stageDig(v)
+    // Exercise the independent hard backstop, with stall recovery tuned later.
+    const cfg = { ...CFG, stallSeconds: CFG.errandSeconds * 2 }
     for (let elapsed = 0; elapsed < CFG.errandSeconds + 1; elapsed += 1 / 30) {
       for (const villager of v.villagers) villager.free = false
-      stepAdultWork(state, v, 1 / 30, CFG, () => 0.5)
+      stepAdultWork(state, v, 1 / 30, cfg, () => 0.5)
     }
     expect(state.tasks.every((task) => task === null)).toBe(true)
     // The pair never assembled, so no word was ever WITHHELD: this reports as

@@ -851,7 +851,7 @@ export interface BalanceConfig {
       /** Backstop: an errand never outlives this, however the walk goes. */
       errandSeconds: number
       /** Seconds of NO headway toward the target after which the errand is let
-       *  go, so a walk that cannot finish stops holding its villager. */
+       *  go for BOTH partners, including one already waiting at his spot. */
       stallSeconds: number
       /** The pace a villager walks at while on an errand (m/s). */
       pace: number
@@ -1603,7 +1603,7 @@ export const balance: BalanceConfig = {
       errandSeconds: 300,
       // A walk that gets NOWHERE for this long is let go — twenty seconds is
       // many times the longest stretch a legitimate detour round a hut spends
-      // without shortening the straight line, and a twentieth of the backstop
+      // without shortening the straight line, and a fifteenth of the backstop
       // above, which on its own held a blocked villager for twenty staged
       // errands and left the village silent for minutes (point 586).
       stallSeconds: 20,
