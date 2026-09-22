@@ -6231,6 +6231,74 @@ if (section('village-loom')) {
         check('the river is in the captured frame, read at the projected water points',
           waterSeen.length > 0, JSON.stringify(teaching.water))
       }
+
+      // FROM THE PLAZA (point 1183): the user's criterion is that the station
+      // reads from across the village, not at the loom. Wait until one end has
+      // been tended, so the picture carries the mark the word caused and the
+      // stack of finished strips beside her.
+      const tended = await page.waitForFunction(() => {
+        const b = window.__placeScene?.getObjectByName('village-loom')?.userData?.loom?.bundles
+        return !!b && b.UPSTREAM !== b.DOWNSTREAM
+      }, null, { timeout: 90000 }).then(() => true).catch(() => false)
+      check('once the helper has tended an end, the two warp ends differ', tended)
+      const plaza = await page.evaluate(() => {
+        const layout = window.__placeLayout
+        const station = layout.loom
+        const solids = layout.colliders.filter(c => !(
+          (c.kind === 'segment' && c.x1 === station.upstream.x && c.z1 === station.upstream.z) ||
+          (c.x === station.weaver.x && c.z === station.weaver.z)
+        ))
+        const clear = (x, z) => Math.min(...solids.map(c => window.__clearanceTo(c, x, z)))
+        const target = station.weaver
+        // The plaza is the village's open middle; search a disc round it for
+        // the stand whose sight line to her runs WIDEST of every hut, so the
+        // picture judges the station rather than a gap between two walls.
+        let best = null
+        for (const r of [0, 1.5, 3, 4.5, 6]) {
+          for (let k = 0; k < (r ? 16 : 1); k++) {
+            const x = Math.cos(k / 16 * Math.PI * 2) * r
+            const z = 3 + Math.sin(k / 16 * Math.PI * 2) * r
+            const dist = Math.hypot(target.x - x, target.z - z)
+            if (dist < 8 || clear(x, z) < 0.4) continue
+            let width = Infinity
+            // The last 2 m are the station's own ground, not the sight line.
+            for (let s = 1; s <= 32; s++) {
+              const t = s / 32
+              if (dist * (1 - t) < 2) break
+              width = Math.min(width, clear(x + (target.x - x) * t, z + (target.z - z) * t))
+            }
+            if (width < 0.15) continue
+            if (!best || width > best.width) best = { x, z, dist, width }
+          }
+        }
+        if (!best) return null
+        const p = window.__placePlayer
+        p.x = best.x
+        p.z = best.z
+        p.yaw = Math.atan2(target.x - best.x, target.z - best.z) + Math.PI
+        p.pitch = -0.04
+        return best
+      })
+      check('a stand on the plaza sees the loom over open ground from at least 8 m', !!plaza,
+        JSON.stringify(plaza))
+      if (plaza) {
+        await nextFrames(3)
+        const seen = await page.evaluate(() => {
+          const loom = window.__placeScene.getObjectByName('village-loom')
+          const stack = window.__placeScene.getObjectByName('village-loom-finished-cloth')
+          return {
+            stacked: loom.userData.loom.stacked,
+            visibleStrips: stack.children.filter(c => c.visible).length,
+            bundles: loom.userData.loom.bundles,
+          }
+        })
+        check('the finished strips lie stacked beside the loom', seen.visibleStrips > 0 && seen.visibleStrips === seen.stacked,
+          JSON.stringify(seen))
+        await frame('1183-village-loom-from-plaza', {
+          local: { x: stand.weaver.x, y: 0.6, z: stand.weaver.z },
+          label: `the loom station seen from the plaza, ${plaza.dist.toFixed(1)} m away through a ${plaza.width.toFixed(2)} m clear sight line: weaver, helper, the tended end's yarn and the cloth stack`,
+        })
+      }
     }
   } finally {
     await page.evaluate((seed) => {

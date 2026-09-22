@@ -107,7 +107,7 @@ import { speechBearing } from './speechBearing'
 import { SpeechFloor } from '../../communication/speechFloor'
 import { utterancePlan, registerOptions } from '../../communication/speaking'
 import { speechLabelSeconds } from '../../communication/speechLabel'
-import { playSpeech } from '../../systems/ambience'
+import { playLoomBeat, playSpeech } from '../../systems/ambience'
 import { speakOverhead, speechClock } from './speechChannel'
 import { placePlayerPosition } from './playerPosition'
 import { animalAnchors, animalBodies, animalScene, stepAnimal, turnToward, ANIMAL_TURN_RATE } from './animalSpots'
@@ -137,10 +137,13 @@ import {
   createLoomWork,
   loomPicture,
   loomPose,
+  loomHelperPose,
   SHUTTLE_THROW,
   stepLoomWork,
   type LoomDirection,
 } from './loomWork'
+import { initialLoomCloth } from '../../systems/loomCloth'
+import { FOLDED_STRIP, LOOM_BUILD, loomClothTransform, loomStackPosition, loomWeaveColor } from './loomVisual'
 import { drummerFacing } from './chiefWalk'
 import { DRUMMER_SPEAKER_ID } from './chiefPresence'
 import { queuedDrummerVoice, setDrummerVoice } from './drummerVoice'
@@ -508,28 +511,6 @@ function Cook({ x, z, cloth }: { x: number; z: number; cloth: string }) {
 }
 
 /**
- * Construction of the loom, in scene units against a figure drawn 1.0 unit
- * tall. The strip is Park's own narrow one — a hand's width — and everything
- * else is sized to a seated body beside it.
- */
-const LOOM_BUILD = {
-  /** Height of the stretched threads. LOW, because it is a ground loom and a
-   *  SEATED weaver works it: her shoulder is at 0.256 and her arm is 0.33, so
-   *  this is where her hands actually land (`loomWork`'s WARP_REACH). */
-  warpY: 0.22,
-  stakeHeight: 0.34,
-  /** Woven width — "seldom wider than four inches" (docs/peoples-1890.md §8.1). */
-  stripWidth: 0.12,
-  clothThickness: 0.022,
-  threadThickness: 0.01,
-  /** The small frame of heddles she sits under, which the long warp keeps. */
-  heddleX: 0.2,
-  heddleY: 0.46,
-  heddleRadius: 0.03,
-  shuttle: [0.1, 0.04, 0.05] as [number, number, number],
-}
-
-/**
  * THE WEAVER AT HER LOOM (work-order 1157), and the station's second job.
  *
  * The reported defect was a figure standing beside a loom with both arms
@@ -552,11 +533,13 @@ const LOOM_BUILD = {
  * The cycle is frame-time driven, so it stops with the scene.
  */
 function Loom({
+  placeId,
   station,
   cloth,
   weave,
   childBodies,
 }: {
+  placeId: string
   station: LoomStation
   cloth: string
   weave: string
@@ -568,6 +551,7 @@ function Loom({
   const camera = useThree((state) => state.camera)
   const floor = useContext(SpeechFloorContext)
   const cfg = balance.villageLife.loom
+  const dyedWeave = useMemo(() => loomWeaveColor(weave), [weave])
 
   // Both bodies are ones the passers-by go round (point 578). The whole LENGTH
   // of the warp is a collider in the layout, so nothing here has to repeat it.
@@ -601,6 +585,9 @@ function Loom({
   const weaverGroup = useRef<THREE.Group>(null)
   const clothMesh = useRef<THREE.Mesh>(null)
   const shuttle = useRef<THREE.Mesh>(null)
+  const carriedBundle = useRef<THREE.Group>(null)
+  const endBundles = useRef<Array<THREE.Group | null>>([])
+  const stackMeshes = useRef<Array<THREE.Mesh | null>>([])
   const helper = useRef<THREE.Group>(null)
   const cadence = useMemo(() => gaitCadence(FIGURE_LIMBS.hipY), [])
   const walked = useRef(0)
@@ -638,6 +625,28 @@ function Loom({
       rand,
     )
     const picture = loomPicture(work)
+    const game = useGame.getState()
+    if (work.finished > 0) game.recordLoomCloth(placeId, work.finished)
+    const stacked = useGame.getState().placeLoomCloth[placeId] ?? initialLoomCloth(game.seed, placeId)
+    for (let i = 0; i < stackMeshes.current.length; i++) {
+      const mesh = stackMeshes.current[i]
+      if (mesh) mesh.visible = i < stacked
+    }
+    if (work.beats > 0) {
+      const at = station.weaver
+      const distance = placePlayerPosition.active
+        ? Math.hypot(at.x - placePlayerPosition.x, at.z - placePlayerPosition.z)
+        : Infinity
+      playLoomBeat(distance, speechBearing(camera, at))
+    }
+    if (carriedBundle.current) carriedBundle.current.visible = picture.helperCarrying
+    for (const [i, direction] of (['UPSTREAM', 'DOWNSTREAM'] as const).entries()) {
+      const bundle = endBundles.current[i]
+      if (bundle) {
+        bundle.visible = picture.bundles[direction] > 0
+        bundle.scale.y = picture.bundles[direction]
+      }
+    }
 
     // THE WEAVER. Her arms and trunk come from the cycle, so the cloth can
     // never change beside hands that are not working it.
@@ -654,17 +663,18 @@ function Loom({
     // The station's own clock, published on the group: a check that has to wait
     // for HALF A PASS waits for this rather than for a second of the wall
     // clock, which is neither the same thing nor allowed in a suite.
-    if (group.current) group.current.userData.loom = { pass: work.pass, passes: work.passes }
+    if (group.current) group.current.userData.loom = { pass: work.pass, passes: work.passes, fold: work.fold, stacked, bundles: picture.bundles }
 
     // THE CLOTH grows along the warp from her seat and is taken off at the
     // stake. Scaled rather than rebuilt: one box, one number per frame.
     if (clothMesh.current) {
-      const grown = Math.max(1e-3, picture.cloth)
-      clothMesh.current.scale.z = grown
-      clothMesh.current.position.z = grown / 2
-      clothMesh.current.visible = picture.cloth > 0.02
+      const shown = loomClothTransform(picture, stacked, waterSide)
+      clothMesh.current.scale.set(...shown.scale)
+      clothMesh.current.position.set(...shown.position)
+      clothMesh.current.visible = shown.visible
     }
     if (shuttle.current) {
+      shuttle.current.visible = picture.fold === null
       shuttle.current.position.x = picture.shuttle * SHUTTLE_THROW
       shuttle.current.position.y = LOOM_BUILD.warpY + 0.035 + picture.beat * 0.01
     }
@@ -690,13 +700,11 @@ function Loom({
     }
     const hp = helperPose.current
     if (hp) {
-      // At the warp he stoops to it; walking he carries his arms at rest.
-      const at = picture.helperWorking ? 1 : 0
-      const reach = armAim(0, -0.5 - at * 0.35)
-      Object.assign(hp.left, at ? reach : REST_POSE.left)
-      Object.assign(hp.right, at ? reach : REST_POSE.right)
-      hp.lean = at * 0.35
-      hp.turn = 0
+      const next = loomHelperPose(picture)
+      Object.assign(hp.left, next.left)
+      Object.assign(hp.right, next.right)
+      hp.lean = next.lean
+      hp.turn = next.turn
       applyFigurePose(helperLimbs.current, hp)
     }
     // The body he presents to the rest of the village follows him.
@@ -737,7 +745,7 @@ function Loom({
           number rather than a rebuilt geometry. */}
       <mesh ref={clothMesh} name="village-loom-cloth" position={[0, LOOM_BUILD.warpY + 0.006, 0]} castShadow>
         <boxGeometry args={[LOOM_BUILD.stripWidth * 1.06, LOOM_BUILD.clothThickness, 1]} />
-        <meshStandardMaterial color={weave} roughness={0.95} side={THREE.DoubleSide} />
+        <meshStandardMaterial color={dyedWeave} roughness={0.95} side={THREE.DoubleSide} />
       </mesh>
       {/* The small frame of heddles she sits under — the one part of the old
           standing loom that stays. */}
@@ -754,16 +762,51 @@ function Loom({
       {/* The shuttle, riding across the warp in her hand's own rhythm. */}
       <mesh ref={shuttle} name="village-loom-shuttle" position={[0, LOOM_BUILD.warpY + 0.035, 0.03]} castShadow>
         <boxGeometry args={LOOM_BUILD.shuttle} />
-        <meshStandardMaterial color="#8a6a3a" roughness={0.9} />
+        <meshStandardMaterial color="#352316" roughness={0.9} />
       </mesh>
+      {/* Completed, folded strips. Each is one reported take-off, with seeded history. */}
+      <group name="village-loom-finished-cloth">
+        {Array.from({ length: cfg.stackCap }, (_, i) => (
+          <mesh key={i} ref={(mesh) => { stackMeshes.current[i] = mesh }} position={loomStackPosition(i, waterSide)} castShadow>
+            <boxGeometry args={[LOOM_BUILD.stripWidth, FOLDED_STRIP.thickness * 0.9, FOLDED_STRIP.length]} />
+            <meshStandardMaterial color={dyedWeave} roughness={0.95} />
+          </mesh>
+        ))}
+      </group>
+      {/* Bundles remain where the direction sent him, beside that end's threads. */}
+      {[-1, 1].map((sign, i) => (
+        <group key={sign} ref={(bundle) => { endBundles.current[i] = bundle }} name={`village-loom-bundle-${sign < 0 ? 'upstream' : 'downstream'}`} position={[waterSide * 0.14, 0, sign * cfg.tendStand]} visible={false}>
+          <LoomYarnBundle color={weave} />
+        </group>
+      ))}
       {/* The weaver, beside the warp at its middle, facing across it. */}
       <group ref={weaverGroup} name="village-weaver-body" position={[-waterSide * WEAVER_SIDE_OFFSET, 0, 0]} rotation={[0, waterSide * Math.PI / 2, 0]}>
         <Figure cloth={cloth} kneel pose={pose} limbs={weaverLimbs} />
       </group>
       {/* Her helper, on the water side of the threads. */}
       <group ref={helper} name="village-loom-helper" position={[waterSide * HELPER_SIDE_OFFSET, 0, 0]}>
-        <Figure cloth={weave} legs pose={helperPose} limbs={helperLimbs} gait={helperGait} />
+        <Figure cloth={weave} legs pose={helperPose} limbs={helperLimbs} gait={helperGait} handProp={
+          <group ref={carriedBundle} name="village-loom-carried-bundle" visible={false}>
+            <LoomYarnBundle color={weave} />
+          </group>
+        } />
       </group>
+    </group>
+  )
+}
+
+/** A wound hank with a pale tie, readable both in his hand and at the warp end. */
+function LoomYarnBundle({ color }: { color: string }) {
+  return (
+    <group>
+      <mesh position={[0, 0.065, 0]} castShadow>
+        <boxGeometry args={[0.16, 0.13, 0.28]} />
+        <meshStandardMaterial color={color} roughness={1} />
+      </mesh>
+      <mesh position={[0, 0.065, 0]}>
+        <boxGeometry args={[0.17, 0.14, 0.035]} />
+        <meshStandardMaterial color="#e4d4ab" roughness={1} />
+      </mesh>
     </group>
   )
 }
@@ -3907,6 +3950,8 @@ export function PlaceLife({
           <Cook x={firePos[0] + 1.2} z={firePos[1] + 1.0} cloth={style.cloth[0]} />
           {loom && (
             <Loom
+              key={placeId}
+              placeId={placeId}
               station={loom}
               cloth={style.cloth[1 % style.cloth.length]}
               weave={style.bandColor}

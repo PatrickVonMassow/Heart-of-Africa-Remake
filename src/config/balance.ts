@@ -874,7 +874,7 @@ export interface BalanceConfig {
       passSeconds: number
       /** Metres of woven strip one completed pass adds to the cloth. */
       clothPerPass: number
-      /** Seconds between two NAMED tendings. The throws themselves are silent;
+      /** Seconds between two NAMED tendings. The throws themselves say no words;
        *  this is the rate the two direction words fall at. */
       tendIntervalSeconds: number
       /** Random spread of that interval, 0..1 (0 = a metronome). */
@@ -883,6 +883,17 @@ export interface BalanceConfig {
       tendDwellSeconds: number
       /** The pace he walks the warp at, in metres per second. */
       helperPace: number
+      foldSeconds: number
+      weaveSaturation: number
+      helperCycleSeconds: number
+      stackCap: number
+      stackFallback: number
+      stackSeedMin: number
+      stackSeedMax: number
+      beatPeak: number
+      beatAttack: number
+      beatDuration: number
+      beatFrequency: number
     }
     /** The body every inhabitant presents to every other (work-order 578). */
     separation: {
@@ -1640,6 +1651,18 @@ export const balance: BalanceConfig = {
       tendIntervalSpread: 0.35,
       tendDwellSeconds: 5,
       helperPace: 1.25, // the errand walk's own unhurried pace
+      // Calibratable scenery and motion; no inventory or trade value.
+      foldSeconds: 3.2,
+      weaveSaturation: 0.25,
+      helperCycleSeconds: 1.1,
+      stackCap: 8,
+      stackFallback: 3,
+      stackSeedMin: 2,
+      stackSeedMax: 4,
+      beatPeak: 0.65,
+      beatAttack: 0.003,
+      beatDuration: 0.085,
+      beatFrequency: 1800,
     },
     // The body every inhabitant presents to every other (work-order 578).
     // Calibratable starting values (educated guess, CLAUDE.md §2), stated
