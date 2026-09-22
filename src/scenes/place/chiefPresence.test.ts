@@ -4,7 +4,8 @@ import { PLACES } from '../../world/geo'
 import { DRUM_MESSAGE_VILLAGE } from '../../state/store'
 import { chiefMovementColliders, chiefStandingPosition, clearChiefStanding, resetChiefWalk, setChiefStanding, withinGiveReach } from './chiefPresence'
 import { CHIEF_BODY_RADIUS, PLAYER_RADIUS, resolveMove, standingClear, hasEscapeDirection, type Collider } from './collision'
-import { buildLayout, chiefStandingSpot, interactiveCircleRadius } from './layout'
+import { chiefStandingSpot, interactiveCircleRadius } from './layout'
+import { sharedLayout } from './layoutHarness'
 import { REGION_PLACE_STYLES } from './regionStyles'
 import { chiefBesideDrummerSpot, chiefWalkPosition, type ChiefWalk } from './chiefWalk'
 import { nextChiefAction } from './chiefMeeting'
@@ -58,7 +59,7 @@ describe('the chief’s live body', () => {
 
 describe('the passage at his hut', () => {
   it.each(villagers)('$id: the hut/body passage fits the player and opens onto usable ground', (village) => {
-    const layout = buildLayout(village.id, 12345)
+    const layout = sharedLayout(village.id, 12345)
     const hut = layout.interactives.find((it) => it.type === 'chief')!
     const radius = interactiveCircleRadius('chief', REGION_PLACE_STYLES[village.region])
     const [cx, cz] = chiefStandingSpot(hut, radius)
@@ -107,7 +108,7 @@ describe('the passage at his hut', () => {
   it.each(villagers)('$id: open ground exists to walk at his body from', (village) => {
     const radius = interactiveCircleRadius('chief', REGION_PLACE_STYLES[village.region])
     for (const seed of [12345, 7]) {
-      const layout = buildLayout(village.id, seed)
+      const layout = sharedLayout(village.id, seed)
       const hut = layout.interactives.find((it) => it.type === 'chief')!
       const [cx, cz] = chiefStandingSpot(hut, radius)
       const base = Math.atan2(cx - hut.pos[0], cz - hut.pos[1])
@@ -142,7 +143,7 @@ describe('the passage at his hut', () => {
   it('contact distance still permits giving, asking for drums and calling him back', () => {
     const beside = chiefBesideDrummerSpot(balance.communication.chiefBesideDrummer)
     const state = { mode: 'place', placeId: DRUM_MESSAGE_VILLAGE } as const
-    const layout = buildLayout(DRUM_MESSAGE_VILLAGE, 12345)
+    const layout = sharedLayout(DRUM_MESSAGE_VILLAGE, 12345)
     const hut = layout.interactives.find((it) => it.type === 'chief')!
     const door = chiefStandingSpot(hut)
     for (const phase of ['walking-out', 'at-drummer', 'walking-back'] as const) {

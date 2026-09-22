@@ -6,8 +6,8 @@
 
 import { beforeAll, describe, expect, it } from 'vitest'
 import { setupGeodata } from '../../test/geodata'
-import { SEEDS, REPORTED_SEED, WEDGE_SEED, VILLAGES } from './layoutHarness'
-import { buildLayout, fenceColliders, fencePanels } from './layout'
+import { SEEDS, REPORTED_SEED, WEDGE_SEED, VILLAGES , sharedLayout } from './layoutHarness'
+import { fenceColliders, fencePanels } from './layout'
 import { spawnPointFree, standingClear, WALKER_RADIUS } from './collision'
 import { ANIMAL_RADIUS, animalAnchors } from './animalSpots'
 import { PLACES } from '../../world/geo'
@@ -29,7 +29,7 @@ describe('inhabitant spawn/errand freedom (point 155)', () => {
     '%s: every errand point has a clear standing circle and an escape direction',
     (id) => {
       for (const s of SEEDS) {
-        const layout = buildLayout(id, s)
+        const layout = sharedLayout(id, s)
         for (const [ex, ez] of layout.errands) {
           expect(
             spawnPointFree(layout.colliders, ex, ez, WALKER_RADIUS),
@@ -61,7 +61,7 @@ describe('fence colliders follow the drawn panels (point 413)', () => {
 
   it.each(PLACES.map((p) => [p.id] as const))('%s: no gap between neighbouring panel colliders', (id) => {
     for (const s of [...SEEDS, REPORTED_SEED]) {
-      const layout = buildLayout(id, s)
+      const layout = sharedLayout(id, s)
       for (const f of layout.fences) {
         const run = fenceColliders(f)
         const n = f.posts.length
@@ -98,7 +98,7 @@ describe('fence colliders follow the drawn panels (point 413)', () => {
 
   it.each(PLACES.map((p) => [p.id] as const))('%s: every gate stays walkable', (id) => {
     for (const s of [...SEEDS, REPORTED_SEED]) {
-      const layout = buildLayout(id, s)
+      const layout = sharedLayout(id, s)
       for (const f of layout.fences) {
         const run = fenceColliders(f)
         const span = postSpacing(f.posts) * 1.5
@@ -119,7 +119,7 @@ describe('fence colliders follow the drawn panels (point 413)', () => {
 
   it.each(PLACES.map((p) => [p.id] as const))('%s: one DRAWN panel per fence collider — the wall cannot outrun the picture', (id) => {
     for (const s of [...SEEDS, REPORTED_SEED]) {
-      const layout = buildLayout(id, s)
+      const layout = sharedLayout(id, s)
       // Work-order 583: the scene instanced its fence panels into a buffer with
       // a FIXED capacity while the collider run had none, so a compound whose
       // rings asked for more panels than the buffer held drew the overflow
@@ -150,7 +150,7 @@ describe('fence colliders follow the drawn panels (point 413)', () => {
     let most = 0
     for (const id of VILLAGES.map((p) => p.id))
       for (const s of [...SEEDS, REPORTED_SEED, WEDGE_SEED, 1, 2, 3, 4, 5, 6, 7, 8])
-        most = Math.max(most, fencePanels(buildLayout(id, s).fences).filter((p) => p.kind === 'woven').length)
+        most = Math.max(most, fencePanels(sharedLayout(id, s).fences).filter((p) => p.kind === 'woven').length)
     expect(most).toBeGreaterThan(160)
   })
 })
@@ -168,7 +168,7 @@ describe('animal anchors stand on free ground (point 413)', () => {
 
   it.each(VILLAGES.map((p) => [p.id] as const))('%s: every animal anchor is clear and can be left', (id) => {
     for (const s of SEEDS) {
-      const layout = buildLayout(id, s)
+      const layout = sharedLayout(id, s)
       const anchors = animalAnchors(localSeed(s, id), layout.pen ? 4 : 3, layout.pen, layout.colliders)
       expect(anchors.length).toBeGreaterThan(0)
       for (const a of anchors) {

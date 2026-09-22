@@ -20,8 +20,8 @@ import {
   type Body,
   solidBodies,
   laneSamples,
+  sharedLayout,
 } from './layoutHarness'
-import { buildLayout } from './layout'
 import { closestOnPolyline } from './lanePlan'
 import { PLACES } from '../../world/geo'
 import { VILLAGE_PLANS } from './regionStyles'
@@ -51,7 +51,7 @@ describe('village plan mapping (design.md §4.5)', () => {
 
 describe.each(SEEDS)('layout invariants (seed %i)', (seed) => {
   it.each(PLACES.map((p) => [p.id] as const))('%s: windows keep a clear line outward', (id) => {
-    const layout = buildLayout(id, seed)
+    const layout = sharedLayout(id, seed)
     const port = PORTS.some((p) => p.id === id)
     const bodies = solidBodies(layout, port)
     for (let i = 0; i < bodies.length; i++) {
@@ -63,7 +63,7 @@ describe.each(SEEDS)('layout invariants (seed %i)', (seed) => {
   })
 
   it.each(PLACES.map((p) => [p.id] as const))('%s: no building stands on a lane', (id) => {
-    const layout = buildLayout(id, seed)
+    const layout = sharedLayout(id, seed)
     const port = PORTS.some((p) => p.id === id)
     const bodies = solidBodies(layout, port)
     for (const path of layout.paths) {
@@ -76,7 +76,7 @@ describe.each(SEEDS)('layout invariants (seed %i)', (seed) => {
   })
 
   it.each(PLACES.map((p) => [p.id] as const))('%s: every door is reachable, no corner squeeze', (id) => {
-    const layout = buildLayout(id, seed)
+    const layout = sharedLayout(id, seed)
     const port = PORTS.some((p) => p.id === id)
     const bodies = solidBodies(layout, port)
     const doors: Array<{ door: [number, number]; owner: Body | null }> = layout.dwellings.map((d) => ({
@@ -97,7 +97,7 @@ describe.each(SEEDS)('layout invariants (seed %i)', (seed) => {
   })
 
   it.each(PLACES.map((p) => [p.id] as const))('%s: no building corner reaches the walkable edge', (id) => {
-    const layout = buildLayout(id, seed)
+    const layout = sharedLayout(id, seed)
     for (const d of layout.dwellings) {
       const cornerR =
         d.kind === 'warehouse' ? Math.hypot(d.r, 2.3) : d.kind === 'box' ? d.r * 1.33 : d.kind === 'mosque' ? d.r * 1.29 : d.r
@@ -109,7 +109,7 @@ describe.each(SEEDS)('layout invariants (seed %i)', (seed) => {
   })
 
   it.each(PLACES.map((p) => [p.id] as const))('%s: the spawn corridor stays clear', (id) => {
-    const layout = buildLayout(id, seed)
+    const layout = sharedLayout(id, seed)
     const port = PORTS.some((p) => p.id === id)
     for (const b of solidBodies(layout, port)) {
       if (b.z > 5 && b.z < layout.radius) {
@@ -119,7 +119,7 @@ describe.each(SEEDS)('layout invariants (seed %i)', (seed) => {
   })
 
   it.each(PORTS.map((p) => [p.id] as const))('%s: winding lanes, a square, buildings front their lane', (id) => {
-    const layout = buildLayout(id, seed)
+    const layout = sharedLayout(id, seed)
     // An organic network: main + cross lane + square (+ alleys with size),
     // and the main lanes are genuinely winding, not straight axes.
     expect(layout.paths.length).toBeGreaterThanOrEqual(3)
@@ -156,7 +156,7 @@ describe.each(SEEDS)('layout invariants (seed %i)', (seed) => {
   it.each(VILLAGES.map((v) => [v.id, VILLAGE_PLANS[v.peopleId ?? '']] as const))(
     '%s: follows its %s plan',
     (id, plan) => {
-      const layout = buildLayout(id, seed)
+      const layout = sharedLayout(id, seed)
       const huts = layout.dwellings.filter((d) => d.kind === 'hut' || d.kind === 'box' || d.kind === 'tent')
       expect(huts.length, `${id}: the village is inhabited`).toBeGreaterThanOrEqual(6)
       if (plan === 'ring') {
@@ -227,14 +227,14 @@ describe.each(SEEDS)('layout invariants (seed %i)', (seed) => {
     // placement silently skipped it in ~6 % of seeds (found by the polish
     // gate); sweep-verified across a wide seed range here.
     for (let s = seed; s < seed + 40; s++) {
-      const layout = buildLayout('timbuktu', s)
+      const layout = sharedLayout('timbuktu', s)
       expect(layout.dwellings.some((d) => d.kind === 'mosque'), `seed ${s}`).toBe(true)
     }
   })
 
   it('ports outscale villages in fabric (Cairo vs Boma)', () => {
-    const cairo = buildLayout('cairo', seed)
-    const boma = buildLayout('boma', seed)
+    const cairo = sharedLayout('cairo', seed)
+    const boma = sharedLayout('boma', seed)
     expect(cairo.radius).toBeGreaterThan(boma.radius)
     expect(cairo.dwellings.length).toBeGreaterThan(boma.dwellings.length)
   })

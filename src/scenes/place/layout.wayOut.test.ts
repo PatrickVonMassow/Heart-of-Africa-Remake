@@ -6,13 +6,12 @@
 
 import { beforeAll, describe, expect, it } from 'vitest'
 import { setupGeodata } from '../../test/geodata'
-import { SEEDS, REPORTED_SEED, WEDGE_SEED, PORTS, VILLAGES } from './layoutHarness'
+import { SEEDS, REPORTED_SEED, WEDGE_SEED, PORTS, VILLAGES , sharedLayout } from './layoutHarness'
 import {
   COMPOUND_RING_MIN,
   WAY_OUT_HALF_WIDTH,
   WAY_OUT_INNER,
   WAY_OUT_OUTER,
-  buildLayout,
   dwellingCircleRadius,
   fenceColliders,
   type PlaceLayout,
@@ -64,7 +63,7 @@ describe('no two palisades cross (work-order 604)', () => {
     '%s: two fence runs always leave the player room to walk between them',
     (id) => {
       for (const s of [...SEEDS, REPORTED_SEED, WEDGE_SEED, 1, 2, 3, 4, 5, 6]) {
-        const worst = worstFencePair(buildLayout(id, s))
+        const worst = worstFencePair(sharedLayout(id, s))
         expect(
           worst,
           `${id} seed ${s}: two fence runs approach to ${worst.toFixed(2)} m`,
@@ -96,7 +95,7 @@ describe('no two palisades cross (work-order 604)', () => {
   it.each(VILLAGES.map((p) => [p.id] as const))('%s: no dwelling grows through a fence', (id) => {
     const style = REGION_PLACE_STYLES[placeById(id).region]
     for (const s of [...SEEDS, REPORTED_SEED, WEDGE_SEED, 1, 2, 3]) {
-      const layout = buildLayout(id, s)
+      const layout = sharedLayout(id, s)
       const runs = layout.fences.flatMap((f) => fenceColliders(f))
       for (const d of layout.dwellings) {
         const body = dwellingCircleRadius(d, style)
@@ -154,7 +153,7 @@ describe('every settlement keeps one way out free (work-order 688)', () => {
   it.each([...PORTS, ...VILLAGES].map((p) => [p.id] as const))('%s: the way out stays walkable', async (id) => {
     for (const seed of [...SEEDS, REPORTED_SEED, WEDGE_SEED, 1, 2, 3]) {
       await new Promise((resolve) => setTimeout(resolve, 0))
-      const layout = buildLayout(id, seed)
+      const layout = sharedLayout(id, seed)
       expect(layout.wayOut, `${id} seed ${seed}: no crossing of the boundary is free`).not.toBeNull()
       expect(
         crossingIsClear(layout, layout.wayOut as number),
@@ -174,7 +173,7 @@ describe('every settlement keeps one way out free (work-order 688)', () => {
   it.each([...PORTS, ...VILLAGES].map((p) => [p.id] as const))('%s: the dressing is not thinned out for it', async (id) => {
     for (const seed of [...SEEDS, REPORTED_SEED, WEDGE_SEED, 1, 2, 3]) {
       await new Promise((resolve) => setTimeout(resolve, 0))
-      const layout = buildLayout(id, seed)
+      const layout = sharedLayout(id, seed)
       expect(layout.flora.length, `${id} seed ${seed}: flora`).toBeGreaterThanOrEqual(6)
       expect(layout.rocks.length, `${id} seed ${seed}: rocks`).toBeGreaterThanOrEqual(11)
     }

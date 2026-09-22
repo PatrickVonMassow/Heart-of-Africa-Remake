@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { PLACES } from '../../world/geo'
-import { buildLayout } from './layout'
+import { sharedLayout } from './layoutHarness'
 import { figureStance, unplacedInhabitant, UNPLACED_EPS, type PlaceSpot } from './placement'
 
 /** The transform a group that nobody ever placed carries — React's identity. */
@@ -8,7 +8,7 @@ const NEVER_WRITTEN = { x: 0, y: 0, z: 0 }
 
 /** A settlement's own placement set, as PlaceLife assembles it. */
 function anchorsOf(placeId: string): PlaceSpot[] {
-  const layout = buildLayout(placeId, 7)
+  const layout = sharedLayout(placeId, 7)
   return [
     ...layout.dwellings.map((d) => ({ x: d.x, z: d.z })),
     ...layout.errands.map(([x, z]) => ({ x, z })),
@@ -71,7 +71,7 @@ describe('every settlement places its inhabitants away from its origin', () => {
   })
 
   it.each(settlements.map((p) => p.id))('%s: every dwelling is a real stance', (id) => {
-    const layout = buildLayout(id, 7)
+    const layout = sharedLayout(id, 7)
     const anchors = anchorsOf(id)
     expect(layout.dwellings.length).toBeGreaterThan(0)
     for (const d of layout.dwellings) {
