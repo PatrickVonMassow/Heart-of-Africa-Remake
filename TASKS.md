@@ -132,6 +132,9 @@ put it is the mistake this line exists to stop.
   Refs: src/scenes/place/adultWork.ts, src/config/balance.ts, src/ui/DebugMenu.tsx,
   src/scenes/place/layout.ts, local/ErwachsenerHaengtAmFeuerFest.zip, local/DochBefreit.zip,
   point 586, point 1087
+  Bundle: Dorfleben — it edits the water errand in `adultWork.ts`, the errand block in
+  `balance.ts` and the debug slider, the adult-teaching path 1051, 1056, 1058 and 1087 reach,
+  so it is worked after them and never beside them.
 
 - [ ] 1181. Three hundred and thirteen tooling tests pay for a browser they never open, and
   what is left after that is six replay files (measured 22.09.2026 out of point 1180).
