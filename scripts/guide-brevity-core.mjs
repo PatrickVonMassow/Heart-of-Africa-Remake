@@ -592,7 +592,14 @@ export const LIMITS = {
   // projection and the vantage search models a warehouse as a circle). It got no entry of its
   // own: it is one clause on "Grüner Test, falsches Bild", whose whole subject is a check that
   // passes while the picture does not. Net: +2 lines / +22 words. 703 -> 705.
-  maxLines: 705,
+  // 22.09.2026, a fold that paid MORE than it cost: a guard resolving a REMEMBERED path against
+  // the working directory it inherits (retrospective §3.303's addendum — a relative dashboard
+  // marker that reads as "not registered" from every worktree). It got no entry of its own: it
+  // is one clause on "Test und Wächter hingen an ihrer Umgebung", whose subject is already a
+  // check measuring its repository instead of the code. SHORTEN-BEFORE-RAISE was applied to the
+  // two test-tier prompts, which gave back more than the clause took. Net: -1 line / -2 words.
+  // 705 -> 704 — the ceiling follows the measurement down.
+  maxLines: 704,
   // 18.09.2026, second fold of the day: the lesson that a check the test environment CANNOT
   // perform is measured and filed as its own visible task, not carried as a footnote, reached
   // the guide as one clause on "Gruener Test, falsches Bild" and was paid for inside the same
@@ -914,7 +921,9 @@ export const LIMITS = {
   // 22.09.2026: the click lesson of 21.09. had overrun both ceilings (708 lines,
   // 6957 words); trimmed back into the guide's own budget with two neighbouring
   // sentences losing filler. Net: -2 words. 6904 -> 6902.
-  maxWords: 6902,
+  // 22.09.2026 (second): the remembered-relative-path clause justified beside maxLines cost 21
+  // words and the two test-tier prompts gave back 23. Net: -2 words. 6902 -> 6900.
+  maxWords: 6900,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,

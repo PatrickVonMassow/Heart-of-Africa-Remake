@@ -137,17 +137,15 @@ Automatische Tests sind das Rückgrat; ohne sie ist „Vibe Coding" ein Blindflu
   mehrfach flakefrei.
 
 > *Prompt:* „Richte drei Test-Stufen ein — schnell (Unit, immer), klein (Unit + Kern-
-> Browsertests) und groß (volle Regression auf allen Ziel-Backends). Wähl pro Änderung die
-> passende Stufe und nenn mir kurz warum; **etabliere einen Mechanismus**, der die große
-> Stufe vor einem Release **erzwingt** und sie **verweigert**, solange die schmale zum
-> geänderten Stand nicht grün ist."
+> Browsertests), groß (volle Regression auf allen Ziel-Backends). Wähl pro Änderung die Stufe
+> und nenn kurz warum; ein **Mechanismus** **erzwingt** die große vor einem Release und
+> **verweigert** sie, solange die schmale zum geänderten Stand nicht grün ist."
 
-*(Kosten ≈ 1,5x)* Zwei Mechanismen, die das Netz ehrlich halten:
+*(Kosten ≈ 1,5x)* Zwei Mechanismen halten das Netz ehrlich:
 
-> *Prompt:* „Etabliere einen Mechanismus, der eine Wiederholung **sichtbar** macht: Ein
-> flakender Test darf einmal wiederholt werden, gilt danach als **verdächtig** und trägt keine
-> Freigabe mehr. Erledigt ist ein Rot nur mit **benannter Ursache** — wiederholte Grüns
-> sind keine. Und einen, der feste Wartezeiten aufspürt."
+> *Prompt:* „Mach jede Wiederholung **sichtbar**: Ein flakender Test darf einmal wiederholt
+> werden, gilt danach als **verdächtig** und trägt keine Freigabe mehr. Erledigt ist ein Rot nur
+> mit **benannter Ursache** — wiederholte Grüns sind keine. Und spür feste Wartezeiten auf."
 
 Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
@@ -242,8 +240,9 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 - **Test und Wächter hingen an ihrer Umgebung, nicht am Verhalten.** Sie messen dein Repository
   statt deinen Code — von Hand nachgeprüft bestätigt sich der Fehler selbst.
-  → *Prompt:* „Jede Prüfung bekommt ihre Pfade **eingespritzt**; was fürs **ganze Projekt** gilt,
-  wird an **einer** Stelle gelesen. Grün bei dir, rot im Haken? Lass es aus **beiden** Wurzeln laufen."
+  → *Prompt:* „Jede Prüfung bekommt ihre Pfade **eingespritzt** und **absolut** — ein gemerkter
+  relativer Pfad wird zu so vielen Regeln, wie es Arbeitsverzeichnisse gibt. Was fürs **ganze
+  Projekt** gilt, wird an **einer** Stelle gelesen. Grün bei dir, rot im Haken? Beide Wurzeln."
 
 - **Messung und Vorschau verunreinigt.** Halbfertiges gilt als ‚fertig'.
   → *Prompt:* „Hol mein Urteil am **veröffentlichten** Stand ein, nie an einem Zwischenzweig, und
@@ -703,4 +702,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 0ebde87d3297363061efaaf4141aa1fd9ba75e3575b47f1f03404277597ba8e7 -->
+<!-- GUIDE-FINGERPRINT: 27d4671118565548204b1363d5f31535da2a4f8f6ad6c574191f7cf731bbc4e1 -->

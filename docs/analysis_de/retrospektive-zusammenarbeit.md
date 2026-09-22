@@ -1687,7 +1687,7 @@ stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die s
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Dienstag, 22.09.2026, 17:09 · Quellen-Fingerprint: `0ebde87d3297…`
+Zuletzt aktualisiert: Dienstag, 22.09.2026, 17:48 · Quellen-Fingerprint: `27d467111856…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1763,7 +1763,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A point delivered as a rider on another branch is closed with fold-point --delivered, and its push needs a closing card first | 1 | niedrig | point-proof-guard.mjs, push-arrival-guard.mjs | ✔ Mechanismus |
 | Saved games do not constrain design work: the feature is switched off, nobody plays a serious run, and no migration is ever owed for a data change | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | 24.07.2026 evening chaos — serving model silently degraded to Haiku 4.5; verify the serving model before batch work, Haiku-class must pause instead of working | 6 | hoch | model-guard.mjs | ✔ Mechanismus |
-| Keep the shell cwd in /workspace/hoa; a worktree cwd makes the Stop guards judge the wrong repo root | 3 | mittel | worktree-reminder.mjs | ✔ Mechanismus |
+| Keep the shell cwd in /workspace/hoa; a worktree cwd makes the Stop guards judge the wrong repo root | 4 | hoch | worktree-reminder.mjs | ✔ Mechanismus |
 | ENDED 17.08.2026 — the 13.08. emergency that pushed the MAXIMUM load to OpenAI (hard cases to Sol via --anyway, pool of one) is over; the normal three-lane split of CLAUDE.md §6 applies again | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Every new optical/graphics feature must be sorted into the low/medium/high detail presets, enforced by a pure completeness test — a new quality key with no preset entries fails the gate | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Write about this project as a participant (\"wir/unser\"), never as an outside observer (\"euer Mechanismus\", \"die ihr abschaffen wollt\") | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1795,8 +1795,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 98 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 7 Revert-/Reapply-Commits · 138 Prozess-/Meta-TASKS-Punkte (davon 66 offen).
 
-<!-- RETRO-FINGERPRINT: 0ebde87d3297363061efaaf4141aa1fd9ba75e3575b47f1f03404277597ba8e7 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-22T15:09:21.014Z -->
+<!-- RETRO-FINGERPRINT: 27d4671118565548204b1363d5f31535da2a4f8f6ad6c574191f7cf731bbc4e1 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-22T15:48:13.958Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -8085,3 +8085,27 @@ ein Commit, um ihn abzuräumen; diesmal war er bereits abgeräumt, und er kam tr
 **mitdrucken**; behauptete Frische, die nie geprüft wurde, ist die teuerste Sorte Falschmeldung.
 Und die verlangte Abhilfe gehört gegen die eigene Wiederanlaufzeit gerechnet: Ist sie langsamer,
 verweigert der Wächter dauerhaft und gerade die Sitzungen, die alles richtig gemacht haben.
+
+**Nachtrag vom selben Abend, 22.09.2026 — die Hälfte des Fehlers war die ganze Zeit ein
+Argument.** Der Wiedergänger kam im Abendzug noch zweimal, und diesmal habe ich nicht die
+Tafel repariert, sondern nachgesehen, was der Merker überhaupt enthält:
+`.claude/dashboard-state.json` speichert unter `dashboardPath` genau die Zeichenkette, die
+`--synced` übergeben bekam. Der gewohnte Aufruf übergibt `.batch-dashboard.html` — **relativ**.
+Der Stop-Haken löst ihn danach gegen seine eigene Wurzel auf, und in einem Arbeitsbaum zeigt er
+ins Leere. Ein einziges Mal absolut registriert (`--synced /workspace/hoa/.batch-dashboard.html`),
+und diese Hälfte der Falle ist dauerhaft zu: Der Merker trägt dann aus jedem Verzeichnis.
+
+Die andere Hälfte bleibt und ist die lehrreichere. Der Wächter liest `head` und die Zahl der
+offenen Punkte ebenfalls aus der Wurzel, in der er läuft — aus einem Zweig-Arbeitsbaum also die
+Zweig-SHA und dessen TASKS-Stand. Die Folge sind zwei Verweigerungen, die inhaltlich klingen und
+es nicht sind: „HEAD moved to \<Zweig-SHA\>" und eine Fußzeilen-Zahl, die um einen Punkt abweicht,
+weil der Zweig vor den letzten Anhängen abgezweigt wurde. Beide fordern zum Veröffentlichen auf,
+und ein Veröffentlichen aus dem Arbeitsbaum würde die falsche Zahl sogar festschreiben. Nur das
+blanke `cd` in den Hauptbaum hebt sie auf — in einer `&&`-Kette hält es nicht, was seit dem
+08.09. bekannt ist und mich trotzdem erneut zwei Züge gekostet hat.
+
+**Lehre:** Wo ein Wächter einen hinterlegten Pfad gegen ein geerbtes Arbeitsverzeichnis auflöst,
+ist der relative Pfad der eigentliche Defekt — ein absolut hinterlegter Merker ist kein Workaround,
+sondern die Behebung. Und wo derselbe Wächter Zustandszahlen aus derselben Wurzel liest, ist die
+erste Frage bei jeder inhaltlich klingenden Verweigerung nicht „stimmt die Zahl?", sondern
+**„aus welcher Wurzel ist sie gemessen?"**
