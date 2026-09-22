@@ -1767,3 +1767,22 @@ wird, muss deren Takt löschen, statt ihn weiterlaufen zu lassen.
 NICHT EINGEREIHT: Infrastruktur-Freeze (Nutzerentscheidung 01.09.2026). Der
 Fall hat kein Spielwerk blockiert und keine falsche Freigabe erlaubt; er hat
 eine Sitzung Arbeitszeit gekostet.
+
+## `polish` adult-errands: die Montage-Wartebedingung akzeptiert veraltete Hooks (22.09.2026)
+
+Gemessen beim Bildnachweis von Punkt 1184 auf WebGPU: In 2 von 4 Läufen der
+Sektion `adult-errands` (16:50 und 22:41, beide auf `feat/1184-word-then-act`)
+stirbt `polish` an `scripts/verify/polish.mjs:7524` mit
+`TypeError: Cannot read properties of undefined (reading 'digSites')`, weil
+`window.__placeLayout` in diesem Moment fehlt; der Lauf 23:28 am selben Commit
+und der Lauf 23:24 am Merge-Base `d6954d956` kamen an derselben Stelle durch.
+Die Wartebedingung davor (`__placeWalkers?.sample && __placeErrands`) prüft nur
+Hooks aus `PlaceLife`, die beim Ortswechsel stehen bleiben können, nicht den
+`PlaceScene`-Hook `__placeLayout`, den der nächste Schritt liest. Vermutete
+Ursache: Warten auf veraltete Hooks des vorigen Orts; die naheliegende
+Reparatur ist, auch auf `__placeLayout` zu warten. Folge: der Absturz beendet
+die Suite und kostet die Abdeckung der fünf folgenden Sektionen.
+
+NICHT EINGEREIHT: Infrastruktur-Freeze (Nutzerentscheidung 01.09.2026). Ein
+Wiederholungslauf kommt durch; wird der Absturz reproduzierbar, gehört er als
+Punkt in die Arbeitsordnung.
