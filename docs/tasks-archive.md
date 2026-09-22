@@ -31094,4 +31094,18 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Criticality: high — the ceiling's failure mode is `cancelled`, which names no cause and
   which no push can clear, and it has already fired on `main`.
   Refs: vitest.config.ts:20, src/test/setup.ts:26-55, CI runs 35702549770 / 35696684799
+  MEASURED AT THE TICK (CI run 35749329837, `ci/gate (branch)` green on fe550df16): the sharded
+  `unit` step runs 6 min 42 s on shard 1 and 10 min 46 s on shard 2, inside `fast` jobs of
+  7 min 26 s and 11 min 45 s. The binding figure is the slower shard, so the step sits
+  14 min 14 s — and its whole job 13 min 15 s — under the 25-minute ceiling, against 1 min 22 s
+  to 4 min 12 s before. That is past the five-minute mark of final state 3, so the replay floor
+  does NOT go to the user as a decision; it stays named here instead.
+  WHAT THE SPLIT COST AND WHERE IT BIT: moving `scripts/**` to `node` took jsdom away from seven
+  files under `scripts/verify` that had been relying on it silently — 69 cases, all `window is
+  not defined`, and the first reading of that run called them green because a step under
+  `continue-on-error` reports `conclusion=success`. They are the files that run browser-page code
+  locally, so each keeps jsdom through its own `@vitest-environment` docblock and the other 306
+  tooling tests pay for no browser. The shards are uneven by construction — the six children's-game
+  replays land together in shard 2 — and that imbalance, not the case count, is what any further
+  halving would have to attack.
   Bundle: Testinfrastruktur.
