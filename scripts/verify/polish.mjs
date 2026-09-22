@@ -5826,7 +5826,7 @@ if (section('village-stations')) {
     const staged = await page.evaluate(() => {
       const scene = window.__placeScene
       const layout = window.__placeLayout
-      const loom = scene.getObjectByName('village-weaver')
+      const loom = scene.getObjectByName('village-loom')
       const figure = scene.getObjectByName('village-weaver-body')
       const at = (object) => {
         object.updateWorldMatrix(true, false)

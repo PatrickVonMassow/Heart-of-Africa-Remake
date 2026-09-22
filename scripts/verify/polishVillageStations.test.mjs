@@ -22,7 +22,7 @@ async function photograph({ marketX = -5.21, marketRadius = 2.9, failFrame = fal
   const loom = matrix(0, -3)
   const body = matrix(0, -2.45, Math.PI)
   vi.stubGlobal('__game', { getState: () => state, setState: update => Object.assign(state, update) })
-  vi.stubGlobal('__placeScene', { getObjectByName: name => name === 'village-weaver' ? loom : body })
+  vi.stubGlobal('__placeScene', { getObjectByName: name => name === 'village-loom' ? loom : body })
   vi.stubGlobal('__placeLayout', {
     interactives: [{ type: 'market', pos: [marketX, -5.76] }], dwellings: [],
     colliders: [{ x: marketX, z: -5.76, r: marketRadius }],

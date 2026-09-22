@@ -8,6 +8,7 @@ import { standsOnGroundPlate } from './riverBank'
 import { standingClear, WALKER_RADIUS } from './collision'
 import {
   HELPER_SIDE_OFFSET,
+  WEAVER_SIDE_OFFSET,
   loomAround,
   placeLoom,
   waterAhead,
@@ -268,7 +269,7 @@ describe('loomAround is the one geometry both the layout and the scene read', ()
     expect(station.downstream).toEqual({ x: 2, z: 0 })
     // The stakes are ON the warp; the two bodies are beside it, and on
     // opposite sides — she inland, he between the threads and the water.
-    expect(station.weaver.x).toBeCloseTo(2 - 0.45, 9)
+    expect(station.weaver.x).toBeCloseTo(2 - WEAVER_SIDE_OFFSET, 9)
     expect(station.helperHome.x).toBeCloseTo(2 + HELPER_SIDE_OFFSET, 9)
     expect(station.tend.upstream).toEqual({ x: 2 + HELPER_SIDE_OFFSET, z: -5 })
     expect(station.tend.downstream).toEqual({ x: 2 + HELPER_SIDE_OFFSET, z: -1 })
