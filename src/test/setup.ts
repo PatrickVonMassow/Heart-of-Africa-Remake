@@ -42,13 +42,19 @@ if (typeof globalThis.ResizeObserver === 'undefined') {
 // inside the long replays, "or it starves the worker's own bookkeeping" — but
 // it only protects the replay it stands in, and the CI runner is slow enough
 // that ordinary synchronous files reach the deadline between two of them.
-// Capping the CI pool at two workers did not touch it (1b389d2a0) and cost the
-// run 43 % of its wall clock, which is the measurement that rules out
-// over-subscription as the cause. THAT CAP STOOD ANYWAY UNTIL 22.09.2026, when
-// its price came due — the `fast` job hit its 25-minute ceiling and was
-// recorded `cancelled` — and `vitest.config.ts` claimed the opposite of this
-// paragraph the whole time. The yield below is what holds the RPC open; the
-// pool width is not, and must not be narrowed again in its name.
+// Capping the CI pool at two workers did not touch it (1b389d2a0): the yield
+// below is what holds the RPC open, the pool width is not, and it must not be
+// narrowed again in that name.
+//
+// THE 43 % THIS PARAGRAPH USED TO CLAIM THE CAP COST WAS TOO HIGH, and the
+// correction belongs here rather than in a new comment somewhere else
+// (22.09.2026). Measured across the 442 test files that finished in BOTH of two
+// CI runs of the same tree — 35683117792 at two workers, 35688934273 at four —
+// the same work takes 565.3 s summed at two and 894.7 s at four: each file runs
+// 1.58x slower at the wider pool, so the halving cost about a fifth of the
+// throughput, not close to half of it. `vitest.config.ts` carries the full
+// reading and the reason the cap is taken back there; the two files now say the
+// same thing, which they had not done for nineteen days.
 //
 // `setImmediate` is captured HERE, at module load, so a test that installs
 // fake timers and forgets to restore them cannot take the yield away; both it

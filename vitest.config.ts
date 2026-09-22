@@ -61,24 +61,33 @@ export default defineConfig({
     // the SAME ~91 s wall clock, because the extra forks were queueing, not
     // running. The cap therefore costs no time and buys back the gate. Raise it
     // only against a measurement showing the wall clock actually falls.
-    // THE CI HALF OF THIS CAP WAS A DISPROVED GUESS, and it is taken back here
-    // (22.09.2026). On 03.09.2026 the hosted runs died four times on the same
-    // `Timeout calling "onTaskUpdate"`, and at 03:54 the pool was halved on CI
-    // against the guess that four workers over-subscribed the runner
-    // (1b389d2a0). It did not help. The fix landed 80 minutes later as one
-    // macrotask yield per test (0d6746072), and the comment that carries it —
-    // `src/test/setup.ts`, the later and better-informed account of that same
-    // night — records BOTH halves of what happened: the cap "did not touch it"
-    // and it "cost the run 43 % of its wall clock". Nobody reverted it, and
-    // this file went on claiming the opposite for nineteen days.
-    // WHAT IT COST, read off the `unit` step's own banner in the green run
-    // 35683117792 (1438.31 s wall): tests 2219.68 s of SUMMED worker time,
-    // environment 361.19 s, collect 110.06 s. At two workers that is roughly
-    // 1110 s of wall clock in tests alone, on a runner the repository's public
-    // visibility gives four cores. The proof that it really is wider than two
-    // is the 43 % itself: on a two-core runner, dropping from four workers to
-    // two costs nothing, because the extra forks only queue — which is exactly
-    // the argument the local cap below rests on.
+    // THE CI HALF OF THIS CAP IS TAKEN BACK (22.09.2026) — BUT NOT FOR THE
+    // REASON EITHER OF THE TWO OLD COMMENTS GAVE. On 03.09.2026 the hosted runs
+    // died four times on `Timeout calling "onTaskUpdate"`; at 03:54 the pool was
+    // halved on CI (1b389d2a0), and 80 minutes later the real fix landed as one
+    // macrotask yield per test (0d6746072). The cap stayed, this file claimed it
+    // had fixed the starvation, and `src/test/setup.ts` claimed it had cost 43 %
+    // of the wall clock. Neither claim survived being measured.
+    // WHAT THE WIDTH REALLY COSTS AND BUYS, measured 22.09.2026 over the 442
+    // test files that finished in BOTH of two CI runs of the same tree
+    // (35683117792 at two workers, 35688934273 at four): the same work takes
+    // 565.3 s summed at two and 894.7 s at four. Every file is 1.58x slower at
+    // the wider pool, so doubling the workers buys 1.26x throughput — a real
+    // gain, and less than half the 43 % the other file asserted. The runner IS
+    // over-subscribed at four; it is simply not over-subscribed enough to lose.
+    // AND THE SLOWDOWN IS FLAT ACROSS FILE SIZES — 1.64x under a second, 1.63x
+    // at 1-5 s, 1.51x at 5-20 s, 1.57x at 20-60 s, 1.69x above — so it is plain
+    // CPU over-subscription and not memory pressure on the heavy files. That is
+    // why no rearrangement of the suite can remove it, and why the wider pool is
+    // worth exactly its 26 % and nothing more.
+    // WIDENING IS ONLY SAFE BECAUSE THE FLOOR WENT FIRST. A pool cannot finish a
+    // run sooner than its slowest single FILE, and at four workers the old
+    // `tagShuffle.test.ts` — 712 s of the two-worker run — would have grown to
+    // roughly 1125 s: one file eating three quarters of the job's 25-minute
+    // ceiling, with nothing but a `cancelled` to show for it. The same work now
+    // lies across thirteen files (work-order 1178, not one case shortened), so
+    // the floor is a fraction of the pool's own time and the width is what
+    // decides the wall clock again.
     // THE LOCAL 4 STAYS, on its own measurement (29.07.2026, above).
     maxWorkers: 4,
   },
