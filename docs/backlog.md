@@ -1744,3 +1744,26 @@ NICHT EINGEREIHT: Der Nutzer wollte ausdrücklich erst diskutieren. Die Frage, o
 Platz aus oder erst davor lesbar sein soll, steht als Entscheidungskarte „Webstuhl: vom Platz aus
 erkennen oder erst, wenn man davorsteht?" auf der Tafel. Befund (1) wird unabhängig von der
 Antwort gebaut, (2) hängt an ihr.
+
+## Der Retry-Takt der automatischen Pause kennt keinen Nutzer-Halt (22.09.2026)
+
+Gemessen am 22.09.2026 zwischen 20:52 und 20:58. Der Nutzer hatte die Batch
+angehalten und in der laufenden Sitzung ausdrücklich gesagt, vor dem
+Weiterlaufen stehe eine Umstellung an; der SessionStart-Hook wies dieselbe
+Sitzung korrekt an, nicht selbst fortzusetzen. Die Pause-Marke war aber vom
+Typ `automatic` (cause `runaway`, `retry-after` 18:46:06Z), und als dieser
+Takt ablief, startete der Autostart-Watchdog um 20:56 eine autonome Sitzung
+(`claimedAt` 1790103392299, trigger `watchdog`), die den Lock nahm und der
+betreuten Sitzung jede Mutation mit STAND-DOWN verweigerte. Ein maschinell
+gesetzter Retry-Takt überschreibt damit einen menschlichen Halt, der nach dem
+Setzen der Marke ausgesprochen wurde.
+
+Die Sitzung, die den Lock abgab, hat die Marke anschließend als `user-stop`
+mit `retry-after: never` neu geschrieben — das ist die richtige Form, aber sie
+entstand von Hand und erst nach dem Zwischenfall. Was fehlt, ist der Übergang:
+Ein Nutzer-Halt, der während einer laufenden automatischen Pause ausgesprochen
+wird, muss deren Takt löschen, statt ihn weiterlaufen zu lassen.
+
+NICHT EINGEREIHT: Infrastruktur-Freeze (Nutzerentscheidung 01.09.2026). Der
+Fall hat kein Spielwerk blockiert und keine falsche Freigabe erlaubt; er hat
+eine Sitzung Arbeitszeit gekostet.
