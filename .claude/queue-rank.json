@@ -1387,17 +1387,17 @@
       "origin": "machine",
       "place": "last"
     },
-    "1178": {
-      "at": "2026-09-22T04:45:59.794Z",
-      "why": "Der Release selbst muss durch genau dieses Tor: ein Job-Timeout auf main wird als abgebrochen verbucht, ist durch keinen Push zu loesen und sperrt ueber ci-status-guard den ganzen Batch — Punkt 633 und 174 sind hinter einem Tor, das jede Landung auf 25m17s gegen 25m00s ausspielt, nicht erreichbar.",
-      "origin": "machine",
-      "place": "ahead"
-    },
     "1179": {
       "at": "2026-09-22T04:46:02.115Z",
       "why": "Blockiert keinen Punkt und kostet keinem Spieler etwas: es macht nur die Wartestellung waehrend Abschlussarbeiten unsichtbar — hinten ist richtig.",
       "origin": "machine",
       "place": "last"
+    },
+    "1181": {
+      "at": "2026-09-22T09:14:21.753Z",
+      "why": "Die 25-Minuten-Decke des unit-Jobs hat auf main selbst schon einen Lauf storniert (35696684799, abgeschnitten bei 25:18), und ein cancelled nennt keine Ursache und wird von keinem Push geklaert — es wuerde die CI der Release-Punkte 633 und 174 genauso treffen wie jede andere.",
+      "origin": "machine",
+      "place": "ahead"
     }
   },
   "boundary": {
@@ -1429,7 +1429,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-22T04:46:02.125Z",
+    "at": "2026-09-22T09:14:21.763Z",
     "points": [
       174,
       184,
@@ -1838,8 +1838,8 @@
       1175,
       1176,
       1177,
-      1178,
-      1179
+      1179,
+      1181
     ]
   }
 }

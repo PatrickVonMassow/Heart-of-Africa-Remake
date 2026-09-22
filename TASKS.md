@@ -77,6 +77,62 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
+- [ ] 1182. `adultErrands.stallSeconds` is declared, balanced at 20 s, tunable in the debug
+  menu — and never read, so a water errand whose pair never assembles pins two adults beside
+  the village fire for the full 300 s backstop and the village fetches no water for five
+  minutes (user report 22.09.2026, two archives, seed 2838685132, bambara-village, WebGPU,
+  production 32b3d98).
+  WHAT THE USER SAW: `local/ErwachsenerHaengtAmFeuerFest.zip` at 09:11:04Z — "Erwachsener
+  hängt fest", an adult standing motionless at the cooking fire — and in the same session
+  never once a villager fetching water. Then `local/DochBefreit.zip` at 09:13:56Z, 172 s
+  later: "Eben hat er sich doch irgendwie befreit und jetzt geht auch jemand zum Fluss." The
+  two symptoms are ONE defect and the self-release is the proof of it: nothing repaired the
+  village, the 300 s backstop simply expired.
+  THE MECHANISM, read out of the code: `layout.ts` puts the water stand BESIDE the fire
+  (`WATER_STAND_FIRE_GAPS` off `VILLAGE_FIRE`), so the two men a water errand casts — the
+  sender who orders it and the carrier who goes — both take spots at the fire.
+  `adultWork.ts` `readyWord` releases the sender's RIVER only when `t.arrived &&
+  state.tasks[t.partner]?.arrived`: BOTH men must be counted arrived at their own spot.
+  Until then the word is not ready, `!ready && !t.withheld` skips the floor entirely, and
+  neither man has anything to do. The sender is `arrived` and therefore not walking, so no
+  walker-level release can reach him; the carrier may be stalled a walker's width off his
+  spot. The ONLY exit is `t.age >= cfg.errandSeconds` at line 472 — 300 s. And while either
+  task lives, `state.tasks.some((t) => t?.situation === 'water-out' || t?.situation ===
+  'water-back')` refuses to cast a second water errand, which is why NO water is fetched for
+  the whole five minutes rather than merely this one errand failing.
+  WHY THE BACKSTOP IS NOT THE ANSWER: `balance.ts` around `errandSeconds: 300` states in its
+  own comment that "a genuinely stuck villager is still let go by `stallSeconds` below long
+  before it". That is the assumption the whole 300 s sizing rests on, and it is false.
+  `stallSeconds` enters `AdultWorkConfig` (adultWork.ts:93), is set to 20 (balance.ts:1609)
+  and is editable as `adultErrandStall` (DebugMenu.tsx:227) — `grep stallSeconds src` finds no
+  read of it in `adultWork.ts`, and `git log -S` shows it arrived with 1989617d4 on 02.09.2026
+  and never gained a consumer. `balance.unstuck.stallSeconds` is a DIFFERENT value, read by
+  `TravelScene` for the player.
+  WHAT TO BUILD: give `stepAdultWork` the release its config already promises. A task that has
+  made no progress towards `goalOf(task)` for `cfg.stallSeconds` is let go, and letting go
+  clears the PAIR (`clearPair`), not one man — releasing the carrier alone leaves the sender
+  standing at the fire and the water errand still uncastable. The measure must be PROGRESS
+  towards the goal, not motion: a man shuffling on the spot against a collider is stuck. A man
+  who has legitimately ARRIVED and is waiting for his partner is not walking anywhere, so the
+  clock has to run on the pair's assembly, not on his own feet — the sender waiting at the
+  stand for a carrier who never arrives is exactly the case that must expire.
+  MIND WHAT MUST NOT BREAK: `assertNoOwedWord` fires `adult-pair-never-met` whenever a task
+  dies owing a word it never became able to say. That is precisely this case, so a release at
+  20 s will make the assert fire twenty times sooner and far more often in dev. The assert is
+  RIGHT — the pair really never met — but a stall release is a HANDLED outcome, not a lost
+  atom, and must be distinguishable from a word that was withheld and dropped. Decide that
+  deliberately and say so in the code; do not silence the assert.
+  Criticality: high — it is player-visible in the first minutes of the first village, it makes
+  the village look broken, and it costs the RIVER teaching situation entirely for five minutes
+  at a time. Both of the user's reports are the same session.
+  Test: Vitest — `adultWork` with a `view` whose `standable` keeps one of the two men off his
+  spot, stepped past `stallSeconds`: the pair is cleared, `water-out` becomes castable again,
+  and no task survives to the 300 s backstop. Plus a picture check at bambara-village seed
+  2838685132 that a water carrier reaches the river.
+  Refs: src/scenes/place/adultWork.ts, src/config/balance.ts, src/ui/DebugMenu.tsx,
+  src/scenes/place/layout.ts, local/ErwachsenerHaengtAmFeuerFest.zip, local/DochBefreit.zip,
+  point 586, point 1087
+
 - [ ] 1181. Three hundred and thirteen tooling tests pay for a browser they never open, and
   what is left after that is six replay files (measured 22.09.2026 out of point 1180).
   WHERE IT COMES FROM: 1180 took the duplicate village building out of eleven place suites and
