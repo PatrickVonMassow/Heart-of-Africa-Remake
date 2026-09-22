@@ -142,12 +142,18 @@ describe('the instructed body waits for the word to end', () => {
     const dt = 1 / 60
     let word = null
     for (let t = 0; t < 5 && !word; t += dt) word = f.step(dt)
-    for (let t = 0; t < instructionDelay('RIVER'); t += dt) {
-      const sender = f.state.tasks[f.sender]
-      if (sender?.holdFor === undefined) break
+    expect(f.state.tasks[f.sender]!.holdFor).toBeGreaterThan(0)
+    let ticks = 0
+    while (f.state.tasks[f.sender]?.holdFor !== undefined) {
+      const sender = f.state.tasks[f.sender]!
       expect(sender.owes).toBe(false)
       expect(sender.withheld).toBeUndefined()
+      f.step(dt)
+      ticks++
+      expect(ticks).toBeLessThan(instructionDelay('RIVER') / dt + 2)
     }
+    // The hold ran out and the carrier set off on that very tick.
+    expect(f.state.tasks[f.carrier]!.phase).toBe('fetch')
     expect(errors).not.toHaveBeenCalled()
   })
 
