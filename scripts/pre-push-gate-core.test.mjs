@@ -1,6 +1,7 @@
 // The pre-push gate's decision (point 302). The rule it defends: CI must never
 // be the first place a broken state is noticed, because a red run mails the
 // user and a later fix does not unsend that mail.
+import vitestConfig from '../vitest.config.ts'
 import { describe, it, expect } from 'vitest'
 import { readFileSync, readdirSync } from 'node:fs'
 import { execFile } from 'node:child_process'
@@ -858,12 +859,9 @@ describe('counting the test files a checkout holds', () => {
     // The floor is only as good as this mirror: an include list changed in the
     // config without this constant would silently detune it, so the two are
     // pinned identical here rather than trusted to stay in step.
-    const config = readFileSync(resolve(REPO_ROOT, 'vitest.config.ts'), 'utf8')
-    const include = /include:\s*\[([^\]]*)\]/.exec(config)
-    expect(include, 'vitest.config.ts no longer declares test.include as a literal array').toBeTruthy()
-    const patterns = [...include[1].matchAll(/'([^']+)'/g)].map((m) => m[1])
+    const patterns = vitestConfig.test.projects.flatMap((project) => project.test.include)
     expect(patterns.length).toBeGreaterThan(0)
-    expect(patterns).toEqual(TEST_FILE_PATTERNS)
+    expect(patterns.slice().sort()).toEqual(TEST_FILE_PATTERNS.slice().sort())
   })
 
   it('matches exactly what those globs cover, and nothing else', () => {
