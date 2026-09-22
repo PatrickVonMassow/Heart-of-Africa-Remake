@@ -1642,6 +1642,7 @@ export const balance: BalanceConfig = {
       helperPace: 1.25, // the errand walk's own unhurried pace
       // Calibratable scenery and motion; no inventory or trade value.
       foldSeconds: 3.2,
+      weaveSaturation: 0.25,
       helperCycleSeconds: 1.1,
       stackCap: 8,
       stackFallback: 3,
