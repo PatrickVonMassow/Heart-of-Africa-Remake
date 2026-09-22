@@ -78,6 +78,24 @@ export function parseOutcomes(text) {
   return out
 }
 
+/** Combine the two CI shards, requiring every gate step to have passed.
+ * Missing output (for example a job timeout) must never become a green status.
+ * Keep this stricter contract local to sharding: legacy callers still use the
+ * original verdict semantics for superseded runs and steps that did not run. */
+export function shardOutcomes(outputs) {
+  const required = ['checkout', 'node', 'install', 'build', 'lint', 'audit', 'unit']
+  return [1, 2].flatMap((shard) => {
+    const entries = parseOutcomes(outputs?.[`shard_${shard}`])
+    return required.map((step) => {
+      const matches = entries.filter((entry) => entry.step === step)
+      return {
+        step: `shard-${shard}/${step}`,
+        outcome: matches.length === 1 && matches[0].outcome === 'success' ? 'success' : 'failure',
+      }
+    })
+  })
+}
+
 /**
  * The whole verdict for one run.
  * @returns {{soft:boolean, mails:boolean, failed:string[], failedSteps:string,
