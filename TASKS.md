@@ -142,6 +142,20 @@ put it is the mistake this line exists to stop.
 - [ ] 1174. The village vocabulary is rolled per run, under rules that keep the direction pair a
   mirror (user 21.09.2026, drained from the findings carrier; placed here on the user's
   instruction, ahead of 659, which must judge a mechanic that no longer changes).
+  ESCALATED BY ITS COMMISSIONED AUTHOR, NOT GUESSED (GPT-6 Astra, 22.09.2026, on branch
+  `feat/1174-rolled-lexicon` at b5a8fd789; the author regenerated the brief at HEAD and stopped
+  with a clean worktree rather than build on a spec that disagrees with the code). TWO
+  DISCREPANCIES TO SETTLE BEFORE IMPLEMENTATION:
+  a) The spec's step 4 describes a game-field WHITELIST in `stateDump.ts`; the implementation
+     serializes the whole game object. The question the author asked and did not answer for
+     itself: should the dump keep every existing game field and serialize the vocabulary
+     explicitly as six utterance strings, or is the whitelist the intended final state?
+  b) The spec claims the documentation carries a "three reversal pairs" sentence that has to be
+     corrected. It does not: the documentation already says two reversal pairs plus two
+     palindromes, which is what this point's own THE SET paragraph says too. The correction
+     item has no subject and is struck unless someone names the file that carries it.
+  Whoever answers these writes the answer INTO this point (a delegated author may not guess it),
+  and only then is the lane commissioned again.
   Bundle: Dorfleben
   The tonal lexicon is a fixed module constant today, so the syllable-to-meaning assignment is
   identical in every playthrough and a returning player solves the drum puzzle from memorised
