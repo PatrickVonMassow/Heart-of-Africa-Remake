@@ -81,9 +81,20 @@ put it is the mistake this line exists to stop.
   what is left after that is six replay files (measured 22.09.2026 out of point 1180).
   WHERE IT COMES FROM: 1180 took the duplicate village building out of eleven place suites and
   brought the `unit` step from 21 min 30 s to 19 min 56 s (CI run 35702549770, 528 files /
-  16 280 cases green), which leaves 4 min 12 s under the `timeout-minutes: 25` ceiling instead
-  of 2 min 40 s. That ceiling has already cancelled a run on `main` itself (35696684799, cut
-  off at 25 min 18 s), so the headroom is the point, not the tidiness.
+  16 280 cases green). That ceiling has already cancelled a run on `main` itself
+  (35696684799, cut off at 25 min 18 s), so the headroom is the point, not the tidiness.
+  AND THE HEADROOM IS NOT ONE NUMBER — the finding that changes the shape of the question.
+  `main` ran the IDENTICAL tree an hour later (35705921673) and took 22 min 41 s of `unit`
+  inside a 23 min 38 s job: same 528 files, same 16 280 cases, 1 880.3 s of summed test time
+  against the branch run's 1 658.4 s. A hosted runner varies by about 13 %, which at this size
+  is three minutes, so the headroom after 1180 is 1 min 22 s on a slow draw and 4 min 12 s on
+  a fast one. An answer that leaves the job within one runner's variance of the ceiling has
+  not answered it.
+  THE STRUCTURAL OPTION, to be weighed FIRST because it needs no case to change and no ceiling
+  to rise: `unit` is ONE job running one Vitest process. Vitest shards (`--shard=1/2`), so the
+  step can become two jobs running side by side, each about half the wall clock, each judged
+  by the same gate verdict. That halves the exposure outright instead of trimming at it, and
+  it is the only lever left that does not touch the replays.
   THE LEVER THAT IS LEFT AND CHEAP: 313 of the 528 test files are `scripts/**/*.test.mjs`,
   which `vitest.config.ts` itself calls "pure modules, no game imports", and every one of them
   pays for a jsdom environment and a React Testing Library setup it cannot use. They hold
