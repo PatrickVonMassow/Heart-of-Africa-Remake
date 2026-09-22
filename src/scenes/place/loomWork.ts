@@ -240,7 +240,12 @@ export function stepLoomWork(
       }
     } else if (errand.phase === 'work') {
       if (errand.clock >= cfg.tendDwellSeconds) {
-        state.bundles[errand.toward] = Math.min(3, state.bundles[errand.toward] + 1)
+        const other = errand.toward === 'UPSTREAM' ? 'DOWNSTREAM' : 'UPSTREAM'
+        // Old yarn is used up; a replenished end must still differ from its
+        // opposite, including after repeated visits to both ends.
+        let bundles = state.bundles[errand.toward] % 3 + 1
+        if (bundles === state.bundles[other]) bundles = bundles % 3 + 1
+        state.bundles[errand.toward] = bundles
         errand.phase = 'return'
         errand.clock = 0
       }
@@ -338,7 +343,7 @@ export function loomPicture(state: LoomWorkState, helperCycleSeconds = balance.v
   const across = Math.sin(state.pass * Math.PI * 2)
   return {
     shuttle: across,
-    beat: state.fold === null ? Math.max(0, Math.cos(state.pass * Math.PI * 2)) ** 6 : 0,
+    beat: state.fold === null || state.fold === 0 ? Math.max(0, Math.cos(state.pass * Math.PI * 2)) ** 6 : 0,
     cloth: state.cloth,
     helperAt: state.errand ? state.errand.at : 0,
     helperWorking: state.errand?.phase === 'work',
@@ -381,7 +386,7 @@ const HAND_ELEVATION = -0.1
  * cloth that changes by itself — which is the whole defect the report showed.
  */
 export function loomPose(picture: LoomPicture): FigurePose {
-  if (picture.fold !== null) {
+  if (picture.fold !== null && picture.fold > 0) {
     const gather = Math.sin(picture.fold * Math.PI * 4)
     return {
       left: armAim(0.45 * gather, -0.35),

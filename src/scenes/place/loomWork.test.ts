@@ -378,3 +378,17 @@ describe('readable work and take-off', () => {
     expect(leans.filter((v, i) => v > leans[(i + 63) % 64] && v > leans[(i + 1) % 64])).toHaveLength(1)
   })
 })
+
+
+it('keeps replenished warp ends distinct after repeated tending in both directions', () => {
+  const state = createLoomWork(cfg, () => 0.5)
+  for (const toward of ['UPSTREAM', 'DOWNSTREAM', 'DOWNSTREAM', 'UPSTREAM', 'DOWNSTREAM', 'UPSTREAM', 'UPSTREAM', 'DOWNSTREAM'] as const) {
+    state.errand = { toward, phase: 'work', at: warpSign(toward) * cfg.tendStand, clock: 0 }
+    const before = state.bundles[toward]
+    stepLoomWork(state, view(), cfg.tendDwellSeconds, cfg, () => 0.5)
+    expect(state.bundles[toward]).not.toBe(before)
+    expect(state.bundles.UPSTREAM).not.toBe(state.bundles.DOWNSTREAM)
+    expect(state.bundles[toward]).toBeGreaterThan(0)
+    expect(state.bundles[toward]).toBeLessThanOrEqual(3)
+  }
+})

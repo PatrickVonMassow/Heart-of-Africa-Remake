@@ -874,7 +874,7 @@ export interface BalanceConfig {
       passSeconds: number
       /** Metres of woven strip one completed pass adds to the cloth. */
       clothPerPass: number
-      /** Seconds between two NAMED tendings. The throws themselves are silent;
+      /** Seconds between two NAMED tendings. The throws themselves say no words;
        *  this is the rate the two direction words fall at. */
       tendIntervalSeconds: number
       /** Random spread of that interval, 0..1 (0 = a metronome). */
@@ -883,6 +883,17 @@ export interface BalanceConfig {
       tendDwellSeconds: number
       /** The pace he walks the warp at, in metres per second. */
       helperPace: number
+      foldSeconds: number
+      weaveSaturation: number
+      helperCycleSeconds: number
+      stackCap: number
+      stackFallback: number
+      stackSeedMin: number
+      stackSeedMax: number
+      beatPeak: number
+      beatAttack: number
+      beatDuration: number
+      beatFrequency: number
     }
     /** The body every inhabitant presents to every other (work-order 578). */
     separation: {

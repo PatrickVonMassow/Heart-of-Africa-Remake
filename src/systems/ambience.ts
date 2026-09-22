@@ -1057,7 +1057,8 @@ export function speechRoute(ac: AudioContext, dest: AudioNode, pan: number) {
 export function loomBeatPlan(distance: number, bearing = 0, volume = balance.ambienceVolume) {
   const cfg = balance.villageLife.loom
   return {
-    peak: cfg.beatPeak * hearingGain(distance) * Math.max(0, volume),
+    // A reed carries across the plaza like a called voice, beyond conversation.
+    peak: cfg.beatPeak * hearingGain(distance, balance.communication.call.reach, balance.communication.call.falloff) * Math.max(0, volume),
     pan: speechPan(bearing),
     attack: cfg.beatAttack,
     duration: cfg.beatDuration,
