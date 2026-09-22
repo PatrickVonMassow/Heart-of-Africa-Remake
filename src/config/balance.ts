@@ -1640,6 +1640,17 @@ export const balance: BalanceConfig = {
       tendIntervalSpread: 0.35,
       tendDwellSeconds: 5,
       helperPace: 1.25, // the errand walk's own unhurried pace
+      // Calibratable scenery and motion; no inventory or trade value.
+      foldSeconds: 3.2,
+      helperCycleSeconds: 1.1,
+      stackCap: 8,
+      stackFallback: 3,
+      stackSeedMin: 2,
+      stackSeedMax: 4,
+      beatPeak: 0.65,
+      beatAttack: 0.003,
+      beatDuration: 0.085,
+      beatFrequency: 1800,
     },
     // The body every inhabitant presents to every other (work-order 578).
     // Calibratable starting values (educated guess, CLAUDE.md §2), stated
