@@ -76,6 +76,17 @@ jobs:
 
   fast:
     runs-on: ubuntu-latest
+    # Separate hosted runners halve the work assigned to each job without
+    # widening the per-runner pool or changing any replay cases.
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    # Unique names matter: matrix completion order is unspecified. The single
+    # gate job below combines both; no passing shard can overwrite a red one.
+    outputs:
+      shard_1: ${{ steps.outcomes.outputs.shard_1 }}
+      shard_2: ${{ steps.outcomes.outputs.shard_2 }}
     # OUTGROWN AT 15, RAISED ONCE AND MEASURED (13.09.2026). The unit layer grows
     # with the game, and this ceiling had been eaten: the last two GREEN runs —
     # one of them on `main` itself — took 14 min 41 s and 14 min 45 s, leaving
@@ -91,7 +102,8 @@ jobs:
     # on every step (`env` is not available to `continue-on-error`), and pinned
     # step by step in scripts/ci-gate-verdict-core.test.mjs.
     steps:
-      - uses: actions/checkout@v4
+      - id: checkout
+        uses: actions/checkout@v4
         continue-on-error: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/feat/') }}
         with:
           # TWO COMMITS, not one: the unit layer contains checks that read this
@@ -112,7 +124,8 @@ jobs:
           # why — for shallowness on `main`, and for the missing `main` revision
           # itself on a branch run, where this checkout is the branch.
           fetch-depth: 2
-      - uses: actions/setup-node@v4
+      - id: node
+        uses: actions/setup-node@v4
         continue-on-error: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/feat/') }}
         with:
           node-version: 20
@@ -141,10 +154,32 @@ jobs:
       - id: unit
         name: unit
         continue-on-error: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/feat/') }}
-        run: npm run test:unit
-      # The verdict. On `main` the job has already failed by itself and this only
-      # reports; on a `feat/**` push it is the ONLY place the true result is
-      # written, so it must run whatever happened before it.
+        run: npm run test:unit -- --shard=${{ matrix.shard }}/2
+      - id: outcomes
+        name: record shard outcomes
+        if: always()
+        continue-on-error: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/feat/') }}
+        env:
+          SHARD: ${{ matrix.shard }}
+          GATE_OUTCOMES: checkout=${{ steps.checkout.outcome }} node=${{ steps.node.outcome }} install=${{ steps.install.outcome }} build=${{ steps.build.outcome }} lint=${{ steps.lint.outcome }} audit=${{ steps.audit.outcome }} unit=${{ steps.unit.outcome }}
+        run: printf 'shard_%s=%s\n' "$SHARD" "$GATE_OUTCOMES" >> "$GITHUB_OUTPUT"
+
+  gate:
+    needs: fast
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - id: checkout
+        uses: actions/checkout@v4
+        continue-on-error: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/feat/') }}
+      - id: node
+        uses: actions/setup-node@v4
+        continue-on-error: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/feat/') }}
+        with:
+          node-version: 20
+      # One verdict owns the branch status and notification after BOTH shards.
+      # Missing outcomes fail closed, including a timed-out or skipped shard.
       - id: verdict
         name: gate verdict
         if: always()
@@ -152,7 +187,8 @@ jobs:
         env:
           GATE_EVENT: ${{ github.event_name }}
           GATE_REF: ${{ github.ref }}
-          GATE_OUTCOMES: install=${{ steps.install.outcome }} build=${{ steps.build.outcome }} lint=${{ steps.lint.outcome }} audit=${{ steps.audit.outcome }} unit=${{ steps.unit.outcome }}
+          GATE_OUTCOMES: checkout=${{ steps.checkout.outcome }} node=${{ steps.node.outcome }}
+          GATE_SHARDS: ${{ toJSON(needs.fast.outputs) }}
           GATE_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: node scripts/ci-gate-verdict.mjs

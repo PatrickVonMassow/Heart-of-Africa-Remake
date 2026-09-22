@@ -1,3 +1,11 @@
+/**
+ * @vitest-environment jsdom
+ *
+ * EXCEPTION to the tooling project's Node environment: this file runs browser-page
+ * code here — a function Playwright serializes into the page, or a `polish.mjs`
+ * sampler block — and that code reads `window`/`document` directly. It needs a DOM,
+ * so it keeps jsdom per file instead of dragging the other tooling tests back into one.
+ */
 import { afterEach, expect, it, vi } from 'vitest'
 import { BoxGeometry, Group, Mesh, PerspectiveCamera } from 'three/webgpu'
 import { captureSpoilWalk, digPictureUnmounted, readDigPicture, readSpoilWalker } from './digSitePicture.mjs'
