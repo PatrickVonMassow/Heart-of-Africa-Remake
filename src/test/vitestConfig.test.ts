@@ -34,22 +34,25 @@ describe('the fast layer is timed to survive the agent pool (point 398)', () => 
     expect(unitTest.slowTestThreshold!).toBeLessThan(unitTest.testTimeout! / 2)
   })
 
-  // THE POOL WIDTH IS THE SAME KIND OF NUMBER, and it is pinned for the same
-  // reason: it was narrowed on CI on 03.09.2026 against a guess that the very
-  // commit's own follow-up disproved 80 minutes later, and the narrowing then
-  // stood for nineteen days at 43 % of the run's wall clock until the job hit
-  // its 25-minute ceiling and was recorded `cancelled`. A future "let us be
-  // careful on the hosted runner" would buy that back, so the CI-conditional
-  // shape is what this case forbids — not the number alone.
-  it('uses one pool width everywhere, with no CI-conditional narrowing', () => {
-    expect(unitTest.maxWorkers).toBe(4)
-    // The value must not depend on the environment the config is READ in: a
-    // `process.env.CI ? … : …` would make this assertion pass locally and mean
-    // something else on the runner, which is exactly how the last one survived.
+  // THE POOL WIDTH IS THE SAME KIND OF NUMBER, and it is now pinned in BOTH
+  // directions. It was narrowed on CI on 03.09.2026 against a guess that the
+  // very commit's own follow-up disproved 80 minutes later — that guess is gone
+  // from every file that carried it. The NARROWING stayed, on a different and
+  // measured reason (22.09.2026, written out in `vitest.config.ts`): four
+  // workers on a hosted runner run every file 1.58x slower, and `testTimeout` is
+  // wall clock PER CASE that does not widen with the pool, so the first
+  // four-worker run of the split tree (35690977039) turned fourteen green cases
+  // into timeouts — every failure a timeout, not one an assertion — while buying
+  // the job 7 % of its wall clock. The CI-conditional shape is therefore
+  // REQUIRED, and this case exists so that neither half is changed in silence.
+  it('narrows the pool on CI, and nowhere else', () => {
+    expect(unitTest.maxWorkers).toBe(process.env.CI ? 2 : 4)
+    // Pinned on the SOURCE as well as on the value: read off the runner, the
+    // value alone would say nothing about what the runner gets.
     const source = readFileSync(new URL('../../vitest.config.ts', import.meta.url), 'utf8')
     const line = source.split('\n').find((l) => l.includes('maxWorkers:'))
     expect(line).toBeDefined()
-    expect(line).not.toMatch(/process\.env/)
+    expect(line).toMatch(/maxWorkers:\s*process\.env\.CI\s*\?\s*2\s*:\s*4\s*,/)
   })
 
   // The other half of the bargain: the ceiling was raised to stop LOAD failures,

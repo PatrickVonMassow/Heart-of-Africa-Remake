@@ -80,15 +80,33 @@ export default defineConfig({
     // CPU over-subscription and not memory pressure on the heavy files. That is
     // why no rearrangement of the suite can remove it, and why the wider pool is
     // worth exactly its 26 % and nothing more.
-    // WIDENING IS ONLY SAFE BECAUSE THE FLOOR WENT FIRST. A pool cannot finish a
+    // WIDENING NEEDED THE FLOOR TO GO FIRST, AND IT DID. A pool cannot finish a
     // run sooner than its slowest single FILE, and at four workers the old
     // `tagShuffle.test.ts` — 712 s of the two-worker run — would have grown to
     // roughly 1125 s: one file eating three quarters of the job's 25-minute
     // ceiling, with nothing but a `cancelled` to show for it. The same work now
-    // lies across thirteen files (work-order 1178, not one case shortened), so
-    // the floor is a fraction of the pool's own time and the width is what
-    // decides the wall clock again.
+    // lies across thirteen files (work-order 1178, not one case shortened).
+    // AND THE WIDENING STILL HAD TO BE TAKEN BACK, because the 1.58x above is
+    // not only a throughput figure — it is spent against `testTimeout`, which is
+    // WALL CLOCK PER CASE and does not widen with the pool. Measured on CI run
+    // 35690977039, the first four-worker run of the split tree: FOURTEEN cases
+    // red, every one of them `Test timed out`, not one an assertion —
+    // bankGame (6), layout (3), riverBank, layout.fabric, tagShuffle,
+    // tagShuffle.bankRoaming (which had already been given 120 s of its own) and
+    // roofClearance. Every case that took more than ~12.6 s at two workers fails
+    // at four. The gain did not pay for it either: 1329 s of `unit` against the
+    // 1434 s the two-worker `main` run took the same morning — 7 %, not 26 %,
+    // because the wall clock here is set by the job's longest pole and not by
+    // the pool's summed time.
+    // SO THE CHOICE IS MADE ON THE MEASUREMENT, as work-order 1178 asked: the CI
+    // half of the cap stands, and the reason is now a different one from the
+    // 2026-09-03 comment this file used to carry. It is NOT the `onTaskUpdate`
+    // starvation — `src/test/setup.ts` fixes that with its macrotask yield, and
+    // the cap never touched it. It is that four workers on a hosted runner cost
+    // every case 1.58x of its budget to buy the job 7 % of its wall clock.
+    // Widening it again needs BOTH halves measured: the wall clock AND a green
+    // case list.
     // THE LOCAL 4 STAYS, on its own measurement (29.07.2026, above).
-    maxWorkers: 4,
+    maxWorkers: process.env.CI ? 2 : 4,
   },
 })

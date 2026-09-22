@@ -52,9 +52,13 @@ if (typeof globalThis.ResizeObserver === 'undefined') {
 // CI runs of the same tree — 35683117792 at two workers, 35688934273 at four —
 // the same work takes 565.3 s summed at two and 894.7 s at four: each file runs
 // 1.58x slower at the wider pool, so the halving cost about a fifth of the
-// throughput, not close to half of it. `vitest.config.ts` carries the full
-// reading and the reason the cap is taken back there; the two files now say the
-// same thing, which they had not done for nineteen days.
+// throughput, not close to half of it.
+//
+// THE CAP STAYS ALL THE SAME, and for a reason that has nothing to do with this
+// paragraph: that same 1.58x is also spent against `testTimeout`, and four
+// workers turned fourteen green cases into timeouts (CI run 35690977039).
+// `vitest.config.ts` carries the full reading; the two files now say the same
+// thing, which they had not done for nineteen days.
 //
 // `setImmediate` is captured HERE, at module load, so a test that installs
 // fake timers and forgets to restore them cannot take the yield away; both it
