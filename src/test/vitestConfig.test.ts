@@ -11,6 +11,7 @@
 // pulled the ceiling back down would re-break the push under exactly the load
 // this project is designed to run at, so the number is asserted here with its
 // reason attached.
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import config from '../../vitest.config'
 
@@ -31,6 +32,27 @@ describe('the fast layer is timed to survive the agent pool (point 398)', () => 
     // 2 s to 15 s must be printed with its duration long before it is failed.
     expect(unitTest.slowTestThreshold).toBe(1000)
     expect(unitTest.slowTestThreshold!).toBeLessThan(unitTest.testTimeout! / 2)
+  })
+
+  // THE POOL WIDTH IS THE SAME KIND OF NUMBER, and it is now pinned in BOTH
+  // directions. It was narrowed on CI on 03.09.2026 against a guess that the
+  // very commit's own follow-up disproved 80 minutes later — that guess is gone
+  // from every file that carried it. The NARROWING stayed, on a different and
+  // measured reason (22.09.2026, written out in `vitest.config.ts`): four
+  // workers on a hosted runner run every file 1.58x slower, and `testTimeout` is
+  // wall clock PER CASE that does not widen with the pool, so the first
+  // four-worker run of the split tree (35690977039) turned fourteen green cases
+  // into timeouts — every failure a timeout, not one an assertion — while buying
+  // the job 7 % of its wall clock. The CI-conditional shape is therefore
+  // REQUIRED, and this case exists so that neither half is changed in silence.
+  it('narrows the pool on CI, and nowhere else', () => {
+    expect(unitTest.maxWorkers).toBe(process.env.CI ? 2 : 4)
+    // Pinned on the SOURCE as well as on the value: read off the runner, the
+    // value alone would say nothing about what the runner gets.
+    const source = readFileSync(new URL('../../vitest.config.ts', import.meta.url), 'utf8')
+    const line = source.split('\n').find((l) => l.includes('maxWorkers:'))
+    expect(line).toBeDefined()
+    expect(line).toMatch(/maxWorkers:\s*process\.env\.CI\s*\?\s*2\s*:\s*4\s*,/)
   })
 
   // The other half of the bargain: the ceiling was raised to stop LOAD failures,

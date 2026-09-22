@@ -61,11 +61,52 @@ export default defineConfig({
     // the SAME ~91 s wall clock, because the extra forks were queueing, not
     // running. The cap therefore costs no time and buys back the gate. Raise it
     // only against a measurement showing the wall clock actually falls.
-    // THE SAME STARVATION RETURNED ON CI (03.09.2026): three fast-job runs in
-    // one night, every test green (447 files / 14713 tests) and exit 1 on the
-    // identical `Timeout calling "onTaskUpdate"` — the hosted runner has ~4
-    // cores, so 4 workers there is the very over-subscription the cap above
-    // fixed locally on 16. On CI the pool leaves a core for the main thread.
+    // THE CI HALF OF THIS CAP IS TAKEN BACK (22.09.2026) — BUT NOT FOR THE
+    // REASON EITHER OF THE TWO OLD COMMENTS GAVE. On 03.09.2026 the hosted runs
+    // died four times on `Timeout calling "onTaskUpdate"`; at 03:54 the pool was
+    // halved on CI (1b389d2a0), and 80 minutes later the real fix landed as one
+    // macrotask yield per test (0d6746072). The cap stayed, this file claimed it
+    // had fixed the starvation, and `src/test/setup.ts` claimed it had cost 43 %
+    // of the wall clock. Neither claim survived being measured.
+    // WHAT THE WIDTH REALLY COSTS AND BUYS, measured 22.09.2026 over the 442
+    // test files that finished in BOTH of two CI runs of the same tree
+    // (35683117792 at two workers, 35688934273 at four): the same work takes
+    // 565.3 s summed at two and 894.7 s at four. Every file is 1.58x slower at
+    // the wider pool, so doubling the workers buys 1.26x throughput — a real
+    // gain, and less than half the 43 % the other file asserted. The runner IS
+    // over-subscribed at four; it is simply not over-subscribed enough to lose.
+    // AND THE SLOWDOWN IS FLAT ACROSS FILE SIZES — 1.64x under a second, 1.63x
+    // at 1-5 s, 1.51x at 5-20 s, 1.57x at 20-60 s, 1.69x above — so it is plain
+    // CPU over-subscription and not memory pressure on the heavy files. That is
+    // why no rearrangement of the suite can remove it, and why the wider pool is
+    // worth exactly its 26 % and nothing more.
+    // WIDENING NEEDED THE FLOOR TO GO FIRST, AND IT DID. A pool cannot finish a
+    // run sooner than its slowest single FILE, and at four workers the old
+    // `tagShuffle.test.ts` — 712 s of the two-worker run — would have grown to
+    // roughly 1125 s: one file eating three quarters of the job's 25-minute
+    // ceiling, with nothing but a `cancelled` to show for it. The same work now
+    // lies across thirteen files (work-order 1178, not one case shortened).
+    // AND THE WIDENING STILL HAD TO BE TAKEN BACK, because the 1.58x above is
+    // not only a throughput figure — it is spent against `testTimeout`, which is
+    // WALL CLOCK PER CASE and does not widen with the pool. Measured on CI run
+    // 35690977039, the first four-worker run of the split tree: FOURTEEN cases
+    // red, every one of them `Test timed out`, not one an assertion —
+    // bankGame (6), layout (3), riverBank, layout.fabric, tagShuffle,
+    // tagShuffle.bankRoaming (which had already been given 120 s of its own) and
+    // roofClearance. Every case that took more than ~12.6 s at two workers fails
+    // at four. The gain did not pay for it either: 1329 s of `unit` against the
+    // 1434 s the two-worker `main` run took the same morning — 7 %, not 26 %,
+    // because the wall clock here is set by the job's longest pole and not by
+    // the pool's summed time.
+    // SO THE CHOICE IS MADE ON THE MEASUREMENT, as work-order 1178 asked: the CI
+    // half of the cap stands, and the reason is now a different one from the
+    // 2026-09-03 comment this file used to carry. It is NOT the `onTaskUpdate`
+    // starvation — `src/test/setup.ts` fixes that with its macrotask yield, and
+    // the cap never touched it. It is that four workers on a hosted runner cost
+    // every case 1.58x of its budget to buy the job 7 % of its wall clock.
+    // Widening it again needs BOTH halves measured: the wall clock AND a green
+    // case list.
+    // THE LOCAL 4 STAYS, on its own measurement (29.07.2026, above).
     maxWorkers: process.env.CI ? 2 : 4,
   },
 })
