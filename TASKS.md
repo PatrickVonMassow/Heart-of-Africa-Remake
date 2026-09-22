@@ -16174,6 +16174,42 @@ to land than a mechanism that needs a review.
   35580966090
   Bundle: Session- & Repo-Hygiene.
 
+- [ ] 1188. A daemon checkpoint acknowledges one SHA while another is what actually landed, and
+  the red it makes on `main` blocks every push (measured 22.09.2026 while carrying out the
+  user's reorder of 1184 and 1183).
+  WHAT FAILED: CI run 35734686008 for `origin/main` 2102185 concluded "failure" on the `fast`
+  job's unit stage — `scripts/batch-daemon.test.mjs:303`, "the daemon lifecycle in the sandbox >
+  gets a checkpoint acknowledged with the pushed SHA". The assertion is
+  `expect(git(['rev-parse', 'feat/stub'], originDir)).toBe(answer.sha)`; the origin's
+  `feat/stub` stood at `35f9510bed0fdf3b9cc42b35092ee4b679369d1e` while the acknowledged
+  checkpoint reported `ad663c029ce71f4c889bce8e0ba72046e977215b`. Everything else was green: 528
+  of 529 files, 16 289 tests, 11 skipped, 875.69 s.
+  THAT IT IS NOT THE COMMIT'S CONTENT IS MEASURED. 2102185 refreshes the retrospective and
+  touches no daemon path. The whole file ran 25 of 25 green on this host in 24.68 s, and the
+  pre-push gate of 8fd8135c5 ran the same 529 files green minutes later. So the divergence
+  appears only under CI timing.
+  WHAT IT COSTS, and why this is a point rather than a backlog line: `ci-status-guard` holds
+  every main action until a fixing push, so an unowned red on `main` stops the batch. It stopped
+  this one, and only the next push superseded the red sha — which clears the guard without
+  clearing the cause.
+  IT IS NOT POINT 1171. That point owns a `bankGame` case running into its own 20 s per-test
+  bound; this is a SHA comparison in the daemon's checkpoint bookkeeping, a different test and a
+  different mechanism. It is not point 901 either, which owns a run CANCELLED by the workflow's
+  own concurrency rule rather than a failing assertion.
+  WHAT IS NOT MEASURED, named rather than assumed: whether the acknowledged SHA is read before
+  the push completes or the origin is read after a later push, i.e. which of the two sides is
+  early; whether the drill's own sandbox origin can receive a second push inside the window;
+  and whether the case reproduces on a loaded local host.
+  Final state: the acknowledgement and the ref it names cannot disagree — either the checkpoint
+  reports the SHA it actually pushed, or the test reads the ref at the moment the answer was
+  formed. A re-run that happens to pass does not close this point (point 640).
+  Test: `npx vitest run scripts/batch-daemon.test.mjs` green on a quiet host with its duration
+  printed, plus the case green over three consecutive CI runs.
+  Criticality: medium — no player loses anything, but it reds `main` for a reason no diff
+  explains and blocks the push gate the whole batch pays at.
+  Refs: scripts/batch-daemon.test.mjs:303, scripts/batch-daemon.mjs, CI run 35734686008
+  Bundle: Session- & Repo-Hygiene.
+
 - [ ] 1172. The dig-pair picture check finds no adults at all at the shutter and reds the whole
   `polish` pass (measured 21.09.2026 while landing point 1158).
   WHAT FAILED: `polish --section=adult-errands`, WebGPU, on `feat/1158-escape-cooldown-return`
