@@ -44,7 +44,11 @@ if (typeof globalThis.ResizeObserver === 'undefined') {
 // that ordinary synchronous files reach the deadline between two of them.
 // Capping the CI pool at two workers did not touch it (1b389d2a0) and cost the
 // run 43 % of its wall clock, which is the measurement that rules out
-// over-subscription as the cause.
+// over-subscription as the cause. THAT CAP STOOD ANYWAY UNTIL 22.09.2026, when
+// its price came due — the `fast` job hit its 25-minute ceiling and was
+// recorded `cancelled` — and `vitest.config.ts` claimed the opposite of this
+// paragraph the whole time. The yield below is what holds the RPC open; the
+// pool width is not, and must not be narrowed again in its name.
 //
 // `setImmediate` is captured HERE, at module load, so a test that installs
 // fake timers and forgets to restore them cannot take the yield away; both it

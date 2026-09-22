@@ -11,6 +11,7 @@
 // pulled the ceiling back down would re-break the push under exactly the load
 // this project is designed to run at, so the number is asserted here with its
 // reason attached.
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import config from '../../vitest.config'
 
@@ -31,6 +32,24 @@ describe('the fast layer is timed to survive the agent pool (point 398)', () => 
     // 2 s to 15 s must be printed with its duration long before it is failed.
     expect(unitTest.slowTestThreshold).toBe(1000)
     expect(unitTest.slowTestThreshold!).toBeLessThan(unitTest.testTimeout! / 2)
+  })
+
+  // THE POOL WIDTH IS THE SAME KIND OF NUMBER, and it is pinned for the same
+  // reason: it was narrowed on CI on 03.09.2026 against a guess that the very
+  // commit's own follow-up disproved 80 minutes later, and the narrowing then
+  // stood for nineteen days at 43 % of the run's wall clock until the job hit
+  // its 25-minute ceiling and was recorded `cancelled`. A future "let us be
+  // careful on the hosted runner" would buy that back, so the CI-conditional
+  // shape is what this case forbids — not the number alone.
+  it('uses one pool width everywhere, with no CI-conditional narrowing', () => {
+    expect(unitTest.maxWorkers).toBe(4)
+    // The value must not depend on the environment the config is READ in: a
+    // `process.env.CI ? … : …` would make this assertion pass locally and mean
+    // something else on the runner, which is exactly how the last one survived.
+    const source = readFileSync(new URL('../../vitest.config.ts', import.meta.url), 'utf8')
+    const line = source.split('\n').find((l) => l.includes('maxWorkers:'))
+    expect(line).toBeDefined()
+    expect(line).not.toMatch(/process\.env/)
   })
 
   // The other half of the bargain: the ceiling was raised to stop LOAD failures,

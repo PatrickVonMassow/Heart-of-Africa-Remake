@@ -61,11 +61,25 @@ export default defineConfig({
     // the SAME ~91 s wall clock, because the extra forks were queueing, not
     // running. The cap therefore costs no time and buys back the gate. Raise it
     // only against a measurement showing the wall clock actually falls.
-    // THE SAME STARVATION RETURNED ON CI (03.09.2026): three fast-job runs in
-    // one night, every test green (447 files / 14713 tests) and exit 1 on the
-    // identical `Timeout calling "onTaskUpdate"` — the hosted runner has ~4
-    // cores, so 4 workers there is the very over-subscription the cap above
-    // fixed locally on 16. On CI the pool leaves a core for the main thread.
-    maxWorkers: process.env.CI ? 2 : 4,
+    // THE CI HALF OF THIS CAP WAS A DISPROVED GUESS, and it is taken back here
+    // (22.09.2026). On 03.09.2026 the hosted runs died four times on the same
+    // `Timeout calling "onTaskUpdate"`, and at 03:54 the pool was halved on CI
+    // against the guess that four workers over-subscribed the runner
+    // (1b389d2a0). It did not help. The fix landed 80 minutes later as one
+    // macrotask yield per test (0d6746072), and the comment that carries it —
+    // `src/test/setup.ts`, the later and better-informed account of that same
+    // night — records BOTH halves of what happened: the cap "did not touch it"
+    // and it "cost the run 43 % of its wall clock". Nobody reverted it, and
+    // this file went on claiming the opposite for nineteen days.
+    // WHAT IT COST, read off the `unit` step's own banner in the green run
+    // 35683117792 (1438.31 s wall): tests 2219.68 s of SUMMED worker time,
+    // environment 361.19 s, collect 110.06 s. At two workers that is roughly
+    // 1110 s of wall clock in tests alone, on a runner the repository's public
+    // visibility gives four cores. The proof that it really is wider than two
+    // is the 43 % itself: on a two-core runner, dropping from four workers to
+    // two costs nothing, because the extra forks only queue — which is exactly
+    // the argument the local cap below rests on.
+    // THE LOCAL 4 STAYS, on its own measurement (29.07.2026, above).
+    maxWorkers: 4,
   },
 })
