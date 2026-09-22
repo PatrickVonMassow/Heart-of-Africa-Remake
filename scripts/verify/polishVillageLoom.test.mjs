@@ -48,7 +48,8 @@ class Vec {
 afterEach(() => vi.unstubAllGlobals())
 
 async function photograph({
-  blocked = false, moves = true, arms = true, called = true, parked = false, helperAt = 1.6, water = true, labelOn = true,
+  blocked = false, moves = true, arms = true, called = true, parked = false, returning = false, arrivesOnShutter = false,
+  helperAt = 1.6, water = true, labelOn = true,
 } = {}) {
   if (!called) helperAt = 0.2
   if (parked) helperAt = 2.4
@@ -58,11 +59,12 @@ async function photograph({
     const p = get()
     return { elements: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, p.x, p.y, p.z, 1] }
   } })
-  // Walking, he faces along the warp (yaw 0); parked at his stand he has
-  // turned to the threads (π/2), exactly as the scene sets him.
+  // Walking OUT on the downstream side he faces yaw 0; on his way back he
+  // faces π; parked at his stand he has turned to the threads (π/2) —
+  // exactly as the scene sets him.
   const helper = {
     position: { x: 0.45, y: 0, z: helperAt },
-    rotation: { y: parked ? Math.PI / 2 : 0 },
+    rotation: { y: parked ? Math.PI / 2 : returning ? Math.PI : helperAt < 0 ? Math.PI : 0 },
     ...object(() => ({ x: 0.45, y: 0, z: -3 + helperAt })),
   }
   // Her two hands, riding the shuttle throw — or frozen beside it.
@@ -136,7 +138,16 @@ async function photograph({
       viewportSize: () => VIEW,
     },
     (name, pass, detail) => checks.push({ name, pass, detail }),
-    async (name, subject) => { frames.push({ name, subject }); return png(shot++ && moves ? 1 : 0, water) },
+    async (name, subject) => {
+      frames.push({ name, subject })
+      // A helper who reaches his stand while the shutter is open: the state
+      // read before the photograph held, the picture does not show it.
+      if (arrivesOnShutter && name.endsWith('named-tending')) {
+        helper.position.z = 2.4
+        helper.rotation.y = Math.PI / 2
+      }
+      return png(shot++ && moves ? 1 : 0, water)
+    },
     async () => {}, async () => {}, sharp,
   )
   return { state, checks, frames, player }
@@ -184,13 +195,23 @@ it('names the direction the helper actually walked in the frame it writes', asyn
   expect(up.frames.at(-1).subject.label).toContain('upstream')
 })
 
-it('a helper parked at his stand is not part-way along the warp', async () => {
-  const { checks, frames } = await photograph({ parked: true })
-  expect(checks.find(c => c.name.includes('sends her helper')).pass).toBe(false)
-  expect(frames.map(f => f.name)).toEqual([
-    '1157-village-loom-working-a',
-    '1157-village-loom-working-b',
-  ])
+it('a helper parked at his stand, or on his way back, is not carrying the word out', async () => {
+  for (const setup of [{ parked: true }, { returning: true }]) {
+    const { checks, frames } = await photograph(setup)
+    expect(checks.find(c => c.name.includes('sends her helper')).pass, JSON.stringify(setup)).toBe(false)
+    expect(frames.map(f => f.name)).toEqual([
+      '1157-village-loom-working-a',
+      '1157-village-loom-working-b',
+    ])
+  }
+})
+
+it('the shutter is bracketed: a helper who arrives while the picture is taken reads red', async () => {
+  const good = await photograph()
+  expect(good.checks.find(c => c.name.startsWith('he was still walking out')).pass).toBe(true)
+  const late = await photograph({ arrivesOnShutter: true })
+  expect(late.checks.find(c => c.name.startsWith('he is part-way')).pass).toBe(true)
+  expect(late.checks.find(c => c.name.startsWith('he was still walking out')).pass).toBe(false)
 })
 
 it('the teaching frame needs her reading on the screen and the river in the picture', async () => {

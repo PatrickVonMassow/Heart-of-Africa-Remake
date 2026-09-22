@@ -604,6 +604,10 @@ function Loom({
   const helper = useRef<THREE.Group>(null)
   const cadence = useMemo(() => gaitCadence(FIGURE_LIMBS.hipY), [])
   const walked = useRef(0)
+  // Where his stride settles when he stops — the Kids' mechanism, so a helper
+  // tending the warp or waiting at her side stands on both feet rather than
+  // frozen mid-stride (GPT-6 Astra review, second round).
+  const gaitOffset = useRef(0)
 
   const childrenHear = useCallback(
     (x: number, z: number) => {
@@ -669,9 +673,14 @@ function Loom({
     // drawn in the loom's own frame, so his walk IS the warp's direction.
     const moved = Math.abs(picture.helperAt - before)
     walked.current += moved
-    helperGait.current = gaitPhase(walked.current, cadence)
+    const stride = gaitPhase(walked.current, cadence)
+    if (moved <= 1e-6) gaitOffset.current = restingPhase(stride + gaitOffset.current, dt) - stride
+    const phase = stride + gaitOffset.current
+    helperGait.current = phase
     if (helper.current) {
-      helper.current.position.set(waterSide * HELPER_SIDE_OFFSET, 0, picture.helperAt)
+      // Dropped onto his stance leg, so the swinging feet ride the ground
+      // instead of hanging above it.
+      helper.current.position.set(waterSide * HELPER_SIDE_OFFSET, gaitBodyLift(phase, FIGURE_LIMBS.hipY), picture.helperAt)
       // Walking, he faces the way he is going — which is the word. Working or
       // home, he faces the warp he is tending.
       const walking = work.errand !== null && work.errand.phase !== 'work' && moved > 1e-6

@@ -6117,27 +6117,34 @@ if (section('village-loom')) {
         const s = window.__placeLayout.loom
         return Math.hypot(s.tend.downstream.x - s.seat.x, s.tend.downstream.z - s.seat.z)
       })
-      // PART-WAY AND WALKING (GPT-6 Astra review, pass 4): a helper parked at his
-      // stand, or standing beyond it, is not a body carrying a direction. He
-      // faces the way he walks (0 or π) and turns to the warp when he stands
-      // (±π/2), so the scene itself says which. The word falls a few times a
-      // minute, so the wait is generous.
-      const called = await page.waitForFunction((limit) => {
+      // PART-WAY, AND WALKING OUT (GPT-6 Astra review, two rounds): a helper
+      // parked at his stand, standing beyond it, or on his way BACK is not a
+      // body carrying the word she said. He faces the way he walks (0 toward
+      // downstream, π toward upstream) and turns to the warp when he stands
+      // (±π/2), so outward is the facing that matches the side he is on — and
+      // her reading must still stand, because it is the word his walk means.
+      // The word falls a few times a minute, so the wait is generous.
+      const helperState = (limit) => {
         const helper = window.__placeScene?.getObjectByName('village-loom-helper')
-        if (!helper) return false
-        const along = Math.abs(helper.position.z)
-        const walking = Math.abs(Math.abs(helper.rotation.y) - Math.PI / 2) > 0.1
-        return walking && along > 0.4 && along < limit
-      }, tendStand - 0.4, { timeout: 60000 }).then(() => true).catch(() => false)
-      check('the weaver’s call sends her helper part-way along the warp, and he is walking it', called)
+        if (!helper) return null
+        const along = helper.position.z
+        const yaw = helper.rotation.y
+        const outward = along > 0 ? Math.abs(yaw) < 0.1 : Math.abs(Math.abs(yaw) - Math.PI) < 0.1
+        const reading = (window.__speech?.labels() ?? []).some(l => l.speakerId === 'village-weaver')
+        return { along, partWay: Math.abs(along) > 0.4 && Math.abs(along) < limit, outward, reading }
+      }
+      const called = await page.waitForFunction(({ src, limit }) => {
+        const s = new Function('limit', 'return (' + src + ')(limit)')(limit)
+        return !!s && s.partWay && s.outward && s.reading
+      }, { src: helperState.toString(), limit: tendStand - 0.4 }, { timeout: 60000 }).then(() => true).catch(() => false)
+      check('the weaver’s call sends her helper part-way along the warp, and he is walking it OUT under her reading', called)
       if (called) {
         const view = page.viewportSize()
-        const teaching = await page.evaluate(({ width, height, limit }) => {
-          const helper = window.__placeScene.getObjectByName('village-loom-helper')
+        const teaching = await page.evaluate(({ width, height, limit, src }) => {
           const layout = window.__placeLayout
           const station = layout.loom
-          const along = helper.position.z
-          const labels = window.__speech?.labels() ?? []
+          const state = new Function('limit', 'return (' + src + ')(limit)')(limit)
+          const along = state.along
           const screen = window.__speech?.anchorScreen('village-weaver') ?? null
           // Three points ON THE WATER: three metres beyond the waterline
           // straight out from her seat, and a stride either way along the
@@ -6158,20 +6165,17 @@ if (section('village-loom')) {
               })
             : []
           return {
-            along,
-            partWay: Math.abs(along) > 0.3 && Math.abs(along) < limit,
-            walking: Math.abs(Math.abs(helper.rotation.y) - Math.PI / 2) > 0.1,
+            ...state,
             toward: along > 0 ? 'DOWNSTREAM' : 'UPSTREAM',
-            reading: labels.some(l => l.speakerId === 'village-weaver'),
             screen,
             labelOnScreen: !!screen && screen.x >= 0 && screen.x <= width && screen.y >= 0 && screen.y <= height,
             water,
           }
-        }, { width: view.width, height: view.height, limit: tendStand })
+        }, { width: view.width, height: view.height, limit: tendStand, src: helperState.toString() })
         check('her reading stands over her own head while he walks — and ON the screen',
           teaching.reading && teaching.labelOnScreen, JSON.stringify(teaching))
-        check('he is part-way along the warp and still walking when the picture is taken',
-          teaching.partWay && teaching.walking, JSON.stringify({ along: teaching.along, walking: teaching.walking }))
+        check('he is part-way along the warp and still walking out before the picture is taken',
+          teaching.partWay && teaching.outward, JSON.stringify({ along: teaching.along, outward: teaching.outward }))
         // The frame declares the HELPER as its subject: he is what the word
         // means, and a picture that lost him would prove nothing.
         const helperWorld = await page.evaluate(() => {
@@ -6184,6 +6188,15 @@ if (section('village-loom')) {
           local: { x: helperWorld.x, y: helperWorld.y + 0.6, z: helperWorld.z },
           label: `the helper ${teaching.toward.toLowerCase()} along the warp after the weaver named it, her reading over her head and the river beyond`,
         })
+        // THE SHUTTER IS BRACKETED: the same state read again AFTER the frame.
+        // His walk out is monotone and her reading only ever ends, so a state
+        // that held before the shutter and still holds after it held at the
+        // shutter too — a helper who arrived, or a reading that faded, while
+        // the photograph was being taken is caught here.
+        const after = await page.evaluate(({ src, limit }) => new Function('limit', 'return (' + src + ')(limit)')(limit),
+          { src: helperState.toString(), limit: tendStand })
+        check('he was still walking out under her reading when the shutter closed',
+          !!after && after.partWay && after.outward && after.reading, JSON.stringify(after))
         // THE WATER IS IN THE PICTURE (item 10): read off the captured frame at
         // the projected water points, not assumed from the stand. Water is the
         // one blue-dominant ground in this village; sand, cloth and a body in
