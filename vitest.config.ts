@@ -1,7 +1,8 @@
 import { defineConfig } from 'vitest/config'
 
 // Fast, deterministic unit/component layer (CLAUDE.md §7.2): pure logic, store
-// transitions and the HTML HUD components run in jsdom with no browser or dev
+// transitions and the HTML HUD components run in jsdom; tooling runs in Node.
+// Neither environment needs a browser or dev
 // server, so the bulk of the regression finishes in seconds and never flickers
 // on RAF/browser timing. The remaining browser-only checks stay in Playwright
 // (scripts/verify/*.mjs).
@@ -13,12 +14,28 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig({
   esbuild: { jsx: 'automatic', jsxImportSource: 'react' },
   test: {
-    environment: 'jsdom',
-    // scripts/**/*.test.mjs covers the plain-JS tooling layer (the dashboard
-    // Stop-hook guard's decision logic, the regression runner's suite→tier→
-    // backend map) — pure modules, no game imports.
-    include: ['src/**/*.test.{ts,tsx}', 'scripts/**/*.test.mjs'],
-    setupFiles: ['./src/test/setup.ts'],
+    // Both projects inherit the native macrotask yield, timeouts and transforms.
+    // Only the app pays for jsdom and React Testing Library setup.
+    setupFiles: ['./src/test/yieldSetup.ts'],
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: 'tooling',
+          environment: 'node',
+          include: ['scripts/**/*.test.mjs'],
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: 'app',
+          environment: 'jsdom',
+          include: ['src/**/*.test.{ts,tsx}'],
+          setupFiles: ['./src/test/setup.ts'],
+        },
+      },
+    ],
     // The suite itself is a hostile boundary: a fixture that escapes through a
     // script's source-derived root must turn the whole run red if it changes a
     // running checkout's HEAD/index/branch ref or the shared config. Foreign
@@ -66,7 +83,7 @@ export default defineConfig({
     // died four times on `Timeout calling "onTaskUpdate"`; at 03:54 the pool was
     // halved on CI (1b389d2a0), and 80 minutes later the real fix landed as one
     // macrotask yield per test (0d6746072). The cap stayed, this file claimed it
-    // had fixed the starvation, and `src/test/setup.ts` claimed it had cost 43 %
+    // had fixed the starvation, and `src/test/yieldSetup.ts` claimed it had cost 43 %
     // of the wall clock. Neither claim survived being measured.
     // WHAT THE WIDTH REALLY COSTS AND BUYS, measured 22.09.2026 over the 442
     // test files that finished in BOTH of two CI runs of the same tree
@@ -101,7 +118,7 @@ export default defineConfig({
     // SO THE CHOICE IS MADE ON THE MEASUREMENT, as work-order 1178 asked: the CI
     // half of the cap stands, and the reason is now a different one from the
     // 2026-09-03 comment this file used to carry. It is NOT the `onTaskUpdate`
-    // starvation — `src/test/setup.ts` fixes that with its macrotask yield, and
+    // starvation — `src/test/yieldSetup.ts` fixes that with its macrotask yield, and
     // the cap never touched it. It is that four workers on a hosted runner cost
     // every case 1.58x of its budget to buy the job 7 % of its wall clock.
     // Widening it again needs BOTH halves measured: the wall clock AND a green
