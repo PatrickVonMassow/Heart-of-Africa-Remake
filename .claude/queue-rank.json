@@ -1399,12 +1399,6 @@
       "origin": "machine",
       "place": "ahead"
     },
-    "1182": {
-      "at": "2026-09-22T09:30:44.889Z",
-      "why": "Der Nutzer hat den Bugreport heute gemeldet und ausdrücklich gesagt: beides kritisch, direkt als nächstes beheben",
-      "origin": "user",
-      "place": "ahead"
-    },
     "1183": {
       "at": "2026-09-22T09:53:41.277Z",
       "why": "Der Nutzer hat am 22.09.2026 die Entscheidungskarte beantwortet und den Punkt ausdrücklich direkt hinter 1181 bestellt",
@@ -1416,6 +1410,12 @@
       "why": "Der Nutzer hat den Punkt am 22.09.2026 ausdrücklich direkt hinter 1183 bestellt",
       "origin": "user",
       "place": "ahead"
+    },
+    "1187": {
+      "at": "2026-09-22T13:28:41.849Z",
+      "why": "Testinfrastruktur hinter der Release-Reihenfolge: zuerst die Kommunikationsmechanik, dann 633, dann 174 — ein rotierender Pruefschritt kostet Laufzeit, aber keinen Spielzustand, und Punkt 642 entscheidet die Klasse ohnehin vor ihm.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1447,7 +1447,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-22T10:04:55.681Z",
+    "at": "2026-09-22T13:28:41.859Z",
     "points": [
       174,
       184,
@@ -1858,9 +1858,11 @@
       1177,
       1179,
       1181,
-      1182,
       1183,
-      1184
+      1184,
+      1185,
+      1186,
+      1187
     ]
   }
 }
