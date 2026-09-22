@@ -911,7 +911,10 @@ export const LIMITS = {
   // words after both tightenings: 6847 -> 6882.
   // 21.09.2026 (second): the jointly-blind-guards clause justified beside maxLines measures 22
   // words: 6882 -> 6904.
-  maxWords: 6904,
+  // 22.09.2026: the click lesson of 21.09. had overrun both ceilings (708 lines,
+  // 6957 words); trimmed back into the guide's own budget with two neighbouring
+  // sentences losing filler. Net: -2 words. 6904 -> 6902.
+  maxWords: 6902,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,

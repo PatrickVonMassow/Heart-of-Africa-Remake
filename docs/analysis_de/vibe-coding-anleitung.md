@@ -421,12 +421,12 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   während fertige, ungesicherte Arbeit danebenliegt.
   → *Prompt:* „Eine **verneinende** Meldung nennt den **gemessenen** Zustand, den sie verneint."
 
-- **Einigkeit und Erfolg sind keine Evidenz.** Modelle liegen gemeinsam daneben, und
-  „es lief durch" beweist den Weg nicht.
+- **Einigkeit und Erfolg sind keine Evidenz.** Modelle liegen gemeinsam daneben, und „es lief
+  durch" beweist weder den Weg noch die Automatik.
   → *Prompt:* „Welcher **eine Test** macht die Ursache **sichtbar**? Sag **vor** der Messung,
   welches Ergebnis welche Erklärung ausschließt."
 
-- **Zwei Aufträge für einen Fehler.** Derselbe Mangel wird arglos ein zweites Mal aufgeschrieben.
+- **Zwei Aufträge für einen Fehler.** Derselbe Mangel wird ein zweites Mal aufgeschrieben.
   → *Prompt:* „Vor jedem neuen Punkt: Such die offenen nach demselben Problem ab und **erweitere**
   den vorhandenen. Verwirfst du einen Zweig, rette, was darin über seinen Auftrag hinausgeht."
 
@@ -440,7 +440,7 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   die **Nachbarschaft** und schreib es als Test."
 
 - **Der erste Fehlschlag macht sich selbst dauerhaft.** Eine wiederkehrende Aufgabe liest ihre
-  eigene Spur, die es beim ersten Lauf nicht gibt — und bricht von da an immer ab.
+  eigene Spur, die es beim ersten Lauf nicht gibt, und bricht fortan ab.
   → *Prompt:* „Prüf jede wiederkehrende Aufgabe gegen den **leeren Zustand**. ‚Übersprungen' ist
   **kein Betriebszustand** — was sie nicht tut, meldet sie laut."
 
@@ -703,4 +703,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 8f954caaf45ed114fb1d566f6dfbdd6aa2807c2112bdee2b0539d3d40c2189a0 -->
+<!-- GUIDE-FINGERPRINT: ba6e49c09d43dd55506d878412342a3d33a32cd610110c38376c6ba15ef98cf5 -->
