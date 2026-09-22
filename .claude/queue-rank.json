@@ -1398,6 +1398,12 @@
       "why": "Die 25-Minuten-Decke des unit-Jobs hat auf main selbst schon einen Lauf storniert (35696684799, abgeschnitten bei 25:18), und ein cancelled nennt keine Ursache und wird von keinem Push geklaert — es wuerde die CI der Release-Punkte 633 und 174 genauso treffen wie jede andere.",
       "origin": "machine",
       "place": "ahead"
+    },
+    "1182": {
+      "at": "2026-09-22T09:30:44.889Z",
+      "why": "Der Nutzer hat den Bugreport heute gemeldet und ausdrücklich gesagt: beides kritisch, direkt als nächstes beheben",
+      "origin": "user",
+      "place": "ahead"
     }
   },
   "boundary": {
@@ -1429,7 +1435,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-22T09:14:21.763Z",
+    "at": "2026-09-22T09:30:44.904Z",
     "points": [
       174,
       184,
@@ -1839,7 +1845,8 @@
       1176,
       1177,
       1179,
-      1181
+      1181,
+      1182
     ]
   }
 }

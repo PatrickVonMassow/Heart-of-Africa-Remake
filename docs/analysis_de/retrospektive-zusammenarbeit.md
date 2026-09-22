@@ -1686,7 +1686,7 @@ stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die s
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Dienstag, 22.09.2026, 06:43 · Quellen-Fingerprint: `b98c8827d0f9…`
+Zuletzt aktualisiert: Dienstag, 22.09.2026, 11:33 · Quellen-Fingerprint: `014fd45634f9…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1794,8 +1794,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 98 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 7 Revert-/Reapply-Commits · 137 Prozess-/Meta-TASKS-Punkte (davon 65 offen).
 
-<!-- RETRO-FINGERPRINT: b98c8827d0f9fe718c7108716140ba938e4aa883745db86dbddc45a0cfb41252 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-22T04:43:46.044Z -->
+<!-- RETRO-FINGERPRINT: 014fd45634f93ef6d9b6032ed9072643e008510268166a8d433b6d2e0de9f96c -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-22T09:33:23.296Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -8020,3 +8020,31 @@ Kosten anfallen.
 ist keine Vorsicht, sondern eine Rechnung ohne Gegenleistung. Und ein Kommentar, der eine
 Einstellung begründet, ist mit ihr zu prüfen: Steht die Widerlegung in einer anderen Datei,
 gewinnt sie nicht von allein.
+
+### 3.302 Der Kommentar berief sich auf ein Sicherheitsnetz, das nie angeschlossen wurde
+
+Am 22.09.2026 meldete der Nutzer zwei Dinge aus derselben Spielrunde: Ein Erwachsener stand
+regungslos am Dorffeuer, und in derselben Zeit holte niemand Wasser. Zwei Minuten später die
+Entwarnung — „er hat sich doch irgendwie befreit". Die Entwarnung war der Beweis. Nichts hatte
+sich repariert; eine Frist von 300 Sekunden war abgelaufen.
+
+Die Frist ist mit Sorgfalt hergeleitet. Der Kommentar in `balance.ts` rechnet den Rundweg über
+drei Flussdörfer und zwanzig Saaten vor, begründet die 300 Sekunden als das 3,6-fache der
+gemessenen Luftlinie und schließt mit dem Satz, ein wirklich festsitzender Dorfbewohner werde
+von `stallSeconds` **längst vorher** freigelassen. Genau darauf ruht die Großzügigkeit des
+Wertes. Nur wird `stallSeconds` nirgends gelesen: Er steht im Konfigurationstyp, steht mit 20
+Sekunden in der Bilanz, ist im Debug-Menü als Schieberegler sichtbar — und kam am 02.09.2026 in
+den Code, ohne je einen Verbraucher zu bekommen.
+
+Das Tückische daran ist die Beweislage. Ein Wert, der nirgends steht, fällt beim Lesen auf. Ein
+Wert, der an drei Stellen steht — Typ, Bilanz, Bedienoberfläche — sieht in jeder einzelnen
+davon nach einem lebenden Mechanismus aus, und der Schieberegler im Debug-Menü behauptet
+zusätzlich, man könne ihn zur Laufzeit erproben. Der Kommentar, der sich auf ihn beruft, liest
+sich wie eine Prüfung und ist doch nur eine Annahme. Die Rechnung kam beim Spieler an: fünf
+Minuten sichtbar kaputtes Dorf, und weil ein laufender Wassergang den nächsten sperrt, in
+diesen fünf Minuten gar kein Wasserholen.
+
+**Lehre:** Beruft sich ein Kommentar auf einen anderen Mechanismus, ist dieser Bezug Teil der
+Aussage und wird wie sie geprüft — ein `grep` nach dem Namen, bevor man sich auf ihn verlässt.
+Und ein eingestellter, bedienbarer Wert ohne Leser ist schlimmer als gar keiner: Er verspricht
+ein Sicherheitsnetz, und alle folgenden Entscheidungen rechnen mit ihm.
