@@ -959,6 +959,17 @@ put it is the mistake this line exists to stop.
   exits, and the run dies rather than reports — so it covers no backend, no red in it can
   be charged, and only a hand-signed crash sign-off gets it off the guard's list. Three
   such crashed records stood on `main` when 1140 landed.
+  A THIRD FRAME, AND THE FIRST THAT IS REPRODUCIBLE ON DEMAND (measured 22.09.2026 during the
+  covering runs of point 1182): `648-village-children` (polish, WebGL 2) misses its subject off
+  the BOTTOM edge and takes the pass with it — twice in a row, at 166 checks and 36 frames after
+  19m 41s and 19m 35s, on the same tree e1b7d1561. Its OWN section is green on both sides:
+  `polish --section=children-tag` passes 16/16 at e1b7d1561 AND at `main` 86c4babaf, WebGL 2,
+  minutes apart. So the frame misses only INSIDE the pass — something earlier in the run leaves
+  the children or the camera where the section never finds them — and the same wording was
+  already recorded inside a full WebGPU pass on `main` at 9259d6dd8 earlier that day, with its
+  section green right after. That makes this the cheapest reproduction of both questions below:
+  the miss has a section-versus-pass difference to measure, and the throw costs a whole pass
+  every time it happens.
   SO THERE ARE TWO QUESTIONS, and the second is the expensive one:
   1. WHY THESE TWO FRAMES MISS. A travel that stops short is a game defect; a wait that
      expires on a camera still moving is a suite defect. The printed evidence names both
@@ -16283,3 +16294,37 @@ to land than a mechanism that needs a review.
   invisible in exactly the minutes the rule of 28.07.2026 exists to cover.
   Refs: scripts/batch-in-flight.mjs, scripts/board-publish.mjs
   Bundle: Testinfrastruktur.
+
+- [ ] 1187. The weaver's hand check rotates: it reds inside the pass and greens on its own
+  section, at the same tree (measured 22.09.2026 during the covering run of point 1182).
+  WHAT WAS MEASURED, three runs, one machine, all WebGPU and all quiet:
+  · full `polish` at e1b7d1561 — RED: "BOTH her hands are elsewhere half a pass later — the arms
+    work, not only the tool" [--section=village-loom]. Left hand moved 0.045 m, RIGHT hand
+    0.0137 m against a bar of 0.02 m, so one hand of two missed it.
+  · `polish --section=village-loom` at 86c4babaf (`main`) — the check GREEN (12 pass, 0 fail;
+    the run's exit 1 came from two Vite `504 Outdated Optimize Dep` console errors already
+    charged to point 939).
+  · `polish --section=village-loom` at e1b7d1561, the SAME tree that failed inside the pass —
+    GREEN (12 pass, 0 fail, 0 console errors, exit 0).
+  So the tree is not what moves. The check landed on 22.09.2026 with 503492100 ("make the
+  loom's picture checks ask for arms"), and it samples the weaver twice "half a pass later":
+  when the second shutter falls near a turning point of her stroke, the returning hand has
+  travelled less than the bar and the check reds although the arms are working.
+  THE FAMILY IS NAMED, NOT NEW: this is the rotating-staging family of points 200, 336, 568 and
+  570, and point 642 is the decision about what to do with a check whose verdict depends on
+  when the shutter falls. This point exists so the newest member is not rediscovered from
+  scratch, and so a landing stops paying a 39-minute re-run for it.
+  FINAL STATE: the cause is IDENTIFIED before anything is tuned — either the sample is taken at
+  an arbitrary phase of the stroke (then the check waits for a stroke phase it names, the way
+  the other loom checks poll on the app's own state, rather than on a fixed half-pass), or one
+  arm genuinely stops while the other works (then it is a PRODUCT defect and the check is
+  right). The bar is NOT lowered to make the red go away until it is established which of the
+  two it is.
+  Criticality: medium — it hides no product defect on its own, but it reds the covering gate of
+  every point whose pass includes `village-loom`, and a rotating red is the thing point 549 was
+  built to abolish.
+  Test: the section runs ten times on the pinned world with the same verdict every time, and
+  whichever cause was found is named in the commit message with its evidence.
+  Refs: scripts/verify/polish.mjs:6123, commit 503492100, point 200, point 549, point 568,
+  point 570, point 642, point 939
+  Bundle: Testinfrastruktur
