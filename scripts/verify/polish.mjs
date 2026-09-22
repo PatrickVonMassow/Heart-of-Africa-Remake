@@ -6250,29 +6250,34 @@ if (section('village-loom')) {
         ))
         const clear = (x, z) => Math.min(...solids.map(c => window.__clearanceTo(c, x, z)))
         const target = station.weaver
-        // The plaza is the village's open middle; search a ring round it for a
-        // stand with open ground and an open sight line to her.
-        for (const r of [0, 1.5, 3, 4.5]) {
-          for (let k = 0; k < (r ? 12 : 1); k++) {
-            const x = Math.cos(k / 12 * Math.PI * 2) * r
-            const z = 3 + Math.sin(k / 12 * Math.PI * 2) * r
+        // The plaza is the village's open middle; search a disc round it for
+        // the stand whose sight line to her runs WIDEST of every hut, so the
+        // picture judges the station rather than a gap between two walls.
+        let best = null
+        for (const r of [0, 1.5, 3, 4.5, 6]) {
+          for (let k = 0; k < (r ? 16 : 1); k++) {
+            const x = Math.cos(k / 16 * Math.PI * 2) * r
+            const z = 3 + Math.sin(k / 16 * Math.PI * 2) * r
             const dist = Math.hypot(target.x - x, target.z - z)
             if (dist < 8 || clear(x, z) < 0.4) continue
-            let open = true
+            let width = Infinity
+            // The last 2 m are the station's own ground, not the sight line.
             for (let s = 1; s <= 32; s++) {
               const t = s / 32
-              if (clear(x + (target.x - x) * t, z + (target.z - z) * t) < 0.15) open = false
+              if (dist * (1 - t) < 2) break
+              width = Math.min(width, clear(x + (target.x - x) * t, z + (target.z - z) * t))
             }
-            if (!open) continue
-            const p = window.__placePlayer
-            p.x = x
-            p.z = z
-            p.yaw = Math.atan2(target.x - x, target.z - z) + Math.PI
-            p.pitch = -0.04
-            return { x, z, dist }
+            if (width < 0.15) continue
+            if (!best || width > best.width) best = { x, z, dist, width }
           }
         }
-        return null
+        if (!best) return null
+        const p = window.__placePlayer
+        p.x = best.x
+        p.z = best.z
+        p.yaw = Math.atan2(target.x - best.x, target.z - best.z) + Math.PI
+        p.pitch = -0.04
+        return best
       })
       check('a stand on the plaza sees the loom over open ground from at least 8 m', !!plaza,
         JSON.stringify(plaza))
@@ -6291,7 +6296,7 @@ if (section('village-loom')) {
           JSON.stringify(seen))
         await frame('1183-village-loom-from-plaza', {
           local: { x: stand.weaver.x, y: 0.6, z: stand.weaver.z },
-          label: `the loom station seen from the plaza, ${plaza.dist.toFixed(1)} m away: weaver, helper, the tended end's yarn and the cloth stack`,
+          label: `the loom station seen from the plaza, ${plaza.dist.toFixed(1)} m away through a ${plaza.width.toFixed(2)} m clear sight line: weaver, helper, the tended end's yarn and the cloth stack`,
         })
       }
     }
