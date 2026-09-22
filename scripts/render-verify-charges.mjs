@@ -662,6 +662,20 @@ export const RED_CHARGES = [
   {
     point: 568,
     suite: 'polish',
+    backend: 'webgpu',
+    featureLevel: 'compatibility',
+    kind: 'check',
+    match: /handover zone itself carries neither band.s edge/i,
+    why:
+      'The SECOND half of the same rim measurement: it reads red beside the "SAME water" check ' +
+      'above, in the same adult-errands rotation, whenever that one does — measured 22.09.2026 ' +
+      'on WebGPU (compatibility) at 02eec84 with the rim zone 13/94/105 against the water either ' +
+      'side, step 42 — and it is the same unresolved question point 568 owns: whether the sample ' +
+      'is taken too early or the rim seam is real.',
+  },
+  {
+    point: 568,
+    suite: 'polish',
     backend: 'webgl',
     kind: 'check',
     match: /water beyond the plate.s rim is the SAME water/i,

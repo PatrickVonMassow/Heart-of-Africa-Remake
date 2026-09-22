@@ -131,7 +131,16 @@ import {
   LOW_DRUM,
   type DrumGeometry,
 } from './drummerPose'
-import { LOOM_SPOT, WEAVER_OFFSET, weaverStance, PORT_TALKERS, portTraderSpots, VILLAGE_SPOTS, villageAdultStations, villageHasWell, type PlayGround } from './lifeSpots'
+import { PORT_TALKERS, portTraderSpots, VILLAGE_SPOTS, villageAdultStations, villageHasWell, type PlayGround } from './lifeSpots'
+import { HELPER_SIDE_OFFSET, WARP_STAKE_RADIUS, WEAVER_SIDE_OFFSET, type LoomStation } from './loom'
+import {
+  createLoomWork,
+  loomPicture,
+  loomPose,
+  SHUTTLE_THROW,
+  stepLoomWork,
+  type LoomDirection,
+} from './loomWork'
 import { drummerFacing } from './chiefWalk'
 import { DRUMMER_SPEAKER_ID } from './chiefPresence'
 import { queuedDrummerVoice, setDrummerVoice } from './drummerVoice'
@@ -498,36 +507,295 @@ function Cook({ x, z, cloth }: { x: number; z: number; cloth: string }) {
   )
 }
 
-/** Weaver working at a simple standing loom. */
-function Weaver({ x, z, cloth, weave }: { x: number; z: number; cloth: string; weave: string }) {
+/**
+ * Construction of the loom, in scene units against a figure drawn 1.0 unit
+ * tall. The strip is Park's own narrow one — a hand's width — and everything
+ * else is sized to a seated body beside it.
+ */
+const LOOM_BUILD = {
+  /** Height of the stretched threads. LOW, because it is a ground loom and a
+   *  SEATED weaver works it: her shoulder is at 0.256 and her arm is 0.33, so
+   *  this is where her hands actually land (`loomWork`'s WARP_REACH). */
+  warpY: 0.22,
+  stakeHeight: 0.34,
+  /** Woven width — "seldom wider than four inches" (docs/peoples-1890.md §8.1). */
+  stripWidth: 0.12,
+  clothThickness: 0.022,
+  threadThickness: 0.01,
+  /** The small frame of heddles she sits under, which the long warp keeps. */
+  heddleX: 0.2,
+  heddleY: 0.46,
+  heddleRadius: 0.03,
+  shuttle: [0.1, 0.04, 0.05] as [number, number, number],
+}
+
+/**
+ * THE WEAVER AT HER LOOM (work-order 1157), and the station's second job.
+ *
+ * The reported defect was a figure standing beside a loom with both arms
+ * hanging — the one village adult station with no motion at all. What replaces
+ * it is not only motion: the loom is also the SECOND place UPSTREAM and
+ * DOWNSTREAM can be learned, beside the children's bank game, and everything
+ * here serves that.
+ *
+ *  - THE WARP LIES ON THE RIVER'S AXIS, stretched between two stakes parallel
+ *    to the bank. The axis comes from the layout (`./loom`), which derived it
+ *    from the bank itself — never from a heading written here.
+ *  - SHE SITS AT ITS MIDDLE, so both of her calls send the helper AWAY. From an
+ *    end one call would be "toward me", and the pair could be learned as
+ *    come/go.
+ *  - THE HANDS RIDE THE TOOL. Both arms are written every frame from the same
+ *    cycle the cloth grows on (`loomPose`), the pounder's own mechanism.
+ *  - THE HELPER CARRIES THE MEANING. She names a direction and does not point;
+ *    he walks that way along the warp and works there.
+ *
+ * The cycle is frame-time driven, so it stops with the scene.
+ */
+function Loom({
+  station,
+  cloth,
+  weave,
+  childBodies,
+}: {
+  station: LoomStation
+  cloth: string
+  weave: string
+  /** The children's live bodies: a word waits rather than arriving in their
+   *  ear, exactly as the diggers' and carriers' words do (work-order 688). */
+  childBodies: RefObject<readonly InhabitantBody[]>
+}) {
   const groundHeight = usePlaceGround()
-  // A body the passers-by go round (point 578).
-  const body = weaverStance([x, z])
-  useStandingBody(body.x, body.z)
-  const facing = Math.atan2(-x, -z)
+  const camera = useThree((state) => state.camera)
+  const floor = useContext(SpeechFloorContext)
+  const cfg = balance.villageLife.loom
+
+  // Both bodies are ones the passers-by go round (point 578). The whole LENGTH
+  // of the warp is a collider in the layout, so nothing here has to repeat it.
+  useStandingBody(station.weaver.x, station.weaver.z)
+  // He is a vignette figure on an errand of his own: he pushes the passers-by
+  // aside and never gives way himself, and this component writes where he is.
+  const helperBody = useInhabitantBodies(1, {
+    fixed: true,
+    x: station.helperHome.x,
+    z: station.helperHome.z,
+  })
+
+  // The loom's own frame: local +Z runs DOWNSTREAM along the warp, and local +X
+  // is across it. Which way across the water lies is read off the station
+  // rather than assumed, because a mirrored bank would swap it.
+  const yaw = Math.atan2(station.fx, station.fz)
+  const waterSide = station.ax * station.fz - station.az * station.fx >= 0 ? 1 : -1
+
+  const rand = useMemo(() => mulberry32((Math.round(station.seat.x * 128) ^ Math.round(station.seat.z * 977)) >>> 0), [station])
+  const work = useMemo(() => createLoomWork(cfg, rand), [cfg, rand])
+  const pose = useRef<FigurePose | null>(loomPose(loomPicture(work)))
+  // His own mutable pose, born at rest: a null here is never written, and the
+  // frame below would skip him for good (GPT-6 Astra review, pass 5).
+  const helperPose = useRef<FigurePose | null>({ left: { ...REST_POSE.left }, right: { ...REST_POSE.right }, lean: 0, turn: 0 })
+  const helperGait = useRef(0)
+  // Both poses are OWNED here: written and applied in the same frame, so the
+  // hands never trail the shuttle by one frame (the Kids pattern, work-order 1065).
+  const weaverLimbs = useRef<FigureLimbs | null>(null)
+  const helperLimbs = useRef<FigureLimbs | null>(null)
+  const group = useRef<THREE.Group>(null)
+  const weaverGroup = useRef<THREE.Group>(null)
+  const clothMesh = useRef<THREE.Mesh>(null)
+  const shuttle = useRef<THREE.Mesh>(null)
+  const helper = useRef<THREE.Group>(null)
+  const cadence = useMemo(() => gaitCadence(FIGURE_LIMBS.hipY), [])
+  const walked = useRef(0)
+  // Where his stride settles when he stops — the Kids' mechanism, so a helper
+  // tending the warp or waiting at her side stands on both feet rather than
+  // frozen mid-stride (GPT-6 Astra review, second round).
+  const gaitOffset = useRef(0)
+
+  const childrenHear = useCallback(
+    (x: number, z: number) => {
+      const ear = balance.communication.hearingRadius
+      for (const kid of childBodies.current) {
+        if (kid.active && Math.hypot(kid.x - x, kid.z - z) <= ear) return true
+      }
+      return false
+    },
+    [childBodies],
+  )
+
+  useFrame((_, rawDt) => {
+    const dt = Math.min(rawDt, 0.1)
+    const before = work.errand ? work.errand.at : 0
+    const said = stepLoomWork(
+      work,
+      {
+        // A settlement whose warp lies on no river has no upstream to name.
+        teaches: station.onRiverAxis,
+        helper: true,
+        seat: station.weaver,
+        childrenHear,
+        floor: floor ?? undefined,
+      },
+      dt,
+      cfg,
+      rand,
+    )
+    const picture = loomPicture(work)
+
+    // THE WEAVER. Her arms and trunk come from the cycle, so the cloth can
+    // never change beside hands that are not working it.
+    const p = pose.current
+    if (p) {
+      const next = loomPose(picture)
+      Object.assign(p.left, next.left)
+      Object.assign(p.right, next.right)
+      p.lean = next.lean
+      p.turn = next.turn
+      applyFigurePose(weaverLimbs.current, p)
+    }
+
+    // The station's own clock, published on the group: a check that has to wait
+    // for HALF A PASS waits for this rather than for a second of the wall
+    // clock, which is neither the same thing nor allowed in a suite.
+    if (group.current) group.current.userData.loom = { pass: work.pass, passes: work.passes }
+
+    // THE CLOTH grows along the warp from her seat and is taken off at the
+    // stake. Scaled rather than rebuilt: one box, one number per frame.
+    if (clothMesh.current) {
+      const grown = Math.max(1e-3, picture.cloth)
+      clothMesh.current.scale.z = grown
+      clothMesh.current.position.z = grown / 2
+      clothMesh.current.visible = picture.cloth > 0.02
+    }
+    if (shuttle.current) {
+      shuttle.current.position.x = picture.shuttle * SHUTTLE_THROW
+      shuttle.current.position.y = LOOM_BUILD.warpY + 0.035 + picture.beat * 0.01
+    }
+
+    // THE HELPER walks the warp to the end she named and works there. He is
+    // drawn in the loom's own frame, so his walk IS the warp's direction.
+    const moved = Math.abs(picture.helperAt - before)
+    walked.current += moved
+    const stride = gaitPhase(walked.current, cadence)
+    if (moved <= 1e-6) gaitOffset.current = restingPhase(stride + gaitOffset.current, dt) - stride
+    const phase = stride + gaitOffset.current
+    helperGait.current = phase
+    if (helper.current) {
+      // Dropped onto his stance leg, so the swinging feet ride the ground
+      // instead of hanging above it.
+      helper.current.position.set(waterSide * HELPER_SIDE_OFFSET, gaitBodyLift(phase, FIGURE_LIMBS.hipY), picture.helperAt)
+      // Walking, he faces the way he is going — which is the word. Working or
+      // home, he faces the warp he is tending.
+      const walking = work.errand !== null && work.errand.phase !== 'work' && moved > 1e-6
+      helper.current.rotation.y = walking
+        ? (picture.helperAt > before ? 0 : Math.PI)
+        : -waterSide * Math.PI / 2
+    }
+    const hp = helperPose.current
+    if (hp) {
+      // At the warp he stoops to it; walking he carries his arms at rest.
+      const at = picture.helperWorking ? 1 : 0
+      const reach = armAim(0, -0.5 - at * 0.35)
+      Object.assign(hp.left, at ? reach : REST_POSE.left)
+      Object.assign(hp.right, at ? reach : REST_POSE.right)
+      hp.lean = at * 0.35
+      hp.turn = 0
+      applyFigurePose(helperLimbs.current, hp)
+    }
+    // The body he presents to the rest of the village follows him.
+    const body = helperBody[0]
+    if (body) {
+      body.x = station.helperHome.x + station.fx * picture.helperAt
+      body.z = station.helperHome.z + station.fz * picture.helperAt
+      body.active = true
+    }
+
+    // The reading stands over HER head: she is the one who said it, and the
+    // player has to be able to tell the speaker from the body that answers.
+    if (said) speakLoomCall(camera, station, said, weaverGroup.current)
+  })
+
+  const half = cfg.warpHalf
   return (
-    <group name="village-weaver" position={[x, groundHeight(x, z), z]} rotation={[0, facing, 0]}>
-      {/* Loom frame */}
-      {[-0.55, 0.55].map((px) => (
-        <mesh key={px} position={[px, 0.75, 0]} castShadow>
-          <cylinderGeometry args={[0.035, 0.045, 1.5, 5]} />
+    <group
+      ref={group}
+      name="village-loom"
+      position={[station.seat.x, groundHeight(station.seat.x, station.seat.z), station.seat.z]}
+      rotation={[0, yaw, 0]}
+    >
+      {/* The two stakes the warp is stretched between, one upstream, one down. */}
+      {[-half, half].map((pz) => (
+        <mesh key={pz} position={[0, LOOM_BUILD.stakeHeight / 2, pz]} castShadow>
+          <cylinderGeometry args={[WARP_STAKE_RADIUS * 0.8, WARP_STAKE_RADIUS, LOOM_BUILD.stakeHeight, 5]} />
           <meshStandardMaterial color="#5f4526" roughness={0.95} />
         </mesh>
       ))}
-      <mesh position={[0, 1.45, 0]} rotation={[0, 0, Math.PI / 2]} castShadow>
-        <cylinderGeometry args={[0.03, 0.03, 1.25, 5]} />
-        <meshStandardMaterial color="#5f4526" roughness={0.95} />
+      {/* The stretched warp itself: the long threads, running with the river. */}
+      <mesh position={[0, LOOM_BUILD.warpY, 0]} castShadow>
+        <boxGeometry args={[LOOM_BUILD.stripWidth, LOOM_BUILD.threadThickness, half * 2]} />
+        <meshStandardMaterial color="#d8c9a6" roughness={0.95} side={THREE.DoubleSide} />
       </mesh>
-      {/* Half-finished cloth */}
-      <mesh position={[0, 1.0, 0]} castShadow>
-        <boxGeometry args={[0.95, 0.85, 0.03]} />
+      {/* The half-finished cloth, growing from her seat along the warp. The
+          box is a unit deep and SCALED each frame, so its length is one
+          number rather than a rebuilt geometry. */}
+      <mesh ref={clothMesh} name="village-loom-cloth" position={[0, LOOM_BUILD.warpY + 0.006, 0]} castShadow>
+        <boxGeometry args={[LOOM_BUILD.stripWidth * 1.06, LOOM_BUILD.clothThickness, 1]} />
         <meshStandardMaterial color={weave} roughness={0.95} side={THREE.DoubleSide} />
       </mesh>
-      <group name="village-weaver-body" position={[0, 0, WEAVER_OFFSET]} rotation={[0, body.yaw - facing, 0]}>
-        <Figure cloth={cloth} />
+      {/* The small frame of heddles she sits under — the one part of the old
+          standing loom that stays. */}
+      {[-LOOM_BUILD.heddleX, LOOM_BUILD.heddleX].map((px) => (
+        <mesh key={px} position={[px, LOOM_BUILD.heddleY / 2, 0]} castShadow>
+          <cylinderGeometry args={[LOOM_BUILD.heddleRadius, LOOM_BUILD.heddleRadius, LOOM_BUILD.heddleY, 5]} />
+          <meshStandardMaterial color="#5f4526" roughness={0.95} />
+        </mesh>
+      ))}
+      <mesh position={[0, LOOM_BUILD.heddleY, 0]} rotation={[0, 0, Math.PI / 2]} castShadow>
+        <cylinderGeometry args={[LOOM_BUILD.heddleRadius * 0.8, LOOM_BUILD.heddleRadius * 0.8, LOOM_BUILD.heddleX * 2, 5]} />
+        <meshStandardMaterial color="#5f4526" roughness={0.95} />
+      </mesh>
+      {/* The shuttle, riding across the warp in her hand's own rhythm. */}
+      <mesh ref={shuttle} name="village-loom-shuttle" position={[0, LOOM_BUILD.warpY + 0.035, 0.03]} castShadow>
+        <boxGeometry args={LOOM_BUILD.shuttle} />
+        <meshStandardMaterial color="#8a6a3a" roughness={0.9} />
+      </mesh>
+      {/* The weaver, beside the warp at its middle, facing across it. */}
+      <group ref={weaverGroup} name="village-weaver-body" position={[-waterSide * WEAVER_SIDE_OFFSET, 0, 0]} rotation={[0, waterSide * Math.PI / 2, 0]}>
+        <Figure cloth={cloth} kneel pose={pose} limbs={weaverLimbs} />
+      </group>
+      {/* Her helper, on the water side of the threads. */}
+      <group ref={helper} name="village-loom-helper" position={[waterSide * HELPER_SIDE_OFFSET, 0, 0]}>
+        <Figure cloth={weave} legs pose={helperPose} limbs={helperLimbs} gait={helperGait} />
       </group>
     </group>
   )
+}
+
+/**
+ * THE WEAVER NAMES A DIRECTION (work-order 1157 item 7). One atom, through the
+ * same §13.4 hearing gate as every other village voice, with the reading over
+ * her head where the player can read it.
+ *
+ * SHE DOES NOT POINT AND DOES NOT MIME, which is why no gesture is raised here:
+ * the meaning is carried by the helper's body walking that way along the warp.
+ * An arm thrown after the word would offer a second reading — "over there" —
+ * and that is the reading the whole station exists to prune.
+ */
+function speakLoomCall(
+  camera: THREE.Camera,
+  station: LoomStation,
+  direction: LoomDirection,
+  anchor: THREE.Group | null,
+): void {
+  const at = station.weaver
+  const distance = placePlayerPosition.active
+    ? Math.hypot(at.x - placePlayerPosition.x, at.z - placePlayerPosition.z)
+    : Infinity
+  const utterance = utteranceOf(direction)
+  playSpeech(utterancePlan(utterance, distance, { bearing: speechBearing(camera, at) }))
+  if (speechReach(distance).audible) {
+    useGame.getState().hearUtterance(utterance)
+    if (anchor) {
+      speakOverhead('village-weaver', [utterance], anchor, { floor: true, seconds: speechLabelSeconds(1) })
+    }
+  }
 }
 
 /** Height factor of a child figure against a grown one. */
@@ -3363,6 +3631,7 @@ export function PlaceLife({
   waterStand,
   playRocks,
   playGround,
+  loom,
   rocks,
   climbRock,
   pen,
@@ -3405,6 +3674,10 @@ export function PlaceLife({
   /** The children's roaming quarter, decided by the layout (work-order 688) so
    *  the adults' work sites can be placed clear of it. */
   playGround: PlayGround | null
+  /** The weaver's loom (work-order 1157): the seat at the middle of a warp
+   *  stretched on the river's own axis, and the two stakes it runs between.
+   *  Null where the plan left the station no room, and in every port. */
+  loom: LoomStation | null
   rocks: Array<[number, number, number]>
   /** Which of those boulders the layout derived for the climb (work-order 1082),
    *  or null where it left no room and the round must search for one. */
@@ -3632,7 +3905,14 @@ export function PlaceLife({
         <InhabitantBodiesContext.Provider value={inhabitantBodies}>
           <SpeechFloorContext.Provider value={speechFloor}>
           <Cook x={firePos[0] + 1.2} z={firePos[1] + 1.0} cloth={style.cloth[0]} />
-          <Weaver x={LOOM_SPOT[0]} z={LOOM_SPOT[1]} cloth={style.cloth[1 % style.cloth.length]} weave={style.bandColor} />
+          {loom && (
+            <Loom
+              station={loom}
+              cloth={style.cloth[1 % style.cloth.length]}
+              weave={style.bandColor}
+              childBodies={childBodies}
+            />
+          )}
           {(!bank || bankStage) && (
             <Kids
               childBodies={childBodies}

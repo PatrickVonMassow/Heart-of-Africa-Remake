@@ -10,14 +10,14 @@ import { climbBoulder } from './looseRocks'
 import { playRockFlank } from './playRockSurface'
 import { createTagGame, stepTagGame } from './tagGame'
 import { createBankGame } from './bankGame'
-import { LOOM_SPOT, PORT_TALKERS, VILLAGE_SPOTS, villageAdultStations, villageHasWell } from './lifeSpots'
+import { PORT_TALKERS, VILLAGE_SPOTS, villageAdultStations, villageHasWell } from './lifeSpots'
 
 // Execute the production component's composition without mounting the WebGPU
 // renderer. Its memo and JSX stay real; child components remain opaque elements.
 const source = readFileSync('src/scenes/place/PlaceLife.tsx', 'utf8')
 const component = source.slice(source.indexOf('export function PlaceLife(')).replace('export function', 'function').replaceAll('import.meta.env.DEV', 'true')
 const devAssert = vi.fn()
-const components = ['Kids', 'Porters', 'Traders', 'Talkers', 'Walkers', 'Cook', 'Weaver',
+const components = ['Kids', 'Porters', 'Traders', 'Talkers', 'Walkers', 'Cook', 'Loom',
   'ErrandVillagers', 'Goats', 'FireTender', 'Pounder', 'Drummer', 'Well', 'TaskWalker']
 const contexts = ['ColdCloaksContext', 'LimbDetailContext', 'InhabitantBodiesContext', 'SpeechFloorContext']
 const deps = {
@@ -30,7 +30,7 @@ const deps = {
   useGame: () => 0, placeById: () => null, createInhabitantSet: () => ({}),
   SpeechFloor: class {}, placePlayerPosition: {}, useUnplacedInhabitantWatch: () => {},
   balance, devAssert, climbBoulder, playRockFlank,
-  villageAdultStations, villageHasWell, LOOM_SPOT, PORT_TALKERS, VILLAGE_SPOTS,
+  villageAdultStations, villageHasWell, PORT_TALKERS, VILLAGE_SPOTS,
 }
 const compose = new Function(...Object.keys(deps), ts.transpile(component, {
   target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.React,

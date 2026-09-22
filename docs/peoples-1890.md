@@ -2377,6 +2377,66 @@ Since 27.07.2026 (point 367) the record itself sits one document further out,
 in `docs/design-reference.md` §19.15 — same number, same text, still design
 rather than research; design.md §19.15 is the pointer to it.
 
+### 8.1 The weaver's loom: what the sources carry, and what the game adapts
+
+The standing loom this station replaced had no construction source recorded
+anywhere. The check below was made before the replacement was built, so the part
+of it that IS a Bambara/Mande reconstruction and the part that is a deliberate
+game adaptation can be told apart by anyone reading the code later.
+
+- **PERIOD, but early:** [Mungo Park, *Travels in the Interior Districts of
+  Africa* (1799), chapter XXI](https://www.gutenberg.org/cache/epub/74976/pg74976.txt),
+  the cotton-manufacture passage containing “The weaving is performed by the men”. Park
+  describes women spinning, men weaving, a web seldom wider than four inches,
+  and a shuttle with a larger chamber for coarse thread. He compares the loom's
+  principle to European looms. This supports narrow-strip weaving and a shuttle,
+  but does not specify warp length, stakes, heddle supports or the seat's location.
+  His observations precede the game's 1890 setting by roughly a century.
+- **PERIOD, neighbouring context:** [René Caillié, *Travels through Central
+  Africa to Timbuctoo* (1830), vol. I, chapter XI, pp. 303–304](https://www.gutenberg.org/files/69847/69847-h/69847-h.htm),
+  describes Wassoulo cloth at most five inches wide, reed slays (beaters), and
+  shuttles with small bobbins held by wire or reed. He identifies these inhabitants
+  as Foulahs who do not speak Foulah; this is not a Ségou-specific construction
+  account. Chapter XII, p. 323, explicitly reports weaving in Bambara villages,
+  without describing their loom. Neither passage locates the weaver midway
+  between two warp stakes.
+
+**THE SOURCES CARRY** narrow-strip weaving, the shuttle and the reed beater —
+and, in Park, male weavers. They do not carry a two-ended warp with a seat at its
+middle, and neither passage puts a woman at the loom. That absence does not prove
+such a build never existed; it means the sources cannot be cited for one.
+
+**THE GAME ADAPTS, KNOWINGLY.** Two events, in order: the user ordered the station
+as built on 21.09.2026 (14:41); the author escalated the source question, and the
+owner decided on 22.09.2026 that the build stands as a GAMEPLAY ADAPTATION, not a
+sourced reconstruction. Nothing in this document should be read as Park's or
+Caillié's account of it. Two things depart from the sources and each is
+load-bearing:
+
+- **The seat is at the warp's MIDDLE.** The loom is the second place the player
+  can learn UPSTREAM and DOWNSTREAM, and from the middle BOTH of the weaver's
+  calls send her helper away from her. Seated at an end — which is how the West
+  African strip loom is generally worked; neither source states where the seat
+  is — one call would be "toward me" and the other "away from me", and the
+  player could learn the pair as come/go and still finish the puzzle.
+- **The weaver is the woman the player reported.** She is kept as the figure of
+  the 18.09.2026 bug report, whose complaint was that she did not move.
+
+**WHAT IS KEPT FROM THE SOURCES.** The cloth is a narrow strip — a hand's width,
+`LOOM_BUILD.stripWidth` — carried by a shuttle thrown across the warp and beaten
+down by a reed on each arrival.
+
+**HOW THE GAME RENDERS THAT STRIP** (the game's build, not the sources'): the
+warp is stretched horizontally between two stakes, the strip grows from the
+weaver's seat ALONG it, and it is taken off when it reaches the stake. Nothing
+rises to a top beam, which described the standing frame this station replaced.
+
+**IMPLEMENTATION.** `src/scenes/place/loom.ts` lays the warp on the bank's own
+downstream vector and searches the seat; `src/scenes/place/loomWork.ts` runs the
+weaving cycle and the sparse named tendings; `Loom` in
+`src/scenes/place/PlaceLife.tsx` draws it. The teaching rules are in
+`docs/communication-poc-spec.md`, "The weaver's loom".
+
 ---
 
 ## 9. Keeping the cook-fire alight in the rains (TASKS point 256)

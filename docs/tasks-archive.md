@@ -26086,6 +26086,14 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
      back, the mirrored upstream/downstream walks, every errand that ended in a
      villager standing still — is deleted. The direction words are the children's
      now.
+     SUPERSEDED IN PART, 22.09.2026 (work-order 1157, user order 21.09.2026):
+     the direction words are no longer the children's ALONE. They are taught a
+     second time at the weaver's loom, on one person walking a warp that lies on
+     the river's axis rather than on running groups between two rocks. What this
+     item deleted stays deleted — the old errand catalogue does not come back —
+     and the second teaching is a station of its own, held clear of the
+     children's by the rule of item 6. See `docs/communication-poc-spec.md`,
+     "The weaver's loom".
   4. THE WORK SITES LEAVE THE MIDDLE. The three dig sites (store pit, post hole,
      turned patch) are placed where such work belongs — at a compound edge, beside
      a lane, at the edge of the worked ground — never on the open central ground.

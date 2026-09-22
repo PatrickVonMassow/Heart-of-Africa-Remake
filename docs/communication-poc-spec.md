@@ -1,18 +1,21 @@
 # The communication PoC (design.md §13.4)
 
 This document governs the communication rebuild in work-order points 686–692
-and its landed follow-ups. The playable slice has one six-word tonal language:
-the children's bank game and the adults' water and digging work teach five
-words; the drummer teaches CHIEF. The errand is a four-word drum message.
+and its landed follow-ups. The playable slice has one six-word tonal language,
+taught in four places: the children's bank game and the adults' water and
+digging work teach five words, the weaver's loom teaches UPSTREAM and
+DOWNSTREAM a second time, and the drummer teaches CHIEF. The errand is a
+four-word drum message.
 
 ## What the player does
 
 In one village of the tonal West/Centre belt the player watches and listens.
 The inhabitants speak atomic utterances built from one syllable in two tones,
 and the player works out their meanings from visible situations. The new
-teaching is divided between the children's bank game, including the village's
-play rocks, and the adults' water and digging work. Those situations are built
-in their own work-order points; the removed catalogues are not substitutes for
+teaching is divided between four places: the children's bank game, including
+the village's play rocks, the adults' water and digging work, the weaver's loom
+("The weaver's loom" below), and the drummer. Those situations are built in
+their own work-order points; the removed catalogues are not substitutes for
 them.
 
 Later the chief sends a message on two drums in the same language. The player
@@ -65,8 +68,8 @@ so the six words fall into two mirror pairs — RIVER/CHIEF and
 UPSTREAM/DOWNSTREAM — and two sequences that are their own mirror, ROCK and
 DIG. UPSTREAM and DOWNSTREAM remain the
 only pair the player hears AS a pair — they are announced against each other in
-the same round of the bank game, while CHIEF is only ever said alone, by the
-drummer pointing at the hut.
+the same round of the bank game AND at the weaver's loom, while CHIEF is only
+ever said alone, by the drummer pointing at the hut.
 
 CHIEF is taught the way every other word is: the use key at the drummer while
 the chief is in his hut makes him point his arm at the chief's hut and say it,
@@ -270,6 +273,53 @@ seedling tray. Completion leaves a covered store, a set post or planted rows.
 The spoil is walkable ground with matching height and collision; the pit and
 its furniture leave the workers reachable. The water path reaches the bank
 through the settlement's actual huts and fence gates, across world seeds.
+
+
+## The weaver's loom
+
+UPSTREAM and DOWNSTREAM are taught in TWO places, and the loom is the second of
+them (work-order 1157). The two pictures share exactly one feature — the
+river's axis — and that intersection is what prunes the readings a single
+picture leaves open: on the bank the words hang on running GROUPS between two
+rocks, so "to the far rock" is available; at the loom they hang on ONE PERSON
+WALKING along a stretched warp, where no far rock exists and left/right
+survives no change of standpoint.
+
+The station is layout data (`src/scenes/place/loom.ts`), laid after the bank,
+the children's stage and quarter, and the water lane's head have all settled:
+
+- **The warp lies on the river's axis.** It is stretched between two stakes
+  parallel to the bank, derived from the bank's own downstream vector, never
+  from a written heading. A settlement with no river keeps its weaver, lays the
+  warp on the tangent and teaches nothing here.
+- **She sits at its MIDDLE**, and that is load-bearing rather than decorative:
+  from the middle both of her calls send the helper AWAY from her. Seated at an
+  end, one call would be "toward me" and the other "away from me", and the pair
+  could be learned as come/go.
+- **She has a helper**, because nobody speaks to nobody. With no helper at the
+  station the order is not given at all; it waits.
+- **The word sits on a body that moves that way.** When the warp needs tending
+  she says UPSTREAM or DOWNSTREAM and the helper walks that way along the warp
+  and works there. She does not point and does not mime: an arm thrown after the
+  word would offer "over there", which is the reading the station exists to
+  prune.
+- **It stays sparse.** A named tending falls a few times a minute
+  (`balance.villageLife.loom.tendIntervalSeconds`); the shuttle throws
+  themselves are silent, and the word waits while a child is in earshot, exactly
+  as the adults' words do.
+- **The station keeps its distance.** Seat and both stakes clear every place a
+  child speaks — the roaming quarter, both play rocks, the descent — and the
+  water lane's head by `communication.talk.reach`, so the direction words never
+  arrive mixed with the children's and RIVER is never spoken into the same ear.
+  Where a shipped plan cannot give that room the LOOM moves, not the children.
+- **The water is in the picture.** From the weaver's place the river is visible,
+  so the claim that the warp lies on its axis is one the player can check.
+
+The weaving itself is village life and says nothing: the shuttle crosses and
+returns, the reed beats the weft down, and the woven strip grows from her seat
+along the warp until it reaches the stake and is taken off. Her arms come from
+that same cycle, so the cloth can never change beside hands that are not
+working it.
 
 ## The messages
 

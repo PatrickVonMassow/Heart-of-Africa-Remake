@@ -5826,7 +5826,7 @@ if (section('village-stations')) {
     const staged = await page.evaluate(() => {
       const scene = window.__placeScene
       const layout = window.__placeLayout
-      const loom = scene.getObjectByName('village-weaver')
+      const loom = scene.getObjectByName('village-loom')
       const figure = scene.getObjectByName('village-weaver-body')
       const at = (object) => {
         object.updateWorldMatrix(true, false)
@@ -5835,8 +5835,19 @@ if (section('village-stations')) {
       }
       const prop = at(loom)
       const body = at(figure)
+      const station = layout.loom
       const buildings = layout.colliders.slice(0, layout.interactives.length + layout.dwellings.length)
       const gap = (point, radius) => Math.min(...buildings.map(c => window.__clearanceTo(c, point.x, point.z) - radius))
+      // The warp is a LENGTH, not a point (work-order 1157): a gap measured at
+      // its midpoint alone says nothing about the stake ends, so the whole run
+      // is sampled at the thread's own half-width.
+      let warpGap = Infinity
+      for (let k = 0; k <= 16; k++) {
+        const t = k / 16
+        const x = station.upstream.x + (station.downstream.x - station.upstream.x) * t
+        const z = station.upstream.z + (station.downstream.z - station.upstream.z) * t
+        warpGap = Math.min(warpGap, gap({ x, z }, 0.2))
+      }
       const e = figure.matrixWorld.elements
       const facesLoom = e[8] * (prop.x - body.x) + e[10] * (prop.z - body.z) > 0
       // The point wants the trading post's wall VISIBLY CLEAR BEHIND her, so
@@ -5847,13 +5858,27 @@ if (section('village-stations')) {
       // inside a building or fence; the reported seed may have one there.
       const p = window.__placePlayer
       const market = layout.interactives.find(it => it.type === 'market')
-      const otherBodies = layout.colliders.filter(c => !(c.x === prop.x && c.z === prop.z && c.r === 1))
+      // The loom's OWN bodies — the warp run and the weaver beside it — are not
+      // what a camera stand has to keep clear of; she is the subject.
+      const otherBodies = layout.colliders.filter(c => !(
+        (c.kind === 'segment' && c.x1 === station.upstream.x && c.z1 === station.upstream.z) ||
+        (c.x === station.weaver.x && c.z === station.weaver.z)
+      ))
       const clear = (x, z) => Math.min(...otherBodies.map(c => window.__clearanceTo(c, x, z)))
       const toMarket = Math.atan2(market.pos[0] - body.x, market.pos[1] - body.z)
       const span = Math.hypot(market.pos[0] - body.x, market.pos[1] - body.z)
-      const aim = { x: body.x + (market.pos[0] - body.x) * 0.4, z: body.z + (market.pos[1] - body.z) * 0.4 }
+      // A WALL FAR OFF IS NOT IN THE PICTURE. Since the loom lies on the river's
+      // axis (work-order 1157) the reported seed seats her twenty metres from
+      // the trading post, and no stand nine metres out holds both inside the
+      // lens. The clearance the point asks for is then plain in the open ground
+      // itself: the frame is aimed at HER, from the side, and the wall is
+      // wherever it is. Close by, both are still framed together.
+      const far = span > 12
+      const aim = far
+        ? { x: body.x, z: body.z }
+        : { x: body.x + (market.pos[0] - body.x) * 0.4, z: body.z + (market.pos[1] - body.z) * 0.4 }
       // A hut further off needs the lens further back to hold both in one frame.
-      const stand = Math.min(9, Math.max(4.5, span * 1.1))
+      const stand = far ? 6 : Math.min(9, Math.max(4.5, span * 1.1))
       let cameraGap = -Infinity
       let framed = null
       for (let k = 0; k < 24; k++) {
@@ -5863,6 +5888,10 @@ if (section('village-stations')) {
         const angle = toMarket + (k % 2 ? -1 : 1) * (Math.PI / 2 + Math.floor(k / 2) * Math.PI / 24)
         const x = body.x + Math.sin(angle) * stand
         const z = body.z + Math.cos(angle) * stand
+        // INSIDE THE SETTLEMENT, or the game leaves it at the next frame and
+        // the shutter finds travel mode: the boundary band never runs inside
+        // the layout's radius, so a stand short of that radius is always in.
+        if (Math.hypot(x, z) > layout.radius - 0.5) continue
         if (clear(x, z) < 0.35) continue
         let visible = true
         for (let step = 1; step <= 16; step++) {
@@ -5882,18 +5911,24 @@ if (section('village-stations')) {
         // wide frame; 26 keeps both subjects clear of the very edge.
         const bodyOff = offAxis(body.x, body.z)
         const marketOff = offAxis(market.pos[0], market.pos[1])
-        if (bodyOff > 26 || marketOff > 26) continue
+        if (bodyOff > 26 || (!far && marketOff > 26)) continue
         p.x = x
         p.z = z
         p.yaw = Math.atan2(aim.x - p.x, aim.z - p.z) + Math.PI
         p.pitch = -0.1
         cameraGap = clear(x, z)
-        framed = { bodyOff: +bodyOff.toFixed(1), marketOff: +marketOff.toFixed(1) }
+        // The stand's own place in the settlement, printed with the verdict: a
+        // stand outside the boundary band would leave the place at the next
+        // frame, and that reads as "travel mode" at the shutter.
+        framed = {
+          bodyOff: +bodyOff.toFixed(1), marketOff: +marketOff.toFixed(1),
+          stand: { x: +x.toFixed(2), z: +z.toFixed(2), out: +Math.hypot(x, z).toFixed(2), radius: layout.radius },
+        }
         break
       }
-      return { body, propGap: gap(prop, 1), bodyGap: gap(body, 0.3), cameraGap, facesLoom, framed }
+      return { body, propGap: warpGap, bodyGap: gap(body, 0.3), cameraGap, facesLoom, framed }
     })
-    check('the reported weaver and loom have a walker-wide gap to the village buildings',
+    check('the reported weaver and her whole warp have a walker-wide gap to the village buildings',
       staged.propGap >= 0.6 && staged.bodyGap >= 0.6, JSON.stringify(staged))
     check('the weaver faces her loom', staged.facesLoom)
     check('the weaver photograph stands on open ground', staged.cameraGap >= 0.35, `${staged.cameraGap.toFixed(2)} m`)
@@ -5904,6 +5939,299 @@ if (section('village-stations')) {
       local: { x: staged.body.x, y: staged.body.y + 0.9, z: staged.body.z },
       label: 'the reported-seed weaver at her loom seen from the side, with open ground between her and the trading-post wall',
     })
+  } finally {
+    await page.evaluate((seed) => {
+      const g = window.__game.getState()
+      if (g.placeId) g.leavePlace()
+      window.__game.setState({ seed })
+    }, bootSeed)
+  }
+}
+
+// THE WEAVER WORKS, AND HER LOOM TEACHES THE RIVER'S TWO DIRECTIONS (work-order
+// 1157), from the standpoint of the report that opened it: Bambara Village at
+// seed 394349866, where the user photographed a figure with both arms hanging.
+//
+// Two pictures, and they answer two different questions.
+//  - THE MOTION. Two frames a second apart, from ONE camera stand, must DIFFER
+//    where her arms and the shuttle are. A scene-graph reading alone would not
+//    settle it: the defect reported was a picture, so the evidence is pixels.
+//  - THE TEACHING. One frame carrying the helper part-way along the warp, the
+//    weaver's own reading over her head, and the river in the same picture — the
+//    three things that make the axis claim checkable by the player.
+if (section('village-loom')) {
+  const bootSeed = await page.evaluate(() => window.__game.getState().seed)
+  try {
+    await page.evaluate(() => {
+      const g = window.__game.getState()
+      if (g.placeId) g.leavePlace()
+    })
+    await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
+    await page.evaluate(() => {
+      window.__game.setState({ seed: 394349866 })
+      window.__game.getState().enterPlace('bambara-village')
+      window.__game.getState().setJournalOpen(false)
+    })
+    await page.waitForFunction(() =>
+      window.__game.getState().placeId === 'bambara-village' &&
+      !!window.__placeScene?.getObjectByName('village-loom-shuttle'), null, { timeout: 40000 })
+    await waitForSceneBuilt(page)
+
+    // THE STAND: on the inland side of the warp, looking straight out at the
+    // water. The warp then runs left-to-right across the picture, the weaver is
+    // in the middle of it, the helper is in frame wherever the word sends him,
+    // and the river lies beyond — one stand that serves both questions.
+    const stand = await page.evaluate(() => {
+      const layout = window.__placeLayout
+      const station = layout.loom
+      const bank = layout.bank
+      const solids = layout.colliders.filter(c => !(
+        (c.kind === 'segment' && c.x1 === station.upstream.x && c.z1 === station.upstream.z) ||
+        (c.x === station.weaver.x && c.z === station.weaver.z)
+      ))
+      const clear = (x, z) => Math.min(...solids.map(c => window.__clearanceTo(c, x, z)))
+      const p = window.__placePlayer
+      // One framing: `back` metres out on HER side of the warp, `side` metres
+      // along it, aimed at `target`. The first distance that stands on open
+      // ground with an open sight line wins.
+      const place = (backs, side, target, pitch) => {
+        for (const back of backs) {
+          const x = station.seat.x - station.ax * back + station.fx * side
+          const z = station.seat.z - station.az * back + station.fz * side
+          if (clear(x, z) < 0.4) continue
+          let open = true
+          for (let k = 1; k <= 16; k++) {
+            const t = k / 16
+            if (clear(x + (target.x - x) * t, z + (target.z - z) * t) < 0.15) open = false
+          }
+          if (!open) continue
+          p.x = x
+          p.z = z
+          p.yaw = Math.atan2(target.x - x, target.z - z) + Math.PI
+          p.pitch = pitch
+          return { back, side, x, z }
+        }
+        return null
+      }
+      window.__loomPlace = place
+      window.__loomStation = station
+      // THE MOTION IS HERS, so its stand is CLOSE and on her own side. One wide
+      // stand for both was tried first and failed the eye rather than the
+      // check: the helper stands across the warp from her, so any near-square
+      // view puts a whole standing body behind a kneeling one and the frame
+      // reads as one blob.
+      // Aimed DOWN at her: she kneels at a warp laid low, so a level lens at
+      // standing eye height puts her at the bottom edge and the helper behind
+      // her fills the frame. The pitch is the angle from the eye to her body,
+      // and the offset along the warp swings him out from behind her.
+      const close = place([3, 3.5, 2.6, 4], 1.3, station.weaver, -0.42)
+      return close && {
+        close,
+        weaver: station.weaver,
+        seat: station.seat,
+        warpHalf: Math.hypot(station.downstream.x - station.seat.x, station.downstream.z - station.seat.z),
+        water: bank ? { x: bank.bank.x, z: bank.bank.z } : null,
+        onRiverAxis: station.onRiverAxis,
+      }
+    })
+    check('a close stand on her own side of the warp sees the weaver over open ground', !!stand,
+      JSON.stringify(stand))
+
+    if (stand) {
+      check('the Bambara loom lies on the river’s axis, so the two words can be taught here',
+        stand.onRiverAxis)
+      await nextFrames(3)
+      // The crop the motion is measured in: the weaver and the warp in front of
+      // her, without the sky or the far bank, so a drifting cloud cannot pass
+      // for a working hand.
+      const view = page.viewportSize()
+      const clip = {
+        left: Math.round(view.width * 0.3),
+        top: Math.round(view.height * 0.42),
+        width: Math.round(view.width * 0.4),
+        height: Math.round(view.height * 0.32),
+      }
+      const readCrop = async (buffer) => {
+        const { data, info } = await sharp(buffer).extract(clip).raw().toBuffer({ resolveWithObject: true })
+        return { data, info }
+      }
+      const first = await frame('1157-village-loom-working-a', {
+        local: { x: stand.weaver.x, y: 0.8, z: stand.weaver.z },
+        label: 'the weaver at her long warp, first of two frames half a pass apart that must differ at her arms and shuttle',
+      })
+      // The shuttle AND both her hands, in world space: the pixel difference
+      // below says that something in the crop changed, and a growing cloth or
+      // a thrown shuttle would change it over arms that never moved — which is
+      // the reported defect (GPT-6 Astra review, pass 4).
+      const shuttleAndHands = () => {
+        const m = window.__placeScene.getObjectByName('village-loom-shuttle')
+        m.updateWorldMatrix(true, false)
+        const e = m.matrixWorld.elements
+        const hands = {}
+        window.__placeScene.getObjectByName('village-weaver-body').traverse((o) => {
+          if (o.name !== 'hand-left' && o.name !== 'hand-right') return
+          o.updateWorldMatrix(true, false)
+          const h = o.matrixWorld.elements
+          hands[o.name] = { x: h[12], y: h[13], z: h[14] }
+        })
+        return { x: e[12], y: e[13], z: e[14], hands }
+      }
+      const shuttleA = await page.evaluate((body) => {
+        window.__loomPassAt = window.__placeScene.getObjectByName('village-loom').userData.loom.pass
+        return new Function('return (' + body + ')()')()
+      }, shuttleAndHands.toString())
+      // HALF A PASS OF HER OWN CLOCK, not a second of the wall clock: the
+      // shuttle is then at the other side of the warp and both arms have
+      // swapped their work, which is the largest difference the cycle offers.
+      // A fixed pause would be the same picture on a fast machine and three
+      // passes later on a slow one.
+      // A cycle that never advances is the REPORTED DEFECT, so it reads as a
+      // red check here rather than as a harness timeout thrown from the wait.
+      const advanced = await page.waitForFunction(() => {
+        const now = window.__placeScene?.getObjectByName('village-loom')?.userData?.loom?.pass
+        if (typeof now !== 'number') return false
+        const since = (now - window.__loomPassAt + 1) % 1
+        return since >= 0.45
+      }, null, { timeout: 30000 }).then(() => true).catch(() => false)
+      check('her cycle advances by itself, half a pass of her own clock', advanced)
+      await nextFrames(2)
+      const shuttleB = await page.evaluate((body) => new Function('return (' + body + ')()')(), shuttleAndHands.toString())
+      const second = await frame('1157-village-loom-working-b', {
+        local: { x: stand.weaver.x, y: 0.8, z: stand.weaver.z },
+        label: 'the same weaver half a pass later, her arms and the shuttle at the other side of the warp',
+      })
+      const a = await readCrop(first)
+      const b = await readCrop(second)
+      let moved = 0
+      for (let i = 0; i < a.data.length; i += a.info.channels) {
+        if (Math.abs(a.data[i] - b.data[i]) > 8) moved++
+      }
+      const share = moved / (a.info.width * a.info.height)
+      // The reported defect was a figure that did not move at all, so the bar is
+      // the difference between "nothing changed" and "a body worked" — not a
+      // tuned pixel count. Anything from a hand crossing the warp clears it.
+      check('two frames half a pass apart differ where the weaver works', share > 0.002,
+        `${(share * 100).toFixed(2)} % of the crop changed`)
+      check('the shuttle is at another place on the warp half a pass later',
+        Math.hypot(shuttleA.x - shuttleB.x, shuttleA.z - shuttleB.z) + Math.abs(shuttleA.y - shuttleB.y) > 0.01,
+        JSON.stringify({ shuttleA, shuttleB }))
+      const handMoved = (name) => {
+        const p = shuttleA.hands?.[name]
+        const q = shuttleB.hands?.[name]
+        return !!p && !!q && Math.hypot(p.x - q.x, p.y - q.y, p.z - q.z) > 0.02
+      }
+      check('BOTH her hands are elsewhere half a pass later — the arms work, not only the tool',
+        handMoved('hand-left') && handMoved('hand-right'),
+        JSON.stringify({ a: shuttleA.hands, b: shuttleB.hands }))
+
+      // THE TEACHING PICTURE. The stand steps back FIRST: the teaching is the
+      // station's — her, the warp, the helper wherever the word sends him, and
+      // the river behind them — and it is taken while he is still on his way,
+      // so nothing may run between the wait and the shutter.
+      const wide = await page.evaluate(() =>
+        window.__loomPlace([7.5, 8.5, 6.5, 9.5], 2.4, window.__loomStation.seat, -0.05))
+      check('a wide stand carries the whole station with the water behind it', !!wide,
+        JSON.stringify(wide))
+      const tendStand = await page.evaluate(() => {
+        const s = window.__placeLayout.loom
+        return Math.hypot(s.tend.downstream.x - s.seat.x, s.tend.downstream.z - s.seat.z)
+      })
+      // PART-WAY, AND WALKING OUT (GPT-6 Astra review, two rounds): a helper
+      // parked at his stand, standing beyond it, or on his way BACK is not a
+      // body carrying the word she said. He faces the way he walks (0 toward
+      // downstream, π toward upstream) and turns to the warp when he stands
+      // (±π/2), so outward is the facing that matches the side he is on — and
+      // her reading must still stand, because it is the word his walk means.
+      // The word falls a few times a minute, so the wait is generous.
+      const helperState = (limit) => {
+        const helper = window.__placeScene?.getObjectByName('village-loom-helper')
+        if (!helper) return null
+        const along = helper.position.z
+        const yaw = helper.rotation.y
+        const outward = along > 0 ? Math.abs(yaw) < 0.1 : Math.abs(Math.abs(yaw) - Math.PI) < 0.1
+        const reading = (window.__speech?.labels() ?? []).some(l => l.speakerId === 'village-weaver')
+        return { along, partWay: Math.abs(along) > 0.4 && Math.abs(along) < limit, outward, reading }
+      }
+      const called = await page.waitForFunction(({ src, limit }) => {
+        const s = new Function('limit', 'return (' + src + ')(limit)')(limit)
+        return !!s && s.partWay && s.outward && s.reading
+      }, { src: helperState.toString(), limit: tendStand - 0.4 }, { timeout: 60000 }).then(() => true).catch(() => false)
+      check('the weaver’s call sends her helper part-way along the warp, and he is walking it OUT under her reading', called)
+      if (called) {
+        const view = page.viewportSize()
+        const teaching = await page.evaluate(({ width, height, limit, src }) => {
+          const layout = window.__placeLayout
+          const station = layout.loom
+          const state = new Function('limit', 'return (' + src + ')(limit)')(limit)
+          const along = state.along
+          const screen = window.__speech?.anchorScreen('village-weaver') ?? null
+          // Three points ON THE WATER: three metres beyond the waterline
+          // straight out from her seat, and a stride either way along the
+          // warp. Each is projected through the live camera; the frame is
+          // then read at the ones inside it.
+          const cam = window.__placeCamera
+          const V = Object.getPrototypeOf(cam.position).constructor
+          const out = layout.bank
+            ? layout.bank.distance - (station.seat.x * layout.bank.nx + station.seat.z * layout.bank.nz) + 3
+            : 0
+          const water = layout.bank
+            ? [-2.5, 0, 2.5].map((d) => {
+                const x = station.seat.x + layout.bank.nx * out + station.fx * d
+                const z = station.seat.z + layout.bank.nz * out + station.fz * d
+                const v = new V(x, 0, z).project(cam)
+                const inFrame = v.z < 1 && Math.abs(v.x) < 0.98 && Math.abs(v.y) < 0.98
+                return { px: Math.round(((v.x + 1) / 2) * width), py: Math.round(((1 - v.y) / 2) * height), inFrame }
+              })
+            : []
+          return {
+            ...state,
+            toward: along > 0 ? 'DOWNSTREAM' : 'UPSTREAM',
+            screen,
+            labelOnScreen: !!screen && screen.x >= 0 && screen.x <= width && screen.y >= 0 && screen.y <= height,
+            water,
+          }
+        }, { width: view.width, height: view.height, limit: tendStand, src: helperState.toString() })
+        check('her reading stands over her own head while he walks — and ON the screen',
+          teaching.reading && teaching.labelOnScreen, JSON.stringify(teaching))
+        check('he is part-way along the warp and still walking out before the picture is taken',
+          teaching.partWay && teaching.outward, JSON.stringify({ along: teaching.along, outward: teaching.outward }))
+        // The frame declares the HELPER as its subject: he is what the word
+        // means, and a picture that lost him would prove nothing.
+        const helperWorld = await page.evaluate(() => {
+          const helper = window.__placeScene.getObjectByName('village-loom-helper')
+          helper.updateWorldMatrix(true, false)
+          const e = helper.matrixWorld.elements
+          return { x: e[12], y: e[13], z: e[14] }
+        })
+        const third = await frame('1157-village-loom-named-tending', {
+          local: { x: helperWorld.x, y: helperWorld.y + 0.6, z: helperWorld.z },
+          label: `the helper ${teaching.toward.toLowerCase()} along the warp after the weaver named it, her reading over her head and the river beyond`,
+        })
+        // THE SHUTTER IS BRACKETED: the same state read again AFTER the frame.
+        // His walk out is monotone and her reading only ever ends, so a state
+        // that held before the shutter and still holds after it held at the
+        // shutter too — a helper who arrived, or a reading that faded, while
+        // the photograph was being taken is caught here.
+        const after = await page.evaluate(({ src, limit }) => new Function('limit', 'return (' + src + ')(limit)')(limit),
+          { src: helperState.toString(), limit: tendStand })
+        check('he was still walking out under her reading when the shutter closed',
+          !!after && after.partWay && after.outward && after.reading, JSON.stringify(after))
+        // THE WATER IS IN THE PICTURE (item 10): read off the captured frame at
+        // the projected water points, not assumed from the stand. Water is the
+        // one blue-dominant ground in this village; sand, cloth and a body in
+        // the way are not.
+        const { data, info } = await sharp(third).raw().toBuffer({ resolveWithObject: true })
+        const blueAt = (px, py) => {
+          if (px < 0 || py < 0 || px >= info.width || py >= info.height) return false
+          const i = (py * info.width + px) * info.channels
+          const r = data[i], g = data[i + 1], b = data[i + 2]
+          return b > r + 15 && b >= g - 10
+        }
+        const waterSeen = teaching.water.filter(w => w.inFrame && blueAt(w.px, w.py))
+        check('the river is in the captured frame, read at the projected water points',
+          waterSeen.length > 0, JSON.stringify(teaching.water))
+      }
+    }
   } finally {
     await page.evaluate((seed) => {
       const g = window.__game.getState()

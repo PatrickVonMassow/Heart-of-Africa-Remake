@@ -7,7 +7,8 @@
 import { placeById } from '../../world/geo'
 import { mulberry32 } from '../../world/noise'
 import { REGION_PLACE_STYLES, VILLAGE_PLANS, type RegionPlaceStyle } from './regionStyles'
-import { PORT_TALKERS, portAdultStations, childPlayGround, villageAdultStations, villageKeepClearSpots, villageLifeProps, villageLifeFootprints, type PlayGround } from './lifeSpots'
+import { LOOM_SPOT, PORT_TALKERS, portAdultStations, childPlayGround, villageAdultStations, villageKeepClearSpots, villageLifeProps, villageLifeFootprints, type PlayGround } from './lifeSpots'
+import { placeLoom, WARP_BODY_RADIUS, WEAVER_BODY_RADIUS, type LoomStation } from './loom'
 import { boxCollider, nudgeToFree, spawnPointFree, standingClear, PLAYER_RADIUS, WALKER_RADIUS, CHIEF_BODY_RADIUS, type Collider } from './collision'
 import { CHIEF_HUT, MARKET_HUT, dwellingRoofProfile, hutRoofProfile, roofStandOff } from './roofClearance'
 import { windingPoints, laneSlots, closestOnPolyline, bendAround, type LaneSlot } from './lanePlan'
@@ -158,6 +159,17 @@ export interface PlaceLayout {
    *  down and where both of the errand's words are spoken. Null where the
    *  settlement has no water path to serve. */
   waterStand: BankPoint | null
+  /**
+   * THE WEAVER'S LOOM (work-order 1157): the seat at the middle of a long warp
+   * stretched PARALLEL to the bank, and the two stakes it runs between. It is
+   * layout data for the reason the play rocks and the dig sites are: the warp's
+   * axis IS the river's axis, and a second one derived in the scene would be a
+   * second loom. Null where the plan leaves the station no room at all.
+   *
+   * `onRiverAxis` is false in a settlement with no river; there the warp lies on
+   * the tangent, the weaver works, and no direction is named.
+   */
+  loom: LoomStation | null
   /**
    * The children's roaming quarter (work-order 481.4): where the group plays
    * between two cycles of its bank game, and how far it roams. It is layout data
@@ -1627,7 +1639,17 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   if (place.kind === 'village') {
     // The props include the fire's stand-off; figure bodies are registered by
     // PlaceLife, so the kneeling cook needs no overlapping static collider.
-    colliders.push(...villageLifeProps(VILLAGE_FIRE, placeId))
+    // THE LOOM PUTS NO CIRCLE HERE (work-order 1157). Its nominal ground is
+    // still reserved against the PLAN — `lifeSpots` and `villageLifeFootprints`
+    // both carry it, so the huts are fitted around it as before — but the
+    // collider it contributes is the WARP, and the warp cannot be laid until
+    // the bank, the children's stage and the water lane have settled. It is
+    // pushed there instead of here; nothing is pushed now and spliced out
+    // later, because every index-based read of this array (the buildings, the
+    // fence run) would shift under the splice.
+    colliders.push(...villageLifeProps(VILLAGE_FIRE, placeId).filter(
+      (c) => !(c.x === LOOM_SPOT[0] && c.z === LOOM_SPOT[1]),
+    ))
   } else {
     colliders.push({ x: PORT_TALKERS[0], z: PORT_TALKERS[1], r: 0.85 }) // chatting pair
   }
@@ -2070,6 +2092,76 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     }
   }
 
+  // THE LOOM IS LAID AFTER EVERYTHING IT HAS TO CLEAR (work-order 1157). Its
+  // warp runs on the river's own axis and its seat is the warp's midpoint, so
+  // the station is a 6.4 m body rather than a point, and every geometry it must
+  // stay clear of — the bank, the children's stage, their roaming quarter and
+  // the water lane's head — is settled only by here. Where the shipped plan
+  // cannot give it the room, THE LOOM MOVES AND THE CHILDREN DO NOT (item 9):
+  // their ground is what the whole communication slice is arranged around.
+  let loom: LoomStation | null = null
+  if (place.kind === 'village') {
+    loom = placeLoom({
+      bank,
+      nominal: LOOM_SPOT,
+      walkRadius: radius - WALKER_RADIUS,
+      free: (x, z, r) =>
+        Math.hypot(x, z) < radius - r &&
+        standingClear(colliders, x, z, r) &&
+        standsOnGroundPlate(bank, x, z, r) &&
+        // AND OFF THE WAY OUT (work-order 688). The crossing is read off the
+        // BUILT fabric and nothing is moved for it, so the warp — a later
+        // object, like the loose dressing — keeps out of it rather than
+        // sealing the one bearing a person can walk out over.
+        !onWayOut(wayOut, radius, x, z, r) &&
+        // AND OFF THE VILLAGE LANES AND THE CHILDREN'S WAY DOWN TO THE WATER:
+        // a warp across either would stand in a walk the layout already drew
+        // (GPT-6 Astra review, pass 7).
+        !onLane(x, z, r) &&
+        !onWayToWater(x, z, r),
+      sightClear: (from, to, halfWidth) => clearCorridor(colliders, from, to, halfWidth),
+      toChildren,
+      waterPathHead: waterPath ? waterPath.head : null,
+      onWaterLane: (x, z, r) => !!waterPath &&
+        closestOnPolyline(
+          [[waterPath.head.x, waterPath.head.z], [waterPath.foot.x, waterPath.foot.z]],
+          x,
+          z,
+        ).dist < WATER_PATH_WIDTH / 2 + r,
+      clearance: balance.communication.talk.reach,
+      geometry: balance.villageLife.loom,
+    })
+    devAssert(
+      loom !== null,
+      'loom-missing',
+      () => `${place.id}@${seed}: no ground takes the warp with the water in sight`,
+    )
+    // The warp's own body joins the set: the threads run at knee height with
+    // the drag weight on them, so a passer-by walks round the whole length
+    // rather than through it (item 11, point 578).
+    if (loom) {
+      colliders.push({
+        kind: 'segment',
+        x1: loom.upstream.x,
+        z1: loom.upstream.z,
+        x2: loom.downstream.x,
+        z2: loom.downstream.z,
+        r: WARP_BODY_RADIUS,
+      })
+      colliders.push({ x: loom.weaver.x, z: loom.weaver.z, r: WEAVER_BODY_RADIUS })
+      // The errand points were chosen before the warp existed; one that now
+      // stands in it is moved off it, exactly as every other placement's points
+      // are freed (point 155: an errand point must carry a standing walker and
+      // leave him a way out).
+      for (const point of errands) {
+        if (spawnPointFree(colliders, point[0], point[1], WALKER_RADIUS)) continue
+        const freed = nudgeToFree(colliders, point[0], point[1], WALKER_RADIUS)
+        point[0] = freed[0]
+        point[1] = freed[1]
+      }
+    }
+  }
+
   // The village's ground work (work-order point 483): three patches where
   // villagers dig — a store pit, a post hole and a patch turned over. They are
   // placed like every other loose object (free ground, off the lanes, seeded by
@@ -2176,5 +2268,5 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   }
 
 
-  return { radius, spawnZ: radius - SPAWN_INSET, interactives, dwellings, fences, paths, flora, rocks, climbRock, digSites, bank, playRocks, waterPath, waterStand, playGround, wayOut, pen, errands, colliders }
+  return { radius, spawnZ: radius - SPAWN_INSET, interactives, dwellings, fences, paths, flora, rocks, climbRock, digSites, bank, playRocks, waterPath, waterStand, loom, playGround, wayOut, pen, errands, colliders }
 }

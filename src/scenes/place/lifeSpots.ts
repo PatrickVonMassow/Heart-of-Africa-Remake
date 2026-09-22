@@ -6,7 +6,16 @@ import { WALKER_RADIUS } from './collision'
 import { mulberry32 } from '../../world/noise'
 import { ROCK_VILLAGE_ID } from '../../world/communicationRock'
 
-/** Keep the established adult/hearing geography; fit the buildings around it. */
+/**
+ * Where the loom BELONGS while the village is planned: the buildings are fitted
+ * around it and the children's ground is kept clear of it, so the station keeps
+ * the established adult/hearing geography.
+ *
+ * It is a RESERVATION, not the station (work-order 1157). The loom itself is a
+ * long warp on the river's axis, and it is laid by `./loom` once the bank, the
+ * children's stage and the water lane have settled — starting here, and moving
+ * only where the shipped plan cannot give it the room.
+ */
 export const LOOM_SPOT: [number, number] = [-8.5, -7]
 export const WEAVER_OFFSET = 0.55
 
@@ -16,7 +25,9 @@ export function inwardStationBody(spot: readonly [number, number], offset: numbe
   return { x: spot[0] + Math.sin(yaw) * offset, z: spot[1] + Math.cos(yaw) * offset, r: WALKER_RADIUS }
 }
 
-/** The body is on the village side of the frame, looking back at the loom. */
+/** The reserved body beside the nominal spot, on the village side of it. The
+ *  drawn weaver sits where `./loom` puts her; this keeps her usual ground free
+ *  while the plan is laid. */
 export function weaverStance(spot: readonly [number, number] = LOOM_SPOT) {
   const body = inwardStationBody(spot, WEAVER_OFFSET)
   return { ...body, yaw: Math.atan2(spot[0] - body.x, spot[1] - body.z) }
@@ -97,7 +108,7 @@ export function villageAdultStations(
     VILLAGE_SPOTS.pounder,
     VILLAGE_SPOTS.drummer,
     ...well,
-    LOOM_SPOT, // the weaver at her loom
+    LOOM_SPOT, // the weaver's reserved ground (the laid warp clears them itself)
     [fx, fz], // the fire itself
     [fx + 1.2, fz + 1.0], // the cook
     [fx - 1.3, fz - 0.7], // the fire tender

@@ -3,7 +3,9 @@ import { afterEach, expect, it, vi } from 'vitest'
 
 const source = readFileSync('scripts/verify/polish.mjs', 'utf8')
 const start = source.indexOf("if (section('village-stations')) {")
-const end = source.indexOf("\nif (section('adult-errands'))", start)
+// The loom's OWN picture section follows this one and is driven by its own
+// test; this slice stops where it begins.
+const end = source.indexOf("\nif (section('village-loom'))", start)
 if (start < 0 || end < 0) throw new Error('Village station section missing')
 const run = new (Object.getPrototypeOf(async function () {}).constructor)(
   'section', 'page', 'check', 'frame', 'nextFrames', 'waitForSceneBuilt', source.slice(start, end),
@@ -11,7 +13,7 @@ const run = new (Object.getPrototypeOf(async function () {}).constructor)(
 
 afterEach(() => vi.unstubAllGlobals())
 
-async function photograph({ marketX = -5.21, marketRadius = 2.9, failFrame = false } = {}) {
+async function photograph({ marketX = -5.21, marketRadius = 2.9, radius = 30, failFrame = false } = {}) {
   const state = { seed: 42, placeId: 'cairo', leavePlace() { this.placeId = null }, enterPlace(id) { this.placeId = id }, setJournalOpen() {} }
   const matrix = (x, z, yaw = 0) => ({
     updateWorldMatrix() {},
@@ -20,10 +22,21 @@ async function photograph({ marketX = -5.21, marketRadius = 2.9, failFrame = fal
   const loom = matrix(0, -3)
   const body = matrix(0, -2.45, Math.PI)
   vi.stubGlobal('__game', { getState: () => state, setState: update => Object.assign(state, update) })
-  vi.stubGlobal('__placeScene', { getObjectByName: name => name === 'village-weaver' ? loom : body })
+  vi.stubGlobal('__placeScene', { getObjectByName: name => name === 'village-loom' ? loom : body })
   vi.stubGlobal('__placeLayout', {
+    radius,
     interactives: [{ type: 'market', pos: [marketX, -5.76] }], dwellings: [],
     colliders: [{ x: marketX, z: -5.76, r: marketRadius }],
+    // The station as the layout lays it (work-order 1157): a 6.4 m warp on the
+    // z axis, the weaver beside its middle where the stubbed body stands.
+    loom: {
+      seat: { x: 0, z: -3 },
+      weaver: { x: 0, z: -2.45 },
+      upstream: { x: 0, z: -6.2 },
+      downstream: { x: 0, z: 0.2 },
+      fx: 0, fz: 1, ax: 0, az: -1,
+      onRiverAxis: true,
+    },
   })
   const player = {}
   vi.stubGlobal('__placePlayer', player)
@@ -86,4 +99,20 @@ it('refuses a photograph when every candidate camera stand is blocked', async ()
   expect(checks[3].pass).toBe(false)
   expect(frames).toEqual([])
   expect(state.seed).toBe(42)
+})
+
+it('keeps every camera stand inside the settlement, where the game does not leave the place', async () => {
+  // A settlement so small that every side stand would fall outside its
+  // boundary: the search must refuse rather than hand the shutter travel mode.
+  const { checks, frames, player } = await photograph({ radius: 4 })
+  expect(checks[2].pass).toBe(false)
+  expect(frames).toEqual([])
+  expect(player.x).toBeUndefined()
+})
+
+it('photographs her from the side when the trading post stands far off, without asking for it in frame', async () => {
+  const { checks, frames, player, body } = await photograph({ marketX: -25 })
+  expect(checks[3]).toMatchObject({ pass: true })
+  expect(frames.map(f => f.name)).toEqual(['1143-village-weaver-clear-of-market'])
+  expect(Math.hypot(player.x - body.x, player.z - body.z)).toBeCloseTo(6, 6)
 })
