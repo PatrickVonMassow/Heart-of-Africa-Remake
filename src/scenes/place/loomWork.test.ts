@@ -132,16 +132,18 @@ describe('the word sits on a body that moves that way (item 7)', () => {
     const state = createLoomWork(cfg, mulberry32(23))
     const v = view()
     const dt = 1 / 60
-    let sawHome = false
+    // Home counts only AFTER he has been away: the idle start is home too, and
+    // a helper who never came back would pass a check that counted it.
     let sawAway = false
+    let cameBack = false
     for (let t = 0; t < 180; t += dt) {
       stepLoomWork(state, v, dt, cfg, mulberry32(29))
       const p = loomPicture(state)
-      if (Math.abs(p.helperAt) < 1e-9 && state.errand === null) sawHome = true
       if (Math.abs(p.helperAt) > cfg.tendStand - 1e-6) sawAway = true
+      if (sawAway && Math.abs(p.helperAt) < 1e-9 && state.errand === null) cameBack = true
     }
     expect(sawAway).toBe(true)
-    expect(sawHome).toBe(true)
+    expect(cameBack).toBe(true)
   })
 })
 

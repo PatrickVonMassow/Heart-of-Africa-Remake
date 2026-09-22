@@ -589,8 +589,14 @@ function Loom({
   const rand = useMemo(() => mulberry32((Math.round(station.seat.x * 128) ^ Math.round(station.seat.z * 977)) >>> 0), [station])
   const work = useMemo(() => createLoomWork(cfg, rand), [cfg, rand])
   const pose = useRef<FigurePose | null>(loomPose(loomPicture(work)))
-  const helperPose = useRef<FigurePose | null>(null)
+  // His own mutable pose, born at rest: a null here is never written, and the
+  // frame below would skip him for good (GPT-6 Astra review, pass 5).
+  const helperPose = useRef<FigurePose | null>({ left: { ...REST_POSE.left }, right: { ...REST_POSE.right }, lean: 0, turn: 0 })
   const helperGait = useRef(0)
+  // Both poses are OWNED here: written and applied in the same frame, so the
+  // hands never trail the shuttle by one frame (the Kids pattern, work-order 1065).
+  const weaverLimbs = useRef<FigureLimbs | null>(null)
+  const helperLimbs = useRef<FigureLimbs | null>(null)
   const group = useRef<THREE.Group>(null)
   const weaverGroup = useRef<THREE.Group>(null)
   const clothMesh = useRef<THREE.Mesh>(null)
@@ -638,6 +644,7 @@ function Loom({
       Object.assign(p.right, next.right)
       p.lean = next.lean
       p.turn = next.turn
+      applyFigurePose(weaverLimbs.current, p)
     }
 
     // The station's own clock, published on the group: a check that has to wait
@@ -681,6 +688,7 @@ function Loom({
       Object.assign(hp.right, at ? reach : REST_POSE.right)
       hp.lean = at * 0.35
       hp.turn = 0
+      applyFigurePose(helperLimbs.current, hp)
     }
     // The body he presents to the rest of the village follows him.
     const body = helperBody[0]
@@ -741,11 +749,11 @@ function Loom({
       </mesh>
       {/* The weaver, beside the warp at its middle, facing across it. */}
       <group ref={weaverGroup} name="village-weaver-body" position={[-waterSide * WEAVER_SIDE_OFFSET, 0, 0]} rotation={[0, waterSide * Math.PI / 2, 0]}>
-        <Figure cloth={cloth} kneel pose={pose} />
+        <Figure cloth={cloth} kneel pose={pose} limbs={weaverLimbs} />
       </group>
       {/* Her helper, on the water side of the threads. */}
       <group ref={helper} name="village-loom-helper" position={[waterSide * HELPER_SIDE_OFFSET, 0, 0]}>
-        <Figure cloth={weave} legs pose={helperPose} gait={helperGait} />
+        <Figure cloth={weave} legs pose={helperPose} limbs={helperLimbs} gait={helperGait} />
       </group>
     </group>
   )

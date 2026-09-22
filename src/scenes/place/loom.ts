@@ -254,11 +254,12 @@ export function waterAhead(at: BankPoint, bank: PlaceRiverBank): BankPoint {
  */
 export function placeLoom(p: LoomPlacement): LoomStation | null {
   // The warp's axis. With a bank it is the river's, and that is the whole
-  // point; without one it is the tangent at the nominal spot, which gives a
-  // bankless village its weaver without inventing a direction for it.
+  // point; without one it is the tangent at each CANDIDATE seat, which gives a
+  // bankless village its weaver without inventing a direction for it. Taken
+  // per candidate, not once at the nominal spot: a seat swept 90° round with
+  // the nominal tangent kept would lay the two bodies along the threads
+  // (GPT-6 Astra review, pass 8).
   const nominalAngle = Math.atan2(p.nominal[1], p.nominal[0])
-  const fx = p.bank ? p.bank.fx : -Math.sin(nominalAngle)
-  const fz = p.bank ? p.bank.fz : Math.cos(nominalAngle)
   const onRiverAxis = p.bank !== null
 
   const baseRadius = Math.hypot(p.nominal[0], p.nominal[1])
@@ -272,6 +273,8 @@ export function placeLoom(p: LoomPlacement): LoomStation | null {
   for (let step = 0; step <= SEAT_SWEEP_DEGREES; step++) {
     for (const sign of step === 0 ? [1] : [-1, 1]) {
       const a = nominalAngle + sign * step * (Math.PI / 180)
+      const fx = p.bank ? p.bank.fx : -Math.sin(a)
+      const fz = p.bank ? p.bank.fz : Math.cos(a)
       for (const r of radii) {
         const seat = { x: Math.cos(a) * r, z: Math.sin(a) * r }
         // Across the warp, toward the water — or straight outward where the

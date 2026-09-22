@@ -74,6 +74,39 @@ describe('the loom lies on the river’s axis (work-order 1157 item 4)', () => {
     const dot = (station!.seat.x / radial) * station!.fx + (station!.seat.z / radial) * station!.fz
     expect(Math.abs(dot)).toBeLessThan(1e-9)
   })
+
+  it('a bankless seat swept away from its nominal spot keeps the tangent of where it LANDS', () => {
+    // The nominal wedge is blocked, so the sweep settles the seat a quarter
+    // turn round. The warp must be the tangent THERE — with the nominal
+    // tangent kept, the bodies would stand along the threads (Astra, pass 8).
+    const nominal: [number, number] = [-8.5, -7]
+    const nominalAngle = Math.atan2(nominal[1], nominal[0])
+    const wedge = (x: number, z: number) => {
+      const d = Math.atan2(z, x) - nominalAngle
+      return Math.abs(Math.atan2(Math.sin(d), Math.cos(d))) > Math.PI / 3
+    }
+    const station = placeLoom({
+      bank: null,
+      nominal,
+      walkRadius: 30,
+      free: wedge,
+      sightClear: () => true,
+      toChildren: () => Infinity,
+      waterPathHead: null,
+      onWaterLane: () => false,
+      clearance: balance.communication.talk.reach,
+      geometry: balance.villageLife.loom,
+    })
+    expect(station).not.toBeNull()
+    const d = Math.atan2(station!.seat.z, station!.seat.x) - nominalAngle
+    expect(Math.abs(Math.atan2(Math.sin(d), Math.cos(d)))).toBeGreaterThan(Math.PI / 4)
+    const radial = Math.hypot(station!.seat.x, station!.seat.z)
+    const dot = (station!.seat.x / radial) * station!.fx + (station!.seat.z / radial) * station!.fz
+    expect(Math.abs(dot)).toBeLessThan(1e-9)
+    // And the across-warp axis, which places the two bodies, is perpendicular
+    // to the warp itself.
+    expect(Math.abs(station!.ax * station!.fx + station!.az * station!.fz)).toBeLessThan(1e-9)
+  })
 })
 
 describe('the weaver sits in the MIDDLE of the warp (item 5)', () => {
@@ -249,8 +282,14 @@ describe('the whole warp is a body the village walks round (item 11)', () => {
     for (const { id, seed, layout } of shippedLooms()) {
       const loom = layout.loom
       if (!loom) continue
+      // Both ends and the body radius: a zero-length stub at the upstream stake
+      // would pass an end-point match and leave the warp walkable.
       const warp = layout.colliders.find(
-        (c) => c.kind === 'segment' && Math.hypot(c.x1 - loom.upstream.x, c.z1 - loom.upstream.z) < 1e-9,
+        (c) =>
+          c.kind === 'segment' &&
+          Math.hypot(c.x1 - loom.upstream.x, c.z1 - loom.upstream.z) < 1e-9 &&
+          Math.hypot(c.x2 - loom.downstream.x, c.z2 - loom.downstream.z) < 1e-9 &&
+          c.r === WARP_BODY_RADIUS,
       )
       expect(warp, `${id}/${seed}`).toBeTruthy()
       const seat = layout.colliders.find(
