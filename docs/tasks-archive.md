@@ -30946,3 +30946,46 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Refs: .github/workflows/ci.yml:89, vitest.config.ts:69, src/test/setup.ts:26-55, CI runs
   35685632209 / 35683117792 / 35671555829
   Bundle: Testinfrastruktur.
+
+- [x] 1180. The unit layer builds the same ninety-nine villages some twelve thousand times,
+  and that duplicate work — not the number of cases — is the last six and a half minutes
+  (measured 22.09.2026 out of point 1178).
+  WHERE THE POINT COMES FROM: 1178 brought the `fast` job back to green and settled the pool
+  width on measurement, but its own target of a 15-minute `unit` step was not reachable with
+  the levers it named. It is now green at 21 min 30 s (CI run 35692702523, 527 files /
+  16 275 cases). The floor is no longer the obstacle: the slowest single file is 182.4 s
+  against a 1 289.9 s wall clock, so no further file splitting helps.
+  THE MEASUREMENT THAT NAMES THE LEVER. `buildLayout(placeId, seed)` is a deterministic
+  function of its two arguments — it seeds `mulberry32` from `seed ^ hash(placeId)` and takes
+  nothing else — and it costs 111 ms per call: building the whole (33 places x 3 seeds) grid
+  once takes 10 966 ms on a quiet host. The suite does not build that grid once. It was
+  already caught doing it twice inside a SINGLE file: `roofClearance.test.ts` rebuilt all 99
+  cells purely to read the roof labels off them, and dropping that one duplicate pass took the
+  case from 10 952 ms to 1 ms with no coverage lost and the cell count asserted so none can be
+  skipped in silence. The same grid is rebuilt from scratch in `layout.test.ts` (134.0 s),
+  `layout.wayOut.test.ts` (111.1 s), `lifeStationClearance.test.ts` (108.5 s),
+  `layout.fabric.test.ts` (91.6 s), `riverBank.test.ts` (79.3 s), `layout.waterPath.test.ts`
+  (49.2 s), `layout.groundWork.test.ts` (27.4 s) and the six `tagShuffle.*`/`bankGame` replays
+  (758.6 s) — 1 374 s of the layer's 1 890 s of summed test time, which at 111 ms a layout is
+  of the order of twelve thousand builds of ninety-nine distinct results.
+  FINAL STATE:
+  1. A layout the suite has already built for a given (place, seed) is not built again —
+     through a shared test fixture, never through memoisation inside the shipped
+     `buildLayout`, which must stay a pure function with no cache the game pays for.
+  2. Sharing is proven SAFE rather than assumed: a case that mutates a layout it was handed
+     cannot silently corrupt the next reader. Either the fixture hands out a copy where a
+     case writes, or the writing cases are found and named.
+  3. Not one case is shortened, dropped or merged — the same assertions run on the same
+     layouts. The saving is in the building, not in the checking.
+  4. The `unit` step of a green `fast` run is read off CI and written into the tick as a
+     figure, with the headroom under `timeout-minutes: 25` stated alongside it.
+  Test: Vitest on the fixture itself — the same (place, seed) asked for twice yields layouts
+  that compare equal, a call count proving the second ask did not rebuild, and cover that a
+  mutation by one reader does not reach the next. Plus the CI `unit` duration, before and
+  after.
+  Criticality: high — every landing pays these minutes, and at 21 min 30 s the job still sits
+  inside four minutes of the `timeout-minutes: 25` ceiling whose failure mode is `cancelled`,
+  which names no cause and which no push can clear.
+  Refs: src/scenes/place/layout.ts:822, src/scenes/place/roofClearance.test.ts, vitest.config.ts,
+  CI run 35692702523
+  Bundle: Testinfrastruktur.
