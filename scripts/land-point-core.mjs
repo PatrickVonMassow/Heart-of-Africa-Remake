@@ -32,6 +32,8 @@
 //     core the Stop-hook guard uses) BEFORE it is written, so the chain can never
 //     produce a state that guard would block.
 
+import { CLAUDE_MODEL } from './fable-switch-core.mjs'
+
 /** A landing failure that is the CHAIN's own verdict, not a crash. */
 export class LandingError extends Error {
   constructor(message, { step = null, repair = null } = {}) {
@@ -123,7 +125,7 @@ export function tickCommitMessage({ number, model } = {}) {
   if (!name) {
     throw new LandingError('no authoring model given for the tick commit', {
       step: 'push',
-      repair: 'pass --model "Claude Opus 5" (the model running this landing) — the trailer is model-guard\'s only evidence',
+      repair: `pass --model "${CLAUDE_MODEL}" (the model running this landing) — the trailer is model-guard's only evidence`,
     })
   }
   return [

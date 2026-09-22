@@ -23,7 +23,16 @@ import { resolve } from 'node:path'
 // allowlist's own answer (scripts/model-guard-core.mjs, which imports nothing),
 // so "who authored this" cannot drift from "who may author at all".
 import { modelNamesIn } from './model-guard-core.mjs'
-import { ASTRA_MODEL, FABLE_MODEL, fableIsOn, isSwitchFallbackReason, mergeFallbackReason, mergerModel } from './fable-switch-core.mjs'
+import {
+  ASTRA_MODEL,
+  FABLE_MODEL,
+  OPUS_FALLBACK_MODEL,
+  OPUS_MODEL,
+  fableIsOn,
+  isSwitchFallbackReason,
+  mergeFallbackReason,
+  mergerModel,
+} from './fable-switch-core.mjs'
 // …and how a review split into PASSES over the file set composes back into a
 // coverage (point 714). Both the recorder and this gate ask the same module, so
 // what may be WRITTEN and what CLEARS cannot drift apart.
@@ -332,8 +341,8 @@ export function normaliseHandover(reason) {
   const raw = String(reason ?? '').trim()
   return RETIRED_HANDOVERS[raw] ?? raw
 }
-export const ASTRA_UNAVAILABLE_REVIEW_CHAIN = Object.freeze([FABLE_MODEL, 'Opus 5', 'Opus 4.8'])
-export const ASTRA_AUTHORED_REVIEW_CHAIN = Object.freeze(['Opus 5', FABLE_MODEL, 'Opus 4.8'])
+export const ASTRA_UNAVAILABLE_REVIEW_CHAIN = Object.freeze([FABLE_MODEL, OPUS_MODEL, OPUS_FALLBACK_MODEL])
+export const ASTRA_AUTHORED_REVIEW_CHAIN = Object.freeze([OPUS_MODEL, FABLE_MODEL, OPUS_FALLBACK_MODEL])
 
 /** The chain in force for a handover at record time. */
 export function handoverChainFor(reason, fableState) {

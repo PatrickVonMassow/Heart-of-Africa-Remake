@@ -14,7 +14,7 @@
 //          the HARD and CRITICAL ones — difficult, complex, error-prone or
 //          tagged HIGH criticality goes STRAIGHT here, where it used to be held
 //          back for Opus.
-//   opus   Opus 5 keeps what only the main lane can honestly finish: a point
+//   opus   Opus 5.5 keeps what only the main lane can honestly finish: a point
 //          whose VERIFICATION is the work (a picture judged on both backends is
 //          the main session's job, so authoring it elsewhere buys nothing) —
 //          and only while nothing marks that point hard, because the user's
@@ -33,7 +33,7 @@
 // itself. Side-effect free; the work-order reading belongs to
 // scripts/author-astra.mjs. Pinned by author-routing-core.test.mjs.
 
-import { ASTRA_MODEL, FABLE_MODEL, fableIsOn, fableRefusalReason, requireState } from './fable-switch-core.mjs'
+import { ASTRA_MODEL, FABLE_MODEL, OPUS_MODEL, fableIsOn, fableRefusalReason, requireState } from './fable-switch-core.mjs'
 
 /** The authoring lanes, in the order this file describes them. */
 export const LANES = Object.freeze(['astra', 'fable', 'opus'])
@@ -43,7 +43,7 @@ export const LANES = Object.freeze(['astra', 'fable', 'opus'])
 export const LANE_MODEL = Object.freeze({
   astra: ASTRA_MODEL,
   fable: FABLE_MODEL,
-  opus: 'Opus 5',
+  opus: OPUS_MODEL,
 })
 
 /**
@@ -104,7 +104,7 @@ export function specExaminerFor(history = {}, fallbackAuthor = '') {
   const rounds = Array.isArray(history?.rounds) ? history.rounds : []
   const author = [...rounds].reverse().find((round) => round.authoredBy)?.authoredBy || String(fallbackAuthor)
   if (/\b(?:astra|sol)\b/i.test(author)) {
-    return { vendor: 'claude', model: 'Opus 5', route: 'claude-read', author }
+    return { vendor: 'claude', model: OPUS_MODEL, route: 'claude-read', author }
   }
   return { vendor: 'astra', model: ASTRA_MODEL, route: 'ask-astra', author }
 }

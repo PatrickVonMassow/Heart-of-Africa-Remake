@@ -51,7 +51,7 @@ import { MANDATE_MAX_AGE_MS, resumeRepairMandate } from './batch-doctor-core.mjs
 import { consumeMandateMarker } from './batch-doctor-states.mjs'
 import { isPaused, pauseReason } from './batch-lock.mjs'
 import { currentFableState } from './fable-switch.mjs'
-import { servingPolicyLine } from './fable-switch-core.mjs'
+import { OPUS_MODEL, servingPolicyLine } from './fable-switch-core.mjs'
 import { REPO_ROOT, repoPath } from './repo-paths.mjs'
 import { noteHandoverAttributionSuccessorStart } from './handover-attribution.mjs'
 
@@ -219,7 +219,7 @@ const RESUME_BODY =
   'DELEGATION (user decision 22.07.2026): delegate implementation AND infra/guard/doc/' +
   'dashboard work to parallel WORKTREE-ISOLATED subagents on NON-OVERLAPPING files — under ' +
   'the model policy stated above, so the points go to GPT-6 Astra — the hard and critical ' +
-  'ones included — while a point whose verification is the work stays with Opus 5 unless ' +
+  'ones included — while a point whose verification is the work stays with ' + OPUS_MODEL + ' unless ' +
   'its spec marks it hard ' +
   '(each point on its own branch, gates green, pushed, not merged by the agent); the main ' +
   'session keeps only the picture-verification on both backends, the serial merge -> ' +

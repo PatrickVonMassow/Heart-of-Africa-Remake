@@ -83,7 +83,7 @@ strategy and suite map: `scripts/verify/README.md`.
   remain allowed. It currently defaults to `observe` and refuses nothing until
   its arming point lands. Owner mechanics: `docs/batch-owner-runbook.md`.
 - **Model policy.** GPT-6 Astra authors difficult, complex, error-prone, and
-  HIGH-criticality points; Opus 5 authors points whose verification is the work.
+  HIGH-criticality points; Opus 5.5 authors points whose verification is the work.
   Fable 5.1 authors tagged points and router escalations. Review is cross-vendor and
   never by an author of the range: Astra reviews Claude work through
   `scripts/review-astra.mjs`, Claude reviews Astra work. `node

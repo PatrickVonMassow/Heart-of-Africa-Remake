@@ -35,7 +35,9 @@ import {
   ASTRA_MODEL_ID,
   FABLE_MODEL,
   FABLE_MODEL_ID,
+  OPUS_FALLBACK_MODEL,
   OPUS_FALLBACK_MODEL_ID,
+  OPUS_MODEL,
   OPUS_MODEL_ID,
   fableIsOn,
 } from './fable-switch-core.mjs'
@@ -74,8 +76,8 @@ export const ASTRA_REASONING_EFFORT = 'high'
  *  order. The ones behind Fable exist because Fable and Opus also AUTHOR here,
  *  and no model may review its own work (CLAUDE.md §6). */
 export const FALLBACK_MODEL_NAME = FABLE_MODEL
-export const SECOND_FALLBACK_MODEL_NAME = 'Opus 5'
-export const FALLBACK_CHAIN = Object.freeze([FALLBACK_MODEL_NAME, SECOND_FALLBACK_MODEL_NAME, 'Opus 4.8'])
+export const SECOND_FALLBACK_MODEL_NAME = OPUS_MODEL
+export const FALLBACK_CHAIN = Object.freeze([FALLBACK_MODEL_NAME, SECOND_FALLBACK_MODEL_NAME, OPUS_FALLBACK_MODEL])
 
 /**
  * …and the chain for the OTHER direction (point 667): who reviews what ASTRA
@@ -85,9 +87,9 @@ export const FALLBACK_CHAIN = Object.freeze([FALLBACK_MODEL_NAME, SECOND_FALLBAC
  * who else can look at this?" and starts at Fable, the second-opinion model.
  * This one answers "Astra wrote it, who takes it from here?" — and under the role
  * swap that reviewer ALSO runs the suites, judges the picture and lands the
- * point, which is the main authoring session's job. So it starts at Opus 5.
+ * point, which is the main authoring session's job. So it starts at the Opus lane.
  */
-export const CLAUDE_REVIEW_CHAIN = Object.freeze(['Opus 5', FABLE_MODEL, 'Opus 4.8'])
+export const CLAUDE_REVIEW_CHAIN = Object.freeze([OPUS_MODEL, FABLE_MODEL, OPUS_FALLBACK_MODEL])
 
 /** Every reviewer the policy can name, including the exact CLI identity needed
  *  to start it. Keeping the executable roster beside the decision chains makes
@@ -96,7 +98,7 @@ export const REVIEWER_ROSTER = Object.freeze([
   Object.freeze({ key: 'astra', name: ASTRA_MODEL_NAME, id: ASTRA_MODEL_ID, runtime: 'codex', effort: ASTRA_REASONING_EFFORT }),
   Object.freeze({ key: 'fable', name: FALLBACK_MODEL_NAME, id: FABLE_MODEL_ID, runtime: 'claude', effort: 'high' }),
   Object.freeze({ key: 'opus', name: SECOND_FALLBACK_MODEL_NAME, id: OPUS_MODEL_ID, runtime: 'claude', effort: 'high' }),
-  Object.freeze({ key: 'opus48', name: 'Opus 4.8', id: OPUS_FALLBACK_MODEL_ID, runtime: 'claude', effort: 'high' }),
+  Object.freeze({ key: 'opus48', name: OPUS_FALLBACK_MODEL, id: OPUS_FALLBACK_MODEL_ID, runtime: 'claude', effort: 'high' }),
 ])
 
 /** The executable identity for a policy model name/key/id, or null. */

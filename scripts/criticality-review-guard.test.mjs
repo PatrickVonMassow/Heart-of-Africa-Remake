@@ -34,6 +34,7 @@ import {
   readWorkOrder,
   showAt,
 } from './criticality-review-guard.mjs'
+import { CLAUDE_MODEL, OPUS_MODEL } from './fable-switch-core.mjs'
 
 describe('baselineFor', () => {
   it('prefers the branch’s own confirmed baseline, then main’s, then nothing', () => {
@@ -684,7 +685,7 @@ describe('the unavailable-receipt CLI', { timeout: 30_000 }, () => {
       expect(
         runGit(
           'commit', '-q', '-m',
-          'Seed the receipt range\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>',
+          `Seed the receipt range\n\nCo-Authored-By: ${CLAUDE_MODEL} <noreply@anthropic.com>`,
         ).status,
       ).toBe(0)
       const base = runGit('rev-parse', 'HEAD').stdout.trim()
@@ -698,7 +699,7 @@ describe('the unavailable-receipt CLI', { timeout: 30_000 }, () => {
       expect(
         runGit(
           'commit', '-q', '-m',
-          'Add a contribution by every configured reader\n\nCo-Authored-By: GPT-6 Astra <noreply@openai.com>\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\nCo-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>',
+          `Add a contribution by every configured reader\n\nCo-Authored-By: GPT-6 Astra <noreply@openai.com>\nCo-Authored-By: ${CLAUDE_MODEL} <noreply@anthropic.com>\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\nCo-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`,
         ).status,
       ).toBe(0)
       const head = runGit('rev-parse', 'HEAD').stdout.trim()
@@ -779,7 +780,7 @@ describe('the findings-filed receipt', () => {
     // The recorder always writes the reviewed commit's authorship key, so a row
     // without one can only have arrived by hand — and a hand-edited ledger earns
     // a refusal, never a clearance.
-    authoredBy: 'Claude Opus 5 <noreply@anthropic.com>',
+    authoredBy: `${CLAUDE_MODEL} <noreply@anthropic.com>`,
     evidence: 'read the whole mechanism and found it wrong in two places',
     at: 1_788_000_000_000,
   }
@@ -856,7 +857,7 @@ describe('the findings-filed receipt', () => {
 
   it('REFUSES when no such review exists at all', () => {
     expect(build({ records: [] }).ok).toBe(false)
-    expect(build({ model: 'Opus 5' }).ok).toBe(false)
+    expect(build({ model: OPUS_MODEL }).ok).toBe(false)
   })
 
   it('REFUSES an empty or malformed finding list', () => {

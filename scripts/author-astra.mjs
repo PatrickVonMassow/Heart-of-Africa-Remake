@@ -43,7 +43,7 @@ import { ensureModelProven } from './review-astra.mjs'
 import { currentSetting, settingProblemLine } from './astra-share.mjs'
 import { routeFor } from './astra-share-core.mjs'
 import { currentFableState } from './fable-switch.mjs'
-import { fableIsOn } from './fable-switch-core.mjs'
+import { OPUS_MODEL, fableIsOn } from './fable-switch-core.mjs'
 import {
   authoringClaudeArgs,
   FABLE_MODEL,
@@ -489,7 +489,7 @@ const AUTHOR_LANE_CONFIG = Object.freeze({
     model: ASTRA_MODEL_NAME,
     modelId: ASTRA_MODEL_ID,
     trailer: ASTRA_TRAILER,
-    reviewer: 'Opus 5',
+    reviewer: OPUS_MODEL,
     reviewerLabel: 'Claude',
     runtime: 'codex',
     runtimeLabel: 'codex',

@@ -27,6 +27,7 @@
 // wrong here goes wrong QUIETLY, so every judgment is a function with no I/O,
 // pinned in scripts/fold-point-core.test.mjs, and scripts/fold-point.mjs only
 // performs what these decide.
+import { CLAUDE_MODEL } from './fable-switch-core.mjs'
 import { LandingError, VERDICT, tickAndArchive } from './land-point-core.mjs'
 import { closeCard, nowCard, queueCard, toNow } from './board-core.mjs'
 
@@ -285,7 +286,7 @@ export function foldCommitMessage({ number, into = null, delivered = '', model }
   if (!name) {
     throw new LandingError('no authoring model given for the fold commit', {
       step: 'commit',
-      repair: 'pass --model "Claude Opus 5" (the model running this fold) — the trailer is model-guard\'s only evidence',
+      repair: `pass --model "${CLAUDE_MODEL}" (the model running this fold) — the trailer is model-guard's only evidence`,
     })
   }
   const reason = foldReason({ into, delivered })

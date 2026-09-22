@@ -42,7 +42,7 @@ import {
 import { tmpdir } from 'node:os'
 import { delimiter, join, resolve } from 'node:path'
 import { FALLBACK_MODEL_NAME, SECOND_FALLBACK_MODEL_NAME, ASTRA_MODEL_NAME } from './review-astra-core.mjs'
-import { writeState as writeFableState } from './fable-switch-core.mjs'
+import { CLAUDE_MODEL, OPUS_MODEL, OPUS_MODEL_ID, writeState as writeFableState } from './fable-switch-core.mjs'
 import { formatContributionPassPlan } from './review-astra.mjs'
 
 /** The command and everything it imports — copied so REPO_ROOT is the fixture. */
@@ -351,11 +351,11 @@ beforeAll(() => {
   // The trailing-space file exists from the start, so the edge branch MODIFIES
   // it and its current content must travel beside the patch.
   if (process.platform !== 'win32') writeFileSync(join(repo, EDGE_NAME), 'the original edge-space file\n')
-  mainSha = commit('world.txt', 'the fixture world\n', 'Lay down the fixture world', 'Opus 5')
+  mainSha = commit('world.txt', 'the fixture world\n', 'Lay down the fixture world', OPUS_MODEL)
 
   git('checkout', '-q', '-b', 'feat')
-  commit('world.txt', 'the fixture world, revised\n', 'Revise the world', 'Opus 5')
-  headSha = commit('added.txt', 'a file the patch carries whole\n', 'Add a file', 'Opus 5')
+  commit('world.txt', 'the fixture world, revised\n', 'Revise the world', OPUS_MODEL)
+  headSha = commit('added.txt', 'a file the patch carries whole\n', 'Add a file', OPUS_MODEL)
 
   git('checkout', '-q', '-b', 'fable-work', 'main')
   fableSha = commit('fable.txt', 'written by the fallback reviewer\n', 'Write something as Fable', 'Fable 5.1')
@@ -383,14 +383,14 @@ beforeAll(() => {
     '--no-verify',
     '-q',
     '-m',
-    'Write across both authoring lanes\n\nCo-Authored-By: GPT-5.6 Sol <noreply@openai.com>\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>',
+    `Write across both authoring lanes\n\nCo-Authored-By: GPT-5.6 Sol <noreply@openai.com>\nCo-Authored-By: ${CLAUDE_MODEL} <noreply@anthropic.com>`,
   )
   unreviewableSha = git('rev-parse', 'HEAD')
 
   // One independently reviewable file beside one both-vendor file. The latter
   // remains owed, but it must not suppress the pass the former can earn.
   git('checkout', '-q', '-b', 'partly-reviewable', 'main')
-  commit('reviewable.txt', 'written by one authoring lane\n', 'Add the reviewable part', 'Opus 5')
+  commit('reviewable.txt', 'written by one authoring lane\n', 'Add the reviewable part', OPUS_MODEL)
   writeFileSync(join(repo, 'unavailable.txt'), 'written by both authoring lanes\n')
   git('add', '-A')
   git(
@@ -398,7 +398,7 @@ beforeAll(() => {
     '--no-verify',
     '-q',
     '-m',
-    'Add the unavailable part\n\nCo-Authored-By: GPT-5.6 Sol <noreply@openai.com>\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>',
+    `Add the unavailable part\n\nCo-Authored-By: GPT-5.6 Sol <noreply@openai.com>\nCo-Authored-By: ${CLAUDE_MODEL} <noreply@anthropic.com>`,
   )
   partlyReviewableSha = git('rev-parse', 'HEAD')
 
@@ -407,9 +407,9 @@ beforeAll(() => {
   // exactly the historical shape that used to turn the cc-only resolution into
   // unknown authorship and refuse the whole review plan.
   git('checkout', '-q', '-b', 'merge-resolution', mainSha)
-  commit('world.txt', 'the feature-side world\n', 'Revise the world on the feature', 'Opus 5')
+  commit('world.txt', 'the feature-side world\n', 'Revise the world on the feature', OPUS_MODEL)
   git('checkout', '-q', 'main')
-  commit('world.txt', 'the main-side world\n', 'Revise the world on main', 'Opus 5')
+  commit('world.txt', 'the main-side world\n', 'Revise the world on main', OPUS_MODEL)
   git('checkout', '-q', 'merge-resolution')
   const merged = spawnSync('git', ['-c', 'core.hooksPath=', 'merge', '--no-ff', '--no-commit', 'main'], {
     windowsHide: true,
@@ -430,20 +430,20 @@ beforeAll(() => {
   writeFileSync(join(repo, 'bulk-a.txt'), `${'a'.repeat(120_000)}\n`)
   writeFileSync(join(repo, 'bulk-b.txt'), `${'b'.repeat(120_000)}\n`)
   git('add', '-A')
-  git('commit', '--no-verify', '-q', '-m', 'Add two files no single round can hold\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>')
+  git('commit', '--no-verify', '-q', '-m', `Add two files no single round can hold\n\nCo-Authored-By: ${CLAUDE_MODEL} <noreply@anthropic.com>`)
   bulkSha = git('rev-parse', 'HEAD')
 
   // …and a branch that CHANGES that quoted-name file, so the range carries it as
   // a modification and its current content must travel with the patch.
   git('checkout', '-q', '-b', 'odd-name', 'main')
-  oddSha = commit(ODD_NAME, 'the odd-named file, revised in this range\n', 'Revise the odd-named file', 'Opus 5')
+  oddSha = commit(ODD_NAME, 'the odd-named file, revised in this range\n', 'Revise the odd-named file', OPUS_MODEL)
 
   // …and a branch adding a GITLINK (a submodule pointer, mode 160000): its
   // entry names a COMMIT object, so its body is absent by design. cacheinfo
   // writes the entry without any submodule machinery.
   git('checkout', '-q', '-b', 'gitlink', 'main')
   git('update-index', '--add', '--cacheinfo', `160000,${'f'.repeat(40)},vendor-sub`)
-  git('commit', '--no-verify', '-q', '-m', 'Pin the vendored subproject\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>')
+  git('commit', '--no-verify', '-q', '-m', `Pin the vendored subproject\n\nCo-Authored-By: ${CLAUDE_MODEL} <noreply@anthropic.com>`)
   gitlinkSha = git('rev-parse', 'HEAD')
 
   // …and a branch touching a path with a TRAILING SPACE, which git prints
@@ -451,7 +451,7 @@ beforeAll(() => {
   // third round). Windows cannot create such a file, so the branch is POSIX-only.
   if (process.platform !== 'win32') {
     git('checkout', '-q', '-b', 'edge-name', 'main')
-    edgeSha = commit(EDGE_NAME, 'content behind the trailing space\n', 'Touch the edge-space file', 'Opus 5')
+    edgeSha = commit(EDGE_NAME, 'content behind the trailing space\n', 'Touch the edge-space file', OPUS_MODEL)
   }
 
   // …and the same bulk, authored by SOL: the role swap hands the whole range to
@@ -473,7 +473,7 @@ beforeAll(() => {
       'shared.txt',
       `current end state after touch ${index}\n`,
       `Touch the shared file ${index}`,
-      'Opus 5',
+      OPUS_MODEL,
     )
     if (index === 1) historicalReviewSha = touchSha
     manyTouchesSha = touchSha
@@ -481,14 +481,14 @@ beforeAll(() => {
 
   // A path changed and then restored has no net artefact to review.
   git('checkout', '-q', '-b', 'reverted', mainSha)
-  commit('world.txt', 'temporary world\n', 'Temporarily revise the world', 'Opus 5')
-  revertedSha = commit('world.txt', 'the fixture world\n', 'Restore the fixture world', 'Opus 5')
+  commit('world.txt', 'temporary world\n', 'Temporarily revise the world', OPUS_MODEL)
+  revertedSha = commit('world.txt', 'the fixture world\n', 'Restore the fixture world', OPUS_MODEL)
 
   // A history sharing no ancestor with the rest: the third form of "not a proper
   // ancestor", which merge-base answers with nothing at all.
   git('checkout', '-q', '--orphan', 'unrelated')
   git('rm', '-rqf', '--ignore-unmatch', '.')
-  orphanSha = commit('orphan.txt', 'no common ancestor with anything\n', 'Start an unrelated history', 'Opus 5')
+  orphanSha = commit('orphan.txt', 'no common ancestor with anything\n', 'Start an unrelated history', OPUS_MODEL)
   git('checkout', '-q', '-f', 'feat')
 
   // A genuine contribution-era scoped pass: it read shared.txt after touch 1,
@@ -595,7 +595,7 @@ describe('a review that runs', () => {
       verdict: 'merge',
       mode: 'review',
       point: 624,
-      authoredBy: expect.stringContaining('Opus 5'),
+      authoredBy: expect.stringContaining(OPUS_MODEL),
     })
     // The material really REACHES the model — asserted on what the process
     // received, not on the caller's own log line.
@@ -626,7 +626,7 @@ describe('the file bodies travel byte-exact', () => {
     git('checkout', '-q', '-b', 'padded-work', 'main')
     // A MODIFIED file, so its body travels as current content — an added one
     // rides inside the patch and would not exercise the body read.
-    const sha = commit('world.txt', '\n\n  body with edges  \n\n', 'Pad a file with blank edges', 'Opus 5')
+    const sha = commit('world.txt', '\n\n  body with edges  \n\n', 'Pad a file with blank edges', OPUS_MODEL)
     const r = run(['--sha', sha, '--brief', 'judge the padding'])
     expect(r.status, r.stderr).toBe(0)
     const sent = readFileSync(join(dir, 'stdin.txt'), 'utf8')
@@ -643,7 +643,7 @@ describe('a binary file in the range', () => {
     git('checkout', '-q', '-b', 'binary-work', 'main')
     writeFileSync(join(repo, 'blob.bin'), Buffer.from([0, 1, 2, 3, 250, 251, 0, 90]))
     git('add', '-A')
-    git('commit', '--no-verify', '-q', '-m', 'Add a binary blob\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>')
+    git('commit', '--no-verify', '-q', '-m', `Add a binary blob\n\nCo-Authored-By: ${CLAUDE_MODEL} <noreply@anthropic.com>`)
     const sha = git('rev-parse', 'HEAD')
     const r = run(['--sha', sha, '--brief', 'judge the blob'])
     expect(r.status, r.stderr).toBe(0)
@@ -667,7 +667,7 @@ describe('a binary file in the range', () => {
     // called the material complete.
     writeFileSync(join(repo, 'legacy.txt'), Buffer.from([0x61, 0xff, 0x62, 0x0a]))
     git('add', '-A')
-    git('commit', '--no-verify', '-q', '-m', 'Add a latin1 body\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>')
+    git('commit', '--no-verify', '-q', '-m', `Add a latin1 body\n\nCo-Authored-By: ${CLAUDE_MODEL} <noreply@anthropic.com>`)
     const sha = git('rev-parse', 'HEAD')
     const r = run(['--sha', sha, '--brief', 'judge the legacy bytes'])
     expect(r.status).not.toBe(0)
@@ -995,9 +995,9 @@ describe('a range SOL authored', () => {
     writeFileSync(join(dir, 'calls.log'), '')
     const r = run(['--reviewer', 'opus', '--sha', astraSha, '--point', '667', '--brief', 'judge the authoring lane'])
     expect(r.status, `${r.stdout}${r.stderr}`).toBe(0)
-    expect(calls()).toEqual(['claude-opus-5[1m]'])
-    expect(r.stdout).toContain('Opus 5 reviewed')
-    expect(r.stdout).toContain('--model "Opus 5"')
+    expect(calls()).toEqual([OPUS_MODEL_ID])
+    expect(r.stdout).toContain(`${OPUS_MODEL} reviewed`)
+    expect(r.stdout).toContain(`--model "${OPUS_MODEL}"`)
     expect(r.stdout).toContain('--model-result')
     expect(r.stdout).toContain('--handover astra-authored')
   })
@@ -1080,7 +1080,7 @@ describe('a modified gitlink', () => {
     provenId()
     git('checkout', '-q', '-b', 'fake-gitlink', 'main')
     const body = `prose about submodules\nSubproject commit ${'a'.repeat(40)}\nmore prose\n`
-    const sha = commit('world.txt', body, 'Mention a subproject pointer in prose', 'Opus 5')
+    const sha = commit('world.txt', body, 'Mention a subproject pointer in prose', OPUS_MODEL)
     const r = run(['--sha', sha, '--brief', 'judge the prose'])
     expect(r.status, r.stderr).toBe(0)
     const sent = readFileSync(join(dir, 'stdin.txt'), 'utf8')

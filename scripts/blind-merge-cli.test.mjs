@@ -9,7 +9,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { writeState } from './fable-switch-core.mjs'
+import { OPUS_MODEL, writeState } from './fable-switch-core.mjs'
 
 const CLI = join(dirname(fileURLToPath(import.meta.url)), 'blind-merge.mjs')
 
@@ -61,7 +61,7 @@ beforeAll(() => {
   switchOn = write('fable-on.json', writeState('on', { why: 'test capacity restored', by: 'test', now: 1 }))
   switchOff = write('fable-off.json', writeState('off', { why: 'test capacity exhausted', by: 'test', now: 1 }))
   write('A.json', {
-    model: 'Opus 5',
+    model: OPUS_MODEL,
     entries: [
       { id: 'A1', file: 'src/world/river.ts', defect: 'the ribbon tears at the delta' },
       { id: 'A2', file: 'src/ui/hud.tsx', defect: 'the health badge overlaps the date' },

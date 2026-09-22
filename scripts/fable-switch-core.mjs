@@ -10,10 +10,12 @@ export const FABLE_MODEL = 'Fable 5.1'
 // The OpenAI lane, stated ONCE here beside the other model identities and imported
 // everywhere else (point 1061). GPT-5.6 Sol held this lane until 05.09.2026.
 export const ASTRA_MODEL = 'GPT-6 Astra'
-export const CLAUDE_MODEL = 'Claude Opus 5'
-export const OPUS_MODEL = 'Opus 5'
+export const CLAUDE_MODEL = 'Claude Opus 5.5'
+export const OPUS_MODEL = 'Opus 5.5'
 export const OPUS_FALLBACK_MODEL = 'Opus 4.8'
-export const OPUS_MODEL_ID = 'claude-opus-5[1m]'
+// The Anthropic lane, raised from Opus 5 to Opus 5.5 by the user on 22.09.2026.
+// Needs Claude Code >= 2.1.280; older CLIs answer 400 "does not support this model".
+export const OPUS_MODEL_ID = 'claude-opus-5-5[1m]'
 // The NEWEST released Fable, never a pinned older one (user, 01.09.2026): a version
 // recorded here cannot go red on its own, so nothing but this line notices a new release.
 // Needs Claude Code >= 2.1.251; older CLIs answer 400 "does not support this model".

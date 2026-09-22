@@ -9,6 +9,7 @@ import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync 
 import { tmpdir } from 'node:os'
 import { delimiter, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { OPUS_MODEL_ID } from './fable-switch-core.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const CLI = join(HERE, 'ask-astra.mjs')
@@ -244,7 +245,7 @@ describe('an ask that runs', () => {
     clearCalls()
     const r = run(['--model', 'opus', '--kind', 'diagnose', '--brief', 'fold it', '--file', materialFile])
     expect(r.status, r.stderr).toBe(0)
-    expect(calls()).toEqual(['claude-opus-5[1m]'])
+    expect(calls()).toEqual([OPUS_MODEL_ID])
   })
 
   it('proves the model id first, sends the material on stdin and prints the answer', () => {
