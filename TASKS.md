@@ -16007,3 +16007,35 @@ to land than a mechanism that needs a review.
   meaning, and it does so silently, which is worse than a red.
   Refs: `scripts/verify/polish.mjs` (`__pickChildVantage`, the `children-motion` frame),
   the shutter's subject check (point 375). Sibling of the frame-aim points 1121 and 1125.
+- [ ] 1177. Every full polish run is recorded as died of an uncaught exception after its own
+  report, so no full polish pass has counted as a covering picture run since 21.09.2026 (owner
+  finding 22.09.2026, while landing 1157).
+  Bundle: Testinfrastruktur
+  MEASURED in `.claude/render-verify-state.json`: the six full polish runs recorded since
+  21.09.2026 15:43Z — 6c778f8 and 46c7120 on `main` (WebGPU and WebGL 2), 4fa7427, 9259d6d,
+  3a82cc1 and 02eec84 on `feat/1157-weaver-loom` — all carry `crashed: true`,
+  `crashSource: uncaught-exception`, `terminalVerdict: false`, although every one of them printed
+  its own terminal line (`FAIL polish 234 pass, 1 fail` and the like) and its reds were classified
+  against the charges. A `--section` run of the same suite never carries the marker. The recorder
+  (`scripts/render-verify-recorder.mjs`, `uncaughtExceptionMonitor`) is doing what it says: Node
+  really printed an uncaught exception in the polish process, after the report — but NOTHING
+  KEEPS THAT EXCEPTION: the kept log (`local/verify-logs/*.log`) holds the runner's summary lines
+  only, `.log.progress` is empty, and the suite's own stdout/stderr is not written anywhere. So the
+  cause cannot be read from any run that has happened, and `render-verify-guard` refuses every
+  full run as "incomplete — no charge may be accepted", which makes its covering-run demand
+  unsatisfiable through polish.
+  Final state: the exception is FOUND AND FIXED — the most likely seat is a section's teardown or
+  a top-level `await` that rejects after the terminal reporter has printed (a Playwright timeout
+  in a `finally`, or a dangling wait on a page already closed) — and, independently of the
+  fix, the runner KEEPS the child's stderr tail (the last 200 lines) beside the log, so the
+  next crash of this kind names itself. A full polish run then records `crashed: false` with a
+  terminal verdict, and a charged red counts as accounted for.
+  Test: a unit test on the recorder proves that a suite which prints its terminal line and then
+  rejects a top-level promise is recorded with the exception text kept; and one full polish pass
+  on WebGPU recorded without the crash marker is the evidence for the fix.
+  Criticality: high — no player impact, but every picture proof of a landed point is silently
+  refused, so the render guard either blocks every landing or is deferred around, which is the
+  false-approval path CLAUDE.md §2 names.
+  Refs: `scripts/render-verify-recorder.mjs` (armed.uncaught, line ~737), `scripts/verify/run-logged.mjs`,
+  `scripts/verify/polish.mjs`, the six run records above; deferred around once on 22.09.2026 for
+  point 1157 (`render-verify-guard --defer`).
