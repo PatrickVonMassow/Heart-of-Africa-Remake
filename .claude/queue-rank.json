@@ -1386,6 +1386,12 @@
       "why": "user 21.09.2026, 20:21: nach 659, vor 633 — gehoert zu v0.3, weil v0.3 die Kinderspiele einfuehrt",
       "origin": "user",
       "place": "ahead"
+    },
+    "1177": {
+      "at": "2026-09-22T04:09:46.332Z",
+      "why": "Infrastruktur-Befund ohne Spielereffekt; er reiht sich hinter die offene Spielarbeit, weil der Render-Guard fuer 1157 bereits laut deferiert ist und jede weitere Landung dieselbe Deferral nehmen kann, bis 1177 an der Reihe ist",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1417,7 +1423,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-21T21:30:13.990Z",
+    "at": "2026-09-22T04:09:46.342Z",
     "points": [
       174,
       184,
@@ -1825,7 +1831,8 @@
       1172,
       1174,
       1175,
-      1176
+      1176,
+      1177
     ]
   }
 }
