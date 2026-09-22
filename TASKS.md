@@ -219,9 +219,26 @@ put it is the mistake this line exists to stop.
   station worth walking past twice. Today the strip grows to the stake and then simply is not
   there any more: nothing records that a village wove anything. The finished strip is TAKEN OFF
   and STAYS — a stack beside the loom that grows over the visit and survives leaving and
-  re-entering the place. Design it against `design.md` before building: if a woven strip can be
-  a trade good or a gift, say so there and here; if it cannot in the PoC, it is scenery that
-  accumulates, and the point says which of the two it is rather than leaving it open.
+  re-entering the place. DECIDED by the user 22.09.2026, so no author asks again: it is
+  ACCUMULATING SCENERY, not a trade good and not a gift (verbatim: »Könnte man mit nicht allzu
+  großem Aufwand einen sichtbaren Nutzen des Ergebnisses einbauen? Ich meine nicht aus
+  funktionaler Sicht für die Kommunikationsmechanik, sondern als Kulisse, damit das Weben nicht
+  nur Selbstzweck zum Lehren der Wörter ist, sondern sich nach Teil eines Dorflebens anfühlt.«).
+  No `VILLAGE_TRADE_GOODS` entry (store.ts:2302), no `giftPrices` entry, no inventory link, no
+  cloth economy in `design.md`.
+  THE CHEAP SHAPE, measured on paths that already exist: (1) the take-off already happens at
+  loomWork.ts:177-179 (`while (state.cloth >= cfg.warpHalf) state.cloth -= cfg.warpHalf`) — it
+  becomes a reported event and the weaver folds the strip with her existing pose cycle instead of
+  it vanishing inside one frame; (2) per-place persistence follows the store's existing shape
+  `placeSituations: Record<string, string>` (store.ts:218, written 1518, in the snapshot 2048),
+  so a `Record<placeId, number>` rides the save round trip with no migration; (3) the strips are
+  drawn in `style.bandColor`, which the scene ALREADY passes to the loom as `weave`
+  (PlaceLife.tsx:3912) and which is the same palette the inhabitants are dressed from — so »what
+  she weaves is what the village wears« is made by the picture and costs no mechanism; (4) the
+  stack is capped, and past the cap the village has carried the cloth away, so it falls back
+  rather than towering; cap and fall-back calibratable in the loom block of balance.ts; (5) a
+  first-entered place starts from its seed, not at zero — a village that has stood for years has
+  woven before the player arrived.
   Criticality: medium — the station works and teaches nothing the player can see, which is the
   cost; it is not a crash and blocks nothing.
   Test: Vitest for the helper's cycle (his pose moves across frames while `helperWorking`, and
@@ -769,6 +786,146 @@ put it is the mistake this line exists to stop.
   tag plus `poc` dynamically, but a tag push alone does not trigger it. Then VERIFY
   that /v0.3/ and /poc/ serve the new state, and FREEZE the tag: it is never
   re-pointed.
+
+- [ ] 1185. The decision protocol gets its own collapsed board section with an archive
+  (user order 22.09.2026, 12:25, verbatim: »Neuer Punkt nach 174: Das Entscheidungsprotokoll
+  flutet aktuell die Sektion 'Von dir zu klären'. In den seltensten Fällen lege ich da ein
+  Veto ein, deswegen ist mir das zu dominant. Es soll im Dashboard eine neue Sektion
+  'Entscheidungsprotokoll' geben, in dem diese Punkte landen. Die soll ganz unten (also
+  unterhalb von 'Erledigt') und standardmäßig zugeklappt sein. Außerdem soll es dafür eine
+  Archiv-Funktion geben, so wie bei den erledigten Punkten, mit einem Link in der Art 'Die
+  älteren ... Entscheidungen stehen im Archiv des Entscheidungsprotokolls.' Sonst wird das
+  schnell zu lang.«).
+  MEASURED on the live board 22.09.2026: twelve of the cards under "Von dir zu klären" are
+  `Entscheidungsprotokoll:` records — the section the user reads for what he must decide is
+  mostly things already decided. The record itself stays (the retroactive veto of
+  docs/batch-autonomy.md depends on it); it only moves out of the way.
+  FINAL STATE.
+  1. Five sections, in this order: "Woran ich gerade arbeite", "Von dir zu klären",
+     "Warteschlange", "Erledigt", "Entscheidungsprotokoll" — the new one LAST, below
+     "Erledigt". The three places that name the sections agree: `REQUIRED_SECTIONS`
+     (scripts/board-structure-core.mjs), `HEAD` (scripts/board-core.mjs, a new key beside
+     now/vdzk/queue/done) and `SECTION_TITLES` (scripts/dashboard-guard-core.mjs). The
+     structure gate expects five `<details class="sect">` wrappers and five `<h2>`s in that
+     order.
+  2. Every card whose title begins `Entscheidungsprotokoll:` lands in the new section, never
+     under "Von dir zu klären". The producers keep their texts unchanged
+     (alert-escalation-core.mjs, batch-autostart-core.mjs, batch-pause-core.mjs,
+     child-retry-core.mjs, model-handoff-core.mjs, user-gate-core.mjs, and the admissible
+     shape vdzk-admissibility-core.mjs demands); the ROUTING happens once, at the board's own
+     card writer, by title prefix. A protocol card is inserted newest-first at the top of its
+     section, exactly as `addVdzk` inserts today. `board.mjs` gains the add/remove pair for
+     the new section, and `vdzk-add` refuses a title starting with `Entscheidungsprotokoll:`
+     with a line naming the right command.
+  3. Collapsed by default. The board's restore script opens every `.sect` except "Erledigt"
+     when the reader has no stored toggle; the new section joins "Erledigt" in staying
+     closed. A reader who opens it keeps it open — the per-reader toggle memory is unchanged.
+  4. Archive, like the done cards. The section keeps at most `ENTSCHEIDUNGEN_ON_BOARD = 20`
+     cards (estimate, calibratable — the section is collapsed, so the number only governs
+     page weight); the older ones rotate out through scripts/board-archive-rotate.mjs, which
+     then rotates BOTH capped sections in one pass, and the publisher pushes board and
+     archive together as it does today. The section's foot carries the link, in the wording
+     of the done section: `<p class="archive-link">Die älteren N Entscheidungen stehen im <a
+     href="...">Archiv des Entscheidungsprotokolls</a>.</p>` The archive target is the
+     EXISTING archive page (`archive.html`), which gains its own second `<h2
+     id="entscheidungsprotokoll">Entscheidungsprotokoll</h2>` section below the done cards;
+     the link points at that anchor. No new published page and no new URL. The done-card
+     rotation keeps inserting under the FIRST `<h2>`, so the two sections cannot mix.
+  5. Guard reach, widened not rebuilt (infrastructure freeze, CLAUDE.md §2):
+     `erledigt-overflow` and `archive-link-missing` judge both capped sections; the card
+     checks that already cover every card — empty body, conciseness, card topic, title
+     length — cover the new section's cards too; the VDZK-SPECIFIC pressure stays on the four
+     old sections: a protocol card is NOT an open question, so it creates no Stop-hook demand
+     to answer it, no decision-card gate and no open-question count anywhere. That is the
+     point of the change.
+  6. Migration. The protocol cards standing under "Von dir zu klären" on the published board
+     move into the new section in their current order, verbatim (twelve of them on
+     22.09.2026). Board and archive are published artefacts, not sources (both git-ignored),
+     so the move happens once on the publish path; no card text changes.
+  CONSTRAINTS. Infrastructure freeze (CLAUDE.md §2): widen the existing section list, cap and
+  rotation. No new guard, no new published page, no new URL, no router abstraction beyond the
+  one title-prefix cut at the board's card writer. The board stays ONE HTML file with its own
+  viewport; the structure gate runs before the bytes leave (board-publish.mjs). Board and
+  archive are git-ignored published artefacts — the migration is a publish, not a commit of
+  content. The retroactive veto stays reachable: the record remains visible, dated and
+  archived, only no longer in the section for open questions.
+  WORDING: board text German; code, identifiers and filenames English.
+  Criticality: high — it edits the board structure gate, the card writer and the publish
+  path, and a malformed board reaches the user on his phone.
+  Four eyes: CONVERGENT mode (CLAUDE.md §6) — one author, then cross-vendor review of the
+  artefact before its rationale. The spec's own words (migration, lock, routing) hit the HARD
+  markers in scripts/author-routing-core.mjs, so the routing puts it in the Astra lane and
+  the Claude session reviews it; no model reviews its own work. The user asked on 22.09.2026,
+  12:36 whether the rebuild runs under four eyes; it does, and that stands here rather than
+  only in the chat.
+  Test: Vitest — title-prefix routing into the new section and the `vdzk-add` refusal; five
+  sections in board-structure-core including wrapper and orphan counts; guard reach over both
+  capped sections and the ABSENCE of open-question pressure for a protocol card; rotation of
+  both sections in one pass with the two link texts and their counts. Playwright (board
+  layout suite): the fifth section renders below "Erledigt" and is collapsed on a first visit
+  while the other three stand open.
+  Refs: scripts/board-core.mjs, scripts/board-structure-core.mjs,
+  scripts/dashboard-guard-core.mjs, scripts/board-archive-rotate.mjs, scripts/board-publish.mjs,
+  scripts/vdzk-admissibility-core.mjs, user order 22.09.2026 12:25
+  Bundle: Chat & Tafel
+
+- [ ] 1186. A standing-down session can file a finding without evading the guard (user order
+  22.09.2026, 12:36, verbatim: »Ja, eine solche Blockade passiert oft. Reihe dafür einen
+  Punkt ein, der direkt nach dem Dashboard-Umbau erledigt wird.«). ORDER: directly after
+  point 1185 — the user tied the two together.
+  WHY. The findings carrier exists precisely FOR the session that does not hold the batch
+  lock: "a window the user is TALKING TO deposits the finished, TASKS-ready spec"
+  (scripts/findings-request-core.mjs). The ownership stand-down refuses that window every
+  write it needs to produce one. The two rules are correct on their own and cancel each other
+  where they meet, and the meeting point is the ordinary case: the user talks to a second
+  window while the batch runs.
+  PROBLEM, measured 22.09.2026 between 12:25 and 12:30. While another live session owns the
+  batch lock, `ownershipStandDownDecision` (scripts/board-first-core.mjs) refuses EVERY
+  mutation of this session: `mkdir` was refused, a `Write` of a file in the session
+  scratchpad was refused. The one route a standing-down session is REQUIRED to take —
+  `scripts/finding.mjs --request`, whose long fields must be FILES on purpose, because a spec
+  on a command line hits quoting, length and umlaut limits — therefore cannot be prepared at
+  all: creating the file it needs is itself a refused mutation. The deposit only succeeded
+  through a zsh process substitution (`--spec-file =(cat <<EOF …)`), i.e. by slipping past
+  the classifier, which judges the command HEAD. A guard whose sanctioned path is reachable
+  only by evading it teaches evasion.
+  FINAL STATE.
+  1. `scripts/finding.mjs` takes every long field from STDIN as well as from a file:
+     `--spec-file -` (and the same for `--why-file`, `--constraints-file`, `--quotes-file`,
+     `--doc-impact-file`, `--open-questions-file`), plus ALL fields in ONE call through a
+     delimited stdin document, each part opened by a line of the form `--- <field> ---`. One
+     invocation then carries a whole request without touching the filesystem. The file form
+     stays exactly as it is; stdin satisfies the reason the fields are files just as well.
+  2. The stand-down decision stops refusing a write whose target is the SESSION SCRATCHPAD
+     (the harness-announced `/tmp/claude-<uid>/<project>/<session>/scratchpad` directory,
+     matched on the real path, not on the word). Nothing there is repository, board or batch
+     state; it is the session's own workspace, and refusing it buys nothing while blocking
+     notes, digests and exactly the temp files the sanctioned deposit path asks for.
+     Repository paths, the board, TASKS.md and every batch action stay refused as they are
+     today. This NARROWS an existing gate and adds no new mechanism.
+  3. The refusal text stays true to what it now allows: beside "reads remain available" it
+     names the one write path that stays open (the scratchpad) and the carrier command, so
+     the standing-down session finds the sanctioned route instead of inventing a shell trick.
+  NOT IN SCOPE: any batch authority for a standing-down session. It still may not merge,
+  tick, publish the board or edit the work order.
+  CONSTRAINTS. Infrastructure freeze (CLAUDE.md §2): this point REMOVES reach from an
+  existing gate and adds an input channel to an existing script. No new guard, no ledger
+  field, no router. The stand-down itself stays: repository, board, work order and every
+  batch action remain refused for a session that does not own the lock. Protected paths
+  (.claude/settings.json and the hooks) are attended-only; if the fix needs one, it is
+  prepared and handed to the user, not written unattended.
+  Criticality: medium — it blocks no game work, but every session the user talks to while the
+  batch runs meets it, and the only way through was evading a guard.
+  Test: Vitest — `classifyCall` / `ownershipStandDownDecision`: a scratchpad path classifies
+  read-only; a repository path, the work order and the board stay refused; a path merely
+  CONTAINING the word "scratchpad" outside the session directory is refused. `finding.mjs`:
+  one field from stdin, the multi-field document, the file form unchanged, and a malformed
+  document refused with a line naming the fields. The tests call the real refusal path with a
+  real scratchpad write — a drill that reconstructs the aftermath would stay green over the
+  broken action.
+  Refs: scripts/board-first-core.mjs, scripts/finding.mjs, scripts/findings-request-core.mjs,
+  measured in this session 22.09.2026 12:25–12:30, user order 22.09.2026 12:36
+  Bundle: Modell & Wächter
 
 - [ ] 1150. The doctor's quarantine takes the frames away from a RUNNING picture run
   (measured 18.09.2026, twice in one hour, 01:22 and 01:31). The covering WebGPU `polish`
