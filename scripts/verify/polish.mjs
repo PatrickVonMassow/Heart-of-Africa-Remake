@@ -5972,36 +5972,50 @@ if (section('village-loom')) {
       ))
       const clear = (x, z) => Math.min(...solids.map(c => window.__clearanceTo(c, x, z)))
       const p = window.__placePlayer
-      // Far enough back that a helper 2.4 m along the warp stays well inside a
-      // wide frame, and stepped out until the ground is standable.
-      for (const back of [6, 6.8, 7.6, 5.4, 8.4]) {
-        const x = station.seat.x - station.ax * back
-        const z = station.seat.z - station.az * back
-        if (clear(x, z) < 0.4) continue
-        let open = true
-        for (let k = 1; k <= 16; k++) {
-          const t = k / 16
-          if (clear(x + (station.seat.x - x) * t, z + (station.seat.z - z) * t) < 0.15) open = false
+      // One framing: `back` metres out on HER side of the warp, `side` metres
+      // along it, aimed at `target`. The first distance that stands on open
+      // ground with an open sight line wins.
+      const place = (backs, side, target, pitch) => {
+        for (const back of backs) {
+          const x = station.seat.x - station.ax * back + station.fx * side
+          const z = station.seat.z - station.az * back + station.fz * side
+          if (clear(x, z) < 0.4) continue
+          let open = true
+          for (let k = 1; k <= 16; k++) {
+            const t = k / 16
+            if (clear(x + (target.x - x) * t, z + (target.z - z) * t) < 0.15) open = false
+          }
+          if (!open) continue
+          p.x = x
+          p.z = z
+          p.yaw = Math.atan2(target.x - x, target.z - z) + Math.PI
+          p.pitch = pitch
+          return { back, side, x, z }
         }
-        if (!open) continue
-        p.x = x
-        p.z = z
-        p.yaw = Math.atan2(station.seat.x - x, station.seat.z - z) + Math.PI
-        p.pitch = -0.06
-        return {
-          back,
-          x,
-          z,
-          weaver: station.weaver,
-          seat: station.seat,
-          warpHalf: Math.hypot(station.downstream.x - station.seat.x, station.downstream.z - station.seat.z),
-          water: bank ? { x: bank.bank.x, z: bank.bank.z } : null,
-          onRiverAxis: station.onRiverAxis,
-        }
+        return null
       }
-      return null
+      window.__loomPlace = place
+      window.__loomStation = station
+      // THE MOTION IS HERS, so its stand is CLOSE and on her own side. One wide
+      // stand for both was tried first and failed the eye rather than the
+      // check: the helper stands across the warp from her, so any near-square
+      // view puts a whole standing body behind a kneeling one and the frame
+      // reads as one blob.
+      // Aimed DOWN at her: she kneels at a warp laid low, so a level lens at
+      // standing eye height puts her at the bottom edge and the helper behind
+      // her fills the frame. The pitch is the angle from the eye to her body,
+      // and the offset along the warp swings him out from behind her.
+      const close = place([3, 3.5, 2.6, 4], 1.3, station.weaver, -0.42)
+      return close && {
+        close,
+        weaver: station.weaver,
+        seat: station.seat,
+        warpHalf: Math.hypot(station.downstream.x - station.seat.x, station.downstream.z - station.seat.z),
+        water: bank ? { x: bank.bank.x, z: bank.bank.z } : null,
+        onRiverAxis: station.onRiverAxis,
+      }
     })
-    check('a stand on the inland side of the warp sees the weaver over open ground', !!stand,
+    check('a close stand on her own side of the warp sees the weaver over open ground', !!stand,
       JSON.stringify(stand))
 
     if (stand) {
@@ -6083,6 +6097,13 @@ if (section('village-loom')) {
       }, null, { timeout: 60000 }).then(() => true).catch(() => false)
       check('the weaver’s call sends her helper part-way along the warp', called)
       if (called) {
+        // THE TEACHING IS THE STATION'S, so it steps back: her, the warp, the
+        // helper wherever the word sent him, and the river behind them.
+        const wide = await page.evaluate(() =>
+          window.__loomPlace([7.5, 8.5, 6.5, 9.5], 2.4, window.__loomStation.seat, -0.05))
+        check('a wide stand carries the whole station with the water behind it', !!wide,
+          JSON.stringify(wide))
+        await nextFrames(3)
         const teaching = await page.evaluate(() => {
           const helper = window.__placeScene.getObjectByName('village-loom-helper')
           const station = window.__placeLayout.loom

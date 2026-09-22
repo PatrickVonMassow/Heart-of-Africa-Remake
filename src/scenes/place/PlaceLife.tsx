@@ -513,16 +513,18 @@ function Cook({ x, z, cloth }: { x: number; z: number; cloth: string }) {
  * else is sized to a seated body beside it.
  */
 const LOOM_BUILD = {
-  /** Height of the stretched threads: knee height on a standing body. */
-  warpY: 0.3,
-  stakeHeight: 0.44,
+  /** Height of the stretched threads. LOW, because it is a ground loom and a
+   *  SEATED weaver works it: her shoulder is at 0.256 and her arm is 0.33, so
+   *  this is where her hands actually land (`loomWork`'s WARP_REACH). */
+  warpY: 0.22,
+  stakeHeight: 0.34,
   /** Woven width — "seldom wider than four inches" (docs/peoples-1890.md §8.1). */
   stripWidth: 0.12,
   clothThickness: 0.022,
   threadThickness: 0.01,
   /** The small frame of heddles she sits under, which the long warp keeps. */
   heddleX: 0.2,
-  heddleY: 0.62,
+  heddleY: 0.46,
   heddleRadius: 0.03,
   shuttle: [0.1, 0.04, 0.05] as [number, number, number],
 }

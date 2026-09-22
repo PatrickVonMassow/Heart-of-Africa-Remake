@@ -61,8 +61,9 @@ async function photograph({ blocked = false, moves = true, called = true, helper
   vi.stubGlobal('__placeLayout', {
     interactives: [], dwellings: [],
     // The warp on the z axis, the water to −x, and one hut on the INLAND side
-    // that either stands well clear of every candidate stand or covers them all.
-    colliders: [{ x: blocked ? 7 : 14, z: -3, r: blocked ? 4 : 1 }],
+    // that either stands well clear of every candidate stand or covers them
+    // all — the close ones at 2.6-3.6 m and the wide ones at 6.5-9.5 m alike.
+    colliders: [{ x: blocked ? 5 : 14, z: -3, r: blocked ? 6 : 1 }],
     bank: { nx: -1, nz: 0, fx: 0, fz: 1, distance: 20, bank: { x: -20, z: -3 } },
     loom: {
       seat: { x: 0, z: -3 }, weaver: { x: 0.45, z: -3 },
@@ -102,11 +103,12 @@ async function photograph({ blocked = false, moves = true, called = true, helper
   return { state, checks, frames, player }
 }
 
-it('stands back on the inland side of the warp, looking out at the water', async () => {
+it('shoots her motion from close by and the teaching from back, both inland', async () => {
   const { player, checks, frames } = await photograph()
-  // The water is to −x, so the stand is to +x of the seat and faces it.
-  expect(player.x).toBeGreaterThan(0)
-  expect(player.z).toBeCloseTo(-3, 6)
+  // The water is to −x, so both stands are to +x of the seat. The last one set
+  // is the WIDE one: 7.5 m out and 2.4 m along the warp from her middle.
+  expect(player.x).toBeCloseTo(7.5, 6)
+  expect(player.z).toBeCloseTo(-3 + 2.4, 6)
   expect(checks[0].pass).toBe(true)
   expect(checks[1].pass).toBe(true)
   expect(frames.map(f => f.name)).toEqual([

@@ -300,8 +300,20 @@ export function loomPicture(state: LoomWorkState): LoomPicture {
  */
 export const SHUTTLE_THROW = 0.16
 
-/** Forward reach from the weaver's shoulders to the warp she works. */
-const WARP_REACH = 0.4
+/**
+ * Forward reach from the weaver's shoulders to the warp she works, and the
+ * height of her hands above her own shoulder line — negative, because she sits
+ * at a warp laid low and reaches forward and DOWN to it.
+ *
+ * MEASURED AGAINST THE DRAWN BODY, not guessed: a kneeling figure's shoulder
+ * sits at `FIGURE_LIMBS.shoulderY` of a 0.55 body, on a group squashed to 0.75
+ * — 0.256 in scene units — and its arm is 0.33 long. At this reach and this
+ * elevation the hands land on `LOOM_BUILD.warpY`. The first build had them
+ * 0.11 high under a warp at 0.30, and the picture showed a cone with no arms
+ * at all: the very thing the report complained of, rebuilt.
+ */
+const WARP_REACH = 0.28
+const HAND_ELEVATION = -0.1
 
 /**
  * THE HANDS RIDE THE TOOL (item 1). Both arms are written every frame from the
@@ -319,8 +331,8 @@ export function loomPose(picture: LoomPicture): FigurePose {
   // Elevation is NEGATIVE here: she sits at a warp laid low, so both arms
   // reach forward and DOWN rather than up as the pounder's do.
   return {
-    left: armAim(carry, -0.45 + picture.beat * 0.06),
-    right: armAim(beat, -0.38 - picture.beat * 0.22),
+    left: armAim(carry, HAND_ELEVATION + picture.beat * 0.06),
+    right: armAim(beat, HAND_ELEVATION - 0.04 - picture.beat * 0.16),
     lean: 0.1 + picture.beat * 0.14,
     turn: 0,
   }

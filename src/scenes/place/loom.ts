@@ -36,8 +36,11 @@ export const WEAVER_BODY_RADIUS = 0.3
  * is BESIDE the warp rather than on it — and she is on the INLAND side, with
  * the water beyond the warp, so a player standing behind her sees the weaver,
  * her warp and the river in one look (item 10).
+ *
+ * The distance is the SEATED body's own reach (`loomWork`'s WARP_REACH): closer
+ * and she sits in her threads, further and her hands stop short of them.
  */
-export const WEAVER_SIDE_OFFSET = 0.45
+export const WEAVER_SIDE_OFFSET = 0.36
 
 /** The helper works the far side, between the warp and the water. */
 export const HELPER_SIDE_OFFSET = 0.45
