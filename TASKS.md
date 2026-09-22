@@ -219,9 +219,26 @@ put it is the mistake this line exists to stop.
   station worth walking past twice. Today the strip grows to the stake and then simply is not
   there any more: nothing records that a village wove anything. The finished strip is TAKEN OFF
   and STAYS — a stack beside the loom that grows over the visit and survives leaving and
-  re-entering the place. Design it against `design.md` before building: if a woven strip can be
-  a trade good or a gift, say so there and here; if it cannot in the PoC, it is scenery that
-  accumulates, and the point says which of the two it is rather than leaving it open.
+  re-entering the place. DECIDED by the user 22.09.2026, so no author asks again: it is
+  ACCUMULATING SCENERY, not a trade good and not a gift (verbatim: »Könnte man mit nicht allzu
+  großem Aufwand einen sichtbaren Nutzen des Ergebnisses einbauen? Ich meine nicht aus
+  funktionaler Sicht für die Kommunikationsmechanik, sondern als Kulisse, damit das Weben nicht
+  nur Selbstzweck zum Lehren der Wörter ist, sondern sich nach Teil eines Dorflebens anfühlt.«).
+  No `VILLAGE_TRADE_GOODS` entry (store.ts:2302), no `giftPrices` entry, no inventory link, no
+  cloth economy in `design.md`.
+  THE CHEAP SHAPE, measured on paths that already exist: (1) the take-off already happens at
+  loomWork.ts:177-179 (`while (state.cloth >= cfg.warpHalf) state.cloth -= cfg.warpHalf`) — it
+  becomes a reported event and the weaver folds the strip with her existing pose cycle instead of
+  it vanishing inside one frame; (2) per-place persistence follows the store's existing shape
+  `placeSituations: Record<string, string>` (store.ts:218, written 1518, in the snapshot 2048),
+  so a `Record<placeId, number>` rides the save round trip with no migration; (3) the strips are
+  drawn in `style.bandColor`, which the scene ALREADY passes to the loom as `weave`
+  (PlaceLife.tsx:3912) and which is the same palette the inhabitants are dressed from — so »what
+  she weaves is what the village wears« is made by the picture and costs no mechanism; (4) the
+  stack is capped, and past the cap the village has carried the cloth away, so it falls back
+  rather than towering; cap and fall-back calibratable in the loom block of balance.ts; (5) a
+  first-entered place starts from its seed, not at zero — a village that has stood for years has
+  woven before the player arrived.
   Criticality: medium — the station works and teaches nothing the player can see, which is the
   cost; it is not a crash and blocks nothing.
   Test: Vitest for the helper's cycle (his pose moves across frames while `helperWorking`, and
