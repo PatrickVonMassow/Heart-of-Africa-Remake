@@ -651,6 +651,8 @@ export function DebugMenu() {
       ]),
       num(t.debug.callFalloff, balance.communication.call.falloff,
         (v) => { balance.communication.call.falloff = Math.max(0, v); bump() }, 1),
+      num(t.debug.speechInstructionHold, balance.communication.instructionHoldSeconds,
+        (v) => { balance.communication.instructionHoldSeconds = Math.max(0, v); bump() }, 0.25),
       num(t.debug.speechConsequence, balance.communication.consequenceSeconds,
         (v) => { balance.communication.consequenceSeconds = Math.max(0, v); bump() }, 0.5),
       num(t.debug.speechHold, balance.communication.speechHoldSeconds,

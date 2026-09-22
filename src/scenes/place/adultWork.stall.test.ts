@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { balance } from '../../config/balance'
+import { instructionDelay } from '../../communication/speaking'
 import { resetDevAsserts } from '../../systems/devAssert'
 import {
   clearTask, createAdultWork, goalOf, stepAdultWork,
@@ -131,7 +132,10 @@ describe('adult errand progress release', () => {
     const f = fixture()
     f.atGoal(f.sender)
     f.atGoal(f.carrier)
-    for (let tick = 0; tick < 4 && f.state.tasks[f.carrier]!.phase !== 'fetch'; tick++) f.step()
+    // The order is spoken first and obeyed a moment later (work-order 1184), so
+    // the budget covers the hold between the two.
+    const ticks = 4 + Math.ceil(instructionDelay('RIVER') / 0.25)
+    for (let tick = 0; tick < ticks && f.state.tasks[f.carrier]!.phase !== 'fetch'; tick++) f.step()
     f.atGoal(f.carrier)
     while (f.state.tasks[f.carrier]!.situation !== 'water-back') f.step()
     for (let elapsed = 0; elapsed < cfg.stallSeconds; elapsed += 0.25) f.step()

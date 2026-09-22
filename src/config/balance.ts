@@ -915,6 +915,10 @@ export interface BalanceConfig {
     call: { reach: number; loudness: number; falloff: number }
     /** Visible consequence after the last syllable; calibratable seconds. */
     consequenceSeconds: number
+    /** How long an INSTRUCTED body waits after the last syllable before it
+     *  starts doing what it was told (work-order 1184). Serves the water errand
+     *  and the loom alike; the word's own length is added to it. */
+    instructionHoldSeconds: number
     /** Stuck-situation backstop, measured against shipped work in tests. */
     speechHoldSeconds: number
     /** How long the hypothesis stands over a speaker's head, for one atom. */
@@ -1701,6 +1705,23 @@ export const balance: BalanceConfig = {
     // in the shipped-layout replay. Keep the whole call audible (calibratable).
     call: { reach: 34, loudness: 1.25, falloff: 4 },
     consequenceSeconds: 2,
+    // Calibratable (CLAUDE.md §2), user's default of 22.09.2026: one second
+    // between the end of an order and the first step of the man obeying it.
+    // Long enough that the word plainly comes FIRST and the act answers it,
+    // short enough that the two still read as one exchange. With a four-
+    // syllable word at 0.3 s that is a 2.09 s hold, which sits inside the
+    // floor's own consequence window (1.2 + `consequenceSeconds`) and inside
+    // the note over the speaker's head (`labelSeconds`), so nothing else in the
+    // village speaks into the gap and the player can still see what was said
+    // when the body answers it.
+    // WATER IS SCARCE (point 1182), SO THE COST WAS MEASURED, NOT ASSUMED: over
+    // 1200 s of simulated village at four adults, the interval between two
+    // deliveries is 63.29 s both with the hold and without it (19 deliveries
+    // either way). The errand carries TWO held words, but the catalogue only
+    // casts water on its `intervalSeconds` grid, which swallows them; the same
+    // harness moves to 80.72 s at a hold of 8 s, so the reading is a real
+    // measurement and not a blind spot.
+    instructionHoldSeconds: 1,
     speechHoldSeconds: 240,
     // Long enough to read one reading and look back at the speaker, short
     // enough that the scene never carries standing text; a phrase adds one

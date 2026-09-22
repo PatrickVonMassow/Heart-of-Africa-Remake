@@ -126,6 +126,18 @@ word waits until the previous word's effect was visible — the invited adult se
 off, the dispatched carrier leaves. Silence teaches nothing; the visible
 consequence is the lesson.
 
+THE WORD COMES FIRST AND THE ACT ANSWERS IT (work-order 1184, user 22.09.2026).
+The instructed body does not move until the utterance has ENDED, and then waits
+`communication.instructionHoldSeconds` longer — one second by default, measured
+from the utterance's own length rather than a guessed syllable count, so it
+follows the pace and the phrase. An order carried out in the frame it is spoken,
+before its four syllables have finished, reads as a man narrating his own act
+rather than as one man sending another. The hold applies to the water errand's
+two RIVER words, to both DIG utterances and to the weaver's calls; it sits
+INSIDE each station's own deadlines rather than on top of them, and stays inside
+the floor's consequence window, so no other exchange speaks into the gap and the
+note over the speaker's head still stands when the body answers.
+
 The floor measures at the player's ear, at each register's own reach rather than
 a flat radius, so a village out of earshot keeps talking and acceptance criterion
 15 is not paid for a confusion that never reaches the player.

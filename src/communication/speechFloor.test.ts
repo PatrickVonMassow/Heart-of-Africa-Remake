@@ -30,6 +30,17 @@ describe('one speech floor at the player’s ear', () => {
     expect(arbiter.request(water)).toBe(false)
   })
 
+  it('keeps the floor through an ordered act that waits longer than the ordinary window', () => {
+    const { arbiter, ask, at } = floor()
+    const order = ask('water pair'), other = ask('dig pair')
+    const window = utteranceSeconds(4) + balance.communication.consequenceSeconds
+    expect(arbiter.request({ ...order, ends: true, actAfter: window + 3 })).toBe(true)
+    at(window + 1)
+    expect(arbiter.request(other)).toBe(false)
+    at(window + 3)
+    expect(arbiter.request(other)).toBe(true)
+  })
+
   it('keeps distant situations talking, but measures a child’s CALL beyond TALK reach', () => {
     const { arbiter, ask } = floor()
     const distant = ask('distant adults', 11)

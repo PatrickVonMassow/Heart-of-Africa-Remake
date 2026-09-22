@@ -566,6 +566,7 @@ export const de: Strings = {
     talkLoudness: 'Sprechen: Lautstärke',
     callLoudness: 'Rufen: Lautstärke',
     callFalloff: 'Rufen: Abfallschärfe',
+    speechInstructionHold: 'Sprache: Pause, bis ein Auftrag ausgeführt wird (s)',
     speechConsequence: 'Sprache: sichtbare Folge (s)',
     speechHold: 'Sprache: maximaler Aufschub (s)',
     speechHearingFalloff: 'Sprechen: Abfallschärfe',

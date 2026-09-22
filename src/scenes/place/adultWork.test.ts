@@ -25,7 +25,7 @@ import {
 } from './adultWork'
 import { clearOfSpoil, DIG_RIM_DISTANCE } from './placeGround'
 import { SpeechFloor } from '../../communication/speechFloor'
-import { utteranceSeconds } from '../../communication/speaking'
+import { instructionDelay, utteranceSeconds } from '../../communication/speaking'
 import { balance } from '../../config/balance'
 import { CONCEPT_IDS } from '../../communication/lexicon'
 import { DIG_CYCLE_SECONDS } from '../../render/gesture'
@@ -152,6 +152,20 @@ function putAtGoal(state: AdultWorkState, v: AdultWorkView, index: number): void
   v.villagers[index].z = goal.z
 }
 
+/**
+ * Runs out the hold between a word and the act it orders (work-order 1184)
+ * without moving anybody and without casting anything new. The body waits for
+ * the word to be heard out, and a case that measures what FOLLOWS the word has
+ * to wait with it.
+ */
+function pastHold(state: AdultWorkState, v: AdultWorkView, concept: 'RIVER' | 'DIG' = 'DIG', cfg = CFG): void {
+  const dt = 1 / 60
+  const next = state.next
+  state.next = Infinity
+  for (let t = 0; t <= instructionDelay(concept); t += dt) stepAdultWork(state, v, dt, cfg, () => 0.5)
+  state.next = next
+}
+
 function threeWordsDue(): { state: AdultWorkState; v: AdultWorkView } {
   const v = view(5, [
     // The returning carrier stands at the stand, where his report falls.
@@ -224,6 +238,9 @@ describe('RIVER is ordered and reported at the village water stand', () => {
     // The carrier's arrival is recorded after the sender's first turn.
     stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
     expect(stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)).toMatchObject({ id: 'water-out' })
+    // The carrier is still at the stand while the order plays (work-order 1184).
+    expect(state.tasks[1]).toMatchObject({ phase: 'wait', carry: 'none' })
+    pastHold(state, v, 'RIVER')
     expect(state.tasks[1]).toMatchObject({ phase: 'fetch', carry: 'emptyJar' })
   })
 
@@ -443,6 +460,12 @@ describe('the water carrier dips his jar at the water (work-order 1087)', () => 
     const word = stepAdultWork(state, listening, 1 / 60, CFG, () => 0.5)
     expect(word).toMatchObject({ id: 'water-back', concept: 'RIVER', speaker: carrier })
     expect(state.standJars).toBe(1)
+    // The report ends the errand when it has been HEARD OUT (work-order 1184):
+    // the carrier stands at the stand through the hold, and no second jar is
+    // counted while he does.
+    expect(taskOf(state, carrier)).not.toBeNull()
+    pastHold(state, listening, 'RIVER')
+    expect(state.standJars).toBe(1)
     expect(taskOf(state, carrier)).toBeNull()
   })
 
@@ -519,6 +542,9 @@ describe('DIG is a summons said twice', () => {
     const partner = taskOf(state, initiator)!.partner!
     putAtGoal(state, v, initiator)
     expect(stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)?.purpose).toBe('invitation')
+    // The invitation is heard out before either man sets off (work-order 1184).
+    expect(taskOf(state, initiator)!.phase).toBe('invite')
+    pastHold(state, v)
 
     const first = taskOf(state, initiator)!
     const second = taskOf(state, partner)!
@@ -540,6 +566,9 @@ describe('DIG is a summons said twice', () => {
     const atSite = stepAdultWork(state, v, utteranceSeconds(4) + balance.communication.consequenceSeconds, CFG, () => 0.5)
     expect(atSite).toMatchObject({ concept: 'DIG', speaker: initiator, purpose: 'site' })
     expect(atSite?.aim).toEqual({ x: site.x, y: 0, z: site.z })
+    // Neither blade moves until the word at the hole has been heard out.
+    expect(isDigging(state, initiator, v)).toBe(false)
+    pastHold(state, v)
     expect(isDigging(state, initiator, v)).toBe(true)
     expect(isDigging(state, partner, v)).toBe(true)
   })
@@ -552,13 +581,25 @@ describe('DIG is a summons said twice', () => {
     expect(carryOf(state, initiator)).toBe('digTool')
     expect(carryOf(state, partner)).toBe('digTool')
     putAtGoal(state, v, initiator)
-    stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
+    expect(stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)?.purpose).toBe('invitation')
+    expect(carryOf(state, initiator)).toBe('digTool')
+    expect(carryOf(state, partner)).toBe('digTool')
+    // Through the invitation's hold into the joint walk (work-order 1184).
+    pastHold(state, v)
+    expect(taskOf(state, initiator)!.phase).toBe('site')
+    expect(taskOf(state, partner)!.phase).toBe('site')
     expect(carryOf(state, initiator)).toBe('digTool')
     expect(carryOf(state, partner)).toBe('digTool')
     putAtGoal(state, v, initiator)
     putAtGoal(state, v, partner)
     stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
-    stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
+    const atSite = stepAdultWork(state, v, utteranceSeconds(4) + balance.communication.consequenceSeconds, CFG, () => 0.5)
+    expect(atSite?.purpose).toBe('site')
+    // Through the word at the hole into the stroke itself.
+    pastHold(state, v)
+    expect(isDigging(state, initiator, v)).toBe(true)
+    expect(isDigging(state, partner, v)).toBe(true)
+    for (let t = 0; t < DIG_CYCLE_SECONDS; t += 1 / 60) stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
     expect(carryOf(state, initiator)).toBe('digTool')
     expect(carryOf(state, partner)).toBe('digTool')
   })
@@ -615,6 +656,7 @@ describe('DIG is a summons said twice', () => {
     expect(taskOf(state, initiator)).toMatchObject({ phase: 'invite', owes: true, hushed: true })
     audibleToChild = false
     expect(stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)?.purpose).toBe('invitation')
+    pastHold(state, v)
 
     putAtGoal(state, v, initiator)
     putAtGoal(state, v, partner)
@@ -625,6 +667,7 @@ describe('DIG is a summons said twice', () => {
     expect(isDigging(state, initiator, v)).toBe(false)
     audibleToChild = false
     expect(stepAdultWork(state, v, utteranceSeconds(4) + balance.communication.consequenceSeconds, CFG, () => 0.5)?.purpose).toBe('site')
+    pastHold(state, v)
     expect(isDigging(state, initiator, v)).toBe(true)
     expect(isDigging(state, partner, v)).toBe(true)
   })
@@ -636,6 +679,7 @@ describe('DIG is a summons said twice', () => {
     const partner = taskOf(state, initiator)!.partner!
     putAtGoal(state, v, initiator)
     expect(stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)?.purpose).toBe('invitation')
+    pastHold(state, v)
 
     const site = v.geography.digSites[taskOf(state, initiator)!.siteIndex!]
     const bystander = v.villagers.findIndex((_, i) => i !== initiator && i !== partner)
@@ -652,6 +696,7 @@ describe('DIG is a summons said twice', () => {
     v.villagers[bystander].x = 40
     v.villagers[bystander].z = 40
     expect(stepAdultWork(state, v, utteranceSeconds(4) + balance.communication.consequenceSeconds, CFG, () => 0.5)?.purpose).toBe('site')
+    pastHold(state, v)
     expect(isDigging(state, initiator, v)).toBe(true)
     expect(isDigging(state, partner, v)).toBe(true)
   })
@@ -746,10 +791,12 @@ describe('both diggers work the rim of their own site', () => {
     const partner = taskOf(state, initiator)!.partner!
     putAtGoal(state, v, initiator)
     stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
+    pastHold(state, v) // the invitation is heard out before the joint walk
     putAtGoal(state, v, initiator)
     putAtGoal(state, v, partner)
     stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
     stepAdultWork(state, v, utteranceSeconds(4) + balance.communication.consequenceSeconds, CFG, () => 0.5)
+    pastHold(state, v) // and so is the word at the hole
     expect(isDigging(state, partner, v)).toBe(true)
 
     // The old join stand, 2.4 m out: a full stroke there hoed unbroken ground.
@@ -767,10 +814,12 @@ describe('both diggers work the rim of their own site', () => {
     const partner = taskOf(state, initiator)!.partner!
     putAtGoal(state, v, initiator)
     stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
+    pastHold(state, v) // the invitation is heard out before the joint walk
     putAtGoal(state, v, initiator)
     putAtGoal(state, v, partner)
     stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
     stepAdultWork(state, v, utteranceSeconds(4) + balance.communication.consequenceSeconds, CFG, () => 0.5)
+    pastHold(state, v) // and so is the word at the hole
     const siteIndex = taskOf(state, partner)!.siteIndex!
     const site = v.geography.digSites[siteIndex]
 
@@ -808,12 +857,14 @@ describe('digging records work at the site', () => {
     const siteIndex = taskOf(state, initiator)!.siteIndex!
     putAtGoal(state, v, initiator)
     stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
+    pastHold(state, v) // the invitation is heard out before the joint walk
     putAtGoal(state, v, initiator)
     putAtGoal(state, v, partner)
     stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
     expect(digProgressOf(state, v.geography.digSites.length)[siteIndex]).toEqual({ dug: 0, strikes: 0 })
     stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
-    for (let t = 0; t < 5 + utteranceSeconds(4) + balance.communication.consequenceSeconds; t += 1 / 60) {
+    // The word at the hole is heard out too, before the first stroke falls.
+    for (let t = 0; t < 5 + utteranceSeconds(4) + balance.communication.consequenceSeconds + instructionDelay('DIG'); t += 1 / 60) {
       walkFrame(state, v, 1 / 60)
       stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
     }
