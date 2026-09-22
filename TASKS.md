@@ -77,6 +77,42 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
+- [ ] 1181. Three hundred and thirteen tooling tests pay for a browser they never open, and
+  what is left after that is six replay files (measured 22.09.2026 out of point 1180).
+  WHERE IT COMES FROM: 1180 took the duplicate village building out of eleven place suites and
+  brought the `unit` step from 21 min 30 s to 19 min 56 s (CI run 35702549770, 528 files /
+  16 280 cases green), which leaves 4 min 12 s under the `timeout-minutes: 25` ceiling instead
+  of 2 min 40 s. That ceiling has already cancelled a run on `main` itself (35696684799, cut
+  off at 25 min 18 s), so the headroom is the point, not the tidiness.
+  THE LEVER THAT IS LEFT AND CHEAP: 313 of the 528 test files are `scripts/**/*.test.mjs`,
+  which `vitest.config.ts` itself calls "pure modules, no game imports", and every one of them
+  pays for a jsdom environment and a React Testing Library setup it cannot use. They hold
+  266.0 s of the run's 1 658.4 s of test time, and the run's own banner puts `environment` at
+  308.8 s and `setup` at 74.3 s summed — of which those files carry roughly their share by
+  count. CAUTION, carried forward from point 1178: `src/test/setup.ts` also holds the
+  macrotask yield that fixes the `onTaskUpdate` starvation, so a node-environment project must
+  KEEP that yield or the run exits 1 with every case green.
+  AND THE FLOOR THAT IS NOT CHEAP, named here so the next reader does not rediscover it: after
+  1180 the six children's-game replays hold 762 s of the 1 658.4 s — `tagShuffle.bankRegroup`
+  207.1 s, `bankRoaming` 172.1 s, `bankTraveller` 137.8 s, `bankGame` 132.2 s, `bankRound`
+  69.8 s, `tagShuffle` 43.0 s. They are NOT layout-bound: each builds six to eight layouts and
+  spends the rest simulating, so the fixture of 1180 does nothing for them and no cache will.
+  Their cases may not be shortened or dropped (TASKS.md), which means anything further is a
+  question about the replays themselves and belongs to the user, not to a refactor.
+  FINAL STATE:
+  1. `scripts/**/*.test.mjs` resolve to a `node` environment and `src/**` keeps jsdom, with
+     the macrotask yield still running for both.
+  2. The `unit` step of a green `fast` run is read off CI afterwards and written into the tick
+     as a figure, with its headroom under the 25-minute ceiling stated beside it.
+  3. If that headroom is still under five minutes, the replay floor above goes to the user as
+     a decision rather than being optimised around in silence.
+  Test: Vitest cover for which environment a given test file resolves to — one `scripts/**`
+  file and one `src/**` file — plus a case proving the yield is installed in both.
+  Criticality: high — the ceiling's failure mode is `cancelled`, which names no cause and
+  which no push can clear, and it has already fired on `main`.
+  Refs: vitest.config.ts:20, src/test/setup.ts:26-55, CI runs 35702549770 / 35696684799
+  Bundle: Testinfrastruktur.
+
 - [ ] 1180. The unit layer builds the same ninety-nine villages some twelve thousand times,
   and that duplicate work — not the number of cases — is the last six and a half minutes
   (measured 22.09.2026 out of point 1178).
