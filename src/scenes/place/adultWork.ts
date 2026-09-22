@@ -22,6 +22,7 @@
 import { atDigStand, DIG_ARRIVE_RADIUS, digStandingPlaces } from './placeGround'
 import { SpeechFloor } from '../../communication/speechFloor'
 import { balance } from '../../config/balance'
+import { instructionDelay } from '../../communication/speaking'
 import type { ConceptId } from '../../communication/lexicon'
 import { DIG_CYCLE_SECONDS } from '../../render/gesture'
 import { devAssert } from '../../systems/devAssert'
@@ -111,6 +112,11 @@ export interface AdultTask extends ErrandPoint {
    *  removed, let back in through the side door. */
   withheld?: boolean
   speechOwner?: object
+  /** Seconds still to run between the word just SPOKEN and the act it orders
+   *  (work-order 1184). Its own state, deliberately not `owes`: a task inside
+   *  the hold owes nothing — the word has been said — so neither
+   *  `assertNoOwedWord` bound may read it as a lost or unpaid word. */
+  holdFor?: number
   pendingWord?: SpokenWord
   /** The villager who ORDERED this errand and who its words are addressed to
    *  (work-order 1087). He stands at the water stand for the whole round trip,
@@ -243,6 +249,16 @@ function clearPair(state: AdultWorkState, index: number, reason: ReleaseReason =
   if (task) {
     assertNoOwedWord(task, index, reason)
     if (task.partner !== null && state.tasks[task.partner]) assertNoOwedWord(state.tasks[task.partner]!, task.partner, reason)
+    // THE PAIR HOLDS THE FLOOR THROUGH ITS OWN HOLD (work-order 1184), and this
+    // release is what ends that. The alternative — letting go at the last
+    // syllable — leaves the gap between an order and the first step of the man
+    // obeying it open to any other exchange in the village, so the player hears
+    // a second word land between the two halves of the one he is meant to pair.
+    // No new mechanism is needed for it: the floor already reserves the
+    // situation and its consequence window for `utteranceSeconds(4) +
+    // consequenceSeconds`, which OUTLASTS `instructionDelay` at shipped balance
+    // (asserted in adultWork.hold.test.ts, so a later balance edit cannot
+    // silently open that gap).
     state.floor?.release(task.speechOwner ?? task)
   }
   state.tasks[index] = null
@@ -434,13 +450,28 @@ function readyWord(state: AdultWorkState, view: AdultWorkView, t: AdultTask, i: 
   return null
 }
 
-function wordConsequence(state: AdultWorkState, view: AdultWorkView, t: AdultTask, i: number): void {
+/**
+ * The word has just been granted the floor. The DEBT ends here — it has been
+ * said — but the act it orders waits out `instructionDelay` first (work-order
+ * 1184): the instructed body must not move before the word has been heard.
+ * The wait sits INSIDE the errand's own budget, because `age` keeps running.
+ */
+function wordSpoken(state: AdultWorkState, view: AdultWorkView, t: AdultTask, i: number, word: SpokenWord): void {
   t.owes = false
   t.hushed = false
   // The word is paid, so its withholding history ends here and the next word
   // this task owes starts with a clean slate.
   delete t.withheld
   delete t.pendingWord
+  const hold = instructionDelay(word.concept)
+  if (hold > 0) {
+    t.holdFor = hold
+    return
+  }
+  wordConsequence(state, view, t, i)
+}
+
+function wordConsequence(state: AdultWorkState, view: AdultWorkView, t: AdultTask, i: number): void {
   if (t.phase === 'invite') startJointWalk(state, t, view.geography)
   else if (t.phase === 'site') startDigging(state, t)
   else if (t.situation === 'water-back') clearPair(state, i)
@@ -523,6 +554,20 @@ export function stepAdultWork(
       continue
     }
 
+    // THE WORD IS SPOKEN, THE BODY HAS NOT MOVED YET (work-order 1184). The
+    // hold runs down on the errand's own clock — `age` below keeps counting —
+    // so it lengthens no deadline; it only delays the act the word ordered.
+    if (t.holdFor !== undefined) {
+      t.holdFor -= dt
+      if (t.holdFor <= 0) {
+        delete t.holdFor
+        wordConsequence(state, view, t, i)
+        // A consequence may dissolve the pair (the report back ends the
+        // errand); the rest of this body belongs to a task that is gone.
+        if (!state.tasks[i]) continue
+      }
+    }
+
     const goal = goalOf(t)
     if (!t.arrived && Math.hypot(me.x - goal.x, me.z - goal.z) <= workArrivalRadius(t)) {
       t.arrived = true
@@ -580,7 +625,7 @@ export function stepAdultWork(
           const word = t.pendingWord
           state.emitted.push(word)
           spoken ??= word
-          wordConsequence(state, view, t, i)
+          wordSpoken(state, view, t, i, word)
         }
       }
     }
@@ -632,7 +677,9 @@ export function stepAdultWork(
         t.dug = 0
         state.staged['water-back'] = (state.staged['water-back'] ?? 0) + 1
       }
-    } else if (t.arrived && t.phase === 'walk' && !t.owes) state.tasks[i] = null
+      // A carrier who has just made his report still stands there through his
+      // hold: the errand ends when the hold does, not on the last syllable.
+    } else if (t.arrived && t.phase === 'walk' && !t.owes && t.holdFor === undefined) state.tasks[i] = null
   }
 
   if (spoken) return rememberWord(state, spoken)

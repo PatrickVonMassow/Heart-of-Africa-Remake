@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { balance } from '../../config/balance'
+import { instructionDelay } from '../../communication/speaking'
 import { mulberry32 } from '../../world/noise'
 import {
   createLoomWork,
@@ -144,6 +145,66 @@ describe('the word sits on a body that moves that way (item 7)', () => {
     }
     expect(sawAway).toBe(true)
     expect(cameBack).toBe(true)
+  })
+})
+
+describe('the helper waits for the word to end (work-order 1184)', () => {
+  /** Steps until the weaver names a direction, then answers with the state. */
+  function untilCalled(state: LoomWorkState, v: LoomWorkView, dt = 1 / 60) {
+    for (let t = 0; t < 600; t += dt) {
+      const word = stepLoomWork(state, v, dt, cfg, mulberry32(31))
+      if (word) return word
+    }
+    throw new Error('the loom never said anything')
+  }
+
+  it('stands at the seat while the word plays, then sets off', () => {
+    const state = createLoomWork(cfg, mulberry32(37))
+    const v = view()
+    const dt = 1 / 60
+    const said = untilCalled(state, v, dt)
+    // The order has been given and the body has not moved: he is at the seat,
+    // not walking and not working.
+    expect(state.errand).toEqual({ toward: said, phase: 'hold', at: 0, clock: 0 })
+    expect(loomPicture(state).helperAt).toBe(0)
+    expect(loomPicture(state).helperWorking).toBe(false)
+
+    const hold = instructionDelay(said)
+    for (let t = 0; t < hold - 2 * dt; t += dt) {
+      stepLoomWork(state, v, dt, cfg, mulberry32(41))
+      expect(state.errand!.phase).toBe('hold')
+      expect(loomPicture(state).helperAt).toBe(0)
+    }
+    for (let k = 0; k < 4; k++) stepLoomWork(state, v, dt, cfg, mulberry32(43))
+    expect(state.errand!.phase).toBe('walk')
+    expect(Math.sign(loomPicture(state).helperAt)).toBe(warpSign(said))
+  })
+
+  it('reads the pause from balance rather than from a constant in the code', () => {
+    const shipped = balance.communication.instructionHoldSeconds
+    try {
+      balance.communication.instructionHoldSeconds = 5
+      const state = createLoomWork(cfg, mulberry32(47))
+      const v = view()
+      const dt = 1 / 60
+      untilCalled(state, v, dt)
+      // The shipped second would have had him walking well before this.
+      for (let t = 0; t < 3; t += dt) stepLoomWork(state, v, dt, cfg, mulberry32(53))
+      expect(state.errand!.phase).toBe('hold')
+    } finally {
+      balance.communication.instructionHoldSeconds = shipped
+    }
+  })
+
+  it('holds inside the tending cycle: no second order falls into the gap', () => {
+    const state = createLoomWork(cfg, mulberry32(59))
+    const v = view()
+    const dt = 1 / 60
+    const said = untilCalled(state, v, dt)
+    for (let t = 0; t < instructionDelay(said); t += dt) {
+      expect(stepLoomWork(state, v, dt, cfg, mulberry32(61))).toBeNull()
+    }
+    expect(state.owed).toBeNull()
   })
 })
 

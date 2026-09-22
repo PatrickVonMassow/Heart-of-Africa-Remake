@@ -567,6 +567,7 @@ export const en: Strings = {
     talkLoudness: 'Talk: loudness',
     callLoudness: 'Call: loudness',
     callFalloff: 'Call: falloff sharpness',
+    speechInstructionHold: 'Speech: pause before an order is obeyed (s)',
     speechConsequence: 'Speech: visible consequence (s)',
     speechHold: 'Speech: maximum deferral (s)',
     speechHearingFalloff: 'Talk: falloff sharpness',

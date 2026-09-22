@@ -25,6 +25,7 @@
 // The module is pure: no three, no scene, no clock of its own.
 
 import { SpeechFloor } from '../../communication/speechFloor'
+import { instructionDelay } from '../../communication/speaking'
 import { devAssert } from '../../systems/devAssert'
 import { armAim, type FigurePose } from '../../render/gesture'
 import type { ConceptId } from '../../communication/lexicon'
@@ -68,7 +69,13 @@ export interface LoomWorkView {
 /** The helper's errand along the warp. */
 export interface LoomErrand {
   toward: LoomDirection
-  phase: 'walk' | 'work' | 'return'
+  /**
+   * `hold` is the pause between the word and the first step (work-order 1184):
+   * the helper stands at the seat, having been told, and has not set off yet.
+   * The errand EXISTS during it, so the station stages no second order into the
+   * gap and the hold sits inside the tending cycle rather than on top of it.
+   */
+  phase: 'hold' | 'walk' | 'work' | 'return'
   /** Signed metres from the seat along the warp; downstream is positive. */
   at: number
   /** Seconds spent in the current phase. */
@@ -186,7 +193,16 @@ export function stepLoomWork(
   if (errand) {
     errand.clock += dt
     const target = warpSign(errand.toward) * cfg.tendStand
-    if (errand.phase === 'walk') {
+    if (errand.phase === 'hold') {
+      // HE WAS TOLD, AND HE IS LISTENING (work-order 1184). The instruction
+      // used to move him in the frame it was spoken, before its four syllables
+      // had finished, which reads as the weaver narrating her own helper rather
+      // than as an order given to him.
+      if (errand.clock >= instructionDelay(errand.toward)) {
+        errand.phase = 'walk'
+        errand.clock = 0
+      }
+    } else if (errand.phase === 'walk') {
       errand.at = approach(errand.at, target, cfg.helperPace * dt)
       if (Math.abs(errand.at - target) < 1e-6) {
         errand.phase = 'work'
@@ -240,9 +256,11 @@ export function stepLoomWork(
       state.owed = null
       state.owedFor = 0
       state.untilCall = nextInterval(cfg, rand)
-      // The helper's walk is the word's visible consequence, and it starts on
-      // the same step the word is said — the body IS the meaning.
-      state.errand = { toward: said, phase: 'walk', at: 0, clock: 0 }
+      // The helper's walk is the word's visible consequence, and the body IS
+      // still the meaning — it simply must not move before the word has been
+      // heard out (work-order 1184). He stands at the seat for the word's own
+      // length plus `instructionHoldSeconds`, then sets off.
+      state.errand = { toward: said, phase: 'hold', at: 0, clock: 0 }
       return said
     }
     devAssert(

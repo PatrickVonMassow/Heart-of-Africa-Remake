@@ -588,6 +588,7 @@ export interface Strings {
     callLoudness: string
     callFalloff: string
     speechConsequence: string
+    speechInstructionHold: string
     speechHold: string
     speechHearingFalloff: string
     speechLabelSeconds: string
