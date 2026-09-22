@@ -1404,6 +1404,12 @@
       "why": "Der Nutzer hat den Bugreport heute gemeldet und ausdrücklich gesagt: beides kritisch, direkt als nächstes beheben",
       "origin": "user",
       "place": "ahead"
+    },
+    "1183": {
+      "at": "2026-09-22T09:53:41.277Z",
+      "why": "Der Nutzer hat am 22.09.2026 die Entscheidungskarte beantwortet und den Punkt ausdrücklich direkt hinter 1181 bestellt",
+      "origin": "user",
+      "place": "ahead"
     }
   },
   "boundary": {
@@ -1435,7 +1441,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-22T09:30:44.904Z",
+    "at": "2026-09-22T09:53:41.287Z",
     "points": [
       174,
       184,
@@ -1846,7 +1852,8 @@
       1177,
       1179,
       1181,
-      1182
+      1182,
+      1183
     ]
   }
 }

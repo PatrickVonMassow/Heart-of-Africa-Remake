@@ -183,6 +183,59 @@ put it is the mistake this line exists to stop.
   Refs: vitest.config.ts:20, src/test/setup.ts:26-55, CI runs 35702549770 / 35696684799
   Bundle: Testinfrastruktur.
 
+- [ ] 1183. The loom station is not readable: the helper's work is a standing picture, both
+  warp ends look alike so the direction word carries no consequence, the weaving itself is
+  small, silent and below knee height — and nothing the weaver makes ever stays in the world
+  (user order 22.09.2026, after the report "man sieht nicht, dass da jemand webt und was die
+  Hilfsperson macht" and his decision on the board card "Webstuhl: vom Platz aus erkennen oder
+  erst, wenn man davorsteht?").
+  THE USER DECIDED THE SCOPE: readable FROM THE PLAZA, all four parts below, and he added the
+  fourth himself — "Wie wäre es, wenn zusätzlich etwas Sichtbares entsteht?"
+  1. THE HELPER GETS A CYCLE AND A THING IN HIS HANDS. Measured: `PlaceLife.tsx` sets both his
+  arms to `armAim(0, -0.85)` and `lean 0.35` while `helperWorking`, and leaves them there for
+  the whole `tendDwellSeconds` of 5 s. It is a STILL, not an animation — he walks 2.4 m, freezes
+  bent over, walks back. Give him the repeated motion the weaver and the pounder already use
+  (`loomPose` writes both arms every frame from the pass cycle; follow it), and give him an
+  object that CHANGES state: a bundle carried out and returned empty, or a drag weight he shifts.
+  2. THE TENDED END MUST LOOK TENDED AFTERWARDS. This is the part that decides whether the
+  station teaches anything at all: today both warp ends are identical, so a helper walking to
+  one of them reads as wandering rather than as the consequence of UPSTREAM or DOWNSTREAM. The
+  word is the whole purpose of the station (`loomWork.ts` header). Leave a visible mark at the
+  end he worked — the moved weight, the placed bundle — so the two ends differ and the word has
+  something to have caused.
+  3. THE WEAVING GETS ITS BEAT, AND IT CARRIES. The reed's beat is currently ±0.06/0.16 of arm
+  elevation and `lean 0.1..0.24`; the whole apparatus is `warpY` 0.22, `stakeHeight` 0.34,
+  `stripWidth` 0.12 — below knee height, all of it horizontal. Two levers, both needed for the
+  plaza distance the user asked for: (a) a SOUND, the reed landing once per pass. The village has
+  no work sound at all — `src/systems/ambience.ts` holds drum, footsteps, thunder, trample and
+  speech and nothing else — and a narrow-strip loom is above all a clack. `speechRoute(ac, dest,
+  pan)` already exists, so a placed, panned beat is within reach; route it like speech and give
+  it the same distance falloff. (b) a markedly bigger upper-body beat, so the motion is visible
+  where the sound points.
+  Do NOT raise the loom. The height is the reconstruction (docs/peoples-1890.md §8.1, Park's
+  four inches) and it stays; what changes is contrast — a saturated weave colour against pale
+  ground and a darker, larger shuttle.
+  4. SOMETHING VISIBLE COMES OF IT — the user's own addition, and the part that makes the
+  station worth walking past twice. Today the strip grows to the stake and then simply is not
+  there any more: nothing records that a village wove anything. The finished strip is TAKEN OFF
+  and STAYS — a stack beside the loom that grows over the visit and survives leaving and
+  re-entering the place. Design it against `design.md` before building: if a woven strip can be
+  a trade good or a gift, say so there and here; if it cannot in the PoC, it is scenery that
+  accumulates, and the point says which of the two it is rather than leaving it open.
+  Criticality: medium — the station works and teaches nothing the player can see, which is the
+  cost; it is not a crash and blocks nothing.
+  Test: Vitest for the helper's cycle (his pose moves across frames while `helperWorking`, and
+  the two warp ends differ once one has been tended), for the finished-strip accounting across a
+  place re-entry, and for the beat's plan the way the drum and trample plans are tested. Picture
+  check at bambara-village on BOTH backends, judged at PLAZA distance and not at the loom — the
+  user's criterion is that the station is recognisable from across the village.
+  Bundle: Dorfleben — it edits the loom in `PlaceLife.tsx`, `loomWork.ts`, the loom block in
+  `balance.ts` and `ambience.ts`, the same village-life and audio paths 1072, 1080 and 1157
+  reach, so it is worked after them and never beside them.
+  Refs: src/scenes/place/loomWork.ts, src/scenes/place/loom.ts, src/scenes/place/PlaceLife.tsx,
+  src/systems/ambience.ts, src/config/balance.ts, docs/peoples-1890.md §8.1, docs/backlog.md
+  (22.09.2026), point 1157
+
 - [ ] 1174. The village vocabulary is rolled per run, under rules that keep the direction pair a
   mirror (user 21.09.2026, drained from the findings carrier; placed here on the user's
   instruction, ahead of 659, which must judge a mechanic that no longer changes).
