@@ -370,7 +370,7 @@ export const SHUTTLE_THROW = 0.16
  *
  * MEASURED AGAINST THE DRAWN BODY, not guessed: a kneeling figure's shoulder
  * sits at `FIGURE_LIMBS.shoulderY` of a 0.55 body, on a group squashed to 0.75
- * — 0.256 in scene units — and its arm is 0.33 long. At this reach and this
+ * — 0.256 in scene units — and its arm is 0.242 long. At this reach and this
  * elevation the hands land on `LOOM_BUILD.warpY`. The first build had them
  * 0.11 high under a warp at 0.30, and the picture showed a cone with no arms
  * at all: the very thing the report complained of, rebuilt.
@@ -400,12 +400,13 @@ export function loomPose(picture: LoomPicture): FigurePose {
   // beating hand stays in over the reed, moving the other way as it drives.
   const carry = Math.atan2(across, WARP_REACH)
   const beat = Math.atan2(-across * 0.3, WARP_REACH)
-  // Elevation is NEGATIVE here: she sits at a warp laid low, so both arms
-  // reach forward and DOWN rather than up as the pounder's do.
+  const lean = 0.04 + picture.beat * 0.48
+  // Counter-rotate the shoulders as the trunk drives forward: the hands stay
+  // down at the warp rather than following the larger lean into the ground.
   return {
-    left: armAim(carry, HAND_ELEVATION - picture.beat * 0.38),
-    right: armAim(beat, HAND_ELEVATION - 0.04 - picture.beat * 0.52),
-    lean: 0.04 + picture.beat * 0.48,
+    left: armAim(carry, HAND_ELEVATION + lean),
+    right: armAim(beat, HAND_ELEVATION - 0.04 + lean),
+    lean,
     turn: 0,
   }
 }

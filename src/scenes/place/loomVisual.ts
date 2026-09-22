@@ -4,7 +4,7 @@ import type { LoomPicture } from './loomWork'
 
 export const LOOM_BUILD = {
   /** Height of the stretched threads. LOW, because it is a ground loom and a
-   *  SEATED weaver works it: her shoulder is at 0.256 and her arm is 0.33, so
+   *  SEATED weaver works it: her shoulder is at 0.256 and her arm is 0.242, so
    *  this is where her hands actually land (`loomWork`'s WARP_REACH). */
   warpY: 0.22,
   stakeHeight: 0.34,

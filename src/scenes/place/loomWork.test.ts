@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { balance } from '../../config/balance'
 import { instructionDelay } from '../../communication/speaking'
+import { handAt } from '../../render/gesture'
+import { FIGURE_LIMBS } from '../../render/figures'
+import { LOOM_BUILD } from './loomVisual'
 import { mulberry32 } from '../../world/noise'
 import {
   createLoomWork,
@@ -287,12 +290,16 @@ describe('the hands ride the tool (item 1)', () => {
     for (let k = 0; k < 40; k++) {
       stepLoomWork(state, view(), cfg.passSeconds / 40, cfg, mulberry32(71))
       const pose = loomPose(loomPicture(state))
-      // armAim's pitch is -(pi/2 + elevation); a negative elevation is a hand
-      // below the shoulder line, which is where a seated weaver's hands are.
-      for (const arm of [pose.left, pose.right]) {
+      // Judge the actual kneeling body's height after the trunk rotation:
+      // local arm elevation alone ignores the lean it must compensate for.
+      const shoulderY = FIGURE_LIMBS.shoulderY * Math.cos(pose.lean) * 0.55 * 0.75
+      for (const side of ['left', 'right'] as const) {
+        const arm = pose[side]
         const elevation = -arm.pitch - Math.PI / 2
-        expect(elevation).toBeLessThan(0)
-        expect(elevation).toBeGreaterThan(-1)
+        const handY = handAt(side, arm.yaw, elevation, pose.lean)[1] * 0.55 * 0.75
+        expect(handY).toBeLessThan(shoulderY)
+        expect(handY).toBeGreaterThan(LOOM_BUILD.warpY - 0.03)
+        expect(handY).toBeLessThan(LOOM_BUILD.warpY + 0.04)
       }
     }
   })
