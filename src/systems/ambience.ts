@@ -8,7 +8,7 @@ import { balance } from '../config/balance'
 import { devAssert } from './devAssert'
 import { MIX_LIMITER_DOMAIN, mixLimiterCurve, readCurveTable } from './mixLimiter'
 import type { Tone } from '../communication/lexicon'
-import { phrasePlan, utterancePlan, type SpeechPlan, type SpeechVoice, type SpeechOptions } from '../communication/speaking'
+import { hearingGain, speechPan, phrasePlan, utterancePlan, type SpeechPlan, type SpeechVoice, type SpeechOptions } from '../communication/speaking'
 import type { DrumId, DrumMessagePlan } from '../communication/drumMessage'
 
 export interface AmbienceScene {
@@ -884,6 +884,7 @@ function clapVoice(
   g.connect(dest)
   src.start(t0)
   src.stop(t0 + dur + 0.05)
+  return src
 }
 
 /**
@@ -1050,6 +1051,33 @@ export function speechRoute(ac: AudioContext, dest: AudioNode, pan: number) {
     monoGain: compensation.gain.value * (left + right) / 2,
     dispose: () => { compensation.disconnect(); panner.disconnect() },
   }
+}
+
+/** A dry wooden reed strike, using speech's distance and stereo placement. */
+export function loomBeatPlan(distance: number, bearing = 0, volume = balance.ambienceVolume) {
+  const cfg = balance.villageLife.loom
+  return {
+    peak: cfg.beatPeak * hearingGain(distance) * Math.max(0, volume),
+    pan: speechPan(bearing),
+    attack: cfg.beatAttack,
+    duration: cfg.beatDuration,
+    frequency: cfg.beatFrequency,
+  }
+}
+
+export function playLoomBeat(distance: number, bearing = 0): void {
+  const plan = loomBeatPlan(distance, bearing)
+  if (!ctx || !master || plan.peak <= 0) return
+  const ac = ctx
+  // A work sound belongs to ambience, with the same panner as a placed voice.
+  const route = speechRoute(ac, ambientBus ?? master, plan.pan)
+  const t = ac.currentTime
+  const source = clapVoice(ac, route.input, t, plan.duration, false, 'bandpass', plan.frequency, 2.5, (gain) => {
+    gain.setValueAtTime(0.0001, t)
+    gain.linearRampToValueAtTime(plan.peak, t + plan.attack)
+    gain.exponentialRampToValueAtTime(0.0001, t + plan.duration)
+  })
+  source.onended = route.dispose
 }
 
 /**
