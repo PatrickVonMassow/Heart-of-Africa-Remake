@@ -31109,3 +31109,57 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   replays land together in shard 2 — and that imbalance, not the case count, is what any further
   halving would have to attack.
   Bundle: Testinfrastruktur.
+
+- [x] 1184. An instruction is carried out in the same frame it is spoken, before its four
+  syllables have even finished, so the village reads as people narrating their own actions
+  rather than as one person telling another what to do (user order 22.09.2026).
+  WHAT THE USER SAW: "Aktuell werden Anweisungen wie die zum Wasserholen und die an den Helfer
+  beim Weben instantan umgesetzt. Das wirkt dadurch nicht organisch und man könnte es eher für
+  das Kommentieren der eigenen Handlung halten." That is exactly the failure mode the water
+  errand was rebuilt to avoid — `adultWork.ts` records the user's ruling of 07.09.2026 that "the
+  inhabitant used to narrate his own act, which reads as staged for the player" — and the
+  instant consequence puts it straight back.
+  WHERE IT IS, in both places, and they are the same shape: `adultWork.ts` `wordConsequence`
+  runs the moment the floor grants the word — it sets `carrier.phase = 'fetch'`,
+  `carry = 'emptyJar'` and the carrier's goal in that same step; `loomWork.ts` does the same with
+  `state.errand = { toward: said, phase: 'walk', at: 0, clock: 0 }`, whose own comment says the
+  walk "starts on the same step the word is said — the body IS the meaning". That comment is the
+  decision to revise: the body is still the meaning, it simply must not move before the word has
+  been heard.
+  AND IT STARTS TOO EARLY EVEN FOR THAT. The word's audio is a PLAN with a duration
+  (`speaking.ts` `phrasePlan` returns `duration = last.startOffset + last.duration`), scheduled
+  forward from the moment it is granted. The consequence fires at grant time, i.e. at the START
+  of the first syllable, so the player sees the answer before the question is finished.
+  FINAL STATE: the instructed person begins to carry out the instruction a configurable time
+  AFTER the utterance has ENDED. Default 1 s (user), measured from the plan's own duration rather
+  than from a guessed syllable count, so it stays right when the phrase, the pace or the distance
+  changes. The value belongs in `balance.ts` marked calibratable (CLAUDE.md §2), one value
+  serving both stations unless a measured reason splits them.
+  WHAT MUST NOT BREAK, and this is the whole risk of the point:
+  · THE DEADLINES ALREADY IN PLACE. `adultWork.ts` expires a task at `cfg.errandSeconds` and
+    `loomWork.ts` has `LOOM_WORD_BACKSTOP_SECONDS`; both now gain a hold between the word and
+    the act. The hold goes INSIDE the budget, not on top of it, and `assertNoOwedWord` must keep
+    meaning what it means — a word still owed at expiry. A task inside the new hold owes
+    NOTHING: it has been said. Give that state its own name rather than leaving it to look like
+    an unpaid word.
+  · THE SPEECH FLOOR. A pair holding the floor through the hold blocks every other word in the
+    village for a second; a pair releasing it before the consequence lands can be interrupted
+    mid-instruction. Decide which, deliberately, and say so where `SpeechFloor.release` is
+    called.
+  · THE PLAYER'S OWN ANNOTATION. The journal records an utterance when it is heard; the act it
+    belongs to now happens a second later. Check that the pairing the player is invited to make
+    still holds and that the SPACE invitation window does not close in the gap.
+  · WATER IS ALREADY SCARCE (point 1182). One water errand runs at a time, so a hold on each leg
+    lengthens the interval between visible water. Measure that rather than assume it is small.
+  Criticality: medium — nothing breaks, but it undoes the readability the teaching situations
+  exist for, and the user names it as the reason the village does not read as instruction.
+  Test: Vitest — a granted word does NOT move the instructed body in the same step, the body
+  starts after `duration + delay`, the delay is read from balance and not hardcoded, and a task
+  inside the hold reports neither an owed word nor a pair that never met. Picture check at
+  bambara-village on both backends: the carrier still stands at the stand while the word plays.
+  Bundle: Dorfleben — it edits `adultWork.ts`, `loomWork.ts`, the speech floor's hold and the
+  errand and loom blocks in `balance.ts`, the same adult-teaching path 1051, 1056, 1058, 1087
+  and 1182 reach, so it is worked after them and never beside them.
+  Refs: src/scenes/place/adultWork.ts, src/scenes/place/loomWork.ts,
+  src/communication/speaking.ts, src/communication/speechFloor.ts, src/config/balance.ts,
+  point 1087, point 1182, point 1183
