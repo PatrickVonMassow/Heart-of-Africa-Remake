@@ -6040,13 +6040,27 @@ if (section('village-loom')) {
         local: { x: stand.weaver.x, y: 0.8, z: stand.weaver.z },
         label: 'the weaver at her long warp, first of two frames half a pass apart that must differ at her arms and shuttle',
       })
-      const shuttleA = await page.evaluate(() => {
+      // The shuttle AND both her hands, in world space: the pixel difference
+      // below says that something in the crop changed, and a growing cloth or
+      // a thrown shuttle would change it over arms that never moved — which is
+      // the reported defect (GPT-6 Astra review, pass 4).
+      const shuttleAndHands = () => {
         const m = window.__placeScene.getObjectByName('village-loom-shuttle')
         m.updateWorldMatrix(true, false)
         const e = m.matrixWorld.elements
+        const hands = {}
+        window.__placeScene.getObjectByName('village-weaver-body').traverse((o) => {
+          if (o.name !== 'hand-left' && o.name !== 'hand-right') return
+          o.updateWorldMatrix(true, false)
+          const h = o.matrixWorld.elements
+          hands[o.name] = { x: h[12], y: h[13], z: h[14] }
+        })
+        return { x: e[12], y: e[13], z: e[14], hands }
+      }
+      const shuttleA = await page.evaluate((body) => {
         window.__loomPassAt = window.__placeScene.getObjectByName('village-loom').userData.loom.pass
-        return { x: e[12], y: e[13], z: e[14] }
-      })
+        return new Function('return (' + body + ')()')()
+      }, shuttleAndHands.toString())
       // HALF A PASS OF HER OWN CLOCK, not a second of the wall clock: the
       // shuttle is then at the other side of the warp and both arms have
       // swapped their work, which is the largest difference the cycle offers.
@@ -6062,12 +6076,7 @@ if (section('village-loom')) {
       }, null, { timeout: 30000 }).then(() => true).catch(() => false)
       check('her cycle advances by itself, half a pass of her own clock', advanced)
       await nextFrames(2)
-      const shuttleB = await page.evaluate(() => {
-        const m = window.__placeScene.getObjectByName('village-loom-shuttle')
-        m.updateWorldMatrix(true, false)
-        const e = m.matrixWorld.elements
-        return { x: e[12], y: e[13], z: e[14] }
-      })
+      const shuttleB = await page.evaluate((body) => new Function('return (' + body + ')()')(), shuttleAndHands.toString())
       const second = await frame('1157-village-loom-working-b', {
         local: { x: stand.weaver.x, y: 0.8, z: stand.weaver.z },
         label: 'the same weaver half a pass later, her arms and the shuttle at the other side of the warp',
@@ -6087,40 +6096,82 @@ if (section('village-loom')) {
       check('the shuttle is at another place on the warp half a pass later',
         Math.hypot(shuttleA.x - shuttleB.x, shuttleA.z - shuttleB.z) + Math.abs(shuttleA.y - shuttleB.y) > 0.01,
         JSON.stringify({ shuttleA, shuttleB }))
+      const handMoved = (name) => {
+        const p = shuttleA.hands?.[name]
+        const q = shuttleB.hands?.[name]
+        return !!p && !!q && Math.hypot(p.x - q.x, p.y - q.y, p.z - q.z) > 0.02
+      }
+      check('BOTH her hands are elsewhere half a pass later — the arms work, not only the tool',
+        handMoved('hand-left') && handMoved('hand-right'),
+        JSON.stringify({ a: shuttleA.hands, b: shuttleB.hands }))
 
-      // THE TEACHING PICTURE. The word falls a few times a minute, so the wait
-      // is generous; the player is already standing inside her talk reach, so
-      // the reading goes up over HER head when it does.
-      const called = await page.waitForFunction(() => {
+      // THE TEACHING PICTURE. The stand steps back FIRST: the teaching is the
+      // station's — her, the warp, the helper wherever the word sends him, and
+      // the river behind them — and it is taken while he is still on his way,
+      // so nothing may run between the wait and the shutter.
+      const wide = await page.evaluate(() =>
+        window.__loomPlace([7.5, 8.5, 6.5, 9.5], 2.4, window.__loomStation.seat, -0.05))
+      check('a wide stand carries the whole station with the water behind it', !!wide,
+        JSON.stringify(wide))
+      const tendStand = await page.evaluate(() => {
+        const s = window.__placeLayout.loom
+        return Math.hypot(s.tend.downstream.x - s.seat.x, s.tend.downstream.z - s.seat.z)
+      })
+      // PART-WAY AND WALKING (GPT-6 Astra review, pass 4): a helper parked at his
+      // stand, or standing beyond it, is not a body carrying a direction. He
+      // faces the way he walks (0 or π) and turns to the warp when he stands
+      // (±π/2), so the scene itself says which. The word falls a few times a
+      // minute, so the wait is generous.
+      const called = await page.waitForFunction((limit) => {
         const helper = window.__placeScene?.getObjectByName('village-loom-helper')
-        return !!helper && Math.abs(helper.position.z) > 1.2
-      }, null, { timeout: 60000 }).then(() => true).catch(() => false)
-      check('the weaver’s call sends her helper part-way along the warp', called)
+        if (!helper) return false
+        const along = Math.abs(helper.position.z)
+        const walking = Math.abs(Math.abs(helper.rotation.y) - Math.PI / 2) > 0.1
+        return walking && along > 0.4 && along < limit
+      }, tendStand - 0.4, { timeout: 60000 }).then(() => true).catch(() => false)
+      check('the weaver’s call sends her helper part-way along the warp, and he is walking it', called)
       if (called) {
-        // THE TEACHING IS THE STATION'S, so it steps back: her, the warp, the
-        // helper wherever the word sent him, and the river behind them.
-        const wide = await page.evaluate(() =>
-          window.__loomPlace([7.5, 8.5, 6.5, 9.5], 2.4, window.__loomStation.seat, -0.05))
-        check('a wide stand carries the whole station with the water behind it', !!wide,
-          JSON.stringify(wide))
-        await nextFrames(3)
-        const teaching = await page.evaluate(() => {
+        const view = page.viewportSize()
+        const teaching = await page.evaluate(({ width, height, limit }) => {
           const helper = window.__placeScene.getObjectByName('village-loom-helper')
-          const station = window.__placeLayout.loom
+          const layout = window.__placeLayout
+          const station = layout.loom
           const along = helper.position.z
           const labels = window.__speech?.labels() ?? []
+          const screen = window.__speech?.anchorScreen('village-weaver') ?? null
+          // Three points ON THE WATER: three metres beyond the waterline
+          // straight out from her seat, and a stride either way along the
+          // warp. Each is projected through the live camera; the frame is
+          // then read at the ones inside it.
+          const cam = window.__placeCamera
+          const V = Object.getPrototypeOf(cam.position).constructor
+          const out = layout.bank
+            ? layout.bank.distance - (station.seat.x * layout.bank.nx + station.seat.z * layout.bank.nz) + 3
+            : 0
+          const water = layout.bank
+            ? [-2.5, 0, 2.5].map((d) => {
+                const x = station.seat.x + layout.bank.nx * out + station.fx * d
+                const z = station.seat.z + layout.bank.nz * out + station.fz * d
+                const v = new V(x, 0, z).project(cam)
+                const inFrame = v.z < 1 && Math.abs(v.x) < 0.98 && Math.abs(v.y) < 0.98
+                return { px: Math.round(((v.x + 1) / 2) * width), py: Math.round(((1 - v.y) / 2) * height), inFrame }
+              })
+            : []
           return {
             along,
+            partWay: Math.abs(along) > 0.3 && Math.abs(along) < limit,
+            walking: Math.abs(Math.abs(helper.rotation.y) - Math.PI / 2) > 0.1,
             toward: along > 0 ? 'DOWNSTREAM' : 'UPSTREAM',
             reading: labels.some(l => l.speakerId === 'village-weaver'),
-            screen: window.__speech?.anchorScreen('village-weaver') ?? null,
-            waterAhead: window.__placeLayout.bank
-              ? { x: station.seat.x + window.__placeLayout.bank.nx * 6, z: station.seat.z + window.__placeLayout.bank.nz * 6 }
-              : null,
+            screen,
+            labelOnScreen: !!screen && screen.x >= 0 && screen.x <= width && screen.y >= 0 && screen.y <= height,
+            water,
           }
-        })
-        check('her reading stands over her own head while he walks', teaching.reading,
-          JSON.stringify(teaching))
+        }, { width: view.width, height: view.height, limit: tendStand })
+        check('her reading stands over her own head while he walks — and ON the screen',
+          teaching.reading && teaching.labelOnScreen, JSON.stringify(teaching))
+        check('he is part-way along the warp and still walking when the picture is taken',
+          teaching.partWay && teaching.walking, JSON.stringify({ along: teaching.along, walking: teaching.walking }))
         // The frame declares the HELPER as its subject: he is what the word
         // means, and a picture that lost him would prove nothing.
         const helperWorld = await page.evaluate(() => {
@@ -6129,10 +6180,24 @@ if (section('village-loom')) {
           const e = helper.matrixWorld.elements
           return { x: e[12], y: e[13], z: e[14] }
         })
-        await frame('1157-village-loom-named-tending', {
+        const third = await frame('1157-village-loom-named-tending', {
           local: { x: helperWorld.x, y: helperWorld.y + 0.6, z: helperWorld.z },
           label: `the helper ${teaching.toward.toLowerCase()} along the warp after the weaver named it, her reading over her head and the river beyond`,
         })
+        // THE WATER IS IN THE PICTURE (item 10): read off the captured frame at
+        // the projected water points, not assumed from the stand. Water is the
+        // one blue-dominant ground in this village; sand, cloth and a body in
+        // the way are not.
+        const { data, info } = await sharp(third).raw().toBuffer({ resolveWithObject: true })
+        const blueAt = (px, py) => {
+          if (px < 0 || py < 0 || px >= info.width || py >= info.height) return false
+          const i = (py * info.width + px) * info.channels
+          const r = data[i], g = data[i + 1], b = data[i + 2]
+          return b > r + 15 && b >= g - 10
+        }
+        const waterSeen = teaching.water.filter(w => w.inFrame && blueAt(w.px, w.py))
+        check('the river is in the captured frame, read at the projected water points',
+          waterSeen.length > 0, JSON.stringify(teaching.water))
       }
     }
   } finally {

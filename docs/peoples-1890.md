@@ -2406,26 +2406,30 @@ and, in Park, male weavers. They do not carry a two-ended warp with a seat at it
 middle, and neither passage puts a woman at the loom. That absence does not prove
 such a build never existed; it means the sources cannot be cited for one.
 
-**THE GAME ADAPTS, KNOWINGLY** (owner decision, 22.09.2026, after the author's
-escalation). The station as built is a GAMEPLAY ADAPTATION ordered by the user on
-21.09.2026, not a sourced reconstruction, and nothing in this document should be
-read as Park's or Caillié's account of it. Two things depart from the sources and
-each is load-bearing:
+**THE GAME ADAPTS, KNOWINGLY.** Two events, in order: the user ordered the station
+as built on 21.09.2026 (14:41); the author escalated the source question, and the
+owner decided on 22.09.2026 that the build stands as a GAMEPLAY ADAPTATION, not a
+sourced reconstruction. Nothing in this document should be read as Park's or
+Caillié's account of it. Two things depart from the sources and each is
+load-bearing:
 
 - **The seat is at the warp's MIDDLE.** The loom is the second place the player
   can learn UPSTREAM and DOWNSTREAM, and from the middle BOTH of the weaver's
-  calls send her helper away from her. Seated at an end — which is how the
-  sources' strip loom is worked — one call would be "toward me" and the other
-  "away from me", and the player could learn the pair as come/go and still
-  finish the puzzle.
+  calls send her helper away from her. Seated at an end — which is how the West
+  African strip loom is generally worked; neither source states where the seat
+  is — one call would be "toward me" and the other "away from me", and the
+  player could learn the pair as come/go and still finish the puzzle.
 - **The weaver is the woman the player reported.** She is kept as the figure of
   the 18.09.2026 bug report, whose complaint was that she did not move.
 
 **WHAT IS KEPT FROM THE SOURCES.** The cloth is a narrow strip — a hand's width,
 `LOOM_BUILD.stripWidth` — carried by a shuttle thrown across the warp and beaten
-down by a reed on each arrival, and it is taken off when it reaches the stake.
-The strip grows from the weaver's seat ALONG the horizontal warp; nothing rises
-to a top beam, which described the standing frame this station replaced.
+down by a reed on each arrival.
+
+**HOW THE GAME RENDERS THAT STRIP** (the game's build, not the sources'): the
+warp is stretched horizontally between two stakes, the strip grows from the
+weaver's seat ALONG it, and it is taken off when it reaches the stake. Nothing
+rises to a top beam, which described the standing frame this station replaced.
 
 **IMPLEMENTATION.** `src/scenes/place/loom.ts` lays the warp on the bank's own
 downstream vector and searches the seat; `src/scenes/place/loomWork.ts` runs the

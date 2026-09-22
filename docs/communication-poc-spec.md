@@ -1,18 +1,21 @@
 # The communication PoC (design.md §13.4)
 
 This document governs the communication rebuild in work-order points 686–692
-and its landed follow-ups. The playable slice has one six-word tonal language:
-the children's bank game and the adults' water and digging work teach five
-words; the drummer teaches CHIEF. The errand is a four-word drum message.
+and its landed follow-ups. The playable slice has one six-word tonal language,
+taught in four places: the children's bank game and the adults' water and
+digging work teach five words, the weaver's loom teaches UPSTREAM and
+DOWNSTREAM a second time, and the drummer teaches CHIEF. The errand is a
+four-word drum message.
 
 ## What the player does
 
 In one village of the tonal West/Centre belt the player watches and listens.
 The inhabitants speak atomic utterances built from one syllable in two tones,
 and the player works out their meanings from visible situations. The new
-teaching is divided between the children's bank game, including the village's
-play rocks, and the adults' water and digging work. Those situations are built
-in their own work-order points; the removed catalogues are not substitutes for
+teaching is divided between four places: the children's bank game, including
+the village's play rocks, the adults' water and digging work, the weaver's loom
+("The weaver's loom" below), and the drummer. Those situations are built in
+their own work-order points; the removed catalogues are not substitutes for
 them.
 
 Later the chief sends a message on two drums in the same language. The player

@@ -2113,7 +2113,12 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
         // BUILT fabric and nothing is moved for it, so the warp — a later
         // object, like the loose dressing — keeps out of it rather than
         // sealing the one bearing a person can walk out over.
-        !onWayOut(wayOut, radius, x, z, r),
+        !onWayOut(wayOut, radius, x, z, r) &&
+        // AND OFF THE VILLAGE LANES AND THE CHILDREN'S WAY DOWN TO THE WATER:
+        // a warp across either would stand in a walk the layout already drew
+        // (GPT-6 Astra review, pass 7).
+        !onLane(x, z, r) &&
+        !onWayToWater(x, z, r),
       sightClear: (from, to, halfWidth) => clearCorridor(colliders, from, to, halfWidth),
       toChildren,
       waterPathHead: waterPath ? waterPath.head : null,
