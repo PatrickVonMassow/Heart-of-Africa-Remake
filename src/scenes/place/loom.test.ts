@@ -2,7 +2,8 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import { setupGeodata } from '../../test/geodata'
 import { PLACES } from '../../world/geo'
 import { balance } from '../../config/balance'
-import { buildLayout } from './layout'
+import { buildLayout, onWayOut, WATER_PATH_WIDTH } from './layout'
+import { closestOnPolyline } from './lanePlan'
 import { standsOnGroundPlate } from './riverBank'
 import { standingClear, WALKER_RADIUS } from './collision'
 import {
@@ -171,6 +172,51 @@ describe('the station keeps its distance and shows the water (items 9 and 10)', 
       }
     }
     expect(off).toEqual([])
+  })
+})
+
+describe('the station gives way to what was there first', () => {
+  it('never seals the settlement’s one way out, nor the carriers’ water lane', () => {
+    const off: string[] = []
+    for (const { id, seed, layout } of shippedLooms()) {
+      const { loom, wayOut, radius, waterPath } = layout
+      if (!loom) continue
+      for (let k = 0; k <= 16; k++) {
+        const t = k / 16
+        const x = loom.upstream.x + (loom.downstream.x - loom.upstream.x) * t
+        const z = loom.upstream.z + (loom.downstream.z - loom.upstream.z) * t
+        if (onWayOut(wayOut, radius, x, z, WARP_BODY_RADIUS)) off.push(`${id}/${seed}: warp on the way out`)
+        if (waterPath) {
+          const d = closestOnPolyline(
+            [[waterPath.head.x, waterPath.head.z], [waterPath.foot.x, waterPath.foot.z]],
+            x,
+            z,
+          ).dist
+          if (d < WATER_PATH_WIDTH / 2 + WARP_BODY_RADIUS) off.push(`${id}/${seed}: warp across the water lane`)
+        }
+      }
+    }
+    expect(off.slice(0, 10)).toEqual([])
+  })
+
+  it('leaves a walker room to pass BEYOND each stake, so the wall can be walked round', () => {
+    const off: string[] = []
+    for (const { id, seed, layout } of shippedLooms()) {
+      const loom = layout.loom
+      if (!loom) continue
+      const own = layout.colliders.filter((c) =>
+        c.kind === 'segment'
+          ? Math.hypot(c.x1 - loom.upstream.x, c.z1 - loom.upstream.z) > 1e-9
+          : c.kind === 'box' || Math.hypot(c.x - loom.weaver.x, c.z - loom.weaver.z) > 1e-9,
+      )
+      const past = balance.villageLife.loom.warpHalf + WARP_BODY_RADIUS + WALKER_RADIUS * 2
+      for (const d of [-past, past]) {
+        const x = loom.seat.x + loom.fx * d
+        const z = loom.seat.z + loom.fz * d
+        if (!standingClear(own, x, z, WALKER_RADIUS)) off.push(`${id}/${seed}: no room past a stake`)
+      }
+    }
+    expect(off.slice(0, 10)).toEqual([])
   })
 })
 
