@@ -147,6 +147,32 @@ put it is the mistake this line exists to stop.
   src/systems/ambience.ts, src/config/balance.ts, docs/peoples-1890.md §8.1, docs/backlog.md
   (22.09.2026), point 1157
 
+- [ ] 1190. From the plaza the Bambara loom is seen only through a gap between two huts, and
+  there it is a pair of small figures, not a loom (measured 23.09.2026 while landing 1183).
+  PROBLEM. Point 1183 made the station readable UP CLOSE on both backends: the folded strips
+  lie stacked beside the loom, the helper carries a yarn bundle out and leaves it at the end
+  the word named, the weaver's trunk drives each beat. The user's criterion was the PLAZA.
+  The new plaza frame (`scripts/verify/polish.mjs` village-loom, `1183-village-loom-from-plaza`)
+  searches a 6 m disc round the plaza (0, 3) for the widest open sight line to the weaver:
+  NO stand has 0.5 m of clearance along it, and the best one looks through a narrow gap
+  between two dwellings. What reaches the picture there is a kneeling cone and a standing
+  figure by the water, a few dozen pixels tall; the warp, the stack and the tended end's
+  bundle do not read. The reed's clack (1183 part 3) carries across the plaza; the picture
+  does not.
+  FINAL STATE. From a stand on the Bambara plaza the station reads as a loom being worked: the
+  sight line from the plaza to it is open (the frame's check tightened from 0.15 m to at least
+  1 m of clearance), and the warp line and the cloth stack are distinguishable in the frame.
+  The loom's height stays (docs/peoples-1890.md §8.1, point 1183: "Do NOT raise the loom");
+  the lever is WHERE the station stands relative to the dwellings and the plaza, within the
+  bank constraint that the warp runs on the river's axis (`onRiverAxis`, point 1157).
+  Criticality: medium — the teaching station works; the user's stated criterion is not met.
+  Test: the village-loom section's plaza frame on both backends with the tightened clearance;
+  Vitest for any layout rule that moves the station (it still lies on the river's axis and
+  clear of every dwelling).
+  Refs: src/scenes/place/layout.ts (loom station placement), scripts/verify/polish.mjs
+  (village-loom, plaza frame), point 1183, point 1157
+  Bundle: Dorfleben
+
 - [ ] 1174. The village vocabulary is rolled per run, under rules that keep the direction pair a
   mirror (user 21.09.2026, drained from the findings carrier; placed here on the user's
   instruction, ahead of 659, which must judge a mechanic that no longer changes).
