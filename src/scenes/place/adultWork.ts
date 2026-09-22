@@ -533,11 +533,13 @@ export function stepAdultWork(
       const ready = readyWord(state, view, t, i)
       if (ready) t.pendingWord = ready
       const partnerTask = t.partner === null ? null : state.tasks[t.partner]
-      // A previously withheld word keeps its debt. Give the floor the earlier
-      // walking deadline too, so it discharges that debt before a stall kill.
+      // A previously withheld word keeps its debt. The floor remembers its
+      // earliest deadline, so only pass a walking deadline when release is
+      // imminent: renewed headway can reset a stall clock on any earlier frame.
+      const walkingLife = Math.min(stallRemaining(t, cfg), stallRemaining(partnerTask, cfg))
       const remaining = Math.min(
         cfg.errandSeconds - Math.max(t.age, partnerTask?.age ?? 0),
-        stallRemaining(t, cfg), stallRemaining(partnerTask, cfg),
+        walkingLife <= dt * 2 ? walkingLife : Infinity,
       )
       const urgent = remaining <= dt * 2
       // A word whose moment has NOT come claims no turn on the floor. The pair

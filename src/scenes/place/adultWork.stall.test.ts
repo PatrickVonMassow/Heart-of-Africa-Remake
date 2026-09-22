@@ -166,4 +166,22 @@ describe('adult errand progress release', () => {
     expect(errors.mock.calls.flat().join(' ')).toContain('adult-atom-lost')
     expect(errors.mock.calls.flat().join(' ')).not.toContain('adult-pair-never-met')
   })
+
+  it('does not impose a stale speech deadline when a displaced partner keeps making headway', () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const f = fixture()
+    f.view.childrenHear = () => true
+    f.atGoal(f.sender)
+    f.atGoal(f.carrier)
+    f.step()
+    f.step()
+    expect(f.state.tasks[f.sender]!.withheld).toBe(true)
+    f.state.tasks[f.carrier]!.arrived = false
+    f.view.villagers[f.carrier].x += 80
+    for (let elapsed = 0; elapsed < cfg.stallSeconds * 2; elapsed += 0.25) f.walk()
+    expect(f.state.tasks).toEqual(f.pair)
+    expect(f.state.tasks[f.sender]!.owes).toBe(true)
+    expect(f.state.floor!.forcedCount).toBe(0)
+    expect(errors).not.toHaveBeenCalled()
+  })
 })
