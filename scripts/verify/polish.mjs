@@ -5867,9 +5867,18 @@ if (section('village-stations')) {
       const clear = (x, z) => Math.min(...otherBodies.map(c => window.__clearanceTo(c, x, z)))
       const toMarket = Math.atan2(market.pos[0] - body.x, market.pos[1] - body.z)
       const span = Math.hypot(market.pos[0] - body.x, market.pos[1] - body.z)
-      const aim = { x: body.x + (market.pos[0] - body.x) * 0.4, z: body.z + (market.pos[1] - body.z) * 0.4 }
+      // A WALL FAR OFF IS NOT IN THE PICTURE. Since the loom lies on the river's
+      // axis (work-order 1157) the reported seed seats her twenty metres from
+      // the trading post, and no stand nine metres out holds both inside the
+      // lens. The clearance the point asks for is then plain in the open ground
+      // itself: the frame is aimed at HER, from the side, and the wall is
+      // wherever it is. Close by, both are still framed together.
+      const far = span > 12
+      const aim = far
+        ? { x: body.x, z: body.z }
+        : { x: body.x + (market.pos[0] - body.x) * 0.4, z: body.z + (market.pos[1] - body.z) * 0.4 }
       // A hut further off needs the lens further back to hold both in one frame.
-      const stand = Math.min(9, Math.max(4.5, span * 1.1))
+      const stand = far ? 6 : Math.min(9, Math.max(4.5, span * 1.1))
       let cameraGap = -Infinity
       let framed = null
       for (let k = 0; k < 24; k++) {
@@ -5879,6 +5888,10 @@ if (section('village-stations')) {
         const angle = toMarket + (k % 2 ? -1 : 1) * (Math.PI / 2 + Math.floor(k / 2) * Math.PI / 24)
         const x = body.x + Math.sin(angle) * stand
         const z = body.z + Math.cos(angle) * stand
+        // INSIDE THE SETTLEMENT, or the game leaves it at the next frame and
+        // the shutter finds travel mode: the boundary band never runs inside
+        // the layout's radius, so a stand short of that radius is always in.
+        if (Math.hypot(x, z) > layout.radius - 0.5) continue
         if (clear(x, z) < 0.35) continue
         let visible = true
         for (let step = 1; step <= 16; step++) {
@@ -5898,13 +5911,19 @@ if (section('village-stations')) {
         // wide frame; 26 keeps both subjects clear of the very edge.
         const bodyOff = offAxis(body.x, body.z)
         const marketOff = offAxis(market.pos[0], market.pos[1])
-        if (bodyOff > 26 || marketOff > 26) continue
+        if (bodyOff > 26 || (!far && marketOff > 26)) continue
         p.x = x
         p.z = z
         p.yaw = Math.atan2(aim.x - p.x, aim.z - p.z) + Math.PI
         p.pitch = -0.1
         cameraGap = clear(x, z)
-        framed = { bodyOff: +bodyOff.toFixed(1), marketOff: +marketOff.toFixed(1) }
+        // The stand's own place in the settlement, printed with the verdict: a
+        // stand outside the boundary band would leave the place at the next
+        // frame, and that reads as "travel mode" at the shutter.
+        framed = {
+          bodyOff: +bodyOff.toFixed(1), marketOff: +marketOff.toFixed(1),
+          stand: { x: +x.toFixed(2), z: +z.toFixed(2), out: +Math.hypot(x, z).toFixed(2), radius: layout.radius },
+        }
         break
       }
       return { body, propGap: warpGap, bodyGap: gap(body, 0.3), cameraGap, facesLoom, framed }

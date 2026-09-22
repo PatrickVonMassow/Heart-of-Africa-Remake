@@ -13,7 +13,7 @@ const run = new (Object.getPrototypeOf(async function () {}).constructor)(
 
 afterEach(() => vi.unstubAllGlobals())
 
-async function photograph({ marketX = -5.21, marketRadius = 2.9, failFrame = false } = {}) {
+async function photograph({ marketX = -5.21, marketRadius = 2.9, radius = 30, failFrame = false } = {}) {
   const state = { seed: 42, placeId: 'cairo', leavePlace() { this.placeId = null }, enterPlace(id) { this.placeId = id }, setJournalOpen() {} }
   const matrix = (x, z, yaw = 0) => ({
     updateWorldMatrix() {},
@@ -24,6 +24,7 @@ async function photograph({ marketX = -5.21, marketRadius = 2.9, failFrame = fal
   vi.stubGlobal('__game', { getState: () => state, setState: update => Object.assign(state, update) })
   vi.stubGlobal('__placeScene', { getObjectByName: name => name === 'village-loom' ? loom : body })
   vi.stubGlobal('__placeLayout', {
+    radius,
     interactives: [{ type: 'market', pos: [marketX, -5.76] }], dwellings: [],
     colliders: [{ x: marketX, z: -5.76, r: marketRadius }],
     // The station as the layout lays it (work-order 1157): a 6.4 m warp on the
@@ -98,4 +99,20 @@ it('refuses a photograph when every candidate camera stand is blocked', async ()
   expect(checks[3].pass).toBe(false)
   expect(frames).toEqual([])
   expect(state.seed).toBe(42)
+})
+
+it('keeps every camera stand inside the settlement, where the game does not leave the place', async () => {
+  // A settlement so small that every side stand would fall outside its
+  // boundary: the search must refuse rather than hand the shutter travel mode.
+  const { checks, frames, player } = await photograph({ radius: 4 })
+  expect(checks[2].pass).toBe(false)
+  expect(frames).toEqual([])
+  expect(player.x).toBeUndefined()
+})
+
+it('photographs her from the side when the trading post stands far off, without asking for it in frame', async () => {
+  const { checks, frames, player, body } = await photograph({ marketX: -25 })
+  expect(checks[3]).toMatchObject({ pass: true })
+  expect(frames.map(f => f.name)).toEqual(['1143-village-weaver-clear-of-market'])
+  expect(Math.hypot(player.x - body.x, player.z - body.z)).toBeCloseTo(6, 6)
 })
