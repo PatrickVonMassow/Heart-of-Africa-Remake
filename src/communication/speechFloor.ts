@@ -18,6 +18,9 @@ export interface FloorRequest {
   remaining?: number
   step?: number
   ends?: boolean
+  /** Seconds after the grant before the act the word orders begins
+   *  (work-order 1184); the reservation lasts at least that long. */
+  actAfter?: number
 }
 interface Situation { name: string; sources: FloorRequest['sources']; next: number }
 /** `sayable` separates a word the FLOOR defers from one its own speaker cannot
@@ -96,7 +99,9 @@ export class SpeechFloor {
       devAssert(false, 'adult-atom-lost', () => `${this.scope}: ${r.name}/${r.word}: forced after ${(now - (queued?.since ?? now)).toFixed(2)}s; overrun situation ${foreign?.name ?? own?.name ?? r.name}${r.blocked ? ' (speaker blocked)' : ''}`)
     }
     words?.delete(r.word)
-    const next = now + utteranceSeconds(4) + balance.communication.consequenceSeconds
+    // The reservation outlasts the ordered act's own hold, so a calibrated
+    // pause can never open a gap another exchange speaks into (work-order 1184).
+    const next = now + Math.max(utteranceSeconds(4) + balance.communication.consequenceSeconds, r.actAfter ?? 0)
     this.situations.set(r.situation, { name: r.name, sources: r.sources, next })
     if (this.audible(r.source)) this.consequence = { source: { ...r.source }, until: next }
     if (r.ends) this.release(r.situation)

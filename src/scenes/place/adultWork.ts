@@ -254,11 +254,8 @@ function clearPair(state: AdultWorkState, index: number, reason: ReleaseReason =
     // syllable — leaves the gap between an order and the first step of the man
     // obeying it open to any other exchange in the village, so the player hears
     // a second word land between the two halves of the one he is meant to pair.
-    // No new mechanism is needed for it: the floor already reserves the
-    // situation and its consequence window for `utteranceSeconds(4) +
-    // consequenceSeconds`, which OUTLASTS `instructionDelay` at shipped balance
-    // (asserted in adultWork.hold.test.ts, so a later balance edit cannot
-    // silently open that gap).
+    // The request names the hold as `actAfter`, so the floor's reservation
+    // covers it at any calibration, not only at shipped balance.
     state.floor?.release(task.speechOwner ?? task)
   }
   state.tasks[index] = null
@@ -618,6 +615,7 @@ export function stepAdultWork(
           sources: () => [view.villagers[i], ...(t.partner === null ? [] : [view.villagers[t.partner]])]
             .filter((p) => !!p).map((p) => ({ x: p.x, z: p.z, register: 'talk' as const })),
           blocked, remaining, step: dt, ends,
+          actAfter: instructionDelay(t.pendingWord.concept),
         })
         t.hushed = !!ready && !allowed
         if (!allowed) t.withheld = true

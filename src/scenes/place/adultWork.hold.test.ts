@@ -87,10 +87,8 @@ describe('the word is measured, not guessed', () => {
   })
 
   it('stays inside the floor’s own consequence window and under the note over the head', () => {
-    // THE PAIR KEEPS THE FLOOR THROUGH ITS HOLD, with no new mechanism: the
-    // floor already reserves a situation and its consequence window for one
-    // word plus `consequenceSeconds`, and that must outlast the hold or another
-    // exchange speaks into the gap between an order and the act answering it.
+    // At shipped balance the hold fits the floor's ordinary window, so the
+    // `actAfter` reservation (speechFloor.test.ts) changes no shipped timing.
     const window = utteranceSeconds(SEQUENCE_LENGTH) + balance.communication.consequenceSeconds
     for (const concept of CONCEPT_IDS) {
       expect(instructionDelay(concept)).toBeLessThanOrEqual(window)

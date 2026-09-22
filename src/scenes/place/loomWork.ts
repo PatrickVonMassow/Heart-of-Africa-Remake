@@ -247,6 +247,7 @@ export function stepLoomWork(
       blocked: false,
       step: dt,
       ends: true,
+      actAfter: instructionDelay(state.owed),
     }))
     if (allowed) {
       const said = state.owed
