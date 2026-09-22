@@ -77,6 +77,68 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
+- [ ] 1178. The unit gate's 25-minute ceiling is eaten again, and a job timeout is the worst
+  shape of red: it names neither its cause nor a fix (measured 22.09.2026 on the CI handoff of
+  point 1157).
+  WHAT FAILED: CI run 35685632209 for `feat/1157-weaver-loom` 52bf47fc6 is recorded
+  `cancelled`, not `failure` — the `fast` job hit `timeout-minutes: 25` at 25m17s. Nothing in
+  the diff under it is at fault: the three preceding runs of the same branch were green at
+  18m58s (35671555829), 24m50s (35678754364) and 24m45s (35683117792). The cost sits in ONE
+  step — `unit` took 23m59s of that 24m45s run, and the other six steps 46s together.
+  THE CEILING HAS ALREADY BEEN RAISED ONCE, and the comment that raised it
+  (`.github/workflows/ci.yml`, 13.09.2026) forbids raising it a second time: "a run that
+  approaches it again is a signal to make the suite cheaper, not to raise this a second time".
+  Between that raise and today the layer grew from 14m45s to 24m45s in nine days, with no
+  configuration change under it.
+  A CONTRADICTION IN THE PROJECT'S OWN RECORD, and the first thing to settle:
+  `vitest.config.ts:69` justifies `maxWorkers: process.env.CI ? 2 : 4` as the fix for the
+  `onTaskUpdate` starvation of 03.09.2026, while `src/test/setup.ts:45` — written 80 minutes
+  LATER the same night (0d6746072 at 05:15 against 1b389d2a0 at 03:54) — records of that very
+  commit that the cap "did not touch it" and "cost the run 43 % of its wall clock", and that
+  the macrotask yield is what actually fixed it. If the later account holds, close to half the
+  CI wall clock is being paid for a hypothesis that was disproved the same night and never
+  reverted.
+  MEASURED SINCE, and it moves the answer: the cost is not spread over the layer, it sits in
+  TWO FILES. A full `vitest run --reporter=json` on a quiet host (516 files, 16 285 cases,
+  1659 s of summed file time, 4 workers, ~540 s wall) reads
+  `src/scenes/place/tagShuffle.test.ts` at 518.8 s over 50 cases and
+  `src/scenes/place/layout.test.ts` at 339.7 s over 1157 cases — together 51.7 % of the whole
+  layer. The top 40 files hold 93.6 %; the remaining 476 hold 6.4 %. So the LOCAL wall clock
+  (~540 s) is not set by the pool at all, it is set by the single longest file: no worker count
+  can finish a run sooner than its slowest file, and `tagShuffle` alone is 8 min 39 s here and
+  slower on a hosted core.
+  THAT MAKES TWO LEVERS, in this order. The pool cap governs everything up to that floor; the
+  floor itself is only moved by splitting the two long files — they are deterministic replays
+  of the village choreography, so their cases may be SPREAD ACROSS FILES but never shortened
+  or dropped (TASKS.md: tests are never weakened).
+  A THIRD, much smaller: 313 of the 516 test files are `scripts/**/*.test.mjs`, which
+  `vitest.config.ts` itself describes as "pure modules, no game imports", and every one pays
+  for a jsdom environment and a React Testing Library setup it cannot use — the CI run's own
+  banner puts that at `environment 361.19 s` of summed worker time against `tests 2219.68 s`.
+  It is worth about three minutes and is the LAST step, not the first. CAUTION for whoever
+  takes it: `src/test/setup.ts` also carries the macrotask yield that fixes the `onTaskUpdate`
+  starvation, so a node-environment project must keep that yield.
+  FINAL STATE:
+  1. What the worker cap costs is MEASURED on CI rather than argued: the same commit run at
+     the current value and at a raised one, both wall clocks recorded — and EITHER the cap is
+     corrected with that measurement behind it, OR its comment is rewritten to say why the
+     43 % is worth paying.
+  2. The `unit` step of a green `fast` run sits at or under 15 minutes again, with its
+     headroom stated as a figure rather than as a hope.
+  2a. The critical path is named as a figure: the slowest SINGLE file's duration on CI, which
+     is the floor no pool width can go under.
+  3. Whatever is changed, `timeout-minutes: 25` is NOT raised.
+  4. The two contradicting comments say the same thing afterwards.
+  Test: the `fast` job's `unit` duration read off three consecutive green CI runs and written
+  into the tick; plus Vitest cover for any config split that is introduced — which environment
+  a given test file is resolved to.
+  Criticality: high — this is not a flake. Every landing now runs within a minute of a ceiling
+  whose failure mode is `cancelled`, which no push can clear and which names no cause; on
+  `main` that stops the whole batch through `ci-status-guard`.
+  Refs: .github/workflows/ci.yml:89, vitest.config.ts:69, src/test/setup.ts:26-55, CI runs
+  35685632209 / 35683117792 / 35671555829
+  Bundle: Testinfrastruktur.
+
 - [ ] 1174. The village vocabulary is rolled per run, under rules that keep the direction pair a
   mirror (user 21.09.2026, drained from the findings carrier; placed here on the user's
   instruction, ahead of 659, which must judge a mechanic that no longer changes).
@@ -15938,3 +16000,23 @@ to land than a mechanism that needs a review.
   Refs: `scripts/render-verify-recorder.mjs` (armed.uncaught, line ~737), `scripts/verify/run-logged.mjs`,
   `scripts/verify/polish.mjs`, the six run records above; deferred around once on 22.09.2026 for
   point 1157 (`render-verify-guard --defer`).
+
+- [ ] 1179. A session that is waiting cannot declare its wait while it does closing work, and
+  the attempt leaves the board unpublishable (measured 22.09.2026 during the closing duties of
+  point 1157).
+  `batch-in-flight.mjs --waiting-on` derives its now-card from a point number. With
+  `--point 1157` — the point whose closing duties WERE the work, merged and ticked — it wrote
+  the board file, and every later `board-publish.mjs` then REFUSED: "active-work source
+  unresolved: evidence item 1 names point 1157, which is not open". Without `--point` it
+  refuses outright: "1 evidence item(s) name no point". So the one state the board has its own
+  card for — `board.mjs closing <N>`, the merged-and-ticked point whose duties are still owed
+  — is the one state in which a wait cannot be made visible at all. The board stayed
+  unpublishable until `--clear`.
+  FINAL STATE: a closing card carries a waiting declaration exactly as a now-card does, and a
+  declaration that cannot be rendered is refused BEFORE it writes the board file, never after.
+  Test: Vitest on the declaration's card derivation — a closed point with a standing closing
+  card accepted, and a refusal proven not to have touched the board file.
+  Criticality: low — it costs no player anything and blocks no point, but it makes the batch
+  invisible in exactly the minutes the rule of 28.07.2026 exists to cover.
+  Refs: scripts/batch-in-flight.mjs, scripts/board-publish.mjs
+  Bundle: Testinfrastruktur.

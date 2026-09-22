@@ -66,6 +66,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 19.09. abends | Die CI war rot, wo dieselbe Suite hier grün fährt: Das Abbruch-Protokoll nahm den zuletzt gepushten Stand aus der Notiz, die der Arbeiter nach dem Push schreibt — wird er dazwischen getötet, nennt das Protokoll eine Spitze, die nicht steht. Der vorhandene Prüffall hoffte auf das Rennen und war auch gegen den unreparierten Stand grün (§3.295) |
 | 21.09. | Ein fertiger Punkt wurde komplett neu gebaut, weil keine der drei Quellen, die die Wiederaufnahme liest — Fokuszeile, Auftrag, Punkt-Brief —, den bereits bestehenden Zweig und Arbeitsbaum nennt; die Lebendprüfung meldete dazu „work output 0 min old" und meinte die Bilder der gerade beendeten Suite, nicht einen arbeitenden Autor (§3.296, Gegenstück zu §3.258) |
 | 21.09. abends | Ein Bildbeweis kam sechsmal grün zurück und zeigte zuletzt kein Kind mehr: Der Verschluss prüft, ob der erklärte Gegenstand ins Bild PROJIZIERT, und ein Kind hinter einer Lagerhauswand tut das; die Standpunktsuche modelliert jedes Gebäude als Kreis, was bei runden Hütten stimmt und bei eckigen Speichern nicht. Beide Prüfungen hatten recht mit ihrer eigenen Frage, und zusammen waren sie blind (§3.297) |
+| 22.09. | Der Deckel, der eine Vermutung umsetzte, stand neunzehn Tage nach ihrer Widerlegung noch: Die CI-Arbeiter wurden am 03.09. um 03:54 auf zwei gedrosselt, um 05:15 kam die echte Reparatur, und ihr Kommentar hält fest, dass die Drosselung nichts half und 43 Prozent der Wanduhr kostete — die Einstellung blieb, ihre eigene Begründung behauptet bis heute den Erfolg. Fällig wurde die Rechnung, als der `fast`-Job seine 25-Minuten-Decke bei 25m17s riss und GitHub das als »abgebrochen« verbuchte (§3.301, Punkt 1178) |
 | 13.09. | Ein Punkt zog seine eigenen Rot-Ladungen zurück, wie es die Regel verlangt — zwei Tests standen noch auf ihnen und wurden erst im Tor der LANDUNG rot, als der Merge schon auf main lag: Das Register erzwingt »kein Eintrag ohne offenen Punkt«, niemand erzwingt »kein Test ohne seinen Eintrag« (§3.268). Dieselbe Sitzung wies drei Fremd-Rot nach: gegen die Zweigwurzel gemessen sind alle drei auch auf main rot, und das Rätsel am Schutthang ist dort nicht sporadisch, sondern reproduziert jedes Mal |
 | 13.09. abends | Vier CI-Läufe eines Zweigs starben als »cancelled« — ein Wort, das weder Ursache noch Reparatur nennt und das kein Push heilen kann. Es war das 15-Minuten-Limit des `fast`-Jobs: Die letzten beiden GRÜNEN Läufe, einer davon auf main, brauchten 14 m 41 s und 14 m 45 s, also rund fünfzehn Sekunden Luft. Der nächste Punkt, der irgendeinen Test hinzufügt, musste auflaufen, egal welcher. Sichtbar wurde es erst im Schrittprotokoll: install/build/lint/audit grün, `unit: cancelled`, »The operation was canceled« nach 15 m 13 s (§3.270) |
 | 14.09. | Nach einer Parallelsitzung verlangte ein Stop-Hook `batch-doctor --gate` vor JEDER weiteren Batch-Arbeit — dessen Tor fährt eine volle Unit-Suite, neben dem laufenden Zwei-Backend-Bildlauf auf derselben Maschine. Gefunden hat der Doktor genau eine Datei: die Review-Zeile, die dieselbe Sitzung vier Minuten zuvor geschrieben hatte. Sie zu committen genügte, das Urteil sprang auf `consistent`, die Unit-Suite wurde nie gebraucht; ihr Abbruch ließ zwei verwaiste vitest-Worker neben dem Bildlauf zurück (§3.271, Wiedergänger von §3.267) |
@@ -1685,7 +1686,7 @@ stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die s
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Montag, 21.09.2026, 23:53 · Quellen-Fingerprint: `ba6e49c09d43…`
+Zuletzt aktualisiert: Dienstag, 22.09.2026, 06:43 · Quellen-Fingerprint: `b98c8827d0f9…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1727,7 +1728,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to the OpenAI lane, GPT-6 Astra), and review is cross-vendor, not Fable-by-default | 6 | hoch | — (Regel/Memory) | ◐ Regel |
 | Iterate on the new feature's OWN test first; the full regression runs once at the end, never as the debugging loop | 2 | mittel | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 90 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 91 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | wait-command-guard.mjs | ✔ Mechanismus |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | \"Gib ab\" / \"abgeben\" means hand the batch to a SUCCESSOR session so the context does not overflow — it never means pause or stop the batch | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1791,10 +1792,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 98 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 7 Revert-/Reapply-Commits · 136 Prozess-/Meta-TASKS-Punkte (davon 64 offen).
+Erfasste Quellen: 98 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 7 Revert-/Reapply-Commits · 137 Prozess-/Meta-TASKS-Punkte (davon 65 offen).
 
-<!-- RETRO-FINGERPRINT: ba6e49c09d43dd55506d878412342a3d33a32cd610110c38376c6ba15ef98cf5 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-21T21:53:45.721Z -->
+<!-- RETRO-FINGERPRINT: b98c8827d0f9fe718c7108716140ba938e4aa883745db86dbddc45a0cfb41252 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-22T04:43:46.044Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -7988,3 +7989,34 @@ Grundlage sich unter ihm verschiebt, sagt nichts mehr aus.
 **Lehre:** Solange ein Lauf auf dem eigenen Zweig misst, ist **jeder** Commit ein zweiter
 Maschinenverbraucher — auch ein Wort in einer Textdatei. Was während einer Landung anfällt, wird
 gesammelt und danach abgesetzt; die Wartestellung dafür ist ohnehin schon deklariert.
+
+### 3.301 Die widerlegte Maßnahme blieb stehen, und ihr Kommentar behauptete weiter den Erfolg
+
+In der Nacht des 03.09.2026 starb die Unit-Suite auf CI viermal an `Timeout calling
+"onTaskUpdate"` — alle Tests grün, Exit 1. Um 03:54 wurde die Vermutung gebaut, der Pool sei
+überbucht: `maxWorkers` auf CI von vier auf zwei. Sie half nicht. Um 05:15 kam die wirkliche
+Reparatur, ein Makrotask-Yield nach jedem Test, und ihr Kommentar in `src/test/setup.ts` hält
+beides fest: die Drosselung habe den Fehler **nicht berührt** und den Lauf **43 Prozent seiner
+Wanduhr gekostet**.
+
+Zurückgenommen wurde sie trotzdem nie. Neunzehn Tage später steht in `vitest.config.ts` immer
+noch, der Deckel sei die Antwort auf jene Nacht — das Projekt widerspricht sich also über zwei
+Dateien hinweg, und gelesen wird im Zweifel die Datei, in der die Einstellung steht, nicht die,
+in der ihre Widerlegung steht. Sichtbar wurde das erst, als die Rechnung fällig war: Am
+22.09.2026 riss der `fast`-Job seine 25-Minuten-Decke bei 25m17s, davon 23m59s allein im
+Schritt `unit`. GitHub verbucht einen Job-Timeout als »abgebrochen«, nicht als »fehlgeschlagen«
+— die schlechteste Form von Rot, weil sie weder Ursache noch Abhilfe nennt und kein Push sie
+auflöst.
+
+Zwei Gewohnheiten greifen hier ineinander. Die erste: Eine Maßnahme, die eine Vermutung
+umsetzt, wird gebaut und nicht wieder abgebaut, wenn die Vermutung fällt — die richtige
+Reparatur daneben fühlt sich wie ein Abschluss an, und der gescheiterte Versuch verschwindet
+aus dem Blick, statt aus dem Code. Die zweite: Ihr Preis war von Anfang an gemessen und
+aufgeschrieben, nur eben an der Stelle, an der die Lösung steht, und nicht an der, an der die
+Kosten anfallen.
+
+**Lehre:** Wer eine Maßnahme gegen eine Vermutung baut und die Vermutung danach widerlegt,
+**nimmt die Maßnahme im selben Commit zurück** — ein gescheiterter Versuch, der stehen bleibt,
+ist keine Vorsicht, sondern eine Rechnung ohne Gegenleistung. Und ein Kommentar, der eine
+Einstellung begründet, ist mit ihr zu prüfen: Steht die Widerlegung in einer anderen Datei,
+gewinnt sie nicht von allein.

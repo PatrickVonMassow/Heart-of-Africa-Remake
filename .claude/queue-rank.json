@@ -1327,12 +1327,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "1157": {
-      "at": "2026-09-18T11:26:34.291Z",
-      "why": "User 18.09.2026 13:24: file the still-weaver bug report directly after point 690",
-      "origin": "user",
-      "place": "ahead"
-    },
     "1163": {
       "at": "2026-09-18T23:49:52.580Z",
       "why": "Kosmetik ohne Spielwirkung, unter allem was heute blockiert — hinten ist richtig.",
@@ -1392,6 +1386,18 @@
       "why": "Infrastruktur-Befund ohne Spielereffekt; er reiht sich hinter die offene Spielarbeit, weil der Render-Guard fuer 1157 bereits laut deferiert ist und jede weitere Landung dieselbe Deferral nehmen kann, bis 1177 an der Reihe ist",
       "origin": "machine",
       "place": "last"
+    },
+    "1178": {
+      "at": "2026-09-22T04:45:59.794Z",
+      "why": "Der Release selbst muss durch genau dieses Tor: ein Job-Timeout auf main wird als abgebrochen verbucht, ist durch keinen Push zu loesen und sperrt ueber ci-status-guard den ganzen Batch — Punkt 633 und 174 sind hinter einem Tor, das jede Landung auf 25m17s gegen 25m00s ausspielt, nicht erreichbar.",
+      "origin": "machine",
+      "place": "ahead"
+    },
+    "1179": {
+      "at": "2026-09-22T04:46:02.115Z",
+      "why": "Blockiert keinen Punkt und kostet keinem Spieler etwas: es macht nur die Wartestellung waehrend Abschlussarbeiten unsichtbar — hinten ist richtig.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1423,7 +1429,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-22T04:09:46.342Z",
+    "at": "2026-09-22T04:46:02.125Z",
     "points": [
       174,
       184,
@@ -1822,7 +1828,6 @@
       1152,
       1153,
       1154,
-      1157,
       1163,
       1164,
       1167,
@@ -1832,7 +1837,9 @@
       1174,
       1175,
       1176,
-      1177
+      1177,
+      1178,
+      1179
     ]
   }
 }

@@ -444,13 +444,13 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Prüf jede wiederkehrende Aufgabe gegen den **leeren Zustand**. ‚Übersprungen' ist
   **kein Betriebszustand** — was sie nicht tut, meldet sie laut."
 
-- **Die Kur ist teurer als der Fehler.** Eine Regel, die ein seltenes Fehlverhalten sicher
-  unterbindet, verbiegt alles andere mit.
-  → *Prompt:* „Ein bestätigter Befund verpflichtet zur **Untersuchung**, nicht zur Änderung: Miss
-  die Kur gegen gesunde Fälle. Ist sie teurer, **buche** den Fehler mit Zahlen und verworfener Kur.
-  Dasselbe gilt für deinen **Ablauf**: Zwingt die Kette aus Tor, Nummer und Tabelle jede
-  Zweiminutensache in einen Stundenvorgang, fehlt der **kleine Weg** — reine Prosa, die nur du
-  liest, wird **gemacht**, nicht eingereiht."
+- **Die Kur ist teurer als der Fehler — und die wirkungslose bleibt stehen.** Eine Regel gegen
+  seltenes Fehlverhalten verbiegt alles mit; half sie nicht, wird daneben repariert und der
+  Versuch nie zurückgenommen (43 % Laufzeit, §3.301).
+  → *Prompt:* „Miss die Kur gegen gesunde Fälle: ist sie teurer, **buche** sie als verworfen;
+  hilft sie **nicht**, nimm sie im **selben Commit** zurück. Zwingt deine Kette jede
+  Zweiminutensache in einen Stundenvorgang, fehlt der **kleine Weg**: Prosa nur für dich wird
+  **gemacht**, nicht eingereiht."
 
 - **Die Reihenfolge wird gerankt, nicht befolgt — und der fertige Punkt ist unsichtbar.** Die KI
   fängt Neues an, während halbfertige Zweige liegen; Liste und Auftrag beschreiben die **Arbeit**,
@@ -703,4 +703,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: ba6e49c09d43dd55506d878412342a3d33a32cd610110c38376c6ba15ef98cf5 -->
+<!-- GUIDE-FINGERPRINT: b98c8827d0f9fe718c7108716140ba938e4aa883745db86dbddc45a0cfb41252 -->
