@@ -135,6 +135,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 08.09. abends | Dritter Auftritt derselben Verwechslung, mit einem neuen Sensor: Nach der Kontextuebergabe um 20:26 lehnte der Starter jeden Tick mit `registered-writer-live` ab — „work output 14/18 min old (working files)" —, waehrend `ps` keinen einzigen Autorprozess zeigte. Die frischen Dateien waren die Ausgabe der grossen Regression, die in jenem Arbeitsbaum allein zu Ende lief und um 20:36 rot endete. Eine fertige Suite hinterlaesst Dateien wie ein arbeitender Autor; der Sollzustand von Punkt 1048 nennt Arbeitsbaum-Evidenz aber gerade als Gegenprobe zum frischen Zweigstand. Eine halbe Stunde Stillstand, der rote Lauf ungelesen, beendet wieder von einer Nutzerfrage ([§3.170](#3170-der-letzte-atemzug-wird-als-herzschlag-gelesen), Punkt 1048) |
 | 08.09. nachts | Auf die Standsfrage kam eine korrekt gelesene Messung und daran ein erfundener Reststand: „erst die halbe Strecke, danach WebGPU" — zwei Minuten später war der Lauf beendet, denn ein roter erster Durchgang beendet ihn und die zweite Bahn faehrt nie. Die widerlegende Tatsache stand im selben Absatz derselben Nachricht, drei rote Suiten waren gerade aufgezaehlt worden. Der Nutzer sah beides hintereinander und sagte es ([§3.250](#3250-der-reststand-wurde-erzaehlt-waehrend-der-beleg-dagegen-schon-vorgelesen-war)) |
 | 19.09. nachts | Der deckende Bildlauf wurde NACH der Landung gefahren statt davor, und das allein trug die Sitzung 52.000 Token über ihre Decke: Er lief zwanzig Minuten, brachte ein fremdes Rot mit, das erst eingeordnet werden musste, und jeder seiner Schritte stritt mit dem Tafel-Tor, weil der Punkt schon abgehakt war und keine Jetzt-Karte mehr tragen konnte. Auf WebGPU konnte er gar nicht decken — das seit dem 17.09. als vorbestehend eingereihte Bild der Victoria-Fälle beendet den Lauf nach 45 Prüfungen (Punkt 1145), also blieb nur die laute Zurückstellung |
+| 22.09. abends | Derselbe Stop-Hook wie am 14.09. verlangte nach einer Parallelsitzung `batch-doctor --gate` — nur war der Alarm diesmal eine neun Minuten alte Messung, und der Doktor hatte ihn 31 Sekunden zuvor bereits abgeräumt. Die geforderte Abhilfe dauert acht Minuten, der Alarm erhebt sich nach einunddreißig Sekunden: ein Rennen, das die sanktionierte Maßnahme nie gewinnen kann. Daneben meldete derselbe Zug „Dashboard nicht registriert", weil der Stop-Wächter den Merkerpfad gegen ein in einen Worktree gewandertes Arbeitsverzeichnis auflöst (§3.303, Wiedergänger von §3.271) |
 
 | 15.09. nachmittags | Ein neu eingereihter Punkt erzaehlte der Maschine das Gegenteil von sich selbst: Seine Ueberschrift »has no covering picture run« las der Bildpflicht-Klassierer als VERNEINUNG, der Punkt, dessen einziger Zweck zwei Bildlaeufe sind, wies sich damit als bildfrei aus. Gefangen von einer angehefteten Pruefung, die die exakte Menge solcher Zeilen festhaelt statt ihrer Anzahl; die Korrektur war ein positiv formulierter Satz (§3.274) |
 | 15.09. nachmittags | Und derselbe Punkt trug eine falsche Tatsache: Die deckenden Laeufe lagen scheinbar zwei Stunden VOR dem Merge, den sie decken sollten — Laufstempel in UTC gegen Commit-Zeiten in +0200 gelesen. Beide liefen am Merge-HEAD selbst, mit je sechs Bildern auf beiden Bahnen. Aufgefallen beilaeufig, weil eine Wartequittung ihren HEAD mit ausdruckte. Wortwoertlich die Lehre aus §3.253, drei Tage alt und von mir wiederholt (§3.275) |
@@ -1686,7 +1687,7 @@ stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die s
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Dienstag, 22.09.2026, 16:09 · Quellen-Fingerprint: `d64964f3b1b2…`
+Zuletzt aktualisiert: Dienstag, 22.09.2026, 17:09 · Quellen-Fingerprint: `0ebde87d3297…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1794,8 +1795,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 98 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 7 Revert-/Reapply-Commits · 138 Prozess-/Meta-TASKS-Punkte (davon 66 offen).
 
-<!-- RETRO-FINGERPRINT: d64964f3b1b2e7d28d41c1d1092bb821b11852222b61773d5e21c4cfd46ac531 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-22T14:09:09.744Z -->
+<!-- RETRO-FINGERPRINT: 0ebde87d3297363061efaaf4141aa1fd9ba75e3575b47f1f03404277597ba8e7 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-22T15:09:21.014Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -8048,3 +8049,39 @@ diesen fünf Minuten gar kein Wasserholen.
 Aussage und wird wie sie geprüft — ein `grep` nach dem Namen, bevor man sich auf ihn verlässt.
 Und ein eingestellter, bedienbarer Wert ohne Leser ist schlimmer als gar keiner: Er verspricht
 ein Sicherheitsnetz, und alle folgenden Entscheidungen rechnen mit ihm.
+
+### 3.303 Die geforderte Abhilfe war langsamer als der Alarm, der sie forderte (Wiedergänger von §3.271)
+
+Am 22.09.2026 verweigerte ein Wächter zwei aufeinanderfolgende Züge einer landenden Sitzung mit
+der Begründung, eine zweite Sitzung habe „within the last minutes" Werkzeuge im Repository
+benutzt. Die Behauptung war beim Erheben bereits falsch. Der Doktor hatte den Alarm um 17:05:30
+abgeräumt und dazu vermerkt, dass die Torforderung für diesen Stand erfüllt sei; **31 Sekunden
+später** erhob ihn der Wächter erneut — mit derselben Messung wie zuvor, einem letzten
+Werkzeugaufruf der Fremdsitzung um 16:56:59, also einer im Moment des Erhebens **neun Minuten
+alten** Zahl. Ein unmittelbar danach laufender Doktor maß `parallelNow=0`.
+
+Das Besondere ist nicht der veraltete Wert, sondern das Verhältnis der beiden Zeiten. Die
+Abhilfe, die die Verweigerung verlangt, ist ein `--gate`-Lauf, und der fährt die Unit-Suite
+selbst: gemessen **acht Minuten**. Der Alarm erhebt sich nach einunddreißig Sekunden neu. Die
+geforderte Maßnahme kann das Rennen also nicht gewinnen — nicht bei schlechtem Timing, sondern
+nie. Ein Wächter, dessen sanktionierter Ausweg vielfach langsamer ist als sein eigener
+Wiederanlauf, ist keine Hürde mehr, sondern eine geschlossene Tür; und weil seine Meldung eine
+Aktualität behauptet, die sie nie geprüft hat, liest sich die Sackgasse wie ein echter Befund.
+
+Daneben lief im selben Zug ein zweiter Irrtum derselben Familie. Die Meldung „BATCH DASHBOARD
+NOT REGISTERED" war ebenso unwahr: Der Merker war korrekt, die Datei vorhanden, und der
+Handaufruf desselben Wächters im Haupttree quittierte mit Exit 0. Der Stop-Wächter löst den
+hinterlegten Pfad jedoch gegen das Arbeitsverzeichnis auf, und dieses war durch eine gebündelte
+Shell-Kette in einen Worktree gewandert, in dem es keine Tafel gibt. Beide Meldungen benennen
+einen Zustand — „nicht registriert", „läuft gerade" —, wo die Ursache eine Auflösungsbasis und
+ein Messalter ist.
+
+Am 14.09. stand dieselbe Forderung schon einmal (§3.271), und damals war die Diagnose, dass der
+Doktor genau eine unbedeutende Datei fand und seine Unit-Suite nie gebraucht wurde. Neu ist hier
+nicht die Kostspieligkeit des Tores, sondern dass der Alarm sich SELBST nachlegt: Damals genügte
+ein Commit, um ihn abzuräumen; diesmal war er bereits abgeräumt, und er kam trotzdem wieder.
+
+**Lehre:** Eine Verweigerung, die auf Aktualität pocht, muss das Alter ihrer Messung
+**mitdrucken**; behauptete Frische, die nie geprüft wurde, ist die teuerste Sorte Falschmeldung.
+Und die verlangte Abhilfe gehört gegen die eigene Wiederanlaufzeit gerechnet: Ist sie langsamer,
+verweigert der Wächter dauerhaft und gerade die Sitzungen, die alles richtig gemacht haben.

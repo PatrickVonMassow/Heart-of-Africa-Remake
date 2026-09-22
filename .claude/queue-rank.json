@@ -1416,6 +1416,12 @@
       "why": "Testinfrastruktur hinter der Release-Reihenfolge: zuerst die Kommunikationsmechanik, dann 633, dann 174 — ein rotierender Pruefschritt kostet Laufzeit, aber keinen Spielzustand, und Punkt 642 entscheidet die Klasse ohnehin vor ihm.",
       "origin": "machine",
       "place": "last"
+    },
+    "1189": {
+      "at": "2026-09-22T15:13:26.695Z",
+      "why": "Last is right: the alarm is cleared by a plain batch-doctor run in under a second, so the blockade has a known cheap workaround and no longer stops a session; the eight-minute gate was only ever the demanded remedy, never the only one.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1447,7 +1453,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-22T14:20:11.402Z",
+    "at": "2026-09-22T15:13:26.706Z",
     "points": [
       174,
       184,
@@ -1863,7 +1869,8 @@
       1185,
       1186,
       1187,
-      1188
+      1188,
+      1189
     ]
   }
 }

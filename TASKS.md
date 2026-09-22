@@ -16364,3 +16364,41 @@ to land than a mechanism that needs a review.
   Refs: scripts/verify/polish.mjs:6123, commit 503492100, point 200, point 549, point 568,
   point 570, point 642, point 939
   Bundle: Testinfrastruktur
+
+- [ ] 1189. The parallel alert re-raises itself from a stale reading and blocks the session
+  that just cleared it (measured 22.09.2026, 17:05-17:06, two consecutive turns blocked).
+  PROBLEM. `batch-doctor --gate` marked the alert handled at 17:05:30 and recorded "gate
+  demand satisfied for HEAD 6860863c". THIRTY-ONE SECONDS LATER, at 17:06:01,
+  `batch-progress-guard` raised it again — carrying a `lastToolAt` for the foreign session of
+  16:56:59, a reading already NINE MINUTES old at the moment of raising. The refusal text
+  asserts the other session "has run tools in this repo within the last minutes", which was
+  false when it was written: a doctor run immediately afterwards measures `parallelNow=0`.
+  WHY IT CANNOT BE WAITED OUT. The remedy the refusal demands is the eight-minute `--gate`
+  run (it drives `test:unit` itself), while the alert re-raises after thirty-one seconds. The
+  demanded fix can therefore never win the race, and the session is refused for a condition
+  that no longer holds. This is the blockade exception of CLAUDE.md §2, not tidiness.
+  FINAL STATE.
+  1. The alert is raised only when `lastToolAt` is NEWER than the last handled-marking. Both
+     values already exist — `.claude/parallel-alert.json` carries the first, `.claude/doctor.log`
+     the second — so this is a comparison, not a new mechanism and not a new field.
+  2. The refusal text stops asserting recency it has not checked: it prints the measured age
+     of the foreign session's last tool call, so a reader can see at once whether the alarm is
+     live or stale.
+  SECOND, INDEPENDENT FINDING FROM THE SAME TURN, recorded here so it is not rediscovered:
+  the Stop guard resolves `marker.dashboardPath` against the CWD, so a session whose CWD has
+  drifted into a worktree fails `markerFileExists` and is told "BATCH DASHBOARD NOT
+  REGISTERED" — while `dashboard-guard --synced` in the main tree exits 0 and reports the
+  dashboard registered. The marker is correct; only the resolution base is wrong. Resolve it
+  against the repository root, or name the CWD in the refusal so the real cause is legible.
+  CONSTRAINTS. Infrastructure freeze (CLAUDE.md §2): both halves TIGHTEN or correct existing
+  checks. No new guard, no ledger field, no router.
+  Criticality: medium — it blocks no game work, but it refused two consecutive turns of a
+  landing session for a condition that had already passed, and the refusal it demands costs
+  eight minutes each time.
+  Test: Vitest on the pure decision — an alert whose `lastToolAt` predates the last handled
+  marking does NOT raise; one that postdates it does; the refusal text carries the measured
+  age. For the dashboard half: a marker resolved from a worktree CWD still finds the main
+  tree's dashboard. The tests call the real decision, not a reconstruction of its aftermath.
+  Refs: scripts/batch-doctor.mjs, scripts/dashboard-guard-core.mjs:859, .claude/parallel-alert.json,
+  .claude/doctor.log, measured in this session 22.09.2026 17:05-17:06
+  Bundle: Modell & Wächter
