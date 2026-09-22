@@ -182,6 +182,7 @@ describe('village speech (design.md §13.4)', () => {
       talk: { reach: 10, loudness: 1, falloff: 4 },
       call: { reach: 34, loudness: 1.25, falloff: 4 },
       consequenceSeconds: 2,
+      instructionHoldSeconds: 1,
       speechHoldSeconds: 240,
       labelSeconds: 2.6,
       speechPitchHz: 140,
