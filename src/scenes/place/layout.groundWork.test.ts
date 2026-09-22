@@ -5,7 +5,8 @@
 
 import { beforeAll, describe, expect, it } from 'vitest'
 import { setupGeodata } from '../../test/geodata'
-import { SEEDS, PORTS, VILLAGES } from './layoutHarness'
+import { SEEDS, PORTS, VILLAGES,
+  sharedLayout } from './layoutHarness'
 import { digFurnitureFootprints } from './digSiteAppearance'
 import {
   digLocalToWorld,
@@ -18,8 +19,7 @@ import {
   CENTRAL_GROUND_RADIUS,
   DIG_SITE_ANCHOR_REACH,
   DIG_SITE_FIELD_BAND,
-  buildLayout,
-} from './layout'
+  } from './layout'
 import { standingClear, WALKER_RADIUS, type CircleCollider } from './collision'
 import { closestOnPolyline } from './lanePlan'
 import { ROCK_VILLAGE_ID } from '../../world/communicationRock'
@@ -49,7 +49,7 @@ beforeAll(async () => {
 describe('the ground work villagers dig at (work-order 483)', () => {
   it.each([['bambara-village', 29], ['mandinka-village', 48]] as const)(
     'keeps both purposes in a narrow anchored space: %s seed %i', (id, seed) => {
-    const layout = buildLayout(id, seed)
+    const layout = sharedLayout(id, seed)
     expect(layout.digSites).toHaveLength(2)
     expect(layout.digSites.some((site) => site.kind === 'patch')).toBe(true)
     for (const site of layout.digSites) {
@@ -62,7 +62,7 @@ describe('the ground work villagers dig at (work-order 483)', () => {
 
   it.each(SEEDS)('seed %i: every village has two distinct inland purposes, each on its own spot', (seed) => {
     for (const v of VILLAGES) {
-      const layout = buildLayout(v.id, seed)
+      const layout = sharedLayout(v.id, seed)
       expect(layout.digSites, v.id).toHaveLength(2)
       expect(layout.digSites.filter((s) => s.kind === 'patch'), v.id).toHaveLength(1)
       expect(layout.digSites.some((s) => s.kind === 'pit' || s.kind === 'postHole'), v.id).toBe(true)
@@ -81,7 +81,7 @@ describe('the ground work villagers dig at (work-order 483)', () => {
 
   it.each(SEEDS)('seed %i: a villager can stand in the ground work, and leave it again', (seed) => {
     for (const v of VILLAGES) {
-      const layout = buildLayout(v.id, seed)
+      const layout = sharedLayout(v.id, seed)
       for (const site of layout.digSites) {
         const where = `${v.id} ${site.kind}`
         // Inside the walkable disc, away from the arrival corridor's edge.
@@ -108,7 +108,7 @@ describe('the ground work villagers dig at (work-order 483)', () => {
   })
 
   it('leaves the ground passable: turned earth is walked over, not collided with', () => {
-    const layout = buildLayout(ROCK_VILLAGE_ID, 42)
+    const layout = sharedLayout(ROCK_VILLAGE_ID, 42)
     for (const site of layout.digSites) {
       const own = layout.colliders.filter(
         (c) => 'r' in c && Math.hypot((c as { x: number }).x - site.x, (c as { z: number }).z - site.z) < 0.5,
@@ -119,7 +119,7 @@ describe('the ground work villagers dig at (work-order 483)', () => {
 
   it.each(SEEDS)('seed %i: leaves the open central ground alone', (seed) => {
     for (const v of VILLAGES) {
-      const layout = buildLayout(v.id, seed)
+      const layout = sharedLayout(v.id, seed)
       for (const site of layout.digSites) {
         // Nobody digs on the village square: the picture of men digging in the
         // middle beside a pointless boulder is what work-order 688 removed.
@@ -132,7 +132,7 @@ describe('the ground work villagers dig at (work-order 483)', () => {
 
   it.each(SEEDS)('seed %i: keeps every work site out of the children`s earshot', (seed) => {
     for (const v of VILLAGES) {
-      const layout = buildLayout(v.id, seed)
+      const layout = sharedLayout(v.id, seed)
       const earshot = balance.communication.hearingRadius
       for (const site of layout.digSites) {
         const where = `${v.id} ${site.kind}`
@@ -159,7 +159,7 @@ describe('the ground work villagers dig at (work-order 483)', () => {
     let total = 0
     for (const seed of SEEDS) {
       for (const v of VILLAGES) {
-        const layout = buildLayout(v.id, seed)
+        const layout = sharedLayout(v.id, seed)
         for (const site of layout.digSites) {
           total++
           const toCompound = layout.dwellings.reduce(
@@ -185,12 +185,12 @@ describe('the ground work villagers dig at (work-order 483)', () => {
   })
 
   it('gives ports none: the teaching is a village matter', () => {
-    for (const p of PORTS) expect(buildLayout(p.id, 42).digSites, p.id).toEqual([])
+    for (const p of PORTS) expect(sharedLayout(p.id, 42).digSites, p.id).toEqual([])
   })
 
   it('places them deterministically, like everything else in the layout', () => {
-    expect(buildLayout(ROCK_VILLAGE_ID, 42).digSites).toEqual(buildLayout(ROCK_VILLAGE_ID, 42).digSites)
-    expect(buildLayout(ROCK_VILLAGE_ID, 42).digSites).not.toEqual(buildLayout(ROCK_VILLAGE_ID, 7).digSites)
+    expect(sharedLayout(ROCK_VILLAGE_ID, 42).digSites).toEqual(sharedLayout(ROCK_VILLAGE_ID, 42).digSites)
+    expect(sharedLayout(ROCK_VILLAGE_ID, 42).digSites).not.toEqual(sharedLayout(ROCK_VILLAGE_ID, 7).digSites)
   })
 })
 
@@ -202,7 +202,7 @@ describe('the ground work villagers dig at (work-order 483)', () => {
 // keeps a stone that both raises the ground and blocks it.
 describe.each(SEEDS)('the loose stones in the collider set (seed %i)', (seed) => {
   it.each(VILLAGES.map((p) => [p.id] as const))('%s: carries only the stones that are walked around', (id) => {
-    const layout = buildLayout(id, seed)
+    const layout = sharedLayout(id, seed)
     const circles = layout.colliders.filter((c): c is CircleCollider => 'r' in c && 'x' in c)
     let walkedOver = 0
     for (const [x, z, scale] of layout.rocks) {
@@ -235,7 +235,7 @@ describe.each(SEEDS)('the loose stones in the collider set (seed %i)', (seed) =>
 // stands where the round can reach it, and that it narrows nothing.
 describe.each(SEEDS)('the derived climbing stone (seed %i)', (seed) => {
   it.each(VILLAGES.map((p) => [p.id] as const))('%s: carries one beside the children`s quarter', (id) => {
-    const layout = buildLayout(id, seed)
+    const layout = sharedLayout(id, seed)
     const quarter = layout.playGround
     expect(quarter, `${id}: a village carries a children's quarter`).toBeTruthy()
     const derived = layout.climbRock

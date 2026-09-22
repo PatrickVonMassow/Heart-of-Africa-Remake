@@ -11,7 +11,8 @@
 // through, and never satisfied by a single village that happens to be roomy.
 
 import { beforeAll, describe, expect, it } from 'vitest'
-import { buildLayout, PLACE_RADIUS, PLACE_RADIUS_BASE, VILLAGE_FIRE } from './layout'
+import { PLACE_RADIUS, PLACE_RADIUS_BASE, VILLAGE_FIRE } from './layout'
+import { sharedLayout } from './layoutHarness'
 import { villageAdultStations } from './lifeSpots'
 import { BANK_STRETCH_MAX_SPAN, BANK_STRETCH_MIN_SPAN } from './riverBank'
 import { setupGeodata } from '../../test/geodata'
@@ -39,7 +40,7 @@ describe('the settlement gives every teaching voice its own room', () => {
     const reach = balance.communication.talk.reach
     let withBank = 0
     for (const v of VILLAGES) {
-      const layout = buildLayout(v.id, seed)
+      const layout = sharedLayout(v.id, seed)
       const quarter = layout.playGround
       expect(quarter, `${v.id}: no children's quarter at all`).not.toBeNull()
       if (!quarter) continue
@@ -84,7 +85,7 @@ describe('the settlement gives every teaching voice its own room', () => {
   it.each(SEEDS)('seed %i: keeps the running stretch a run at every settlement size', (seed) => {
     let measured = 0
     for (const v of VILLAGES) {
-      const layout = buildLayout(v.id, seed)
+      const layout = sharedLayout(v.id, seed)
       if (!layout.playRocks) continue
       measured++
       const { upstream, downstream } = layout.playRocks
@@ -106,7 +107,7 @@ describe('the settlement gives every teaching voice its own room', () => {
     // quarters are bigger than that floor on a decent share of the villages.
     let roomy = 0
     for (const v of VILLAGES) {
-      const g = buildLayout(v.id, 42).playGround
+      const g = sharedLayout(v.id, 42).playGround
       if (g && g.radius > 4) roomy++
     }
     expect(roomy, 'every village still plays on the smallest ground allowed').toBeGreaterThan(VILLAGES.length / 3)

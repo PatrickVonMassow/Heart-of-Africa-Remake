@@ -3,6 +3,7 @@ import { setupGeodata } from '../../test/geodata'
 import { PLACES } from '../../world/geo'
 import { balance } from '../../config/balance'
 import { buildLayout, onWayOut, WATER_PATH_WIDTH } from './layout'
+import { sharedLayout } from './layoutHarness'
 import { closestOnPolyline } from './lanePlan'
 import { standsOnGroundPlate } from './riverBank'
 import { standingClear, WALKER_RADIUS } from './collision'
@@ -25,7 +26,7 @@ const SEEDS = [7, 42, 1337, 394349866, 1838110026]
 function shippedLooms() {
   const out: Array<{ id: string; seed: number; layout: ReturnType<typeof buildLayout> }> = []
   for (const id of VILLAGES) {
-    for (const seed of SEEDS) out.push({ id, seed, layout: buildLayout(id, seed) })
+    for (const seed of SEEDS) out.push({ id, seed, layout: sharedLayout(id, seed) })
   }
   return out
 }
