@@ -47,17 +47,20 @@ async function png(mark = 0, water = true) {
 }
 
 /** The live camera, as far as the section reads it: a vector class whose
- *  `project` puts every point at one fixed screen spot inside the frame. */
+ *  `project` puts every point at one fixed screen spot inside the frame —
+ *  except a drawn body's corners (taken through `applyMatrix4`), which keep
+ *  their height, so the station's projected size can be read (point 1191). */
 class Vec {
   constructor(x = 0, y = 0, z = 0) { this.x = x; this.y = y; this.z = z }
-  project() { this.x = 0; this.y = 0.33; this.z = 0.5; return this }
+  applyMatrix4() { this.drawn = true; return this }
+  project() { this.y = this.drawn ? 0.33 + this.y * 0.2 : 0.33; this.x = 0; this.z = 0.5; return this }
 }
 
 afterEach(() => vi.unstubAllGlobals())
 
 async function photograph({
   blocked = false, moves = true, arms = true, called = true, parked = false, returning = false, arrivesOnShutter = false,
-  helperAt = 1.6, water = true, labelOn = true, tended = true, stacked = 2,
+  helperAt = 1.6, water = true, labelOn = true, tended = true, stacked = 2, stationHeight = 1.2,
 } = {}) {
   if (!called) helperAt = 0.2
   if (parked) helperAt = 2.4
@@ -86,7 +89,17 @@ async function photograph({
   // A tended end differs from its opposite (point 1183); the stack is what the
   // loom group publishes and what its folded strips show.
   const bundles = tended ? { UPSTREAM: 0, DOWNSTREAM: 1 } : { UPSTREAM: 0, DOWNSTREAM: 0 }
-  const loomGroup = { userData: { loom: { pass: 0.1, passes: 3, bundles, stacked } } }
+  // Its drawn body: one mesh whose box stands `stationHeight` tall (1.2
+  // projects to ~92 px of jsdom's 768-high window).
+  const warpMesh = {
+    isMesh: true, visible: true, matrixWorld: {},
+    geometry: { boundingBox: { min: { x: -0.5, y: 0, z: -3.2 }, max: { x: 0.5, y: stationHeight, z: 3.2 } } },
+  }
+  const loomGroup = {
+    userData: { loom: { pass: 0.1, passes: 3, bundles, stacked } },
+    updateWorldMatrix() {},
+    traverse(cb) { cb(warpMesh) },
+  }
   const stack = { children: Array.from({ length: 8 }, (_, i) => ({ visible: i < stacked })) }
   // What "time passes" means here: half a pass of HER clock, and the shuttle
   // thrown to the other side of the warp with it — her hands going with it
@@ -276,4 +289,11 @@ it('restores the world seed and leaves the settlement afterwards', async () => {
   const { state } = await photograph()
   expect(state.seed).toBe(42)
   expect(state.placeId).toBeNull()
+})
+
+it('from the plaza a station a few dozen pixels tall reads red, not merely in line (point 1191)', async () => {
+  const tall = await photograph()
+  expect(tall.checks.find(c => c.name.includes('px tall on the screen'))?.pass).toBe(true)
+  const small = await photograph({ stationHeight: 0.6 })
+  expect(small.checks.find(c => c.name.includes('px tall on the screen'))?.pass).toBe(false)
 })

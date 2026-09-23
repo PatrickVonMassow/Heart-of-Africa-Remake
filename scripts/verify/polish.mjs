@@ -5959,13 +5959,12 @@ if (section('village-stations')) {
 //  - THE TEACHING. One frame carrying the helper part-way along the warp, the
 //    weaver's own reading over her head, and the river in the same picture — the
 //    three things that make the axis claim checkable by the player.
-/** The loom station's projected height from the plaza stand, in pixels of a
- *  900-high viewport (work-order 1191). Measured 23.09.2026: 94.9 px from
- *  16.4 m on the shipped Bambara plan; the 27.7 m seat it replaced scales to
- *  ~56 px. Calibratable. */
-const LOOM_PLAZA_MIN_PX = 70
-
 if (section('village-loom')) {
+  /** The loom station's projected height from the plaza stand, in pixels of a
+   *  900-high viewport (work-order 1191). Measured 23.09.2026: 94.9 px from
+   *  16.4 m on the shipped Bambara plan; the 27.7 m seat it replaced scales to
+   *  ~56 px. Calibratable. */
+  const LOOM_PLAZA_MIN_PX = 70
   const bootSeed = await page.evaluate(() => window.__game.getState().seed)
   try {
     await page.evaluate(() => {
