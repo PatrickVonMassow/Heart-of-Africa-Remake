@@ -5959,9 +5959,11 @@ if (section('village-stations')) {
 //  - THE TEACHING. One frame carrying the helper part-way along the warp, the
 //    weaver's own reading over her head, and the river in the same picture — the
 //    three things that make the axis claim checkable by the player.
-/** The loom station's projected height from the plaza stand, in pixels
- *  (work-order 1191). Calibratable against the recorded frame. */
-const LOOM_PLAZA_MIN_PX = 60
+/** The loom station's projected height from the plaza stand, in pixels of a
+ *  900-high viewport (work-order 1191). Measured 23.09.2026: 94.9 px from
+ *  16.4 m on the shipped Bambara plan; the 27.7 m seat it replaced scales to
+ *  ~56 px. Calibratable. */
+const LOOM_PLAZA_MIN_PX = 70
 
 if (section('village-loom')) {
   const bootSeed = await page.evaluate(() => window.__game.getState().seed)
@@ -6175,17 +6177,23 @@ if (section('village-loom')) {
           // then read at the ones inside it.
           const cam = window.__placeCamera
           const V = Object.getPrototypeOf(cam.position).constructor
-          const out = layout.bank
-            ? layout.bank.distance - (station.seat.x * layout.bank.nx + station.seat.z * layout.bank.nz) + 3
+          // AT THREE DEPTHS, NOT ONE (work-order 1191): from a seat ~29 m back
+          // the point 3 m past the modelled waterline projected onto the drawn
+          // beach a few pixels under the water band, with the river plainly in
+          // the frame. 8 and 15 m out lie on the water from any seat the
+          // placement allows; one blue point still answers the question.
+          const toLine = layout.bank
+            ? layout.bank.distance - (station.seat.x * layout.bank.nx + station.seat.z * layout.bank.nz)
             : 0
           const water = layout.bank
-            ? [-2.5, 0, 2.5].map((d) => {
+            ? [3, 8, 15].flatMap((beyond) => [-2.5, 0, 2.5].map((d) => {
+                const out = toLine + beyond
                 const x = station.seat.x + layout.bank.nx * out + station.fx * d
                 const z = station.seat.z + layout.bank.nz * out + station.fz * d
                 const v = new V(x, 0, z).project(cam)
                 const inFrame = v.z < 1 && Math.abs(v.x) < 0.98 && Math.abs(v.y) < 0.98
                 return { px: Math.round(((v.x + 1) / 2) * width), py: Math.round(((1 - v.y) / 2) * height), inFrame }
-              })
+              }))
             : []
           return {
             ...state,
