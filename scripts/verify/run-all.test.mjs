@@ -160,8 +160,7 @@ describe('one pass per suite (point 1135)', () => {
     { crashed: true, crashSource: 'uncaught-exception' },
     { truncated: true },
     { asserted: false },
-    // What the recorder writes for a stack line on stderr and no terminal verdict.
-    { crashed: true, terminalVerdict: false },
+    { terminalVerdict: false },
     { startedAt: 0 },
     { backend: 'webgpu' },
     { exit: 2 },
@@ -454,7 +453,7 @@ describe('an unlooked-at red is still a red (Astra review round 3, 17.09.2026)',
     const result = await run({
       exitStatus: 0,
       outputs: ['PASS  a check\nconsole errors: 0'],
-      records: [{ exit: 0, truncated: true, reds: [{ name: ground, kind: 'check', point: 603 }] }],
+      records: [{ exit: 0, terminalVerdict: false, reds: [{ name: ground, kind: 'check', point: 603 }] }],
     })
     // Incomplete: the reds hold rather than charge, and the pass is not green.
     expect(result.log).toContain("the printed line says PASS, but this run's own record carries 1 red(s)")
@@ -530,21 +529,12 @@ describe('a red with no name still holds (Astra review round 5, 17.09.2026)', ()
 describe('a section record is judged by what it carries', () => {
   const rim = 'the water beyond the plate’s rim is the SAME water as the water at the bank (≤ 12/255 per channel)'
   const rimLine = `FAIL  ${rim} — far 7/88/101 against near 120/144/138  [--section=adult-errands]`
-  const rimRecord = { partial: true, section: 'adult-errands', crashed: false, terminalVerdict: false,
+  const rimRecord = { partial: true, section: 'adult-errands',
     reds: [{ name: rim, kind: 'check', point: 568, detail: 'far 7/88/101 against near 120/144/138', section: 'adult-errands' }] }
-
-  it('charges a section record with failing checks and no terminal verdict line', async () => {
-    const result = await run({ suite: 'polish', section: 'adult-errands', tasks: '- [ ] 568. water rim',
-      outputs: [rimLine], records: [rimRecord] })
-    expect(result.log).toContain('PARTIAL  polish — every red is charged to open point(s) 568')
-    expect(result.log).toContain('POINT REDS DO NOT HOLD')
-    expect(result.log).not.toContain('incomplete')
-    expect(result.status).toBe(ownership.EXIT_NOT_HELD)
-  })
 
   it.each([
     { crashed: true, crashSource: 'uncaught-exception' },
-    { crashed: true },
+    { crashed: true, terminalVerdict: false },
     { truncated: true },
   ])('still refuses a crashed or truncated section record: %j', async (broken) => {
     const result = await run({ suite: 'polish', section: 'adult-errands', tasks: '- [ ] 568. water rim',
@@ -567,6 +557,28 @@ describe('a section record is judged by what it carries', () => {
     expect(result.log).not.toContain('one reading')
     expect(result.log).not.toContain('[--section=core-loop] (')
     expect(result.status).toBe(ownership.EXIT_NOT_HELD)
+  })
+
+  it('reads a tagged detail-less check without its tag in a WHOLE run too', async () => {
+    // flow tags every result line whether or not a section was asked for.
+    const result = await run({ suite: 'flow', tasks: '- [ ] 1154. start kit',
+      outputs: ['FAIL  2 starting gifts [--section=core-loop]\nFAIL  Shovel bought (−$20) [--section=core-loop]'],
+      records: [{ reds: [
+        { name: '2 starting gifts', kind: 'check', point: 1154, section: 'core-loop' },
+        { name: 'Shovel bought (−$20)', kind: 'check', point: 1154, section: 'core-loop' },
+      ] }] })
+    expect(result.log).toContain('POINT REDS DO NOT HOLD')
+    expect(result.log).toContain('ACCOUNTED FOR  flow')
+    expect(result.log).not.toContain('[--section=core-loop] (')
+    expect(result.status).toBe(ownership.EXIT_NOT_HELD)
+  })
+
+  it('keeps a tag-shaped tail that names no declared section', async () => {
+    const result = await run({ suite: 'flow', tasks: '- [ ] 1154. start kit',
+      outputs: ['FAIL  2 starting gifts [--section=no-such-block]'],
+      records: [{ reds: [{ name: '2 starting gifts', kind: 'check', point: 1154 }] }] })
+    expect(result.log).toContain('POINT REDS HOLD')
+    expect(result.log).toContain('2 starting gifts [--section=no-such-block]')
   })
 
   it('does not let a printed reading the record lacks deny the record\'s charge, and names that reading', async () => {

@@ -327,12 +327,8 @@ function runSuite(name, baseUrl, onlySection = '') {
   )
   const record = fresh.length === 1 && !res.error && !res.signal ? fresh[0] : null
   const openPoints = new Set(chargeablePoints(readTasksAll()))
-  // COMPLETE MEANS THE RECORD CARRIES ITS EXIT, ITS BACKEND AND ITS REDS, and
-  // neither crashed nor truncated. A printed terminal verdict line is not asked:
-  // a crash is refused through `isCrashedRun`, which already reads an explicit
-  // `terminalVerdict: false` beside `crashed` as a death.
   const complete = record && record.exit === res.status && record.asserted === true &&
-    !isCrashedRun(record) && !isIncompleteRecording(record)
+    record.terminalVerdict === true && !isCrashedRun(record) && !isIncompleteRecording(record)
   const recordedReds = Array.isArray(record?.reds) ? record.reds : []
   const reds = complete ? recordedReds : []
   const ownedReds = reds.filter((red) => owned(red, name, record.backend, record.featureLevel, openPoints))
@@ -351,15 +347,20 @@ function runSuite(name, baseUrl, onlySection = '') {
     ? red.point
     : chargeFor(red, { suite: name, backend: record.backend, featureLevel: record.featureLevel })?.point ?? null)
   const ownedSet = new Set(ownedReds)
-  // THE PRINTED LINES ARE READ WITHOUT THE LIVE SECTION'S TAG, exactly as the
-  // recorder stores them (`separateResultSection`). A check without a detail
-  // carries the tag inside its NAME, so read raw, one red arrived twice: keyed
-  // by the record, and keyed with the tag by the output.
-  const liveSection = onlySection || process.env[SECTION_ENV] || ''
-  const tag = isSectionName(liveSection) ? sectionTag(liveSection) : null
-  const judged = tag
-    ? out.split('\n').map((line) => (line.endsWith(tag) ? line.slice(0, -tag.length) : line)).join('\n')
-    : out
+  // THE PRINTED LINES ARE READ WITHOUT A SECTION TAG, as the recorder stores
+  // them (`separateResultSection`). Suites tag their lines in whole runs too,
+  // and a check without a detail carries the tag inside its NAME, so read raw,
+  // one red arrived twice: keyed by the record, and keyed with the tag by the
+  // output. Only a tag of a section the suite declares is stripped.
+  const declared = new Set([onlySection, process.env[SECTION_ENV]])
+  try {
+    for (const n of listSections(readFileSync(join(HERE, `${name}.mjs`), 'utf8'))) declared.add(n)
+  } catch { /* an unreadable suite source strips the live section's tag only */ }
+  const tags = [...declared].filter(isSectionName).map(sectionTag)
+  const judged = tags.length === 0 ? out : out.split('\n').map((line) => {
+    const tag = tags.find((t) => line.endsWith(t))
+    return tag ? line.slice(0, -tag.length) : line
+  }).join('\n')
   const printed = failedChecks(judged)
   // A RECORD ENTRY MAY CARRY NO KEY — older records and hand-written ones name
   // the check and nothing else. Deriving it from the name is what every other
