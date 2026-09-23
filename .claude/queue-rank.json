@@ -1422,6 +1422,12 @@
       "why": "Follow-up refinement of a landed point; medium urgency, waits behind the release",
       "origin": "machine",
       "place": "last"
+    },
+    "1198": {
+      "at": "2026-09-23T17:40:34.165Z",
+      "why": "Der abgestürzte Abschnittslauf lässt die bekannten Roten von 568 nie abrechnen; jeder Punkt durch adult-errands bleibt sonst rot, auch nach 1196.",
+      "origin": "machine",
+      "place": "ahead"
     }
   },
   "boundary": {
@@ -1453,7 +1459,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-23T17:21:48.631Z",
+    "at": "2026-09-23T17:40:34.180Z",
     "points": [
       174,
       184,
@@ -1871,7 +1877,8 @@
       1194,
       1195,
       1196,
-      1197
+      1197,
+      1198
     ]
   }
 }

@@ -153,7 +153,8 @@ put it is the mistake this line exists to stop.
   when it never arrives), and the section run ends with a terminal verdict on WebGPU and
   WebGL 2; its remaining reds are the ones charged to point 568.
   Test: `npm test -- polish --section=adult-errands` on both backends, record not crashed.
-  Criticality: medium. Refs: scripts/verify/polish.mjs:7635, .claude/render-verify-state.json,
+  Criticality: medium; blocking — it holds a red that cannot otherwise close: the crashed record
+  refuses every charge for the section. Refs: scripts/verify/polish.mjs:7635, .claude/render-verify-state.json,
   local/verify-logs/2026-09-23T10-36-45-287-polish.log.
   Bundle: Modell & Wächter
 
