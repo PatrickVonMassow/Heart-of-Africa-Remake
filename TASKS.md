@@ -77,34 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1194. An Astra outage falls back to Opus 5.5 by itself.
-  USER ORDER 23.09.2026, 10:59: »Was ist denn der Fallback, wenn OpenAI ausfällt? Falls das
-  nicht so ist, soll es ab jetzt Opus 5.5 sein.«
-  PROBLEM, measured 23.09.2026 11:00. There is NO automatic fallback. The vendor cut is a
-  hand-set switch (`scripts/astra-share.mjs`, three settings, `claude-only` the escape hatch);
-  nothing measures whether the ChatGPT side answers, so an exhausted OpenAI volume leaves the
-  switch at `prefer-astra` and every routed authoring run walks into the dead vendor. The
-  launcher's quota machinery (`batch-autostart.mjs --quota-report`, `scripts/quota-drill.mjs`)
-  covers only the ANTHROPIC serving limit; it says nothing about Astra. On this date the switch
-  was moved to `claude-only` by hand, which is exactly the manual step this point removes.
-  FINAL STATE: a routed Astra run that fails on a vendor-limit or unreachable signature is
-  recognised as such (its own signature set, like the quota signature), the kind is served in
-  the Claude lane by Opus 5.5 instead of failing the point, and the fallback is RECORDED with
-  its signature and a probe clock so it lifts by itself when the volume returns. The switch
-  keeps its operator value; the fallback is a measured override on top of it, visible in
-  `--status` and on the board. Four eyes under the fallback uses the decorrelated same-vendor
-  pair (Fable 5.1 reviews Opus 5.5 work) and records that it is a fallback, per CLAUDE.md §6.
-  Test: Vitest on the pure decision — a limit signature yields the Claude lane plus a probe
-  clock, an ordinary authoring failure does NOT (it stays the point's red), an expired probe
-  returns routing to the operator setting, and `--status` names the active fallback.
-  Criticality: high — without it a vendor outage stops authoring for as long as the outage
-  lasts, and the standing instruction is that the batch never stands still.
-  Refs: scripts/astra-share-core.mjs (`ROUTES`, `settingOrSafe`), scripts/astra-share.mjs,
-  scripts/author-astra-core.mjs, scripts/ask-astra-core.mjs, scripts/batch-autostart.mjs
-  (`--quota-report` as the pattern), scripts/quota-drill.mjs, docs/astra-routing.md,
-  CLAUDE.md §6.
-  Bundle: Modell & Wächter
-
 - [ ] 1198. The adult-errands picture section ends with a verdict instead of a crash.
   PROBLEM, measured 23.09.2026 by the author of point 1196. `polish --section=adult-errands`
   dies after its checks with an uncaught `TypeError: Cannot read properties of undefined
