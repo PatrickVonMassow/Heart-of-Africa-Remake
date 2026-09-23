@@ -1753,4 +1753,14 @@ export const RED_CHARGES = [
       + 'so the scene leaves the place and the route reads place null. Pure layout geometry, '
       + 'so no backend is excluded. The charge dies with point 1202.',
   },
+  {
+    point: 1197,
+    suite: 'polish',
+    kind: 'console',
+    match: /^console error: \[ASSERT\] loom-unseen-from-plaza — hausa-village@1838110026:/i,
+    why:
+      'MEASURED 24.09.2026 on main 7804a0fce, webgpu/polish: the dev assert fires for the '
+      + 'hausa-village plan seed 1838110026, one of the seeds point 1197 names as still firing '
+      + 'loom-unseen-from-plaza. Pure layout, so no backend is excluded. The charge dies with point 1197.',
+  },
 ]
