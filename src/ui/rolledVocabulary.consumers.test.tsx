@@ -4,7 +4,7 @@
 // producing the shipped syllables, and only a test like this one sees it.
 import { describe, it, expect, beforeEach } from 'vitest'
 import { fireEvent, render } from '@testing-library/react'
-import { CONCEPT_IDS, tonesOf, type Vocabulary } from '../communication/lexicon'
+import { CONCEPT_IDS, SYLLABLE_SEPARATOR, tonesOf, type Vocabulary } from '../communication/lexicon'
 import { enumerateVocabularies, SHIPPED_VOCABULARY } from '../communication/vocabulary'
 import { conceptSpeech } from '../communication/speaking'
 import { drumMessagePhrase, drumMessagePlan, CHIEF_MESSAGE_CONCEPTS } from '../communication/drumMessage'
@@ -47,14 +47,16 @@ describe('consumers follow the run vocabulary, not the shipped one', () => {
   it('the journal and the drum display carry the run words after the drums', () => {
     g().receiveDrumMessage()
     g().setUtteranceHypothesis(OTHER.RIVER, 'my river')
-    render(<JournalPanel />)
+    const journal = render(<JournalPanel />)
     // The heard utterances live behind the journal's second tab (point 579).
     fireEvent.click(document.querySelectorAll('.journal .journal-tab')[1])
     const heard = [...document.querySelectorAll('.journal .observation .utterance')].map((e) => e.textContent)
-    for (const c of CHIEF_MESSAGE_CONCEPTS) expect(heard).toContain(OTHER[c])
-    expect(heard).not.toContain(SHIPPED_VOCABULARY.RIVER)
-    document.body.innerHTML = ''
+    const runWords = CHIEF_MESSAGE_CONCEPTS.map((c) => OTHER[c])
+    expect([...heard].sort()).toEqual([...runWords].sort())
+    journal.unmount()
     render(<DrumMessageDialog />)
+    const shown = [...document.querySelectorAll('.drum-concept .utterance')].map((e) => e.textContent)
+    expect(shown).toEqual(runWords.map((u) => u.split(SYLLABLE_SEPARATOR).join('')))
     const readings = [...document.querySelectorAll('.drum-concept .reading')].map((e) => e.textContent)
     expect(readings[CHIEF_MESSAGE_CONCEPTS.indexOf('RIVER')]).toBe('my river')
   })
