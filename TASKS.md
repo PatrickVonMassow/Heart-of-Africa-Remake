@@ -224,6 +224,10 @@ put it is the mistake this line exists to stop.
   SEQUENCE_LENGTH rather than the literal 4 (drumMessage.test.ts, speaking.test.ts,
   ambience.test.ts, adultWork.hold.test.ts), which is the starting point, not the proof. The
   point ships with the constant back at 4; what ships is the evidence that five ran.
+  STILL OWED (23.09.2026): the first attempt ran beside a main push gate on the same
+  machine and was abandoned; the constant is back at 4 and the branch is clean. The
+  derivation and both rules are already proven at five and six by unit cases; what is
+  missing is the GAME at five syllables, on a quiet machine.
 
   TEXT THAT GOES FALSE UNDER THE ROLL and is rewritten in the same commit: the per-sequence
   comments in lexicon.ts on RIVER (the word the whole message opens on) and CHIEF (RIVER's tonal
