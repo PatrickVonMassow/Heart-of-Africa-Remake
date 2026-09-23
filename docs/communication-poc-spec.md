@@ -82,6 +82,15 @@ errand, so a reversal would form an eight-strike palindrome across the constant
 pause, an audible symmetry with no meaning. No other message adjacency can
 form it because the directions consume their whole reversal pair.
 
+These counts (96, 24, 20, 8) hold for four syllables and six concepts only. Both
+rules are predicates over a vocabulary and its errand, and the word set is
+derived from `SEQUENCE_LENGTH`, so another length is a new constant plus a new
+pinned table. The game was run at five syllables on 23.09.2026: 15 words,
+17,160 mappings, and roll, drum message, villager speech, journal and overhead
+labels all carried five-syllable words. Enumerating that set takes about three
+seconds per new game, so a length bump should replace "enumerate all" with
+"draw from the seed and reject what fails the predicates".
+
 A second, meaningless mirror pair among RIVER, ROCK, DIG and CHIEF is
 unavoidable and accepted. In 8 of the 20 mappings both members still occur in
 the errand, but never adjacently. UPSTREAM and DOWNSTREAM are the meaningful

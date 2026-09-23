@@ -30,9 +30,9 @@ export type ConceptId =
   | 'CHIEF'
 
 /**
- * Every sequence is four syllables long with an even number of highs. Those
- * eight parity sequences are mutually at least two syllables apart: six are
- * words and two remain reserved.
+ * Every sequence has this many syllables and an even number of highs, so any
+ * two are at least two syllables apart. Counted at four: eight such sequences,
+ * six words and two reserved. Another length derives another set.
  */
 export const SEQUENCE_LENGTH = 4
 
