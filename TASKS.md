@@ -77,33 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1191. From the Bambara plaza the loom station reads as a loom being worked.
-  PROBLEM. After point 1190 the plaza has an open, metre-wide line to the weaver, but in the
-  shipped plan (`bambara-village@394349866`) the only seat with such a line stands 27.7 m
-  from the plaza middle, and `1183-village-loom-from-plaza` shows a kneeling cone and a
-  standing figure a few dozen pixels tall; warp and cloth stack do not read. Nearest-first
-  seat ordering was measured and does not help: the dwellings between the plaza and the
-  nominal seat (`LOOM_SPOT`, ~13 m) close every nearer line.
-  DECIDED 23.09.2026 (owner, open to veto): a DWELLING compound may give way to the plaza's
-  view of the loom, as trees, stones, sheds and granaries already do (point 1190) —
-  `docs/peoples-1890.md` §8.1 says nothing on where compounds stand, the ring is procedural.
-  The loom's height stays (§8.1, point 1183), and the warp stays on the river's axis.
-  FINAL STATE. In the shipped Bambara plan the station sits at most ~15 m from a plaza stand
-  with a metre-wide open line (the compound in the way shifts outward on its ring, or is left
-  unbuilt, whichever keeps the ring's other rules), and in the plaza frame the warp line and
-  the cloth stack are distinguishable on both backends; the frame asserts the station's
-  PROJECTED height against a stated pixel minimum rather than a distance.
-  The same lever clears the Maasai plan: on main 43c00aa29 the `loom-unseen-from-plaza` assert
-  fires for `maasai-village@42` (collision and polish village sections, charged here), and it
-  fires for no settlement at seed 42 when this point lands.
-  Criticality: medium. Test: Vitest for the yielding rule (station on the river axis, clear
-  of every dwelling, compound count unchanged or the drop named); `polish --section=village-loom`
-  plaza frame on both backends.
-  Refs: src/scenes/place/layout.ts (plazaYielding, plazaLine, dwelling ring),
-  src/scenes/place/loom.ts (placeLoom), scripts/verify/polish.mjs (village-loom plaza frame),
-  point 1190
-  Bundle: Dorfleben
-
 - [ ] 1174. The village vocabulary is rolled per run, under rules that keep the direction pair a
   mirror (user 21.09.2026, drained from the findings carrier; placed here on the user's
   instruction, ahead of 659, which must judge a mechanic that no longer changes).
@@ -303,6 +276,42 @@ put it is the mistake this line exists to stop.
   scripts/author-astra-core.mjs, scripts/ask-astra-core.mjs, scripts/batch-autostart.mjs
   (`--quota-report` as the pattern), scripts/quota-drill.mjs, docs/astra-routing.md,
   CLAUDE.md §6.
+  Bundle: Modell & Wächter
+
+- [ ] 1196. A cheap section run can accept a charge for a known foreign red.
+  PROBLEM, measured 23.09.2026 on the ten-section picture check of point 1174, identically on
+  WebGPU and WebGL 2. Two known, filed, charged reds could not be cleared by the run that met
+  them, so both held against the point that was only passing through:
+  a) `polish --section=adult-errands`: 34 pass, 2 fail — the two halves of point 568's water-rim
+     measurement, both of which the ledger carries for BOTH backends. The verdict was
+     "the run record is incomplete, so no charge may be accepted for it — ownership unresolved".
+     Cause: `complete` in `scripts/verify/run-all.mjs:329` demands `record.terminalVerdict === true`,
+     and the recorder sets that flag only on a line matching `TERMINAL_VERDICT_LINE`
+     (`scripts/render-verify-recorder.mjs:203`) — `N CHECK(S) FAILED`, `console errors:`,
+     `FAILURES: n`. A section run of `polish` whose CHECKS fail prints its FAIL lines and no such
+     terminal line, so the record carries the reds but is classed incomplete: the cheap rung can
+     never accept a charge for a failing check, which is exactly what the ladder's cheap rung is
+     for. A console-error-only failure DOES print `console errors: 1` and charges fine — the gap
+     is specific to failing checks.
+  b) `flow --section=core-loop`: the record is complete and carries both reds owned by point 1154,
+     yet the verdict was "charged for one reading of this check but not for every one this run
+     produced". The printed occurrences carry one reading the charge does not own, so
+     `occurrences.every(owned)` fails although the record's own reds are fully owned.
+  FINAL STATE: a record that carries its reds, its exit and `asserted` is chargeable whether or
+  not the suite printed a terminal verdict line — either the recorder recognises a section run's
+  terminal shape, or completeness stops resting on that line while still refusing a crashed or
+  truncated record. And a printed occurrence that the record does not carry may not by itself
+  deny a charge the record's own reds earn; where the two disagree the run says WHICH reading is
+  unowned, with its measurement, instead of a sentence nobody can act on.
+  NOT IN THIS POINT: changing what any charge covers. Points 568 and 1154 keep their entries.
+  Test: Vitest on the pure decision — a section record with failing checks and no terminal line
+  is chargeable; a crashed or truncated record is not; a printed occurrence absent from the
+  record does not deny the record's own charge, and the printed reason names the reading.
+  Criticality: high — it blocks the cheap rung of every point whose sections carry a known
+  foreign red, which is how it was found: the picture check of 1174 held two reds it does not own.
+  Refs: scripts/verify/run-all.mjs:318-410, scripts/render-verify-recorder.mjs:203/326,
+  scripts/render-verify-core.mjs:960-980, scripts/render-verify-charges.mjs (points 568, 1154),
+  local/verify-logs/2026-09-23T10-36-45-287-polish.log, .claude/render-verify-state.json.
   Bundle: Modell & Wächter
 
 - [ ] 659. The whole communication chain, played through and judged by what reaches the
@@ -638,6 +647,38 @@ put it is the mistake this line exists to stop.
   tag plus `poc` dynamically, but a tag push alone does not trigger it. Then VERIFY
   that /v0.3/ and /poc/ serve the new state, and FREEZE the tag: it is never
   re-pointed.
+
+- [ ] 1195. The board says by itself that the batch is standing.
+  USER ORDER 23.09.2026, 12:21: »Fast genauso schlimm wie eine stehende Batch ist, dass ich auf
+  dem Dashboard nicht sehen konnte, dass sie stand. Dazu einen Task nach 174 einreihen, der das
+  behebt.« Placed behind point 174 on that instruction.
+  PROBLEM, measured on the 75-minute standstill of this morning (retrospective §3.304). The
+  "Woran ich gerade arbeite" card still read "Stand 09:22 — Landungsbereitschaft prüfen" at
+  10:51, because the card is written by the working session and nobody was left to write one.
+  The board therefore shows the LAST CLAIM, never its age, and a standstill looks exactly like
+  work in progress. Every fact needed to see it was already on disk — `.claude/batch-lock.json`
+  absent or its heartbeat stale, the focus stamp's age, the launcher's own skip reason in
+  `.claude/batch-launcher.log`, a `.claude/batch-paused` record — and none of it reaches the page.
+  FINAL STATE: the board's own state block carries a measured LIVENESS line, written by the
+  publish path rather than by the working session, so it is right even when no session runs:
+  who holds the batch (or that nobody does), how old the heartbeat and the focus stamp are, and,
+  when the batch is paused, the pause's type, reason and restart clock — a clockless hold said
+  in those words. Where the newest of those readings is older than one launcher tick plus its
+  grace, the card SAYS the batch is standing and for how long, visibly at the top and legible in
+  mobile portrait, instead of repeating the last claim. The readings are taken at publish time;
+  no session has to remember to write them. A deploy whose page is older than the readings says
+  its own age, so a cached page cannot claim a live batch.
+  Test: Vitest on the pure decision — a lock absent, a stale heartbeat, a fresh heartbeat, a
+  clockless `user-stop` and a clocked park each yield the line the board prints, with the
+  standstill verdict and its measured duration; the boundary at one tick plus grace is asserted
+  from both sides. Plus a render assertion that the line reaches the published HTML and reads in
+  portrait width.
+  Criticality: high — without it the only detector of a standstill is the user looking, which is
+  how this morning's was found.
+  Refs: scripts/board-publish.mjs, scripts/board-queue-core.mjs, scripts/dashboard-guard-core.mjs,
+  .claude/batch-lock.json, .claude/batch-paused, .claude/current-focus.json,
+  .claude/batch-launcher.log, memory `batch-dashboard-artifact`, points 1193 and 1194.
+  Bundle: Modell & Wächter
 
 - [ ] 1185. The decision protocol gets its own collapsed board section with an archive
   (user order 22.09.2026, 12:25, verbatim: »Neuer Punkt nach 174: Das Entscheidungsprotokoll
@@ -16325,3 +16366,21 @@ to land than a mechanism that needs a review.
   Criticality: medium — permits a false approval (CLAUDE.md §2 finding intake).
   Refs: scripts/verify/run-all.mjs:717, scripts/verify/tiers.mjs (`parseArgs`, `suitesFor`).
   Bundle: Modell & Wächter
+- [ ] 1197. The loom reads from the plaza in the eight village plans point 1191 left far.
+  (Drained from the findings carrier, 23.09.2026; follow-up of point 1191.)
+  Bundle: Dorfleben
+  PROBLEM, measured 23.09.2026 on main after point 1191 with `buildLayout` over the loom.test.ts
+  seeds (7, 42, 1337, 394349866, 1838110026): `loom-unseen-from-plaza` still fires for
+  swahili-village at 7/1337/394349866/1838110026, tuareg-village at 1337/1838110026,
+  hausa-village at 1838110026 and san-village at 394349866 (53 of 115 pairs on fd009039b, 8 now).
+  Separately, the shipped Bambara plan's station stands 16.4 m from the nearest plaza stand,
+  over the point's "~15 m", and bambara-village@42 keeps its 28.8 m seat because its plan
+  cannot spare a compound (three enclosures is the floor). Traced on Bambara: west of the
+  plaza the water head's talk separation, east the children's, north the 4 m inland slack
+  leave no free ground within reach; the swahili coastrow has no household that may give way.
+  FINAL STATE: none of these pairs fires the assert, the seat stays within 17 m of a stand,
+  and the plan floors of point 1191 (compounds, dwellings, ksar block, dressing) still hold —
+  the likely lever is a compound shifting outward on its ring rather than being left unbuilt.
+  Criticality: medium. Test: Vitest over the five seeds; `polish --section=village-loom`.
+  Refs: src/scenes/place/layout.ts (displacedBy, affordable, topUpCompounds),
+  src/scenes/place/loom.ts (placeLoom passes), point 1191

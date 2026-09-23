@@ -929,7 +929,11 @@ export const LIMITS = {
   // sentences losing filler. Net: -2 words. 6904 -> 6902.
   // 22.09.2026 (second): the remembered-relative-path clause justified beside maxLines cost 21
   // words and the two test-tier prompts gave back 23. Net: -2 words. 6902 -> 6900.
-  maxWords: 6900,
+  // 23.09.2026: two clauses of the standstill morning (retrospective §3.304) — a retreat that
+  // stops everyone, and a display that must name its own age — were folded into the bullets they
+  // belong to, and the freshness bullet gave back more filler than they took. Net: -3 words.
+  // 6900 -> 6897.
+  maxWords: 6897,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,
