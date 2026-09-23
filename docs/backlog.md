@@ -1786,3 +1786,5 @@ die Suite und kostet die Abdeckung der fünf folgenden Sektionen.
 NICHT EINGEREIHT: Infrastruktur-Freeze (Nutzerentscheidung 01.09.2026). Ein
 Wiederholungslauf kommt durch; wird der Absturz reproduzierbar, gehört er als
 Punkt in die Arbeitsordnung.
+
+- Cross-model review of the lockless user-stop writer (point 1193) was not run: the whole-file range (batch-autostart.mjs) exceeded the 200k review budget and Astra is claude-only. Diff-scoped review of `scripts/batch-pause.mjs`, `batch-pause-core.mjs` classifyPause and the launcher's recovery branch remains open (23.09.2026).
