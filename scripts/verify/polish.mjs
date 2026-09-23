@@ -965,7 +965,7 @@ if (section('speech-hypothesis')) {
 // focus and the typing are the genuine article.
 if (section('speech-guess')) {
   await goToPlace('maasai-village')
-  const GUESS_UTTERANCE = 'ba-BA-ba-BA' // RIVER, as the shipped lexicon beats it
+  const GUESS_UTTERANCE = 'ba-BA-ba-BA' // one of the six words; its meaning is rolled per run
   const guessPose = await page.evaluate(() => {
     const p = window.__placePlayer
     return p ? { x: p.x, z: p.z, yaw: p.yaw, pitch: p.pitch } : null

@@ -243,7 +243,7 @@ if (section('position-query')) {
 // what the four-eyes review of 16.09.2026 held against the unit layer.
 if (section('guess-key')) {
   await enterNubianVillage()
-  const UTTERANCE = 'ba-BA-ba-BA' // RIVER, as the shipped lexicon beats it
+  const UTTERANCE = 'ba-BA-ba-BA' // one of the six words; its meaning is rolled per run
   // Stand the traveller a few steps from a speaking villager, in the open: no
   // door is in reach there, so what answers a key is the WORD or nothing.
   const staged = await page.evaluate((u) => {
