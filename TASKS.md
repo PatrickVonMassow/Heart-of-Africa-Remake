@@ -99,8 +99,21 @@ put it is the mistake this line exists to stop.
   Test: the village-loom section's plaza frame on both backends with the tightened clearance;
   Vitest for any layout rule that moves the station (it still lies on the river's axis and
   clear of every dwelling).
-  Refs: src/scenes/place/layout.ts (loom station placement), scripts/verify/polish.mjs
-  (village-loom, plaza frame), point 1183, point 1157
+  MEASURED 23.09.2026 ON `feat/1190-loom-visible-from-plaza`: THE SEAT ALONE CANNOT DO IT.
+  The branch holds the placement to a plaza view, measures that view as a WIDTH and takes
+  the widest the plan allows, and keeps the station no farther back from the water than
+  the plan meant — the last because the water sight line reads solids and not the ground,
+  so a seat that drifted inland passed it and the frame came back with the river at the
+  horizon. Unit tests and lint are green. But the shipped Bambara plan the picture check
+  runs (`bambara-village@394349866`, and seed 1337 with it) holds NO metre-wide line from
+  the plaza to any seat that also keeps the river in the picture: the compounds stand where
+  they stand. So the frame's tightened check fails on the branch, and it fails honestly.
+  WHAT IS STILL OWED: the dwelling ring, not the seat. One compound or lane has to give way
+  so the plaza has a line at all — `docs/peoples-1890.md` §8.1 governs what may move. Until
+  that is decided the point is NOT met and must not be ticked.
+  Refs: src/scenes/place/layout.ts (loom station placement), src/scenes/place/loom.ts
+  (placeLoom, plaza view), scripts/verify/polish.mjs (village-loom, plaza frame), point 1183,
+  point 1157
   Bundle: Dorfleben
 
 - [ ] 1174. The village vocabulary is rolled per run, under rules that keep the direction pair a
