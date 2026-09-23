@@ -2265,7 +2265,7 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     // (outbuildings, trees, stones) gives way to the station as well.
     const householdLanes = new Set([...households.values()].flatMap((h) => h.paths))
     const standingLanes = paths.filter((lane) => !householdLanes.has(lane))
-    const groundFree = (x: number, z: number, r: number, solids: readonly Collider[], lanes: readonly PathDef[]) =>
+    const groundFree = (x: number, z: number, r: number, solids: Collider[], lanes: readonly PathDef[]) =>
       Math.hypot(x, z) < radius - r &&
       standingClear(solids, x, z, r) &&
       standsOnGroundPlate(bank, x, z, r) &&

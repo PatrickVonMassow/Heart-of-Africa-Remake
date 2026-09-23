@@ -254,7 +254,6 @@ export function stationGround(
  * must not be heard beside kept at their distance.
  */
 function stationHolds(station: LoomStation, p: LoomPlacement): boolean {
-  const { warpHalf } = p.geometry
   // The arithmetic tests first; the sampled ones below are what a sweep pays for.
   // AND NO FARTHER FROM THE WATER THAN THE PLAN MEANT IT TO BE (work-order
   // 1190). The water sight line below reads SOLIDS, not the ground: a dune
@@ -386,7 +385,7 @@ export function placeLoom(p: LoomPlacement): LoomStation | null {
   // so where the first pass finds no seen seat the second asks again with the
   // households that may give way taken out. Its widest seat is only a fallback
   // for the first pass's: nothing is left unbuilt for a view that is not had.
-  let widest: { station: LoomStation; view: number } | null = null
+  let widest = null as { station: LoomStation; view: number } | null
   const plazaPass = (q: LoomPlacement): LoomStation | null => {
     let viewed = 0
     for (let step = 0; step <= SEAT_SWEEP_DEGREES; step += PLAZA_SWEEP_DEGREE_STEP) {
