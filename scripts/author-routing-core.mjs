@@ -1,4 +1,4 @@
-// WHICH AUTHORING LANE A POINT GOES TO (point 667). rule:model-policy@0238ab8b
+// WHICH AUTHORING LANE A POINT GOES TO (point 667). rule:model-policy@aa7f5b05
 //
 // The user pays two vendors, and authoring is the largest single item of the
 // spend, so it is split across both rather than sitting on one. It does NOT all
@@ -7,7 +7,9 @@
 // happens to be dispatching. The SPLIT is the standing policy; how full each
 // pool happens to be on a given day is not a reason this file knows about
 // (cross-vendor audit 17.08.2026 — the header used to argue from one day's
-// quota reading, which then outlived it).
+// quota reading, which then outlived it). An UNREACHABLE lane is different from
+// a full one: where the OpenAI volume is spent, authoring goes to Opus 5.5 rather
+// than waiting for the vendor (user 23.09.2026; point 1194 measures and lifts it).
 //
 //   astra  GPT-6 Astra authors the points, and Claude then reviews, runs the
 //          suites, judges the picture and lands. Since 18.08.2026 that includes

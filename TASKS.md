@@ -77,6 +77,33 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
+- [ ] 1191. From the Bambara plaza the loom station reads as a loom being worked.
+  PROBLEM. After point 1190 the plaza has an open, metre-wide line to the weaver, but in the
+  shipped plan (`bambara-village@394349866`) the only seat with such a line stands 27.7 m
+  from the plaza middle, and `1183-village-loom-from-plaza` shows a kneeling cone and a
+  standing figure a few dozen pixels tall; warp and cloth stack do not read. Nearest-first
+  seat ordering was measured and does not help: the dwellings between the plaza and the
+  nominal seat (`LOOM_SPOT`, ~13 m) close every nearer line.
+  DECIDED 23.09.2026 (owner, open to veto): a DWELLING compound may give way to the plaza's
+  view of the loom, as trees, stones, sheds and granaries already do (point 1190) —
+  `docs/peoples-1890.md` §8.1 says nothing on where compounds stand, the ring is procedural.
+  The loom's height stays (§8.1, point 1183), and the warp stays on the river's axis.
+  FINAL STATE. In the shipped Bambara plan the station sits at most ~15 m from a plaza stand
+  with a metre-wide open line (the compound in the way shifts outward on its ring, or is left
+  unbuilt, whichever keeps the ring's other rules), and in the plaza frame the warp line and
+  the cloth stack are distinguishable on both backends; the frame asserts the station's
+  PROJECTED height against a stated pixel minimum rather than a distance.
+  The same lever clears the Maasai plan: on main 43c00aa29 the `loom-unseen-from-plaza` assert
+  fires for `maasai-village@42` (collision and polish village sections, charged here), and it
+  fires for no settlement at seed 42 when this point lands.
+  Criticality: medium. Test: Vitest for the yielding rule (station on the river axis, clear
+  of every dwelling, compound count unchanged or the drop named); `polish --section=village-loom`
+  plaza frame on both backends.
+  Refs: src/scenes/place/layout.ts (plazaYielding, plazaLine, dwelling ring),
+  src/scenes/place/loom.ts (placeLoom), scripts/verify/polish.mjs (village-loom plaza frame),
+  point 1190
+  Bundle: Dorfleben
+
 - [ ] 1174. The village vocabulary is rolled per run, under rules that keep the direction pair a
   mirror (user 21.09.2026, drained from the findings carrier; placed here on the user's
   instruction, ahead of 659, which must judge a mechanic that no longer changes).
@@ -219,6 +246,64 @@ put it is the mistake this line exists to stop.
   Refs: `src/communication/lexicon.ts`, `src/communication/lexicon.test.ts`,
   `src/communication/drumMessage.ts`, `src/state/store.ts`, `src/state/stateDump.ts`,
   `docs/communication-poc-spec.md`.
+
+- [ ] 1193. A session that is standing down cannot stop the batch.
+  PROBLEM, measured 23.09.2026 10:51-11:05. The batch stood still for 75 minutes. At 09:30 the
+  launcher started session `cfd01f9f` for ONE board-chat message, with its prompt stating it
+  does NOT hold the batch lock and will rightly be told to STAND DOWN. At 09:36 that very
+  session wrote `.claude/batch-paused` with `type: user-stop`, `retry-after: never` and the
+  reason "Chat-Antwort-Sitzung: nur eine Board-Nachricht zu beantworten. Kein Batch-Auftrag" —
+  a description of ITSELF, not of any user stop; no user had typed one (the only prompt in
+  `cfd01f9f` is the chat-reply order). The real worker `1438395e` then ended, and the launcher
+  refused every successor from 09:50 to 10:50 with "batch is paused with no restart clock
+  (typed user-stop)". The veto is correct for a real user stop; the fault is that a
+  stood-down, chat-only session is a reachable writer of the global clockless pause, and that
+  `user-stop` can be asserted without any user utterance behind it.
+  FINAL STATE: the clockless `user-stop` pause is writable only by a session that HOLDS the
+  batch lock; a session without the lock that calls `scripts/batch-pause.mjs --user-stop` is
+  refused with a named cause and writes nothing. A chat-reply/stand-down session that wants to
+  record "nothing to do here" uses its own session-scoped exit, never the global marker.
+  `scripts/batch-autostart.mjs` additionally treats a clockless `user-stop` whose recorded
+  reason names no user utterance as MALFORMED: it snapshots it, replaces it with a short
+  recovery clock and spawns the successor, so no misfiled marker can hold the batch forever.
+  Test: Vitest on the real writers — `recordUserStop` without the lock refuses and leaves the
+  marker absent; with the lock it writes as today; the launcher decision on the measured
+  marker (verbatim from this incident, archived in the point's commit) yields a clocked retry
+  plus a successor instead of a permanent hold.
+  Criticality: high — permits an unbounded standstill, against the standing instruction that a
+  permanent standstill must never happen (user 23.08.2026, reaffirmed 23.09.2026).
+  Refs: scripts/batch-pause.mjs, scripts/batch-pause-core.mjs, scripts/batch-lock.mjs
+  (`setPaused`, `clearPaused`), scripts/batch-autostart.mjs, .claude/batch-launcher.log
+  (09:36-10:50 ticks), transcript cfd01f9f-ab45-45f1-a57d-ef6416278b8f.
+  Bundle: Modell & Wächter
+
+- [ ] 1194. An Astra outage falls back to Opus 5.5 by itself.
+  USER ORDER 23.09.2026, 10:59: »Was ist denn der Fallback, wenn OpenAI ausfällt? Falls das
+  nicht so ist, soll es ab jetzt Opus 5.5 sein.«
+  PROBLEM, measured 23.09.2026 11:00. There is NO automatic fallback. The vendor cut is a
+  hand-set switch (`scripts/astra-share.mjs`, three settings, `claude-only` the escape hatch);
+  nothing measures whether the ChatGPT side answers, so an exhausted OpenAI volume leaves the
+  switch at `prefer-astra` and every routed authoring run walks into the dead vendor. The
+  launcher's quota machinery (`batch-autostart.mjs --quota-report`, `scripts/quota-drill.mjs`)
+  covers only the ANTHROPIC serving limit; it says nothing about Astra. On this date the switch
+  was moved to `claude-only` by hand, which is exactly the manual step this point removes.
+  FINAL STATE: a routed Astra run that fails on a vendor-limit or unreachable signature is
+  recognised as such (its own signature set, like the quota signature), the kind is served in
+  the Claude lane by Opus 5.5 instead of failing the point, and the fallback is RECORDED with
+  its signature and a probe clock so it lifts by itself when the volume returns. The switch
+  keeps its operator value; the fallback is a measured override on top of it, visible in
+  `--status` and on the board. Four eyes under the fallback uses the decorrelated same-vendor
+  pair (Fable 5.1 reviews Opus 5.5 work) and records that it is a fallback, per CLAUDE.md §6.
+  Test: Vitest on the pure decision — a limit signature yields the Claude lane plus a probe
+  clock, an ordinary authoring failure does NOT (it stays the point's red), an expired probe
+  returns routing to the operator setting, and `--status` names the active fallback.
+  Criticality: high — without it a vendor outage stops authoring for as long as the outage
+  lasts, and the standing instruction is that the batch never stands still.
+  Refs: scripts/astra-share-core.mjs (`ROUTES`, `settingOrSafe`), scripts/astra-share.mjs,
+  scripts/author-astra-core.mjs, scripts/ask-astra-core.mjs, scripts/batch-autostart.mjs
+  (`--quota-report` as the pattern), scripts/quota-drill.mjs, docs/astra-routing.md,
+  CLAUDE.md §6.
+  Bundle: Modell & Wächter
 
 - [ ] 659. The whole communication chain, played through and judged by what reaches the
   PLAYER — A SIX-EYES ALL-ROUND REVIEW.
@@ -553,33 +638,6 @@ put it is the mistake this line exists to stop.
   tag plus `poc` dynamically, but a tag push alone does not trigger it. Then VERIFY
   that /v0.3/ and /poc/ serve the new state, and FREEZE the tag: it is never
   re-pointed.
-
-- [ ] 1191. From the Bambara plaza the loom station reads as a loom being worked.
-  PROBLEM. After point 1190 the plaza has an open, metre-wide line to the weaver, but in the
-  shipped plan (`bambara-village@394349866`) the only seat with such a line stands 27.7 m
-  from the plaza middle, and `1183-village-loom-from-plaza` shows a kneeling cone and a
-  standing figure a few dozen pixels tall; warp and cloth stack do not read. Nearest-first
-  seat ordering was measured and does not help: the dwellings between the plaza and the
-  nominal seat (`LOOM_SPOT`, ~13 m) close every nearer line.
-  DECIDED 23.09.2026 (owner, open to veto): a DWELLING compound may give way to the plaza's
-  view of the loom, as trees, stones, sheds and granaries already do (point 1190) —
-  `docs/peoples-1890.md` §8.1 says nothing on where compounds stand, the ring is procedural.
-  The loom's height stays (§8.1, point 1183), and the warp stays on the river's axis.
-  FINAL STATE. In the shipped Bambara plan the station sits at most ~15 m from a plaza stand
-  with a metre-wide open line (the compound in the way shifts outward on its ring, or is left
-  unbuilt, whichever keeps the ring's other rules), and in the plaza frame the warp line and
-  the cloth stack are distinguishable on both backends; the frame asserts the station's
-  PROJECTED height against a stated pixel minimum rather than a distance.
-  The same lever clears the Maasai plan: on main 43c00aa29 the `loom-unseen-from-plaza` assert
-  fires for `maasai-village@42` (collision and polish village sections, charged here), and it
-  fires for no settlement at seed 42 when this point lands.
-  Criticality: medium. Test: Vitest for the yielding rule (station on the river axis, clear
-  of every dwelling, compound count unchanged or the drop named); `polish --section=village-loom`
-  plaza frame on both backends.
-  Refs: src/scenes/place/layout.ts (plazaYielding, plazaLine, dwelling ring),
-  src/scenes/place/loom.ts (placeLoom), scripts/verify/polish.mjs (village-loom plaza frame),
-  point 1190
-  Bundle: Dorfleben
 
 - [ ] 1185. The decision protocol gets its own collapsed board section with an archive
   (user order 22.09.2026, 12:25, verbatim: »Neuer Punkt nach 174: Das Entscheidungsprotokoll

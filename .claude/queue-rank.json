@@ -1405,11 +1405,29 @@
       "origin": "machine",
       "place": "last"
     },
+    "1191": {
+      "at": "2026-09-23T07:31:35.686Z",
+      "why": "User 23.09.2026: 1191 steht als oberster Punkt der Queue, vor 659.",
+      "origin": "user",
+      "place": "ahead"
+    },
     "1192": {
       "at": "2026-09-23T07:08:05.043Z",
       "why": "False-approval infra point homed in its bundle; the queue order places it with that bundle, not ahead of game work",
       "origin": "machine",
       "place": "last"
+    },
+    "1193": {
+      "at": "2026-09-23T09:16:16.567Z",
+      "why": "Der Defekt hat den Batch heute 75 Minuten dauerhaft angehalten und kann es jederzeit wieder tun; ein Release, das dabei stehenbleibt, wird nicht fertig.",
+      "origin": "machine",
+      "place": "ahead"
+    },
+    "1194": {
+      "at": "2026-09-23T09:16:16.709Z",
+      "why": "Nutzer 23.09.2026 10:59: der Fallback soll ab jetzt Opus 5.5 sein.",
+      "origin": "user",
+      "place": "ahead"
     }
   },
   "boundary": {
@@ -1441,7 +1459,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-23T07:08:05.055Z",
+    "at": "2026-09-23T09:16:16.724Z",
     "points": [
       174,
       184,
@@ -1857,7 +1875,9 @@
       1188,
       1189,
       1191,
-      1192
+      1192,
+      1193,
+      1194
     ]
   }
 }
