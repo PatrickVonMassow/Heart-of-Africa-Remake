@@ -31287,3 +31287,30 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   a metre-wide line stands 27.7 m from the plaza middle (seed 1337: 11.6 m, but no full line).
   That the loom READS from the plaza — warp and stack distinguishable — moves to point 1191.
   Bundle: Dorfleben
+
+- [x] 1191. From the Bambara plaza the loom station reads as a loom being worked.
+  PROBLEM. After point 1190 the plaza has an open, metre-wide line to the weaver, but in the
+  shipped plan (`bambara-village@394349866`) the only seat with such a line stands 27.7 m
+  from the plaza middle, and `1183-village-loom-from-plaza` shows a kneeling cone and a
+  standing figure a few dozen pixels tall; warp and cloth stack do not read. Nearest-first
+  seat ordering was measured and does not help: the dwellings between the plaza and the
+  nominal seat (`LOOM_SPOT`, ~13 m) close every nearer line.
+  DECIDED 23.09.2026 (owner, open to veto): a DWELLING compound may give way to the plaza's
+  view of the loom, as trees, stones, sheds and granaries already do (point 1190) —
+  `docs/peoples-1890.md` §8.1 says nothing on where compounds stand, the ring is procedural.
+  The loom's height stays (§8.1, point 1183), and the warp stays on the river's axis.
+  FINAL STATE. In the shipped Bambara plan the station sits at most ~15 m from a plaza stand
+  with a metre-wide open line (the compound in the way shifts outward on its ring, or is left
+  unbuilt, whichever keeps the ring's other rules), and in the plaza frame the warp line and
+  the cloth stack are distinguishable on both backends; the frame asserts the station's
+  PROJECTED height against a stated pixel minimum rather than a distance.
+  The same lever clears the Maasai plan: on main 43c00aa29 the `loom-unseen-from-plaza` assert
+  fires for `maasai-village@42` (collision and polish village sections, charged here), and it
+  fires for no settlement at seed 42 when this point lands.
+  Criticality: medium. Test: Vitest for the yielding rule (station on the river axis, clear
+  of every dwelling, compound count unchanged or the drop named); `polish --section=village-loom`
+  plaza frame on both backends.
+  Refs: src/scenes/place/layout.ts (plazaYielding, plazaLine, dwelling ring),
+  src/scenes/place/loom.ts (placeLoom), scripts/verify/polish.mjs (village-loom plaza frame),
+  point 1190
+  Bundle: Dorfleben
