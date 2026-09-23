@@ -18,8 +18,12 @@ import {
   SAFE_SETTING,
   SETTINGS,
   SETTING_NOTES,
+  OUTAGE_PROBE_MS,
+  afterAstraRun,
   applyFooterNote,
   boardNoteSegment,
+  effectiveRoute,
+  fallbackLine,
   briefLine,
   kindsToAstra,
   normaliseSetting,
@@ -236,5 +240,69 @@ describe('the board note', () => {
     expect(out).toContain('3 offene Punkte')
     expect(out).toContain('lädt sich alle 30 s selbst neu.')
     expect(applyFooterNote('<main>no footer</main>', 'prefer-astra')).toBe('<main>no footer</main>')
+  })
+})
+
+describe('the measured outage fallback (point 1194)', () => {
+  const now = Date.UTC(2026, 8, 23, 11, 0)
+  const limit = { ok: false, kind: 'allowance-exhausted', cause: 'the ChatGPT allowance for this account is exhausted' }
+  const text = 'working …\nERROR: You have hit your usage limit. Try again later.'
+  const fellBack = afterAstraRun({ outcome: limit, text, kind: 'author', now })
+  const state = { setting: 'prefer-astra', corrupt: false, fallback: fellBack.fallback }
+
+  it('a limit signature yields the Claude lane plus a probe clock', () => {
+    expect(fellBack.fellBack).toBe(true)
+    expect(fellBack.fallback).toMatchObject({ outage: 'allowance-exhausted', kind: 'author', since: now, probeAt: now + OUTAGE_PROBE_MS, probes: 1 })
+    expect(fellBack.fallback.signature).toMatch(/usage limit/)
+    for (const kind of KINDS) expect(effectiveRoute(kind, state, now + 1).to, kind).toBe('claude')
+    expect(effectiveRoute('author', state, now + 1).fallback).toEqual(fellBack.fallback)
+  })
+
+  it('an unreachable vendor is an outage too, and a renewal keeps its start and counts the probe', () => {
+    const again = afterAstraRun({ outcome: { ok: false, kind: 'unreachable' }, text: 'stream disconnected', previous: fellBack.fallback, now: now + OUTAGE_PROBE_MS + 5 })
+    expect(again.fellBack).toBe(true)
+    expect(again.fallback).toMatchObject({ outage: 'unreachable', since: now, probes: 2, probeAt: now + 2 * OUTAGE_PROBE_MS + 5 })
+  })
+
+  it('an ordinary authoring failure is NOT a fallback — it stays the point\'s red', () => {
+    for (const kind of ['error-exit', 'timeout', 'no-verdict', 'login-expired', 'model-refused']) {
+      const run = afterAstraRun({ outcome: { ok: false, kind }, text: 'tests failed', kind: 'author', now })
+      expect(run.fellBack, kind).toBe(false)
+      expect(run.fallback, kind).toBeNull()
+    }
+    expect(effectiveRoute('author', { setting: 'prefer-astra', fallback: null }, now).to).toBe('astra')
+    // …and it leaves a standing record exactly as it was.
+    expect(afterAstraRun({ outcome: { ok: false, kind: 'error-exit' }, previous: fellBack.fallback, now }).fallback).toEqual(fellBack.fallback)
+  })
+
+  it('an expired probe returns routing to the operator setting, and a success lifts the record', () => {
+    const later = now + OUTAGE_PROBE_MS
+    expect(effectiveRoute('author', state, later)).toEqual({ to: 'astra', fallback: null })
+    expect(effectiveRoute('review', { ...state, setting: 'default' }, later).to).toBe('astra')
+    expect(effectiveRoute('author', { ...state, setting: 'claude-only' }, now).to).toBe('claude')
+    expect(fallbackLine(state, later)).toBe('')
+    expect(afterAstraRun({ outcome: { ok: true }, previous: fellBack.fallback, now: later })).toEqual({ fallback: null, fellBack: false })
+  })
+
+  it('--status, the brief and the board name the active fallback, and keep the operator setting', () => {
+    expect(statusLine(state, now + 1)).toMatch(/^astra-share: prefer-astra \(outage FALLBACK until .+\) — to GPT-6 Astra: nothing/)
+    const line = fallbackLine(state, now + 1)
+    expect(line).toMatch(/FALLBACK ACTIVE/)
+    expect(line).toMatch(/usage limit/)
+    expect(line).toMatch(/Opus 5\.5 authors/)
+    expect(line).toMatch(/Fable 5\.1 reads Opus 5\.5 work, recorded as a fallback/)
+    expect(line).toMatch(/`prefer-astra` stays/)
+    expect(statusLine(state, now + OUTAGE_PROBE_MS)).not.toMatch(/FALLBACK/)
+    const live = { ...state, fallback: { ...state.fallback, probeAt: Date.now() + 60_000 } }
+    expect(briefLine(live)).toMatch(/FALLBACK ACTIVE/)
+    expect(boardNoteSegment(live)).toMatch(/^Astra-Routing: Ausfall-Rückfall \(allowance-exhausted\)/)
+    expect(applyFooterNote('<footer>a</footer>', live)).toMatch(/Ausfall-Rückfall/)
+  })
+
+  it('a state file carries the record through a read, and drops a malformed one', () => {
+    const written = writeState('prefer-astra', { now, fallback: fellBack.fallback })
+    expect(readSetting(JSON.stringify(written)).fallback).toEqual(fellBack.fallback)
+    expect(readSetting(JSON.stringify({ ...written, fallback: { outage: 'error-exit', since: now, probeAt: now + 1 } })).fallback).toBeNull()
+    expect(writeState('default', { now })).not.toHaveProperty('fallback')
   })
 })

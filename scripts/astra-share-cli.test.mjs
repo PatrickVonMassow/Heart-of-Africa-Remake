@@ -138,4 +138,18 @@ describe('settingProblemLine', () => {
     expect(settingProblemLine({ setting: 'default', problem: '' })).toBe('')
     expect(settingProblemLine(null)).toBe('')
   })
+
+  it('names an active outage fallback in --status, and an operator --set keeps it', () => {
+    const now = Date.now()
+    const fallback = { outage: 'unreachable', signature: 'stream disconnected before completion', kind: 'review', since: now, probeAt: now + 600_000, probes: 1 }
+    mkdirSync(dirname(file), { recursive: true })
+    writeFileSync(file, JSON.stringify({ setting: 'prefer-astra', changedAt: now, changedBy: 'test', fallback }))
+    const r = run('--status')
+    expect(r.status).toBe(0)
+    expect(r.stdout).toMatch(/^astra-share: prefer-astra \(outage FALLBACK until .+\) — to GPT-6 Astra: nothing/)
+    expect(r.stdout).toMatch(/FALLBACK ACTIVE — GPT-6 Astra unreachable/)
+    expect(r.stdout).toMatch(/author {5}→ Claude/)
+    expect(run('--set', 'default').status).toBe(0)
+    expect(state().fallback).toEqual(fallback)
+  })
 })
