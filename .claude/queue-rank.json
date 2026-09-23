@@ -1405,40 +1405,18 @@
       "origin": "machine",
       "place": "last"
     },
+    "1191": {
+      "at": "2026-09-23T07:31:35.686Z",
+      "why": "User 23.09.2026: 1191 steht als oberster Punkt der Queue, vor 659.",
+      "origin": "user",
+      "place": "ahead"
+    },
     "1192": {
       "at": "2026-09-23T07:08:05.043Z",
       "why": "False-approval infra point homed in its bundle; the queue order places it with that bundle, not ahead of game work",
       "origin": "machine",
       "place": "last"
     }
-  },
-  "boundary": {
-    "at": "2026-08-21T00:55:14.962Z",
-    "points": [
-      336,
-      553,
-      596,
-      633,
-      659,
-      660,
-      663,
-      708,
-      715,
-      719,
-      733,
-      735,
-      736,
-      738,
-      739,
-      746,
-      747,
-      750,
-      759,
-      760,
-      762,
-      764
-    ],
-    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
     "at": "2026-09-23T07:08:05.055Z",
@@ -1859,5 +1837,33 @@
       1191,
       1192
     ]
+  },
+  "boundary": {
+    "at": "2026-08-21T00:55:14.962Z",
+    "points": [
+      336,
+      553,
+      596,
+      633,
+      659,
+      660,
+      663,
+      708,
+      715,
+      719,
+      733,
+      735,
+      736,
+      738,
+      739,
+      746,
+      747,
+      750,
+      759,
+      760,
+      762,
+      764
+    ],
+    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   }
 }
