@@ -16181,3 +16181,21 @@ to land than a mechanism that needs a review.
   Criticality: medium. Test: Vitest over the five seeds; `polish --section=village-loom`.
   Refs: src/scenes/place/layout.ts (displacedBy, affordable, topUpCompounds),
   src/scenes/place/loom.ts (placeLoom passes), point 1191
+- [ ] 1202. The dig picture's camera stand lies inside the settlement.
+  PROBLEM, measured 23.09.2026 while repairing point 1198: `digPictureView` (scripts/verify/
+  digSitePicture.mjs) puts the stand for fixture `bambara-village` seed 58 at x 12.0, z 30.6
+  (r 32.9 m), past the settlement boundary, so `isOutsidePlace` fires on the first frame,
+  PlaceScene leaves the place, and `polish --section=adult-errands` reads `the spoil crossing
+  starts on flat ground — {"error":"no patch dig site","place":null}`; frame
+  `1056-two-excavations-walkable-spoil` is never taken. `src/scenes/place/digPicture.test.ts`
+  stays green because it never asks for the stand to be inside. A seed search over 0-799 with
+  that extra condition found no seed on either side of the pair: the far side is outside, the
+  near side fails `standingClear` on the sight lines (636 of 1600 probes).
+  FINAL STATE: the fixture test asserts `isOutsidePlace(layout, view.x, view.z) === false`, a
+  composition (seed, stand side, or a stand-off rule) passes it with every existing condition,
+  and `polish --section=adult-errands` takes frame 1056 on WebGPU and WebGL 2 with no red but
+  those charged to point 568.
+  Criticality: medium — a picture proof of the dig spoil is missing on every run.
+  Test: Vitest `src/scenes/place/digPicture.test.ts`; `polish --section=adult-errands`.
+  Refs: scripts/verify/digSitePicture.mjs, src/scenes/place/boundary.ts, point 1173, point 1198.
+  Bundle: Dorfleben
