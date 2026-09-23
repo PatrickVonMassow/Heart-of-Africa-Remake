@@ -78,10 +78,12 @@ kind is MOVED to the front in the same turn that files it; leaving it where appe
 put it is the mistake this line exists to stop.
 
 - [ ] 1201. The production build is judged by a picture, not only by the dev server.
+  Bundle: Testinfrastruktur — the lane that would have caught this is the picture lane, and the
+  fix touches its scripts rather than any scene file.
   Criticality: high — it stands before the release because, if the measurement below is a real
   defect, the build that /poc/ and the coming /v0.3/ serve shows the player no world at all, and
-  that is the release's purpose. No picture lane looks at a production build today, so nothing
-  can currently tell the two readings apart.
+  that is the release's purpose. Every picture lane today shoots the dev server, so nothing can
+  currently tell the two readings apart.
   MEASURED 23.09.2026 while publishing `poc` (archived point 1200) on commit 9c61be419. System
   Chrome `--headless=new` with `--enable-unsafe-webgpu`, 1280×800, 14 s after the canvas
   appears, then Tab to close the journal: the HUD, the journal and the DOM place labels (Tool

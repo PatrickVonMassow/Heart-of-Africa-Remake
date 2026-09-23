@@ -122,14 +122,6 @@ Füllstand empfiehlt ein leeres Modell.
    > ungesichert, in der ich hinsehe — und merkt auch, wenn der Text steht, während die
    > Arbeit weiterlief."
 
-   Und gleich mitbestellen, woran wir am 23.09.2026 hängengeblieben sind: Ein Board,
-   das „gerade läuft nichts" behauptet, muss jede Schreiboperation sperren — sonst ist
-   die Behauptung wertlos. Dann braucht es aber einen Weg für Arbeit, die es noch gar
-   nicht gibt, denn das Anlegen des ersten Eintrags ist selbst eine Schreiboperation:
-   > „Wenn die Leerlauf-Behauptung Schreiboperationen sperrt, muss **das Eintragen
-   > neuer Arbeit** ausdrücklich erlaubt bleiben — sonst kann ein frischer Auftrag
-   > nicht angefangen werden, ohne das Board zu belügen."
-
 ---
 
 ## Automatische Tests — und ihre Tiefe abstufen
@@ -709,4 +701,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 39dee964328a5d288e7675ad45fc98c04570e54f2f1525de795591ab9f1eca73 -->
+<!-- GUIDE-FINGERPRINT: 12e807e9ad5ce357557ecda407e989681b23e76c7a6e563dd8cfc83923cd9dd3 -->
