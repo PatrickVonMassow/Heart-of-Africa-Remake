@@ -196,6 +196,35 @@ put it is the mistake this line exists to stop.
   overhead labels must all change with it. A consumer that forgot to thread the vocabulary keeps
   producing the shipped syllables, and only that test catches it.
 
+  8. IT STAYS LENGTH-GENERIC, AND THE ACCEPTANCE PROVES IT AT FIVE (user 23.09.2026, ordered while
+  the point was in flight; the running verification was discarded for it). Raising
+  SEQUENCE_LENGTH later - to fit more concepts into the language - must be a change of that
+  constant plus a new pinned table, not a redesign of the roll. Three constraints, none of which
+  changes what this point ships (SEQUENCE_LENGTH stays 4, same shipped vocabulary, same 20, the
+  pinned table stays): (i) the well-formed set is DERIVED from SEQUENCE_LENGTH - bitmask over
+  the length, even number of highs, both tones present - never six written-out literals;
+  lexicon.test.ts already enumerates this way, and the production enumerator of step 1 uses the
+  same derivation. (ii) rules (a) and (b) are PREDICATES OVER A VOCABULARY, not concept
+  literals: (a) "UPSTREAM is the ascending sequence - all lows, then all highs - and DOWNSTREAM
+  its reverse", stated over the shape so it names exactly one sequence at any length; (b) "no
+  two concepts ADJACENT IN THE ERRAND are tonal mirrors of each other", with the errand as its
+  input, so ROCK/DIG is the case that follows from today's errand rather than the rule itself.
+  The enumerator is a thin loop over these two predicates and the roll applies the SAME
+  predicates - so a later length bump can swap "enumerate all, pin the table" for "draw from the
+  seed, reject what fails the predicates" without touching the rules. (iii) the comment carrying
+  96 -> 24 -> 20, and the matching passage in docs/communication-poc-spec.md, state explicitly
+  that these counts are computed FOR FOUR SYLLABLES AND SIX CONCEPTS - otherwise they go
+  silently false at the first length change, the same failure mode this point is already
+  repairing in that document.
+  THE ACCEPTANCE INCLUDES A RUN AT SEQUENCE_LENGTH = 5 (user 23.09.2026), and it is more than a
+  unit test of the derivation: the game is exercised at five syllables - roll, vocabulary, drum
+  message, villager speech, journal and overhead labels - and must work. Measured today, the
+  well-formed set at length 5 is 15 sequences rather than 6, so a pinned 20-row table cannot
+  carry it and every site that silently assumed four is exposed. The existing tests read
+  SEQUENCE_LENGTH rather than the literal 4 (drumMessage.test.ts, speaking.test.ts,
+  ambience.test.ts, adultWork.hold.test.ts), which is the starting point, not the proof. The
+  point ships with the constant back at 4; what ships is the evidence that five ran.
+
   TEXT THAT GOES FALSE UNDER THE ROLL and is rewritten in the same commit: the per-sequence
   comments in lexicon.ts on RIVER (the word the whole message opens on) and CHIEF (RIVER's tonal
   mirror, the only mirror heard as a pair); the lexicon.ts header claim that the registry is
