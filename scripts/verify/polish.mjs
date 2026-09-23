@@ -965,7 +965,7 @@ if (section('speech-hypothesis')) {
 // focus and the typing are the genuine article.
 if (section('speech-guess')) {
   await goToPlace('maasai-village')
-  const GUESS_UTTERANCE = 'ba-BA-ba-BA' // RIVER, as the shipped lexicon beats it
+  const GUESS_UTTERANCE = 'ba-BA-ba-BA' // one of the six words; its meaning is rolled per run
   const guessPose = await page.evaluate(() => {
     const p = window.__placePlayer
     return p ? { x: p.x, z: p.z, yaw: p.yaw, pitch: p.pitch } : null
@@ -8593,10 +8593,12 @@ if (section('chief-to-drummer')) {
     )
     .then((h) => h.jsonValue())
     .catch(() => null)
+  // CHIEF's word is rolled per run, so it is read from the run, not typed here.
+  const chiefWord = await page.evaluate(() => window.__game.getState().vocabulary.CHIEF)
   check(
     'the drummer names the chief with one word of the language',
-    Array.isArray(named) && named.length === 1 && named[0] === 'BA-ba-BA-ba',
-    JSON.stringify(named),
+    Array.isArray(named) && named.length === 1 && named[0] === chiefWord,
+    JSON.stringify({ named, chiefWord }),
   )
 
   // 1b. THE COLLISION THE TWO KEYS REMOVED (point 1139, user 16.09.2026). The

@@ -3,6 +3,7 @@
 // game state, his own readings with it, and both survive a save/load round
 // trip. The lexicon and the memory rules themselves are covered in
 // src/communication/*.test.ts — this file pins the STORE wiring.
+import { SHIPPED_VOCABULARY } from '../communication/vocabulary'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { hasHeard, heardUtterances, hypothesisFor } from '../communication/heard'
 import { utteranceOf } from '../communication/lexicon'
@@ -22,11 +23,12 @@ withWorld()
 
 beforeEach(() => {
   freshGame()
+  useGame.setState({ vocabulary: SHIPPED_VOCABULARY })
 })
 
-const RIVER_UTTERANCE = utteranceOf('RIVER')
-const DIG = utteranceOf('DIG')
-const ROCK_UTTERANCE = utteranceOf('ROCK')
+const RIVER_UTTERANCE = utteranceOf('RIVER', SHIPPED_VOCABULARY)
+const DIG = utteranceOf('DIG', SHIPPED_VOCABULARY)
+const ROCK_UTTERANCE = utteranceOf('ROCK', SHIPPED_VOCABULARY)
 
 describe('hearing utterances (design.md §13.4)', () => {
   it('a fresh game has heard nothing', () => {
@@ -177,7 +179,7 @@ describe("the chief's drum message (design.md §13.4)", () => {
     g().receiveDrumMessage()
     expect(g().drumMessageHeard).toEqual({ errand: true, answer: false })
     const heard = heardUtterances(g().communication).map((h) => h.utterance)
-    for (const atom of drumMessagePhrase()) {
+    for (const atom of drumMessagePhrase(SHIPPED_VOCABULARY)) {
       expect(heard).toContain(atom)
       expect(g().communication.heard[atom].firstHeardDay).toBe(40)
     }
@@ -209,7 +211,7 @@ describe("the chief's drum message (design.md §13.4)", () => {
     expect(g().drumMessageHeard).toEqual({ errand: false, answer: false })
     expect(g().loadCheckpoint()).toBe(true)
     expect(g().drumMessageHeard).toEqual({ errand: true, answer: false })
-    expect(hasHeard(g().communication, drumMessagePhrase()[0])).toBe(true)
+    expect(hasHeard(g().communication, drumMessagePhrase(SHIPPED_VOCABULARY)[0])).toBe(true)
   })
 
   it('a snapshot from before the drums existed simply never heard them', () => {
@@ -238,7 +240,7 @@ describe('the hand-over asks for the current drums without changing the give rul
     const running = useUi.getState().drumPerformance!
     expect(g().rockArtefact).toBe('given')
     expect(g().carriedForms).toContain('rock-relief')
-    expect(running.plan.atoms).toEqual(drumMessagePhrase('answer'))
+    expect(running.plan.atoms).toEqual(drumMessagePhrase(SHIPPED_VOCABULARY, 'answer'))
     expect(playDrumMessage).toHaveBeenLastCalledWith(running.plan)
     expect(g().drumMessageHeard).toEqual({ errand: false, answer: false })
     expect(heardUtterances(g().communication)).toHaveLength(0)
@@ -280,7 +282,7 @@ describe('the hand-over asks for the current drums without changing the give rul
     expect(useUi.getState().deferredDrumAnswer).toBe(false)
     expect(playDrumMessage).toHaveBeenCalledTimes(calls + 1)
     expect(g().drumMessageHeard).toEqual({ errand: true, answer: false })
-    expect(hasHeard(g().communication, utteranceOf('DOWNSTREAM'))).toBe(false)
+    expect(hasHeard(g().communication, utteranceOf('DOWNSTREAM', SHIPPED_VOCABULARY))).toBe(false)
     g().requestDrumMessage()
     expect(useUi.getState().drumPerformance).toBe(answer)
     g().finishDrumMessage()
@@ -309,12 +311,12 @@ describe('the hand-over asks for the current drums without changing the give rul
     const expected = { errand: messages.some((m) => m === 'errand'), answer: messages.some((m) => m === 'answer') }
     const entries = g().journal.filter((e) => ['journal.drumMessage', 'journal.drumAnswer'].includes(e.text.key))
     expect(entries).toHaveLength(messages.length)
-    g().setUtteranceHypothesis(utteranceOf('RIVER'), 'water')
+    g().setUtteranceHypothesis(utteranceOf('RIVER', SHIPPED_VOCABULARY), 'water')
     g().saveCheckpoint()
     g().newGame()
     expect(g().loadCheckpoint()).toBe(true)
     expect(g().drumMessageHeard).toEqual(expected)
-    expect(hypothesisFor(g().communication, utteranceOf('RIVER'))).toBe('water')
+    expect(hypothesisFor(g().communication, utteranceOf('RIVER', SHIPPED_VOCABULARY))).toBe('water')
     for (const message of messages) g().receiveDrumMessage(message)
     expect(g().journal.filter((e) => ['journal.drumMessage', 'journal.drumAnswer'].includes(e.text.key))).toHaveLength(messages.length)
   })

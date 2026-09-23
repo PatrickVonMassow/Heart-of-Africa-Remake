@@ -51,6 +51,7 @@ function SpeechLabelView({
   // DEBUG (user 09.08.2026): the concept behind the utterance instead of the
   // syllables and the player's guess. Never on in a real run — it hands the
   // player the very answer the mechanic asks him to work out.
+  const vocabulary = useGame((s) => s.vocabulary)
   const conceptLabels = useUi((s) => s.speechConceptLabels)
 
   useFrame(() => {
@@ -73,6 +74,7 @@ function SpeechLabelView({
           speakerId={label.speakerId}
           atoms={label.atoms}
           memory={memory}
+          vocabulary={vocabulary}
           conceptLabels={conceptLabels}
           targeted={targeted}
         />

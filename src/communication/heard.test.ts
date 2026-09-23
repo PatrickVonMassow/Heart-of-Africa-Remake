@@ -1,6 +1,7 @@
 // What counts as heard (docs/communication-poc-spec.md): the first hearing
 // wins, a phrase records each atom on its own, the player's own reading lives
 // beside it, and the whole memory survives a save round trip. Pure logic.
+import { SHIPPED_VOCABULARY } from './vocabulary'
 import { describe, expect, it } from 'vitest'
 import { balance } from '../config/balance'
 import {
@@ -17,9 +18,9 @@ import {
 } from './heard'
 import { CONCEPT_IDS, conceptOf, phraseOf, utteranceOf } from './lexicon'
 
-const RIVER_UTTERANCE = utteranceOf('RIVER')
-const DIG = utteranceOf('DIG')
-const ROCK_UTTERANCE = utteranceOf('ROCK')
+const RIVER_UTTERANCE = utteranceOf('RIVER', SHIPPED_VOCABULARY)
+const DIG = utteranceOf('DIG', SHIPPED_VOCABULARY)
+const ROCK_UTTERANCE = utteranceOf('ROCK', SHIPPED_VOCABULARY)
 
 describe('hearing distance', () => {
   it('carries to the balance radius and no further', () => {
@@ -89,29 +90,29 @@ describe('observing an utterance', () => {
 
 describe('observing a phrase', () => {
   it('observes each atom on its own', () => {
-    const memory = observePhrase(emptyMemory(), phraseOf(['DIG', 'ROCK']), 5)
+    const memory = observePhrase(emptyMemory(), phraseOf(['DIG', 'ROCK'], SHIPPED_VOCABULARY), 5)
     expect(Object.keys(memory.heard).sort()).toEqual([DIG, ROCK_UTTERANCE].sort())
     expect(memory.heard[DIG].firstHeardDay).toBe(5)
     expect(memory.heard[ROCK_UTTERANCE].firstHeardDay).toBe(5)
   })
 
   it('gives every atom of the phrase the settlement it was heard in', () => {
-    const memory = observePhrase(emptyMemory(), phraseOf(['DIG', 'ROCK']), 5, 'bambara-village')
+    const memory = observePhrase(emptyMemory(), phraseOf(['DIG', 'ROCK'], SHIPPED_VOCABULARY), 5, 'bambara-village')
     expect(memory.heard[DIG].firstHeardPlace).toBe('bambara-village')
     expect(memory.heard[ROCK_UTTERANCE].firstHeardPlace).toBe('bambara-village')
   })
 
   it('records a repeated atom once', () => {
-    const memory = observePhrase(emptyMemory(), phraseOf(['DIG', 'ROCK', 'DIG']), 5)
+    const memory = observePhrase(emptyMemory(), phraseOf(['DIG', 'ROCK', 'DIG'], SHIPPED_VOCABULARY), 5)
     expect(Object.keys(memory.heard)).toHaveLength(2)
   })
 
   it('adds only the new atoms of a phrase and returns the memory unchanged when none are', () => {
     const known = observeUtterance(emptyMemory(), DIG, 2)
-    const mixed = observePhrase(known, phraseOf(['DIG', 'ROCK']), 9)
+    const mixed = observePhrase(known, phraseOf(['DIG', 'ROCK'], SHIPPED_VOCABULARY), 9)
     expect(mixed.heard[DIG].firstHeardDay).toBe(2)
     expect(mixed.heard[ROCK_UTTERANCE].firstHeardDay).toBe(9)
-    expect(observePhrase(mixed, phraseOf(['DIG', 'ROCK']), 20)).toBe(mixed)
+    expect(observePhrase(mixed, phraseOf(['DIG', 'ROCK'], SHIPPED_VOCABULARY), 20)).toBe(mixed)
     expect(observePhrase(mixed, [], 20)).toBe(mixed)
   })
 })
@@ -147,23 +148,23 @@ describe('the journal listing', () => {
   it('lists what was heard in the lexicon\'s sort order, whatever the order of hearing', () => {
     let memory = emptyMemory()
     for (const concept of [...CONCEPT_IDS].reverse()) {
-      memory = observeUtterance(memory, utteranceOf(concept), 1)
+      memory = observeUtterance(memory, utteranceOf(concept, SHIPPED_VOCABULARY), 1)
     }
-    const listed = heardUtterances(memory).map((e) => conceptOf(e.utterance))
+    const listed = heardUtterances(memory).map((e) => conceptOf(e.utterance, SHIPPED_VOCABULARY))
     expect(listed).toEqual(['UPSTREAM', 'RIVER', 'DIG', 'ROCK', 'CHIEF', 'DOWNSTREAM'])
   })
 })
 
 describe('the save round trip', () => {
   it('restores days and hypotheses unchanged', () => {
-    let memory = observePhrase(emptyMemory(), phraseOf(['DIG', 'ROCK']), 7)
+    let memory = observePhrase(emptyMemory(), phraseOf(['DIG', 'ROCK'], SHIPPED_VOCABULARY), 7)
     memory = setHypothesis(memory, DIG, 'dig?')
     const restored = deserializeMemory(JSON.parse(JSON.stringify(serializeMemory(memory))))
     expect(restored).toEqual(memory)
   })
 
   it('carries the settlement through the save, and invents none where the save has none', () => {
-    const memory = observePhrase(emptyMemory(), phraseOf(['DIG', 'ROCK']), 7, 'bambara-village')
+    const memory = observePhrase(emptyMemory(), phraseOf(['DIG', 'ROCK'], SHIPPED_VOCABULARY), 7, 'bambara-village')
     const restored = deserializeMemory(JSON.parse(JSON.stringify(serializeMemory(memory))))
     expect(restored.heard[DIG].firstHeardPlace).toBe('bambara-village')
     // A snapshot written before the place was tracked, or with an empty one:

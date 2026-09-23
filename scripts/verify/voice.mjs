@@ -324,6 +324,8 @@ if (section('village-stereo')) {
     const { sampleSpeech } = await import('/scripts/verify/speechSampler.mjs')
     const a = window.__ambience
     const b = window.__balance
+    // The vocabulary is rolled per run, so the word is taken from this run.
+    const river = utteranceOf('RIVER', window.__game.getState().vocabulary)
     a.start()
     const ac = a.context()
     await ac.resume()
@@ -341,11 +343,11 @@ if (section('village-stereo')) {
     const sample = async (childrenOnly) => {
       const tones = [b.communication.speechPitchHz, b.communication.speechChildPitchHz]
       const startedAt = ac.currentTime
-      a.speak(utteranceOf('RIVER'), childrenOnly ? 0 : 3, {
+      a.speak(river, childrenOnly ? 0 : 3, {
         bearing: childrenOnly ? Math.PI / 2 : -Math.PI / 2,
         voice: childrenOnly ? 'child' : 'adult',
       })
-      a.speak(utteranceOf('RIVER'), childrenOnly ? 0 : 3, { bearing: Math.PI / 2, voice: 'child' })
+      a.speak(river, childrenOnly ? 0 : 3, { bearing: Math.PI / 2, voice: 'child' })
       return sampleSpeech(ac, analysers, tones, startedAt)
     }
     try {

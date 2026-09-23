@@ -3,6 +3,7 @@
 // journal writes. What only a browser can show — the pointer lock going and
 // coming back, and real keystrokes reaching the field — stays in
 // scripts/verify/polish.mjs.
+import { SHIPPED_VOCABULARY } from '../communication/vocabulary'
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { fireEvent, render } from '@testing-library/react'
 import { Dialogs } from './Dialogs'
@@ -15,8 +16,8 @@ import { de } from '../i18n/de'
 import { useLocale } from '../i18n'
 import { freshGame, g } from '../test/store'
 
-const RIVER_UTTERANCE = utteranceOf('RIVER')
-const DIG = utteranceOf('DIG')
+const RIVER_UTTERANCE = utteranceOf('RIVER', SHIPPED_VOCABULARY)
+const DIG = utteranceOf('DIG', SHIPPED_VOCABULARY)
 
 /** Open the dialog for what one speaker just said. */
 const openFor = (...atoms: string[]) =>

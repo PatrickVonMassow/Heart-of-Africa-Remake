@@ -1,3 +1,4 @@
+import { SHIPPED_VOCABULARY } from '../../communication/vocabulary'
 import { beforeAll, expect, it, vi } from 'vitest'
 import { resetDevAsserts } from '../../systems/devAssert'
 import { balance } from '../../config/balance'
@@ -72,6 +73,7 @@ it('measures the hold above complete healthy exchanges on every shipped village 
       const stuck = [0, 0]
       const anchors = people.map((p) => [p.x, p.z] as readonly [number, number])
       const view: AdultWorkView = {
+    vocabulary: SHIPPED_VOCABULARY,
         villagers: people,
         geography: {
           waterHead: layout.waterPath?.head ?? null,

@@ -3,6 +3,7 @@
 // hearing bookkeeping — out of range records nothing, in range records once, a
 // phrase records each atom. All pure; the browser only proves sound plays.
 
+import { SHIPPED_VOCABULARY } from './vocabulary'
 import { afterEach, describe, expect, it } from 'vitest'
 import { balance } from '../config/balance'
 import { emptyMemory, hasHeard, heardUtterances } from './heard'
@@ -17,9 +18,9 @@ import {
   utteranceSeconds,
 } from './speaking'
 
-const RIVER_UTTERANCE = utteranceOf('RIVER')
-const DIG = utteranceOf('DIG')
-const ROCK_UTTERANCE = utteranceOf('ROCK')
+const RIVER_UTTERANCE = utteranceOf('RIVER', SHIPPED_VOCABULARY)
+const DIG = utteranceOf('DIG', SHIPPED_VOCABULARY)
+const ROCK_UTTERANCE = utteranceOf('ROCK', SHIPPED_VOCABULARY)
 
 const defaults = structuredClone(balance.communication)
 const defaultVolume = balance.ambienceVolume
@@ -122,7 +123,7 @@ describe('utterancePlan (the syllables at a constant pace)', () => {
 })
 
 describe('phrasePlan (atoms with the constant pause between them)', () => {
-  const phrase = phraseOf(['DIG', 'ROCK'])
+  const phrase = phraseOf(['DIG', 'ROCK'], SHIPPED_VOCABULARY)
 
   it('plays every atom, separated by exactly the constant pause', () => {
     const plan = phrasePlan(phrase, 0, { syllableSeconds: 0.3, pauseSeconds: 0.9, volume: 1 })
@@ -180,18 +181,18 @@ describe('hearing bookkeeping (point 477 store — what the distance decides)', 
   })
 
   it('records EACH atom of a phrase heard in range', () => {
-    const memory = hearPhrase(emptyMemory(), phraseOf(['DIG', 'ROCK']), 3, day, radius)
+    const memory = hearPhrase(emptyMemory(), phraseOf(['DIG', 'ROCK'], SHIPPED_VOCABULARY), 3, day, radius)
     expect(heardUtterances(memory).map((h) => h.utterance).sort()).toEqual([DIG, ROCK_UTTERANCE].sort())
     expect(memory.heard[DIG].firstHeardDay).toBe(day)
   })
 
   it('records no atom of a phrase spoken out of range', () => {
-    const memory = hearPhrase(emptyMemory(), phraseOf(['DIG', 'ROCK']), radius * 2, day, radius)
+    const memory = hearPhrase(emptyMemory(), phraseOf(['DIG', 'ROCK'], SHIPPED_VOCABULARY), radius * 2, day, radius)
     expect(heardUtterances(memory)).toHaveLength(0)
   })
 
   it('walking closer turns the same phrase into a recorded one', () => {
-    const phrase = phraseOf(['DIG', 'ROCK'])
+    const phrase = phraseOf(['DIG', 'ROCK'], SHIPPED_VOCABULARY)
     const far = hearPhrase(emptyMemory(), phrase, radius * 2, day, radius)
     const near = hearPhrase(far, phrase, radius * 0.4, day + 1, radius)
     expect(heardUtterances(near)).toHaveLength(2)
@@ -228,8 +229,8 @@ describe('direction and conversational reach', () => {
   })
 
   it('stores one position and register without changing syllable levels or timing', () => {
-    const centred = phrasePlan(phraseOf(['UPSTREAM', 'DOWNSTREAM']), 3)
-    const child = phrasePlan(phraseOf(['UPSTREAM', 'DOWNSTREAM']), 3, { bearing: Math.PI / 2, voice: 'child' })
+    const centred = phrasePlan(phraseOf(['UPSTREAM', 'DOWNSTREAM'], SHIPPED_VOCABULARY), 3)
+    const child = phrasePlan(phraseOf(['UPSTREAM', 'DOWNSTREAM'], SHIPPED_VOCABULARY), 3, { bearing: Math.PI / 2, voice: 'child' })
     expect(child.pan).toBe(balance.communication.speechStereoWidth)
     expect(child.voice).toBe('child')
     expect(child.syllables).toEqual(centred.syllables)

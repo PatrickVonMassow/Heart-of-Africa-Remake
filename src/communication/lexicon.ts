@@ -1,15 +1,15 @@
 // The tonal lexicon of the village communication slice (design.md §13.4,
-// docs/communication-poc-spec.md): the six concepts, the tone sequence each
-// one is spoken in, and the tone helpers every consumer — villager speech,
+// docs/communication-poc-spec.md): the six concepts, the lects that speak
+// them, and the tone helpers every consumer — villager speech,
 // drums, journal, overhead labels — reads instead of restating them.
 //
 // Pure data and pure logic. Nothing here knows about the scene, the store or
 // the UI, and nothing here is localized: the game never hands the player a
 // translation, it only ever shows him what he wrote down himself.
 //
-// The registry is keyed by LECT (a region's way of speaking), so a second
-// region is a new entry in LECTS — consumers keep calling sequenceOf() /
-// utteranceOf() with a lect id and never change.
+// Lects hold the fixed syllables and reserved sequences. The six concept
+// assignments are an explicit Vocabulary value rolled once per run; every
+// consumer supplies that value rather than resolving a module-level mapping.
 
 /** The two meaning-bearing tones. Nothing else carries meaning anywhere. */
 export type Tone = 'low' | 'high'
@@ -19,7 +19,7 @@ export type ToneSequence = readonly Tone[]
 
 /**
  * The concepts of the slice. Adding another here fails to compile
- * until every lect gives it a sequence (the Record below is exhaustive).
+ * until every vocabulary gives it a sequence (the Record below is exhaustive).
  */
 export type ConceptId =
   | 'RIVER'
@@ -30,9 +30,9 @@ export type ConceptId =
   | 'CHIEF'
 
 /**
- * Every sequence is four syllables long with an even number of highs. Those
- * eight parity sequences are mutually at least two syllables apart: six are
- * words and two remain reserved.
+ * Every sequence has this many syllables and an even number of highs, so any
+ * two are at least two syllables apart. Counted at four: eight such sequences,
+ * six words and two reserved. Another length derives another set.
  */
 export const SEQUENCE_LENGTH = 4
 
@@ -48,6 +48,9 @@ export const SYLLABLE_SEPARATOR = '-'
  */
 export type UtteranceId = string
 
+/** The run's six tone sequences, written as utterances so saves retain the mapping. */
+export type Vocabulary = Readonly<Record<ConceptId, UtteranceId>>
+
 /**
  * A PHRASE is an ordered list of atoms spoken one after another, separated by
  * the constant pause the drums also use (balance.communication.phrasePauseSeconds)
@@ -55,25 +58,18 @@ export type UtteranceId = string
  */
 export type Phrase = readonly UtteranceId[]
 
-/** A region's way of speaking: its two syllables and its sequence per concept. */
+/** The fixed parts of a region's speech; concept assignments live in Vocabulary. */
 export interface Lect {
   id: LectId
   /** The low syllable, written lowercase. */
   low: string
   /** The high syllable, written uppercase. */
   high: string
-  /** One sequence per concept — exhaustive by type. */
-  sequences: Readonly<Record<ConceptId, ToneSequence>>
   /** Well-formed sequences this lect deliberately leaves unused. */
   reserved: readonly ToneSequence[]
 }
 
 export type LectId = 'tonalWestCentre'
-
-/** Reads a sequence the way docs/communication-poc-spec.md writes it. */
-function seq(spoken: string): ToneSequence {
-  return spoken.split(SYLLABLE_SEPARATOR).map(toneOfSyllable)
-}
 
 /**
  * The tone of a written syllable: HIGH when it is written in upper case, LOW
@@ -92,31 +88,18 @@ export function toneOfSyllable(syllable: string): Tone {
  *
  * A WORD additionally carries AT LEAST ONE SYLLABLE OF EACH TONE. The two
  * single-tone sequences are four identical strikes, the least hearable thing
- * the drums can beat, and the message opens on RIVER — so they stay out of the
- * lexicon and are the whole of `reserved` now that CHIEF took the last spare
- * mixed sequence.
+ * the drums can beat — so they stay out of every vocabulary and are the whole
+ * of `reserved`; the six mixed sequences are all words, in a rolled order.
  */
 const TONAL_WEST_CENTRE: Lect = {
   id: 'tonalWestCentre',
   low: 'ba',
   high: 'BA',
-  sequences: {
-    RIVER: seq('ba-BA-ba-BA'), // alternating: the word the whole message opens on
-    UPSTREAM: seq('ba-ba-BA-BA'), // rising against the current
-    DOWNSTREAM: seq('BA-BA-ba-ba'), // its mirror, falling with it
-    ROCK: seq('BA-ba-ba-BA'), // framed by two highs: a class of solid things
-    DIG: seq('ba-BA-BA-ba'),
-    // The man the drummer points his arm at. It takes the last spare mixed
-    // sequence, which is RIVER's tonal mirror — so the direction pair is no
-    // longer the ONLY mirror in the language. It stays the only mirror the
-    // player hears as a PAIR: UPSTREAM and DOWNSTREAM are said in the same
-    // breath at the bank game, while CHIEF is only ever said alone.
-    CHIEF: seq('BA-ba-BA-ba'),
-  },
-  reserved: [
-    seq('ba-ba-ba-ba'), // single-tone, therefore never a word
-    seq('BA-BA-BA-BA'), // single-tone, therefore never a word
-  ],
+  // Derived, not written out: the single-tone sequences of this length. They
+  // are the least hearable thing the drums can beat, so they are never words.
+  reserved: wellFormedSequences().filter(
+    (s) => highCount(s) === 0 || highCount(s) === s.length,
+  ),
 }
 
 /** Every lect. A new region adds an entry here and touches no consumer. */
@@ -127,14 +110,17 @@ export const LECTS: Readonly<Record<LectId, Lect>> = {
 /** The lect of the village the slice plays in. */
 export const DEFAULT_LECT: LectId = 'tonalWestCentre'
 
-export function lectOf(id: LectId = DEFAULT_LECT): Lect {
+export function lectOf(id: LectId): Lect {
   return LECTS[id]
 }
 
-/** Every concept, in the registry's order. */
-export const CONCEPT_IDS: readonly ConceptId[] = Object.keys(
-  TONAL_WEST_CENTRE.sequences,
-) as ConceptId[]
+/** Keyed by ConceptId, so a concept added to the type fails to compile here. */
+const CONCEPT_ORDER: Record<ConceptId, true> = {
+  RIVER: true, UPSTREAM: true, DOWNSTREAM: true, ROCK: true, DIG: true, CHIEF: true,
+}
+
+/** Every concept, in the vocabulary table's order. */
+export const CONCEPT_IDS: readonly ConceptId[] = Object.keys(CONCEPT_ORDER) as ConceptId[]
 
 /**
  * The direction pair is an exact tonal mirror, the relationship the player is
@@ -144,19 +130,19 @@ export const MIRROR_PAIRS: readonly (readonly [ConceptId, ConceptId])[] = [
   ['UPSTREAM', 'DOWNSTREAM'],
 ]
 
-export function sequenceOf(concept: ConceptId, lect: LectId = DEFAULT_LECT): ToneSequence {
-  return lectOf(lect).sequences[concept]
+export function sequenceOf(concept: ConceptId, vocabulary: Vocabulary): ToneSequence {
+  return tonesOf(vocabulary[concept])
 }
 
 /** Writes a sequence out in a lect's syllables, e.g. `BA-BA-ba-ba`. */
-export function speak(sequence: ToneSequence, lect: LectId = DEFAULT_LECT): UtteranceId {
+export function speak(sequence: ToneSequence, lect: LectId): UtteranceId {
   const { low, high } = lectOf(lect)
   return sequence.map((tone) => (tone === 'high' ? high : low)).join(SYLLABLE_SEPARATOR)
 }
 
 /** The spoken atom of a concept — the key the heard store and the save use. */
-export function utteranceOf(concept: ConceptId, lect: LectId = DEFAULT_LECT): UtteranceId {
-  return speak(sequenceOf(concept, lect), lect)
+export function utteranceOf(concept: ConceptId, vocabulary: Vocabulary): UtteranceId {
+  return vocabulary[concept]
 }
 
 /** The tones of a written utterance, read off the syllables' case. */
@@ -166,8 +152,8 @@ export function tonesOf(utterance: UtteranceId): ToneSequence {
 }
 
 /** The concept an utterance names, or null when it names none. */
-export function conceptOf(utterance: UtteranceId, lect: LectId = DEFAULT_LECT): ConceptId | null {
-  for (const id of CONCEPT_IDS) if (utteranceOf(id, lect) === utterance) return id
+export function conceptOf(utterance: UtteranceId, vocabulary: Vocabulary): ConceptId | null {
+  for (const id of CONCEPT_IDS) if (utteranceOf(id, vocabulary) === utterance) return id
   return null
 }
 
@@ -194,13 +180,28 @@ export function toneDistance(a: ToneSequence, b: ToneSequence): number {
  *
  * Not the same as "usable as a concept", which it used to say. The single-tone
  * sequences `ba-ba-ba-ba` and `BA-BA-BA-BA` are well formed by this rule and are
- * deliberately never words — they are the whole of the inventory's reserve. Whether a sequence IS a word is `conceptOf`'s question, and it answers
- * it against the lexicon rather than by calling this.
+ * deliberately never words — two of two reserved sequences. Whether a sequence
+ * IS a word is `conceptOf`'s question, answered against the run vocabulary.
  */
-export function isWellFormed(sequence: ToneSequence): boolean {
-  if (sequence.length !== SEQUENCE_LENGTH) return false
+export function isWellFormed(sequence: ToneSequence, length: number = SEQUENCE_LENGTH): boolean {
+  if (sequence.length !== length) return false
   const highs = highCount(sequence)
   return highs % 2 === 0
+}
+
+/**
+ * Every sequence the tongue can form at a length, in a stable order. Derived
+ * rather than written out, so raising SEQUENCE_LENGTH needs no new literals.
+ */
+export function wellFormedSequences(length: number = SEQUENCE_LENGTH): ToneSequence[] {
+  const all: ToneSequence[] = []
+  for (let mask = 0; mask < 1 << length; mask++) {
+    const sequence: ToneSequence = Array.from({ length }, (_, i) =>
+      mask & (1 << (length - 1 - i)) ? 'high' : 'low',
+    )
+    if (isWellFormed(sequence, length)) all.push(sequence)
+  }
+  return all
 }
 
 export function reversed(sequence: ToneSequence): ToneSequence {
@@ -231,6 +232,6 @@ export function compareUtterances(a: UtteranceId, b: UtteranceId): number {
 }
 
 /** The atoms of a phrase of concepts, in order. */
-export function phraseOf(concepts: readonly ConceptId[], lect: LectId = DEFAULT_LECT): Phrase {
-  return concepts.map((c) => utteranceOf(c, lect))
+export function phraseOf(concepts: readonly ConceptId[], vocabulary: Vocabulary): Phrase {
+  return concepts.map((c) => utteranceOf(c, vocabulary))
 }

@@ -4,6 +4,7 @@
 // PLACEMENT is pinned in src/world/communicationRock.test.ts — this file pins
 // the store wiring: the dig branch, the hand-over guards, the chronicle in both
 // languages, and the save/load round trip.
+import { SHIPPED_VOCABULARY } from '../communication/vocabulary'
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { balance } from '../config/balance'
 import { g, freshGame, withWorld, useGame, standBeforeChief, leaveTheChief } from '../test/store'
@@ -19,6 +20,7 @@ withWorld()
 
 beforeEach(() => {
   freshGame()
+  useGame.setState({ vocabulary: SHIPPED_VOCABULARY })
   balance.randomEventsEnabled = false
 })
 afterEach(() => {
@@ -113,16 +115,16 @@ describe('giving the find to the chief', () => {
     carriedIntoTheVillage()
     g().debugSet({ day: 60 })
     g().handArtefactToChief()
-    for (const atom of drumMessagePhrase('answer')) {
+    for (const atom of drumMessagePhrase(SHIPPED_VOCABULARY, 'answer')) {
       expect(hasHeard(g().communication, atom)).toBe(false)
     }
     // Nothing is translated for the player: an utterance he wrote no note for
     // stays without one.
-    expect(hypothesisFor(g().communication, utteranceOf('ROCK'))).toBe('')
+    expect(hypothesisFor(g().communication, utteranceOf('ROCK', SHIPPED_VOCABULARY))).toBe('')
   })
 
   it('keeps the day and the note of a concept already heard in the village', () => {
-    const DIG = utteranceOf('DIG')
+    const DIG = utteranceOf('DIG', SHIPPED_VOCABULARY)
     g().debugSet({ day: 4 })
     g().hearUtterance(DIG)
     g().setUtteranceHypothesis(DIG, 'dig')

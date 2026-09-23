@@ -29,7 +29,8 @@ import {
   deserializeMemory, emptyMemory, observePhrase, observeUtterance, serializeMemory,
   setHypothesis, type CommunicationMemory,
 } from '../communication/heard'
-import type { Phrase, UtteranceId } from '../communication/lexicon'
+import { rollVocabulary, SHIPPED_VOCABULARY } from '../communication/vocabulary'
+import type { Phrase, UtteranceId, Vocabulary } from '../communication/lexicon'
 import { currentDrumMessage, drumMessagePhrase, drumMessagePlan, type DrumMessageId } from '../communication/drumMessage'
 import { playDrumMessage } from '../systems/ambience'
 import { ROCK_VILLAGE_ID, isAtCommunicationRock } from '../world/communicationRock'
@@ -161,6 +162,8 @@ export interface GameState {
   orientationGiven: Record<string, boolean>
   journal: JournalEntry[]
   journalOpen: boolean
+  /** Region-wide assignment, fixed for the entire run and saved by value. */
+  vocabulary: Vocabulary
   /** What the player has HEARD of a people's speech, and the readings he wrote
    *  for it (design.md §13.4, docs/communication-poc-spec.md). The journal's
    *  observation section renders it; the game never interprets a note. */
@@ -532,6 +535,7 @@ export function startState(seed: number, placeId: string = startPlaceId()) {
       { id: 1, day: 0, title: { key: 'journal.titles.departure' }, text: { key: 'journal.start' }, kind: 'event' as const, sketch: 'harbor' as SketchId },
     ],
     journalOpen: true,
+    vocabulary: rollVocabulary(seed),
     communication: emptyMemory(),
     drumMessageHeard: { errand: false, answer: false },
     rockArtefact: 'buried' as RockArtefactState,
@@ -731,7 +735,7 @@ export const useGame = create<GameState>()((set, get) => ({
   // written once — hearing the drums a second time adds no second page.
   receiveDrumMessage: (message = 'errand') => {
     const s = get()
-    const heard = observePhrase(s.communication, drumMessagePhrase(message), Math.floor(s.day), heardIn(s))
+    const heard = observePhrase(s.communication, drumMessagePhrase(s.vocabulary, message), Math.floor(s.day), heardIn(s))
     set({ communication: heard, drumMessageHeard: { ...s.drumMessageHeard, [message]: true } })
     if (s.drumMessageHeard[message]) return
     get().addEntry(
@@ -765,7 +769,7 @@ export const useGame = create<GameState>()((set, get) => ({
       }
       return
     }
-    const plan = drumMessagePlan(message)
+    const plan = drumMessagePlan(s.vocabulary, message)
     // The minute restarts when the message actually begins, including a
     // deferred answer, and both sound and hands receive this very plan.
     setChiefWalkState(chiefCalled(chiefWalkState(), speechClock()).walk)
@@ -2074,6 +2078,7 @@ export const useGame = create<GameState>()((set, get) => ({
       honoredFriend: s.honoredFriend, lastFriendAidDay: s.lastFriendAidDay,
       freeCamps: s.freeCamps, villageCamps: s.villageCamps,
       villageDigProgress: s.villageDigProgress,
+      vocabulary: s.vocabulary,
       communication: serializeMemory(s.communication),
       drumMessageHeard: s.drumMessageHeard,
       rockArtefact: s.rockArtefact, carriedForms: s.carriedForms, spentSockets: s.spentSockets,
@@ -2158,6 +2163,9 @@ export const useGame = create<GameState>()((set, get) => ({
         // Heard utterances and their notes (design.md §13.4). deserializeMemory
         // is tolerant, so a snapshot from before this system yields an empty
         // memory rather than a broken one.
+        // Old notes were written against the shipped mapping. Deriving from
+        // the seed here would silently attach those notes to different meanings.
+        vocabulary: snap.vocabulary ?? { ...SHIPPED_VOCABULARY },
         communication: deserializeMemory(snap.communication),
         // A snapshot from before the drums existed simply never heard them.
         drumMessageHeard: { errand: snap.drumMessageHeard?.errand === true, answer: snap.drumMessageHeard?.answer === true },

@@ -19,6 +19,7 @@
 // The module is pure: no three, no scene. `PlaceLife` gives it the live village
 // and carries out what comes back.
 
+import type { Vocabulary } from '../../communication/lexicon'
 import { atDigStand, DIG_ARRIVE_RADIUS, digStandingPlaces } from './placeGround'
 import { SpeechFloor } from '../../communication/speechFloor'
 import { balance } from '../../config/balance'
@@ -66,6 +67,7 @@ export interface AdultWorkGeography {
 export interface AdultWorker extends ErrandPoint { free: boolean }
 
 export interface AdultWorkView {
+  vocabulary: Vocabulary
   floor?: SpeechFloor
   villagers: readonly AdultWorker[]
   geography: AdultWorkGeography
@@ -460,7 +462,7 @@ function wordSpoken(state: AdultWorkState, view: AdultWorkView, t: AdultTask, i:
   // this task owes starts with a clean slate.
   delete t.withheld
   delete t.pendingWord
-  const hold = instructionDelay(word.concept)
+  const hold = instructionDelay(word.concept, view.vocabulary)
   if (hold > 0) {
     t.holdFor = hold
     return
@@ -615,7 +617,7 @@ export function stepAdultWork(
           sources: () => [view.villagers[i], ...(t.partner === null ? [] : [view.villagers[t.partner]])]
             .filter((p) => !!p).map((p) => ({ x: p.x, z: p.z, register: 'talk' as const })),
           blocked, remaining, step: dt, ends,
-          actAfter: instructionDelay(t.pendingWord.concept),
+          actAfter: instructionDelay(t.pendingWord.concept, view.vocabulary),
         })
         t.hushed = !!ready && !allowed
         if (!allowed) t.withheld = true

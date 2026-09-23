@@ -15,6 +15,7 @@
 // run sooner than its slowest single file. Splitting the judgements across files
 // lowers that floor; sharing the harness keeps them replaying the same
 // settlement.
+import { rollVocabulary } from '../../communication/vocabulary'
 import { expect } from 'vitest'
 import {
   CHILD_MOTION,
@@ -219,6 +220,7 @@ export function crowd(
     return true
   }
   const workView: AdultWorkView = {
+    vocabulary: rollVocabulary(seed),
     villagers: walkers.map((b) => ({ x: b.x, z: b.z, free: true })),
     geography: {
       waterHead: layout.waterPath ? { x: layout.waterPath.head.x, z: layout.waterPath.head.z } : null,
