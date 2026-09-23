@@ -2440,8 +2440,12 @@ in that line trees, loose stones and the outbuildings (sheds, granaries) give
 way first. Where that is not enough, a household gives way too — a compound
 whole, with its wall, lane and errand, or a hut standing alone — in the line or
 on the ground the station is given, because nothing here fixes where a compound
-of the procedural ring stands; the layout names the drop (`gaveWayToLoom`). The
-chief's and trading huts and the landmarks stay. The teaching rules are in
+of the procedural ring stands; the layout names the drop (`gaveWayToLoom`) and
+refills the compounds still standing where they have room. A seat is taken only
+if the plan can afford it: a compound cluster keeps three enclosures, other
+plans six dwellings, a ksar eight houses, and the dressing its way-out floor.
+Where no seat near the plaza is affordable, the far seat of point 1190 stands.
+The chief's and trading huts and the landmarks stay. The teaching rules are in
 `docs/communication-poc-spec.md`, "The weaver's loom".
 
 ---

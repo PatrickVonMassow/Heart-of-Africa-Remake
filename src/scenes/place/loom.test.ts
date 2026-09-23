@@ -108,9 +108,10 @@ describe('a household gives way to the plaza’s view (work-order 1191)', () => 
     expect(unseen).toEqual([])
   })
 
-  it('a seen station is near enough the plaza to read — within 17 m of a stand', () => {
+  it('a station a household gave way for is near enough to read — within 17 m of a stand', () => {
+    // A plan that can afford no household keeps the far seat it had before.
     const far = shippedLooms()
-      .filter(({ layout }) => layout.loom?.seenFromPlaza === true)
+      .filter(({ layout }) => layout.loom?.seenFromPlaza === true && layout.gaveWayToLoom.households > 0)
       .filter(({ layout }) => {
         const w = layout.loom!.weaver
         return Math.min(...plazaStands().map(([x, z]) => Math.hypot(w.x - x, w.z - z))) > 17
@@ -135,12 +136,12 @@ describe('a household gives way to the plaza’s view (work-order 1191)', () => 
 
   it('what was left unbuilt is named, and nothing is where the line was already open', () => {
     // Fang@42 keeps its nominal seat with the view open past every hut.
-    expect(sharedLayout('fang-village', 42).gaveWayToLoom).toEqual({ households: 0, dwellings: 0 })
+    expect(sharedLayout('fang-village', 42).gaveWayToLoom).toEqual({ households: 0, dwellings: 0, rebuilt: 0 })
     const bambara = sharedLayout('bambara-village', 394349866)
     expect(bambara.gaveWayToLoom.households).toBeGreaterThan(0)
     expect(bambara.gaveWayToLoom.dwellings).toBeGreaterThanOrEqual(bambara.gaveWayToLoom.households)
-    // The ring still reads as a village of families, not a clearing.
-    expect(bambara.dwellings.filter((d) => d.kind === 'hut').length).toBeGreaterThanOrEqual(4)
+    // A compound goes whole, and the cluster keeps at least three of them.
+    expect(bambara.fences.filter((f) => f.kind === 'woven').length).toBeGreaterThanOrEqual(3)
   })
 })
 

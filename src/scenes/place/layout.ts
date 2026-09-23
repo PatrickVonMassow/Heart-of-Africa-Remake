@@ -181,10 +181,11 @@ export interface PlaceLayout {
   loom: LoomStation | null
   /**
    * What was left unbuilt so the plaza sees the loom (work-order 1191): the
-   * households (a compound, or a hut standing alone) and the dwellings they
-   * held. Zero where the line needed nothing but outbuildings and dressing.
+   * households (a compound, or a hut standing alone), the dwellings they held,
+   * and the huts the compounds still standing took back. Zero where the line
+   * needed nothing but outbuildings and dressing.
    */
-  gaveWayToLoom: { households: number; dwellings: number }
+  gaveWayToLoom: { households: number; dwellings: number; rebuilt: number }
   /**
    * The children's roaming quarter (work-order 481.4): where the group plays
    * between two cycles of its bank game, and how far it roams. It is layout data
@@ -781,6 +782,15 @@ const PLAZA_SIGHT_MIN_DISTANCE = 8
  *  16.5 m once the children's and the water head's talk separations are kept,
  *  so the frame's projected-height minimum is what decides. Calibratable. */
 const PLAZA_SIGHT_MAX_DISTANCE = 17
+/** What a village keeps whatever gives way to the loom (work-order 1191):
+ *  enough dwellings to read as inhabited, a ksar's dense block (its infill
+ *  draw's own minimum) and a compound cluster's enclosures round the plaza. */
+const VILLAGE_MIN_DWELLINGS = 6
+const KSAR_MIN_HOUSES = 8
+const COMPOUND_MIN = 3
+/** ... and the loose dressing its line may thin out, down to this. */
+const DRESSING_MIN_FLORA = 5
+const DRESSING_MIN_ROCKS = 11
 /** The station's own ground at the far end, which is not sight line. */
 const PLAZA_SIGHT_STATION_GROUND = 2
 /** The widths a view is measured at, narrowest first. */
@@ -994,6 +1004,14 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
    *  loom (work-order 1191): a family compound goes as one — its huts, granary,
    *  wall, lane and errand — so no wall is left standing round empty ground. */
   const householdOf = new Map<DwellingDef, Household>()
+  /** The compound plan's family enclosures, which the plan keeps at least
+   *  `COMPOUND_MIN` of whatever gives way. */
+  const compoundHouseholds = new Set<Household>()
+  /** Fills the compounds still standing back up to a hut count, inside their
+   *  own walls; set by the compound plan, null elsewhere. `clear` adds the
+   *  ground a later caller keeps (work-order 1191). */
+  let topUpCompounds: ((target: number, clear: (x: number, z: number, body: number) => boolean) => DwellingDef[]) | null = null
+  const leftUnbuilt = new Set<Household>()
   const newHousehold = (): Household => ({ dwellings: [], fences: [], paths: [], errands: [] })
   const joinHousehold = (h: Household, d: DwellingDef | null) => {
     if (!d) return
@@ -1468,6 +1486,7 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
         }
         if (!clears(cx, cz) || cr + ring > radius - 2) continue
         const household = newHousehold()
+        compoundHouseholds.add(household)
         placedRings.push({ x: cx, z: cz, a, ring, household })
         for (const seat of seats) {
           const x = cx + Math.cos(a + seat.angle) * seat.dist
@@ -1503,20 +1522,28 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
       // make the whole village read as half-abandoned, and how densely a Sahel
       // compound is built is a design decision (design.md §4.5), not a dice roll.
       const familyHuts = () => dwellings.filter((d) => d.kind === 'hut').length
-      const hutTarget = Math.max(7, placedRings.length * 2)
-      for (let t = 0; t < 240 && placedRings.length > 0 && familyHuts() < hutTarget; t++) {
-        const compound = placedRings[t % placedRings.length]
-        const ha = compound.a + Math.PI + (rand() - 0.5) * 3.4
-        const r = 1.3 + rand() * 0.6
-        const h = 1.9 + rand() * 0.5
-        // Inside its own wall like every other hut of the compound.
-        const hd = Math.min(3.1 + rand() * 1.9, compound.ring - FENCE_PANEL_RADIUS.woven - COMPOUND_WALL_GAP - hutBody(r, h))
-        if (hd < 1.5) continue
-        const x = compound.x + Math.cos(ha) * hd
-        const z = compound.z + Math.sin(ha) * hd
-        if (!isFree(x, z, 3.2, r) || onLane(x, z, r) || !clearOfFences(x, z, hutBody(r, h))) continue
-        joinHousehold(compound.household, addDwelling('hut', x, z, faceTo(x, z, compound.x, compound.z), r, h))
+      topUpCompounds = (target, clear) => {
+        const added: DwellingDef[] = []
+        const standing = placedRings.filter((c) => !leftUnbuilt.has(c.household))
+        for (let t = 0; t < 240 && standing.length > 0 && familyHuts() < target; t++) {
+          const compound = standing[t % standing.length]
+          const ha = compound.a + Math.PI + (rand() - 0.5) * 3.4
+          const r = 1.3 + rand() * 0.6
+          const h = 1.9 + rand() * 0.5
+          // Inside its own wall like every other hut of the compound.
+          const hd = Math.min(3.1 + rand() * 1.9, compound.ring - FENCE_PANEL_RADIUS.woven - COMPOUND_WALL_GAP - hutBody(r, h))
+          if (hd < 1.5) continue
+          const x = compound.x + Math.cos(ha) * hd
+          const z = compound.z + Math.sin(ha) * hd
+          if (!isFree(x, z, 3.2, r) || onLane(x, z, r) || !clearOfFences(x, z, hutBody(r, h))) continue
+          if (!clear(x, z, hutBody(r, h))) continue
+          const d = addDwelling('hut', x, z, faceTo(x, z, compound.x, compound.z), r, h)
+          joinHousehold(compound.household, d)
+          if (d) added.push(d)
+        }
+        return added
       }
+      topUpCompounds(Math.max(7, placedRings.length * 2), () => true)
       // A shed and a drying rack scattered between the compounds.
       for (let i = 0; i < 6 && dwellings.filter((d) => d.kind === 'shed').length < 2; i++) {
         const a = rand() * Math.PI * 2
@@ -1693,6 +1720,8 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   // and the trading huts stand where the plan put them; a shed or a granary
   // standing in the one line the plaza has is left unbuilt, as a tree there is.
   const plazaYielding = new Map<Collider, () => void>()
+  const floraBodies = new Set<Collider>()
+  const rockBodies = new Set<Collider>()
   const dropFrom = <T>(list: T[], item: T) => () => {
     const at = list.indexOf(item)
     if (at >= 0) list.splice(at, 1)
@@ -2063,6 +2092,7 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     const body = { x: t.x, z: t.z, r: 0.45 }
     colliders.push(body)
     plazaYielding.set(body, dropFrom(flora, t))
+    floraBodies.add(body)
   }
   for (const rock of rocks) {
     const [x, z, s] = rock
@@ -2070,6 +2100,7 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     const body = { x, z, r: looseRockRadius(s) }
     colliders.push(body)
     plazaYielding.set(body, dropFrom(rocks, rock))
+    rockBodies.add(body)
   }
 
   // THE STONE THE CHILDREN CLIMB (work-order 1082), derived LAST — after the
@@ -2202,7 +2233,7 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   // cannot give it the room, THE LOOM MOVES AND THE CHILDREN DO NOT (item 9):
   // their ground is what the whole communication slice is arranged around.
   let loom: LoomStation | null = null
-  const gaveWayToLoom = { households: 0, dwellings: 0 }
+  const gaveWayToLoom = { households: 0, dwellings: 0, rebuilt: 0 }
   if (place.kind === 'village') {
     // The stands a villager could look from are the same for every candidate
     // seat, so they are walked once rather than per trial (the sweep runs twice
@@ -2236,12 +2267,12 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     }
     const lightSolids = colliders.filter((c) => !plazaYielding.has(c))
     const sightSolids = lightSolids.filter((c) => !households.has(c))
-    const plazaLine = (seat: BankPoint, floor = 0, solids = sightSolids) => {
+    const plazaLine = (seat: BankPoint, floor = 0, solids = sightSolids, reach = PLAZA_SIGHT_MAX_DISTANCE) => {
       let widest = floor
       let line: { from: BankPoint; to: BankPoint } | null = null
       for (const stand of plazaStands) {
         const dist = Math.hypot(seat.x - stand.x, seat.z - stand.z)
-        if (dist < PLAZA_SIGHT_MIN_DISTANCE || dist > PLAZA_SIGHT_MAX_DISTANCE) continue
+        if (dist < PLAZA_SIGHT_MIN_DISTANCE || dist > reach) continue
         // The last stretch is the station's own ground, not the sight line.
         const t = (dist - PLAZA_SIGHT_STATION_GROUND) / dist
         const to = { x: stand.x + (seat.x - stand.x) * t, z: stand.z + (seat.z - stand.z) * t }
@@ -2261,8 +2292,50 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
       return { widest, line }
     }
     // The ground a station may take once the households give way: their
-    // bodies, walls and lanes go with them, and what gives way to the line
-    // (outbuildings, trees, stones) gives way to the station as well.
+    // bodies, walls and lanes go with them. Trees and stones give way to the
+    // LINE only; the dressing is not thinned out for the station's ground.
+    /** What a station displaces: the households in its plaza line — none
+     *  where a line past the outbuildings alone is open — and on its ground. */
+    const displacedBy = (station: LoomStation) => {
+      const light = plazaLine(station.weaver, 0, lightSolids)
+      const line = light.widest >= PLAZA_SIGHT_HALF_WIDTH ? light.line : plazaLine(station.weaver).line
+      const ground = stationGround(station, balance.villageLife.loom)
+      const leaving = new Set<Household>()
+      for (const [body, household] of households) {
+        if (leaving.has(household)) continue
+        const inLine = !!line && !clearCorridor([body], line.from, line.to, PLAZA_SIGHT_HALF_WIDTH)
+        if (inLine || ground.some((g) => !standingClear([body], g.x, g.z, g.r))) leaving.add(household)
+      }
+      const thinned = { flora: 0, rocks: 0 }
+      if (line) {
+        for (const body of plazaYielding.keys()) {
+          if (clearCorridor([body], line.from, line.to, PLAZA_SIGHT_HALF_WIDTH)) continue
+          if (floraBodies.has(body)) thinned.flora++
+          if (rockBodies.has(body)) thinned.rocks++
+        }
+      }
+      return { line, leaving, thinned }
+    }
+    /** Whether the plan's other rules still hold once they are gone (work-order
+     *  1191): a compound cluster keeps its enclosures — a compound goes whole,
+     *  so it is compounds that are counted there, and its huts are the named
+     *  drop — the other plans stay inhabited, and a ksar keeps its block. A
+     *  seat that would cost more is not taken. */
+    const villagePlan = VILLAGE_PLANS[place.peopleId ?? ''] ?? 'compound'
+    const affordable = ({ leaving, thinned }: ReturnType<typeof displacedBy>) => {
+      // The dressing is not thinned out below the way-out floor (point 688).
+      if (flora.length - thinned.flora < DRESSING_MIN_FLORA) return false
+      if (rocks.length - thinned.rocks < DRESSING_MIN_ROCKS) return false
+      if (leaving.size === 0) return true
+      if (villagePlan === 'compound') {
+        return [...compoundHouseholds].filter((h) => !leaving.has(h)).length >= COMPOUND_MIN
+      }
+      const gone = new Set([...leaving].flatMap((h) => h.dwellings))
+      const left = dwellings.filter((d) => (d.kind === 'hut' || d.kind === 'box' || d.kind === 'tent') && !gone.has(d))
+      if (left.length < VILLAGE_MIN_DWELLINGS) return false
+      return villagePlan !== 'ksar' || left.filter((d) => d.kind === 'box').length >= KSAR_MIN_HOUSES
+    }
+    const standingSolids = colliders.filter((c) => !households.has(c))
     const householdLanes = new Set([...households.values()].flatMap((h) => h.paths))
     const standingLanes = paths.filter((lane) => !householdLanes.has(lane))
     const groundFree = (x: number, z: number, r: number, solids: Collider[], lanes: readonly PathDef[]) =>
@@ -2287,7 +2360,8 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
         : Infinity,
       walkRadius: radius - WALKER_RADIUS,
       free: (x, z, r) => groundFree(x, z, r, colliders, paths),
-      freeGivingWay: (x, z, r) => groundFree(x, z, r, sightSolids, standingLanes),
+      freeGivingWay: (x, z, r) => groundFree(x, z, r, standingSolids, standingLanes),
+      givesWay: (station) => affordable(displacedBy(station)),
       sightClear: (from, to, halfWidth) => clearCorridor(colliders, from, to, halfWidth),
       // THE PLAZA'S OWN VIEW (work-order 1190). The ground the player stands on
       // to look at the village's middle is not one spot, so the line is asked
@@ -2296,6 +2370,10 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
       // each side: the shipped seat passed a 0.15 m line through a gap between
       // two dwellings, and what arrived in the frame was two figures, not a loom.
       plazaView: (seat, floor) => plazaLine(seat, floor).widest,
+      // The floor under both: the view from any distance with nothing but the
+      // outbuildings and the dressing giving way — the plaza's view as it was
+      // before a household could (work-order 1190).
+      plazaViewFar: (seat, floor) => plazaLine(seat, floor, lightSolids, Infinity).widest,
       plazaReach: (seat) => plazaStands.some((stand) => {
         const dist = Math.hypot(seat.x - stand.x, seat.z - stand.z)
         return dist >= PLAZA_SIGHT_MIN_DISTANCE && dist <= PLAZA_SIGHT_MAX_DISTANCE
@@ -2320,22 +2398,21 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
       const at = colliders.indexOf(body)
       if (at >= 0) colliders.splice(at, 1)
     }
-    const lightLine = loom ? plazaLine(loom.weaver, 0, lightSolids) : null
-    const cleared = lightLine && lightLine.widest >= PLAZA_SIGHT_HALF_WIDTH
-      ? lightLine.line
-      : loom ? plazaLine(loom.weaver).line : null
+    // Only what the placement could afford: a seat found by the last, far
+    // pass is cleared the way it was before a household could give way.
+    const asked = loom?.seenFromPlaza ? displacedBy(loom) : null
+    const displaced = asked && asked.line && affordable(asked) ? asked : null
+    const cleared = displaced?.line ?? (loom ? plazaLine(loom.weaver, 0, lightSolids, Infinity).line : null)
     if (cleared) {
-      const inLine = (body: Collider) => !clearCorridor([body], cleared.from, cleared.to, PLAZA_SIGHT_HALF_WIDTH)
-      // ... and whatever stands on the ground the station was given, which is
-      // only ever something that gives way: the strict search never lets it.
-      const ground = loom ? stationGround(loom, balance.villageLife.loom) : []
-      const underStation = (body: Collider) => ground.some((g) => !standingClear([body], g.x, g.z, g.r))
       for (const [body, drop] of plazaYielding) {
-        if (!inLine(body) && !underStation(body)) continue
+        if (clearCorridor([body], cleared.from, cleared.to, PLAZA_SIGHT_HALF_WIDTH)) continue
         drop()
         remove(body)
       }
-      const leaving = new Set([...households].filter(([body]) => inLine(body) || underStation(body)).map(([, h]) => h))
+    }
+    if (displaced) {
+      const leaving = displaced.leaving
+      const hutsBefore = dwellings.filter((d) => d.kind === 'hut').length
       const errandsLeaving = new Set<number>()
       for (const h of leaving) {
         for (const d of h.dwellings) {
@@ -2356,10 +2433,36 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
           if (at >= 0) paths.splice(at, 1)
         }
         for (const i of h.errands) errandsLeaving.add(i)
+        leftUnbuilt.add(h)
         gaveWayToLoom.households++
       }
       // Descending, so each splice leaves the indices still to go in place.
       for (const i of [...errandsLeaving].sort((a, b) => b - a)) errands.splice(i, 1)
+      // THE FAMILIES MOVE, THE VILLAGE STAYS AS FULL (the plan's other rules):
+      // the compounds still standing take the huts back up to the count the
+      // plan had, on ground that keeps clear of everything laid since — the
+      // station, its line, the children's quarter and their way to the water,
+      // the way out and every loose body.
+      if (leaving.size > 0 && topUpCompounds && loom && displaced.line) {
+        const station = loom
+        const line = displaced.line
+        const ground = stationGround(station, balance.villageLife.loom)
+        const added = topUpCompounds(hutsBefore, (x, z, body) =>
+          standingClear(colliders, x, z, body + 2 * PLAYER_RADIUS) &&
+          ground.every((g) => Math.hypot(x - g.x, z - g.z) > g.r + body + 2 * PLAYER_RADIUS) &&
+          clearCorridor([{ x, z, r: body }], line.from, line.to, PLAZA_SIGHT_HALF_WIDTH) &&
+          !inPlayGround(x, z, body) &&
+          !onWayToWater(x, z, body) &&
+          !onWayOut(wayOut, radius, x, z, body))
+        // Into the buildings' prefix of the collider list, in dwelling order:
+        // readers take `interactives + dwellings` bodies off its front.
+        for (const d of added) {
+          const body = dwellingCollider(d, style)
+          colliders.splice(interactives.length + dwellings.indexOf(d), 0, body)
+          dwellingBodies.set(d, body)
+          gaveWayToLoom.rebuilt++
+        }
+      }
     }
     // THE PLAZA VIEW IS LOUD WHEN IT IS MISSED (work-order 1190): a settlement
     // whose plan holds no seat the plaza can see still gets its loom, but the

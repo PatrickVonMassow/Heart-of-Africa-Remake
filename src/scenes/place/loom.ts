@@ -122,6 +122,12 @@ export interface LoomPlacement {
    *  leaves, it is asked again over this; the layout then leaves unbuilt what
    *  the chosen station stands on. Omitted: nothing gives way. */
   freeGivingWay?: (x: number, z: number, r: number) => boolean
+  /** Whether the settlement can afford what a seen seat displaces (work-order
+   *  1191); a seat that would cost its plan too much is passed over. */
+  givesWay?: (station: LoomStation) => boolean
+  /** The plaza's view with no reach and nothing that is a household giving
+   *  way; asked last, so no plan ends worse off than before 1191. */
+  plazaViewFar?: (seat: BankPoint, floor?: number) => number
   /** Distance from a spot to the NEAREST place a child speaks. The loom's own
    *  direction words must never arrive mixed with the children's (688 §1, §6),
    *  so this is the same measure the dig sites and the water path are held to. */
@@ -401,7 +407,11 @@ export function placeLoom(p: LoomPlacement): LoomStation | null {
           if (q.plazaReach && !q.plazaReach(station.weaver)) continue
           if (!stationHolds(station, q)) continue
           const view = q.plazaView(station.weaver, widest ? widest.view : 0)
-          if (view >= PLAZA_SIGHT_HALF_WIDTH) return { ...station, seenFromPlaza: true }
+          if (view >= PLAZA_SIGHT_HALF_WIDTH) {
+            const seen = { ...station, seenFromPlaza: true }
+            if (!q.givesWay || q.givesWay(seen)) return seen
+            continue
+          }
           if (q === p && (!widest || view > widest.view)) widest = { station, view }
           if (++viewed >= PLAZA_SWEEP_VIEWED_SEATS) return null
         }
@@ -409,7 +419,9 @@ export function placeLoom(p: LoomPlacement): LoomStation | null {
     }
     return null
   }
-  const seen = plazaPass(p) ?? (p.freeGivingWay ? plazaPass({ ...p, free: p.freeGivingWay }) : null)
+  const seen = plazaPass(p) ??
+    (p.freeGivingWay ? plazaPass({ ...p, free: p.freeGivingWay }) : null) ??
+    (p.plazaViewFar ? plazaPass({ ...p, plazaView: p.plazaViewFar, plazaReach: undefined, givesWay: undefined }) : null)
   if (seen) return seen
   if (widest) return { ...widest.station, seenFromPlaza: false }
   return sweep()
