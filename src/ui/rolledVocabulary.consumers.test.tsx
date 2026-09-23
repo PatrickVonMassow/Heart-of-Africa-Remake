@@ -92,7 +92,8 @@ describe('only the roll and the save fallback name the shipped vocabulary', () =
   it('the vocabulary module hands the shipped mapping out under its own name only', () => {
     const module = readFileSync(join(SRC, 'communication/vocabulary.ts'), 'utf8')
     expect(module.match(/^export .*$/gm)?.map((l) => l.match(/(?:const|function) (\w+)/)?.[1])).toEqual(
-      ['SHIPPED_VOCABULARY', 'enumerateVocabularies', 'rollVocabulary'])
+      ['SHIPPED_VOCABULARY', 'wordSequences', 'ascendingSequence', 'hasIconicDirections',
+        'hasNoAdjacentMirrors', 'enumerateVocabularies', 'rollVocabulary'])
     expect(module.match(/SHIPPED_VOCABULARY/g)).toHaveLength(1)
   })
 
