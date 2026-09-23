@@ -1742,4 +1742,15 @@ export const RED_CHARGES = [
       + '`--section=children-tag` is 16/16 on that state and on main. The charge dies with '
       + 'point 1145, which turns the throw into a failed check and repairs the framing.',
   },
+  {
+    point: 1202,
+    suite: 'polish',
+    kind: 'check',
+    match: /the spoil crossing starts on flat ground/i,
+    why:
+      'FILED AS 1202 ON 23.09.2026 once point 1198 stopped the adult-errands section crashing: '
+      + 'the dig-picture stand for bambara-village seed 58 lies 32.9 m out, past the boundary, '
+      + 'so the scene leaves the place and the route reads place null. Pure layout geometry, '
+      + 'so no backend is excluded. The charge dies with point 1202.',
+  },
 ]
