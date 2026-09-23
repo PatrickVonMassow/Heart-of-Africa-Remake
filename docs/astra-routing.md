@@ -63,11 +63,17 @@ wonders why a diagnosis came back in another voice.
 whether the vendor answers. When the OpenAI volume is exhausted or the lane is
 unreachable, authoring falls back to Opus 5.5 rather than waiting for the vendor
 (user 23.09.2026, after the volume ran out mid-batch and the switch had to be
-moved by hand). CLAUDE.md §6 states the rule; point 1194 makes it automatic — the
-failure signature is recognised, the kind is served in the Claude lane, and the
-fallback is recorded with a probe clock so it lifts by itself when the volume
-returns. Four eyes under the fallback uses the decorrelated same-vendor pair
-(Fable 5.1 reads Opus 5.5 work) and records that it is a fallback.
+moved by hand). CLAUDE.md §6 states the rule; point 1194 makes it automatic. A
+routed codex run whose outcome is `allowance-exhausted` or `unreachable`
+(`OUTAGE_KINDS` in `scripts/astra-share-core.mjs`) writes a `fallback` record —
+signature, kind and a probe clock (`OUTAGE_PROBE_MS`, 30 min, calibratable) —
+beside the operator setting, which stays as it was. While the clock runs every
+kind routes to Claude: an ask is served on Opus 5.5, `author-astra.mjs` exits 5
+("author it on Opus 5.5", not the point's red), and a review hands over to
+Fable 5.1 with a cause that names the fallback. When the clock runs out the next
+routed run is the probe: a success lifts the record, the same signature renews
+it. Any other failure is never a fallback. `--status`, the delegation brief and
+the board footer name an active fallback.
 
 ## Asking Astra
 
