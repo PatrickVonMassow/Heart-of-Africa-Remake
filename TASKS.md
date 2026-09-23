@@ -124,15 +124,18 @@ put it is the mistake this line exists to stop.
      yet the verdict was "charged for one reading of this check but not for every one this run
      produced". The printed occurrences carry one reading the charge does not own, so
      `occurrences.every(owned)` fails although the record's own reds are fully owned.
-  FINAL STATE: a record that carries its reds, its exit and `asserted` is chargeable whether or
-  not the suite printed a terminal verdict line — either the recorder recognises a section run's
-  terminal shape, or completeness stops resting on that line while still refusing a crashed or
-  truncated record. And a printed occurrence that the record does not carry may not by itself
+  CORRECTED 23.09.2026 by the author's measurement and the Fable review: a) is NOT a missing
+  terminal line — polish always prints `console errors: N`; the adult-errands record is a real
+  crash (`crashSource: 'uncaught-exception'`), filed as point 1198. Completeness keeps resting on
+  the terminal verdict line. b) is the section tag `[--section=…]` left on printed FAIL lines, in
+  section AND whole runs, so the same red arrived under a key the record does not carry.
+  FINAL STATE: printed lines are keyed exactly as the recorder stores them (section tag stripped
+  in every run), and a printed occurrence that the record does not carry may not by itself
   deny a charge the record's own reds earn; where the two disagree the run says WHICH reading is
   unowned, with its measurement, instead of a sentence nobody can act on.
   NOT IN THIS POINT: changing what any charge covers. Points 568 and 1154 keep their entries.
-  Test: Vitest on the pure decision — a section record with failing checks and no terminal line
-  is chargeable; a crashed or truncated record is not; a printed occurrence absent from the
+  Test: Vitest on the pure decision — tagged FAIL lines in a section and in a whole run key like
+  the record; a record without a terminal line, crashed or truncated, is not chargeable; a printed occurrence absent from the
   record does not deny the record's own charge, and the printed reason names the reading.
   Criticality: high — it blocks the cheap rung of every point whose sections carry a known
   foreign red, which is how it was found: the picture check of 1174 held two reds it does not own.
