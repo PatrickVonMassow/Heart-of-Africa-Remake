@@ -1789,3 +1789,13 @@ Punkt in die Arbeitsordnung.
 
 - Cross-model review of the lockless user-stop writer (point 1193) was not run: the whole-file range (batch-autostart.mjs) exceeded the 200k review budget and Astra is claude-only. Diff-scoped review of `scripts/batch-pause.mjs`, `batch-pause-core.mjs` classifyPause and the launcher's recovery branch remains open (23.09.2026).
 - Astra outage fallback (point 1194), Fable review notes, 23.09.2026: no manual lift of an active fallback before its probe clock expires (`ask-astra --anyway` is the only manual probe; say so in docs/astra-routing.md); `fallbackLine` names "Fable 5.1 reads Opus 5.5" even when the chain would land on Opus 4.8; `review-astra-cli.test.mjs`'s `run()` helper does not default `ASTRA_SHARE_FILE` to a temp file, so a future outage-stub test could write the real share file; an Astra-lane authoring attempt during an outage exits 5 and is relaunched on Opus by hand — nothing re-dispatches it.
+
+- Die Leerlauf-Behauptung der Tafel sperrt das Anlegen einer frischen Nutzeranordnung
+  (§3.306, gemessen 23.09.2026). `board-first-core` verweigert jede Schreiboperation, solange
+  »Gerade keine laufende Arbeit« steht; `now <N>` braucht eine Warteschlangen-Karte aus
+  TASKS.md, `closing <N>` einen gemergten Punkt — und der Punkt, der die erste Bedingung
+  erfüllen würde, entsteht nur durch genau die verbotene Schreiboperation. Durchgekommen bin
+  ich allein über die Einmal-pro-Zug-Freigabe des board-first-Tors.
+  NICHT EINGEREIHT: Infrastruktur-Freeze (Nutzerentscheidung 01.09.2026). Der Defekt lässt
+  nichts Falsches durch und blockiert keine laufende Spielarbeit; ein vierter Kartentyp wäre
+  genau der Wiederaufbau, den CLAUDE.md §2 untersagt.

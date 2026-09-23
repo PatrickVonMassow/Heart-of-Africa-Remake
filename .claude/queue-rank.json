@@ -1422,12 +1422,6 @@
       "why": "Der Test sperrt den Push von main und jedes Autoren-Gate auf einer belasteten Maschine; ohne ihn steht die Landung.",
       "origin": "machine",
       "place": "ahead"
-    },
-    "1200": {
-      "at": "2026-09-23T19:24:44.192Z",
-      "why": "Direkter Nutzerauftrag vom 23.09.2026, 21:12: poc auf den aktuellen main-Stand setzen und veroeffentlichen",
-      "origin": "user",
-      "place": "ahead"
     }
   },
   "boundary": {
@@ -1459,7 +1453,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-23T19:24:44.204Z",
+    "at": "2026-09-23T19:41:28.718Z",
     "points": [
       174,
       184,
@@ -1877,8 +1871,7 @@
       1195,
       1197,
       1198,
-      1199,
-      1200
+      1199
     ]
   }
 }
