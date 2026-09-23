@@ -79,6 +79,12 @@ const PLAZA_INLAND_SLACK = 4
 const PLAZA_SWEEP_DEGREE_STEP = 2
 /** Metres between candidate radii in that sweep. */
 const PLAZA_SWEEP_RADIUS_STRIDE = 1
+/** Valid seats whose plaza view that sweep measures before it settles for the
+ *  widest found. Every settlement lays a loom, and a plan with no full line
+ *  otherwise measured every seat: layouts ran 2.4x slower, up to 5x in the
+ *  bankless villages, and a layout test crossed its 20 s timeout. The shipped
+ *  Bambara plan finds its full line at the 58th. */
+const PLAZA_SWEEP_VIEWED_SEATS = 120
 
 export interface LoomGeometry {
   /** Metres from the seat to each stake — half the stretched warp. */
@@ -356,7 +362,8 @@ export function placeLoom(p: LoomPlacement): LoomStation | null {
   // Both questions are answered in ONE pass over the same seats in the same
   // order, so the view of each seat is measured once.
   let widest: { station: LoomStation; view: number } | null = null
-  for (let step = 0; step <= SEAT_SWEEP_DEGREES; step += PLAZA_SWEEP_DEGREE_STEP) {
+  let viewed = 0
+  plaza: for (let step = 0; step <= SEAT_SWEEP_DEGREES; step += PLAZA_SWEEP_DEGREE_STEP) {
     for (const sign of step === 0 ? [1] : [-1, 1]) {
       const a = nominalAngle + sign * step * (Math.PI / 180)
       const fx = p.bank ? p.bank.fx : -Math.sin(a)
@@ -370,6 +377,7 @@ export function placeLoom(p: LoomPlacement): LoomStation | null {
         const view = p.plazaView(station.weaver, widest ? widest.view : 0)
         if (view >= PLAZA_SIGHT_HALF_WIDTH) return { ...station, seenFromPlaza: true }
         if (!widest || view > widest.view) widest = { station, view }
+        if (++viewed >= PLAZA_SWEEP_VIEWED_SEATS) break plaza
       }
     }
   }
