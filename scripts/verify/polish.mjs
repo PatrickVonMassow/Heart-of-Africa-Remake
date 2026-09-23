@@ -7640,15 +7640,17 @@ if (section('adult-errands')) {
           const { digLocalToWorld, spoilOffset, placeGroundHeight } = await import('/src/scenes/place/placeGround.ts')
           const layout = window.__placeLayout
           const site = layout?.digSites.find((s) => s.kind === 'patch')
-          if (!site) return null
+          // A null place means the picture stand lies past the settlement's edge.
+          if (!site) return { error: 'no patch dig site', place: window.__game.getState().placeId, kinds: layout?.digSites.map((s) => s.kind) ?? null }
           const start = digLocalToWorld(site, spoilOffset(site), -1.6)
           const end = digLocalToWorld(site, spoilOffset(site), 1.6)
           const ground = { bank: layout.bank, sites: layout.digSites, progress: window.__placeErrands().digProgress, rocks: layout.rocks }
-          if (Math.abs(placeGroundHeight(ground, start.x, start.z)) > 0.001) return null
+          const height = placeGroundHeight(ground, start.x, start.z)
+          if (Math.abs(height) > 0.001) return { error: 'start is not flat', height, start }
           return { who: 0, start, end }
         })
-        check('the spoil crossing starts on flat ground', !!route, JSON.stringify(route))
-        if (route) await captureSpoilWalk(page, check, frame, nextFrames, route)
+        check('the spoil crossing starts on flat ground', !route.error, JSON.stringify(route))
+        if (!route.error) await captureSpoilWalk(page, check, frame, nextFrames, route)
       }
     }
   } finally {
