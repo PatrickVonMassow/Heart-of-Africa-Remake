@@ -71,11 +71,6 @@ export interface Lect {
 
 export type LectId = 'tonalWestCentre'
 
-/** Reads a sequence the way docs/communication-poc-spec.md writes it. */
-function seq(spoken: string): ToneSequence {
-  return spoken.split(SYLLABLE_SEPARATOR).map(toneOfSyllable)
-}
-
 /**
  * The tone of a written syllable: HIGH when it is written in upper case, LOW
  * otherwise. Lect-independent on purpose, so the journal can sort a saved
