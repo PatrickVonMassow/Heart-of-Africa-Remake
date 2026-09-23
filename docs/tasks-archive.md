@@ -31587,3 +31587,25 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   (`--quota-report` as the pattern), scripts/quota-drill.mjs, docs/astra-routing.md,
   CLAUDE.md §6.
   Bundle: Modell & Wächter
+
+- [x] 1200. The `poc` tag names the current `main` state and /poc/ serves it.
+  USER ORDER 23.09.2026, 21:12: »Tagge den aktuellen main-Stand als poc und veröffentliche ihn
+  unter https://patrickvonmassow.github.io/Heart-of-Africa-Remake/poc/«. This is NOT a version
+  release. `docs/batch-owner-runbook.md` (user decision 20.09.2026) holds that `poc` is the
+  current playable build, moved to any `main` commit on request — no closing run, no approval
+  beyond the request, and `closing-guard` does not gate it. Point 174 keeps the `v0.3` tag and
+  its gate; nothing here touches it, and `poc` may run ahead of the newest version tag.
+  MEASURED STATE: `poc` stands on cd275b2331c3776295fd1ac705ee9e3c1ffbf840 (20.09.2026), 306
+  commits behind `main`.
+  FINAL STATE: `poc` points at a `main` HEAD whose CI concluded green, the tag is force-pushed
+  to `origin`, the Pages deployment is dispatched (a tag push alone does not rebuild the
+  targets), and /poc/ is verified to serve the new build.
+  DONE 23.09.2026, 21:31. `poc` moved from cd275b233 to 9c61be419 (CI green, run 35907221359)
+  and force-pushed; Pages deployed by manual dispatch, run 35909070670, green. Verified: /poc/,
+  /v0.1/, /v0.2/ and the root all answer HTTP 200, /poc/ serves the same build as the root (the
+  shared chunks rolldown-runtime-QTnfLwEv.js, react-DPd1JddB.js and index-CPgrkYvP.css are
+  byte-identical), and a headless system-Chrome run against /poc/ loads the scene, opens the F8
+  benchmark overlay and closes it with Esc. A black 3D area in that capture reproduces
+  identically on the root deployment and in a local `npm run preview`, so it is neither caused
+  nor exposed by the tag move; it is filed as a finding.
+
