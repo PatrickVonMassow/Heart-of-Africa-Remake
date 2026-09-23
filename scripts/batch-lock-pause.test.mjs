@@ -81,7 +81,7 @@ describe('the rung is shared, so a repeating cause reaches a capped probe', () =
   })
 
   it('writes the only clockless form as a typed user-stop', () => {
-    setPaused('the user asked to stop', { ...opts(), cause: 'user-stop' })
+    setPaused('the user asked "stop the batch"', { ...opts(), cause: 'user-stop' })
     expect(readFileSync(path, 'utf8')).toMatch(/type: user-stop/)
     expect(pauseState(Date.now(), opts()).state).toBe('hold')
   })
