@@ -570,6 +570,9 @@ put it is the mistake this line exists to stop.
   unbuilt, whichever keeps the ring's other rules), and in the plaza frame the warp line and
   the cloth stack are distinguishable on both backends; the frame asserts the station's
   PROJECTED height against a stated pixel minimum rather than a distance.
+  The same lever clears the Maasai plan: on main 43c00aa29 the `loom-unseen-from-plaza` assert
+  fires for `maasai-village@42` (collision and polish village sections, charged here), and it
+  fires for no settlement at seed 42 when this point lands.
   Criticality: medium. Test: Vitest for the yielding rule (station on the river axis, clear
   of every dwelling, compound count unchanged or the drop named); `polish --section=village-loom`
   plaza frame on both backends.

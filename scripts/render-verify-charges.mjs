@@ -1742,4 +1742,28 @@ export const RED_CHARGES = [
       + '`--section=children-tag` is 16/16 on that state and on main. The charge dies with '
       + 'point 1145, which turns the throw into a failed check and repairs the framing.',
   },
+  {
+    point: 1191,
+    suite: 'collision',
+    kind: 'console',
+    match: /\[ASSERT\] loom-unseen-from-plaza — maasai-village@42:/i,
+    why:
+      'MEASURED 23.09.2026 on main (43c00aa29), collision --section=village: the dev assert point 1190 '
+      + 'armed fires for the Maasai plan at seed 42 — no plaza stand sees the loom over open ground. '
+      + 'It is a layout question, not a renderer one, so the entry names no backend. Point 1191 owns '
+      + 'the dwelling ring giving way to the plaza line, which is the lever this plan lacks; its final '
+      + 'state now names this settlement. The charge dies with point 1191.',
+  },
+  {
+    point: 1191,
+    suite: 'polish',
+    kind: 'console',
+    match: /\[ASSERT\] loom-unseen-from-plaza — maasai-village@42:/i,
+    why:
+      'MEASURED 23.09.2026 on main (43c00aa29), polish --section=village: the dev assert point 1190 '
+      + 'armed fires for the Maasai plan at seed 42 — no plaza stand sees the loom over open ground. '
+      + 'It is a layout question, not a renderer one, so the entry names no backend. Point 1191 owns '
+      + 'the dwelling ring giving way to the plaza line, which is the lever this plan lacks; its final '
+      + 'state now names this settlement. The charge dies with point 1191.',
+  },
 ]
