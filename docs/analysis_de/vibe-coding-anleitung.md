@@ -663,15 +663,6 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   Build, Lint oder Tests, **warte** und **räum nichts weg**. Die Regel heißt **‚kein zweiter
   Maschinenverbraucher'**."
 
-- **Der Ausweg führt an ein Fenster, vor dem niemand sitzt.** Läuft dein Werkzeug in mehreren
-  Sitzungen — eine, in der du tippst, und mehrere, die im Hintergrund arbeiten —, dann kann die
-  bediente Sitzung an eine andere zwar schreiben, aber dort wartet die Nachricht auf eine
-  Freigabe, die niemand gibt. Du wirst gebeten, „im anderen Fenster" zu bestätigen, und es gibt
-  kein anderes Fenster. Das sieht aus wie ein nächster Schritt und ist ein Stillstand.
-  → *Prompt:* „Es gibt **genau eine bediente Sitzung**: meine. Alles andere läuft ohne Menschen.
-  Schick mich nie dorthin. Darfst du etwas nicht schreiben, **hol dir das Recht** auf dem dafür
-  vorgesehenen Weg — und sag mir, was dich blockiert hat."
-
 ---
 
 ## Drei Meta-Regeln, die alles zusammenhalten
@@ -710,4 +701,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 9f6353e89e071cbae26a4ba2c98a0a02f490167478d90d9267544ff5f8f869b8 -->
+<!-- GUIDE-FINGERPRINT: 2fa64776ec11e70d13b09c98fe31adbe026296fc3a60682f5b72f47d4988447c -->
