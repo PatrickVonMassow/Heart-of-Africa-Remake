@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CONCEPT_IDS, highCount, tonesOf } from './lexicon'
+import { CONCEPT_IDS, SEQUENCE_LENGTH, highCount, tonesOf } from './lexicon'
 import {
   ascendingSequence, enumerateVocabularies, hasIconicDirections, hasNoAdjacentMirrors,
   rollVocabulary, SHIPPED_VOCABULARY, wordSequences,
@@ -32,14 +32,17 @@ const EXPECTED = [
 const row = (v: ReturnType<typeof rollVocabulary>) => CONCEPT_IDS.map((c) => v[c]).join(' | ')
 
 describe('the run vocabulary', () => {
-  it('enumerates exactly the pinned 20 assignments and includes the shipped mapping', () => {
+  // The pinned table belongs to FOUR syllables and six concepts. At another
+  // length the derivation produces another table, which is the point of the
+  // cases further down; pinning would then say only that nobody re-pinned.
+  it.runIf(SEQUENCE_LENGTH === 4)('enumerates exactly the pinned 20 assignments and includes the shipped mapping', () => {
     const actual = enumerateVocabularies().map(row)
     expect(actual).toEqual(EXPECTED)
     expect(new Set(actual).size).toBe(20)
     expect(actual).toContain(row(SHIPPED_VOCABULARY))
   })
 
-  it('keeps iconic directions and no eight-strike palindrome across any errand pause', () => {
+  it.runIf(SEQUENCE_LENGTH === 4)('keeps iconic directions and no eight-strike palindrome across any errand pause', () => {
     let internalMirrors = 0
     for (const v of enumerateVocabularies()) {
       expect(v.UPSTREAM).toBe('ba-ba-BA-BA')
@@ -55,7 +58,7 @@ describe('the run vocabulary', () => {
     expect(internalMirrors).toBe(8)
   })
 
-  it('reproducibly reaches every mapping from a run seed', () => {
+  it.runIf(SEQUENCE_LENGTH === 4)('reproducibly reaches every mapping from a run seed', () => {
     const reached = new Set<string>()
     for (let seed = 0; seed < 1000; seed++) {
       const vocabulary = rollVocabulary(seed)
