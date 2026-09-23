@@ -31520,3 +31520,42 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   (`setPaused`, `clearPaused`), scripts/batch-autostart.mjs, .claude/batch-launcher.log
   (09:36-10:50 ticks), transcript cfd01f9f-ab45-45f1-a57d-ef6416278b8f.
   Bundle: Modell & Wächter
+
+- [x] 1196. A cheap section run can accept a charge for a known foreign red.
+  PROBLEM, measured 23.09.2026 on the ten-section picture check of point 1174, identically on
+  WebGPU and WebGL 2. Two known, filed, charged reds could not be cleared by the run that met
+  them, so both held against the point that was only passing through:
+  a) `polish --section=adult-errands`: 34 pass, 2 fail — the two halves of point 568's water-rim
+     measurement, both of which the ledger carries for BOTH backends. The verdict was
+     "the run record is incomplete, so no charge may be accepted for it — ownership unresolved".
+     Cause: `complete` in `scripts/verify/run-all.mjs:329` demands `record.terminalVerdict === true`,
+     and the recorder sets that flag only on a line matching `TERMINAL_VERDICT_LINE`
+     (`scripts/render-verify-recorder.mjs:203`) — `N CHECK(S) FAILED`, `console errors:`,
+     `FAILURES: n`. A section run of `polish` whose CHECKS fail prints its FAIL lines and no such
+     terminal line, so the record carries the reds but is classed incomplete: the cheap rung can
+     never accept a charge for a failing check, which is exactly what the ladder's cheap rung is
+     for. A console-error-only failure DOES print `console errors: 1` and charges fine — the gap
+     is specific to failing checks.
+  b) `flow --section=core-loop`: the record is complete and carries both reds owned by point 1154,
+     yet the verdict was "charged for one reading of this check but not for every one this run
+     produced". The printed occurrences carry one reading the charge does not own, so
+     `occurrences.every(owned)` fails although the record's own reds are fully owned.
+  CORRECTED 23.09.2026 by the author's measurement and the Fable review: a) is NOT a missing
+  terminal line — polish always prints `console errors: N`; the adult-errands record is a real
+  crash (`crashSource: 'uncaught-exception'`), filed as point 1198. Completeness keeps resting on
+  the terminal verdict line. b) is the section tag `[--section=…]` left on printed FAIL lines, in
+  section AND whole runs, so the same red arrived under a key the record does not carry.
+  FINAL STATE: printed lines are keyed exactly as the recorder stores them (section tag stripped
+  in every run), and a printed occurrence that the record does not carry may not by itself
+  deny a charge the record's own reds earn; where the two disagree the run says WHICH reading is
+  unowned, with its measurement, instead of a sentence nobody can act on.
+  NOT IN THIS POINT: changing what any charge covers. Points 568 and 1154 keep their entries.
+  Test: Vitest on the pure decision — tagged FAIL lines in a section and in a whole run key like
+  the record; a record without a terminal line, crashed or truncated, is not chargeable; a printed occurrence absent from the
+  record does not deny the record's own charge, and the printed reason names the reading.
+  Criticality: high — it blocks the cheap rung of every point whose sections carry a known
+  foreign red, which is how it was found: the picture check of 1174 held two reds it does not own.
+  Refs: scripts/verify/run-all.mjs:318-410, scripts/render-verify-recorder.mjs:203/326,
+  scripts/render-verify-core.mjs:960-980, scripts/render-verify-charges.mjs (points 568, 1154),
+  local/verify-logs/2026-09-23T10-36-45-287-polish.log, .claude/render-verify-state.json.
+  Bundle: Modell & Wächter
