@@ -36,11 +36,14 @@ import {
   digPose,
   fillPose,
   fillSquat,
+  gestureEnvelope,
   gesturePose,
   isGesturing,
   REST_POSE,
   restGesture,
   startGesture,
+  TOUCH_LEAN,
+  type ArmSide,
   type FigurePose,
   type GestureKind,
   type GestureState,
@@ -63,7 +66,20 @@ import { insidePlace } from './boundary'
 import { playRockFlank } from './playRockSurface'
 import { standsOnGroundPlate, type PlaceRiverBank } from './riverBank'
 import { advancePlaceRoute, buildPlaceNavGrid, findPlaceRoute, navClearBetween, navRestrict, type NavPoint } from './routing'
-import { absorbSeparation, createTagGame, stepTagGame, type TagChild } from './tagGame'
+import {
+  absorbSeparation,
+  chaserGaze,
+  createTagGame,
+  grabAim,
+  grabDue,
+  handGapToBody,
+  stepTagGame,
+  steerGrab,
+  tagBody,
+  tagFigurePose,
+  takeCries,
+  type TagChild,
+} from './tagGame'
 import {
   bankChildCanSeparate,
   bankChildTouching,
@@ -105,9 +121,9 @@ import {
 import { gestureIfHeard, speechReach } from '../../communication/spokenGesture'
 import { speechBearing } from './speechBearing'
 import { SpeechFloor } from '../../communication/speechFloor'
-import { conceptSpeech, registerOptions } from '../../communication/speaking'
+import { conceptSpeech, cryPlan, registerOptions } from '../../communication/speaking'
 import { speechLabelSeconds } from '../../communication/speechLabel'
-import { playLoomBeat, playSpeech } from '../../systems/ambience'
+import { playLoomBeat, playSpeech, playTagCry } from '../../systems/ambience'
 import { speakOverhead, speechClock } from './speechChannel'
 import { placePlayerPosition } from './playerPosition'
 import { animalAnchors, animalBodies, animalScene, stepAnimal, turnToward, ANIMAL_TURN_RATE } from './animalSpots'
@@ -861,6 +877,48 @@ const CROUCH_POSE: FigurePose = {
   turn: 0,
 }
 
+/** The catch frame as the drawn hands show it (work-order 1176, dev read-back). */
+interface TagCatchShot {
+  clock: number
+  catcher: number
+  caught: number
+  hand: string
+  x: number
+  y: number
+  z: number
+  /** The hand's surface off the caught child's trunk; ≤ 0 is on or in it. */
+  gap: number
+  handRadius: number
+  catcherAt: { x: number; z: number }
+  caughtAt: { x: number; z: number }
+}
+
+/** A frame late in the caught child's beat (work-order 1176, dev read-back). */
+interface TagBeatShot {
+  clock: number
+  caught: number
+  runner: number
+  caughtAt: { x: number; z: number }
+  runnerAt: { x: number; z: number } | null
+  apart: number | null
+  caughtPace: number
+  runnerPace: number | null
+  body: string
+}
+
+/** The world positions of a figure's two drawn hands, read off the scene graph. */
+function worldHands(g: THREE.Object3D): Array<{ hand: string; x: number; y: number; z: number }> {
+  const hands: Array<{ hand: string; x: number; y: number; z: number }> = []
+  g.updateWorldMatrix(true, true)
+  g.traverse((o) => {
+    if (o.name !== 'hand-left' && o.name !== 'hand-right') return
+    const w = new THREE.Vector3()
+    o.getWorldPosition(w)
+    hands.push({ hand: o.name, x: w.x, y: w.y, z: w.z })
+  })
+  return hands
+}
+
 /**
  * Speaks one moment of the children's bank game (work-order 687): the atom
  * through the §13.4 hearing curve, the reading over the speaker's head and the
@@ -1211,9 +1269,26 @@ function Kids({
   if (limbs.current.length !== count) {
     limbs.current = Array.from({ length: count }, (_, i) => limbs.current[i] ?? { current: null })
   }
+  // THE TAG ROUND'S READING (work-order 1176): which arm each child's grab
+  // reaches with (kept, so the arm never flickers between sides), the trunk turn
+  // that grab was aimed through (held while the hand fades), the catch count the
+  // last frame saw, and the pitch roll of the catcher's cry.
+  const grabSides = useRef<Array<ArmSide | null>>([])
+  const grabTurns = useRef<number[]>([])
+  const seenTags = useRef(0)
+  const cryRand = useMemo(() => mulberry32((seed + 9127) >>> 0), [seed])
+  // Dev-only shutter on the catch (work-order 1176): `catch` holds the very
+  // frame the hand lands, `beat` a frame late in the caught child's stand.
+  const catchCapture = useRef<{ armed: 'catch' | 'beat' | null; held: boolean; pending: boolean }>({
+    armed: null,
+    held: false,
+    pending: false,
+  })
+  const catchShot = useRef<TagCatchShot | null>(null)
+  const beatShot = useRef<TagBeatShot | null>(null)
 
   useFrame((_, rawDt) => {
-    if (import.meta.env.DEV && chargeCapture.current.held) return
+    if (import.meta.env.DEV && (chargeCapture.current.held || catchCapture.current.held)) return
     const dt = Math.min(rawDt, 0.1)
     let spoken: BankUtterance | null = null
     world.floor = speechFloor ?? undefined
@@ -1291,6 +1366,34 @@ function Kids({
     if (spoken) {
       speakBankUtterance(camera, spoken, children[spoken.speaker], refs.current[spoken.speaker], gestures.current[spoken.speaker])
     }
+    // A catch this frame: the tag count only ever grows within one game, so a
+    // fresh game (its count back at zero) is never mistaken for one.
+    const caughtNow = !!game && game.tags > seenTags.current
+    if (game) seenTags.current = game.tags
+    const tagCfg = balance.villageLife.tag
+    // THE CATCHER'S CRY (work-order 1176): one wordless `ha` in the child
+    // register for each catch, never the caught child's. Nothing is heard into
+    // the memory and nothing is shown — sound only — and a cry that would fall
+    // into an exchange holding the floor is dropped, not deferred.
+    if (game && game.cries.length > 0) {
+      const held = (c: TagChild) => !!speechFloor?.holdsFloor({ x: c.x, z: c.z, register: 'talk' })
+      for (const i of takeCries(game, held)) {
+        const kid = children[i]
+        const distance = placePlayerPosition.active
+          ? Math.hypot(kid.x - placePlayerPosition.x, kid.z - placePlayerPosition.z)
+          : Infinity
+        playTagCry(
+          cryPlan(distance, {
+            bearing: speechBearing(camera, kid),
+            reach: tagCfg.cryReach,
+            gain: tagCfg.cryGain,
+            seconds: tagCfg.crySeconds,
+            pitchSpread: tagCfg.cryPitchSpread,
+            roll: cryRand(),
+          }),
+        )
+      }
+    }
     // THE WORD'S OWN FRAME (work-order 1065). The tap is captured below, once
     // this frame's pose has been written AND applied — that is the picture the
     // player sees the word fall over, and the frame the whole claim rests on.
@@ -1335,12 +1438,76 @@ function Kids({
       // Only READ here: this frame's advance already ran above, before the
       // word could start a new gesture (work-order 1065).
       const gesture = gestures.current[i]
-      const shown = gesturePose(gesture.current)
-      pose.left = crouched ? CROUCH_POSE.left : shown.left
-      pose.right = crouched ? CROUCH_POSE.right : shown.right
-      pose.turn = shown.turn
-      pose.lean = crouched ? CROUCH_POSE.lean : c.lean + shown.lean
+      if (game) {
+        // THE TAG ROUND READS AT A GLANCE (work-order 1176). The chaser reaches
+        // for its quarry from the commit distance in, re-aimed every frame; on
+        // the catch frame the catcher's hand is aimed once more at the child it
+        // caught and let go from there. Everyone else lets a grab fade.
+        const quarry =
+          i === game.chaser && grabDue(game, tagCfg)
+            ? children[game.target]
+            : caughtNow && i === game.immune && gesture.current.kind === 'touch'
+              ? children[game.chaser]
+              : null
+        if (quarry) {
+          const aim = grabAim(
+            { x: c.x, z: c.z, facing: c.facing },
+            quarry,
+            // The lean the pose below draws while the hand is out.
+            Math.max(c.lean, TOUCH_LEAN),
+            KID_SCALE,
+            tagCfg.gazeTurnMax,
+            grabSides.current[i] ?? null,
+          )
+          grabSides.current[i] = aim.side
+          grabTurns.current[i] = aim.turn
+          gesture.current = steerGrab(gesture.current, aim)
+          if (i !== game.chaser) gesture.current = steerGrab(gesture.current, null)
+        } else {
+          gesture.current = steerGrab(gesture.current, null)
+        }
+        if (gesture.current.kind !== 'touch') grabSides.current[i] = null
+        const reach = gesture.current.kind === 'touch' ? gestureEnvelope(gesture.current) : 0
+        const gaze = i === game.chaser ? chaserGaze(game, tagCfg) : 0
+        const turn = (grabTurns.current[i] ?? 0) * reach + gaze * (1 - reach)
+        const drawn = tagFigurePose(tagBody(game, i), gesturePose(gesture.current), gestureEnvelope(gesture.current), c.lean, turn)
+        pose.left = drawn.left
+        pose.right = drawn.right
+        pose.turn = drawn.turn
+        pose.lean = drawn.lean
+      } else {
+        const shown = gesturePose(gesture.current)
+        pose.left = crouched ? CROUCH_POSE.left : shown.left
+        pose.right = crouched ? CROUCH_POSE.right : shown.right
+        pose.turn = shown.turn
+        pose.lean = crouched ? CROUCH_POSE.lean : c.lean + shown.lean
+      }
       applyFigurePose(limbs.current[i]?.current ?? null, pose)
+      // THE CATCH FRAME, read off the drawn hands (work-order 1176, the same
+      // read-back as the tap's): the catcher's hand against the caught child.
+      if (import.meta.env.DEV && game && caughtNow && i === game.immune) {
+        const caught = children[game.chaser]
+        const hands = worldHands(g)
+        const ground = groundHeight(caught.x, caught.z)
+        const best = hands
+          .map((h) => ({ ...h, gap: handGapToBody([h.x, h.y, h.z], caught, KID_SCALE, ground) }))
+          .sort((a, b) => a.gap - b.gap)[0]
+        catchShot.current = best
+          ? {
+              clock: game.clock,
+              catcher: i,
+              caught: game.chaser,
+              hand: best.hand,
+              x: best.x,
+              y: best.y,
+              z: best.z,
+              gap: best.gap,
+              handRadius: FIGURE_LIMBS.handRadius * KID_SCALE,
+              catcherAt: { x: c.x, z: c.z },
+              caughtAt: { x: caught.x, z: caught.z },
+            }
+          : null
+      }
       if (i === openedTouch) {
         g.updateWorldMatrix(true, true)
         const hands: Array<{ x: number; y: number; z: number; pitch: number }> = []
@@ -1372,6 +1539,32 @@ function Kids({
         else tapOpening.current = opening
       }
     })
+    // The dev shutter (work-order 1176): hold the catch frame itself, or a
+    // frame late in the caught child's beat, once it has been drawn.
+    if (import.meta.env.DEV && game && catchCapture.current.armed) {
+      const cap = catchCapture.current
+      if (cap.armed === 'catch' && caughtNow && catchShot.current) cap.held = true
+      if (cap.armed === 'beat') {
+        if (caughtNow) cap.pending = true
+        const pause = Math.min(tagCfg.caughtPauseSeconds, tagCfg.immunitySeconds)
+        if (cap.pending && game.pauseFor > 0 && game.pauseFor <= pause * 0.35) {
+          const caught = children[game.chaser]
+          const runner = game.immune >= 0 ? children[game.immune] : null
+          beatShot.current = {
+            clock: game.clock,
+            caught: game.chaser,
+            runner: game.immune,
+            caughtAt: { x: caught.x, z: caught.z },
+            runnerAt: runner ? { x: runner.x, z: runner.z } : null,
+            apart: runner ? Math.hypot(runner.x - caught.x, runner.z - caught.z) : null,
+            caughtPace: caught.pace,
+            runnerPace: runner ? runner.pace : null,
+            body: tagBody(game, game.chaser),
+          }
+          cap.held = true
+        }
+      }
+    }
   })
 
   // Dev hook for the headless verification (CLAUDE.md §7.2): the live game.
@@ -1380,6 +1573,22 @@ function Kids({
     const w = window as unknown as Record<string, unknown>
     const bank = round.bank
     w.__placeHoldCharge = (armed: boolean) => { chargeCapture.current = { armed, held: false } }
+    // The catch shutter (work-order 1176): `catch`, `beat`, or null to release.
+    w.__placeHoldCatch = (armed: 'catch' | 'beat' | null) => {
+      catchCapture.current = { armed, held: false, pending: false }
+    }
+    // Where each drawn hand of child `i` stands, in the world and in the
+    // child's own body frame (body heights: +z forward, +y up) — the catcher's
+    // forward arms are read off these pivots, not assumed (work-order 1176).
+    w.__placeTagHands = (i: number) => {
+      const g = refs.current[i]
+      if (!g) return null
+      g.updateWorldMatrix(true, true)
+      return worldHands(g).map((h) => {
+        const local = g.worldToLocal(new THREE.Vector3(h.x, h.y, h.z))
+        return { ...h, local: { x: local.x, y: local.y, z: local.z } }
+      })
+    }
     // ONE HOOK FOR BOTH ROUNDS. The live child-motion check reads this shape,
     // and it must not have to know which game a settlement plays: the bank round
     // reports its own catcher, quarry, tags and clocks under the same names.
@@ -1395,6 +1604,12 @@ function Kids({
        *  looking at; absent in the tag round. */
       phase: bank ? bank.phase : null,
       chargeHeld: chargeCapture.current.held,
+      // The tag round's catch reading (work-order 1176); null in the bank round.
+      pauseFor: game ? game.pauseFor : null,
+      immune: game ? game.immune : null,
+      catchHeld: catchCapture.current.held,
+      catchShot: catchShot.current,
+      beatShot: beatShot.current,
       catcherLine: bank && stage ? {
         rock: rockAt(stage, otherEnd(bank.from)),
         tapper: bank.tapper,
@@ -1458,6 +1673,11 @@ function Kids({
         // the spectator's stand has to prove the arm, not just the note; nothing
         // outside the game can read a live gesture off the drawn pose.
         gesture: ((g) => g && { kind: g.kind, t: g.t, duration: g.duration, bearing: g.bearing })(gestures.current[i]?.current),
+        // How the body reads in the tag round (work-order 1176) and the trunk
+        // turn it is drawn with; null in the bank round.
+        body: game ? tagBody(game, i) : null,
+        facing: c.facing,
+        turn: poses.current[i]?.current?.turn ?? 0,
       })),
       /** The stone the off-game ROCK is climbed and spoken at, with the size the
        *  climb is played against (work-order 1080). Published rather than
