@@ -31634,3 +31634,20 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   from then on, so no lane can be green over a build nobody has looked at. If it is a headless
   artefact, that is written down where the next reader of a black production screenshot will
   find it, and this point closes without a code change.
+
+- [x] 1198. The adult-errands picture section ends with a verdict instead of a crash.
+  PROBLEM, measured 23.09.2026 by the author of point 1196. `polish --section=adult-errands`
+  dies after its checks with an uncaught `TypeError: Cannot read properties of undefined
+  (reading 'digSites')` at `scripts/verify/polish.mjs:7635`: the dig-picture route step reads
+  `window.__placeLayout` but only waits for `__placeWalkers` and `__placeErrands`. The record
+  is `crashed: true` (`crashSource: 'uncaught-exception'`), so no charge can ever be accepted
+  for the section's two known reds (point 568), on either backend — the cheap rung of every
+  point passing through that section is blocked.
+  FINAL STATE: the step waits for `__placeLayout` (or skips the dig picture with a named FAIL
+  when it never arrives), and the section run ends with a terminal verdict on WebGPU and
+  WebGL 2; its remaining reds are the ones charged to point 568.
+  Test: `npm test -- polish --section=adult-errands` on both backends, record not crashed.
+  Criticality: medium; blocking — it holds a red that cannot otherwise close: the crashed record
+  refuses every charge for the section. Refs: scripts/verify/polish.mjs:7635, .claude/render-verify-state.json,
+  local/verify-logs/2026-09-23T10-36-45-287-polish.log.
+  Bundle: Modell & Wächter

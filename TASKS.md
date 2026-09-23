@@ -77,23 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1198. The adult-errands picture section ends with a verdict instead of a crash.
-  PROBLEM, measured 23.09.2026 by the author of point 1196. `polish --section=adult-errands`
-  dies after its checks with an uncaught `TypeError: Cannot read properties of undefined
-  (reading 'digSites')` at `scripts/verify/polish.mjs:7635`: the dig-picture route step reads
-  `window.__placeLayout` but only waits for `__placeWalkers` and `__placeErrands`. The record
-  is `crashed: true` (`crashSource: 'uncaught-exception'`), so no charge can ever be accepted
-  for the section's two known reds (point 568), on either backend — the cheap rung of every
-  point passing through that section is blocked.
-  FINAL STATE: the step waits for `__placeLayout` (or skips the dig picture with a named FAIL
-  when it never arrives), and the section run ends with a terminal verdict on WebGPU and
-  WebGL 2; its remaining reds are the ones charged to point 568.
-  Test: `npm test -- polish --section=adult-errands` on both backends, record not crashed.
-  Criticality: medium; blocking — it holds a red that cannot otherwise close: the crashed record
-  refuses every charge for the section. Refs: scripts/verify/polish.mjs:7635, .claude/render-verify-state.json,
-  local/verify-logs/2026-09-23T10-36-45-287-polish.log.
-  Bundle: Modell & Wächter
-
 - [ ] 1199. The mechanism-review gather test stops timing out the unit gate.
   PROBLEM, measured 23.09.2026, three times in one hour: `scripts/mechanism-review-guard.test.mjs`
   "bootstrapBase > seeds the anchor from the one shape that carries the flag AND the baseline"
