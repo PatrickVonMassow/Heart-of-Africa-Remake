@@ -105,7 +105,7 @@ import {
 import { gestureIfHeard, speechReach } from '../../communication/spokenGesture'
 import { speechBearing } from './speechBearing'
 import { SpeechFloor } from '../../communication/speechFloor'
-import { utterancePlan, registerOptions } from '../../communication/speaking'
+import { conceptSpeech, registerOptions } from '../../communication/speaking'
 import { speechLabelSeconds } from '../../communication/speechLabel'
 import { playLoomBeat, playSpeech } from '../../systems/ambience'
 import { speakOverhead, speechClock } from './speechChannel'
@@ -614,6 +614,7 @@ function Loom({
       work,
       {
         // A settlement whose warp lies on no river has no upstream to name.
+        vocabulary: useGame.getState().vocabulary,
         teaches: station.onRiverAxis,
         helper: true,
         seat: station.weaver,
@@ -831,8 +832,8 @@ function speakLoomCall(
   const distance = placePlayerPosition.active
     ? Math.hypot(at.x - placePlayerPosition.x, at.z - placePlayerPosition.z)
     : Infinity
-  const utterance = utteranceOf(direction)
-  playSpeech(utterancePlan(utterance, distance, { bearing: speechBearing(camera, at) }))
+  const { utterance, plan } = conceptSpeech(direction, useGame.getState().vocabulary, distance, { bearing: speechBearing(camera, at) })
+  playSpeech(plan)
   if (speechReach(distance).audible) {
     useGame.getState().hearUtterance(utterance)
     if (anchor) {
@@ -881,8 +882,8 @@ function speakBankUtterance(
     : Infinity
   const options = registerOptions(bankVoiceRegister(said.moment))
   const reach = speechReach(distance, options.radius)
-  const utterance = utteranceOf(said.concept)
-  playSpeech(utterancePlan(utterance, distance, { bearing: speechBearing(camera, speaker), voice: 'child', ...options }))
+  const { utterance, plan } = conceptSpeech(said.concept, useGame.getState().vocabulary, distance, { bearing: speechBearing(camera, speaker), voice: 'child', ...options })
+  playSpeech(plan)
   if (reach.audible) {
     useGame.getState().hearUtterance(utterance)
     if (anchor) {
@@ -1409,7 +1410,7 @@ function Kids({
        *  cannot tell the taught direction from any other utterance in the
        *  round, and would pass on the wrong one. */
       direction: bank ? bank.direction : null,
-      announcedWord: bank && bank.direction ? utteranceOf(bank.direction) : null,
+      announcedWord: bank && bank.direction ? utteranceOf(bank.direction, useGame.getState().vocabulary) : null,
       // The game's OWN clock: the verification samples an interval of GAME,
       // never a count of frames, which buy different amounts of it per machine.
       clock: bank ? bank.clock : game!.clock,
@@ -2114,8 +2115,8 @@ function speakChiefWord(
   const distance = placePlayerPosition.active
     ? Math.hypot(drummer.x - placePlayerPosition.x, drummer.z - placePlayerPosition.z)
     : Infinity
-  const utterance = utteranceOf('CHIEF')
-  playSpeech(utterancePlan(utterance, distance, { bearing: speechBearing(camera, drummer) }))
+  const { utterance, plan } = conceptSpeech('CHIEF', useGame.getState().vocabulary, distance, { bearing: speechBearing(camera, drummer) })
+  playSpeech(plan)
   if (speechReach(distance).audible) {
     useGame.getState().hearUtterance(utterance)
     if (anchor) {
@@ -2931,9 +2932,10 @@ function ErrandVillagers({
     [geography, playGround, playRocks],
   )
   const speechFloor = useContext(SpeechFloorContext)
+  const vocabulary = useGame((s) => s.vocabulary)
   const view = useMemo<AdultWorkView>(
-    () => ({ villagers: people, geography, standable, invitationClear, childrenHear, floor: speechFloor ?? undefined }),
-    [people, geography, standable, invitationClear, childrenHear, speechFloor],
+    () => ({ vocabulary, villagers: people, geography, standable, invitationClear, childrenHear, floor: speechFloor ?? undefined }),
+    [vocabulary, people, geography, standable, invitationClear, childrenHear, speechFloor],
   )
 
   // The body each villager presents to every other inhabitant (point 578): two
@@ -3576,8 +3578,8 @@ function speakWork(
   const distance = placePlayerPosition.active
     ? Math.hypot(speaker.x - placePlayerPosition.x, speaker.z - placePlayerPosition.z)
     : Infinity
-  const utterance = utteranceOf(said.concept)
-  playSpeech(utterancePlan(utterance, distance, { bearing: speechBearing(camera, speaker) }))
+  const { utterance, plan } = conceptSpeech(said.concept, useGame.getState().vocabulary, distance, { bearing: speechBearing(camera, speaker) })
+  playSpeech(plan)
   if (speechReach(distance).audible) {
     useGame.getState().hearUtterance(utterance)
     if (anchor) {

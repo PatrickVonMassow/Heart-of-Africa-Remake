@@ -38,6 +38,8 @@ describe('dumpGameState (design.md §21.1, F6)', () => {
     expect(parsed.build).toBeTruthy()
     expect(parsed.generatedAt).toBeTruthy()
     expect(parsed.game.seed).toBe(4711)
+    expect(parsed.game.vocabulary).toEqual(s.vocabulary)
+    expect(Object.values(parsed.game.vocabulary)).toHaveLength(6)
     expect(parsed.game.mode).toBe(s.mode)
     expect(parsed.game.placeId).toBe(s.placeId)
     expect(parsed.game.day).toBe(s.day)

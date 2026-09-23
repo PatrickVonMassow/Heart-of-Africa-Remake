@@ -1,3 +1,4 @@
+import { SHIPPED_VOCABULARY } from '../communication/vocabulary'
 // The chief's drum message on paper (work-order point 486): the display shows
 // the four concepts with the player's own reading over each, every reading is
 // editable in the journal as ONE note, and the message can always be
@@ -20,11 +21,12 @@ import { DRUM_MESSAGE_VILLAGE, useGame } from '../state/store'
 import { nextChiefAction } from '../scenes/place/chiefMeeting'
 import { setChiefWalkState } from '../scenes/place/chiefPresence'
 
-const DIG = utteranceOf('DIG')
-const RIVER = utteranceOf('RIVER')
+const DIG = utteranceOf('DIG', SHIPPED_VOCABULARY)
+const RIVER = utteranceOf('RIVER', SHIPPED_VOCABULARY)
 
 beforeEach(() => {
   freshGame()
+  useGame.setState({ vocabulary: SHIPPED_VOCABULARY })
   useLocale.getState().setLang('en')
   useUi.getState().setDialog(null)
   useUi.getState().clearDrumMessage()
@@ -49,7 +51,7 @@ const syllables = () =>
 describe('the message display (design.md §13.4)', () => {
   it('shows the four drummed concepts in the order they were beaten', () => {
     render(<DrumMessageDialog />)
-    expect(syllables()).toEqual([...drumMessagePhrase()])
+    expect(syllables()).toEqual([...drumMessagePhrase(SHIPPED_VOCABULARY)])
   })
 
   it('shows ??? over a concept the player has not read yet', () => {
@@ -156,7 +158,7 @@ describe('the message can always be reopened (point 486)', () => {
     useUi.getState().setDialog({ kind: 'drumMessage', message: 'errand' })
     render(<Dialogs />)
     expect(document.querySelector('.dialog.drum-message')).toBeInTheDocument()
-    expect(syllables()).toEqual([...drumMessagePhrase()])
+    expect(syllables()).toEqual([...drumMessagePhrase(SHIPPED_VOCABULARY)])
   })
 })
 
@@ -169,7 +171,7 @@ describe('the drums are waited out before the message is understood', () => {
   })
 
   it('teaches nothing until the last beat, then opens the display', () => {
-    const plan = drumMessagePlan()
+    const plan = drumMessagePlan(SHIPPED_VOCABULARY)
     render(<DrumMessageWatcher />)
     act(() => {
       useUi.getState().startDrumMessage(plan, performance.now())
@@ -189,7 +191,7 @@ describe('the drums are waited out before the message is understood', () => {
   })
 
   it('never interrupts a dialog the player has opened meanwhile', () => {
-    const plan = drumMessagePlan()
+    const plan = drumMessagePlan(SHIPPED_VOCABULARY)
     render(<DrumMessageWatcher />)
     act(() => {
       useUi.getState().startDrumMessage(plan, performance.now())
@@ -203,7 +205,7 @@ describe('the drums are waited out before the message is understood', () => {
   })
 
   it('does not restart a message that is already being beaten out', () => {
-    const plan = drumMessagePlan()
+    const plan = drumMessagePlan(SHIPPED_VOCABULARY)
     const started = performance.now()
     act(() => {
       useUi.getState().startDrumMessage(plan, started)
@@ -227,7 +229,7 @@ describe('the chief sends the message outdoors (design.md §12/§13.4)', () => {
   })
 
   it('sets the drums beating for the whole message length', () => {
-    const plan = drumMessagePlan()
+    const plan = drumMessagePlan(SHIPPED_VOCABULARY)
     act(() => {
       useUi.getState().startDrumMessage(plan)
     })
@@ -248,20 +250,20 @@ describe('the answer display', () => {
     useUi.getState().setDialog({ kind: 'drumMessage', message: 'answer' })
     const t = lang === 'de' ? de : en
     render(<Dialogs />)
-    expect(syllables()).toEqual(drumMessagePhrase('answer'))
+    expect(syllables()).toEqual(drumMessagePhrase(SHIPPED_VOCABULARY, 'answer'))
     expect(document.querySelector('.drum-message h3')?.textContent).toBe(t.drumMessage.answerTitle)
     expect(document.querySelector('.drum-message .flavor')?.textContent).toBe(t.drumMessage.answerHint)
     expect(readings()).toEqual([NO_READING, NO_READING])
     fireEvent.click(document.querySelectorAll('.drum-concept .reading')[1])
     fireEvent.change(document.querySelector('.drum-concept .hypothesis')!, { target: { value: 'with the current' } })
-    expect(hypothesisFor(g().communication, utteranceOf('DOWNSTREAM'))).toBe('with the current')
+    expect(hypothesisFor(g().communication, utteranceOf('DOWNSTREAM', SHIPPED_VOCABULARY))).toBe('with the current')
   })
 
   it('keeps the errand reopen intact after the give', () => {
     useGame.setState({ rockArtefact: 'given' })
     useUi.getState().setDialog({ kind: 'drumMessage', message: 'errand' })
     render(<Dialogs />)
-    expect(syllables()).toEqual(drumMessagePhrase('errand'))
+    expect(syllables()).toEqual(drumMessagePhrase(SHIPPED_VOCABULARY, 'errand'))
   })
 })
 
@@ -286,7 +288,7 @@ describe('the finished answer is what the player heard', () => {
     expect(answer.plan.message).toBe('answer')
     act(() => useUi.getState().setDialog(null))
     act(() => vi.advanceTimersByTime(Math.ceil(answer.plan.duration * 1000) - 1))
-    expect(g().communication.heard[utteranceOf('DOWNSTREAM')]).toBeUndefined()
+    expect(g().communication.heard[utteranceOf('DOWNSTREAM', SHIPPED_VOCABULARY)]).toBeUndefined()
     expect(useUi.getState().dialog).toBeNull()
     act(() => vi.advanceTimersByTime(1))
     expect(g().drumMessageHeard).toEqual({ errand: true, answer: true })
@@ -297,7 +299,7 @@ describe('the finished answer is what the player heard', () => {
   it.each(['errand', 'answer'] as const)('reopens an already heard %s only after the repeat finishes', (message) => {
     g().receiveDrumMessage(message)
     const pages = g().journal.length
-    const plan = drumMessagePlan(message)
+    const plan = drumMessagePlan(SHIPPED_VOCABULARY, message)
     render(<DrumMessageWatcher />)
     act(() => useUi.getState().startDrumMessage(plan))
     act(() => vi.advanceTimersByTime(Math.ceil(plan.duration * 1000) - 1))
@@ -310,7 +312,7 @@ describe('the finished answer is what the player heard', () => {
   })
 
   it.each([null, { kind: 'trade', building: 'market' }] as const)('records only after its last beat and respects an existing dialog: %s', (dialog) => {
-    const plan = drumMessagePlan('answer')
+    const plan = drumMessagePlan(SHIPPED_VOCABULARY, 'answer')
     render(<DrumMessageWatcher />)
     act(() => {
       useUi.getState().setDialog(dialog)
@@ -318,7 +320,7 @@ describe('the finished answer is what the player heard', () => {
     })
     act(() => vi.advanceTimersByTime(plan.duration * 1000 - 1))
     expect(g().drumMessageHeard.answer).toBe(false)
-    expect(g().communication.heard[utteranceOf('DOWNSTREAM')]).toBeUndefined()
+    expect(g().communication.heard[utteranceOf('DOWNSTREAM', SHIPPED_VOCABULARY)]).toBeUndefined()
     act(() => vi.advanceTimersByTime(2))
     expect(g().drumMessageHeard).toEqual({ errand: false, answer: true })
     expect(useUi.getState().dialog).toEqual(dialog ?? { kind: 'drumMessage', message: 'answer' })
@@ -326,7 +328,7 @@ describe('the finished answer is what the player heard', () => {
 
   it('does not record a cancelled performance or resurrect its deferred answer', () => {
     render(<DrumMessageWatcher />)
-    act(() => useUi.getState().startDrumMessage(drumMessagePlan('errand')))
+    act(() => useUi.getState().startDrumMessage(drumMessagePlan(SHIPPED_VOCABULARY, 'errand')))
     act(() => {
       useUi.setState({ deferredDrumAnswer: true })
       useUi.getState().clearDrumMessage()

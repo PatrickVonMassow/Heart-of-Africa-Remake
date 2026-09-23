@@ -1,3 +1,4 @@
+import { SHIPPED_VOCABULARY } from '../../communication/vocabulary'
 // THE WORD COMES FIRST, THE ACT ANSWERS IT (work-order 1184, user 22.09.2026).
 // An order carried out in the frame it is spoken — before its four syllables
 // have finished — reads as a man narrating his own act rather than as one man
@@ -24,6 +25,7 @@ const cfg: AdultWorkConfig = { ...balance.villageLife.adultErrands, intervalSeco
 /** A sender and a carrier at the stand, with the order about to fall. */
 function fixture(config = cfg) {
   const view: AdultWorkView = {
+    vocabulary: SHIPPED_VOCABULARY,
     villagers: [{ x: 0, z: 0, free: true }, { x: 1, z: 0, free: true }],
     geography: {
       waterStand: { x: 0, z: 5 }, waterHead: { x: 10, z: 0 },
@@ -62,8 +64,8 @@ afterEach(() => {
 
 describe('the word is measured, not guessed', () => {
   it('phraseSeconds IS the plan’s own duration, for one atom and for a phrase', () => {
-    const one = [utteranceOf('RIVER')]
-    const two = [utteranceOf('DIG'), utteranceOf('RIVER')]
+    const one = [utteranceOf('RIVER', SHIPPED_VOCABULARY)]
+    const two = [utteranceOf('DIG', SHIPPED_VOCABULARY), utteranceOf('RIVER', SHIPPED_VOCABULARY)]
     expect(phraseSeconds(one)).toBeCloseTo(phrasePlan(one, 0).duration, 10)
     expect(phraseSeconds(two)).toBeCloseTo(phrasePlan(two, 0).duration, 10)
     // And it answers where the plan falls silent: out of earshot there is no
@@ -74,16 +76,16 @@ describe('the word is measured, not guessed', () => {
   })
 
   it('follows the pace rather than a hardcoded syllable count', () => {
-    const slow = phraseSeconds([utteranceOf('RIVER')], { syllableSeconds: 0.6 })
-    expect(slow).toBeCloseTo(phraseSeconds([utteranceOf('RIVER')]) * 2, 10)
+    const slow = phraseSeconds([utteranceOf('RIVER', SHIPPED_VOCABULARY)], { syllableSeconds: 0.6 })
+    expect(slow).toBeCloseTo(phraseSeconds([utteranceOf('RIVER', SHIPPED_VOCABULARY)]) * 2, 10)
   })
 
   it('reads its pause from balance, and every word is at least its own length', () => {
     for (const concept of CONCEPT_IDS) {
-      expect(instructionDelay(concept)).toBeCloseTo(conceptSeconds(concept) + 1, 10)
+      expect(instructionDelay(concept, SHIPPED_VOCABULARY)).toBeCloseTo(conceptSeconds(concept, SHIPPED_VOCABULARY) + 1, 10)
     }
     balance.communication.instructionHoldSeconds = 2.5
-    expect(instructionDelay('RIVER')).toBeCloseTo(conceptSeconds('RIVER') + 2.5, 10)
+    expect(instructionDelay('RIVER', SHIPPED_VOCABULARY)).toBeCloseTo(conceptSeconds('RIVER', SHIPPED_VOCABULARY) + 2.5, 10)
   })
 
   it('stays inside the floor’s own consequence window and under the note over the head', () => {
@@ -91,10 +93,10 @@ describe('the word is measured, not guessed', () => {
     // `actAfter` reservation (speechFloor.test.ts) changes no shipped timing.
     const window = utteranceSeconds(SEQUENCE_LENGTH) + balance.communication.consequenceSeconds
     for (const concept of CONCEPT_IDS) {
-      expect(instructionDelay(concept)).toBeLessThanOrEqual(window)
+      expect(instructionDelay(concept, SHIPPED_VOCABULARY)).toBeLessThanOrEqual(window)
       // And the player's own annotation must still stand when the body answers,
       // or the pairing he is invited to make has nothing left to pair.
-      expect(instructionDelay(concept)).toBeLessThanOrEqual(speechLabelSeconds(1))
+      expect(instructionDelay(concept, SHIPPED_VOCABULARY)).toBeLessThanOrEqual(speechLabelSeconds(1))
     }
   })
 })
@@ -111,7 +113,7 @@ describe('the instructed body waits for the word to end', () => {
     expect(f.state.tasks[f.carrier]!.phase).toBe('wait')
     expect(f.state.tasks[f.carrier]!.carry).toBe('none')
     expect(f.state.tasks[f.sender]!.owes).toBe(false)
-    expect(f.state.tasks[f.sender]!.holdFor).toBeCloseTo(instructionDelay('RIVER'), 6)
+    expect(f.state.tasks[f.sender]!.holdFor).toBeCloseTo(instructionDelay('RIVER', SHIPPED_VOCABULARY), 6)
   })
 
   it('sets off after the word’s length plus the pause, and not before', () => {
@@ -119,7 +121,7 @@ describe('the instructed body waits for the word to end', () => {
     const dt = 1 / 60
     let word = null
     for (let t = 0; t < 5 && !word; t += dt) word = f.step(dt)
-    const hold = instructionDelay('RIVER')
+    const hold = instructionDelay('RIVER', SHIPPED_VOCABULARY)
     expect(fetchedWithin(f, hold - 2 * dt, dt)).toBe(false)
     expect(fetchedWithin(f, 4 * dt, dt)).toBe(true)
     expect(f.state.tasks[f.carrier]!.carry).toBe('emptyJar')
@@ -132,7 +134,7 @@ describe('the instructed body waits for the word to end', () => {
     let word = null
     for (let t = 0; t < 5 && !word; t += dt) word = f.step(dt)
     // The shipped default would have sent him off long ago.
-    expect(fetchedWithin(f, conceptSeconds('RIVER') + 1.5, dt)).toBe(false)
+    expect(fetchedWithin(f, conceptSeconds('RIVER', SHIPPED_VOCABULARY) + 1.5, dt)).toBe(false)
     expect(fetchedWithin(f, 3, dt)).toBe(true)
   })
 
@@ -150,7 +152,7 @@ describe('the instructed body waits for the word to end', () => {
       expect(sender.withheld).toBeUndefined()
       f.step(dt)
       ticks++
-      expect(ticks).toBeLessThan(instructionDelay('RIVER') / dt + 2)
+      expect(ticks).toBeLessThan(instructionDelay('RIVER', SHIPPED_VOCABULARY) / dt + 2)
     }
     // The hold ran out and the carrier set off on that very tick.
     expect(f.state.tasks[f.carrier]!.phase).toBe('fetch')
@@ -163,9 +165,9 @@ describe('the instructed body waits for the word to end', () => {
     let word = null
     for (let t = 0; t < 5 && !word; t += dt) word = f.step(dt)
     const ageAtWord = f.state.tasks[f.sender]!.age
-    for (let t = 0; t < instructionDelay('RIVER'); t += dt) f.step(dt)
+    for (let t = 0; t < instructionDelay('RIVER', SHIPPED_VOCABULARY); t += dt) f.step(dt)
     const sender = f.state.tasks[f.sender]
     // The clock that kills an overrunning errand kept running through the hold.
-    expect(sender!.age).toBeGreaterThan(ageAtWord + instructionDelay('RIVER') - 2 * dt)
+    expect(sender!.age).toBeGreaterThan(ageAtWord + instructionDelay('RIVER', SHIPPED_VOCABULARY) - 2 * dt)
   })
 })

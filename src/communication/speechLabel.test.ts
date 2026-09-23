@@ -1,3 +1,4 @@
+import { SHIPPED_VOCABULARY } from './vocabulary'
 // The hypothesis over the speaker's head (design.md §13.4, work-order point
 // 485): its lifetime, and its binding to the ONE note the journal edits. The
 // scene channel is covered in src/scenes/place/speechChannel.test.ts.
@@ -20,9 +21,9 @@ import {
   withSpeechTarget,
 } from './speechLabel'
 
-const RIVER_UTTERANCE = utteranceOf('RIVER')
-const DIG = utteranceOf('DIG')
-const ROCK_UTTERANCE = utteranceOf('ROCK')
+const RIVER_UTTERANCE = utteranceOf('RIVER', SHIPPED_VOCABULARY)
+const DIG = utteranceOf('DIG', SHIPPED_VOCABULARY)
+const ROCK_UTTERANCE = utteranceOf('ROCK', SHIPPED_VOCABULARY)
 
 /** A memory that has heard the given utterances, on day 1. */
 function heardMemory(...utterances: string[]) {
@@ -45,7 +46,7 @@ describe('what the label says (design.md §13.4)', () => {
   it('shows one reading per atom of a phrase, in order', () => {
     let memory = heardMemory(DIG, ROCK_UTTERANCE)
     memory = setHypothesis(memory, DIG, 'dig')
-    const readings = labelReadings(memory, phraseOf(['DIG', 'ROCK']))
+    const readings = labelReadings(memory, phraseOf(['DIG', 'ROCK'], SHIPPED_VOCABULARY))
     expect(readings.map((r) => r.utterance)).toEqual([DIG, ROCK_UTTERANCE])
     expect(readings.map((r) => r.reading)).toEqual(['dig', NO_READING])
   })
@@ -79,7 +80,7 @@ describe('when a label shows at all (design.md §13.4)', () => {
   })
 
   it('shows a phrase as soon as one of its atoms is known', () => {
-    expect(isSpeechLabelVisible(heardMemory(DIG), phraseOf(['DIG', 'ROCK']))).toBe(true)
+    expect(isSpeechLabelVisible(heardMemory(DIG), phraseOf(['DIG', 'ROCK'], SHIPPED_VOCABULARY))).toBe(true)
   })
 })
 

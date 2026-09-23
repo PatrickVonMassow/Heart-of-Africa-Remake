@@ -1,3 +1,4 @@
+import type { Vocabulary } from '../../communication/lexicon'
 // THE WEAVER'S WORK AND HER TWO WORDS (work-order 1157).
 //
 // Two things run here, and only one of them speaks.
@@ -55,6 +56,7 @@ export interface LoomWorkConfig {
 }
 
 export interface LoomWorkView {
+  vocabulary: Vocabulary
   /** Whether the two direction words exist in this settlement at all. False
    *  where the warp lies on no river and there is no upstream to name. */
   teaches: boolean
@@ -228,7 +230,7 @@ export function stepLoomWork(
       // used to move him in the frame it was spoken, before its four syllables
       // had finished, which reads as the weaver narrating her own helper rather
       // than as an order given to him.
-      if (errand.clock >= instructionDelay(errand.toward)) {
+      if (errand.clock >= instructionDelay(errand.toward, view.vocabulary)) {
         errand.phase = 'walk'
         errand.clock = 0
       }
@@ -283,7 +285,7 @@ export function stepLoomWork(
       blocked: false,
       step: dt,
       ends: true,
-      actAfter: instructionDelay(state.owed),
+      actAfter: instructionDelay(state.owed, view.vocabulary),
     }))
     if (allowed) {
       const said = state.owed

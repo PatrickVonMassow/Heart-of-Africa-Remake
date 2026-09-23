@@ -1,3 +1,4 @@
+import { SHIPPED_VOCABULARY } from '../../communication/vocabulary'
 // The channel between a speaking figure and its overhead label (design.md
 // §13.4, work-order point 485): the label rides on the SPEAKER's object, it is
 // gone when its time is up, and it goes with the figure when that leaves the
@@ -22,8 +23,8 @@ import {
   updateSpeechTarget,
 } from './speechChannel'
 
-const RIVER_UTTERANCE = utteranceOf('RIVER')
-const DIG = utteranceOf('DIG')
+const RIVER_UTTERANCE = utteranceOf('RIVER', SHIPPED_VOCABULARY)
+const DIG = utteranceOf('DIG', SHIPPED_VOCABULARY)
 
 /** A stand-in for the figure the label rides on; `parent: null` = unmounted. */
 function figure(parent: unknown = {}): Object3D {

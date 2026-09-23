@@ -1,3 +1,4 @@
+import { SHIPPED_VOCABULARY } from '../communication/vocabulary'
 // Coastal surf fade (point 153, design.md §19.1): the surf bed is only audible
 // near the coast — full at the shore, silent beyond a calibratable cutoff, and
 // monotone between. The curve is pure, so it is pinned here.
@@ -465,7 +466,7 @@ describe('playThunder (point 166 — scheduled on the audio clock, survives to f
     const ctx = FakeCtx.last
     if (!ctx) return
     ctx.currentTime = 5
-    const plan = drumMessagePlan()
+    const plan = drumMessagePlan(SHIPPED_VOCABULARY)
     const before = ctx.oscillators.length
     playDrumMessage(plan)
     const voices = ctx.oscillators.slice(before)
@@ -725,7 +726,7 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
 
   it('schedules one voice per syllable, at the plan offsets on the audio clock', () => {
     ctx.currentTime = 40
-    const plan = utterancePlan(utteranceOf('DIG'), 0, { syllableSeconds: 0.3, volume: 1 })
+    const plan = utterancePlan(utteranceOf('DIG', SHIPPED_VOCABULARY), 0, { syllableSeconds: 0.3, volume: 1 })
     const voices = spoken(() => playSpeech(plan))
     expect(voices).toHaveLength(plan.syllables.length)
     voices.forEach((v, i) => {
@@ -736,7 +737,7 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
 
   it('gives the high syllable a higher carrier than the low one — the two samples', () => {
     ctx.currentTime = 60
-    const plan = utterancePlan(utteranceOf('DIG'), 0, { syllableSeconds: 0.3, volume: 1 })
+    const plan = utterancePlan(utteranceOf('DIG', SHIPPED_VOCABULARY), 0, { syllableSeconds: 0.3, volume: 1 })
     const voices = spoken(() => playSpeech(plan))
     const pitch = (i: number) => voices[i].frequency.events[0].value ?? 0
     const high = plan.syllables.findIndex((s) => s.tone === 'high')
@@ -746,7 +747,7 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
 
   it('keeps the phrase pause on the clock between the atoms', () => {
     ctx.currentTime = 80
-    const plan = phrasePlan(phraseOf(['DIG', 'ROCK']), 0, {
+    const plan = phrasePlan(phraseOf(['DIG', 'ROCK'], SHIPPED_VOCABULARY), 0, {
       syllableSeconds: 0.3,
       pauseSeconds: 0.9,
       volume: 1,
@@ -760,9 +761,9 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
 
   it('schedules nothing for a speaker out of earshot or a muted soundscape', () => {
     ctx.currentTime = 100
-    expect(spoken(() => playSpeech(utterancePlan(utteranceOf('DIG'), 999, { volume: 1 })))).toHaveLength(0)
+    expect(spoken(() => playSpeech(utterancePlan(utteranceOf('DIG', SHIPPED_VOCABULARY), 999, { volume: 1 })))).toHaveLength(0)
     balance.ambienceVolume = 0
-    expect(spoken(() => playSpeech(utterancePlan(utteranceOf('DIG'), 0)))).toHaveLength(0)
+    expect(spoken(() => playSpeech(utterancePlan(utteranceOf('DIG', SHIPPED_VOCABULARY), 0)))).toHaveLength(0)
     balance.ambienceVolume = defaultVolume
   })
 
@@ -779,8 +780,8 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
   }
 
   it('routes overlapping utterances through separate fixed panners and releases each route', () => {
-    const adult = utterancePlan(utteranceOf('RIVER'), 3, { bearing: -Math.PI / 2 })
-    const child = utterancePlan(utteranceOf('RIVER'), 3, { bearing: Math.PI / 2, voice: 'child' })
+    const adult = utterancePlan(utteranceOf('RIVER', SHIPPED_VOCABULARY), 3, { bearing: -Math.PI / 2 })
+    const child = utterancePlan(utteranceOf('RIVER', SHIPPED_VOCABULARY), 3, { bearing: Math.PI / 2, voice: 'child' })
     const before = ctx.panners.length
     const adults = spoken(() => playSpeech(adult))
     const children = spoken(() => playSpeech(child))
@@ -846,7 +847,7 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
   it('is quieter from further away, and never louder than right beside the speaker', () => {
     ctx.currentTime = 120
     const peakOf = (distance: number) => {
-      const voices = spoken(() => playSpeech(utterancePlan(utteranceOf('DIG'), distance, { volume: 1 })))
+      const voices = spoken(() => playSpeech(utterancePlan(utteranceOf('DIG', SHIPPED_VOCABULARY), distance, { volume: 1 })))
       return Math.max(...envelopeOf(voices[0]).gain.events.map((e) => e.value ?? 0))
     }
     const near = peakOf(0)
@@ -885,7 +886,7 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
     }
     const speak = () => {
       const before = ctx.oscillators.length
-      playSpeech(utterancePlan(utteranceOf('DIG'), 0, { volume: 1 }))
+      playSpeech(utterancePlan(utteranceOf('DIG', SHIPPED_VOCABULARY), 0, { volume: 1 }))
       return ctx.oscillators.slice(before)
     }
 
@@ -1096,7 +1097,7 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
      *  option override, so the plan reads the shipped balance. */
     const syllableBesideThePlayer = (): { peak: number; bus: FakeGain } => {
       const before = ctx.oscillators.length
-      playSpeech(utterancePlan(utteranceOf('DIG'), 0))
+      playSpeech(utterancePlan(utteranceOf('DIG', SHIPPED_VOCABULARY), 0))
       const voice = ctx.oscillators.slice(before)[0]
       expect(voice, 'a villager beside the player schedules a voice').toBeDefined()
       const peak = Math.max(...envelopeOf(voice).gain.events.map((e) => e.value ?? 0))
@@ -1175,7 +1176,7 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
   it.each([{ register: 'talk' as const, count: 2 }, { register: 'call' as const, count: 1 }])('measures headroom for $count close child $register voices, ambience, drums and a step', ({ register, count }) => {
     setAmbienceScene({ region: 'central', mode: 'place', placeKind: 'village', nearVillage: false })
     refreshAmbienceVolume()
-    const voices = spoken(() => playSpeech(utterancePlan(utteranceOf('RIVER'), 0, {
+    const voices = spoken(() => playSpeech(utterancePlan(utteranceOf('RIVER', SHIPPED_VOCABULARY), 0, {
       bearing: Math.PI / 2, voice: 'child', ...registerOptions(register),
     })))
     const envelope = envelopeOf(voices[0])
@@ -1293,7 +1294,7 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
     const { ambienceFloor, ambientBus } = villageFloor()
     const master = ambientBus.connected[0] as FakeGain
 
-    const plan = drumMessagePlan()
+    const plan = drumMessagePlan(SHIPPED_VOCABULARY)
     const voices = spoken(() => playDrumMessage(plan))
     expect(voices).toHaveLength(plan.strikes.length * 2)
 
@@ -1348,7 +1349,7 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
     const { ambienceFloor } = villageFloor()
 
     const beforeSpeech = ctx.oscillators.length
-    playSpeech(utterancePlan(utteranceOf('DIG'), distance))
+    playSpeech(utterancePlan(utteranceOf('DIG', SHIPPED_VOCABULARY), distance))
     const voice = ctx.oscillators.slice(beforeSpeech)[0]
     const envelope = envelopeOf(voice)
     const speechBus = envelope.connected[0] as FakeGain

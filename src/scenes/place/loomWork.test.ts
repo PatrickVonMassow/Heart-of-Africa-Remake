@@ -1,3 +1,4 @@
+import { SHIPPED_VOCABULARY } from '../../communication/vocabulary'
 import { describe, expect, it } from 'vitest'
 import { balance } from '../../config/balance'
 import { instructionDelay } from '../../communication/speaking'
@@ -21,6 +22,7 @@ const cfg = balance.villageLife.loom
 
 function view(over: Partial<LoomWorkView> = {}): LoomWorkView {
   return {
+    vocabulary: SHIPPED_VOCABULARY,
     teaches: true,
     helper: true,
     seat: { x: 0, z: 0 },
@@ -173,7 +175,7 @@ describe('the helper waits for the word to end (work-order 1184)', () => {
     expect(loomPicture(state).helperAt).toBe(0)
     expect(loomPicture(state).helperWorking).toBe(false)
 
-    const hold = instructionDelay(said)
+    const hold = instructionDelay(said, SHIPPED_VOCABULARY)
     for (let t = 0; t < hold - 2 * dt; t += dt) {
       stepLoomWork(state, v, dt, cfg, mulberry32(41))
       expect(state.errand!.phase).toBe('hold')
@@ -205,7 +207,7 @@ describe('the helper waits for the word to end (work-order 1184)', () => {
     const v = view()
     const dt = 1 / 60
     const said = untilCalled(state, v, dt)
-    for (let t = 0; t < instructionDelay(said); t += dt) {
+    for (let t = 0; t < instructionDelay(said, SHIPPED_VOCABULARY); t += dt) {
       expect(stepLoomWork(state, v, dt, cfg, mulberry32(61))).toBeNull()
     }
     expect(state.owed).toBeNull()

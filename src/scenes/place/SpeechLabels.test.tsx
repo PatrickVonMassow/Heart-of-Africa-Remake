@@ -1,3 +1,4 @@
+import { SHIPPED_VOCABULARY } from '../../communication/vocabulary'
 import { act, render } from '@testing-library/react'
 import { beforeEach, expect, it, vi } from 'vitest'
 import * as THREE from 'three/webgpu'
@@ -15,7 +16,7 @@ vi.mock('@react-three/fiber', () => ({
 }))
 vi.mock('@react-three/drei', () => ({ Html: () => null }))
 
-const atoms: Phrase = [utteranceOf('UPSTREAM')]
+const atoms: Phrase = [utteranceOf('UPSTREAM', SHIPPED_VOCABULARY)]
 const hook = () => (window as unknown as {
   __speech: { speak: (id: string, atoms: Phrase, anchor?: string, seconds?: number) => boolean }
 }).__speech

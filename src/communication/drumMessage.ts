@@ -13,7 +13,7 @@
 // same strikes, and the display reads its elements from the player's memory.
 
 import { hypothesisFor, type CommunicationMemory } from './heard'
-import { phraseOf, tonesOf, type ConceptId, type LectId, type Phrase, type UtteranceId } from './lexicon'
+import { phraseOf, tonesOf, type ConceptId, type Vocabulary, type Phrase, type UtteranceId } from './lexicon'
 import { NO_READING } from './speechLabel'
 import { balance } from '../config/balance'
 import { phrasePlan, type SpeechOptions } from './speaking'
@@ -75,9 +75,9 @@ export interface DrumMessagePlan {
   duration: number
 }
 
-/** The atoms of the message in the given lect — the spoken phrase, unchanged. */
-export function drumMessagePhrase(message: DrumMessageId = 'errand', lect?: LectId): Phrase {
-  return phraseOf(message === 'answer' ? CHIEF_ANSWER_CONCEPTS : CHIEF_MESSAGE_CONCEPTS, lect)
+/** The atoms of the message in the run vocabulary — the spoken phrase, unchanged. */
+export function drumMessagePhrase(vocabulary: Vocabulary, message: DrumMessageId = 'errand'): Phrase {
+  return phraseOf(message === 'answer' ? CHIEF_ANSWER_CONCEPTS : CHIEF_MESSAGE_CONCEPTS, vocabulary)
 }
 
 /**
@@ -89,13 +89,13 @@ export function drumMessagePhrase(message: DrumMessageId = 'errand', lect?: Lect
  * Every syllable becomes one strike: a low syllable on the large drum, a high
  * one on the small drum, and nothing else encodes anything.
  */
-export function drumMessagePlan(message: DrumMessageId = 'errand', options: SpeechOptions = {}, lect?: LectId): DrumMessagePlan {
+export function drumMessagePlan(vocabulary: Vocabulary, message: DrumMessageId = 'errand', options: SpeechOptions = {}): DrumMessagePlan {
   // Speech shares the timing, but its measured vowel/panner headroom must not
   // recalibrate the message drums: the message carries its OWN calibratable
   // level (`balance.communication.drumMessagePeak`).
   const peak = balance.communication.drumMessagePeak *
     Math.max(0, options.volume ?? balance.ambienceVolume)
-  const atoms = drumMessagePhrase(message, lect)
+  const atoms = drumMessagePhrase(vocabulary, message)
   const plan = phrasePlan(atoms, 0, options)
   const perAtom = atoms.map((atom) => tonesOf(atom).length)
   const strikes: DrumStrike[] = []
@@ -158,10 +158,10 @@ export interface DrumMessageElement {
  */
 export function drumMessageElements(
   memory: CommunicationMemory,
+  vocabulary: Vocabulary,
   message: DrumMessageId = 'errand',
-  lect?: LectId,
 ): DrumMessageElement[] {
-  return drumMessagePhrase(message, lect).map((utterance, index) => {
+  return drumMessagePhrase(vocabulary, message).map((utterance, index) => {
     const note = hypothesisFor(memory, utterance)
     return { index, utterance, reading: note === '' ? NO_READING : note, unread: note === '' }
   })

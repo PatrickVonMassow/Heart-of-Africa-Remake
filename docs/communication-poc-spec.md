@@ -50,8 +50,15 @@ short enough to compare with a written note.
 
 ## The lexicon
 
-The registry lives in `src/communication/lexicon.ts` and is keyed by lect so a
-second region can add its own entry without changing consumers.
+`src/communication/lexicon.ts` defines the six concepts and the fixed lect:
+its syllables and reserved sequences. `src/communication/vocabulary.ts`
+enumerates 20 assignments and rolls one from an independent run-seed stream
+at each new game. The mapping stays unchanged across settlements and travel.
+Saves and debug JSON carry the six utterance strings by concept, never an index.
+A save without this field restores the original mapping below so existing
+utterance-keyed journal notes retain their meaning.
+
+Original mapping (one of the 20, not the authority for a new run):
 
 | Concept | Sequence | Meaning in the teaching |
 |---|---|---|
@@ -63,13 +70,22 @@ second region can add its own entry without changing consumers.
 | CHIEF | `BA-ba-BA-ba` | the village's head man |
 
 Reserved and unused: the two single-tone sequences `ba-ba-ba-ba` and
-`BA-BA-BA-BA`. CHIEF took the last spare mixed sequence, RIVER's tonal mirror,
-so the six words fall into two mirror pairs — RIVER/CHIEF and
-UPSTREAM/DOWNSTREAM — and two sequences that are their own mirror, ROCK and
-DIG. UPSTREAM and DOWNSTREAM remain the
-only pair the player hears AS a pair — they are announced against each other in
-the same round of the bank game AND at the weaver's loom, while CHIEF is only
-ever said alone, by the drummer pointing at the hut.
+`BA-BA-BA-BA`. The six usable sequences form two reversal pairs:
+`ba-ba-BA-BA` / `BA-BA-ba-ba` and `ba-BA-ba-BA` / `BA-ba-BA-ba`, plus two
+palindromes, `ba-BA-BA-ba` and `BA-ba-ba-BA`.
+
+Rule (a) fixes UPSTREAM to the rising `ba-ba-BA-BA` and DOWNSTREAM to the
+falling `BA-BA-ba-ba`: iconic against and with the visible current. This leaves
+24 permutations of RIVER, ROCK, DIG and CHIEF. Rule (b) excludes ROCK and DIG
+being reversals of each other, leaving 20. Those words are adjacent in the
+errand, so a reversal would form an eight-strike palindrome across the constant
+pause, an audible symmetry with no meaning. No other message adjacency can
+form it because the directions consume their whole reversal pair.
+
+A second, meaningless mirror pair among RIVER, ROCK, DIG and CHIEF is
+unavoidable and accepted. In 8 of the 20 mappings both members still occur in
+the errand, but never adjacently. UPSTREAM and DOWNSTREAM are the meaningful
+opposites taught in the same bank-game round and at the weaver's loom.
 
 CHIEF is taught the way every other word is: the use key at the drummer while
 the chief is in his hut makes him point his arm at the chief's hut and say it,

@@ -1,3 +1,4 @@
+import { SHIPPED_VOCABULARY } from '../../communication/vocabulary'
 // The one cheap check that would have caught point 576: the drummer's hands
 // beat ON the skins, and each on the drum it stands over. Both defects were
 // pure geometry — the swing arc lay below the heads and the two arms were
@@ -151,7 +152,7 @@ describe('the drummer moves only for the message plan', () => {
   })
 
   it("drops the matching hand at every strike time in the chief's exact plan", () => {
-    const plan = drumMessagePlan()
+    const plan = drumMessagePlan(SHIPPED_VOCABULARY)
     for (const strike of plan.strikes) {
       const frame = drummerPoseAt(plan, strike.at)
       const activeSwing = strike.drum === 'low' ? frame.lowSwing : frame.highSwing
@@ -165,7 +166,7 @@ describe('the drummer moves only for the message plan', () => {
   })
 
   it('follows each sounding strike through its own duration and waits in the gaps', () => {
-    const plan = drumMessagePlan()
+    const plan = drumMessagePlan(SHIPPED_VOCABULARY)
     for (const strike of plan.strikes) {
       const elapsed = strike.at + strike.duration * 0.4
       const frame = drummerPoseAt(plan, elapsed)

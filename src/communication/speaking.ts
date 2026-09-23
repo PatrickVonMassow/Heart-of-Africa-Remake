@@ -10,7 +10,7 @@
 
 import { balance } from '../config/balance'
 import { isWithinHearing, observePhrase, observeUtterance, type CommunicationMemory } from './heard'
-import { tonesOf, utteranceOf, type ConceptId, type Phrase, type Tone, type UtteranceId } from './lexicon'
+import { tonesOf, utteranceOf, type ConceptId, type Phrase, type Tone, type UtteranceId, type Vocabulary } from './lexicon'
 
 /** One syllable as it is played: which of the two samples, when, how loud. */
 export interface SpokenSyllable {
@@ -153,6 +153,17 @@ export function utterancePlan(
   return phrasePlan(utterance === '' ? [] : [utterance], distance, options)
 }
 
+/** A villager's word and the sound it produces, from the same run mapping. */
+export function conceptSpeech(
+  concept: ConceptId,
+  vocabulary: Vocabulary,
+  distance: number,
+  options: SpeechOptions = {},
+): { utterance: UtteranceId; plan: SpeechPlan } {
+  const utterance = utteranceOf(concept, vocabulary)
+  return { utterance, plan: utterancePlan(utterance, distance, options) }
+}
+
 /**
  * The plan for a PHRASE: its atoms one after another, separated by the constant
  * pause and by nothing else (docs/communication-poc-spec.md). The pause sits
@@ -218,8 +229,8 @@ export function phraseSeconds(phrase: Phrase, options: SpeechOptions = {}): numb
 }
 
 /** The seconds the word for `concept` occupies when it is spoken. */
-export function conceptSeconds(concept: ConceptId, options: SpeechOptions = {}): number {
-  return phraseSeconds([utteranceOf(concept)], options)
+export function conceptSeconds(concept: ConceptId, vocabulary: Vocabulary, options: SpeechOptions = {}): number {
+  return phraseSeconds([utteranceOf(concept, vocabulary)], options)
 }
 
 /**
@@ -236,8 +247,8 @@ export function conceptSeconds(concept: ConceptId, options: SpeechOptions = {}):
  * The length comes from the plan, not from a guessed syllable count, so it
  * stays right when the phrase, the pace or the pause changes.
  */
-export function instructionDelay(concept: ConceptId, options: SpeechOptions = {}): number {
-  return conceptSeconds(concept, options) + Math.max(0, balance.communication.instructionHoldSeconds)
+export function instructionDelay(concept: ConceptId, vocabulary: Vocabulary, options: SpeechOptions = {}): number {
+  return conceptSeconds(concept, vocabulary, options) + Math.max(0, balance.communication.instructionHoldSeconds)
 }
 
 /**

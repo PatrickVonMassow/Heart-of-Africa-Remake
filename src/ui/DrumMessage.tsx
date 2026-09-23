@@ -34,13 +34,14 @@ export function Syllables({ utterance }: { utterance: string }) {
 export function DrumMessageDialog({ message = 'errand' }: { message?: DrumMessageId }) {
   const t = useStrings()
   const memory = useGame((s) => s.communication)
+  const vocabulary = useGame((s) => s.vocabulary)
   const setHypothesis = useGame((s) => s.setUtteranceHypothesis)
   const setDialog = useUi((s) => s.setDialog)
   // The store trims a note, so a directly bound field would swallow every space
   // the moment it is typed — the journal's field keeps its draft the same way.
   const [drafts, setDrafts] = useState<Record<string, string>>({})
   const [editing, setEditing] = useState<number | null>(null)
-  const elements = drumMessageElements(memory, message)
+  const elements = drumMessageElements(memory, vocabulary, message)
 
   return (
     <div className="dialog-backdrop">

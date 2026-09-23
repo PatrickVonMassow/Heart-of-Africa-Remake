@@ -1,3 +1,4 @@
+import { SHIPPED_VOCABULARY } from '../communication/vocabulary'
 // Guessing a meaning where it is spoken (design.md §13.4, work-order point
 // 588): the dialog that opens on the speaker himself, writing the SAME note the
 // journal writes. What only a browser can show — the pointer lock going and
@@ -15,8 +16,8 @@ import { de } from '../i18n/de'
 import { useLocale } from '../i18n'
 import { freshGame, g } from '../test/store'
 
-const RIVER_UTTERANCE = utteranceOf('RIVER')
-const DIG = utteranceOf('DIG')
+const RIVER_UTTERANCE = utteranceOf('RIVER', SHIPPED_VOCABULARY)
+const DIG = utteranceOf('DIG', SHIPPED_VOCABULARY)
 
 /** Open the dialog for what one speaker just said. */
 const openFor = (...atoms: string[]) =>

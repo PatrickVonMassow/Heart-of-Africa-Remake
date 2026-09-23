@@ -1,3 +1,4 @@
+import { rollVocabulary } from '../../communication/vocabulary'
 // THE HARNESS THE CHILDREN`S REPLAYS ARE JUDGED ON (work-order 648/656/687,
 // split out under work-order 1178). Test-only: nothing in the shipped game
 // imports it, and the Vitest include glob (`src/**/*.test.{ts,tsx}`) does not
@@ -219,6 +220,7 @@ export function crowd(
     return true
   }
   const workView: AdultWorkView = {
+    vocabulary: rollVocabulary(seed),
     villagers: walkers.map((b) => ({ x: b.x, z: b.z, free: true })),
     geography: {
       waterHead: layout.waterPath ? { x: layout.waterPath.head.x, z: layout.waterPath.head.z } : null,
