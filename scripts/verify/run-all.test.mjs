@@ -9,6 +9,7 @@ import * as tiers from './tiers.mjs'
 import * as load from './machine-load-core.mjs'
 import * as sections from './sections.mjs'
 import * as ownership from './red-ownership-core.mjs'
+import * as tagCore from '../section-tag-core.mjs'
 
 const { chargeReds, RETRY_ENV, runVerdict } = core
 const ground = 'first-person ground shows micro-detail (edge energy)'
@@ -23,7 +24,7 @@ const source = readFileSync(runnerUrl, 'utf8')
 
 async function run({ outputs = [known], records = [{}], tasks = '- [ ] 603. ground repair',
   backend = 'webgl', suite = 'settings', previous = [], spawnError = null, large = false,
-  exitStatus = null, preflight = false } = {}) {
+  exitStatus = null, preflight = false, section = null } = {}) {
   const printed = []
   const exit = new Error('runner exited')
   let exitCode
@@ -49,14 +50,16 @@ async function run({ outputs = [known], records = [{}], tasks = '- [ ] 603. grou
     return { status, stdout: out, stderr: '', error: spawnError }
   }
   const context = {
-    ...core, ...classify, ...tiers, ...load, ...sections, ...ownership,
-    spawnSync, dirname, join, fileURLToPath,
+    ...core, ...classify, ...tiers, ...load, ...sections, ...ownership, ...tagCore,
+    spawnSync, dirname, join, fileURLToPath, readFileSync,
     readRenderState: () => ({ runs: saved }), readTasksAll: () => tasks,
     launchServer: async () => ({ base: 'http://test', child: null }), killTree: () => {},
     needsGpuBackendProbe: () => false,
     console: { log: (...args) => printed.push(args.join(' ')) },
     process: {
-      execPath: 'node', argv: ['node', 'run-all.mjs', ...(large ? ['large'] : []), suite, ...(preflight ? ['lint'] : [])],
+      execPath: 'node',
+      argv: ['node', 'run-all.mjs', ...(large ? ['large'] : []), suite, ...(preflight ? ['lint'] : []),
+        ...(section ? [`--section=${section}`] : [])],
       env: {
         RVA_SKIP_PREFLIGHT: large || !preflight ? '1' : '0', VERIFY_GL: backend,
         VERIFY_ON_LOAD: 'off', RVA_LADDER_ASKED: '1',
@@ -366,7 +369,7 @@ describe('what the ledger classification must not lose (Astra review, 17.09.2026
     })
     expect(result.log).toContain('POINT REDS HOLD')
     expect(result.log).toContain('a new defect')
-    expect(result.log).toContain('carried by no charged record entry')
+    expect(result.log).toContain('printed by the suite as "a new defect — unexpected measurement" but carried by no record entry')
     expect(result.log).not.toContain('ACCOUNTED FOR')
     expect(result.status).toBe(1)
   })
@@ -429,7 +432,7 @@ describe('no path turns a red into a pass (Astra review round 2, 17.09.2026)', (
       ] }],
     })
     expect(result.log).toContain('POINT REDS HOLD')
-    expect(result.log).toContain('but not for every one this run produced')
+    expect(result.log).toContain('charged for one reading of this check but not for "no child walks without getting anywhere — worst child 7 at 44.0s, 0.02 m walked inside 9.9 m"')
     expect(result.status).toBe(1)
   })
 
@@ -503,7 +506,8 @@ describe('a red with no name still holds (Astra review round 5, 17.09.2026)', ()
 
   it('does not let a charged measurement cover a second PRINTED measurement of the same check', async () => {
     // The parser folds repeats away by key and the key folds the measurement
-    // away, so only the occurrence-level test can see the second reading.
+    // away; the recorder keeps the first reading and marks the key varied, and
+    // a detail-scoped charge refuses a varied red.
     const walk = 'no child walks without getting anywhere'
     const result = await run({
       suite: 'polish',
@@ -512,9 +516,81 @@ describe('a red with no name still holds (Astra review round 5, 17.09.2026)', ()
         `FAIL  ${walk} — worst child 3 at 12.5s, 1.29 m walked inside 0.32 m\n` +
         `FAIL  ${walk} — worst child 7 at 44.0s, 0.02 m walked inside 9.9 m`,
       ],
-      records: [{ reds: [{ name: walk, kind: 'check', detail: 'worst child 3 at 12.5s, 1.29 m walked inside 0.32 m' }] }],
+      records: [{ reds: [{ name: walk, kind: 'check', detail: 'worst child 3 at 12.5s, 1.29 m walked inside 0.32 m', detailVaried: true }] }],
     })
     expect(result.log).toContain('POINT REDS HOLD')
     expect(result.status).toBe(1)
+  })
+})
+
+// A CHEAP SECTION RUN CAN ACCEPT A CHARGE FOR A KNOWN FOREIGN RED. Measured
+// 23.09.2026: a record carrying its reds, exit and backend was refused for a
+// missing terminal line, and a flow section's printed tag split one red in two.
+describe('a section record is judged by what it carries', () => {
+  const rim = 'the water beyond the plate’s rim is the SAME water as the water at the bank (≤ 12/255 per channel)'
+  const rimLine = `FAIL  ${rim} — far 7/88/101 against near 120/144/138  [--section=adult-errands]`
+  const rimRecord = { partial: true, section: 'adult-errands',
+    reds: [{ name: rim, kind: 'check', point: 568, detail: 'far 7/88/101 against near 120/144/138', section: 'adult-errands' }] }
+
+  it.each([
+    { crashed: true, crashSource: 'uncaught-exception' },
+    { crashed: true, terminalVerdict: false },
+    { truncated: true },
+  ])('still refuses a crashed or truncated section record: %j', async (broken) => {
+    const result = await run({ suite: 'polish', section: 'adult-errands', tasks: '- [ ] 568. water rim',
+      outputs: [rimLine], records: [{ ...rimRecord, ...broken }] })
+    expect(result.log).toContain('POINT REDS HOLD')
+    expect(result.log).toContain('the run record is incomplete, so no charge may be accepted for it')
+    expect(result.status).toBe(1)
+  })
+
+  it('reads a detail-less check without the section tag, so it is the record\'s own red', async () => {
+    // flow prints `FAIL  2 starting gifts [--section=core-loop]`: no detail, so
+    // the tag sat inside the NAME and the same red arrived under a second key.
+    const result = await run({ suite: 'flow', section: 'core-loop', tasks: '- [ ] 1154. start kit',
+      outputs: ['FAIL  2 starting gifts [--section=core-loop]\nFAIL  Shovel bought (−$20) [--section=core-loop]'],
+      records: [{ partial: true, section: 'core-loop', reds: [
+        { name: '2 starting gifts', kind: 'check', point: 1154, section: 'core-loop' },
+        { name: 'Shovel bought (−$20)', kind: 'check', point: 1154, section: 'core-loop' },
+      ] }] })
+    expect(result.log).toContain('POINT REDS DO NOT HOLD')
+    expect(result.log).not.toContain('one reading')
+    expect(result.log).not.toContain('[--section=core-loop] (')
+    expect(result.status).toBe(ownership.EXIT_NOT_HELD)
+  })
+
+  it('reads a tagged detail-less check without its tag in a WHOLE run too', async () => {
+    // flow tags every result line whether or not a section was asked for.
+    const result = await run({ suite: 'flow', tasks: '- [ ] 1154. start kit',
+      outputs: ['FAIL  2 starting gifts [--section=core-loop]\nFAIL  Shovel bought (−$20) [--section=core-loop]'],
+      records: [{ reds: [
+        { name: '2 starting gifts', kind: 'check', point: 1154, section: 'core-loop' },
+        { name: 'Shovel bought (−$20)', kind: 'check', point: 1154, section: 'core-loop' },
+      ] }] })
+    expect(result.log).toContain('POINT REDS DO NOT HOLD')
+    expect(result.log).toContain('ACCOUNTED FOR  flow')
+    expect(result.log).not.toContain('[--section=core-loop] (')
+    expect(result.status).toBe(ownership.EXIT_NOT_HELD)
+  })
+
+  it('keeps a tag-shaped tail that names no declared section', async () => {
+    const result = await run({ suite: 'flow', tasks: '- [ ] 1154. start kit',
+      outputs: ['FAIL  2 starting gifts [--section=no-such-block]'],
+      records: [{ reds: [{ name: '2 starting gifts', kind: 'check', point: 1154 }] }] })
+    expect(result.log).toContain('POINT REDS HOLD')
+    expect(result.log).toContain('2 starting gifts [--section=no-such-block]')
+  })
+
+  it('does not let a printed reading the record lacks deny the record\'s charge, and names that reading', async () => {
+    const walk = 'no child walks without getting anywhere'
+    const second = 'worst child 7 at 44.0s, 0.02 m walked inside 9.9 m'
+    const result = await run({
+      suite: 'polish',
+      tasks: '- [ ] 694. child walking',
+      outputs: [`FAIL  ${walk} — worst child 3 at 12.5s, 1.29 m walked inside 0.32 m\nFAIL  ${walk} — ${second}`],
+      records: [{ reds: [{ name: walk, kind: 'check', detail: 'worst child 3 at 12.5s, 1.29 m walked inside 0.32 m' }] }],
+    })
+    expect(result.log).toContain('POINT REDS DO NOT HOLD')
+    expect(result.log).toContain(`the suite also printed "${walk} — ${second}", which the record does not carry and no charge owns`)
   })
 })
