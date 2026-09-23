@@ -77,36 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1193. A session that is standing down cannot stop the batch.
-  PROBLEM, measured 23.09.2026 10:51-11:05. The batch stood still for 75 minutes. At 09:30 the
-  launcher started session `cfd01f9f` for ONE board-chat message, with its prompt stating it
-  does NOT hold the batch lock and will rightly be told to STAND DOWN. At 09:36 that very
-  session wrote `.claude/batch-paused` with `type: user-stop`, `retry-after: never` and the
-  reason "Chat-Antwort-Sitzung: nur eine Board-Nachricht zu beantworten. Kein Batch-Auftrag" —
-  a description of ITSELF, not of any user stop; no user had typed one (the only prompt in
-  `cfd01f9f` is the chat-reply order). The real worker `1438395e` then ended, and the launcher
-  refused every successor from 09:50 to 10:50 with "batch is paused with no restart clock
-  (typed user-stop)". The veto is correct for a real user stop; the fault is that a
-  stood-down, chat-only session is a reachable writer of the global clockless pause, and that
-  `user-stop` can be asserted without any user utterance behind it.
-  FINAL STATE: the clockless `user-stop` pause is writable only by a session that HOLDS the
-  batch lock; a session without the lock that calls `scripts/batch-pause.mjs --user-stop` is
-  refused with a named cause and writes nothing. A chat-reply/stand-down session that wants to
-  record "nothing to do here" uses its own session-scoped exit, never the global marker.
-  `scripts/batch-autostart.mjs` additionally treats a clockless `user-stop` whose recorded
-  reason names no user utterance as MALFORMED: it snapshots it, replaces it with a short
-  recovery clock and spawns the successor, so no misfiled marker can hold the batch forever.
-  Test: Vitest on the real writers — `recordUserStop` without the lock refuses and leaves the
-  marker absent; with the lock it writes as today; the launcher decision on the measured
-  marker (verbatim from this incident, archived in the point's commit) yields a clocked retry
-  plus a successor instead of a permanent hold.
-  Criticality: high — permits an unbounded standstill, against the standing instruction that a
-  permanent standstill must never happen (user 23.08.2026, reaffirmed 23.09.2026).
-  Refs: scripts/batch-pause.mjs, scripts/batch-pause-core.mjs, scripts/batch-lock.mjs
-  (`setPaused`, `clearPaused`), scripts/batch-autostart.mjs, .claude/batch-launcher.log
-  (09:36-10:50 ticks), transcript cfd01f9f-ab45-45f1-a57d-ef6416278b8f.
-  Bundle: Modell & Wächter
-
 - [ ] 1194. An Astra outage falls back to Opus 5.5 by itself.
   USER ORDER 23.09.2026, 10:59: »Was ist denn der Fallback, wenn OpenAI ausfällt? Falls das
   nicht so ist, soll es ab jetzt Opus 5.5 sein.«
