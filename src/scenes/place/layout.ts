@@ -1645,7 +1645,20 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
       colliders.push({ x: it.pos[0], z: it.pos[1], r: interactiveCircleRadius(it.type, style) })
     }
   })
-  for (const d of dwellings) colliders.push(dwellingCollider(d, style))
+  // WHAT GIVES WAY TO THE PLAZA'S VIEW OF THE LOOM (work-order 1190): the
+  // outbuildings, the trees and the loose stones. The dwellings, the chief's
+  // and the trading huts stand where the plan put them; a shed or a granary
+  // standing in the one line the plaza has is left unbuilt, as a tree there is.
+  const plazaYielding = new Map<Collider, () => void>()
+  const dropFrom = <T>(list: T[], item: T) => () => {
+    const at = list.indexOf(item)
+    if (at >= 0) list.splice(at, 1)
+  }
+  for (const d of dwellings) {
+    const body = dwellingCollider(d, style)
+    colliders.push(body)
+    if (d.kind === 'shed' || d.kind === 'granary') plazaYielding.set(body, dropFrom(dwellings, d))
+  }
   const fenceColliderStart = colliders.length
   const compoundColliders = new Set<Collider>()
   for (const f of fences) {
@@ -1992,10 +2005,17 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   // instead (work-order 1149): `placeGround.ts` raises the surface under it and
   // it enters no collider set, so neither the player nor a villager snags on a
   // pebble. `looseRockIsGround` is the single answer both sides read.
-  for (const t of flora) colliders.push({ x: t.x, z: t.z, r: 0.45 })
-  for (const [x, z, s] of rocks) {
+  for (const t of flora) {
+    const body = { x: t.x, z: t.z, r: 0.45 }
+    colliders.push(body)
+    plazaYielding.set(body, dropFrom(flora, t))
+  }
+  for (const rock of rocks) {
+    const [x, z, s] = rock
     if (looseRockIsGround(s)) continue
-    colliders.push({ x, z, r: looseRockRadius(s) })
+    const body = { x, z, r: looseRockRadius(s) }
+    colliders.push(body)
+    plazaYielding.set(body, dropFrom(rocks, rock))
   }
 
   // THE STONE THE CHILDREN CLIMB (work-order 1082), derived LAST — after the
@@ -2141,6 +2161,31 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
         if (standingClear(colliders, x, z, WALKER_RADIUS)) plazaStands.push({ x, z })
       }
     }
+    // The view is measured past whatever gives way (above): a line that only a
+    // tree or a shed stands in is a line the plaza is given, not one it lacks.
+    const sightSolids = colliders.filter((c) => !plazaYielding.has(c))
+    const plazaLine = (seat: BankPoint) => {
+      let widest = 0
+      let line: { from: BankPoint; to: BankPoint } | null = null
+      for (const stand of plazaStands) {
+        const dist = Math.hypot(seat.x - stand.x, seat.z - stand.z)
+        if (dist < PLAZA_SIGHT_MIN_DISTANCE) continue
+        // The last stretch is the station's own ground, not the sight line.
+        const t = (dist - PLAZA_SIGHT_STATION_GROUND) / dist
+        const to = { x: stand.x + (seat.x - stand.x) * t, z: stand.z + (seat.z - stand.z) * t }
+        // Widened until it no longer fits: the placement wants the BEST view a
+        // plan holds, not only whether the full metre is there.
+        for (const half of PLAZA_SIGHT_WIDTHS) {
+          if (half <= widest) continue
+          if (clearCorridor(sightSolids, stand, to, half, PLAZA_SIGHT_SAMPLE)) {
+            widest = half
+            line = { from: stand, to }
+          }
+        }
+        if (widest >= PLAZA_SIGHT_HALF_WIDTH) break
+      }
+      return { widest, line }
+    }
     loom = placeLoom({
       bank,
       nominal: LOOM_SPOT,
@@ -2169,24 +2214,7 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
       // check walks — and one open line is enough. The corridor is a metre to
       // each side: the shipped seat passed a 0.15 m line through a gap between
       // two dwellings, and what arrived in the frame was two figures, not a loom.
-      plazaView: (seat) => {
-        let widest = 0
-        for (const stand of plazaStands) {
-          const dist = Math.hypot(seat.x - stand.x, seat.z - stand.z)
-          if (dist < PLAZA_SIGHT_MIN_DISTANCE) continue
-          // The last stretch is the station's own ground, not the sight line.
-          const t = (dist - PLAZA_SIGHT_STATION_GROUND) / dist
-          const to = { x: stand.x + (seat.x - stand.x) * t, z: stand.z + (seat.z - stand.z) * t }
-          // Widened until it no longer fits: the placement wants the BEST view a
-          // plan holds, not only whether the full metre is there.
-          for (const half of PLAZA_SIGHT_WIDTHS) {
-            if (half <= widest) continue
-            if (clearCorridor(colliders, stand, to, half, PLAZA_SIGHT_SAMPLE)) widest = half
-          }
-          if (widest >= PLAZA_SIGHT_HALF_WIDTH) return widest
-        }
-        return widest
-      },
+      plazaView: (seat) => plazaLine(seat).widest,
       toChildren,
       waterPathHead: waterPath ? waterPath.head : null,
       onWaterLane: (x, z, r) => !!waterPath &&
@@ -2198,6 +2226,17 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
       clearance: balance.communication.talk.reach,
       geometry: balance.villageLife.loom,
     })
+    // THE LINE IS THEN CLEARED: whatever gave way in it is taken out of the
+    // village, its body and its drawing both, so the view the placement counted
+    // on is the view the finished layout holds.
+    const cleared = loom ? plazaLine(loom.weaver).line : null
+    if (cleared) {
+      for (const [body, drop] of plazaYielding) {
+        if (clearCorridor([body], cleared.from, cleared.to, PLAZA_SIGHT_HALF_WIDTH)) continue
+        drop()
+        colliders.splice(colliders.indexOf(body), 1)
+      }
+    }
     // THE PLAZA VIEW IS LOUD WHEN IT IS MISSED (work-order 1190): a settlement
     // whose plan holds no seat the plaza can see still gets its loom, but the
     // shortfall is a detector in every test and manual session, not a silence.
