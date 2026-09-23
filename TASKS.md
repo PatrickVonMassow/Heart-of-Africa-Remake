@@ -570,6 +570,9 @@ put it is the mistake this line exists to stop.
   unbuilt, whichever keeps the ring's other rules), and in the plaza frame the warp line and
   the cloth stack are distinguishable on both backends; the frame asserts the station's
   PROJECTED height against a stated pixel minimum rather than a distance.
+  The same lever clears the Maasai plan: on main 43c00aa29 the `loom-unseen-from-plaza` assert
+  fires for `maasai-village@42` (collision and polish village sections, charged here), and it
+  fires for no settlement at seed 42 when this point lands.
   Criticality: medium. Test: Vitest for the yielding rule (station on the river axis, clear
   of every dwelling, compound count unchanged or the drop named); `polish --section=village-loom`
   plaza frame on both backends.
@@ -16250,4 +16253,17 @@ to land than a mechanism that needs a review.
   tree's dashboard. The tests call the real decision, not a reconstruction of its aftermath.
   Refs: scripts/batch-doctor.mjs, scripts/dashboard-guard-core.mjs:859, .claude/parallel-alert.json,
   .claude/doctor.log, measured in this session 22.09.2026 17:05-17:06
+  Bundle: Modell & Wächter
+
+- [ ] 1192. A verification run that ran no suite is RED, never GREEN.
+  PROBLEM. `npm test -- 'polish --section=village-loom'` (the suite and flag as ONE argument,
+  as an unsplit zsh variable passes them) printed `ALL GREEN — 0 suites run` and a GREEN
+  receipt with `suites: (none recorded)`, frames 0/0 (23.09.2026, 1174 worktree,
+  `local/verify-logs/2026-09-23T05-51-19-866-polish_--section_village-loom.log`). Such a
+  receipt can stand in for a ladder rung or a point's suite evidence: a false approval.
+  FINAL STATE: `scripts/verify/run-all.mjs` exits non-zero with a named cause when the
+  selected suite list is empty or an argument names no known suite; the receipt says RED.
+  A unit test calls the real selection with an unknown/merged argument and asserts the red.
+  Criticality: medium — permits a false approval (CLAUDE.md §2 finding intake).
+  Refs: scripts/verify/run-all.mjs:717, scripts/verify/tiers.mjs (`parseArgs`, `suitesFor`).
   Bundle: Modell & Wächter

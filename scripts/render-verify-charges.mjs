@@ -1721,4 +1721,49 @@ export const RED_CHARGES = [
       + 'point 1145, which decides by measurement whether the travel stops short or the settle '
       + 'wait expires, and repairs that.',
   },
+  {
+    point: 1187,
+    suite: 'polish',
+    kind: 'check',
+    match: /BOTH her hands are elsewhere half a pass later/i,
+    why:
+      'FILED AS 1187 ON 22.09.2026 from the full webgpu polish pass at e1b7d1561 (279 pass / '
+      + '3 fail): the village-loom hand check reds inside the pass and is green in its own '
+      + 'section (12/12) on the same state and on main. The charge dies with point 1187.',
+  },
+  {
+    point: 1145,
+    suite: 'polish',
+    kind: 'check',
+    match: /^frame 648-village-children\b/i,
+    why:
+      'POINT 1145 TOOK THIS FRAME AS ITS THIRD on 22.09.2026: webgl polish at e1b7d1561 died '
+      + 'twice identically on the frameSubject throw (subject off the bottom edge), while '
+      + '`--section=children-tag` is 16/16 on that state and on main. The charge dies with '
+      + 'point 1145, which turns the throw into a failed check and repairs the framing.',
+  },
+  {
+    point: 1191,
+    suite: 'collision',
+    kind: 'console',
+    match: /\[ASSERT\] loom-unseen-from-plaza — maasai-village@42:/i,
+    why:
+      'MEASURED 23.09.2026 on main (43c00aa29), collision --section=village: the dev assert point 1190 '
+      + 'armed fires for the Maasai plan at seed 42 — no plaza stand sees the loom over open ground. '
+      + 'It is a layout question, not a renderer one, so the entry names no backend. Point 1191 owns '
+      + 'the dwelling ring giving way to the plaza line, which is the lever this plan lacks; its final '
+      + 'state now names this settlement. The charge dies with point 1191.',
+  },
+  {
+    point: 1191,
+    suite: 'polish',
+    kind: 'console',
+    match: /\[ASSERT\] loom-unseen-from-plaza — maasai-village@42:/i,
+    why:
+      'MEASURED 23.09.2026 on main (43c00aa29), polish --section=village: the dev assert point 1190 '
+      + 'armed fires for the Maasai plan at seed 42 — no plaza stand sees the loom over open ground. '
+      + 'It is a layout question, not a renderer one, so the entry names no backend. Point 1191 owns '
+      + 'the dwelling ring giving way to the plaza line, which is the lever this plan lacks; its final '
+      + 'state now names this settlement. The charge dies with point 1191.',
+  },
 ]
