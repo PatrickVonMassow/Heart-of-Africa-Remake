@@ -49,6 +49,10 @@ import { planAuthorshipGroups } from './mechanism-review-range-core.mjs'
 import { commonRepoPath, repoPath } from './repo-paths.mjs'
 import { readOwnerLock } from './batch-singleton.mjs'
 
+// No stored baseline, recovery lands on HEAD: the gather's full path over an
+// empty range, so no case in this file walks the live repository history.
+const EMPTY_RANGE = { readBaseline: () => ({}), bootstrap: (head) => head }
+
 describe('the switched-off gate (point 1036)', () => {
   it('stands down for every caller but the measuring read, and says why', () => {
     // The block is off (CLAUDE.md §2 infrastructure freeze). A gather without
@@ -65,11 +69,12 @@ describe('the switched-off gate (point 1036)', () => {
 
     // And the read answers regardless of who holds the batch lock — the defect
     // that made a hand-run `--status` print "stands down" and exit 0.
-    const read = gatherMechanismReviewInputs({ sessionId: '', report: true })
+    // A fixture baseline at HEAD bounds the range to nothing: the live history
+    // cost 23-60 s here and timed out the push gate, and the applicability
+    // decision under test is taken before any history is read.
+    const read = gatherMechanismReviewInputs({ sessionId: '', report: true, ...EMPTY_RANGE })
     expect(read.applicable).toBe(true)
-    // This scans the live review history: measured at 23.34 s even in isolation
-    // on 14.09.2026. Keep the read and assertions, with a per-case history budget.
-  }, 60_000)
+  })
 
   it('lets the report outlive a context-fence deferral, and only the report', () => {
     // The fence suspends ENFORCEMENT. With the block gone there is nothing left
@@ -192,15 +197,21 @@ describe('bootstrapBase', () => {
     // assertion would have let the very defect above pass unnoticed.
     // `report: true` is what makes the gather APPLICABLE at all now: the gate's
     // block is switched off (point 1036) and only the measuring read remains.
+    // The fixture is the defect's own shape — no stored baseline, one recovered
+    // at HEAD — so the gather reaches its NORMAL return with the flag set, and
+    // the empty range keeps the live history (40-60 s) out of the unit layer.
     const gathered = gatherMechanismReviewInputs({
       sessionId: readOwnerLock()?.sessionId ?? '',
       report: true,
+      ...EMPTY_RANGE,
     })
     expect(gathered.applicable).toBe(true)
+    expect(gathered.inputs.fence).toBeDefined() // the normal return, not an early one
     expect(Object.hasOwn(gathered, 'baselineMissing')).toBe(true)
+    expect(gathered.baselineMissing).toBe(true)
     expect(gathered.baselineMissing).toBe(gathered.inputs.baselineMissing)
-    // The same live-history read as the report above: measured at 20.60 s.
-  }, 60_000)
+    expect(shouldSeedRecoveryAnchor(gathered)).toBe(true)
+  })
 
   it('refuses an unreachable anchor and names the merge that makes recovery possible', () => {
     const head = 'headsha'
