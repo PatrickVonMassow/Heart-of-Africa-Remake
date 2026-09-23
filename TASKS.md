@@ -639,6 +639,38 @@ put it is the mistake this line exists to stop.
   that /v0.3/ and /poc/ serve the new state, and FREEZE the tag: it is never
   re-pointed.
 
+- [ ] 1195. The board says by itself that the batch is standing.
+  USER ORDER 23.09.2026, 12:21: »Fast genauso schlimm wie eine stehende Batch ist, dass ich auf
+  dem Dashboard nicht sehen konnte, dass sie stand. Dazu einen Task nach 174 einreihen, der das
+  behebt.« Placed behind point 174 on that instruction.
+  PROBLEM, measured on the 75-minute standstill of this morning (retrospective §3.304). The
+  "Woran ich gerade arbeite" card still read "Stand 09:22 — Landungsbereitschaft prüfen" at
+  10:51, because the card is written by the working session and nobody was left to write one.
+  The board therefore shows the LAST CLAIM, never its age, and a standstill looks exactly like
+  work in progress. Every fact needed to see it was already on disk — `.claude/batch-lock.json`
+  absent or its heartbeat stale, the focus stamp's age, the launcher's own skip reason in
+  `.claude/batch-launcher.log`, a `.claude/batch-paused` record — and none of it reaches the page.
+  FINAL STATE: the board's own state block carries a measured LIVENESS line, written by the
+  publish path rather than by the working session, so it is right even when no session runs:
+  who holds the batch (or that nobody does), how old the heartbeat and the focus stamp are, and,
+  when the batch is paused, the pause's type, reason and restart clock — a clockless hold said
+  in those words. Where the newest of those readings is older than one launcher tick plus its
+  grace, the card SAYS the batch is standing and for how long, visibly at the top and legible in
+  mobile portrait, instead of repeating the last claim. The readings are taken at publish time;
+  no session has to remember to write them. A deploy whose page is older than the readings says
+  its own age, so a cached page cannot claim a live batch.
+  Test: Vitest on the pure decision — a lock absent, a stale heartbeat, a fresh heartbeat, a
+  clockless `user-stop` and a clocked park each yield the line the board prints, with the
+  standstill verdict and its measured duration; the boundary at one tick plus grace is asserted
+  from both sides. Plus a render assertion that the line reaches the published HTML and reads in
+  portrait width.
+  Criticality: high — without it the only detector of a standstill is the user looking, which is
+  how this morning's was found.
+  Refs: scripts/board-publish.mjs, scripts/board-queue-core.mjs, scripts/dashboard-guard-core.mjs,
+  .claude/batch-lock.json, .claude/batch-paused, .claude/current-focus.json,
+  .claude/batch-launcher.log, memory `batch-dashboard-artifact`, points 1193 and 1194.
+  Bundle: Modell & Wächter
+
 - [ ] 1185. The decision protocol gets its own collapsed board section with an archive
   (user order 22.09.2026, 12:25, verbatim: »Neuer Punkt nach 174: Das Entscheidungsprotokoll
   flutet aktuell die Sektion 'Von dir zu klären'. In den seltensten Fällen lege ich da ein
