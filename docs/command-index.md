@@ -72,7 +72,7 @@
 | `batch-owner-work.mjs` | THE OWNER'S CORROBORATION, GATHERED ONCE FOR EVERY DOOR (four-eyes review of point 556, confirmed finding 2). | — |
 | `batch-ownership-core.mjs` | THE OWNERSHIP VERDICT — ONE function, and deliberately only one (point 612, with the cross-point ruling of point 614). | — |
 | `batch-pause-core.mjs` | EVERY PARK CARRIES A RESTART CLOCK (point 445, out of the fortnight-alone review). | — |
-| `batch-pause.mjs` | Deliberate writer for an allowed batch stop. | usage: node scripts/batch-pause.mjs --user-stop "<reason>" \| --awaiting-user "<reason>" |
+| `batch-pause.mjs` | Deliberate writer for an allowed batch stop. | usage: node scripts/batch-pause.mjs --user-stop "<quoted user words>" \| --awaiting-user "<reason>" |
 | `batch-progress-guard.mjs` | Stop hook (user mandate 22.07.2026): GUARANTEE the batch never idle-stops. | — |
 | `batch-reconcile-core.mjs` | SUCCESSOR RECONCILIATION — step 8 of the "Ordered work" in docs/handover-architecture.md (work-order point 834, the front stage of 676; union M26-M29, M41). | — |
 | `batch-reconcile.mjs` | EVIDENCE GATHERING FOR SUCCESSOR RECONCILIATION — step 8 of the "Ordered work" in docs/handover-architecture.md (work-order point 834, the front stage of 676). | usage: node scripts/batch-reconcile.mjs --repo <dir> --batch <id> [--apply --session <sid>] |

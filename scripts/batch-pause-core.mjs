@@ -54,6 +54,18 @@ export const CLOCKLESS_CAUSES = {
 }
 
 /**
+ * A USER STOP QUOTES THE USER (point 1193). On 23.09.2026 a stood-down chat-reply
+ * session wrote a typed user-stop whose reason described only itself, and the
+ * batch stood still for 75 minutes. A clockless stop therefore carries the user's
+ * words in quotation marks; a typed user-stop without one is misfiled.
+ */
+export const USER_UTTERANCE = /"[^"\n]{3,}"|„[^“”\n]{3,}[“”]|“[^”\n]{3,}”|»[^«\n]{3,}«/
+
+export function namesUserUtterance(reason) {
+  return USER_UTTERANCE.test(String(reason ?? ''))
+}
+
+/**
  * The retry ladder: a first park is short, each further one longer, and after the
  * last rung the park becomes clockless ('retries-exhausted'). Twenty minutes is the
  * point's own measure of a self-clearing cause; three hours is long enough that a
@@ -157,7 +169,7 @@ export function parsePauseRecord(text) {
  * What the launcher should do with the record it found.
  *
  *   text === null  → 'none'   the file does not exist; the batch is not parked
- *   proved user stop→'hold'   only a typed, internally consistent user stop
+ *   proved user stop→'hold'   only a typed, consistent user stop quoting the user
  *   no usable clock→ 'recover' legacy marker, `never`, or an unreadable stamp
  *   clock ahead    → 'wait'   still parked, `waitMs` to go
  *   clock passed   → 'retry'  the launcher clears the record and resumes
@@ -171,8 +183,13 @@ export function classifyPause({ text, now = Date.now() } = {}) {
   const rec = parsePauseRecord(text)
   const base = { reason: rec.reason, type: rec.type, cause: rec.cause, retryAfter: rec.retryAfter, attempt: rec.attempt, pausedAt: rec.pausedAt, waitMs: 0 }
   if (rec.retryAfter == null) {
-    const provedUserStop = rec.type === PAUSE_TYPES.USER_STOP && rec.cause === 'user-stop' && rec.clocklessOnPurpose
-    if (provedUserStop) return { ...base, state: 'hold', why: 'typed user-stop: the user deliberately stopped the batch' }
+    const typedUserStop = rec.type === PAUSE_TYPES.USER_STOP && rec.cause === 'user-stop' && rec.clocklessOnPurpose
+    if (typedUserStop && namesUserUtterance(rec.reason)) {
+      return { ...base, state: 'hold', why: 'typed user-stop: the user deliberately stopped the batch' }
+    }
+    if (typedUserStop) {
+      return { ...base, state: 'recover', misfiledUserStop: true, why: 'typed user-stop quotes no user utterance (a misfiled stop)' }
+    }
     const why = rec.clocklessOnPurpose
       ? `retry-after is never, but only a typed user-stop may be clockless${rec.type ? ` (type ${rec.type})` : ''}`
       : rec.hasRetryKey
@@ -215,7 +232,8 @@ export function planPause({ cause = null, attempt = 0, now = Date.now(), ladder 
 export function pauseRecovery({ text = '', now = Date.now(), delayMs = PAUSE_RETRY_LADDER_MS[0] } = {}) {
   const raw = String(text ?? '')
   const rec = parsePauseRecord(raw)
-  const delay = Number.isFinite(delayMs) && delayMs > 0 ? delayMs : PAUSE_RETRY_LADDER_MS[0]
+  // Zero is allowed: a misfiled user stop gets a clock that expires this tick.
+  const delay = Number.isFinite(delayMs) && delayMs >= 0 ? delayMs : PAUSE_RETRY_LADDER_MS[0]
   const snapshot = raw === '' ? '(empty file)' : JSON.stringify(raw)
   const snapshotKey = createHash('sha256').update(raw).digest('hex').slice(0, 12)
   const reason = rec.reason || 'ambiguous pause record (no reason recorded)'

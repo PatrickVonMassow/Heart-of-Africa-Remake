@@ -162,10 +162,12 @@ describe('the clock a new park gets', () => {
 
 describe('typed clockless records and ambiguous recovery', () => {
   it('holds only a typed, internally consistent user-stop with no clock', () => {
-    const proved = formatPauseRecord({ reason: 'the user said stop', cause: 'user-stop', retryAfter: null })
+    const proved = formatPauseRecord({ reason: 'the user said „stop the batch“', cause: 'user-stop', retryAfter: null })
     expect(classifyPause({ text: proved, now: NOW })).toMatchObject({ state: 'hold', type: 'user-stop', cause: 'user-stop' })
     expect(classifyPause({ text: proved.replace('type: user-stop', 'type: automatic'), now: NOW }).state).toBe('recover')
     expect(classifyPause({ text: proved.replace('cause: user-stop', 'cause: serving-model'), now: NOW }).state).toBe('recover')
+    const unquoted = formatPauseRecord({ reason: 'chat-reply session, nothing to do', cause: 'user-stop', retryAfter: null })
+    expect(classifyPause({ text: unquoted, now: NOW })).toMatchObject({ state: 'recover', misfiledUserStop: true })
   })
 
   it.each([

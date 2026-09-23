@@ -845,7 +845,7 @@ try {
       `--pid <background run> --log <its log>\` and the stop is allowed while a probe still finds that work ` +
       `alive (it expires, and one dead item ends it — so act as soon as the work lands); ` +
       `(b) the user asked you to stop — then run \`node scripts/batch-pause.mjs --user-stop ` +
-      `"<the user's instruction>"\` and stop; (c) you have just ` +
+      `"<the user's words, in quotation marks>"\` and stop; (c) you have just ` +
       `MERGED AND TICKED a point — that is a POINT BOUNDARY, so ` +
       `END THE SESSION instead of pulling the next point into this context (the context is the batch's ` +
       `dominant cost): \`node scripts/batch-boundary.mjs --prepare <the landed point>\`, its bookkeeping, then ` +

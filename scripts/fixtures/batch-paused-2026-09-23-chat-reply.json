@@ -1,0 +1,5 @@
+{
+  "source": "session cfd01f9f-ab45-45f1-a57d-ef6416278b8f, 2026-09-23T07:36:29.510Z: node scripts/batch-pause.mjs --user-stop with the reason below; .claude/autostart.log 07:50-08:50 logged it as a typed user-stop hold",
+  "note": "The live marker was overwritten when the batch resumed. The reason and the writer command are verbatim from the transcript; the record is that command's output through formatPauseRecord, paused-at rounded to the second of the command's result.",
+  "text": "Chat-Antwort-Sitzung: nur eine Board-Nachricht zu beantworten (1191 an den Queue-Kopf). Kein Batch-Auftrag; die offene Renderpruefung und der CI-Lauf gehoeren dem laufenden Punkt 1174 der uebergebenden Sitzung.\ntype: user-stop\ncause: user-stop\npaused-at: 2026-09-23T07:36:30.000Z\nretry-after: never\n"
+}
