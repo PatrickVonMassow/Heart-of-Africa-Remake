@@ -18,7 +18,7 @@
 
 import { KINDS as ASK_KINDS } from './ask-astra-core.mjs'
 import { FABLE_MODEL, OPUS_MODEL } from './fable-switch-core.mjs'
-import { OUTCOME } from './review-astra-core.mjs'
+import { OUTAGE_OUTCOMES } from './review-astra-core.mjs'
 import { mainCheckoutFrom } from './main-checkout-core.mjs'
 
 /**
@@ -225,7 +225,7 @@ export function writeState(setting, { now = Date.now(), by = '', fallback = null
 // renews it. An ordinary failure is never a fallback — it stays the point's red.
 
 /** The classified outcomes that are a VENDOR outage — its own signature set. */
-export const OUTAGE_KINDS = Object.freeze([OUTCOME.ALLOWANCE_EXHAUSTED, OUTCOME.UNREACHABLE])
+export const OUTAGE_KINDS = OUTAGE_OUTCOMES
 
 /** How long a recorded outage keeps routing off Astra before the next probe. Calibratable. */
 export const OUTAGE_PROBE_MS = 30 * 60 * 1000

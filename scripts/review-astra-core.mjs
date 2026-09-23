@@ -155,6 +155,10 @@ const CAUSE_TEXT = Object.freeze({
   [OUTCOME.SELF_REVIEW]: `${ASTRA_MODEL_NAME} AUTHORED part of this range — no model reviews its own work`,
 })
 
+/** The outcomes that are a VENDOR outage rather than a failed run — the signature set
+ *  the share switch's measured fallback keys on (scripts/astra-share-core.mjs). */
+export const OUTAGE_OUTCOMES = Object.freeze([OUTCOME.ALLOWANCE_EXHAUSTED, OUTCOME.UNREACHABLE])
+
 /** The cause sentence of one outcome kind — for the callers that skip classifyOutcome. */
 export function causeTextFor(kind) {
   return CAUSE_TEXT[kind] ?? ''
