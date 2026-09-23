@@ -89,10 +89,8 @@ strategy and suite map: `scripts/verify/README.md`.
   `scripts/review-astra.mjs`, Claude reviews Astra work. `node
   scripts/fable-switch.mjs --status` is the sole answer whether Fable
   participates in authoring, serving, commit trailers, or blind merging.
-  Serving models outside its reported chain pause the batch. When the Astra lane is
-  unavailable (OpenAI volume exhausted or unreachable), authoring falls back to Opus 5.5
-  rather than waiting for the vendor (user 23.09.2026); the fallback is recorded and
-  lifts when the volume returns. Every commit names
+  Serving models outside its reported chain pause the batch. An unreachable Astra
+  lane authors on Opus 5.5. Every commit names
   its author model in a `Co-Authored-By` trailer.
   A commit may name its cross-vendor reviewer in a distinct `Reviewed-By: <allowed model> <model vendor no-reply address>` trailer, never `Co-Authored-By`.
 - **Four eyes has two modes.** Divergent work runs blind-parallel from identical

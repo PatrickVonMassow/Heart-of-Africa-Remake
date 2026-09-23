@@ -1,5 +1,5 @@
 // THE SWITCH THAT MOVES WORK BETWEEN THE TWO VENDORS (point 654, widened by 667).
-// rule:model-policy@0238ab8b
+// rule:model-policy@aa7f5b05
 //
 // WHY IT EXISTS: the user pays two vendors whose allowances run out at different times,
 // and wants the load moved BEFORE one of them is nearly spent. It began as a read-only
@@ -8,6 +8,10 @@
 // needs — Astra stands in the author allowlist (scripts/model-guard-core.mjs), the
 // `commit-msg` hook takes its trailer, and where Astra authored, CLAUDE reviews, runs the
 // suites, judges the picture and lands.
+//
+// The switch says where work SHOULD go; it does not know whether the vendor answers.
+// An UNREACHABLE lane — exhausted OpenAI volume included — authors on Opus 5.5 instead
+// of waiting (user 23.09.2026); point 1194 makes that automatic, with a probe clock.
 //
 // Side-effect free: reading and writing the file, and the printing, belong to
 // scripts/astra-share.mjs. Pinned by astra-share-core.test.mjs.
