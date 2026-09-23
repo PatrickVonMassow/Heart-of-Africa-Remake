@@ -48,8 +48,8 @@ import { dirname, join, sep as sep_ } from 'node:path'
 import { createHash } from 'node:crypto'
 import { REPO_ROOT } from './repo-paths.mjs'
 import { isMainModule } from './is-main.mjs'
-import { currentSetting, settingProblemLine } from './astra-share.mjs'
-import { routeFor } from './astra-share-core.mjs'
+import { currentSetting, recordAstraRun, settingProblemLine } from './astra-share.mjs'
+import { effectiveRoute, fallbackReviewCause } from './astra-share-core.mjs'
 import { currentFableState } from './fable-switch.mjs'
 import { readRecords, verifyCarried } from './mechanism-review.mjs'
 import { mergeProblem, reviewRecordWellFormed, sameModel } from './mechanism-review-core.mjs'
@@ -1246,9 +1246,13 @@ if (isMainModule(import.meta.url)) {
       process.exit(2)
     }
 
-    if (!requestedReviewer && routeFor('review', share.setting) !== 'astra') {
+    const reviewRoute = effectiveRoute('review', share)
+    if (!requestedReviewer && reviewRoute.to !== 'astra') {
+      // Under a measured outage the hand-over names itself a fallback (point 1194).
       const decision = decideReview({
-        outcome: { ok: false, kind: OUTCOME.SWITCHED_OFF, cause: causeTextFor(OUTCOME.SWITCHED_OFF) },
+        outcome: reviewRoute.fallback
+          ? { ok: false, kind: reviewRoute.fallback.outage, cause: fallbackReviewCause(reviewRoute.fallback) }
+          : { ok: false, kind: OUTCOME.SWITCHED_OFF, cause: causeTextFor(OUTCOME.SWITCHED_OFF) },
         parsed: { ok: false },
         authorModel: rangeAuthors,
         fableState,
@@ -1351,6 +1355,11 @@ if (isMainModule(import.meta.url)) {
       ? runCodex(request)
       : runClaudeReviewer({ ...request, reviewer: targetReviewer })
     const outcome = targetReviewer.runtime === 'codex' ? classifyOutcome(run) : run
+    // An outage signature records the fallback; the hand-over below says it is one.
+    const outage = targetReviewer.runtime === 'codex'
+      ? recordAstraRun({ outcome, text: `${run.stderr ?? ''}\n${run.stdout ?? ''}`, kind: 'review', who: 'review-astra' })
+      : { fellBack: false }
+    if (outage.fellBack) outcome.cause = fallbackReviewCause(outage.fallback)
     // The RECEIPT is demanded back (finding 8): the token stands only on the
     // material's last line, so an answer that cannot repeat it is a run whose
     // material is not proven read — no verdict, and therefore no record.
