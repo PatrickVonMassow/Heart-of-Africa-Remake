@@ -376,10 +376,9 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Überwache den **Zustand** statt des Ereignisses, und **löse jeden Ersatzkanal
   einmal echt aus**. Was anhalten darf, eskaliert nur auf **aufeinanderfolgende** Fehlschläge."
 
-- **Der Halt, den nur ein Mensch aufhebt.** Er kostet den Rest deiner Abwesenheit — und ein
-  leerer Marker sieht aus wie dein bewusster Stopp.
-  → *Prompt:* „Jeder Halt bekommt eine Wiederanlauf-Uhr. Ohne Uhr bleibt nur, was **nachweislich**
-  von mir kommt; alles andere wird protokolliert und kurz wiederholt."
+- **Der Halt, den nur ein Mensch aufhebt.** Ein leerer Marker sieht aus wie dein Stopp.
+  → *Prompt:* „Jeder Halt bekommt eine Wiederanlauf-Uhr; ohne Uhr bleibt nur, was **nachweislich**
+  von mir kommt, sonst wird protokolliert und wiederholt."
 
 - **Prosa wirkt nicht — als Priorität so wenig wie als Meldung.** Ein Tor hielt den eigenen
   Delegaten für fremd: Die Übergabe nannte ihn nur im Text.
@@ -510,10 +509,10 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   Bestand und erklärt korrekt entstandene Altdaten für gefälscht.
   → *Prompt:* „Eine Pflicht in einer Prüfung, die Altbestände liest, sagt **ab wann** sie gilt."
 
-- **Der Wächter tritt zurück — und hört dabei auf zu messen.** Wer fremde Arbeit nicht anfassen
-  darf, nennt nur noch den Grund, nichts zu tun.
-  → *Prompt:* „Zurücktreten heißt **nicht handeln**, nie **nicht wissen**. Lesen kollidiert mit
-  nichts.“
+- **Der Wächter tritt zurück — und hält dabei alle an.** Sein „nicht zuständig" landet im
+  Zustand, den alle lesen, und heißt „nie".
+  → *Prompt:* „Zurücktreten heißt **nicht handeln**, nie **nicht wissen**, und gilt **für dich**,
+  nie für alle: den globalen Halt schreibt nur, wer **hält**. Lesen kollidiert mit nichts.“
 
 - **Die Pflicht wächst schneller, als du sie erfüllen kannst.** Verlangt eine Prüfung „alles seit
   dem letzten Mal", wird sie unerfüllbar. Gilt ein Veto der **Datei** statt dem Befund, wächst der
@@ -702,4 +701,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 84e08cc13fd2f74d7e9f67e6a527d70afdc8c76be9b0c77b31ccb2e798ff71c7 -->
+<!-- GUIDE-FINGERPRINT: 5c05d2143d661cd024ce1f08fd0d71b7108896396d22da4bfceaf5d4c7a5be2f -->
