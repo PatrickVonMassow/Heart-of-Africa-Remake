@@ -31651,3 +31651,20 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   refuses every charge for the section. Refs: scripts/verify/polish.mjs:7635, .claude/render-verify-state.json,
   local/verify-logs/2026-09-23T10-36-45-287-polish.log.
   Bundle: Modell & Wächter
+
+- [x] 1199. The mechanism-review gather test stops timing out the unit gate.
+  PROBLEM, measured 23.09.2026, three times in one hour: `scripts/mechanism-review-guard.test.mjs`
+  "bootstrapBase > seeds the anchor from the one shape that carries the flag AND the baseline"
+  runs `gatherMechanismReviewInputs` against the LIVE repository history. Its comment measured
+  20.60 s; alone it now takes 39.5 s, and on a host with one parallel vitest run it passes 60 s
+  and times out — the main pre-push gate refused a push twice for it, and both delegated
+  authors of 1194 and 1196 reported the same red. The gate it measures is switched off (point
+  1036), so the test spends the gate's whole budget on a read nothing blocks on.
+  FINAL STATE: the symmetry assertion (the flag sits where `shouldSeedRecoveryAnchor` reads it,
+  with the value the verdict gets) runs on a fixture or a bounded history, well under 5 s, and
+  keeps pinning the defect it was written for; no timeout is raised.
+  Test: the file passes alone and beside a parallel `npm run test:unit`.
+  Criticality: high; blocking — it refuses the main push and every delegated gate on a busy host.
+  Refs: scripts/mechanism-review-guard.test.mjs:172-203, scripts/mechanism-review-guard.mjs
+  (`gatherMechanismReviewInputs`), local/tool-output-logs/push-main-1198.log.
+  Bundle: Modell & Wächter

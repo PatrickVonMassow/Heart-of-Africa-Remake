@@ -77,23 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1199. The mechanism-review gather test stops timing out the unit gate.
-  PROBLEM, measured 23.09.2026, three times in one hour: `scripts/mechanism-review-guard.test.mjs`
-  "bootstrapBase > seeds the anchor from the one shape that carries the flag AND the baseline"
-  runs `gatherMechanismReviewInputs` against the LIVE repository history. Its comment measured
-  20.60 s; alone it now takes 39.5 s, and on a host with one parallel vitest run it passes 60 s
-  and times out — the main pre-push gate refused a push twice for it, and both delegated
-  authors of 1194 and 1196 reported the same red. The gate it measures is switched off (point
-  1036), so the test spends the gate's whole budget on a read nothing blocks on.
-  FINAL STATE: the symmetry assertion (the flag sits where `shouldSeedRecoveryAnchor` reads it,
-  with the value the verdict gets) runs on a fixture or a bounded history, well under 5 s, and
-  keeps pinning the defect it was written for; no timeout is raised.
-  Test: the file passes alone and beside a parallel `npm run test:unit`.
-  Criticality: high; blocking — it refuses the main push and every delegated gate on a busy host.
-  Refs: scripts/mechanism-review-guard.test.mjs:172-203, scripts/mechanism-review-guard.mjs
-  (`gatherMechanismReviewInputs`), local/tool-output-logs/push-main-1198.log.
-  Bundle: Modell & Wächter
-
 - [ ] 659. The whole communication chain, played through and judged by what reaches the
   PLAYER — A SIX-EYES ALL-ROUND REVIEW.
   ON HOLD (user 13.08.2026, 22:25: »Stoppe 659 erstmal — der macht erstmal keinen Sinn, wenn wir
