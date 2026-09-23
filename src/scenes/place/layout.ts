@@ -8,7 +8,7 @@ import { placeById } from '../../world/geo'
 import { mulberry32 } from '../../world/noise'
 import { REGION_PLACE_STYLES, VILLAGE_PLANS, type RegionPlaceStyle } from './regionStyles'
 import { LOOM_SPOT, PORT_TALKERS, portAdultStations, childPlayGround, villageAdultStations, villageKeepClearSpots, villageLifeProps, villageLifeFootprints, type PlayGround } from './lifeSpots'
-import { placeLoom, WARP_BODY_RADIUS, WEAVER_BODY_RADIUS, type LoomStation } from './loom'
+import { placeLoom, PLAZA_SIGHT_HALF_WIDTH, WARP_BODY_RADIUS, WEAVER_BODY_RADIUS, type LoomStation } from './loom'
 import { boxCollider, nudgeToFree, spawnPointFree, standingClear, PLAYER_RADIUS, WALKER_RADIUS, CHIEF_BODY_RADIUS, type Collider } from './collision'
 import { CHIEF_HUT, MARKET_HUT, dwellingRoofProfile, hutRoofProfile, roofStandOff } from './roofClearance'
 import { windingPoints, laneSlots, closestOnPolyline, bendAround, type LaneSlot } from './lanePlan'
@@ -762,8 +762,8 @@ const PLAZA_SIGHT_STANDS = 8
 const PLAZA_SIGHT_MIN_DISTANCE = 8
 /** The station's own ground at the far end, which is not sight line. */
 const PLAZA_SIGHT_STATION_GROUND = 2
-/** A metre either side of the line — a gap between two huts is not a view. */
-const PLAZA_SIGHT_HALF_WIDTH = 1
+/** The widths a view is measured at, narrowest first. */
+const PLAZA_SIGHT_WIDTHS = [0.25, 0.5, 0.75, 1] as const
 /** How finely that line is walked; wider is stricter, and far cheaper. */
 const PLAZA_SIGHT_SAMPLE = 0.2
 
@@ -2144,6 +2144,9 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     loom = placeLoom({
       bank,
       nominal: LOOM_SPOT,
+      nominalWaterOff: bank
+        ? bank.distance - (LOOM_SPOT[0] * bank.nx + LOOM_SPOT[1] * bank.nz)
+        : Infinity,
       walkRadius: radius - WALKER_RADIUS,
       free: (x, z, r) =>
         Math.hypot(x, z) < radius - r &&
@@ -2166,16 +2169,23 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
       // check walks — and one open line is enough. The corridor is a metre to
       // each side: the shipped seat passed a 0.15 m line through a gap between
       // two dwellings, and what arrived in the frame was two figures, not a loom.
-      plazaSight: (seat) => {
+      plazaView: (seat) => {
+        let widest = 0
         for (const stand of plazaStands) {
           const dist = Math.hypot(seat.x - stand.x, seat.z - stand.z)
           if (dist < PLAZA_SIGHT_MIN_DISTANCE) continue
           // The last stretch is the station's own ground, not the sight line.
           const t = (dist - PLAZA_SIGHT_STATION_GROUND) / dist
           const to = { x: stand.x + (seat.x - stand.x) * t, z: stand.z + (seat.z - stand.z) * t }
-          if (clearCorridor(colliders, stand, to, PLAZA_SIGHT_HALF_WIDTH, PLAZA_SIGHT_SAMPLE)) return true
+          // Widened until it no longer fits: the placement wants the BEST view a
+          // plan holds, not only whether the full metre is there.
+          for (const half of PLAZA_SIGHT_WIDTHS) {
+            if (half <= widest) continue
+            if (clearCorridor(colliders, stand, to, half, PLAZA_SIGHT_SAMPLE)) widest = half
+          }
+          if (widest >= PLAZA_SIGHT_HALF_WIDTH) return widest
         }
-        return false
+        return widest
       },
       toChildren,
       waterPathHead: waterPath ? waterPath.head : null,
