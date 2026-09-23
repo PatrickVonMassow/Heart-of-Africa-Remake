@@ -80,20 +80,17 @@ put it is the mistake this line exists to stop.
 - [ ] 1174. The village vocabulary is rolled per run, under rules that keep the direction pair a
   mirror (user 21.09.2026, drained from the findings carrier; placed here on the user's
   instruction, ahead of 659, which must judge a mechanic that no longer changes).
-  ESCALATED BY ITS COMMISSIONED AUTHOR, NOT GUESSED (GPT-6 Astra, 22.09.2026, on branch
-  `feat/1174-rolled-lexicon` at b5a8fd789; the author regenerated the brief at HEAD and stopped
-  with a clean worktree rather than build on a spec that disagrees with the code). TWO
-  DISCREPANCIES TO SETTLE BEFORE IMPLEMENTATION:
-  a) The spec's step 4 describes a game-field WHITELIST in `stateDump.ts`; the implementation
-     serializes the whole game object. The question the author asked and did not answer for
-     itself: should the dump keep every existing game field and serialize the vocabulary
-     explicitly as six utterance strings, or is the whitelist the intended final state?
-  b) The spec claims the documentation carries a "three reversal pairs" sentence that has to be
-     corrected. It does not: the documentation already says two reversal pairs plus two
-     palindromes, which is what this point's own THE SET paragraph says too. The correction
-     item has no subject and is struck unless someone names the file that carries it.
-  Whoever answers these writes the answer INTO this point (a delegated author may not guess it),
-  and only then is the lane commissioned again.
+  ESCALATION ANSWERED (owner, 23.09.2026, measured against the code at eb801aa5c; the author
+  had stopped at b5a8fd789 on two brief/code discrepancies):
+  a) `dumpGameState` in `src/state/stateDump.ts` serializes the WHOLE game object, and that
+     stays: no whitelist is introduced. The vocabulary lives in game state as a record of the
+     six utterance strings keyed by concept, so the dump carries it by construction; a unit
+     test asserts it is present in the dump. Step 4's claim of a dump whitelist is struck.
+     `saveCheckpoint` in `src/state/store.ts` IS a whitelist and gets the explicit entry.
+  b) `docs/communication-poc-spec.md` already says two mirror pairs plus two palindromes;
+     the "three pairs" correction is struck. What still goes false under the roll is that
+     section naming RIVER/CHIEF as the fixed mirror pair: it is rewritten as the point says
+     (structure, the two rules, the roll), and the lexicon.ts comments listed below likewise.
   Bundle: Dorfleben
   The tonal lexicon is a fixed module constant today, so the syllable-to-meaning assignment is
   identical in every playthrough and a returning player solves the drum puzzle from memorised
