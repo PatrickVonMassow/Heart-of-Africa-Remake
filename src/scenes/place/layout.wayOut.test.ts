@@ -169,12 +169,14 @@ describe('every settlement keeps one way out free (work-order 688)', () => {
   // Measured over every settlement at eight seeds: 0.74 of the 23 loose objects
   // dropped on average, 5 in the worst layout, and the floors below are the
   // worst kept counts on record (baganda-village seed 7 and tuareg-village seed
-  // 7). They are a bar on the price, not a target.
+  // 7). They are a bar on the price, not a target. The flora floor fell by one
+  // when the plaza's line to the loom (work-order 1190) took a tree out of
+  // mandinka-village seed 1337: that tree is the view's price, not the way's.
   it.each([...PORTS, ...VILLAGES].map((p) => [p.id] as const))('%s: the dressing is not thinned out for it', async (id) => {
     for (const seed of [...SEEDS, REPORTED_SEED, WEDGE_SEED, 1, 2, 3]) {
       await new Promise((resolve) => setTimeout(resolve, 0))
       const layout = sharedLayout(id, seed)
-      expect(layout.flora.length, `${id} seed ${seed}: flora`).toBeGreaterThanOrEqual(6)
+      expect(layout.flora.length, `${id} seed ${seed}: flora`).toBeGreaterThanOrEqual(5)
       expect(layout.rocks.length, `${id} seed ${seed}: rocks`).toBeGreaterThanOrEqual(11)
     }
   })
