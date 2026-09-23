@@ -2435,9 +2435,13 @@ rises to a top beam, which described the standing frame this station replaced.
 downstream vector and searches the seat; `src/scenes/place/loomWork.ts` runs the
 weaving cycle and the sparse named tendings; `Loom` in
 `src/scenes/place/PlaceLife.tsx` draws it. The seat is held to a metre-wide
-line from the plaza (point 1190); in that line trees, loose stones and the
-outbuildings (sheds, granaries) give way, while dwellings and the chief's and
-trading huts stay where the plan put them. The teaching rules are in
+line from the plaza (point 1190), from a stand at most 17 m off (point 1191);
+in that line trees, loose stones and the outbuildings (sheds, granaries) give
+way first. Where that is not enough, a household gives way too — a compound
+whole, with its wall, lane and errand, or a hut standing alone — in the line or
+on the ground the station is given, because nothing here fixes where a compound
+of the procedural ring stands; the layout names the drop (`gaveWayToLoom`). The
+chief's and trading huts and the landmarks stay. The teaching rules are in
 `docs/communication-poc-spec.md`, "The weaver's loom".
 
 ---
