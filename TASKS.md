@@ -305,6 +305,42 @@ put it is the mistake this line exists to stop.
   CLAUDE.md §6.
   Bundle: Modell & Wächter
 
+- [ ] 1196. A cheap section run can accept a charge for a known foreign red.
+  PROBLEM, measured 23.09.2026 on the ten-section picture check of point 1174, identically on
+  WebGPU and WebGL 2. Two known, filed, charged reds could not be cleared by the run that met
+  them, so both held against the point that was only passing through:
+  a) `polish --section=adult-errands`: 34 pass, 2 fail — the two halves of point 568's water-rim
+     measurement, both of which the ledger carries for BOTH backends. The verdict was
+     "the run record is incomplete, so no charge may be accepted for it — ownership unresolved".
+     Cause: `complete` in `scripts/verify/run-all.mjs:329` demands `record.terminalVerdict === true`,
+     and the recorder sets that flag only on a line matching `TERMINAL_VERDICT_LINE`
+     (`scripts/render-verify-recorder.mjs:203`) — `N CHECK(S) FAILED`, `console errors:`,
+     `FAILURES: n`. A section run of `polish` whose CHECKS fail prints its FAIL lines and no such
+     terminal line, so the record carries the reds but is classed incomplete: the cheap rung can
+     never accept a charge for a failing check, which is exactly what the ladder's cheap rung is
+     for. A console-error-only failure DOES print `console errors: 1` and charges fine — the gap
+     is specific to failing checks.
+  b) `flow --section=core-loop`: the record is complete and carries both reds owned by point 1154,
+     yet the verdict was "charged for one reading of this check but not for every one this run
+     produced". The printed occurrences carry one reading the charge does not own, so
+     `occurrences.every(owned)` fails although the record's own reds are fully owned.
+  FINAL STATE: a record that carries its reds, its exit and `asserted` is chargeable whether or
+  not the suite printed a terminal verdict line — either the recorder recognises a section run's
+  terminal shape, or completeness stops resting on that line while still refusing a crashed or
+  truncated record. And a printed occurrence that the record does not carry may not by itself
+  deny a charge the record's own reds earn; where the two disagree the run says WHICH reading is
+  unowned, with its measurement, instead of a sentence nobody can act on.
+  NOT IN THIS POINT: changing what any charge covers. Points 568 and 1154 keep their entries.
+  Test: Vitest on the pure decision — a section record with failing checks and no terminal line
+  is chargeable; a crashed or truncated record is not; a printed occurrence absent from the
+  record does not deny the record's own charge, and the printed reason names the reading.
+  Criticality: high — it blocks the cheap rung of every point whose sections carry a known
+  foreign red, which is how it was found: the picture check of 1174 held two reds it does not own.
+  Refs: scripts/verify/run-all.mjs:318-410, scripts/render-verify-recorder.mjs:203/326,
+  scripts/render-verify-core.mjs:960-980, scripts/render-verify-charges.mjs (points 568, 1154),
+  local/verify-logs/2026-09-23T10-36-45-287-polish.log, .claude/render-verify-state.json.
+  Bundle: Modell & Wächter
+
 - [ ] 659. The whole communication chain, played through and judged by what reaches the
   PLAYER — A SIX-EYES ALL-ROUND REVIEW.
   ON HOLD (user 13.08.2026, 22:25: »Stoppe 659 erstmal — der macht erstmal keinen Sinn, wenn wir
