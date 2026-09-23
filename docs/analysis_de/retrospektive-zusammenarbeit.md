@@ -1688,7 +1688,7 @@ stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die s
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 23.09.2026, 16:01 · Quellen-Fingerprint: `9f6353e89e07…`
+Zuletzt aktualisiert: Mittwoch, 23.09.2026, 19:02 · Quellen-Fingerprint: `15ecaf56a8ef…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1794,12 +1794,11 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | WebGPU is testable headless/autonomously via system Chrome (channel:'chrome') + --headless=new; the limitation applies only to Playwright's bundled Chromium | 3 | mittel | — (Regel/Memory) | ◐ Regel |
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
-| Es gibt genau EINE bediente Sitzung — eine Nachricht an eine headless Sitzung wartet auf eine Freigabe, die niemand gibt; der Nutzer wird nie in ein anderes Fenster geschickt | 1 | mittel | — (Regel/Memory) | ◐ Regel |
 
-Erfasste Quellen: 99 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 7 Revert-/Reapply-Commits · 140 Prozess-/Meta-TASKS-Punkte (davon 68 offen).
+Erfasste Quellen: 99 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 7 Revert-/Reapply-Commits · 140 Prozess-/Meta-TASKS-Punkte (davon 67 offen).
 
-<!-- RETRO-FINGERPRINT: 9f6353e89e071cbae26a4ba2c98a0a02f490167478d90d9267544ff5f8f869b8 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-23T14:01:02.474Z -->
+<!-- RETRO-FINGERPRINT: 15ecaf56a8efd7bab38a5daff721718904a222cd8fbb5c21f29235895839b36b -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-23T17:02:15.535Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
