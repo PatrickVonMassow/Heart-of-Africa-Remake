@@ -1363,12 +1363,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "1174": {
-      "at": "2026-09-21T14:46:48.199Z",
-      "why": "Nutzerauftrag vom 21.09.2026 mit eigener Platzierung: unmittelbar vor 659, weil die Rundum-Gegenlese der Kommunikationskette einen Mechanismus beurteilen muss, der sich nicht mehr ändert.",
-      "origin": "user",
-      "place": "ahead"
-    },
     "1175": {
       "at": "2026-09-21T15:56:48.717Z",
       "why": "Maschinell eingereiht beim Landen von 690; kein Spielerimpakt, und die Reparatur steht hinter den Bildziel-Punkten derselben Suite.",
@@ -1410,12 +1404,6 @@
       "why": "False-approval infra point homed in its bundle; the queue order places it with that bundle, not ahead of game work",
       "origin": "machine",
       "place": "last"
-    },
-    "1193": {
-      "at": "2026-09-23T09:16:16.567Z",
-      "why": "Der Defekt hat den Batch heute 75 Minuten dauerhaft angehalten und kann es jederzeit wieder tun; ein Release, das dabei stehenbleibt, wird nicht fertig.",
-      "origin": "machine",
-      "place": "ahead"
     },
     "1194": {
       "at": "2026-09-23T09:16:16.709Z",
@@ -1465,7 +1453,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-23T12:48:00.332Z",
+    "at": "2026-09-23T17:21:48.631Z",
     "points": [
       174,
       184,
@@ -1870,7 +1858,6 @@
       1169,
       1171,
       1172,
-      1174,
       1175,
       1176,
       1177,
@@ -1881,7 +1868,6 @@
       1188,
       1189,
       1192,
-      1193,
       1194,
       1195,
       1196,
