@@ -31233,3 +31233,57 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Refs: src/scenes/place/loomWork.ts, src/scenes/place/loom.ts, src/scenes/place/PlaceLife.tsx,
   src/systems/ambience.ts, src/config/balance.ts, docs/peoples-1890.md §8.1, docs/backlog.md
   (22.09.2026), point 1157
+
+- [x] 1190. From the plaza the Bambara loom is seen only through a gap between two huts, and
+  there it is a pair of small figures, not a loom (measured 23.09.2026 while landing 1183).
+  PROBLEM. Point 1183 made the station readable UP CLOSE on both backends: the folded strips
+  lie stacked beside the loom, the helper carries a yarn bundle out and leaves it at the end
+  the word named, the weaver's trunk drives each beat. The user's criterion was the PLAZA.
+  The new plaza frame (`scripts/verify/polish.mjs` village-loom, `1183-village-loom-from-plaza`)
+  searches a 6 m disc round the plaza (0, 3) for the widest open sight line to the weaver:
+  NO stand has 0.5 m of clearance along it, and the best one looks through a narrow gap
+  between two dwellings. What reaches the picture there is a kneeling cone and a standing
+  figure by the water, a few dozen pixels tall; the warp, the stack and the tended end's
+  bundle do not read. The reed's clack (1183 part 3) carries across the plaza; the picture
+  does not.
+  FINAL STATE. From a stand on the Bambara plaza the station reads as a loom being worked: the
+  sight line from the plaza to it is open (the frame's check tightened from 0.15 m to at least
+  1 m of clearance), and the warp line and the cloth stack are distinguishable in the frame.
+  The loom's height stays (docs/peoples-1890.md §8.1, point 1183: "Do NOT raise the loom");
+  the lever is WHERE the station stands relative to the dwellings and the plaza, within the
+  bank constraint that the warp runs on the river's axis (`onRiverAxis`, point 1157).
+  Criticality: medium — the teaching station works; the user's stated criterion is not met.
+  Test: the village-loom section's plaza frame on both backends with the tightened clearance;
+  Vitest for any layout rule that moves the station (it still lies on the river's axis and
+  clear of every dwelling).
+  MEASURED 23.09.2026 ON `feat/1190-loom-visible-from-plaza`: THE SEAT ALONE CANNOT DO IT.
+  The branch holds the placement to a plaza view, measures that view as a WIDTH and takes
+  the widest the plan allows, and keeps the station no farther back from the water than
+  the plan meant — the last because the water sight line reads solids and not the ground,
+  so a seat that drifted inland passed it and the frame came back with the river at the
+  horizon. Unit tests and lint are green. But the shipped Bambara plan the picture check
+  runs (`bambara-village@394349866`, and seed 1337 with it) holds NO metre-wide line from
+  the plaza to any seat that also keeps the river in the picture: the compounds stand where
+  they stand. So the frame's tightened check fails on the branch, and it fails honestly.
+  WHAT IS STILL OWED: the dwelling ring, not the seat. One compound or lane has to give way
+  so the plaza has a line at all — `docs/peoples-1890.md` §8.1 governs what may move. Until
+  that is decided the point is NOT met and must not be ticked.
+  MEASURED 23.09.2026 04:05, BRANCH HEAD aba15e2b6: THE LINE IS OPEN, THE LOOM STILL DOES NOT
+  READ. Trees, loose stones, sheds and granaries in the plaza's line now give way (dwellings
+  stay), the seat search was made cheap again (layouts had become up to 10x slower and three
+  place suites timed out), and place units plus `polish --section=village-loom` on WebGPU are
+  green with the 1 m check. But `1183-village-loom-from-plaza` shows the station ~25 m off
+  across open ground as a kneeling cone and a standing figure a few dozen pixels tall; warp
+  and stack do not read. NEXT LEVER: the frame's stand, not the village — take the NEAREST
+  plaza stand that holds the full metre (and check the layout rule's minimum distance against
+  it) before anything moves a compound. The same section is green on WebGL 2 as well (04:19).
+  Refs: src/scenes/place/layout.ts (loom station placement), src/scenes/place/loom.ts
+  (placeLoom, plaza view), scripts/verify/polish.mjs (village-loom, plaza frame), point 1183,
+  point 1157
+  SPLIT 23.09.2026 04:55 (owner, point not converging): 1190 closes on the OPEN LINE — the
+  plaza's frame now holds the full metre and is taken from the NEAREST plaza stand that does,
+  green on both backends (branch eb1afa8cc+). Ordering the seat search by nearness to the
+  plaza was measured and changes nothing: in `bambara-village@394349866` the only seat with
+  a metre-wide line stands 27.7 m from the plaza middle (seed 1337: 11.6 m, but no full line).
+  That the loom READS from the plaza — warp and stack distinguishable — moves to point 1191.
+  Bundle: Dorfleben
