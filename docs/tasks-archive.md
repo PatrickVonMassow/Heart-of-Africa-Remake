@@ -31314,3 +31314,179 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   src/scenes/place/loom.ts (placeLoom), scripts/verify/polish.mjs (village-loom plaza frame),
   point 1190
   Bundle: Dorfleben
+
+- [x] 1174. The village vocabulary is rolled per run, under rules that keep the direction pair a
+  mirror (user 21.09.2026, drained from the findings carrier; placed here on the user's
+  instruction, ahead of 659, which must judge a mechanic that no longer changes).
+  ESCALATION ANSWERED (owner, 23.09.2026, measured against the code at eb801aa5c; the author
+  had stopped at b5a8fd789 on two brief/code discrepancies):
+  a) `dumpGameState` in `src/state/stateDump.ts` serializes the WHOLE game object, and that
+     stays: no whitelist is introduced. The vocabulary lives in game state as a record of the
+     six utterance strings keyed by concept, so the dump carries it by construction; a unit
+     test asserts it is present in the dump. Step 4's claim of a dump whitelist is struck.
+     `saveCheckpoint` in `src/state/store.ts` IS a whitelist and gets the explicit entry.
+  b) `docs/communication-poc-spec.md` already says two mirror pairs plus two palindromes;
+     the "three pairs" correction is struck. What still goes false under the roll is that
+     section naming RIVER/CHIEF as the fixed mirror pair: it is rewritten as the point says
+     (structure, the two rules, the roll), and the lexicon.ts comments listed below likewise.
+  Bundle: Dorfleben
+  The tonal lexicon is a fixed module constant today, so the syllable-to-meaning assignment is
+  identical in every playthrough and a returning player solves the drum puzzle from memorised
+  syllables instead of listening. The assignment is rolled at every game start instead, while
+  `UPSTREAM` and `DOWNSTREAM` stay exact tonal mirrors of one another, so the opposite relation
+  stays learnable.
+  Cross-vendor reviewed before filing: audited by GPT-6 Astra (21.09.2026, effort high — counts
+  confirmed, an earlier rule requiring RIVER to be alternating rejected as unestablished, the
+  module-lifetime and save-remapping defects raised) and proofread by Fable 5.1 (21.09.2026 —
+  counts recomputed, five corrections folded in). The counts were recomputed once more here by
+  enumeration before filing: 96 mirrored assignments, 24 under rule (a), 20 under rule (b), of
+  which 8 keep both members of the unavoidable spurious mirror inside the errand, and today's
+  vocabulary is one of the 20.
+
+  FINAL STATE: the syllable-to-meaning assignment of the village lexicon is rolled at every game
+  start from an enumerated set of vocabularies that all obey the rules the player is meant to
+  learn; it holds unchanged for the whole run, and it is part of the save and of the debug JSON.
+
+  THE SET: 20 VOCABULARIES. The build rule is unchanged - four syllables, an even number of
+  highs, both tones present. The six usable sequences form exactly two reversal pairs plus two
+  palindromes: ba-ba-BA-BA / BA-BA-ba-ba, ba-BA-ba-BA / BA-ba-BA-ba, and the palindromes
+  ba-BA-BA-ba and BA-ba-ba-BA. 96 assignments keep UPSTREAM and DOWNSTREAM mirrored (4 direction
+  choices times 4! for the rest). Two rules cut them to 20, and the shipped vocabulary is one of
+  the 20.
+
+  RULE (a) ICONIC DIRECTIONS: UPSTREAM is always ba-ba-BA-BA (rising) and DOWNSTREAM always
+  BA-BA-ba-ba (falling). The river visibly flows and the bank game teaches the pair against the
+  current, so the tone line rises against it and falls with it. On the alternating pair instead,
+  the rising and the falling sequence would carry two unrelated concepts - a cue pointing the
+  wrong way. 96 becomes 24.
+
+  RULE (b) ROCK AND DIG ARE NOT MIRRORS OF EACH OTHER. The grounding fact, and the whole of the
+  argument: ROCK and DIG stand adjacent in the errand RIVER-UPSTREAM-ROCK-DIG, separated by the
+  one constant pause, so if they were mirrors the message would contain an EIGHT-STRIKE
+  PALINDROME across that pause - an audible symmetry the game attaches no meaning to, inside the
+  one message the player must decode. That figure can arise nowhere else: RIVER cannot mirror
+  UPSTREAM and UPSTREAM cannot mirror ROCK (the direction pair is spent), the answer
+  RIVER-DOWNSTREAM cannot mirror either, and the bank game speaks single atoms per moment rather
+  than phrases, so no other adjacency exists. 24 becomes 20. STATE HONESTLY in the code comment
+  what this rule does NOT do: because the directions consume one whole reversal pair, a second,
+  meaningless mirror pair always remains among RIVER, ROCK, DIG and CHIEF - that is unavoidable
+  and accepted (user 21.09.2026) - and in 8 of the surviving 20 both of its members still sit
+  inside the errand, only never adjacently. If the owner prefers variety over this rule,
+  dropping (b) ships 24 vocabularies and nothing else in this point changes.
+
+  REJECTED, recorded so it is not re-proposed: requiring RIVER to be one of the two alternating
+  sequences, on the grounds that the message opens on RIVER and alternation is the most hearable
+  pattern. Unestablished (GPT-6 Astra and Fable 5.1 independently); and it would pull the
+  spurious mirror INTO the errand in 8 of 12 cases.
+
+  BUILD.
+
+  1. ENUMERATE, DO NOT TABULATE. A small pure function derives the 20 from rules (a) and (b).
+  The generated list is pinned literally in the test, so a rule change shows as a table diff
+  instead of passing silently.
+
+  2. THE ROLLED MAPPING IS A VALUE, NOT AN ID. Introduce an explicit Vocabulary type - one tone
+  sequence per ConceptId - and let the Lect keep only what does not roll: its id, its two
+  syllables, its reserved sequences. The existing LectId parameter CANNOT carry a rolled
+  mapping: it is a string resolved against the module constant LECTS. Consumers take the
+  vocabulary itself (or one value object holding lect plus vocabulary); they must not resolve it
+  from a store, so lexicon.ts stays pure.
+
+  3. ROLL FROM THE RUN SEED, not from Math.random, using the idiom already in
+  src/state/store.ts: pickKnowingVillages(seed) derives its own generator with mulberry32(seed
+  exclusive-or constant) and is called from startState. The rolled vocabulary is produced the
+  same way and stored in game state at startState. Consequence to keep: the dev parameter
+  ?seed=<n> makes every one of the 20 reproducibly reachable from a test.
+
+  4. SAVE AND DUMP CARRY THE MAPPING ITSELF, NOT AN INDEX. saveCheckpoint whitelists its fields
+  and stateDump.ts builds an explicit whitelist object, so the vocabulary appears in neither by
+  itself: both get an explicit entry holding the six utterance strings by concept. An index into
+  the enumerated 20 is forbidden - step 1 allows the list order to change, which would silently
+  rebind old saves. On load, a save WITHOUT the field falls back to the SHIPPED vocabulary,
+  never to derive(seed): that save was played on the shipped mapping and its journal notes are
+  keyed by utterance text, so a derived mapping would attach the player's own notes to the wrong
+  concepts in 19 of 20 cases. No migration beyond that one fallback (saves are throwaway in the
+  PoC).
+
+  5. IT HOLDS FOR THE WHOLE RUN - across leaving the village, entering another settlement,
+  travel and return. It is the region's way of speaking, not one village's mood.
+
+  6. THE MODULE STOPS BEING THE AUTHORITY, AND THE SILENT FALLBACKS GO. lexicon.ts holds the
+  mapping at module lifetime today, so a roll at import time would not re-roll a second new game
+  in the same running application. Every default that lets a forgotten call site fall back to
+  the shipped mapping must go, not be redirected: the defaults on sequenceOf, speak,
+  utteranceOf, conceptOf and phraseOf, AND the default on lectOf(id = DEFAULT_LECT). In
+  drumMessage.ts the three optional lect parameters (drumMessagePhrase, drumMessagePlan,
+  drumMessageElements) sit AFTER defaulted parameters, so making them required means reordering
+  those signatures rather than passing undefined at the call sites. Measured 21.09.2026: outside
+  lexicon.ts there are seven call sites of sequenceOf/utteranceOf/phraseOf/speak/conceptOf, one
+  of which already passes a lect explicitly - the threading itself is small; the signature
+  changes are the work.
+
+  7. TESTS THAT CAN ACTUALLY FAIL. Checking distance-2, distinct heard-store keys, the journal
+  sort order and the 16/8 strike counts across all 20 proves nothing: every vocabulary uses the
+  same six strings, so those hold by construction. The per-vocabulary assertions are instead:
+  rules (a) and (b) hold for each of the 20; the enumerated list equals the pinned literal
+  table; every one of the 20 is reachable by some seed; no errand contains an eight-strike
+  palindrome across the pause; a save round-trip restores the same mapping, and a save without
+  the field restores the SHIPPED one. THE LOAD-BEARING TEST is a consumer test run under a
+  vocabulary that is NOT the shipped one: villager speech, the drum message, the journal and the
+  overhead labels must all change with it. A consumer that forgot to thread the vocabulary keeps
+  producing the shipped syllables, and only that test catches it.
+
+  8. IT STAYS LENGTH-GENERIC, AND THE ACCEPTANCE PROVES IT AT FIVE (user 23.09.2026, ordered while
+  the point was in flight; the running verification was discarded for it). Raising
+  SEQUENCE_LENGTH later - to fit more concepts into the language - must be a change of that
+  constant plus a new pinned table, not a redesign of the roll. Three constraints, none of which
+  changes what this point ships (SEQUENCE_LENGTH stays 4, same shipped vocabulary, same 20, the
+  pinned table stays): (i) the well-formed set is DERIVED from SEQUENCE_LENGTH - bitmask over
+  the length, even number of highs, both tones present - never six written-out literals;
+  lexicon.test.ts already enumerates this way, and the production enumerator of step 1 uses the
+  same derivation. (ii) rules (a) and (b) are PREDICATES OVER A VOCABULARY, not concept
+  literals: (a) "UPSTREAM is the ascending sequence - all lows, then all highs - and DOWNSTREAM
+  its reverse", stated over the shape so it names exactly one sequence at any length; (b) "no
+  two concepts ADJACENT IN THE ERRAND are tonal mirrors of each other", with the errand as its
+  input, so ROCK/DIG is the case that follows from today's errand rather than the rule itself.
+  The enumerator is a thin loop over these two predicates and the roll applies the SAME
+  predicates - so a later length bump can swap "enumerate all, pin the table" for "draw from the
+  seed, reject what fails the predicates" without touching the rules. (iii) the comment carrying
+  96 -> 24 -> 20, and the matching passage in docs/communication-poc-spec.md, state explicitly
+  that these counts are computed FOR FOUR SYLLABLES AND SIX CONCEPTS - otherwise they go
+  silently false at the first length change, the same failure mode this point is already
+  repairing in that document.
+  THE ACCEPTANCE INCLUDES A RUN AT SEQUENCE_LENGTH = 5 (user 23.09.2026), and it is more than a
+  unit test of the derivation: the game is exercised at five syllables - roll, vocabulary, drum
+  message, villager speech, journal and overhead labels - and must work. Measured today, the
+  well-formed set at length 5 is 15 sequences rather than 6, so a pinned 20-row table cannot
+  carry it and every site that silently assumed four is exposed. The existing tests read
+  SEQUENCE_LENGTH rather than the literal 4 (drumMessage.test.ts, speaking.test.ts,
+  ambience.test.ts, adultWork.hold.test.ts), which is the starting point, not the proof. The
+  point ships with the constant back at 4; what ships is the evidence that five ran.
+  STILL OWED (23.09.2026): the first attempt ran beside a main push gate on the same
+  machine and was abandoned; the constant is back at 4 and the branch is clean. The
+  derivation and both rules are already proven at five and six by unit cases; what is
+  missing is the GAME at five syllables, on a quiet machine.
+
+  TEXT THAT GOES FALSE UNDER THE ROLL and is rewritten in the same commit: the per-sequence
+  comments in lexicon.ts on RIVER (the word the whole message opens on) and CHIEF (RIVER's tonal
+  mirror, the only mirror heard as a pair); the lexicon.ts header claim that the registry is
+  keyed by lect; the header saying five concepts (there are six); the isWellFormed comment
+  saying two of the three reserved sequences (there are two of two); and in
+  docs/communication-poc-spec.md the false sentence that all six words fall into three mirror
+  pairs RIVER/CHIEF, UPSTREAM/DOWNSTREAM and ROCK/DIG - ROCK and DIG are each palindromes, not
+  reversals of each other. The rewritten section states the real structure, the two rules and
+  the roll.
+
+  NOT IN THIS POINT: re-rolling the vocabulary does not by itself defeat a replaying player,
+  because the errand is a fixed concept order and the answer is fixed too, so whoever memorised
+  the ERRAND walks upstream to the rock and digs without understanding a word (GPT-6 Astra
+  called this decisive, Fable 5.1 did not contest it). The minimum cure is a rolled errand
+  DIRECTION with the artefact placed accordingly and the answer derived consistently; real
+  re-learning needs an outcome-relevant choice carried by a changing word. Separate design
+  decision, separate point.
+  Criticality: medium — it threads one value through every consumer of the language, so the risk
+  is a forgotten call site silently keeping the shipped syllables, which is what the load-bearing
+  consumer test exists to catch.
+  Refs: `src/communication/lexicon.ts`, `src/communication/lexicon.test.ts`,
+  `src/communication/drumMessage.ts`, `src/state/store.ts`, `src/state/stateDump.ts`,
+  `docs/communication-poc-spec.md`.
