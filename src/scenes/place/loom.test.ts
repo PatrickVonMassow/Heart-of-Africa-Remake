@@ -12,6 +12,7 @@ import {
   WEAVER_SIDE_OFFSET,
   loomAround,
   placeLoom,
+  stationGround,
   waterAhead,
   WARP_BODY_RADIUS,
   WEAVER_BODY_RADIUS,
@@ -72,12 +73,10 @@ function plazaViewOf(layout: ReturnType<typeof buildLayout>): number {
 
 describe('the village plaza sees the loom (work-order 1190)', () => {
   it('the Bambara plaza always looks at the station over some open ground', () => {
-    // NOT EVERY PLAN HOLDS A FULL METRE. Seeds 1337 and 394349866 do not: with
-    // the loom kept near the water, as the frame that judges it requires, their
-    // dwellings leave the plaza no wider line. The placement then takes the
-    // WIDEST view going rather than the first seat that clears everything else,
-    // and what remains is a dwelling-placement question rather than a seat one.
-    // The floor asserted here is that no plan is seated blind.
+    // Seeds 1337 and 394349866 held no full metre until a household could give
+    // way (work-order 1191); every shipped Bambara plan does now. Where a plan
+    // still cannot, the placement takes the WIDEST view going, and the floor
+    // asserted here is that no plan is seated blind.
     const blind = shippedLooms()
       .filter(({ id }) => id.startsWith('bambara'))
       .filter(({ layout }) => plazaViewOf(layout) <= 0)
@@ -90,6 +89,59 @@ describe('the village plaza sees the loom (work-order 1190)', () => {
       .filter(({ layout }) => layout.loom?.seenFromPlaza === true && plazaViewOf(layout) < 1)
       .map(({ id, seed }) => `${id}/${seed}`)
     expect(lying).toEqual([])
+  })
+})
+
+describe('a household gives way to the plaza’s view (work-order 1191)', () => {
+  const plazaStands = () => {
+    const out: Array<[number, number]> = [[0, 3]]
+    for (const ring of [1.5, 3, 4.5, 6]) {
+      for (let k = 0; k < 8; k++) out.push([Math.cos((k / 8) * Math.PI * 2) * ring, 3 + Math.sin((k / 8) * Math.PI * 2) * ring])
+    }
+    return out
+  }
+
+  it('at seed 42 every village’s plaza sees its loom, and the shipped Bambara plan’s does', () => {
+    const unseen = [...VILLAGES.map((id) => [id, 42] as const), ['bambara-village', 394349866] as const]
+      .filter(([id, seed]) => sharedLayout(id, seed).loom?.seenFromPlaza !== true)
+      .map(([id, seed]) => `${id}/${seed}`)
+    expect(unseen).toEqual([])
+  })
+
+  it('a station a household gave way for is near enough to read — within 17 m of a stand', () => {
+    // A plan that can afford no household keeps the far seat it had before.
+    const far = shippedLooms()
+      .filter(({ layout }) => layout.loom?.seenFromPlaza === true && layout.gaveWayToLoom.households > 0)
+      .filter(({ layout }) => {
+        const w = layout.loom!.weaver
+        return Math.min(...plazaStands().map(([x, z]) => Math.hypot(w.x - x, w.z - z))) > 17
+      })
+      .map(({ id, seed }) => `${id}/${seed}`)
+    expect(far).toEqual([])
+  })
+
+  it('the station stands clear of every dwelling left standing, on the river’s axis', () => {
+    const crossing: string[] = []
+    for (const { id, seed, layout } of shippedLooms()) {
+      const loom = layout.loom
+      if (!loom) continue
+      if (layout.bank) expect(loom.fx * layout.bank.fx + loom.fz * layout.bank.fz).toBeCloseTo(1, 6)
+      for (const g of stationGround(loom, balance.villageLife.loom)) {
+        const hit = layout.dwellings.find((d) => Math.hypot(g.x - d.x, g.z - d.z) < d.r + g.r)
+        if (hit) crossing.push(`${id}/${seed}: ${hit.kind} at ${hit.x.toFixed(1)},${hit.z.toFixed(1)}`)
+      }
+    }
+    expect(crossing).toEqual([])
+  })
+
+  it('what was left unbuilt is named, and nothing is where the line was already open', () => {
+    // Fang@42 keeps its nominal seat with the view open past every hut.
+    expect(sharedLayout('fang-village', 42).gaveWayToLoom).toEqual({ households: 0, dwellings: 0, rebuilt: 0 })
+    const bambara = sharedLayout('bambara-village', 394349866)
+    expect(bambara.gaveWayToLoom.households).toBeGreaterThan(0)
+    expect(bambara.gaveWayToLoom.dwellings).toBeGreaterThanOrEqual(bambara.gaveWayToLoom.households)
+    // A compound goes whole, and the cluster keeps at least three of them.
+    expect(bambara.fences.filter((f) => f.kind === 'woven').length).toBeGreaterThanOrEqual(3)
   })
 })
 

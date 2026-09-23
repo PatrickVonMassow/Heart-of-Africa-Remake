@@ -5960,6 +5960,11 @@ if (section('village-stations')) {
 //    weaver's own reading over her head, and the river in the same picture — the
 //    three things that make the axis claim checkable by the player.
 if (section('village-loom')) {
+  /** The loom station's projected height from the plaza stand, in pixels of a
+   *  900-high viewport (work-order 1191). Measured 23.09.2026: 94.9 px from
+   *  16.4 m on the shipped Bambara plan; the 27.7 m seat it replaced scales to
+   *  ~56 px. Calibratable. */
+  const LOOM_PLAZA_MIN_PX = 70
   const bootSeed = await page.evaluate(() => window.__game.getState().seed)
   try {
     await page.evaluate(() => {
@@ -6171,17 +6176,23 @@ if (section('village-loom')) {
           // then read at the ones inside it.
           const cam = window.__placeCamera
           const V = Object.getPrototypeOf(cam.position).constructor
-          const out = layout.bank
-            ? layout.bank.distance - (station.seat.x * layout.bank.nx + station.seat.z * layout.bank.nz) + 3
+          // AT THREE DEPTHS, NOT ONE (work-order 1191): from a seat ~29 m back
+          // the point 3 m past the modelled waterline projected onto the drawn
+          // beach a few pixels under the water band, with the river plainly in
+          // the frame. 8 and 15 m out lie on the water from any seat the
+          // placement allows; one blue point still answers the question.
+          const toLine = layout.bank
+            ? layout.bank.distance - (station.seat.x * layout.bank.nx + station.seat.z * layout.bank.nz)
             : 0
           const water = layout.bank
-            ? [-2.5, 0, 2.5].map((d) => {
+            ? [3, 8, 15].flatMap((beyond) => [-2.5, 0, 2.5].map((d) => {
+                const out = toLine + beyond
                 const x = station.seat.x + layout.bank.nx * out + station.fx * d
                 const z = station.seat.z + layout.bank.nz * out + station.fz * d
                 const v = new V(x, 0, z).project(cam)
                 const inFrame = v.z < 1 && Math.abs(v.x) < 0.98 && Math.abs(v.y) < 0.98
                 return { px: Math.round(((v.x + 1) / 2) * width), py: Math.round(((1 - v.y) / 2) * height), inFrame }
-              })
+              }))
             : []
           return {
             ...state,
@@ -6299,6 +6310,33 @@ if (section('village-loom')) {
         })
         check('the finished strips lie stacked beside the loom', seen.visibleStrips > 0 && seen.visibleStrips === seen.stacked,
           JSON.stringify(seen))
+        // READ, NOT MERELY IN LINE (work-order 1191): the station's drawn body
+        // is projected through the live camera and its height on the screen is
+        // held to a stated minimum. At 27.7 m it arrived as a cone and a stick;
+        // a distance says nothing about the lens, so the pixels are asked.
+        const projected = await page.evaluate(() => {
+          const loom = window.__placeScene.getObjectByName('village-loom')
+          const cam = window.__placeCamera
+          const V = Object.getPrototypeOf(cam.position).constructor
+          loom.updateWorldMatrix(true, true)
+          let top = Infinity
+          let bottom = -Infinity
+          loom.traverse((o) => {
+            if (!o.isMesh || !o.visible || !o.geometry) return
+            if (!o.geometry.boundingBox) o.geometry.computeBoundingBox()
+            const b = o.geometry.boundingBox
+            for (const x of [b.min.x, b.max.x]) for (const y of [b.min.y, b.max.y]) for (const z of [b.min.z, b.max.z]) {
+              const v = new V(x, y, z).applyMatrix4(o.matrixWorld).project(cam)
+              if (v.z >= 1) continue
+              const py = ((1 - v.y) / 2) * window.innerHeight
+              top = Math.min(top, py)
+              bottom = Math.max(bottom, py)
+            }
+          })
+          return { px: Number.isFinite(top) ? bottom - top : 0, viewport: window.innerHeight }
+        })
+        check(`from the plaza the station stands at least ${LOOM_PLAZA_MIN_PX} px tall on the screen`,
+          projected.px >= LOOM_PLAZA_MIN_PX, JSON.stringify({ ...projected, dist: plaza.dist }))
         await frame('1183-village-loom-from-plaza', {
           local: { x: stand.weaver.x, y: 0.6, z: stand.weaver.z },
           label: `the loom station seen from the plaza, ${plaza.dist.toFixed(1)} m away through a ${plaza.width.toFixed(2)} m clear sight line: weaver, helper, the tended end's yarn and the cloth stack`,
