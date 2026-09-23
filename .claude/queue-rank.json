@@ -1404,6 +1404,12 @@
       "why": "Last is right: the alarm is cleared by a plain batch-doctor run in under a second, so the blockade has a known cheap workaround and no longer stops a session; the eight-minute gate was only ever the demanded remedy, never the only one.",
       "origin": "machine",
       "place": "last"
+    },
+    "1192": {
+      "at": "2026-09-23T07:08:05.043Z",
+      "why": "False-approval infra point homed in its bundle; the queue order places it with that bundle, not ahead of game work",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1435,7 +1441,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-23T05:03:40.540Z",
+    "at": "2026-09-23T07:08:05.055Z",
     "points": [
       174,
       184,
@@ -1850,7 +1856,8 @@
       1187,
       1188,
       1189,
-      1191
+      1191,
+      1192
     ]
   }
 }
