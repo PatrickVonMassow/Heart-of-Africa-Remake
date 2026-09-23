@@ -1423,11 +1423,11 @@
       "origin": "machine",
       "place": "ahead"
     },
-    "1201": {
-      "at": "2026-09-23T19:57:01.158Z",
-      "why": "Wenn die Messung ein echter Defekt ist, liefert genau der Build, den das Release veroeffentlicht, dem Spieler keine Welt — das Release kann darauf nicht warten",
+    "1202": {
+      "at": "2026-09-23T21:38:02.542Z",
+      "why": "fehlendes Beweisbild, kein Spielerschaden; hinter die offenen Dorfleben-Punkte",
       "origin": "machine",
-      "place": "ahead"
+      "place": "last"
     }
   },
   "boundary": {
@@ -1459,7 +1459,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-23T19:57:01.172Z",
+    "at": "2026-09-23T21:38:02.555Z",
     "points": [
       174,
       184,
@@ -1878,7 +1878,7 @@
       1197,
       1198,
       1199,
-      1201
+      1202
     ]
   }
 }
