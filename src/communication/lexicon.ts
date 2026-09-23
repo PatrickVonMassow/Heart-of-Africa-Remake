@@ -1,6 +1,6 @@
 // The tonal lexicon of the village communication slice (design.md §13.4,
-// docs/communication-poc-spec.md): the six concepts, the tone sequence each
-// one is spoken in, and the tone helpers every consumer — villager speech,
+// docs/communication-poc-spec.md): the six concepts, the lects that speak
+// them, and the tone helpers every consumer — villager speech,
 // drums, journal, overhead labels — reads instead of restating them.
 //
 // Pure data and pure logic. Nothing here knows about the scene, the store or
@@ -118,10 +118,13 @@ export function lectOf(id: LectId): Lect {
   return LECTS[id]
 }
 
+/** Keyed by ConceptId, so a concept added to the type fails to compile here. */
+const CONCEPT_ORDER: Record<ConceptId, true> = {
+  RIVER: true, UPSTREAM: true, DOWNSTREAM: true, ROCK: true, DIG: true, CHIEF: true,
+}
+
 /** Every concept, in the vocabulary table's order. */
-export const CONCEPT_IDS: readonly ConceptId[] = [
-  'RIVER', 'UPSTREAM', 'DOWNSTREAM', 'ROCK', 'DIG', 'CHIEF',
-]
+export const CONCEPT_IDS: readonly ConceptId[] = Object.keys(CONCEPT_ORDER) as ConceptId[]
 
 /**
  * The direction pair is an exact tonal mirror, the relationship the player is

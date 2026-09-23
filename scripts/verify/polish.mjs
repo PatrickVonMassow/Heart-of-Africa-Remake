@@ -8555,10 +8555,12 @@ if (section('chief-to-drummer')) {
     )
     .then((h) => h.jsonValue())
     .catch(() => null)
+  // CHIEF's word is rolled per run, so it is read from the run, not typed here.
+  const chiefWord = await page.evaluate(() => window.__game.getState().vocabulary.CHIEF)
   check(
     'the drummer names the chief with one word of the language',
-    Array.isArray(named) && named.length === 1 && named[0] === 'BA-ba-BA-ba',
-    JSON.stringify(named),
+    Array.isArray(named) && named.length === 1 && named[0] === chiefWord,
+    JSON.stringify({ named, chiefWord }),
   )
 
   // 1b. THE COLLISION THE TWO KEYS REMOVED (point 1139, user 16.09.2026). The
