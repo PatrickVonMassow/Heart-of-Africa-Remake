@@ -5959,6 +5959,10 @@ if (section('village-stations')) {
 //  - THE TEACHING. One frame carrying the helper part-way along the warp, the
 //    weaver's own reading over her head, and the river in the same picture — the
 //    three things that make the axis claim checkable by the player.
+/** The loom station's projected height from the plaza stand, in pixels
+ *  (work-order 1191). Calibratable against the recorded frame. */
+const LOOM_PLAZA_MIN_PX = 60
+
 if (section('village-loom')) {
   const bootSeed = await page.evaluate(() => window.__game.getState().seed)
   try {
@@ -6299,6 +6303,33 @@ if (section('village-loom')) {
         })
         check('the finished strips lie stacked beside the loom', seen.visibleStrips > 0 && seen.visibleStrips === seen.stacked,
           JSON.stringify(seen))
+        // READ, NOT MERELY IN LINE (work-order 1191): the station's drawn body
+        // is projected through the live camera and its height on the screen is
+        // held to a stated minimum. At 27.7 m it arrived as a cone and a stick;
+        // a distance says nothing about the lens, so the pixels are asked.
+        const projected = await page.evaluate(() => {
+          const loom = window.__placeScene.getObjectByName('village-loom')
+          const cam = window.__placeCamera
+          const V = Object.getPrototypeOf(cam.position).constructor
+          loom.updateWorldMatrix(true, true)
+          let top = Infinity
+          let bottom = -Infinity
+          loom.traverse((o) => {
+            if (!o.isMesh || !o.visible || !o.geometry) return
+            if (!o.geometry.boundingBox) o.geometry.computeBoundingBox()
+            const b = o.geometry.boundingBox
+            for (const x of [b.min.x, b.max.x]) for (const y of [b.min.y, b.max.y]) for (const z of [b.min.z, b.max.z]) {
+              const v = new V(x, y, z).applyMatrix4(o.matrixWorld).project(cam)
+              if (v.z >= 1) continue
+              const py = ((1 - v.y) / 2) * window.innerHeight
+              top = Math.min(top, py)
+              bottom = Math.max(bottom, py)
+            }
+          })
+          return { px: Number.isFinite(top) ? bottom - top : 0, viewport: window.innerHeight }
+        })
+        check(`from the plaza the station stands at least ${LOOM_PLAZA_MIN_PX} px tall on the screen`,
+          projected.px >= LOOM_PLAZA_MIN_PX, JSON.stringify({ ...projected, dist: plaza.dist }))
         await frame('1183-village-loom-from-plaza', {
           local: { x: stand.weaver.x, y: 0.6, z: stand.weaver.z },
           label: `the loom station seen from the plaza, ${plaza.dist.toFixed(1)} m away through a ${plaza.width.toFixed(2)} m clear sight line: weaver, helper, the tended end's yarn and the cloth stack`,
