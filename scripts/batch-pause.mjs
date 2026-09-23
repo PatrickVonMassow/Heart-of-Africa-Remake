@@ -8,7 +8,7 @@
 // only the first is proof that the user stopped the batch and may therefore omit
 // a restart clock. The second is an automatic park and inherits the retry ladder.
 //
-// The user stop is writable only by the session that HOLDS the batch lock, and its
+// The user stop is writable only by the session that OWNS the batch, and its
 // reason quotes the user's words (point 1193). A stood-down or chat-reply session
 // is not held by the batch guards: it simply ends its turn and records nothing.
 
@@ -18,7 +18,7 @@ import { PID_START_TOLERANCE_MS, findClaudeAncestor, readOwnerLock } from './bat
 import { namesUserUtterance } from './batch-pause-core.mjs'
 
 export const pauseUsage = () =>
-  'usage: node scripts/batch-pause.mjs --user-stop "<reason quoting the user\'s words>" | --awaiting-user "<reason>"'
+  'usage: node scripts/batch-pause.mjs --user-stop "<quoted user words>" | --awaiting-user "<reason>"'
 
 export function parsePauseCommand(argv = []) {
   const [mode, rawReason, ...extra] = argv
