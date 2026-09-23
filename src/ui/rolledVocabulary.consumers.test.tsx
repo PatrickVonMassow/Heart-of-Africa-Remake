@@ -81,11 +81,19 @@ describe('only the roll and the save fallback name the shipped vocabulary', () =
   it('no other source file references SHIPPED_VOCABULARY or spells a shipped word', () => {
     const words = Object.values(SHIPPED_VOCABULARY)
     const offenders = sources(SRC)
-      .map((f) => [relative(SRC, f).split('\\').join('/'), readFileSync(f, 'utf8')] as const)
+      // Comments may show the notation; only code can speak a word.
+      .map((f) => [relative(SRC, f).split('\\').join('/'), readFileSync(f, 'utf8').replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '')] as const)
       .filter(([rel]) => !ALLOWED.includes(rel))
-      .filter(([, text]) => text.includes('SHIPPED_VOCABULARY') || words.some((w) => text.includes(`'${w}'`)))
+      .filter(([, text]) => text.includes('SHIPPED_VOCABULARY') || words.some((w) => ['\'', '"', '`'].some((q) => text.includes(q + w + q))))
       .map(([rel]) => rel)
     expect(offenders).toEqual([])
+  })
+
+  it('the vocabulary module hands the shipped mapping out under its own name only', () => {
+    const module = readFileSync(join(SRC, 'communication/vocabulary.ts'), 'utf8')
+    expect(module.match(/^export .*$/gm)?.map((l) => l.match(/(?:const|function) (\w+)/)?.[1])).toEqual(
+      ['SHIPPED_VOCABULARY', 'enumerateVocabularies', 'rollVocabulary'])
+    expect(module.match(/SHIPPED_VOCABULARY/g)).toHaveLength(1)
   })
 
   it('the store reads the shipped vocabulary only as the fallback for a save without one', () => {
