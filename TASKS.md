@@ -16366,3 +16366,21 @@ to land than a mechanism that needs a review.
   Criticality: medium — permits a false approval (CLAUDE.md §2 finding intake).
   Refs: scripts/verify/run-all.mjs:717, scripts/verify/tiers.mjs (`parseArgs`, `suitesFor`).
   Bundle: Modell & Wächter
+- [ ] 1197. The loom reads from the plaza in the eight village plans point 1191 left far.
+  (Drained from the findings carrier, 23.09.2026; follow-up of point 1191.)
+  Bundle: Dorfleben
+  PROBLEM, measured 23.09.2026 on main after point 1191 with `buildLayout` over the loom.test.ts
+  seeds (7, 42, 1337, 394349866, 1838110026): `loom-unseen-from-plaza` still fires for
+  swahili-village at 7/1337/394349866/1838110026, tuareg-village at 1337/1838110026,
+  hausa-village at 1838110026 and san-village at 394349866 (53 of 115 pairs on fd009039b, 8 now).
+  Separately, the shipped Bambara plan's station stands 16.4 m from the nearest plaza stand,
+  over the point's "~15 m", and bambara-village@42 keeps its 28.8 m seat because its plan
+  cannot spare a compound (three enclosures is the floor). Traced on Bambara: west of the
+  plaza the water head's talk separation, east the children's, north the 4 m inland slack
+  leave no free ground within reach; the swahili coastrow has no household that may give way.
+  FINAL STATE: none of these pairs fires the assert, the seat stays within 17 m of a stand,
+  and the plan floors of point 1191 (compounds, dwellings, ksar block, dressing) still hold —
+  the likely lever is a compound shifting outward on its ring rather than being left unbuilt.
+  Criticality: medium. Test: Vitest over the five seeds; `polish --section=village-loom`.
+  Refs: src/scenes/place/layout.ts (displacedBy, affordable, topUpCompounds),
+  src/scenes/place/loom.ts (placeLoom passes), point 1191
