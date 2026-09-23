@@ -111,6 +111,15 @@ put it is the mistake this line exists to stop.
   WHAT IS STILL OWED: the dwelling ring, not the seat. One compound or lane has to give way
   so the plaza has a line at all — `docs/peoples-1890.md` §8.1 governs what may move. Until
   that is decided the point is NOT met and must not be ticked.
+  MEASURED 23.09.2026 04:05, BRANCH HEAD aba15e2b6: THE LINE IS OPEN, THE LOOM STILL DOES NOT
+  READ. Trees, loose stones, sheds and granaries in the plaza's line now give way (dwellings
+  stay), the seat search was made cheap again (layouts had become up to 10x slower and three
+  place suites timed out), and place units plus `polish --section=village-loom` on WebGPU are
+  green with the 1 m check. But `1183-village-loom-from-plaza` shows the station ~25 m off
+  across open ground as a kneeling cone and a standing figure a few dozen pixels tall; warp
+  and stack do not read. NEXT LEVER: the frame's stand, not the village — take the NEAREST
+  plaza stand that holds the full metre (and check the layout rule's minimum distance against
+  it) before anything moves a compound. WebGL 2 section run still owed.
   Refs: src/scenes/place/layout.ts (loom station placement), src/scenes/place/loom.ts
   (placeLoom, plaza view), scripts/verify/polish.mjs (village-loom, plaza frame), point 1183,
   point 1157
