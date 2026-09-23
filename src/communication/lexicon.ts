@@ -48,6 +48,9 @@ export const SYLLABLE_SEPARATOR = '-'
  */
 export type UtteranceId = string
 
+/** The run's six tone sequences, written as utterances so saves retain the mapping. */
+export type Vocabulary = Readonly<Record<ConceptId, UtteranceId>>
+
 /**
  * A PHRASE is an ordered list of atoms spoken one after another, separated by
  * the constant pause the drums also use (balance.communication.phrasePauseSeconds)
