@@ -3,6 +3,8 @@
 // rolled concepts. A consumer that forgot to thread the run vocabulary keeps
 // producing the shipped syllables, and only a test like this one sees it.
 import { describe, it, expect, beforeEach } from 'vitest'
+import { readdirSync, readFileSync } from 'node:fs'
+import { join, relative } from 'node:path'
 import { fireEvent, render } from '@testing-library/react'
 import { CONCEPT_IDS, SYLLABLE_SEPARATOR, tonesOf, type Vocabulary } from '../communication/lexicon'
 import { enumerateVocabularies, SHIPPED_VOCABULARY } from '../communication/vocabulary'
@@ -64,5 +66,31 @@ describe('consumers follow the run vocabulary, not the shipped one', () => {
   it('the overhead label names the run concept in its debug view', () => {
     render(<SpeechLabelCard speakerId="s" atoms={[OTHER.CHIEF]} memory={g().communication} vocabulary={OTHER} conceptLabels />)
     expect(document.querySelector('.speech-atom .syllables')?.textContent).toBe('CHIEF')
+  })
+})
+
+// The tests above hand OTHER in, so they prove each consumer CAN follow the run
+// vocabulary; this one proves no call site can reach the shipped one instead.
+// With every default removed, the only route left is naming it.
+describe('only the roll and the save fallback name the shipped vocabulary', () => {
+  const SRC = join(__dirname, '..')
+  const ALLOWED = ['communication/vocabulary.ts', 'state/store.ts']
+  const sources = (dir: string): string[] => readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+    e.isDirectory() ? sources(join(dir, e.name)) : /\.tsx?$/.test(e.name) && !/\.test\.tsx?$/.test(e.name) ? [join(dir, e.name)] : [])
+
+  it('no other source file references SHIPPED_VOCABULARY or spells a shipped word', () => {
+    const words = Object.values(SHIPPED_VOCABULARY)
+    const offenders = sources(SRC)
+      .map((f) => [relative(SRC, f).split('\\').join('/'), readFileSync(f, 'utf8')] as const)
+      .filter(([rel]) => !ALLOWED.includes(rel))
+      .filter(([, text]) => text.includes('SHIPPED_VOCABULARY') || words.some((w) => text.includes(`'${w}'`)))
+      .map(([rel]) => rel)
+    expect(offenders).toEqual([])
+  })
+
+  it('the store reads the shipped vocabulary only as the fallback for a save without one', () => {
+    const store = readFileSync(join(SRC, 'state/store.ts'), 'utf8')
+    const uses = store.split('\n').filter((l) => l.includes('SHIPPED_VOCABULARY') && !l.trimStart().startsWith('import'))
+    expect(uses).toEqual([expect.stringMatching(/snap\.vocabulary \?\? \{ \.\.\.SHIPPED_VOCABULARY \}/)])
   })
 })
