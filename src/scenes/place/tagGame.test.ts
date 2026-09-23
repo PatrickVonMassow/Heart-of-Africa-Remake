@@ -10,13 +10,23 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  CHASER_ARMS,
   catchReached,
+  chaserGaze,
   chooseTarget,
   createTagGame,
+  grabAim,
+  grabDue,
+  grabHandWorld,
+  handGapToBody,
   lineClear,
   moveChild,
   nearestCatchable,
   stepTagGame,
+  steerGrab,
+  tagBody,
+  tagFigurePose,
+  takeCries,
   type TagChild,
   type TagConfig,
   type TagState,
@@ -28,6 +38,22 @@ import { balance } from '../../config/balance'
 import { floorPace, recoverPace, trotPace } from '../../systems/pursuit'
 import { mulberry32 } from '../../world/noise'
 import { resetDevAsserts } from '../../systems/devAssert'
+import {
+  advanceGesture,
+  armDirection,
+  gestureArm,
+  gestureBlendOf,
+  gestureEnvelope,
+  gesturePose,
+  REST_POSE,
+  restGesture,
+  startGesture,
+  TOUCH_LEAN,
+} from '../../render/gesture'
+import { CHILD_FIGURE_SCALE, FIGURE_LIMBS } from '../../render/figures'
+import { cryPlan } from '../../communication/speaking'
+import { SpeechFloor } from '../../communication/speechFloor'
+import { clearSpeechLabels, speechLabelState } from './speechChannel'
 
 const CFG: TagConfig = balance.villageLife.tag
 const RADIUS = 26
@@ -1767,5 +1793,228 @@ describe('contact approach clearance', () => {
     expect(c.z).toBeCloseTo(0)
     expect(c.walked).toBeCloseTo(0.14)
     expect(c.nudges).toBe(0)
+  })
+})
+
+// --- Work-order 1176: the game of tag reads at a glance ----------------------
+describe('the tag round reads at a glance (work-order 1176)', () => {
+  const pairAt = (gap: number): TagState => {
+    const s = game([
+      [0, 0],
+      [gap, 0],
+    ])
+    s.chaser = 0
+    s.playing = true
+    s.target = 1
+    return s
+  }
+
+  it('the caught child stands out its beat while the catcher runs off at once', () => {
+    const s = pairAt(CFG.catchDistance * 0.5)
+    stepTagGame(s, 1e-6, CFG, OPEN)
+    expect(s.tags).toBe(1)
+    const caught = s.chaser
+    const catcher = s.immune
+    const stood = { x: s.children[caught].x, z: s.children[caught].z }
+    const ran = { x: s.children[catcher].x, z: s.children[catcher].z }
+    // Just short of the end of the beat.
+    run(s, CFG.caughtPauseSeconds - 0.05, OPEN, CFG, 1 / 60, (st) => {
+      expect(tagBody(st, caught)).toBe('caught')
+      expect(st.children[caught].pace).toBe(0)
+      expect(st.children[caught].held).toBe(true)
+    })
+    const c = s.children[caught]
+    expect(Math.hypot(c.x - stood.x, c.z - stood.z)).toBeLessThan(1e-9)
+    const r = s.children[catcher]
+    expect(Math.hypot(r.x - ran.x, r.z - ran.z)).toBeGreaterThan(0.5)
+    // ...and neither the role swap nor the immunity changed for it.
+    expect(s.chaser).toBe(caught)
+    expect(s.immune).toBe(catcher)
+  })
+
+  it('the swap and the immunity are those of before: role passed, window granted, tenure reset', () => {
+    const s = pairAt(CFG.catchDistance * 0.5)
+    s.chaserFor = 9
+    stepTagGame(s, 1e-6, CFG, OPEN)
+    expect(s.chaser).toBe(1)
+    expect(s.immune).toBe(0)
+    expect(s.immuneFor).toBe(CFG.immunitySeconds)
+    expect(s.chaserFor).toBe(0)
+  })
+
+  it('the beat never outlasts the immunity, and leaves a first step inside it', () => {
+    expect(CFG.immunitySeconds).toBeGreaterThanOrEqual(CFG.caughtPauseSeconds + 0.5)
+    const s = game(FOUR)
+    run(s, 120, OPEN, CFG, 1 / 60, (st) => {
+      if (st.pauseFor > 0) expect(st.pauseFor).toBeLessThanOrEqual(st.immuneFor + 1e-9)
+    })
+    expect(s.tags).toBeGreaterThan(2)
+    // A debug edit that makes the beat longer than the window is held to it.
+    const long = { ...CFG, caughtPauseSeconds: CFG.immunitySeconds * 3 }
+    const t = pairAt(long.catchDistance * 0.5)
+    stepTagGame(t, 1e-6, long, OPEN)
+    expect(t.pauseFor).toBeLessThanOrEqual(t.immuneFor)
+  })
+
+  it('after the beat the new chaser turns on the spot, eased, before it runs', () => {
+    const s = pairAt(CFG.catchDistance * 0.5)
+    stepTagGame(s, 1e-6, CFG, OPEN)
+    const caught = s.chaser
+    const facings: number[] = []
+    run(s, 2, OPEN, CFG, 1 / 60, (st) => facings.push(st.children[caught].facing))
+    for (let i = 1; i < facings.length; i++) {
+      const step = Math.abs(Math.atan2(Math.sin(facings[i] - facings[i - 1]), Math.cos(facings[i] - facings[i - 1])))
+      expect(step).toBeLessThanOrEqual(CFG.turnRate / 60 + 1e-9)
+    }
+  })
+
+  it('only the chaser holds its arms forward, and not while it stands out its beat', () => {
+    const s = pairAt(3)
+    expect(tagBody(s, 0)).toBe('chaser')
+    expect(tagBody(s, 1)).toBe('runner')
+    const rest = tagFigurePose('runner', { left: { ...REST_POSE.left }, right: { ...REST_POSE.right }, lean: 0, turn: 0 }, 0, 0.1, 0)
+    expect(rest.left).toEqual(REST_POSE.left)
+    const forward = tagFigurePose('chaser', { left: { ...REST_POSE.left }, right: { ...REST_POSE.right }, lean: 0, turn: 0 }, 0, 0.1, 0)
+    expect(forward.left).toEqual(CHASER_ARMS.left)
+    expect(forward.right).toEqual(CHASER_ARMS.right)
+    // Both hands in front of the body at chest height, not at its sides.
+    for (const arm of [forward.left, forward.right]) {
+      const d = armDirection(arm)
+      expect(d[2]).toBeGreaterThan(0.8)
+      expect(FIGURE_LIMBS.shoulderY + d[1] * FIGURE_LIMBS.armLength).toBeGreaterThan(0.45)
+    }
+    const caught = tagFigurePose('caught', { left: { ...REST_POSE.left }, right: { ...REST_POSE.right }, lean: 0, turn: 0 }, 0, 0, 0)
+    expect(caught.left).toEqual(REST_POSE.left)
+    expect(caught.right).toEqual(REST_POSE.right)
+  })
+
+  it("the catcher's head bearing tracks its quarry, within the gaze limit", () => {
+    for (const side of [1, -1]) {
+      const s = pairAt(3)
+      s.children[0].facing = 0
+      s.children[1].x = side * 1
+      s.children[1].z = 3
+      const want = Math.atan2(side * 1, 3)
+      expect(chaserGaze(s, CFG)).toBeCloseTo(want, 9)
+      // Far round to its side: the turn stops at the limit, on the right side.
+      s.children[1].x = side * 3
+      s.children[1].z = 0.2
+      expect(chaserGaze(s, CFG)).toBeCloseTo(side * CFG.gazeTurnMax, 9)
+    }
+    // Runners keep looking where they run, and so does a chaser in its beat.
+    const t = pairAt(CFG.catchDistance * 0.5)
+    stepTagGame(t, 1e-6, CFG, OPEN)
+    expect(chaserGaze(t, CFG)).toBe(0)
+  })
+
+  it('the grab is asked for inside the commit distance and let go outside it', () => {
+    const inside = pairAt(CFG.commitDistance - 0.1)
+    expect(grabDue(inside, CFG)).toBe(true)
+    const outside = pairAt(CFG.commitDistance + 0.1)
+    expect(grabDue(outside, CFG)).toBe(false)
+    // Held and re-aimed while due...
+    let g = steerGrab(restGesture(), { bearing: 0.1, elevation: 0.2 })
+    expect(g.kind).toBe('touch')
+    expect(gestureEnvelope(g)).toBe(1)
+    for (let i = 0; i < 300; i++) {
+      g = steerGrab(advanceGesture(g, 1 / 60), { bearing: 0.1 + i * 1e-3, elevation: 0.2 })
+      expect(gestureEnvelope(g)).toBe(1)
+    }
+    expect(g.bearing).toBeCloseTo(0.1 + 299e-3, 9)
+    // ...and fading from the very frame it is not: gone within the touch blend.
+    g = steerGrab(g, null)
+    expect(gestureEnvelope(g)).toBe(1)
+    g = advanceGesture(g, gestureBlendOf('touch') / 2)
+    expect(gestureEnvelope(g)).toBeGreaterThan(0)
+    expect(gestureEnvelope(g)).toBeLessThan(1)
+    g = advanceGesture(g, gestureBlendOf('touch'))
+    expect(g.kind).toBeNull()
+    // A gesture that is not a grab is left alone.
+    const point = startGesture('point', { bearing: 0.3 })
+    expect(steerGrab(point, null)).toBe(point)
+  })
+
+  it('at the catch distance the reaching hand is ON the quarry: within one hand radius of its body', () => {
+    const scale = CHILD_FIGURE_SCALE
+    for (const facing of [0, 0.3, -0.3]) {
+      for (const lean of [TOUCH_LEAN, Math.max(CFG.leanAtSprint, TOUCH_LEAN)]) {
+        const chaser = { x: 0, z: 0, facing }
+        const quarry = { x: 0, z: CFG.catchDistance }
+        const aim = grabAim(chaser, quarry, lean, scale, CFG.gazeTurnMax)
+        const arm = gesturePose(startGesture('touch', { bearing: aim.bearing, elevation: aim.elevation }))
+        const hand = grabHandWorld(chaser, arm[aim.side], aim.side, lean, aim.turn, scale)
+        const gap = handGapToBody(hand, quarry, scale)
+        expect(gap).toBeLessThanOrEqual(FIGURE_LIMBS.handRadius * scale)
+        // The arm that reaches is the one gesturePose draws, never crossing the chest.
+        expect(gestureArm(aim.bearing)).toBe(aim.side)
+      }
+    }
+    // And outside the reach it is visibly NOT on the child: a miss reads as a miss.
+    const far = { x: 0, z: CFG.commitDistance }
+    const aim = grabAim({ x: 0, z: 0, facing: 0 }, far, TOUCH_LEAN, scale, CFG.gazeTurnMax)
+    const arm = gesturePose(startGesture('touch', { bearing: aim.bearing, elevation: aim.elevation }))
+    const hand = grabHandWorld({ x: 0, z: 0, facing: 0 }, arm[aim.side], aim.side, TOUCH_LEAN, aim.turn, scale)
+    expect(handGapToBody(hand, far, scale)).toBeGreaterThan(0.5)
+  })
+
+  it('a catch owes exactly one cry, the catcher’s, and none for the caught child', () => {
+    const s = pairAt(CFG.catchDistance * 0.5)
+    stepTagGame(s, 1e-6, CFG, OPEN)
+    expect(s.cries).toEqual([0])
+    const due = takeCries(s, () => false)
+    expect(due).toEqual([0])
+    expect(due).not.toContain(s.chaser)
+    expect(s.cries).toEqual([])
+    // Through the beat nothing more is owed: the caught child is silent.
+    run(s, CFG.caughtPauseSeconds, OPEN, CFG)
+    expect(s.cries).toEqual([])
+  })
+
+  it('the cry is no word: no lect syllable, no utterance and no overhead label', () => {
+    clearSpeechLabels()
+    const before = speechLabelState()
+    const plan = cryPlan(3, {
+      bearing: 0.4,
+      reach: balance.villageLife.tag.cryReach,
+      gain: balance.villageLife.tag.cryGain,
+      seconds: balance.villageLife.tag.crySeconds,
+      pitchSpread: balance.villageLife.tag.cryPitchSpread,
+      roll: 0.5,
+      volume: 1,
+    })
+    expect(plan).not.toBeNull()
+    expect(Object.keys(plan!).sort()).toEqual(['duration', 'pan', 'peak', 'pitch', 'voice'])
+    expect(plan!.voice).toBe('child')
+    expect(plan!.duration).toBeGreaterThanOrEqual(0.15)
+    expect(plan!.duration).toBeLessThanOrEqual(0.3)
+    expect(speechLabelState()).toBe(before)
+    // The pitch varies per cry within the spread, and the level with distance.
+    const at = (roll: number, d = 3) =>
+      cryPlan(d, { reach: balance.villageLife.tag.cryReach, gain: balance.villageLife.tag.cryGain, seconds: balance.villageLife.tag.crySeconds, pitchSpread: balance.villageLife.tag.cryPitchSpread, roll, volume: 1 })
+    expect(at(0)!.pitch).toBeCloseTo(1 - balance.villageLife.tag.cryPitchSpread, 9)
+    expect(at(1)!.pitch).toBeCloseTo(1 + balance.villageLife.tag.cryPitchSpread, 9)
+    expect(at(0.5, 8)!.peak).toBeLessThan(at(0.5, 2)!.peak)
+    // Beyond the talk reach, and at volume 0, nothing at all.
+    expect(at(0.5, balance.villageLife.tag.cryReach + 0.1)).toBeNull()
+    expect(cryPlan(2, { reach: balance.villageLife.tag.cryReach, gain: balance.villageLife.tag.cryGain, seconds: balance.villageLife.tag.crySeconds, pitchSpread: 0, roll: 0, volume: 0 })).toBeNull()
+  })
+
+  it('a cry due while an exchange holds the floor is dropped, not deferred', () => {
+    let now = 0
+    const floor = new SpeechFloor(() => ({ x: 0, z: 0, active: true }), () => now)
+    const source = { x: 2, z: 0, register: 'talk' as const }
+    expect(floor.request({ situation: {}, name: 'pair', word: 'RIVER', source, sources: () => [source] })).toBe(true)
+    const s = pairAt(CFG.catchDistance * 0.5)
+    stepTagGame(s, 1e-6, CFG, OPEN)
+    const held = (c: TagChild) => floor.holdsFloor({ x: c.x, z: c.z, register: 'talk' })
+    expect(takeCries(s, held)).toEqual([])
+    // Not waiting in a queue for the floor to clear: it is gone.
+    now = 60
+    expect(floor.holdsFloor(source)).toBe(false)
+    expect(takeCries(s, held)).toEqual([])
+    // With the floor free, the next catch's cry is heard.
+    const t = pairAt(CFG.catchDistance * 0.5)
+    stepTagGame(t, 1e-6, CFG, OPEN)
+    expect(takeCries(t, held)).toEqual([0])
   })
 })
