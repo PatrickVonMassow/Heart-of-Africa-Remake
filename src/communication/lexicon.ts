@@ -100,10 +100,11 @@ const TONAL_WEST_CENTRE: Lect = {
   id: 'tonalWestCentre',
   low: 'ba',
   high: 'BA',
-  reserved: [
-    seq('ba-ba-ba-ba'), // single-tone, therefore never a word
-    seq('BA-BA-BA-BA'), // single-tone, therefore never a word
-  ],
+  // Derived, not written out: the single-tone sequences of this length. They
+  // are the least hearable thing the drums can beat, so they are never words.
+  reserved: wellFormedSequences().filter(
+    (s) => highCount(s) === 0 || highCount(s) === s.length,
+  ),
 }
 
 /** Every lect. A new region adds an entry here and touches no consumer. */
@@ -187,10 +188,25 @@ export function toneDistance(a: ToneSequence, b: ToneSequence): number {
  * deliberately never words — two of two reserved sequences. Whether a sequence
  * IS a word is `conceptOf`'s question, answered against the run vocabulary.
  */
-export function isWellFormed(sequence: ToneSequence): boolean {
-  if (sequence.length !== SEQUENCE_LENGTH) return false
+export function isWellFormed(sequence: ToneSequence, length: number = SEQUENCE_LENGTH): boolean {
+  if (sequence.length !== length) return false
   const highs = highCount(sequence)
   return highs % 2 === 0
+}
+
+/**
+ * Every sequence the tongue can form at a length, in a stable order. Derived
+ * rather than written out, so raising SEQUENCE_LENGTH needs no new literals.
+ */
+export function wellFormedSequences(length: number = SEQUENCE_LENGTH): ToneSequence[] {
+  const all: ToneSequence[] = []
+  for (let mask = 0; mask < 1 << length; mask++) {
+    const sequence: ToneSequence = Array.from({ length }, (_, i) =>
+      mask & (1 << (length - 1 - i)) ? 'high' : 'low',
+    )
+    if (isWellFormed(sequence, length)) all.push(sequence)
+  }
+  return all
 }
 
 export function reversed(sequence: ToneSequence): ToneSequence {
