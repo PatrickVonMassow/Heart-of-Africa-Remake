@@ -1393,24 +1393,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "1181": {
-      "at": "2026-09-22T09:14:21.753Z",
-      "why": "Die 25-Minuten-Decke des unit-Jobs hat auf main selbst schon einen Lauf storniert (35696684799, abgeschnitten bei 25:18), und ein cancelled nennt keine Ursache und wird von keinem Push geklaert — es wuerde die CI der Release-Punkte 633 und 174 genauso treffen wie jede andere.",
-      "origin": "machine",
-      "place": "ahead"
-    },
-    "1183": {
-      "at": "2026-09-22T09:53:41.277Z",
-      "why": "Der Nutzer hat am 22.09.2026 die Entscheidungskarte beantwortet und den Punkt ausdrücklich direkt hinter 1181 bestellt",
-      "origin": "user",
-      "place": "ahead"
-    },
-    "1184": {
-      "at": "2026-09-22T10:04:55.669Z",
-      "why": "Der Nutzer hat den Punkt am 22.09.2026 ausdrücklich direkt hinter 1183 bestellt",
-      "origin": "user",
-      "place": "ahead"
-    },
     "1187": {
       "at": "2026-09-22T13:28:41.849Z",
       "why": "Testinfrastruktur hinter der Release-Reihenfolge: zuerst die Kommunikationsmechanik, dann 633, dann 174 — ein rotierender Pruefschritt kostet Laufzeit, aber keinen Spielzustand, und Punkt 642 entscheidet die Klasse ohnehin vor ihm.",
@@ -1423,34 +1405,6 @@
       "origin": "machine",
       "place": "last"
     }
-  },
-  "boundary": {
-    "at": "2026-08-21T00:55:14.962Z",
-    "points": [
-      336,
-      553,
-      596,
-      633,
-      659,
-      660,
-      663,
-      708,
-      715,
-      719,
-      733,
-      735,
-      736,
-      738,
-      739,
-      746,
-      747,
-      750,
-      759,
-      760,
-      762,
-      764
-    ],
-    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
     "at": "2026-09-22T15:13:26.706Z",
@@ -1863,14 +1817,39 @@
       1176,
       1177,
       1179,
-      1181,
-      1183,
-      1184,
       1185,
       1186,
       1187,
       1188,
       1189
     ]
+  },
+  "boundary": {
+    "at": "2026-08-21T00:55:14.962Z",
+    "points": [
+      336,
+      553,
+      596,
+      633,
+      659,
+      660,
+      663,
+      708,
+      715,
+      719,
+      733,
+      735,
+      736,
+      738,
+      739,
+      746,
+      747,
+      750,
+      759,
+      760,
+      762,
+      764
+    ],
+    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   }
 }

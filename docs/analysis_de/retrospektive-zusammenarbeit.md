@@ -1687,7 +1687,7 @@ stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die s
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 23.09.2026, 00:27 · Quellen-Fingerprint: `234c1539d695…`
+Zuletzt aktualisiert: Mittwoch, 23.09.2026, 02:09 · Quellen-Fingerprint: `48463cf628ef…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1725,7 +1725,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Detach a landing or long gate with setsid, and end every third turn with prose so the wait does not hand the batch away | 3 | mittel | — (Regel/Memory) | ◐ Regel |
 | When a measured doc budget blocks an addition, shorten or MERGE existing entries — raising the limit is the last resort, decided by me with a written reason, NEVER asked of the user | 4 | hoch | doc-budget-guard.mjs | ✔ Mechanismus |
 | a drill that recreates the state after an action tests the assumption, not the action — and stays green forever | 2 | mittel | — (Regel/Memory) | ◐ Regel |
-| Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 4 | hoch | — (Regel/Memory) | ◐ Regel |
+| Work at Medium effort — the standing tier for every kind of work since 22.09.2026; never High, never Extra high | 5 | hoch | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to the OpenAI lane, GPT-6 Astra), and review is cross-vendor, not Fable-by-default | 6 | hoch | — (Regel/Memory) | ◐ Regel |
 | Iterate on the new feature's OWN test first; the full regression runs once at the end, never as the debugging loop | 2 | mittel | — (Regel/Memory) | ◐ Regel |
@@ -1795,8 +1795,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 98 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 7 Revert-/Reapply-Commits · 138 Prozess-/Meta-TASKS-Punkte (davon 66 offen).
 
-<!-- RETRO-FINGERPRINT: 234c1539d6954de6ba05f86da1b97e03529a057281593189c3aed9ab44f8865c -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-22T22:27:37.028Z -->
+<!-- RETRO-FINGERPRINT: 48463cf628efd928e563f320354c29495c7c65b6090e8d2102e29c9adabc3df5 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-23T00:09:02.930Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
