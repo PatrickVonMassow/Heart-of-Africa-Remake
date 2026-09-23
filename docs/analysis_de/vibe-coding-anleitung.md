@@ -329,10 +329,10 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   den du lieferst: Stimmt er nicht, korrigier ihn und **frag neu** — überstimm nie den Prüfer."
 
 - **„Läuft der noch?" mit „ist die Ausgabe frisch?" beantwortet.** Frische belegt nur, dass jemand
-  gearbeitet *hat*: Ein **fertiger** Lauf hinterlässt frische Dateien wie ein arbeitender, ein
-  Commit ist sogar das **Letzte**, was einer tut. Zwei Spuren gegeneinander zu prüfen hilft nicht.
+  gearbeitet *hat*: Ein **fertiger** Lauf hinterlässt frische Dateien wie ein arbeitender.
   → *Prompt:* „Miss Lebendigkeit am **Vorgang** (Kennung samt Startzeit), nie an seinen Spuren;
-  unlesbar heißt **unbekannt**, nicht tot. Frische darf eine Nachfrist nur **verkürzen**."
+  unlesbar heißt **unbekannt**, nicht tot. Frische verkürzt eine Nachfrist nur, und deine
+  **Anzeige** nennt ihr **Alter** — sonst gilt die letzte Behauptung als Gegenwart."
 
 - **Plötzlich rot, obwohl niemand den Code angefasst hat.** Zwei Teile buchstabieren dieselbe Regel
   getrennt — eines schreibt, eines prüft.
@@ -701,4 +701,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 5c05d2143d661cd024ce1f08fd0d71b7108896396d22da4bfceaf5d4c7a5be2f -->
+<!-- GUIDE-FINGERPRINT: 2fa64776ec11e70d13b09c98fe31adbe026296fc3a60682f5b72f47d4988447c -->
