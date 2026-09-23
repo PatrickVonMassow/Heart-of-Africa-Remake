@@ -119,7 +119,7 @@ put it is the mistake this line exists to stop.
   across open ground as a kneeling cone and a standing figure a few dozen pixels tall; warp
   and stack do not read. NEXT LEVER: the frame's stand, not the village — take the NEAREST
   plaza stand that holds the full metre (and check the layout rule's minimum distance against
-  it) before anything moves a compound. WebGL 2 section run still owed.
+  it) before anything moves a compound. The same section is green on WebGL 2 as well (04:19).
   Refs: src/scenes/place/layout.ts (loom station placement), src/scenes/place/loom.ts
   (placeLoom, plaza view), scripts/verify/polish.mjs (village-loom, plaza frame), point 1183,
   point 1157
