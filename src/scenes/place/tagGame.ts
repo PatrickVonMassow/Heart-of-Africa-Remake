@@ -134,6 +134,9 @@ export interface TagConfig extends StaminaProfile {
    * goats already do; this is the same easing.
    */
   turnRate: number
+  /** Seconds the freshly caught child stands before it gives chase (work-order
+   *  1176). Only the caught child pauses; it stays under `immunitySeconds`. */
+  caughtPauseSeconds: number
 }
 
 /** One child in the group. */
@@ -263,6 +266,15 @@ export interface TagState {
   /** The long-run alarm's watch over the play itself (point 589): how long the
    *  group has produced no catch and no fresh round. */
   play: ProducerWatch
+  /** Seconds left of the caught child's beat (work-order 1176): the CHASER
+   *  stands, arms dropped, while the child that caught it runs off. */
+  pauseFor: number
+  /** After the beat the chaser turns on the spot to its quarry before running;
+   *  true until its body faces the way it wants to go. */
+  turning: boolean
+  /** Children who made a catch since the scene last drained this: each owes one
+   *  wordless cry (work-order 1176). Never the caught child. */
+  cries: number[]
 }
 
 /** The settlement as the chase sees it. `blocked` answers for the STATIC set —
@@ -382,6 +394,9 @@ export function createTagGame(
     tags: 0,
     clock: 0,
     play: createProducerWatch(),
+    pauseFor: 0,
+    turning: false,
+    cries: [],
   }
 }
 
@@ -463,6 +478,8 @@ function startRound(s: TagState, cfg: TagConfig): void {
   s.chaserFor = 0
   s.gapTrend = 0
   s.lastGap = NaN
+  s.pauseFor = 0
+  s.turning = false
   s.playing = true
   // They are about to run: opening the round on a commanded pace of zero would
   // leave one frame in which a PLAYING child stands still — the very thing the
@@ -476,6 +493,8 @@ function startRound(s: TagState, cfg: TagConfig): void {
 /** Break the round off into ordinary idling for a while before starting again. */
 function breakOffRound(s: TagState, cfg: TagConfig): void {
   s.playing = false
+  s.pauseFor = 0
+  s.turning = false
   s.idleFor = cfg.idleSeconds
   s.chaser = -1
   s.target = -1
@@ -941,6 +960,12 @@ function advanceTagGame(
     s.immuneFor = Math.max(0, s.immuneFor - dt)
     if (s.immuneFor === 0) s.immune = -1
   }
+  // The caught child's beat runs on the round's clock; when it ends the child
+  // turns to its quarry on the spot before it runs (work-order 1176).
+  if (s.pauseFor > 0) {
+    s.pauseFor = Math.max(0, s.pauseFor - dt)
+    if (s.pauseFor === 0) s.turning = true
+  }
   if (s.chaserFor >= cfg.resolveCapSeconds) {
     breakOffRound(s, cfg)
     assertPlaced(s, cfg, world)
@@ -989,6 +1014,8 @@ function advanceTagGame(
     const occAt = occ && ((x: number, z: number) => occ(i, partner, x, z))
     let wants: boolean
     let desired: number
+    // The caught child standing out its beat, or turning to its quarry after it.
+    let standing = false
     if (isChaser) {
       wants =
         !!target &&
@@ -1018,6 +1045,23 @@ function advanceTagGame(
         // catch ring the turn opens a little further, so the circle drifts
         // outward instead of grinding along the body.
         desired = to + side * (Math.PI / 2 + (gap < cfg.catchDistance ? 0.35 : 0))
+      }
+      // THE CAUGHT CHILD STOPS FOR A BEAT (work-order 1176): standing where it
+      // was touched, then turning on the spot through the eased facing until
+      // it looks where it will run. No second timer: the turn ends on course.
+      // The turn opens in the beat's second half — measured, a whole turn left
+      // until after the beat held a cornered runner shuffling at the rim beside
+      // the standing chaser (0.25-0.34 % of judged time at two seeds, gate 0.25).
+      if (s.pauseFor > 0) {
+        standing = true
+        if (s.pauseFor <= cfg.caughtPauseSeconds / 2) c.heading = desired
+      } else if (s.turning) {
+        if (Math.abs(angleTo(c.facing, desired)) > ON_COURSE) {
+          standing = true
+          c.heading = desired
+        } else {
+          s.turning = false
+        }
       }
     } else {
       const gapToChaser = dist(c, chaser)
@@ -1082,13 +1126,17 @@ function advanceTagGame(
     // standing (measured at the user's seed, 3930 of 3931 commanded-still frames).
     const claim = isChaser ? null : (steer?.(i, s) ?? null)
     if (claim) desired = claim.heading
-    c.sprinting = wants
+    c.sprinting = wants && !standing
     c.press = pressState(c.press, c.reserve, cfg)
-    c.effort = chooseEffort(c.press, wants)
-    c.pace = claim
-      ? Math.max(0, claim.pace)
-      : Math.max(floor, effortPace(c.effort, c.reserve, cfg, isChaser ? 'chaser' : 'runner'))
-    c.held = !!claim && c.pace <= 0
+    c.effort = chooseEffort(c.press, c.sprinting)
+    c.pace = standing
+      ? 0
+      : claim
+        ? Math.max(0, claim.pace)
+        : Math.max(floor, effortPace(c.effort, c.reserve, cfg, isChaser ? 'chaser' : 'runner'))
+    // The beat is a commanded stillness like a claim's: the floor and the stall
+    // watch leave it alone and the legs settle to standing.
+    c.held = standing || (!!claim && c.pace <= 0)
     ageEdge(c, dt)
     // A commanded stillness moves nothing — and leaves `pinned` and `walked`
     // alone, so a standing child is never mistaken for one stuck on geometry and
@@ -1100,7 +1148,8 @@ function advanceTagGame(
     // The BODY turns at a rate toward where it is going. The travel heading may
     // jump — a deflection round a hut corner is a real change of direction — but
     // a body that snapped to it spun about-face inside a single frame.
-    c.facing = turnToward(c.facing, c.heading, cfg.turnRate * dt)
+    // Through the beat's first half the body stays as it was caught.
+    if (!(isChaser && s.pauseFor > cfg.caughtPauseSeconds / 2)) c.facing = turnToward(c.facing, c.heading, cfg.turnRate * dt)
     c.reserve = advanceReserve(c.reserve, c.pace, dt, cfg, c.drainScale, c.recoverScale)
     // The posture is a function of the PACE, not of the decision: it changes
     // continuously with the speed, so nothing snaps when a threshold is crossed.
@@ -1139,6 +1188,11 @@ function advanceTagGame(
       s.gapTrend = 0
       s.lastGap = NaN
       s.tags++
+      // Only the caught child stops; the catcher runs off at once, and it is
+      // the catcher who cries out (work-order 1176).
+      s.pauseFor = cfg.caughtPauseSeconds
+      s.turning = false
+      if (s.cries.length < 4) s.cries.push(old)
       // The new chaser owes the freshly-tagged child a turn away before it
       // resumes — the same hysteresis that keeps the animals' dodge and guard
       // states from flapping.

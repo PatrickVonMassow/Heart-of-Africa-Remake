@@ -754,6 +754,17 @@ export interface BalanceConfig {
       leanAtSprint: number
       /** How fast the drawn body may turn, in rad/s. */
       turnRate: number
+      /** Seconds the freshly caught child stands before it chases (work-order
+       *  1176); never longer than `immunitySeconds`. */
+      caughtPauseSeconds: number
+      /** Largest trunk turn (rad) the chaser's gaze takes toward its quarry. */
+      gazeTurnMax: number
+      /** The catcher's wordless cry: length (s), per-cry pitch spread (±
+       *  fraction), reach (m) and level (a factor on the voice peak). */
+      crySeconds: number
+      cryPitchSpread: number
+      cryReach: number
+      cryGain: number
       /** Radius of the children's play ground — how far from its middle they
        *  may roam. It is what keeps them a GROUP the player can stand among
        *  (point 481/478), not a scatter across the whole settlement. */
@@ -1420,6 +1431,17 @@ export const balance: BalanceConfig = {
       // ~3.6 rad/s: a body turns a half circle in about a second — quick enough
       // for a chase to read as agile, slow enough that no figure snaps about-face.
       turnRate: 3.6,
+      // Work-order 1176, calibratable estimates. The caught child's beat of
+      // frustration; the tag-back window (1.4 s) covers it plus a first step.
+      caughtPauseSeconds: 0.7,
+      // The chaser looks at its quarry within a modest trunk turn.
+      gazeTurnMax: 0.6,
+      // One wordless child cry on the catch: a short "ha!", varied a little per
+      // cry, heard as far as the talk register carries (10 m).
+      crySeconds: 0.22,
+      cryPitchSpread: 0.08,
+      cryReach: 10,
+      cryGain: 0.8,
       // A ground 20 m across: room for a chase to breathe, small enough that the
       // group stays one group a player can stand among and hear (point 481).
       playRadius: 10,
