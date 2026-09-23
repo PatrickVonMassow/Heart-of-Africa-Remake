@@ -104,8 +104,10 @@ export interface LoomPlacement {
   sightClear: (from: BankPoint, to: BankPoint, halfWidth: number) => boolean
   /** How wide a corridor of open ground the settlement's plaza looks at this
    *  seat through — the widest over every stand on the plaza, 0 where none sees
-   *  it at all (work-order 1190). Settlements without a plaza answer Infinity. */
-  plazaView: (seat: BankPoint) => number
+   *  it at all (work-order 1190). Settlements without a plaza answer Infinity.
+   *  With `floor`, widths up to it are not measured and `floor` is the answer
+   *  when nothing wider fits. */
+  plazaView: (seat: BankPoint, floor?: number) => number
   /** Distance from a spot to the NEAREST place a child speaks. The loom's own
    *  direction words must never arrive mixed with the children's (688 §1, §6),
    *  so this is the same measure the dig sites and the water path are held to. */
@@ -201,8 +203,28 @@ export function loomAround(
  * ground, the seat's view of the water open, and the two teaching places it
  * must not be heard beside kept at their distance.
  */
-function stationHolds(station: LoomStation, p: LoomPlacement, wantPlazaSight: boolean): boolean {
+function stationHolds(station: LoomStation, p: LoomPlacement): boolean {
   const { warpHalf } = p.geometry
+  // The arithmetic tests first; the sampled ones below are what a sweep pays for.
+  // AND NO FARTHER FROM THE WATER THAN THE PLAN MEANT IT TO BE (work-order
+  // 1190). The water sight line below reads SOLIDS, not the ground: a dune
+  // between the seat and the river passes it and still hides the water in the
+  // picture, which is how a seat moved inland for the plaza's sake arrived with
+  // the river at the horizon and nothing blue where the frame reads for it.
+  if (p.bank) {
+    const off = p.bank.distance - (station.weaver.x * p.bank.nx + station.weaver.z * p.bank.nz)
+    if (off > p.nominalWaterOff + PLAZA_INLAND_SLACK) return false
+  }
+  // THE SEPARATION (item 9): the direction words spoken here must not arrive in
+  // the same ear as the children's, and RIVER must not arrive in this one. The
+  // whole station is held to it, because the helper speaks from neither end
+  // but the weaver's word is heard wherever he is walking.
+  for (const on of [station.weaver, station.upstream, station.downstream]) {
+    if (p.toChildren(on.x, on.z) < p.clearance) return false
+    if (p.waterPathHead && Math.hypot(on.x - p.waterPathHead.x, on.z - p.waterPathHead.z) < p.clearance) {
+      return false
+    }
+  }
   // The warp's whole LENGTH, not its ends: a stake either side of a hut corner
   // would pass an end-point test and run the threads through the wall.
   const steps = Math.max(8, Math.ceil((warpHalf * 2) / 0.4))
@@ -235,16 +257,6 @@ function stationHolds(station: LoomStation, p: LoomPlacement, wantPlazaSight: bo
     const on = at(station, d, HELPER_SIDE_OFFSET)
     if (!p.free(on.x, on.z, WEAVER_BODY_RADIUS)) return false
   }
-  // THE SEPARATION (item 9): the direction words spoken here must not arrive in
-  // the same ear as the children's, and RIVER must not arrive in this one. The
-  // whole station is held to it, because the helper speaks from neither end
-  // but the weaver's word is heard wherever he is walking.
-  for (const on of [station.weaver, station.upstream, station.downstream]) {
-    if (p.toChildren(on.x, on.z) < p.clearance) return false
-    if (p.waterPathHead && Math.hypot(on.x - p.waterPathHead.x, on.z - p.waterPathHead.z) < p.clearance) {
-      return false
-    }
-  }
   // THE WATER MUST BE IN THE PICTURE (item 10). A layout that hides the river
   // from the seat fails the point: the axis claim is only checkable if the
   // player standing at the loom can see what it is an axis of. The line is
@@ -262,26 +274,7 @@ function stationHolds(station: LoomStation, p: LoomPlacement, wantPlazaSight: bo
     for (const stand of [station.weaver, station.helperHome]) {
       if (!p.sightClear(stand, waterAhead(stand, p.bank), SIGHT_HALF_WIDTH)) return false
     }
-    // AND NO FARTHER FROM THE WATER THAN THE PLAN MEANT IT TO BE. The sight
-    // line above reads SOLIDS, not the ground: a dune between the seat and the
-    // river passes it and still hides the water in the picture, which is how a
-    // seat moved inland for the plaza's sake arrived with the river at the
-    // horizon and nothing blue where the frame reads for it.
-    const off = p.bank.distance - (station.weaver.x * p.bank.nx + station.weaver.z * p.bank.nz)
-    if (off > p.nominalWaterOff + PLAZA_INLAND_SLACK) return false
   }
-  // AND THE PLAZA SHOULD SEE THE WORK (work-order 1190). The station being
-  // readable from up close was point 1183; the user's criterion was the plaza,
-  // and the shipped seat only showed through a gap between two dwellings. The
-  // line is asked from the plaza rather than drawn to it, because where the
-  // player stands there is not one spot but a small ground.
-  //
-  // IT IS THE FIRST SWEEP'S RULE, NOT AN ABSOLUTE ONE. Two shipped Mandinka
-  // plans hold no seat that both clears every solid above and looks at the
-  // plaza over a metre-wide corridor, and a village with NO loom teaches
-  // nothing at all — so the caller sweeps again without this rule and the
-  // station says which sweep found it.
-  if (wantPlazaSight && p.plazaView(station.weaver) < PLAZA_SIGHT_HALF_WIDTH) return false
   return true
 }
 
@@ -319,7 +312,10 @@ export function placeLoom(p: LoomPlacement): LoomStation | null {
     if (baseRadius + d <= maxRadius) radii.push(baseRadius + d)
   }
 
-  /** The candidate radii at a given stride, nearest the nominal one first. */
+  /** The candidate radii at a given stride, nearest the nominal one first.
+   *  THE STRIDE IS TAKEN ON THE SEQUENCE, NOT ON THE ARRAY: skipping every nth
+   *  entry of `radii` would drop only the INWARD ones (the list alternates in,
+   *  out) and the search would drift away from the river without saying so. */
   const radiiAt = (stride: number): number[] => {
     const out = [baseRadius]
     for (let d = stride; d <= maxRadius; d += stride) {
@@ -329,28 +325,21 @@ export function placeLoom(p: LoomPlacement): LoomStation | null {
     return out
   }
 
-  /** One sweep out from the nominal bearing, nearest first. */
-  const sweep = (degreeStep: number, radiusStride: number, wantPlazaSight: boolean): LoomStation | null => {
-    // THE STRIDE IS TAKEN ON THE SEQUENCE, NOT ON THE ARRAY. Skipping every nth
-    // entry of `radii` would drop only the INWARD ones — the list alternates in,
-    // out, in, out — and the search would drift away from the river without ever
-    // saying so. It cost a frame in which the water had left the picture.
-    const swept = radiusStride === SEAT_RADIUS_STEP ? radii : radiiAt(radiusStride)
-    for (let step = 0; step <= SEAT_SWEEP_DEGREES; step += degreeStep) {
+  /** The fine sweep out from the nominal bearing, nearest first. */
+  const sweep = (): LoomStation | null => {
+    for (let step = 0; step <= SEAT_SWEEP_DEGREES; step++) {
       for (const sign of step === 0 ? [1] : [-1, 1]) {
         const a = nominalAngle + sign * step * (Math.PI / 180)
         const fx = p.bank ? p.bank.fx : -Math.sin(a)
         const fz = p.bank ? p.bank.fz : Math.cos(a)
-        for (const r of swept) {
+        for (const r of radii) {
           const seat = { x: Math.cos(a) * r, z: Math.sin(a) * r }
           // Across the warp, toward the water — or straight outward where the
           // settlement stands on no river and there is no water to face.
           const ax = p.bank ? p.bank.nx : Math.cos(a)
           const az = p.bank ? p.bank.nz : Math.sin(a)
           const station = loomAround(seat, fx, fz, ax, az, p.geometry, onRiverAxis)
-          if (stationHolds(station, p, wantPlazaSight)) {
-            return { ...station, seenFromPlaza: wantPlazaSight }
-          }
+          if (stationHolds(station, p)) return { ...station, seenFromPlaza: false }
         }
       }
     }
@@ -364,9 +353,8 @@ export function placeLoom(p: LoomPlacement): LoomStation | null {
   // not "anywhere": it is the seat with the widest view of the ones that clear
   // everything else, which is the user's criterion served as far as the plan
   // allows. Only a plan with no valid seat at all falls to the fine sweep.
-  const seen = sweep(PLAZA_SWEEP_DEGREE_STEP, PLAZA_SWEEP_RADIUS_STRIDE, true)
-  if (seen) return seen
-
+  // Both questions are answered in ONE pass over the same seats in the same
+  // order, so the view of each seat is measured once.
   let widest: { station: LoomStation; view: number } | null = null
   for (let step = 0; step <= SEAT_SWEEP_DEGREES; step += PLAZA_SWEEP_DEGREE_STEP) {
     for (const sign of step === 0 ? [1] : [-1, 1]) {
@@ -378,12 +366,13 @@ export function placeLoom(p: LoomPlacement): LoomStation | null {
         const ax = p.bank ? p.bank.nx : Math.cos(a)
         const az = p.bank ? p.bank.nz : Math.sin(a)
         const station = loomAround(seat, fx, fz, ax, az, p.geometry, onRiverAxis)
-        if (!stationHolds(station, p, false)) continue
-        const view = p.plazaView(station.weaver)
+        if (!stationHolds(station, p)) continue
+        const view = p.plazaView(station.weaver, widest ? widest.view : 0)
+        if (view >= PLAZA_SIGHT_HALF_WIDTH) return { ...station, seenFromPlaza: true }
         if (!widest || view > widest.view) widest = { station, view }
       }
     }
   }
   if (widest) return { ...widest.station, seenFromPlaza: false }
-  return sweep(1, SEAT_RADIUS_STEP, false)
+  return sweep()
 }

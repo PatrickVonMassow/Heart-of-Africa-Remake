@@ -2164,8 +2164,8 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     // The view is measured past whatever gives way (above): a line that only a
     // tree or a shed stands in is a line the plaza is given, not one it lacks.
     const sightSolids = colliders.filter((c) => !plazaYielding.has(c))
-    const plazaLine = (seat: BankPoint) => {
-      let widest = 0
+    const plazaLine = (seat: BankPoint, floor = 0) => {
+      let widest = floor
       let line: { from: BankPoint; to: BankPoint } | null = null
       for (const stand of plazaStands) {
         const dist = Math.hypot(seat.x - stand.x, seat.z - stand.z)
@@ -2174,13 +2174,15 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
         const t = (dist - PLAZA_SIGHT_STATION_GROUND) / dist
         const to = { x: stand.x + (seat.x - stand.x) * t, z: stand.z + (seat.z - stand.z) * t }
         // Widened until it no longer fits: the placement wants the BEST view a
-        // plan holds, not only whether the full metre is there.
+        // plan holds, not only whether the full metre is there. A width that
+        // fails fails every wider one, so the first miss ends the stand, and
+        // one cull per stand keeps the tests on the nearby solids.
+        const near = collidersNearRun(sightSolids, stand.x, stand.z, to.x, to.z, PLAZA_SIGHT_HALF_WIDTH + PLAZA_SIGHT_SAMPLE)
         for (const half of PLAZA_SIGHT_WIDTHS) {
           if (half <= widest) continue
-          if (clearCorridor(sightSolids, stand, to, half, PLAZA_SIGHT_SAMPLE)) {
-            widest = half
-            line = { from: stand, to }
-          }
+          if (!clearCorridor(near, stand, to, half, PLAZA_SIGHT_SAMPLE)) break
+          widest = half
+          line = { from: stand, to }
         }
         if (widest >= PLAZA_SIGHT_HALF_WIDTH) break
       }
@@ -2214,7 +2216,7 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
       // check walks — and one open line is enough. The corridor is a metre to
       // each side: the shipped seat passed a 0.15 m line through a gap between
       // two dwellings, and what arrived in the frame was two figures, not a loom.
-      plazaView: (seat) => plazaLine(seat).widest,
+      plazaView: (seat, floor) => plazaLine(seat, floor).widest,
       toChildren,
       waterPathHead: waterPath ? waterPath.head : null,
       onWaterLane: (x, z, r) => !!waterPath &&
