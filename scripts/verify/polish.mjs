@@ -3569,7 +3569,7 @@ if (section('tag-catch')) {
     // Body heights, in the child's own frame: +z forward, +y up. A hanging arm
     // ends near z 0 (a run's lean carries it a little forward); the catcher's
     // hands stand out in front at chest height.
-    const forward = (h) => h.local.z > 0.3 && h.local.y > 0.35 && h.local.y < 0.8
+    const forward = (h) => h.local.z > 0.25 && h.local.y > 0.4 && h.local.y < 0.8
     check(
       "the catcher's two hands are held forward at chest height, read off the drawn pivots",
       !!arms && arms.chaser?.length === 2 && arms.chaser.every(forward),
@@ -3577,42 +3577,47 @@ if (section('tag-catch')) {
     )
     check(
       "while a runner's hands hang at its sides",
-      !!arms && arms.runner?.length === 2 && arms.runner.every((h) => h.local.z < 0.2),
+      !!arms && arms.runner?.length === 2 && arms.runner.every((h) => h.local.z < 0.15),
       arms ? JSON.stringify(arms.runner?.map((h) => h.local)) : 'no runner frame',
     )
 
     // Side-on to the pair, a few metres off, on a line the rendered scene
     // leaves clear to the subject — both sides tried, the nearer range first.
-    const standBeside = (from, to, subject) =>
-      page.evaluate(
-        ({ from, to, subject }) => {
-          const p = window.__placePlayer
-          const L = window.__placeLayout
-          if (!p || !window.__placeRayHit) return null
-          const ux = to.x - from.x
-          const uz = to.z - from.z
-          const n = Math.hypot(ux, uz) || 1
-          const mx = (from.x + to.x) / 2
-          const mz = (from.z + to.z) / 2
-          const rim = (L ? L.radius : 28) - 1.5
-          for (const back of [3.2, 4.2, 2.6]) {
-            for (const side of [1, -1]) {
-              const x = mx + (side * uz / n) * back
-              const z = mz + (-side * ux / n) * back
-              if (Math.hypot(x, z) > rim) continue
+    // Each candidate is stood on, DRAWN, and only then ray-probed: the camera
+    // follows the player pose in the next frame, not in the call that sets it.
+    const standBeside = async (from, to, subject) => {
+      for (const back of [3.2, 4.2, 2.6]) {
+        for (const side of [1, -1]) {
+          const placed = await page.evaluate(
+            ({ from, to, back, side }) => {
+              const p = window.__placePlayer
+              const L = window.__placeLayout
+              if (!p) return false
+              const ux = to.x - from.x
+              const uz = to.z - from.z
+              const n = Math.hypot(ux, uz) || 1
+              const mx = (from.x + to.x) / 2
+              const mz = (from.z + to.z) / 2
+              const x = mx + ((side * uz) / n) * back
+              const z = mz + ((-side * ux) / n) * back
+              if (Math.hypot(x, z) > (L ? L.radius : 28) - 1.5) return false
               p.x = x
               p.z = z
+              // Place-camera yaw 0 looks toward −Z, hence the +PI complement.
               p.yaw = Math.atan2(mx - x, mz - z) + Math.PI
               p.pitch = -0.28
-              window.__placeCamera?.updateMatrixWorld?.()
-              const hit = window.__placeRayHit(subject.x, 0.3, subject.z)
-              if (hit.hitDistance == null || hit.hitDistance >= hit.targetDistance * 0.9) return { x, z, back }
-            }
-          }
-          return null
-        },
-        { from, to, subject },
-      )
+              return true
+            },
+            { from, to, back, side },
+          )
+          if (!placed) continue
+          await nextFrames(3)
+          const hit = await page.evaluate((q) => window.__placeRayHit?.(q.x, 0.3, q.z) ?? null, subject)
+          if (hit && (hit.hitDistance == null || hit.hitDistance >= hit.targetDistance * 0.9)) return { back, side, hit }
+        }
+      }
+      return null
+    }
 
     // THE CATCH FRAME, held by the shutter the moment the hand lands.
     await page.evaluate(() => window.__placeHoldCatch('catch'))

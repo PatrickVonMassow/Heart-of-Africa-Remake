@@ -1585,7 +1585,9 @@ function Kids({
       if (!g) return null
       g.updateWorldMatrix(true, true)
       return worldHands(g).map((h) => {
-        const local = g.worldToLocal(new THREE.Vector3(h.x, h.y, h.z))
+        // The outer group is unscaled (metres); the figure inside it is drawn
+        // at the child's scale, so body heights are metres over that scale.
+        const local = g.worldToLocal(new THREE.Vector3(h.x, h.y, h.z)).divideScalar(KID_SCALE)
         return { ...h, local: { x: local.x, y: local.y, z: local.z } }
       })
     }
