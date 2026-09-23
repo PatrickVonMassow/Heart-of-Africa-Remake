@@ -114,6 +114,14 @@ export interface LoomPlacement {
    *  With `floor`, widths up to it are not measured and `floor` is the answer
    *  when nothing wider fits. */
   plazaView: (seat: BankPoint, floor?: number) => number
+  /** Whether a seat stands near enough the plaza to be READ from it (work-order
+   *  1191); a seat beyond is not asked for its view. Omitted: every seat is. */
+  plazaReach?: (seat: BankPoint) => boolean
+  /** `free` with the households that may give way to the plaza's view taken
+   *  out (work-order 1191). Where the plaza sees no seat on the ground the plan
+   *  leaves, it is asked again over this; the layout then leaves unbuilt what
+   *  the chosen station stands on. Omitted: nothing gives way. */
+  freeGivingWay?: (x: number, z: number, r: number) => boolean
   /** Distance from a spot to the NEAREST place a child speaks. The loom's own
    *  direction words must never arrive mixed with the children's (688 §1, §6),
    *  so this is the same measure the dig sites and the water path are held to. */
@@ -205,6 +213,42 @@ export function loomAround(
 }
 
 /**
+ * The ground a laid-out station needs free, as circles: the warp, a way round
+ * each end, and the weaver and her helper's walk (work-order 1191 reads it to
+ * leave unbuilt what a chosen station stands on).
+ */
+export function stationGround(
+  station: LoomStation,
+  geometry: LoomPlacement['geometry'],
+): Array<{ x: number; z: number; r: number; kind: 'warp' | 'end' | 'body' }> {
+  const { warpHalf } = geometry
+  const ground: Array<{ x: number; z: number; r: number; kind: 'warp' | 'end' | 'body' }> = []
+  // The warp's whole LENGTH, not its ends: a stake either side of a hut corner
+  // would pass an end-point test and run the threads through the wall.
+  const steps = Math.max(8, Math.ceil((warpHalf * 2) / 0.4))
+  for (let k = 0; k <= steps; k++) {
+    const on = at(station, -warpHalf + (warpHalf * 2 * k) / steps)
+    ground.push({ ...on, r: WARP_BODY_RADIUS, kind: 'warp' })
+  }
+  // A WAY ROUND EACH END. The warp is a wall six metres long between the
+  // village and its water, and a walker must be able to pass it: the ground
+  // just beyond each stake carries a walker's own body, clear of everything
+  // else. Without this the station can seal the route to the bank against a
+  // hut, which is what the point-483 walk found on the first build.
+  const pastEnd = warpHalf + WARP_BODY_RADIUS + WALKER_RADIUS * 2
+  for (const d of [-pastEnd, pastEnd]) ground.push({ ...at(station, d), r: WALKER_RADIUS, kind: 'end' })
+  // The weaver and her helper are bodies of their own beside the threads, and
+  // the helper's whole walk between his stands is ground he has to cross.
+  ground.push({ x: station.weaver.x, z: station.weaver.z, r: WEAVER_BODY_RADIUS, kind: 'body' })
+  const helperSteps = Math.max(8, Math.ceil((geometry.tendStand * 2) / 0.4))
+  for (let k = 0; k <= helperSteps; k++) {
+    const d = -geometry.tendStand + (geometry.tendStand * 2 * k) / helperSteps
+    ground.push({ ...at(station, d, HELPER_SIDE_OFFSET), r: WEAVER_BODY_RADIUS, kind: 'body' })
+  }
+  return ground
+}
+
+/**
  * Whether a laid-out station stands where it may: the whole warp on standable
  * ground, the seat's view of the water open, and the two teaching places it
  * must not be heard beside kept at their distance.
@@ -231,37 +275,12 @@ function stationHolds(station: LoomStation, p: LoomPlacement): boolean {
       return false
     }
   }
-  // The warp's whole LENGTH, not its ends: a stake either side of a hut corner
-  // would pass an end-point test and run the threads through the wall.
-  const steps = Math.max(8, Math.ceil((warpHalf * 2) / 0.4))
-  for (let k = 0; k <= steps; k++) {
-    const d = -warpHalf + (warpHalf * 2 * k) / steps
-    const on = at(station, d)
-    if (Math.hypot(on.x, on.z) > p.walkRadius) return false
-    if (!p.free(on.x, on.z, WARP_BODY_RADIUS)) return false
+  for (const g of stationGround(station, p.geometry)) {
+    if (g.kind !== 'body' && Math.hypot(g.x, g.z) > p.walkRadius) return false
+    if (!p.free(g.x, g.z, g.r)) return false
     // NOT ACROSS THE CARRIERS' TRACK (work-order 688): the water lane is drawn
     // ground, and a wall laid over it would stand in the picture of the walk.
-    if (p.onWaterLane(on.x, on.z, WARP_BODY_RADIUS)) return false
-  }
-  // A WAY ROUND EACH END. The warp is a wall six metres long between the
-  // village and its water, and a walker must be able to pass it: the ground
-  // just beyond each stake carries a walker's own body, clear of everything
-  // else. Without this the station can seal the route to the bank against a
-  // hut, which is what the point-483 walk found on the first build.
-  const pastEnd = warpHalf + WARP_BODY_RADIUS + WALKER_RADIUS * 2
-  for (const d of [-pastEnd, pastEnd]) {
-    const on = at(station, d)
-    if (Math.hypot(on.x, on.z) > p.walkRadius) return false
-    if (!p.free(on.x, on.z, WALKER_RADIUS)) return false
-  }
-  // The weaver and her helper are bodies of their own beside the threads, and
-  // the helper's whole walk between his stands is ground he has to cross.
-  if (!p.free(station.weaver.x, station.weaver.z, WEAVER_BODY_RADIUS)) return false
-  const helperSteps = Math.max(8, Math.ceil((p.geometry.tendStand * 2) / 0.4))
-  for (let k = 0; k <= helperSteps; k++) {
-    const d = -p.geometry.tendStand + (p.geometry.tendStand * 2 * k) / helperSteps
-    const on = at(station, d, HELPER_SIDE_OFFSET)
-    if (!p.free(on.x, on.z, WEAVER_BODY_RADIUS)) return false
+    if (g.kind === 'warp' && p.onWaterLane(g.x, g.z, g.r)) return false
   }
   // THE WATER MUST BE IN THE PICTURE (item 10). A layout that hides the river
   // from the seat fails the point: the axis claim is only checkable if the
@@ -361,26 +380,38 @@ export function placeLoom(p: LoomPlacement): LoomStation | null {
   // allows. Only a plan with no valid seat at all falls to the fine sweep.
   // Both questions are answered in ONE pass over the same seats in the same
   // order, so the view of each seat is measured once.
+  //
+  // THE PLAN'S OWN GROUND FIRST, THEN THE GROUND A HOUSEHOLD GIVES UP (work-order
+  // 1191): a Sahel compound ring leaves no free ground near the plaza at all,
+  // so where the first pass finds no seen seat the second asks again with the
+  // households that may give way taken out. Its widest seat is only a fallback
+  // for the first pass's: nothing is left unbuilt for a view that is not had.
   let widest: { station: LoomStation; view: number } | null = null
-  let viewed = 0
-  plaza: for (let step = 0; step <= SEAT_SWEEP_DEGREES; step += PLAZA_SWEEP_DEGREE_STEP) {
-    for (const sign of step === 0 ? [1] : [-1, 1]) {
-      const a = nominalAngle + sign * step * (Math.PI / 180)
-      const fx = p.bank ? p.bank.fx : -Math.sin(a)
-      const fz = p.bank ? p.bank.fz : Math.cos(a)
-      for (const r of radiiAt(PLAZA_SWEEP_RADIUS_STRIDE)) {
-        const seat = { x: Math.cos(a) * r, z: Math.sin(a) * r }
-        const ax = p.bank ? p.bank.nx : Math.cos(a)
-        const az = p.bank ? p.bank.nz : Math.sin(a)
-        const station = loomAround(seat, fx, fz, ax, az, p.geometry, onRiverAxis)
-        if (!stationHolds(station, p)) continue
-        const view = p.plazaView(station.weaver, widest ? widest.view : 0)
-        if (view >= PLAZA_SIGHT_HALF_WIDTH) return { ...station, seenFromPlaza: true }
-        if (!widest || view > widest.view) widest = { station, view }
-        if (++viewed >= PLAZA_SWEEP_VIEWED_SEATS) break plaza
+  const plazaPass = (q: LoomPlacement): LoomStation | null => {
+    let viewed = 0
+    for (let step = 0; step <= SEAT_SWEEP_DEGREES; step += PLAZA_SWEEP_DEGREE_STEP) {
+      for (const sign of step === 0 ? [1] : [-1, 1]) {
+        const a = nominalAngle + sign * step * (Math.PI / 180)
+        const fx = p.bank ? p.bank.fx : -Math.sin(a)
+        const fz = p.bank ? p.bank.fz : Math.cos(a)
+        for (const r of radiiAt(PLAZA_SWEEP_RADIUS_STRIDE)) {
+          const seat = { x: Math.cos(a) * r, z: Math.sin(a) * r }
+          const ax = p.bank ? p.bank.nx : Math.cos(a)
+          const az = p.bank ? p.bank.nz : Math.sin(a)
+          const station = loomAround(seat, fx, fz, ax, az, p.geometry, onRiverAxis)
+          if (q.plazaReach && !q.plazaReach(station.weaver)) continue
+          if (!stationHolds(station, q)) continue
+          const view = q.plazaView(station.weaver, widest ? widest.view : 0)
+          if (view >= PLAZA_SIGHT_HALF_WIDTH) return { ...station, seenFromPlaza: true }
+          if (q === p && (!widest || view > widest.view)) widest = { station, view }
+          if (++viewed >= PLAZA_SWEEP_VIEWED_SEATS) return null
+        }
       }
     }
+    return null
   }
+  const seen = plazaPass(p) ?? (p.freeGivingWay ? plazaPass({ ...p, free: p.freeGivingWay }) : null)
+  if (seen) return seen
   if (widest) return { ...widest.station, seenFromPlaza: false }
   return sweep()
 }

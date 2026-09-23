@@ -8,7 +8,7 @@ import { placeById } from '../../world/geo'
 import { mulberry32 } from '../../world/noise'
 import { REGION_PLACE_STYLES, VILLAGE_PLANS, type RegionPlaceStyle } from './regionStyles'
 import { LOOM_SPOT, PORT_TALKERS, portAdultStations, childPlayGround, villageAdultStations, villageKeepClearSpots, villageLifeProps, villageLifeFootprints, type PlayGround } from './lifeSpots'
-import { placeLoom, PLAZA_SIGHT_HALF_WIDTH, WARP_BODY_RADIUS, WEAVER_BODY_RADIUS, type LoomStation } from './loom'
+import { placeLoom, stationGround, PLAZA_SIGHT_HALF_WIDTH, WARP_BODY_RADIUS, WEAVER_BODY_RADIUS, type LoomStation } from './loom'
 import { boxCollider, nudgeToFree, spawnPointFree, standingClear, PLAYER_RADIUS, WALKER_RADIUS, CHIEF_BODY_RADIUS, type Collider } from './collision'
 import { CHIEF_HUT, MARKET_HUT, dwellingRoofProfile, hutRoofProfile, roofStandOff } from './roofClearance'
 import { windingPoints, laneSlots, closestOnPolyline, bendAround, type LaneSlot } from './lanePlan'
@@ -85,6 +85,15 @@ export interface FenceDef {
   kind: 'thorn' | 'woven' | 'stone'
   /** Sequential post positions; panels orient toward the next post. */
   posts: Array<[number, number]>
+}
+
+/** A dwelling's household: what gives way together (work-order 1191). */
+interface Household {
+  dwellings: DwellingDef[]
+  fences: FenceDef[]
+  paths: PathDef[]
+  /** Indices into the layout's errands. */
+  errands: number[]
 }
 
 export interface PlaceLayout {
@@ -170,6 +179,12 @@ export interface PlaceLayout {
    * the tangent, the weaver works, and no direction is named.
    */
   loom: LoomStation | null
+  /**
+   * What was left unbuilt so the plaza sees the loom (work-order 1191): the
+   * households (a compound, or a hut standing alone) and the dwellings they
+   * held. Zero where the line needed nothing but outbuildings and dressing.
+   */
+  gaveWayToLoom: { households: number; dwellings: number }
   /**
    * The children's roaming quarter (work-order 481.4): where the group plays
    * between two cycles of its bank game, and how far it roams. It is layout data
@@ -760,6 +775,12 @@ const PLAZA_SIGHT_RINGS = [0, 1.5, 3, 4.5, 6] as const
 const PLAZA_SIGHT_STANDS = 8
 /** Nearer than this the loom is no longer being seen ACROSS the village. */
 const PLAZA_SIGHT_MIN_DISTANCE = 8
+/** Farther than this from every stand the loom is two small figures, not a
+ *  loom being worked (work-order 1191: 27.7 m read as a cone and a stick). The
+ *  point asked for ~15 m; both shipped Bambara plans hold nothing nearer than
+ *  16.5 m once the children's and the water head's talk separations are kept,
+ *  so the frame's projected-height minimum is what decides. Calibratable. */
+const PLAZA_SIGHT_MAX_DISTANCE = 17
 /** The station's own ground at the far end, which is not sight line. */
 const PLAZA_SIGHT_STATION_GROUND = 2
 /** The widths a view is measured at, narrowest first. */
@@ -969,6 +990,16 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   const compoundFences = new Set<FenceDef>()
   const paths: PathDef[] = []
   const errands: Array<[number, number]> = []
+  /** What a dwelling takes with it when it gives way to the plaza's view of the
+   *  loom (work-order 1191): a family compound goes as one — its huts, granary,
+   *  wall, lane and errand — so no wall is left standing round empty ground. */
+  const householdOf = new Map<DwellingDef, Household>()
+  const newHousehold = (): Household => ({ dwellings: [], fences: [], paths: [], errands: [] })
+  const joinHousehold = (h: Household, d: DwellingDef | null) => {
+    if (!d) return
+    h.dwellings.push(d)
+    householdOf.set(d, h)
+  }
   let pen: PlaceLayout['pen'] = null
   const center: [number, number] = [0, 1.5]
 
@@ -1320,7 +1351,13 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
         const r = 1.5 + rand() * 0.4
         if (!isFree(x, z, 3.4, r) || onLane(x, z, r)) continue
         const d = addDwelling('hut', x, z, faceTo(x, z, 0, 0), r, 1.5 + rand() * 0.3)
-        if (d && dwellings.length % 2 === 0) pushPath([center, d.door], 1.0, true)
+        if (!d) continue
+        const household = newHousehold()
+        joinHousehold(household, d)
+        if (dwellings.length % 2 === 0) {
+          pushPath([center, d.door], 1.0, true)
+          household.paths.push(paths[paths.length - 1])
+        }
       }
       fences.push({
         kind: style.fence === 'none' ? 'thorn' : style.fence,
@@ -1375,7 +1412,7 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
       const startAngle = rand() * Math.PI * 2
       const hutBody = (r: number, h: number) =>
         dwellingCircleRadius({ x: 0, z: 0, rot: 0, kind: 'hut', r, h, floors: 1, door: [0, 0] }, style) ?? r
-      const placedRings: Array<{ x: number; z: number; a: number; ring: number }> = []
+      const placedRings: Array<{ x: number; z: number; a: number; ring: number; household: Household }> = []
       for (let c = 0; c < requested; c++) {
         const a = startAngle + (c / requested) * Math.PI * 2 + (rand() - 0.5) * 0.1
         // The family's huts, drawn once as offsets from the compound's own centre
@@ -1430,15 +1467,16 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
           cz = Math.sin(a) * cr
         }
         if (!clears(cx, cz) || cr + ring > radius - 2) continue
-        placedRings.push({ x: cx, z: cz, a, ring })
+        const household = newHousehold()
+        placedRings.push({ x: cx, z: cz, a, ring, household })
         for (const seat of seats) {
           const x = cx + Math.cos(a + seat.angle) * seat.dist
           const z = cz + Math.sin(a + seat.angle) * seat.dist
           if (!isFree(x, z, 3.2, seat.r) || onLane(x, z, seat.r)) continue
-          addDwelling('hut', x, z, faceTo(x, z, cx, cz), seat.r, seat.h)
+          joinHousehold(household, addDwelling('hut', x, z, faceTo(x, z, cx, cz), seat.r, seat.h))
         }
         if (style.granaries && isFree(cx + 2, cz + 2, 2.2, 0.85) && !onLane(cx + 2, cz + 2, 1.2)) {
-          addDwelling('granary', cx + 2, cz + 2, faceTo(cx + 2, cz + 2, cx, cz), 0.85, 1.1)
+          joinHousehold(household, addDwelling('granary', cx + 2, cz + 2, faceTo(cx + 2, cz + 2, cx, cz), 0.85, 1.1))
         }
         const openingAngle = Math.atan2(-cz, -cx)
         if (walled) {
@@ -1449,11 +1487,16 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
           }
           fences.push(fence)
           compoundFences.add(fence)
+          household.fences.push(fence)
         }
         const gx = cx + Math.cos(openingAngle) * ring
         const gz = cz + Math.sin(openingAngle) * ring
         pushPath([center, [gx, gz]], 1.3)
-        if (c < 2) errands.push([gx, gz])
+        household.paths.push(paths[paths.length - 1])
+        if (c < 2) {
+          household.errands.push(errands.length)
+          errands.push([gx, gz])
+        }
       }
       // Top up the family huts where the jitter left a compound thin: a hut
       // rejected by a lane, a neighbour or the plaza corridor would otherwise
@@ -1472,7 +1515,7 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
         const x = compound.x + Math.cos(ha) * hd
         const z = compound.z + Math.sin(ha) * hd
         if (!isFree(x, z, 3.2, r) || onLane(x, z, r) || !clearOfFences(x, z, hutBody(r, h))) continue
-        addDwelling('hut', x, z, faceTo(x, z, compound.x, compound.z), r, h)
+        joinHousehold(compound.household, addDwelling('hut', x, z, faceTo(x, z, compound.x, compound.z), r, h))
       }
       // A shed and a drying rack scattered between the compounds.
       for (let i = 0; i < 6 && dwellings.filter((d) => d.kind === 'shed').length < 2; i++) {
@@ -1654,16 +1697,20 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     const at = list.indexOf(item)
     if (at >= 0) list.splice(at, 1)
   }
+  const dwellingBodies = new Map<DwellingDef, Collider>()
   for (const d of dwellings) {
     const body = dwellingCollider(d, style)
     colliders.push(body)
+    dwellingBodies.set(d, body)
     if (d.kind === 'shed' || d.kind === 'granary') plazaYielding.set(body, dropFrom(dwellings, d))
   }
   const fenceColliderStart = colliders.length
   const compoundColliders = new Set<Collider>()
+  const fenceBodies = new Map<FenceDef, Collider[]>()
   for (const f of fences) {
     const run = fenceColliders(f)
     colliders.push(...run)
+    fenceBodies.set(f, run)
     if (compoundFences.has(f)) for (const c of run) compoundColliders.add(c)
   }
   const fenceColliderCount = colliders.length - fenceColliderStart
@@ -1905,11 +1952,18 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
       const candidate = findHeadHere(fixed)
       if (candidate) {
         const gated = fences.map((f) => compoundFences.has(f) ? waterGate(f, candidate, foot) : f)
-        const fenceRun = gated.flatMap(fenceColliders)
+        const runs = gated.map(fenceColliders)
+        const fenceRun = runs.flat()
         // Validate the rebuilt run before committing either the drawn posts or
         // the colliders. No invisible wall and no erased collision-only wall.
         if (clearRunHere(candidate, [...fixed, ...fenceRun])) {
           head = candidate
+          // The household keeps the wall it is drawn with, gate and all.
+          for (const h of new Set(householdOf.values())) {
+            h.fences = h.fences.map((f) => gated[fences.indexOf(f)] ?? f)
+          }
+          fenceBodies.clear()
+          gated.forEach((f, i) => fenceBodies.set(f, runs[i]))
           fences.splice(0, fences.length, ...gated)
           colliders.splice(fenceColliderStart, fenceColliderCount, ...fenceRun)
         }
@@ -2148,6 +2202,7 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   // cannot give it the room, THE LOOM MOVES AND THE CHILDREN DO NOT (item 9):
   // their ground is what the whole communication slice is arranged around.
   let loom: LoomStation | null = null
+  const gaveWayToLoom = { households: 0, dwellings: 0 }
   if (place.kind === 'village') {
     // The stands a villager could look from are the same for every candidate
     // seat, so they are walked once rather than per trial (the sweep runs twice
@@ -2163,13 +2218,30 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     }
     // The view is measured past whatever gives way (above): a line that only a
     // tree or a shed stands in is a line the plaza is given, not one it lacks.
-    const sightSolids = colliders.filter((c) => !plazaYielding.has(c))
-    const plazaLine = (seat: BankPoint, floor = 0) => {
+    //
+    // A DWELLING GIVES WAY TOO (work-order 1191, owner decision 23.09.2026):
+    // the plaza sits inside the ring of compounds, so a seat near the plaza has
+    // a compound between the two nearly everywhere, and the one seat a clear
+    // line reached stood 27.7 m out, where the loom read as two small figures.
+    // The ring is procedural and nothing fixes where a compound stands
+    // (docs/peoples-1890.md §8.1), so the household in the line is left
+    // unbuilt, whole. The landmarks and the functional huts still hold.
+    const households = new Map<Collider, Household>()
+    for (const d of dwellings) {
+      if (d.kind !== 'hut' && d.kind !== 'box' && d.kind !== 'tent' && !householdOf.has(d)) continue
+      const household = householdOf.get(d) ?? { dwellings: [d], fences: [], paths: [], errands: [] }
+      const body = dwellingBodies.get(d)
+      if (body && !plazaYielding.has(body)) households.set(body, household)
+      for (const f of household.fences) for (const c of fenceBodies.get(f) ?? []) households.set(c, household)
+    }
+    const lightSolids = colliders.filter((c) => !plazaYielding.has(c))
+    const sightSolids = lightSolids.filter((c) => !households.has(c))
+    const plazaLine = (seat: BankPoint, floor = 0, solids = sightSolids) => {
       let widest = floor
       let line: { from: BankPoint; to: BankPoint } | null = null
       for (const stand of plazaStands) {
         const dist = Math.hypot(seat.x - stand.x, seat.z - stand.z)
-        if (dist < PLAZA_SIGHT_MIN_DISTANCE) continue
+        if (dist < PLAZA_SIGHT_MIN_DISTANCE || dist > PLAZA_SIGHT_MAX_DISTANCE) continue
         // The last stretch is the station's own ground, not the sight line.
         const t = (dist - PLAZA_SIGHT_STATION_GROUND) / dist
         const to = { x: stand.x + (seat.x - stand.x) * t, z: stand.z + (seat.z - stand.z) * t }
@@ -2177,7 +2249,7 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
         // plan holds, not only whether the full metre is there. A width that
         // fails fails every wider one, so the first miss ends the stand, and
         // one cull per stand keeps the tests on the nearby solids.
-        const near = collidersNearRun(sightSolids, stand.x, stand.z, to.x, to.z, PLAZA_SIGHT_HALF_WIDTH + PLAZA_SIGHT_SAMPLE)
+        const near = collidersNearRun(solids, stand.x, stand.z, to.x, to.z, PLAZA_SIGHT_HALF_WIDTH + PLAZA_SIGHT_SAMPLE)
         for (const half of PLAZA_SIGHT_WIDTHS) {
           if (half <= widest) continue
           if (!clearCorridor(near, stand, to, half, PLAZA_SIGHT_SAMPLE)) break
@@ -2188,6 +2260,25 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
       }
       return { widest, line }
     }
+    // The ground a station may take once the households give way: their
+    // bodies, walls and lanes go with them, and what gives way to the line
+    // (outbuildings, trees, stones) gives way to the station as well.
+    const householdLanes = new Set([...households.values()].flatMap((h) => h.paths))
+    const standingLanes = paths.filter((lane) => !householdLanes.has(lane))
+    const groundFree = (x: number, z: number, r: number, solids: readonly Collider[], lanes: readonly PathDef[]) =>
+      Math.hypot(x, z) < radius - r &&
+      standingClear(solids, x, z, r) &&
+      standsOnGroundPlate(bank, x, z, r) &&
+      // AND OFF THE WAY OUT (work-order 688). The crossing is read off the
+      // BUILT fabric and nothing is moved for it, so the warp — a later
+      // object, like the loose dressing — keeps out of it rather than
+      // sealing the one bearing a person can walk out over.
+      !onWayOut(wayOut, radius, x, z, r) &&
+      // AND OFF THE VILLAGE LANES AND THE CHILDREN'S WAY DOWN TO THE WATER:
+      // a warp across either would stand in a walk the layout already drew
+      // (GPT-6 Astra review, pass 7).
+      !lanes.some((lane) => closestOnPolyline(lane.points, x, z).dist < lane.width / 2 + r) &&
+      !onWayToWater(x, z, r)
     loom = placeLoom({
       bank,
       nominal: LOOM_SPOT,
@@ -2195,20 +2286,8 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
         ? bank.distance - (LOOM_SPOT[0] * bank.nx + LOOM_SPOT[1] * bank.nz)
         : Infinity,
       walkRadius: radius - WALKER_RADIUS,
-      free: (x, z, r) =>
-        Math.hypot(x, z) < radius - r &&
-        standingClear(colliders, x, z, r) &&
-        standsOnGroundPlate(bank, x, z, r) &&
-        // AND OFF THE WAY OUT (work-order 688). The crossing is read off the
-        // BUILT fabric and nothing is moved for it, so the warp — a later
-        // object, like the loose dressing — keeps out of it rather than
-        // sealing the one bearing a person can walk out over.
-        !onWayOut(wayOut, radius, x, z, r) &&
-        // AND OFF THE VILLAGE LANES AND THE CHILDREN'S WAY DOWN TO THE WATER:
-        // a warp across either would stand in a walk the layout already drew
-        // (GPT-6 Astra review, pass 7).
-        !onLane(x, z, r) &&
-        !onWayToWater(x, z, r),
+      free: (x, z, r) => groundFree(x, z, r, colliders, paths),
+      freeGivingWay: (x, z, r) => groundFree(x, z, r, sightSolids, standingLanes),
       sightClear: (from, to, halfWidth) => clearCorridor(colliders, from, to, halfWidth),
       // THE PLAZA'S OWN VIEW (work-order 1190). The ground the player stands on
       // to look at the village's middle is not one spot, so the line is asked
@@ -2217,6 +2296,10 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
       // each side: the shipped seat passed a 0.15 m line through a gap between
       // two dwellings, and what arrived in the frame was two figures, not a loom.
       plazaView: (seat, floor) => plazaLine(seat, floor).widest,
+      plazaReach: (seat) => plazaStands.some((stand) => {
+        const dist = Math.hypot(seat.x - stand.x, seat.z - stand.z)
+        return dist >= PLAZA_SIGHT_MIN_DISTANCE && dist <= PLAZA_SIGHT_MAX_DISTANCE
+      }),
       toChildren,
       waterPathHead: waterPath ? waterPath.head : null,
       onWaterLane: (x, z, r) => !!waterPath &&
@@ -2230,14 +2313,53 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     })
     // THE LINE IS THEN CLEARED: whatever gave way in it is taken out of the
     // village, its body and its drawing both, so the view the placement counted
-    // on is the view the finished layout holds.
-    const cleared = loom ? plazaLine(loom.weaver).line : null
+    // on is the view the finished layout holds. A line that needs only the
+    // outbuildings and the dressing gone is preferred, so no household is left
+    // unbuilt for a view the plaza already has past them.
+    const remove = (body: Collider) => {
+      const at = colliders.indexOf(body)
+      if (at >= 0) colliders.splice(at, 1)
+    }
+    const lightLine = loom ? plazaLine(loom.weaver, 0, lightSolids) : null
+    const cleared = lightLine && lightLine.widest >= PLAZA_SIGHT_HALF_WIDTH
+      ? lightLine.line
+      : loom ? plazaLine(loom.weaver).line : null
     if (cleared) {
+      const inLine = (body: Collider) => !clearCorridor([body], cleared.from, cleared.to, PLAZA_SIGHT_HALF_WIDTH)
+      // ... and whatever stands on the ground the station was given, which is
+      // only ever something that gives way: the strict search never lets it.
+      const ground = loom ? stationGround(loom, balance.villageLife.loom) : []
+      const underStation = (body: Collider) => ground.some((g) => !standingClear([body], g.x, g.z, g.r))
       for (const [body, drop] of plazaYielding) {
-        if (clearCorridor([body], cleared.from, cleared.to, PLAZA_SIGHT_HALF_WIDTH)) continue
+        if (!inLine(body) && !underStation(body)) continue
         drop()
-        colliders.splice(colliders.indexOf(body), 1)
+        remove(body)
       }
+      const leaving = new Set([...households].filter(([body]) => inLine(body) || underStation(body)).map(([, h]) => h))
+      const errandsLeaving = new Set<number>()
+      for (const h of leaving) {
+        for (const d of h.dwellings) {
+          const at = dwellings.indexOf(d)
+          if (at < 0) continue
+          dwellings.splice(at, 1)
+          const body = dwellingBodies.get(d)
+          if (body) remove(body)
+          gaveWayToLoom.dwellings++
+        }
+        for (const f of h.fences) {
+          const at = fences.indexOf(f)
+          if (at >= 0) fences.splice(at, 1)
+          for (const c of fenceBodies.get(f) ?? []) remove(c)
+        }
+        for (const lane of h.paths) {
+          const at = paths.indexOf(lane)
+          if (at >= 0) paths.splice(at, 1)
+        }
+        for (const i of h.errands) errandsLeaving.add(i)
+        gaveWayToLoom.households++
+      }
+      // Descending, so each splice leaves the indices still to go in place.
+      for (const i of [...errandsLeaving].sort((a, b) => b - a)) errands.splice(i, 1)
     }
     // THE PLAZA VIEW IS LOUD WHEN IT IS MISSED (work-order 1190): a settlement
     // whose plan holds no seat the plaza can see still gets its loom, but the
@@ -2384,5 +2506,5 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   }
 
 
-  return { radius, spawnZ: radius - SPAWN_INSET, interactives, dwellings, fences, paths, flora, rocks, climbRock, digSites, bank, playRocks, waterPath, waterStand, loom, playGround, wayOut, pen, errands, colliders }
+  return { radius, spawnZ: radius - SPAWN_INSET, interactives, dwellings, fences, paths, flora, rocks, climbRock, digSites, bank, playRocks, waterPath, waterStand, loom, gaveWayToLoom, playGround, wayOut, pen, errands, colliders }
 }
