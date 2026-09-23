@@ -678,6 +678,20 @@ export const RED_CHARGES = [
     suite: 'polish',
     backend: 'webgl',
     kind: 'check',
+    match: /handover zone itself carries neither band.s edge/i,
+    why:
+      'The rim measurement\'s second half, now measured on WebGL 2 as well — 22.09.2026 at ' +
+      'e1b7d1561, rim zone 3/82/97 against the water either side, step 60.2 (63.6, 57.3, 60.2), ' +
+      'in the same adult-errands run whose SAME-water check read step 114.4. The WebGPU entry ' +
+      'above says in its own words that a backend stays uncharged until someone measures it ' +
+      'there; this is that measurement, and it changes nothing about the open question point ' +
+      '568 owns — whether the sample is taken too early or the rim seam is real.',
+  },
+  {
+    point: 568,
+    suite: 'polish',
+    backend: 'webgl',
+    kind: 'check',
     match: /water beyond the plate.s rim is the SAME water/i,
     why:
       'Measured 09.08.2026 twice on WebGL 2 with the world seed pinned to 42: red on one run ' +

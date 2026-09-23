@@ -9,15 +9,18 @@
 //   · and, on a routine `feat/**` push, a COMMIT STATUS carrying the real
 //     result, since that run's own conclusion is green by design.
 //
-// IT ALWAYS EXITS 0. On `main` the job has already failed by itself, so there is
-// nothing for this step to add; on a branch, failing here would re-create the
-// very mail the point removes.
+// Legacy single-job callers exit 0: their job already carries the failure.
+// The aggregate shard gate also fails hard runs itself, including missing shard
+// results. Routine branch pushes still report through their commit status.
 
 import { appendFile } from 'node:fs/promises'
 import {
   annotations,
   commitStatus,
+  isSoftRun,
   renderSummary,
+  parseOutcomes,
+  shardOutcomes,
   stepOutputs,
   verdict,
 } from './ci-gate-verdict-core.mjs'
@@ -53,11 +56,23 @@ async function postCommitStatus(status) {
 }
 
 async function main() {
+  const aggregated = process.env.GATE_SHARDS !== undefined
+  let shards = {}
+  if (aggregated) {
+    try {
+      shards = JSON.parse(process.env.GATE_SHARDS)
+    } catch {
+      // Missing proof fails below, including malformed transport.
+    }
+  }
+  const outcomes = parseOutcomes(process.env.GATE_OUTCOMES)
+  if (aggregated) outcomes.push(...shardOutcomes(shards))
   const v = verdict({
     event: process.env.GATE_EVENT,
     ref: process.env.GATE_REF,
-    outcomes: process.env.GATE_OUTCOMES,
+    outcomes,
   })
+  if (aggregated && !v.soft && !v.ok) process.exitCode = 1
   const runUrl = process.env.GATE_RUN_URL ?? ''
 
   for (const line of annotations(v)) console.log(line)
@@ -77,7 +92,9 @@ async function main() {
 }
 
 main().catch((err) => {
-  // Fail-open by construction: a broken reporter must not fail the job it
-  // reports on — that would mail the owner for a bug in the silencer itself.
-  console.log(`ci-gate-verdict: internal error (non-fatal): ${err?.message ?? err}`)
+  // Routine branch pushes remain soft; a broken aggregate cannot approve main.
+  if (process.env.GATE_SHARDS !== undefined && !isSoftRun({ event: process.env.GATE_EVENT, ref: process.env.GATE_REF })) {
+    process.exitCode = 1
+  }
+  console.log(`ci-gate-verdict: internal error: ${err?.message ?? err}`)
 })

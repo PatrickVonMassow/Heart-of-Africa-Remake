@@ -1,3 +1,11 @@
+/**
+ * @vitest-environment jsdom
+ *
+ * EXCEPTION to the tooling project's Node environment: this file runs browser-page
+ * code here — a function Playwright serializes into the page, or a `polish.mjs`
+ * sampler block — and that code reads `window`/`document` directly. It needs a DOM,
+ * so it keeps jsdom per file instead of dragging the other tooling tests back into one.
+ */
 import { describe, it, expect } from 'vitest'
 import { readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'

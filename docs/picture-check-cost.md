@@ -139,14 +139,15 @@ verbatim:
 
 The same page gives the per-tier ceilings. Models from Claude 4.7 on are the
 **high-resolution** tier: long edge ≤ 2576 px and ≤ 4784 visual tokens. Anything
-larger is downscaled first. This project's authoring model is Opus 5, which is
+larger is downscaled first. This project's authoring model is Opus 5.5, which is
 in that tier, and **no screenshot in `verification/` reaches either ceiling** —
 the largest is 1440 px on the long edge and 1716 tokens — so the formula applies
 unclamped to every frame here. (`measure-picture-cost.mjs` asserts this: it
 reports `any image clamped by the tier limits: false`.)
 
-Pricing: Opus 5 input is **$5.00 per million tokens**
-(`claude-api` skill model table, cached 2026-06-24).
+Pricing: the figures below were measured at the Opus 5 rate of **$5.00 per million
+input tokens** (`claude-api` skill model table, cached 2026-06-24); the lane moved to
+Opus 5.5 on 22.09.2026 and its own rate is not published in that table yet.
 
 ### Per screenshot
 

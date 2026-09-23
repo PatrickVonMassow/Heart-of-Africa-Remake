@@ -77,71 +77,20 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1178. The unit gate's 25-minute ceiling is eaten again, and a job timeout is the worst
-  shape of red: it names neither its cause nor a fix (measured 22.09.2026 on the CI handoff of
-  point 1157).
-  WHAT FAILED: CI run 35685632209 for `feat/1157-weaver-loom` 52bf47fc6 is recorded
-  `cancelled`, not `failure` — the `fast` job hit `timeout-minutes: 25` at 25m17s. Nothing in
-  the diff under it is at fault: the three preceding runs of the same branch were green at
-  18m58s (35671555829), 24m50s (35678754364) and 24m45s (35683117792). The cost sits in ONE
-  step — `unit` took 23m59s of that 24m45s run, and the other six steps 46s together.
-  THE CEILING HAS ALREADY BEEN RAISED ONCE, and the comment that raised it
-  (`.github/workflows/ci.yml`, 13.09.2026) forbids raising it a second time: "a run that
-  approaches it again is a signal to make the suite cheaper, not to raise this a second time".
-  Between that raise and today the layer grew from 14m45s to 24m45s in nine days, with no
-  configuration change under it.
-  A CONTRADICTION IN THE PROJECT'S OWN RECORD, and the first thing to settle:
-  `vitest.config.ts:69` justifies `maxWorkers: process.env.CI ? 2 : 4` as the fix for the
-  `onTaskUpdate` starvation of 03.09.2026, while `src/test/setup.ts:45` — written 80 minutes
-  LATER the same night (0d6746072 at 05:15 against 1b389d2a0 at 03:54) — records of that very
-  commit that the cap "did not touch it" and "cost the run 43 % of its wall clock", and that
-  the macrotask yield is what actually fixed it. If the later account holds, close to half the
-  CI wall clock is being paid for a hypothesis that was disproved the same night and never
-  reverted.
-  MEASURED SINCE, and it moves the answer: the cost is not spread over the layer, it sits in
-  TWO FILES. A full `vitest run --reporter=json` on a quiet host (516 files, 16 285 cases,
-  1659 s of summed file time, 4 workers, ~540 s wall) reads
-  `src/scenes/place/tagShuffle.test.ts` at 518.8 s over 50 cases and
-  `src/scenes/place/layout.test.ts` at 339.7 s over 1157 cases — together 51.7 % of the whole
-  layer. The top 40 files hold 93.6 %; the remaining 476 hold 6.4 %. So the LOCAL wall clock
-  (~540 s) is not set by the pool at all, it is set by the single longest file: no worker count
-  can finish a run sooner than its slowest file, and `tagShuffle` alone is 8 min 39 s here and
-  slower on a hosted core.
-  THAT MAKES TWO LEVERS, in this order. The pool cap governs everything up to that floor; the
-  floor itself is only moved by splitting the two long files — they are deterministic replays
-  of the village choreography, so their cases may be SPREAD ACROSS FILES but never shortened
-  or dropped (TASKS.md: tests are never weakened).
-  A THIRD, much smaller: 313 of the 516 test files are `scripts/**/*.test.mjs`, which
-  `vitest.config.ts` itself describes as "pure modules, no game imports", and every one pays
-  for a jsdom environment and a React Testing Library setup it cannot use — the CI run's own
-  banner puts that at `environment 361.19 s` of summed worker time against `tests 2219.68 s`.
-  It is worth about three minutes and is the LAST step, not the first. CAUTION for whoever
-  takes it: `src/test/setup.ts` also carries the macrotask yield that fixes the `onTaskUpdate`
-  starvation, so a node-environment project must keep that yield.
-  FINAL STATE:
-  1. What the worker cap costs is MEASURED on CI rather than argued: the same commit run at
-     the current value and at a raised one, both wall clocks recorded — and EITHER the cap is
-     corrected with that measurement behind it, OR its comment is rewritten to say why the
-     43 % is worth paying.
-  2. The `unit` step of a green `fast` run sits at or under 15 minutes again, with its
-     headroom stated as a figure rather than as a hope.
-  2a. The critical path is named as a figure: the slowest SINGLE file's duration on CI, which
-     is the floor no pool width can go under.
-  3. Whatever is changed, `timeout-minutes: 25` is NOT raised.
-  4. The two contradicting comments say the same thing afterwards.
-  Test: the `fast` job's `unit` duration read off three consecutive green CI runs and written
-  into the tick; plus Vitest cover for any config split that is introduced — which environment
-  a given test file is resolved to.
-  Criticality: high — this is not a flake. Every landing now runs within a minute of a ceiling
-  whose failure mode is `cancelled`, which no push can clear and which names no cause; on
-  `main` that stops the whole batch through `ci-status-guard`.
-  Refs: .github/workflows/ci.yml:89, vitest.config.ts:69, src/test/setup.ts:26-55, CI runs
-  35685632209 / 35683117792 / 35671555829
-  Bundle: Testinfrastruktur.
-
 - [ ] 1174. The village vocabulary is rolled per run, under rules that keep the direction pair a
   mirror (user 21.09.2026, drained from the findings carrier; placed here on the user's
   instruction, ahead of 659, which must judge a mechanic that no longer changes).
+  ESCALATION ANSWERED (owner, 23.09.2026, measured against the code at eb801aa5c; the author
+  had stopped at b5a8fd789 on two brief/code discrepancies):
+  a) `dumpGameState` in `src/state/stateDump.ts` serializes the WHOLE game object, and that
+     stays: no whitelist is introduced. The vocabulary lives in game state as a record of the
+     six utterance strings keyed by concept, so the dump carries it by construction; a unit
+     test asserts it is present in the dump. Step 4's claim of a dump whitelist is struck.
+     `saveCheckpoint` in `src/state/store.ts` IS a whitelist and gets the explicit entry.
+  b) `docs/communication-poc-spec.md` already says two mirror pairs plus two palindromes;
+     the "three pairs" correction is struck. What still goes false under the roll is that
+     section naming RIVER/CHIEF as the fixed mirror pair: it is rewritten as the point says
+     (structure, the two rules, the roll), and the lexicon.ts comments listed below likewise.
   Bundle: Dorfleben
   The tonal lexicon is a fixed module constant today, so the syllable-to-meaning assignment is
   identical in every playthrough and a returning player solves the drum puzzle from memorised
@@ -605,6 +554,170 @@ put it is the mistake this line exists to stop.
   that /v0.3/ and /poc/ serve the new state, and FREEZE the tag: it is never
   re-pointed.
 
+- [ ] 1191. From the Bambara plaza the loom station reads as a loom being worked.
+  PROBLEM. After point 1190 the plaza has an open, metre-wide line to the weaver, but in the
+  shipped plan (`bambara-village@394349866`) the only seat with such a line stands 27.7 m
+  from the plaza middle, and `1183-village-loom-from-plaza` shows a kneeling cone and a
+  standing figure a few dozen pixels tall; warp and cloth stack do not read. Nearest-first
+  seat ordering was measured and does not help: the dwellings between the plaza and the
+  nominal seat (`LOOM_SPOT`, ~13 m) close every nearer line.
+  DECIDED 23.09.2026 (owner, open to veto): a DWELLING compound may give way to the plaza's
+  view of the loom, as trees, stones, sheds and granaries already do (point 1190) —
+  `docs/peoples-1890.md` §8.1 says nothing on where compounds stand, the ring is procedural.
+  The loom's height stays (§8.1, point 1183), and the warp stays on the river's axis.
+  FINAL STATE. In the shipped Bambara plan the station sits at most ~15 m from a plaza stand
+  with a metre-wide open line (the compound in the way shifts outward on its ring, or is left
+  unbuilt, whichever keeps the ring's other rules), and in the plaza frame the warp line and
+  the cloth stack are distinguishable on both backends; the frame asserts the station's
+  PROJECTED height against a stated pixel minimum rather than a distance.
+  Criticality: medium. Test: Vitest for the yielding rule (station on the river axis, clear
+  of every dwelling, compound count unchanged or the drop named); `polish --section=village-loom`
+  plaza frame on both backends.
+  Refs: src/scenes/place/layout.ts (plazaYielding, plazaLine, dwelling ring),
+  src/scenes/place/loom.ts (placeLoom), scripts/verify/polish.mjs (village-loom plaza frame),
+  point 1190
+  Bundle: Dorfleben
+
+- [ ] 1185. The decision protocol gets its own collapsed board section with an archive
+  (user order 22.09.2026, 12:25, verbatim: »Neuer Punkt nach 174: Das Entscheidungsprotokoll
+  flutet aktuell die Sektion 'Von dir zu klären'. In den seltensten Fällen lege ich da ein
+  Veto ein, deswegen ist mir das zu dominant. Es soll im Dashboard eine neue Sektion
+  'Entscheidungsprotokoll' geben, in dem diese Punkte landen. Die soll ganz unten (also
+  unterhalb von 'Erledigt') und standardmäßig zugeklappt sein. Außerdem soll es dafür eine
+  Archiv-Funktion geben, so wie bei den erledigten Punkten, mit einem Link in der Art 'Die
+  älteren ... Entscheidungen stehen im Archiv des Entscheidungsprotokolls.' Sonst wird das
+  schnell zu lang.«).
+  MEASURED on the live board 22.09.2026: twelve of the cards under "Von dir zu klären" are
+  `Entscheidungsprotokoll:` records — the section the user reads for what he must decide is
+  mostly things already decided. The record itself stays (the retroactive veto of
+  docs/batch-autonomy.md depends on it); it only moves out of the way.
+  FINAL STATE.
+  1. Five sections, in this order: "Woran ich gerade arbeite", "Von dir zu klären",
+     "Warteschlange", "Erledigt", "Entscheidungsprotokoll" — the new one LAST, below
+     "Erledigt". The three places that name the sections agree: `REQUIRED_SECTIONS`
+     (scripts/board-structure-core.mjs), `HEAD` (scripts/board-core.mjs, a new key beside
+     now/vdzk/queue/done) and `SECTION_TITLES` (scripts/dashboard-guard-core.mjs). The
+     structure gate expects five `<details class="sect">` wrappers and five `<h2>`s in that
+     order.
+  2. Every card whose title begins `Entscheidungsprotokoll:` lands in the new section, never
+     under "Von dir zu klären". The producers keep their texts unchanged
+     (alert-escalation-core.mjs, batch-autostart-core.mjs, batch-pause-core.mjs,
+     child-retry-core.mjs, model-handoff-core.mjs, user-gate-core.mjs, and the admissible
+     shape vdzk-admissibility-core.mjs demands); the ROUTING happens once, at the board's own
+     card writer, by title prefix. A protocol card is inserted newest-first at the top of its
+     section, exactly as `addVdzk` inserts today. `board.mjs` gains the add/remove pair for
+     the new section, and `vdzk-add` refuses a title starting with `Entscheidungsprotokoll:`
+     with a line naming the right command.
+  3. Collapsed by default. The board's restore script opens every `.sect` except "Erledigt"
+     when the reader has no stored toggle; the new section joins "Erledigt" in staying
+     closed. A reader who opens it keeps it open — the per-reader toggle memory is unchanged.
+  4. Archive, like the done cards. The section keeps at most `ENTSCHEIDUNGEN_ON_BOARD = 20`
+     cards (estimate, calibratable — the section is collapsed, so the number only governs
+     page weight); the older ones rotate out through scripts/board-archive-rotate.mjs, which
+     then rotates BOTH capped sections in one pass, and the publisher pushes board and
+     archive together as it does today. The section's foot carries the link, in the wording
+     of the done section: `<p class="archive-link">Die älteren N Entscheidungen stehen im <a
+     href="...">Archiv des Entscheidungsprotokolls</a>.</p>` The archive target is the
+     EXISTING archive page (`archive.html`), which gains its own second `<h2
+     id="entscheidungsprotokoll">Entscheidungsprotokoll</h2>` section below the done cards;
+     the link points at that anchor. No new published page and no new URL. The done-card
+     rotation keeps inserting under the FIRST `<h2>`, so the two sections cannot mix.
+  5. Guard reach, widened not rebuilt (infrastructure freeze, CLAUDE.md §2):
+     `erledigt-overflow` and `archive-link-missing` judge both capped sections; the card
+     checks that already cover every card — empty body, conciseness, card topic, title
+     length — cover the new section's cards too; the VDZK-SPECIFIC pressure stays on the four
+     old sections: a protocol card is NOT an open question, so it creates no Stop-hook demand
+     to answer it, no decision-card gate and no open-question count anywhere. That is the
+     point of the change.
+  6. Migration. The protocol cards standing under "Von dir zu klären" on the published board
+     move into the new section in their current order, verbatim (twelve of them on
+     22.09.2026). Board and archive are published artefacts, not sources (both git-ignored),
+     so the move happens once on the publish path; no card text changes.
+  CONSTRAINTS. Infrastructure freeze (CLAUDE.md §2): widen the existing section list, cap and
+  rotation. No new guard, no new published page, no new URL, no router abstraction beyond the
+  one title-prefix cut at the board's card writer. The board stays ONE HTML file with its own
+  viewport; the structure gate runs before the bytes leave (board-publish.mjs). Board and
+  archive are git-ignored published artefacts — the migration is a publish, not a commit of
+  content. The retroactive veto stays reachable: the record remains visible, dated and
+  archived, only no longer in the section for open questions.
+  WORDING: board text German; code, identifiers and filenames English.
+  Criticality: high — it edits the board structure gate, the card writer and the publish
+  path, and a malformed board reaches the user on his phone.
+  Four eyes: CONVERGENT mode (CLAUDE.md §6) — one author, then cross-vendor review of the
+  artefact before its rationale. The spec's own words (migration, lock, routing) hit the HARD
+  markers in scripts/author-routing-core.mjs, so the routing puts it in the Astra lane and
+  the Claude session reviews it; no model reviews its own work. The user asked on 22.09.2026,
+  12:36 whether the rebuild runs under four eyes; it does, and that stands here rather than
+  only in the chat.
+  Test: Vitest — title-prefix routing into the new section and the `vdzk-add` refusal; five
+  sections in board-structure-core including wrapper and orphan counts; guard reach over both
+  capped sections and the ABSENCE of open-question pressure for a protocol card; rotation of
+  both sections in one pass with the two link texts and their counts. Playwright (board
+  layout suite): the fifth section renders below "Erledigt" and is collapsed on a first visit
+  while the other three stand open.
+  Refs: scripts/board-core.mjs, scripts/board-structure-core.mjs,
+  scripts/dashboard-guard-core.mjs, scripts/board-archive-rotate.mjs, scripts/board-publish.mjs,
+  scripts/vdzk-admissibility-core.mjs, user order 22.09.2026 12:25
+  Bundle: Chat & Tafel
+
+- [ ] 1186. A standing-down session can file a finding without evading the guard (user order
+  22.09.2026, 12:36, verbatim: »Ja, eine solche Blockade passiert oft. Reihe dafür einen
+  Punkt ein, der direkt nach dem Dashboard-Umbau erledigt wird.«). ORDER: directly after
+  point 1185 — the user tied the two together.
+  WHY. The findings carrier exists precisely FOR the session that does not hold the batch
+  lock: "a window the user is TALKING TO deposits the finished, TASKS-ready spec"
+  (scripts/findings-request-core.mjs). The ownership stand-down refuses that window every
+  write it needs to produce one. The two rules are correct on their own and cancel each other
+  where they meet, and the meeting point is the ordinary case: the user talks to a second
+  window while the batch runs.
+  PROBLEM, measured 22.09.2026 between 12:25 and 12:30. While another live session owns the
+  batch lock, `ownershipStandDownDecision` (scripts/board-first-core.mjs) refuses EVERY
+  mutation of this session: `mkdir` was refused, a `Write` of a file in the session
+  scratchpad was refused. The one route a standing-down session is REQUIRED to take —
+  `scripts/finding.mjs --request`, whose long fields must be FILES on purpose, because a spec
+  on a command line hits quoting, length and umlaut limits — therefore cannot be prepared at
+  all: creating the file it needs is itself a refused mutation. The deposit only succeeded
+  through a zsh process substitution (`--spec-file =(cat <<EOF …)`), i.e. by slipping past
+  the classifier, which judges the command HEAD. A guard whose sanctioned path is reachable
+  only by evading it teaches evasion.
+  FINAL STATE.
+  1. `scripts/finding.mjs` takes every long field from STDIN as well as from a file:
+     `--spec-file -` (and the same for `--why-file`, `--constraints-file`, `--quotes-file`,
+     `--doc-impact-file`, `--open-questions-file`), plus ALL fields in ONE call through a
+     delimited stdin document, each part opened by a line of the form `--- <field> ---`. One
+     invocation then carries a whole request without touching the filesystem. The file form
+     stays exactly as it is; stdin satisfies the reason the fields are files just as well.
+  2. The stand-down decision stops refusing a write whose target is the SESSION SCRATCHPAD
+     (the harness-announced `/tmp/claude-<uid>/<project>/<session>/scratchpad` directory,
+     matched on the real path, not on the word). Nothing there is repository, board or batch
+     state; it is the session's own workspace, and refusing it buys nothing while blocking
+     notes, digests and exactly the temp files the sanctioned deposit path asks for.
+     Repository paths, the board, TASKS.md and every batch action stay refused as they are
+     today. This NARROWS an existing gate and adds no new mechanism.
+  3. The refusal text stays true to what it now allows: beside "reads remain available" it
+     names the one write path that stays open (the scratchpad) and the carrier command, so
+     the standing-down session finds the sanctioned route instead of inventing a shell trick.
+  NOT IN SCOPE: any batch authority for a standing-down session. It still may not merge,
+  tick, publish the board or edit the work order.
+  CONSTRAINTS. Infrastructure freeze (CLAUDE.md §2): this point REMOVES reach from an
+  existing gate and adds an input channel to an existing script. No new guard, no ledger
+  field, no router. The stand-down itself stays: repository, board, work order and every
+  batch action remain refused for a session that does not own the lock. Protected paths
+  (.claude/settings.json and the hooks) are attended-only; if the fix needs one, it is
+  prepared and handed to the user, not written unattended.
+  Criticality: medium — it blocks no game work, but every session the user talks to while the
+  batch runs meets it, and the only way through was evading a guard.
+  Test: Vitest — `classifyCall` / `ownershipStandDownDecision`: a scratchpad path classifies
+  read-only; a repository path, the work order and the board stay refused; a path merely
+  CONTAINING the word "scratchpad" outside the session directory is refused. `finding.mjs`:
+  one field from stdin, the multi-field document, the file form unchanged, and a malformed
+  document refused with a line naming the fields. The tests call the real refusal path with a
+  real scratchpad write — a drill that reconstructs the aftermath would stay green over the
+  broken action.
+  Refs: scripts/board-first-core.mjs, scripts/finding.mjs, scripts/findings-request-core.mjs,
+  measured in this session 22.09.2026 12:25–12:30, user order 22.09.2026 12:36
+  Bundle: Modell & Wächter
+
 - [ ] 1150. The doctor's quarantine takes the frames away from a RUNNING picture run
   (measured 18.09.2026, twice in one hour, 01:22 and 01:31). The covering WebGPU `polish`
   run for point 1147 was drawing (pid 661900, its own record says `cleanAtStart: true`, the
@@ -696,6 +809,17 @@ put it is the mistake this line exists to stop.
   exits, and the run dies rather than reports — so it covers no backend, no red in it can
   be charged, and only a hand-signed crash sign-off gets it off the guard's list. Three
   such crashed records stood on `main` when 1140 landed.
+  A THIRD FRAME, AND THE FIRST THAT IS REPRODUCIBLE ON DEMAND (measured 22.09.2026 during the
+  covering runs of point 1182): `648-village-children` (polish, WebGL 2) misses its subject off
+  the BOTTOM edge and takes the pass with it — twice in a row, at 166 checks and 36 frames after
+  19m 41s and 19m 35s, on the same tree e1b7d1561. Its OWN section is green on both sides:
+  `polish --section=children-tag` passes 16/16 at e1b7d1561 AND at `main` 86c4babaf, WebGL 2,
+  minutes apart. So the frame misses only INSIDE the pass — something earlier in the run leaves
+  the children or the camera where the section never finds them — and the same wording was
+  already recorded inside a full WebGPU pass on `main` at 9259d6dd8 earlier that day, with its
+  section green right after. That makes this the cheapest reproduction of both questions below:
+  the miss has a section-versus-pass difference to measure, and the throw costs a whole pass
+  every time it happens.
   SO THERE ARE TWO QUESTIONS, and the second is the expensive one:
   1. WHY THESE TWO FRAMES MISS. A travel that stops short is a game defect; a wait that
      expires on a camera still moving is a suite defect. The printed evidence names both
@@ -8230,10 +8354,9 @@ to land than a mechanism that needs a review.
   before a tag and gates nothing: it is a systematic hardening method that belongs to
   the current release's closing, and point 203 carries its extension.
   EXECUTION (user-approved 19.07.2026): run 184 with ULTRACODE (multi-agent
-  Workflow orchestration) on OPUS 4.8, effort HIGH — xhigh for the design/audit
-  phase (the invariant-harness architecture and the five-class sweeps), high for
-  implementation; trivial mechanical sub-stages (the WebGL2 smoke scaffold, blunt
-  test skeletons) may drop to a cheaper model / low effort via per-agent override.
+  Workflow orchestration) on OPUS 4.8. Every stage runs at MEDIUM effort — the
+  July HIGH/xhigh split was superseded on 22.09.2026, when Medium became the tier
+  for all Anthropic-lane work.
   The audit sweeps and the adversarial finding-verification are the reasoning heart
   — keep those on Opus 4.8. First step is the WebGPU lane (Pillar 3); it may be
   pulled forward if needed to verify a play-test fix (e.g. 181's likely
@@ -15900,6 +16023,42 @@ to land than a mechanism that needs a review.
   35580966090
   Bundle: Session- & Repo-Hygiene.
 
+- [ ] 1188. A daemon checkpoint acknowledges one SHA while another is what actually landed, and
+  the red it makes on `main` blocks every push (measured 22.09.2026 while carrying out the
+  user's reorder of 1184 and 1183).
+  WHAT FAILED: CI run 35734686008 for `origin/main` 2102185 concluded "failure" on the `fast`
+  job's unit stage — `scripts/batch-daemon.test.mjs:303`, "the daemon lifecycle in the sandbox >
+  gets a checkpoint acknowledged with the pushed SHA". The assertion is
+  `expect(git(['rev-parse', 'feat/stub'], originDir)).toBe(answer.sha)`; the origin's
+  `feat/stub` stood at `35f9510bed0fdf3b9cc42b35092ee4b679369d1e` while the acknowledged
+  checkpoint reported `ad663c029ce71f4c889bce8e0ba72046e977215b`. Everything else was green: 528
+  of 529 files, 16 289 tests, 11 skipped, 875.69 s.
+  THAT IT IS NOT THE COMMIT'S CONTENT IS MEASURED. 2102185 refreshes the retrospective and
+  touches no daemon path. The whole file ran 25 of 25 green on this host in 24.68 s, and the
+  pre-push gate of 8fd8135c5 ran the same 529 files green minutes later. So the divergence
+  appears only under CI timing.
+  WHAT IT COSTS, and why this is a point rather than a backlog line: `ci-status-guard` holds
+  every main action until a fixing push, so an unowned red on `main` stops the batch. It stopped
+  this one, and only the next push superseded the red sha — which clears the guard without
+  clearing the cause.
+  IT IS NOT POINT 1171. That point owns a `bankGame` case running into its own 20 s per-test
+  bound; this is a SHA comparison in the daemon's checkpoint bookkeeping, a different test and a
+  different mechanism. It is not point 901 either, which owns a run CANCELLED by the workflow's
+  own concurrency rule rather than a failing assertion.
+  WHAT IS NOT MEASURED, named rather than assumed: whether the acknowledged SHA is read before
+  the push completes or the origin is read after a later push, i.e. which of the two sides is
+  early; whether the drill's own sandbox origin can receive a second push inside the window;
+  and whether the case reproduces on a loaded local host.
+  Final state: the acknowledgement and the ref it names cannot disagree — either the checkpoint
+  reports the SHA it actually pushed, or the test reads the ref at the moment the answer was
+  formed. A re-run that happens to pass does not close this point (point 640).
+  Test: `npx vitest run scripts/batch-daemon.test.mjs` green on a quiet host with its duration
+  printed, plus the case green over three consecutive CI runs.
+  Criticality: medium — no player loses anything, but it reds `main` for a reason no diff
+  explains and blocks the push gate the whole batch pays at.
+  Refs: scripts/batch-daemon.test.mjs:303, scripts/batch-daemon.mjs, CI run 35734686008
+  Bundle: Session- & Repo-Hygiene.
+
 - [ ] 1172. The dig-pair picture check finds no adults at all at the shutter and reds the whole
   `polish` pass (measured 21.09.2026 while landing point 1158).
   WHAT FAILED: `polish --section=adult-errands`, WebGPU, on `feat/1158-escape-cooldown-return`
@@ -16020,3 +16179,75 @@ to land than a mechanism that needs a review.
   invisible in exactly the minutes the rule of 28.07.2026 exists to cover.
   Refs: scripts/batch-in-flight.mjs, scripts/board-publish.mjs
   Bundle: Testinfrastruktur.
+
+- [ ] 1187. The weaver's hand check rotates: it reds inside the pass and greens on its own
+  section, at the same tree (measured 22.09.2026 during the covering run of point 1182).
+  WHAT WAS MEASURED, three runs, one machine, all WebGPU and all quiet:
+  · full `polish` at e1b7d1561 — RED: "BOTH her hands are elsewhere half a pass later — the arms
+    work, not only the tool" [--section=village-loom]. Left hand moved 0.045 m, RIGHT hand
+    0.0137 m against a bar of 0.02 m, so one hand of two missed it.
+  · `polish --section=village-loom` at 86c4babaf (`main`) — the check GREEN (12 pass, 0 fail;
+    the run's exit 1 came from two Vite `504 Outdated Optimize Dep` console errors already
+    charged to point 939).
+  · `polish --section=village-loom` at e1b7d1561, the SAME tree that failed inside the pass —
+    GREEN (12 pass, 0 fail, 0 console errors, exit 0).
+  So the tree is not what moves. The check landed on 22.09.2026 with 503492100 ("make the
+  loom's picture checks ask for arms"), and it samples the weaver twice "half a pass later":
+  when the second shutter falls near a turning point of her stroke, the returning hand has
+  travelled less than the bar and the check reds although the arms are working.
+  THE FAMILY IS NAMED, NOT NEW: this is the rotating-staging family of points 200, 336, 568 and
+  570, and point 642 is the decision about what to do with a check whose verdict depends on
+  when the shutter falls. This point exists so the newest member is not rediscovered from
+  scratch, and so a landing stops paying a 39-minute re-run for it.
+  FINAL STATE: the cause is IDENTIFIED before anything is tuned — either the sample is taken at
+  an arbitrary phase of the stroke (then the check waits for a stroke phase it names, the way
+  the other loom checks poll on the app's own state, rather than on a fixed half-pass), or one
+  arm genuinely stops while the other works (then it is a PRODUCT defect and the check is
+  right). The bar is NOT lowered to make the red go away until it is established which of the
+  two it is.
+  Criticality: medium — it hides no product defect on its own, but it reds the covering gate of
+  every point whose pass includes `village-loom`, and a rotating red is the thing point 549 was
+  built to abolish.
+  Test: the section runs ten times on the pinned world with the same verdict every time, and
+  whichever cause was found is named in the commit message with its evidence.
+  Refs: scripts/verify/polish.mjs:6123, commit 503492100, point 200, point 549, point 568,
+  point 570, point 642, point 939
+  Bundle: Testinfrastruktur
+
+- [ ] 1189. The parallel alert re-raises itself from a stale reading and blocks the session
+  that just cleared it (measured 22.09.2026, 17:05-17:06, two consecutive turns blocked).
+  PROBLEM. `batch-doctor --gate` marked the alert handled at 17:05:30 and recorded "gate
+  demand satisfied for HEAD 6860863c". THIRTY-ONE SECONDS LATER, at 17:06:01,
+  `batch-progress-guard` raised it again — carrying a `lastToolAt` for the foreign session of
+  16:56:59, a reading already NINE MINUTES old at the moment of raising. The refusal text
+  asserts the other session "has run tools in this repo within the last minutes", which was
+  false when it was written: a doctor run immediately afterwards measures `parallelNow=0`.
+  WHY IT CANNOT BE WAITED OUT. The remedy the refusal demands is the eight-minute `--gate`
+  run (it drives `test:unit` itself), while the alert re-raises after thirty-one seconds. The
+  demanded fix can therefore never win the race, and the session is refused for a condition
+  that no longer holds. This is the blockade exception of CLAUDE.md §2, not tidiness.
+  FINAL STATE.
+  1. The alert is raised only when `lastToolAt` is NEWER than the last handled-marking. Both
+     values already exist — `.claude/parallel-alert.json` carries the first, `.claude/doctor.log`
+     the second — so this is a comparison, not a new mechanism and not a new field.
+  2. The refusal text stops asserting recency it has not checked: it prints the measured age
+     of the foreign session's last tool call, so a reader can see at once whether the alarm is
+     live or stale.
+  SECOND, INDEPENDENT FINDING FROM THE SAME TURN, recorded here so it is not rediscovered:
+  the Stop guard resolves `marker.dashboardPath` against the CWD, so a session whose CWD has
+  drifted into a worktree fails `markerFileExists` and is told "BATCH DASHBOARD NOT
+  REGISTERED" — while `dashboard-guard --synced` in the main tree exits 0 and reports the
+  dashboard registered. The marker is correct; only the resolution base is wrong. Resolve it
+  against the repository root, or name the CWD in the refusal so the real cause is legible.
+  CONSTRAINTS. Infrastructure freeze (CLAUDE.md §2): both halves TIGHTEN or correct existing
+  checks. No new guard, no ledger field, no router.
+  Criticality: medium — it blocks no game work, but it refused two consecutive turns of a
+  landing session for a condition that had already passed, and the refusal it demands costs
+  eight minutes each time.
+  Test: Vitest on the pure decision — an alert whose `lastToolAt` predates the last handled
+  marking does NOT raise; one that postdates it does; the refusal text carries the measured
+  age. For the dashboard half: a marker resolved from a worktree CWD still finds the main
+  tree's dashboard. The tests call the real decision, not a reconstruction of its aftermath.
+  Refs: scripts/batch-doctor.mjs, scripts/dashboard-guard-core.mjs:859, .claude/parallel-alert.json,
+  .claude/doctor.log, measured in this session 22.09.2026 17:05-17:06
+  Bundle: Modell & Wächter

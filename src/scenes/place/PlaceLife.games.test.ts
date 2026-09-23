@@ -5,7 +5,7 @@ import { createElement, type ReactElement } from 'react'
 import { balance } from '../../config/balance'
 import { PLACES } from '../../world/geo'
 import { mulberry32 } from '../../world/noise'
-import { buildLayout } from './layout'
+import { sharedLayout } from './layoutHarness'
 import { climbBoulder } from './looseRocks'
 import { playRockFlank } from './playRockSurface'
 import { createTagGame, stepTagGame } from './tagGame'
@@ -45,7 +45,7 @@ function gamesIn(node: unknown): ReactElement<Record<string, unknown>>[] {
 }
 
 function render(id: string, kind: 'port' | 'village', seed = 7) {
-  const layout = buildLayout(id, seed)
+  const layout = sharedLayout(id, seed)
   devAssert.mockClear()
   const tree = compose({ ...layout, kind, seed, placeId: id,
     style: { cloth: ['red', 'blue'], bandColor: 'white' },
@@ -92,7 +92,7 @@ describe('each settlement stages exactly one children’s game', () => {
 
   it('has coverage of ports, bank villages and bankless villages', () => {
     const cases = new Set(PLACES.filter(p => p.kind === 'port' || p.kind === 'village').map(p =>
-      p.kind === 'port' ? 'port' : buildLayout(p.id, 7).bank ? 'bank' : 'bankless'))
+      p.kind === 'port' ? 'port' : sharedLayout(p.id, 7).bank ? 'bank' : 'bankless'))
     expect(cases).toEqual(new Set(['port', 'bank', 'bankless']))
   })
 

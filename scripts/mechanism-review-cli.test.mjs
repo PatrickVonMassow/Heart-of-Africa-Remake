@@ -30,7 +30,14 @@ import {
   verifyHalfAuthors,
 } from './mechanism-review.mjs'
 import { LEDGER_RELATIVE_PATH, MODES, VERDICTS } from './mechanism-review-core.mjs'
-import { readState as readFableState, writeState as writeFableState } from './fable-switch-core.mjs'
+import {
+  CLAUDE_MODEL,
+  FABLE_MODEL,
+  OPUS_FALLBACK_MODEL,
+  OPUS_MODEL,
+  readState as readFableState,
+  writeState as writeFableState,
+} from './fable-switch-core.mjs'
 
 const SCRIPT = resolve(process.cwd(), 'scripts', 'mechanism-review.mjs')
 const FABLE_FILES = ['fable-switch.mjs', 'fable-switch-core.mjs', 'atomic-write.mjs', 'git-tracked.mjs']
@@ -858,7 +865,7 @@ describe('the mode round-trips into the ledger', () => {
       git('config', 'user.name', 'Test')
       writeFileSync(join(repo, 'world.txt'), 'a fixture world\n')
       git('add', '-A')
-      git('commit', '-q', '-m', 'Lay down the world\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>')
+      git('commit', '-q', '-m', `Lay down the world\n\nCo-Authored-By: ${CLAUDE_MODEL} <noreply@anthropic.com>`)
       const _sha = git('rev-parse', 'HEAD').stdout.trim()
 
       const w = (name, value) => {
@@ -868,7 +875,7 @@ describe('the mode round-trips into the ledger', () => {
       }
       // THE HALVES ARE COMMITTED ARTEFACTS, because that is the only form whose
       // authorship the recorder can prove (cross-vendor review of point 889).
-      const halfA = { model: 'Opus 5', entries: [{ id: 'A1', file: 'x.ts', defect: 'the first defect' }] }
+      const halfA = { model: OPUS_MODEL, entries: [{ id: 'A1', file: 'x.ts', defect: 'the first defect' }] }
       const halfB = { model: 'GPT-6 Astra', entries: [{ id: 'B1', file: 'x.ts', defect: 'the first defect said differently' }] }
       mkdirSync(join(repo, 'docs'), { recursive: true })
       writeFileSync(join(repo, 'docs', 'A.json'), JSON.stringify(halfA))
@@ -878,7 +885,7 @@ describe('the mode round-trips into the ledger', () => {
         JSON.stringify({ mergedBy: 'GPT-6 Astra', entries: [{ id: 'U1', from: ['A1', 'B1'], defect: 'the first defect' }] }),
       )
       git('add', '-A')
-      git('commit', '-q', '-m', 'File the two blind halves and their union\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>')
+      git('commit', '-q', '-m', `File the two blind halves and their union\n\nCo-Authored-By: ${CLAUDE_MODEL} <noreply@anthropic.com>`)
       // The fold is recorded against the commit that CARRIES the artefacts —
       // the record's sha is where the halves and union are anchored, so a sha
       // whose tree lacks them refuses (re-review round 4).
@@ -913,7 +920,7 @@ describe('the mode round-trips into the ledger', () => {
       expect(row.mergeFallback).toMatch(/^Fable 5.1 is switched off by the recorded Fable switch \(node scripts\/fable-switch\.mjs --status\): /)
       expect(row.accounting).toMatch(/1 A \+ 1 B entries → 1 union entries .*every input entry accounted for/)
       // The row says which blobs it read, so a later reader re-derives the proof.
-      expect(row.halfAuthors).toEqual(['Opus 5', 'GPT-6 Astra'])
+      expect(row.halfAuthors).toEqual([OPUS_MODEL, 'GPT-6 Astra'])
       // Stored repo-relative, so the ledger row is valid from every checkout.
       expect(row.halfSources).toEqual(['docs/A.json', 'docs/B.json'])
       expect(row.halfBlobs).toEqual([
@@ -1546,7 +1553,7 @@ describe('a routed Claude reviewer round-trips its model proof and exact file sc
           sha: '9'.repeat(40),
           subject: 'mixed end state',
           authoredBy: 'GPT-5.6 Sol <noreply@openai.com>',
-          authors: ['GPT-5.6 Sol', 'Claude Opus 5'],
+          authors: ['GPT-5.6 Sol', CLAUDE_MODEL],
           at: Date.parse('2026-08-28T04:00:00.000Z'),
         }),
       })
@@ -1554,7 +1561,7 @@ describe('a routed Claude reviewer round-trips its model proof and exact file sc
       expect(built.record).toMatchObject({
         model: 'Fable 5.1',
         handover: 'sol-authored',
-        handoverChain: ['Opus 5', 'Fable 5.1', 'Opus 4.8'],
+        handoverChain: [OPUS_MODEL, FABLE_MODEL, OPUS_FALLBACK_MODEL],
         reviewerAuthorship: {
           status: 'agreement',
           actualModel: 'Fable 5.1',

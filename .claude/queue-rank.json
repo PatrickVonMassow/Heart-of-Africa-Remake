@@ -1387,49 +1387,27 @@
       "origin": "machine",
       "place": "last"
     },
-    "1178": {
-      "at": "2026-09-22T04:45:59.794Z",
-      "why": "Der Release selbst muss durch genau dieses Tor: ein Job-Timeout auf main wird als abgebrochen verbucht, ist durch keinen Push zu loesen und sperrt ueber ci-status-guard den ganzen Batch — Punkt 633 und 174 sind hinter einem Tor, das jede Landung auf 25m17s gegen 25m00s ausspielt, nicht erreichbar.",
-      "origin": "machine",
-      "place": "ahead"
-    },
     "1179": {
       "at": "2026-09-22T04:46:02.115Z",
       "why": "Blockiert keinen Punkt und kostet keinem Spieler etwas: es macht nur die Wartestellung waehrend Abschlussarbeiten unsichtbar — hinten ist richtig.",
       "origin": "machine",
       "place": "last"
+    },
+    "1187": {
+      "at": "2026-09-22T13:28:41.849Z",
+      "why": "Testinfrastruktur hinter der Release-Reihenfolge: zuerst die Kommunikationsmechanik, dann 633, dann 174 — ein rotierender Pruefschritt kostet Laufzeit, aber keinen Spielzustand, und Punkt 642 entscheidet die Klasse ohnehin vor ihm.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1189": {
+      "at": "2026-09-22T15:13:26.695Z",
+      "why": "Last is right: the alarm is cleared by a plain batch-doctor run in under a second, so the blockade has a known cheap workaround and no longer stops a session; the eight-minute gate was only ever the demanded remedy, never the only one.",
+      "origin": "machine",
+      "place": "last"
     }
   },
-  "boundary": {
-    "at": "2026-08-21T00:55:14.962Z",
-    "points": [
-      336,
-      553,
-      596,
-      633,
-      659,
-      660,
-      663,
-      708,
-      715,
-      719,
-      733,
-      735,
-      736,
-      738,
-      739,
-      746,
-      747,
-      750,
-      759,
-      760,
-      762,
-      764
-    ],
-    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
-  },
   "settled": {
-    "at": "2026-09-22T04:46:02.125Z",
+    "at": "2026-09-22T15:13:26.706Z",
     "points": [
       174,
       184,
@@ -1838,8 +1816,40 @@
       1175,
       1176,
       1177,
-      1178,
-      1179
+      1179,
+      1185,
+      1186,
+      1187,
+      1188,
+      1189
     ]
+  },
+  "boundary": {
+    "at": "2026-08-21T00:55:14.962Z",
+    "points": [
+      336,
+      553,
+      596,
+      633,
+      659,
+      660,
+      663,
+      708,
+      715,
+      719,
+      733,
+      735,
+      736,
+      738,
+      739,
+      746,
+      747,
+      750,
+      759,
+      760,
+      762,
+      764
+    ],
+    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   }
 }

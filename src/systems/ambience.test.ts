@@ -8,6 +8,8 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   coastSurfGain,
+  loomBeatPlan,
+  playLoomBeat,
   emitFootstep,
   emitDrumPhrase,
   playDrumMessage,
@@ -33,7 +35,7 @@ import {
 import { thunderDelaySeconds } from './season'
 import { balance } from '../config/balance'
 import { phraseOf, utteranceOf, SEQUENCE_LENGTH } from '../communication/lexicon'
-import { phrasePlan, utterancePlan, registerOptions } from '../communication/speaking'
+import { hearingGain, speechPan, phrasePlan, utterancePlan, registerOptions } from '../communication/speaking'
 import { resetDevAsserts } from './devAssert'
 import { readCurveTable } from './mixLimiter'
 import { drumMessagePlan } from '../communication/drumMessage'
@@ -1373,5 +1375,75 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
       const former = 1.8 * 0.1 * 2 * SYLLABLE_SYNTHESIS_GAIN / (1 + 24 * (distance / 10) ** 2)
       expect(speechPeak).toBeGreaterThan(former)
     }
+  })
+})
+
+
+describe('the loom reed has a placed, dry beat', () => {
+  it('uses speech falloff and panning, including the rear half of the village', () => {
+    const near = loomBeatPlan(0, 0, 1)
+    for (const d of [1, 3, 15, 25, balance.communication.call.reach]) {
+      expect(loomBeatPlan(d, 0, 1).peak / near.peak).toBeCloseTo(hearingGain(d, balance.communication.call.reach, balance.communication.call.falloff))
+    }
+    expect(loomBeatPlan(20, 0, 1).peak).toBeGreaterThan(0)
+    expect(loomBeatPlan(balance.communication.call.reach + 1, 0, 1).peak).toBe(0)
+    for (const bearing of [-Math.PI / 2, Math.PI / 2, Math.PI * 0.75]) {
+      expect(loomBeatPlan(0, bearing).pan).toBe(speechPan(bearing))
+    }
+  })
+
+  it('has a sharp attack, a short wooden tail and respects the ambience mute', () => {
+    const plan = loomBeatPlan(2, 0, 1)
+    expect(plan.attack).toBeLessThan(0.01)
+    expect(plan.duration).toBeGreaterThan(plan.attack * 5)
+    expect(plan.duration).toBeLessThan(0.15)
+    expect(plan.frequency).toBeGreaterThan(1000)
+    expect(plan.frequency).toBeLessThan(3000)
+    expect(loomBeatPlan(2, 0, 0).peak).toBe(0)
+    expect(loomBeatPlan(2, 0, -1).peak).toBe(0)
+    expect(loomBeatPlan(2, 0, 0.5).peak).toBeCloseTo(plan.peak / 2)
+  })
+})
+
+
+describe('the reed beat reaches the placed audio route', () => {
+  let ctx: FakeCtx
+  const defaultVolume = balance.ambienceVolume
+  beforeAll(() => {
+    vi.useFakeTimers()
+    ;(window as unknown as { AudioContext: unknown }).AudioContext = FakeCtx
+    startAmbience()
+    ctx = FakeCtx.last!
+  })
+  afterAll(() => { vi.useRealTimers(); balance.ambienceVolume = defaultVolume })
+
+  it('schedules one strike and releases its stereo route when it ends', () => {
+    ctx.currentTime = 500
+    balance.ambienceVolume = 1
+    const before = ctx.sources.length
+    const plan = loomBeatPlan(15, Math.PI / 2)
+    playLoomBeat(15, Math.PI / 2)
+    expect(ctx.sources.length - before).toBe(1)
+    const source = ctx.sources.at(-1)!
+    const filter = source.connected[0] as FakeFilter
+    const envelope = filter.connected[0] as FakeGain
+    const route = envelope.connected[0] as FakeGain
+    const panner = route.connected[0] as FakePanner
+    expect(source.startedAt).toBe(500)
+    expect(source.stoppedAt).toBeCloseTo(500 + plan.duration + 0.05)
+    expect(filter.frequency.value).toBe(plan.frequency)
+    expect(envelope.gain.events).toContainEqual({ type: 'lin', value: plan.peak, time: 500 + plan.attack })
+    expect(panner.pan.value).toBe(plan.pan)
+    source.onended!()
+    expect(route.disconnectCalls).toBe(1)
+    expect(panner.disconnectCalls).toBe(1)
+  })
+
+  it('schedules no source or panner beyond reach or while muted', () => {
+    const before = [ctx.sources.length, ctx.panners.length]
+    playLoomBeat(Infinity, 1)
+    balance.ambienceVolume = 0
+    playLoomBeat(0, 1)
+    expect([ctx.sources.length, ctx.panners.length]).toEqual(before)
   })
 })

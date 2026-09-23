@@ -884,7 +884,7 @@ const EXPECTED_CONTROLS: Record<DebugGroupId, readonly string[]> = {
     'debug.separationRadius', 'debug.separationSlop', 'debug.separationStiffness',
     'debug.separationSpeed', 'debug.separationWedge', 'debug.separationPasses',
     'debug.speechSyllable', 'debug.speechPhrasePause', 'debug.speechHearingRadius',
-    'debug.speechHearingFalloff', 'debug.talkReach', 'debug.callReach', 'debug.talkLoudness', 'debug.callLoudness', 'debug.callFalloff', 'debug.speechConsequence', 'debug.speechHold', 'debug.speechLabelSeconds', 'debug.speechLabelHeadroom',
+    'debug.speechHearingFalloff', 'debug.talkReach', 'debug.callReach', 'debug.talkLoudness', 'debug.callLoudness', 'debug.callFalloff', 'debug.speechInstructionHold', 'debug.speechConsequence', 'debug.speechHold', 'debug.speechLabelSeconds', 'debug.speechLabelHeadroom',
     'debug.speechPitch', 'debug.speechChildPitch', 'debug.speechStereoWidth', 'debug.speechPitchInterval',
     'debug.speechConceptLabels',
     'debug.tagChildCount', 'debug.tagSprintSpeed', 'debug.tagRunnerBoost', 'debug.tagTrotFactor',
@@ -996,12 +996,12 @@ describe('DebugMenu completeness: every control is present, in its group (point 
     })
   })
 
-  it('carries all 203 controls in total, and none twice', () => {
+  it('carries all 204 controls in total, and none twice', () => {
     render(<DebugMenu />)
     const labels = renderedRowLabels()
     const expected = DEBUG_GROUP_ORDER.flatMap((id) => EXPECTED_CONTROLS[id])
     expect(labels.length).toBe(expected.length)
-    expect(labels.length).toBe(203)
+    expect(labels.length).toBe(204)
     expect(new Set(labels).size).toBe(labels.length)
   })
 
@@ -1048,7 +1048,7 @@ describe('DebugMenu completeness: every control is present, in its group (point 
   it('gives every control a real input, select or button — no label without a control', () => {
     render(<DebugMenu />)
     const rows = [...document.querySelectorAll('.debug-menu .debug-group-body > label')]
-    expect(rows.length).toBe(203)
+    expect(rows.length).toBe(204)
     for (const row of rows) {
       const label = row.querySelector('span')?.textContent ?? '(none)'
       // The renderer row is the one deliberate read-only display (design.md §21.3).
@@ -1102,7 +1102,7 @@ describe('DebugMenu groups collapse and remember their state (point 393)', () =>
     render(<DebugMenu />)
     // Nothing opened: the whole set is still there (hidden), and a value still
     // writes through — the verify suites drive the controls this way.
-    expect(renderedRowLabels().length).toBe(203)
+    expect(renderedRowLabels().length).toBe(204)
     fireEvent.change(numberField(en.debug.travelSpeed), { target: { value: '9' } })
     expect(balance.travelSpeed).toBe(9)
     balance.travelSpeed = DEFAULTS.travelSpeed
@@ -1150,7 +1150,7 @@ describe('DebugMenu filter narrows the whole menu (point 393)', () => {
     typeFilter('croc')
     expect(renderedRowLabels().length).toBeLessThan(149)
     typeFilter('')
-    expect(renderedRowLabels().length).toBe(203)
+    expect(renderedRowLabels().length).toBe(204)
     expect(renderedGroups().filter((g) => g.open).map((g) => g.title)).toEqual([en.debug.groups.tools])
   })
 

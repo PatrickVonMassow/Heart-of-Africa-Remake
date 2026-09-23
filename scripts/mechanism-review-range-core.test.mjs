@@ -15,6 +15,7 @@ import {
   vendorOf,
 } from './mechanism-review-range-core.mjs'
 import { evaluateMechanismReview } from './mechanism-review-core.mjs'
+import { CLAUDE_MODEL, OPUS_MODEL } from './fable-switch-core.mjs'
 
 const sha = (letter) => letter.repeat(40)
 const commit = (id, authorModel, files) => ({ sha: sha(id), authorModel, files })
@@ -53,7 +54,7 @@ describe('authorship-cut mechanism review planning', () => {
       endStateFiles: ['TASKS.md', mechanism],
     })
     expect(plan.groups).toEqual([
-      expect.objectContaining({ files: [mechanism], reviewer: 'Opus 5' }),
+      expect.objectContaining({ files: [mechanism], reviewer: OPUS_MODEL }),
     ])
     expect(plan.dropped).toEqual([
       expect.objectContaining({ file: 'TASKS.md', reason: REVIEW_END_STATE_EXCLUSIONS['TASKS.md'] }),
@@ -105,7 +106,7 @@ describe('authorship-cut mechanism review planning', () => {
     expect(plan.groups[0]).toMatchObject({
       kind: 'files',
       files: [file],
-      reviewer: 'Opus 5',
+      reviewer: OPUS_MODEL,
     })
     expect(plan.groups[0].commits).toHaveLength(8)
     expect(plan.superseded).toEqual([
@@ -128,7 +129,7 @@ describe('authorship-cut mechanism review planning', () => {
   it('names a group with no eligible reviewer instead of assigning an author', () => {
     const plan = planAuthorshipGroups({
       commits: [
-        { sha: sha('a'), authorModels: ['GPT-6 Astra', 'Opus 5', 'Fable 5.1', 'Opus 4.8'], files: ['x'] },
+        { sha: sha('a'), authorModels: ['GPT-6 Astra', OPUS_MODEL, 'Fable 5.1', 'Opus 4.8'], files: ['x'] },
       ],
     })
     expect(plan.groups[0].reviewer).toBe('')
@@ -170,7 +171,7 @@ describe('authorship-cut mechanism review planning', () => {
       }),
       expect.objectContaining({
         vendor: 'openai',
-        reviewer: 'Opus 5',
+        reviewer: OPUS_MODEL,
         reviewerVendor: 'anthropic',
         files: ['scripts/sol-guard.mjs'],
       }),
@@ -205,7 +206,7 @@ describe('authorship-cut mechanism review planning', () => {
       ],
     })
     expect(plan.groups).toEqual([
-      expect.objectContaining({ files: ['sol-only'], commits: [sha('a')], reviewer: 'Opus 5' }),
+      expect.objectContaining({ files: ['sol-only'], commits: [sha('a')], reviewer: OPUS_MODEL }),
       expect.objectContaining({
         files: [carried],
         commits: [sha('b'), sha('c')],
@@ -238,10 +239,10 @@ describe('authorship-cut mechanism review planning', () => {
 
   it('requires the other vendor even when another same-vendor model is not an author', () => {
     expect(eligibleReviewer(['Claude Fable 5.1'])).toBe('GPT-6 Astra')
-    expect(eligibleReviewer(['GPT-5.6 Sol'])).toBe('Opus 5')
-    expect(eligibleReviewer(['GPT-6 Astra'])).toBe('Opus 5')
+    expect(eligibleReviewer(['GPT-5.6 Sol'])).toBe(OPUS_MODEL)
+    expect(eligibleReviewer(['GPT-6 Astra'])).toBe(OPUS_MODEL)
     expect(eligibleReviewer(['GPT-5.6 Sol', 'Claude Opus 5'])).toBe('GPT-6 Astra')
-    expect(vendorOf('Claude Opus 5 <noreply@anthropic.com>')).toBe('anthropic')
+    expect(vendorOf(`${CLAUDE_MODEL} <noreply@anthropic.com>`)).toBe('anthropic')
   })
 })
 

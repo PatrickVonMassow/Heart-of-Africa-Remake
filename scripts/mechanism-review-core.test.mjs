@@ -43,7 +43,7 @@ import {
   verifiedPlannerPasses,
   VERDICTS,
 } from './mechanism-review-core.mjs'
-import { readState, writeState } from './fable-switch-core.mjs'
+import { CLAUDE_MODEL, readState, writeState } from './fable-switch-core.mjs'
 
 const FABLE_OFF = readState(JSON.stringify(writeState('off', { why: 'test capacity exhausted', by: 'test', now: 1 })))
 
@@ -2515,7 +2515,7 @@ describe('validateRecord carries the mode', () => {
       model: 'GPT-6 Astra',
       verdict: 'merge',
       evidence: 'read both independent lists against the same invariants',
-      authoredBy: 'Claude Opus 5',
+      authoredBy: CLAUDE_MODEL,
       mode: 'blind-parallel',
       accounting: counted.accounting,
       fableState: FABLE_OFF,

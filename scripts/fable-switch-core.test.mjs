@@ -9,6 +9,11 @@ import {
   mergePromptFraming,
   mergerModel,
   CLAUDE_MODEL,
+  OPUS_FALLBACK_MODEL,
+  OPUS_FALLBACK_MODEL_ID,
+  OPUS_MODEL,
+  OPUS_MODEL_ID,
+  FABLE_MODEL_ID,
   readState,
   requireState,
   servingChain,
@@ -62,21 +67,21 @@ describe('the Fable state record', () => {
 
 describe('decisions derived from the state', () => {
   it('includes Fable in the serving chain only while on', () => {
-    expect(servingChain(on())).toEqual(['Opus 5', FABLE_MODEL, 'Opus 4.8'])
-    expect(servingChain(off())).toEqual(['Opus 5', 'Opus 4.8'])
+    expect(servingChain(on())).toEqual([OPUS_MODEL, FABLE_MODEL, OPUS_FALLBACK_MODEL])
+    expect(servingChain(off())).toEqual([OPUS_MODEL, OPUS_FALLBACK_MODEL])
     expect(servingRoute(on()).map((lane) => lane.id)).toEqual([
-      'claude-opus-5[1m]',
-      'claude-fable-5-1',
-      'claude-opus-4-8[1m]',
+      OPUS_MODEL_ID,
+      FABLE_MODEL_ID,
+      OPUS_FALLBACK_MODEL_ID,
     ])
-    expect(servingFallbackModelId(on())).toBe('claude-fable-5-1')
-    expect(servingFallbackModelId(off())).toBe('claude-opus-4-8[1m]')
+    expect(servingFallbackModelId(on())).toBe(FABLE_MODEL_ID)
+    expect(servingFallbackModelId(off())).toBe(OPUS_FALLBACK_MODEL_ID)
   })
 
   it('builds the serving briefing and forbidden names from the same direction', () => {
-    expect(servingPolicyLine(on())).toContain('Opus 5, then Fable 5.1, then Opus 4.8')
+    expect(servingPolicyLine(on())).toContain(`${OPUS_MODEL}, then ${FABLE_MODEL}, then ${OPUS_FALLBACK_MODEL}`)
     expect(servingPolicyLine(on())).not.toContain('Fable 5.1, Sonnet, Haiku')
-    expect(servingPolicyLine(off())).toContain('Opus 5, then Opus 4.8')
+    expect(servingPolicyLine(off())).toContain(`${OPUS_MODEL}, then ${OPUS_FALLBACK_MODEL}`)
     expect(servingPolicyLine(off())).toContain('Fable 5.1, Sonnet, Haiku')
     expect(servingPolicyLine(off())).toContain('node scripts/fable-switch.mjs --status')
     expect(servingPolicyLine(off())).toContain('trusted handoff to the next allowed lane')
@@ -152,23 +157,23 @@ describe('decisions derived from the state', () => {
     // With every roster model tainted by the mixed name, the switch's own answer
     // is kept for the caller to judge — which records the two-model fallback and
     // owes the decorrelated framing, instead of printing "wrote neither half".
-    expect(mergerModel(on(), ['Fable / GPT-6 Astra', 'Claude Opus 5'])).toBe(FABLE_MODEL)
-    expect(mergePromptFraming(on(), ['Fable / GPT-6 Astra', 'Claude Opus 5'])).toMatch(/DECORRELATED MERGE FRAMING/)
+    expect(mergerModel(on(), ['Fable / GPT-6 Astra', CLAUDE_MODEL])).toBe(FABLE_MODEL)
+    expect(mergePromptFraming(on(), ['Fable / GPT-6 Astra', CLAUDE_MODEL])).toMatch(/DECORRELATED MERGE FRAMING/)
     expect(mergerModel(off(), ['Fable / GPT-6 Astra', CLAUDE_MODEL])).toBe(ASTRA_MODEL)
     expect(mergePromptFraming(off(), ['Fable / GPT-6 Astra', CLAUDE_MODEL])).toMatch(/DECORRELATED MERGE FRAMING/)
     // …but each mentioned model keeps its own version: a name mentioning a
     // DIFFERENT Astra does not disqualify the current one.
-    expect(mergerModel(on(), ['Fable 5.1 / GPT-7 Astra', 'Claude Opus 5'])).toBe(ASTRA_MODEL)
+    expect(mergerModel(on(), [`${FABLE_MODEL} / GPT-7 Astra`, CLAUDE_MODEL])).toBe(ASTRA_MODEL)
     // While the mentioned version matching the roster still disqualifies.
-    expect(mergerModel(on(), ['Fable 5.1 / GPT-6 Astra', ''])).toBe(CLAUDE_MODEL)
+    expect(mergerModel(on(), [`${FABLE_MODEL} / ${ASTRA_MODEL}`, ''])).toBe(CLAUDE_MODEL)
     // One family, several versions: each mentioned version is tainted — the
     // collapse to the first version let the other pass as untainted.
     expect(mergerModel(off(), ['GPT-7 Astra / GPT-6 Astra', CLAUDE_MODEL])).toBe(ASTRA_MODEL)
-    expect(mergerModel(on(), ['GPT-7 Astra / GPT-6 Astra', 'Claude Opus 5'])).toBe(FABLE_MODEL)
+    expect(mergerModel(on(), [`GPT-7 Astra / ${ASTRA_MODEL}`, CLAUDE_MODEL])).toBe(FABLE_MODEL)
     // SAME-VENDOR compounds too: "Fable 5.1 / Claude Opus 5" mentions Claude, so
     // Claude may not be offered as untainted (reduction to one key did that).
-    expect(mergerModel(on(), ['Fable 5.1 / Claude Opus 5', 'GPT-6 Astra'])).toBe(FABLE_MODEL)
-    expect(mergePromptFraming(on(), ['Fable 5.1 / Claude Opus 5', 'GPT-6 Astra'])).toMatch(/DECORRELATED MERGE FRAMING/)
+    expect(mergerModel(on(), [`${FABLE_MODEL} / ${CLAUDE_MODEL}`, ASTRA_MODEL])).toBe(FABLE_MODEL)
+    expect(mergePromptFraming(on(), [`${FABLE_MODEL} / ${CLAUDE_MODEL}`, ASTRA_MODEL])).toMatch(/DECORRELATED MERGE FRAMING/)
   })
 
   it('tells two Astra versions apart instead of treating every Astra as one model', () => {

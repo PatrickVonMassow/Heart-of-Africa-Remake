@@ -11,6 +11,7 @@ import { clampDay, dayOfMonthJump, dayOfYearJump } from '../systems/season'
 import type { LatLon, Material, RegionId } from '../world/geo'
 import { KNOWN_FROM_START_PLACES, PLACES, REGION_VALUES, latLonToWorld, placeById, regionAt, worldToLatLon } from '../world/geo'
 import { isBlocked, sampleTerrain } from '../world/terrain'
+import { addLoomCloth, initialLoomCloth } from '../systems/loomCloth'
 import { mulberry32 } from '../world/noise'
 import { WATERFALLS } from '../world/data/landmarks'
 import { lakeDistance, riverDistance } from '../world/geoIndex'
@@ -216,6 +217,9 @@ export interface GameState {
    *  change, then updates this. A place with no modelled situation reports a
    *  constant key and so never changes or re-fires (systems/placeSituation). */
   placeSituations: Record<string, string>
+  /** Finished strips beside each loom, retained across visits and saves. */
+  placeLoomCloth: Record<string, number>
+  recordLoomCloth: (placeId: string, finished: number) => void
   /** Excavation work survives leaving and re-entering its village. */
   villageDigProgress: Record<string, DigSiteProgress[]>
   recordVillageDig: (placeId: string, progress: readonly DigSiteProgress[]) => void
@@ -557,6 +561,7 @@ export function startState(seed: number, placeId: string = startPlaceId()) {
     // happening, so the first walk back in writes that place's own vignette.
     enteredPlaces: [] as string[],
     placeSituations: {} as Record<string, string>,
+    placeLoomCloth: {} as Record<string, number>,
     explored: withExplored({}, start.lat, start.lon) ?? {},
     chiefOutside: {} as Record<string, boolean>,
     honoredFriend: {} as Partial<Record<RegionId, boolean>>,
@@ -1483,6 +1488,14 @@ export const useGame = create<GameState>()((set, get) => ({
     set(patch)
   },
 
+  recordLoomCloth: (id, finished) => {
+    if (!Number.isSafeInteger(finished) || finished <= 0) return
+    const s = get()
+    if (s.mode !== 'place' || s.placeId !== id || placeById(id).kind !== 'village') return
+    const current = s.placeLoomCloth[id] ?? initialLoomCloth(s.seed, id)
+    set({ placeLoomCloth: { ...s.placeLoomCloth, [id]: addLoomCloth(current, finished) } })
+  },
+
   enterPlace: (id) => {
     const s = get()
     const place = placeById(id)
@@ -1516,6 +1529,9 @@ export const useGame = create<GameState>()((set, get) => ({
       enteredPlaces: firstEntry ? [...s.enteredPlaces, id] : s.enteredPlaces,
       // The situation just journaled — compared against on the next entry.
       placeSituations: { ...s.placeSituations, [id]: situation },
+      placeLoomCloth: place.kind === 'village' && s.placeLoomCloth[id] === undefined
+        ? { ...s.placeLoomCloth, [id]: initialLoomCloth(s.seed, id) }
+        : s.placeLoomCloth,
       // A first-visited village is itself a bounty-worthy discovery (§10).
       pendingBounties:
         first && place.kind === 'village'
@@ -2045,7 +2061,7 @@ export const useGame = create<GameState>()((set, get) => ({
       journal: s.journal, region: s.region, visitedRegions: s.visitedRegions,
       health: s.health, afflictions: s.afflictions, sunblindRecovery: s.sunblindRecovery,
       dryDays: s.dryDays, canteenFill: s.canteenFill, woundHealDays: s.woundHealDays,
-      visitedPlaces: s.visitedPlaces, enteredPlaces: s.enteredPlaces, placeSituations: s.placeSituations,
+      visitedPlaces: s.visitedPlaces, enteredPlaces: s.enteredPlaces, placeSituations: s.placeSituations, placeLoomCloth: s.placeLoomCloth,
       knowingVillages: s.knowingVillages,
       graveLatLon: s.graveLatLon, foodWarned: s.foodWarned, foodOutWarned: s.foodOutWarned,
       penaltyJournaled: s.penaltyJournaled,
@@ -2091,6 +2107,7 @@ export const useGame = create<GameState>()((set, get) => ({
         ...snap,
         equipment: cleanEquipment,
         villageDigProgress: snap.villageDigProgress ?? {},
+        placeLoomCloth: snap.placeLoomCloth ?? {},
         explored: snap.explored ?? {},
         // The ten ports are known from the start (point 288): a legacy save from
         // before this rule migrates by marking them discovered, so their labels

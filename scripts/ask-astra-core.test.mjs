@@ -21,12 +21,13 @@ import {
   parseClaudeAskOutput,
   resolveAskModel,
 } from './ask-astra-core.mjs'
+import { OPUS_MODEL } from './fable-switch-core.mjs'
 
 describe('the kinds', () => {
   it('addresses every model the blind-merger switch can select', () => {
     expect(resolveAskModel()).toMatchObject({ key: 'astra', runtime: 'codex', name: 'GPT-6 Astra' })
     expect(resolveAskModel('fable')).toMatchObject({ runtime: 'claude', name: 'Fable 5.1', id: 'claude-fable-5-1' })
-    expect(resolveAskModel('opus')).toMatchObject({ runtime: 'claude', name: 'Opus 5' })
+    expect(resolveAskModel('opus')).toMatchObject({ runtime: 'claude', name: OPUS_MODEL })
     expect(resolveAskModel('sonnet')).toBeNull()
     expect(resolveAskModel('opus48')).toMatchObject({ name: 'Opus 4.8', id: 'claude-opus-4-8[1m]' })
   })

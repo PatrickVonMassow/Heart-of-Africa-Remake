@@ -10,7 +10,8 @@
 
 import { describe, expect, it } from 'vitest'
 import { standingClear, WALKER_RADIUS, spawnPointFree, type CircleCollider } from './collision'
-import { buildLayout, PLAY_ROCK_SCALE } from './layout'
+import { PLAY_ROCK_SCALE } from './layout'
+import { sharedLayout } from './layoutHarness'
 import { BANK_PLAY_LANE_HALF, bankPlayRocksView, inBankPlayLane, standsOnGroundPlate } from './riverBank'
 import { PLAY_ROCK_SEEDS, playRockSurfaceRadius, playRockYaw } from './playRockSurface'
 import { PLACES } from '../../world/geo'
@@ -48,7 +49,7 @@ function adultBodyRadius(y: number): number {
 describe('the children`s play stage on the bank (point 687)', () => {
   it('gives exactly the river villages two play rocks, and no other settlement any', () => {
     for (const place of PLACES) {
-      const layout = buildLayout(place.id, 4242)
+      const layout = sharedLayout(place.id, 4242)
       expect(!!layout.playRocks).toBe(!!layout.bank)
       if (RIVER_VILLAGES.includes(place.id)) expect(layout.playRocks).not.toBeNull()
     }
@@ -58,7 +59,7 @@ describe('the children`s play stage on the bank (point 687)', () => {
     const minTop = balance.villageLife.bankGame.climbableRockTop
     for (const id of RIVER_VILLAGES) {
       for (const seed of [42, 99, 2972259115, 236333330]) {
-        const layout = buildLayout(id, seed)
+        const layout = sharedLayout(id, seed)
         expect(layout.bank).not.toBeNull()
         expect(layout.rocks.length).toBeGreaterThan(0)
         // …and the stone the children's quarter actually gets is one that can be
@@ -86,7 +87,7 @@ describe('the children`s play stage on the bank (point 687)', () => {
     // widest point is 0.15 m of ground nobody may stand on, and it is exactly
     // the ground the tapping child has to reach the stone from (work-order
     // 1065). So the number is MEASURED here against the mesh the scene draws.
-    const layout = buildLayout(RIVER_VILLAGES[0], 42)
+    const layout = sharedLayout(RIVER_VILLAGES[0], 42)
     const rocks = layout.playRocks!
     for (const [i, seed] of PLAY_ROCK_SEEDS.entries()) {
       const at = i === 0 ? rocks.upstream : rocks.downstream
@@ -110,7 +111,7 @@ describe('the children`s play stage on the bank (point 687)', () => {
 
   it('sets them at the ends of the settlement`s own stretch, mirrored', () => {
     for (const id of RIVER_VILLAGES) {
-      const layout = buildLayout(id, 42)
+      const layout = sharedLayout(id, 42)
       const rocks = layout.playRocks!
       const bank = layout.bank!
       // The pair is the bank's own mirror pair pulled inland by one fixed inset,
@@ -134,7 +135,7 @@ describe('the children`s play stage on the bank (point 687)', () => {
     const halfV = (FOV_DEG / 2) * (Math.PI / 180)
     const halfH = Math.atan(Math.tan(halfV) * (VIEWPORT.width / VIEWPORT.height))
     for (const id of RIVER_VILLAGES) {
-      const rocks = buildLayout(id, 42).playRocks!
+      const rocks = sharedLayout(id, 42).playRocks!
       const stretch = Math.hypot(
         rocks.upstream.x - rocks.downstream.x,
         rocks.upstream.z - rocks.downstream.z,
@@ -187,7 +188,7 @@ describe('the children`s play stage on the bank (point 687)', () => {
     const floor = 3 * (2 * WALKER_RADIUS)
     for (const id of RIVER_VILLAGES) {
       for (const seed of [42, 99, 2972259115, 236333330]) {
-        const layout = buildLayout(id, seed)
+        const layout = sharedLayout(id, seed)
         const rocks = layout.playRocks!
         const dx = rocks.downstream.x - rocks.upstream.x
         const dz = rocks.downstream.z - rocks.upstream.z
@@ -227,7 +228,7 @@ describe('the children`s play stage on the bank (point 687)', () => {
   it('keeps every loose boulder and tuft out of that lane', () => {
     for (const id of RIVER_VILLAGES) {
       for (const seed of [42, 99, 7, 2972259115]) {
-        const layout = buildLayout(id, seed)
+        const layout = sharedLayout(id, seed)
         for (const [x, z, s] of layout.rocks) {
           expect(inBankPlayLane(layout.playRocks, x, z, 0.35 + s * 0.5)).toBe(false)
         }
@@ -251,7 +252,7 @@ describe('the children`s play stage on the bank (point 687)', () => {
 
   it('makes both rocks solid, so nobody walks through the run`s targets', () => {
     for (const id of RIVER_VILLAGES) {
-      const layout = buildLayout(id, 42)
+      const layout = sharedLayout(id, 42)
       const rocks = layout.playRocks!
       for (const p of [rocks.upstream, rocks.downstream]) {
         expect(standingClear(layout.colliders, p.x, p.z, WALKER_RADIUS)).toBe(false)

@@ -1,6 +1,6 @@
 // FOLD A POINT AWAY — tick, archive move and Erledigt card in one command (point 614).
 //
-//   node scripts/fold-point.mjs 613 --into 720 --model "Claude Opus 5"
+//   node scripts/fold-point.mjs 613 --into 720 --model "Claude Opus 5.5"
 //   node scripts/fold-point.mjs 613 --delivered "der Fix sitzt seit c0ffee in main" --model "…"
 //   node scripts/fold-point.mjs 613 --into 720 --model "…" --dry        print the plan, touch nothing
 //   node scripts/fold-point.mjs 613 --into 720 --text-stdin --model "…" German card text on stdin

@@ -21,7 +21,8 @@ import {
 import { balance } from '../../config/balance'
 import { BACKDROP_SCALE, GROUND_DISC_OVERHANG } from './backdrop'
 import { insidePlace, isOutsidePlace, maxBoundaryRadius, groundPlateRadius, placeBoundaryRadius } from './boundary'
-import { buildLayout, PLACE_RADIUS, WATER_STAND_WORK_RING } from './layout'
+import { PLACE_RADIUS, WATER_STAND_WORK_RING } from './layout'
+import { sharedLayout } from './layoutHarness'
 import { resolveMove, PLAYER_RADIUS, WALKER_RADIUS, standingClear } from './collision'
 import { buildPlaceNavGrid, findPlaceRoute } from './routing'
 import { PLACES, RIVERS, VILLAGE_RIVER_CLEARANCE_DEG, placeById, latLonToWorld } from '../../world/geo'
@@ -110,7 +111,7 @@ describe('the PoC village stands on its river (work-order 482)', () => {
 })
 
 describe('the bank is REACHABLE, and the village stays dry', () => {
-  const layout = buildLayout(ROCK_VILLAGE_ID, SEED)
+  const layout = sharedLayout(ROCK_VILLAGE_ID, SEED)
 
   it('carries the bank into the layout', () => {
     expect(layout.bank).not.toBeNull()
@@ -144,7 +145,7 @@ describe('the bank is REACHABLE, and the village stays dry', () => {
   })
 
   it.each(BANK_SEEDS)('at seed %d the centre and every built thing stay dry', (seed) => {
-    const layout = buildLayout(ROCK_VILLAGE_ID, seed)
+    const layout = sharedLayout(ROCK_VILLAGE_ID, seed)
     const wet = (x: number, z: number, r: number) => dot({ x, z }, bank.nx, bank.nz) + r >= bank.distance
     expect(wet(0, 0, 0)).toBe(false)
     for (const d of layout.dwellings) expect(wet(d.x, d.z, d.r), `dwelling at ${d.x},${d.z}`).toBe(false)
@@ -160,7 +161,7 @@ describe('the bank is REACHABLE, and the village stays dry', () => {
   })
 
   it.each(BANK_SEEDS)('THE WATER IS NOT A WALL at seed %d: nothing invisible stands at the waterline', (seed) => {
-    const layout = buildLayout(ROCK_VILLAGE_ID, seed)
+    const layout = sharedLayout(ROCK_VILLAGE_ID, seed)
     // Work-order 584, from the F6 report "Ich laufe hier gegen das Wasser wie
     // gegen eine Wand": a collider ran along the waterline and stopped the
     // player a metre short of the bank his village exists to let him reach.
@@ -181,7 +182,7 @@ describe('the bank is REACHABLE, and the village stays dry', () => {
   })
 
   it.each(BANK_SEEDS)('at seed %d a walk from the village centre into the river WADES, and is handed on to the map', (seed) => {
-    const layout = buildLayout(ROCK_VILLAGE_ID, seed)
+    const layout = sharedLayout(ROCK_VILLAGE_ID, seed)
     // The state the decision names (work-order 584): he crosses the waterline,
     // walks on until the water is at his wading depth, and there — out of his
     // depth, where the river is swum — the settlement ends. Never a dead stop
@@ -267,7 +268,7 @@ describe('the bank is REACHABLE, and the village stays dry', () => {
 
 describe('the landmark boulder is nowhere near the settlement (work-order 482 item 6)', () => {
   it('lies far outside the walkable region, upstream', () => {
-    const layout = buildLayout(ROCK_VILLAGE_ID, SEED)
+    const layout = sharedLayout(ROCK_VILLAGE_ID, SEED)
     for (const seed of [1, 7, 42, 1337, 90210]) {
       const rock = communicationRockSite(seed)
       // Expressed in the settlement's own frame (the panorama's scale).
@@ -309,7 +310,7 @@ describe('a bank exists only where the geography carries one', () => {
 
   it('every place in the roster still builds a layout, bank or no bank', () => {
     for (const place of PLACES) {
-      const layout = buildLayout(place.id, SEED)
+      const layout = sharedLayout(place.id, SEED)
       expect(layout.radius, place.id).toBeGreaterThan(0)
       if (place.kind !== 'village') expect(layout.bank, place.id).toBeNull()
     }
@@ -336,7 +337,7 @@ describe('nothing solid stands in the children`s running lane (work-order 687)',
     let checked = 0
     for (const id of ['bambara-village', 'maasai-village', 'swahili-village']) {
       for (let seed = 1; seed <= 60; seed++) {
-        const layout = buildLayout(id, seed)
+        const layout = sharedLayout(id, seed)
         const rocks = layout.playRocks
         if (!rocks) continue
         checked++
@@ -372,7 +373,7 @@ describe('nothing solid stands in the children`s running lane (work-order 687)',
   it('returns play rocks derived from the SETTLED bank, not the one before it', () => {
     for (const id of ['bambara-village', 'maasai-village', 'swahili-village']) {
       for (let seed = 1; seed <= 40; seed++) {
-        const layout = buildLayout(id, seed)
+        const layout = sharedLayout(id, seed)
         if (!layout.bank || !layout.playRocks) continue
         const fromSettled = bankPlayRocks(layout.bank)
         expect(layout.playRocks.upstream, `${id} seed ${seed}`).toEqual(fromSettled.upstream)
@@ -402,7 +403,7 @@ describe('the river places can be told apart (points 686/687)', () => {
     let checked = 0
     for (const id of ['bambara-village', 'maasai-village', 'swahili-village']) {
       for (let seed = 1; seed <= 40; seed++) {
-        const layout = buildLayout(id, seed)
+        const layout = sharedLayout(id, seed)
         const bank = layout.bank
         if (!bank) continue
         checked++
@@ -442,7 +443,7 @@ describe('the water carrier fills his jar at the waterline (work-order 1087)', (
     let checked = 0
     for (const id of riverVillages) {
       for (let seed = 1; seed <= 20; seed++) {
-        const bank = buildLayout(id, seed).bank
+        const bank = sharedLayout(id, seed).bank
         if (!bank) continue
         checked++
         const spot = bankFillSpot(bank)
@@ -464,7 +465,7 @@ describe('the water carrier fills his jar at the waterline (work-order 1087)', (
   })
 
   it('leaves the path`s landing where it is — only the fill moved', () => {
-    const bank = buildLayout('bambara-village', 1).bank
+    const bank = sharedLayout('bambara-village', 1).bank
     expect(bank).toBeTruthy()
     if (!bank) return
     const foot = bankWaterFoot(bank)
@@ -489,7 +490,7 @@ describe('the village water stand can be walked up to (work-order 1087)', () => 
     let checked = 0
     for (const id of riverVillages) {
       for (let seed = 1; seed <= 20; seed++) {
-        const layout = buildLayout(id, seed)
+        const layout = sharedLayout(id, seed)
         const stand = layout.waterStand
         if (!stand) continue
         checked++
@@ -511,7 +512,7 @@ describe('the village water stand can be walked up to (work-order 1087)', () => 
     let fetching = 0
     for (const id of riverVillages) {
       for (let seed = 1; seed <= 20; seed++) {
-        const layout = buildLayout(id, seed)
+        const layout = sharedLayout(id, seed)
         if (!layout.waterPath) continue
         fetching++
         expect(layout.waterStand, `${id} seed ${seed}: a water path but no stand`).toBeTruthy()
@@ -526,7 +527,7 @@ describe('the village water stand can be walked up to (work-order 1087)', () => 
     // mandinka-village seed 7 put it 0.50 m off the centre of a lane 1.30 m wide.
     for (const id of riverVillages) {
       for (let seed = 1; seed <= 20; seed++) {
-        const layout = buildLayout(id, seed)
+        const layout = sharedLayout(id, seed)
         const stand = layout.waterStand
         if (!stand) continue
         for (const path of layout.paths) {
@@ -549,7 +550,7 @@ describe('the village water stand can be walked up to (work-order 1087)', () => 
   it('retains the water path and stand at every river village seed', () => {
     for (const id of riverVillages) {
       for (let seed = 1; seed <= 40; seed++) {
-        const layout = buildLayout(id, seed)
+        const layout = sharedLayout(id, seed)
         expect(layout.waterPath, `${id} seed ${seed}`).not.toBeNull()
         expect(layout.waterStand, `${id} seed ${seed}`).not.toBeNull()
       }
@@ -581,7 +582,7 @@ describe('the water errand fits the time it is given (work-order 1087)', () => {
     let checked = 0
     for (const id of riverVillages) {
       for (let seed = 1; seed <= 20; seed++) {
-        const layout = buildLayout(id, seed)
+        const layout = sharedLayout(id, seed)
         const stand = layout.waterStand
         if (!stand || !layout.bank) continue
         checked++

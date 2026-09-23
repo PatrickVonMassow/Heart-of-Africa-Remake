@@ -30873,3 +30873,417 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   saying what the sources carry (strip, shuttle, beater, male weavers) and what the game changes
   and why (mid-seat so both calls send the helper away; the weaver kept as the figure the player
   reported). Do not phrase the adaptation as Park's or Caillié's account anywhere in the docs.
+
+- [x] 1178. The unit gate's 25-minute ceiling is eaten again, and a job timeout is the worst
+  shape of red: it names neither its cause nor a fix (measured 22.09.2026 on the CI handoff of
+  point 1157).
+  WHAT FAILED: CI run 35685632209 for `feat/1157-weaver-loom` 52bf47fc6 is recorded
+  `cancelled`, not `failure` — the `fast` job hit `timeout-minutes: 25` at 25m17s. Nothing in
+  the diff under it is at fault: the three preceding runs of the same branch were green at
+  18m58s (35671555829), 24m50s (35678754364) and 24m45s (35683117792). The cost sits in ONE
+  step — `unit` took 23m59s of that 24m45s run, and the other six steps 46s together.
+  THE CEILING HAS ALREADY BEEN RAISED ONCE, and the comment that raised it
+  (`.github/workflows/ci.yml`, 13.09.2026) forbids raising it a second time: "a run that
+  approaches it again is a signal to make the suite cheaper, not to raise this a second time".
+  Between that raise and today the layer grew from 14m45s to 24m45s in nine days, with no
+  configuration change under it.
+  A CONTRADICTION IN THE PROJECT'S OWN RECORD, and the first thing to settle:
+  `vitest.config.ts:69` justifies `maxWorkers: process.env.CI ? 2 : 4` as the fix for the
+  `onTaskUpdate` starvation of 03.09.2026, while `src/test/setup.ts:45` — written 80 minutes
+  LATER the same night (0d6746072 at 05:15 against 1b389d2a0 at 03:54) — records of that very
+  commit that the cap "did not touch it" and "cost the run 43 % of its wall clock", and that
+  the macrotask yield is what actually fixed it. If the later account holds, close to half the
+  CI wall clock is being paid for a hypothesis that was disproved the same night and never
+  reverted.
+  MEASURED SINCE, and it moves the answer: the cost is not spread over the layer, it sits in
+  TWO FILES. A full `vitest run --reporter=json` on a quiet host (516 files, 16 285 cases,
+  1659 s of summed file time, 4 workers, ~540 s wall) reads
+  `src/scenes/place/tagShuffle.test.ts` at 518.8 s over 50 cases and
+  `src/scenes/place/layout.test.ts` at 339.7 s over 1157 cases — together 51.7 % of the whole
+  layer. The top 40 files hold 93.6 %; the remaining 476 hold 6.4 %. So the LOCAL wall clock
+  (~540 s) is not set by the pool at all, it is set by the single longest file: no worker count
+  can finish a run sooner than its slowest file, and `tagShuffle` alone is 8 min 39 s here and
+  slower on a hosted core.
+  THAT MAKES TWO LEVERS, in this order. The pool cap governs everything up to that floor; the
+  floor itself is only moved by splitting the two long files — they are deterministic replays
+  of the village choreography, so their cases may be SPREAD ACROSS FILES but never shortened
+  or dropped (TASKS.md: tests are never weakened).
+  A THIRD, much smaller: 313 of the 516 test files are `scripts/**/*.test.mjs`, which
+  `vitest.config.ts` itself describes as "pure modules, no game imports", and every one pays
+  for a jsdom environment and a React Testing Library setup it cannot use — the CI run's own
+  banner puts that at `environment 361.19 s` of summed worker time against `tests 2219.68 s`.
+  It is worth about three minutes and is the LAST step, not the first. CAUTION for whoever
+  takes it: `src/test/setup.ts` also carries the macrotask yield that fixes the `onTaskUpdate`
+  starvation, so a node-environment project must keep that yield.
+  FINAL STATE:
+  1. What the worker cap costs is MEASURED on CI rather than argued: the same commit run at
+     the current value and at a raised one, both wall clocks recorded — and EITHER the cap is
+     corrected with that measurement behind it, OR its comment is rewritten to say why the
+     43 % is worth paying.
+  2. The `unit` step of a green `fast` run sits at or under 15 minutes again, with its
+     headroom stated as a figure rather than as a hope.
+     CUT OUT TO POINT 1180 (22.09.2026), because the measurement this point produced named a
+     lever this point's own constraints do not contain. The step is GREEN at 21 min 30 s (CI
+     run 35692702523, 527 files / 16 275 cases, nothing red). Reaching 900 s needs 780 s taken
+     out of the 2 408 s this layer sums to, and 1 374 s of that sits in fourteen village
+     files whose cases may not be shortened — so the remaining lever is duplicate WORK, not
+     fewer cases, and it is measured and handed on rather than guessed at here.
+  2a. The critical path is named as a figure: the slowest SINGLE file's duration on CI, which
+     is the floor no pool width can go under.
+     MET, and it closes the question rather than merely answering it: the slowest single file
+     on CI run 35692702523 is `src/scenes/place/tagShuffle.bankRegroup.test.ts` at 182.4 s.
+     Against a 1 289.9 s wall clock that floor is no longer binding — the summed work is. So
+     splitting files further buys NOTHING more, and this point's own instruction to spread the
+     long replays across files has been carried out as far as it pays.
+  3. Whatever is changed, `timeout-minutes: 25` is NOT raised.
+  4. The two contradicting comments say the same thing afterwards.
+  Test: the `fast` job's `unit` duration read off three consecutive green CI runs and written
+  into the tick; plus Vitest cover for any config split that is introduced — which environment
+  a given test file is resolved to.
+  Criticality: high — this is not a flake. Every landing now runs within a minute of a ceiling
+  whose failure mode is `cancelled`, which no push can clear and which names no cause; on
+  `main` that stops the whole batch through `ci-status-guard`.
+  Refs: .github/workflows/ci.yml:89, vitest.config.ts:69, src/test/setup.ts:26-55, CI runs
+  35685632209 / 35683117792 / 35671555829
+  Bundle: Testinfrastruktur.
+
+- [x] 1180. The unit layer builds the same ninety-nine villages some twelve thousand times,
+  and that duplicate work — not the number of cases — is the last six and a half minutes
+  (measured 22.09.2026 out of point 1178).
+  WHERE THE POINT COMES FROM: 1178 brought the `fast` job back to green and settled the pool
+  width on measurement, but its own target of a 15-minute `unit` step was not reachable with
+  the levers it named. It is now green at 21 min 30 s (CI run 35692702523, 527 files /
+  16 275 cases). The floor is no longer the obstacle: the slowest single file is 182.4 s
+  against a 1 289.9 s wall clock, so no further file splitting helps.
+  THE MEASUREMENT THAT NAMES THE LEVER. `buildLayout(placeId, seed)` is a deterministic
+  function of its two arguments — it seeds `mulberry32` from `seed ^ hash(placeId)` and takes
+  nothing else — and it costs 111 ms per call: building the whole (33 places x 3 seeds) grid
+  once takes 10 966 ms on a quiet host. The suite does not build that grid once. It was
+  already caught doing it twice inside a SINGLE file: `roofClearance.test.ts` rebuilt all 99
+  cells purely to read the roof labels off them, and dropping that one duplicate pass took the
+  case from 10 952 ms to 1 ms with no coverage lost and the cell count asserted so none can be
+  skipped in silence. The same grid is rebuilt from scratch in `layout.test.ts` (134.0 s),
+  `layout.wayOut.test.ts` (111.1 s), `lifeStationClearance.test.ts` (108.5 s),
+  `layout.fabric.test.ts` (91.6 s), `riverBank.test.ts` (79.3 s), `layout.waterPath.test.ts`
+  (49.2 s), `layout.groundWork.test.ts` (27.4 s) and the six `tagShuffle.*`/`bankGame` replays
+  (758.6 s) — 1 374 s of the layer's 1 890 s of summed test time, which at 111 ms a layout is
+  of the order of twelve thousand builds of ninety-nine distinct results.
+  FINAL STATE:
+  1. A layout the suite has already built for a given (place, seed) is not built again —
+     through a shared test fixture, never through memoisation inside the shipped
+     `buildLayout`, which must stay a pure function with no cache the game pays for.
+  2. Sharing is proven SAFE rather than assumed: a case that mutates a layout it was handed
+     cannot silently corrupt the next reader. Either the fixture hands out a copy where a
+     case writes, or the writing cases are found and named.
+  3. Not one case is shortened, dropped or merged — the same assertions run on the same
+     layouts. The saving is in the building, not in the checking.
+  4. The `unit` step of a green `fast` run is read off CI and written into the tick as a
+     figure, with the headroom under `timeout-minutes: 25` stated alongside it.
+  Test: Vitest on the fixture itself — the same (place, seed) asked for twice yields layouts
+  that compare equal, a call count proving the second ask did not rebuild, and cover that a
+  mutation by one reader does not reach the next. Plus the CI `unit` duration, before and
+  after.
+  Criticality: high — every landing pays these minutes, and at 21 min 30 s the job still sits
+  inside four minutes of the `timeout-minutes: 25` ceiling whose failure mode is `cancelled`,
+  which names no cause and which no push can clear.
+  Refs: src/scenes/place/layout.ts:822, src/scenes/place/roofClearance.test.ts, vitest.config.ts,
+  CI run 35692702523
+  Bundle: Testinfrastruktur.
+
+- [x] 1182. `adultErrands.stallSeconds` is declared, balanced at 20 s, tunable in the debug
+  menu — and never read, so a water errand whose pair never assembles pins two adults beside
+  the village fire for the full 300 s backstop and the village fetches no water for five
+  minutes (user report 22.09.2026, two archives, seed 2838685132, bambara-village, WebGPU,
+  production 32b3d98).
+  WHAT THE USER SAW: `local/ErwachsenerHaengtAmFeuerFest.zip` at 09:11:04Z — "Erwachsener
+  hängt fest", an adult standing motionless at the cooking fire — and in the same session
+  never once a villager fetching water. Then `local/DochBefreit.zip` at 09:13:56Z, 172 s
+  later: "Eben hat er sich doch irgendwie befreit und jetzt geht auch jemand zum Fluss." The
+  two symptoms are ONE defect and the self-release is the proof of it: nothing repaired the
+  village, the 300 s backstop simply expired.
+  THE MECHANISM, read out of the code: `layout.ts` puts the water stand BESIDE the fire
+  (`WATER_STAND_FIRE_GAPS` off `VILLAGE_FIRE`), so the two men a water errand casts — the
+  sender who orders it and the carrier who goes — both take spots at the fire.
+  `adultWork.ts` `readyWord` releases the sender's RIVER only when `t.arrived &&
+  state.tasks[t.partner]?.arrived`: BOTH men must be counted arrived at their own spot.
+  Until then the word is not ready, `!ready && !t.withheld` skips the floor entirely, and
+  neither man has anything to do. The sender is `arrived` and therefore not walking, so no
+  walker-level release can reach him; the carrier may be stalled a walker's width off his
+  spot. The ONLY exit is `t.age >= cfg.errandSeconds` at line 472 — 300 s. And while either
+  task lives, `state.tasks.some((t) => t?.situation === 'water-out' || t?.situation ===
+  'water-back')` refuses to cast a second water errand, which is why NO water is fetched for
+  the whole five minutes rather than merely this one errand failing.
+  WHY THE BACKSTOP IS NOT THE ANSWER: `balance.ts` around `errandSeconds: 300` states in its
+  own comment that "a genuinely stuck villager is still let go by `stallSeconds` below long
+  before it". That is the assumption the whole 300 s sizing rests on, and it is false.
+  `stallSeconds` enters `AdultWorkConfig` (adultWork.ts:93), is set to 20 (balance.ts:1609)
+  and is editable as `adultErrandStall` (DebugMenu.tsx:227) — `grep stallSeconds src` finds no
+  read of it in `adultWork.ts`, and `git log -S` shows it arrived with 1989617d4 on 02.09.2026
+  and never gained a consumer. `balance.unstuck.stallSeconds` is a DIFFERENT value, read by
+  `TravelScene` for the player.
+  WHAT TO BUILD: give `stepAdultWork` the release its config already promises. A task that has
+  made no progress towards `goalOf(task)` for `cfg.stallSeconds` is let go, and letting go
+  clears the PAIR (`clearPair`), not one man — releasing the carrier alone leaves the sender
+  standing at the fire and the water errand still uncastable. The measure must be PROGRESS
+  towards the goal, not motion: a man shuffling on the spot against a collider is stuck. A man
+  who has legitimately ARRIVED and is waiting for his partner is not walking anywhere, so the
+  clock has to run on the pair's assembly, not on his own feet — the sender waiting at the
+  stand for a carrier who never arrives is exactly the case that must expire.
+  MIND WHAT MUST NOT BREAK: `assertNoOwedWord` fires `adult-pair-never-met` whenever a task
+  dies owing a word it never became able to say. That is precisely this case, so a release at
+  20 s will make the assert fire twenty times sooner and far more often in dev. The assert is
+  RIGHT — the pair really never met — but a stall release is a HANDLED outcome, not a lost
+  atom, and must be distinguishable from a word that was withheld and dropped. Decide that
+  deliberately and say so in the code; do not silence the assert.
+  Criticality: high — it is player-visible in the first minutes of the first village, it makes
+  the village look broken, and it costs the RIVER teaching situation entirely for five minutes
+  at a time. Both of the user's reports are the same session.
+  Test: Vitest — `adultWork` with a `view` whose `standable` keeps one of the two men off his
+  spot, stepped past `stallSeconds`: the pair is cleared, `water-out` becomes castable again,
+  and no task survives to the 300 s backstop. Plus a picture check at bambara-village seed
+  2838685132 that a water carrier reaches the river.
+  Refs: src/scenes/place/adultWork.ts, src/config/balance.ts, src/ui/DebugMenu.tsx,
+  src/scenes/place/layout.ts, local/ErwachsenerHaengtAmFeuerFest.zip, local/DochBefreit.zip,
+  point 586, point 1087
+  Bundle: Dorfleben — it edits the water errand in `adultWork.ts`, the errand block in
+  `balance.ts` and the debug slider, the adult-teaching path 1051, 1056, 1058 and 1087 reach,
+  so it is worked after them and never beside them.
+
+- [x] 1181. Three hundred and thirteen tooling tests pay for a browser they never open, and
+  what is left after that is six replay files (measured 22.09.2026 out of point 1180).
+  WHERE IT COMES FROM: 1180 took the duplicate village building out of eleven place suites and
+  brought the `unit` step from 21 min 30 s to 19 min 56 s (CI run 35702549770, 528 files /
+  16 280 cases green). That ceiling has already cancelled a run on `main` itself
+  (35696684799, cut off at 25 min 18 s), so the headroom is the point, not the tidiness.
+  AND THE HEADROOM IS NOT ONE NUMBER — the finding that changes the shape of the question.
+  `main` ran the IDENTICAL tree an hour later (35705921673) and took 22 min 41 s of `unit`
+  inside a 23 min 38 s job: same 528 files, same 16 280 cases, 1 880.3 s of summed test time
+  against the branch run's 1 658.4 s. A hosted runner varies by about 13 %, which at this size
+  is three minutes, so the headroom after 1180 is 1 min 22 s on a slow draw and 4 min 12 s on
+  a fast one. An answer that leaves the job within one runner's variance of the ceiling has
+  not answered it.
+  THE STRUCTURAL OPTION, to be weighed FIRST because it needs no case to change and no ceiling
+  to rise: `unit` is ONE job running one Vitest process. Vitest shards (`--shard=1/2`), so the
+  step can become two jobs running side by side, each about half the wall clock, each judged
+  by the same gate verdict. That halves the exposure outright instead of trimming at it, and
+  it is the only lever left that does not touch the replays.
+  THE LEVER THAT IS LEFT AND CHEAP: 313 of the 528 test files are `scripts/**/*.test.mjs`,
+  which `vitest.config.ts` itself calls "pure modules, no game imports", and every one of them
+  pays for a jsdom environment and a React Testing Library setup it cannot use. They hold
+  266.0 s of the run's 1 658.4 s of test time, and the run's own banner puts `environment` at
+  308.8 s and `setup` at 74.3 s summed — of which those files carry roughly their share by
+  count. CAUTION, carried forward from point 1178: `src/test/setup.ts` also holds the
+  macrotask yield that fixes the `onTaskUpdate` starvation, so a node-environment project must
+  KEEP that yield or the run exits 1 with every case green.
+  AND THE FLOOR THAT IS NOT CHEAP, named here so the next reader does not rediscover it: after
+  1180 the six children's-game replays hold 762 s of the 1 658.4 s — `tagShuffle.bankRegroup`
+  207.1 s, `bankRoaming` 172.1 s, `bankTraveller` 137.8 s, `bankGame` 132.2 s, `bankRound`
+  69.8 s, `tagShuffle` 43.0 s. They are NOT layout-bound: each builds six to eight layouts and
+  spends the rest simulating, so the fixture of 1180 does nothing for them and no cache will.
+  Their cases may not be shortened or dropped (TASKS.md), which means anything further is a
+  question about the replays themselves and belongs to the user, not to a refactor.
+  FINAL STATE:
+  1. `scripts/**/*.test.mjs` resolve to a `node` environment and `src/**` keeps jsdom, with
+     the macrotask yield still running for both.
+  2. The `unit` step of a green `fast` run is read off CI afterwards and written into the tick
+     as a figure, with its headroom under the 25-minute ceiling stated beside it.
+  3. If that headroom is still under five minutes, the replay floor above goes to the user as
+     a decision rather than being optimised around in silence.
+  Test: Vitest cover for which environment a given test file resolves to — one `scripts/**`
+  file and one `src/**` file — plus a case proving the yield is installed in both.
+  Criticality: high — the ceiling's failure mode is `cancelled`, which names no cause and
+  which no push can clear, and it has already fired on `main`.
+  Refs: vitest.config.ts:20, src/test/setup.ts:26-55, CI runs 35702549770 / 35696684799
+  MEASURED AT THE TICK (CI run 35749329837, `ci/gate (branch)` green on fe550df16): the sharded
+  `unit` step runs 6 min 42 s on shard 1 and 10 min 46 s on shard 2, inside `fast` jobs of
+  7 min 26 s and 11 min 45 s. The binding figure is the slower shard, so the step sits
+  14 min 14 s — and its whole job 13 min 15 s — under the 25-minute ceiling, against 1 min 22 s
+  to 4 min 12 s before. That is past the five-minute mark of final state 3, so the replay floor
+  does NOT go to the user as a decision; it stays named here instead.
+  WHAT THE SPLIT COST AND WHERE IT BIT: moving `scripts/**` to `node` took jsdom away from seven
+  files under `scripts/verify` that had been relying on it silently — 69 cases, all `window is
+  not defined`, and the first reading of that run called them green because a step under
+  `continue-on-error` reports `conclusion=success`. They are the files that run browser-page code
+  locally, so each keeps jsdom through its own `@vitest-environment` docblock and the other 306
+  tooling tests pay for no browser. The shards are uneven by construction — the six children's-game
+  replays land together in shard 2 — and that imbalance, not the case count, is what any further
+  halving would have to attack.
+  Bundle: Testinfrastruktur.
+
+- [x] 1184. An instruction is carried out in the same frame it is spoken, before its four
+  syllables have even finished, so the village reads as people narrating their own actions
+  rather than as one person telling another what to do (user order 22.09.2026).
+  WHAT THE USER SAW: "Aktuell werden Anweisungen wie die zum Wasserholen und die an den Helfer
+  beim Weben instantan umgesetzt. Das wirkt dadurch nicht organisch und man könnte es eher für
+  das Kommentieren der eigenen Handlung halten." That is exactly the failure mode the water
+  errand was rebuilt to avoid — `adultWork.ts` records the user's ruling of 07.09.2026 that "the
+  inhabitant used to narrate his own act, which reads as staged for the player" — and the
+  instant consequence puts it straight back.
+  WHERE IT IS, in both places, and they are the same shape: `adultWork.ts` `wordConsequence`
+  runs the moment the floor grants the word — it sets `carrier.phase = 'fetch'`,
+  `carry = 'emptyJar'` and the carrier's goal in that same step; `loomWork.ts` does the same with
+  `state.errand = { toward: said, phase: 'walk', at: 0, clock: 0 }`, whose own comment says the
+  walk "starts on the same step the word is said — the body IS the meaning". That comment is the
+  decision to revise: the body is still the meaning, it simply must not move before the word has
+  been heard.
+  AND IT STARTS TOO EARLY EVEN FOR THAT. The word's audio is a PLAN with a duration
+  (`speaking.ts` `phrasePlan` returns `duration = last.startOffset + last.duration`), scheduled
+  forward from the moment it is granted. The consequence fires at grant time, i.e. at the START
+  of the first syllable, so the player sees the answer before the question is finished.
+  FINAL STATE: the instructed person begins to carry out the instruction a configurable time
+  AFTER the utterance has ENDED. Default 1 s (user), measured from the plan's own duration rather
+  than from a guessed syllable count, so it stays right when the phrase, the pace or the distance
+  changes. The value belongs in `balance.ts` marked calibratable (CLAUDE.md §2), one value
+  serving both stations unless a measured reason splits them.
+  WHAT MUST NOT BREAK, and this is the whole risk of the point:
+  · THE DEADLINES ALREADY IN PLACE. `adultWork.ts` expires a task at `cfg.errandSeconds` and
+    `loomWork.ts` has `LOOM_WORD_BACKSTOP_SECONDS`; both now gain a hold between the word and
+    the act. The hold goes INSIDE the budget, not on top of it, and `assertNoOwedWord` must keep
+    meaning what it means — a word still owed at expiry. A task inside the new hold owes
+    NOTHING: it has been said. Give that state its own name rather than leaving it to look like
+    an unpaid word.
+  · THE SPEECH FLOOR. A pair holding the floor through the hold blocks every other word in the
+    village for a second; a pair releasing it before the consequence lands can be interrupted
+    mid-instruction. Decide which, deliberately, and say so where `SpeechFloor.release` is
+    called.
+  · THE PLAYER'S OWN ANNOTATION. The journal records an utterance when it is heard; the act it
+    belongs to now happens a second later. Check that the pairing the player is invited to make
+    still holds and that the SPACE invitation window does not close in the gap.
+  · WATER IS ALREADY SCARCE (point 1182). One water errand runs at a time, so a hold on each leg
+    lengthens the interval between visible water. Measure that rather than assume it is small.
+  Criticality: medium — nothing breaks, but it undoes the readability the teaching situations
+  exist for, and the user names it as the reason the village does not read as instruction.
+  Test: Vitest — a granted word does NOT move the instructed body in the same step, the body
+  starts after `duration + delay`, the delay is read from balance and not hardcoded, and a task
+  inside the hold reports neither an owed word nor a pair that never met. Picture check at
+  bambara-village on both backends: the carrier still stands at the stand while the word plays.
+  Bundle: Dorfleben — it edits `adultWork.ts`, `loomWork.ts`, the speech floor's hold and the
+  errand and loom blocks in `balance.ts`, the same adult-teaching path 1051, 1056, 1058, 1087
+  and 1182 reach, so it is worked after them and never beside them.
+  Refs: src/scenes/place/adultWork.ts, src/scenes/place/loomWork.ts,
+  src/communication/speaking.ts, src/communication/speechFloor.ts, src/config/balance.ts,
+  point 1087, point 1182, point 1183
+
+- [x] 1183. The loom station is not readable: the helper's work is a standing picture, both
+  warp ends look alike so the direction word carries no consequence, the weaving itself is
+  small, silent and below knee height — and nothing the weaver makes ever stays in the world
+  (user order 22.09.2026, after the report "man sieht nicht, dass da jemand webt und was die
+  Hilfsperson macht" and his decision on the board card "Webstuhl: vom Platz aus erkennen oder
+  erst, wenn man davorsteht?").
+  THE USER DECIDED THE SCOPE: readable FROM THE PLAZA, all four parts below, and he added the
+  fourth himself — "Wie wäre es, wenn zusätzlich etwas Sichtbares entsteht?"
+  1. THE HELPER GETS A CYCLE AND A THING IN HIS HANDS. Measured: `PlaceLife.tsx` sets both his
+  arms to `armAim(0, -0.85)` and `lean 0.35` while `helperWorking`, and leaves them there for
+  the whole `tendDwellSeconds` of 5 s. It is a STILL, not an animation — he walks 2.4 m, freezes
+  bent over, walks back. Give him the repeated motion the weaver and the pounder already use
+  (`loomPose` writes both arms every frame from the pass cycle; follow it), and give him an
+  object that CHANGES state: a bundle carried out and returned empty, or a drag weight he shifts.
+  2. THE TENDED END MUST LOOK TENDED AFTERWARDS. This is the part that decides whether the
+  station teaches anything at all: today both warp ends are identical, so a helper walking to
+  one of them reads as wandering rather than as the consequence of UPSTREAM or DOWNSTREAM. The
+  word is the whole purpose of the station (`loomWork.ts` header). Leave a visible mark at the
+  end he worked — the moved weight, the placed bundle — so the two ends differ and the word has
+  something to have caused.
+  3. THE WEAVING GETS ITS BEAT, AND IT CARRIES. The reed's beat is currently ±0.06/0.16 of arm
+  elevation and `lean 0.1..0.24`; the whole apparatus is `warpY` 0.22, `stakeHeight` 0.34,
+  `stripWidth` 0.12 — below knee height, all of it horizontal. Two levers, both needed for the
+  plaza distance the user asked for: (a) a SOUND, the reed landing once per pass. The village has
+  no work sound at all — `src/systems/ambience.ts` holds drum, footsteps, thunder, trample and
+  speech and nothing else — and a narrow-strip loom is above all a clack. `speechRoute(ac, dest,
+  pan)` already exists, so a placed, panned beat is within reach; route it like speech and give
+  it the same distance falloff. (b) a markedly bigger upper-body beat, so the motion is visible
+  where the sound points.
+  Do NOT raise the loom. The height is the reconstruction (docs/peoples-1890.md §8.1, Park's
+  four inches) and it stays; what changes is contrast — a saturated weave colour against pale
+  ground and a darker, larger shuttle.
+  4. SOMETHING VISIBLE COMES OF IT — the user's own addition, and the part that makes the
+  station worth walking past twice. Today the strip grows to the stake and then simply is not
+  there any more: nothing records that a village wove anything. The finished strip is TAKEN OFF
+  and STAYS — a stack beside the loom that grows over the visit and survives leaving and
+  re-entering the place. DECIDED by the user 22.09.2026, so no author asks again: it is
+  ACCUMULATING SCENERY, not a trade good and not a gift (verbatim: »Könnte man mit nicht allzu
+  großem Aufwand einen sichtbaren Nutzen des Ergebnisses einbauen? Ich meine nicht aus
+  funktionaler Sicht für die Kommunikationsmechanik, sondern als Kulisse, damit das Weben nicht
+  nur Selbstzweck zum Lehren der Wörter ist, sondern sich nach Teil eines Dorflebens anfühlt.«).
+  No `VILLAGE_TRADE_GOODS` entry (store.ts:2302), no `giftPrices` entry, no inventory link, no
+  cloth economy in `design.md`.
+  THE CHEAP SHAPE, measured on paths that already exist: (1) the take-off already happens at
+  loomWork.ts:177-179 (`while (state.cloth >= cfg.warpHalf) state.cloth -= cfg.warpHalf`) — it
+  becomes a reported event and the weaver folds the strip with her existing pose cycle instead of
+  it vanishing inside one frame; (2) per-place persistence follows the store's existing shape
+  `placeSituations: Record<string, string>` (store.ts:218, written 1518, in the snapshot 2048),
+  so a `Record<placeId, number>` rides the save round trip with no migration; (3) the strips are
+  drawn in `style.bandColor`, which the scene ALREADY passes to the loom as `weave`
+  (PlaceLife.tsx:3912) and which is the same palette the inhabitants are dressed from — so »what
+  she weaves is what the village wears« is made by the picture and costs no mechanism; (4) the
+  stack is capped, and past the cap the village has carried the cloth away, so it falls back
+  rather than towering; cap and fall-back calibratable in the loom block of balance.ts; (5) a
+  first-entered place starts from its seed, not at zero — a village that has stood for years has
+  woven before the player arrived.
+  Criticality: medium — the station works and teaches nothing the player can see, which is the
+  cost; it is not a crash and blocks nothing.
+  Test: Vitest for the helper's cycle (his pose moves across frames while `helperWorking`, and
+  the two warp ends differ once one has been tended), for the finished-strip accounting across a
+  place re-entry, and for the beat's plan the way the drum and trample plans are tested. Picture
+  check at bambara-village on BOTH backends, judged at PLAZA distance and not at the loom — the
+  user's criterion is that the station is recognisable from across the village.
+  Bundle: Dorfleben — it edits the loom in `PlaceLife.tsx`, `loomWork.ts`, the loom block in
+  `balance.ts` and `ambience.ts`, the same village-life and audio paths 1072, 1080, 1157
+  and 1184 reach, so it is worked after them and never beside them.
+  Refs: src/scenes/place/loomWork.ts, src/scenes/place/loom.ts, src/scenes/place/PlaceLife.tsx,
+  src/systems/ambience.ts, src/config/balance.ts, docs/peoples-1890.md §8.1, docs/backlog.md
+  (22.09.2026), point 1157
+
+- [x] 1190. From the plaza the Bambara loom is seen only through a gap between two huts, and
+  there it is a pair of small figures, not a loom (measured 23.09.2026 while landing 1183).
+  PROBLEM. Point 1183 made the station readable UP CLOSE on both backends: the folded strips
+  lie stacked beside the loom, the helper carries a yarn bundle out and leaves it at the end
+  the word named, the weaver's trunk drives each beat. The user's criterion was the PLAZA.
+  The new plaza frame (`scripts/verify/polish.mjs` village-loom, `1183-village-loom-from-plaza`)
+  searches a 6 m disc round the plaza (0, 3) for the widest open sight line to the weaver:
+  NO stand has 0.5 m of clearance along it, and the best one looks through a narrow gap
+  between two dwellings. What reaches the picture there is a kneeling cone and a standing
+  figure by the water, a few dozen pixels tall; the warp, the stack and the tended end's
+  bundle do not read. The reed's clack (1183 part 3) carries across the plaza; the picture
+  does not.
+  FINAL STATE. From a stand on the Bambara plaza the station reads as a loom being worked: the
+  sight line from the plaza to it is open (the frame's check tightened from 0.15 m to at least
+  1 m of clearance), and the warp line and the cloth stack are distinguishable in the frame.
+  The loom's height stays (docs/peoples-1890.md §8.1, point 1183: "Do NOT raise the loom");
+  the lever is WHERE the station stands relative to the dwellings and the plaza, within the
+  bank constraint that the warp runs on the river's axis (`onRiverAxis`, point 1157).
+  Criticality: medium — the teaching station works; the user's stated criterion is not met.
+  Test: the village-loom section's plaza frame on both backends with the tightened clearance;
+  Vitest for any layout rule that moves the station (it still lies on the river's axis and
+  clear of every dwelling).
+  MEASURED 23.09.2026 ON `feat/1190-loom-visible-from-plaza`: THE SEAT ALONE CANNOT DO IT.
+  The branch holds the placement to a plaza view, measures that view as a WIDTH and takes
+  the widest the plan allows, and keeps the station no farther back from the water than
+  the plan meant — the last because the water sight line reads solids and not the ground,
+  so a seat that drifted inland passed it and the frame came back with the river at the
+  horizon. Unit tests and lint are green. But the shipped Bambara plan the picture check
+  runs (`bambara-village@394349866`, and seed 1337 with it) holds NO metre-wide line from
+  the plaza to any seat that also keeps the river in the picture: the compounds stand where
+  they stand. So the frame's tightened check fails on the branch, and it fails honestly.
+  WHAT IS STILL OWED: the dwelling ring, not the seat. One compound or lane has to give way
+  so the plaza has a line at all — `docs/peoples-1890.md` §8.1 governs what may move. Until
+  that is decided the point is NOT met and must not be ticked.
+  MEASURED 23.09.2026 04:05, BRANCH HEAD aba15e2b6: THE LINE IS OPEN, THE LOOM STILL DOES NOT
+  READ. Trees, loose stones, sheds and granaries in the plaza's line now give way (dwellings
+  stay), the seat search was made cheap again (layouts had become up to 10x slower and three
+  place suites timed out), and place units plus `polish --section=village-loom` on WebGPU are
+  green with the 1 m check. But `1183-village-loom-from-plaza` shows the station ~25 m off
+  across open ground as a kneeling cone and a standing figure a few dozen pixels tall; warp
+  and stack do not read. NEXT LEVER: the frame's stand, not the village — take the NEAREST
+  plaza stand that holds the full metre (and check the layout rule's minimum distance against
+  it) before anything moves a compound. The same section is green on WebGL 2 as well (04:19).
+  Refs: src/scenes/place/layout.ts (loom station placement), src/scenes/place/loom.ts
+  (placeLoom, plaza view), scripts/verify/polish.mjs (village-loom, plaza frame), point 1183,
+  point 1157
+  SPLIT 23.09.2026 04:55 (owner, point not converging): 1190 closes on the OPEN LINE — the
+  plaza's frame now holds the full metre and is taken from the NEAREST plaza stand that does,
+  green on both backends (branch eb1afa8cc+). Ordering the seat search by nearness to the
+  plaza was measured and changes nothing: in `bambara-village@394349866` the only seat with
+  a metre-wide line stands 27.7 m from the plaza middle (seed 1337: 11.6 m, but no full line).
+  That the loom READS from the plaza — warp and stack distinguishable — moves to point 1191.
+  Bundle: Dorfleben

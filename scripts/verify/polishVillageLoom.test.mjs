@@ -1,3 +1,11 @@
+/**
+ * @vitest-environment jsdom
+ *
+ * EXCEPTION to the tooling project's Node environment: this file runs browser-page
+ * code here — a function Playwright serializes into the page, or a `polish.mjs`
+ * sampler block — and that code reads `window`/`document` directly. It needs a DOM,
+ * so it keeps jsdom per file instead of dragging the other tooling tests back into one.
+ */
 import { readFileSync } from 'node:fs'
 import { afterEach, expect, it, vi } from 'vitest'
 import sharp from 'sharp'
@@ -49,7 +57,7 @@ afterEach(() => vi.unstubAllGlobals())
 
 async function photograph({
   blocked = false, moves = true, arms = true, called = true, parked = false, returning = false, arrivesOnShutter = false,
-  helperAt = 1.6, water = true, labelOn = true,
+  helperAt = 1.6, water = true, labelOn = true, tended = true, stacked = 2,
 } = {}) {
   if (!called) helperAt = 0.2
   if (parked) helperAt = 2.4
@@ -75,13 +83,17 @@ async function photograph({
     },
   }
   // The station's own clock, as the scene publishes it on the loom group.
-  const loomGroup = { userData: { loom: { pass: 0.1, passes: 3 } } }
+  // A tended end differs from its opposite (point 1183); the stack is what the
+  // loom group publishes and what its folded strips show.
+  const bundles = tended ? { UPSTREAM: 0, DOWNSTREAM: 1 } : { UPSTREAM: 0, DOWNSTREAM: 0 }
+  const loomGroup = { userData: { loom: { pass: 0.1, passes: 3, bundles, stacked } } }
+  const stack = { children: Array.from({ length: 8 }, (_, i) => ({ visible: i < stacked })) }
   // What "time passes" means here: half a pass of HER clock, and the shuttle
   // thrown to the other side of the warp with it — her hands going with it
   // unless the arms are the frozen ones. A still loom advances nothing.
   const advance = () => {
     if (!moves) return
-    loomGroup.userData.loom = { pass: 0.62, passes: 3 }
+    loomGroup.userData.loom = { pass: 0.62, passes: 3, bundles, stacked }
     shuttle.at = { x: -0.12, y: 0.34, z: -3 }
     if (arms) {
       hands['hand-left'] = { x: -0.3, y: 0.46, z: -3.22 }
@@ -94,6 +106,7 @@ async function photograph({
       if (name === 'village-loom-shuttle') return object(() => shuttle.at)
       if (name === 'village-loom') return loomGroup
       if (name === 'village-weaver-body') return weaverBody
+      if (name === 'village-loom-finished-cloth') return stack
       return helper
     },
   })
@@ -139,7 +152,7 @@ async function photograph({
     },
     (name, pass, detail) => checks.push({ name, pass, detail }),
     async (name, subject) => {
-      frames.push({ name, subject })
+      frames.push({ name, subject, stand: { x: player.x, z: player.z } })
       // A helper who reaches his stand while the shutter is open: the state
       // read before the photograph held, the picture does not show it.
       if (arrivesOnShutter && name.endsWith('named-tending')) {
@@ -155,16 +168,21 @@ async function photograph({
 
 it('shoots her motion from close by and the teaching from back, both inland', async () => {
   const { player, checks, frames } = await photograph()
-  // The water is to −x, so both stands are to +x of the seat. The last one set
-  // is the WIDE one: 7.5 m out and 2.4 m along the warp from her middle.
-  expect(player.x).toBeCloseTo(7.5, 6)
-  expect(player.z).toBeCloseTo(-3 + 2.4, 6)
+  // The water is to −x, so both stands are to +x of the seat. The teaching
+  // frame is taken from the WIDE one: 7.5 m out and 2.4 m along the warp.
+  const teaching = frames.find(f => f.name.endsWith('named-tending')).stand
+  expect(teaching.x).toBeCloseTo(7.5, 6)
+  expect(teaching.z).toBeCloseTo(-3 + 2.4, 6)
+  // The plaza frame stands on the plaza disc round (0, 3), at least 8 m out.
+  expect(Math.hypot(player.x, player.z - 3)).toBeLessThanOrEqual(6 + 1e-9)
+  expect(Math.hypot(player.x - 0.45, player.z + 3)).toBeGreaterThanOrEqual(8)
   expect(checks[0].pass).toBe(true)
   expect(checks[1].pass).toBe(true)
   expect(frames.map(f => f.name)).toEqual([
     '1157-village-loom-working-a',
     '1157-village-loom-working-b',
     '1157-village-loom-named-tending',
+    '1183-village-loom-from-plaza',
   ])
 })
 
@@ -189,10 +207,9 @@ it('passes the motion check only when the picture, the shuttle AND her hands all
 })
 
 it('names the direction the helper actually walked in the frame it writes', async () => {
-  const down = await photograph({ helperAt: 1.6 })
-  expect(down.frames.at(-1).subject.label).toContain('downstream')
-  const up = await photograph({ helperAt: -1.6 })
-  expect(up.frames.at(-1).subject.label).toContain('upstream')
+  const teaching = r => r.frames.find(f => f.name.endsWith('named-tending')).subject.label
+  expect(teaching(await photograph({ helperAt: 1.6 }))).toContain('downstream')
+  expect(teaching(await photograph({ helperAt: -1.6 }))).toContain('upstream')
 })
 
 it('a helper parked at his stand, or on his way back, is not carrying the word out', async () => {
@@ -202,6 +219,7 @@ it('a helper parked at his stand, or on his way back, is not carrying the word o
     expect(frames.map(f => f.name)).toEqual([
       '1157-village-loom-working-a',
       '1157-village-loom-working-b',
+      '1183-village-loom-from-plaza',
     ])
   }
 })
@@ -231,7 +249,19 @@ it('reports a silent loom instead of photographing one that said nothing', async
   expect(frames.map(f => f.name)).toEqual([
     '1157-village-loom-working-a',
     '1157-village-loom-working-b',
+    '1183-village-loom-from-plaza',
   ])
+})
+
+it('from the plaza: the tended end must differ and the stack must show what was woven', async () => {
+  const good = await photograph()
+  expect(good.checks.find(c => c.name.startsWith('once the helper has tended')).pass).toBe(true)
+  expect(good.checks.find(c => c.name.startsWith('a stand on the plaza')).pass).toBe(true)
+  expect(good.checks.find(c => c.name.startsWith('the finished strips')).pass).toBe(true)
+  const alike = await photograph({ tended: false })
+  expect(alike.checks.find(c => c.name.startsWith('once the helper has tended')).pass).toBe(false)
+  const bare = await photograph({ stacked: 0 })
+  expect(bare.checks.find(c => c.name.startsWith('the finished strips')).pass).toBe(false)
 })
 
 it('reports rather than photographs when no stand sees her over open ground', async () => {

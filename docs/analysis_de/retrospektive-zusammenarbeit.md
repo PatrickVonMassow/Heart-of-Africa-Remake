@@ -135,6 +135,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 08.09. abends | Dritter Auftritt derselben Verwechslung, mit einem neuen Sensor: Nach der Kontextuebergabe um 20:26 lehnte der Starter jeden Tick mit `registered-writer-live` ab — „work output 14/18 min old (working files)" —, waehrend `ps` keinen einzigen Autorprozess zeigte. Die frischen Dateien waren die Ausgabe der grossen Regression, die in jenem Arbeitsbaum allein zu Ende lief und um 20:36 rot endete. Eine fertige Suite hinterlaesst Dateien wie ein arbeitender Autor; der Sollzustand von Punkt 1048 nennt Arbeitsbaum-Evidenz aber gerade als Gegenprobe zum frischen Zweigstand. Eine halbe Stunde Stillstand, der rote Lauf ungelesen, beendet wieder von einer Nutzerfrage ([§3.170](#3170-der-letzte-atemzug-wird-als-herzschlag-gelesen), Punkt 1048) |
 | 08.09. nachts | Auf die Standsfrage kam eine korrekt gelesene Messung und daran ein erfundener Reststand: „erst die halbe Strecke, danach WebGPU" — zwei Minuten später war der Lauf beendet, denn ein roter erster Durchgang beendet ihn und die zweite Bahn faehrt nie. Die widerlegende Tatsache stand im selben Absatz derselben Nachricht, drei rote Suiten waren gerade aufgezaehlt worden. Der Nutzer sah beides hintereinander und sagte es ([§3.250](#3250-der-reststand-wurde-erzaehlt-waehrend-der-beleg-dagegen-schon-vorgelesen-war)) |
 | 19.09. nachts | Der deckende Bildlauf wurde NACH der Landung gefahren statt davor, und das allein trug die Sitzung 52.000 Token über ihre Decke: Er lief zwanzig Minuten, brachte ein fremdes Rot mit, das erst eingeordnet werden musste, und jeder seiner Schritte stritt mit dem Tafel-Tor, weil der Punkt schon abgehakt war und keine Jetzt-Karte mehr tragen konnte. Auf WebGPU konnte er gar nicht decken — das seit dem 17.09. als vorbestehend eingereihte Bild der Victoria-Fälle beendet den Lauf nach 45 Prüfungen (Punkt 1145), also blieb nur die laute Zurückstellung |
+| 22.09. abends | Derselbe Stop-Hook wie am 14.09. verlangte nach einer Parallelsitzung `batch-doctor --gate` — nur war der Alarm diesmal eine neun Minuten alte Messung, und der Doktor hatte ihn 31 Sekunden zuvor bereits abgeräumt. Die geforderte Abhilfe dauert acht Minuten, der Alarm erhebt sich nach einunddreißig Sekunden: ein Rennen, das die sanktionierte Maßnahme nie gewinnen kann. Daneben meldete derselbe Zug „Dashboard nicht registriert", weil der Stop-Wächter den Merkerpfad gegen ein in einen Worktree gewandertes Arbeitsverzeichnis auflöst (§3.303, Wiedergänger von §3.271) |
 
 | 15.09. nachmittags | Ein neu eingereihter Punkt erzaehlte der Maschine das Gegenteil von sich selbst: Seine Ueberschrift »has no covering picture run« las der Bildpflicht-Klassierer als VERNEINUNG, der Punkt, dessen einziger Zweck zwei Bildlaeufe sind, wies sich damit als bildfrei aus. Gefangen von einer angehefteten Pruefung, die die exakte Menge solcher Zeilen festhaelt statt ihrer Anzahl; die Korrektur war ein positiv formulierter Satz (§3.274) |
 | 15.09. nachmittags | Und derselbe Punkt trug eine falsche Tatsache: Die deckenden Laeufe lagen scheinbar zwei Stunden VOR dem Merge, den sie decken sollten — Laufstempel in UTC gegen Commit-Zeiten in +0200 gelesen. Beide liefen am Merge-HEAD selbst, mit je sechs Bildern auf beiden Bahnen. Aufgefallen beilaeufig, weil eine Wartequittung ihren HEAD mit ausdruckte. Wortwoertlich die Lehre aus §3.253, drei Tage alt und von mir wiederholt (§3.275) |
@@ -1686,7 +1687,7 @@ stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die s
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Dienstag, 22.09.2026, 06:43 · Quellen-Fingerprint: `b98c8827d0f9…`
+Zuletzt aktualisiert: Mittwoch, 23.09.2026, 02:09 · Quellen-Fingerprint: `48463cf628ef…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1724,15 +1725,15 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Detach a landing or long gate with setsid, and end every third turn with prose so the wait does not hand the batch away | 3 | mittel | — (Regel/Memory) | ◐ Regel |
 | When a measured doc budget blocks an addition, shorten or MERGE existing entries — raising the limit is the last resort, decided by me with a written reason, NEVER asked of the user | 4 | hoch | doc-budget-guard.mjs | ✔ Mechanismus |
 | a drill that recreates the state after an action tests the assumption, not the action — and stays green forever | 2 | mittel | — (Regel/Memory) | ◐ Regel |
-| Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 4 | hoch | — (Regel/Memory) | ◐ Regel |
+| Work at Medium effort — the standing tier for every kind of work since 22.09.2026; never High, never Extra high | 5 | hoch | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to the OpenAI lane, GPT-6 Astra), and review is cross-vendor, not Fable-by-default | 6 | hoch | — (Regel/Memory) | ◐ Regel |
 | Iterate on the new feature's OWN test first; the full regression runs once at the end, never as the debugging loop | 2 | mittel | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 91 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 92 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | wait-command-guard.mjs | ✔ Mechanismus |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | \"Gib ab\" / \"abgeben\" means hand the batch to a SUCCESSOR session so the context does not overflow — it never means pause or stop the batch | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
-| User 18.08.2026: hard, complex, error-prone and HIGH-criticality points are AUTHORED by the OpenAI lane directly (GPT-6 Astra since 05.09.2026, GPT-5.6 Sol before) — Opus 5 authors only what is left, and Fable authors only a point that tags its lane or one the router escalates | 5 | hoch | — (Regel/Memory) | ◐ Regel |
+| User 18.08.2026: hard, complex, error-prone and HIGH-criticality points are AUTHORED by the OpenAI lane directly (GPT-6 Astra since 05.09.2026, GPT-5.6 Sol before) — Opus 5.5 authors only what is left, and Fable authors only a point that tags its lane or one the router escalates | 5 | hoch | — (Regel/Memory) | ◐ Regel |
 | Two test layers — Vitest (jsdom) for logic/store/HUD, Playwright for browser-only; add a test per new feature on the right layer | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | STANDING RULE: design.md §19.14 (climate) and §19.15 (peoples) — the research→game implementation records — must be updated in the SAME commit whenever the climate or people rendering changes; peoples-1890 §8 / climate-1890 §9 are pointers | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | All journal texts (de + en) must carry emotional voice markup; English read-aloud runs via Kokoro TTS | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1761,8 +1762,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A declared \"intended residual\" is where real defects hide — legitimate only when the information to close it is genuinely not at hand | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | A point delivered as a rider on another branch is closed with fold-point --delivered, and its push needs a closing card first | 1 | niedrig | point-proof-guard.mjs, push-arrival-guard.mjs | ✔ Mechanismus |
 | Saved games do not constrain design work: the feature is switched off, nobody plays a serious run, and no migration is ever owed for a data change | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
-| 24.07.2026 evening chaos — serving model silently degraded to Haiku 4.5; verify the serving model before batch work, Haiku-class must pause instead of working | 6 | hoch | model-guard.mjs | ✔ Mechanismus |
-| Keep the shell cwd in /workspace/hoa; a worktree cwd makes the Stop guards judge the wrong repo root | 3 | mittel | worktree-reminder.mjs | ✔ Mechanismus |
+| 24.07.2026 evening chaos — serving model silently degraded to Haiku 4.5; verify the serving model before batch work, Haiku-class must pause instead of working | 7 | hoch | model-guard.mjs | ✔ Mechanismus |
+| Keep the shell cwd in /workspace/hoa; a worktree cwd makes the Stop guards judge the wrong repo root | 4 | hoch | worktree-reminder.mjs | ✔ Mechanismus |
 | ENDED 17.08.2026 — the 13.08. emergency that pushed the MAXIMUM load to OpenAI (hard cases to Sol via --anyway, pool of one) is over; the normal three-lane split of CLAUDE.md §6 applies again | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Every new optical/graphics feature must be sorted into the low/medium/high detail presets, enforced by a pure completeness test — a new quality key with no preset entries fails the gate | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Write about this project as a participant (\"wir/unser\"), never as an outside observer (\"euer Mechanismus\", \"die ihr abschaffen wollt\") | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1792,10 +1793,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 98 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 7 Revert-/Reapply-Commits · 137 Prozess-/Meta-TASKS-Punkte (davon 65 offen).
+Erfasste Quellen: 98 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 7 Revert-/Reapply-Commits · 138 Prozess-/Meta-TASKS-Punkte (davon 66 offen).
 
-<!-- RETRO-FINGERPRINT: b98c8827d0f9fe718c7108716140ba938e4aa883745db86dbddc45a0cfb41252 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-22T04:43:46.044Z -->
+<!-- RETRO-FINGERPRINT: 48463cf628efd928e563f320354c29495c7c65b6090e8d2102e29c9adabc3df5 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-23T00:09:02.930Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -8020,3 +8021,91 @@ Kosten anfallen.
 ist keine Vorsicht, sondern eine Rechnung ohne Gegenleistung. Und ein Kommentar, der eine
 Einstellung begründet, ist mit ihr zu prüfen: Steht die Widerlegung in einer anderen Datei,
 gewinnt sie nicht von allein.
+
+### 3.302 Der Kommentar berief sich auf ein Sicherheitsnetz, das nie angeschlossen wurde
+
+Am 22.09.2026 meldete der Nutzer zwei Dinge aus derselben Spielrunde: Ein Erwachsener stand
+regungslos am Dorffeuer, und in derselben Zeit holte niemand Wasser. Zwei Minuten später die
+Entwarnung — „er hat sich doch irgendwie befreit". Die Entwarnung war der Beweis. Nichts hatte
+sich repariert; eine Frist von 300 Sekunden war abgelaufen.
+
+Die Frist ist mit Sorgfalt hergeleitet. Der Kommentar in `balance.ts` rechnet den Rundweg über
+drei Flussdörfer und zwanzig Saaten vor, begründet die 300 Sekunden als das 3,6-fache der
+gemessenen Luftlinie und schließt mit dem Satz, ein wirklich festsitzender Dorfbewohner werde
+von `stallSeconds` **längst vorher** freigelassen. Genau darauf ruht die Großzügigkeit des
+Wertes. Nur wird `stallSeconds` nirgends gelesen: Er steht im Konfigurationstyp, steht mit 20
+Sekunden in der Bilanz, ist im Debug-Menü als Schieberegler sichtbar — und kam am 02.09.2026 in
+den Code, ohne je einen Verbraucher zu bekommen.
+
+Das Tückische daran ist die Beweislage. Ein Wert, der nirgends steht, fällt beim Lesen auf. Ein
+Wert, der an drei Stellen steht — Typ, Bilanz, Bedienoberfläche — sieht in jeder einzelnen
+davon nach einem lebenden Mechanismus aus, und der Schieberegler im Debug-Menü behauptet
+zusätzlich, man könne ihn zur Laufzeit erproben. Der Kommentar, der sich auf ihn beruft, liest
+sich wie eine Prüfung und ist doch nur eine Annahme. Die Rechnung kam beim Spieler an: fünf
+Minuten sichtbar kaputtes Dorf, und weil ein laufender Wassergang den nächsten sperrt, in
+diesen fünf Minuten gar kein Wasserholen.
+
+**Lehre:** Beruft sich ein Kommentar auf einen anderen Mechanismus, ist dieser Bezug Teil der
+Aussage und wird wie sie geprüft — ein `grep` nach dem Namen, bevor man sich auf ihn verlässt.
+Und ein eingestellter, bedienbarer Wert ohne Leser ist schlimmer als gar keiner: Er verspricht
+ein Sicherheitsnetz, und alle folgenden Entscheidungen rechnen mit ihm.
+
+### 3.303 Die geforderte Abhilfe war langsamer als der Alarm, der sie forderte (Wiedergänger von §3.271)
+
+Am 22.09.2026 verweigerte ein Wächter zwei aufeinanderfolgende Züge einer landenden Sitzung mit
+der Begründung, eine zweite Sitzung habe „within the last minutes" Werkzeuge im Repository
+benutzt. Die Behauptung war beim Erheben bereits falsch. Der Doktor hatte den Alarm um 17:05:30
+abgeräumt und dazu vermerkt, dass die Torforderung für diesen Stand erfüllt sei; **31 Sekunden
+später** erhob ihn der Wächter erneut — mit derselben Messung wie zuvor, einem letzten
+Werkzeugaufruf der Fremdsitzung um 16:56:59, also einer im Moment des Erhebens **neun Minuten
+alten** Zahl. Ein unmittelbar danach laufender Doktor maß `parallelNow=0`.
+
+Das Besondere ist nicht der veraltete Wert, sondern das Verhältnis der beiden Zeiten. Die
+Abhilfe, die die Verweigerung verlangt, ist ein `--gate`-Lauf, und der fährt die Unit-Suite
+selbst: gemessen **acht Minuten**. Der Alarm erhebt sich nach einunddreißig Sekunden neu. Die
+geforderte Maßnahme kann das Rennen also nicht gewinnen — nicht bei schlechtem Timing, sondern
+nie. Ein Wächter, dessen sanktionierter Ausweg vielfach langsamer ist als sein eigener
+Wiederanlauf, ist keine Hürde mehr, sondern eine geschlossene Tür; und weil seine Meldung eine
+Aktualität behauptet, die sie nie geprüft hat, liest sich die Sackgasse wie ein echter Befund.
+
+Daneben lief im selben Zug ein zweiter Irrtum derselben Familie. Die Meldung „BATCH DASHBOARD
+NOT REGISTERED" war ebenso unwahr: Der Merker war korrekt, die Datei vorhanden, und der
+Handaufruf desselben Wächters im Haupttree quittierte mit Exit 0. Der Stop-Wächter löst den
+hinterlegten Pfad jedoch gegen das Arbeitsverzeichnis auf, und dieses war durch eine gebündelte
+Shell-Kette in einen Worktree gewandert, in dem es keine Tafel gibt. Beide Meldungen benennen
+einen Zustand — „nicht registriert", „läuft gerade" —, wo die Ursache eine Auflösungsbasis und
+ein Messalter ist.
+
+Am 14.09. stand dieselbe Forderung schon einmal (§3.271), und damals war die Diagnose, dass der
+Doktor genau eine unbedeutende Datei fand und seine Unit-Suite nie gebraucht wurde. Neu ist hier
+nicht die Kostspieligkeit des Tores, sondern dass der Alarm sich SELBST nachlegt: Damals genügte
+ein Commit, um ihn abzuräumen; diesmal war er bereits abgeräumt, und er kam trotzdem wieder.
+
+**Lehre:** Eine Verweigerung, die auf Aktualität pocht, muss das Alter ihrer Messung
+**mitdrucken**; behauptete Frische, die nie geprüft wurde, ist die teuerste Sorte Falschmeldung.
+Und die verlangte Abhilfe gehört gegen die eigene Wiederanlaufzeit gerechnet: Ist sie langsamer,
+verweigert der Wächter dauerhaft und gerade die Sitzungen, die alles richtig gemacht haben.
+
+**Nachtrag vom selben Abend, 22.09.2026 — die Hälfte des Fehlers war die ganze Zeit ein
+Argument.** Der Wiedergänger kam im Abendzug noch zweimal, und diesmal habe ich nicht die
+Tafel repariert, sondern nachgesehen, was der Merker überhaupt enthält:
+`.claude/dashboard-state.json` speichert unter `dashboardPath` genau die Zeichenkette, die
+`--synced` übergeben bekam. Der gewohnte Aufruf übergibt `.batch-dashboard.html` — **relativ**.
+Der Stop-Haken löst ihn danach gegen seine eigene Wurzel auf, und in einem Arbeitsbaum zeigt er
+ins Leere. Ein einziges Mal absolut registriert (`--synced /workspace/hoa/.batch-dashboard.html`),
+und diese Hälfte der Falle ist dauerhaft zu: Der Merker trägt dann aus jedem Verzeichnis.
+
+Die andere Hälfte bleibt und ist die lehrreichere. Der Wächter liest `head` und die Zahl der
+offenen Punkte ebenfalls aus der Wurzel, in der er läuft — aus einem Zweig-Arbeitsbaum also die
+Zweig-SHA und dessen TASKS-Stand. Die Folge sind zwei Verweigerungen, die inhaltlich klingen und
+es nicht sind: „HEAD moved to \<Zweig-SHA\>" und eine Fußzeilen-Zahl, die um einen Punkt abweicht,
+weil der Zweig vor den letzten Anhängen abgezweigt wurde. Beide fordern zum Veröffentlichen auf,
+und ein Veröffentlichen aus dem Arbeitsbaum würde die falsche Zahl sogar festschreiben. Nur das
+blanke `cd` in den Hauptbaum hebt sie auf — in einer `&&`-Kette hält es nicht, was seit dem
+08.09. bekannt ist und mich trotzdem erneut zwei Züge gekostet hat.
+
+**Lehre:** Wo ein Wächter einen hinterlegten Pfad gegen ein geerbtes Arbeitsverzeichnis auflöst,
+ist der relative Pfad der eigentliche Defekt — ein absolut hinterlegter Merker ist kein Workaround,
+sondern die Behebung. Und wo derselbe Wächter Zustandszahlen aus derselben Wurzel liest, ist die
+erste Frage bei jeder inhaltlich klingenden Verweigerung nicht „stimmt die Zahl?", sondern
+**„aus welcher Wurzel ist sie gemessen?"**

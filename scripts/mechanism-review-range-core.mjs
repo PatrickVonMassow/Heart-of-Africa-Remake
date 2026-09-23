@@ -5,10 +5,10 @@
 // around every model that contributed to that retained end-state path. Intermediate versions are named as
 // superseded, and paths whose final state equals the base are dropped.
 import { independentReviewProblem, modelVendor, sameModel } from './mechanism-review-core.mjs'
-import { ASTRA_MODEL, FABLE_MODEL } from './fable-switch-core.mjs'
+import { ASTRA_MODEL, FABLE_MODEL, OPUS_FALLBACK_MODEL, OPUS_MODEL } from './fable-switch-core.mjs'
 import { passComposition } from './review-material-core.mjs'
 
-export const REVIEWER_CANDIDATES = Object.freeze([ASTRA_MODEL, 'Opus 5', FABLE_MODEL, 'Opus 4.8'])
+export const REVIEWER_CANDIDATES = Object.freeze([ASTRA_MODEL, OPUS_MODEL, FABLE_MODEL, OPUS_FALLBACK_MODEL])
 export const UNREVIEWABLE_NARROWING_REMEDY =
   'Review every runnable pass and record the exact measured remainder with the criticality-review-unavailable command printed by review-astra.'
 export const NO_ELIGIBLE_REVIEWER_REASON =

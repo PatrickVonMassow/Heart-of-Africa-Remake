@@ -1,10 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { balance } from '../../config/balance'
+import { instructionDelay } from '../../communication/speaking'
+import { handAt } from '../../render/gesture'
+import { FIGURE_LIMBS } from '../../render/figures'
+import { LOOM_BUILD } from './loomVisual'
 import { mulberry32 } from '../../world/noise'
 import {
   createLoomWork,
   loomPicture,
   loomPose,
+  loomHelperPose,
   stepLoomWork,
   warpSign,
   type LoomDirection,
@@ -59,7 +64,7 @@ describe('the weaver works, in a cycle the clock drives (items 1-3)', () => {
     expect(Math.min(...beat)).toBeLessThan(0.1)
   })
 
-  it('the cloth advances with the passes and wraps at the stake', () => {
+  it('the cloth advances, pauses for take-off, and resumes at the stake', () => {
     const state = createLoomWork(cfg, mulberry32(3))
     state.cloth = 0
     state.pass = 0
@@ -70,11 +75,11 @@ describe('the weaver works, in a cycle the clock drives (items 1-3)', () => {
       stepLoomWork(state, view(), cfg.passSeconds, cfg, mulberry32(4))
       seen.push(state.cloth)
     }
-    expect(state.passes).toBe(passes)
+    expect(state.passes).toBe(passes - Math.ceil(cfg.foldSeconds / cfg.passSeconds))
     // It grew...
     expect(Math.max(...seen)).toBeGreaterThan(cfg.warpHalf * 0.8)
     // ...never past the stake...
-    expect(Math.max(...seen)).toBeLessThan(cfg.warpHalf)
+    expect(Math.max(...seen)).toBeLessThan(cfg.warpHalf + cfg.clothPerPass)
     // ...and it was taken off: some later reading is smaller than an earlier one.
     expect(seen.some((v, i) => i > 0 && v < seen[i - 1]!)).toBe(true)
   })
@@ -144,6 +149,66 @@ describe('the word sits on a body that moves that way (item 7)', () => {
     }
     expect(sawAway).toBe(true)
     expect(cameBack).toBe(true)
+  })
+})
+
+describe('the helper waits for the word to end (work-order 1184)', () => {
+  /** Steps until the weaver names a direction, then answers with the state. */
+  function untilCalled(state: LoomWorkState, v: LoomWorkView, dt = 1 / 60) {
+    for (let t = 0; t < 600; t += dt) {
+      const word = stepLoomWork(state, v, dt, cfg, mulberry32(31))
+      if (word) return word
+    }
+    throw new Error('the loom never said anything')
+  }
+
+  it('stands at the seat while the word plays, then sets off', () => {
+    const state = createLoomWork(cfg, mulberry32(37))
+    const v = view()
+    const dt = 1 / 60
+    const said = untilCalled(state, v, dt)
+    // The order has been given and the body has not moved: he is at the seat,
+    // not walking and not working.
+    expect(state.errand).toEqual({ toward: said, phase: 'hold', at: 0, clock: 0 })
+    expect(loomPicture(state).helperAt).toBe(0)
+    expect(loomPicture(state).helperWorking).toBe(false)
+
+    const hold = instructionDelay(said)
+    for (let t = 0; t < hold - 2 * dt; t += dt) {
+      stepLoomWork(state, v, dt, cfg, mulberry32(41))
+      expect(state.errand!.phase).toBe('hold')
+      expect(loomPicture(state).helperAt).toBe(0)
+    }
+    for (let k = 0; k < 4; k++) stepLoomWork(state, v, dt, cfg, mulberry32(43))
+    expect(state.errand!.phase).toBe('walk')
+    expect(Math.sign(loomPicture(state).helperAt)).toBe(warpSign(said))
+  })
+
+  it('reads the pause from balance rather than from a constant in the code', () => {
+    const shipped = balance.communication.instructionHoldSeconds
+    try {
+      balance.communication.instructionHoldSeconds = 5
+      const state = createLoomWork(cfg, mulberry32(47))
+      const v = view()
+      const dt = 1 / 60
+      untilCalled(state, v, dt)
+      // The shipped second would have had him walking well before this.
+      for (let t = 0; t < 3; t += dt) stepLoomWork(state, v, dt, cfg, mulberry32(53))
+      expect(state.errand!.phase).toBe('hold')
+    } finally {
+      balance.communication.instructionHoldSeconds = shipped
+    }
+  })
+
+  it('holds inside the tending cycle: no second order falls into the gap', () => {
+    const state = createLoomWork(cfg, mulberry32(59))
+    const v = view()
+    const dt = 1 / 60
+    const said = untilCalled(state, v, dt)
+    for (let t = 0; t < instructionDelay(said); t += dt) {
+      expect(stepLoomWork(state, v, dt, cfg, mulberry32(61))).toBeNull()
+    }
+    expect(state.owed).toBeNull()
   })
 })
 
@@ -225,13 +290,112 @@ describe('the hands ride the tool (item 1)', () => {
     for (let k = 0; k < 40; k++) {
       stepLoomWork(state, view(), cfg.passSeconds / 40, cfg, mulberry32(71))
       const pose = loomPose(loomPicture(state))
-      // armAim's pitch is -(pi/2 + elevation); a negative elevation is a hand
-      // below the shoulder line, which is where a seated weaver's hands are.
-      for (const arm of [pose.left, pose.right]) {
+      // Judge the actual kneeling body's height after the trunk rotation:
+      // local arm elevation alone ignores the lean it must compensate for.
+      const shoulderY = FIGURE_LIMBS.shoulderY * Math.cos(pose.lean) * 0.55 * 0.75
+      for (const side of ['left', 'right'] as const) {
+        const arm = pose[side]
         const elevation = -arm.pitch - Math.PI / 2
-        expect(elevation).toBeLessThan(0)
-        expect(elevation).toBeGreaterThan(-1)
+        const handY = handAt(side, arm.yaw, elevation, pose.lean)[1] * 0.55 * 0.75
+        expect(handY).toBeLessThan(shoulderY)
+        expect(handY).toBeGreaterThan(LOOM_BUILD.warpY - 0.03)
+        expect(handY).toBeLessThan(LOOM_BUILD.warpY + 0.04)
       }
     }
   })
+})
+
+
+describe('readable work and take-off', () => {
+  it.each(['UPSTREAM', 'DOWNSTREAM'] as const)('works repeatedly and leaves the bundle at %s', (toward) => {
+    const state = createLoomWork(cfg, mulberry32(73))
+    state.errand = { toward, phase: 'work', at: warpSign(toward) * cfg.tendStand, clock: 0 }
+    const poses = []
+    for (let t = 0; t < cfg.helperCycleSeconds; t += 0.1) {
+      stepLoomWork(state, view(), 0.1, cfg, () => 0.5)
+      const picture = loomPicture(state)
+      expect(picture.helperWorking).toBe(true)
+      expect(picture.helperCarrying).toBe(true)
+      poses.push(loomHelperPose(picture))
+    }
+    for (const side of ['left', 'right'] as const) {
+      const pitches = poses.map(p => p[side].pitch)
+      expect(Math.max(...pitches) - Math.min(...pitches)).toBeGreaterThan(0.4)
+    }
+    const leans = poses.map(p => p.lean)
+    expect(Math.max(...leans) - Math.min(...leans)).toBeGreaterThan(0.3)
+    stepLoomWork(state, view(), cfg.tendDwellSeconds, cfg, () => 0.5)
+    const after = loomPicture(state)
+    expect(after.helperCarrying).toBe(false)
+    expect(after.bundles[toward]).toBe(1)
+    expect(after.bundles[toward === 'UPSTREAM' ? 'DOWNSTREAM' : 'UPSTREAM']).toBe(0)
+    stepLoomWork(state, view(), 0.2, cfg, () => 0.5)
+    expect(loomPicture(state).bundles).toEqual(after.bundles)
+  })
+
+  it('reports a strip only after folding, with no pass or clack during take-off', () => {
+    const state = createLoomWork(cfg, () => 0)
+    state.cloth = cfg.warpHalf - cfg.clothPerPass / 2
+    stepLoomWork(state, view(), cfg.passSeconds, cfg, () => 0.5)
+    expect(state.beats).toBe(1)
+    expect(state.finished).toBe(0)
+    expect(state.fold).toBe(0)
+    const firstPose = loomPose(loomPicture(state))
+    stepLoomWork(state, view(), cfg.foldSeconds / 8, cfg, () => 0.5)
+    expect(loomPose(loomPicture(state))).not.toEqual(firstPose)
+    expect(state.finished).toBe(0)
+    expect(state.beats).toBe(0)
+    expect(state.cloth).toBeGreaterThanOrEqual(cfg.warpHalf)
+    stepLoomWork(state, view(), cfg.foldSeconds * 7 / 8, cfg, () => 0.5)
+    expect(state.finished).toBe(1)
+    expect(state.fold).toBeNull()
+    expect(state.cloth).toBeCloseTo(cfg.clothPerPass / 2)
+    stepLoomWork(state, view(), 0.1, cfg, () => 0.5)
+    expect(state.finished).toBe(0)
+    expect(state.beats).toBe(0)
+  })
+
+  it('counts the same strips and beats across coarse and fine frames', () => {
+    const runFrames = (dt: number) => {
+      const state = createLoomWork(cfg, () => 0)
+      let finished = 0, beats = 0
+      for (let t = 0; t < 300 - 1e-6; t += dt) {
+        stepLoomWork(state, view({ teaches: false }), dt, cfg, () => 0.5)
+        finished += state.finished
+        beats += state.beats
+      }
+      return { finished, beats, cloth: state.cloth }
+    }
+    const fine = runFrames(0.05)
+    const coarse = runFrames(10)
+    expect(fine.finished).toBeGreaterThan(2)
+    expect(coarse.finished).toBe(fine.finished)
+    expect(coarse.beats).toBe(fine.beats)
+    expect(coarse.cloth).toBeCloseTo(fine.cloth)
+  })
+
+  it('has one visible beat per pass and a broad upper-body stroke', () => {
+    const state = createLoomWork(cfg, () => 0)
+    const poses = Array.from({ length: 64 }, (_, i) => {
+      state.pass = i / 64
+      return loomPose(loomPicture(state))
+    })
+    const leans = poses.map(p => p.lean)
+    expect(Math.max(...leans) - Math.min(...leans)).toBeGreaterThan(0.4)
+    expect(leans.filter((v, i) => v > leans[(i + 63) % 64] && v > leans[(i + 1) % 64])).toHaveLength(1)
+  })
+})
+
+
+it('keeps replenished warp ends distinct after repeated tending in both directions', () => {
+  const state = createLoomWork(cfg, () => 0.5)
+  for (const toward of ['UPSTREAM', 'DOWNSTREAM', 'DOWNSTREAM', 'UPSTREAM', 'DOWNSTREAM', 'UPSTREAM', 'UPSTREAM', 'DOWNSTREAM'] as const) {
+    state.errand = { toward, phase: 'work', at: warpSign(toward) * cfg.tendStand, clock: 0 }
+    const before = state.bundles[toward]
+    stepLoomWork(state, view(), cfg.tendDwellSeconds, cfg, () => 0.5)
+    expect(state.bundles[toward]).not.toBe(before)
+    expect(state.bundles.UPSTREAM).not.toBe(state.bundles.DOWNSTREAM)
+    expect(state.bundles[toward]).toBeGreaterThan(0)
+    expect(state.bundles[toward]).toBeLessThanOrEqual(3)
+  }
 })

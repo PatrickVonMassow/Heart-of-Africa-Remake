@@ -96,10 +96,25 @@ describe('the headroom rule (work-order 349)', () => {
   })
 })
 
+/**
+ * Every roof label this file has already built, and the (place, seed) cells the
+ * labels came from. Building a layout is this file's whole cost: the sweeping
+ * cases below already walk the entire grid, so the name sweep reads what they
+ * saw instead of rebuilding all 99 of them a second time. That second pass
+ * alone ate the 20 s case budget on CI (run 35689673493, 22.09.2026) while
+ * every other case in the file stays under a third of a second. Only the
+ * labels and the cell keys are kept — never a layout.
+ */
+const seenRoofNames = new Set<string>()
+const builtCells = new Set<string>()
+const cellKey = (id: string, seed: number) => `${id}:${seed}`
+
 /** Every roof of a settlement, with the fire's cook-shelter included. */
 function roofsOf(id: string, region: string, kind: string, seed: number) {
   const layout = buildLayout(id, seed)
   const roofs = placeRoofs(layout, styleOf(region), kind as 'port' | 'village' | 'monument', VILLAGE_FIRE)
+  for (const roof of roofs) seenRoofNames.add(roof.what)
+  builtCells.add(cellKey(id, seed))
   return { layout, roofs }
 }
 
@@ -148,16 +163,19 @@ describe('no roof hangs into the camera over standable ground (work-order 349)',
   })
 
   it('sweeps every building type that carries a roof', () => {
-    const seen = new Set<string>()
+    // The cases above cover the whole grid, so normally nothing is built here;
+    // a cell is only built when a filtered run skipped the case that owned it.
     for (const p of PLACES) {
       for (const seed of SEEDS) {
-        const { roofs } = roofsOf(p.id, p.region, p.kind, seed)
-        for (const roof of roofs) seen.add(roof.what)
+        if (!builtCells.has(cellKey(p.id, seed))) roofsOf(p.id, p.region, p.kind, seed)
       }
     }
+    // The labels are worth nothing unless they come from EVERY cell: a reuse
+    // that quietly skipped one would shrink the set below, not this count.
+    expect(builtCells.size).toBe(PLACES.length * SEEDS.length)
     // Nine building kinds plus the two enterable huts and the cook-shelter: if
     // a kind stops appearing, the sweep above silently stopped covering it.
-    expect([...seen].sort()).toEqual([
+    expect([...seenRoofNames].sort()).toEqual([
       'box house roof',
       'cook shelter',
       'granary cap',

@@ -28,7 +28,7 @@ import {
   splitTrailerField,
 } from './model-guard-core.mjs'
 import { RECENT_LOG_FORMAT } from './model-guard.mjs'
-import { readState, writeState } from './fable-switch-core.mjs'
+import { CLAUDE_MODEL, readState, writeState } from './fable-switch-core.mjs'
 
 const FABLE_OFF = readState(JSON.stringify(writeState('off', { why: 'test capacity exhausted', by: 'test', now: 1 })))
 const SWITCH_AT = Date.parse('2026-08-20T17:34:12.107Z')
@@ -653,7 +653,7 @@ describe('evaluateCommitTrailers (the commit-msg gate)', () => {
     const text = formatCommitTrailerVerdict(
       evaluateCommitTrailers(msg('Co-Authored-By: Claude <noreply@anthropic.com>'), POLICY_NEUTRAL),
     )
-    expect(text).toContain('Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>')
+    expect(text).toContain(`Co-Authored-By: ${CLAUDE_MODEL} <noreply@anthropic.com>`)
     expect(text).toContain('Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>')
     expect(text).toContain('Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>')
     expect(text).toContain('~/.claude/projects/')

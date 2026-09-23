@@ -10,7 +10,7 @@
 
 import { balance } from '../config/balance'
 import { isWithinHearing, observePhrase, observeUtterance, type CommunicationMemory } from './heard'
-import { tonesOf, type Phrase, type Tone, type UtteranceId } from './lexicon'
+import { tonesOf, utteranceOf, type ConceptId, type Phrase, type Tone, type UtteranceId } from './lexicon'
 
 /** One syllable as it is played: which of the two samples, when, how loud. */
 export interface SpokenSyllable {
@@ -187,8 +187,57 @@ export function phrasePlan(
     }
   }
   if (syllables.length === 0) return { ...silence(), gain, pan, voice }
-  const last = syllables[syllables.length - 1]
-  return { syllables, duration: last.startOffset + last.duration, gain, pan, voice }
+  // ONE SOURCE FOR THE LENGTH (work-order 1184). The plan's duration is the
+  // timeline `phraseSeconds` lays out; a consequence scheduled on that function
+  // and the sound the player hears can therefore never drift apart.
+  return { syllables, duration: phraseSeconds(phrase, options), gain, pan, voice }
+}
+
+/**
+ * The seconds the syllables of `phrase` occupy, from the first one's start to
+ * the last one's end. This is the plan's OWN timeline measured without its
+ * distance and volume gate (work-order 1184): `phrasePlan` returns exactly this
+ * as its `duration` whenever anything is audible at all, and this still answers
+ * for a word spoken where the player is too far away to hear it.
+ */
+export function phraseSeconds(phrase: Phrase, options: SpeechOptions = {}): number {
+  const { syllableSeconds, pauseSeconds } = resolve(options)
+  if (syllableSeconds <= 0) return 0
+  let t = 0
+  let counted = 0
+  for (const atom of phrase) {
+    const tones = tonesOf(atom)
+    if (tones.length === 0) continue
+    if (counted > 0) t += pauseSeconds // between atoms only
+    t += tones.length * syllableSeconds
+    counted += tones.length
+  }
+  // The last syllable SOUNDS for its duty fraction of its step, so the phrase
+  // ends before the step it started does.
+  return counted === 0 ? 0 : t - syllableSeconds * (1 - SYLLABLE_DUTY)
+}
+
+/** The seconds the word for `concept` occupies when it is spoken. */
+export function conceptSeconds(concept: ConceptId, options: SpeechOptions = {}): number {
+  return phraseSeconds([utteranceOf(concept)], options)
+}
+
+/**
+ * WHEN THE ACT A WORD ORDERS MAY BEGIN, counted from the moment the word is
+ * granted the floor (work-order 1184, user 22.09.2026): the word's own length
+ * plus the calibratable pause after it.
+ *
+ * An instruction carried out in the same frame it is spoken — before its four
+ * syllables have even finished — reads as a man narrating his own act rather
+ * than as one man sending another, which is exactly the failure the water
+ * errand was rebuilt to avoid (`adultWork.ts`, user 07.09.2026). The body is
+ * still the meaning; it simply must not move before the word has been heard.
+ *
+ * The length comes from the plan, not from a guessed syllable count, so it
+ * stays right when the phrase, the pace or the pause changes.
+ */
+export function instructionDelay(concept: ConceptId, options: SpeechOptions = {}): number {
+  return conceptSeconds(concept, options) + Math.max(0, balance.communication.instructionHoldSeconds)
 }
 
 /**

@@ -8,7 +8,7 @@ import { spawnSync } from 'node:child_process'
 import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
-import { writeState } from './fable-switch-core.mjs'
+import { CLAUDE_MODEL, writeState } from './fable-switch-core.mjs'
 
 const GATE = resolve(process.cwd(), 'scripts/model-trailer-gate.mjs')
 const HOOK = resolve(process.cwd(), 'scripts/git-hooks/commit-msg')
@@ -48,8 +48,8 @@ describe('the commit-msg model-trailer gate', () => {
 
   it('accepts every allowed spelling', () => {
     for (const t of [
-      'Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>',
-      'Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>',
+      `Co-Authored-By: ${CLAUDE_MODEL} <noreply@anthropic.com>`,
+      `Co-Authored-By: ${CLAUDE_MODEL} (1M context) <noreply@anthropic.com>`,
       'Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>',
       'Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>',
     ]) {
@@ -61,7 +61,7 @@ describe('the commit-msg model-trailer gate', () => {
   it('accepts the documented reviewer key and refuses an undocumented one', () => {
     const documented = judge(
       withTrailer(
-        'Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>\n' +
+        `Co-Authored-By: ${CLAUDE_MODEL} <noreply@anthropic.com>\n` +
           'Reviewed-By: GPT-5.6 Sol <noreply@openai.com>',
       ),
     )
@@ -69,7 +69,7 @@ describe('the commit-msg model-trailer gate', () => {
 
     const undocumented = judge(
       withTrailer(
-        'Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>\n' +
+        `Co-Authored-By: ${CLAUDE_MODEL} <noreply@anthropic.com>\n` +
           'Reviewer: GPT-5.6 Sol <noreply@openai.com>',
       ),
     )
@@ -82,7 +82,7 @@ describe('the commit-msg model-trailer gate', () => {
     const r = judge(withTrailer('Co-Authored-By: Claude <noreply@anthropic.com>'))
     expect(r.status).toBe(1)
     expect(r.stderr).toContain('unnamed-model-trailer')
-    expect(r.stderr).toContain('Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>')
+    expect(r.stderr).toContain(`Co-Authored-By: ${CLAUDE_MODEL} <noreply@anthropic.com>`)
     expect(r.stderr).toContain('~/.claude/projects/')
   })
 
@@ -169,7 +169,7 @@ describe('a real commit through the commit-msg hook', () => {
       const undocumented = vcs(
         'commit',
         '-m',
-        'A probe\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>\nReviewer: GPT-5.6 Sol <noreply@openai.com>',
+        `A probe\n\nCo-Authored-By: ${CLAUDE_MODEL} <noreply@anthropic.com>\nReviewer: GPT-5.6 Sol <noreply@openai.com>`,
       )
       expect(undocumented.status, 'the hook accepted an undocumented reviewer key').not.toBe(0)
       expect(undocumented.stderr).toContain('undocumented-reviewer-trailer')
@@ -179,7 +179,7 @@ describe('a real commit through the commit-msg hook', () => {
         'commit',
         '-q',
         '-m',
-        'A probe\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>\nReviewed-By: GPT-5.6 Sol <noreply@openai.com>',
+        `A probe\n\nCo-Authored-By: ${CLAUDE_MODEL} <noreply@anthropic.com>\nReviewed-By: GPT-5.6 Sol <noreply@openai.com>`,
       )
       expect(ok.status, `the hook refused a named trailer: ${ok.stderr}`).toBe(0)
       expect(vcs('log', '--oneline').stdout.trim()).not.toBe('')

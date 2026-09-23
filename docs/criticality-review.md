@@ -11,7 +11,7 @@ the whole system or hard to reverse.
 
 A HIGH item gets a **model-diverse review** — either
 
-- the primary model (Opus 5) builds and **Fable 5 reviews the PLAN before and the
+- the primary model (Opus 5.5) builds and **Fable 5 reviews the PLAN before and the
   RESULT after** ("is it truly safe, does it work in ALL cases, are there
   negative side effects?"), or
 - Fable builds and Opus cross-checks.

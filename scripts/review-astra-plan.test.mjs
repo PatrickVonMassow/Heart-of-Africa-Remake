@@ -5,6 +5,7 @@ import {
   formatUnavailableReceiptRoute,
 } from './review-astra.mjs'
 import { planAuthorshipGroups } from './mechanism-review-range-core.mjs'
+import { OPUS_MODEL } from './fable-switch-core.mjs'
 
 const sha = 'a'.repeat(40)
 const base = 'b'.repeat(40)
@@ -15,7 +16,7 @@ const pass = {
   endState: sha,
   rangeBase: base,
   files: ['scripts/example-guard.mjs'],
-  reviewer: 'Opus 5',
+  reviewer: OPUS_MODEL,
   reviewerVendor: 'anthropic',
 }
 
@@ -84,7 +85,7 @@ describe('printed review pass commands', () => {
       endStateFiles: files,
     })
     expect(routed.groups).toHaveLength(1)
-    expect(routed.groups[0]).toMatchObject({ reviewer: 'Opus 5', files })
+    expect(routed.groups[0]).toMatchObject({ reviewer: OPUS_MODEL, files })
 
     const text = formatAuthorshipPlan({
       budget: 200_000,
@@ -111,7 +112,7 @@ describe('printed review pass commands', () => {
     const routed = planAuthorshipGroups({
       commits: [{
         sha,
-        authorModels: ['GPT-6 Astra', 'Opus 5', 'Fable 5.1', 'Opus 4.8'],
+        authorModels: ['GPT-6 Astra', OPUS_MODEL, 'Fable 5.1', 'Opus 4.8'],
         files,
       }],
       endStateFiles: files,

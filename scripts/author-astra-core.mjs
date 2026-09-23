@@ -1,4 +1,4 @@
-// THE OPENAI AUTHORING LANE, decided (point 667). Pure half. rule:model-policy@4f05875b
+// THE OPENAI AUTHORING LANE, decided (point 667). Pure half. rule:model-policy@0238ab8b
 //
 // `scripts/review-astra.mjs` and `scripts/ask-astra.mjs` send Astra work it may only
 // READ. This lane sends it work it WRITES: a point, on its own branch, in its
@@ -30,6 +30,7 @@
 // Side-effect free: the spawn, the git work and the push belong to
 // scripts/author-astra.mjs. Pinned by author-astra-core.test.mjs.
 
+import { OPUS_MODEL } from './fable-switch-core.mjs'
 import { allowedTrailers, classifyTrailer, modelNamesIn } from './model-guard-core.mjs'
 import { sameModel } from './mechanism-review-core.mjs'
 import { charStripped, rawFieldValue, stripDecoration, ASTRA_MODEL_ID, ASTRA_MODEL_NAME, ASTRA_REASONING_EFFORT } from './review-astra-core.mjs'
@@ -624,7 +625,7 @@ export function formatAuthoringReport({
   branch = '',
   judged = {},
   parsed = {},
-  reviewer = 'Opus 5',
+  reviewer = OPUS_MODEL,
   pushed = null,
   framing = '',
   commandName = 'author-astra',

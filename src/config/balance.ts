@@ -851,7 +851,7 @@ export interface BalanceConfig {
       /** Backstop: an errand never outlives this, however the walk goes. */
       errandSeconds: number
       /** Seconds of NO headway toward the target after which the errand is let
-       *  go, so a walk that cannot finish stops holding its villager. */
+       *  go for BOTH partners, including one already waiting at his spot. */
       stallSeconds: number
       /** The pace a villager walks at while on an errand (m/s). */
       pace: number
@@ -874,7 +874,7 @@ export interface BalanceConfig {
       passSeconds: number
       /** Metres of woven strip one completed pass adds to the cloth. */
       clothPerPass: number
-      /** Seconds between two NAMED tendings. The throws themselves are silent;
+      /** Seconds between two NAMED tendings. The throws themselves say no words;
        *  this is the rate the two direction words fall at. */
       tendIntervalSeconds: number
       /** Random spread of that interval, 0..1 (0 = a metronome). */
@@ -883,6 +883,17 @@ export interface BalanceConfig {
       tendDwellSeconds: number
       /** The pace he walks the warp at, in metres per second. */
       helperPace: number
+      foldSeconds: number
+      weaveSaturation: number
+      helperCycleSeconds: number
+      stackCap: number
+      stackFallback: number
+      stackSeedMin: number
+      stackSeedMax: number
+      beatPeak: number
+      beatAttack: number
+      beatDuration: number
+      beatFrequency: number
     }
     /** The body every inhabitant presents to every other (work-order 578). */
     separation: {
@@ -915,6 +926,10 @@ export interface BalanceConfig {
     call: { reach: number; loudness: number; falloff: number }
     /** Visible consequence after the last syllable; calibratable seconds. */
     consequenceSeconds: number
+    /** How long an INSTRUCTED body waits after the last syllable before it
+     *  starts doing what it was told (work-order 1184). Serves the water errand
+     *  and the loom alike; the word's own length is added to it. */
+    instructionHoldSeconds: number
     /** Stuck-situation backstop, measured against shipped work in tests. */
     speechHoldSeconds: number
     /** How long the hypothesis stands over a speaker's head, for one atom. */
@@ -1603,7 +1618,7 @@ export const balance: BalanceConfig = {
       errandSeconds: 300,
       // A walk that gets NOWHERE for this long is let go — twenty seconds is
       // many times the longest stretch a legitimate detour round a hut spends
-      // without shortening the straight line, and a twentieth of the backstop
+      // without shortening the straight line, and a fifteenth of the backstop
       // above, which on its own held a blocked villager for twenty staged
       // errands and left the village silent for minutes (point 586).
       stallSeconds: 20,
@@ -1636,6 +1651,18 @@ export const balance: BalanceConfig = {
       tendIntervalSpread: 0.35,
       tendDwellSeconds: 5,
       helperPace: 1.25, // the errand walk's own unhurried pace
+      // Calibratable scenery and motion; no inventory or trade value.
+      foldSeconds: 3.2,
+      weaveSaturation: 0.25,
+      helperCycleSeconds: 1.1,
+      stackCap: 8,
+      stackFallback: 3,
+      stackSeedMin: 2,
+      stackSeedMax: 4,
+      beatPeak: 0.65,
+      beatAttack: 0.003,
+      beatDuration: 0.085,
+      beatFrequency: 1800,
     },
     // The body every inhabitant presents to every other (work-order 578).
     // Calibratable starting values (educated guess, CLAUDE.md §2), stated
@@ -1701,6 +1728,23 @@ export const balance: BalanceConfig = {
     // in the shipped-layout replay. Keep the whole call audible (calibratable).
     call: { reach: 34, loudness: 1.25, falloff: 4 },
     consequenceSeconds: 2,
+    // Calibratable (CLAUDE.md §2), user's default of 22.09.2026: one second
+    // between the end of an order and the first step of the man obeying it.
+    // Long enough that the word plainly comes FIRST and the act answers it,
+    // short enough that the two still read as one exchange. With a four-
+    // syllable word at 0.3 s that is a 2.09 s hold, which sits inside the
+    // floor's own consequence window (1.2 + `consequenceSeconds`) and inside
+    // the note over the speaker's head (`labelSeconds`), so nothing else in the
+    // village speaks into the gap and the player can still see what was said
+    // when the body answers it.
+    // WATER IS SCARCE (point 1182), SO THE COST WAS MEASURED, NOT ASSUMED: over
+    // 1200 s of simulated village at four adults, the interval between two
+    // deliveries is 63.29 s both with the hold and without it (19 deliveries
+    // either way). The errand carries TWO held words, but the catalogue only
+    // casts water on its `intervalSeconds` grid, which swallows them; the same
+    // harness moves to 80.72 s at a hold of 8 s, so the reading is a real
+    // measurement and not a blind spot.
+    instructionHoldSeconds: 1,
     speechHoldSeconds: 240,
     // Long enough to read one reading and look back at the speaker, short
     // enough that the scene never carries standing text; a phrase adds one

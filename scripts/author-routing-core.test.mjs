@@ -23,7 +23,7 @@ import {
   unsuccessfulReviewRounds,
   VERIFICATION_MARKERS,
 } from './author-routing-core.mjs'
-import { readState, writeState } from './fable-switch-core.mjs'
+import { CLAUDE_MODEL, OPUS_MODEL, readState, writeState } from './fable-switch-core.mjs'
 
 const fable = (state) => readState(JSON.stringify(writeState(state, { why: 'test decision', by: 'test', now: 1 })))
 const OFF = fable('off')
@@ -453,10 +453,10 @@ describe('re-authoring rounds — decorrelated before Fable', () => {
   it('routes the examination to the vendor that did not author the rounds, never Fable', () => {
     expect(specExaminerFor({ rounds: [{ authoredBy: 'GPT-5.6 Sol <noreply@openai.com>' }] })).toMatchObject({
       vendor: 'claude',
-      model: 'Opus 5',
+      model: OPUS_MODEL,
       route: 'claude-read',
     })
-    expect(specExaminerFor({ rounds: [{ authoredBy: 'Claude Opus 5 <noreply@anthropic.com>' }] })).toMatchObject({
+    expect(specExaminerFor({ rounds: [{ authoredBy: `${CLAUDE_MODEL} <noreply@anthropic.com>` }] })).toMatchObject({
       vendor: 'astra',
       model: 'GPT-6 Astra',
       route: 'ask-astra',
@@ -469,7 +469,7 @@ describe('re-authoring rounds — decorrelated before Fable', () => {
       point: 727,
       mode: 'review',
       verdict: 'merge',
-      model: 'Opus 5',
+      model: OPUS_MODEL,
       specExamination: 'sound',
       evidence: 'the point and brief agree with every finding',
       ...extra,

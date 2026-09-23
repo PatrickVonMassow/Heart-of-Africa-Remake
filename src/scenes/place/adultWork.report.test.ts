@@ -4,6 +4,7 @@ import { beforeAll, expect, it, vi } from 'vitest'
 import { setupGeodata } from '../../test/geodata'
 import { resetDevAsserts } from '../../systems/devAssert'
 import { balance } from '../../config/balance'
+import { instructionDelay } from '../../communication/speaking'
 import { mulberry32 } from '../../world/noise'
 import { buildLayout } from './layout'
 import * as workApi from './adultWork'
@@ -120,6 +121,13 @@ it.each([0.1, 1 / 30, 1 / 60, 1 / 107])('completes the first reported village wa
     expect(words, 'the first pair must order, fetch, and report before its 300-second expiry').toEqual(['water-out', 'water-back'])
     expect(phases).toEqual(new Set(['wait:none', 'fetch:emptyJar', 'fill:emptyJar', 'walk:fullJar', 'walk:none']))
     expect(work.standJars).toBe(1)
+    // THE REPORT ENDS THE ERRAND WHEN IT HAS BEEN HEARD OUT (work-order 1184):
+    // the pair stands at the stand through the hold between the word and its
+    // consequence, so the loop above broke one moment before they are released.
+    for (let held = 0; held <= instructionDelay('RIVER'); held += dt) {
+      move(env)
+      workApi.stepAdultWork(work, view, dt, cfg, rand)
+    }
     expect(work.tasks).not.toContain(firstSender)
     expect(work.tasks).not.toContain(firstCarrier)
     expect(work.floor?.forcedCount).toBe(0)

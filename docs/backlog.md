@@ -1687,3 +1687,102 @@ WEITERGEFÜHRT ALS PUNKT 1174 (21.09.2026): Der Nutzer hat am selben Tag verlang
 je Spielstart zu würfeln. Damit wandert das überzählige Spiegelpaar von Start zu Start, und der
 Punkt hält es mit seiner Regel (b) aus dem Auftrag heraus, wo es am meisten schadet. Was hier
 stehen bleibt, ist die Abzählung, auf der diese Regel steht — nicht mehr eine offene Schwäche.
+
+## Fünf verwaiste Worktrees, einer davon ein offener Punkt (22.09.2026)
+
+Gemessen 22.09.2026 11:12: `git worktree list` zeigt neben dem Haupt-Checkout fünf
+`feat/`-Worktrees ohne lebenden Autor — point-1049 (`feat/1049-queue-order-rule`, drei
+Wochen), point-1174 (`feat/1174-rolled-lexicon`, vier Stunden), point-834
+(`feat/834-durable-authoring-lane`, vier Wochen), point-847 (`feat/847-brevity-guard-gaps`,
+vier Wochen), point-901 (`feat/901-superseded-ci-run`, drei Wochen). Kein claude-, astra- oder
+codex-Prozess lief im selben Zug auf einem davon. 1174 ist ein OFFENER Punkt (TASKS.md), die
+anderen vier sind drei bis vier Wochen alt. Offen ist, ob einer ungelandete Arbeit hält oder ob
+alle fünf Reste sind. Aufgeräumt wird ausschließlich mit `scripts/worktree-cleanup.mjs`, nie mit
+den nackten git-Befehlen — der `node_modules`-Link folgt sonst in den Hauptbaum. NICHT als Punkt
+eingereiht: kein Spielerschaden, keine Blockade, und der Infrastruktur-Freeze (CLAUDE.md §2)
+lässt Aufräumarbeit an Worktrees nicht vor Spielarbeit.
+
+## render-verify-guard blockt auf testreinen Harness-Dateien (22.09.2026)
+
+Gemessen 22.09.2026: Der Guard blockt das Zugende für `src/scenes/place/layoutHarness.ts` und
+`src/scenes/place/tagShuffleHarness.ts` (aus den Punkten 1178/1180). Beide Dateien sind
+TESTREIN — ein grep über `src/` und `scripts/` findet keinen Importeur außerhalb von
+`*.test.ts`, und `layoutHarness.ts` sagt das in Zeile 2 selbst. Sie rufen `buildLayout`, eine
+reine Funktion, und cachen deren Ergebnis je (place, seed); sie ändern nichts an dem, was
+gerendert wird. Der Guard entscheidet allein am Pfadpräfix `src/scenes/place/` und kann Harness
+von Renderpfad nicht unterscheiden. FOLGE: zwei Suite-Läufe von je rund dreißig Minuten für eine
+Änderung, die kein Pixel bewegen kann — jeder Test-Fixture-Refactor unter `src/scenes/` kostet
+das. MÖGLICHE ENGFÜHRUNG, nicht gebaut: eine Datei unter einem Renderpfad, die kein
+Nicht-Test-Modul importiert, schuldet kein Bild. Unter dem Infrastruktur-Freeze (CLAUDE.md §2)
+wird die Regel im Einzelfall mit `--defer` abgeschaltet statt umgebaut; als Punkt lohnt sie sich
+erst, wenn sie wiederholt Spielarbeit aufhält.
+
+## Die Webstuhl-Hilfsperson hat keine Arbeitsanimation, und beide Kettenenden sehen gleich aus (22.09.2026)
+
+Aus der Nutzermeldung vom 22.09.2026: „Das mit dem Weben funktioniert. Allerdings finde ich nicht
+erkennbar, dass da jemand am Weben ist und was die Hilfsperson macht." Gemessen im selben Zug,
+ZWEI getrennte Befunde.
+
+(1) DIE HILFSPERSON IST UNFERTIG. `PlaceLife.tsx` setzt bei `helperWorking` beide Arme auf
+`armAim(0, -0.85)` und `lean 0.35` — ein STEHENDES Bild ohne Zyklus, `tendDwellSeconds` = 5 s
+lang unbewegt, nichts in den Händen, und am getendeten Kettenende ändert sich hinterher nichts.
+„Was macht der" ist damit auch aus zwei Metern nicht beantwortbar. Schwerer wiegt die Folge für
+den Zweck der Station: Beide Kettenenden sehen identisch aus, also trägt das Wort
+UPSTREAM/DOWNSTREAM keine sichtbare Konsequenz, und der Gang liest sich als Herumlaufen statt als
+Folge des Wortes.
+
+(2) DAS WEBEN IST VORHANDEN, ABER SCHWACH. `loomPose` schreibt beide Arme jeden Frame
+(`carry = atan2(0.16, 0.28)`, also ±30°, `lean` 0.1..0.24), das Schiffchen fährt, das Tuch wächst
+0,11 je 2,6-s-Durchgang. Aber `LOOM_BUILD.warpY` 0,22, `stakeHeight` 0,34, `stripWidth` 0,12 — der
+ganze Apparat liegt unter Kniehöhe, die gesamte Bewegung ist waagerecht und klein, und es gibt
+KEINEN Ton: `src/systems/ambience.ts` kennt Trommel, Schritte, Donner, Trampeln und Sprache, aber
+kein einziges Arbeitsgeräusch im Dorf — dabei ist ein Schmalstreifen-Webstuhl vor allem ein
+Klacken. `speechRoute(ac, dest, pan)` existiert inzwischen, ein ortsbezogener Riet-Schlag ist
+also machbar.
+
+NICHT EINGEREIHT: Der Nutzer wollte ausdrücklich erst diskutieren. Die Frage, ob die Station vom
+Platz aus oder erst davor lesbar sein soll, steht als Entscheidungskarte „Webstuhl: vom Platz aus
+erkennen oder erst, wenn man davorsteht?" auf der Tafel. Befund (1) wird unabhängig von der
+Antwort gebaut, (2) hängt an ihr.
+
+## Der Retry-Takt der automatischen Pause kennt keinen Nutzer-Halt (22.09.2026)
+
+Gemessen am 22.09.2026 zwischen 20:52 und 20:58. Der Nutzer hatte die Batch
+angehalten und in der laufenden Sitzung ausdrücklich gesagt, vor dem
+Weiterlaufen stehe eine Umstellung an; der SessionStart-Hook wies dieselbe
+Sitzung korrekt an, nicht selbst fortzusetzen. Die Pause-Marke war aber vom
+Typ `automatic` (cause `runaway`, `retry-after` 18:46:06Z), und als dieser
+Takt ablief, startete der Autostart-Watchdog um 20:56 eine autonome Sitzung
+(`claimedAt` 1790103392299, trigger `watchdog`), die den Lock nahm und der
+betreuten Sitzung jede Mutation mit STAND-DOWN verweigerte. Ein maschinell
+gesetzter Retry-Takt überschreibt damit einen menschlichen Halt, der nach dem
+Setzen der Marke ausgesprochen wurde.
+
+Die Sitzung, die den Lock abgab, hat die Marke anschließend als `user-stop`
+mit `retry-after: never` neu geschrieben — das ist die richtige Form, aber sie
+entstand von Hand und erst nach dem Zwischenfall. Was fehlt, ist der Übergang:
+Ein Nutzer-Halt, der während einer laufenden automatischen Pause ausgesprochen
+wird, muss deren Takt löschen, statt ihn weiterlaufen zu lassen.
+
+NICHT EINGEREIHT: Infrastruktur-Freeze (Nutzerentscheidung 01.09.2026). Der
+Fall hat kein Spielwerk blockiert und keine falsche Freigabe erlaubt; er hat
+eine Sitzung Arbeitszeit gekostet.
+
+## `polish` adult-errands: die Montage-Wartebedingung akzeptiert veraltete Hooks (22.09.2026)
+
+Gemessen beim Bildnachweis von Punkt 1184 auf WebGPU: In 2 von 4 Läufen der
+Sektion `adult-errands` (16:50 und 22:41, beide auf `feat/1184-word-then-act`)
+stirbt `polish` an `scripts/verify/polish.mjs:7524` mit
+`TypeError: Cannot read properties of undefined (reading 'digSites')`, weil
+`window.__placeLayout` in diesem Moment fehlt; der Lauf 23:28 am selben Commit
+und der Lauf 23:24 am Merge-Base `d6954d956` kamen an derselben Stelle durch.
+Die Wartebedingung davor (`__placeWalkers?.sample && __placeErrands`) prüft nur
+Hooks aus `PlaceLife`, die beim Ortswechsel stehen bleiben können, nicht den
+`PlaceScene`-Hook `__placeLayout`, den der nächste Schritt liest. Vermutete
+Ursache: Warten auf veraltete Hooks des vorigen Orts; die naheliegende
+Reparatur ist, auch auf `__placeLayout` zu warten. Folge: der Absturz beendet
+die Suite und kostet die Abdeckung der fünf folgenden Sektionen.
+
+NICHT EINGEREIHT: Infrastruktur-Freeze (Nutzerentscheidung 01.09.2026). Ein
+Wiederholungslauf kommt durch; wird der Absturz reproduzierbar, gehört er als
+Punkt in die Arbeitsordnung.

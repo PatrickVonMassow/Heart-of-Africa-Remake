@@ -7,7 +7,7 @@
 // nothing in the repository would notice — GitHub is the only place that failure
 // shows, and the mail is the thing we cannot observe from here.
 
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -23,6 +23,7 @@ import {
   mailsOnFailure,
   parseOutcomes,
   renderSummary,
+  shardOutcomes,
   stepOutputs,
   verdict,
 } from './ci-gate-verdict-core.mjs'
@@ -32,6 +33,8 @@ const WORKFLOW = readFileSync(resolve(process.cwd(), '.github/workflows/ci.yml')
 
 /** The one expression that makes a step unable to fail the job. */
 const SOFT_EXPR = "continue-on-error: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/feat/') }}"
+
+const GREEN_SHARD = 'checkout=success node=success install=success build=success lint=success audit=success unit=success'
 
 const BRANCH = { event: 'push', ref: 'refs/heads/feat/513-branch-ci-no-mail' }
 const MAIN = { event: 'push', ref: 'refs/heads/main' }
@@ -128,6 +131,39 @@ describe('verdict', () => {
   })
 })
 
+describe('the combined shard verdict', () => {
+  it('requires both complete green shards, independent of arrival order', () => {
+    const outputs = { shard_2: GREEN_SHARD, shard_1: GREEN_SHARD }
+    expect(shardOutcomes(outputs)).toHaveLength(14)
+    expect(verdict({ ...BRANCH, outcomes: shardOutcomes(outputs) }).ok).toBe(true)
+  })
+
+  it.each([1, 2])('does not hide a red shard %s behind its green sibling', (shard) => {
+    const outputs = { shard_1: GREEN_SHARD, shard_2: GREEN_SHARD }
+    outputs[`shard_${shard}`] = GREEN_SHARD.replace('unit=success', 'unit=failure')
+    const v = verdict({ ...BRANCH, outcomes: shardOutcomes(outputs) })
+    expect(v.failed).toEqual([`shard-${shard}/unit`])
+    expect(commitStatus(v).state).toBe('failure')
+    expect(v.mails).toBe(false)
+  })
+
+  it.each(['failure', 'skipped', 'cancelled', '', 'unknown'])('rejects a shard step outcome of %j', (outcome) => {
+    const outputs = { shard_1: GREEN_SHARD, shard_2: GREEN_SHARD.replace('unit=success', `unit=${outcome}`) }
+    expect(verdict({ ...MAIN, outcomes: shardOutcomes(outputs) }).failed).toEqual(['shard-2/unit'])
+  })
+
+  it.each([undefined, null, {}, { shard_1: GREEN_SHARD }])('rejects missing shard results: %j', (outputs) => {
+    expect(verdict({ ...BRANCH, outcomes: shardOutcomes(outputs) }).ok).toBe(false)
+  })
+
+  it('rejects a missing or duplicate step even when every reported step passed', () => {
+    for (const value of [GREEN_SHARD.replace('unit=success', ''), `${GREEN_SHARD} unit=success`]) {
+      expect(verdict({ ...BRANCH, outcomes: shardOutcomes({ shard_1: GREEN_SHARD, shard_2: value }) }).failed)
+        .toEqual(['shard-2/unit'])
+    }
+  })
+})
+
 describe('the report', () => {
   it('the soft summary says the green tick is not a green gate', () => {
     const text = renderSummary(verdict({ ...BRANCH, outcomes: 'build=failure' }), { runUrl: 'https://run/1' })
@@ -188,7 +224,8 @@ describe('the workflow that arms it', () => {
   it('the verdict step runs whatever happened before it', () => {
     expect(WORKFLOW).toMatch(/id: verdict[\s\S]*?if: always\(\)/)
     expect(WORKFLOW).toContain('node scripts/ci-gate-verdict.mjs')
-    expect(WORKFLOW).toContain('GATE_OUTCOMES: install=${{ steps.install.outcome }}')
+    expect(WORKFLOW).toContain('GATE_SHARDS: ${{ toJSON(needs.fast.outputs) }}')
+    expect(WORKFLOW).toMatch(/gate:\n    needs: fast\n    if: always\(\)/)
   })
 
   it('EVERY gate step is announced to the verdict, and only real steps are', () => {
@@ -199,21 +236,34 @@ describe('the workflow that arms it', () => {
     // comes out green, green-statused and unalerted with every test still
     // passing. So the two sets are compared in BOTH directions: a dropped `id:`
     // and an unannounced step must each fail here.
-    const lines = WORKFLOW.split('\n')
-    const verdictAt = lines.findIndex((l) => l.trim() === '- id: verdict')
-    expect(verdictAt).toBeGreaterThan(0)
-    const ids = lines.slice(0, verdictAt).flatMap((l) => {
-      const m = /^ {6}- id: (\S+)$/.exec(l)
-      return m ? [m[1]] : []
-    })
-    const value = /^\s*GATE_OUTCOMES: (.*)$/m.exec(WORKFLOW)?.[1] ?? ''
+    const fast = WORKFLOW.split('  fast:\n')[1].split('  gate:\n')[0]
+    const beforeCapture = fast.split('      - id: outcomes')[0]
+    const ids = [...beforeCapture.matchAll(/^ {6}- id: (\S+)$/gm)].map(([, id]) => id)
+    const value = /^\s*GATE_OUTCOMES: (.*)$/m.exec(fast)?.[1] ?? ''
     const announced = [...value.matchAll(/(\S+)=\$\{\{ steps\.(\S+)\.outcome \}\}/g)].map(([, label, step]) => {
-      // A label pointing at another step's outcome would report the wrong one.
       expect(label).toBe(step)
       return label
     })
-    expect(ids.length).toBeGreaterThan(3)
+    expect(ids).toEqual(['checkout', 'node', 'install', 'build', 'lint', 'audit', 'unit'])
     expect(announced.slice().sort()).toEqual(ids.slice().sort())
+    // The aggregate core must require exactly the steps the workflow runs.
+    expect(shardOutcomes({}).filter(({ step }) => step.startsWith('shard-1/')).map(({ step }) => step.split('/')[1]))
+      .toEqual(ids)
+  })
+
+  it('runs both shards without fail-fast, at the unchanged job ceiling', () => {
+    const fast = WORKFLOW.split('  fast:\n')[1].split('  gate:\n')[0]
+    expect(fast).toContain('fail-fast: false')
+    expect(fast).toContain('shard: [1, 2]')
+    expect(fast).toContain('timeout-minutes: 25')
+    expect(fast).toContain('npm run test:unit -- --shard=${{ matrix.shard }}/2')
+    expect(fast).toMatch(/id: outcomes[\s\S]*?if: always\(\)/)
+    for (const shard of [1, 2]) {
+      expect(fast).toContain(`shard_${shard}: \${{ steps.outcomes.outputs.shard_${shard} }}`)
+    }
+    expect(fast).toContain('SHARD: ${{ matrix.shard }}')
+    expect(fast).toContain("printf 'shard_%s=%s\\n' \"$SHARD\" \"$GATE_OUTCOMES\" >> \"$GITHUB_OUTPUT\"")
+    expect(WORKFLOW.match(/run: node scripts\/ci-gate-verdict.mjs/g)).toHaveLength(1)
   })
 
   it('the ntfy alert keys off the verdict, which a soft run alone reaches', () => {
@@ -249,6 +299,33 @@ describe('the wrapper, driven for real', () => {
       rmSync(dir, { recursive: true, force: true })
     }
   }
+
+  it.each([
+    ['push', BRANCH.ref, { shard_1: GREEN_SHARD, shard_2: GREEN_SHARD }, 0, 'false'],
+    ['push', BRANCH.ref, { shard_1: GREEN_SHARD }, 0, 'true'],
+    ['push', MAIN.ref, { shard_1: GREEN_SHARD }, 1, 'true'],
+    ['push', MAIN.ref, { shard_1: GREEN_SHARD, shard_2: GREEN_SHARD.replace('unit=success', 'unit=failure') }, 1, 'true'],
+    ['push', MAIN.ref, 'invalid-json', 1, 'true'],
+    ['workflow_dispatch', BRANCH.ref, { shard_1: GREEN_SHARD }, 1, 'true'],
+    ['push', MAIN.ref, { shard_1: GREEN_SHARD, shard_2: GREEN_SHARD }, 0, 'false'],
+  ])('aggregates real wrapper output for %s %s', (event, ref, shards, status, failed) => {
+    const dir = mkdtempSync(join(tmpdir(), 'ci-shards-'))
+    const output = join(dir, 'output.txt')
+    try {
+      const result = spawnSync(process.execPath, [join(HERE, 'ci-gate-verdict.mjs')], {
+        env: {
+          ...process.env, GATE_EVENT: event, GATE_REF: ref,
+          GATE_OUTCOMES: 'checkout=success node=success', GATE_SHARDS: typeof shards === 'string' ? shards : JSON.stringify(shards),
+          GITHUB_TOKEN: '', GITHUB_OUTPUT: output, GITHUB_STEP_SUMMARY: '',
+        },
+        encoding: 'utf8', windowsHide: true,
+      })
+      expect(result.status, result.stderr).toBe(status)
+      expect(readFileSync(output, 'utf8')).toContain(`failed=${failed}`)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
 
   it('a red branch run exits 0 and writes the whole finding down', () => {
     // execFileSync throws on a non-zero exit, so "it exits 0" is asserted by the
