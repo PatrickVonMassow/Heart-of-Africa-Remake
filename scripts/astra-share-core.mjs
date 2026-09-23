@@ -17,6 +17,8 @@
 // scripts/astra-share.mjs. Pinned by astra-share-core.test.mjs.
 
 import { KINDS as ASK_KINDS } from './ask-astra-core.mjs'
+import { FABLE_MODEL, OPUS_MODEL } from './fable-switch-core.mjs'
+import { OUTAGE_OUTCOMES } from './review-astra-core.mjs'
 import { mainCheckoutFrom } from './main-checkout-core.mjs'
 
 /**
@@ -78,10 +80,10 @@ export function settingOrSafe(value) {
  * forgotten one presents a fallback as the operator's choice — which is exactly the
  * defect the flag was added to fix. With one object there is nothing to forget.
  */
-export function asState(value) {
+export function asState(value, now = Date.now()) {
   return value && typeof value === 'object'
-    ? { setting: settingOrSafe(value.setting), corrupt: Boolean(value.corrupt) }
-    : { setting: settingOrSafe(value), corrupt: false }
+    ? { setting: settingOrSafe(value.setting), corrupt: Boolean(value.corrupt), fallback: activeFallback(value, now) }
+    : { setting: settingOrSafe(value), corrupt: false, fallback: null }
 }
 
 /** Where the setting lives, relative to the checkout that owns it. */
@@ -202,14 +204,118 @@ export function readSetting(raw) {
     changedBy: String(parsed?.changedBy ?? ''),
     problem: '',
     corrupt: false,
+    fallback: readFallback(parsed?.fallback),
   }
 }
 
 /** The state object to write for a setting. PURE. */
-export function writeState(setting, { now = Date.now(), by = '' } = {}) {
+export function writeState(setting, { now = Date.now(), by = '', fallback = null } = {}) {
   const value = normaliseSetting(setting)
   if (!value) throw new Error(`astra-share: not a setting: ${setting}`)
-  return { setting: value, changedAt: now, changedBy: String(by ?? '') }
+  const kept = readFallback(fallback)
+  return { setting: value, changedAt: now, changedBy: String(by ?? ''), ...(kept ? { fallback: kept } : {}) }
+}
+
+// THE MEASURED OUTAGE FALLBACK (point 1194). The setting is the operator's; this is an
+// override on top of it, written only when a routed Astra run FAILED on a vendor-limit or
+// unreachable signature, and carrying a probe clock. While the clock runs every kind is
+// served by Claude — Opus 5.5 authors, and four eyes uses the decorrelated same-vendor
+// pair (Fable 5.1 reads Opus 5.5 work). When it runs out, routing returns to the setting
+// and the next routed run is the probe: a success clears the record, the same signature
+// renews it. An ordinary failure is never a fallback — it stays the point's red.
+
+/** The classified outcomes that are a VENDOR outage — its own signature set. */
+export const OUTAGE_KINDS = OUTAGE_OUTCOMES
+
+/** How long a recorded outage keeps routing off Astra before the next probe. Calibratable. */
+export const OUTAGE_PROBE_MS = 30 * 60 * 1000
+
+/** The models serving under the fallback, named once for every consumer. */
+export const FALLBACK_AUTHOR = OPUS_MODEL
+export const FALLBACK_REVIEWER = FABLE_MODEL
+
+/** A fallback record as stored, or null when it is malformed. PURE. */
+export function readFallback(value) {
+  if (!value || typeof value !== 'object') return null
+  const since = Number(value.since)
+  const probeAt = Number(value.probeAt)
+  const ok = (n) => Number.isFinite(n) && n > 0 && n <= MAX_TIMESTAMP
+  if (!ok(since) || !ok(probeAt) || !OUTAGE_KINDS.includes(value.outage)) return null
+  return {
+    outage: value.outage,
+    signature: String(value.signature ?? '').slice(0, 200),
+    kind: String(value.kind ?? ''),
+    since,
+    probeAt,
+    probes: Number.isInteger(value.probes) && value.probes > 0 ? value.probes : 1,
+  }
+}
+
+/** The fallback in force at `now`, or null — an expired probe clock routes by the setting. PURE. */
+export function activeFallback(state, now = Date.now()) {
+  const fb = readFallback(state?.fallback)
+  return fb && fb.probeAt > now ? fb : null
+}
+
+/** The last non-empty line of a failed run that names its outage, for the record. PURE. */
+function signatureLine(text) {
+  const lines = String(text ?? '').replace(/\r/g, '').split('\n').map((l) => l.trim()).filter(Boolean)
+  return (lines.at(-1) ?? '').slice(0, 200)
+}
+
+/**
+ * The fallback record after one routed Astra run. PURE.
+ *
+ * `outcome` is review-astra-core's classifyOutcome; `text` the run's stderr and stdout.
+ * Returns { fallback, fellBack }: a success lifts any record, an outage records or
+ * renews one with a fresh probe clock, and every other failure leaves the record as it
+ * was and is NOT a fallback.
+ */
+export function afterAstraRun({ outcome = {}, text = '', kind = '', previous = null, now = Date.now(), probeMs = OUTAGE_PROBE_MS } = {}) {
+  const prior = readFallback(previous)
+  if (outcome.ok) return { fallback: null, fellBack: false }
+  if (!OUTAGE_KINDS.includes(outcome.kind)) return { fallback: prior, fellBack: false }
+  return {
+    fellBack: true,
+    fallback: {
+      outage: outcome.kind,
+      signature: signatureLine(text) || String(outcome.cause ?? '').slice(0, 200),
+      kind: String(kind ?? ''),
+      since: prior ? prior.since : now,
+      probeAt: now + probeMs,
+      probes: prior ? prior.probes + 1 : 1,
+    },
+  }
+}
+
+/**
+ * Where one kind goes NOW: the setting's route, overridden to Claude while a fallback is
+ * active. PURE. Returns { to, fallback } — `fallback` is the record that moved it, or null.
+ */
+export function effectiveRoute(kind, state, now = Date.now()) {
+  const fallback = activeFallback(state, now)
+  const to = routeFor(kind, asState(state, now).setting)
+  return to === 'astra' && fallback ? { to: 'claude', fallback } : { to, fallback: null }
+}
+
+/** The one sentence every consumer prints for an active fallback, or ''. PURE. */
+export function fallbackLine(state, now = Date.now()) {
+  const fb = activeFallback(state, now)
+  if (!fb) return ''
+  return (
+    `FALLBACK ACTIVE — GPT-6 Astra ${fb.outage} since ${new Date(fb.since).toISOString()} ("${fb.signature}"): ` +
+    `every kind is served by Claude (${FALLBACK_AUTHOR} authors; four eyes is the same-vendor pair, ` +
+    `${FALLBACK_REVIEWER} reads ${FALLBACK_AUTHOR} work, recorded as a fallback) until the probe at ` +
+    `${new Date(fb.probeAt).toISOString()}; the operator setting \`${asState(state, now).setting}\` stays`
+  )
+}
+
+/** The review hand-over cause under the fallback — the record says it was one. PURE. */
+export function fallbackReviewCause(fb) {
+  return (
+    `Astra outage FALLBACK (${fb?.outage ?? 'outage'}: "${fb?.signature ?? ''}") — four eyes on the ` +
+    `decorrelated same-vendor pair, ${FALLBACK_REVIEWER} reading ${FALLBACK_AUTHOR} work`
+  )
 }
 
 /**
@@ -245,12 +351,13 @@ export function kindsToAstra(setting) {
 }
 
 /** `--status` in ONE line: what goes where right now. PURE. */
-export function statusLine(setting) {
-  const value = settingOrSafe(setting)
-  const astra = kindsToAstra(value)
+export function statusLine(state, now = Date.now()) {
+  const { setting: value, fallback } = asState(state, now)
+  const astra = fallback ? [] : kindsToAstra(value)
   const claude = KINDS.filter((kind) => !astra.includes(kind))
   const half = (label, list) => `${label}: ${list.length ? list.join(', ') : 'nothing'}`
-  return `astra-share: ${value} — ${half('to GPT-6 Astra', astra)} · ${half('to Claude', claude)}`
+  const mark = fallback ? ` (outage FALLBACK until ${new Date(fallback.probeAt).toISOString()})` : ''
+  return `astra-share: ${value}${mark} — ${half('to GPT-6 Astra', astra)} · ${half('to Claude', claude)}`
 }
 
 /**
@@ -262,7 +369,10 @@ export function statusLine(setting) {
  * can afford.
  */
 export function briefLine(state) {
-  const { setting: value, corrupt } = asState(state)
+  const { setting: value, corrupt, fallback } = asState(state)
+  if (fallback) {
+    return `- ASTRA ROUTING: ${fallbackLine(state)} — do NOT call \`scripts/ask-astra.mjs\`.`
+  }
   // A FALLBACK SAYS IT IS ONE (audit, 12.08.2026). Presented bare, a safe setting reads
   // as the operator's choice, and nobody repairs the file it actually came from.
   const mark = corrupt ? ' (FALLBACK — the share state file is unusable; repair it with `node scripts/astra-share.mjs --set <setting>`)' : ''
@@ -289,7 +399,14 @@ export function briefLine(state) {
  * a note that is always there is a note nobody reads.
  */
 export function boardNoteSegment(state) {
-  const { setting: value, corrupt } = asState(state)
+  const { setting: value, corrupt, fallback } = asState(state)
+  if (fallback) {
+    return (
+      `Astra-Routing: Ausfall-Rückfall (${fallback.outage}) — alles läuft in der Claude-Kette, ${FALLBACK_AUTHOR} ` +
+      `schreibt, ${FALLBACK_REVIEWER} prüft; nächste Probe ${new Date(fallback.probeAt).toISOString().slice(11, 16)} UTC, ` +
+      `Einstellung bleibt ${value}`
+    )
+  }
   // A fallback is named as one here too — on the board the reader is the user, and the
   // difference between "I set this" and "the file is broken" is the whole message.
   const mark = corrupt ? ' (Notfall-Rückfall: die Einstellungsdatei ist unlesbar)' : ''
