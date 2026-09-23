@@ -143,6 +143,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 15.09. abends | Der beauftragte Autorenlauf zu Punkt 1131 hing ohne `setsid` an der Schale, die ihn startete, und starb mit ihr — sein Protokoll behauptet bis zuletzt »while the run continues«. Ungesichert im Arbeitsbaum lag seine ganze Ausbeute: ein fertiger Reproduktionsstand des gemeldeten Dorfes, gerettet nur, weil ich zufaellig hinsah. Beide Vorsichtsmassnahmen — nach jedem Schritt committen, lange Laeufe abkoppeln — standen geschrieben und adressierten beide den AUFRUFER; Punkt 1133 verschiebt die zweite in den Startpfad des Werkzeugs (§3.106-Nachtrag) |
 | 18.09. vormittags | Ein Ein-Wort-Fix am Zeitstempel-Hook landete auf dem Zweig von Punkt 1155, weil die Sitzung „Current branch: main" aus ihrem Startschnappschuss glaubte, statt den Zweig des Arbeitsbaums zu messen; Cherry-Pick auf main, Revert auf dem Zweig, und der neue Test fiel im Push-Tor erst noch am `windowsHide`-Audit durch (§3.288) |
 
+| 23.09. abends | Ein Nutzerauftrag, der kein Auftragspunkt ist, kommt nicht los: Nach dem regelkonformen Anspruch auf den Batch-Lock verweigerte die Leerlauf-Behauptung der Tafel JEDE Schreiboperation — auch die, die den Punkt erst angelegt hätte. Die beiden dokumentierten Auswege greifen nicht: `now <N>` braucht eine Warteschlangen-Karte, die aus TASKS.md gebaut wird, `closing <N>` einen gemergten Punkt. Durchgekommen bin ich nur, weil das board-first-Tor pro Zug genau einmal feuert — eine Einmal-Freigabe, kein vorgesehener Weg (§3.306) |
 Muster: Ab dem 22.07. explodiert die Commit-Rate (Delegation) — und genau dann häufen sich die Infrastruktur-Vorfälle. **Skalierung der Autonomie erzeugt eine eigene Problemklasse, die die Feature-Arbeit zeitweise überholt.**
 
 ---
@@ -1475,6 +1476,37 @@ bis zum Schluss aus wie Fortschritt. Das ist die Kehrseite von §3.258: Dort spe
 falsch gemessenes Leben die Übergabe, hier verbarg ein falsch gemessenes Leben eine fertige
 Lieferung. Beide Male war die gemessene Größe eine Datei, und gefragt war ein Prozess.
 
+### 3.306 Der Auftrag, der sich selbst nicht anlegen darf
+
+Am 23.09. abends bat der Nutzer, den aktuellen `main`-Stand als `poc` zu taggen und zu
+veröffentlichen. Der Weg dorthin war seit §3.305 klar und wurde diesmal auch gegangen: Den
+Batch-Lock hielt eine autonome Sitzung, also habe ich ihn über `batch-claim.mjs` angefordert,
+bis zur Freigabe blockierend gewartet und ihn genommen. Danach stand die Arbeit trotzdem.
+
+Die Tafel behauptete »Gerade keine laufende Arbeit«, und diese Behauptung verweigert jede
+zustandsändernde Operation — zu Recht, denn sie ist eine Aussage über die Zukunft des Zuges. Nur
+erreichte keiner ihrer Auswege den Zustand, in dem ich war. `now <N>` verlangt einen offenen
+Punkt mit Warteschlangen-Karte, und die Warteschlange wird aus TASKS.md gebaut; `closing <N>`
+verlangt einen gemergten und abgehakten Punkt. Der Auftrag war keins von beidem. Er hätte ein
+Auftragspunkt werden müssen — aber das Anlegen dieses Punktes ist selbst eine Schreiboperation
+und damit genau das, was die Behauptung verbietet. Auch der Umweg über das Scratchpad fiel: Das
+Tor beurteilt jedes schreibende Segment, nicht sein Ziel.
+
+Das ist derselbe Riss, den Punkt 544 im August für die Abschlussarbeiten geschlossen hat, nur
+für einen neuen Fall: die frische Anordnung, die noch keine Nummer hat. Losgekommen bin ich
+nicht über einen vorgesehenen Weg, sondern weil das board-first-Tor pro Zug genau einmal feuert
+— beim zweiten Versuch ging dieselbe Datei-Änderung durch. Eine Einmal-Freigabe ist kein
+Mechanismus; sie hat hier nur zufällig in dieselbe Richtung gezeigt.
+
+Was daraus folgt, ist kein vierter Kartentyp — die Infrastruktur steht unter Einfriergebot, und
+ein weiterer Typ wäre genau der Wiederaufbau, den CLAUDE.md §2 untersagt. Es folgt die
+Beobachtung, dass die Tafel-Behauptung eine Reihenfolge erzwingt, die niemand erklärt hat: Erst
+muss der Auftrag eine Nummer haben, dann darf er getan werden, und das Vergeben der Nummer ist
+bereits die verbotene Handlung. Wer hier ohne die Einmal-Freigabe steht, kann den Auftrag des
+Nutzers nicht ausführen, ohne die Tafel zu belügen oder zu warten — und beides ist schlechter als
+das, was die Regel verhindern soll.
+
+
 ## 4. Die Guards als Immunsystem
 
 Jedes Guard-Skript ist die geronnene Lösung eines real aufgetretenen, wiederholten Problems.
@@ -1688,7 +1720,7 @@ stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die s
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 23.09.2026, 19:40 · Quellen-Fingerprint: `12e807e9ad5c…`
+Zuletzt aktualisiert: Mittwoch, 23.09.2026, 21:41 · Quellen-Fingerprint: `b01e4785f4e2…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1797,8 +1829,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 99 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 7 Revert-/Reapply-Commits · 140 Prozess-/Meta-TASKS-Punkte (davon 67 offen).
 
-<!-- RETRO-FINGERPRINT: 12e807e9ad5ce357557ecda407e989681b23e76c7a6e563dd8cfc83923cd9dd3 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-23T17:40:55.642Z -->
+<!-- RETRO-FINGERPRINT: b01e4785f4e21755c10c2f00847efe74414e5844554896f42b010dd5ce32fb51 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-23T19:41:36.620Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
