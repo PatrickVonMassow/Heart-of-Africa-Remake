@@ -7621,7 +7621,11 @@ if (section('adult-errands')) {
     const mounted = await page.waitForFunction(() => window.__placeWalkers?.sample && window.__placeErrands,
       null, { timeout: 40000 }).then(() => true).catch(() => false)
     check('the composed excavation village mounts with a sampled inhabitant', mounted)
-    if (mounted) {
+    // The route step reads the layout hook, which mounts in its own effect.
+    const layoutReady = mounted && await page.waitForFunction(() => !!window.__placeLayout?.digSites,
+      null, { timeout: 20000 }).then(() => true).catch(() => false)
+    if (mounted) check('the excavation village exposes its layout for the dig picture', layoutReady)
+    if (layoutReady) {
       const sites = await page.evaluate(() => window.__placeErrands().geography.digSites)
       const view = digPictureView(sites)
       check('the excavation picture has two distinct nearby sites', !!view, JSON.stringify(sites))
@@ -7635,7 +7639,8 @@ if (section('adult-errands')) {
         const route = await page.evaluate(async () => {
           const { digLocalToWorld, spoilOffset, placeGroundHeight } = await import('/src/scenes/place/placeGround.ts')
           const layout = window.__placeLayout
-          const site = layout.digSites.find((s) => s.kind === 'patch')
+          const site = layout?.digSites.find((s) => s.kind === 'patch')
+          if (!site) return null
           const start = digLocalToWorld(site, spoilOffset(site), -1.6)
           const end = digLocalToWorld(site, spoilOffset(site), 1.6)
           const ground = { bank: layout.bank, sites: layout.digSites, progress: window.__placeErrands().digProgress, rocks: layout.rocks }
