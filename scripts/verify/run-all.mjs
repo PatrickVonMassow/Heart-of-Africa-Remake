@@ -37,6 +37,7 @@ import {
 import { LADDER_STATUS, formatLadderRefusal } from './ladder-core.mjs'
 import { ladderCheck } from './ladder.mjs'
 import { SECTION_ENV, listSections, planSectionRun, resolveSelection } from './sections.mjs'
+import { isSectionName, sectionTag } from '../section-tag-core.mjs'
 import { readFileSync } from 'node:fs'
 import { EXIT_NOT_HELD, formatOwnershipVerdict, wantsBaseline } from './red-ownership-core.mjs'
 
@@ -346,7 +347,21 @@ function runSuite(name, baseUrl, onlySection = '') {
     ? red.point
     : chargeFor(red, { suite: name, backend: record.backend, featureLevel: record.featureLevel })?.point ?? null)
   const ownedSet = new Set(ownedReds)
-  const printed = failedChecks(out)
+  // THE PRINTED LINES ARE READ WITHOUT A SECTION TAG, as the recorder stores
+  // them (`separateResultSection`). Suites tag their lines in whole runs too,
+  // and a check without a detail carries the tag inside its NAME, so read raw,
+  // one red arrived twice: keyed by the record, and keyed with the tag by the
+  // output. Only a tag of a section the suite declares is stripped.
+  const declared = new Set([onlySection, process.env[SECTION_ENV]])
+  try {
+    for (const n of listSections(readFileSync(join(HERE, `${name}.mjs`), 'utf8'))) declared.add(n)
+  } catch { /* an unreadable suite source strips the live section's tag only */ }
+  const tags = [...declared].filter(isSectionName).map(sectionTag)
+  const judged = tags.length === 0 ? out : out.split('\n').map((line) => {
+    const tag = tags.find((t) => line.endsWith(t))
+    return tag ? line.slice(0, -tag.length) : line
+  }).join('\n')
+  const printed = failedChecks(judged)
   // A RECORD ENTRY MAY CARRY NO KEY — older records and hand-written ones name
   // the check and nothing else. Deriving it from the name is what every other
   // reader of this ledger does, and without it the same red arrives twice: once
@@ -358,8 +373,8 @@ function runSuite(name, baseUrl, onlySection = '') {
   // measurement under the same name — was invisible here while a `detailMatch`
   // charge reads exactly that measurement (Astra, round 5).
   const printedOccurrences = [
-    ...parseCheckLines(out).filter((c) => c.status === 'FAIL'),
-    ...consoleErrorChecks(out),
+    ...parseCheckLines(judged).filter((c) => c.status === 'FAIL'),
+    ...consoleErrorChecks(judged),
   ]
   const ownedPrinted = (check) => complete &&
     owned({ name: check.name, key: check.key, kind: check.kind ?? 'check', detail: check.detail },
@@ -371,37 +386,56 @@ function runSuite(name, baseUrl, onlySection = '') {
     list.push(entry)
     underKey.set(key, list)
   }
-  for (const red of reds) add(keyOf(red), { owned: ownedSet.has(red), point: () => pointOf(red) })
+  // A reading is a red's name and its measurement, as the reason text quotes it.
+  const readingOf = (red) => `"${red.name}${red.detail ? ` — ${red.detail}` : ''}"`
+  for (const red of reds) {
+    add(keyOf(red), { recorded: true, reading: readingOf(red), owned: ownedSet.has(red), point: () => pointOf(red) })
+  }
   for (const check of printedOccurrences) {
-    add(check.key, { owned: ownedPrinted(check), point: () => chargeFor(check, { suite: name, backend: record?.backend, featureLevel: record?.featureLevel })?.point ?? null })
+    add(check.key, {
+      recorded: false,
+      reading: readingOf(check),
+      owned: ownedPrinted(check),
+      point: () => chargeFor(check, { suite: name, backend: record?.backend, featureLevel: record?.featureLevel })?.point ?? null,
+    })
   }
   const row = ({ key, name: check, fromRecord }) => {
-    // EVERY OCCURRENCE, NOT THE FIRST OWNED ONE. The key folds the measurement
-    // out of a check's identity while a `detailMatch` charge reads exactly that
-    // measurement, so two reds under one key can differ in ownership. One of
-    // them being charged says nothing about the other.
+    // EVERY RECORDED OCCURRENCE, NOT THE FIRST OWNED ONE. The key folds the
+    // measurement out of a check's identity while a `detailMatch` charge reads
+    // exactly that measurement, so two reds under one key can differ in
+    // ownership. One of them being charged says nothing about the other.
     const occurrences = underKey.get(key) ?? []
-    // A CHARGE RESTS ON THE RECORD. A red the suite printed but the record does
-    // not carry is a disagreement between the two, and a disagreement charges
-    // nothing — which is also what the runner did before the retry was deleted.
-    const charged = recordedKeys.has(key) && occurrences.length > 0 && occurrences.every((entry) => entry.owned)
-    const point = charged ? occurrences[0].point() : null
+    const recorded = occurrences.filter((entry) => entry.recorded)
+    // A CHARGE RESTS ON THE RECORD. A printed reading the record does not carry
+    // is a disagreement between the two: it charges nothing, and it may not
+    // deny what the record's own reds earn — the record marks a measurement
+    // that varied within the run (`markVariedDetails`) itself. The disagreement
+    // is NAMED instead, with the reading, so it can be acted on.
+    const charged = recordedKeys.has(key) && recorded.length > 0 && recorded.every((entry) => entry.owned)
+    const point = charged ? recorded[0].point() : null
+    const printedUnowned = occurrences.filter((entry) => !entry.recorded && !entry.owned).map((entry) => entry.reading)
+    const recordedUnowned = recorded.filter((entry) => !entry.owned).map((entry) => entry.reading)
+    const printedReadings = occurrences.filter((entry) => !entry.recorded).map((entry) => entry.reading)
     return {
       suite: name,
       check,
       key,
       point,
       elsewhere: charged,
-      title: charged ? `point ${point} — ${check}` : '',
+      title: charged
+        ? `point ${point} — ${check}${printedUnowned.length
+          ? ` (the suite also printed ${printedUnowned.join(', ')}, which the record does not carry and no charge owns)`
+          : ''}`
+        : '',
       reason: charged
         ? `charged to open point ${point}`
-        : occurrences.some((entry) => entry.owned)
-          ? 'charged for one reading of this check but not for every one this run produced'
-          : !complete
-            ? 'the run record is incomplete, so no charge may be accepted for it — ownership unresolved'
-            : fromRecord
-              ? 'not in the classified baseline — no open point owns it'
-              : 'printed by the suite but carried by no charged record entry — ownership unresolved',
+        : !complete
+          ? 'the run record is incomplete, so no charge may be accepted for it — ownership unresolved'
+          : !fromRecord
+            ? `printed by the suite as ${printedReadings.join(', ') || `"${check}"`} but carried by no record entry, and a charge rests on the record — ownership unresolved`
+            : recorded.some((entry) => entry.owned)
+              ? `charged for one reading of this check but not for ${recordedUnowned.join(', ')}`
+              : 'not in the classified baseline — no open point owns it',
     }
   }
   const rows = []
@@ -443,7 +477,7 @@ function runSuite(name, baseUrl, onlySection = '') {
   // ledger is source, and a run that edits its own tree would dirty a landing.
   const redKeys = new Set([...recordedReds.map(keyOf), ...printed.map((check) => check.key)])
   const stale = complete
-    ? allChecks(out)
+    ? allChecks(judged)
       .filter((c) => c.status === 'PASS' && !redKeys.has(c.key))
       .map((c) => ({ check: c.name, charge: chargeFor({ name: c.name, key: c.key, kind: 'check', detail: c.detail },
         { suite: name, backend: record.backend, featureLevel: record.featureLevel }) }))

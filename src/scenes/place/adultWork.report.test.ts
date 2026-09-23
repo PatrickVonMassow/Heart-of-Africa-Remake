@@ -1,3 +1,4 @@
+import { SHIPPED_VOCABULARY } from '../../communication/vocabulary'
 import { readFileSync } from 'node:fs'
 import ts from 'typescript'
 import { beforeAll, expect, it, vi } from 'vitest'
@@ -66,6 +67,7 @@ it.each([0.1, 1 / 30, 1 / 60, 1 / 107])('completes the first reported village wa
   const bodies = inhabitants.createBodies(people.length)
   inhabitants.addBodies(bodySet, bodies)
   const view: workApi.AdultWorkView = {
+    vocabulary: SHIPPED_VOCABULARY,
     villagers: people,
     geography: {
       waterHead: layout.waterPath!.head, waterFoot: layout.waterPath!.foot,
@@ -124,7 +126,7 @@ it.each([0.1, 1 / 30, 1 / 60, 1 / 107])('completes the first reported village wa
     // THE REPORT ENDS THE ERRAND WHEN IT HAS BEEN HEARD OUT (work-order 1184):
     // the pair stands at the stand through the hold between the word and its
     // consequence, so the loop above broke one moment before they are released.
-    for (let held = 0; held <= instructionDelay('RIVER'); held += dt) {
+    for (let held = 0; held <= instructionDelay('RIVER', SHIPPED_VOCABULARY); held += dt) {
       move(env)
       workApi.stepAdultWork(work, view, dt, cfg, rand)
     }

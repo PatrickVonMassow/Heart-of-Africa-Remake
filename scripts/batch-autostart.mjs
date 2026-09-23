@@ -434,7 +434,7 @@ function readRunLogSegment(from) {
       now,
       ...verdict,
       // What the tick does with it: park (hold/wait) or resume (retry/none).
-      parksTheTick: verdict.state === 'hold' || verdict.state === 'wait' || verdict.state === 'recover',
+      parksTheTick: verdict.state === 'hold' || verdict.state === 'wait' || (verdict.state === 'recover' && !verdict.misfiledUserStop),
       clearsTheRecord: verdict.state === 'retry',
       replacesWithRecoveryClock: verdict.state === 'recover',
       note: describePause(verdict),
@@ -644,7 +644,10 @@ try {
 const pauseText = (() => { try { return readFileSync(C('batch-paused'), 'utf8') } catch { return null } })()
 let pause = classifyPause({ text: pauseText, now })
 if (pause.state === 'recover') {
-  const recovery = pauseRecovery({ text: pauseText, now })
+  // A misfiled user stop (point 1193) holds nothing: its clock expires this tick,
+  // so the retry branch below removes it and the successor is spawned.
+  const misfiled = pause.misfiledUserStop === true
+  const recovery = pauseRecovery({ text: pauseText, now, delayMs: misfiled ? 0 : undefined })
   // THE CLOCK IS WRITTEN UNCONDITIONALLY (point 749). It used to be written only
   // if a board card could be recorded first, so a board that could not be written
   // deferred the RECOVERY as well — a reporting failure holding up the repair. The
@@ -652,7 +655,8 @@ if (pause.state === 'recover') {
   try {
     writeTextAtomic(C('batch-paused'), recovery.record)
     pause = classifyPause({ text: recovery.record, now })
-    log(`${describePause(classifyPause({ text: pauseText, now }))}; retry at ${new Date(recovery.retryAfter).toISOString()}`)
+    log(`${describePause(classifyPause({ text: pauseText, now }))}; retry at ${new Date(recovery.retryAfter).toISOString()}` +
+      (misfiled ? `; snapshot ${JSON.stringify(pauseText)}` : ''))
   } catch (e) {
     log(`AMBIGUOUS PAUSE recognised but its recovery clock could not be written (${e?.message ?? e})`)
   }

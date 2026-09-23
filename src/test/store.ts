@@ -4,6 +4,7 @@
 // terrain at the marker coordinates below deterministic.
 import { beforeAll } from 'vitest'
 import { balance } from '../config/balance'
+import { rollVocabulary } from '../communication/vocabulary'
 import { useGame } from '../state/store'
 import { sampleTerrain, type TerrainType } from '../world/terrain'
 import { setupGeodata } from './geodata'
@@ -37,7 +38,7 @@ export const TEST_SEED = 42
 export function freshGame(seed = TEST_SEED): void {
   localStorage.clear()
   useGame.getState().newGame()
-  useGame.setState({ seed, equipment: {} })
+  useGame.setState({ seed, vocabulary: rollVocabulary(seed), equipment: {} })
   balance.randomEventsEnabled = true
   balance.foodPerDay = 1
   balance.health.canteenDrainPerDay = 0.9

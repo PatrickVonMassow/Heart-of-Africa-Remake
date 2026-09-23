@@ -2,6 +2,7 @@
 // is an invitation beside a person, a shared walk, a second utterance beside a
 // site, and only then a two-person bout whose strokes alter that site.
 
+import { SHIPPED_VOCABULARY } from '../../communication/vocabulary'
 import { describe, expect, it, vi } from 'vitest'
 import {
   ADULT_CONCEPTS,
@@ -59,6 +60,7 @@ function view(
   invitationClear: (x: number, z: number) => boolean = () => true,
 ): AdultWorkView {
   return {
+    vocabulary: SHIPPED_VOCABULARY,
     villagers: Array.from({ length: n }, (_, i) => ({
       x: at?.[i]?.x ?? i * 0.6,
       z: at?.[i]?.z ?? i * 0.4,
@@ -162,7 +164,7 @@ function pastHold(state: AdultWorkState, v: AdultWorkView, concept: 'RIVER' | 'D
   const dt = 1 / 60
   const next = state.next
   state.next = Infinity
-  for (let t = 0; t <= instructionDelay(concept); t += dt) stepAdultWork(state, v, dt, cfg, () => 0.5)
+  for (let t = 0; t <= instructionDelay(concept, SHIPPED_VOCABULARY); t += dt) stepAdultWork(state, v, dt, cfg, () => 0.5)
   state.next = next
 }
 
@@ -864,7 +866,7 @@ describe('digging records work at the site', () => {
     expect(digProgressOf(state, v.geography.digSites.length)[siteIndex]).toEqual({ dug: 0, strikes: 0 })
     stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
     // The word at the hole is heard out too, before the first stroke falls.
-    for (let t = 0; t < 5 + utteranceSeconds(4) + balance.communication.consequenceSeconds + instructionDelay('DIG'); t += 1 / 60) {
+    for (let t = 0; t < 5 + utteranceSeconds(4) + balance.communication.consequenceSeconds + instructionDelay('DIG', SHIPPED_VOCABULARY); t += 1 / 60) {
       walkFrame(state, v, 1 / 60)
       stepAdultWork(state, v, 1 / 60, CFG, () => 0.5)
     }

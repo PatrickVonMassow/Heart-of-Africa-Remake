@@ -3,6 +3,7 @@
 // gone when its time is up, and it goes with the figure when that leaves the
 // scene. The lifetime rules themselves are pinned in
 // src/communication/speechLabel.test.ts.
+import { SHIPPED_VOCABULARY } from '../../communication/vocabulary'
 import { describe, it, expect, beforeEach } from 'vitest'
 import type { Object3D } from 'three/webgpu'
 import { utteranceOf } from '../../communication/lexicon'
@@ -22,8 +23,8 @@ import {
   updateSpeechTarget,
 } from './speechChannel'
 
-const RIVER_UTTERANCE = utteranceOf('RIVER')
-const DIG = utteranceOf('DIG')
+const RIVER_UTTERANCE = utteranceOf('RIVER', SHIPPED_VOCABULARY)
+const DIG = utteranceOf('DIG', SHIPPED_VOCABULARY)
 
 /** A stand-in for the figure the label rides on; `parent: null` = unmounted. */
 function figure(parent: unknown = {}): Object3D {

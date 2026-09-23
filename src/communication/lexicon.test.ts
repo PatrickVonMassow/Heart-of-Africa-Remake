@@ -1,6 +1,7 @@
 // The tonal lexicon (docs/communication-poc-spec.md): completeness of the
 // registry, well-formedness and distance of the sequences, the mirror pairs,
 // and the one sort order the journal uses. Pure logic — no browser.
+import { SHIPPED_VOCABULARY } from './vocabulary'
 import { describe, expect, it } from 'vitest'
 import {
   CONCEPT_IDS,
@@ -48,26 +49,24 @@ describe('the registry is complete', () => {
     )
   })
 
-  it('gives every concept a sequence in every lect', () => {
-    for (const lect of LECT_IDS) {
-      for (const concept of CONCEPT_IDS) {
-        expect(sequenceOf(concept, lect), `${lect}/${concept}`).toHaveLength(SEQUENCE_LENGTH)
-      }
-      expect(Object.keys(lectOf(lect).sequences).sort()).toEqual([...CONCEPT_IDS].sort())
+  it('gives every concept a sequence in the shipped vocabulary', () => {
+    for (const concept of CONCEPT_IDS) {
+      expect(sequenceOf(concept, SHIPPED_VOCABULARY), concept).toHaveLength(SEQUENCE_LENGTH)
     }
+    expect(Object.keys(SHIPPED_VOCABULARY).sort()).toEqual([...CONCEPT_IDS].sort())
   })
 
   it('speaks the table of the spec, syllable for syllable', () => {
     for (const concept of CONCEPT_IDS) {
-      expect(utteranceOf(concept), concept).toBe(SPEC_TABLE[concept])
+      expect(utteranceOf(concept, SHIPPED_VOCABULARY), concept).toBe(SPEC_TABLE[concept])
     }
   })
 
   it('resolves a spoken utterance back to its concept, and a non-word to null', () => {
-    for (const concept of CONCEPT_IDS) expect(conceptOf(utteranceOf(concept))).toBe(concept)
-    expect(conceptOf('BA-ba-BA-ba')).toBe('CHIEF') // the last spare sequence, spoken now
-    expect(conceptOf('BA-ba-BA')).toBeNull() // too short
-    expect(conceptOf('')).toBeNull()
+    for (const concept of CONCEPT_IDS) expect(conceptOf(utteranceOf(concept, SHIPPED_VOCABULARY), SHIPPED_VOCABULARY)).toBe(concept)
+    expect(conceptOf('BA-ba-BA-ba', SHIPPED_VOCABULARY)).toBe('CHIEF') // the last spare sequence, spoken now
+    expect(conceptOf('BA-ba-BA', SHIPPED_VOCABULARY)).toBeNull() // too short
+    expect(conceptOf('', SHIPPED_VOCABULARY)).toBeNull()
   })
 
   it('keeps the lects distinguishable: lower-case low, upper-case high, no shared pair', () => {
@@ -82,14 +81,14 @@ describe('the registry is complete', () => {
       expect(pairs.has(`${lect.low}/${lect.high}`)).toBe(false)
       pairs.add(`${lect.low}/${lect.high}`)
     }
-    expect(lectOf()).toBe(lectOf(DEFAULT_LECT))
+    expect(lectOf(DEFAULT_LECT).id).toBe(DEFAULT_LECT)
   })
 })
 
 describe('the sequences are hearable', () => {
   it('are four syllables with an even number of highs', () => {
     for (const concept of CONCEPT_IDS) {
-      const s = sequenceOf(concept)
+      const s = sequenceOf(concept, SHIPPED_VOCABULARY)
       expect(isWellFormed(s), concept).toBe(true)
       expect(highCount(s) % 2, concept).toBe(0)
     }
@@ -104,18 +103,18 @@ describe('the sequences are hearable', () => {
 
   it('carry at least one syllable of each tone — no word is four identical beats', () => {
     for (const concept of CONCEPT_IDS) {
-      const s = sequenceOf(concept)
+      const s = sequenceOf(concept, SHIPPED_VOCABULARY)
       expect(highCount(s), concept).toBeGreaterThan(0)
       expect(highCount(s), concept).toBeLessThan(SEQUENCE_LENGTH)
     }
     // …and the two single-tone sequences are held in reserve rather than spoken.
-    const reserved = lectOf().reserved.map(key)
+    const reserved = lectOf(DEFAULT_LECT).reserved.map(key)
     expect(reserved).toContain(key(['low', 'low', 'low', 'low']))
     expect(reserved).toContain(key(['high', 'high', 'high', 'high']))
   })
 
   it('are unique', () => {
-    const seen = new Set(CONCEPT_IDS.map((c) => key(sequenceOf(c))))
+    const seen = new Set(CONCEPT_IDS.map((c) => key(sequenceOf(c, SHIPPED_VOCABULARY))))
     expect(seen.size).toBe(CONCEPT_IDS.length)
   })
 
@@ -123,31 +122,31 @@ describe('the sequences are hearable', () => {
     for (const a of CONCEPT_IDS) {
       for (const b of CONCEPT_IDS) {
         if (a === b) continue
-        expect(toneDistance(sequenceOf(a), sequenceOf(b)), `${a}/${b}`).toBeGreaterThanOrEqual(2)
+        expect(toneDistance(sequenceOf(a, SHIPPED_VOCABULARY), sequenceOf(b, SHIPPED_VOCABULARY)), `${a}/${b}`).toBeGreaterThanOrEqual(2)
       }
     }
   })
 
   it('turn no misheard beat into another concept — only into a non-word', () => {
     for (const concept of CONCEPT_IDS) {
-      const s = sequenceOf(concept)
+      const s = sequenceOf(concept, SHIPPED_VOCABULARY)
       for (let i = 0; i < s.length; i++) {
         const misheard = [...s]
         misheard[i] = s[i] === 'high' ? 'low' : 'high'
-        expect(conceptOf(speak(misheard)), `${concept} beat ${i}`).toBeNull()
+        expect(conceptOf(speak(misheard, DEFAULT_LECT), SHIPPED_VOCABULARY), `${concept} beat ${i}`).toBeNull()
       }
     }
   })
 
   it('counts a dropped beat as a difference in every position past the end', () => {
-    expect(toneDistance(sequenceOf('RIVER'), sequenceOf('RIVER').slice(0, 3))).toBe(1)
-    expect(toneDistance([], sequenceOf('RIVER'))).toBe(SEQUENCE_LENGTH)
+    expect(toneDistance(sequenceOf('RIVER', SHIPPED_VOCABULARY), sequenceOf('RIVER', SHIPPED_VOCABULARY).slice(0, 3))).toBe(1)
+    expect(toneDistance([], sequenceOf('RIVER', SHIPPED_VOCABULARY))).toBe(SEQUENCE_LENGTH)
   })
 
   it('reserves two unused sequences, and together with them exhausts the space', () => {
-    const reserved = lectOf().reserved
+    const reserved = lectOf(DEFAULT_LECT).reserved
     expect(reserved).toHaveLength(2)
-    const used = new Set(CONCEPT_IDS.map((c) => key(sequenceOf(c))))
+    const used = new Set(CONCEPT_IDS.map((c) => key(sequenceOf(c, SHIPPED_VOCABULARY))))
     for (const s of reserved) {
       expect(isWellFormed(s), key(s)).toBe(true)
       expect(used.has(key(s)), key(s)).toBe(false)
@@ -170,8 +169,8 @@ describe('the sequences are hearable', () => {
 describe('the opposite pairs mirror each other', () => {
   it('reverses the direction pair exactly', () => {
     for (const [a, b] of MIRROR_PAIRS) {
-      expect(reversed(sequenceOf(a)), `${a}/${b}`).toEqual(sequenceOf(b))
-      expect(reversed(sequenceOf(b)), `${b}/${a}`).toEqual(sequenceOf(a))
+      expect(reversed(sequenceOf(a, SHIPPED_VOCABULARY)), `${a}/${b}`).toEqual(sequenceOf(b, SHIPPED_VOCABULARY))
+      expect(reversed(sequenceOf(b, SHIPPED_VOCABULARY)), `${b}/${a}`).toEqual(sequenceOf(a, SHIPPED_VOCABULARY))
     }
   })
 
@@ -184,11 +183,11 @@ describe('the opposite pairs mirror each other', () => {
   // ROCK and DIG are each their own mirror and no pair at all. Pinned here so
   // the next such sentence is caught by a test rather than by a reader.
   it('holds two mirror pairs and two sequences that mirror themselves', () => {
-    const mirrorOf = (c: ConceptId) => key(reversed(sequenceOf(c)))
+    const mirrorOf = (c: ConceptId) => key(reversed(sequenceOf(c, SHIPPED_VOCABULARY)))
     const mirrored = CONCEPT_IDS.filter((c) =>
-      CONCEPT_IDS.some((o) => o !== c && key(sequenceOf(o)) === mirrorOf(c)),
+      CONCEPT_IDS.some((o) => o !== c && key(sequenceOf(o, SHIPPED_VOCABULARY)) === mirrorOf(c)),
     )
-    const selfMirrored = CONCEPT_IDS.filter((c) => key(sequenceOf(c)) === mirrorOf(c))
+    const selfMirrored = CONCEPT_IDS.filter((c) => key(sequenceOf(c, SHIPPED_VOCABULARY)) === mirrorOf(c))
     expect([...mirrored].sort()).toEqual(['CHIEF', 'DOWNSTREAM', 'RIVER', 'UPSTREAM'])
     expect([...selfMirrored].sort()).toEqual(['DIG', 'ROCK'])
   })
@@ -196,20 +195,20 @@ describe('the opposite pairs mirror each other', () => {
 
 describe('utterances and phrases', () => {
   it('reads the tones back off a written utterance', () => {
-    expect(tonesOf('ba-BA-BA-ba')).toEqual(sequenceOf('DIG'))
+    expect(tonesOf('ba-BA-BA-ba')).toEqual(sequenceOf('DIG', SHIPPED_VOCABULARY))
     expect(tonesOf('')).toEqual([])
   })
 
   it('a phrase is the ordered list of its atoms', () => {
-    expect(phraseOf(['ROCK', 'DIG'])).toEqual([utteranceOf('ROCK'), utteranceOf('DIG')])
-    expect(phraseOf([])).toEqual([])
+    expect(phraseOf(['ROCK', 'DIG'], SHIPPED_VOCABULARY)).toEqual([utteranceOf('ROCK', SHIPPED_VOCABULARY), utteranceOf('DIG', SHIPPED_VOCABULARY)])
+    expect(phraseOf([], SHIPPED_VOCABULARY)).toEqual([])
   })
 
   it('keeps the order of the chief\'s four-concept message', () => {
     const message: ConceptId[] = ['RIVER', 'UPSTREAM', 'ROCK', 'DIG']
-    const phrase = phraseOf(message)
+    const phrase = phraseOf(message, SHIPPED_VOCABULARY)
     expect(phrase).toHaveLength(4)
-    expect(phrase.map((a) => conceptOf(a))).toEqual(message)
+    expect(phrase.map((a) => conceptOf(a, SHIPPED_VOCABULARY))).toEqual(message)
   })
 })
 
@@ -232,7 +231,7 @@ describe('the journal sort order', () => {
   })
 
   it('is a total order — antisymmetric on every pair of the lexicon', () => {
-    const all = [...CONCEPT_IDS.map((c) => utteranceOf(c)), 'ba', 'BA-BA', '']
+    const all = [...CONCEPT_IDS.map((c) => utteranceOf(c, SHIPPED_VOCABULARY)), 'ba', 'BA-BA', '']
     for (const a of all) {
       for (const b of all) {
         const sum = Math.sign(compareUtterances(a, b)) + Math.sign(compareUtterances(b, a))
@@ -248,8 +247,8 @@ describe('the journal sort order', () => {
   })
 
   it('sorts the whole lexicon deterministically', () => {
-    const sorted = CONCEPT_IDS.map((c) => utteranceOf(c)).sort(compareUtterances)
-    expect(sorted.map((u) => conceptOf(u))).toEqual(
+    const sorted = CONCEPT_IDS.map((c) => utteranceOf(c, SHIPPED_VOCABULARY)).sort(compareUtterances)
+    expect(sorted.map((u) => conceptOf(u, SHIPPED_VOCABULARY))).toEqual(
       ['UPSTREAM', 'RIVER', 'DIG', 'ROCK', 'CHIEF', 'DOWNSTREAM'],
     )
   })

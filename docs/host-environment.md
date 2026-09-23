@@ -82,6 +82,14 @@ from a later app `window.__renderer` timeout before any suite starts.
   SwiftShader) as the fallback for a host without it — left to disagree, those two stacks
   report an adapter, initialise `isWebGPUBackend`, advance the frame counter and paint
   nothing (`Instance dropped in popErrorScope`, a black canvas behind a live HUD).
+- **A black PRODUCTION screenshot is this host, not the build** (point 1201, 23.09.2026).
+  An ad-hoc shot with bare `--headless=new --enable-unsafe-webgpu --enable-gpu` gets
+  neither flag set above, so Dawn loses its instance and paints the black canvas — on
+  the dev server exactly as on `vite preview`, /poc/ or the root deployment, with a
+  moving FPS readout and `createBuffer … too large` beside the popErrorScope errors.
+  The same two builds under `verifyLaunchOptions('webgpu', …)` both draw Cairo:
+  `verification/1201-black-production-picture-headless.png`. Before reading a black
+  picture as a defect, shoot it with the lane's options.
 - **The level is a THIRD lane, not core coverage.** three.js always requests the
   `compatibility` feature level and then decides by `core-features-and-limits`; the GLES
   adapter carries none, so three sets `compatibilityMode`, drops MSAA and runs compat

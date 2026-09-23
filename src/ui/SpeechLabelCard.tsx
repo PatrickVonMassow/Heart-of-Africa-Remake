@@ -14,7 +14,7 @@
 // card carries no invitation.
 
 import { conceptOf } from '../communication/lexicon'
-import type { Phrase } from '../communication/lexicon'
+import type { Phrase, Vocabulary } from '../communication/lexicon'
 import type { CommunicationMemory } from '../communication/heard'
 import { labelReadings } from '../communication/speechLabel'
 import { useStrings } from '../i18n'
@@ -23,12 +23,14 @@ export function SpeechLabelCard({
   speakerId,
   atoms,
   memory,
+  vocabulary,
   conceptLabels = false,
   targeted = false,
 }: {
   speakerId: string
   atoms: Phrase
   memory: CommunicationMemory
+  vocabulary: Vocabulary
   /** DEBUG view: the concept behind the utterance instead of syllables + guess. */
   conceptLabels?: boolean
   /** This speaker is the one the use key would take. */
@@ -44,7 +46,7 @@ export function SpeechLabelCard({
         {conceptLabels
           ? atoms.map((utterance, i) => (
               <div className="speech-atom" key={`${utterance}-${i}`}>
-                <span className="syllables">{conceptOf(utterance) ?? utterance}</span>
+                <span className="syllables">{conceptOf(utterance, vocabulary) ?? utterance}</span>
               </div>
             ))
           : labelReadings(memory, atoms).map((atom, i) => (

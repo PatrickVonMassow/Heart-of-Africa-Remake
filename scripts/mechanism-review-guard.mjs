@@ -649,6 +649,9 @@ export function gatherMechanismReviewInputs({
   // nor the batch lock may silence it — that lock check is what made a
   // hand-run `--status` print "stands down" and exit 0 (point 1036).
   report = false,
+  // Test seams: a fixture baseline keeps the unit layer off the live history.
+  readBaseline = readBaselineState,
+  bootstrap = bootstrapBase,
 } = {}) {
   if (!report) return { applicable: false, why: GATE_SWITCHED_OFF }
   const head = git('rev-parse HEAD')
@@ -658,10 +661,10 @@ export function gatherMechanismReviewInputs({
   } catch {
     /* detached or unborn — the 'HEAD' key is as good a bucket as any */
   }
-  const state = readBaselineState()
+  const state = readBaseline()
   const stored = baselineFor(state, branch)
   const baselineMissing = !stored
-  const baseline = stored || bootstrapBase(head)
+  const baseline = stored || bootstrap(head)
 
   if (!baseline) {
     return {
@@ -713,7 +716,7 @@ export function gatherMechanismReviewInputs({
       // branch's own pending mechanism work in the act of recovering. The range
       // is then judged for real — a recovery that reported "clear" without
       // looking would be the same silent pass in a new place.
-      effective = bootstrapBase(head)
+      effective = bootstrap(head)
       if (!effective) {
         return {
           applicable: true,

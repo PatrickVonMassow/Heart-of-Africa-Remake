@@ -329,10 +329,10 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   den du lieferst: Stimmt er nicht, korrigier ihn und **frag neu** — überstimm nie den Prüfer."
 
 - **„Läuft der noch?" mit „ist die Ausgabe frisch?" beantwortet.** Frische belegt nur, dass jemand
-  gearbeitet *hat*: Ein **fertiger** Lauf hinterlässt frische Dateien wie ein arbeitender, ein
-  Commit ist sogar das **Letzte**, was einer tut. Zwei Spuren gegeneinander zu prüfen hilft nicht.
+  gearbeitet *hat*: Ein **fertiger** Lauf hinterlässt frische Dateien wie ein arbeitender.
   → *Prompt:* „Miss Lebendigkeit am **Vorgang** (Kennung samt Startzeit), nie an seinen Spuren;
-  unlesbar heißt **unbekannt**, nicht tot. Frische darf eine Nachfrist nur **verkürzen**."
+  unlesbar heißt **unbekannt**, nicht tot. Frische verkürzt eine Nachfrist nur, und deine
+  **Anzeige** nennt ihr **Alter** — sonst gilt die letzte Behauptung als Gegenwart."
 
 - **Plötzlich rot, obwohl niemand den Code angefasst hat.** Zwei Teile buchstabieren dieselbe Regel
   getrennt — eines schreibt, eines prüft.
@@ -376,10 +376,9 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Überwache den **Zustand** statt des Ereignisses, und **löse jeden Ersatzkanal
   einmal echt aus**. Was anhalten darf, eskaliert nur auf **aufeinanderfolgende** Fehlschläge."
 
-- **Der Halt, den nur ein Mensch aufhebt.** Er kostet den Rest deiner Abwesenheit — und ein
-  leerer Marker sieht aus wie dein bewusster Stopp.
-  → *Prompt:* „Jeder Halt bekommt eine Wiederanlauf-Uhr. Ohne Uhr bleibt nur, was **nachweislich**
-  von mir kommt; alles andere wird protokolliert und kurz wiederholt."
+- **Der Halt, den nur ein Mensch aufhebt.** Ein leerer Marker sieht aus wie dein Stopp.
+  → *Prompt:* „Jeder Halt bekommt eine Wiederanlauf-Uhr; ohne Uhr bleibt nur, was **nachweislich**
+  von mir kommt, sonst wird protokolliert und wiederholt."
 
 - **Prosa wirkt nicht — als Priorität so wenig wie als Meldung.** Ein Tor hielt den eigenen
   Delegaten für fremd: Die Übergabe nannte ihn nur im Text.
@@ -510,10 +509,10 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   Bestand und erklärt korrekt entstandene Altdaten für gefälscht.
   → *Prompt:* „Eine Pflicht in einer Prüfung, die Altbestände liest, sagt **ab wann** sie gilt."
 
-- **Der Wächter tritt zurück — und hört dabei auf zu messen.** Wer fremde Arbeit nicht anfassen
-  darf, nennt nur noch den Grund, nichts zu tun.
-  → *Prompt:* „Zurücktreten heißt **nicht handeln**, nie **nicht wissen**. Lesen kollidiert mit
-  nichts.“
+- **Der Wächter tritt zurück — und hält dabei alle an.** Sein „nicht zuständig" landet im
+  Zustand, den alle lesen, und heißt „nie".
+  → *Prompt:* „Zurücktreten heißt **nicht handeln**, nie **nicht wissen**, und gilt **für dich**,
+  nie für alle: den globalen Halt schreibt nur, wer **hält**. Lesen kollidiert mit nichts.“
 
 - **Die Pflicht wächst schneller, als du sie erfüllen kannst.** Verlangt eine Prüfung „alles seit
   dem letzten Mal", wird sie unerfüllbar. Gilt ein Veto der **Datei** statt dem Befund, wächst der
@@ -702,4 +701,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 48463cf628efd928e563f320354c29495c7c65b6090e8d2102e29c9adabc3df5 -->
+<!-- GUIDE-FINGERPRINT: 39dee964328a5d288e7675ad45fc98c04570e54f2f1525de795591ab9f1eca73 -->

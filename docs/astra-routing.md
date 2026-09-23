@@ -59,6 +59,22 @@ repaired instead of lived with.
 While the setting is off its default, the board's footer says so, so nobody
 wonders why a diagnosis came back in another voice.
 
+**An unreachable lane.** The switch says where work SHOULD go; it does not know
+whether the vendor answers. When the OpenAI volume is exhausted or the lane is
+unreachable, authoring falls back to Opus 5.5 rather than waiting for the vendor
+(user 23.09.2026, after the volume ran out mid-batch and the switch had to be
+moved by hand). CLAUDE.md §6 states the rule; point 1194 makes it automatic. A
+routed codex run whose outcome is `allowance-exhausted` or `unreachable`
+(`OUTAGE_KINDS` in `scripts/astra-share-core.mjs`) writes a `fallback` record —
+signature, kind and a probe clock (`OUTAGE_PROBE_MS`, 30 min, calibratable) —
+beside the operator setting, which stays as it was. While the clock runs every
+kind routes to Claude: an ask is served on Opus 5.5, `author-astra.mjs` exits 5
+("author it on Opus 5.5", not the point's red), and a review hands over to
+Fable 5.1 with a cause that names the fallback. When the clock runs out the next
+routed run is the probe: a success lifts the record, the same signature renews
+it. Any other failure is never a fallback. `--status`, the delegation brief and
+the board footer name an active fallback.
+
 ## Asking Astra
 
 ```
@@ -122,7 +138,7 @@ Redirecting stdout to a different file is supported. Piping through `tee` or
 redirecting onto the script's own log destroys it and is unsupported; the script
 does not detect that mistake. Help, routing, examination and dry runs create no log.
 
-<!-- rule:model-policy@0238ab8b -->
+<!-- rule:model-policy@aa7f5b05 -->
 **The cut is a function, not a taste.** CLAUDE.md §6 is the single prose source
 for the authoring and escalation policy. `scripts/author-routing-core.mjs`
 applies it from the point text and recorded review history. A point may request
@@ -135,6 +151,8 @@ recorded §6 Fable escalation once its round threshold is actually reached —
 the rescue for a stuck point outranks the ordinary routing that got it stuck
 (so does the caller's explicit `--anyway`/override argument, which beats both).
 `--rounds <n>` is the deliberate override for history the ledger cannot know.
+An UNREACHABLE Astra lane — exhausted OpenAI volume included — authors on Opus 5.5
+instead of waiting for the vendor (user 23.09.2026); see "An unreachable lane" above.
 
 **What the cut actually moved**, measured over the whole open queue on
 18.08.2026, before and after the day's ruling: **203 points → 120 to the OpenAI

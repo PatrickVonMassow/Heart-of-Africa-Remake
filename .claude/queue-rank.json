@@ -1363,12 +1363,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "1174": {
-      "at": "2026-09-21T14:46:48.199Z",
-      "why": "Nutzerauftrag vom 21.09.2026 mit eigener Platzierung: unmittelbar vor 659, weil die Rundum-Gegenlese der Kommunikationskette einen Mechanismus beurteilen muss, der sich nicht mehr ändert.",
-      "origin": "user",
-      "place": "ahead"
-    },
     "1175": {
       "at": "2026-09-21T15:56:48.717Z",
       "why": "Maschinell eingereiht beim Landen von 690; kein Spielerimpakt, und die Reparatur steht hinter den Bildziel-Punkten derselben Suite.",
@@ -1404,10 +1398,56 @@
       "why": "Last is right: the alarm is cleared by a plain batch-doctor run in under a second, so the blockade has a known cheap workaround and no longer stops a session; the eight-minute gate was only ever the demanded remedy, never the only one.",
       "origin": "machine",
       "place": "last"
+    },
+    "1192": {
+      "at": "2026-09-23T07:08:05.043Z",
+      "why": "False-approval infra point homed in its bundle; the queue order places it with that bundle, not ahead of game work",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1197": {
+      "at": "2026-09-23T12:48:00.322Z",
+      "why": "Follow-up refinement of a landed point; medium urgency, waits behind the release",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1202": {
+      "at": "2026-09-23T21:38:02.542Z",
+      "why": "fehlendes Beweisbild, kein Spielerschaden; hinter die offenen Dorfleben-Punkte",
+      "origin": "machine",
+      "place": "last"
     }
   },
+  "boundary": {
+    "at": "2026-08-21T00:55:14.962Z",
+    "points": [
+      336,
+      553,
+      596,
+      633,
+      659,
+      660,
+      663,
+      708,
+      715,
+      719,
+      733,
+      735,
+      736,
+      738,
+      739,
+      746,
+      747,
+      750,
+      759,
+      760,
+      762,
+      764
+    ],
+    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
+  },
   "settled": {
-    "at": "2026-09-22T15:13:26.706Z",
+    "at": "2026-09-23T22:42:25.923Z",
     "points": [
       174,
       184,
@@ -1812,7 +1852,6 @@
       1169,
       1171,
       1172,
-      1174,
       1175,
       1176,
       1177,
@@ -1821,35 +1860,11 @@
       1186,
       1187,
       1188,
-      1189
+      1189,
+      1192,
+      1195,
+      1197,
+      1202
     ]
-  },
-  "boundary": {
-    "at": "2026-08-21T00:55:14.962Z",
-    "points": [
-      336,
-      553,
-      596,
-      633,
-      659,
-      660,
-      663,
-      708,
-      715,
-      719,
-      733,
-      735,
-      736,
-      738,
-      739,
-      746,
-      747,
-      750,
-      759,
-      760,
-      762,
-      764
-    ],
-    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   }
 }

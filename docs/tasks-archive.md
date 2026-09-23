@@ -31287,3 +31287,384 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   a metre-wide line stands 27.7 m from the plaza middle (seed 1337: 11.6 m, but no full line).
   That the loom READS from the plaza — warp and stack distinguishable — moves to point 1191.
   Bundle: Dorfleben
+
+- [x] 1191. From the Bambara plaza the loom station reads as a loom being worked.
+  PROBLEM. After point 1190 the plaza has an open, metre-wide line to the weaver, but in the
+  shipped plan (`bambara-village@394349866`) the only seat with such a line stands 27.7 m
+  from the plaza middle, and `1183-village-loom-from-plaza` shows a kneeling cone and a
+  standing figure a few dozen pixels tall; warp and cloth stack do not read. Nearest-first
+  seat ordering was measured and does not help: the dwellings between the plaza and the
+  nominal seat (`LOOM_SPOT`, ~13 m) close every nearer line.
+  DECIDED 23.09.2026 (owner, open to veto): a DWELLING compound may give way to the plaza's
+  view of the loom, as trees, stones, sheds and granaries already do (point 1190) —
+  `docs/peoples-1890.md` §8.1 says nothing on where compounds stand, the ring is procedural.
+  The loom's height stays (§8.1, point 1183), and the warp stays on the river's axis.
+  FINAL STATE. In the shipped Bambara plan the station sits at most ~15 m from a plaza stand
+  with a metre-wide open line (the compound in the way shifts outward on its ring, or is left
+  unbuilt, whichever keeps the ring's other rules), and in the plaza frame the warp line and
+  the cloth stack are distinguishable on both backends; the frame asserts the station's
+  PROJECTED height against a stated pixel minimum rather than a distance.
+  The same lever clears the Maasai plan: on main 43c00aa29 the `loom-unseen-from-plaza` assert
+  fires for `maasai-village@42` (collision and polish village sections, charged here), and it
+  fires for no settlement at seed 42 when this point lands.
+  Criticality: medium. Test: Vitest for the yielding rule (station on the river axis, clear
+  of every dwelling, compound count unchanged or the drop named); `polish --section=village-loom`
+  plaza frame on both backends.
+  Refs: src/scenes/place/layout.ts (plazaYielding, plazaLine, dwelling ring),
+  src/scenes/place/loom.ts (placeLoom), scripts/verify/polish.mjs (village-loom plaza frame),
+  point 1190
+  Bundle: Dorfleben
+
+- [x] 1174. The village vocabulary is rolled per run, under rules that keep the direction pair a
+  mirror (user 21.09.2026, drained from the findings carrier; placed here on the user's
+  instruction, ahead of 659, which must judge a mechanic that no longer changes).
+  ESCALATION ANSWERED (owner, 23.09.2026, measured against the code at eb801aa5c; the author
+  had stopped at b5a8fd789 on two brief/code discrepancies):
+  a) `dumpGameState` in `src/state/stateDump.ts` serializes the WHOLE game object, and that
+     stays: no whitelist is introduced. The vocabulary lives in game state as a record of the
+     six utterance strings keyed by concept, so the dump carries it by construction; a unit
+     test asserts it is present in the dump. Step 4's claim of a dump whitelist is struck.
+     `saveCheckpoint` in `src/state/store.ts` IS a whitelist and gets the explicit entry.
+  b) `docs/communication-poc-spec.md` already says two mirror pairs plus two palindromes;
+     the "three pairs" correction is struck. What still goes false under the roll is that
+     section naming RIVER/CHIEF as the fixed mirror pair: it is rewritten as the point says
+     (structure, the two rules, the roll), and the lexicon.ts comments listed below likewise.
+  Bundle: Dorfleben
+  The tonal lexicon is a fixed module constant today, so the syllable-to-meaning assignment is
+  identical in every playthrough and a returning player solves the drum puzzle from memorised
+  syllables instead of listening. The assignment is rolled at every game start instead, while
+  `UPSTREAM` and `DOWNSTREAM` stay exact tonal mirrors of one another, so the opposite relation
+  stays learnable.
+  Cross-vendor reviewed before filing: audited by GPT-6 Astra (21.09.2026, effort high — counts
+  confirmed, an earlier rule requiring RIVER to be alternating rejected as unestablished, the
+  module-lifetime and save-remapping defects raised) and proofread by Fable 5.1 (21.09.2026 —
+  counts recomputed, five corrections folded in). The counts were recomputed once more here by
+  enumeration before filing: 96 mirrored assignments, 24 under rule (a), 20 under rule (b), of
+  which 8 keep both members of the unavoidable spurious mirror inside the errand, and today's
+  vocabulary is one of the 20.
+
+  FINAL STATE: the syllable-to-meaning assignment of the village lexicon is rolled at every game
+  start from an enumerated set of vocabularies that all obey the rules the player is meant to
+  learn; it holds unchanged for the whole run, and it is part of the save and of the debug JSON.
+
+  THE SET: 20 VOCABULARIES. The build rule is unchanged - four syllables, an even number of
+  highs, both tones present. The six usable sequences form exactly two reversal pairs plus two
+  palindromes: ba-ba-BA-BA / BA-BA-ba-ba, ba-BA-ba-BA / BA-ba-BA-ba, and the palindromes
+  ba-BA-BA-ba and BA-ba-ba-BA. 96 assignments keep UPSTREAM and DOWNSTREAM mirrored (4 direction
+  choices times 4! for the rest). Two rules cut them to 20, and the shipped vocabulary is one of
+  the 20.
+
+  RULE (a) ICONIC DIRECTIONS: UPSTREAM is always ba-ba-BA-BA (rising) and DOWNSTREAM always
+  BA-BA-ba-ba (falling). The river visibly flows and the bank game teaches the pair against the
+  current, so the tone line rises against it and falls with it. On the alternating pair instead,
+  the rising and the falling sequence would carry two unrelated concepts - a cue pointing the
+  wrong way. 96 becomes 24.
+
+  RULE (b) ROCK AND DIG ARE NOT MIRRORS OF EACH OTHER. The grounding fact, and the whole of the
+  argument: ROCK and DIG stand adjacent in the errand RIVER-UPSTREAM-ROCK-DIG, separated by the
+  one constant pause, so if they were mirrors the message would contain an EIGHT-STRIKE
+  PALINDROME across that pause - an audible symmetry the game attaches no meaning to, inside the
+  one message the player must decode. That figure can arise nowhere else: RIVER cannot mirror
+  UPSTREAM and UPSTREAM cannot mirror ROCK (the direction pair is spent), the answer
+  RIVER-DOWNSTREAM cannot mirror either, and the bank game speaks single atoms per moment rather
+  than phrases, so no other adjacency exists. 24 becomes 20. STATE HONESTLY in the code comment
+  what this rule does NOT do: because the directions consume one whole reversal pair, a second,
+  meaningless mirror pair always remains among RIVER, ROCK, DIG and CHIEF - that is unavoidable
+  and accepted (user 21.09.2026) - and in 8 of the surviving 20 both of its members still sit
+  inside the errand, only never adjacently. If the owner prefers variety over this rule,
+  dropping (b) ships 24 vocabularies and nothing else in this point changes.
+
+  REJECTED, recorded so it is not re-proposed: requiring RIVER to be one of the two alternating
+  sequences, on the grounds that the message opens on RIVER and alternation is the most hearable
+  pattern. Unestablished (GPT-6 Astra and Fable 5.1 independently); and it would pull the
+  spurious mirror INTO the errand in 8 of 12 cases.
+
+  BUILD.
+
+  1. ENUMERATE, DO NOT TABULATE. A small pure function derives the 20 from rules (a) and (b).
+  The generated list is pinned literally in the test, so a rule change shows as a table diff
+  instead of passing silently.
+
+  2. THE ROLLED MAPPING IS A VALUE, NOT AN ID. Introduce an explicit Vocabulary type - one tone
+  sequence per ConceptId - and let the Lect keep only what does not roll: its id, its two
+  syllables, its reserved sequences. The existing LectId parameter CANNOT carry a rolled
+  mapping: it is a string resolved against the module constant LECTS. Consumers take the
+  vocabulary itself (or one value object holding lect plus vocabulary); they must not resolve it
+  from a store, so lexicon.ts stays pure.
+
+  3. ROLL FROM THE RUN SEED, not from Math.random, using the idiom already in
+  src/state/store.ts: pickKnowingVillages(seed) derives its own generator with mulberry32(seed
+  exclusive-or constant) and is called from startState. The rolled vocabulary is produced the
+  same way and stored in game state at startState. Consequence to keep: the dev parameter
+  ?seed=<n> makes every one of the 20 reproducibly reachable from a test.
+
+  4. SAVE AND DUMP CARRY THE MAPPING ITSELF, NOT AN INDEX. saveCheckpoint whitelists its fields
+  and stateDump.ts builds an explicit whitelist object, so the vocabulary appears in neither by
+  itself: both get an explicit entry holding the six utterance strings by concept. An index into
+  the enumerated 20 is forbidden - step 1 allows the list order to change, which would silently
+  rebind old saves. On load, a save WITHOUT the field falls back to the SHIPPED vocabulary,
+  never to derive(seed): that save was played on the shipped mapping and its journal notes are
+  keyed by utterance text, so a derived mapping would attach the player's own notes to the wrong
+  concepts in 19 of 20 cases. No migration beyond that one fallback (saves are throwaway in the
+  PoC).
+
+  5. IT HOLDS FOR THE WHOLE RUN - across leaving the village, entering another settlement,
+  travel and return. It is the region's way of speaking, not one village's mood.
+
+  6. THE MODULE STOPS BEING THE AUTHORITY, AND THE SILENT FALLBACKS GO. lexicon.ts holds the
+  mapping at module lifetime today, so a roll at import time would not re-roll a second new game
+  in the same running application. Every default that lets a forgotten call site fall back to
+  the shipped mapping must go, not be redirected: the defaults on sequenceOf, speak,
+  utteranceOf, conceptOf and phraseOf, AND the default on lectOf(id = DEFAULT_LECT). In
+  drumMessage.ts the three optional lect parameters (drumMessagePhrase, drumMessagePlan,
+  drumMessageElements) sit AFTER defaulted parameters, so making them required means reordering
+  those signatures rather than passing undefined at the call sites. Measured 21.09.2026: outside
+  lexicon.ts there are seven call sites of sequenceOf/utteranceOf/phraseOf/speak/conceptOf, one
+  of which already passes a lect explicitly - the threading itself is small; the signature
+  changes are the work.
+
+  7. TESTS THAT CAN ACTUALLY FAIL. Checking distance-2, distinct heard-store keys, the journal
+  sort order and the 16/8 strike counts across all 20 proves nothing: every vocabulary uses the
+  same six strings, so those hold by construction. The per-vocabulary assertions are instead:
+  rules (a) and (b) hold for each of the 20; the enumerated list equals the pinned literal
+  table; every one of the 20 is reachable by some seed; no errand contains an eight-strike
+  palindrome across the pause; a save round-trip restores the same mapping, and a save without
+  the field restores the SHIPPED one. THE LOAD-BEARING TEST is a consumer test run under a
+  vocabulary that is NOT the shipped one: villager speech, the drum message, the journal and the
+  overhead labels must all change with it. A consumer that forgot to thread the vocabulary keeps
+  producing the shipped syllables, and only that test catches it.
+
+  8. IT STAYS LENGTH-GENERIC, AND THE ACCEPTANCE PROVES IT AT FIVE (user 23.09.2026, ordered while
+  the point was in flight; the running verification was discarded for it). Raising
+  SEQUENCE_LENGTH later - to fit more concepts into the language - must be a change of that
+  constant plus a new pinned table, not a redesign of the roll. Three constraints, none of which
+  changes what this point ships (SEQUENCE_LENGTH stays 4, same shipped vocabulary, same 20, the
+  pinned table stays): (i) the well-formed set is DERIVED from SEQUENCE_LENGTH - bitmask over
+  the length, even number of highs, both tones present - never six written-out literals;
+  lexicon.test.ts already enumerates this way, and the production enumerator of step 1 uses the
+  same derivation. (ii) rules (a) and (b) are PREDICATES OVER A VOCABULARY, not concept
+  literals: (a) "UPSTREAM is the ascending sequence - all lows, then all highs - and DOWNSTREAM
+  its reverse", stated over the shape so it names exactly one sequence at any length; (b) "no
+  two concepts ADJACENT IN THE ERRAND are tonal mirrors of each other", with the errand as its
+  input, so ROCK/DIG is the case that follows from today's errand rather than the rule itself.
+  The enumerator is a thin loop over these two predicates and the roll applies the SAME
+  predicates - so a later length bump can swap "enumerate all, pin the table" for "draw from the
+  seed, reject what fails the predicates" without touching the rules. (iii) the comment carrying
+  96 -> 24 -> 20, and the matching passage in docs/communication-poc-spec.md, state explicitly
+  that these counts are computed FOR FOUR SYLLABLES AND SIX CONCEPTS - otherwise they go
+  silently false at the first length change, the same failure mode this point is already
+  repairing in that document.
+  THE ACCEPTANCE INCLUDES A RUN AT SEQUENCE_LENGTH = 5 (user 23.09.2026), and it is more than a
+  unit test of the derivation: the game is exercised at five syllables - roll, vocabulary, drum
+  message, villager speech, journal and overhead labels - and must work. Measured today, the
+  well-formed set at length 5 is 15 sequences rather than 6, so a pinned 20-row table cannot
+  carry it and every site that silently assumed four is exposed. The existing tests read
+  SEQUENCE_LENGTH rather than the literal 4 (drumMessage.test.ts, speaking.test.ts,
+  ambience.test.ts, adultWork.hold.test.ts), which is the starting point, not the proof. The
+  point ships with the constant back at 4; what ships is the evidence that five ran.
+  STILL OWED (23.09.2026): the first attempt ran beside a main push gate on the same
+  machine and was abandoned; the constant is back at 4 and the branch is clean. The
+  derivation and both rules are already proven at five and six by unit cases; what is
+  missing is the GAME at five syllables, on a quiet machine.
+
+  TEXT THAT GOES FALSE UNDER THE ROLL and is rewritten in the same commit: the per-sequence
+  comments in lexicon.ts on RIVER (the word the whole message opens on) and CHIEF (RIVER's tonal
+  mirror, the only mirror heard as a pair); the lexicon.ts header claim that the registry is
+  keyed by lect; the header saying five concepts (there are six); the isWellFormed comment
+  saying two of the three reserved sequences (there are two of two); and in
+  docs/communication-poc-spec.md the false sentence that all six words fall into three mirror
+  pairs RIVER/CHIEF, UPSTREAM/DOWNSTREAM and ROCK/DIG - ROCK and DIG are each palindromes, not
+  reversals of each other. The rewritten section states the real structure, the two rules and
+  the roll.
+
+  NOT IN THIS POINT: re-rolling the vocabulary does not by itself defeat a replaying player,
+  because the errand is a fixed concept order and the answer is fixed too, so whoever memorised
+  the ERRAND walks upstream to the rock and digs without understanding a word (GPT-6 Astra
+  called this decisive, Fable 5.1 did not contest it). The minimum cure is a rolled errand
+  DIRECTION with the artefact placed accordingly and the answer derived consistently; real
+  re-learning needs an outcome-relevant choice carried by a changing word. Separate design
+  decision, separate point.
+  Criticality: medium — it threads one value through every consumer of the language, so the risk
+  is a forgotten call site silently keeping the shipped syllables, which is what the load-bearing
+  consumer test exists to catch.
+  Refs: `src/communication/lexicon.ts`, `src/communication/lexicon.test.ts`,
+  `src/communication/drumMessage.ts`, `src/state/store.ts`, `src/state/stateDump.ts`,
+  `docs/communication-poc-spec.md`.
+
+- [x] 1193. A session that is standing down cannot stop the batch.
+  PROBLEM, measured 23.09.2026 10:51-11:05. The batch stood still for 75 minutes. At 09:30 the
+  launcher started session `cfd01f9f` for ONE board-chat message, with its prompt stating it
+  does NOT hold the batch lock and will rightly be told to STAND DOWN. At 09:36 that very
+  session wrote `.claude/batch-paused` with `type: user-stop`, `retry-after: never` and the
+  reason "Chat-Antwort-Sitzung: nur eine Board-Nachricht zu beantworten. Kein Batch-Auftrag" —
+  a description of ITSELF, not of any user stop; no user had typed one (the only prompt in
+  `cfd01f9f` is the chat-reply order). The real worker `1438395e` then ended, and the launcher
+  refused every successor from 09:50 to 10:50 with "batch is paused with no restart clock
+  (typed user-stop)". The veto is correct for a real user stop; the fault is that a
+  stood-down, chat-only session is a reachable writer of the global clockless pause, and that
+  `user-stop` can be asserted without any user utterance behind it.
+  FINAL STATE: the clockless `user-stop` pause is writable only by a session that HOLDS the
+  batch lock; a session without the lock that calls `scripts/batch-pause.mjs --user-stop` is
+  refused with a named cause and writes nothing. A chat-reply/stand-down session that wants to
+  record "nothing to do here" uses its own session-scoped exit, never the global marker.
+  `scripts/batch-autostart.mjs` additionally treats a clockless `user-stop` whose recorded
+  reason names no user utterance as MALFORMED: it snapshots it, replaces it with a short
+  recovery clock and spawns the successor, so no misfiled marker can hold the batch forever.
+  Test: Vitest on the real writers — `recordUserStop` without the lock refuses and leaves the
+  marker absent; with the lock it writes as today; the launcher decision on the measured
+  marker (verbatim from this incident, archived in the point's commit) yields a clocked retry
+  plus a successor instead of a permanent hold.
+  Criticality: high — permits an unbounded standstill, against the standing instruction that a
+  permanent standstill must never happen (user 23.08.2026, reaffirmed 23.09.2026).
+  Refs: scripts/batch-pause.mjs, scripts/batch-pause-core.mjs, scripts/batch-lock.mjs
+  (`setPaused`, `clearPaused`), scripts/batch-autostart.mjs, .claude/batch-launcher.log
+  (09:36-10:50 ticks), transcript cfd01f9f-ab45-45f1-a57d-ef6416278b8f.
+  Bundle: Modell & Wächter
+
+- [x] 1196. A cheap section run can accept a charge for a known foreign red.
+  PROBLEM, measured 23.09.2026 on the ten-section picture check of point 1174, identically on
+  WebGPU and WebGL 2. Two known, filed, charged reds could not be cleared by the run that met
+  them, so both held against the point that was only passing through:
+  a) `polish --section=adult-errands`: 34 pass, 2 fail — the two halves of point 568's water-rim
+     measurement, both of which the ledger carries for BOTH backends. The verdict was
+     "the run record is incomplete, so no charge may be accepted for it — ownership unresolved".
+     Cause: `complete` in `scripts/verify/run-all.mjs:329` demands `record.terminalVerdict === true`,
+     and the recorder sets that flag only on a line matching `TERMINAL_VERDICT_LINE`
+     (`scripts/render-verify-recorder.mjs:203`) — `N CHECK(S) FAILED`, `console errors:`,
+     `FAILURES: n`. A section run of `polish` whose CHECKS fail prints its FAIL lines and no such
+     terminal line, so the record carries the reds but is classed incomplete: the cheap rung can
+     never accept a charge for a failing check, which is exactly what the ladder's cheap rung is
+     for. A console-error-only failure DOES print `console errors: 1` and charges fine — the gap
+     is specific to failing checks.
+  b) `flow --section=core-loop`: the record is complete and carries both reds owned by point 1154,
+     yet the verdict was "charged for one reading of this check but not for every one this run
+     produced". The printed occurrences carry one reading the charge does not own, so
+     `occurrences.every(owned)` fails although the record's own reds are fully owned.
+  CORRECTED 23.09.2026 by the author's measurement and the Fable review: a) is NOT a missing
+  terminal line — polish always prints `console errors: N`; the adult-errands record is a real
+  crash (`crashSource: 'uncaught-exception'`), filed as point 1198. Completeness keeps resting on
+  the terminal verdict line. b) is the section tag `[--section=…]` left on printed FAIL lines, in
+  section AND whole runs, so the same red arrived under a key the record does not carry.
+  FINAL STATE: printed lines are keyed exactly as the recorder stores them (section tag stripped
+  in every run), and a printed occurrence that the record does not carry may not by itself
+  deny a charge the record's own reds earn; where the two disagree the run says WHICH reading is
+  unowned, with its measurement, instead of a sentence nobody can act on.
+  NOT IN THIS POINT: changing what any charge covers. Points 568 and 1154 keep their entries.
+  Test: Vitest on the pure decision — tagged FAIL lines in a section and in a whole run key like
+  the record; a record without a terminal line, crashed or truncated, is not chargeable; a printed occurrence absent from the
+  record does not deny the record's own charge, and the printed reason names the reading.
+  Criticality: high — it blocks the cheap rung of every point whose sections carry a known
+  foreign red, which is how it was found: the picture check of 1174 held two reds it does not own.
+  Refs: scripts/verify/run-all.mjs:318-410, scripts/render-verify-recorder.mjs:203/326,
+  scripts/render-verify-core.mjs:960-980, scripts/render-verify-charges.mjs (points 568, 1154),
+  local/verify-logs/2026-09-23T10-36-45-287-polish.log, .claude/render-verify-state.json.
+  Bundle: Modell & Wächter
+
+- [x] 1194. An Astra outage falls back to Opus 5.5 by itself.
+  USER ORDER 23.09.2026, 10:59: »Was ist denn der Fallback, wenn OpenAI ausfällt? Falls das
+  nicht so ist, soll es ab jetzt Opus 5.5 sein.«
+  PROBLEM, measured 23.09.2026 11:00. There is NO automatic fallback. The vendor cut is a
+  hand-set switch (`scripts/astra-share.mjs`, three settings, `claude-only` the escape hatch);
+  nothing measures whether the ChatGPT side answers, so an exhausted OpenAI volume leaves the
+  switch at `prefer-astra` and every routed authoring run walks into the dead vendor. The
+  launcher's quota machinery (`batch-autostart.mjs --quota-report`, `scripts/quota-drill.mjs`)
+  covers only the ANTHROPIC serving limit; it says nothing about Astra. On this date the switch
+  was moved to `claude-only` by hand, which is exactly the manual step this point removes.
+  FINAL STATE: a routed Astra run that fails on a vendor-limit or unreachable signature is
+  recognised as such (its own signature set, like the quota signature), the kind is served in
+  the Claude lane by Opus 5.5 instead of failing the point, and the fallback is RECORDED with
+  its signature and a probe clock so it lifts by itself when the volume returns. The switch
+  keeps its operator value; the fallback is a measured override on top of it, visible in
+  `--status` and on the board. Four eyes under the fallback uses the decorrelated same-vendor
+  pair (Fable 5.1 reviews Opus 5.5 work) and records that it is a fallback, per CLAUDE.md §6.
+  Test: Vitest on the pure decision — a limit signature yields the Claude lane plus a probe
+  clock, an ordinary authoring failure does NOT (it stays the point's red), an expired probe
+  returns routing to the operator setting, and `--status` names the active fallback.
+  Criticality: high — without it a vendor outage stops authoring for as long as the outage
+  lasts, and the standing instruction is that the batch never stands still.
+  Refs: scripts/astra-share-core.mjs (`ROUTES`, `settingOrSafe`), scripts/astra-share.mjs,
+  scripts/author-astra-core.mjs, scripts/ask-astra-core.mjs, scripts/batch-autostart.mjs
+  (`--quota-report` as the pattern), scripts/quota-drill.mjs, docs/astra-routing.md,
+  CLAUDE.md §6.
+  Bundle: Modell & Wächter
+
+- [x] 1200. The `poc` tag names the current `main` state and /poc/ serves it.
+  USER ORDER 23.09.2026, 21:12: »Tagge den aktuellen main-Stand als poc und veröffentliche ihn
+  unter https://patrickvonmassow.github.io/Heart-of-Africa-Remake/poc/«. This is NOT a version
+  release. `docs/batch-owner-runbook.md` (user decision 20.09.2026) holds that `poc` is the
+  current playable build, moved to any `main` commit on request — no closing run, no approval
+  beyond the request, and `closing-guard` does not gate it. Point 174 keeps the `v0.3` tag and
+  its gate; nothing here touches it, and `poc` may run ahead of the newest version tag.
+  MEASURED STATE: `poc` stands on cd275b2331c3776295fd1ac705ee9e3c1ffbf840 (20.09.2026), 306
+  commits behind `main`.
+  FINAL STATE: `poc` points at a `main` HEAD whose CI concluded green, the tag is force-pushed
+  to `origin`, the Pages deployment is dispatched (a tag push alone does not rebuild the
+  targets), and /poc/ is verified to serve the new build.
+  DONE 23.09.2026, 21:31. `poc` moved from cd275b233 to 9c61be419 (CI green, run 35907221359)
+  and force-pushed; Pages deployed by manual dispatch, run 35909070670, green. Verified: /poc/,
+  /v0.1/, /v0.2/ and the root all answer HTTP 200, /poc/ serves the same build as the root (the
+  shared chunks rolldown-runtime-QTnfLwEv.js, react-DPd1JddB.js and index-CPgrkYvP.css are
+  byte-identical), and a headless system-Chrome run against /poc/ loads the scene, opens the F8
+  benchmark overlay and closes it with Esc. A black 3D area in that capture reproduces
+  identically on the root deployment and in a local `npm run preview`, so it is neither caused
+  nor exposed by the tag move; it is filed as a finding.
+
+- [x] 1201. The production build is judged by a picture, not only by the dev server.
+  Bundle: Testinfrastruktur — the lane that would have caught this is the picture lane, and the
+  fix touches its scripts rather than any scene file.
+  Criticality: high — it stands before the release because, if the measurement below is a real
+  defect, the build that /poc/ and the coming /v0.3/ serve shows the player no world at all, and
+  that is the release's purpose. Every picture lane today shoots the dev server, so nothing can
+  currently tell the two readings apart.
+  MEASURED 23.09.2026 while publishing `poc` (archived point 1200) on commit 9c61be419. System
+  Chrome `--headless=new` with `--enable-unsafe-webgpu`, 1280×800, 14 s after the canvas
+  appears, then Tab to close the journal: the HUD, the journal and the DOM place labels (Tool
+  Hut, Bazaar, Travel Agency, Market Hut, Weapons Hut, General Store) sit right, and the 3D
+  scene stays completely black. The FPS readout runs at 48–60, so it IS rendering. The picture
+  is IDENTICAL on /poc/, on the root deployment (the same commit) and in a local
+  `npm run preview`, so neither the tag nor the deploy causes it. Side observation: repeated
+  `OperationError: Instance dropped in popErrorScope` as a pageerror.
+  THE QUESTION THIS POINT ANSWERS FIRST, before anything is changed: is this a defect of the
+  PRODUCTION build, or an artefact of a headless run without a real GPU? The discriminator is
+  cheap — shoot the same place and moment from the DEV server in the same browser with the same
+  flags. The suites' picture checks run against the dev server and show a world there, so a dev
+  picture that differs from the production picture settles it.
+  FINAL STATE: the answer is recorded with both pictures beside each other. If it is a
+  production defect, its cause is named and fixed and a picture check covers a production build
+  from then on, so no lane can be green over a build nobody has looked at. If it is a headless
+  artefact, that is written down where the next reader of a black production screenshot will
+  find it, and this point closes without a code change.
+
+- [x] 1198. The adult-errands picture section ends with a verdict instead of a crash.
+  PROBLEM, measured 23.09.2026 by the author of point 1196. `polish --section=adult-errands`
+  dies after its checks with an uncaught `TypeError: Cannot read properties of undefined
+  (reading 'digSites')` at `scripts/verify/polish.mjs:7635`: the dig-picture route step reads
+  `window.__placeLayout` but only waits for `__placeWalkers` and `__placeErrands`. The record
+  is `crashed: true` (`crashSource: 'uncaught-exception'`), so no charge can ever be accepted
+  for the section's two known reds (point 568), on either backend — the cheap rung of every
+  point passing through that section is blocked.
+  FINAL STATE: the step waits for `__placeLayout` (or skips the dig picture with a named FAIL
+  when it never arrives), and the section run ends with a terminal verdict on WebGPU and
+  WebGL 2; its remaining reds are the ones charged to point 568.
+  Test: `npm test -- polish --section=adult-errands` on both backends, record not crashed.
+  Criticality: medium; blocking — it holds a red that cannot otherwise close: the crashed record
+  refuses every charge for the section. Refs: scripts/verify/polish.mjs:7635, .claude/render-verify-state.json,
+  local/verify-logs/2026-09-23T10-36-45-287-polish.log.
+  Bundle: Modell & Wächter
+
+- [x] 1199. The mechanism-review gather test stops timing out the unit gate.
+  PROBLEM, measured 23.09.2026, three times in one hour: `scripts/mechanism-review-guard.test.mjs`
+  "bootstrapBase > seeds the anchor from the one shape that carries the flag AND the baseline"
+  runs `gatherMechanismReviewInputs` against the LIVE repository history. Its comment measured
+  20.60 s; alone it now takes 39.5 s, and on a host with one parallel vitest run it passes 60 s
+  and times out — the main pre-push gate refused a push twice for it, and both delegated
+  authors of 1194 and 1196 reported the same red. The gate it measures is switched off (point
+  1036), so the test spends the gate's whole budget on a read nothing blocks on.
+  FINAL STATE: the symmetry assertion (the flag sits where `shouldSeedRecoveryAnchor` reads it,
+  with the value the verdict gets) runs on a fixture or a bounded history, well under 5 s, and
+  keeps pinning the defect it was written for; no timeout is raised.
+  Test: the file passes alone and beside a parallel `npm run test:unit`.
+  Criticality: high; blocking — it refuses the main push and every delegated gate on a busy host.
+  Refs: scripts/mechanism-review-guard.test.mjs:172-203, scripts/mechanism-review-guard.mjs
+  (`gatherMechanismReviewInputs`), local/tool-output-logs/push-main-1198.log.
+  Bundle: Modell & Wächter

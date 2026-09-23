@@ -3,6 +3,7 @@
 // Library checks (jsdom): the journal never shows a voice marker, prose stays
 // intact, the read-aloud control is offered for English only. The actual TTS
 // audio and handwriting animation stay in Playwright.
+import { SHIPPED_VOCABULARY } from '../communication/vocabulary'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
@@ -106,9 +107,9 @@ describe('entry kinds, ordering and sketches (design.md §15/§16)', () => {
 // free-text reading. The store side is pinned in store.communication.test.ts.
 // ---------------------------------------------------------------------------
 
-const RIVER_UTTERANCE = utteranceOf('RIVER')
-const DIG = utteranceOf('DIG')
-const ROCK_UTTERANCE = utteranceOf('ROCK')
+const RIVER_UTTERANCE = utteranceOf('RIVER', SHIPPED_VOCABULARY)
+const DIG = utteranceOf('DIG', SHIPPED_VOCABULARY)
+const ROCK_UTTERANCE = utteranceOf('ROCK', SHIPPED_VOCABULARY)
 
 /** Text of the observation section, '' when it is not rendered at all. */
 const observationText = () => document.querySelector('.journal .observations')?.textContent ?? ''

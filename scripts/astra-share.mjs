@@ -34,9 +34,11 @@ import {
   SAFE_SETTING,
   SETTINGS,
   SETTING_NOTES,
+  afterAstraRun,
+  effectiveRoute,
+  fallbackLine,
   normaliseSetting,
   readSetting,
-  routeFor,
   routingTable,
   settingPathFrom,
   statusLine,
@@ -93,21 +95,47 @@ export function settingProblemLine(state, who = 'astra-share') {
 
 /** Where one kind of work goes right now — the one call every consumer needs. */
 export function routeOf(kind, file = SETTING_FILE) {
-  return routeFor(kind, currentSetting(file).setting)
+  return effectiveRoute(kind, currentSetting(file)).to
 }
 
+// An operator change keeps a recorded outage: the fallback is measured, not chosen.
 function save(setting, { by = '', file = SETTING_FILE } = {}) {
   mkdirSync(dirname(file), { recursive: true })
-  writeJsonAtomic(file, writeState(setting, { by }))
+  const { fallback } = currentSetting(file)
+  writeJsonAtomic(file, writeState(setting, { by, fallback }))
+}
+
+/**
+ * Record what one routed Astra run says about the vendor (point 1194): an outage
+ * signature writes or renews the fallback, a success lifts it. Returns afterAstraRun's
+ * answer. Never throws — a failed write is printed, and the run's own verdict stands.
+ */
+export function recordAstraRun({ outcome, text = '', kind = '', who = 'astra-share', file = SETTING_FILE } = {}) {
+  const state = currentSetting(file)
+  const next = afterAstraRun({ outcome, text, kind, previous: state.fallback })
+  if (state.corrupt || JSON.stringify(next.fallback) === JSON.stringify(state.fallback ?? null)) return next
+  try {
+    mkdirSync(dirname(file), { recursive: true })
+    const base = writeState(state.setting, { by: state.changedBy, fallback: next.fallback })
+    writeJsonAtomic(file, { ...base, changedAt: state.changedAt ?? base.changedAt })
+    if (next.fellBack) console.error(`${who}: ${fallbackLine({ ...state, fallback: next.fallback })}`)
+    else if (!next.fallback && state.fallback) console.error(`${who}: GPT-6 Astra answered — the outage fallback is lifted.`)
+  } catch (e) {
+    console.error(`${who}: could not record the Astra outage fallback (${e.message})`)
+  }
+  return next
 }
 
 /** The full report `--status` prints: the one line, then the table under it. */
 export function statusReport(state) {
-  const lines = [statusLine(state.setting)]
+  const lines = [statusLine(state)]
   if (state.problem) lines.push(`  NOTE: ${state.problem}`)
+  const fallback = fallbackLine(state)
+  if (fallback) lines.push(`  ${fallback}`)
   lines.push(`  ${SETTING_NOTES[state.setting]}`)
   for (const row of routingTable(state.setting)) {
-    lines.push(`  ${row.kind.padEnd(10)} → ${row.to === 'astra' ? 'GPT-6 Astra' : 'Claude     '}   ${KIND_NOTES[row.kind]}`)
+    const to = effectiveRoute(row.kind, state).to
+    lines.push(`  ${row.kind.padEnd(10)} → ${to === 'astra' ? 'GPT-6 Astra' : 'Claude     '}   ${KIND_NOTES[row.kind]}`)
   }
   lines.push('  NEVER routed, at any setting:')
   for (const n of NEVER_ROUTED) lines.push(`    · ${n}`)
@@ -134,7 +162,7 @@ if (isMainModule(import.meta.url)) {
   const asJson = argv.includes('--json')
   const emit = (state, extra = {}) => {
     if (asJson) {
-      console.log(JSON.stringify({ file: SETTING_FILE, ...state, routing: routingTable(state.setting), ...extra }, null, 2))
+      console.log(JSON.stringify({ file: SETTING_FILE, ...state, fallbackActive: Boolean(fallbackLine(state)), routing: routingTable(state.setting).map((row) => ({ ...row, to: effectiveRoute(row.kind, state).to })), ...extra }, null, 2))
     } else {
       console.log(statusReport(state))
     }

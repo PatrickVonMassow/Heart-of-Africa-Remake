@@ -1721,4 +1721,36 @@ export const RED_CHARGES = [
       + 'point 1145, which decides by measurement whether the travel stops short or the settle '
       + 'wait expires, and repairs that.',
   },
+  {
+    point: 1187,
+    suite: 'polish',
+    kind: 'check',
+    match: /BOTH her hands are elsewhere half a pass later/i,
+    why:
+      'FILED AS 1187 ON 22.09.2026 from the full webgpu polish pass at e1b7d1561 (279 pass / '
+      + '3 fail): the village-loom hand check reds inside the pass and is green in its own '
+      + 'section (12/12) on the same state and on main. The charge dies with point 1187.',
+  },
+  {
+    point: 1145,
+    suite: 'polish',
+    kind: 'check',
+    match: /^frame 648-village-children\b/i,
+    why:
+      'POINT 1145 TOOK THIS FRAME AS ITS THIRD on 22.09.2026: webgl polish at e1b7d1561 died '
+      + 'twice identically on the frameSubject throw (subject off the bottom edge), while '
+      + '`--section=children-tag` is 16/16 on that state and on main. The charge dies with '
+      + 'point 1145, which turns the throw into a failed check and repairs the framing.',
+  },
+  {
+    point: 1202,
+    suite: 'polish',
+    kind: 'check',
+    match: /the spoil crossing starts on flat ground/i,
+    why:
+      'FILED AS 1202 ON 23.09.2026 once point 1198 stopped the adult-errands section crashing: '
+      + 'the dig-picture stand for bambara-village seed 58 lies 32.9 m out, past the boundary, '
+      + 'so the scene leaves the place and the route reads place null. Pure layout geometry, '
+      + 'so no backend is excluded. The charge dies with point 1202.',
+  },
 ]

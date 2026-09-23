@@ -3,6 +3,7 @@
 // pure geometry — the swing arc lay below the heads and the two arms were
 // swapped — so both are measurable without a browser.
 
+import { SHIPPED_VOCABULARY } from '../../communication/vocabulary'
 import { describe, expect, it } from 'vitest'
 import {
   DRUMMER_LEAN,
@@ -151,7 +152,7 @@ describe('the drummer moves only for the message plan', () => {
   })
 
   it("drops the matching hand at every strike time in the chief's exact plan", () => {
-    const plan = drumMessagePlan()
+    const plan = drumMessagePlan(SHIPPED_VOCABULARY)
     for (const strike of plan.strikes) {
       const frame = drummerPoseAt(plan, strike.at)
       const activeSwing = strike.drum === 'low' ? frame.lowSwing : frame.highSwing
@@ -165,7 +166,7 @@ describe('the drummer moves only for the message plan', () => {
   })
 
   it('follows each sounding strike through its own duration and waits in the gaps', () => {
-    const plan = drumMessagePlan()
+    const plan = drumMessagePlan(SHIPPED_VOCABULARY)
     for (const strike of plan.strikes) {
       const elapsed = strike.at + strike.duration * 0.4
       const frame = drummerPoseAt(plan, elapsed)

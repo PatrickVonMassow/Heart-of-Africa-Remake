@@ -663,6 +663,11 @@ describe('the launcher acts on the pause record', () => {
     expect(block).not.toMatch(/no restart clock|a human is needed/)
   })
 
+  it('gives a misfiled user stop a clock that expires this tick, so the retry spawns', () => {
+    expect(code).toMatch(/pauseRecovery\(\{ text: pauseText, now, delayMs: misfiled \? 0 : undefined \}\)/)
+    expect(code).toMatch(/verdict\.state === 'recover' && !verdict\.misfiledUserStop/)
+  })
+
   it('the --pause-report drill exits before the tick’s first side effect', () => {
     const drill = codeLines.findIndex((l) => /--pause-report/.test(l))
     const sweep = codeLines.findIndex((l) => /reapableSpawns\(/.test(l))

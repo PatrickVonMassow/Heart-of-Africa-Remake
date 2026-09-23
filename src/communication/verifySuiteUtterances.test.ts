@@ -9,6 +9,7 @@
 // This pins them from the unit layer, the one place that can read both: every
 // utterance-shaped literal in a verification suite must be a word the shipped
 // lexicon really beats.
+import { SHIPPED_VOCABULARY } from './vocabulary'
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -44,7 +45,7 @@ function suiteFiles(): string[] {
 }
 
 describe('the verification suites speak the shipped lexicon', () => {
-  const spoken = new Set(CONCEPT_IDS.map((c) => utteranceOf(c)))
+  const spoken = new Set(CONCEPT_IDS.map((c) => utteranceOf(c, SHIPPED_VOCABULARY)))
 
   it('finds the suites at all — an empty sweep would pin nothing', () => {
     expect(suiteFiles().length).toBeGreaterThan(10)

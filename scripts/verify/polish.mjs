@@ -965,7 +965,7 @@ if (section('speech-hypothesis')) {
 // focus and the typing are the genuine article.
 if (section('speech-guess')) {
   await goToPlace('maasai-village')
-  const GUESS_UTTERANCE = 'ba-BA-ba-BA' // RIVER, as the shipped lexicon beats it
+  const GUESS_UTTERANCE = 'ba-BA-ba-BA' // one of the six words; its meaning is rolled per run
   const guessPose = await page.evaluate(() => {
     const p = window.__placePlayer
     return p ? { x: p.x, z: p.z, yaw: p.yaw, pitch: p.pitch } : null
@@ -5960,6 +5960,11 @@ if (section('village-stations')) {
 //    weaver's own reading over her head, and the river in the same picture — the
 //    three things that make the axis claim checkable by the player.
 if (section('village-loom')) {
+  /** The loom station's projected height from the plaza stand, in pixels of a
+   *  900-high viewport (work-order 1191). Measured 23.09.2026: 94.9 px from
+   *  16.4 m on the shipped Bambara plan; the 27.7 m seat it replaced scales to
+   *  ~56 px. Calibratable. */
+  const LOOM_PLAZA_MIN_PX = 70
   const bootSeed = await page.evaluate(() => window.__game.getState().seed)
   try {
     await page.evaluate(() => {
@@ -6171,17 +6176,23 @@ if (section('village-loom')) {
           // then read at the ones inside it.
           const cam = window.__placeCamera
           const V = Object.getPrototypeOf(cam.position).constructor
-          const out = layout.bank
-            ? layout.bank.distance - (station.seat.x * layout.bank.nx + station.seat.z * layout.bank.nz) + 3
+          // AT THREE DEPTHS, NOT ONE (work-order 1191): from a seat ~29 m back
+          // the point 3 m past the modelled waterline projected onto the drawn
+          // beach a few pixels under the water band, with the river plainly in
+          // the frame. 8 and 15 m out lie on the water from any seat the
+          // placement allows; one blue point still answers the question.
+          const toLine = layout.bank
+            ? layout.bank.distance - (station.seat.x * layout.bank.nx + station.seat.z * layout.bank.nz)
             : 0
           const water = layout.bank
-            ? [-2.5, 0, 2.5].map((d) => {
+            ? [3, 8, 15].flatMap((beyond) => [-2.5, 0, 2.5].map((d) => {
+                const out = toLine + beyond
                 const x = station.seat.x + layout.bank.nx * out + station.fx * d
                 const z = station.seat.z + layout.bank.nz * out + station.fz * d
                 const v = new V(x, 0, z).project(cam)
                 const inFrame = v.z < 1 && Math.abs(v.x) < 0.98 && Math.abs(v.y) < 0.98
                 return { px: Math.round(((v.x + 1) / 2) * width), py: Math.round(((1 - v.y) / 2) * height), inFrame }
-              })
+              }))
             : []
           return {
             ...state,
@@ -6299,6 +6310,33 @@ if (section('village-loom')) {
         })
         check('the finished strips lie stacked beside the loom', seen.visibleStrips > 0 && seen.visibleStrips === seen.stacked,
           JSON.stringify(seen))
+        // READ, NOT MERELY IN LINE (work-order 1191): the station's drawn body
+        // is projected through the live camera and its height on the screen is
+        // held to a stated minimum. At 27.7 m it arrived as a cone and a stick;
+        // a distance says nothing about the lens, so the pixels are asked.
+        const projected = await page.evaluate(() => {
+          const loom = window.__placeScene.getObjectByName('village-loom')
+          const cam = window.__placeCamera
+          const V = Object.getPrototypeOf(cam.position).constructor
+          loom.updateWorldMatrix(true, true)
+          let top = Infinity
+          let bottom = -Infinity
+          loom.traverse((o) => {
+            if (!o.isMesh || !o.visible || !o.geometry) return
+            if (!o.geometry.boundingBox) o.geometry.computeBoundingBox()
+            const b = o.geometry.boundingBox
+            for (const x of [b.min.x, b.max.x]) for (const y of [b.min.y, b.max.y]) for (const z of [b.min.z, b.max.z]) {
+              const v = new V(x, y, z).applyMatrix4(o.matrixWorld).project(cam)
+              if (v.z >= 1) continue
+              const py = ((1 - v.y) / 2) * window.innerHeight
+              top = Math.min(top, py)
+              bottom = Math.max(bottom, py)
+            }
+          })
+          return { px: Number.isFinite(top) ? bottom - top : 0, viewport: window.innerHeight }
+        })
+        check(`from the plaza the station stands at least ${LOOM_PLAZA_MIN_PX} px tall on the screen`,
+          projected.px >= LOOM_PLAZA_MIN_PX, JSON.stringify({ ...projected, dist: plaza.dist }))
         await frame('1183-village-loom-from-plaza', {
           local: { x: stand.weaver.x, y: 0.6, z: stand.weaver.z },
           label: `the loom station seen from the plaza, ${plaza.dist.toFixed(1)} m away through a ${plaza.width.toFixed(2)} m clear sight line: weaver, helper, the tended end's yarn and the cloth stack`,
@@ -7583,7 +7621,11 @@ if (section('adult-errands')) {
     const mounted = await page.waitForFunction(() => window.__placeWalkers?.sample && window.__placeErrands,
       null, { timeout: 40000 }).then(() => true).catch(() => false)
     check('the composed excavation village mounts with a sampled inhabitant', mounted)
-    if (mounted) {
+    // The route step reads the layout hook, which mounts in its own effect.
+    const layoutReady = mounted && await page.waitForFunction(() => !!window.__placeLayout?.digSites,
+      null, { timeout: 20000 }).then(() => true).catch(() => false)
+    if (mounted) check('the excavation village exposes its layout for the dig picture', layoutReady)
+    if (layoutReady) {
       const sites = await page.evaluate(() => window.__placeErrands().geography.digSites)
       const view = digPictureView(sites)
       check('the excavation picture has two distinct nearby sites', !!view, JSON.stringify(sites))
@@ -7597,15 +7639,18 @@ if (section('adult-errands')) {
         const route = await page.evaluate(async () => {
           const { digLocalToWorld, spoilOffset, placeGroundHeight } = await import('/src/scenes/place/placeGround.ts')
           const layout = window.__placeLayout
-          const site = layout.digSites.find((s) => s.kind === 'patch')
+          const site = layout?.digSites.find((s) => s.kind === 'patch')
+          // A null place means the picture stand lies past the settlement's edge.
+          if (!site) return { error: 'no patch dig site', place: window.__game.getState().placeId, kinds: layout?.digSites.map((s) => s.kind) ?? null }
           const start = digLocalToWorld(site, spoilOffset(site), -1.6)
           const end = digLocalToWorld(site, spoilOffset(site), 1.6)
           const ground = { bank: layout.bank, sites: layout.digSites, progress: window.__placeErrands().digProgress, rocks: layout.rocks }
-          if (Math.abs(placeGroundHeight(ground, start.x, start.z)) > 0.001) return null
+          const height = placeGroundHeight(ground, start.x, start.z)
+          if (Math.abs(height) > 0.001) return { error: 'start is not flat', height, start }
           return { who: 0, start, end }
         })
-        check('the spoil crossing starts on flat ground', !!route, JSON.stringify(route))
-        if (route) await captureSpoilWalk(page, check, frame, nextFrames, route)
+        check('the spoil crossing starts on flat ground', !route.error, JSON.stringify(route))
+        if (!route.error) await captureSpoilWalk(page, check, frame, nextFrames, route)
       }
     }
   } finally {
@@ -8555,10 +8600,12 @@ if (section('chief-to-drummer')) {
     )
     .then((h) => h.jsonValue())
     .catch(() => null)
+  // CHIEF's word is rolled per run, so it is read from the run, not typed here.
+  const chiefWord = await page.evaluate(() => window.__game.getState().vocabulary.CHIEF)
   check(
     'the drummer names the chief with one word of the language',
-    Array.isArray(named) && named.length === 1 && named[0] === 'BA-ba-BA-ba',
-    JSON.stringify(named),
+    Array.isArray(named) && named.length === 1 && named[0] === chiefWord,
+    JSON.stringify({ named, chiefWord }),
   )
 
   // 1b. THE COLLISION THE TWO KEYS REMOVED (point 1139, user 16.09.2026). The

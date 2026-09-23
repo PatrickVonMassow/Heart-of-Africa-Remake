@@ -154,6 +154,10 @@ if (process.env.STUB_MODE === 'fail') {
   process.stderr.write('stream error: You are not logged in. Run \`codex login\`.\\n')
   process.exit(1)
 }
+if (process.env.STUB_MODE === 'limit') {
+  process.stderr.write("ERROR: You've hit your usage limit. Try again later.\\n")
+  process.exit(1)
+}
 // A compliant reviewer reads the material to its end and echoes the RECEIPT
 // token from its last line (finding 8). STUB_MODE=no-receipt plays the child
 // that answered without ever reading its stdin.
@@ -755,6 +759,29 @@ describe('a review that does not run', () => {
     expect(r.stdout).toMatch(/claude-only/)
     expect(r.stdout).toContain('The review is NOT done')
     // The allowance is what the switch protects: no codex call may have happened.
+    expect(readFileSync(join(dir, 'calls.log'), 'utf8').trim()).toBe('')
+    rmSync(shareFile, { force: true })
+  })
+
+  // THE MEASURED OUTAGE FALLBACK (point 1194): a limit signature is recorded with its
+  // probe clock and the review goes to the same-vendor pair, named as a fallback; while
+  // the clock runs nothing is sent at all.
+  it('records an Astra usage limit as an outage fallback and hands the review to Fable', () => {
+    provenId()
+    const shareFile = join(dir, 'astra-share.json')
+    writeFileSync(shareFile, JSON.stringify({ setting: 'default' }))
+    const r = run(['--sha', headSha, '--brief', 'judge it'], { STUB_MODE: 'limit', ASTRA_SHARE_FILE: shareFile })
+    expect(r.status).toBe(3)
+    expect(r.stdout).toContain('Astra outage FALLBACK')
+    expect(r.stdout).toContain(FALLBACK_MODEL_NAME)
+    const saved = JSON.parse(readFileSync(shareFile, 'utf8'))
+    expect(saved.setting).toBe('default')
+    expect(saved.fallback).toMatchObject({ outage: 'allowance-exhausted', kind: 'review' })
+    expect(saved.fallback.probeAt).toBeGreaterThan(Date.now())
+    writeFileSync(join(dir, 'calls.log'), '')
+    const again = run(['--sha', headSha, '--brief', 'judge it'], { ASTRA_SHARE_FILE: shareFile })
+    expect(again.status).toBe(3)
+    expect(again.stdout).toContain('Astra outage FALLBACK')
     expect(readFileSync(join(dir, 'calls.log'), 'utf8').trim()).toBe('')
     rmSync(shareFile, { force: true })
   })

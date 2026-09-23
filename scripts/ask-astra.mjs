@@ -27,12 +27,12 @@ import { isMainModule } from './is-main.mjs'
 import { REPO_ROOT } from './repo-paths.mjs'
 import { classifyOutcome, MATERIAL_BUDGET_CHARS, REVIEW_TIMEOUT_MS, ASTRA_MODEL_NAME, ASTRA_REASONING_EFFORT } from './review-astra-core.mjs'
 import { ensureModelProven, runCodex } from './review-astra.mjs'
-import { currentSetting, settingProblemLine } from './astra-share.mjs'
-import { routeFor } from './astra-share-core.mjs'
+import { currentSetting, recordAstraRun, settingProblemLine } from './astra-share.mjs'
+import { effectiveRoute, fallbackLine } from './astra-share-core.mjs'
 import { currentFableState } from './fable-switch.mjs'
 import { fableIsOn } from './fable-switch-core.mjs'
 import { authoringClaudeArgs } from './author-fable-core.mjs'
-import { buildAskPrompt, formatAnswerReport, formatAskMaterial, formatUnavailable, KINDS, normaliseKind, parseAnswer, parseClaudeAskOutput, resolveAskModel } from './ask-astra-core.mjs'
+import { ASK_MODELS, buildAskPrompt, formatAnswerReport, formatAskMaterial, formatUnavailable, KINDS, normaliseKind, parseAnswer, parseClaudeAskOutput, resolveAskModel } from './ask-astra-core.mjs'
 
 /** One git read that never throws — a missing range is reported, not fatal. */
 function git(args) {
@@ -146,7 +146,7 @@ if (isMainModule(import.meta.url)) {
     }
     const kind = normaliseKind(flag('--kind'))
     const brief = flag('--brief')
-    const model = resolveAskModel(flag('--model') || 'astra')
+    let model = resolveAskModel(flag('--model') || 'astra')
     if (!kind || !brief) {
       console.error(`ask-astra: --kind (one of ${KINDS.join(', ')}) and --brief are both required.\n`)
       console.error(usage())
@@ -165,7 +165,12 @@ if (isMainModule(import.meta.url)) {
     if (model.key === 'astra') {
       // A fallback nobody is told about is a setting nobody chose (second cross-vendor round).
       if (share.problem) console.error(settingProblemLine(share, 'ask-astra'))
-      if (routeFor(kind, share.setting) !== 'astra' && !argv.includes('--anyway')) {
+      const routed = effectiveRoute(kind, share)
+      // A MEASURED OUTAGE serves the kind on Opus 5.5 instead of refusing (point 1194).
+      if (routed.fallback && !argv.includes('--anyway')) {
+        console.error(`ask-astra: ${fallbackLine(share)} — asking ${ASK_MODELS.opus.name} instead.`)
+        model = ASK_MODELS.opus
+      } else if (routed.to !== 'astra' && !argv.includes('--anyway')) {
         console.error(
           `ask-astra: the share switch is at \`${share.setting}\`, which routes ${kind} to Claude — not asking ${ASTRA_MODEL_NAME}.\n` +
             `  Do it in the Claude chain, or: node scripts/astra-share.mjs --more   (override once with --anyway)`,
@@ -225,8 +230,18 @@ if (isMainModule(import.meta.url)) {
       input: material,
       timeoutMs: Number(flag('--timeout')) || REVIEW_TIMEOUT_MS,
     }
-    const run = model.runtime === 'codex' ? runCodex(request) : runClaudeAsk({ ...request, model })
-    const outcome = model.runtime === 'codex' ? classifyOutcome(run) : run
+    let run = model.runtime === 'codex' ? runCodex(request) : runClaudeAsk({ ...request, model })
+    let outcome = model.runtime === 'codex' ? classifyOutcome(run) : run
+    if (model.runtime === 'codex') {
+      // An outage signature records the fallback and serves this ask on Opus 5.5.
+      const recorded = recordAstraRun({ outcome, text: `${run.stderr ?? ''}\n${run.stdout ?? ''}`, kind, who: 'ask-astra' })
+      if (recorded.fellBack) {
+        model = ASK_MODELS.opus
+        console.error(`ask-astra: serving the ${kind} on ${model.name} instead …`)
+        run = runClaudeAsk({ ...request, model })
+        outcome = run
+      }
+    }
     const parsed = outcome.ok ? parseAnswer({ kind, text: run.finalMessage }) : { ok: false, error: '' }
     const elapsedMs = Date.now() - startedAt
 

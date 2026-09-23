@@ -40,8 +40,8 @@ import { readTasksOpen } from './tasks-source.mjs'
 import { appendRecord, gitToplevel, readRecords, recordsPathFor } from './mechanism-review.mjs'
 import { classifyOutcome } from './review-astra-core.mjs'
 import { ensureModelProven } from './review-astra.mjs'
-import { currentSetting, settingProblemLine } from './astra-share.mjs'
-import { routeFor } from './astra-share-core.mjs'
+import { currentSetting, recordAstraRun, settingProblemLine } from './astra-share.mjs'
+import { FALLBACK_AUTHOR, effectiveRoute, fallbackLine } from './astra-share-core.mjs'
 import { currentFableState } from './fable-switch.mjs'
 import { OPUS_MODEL, fableIsOn } from './fable-switch-core.mjs'
 import {
@@ -834,7 +834,13 @@ export async function runAuthoringCli({ authorLane = 'astra', argv = process.arg
     if (config.lane === 'astra') {
       const share = currentSetting()
       if (share.problem) console.error(settingProblemLine(share, commandName))
-      if (routeFor('author', share.setting) !== 'astra' && !argv.includes('--anyway')) {
+      const routed = effectiveRoute('author', share)
+      // A MEASURED OUTAGE: the point is authored in the Claude lane (point 1194).
+      if (routed.fallback && !argv.includes('--anyway')) {
+        console.error(`${commandName}: ${fallbackLine(share)}\n  Author point ${point} in the Claude lane on ${FALLBACK_AUTHOR}.`)
+        process.exit(5)
+      }
+      if (routed.to !== 'astra' && !argv.includes('--anyway')) {
         console.error(
           `${commandName}: the share switch is at \`${share.setting}\`, which keeps authoring with Claude.\n` +
             '  node scripts/astra-share.mjs --more   (override once with --anyway)',
@@ -954,6 +960,10 @@ export async function runAuthoringCli({ authorLane = 'astra', argv = process.arg
         ),
     })
     const outcome = config.runtime === 'claude' ? fableAuthoringOutcome(run) : classifyOutcome(run)
+    // A vendor outage is a fallback, not the point's red: recorded, then handed to Opus 5.5.
+    const outage = config.lane === 'astra'
+      ? recordAstraRun({ outcome, text: `${run.stderr ?? ''}\n${run.stdout ?? ''}`, kind: 'author', who: commandName })
+      : { fellBack: false }
     const parsed = parseAuthoringAnswer(run.finalMessage)
     // WHERE THE RUN ENDED, not where it began: nothing stops a sandbox-less run
     // from checking out another branch, and the commits below would then belong
@@ -1044,8 +1054,12 @@ export async function runAuthoringCli({ authorLane = 'astra', argv = process.arg
         : '',
     }))
     // 0 only for a clean run that produced work; 3 says "look at this before you
-    // treat it as a delivery", which is what a script chaining on it must see.
-    process.exitCode = judged.clean ? 0 : 3
+    // treat it as a delivery", which is what a script chaining on it must see;
+    // 5 is the outage fallback — author the point in the Claude lane on Opus 5.5.
+    if (outage.fellBack) {
+      console.error(`${commandName}: GPT-6 Astra is out — author point ${point} in the Claude lane on ${FALLBACK_AUTHOR} (not the point's red).`)
+      process.exitCode = 5
+    } else process.exitCode = judged.clean ? 0 : 3
   } catch (e) {
     console.error(`${commandName} failed: ${(e && e.message) || e}`)
     process.exit(1)

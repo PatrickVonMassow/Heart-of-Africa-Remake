@@ -183,8 +183,16 @@ export const DOC_BUDGETS = [
     // boundary-marker-is-fragile guards the gap point 426 has yet to close, and
     // watch-for-aesthetic-oddities and verify-default-zoom-and-webgpu are two
     // different statements rather than a duplicate. Nothing in the index is stale.
-    maxLines: 52,
-    maxWords: 803,
+    // RAISED on 23.09.2026 by exactly one entry, measured: 53 lines and 820 words
+    // against 52/803. The entry is "Only one head session", the user's standing
+    // order of that day: exactly ONE session is attended and every other one is
+    // headless, so a message held there for approval is never approved and the
+    // user is never sent to another window. It is a genuinely new class — the
+    // surviving lines say where work may run and who owns the batch, none of them
+    // WHO CAN ANSWER. It cost this session two turns pointing at a message that
+    // then expired undelivered. Its hook measures 17 words on this tokenizer.
+    maxLines: 53,
+    maxWords: 820,
     maxEntryWords: 22,
     // Fifteen words: an index of one-hook lines, where a whole new entry is ~20 words —
     // so the slack cannot hide one, and re-wording an existing hook is free.

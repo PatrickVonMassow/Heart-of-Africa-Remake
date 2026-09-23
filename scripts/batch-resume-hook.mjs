@@ -286,13 +286,15 @@ try {
     const header =
       openPointsHeadline(nums, { gated: gatedNums }) +
 
-      // rule:model-policy@0238ab8b
+      // rule:model-policy@aa7f5b05
       'MODEL POLICY (CLAUDE.md §6): AUTHORING HAS THREE LANES. ' +
       'CLAUDE.md §6 owns the authoring and escalation policy; scripts/author-routing-core.mjs ' +
       'makes that cut from point text and recorded review history, while a point\'s own ' +
       '`Author lane:` tag remains an operator decision (ordinary-lane tags yield only to a ' +
       'reached §6 Fable escalation threshold). ' +
-      'scripts/astra-share.mjs --status says what the switch routes right now. REVIEW is ' +
+      'scripts/astra-share.mjs --status says what the switch routes right now. An UNREACHABLE ' +
+      'Astra lane — exhausted OpenAI volume included — authors on Opus 5.5 instead of waiting. ' +
+      'REVIEW is ' +
       'CROSS-VENDOR: Astra reads Anthropic-authored work (scripts/review-astra.mjs), Claude ' +
       'reads Astra-authored work, and no model reviews its own. ' +
       'AN ASTRA-LANE POINT IS COMMISSIONED, NOT WRITTEN HERE: run node ' +

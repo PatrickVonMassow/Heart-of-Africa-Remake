@@ -12,6 +12,7 @@
 // is the ROUND. The settlement's own layout, colliders and crowd are what
 // `tagShuffle.test.ts` replays.
 
+import { SHIPPED_VOCABULARY } from '../../communication/vocabulary'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { SpeechFloor } from '../../communication/speechFloor'
 import { bankPlayRocksView } from './riverBank'
@@ -1498,7 +1499,7 @@ describe('the call register reaches the documented spectator stand', () => {
     for (const { u, speakerX: x, speakerZ: z } of log.when) {
       if (bankVoiceRegister(u.moment) !== 'call') continue
       const distance = dist(stand, { x, z })
-      const plan = utterancePlan(utteranceOf(u.concept), distance, { ...registerOptions('call'), voice: 'child', volume: 1 })
+      const plan = utterancePlan(utteranceOf(u.concept, SHIPPED_VOCABULARY), distance, { ...registerOptions('call'), voice: 'child', volume: 1 })
       expect(plan.gain, `${id} ${u.moment} ${distance.toFixed(2)} m`).toBeGreaterThanOrEqual(0.2)
       expect(plan.syllables[0].peak).toBeGreaterThanOrEqual(0.85 * 1.25 * 0.2)
       expect(gestureIfHeard(distance, u.gesture, {}, balance.communication.call.reach).kind).toBe(u.gesture)

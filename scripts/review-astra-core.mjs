@@ -1,6 +1,6 @@
 // Pure decision core of the CROSS-VENDOR four-eyes review (work-order point 624).
 //
-// rule:model-policy@0238ab8b
+// rule:model-policy@aa7f5b05
 // WHY IT EXISTS: our Claude reviewers are one house, with similar
 // training, therefore CORRELATED blind spots, which is exactly what the
 // four-eyes rule is bought against (CLAUDE.md §6). A model from a different
@@ -154,6 +154,10 @@ const CAUSE_TEXT = Object.freeze({
   [OUTCOME.SWITCHED_OFF]: 'the share switch is at `claude-only` (node scripts/astra-share.mjs --status)',
   [OUTCOME.SELF_REVIEW]: `${ASTRA_MODEL_NAME} AUTHORED part of this range — no model reviews its own work`,
 })
+
+/** The outcomes that are a VENDOR outage rather than a failed run — the signature set
+ *  the share switch's measured fallback keys on (scripts/astra-share-core.mjs). */
+export const OUTAGE_OUTCOMES = Object.freeze([OUTCOME.ALLOWANCE_EXHAUSTED, OUTCOME.UNREACHABLE])
 
 /** The cause sentence of one outcome kind — for the callers that skip classifyOutcome. */
 export function causeTextFor(kind) {

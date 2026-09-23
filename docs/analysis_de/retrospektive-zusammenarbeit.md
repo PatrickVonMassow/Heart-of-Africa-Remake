@@ -136,12 +136,14 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 08.09. nachts | Auf die Standsfrage kam eine korrekt gelesene Messung und daran ein erfundener Reststand: „erst die halbe Strecke, danach WebGPU" — zwei Minuten später war der Lauf beendet, denn ein roter erster Durchgang beendet ihn und die zweite Bahn faehrt nie. Die widerlegende Tatsache stand im selben Absatz derselben Nachricht, drei rote Suiten waren gerade aufgezaehlt worden. Der Nutzer sah beides hintereinander und sagte es ([§3.250](#3250-der-reststand-wurde-erzaehlt-waehrend-der-beleg-dagegen-schon-vorgelesen-war)) |
 | 19.09. nachts | Der deckende Bildlauf wurde NACH der Landung gefahren statt davor, und das allein trug die Sitzung 52.000 Token über ihre Decke: Er lief zwanzig Minuten, brachte ein fremdes Rot mit, das erst eingeordnet werden musste, und jeder seiner Schritte stritt mit dem Tafel-Tor, weil der Punkt schon abgehakt war und keine Jetzt-Karte mehr tragen konnte. Auf WebGPU konnte er gar nicht decken — das seit dem 17.09. als vorbestehend eingereihte Bild der Victoria-Fälle beendet den Lauf nach 45 Prüfungen (Punkt 1145), also blieb nur die laute Zurückstellung |
 | 22.09. abends | Derselbe Stop-Hook wie am 14.09. verlangte nach einer Parallelsitzung `batch-doctor --gate` — nur war der Alarm diesmal eine neun Minuten alte Messung, und der Doktor hatte ihn 31 Sekunden zuvor bereits abgeräumt. Die geforderte Abhilfe dauert acht Minuten, der Alarm erhebt sich nach einunddreißig Sekunden: ein Rennen, das die sanktionierte Maßnahme nie gewinnen kann. Daneben meldete derselbe Zug „Dashboard nicht registriert", weil der Stop-Wächter den Merkerpfad gegen ein in einen Worktree gewandertes Arbeitsverzeichnis auflöst (§3.303, Wiedergänger von §3.271) |
+| 23.09. vormittags | 75 Minuten Stillstand, beendet von der Nutzerfrage, ob 1174 noch laufe: Eine Sitzung, die der Launcher für EINE Board-Nachricht gestartet hatte und deren eigener Auftrag ihr sagt, sie halte den Batch-Lock nicht, schrieb die GLOBALE uhrlose Stopp-Markierung — mit `type: user-stop` und einer Begründung, die sie selbst beschreibt („Chat-Antwort-Sitzung, kein Batch-Auftrag"), obwohl kein Nutzer gestoppt hatte. Der Launcher lehnte danach jeden Nachfolger ab, korrekt nach seiner eigenen Regel. Eine stehengelassene Sitzung darf den Zustand schreiben, der alle anderen anhält — und gesehen hat es niemand, weil die Jetzt-Karte die letzte Behauptung der toten Sitzung wiederholt statt ihr Alter zu nennen (§3.304, Wiedergänger der Stillstands-Familie §3.258; Punkte 1193, 1194, 1195) |
 
 | 15.09. nachmittags | Ein neu eingereihter Punkt erzaehlte der Maschine das Gegenteil von sich selbst: Seine Ueberschrift »has no covering picture run« las der Bildpflicht-Klassierer als VERNEINUNG, der Punkt, dessen einziger Zweck zwei Bildlaeufe sind, wies sich damit als bildfrei aus. Gefangen von einer angehefteten Pruefung, die die exakte Menge solcher Zeilen festhaelt statt ihrer Anzahl; die Korrektur war ein positiv formulierter Satz (§3.274) |
 | 15.09. nachmittags | Und derselbe Punkt trug eine falsche Tatsache: Die deckenden Laeufe lagen scheinbar zwei Stunden VOR dem Merge, den sie decken sollten — Laufstempel in UTC gegen Commit-Zeiten in +0200 gelesen. Beide liefen am Merge-HEAD selbst, mit je sechs Bildern auf beiden Bahnen. Aufgefallen beilaeufig, weil eine Wartequittung ihren HEAD mit ausdruckte. Wortwoertlich die Lehre aus §3.253, drei Tage alt und von mir wiederholt (§3.275) |
 | 15.09. abends | Der beauftragte Autorenlauf zu Punkt 1131 hing ohne `setsid` an der Schale, die ihn startete, und starb mit ihr — sein Protokoll behauptet bis zuletzt »while the run continues«. Ungesichert im Arbeitsbaum lag seine ganze Ausbeute: ein fertiger Reproduktionsstand des gemeldeten Dorfes, gerettet nur, weil ich zufaellig hinsah. Beide Vorsichtsmassnahmen — nach jedem Schritt committen, lange Laeufe abkoppeln — standen geschrieben und adressierten beide den AUFRUFER; Punkt 1133 verschiebt die zweite in den Startpfad des Werkzeugs (§3.106-Nachtrag) |
 | 18.09. vormittags | Ein Ein-Wort-Fix am Zeitstempel-Hook landete auf dem Zweig von Punkt 1155, weil die Sitzung „Current branch: main" aus ihrem Startschnappschuss glaubte, statt den Zweig des Arbeitsbaums zu messen; Cherry-Pick auf main, Revert auf dem Zweig, und der neue Test fiel im Push-Tor erst noch am `windowsHide`-Audit durch (§3.288) |
 
+| 23.09. abends | Ein Nutzerauftrag, der kein Auftragspunkt ist, kommt nicht los: Nach dem regelkonformen Anspruch auf den Batch-Lock verweigerte die Leerlauf-Behauptung der Tafel JEDE Schreiboperation — auch die, die den Punkt erst angelegt hätte. Die beiden dokumentierten Auswege greifen nicht: `now <N>` braucht eine Warteschlangen-Karte, die aus TASKS.md gebaut wird, `closing <N>` einen gemergten Punkt. Durchgekommen bin ich nur, weil das board-first-Tor pro Zug genau einmal feuert — eine Einmal-Freigabe, kein vorgesehener Weg (§3.306) |
 Muster: Ab dem 22.07. explodiert die Commit-Rate (Delegation) — und genau dann häufen sich die Infrastruktur-Vorfälle. **Skalierung der Autonomie erzeugt eine eigene Problemklasse, die die Feature-Arbeit zeitweise überholt.**
 
 ---
@@ -1474,6 +1476,37 @@ bis zum Schluss aus wie Fortschritt. Das ist die Kehrseite von §3.258: Dort spe
 falsch gemessenes Leben die Übergabe, hier verbarg ein falsch gemessenes Leben eine fertige
 Lieferung. Beide Male war die gemessene Größe eine Datei, und gefragt war ein Prozess.
 
+### 3.306 Der Auftrag, der sich selbst nicht anlegen darf
+
+Am 23.09. abends bat der Nutzer, den aktuellen `main`-Stand als `poc` zu taggen und zu
+veröffentlichen. Der Weg dorthin war seit §3.305 klar und wurde diesmal auch gegangen: Den
+Batch-Lock hielt eine autonome Sitzung, also habe ich ihn über `batch-claim.mjs` angefordert,
+bis zur Freigabe blockierend gewartet und ihn genommen. Danach stand die Arbeit trotzdem.
+
+Die Tafel behauptete »Gerade keine laufende Arbeit«, und diese Behauptung verweigert jede
+zustandsändernde Operation — zu Recht, denn sie ist eine Aussage über die Zukunft des Zuges. Nur
+erreichte keiner ihrer Auswege den Zustand, in dem ich war. `now <N>` verlangt einen offenen
+Punkt mit Warteschlangen-Karte, und die Warteschlange wird aus TASKS.md gebaut; `closing <N>`
+verlangt einen gemergten und abgehakten Punkt. Der Auftrag war keins von beidem. Er hätte ein
+Auftragspunkt werden müssen — aber das Anlegen dieses Punktes ist selbst eine Schreiboperation
+und damit genau das, was die Behauptung verbietet. Auch der Umweg über das Scratchpad fiel: Das
+Tor beurteilt jedes schreibende Segment, nicht sein Ziel.
+
+Das ist derselbe Riss, den Punkt 544 im August für die Abschlussarbeiten geschlossen hat, nur
+für einen neuen Fall: die frische Anordnung, die noch keine Nummer hat. Losgekommen bin ich
+nicht über einen vorgesehenen Weg, sondern weil das board-first-Tor pro Zug genau einmal feuert
+— beim zweiten Versuch ging dieselbe Datei-Änderung durch. Eine Einmal-Freigabe ist kein
+Mechanismus; sie hat hier nur zufällig in dieselbe Richtung gezeigt.
+
+Was daraus folgt, ist kein vierter Kartentyp — die Infrastruktur steht unter Einfriergebot, und
+ein weiterer Typ wäre genau der Wiederaufbau, den CLAUDE.md §2 untersagt. Es folgt die
+Beobachtung, dass die Tafel-Behauptung eine Reihenfolge erzwingt, die niemand erklärt hat: Erst
+muss der Auftrag eine Nummer haben, dann darf er getan werden, und das Vergeben der Nummer ist
+bereits die verbotene Handlung. Wer hier ohne die Einmal-Freigabe steht, kann den Auftrag des
+Nutzers nicht ausführen, ohne die Tafel zu belügen oder zu warten — und beides ist schlechter als
+das, was die Regel verhindern soll.
+
+
 ## 4. Die Guards als Immunsystem
 
 Jedes Guard-Skript ist die geronnene Lösung eines real aufgetretenen, wiederholten Problems.
@@ -1687,7 +1720,7 @@ stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die s
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 23.09.2026, 02:09 · Quellen-Fingerprint: `48463cf628ef…`
+Zuletzt aktualisiert: Mittwoch, 23.09.2026, 21:57 · Quellen-Fingerprint: `39dee964328a…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1729,11 +1762,11 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to the OpenAI lane, GPT-6 Astra), and review is cross-vendor, not Fable-by-default | 6 | hoch | — (Regel/Memory) | ◐ Regel |
 | Iterate on the new feature's OWN test first; the full regression runs once at the end, never as the debugging loop | 2 | mittel | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 92 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 93 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | wait-command-guard.mjs | ✔ Mechanismus |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | \"Gib ab\" / \"abgeben\" means hand the batch to a SUCCESSOR session so the context does not overflow — it never means pause or stop the batch | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
-| User 18.08.2026: hard, complex, error-prone and HIGH-criticality points are AUTHORED by the OpenAI lane directly (GPT-6 Astra since 05.09.2026, GPT-5.6 Sol before) — Opus 5.5 authors only what is left, and Fable authors only a point that tags its lane or one the router escalates | 5 | hoch | — (Regel/Memory) | ◐ Regel |
+| User 18.08.2026: hard, complex, error-prone and HIGH-criticality points are AUTHORED by the OpenAI lane directly (GPT-6 Astra since 05.09.2026, GPT-5.6 Sol before) — Opus 5.5 authors only what is left, and Fable authors only a point that tags its lane or one the router escalates | 6 | hoch | — (Regel/Memory) | ◐ Regel |
 | Two test layers — Vitest (jsdom) for logic/store/HUD, Playwright for browser-only; add a test per new feature on the right layer | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | STANDING RULE: design.md §19.14 (climate) and §19.15 (peoples) — the research→game implementation records — must be updated in the SAME commit whenever the climate or people rendering changes; peoples-1890 §8 / climate-1890 §9 are pointers | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | All journal texts (de + en) must carry emotional voice markup; English read-aloud runs via Kokoro TTS | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1748,6 +1781,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | never stretch a scoped user remark into a standing instruction or cite it as one | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | The batch-owning session is a headless successor the launcher spawned — the user cannot see, reach or close it; never ask them to | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | User order 23.08.2026: a lasting standstill must NEVER happen — self-recovery over alerting, no stop that waits on a user card; decide by own judgment and record the decision in the board state section, never as a decision card (vetoed three times) | 5 | hoch | — (Regel/Memory) | ◐ Regel |
+| There is exactly one head session — this chat; every other session is headless and the user cannot be reached through it | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Parallel batch sessions are spawned by the HoA-Batch-Autostart scheduled task after a reboot; the advisory lock never stopped it — a hard singleton is being built | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | A `pgrep -f` wait loop matches its own shell command line, so it never exits — anchor on the process, not the pattern | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Always take the point boundary autonomously at a closed point — never ask the user whether to hand over or /clear | 1 | niedrig | point-proof-guard.mjs | ✔ Mechanismus |
@@ -1762,7 +1796,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A declared \"intended residual\" is where real defects hide — legitimate only when the information to close it is genuinely not at hand | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | A point delivered as a rider on another branch is closed with fold-point --delivered, and its push needs a closing card first | 1 | niedrig | point-proof-guard.mjs, push-arrival-guard.mjs | ✔ Mechanismus |
 | Saved games do not constrain design work: the feature is switched off, nobody plays a serious run, and no migration is ever owed for a data change | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
-| 24.07.2026 evening chaos — serving model silently degraded to Haiku 4.5; verify the serving model before batch work, Haiku-class must pause instead of working | 7 | hoch | model-guard.mjs | ✔ Mechanismus |
+| 24.07.2026 evening chaos — serving model silently degraded to Haiku 4.5; verify the serving model before batch work, Haiku-class must pause instead of working | 8 | hoch | model-guard.mjs | ✔ Mechanismus |
 | Keep the shell cwd in /workspace/hoa; a worktree cwd makes the Stop guards judge the wrong repo root | 4 | hoch | worktree-reminder.mjs | ✔ Mechanismus |
 | ENDED 17.08.2026 — the 13.08. emergency that pushed the MAXIMUM load to OpenAI (hard cases to Sol via --anyway, pool of one) is over; the normal three-lane split of CLAUDE.md §6 applies again | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Every new optical/graphics feature must be sorted into the low/medium/high detail presets, enforced by a pure completeness test — a new quality key with no preset entries fails the gate | 2 | mittel | — (Regel/Memory) | ◐ Regel |
@@ -1793,10 +1827,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 98 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 7 Revert-/Reapply-Commits · 138 Prozess-/Meta-TASKS-Punkte (davon 66 offen).
+Erfasste Quellen: 99 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 7 Revert-/Reapply-Commits · 140 Prozess-/Meta-TASKS-Punkte (davon 67 offen).
 
-<!-- RETRO-FINGERPRINT: 48463cf628efd928e563f320354c29495c7c65b6090e8d2102e29c9adabc3df5 -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-23T00:09:02.930Z -->
+<!-- RETRO-FINGERPRINT: 39dee964328a5d288e7675ad45fc98c04570e54f2f1525de795591ab9f1eca73 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-23T19:57:01.460Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -8109,3 +8143,79 @@ ist der relative Pfad der eigentliche Defekt — ein absolut hinterlegter Merker
 sondern die Behebung. Und wo derselbe Wächter Zustandszahlen aus derselben Wurzel liest, ist die
 erste Frage bei jeder inhaltlich klingenden Verweigerung nicht „stimmt die Zahl?", sondern
 **„aus welcher Wurzel ist sie gemessen?"**
+
+### 3.304 Die Sitzung, die nichts tun durfte, hielt alles an (Wiedergänger von §3.258)
+
+Am 23.09. stand der Batch 75 Minuten. Gefunden hat ihn nicht der Apparat, sondern die Frage des
+Nutzers, ob Punkt 1174 noch laufe — die Karte auf der Tafel nannte keinen Stand, weil niemand
+mehr da war, der einen geschrieben hätte.
+
+Der Ablauf ist in drei Zeilen erzählt. Um 09:20 startete der Launcher nach einer regulären
+Übergabe den Nachfolger für den Batch. Um 09:30 startete er daneben eine zweite Sitzung für
+EINE Board-Nachricht; deren Auftrag sagt ihr ausdrücklich, dass sie den Batch-Lock nicht hält,
+dass der SessionStart-Hook sie zu Recht abweisen wird und dass sie nicht einmal die Arbeitsliste
+lesen soll. Um 09:36 schrieb genau diese Sitzung `.claude/batch-paused` mit `type: user-stop`,
+`retry-after: never` und der Begründung „Chat-Antwort-Sitzung: nur eine Board-Nachricht zu
+beantworten. Kein Batch-Auftrag". Das ist keine Nutzeräußerung, sondern eine Selbstbeschreibung.
+Danach endete die echte Arbeitssitzung, und der Launcher verweigerte um 09:50, 10:05, 10:20,
+10:35 und 10:50 jeden Nachfolger — mit der richtigen Begründung, dass ein getippter user-stop
+bewusst keine Uhr hat.
+
+Kein Glied dieser Kette ist für sich falsch. Das Veto ist gewollt: Wenn der Nutzer stoppt, soll
+kein Automat weiterlaufen. Die Chat-Sitzung sollte den Batch nicht anfassen, und sie hat, in
+ihrem eigenen Verständnis, genau das ausgedrückt — sie wollte sagen, sie sei es nicht, und das
+Werkzeug, das ihr dafür zur Hand lag, sagt „niemand, für immer". Der Fehler liegt in der
+Reichweite: Eine session-lokale Aussage wurde in den einzigen global wirksamen Zustand
+geschrieben, den der Apparat kennt, und `user-stop` ließ sich behaupten, ohne dass irgendwo eine
+Nutzeräußerung nachgewiesen werden musste.
+
+Zur Familie gehört das zu §3.258, wo der Launcher den Nachfolger für die volle Dauer der Phase
+sperrte, in der die Übergabe gerade vorgesehen ist: beide Male stoppte nicht ein Defekt die
+Arbeit, sondern eine korrekt arbeitende Sperre, die auf die falsche Messung angewandt wurde.
+Neu ist hier, wer schreiben darf. Punkt 1193 zieht die Konsequenz zweifach — die uhrlose
+Markierung darf nur noch die Sitzung schreiben, die den Lock hält, und der Launcher liest eine
+uhrlose Markierung ohne belegte Nutzeräußerung als defekt statt als Befehl.
+
+Der Nutzer hat den Stillstand nicht auf der Tafel gesehen, sondern erfragt, und darin liegt der
+eigentliche Vorwurf: „Fast genauso schlimm wie eine stehende Batch ist, dass ich auf dem Dashboard
+nicht sehen konnte, dass sie stand." Die Jetzt-Karte wird von der arbeitenden Sitzung geschrieben,
+also zeigt sie immer deren LETZTE BEHAUPTUNG und nie ihr Alter — um 10:51 stand dort „Stand 09:22".
+Ein Monitor, dessen Anzeige von dem geschrieben wird, dessen Ausfall er melden soll, kann diesen
+Ausfall nicht melden; es ist derselbe Denkfehler wie beim Fühler, der sich selbst misst. Alles
+Nötige lag bereits auf der Platte — fehlender Lock, Alter der Meldung, die Absage-Begründung des
+Launchers, die Pause-Markierung —, nur nahm es niemand beim Veröffentlichen. Punkt 1195 verschiebt
+genau das: Die Veröffentlichung misst selbst und sagt, dass die Batch steht, samt Dauer. Auf
+Anordnung des Nutzers steht er hinter dem Release-Tag.
+
+Der zweite Befund desselben Vormittags liegt daneben und ist harmloser, aber von derselben Art:
+Auf die Frage, was bei einem Ausfall der OpenAI-Seite geschieht, war die gemessene Antwort
+„nichts". Die Vergabe zwischen den Anbietern ist ein Schalter von Hand; die Kontingent-Mechanik
+des Launchers kennt nur das Anthropic-Limit. Ein leeres OpenAI-Volumen hätte also jeden
+vergebenen Autorenlauf in den toten Anbieter laufen lassen, ohne dass etwas zurückfällt. Seit
+dem 23.09. steht die Regel in CLAUDE.md §6 — eine unerreichbare Astra-Bahn schreibt auf
+Opus 5.5 —, und Punkt 1194 macht sie messend und selbstheilend.
+
+### 3.305 Die Nachricht an ein Fenster, vor dem niemand sitzt
+
+Am 23.09. ordnete der Nutzer an, eine Anforderung in den gerade laufenden Punkt 1174
+aufzunehmen. Die Sitzung, in der er tippte, hielt den Batch-Lock nicht, und der Stand-down-Guard
+verweigert einer solchen Sitzung jede Schreiboperation — TASKS.md, Findings-Carrier, Memory,
+sogar das Scratchpad. Bis hierhin arbeitet alles wie gebaut.
+
+Der Fehler war der Ausweg, den ich gewählt habe: die fertig formulierte Anforderung per
+Cross-Session-Nachricht an die Sitzung zu schicken, die den Lock hielt, und dem Nutzer zu sagen,
+er möge sie „im anderen Fenster" freigeben. Es gibt kein anderes Fenster. Die haltende Sitzung
+war der headless gestartete Batch-Worker; ihre Zustellung wartete auf eine Freigabe, die dort
+niemand geben konnte, und lief unzugestellt ab. Zweimal habe ich den Nutzer dorthin geschickt,
+bevor er widersprach: Es gibt genau EINE bediente Sitzung, seine.
+
+Die Klasse ist damit benannt und liegt neben §3.304: Ein Weg, der eine menschliche Handlung an
+einer Stelle voraussetzt, an der kein Mensch ist, ist kein Weg, sondern ein Stillstand mit
+Begründung. Richtig war, was danach geschah — messen, statt zu warten: Die haltende Sitzung
+stand in einer bis 19:32 deklarierten Wartestellung auf den Abschnitts-Suites, es lief kein
+Merge und keine Landung, `main` war sauber und der Punkt-Branch gepusht. Damit kostete das
+erzwungene Übernehmen nur eine Suite, deren Ergebnis die neue Anforderung ohnehin entwertet
+hatte. Die Regel steht seit dem 23.09. im Memory (`only-one-head-session`): Wenn eine Anordnung
+eine Schreiboperation braucht und der Guard sie verweigert, hole ich den Batch über den
+vorgesehenen Anspruchsweg selbst — und schicke den Nutzer nie in eine Sitzung, die ihn nicht
+hören kann.
