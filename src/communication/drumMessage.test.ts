@@ -1,9 +1,9 @@
-import { SHIPPED_VOCABULARY } from './vocabulary'
 // The chief's drum message (work-order point 486): the four concepts, the
 // strikes that beat them, and the elements the display shows. The load-bearing
 // claim is that the drums say EXACTLY what the village speaks — sequence for
 // sequence, with one constant pause between the concepts and nothing else.
 
+import { SHIPPED_VOCABULARY } from './vocabulary'
 import { afterEach, describe, expect, it } from 'vitest'
 import { balance } from '../config/balance'
 import { emptyMemory, observePhrase, setHypothesis } from './heard'

@@ -1,4 +1,3 @@
-import { SHIPPED_VOCABULARY } from '../../communication/vocabulary'
 // THE CHILDREN'S BANK GAME, REPLAYED (work-order 687).
 //
 // The spec's own test list, one case each: the phases alternate, the caller
@@ -13,6 +12,7 @@ import { SHIPPED_VOCABULARY } from '../../communication/vocabulary'
 // is the ROUND. The settlement's own layout, colliders and crowd are what
 // `tagShuffle.test.ts` replays.
 
+import { SHIPPED_VOCABULARY } from '../../communication/vocabulary'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { SpeechFloor } from '../../communication/speechFloor'
 import { bankPlayRocksView } from './riverBank'

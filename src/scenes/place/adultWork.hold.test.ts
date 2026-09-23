@@ -1,4 +1,3 @@
-import { SHIPPED_VOCABULARY } from '../../communication/vocabulary'
 // THE WORD COMES FIRST, THE ACT ANSWERS IT (work-order 1184, user 22.09.2026).
 // An order carried out in the frame it is spoken — before its four syllables
 // have finished — reads as a man narrating his own act rather than as one man
@@ -7,6 +6,7 @@ import { SHIPPED_VOCABULARY } from '../../communication/vocabulary'
 // the word plays, it starts after the word's own length plus the calibratable
 // pause, and a task inside that hold owes nothing.
 
+import { SHIPPED_VOCABULARY } from '../../communication/vocabulary'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { balance } from '../../config/balance'
 import { resetDevAsserts } from '../../systems/devAssert'

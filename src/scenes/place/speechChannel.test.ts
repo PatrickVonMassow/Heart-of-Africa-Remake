@@ -1,9 +1,9 @@
-import { SHIPPED_VOCABULARY } from '../../communication/vocabulary'
 // The channel between a speaking figure and its overhead label (design.md
 // §13.4, work-order point 485): the label rides on the SPEAKER's object, it is
 // gone when its time is up, and it goes with the figure when that leaves the
 // scene. The lifetime rules themselves are pinned in
 // src/communication/speechLabel.test.ts.
+import { SHIPPED_VOCABULARY } from '../../communication/vocabulary'
 import { describe, it, expect, beforeEach } from 'vitest'
 import type { Object3D } from 'three/webgpu'
 import { utteranceOf } from '../../communication/lexicon'

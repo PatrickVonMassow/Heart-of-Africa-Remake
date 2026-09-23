@@ -93,9 +93,8 @@ export function toneOfSyllable(syllable: string): Tone {
  *
  * A WORD additionally carries AT LEAST ONE SYLLABLE OF EACH TONE. The two
  * single-tone sequences are four identical strikes, the least hearable thing
- * the drums can beat, and the message opens on RIVER — so they stay out of the
- * lexicon and are the whole of `reserved` now that CHIEF took the last spare
- * mixed sequence.
+ * the drums can beat — so they stay out of every vocabulary and are the whole
+ * of `reserved`; the six mixed sequences are all words, in a rolled order.
  */
 const TONAL_WEST_CENTRE: Lect = {
   id: 'tonalWestCentre',

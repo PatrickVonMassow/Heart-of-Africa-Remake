@@ -1,9 +1,9 @@
-import { SHIPPED_VOCABULARY } from '../../communication/vocabulary'
 // The one cheap check that would have caught point 576: the drummer's hands
 // beat ON the skins, and each on the drum it stands over. Both defects were
 // pure geometry — the swing arc lay below the heads and the two arms were
 // swapped — so both are measurable without a browser.
 
+import { SHIPPED_VOCABULARY } from '../../communication/vocabulary'
 import { describe, expect, it } from 'vitest'
 import {
   DRUMMER_LEAN,

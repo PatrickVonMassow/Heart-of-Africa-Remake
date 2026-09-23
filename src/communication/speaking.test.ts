@@ -1,9 +1,9 @@
-import { SHIPPED_VOCABULARY } from './vocabulary'
 // The spoken utterance (design.md §13.4, docs/communication-poc-spec.md): the
 // attenuation curve, the timing of the syllables and the phrase pause, and the
 // hearing bookkeeping — out of range records nothing, in range records once, a
 // phrase records each atom. All pure; the browser only proves sound plays.
 
+import { SHIPPED_VOCABULARY } from './vocabulary'
 import { afterEach, describe, expect, it } from 'vitest'
 import { balance } from '../config/balance'
 import { emptyMemory, hasHeard, heardUtterances } from './heard'

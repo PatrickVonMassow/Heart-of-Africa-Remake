@@ -1,4 +1,3 @@
-import { SHIPPED_VOCABULARY } from '../communication/vocabulary'
 // Coastal surf fade (point 153, design.md §19.1): the surf bed is only audible
 // near the coast — full at the shore, silent beyond a calibratable cutoff, and
 // monotone between. The curve is pure, so it is pinned here.
@@ -6,6 +5,7 @@ import { SHIPPED_VOCABULARY } from '../communication/vocabulary'
 // and a fake AudioContext pins that a flash SCHEDULES the clap at the pure
 // thunderDelaySeconds lag on the audio clock and SURVIVES to fire — no later
 // frame or ambience state change can cancel it.
+import { SHIPPED_VOCABULARY } from '../communication/vocabulary'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   coastSurfGain,

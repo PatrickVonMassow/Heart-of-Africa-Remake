@@ -1,9 +1,9 @@
-import { SHIPPED_VOCABULARY } from '../communication/vocabulary'
 // The note over a speaker's head as the player reads it (design.md §13.4,
 // work-order points 485/588): the syllables beside his own reading, and — on
 // the ONE speaker a click would take — the highlight and the invitation to
 // guess. The scene-side attachment stays in Playwright; everything a human
 // reads off the note is decided here.
+import { SHIPPED_VOCABULARY } from '../communication/vocabulary'
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { render } from '@testing-library/react'
 import { SpeechLabelCard } from './SpeechLabelCard'

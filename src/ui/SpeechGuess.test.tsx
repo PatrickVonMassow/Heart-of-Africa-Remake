@@ -1,9 +1,9 @@
-import { SHIPPED_VOCABULARY } from '../communication/vocabulary'
 // Guessing a meaning where it is spoken (design.md §13.4, work-order point
 // 588): the dialog that opens on the speaker himself, writing the SAME note the
 // journal writes. What only a browser can show — the pointer lock going and
 // coming back, and real keystrokes reaching the field — stays in
 // scripts/verify/polish.mjs.
+import { SHIPPED_VOCABULARY } from '../communication/vocabulary'
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { fireEvent, render } from '@testing-library/react'
 import { Dialogs } from './Dialogs'

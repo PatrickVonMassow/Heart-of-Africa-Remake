@@ -1,7 +1,7 @@
-import { SHIPPED_VOCABULARY } from './vocabulary'
 // The hypothesis over the speaker's head (design.md §13.4, work-order point
 // 485): its lifetime, and its binding to the ONE note the journal edits. The
 // scene channel is covered in src/scenes/place/speechChannel.test.ts.
+import { SHIPPED_VOCABULARY } from './vocabulary'
 import { describe, it, expect } from 'vitest'
 import { balance } from '../config/balance'
 import { emptyMemory, observeUtterance, setHypothesis } from './heard'

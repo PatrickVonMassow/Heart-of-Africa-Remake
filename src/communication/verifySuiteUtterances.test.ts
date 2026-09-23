@@ -1,4 +1,3 @@
-import { SHIPPED_VOCABULARY } from './vocabulary'
 // The BROWSER suites speak utterances too, and theirs are plain string literals
 // in a .mjs file that imports nothing from the game. Point 686 shortened every
 // word from five syllables to four and those literals stayed behind: because the
@@ -10,6 +9,7 @@ import { SHIPPED_VOCABULARY } from './vocabulary'
 // This pins them from the unit layer, the one place that can read both: every
 // utterance-shaped literal in a verification suite must be a word the shipped
 // lexicon really beats.
+import { SHIPPED_VOCABULARY } from './vocabulary'
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'

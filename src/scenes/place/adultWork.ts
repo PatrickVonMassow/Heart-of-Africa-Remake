@@ -1,4 +1,3 @@
-import type { Vocabulary } from '../../communication/lexicon'
 // The adults teach by DOING THEIR OWN WORK (work-order 688). Two words, two
 // situations each, and no translation among them.
 //
@@ -20,6 +19,7 @@ import type { Vocabulary } from '../../communication/lexicon'
 // The module is pure: no three, no scene. `PlaceLife` gives it the live village
 // and carries out what comes back.
 
+import type { Vocabulary } from '../../communication/lexicon'
 import { atDigStand, DIG_ARRIVE_RADIUS, digStandingPlaces } from './placeGround'
 import { SpeechFloor } from '../../communication/speechFloor'
 import { balance } from '../../config/balance'

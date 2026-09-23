@@ -1,8 +1,8 @@
-import { SHIPPED_VOCABULARY } from '../../communication/vocabulary'
 // The pure contract for the adults' teaching work (work-order 688/1051): DIG
 // is an invitation beside a person, a shared walk, a second utterance beside a
 // site, and only then a two-person bout whose strokes alter that site.
 
+import { SHIPPED_VOCABULARY } from '../../communication/vocabulary'
 import { describe, expect, it, vi } from 'vitest'
 import {
   ADULT_CONCEPTS,

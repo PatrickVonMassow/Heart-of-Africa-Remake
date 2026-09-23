@@ -1,7 +1,7 @@
-import { SHIPPED_VOCABULARY } from './vocabulary'
 // What counts as heard (docs/communication-poc-spec.md): the first hearing
 // wins, a phrase records each atom on its own, the player's own reading lives
 // beside it, and the whole memory survives a save round trip. Pure logic.
+import { SHIPPED_VOCABULARY } from './vocabulary'
 import { describe, expect, it } from 'vitest'
 import { balance } from '../config/balance'
 import {

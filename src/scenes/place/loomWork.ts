@@ -1,4 +1,3 @@
-import type { Vocabulary } from '../../communication/lexicon'
 // THE WEAVER'S WORK AND HER TWO WORDS (work-order 1157).
 //
 // Two things run here, and only one of them speaks.
@@ -25,6 +24,7 @@ import type { Vocabulary } from '../../communication/lexicon'
 //
 // The module is pure: no three, no scene, no clock of its own.
 
+import type { Vocabulary } from '../../communication/lexicon'
 import { balance } from '../../config/balance'
 import { SpeechFloor } from '../../communication/speechFloor'
 import { instructionDelay } from '../../communication/speaking'

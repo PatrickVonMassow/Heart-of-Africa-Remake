@@ -1,7 +1,7 @@
-import { SHIPPED_VOCABULARY } from './vocabulary'
 // The tonal lexicon (docs/communication-poc-spec.md): completeness of the
 // registry, well-formedness and distance of the sequences, the mirror pairs,
 // and the one sort order the journal uses. Pure logic — no browser.
+import { SHIPPED_VOCABULARY } from './vocabulary'
 import { describe, expect, it } from 'vitest'
 import {
   CONCEPT_IDS,

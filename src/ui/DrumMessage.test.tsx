@@ -1,8 +1,8 @@
-import { SHIPPED_VOCABULARY } from '../communication/vocabulary'
 // The chief's drum message on paper (work-order point 486): the display shows
 // the four concepts with the player's own reading over each, every reading is
 // editable in the journal as ONE note, and the message can always be
 // reopened once the drums have spoken.
+import { SHIPPED_VOCABULARY } from '../communication/vocabulary'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, fireEvent, act } from '@testing-library/react'
 import { DrumMessageDialog, DrumMessageWatcher } from './DrumMessage'

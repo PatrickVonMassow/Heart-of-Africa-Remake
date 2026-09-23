@@ -1,10 +1,10 @@
-import { SHIPPED_VOCABULARY } from '../communication/vocabulary'
 // The end of the drum errand (work-order point 487): digging at the landmark
 // boulder recovers the artefact, digging anywhere else does not, and handing it
 // to the chief in his own village is what solves the puzzle. The rock's
 // PLACEMENT is pinned in src/world/communicationRock.test.ts — this file pins
 // the store wiring: the dig branch, the hand-over guards, the chronicle in both
 // languages, and the save/load round trip.
+import { SHIPPED_VOCABULARY } from '../communication/vocabulary'
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { balance } from '../config/balance'
 import { g, freshGame, withWorld, useGame, standBeforeChief, leaveTheChief } from '../test/store'

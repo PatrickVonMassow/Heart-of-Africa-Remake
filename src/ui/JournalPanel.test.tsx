@@ -1,9 +1,9 @@
-import { SHIPPED_VOCABULARY } from '../communication/vocabulary'
 // JournalPanel HUD component (CLAUDE.md §7.1 pt. 17/19, design.md §15/§16).
 // Ports the render-side asserts of voice.mjs and i18n.mjs into React Testing
 // Library checks (jsdom): the journal never shows a voice marker, prose stays
 // intact, the read-aloud control is offered for English only. The actual TTS
 // audio and handwriting animation stay in Playwright.
+import { SHIPPED_VOCABULARY } from '../communication/vocabulary'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'

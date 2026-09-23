@@ -1,4 +1,3 @@
-import { rollVocabulary } from '../../communication/vocabulary'
 // THE HARNESS THE CHILDREN`S REPLAYS ARE JUDGED ON (work-order 648/656/687,
 // split out under work-order 1178). Test-only: nothing in the shipped game
 // imports it, and the Vitest include glob (`src/**/*.test.{ts,tsx}`) does not
@@ -16,6 +15,7 @@ import { rollVocabulary } from '../../communication/vocabulary'
 // run sooner than its slowest single file. Splitting the judgements across files
 // lowers that floor; sharing the harness keeps them replaying the same
 // settlement.
+import { rollVocabulary } from '../../communication/vocabulary'
 import { expect } from 'vitest'
 import {
   CHILD_MOTION,

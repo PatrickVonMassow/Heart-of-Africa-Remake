@@ -162,11 +162,11 @@ export interface GameState {
   orientationGiven: Record<string, boolean>
   journal: JournalEntry[]
   journalOpen: boolean
+  /** Region-wide assignment, fixed for the entire run and saved by value. */
+  vocabulary: Vocabulary
   /** What the player has HEARD of a people's speech, and the readings he wrote
    *  for it (design.md §13.4, docs/communication-poc-spec.md). The journal's
    *  observation section renders it; the game never interprets a note. */
-  /** Region-wide assignment, fixed for the entire run and saved by value. */
-  vocabulary: Vocabulary
   communication: CommunicationMemory
   /** True once the chief's drums have beaten his message out in full (design.md
    *  §13.4, point 486). It never goes back: the message display stays

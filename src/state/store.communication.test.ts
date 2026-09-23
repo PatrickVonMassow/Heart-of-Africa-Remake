@@ -1,9 +1,9 @@
-import { SHIPPED_VOCABULARY } from '../communication/vocabulary'
 // Communication observations in the store (design.md §13.4,
 // docs/communication-poc-spec.md): what the player has HEARD travels in the
 // game state, his own readings with it, and both survive a save/load round
 // trip. The lexicon and the memory rules themselves are covered in
 // src/communication/*.test.ts — this file pins the STORE wiring.
+import { SHIPPED_VOCABULARY } from '../communication/vocabulary'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { hasHeard, heardUtterances, hypothesisFor } from '../communication/heard'
 import { utteranceOf } from '../communication/lexicon'
