@@ -6267,7 +6267,11 @@ if (section('village-loom')) {
               if (dist * (1 - t) < 2) break
               width = Math.min(width, clear(x + (target.x - x) * t, z + (target.z - z) * t))
             }
-            if (width < 0.15) continue
+            // A METRE EITHER SIDE, NOT A CRACK (work-order 1190). At 0.15 m the
+            // widest "open" line ran between two dwellings and what arrived in
+            // the frame was two small figures; the layout now seats the loom to
+            // this same width, so the frame asks what the plan promises.
+            if (width < 1) continue
             if (!best || width > best.width) best = { x, z, dist, width }
           }
         }

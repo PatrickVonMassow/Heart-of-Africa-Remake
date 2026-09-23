@@ -31,6 +31,58 @@ function shippedLooms() {
   return out
 }
 
+/**
+ * Whether a stand on the plaza looks at a seat over open ground — recomputed
+ * here from the finished layout rather than read back from the placement, so
+ * the rule is checked and not merely echoed (work-order 1190).
+ *
+ * The station's OWN bodies are left out: the warp, its stakes and the weaver
+ * are what the line is drawn to, and they stand at the far end of it.
+ */
+function seenFromPlaza(layout: ReturnType<typeof buildLayout>): boolean {
+  const loom = layout.loom
+  if (!loom) return false
+  const solids = layout.colliders.filter(
+    (c) => Math.hypot(c.x - loom.seat.x, c.z - loom.seat.z) > 4,
+  )
+  for (const ring of [0, 1.5, 3, 4.5, 6]) {
+    for (let k = 0; k < (ring ? 8 : 1); k++) {
+      const a = (k / 8) * Math.PI * 2
+      const x = Math.cos(a) * ring
+      const z = 3 + Math.sin(a) * ring
+      const dist = Math.hypot(loom.weaver.x - x, loom.weaver.z - z)
+      if (dist < 8) continue
+      if (!standingClear(layout.colliders, x, z, WALKER_RADIUS)) continue
+      let open = true
+      for (let step = 0; step <= 64; step++) {
+        const t = (step / 64) * ((dist - 2) / dist)
+        const px = x + (loom.weaver.x - x) * t
+        const pz = z + (loom.weaver.z - z) * t
+        if (!standingClear(solids, px, pz, 1)) { open = false; break }
+      }
+      if (open) return true
+    }
+  }
+  return false
+}
+
+describe('the village plaza sees the loom (work-order 1190)', () => {
+  it('the Bambara plaza looks at the station over open ground, on every shipped seed', () => {
+    const blind = shippedLooms()
+      .filter(({ id }) => id.startsWith('bambara'))
+      .filter(({ layout }) => !seenFromPlaza(layout))
+      .map(({ id, seed }) => `${id}/${seed}`)
+    expect(blind).toEqual([])
+  })
+
+  it('a station the placement calls seen is one the plaza really sees', () => {
+    const lying = shippedLooms()
+      .filter(({ layout }) => layout.loom?.seenFromPlaza === true && !seenFromPlaza(layout))
+      .map(({ id, seed }) => `${id}/${seed}`)
+    expect(lying).toEqual([])
+  })
+})
+
 describe('the loom lies on the river’s axis (work-order 1157 item 4)', () => {
   it('every shipped village layout carries a loom', () => {
     const missing = shippedLooms().filter(({ layout }) => layout.loom === null)
