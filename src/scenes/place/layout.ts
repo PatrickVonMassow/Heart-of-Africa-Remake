@@ -8,7 +8,7 @@ import { placeById } from '../../world/geo'
 import { mulberry32 } from '../../world/noise'
 import { REGION_PLACE_STYLES, VILLAGE_PLANS, type RegionPlaceStyle } from './regionStyles'
 import { LOOM_SPOT, PORT_TALKERS, portAdultStations, childPlayGround, villageAdultStations, villageKeepClearSpots, villageLifeProps, villageLifeFootprints, type PlayGround } from './lifeSpots'
-import { placeLoom, WARP_BODY_RADIUS, WEAVER_BODY_RADIUS, type LoomStation } from './loom'
+import { placeLoom, PLAZA_SIGHT_HALF_WIDTH, WARP_BODY_RADIUS, WEAVER_BODY_RADIUS, type LoomStation } from './loom'
 import { boxCollider, nudgeToFree, spawnPointFree, standingClear, PLAYER_RADIUS, WALKER_RADIUS, CHIEF_BODY_RADIUS, type Collider } from './collision'
 import { CHIEF_HUT, MARKET_HUT, dwellingRoofProfile, hutRoofProfile, roofStandOff } from './roofClearance'
 import { windingPoints, laneSlots, closestOnPolyline, bendAround, type LaneSlot } from './lanePlan'
@@ -748,9 +748,37 @@ function collidersNearRun(
 
 /** A continuous corridor: each 0.1 m sample is widened by half a step,
  * so even a grazing box corner between samples cannot touch the drawn lane. */
-function clearCorridor(colliders: readonly Collider[], head: BankPoint, foot: BankPoint, halfWidth: number): boolean {
+/**
+ * THE PLAZA A VILLAGER LOOKS FROM (work-order 1190). The village's middle is a
+ * ground rather than a point — the compounds sit evenly around it — so the loom
+ * is held to being visible from SOME stand on it. These are the picture check's
+ * own numbers (`scripts/verify/polish.mjs`, village-loom), kept in step with it
+ * so the layout rule and the frame ask the same question.
+ */
+const PLAZA_CENTRE: readonly [number, number] = [0, 3]
+const PLAZA_SIGHT_RINGS = [0, 1.5, 3, 4.5, 6] as const
+const PLAZA_SIGHT_STANDS = 8
+/** Nearer than this the loom is no longer being seen ACROSS the village. */
+const PLAZA_SIGHT_MIN_DISTANCE = 8
+/** The station's own ground at the far end, which is not sight line. */
+const PLAZA_SIGHT_STATION_GROUND = 2
+/** The widths a view is measured at, narrowest first. */
+const PLAZA_SIGHT_WIDTHS = [0.25, 0.5, 0.75, 1] as const
+/** How finely that line is walked; wider is stricter, and far cheaper. */
+const PLAZA_SIGHT_SAMPLE = 0.2
+
+/**
+ * Whether a corridor of `halfWidth` between two points is free of solids.
+ *
+ * `sample` is how finely the run is walked. A COARSER step is the conservative
+ * direction, not the cheap one: the clearance each sample is held to grows by
+ * half the step, so a wider stride can only reject a corridor a finer one
+ * accepted. The plaza sight line (work-order 1190) strides wide because it asks
+ * about a view metres across and is asked thousands of times per layout.
+ */
+function clearCorridor(colliders: readonly Collider[], head: BankPoint, foot: BankPoint, halfWidth: number, sample = 0.1): boolean {
   const length = Math.hypot(foot.x - head.x, foot.z - head.z)
-  const steps = Math.max(1, Math.ceil(length / 0.1))
+  const steps = Math.max(1, Math.ceil(length / sample))
   const clearance = halfWidth + length / steps / 2
   const near = collidersNearRun(colliders, head.x, head.z, foot.x, foot.z, clearance)
   if (near.length === 0) return true
@@ -1617,7 +1645,20 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
       colliders.push({ x: it.pos[0], z: it.pos[1], r: interactiveCircleRadius(it.type, style) })
     }
   })
-  for (const d of dwellings) colliders.push(dwellingCollider(d, style))
+  // WHAT GIVES WAY TO THE PLAZA'S VIEW OF THE LOOM (work-order 1190): the
+  // outbuildings, the trees and the loose stones. The dwellings, the chief's
+  // and the trading huts stand where the plan put them; a shed or a granary
+  // standing in the one line the plaza has is left unbuilt, as a tree there is.
+  const plazaYielding = new Map<Collider, () => void>()
+  const dropFrom = <T>(list: T[], item: T) => () => {
+    const at = list.indexOf(item)
+    if (at >= 0) list.splice(at, 1)
+  }
+  for (const d of dwellings) {
+    const body = dwellingCollider(d, style)
+    colliders.push(body)
+    if (d.kind === 'shed' || d.kind === 'granary') plazaYielding.set(body, dropFrom(dwellings, d))
+  }
   const fenceColliderStart = colliders.length
   const compoundColliders = new Set<Collider>()
   for (const f of fences) {
@@ -1964,10 +2005,17 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   // instead (work-order 1149): `placeGround.ts` raises the surface under it and
   // it enters no collider set, so neither the player nor a villager snags on a
   // pebble. `looseRockIsGround` is the single answer both sides read.
-  for (const t of flora) colliders.push({ x: t.x, z: t.z, r: 0.45 })
-  for (const [x, z, s] of rocks) {
+  for (const t of flora) {
+    const body = { x: t.x, z: t.z, r: 0.45 }
+    colliders.push(body)
+    plazaYielding.set(body, dropFrom(flora, t))
+  }
+  for (const rock of rocks) {
+    const [x, z, s] = rock
     if (looseRockIsGround(s)) continue
-    colliders.push({ x, z, r: looseRockRadius(s) })
+    const body = { x, z, r: looseRockRadius(s) }
+    colliders.push(body)
+    plazaYielding.set(body, dropFrom(rocks, rock))
   }
 
   // THE STONE THE CHILDREN CLIMB (work-order 1082), derived LAST — after the
@@ -2101,9 +2149,51 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   // their ground is what the whole communication slice is arranged around.
   let loom: LoomStation | null = null
   if (place.kind === 'village') {
+    // The stands a villager could look from are the same for every candidate
+    // seat, so they are walked once rather than per trial (the sweep runs twice
+    // over hundreds of seats, and the corridor test is the expensive half).
+    const plazaStands: BankPoint[] = []
+    for (const ring of PLAZA_SIGHT_RINGS) {
+      for (let k = 0; k < (ring ? PLAZA_SIGHT_STANDS : 1); k++) {
+        const a = (k / PLAZA_SIGHT_STANDS) * Math.PI * 2
+        const x = PLAZA_CENTRE[0] + Math.cos(a) * ring
+        const z = PLAZA_CENTRE[1] + Math.sin(a) * ring
+        if (standingClear(colliders, x, z, WALKER_RADIUS)) plazaStands.push({ x, z })
+      }
+    }
+    // The view is measured past whatever gives way (above): a line that only a
+    // tree or a shed stands in is a line the plaza is given, not one it lacks.
+    const sightSolids = colliders.filter((c) => !plazaYielding.has(c))
+    const plazaLine = (seat: BankPoint, floor = 0) => {
+      let widest = floor
+      let line: { from: BankPoint; to: BankPoint } | null = null
+      for (const stand of plazaStands) {
+        const dist = Math.hypot(seat.x - stand.x, seat.z - stand.z)
+        if (dist < PLAZA_SIGHT_MIN_DISTANCE) continue
+        // The last stretch is the station's own ground, not the sight line.
+        const t = (dist - PLAZA_SIGHT_STATION_GROUND) / dist
+        const to = { x: stand.x + (seat.x - stand.x) * t, z: stand.z + (seat.z - stand.z) * t }
+        // Widened until it no longer fits: the placement wants the BEST view a
+        // plan holds, not only whether the full metre is there. A width that
+        // fails fails every wider one, so the first miss ends the stand, and
+        // one cull per stand keeps the tests on the nearby solids.
+        const near = collidersNearRun(sightSolids, stand.x, stand.z, to.x, to.z, PLAZA_SIGHT_HALF_WIDTH + PLAZA_SIGHT_SAMPLE)
+        for (const half of PLAZA_SIGHT_WIDTHS) {
+          if (half <= widest) continue
+          if (!clearCorridor(near, stand, to, half, PLAZA_SIGHT_SAMPLE)) break
+          widest = half
+          line = { from: stand, to }
+        }
+        if (widest >= PLAZA_SIGHT_HALF_WIDTH) break
+      }
+      return { widest, line }
+    }
     loom = placeLoom({
       bank,
       nominal: LOOM_SPOT,
+      nominalWaterOff: bank
+        ? bank.distance - (LOOM_SPOT[0] * bank.nx + LOOM_SPOT[1] * bank.nz)
+        : Infinity,
       walkRadius: radius - WALKER_RADIUS,
       free: (x, z, r) =>
         Math.hypot(x, z) < radius - r &&
@@ -2120,6 +2210,13 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
         !onLane(x, z, r) &&
         !onWayToWater(x, z, r),
       sightClear: (from, to, halfWidth) => clearCorridor(colliders, from, to, halfWidth),
+      // THE PLAZA'S OWN VIEW (work-order 1190). The ground the player stands on
+      // to look at the village's middle is not one spot, so the line is asked
+      // from each of a ring of stands over the plaza — the same disc the picture
+      // check walks — and one open line is enough. The corridor is a metre to
+      // each side: the shipped seat passed a 0.15 m line through a gap between
+      // two dwellings, and what arrived in the frame was two figures, not a loom.
+      plazaView: (seat, floor) => plazaLine(seat, floor).widest,
       toChildren,
       waterPathHead: waterPath ? waterPath.head : null,
       onWaterLane: (x, z, r) => !!waterPath &&
@@ -2131,6 +2228,25 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
       clearance: balance.communication.talk.reach,
       geometry: balance.villageLife.loom,
     })
+    // THE LINE IS THEN CLEARED: whatever gave way in it is taken out of the
+    // village, its body and its drawing both, so the view the placement counted
+    // on is the view the finished layout holds.
+    const cleared = loom ? plazaLine(loom.weaver).line : null
+    if (cleared) {
+      for (const [body, drop] of plazaYielding) {
+        if (clearCorridor([body], cleared.from, cleared.to, PLAZA_SIGHT_HALF_WIDTH)) continue
+        drop()
+        colliders.splice(colliders.indexOf(body), 1)
+      }
+    }
+    // THE PLAZA VIEW IS LOUD WHEN IT IS MISSED (work-order 1190): a settlement
+    // whose plan holds no seat the plaza can see still gets its loom, but the
+    // shortfall is a detector in every test and manual session, not a silence.
+    devAssert(
+      loom === null || loom.seenFromPlaza === true,
+      'loom-unseen-from-plaza',
+      () => `${place.id}@${seed}: no stand on the plaza sees the loom over open ground`,
+    )
     devAssert(
       loom !== null,
       'loom-missing',

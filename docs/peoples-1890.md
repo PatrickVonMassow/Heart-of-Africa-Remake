@@ -2434,7 +2434,10 @@ rises to a top beam, which described the standing frame this station replaced.
 **IMPLEMENTATION.** `src/scenes/place/loom.ts` lays the warp on the bank's own
 downstream vector and searches the seat; `src/scenes/place/loomWork.ts` runs the
 weaving cycle and the sparse named tendings; `Loom` in
-`src/scenes/place/PlaceLife.tsx` draws it. The teaching rules are in
+`src/scenes/place/PlaceLife.tsx` draws it. The seat is held to a metre-wide
+line from the plaza (point 1190); in that line trees, loose stones and the
+outbuildings (sheds, granaries) give way, while dwellings and the chief's and
+trading huts stay where the plan put them. The teaching rules are in
 `docs/communication-poc-spec.md`, "The weaver's loom".
 
 ---

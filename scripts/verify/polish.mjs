@@ -6251,8 +6251,9 @@ if (section('village-loom')) {
         const clear = (x, z) => Math.min(...solids.map(c => window.__clearanceTo(c, x, z)))
         const target = station.weaver
         // The plaza is the village's open middle; search a disc round it for
-        // the stand whose sight line to her runs WIDEST of every hut, so the
-        // picture judges the station rather than a gap between two walls.
+        // the NEAREST stand whose sight line to her keeps a metre clear of
+        // every hut (work-order 1190: the widest line stood ~25 m off and the
+        // station arrived as two small figures).
         let best = null
         for (const r of [0, 1.5, 3, 4.5, 6]) {
           for (let k = 0; k < (r ? 16 : 1); k++) {
@@ -6267,8 +6268,12 @@ if (section('village-loom')) {
               if (dist * (1 - t) < 2) break
               width = Math.min(width, clear(x + (target.x - x) * t, z + (target.z - z) * t))
             }
-            if (width < 0.15) continue
-            if (!best || width > best.width) best = { x, z, dist, width }
+            // A METRE EITHER SIDE, NOT A CRACK (work-order 1190). At 0.15 m the
+            // widest "open" line ran between two dwellings and what arrived in
+            // the frame was two small figures; the layout now seats the loom to
+            // this same width, so the frame asks what the plan promises.
+            if (width < 1) continue
+            if (!best || dist < best.dist) best = { x, z, dist, width }
           }
         }
         if (!best) return null
