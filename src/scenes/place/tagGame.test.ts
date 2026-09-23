@@ -790,7 +790,8 @@ describe('the settlement: the chase runs THROUGH it, never into it', () => {
     // in it — stated here so a later change has to face the decision.
     const s = game(FOUR)
     run(s, 20, OPEN, CFG, 1 / 60, (st) => {
-      for (const c of st.children) expect(c.pace).toBeGreaterThanOrEqual(floorPace(CFG))
+      // The caught child's beat (work-order 1176) is the one commanded stand.
+      for (const c of st.children) if (!c.held) expect(c.pace).toBeGreaterThanOrEqual(floorPace(CFG))
     })
     expect(s.tags).toBeGreaterThan(0)
   })
@@ -904,10 +905,11 @@ describe('another inhabitant’s body is ground to walk round (point 657)', () =
     // line at the moment of the catch — under the stricter layer wiring, so
     // the pin holds even for a wiring that walls playmates (the shipped one
     // does not, and passes a fortiori).
+    const d = CFG.catchDistance * 0.7
     const s = game([
       [0, 0],
-      [0.7, 0],
-      [0.35, 0.05],
+      [d, 0],
+      [d / 2, 0.05],
     ])
     const world: TagWorld = { ...OPEN, occupied: layerWalls(s) }
     s.playing = true
@@ -923,7 +925,9 @@ describe('the paces the eye reads', () => {
     const s = game(FOUR)
     run(s, 45, OPEN, CFG, 1 / 60, (st) => {
       if (!st.playing) return
-      for (const c of st.children) expect(c.pace).toBeGreaterThanOrEqual(floorPace(CFG) - 1e-9)
+      // Only a commanded stand — the caught child's beat (work-order 1176) —
+      // may be below the floor.
+      for (const c of st.children) if (!c.held) expect(c.pace).toBeGreaterThanOrEqual(floorPace(CFG) - 1e-9)
     })
   })
 
@@ -1617,10 +1621,13 @@ describe('the rescue is a finding, not an escape (point 656)', () => {
       [0, 0],
       [0.02, 0.01],
     ])
-    run(s, 1.4, world, CFG)
+    // Without the caught child's beat (work-order 1176): a commanded stand
+    // resets the stall watch by design, and this pins the watch itself.
+    const cfg = { ...CFG, caughtPauseSeconds: 0 }
+    run(s, 1.4, world, cfg)
     expect(s.children[0].nudges).toBe(0) // still inside its window
     expect(s.children[0].pinned).toBeGreaterThan(1.2)
-    run(s, 0.3, world, CFG)
+    run(s, 0.3, world, cfg)
     // Freed exactly ONCE, though both watches were running out together: the
     // rescue re-takes the anchor, so the frame that picked the child up cannot
     // be charged a second time by the progress watch a few lines later.

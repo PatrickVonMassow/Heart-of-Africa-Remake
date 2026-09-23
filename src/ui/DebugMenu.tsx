@@ -166,6 +166,12 @@ const TAG_FIELDS: ReadonlyArray<{
   { key: 'silenceSeconds', label: 'tagSilence', step: 5, min: 1 },
   { key: 'leanAtSprint', label: 'tagLean', step: 0.02, min: 0 },
   { key: 'turnRate', label: 'tagTurnRate', step: 0.2, min: 0.1 },
+  { key: 'caughtPauseSeconds', label: 'tagCaughtPause', step: 0.1, min: 0 },
+  { key: 'gazeTurnMax', label: 'tagGazeTurn', step: 0.05, min: 0 },
+  { key: 'crySeconds', label: 'tagCrySeconds', step: 0.02, min: 0.05 },
+  { key: 'cryPitchSpread', label: 'tagCryPitchSpread', step: 0.02, min: 0, max: 0.5 },
+  { key: 'cryReach', label: 'tagCryReach', step: 1, min: 0 },
+  { key: 'cryGain', label: 'tagCryGain', step: 0.05, min: 0 },
   { key: 'playRadius', label: 'tagPlayRadius', step: 1, min: 2 },
 ]
 
@@ -183,6 +189,7 @@ const BANK_GAME_FIELDS: ReadonlyArray<{
   min: number
   max?: number
 }> = [
+  { key: 'catchDistance', label: 'bankCatch', step: 0.1, min: 0 },
   { key: 'roamSeconds', label: 'bankRoam', step: 5, min: 5 },
   { key: 'roamSpread', label: 'bankRoamSpread', step: 0.05, min: 0, max: 1 },
   { key: 'gatherSeconds', label: 'bankGather', step: 2, min: 2 },
