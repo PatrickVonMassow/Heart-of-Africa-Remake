@@ -3589,7 +3589,7 @@ if (section('tag-catch')) {
       for (const back of [3.2, 4.2, 2.6]) {
         for (const side of [1, -1]) {
           const placed = await page.evaluate(
-            ({ from, to, back, side }) => {
+            ({ from, to, back, side, subject }) => {
               const p = window.__placePlayer
               const L = window.__placeLayout
               if (!p) return false
@@ -3603,12 +3603,13 @@ if (section('tag-catch')) {
               if (Math.hypot(x, z) > (L ? L.radius : 28) - 1.5) return false
               p.x = x
               p.z = z
-              // Place-camera yaw 0 looks toward −Z, hence the +PI complement.
-              p.yaw = Math.atan2(mx - x, mz - z) + Math.PI
+              // Aimed at the SUBJECT, not the pair's middle: the pair may have
+              // run apart. Place-camera yaw 0 looks toward −Z, hence the +PI.
+              p.yaw = Math.atan2(subject.x - x, subject.z - z) + Math.PI
               p.pitch = -0.28
               return true
             },
-            { from, to, back, side },
+            { from, to, back, side, subject },
           )
           if (!placed) continue
           await nextFrames(3)
