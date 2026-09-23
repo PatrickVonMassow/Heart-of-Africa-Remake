@@ -44,7 +44,8 @@ function plazaViewOf(layout: ReturnType<typeof buildLayout>): number {
   const loom = layout.loom
   if (!loom) return 0
   const solids = layout.colliders.filter(
-    (c) => Math.hypot(c.x - loom.seat.x, c.z - loom.seat.z) > 4,
+    // A segment has no centre; its NaN distance already excluded it before the type narrowed.
+    (c) => c.kind !== 'segment' && Math.hypot(c.x - loom.seat.x, c.z - loom.seat.z) > 4,
   )
   let widest = 0
   for (const ring of [0, 1.5, 3, 4.5, 6]) {
