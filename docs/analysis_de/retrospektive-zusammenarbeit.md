@@ -1688,7 +1688,7 @@ stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die s
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 23.09.2026, 15:13 · Quellen-Fingerprint: `044c2cef8fcc…`
+Zuletzt aktualisiert: Mittwoch, 23.09.2026, 16:01 · Quellen-Fingerprint: `9f6353e89e07…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1749,6 +1749,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | never stretch a scoped user remark into a standing instruction or cite it as one | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | The batch-owning session is a headless successor the launcher spawned — the user cannot see, reach or close it; never ask them to | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | User order 23.08.2026: a lasting standstill must NEVER happen — self-recovery over alerting, no stop that waits on a user card; decide by own judgment and record the decision in the board state section, never as a decision card (vetoed three times) | 5 | hoch | — (Regel/Memory) | ◐ Regel |
+| There is exactly one head session — this chat; every other session is headless and the user cannot be reached through it | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Parallel batch sessions are spawned by the HoA-Batch-Autostart scheduled task after a reboot; the advisory lock never stopped it — a hard singleton is being built | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | A `pgrep -f` wait loop matches its own shell command line, so it never exits — anchor on the process, not the pattern | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Always take the point boundary autonomously at a closed point — never ask the user whether to hand over or /clear | 1 | niedrig | point-proof-guard.mjs | ✔ Mechanismus |
@@ -1793,11 +1794,12 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | WebGPU is testable headless/autonomously via system Chrome (channel:'chrome') + --headless=new; the limitation applies only to Playwright's bundled Chromium | 3 | mittel | — (Regel/Memory) | ◐ Regel |
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
+| Es gibt genau EINE bediente Sitzung — eine Nachricht an eine headless Sitzung wartet auf eine Freigabe, die niemand gibt; der Nutzer wird nie in ein anderes Fenster geschickt | 1 | mittel | — (Regel/Memory) | ◐ Regel |
 
-Erfasste Quellen: 98 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 7 Revert-/Reapply-Commits · 140 Prozess-/Meta-TASKS-Punkte (davon 68 offen).
+Erfasste Quellen: 99 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 7 Revert-/Reapply-Commits · 140 Prozess-/Meta-TASKS-Punkte (davon 68 offen).
 
-<!-- RETRO-FINGERPRINT: 044c2cef8fcc350e63d6fdcb2b41322abfc5c3ccebb8764c58cfc6f2c93c8dce -->
-<!-- RETRO-LAST-REFRESHED: 2026-09-23T13:13:38.222Z -->
+<!-- RETRO-FINGERPRINT: 9f6353e89e071cbae26a4ba2c98a0a02f490167478d90d9267544ff5f8f869b8 -->
+<!-- RETRO-LAST-REFRESHED: 2026-09-23T14:01:02.474Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -8161,3 +8163,28 @@ des Launchers kennt nur das Anthropic-Limit. Ein leeres OpenAI-Volumen hätte al
 vergebenen Autorenlauf in den toten Anbieter laufen lassen, ohne dass etwas zurückfällt. Seit
 dem 23.09. steht die Regel in CLAUDE.md §6 — eine unerreichbare Astra-Bahn schreibt auf
 Opus 5.5 —, und Punkt 1194 macht sie messend und selbstheilend.
+
+### 3.305 Die Nachricht an ein Fenster, vor dem niemand sitzt
+
+Am 23.09. ordnete der Nutzer an, eine Anforderung in den gerade laufenden Punkt 1174
+aufzunehmen. Die Sitzung, in der er tippte, hielt den Batch-Lock nicht, und der Stand-down-Guard
+verweigert einer solchen Sitzung jede Schreiboperation — TASKS.md, Findings-Carrier, Memory,
+sogar das Scratchpad. Bis hierhin arbeitet alles wie gebaut.
+
+Der Fehler war der Ausweg, den ich gewählt habe: die fertig formulierte Anforderung per
+Cross-Session-Nachricht an die Sitzung zu schicken, die den Lock hielt, und dem Nutzer zu sagen,
+er möge sie „im anderen Fenster" freigeben. Es gibt kein anderes Fenster. Die haltende Sitzung
+war der headless gestartete Batch-Worker; ihre Zustellung wartete auf eine Freigabe, die dort
+niemand geben konnte, und lief unzugestellt ab. Zweimal habe ich den Nutzer dorthin geschickt,
+bevor er widersprach: Es gibt genau EINE bediente Sitzung, seine.
+
+Die Klasse ist damit benannt und liegt neben §3.304: Ein Weg, der eine menschliche Handlung an
+einer Stelle voraussetzt, an der kein Mensch ist, ist kein Weg, sondern ein Stillstand mit
+Begründung. Richtig war, was danach geschah — messen, statt zu warten: Die haltende Sitzung
+stand in einer bis 19:32 deklarierten Wartestellung auf den Abschnitts-Suites, es lief kein
+Merge und keine Landung, `main` war sauber und der Punkt-Branch gepusht. Damit kostete das
+erzwungene Übernehmen nur eine Suite, deren Ergebnis die neue Anforderung ohnehin entwertet
+hatte. Die Regel steht seit dem 23.09. im Memory (`only-one-head-session`): Wenn eine Anordnung
+eine Schreiboperation braucht und der Guard sie verweigert, hole ich den Batch über den
+vorgesehenen Anspruchsweg selbst — und schicke den Nutzer nie in eine Sitzung, die ihn nicht
+hören kann.
