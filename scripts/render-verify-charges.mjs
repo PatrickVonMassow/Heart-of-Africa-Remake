@@ -1721,18 +1721,4 @@ export const RED_CHARGES = [
       + 'point 1145, which decides by measurement whether the travel stops short or the settle '
       + 'wait expires, and repairs that.',
   },
-  {
-    point: 1190,
-    suite: 'polish',
-    kind: 'check',
-    match: /^a stand on the plaza sees the loom over open ground from at least 8 m/i,
-    why:
-      'POINT 1190 IS THIS RED. The check asks for a metre-wide line from the plaza to the loom, '
-      + 'tightened from 0.15 m on the point\'s own branch, and the shipped Bambara plan the suite '
-      + 'runs holds no such line to any seat that also keeps the river in the picture — measured '
-      + '23.09.2026 on `feat/1190-loom-visible-from-plaza` against a green unit layer. The seat '
-      + 'lever is exhausted; what is owed is the dwelling ring, and the point says so and stays '
-      + 'open. NOT backend-scoped: it is a layout question, not a renderer one. The charge dies '
-      + 'with point 1190.',
-  },
 ]
