@@ -77,32 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1201. The production build is judged by a picture, not only by the dev server.
-  Bundle: Testinfrastruktur — the lane that would have caught this is the picture lane, and the
-  fix touches its scripts rather than any scene file.
-  Criticality: high — it stands before the release because, if the measurement below is a real
-  defect, the build that /poc/ and the coming /v0.3/ serve shows the player no world at all, and
-  that is the release's purpose. Every picture lane today shoots the dev server, so nothing can
-  currently tell the two readings apart.
-  MEASURED 23.09.2026 while publishing `poc` (archived point 1200) on commit 9c61be419. System
-  Chrome `--headless=new` with `--enable-unsafe-webgpu`, 1280×800, 14 s after the canvas
-  appears, then Tab to close the journal: the HUD, the journal and the DOM place labels (Tool
-  Hut, Bazaar, Travel Agency, Market Hut, Weapons Hut, General Store) sit right, and the 3D
-  scene stays completely black. The FPS readout runs at 48–60, so it IS rendering. The picture
-  is IDENTICAL on /poc/, on the root deployment (the same commit) and in a local
-  `npm run preview`, so neither the tag nor the deploy causes it. Side observation: repeated
-  `OperationError: Instance dropped in popErrorScope` as a pageerror.
-  THE QUESTION THIS POINT ANSWERS FIRST, before anything is changed: is this a defect of the
-  PRODUCTION build, or an artefact of a headless run without a real GPU? The discriminator is
-  cheap — shoot the same place and moment from the DEV server in the same browser with the same
-  flags. The suites' picture checks run against the dev server and show a world there, so a dev
-  picture that differs from the production picture settles it.
-  FINAL STATE: the answer is recorded with both pictures beside each other. If it is a
-  production defect, its cause is named and fixed and a picture check covers a production build
-  from then on, so no lane can be green over a build nobody has looked at. If it is a headless
-  artefact, that is written down where the next reader of a black production screenshot will
-  find it, and this point closes without a code change.
-
 - [ ] 1198. The adult-errands picture section ends with a verdict instead of a crash.
   PROBLEM, measured 23.09.2026 by the author of point 1196. `polish --section=adult-errands`
   dies after its checks with an uncaught `TypeError: Cannot read properties of undefined
