@@ -325,7 +325,8 @@ async function readings() {
   await guess('04-river', 'perhaps a road', receipt.vocabulary.RIVER)
   // CHIEF must be named while he is indoors, before the first call in words-first.
   const drummer = await d.read(() => ({ x: window.__placeSpots.drummer[0], z: window.__placeSpots.drummer[1] }))
-  await d.inspect(drummer, 1.4)
+  // Two metres off, so his note above the head still stands inside the picture.
+  await d.inspect(drummer, 2)
   await d.wait(() => !window.__game.getState().chiefOutside['bambara-village'], null, 480000)
   await prompt('drummer')
   await page.keyboard.press('Space')
