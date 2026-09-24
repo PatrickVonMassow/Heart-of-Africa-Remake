@@ -6785,6 +6785,343 @@ if (section('channel-crossing')) {
     driveOffNoFlock.gathered && driveOffNoFlock.leftAgain, JSON.stringify(driveOffNoFlock))
 }
 
+// --- Point 312: animals are water-shy, not water-barred (design.md §19.5) ----
+// A flight meets a river and goes IN (the along-shore slide is for the ocean
+// only); a player-driven animal left alone swims to the NEAREST bank on a
+// sampled path (a swim, never the old snap onto land); a swept calf is left to
+// its drama mid-channel until it resolves; and across a driven pass no animal
+// is found standing in a channel.
+if (section('water-shy-flight')) {
+  await page.evaluate(() => window.__game.getState().debugJumpTo(-17.9, 25.9)) // the Zambezi reach of channel-crossing
+  await page.waitForFunction(() => window.__wildlife && window.__game.getState().mode === 'travel', null, { timeout: 15000 })
+  await page.evaluate(() => window.__ui.getState().setTravelZoom(1))
+  await page.evaluate(() => window.__sleepSim(0.6))
+  // Stage: a STRAIGHT bank B with a narrow channel along heading h (land on
+  // both flanks of B, so an along-shore slide IS available) and a land spot L
+  // 11-13 units away for the traveller to stand clear on.
+  const stage = await page.evaluate(() => {
+    const seed = window.__game.getState().seed
+    const U = 10
+    const T = (x, z) => window.__terrainType(-z / U, x / U, seed)
+    const wet = (x, z) => { const t = T(x, z); return t === 'water' || t === 'ocean' }
+    const p0 = { ...window.__game.getState().pos }
+    const why = { bank: 0, channel: 0, straight: 0, clear: 0, widths: [] }
+    const FALLS = [[0.5, 25.2], [-5.15, 14.35], [2.28, 31.68], [-17.93, 25.86], [-28.59, 20.34]]
+    for (let r = 6; r <= 60; r += 1.5) {
+      for (let k = 0; k < 24; k++) {
+        const ang = (k / 24) * Math.PI * 2
+        const bx = p0.x + Math.sin(ang) * r
+        const bz = p0.z + Math.cos(ang) * r
+        if (wet(bx, bz)) continue
+        // Clear of every waterfall (landmarks.ts WATERFALLS): a calf there is
+        // swept over at once and its drama would prove nothing mid-channel.
+        if (FALLS.some(([fl, fo]) => Math.hypot(-bz / U - fl, bx / U - fo) < 0.7)) continue
+        for (let n = 0; n < 16; n++) {
+          const h = (n / 16) * Math.PI * 2
+          const hx = Math.sin(h), hz = Math.cos(h)
+          const tx = Math.cos(h), tz = -Math.sin(h) // bank tangent
+          // Channel: water from 0.5 on, land again within 2..4.5 units, no ocean.
+          let width = null
+          let ok = T(bx + hx * 0.5, bz + hz * 0.5) === 'water'
+          for (let s = 0.75; ok && s <= 14; s += 0.25) {
+            const t = T(bx + hx * s, bz + hz * s)
+            if (t === 'ocean') { ok = false; break }
+            if (t !== 'water') { width = s; break }
+          }
+          if (ok) why.bank++
+          if (ok && width !== null && why.widths.length < 12) why.widths.push(width)
+          if (!ok || width === null || width < 1.5 || width > 9) continue
+          why.channel++
+          // Straight bank: dry along the tangent both ways, wet just off it.
+          let straight = true
+          for (const sg of [1, -1]) {
+            for (let q = 1; q <= 2 && straight; q++) {
+              if (wet(bx + tx * sg * q, bz + tz * sg * q)) straight = false
+              if (q === 1 && T(bx + tx * sg + hx, bz + tz * sg + hz) !== 'water') straight = false
+            }
+          }
+          // The elephant's stand and the traveller's drive start are dry land.
+          if (straight) why.straight++
+          if (!straight || wet(bx - hx * 2, bz - hz * 2) || wet(bx - hx * 3, bz - hz * 3)) continue
+          why.clear++
+          // Land spots on the near side: N (7 u, framing the dart outside the
+          // shy ring of 6) and L (11-13 u, clear of its exit ring of 9).
+          const landAt = (radii) => {
+            for (let j = 0; j < 16; j++) {
+              const la = h + Math.PI + ((j % 2 ? 1 : -1) * Math.ceil(j / 2) * Math.PI) / 16
+              for (const rr of radii) {
+                const lx = bx + Math.sin(la) * rr, lz = bz + Math.cos(la) * rr
+                if (!wet(lx, lz)) return { x: lx, z: lz }
+              }
+            }
+            return null
+          }
+          const L = landAt([12, 11, 13])
+          // N sits beside B across the screen (world x), so the dart is framed
+          // mid-height rather than foreshortened at the top edge.
+          const N = [7, -7, 7.5, -7.5].map((dx) => ({ x: bx + dx, z: bz })).find((q) => !wet(q.x, q.z)) ?? landAt([7, 7.5])
+          if (!L || !N) continue
+          window.__waterShy = { B: { x: bx, z: bz }, h, width, L, N }
+          return { staged: true, B: { x: +bx.toFixed(2), z: +bz.toFixed(2) }, h: +h.toFixed(3), width }
+        }
+      }
+    }
+    return { staged: false, why }
+  })
+  check('water-shy staging finds a straight bank on a narrow channel', stage.staged, JSON.stringify(stage))
+
+  // (1) An elephant driven at a grazer on the straight bank: the grazer goes
+  // INTO the water (no along-shore slide) and out the far side. The elephant
+  // keeps bearing down 2.5 units behind it on its line, following it in, so
+  // the flight lasts across a reach wider than the dart's exit ring.
+  const dart = stage.staged && await page.evaluate(async () => {
+    const st = window.__waterShy
+    const herds = window.__wildlife.herdsRef.current
+    const seed = window.__game.getState().seed
+    const T = (x, z) => window.__terrainType(-z / 10, x / 10, seed)
+    window.__ui.getState().setTravelZoom(0.5)
+    window.__game.setState({ pos: { x: st.N.x, z: st.N.z } })
+    const { B, h, width } = st
+    const hx = Math.sin(h), hz = Math.cos(h)
+    // (Re)stage the pair at the bank; `press` holds the elephant on the line.
+    st.restage = () => {
+      herds.zebra = herds.zebra.filter((a) => a !== st.prey)
+      herds.elephant = herds.elephant.filter((a) => a !== st.eleph)
+      st.prey = { x: B.x, z: B.z, y: 0.2, rot: h, scale: 1, phase: 0.45 }
+      st.eleph = { x: B.x - hx * 2.5, z: B.z - hz * 2.5, y: 0.2, rot: h, heading: h, scale: 1, phase: 0 }
+      herds.zebra.unshift(st.prey)
+      herds.elephant.unshift(st.eleph)
+    }
+    st.press = () => {
+      if (window.__wildlife.lion) { window.__wildlife.lion.mode = 'idle'; window.__wildlife.lion.timer = 999 }
+      const along = Math.max(0, (st.prey.x - B.x) * hx + (st.prey.z - B.z) * hz)
+      st.eleph.x = B.x + hx * (along - 2.5)
+      st.eleph.z = B.z + hz * (along - 2.5)
+    }
+    st.restage()
+    const out = { enteredWater: false, maxSideways: 0, farBank: false }
+    await window.__pollSim(25, () => {
+      st.press()
+      const prey = st.prey
+      const dx = prey.x - B.x, dz = prey.z - B.z
+      const along = dx * hx + dz * hz
+      const t = T(prey.x, prey.z)
+      if (t === 'water') {
+        out.enteredWater = true
+        out.maxSideways = Math.max(out.maxSideways, Math.abs(dx * Math.cos(h) - dz * Math.sin(h)))
+      }
+      if (t !== 'water' && t !== 'ocean' && along > width - 0.5 && prey.crossing === undefined) out.farBank = true
+      return out.farBank
+    })
+    out.maxSideways = +out.maxSideways.toFixed(2)
+    return out
+  })
+  check(
+    'a grazer an elephant drives at a straight bank goes into the water rather than along it (point 312)',
+    !!dart && dart.enteredWater && dart.maxSideways < 1.5,
+    JSON.stringify(dart),
+  )
+  check(
+    'the elephant-driven grazer swims across and climbs out on the far side (point 312)',
+    !!dart && dart.farBank,
+    JSON.stringify(dart),
+  )
+  if (dart) {
+    // The picture: the same dart run again AFTER the scene is ready, caught
+    // mid-channel (the frame's subject is that mid-channel spot).
+    const mid = await page.evaluate(() => {
+      const { B, h, width } = window.__waterShy
+      return { x: B.x + Math.sin(h) * width * 0.45, z: B.z + Math.cos(h) * width * 0.45 }
+    })
+    await captureFrame(page, OUT, '312-flight-swims-the-river', {
+      world: mid,
+      label: 'a grazer darting from an elephant, swimming the river mid-channel',
+    }, {
+      beforeCapture: () => page.evaluate(async () => {
+        const st = window.__waterShy
+        const { B, h, width } = st
+        const seed = window.__game.getState().seed
+        const T = (x, z) => window.__terrainType(-z / 10, x / 10, seed)
+        st.restage()
+        await window.__pollSim(10, () => {
+          st.press()
+          const along = (st.prey.x - B.x) * Math.sin(h) + (st.prey.z - B.z) * Math.cos(h)
+          return T(st.prey.x, st.prey.z) === 'water' && along > width * 0.4
+        })
+      }),
+    })
+    await page.evaluate(() => {
+      const st = window.__waterShy
+      const herds = window.__wildlife.herdsRef.current
+      herds.zebra = herds.zebra.filter((a) => a !== st.prey)
+      herds.elephant = herds.elephant.filter((a) => a !== st.eleph)
+      window.__ui.getState().setTravelZoom(1)
+    })
+  }
+
+  // (2) The traveller drives an animal into the river, then leaves it alone:
+  // it swims to the NEAREST bank under its own power — the path is sampled on
+  // the sim clock, so a snap onto land would read as an impossible speed.
+  const driven = stage.staged && await page.evaluate(async () => {
+    const st = window.__waterShy
+    const { B, h, L } = st
+    const herds = window.__wildlife.herdsRef.current
+    const seed = window.__game.getState().seed
+    const T = (x, z) => window.__terrainType(-z / 10, x / 10, seed)
+    const dry = (x, z) => { const t = T(x, z); return t !== 'water' && t !== 'ocean' }
+    const setPos = (x, z) => window.__game.setState({ pos: { x, z } })
+    const hx = Math.sin(h), hz = Math.cos(h)
+    const prey = { x: B.x, z: B.z, y: 0.2, rot: h, scale: 1, phase: 0.61 }
+    herds.zebra.unshift(prey)
+    setPos(B.x - hx * 3, B.z - hz * 3)
+    const out = { inWater: false, released: false, swamOut: false, sawSwim: false, onLand: false, maxSpeed: 0 }
+    // The nearest bank from a point (the same ray scan as the rule).
+    const nearestBank = (px, pz) => {
+      let best = Infinity
+      for (let k = 0; k < 32; k++) {
+        const a = (k / 32) * Math.PI * 2
+        for (let s = 0.25; s <= 8; s += 0.25) {
+          const x = px + Math.sin(a) * s, z = pz + Math.cos(a) * s
+          if (T(x, z) === 'ocean') break
+          if (dry(x, z)) { best = Math.min(best, s); break }
+        }
+      }
+      return best
+    }
+    // Drive it well in — a unit clear of either bank — before letting go.
+    await window.__pollSim(8, () => {
+      if (window.__wildlife.lion) { window.__wildlife.lion.mode = 'idle'; window.__wildlife.lion.timer = 999 }
+      out.inWater = T(prey.x, prey.z) === 'water' && nearestBank(prey.x, prey.z) >= 1
+      return out.inWater
+    })
+    if (!out.inWater) { herds.zebra = herds.zebra.filter((a) => a !== prey); return out }
+    // Leave it alone: the traveller walks off to L, well outside the shy ring.
+    setPos(L.x, L.z)
+    out.released = true
+    const nearest = nearestBank(prey.x, prey.z)
+    const from = { x: prey.x, z: prey.z }
+    let last = { x: prey.x, z: prey.z, t: window.__simTime() }
+    await window.__pollSim(12, () => {
+      const now = window.__simTime()
+      const dt = now - last.t
+      const step = Math.hypot(prey.x - last.x, prey.z - last.z)
+      if (dt > 1e-3 && step > 0.05) out.maxSpeed = Math.max(out.maxSpeed, step / dt)
+      last = { x: prey.x, z: prey.z, t: now }
+      if (prey.crossing !== undefined) out.sawSwim = true
+      out.onLand = dry(prey.x, prey.z)
+      return out.onLand && prey.crossing === undefined
+    })
+    out.swamOut = out.onLand
+    out.nearest = +nearest.toFixed(2)
+    out.travelled = +Math.hypot(prey.x - from.x, prey.z - from.z).toFixed(2)
+    out.maxSpeed = +out.maxSpeed.toFixed(2)
+    herds.zebra = herds.zebra.filter((a) => a !== prey)
+    return out
+  })
+  check(
+    'a player-driven animal left alone in the river swims out to the nearest bank, a swim not a snap (point 312)',
+    !!driven && driven.inWater && driven.swamOut && driven.sawSwim && driven.maxSpeed < 6 &&
+      driven.travelled <= driven.nearest + 1.5,
+    JSON.stringify(driven),
+  )
+
+  // (3) A calf swept mid-channel belongs to its drama: nothing pulls it out
+  // while it struggles, and the drama resolves (rescued ashore, or drowned).
+  const swept = stage.staged && await page.evaluate(async () => {
+    const st = window.__waterShy
+    const { B, h, width } = st
+    const seed = window.__game.getState().seed
+    const T = (x, z) => window.__terrainType(-z / 10, x / 10, seed)
+    const hx = Math.sin(h), hz = Math.cos(h)
+    const mx = B.x + hx * (width / 2), mz = B.z + hz * (width / 2)
+    const fam = window.__makeTestFamily(mx, mz)
+    fam.parent.x = B.x - hx * 3
+    fam.parent.z = B.z - hz * 3
+    const calf = fam.calf
+    const out = { midChannel: false, struggled: false, pulledOut: false, resolved: false }
+    // Mid-channel: no dry land within a unit in any direction.
+    let clear = true
+    for (let k = 0; k < 8; k++) {
+      const a = (k / 8) * Math.PI * 2
+      const t = T(mx + Math.sin(a), mz + Math.cos(a))
+      if (t !== 'water') clear = false
+    }
+    out.midChannel = clear && T(mx, mz) === 'water'
+    await window.__pollSim(60, () => {
+      if (calf.inWater !== undefined && !calf.rescued) {
+        out.struggled = true
+        if (T(calf.x, calf.z) !== 'water') out.pulledOut = true
+      }
+      if (out.struggled && (calf.dead || (calf.inWater === undefined && !calf.rescued))) { out.resolved = true; return true }
+      return false
+    })
+    out.end = { dead: !!calf.dead, inWater: calf.inWater, rescued: !!calf.rescued }
+    fam.dispose()
+    return out
+  })
+  check(
+    'a calf swept mid-channel is left to its drama there and the drama resolves (point 312)',
+    !!swept && swept.midChannel && swept.struggled && !swept.pulledOut && swept.resolved,
+    JSON.stringify(swept),
+  )
+
+  // (4) Across a driven pass along the bank no animal stands in the channel:
+  // anyone on the water is in a drama, in flight or swimming out — never
+  // parked for longer than the backstop's sweep takes to notice it.
+  const pass = stage.staged && await page.evaluate(async () => {
+    const st = window.__waterShy
+    const { B, h } = st
+    const herds = window.__wildlife.herdsRef.current
+    const seed = window.__game.getState().seed
+    const T = (x, z) => window.__terrainType(-z / 10, x / 10, seed)
+    const setPos = (x, z) => window.__game.setState({ pos: { x, z } })
+    const hx = Math.sin(h), hz = Math.cos(h)
+    const tx = Math.cos(h), tz = -Math.sin(h)
+    const staged = []
+    for (let q = -2; q <= 2; q++) {
+      const a = { x: B.x + tx * q * 1.6 - hx * 0.4, z: B.z + tz * q * 1.6 - hz * 0.4, y: 0.2, rot: h, scale: 1, phase: 0.2 + q * 0.1 }
+      staged.push(a)
+      herds.zebra.unshift(a)
+    }
+    const owned = (a) =>
+      a.dead || a.inWater !== undefined || a.mired !== undefined || a.rescued || a.plungeTo || a.trampleTo ||
+      a.vigil || a.crossing !== undefined || a.caught !== undefined ||
+      (a.child && !a.child.dead && (a.child.inWater !== undefined || a.child.mired !== undefined || a.child.caught !== undefined))
+    const parked = new Map()
+    const out = { samples: 0, wetSeen: 0, worstParked: 0, who: null }
+    const s0 = window.__simTime()
+    await window.__pollSim(14, () => {
+      const now = window.__simTime()
+      const e = now - s0
+      // Walk the bank line for 8 sim-s, three units inland, then stand still.
+      const u = Math.min(e, 8) - 4
+      setPos(B.x + tx * u * 1.5 - hx * 2.2, B.z + tz * u * 1.5 - hz * 2.2)
+      if (window.__wildlife.lion) { window.__wildlife.lion.mode = 'idle'; window.__wildlife.lion.timer = 999 }
+      out.samples++
+      for (const sp of Object.keys(herds)) {
+        if (sp === 'flamingo' || sp === 'crocodile') continue
+        for (const a of herds[sp]) {
+          if (T(a.x, a.z) !== 'water' || owned(a)) { parked.delete(a); continue }
+          const fleeing = a.fleeAt !== undefined && now - a.fleeAt < 0.5
+          if (fleeing) { parked.delete(a); continue }
+          out.wetSeen++
+          if (!parked.has(a)) parked.set(a, now)
+          const held = now - parked.get(a)
+          if (held > out.worstParked) { out.worstParked = +held.toFixed(2); out.who = sp }
+        }
+      }
+      return false
+    })
+    for (const a of staged) herds.zebra = herds.zebra.filter((b) => b !== a)
+    return out
+  })
+  check(
+    'across a driven pass no animal stands in the channel — the canoe lane stays clear (point 312)',
+    !!pass && pass.samples > 20 && pass.worstParked < 1.5,
+    JSON.stringify(pass),
+  )
+}
+
 // --- Point 6: the predator never despawns in view (zoom-aware) ----------------
 // design.md §19: after the meal the predator trots off and leaves the stage
 // only well beyond the visible surroundings; a chase that strays aborts past
