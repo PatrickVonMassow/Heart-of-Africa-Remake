@@ -420,9 +420,12 @@ async function riverTrip(from, to, prefix) {
     // The current may already have carried the swimmer past this waypoint; a
     // player goes on downstream rather than fighting back against the flow.
     const [a, b] = i + 1 < worlds.length ? [world, worlds[i + 1]] : [worlds[i - 1] ?? world, world]
-    const pos = await d.read(() => window.__game.getState().pos)
-    const past = (pos.x - world.x) * (b.x - a.x) + (pos.z - world.z) * (b.z - a.z) > 0
-    if (!past) await d.travelTo(world)
+    const past = async () => {
+      const pos = await d.read(() => window.__game.getState().pos)
+      return (pos.x - world.x) * (b.x - a.x) + (pos.z - world.z) * (b.z - a.z) > 0
+    }
+    // The drift can also carry him past while he is still steering for it.
+    if (!await past()) await d.travelTo(world).catch(async (e) => { if (!await past()) throw e })
     if (i === 0 || i === Math.floor(route.length / 2) || i === route.length - 1) {
       // A swimmer drifts with the current while a settling shutter waits, so
       // the subject is where the traveller floats at the shutter, not the waypoint.
