@@ -31774,3 +31774,59 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   the tag round's catch timing, so the risk is a regression in a landed picture, not a wrong
   mechanic; the point reuses two existing mechanisms and adds none.
   Author lane: ordinary.
+
+- [x] 312. Animals are water-shy, not water-barred (user 25.07.2026, revising the
+  point-192 rule; former point 324 is folded in here). The rule was read far too
+  strictly: "animals must not stand around in water" — so that a canoe passage stays
+  clear — hardened into "water is off limits to them". What the player sees is a
+  fleeing animal PRESSING against the waterline or skating along the bank hunting for
+  a way around, instead of simply swimming across; and a calf swept into the water
+  sticking at the bank so its drama never plays out.
+  THE RULE IS STATED IN ONE PLACE — design.md §19.5. This point BUILDS it; do not
+  restate it elsewhere.
+  (a) NO SPAWN, NO LINGERING — unchanged, and the reason the rule exists. An animal
+  never spawns in water and never idles, grazes, rests or waits in it; one that comes
+  to rest on water makes for the nearest bank. A channel the player canoes must never
+  be blocked by a parked animal. This half must stay demonstrably intact — and it is
+  what ENDS every water passage: the moment a flight stops, the animal turns for the
+  NEAREST bank and SWIMS out under its own power. It is never snapped back onto land,
+  which is how the old setback behaved; shyness must read as shyness, not as a
+  teleport.
+  (b) CROSSING IS ORDINARY: a ROAMING animal may take on a channel rather than turn
+  from it, governed by the calibratable `balance.waterCross.*` (width, readiness).
+  (c) FLIGHT IS UNRESTRICTED. Fleeing anything — a predator, an oncoming elephant, the
+  traveller, fire — the animal enters the water the moment its escape leads there: no
+  dead-end precondition, no pressure radius, no width limit, no chance roll.
+  CONCRETELY: the along-shore deflection (`deflectedStep`) applies to the OCEAN edge
+  ONLY, so a flight meeting a river or lake goes IN rather than sliding along the bank.
+  A juvenile returning to its parent (§19.8) moves under the same freedom.
+  (d) A WATER DRAMA OWNS ITS ACTOR (the folded 324): while a §19.8 water drama runs —
+  the swept calf, the wading rescuer, a crocodile's victim — no leave-the-water rule
+  may pull the animal out. The exemption keys on the DRAMA STATE, not on the species.
+  (e) TWO INVARIANTS UNTOUCHED: the open sea of §11 stays the world's edge (the ocean
+  setback is exactly as it is), and every water passage RESOLVES — a bank is reached or
+  the deadline grounds the animal there (invariant I4), so nothing swims forever.
+  ANCHORS: `fleeCrossing`, `crossingTarget`, `deflectedStep` and the water setback in
+  `src/scenes/travel/wildlifeBehavior.ts`, with their call sites in
+  `src/scenes/travel/Wildlife.tsx` (the three flight sources — predator flee, elephant
+  dart, player-shy — and the calf follow branch); `waterEdgeRules.ts` holds the
+  drinker/bather bank targeting, which does NOT change.
+  WHAT SHRINKS RATHER THAN GROWS: the boxed-trigger machinery this point once called
+  for (a pressure radius, a boxed-persistence hysteresis, a crossing chance for
+  flights) is NOT to be built — under (c) a flight needs no trigger at all. Add no
+  balance values for it.
+  DOCS in the same commit: design.md §19.5 already states the target; CLAUDE.md §7.1
+  point 12 currently carries a forward-pointer at the superseded claim and must be
+  rewritten to the built state when this lands, dropping that pointer.
+  VERIFIABLE: pure — a flight step whose heading meets river or lake water is NOT
+  deflected along the bank, while the same step at an ocean edge still is; a roaming
+  crossing still honours its width and readiness values while a flight ignores both; a
+  drama-flagged animal is setback-exempt while its drama runs and subject to it again
+  afterwards; an idle animal that ends up on water heads for the nearest bank. Live
+  (`scripts/verify/enrichments.mjs`, both backends): an elephant driven at a grazer on
+  a STRAIGHT bank — where an along-shore slide IS available — sends it into the water
+  and out the far side; an animal the PLAYER drives into a river and then leaves alone
+  is out of the water within moments — swimming to the nearest bank, its path sampled
+  so it is a swim and not a jump; the staged swept calf reaches mid-channel and its
+  drama resolves; and across a driven pass no animal is found standing in a channel, so
+  the canoe lane stays clear.
