@@ -97,7 +97,7 @@ export function communicationDriver(page) {
       if (d < best - 0.03) { best = d; progress = Date.now() }
       assert(Date.now() - progress < 15000, `Blocked travel leg to ${JSON.stringify(target)}`)
       assert(await read(() => window.__game.getState().mode === 'travel' && !window.__ui.getState().dialog), 'Travel was interrupted by a modal or scene change')
-      await held(travelKeys(p, target, tolerance / 2), () => page.waitForTimeout(100))
+      await held(travelKeys(p, target, tolerance / 2), () => page.waitForTimeout(Math.min(150, Math.max(20, d * 100))))
     }
     throw new Error('Travel leg timed out')
   }
@@ -131,9 +131,15 @@ export function communicationDriver(page) {
     for (const p of path) await travel(p)
   }
   async function close() {
-    for (let i = 0; i < 3; i++) {
-      if (!await read(() => !!window.__ui.getState().dialog || window.__game.getState().journalOpen)) break
-      await page.keyboard.press('Escape')
+    // Escape is ignored while a journal input owns focus. Use the actual close
+    // buttons, which also work when the last action was editing a reading.
+    const kind = await read(() => window.__ui.getState().dialog?.kind ?? null)
+    if (kind !== null) {
+      assert(['speechGuess', 'drumMessage'].includes(kind), `Unexpected modal: ${kind}`)
+      await page.locator('.dialog .actions button').last().click()
+    }
+    if (await read(() => window.__game.getState().journalOpen)) {
+      await page.locator('.journal header button').click()
     }
   }
   async function inventory(selector) {

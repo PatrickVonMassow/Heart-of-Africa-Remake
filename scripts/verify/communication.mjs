@@ -14,18 +14,22 @@ import { installCommunicationCapture, startAudioWindow, saveAudioWindow } from '
 
 const sections = sectionGate(), { section } = sections
 if (sections.banner()) console.log(sections.banner())
-const out = fileURLToPath(new URL(`../../verification/communication-${VERIFY_GL}-${Date.now()}/`, import.meta.url))
+const prefix = `communication-${VERIFY_GL}-${Date.now()}-`
+const out = fileURLToPath(new URL('../../verification/', import.meta.url))
 mkdirSync(out, { recursive: true })
-const receipt = { revision: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(),
-  requestedBackend: VERIFY_GL, order: VERIFY_GL === 'webgpu' ? 'words-first' : 'message-first',
+const receipt = { revision: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8', windowsHide: true }).trim(),
+  evidencePrefix: prefix, requestedBackend: VERIFY_GL, order: VERIFY_GL === 'webgpu' ? 'words-first' : 'message-first',
   status: 'running', step: 'boot', frames: [], audio: [], events: [], errors: [] }
-const save = () => writeFileSync(`${out}route.json`, JSON.stringify(receipt, null, 2))
+const save = () => writeFileSync(`${out}${prefix}route.json`, JSON.stringify(receipt, null, 2))
 save()
-const browser = await launchVerifyBrowser()
+const browser = await launchVerifyBrowser().catch((error) => {
+  receipt.status = 'failed'; receipt.failure = String(error.stack ?? error); save(); throw error
+})
 // The video preserves short contacts, words and consequences between shutters.
-const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, recordVideo: { dir: out, size: { width: 1440, height: 900 } } })
+const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, recordVideo: { dir: `${out}${prefix}video/`, size: { width: 1440, height: 900 } } })
 const d = communicationDriver(page)
 const shutter = frameShutter(page, out)
+const pendingAudio = new Map()
 page.on('pageerror', (e) => receipt.errors.push(String(e)))
 page.on('console', (m) => { if (m.type() === 'error') receipt.errors.push(m.text()) })
 const check = (name, ok) => { assert(ok, name); console.log(`PASS  ${name}${sections.tag()}`) }
@@ -35,15 +39,22 @@ async function event(name, data = {}) {
 }
 async function step(name) { receipt.step = name; await event(name) }
 async function frame(name, subject) {
-  await shutter(name, subject)
-  receipt.frames.push({ name: `${name}.png`, step: receipt.step, subject, pageMs: await d.read(() => performance.now()) }); save()
+  await shutter(prefix + name, subject)
+  receipt.frames.push({ name: `${prefix}${name}.png`, step: receipt.step, subject, pageMs: await d.read(() => performance.now()) }); save()
 }
 async function localFrame(name, point, label) {
   await frame(name, { local: { x: point.x, y: point.y ?? 0.8, z: point.z }, label, settle: false })
 }
+async function audioStart(name, bands, preRoll = 0) {
+  pendingAudio.set(name, bands)
+  const opened = await startAudioWindow(page, name, preRoll)
+  await event(`audio-${name}-start`, opened)
+  return opened
+}
 async function audioEnd(name, bands) {
-  const audio = await saveAudioWindow(page, out, name, bands)
-  receipt.audio.push({ name, receipt: `${name}.json`, recording: audio.recording, startFrame: audio.startFrame, endFrame: audio.endFrame }); save()
+  const audio = await saveAudioWindow(page, out, name, bands, prefix + name)
+  pendingAudio.delete(name)
+  receipt.audio.push({ name, receipt: `${prefix}${name}.json`, recording: audio.recording, startFrame: audio.startFrame, endFrame: audio.endFrame }); save()
 }
 async function journal(tab = 0) {
   await d.close(); await page.keyboard.press('Tab')
@@ -71,13 +82,18 @@ async function guess(name, reading) {
 async function speech(kind, point, frameName) {
   await d.inspect(point, kind === 'adult-talk' ? 2 : 5)
   const after = await d.read(() => performance.now() / 1000)
-  await d.wait(({ after, child }) => window.__speech?.labels().some((l) =>
-    l.shownAt > after && (child ? l.speakerId.startsWith('kid-') && l.atoms.includes(window.__game.getState().vocabulary.RIVER) : l.speakerId.startsWith('villager-'))),
-  { after, child: kind === 'child-call' }, 480000)
-  await startAudioWindow(page, kind, 1)
-  await frame(frameName, { element: kind === 'child-call' ? '.speech-label[data-speaker^="kid-"]' : '.speech-label[data-speaker^="villager-"]',
+  const heard = await d.wait(({ after, child }) => window.__speech?.labels().find((l) => {
+    const at = window.__speech.anchorScreen(l.speakerId)
+    return l.shownAt > after && at && at.x > 100 && at.x < innerWidth - 100 && at.y > 80 && at.y < innerHeight - 100 &&
+      (child ? l.speakerId.startsWith('kid-') && l.atoms.includes(window.__game.getState().vocabulary.RIVER) : l.speakerId.startsWith('villager-'))
+  }), { after, child: kind === 'child-call' }, 480000)
+  const spoken = await heard.jsonValue(); await heard.dispose()
+  const windowStart = await audioStart(kind, kind === 'child-call' ? receipt.bands.child : receipt.bands.adult, 1)
+  await event(kind, { spoken })
+  await frame(frameName, { element: `.speech-label[data-speaker="${spoken.speakerId}"]`,
     label: `${kind} speaker and natural note`, settle: false })
-  await page.waitForTimeout(2500) // an explicit measured audio window, not a readiness sleep
+  await d.wait((end) => window.__ambience.context().currentTime >= end,
+    windowStart.contextTime + 4 * receipt.setup.levels.communication.syllableSeconds + 0.5, 30000)
   await audioEnd(kind, kind === 'child-call' ? receipt.bands.child : receipt.bands.adult)
 }
 async function prompt(kind) {
@@ -106,11 +122,11 @@ async function chief(prefix = '05') {
 async function message(which, trigger, point) {
   const count = which === 'errand' ? 16 : 8
   const prefix = which === 'errand' ? '05' : '07'
-  await startAudioWindow(page, `drum-${which}`, 0.25)
+  await audioStart(`drum-${which}`, receipt.bands.drums, 0.25)
   await trigger()
   await d.wait((which) => window.__ui.getState().drumPerformance?.plan.message === which, which, 15000)
   const plan = await d.read(() => window.__ui.getState().drumPerformance.plan)
-  check(`${which} has ${count} strikes`, plan.strikes.length === count)
+  check(`${which} plan has ${count} strikes`, plan.strikes.length === count)
   check(`${which} paper is absent before the last beat`, !await page.locator('.drum-message').count())
   await event(`drum-${which}-plan`, { plan })
   await localFrame(`${prefix}-${which}-sounding`, point, 'chief and drummer together sounding the message')
@@ -145,6 +161,11 @@ async function observations() {
   }
   await d.wait(() => window.__placeTapHand()?.tapFor > 0, null, 480000)
   const touch = await d.read(() => window.__placeTapHand())
+  await d.inspect(touch.rock, 2.5)
+  await d.wait((rock) => {
+    const h = window.__placeTapHand()
+    return h?.tapFor > 0 && Math.abs(h.gap) < 0.12 && Math.hypot(h.rock.x - rock.x, h.rock.z - rock.z) < 0.1
+  }, touch.rock, 480000)
   await localFrame('02-stationary-rock-touch', touch.rock, 'stationary hand contact at the bank rock')
   const boulder = await d.read(() => window.__placeTag().boulder)
   await d.inspect(boulder, 4)
@@ -169,13 +190,31 @@ async function observations() {
     return v.work?.situation === 'water-back' && v.work.arrived && v.carry === 'none'
   }, carrier, 480000)
   await localFrame('03-full-jar-set-down', geography.waterStand, 'full jar returned to the stand')
-  const site = geography.digSites[0]
+  // Follow a naturally cast pair to its invitation; it may meet away from
+  // the excavation. The frame must name the speaker, not an empty future pit.
+  const gathering = await d.wait(() => window.__placeErrands().villagers.find((v) => v.work?.phase === 'invite'), null, 480000)
+  const gatheringAt = await gathering.jsonValue(); await gathering.dispose()
+  await d.inspect(gatheringAt, 3)
+  const invitationHandle = await d.wait(() => {
+    const e = window.__placeErrands(), word = e.last
+    if (word?.purpose !== 'invitation' || word.age > window.__balance.communication.labelSeconds) return null
+    const speaker = e.villagers[word.speaker]
+    const id = `villager-${word.speaker}`, at = window.__speech.anchorScreen(id)
+    if (!speaker?.work || !at || at.x < 100 || at.x > innerWidth - 100 || at.y < 80 || at.y > innerHeight - 100) return null
+    return { id, siteIndex: speaker.work.siteIndex, speaker, strikes: e.digProgress[speaker.work.siteIndex].strikes }
+  }, null, 480000)
+  const invitation = await invitationHandle.jsonValue(); await invitationHandle.dispose()
+  await frame('03-dig-invitation', { element: `.speech-label[data-speaker="${invitation.id}"]`, label: 'the spoken invitation and its speaker before the pair digs', settle: false })
+  await event('paired-dig-invitation', invitation)
+  const siteIndex = invitation.siteIndex, site = geography.digSites[siteIndex]
   await d.inspect(site, 4)
-  await d.wait(() => window.__placeErrands().villagers.some((v) => v.work?.siteIndex === 0 && v.work.phase === 'invite'), null, 480000)
-  await localFrame('03-dig-invitation', site, 'the invitation before the pair starts digging')
-  await d.wait(() => window.__placeErrands().villagers.filter((v) => v.work?.siteIndex === 0 && v.digging).length >= 2, null, 480000)
+  await d.wait((index) => window.__placeErrands().villagers.filter((v) => v.work?.siteIndex === index && v.digging).length >= 2, siteIndex, 480000)
   await localFrame('03-paired-dig', site, 'paired digging with tools at the working rim')
-  await d.wait(() => window.__placeErrands().digProgress[0]?.completed, null, 480000)
+  await d.wait(({ index, before }) => {
+    const e = window.__placeErrands()
+    return e.digProgress[index]?.completed && e.digProgress[index].strikes > before &&
+      !e.villagers.some((v) => v.work?.siteIndex === index)
+  }, { index: siteIndex, before: invitation.strikes }, 480000)
   await localFrame('03-finished-work', site, 'the completed pit, post or planting after the bout')
   const loom = await d.read(() => window.__placeLayout.loom)
   await d.walk({ x: loom.weaver.x - loom.ax * 3, z: loom.weaver.z - loom.az * 3 }); await d.aim(loom.seat)
@@ -282,9 +321,10 @@ try {
     await step('1-entry-and-speech')
     await frame('01-entry', { place: 'bambara-village', label: 'first entry to Bambara in this expedition' })
     await installCommunicationCapture(page)
-    await startAudioWindow(page, 'ambient-baseline')
-    await page.waitForTimeout(3000) // explicitly measured three-second baseline; overlap remains in receipt
-    await audioEnd('ambient-baseline', { ...receipt.bands.adult, childLow: receipt.bands.child.low, childHigh: receipt.bands.child.high })
+    const baselineBands = { ...receipt.bands.adult, childLow: receipt.bands.child.low, childHigh: receipt.bands.child.high }
+    const baselineStart = await audioStart('ambient-baseline', baselineBands)
+    await d.wait((end) => window.__ambience.context().currentTime >= end, baselineStart.contextTime + 3, 30000)
+    await audioEnd('ambient-baseline', baselineBands)
     const adult = await d.read(() => window.__placeErrands().villagers[0])
     await speech('adult-talk', adult, '01-adult-talk')
     if (receipt.order === 'message-first') await errand()
@@ -323,6 +363,12 @@ try {
     await reopen('errand', '07-old-errand'); await reopen('answer', '07-answer-reopened')
 
     await step('8-downstream-destination')
+    await journal()
+    const impressionEntry = await d.read(() => window.__game.getState().journal.findIndex((e) => e.text.key === 'journal.artefactGiven'))
+    assert(impressionEntry >= 0, 'The impression has no description in this expedition')
+    await page.locator('.journal .entry').nth(impressionEntry).scrollIntoViewIfNeeded()
+    await frame('08-impression-description', { element: `.journal .entries > .entry:nth-child(${impressionEntry + 1})`, label: 'the carried impression described before choosing its destination' })
+    await d.close()
     await d.leave(); await d.close()
     const socket = await d.read(async () => {
       const { FORM_SOCKETS, socketPosition } = await import('/src/world/forms.ts')
@@ -360,6 +406,7 @@ try {
       }
       const button = page.getByRole('button', { name: language === 'en' ? 'English' : 'Deutsch', exact: true })
       if (await button.isEnabled()) await button.click()
+      await page.locator('.debug-menu h3').click() // remove focus from the filter before F1
       await page.keyboard.press('F1'); await journal()
       await d.wait(() => !document.querySelector('.journal .writing'), null, 120000)
       const entries = page.locator('.journal .entry')
@@ -367,9 +414,9 @@ try {
       for (let i = 0; i < await entries.count(); i++) {
         await entries.nth(i).scrollIntoViewIfNeeded()
         text.push(await entries.nth(i).innerText())
-        await frame(`09-journal-${language}-${i}`, { element: '.journal', label: `visible journal prose, ${language}, entry ${i + 1}` })
+        await frame(`09-journal-${language}-${i}`, { element: `.journal .entries > .entry:nth-child(${i + 1})`, label: `visible journal prose, ${language}, entry ${i + 1}` })
       }
-      writeFileSync(`${out}journal-${language}.txt`, text.join('\n\n'))
+      writeFileSync(`${out}${prefix}journal-${language}.txt`, text.join('\n\n'))
     }
     check('continuous route has no browser errors', receipt.errors.length === 0)
     receipt.status = 'passed'
@@ -380,11 +427,20 @@ try {
   console.log(`FAIL  continuous route at ${receipt.step}: ${error.message}${sections.tag()}`)
   process.exitCode = 1
 } finally {
+  receipt.incompleteAudio = [...pendingAudio.keys()]
+  // Preserve even an interrupted window. It stays explicitly incomplete and
+  // cannot turn the failed expedition into passing audio evidence.
+  for (const [name, bands] of pendingAudio) {
+    try { await saveAudioWindow(page, out, name, bands, prefix + name) }
+    catch (error) { receipt.errors.push(`incomplete ${name}: ${error.message}`) }
+  }
   await d.read(() => window.__communicationCapture?.stop()).catch(() => {})
   save()
   await page.close()
   receipt.video = await page.video()?.path()
   save()
   await browser.close()
-  console.log(`Evidence: ${out}route.json`)
+  console.log(`Evidence: ${out}${prefix}route.json`)
+  console.log(`FAILURES: ${receipt.status === 'passed' ? 0 : 1}`)
+  console.log('console errors:', receipt.errors)
 }

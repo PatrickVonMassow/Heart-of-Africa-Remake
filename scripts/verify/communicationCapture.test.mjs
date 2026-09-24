@@ -10,11 +10,11 @@ it('persists recordings and timestamped receipts, and refuses silent evidence af
     const page = { evaluate: async () => ({ sampleRate, state: 'running', blocks: [
       { frame: 1024, receivedMs: 99, contextTime: 0.1, labels: [{ speakerId: 'villager-1' }], channels: [wave, wave] },
     ] }) }
-    const receipt = await saveAudioWindow(page, out, 'adult-talk', { low: [100, 170], high: [200, 300] })
+    const receipt = await saveAudioWindow(page, out, 'adult-talk', { low: [100, 170], high: [200, 300] }, 'run-adult-talk')
     expect(receipt.startFrame).toBe(1024)
     expect(receipt.endFrame).toBe(5120)
-    expect(JSON.parse(readFileSync(`${out}adult-talk.json`)).blocks[0].labels[0].speakerId).toBe('villager-1')
-    expect(readFileSync(`${out}adult-talk.wav`).length).toBe(44 + wave.length * 4)
+    expect(JSON.parse(readFileSync(`${out}run-adult-talk.json`)).blocks[0].labels[0].speakerId).toBe('villager-1')
+    expect(readFileSync(`${out}run-adult-talk.wav`).length).toBe(44 + wave.length * 4)
     wave.fill(0)
     await expect(saveAudioWindow(page, out, 'silence', { low: [100, 170] })).rejects.toThrow('Missing audio evidence')
     expect(JSON.parse(readFileSync(`${out}silence.json`)).channels[0].rms).toBe(0)

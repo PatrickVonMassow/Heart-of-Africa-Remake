@@ -57,15 +57,15 @@ export async function startAudioWindow(page, name, preRoll = 0) {
   return page.evaluate(({ name, preRoll }) => window.__communicationCapture.start(name, preRoll), { name, preRoll })
 }
 
-export async function saveAudioWindow(page, out, name, bands) {
+export async function saveAudioWindow(page, out, name, bands, fileStem = name) {
   const captured = await page.evaluate((name) => window.__communicationCapture.take(name), name)
   const channels = [0, 1].map((c) => captured.blocks.flatMap((b) => b.channels[c]))
   const blocks = captured.blocks.map(({ channels, ...b }) => ({ ...b, length: channels[0].length }))
   const receipt = { name, state: captured.state, startFrame: blocks[0].frame,
     endFrame: blocks.at(-1).frame + blocks.at(-1).length,
-    recording: `${name}.wav`, blocks, ...analyseAudioWindow(channels, captured.sampleRate, bands, blocks) }
-  writeFileSync(`${out}${name}.wav`, stereoWav(channels, captured.sampleRate))
-  writeFileSync(`${out}${name}.json`, JSON.stringify(receipt, null, 2))
+    recording: `${fileStem}.wav`, blocks, ...analyseAudioWindow(channels, captured.sampleRate, bands, blocks) }
+  writeFileSync(`${out}${fileStem}.wav`, stereoWav(channels, captured.sampleRate))
+  writeFileSync(`${out}${fileStem}.json`, JSON.stringify(receipt, null, 2))
   if (receipt.state !== 'running' || receipt.gaps.length || receipt.channels.every((c) => c.peak === 0)) {
     throw new Error(`Missing audio evidence in ${name}: state=${receipt.state}, gaps=${receipt.gaps.length}, peaks=${receipt.channels.map((c) => c.peak)}`)
   }

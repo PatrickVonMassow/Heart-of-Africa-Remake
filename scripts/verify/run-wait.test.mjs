@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, it, expect } from 'vitest'
+import { COUNTED_SUITE_FRAMES } from './run-wait-core.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const CLI = join(HERE, 'run-wait.mjs')
@@ -72,7 +73,7 @@ describe('--plan: the decision that belongs BEFORE the run', () => {
     expect(res.status).toBe(0)
     expect(res.stdout).toMatch(/BACKGROUND/)
     expect(res.stdout).toMatch(/notification/)
-    expect(res.stdout).toMatch(/94 expected/)
+    expect(res.stdout).toContain(`${94 + COUNTED_SUITE_FRAMES.communication} expected`)
   })
 
   it('lets a single measured suite be one blocking foreground call', () => {

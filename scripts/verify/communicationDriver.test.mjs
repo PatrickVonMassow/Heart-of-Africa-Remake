@@ -15,3 +15,17 @@ it('releases every held movement key when a route fails', async () => {
   await expect(driver.held(['KeyW', 'KeyD'], async () => { throw new Error('blocked') })).rejects.toThrow('blocked')
   expect(events).toEqual([['down', 'KeyW'], ['down', 'KeyD'], ['up', 'KeyW'], ['up', 'KeyD']])
 })
+it('closes the journal through its button even when a text input owns focus', async () => {
+  const clicks = []
+  let readIndex = 0
+  const driver = communicationDriver({
+    evaluate: async () => [null, true][readIndex++],
+    locator: (selector) => ({ click: async () => clicks.push(selector) }),
+  })
+  await driver.close()
+  expect(clicks).toEqual(['.journal header button'])
+})
+it('keeps an unexpected gameplay interruption as a failed continuous run', async () => {
+  const driver = communicationDriver({ evaluate: async () => 'defeat' })
+  await expect(driver.close()).rejects.toThrow('Unexpected modal: defeat')
+})
