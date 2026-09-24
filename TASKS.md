@@ -422,11 +422,20 @@ put it is the mistake this line exists to stop.
   (b) The brake has a production caller. `fenceRefusal` (scripts/context-fence-core.mjs) is
   reached from the registered guard for the handover case; a test spawns the guard above the
   mark and asserts a deny, not a decide()-level unit assertion (point 881 (2)).
-  (c) The read tools count. The matcher covers the read kind whose growth p90 is largest
-  (point 881 (4)), so a session cannot grow past the mark through reads alone.
+  (c) The read tools are MEASURED, not refused. The matcher records the read kind whose growth
+  p90 is largest (point 881 (4)) into the reading, so the next START action sees the true
+  level; reads themselves are never denied at the handover mark. The 150k ceiling, not the
+  122k mark, bounds read growth. The allow-list in (a) stays.
   (d) The overshoot series gets a verdict command, not just a dump:
   `context-incidents.mjs --trend` prints overshoots per day and median overshoot for the last
   7 days, so the effect of the arming is measurable in one call.
+  (e) The handover path carries a refused session. A test takes a session above the mark with
+  a point in flight whose gate still needs a suite, asserts the suite is denied, and asserts
+  that the boundary/handover command starts the successor, which then runs the suite. The
+  fence is not armed while the launcher cannot start a successor (launcher record
+  dead/unknown); in that state it stays at observe and says so (user 24.09.2026: "Ist 1204
+  nicht riskannt? Kann es nicht vorkommen, dass die Einhaltung gar nicht erfüllbar ist und
+  dann haben wir eine Blockade?" — "Ja, passe das entsprechend an.").
   NOT IN SCOPE: raising the ceiling, new ledger fields, a new guard script. This wires and
   arms what is already built (points 700, 881, 932).
   Criticality: high — real usage cost every night.

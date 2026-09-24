@@ -1808,3 +1808,12 @@ Punkt in die Arbeitsordnung.
 - **The main-write guard misses `>>` and heredocs** (24.09.2026). It catches `sed -i` and `>` but
   lets `>>` and heredoc writes through, so a non-owner session can grow a memory file it cannot shrink again. NOT QUEUED: infrastructure freeze (CLAUDE.md §2) — it lets
   nothing false through that a review would miss and blocks no game work.
+- **Toast overlaps the open journal's heading** (24.09.2026, flow frame
+  `05-journal-after-chief-meeting.png`). At 1280x800 the centred toast lies over the journal
+  panel's "Tagebuch" title. NOT QUEUED: cosmetic layout with no blocked action; queue it if a
+  player reports it.
+- **Board shows nothing in progress while a declared wait lacks evidence** (24.09.2026). A
+  `batch-in-flight --waiting-on` without `--point/--pid/--log` is judged `no-evidence`, so the
+  board read idle for ~30 min while a main-push gate ran. NOT QUEUED: display-only,
+  infrastructure freeze (CLAUDE.md §2). Simplification when picked up: default `--pid` to the
+  caller, or refuse a declaration without evidence.
