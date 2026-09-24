@@ -573,13 +573,13 @@ try {
     receipt.final = final
     for (const language of ['en', 'de']) {
       await d.close(); await page.keyboard.press('F1')
-      // Clear any filter and expose the normal language setting.
-      await page.locator('.debug-menu input').first().fill('')
-      for (const head of await page.locator('.debug-group-head').all()) {
-        if (await head.getAttribute('aria-expanded') === 'false') await head.click()
-      }
+      // Filter to the language row: a filter shows its match expanded, while a
+      // remembered collapsed group hides the button from role queries.
+      const row = await d.read(async () => (await import('/src/i18n/index.ts')).getStrings().debug.language)
+      await page.locator('.debug-menu input').first().fill(row)
       const button = page.getByRole('button', { name: language === 'en' ? 'English' : 'Deutsch', exact: true })
       if (await button.isEnabled()) await button.click()
+      await page.locator('.debug-menu input').first().fill('')
       await page.locator('.debug-menu h3').click() // remove focus from the filter before F1
       await page.keyboard.press('F1'); await journal()
       await d.wait(() => !document.querySelector('.journal .writing'), null, 120000)
