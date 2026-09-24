@@ -840,6 +840,7 @@ export const RED_CHARGES = [
     point: 939,
     suite: 'collision',
     backend: 'webgpu',
+    featureLevel: 'compatibility',
     kind: 'console',
     match: /^console error: Failed to load resource: the server responded with a status of 504 \(Outdated Optimize Dep\)/i,
     why:
