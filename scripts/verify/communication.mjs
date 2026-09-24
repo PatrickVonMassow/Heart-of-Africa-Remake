@@ -416,7 +416,13 @@ async function riverTrip(from, to, prefix) {
     const world = await d.read(async (p) => (await import('/src/world/geo.ts')).latLonToWorld(p.lat, p.lon), p)
     await d.travelTo(world)
     if (i === 0 || i === Math.floor(route.length / 2) || i === route.length - 1) {
-      await frame(`${prefix}-river-${i}`, { world: p, label: 'the continuous route along the Niger and its flow' })
+      // A swimmer drifts with the current while a settling shutter waits, so
+      // the subject is where the traveller floats at the shutter, not the waypoint.
+      const at = await d.read(async () => {
+        const s = window.__game.getState()
+        return (await import('/src/world/geo.ts')).worldToLatLon(s.pos.x, s.pos.z)
+      })
+      await frame(`${prefix}-river-${i}`, { world: at, label: 'the continuous route along the Niger and its flow', settle: false })
     }
   }
 }
