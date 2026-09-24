@@ -10,8 +10,9 @@ export async function installCommunicationCapture(page) {
     const source = `class ReceiptPCM extends AudioWorkletProcessor {
       constructor() { super(); this.parts = [[], []]; this.start = currentFrame; }
       process(inputs) {
-        const input = inputs[0];
-        if (!input?.[0]) return true;
+        // An inactive upstream graph arrives as zero channels: that quantum is
+        // silence at the output, recorded as zeros rather than as a gap.
+        const input = inputs[0]?.[0] ? inputs[0] : [new Float32Array(128)];
         if (!this.parts[0].length) this.start = currentFrame;
         for (let c = 0; c < 2; c++) this.parts[c].push(...(input[c] || input[0]));
         if (this.parts[0].length >= 2048) {
