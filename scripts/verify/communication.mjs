@@ -185,6 +185,15 @@ async function chief(prefix = '05') {
     const t = (await import('/src/i18n/index.ts')).getStrings().labels
     return [t.askForDrumMessage, t.repeatDrumMessage, t.repeatDrumAnswer]
   })
+  // Come round to the side of the drum away from the market door first, so the
+  // spots below are measured from there.
+  const away = await d.read((drummer) => {
+    const door = window.__placeLayout.interactives.find((i) => i.type === 'market')?.door
+    if (!door) return null
+    const dx = drummer.x - door[0], dz = drummer.z - door[1], n = Math.hypot(dx, dz) || 1
+    return { x: drummer.x + dx / n * 4, z: drummer.z + dz / n * 4 }
+  }, drummer)
+  if (away) await d.walk(away).catch(() => {})
   for (const distance of [2, 1.7, 1.4]) {
     const reached = await d.inspect(drummer, distance).then(() => true, () => false)
     if (reached && await d.wait((labels) => labels.some((l) => document.querySelector('.prompt')?.textContent.includes(l)), labels, 3000)
