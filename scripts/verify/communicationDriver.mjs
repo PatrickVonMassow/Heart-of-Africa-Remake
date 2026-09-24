@@ -182,6 +182,14 @@ export function communicationDriver(page) {
       assert(replans > 0, `Blocked travel leg: ${JSON.stringify(stuck)}`)
       return travelTo(target, tolerance, replans - 1)
     }
+    // The land grid may end on the last dry cell short of the reach; the final
+    // stretch is steered straight at the target. A block here is left to the
+    // caller's own check of what the traveller reached.
+    const end = await read(() => window.__game.getState().pos)
+    const gap = Math.hypot(target.x - end.x, target.z - end.z)
+    if (gap > tolerance) {
+      await travel({ x: target.x + (end.x - target.x) * tolerance * 0.8 / gap, z: target.z + (end.z - target.z) * tolerance * 0.8 / gap })
+    }
   }
   async function close() {
     // Escape is ignored while a journal input owns focus. Use the actual close
