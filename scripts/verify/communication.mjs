@@ -293,16 +293,19 @@ async function readings() {
   await journal(1)
   const readings = { UPSTREAM: 'against the current', DOWNSTREAM: 'with the current', ROCK: 'a rock', DIG: 'dig' }
   for (const [concept, reading] of Object.entries(readings)) {
-    const row = page.locator('.observation').filter({ has: page.locator('.utterance', { hasText: receipt.vocabulary[concept] }) })
+    const row = page.locator('.observation').filter({ has: page.locator('.utterance', { hasText: exactText(receipt.vocabulary[concept]) }) })
     await row.locator('input').fill(reading) // only notes the expedition actually heard exist here
   }
   await frame('04-saved-glossary', { element: '.observations', label: 'the live syllables saved with the player reading' })
   await d.close()
 }
+// Tonal words differ only in case; a string `hasText` ignores case and matches
+// substrings, so rows are matched exactly.
+const exactText = (text) => new RegExp(`^${text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`)
 async function edits() {
   await journal(1)
   const river = receipt.vocabulary.RIVER
-  const row = page.locator('.observation').filter({ has: page.locator('.utterance', { hasText: river }) })
+  const row = page.locator('.observation').filter({ has: page.locator('.utterance', { hasText: exactText(river) }) })
   await row.locator('input').fill('perhaps a path')
   await page.locator('.journal [role=tab]').first().click() // blur commits the draft
   await reopen('errand', '04-revised-paper')
