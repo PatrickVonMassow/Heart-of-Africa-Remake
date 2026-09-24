@@ -1438,6 +1438,17 @@ than giving up), and the chase's side of it in
 `src/scenes/place/tagGame.test.ts` (the group stays inside its off-centre
 ground, catches transfer the role, stamina ends pursuits and a complete progress
 window detects oscillation even when it crosses the old anchor radius).
+The tag round reads at a glance (point 1176): the catch shot
+`verification/1176-tag-catch.png` shows the catcher's reaching hand ON the
+caught child at the catch frame in a port at default zoom, and
+`verification/1176-tag-beat.png` the caught child standing out its beat with the
+catcher-that-was already away; the drawn hand pivots are read back and judged
+against the caught child's body, and the catcher's forward arms against the
+runners' (`scripts/verify/polish.mjs`, section `tag-catch`); the wordless catch
+cry plays under the voice volume and is silent at 0 on the WebGL 2 audio lane
+(`scripts/verify/voice.mjs`, section `tag-cry`); beat, gaze, grab window, hand
+reach, the single cry and its drop under a held floor are pinned in
+`src/scenes/place/tagGame.test.ts`.
 
 ## 16. Collision inside settlements.
 

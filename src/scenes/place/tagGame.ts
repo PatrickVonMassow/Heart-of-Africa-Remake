@@ -30,6 +30,18 @@
 // side of a fence panel, overlapping nothing.
 
 import { deflectedStep } from '../travel/wildlifeBehavior'
+import { FIGURE_LIMBS } from '../../render/figures'
+import {
+  armAim,
+  armDirection,
+  gestureBlendOf,
+  REST_POSE,
+  startGesture,
+  type ArmPose,
+  type ArmSide,
+  type FigurePose,
+  type GestureState,
+} from '../../render/gesture'
 import {
   createProducerWatch,
   devAssert,
@@ -134,6 +146,11 @@ export interface TagConfig extends StaminaProfile {
    * goats already do; this is the same easing.
    */
   turnRate: number
+  /** Seconds the freshly caught child stands before it gives chase (work-order
+   *  1176). Only the caught child pauses; it stays under `immunitySeconds`. */
+  caughtPauseSeconds: number
+  /** Largest trunk turn (rad) the chaser's gaze takes toward its quarry. */
+  gazeTurnMax: number
 }
 
 /** One child in the group. */
@@ -263,6 +280,15 @@ export interface TagState {
   /** The long-run alarm's watch over the play itself (point 589): how long the
    *  group has produced no catch and no fresh round. */
   play: ProducerWatch
+  /** Seconds left of the caught child's beat (work-order 1176): the CHASER
+   *  stands, arms dropped, while the child that caught it runs off. */
+  pauseFor: number
+  /** After the beat the chaser turns on the spot to its quarry before running;
+   *  true until its body faces the way it wants to go. */
+  turning: boolean
+  /** Children who made a catch since the scene last drained this: each owes one
+   *  wordless cry (work-order 1176). Never the caught child. */
+  cries: number[]
 }
 
 /** The settlement as the chase sees it. `blocked` answers for the STATIC set —
@@ -382,6 +408,9 @@ export function createTagGame(
     tags: 0,
     clock: 0,
     play: createProducerWatch(),
+    pauseFor: 0,
+    turning: false,
+    cries: [],
   }
 }
 
@@ -463,6 +492,8 @@ function startRound(s: TagState, cfg: TagConfig): void {
   s.chaserFor = 0
   s.gapTrend = 0
   s.lastGap = NaN
+  s.pauseFor = 0
+  s.turning = false
   s.playing = true
   // They are about to run: opening the round on a commanded pace of zero would
   // leave one frame in which a PLAYING child stands still — the very thing the
@@ -476,6 +507,8 @@ function startRound(s: TagState, cfg: TagConfig): void {
 /** Break the round off into ordinary idling for a while before starting again. */
 function breakOffRound(s: TagState, cfg: TagConfig): void {
   s.playing = false
+  s.pauseFor = 0
+  s.turning = false
   s.idleFor = cfg.idleSeconds
   s.chaser = -1
   s.target = -1
@@ -941,6 +974,12 @@ function advanceTagGame(
     s.immuneFor = Math.max(0, s.immuneFor - dt)
     if (s.immuneFor === 0) s.immune = -1
   }
+  // The caught child's beat runs on the round's clock; when it ends the child
+  // turns to its quarry on the spot before it runs (work-order 1176).
+  if (s.pauseFor > 0) {
+    s.pauseFor = Math.max(0, s.pauseFor - dt)
+    if (s.pauseFor === 0) s.turning = true
+  }
   if (s.chaserFor >= cfg.resolveCapSeconds) {
     breakOffRound(s, cfg)
     assertPlaced(s, cfg, world)
@@ -989,6 +1028,8 @@ function advanceTagGame(
     const occAt = occ && ((x: number, z: number) => occ(i, partner, x, z))
     let wants: boolean
     let desired: number
+    // The caught child standing out its beat, or turning to its quarry after it.
+    let standing = false
     if (isChaser) {
       wants =
         !!target &&
@@ -1018,6 +1059,23 @@ function advanceTagGame(
         // catch ring the turn opens a little further, so the circle drifts
         // outward instead of grinding along the body.
         desired = to + side * (Math.PI / 2 + (gap < cfg.catchDistance ? 0.35 : 0))
+      }
+      // THE CAUGHT CHILD STOPS FOR A BEAT (work-order 1176): standing where it
+      // was touched, then turning on the spot through the eased facing until
+      // it looks where it will run. No second timer: the turn ends on course.
+      // The turn opens in the beat's second half — measured, a whole turn left
+      // until after the beat held a cornered runner shuffling at the rim beside
+      // the standing chaser (0.25-0.34 % of judged time at two seeds, gate 0.25).
+      if (s.pauseFor > 0) {
+        standing = true
+        if (s.pauseFor <= cfg.caughtPauseSeconds / 2) c.heading = desired
+      } else if (s.turning) {
+        if (Math.abs(angleTo(c.facing, desired)) > ON_COURSE) {
+          standing = true
+          c.heading = desired
+        } else {
+          s.turning = false
+        }
       }
     } else {
       const gapToChaser = dist(c, chaser)
@@ -1082,13 +1140,17 @@ function advanceTagGame(
     // standing (measured at the user's seed, 3930 of 3931 commanded-still frames).
     const claim = isChaser ? null : (steer?.(i, s) ?? null)
     if (claim) desired = claim.heading
-    c.sprinting = wants
+    c.sprinting = wants && !standing
     c.press = pressState(c.press, c.reserve, cfg)
-    c.effort = chooseEffort(c.press, wants)
-    c.pace = claim
-      ? Math.max(0, claim.pace)
-      : Math.max(floor, effortPace(c.effort, c.reserve, cfg, isChaser ? 'chaser' : 'runner'))
-    c.held = !!claim && c.pace <= 0
+    c.effort = chooseEffort(c.press, c.sprinting)
+    c.pace = standing
+      ? 0
+      : claim
+        ? Math.max(0, claim.pace)
+        : Math.max(floor, effortPace(c.effort, c.reserve, cfg, isChaser ? 'chaser' : 'runner'))
+    // The beat is a commanded stillness like a claim's: the floor and the stall
+    // watch leave it alone and the legs settle to standing.
+    c.held = standing || (!!claim && c.pace <= 0)
     ageEdge(c, dt)
     // A commanded stillness moves nothing — and leaves `pinned` and `walked`
     // alone, so a standing child is never mistaken for one stuck on geometry and
@@ -1100,7 +1162,8 @@ function advanceTagGame(
     // The BODY turns at a rate toward where it is going. The travel heading may
     // jump — a deflection round a hut corner is a real change of direction — but
     // a body that snapped to it spun about-face inside a single frame.
-    c.facing = turnToward(c.facing, c.heading, cfg.turnRate * dt)
+    // Through the beat's first half the body stays as it was caught.
+    if (!(isChaser && s.pauseFor > cfg.caughtPauseSeconds / 2)) c.facing = turnToward(c.facing, c.heading, cfg.turnRate * dt)
     c.reserve = advanceReserve(c.reserve, c.pace, dt, cfg, c.drainScale, c.recoverScale)
     // The posture is a function of the PACE, not of the decision: it changes
     // continuously with the speed, so nothing snaps when a threshold is crossed.
@@ -1139,6 +1202,13 @@ function advanceTagGame(
       s.gapTrend = 0
       s.lastGap = NaN
       s.tags++
+      // Only the caught child stops; the catcher runs off at once, and it is
+      // the catcher who cries out (work-order 1176).
+      // Never longer than the tag-back window, whatever a debug edit sets: the
+      // head start of the catcher-that-was is pause plus immunity, one timer.
+      s.pauseFor = Math.max(0, Math.min(cfg.caughtPauseSeconds, cfg.immunitySeconds))
+      s.turning = false
+      if (s.cries.length < 4) s.cries.push(old)
       // The new chaser owes the freshly-tagged child a turn away before it
       // resumes — the same hysteresis that keeps the animals' dodge and guard
       // states from flapping.
@@ -1150,6 +1220,307 @@ function advanceTagGame(
   }
 
   assertPlaced(s, cfg, world)
+}
+
+// --- What the eye reads (work-order 1176) -----------------------------------
+// The round above is pure logic; nothing in it was DRAWN, so a player could not
+// tell which child was IT or when a catch happened. What follows decides the
+// bodies: the catcher's forward arms and gaze, the reaching hand of the grab,
+// the caught child's beat and the catcher's wordless cry. Still pure — the
+// scene writes the result onto the figures (`PlaceLife.tsx`).
+
+/** How a child's body reads in the tag round. */
+export type TagBody = 'chaser' | 'caught' | 'runner'
+
+/** The chaser holds its arms forward; the freshly caught child stands out its
+ *  beat with them dropped; everyone else runs as before. */
+export function tagBody(s: TagState, i: number): TagBody {
+  if (!s.playing || i !== s.chaser) return 'runner'
+  return s.pauseFor > 0 ? 'caught' : 'chaser'
+}
+
+/** Bearing (world, `atan2(dx, dz)`) from one child to another. */
+function bearingTo(a: { x: number; z: number }, b: { x: number; z: number }): number {
+  return Math.atan2(b.x - a.x, b.z - a.z)
+}
+
+/**
+ * The chaser's trunk turn toward its quarry, within `gazeTurnMax` of its
+ * facing, so the eye sees WHOM it is after before the hand goes up. Zero for
+ * every other child, and for the chaser while it stands out its beat.
+ */
+export function chaserGaze(s: TagState, cfg: TagConfig): number {
+  if (tagBody(s, s.chaser) !== 'chaser' || s.target < 0) return 0
+  const c = s.children[s.chaser]
+  const q = s.children[s.target]
+  if (!c || !q) return 0
+  const limit = Math.max(0, cfg.gazeTurnMax)
+  return Math.max(-limit, Math.min(limit, angleTo(c.facing, bearingTo(c, q))))
+}
+
+/** True while the chaser is free to run and its quarry is inside the commit
+ *  distance: the window the grab gesture is held in. */
+export function grabDue(s: TagState, cfg: TagConfig): boolean {
+  if (tagBody(s, s.chaser) !== 'chaser' || s.turning || s.target < 0) return false
+  const c = s.children[s.chaser]
+  const q = s.children[s.target]
+  return !!c && !!q && dist(c, q) <= cfg.commitDistance
+}
+
+/** Where on the quarry the grab aims, in its own body heights: the small of the
+ *  back, just above the hip, where the trunk is widest. Shape, not balance. */
+export const GRAB_HEIGHT = 0.46
+
+/** How far outside the reaching shoulder the trunk turn puts the quarry, in
+ *  shoulder half-separations, so the aim never crosses the chest and the arm
+ *  choice (`gestureArm`) cannot flicker between the two sides. */
+const GRAB_SIDE_OFFSET = 1.5
+
+/** A figure as the grab sees it: where it stands and which way its body faces. */
+export interface GrabFigure {
+  x: number
+  z: number
+  facing: number
+}
+
+/** The grab this frame: the reaching arm, the trunk turn and the arm's aim in
+ *  the turned trunk's frame (what `startGesture('touch', …)` takes). */
+export interface GrabAim {
+  side: ArmSide
+  turn: number
+  bearing: number
+  elevation: number
+}
+
+/** A point of the figure's own frame (unscaled body heights) carried into the
+ *  trunk's frame: the inverse of the trunk group's `rotation.set(lean, turn, 0)`
+ *  (three.js 'XYZ', so the matrix is Rx(lean)·Ry(turn)) about the hip pivot. */
+function intoTrunk(p: [number, number, number], lean: number, turn: number): [number, number, number] {
+  const y0 = p[1] - FIGURE_LIMBS.hipY
+  // Rx(-lean)
+  const cl = Math.cos(lean)
+  const sl = Math.sin(lean)
+  const y1 = y0 * cl + p[2] * sl
+  const z1 = -y0 * sl + p[2] * cl
+  // Ry(-turn)
+  const ct = Math.cos(turn)
+  const st = Math.sin(turn)
+  return [p[0] * ct - z1 * st, y1, p[0] * st + z1 * ct]
+}
+
+/** A point of the trunk's frame back into the figure's own frame. */
+function outOfTrunk(p: [number, number, number], lean: number, turn: number): [number, number, number] {
+  const ct = Math.cos(turn)
+  const st = Math.sin(turn)
+  const x1 = p[0] * ct + p[2] * st
+  const z1 = -p[0] * st + p[2] * ct
+  const cl = Math.cos(lean)
+  const sl = Math.sin(lean)
+  return [x1, p[1] * cl - z1 * sl + FIGURE_LIMBS.hipY, p[1] * sl + z1 * cl]
+}
+
+/** A world point into a figure's own frame, in its body heights. */
+function intoFigure(f: GrabFigure, scale: number, x: number, y: number, z: number): [number, number, number] {
+  const dx = x - f.x
+  const dz = z - f.z
+  const c = Math.cos(f.facing)
+  const s = Math.sin(f.facing)
+  // Ry(-facing): the figure's local +Z is the world direction (sin f, cos f).
+  return [(dx * c - dz * s) / scale, y / scale, (dx * s + dz * c) / scale]
+}
+
+/** The shoulder pivot of one side, in the trunk's frame. */
+function shoulderIn(side: ArmSide): [number, number, number] {
+  return [
+    (side === 'left' ? 1 : -1) * FIGURE_LIMBS.shoulderX,
+    FIGURE_LIMBS.shoulderY - FIGURE_LIMBS.hipY,
+    0,
+  ]
+}
+
+/**
+ * Aim the chaser's reaching hand at the quarry's back: solved through the SAME
+ * pivot chain the figure draws (hip-pivoted trunk with its lean and turn, then
+ * the shoulder), so the hand the player sees is the hand this aims. The arm
+ * points straight at the target point, which puts the hand as close to it as an
+ * arm of that length can — on it once the quarry is within reach, and INTO the
+ * body a little on the frame the gap closes past it.
+ *
+ * `prevSide` is the arm already reaching: it is kept while it can still aim
+ * without crossing the chest.
+ */
+export function grabAim(
+  chaser: GrabFigure,
+  quarry: { x: number; z: number },
+  lean: number,
+  scale: number,
+  gazeTurnMax: number,
+  prevSide: ArmSide | null = null,
+): GrabAim {
+  const toQuarry = angleTo(chaser.facing, bearingTo(chaser, quarry))
+  const flat = Math.max(1e-6, Math.hypot(quarry.x - chaser.x, quarry.z - chaser.z))
+  const side: ArmSide = prevSide ?? (toQuarry >= 0 ? 'left' : 'right')
+  const target = intoFigure(chaser, scale, quarry.x, GRAB_HEIGHT * scale, quarry.z)
+  const limit = Math.max(0, gazeTurnMax)
+  const aimFrom = (arm: ArmSide): GrabAim => {
+    const sign = arm === 'left' ? 1 : -1
+    const offset = Math.asin(Math.min(1, (GRAB_SIDE_OFFSET * FIGURE_LIMBS.shoulderX * scale) / flat))
+    const turn = Math.max(-limit, Math.min(limit, toQuarry - sign * offset))
+    const t = intoTrunk(target, lean, turn)
+    const sh = shoulderIn(arm)
+    const w = [t[0] - sh[0], t[1] - sh[1], t[2] - sh[2]]
+    return {
+      side: arm,
+      turn,
+      bearing: Math.atan2(w[0], w[2]),
+      elevation: Math.atan2(w[1], Math.hypot(w[0], w[2]) || 1e-6),
+    }
+  }
+  const fits = (a: GrabAim) => (a.side === 'left' ? Math.sin(a.bearing) >= 0 : Math.sin(a.bearing) < 0)
+  const first = aimFrom(side)
+  if (fits(first)) return first
+  const other = aimFrom(side === 'left' ? 'right' : 'left')
+  if (fits(other)) return other
+  // Neither arm can reach it without crossing the chest (the gaze limit is
+  // spent): keep the arm, aimed as far inward as its own side allows.
+  return { ...first, bearing: (side === 'left' ? 1 : -1) * 1e-3 }
+}
+
+/**
+ * Where the drawn hand of `side` stands in the world for a pose — the figure's
+ * own chain, for the tests and the dev read-back. `lift` is the body's height
+ * above the ground it stands on.
+ */
+export function grabHandWorld(
+  f: GrabFigure,
+  arm: ArmPose,
+  side: ArmSide,
+  lean: number,
+  turn: number,
+  scale: number,
+  lift = 0,
+): [number, number, number] {
+  const d = armDirection(arm)
+  const sh = shoulderIn(side)
+  const hand = outOfTrunk(
+    [sh[0] + d[0] * FIGURE_LIMBS.armLength, sh[1] + d[1] * FIGURE_LIMBS.armLength, sh[2] + d[2] * FIGURE_LIMBS.armLength],
+    lean,
+    turn,
+  )
+  const c = Math.cos(f.facing)
+  const s = Math.sin(f.facing)
+  // Ry(facing), then the figure's scale and place.
+  return [
+    f.x + scale * (hand[0] * c + hand[2] * s),
+    lift + scale * hand[1],
+    f.z + scale * (-hand[0] * s + hand[2] * c),
+  ]
+}
+
+/** The drawn trunk's radius at a height above the feet, for a figure WITH legs:
+ *  the tunic cone from the hip to the crown (see `Figure` in `PlaceLife.tsx`). */
+export function trunkRadiusAt(height: number, scale: number): number {
+  const L = FIGURE_LIMBS
+  const trunkH = 1 - L.hipY
+  const base = L.bodyRadius * trunkH
+  const y = height / scale - L.hipY
+  if (y < 0 || y > trunkH) return 0
+  return scale * base * (1 - y / trunkH)
+}
+
+/** How far a hand's surface stands off a child's drawn body: negative when it
+ *  rests on or in it. Judged horizontally at the hand's own height. */
+export function handGapToBody(
+  hand: [number, number, number],
+  body: { x: number; z: number },
+  scale: number,
+  groundY = 0,
+): number {
+  const axis = Math.hypot(hand[0] - body.x, hand[2] - body.z)
+  return axis - trunkRadiusAt(hand[1] - groundY, scale) - FIGURE_LIMBS.handRadius * scale
+}
+
+/**
+ * The grab gesture steered for one frame: begun at its pose (the touch kind
+ * has no fade-in), re-aimed and kept alive while `aim` is given, and let go the
+ * moment it is not — the fade-out starts THIS frame, so a near miss reads as a
+ * miss. A gesture of any other kind is left alone.
+ */
+export function steerGrab(g: GestureState, aim: { bearing: number; elevation: number } | null): GestureState {
+  if (aim) {
+    if (g.kind !== 'touch') return startGesture('touch', { bearing: aim.bearing, elevation: aim.elevation, duration: GRAB_HOLD_AHEAD })
+    return {
+      ...g,
+      bearing: aim.bearing,
+      elevation: aim.elevation,
+      duration: Math.max(g.duration, g.t + GRAB_HOLD_AHEAD),
+    }
+  }
+  if (g.kind !== 'touch') return g
+  return { ...g, duration: Math.min(g.duration, g.t + gestureBlendOf('touch')) }
+}
+
+/** Seconds a held grab is kept ahead of its own clock: renewed every frame
+ *  while it is due, so it only runs out if nobody steers it any more. */
+const GRAB_HOLD_AHEAD = 1
+
+/**
+ * The arms, lean and turn a tag child is drawn with. The runners keep exactly
+ * what they had (the gesture's arms, the run's lean). The CHASER's arms rest
+ * forward instead of at its sides — a grabbing posture, blended under whatever
+ * gesture is playing so the grab grows out of it and fades back into it. The
+ * caught child's arms hang through its beat, and its lean eases upright with
+ * its pace. A reaching hand leans the body by the touch's own lean, not on top
+ * of the run's — the stronger of the two.
+ */
+export function tagFigurePose(
+  body: TagBody,
+  shown: FigurePose,
+  envelope: number,
+  runLean: number,
+  turn: number,
+): FigurePose {
+  const lean = Math.max(runLean, shown.lean)
+  if (body !== 'chaser') return { left: shown.left, right: shown.right, lean, turn }
+  const keep = 1 - Math.max(0, Math.min(1, envelope))
+  const under = (arm: ArmPose, rest: ArmPose, forward: ArmPose): ArmPose => ({
+    pitch: arm.pitch + (forward.pitch - rest.pitch) * keep,
+    yaw: arm.yaw + (forward.yaw - rest.yaw) * keep,
+    roll: arm.roll + (forward.roll - rest.roll) * keep,
+  })
+  return {
+    left: under(shown.left, REST_POSE.left, CHASER_ARMS.left),
+    right: under(shown.right, REST_POSE.right, CHASER_ARMS.right),
+    lean,
+    turn,
+  }
+}
+
+/**
+ * The catcher's arms: both held out in front, hands at chest height and turned
+ * a little inward toward each other. The figure's arm is one straight limb, so
+ * "elbows bent" is carried by the inward turn rather than a joint. Shape, not
+ * balance: it is a posture, and `figures.test.ts` style clearance holds because
+ * both arms stand well off the cone.
+ */
+export const CHASER_ARMS: Readonly<{ left: ArmPose; right: ArmPose }> = Object.freeze({
+  left: armAim(-0.2, -0.18),
+  right: armAim(0.2, -0.18),
+})
+
+/**
+ * The wordless cries due this frame (work-order 1176): each catch owes one to
+ * the child that MADE it. A cry that would fall while an exchange holds the
+ * floor within earshot of it is DROPPED, not deferred — a cry is not a message.
+ * Drains the queue either way.
+ */
+export function takeCries(s: TagState, floorHeld: (child: TagChild) => boolean): number[] {
+  const due = s.cries.filter((i) => {
+    const c = s.children[i]
+    return !!c && !floorHeld(c)
+  })
+  s.cries.length = 0
+  return due
 }
 
 /**

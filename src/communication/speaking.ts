@@ -276,3 +276,56 @@ export function hearPhrase(
 ): CommunicationMemory {
   return isWithinHearing(distance, radius) ? observePhrase(memory, phrase, day) : memory
 }
+
+/**
+ * A WORDLESS CRY (work-order 1176): the tag catcher's one short "ha!" at the
+ * catch. Deliberately NOT a plan of syllables — it carries no tone of the lect,
+ * no utterance and nothing the hearing memory or the overhead label could read,
+ * so there is no concept in it to learn. It shares only what every voice
+ * shares: the child register, the camera-relative pan, the distance fall-off
+ * and the §21 volume (and, where it is played, the speech bus).
+ */
+export interface CryPlan {
+  /** Envelope peak (pre-bus), already distance- and volume-scaled; > 0. */
+  peak: number
+  pan: number
+  /** Seconds the cry sounds. */
+  duration: number
+  /** Factor on the child carrier: the per-cry variation. */
+  pitch: number
+  voice: SpeechVoice
+}
+
+/**
+ * The cry heard `distance` away, or null when nothing would be heard (out of
+ * reach, muted or a zero level). `roll` in [0, 1) picks this cry's pitch within
+ * ±`pitchSpread`, so a group of children never sounds like one sample.
+ */
+export function cryPlan(
+  distance: number,
+  options: {
+    bearing?: number
+    reach: number
+    gain: number
+    seconds: number
+    pitchSpread: number
+    roll: number
+    falloff?: number
+    volume?: number
+  },
+): CryPlan | null {
+  const falloff = options.falloff ?? balance.communication.talk.falloff
+  const volume = Math.max(0, options.volume ?? balance.ambienceVolume)
+  const level = hearingGain(distance, options.reach, falloff) * volume * Math.max(0, options.gain)
+  const duration = Math.max(0, options.seconds)
+  if (!(level > 0) || !(duration > 0)) return null
+  const spread = Math.max(0, options.pitchSpread)
+  const roll = Math.max(0, Math.min(1, options.roll))
+  return {
+    peak: SPEECH_PEAK * level,
+    pan: speechPan(options.bearing ?? 0),
+    duration,
+    pitch: 1 + (roll * 2 - 1) * spread,
+    voice: 'child',
+  }
+}

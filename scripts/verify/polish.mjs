@@ -3530,6 +3530,174 @@ if (section('children-tag')) {
   await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
 }
 
+// --- The game of tag reads at a glance (work-order 1176) ----------------------
+// In a PORT at the default zoom: the catch frame itself, held by the dev
+// shutter, with the catcher's reaching hand ON the caught child — judged off
+// the DRAWN hand pivots against the caught child's drawn trunk, never assumed —
+// and a frame late in the caught child's beat with the catcher-that-was already
+// away from it. The catcher's forward arms are read off the same pivots, set
+// against a runner's hanging ones.
+if (section('tag-catch')) {
+  await goToPlace('cairo')
+  const live = await page
+    .waitForFunction(() => window.__game.getState().placeId === 'cairo' && !!window.__placeTag && !!window.__placeHoldCatch, null, { timeout: 40000 })
+    .then(() => true)
+    .catch(() => false)
+  check('the port children publish their live game of tag and the catch shutter', live)
+  if (live) {
+    const played = await page
+      .waitForFunction(() => window.__placeTag().playing && window.__placeTag().chaser >= 0, null, { timeout: 60000 })
+      .then(() => true)
+      .catch(() => false)
+    check('a round of tag is in play in the port', played)
+
+    // THE CATCHER'S ARMS, read off the hand pivots. A frame in which the chaser
+    // chases WITHOUT a grab playing (outside the commit distance) is waited for
+    // and read in the same page call as the round, so both describe one frame.
+    const arms = await page
+      .waitForFunction(() => {
+        const t = window.__placeTag()
+        if (!t.playing || t.chaser < 0) return null
+        const c = t.children[t.chaser]
+        if (c.body !== 'chaser' || (c.gesture && c.gesture.kind)) return null
+        const runner = t.children.findIndex((k, i) => i !== t.chaser && k.body === 'runner' && !(k.gesture && k.gesture.kind))
+        if (runner < 0) return null
+        return { chaser: window.__placeTagHands(t.chaser), runner: window.__placeTagHands(runner) }
+      }, null, { timeout: 60000, polling: 'raf' })
+      .then((h) => h.jsonValue())
+      .catch(() => null)
+    // Body heights, in the child's own frame: +z forward, +y up. A hanging arm
+    // ends near z 0 (a run's lean carries it a little forward); the catcher's
+    // hands stand out in front at chest height.
+    const forward = (h) => h.local.z > 0.25 && h.local.y > 0.4 && h.local.y < 0.8
+    check(
+      "the catcher's two hands are held forward at chest height, read off the drawn pivots",
+      !!arms && arms.chaser?.length === 2 && arms.chaser.every(forward),
+      arms ? JSON.stringify(arms.chaser?.map((h) => h.local)) : 'no chasing frame without a grab',
+    )
+    check(
+      "while a runner's hands hang at its sides",
+      !!arms && arms.runner?.length === 2 && arms.runner.every((h) => h.local.z < 0.15),
+      arms ? JSON.stringify(arms.runner?.map((h) => h.local)) : 'no runner frame',
+    )
+
+    // Side-on to the pair, a few metres off, on a line the rendered scene
+    // leaves clear to the subject — both sides tried, the nearer range first.
+    // Each candidate is stood on, DRAWN, and only then ray-probed: the camera
+    // follows the player pose in the next frame, not in the call that sets it.
+    const standBeside = async (from, to, subject) => {
+      for (const back of [3.2, 4.2, 2.6]) {
+        for (const side of [1, -1]) {
+          const placed = await page.evaluate(
+            ({ from, to, back, side, subject }) => {
+              const p = window.__placePlayer
+              const L = window.__placeLayout
+              if (!p) return false
+              const ux = to.x - from.x
+              const uz = to.z - from.z
+              const n = Math.hypot(ux, uz) || 1
+              const mx = (from.x + to.x) / 2
+              const mz = (from.z + to.z) / 2
+              const x = mx + ((side * uz) / n) * back
+              const z = mz + ((-side * ux) / n) * back
+              if (Math.hypot(x, z) > (L ? L.radius : 28) - 1.5) return false
+              p.x = x
+              p.z = z
+              // Aimed at the SUBJECT, not the pair's middle: the pair may have
+              // run apart. Place-camera yaw 0 looks toward −Z, hence the +PI.
+              p.yaw = Math.atan2(subject.x - x, subject.z - z) + Math.PI
+              p.pitch = -0.28
+              return true
+            },
+            { from, to, back, side, subject },
+          )
+          if (!placed) continue
+          await nextFrames(3)
+          // Collision may have moved the drawn camera off the requested spot: re-aim
+          // from where it really stands, pitch included, and refuse a spot so close
+          // that the subject falls off the bottom edge.
+          const aimed = await page.evaluate((q) => {
+            const p = window.__placePlayer
+            const probe = window.__placeRayHit?.(q.x, 0.3, q.z)
+            if (!p || !probe) return false
+            const h = Math.hypot(q.x - p.x, q.z - p.z)
+            if (h < 2) return false
+            const dy = Math.sqrt(Math.max(0, probe.targetDistance ** 2 - h ** 2))
+            p.yaw = Math.atan2(q.x - p.x, q.z - p.z) + Math.PI
+            p.pitch = -Math.atan2(dy + 0.3 - 0.35, h)
+            return true
+          }, subject)
+          if (!aimed) continue
+          await nextFrames(3)
+          const hit = await page.evaluate((q) => window.__placeRayHit?.(q.x, 0.3, q.z) ?? null, subject)
+          if (hit && (hit.hitDistance == null || hit.hitDistance >= hit.targetDistance * 0.9)) return { back, side, hit }
+        }
+      }
+      return null
+    }
+
+    // THE CATCH FRAME, held by the shutter the moment the hand lands.
+    await page.evaluate(() => window.__placeHoldCatch('catch'))
+    const shot = await page
+      .waitForFunction(() => {
+        const t = window.__placeTag()
+        return t.catchHeld && t.catchShot ? t.catchShot : null
+      }, null, { timeout: 120000 })
+      .then((h) => h.jsonValue())
+      .catch(() => null)
+    check('a catch is held at its own frame', !!shot)
+    if (shot) {
+      check(
+        "at the catch frame the catcher's drawn hand is ON the caught child (within one child hand radius of its body)",
+        shot.gap <= shot.handRadius,
+        `${shot.hand} ${(shot.gap * 100).toFixed(1)} cm off the trunk (hand radius ${(shot.handRadius * 100).toFixed(1)} cm), catcher ${shot.catcher} → caught ${shot.caught}`,
+      )
+      await nextFrames(2)
+      const stood = await standBeside(shot.catcherAt, shot.caughtAt, shot.caughtAt)
+      check('a clear side-on standpoint on the catch', !!stood, stood ? `${stood.back} m` : 'every standpoint occluded')
+      if (stood) {
+        await frame('1176-tag-catch', {
+          local: { x: shot.caughtAt.x, y: 0.35, z: shot.caughtAt.z },
+          label: "the catch frame: the catcher's reaching hand on the caught child, in the port at default zoom",
+        })
+      }
+    }
+    await page.evaluate(() => window.__placeHoldCatch(null))
+
+    // THE BEAT: a frame late in the caught child's stand, the runner away.
+    await page.evaluate(() => window.__placeHoldCatch('beat'))
+    const beat = await page
+      .waitForFunction(() => {
+        const t = window.__placeTag()
+        return t.catchHeld && t.beatShot ? t.beatShot : null
+      }, null, { timeout: 120000 })
+      .then((h) => h.jsonValue())
+      .catch(() => null)
+    check('a frame late in the caught child\'s beat is held', !!beat)
+    if (beat) {
+      const catchRing = await page.evaluate(() => window.__balance.villageLife.tag.catchDistance)
+      check(
+        'through its beat the caught child stands (no pace, arms dropped) while the catcher-that-was is already away',
+        // Away = outside the catch ring and moving. No margin beyond the ring: a
+        // catcher-that-was with a spent reserve leaves at its recovery pace, which
+        // is the landed stamina model, not a runner that stays.
+        beat.body === 'caught' && beat.caughtPace === 0 && beat.apart != null && beat.apart > catchRing && (beat.runnerPace ?? 0) > 0,
+        JSON.stringify(beat),
+      )
+      await nextFrames(2)
+      const stood = await standBeside(beat.caughtAt, beat.runnerAt ?? beat.caughtAt, beat.caughtAt)
+      check('a clear side-on standpoint on the beat', !!stood, stood ? `${stood.back} m` : 'every standpoint occluded')
+      if (stood) {
+        await frame('1176-tag-beat', {
+          local: { x: beat.caughtAt.x, y: 0.35, z: beat.caughtAt.z },
+          label: 'the caught child standing out its beat, the catcher-that-was already running off',
+        })
+      }
+    }
+    await page.evaluate(() => window.__placeHoldCatch(null))
+  }
+}
+
 // --- How the children MOVE (work-order 648) ----------------------------------
 // The user reported three things from one state in the Bambara village: a child
 // hangs briefly, a child jitters on the spot, two children clip through each

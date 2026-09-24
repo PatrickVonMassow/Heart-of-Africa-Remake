@@ -48,6 +48,16 @@ export class SpeechFloor {
     return player.active && isWithinHearing(Math.hypot(source.x - player.x, source.z - player.z), voiceRegister(source.register).reach)
   }
 
+  /** Whether an exchange the player can hear is speaking or showing its
+   *  consequence right now, with `source` in earshot too — the moment a sound
+   *  that is not a word (the tag catcher's cry, work-order 1176) must not fall
+   *  into. A question only: it reserves nothing and queues nothing. */
+  holdsFloor(source: FloorSource): boolean {
+    if (!this.audible(source)) return false
+    const now = this.now()
+    return [...this.situations.values()].some((s) => now < s.next && s.sources().some((p) => this.audible(p)))
+  }
+
   waiting(situation: object): boolean {
     return (this.held.get(situation)?.size ?? 0) > 0
   }

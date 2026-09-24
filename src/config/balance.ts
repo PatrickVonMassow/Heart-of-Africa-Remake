@@ -754,6 +754,17 @@ export interface BalanceConfig {
       leanAtSprint: number
       /** How fast the drawn body may turn, in rad/s. */
       turnRate: number
+      /** Seconds the freshly caught child stands before it chases (work-order
+       *  1176); never longer than `immunitySeconds`. */
+      caughtPauseSeconds: number
+      /** Largest trunk turn (rad) the chaser's gaze takes toward its quarry. */
+      gazeTurnMax: number
+      /** The catcher's wordless cry: length (s), per-cry pitch spread (±
+       *  fraction), reach (m) and level (a factor on the voice peak). */
+      crySeconds: number
+      cryPitchSpread: number
+      cryReach: number
+      cryGain: number
       /** Radius of the children's play ground — how far from its middle they
        *  may roam. It is what keeps them a GROUP the player can stand among
        *  (point 481/478), not a scatter across the whole settlement. */
@@ -763,6 +774,9 @@ export interface BalanceConfig {
      *  cycle, the stage's own distances and the berth they give the traveller.
      *  The paces, the stamina and the steering are the tag game's above. */
     bankGame: {
+      /** The bank round's own catch ring (m): it overrides the tag round's,
+       *  which shrank to a hand's reach in work-order 1176. */
+      catchDistance: number
       /** How long the group roams its own quarter between two cycles. */
       roamSeconds: number
       /** Per-cycle spread of that length, 0..1 (0 = a metronome). */
@@ -1394,7 +1408,12 @@ export const balance: BalanceConfig = {
       pressureDistance: 11,
       chaseReach: 14,
       commitDistance: 2,
-      catchDistance: 0.8,
+      // Work-order 1176: the catch is a reaching hand ON the quarry, so the ring
+      // is the reach of a child's leaning arm (0.24 m arm, 0.5 rad lean) plus the
+      // quarry's trunk and one hand — measured through the drawn chain, the hand
+      // touches up to 0.45 m and stands 7 cm off at 0.5. It was 0.8, a touch the
+      // arm could never make. Calibratable.
+      catchDistance: 0.45,
       targetSwitchMargin: 1.5,
       immunitySeconds: 1.4,
       resolveCapSeconds: 45, // BACKSTOP per chaser tenure, not the mechanism
@@ -1420,6 +1439,17 @@ export const balance: BalanceConfig = {
       // ~3.6 rad/s: a body turns a half circle in about a second — quick enough
       // for a chase to read as agile, slow enough that no figure snaps about-face.
       turnRate: 3.6,
+      // Work-order 1176, calibratable estimates. The caught child's beat of
+      // frustration; the tag-back window (1.4 s) covers it plus a first step.
+      caughtPauseSeconds: 0.7,
+      // The chaser looks at its quarry within a modest trunk turn.
+      gazeTurnMax: 0.6,
+      // One wordless child cry on the catch: a short "ha!", varied a little per
+      // cry, heard as far as the talk register carries (10 m).
+      crySeconds: 0.22,
+      cryPitchSpread: 0.08,
+      cryReach: 10,
+      cryGain: 0.8,
       // A ground 20 m across: room for a chase to breathe, small enough that the
       // group stays one group a player can stand among and hear (point 481).
       playRadius: 10,
@@ -1432,6 +1462,9 @@ export const balance: BalanceConfig = {
     // backstop generous enough that it is the condition — not the clock — that
     // normally ends it.
     bankGame: {
+      // The pre-1176 ring, kept for the bank round: its catch has no reaching
+      // hand and its landed pictures must not change. Calibratable.
+      catchDistance: 0.8,
       roamSeconds: 55,
       roamSpread: 0.25,
       // Calibratable backstops: allow a full-stretch walk plus a hut detour.

@@ -8,7 +8,7 @@ import { balance } from '../config/balance'
 import { devAssert } from './devAssert'
 import { MIX_LIMITER_DOMAIN, mixLimiterCurve, readCurveTable } from './mixLimiter'
 import type { Tone } from '../communication/lexicon'
-import { hearingGain, speechPan, phrasePlan, utterancePlan, type SpeechPlan, type SpeechVoice, type SpeechOptions } from '../communication/speaking'
+import { hearingGain, speechPan, phrasePlan, utterancePlan, type CryPlan, type SpeechPlan, type SpeechVoice, type SpeechOptions } from '../communication/speaking'
 import type { DrumId, DrumMessagePlan } from '../communication/drumMessage'
 
 export interface AmbienceScene {
@@ -984,24 +984,66 @@ const speechProbe =
     : null
 
 /**
+ * A syllable's FORM. `ba` is the lect's syllable: the plosive onset of a `b` (a
+ * hard release, the dip of the closure opening, formants rising into the vowel)
+ * and a small pitch fall. `ha` is the WORDLESS cry of work-order 1176: the same
+ * voice and vowel, but breathed in with no plosive and no formant transition,
+ * on a pitch that leaps up and falls away — a whoop, never a tone of the lect.
+ */
+export type SyllableForm = 'ba' | 'ha'
+
+/** The `ha` cry's pitch contour, as factors on its carrier: it rises to its
+ *  top a third of the way in and falls below its start by the end. Shape. */
+const CRY_CONTOUR = { rise: 1.14, at: 0.33, fall: 0.86 }
+/** Where the cry sits against the child's HIGH tone: above it, so the one
+ *  wordless sound cannot be heard as a `BA` of the lect. Shape. */
+const CRY_LIFT = 1.18
+/** The breathed onset of the `h`: soft, not the burst of a `b`. Shape. */
+const CRY_ATTACK_SECONDS = 0.025
+
+/**
  * One spoken syllable `ba`: the voiced carrier of its tone through the vowel's
  * resonators, with the plosive onset of a `b` — a hard release transient, the
  * short dip of the closure opening, then the vowel body. Exported so the
  * offline spectrum check (ambience.speech.test.ts) renders the REAL chain.
+ *
+ * With `form` `ha` it is the tag catcher's wordless cry instead (work-order
+ * 1176): `tone` is ignored, the carrier sits above the high tone by `CRY_LIFT`
+ * times the per-cry `pitch`, and the onset is breathed.
  */
-export function speakSyllable(ac: AudioContext, dest: AudioNode, t0: number, tone: Tone, dur: number, peak: number, voice: SpeechVoice = 'adult') {
-  const carrier = syllableCarrier(tone, voice)
+export function speakSyllable(
+  ac: AudioContext,
+  dest: AudioNode,
+  t0: number,
+  tone: Tone,
+  dur: number,
+  peak: number,
+  voice: SpeechVoice = 'adult',
+  form: SyllableForm = 'ba',
+  pitch = 1,
+) {
+  const cry = form === 'ha'
+  const carrier = cry ? syllableCarrier('high', voice) * CRY_LIFT * Math.max(0.1, pitch) : syllableCarrier(tone, voice)
   const osc = ac.createOscillator()
   osc.type = 'sawtooth'
   osc.frequency.setValueAtTime(carrier, t0)
-  osc.frequency.linearRampToValueAtTime(carrier * SPEECH_PITCH_FALL, t0 + dur)
+  if (cry) {
+    osc.frequency.linearRampToValueAtTime(carrier * CRY_CONTOUR.rise, t0 + dur * CRY_CONTOUR.at)
+    osc.frequency.linearRampToValueAtTime(carrier * CRY_CONTOUR.fall, t0 + dur)
+  } else {
+    osc.frequency.linearRampToValueAtTime(carrier * SPEECH_PITCH_FALL, t0 + dur)
+  }
   const onset = Math.min(VOWEL_ONSET_SECONDS, dur * 0.3)
   let node: AudioNode = osc
   for (const f of VOWEL_A) {
     const bq = ac.createBiquadFilter()
     bq.type = 'peaking'
-    bq.frequency.setValueAtTime(f.hz * f.onset, t0)
-    bq.frequency.linearRampToValueAtTime(f.hz, t0 + onset) // the `b` transition
+    if (cry) {
+      bq.frequency.setValueAtTime(f.hz, t0) // an open `a` from the first instant
+    } else {
+      bq.frequency.setValueAtTime(f.hz * f.onset, t0)
+      bq.frequency.linearRampToValueAtTime(f.hz, t0 + onset) // the `b` transition
+    }
     bq.Q.value = f.q
     bq.gain.value = f.gainDb
     node.connect(bq)
@@ -1013,18 +1055,59 @@ export function speakSyllable(ac: AudioContext, dest: AudioNode, t0: number, ton
   tilt.Q.value = 0.7
   node.connect(tilt)
   const g = ac.createGain()
-  const attack = Math.min(0.002, dur * 0.05)
-  const body = Math.min(dur * 0.5, onset + 0.05)
   g.gain.setValueAtTime(0.0001, t0)
-  g.gain.linearRampToValueAtTime(peak, t0 + attack) // the burst of the `b`
-  g.gain.linearRampToValueAtTime(peak * 0.55, t0 + onset) // …and the dip behind it
-  g.gain.linearRampToValueAtTime(peak * 0.95, t0 + body) // the vowel swells
+  if (cry) {
+    const attack = Math.min(CRY_ATTACK_SECONDS, dur * 0.3)
+    g.gain.linearRampToValueAtTime(peak, t0 + attack) // breathed in, no burst
+    g.gain.linearRampToValueAtTime(peak * 0.9, t0 + dur * 0.5)
+  } else {
+    const attack = Math.min(0.002, dur * 0.05)
+    const body = Math.min(dur * 0.5, onset + 0.05)
+    g.gain.linearRampToValueAtTime(peak, t0 + attack) // the burst of the `b`
+    g.gain.linearRampToValueAtTime(peak * 0.55, t0 + onset) // …and the dip behind it
+    g.gain.linearRampToValueAtTime(peak * 0.95, t0 + body) // the vowel swells
+  }
   g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur)
   tilt.connect(g)
   g.connect(dest)
   osc.start(t0)
   osc.stop(t0 + dur + 0.05)
   return osc
+}
+
+/** Dev/verify probe: proves a catch cry really SCHEDULED audio, and at what
+ *  level it left the graph (0 with the speech volume at zero). */
+const cryProbe =
+  import.meta.env.DEV && typeof window !== 'undefined'
+    ? ((window as unknown as { __tagCry?: { cries: number; scheduled: number; lastPeak: number; lastLeaving: number } }).__tagCry ??= {
+        cries: 0,
+        scheduled: 0,
+        lastPeak: 0,
+        lastLeaving: 0,
+      })
+    : null
+
+/**
+ * The tag catcher's wordless cry (work-order 1176): one `ha` in the child
+ * register through the SPEECH bus — so it obeys the voice volume the settlement
+ * voices obey, and the §21 volume already sits in the plan's peak. Nothing is
+ * heard, recorded or shown: this is sound only.
+ */
+export function playTagCry(plan: CryPlan | null): void {
+  if (!plan) return
+  if (cryProbe) cryProbe.cries++
+  if (!ctx || !master) return
+  const ac = ctx
+  const dest = speechBus ?? master
+  const route = speechRoute(ac, dest, plan.pan)
+  const osc = speakSyllable(ac, route.input, ac.currentTime, 'high', plan.duration, Math.max(0.0001, plan.peak), plan.voice, 'ha', plan.pitch)
+  osc.onended = route.dispose
+  if (cryProbe) {
+    const chain = speechBus ? speechBus.gain.value * master.gain.value : master.gain.value
+    cryProbe.scheduled++
+    cryProbe.lastPeak = plan.peak
+    cryProbe.lastLeaving = throughDeployedLimiter(plan.peak * chain * route.monoGain)
+  }
 }
 
 /** One route per utterance. The equal-power panner is compensated to keep
@@ -1296,5 +1379,6 @@ if (import.meta.env.DEV && typeof window !== 'undefined') {
     output: () => limiterOut ?? master,
     speakPhrase: (phrase: string[], distance: number) => playSpeech(phrasePlan(phrase, distance)),
     speechProbe: () => ({ ...(speechProbe ?? { spoken: 0, syllables: 0, lastPeak: 0 }) }),
+    cryProbe: () => ({ ...(cryProbe ?? { cries: 0, scheduled: 0, lastPeak: 0, lastLeaving: 0 }) }),
   }
 }

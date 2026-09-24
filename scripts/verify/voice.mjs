@@ -386,6 +386,73 @@ if (section('village-stereo')) {
     JSON.stringify(measured))
 }
 
+// The tag catcher's wordless cry (work-order 1176), on the audio lane: it plays
+// at a catch under the voice volume, and it leaves the graph silent with that
+// volume at 0. The traveller stands among the children so every catch falls
+// inside the cry's reach; a catch whose cry is dropped because an exchange holds
+// the floor is simply waited past.
+if (section('tag-cry')) {
+  await firstGesture()
+  await page.evaluate(async () => {
+    const a = window.__ambience
+    a.start()
+    await a.context()?.resume()
+    const g = window.__game.getState()
+    if (g.placeId !== 'cairo') {
+      if (g.placeId) g.leavePlace()
+      g.enterPlace('cairo')
+    }
+    g.setJournalOpen(false)
+  })
+  const live = await page
+    .waitForFunction(() => window.__game.getState().placeId === 'cairo' && !!window.__placeTag && !!window.__placePlayer, null, { timeout: 60000 })
+    .then(() => true)
+    .catch(() => false)
+  check('the port children publish their live game of tag', live)
+  const cryAtCatch = async (label) => {
+    const before = await page.evaluate(() => ({ ...window.__ambience.cryProbe(), tags: window.__placeTag().tags }))
+    // Stand among the group, re-taken as it runs, until a cry is scheduled.
+    const heard = await page
+      .waitForFunction(
+        (was) => {
+          const t = window.__placeTag()
+          const p = window.__placePlayer
+          if (t.children.length && p) {
+            p.x = t.children.reduce((s, c) => s + c.x, 0) / t.children.length + 0.8
+            p.z = t.children.reduce((s, c) => s + c.z, 0) / t.children.length
+          }
+          const probe = window.__ambience.cryProbe()
+          return probe.scheduled > was.scheduled ? { ...probe, tags: t.tags } : null
+        },
+        before,
+        { timeout: 150000, polling: 'raf' },
+      )
+      .then((h) => h.jsonValue())
+      .catch(() => null)
+    check(`a catch schedules one wordless cry (${label})`, !!heard && heard.tags > before.tags, JSON.stringify({ before, heard }))
+    return heard
+  }
+  if (live) {
+    const loud = await cryAtCatch('voice volume on')
+    check(
+      'the cry leaves the graph at a positive level under the voice volume',
+      !!loud && loud.lastPeak > 0 && loud.lastLeaving > 0,
+      JSON.stringify(loud),
+    )
+    const held = await page.evaluate(() => window.__balance.communication.speechVolume)
+    await page.evaluate(() => {
+      window.__balance.communication.speechVolume = 0
+      window.__ambience.refresh()
+    })
+    const quiet = await cryAtCatch('voice volume 0')
+    check('with the voice volume at 0 the cry is silent', !!quiet && quiet.lastLeaving === 0, JSON.stringify(quiet))
+    await page.evaluate((v) => {
+      window.__balance.communication.speechVolume = v
+      window.__ambience.refresh()
+    }, held)
+  }
+}
+
 // A selected section that never executed is a FAILURE, not a quiet pass: it is
 // the one way a --section run could report green having verified nothing.
 const unrun = sections.unrun()

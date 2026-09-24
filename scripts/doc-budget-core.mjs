@@ -448,7 +448,11 @@ export const DOC_BUDGETS = [
     // 1170): every slot is a button, an item that cannot act says why in a toast
     // rather than the journal, and the toast outranks every panel — a new rule,
     // not a longer telling of the click behaviour that stood there.
-    maxWords: 29476,
+    // RAISED by the 90 measured words of the two tag sentences work-order 1176
+    // owes §13.4 and §19.10 (user 21.09.2026): "silent tag" meant no words and
+    // no labels, never no sound, and the catcher is told apart by his body — a
+    // reading the old text did not give, so a new decision, not a longer telling.
+    maxWords: 29563,
     // A hundred words across 28k: design.md is edited section by section and a genuine
     // new decision runs 40–215 measured words, so the slack absorbs the rewording that
     // accompanies one and refuses the disappearance of a whole section without a

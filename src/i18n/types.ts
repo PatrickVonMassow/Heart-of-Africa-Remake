@@ -626,6 +626,13 @@ export interface Strings {
     tagSilence: string
     tagLean: string
     tagTurnRate: string
+    tagCaughtPause: string
+    tagGazeTurn: string
+    tagCrySeconds: string
+    tagCryPitchSpread: string
+    tagCryReach: string
+    tagCryGain: string
+    bankCatch: string
     tagPlayRadius: string
     bankRoam: string
     bankRoamSpread: string
