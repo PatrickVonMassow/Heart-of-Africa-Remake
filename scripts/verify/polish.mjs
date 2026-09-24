@@ -3678,7 +3678,10 @@ if (section('tag-catch')) {
       const catchRing = await page.evaluate(() => window.__balance.villageLife.tag.catchDistance)
       check(
         'through its beat the caught child stands (no pace, arms dropped) while the catcher-that-was is already away',
-        beat.body === 'caught' && beat.caughtPace === 0 && beat.apart != null && beat.apart > catchRing + 0.3 && (beat.runnerPace ?? 0) > 0,
+        // Away = outside the catch ring and moving. No margin beyond the ring: a
+        // catcher-that-was with a spent reserve leaves at its recovery pace, which
+        // is the landed stamina model, not a runner that stays.
+        beat.body === 'caught' && beat.caughtPace === 0 && beat.apart != null && beat.apart > catchRing && (beat.runnerPace ?? 0) > 0,
         JSON.stringify(beat),
       )
       await nextFrames(2)
