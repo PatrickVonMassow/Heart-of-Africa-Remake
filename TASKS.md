@@ -103,10 +103,11 @@ put it is the mistake this line exists to stop.
   657). What failed was not any single check but the SHAPE of the checking: partial chains
   verified in isolation, each green, with nobody walking the whole way as a player.
 
-  THE METHOD IS SIX EYES, and the user named the three pairs (12.08.2026): the ENUMERATING half
+  THE METHOD IS SIX EYES, and the user named the three models anew (24.09.2026, 07:43, replacing
+  the pairs of 12.08.2026; the first run was discarded): the ENUMERATING half
   — what can break, what a player must be able to do, which step could silently not arrive —
-  is collected BLIND PARALLEL by FABLE 5 and GPT-5.6 SOL, neither seeing the other's list, and
-  OPUS 5 merges the two into one counted union, accounting for every entry as `only A`, `only B`
+  is collected BLIND PARALLEL by OPUS 5.5 and GPT-6 ASTRA, neither seeing the other's list, and
+  FABLE 5.1 merges the two into one counted union, accounting for every entry as `only A`, `only B`
   or `merged with <id>` (`scripts/blind-merge.mjs`, `mechanism-review.mjs --merged-by`). That is
   the CLAUDE.md §6 rule with the models we actually have: the merger wrote neither list. The
   JUDGING half — does this play-through really work — is convergent and keeps the ordinary
