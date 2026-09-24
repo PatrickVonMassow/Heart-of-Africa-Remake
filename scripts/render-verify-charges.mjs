@@ -1763,4 +1763,15 @@ export const RED_CHARGES = [
       + 'hausa-village plan seed 1838110026, one of the seeds point 1197 names as still firing '
       + 'loom-unseen-from-plaza. Pure layout, so no backend is excluded. The charge dies with point 1197.',
   },
+  {
+    point: 642,
+    suite: 'polish',
+    backend: 'webgl',
+    kind: 'check',
+    match: /^the order at the stand can be photographed: a sender still there and a carrier already going — no order in 180 s/i,
+    why:
+      'MEASURED 24.09.2026 on feat/1176 f69e1c300, webgl/polish: the moment-catcher point 642 '
+      + 'names as its fourth case (15.09.2026) found no order inside its 180 s window; the branch '
+      + 'does not touch the water errand. The charge dies with point 642.',
+  },
 ]
