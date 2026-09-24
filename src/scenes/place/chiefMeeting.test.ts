@@ -16,7 +16,7 @@ import { chiefBesideDrummerSpot } from './chiefWalk'
 import { PLAYER_RADIUS, standingClear } from './collision'
 import { VILLAGE_SPOTS } from './lifeSpots'
 import { balance } from '../../config/balance'
-import { placeById } from '../../world/geo'
+import { placeById, PLACES } from '../../world/geo'
 
 withWorld()
 
@@ -44,14 +44,39 @@ describe('the chief comes out of his hut (design.md §12)', () => {
     expect(g().chiefOutside[DRUM_MESSAGE_VILLAGE]).toBe(true)
     expect(chiefWalkState().phase).toBe('walking-out')
     expect(g().toast).toBe(getStrings().toasts.chiefStepsOut)
+    expect(g().orientationGiven[DRUM_MESSAGE_VILLAGE]).toBe(true)
+    expect(g().journal.filter((e) => e.text.key === 'journal.chiefWalk')).toHaveLength(1)
+    g().callChiefOut()
+    g().leavePlace()
+    g().enterPlace(DRUM_MESSAGE_VILLAGE)
+    g().callChiefOut()
+    expect(chiefWalkState().phase).toBe('walking-out')
+    expect(g().toast).toBe(getStrings().toasts.chiefStepsOut)
+    expect(g().journal.filter((e) => e.text.key === 'journal.chiefWalk')).toHaveLength(1)
   })
 
-  it('standing before him orients the traveller in the settlement (§17)', () => {
-    g().enterPlace(OTHER_VILLAGE)
-    expect(g().orientationGiven[OTHER_VILLAGE]).toBeFalsy()
-    g().callChiefOut()
-    expect(g().orientationGiven[OTHER_VILLAGE]).toBe(true)
-  })
+  it.each(PLACES.filter((p) => p.kind === 'village' && p.id !== DRUM_MESSAGE_VILLAGE).map((p) => p.id))(
+    '%s: meeting the head man gives orientation without the drum-message chain',
+    (id) => {
+      g().enterPlace(id)
+      expect(g().orientationGiven[id]).toBeFalsy()
+      const walk = chiefWalkState()
+      const journal = g().journal
+      // First and repeated uses take the same ordinary-meeting action.
+      for (let press = 0; press < 2; press++) {
+        expect(nextChiefAction('hut', g(), chiefWalkState().phase)).toBe('no-message')
+        g().callChiefOut()
+        expect(g().orientationGiven[id]).toBe(true)
+        expect(g().chiefOutside[id]).toBeFalsy()
+        expect(chiefWalkState()).toBe(walk)
+        expect(chiefWalkState().phase).toBe('in-hut')
+        expect(g().toast).toBe(getStrings().toasts.chiefNoMessage)
+        expect(g().toast).not.toBe(getStrings().toasts.chiefStepsOut)
+        expect(g().journal).toBe(journal)
+        expect(g().journal.some((e) => e.text.key === 'journal.chiefWalk')).toBe(false)
+      }
+    },
+  )
 
   it('leaves the hut inert in every phase but the one he is inside for', () => {
     g().enterPlace(DRUM_MESSAGE_VILLAGE)
@@ -83,7 +108,11 @@ describe('the drums, once he stands there (design.md §13.4)', () => {
 
   it('another people’s chief has no message of his own to send', () => {
     g().enterPlace(OTHER_VILLAGE)
-    expect(nextChiefAction('chief', g(), 'at-drummer')).toBe('no-message')
+    for (const phase of ['walking-out', 'at-drummer', 'walking-back'] as const) {
+      for (const target of ['hut', 'chief', 'drummer'] as const) {
+        expect(nextChiefAction(target, g(), phase)).toBe('no-message')
+      }
+    }
   })
 
   it('the key hands NOTHING over — carrying the find changes nothing about it', () => {

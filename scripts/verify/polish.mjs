@@ -1297,7 +1297,7 @@ if (section('town-plan')) {
 if (section('orientation-markers')) {
   await goToPlace('maasai-village')
   const before = await page.evaluate(() => document.querySelectorAll('.building-highlight').length)
-  check('no building markers before the chief comes out', before === 0, `${before}`)
+  check('no building markers before meeting the chief', before === 0, `${before}`)
   const toast = await page.evaluate(() => {
     // Standing before the head man is what orients the traveller now; the gift
     // that used to buy it retired with the goodwill state (point 1052).
