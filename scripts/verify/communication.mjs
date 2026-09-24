@@ -122,7 +122,9 @@ async function speech(kind, point, frameName) {
 async function prompt(kind) {
   const label = await d.read(async (kind) => {
     const t = (await import('/src/i18n/index.ts')).getStrings()
-    return kind === 'hut' ? t.buildings.chief : t.labels.askDrummer
+    // At the drum the chief is asked for his message; only while he is indoors
+    // does the key name him through the drummer.
+    return kind === 'hut' ? t.buildings.chief : kind === 'message' ? t.labels.askForDrumMessage : t.labels.askDrummer
   }, kind)
   await d.wait((label) => document.querySelector('.prompt')?.textContent.includes(label), label)
 }
@@ -181,7 +183,7 @@ async function errand() {
   await step('5-errand')
   const drummer = await chief()
   await message('errand', async () => {
-    await prompt('drummer')
+    await prompt('message')
     await page.keyboard.press('Space')
   }, drummer)
   if (receipt.order === 'message-first') {
