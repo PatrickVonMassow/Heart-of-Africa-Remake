@@ -477,7 +477,17 @@ try {
     await d.wait(() => window.__game.getState().placeId === 'bambara-village' && window.__placePlayer)
     const drummer = await chief('07')
     const chiefAt = await d.read(() => ({ x: window.__chief.x, z: window.__chief.z }))
-    await d.inspect(chiefAt, 1.5)
+    // Stand square to the pair, 1.8 m before their middle: within the chief's
+    // give reach, and far enough that the drummer stays above the frame's foot.
+    const gx = drummer.x - chiefAt.x, gz = drummer.z - chiefAt.z, gap = Math.hypot(gx, gz) || 1
+    const middle = { x: (chiefAt.x + drummer.x) / 2, z: (chiefAt.z + drummer.z) / 2 }
+    let stood = false
+    for (const side of [1, -1]) {
+      stood = await d.walk({ x: middle.x - side * gz / gap * 1.8, z: middle.z + side * gx / gap * 1.8 }).then(() => true, () => false)
+      if (stood) break
+    }
+    assert(stood, 'No reachable stand square to the chief and the drummer')
+    await d.aim(chiefAt)
     await event('give-input', { pointerLocked: await d.read(() => !!document.pointerLockElement), control: 'inventory number key' })
     await message('answer', () => d.inventory('[data-find="rockArtefact"]'), drummer)
     check('find given and named impression carried', !await page.locator('[data-find="rockArtefact"]').count() && await page.locator('[data-form="rock-relief"]').count() === 1)
