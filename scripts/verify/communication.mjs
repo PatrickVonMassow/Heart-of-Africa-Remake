@@ -70,13 +70,19 @@ async function reopen(message, name) {
   if (name === '04-cleared-paper') assert.equal(reading, '???')
   await d.close()
 }
-async function guess(name, reading, expectedAtom) {
-  await d.wait(() => !!document.querySelector('.speech-label.targeted .speech-invite'))
+async function guess(name, reading, expectedAtom, speaker = null) {
+  // With a speaker named, only his note may be the one E is pressed on: another
+  // villager's older note nearby can hold the target meanwhile.
+  const invited = (speaker) => {
+    const note = document.querySelector('.speech-label.targeted')
+    return !!note?.querySelector('.speech-invite') && (!speaker || note.getAttribute('data-speaker') === speaker)
+  }
+  await d.wait(invited, speaker)
   // The speaker keeps walking while the camera turns, so a single aim can miss;
   // re-aim at whoever is targeted until the note stands inside the picture.
   let targeted = null, faced = false
   for (let attempt = 0; attempt < 6 && !faced; attempt++) {
-    await d.wait(() => !!document.querySelector('.speech-label.targeted .speech-invite'))
+    await d.wait(invited, speaker)
     targeted = await d.read(() => document.querySelector('.speech-label.targeted').getAttribute('data-speaker'))
     faced = await faceNote(targeted)
   }
@@ -306,7 +312,7 @@ async function readings() {
   await prompt('drummer')
   await page.keyboard.press('Space')
   await d.wait(() => window.__speech?.labels().some((l) => l.speakerId === 'drummer'))
-  await guess('04-chief-indoors', 'perhaps the head man', receipt.vocabulary.CHIEF)
+  await guess('04-chief-indoors', 'perhaps the head man', receipt.vocabulary.CHIEF, 'drummer')
   await journal(1)
   const readings = { UPSTREAM: 'against the current', DOWNSTREAM: 'with the current', ROCK: 'a rock', DIG: 'dig' }
   for (const [concept, reading] of Object.entries(readings)) {
