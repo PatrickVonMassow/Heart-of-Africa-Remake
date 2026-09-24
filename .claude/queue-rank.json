@@ -1393,6 +1393,12 @@
       "origin": "machine",
       "place": "last"
     },
+    "1195": {
+      "at": "2026-09-24T11:19:47.294Z",
+      "why": "User 24.09.2026 13:03: ziehe das Ticket vor 633",
+      "origin": "user",
+      "place": "ahead"
+    },
     "1197": {
       "at": "2026-09-23T12:48:00.322Z",
       "why": "Follow-up refinement of a landed point; medium urgency, waits behind the release",
@@ -1422,10 +1428,40 @@
       "why": "pre-existing animal-behaviour red, no blocker; joins its bundle at the end",
       "origin": "machine",
       "place": "last"
+    },
+    "1206": {
+      "at": "2026-09-24T14:51:50.499Z",
+      "why": "User 24.09.2026 16:51: »Ziehe 1206 vor 1195.«",
+      "origin": "user",
+      "place": "ahead"
+    },
+    "1207": {
+      "at": "2026-09-24T11:19:47.582Z",
+      "why": "User 24.09.2026 13:08: directly behind 174, not with 1195",
+      "origin": "user",
+      "place": "ahead"
+    },
+    "1208": {
+      "at": "2026-09-24T11:19:47.389Z",
+      "why": "User 24.09.2026: directly after 659 (its PLACEMENT line)",
+      "origin": "user",
+      "place": "ahead"
+    },
+    "1209": {
+      "at": "2026-09-24T11:30:41.284Z",
+      "why": "User 24.09.2026 13:30: direkt vor 1204, Vier-Augen",
+      "origin": "user",
+      "place": "ahead"
+    },
+    "1210": {
+      "at": "2026-09-24T14:37:20.498Z",
+      "why": "User 24.09.2026 16:36: »Das soll direkt als nächstes erledigt werden.«",
+      "origin": "user",
+      "place": "ahead"
     }
   },
   "settled": {
-    "at": "2026-09-24T02:38:25.205Z",
+    "at": "2026-09-24T14:37:20.507Z",
     "points": [
       174,
       184,
@@ -1841,7 +1877,14 @@
       1195,
       1197,
       1202,
-      1203
+      1203,
+      1204,
+      1205,
+      1206,
+      1207,
+      1208,
+      1209,
+      1210
     ]
   },
   "boundary": {

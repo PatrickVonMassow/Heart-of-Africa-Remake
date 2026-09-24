@@ -162,6 +162,112 @@ put it is the mistake this line exists to stop.
   keeps hitting the bugs.
   Bundle: Verständigung.
 
+- [ ] 1208. Hunted animals flee into rivers and lakes too.
+  Hunted animals flee into rivers and lakes too (user 24.09.2026, reopening the flight half of
+  point 312). Point 312 switched only the shared `fleeMove` flight (predator flee, elephant dart,
+  player-shy) to the ocean-only `fleeWaterStep`; the HUNT itself was left on the old water-barred
+  rule, and the hunt is the flight the player watches most.
+  MEASURED on main 4b983b67f (report local/TiereImmernochWassergesperrt.zip, build 15c2da2, which
+  contains the 312 merge 9c8e4e299; seed 129298658, x/z 323.86/-244.65, cheetah hunt of a real-herd
+  antelope at a river bank, carcass left at the bank 298.07/-256.67):
+  - `src/scenes/travel/Wildlife.tsx` ~4707: the chase victim's flight `calfFleeStep(...)` uses
+    `fleeBlocked` = `ty === 'ocean' || ty === 'water'` — the victim slides and fans along the bank
+    ("zittert am Ufer") and is taken at the waterline instead of swimming.
+  - ~4749 / `blockHeading`: the parent guarding its hunted calf moves under the same land-only rule.
+  - ~2582: `!isChaseVictim` keeps a chase victim that does reach water out of the §19.8 water
+    handling, so even a wet victim would have no water behaviour.
+  FINAL STATE (design.md §19.5 (c), already stated — do not restate):
+  (a) The chase victim's flight and the guarding parent's station run use the ocean-only
+      `flightBlocked` predicate: a heading into river/lake water is taken straight; the ocean edge
+      still deflects, and the calfFleeStep corridor/dead-end logic stays for the ocean only.
+  (b) A victim in water swims at the swim pace (as `fleeMove` does) with water-surface height, and
+      the hunter follows or gives up by the existing chase rules; the hunt still RESOLVES (catch,
+      far bank reached → chase ends, or the existing offstage abort) — no endless swim (I4).
+  (c) When the chase ends with the victim still in water, it heads for the nearest bank under the
+      312 no-lingering rule.
+  (d) Fights (`wetOrSea`, ~2970) stay land-only — they are not flights.
+  VERIFIABLE: pure — the victim flee step with a river ahead is not deflected, with the ocean ahead it
+  is. Live (`scripts/verify/enrichments.mjs`, both backends): a staged real-herd hunt with the victim
+  between the predator and a straight river bank sends the victim into the river (path sampled: a
+  swim, not a jump) and the hunt resolves; the reported seed/position is the natural repro.
+
+  --- bounds the user named (verbatim) ---
+  PLACEMENT (user 24.09.2026): rank this point IMMEDIATELY AFTER point 659 in the work order (.claude/queue-rank.json, origin user) — it is the next point worked once 659 lands.
+
+  --- the user’s own sentences, with their date ---
+  user 24.09.2026: "Ich sehe überhaupt keine Auswirkung vom angeblich erledigten Task 312. Auch wenn ein Löwe ein Tier jagt, lässt es sich lieber am Ufer fressen, als einen Fuß ins Wasser zu setzen."
+  user 24.09.2026: "Das soll direkt direkt nach 659 behoben werden."
+  PLACEMENT (user 24.09.2026): rank this point IMMEDIATELY AFTER point 659 in the work order (.claude/queue-rank.json, origin user) — it is the next point worked once 659 lands.
+  Criticality: medium.
+  Bundle: Tierverhalten.
+
+- [ ] 1206. Route blind-parallel enumerate halves to Astra at the default share setting, then switch to default.
+  FINAL STATE: at `default`, a blind-parallel half reaches GPT-6 Astra; authoring stays with Claude; and the machine switch stands at `default`.
+
+  (a) ROUTING (scripts/astra-share-core.mjs): the `default` row routes `review` AND `enumerate` to Astra; diagnose, audit, explain and author stay with Claude. `audit` stays with Claude deliberately (large sweeps are the costly kind); a blind audit half at `default` uses the existing `--anyway`. No new setting, no new kind, no new mechanism - a table entry.
+
+  (b) Every text that describes `default` says the same: SETTING_NOTES.default, the `default` branch of briefLine, the board note if it names the kinds, and the table and prose in docs/astra-routing.md (row `default`, the "today's behaviour" sentence).
+
+  (c) Tests: astra-share-core.test.mjs / astra-share-cli.test.mjs pin the new `default` row (enumerate -> astra; audit/diagnose/explain/author -> claude); ask-astra-cli.test.mjs pins that `--kind enumerate` at `default` is NOT refused with exit 3 while `--kind audit` still is. Adjust any existing test that pinned the old refusal.
+
+  (d) After the merge, switch this machine: `node scripts/astra-share.mjs --set default`, and state the resulting `--status` line in the closing record.
+
+  NOT IN SCOPE: changing `prefer-astra` or `claude-only`, the review path, or the author-routing cut.
+  Criticality: medium.
+  PLACEMENT (user 24.09.2026, 13:08): directly behind point 174, not with 1195: "1206 und 1207 solln nicht mitrücken. Sie sollen also nach dem Vorziehen von 1195 direkt hinter 174 stehen."
+  Bundle: Modell & Wächter.
+
+- [ ] 1195. The board says by itself that the batch is standing.
+  USER ORDER 23.09.2026, 12:21: »Fast genauso schlimm wie eine stehende Batch ist, dass ich auf
+  dem Dashboard nicht sehen konnte, dass sie stand. Dazu einen Task nach 174 einreihen, der das
+  behebt.« Placed behind point 174 on that instruction.
+  PROBLEM, measured on the 75-minute standstill of this morning (retrospective §3.304). The
+  "Woran ich gerade arbeite" card still read "Stand 09:22 — Landungsbereitschaft prüfen" at
+  10:51, because the card is written by the working session and nobody was left to write one.
+  The board therefore shows the LAST CLAIM, never its age, and a standstill looks exactly like
+  work in progress. Every fact needed to see it was already on disk — `.claude/batch-lock.json`
+  absent or its heartbeat stale, the focus stamp's age, the launcher's own skip reason in
+  `.claude/batch-launcher.log`, a `.claude/batch-paused` record — and none of it reaches the page.
+  FINAL STATE: the board's own state block carries a measured LIVENESS line, written by the
+  publish path rather than by the working session, so it is right even when no session runs:
+  who holds the batch (or that nobody does), how old the heartbeat and the focus stamp are, and,
+  when the batch is paused, the pause's type, reason and restart clock — a clockless hold said
+  in those words. Where the newest of those readings is older than one launcher tick plus its
+  grace, the card SAYS the batch is standing and for how long, visibly at the top and legible in
+  mobile portrait, instead of repeating the last claim. The readings are taken at publish time;
+  no session has to remember to write them. A deploy whose page is older than the readings says
+  its own age, so a cached page cannot claim a live batch.
+  Test: Vitest on the pure decision — a lock absent, a stale heartbeat, a fresh heartbeat, a
+  clockless `user-stop` and a clocked park each yield the line the board prints, with the
+  standstill verdict and its measured duration; the boundary at one tick plus grace is asserted
+  from both sides. Plus a render assertion that the line reaches the published HTML and reads in
+  portrait width.
+  Criticality: high — without it the only detector of a standstill is the user looking, which is
+  how this morning's was found.
+  Refs: scripts/board-publish.mjs, scripts/board-queue-core.mjs, scripts/dashboard-guard-core.mjs,
+  .claude/batch-lock.json, .claude/batch-paused, .claude/current-focus.json,
+  .claude/batch-launcher.log, memory `batch-dashboard-artifact`, points 1193 and 1194.
+  AMENDMENT, user order 24.09.2026: the board also publishes while a batch WORKS.
+  Measured 24.09.2026, 12:56: the board stood at 10:41 while point 659 took eight commits and
+  three verify runs, because publishDue (scripts/board-currency-core.mjs publishDuePatch) is set
+  only when the open-point fingerprint changes, and the progress card is written by hand.
+  (f) A publish is also due when the live board is older than a calibratable age (default
+  25 min) or the active point's feat/<N>-* branch head differs from the head stamped on the
+  published board (.claude/current-focus.json names the point). The launcher watchdog
+  (WATCHDOG_TICK_MS) performs that publish itself; the working session gets no new duty and no
+  new guard is added (infrastructure freeze).
+  (g) A measured PROGRESS line beside the liveness line, built by the publish path from disk:
+  active point, its branch's newest commit (time, subject), the verification running now
+  (suite and section), and that point's newest verify verdict (green/red with its first FAIL
+  line). The hand-written focus card stays optional commentary.
+  Test additions: Vitest on the due-decision (unchanged open set + board older than the limit
+  is due; + new focus-branch commit is due; fresh board + same head is not due; the age limit
+  asserted from both sides) and on the progress-line builder (running suite, red verdict with
+  FAIL line, no active point); the render assertion covers the progress line in portrait.
+  PLACEMENT (user 24.09.2026, 13:03): "Okay, mach das so und ziehe das Ticket vor 633."
+  user 24.09.2026, 12:58: "Was können wir dagegen tun, die Status-Updates viel zu selten erfolgen?"
+  Bundle: Modell & Wächter
+
 - [ ] 633. The release's closing run — two regressions with the cleanup between them (user
   11.08.2026, splitting point 174: "Dafür scheint mir die Schätzung von 1 h viel zu wenig
   zu sein"). 174 carried the whole release in one card estimated at ~1 h, which was true
@@ -250,36 +356,54 @@ put it is the mistake this line exists to stop.
   that /v0.3/ and /poc/ serve the new state, and FREEZE the tag: it is never
   re-pointed.
 
-- [ ] 1195. The board says by itself that the batch is standing.
-  USER ORDER 23.09.2026, 12:21: »Fast genauso schlimm wie eine stehende Batch ist, dass ich auf
-  dem Dashboard nicht sehen konnte, dass sie stand. Dazu einen Task nach 174 einreihen, der das
-  behebt.« Placed behind point 174 on that instruction.
-  PROBLEM, measured on the 75-minute standstill of this morning (retrospective §3.304). The
-  "Woran ich gerade arbeite" card still read "Stand 09:22 — Landungsbereitschaft prüfen" at
-  10:51, because the card is written by the working session and nobody was left to write one.
-  The board therefore shows the LAST CLAIM, never its age, and a standstill looks exactly like
-  work in progress. Every fact needed to see it was already on disk — `.claude/batch-lock.json`
-  absent or its heartbeat stale, the focus stamp's age, the launcher's own skip reason in
-  `.claude/batch-launcher.log`, a `.claude/batch-paused` record — and none of it reaches the page.
-  FINAL STATE: the board's own state block carries a measured LIVENESS line, written by the
-  publish path rather than by the working session, so it is right even when no session runs:
-  who holds the batch (or that nobody does), how old the heartbeat and the focus stamp are, and,
-  when the batch is paused, the pause's type, reason and restart clock — a clockless hold said
-  in those words. Where the newest of those readings is older than one launcher tick plus its
-  grace, the card SAYS the batch is standing and for how long, visibly at the top and legible in
-  mobile portrait, instead of repeating the last claim. The readings are taken at publish time;
-  no session has to remember to write them. A deploy whose page is older than the readings says
-  its own age, so a cached page cannot claim a live batch.
-  Test: Vitest on the pure decision — a lock absent, a stale heartbeat, a fresh heartbeat, a
-  clockless `user-stop` and a clocked park each yield the line the board prints, with the
-  standstill verdict and its measured duration; the boundary at one tick plus grace is asserted
-  from both sides. Plus a render assertion that the line reaches the published HTML and reads in
-  portrait width.
-  Criticality: high — without it the only detector of a standstill is the user looking, which is
-  how this morning's was found.
-  Refs: scripts/board-publish.mjs, scripts/board-queue-core.mjs, scripts/dashboard-guard-core.mjs,
-  .claude/batch-lock.json, .claude/batch-paused, .claude/current-focus.json,
-  .claude/batch-launcher.log, memory `batch-dashboard-artifact`, points 1193 and 1194.
+- [ ] 1207. The stand-down fence refuses writes outside the checkout, so the documented request handoff cannot be used.
+  FINAL STATE: a stood-down session can deposit a request with `finding.mjs --request` using files it writes itself, with no workaround.
+
+  (a) ownershipStandDownDecision (scripts/board-first-core.mjs) does not block a Write/Edit whose file_path lies outside the main checkout, and does not block a Bash segment that segmentWritesOnlyOutsideCheckout (scripts/batch-lease-core.mjs) already clears - reuse that function, add no new classifier. A path inside the checkout stays refused exactly as today.
+
+  (b) Check why `cat > why.md` after `cd <scratchpad>` was refused by the lease fence although it writes outside the checkout (relative target resolved against the session cwd rather than the segment cwd?); fix so it passes.
+
+  (c) Tests: a stood-down Write to the session scratchpad and a stood-down `cat > <scratchpad>/x.md <<EOF` both pass; a stood-down Write to TASKS.md and to src/ still block.
+
+  NOT IN SCOPE: a new guard, a new flag on finding.mjs, or any loosening of in-checkout writes. This switches a rule off where it is in the way (CLAUDE.md section 2 freeze).
+  Criticality: medium.
+  PLACEMENT (user 24.09.2026, 13:08): directly behind point 174, not with 1195: "1206 und 1207 solln nicht mitrücken. Sie sollen also nach dem Vorziehen von 1195 direkt hinter 174 stehen."
+  Bundle: Modell & Wächter.
+
+- [ ] 1209. Every session starts and runs on a smaller fixed context load.
+  USER ORDER 24.09.2026, 13:30: »Reihe die von dir vorgeschlagenen Maßnahmen zur Reduktion des
+  Token-Verbrauchs direkt vor 1204 ein. Das soll aber mit Vier-Augen-Prinzip umgesetzt werden.«
+  Earlier the same day, 13:10: »Wieso hast du eigentlich nur für diese Diskussion schon über 80k
+  Token verbraucht?« and 13:14: »Wäre es z. B. ein Ansatz Text wie die in CLAUDE.md … darauf zu
+  prüfen, ob wirklich alle diese Infos für jede Session notwendig sind und … ob sich der selbe
+  Inhalt nicht mit deutlich weniger Worten (z. B. stichpunktartig) darstellen lässt?«
+  PROBLEM: a discussion-only session reached 80k context. Measured: CLAUDE.md ~2.7k and MEMORY.md
+  ~1.7k tokens; the estimated remaining fixed load (tool schemas, MCP/skill listings, the
+  SessionStart text) was ~30k+ and is NOT yet measured. Per-turn hook texts (timestamp,
+  dashboard reminder, stand-down, context level) repeat several hundred tokens every turn.
+  FINAL STATE, strictly deletion and simplification (infrastructure freeze, CLAUDE.md §2):
+  (a) MEASURE first: the context reading of a fresh session before its first tool call, split by
+  source (system/tool schemas, MCP servers, skills, CLAUDE.md, MEMORY.md, hook texts), recorded
+  in the point's evidence. Every later step reports its saving against this baseline.
+  (b) Unused tool surface OFF: MCP servers, plugins and connectors no session of this project
+  uses are disabled in the project settings (keep whole-tool allowances broad, memory
+  `track-permission-prompts`).
+  (c) Per-turn hook texts shrink to one line when nothing is due; the full text appears only
+  when the condition actually applies (e.g. the stand-down text only in a standing-down session).
+  (d) CLAUDE.md and MEMORY.md are condensed: content no session needs every time moves to the
+  linked docs; the rest is terse bullet form written for sessions, not humans. No rule changes
+  meaning — a rule that is dropped is named as dropped.
+  FOUR EYES (user order): (d) and the keep/cut list of (b)/(c) are DIVERGENT work — Opus 5.5 and
+  GPT-6 Astra each produce the cut list blind-parallel from identical inputs, a third model
+  merges through scripts/blind-merge.mjs and every dropped or reworded rule is listed with its
+  reason. The implementation is reviewed cross-vendor (never by its author) before landing,
+  reading the diff before its rationale.
+  Test: the unit layer stays green over the documents (tests exist over CLAUDE.md/docs); a
+  fresh-session reading after the change is recorded beside the baseline of (a); every hook whose
+  text changed keeps its own test green.
+  Criticality: medium — cost, not correctness; but it is paid by every session.
+  Refs: CLAUDE.md, memory MEMORY.md, .claude/settings.json, scripts/*-hook.mjs,
+  scripts/*-guard.mjs, scripts/blind-merge.mjs, scripts/review-astra.mjs.
   Bundle: Modell & Wächter
 
 - [ ] 1204. Arm the handover watermark so it refuses instead of observing.

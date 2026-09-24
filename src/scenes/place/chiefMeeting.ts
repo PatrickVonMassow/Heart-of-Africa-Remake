@@ -1,13 +1,14 @@
 // What the use key does at the chief's hut, at the chief himself and at his
 // drummer (design.md §12, §13.4, docs/communication-poc-spec.md).
 //
-// The chief does not speak at his own door. The first press at the hut sends
+// In Bambara the chief does not speak at his own door. The first press at the hut sends
 // him OUT and ACROSS to the drummer's side; from there the press at either man
 // sends his message on the drums, repeats it while he stands, and calls him
 // back while he walks home. Used while he is outside, the hut itself does
 // nothing at all. And while he is inside it, the press at the drummer belongs
 // to the drummer: he points at the hut and names the man with the sixth word of
 // the language.
+// Elsewhere the hut's head man acknowledges the traveller without stepping out.
 //
 // What the key no longer does is hand anything over. The find from the boulder
 // is an inventory item and is given by USING it before him (design.md §6), so
@@ -53,13 +54,17 @@ export function nextChiefAction(
   if (s.mode !== 'place' || !s.placeId) return 'none'
   const place = placeById(s.placeId)
   if (place.kind !== 'village') return 'none'
+  if (place.id !== DRUM_MESSAGE_VILLAGE) {
+    if (target === 'hut') return 'no-message'
+    if (phase === 'in-hut') return target === 'drummer' ? 'name-chief' : 'none'
+    return 'no-message'
+  }
   // Whether the traveller carries the find or not makes no difference here: the
   // find is given by using the item before him, never by this key.
-  const message = place.id === DRUM_MESSAGE_VILLAGE ? 'send-message' : 'no-message'
   if (target === 'hut') return phase === 'in-hut' ? 'step-out' : 'none'
   switch (phase) {
     case 'at-drummer':
-      return message
+      return 'send-message'
     case 'walking-back':
       return 'call-back'
     case 'in-hut':

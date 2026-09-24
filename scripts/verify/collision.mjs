@@ -336,17 +336,27 @@ async function reachableBuildings(sceneLabel) {
       if (reset) {
         // Arm the Space prompt at the door, then press it (design.md §2.3).
         await page.waitForFunction(() => !!document.querySelector('.prompt'), null, { timeout: 8000 }).catch(() => {})
+        // Outside Bambara the head man answers from indoors, so clear the toast
+        // and his orientation first: the press itself has to raise both.
+        const noMessage = await page.evaluate(async () => {
+          const g = window.__game.getState()
+          window.__game.setState({ toast: null, orientationGiven: { ...g.orientationGiven, [g.placeId]: false } })
+          const { getStrings } = await import('/src/i18n/index.ts')
+          return getStrings().toasts.chiefNoMessage
+        })
         await page.keyboard.press('Space')
+        // Only Bambara's chief walks out to his drummer (design.md §13.4).
         const answered = t.type === 'chief'
-          ? () => {
+          ? (msg) => {
               const g = window.__game.getState()
-              return g.chiefOutside[g.placeId] === true
+              if (g.placeId === 'bambara-village') return g.chiefOutside[g.placeId] === true
+              return g.toast === msg && g.orientationGiven[g.placeId] === true && g.chiefOutside[g.placeId] !== true
             }
           : () => !!document.querySelector('.dialog')
-        opened = await page.waitForFunction(answered, null, { timeout: 8000 }).then(() => true).catch(() => false)
+        opened = await page.waitForFunction(answered, noMessage, { timeout: 8000 }).then(() => true).catch(() => false)
       }
     }
-    const missed = t.type === 'chief' ? '(did not come out)' : '(no open)'
+    const missed = t.type === 'chief' ? '(did not answer)' : '(no open)'
     if (!placed || !reset || !opened) {
       const why = !placed ? '(no clear standpoint)' : !reset ? '(the reset left him outside)' : missed
       notOperable.push(`${t.type}${why}`)
@@ -517,8 +527,8 @@ if (section('village')) {
   await ejectTest('Village', '(cs)=>cs.reduce((b,c,i)=>(c.kind==="segment"&&b<0)?i:b,-1)') // fence panel
 
   // Chief hut operable despite collision: standing at its door and pressing the
-  // Space use key brings the chief OUT of it (design.md §2.3, §12). There is no
-  // audience window any more — the answer to the press is a man in the open.
+  // Space use key meets the head man and gives orientation (design.md §17.3).
+  // Outside Bambara he answers from his hut, without walking to the drummer.
   await page.evaluate(() => {
     const it = window.__placeLayout.interactives.find((i) => i.type === 'chief')
     const p = window.__placePlayer
@@ -536,20 +546,23 @@ if (section('village')) {
     { timeout: 8000 },
   )
   await page.keyboard.press('Space')
-  const chiefCameOut = await page
+  const chiefMet = await page
     .waitForFunction(() => {
       const g = window.__game.getState()
-      return g.chiefOutside[g.placeId] === true
+      return g.orientationGiven[g.placeId] === true
     }, null, { timeout: 8000 })
     .then(() => true)
     .catch(() => false)
-  check('Village: the chief comes out with Space at his door', chiefCameOut)
+  check('Village: meeting the chief with Space at his door gives orientation', chiefMet)
+  check('Village: the Maasai chief stays indoors', await page.evaluate(() => {
+    const g = window.__game.getState()
+    return !g.chiefOutside[g.placeId] && !window.__chief
+  }))
   await page.waitForTimeout(200)
   await dwellingDoorsReachable('Village')
   // Step BACK from the door and face the hut, or the frame holds nothing but
   // wall: at the door the camera stands inside the building's own footprint.
-  // From ~9 m out on the door's own bearing, hut, door and the man standing
-  // 1.6 m beside it are all in the picture.
+  // From ~9 m out on the door's own bearing, hut and door are in the picture.
   await page.evaluate(() => {
     const it = window.__placeLayout.interactives.find((i) => i.type === 'chief')
     const p = window.__placePlayer
@@ -563,7 +576,7 @@ if (section('village')) {
     // Place-camera yaw 0 looks toward -Z, so aim with the +PI complement.
     p.yaw = Math.atan2(hx - p.x, hz - p.z) + Math.PI
   })
-  await shot('53-collision-village-chief-hut', { place: 'maasai-village', label: "the chief's hut, its door and the chief standing out in front of it" })
+  await shot('53-collision-village-chief-hut', { place: 'maasai-village', label: "the chief's hut and its reachable door" })
   await page.evaluate(() => { const p = window.__placePlayer; p.x = 0; p.z = 0 })
   await page.waitForTimeout(150)
 

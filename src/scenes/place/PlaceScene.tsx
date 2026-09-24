@@ -527,7 +527,7 @@ function VillageHut({
 
 /**
  * The use key at the chief's hut, at the chief himself and at his drummer
- * (design.md §12, §13.4). The hut sends him OUT and across to the drummer;
+ * (design.md §12, §13.4). In Bambara the hut sends him OUT and across to the drummer;
  * out there either man sends the message, repeats it while he stands, and calls
  * him back while he walks home; and while he is indoors the drummer names him.
  *
@@ -558,7 +558,8 @@ function actOnChief(target: ChiefTarget, layout: PlaceLayout | null): void {
       break
     }
     case 'no-message':
-      game.setToast(strings.toasts.chiefNoMessage)
+      // The ordinary meeting also gives the settlement orientation (§17.3).
+      game.callChiefOut()
       break
     default:
       break
