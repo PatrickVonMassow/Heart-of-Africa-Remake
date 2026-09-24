@@ -25,8 +25,10 @@ export function communicationDriver(page) {
   // A slow frame turns further than the key was held, so a sign flip halves
   // the next press instead of swinging past the subject indefinitely. A turn
   // key still moves a whole frame's worth, so the last stretch goes through
-  // mouse-look, which turns by the exact pixel delta (0.0011 rad/px).
-  let pointer = null
+  // mouse-look, which turns by the exact pixel delta (0.0011 rad/px). The
+  // cursor's real position is only recorded, so every nudge stays on its row
+  // and never tilts the view (movementY 0).
+  page.addInitScript?.(() => addEventListener('mousemove', (e) => { window.__driverCursor = { x: e.clientX, y: e.clientY } }, { capture: true, passive: true }))
   async function aim(target) {
     let scale = 1, last = 0, delta = 0, distance = 0
     for (let i = 0; i < 80; i++) {
@@ -35,16 +37,11 @@ export function communicationDriver(page) {
       distance = Math.hypot(target.x - p.x, target.z - p.z)
       if (Math.abs(delta) < 0.065) return
       if (Math.abs(delta) < 0.35 && page.mouse) {
-        const dx = Math.round(-delta / 0.0011)
-        // An unknown or edge cursor is re-centred first; that move turns the
-        // view too, so the pose is read again before the measured nudge.
-        if (!pointer || pointer.x + dx < 40 || pointer.x + dx > 1400) {
-          pointer = { x: 720, y: 450 }
-          await page.mouse.move(pointer.x, pointer.y)
-          continue
-        }
-        pointer.x += dx
-        await page.mouse.move(pointer.x, pointer.y, { steps: 4 })
+        const at = await read(() => window.__driverCursor ?? { x: 0, y: 0 })
+        const x = at.x + Math.round(-delta / 0.0011)
+        // Near an edge the cursor first slides back to the middle of its row;
+        // that turns the view too, so the pose is read again before the nudge.
+        await page.mouse.move(x < 40 || x > 1400 ? 720 : x, at.y, { steps: 4 })
         continue
       }
       if (last && Math.sign(last) !== Math.sign(delta)) scale = Math.max(0.1, scale / 2)
