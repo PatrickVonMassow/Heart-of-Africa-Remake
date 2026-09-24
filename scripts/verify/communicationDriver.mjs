@@ -105,6 +105,7 @@ export function communicationDriver(page) {
     const path = await read(async ({ target, tolerance }) => {
       const { collidableFloraNear } = await import('/src/scenes/travel/TravelScene.tsx')
       const { buildPlaceNavGrid, findPlaceRoute, navRestrict } = await import('/src/scenes/place/routing.ts')
+      const { settlementCollisionRadius } = await import('/src/scenes/travel/settlementEntry.ts')
       const { sampleTerrain, isBlocked } = await import('/src/world/terrain.ts')
       const { worldToLatLon, PLACES, latLonToWorld } = await import('/src/world/geo.ts')
       const s = window.__game.getState(), origin = s.pos
@@ -113,9 +114,9 @@ export function communicationDriver(page) {
         .map(([x, z, r]) => ({ x: x - origin.x, z: z - origin.z, r }))
       for (const place of PLACES) {
         const p = latLonToWorld(place.lat, place.lon)
-        if (Math.hypot(p.x - origin.x, p.z - origin.z) > 2) colliders.push({ x: p.x - origin.x, z: p.z - origin.z, r: 1.6 })
+        if (Math.hypot(p.x - origin.x, p.z - origin.z) > 2) colliders.push({ x: p.x - origin.x, z: p.z - origin.z, r: settlementCollisionRadius(window.__balance.placeEnterRadius, window.__balance.placeCollisionFactor) })
       }
-      const grid = buildPlaceNavGrid({ radius: reach }, colliders, 0.22, 0.44, 0.25)
+      const grid = buildPlaceNavGrid({ radius: reach }, colliders, 0.6, 1.2, 0.25)
       navRestrict(grid, (x, z) => {
         const p = worldToLatLon(x + origin.x, z + origin.z)
         return !isBlocked(sampleTerrain(p.lat, p.lon, s.seed).type, p.lat, p.lon)

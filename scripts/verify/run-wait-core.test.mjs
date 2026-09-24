@@ -164,7 +164,7 @@ describe('the measured constants stay in lockstep with docs/picture-check-cost.m
     // LARGE, one backend: the document's 93 shots plus `startup`'s single frame,
     // which the recorder never logged; 2536.0 s over the suites plus the preview.
     const large = [...DEV_SUITES, 'preview']
-    expect(expectedFrames(large).frames).toBe(94)
+    expect(expectedFrames(large).frames).toBe(94 + COUNTED_SUITE_FRAMES.communication)
     expect(Math.round(expectedRuntimeMs(large).ms / 100) / 10).toBe(2536.0)
   })
 })
@@ -176,7 +176,7 @@ describe('planRun — what the command will really do', () => {
     expect(plan.suites).toContain('preview')
     // 2536.0 s (full pass + preview) + the render-only WebGPU pass.
     expect(plan.expectedMs).toBeGreaterThan(2_536_000)
-    expect(plan.expectedFrames).toBe(94)
+    expect(plan.expectedFrames).toBe(94 + COUNTED_SUITE_FRAMES.communication)
   })
 
   it('reports the LANE a suite really opens, not the pass it sits in', () => {

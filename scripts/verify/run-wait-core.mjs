@@ -94,7 +94,7 @@ export const SUITE_FRAMES = Object.freeze({
  * rather than silently treated as zero — an estimate that quietly omits a suite
  * is how a wait comes out too short and the poll loop returns.
  */
-export const UNMEASURED_SUITES = Object.freeze(['docs', 'board-layout', 'startup', 'report', 'crossbrowser'])
+export const UNMEASURED_SUITES = Object.freeze(['docs', 'board-layout', 'startup', 'report', 'crossbrowser', 'communication'])
 
 /**
  * Their FRAME counts, which — unlike their runtimes — can be established by
@@ -109,7 +109,7 @@ export const UNMEASURED_SUITES = Object.freeze(['docs', 'board-layout', 'startup
  * expected, and a permanent false alarm is how a reader learns to skip the one
  * line that would have caught a missing picture.
  */
-export const COUNTED_SUITE_FRAMES = Object.freeze({ docs: 0, 'board-layout': 0, startup: 1, report: 0, crossbrowser: 0 })
+export const COUNTED_SUITE_FRAMES = Object.freeze({ docs: 0, 'board-layout': 0, startup: 1, report: 0, crossbrowser: 0, communication: 48 })
 
 /** When the runtime/shot table was measured — printed with a frames verdict, so
  *  a reader can tell "the table is older than the suites" from "a suite stopped

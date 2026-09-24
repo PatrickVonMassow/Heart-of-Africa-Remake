@@ -13,7 +13,7 @@
  */
 export const DEV_SUITES = [
   'docs', 'board-layout', 'startup', 'world', 'i18n', 'flow', 'health', 'events', 'collision', 'handwriting',
-  'polish', 'gamepad', 'touch', 'voice', 'settings', 'enrichments', 'invariants',
+  'polish', 'communication', 'gamepad', 'touch', 'voice', 'settings', 'enrichments', 'invariants',
   'benchmark', 'report',
 ]
 
