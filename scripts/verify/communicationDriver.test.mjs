@@ -42,14 +42,16 @@ it('halves the turn press after swinging past the subject', async () => {
   expect(holds.length).toBeLessThan(20)
   expect(holds.at(-1)).toBeLessThan(holds[0])
 })
-it('accepts the nearest yaw one shortest press can reach', async () => {
-  let yaw = 0.073, presses = 0
+it('finishes the aim with mouse-look when a turn key overshoots by a whole frame', async () => {
+  let yaw = 0.3, presses = 0, cursor = 720
   const driver = communicationDriver({
     evaluate: async () => ({ x: 0, z: 0, yaw }),
     keyboard: { down: async () => {}, up: async () => {} },
-    // Every press turns one whole 0.146 rad frame however short it is held.
+    // Every key press turns one whole 0.146 rad frame however short it is held.
     waitForTimeout: async () => { presses++; yaw += yaw > 0 ? -0.146 : 0.146 },
+    mouse: { move: async (x) => { yaw -= (x - cursor) * 0.0011; cursor = x } },
   })
   await driver.aim({ x: 0, z: -1 })
-  expect(presses).toBeLessThan(80)
+  expect(Math.abs(yaw)).toBeLessThan(0.065)
+  expect(presses).toBe(0)
 })

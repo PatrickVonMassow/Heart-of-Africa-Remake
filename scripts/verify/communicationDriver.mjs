@@ -23,23 +23,33 @@ export function communicationDriver(page) {
     } finally { for (const key of keys) await page.keyboard.up(key) }
   }
   // A slow frame turns further than the key was held, so a sign flip halves
-  // the next press instead of swinging past the subject indefinitely. The
-  // shortest press still turns at least one frame; within half of that
-  // measured step no key press lands closer, so the aim is as good as it gets.
+  // the next press instead of swinging past the subject indefinitely. A turn
+  // key still moves a whole frame's worth, so the last stretch goes through
+  // mouse-look, which turns by the exact pixel delta (0.0011 rad/px).
+  let pointer = null
   async function aim(target) {
-    let scale = 1, last = 0, delta = 0, distance = 0, prevYaw = null, floorPress = false, minStep = Infinity
+    let scale = 1, last = 0, delta = 0, distance = 0
     for (let i = 0; i < 80; i++) {
       const p = await read(() => ({ ...window.__placePlayer }))
-      if (floorPress && prevYaw !== null) minStep = Math.min(minStep, Math.abs(Math.atan2(Math.sin(p.yaw - prevYaw), Math.cos(p.yaw - prevYaw))))
       delta = turnDelta(p.yaw, p, target)
       distance = Math.hypot(target.x - p.x, target.z - p.z)
-      if (Math.abs(delta) < 0.065 || (minStep < Infinity && Math.abs(delta) <= minStep / 2)) return
+      if (Math.abs(delta) < 0.065) return
+      if (Math.abs(delta) < 0.35 && page.mouse) {
+        const dx = Math.round(-delta / 0.0011)
+        // An unknown or edge cursor is re-centred first; that move turns the
+        // view too, so the pose is read again before the measured nudge.
+        if (!pointer || pointer.x + dx < 40 || pointer.x + dx > 1400) {
+          pointer = { x: 720, y: 450 }
+          await page.mouse.move(pointer.x, pointer.y)
+          continue
+        }
+        pointer.x += dx
+        await page.mouse.move(pointer.x, pointer.y, { steps: 4 })
+        continue
+      }
       if (last && Math.sign(last) !== Math.sign(delta)) scale = Math.max(0.1, scale / 2)
       last = delta
-      const ms = Math.max(8, Math.min(180, Math.max(20, Math.abs(delta) / 2.2 * 700)) * scale)
-      floorPress = ms === 8
-      prevYaw = p.yaw
-      await held([delta > 0 ? 'ArrowLeft' : 'ArrowRight'], () => page.waitForTimeout(ms))
+      await held([delta > 0 ? 'ArrowLeft' : 'ArrowRight'], () => page.waitForTimeout(Math.max(8, Math.min(180, Math.max(20, Math.abs(delta) / 2.2 * 700)) * scale)))
     }
     throw new Error(`Could not aim at the declared subject using turn keys (${delta.toFixed(3)} rad off at ${distance.toFixed(2)} m)`)
   }
