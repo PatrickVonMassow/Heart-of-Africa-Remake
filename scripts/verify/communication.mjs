@@ -84,13 +84,29 @@ async function guess(name, reading, expectedAtom) {
 }
 async function speech(kind, point, frameName) {
   await d.inspect(point, kind === 'adult-talk' ? 2 : 5)
-  const after = await d.read(() => performance.now() / 1000)
-  const heard = await d.wait(({ after, child }) => window.__speech?.labels().find((l) => {
-    const at = window.__speech.anchorScreen(l.speakerId)
-    return l.shownAt > after && at && at.x > 100 && at.x < innerWidth - 100 && at.y > 80 && at.y < innerHeight - 100 &&
+  // A player turns to the voice he hears: wait for a drawn note (unheard speech
+  // is never drawn), face its speaker with the normal controls, and take it only
+  // once the note stands inside the picture.
+  let spoken = null
+  const deadline = Date.now() + 480000
+  let after = await d.read(() => performance.now() / 1000)
+  while (!spoken) {
+    assert(Date.now() < deadline, `No ${kind} note reached the picture`)
+    const heard = await d.wait(({ after, child }) => window.__speech?.labels().find((l) =>
+      l.shownAt > after && document.querySelector(`.speech-label[data-speaker="${l.speakerId}"]`) &&
       (child ? l.speakerId.startsWith('kid-') && l.atoms.includes(window.__game.getState().vocabulary.RIVER) : l.speakerId.startsWith('villager-'))
-  }), { after, child: kind === 'child-call' }, 480000)
-  const spoken = await heard.jsonValue(); await heard.dispose()
+    ), { after, child: kind === 'child-call' }, Math.max(1000, deadline - Date.now()))
+    const label = await heard.jsonValue(); await heard.dispose()
+    after = label.shownAt
+    const world = await d.read((id) => window.__speech.anchorWorld(id), label.speakerId)
+    if (!world) continue
+    await d.aim({ x: world[0], z: world[2] })
+    const seen = await d.wait((id) => {
+      const box = document.querySelector(`.speech-label[data-speaker="${id}"]`)?.getBoundingClientRect()
+      return box && box.width > 1 && box.left > 0 && box.top > 0 && box.right < innerWidth && box.bottom < innerHeight
+    }, label.speakerId, 3000).then(() => true, () => false)
+    if (seen) spoken = label
+  }
   const windowStart = await audioStart(kind, kind === 'child-call' ? receipt.bands.child : receipt.bands.adult, 1)
   await event(kind, { spoken })
   await frame(frameName, { element: `.speech-label[data-speaker="${spoken.speakerId}"]`,

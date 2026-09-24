@@ -145,10 +145,17 @@ export function SpeechLabels() {
         anchor.getWorldPosition(WORLD)
         WORLD.y += label.height
         WORLD.project(camera)
+        // Behind the camera the projection mirrors onto the screen while drei
+        // hides the note; report what the picture shows, which is nothing.
+        if (WORLD.z > 1) return null
         return {
           x: ((WORLD.x + 1) / 2) * size.width,
           y: ((1 - WORLD.y) / 2) * size.height,
         }
+      },
+      anchorWorld: (speakerId: string) => {
+        const anchor = speechAnchor(speakerId)
+        return anchor ? anchor.getWorldPosition(WORLD).toArray() : null
       },
       labels: () => speechLabelState().labels,
       clear: clearSpeechLabels,
