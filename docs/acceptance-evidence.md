@@ -323,10 +323,11 @@ polish.mjs` section `chief-to-drummer` proves he is SEEN walking — part of the
 path behind him, part still in front — and then standing abreast of the drummer
 where the scene really drew him; `scripts/verify/collision.mjs` that his door
 answers its use key from a collision-free standpoint, with the reset to his hut
-checked before the press; `scripts/verify/flow.mjs` photographs the pair from
-the front in `04-chief-outside-his-hut.png`; and the same `polish.mjs` section
-photographs them again in `151-chief-beside-his-drummer.png`, with the drums
-still speaking at the shutter.
+checked before the press; the same `polish.mjs` section photographs the pair
+in `151-chief-beside-his-drummer.png`, with the drums still speaking at the
+shutter. Only Bambara's chief walks out: `scripts/verify/flow.mjs` shows the
+Nubian head man answering from his hut in `04-chief-hut-meeting.png`, with no
+follow-me entry in `05-journal-after-chief-meeting.png`.
 
 THE ERRAND AND ITS ANSWER. The player follows the river upstream in the
 bird's-eye view and digs at the rendered boulder. The find is an inventory item
