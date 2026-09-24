@@ -72,6 +72,8 @@ async function reopen(message, name) {
 }
 async function guess(name, reading, expectedAtom) {
   await d.wait(() => !!document.querySelector('.speech-label.targeted .speech-invite'))
+  const targeted = await d.read(() => document.querySelector('.speech-label.targeted').getAttribute('data-speaker'))
+  assert(await faceNote(targeted), `The targeted note of ${targeted} never reached the picture`)
   await frame(`${name}-invitation`, { element: '.speech-label.targeted', label: 'the live note inviting E above its speaker', settle: false })
   await page.keyboard.press('KeyE')
   await page.locator('.speech-guess').waitFor()
