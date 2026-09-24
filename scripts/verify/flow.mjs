@@ -1,5 +1,5 @@
 // End-to-end verification of the POC gameplay loop (CLAUDE.md §7.1/§7.2):
-// start → trade in Cairo → checkpoint → travel → village → the chief outside →
+// start → trade in Cairo → checkpoint → travel → village → meet the chief →
 // grave → victory. Runs against the dev server (dev hooks __game,
 // __placePlayer, __placeLayout are DEV-only). UI text is asserted in German,
 // the default game language; journal entries are asserted by their
@@ -61,8 +61,8 @@ const BUILDING_LABELS = { tools: 'Geräte-Hütte', shop: 'Laden', chief: 'Chefh�
 
 // Stand at the building's door, wait for the Space use-key prompt to arm, then
 // press Space (design.md §2.3): the building no longer opens by merely walking
-// into its door. At the CHIEF's hut the press opens no window at all — it brings
-// the man out (design.md §12), so that is what the wait looks for.
+// into its door. At the CHIEF's hut the press opens no window at all — meeting
+// the head man provides settlement orientation (design.md §17.3).
 async function enterBuilding(type) {
   const it = await findInteractive(type)
   {
@@ -80,7 +80,7 @@ async function enterBuilding(type) {
     if (type === 'chief') {
       await page.waitForFunction(() => {
         const g = window.__game.getState()
-        return g.chiefOutside[g.placeId] === true
+        return g.orientationGiven[g.placeId] === true
       }, null, { timeout: 30000 })
     } else {
       await page.waitForFunction(() => !!document.querySelector('.dialog'), null, { timeout: 30000 })
@@ -464,49 +464,33 @@ if (section('core-loop')) {
     check('a hut door opens even with the journal open (design.md §16)', true, 'no market hut in this village — skipped')
   }
 
-  // --- 6. The chief comes out and says what he knows (criteria 6, 7) ---
-  // No gift buys this and no window holds it any more (point 1052): the use key
-  // at his door brings him into the open, and he speaks from the first minute.
+  // --- 6. The Nubian head man answers without Bambara's drum chain ---
+  const journalBeforeChief = (await state()).journal.length
   await enterBuilding('chief')
   await page.waitForTimeout(300)
   s = await state()
-  check('The use key brings the chief out of his hut', s.chiefOutside[s.placeId] === true)
-  // He does not stay at his door: he walks across to his drummer and speaks
-  // through the drums from there (design.md §13.4). Wait until he has ARRIVED,
-  // then stand in FRONT of the pair — both men face the same way, so a spot on
-  // that bearing has chief and drummer in one picture, from the front.
-  await page.waitForFunction(() => window.__chief?.phase === 'at-drummer', null, { timeout: 30000 })
-  // Read the state AFTER his walk: the snapshot above was taken at his door, and
-  // the journal checks below belong to the man who has arrived.
-  s = await state()
-  await page.evaluate(() => {
-    const chief = window.__chief
-    const yaw = chief.facing
-    const mx = (chief.x + chief.drummer[0]) / 2
-    const mz = (chief.z + chief.drummer[1]) / 2
-    const p = window.__placePlayer
-    p.x = mx + Math.sin(yaw) * 6
-    p.z = mz + Math.cos(yaw) * 6
-    // Place-camera yaw 0 looks toward -Z, so aim with the +PI complement.
-    p.yaw = Math.atan2(mx - p.x, mz - p.z) + Math.PI
+  check('The Nubian chief stays in his hut after the use key', !s.chiefOutside[s.placeId] &&
+    await page.evaluate(() => !window.__chief))
+  check('Meeting the Nubian chief gives settlement orientation', s.orientationGiven[s.placeId] === true)
+  const noMessage = await page.evaluate(async () => {
+    const { getStrings } = await import('/src/i18n/index.ts')
+    return getStrings().toasts.chiefNoMessage
   })
-  await shot('04-chief-outside-his-hut', { place: 'nubian-village', label: 'the chief standing beside his drummer, both seen from the front' })
+  check('The Nubian chief answers with nothing to send', s.toast === noMessage)
+  await shot('04-chief-hut-meeting', { element: '.toast', label: 'the ordinary head-man response at the chief’s hut' })
   const walkEntries = s.journal.filter((e) => titleKey(e) === 'journal.titles.chiefWalk')
-  check('Meeting him records his walk once', walkEntries.length === 1 &&
-    walkEntries[0].text.key === 'journal.chiefWalk' && !walkEntries[0].text.params)
+  check('Meeting the Nubian chief adds no follow-me journal entry', walkEntries.length === 0 &&
+    s.journal.length === journalBeforeChief)
   check('The door supplies no deciphered message',
     !s.journal.some((e) => ['journal.hintRaw', 'journal.hintDecoded'].includes(e.text?.key)))
-  // Do-not-disturb is on for this run (line ~110, so the long walks are not
-  // interrupted), and DND is exactly the setting that stops a new entry from
-  // opening the book. The player's own way to read it is to open it — so open it,
-  // rather than photograph a panel this suite has arranged not to appear.
+  // Open the journal ourselves: this ordinary meeting writes no new page.
   await page.evaluate(() => window.__game.getState().setJournalOpen(true))
   await page.waitForFunction(() => !!document.querySelector('.journal'), null, { timeout: 5000 })
-  await shot('05-journal-hint', { element: '.journal', label: 'the journal recording the chief’s walk' })
+  await shot('05-journal-after-chief-meeting', { element: '.journal', label: 'the existing journal after meeting the Nubian head man' })
   await page.evaluate(() => window.__game.getState().setJournalOpen(false))
   await page.waitForTimeout(200)
 
-  // --- 7. Another village records its own chief’s walk ---
+  // --- 7. An eastern village also has an ordinary head man ---
   await leaveByWalking()
   await page.evaluate(() => {
     const g = window.__game.getState()
@@ -520,8 +504,10 @@ if (section('core-loop')) {
   })
   await page.waitForTimeout(400)
   s = await state()
-  check('The eastern chief also records his walk without coordinates',
-    s.journal.filter((e) => titleKey(e) === 'journal.titles.chiefWalk').length === 2 &&
+  check('The eastern chief gives orientation without a walk or follow-me entry',
+    s.orientationGiven[s.placeId] === true && !s.chiefOutside[s.placeId] && s.toast === noMessage &&
+    await page.evaluate(() => !window.__chief) &&
+    s.journal.filter((e) => titleKey(e) === 'journal.titles.chiefWalk').length === 0 &&
     !s.journal.some((e) => ['journal.hintRaw', 'journal.hintDecoded'].includes(e.text?.key)))
   await page.evaluate(() => window.__game.getState().leavePlace())
   await page.waitForTimeout(800)
