@@ -70,6 +70,22 @@ async function reopen(message, name) {
   if (name === '04-cleared-paper') assert.equal(reading, '???')
   await d.close()
 }
+// What the speech layer and the key prompt hold right now, for a timeout message.
+async function speechState() {
+  return 'speech ' + JSON.stringify(await d.read(() => {
+    const p = window.__placePlayer
+    return {
+      player: p && [p.x, p.z],
+      prompt: document.querySelector('.prompt')?.textContent ?? null,
+      chief: window.__chief?.phase ?? null,
+      targeted: document.querySelector('.speech-label.targeted')?.getAttribute('data-speaker') ?? null,
+      notes: window.__speech.labels().map((l) => {
+        const w = window.__speech.anchorWorld(l.speakerId)
+        return { speaker: l.speakerId, atoms: l.atoms, shownAt: l.shownAt, distance: w && p ? Math.hypot(w[0] - p.x, w[2] - p.z) : null }
+      }),
+    }
+  }))
+}
 async function guess(name, reading, expectedAtom, speaker = null) {
   // With a speaker named, only his note may be the one E is pressed on: another
   // villager's older note nearby can hold the target meanwhile.
@@ -78,19 +94,7 @@ async function guess(name, reading, expectedAtom, speaker = null) {
     return !!note?.querySelector('.speech-invite') && (!speaker || note.getAttribute('data-speaker') === speaker)
   }
   await d.wait(invited, speaker, 60000).catch(async (error) => {
-    // Name the speech state instead, so a timeout says which note held the key.
-    const state = await d.read(() => {
-      const p = window.__placePlayer
-      return {
-        player: p && [p.x, p.z],
-        targeted: document.querySelector('.speech-label.targeted')?.getAttribute('data-speaker') ?? null,
-        notes: window.__speech.labels().map((l) => {
-          const w = window.__speech.anchorWorld(l.speakerId)
-          return { speaker: l.speakerId, atoms: l.atoms, shownAt: l.shownAt, distance: w && p ? Math.hypot(w[0] - p.x, w[2] - p.z) : null }
-        }),
-      }
-    })
-    throw new Error(`no invitation on ${speaker ?? 'any'} note; speech ${JSON.stringify(state)} (${error.message})`)
+    throw new Error(`no invitation on ${speaker ?? 'any'} note; ${await speechState()} (${error.message})`)
   })
   // The speaker keeps walking while the camera turns, so a single aim can miss;
   // re-aim at whoever is targeted until the note stands inside the picture.
@@ -325,7 +329,9 @@ async function readings() {
   await d.wait(() => !window.__game.getState().chiefOutside['bambara-village'], null, 480000)
   await prompt('drummer')
   await page.keyboard.press('Space')
-  await d.wait(() => window.__speech?.labels().some((l) => l.speakerId === 'drummer'))
+  await d.wait(() => window.__speech?.labels().some((l) => l.speakerId === 'drummer'), null, 60000).catch(async (error) => {
+    throw new Error(`the drummer never spoke after the key; ${await speechState()} (${error.message})`)
+  })
   await guess('04-chief-indoors', 'perhaps the head man', receipt.vocabulary.CHIEF, 'drummer')
   await journal(1)
   const readings = { UPSTREAM: 'against the current', DOWNSTREAM: 'with the current', ROCK: 'a rock', DIG: 'dig' }
