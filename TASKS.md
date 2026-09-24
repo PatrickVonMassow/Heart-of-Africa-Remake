@@ -370,6 +370,42 @@ put it is the mistake this line exists to stop.
   PLACEMENT (user 24.09.2026, 13:08): directly behind point 174, not with 1195: "1206 und 1207 solln nicht mitrücken. Sie sollen also nach dem Vorziehen von 1195 direkt hinter 174 stehen."
   Bundle: Werkzeug.
 
+- [ ] 1209. Every session starts and runs on a smaller fixed context load.
+  USER ORDER 24.09.2026, 13:30: »Reihe die von dir vorgeschlagenen Maßnahmen zur Reduktion des
+  Token-Verbrauchs direkt vor 1204 ein. Das soll aber mit Vier-Augen-Prinzip umgesetzt werden.«
+  Earlier the same day, 13:10: »Wieso hast du eigentlich nur für diese Diskussion schon über 80k
+  Token verbraucht?« and 13:14: »Wäre es z. B. ein Ansatz Text wie die in CLAUDE.md … darauf zu
+  prüfen, ob wirklich alle diese Infos für jede Session notwendig sind und … ob sich der selbe
+  Inhalt nicht mit deutlich weniger Worten (z. B. stichpunktartig) darstellen lässt?«
+  PROBLEM: a discussion-only session reached 80k context. Measured: CLAUDE.md ~2.7k and MEMORY.md
+  ~1.7k tokens; the estimated remaining fixed load (tool schemas, MCP/skill listings, the
+  SessionStart text) was ~30k+ and is NOT yet measured. Per-turn hook texts (timestamp,
+  dashboard reminder, stand-down, context level) repeat several hundred tokens every turn.
+  FINAL STATE, strictly deletion and simplification (infrastructure freeze, CLAUDE.md §2):
+  (a) MEASURE first: the context reading of a fresh session before its first tool call, split by
+  source (system/tool schemas, MCP servers, skills, CLAUDE.md, MEMORY.md, hook texts), recorded
+  in the point's evidence. Every later step reports its saving against this baseline.
+  (b) Unused tool surface OFF: MCP servers, plugins and connectors no session of this project
+  uses are disabled in the project settings (keep whole-tool allowances broad, memory
+  `track-permission-prompts`).
+  (c) Per-turn hook texts shrink to one line when nothing is due; the full text appears only
+  when the condition actually applies (e.g. the stand-down text only in a standing-down session).
+  (d) CLAUDE.md and MEMORY.md are condensed: content no session needs every time moves to the
+  linked docs; the rest is terse bullet form written for sessions, not humans. No rule changes
+  meaning — a rule that is dropped is named as dropped.
+  FOUR EYES (user order): (d) and the keep/cut list of (b)/(c) are DIVERGENT work — Opus 5.5 and
+  GPT-6 Astra each produce the cut list blind-parallel from identical inputs, a third model
+  merges through scripts/blind-merge.mjs and every dropped or reworded rule is listed with its
+  reason. The implementation is reviewed cross-vendor (never by its author) before landing,
+  reading the diff before its rationale.
+  Test: the unit layer stays green over the documents (tests exist over CLAUDE.md/docs); a
+  fresh-session reading after the change is recorded beside the baseline of (a); every hook whose
+  text changed keeps its own test green.
+  Criticality: medium — cost, not correctness; but it is paid by every session.
+  Refs: CLAUDE.md, memory MEMORY.md, .claude/settings.json, scripts/*-hook.mjs,
+  scripts/*-guard.mjs, scripts/blind-merge.mjs, scripts/review-astra.mjs.
+  Bundle: Modell & Wächter
+
 - [ ] 1204. Arm the handover watermark so it refuses instead of observing.
   PROBLEM, user order 24.09.2026: "Du kommst immer wieder über die 150k und bringst danach eine
   Begründung. … Aber das scheint nicht zu helfen, denn du scheinst nicht daraus zu lernen."
