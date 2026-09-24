@@ -61,13 +61,18 @@ export function analyseAudioWindow(channels, sampleRate, bands, blocks = []) {
     spectra.push(Array.from(spectrum))
     return { peak, rms: Math.sqrt(square / samples.length), bandMeanSquare: energy }
   })
-  const gaps = []
+  const gaps = [], restamped = []
   for (let i = 1; i < blocks.length; i++) {
     const missing = blocks[i].frame - (blocks[i - 1].frame + blocks[i - 1].length)
-    if (missing !== 0) gaps.push({ afterFrame: blocks[i - 1].frame, missingFrames: missing })
+    const next = blocks[i + 1] ? blocks[i + 1].frame - (blocks[i].frame + blocks[i].length) : 0
+    // A block stamped early and its successor late by the same amount carries
+    // every sample in order: one mis-stamped block, not lost audio.
+    if (missing < 0 && next === -missing) {
+      restamped.push({ afterFrame: blocks[i - 1].frame, shiftFrames: missing }); i++
+    } else if (missing !== 0) gaps.push({ afterFrame: blocks[i - 1].frame, missingFrames: missing })
   }
   return { sampleRate, samples: channels[0].length, duration: channels[0].length / sampleRate,
-    bandsHz: bands, fftSize: size, binHz: sampleRate / size, channels: result, spectra, gaps }
+    bandsHz: bands, fftSize: size, binHz: sampleRate / size, channels: result, spectra, gaps, restamped }
 }
 
 export function stereoWav(channels, sampleRate) {

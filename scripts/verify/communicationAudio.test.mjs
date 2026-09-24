@@ -21,6 +21,18 @@ describe('final-output audio evidence', () => {
     expect(a.channels.every((c) => c.peak === 0 && c.rms === 0)).toBe(true)
     expect(a.gaps.map((g) => g.missingFrames)).toEqual([128, -84])
   })
+  it('reads an early block followed by an equally late one as a restamp, not a gap', () => {
+    const zero = Array(sr).fill(0)
+    const a = analyseAudioWindow([zero, zero], sr, bands, [
+      { frame: 0, length: 128 }, { frame: 0, length: 128 }, { frame: 256, length: 128 }, { frame: 384, length: 128 },
+    ])
+    expect(a.gaps).toEqual([])
+    expect(a.restamped).toEqual([{ afterFrame: 0, shiftFrames: -128 }])
+    const lost = analyseAudioWindow([zero, zero], sr, bands, [
+      { frame: 0, length: 128 }, { frame: 0, length: 128 }, { frame: 384, length: 128 },
+    ])
+    expect(lost.gaps.map((g) => g.missingFrames)).toEqual([-128, 256])
+  })
   it('rejects missing, malformed and undersized evidence', () => {
     expect(() => analyseAudioWindow([[], []], sr, bands)).toThrow()
     expect(() => analyseAudioWindow([tone(128), [0]], sr, bands)).toThrow()
