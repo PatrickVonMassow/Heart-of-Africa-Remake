@@ -1369,12 +1369,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "1176": {
-      "at": "2026-09-21T21:12:53.633Z",
-      "why": "user 21.09.2026, 20:21: nach 659, vor 633 — gehoert zu v0.3, weil v0.3 die Kinderspiele einfuehrt",
-      "origin": "user",
-      "place": "ahead"
-    },
     "1177": {
       "at": "2026-09-22T04:09:46.332Z",
       "why": "Infrastruktur-Befund ohne Spielereffekt; er reiht sich hinter die offene Spielarbeit, weil der Render-Guard fuer 1157 bereits laut deferiert ist und jede weitere Landung dieselbe Deferral nehmen kann, bis 1177 an der Reihe ist",
@@ -1416,6 +1410,12 @@
       "why": "fehlendes Beweisbild, kein Spielerschaden; hinter die offenen Dorfleben-Punkte",
       "origin": "machine",
       "place": "last"
+    },
+    "1203": {
+      "at": "2026-09-24T02:38:25.192Z",
+      "why": "low-criticality test-infrastructure noise with no player impact; last is right",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1447,7 +1447,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-23T22:42:25.923Z",
+    "at": "2026-09-24T02:38:25.205Z",
     "points": [
       174,
       184,
@@ -1853,7 +1853,6 @@
       1171,
       1172,
       1175,
-      1176,
       1177,
       1179,
       1185,
@@ -1864,7 +1863,8 @@
       1192,
       1195,
       1197,
-      1202
+      1202,
+      1203
     ]
   }
 }
