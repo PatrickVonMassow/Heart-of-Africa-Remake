@@ -413,7 +413,9 @@ async function riverTrip(from, to, prefix) {
   await event(`${prefix}-route`, { route, from, to })
   const worlds = await d.read(async (route) => {
     const { latLonToWorld } = await import('/src/world/geo.ts')
-    return route.map((p) => latLonToWorld(p.lat, p.lon))
+    const { sampleTerrain } = await import('/src/world/terrain.ts')
+    const seed = window.__game.getState().seed
+    return route.map((p) => ({ ...latLonToWorld(p.lat, p.lon), wet: ['water', 'ocean'].includes(sampleTerrain(p.lat, p.lon, seed).type) }))
   }, route)
   for (let i = 0; i < route.length; i++) {
     const world = worlds[i]
@@ -425,7 +427,8 @@ async function riverTrip(from, to, prefix) {
       return (pos.x - world.x) * (b.x - a.x) + (pos.z - world.z) * (b.z - a.z) > 0
     }
     // The drift can also carry him past while he is still steering for it.
-    if (!await past()) await d.travelTo(world).catch(async (e) => { if (!await past()) throw e })
+    // A bank point the flood plain puts under water is walked round, not swum to.
+    if (!world.wet && !await past()) await d.travelTo(world).catch(async (e) => { if (!await past()) throw e })
     if (i === 0 || i === Math.floor(route.length / 2) || i === route.length - 1) {
       // A swimmer drifts with the current while a settling shutter waits, so
       // the subject is where the traveller floats at the shutter, not the waypoint.

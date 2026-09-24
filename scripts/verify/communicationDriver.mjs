@@ -150,16 +150,21 @@ export function communicationDriver(page) {
         const p = latLonToWorld(place.lat, place.lon)
         if (Math.hypot(p.x - origin.x, p.z - origin.z) > 2) colliders.push({ x: p.x - origin.x, z: p.z - origin.z, r: settlementCollisionRadius(window.__balance.placeEnterRadius, window.__balance.placeCollisionFactor) })
       }
-      const grid = buildPlaceNavGrid({ radius: reach }, colliders, 0.6, 1.2, 0.25)
-      navRestrict(grid, (x, z) => {
-        const p = worldToLatLon(x + origin.x, z + origin.z)
-        return !isBlocked(sampleTerrain(p.lat, p.lon, s.seed).type, p.lat, p.lon)
-      })
+      // A player walks the bank: water is crossed only where no land way
+      // exists, because the current carries a swimmer off his course.
+      const plan = (swim) => {
+        const grid = buildPlaceNavGrid({ radius: reach }, colliders, 0.6, 1.2, 0.25)
+        navRestrict(grid, (x, z) => {
+          const p = worldToLatLon(x + origin.x, z + origin.z), type = sampleTerrain(p.lat, p.lon, s.seed).type
+          return !isBlocked(type, p.lat, p.lon) && (swim || (type !== 'water' && type !== 'ocean'))
+        })
+        return findPlaceRoute(grid, { x: 0, z: 0 }, to, 12)
+      }
       // An interaction target may be solid: stop within its declared reach.
       const dx = target.x - origin.x, dz = target.z - origin.z, len = Math.hypot(dx, dz)
       if (len <= tolerance) return []
       const to = { x: dx * (1 - tolerance / len), z: dz * (1 - tolerance / len) }
-      return findPlaceRoute(grid, { x: 0, z: 0 }, to, 12)?.map((p) => ({ x: p.x + origin.x, z: p.z + origin.z })) ?? null
+      return (plan(false) ?? plan(true))?.map((p) => ({ x: p.x + origin.x, z: p.z + origin.z })) ?? null
     }, { target, tolerance })
     if (!path) {
       // An animal may stand on the waypoint or around the traveller; a player
