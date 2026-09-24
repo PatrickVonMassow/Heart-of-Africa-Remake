@@ -230,8 +230,11 @@ async function message(which, trigger, point) {
   check(`${which} paper is absent before the last beat`, !await page.locator('.drum-message').count())
   await event(`drum-${which}-plan`, { plan, startedAt, endsAt: performance.endsAt })
   // Giving at the chief leaves the view on him; the pair is framed at the drum.
-  await d.aim(point)
-  await localFrame(`${prefix}-${which}-sounding`, point, 'chief and drummer together sounding the message')
+  // Aimed at the pair's upper bodies: from the 1.4-2 m the key needs, a
+  // point at knee height falls below a level view's bottom edge.
+  const bodies = { x: point.x, y: 1.0, z: point.z }
+  await d.aim(bodies)
+  await localFrame(`${prefix}-${which}-sounding`, bodies, 'chief and drummer together sounding the message')
   await d.wait((which) => window.__game.getState().drumMessageHeard[which] && !!document.querySelector('.drum-message'), which, 60000)
   const firstShown = await d.read(() => {
     const timing = window.__communicationPaperTiming
