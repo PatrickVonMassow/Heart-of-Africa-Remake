@@ -16059,3 +16059,18 @@ to land than a mechanism that needs a review.
   Test: Vitest `src/scenes/place/digPicture.test.ts`; `polish --section=adult-errands`.
   Refs: scripts/verify/digSitePicture.mjs, src/scenes/place/boundary.ts, point 1173, point 1198.
   Bundle: Dorfleben
+- [ ] 1203. The voice suite reds on a network hiccup at huggingface.co.
+  PROBLEM, measured 23.09.2026 on feat/1174 e5b3b6407, webgl/voice: `TTS assets recorded into
+  the local cache` (scripts/verify/voice.mjs) failed with 12 assets served and one
+  `fetchErrors` entry — `voices/bm_george.bin` from huggingface.co, "fetch failed". The check
+  treats any fetch error as a product red, so an external network transient blocks the render
+  gate until someone charges it by hand.
+  FINAL STATE: a fetch error that is a network failure of the external model host (no HTTP
+  status) is reported as an ENVIRONMENT transient — the check fails soft with that label and the
+  run is not counted as a product red — while an HTTP error status or zero assets recorded stays
+  a hard red. CLAUDE.md §7.2 ("fail soft for environment/staging transients") is the rule.
+  Criticality: low — no player impact; it unblocks the gate from outside noise.
+  Test: `npm test -- voice` on WebGL 2 with the host reachable (green) and with a blocked host
+  route for one voice file (soft, labelled); a Vitest case if the classification is a pure helper.
+  Refs: scripts/verify/voice.mjs, scripts/render-verify-charges.mjs.
+  Bundle: Testinfrastruktur
