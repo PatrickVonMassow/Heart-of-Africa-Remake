@@ -3613,6 +3613,22 @@ if (section('tag-catch')) {
           )
           if (!placed) continue
           await nextFrames(3)
+          // Collision may have moved the drawn camera off the requested spot: re-aim
+          // from where it really stands, pitch included, and refuse a spot so close
+          // that the subject falls off the bottom edge.
+          const aimed = await page.evaluate((q) => {
+            const p = window.__placePlayer
+            const probe = window.__placeRayHit?.(q.x, 0.3, q.z)
+            if (!p || !probe) return false
+            const h = Math.hypot(q.x - p.x, q.z - p.z)
+            if (h < 2) return false
+            const dy = Math.sqrt(Math.max(0, probe.targetDistance ** 2 - h ** 2))
+            p.yaw = Math.atan2(q.x - p.x, q.z - p.z) + Math.PI
+            p.pitch = -Math.atan2(dy + 0.3 - 0.35, h)
+            return true
+          }, subject)
+          if (!aimed) continue
+          await nextFrames(3)
           const hit = await page.evaluate((q) => window.__placeRayHit?.(q.x, 0.3, q.z) ?? null, subject)
           if (hit && (hit.hitDistance == null || hit.hitDistance >= hit.targetDistance * 0.9)) return { back, side, hit }
         }
