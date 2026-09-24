@@ -411,10 +411,18 @@ async function riverTrip(from, to, prefix) {
   })
   const route = riverBankRoute(axis, from, to)
   await event(`${prefix}-route`, { route, from, to })
+  const worlds = await d.read(async (route) => {
+    const { latLonToWorld } = await import('/src/world/geo.ts')
+    return route.map((p) => latLonToWorld(p.lat, p.lon))
+  }, route)
   for (let i = 0; i < route.length; i++) {
-    const p = route[i]
-    const world = await d.read(async (p) => (await import('/src/world/geo.ts')).latLonToWorld(p.lat, p.lon), p)
-    await d.travelTo(world)
+    const world = worlds[i]
+    // The current may already have carried the swimmer past this waypoint; a
+    // player goes on downstream rather than fighting back against the flow.
+    const [a, b] = i + 1 < worlds.length ? [world, worlds[i + 1]] : [worlds[i - 1] ?? world, world]
+    const pos = await d.read(() => window.__game.getState().pos)
+    const past = (pos.x - world.x) * (b.x - a.x) + (pos.z - world.z) * (b.z - a.z) > 0
+    if (!past) await d.travelTo(world)
     if (i === 0 || i === Math.floor(route.length / 2) || i === route.length - 1) {
       // A swimmer drifts with the current while a settling shutter waits, so
       // the subject is where the traveller floats at the shutter, not the waypoint.
