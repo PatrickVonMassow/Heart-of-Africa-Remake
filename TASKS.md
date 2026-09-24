@@ -77,25 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1210. The chief's step-out, drum promise and follow-me journal entry happen in Bambara Village only.
-  User 24.09.2026, 16:11: »Die Umsetzung der PoC-Kommunikationsmechanik hatte also Einfluss auf
-  andere Dörfer als das Bambara Village? Das sollte so nicht sein.« 16:36: »Das soll direkt als
-  nächstes erledigt werden.«
-  Measured on main 49f900c39: `callChiefOut` (src/state/store.ts) gates only on
-  `place.kind === 'village'`, so in EVERY village using the chief's hut walks him out to his
-  drummer, shows `toasts.chiefStepsOut` (promising he will speak over the drums) and on the first
-  time writes `journal.chiefWalk` ("apparently I was meant to follow him") — while only
-  `DRUM_MESSAGE_VILLAGE` sends a message (`chiefMeeting.ts` yields `no-message` elsewhere).
-  Introduced by 39fa30da6 (05.09); listed as U4/U5 in docs/blind-659/union.json on feat/659.
-  Final state: outside Bambara Village no part of the communication chain appears — no walk to
-  the drummer, no drum-promise toast, no chiefWalk journal entry; the chief there answers as a
-  plain head man with nothing to send. The design.md §17 orientation marking (`orientationGiven`)
-  rides on the same step-out today: keep it reachable outside Bambara per design.md, or mark
-  `// OPEN:` and report if design.md leaves its trigger unclear.
-  Test: Vitest store/interaction test — outside `DRUM_MESSAGE_VILLAGE` no chiefStepsOut toast, no
-  chiefWalk entry, no walk; inside Bambara unchanged.
-  Bundle: Kommunikation.
-
 - [ ] 659. The whole communication chain, played through and judged by what reaches the
   PLAYER — A SIX-EYES ALL-ROUND REVIEW.
   ON HOLD (user 13.08.2026, 22:25: »Stoppe 659 erstmal — der macht erstmal keinen Sinn, wenn wir
