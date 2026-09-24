@@ -128,7 +128,11 @@ async function prompt(kind) {
     // does the key name him through the drummer.
     return kind === 'hut' ? t.buildings.chief : kind === 'message' ? t.labels.askForDrumMessage : t.labels.askDrummer
   }, kind)
-  await d.wait((label) => document.querySelector('.prompt')?.textContent.includes(label), label)
+  await d.wait((label) => document.querySelector('.prompt')?.textContent.includes(label), label, 30000).catch(async (error) => {
+    // Name what the prompt showed instead, so a timeout says which candidate won.
+    const shown = await d.read(() => document.querySelector('.prompt')?.textContent ?? null)
+    throw new Error(`prompt "${label}" never appeared; the prompt showed ${JSON.stringify(shown)} (${error.message})`)
+  })
 }
 async function chief(prefix = '05') {
   await d.close()
