@@ -82,6 +82,17 @@ async function guess(name, reading, expectedAtom) {
   await page.locator('.speech-guess .actions button').first().click()
   await d.close()
 }
+// Turns to a speaker with the normal controls; true once his note stands
+// inside the picture (drei hides a note behind the camera).
+async function faceNote(id) {
+  const world = await d.read((id) => window.__speech.anchorWorld(id), id)
+  if (!world) return false
+  await d.aim({ x: world[0], z: world[2] })
+  return d.wait((id) => {
+    const box = document.querySelector(`.speech-label[data-speaker="${id}"]`)?.getBoundingClientRect()
+    return box && box.width > 1 && box.left > 0 && box.top > 0 && box.right < innerWidth && box.bottom < innerHeight
+  }, id, 3000).then(() => true, () => false)
+}
 async function speech(kind, point, frameName) {
   await d.inspect(point, kind === 'adult-talk' ? 2 : 5)
   // A player turns to the voice he hears: wait for a drawn note (unheard speech
@@ -98,14 +109,7 @@ async function speech(kind, point, frameName) {
     ), { after, child: kind === 'child-call' }, Math.max(1000, deadline - Date.now()))
     const label = await heard.jsonValue(); await heard.dispose()
     after = label.shownAt
-    const world = await d.read((id) => window.__speech.anchorWorld(id), label.speakerId)
-    if (!world) continue
-    await d.aim({ x: world[0], z: world[2] })
-    const seen = await d.wait((id) => {
-      const box = document.querySelector(`.speech-label[data-speaker="${id}"]`)?.getBoundingClientRect()
-      return box && box.width > 1 && box.left > 0 && box.top > 0 && box.right < innerWidth && box.bottom < innerHeight
-    }, label.speakerId, 3000).then(() => true, () => false)
-    if (seen) spoken = label
+    if (await faceNote(label.speakerId)) spoken = label
   }
   const windowStart = await audioStart(kind, kind === 'child-call' ? receipt.bands.child : receipt.bands.adult, 1)
   await event(kind, { spoken })
@@ -230,16 +234,23 @@ async function observations() {
   // the excavation. The frame must name the speaker, not an empty future pit.
   const gathering = await d.wait(() => window.__placeErrands().villagers.find((v) => v.work?.phase === 'invite'), null, 480000)
   const gatheringAt = await gathering.jsonValue(); await gathering.dispose()
+  await event('dig-gathering', { at: gatheringAt })
   await d.inspect(gatheringAt, 3)
-  const invitationHandle = await d.wait(() => {
-    const e = window.__placeErrands(), word = e.last
-    if (word?.purpose !== 'invitation' || word.age > window.__balance.communication.labelSeconds) return null
-    const speaker = e.villagers[word.speaker]
-    const id = `villager-${word.speaker}`, at = window.__speech.anchorScreen(id)
-    if (!speaker?.work || !at || at.x < 100 || at.x > innerWidth - 100 || at.y < 80 || at.y > innerHeight - 100) return null
-    return { id, siteIndex: speaker.work.siteIndex, speaker, strikes: e.digProgress[speaker.work.siteIndex].strikes }
-  }, null, 480000)
-  const invitation = await invitationHandle.jsonValue(); await invitationHandle.dispose()
+  let invitation = null
+  const invitationDeadline = Date.now() + 480000
+  while (!invitation) {
+    assert(Date.now() < invitationDeadline, 'No dig invitation note reached the picture')
+    const invitationHandle = await d.wait(() => {
+      const e = window.__placeErrands(), word = e.last
+      if (word?.purpose !== 'invitation' || word.age > window.__balance.communication.labelSeconds) return null
+      const speaker = e.villagers[word.speaker], id = `villager-${word.speaker}`
+      if (!speaker?.work || !document.querySelector(`.speech-label[data-speaker="${id}"]`)) return null
+      return { id, siteIndex: speaker.work.siteIndex, speaker, strikes: e.digProgress[speaker.work.siteIndex].strikes }
+    }, null, Math.max(1000, invitationDeadline - Date.now()))
+    const candidate = await invitationHandle.jsonValue(); await invitationHandle.dispose()
+    if (await faceNote(candidate.id)) invitation = candidate
+    else await d.wait(() => window.__placeErrands().last?.purpose !== 'invitation', null, 30000).catch(() => {})
+  }
   await frame('03-dig-invitation', { element: `.speech-label[data-speaker="${invitation.id}"]`, label: 'the spoken invitation and its speaker before the pair digs', settle: false })
   await event('paired-dig-invitation', invitation)
   const siteIndex = invitation.siteIndex, site = geography.digSites[siteIndex]
