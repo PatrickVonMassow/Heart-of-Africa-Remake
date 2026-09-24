@@ -557,8 +557,13 @@ try {
     await frame('08-impression-and-socket', { world: socket, label: 'weathered block at the talus foot and carried impression' })
     await step('9-fit-and-journal')
     await frame('09-before-fit', { world: socket, label: 'the unfitted talus block before using the impression' })
+    // Arriving at the cliffs opens their discovery entry; a player closes it first.
+    await d.close()
     await d.inventory('[data-form="rock-relief"]')
-    await d.wait(() => window.__game.getState().spentSockets.includes('bandiagara-talus'), null, 10000)
+    await d.wait(() => window.__game.getState().spentSockets.includes('bandiagara-talus'), null, 10000).catch(async (e) => {
+      const state = await d.read(() => { const g = window.__game.getState(); return { mode: g.mode, pos: g.pos, toast: g.toast ?? null, journalOpen: g.journalOpen, forms: g.carriedForms } })
+      throw new Error(`${e.message} — the impression did not fit: ${JSON.stringify({ ...state, socket: socketWorld })}`)
+    })
     check('the fit announces the puzzle success', await d.read(async () =>
       document.querySelector('.toast')?.textContent === (await import('/src/i18n/index.ts')).getStrings().toasts.pocSolved))
     await frame('09-success-toast', { element: '.toast', label: 'the puzzle success toast after fitting the impression', settle: false })
