@@ -1422,10 +1422,28 @@
       "why": "pre-existing animal-behaviour red, no blocker; joins its bundle at the end",
       "origin": "machine",
       "place": "last"
+    },
+    "1206": {
+      "at": "2026-09-24T08:08:33.931Z",
+      "why": "Tooling request from 24.09.2026; no place named, last is right",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1207": {
+      "at": "2026-09-24T08:08:34.043Z",
+      "why": "Tooling request from 24.09.2026; no place named, last is right",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1208": {
+      "at": "2026-09-24T08:08:33.835Z",
+      "why": "User 24.09.2026: rank directly after 659 in the work order",
+      "origin": "user",
+      "place": "last"
     }
   },
   "settled": {
-    "at": "2026-09-24T02:38:25.205Z",
+    "at": "2026-09-24T08:05:59.626Z",
     "points": [
       174,
       184,
@@ -1841,7 +1859,9 @@
       1195,
       1197,
       1202,
-      1203
+      1203,
+      1204,
+      1205
     ]
   },
   "boundary": {

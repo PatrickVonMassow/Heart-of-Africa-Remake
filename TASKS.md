@@ -162,6 +162,45 @@ put it is the mistake this line exists to stop.
   keeps hitting the bugs.
   Bundle: Verständigung.
 
+- [ ] 1208. Hunted animals flee into rivers and lakes too.
+  Hunted animals flee into rivers and lakes too (user 24.09.2026, reopening the flight half of
+  point 312). Point 312 switched only the shared `fleeMove` flight (predator flee, elephant dart,
+  player-shy) to the ocean-only `fleeWaterStep`; the HUNT itself was left on the old water-barred
+  rule, and the hunt is the flight the player watches most.
+  MEASURED on main 4b983b67f (report local/TiereImmernochWassergesperrt.zip, build 15c2da2, which
+  contains the 312 merge 9c8e4e299; seed 129298658, x/z 323.86/-244.65, cheetah hunt of a real-herd
+  antelope at a river bank, carcass left at the bank 298.07/-256.67):
+  - `src/scenes/travel/Wildlife.tsx` ~4707: the chase victim's flight `calfFleeStep(...)` uses
+    `fleeBlocked` = `ty === 'ocean' || ty === 'water'` — the victim slides and fans along the bank
+    ("zittert am Ufer") and is taken at the waterline instead of swimming.
+  - ~4749 / `blockHeading`: the parent guarding its hunted calf moves under the same land-only rule.
+  - ~2582: `!isChaseVictim` keeps a chase victim that does reach water out of the §19.8 water
+    handling, so even a wet victim would have no water behaviour.
+  FINAL STATE (design.md §19.5 (c), already stated — do not restate):
+  (a) The chase victim's flight and the guarding parent's station run use the ocean-only
+      `flightBlocked` predicate: a heading into river/lake water is taken straight; the ocean edge
+      still deflects, and the calfFleeStep corridor/dead-end logic stays for the ocean only.
+  (b) A victim in water swims at the swim pace (as `fleeMove` does) with water-surface height, and
+      the hunter follows or gives up by the existing chase rules; the hunt still RESOLVES (catch,
+      far bank reached → chase ends, or the existing offstage abort) — no endless swim (I4).
+  (c) When the chase ends with the victim still in water, it heads for the nearest bank under the
+      312 no-lingering rule.
+  (d) Fights (`wetOrSea`, ~2970) stay land-only — they are not flights.
+  VERIFIABLE: pure — the victim flee step with a river ahead is not deflected, with the ocean ahead it
+  is. Live (`scripts/verify/enrichments.mjs`, both backends): a staged real-herd hunt with the victim
+  between the predator and a straight river bank sends the victim into the river (path sampled: a
+  swim, not a jump) and the hunt resolves; the reported seed/position is the natural repro.
+
+  --- bounds the user named (verbatim) ---
+  PLACEMENT (user 24.09.2026): rank this point IMMEDIATELY AFTER point 659 in the work order (.claude/queue-rank.json, origin user) — it is the next point worked once 659 lands.
+
+  --- the user’s own sentences, with their date ---
+  user 24.09.2026: "Ich sehe überhaupt keine Auswirkung vom angeblich erledigten Task 312. Auch wenn ein Löwe ein Tier jagt, lässt es sich lieber am Ufer fressen, als einen Fuß ins Wasser zu setzen."
+  user 24.09.2026: "Das soll direkt direkt nach 659 behoben werden."
+  PLACEMENT (user 24.09.2026): rank this point IMMEDIATELY AFTER point 659 in the work order (.claude/queue-rank.json, origin user) — it is the next point worked once 659 lands.
+  Criticality: medium.
+  Bundle: Tierverhalten.
+
 - [ ] 633. The release's closing run — two regressions with the cleanup between them (user
   11.08.2026, splitting point 174: "Dafür scheint mir die Schätzung von 1 h viel zu wenig
   zu sein"). 174 carried the whole release in one card estimated at ~1 h, which was true
@@ -16055,3 +16094,31 @@ to land than a mechanism that needs a review.
   Test: `npm test -- enrichments --section=elephant-trampling` green; a Vitest case if the leave
   decision is a pure helper. Refs: src/scenes/travel/Wildlife.tsx, scripts/verify/enrichments.mjs.
   Bundle: Tierverhalten.
+
+- [ ] 1206. Route blind-parallel enumerate halves to Astra at the default share setting, then switch to default.
+  FINAL STATE: at `default`, a blind-parallel half reaches GPT-6 Astra; authoring stays with Claude; and the machine switch stands at `default`.
+
+  (a) ROUTING (scripts/astra-share-core.mjs): the `default` row routes `review` AND `enumerate` to Astra; diagnose, audit, explain and author stay with Claude. `audit` stays with Claude deliberately (large sweeps are the costly kind); a blind audit half at `default` uses the existing `--anyway`. No new setting, no new kind, no new mechanism - a table entry.
+
+  (b) Every text that describes `default` says the same: SETTING_NOTES.default, the `default` branch of briefLine, the board note if it names the kinds, and the table and prose in docs/astra-routing.md (row `default`, the "today's behaviour" sentence).
+
+  (c) Tests: astra-share-core.test.mjs / astra-share-cli.test.mjs pin the new `default` row (enumerate -> astra; audit/diagnose/explain/author -> claude); ask-astra-cli.test.mjs pins that `--kind enumerate` at `default` is NOT refused with exit 3 while `--kind audit` still is. Adjust any existing test that pinned the old refusal.
+
+  (d) After the merge, switch this machine: `node scripts/astra-share.mjs --set default`, and state the resulting `--status` line in the closing record.
+
+  NOT IN SCOPE: changing `prefer-astra` or `claude-only`, the review path, or the author-routing cut.
+  Criticality: medium.
+  Bundle: Werkzeug.
+
+- [ ] 1207. The stand-down fence refuses writes outside the checkout, so the documented request handoff cannot be used.
+  FINAL STATE: a stood-down session can deposit a request with `finding.mjs --request` using files it writes itself, with no workaround.
+
+  (a) ownershipStandDownDecision (scripts/board-first-core.mjs) does not block a Write/Edit whose file_path lies outside the main checkout, and does not block a Bash segment that segmentWritesOnlyOutsideCheckout (scripts/batch-lease-core.mjs) already clears - reuse that function, add no new classifier. A path inside the checkout stays refused exactly as today.
+
+  (b) Check why `cat > why.md` after `cd <scratchpad>` was refused by the lease fence although it writes outside the checkout (relative target resolved against the session cwd rather than the segment cwd?); fix so it passes.
+
+  (c) Tests: a stood-down Write to the session scratchpad and a stood-down `cat > <scratchpad>/x.md <<EOF` both pass; a stood-down Write to TASKS.md and to src/ still block.
+
+  NOT IN SCOPE: a new guard, a new flag on finding.mjs, or any loosening of in-checkout writes. This switches a rule off where it is in the way (CLAUDE.md section 2 freeze).
+  Criticality: medium.
+  Bundle: Werkzeug.
