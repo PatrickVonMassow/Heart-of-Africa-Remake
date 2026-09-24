@@ -292,7 +292,12 @@ async function observations() {
   await d.aim(empty)
   await localFrame('03-empty-jar', empty, 'the water carrier sets out with the empty jar')
   await d.inspect(geography.waterFoot, 3)
-  await d.wait((i) => window.__placeErrands().villagers[i].filling !== null, carrier, 480000)
+  await d.wait((i) => window.__placeErrands().villagers[i].filling !== null, carrier, 480000).catch(async (e) => {
+    // Name where the carrier stands and what his errand says, not only the wait.
+    const state = await d.read((i) => ({ carrier: window.__placeErrands().villagers[i], player: { ...window.__placePlayer },
+      waterFoot: window.__placeErrands().geography.waterFoot }), carrier)
+    throw new Error(`${e.message} — carrier never filled: ${JSON.stringify({ ...state, carrier: { ...state.carrier, drawn: undefined } })}`)
+  })
   await localFrame('03-dipping-jar', geography.waterFoot, 'the same carrier dipping the jar at the water')
   await d.inspect(geography.waterStand, 3)
   await d.wait((i) => {
