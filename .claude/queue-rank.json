@@ -1452,6 +1452,12 @@
       "why": "User 24.09.2026 13:30: direkt vor 1204, Vier-Augen",
       "origin": "user",
       "place": "ahead"
+    },
+    "1210": {
+      "at": "2026-09-24T14:37:20.498Z",
+      "why": "User 24.09.2026 16:36: »Das soll direkt als nächstes erledigt werden.«",
+      "origin": "user",
+      "place": "ahead"
     }
   },
   "boundary": {
@@ -1483,7 +1489,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-24T11:30:41.294Z",
+    "at": "2026-09-24T14:37:20.507Z",
     "points": [
       174,
       184,
@@ -1905,7 +1911,8 @@
       1206,
       1207,
       1208,
-      1209
+      1209,
+      1210
     ]
   }
 }
