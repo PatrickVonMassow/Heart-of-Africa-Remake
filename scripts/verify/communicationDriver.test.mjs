@@ -42,3 +42,14 @@ it('halves the turn press after swinging past the subject', async () => {
   expect(holds.length).toBeLessThan(20)
   expect(holds.at(-1)).toBeLessThan(holds[0])
 })
+it('accepts the nearest yaw one shortest press can reach', async () => {
+  let yaw = 0.073, presses = 0
+  const driver = communicationDriver({
+    evaluate: async () => ({ x: 0, z: 0, yaw }),
+    keyboard: { down: async () => {}, up: async () => {} },
+    // Every press turns one whole 0.146 rad frame however short it is held.
+    waitForTimeout: async () => { presses++; yaw += yaw > 0 ? -0.146 : 0.146 },
+  })
+  await driver.aim({ x: 0, z: -1 })
+  expect(presses).toBeLessThan(80)
+})

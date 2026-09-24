@@ -23,17 +23,23 @@ export function communicationDriver(page) {
     } finally { for (const key of keys) await page.keyboard.up(key) }
   }
   // A slow frame turns further than the key was held, so a sign flip halves
-  // the next press instead of swinging past the subject indefinitely.
+  // the next press instead of swinging past the subject indefinitely. The
+  // shortest press still turns at least one frame; within half of that
+  // measured step no key press lands closer, so the aim is as good as it gets.
   async function aim(target) {
-    let scale = 1, last = 0, delta = 0, distance = 0
+    let scale = 1, last = 0, delta = 0, distance = 0, prevYaw = null, floorPress = false, minStep = Infinity
     for (let i = 0; i < 80; i++) {
       const p = await read(() => ({ ...window.__placePlayer }))
+      if (floorPress && prevYaw !== null) minStep = Math.min(minStep, Math.abs(Math.atan2(Math.sin(p.yaw - prevYaw), Math.cos(p.yaw - prevYaw))))
       delta = turnDelta(p.yaw, p, target)
       distance = Math.hypot(target.x - p.x, target.z - p.z)
-      if (Math.abs(delta) < 0.065) return
+      if (Math.abs(delta) < 0.065 || (minStep < Infinity && Math.abs(delta) <= minStep / 2)) return
       if (last && Math.sign(last) !== Math.sign(delta)) scale = Math.max(0.1, scale / 2)
       last = delta
-      await held([delta > 0 ? 'ArrowLeft' : 'ArrowRight'], () => page.waitForTimeout(Math.max(8, Math.min(180, Math.max(20, Math.abs(delta) / 2.2 * 700)) * scale)))
+      const ms = Math.max(8, Math.min(180, Math.max(20, Math.abs(delta) / 2.2 * 700)) * scale)
+      floorPress = ms === 8
+      prevYaw = p.yaw
+      await held([delta > 0 ? 'ArrowLeft' : 'ArrowRight'], () => page.waitForTimeout(ms))
     }
     throw new Error(`Could not aim at the declared subject using turn keys (${delta.toFixed(3)} rad off at ${distance.toFixed(2)} m)`)
   }
