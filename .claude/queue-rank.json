@@ -1,11 +1,5 @@
 {
   "ranked": {
-    "312": {
-      "at": "2026-09-21T21:12:56.442Z",
-      "why": "user 21.09.2026, 21:38: Ziehe 312 vor 633",
-      "origin": "user",
-      "place": "ahead"
-    },
     "336": {
       "at": "2026-08-21T16:06:02.037Z",
       "why": "User ruling 21.08.2026 (only the communication mechanic, then 633 and the release 174), plus the branch decision of the same day: feat/336-croc-staging was deleted because two of two files had moved on main, so nothing is left to fall behind and the rebuild this point demands waits until after the release.",
@@ -1416,35 +1410,19 @@
       "why": "low-criticality test-infrastructure noise with no player impact; last is right",
       "origin": "machine",
       "place": "last"
+    },
+    "1204": {
+      "at": "2026-09-24T05:08:04.018Z",
+      "why": "user order 24.09.2026: context overshoots past 150k every night — arm the watermark before the release",
+      "origin": "user",
+      "place": "ahead"
+    },
+    "1205": {
+      "at": "2026-09-24T05:08:04.109Z",
+      "why": "pre-existing animal-behaviour red, no blocker; joins its bundle at the end",
+      "origin": "machine",
+      "place": "last"
     }
-  },
-  "boundary": {
-    "at": "2026-08-21T00:55:14.962Z",
-    "points": [
-      336,
-      553,
-      596,
-      633,
-      659,
-      660,
-      663,
-      708,
-      715,
-      719,
-      733,
-      735,
-      736,
-      738,
-      739,
-      746,
-      747,
-      750,
-      759,
-      760,
-      762,
-      764
-    ],
-    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
     "at": "2026-09-24T02:38:25.205Z",
@@ -1461,7 +1439,6 @@
       303,
       309,
       310,
-      312,
       314,
       315,
       319,
@@ -1866,5 +1843,33 @@
       1202,
       1203
     ]
+  },
+  "boundary": {
+    "at": "2026-08-21T00:55:14.962Z",
+    "points": [
+      336,
+      553,
+      596,
+      633,
+      659,
+      660,
+      663,
+      708,
+      715,
+      719,
+      733,
+      735,
+      736,
+      738,
+      739,
+      746,
+      747,
+      750,
+      759,
+      760,
+      762,
+      764
+    ],
+    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   }
 }
