@@ -336,19 +336,24 @@ async function reachableBuildings(sceneLabel) {
       if (reset) {
         // Arm the Space prompt at the door, then press it (design.md §2.3).
         await page.waitForFunction(() => !!document.querySelector('.prompt'), null, { timeout: 8000 }).catch(() => {})
-        // Outside Bambara the head man answers from indoors with a toast, so
-        // clear any earlier one first and let the press have to raise it.
-        await page.evaluate(() => window.__game.setState({ toast: null }))
+        // Outside Bambara the head man answers from indoors, so clear the toast
+        // and his orientation first: the press itself has to raise both.
+        const noMessage = await page.evaluate(async () => {
+          const g = window.__game.getState()
+          window.__game.setState({ toast: null, orientationGiven: { ...g.orientationGiven, [g.placeId]: false } })
+          const { getStrings } = await import('/src/i18n/index.ts')
+          return getStrings().toasts.chiefNoMessage
+        })
         await page.keyboard.press('Space')
         // Only Bambara's chief walks out to his drummer (design.md §13.4).
         const answered = t.type === 'chief'
-          ? () => {
+          ? (msg) => {
               const g = window.__game.getState()
               if (g.placeId === 'bambara-village') return g.chiefOutside[g.placeId] === true
-              return !!g.toast && g.orientationGiven[g.placeId] === true && g.chiefOutside[g.placeId] !== true
+              return g.toast === msg && g.orientationGiven[g.placeId] === true && g.chiefOutside[g.placeId] !== true
             }
           : () => !!document.querySelector('.dialog')
-        opened = await page.waitForFunction(answered, null, { timeout: 8000 }).then(() => true).catch(() => false)
+        opened = await page.waitForFunction(answered, noMessage, { timeout: 8000 }).then(() => true).catch(() => false)
       }
     }
     const missed = t.type === 'chief' ? '(did not answer)' : '(no open)'
