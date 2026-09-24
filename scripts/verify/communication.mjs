@@ -495,8 +495,15 @@ try {
     await step('7-return-and-give')
     await riverTrip(rock, receipt.setup.village, '07-return')
     const villageWorld = await d.read(async (p) => (await import('/src/world/geo.ts')).latLonToWorld(p.lat, p.lon), receipt.setup.village)
-    await d.travelTo(villageWorld, 2)
-    await d.wait(() => window.__ui.getState().enterPlaceId === 'bambara-village')
+    // Keep steering in: a traveller who stops in the river drifts off the
+    // entry ring again before the prompt can be answered.
+    const entryDeadline = Date.now() + 180000
+    for (;;) {
+      await d.travelTo(villageWorld, 2)
+      if (await d.wait(() => window.__ui.getState().enterPlaceId === 'bambara-village', null, 5000).then(() => true, () => false)) break
+      const here = await d.read(() => ({ pos: window.__game.getState().pos, prompt: window.__ui.getState().enterPlaceId ?? null }))
+      assert(Date.now() < entryDeadline, `No entry prompt at the village: ${JSON.stringify({ ...here, village: villageWorld })}`)
+    }
     await page.keyboard.press('Space')
     await d.wait(() => window.__game.getState().placeId === 'bambara-village' && window.__placePlayer)
     const drummer = await chief('07')
