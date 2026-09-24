@@ -147,11 +147,13 @@ describe('fence colliders follow the drawn panels (point 413)', () => {
     // collider agree; this line is what says the defect was real. It asks the
     // WORLDS rather than one seed — the compound walls are sized from the huts
     // they enclose (work-order 604), so which seed holds the longest run moved.
-    let most = 0
-    for (const id of VILLAGES.map((p) => p.id))
-      for (const s of [...SEEDS, REPORTED_SEED, WEDGE_SEED, 1, 2, 3, 4, 5, 6, 7, 8])
-        most = Math.max(most, fencePanels(sharedLayout(id, s).fences).filter((p) => p.kind === 'woven').length)
-    expect(most).toBeGreaterThan(160)
+    // This is an existence check, so stop at the first witness. Scanning the
+    // remaining worlds after finding it exceeded the test's 20-second budget.
+    const exceedsOldCeiling = VILLAGES.some(({ id }) =>
+      [...SEEDS, REPORTED_SEED, WEDGE_SEED, 1, 2, 3, 4, 5, 6, 7, 8].some((s) =>
+        fencePanels(sharedLayout(id, s).fences).filter((p) => p.kind === 'woven').length > 160),
+    )
+    expect(exceedsOldCeiling).toBe(true)
   })
 })
 
