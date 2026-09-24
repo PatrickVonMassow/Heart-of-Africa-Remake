@@ -321,7 +321,12 @@ async function observations() {
       const speaker = e.villagers[word.speaker], id = `villager-${word.speaker}`
       if (!speaker?.work || !document.querySelector(`.speech-label[data-speaker="${id}"]`)) return null
       return { id, siteIndex: speaker.work.siteIndex, speaker, strikes: e.digProgress[speaker.work.siteIndex].strikes }
-    }, null, Math.max(1000, invitationDeadline - Date.now()))
+    }, null, Math.max(1000, invitationDeadline - Date.now())).catch(async (e) => {
+      // Name why the pair stayed silent: its owed word, hush and the children's ear.
+      const state = await d.read(() => ({ last: window.__placeErrands().last, player: { ...window.__placePlayer },
+        pairs: window.__placeErrands().villagers.map((v, i) => ({ i, x: v.x, z: v.z, work: v.work })).filter((v) => v.work?.situation?.startsWith('dig')) }))
+      throw new Error(`${e.message} — no invitation note: ${JSON.stringify(state)}`)
+    })
     const candidate = await invitationHandle.jsonValue(); await invitationHandle.dispose()
     if (await faceNote(candidate.id)) invitation = candidate
     else await d.wait(() => window.__placeErrands().last?.purpose !== 'invitation', null, 30000).catch(() => {})

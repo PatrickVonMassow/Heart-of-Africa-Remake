@@ -3521,7 +3521,9 @@ function ErrandVillagers({
           drawn: { squatY: g ? g.scale.y : null, handY, headAspect },
           carry: carryOf(work, i),
           work: task
-            ? { situation: task.situation, phase: task.phase, siteIndex: task.siteIndex, x: task.x, z: task.z, arrived: task.arrived }
+            ? { situation: task.situation, phase: task.phase, siteIndex: task.siteIndex, x: task.x, z: task.z, arrived: task.arrived,
+                partner: task.partner, owes: !!task.owes, hushed: !!task.hushed, withheld: !!task.withheld,
+                pending: task.pendingWord?.concept ?? null, childrenHear: view.childrenHear(p.x, p.z) }
             : null,
         }
       }),
