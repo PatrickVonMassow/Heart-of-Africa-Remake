@@ -177,10 +177,19 @@ async function chief(prefix = '05') {
     await localFrame(`${prefix}-chief-walks-out`, { x: hut.pos[0], z: hut.pos[1] }, 'the chief leaving his hut')
   }
   const drummer = await d.read(() => ({ x: window.__placeSpots.drummer[0], z: window.__placeSpots.drummer[1] }))
-  // The market door stands 2.84 m from the drum: at 2 m on its side the nearer
-  // door wins the key, so step up to the drum as a player would.
-  await d.inspect(drummer, 1.4)
   await d.wait(() => window.__chief?.phase === 'at-drummer')
+  // The market door stands 2.84 m from the drum, so on its side the nearer door
+  // can win the key, and the chief beside the drummer can block a spot: step up
+  // closer until the key asks for his message, as a player would.
+  const labels = await d.read(async () => {
+    const t = (await import('/src/i18n/index.ts')).getStrings().labels
+    return [t.askForDrumMessage, t.repeatDrumMessage, t.repeatDrumAnswer]
+  })
+  for (const distance of [2, 1.7, 1.4]) {
+    const reached = await d.inspect(drummer, distance).then(() => true, () => false)
+    if (reached && await d.wait((labels) => labels.some((l) => document.querySelector('.prompt')?.textContent.includes(l)), labels, 3000)
+      .then(() => true, () => false)) break
+  }
   return drummer
 }
 async function message(which, trigger, point) {
