@@ -106,6 +106,20 @@ export function communicationDriver(page) {
     await walk(exit.inside); await aim(exit.outside)
     await held(['KeyW'], () => wait(() => window.__game.getState().mode === 'travel', null, 30000))
   }
+  // A stuck traveller is recorded with what stands around him, so a refused
+  // leg names its obstacle instead of only its target.
+  async function blockedAt(pos, target) {
+    return read(async ({ pos, target }) => {
+      const { collidableAnimalsNear } = await import('/src/scenes/travel/wildlifeCollision.ts')
+      const { collidableFloraNear } = await import('/src/scenes/travel/TravelScene.tsx')
+      const { sampleTerrain, isBlocked } = await import('/src/world/terrain.ts')
+      const { worldToLatLon } = await import('/src/world/geo.ts')
+      const s = window.__game.getState(), ll = worldToLatLon(pos.x, pos.z)
+      const t = sampleTerrain(ll.lat, ll.lon, s.seed).type
+      return { pos, target, latLon: ll, terrain: t, blocked: isBlocked(t, ll.lat, ll.lon), toast: s.toast ?? null,
+        animals: collidableAnimalsNear(pos.x, pos.z, 3), flora: collidableFloraNear(pos.x, pos.z, s.seed, 1.5) }
+    }, { pos, target })
+  }
   async function travel(target, tolerance = 0.25) {
     const started = Date.now()
     let best = Infinity, progress = started
@@ -114,13 +128,13 @@ export function communicationDriver(page) {
       const d = Math.hypot(p.x - target.x, p.z - target.z)
       if (d < tolerance) return
       if (d < best - 0.03) { best = d; progress = Date.now() }
-      assert(Date.now() - progress < 15000, `Blocked travel leg to ${JSON.stringify(target)}`)
+      if (Date.now() - progress >= 15000) return blockedAt(p, target)
       assert(await read(() => window.__game.getState().mode === 'travel' && !window.__ui.getState().dialog), 'Travel was interrupted by a modal or scene change')
       await held(travelKeys(p, target, tolerance / 2), () => page.waitForTimeout(Math.min(150, Math.max(20, d * 100))))
     }
     throw new Error('Travel leg timed out')
   }
-  async function travelTo(target, tolerance = 0.25) {
+  async function travelTo(target, tolerance = 0.25, replans = 3) {
     const path = await read(async ({ target, tolerance }) => {
       const { collidableFloraNear } = await import('/src/scenes/travel/TravelScene.tsx')
       const { buildPlaceNavGrid, findPlaceRoute, navRestrict } = await import('/src/scenes/place/routing.ts')
@@ -129,7 +143,8 @@ export function communicationDriver(page) {
       const { worldToLatLon, PLACES, latLonToWorld } = await import('/src/world/geo.ts')
       const s = window.__game.getState(), origin = s.pos
       const reach = Math.hypot(target.x - origin.x, target.z - origin.z) + 5
-      const colliders = collidableFloraNear(origin.x, origin.z, s.seed, reach)
+      const { collidableAnimalsNear } = await import('/src/scenes/travel/wildlifeCollision.ts')
+      const colliders = [...collidableFloraNear(origin.x, origin.z, s.seed, reach), ...collidableAnimalsNear(origin.x, origin.z, reach)]
         .map(([x, z, r]) => ({ x: x - origin.x, z: z - origin.z, r }))
       for (const place of PLACES) {
         const p = latLonToWorld(place.lat, place.lon)
@@ -147,7 +162,14 @@ export function communicationDriver(page) {
       return findPlaceRoute(grid, { x: 0, z: 0 }, to, 12)?.map((p) => ({ x: p.x + origin.x, z: p.z + origin.z })) ?? null
     }, { target, tolerance })
     assert(path, `No traversable route to ${JSON.stringify(target)}`)
-    for (const p of path) await travel(p)
+    for (const p of path) {
+      const stuck = await travel(p)
+      if (!stuck) continue
+      // Wildlife moves: a player steps around it, so the leg is planned again
+      // from where he stands, with the animals that now stand there.
+      assert(replans > 0, `Blocked travel leg: ${JSON.stringify(stuck)}`)
+      return travelTo(target, tolerance, replans - 1)
+    }
   }
   async function close() {
     // Escape is ignored while a journal input owns focus. Use the actual close
