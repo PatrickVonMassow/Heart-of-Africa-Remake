@@ -585,7 +585,9 @@ try {
       // remembered collapsed group hides the button from role queries.
       const row = await d.read(async () => (await import('/src/i18n/index.ts')).getStrings().debug.language)
       await page.locator('.debug-menu input').first().fill(row)
-      const button = page.getByRole('button', { name: language === 'en' ? 'English' : 'Deutsch', exact: true })
+      // By its shown text: the role query missed the visible button under the
+      // cliffs' name card.
+      const button = page.locator(`.debug-menu button:text-is("${language === 'en' ? 'English' : 'Deutsch'}")`)
       if (await button.isEnabled()) await button.click()
       await page.locator('.debug-menu input').first().fill('')
       await page.locator('.debug-menu h3').click() // remove focus from the filter before F1
