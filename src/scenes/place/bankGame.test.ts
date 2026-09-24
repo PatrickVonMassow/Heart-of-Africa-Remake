@@ -953,7 +953,7 @@ describe('the children`s game at the bank (point 687)', () => {
     expect(walkedAfterOut).toBeGreaterThan(0)
   })
 
-  it('walks round the traveller instead of stopping the game, and gives him the wider berth', () => {
+  it('walks round the traveller instead of stopping the game', () => {
     // The stranger stands in the middle of the lane, squarely on the line the
     // runners take. The game must go on, and nobody may come nearer than a
     // villager's body plus the extra berth.
@@ -962,8 +962,11 @@ describe('the children`s game at the bank (point 687)', () => {
     const { runs: blocked, log } = replayAll(600, { world })
     expect(blocked.reduce((n, r) => n + r.s.runs, 0)).toBeGreaterThan(2)
     expect(log.said.some((u) => u.moment === 'arrival')).toBe(true)
-    // …and the same replays without him produce a game too, so the case is
-    // measuring the swerve rather than a settlement that never plays.
+  })
+
+  it('keeps the bank game running without a traveller in the lane', () => {
+    // Keep the same five-seed control, with its own timeout budget: both
+    // groups together exceeded 20 seconds under concurrent authoring load.
     const { runs: open } = replayAll(600)
     expect(open.reduce((n, r) => n + r.s.runs, 0)).toBeGreaterThan(2)
   })
