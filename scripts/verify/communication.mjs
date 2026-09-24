@@ -120,7 +120,8 @@ async function guess(name, reading, expectedAtom, speaker = null) {
 async function faceNote(id) {
   const world = await d.read((id) => window.__speech.anchorWorld(id), id)
   if (!world) return false
-  await d.aim({ x: world[0], z: world[2] })
+  // A running child can outpace the turn; a missed aim waits for his next note.
+  if (!await d.aim({ x: world[0], z: world[2] }).then(() => true, (error) => (console.log(`# ${id}: ${error.message}`), false))) return false
   return d.wait((id) => {
     const box = document.querySelector(`.speech-label[data-speaker="${id}"]`)?.getBoundingClientRect()
     return box && box.width > 1 && box.left > 0 && box.top > 0 && box.right < innerWidth && box.bottom < innerHeight

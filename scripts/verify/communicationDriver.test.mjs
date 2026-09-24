@@ -29,3 +29,16 @@ it('keeps an unexpected gameplay interruption as a failed continuous run', async
   const driver = communicationDriver({ evaluate: async () => 'defeat' })
   await expect(driver.close()).rejects.toThrow('Unexpected modal: defeat')
 })
+it('halves the turn press after swinging past the subject', async () => {
+  const holds = []
+  let yaw = 0.5
+  const driver = communicationDriver({
+    evaluate: async () => ({ x: 0, z: 0, yaw }),
+    keyboard: { down: async () => {}, up: async () => {} },
+    // Each press turns 2.5x the ideal amount, as a slow frame would; unhalved it diverges.
+    waitForTimeout: async (ms) => { holds.push(ms); yaw += (yaw > 0 ? -1 : 1) * 2.5 * ms / 700 * 2.2 },
+  })
+  await driver.aim({ x: 0, z: -1 })
+  expect(holds.length).toBeLessThan(20)
+  expect(holds.at(-1)).toBeLessThan(holds[0])
+})
