@@ -51,6 +51,15 @@ export async function installCommunicationCapture(page) {
       },
       stop() { output.disconnect(node); node.disconnect(); silence.disconnect(); node.port.close() },
     }
+    // A fresh worklet drops a few quanta right after its first block; windows
+    // start only once four contiguous blocks have arrived.
+    const deadline = performance.now() + 10000
+    for (;;) {
+      const tail = ring.slice(-4)
+      if (tail.length === 4 && tail.every((b, i) => !i || b.frame === tail[i - 1].frame + tail[i - 1].channels[0].length)) break
+      if (performance.now() > deadline) throw new Error('Missing evidence: audio capture never delivered contiguous blocks')
+      await new Promise((r) => setTimeout(r, 50))
+    }
   })
 }
 
