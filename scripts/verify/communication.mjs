@@ -221,6 +221,8 @@ async function message(which, trigger, point) {
   check(`${which} plan has ${count} strikes`, plan.strikes.length === count)
   check(`${which} paper is absent before the last beat`, !await page.locator('.drum-message').count())
   await event(`drum-${which}-plan`, { plan, startedAt, endsAt: performance.endsAt })
+  // Giving at the chief leaves the view on him; the pair is framed at the drum.
+  await d.aim(point)
   await localFrame(`${prefix}-${which}-sounding`, point, 'chief and drummer together sounding the message')
   await d.wait((which) => window.__game.getState().drumMessageHeard[which] && !!document.querySelector('.drum-message'), which, 60000)
   const firstShown = await d.read(() => {
