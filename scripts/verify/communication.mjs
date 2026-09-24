@@ -72,8 +72,15 @@ async function reopen(message, name) {
 }
 async function guess(name, reading, expectedAtom) {
   await d.wait(() => !!document.querySelector('.speech-label.targeted .speech-invite'))
-  const targeted = await d.read(() => document.querySelector('.speech-label.targeted').getAttribute('data-speaker'))
-  assert(await faceNote(targeted), `The targeted note of ${targeted} never reached the picture`)
+  // The speaker keeps walking while the camera turns, so a single aim can miss;
+  // re-aim at whoever is targeted until the note stands inside the picture.
+  let targeted = null, faced = false
+  for (let attempt = 0; attempt < 6 && !faced; attempt++) {
+    await d.wait(() => !!document.querySelector('.speech-label.targeted .speech-invite'))
+    targeted = await d.read(() => document.querySelector('.speech-label.targeted').getAttribute('data-speaker'))
+    faced = await faceNote(targeted)
+  }
+  assert(faced, `The targeted note of ${targeted} never reached the picture`)
   await frame(`${name}-invitation`, { element: '.speech-label.targeted', label: 'the live note inviting E above its speaker', settle: false })
   await page.keyboard.press('KeyE')
   await page.locator('.speech-guess').waitFor()
