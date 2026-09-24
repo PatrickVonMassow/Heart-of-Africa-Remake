@@ -55,7 +55,11 @@ import {
   elephantWouldTrample,
   deflectAroundCircle,
   fleesFromPlayer,
-  fleeCrossing,
+  fleeWaterStep,
+  nearestBankTarget,
+  waterDramaOwns,
+  waterExit,
+  FLIGHT_GRACE_SECONDS,
   resolveFleeTarget,
   type DramaState,
   flightStep,
@@ -366,6 +370,10 @@ interface Animal {
    *  seasonal wade speed with a lowered body; cleared on landing (or by the
    *  resolve deadline — every started move ends, invariant I4). */
   crossing?: { tx: number; tz: number; time: number }
+  /** Sim time of this animal's last flight step (point 312): while recent, a
+   *  flight that took it onto river/lake water keeps swimming and the
+   *  backstop leaves it alone; once it lapses the swim-to-bank takes over. */
+  fleeAt?: number
   /** The crocodile ambush (design.md §19.16, point 130), per-crocodile state:
    *  absent = hidden at its spot; set = lunging at / gripping a victim or
    *  slinking back home. Its own state — the scripted LION hunt is never
@@ -3243,17 +3251,16 @@ function Herds() {
       }
     }
 
-    // Animals never walk into the impassable open ocean (design.md §19): a
-    // rotating slice of the herds is checked each frame (full coverage every
-    // few frames), and anyone standing on an ocean cell is set back to the
-    // nearest land. This backstops every mover — flee, dodge, follow, escort
-    // and the separation pushes — without sampling every animal every frame.
+    // The §19.5 water backstop: a rotating slice of the herds is checked each
+    // frame (full coverage every few frames). Anyone on an OCEAN cell is set
+    // back to the nearest land at once — the sea is the world's edge. Anyone
+    // resting on river/lake water (not in a drama, not in flight) swims for
+    // the NEAREST bank under its own power (point 312) — never a snap.
     {
       const phase = waterSweep.current++ % 7
       for (const sp of SPECIES) {
         // Flamingos are shoreline waders and the crocodile's home IS the
-        // water (design.md §19.16) — both stand exempt; everyone else is set
-        // back to land.
+        // water (design.md §19.16) — both stand exempt.
         if (sp === 'flamingo' || sp === 'crocodile') continue
         const list = herds[sp]
         for (let i = phase; i < list.length; i += 7) {
@@ -3275,29 +3282,27 @@ function Herds() {
             )
           if (a.caught !== undefined)
             devAssert(a.caught <= CAUGHT_DURATION + 2, 'caught-window-bounded', () => `${sp} caught=${a.caught}`)
-          // Water drama (struggle, rescue, plunge, a wading parent) owns its
-          // own movement; everyone else must never STAND in water — not in
-          // the open sea, and not in a river or lake either (an animal only
-          // reaches the water's edge to drink, design.md §19). A purposeful
-          // CROSSING (point 192) is exempt while it lasts, and so is a CAUGHT
-          // victim (point 197: the croc grips its prey at the waterline — the
-          // setback used to teleport it out of the grip, the vanish class).
-          if (
-            a.dead || a.inWater !== undefined || a.mired !== undefined || a.rescued || a.plungeTo ||
-            a.trampleTo || a.vigil || a.crossing !== undefined || a.caught !== undefined
-          )
-            continue
-          // A parent CHARGING a predator that holds its calf is such a drama
-          // mover too (point 383): a crocodile hauls its catch into the river, so
-          // the charge now genuinely reaches the water — and a setback mid-charge
-          // would break the §19.8 rescue/sacrifice at the waterline that §19.16
-          // builds on. This list and the collision push's `inDrama` mirror each
-          // other; the push already exempted a child-caught parent.
-          if (
-            a.child && !a.child.dead &&
-            (a.child.inWater !== undefined || a.child.mired !== undefined || a.child.caught !== undefined)
-          )
-            continue
+          // A running water drama owns its actor (point 312(d), keyed on the
+          // drama STATE): struggle, rescue, plunge, a purposeful crossing or
+          // swim-out, a caught victim at the waterline (point 197), and a
+          // parent wading to or charging for its calf (point 383) — no
+          // leave-the-water rule may pull any of them out. The collision
+          // push's `inDrama` mirrors this list.
+          const owned = waterDramaOwns({
+            dead: a.dead,
+            inWater: a.inWater,
+            mired: a.mired,
+            rescued: a.rescued,
+            plungeTo: a.plungeTo,
+            trampleTo: a.trampleTo,
+            vigil: a.vigil,
+            crossing: a.crossing,
+            caught: a.caught,
+            childInDrama:
+              !!a.child && !a.child.dead &&
+              (a.child.inWater !== undefined || a.child.mired !== undefined || a.child.caught !== undefined),
+          })
+          if (owned) continue
           const ll = worldToLatLon(a.x, a.z)
           const terSample = sampleTerrain(ll.lat, ll.lon, seed)
           const ter = terSample.type
@@ -3311,7 +3316,28 @@ function Herds() {
             a.y = groundedBodyY(terSample.height)
             a.grounded = true // seen by the sweep at least once (203(A) gate)
           }
-          if (ter === 'ocean' || ter === 'water') {
+          const inFlight = a.fleeAt !== undefined && simTimeRef.current - a.fleeAt < FLIGHT_GRACE_SECONDS
+          const exit = waterExit(ter, false, inFlight)
+          const bank =
+            exit === 'swim-to-bank'
+              ? nearestBankTarget(
+                  a.x,
+                  a.z,
+                  (nx, nz) => {
+                    const w = worldToLatLon(nx, nz)
+                    return sampleTerrain(w.lat, w.lon, seed).type
+                  },
+                  CROSS_SWIM_SPEED * balance.waterCross.resolveSeconds,
+                )
+              : null
+          if (bank) {
+            // Shy, not barred: turn for the nearest bank and swim out — the
+            // crossing mover carries it (chest-deep, deadline-bounded, I4).
+            a.crossing = { tx: bank.tx, tz: bank.tz, time: 0 }
+            a.dodgeHeading = undefined
+          } else if (exit !== 'none') {
+            // The ocean — or no bank within swim reach, which the I4 deadline
+            // would ground anyway — sets the animal back onto land at once.
             const back = findLandNear(a.x, a.z, seed)
             a.x = back.x
             a.z = back.z
@@ -3923,24 +3949,36 @@ function Herds() {
         herdCentre.set(hid, { cx: ccx, cz: ccz, heading: st.heading })
       }
     }
-    // Shared water/ocean blocked-step predicate for the deflected flight steps
-    // (points 201/197 — the same shape the calf flee uses).
-    const waterBlockedAt = (nx: number, nz: number) => {
-      const ll = worldToLatLon(nx, nz)
-      const ty = sampleTerrain(ll.lat, ll.lon, seed).type
-      return ty === 'ocean' || ty === 'water'
-    }
-    // A flying bird crosses river/lake water freely — only the open ocean
-    // deflects its shy flight (design.md §19).
-    const oceanBlockedAt = (nx: number, nz: number) => {
-      const ll = worldToLatLon(nx, nz)
-      return sampleTerrain(ll.lat, ll.lon, seed).type === 'ocean'
-    }
     // Raw terrain type at a world point — the shape fleeCrossing/crossingTarget
     // probe the channel with (point 192).
     const terrainTypeAtWorld = (nx: number, nz: number) => {
       const ll = worldToLatLon(nx, nz)
       return sampleTerrain(ll.lat, ll.lon, seed).type
+    }
+    // One flight step for every flight source (design.md §19.5, point 312):
+    // deflected at the OCEAN edge only, so a flight meeting a river or lake
+    // goes in and swims — chest-deep, at the braked swim pace — instead of
+    // pressing against the waterline or skating along the bank. Stamps fleeAt
+    // so the backstop leaves the swimmer alone until its flight ends; returns
+    // the step and the body height for this spot. A wader stands on the sheet.
+    const swimPace = wadeSpeed(
+      CROSS_SWIM_SPEED,
+      seasonFlowFactor(CURRENT_WEATHER.wetness, balance.waterDrama.dryFlowFactor, balance.waterDrama.wetFlowFactor),
+    )
+    const fleeMove = (a: Animal, heading: number, speed: number, wader = false) => {
+      const wet = !wader && terrainTypeAtWorld(a.x, a.z) === 'water'
+      const pace = wet ? Math.min(speed, swimPace) : speed
+      const step = fleeWaterStep(a.x, a.z, heading, pace * dt, terrainTypeAtWorld, 0.8)
+      a.x = step.x
+      a.z = step.z
+      a.fleeAt = simTimeRef.current
+      const gfl = worldToLatLon(a.x, a.z)
+      const gft = sampleTerrain(gfl.lat, gfl.lon, seed)
+      if (gft.type === 'water') {
+        const ws = waterSurfaceY(gfl.lat, gfl.lon, seed, gft.height)
+        a.y = wader ? waderStandY(gft.height, ws) : sheetAnchorY(ws, gft.height, 0.32)
+      } else if (gft.type !== 'ocean') a.y = groundedBodyY(gft.height)
+      return step
     }
     // The traveller as a threat source for the player-shy flight (design.md
     // §19): fed into the SAME fleeHeading/held-heading machinery as the
@@ -4457,17 +4495,16 @@ function Herds() {
             pitch = Math.PI / 2.3 // thrown on its side, thrashing
             familyHeld = true
           } else if (a.crossing !== undefined) {
-            // Purposeful water crossing (point 192, the user's water-rule
-            // revision): swim straight for the far bank at the seasonal wade
-            // speed, chest-deep ON the rendered surface; landing — or the
+            // A swim for a bank (point 192's crossing, and point 312's swim-out
+            // to the nearest bank): straight for the target at the seasonal
+            // wade speed, chest-deep ON the rendered surface; landing — or the
             // resolve deadline (invariant I4) — ends it.
             const c = a.crossing
             c.time += dt
             const cdx = c.tx - a.x
             const cdz = c.tz - a.z
             const cd = Math.hypot(cdx, cdz)
-            const bw2 = balance.waterDrama
-            const swim = wadeSpeed(CROSS_SWIM_SPEED, seasonFlowFactor(CURRENT_WEATHER.wetness, bw2.dryFlowFactor, bw2.wetFlowFactor))
+            const swim = swimPace
             if (cd > 0.05) {
               a.x += (cdx / cd) * Math.min(cd, swim * dt)
               a.z += (cdz / cd) * Math.min(cd, swim * dt)
@@ -4477,7 +4514,16 @@ function Herds() {
             const onLand = ct2.type !== 'water' && ct2.type !== 'ocean'
             if ((onLand && cd < 0.6) || c.time > balance.waterCross.resolveSeconds) {
               a.crossing = undefined
-              a.y = Math.max(0.02, ct2.height)
+              if (!onLand) {
+                // The deadline grounds a swimmer still on the water at the
+                // nearest land (I4) — nothing swims forever, and no second
+                // swim is started behind it.
+                const back = findLandNear(a.x, a.z, seed)
+                a.x = back.x
+                a.z = back.z
+                const bl = worldToLatLon(a.x, a.z)
+                a.y = groundedBodyY(sampleTerrain(bl.lat, bl.lon, seed).height)
+              } else a.y = Math.max(0.02, ct2.height)
             } else if (!onLand) {
               const ws2 = waterSurfaceY(cll2.lat, cll2.lon, seed, ct2.height)
               a.y = sheetAnchorY(ws2, ct2.height, 0.32) // chest-deep on the sheet
@@ -4761,29 +4807,10 @@ function Herds() {
                 a.dodgeHeading === undefined
                   ? shyPick.heading
                   : turnToward(a.dodgeHeading, shyPick.heading, PREY_DODGE_TURN * dt)
-              const shyStep = deflectedStep(a.x, a.z, a.dodgeHeading, PLAYER_SHY_SPEED * dt, waterBlockedAt, 0.8)
-              // Boxed against the water by the approaching traveller (point
-              // 248): cross the river/lake like the predator-fleeing prey
-              // does (point 192) instead of pinning at the waterline. The
-              // crossing (a drama state) then owns the calf and silences the
-              // player-shy flee until it lands.
-              const esc = fleeCrossing(
-                shyStep.moved,
-                a.crossing !== undefined,
-                a.x,
-                a.z,
-                a.dodgeHeading,
-                balance.waterCross.maxUnits,
-                terrainTypeAtWorld,
-              )
-              if (esc) a.crossing = { tx: esc.tx, tz: esc.tz, time: 0 }
-              a.x = shyStep.x
-              a.z = shyStep.z
-              { // ground-follow (point 203(A)): a mover carries its own standing height
-                const gfl = worldToLatLon(a.x, a.z)
-                const gft = sampleTerrain(gfl.lat, gfl.lon, seed)
-                if (gft.type !== 'water' && gft.type !== 'ocean') bodyY = a.y = groundedBodyY(gft.height)
-              }
+              // Flight is unrestricted by river/lake water (point 312): a
+              // traveller driving the calf at a bank sends it in, not along.
+              fleeMove(a, a.dodgeHeading, PLAYER_SHY_SPEED)
+              bodyY = a.y
               px = a.x
               pz = a.z
               wobTarget = 0
@@ -4950,37 +4977,12 @@ function Herds() {
           if (d < FLEE_RADIUS && d > 0.01) {
             fleeingLion = true
             const urgency = (FLEE_RADIUS - d) / FLEE_RADIUS
-            // Water-deflected flight (points 201/197): the raw radial step ran a
-            // fleeing animal straight onto a water cell where the §19.5 backstop
-            // teleported it back — an on-the-spot pin at the bank (the user's
-            // calf standing at the waterline while its parent was taken). Steer
-            // along the bank instead; a genuine dead-end stands (the drama or
-            // the walk-on resolves it). Point 192 will later allow choosing the
-            // water on purpose — this only swaps the blocked predicate then.
+            // Unrestricted flight (point 312): a river or lake in the escape
+            // line is swum, not skirted — predators do not follow into the
+            // deep; only the ocean edge deflects the step along the shore.
             const fleeH = Math.atan2(dx, dz)
-            const fleeStep = deflectedStep(a.x, a.z, fleeH, FLEE_SPEED * urgency * dt, waterBlockedAt, 0.8)
-            // Boxed against the water with the predator behind (point 192):
-            // flee INTO the water — predators do not follow into the deep.
-            // Shared fleeCrossing rule (river/lake only, never the ocean).
-            {
-              const esc = fleeCrossing(
-                fleeStep.moved,
-                a.crossing !== undefined,
-                a.x,
-                a.z,
-                fleeH,
-                balance.waterCross.maxUnits,
-                terrainTypeAtWorld,
-              )
-              if (esc) a.crossing = { tx: esc.tx, tz: esc.tz, time: 0 }
-            }
-            a.x = fleeStep.x
-            a.z = fleeStep.z
-            { // ground-follow (point 203(A)): a mover carries its own standing height
-              const gfl = worldToLatLon(a.x, a.z)
-              const gft = sampleTerrain(gfl.lat, gfl.lon, seed)
-              if (gft.type !== 'water' && gft.type !== 'ocean') bodyY = a.y = groundedBodyY(gft.height)
-            }
+            const fleeStep = fleeMove(a, fleeH, FLEE_SPEED * urgency)
+            bodyY = a.y
             px = a.x
             pz = a.z
             wobTarget = 0.3
@@ -5057,45 +5059,12 @@ function Herds() {
             // The elephant dart stays deliberately slower than the herd (the
             // trample must remain possible); a pure player flight runs.
             const spd = pick.source === 'elephant' ? PREY_PANIC_SPEED : PLAYER_SHY_SPEED
-            // Deflect the dart along a bank instead of into the water (points
-            // 201/197): the raw step ran the dodge onto a water cell where the
-            // backstop teleported it back — a vibrating pin at the waterline.
-            // A flying bird instead crosses river/lake freely (ocean-only
-            // deflection) — it is in the air.
-            const dodgeStep = deflectedStep(
-              a.x,
-              a.z,
-              a.dodgeHeading,
-              spd * dt,
-              sp === 'flamingo' ? oceanBlockedAt : waterBlockedAt,
-              0.8,
-            )
-            if (sp !== 'flamingo') {
-              // Boxed against the water with the threat bearing down (point
-              // 192): rather than be caught, take to the water — the herd
-              // does not follow into the deep. Shared fleeCrossing rule
-              // (river/lake only, never the ocean).
-              const esc = fleeCrossing(
-                dodgeStep.moved,
-                a.crossing !== undefined,
-                a.x,
-                a.z,
-                a.dodgeHeading,
-                balance.waterCross.maxUnits,
-                terrainTypeAtWorld,
-              )
-              if (esc) a.crossing = { tx: esc.tx, tz: esc.tz, time: 0 }
-            }
-            a.x = dodgeStep.x
-            a.z = dodgeStep.z
-            { // ground-follow (point 203(A)): a mover carries its own standing
-              // height — and the fleeing wader stands on the sheet over water.
-              const gfl = worldToLatLon(a.x, a.z)
-              const gft = sampleTerrain(gfl.lat, gfl.lon, seed)
-              if (gft.type === 'water' && sp === 'flamingo')
-                bodyY = a.y = waderStandY(gft.height, waterSurfaceY(gfl.lat, gfl.lon, seed, gft.height))
-              else if (gft.type !== 'water' && gft.type !== 'ocean') bodyY = a.y = groundedBodyY(gft.height)
-            }
+            // Unrestricted flight (point 312): the dart and the shy flight go
+            // INTO a river or lake in their way and swim it — the herd does
+            // not follow into the deep; only the ocean edge deflects. The
+            // wader stands on the sheet instead of swimming.
+            fleeMove(a, a.dodgeHeading, spd, sp === 'flamingo')
+            bodyY = a.y
             px = a.x
             pz = a.z
             wobTarget = 0

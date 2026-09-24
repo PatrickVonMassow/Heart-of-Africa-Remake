@@ -17,7 +17,12 @@ import {
   isInDrama,
   drinkExemptFromPlayerShy,
   resolveFleeTarget,
-  fleeCrossing,
+  fleeWaterStep,
+  flightBlocked,
+  roamCrossing,
+  nearestBankTarget,
+  waterDramaOwns,
+  waterExit,
   type FleeArbitrationState,
   PLAYER_SHY_STRONG_WEAPON,
   FLIGHT_DESPAWN_OUT,
@@ -657,33 +662,78 @@ describe('resolveFleeTarget (point 252 — ONE arbitration point for every co-ac
   })
 })
 
-describe('fleeCrossing (point 248 — a boxed flight takes to the water like the predator-flee)', () => {
-  // Fake terrain along +z: water for z in (0, 3], land beyond — the
-  // crossingTarget fixture shape.
+describe('water-shy, not water-barred (design.md §19.5, point 312)', () => {
+  // Fake terrain along +z: land for z <= 0, water for z in (0, 3], land beyond.
   const riverThenLand = (_x: number, z: number) => (z > 0 && z <= 3 ? 'water' : 'savanna')
+  const coast = (_x: number, z: number) => (z > 0 ? 'ocean' : 'savanna')
+  const wideLake = (_x: number, z: number) => (z > 0 && z <= 20 ? 'water' : 'savanna')
 
-  it('a player-boxed shy flee (deflected step dead-ended) triggers a crossing to the far bank', () => {
-    // The call-site pattern: the shy step fans against a water cove and cannot
-    // move; fleeCrossing then finds the far bank along the held heading — the
-    // animal crosses instead of pinning at the waterline.
-    const cove = () => true // every probe wet — the dead-ended fan
-    const step = deflectedStep(0, 0, 0, 0.07, cove, 0.8)
-    expect(step.moved).toBe(false)
-    const esc = fleeCrossing(step.moved, false, 0, 0, 0, 6, riverThenLand)
-    expect(esc).not.toBeNull()
-    expect(esc!.tz).toBeGreaterThan(3) // past the channel, on land
+  it('a flight step heading into river/lake water is NOT deflected along the bank', () => {
+    const step = fleeWaterStep(0, -0.05, 0, 0.1, riverThenLand, 0.8)
+    expect(step.moved).toBe(true)
+    expect(step.heading).toBe(0) // straight in, no along-shore slide
+    expect(riverThenLand(step.x, step.z)).toBe('water')
   })
 
-  it('still refuses the ocean and an over-wide channel — the point-192 rules are unchanged', () => {
+  it('the same flight step at an OCEAN edge is still turned along the shore', () => {
+    const step = fleeWaterStep(0, -0.05, 0, 0.1, coast, 0.8)
+    expect(step.moved).toBe(true)
+    expect(step.heading).not.toBe(0)
+    expect(coast(step.x, step.z)).not.toBe('ocean')
+    expect(flightBlocked('ocean')).toBe(true)
+    expect(flightBlocked('water')).toBe(false)
+  })
+
+  it('a flight ignores width: it goes into a lake far wider than the roaming swim width', () => {
+    const step = fleeWaterStep(0, -0.05, 0, 0.1, wideLake, 0.8)
+    expect(step.heading).toBe(0)
+    expect(wideLake(step.x, step.z)).toBe('water')
+  })
+
+  it('a roaming crossing still honours its width and its readiness roll', () => {
+    expect(roamCrossing(0.1, 0.3, 0, 0, 0, 6, riverThenLand)).not.toBeNull()
+    expect(roamCrossing(0.5, 0.3, 0, 0, 0, 6, riverThenLand)).toBeNull() // not ready
+    expect(roamCrossing(0.1, 0.3, 0, 0, 0, 6, wideLake)).toBeNull() // too wide
     const toSea = (_x: number, z: number) => (z > 0 && z <= 2 ? 'water' : 'ocean')
-    expect(fleeCrossing(false, false, 0, 0, 0, 6, toSea)).toBeNull()
-    const wide = (_x: number, z: number) => (z > 0 && z <= 9 ? 'water' : 'savanna')
-    expect(fleeCrossing(false, false, 0, 0, 0, 6, wide)).toBeNull()
+    expect(roamCrossing(0, 1, 0, 0, 0, 6, toSea)).toBeNull() // never the ocean
   })
 
-  it('a step that MOVED, or an animal already mid-crossing, starts no crossing', () => {
-    expect(fleeCrossing(true, false, 0, 0, 0, 6, riverThenLand)).toBeNull()
-    expect(fleeCrossing(false, true, 0, 0, 0, 6, riverThenLand)).toBeNull()
+  it('an idle animal on water heads for the NEAREST bank, not the far one', () => {
+    // At z = 1 in the 3-wide channel: the near bank (z <= 0) is 1 away, the far one 2.
+    const t = nearestBankTarget(0, 1, riverThenLand, 30)
+    expect(t).not.toBeNull()
+    expect(t!.tz).toBeLessThanOrEqual(0)
+    expect(Math.hypot(t!.tx, t!.tz - 1)).toBeLessThanOrEqual(1.01)
+    // Nearer the far side, the far bank is the nearest.
+    const f = nearestBankTarget(0, 2.6, riverThenLand, 30)
+    expect(f!.tz).toBeGreaterThan(3)
+  })
+
+  it('the nearest-bank search never swims the sea and resolves to null out of reach', () => {
+    const seaThenLand = (_x: number, z: number) => (z < 0 ? 'ocean' : z <= 4 ? 'water' : 'savanna')
+    const t = nearestBankTarget(0, 0.5, seaThenLand, 30)
+    expect(t!.tz).toBeGreaterThan(4) // the sea side is never a way out
+    expect(nearestBankTarget(0, 10, wideLake, 5)).toBeNull()
+  })
+
+  it('a drama-flagged animal is exempt while its drama runs and subject again afterwards', () => {
+    const swept = { inWater: 2 }
+    expect(waterDramaOwns(swept)).toBe(true)
+    expect(waterExit('water', waterDramaOwns(swept), false)).toBe('none')
+    const after = { inWater: undefined }
+    expect(waterDramaOwns(after)).toBe(false)
+    expect(waterExit('water', waterDramaOwns(after), false)).toBe('swim-to-bank')
+    // Keyed on the state, whatever the species: a wading parent, a caught victim.
+    expect(waterDramaOwns({ childInDrama: true })).toBe(true)
+    expect(waterDramaOwns({ caught: 0.5 })).toBe(true)
+  })
+
+  it('water exit: the ocean still sets back, a flight keeps swimming, land needs nothing', () => {
+    expect(waterExit('ocean', false, false)).toBe('setback')
+    expect(waterExit('ocean', false, true)).toBe('setback')
+    expect(waterExit('water', false, true)).toBe('none')
+    expect(waterExit('water', false, false)).toBe('swim-to-bank')
+    expect(waterExit('savanna', false, false)).toBe('none')
   })
 })
 
