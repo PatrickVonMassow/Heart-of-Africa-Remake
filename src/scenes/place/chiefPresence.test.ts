@@ -97,7 +97,9 @@ describe('the passage at his hut', () => {
     expect(standingClear(settlement, mx, mz, PLAYER_RADIUS)).toBe(true)
     expect(hasEscapeDirection(settlement, mx, mz, PLAYER_RADIUS, PLAYER_RADIUS * 2)).toBe(true)
     expect(standingClear(settlement, ...hut.door!, PLAYER_RADIUS)).toBe(true)
-    expect(nextChiefAction('hut', { mode: 'place', placeId: village.id }, 'in-hut')).toBe('step-out')
+    expect(nextChiefAction('hut', { mode: 'place', placeId: village.id }, 'in-hut')).toBe(
+      village.id === DRUM_MESSAGE_VILLAGE ? 'step-out' : 'no-message',
+    )
   })
 
   // The passage cases above prove nobody is WEDGED by him. This one proves the

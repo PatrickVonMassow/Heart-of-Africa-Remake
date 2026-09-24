@@ -1,4 +1,4 @@
-// The door records the chief's walk; only the drums carry his message (§13.4).
+// Only Bambara's door records the chief's walk; the drums carry his message (§13.4).
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { PLACES } from '../world/geo'
 import { balance } from '../config/balance'
@@ -6,6 +6,7 @@ import { g, freshGame, withWorld, useGame } from '../test/store'
 import { DICTIONARIES, resolveText, useLocale } from '../i18n'
 import { stripVoiceMarkup } from '../journal/voiceMarkup'
 import { chiefWalkState, resetChiefWalk } from '../scenes/place/chiefPresence'
+import { DRUM_MESSAGE_VILLAGE } from './store'
 
 withWorld()
 beforeEach(() => {
@@ -29,13 +30,21 @@ describe('knowing people (design.md §13.3)', () => {
 })
 
 describe('the first door press', () => {
-  it.each(['en', 'de'] as const)('%s: writes exactly the walk entry at every village', (lang) => {
+  it.each(['en', 'de'] as const)('%s: writes the walk entry only in Bambara', (lang) => {
     useLocale.getState().setLang(lang)
     for (const village of PLACES.filter((p) => p.kind === 'village')) {
       g().enterPlace(village.id)
       const before = g().journal.length
       g().callChiefOut()
       const added = g().journal.slice(before)
+      expect(g().orientationGiven[village.id]).toBe(true)
+      if (village.id !== DRUM_MESSAGE_VILLAGE) {
+        expect(added, village.id).toHaveLength(0)
+        expect(g().toast).toBe(DICTIONARIES[lang].toasts.chiefNoMessage)
+        expect(chiefWalkState().phase).toBe('in-hut')
+        g().leavePlace()
+        continue
+      }
       expect(added, village.id).toHaveLength(1)
       expect(added[0]).toMatchObject({
         title: { key: 'journal.titles.chiefWalk' },
@@ -54,7 +63,7 @@ describe('the first door press', () => {
   })
 
   it('later presses do nothing outside, then call him out again without another entry', () => {
-    const village = g().knowingVillages.north
+    const village = DRUM_MESSAGE_VILLAGE
     g().enterPlace(village)
     g().callChiefOut()
     const journal = g().journal
@@ -78,7 +87,7 @@ describe('the first door press', () => {
   })
 
   it('checkpoint reload preserves the first meeting without saving hint state', () => {
-    g().enterPlace(g().knowingVillages.north)
+    g().enterPlace(DRUM_MESSAGE_VILLAGE)
     g().callChiefOut()
     g().saveCheckpoint()
     const saved = JSON.parse(localStorage.getItem('hoa-checkpoints-v1')!)[0]
