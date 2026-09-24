@@ -2236,6 +2236,16 @@ was ever pointed at its subject. Do NOT resolve a refusal by redeclaring the
 frame `general` — a check that reports its own subject as optional is the
 failure this mechanism exists to prevent.
 
+## Continuous communication expedition
+
+`VERIFY_GL=webgpu npm test -- communication --section=continuous-route` runs
+one entry-to-fit expedition; repeat with `VERIFY_GL=webgl` for message-first.
+The suite asserts its actual backend and uses ordinary input after its recorded
+pre-entry setup. Its named frames, stereo WAV windows, audio JSON receipts,
+route video and English/German journal text share a unique run prefix under
+`verification/`. See [the route and artifact guide](../../docs/communication-playthrough.md#runnable-continuous-harness-authored-not-browser-executed).
+This authoring adds no measured runtime or browser acceptance claim.
+
 ## Verification rules extracted from the per-turn policy
 
 Exercise features at states a player can reach. In bird's-eye view the ordinary
