@@ -39,7 +39,15 @@ async function event(name, data = {}) {
 }
 async function step(name) { receipt.step = name; await event(name) }
 async function frame(name, subject) {
-  await shutter(prefix + name, subject)
+  await shutter(prefix + name, subject).catch(async (error) => {
+    // A refused frame records where the game really stood, so the red names its cause.
+    await event(`${name}-refused`, await d.read(() => {
+      const s = window.__game.getState()
+      return { mode: s.mode, placeId: s.placeId, pos: s.pos, day: s.day, dialog: window.__ui.getState().dialog ?? null,
+        journal: s.journal.slice(-3).map((e) => e.text?.key ?? null) }
+    }).catch((e) => ({ unreadable: e.message })))
+    throw error
+  })
   receipt.frames.push({ name: `${prefix}${name}.png`, step: receipt.step, subject, pageMs: await d.read(() => performance.now()) }); save()
 }
 async function localFrame(name, point, label) {
