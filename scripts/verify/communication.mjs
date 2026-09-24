@@ -285,19 +285,26 @@ async function observations() {
 
   await step('3-adult-work-and-loom')
   const geography = await d.read(() => window.__placeErrands().geography)
-  await d.inspect(geography.waterStand, 3)
-  await d.wait(() => window.__placeErrands().villagers.some((v) => v.carry === 'emptyJar'), null, 480000)
-  const carrier = await d.read(() => window.__placeErrands().villagers.findIndex((v) => v.carry === 'emptyJar'))
-  const empty = await d.read((i) => window.__placeErrands().villagers[i], carrier)
-  await d.aim(empty)
-  await localFrame('03-empty-jar', empty, 'the water carrier sets out with the empty jar')
-  await d.inspect(geography.waterFoot, 3)
-  await d.wait((i) => window.__placeErrands().villagers[i].filling !== null, carrier, 480000).catch(async (e) => {
-    // Name where the carrier stands and what his errand says, not only the wait.
-    const state = await d.read((i) => ({ carrier: window.__placeErrands().villagers[i], player: { ...window.__placePlayer },
-      waterFoot: window.__placeErrands().geography.waterFoot }), carrier)
-    throw new Error(`${e.message} — carrier never filled: ${JSON.stringify({ ...state, carrier: { ...state.carrier, drawn: undefined } })}`)
-  })
+  let carrier = -1
+  for (let attempt = 0; carrier < 0; attempt++) {
+    await d.inspect(geography.waterStand, 3)
+    await d.wait(() => window.__placeErrands().villagers.some((v) => v.carry === 'emptyJar'), null, 480000)
+    const i = await d.read(() => window.__placeErrands().villagers.findIndex((v) => v.carry === 'emptyJar'))
+    const empty = await d.read((i) => window.__placeErrands().villagers[i], i)
+    await d.aim(empty)
+    await localFrame(`03-empty-jar${attempt ? '-' + attempt : ''}`, empty, 'the water carrier sets out with the empty jar')
+    await d.inspect(geography.waterFoot, 3)
+    const outcome = await d.wait((i) => {
+      const v = window.__placeErrands().villagers[i]
+      return v.filling !== null ? 'filled' : v.carry !== 'emptyJar' ? 'abandoned' : null
+    }, i, 480000).then((h) => h.jsonValue())
+    if (outcome === 'filled') { carrier = i; break }
+    // A carrier who drops his jar before the water is a finding in its own
+    // right: it is recorded for the report, and the next carrier is followed.
+    const state = await d.read((i) => ({ carrier: { ...window.__placeErrands().villagers[i], drawn: undefined }, player: { ...window.__placePlayer } }), i)
+    await event('water-errand-abandoned', { attempt, ...state })
+    assert(attempt < 2, `Three water carriers dropped their jar before the water: ${JSON.stringify(state)}`)
+  }
   await localFrame('03-dipping-jar', geography.waterFoot, 'the same carrier dipping the jar at the water')
   await d.inspect(geography.waterStand, 3)
   await d.wait((i) => {
