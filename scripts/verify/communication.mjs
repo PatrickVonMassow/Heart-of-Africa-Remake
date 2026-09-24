@@ -77,7 +77,21 @@ async function guess(name, reading, expectedAtom, speaker = null) {
     const note = document.querySelector('.speech-label.targeted')
     return !!note?.querySelector('.speech-invite') && (!speaker || note.getAttribute('data-speaker') === speaker)
   }
-  await d.wait(invited, speaker)
+  await d.wait(invited, speaker, 60000).catch(async (error) => {
+    // Name the speech state instead, so a timeout says which note held the key.
+    const state = await d.read(() => {
+      const p = window.__placePlayer
+      return {
+        player: p && [p.x, p.z],
+        targeted: document.querySelector('.speech-label.targeted')?.getAttribute('data-speaker') ?? null,
+        notes: window.__speech.labels().map((l) => {
+          const w = window.__speech.anchorWorld(l.speakerId)
+          return { speaker: l.speakerId, atoms: l.atoms, shownAt: l.shownAt, distance: w && p ? Math.hypot(w[0] - p.x, w[2] - p.z) : null }
+        }),
+      }
+    })
+    throw new Error(`no invitation on ${speaker ?? 'any'} note; speech ${JSON.stringify(state)} (${error.message})`)
+  })
   // The speaker keeps walking while the camera turns, so a single aim can miss;
   // re-aim at whoever is targeted until the note stands inside the picture.
   let targeted = null, faced = false
