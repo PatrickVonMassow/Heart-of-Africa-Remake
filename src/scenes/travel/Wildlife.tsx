@@ -2334,6 +2334,14 @@ function Herds() {
     for (const sp of FAMILY_DEFEND_SPECIES) {
       for (const a of herds[sp]) {
         if (a.dead) continue
+        // A calf's drama owns its parent (point 312(d)): a swim for a bank
+        // yields the moment the calf is seized, in the water or mired, so the
+        // rescue drive — not the swim — moves the parent.
+        if (
+          a.crossing !== undefined && a.child && !a.child.dead &&
+          (a.child.caught !== undefined || a.child.inWater !== undefined || a.child.mired !== undefined)
+        )
+          a.crossing = undefined
         // The defence kick's pose window runs down here so it always resolves
         // (point 124) — the render loop below only draws it.
         if (a.kick !== undefined) {
