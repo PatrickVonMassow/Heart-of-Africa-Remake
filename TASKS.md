@@ -94,6 +94,7 @@ put it is the mistake this line exists to stop.
   `// OPEN:` and report if design.md leaves its trigger unclear.
   Test: Vitest store/interaction test — outside `DRUM_MESSAGE_VILLAGE` no chiefStepsOut toast, no
   chiefWalk entry, no walk; inside Bambara unchanged.
+  Bundle: Kommunikation.
 
 - [ ] 659. The whole communication chain, played through and judged by what reaches the
   PLAYER — A SIX-EYES ALL-ROUND REVIEW.
@@ -218,6 +219,22 @@ put it is the mistake this line exists to stop.
   PLACEMENT (user 24.09.2026): rank this point IMMEDIATELY AFTER point 659 in the work order (.claude/queue-rank.json, origin user) — it is the next point worked once 659 lands.
   Criticality: medium.
   Bundle: Tierverhalten.
+
+- [ ] 1206. Route blind-parallel enumerate halves to Astra at the default share setting, then switch to default.
+  FINAL STATE: at `default`, a blind-parallel half reaches GPT-6 Astra; authoring stays with Claude; and the machine switch stands at `default`.
+
+  (a) ROUTING (scripts/astra-share-core.mjs): the `default` row routes `review` AND `enumerate` to Astra; diagnose, audit, explain and author stay with Claude. `audit` stays with Claude deliberately (large sweeps are the costly kind); a blind audit half at `default` uses the existing `--anyway`. No new setting, no new kind, no new mechanism - a table entry.
+
+  (b) Every text that describes `default` says the same: SETTING_NOTES.default, the `default` branch of briefLine, the board note if it names the kinds, and the table and prose in docs/astra-routing.md (row `default`, the "today's behaviour" sentence).
+
+  (c) Tests: astra-share-core.test.mjs / astra-share-cli.test.mjs pin the new `default` row (enumerate -> astra; audit/diagnose/explain/author -> claude); ask-astra-cli.test.mjs pins that `--kind enumerate` at `default` is NOT refused with exit 3 while `--kind audit` still is. Adjust any existing test that pinned the old refusal.
+
+  (d) After the merge, switch this machine: `node scripts/astra-share.mjs --set default`, and state the resulting `--status` line in the closing record.
+
+  NOT IN SCOPE: changing `prefer-astra` or `claude-only`, the review path, or the author-routing cut.
+  Criticality: medium.
+  PLACEMENT (user 24.09.2026, 13:08): directly behind point 174, not with 1195: "1206 und 1207 solln nicht mitrücken. Sie sollen also nach dem Vorziehen von 1195 direkt hinter 174 stehen."
+  Bundle: Modell & Wächter.
 
 - [ ] 1195. The board says by itself that the batch is standing.
   USER ORDER 23.09.2026, 12:21: »Fast genauso schlimm wie eine stehende Batch ist, dass ich auf
@@ -357,22 +374,6 @@ put it is the mistake this line exists to stop.
   tag plus `poc` dynamically, but a tag push alone does not trigger it. Then VERIFY
   that /v0.3/ and /poc/ serve the new state, and FREEZE the tag: it is never
   re-pointed.
-
-- [ ] 1206. Route blind-parallel enumerate halves to Astra at the default share setting, then switch to default.
-  FINAL STATE: at `default`, a blind-parallel half reaches GPT-6 Astra; authoring stays with Claude; and the machine switch stands at `default`.
-
-  (a) ROUTING (scripts/astra-share-core.mjs): the `default` row routes `review` AND `enumerate` to Astra; diagnose, audit, explain and author stay with Claude. `audit` stays with Claude deliberately (large sweeps are the costly kind); a blind audit half at `default` uses the existing `--anyway`. No new setting, no new kind, no new mechanism - a table entry.
-
-  (b) Every text that describes `default` says the same: SETTING_NOTES.default, the `default` branch of briefLine, the board note if it names the kinds, and the table and prose in docs/astra-routing.md (row `default`, the "today's behaviour" sentence).
-
-  (c) Tests: astra-share-core.test.mjs / astra-share-cli.test.mjs pin the new `default` row (enumerate -> astra; audit/diagnose/explain/author -> claude); ask-astra-cli.test.mjs pins that `--kind enumerate` at `default` is NOT refused with exit 3 while `--kind audit` still is. Adjust any existing test that pinned the old refusal.
-
-  (d) After the merge, switch this machine: `node scripts/astra-share.mjs --set default`, and state the resulting `--status` line in the closing record.
-
-  NOT IN SCOPE: changing `prefer-astra` or `claude-only`, the review path, or the author-routing cut.
-  Criticality: medium.
-  PLACEMENT (user 24.09.2026, 13:08): directly behind point 174, not with 1195: "1206 und 1207 solln nicht mitrücken. Sie sollen also nach dem Vorziehen von 1195 direkt hinter 174 stehen."
-  Bundle: Modell & Wächter.
 
 - [ ] 1207. The stand-down fence refuses writes outside the checkout, so the documented request handoff cannot be used.
   FINAL STATE: a stood-down session can deposit a request with `finding.mjs --request` using files it writes itself, with no workaround.
