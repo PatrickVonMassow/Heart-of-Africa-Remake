@@ -790,7 +790,17 @@ export const useGame = create<GameState>()((set, get) => ({
     const s = get()
     if (s.mode !== 'place' || !s.placeId) return
     const place = placeById(s.placeId)
-    if (place.kind !== 'village' || s.chiefOutside[place.id]) return
+    if (place.kind !== 'village') return
+    // Meeting the head man still marks the buildings (§17.3), but only
+    // Bambara's chief leads the traveller to a drum message.
+    if (place.id !== DRUM_MESSAGE_VILLAGE) {
+      set({
+        orientationGiven: { ...s.orientationGiven, [place.id]: true },
+        toast: getStrings().toasts.chiefNoMessage,
+      })
+      return
+    }
+    if (s.chiefOutside[place.id]) return
     // The walk itself is scene furniture; the store owns only that he is out.
     setChiefWalkState(chiefStepsOut(chiefWalkState(), speechClock()))
     set({
