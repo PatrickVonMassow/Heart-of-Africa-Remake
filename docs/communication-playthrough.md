@@ -110,3 +110,51 @@ The existing `polish` sections `children-bank-game`, `children-boulder-climb`,
 `artefact-give`, plus `world --section=communication-errand`, are useful for
 isolating a failure. They have their own setup and cannot be stitched together
 as evidence of the uninterrupted entry-to-fit run.
+
+## Resumed gate record and outstanding review work
+
+The resumed baseline `5b7f3e497` passed `npx tsc -b`,
+`npm run typecheck:test`, `npm run lint` and `npm run build`.
+Its full `npm run test:unit` exited 1: 536 files passed, two failed;
+16,423 tests passed, two timed out and seven were skipped (757.25 seconds).
+The failures were the bank-game traveller comparison and the compound-village
+fence-capacity witness, each exceeding its 20-second case limit.
+
+Two separate rescue commits repair those checks without changing game code or
+raising timeouts:
+
+- `306779b2c` separates the traveller and open-lane replays into independent
+  cases, retaining all five seeds, 600-second simulations and assertions for
+  each condition. Both targeted cases passed (8.8 and 6.6 seconds).
+- `b4dd0141e` stops the fence-capacity existence search at its first layout
+  exceeding 160 woven panels. The search candidates and condition are unchanged;
+  the separate exhaustive panel/collider checks remain. The targeted case
+  passed in 2.8 seconds.
+
+The complete rerun on **`b4dd0141e`** returned:
+
+| Gate | Result |
+| --- | --- |
+| `npx tsc -b` | Passed, exit 0 |
+| `npm run typecheck:test` | Passed, exit 0 |
+| `npm run lint` | Passed, exit 0 |
+| `npm run build` | Passed, exit 0; dependency warning about `kokoro-js` IIFE `import.meta` |
+| `npm run test:unit` | Passed, exit 0; 538 files, 16,426 tests passed, seven skipped; 622.45 seconds |
+
+The full rerun log is retained locally at
+`local/verify-logs/communication-resume-unit.log` (git-ignored). Both repaired
+files and all four `CommunicationPlaythrough.test.tsx` cases passed in that run.
+This section records the results after verification; it changes no executable
+code and does not claim a gate on a merge candidate.
+
+Review findings 2–4 remain **open**. The authoring instructions explicitly say
+“Do NOT push, do NOT merge” and “the browser suites are NOT yours to run,”
+while the review requests a merge from `main`, pushes and permission to check
+the browser harness. Clarification was requested; no answer was received before
+this handoff. No merge, author-issued push or browser execution was performed.
+Pushes remain the wrapper's responsibility. The requested ordering stops at
+the unresolved merge: the continuous Playwright route has not been built.
+There are no new frames, audio measurements, browser journal captures or
+reproduced browser findings with severity/U-id dispositions. The route above
+and the historical union remain outstanding reviewer inputs, not completed
+browser evidence. Picture judgment and landing remain with the Claude session.
