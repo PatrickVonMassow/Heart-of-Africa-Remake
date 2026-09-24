@@ -153,7 +153,9 @@ async function chief(prefix = '05') {
     await localFrame(`${prefix}-chief-walks-out`, { x: hut.pos[0], z: hut.pos[1] }, 'the chief leaving his hut')
   }
   const drummer = await d.read(() => ({ x: window.__placeSpots.drummer[0], z: window.__placeSpots.drummer[1] }))
-  await d.inspect(drummer, 2)
+  // The market door stands 2.84 m from the drum: at 2 m on its side the nearer
+  // door wins the key, so step up to the drum as a player would.
+  await d.inspect(drummer, 1.4)
   await d.wait(() => window.__chief?.phase === 'at-drummer')
   return drummer
 }
@@ -299,7 +301,7 @@ async function readings() {
   await guess('04-river', 'perhaps a road', receipt.vocabulary.RIVER)
   // CHIEF must be named while he is indoors, before the first call in words-first.
   const drummer = await d.read(() => ({ x: window.__placeSpots.drummer[0], z: window.__placeSpots.drummer[1] }))
-  await d.inspect(drummer, 2)
+  await d.inspect(drummer, 1.4)
   await d.wait(() => !window.__game.getState().chiefOutside['bambara-village'], null, 480000)
   await prompt('drummer')
   await page.keyboard.press('Space')
