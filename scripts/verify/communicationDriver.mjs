@@ -161,7 +161,14 @@ export function communicationDriver(page) {
       const to = { x: dx * (1 - tolerance / len), z: dz * (1 - tolerance / len) }
       return findPlaceRoute(grid, { x: 0, z: 0 }, to, 12)?.map((p) => ({ x: p.x + origin.x, z: p.z + origin.z })) ?? null
     }, { target, tolerance })
-    assert(path, `No traversable route to ${JSON.stringify(target)}`)
+    if (!path) {
+      // An animal may stand on the waypoint or around the traveller; a player
+      // waits for it to move on before choosing the way again.
+      const here = await read(() => window.__game.getState().pos)
+      assert(replans > 0, `No traversable route: ${JSON.stringify(await blockedAt(here, target))}`)
+      await page.waitForTimeout(3000)
+      return travelTo(target, tolerance, replans - 1)
+    }
     for (const p of path) {
       const stuck = await travel(p)
       if (!stuck) continue
