@@ -59,13 +59,13 @@ export function communicationDriver(page) {
       const distance = Math.hypot(p.x - target.x, p.z - target.z)
       if (distance < 0.32) return
       if (distance < best - 0.08) { best = distance; progress = Date.now() }
-      assert(Date.now() - progress < 12000, `Blocked settlement walk to ${JSON.stringify(target)}`)
+      if (Date.now() - progress >= 12000) return { blocked: target, at: p }
       await aim(target)
       await held(['KeyW'], () => page.waitForTimeout(Math.min(250, Math.max(35, distance * 110))))
     }
     throw new Error('Settlement walk timed out')
   }
-  async function walk(target) {
+  async function walk(target, replans = 3) {
     const path = await read(async (to) => {
       const { buildPlaceNavGrid, findPlaceRoute } = await import('/src/scenes/place/routing.ts')
       const l = window.__placeLayout
@@ -73,7 +73,15 @@ export function communicationDriver(page) {
       return findPlaceRoute(grid, window.__placePlayer, to)
     }, target)
     assert(path?.length, `No walkable route to ${JSON.stringify(target)}`)
-    for (const p of path) await walkLeg(p)
+    for (const p of path) {
+      const stuck = await walkLeg(p)
+      if (!stuck) continue
+      // Villagers and children are not on the static grid: a player waits for
+      // the one in his way to move on and chooses the way again from there.
+      assert(replans > 0, `Blocked settlement walk: ${JSON.stringify(stuck)}`)
+      await page.waitForTimeout(2000)
+      return walk(target, replans - 1)
+    }
   }
   async function inspect(target, distance = 3) {
     const stand = await read(async ({ target, distance }) => {
