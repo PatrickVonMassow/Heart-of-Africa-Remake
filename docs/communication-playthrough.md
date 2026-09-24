@@ -125,7 +125,7 @@ provided separately by the measured WAV windows, not by Playwright's video.
 | `01-entry`, `01-adult-talk` | Entry and a natural adult exchange |
 | `02-child-call`, `02-run-*`, `02-stationary-rock-touch`, `02-off-game-climb` | RIVER call, both directions, contact and climb |
 | `03-empty-jar`, `03-dipping-jar`, `03-full-jar-set-down`, `03-dig-invitation`, `03-paired-dig`, `03-finished-work`, `03-loom-*` | Adult consequences and both loom directions |
-| `04-chief-indoors-*`, `04-saved-glossary`, `04-revised-paper`, `04-cleared-paper`, `04-paper-edited` | Live E invitation, guesses and shared edits |
+| `04-river-*`, `04-chief-indoors-*`, `04-saved-glossary`, `04-revised-paper`, `04-cleared-paper`, `04-paper-edited` | Live E invitation, guesses and shared edits |
 | `05-chief-walks-out`, `05-errand-*` | Chief, sixteen-strike plan and completed paper |
 | `06-upstream-river-*`, `06-separate-boulder`, `06-excavated-find`, `06-find-journal` | Upstream route and excavation |
 | `07-return-river-*`, `07-chief-walks-out`, `07-answer-*`, `07-clay-impression`, `07-old-errand` | Return, give, eight-strike plan and both papers |
@@ -240,3 +240,25 @@ above now replaces the missing implementation. Browser execution on both
 backends, sound discrimination, rendered-picture judgment and landing remain
 with the Claude reviewer. Pushes remain the wrapper's responsibility under the
 house rule “Do NOT push”; no author-issued push was made.
+
+## Harness authoring gates (this leg)
+
+The full rerun passed: **543 files, 16,441 tests passed, seven skipped**
+(558.36 seconds, exit 0). The first run's four harness-integration failures
+were corrected: helper classification, terminal verdict output, the expected
+frame total and `windowsHide` on the revision lookup. No application test was
+changed to obtain this result. The final live-RIVER selection and first-paper
+appearance checks also passed their focused contract run (15 tests, exit 0).
+
+| Gate | Result |
+| --- | --- |
+| `npm run test:unit` | Passed, exit 0; counts above |
+| `npm run build` (includes `tsc -b`) | Passed, exit 0; existing `kokoro-js` IIFE `import.meta` warning |
+| `npm run lint` | Passed, exit 0 |
+| `npm run typecheck:test` | Passed, exit 0 |
+| Browser suites, audio listening and frame judgment | Not run by the author; assigned to the Claude reviewer |
+
+Logs are local, git-ignored files under `local/verify-logs/`, named
+`communication-harness-{unit,build,lint,types}-final.log`. This is an authoring
+and cheap-gate record, not a browser acceptance result. No new browser frames,
+recordings or journal captures are claimed here.

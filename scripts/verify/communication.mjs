@@ -70,10 +70,13 @@ async function reopen(message, name) {
   if (name === '04-cleared-paper') assert.equal(reading, '???')
   await d.close()
 }
-async function guess(name, reading) {
+async function guess(name, reading, expectedAtom) {
   await d.wait(() => !!document.querySelector('.speech-label.targeted .speech-invite'))
   await frame(`${name}-invitation`, { element: '.speech-label.targeted', label: 'the live note inviting E above its speaker', settle: false })
   await page.keyboard.press('KeyE')
+  await page.locator('.speech-guess').waitFor()
+  const selected = await page.locator('.speech-guess .utterance').first().locator('span').allTextContents()
+  assert.equal(selected.join('-'), expectedAtom, 'E must select the intended live syllables')
   await page.locator('.speech-guess .hypothesis').first().fill(reading)
   await frame(`${name}-reading`, { element: '.speech-guess', label: 'selected live syllables and the provisional reading' })
   await page.locator('.speech-guess .actions button').first().click()
@@ -123,14 +126,31 @@ async function message(which, trigger, point) {
   const count = which === 'errand' ? 16 : 8
   const prefix = which === 'errand' ? '05' : '07'
   await audioStart(`drum-${which}`, receipt.bands.drums, 0.25)
+  await d.read(() => {
+    const timing = { firstShown: null, observer: null }
+    timing.observer = new MutationObserver(() => {
+      if (timing.firstShown === null && document.querySelector('.drum-message')) timing.firstShown = performance.now()
+    })
+    timing.observer.observe(document.body, { childList: true, subtree: true })
+    window.__communicationPaperTiming = timing
+  })
   await trigger()
   await d.wait((which) => window.__ui.getState().drumPerformance?.plan.message === which, which, 15000)
-  const plan = await d.read(() => window.__ui.getState().drumPerformance.plan)
+  const performance = await d.read(() => window.__ui.getState().drumPerformance)
+  const { plan, startedAt } = performance
   check(`${which} plan has ${count} strikes`, plan.strikes.length === count)
   check(`${which} paper is absent before the last beat`, !await page.locator('.drum-message').count())
-  await event(`drum-${which}-plan`, { plan })
+  await event(`drum-${which}-plan`, { plan, startedAt, endsAt: performance.endsAt })
   await localFrame(`${prefix}-${which}-sounding`, point, 'chief and drummer together sounding the message')
   await d.wait((which) => window.__game.getState().drumMessageHeard[which] && !!document.querySelector('.drum-message'), which, 60000)
+  const firstShown = await d.read(() => {
+    const timing = window.__communicationPaperTiming
+    timing.observer.disconnect()
+    return timing.firstShown
+  })
+  check(`${which} paper first appears after the complete performance`,
+    firstShown !== null && firstShown >= startedAt + plan.duration * 1000)
+  await event(`drum-${which}-paper-shown`, { firstShown })
   await audioEnd(`drum-${which}`, receipt.bands.drums)
   const atoms = await page.locator('.drum-concept .utterance').evaluateAll((nodes) => nodes.map((n) => [...n.querySelectorAll('span')].map((s) => s.textContent).join('-')))
   assert.deepEqual(atoms, plan.atoms)
@@ -228,6 +248,13 @@ async function observations() {
 }
 async function readings() {
   await step('4-guesses')
+  const stand = await d.read(() => window.__placeErrands().geography.waterStand)
+  await d.inspect(stand, 2.5)
+  await d.wait(() => {
+    const id = document.querySelector('.speech-label.targeted .speech-invite')?.closest('[data-speaker]')?.getAttribute('data-speaker')
+    return window.__speech.labels().some((l) => l.speakerId === id && l.atoms.includes(window.__game.getState().vocabulary.RIVER))
+  }, null, 480000)
+  await guess('04-river', 'perhaps a road', receipt.vocabulary.RIVER)
   // CHIEF must be named while he is indoors, before the first call in words-first.
   const drummer = await d.read(() => ({ x: window.__placeSpots.drummer[0], z: window.__placeSpots.drummer[1] }))
   await d.inspect(drummer, 2)
@@ -235,9 +262,9 @@ async function readings() {
   await prompt('drummer')
   await page.keyboard.press('Space')
   await d.wait(() => window.__speech?.labels().some((l) => l.speakerId === 'drummer'))
-  await guess('04-chief-indoors', 'perhaps the head man')
+  await guess('04-chief-indoors', 'perhaps the head man', receipt.vocabulary.CHIEF)
   await journal(1)
-  const readings = { RIVER: 'water / river', UPSTREAM: 'against the current', DOWNSTREAM: 'with the current', ROCK: 'a rock', DIG: 'dig' }
+  const readings = { UPSTREAM: 'against the current', DOWNSTREAM: 'with the current', ROCK: 'a rock', DIG: 'dig' }
   for (const [concept, reading] of Object.entries(readings)) {
     const row = page.locator('.observation').filter({ has: page.locator('.utterance', { hasText: receipt.vocabulary[concept] }) })
     await row.locator('input').fill(reading) // only notes the expedition actually heard exist here
@@ -434,7 +461,10 @@ try {
     try { await saveAudioWindow(page, out, name, bands, prefix + name) }
     catch (error) { receipt.errors.push(`incomplete ${name}: ${error.message}`) }
   }
-  await d.read(() => window.__communicationCapture?.stop()).catch(() => {})
+  await d.read(() => {
+    window.__communicationCapture?.stop()
+    window.__communicationPaperTiming?.observer.disconnect()
+  }).catch(() => {})
   save()
   await page.close()
   receipt.video = await page.video()?.path()

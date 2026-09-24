@@ -43,5 +43,10 @@ describe('continuous communication route contract', () => {
     expect(source).toContain('process.exitCode = 1')
     expect(source).not.toMatch(/\.screenshot\(/) // every named frame uses the shared shutter
     expect(source).toContain('recordVideo:')
+    expect(source).toContain("guess('04-river', 'perhaps a road', receipt.vocabulary.RIVER)")
+    expect(source).toContain("assert.equal(selected.join('-'), expectedAtom")
+    expect(source).toContain("row.locator('input').fill('perhaps a path')")
+    expect(source.indexOf('timing.observer.observe')).toBeLessThan(source.indexOf('await trigger()'))
+    expect(source).toContain('firstShown >= startedAt + plan.duration * 1000')
   })
 })
