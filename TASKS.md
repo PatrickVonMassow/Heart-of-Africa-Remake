@@ -161,6 +161,31 @@ put it is the mistake this line exists to stop.
   keeps hitting the bugs.
   Bundle: Verständigung.
 
+- [ ] 1204. Arm the handover watermark so it refuses instead of observing.
+  PROBLEM, user order 24.09.2026: "Du kommst immer wieder über die 150k und bringst danach eine
+  Begründung. … Aber das scheint nicht zu helfen, denn du scheinst nicht daraus zu lernen."
+  Measured that morning: 25 overshoots in the four days since 2026-09-20, median +99k, max +336k
+  past the 150k ceiling; `context-fence-guard.mjs --status` reports mode observe / armed false.
+  FINAL STATE: a session cannot pass the 122,000-token handover watermark without being
+  stopped, and the stop is not a status string it has to ask for.
+  (a) The handover mark INTERRUPTS. The PreToolUse path that already runs
+  `context-fence-guard.mjs` denies a START action (agent, suite, new point, authoring) once
+  the measured reading is at or past the handover watermark, in BOTH fence modes, with the
+  boundary command in the refusal text. Finishing the step in flight, reading, and the
+  boundary/handover commands themselves stay allowed — point 881's list of session-ending
+  commands is the allow-list, and a test pins that each of them still passes above the mark.
+  (b) The brake has a production caller. `fenceRefusal` (scripts/context-fence-core.mjs) is
+  reached from the registered guard for the handover case; a test spawns the guard above the
+  mark and asserts a deny, not a decide()-level unit assertion (point 881 (2)).
+  (c) The read tools count. The matcher covers the read kind whose growth p90 is largest
+  (point 881 (4)), so a session cannot grow past the mark through reads alone.
+  (d) The overshoot series gets a verdict command, not just a dump:
+  `context-incidents.mjs --trend` prints overshoots per day and median overshoot for the last
+  7 days, so the effect of the arming is measurable in one call.
+  NOT IN SCOPE: raising the ceiling, new ledger fields, a new guard script. This wires and
+  arms what is already built (points 700, 881, 932).
+  Criticality: high — real usage cost every night.
+  Bundle: Modell & Wächter.
 - [ ] 633. The release's closing run — two regressions with the cleanup between them (user
   11.08.2026, splitting point 174: "Dafür scheint mir die Schätzung von 1 h viel zu wenig
   zu sein"). 174 carried the whole release in one card estimated at ~1 h, which was true
@@ -16018,31 +16043,6 @@ to land than a mechanism that needs a review.
   route for one voice file (soft, labelled); a Vitest case if the classification is a pure helper.
   Refs: scripts/verify/voice.mjs, scripts/render-verify-charges.mjs.
   Bundle: Testinfrastruktur
-- [ ] 1204. Arm the handover watermark so it refuses instead of observing.
-  PROBLEM, user order 24.09.2026: "Du kommst immer wieder über die 150k und bringst danach eine
-  Begründung. … Aber das scheint nicht zu helfen, denn du scheinst nicht daraus zu lernen."
-  Measured that morning: 25 overshoots in the four days since 2026-09-20, median +99k, max +336k
-  past the 150k ceiling; `context-fence-guard.mjs --status` reports mode observe / armed false.
-  FINAL STATE: a session cannot pass the 122,000-token handover watermark without being
-  stopped, and the stop is not a status string it has to ask for.
-  (a) The handover mark INTERRUPTS. The PreToolUse path that already runs
-  `context-fence-guard.mjs` denies a START action (agent, suite, new point, authoring) once
-  the measured reading is at or past the handover watermark, in BOTH fence modes, with the
-  boundary command in the refusal text. Finishing the step in flight, reading, and the
-  boundary/handover commands themselves stay allowed — point 881's list of session-ending
-  commands is the allow-list, and a test pins that each of them still passes above the mark.
-  (b) The brake has a production caller. `fenceRefusal` (scripts/context-fence-core.mjs) is
-  reached from the registered guard for the handover case; a test spawns the guard above the
-  mark and asserts a deny, not a decide()-level unit assertion (point 881 (2)).
-  (c) The read tools count. The matcher covers the read kind whose growth p90 is largest
-  (point 881 (4)), so a session cannot grow past the mark through reads alone.
-  (d) The overshoot series gets a verdict command, not just a dump:
-  `context-incidents.mjs --trend` prints overshoots per day and median overshoot for the last
-  7 days, so the effect of the arming is measurable in one call.
-  NOT IN SCOPE: raising the ceiling, new ledger fields, a new guard script. This wires and
-  arms what is already built (points 700, 881, 932).
-  Criticality: high — real usage cost every night.
-  Bundle: Modell & Wächter.
 - [ ] 1205. The lion does not move on once the elephant-trampling carcass is consumed.
   PROBLEM, measured 24.09.2026 by the point-312 author: `npm test -- enrichments
   --section=elephant-trampling` is 13 pass, 1 fail — "Lion moves on once the carcass is consumed"
