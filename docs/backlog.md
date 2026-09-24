@@ -1799,3 +1799,12 @@ Punkt in die Arbeitsordnung.
   NICHT EINGEREIHT: Infrastruktur-Freeze (Nutzerentscheidung 01.09.2026). Der Defekt lässt
   nichts Falsches durch und blockiert keine laufende Spielarbeit; ein vierter Kartentyp wäre
   genau der Wiederaufbau, den CLAUDE.md §2 untersagt.
+
+- **Hunted calf still treats river water as blocked** (24.09.2026, from point 312). Flights now
+  swim rivers, but `calfFleeStep` (a calf run down by a land hunt) still deflects at river banks;
+  design.md §19.8 wants the calf run down in the open, so whether it may enter water is a design
+  question. Also still unwired since point 192: roaming crossings (`roamCrossing`,
+  `balance.waterCross.chance`) are tested but called by no game mover.
+- **The main-write guard misses `>>` and heredocs** (24.09.2026). It catches `sed -i` and `>` but
+  lets `>>` and heredoc writes through, so a non-owner session can grow a memory file it cannot shrink again. NOT QUEUED: infrastructure freeze (CLAUDE.md §2) — it lets
+  nothing false through that a review would miss and blocks no game work.
