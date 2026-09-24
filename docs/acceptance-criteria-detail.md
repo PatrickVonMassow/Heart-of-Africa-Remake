@@ -153,9 +153,9 @@ the herds' family life with calf predation and water drama), §19.9's climate an
 dressing, §2.4's "Graphics and atmosphere", and §4.4's elephant-graveyard dressing
 (readable at a glance).
 
-SUPERSEDED AS A TARGET (user 25.07.2026, design.md §19.5): water is for crossing, not for
-lingering — a FLIGHT is never restricted by river or lake at all, and the §19.5 revision
-states it. The evidence section pins what is BUILT today.
+Animals are water-shy, not water-barred (design.md §19.5): a flight goes into a river or
+lake instead of skirting it, a §19.8 water drama keeps its actor, anyone else left on the
+water swims out to the nearest bank, and the open sea stays the world's edge.
 
 OPEN: tree-climbing-to-flee (§9 open item), and the one seasonal-dress reading the
 research allows but the figures cannot yet show — a wrap worn DIFFERENTLY in the cold

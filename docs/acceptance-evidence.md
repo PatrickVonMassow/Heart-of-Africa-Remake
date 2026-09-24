@@ -822,19 +822,24 @@ Verifiable (`scripts/verify/settings.mjs`,
   animals keep their body spacing after spawn (no two inside one
   another) and an animal placed onto another parts from it within
   moments, while the elephant trample remains possible; an animal on
-  an open-ocean cell — and, outside the §19.8 water dramas, the wading
-  flamingos, a CAUGHT victim at the waterline and a purposeful CROSSING
-  (point 192), on any river/lake water cell — is set back to the nearest
-  land; the point-192 water rule holds — SUPERSEDED as a TARGET by the
-  §19.5 revision of 25.07.2026 (water is for crossing, not for lingering;
-  a FLIGHT is never restricted by river or lake at all), which this
-  paragraph will state once that lands: what follows pins what is BUILT
-  today, per the §7.1 convention — an animal may CROSS a river/lake
-  (chest-deep on the rendered sheet, seasonal wade speed,
-  `balance.waterCross.*` calibratable, hard resolve deadline) and a prey
-  boxed against the water by a predator or an oncoming elephant flees
-  INTO it — the crossingTarget pick refuses the ocean and over-wide
-  channels (pure-tested), and a staged crossing swims the channel and
+  an open-ocean cell is set back to the nearest land at once, while
+  river/lake water is shy, not barred (§19.5, point 312): a flight —
+  predator flee, elephant dart, player-shy — is deflected at the ocean
+  edge only and goes INTO a river or lake in its way, swimming it
+  (`fleeWaterStep`); a §19.8 water drama keeps its actor whatever the
+  species (`waterDramaOwns`); anyone else left on the water — idle, or a
+  flight just ended — swims to the NEAREST bank under its own power
+  (`nearestBankTarget`/`waterExit`), never snapped, and a swim that
+  misses its `balance.waterCross.resolveSeconds` deadline is grounded
+  (I4); a roaming crossing keeps its width and readiness values
+  (`roamCrossing`) — all pure-tested in
+  `src/scenes/travel/wildlifeBehavior.test.ts`. Live, the
+  `water-shy-flight` section of `scripts/verify/enrichments.mjs` drives
+  an elephant at a grazer on a straight bank (it swims across and out
+  the far side), lets a player-driven animal swim to the nearest bank
+  on a sampled path, keeps a swept calf mid-channel until its drama
+  resolves and finds no animal standing in a channel across a driven
+  pass; a staged crossing swims the channel and
   lands in `scripts/verify/enrichments.mjs`; the scripted walk-off deflects along the coast
   instead of entering the ocean (the step rule pure-tested in
   `src/scenes/travel/wildlifeBehavior.test.ts`, the coast walk

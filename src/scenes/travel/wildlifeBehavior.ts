@@ -274,8 +274,8 @@ export function blockHeading(
 
 /**
  * Water-crossing target (point 192 — the user's water-rule revision: animals
- * may purposefully CROSS a river/lake and may FLEE INTO water, they just never
- * spawn or idle in it; the ocean stays absolute). Probes 1-unit steps along
+ * may purposefully CROSS a river/lake, they just never spawn or idle in it;
+ * the ocean stays absolute). Probes 1-unit steps along
  * `heading`: every wet step must be RIVER/LAKE water ('water', never 'ocean'),
  * and the first LAND cell within `maxUnits` becomes the crossing target. Ocean
  * anywhere on the line, or no land within reach, returns null — no crossing.
@@ -301,25 +301,134 @@ export function crossingTarget(
 }
 
 /**
- * The boxed-flight crossing decision (points 192/248): when a flee/dodge step
- * dead-ends against the water (`moved` false), the animal takes to it and
- * swims for the far bank rather than balking at the waterline — the SAME rule
- * for every flight source (predator flee, elephant dart AND the player-shy
- * flee; point 248 closed the player-shy gap that pinned a player-boxed animal
- * at the bank). crossingTarget still refuses the ocean and over-wide channels,
- * and an animal already mid-crossing starts no second one.
+ * A flight's blocked predicate (design.md §19.5, point 312): the OCEAN only.
+ * Animals are water-shy, not water-barred — a flight (predator, elephant,
+ * traveller) that meets a river or lake goes IN rather than sliding along the
+ * bank; the along-shore deflection is for the world's sea edge alone.
  */
-export function fleeCrossing(
-  moved: boolean,
-  alreadyCrossing: boolean,
+export function flightBlocked(terrainType: string): boolean {
+  return terrainType === 'ocean'
+}
+
+/**
+ * One flight step (point 312): deflectedStep against the ocean edge only, so a
+ * heading into river/lake water is taken straight while the same heading at a
+ * coast is still turned along the shore.
+ */
+export function fleeWaterStep(
+  x: number,
+  z: number,
+  heading: number,
+  dist: number,
+  terrainTypeAt: (x: number, z: number) => string,
+  lookahead = 0.8,
+): { x: number; z: number; heading: number; moved: boolean } {
+  return deflectedStep(x, z, heading, dist, (px, pz) => flightBlocked(terrainTypeAt(px, pz)), lookahead)
+}
+
+/**
+ * The roaming crossing decision (point 192, kept by point 312): a ROAMING
+ * mover blocked by water crosses only when the readiness roll passes
+ * (`roll < chance`) and the channel fits its swim width (`maxUnits`) — the
+ * calibratable `balance.waterCross.*`. A flight never asks this.
+ */
+export function roamCrossing(
+  roll: number,
+  chance: number,
   x: number,
   z: number,
   heading: number,
   maxUnits: number,
   terrainTypeAt: (x: number, z: number) => string,
 ): { tx: number; tz: number } | null {
-  if (moved || alreadyCrossing) return null
+  if (!(roll < chance)) return null
   return crossingTarget(x, z, heading, maxUnits, terrainTypeAt)
+}
+
+/**
+ * The NEAREST bank for an animal left on river/lake water (point 312): rays in
+ * `rays` directions advance together ring by ring in `step` strides, and the
+ * first dry cell any of them reaches is the target — so it is the nearest one
+ * the animal can swim to in a straight line. A ray that meets the ocean is
+ * dropped (the sea is never swum). `null` when nothing is within `maxUnits`:
+ * the caller grounds the animal instead (invariant I4).
+ */
+export function nearestBankTarget(
+  x: number,
+  z: number,
+  terrainTypeAt: (x: number, z: number) => string,
+  maxUnits: number,
+  rays = 16,
+  step = 0.5,
+): { tx: number; tz: number } | null {
+  const open = new Array<boolean>(rays).fill(true)
+  for (let i = 1; i * step <= maxUnits; i++) {
+    const r = i * step
+    for (let k = 0; k < rays; k++) {
+      if (!open[k]) continue
+      const h = (k / rays) * Math.PI * 2
+      const px = x + Math.sin(h) * r
+      const pz = z + Math.cos(h) * r
+      const t = terrainTypeAt(px, pz)
+      if (t === 'ocean') open[k] = false
+      else if (t !== 'water') return { tx: px, tz: pz }
+    }
+  }
+  return null
+}
+
+/** The states under which a §19.8 water drama (or another scripted drive)
+ *  owns an animal's position (point 312(d)) — keyed on the drama state, never
+ *  on the species. */
+export interface WaterOwnership {
+  dead?: boolean
+  inWater?: number
+  mired?: number
+  rescued?: boolean
+  plungeTo?: unknown
+  trampleTo?: unknown
+  vigil?: unknown
+  crossing?: unknown
+  caught?: number
+  /** A parent whose calf is in the water, mired or seized (wading/charging). */
+  childInDrama?: boolean
+}
+
+/** Does a running drama own this animal, so no leave-the-water rule may pull
+ *  it out (point 312(d))? */
+export function waterDramaOwns(s: WaterOwnership): boolean {
+  return (
+    !!s.dead ||
+    s.inWater !== undefined ||
+    s.mired !== undefined ||
+    !!s.rescued ||
+    !!s.plungeTo ||
+    !!s.trampleTo ||
+    !!s.vigil ||
+    s.crossing !== undefined ||
+    s.caught !== undefined ||
+    !!s.childInDrama
+  )
+}
+
+/** How long after its last flight step an animal still counts as fleeing —
+ *  bridges the backstop sweep's frame slicing, not a gameplay value. */
+export const FLIGHT_GRACE_SECONDS = 0.5
+
+export type WaterExit = 'none' | 'swim-to-bank' | 'setback'
+
+/**
+ * The §19.5 water backstop decision (point 312). The open ocean is the world's
+ * edge: anyone on it is set back to land at once, exactly as before. River or
+ * lake water is shy, not barred: a drama owner stays, an animal still in
+ * flight keeps swimming, and anyone else — idle, resting, a flight just ended —
+ * swims for the nearest bank under its own power (never a snap onto land).
+ */
+export function waterExit(terrainType: string, dramaOwned: boolean, inFlight: boolean): WaterExit {
+  if (dramaOwned) return 'none'
+  if (terrainType === 'ocean') return 'setback'
+  if (terrainType === 'water') return inFlight ? 'none' : 'swim-to-bank'
+  return 'none'
 }
 
 /**
