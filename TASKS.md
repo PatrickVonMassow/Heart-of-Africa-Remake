@@ -354,7 +354,7 @@ put it is the mistake this line exists to stop.
   NOT IN SCOPE: changing `prefer-astra` or `claude-only`, the review path, or the author-routing cut.
   Criticality: medium.
   PLACEMENT (user 24.09.2026, 13:08): directly behind point 174, not with 1195: "1206 und 1207 solln nicht mitrücken. Sie sollen also nach dem Vorziehen von 1195 direkt hinter 174 stehen."
-  Bundle: Werkzeug.
+  Bundle: Modell & Wächter.
 
 - [ ] 1207. The stand-down fence refuses writes outside the checkout, so the documented request handoff cannot be used.
   FINAL STATE: a stood-down session can deposit a request with `finding.mjs --request` using files it writes itself, with no workaround.
@@ -368,7 +368,7 @@ put it is the mistake this line exists to stop.
   NOT IN SCOPE: a new guard, a new flag on finding.mjs, or any loosening of in-checkout writes. This switches a rule off where it is in the way (CLAUDE.md section 2 freeze).
   Criticality: medium.
   PLACEMENT (user 24.09.2026, 13:08): directly behind point 174, not with 1195: "1206 und 1207 solln nicht mitrücken. Sie sollen also nach dem Vorziehen von 1195 direkt hinter 174 stehen."
-  Bundle: Werkzeug.
+  Bundle: Modell & Wächter.
 
 - [ ] 1209. Every session starts and runs on a smaller fixed context load.
   USER ORDER 24.09.2026, 13:30: »Reihe die von dir vorgeschlagenen Maßnahmen zur Reduktion des
