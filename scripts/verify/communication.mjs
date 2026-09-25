@@ -322,7 +322,14 @@ async function message(which, trigger, point) {
   // Aimed at the pair's upper bodies: from the 1.4-2 m the key needs, a
   // point at knee height falls below a level view's bottom edge.
   assert(await d.read((which) => window.__ui.getState().drumPerformance?.plan.message === which, which), 'Drum frame was late')
-  await localFrame(`${prefix}-${which}-sounding`, bodies, 'chief and drummer together sounding the message')
+  // Where a late frame lost its time: request, shutter and finished write.
+  const shot = { requested: await d.read(() => performance.now()) }
+  await localFrame(`${prefix}-${which}-sounding`, bodies, 'chief and drummer together sounding the message', async () => {
+    shot.shutter = await d.read(() => performance.now())
+    assert(await d.read((which) => window.__ui.getState().drumPerformance?.plan.message === which, which), 'Drum frame was late at the shutter')
+  })
+  shot.written = await d.read(() => performance.now())
+  await event(`drum-${which}-frame-timing`, shot)
   assert(await d.read((which) => window.__ui.getState().drumPerformance?.plan.message === which, which), 'Drum frame completed after the performance')
   await d.wait((which) => window.__game.getState().drumMessageHeard[which] && !!document.querySelector('.drum-message'), which, 60000)
   const firstShown = await d.read(() => {
