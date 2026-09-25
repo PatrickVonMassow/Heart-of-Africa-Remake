@@ -102,11 +102,16 @@ export async function observeBankCall({ budgetMs, prepare, sample, pause, reject
  * `last` meanwhile; only then is he recorded as lapsed. */
 export function inviteOutcome(s, watch, labelSeconds) {
   if (s.labelled) return { seen: s.labelled }
-  if (s.last?.purpose === 'invitation' && s.last.speaker === s.initiator) watch.spokeAt ??= s.nowS - s.last.age
+  if (s.last?.purpose === 'invitation' && s.last.speaker === s.initiator) {
+    watch.spokeAt ??= s.nowS - s.last.age
+    // What the label channel held when the word was first seen spoken: no
+    // label, a label the heard-filter hides, or a label dropped later.
+    watch.atSpeak ??= s.speech ?? null
+  }
   if (s.task?.phase === 'invite' && s.task.owes) { watch.villager = s.villager; return null }
   watch.leftAt ??= s.nowS
   if (s.nowS - watch.leftAt <= labelSeconds) return s.initiatorLabel ? { seen: s.initiatorLabel } : null
-  return { lapsed: true, spokeUnseen: watch.spokeAt !== undefined, last: watch.villager ?? null, now: s.task ?? null }
+  return { lapsed: true, spokeUnseen: watch.spokeAt !== undefined, atSpeak: watch.atSpeak ?? null, last: watch.villager ?? null, now: s.task ?? null }
 }
 
 /** Follow one dig initiator until his invitation is seen or he lapses. */

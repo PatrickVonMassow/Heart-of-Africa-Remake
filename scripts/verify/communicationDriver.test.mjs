@@ -157,5 +157,12 @@ it('records a lapse only after the label window when the initiator leaves the in
   const watch = {}, base = { initiator: 2, labelled: null, initiatorLabel: null, last: null }
   expect(inviteOutcome({ ...base, nowS: 0, task: { phase: 'invite', owes: true }, villager: { x: 1 } }, watch, 4)).toBeNull()
   expect(inviteOutcome({ ...base, nowS: 1, task: null }, watch, 4)).toBeNull()
-  expect(inviteOutcome({ ...base, nowS: 6, task: null }, watch, 4)).toEqual({ lapsed: true, spokeUnseen: false, last: { x: 1 }, now: null })
+  expect(inviteOutcome({ ...base, nowS: 6, task: null }, watch, 4)).toEqual({ lapsed: true, spokeUnseen: false, atSpeak: null, last: { x: 1 }, now: null })
+})
+it('keeps the label channel as it stood when the initiator was first seen speaking', () => {
+  const watch = {}, base = { initiator: 2, labelled: null, initiatorLabel: null }
+  const speech = { channel: null, dom: [], distance: 2.9 }
+  inviteOutcome({ ...base, nowS: 0, last: { purpose: 'invitation', speaker: 2, age: 0 }, speech, task: { phase: 'invite', owes: true }, villager: { x: 1 } }, watch, 4)
+  inviteOutcome({ ...base, nowS: 1, last: { purpose: 'invitation', speaker: 2, age: 1 }, speech: { channel: 'later' }, task: null }, watch, 4)
+  expect(inviteOutcome({ ...base, nowS: 6, last: null, task: null }, watch, 4)).toMatchObject({ lapsed: true, spokeUnseen: true, atSpeak: speech })
 })

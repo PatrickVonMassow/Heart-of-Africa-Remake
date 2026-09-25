@@ -481,7 +481,12 @@ async function observations() {
           if (!speaker || site === undefined || site === null || !document.querySelector(`.speech-label[data-speaker="${id}"]`)) return null
           return { id, siteIndex: site, speaker, strikes: e.digProgress[site]?.strikes }
         }
-        return { nowS: performance.now() / 1000, last: word, initiator, task: v?.work ?? null, villager: v ? { ...v, drawn: undefined } : null,
+        const own = `villager-${initiator}`, label = window.__speech?.labels().find((l) => l.speakerId === own)
+        const player = window.__placePlayer, speech = {
+          channel: label ? { atoms: label.atoms, floor: label.floor, shownAt: label.shownAt } : null,
+          dom: [...document.querySelectorAll('.speech-label')].map((n) => n.dataset.speaker),
+          distance: v && player ? Math.hypot(v.x - player.x, v.z - player.z) : null }
+        return { nowS: performance.now() / 1000, last: word, initiator, speech, task: v?.work ?? null, villager: v ? { ...v, drawn: undefined } : null,
           labelled: word?.purpose === 'invitation' && word.age <= labelSeconds ? seen(word.speaker) : null, initiatorLabel: seen(initiator, followedSite) }
       }, { initiator: gatheringAt.index, labelSeconds, followedSite: gatheringAt.work.siteIndex }) })
     if (!outcome) {
