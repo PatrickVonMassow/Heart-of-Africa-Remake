@@ -13,7 +13,7 @@ export function travelKeys(from, target, tolerance = 0.12) {
 
 /** All writes after entry are Playwright keyboard/mouse input. evaluate reads
  * poses or computes routes on private grids; it never changes the live pose. */
-export function communicationDriver(page) {
+export function communicationDriver(page, { onTravelProgress = async () => {} } = {}) {
   const read = (fn, arg) => page.evaluate(fn, arg)
   const wait = (fn, arg, timeout = 180000) => page.waitForFunction(fn, arg, { timeout, polling: 'raf' })
   async function held(keys, action) {
@@ -136,6 +136,7 @@ export function communicationDriver(page) {
     let best = Infinity, progress = started
     while (Date.now() - started < 120000) {
       const p = await read(() => window.__game.getState().pos)
+      await onTravelProgress(p)
       const d = Math.hypot(p.x - target.x, p.z - target.z)
       if (d < tolerance) return
       if (d < best - 0.03) { best = d; progress = Date.now() }

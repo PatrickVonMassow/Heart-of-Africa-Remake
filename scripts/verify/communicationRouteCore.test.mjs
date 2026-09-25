@@ -12,3 +12,13 @@ it('follows either direction along the same bank instead of cutting a bend', () 
   expect(() => riverBankRoute([], {}, {})).toThrow()
   expect(() => riverBankRoute([{ lat: 0, lon: 0 }, { lat: 0, lon: 0 }], { lat: 0, lon: 0 }, { lat: 0, lon: 0 })).toThrow()
 })
+
+it('takes route frames at separated places reached along the leg', async () => {
+  const { routeFrameProgress } = await import('./communicationRouteCore.mjs')
+  const s = { distance: 0, next: 1, spacing: 5, frames: 0 }
+  expect(routeFrameProgress(s, { x: 0, z: 0 })).toBe(false)
+  for (let i = 0; i < 10; i++) expect(routeFrameProgress(s, { x: 0, z: 0 })).toBe(false)
+  const shots = []
+  for (let x = 1; x <= 20; x++) if (routeFrameProgress(s, { x, z: 0 })) shots.push(x)
+  expect(shots).toEqual([1, 6, 11])
+})

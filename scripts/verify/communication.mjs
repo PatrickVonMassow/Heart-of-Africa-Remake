@@ -9,7 +9,7 @@ import { sectionGate } from './sections.mjs'
 import { frameShutter } from './frameSubject.mjs'
 import { installTtsCache } from './ttsCache.mjs'
 import { communicationDriver } from './communicationDriver.mjs'
-import { riverBankRoute } from './communicationRouteCore.mjs'
+import { riverBankRoute, routeFrameProgress } from './communicationRouteCore.mjs'
 import { installCommunicationCapture, startAudioWindow, saveAudioWindow } from './communicationCapture.mjs'
 
 const sections = sectionGate(), { section } = sections
@@ -27,7 +27,13 @@ const browser = await launchVerifyBrowser().catch((error) => {
 })
 // The video preserves short contacts, words and consequences between shutters.
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, recordVideo: { dir: `${out}${prefix}video/`, size: { width: 1440, height: 900 } } })
-const d = communicationDriver(page)
+let riverLeg = null
+const d = communicationDriver(page, { onTravelProgress: async (position) => {
+  if (!riverLeg || !routeFrameProgress(riverLeg, position)) return
+  const at = await d.read(async (p) => (await import('/src/world/geo.ts')).worldToLatLon(p.x, p.z), position)
+  await frame(`${riverLeg.prefix}-river-${riverLeg.frames - 1}`, { world: at, label: 'the river leg at a new travelled station', settle: false })
+  await event('river-frame-station', { prefix: riverLeg.prefix, position, travelled: riverLeg.distance })
+} })
 const shutter = frameShutter(page, out)
 const pendingAudio = new Map()
 let ambientBaseline = null
@@ -461,6 +467,9 @@ async function riverTrip(from, to, prefix) {
     const seed = window.__game.getState().seed
     return route.map((p) => ({ ...latLonToWorld(p.lat, p.lon), wet: ['water', 'ocean'].includes(sampleTerrain(p.lat, p.lon, seed).type) }))
   }, route)
+  const length = worlds.slice(1).reduce((sum, p, i) => sum + Math.hypot(p.x - worlds[i].x, p.z - worlds[i].z), 0)
+  riverLeg = { prefix, distance: 0, next: 1, spacing: Math.max(1, length / 3), frames: 0,
+    previous: await d.read(() => window.__game.getState().pos) }
   for (let i = 0; i < route.length; i++) {
     const world = worlds[i]
     // The current may already have carried the swimmer past this waypoint; a
@@ -473,16 +482,12 @@ async function riverTrip(from, to, prefix) {
     // The drift can also carry him past while he is still steering for it.
     // A bank point the flood plain puts under water is walked round, not swum to.
     if (!world.wet && !await past()) await d.travelTo(world).catch(async (e) => { if (!await past()) throw e })
-    if (i === 0 || i === Math.floor(route.length / 2) || i === route.length - 1) {
-      // A swimmer drifts with the current while a settling shutter waits, so
-      // the subject is where the traveller floats at the shutter, not the waypoint.
-      const at = await d.read(async () => {
-        const s = window.__game.getState()
-        return (await import('/src/world/geo.ts')).worldToLatLon(s.pos.x, s.pos.z)
-      })
-      await frame(`${prefix}-river-${i}`, { world: at, label: 'the continuous route along the Niger and its flow', settle: false })
-    }
   }
+  // Some offset stations lie in the floodplain. Even when all were skipped,
+  // finish this leg before recording it as a journey.
+  await d.travelTo(worlds.at(-1), 2)
+  assert(riverLeg.frames >= 2, `Missing separated route views on ${prefix}: ${riverLeg.frames}`)
+  riverLeg = null
 }
 try {
   if (section('continuous-route')) {

@@ -33,7 +33,7 @@ it('halves the turn press after swinging past the subject', async () => {
   const holds = []
   let yaw = 0.5
   const driver = communicationDriver({
-    evaluate: async () => ({ x: 0, z: 0, yaw }),
+    evaluate: async (fn) => String(fn).includes('journalOpen') ? false : ({ x: 0, z: 0, yaw }),
     keyboard: { down: async () => {}, up: async () => {} },
     // Each press turns 2.5x the ideal amount, as a slow frame would; unhalved it diverges.
     waitForTimeout: async (ms) => { holds.push(ms); yaw += (yaw > 0 ? -1 : 1) * 2.5 * ms / 700 * 2.2 },
@@ -45,7 +45,7 @@ it('halves the turn press after swinging past the subject', async () => {
 it('finishes the aim with mouse-look when a turn key overshoots by a whole frame', async () => {
   let yaw = 0.3, pitch = 0, presses = 0, cursor = { x: 30, y: 200 }
   const driver = communicationDriver({
-    evaluate: async (fn) => String(fn).includes('__driverCursor') ? cursor : { x: 0, z: 0, yaw },
+    evaluate: async (fn) => String(fn).includes('journalOpen') ? false : String(fn).includes('__driverCursor') ? cursor : { x: 0, z: 0, yaw },
     keyboard: { down: async () => {}, up: async () => {} },
     // Every key press turns one whole 0.146 rad frame however short it is held.
     waitForTimeout: async () => { presses++; yaw += yaw > 0 ? -0.146 : 0.146 },

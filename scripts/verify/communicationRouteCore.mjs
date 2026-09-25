@@ -21,3 +21,17 @@ export function riverBankRoute(axis, from, to, offset = 0.2) {
   }
   return points
 }
+
+/** Shutter stations are reached by travelled distance, never by elapsed time.
+ * Keep each frame separated in world space as well, so circling cannot produce
+ * three supposed river-leg views of one spot. */
+export function routeFrameProgress(state, position) {
+  if (state.previous) state.distance += Math.hypot(position.x - state.previous.x, position.z - state.previous.z)
+  state.previous = { ...position }
+  if (state.frames >= 3 || state.distance < state.next) return false
+  if (state.lastFrame && Math.hypot(position.x - state.lastFrame.x, position.z - state.lastFrame.z) < state.spacing) return false
+  state.frames++
+  state.lastFrame = { ...position }
+  state.next = state.distance + state.spacing
+  return true
+}
