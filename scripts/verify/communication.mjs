@@ -760,12 +760,13 @@ try {
     await d.close()
     // At the closest player zoom the block's crown lies above the picture; a
     // player scrolls out until crown and socket face are both in view.
-    const socketInView = () => d.read(({ x, z, baseY }) => window.__camera.onScreen(x, z - 0.5, baseY + 2.2) && window.__camera.onScreen(x, z + 0.7, baseY + 1.05), socketWorld)
+    const inView = ({ x, z, baseY }) => window.__camera.onScreen(x, z - 0.5, baseY + 2.2) && window.__camera.onScreen(x, z + 0.7, baseY + 1.05)
     await page.mouse.move(720, 450)
-    for (let notch = 0; notch < 12 && !await socketInView(); notch++) {
-      await page.mouse.wheel(0, 150); await page.waitForTimeout(500)
+    // Each notch eases the camera out; give it until the view holds the block.
+    for (let notch = 0; notch < 12 && !await d.read(inView, socketWorld); notch++) {
+      await page.mouse.wheel(0, 150); await d.wait(inView, socketWorld, 500).catch(() => {})
     }
-    await d.wait(({ x, z, baseY }) => window.__camera.onScreen(x, z - 0.5, baseY + 2.2) && window.__camera.onScreen(x, z + 0.7, baseY + 1.05), socketWorld)
+    await d.wait(inView, socketWorld)
     await event('socket-view', { socketWorld, features: ['cliff crown', 'sloping socket face'], stand: await d.read(() => window.__game.getState().pos) })
     await frame('08-impression-and-socket', { world: socket, label: 'weathered block at the talus foot and carried impression' })
     await step('9-fit-and-journal')
