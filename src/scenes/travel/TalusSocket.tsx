@@ -9,14 +9,26 @@ export function buildReliefFace() {
   return new THREE.ShapeGeometry(shape)
 }
 
+export function buildSocketBlock() {
+  const geometry = new THREE.BoxGeometry(1.8, 1, 1.7, 2, 1, 2)
+  const p = geometry.getAttribute('position')
+  for (let i = 0; i < p.count; i++) {
+    const z = p.getZ(i) + 0.6
+    p.setXYZ(i, p.getX(i), p.getY(i) > 0 ? 1.03 - (z - 0.7) / Math.sqrt(3) : 0.02, z)
+  }
+  geometry.computeVertexNormals()
+  return geometry
+}
+
 /** The sloping face is readable from the normal travel camera above the plain.
  * The fitted stone slides aside, leaving a bright exposed seat and a dark seam. */
 export function TalusSocket({ fitted }: { fitted: boolean }) {
   const relief = useMemo(buildReliefFace, [])
-  useEffect(() => () => relief.dispose(), [relief])
+  const block = useMemo(buildSocketBlock, [])
+  useEffect(() => () => { relief.dispose(); block.dispose() }, [relief, block])
   return <group name="bandiagara-talus-socket" userData={{ fitted }}>
-    <mesh position={[0, 0.36, 0.55]} castShadow receiveShadow>
-      <dodecahedronGeometry args={[1, 0]} /><meshStandardMaterial color="#95724f" roughness={1} />
+    <mesh geometry={block} castShadow receiveShadow>
+      <meshStandardMaterial color="#95724f" roughness={1} />
     </mesh>
     <group position={[0, 1.05, 0.7]} rotation={[-Math.PI / 3, 0, 0]}>
       <mesh name="socket-recess" geometry={relief} scale={1.1}><meshStandardMaterial color="#231c16" roughness={1} side={THREE.DoubleSide} /></mesh>

@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { buildReliefFace, TalusSocket } from './TalusSocket'
+import { buildReliefFace, buildSocketBlock, TalusSocket } from './TalusSocket'
 import { ClayImpression } from '../../ui/ClayImpression'
 import { ROCK_RELIEF, ROCK_RELIEF_SVG } from '../../world/rockRelief'
 
@@ -21,4 +21,17 @@ it('opens a seam and moves the relief after fitting, retaining the block', () =>
   expect(after).toContain('0.48,-0.12,0.025')
   expect(before).toContain('bandiagara-talus-socket')
   expect(after).toContain('bandiagara-talus-socket')
+})
+
+it('keeps the entire sloping relief above the stone surface rather than buried in it', () => {
+  const geometry = buildSocketBlock()
+  const p = geometry.getAttribute('position')
+  for (let i = 0; i < p.count; i++) {
+    expect(p.getY(i)).toBeLessThanOrEqual(1.03 - (p.getZ(i) - 0.7) / Math.sqrt(3) + 1e-6)
+  }
+  for (const [, y] of ROCK_RELIEF) {
+    const worldY = 1.05 + y * 0.5, worldZ = 0.7 - y * Math.sqrt(3) / 2
+    expect(worldY - (1.03 - (worldZ - 0.7) / Math.sqrt(3))).toBeCloseTo(0.02)
+  }
+  geometry.dispose()
 })
