@@ -35,3 +35,16 @@ export function routeFrameProgress(state, position) {
   state.next = state.distance + state.spacing
   return true
 }
+
+
+/** A retry needs a changed obstruction, not merely more wall-clock time. */
+export function positionsMoved(before, after, minimum = 0.3) {
+  return before.length !== after.length || before.some((p, i) => Math.hypot(p.x - after[i].x, p.z - after[i].z) >= minimum)
+}
+
+/** Read-only village crowd near a blocked walk, shared by snapshot and wait. */
+export function nearbyTeachingCrowd(at) {
+  const crowd = [...(window.__placeErrands?.().villagers ?? []), ...(window.__placeTag?.().children ?? [])]
+  if (window.__chief) crowd.push(window.__chief)
+  return crowd.filter((p) => Math.hypot(p.x - at.x, p.z - at.z) < 5).map(({ x, z }) => ({ x, z }))
+}

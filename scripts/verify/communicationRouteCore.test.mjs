@@ -22,3 +22,13 @@ it('takes route frames at separated places reached along the leg', async () => {
   for (let x = 1; x <= 20; x++) if (routeFrameProgress(s, { x, z: 0 })) shots.push(x)
   expect(shots).toEqual([1, 6, 11])
 })
+
+it('retries only when an obstruction moves or leaves, ignoring small idle motion', async () => {
+  const { positionsMoved } = await import('./communicationRouteCore.mjs')
+  const before = [{ x: 1, z: 2 }]
+  expect(positionsMoved(before, before)).toBe(false)
+  expect(positionsMoved(before, [{ x: 1.02, z: 2 }])).toBe(false)
+  expect(positionsMoved(before, [{ x: 1.4, z: 2 }])).toBe(true)
+  expect(positionsMoved(before, [])).toBe(true)
+  expect(positionsMoved([], [])).toBe(false)
+})

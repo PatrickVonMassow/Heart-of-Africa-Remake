@@ -66,7 +66,7 @@ export async function installCommunicationCapture(page) {
       const tail = ring.slice(-4)
       if (tail.length === 4 && tail.every((b, i) => !i || b.frame === tail[i - 1].frame + tail[i - 1].channels[0].length)) break
       if (performance.now() > deadline) throw new Error('Missing evidence: audio capture never delivered contiguous blocks')
-      await new Promise((r) => setTimeout(r, 50))
+      await new Promise(requestAnimationFrame)
     }
   })
 }

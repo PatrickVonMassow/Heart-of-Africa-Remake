@@ -94,7 +94,14 @@ export function communicationDriver(page, { onTravelProgress = async () => {} } 
       // Villagers and children are not on the static grid: a player waits for
       // the one in his way to move on and chooses the way again from there.
       assert(replans > 0, `Blocked settlement walk: ${JSON.stringify(stuck)}`)
-      await page.waitForTimeout(2000)
+      const before = await read(async (at) => {
+        const { nearbyTeachingCrowd } = await import('/scripts/verify/communicationRouteCore.mjs')
+        return nearbyTeachingCrowd(at)
+      }, stuck.at)
+      await wait(async ({ before, at }) => {
+        const { nearbyTeachingCrowd, positionsMoved } = await import('/scripts/verify/communicationRouteCore.mjs')
+        return positionsMoved(before, nearbyTeachingCrowd(at))
+      }, { before, at: stuck.at }, 15000)
       return walk(target, replans - 1)
     }
   }
@@ -195,7 +202,16 @@ export function communicationDriver(page, { onTravelProgress = async () => {} } 
       // waits for it to move on before choosing the way again.
       const here = await read(() => window.__game.getState().pos)
       assert(replans > 0, `No traversable route: ${JSON.stringify(await blockedAt(here, target))}`)
-      await page.waitForTimeout(3000)
+      const before = await read(async ({ here, target }) => {
+        const { collidableAnimalsNear } = await import('/src/scenes/travel/wildlifeCollision.ts')
+        return collidableAnimalsNear(here.x, here.z, Math.hypot(target.x - here.x, target.z - here.z) + 5).map(([x, z]) => ({ x, z }))
+      }, { here, target })
+      await wait(async ({ before, here, target }) => {
+        const { collidableAnimalsNear } = await import('/src/scenes/travel/wildlifeCollision.ts')
+        const { positionsMoved } = await import('/scripts/verify/communicationRouteCore.mjs')
+        const after = collidableAnimalsNear(here.x, here.z, Math.hypot(target.x - here.x, target.z - here.z) + 5).map(([x, z]) => ({ x, z }))
+        return positionsMoved(before, after)
+      }, { before, here, target }, 15000)
       return travelTo(target, tolerance, replans - 1)
     }
     for (const p of path) {
