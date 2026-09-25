@@ -3025,11 +3025,13 @@ export function TravelScene() {
       for (const c of places) obstacles.push(c)
       if (obstacles.length > 0) {
         let [nx, nz] = resolveTravelMove(beforeX, beforeZ, p.x, p.z, obstacles, PLAYER_R)
-        // A body pushed out of an animal or a tree must not land in blocked
-        // water (point 1212: an antelope wading onto him at the delta shore
-        // pushed him into the closed Mediterranean). He holds his last spot instead.
+        // A PUSH out of an animal or a tree must not land him in blocked water
+        // (point 1212: an antelope wading onto him at the delta shore pushed him
+        // into the closed Mediterranean). He holds his last spot instead. His own
+        // step is left alone: moveTravel already judged it.
         const ll = worldToLatLon(nx, nz)
-        if (isBlocked(sampleTerrain(ll.lat, ll.lon, s.seed).type, ll.lat, ll.lon)) [nx, nz] = [beforeX, beforeZ]
+        const pushed = nx !== p.x || nz !== p.z
+        if (pushed && isBlocked(sampleTerrain(ll.lat, ll.lon, s.seed).type, ll.lat, ll.lon)) [nx, nz] = [beforeX, beforeZ]
         if (nx !== p.x || nz !== p.z) useGame.setState({ pos: { x: nx, z: nz } })
       }
     }

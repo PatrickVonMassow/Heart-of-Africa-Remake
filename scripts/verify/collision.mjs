@@ -1265,6 +1265,50 @@ if (section('inhabitant-placement')) {
   )
 }
 
+// === Stranded in blocked water (point 1212) ===================================
+// The user's bug report (local/GefangenerSpieler.zip): an antelope's collision
+// push left him in the closed Mediterranean off the delta beach, and no input
+// moved him. From that exact standpoint he must now walk out under held input —
+// the nearest open ground is the beach to the south — and on at least ten world units.
+if (section('stranded-shore')) {
+  const REPORT = { seed: 804048534, x: 299.925882924154, z: -310.1447977921902 }
+  await page.evaluate(() => {
+    const g = window.__game.getState()
+    g.setJournalOpen(false)
+    if (g.mode !== 'travel') g.leavePlace()
+  })
+  await page.waitForFunction(() => window.__game.getState().mode === 'travel', null, { timeout: 30000 })
+  await page.evaluate((r) => window.__game.setState({ seed: r.seed, pos: { x: r.x, z: r.z }, toast: null }), REPORT)
+  await page.waitForTimeout(1500)
+  await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyS' })))
+  let walked = 0
+  const t0 = Date.now()
+  while (Date.now() - t0 < 20000 && walked < 10) {
+    walked = await page.evaluate(
+      (r) =>
+        new Promise((res) =>
+          requestAnimationFrame(() =>
+            requestAnimationFrame(() => {
+              window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyS' }))
+              const p = window.__game.getState().pos
+              res(Math.hypot(p.x - r.x, p.z - r.z))
+            }),
+          ),
+        ),
+      REPORT,
+    )
+  }
+  await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyS' })))
+  check(
+    'stranded shore: from the report standpoint he walks at least ten units out of the blocked water (point 1212)',
+    walked >= 10,
+    `walked ${walked.toFixed(2)} units in ${((Date.now() - t0) / 1000).toFixed(1)} s`,
+  )
+  await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+  await page.waitForTimeout(400)
+  await shot('54-collision-stranded-shore', { world: { lat: 30.99, lon: 29.9926 }, label: 'the delta beach he walked out onto' })
+}
+
 // A selected section that never executed is a FAILURE, not a quiet pass: it is
 // the one way a --section run could report green having verified nothing.
 const unrun = sections.unrun()
