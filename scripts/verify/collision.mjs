@@ -1280,6 +1280,13 @@ if (section('stranded-shore')) {
   await page.waitForFunction(() => window.__game.getState().mode === 'travel', null, { timeout: 30000 })
   await page.evaluate((r) => window.__game.setState({ seed: r.seed, pos: { x: r.x, z: r.z }, toast: null }), REPORT)
   await page.waitForTimeout(1500)
+  // Measured from where he stands once the scene has settled, and only if that
+  // is still the trap: a setup push onto open ground would prove nothing.
+  const start = await page.evaluate(() => {
+    const g = window.__game.getState()
+    return { x: g.pos.x, z: g.pos.z, blocked: window.__travelBlocked(g.pos.x, g.pos.z, g.seed) }
+  })
+  check('stranded shore: the settled standpoint is still blocked water (point 1212)', start.blocked, `at ${start.x.toFixed(2)}/${start.z.toFixed(2)}`)
   await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyS' })))
   let walked = 0
   const t0 = Date.now()
@@ -1295,14 +1302,18 @@ if (section('stranded-shore')) {
             }),
           ),
         ),
-      REPORT,
+      start,
     )
   }
   await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyS' })))
+  const endOpen = await page.evaluate(() => {
+    const g = window.__game.getState()
+    return !window.__travelBlocked(g.pos.x, g.pos.z, g.seed)
+  })
   check(
     'stranded shore: from the report standpoint he walks at least ten units out of the blocked water (point 1212)',
-    walked >= 10,
-    `walked ${walked.toFixed(2)} units in ${((Date.now() - t0) / 1000).toFixed(1)} s`,
+    walked >= 10 && endOpen,
+    `walked ${walked.toFixed(2)} units in ${((Date.now() - t0) / 1000).toFixed(1)} s, ending on ${endOpen ? 'open ground' : 'BLOCKED water'}`,
   )
   await page.evaluate(() => window.__game.getState().setJournalOpen(false))
   await page.waitForTimeout(400)

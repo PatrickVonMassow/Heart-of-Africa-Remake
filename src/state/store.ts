@@ -916,13 +916,12 @@ export const useGame = create<GameState>()((set, get) => ({
     let nextT = sampleTerrain(next.lat, next.lon, s.seed)
     let tx = nx
     let tz = nz
-    const blockedAt = (px: number, pz: number) => {
-      const ll = worldToLatLon(px, pz)
-      return isBlocked(sampleTerrain(ll.lat, ll.lon, s.seed).type, ll.lat, ll.lon)
-    }
+    const blockedAt = (px: number, pz: number) => travelBlockedAt(px, pz, s.seed)
     // Already standing in blocked water (point 1212: a wading animal's collision
-    // push once left him there): every step toward the nearest open spot is
-    // allowed, so the border can hold him out but never hold him in.
+    // push once left him there): a step headed toward the nearest open spot is
+    // allowed, so the border can hold him out but never hold him in. "Toward"
+    // means within the balance cone: each allowed step closes at least half its
+    // length on the exit, so he cannot creep sideways along a closed sea.
     const exit = isBlocked(here.type, cur.lat, cur.lon)
       ? findFreeSpot(s.pos.x, s.pos.z, {
           step: balance.strandedExit.searchStep,
@@ -932,9 +931,13 @@ export const useGame = create<GameState>()((set, get) => ({
         })
       : null
     devAssert(exit === null || exit.found, 'travel-stranded', () => `no open spot within ${balance.strandedExit.searchRadius} of ${s.pos.x.toFixed(2)}/${s.pos.z.toFixed(2)}`)
-    const towardExit =
-      exit?.found === true &&
-      Math.hypot(nx - exit.pos[0], nz - exit.pos[1]) < Math.hypot(s.pos.x - exit.pos[0], s.pos.z - exit.pos[1])
+    let towardExit = false
+    if (exit?.found === true) {
+      const ex = exit.pos[0] - s.pos.x
+      const ez = exit.pos[1] - s.pos.z
+      const d = Math.hypot(ex, ez)
+      towardExit = d > 0 && ((nx - s.pos.x) * ex + (nz - s.pos.z) * ez) / (d * step) >= balance.strandedExit.minHeadingCos
+    }
     if (!towardExit && isBlocked(nextT.type, next.lat, next.lon)) {
       // SLIDE along the boundary rather than stopping dead (point 316): a
       // swimmer pushed against the ocean by the river current had no lateral
@@ -2410,9 +2413,16 @@ export function priceOfGood(good: EquipmentId | 'food' | Material): number {
   }
 }
 
-// Dev-only hook for the headless Playwright verification (CLAUDE.md §7.2).
+/** Whether a travel position lies in water the traveller may not enter. */
+export function travelBlockedAt(x: number, z: number, seed: number): boolean {
+  const ll = worldToLatLon(x, z)
+  return isBlocked(sampleTerrain(ll.lat, ll.lon, seed).type, ll.lat, ll.lon)
+}
+
+// Dev-only hooks for the headless Playwright verification (CLAUDE.md §7.2).
 if (import.meta.env.DEV && typeof window !== 'undefined') {
   ;(window as unknown as Record<string, unknown>).__game = useGame
+  ;(window as unknown as Record<string, unknown>).__travelBlocked = travelBlockedAt
 }
 
 

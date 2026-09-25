@@ -249,6 +249,8 @@ export interface BalanceConfig {
     searchStep: number
     /** Farthest the search looks, world units. */
     searchRadius: number
+    /** Least cosine between an allowed step and the way to the exit. */
+    minHeadingCos: number
   }
   /** Random events enabled (design.md §14). */
   randomEventsEnabled: boolean
@@ -1123,7 +1125,7 @@ export const balance: BalanceConfig = {
   // passage down the channel is never deflected by a riverside settlement.
   placeCollisionFactor: 0.6,
   oceanSwimMarginDeg: 1.0, // calibratable: swimmable coastal band width in degrees (point 221: narrowed from 1.2 so the traveller cannot wade ~1.18 deg out into deep blue while the ~0.89 deg nearshore stays swimmable)
-  strandedExit: { searchStep: 0.5, searchRadius: 20 }, // calibratable: the report's trap lay 2.5 units off the beach
+  strandedExit: { searchStep: 0.5, searchRadius: 20, minHeadingCos: 0.5 }, // calibratable: the report's trap lay under a unit off the beach; cos 0.5 = a 60° cone
   randomEventsEnabled: false, // demo start preset (point 104): events off by default; debug toggle
   // Per-day base probabilities (design.md §14). Reduced by a factor of 5 from
   // the earlier calibration on user request — events should be markedly rarer.
