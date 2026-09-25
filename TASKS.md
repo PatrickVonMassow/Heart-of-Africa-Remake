@@ -96,26 +96,6 @@ put it is the mistake this line exists to stop.
      and passes after, and a Playwright run on WebGPU from the report's standpoint in
      which the traveller walks at least ten world units away.
   Bundle: Steuerung & Performance.
-- [ ] 1213. A young animal killed by a predator stays dead and becomes a carcass (user bug
-  report 25.09.2026, local/JungtierZombie.zip: the lion caught the young animal, the
-  parent stood mourning beside it, no vultures came, and then the young was alive again
-  and hopped around; seed 804048534, position x/z 305.26 / -311.2, north region,
-  day 42.14, build 6a5373c, WebGPU, medium).
-  The report's wildlife section lists 0 carcasses, the young antelope at 300.36 / -305.26
-  in state `separated` with `young: true`, and its parent at 304.88 / -313.6 wading with
-  `childAt` pointing at it — the killed young was restored instead of leaving a carcass.
-  Final state:
-
-  1. A young animal killed in a hunt leaves a carcass like an adult victim does, the
-     vultures come to it by the ordinary carcass mechanism, and the young is not
-     re-created alive at that spot or re-linked to its parent.
-  2. The parent's mourning ends with the parent released from the dead young (no
-     `childAt` to a carcass or a respawned young); a later new young, if the herd
-     mechanism creates one, is a distinct animal that does not appear at the kill.
-  3. Proof: a Vitest driving a hunt that kills a young animal and asserting a carcass,
-     a vulture flock that owns it, and no living young with that identity afterwards;
-     and a Playwright picture on WebGPU of the carcass with the vultures.
-  Bundle: Tierverhalten.
 - [ ] 659. The whole communication chain, played through and judged by what reaches the
   PLAYER — A SIX-EYES ALL-ROUND REVIEW.
   ON HOLD (user 13.08.2026, 22:25: »Stoppe 659 erstmal — der macht erstmal keinen Sinn, wenn wir
@@ -541,6 +521,26 @@ put it is the mistake this line exists to stop.
   scripts/vdzk-admissibility-core.mjs, user order 22.09.2026 12:25
   Bundle: Chat & Tafel
 
+- [ ] 1213. A young animal killed by a predator stays dead and becomes a carcass (user bug
+  report 25.09.2026, local/JungtierZombie.zip: the lion caught the young animal, the
+  parent stood mourning beside it, no vultures came, and then the young was alive again
+  and hopped around; seed 804048534, position x/z 305.26 / -311.2, north region,
+  day 42.14, build 6a5373c, WebGPU, medium).
+  The report's wildlife section lists 0 carcasses, the young antelope at 300.36 / -305.26
+  in state `separated` with `young: true`, and its parent at 304.88 / -313.6 wading with
+  `childAt` pointing at it — the killed young was restored instead of leaving a carcass.
+  Final state:
+
+  1. A young animal killed in a hunt leaves a carcass like an adult victim does, the
+     vultures come to it by the ordinary carcass mechanism, and the young is not
+     re-created alive at that spot or re-linked to its parent.
+  2. The parent's mourning ends with the parent released from the dead young (no
+     `childAt` to a carcass or a respawned young); a later new young, if the herd
+     mechanism creates one, is a distinct animal that does not appear at the kill.
+  3. Proof: a Vitest driving a hunt that kills a young animal and asserting a carcass,
+     a vulture flock that owns it, and no living young with that identity afterwards;
+     and a Playwright picture on WebGPU of the carcass with the vultures.
+  Bundle: Tierverhalten.
 - [ ] 1186. A standing-down session can file a finding without evading the guard (user order
   22.09.2026, 12:36, verbatim: »Ja, eine solche Blockade passiert oft. Reihe dafür einen
   Punkt ein, der direkt nach dem Dashboard-Umbau erledigt wird.«). ORDER: directly after

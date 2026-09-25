@@ -1441,12 +1441,6 @@
       "origin": "user",
       "place": "ahead"
     },
-    "1208": {
-      "at": "2026-09-24T11:19:47.389Z",
-      "why": "User 24.09.2026: directly after 659 (its PLACEMENT line)",
-      "origin": "user",
-      "place": "ahead"
-    },
     "1209": {
       "at": "2026-09-24T11:30:41.284Z",
       "why": "User 24.09.2026 13:30: direkt vor 1204, Vier-Augen",
@@ -1460,8 +1454,8 @@
       "place": "ahead"
     },
     "1213": {
-      "at": "2026-09-25T06:26:38.989Z",
-      "why": "User 25.09.2026 08:25: »Beide oben in der Queue einreihen, GefangenerSpieler.zip zuerst.« — directly behind 1212",
+      "at": "2026-09-25T07:35:00.000Z",
+      "why": "User 25.09.2026 09:30: »Schiebe vorher noch 1213 nach 1185 … Der ist jetzt doch nicht mehr so dringend.« — directly behind 1185",
       "origin": "user",
       "place": "ahead"
     }
@@ -1495,7 +1489,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-25T01:30:02.276Z",
+    "at": "2026-09-25T07:23:03.119Z",
     "points": [
       174,
       184,
@@ -1916,8 +1910,10 @@
       1205,
       1206,
       1207,
-      1208,
-      1209
+      1209,
+      1211,
+      1212,
+      1213
     ]
   }
 }
