@@ -632,6 +632,7 @@ function Loom({
         // A settlement whose warp lies on no river has no upstream to name.
         vocabulary: useGame.getState().vocabulary,
         teaches: station.onRiverAxis,
+        rockHeard: Object.hasOwn(useGame.getState().communication.heard, useGame.getState().vocabulary.ROCK),
         helper: true,
         seat: station.weaver,
         childrenHear,
