@@ -16240,3 +16240,19 @@ to land than a mechanism that needs a review.
   never fire. 51 unindexed memories, 8 dangling links, 4 superseded. CLAUDE.md:81 vs :180 fence wording. No edits made.
   Criticality: low — deletions and wording fixes; item 3 needs an attended session.
   Bundle: Modell & Wächter.
+
+- [ ] 1215. Top-centre HUD notices overlap and become unreadable.
+  PROBLEM, seen 25.09.2026 in the point-659 route evidence (both backends green, picture-judged):
+  on the WebGL 2 fallback the dismissible graphics notice, a toast and the place-title card share
+  the same top-centre slot, so the toast text is drawn across the notice text and the title
+  (`communication-webgl-1790356605654-09-after-fit.png`: "Dummy message: the puzzle ... is solved."
+  over "Graphics notice: WebGPU is unavailable ..."; also `-07-answer-sounding.png`). On WebGPU the
+  "Chief" title card covers the start of the toast (`communication-webgpu-1790355374457-05-chief-walks-out.png`)
+  and the "Bandiagara" title covers the talus block's crown (`-08-impression-and-socket.png`).
+  FINAL STATE: notices in the top slot stack or queue without overlapping, every one readable in
+  full; a place title never covers toast text. Both languages, desktop and phone portrait.
+  Criticality: medium — the puzzle-success toast and the fallback notice are unreadable while both show.
+  Test: a Playwright layout check that the notice, toast and title boxes do not intersect when all
+  three are shown, on WebGL 2 (where the notice appears) and WebGPU; picture check on both backends.
+  Refs: src/ui/Hud.tsx, the graphics-notice and place-title components.
+  Bundle: unbundled (HUD).
