@@ -1,4 +1,3 @@
-import { ClayImpression } from './ClayImpression'
 // HUD composition: status bar, inventory/hand bar, prompt, toast, journal,
 // dialogs, start/victory overlays and the debug menu. All player-visible
 // text comes from the language files (design.md §17 localization).
@@ -14,6 +13,7 @@ import { MONTH_KEYS } from '../systems/season'
 
 import { useUi } from '../state/ui'
 import { StatusBar } from './StatusBar'
+import { ClayImpression } from './ClayImpression'
 import { JournalPanel } from './JournalPanel'
 import { Dialogs } from './Dialogs'
 import { DrumMessageWatcher } from './DrumMessage'
