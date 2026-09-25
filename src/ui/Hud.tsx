@@ -1,3 +1,4 @@
+import { ClayImpression } from './ClayImpression'
 // HUD composition: status bar, inventory/hand bar, prompt, toast, journal,
 // dialogs, start/victory overlays and the debug menu. All player-visible
 // text comes from the language files (design.md §17 localization).
@@ -215,6 +216,7 @@ function InventoryBar() {
           onClick={slot.activate}
         >
           {i < 9 && <span className="inv-digit" aria-hidden="true">{i + 1}</span>}
+          {slot.form === 'rock-relief' && <ClayImpression />}
           {slot.label}
         </button>
       ))}

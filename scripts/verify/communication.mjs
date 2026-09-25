@@ -587,7 +587,11 @@ try {
     })
     await riverTrip(receipt.setup.village, socket, '08-downstream')
     const socketWorld = await d.read(async (p) => (await import('/src/world/geo.ts')).latLonToWorld(p.lat, p.lon), socket)
-    await d.travelTo(socketWorld, 2)
+    // Stand in front of the sloped relief, clear of the block and within fit reach.
+    await d.travelTo({ x: socketWorld.x, z: socketWorld.z + 2.5 }, 0.15)
+    await d.close()
+    await d.wait(({ x, z }) => window.__camera.onScreen(x, z, 2.2) && window.__camera.onScreen(x, z + 0.7, 1.05), socketWorld)
+    await event('socket-view', { socketWorld, features: ['cliff crown', 'sloping socket face'], stand: await d.read(() => window.__game.getState().pos) })
     await frame('08-impression-and-socket', { world: socket, label: 'weathered block at the talus foot and carried impression' })
     await step('9-fit-and-journal')
     await frame('09-before-fit', { world: socket, label: 'the unfitted talus block before using the impression' })
