@@ -1849,3 +1849,12 @@ the card title in `.claude/board-queue.json` and nothing strips it when a point
 is picked up again, so the board contradicted itself until the user reported it.
 Corrected by hand with `scripts/board.mjs title 659`. Non-blocking: no player
 impact, board bookkeeping only.
+
+## Communication route: two framing weaknesses seen in round 7
+
+Found 26.09.2026 in the point-659 route evidence (`communication-webgpu-1790372136841-*`).
+`03-dig-invitation`: the driver keeps within 0.6 × talk reach of the initiator, so on WebGPU it
+stood right behind him; his head fills the foreground and the label sits high above it. The WebGL
+twin shows the pair and the label cleanly. `07-clay-impression` / `07-answer-sounding`: the
+"Space — Have the answer beaten again" prompt sits over inventory slot 6 ("Clay Impression of a
+Rock"); both stay legible. Non-blocking: the game behaves correctly and every word is readable.
