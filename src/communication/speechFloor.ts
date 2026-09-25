@@ -37,10 +37,12 @@ export class SpeechFloor {
   private readonly player: () => { x: number; z: number; active: boolean }
   private readonly now: () => number
   private readonly scope: string
-  constructor(player: () => { x: number; z: number; active: boolean }, now: () => number, scope = 'village', private readonly interrupted: () => boolean = () => false) {
+  private readonly interrupted: () => boolean
+  constructor(player: () => { x: number; z: number; active: boolean }, now: () => number, scope = 'village', interrupted: () => boolean = () => false) {
     this.player = player
     this.now = now
     this.scope = scope
+    this.interrupted = interrupted
   }
 
   private audible(source: FloorSource): boolean {
