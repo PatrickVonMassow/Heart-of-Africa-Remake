@@ -56,6 +56,9 @@ import {
   deflectAroundCircle,
   fleesFromPlayer,
   fleeWaterStep,
+  chaseFleeStep,
+  swimBrakedPace,
+  chaseSwimEscaped,
   nearestBankTarget,
   waterDramaOwns,
   waterExit,
@@ -374,6 +377,10 @@ interface Animal {
    *  flight that took it onto river/lake water keeps swimming and the
    *  backstop leaves it alone; once it lapses the swim-to-bank takes over. */
   fleeAt?: number
+  /** A hunted calf swam during its chase (design.md §19.5): landing again ends
+   *  the chase (far bank), and a chase that ends first sends it to the nearest
+   *  bank. Cleared once it stands on land. */
+  chaseSwim?: true
   /** The crocodile ambush (design.md §19.16, point 130), per-crocodile state:
    *  absent = hidden at its spot; set = lunging at / gripping a victim or
    *  slinking back home. Its own state — the scripted LION hunt is never
@@ -2191,6 +2198,55 @@ function Herds() {
       )
       if (y !== null) a.y = y
     }
+    // Raw terrain type at a world point — the shape fleeCrossing/crossingTarget
+    // probe the channel with (point 192).
+    const terrainTypeAtWorld = (nx: number, nz: number) => {
+      const ll = worldToLatLon(nx, nz)
+      return sampleTerrain(ll.lat, ll.lon, seed).type
+    }
+    // One flight step for every flight source (design.md §19.5, point 312):
+    // deflected at the OCEAN edge only, so a flight meeting a river or lake
+    // goes in and swims — chest-deep, at the braked swim pace — instead of
+    // pressing against the waterline or skating along the bank. Stamps fleeAt
+    // so the backstop leaves the swimmer alone until its flight ends; returns
+    // the step and the body height for this spot. A wader stands on the sheet.
+    const swimPace = wadeSpeed(
+      CROSS_SWIM_SPEED,
+      seasonFlowFactor(CURRENT_WEATHER.wetness, balance.waterDrama.dryFlowFactor, balance.waterDrama.wetFlowFactor),
+    )
+    // Stamp the flight and set the body height at the new spot (returns the
+    // terrain type there): chest-deep on the sheet in water, grounded on land.
+    const settleFlight = (a: Animal, wader: boolean): string => {
+      a.fleeAt = simTimeRef.current
+      const gfl = worldToLatLon(a.x, a.z)
+      const gft = sampleTerrain(gfl.lat, gfl.lon, seed)
+      if (gft.type === 'water') {
+        const ws = waterSurfaceY(gfl.lat, gfl.lon, seed, gft.height)
+        a.y = wader ? waderStandY(gft.height, ws) : sheetAnchorY(ws, gft.height, 0.32)
+      } else if (gft.type !== 'ocean') a.y = groundedBodyY(gft.height)
+      return gft.type
+    }
+    const fleeMove = (a: Animal, heading: number, speed: number, wader = false) => {
+      const pace = wader ? speed : swimBrakedPace(speed, terrainTypeAtWorld(a.x, a.z), swimPace)
+      const step = fleeWaterStep(a.x, a.z, heading, pace * dt, terrainTypeAtWorld, 0.8)
+      a.x = step.x
+      a.z = step.z
+      settleFlight(a, wader)
+      return step
+    }
+    // The hunted calf's flight (design.md §19.5): the same ocean-only rule,
+    // routed through calfFleeStep's away-from-the-hunter fan. A step that
+    // lands in river/lake water marks the swim (chaseSwim) — the far-bank
+    // resolution and the swim-out after the chase read it.
+    const chaseFleeMove = (a: Animal, hunterX: number, hunterZ: number, speed: number) => {
+      const pace = swimBrakedPace(speed, terrainTypeAtWorld(a.x, a.z), swimPace)
+      const step = chaseFleeStep(a.x, a.z, hunterX, hunterZ, pace * dt, terrainTypeAtWorld, 0.8, a.fleeCorridor)
+      a.fleeCorridor = step.corridor
+      a.x = step.x
+      a.z = step.z
+      if (settleFlight(a, false) === 'water') a.chaseSwim = true
+      return step
+    }
     // The one burst-derived speed of all four rescue drives (point 127),
     // read fresh so a debug edit of balance.family.rescueBurst applies live.
     const RESCUE_SPEED = rescueSpeed(balance.family.rescueBurst)
@@ -2511,10 +2567,11 @@ function Herds() {
           const calf = a.child
           const h = blockHeading(a.x, a.z, calf.x, calf.z, LION_STATE.lx, LION_STATE.lz, PARENT_BLOCK_OFFSET)
           if (h !== null) {
-            a.x += Math.sin(h) * RESCUE_SPEED * dt
-            a.z += Math.cos(h) * RESCUE_SPEED * dt
-            groundFollow(a) // point 283: the shield renders at a.y — re-ground it after the burst
-          }
+            // The station run is a flight step (design.md §19.5): deflected at
+            // the ocean only, into a river/lake after its calf at the swim pace,
+            // riding the sheet there (point 283's re-ground on land).
+            fleeMove(a, h, RESCUE_SPEED)
+          } else a.fleeAt = simTimeRef.current // on station (maybe mid-river): still the chase's, not the backstop's
           // SWEPT (point 179): the hunter's last MOVE SEGMENT vs the interposing
           // parent, not its current point — a big clamped-dt step must not carry
           // it THROUGH the living shield without registering contact. The segment
@@ -2590,7 +2647,23 @@ function Herds() {
               a.mired = undefined
             }
           }
-          if (a.inWater === undefined && !a.rescued && a.caught === undefined && !isChaseVictim) {
+          // A calf that swam in its chase (design.md §19.5) is no fall-in: once
+          // the chase is over it swims for the NEAREST bank under the 312
+          // no-lingering rule (the crossing mover, deadline-bounded — I4)
+          // rather than starting the §19.8 struggle.
+          if (a.chaseSwim && !isChaseVictim && a.caught === undefined) {
+            const cty = terrainTypeAtWorld(a.x, a.z)
+            if (cty !== 'water') a.chaseSwim = undefined
+            else if (a.crossing === undefined) {
+              const bank = nearestBankTarget(
+                a.x, a.z, terrainTypeAtWorld, CROSS_SWIM_SPEED * balance.waterCross.resolveSeconds,
+              )
+              const land = bank ? { x: bank.tx, z: bank.tz } : findLandNear(a.x, a.z, seed)
+              a.crossing = { tx: land.x, tz: land.z, time: 0 }
+              a.dodgeHeading = undefined
+            }
+          }
+          if (a.inWater === undefined && !a.rescued && a.caught === undefined && !isChaseVictim && !a.chaseSwim) {
             const ll = worldToLatLon(a.x, a.z)
             const ter = sampleTerrain(ll.lat, ll.lon, seed)
             if (ter.type === 'water') {
@@ -3957,37 +4030,6 @@ function Herds() {
         herdCentre.set(hid, { cx: ccx, cz: ccz, heading: st.heading })
       }
     }
-    // Raw terrain type at a world point — the shape fleeCrossing/crossingTarget
-    // probe the channel with (point 192).
-    const terrainTypeAtWorld = (nx: number, nz: number) => {
-      const ll = worldToLatLon(nx, nz)
-      return sampleTerrain(ll.lat, ll.lon, seed).type
-    }
-    // One flight step for every flight source (design.md §19.5, point 312):
-    // deflected at the OCEAN edge only, so a flight meeting a river or lake
-    // goes in and swims — chest-deep, at the braked swim pace — instead of
-    // pressing against the waterline or skating along the bank. Stamps fleeAt
-    // so the backstop leaves the swimmer alone until its flight ends; returns
-    // the step and the body height for this spot. A wader stands on the sheet.
-    const swimPace = wadeSpeed(
-      CROSS_SWIM_SPEED,
-      seasonFlowFactor(CURRENT_WEATHER.wetness, balance.waterDrama.dryFlowFactor, balance.waterDrama.wetFlowFactor),
-    )
-    const fleeMove = (a: Animal, heading: number, speed: number, wader = false) => {
-      const wet = !wader && terrainTypeAtWorld(a.x, a.z) === 'water'
-      const pace = wet ? Math.min(speed, swimPace) : speed
-      const step = fleeWaterStep(a.x, a.z, heading, pace * dt, terrainTypeAtWorld, 0.8)
-      a.x = step.x
-      a.z = step.z
-      a.fleeAt = simTimeRef.current
-      const gfl = worldToLatLon(a.x, a.z)
-      const gft = sampleTerrain(gfl.lat, gfl.lon, seed)
-      if (gft.type === 'water') {
-        const ws = waterSurfaceY(gfl.lat, gfl.lon, seed, gft.height)
-        a.y = wader ? waderStandY(gft.height, ws) : sheetAnchorY(ws, gft.height, 0.32)
-      } else if (gft.type !== 'ocean') a.y = groundedBodyY(gft.height)
-      return step
-    }
     // The traveller as a threat source for the player-shy flight (design.md
     // §19): fed into the SAME fleeHeading/held-heading machinery as the
     // elephant dodge — never a second oscillation-prone path.
@@ -4708,39 +4750,13 @@ function Herds() {
             // This calf is the one being run down (design.md §19): it bolts
             // instead of standing at its parent, but slower than its hunter, so
             // the chase is visible in the open before the catch.
-            // Steer around a coast or river the way every other mover does
-            // (point 157): the old raw step ran straight into the water and
-            // pinned the calf. calfFleeStep heads away from the hunter and fans
-            // out to a way around; at a concave sea pocket where the whole fan
-            // is wet it falls back to the point-188 escape corridor (sticky via
-            // a.fleeCorridor) and runs ALONG the shore instead of freezing at
-            // the waterline (point 226). Only a genuine dead-end (water on
-            // every side) stands (moved:false) for the catch to resolve — the
-            // §19.8 "always resolves" rule. Speed and the slower-than-hunter
-            // property are unchanged.
-            const fleeBlocked = (nx: number, nz: number) => {
-              const ll = worldToLatLon(nx, nz)
-              const ty = sampleTerrain(ll.lat, ll.lon, seed).type
-              return ty === 'ocean' || ty === 'water'
-            }
-            const fleeStep = calfFleeStep(
-              a.x,
-              a.z,
-              LION_STATE.lx,
-              LION_STATE.lz,
-              CALF_FLEE_SPEED * dt,
-              fleeBlocked,
-              0.8,
-              a.fleeCorridor,
-            )
-            a.fleeCorridor = fleeStep.corridor
-            a.x = fleeStep.x
-            a.z = fleeStep.z
-            { // ground-follow (point 203(A)): a mover carries its own standing height
-              const gfl = worldToLatLon(a.x, a.z)
-              const gft = sampleTerrain(gfl.lat, gfl.lon, seed)
-              if (gft.type !== 'water' && gft.type !== 'ocean') bodyY = a.y = groundedBodyY(gft.height)
-            }
+            // Flight is water-shy, not water-barred (design.md §19.5): a river
+            // or lake ahead is swum straight (swim pace, on the sheet); only
+            // the OCEAN edge still turns it through calfFleeStep's fan and the
+            // point-226 sticky escape corridor, and a genuine sea dead-end
+            // stands (moved:false) for the catch to resolve (§19.8).
+            const fleeStep = chaseFleeMove(a, LION_STATE.lx, LION_STATE.lz, CALF_FLEE_SPEED)
+            bodyY = a.y
             px = a.x
             pz = a.z
             yaw = fleeStep.heading
@@ -5379,6 +5395,16 @@ function LionHunt() {
     // The predator leaves the stage — and a strayed chase ends — only well
     // beyond the visible surroundings, however far the zoom reaches (§19).
     const offstageR = VIEW_AT_ZOOM1 * useUi.getState().travelZoom + HUNT_OFFSTAGE_MARGIN
+    const terrainAt = (x: number, z: number) => {
+      const ll = worldToLatLon(x, z)
+      return sampleTerrain(ll.lat, ll.lon, seed).type
+    }
+    // The seasonal swim pace, the same the herds' flights use (fleeMove).
+    const huntSwimPace = () =>
+      wadeSpeed(
+        CROSS_SWIM_SPEED,
+        seasonFlowFactor(CURRENT_WEATHER.wetness, balance.waterDrama.dryFlowFactor, balance.waterDrama.wetFlowFactor),
+      )
 
     if (s.mode === 'idle') {
       // Idle clears any stale calf-hunt bookkeeping so a re-armed hunt starts clean.
@@ -5613,6 +5639,17 @@ function LionHunt() {
             s.mode = 'feed'
             s.timer = 30
           }
+        } else if (v.chaseSwim && chaseSwimEscaped(true, terrainAt(v.x, v.z))) {
+          // Far bank reached (design.md §19.5): the calf swam and stands on
+          // land again — it got away across the water and the hunter gives up
+          // into the ordinary walk-off. The hunt resolves; nothing re-chases.
+          v.chaseSwim = undefined
+          s.mode = 'leave'
+          s.heading = leaveHeading(s.lx, s.lz, pos.x, pos.z)
+          s.leaveHeading = undefined
+          s.leaveT = 0
+          s.victim = null
+          s.victimHunt = false
         } else {
           s.px = v.x
           s.pz = v.z
@@ -5650,8 +5687,12 @@ function LionHunt() {
         }
         const lx0 = s.lx
         const lz0 = s.lz
-        s.lx += Math.sin(s.lionHeading) * HUNT_LION_SPEED * dt
-        s.lz += Math.cos(s.lionHeading) * HUNT_LION_SPEED * dt
+        // The hunter follows into a river/lake at the same braked swim pace as
+        // its quarry (design.md §19.5), so the water is a real escape: a close
+        // pursuer still catches, a distant one sees it reach the far bank.
+        const lionPace = swimBrakedPace(HUNT_LION_SPEED, terrainAt(s.lx, s.lz), huntSwimPace())
+        s.lx += Math.sin(s.lionHeading) * lionPace * dt
+        s.lz += Math.cos(s.lionHeading) * lionPace * dt
         // SWEPT catch (point 179): test the lion's MOVE SEGMENT against the prey,
         // not the pre-move point distance `d` — a big clamped-dt step or a
         // tangential pass would otherwise carry the lion THROUGH the calf without
@@ -5823,7 +5864,12 @@ function LionHunt() {
           lion.current.rotation.y = Math.atan2(-0.7, -0.25)
           lion.current.rotation.x = 0.32 + Math.sin(t * 3.2) * 0.16
         } else {
-          lion.current.position.set(s.lx, ground, s.lz)
+          // Swimming after its quarry (design.md §19.5): chest-deep on the
+          // rendered sheet, like every swimmer, never walking the river bed.
+          const lt = sampleTerrain(ll.lat, ll.lon, seed)
+          const swimY =
+            lt.type === 'water' ? sheetAnchorY(waterSurfaceY(ll.lat, ll.lon, seed, lt.height), lt.height, 0.32) : ground
+          lion.current.position.set(s.lx, swimY, s.lz)
           // Face the direction of travel (weaving pursuit / walk-off).
           lion.current.rotation.y = s.mode === 'leave' ? s.heading : s.lionHeading
           lion.current.rotation.x = 0
