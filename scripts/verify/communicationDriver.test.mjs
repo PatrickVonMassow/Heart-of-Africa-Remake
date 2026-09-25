@@ -1,6 +1,6 @@
 import { it, expect } from 'vitest'
 import { runInNewContext } from 'node:vm'
-import { turnDelta, travelKeys, communicationDriver, faceWalkingChief } from './communicationDriver.mjs'
+import { turnDelta, travelKeys, communicationDriver, faceWalkingChief, followInvitation, inviteOutcome } from './communicationDriver.mjs'
 it('turns through the shortest angle and maps world axes to ordinary travel keys', () => {
   expect(turnDelta(0, { x: 0, z: 0 }, { x: 0, z: -1 })).toBeCloseTo(0)
   expect(turnDelta(Math.PI - 0.01, { x: 0, z: 0 }, { x: 0, z: 1 })).toBeCloseTo(0.01)
@@ -142,4 +142,20 @@ it('names the pitch error when mouse-look cannot reach the bank rock', async () 
     .rejects.toThrow(/yaw -0\.031 rad, pitch -0\.220 rad off at 3\.57 m/)
   expect(fake.moves.length).toBeLessThanOrEqual(160)
   expect(fake.state.journalOpen).toBe(false)
+})
+it('keeps a dig initiator\'s own invitation label as seen after another word became last', async () => {
+  const task = { phase: 'invite', owes: true, siteIndex: 1 }, label = { id: 'villager-2', siteIndex: 1 }
+  const samples = [
+    { nowS: 0, initiator: 2, task, last: null, labelled: null, initiatorLabel: null },
+    { nowS: 1, initiator: 2, task: { ...task, owes: false }, last: { purpose: 'site', speaker: 5, age: 0 }, labelled: null, initiatorLabel: label },
+  ]
+  let t = 0, i = 0
+  const outcome = await followInvitation({ budgetMs: 1000, labelSeconds: 4, now: () => t, pause: async (ms) => { t += ms }, sample: async () => samples[Math.min(i++, samples.length - 1)] })
+  expect(outcome).toEqual({ seen: label })
+})
+it('records a lapse only after the label window when the initiator leaves the invite unseen', () => {
+  const watch = {}, base = { initiator: 2, labelled: null, initiatorLabel: null, last: null }
+  expect(inviteOutcome({ ...base, nowS: 0, task: { phase: 'invite', owes: true }, villager: { x: 1 } }, watch, 4)).toBeNull()
+  expect(inviteOutcome({ ...base, nowS: 1, task: null }, watch, 4)).toBeNull()
+  expect(inviteOutcome({ ...base, nowS: 6, task: null }, watch, 4)).toEqual({ lapsed: true, spokeUnseen: false, last: { x: 1 }, now: null })
 })

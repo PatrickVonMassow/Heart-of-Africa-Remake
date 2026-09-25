@@ -97,6 +97,29 @@ export async function observeBankCall({ budgetMs, prepare, sample, pause, reject
   throw new Error(`No child-call note reached the picture within ${budgetMs / 1000}s`)
 }
 
+/** Decide one sample of a followed dig initiator. The initiator's own label
+ * counts for `labelSeconds` after he leaves the owed invite, whatever became
+ * `last` meanwhile; only then is he recorded as lapsed. */
+export function inviteOutcome(s, watch, labelSeconds) {
+  if (s.labelled) return { seen: s.labelled }
+  if (s.last?.purpose === 'invitation' && s.last.speaker === s.initiator) watch.spokeAt ??= s.nowS - s.last.age
+  if (s.task?.phase === 'invite' && s.task.owes) { watch.villager = s.villager; return null }
+  watch.leftAt ??= s.nowS
+  if (s.nowS - watch.leftAt <= labelSeconds) return s.initiatorLabel ? { seen: s.initiatorLabel } : null
+  return { lapsed: true, spokeUnseen: watch.spokeAt !== undefined, last: watch.villager ?? null, now: s.task ?? null }
+}
+
+/** Follow one dig initiator until his invitation is seen or he lapses. */
+export async function followInvitation({ budgetMs, sample, pause, labelSeconds, now = Date.now }) {
+  const deadline = now() + budgetMs, watch = {}
+  while (now() < deadline) {
+    const outcome = inviteOutcome(await sample(), watch, labelSeconds)
+    if (outcome) return outcome
+    await pause(Math.min(100, Math.max(0, deadline - now())))
+  }
+  return null
+}
+
 /** All writes after entry are Playwright keyboard/mouse input. evaluate reads
  * poses or computes routes on private grids; it never changes the live pose. */
 export function communicationDriver(page, { onTravelProgress = async () => {} } = {}) {
