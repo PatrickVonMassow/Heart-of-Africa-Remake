@@ -876,6 +876,21 @@ export const RED_CHARGES = [
   },
   {
     point: 939,
+    suite: 'communication',
+    backend: 'webgpu',
+    featureLevel: 'compatibility',
+    kind: 'check',
+    // NAME-SCOPED to the 504 sentence alone: the route check carries its
+    // errors in its name, and any other error riding along keeps the red.
+    match: /^continuous route at [^:]+: continuous route has no browser errors — (Failed to load resource: the server responded with a status of 504 \(Outdated Optimize Dep\))( \| \1)*$/i,
+    why:
+      'THE SAME VITE TRANSIENT POINT 939 OWNS, ARRIVING IN THE COMMUNICATION ROUTE. Measured '
+      + '26.09.2026 on main (8162d29fe), webgpu/communication: 11 checks green, the one red the '
+      + 'route\'s browser-error check holding a single 504 Outdated Optimize Dep resource error '
+      + 'from the dev server. The charge dies with point 939.',
+  },
+  {
+    point: 939,
     suite: 'report',
     backend: 'webgpu',
     featureLevel: 'compatibility',

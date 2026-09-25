@@ -816,7 +816,8 @@ try {
       }
       writeFileSync(`${out}${prefix}journal-${language}.txt`, text.join('\n\n'))
     }
-    check('continuous route has no browser errors', receipt.errors.length === 0)
+    // The errors ride in the name, so a known transient can be charged by its text alone.
+    check(`continuous route has no browser errors${receipt.errors.length ? ` — ${receipt.errors.slice(0, 3).join(' | ')}` : ''}`, receipt.errors.length === 0)
     receipt.status = 'passed'
     console.log(`PASS  continuous entry-to-fit expedition${sections.tag()}`)
   }
