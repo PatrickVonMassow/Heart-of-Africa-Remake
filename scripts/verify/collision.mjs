@@ -1279,7 +1279,8 @@ if (section('stranded-shore')) {
   })
   await page.waitForFunction(() => window.__game.getState().mode === 'travel', null, { timeout: 30000 })
   await page.evaluate((r) => window.__game.setState({ seed: r.seed, pos: { x: r.x, z: r.z }, toast: null }), REPORT)
-  await page.waitForTimeout(1500)
+  // Let the scene draw a few frames at the standpoint (animals, collision) before reading it.
+  await page.evaluate(() => new Promise((r) => { let n = 30; const f = () => (--n > 0 ? requestAnimationFrame(f) : r()); requestAnimationFrame(f) }))
   // Measured from where he stands once the scene has settled, and only if that
   // is still the trap: a setup push onto open ground would prove nothing.
   const start = await page.evaluate(() => {
@@ -1316,7 +1317,7 @@ if (section('stranded-shore')) {
     `walked ${walked.toFixed(2)} units in ${((Date.now() - t0) / 1000).toFixed(1)} s, ending on ${endOpen ? 'open ground' : 'BLOCKED water'}`,
   )
   await page.evaluate(() => window.__game.getState().setJournalOpen(false))
-  await page.waitForTimeout(400)
+  await page.waitForFunction(() => !document.querySelector('.journal'), null, { timeout: 8000 })
   await shot('54-collision-stranded-shore', { world: { lat: 30.99, lon: 29.9926 }, label: 'the delta beach he walked out onto' })
 }
 
