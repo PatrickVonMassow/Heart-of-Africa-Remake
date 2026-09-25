@@ -351,6 +351,13 @@ export function communicationDriver(page, { onTravelProgress = async () => {} } 
         const { collidableAnimalsNear } = await import('/src/scenes/travel/wildlifeCollision.ts')
         return collidableAnimalsNear(here.x, here.z, Math.hypot(target.x - here.x, target.z - here.z) + 5).map(([x, z]) => ({ x, z }))
       }, { here, target })
+      // A resting animal beside the traveller may outlast the wait; a player
+      // steps back from it first, and the way is chosen from there.
+      const near = before.map((a) => ({ ...a, d: Math.hypot(a.x - here.x, a.z - here.z) })).sort((a, b) => a.d - b.d)[0]
+      if (near && near.d > 0 && near.d < 2) {
+        await travel({ x: here.x + (here.x - near.x) / near.d * 2.5, z: here.z + (here.z - near.z) / near.d * 2.5 })
+        return travelTo(target, tolerance, replans - 1)
+      }
       await wait(async ({ before, here, target }) => {
         const { collidableAnimalsNear } = await import('/src/scenes/travel/wildlifeCollision.ts')
         const { positionsMoved } = await import('/scripts/verify/communicationRouteCore.mjs')
