@@ -6,6 +6,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { balance } from '../config/balance'
 import { travelBlockedAt, useGame } from './store'
 import { g, freshGame, withWorld } from '../test/store'
+import { findFreeSpot } from '../systems/unstuck'
 
 withWorld()
 
@@ -53,6 +54,20 @@ describe('stranded in blocked water (point 1212)', () => {
       worst = Math.max(worst, inWater)
     }
     expect(worst).toBeLessThan(6)
+  })
+
+  it('a long step never overshoots into water farther from the exit', () => {
+    const exitDist = (p: { x: number; z: number }) => {
+      const e = findFreeSpot(p.x, p.z, { step: 0.1, maxRadius: 20, accept: (x, z) => !blockedAt({ x, z }), fallback: [p.x, p.z] })
+      return Math.hypot(e.pos[0] - p.x, e.pos[1] - p.z)
+    }
+    const d0 = exitDist(REPORT_POS)
+    for (let i = 0; i < 32; i++) {
+      const a = (i / 32) * Math.PI * 2
+      standAtReport()
+      g().moveTravel(Math.sin(a), Math.cos(a), 2) // one step of several units
+      if (blockedAt(g().pos)) expect(exitDist(g().pos)).toBeLessThanOrEqual(d0 + 0.1)
+    }
   })
 
   it('a step out to sea is still refused — the Mediterranean stays closed', () => {

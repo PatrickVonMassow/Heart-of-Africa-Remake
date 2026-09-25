@@ -920,8 +920,8 @@ export const useGame = create<GameState>()((set, get) => ({
     // Already standing in blocked water (point 1212: a wading animal's collision
     // push once left him there): a step headed toward the nearest open spot is
     // allowed, so the border can hold him out but never hold him in. "Toward"
-    // means within the balance cone: each allowed step closes at least half its
-    // length on the exit, so he cannot creep sideways along a closed sea.
+    // means within the balance cone AND actually closer, so he can neither creep
+    // sideways along a closed sea nor overshoot the exit with a long step.
     const exit = isBlocked(here.type, cur.lat, cur.lon)
       ? findFreeSpot(s.pos.x, s.pos.z, {
           step: balance.strandedExit.searchStep,
@@ -936,7 +936,10 @@ export const useGame = create<GameState>()((set, get) => ({
       const ex = exit.pos[0] - s.pos.x
       const ez = exit.pos[1] - s.pos.z
       const d = Math.hypot(ex, ez)
-      towardExit = d > 0 && ((nx - s.pos.x) * ex + (nz - s.pos.z) * ez) / (d * step) >= balance.strandedExit.minHeadingCos
+      towardExit =
+        d > 0 &&
+        ((nx - s.pos.x) * ex + (nz - s.pos.z) * ez) / (d * step) >= balance.strandedExit.minHeadingCos &&
+        Math.hypot(exit.pos[0] - nx, exit.pos[1] - nz) < d // a long step must not overshoot past the exit
     }
     if (!towardExit && isBlocked(nextT.type, next.lat, next.lon)) {
       // SLIDE along the boundary rather than stopping dead (point 316): a
