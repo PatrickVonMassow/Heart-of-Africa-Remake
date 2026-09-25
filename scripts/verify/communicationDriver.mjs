@@ -284,7 +284,7 @@ export function communicationDriver(page, { onTravelProgress = async () => {} } 
       }
       // A player walks the bank: water is crossed only where no land way
       // exists, because the current carries a swimmer off his course.
-      const plan = (swim) => {
+      const plan = (swim, to) => {
         const grid = buildPlaceNavGrid({ radius: reach }, colliders, 0.6, 1.2, 0.25)
         navRestrict(grid, (x, z) => {
           const p = worldToLatLon(x + origin.x, z + origin.z), type = sampleTerrain(p.lat, p.lon, s.seed).type
@@ -296,7 +296,23 @@ export function communicationDriver(page, { onTravelProgress = async () => {} } 
       const dx = target.x - origin.x, dz = target.z - origin.z, len = Math.hypot(dx, dz)
       if (len <= tolerance) return []
       const to = { x: dx * (1 - tolerance / len), z: dz * (1 - tolerance / len) }
-      return (plan(false) ?? plan(true))?.map((p) => ({ x: p.x + origin.x, z: p.z + origin.z })) ?? null
+      // An animal resting on that stand spot is stepped round: a player stops
+      // elsewhere within the same reach, nearest side first.
+      const stands = [to]
+      if (tolerance >= 1) {
+        const back = Math.atan2(-dz, -dx)
+        for (const turn of [1, -1, 2, -2, 3, -3, 4]) {
+          const a = back + turn * Math.PI / 4, r = tolerance * 0.8
+          stands.push({ x: dx + Math.cos(a) * r, z: dz + Math.sin(a) * r })
+        }
+      }
+      for (const swim of [false, true]) {
+        for (const stand of stands) {
+          const route = plan(swim, stand)
+          if (route) return route.map((p) => ({ x: p.x + origin.x, z: p.z + origin.z }))
+        }
+      }
+      return null
     }, { target, tolerance })
     if (!path) {
       // An animal may stand on the waypoint or around the traveller; a player
