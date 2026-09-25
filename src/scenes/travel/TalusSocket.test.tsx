@@ -1,6 +1,7 @@
 import { expect, it } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { buildReliefFace, buildSocketBlock, TalusSocket } from './TalusSocket'
+import { TalusSocket } from './TalusSocket'
+import { buildReliefFace, buildSocketBlock } from './talusSocketGeometry'
 import { ClayImpression } from '../../ui/ClayImpression'
 import { ROCK_RELIEF, ROCK_RELIEF_SVG } from '../../world/rockRelief'
 
