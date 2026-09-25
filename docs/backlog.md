@@ -1808,3 +1808,21 @@ Punkt in die Arbeitsordnung.
 - **The main-write guard misses `>>` and heredocs** (24.09.2026). It catches `sed -i` and `>` but
   lets `>>` and heredoc writes through, so a non-owner session can grow a memory file it cannot shrink again. NOT QUEUED: infrastructure freeze (CLAUDE.md §2) — it lets
   nothing false through that a review would miss and blocks no game work.
+- **Toast overlaps the open journal's heading** (24.09.2026, flow frame
+  `05-journal-after-chief-meeting.png`). At 1280x800 the centred toast lies over the journal
+  panel's "Tagebuch" title. NOT QUEUED: cosmetic layout with no blocked action; queue it if a
+  player reports it.
+- **Board shows nothing in progress while a declared wait lacks evidence** (24.09.2026). A
+  `batch-in-flight --waiting-on` without `--point/--pid/--log` is judged `no-evidence`, so the
+  board read idle for ~30 min while a main-push gate ran. NOT QUEUED: display-only,
+  infrastructure freeze (CLAUDE.md §2). Simplification when picked up: default `--pid` to the
+  caller, or refuse a declaration without evidence.
+- **A swimmer makes no headway against the Niger near Mopti** (25.09.2026, point 659 route). At
+  lat 14.64-14.67, lon -4.10 (water, nothing in the way) a swimmer steering 3.4 units upstream
+  made no progress for 15 s: the local current outruns swim speed. NOT QUEUED: a player walks
+  the bank round it; queue it if a route needs swimming upstream there (design.md §11).
+- **A water carrier's errand once ended with the empty jar before the water** (24.09.2026, point
+  659 route, seed 42, HEAD `503e611a1`). Eight minutes later the carrier was on a dig errand and
+  never filled; likely the stall or errand-expiry release dropping the pair. NOT QUEUED: seen
+  once, not in the following green runs on either backend; the continuous route now records
+  `water-errand-abandoned`, so a repeat is filed with its state.

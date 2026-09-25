@@ -838,6 +838,19 @@ export const RED_CHARGES = [
   },
   {
     point: 939,
+    suite: 'collision',
+    backend: 'webgpu',
+    featureLevel: 'compatibility',
+    kind: 'console',
+    match: /^console error: Failed to load resource: the server responded with a status of 504 \(Outdated Optimize Dep\)/i,
+    why:
+      'MEASURED 24.09.2026 15:51Z on webgpu/collision, the first dev-server start after the merge '
+      + 'of point 1210 changed main: 45 of 45 checks green, two 504 Outdated Optimize Dep resource '
+      + 'errors from the re-bundling optimizer. The same environment transient point 939 owns on '
+      + 'its other lanes; the charge dies with that point.',
+  },
+  {
+    point: 939,
     suite: 'benchmark',
     backend: 'webgpu',
     featureLevel: 'compatibility',
