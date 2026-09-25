@@ -77,25 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1212. The traveller can always leave the spot where the user got stuck (user bug
-  report 25.09.2026, local/GefangenerSpieler.zip: "Ich hänge fest!", seed 804048534,
-  position x/z 299.93 / -310.14, lat/lon 31.0145 / 29.9926, north region, day 42.14,
-  travel mode, build 6a5373c, WebGPU, medium).
-  The report's standpoint is at a waterhole where antelopes drink and wade within a few
-  units of the traveller; the traveller cannot move away. The cause is not yet known.
-  Final state:
-
-  1. From the report's exact position and state (load the report JSON), the traveller
-     can move away in at least one direction under player input; the cause of the
-     trap (terrain, water edge, collision, animal body, or state) is named in the
-     commit that fixes it.
-  2. The fix removes the cause rather than teleporting the traveller; if a general
-     escape guarantee is needed, it is a dev-mode invariant (a travel-mode position
-     from which no direction moves is a loud product defect).
-  3. Proof: a Vitest reproducing the trap from the report's position that fails before
-     and passes after, and a Playwright run on WebGPU from the report's standpoint in
-     which the traveller walks at least ten world units away.
-  Bundle: Steuerung & Performance.
 - [ ] 659. The whole communication chain, played through and judged by what reaches the
   PLAYER — A SIX-EYES ALL-ROUND REVIEW.
   ON HOLD (user 13.08.2026, 22:25: »Stoppe 659 erstmal — der macht erstmal keinen Sinn, wenn wir
