@@ -471,9 +471,15 @@ async function observations() {
     // elsewhere; that lapse is recorded for the report, and the next pair is
     // followed instead of waiting out a word that will never come.
     const labelSeconds = await d.read(() => window.__balance.communication.labelSeconds)
+    // The initiator walks off to his partner and speaks from there; a word
+    // beyond talk reach is rightly unheard, so the player keeps within reach.
+    const keepWithin = (await d.read(() => window.__balance.communication.talk.reach)) * 0.6
+    let away = null
     const outcome = await followInvitation({ budgetMs: Math.max(1000, invitationDeadline - Date.now()), labelSeconds,
-      pause: (ms) => page.waitForTimeout(ms),
-      sample: () => d.read(({ initiator, labelSeconds, followedSite }) => {
+      pause: async (ms) => {
+        if (away) { await d.inspect(away, 3); away = null } else await page.waitForTimeout(ms)
+      },
+      sample: async () => { const s = await d.read(({ initiator, labelSeconds, followedSite }) => {
         const e = window.__placeErrands(), word = e.last, v = e.villagers[initiator]
         // The followed initiator keeps his site even when his task has been cleared.
         const seen = (i, site = e.villagers[i]?.work?.siteIndex) => {
@@ -489,7 +495,9 @@ async function observations() {
           emitted: (window.__workSpeech ?? []).filter((e) => e.speaker === initiator && e.purpose === 'invitation').at(-1) ?? null }
         return { nowS: performance.now() / 1000, last: word, initiator, speech, task: v?.work ?? null, villager: v ? { ...v, drawn: undefined } : null,
           labelled: word?.purpose === 'invitation' && word.age <= labelSeconds ? seen(word.speaker) : null, initiatorLabel: seen(initiator, followedSite) }
-      }, { initiator: gatheringAt.index, labelSeconds, followedSite: gatheringAt.work.siteIndex }) })
+      }, { initiator: gatheringAt.index, labelSeconds, followedSite: gatheringAt.work.siteIndex })
+      if (s.villager && s.task?.phase === 'invite' && s.speech.distance > keepWithin) away = { x: s.villager.x, z: s.villager.z }
+      return s } })
     if (!outcome) {
       // Name why the pair stayed silent: its owed word, hush and the children's ear.
       const state = await d.read(() => ({ last: window.__placeErrands().last, player: { ...window.__placePlayer },
