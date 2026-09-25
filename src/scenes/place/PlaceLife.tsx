@@ -1605,6 +1605,11 @@ function Kids({
       /** The bank round's own phase, for a check that wants to know what it is
        *  looking at; absent in the tag round. */
       phase: bank ? bank.phase : null,
+      // How far the round has come and whether a word waits for the floor, so
+      // a silent round names whether it is stalled or only muted.
+      cycles: bank ? bank.cycles : null,
+      runs: bank ? bank.runs : null,
+      pendingWords: bank ? bank.pending.map((u) => u.concept) : null,
       chargeHeld: chargeCapture.current.held,
       // The tag round's catch reading (work-order 1176); null in the bank round.
       pauseFor: game ? game.pauseFor : null,

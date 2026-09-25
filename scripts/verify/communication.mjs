@@ -150,18 +150,18 @@ async function speech(kind, point, frameName) {
   const deadline = Date.now() + 480000
   let after = await d.read(() => performance.now() / 1000)
   while (!spoken) {
-    assert(Date.now() < deadline, `No ${kind} note reached the picture`)
+    assert(Date.now() < deadline, `No ${kind} note reached the picture: ${await speechState()}`)
     const heard = await d.wait(({ after, child }) => window.__speech?.labels().find((l) =>
       l.shownAt > after && document.querySelector(`.speech-label[data-speaker="${l.speakerId}"]`) &&
       (child ? l.speakerId.startsWith('kid-') && l.atoms.includes(window.__game.getState().vocabulary.RIVER) : l.speakerId.startsWith('villager-'))
     ), { after, child: kind === 'child-call' }, typeof point === 'function' ? Math.min(20000, Math.max(1000, deadline - Date.now())) : Math.max(1000, deadline - Date.now())).catch(async (e) => {
-      if (typeof point === 'function' && Date.now() < deadline) return null
+      if (typeof point === 'function' && Date.now() < deadline - 1000) return null
       // Name what was said and drawn meanwhile, and who stood where.
       const state = await d.read((after) => ({
         river: window.__game.getState().vocabulary.RIVER, player: { ...window.__placePlayer },
         labels: window.__speech?.labels().filter((l) => l.shownAt > after - 60).map((l) => ({ id: l.speakerId, atoms: l.atoms, shownAt: l.shownAt,
           drawn: !!document.querySelector(`.speech-label[data-speaker="${l.speakerId}"]`) })),
-        tag: (({ phase, direction }) => ({ phase, direction }))(window.__placeTag?.() ?? {}),
+        tag: (({ phase, direction, cycles, runs, pendingWords, phaseFor }) => ({ phase, direction, cycles, runs, pendingWords, phaseFor }))(window.__placeTag?.() ?? {}),
         kids: window.__placeTag?.().children?.map((c) => ({ x: c.x, z: c.z })) ?? null,
       }), after)
       throw new Error(`${e.message} — no ${kind} note: ${JSON.stringify(state)}`)
