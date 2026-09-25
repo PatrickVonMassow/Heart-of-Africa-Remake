@@ -321,3 +321,10 @@ describe('the hand-over asks for the current drums without changing the give rul
     expect(g().journal.filter((e) => ['journal.drumMessage', 'journal.drumAnswer'].includes(e.text.key))).toHaveLength(messages.length)
   })
 })
+
+it('does not claim previous village hearings in the message-first journal prose', async () => {
+  const { en } = await import('../i18n/en')
+  const { de } = await import('../i18n/de')
+  expect(en.journal.drumMessage).not.toContain('I have heard every one')
+  expect(de.journal.drumMessage).not.toContain('Jedes einzelne habe ich')
+})

@@ -343,6 +343,8 @@ export type BankConfig = TagConfig & BankRoundConfig
  * the player stepped into it would never be watched at all.
  */
 export interface BankWorld extends TagWorld {
+  /** Live listener memory. Omitted only in simulations without a listener. */
+  hasHeard?: (concept: BankConcept) => boolean
   floor?: SpeechFloor
   stranger?: { x: number; z: number; radius: number } | null
   /** Whether the straight line between two points crosses ground a child may
@@ -959,7 +961,8 @@ function openCycle(s: BankState, stage: BankStage, cfg: BankConfig, world: BankW
     s.children.map((_, i) => i),
     rockAt(stage, otherEnd(s.from)),
   )
-  if (caller >= 0 && !maySpeak(s, world, caller, 'call')) return
+  const rockKnown = world.hasHeard?.('ROCK') ?? true
+  if (rockKnown && caller >= 0 && !maySpeak(s, world, caller, 'call')) return
   s.caller = caller
   s.children.forEach((c, i) => {
     c.role = i === caller ? 'catcher' : 'runner'
@@ -974,7 +977,7 @@ function openCycle(s: BankState, stage: BankStage, cfg: BankConfig, world: BankW
   s.tapper = caller
   s.direction = null
   s.runsThisCycle = 0
-  if (caller >= 0) {
+  if (rockKnown && caller >= 0) {
     say(s, {
       concept: 'RIVER',
       moment: 'call',
@@ -1253,7 +1256,11 @@ function advanceBankGame(
     !s.children.some((c) => c.arrival) &&
     (s.phaseFor <= 0 || inPlace(s, stage, cfg, world, s.from, otherEnd(s.from)))
   ) {
-    if (s.direction === null && (world.floor || s.sinceSaid >= cfg.utteranceGapSeconds)) {
+    if (world.hasHeard && !world.hasHeard('ROCK')) {
+      // A listener who missed the climb gets a rock-only touch/run. Never
+      // introduce a direction alongside an as-yet unheard object.
+      openedRun = openRun(s, stage, cfg, world)
+    } else if (s.direction === null && (world.floor || s.sinceSaid >= cfg.utteranceGapSeconds)) {
       announceRun(s, stage, world)
     } else if (s.direction !== null && (world.floor || s.sinceSaid >= cfg.utteranceGapSeconds)) {
       openedRun = openRun(s, stage, cfg, world)

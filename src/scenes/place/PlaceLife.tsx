@@ -1130,6 +1130,10 @@ function Kids({
     // walk itself (`wayTo`).
     if (nav) navRestrict(nav, onGround)
     return {
+      hasHeard: (concept) => {
+        const s = useGame.getState()
+        return Object.hasOwn(s.communication.heard, s.vocabulary[concept])
+      },
       radius: region.radius,
       centerX: region.x,
       centerZ: region.z,

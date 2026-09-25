@@ -1716,3 +1716,28 @@ it('starts natural first and follow-up charges with the whole catcher group off 
   expect(firstCharges).toBeGreaterThan(0)
   expect(groupCharges).toBeGreaterThan(0)
 })
+
+describe('the bank teaches from the live heard set', () => {
+  it('keeps cycles rock-only when the listener has missed every rock naming', () => {
+    const { log } = replay(180, { world: { ...openWorld(), hasHeard: () => false } })
+    expect(log.said.length).toBeGreaterThan(2)
+    expect(log.said.every((u) => u.concept === 'ROCK')).toBe(true)
+    expect(log.said.some((u) => u.moment === 'tap')).toBe(true)
+  })
+  it('admits directions only after a rock naming actually enters the listener memory', () => {
+    const heard = new Set<string>()
+    let rocks = 0
+    const { log } = replay(240, {
+      world: { ...openWorld(), hasHeard: (concept) => heard.has(concept) },
+      observe: (_s, u) => {
+        if (!u) return
+        if (u.concept === 'UPSTREAM' || u.concept === 'DOWNSTREAM') expect(heard.has('ROCK')).toBe(true)
+        // The first two namings are out of earshot: emitted is not heard.
+        if (u.concept === 'ROCK' && ++rocks >= 3) heard.add('ROCK')
+      },
+    })
+    expect(rocks).toBeGreaterThanOrEqual(3)
+    expect(log.said.some((u) => u.concept === 'UPSTREAM')).toBe(true)
+    expect(log.said.some((u) => u.concept === 'DOWNSTREAM')).toBe(true)
+  })
+})
