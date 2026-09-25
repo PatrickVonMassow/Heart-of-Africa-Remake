@@ -1802,7 +1802,7 @@ export const RED_CHARGES = [
     suite: 'enrichments',
     kind: 'check',
     backend: 'webgl',
-    match: /^prey squeezed against a bank flees ALONG it — real ground covered, never a waterline pin \(point 201\)/i,
+    match: /^prey squeezed against a bank flees ALONG it\b/i, // the recorded red name ends before its ' — ' detail
     why:
       'MEASURED 25.09.2026 on the covering enrichments pass (webgl, 285 pass / 3 fail) at main '
       + '40dc83d10, right after the hunted-animal water flight landed: {"onWater":true}. Point 1211 '
@@ -1814,7 +1814,7 @@ export const RED_CHARGES = [
     suite: 'enrichments',
     kind: 'check',
     backend: 'webgl',
-    match: /^the giraffe mother kicks the hunt off — calf freed, parent alive, lion leaves \(point 124\)/i,
+    match: /^the giraffe mother kicks the hunt off\b/i, // the recorded red name ends before its ' — ' detail
     why:
       'MEASURED 25.09.2026 on the same webgl enrichments pass at main 40dc83d10: '
       + '{"caught":false,"kicked":false,"lionLeft":true} — the hunt ended without the kick, plausibly '
