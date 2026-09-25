@@ -374,7 +374,10 @@ export function chaseSwimEscaped(
   if (!entry) return false
   const here = terrainTypeAt(x, z)
   if (here === 'water' || here === 'ocean') return false
-  for (const f of [0.25, 0.5, 0.75]) {
+  // Probe the line at a quarter unit, so even a narrow channel is not skipped.
+  const n = Math.max(4, Math.ceil(Math.hypot(x - entry.x, z - entry.z) / 0.25))
+  for (let i = 1; i < n; i++) {
+    const f = i / n
     if (terrainTypeAt(entry.x + (x - entry.x) * f, entry.z + (z - entry.z) * f) === 'water') return true
   }
   return false
