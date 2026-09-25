@@ -275,8 +275,14 @@ async function errand() {
 async function observations() {
   await step('2-childrens-bank-game')
   const view = await d.read(() => window.__bankStageView())
-  const playground = await d.read(() => window.__placeLayout.playGround)
-  await speech('child-call', playground, '02-child-call')
+  // A player walks to where the children are playing, not to the empty
+  // playground: the bank game can run 30 m off it, beyond their call's reach.
+  const children = await d.read(() => {
+    const kids = window.__placeTag?.().children ?? []
+    if (!kids.length) return window.__placeLayout.playGround
+    return { x: kids.reduce((a, c) => a + c.x, 0) / kids.length, z: kids.reduce((a, c) => a + c.z, 0) / kids.length }
+  })
+  await speech('child-call', children, '02-child-call')
   await d.walk(view); await d.aim(view.look)
   for (const direction of ['UPSTREAM', 'DOWNSTREAM']) {
     await d.wait((direction) => window.__placeTag().phase === 'run' && window.__placeTag().direction === direction, direction, 480000)
