@@ -183,3 +183,14 @@ it('still charges a lapse when the invitation was spoken while being sampled', (
   inviteOutcome({ ...base, nowS: 0.1, task: null, last: { purpose: 'invitation', speaker: 2, age: 0 } }, watch, 4)
   expect(inviteOutcome({ ...base, nowS: 6, task: null, last: { purpose: 'invitation', speaker: 2, age: 5.9 } }, watch, 4)).toMatchObject({ lapsed: true, spokeUnseen: true })
 })
+it('does not charge a lapse when another speaker overwrote the invitation spoken during the pursuit walk', async () => {
+  const task = { phase: 'invite', owes: true, siteIndex: 1 }, base = { initiator: 2, labelled: null, initiatorLabel: null }
+  const samples = [
+    { ...base, nowS: 0, task, last: null, speech: { emitted: null }, villager: { x: 1 } },
+    { ...base, nowS: 9, task: null, last: { purpose: 'site', speaker: 5, age: 1 }, speech: { emitted: { at: 2 } } },
+  ]
+  let t = 0, i = 0
+  const outcome = await followInvitation({ budgetMs: 1000, labelSeconds: 4, now: () => t, pause: async (ms) => { t += ms }, sample: async () => samples[Math.min(i++, samples.length - 1)] })
+  expect(outcome).toEqual({ missed: true, spokeAt: 2, gapSeconds: 9 })
+})
+
