@@ -7172,7 +7172,7 @@ if (section('water-shy-flight')) {
     const ls = window.__lionHunt.state
     const out = {
       enteredWater: false, maxSideways: 0, maxSpeed: 0, swimSamples: 0, maxSwimYErr: 0,
-      calfWetSpeed: 0, hunterSwam: false, hunterWetSpeed: 0, outcome: null,
+      calfWetSpeed: 0, calfWetSteps: 0, hunterSwam: false, hunterWetSpeed: 0, hunterWetSteps: 0, outcome: null,
     }
     let last = { x: calf.x, z: calf.z, lx: ls.lx, lz: ls.lz, t: window.__simTime() }
     await window.__pollSim(30, () => {
@@ -7183,8 +7183,12 @@ if (section('water-shy-flight')) {
       if (dt > 1e-3) {
         out.maxSpeed = Math.max(out.maxSpeed, step / dt)
         // Wet pace only over a stretch that lay wholly in the water.
-        if (calfWet && T(last.x, last.z) === 'water') out.calfWetSpeed = Math.max(out.calfWetSpeed, step / dt)
+        if (calfWet && T(last.x, last.z) === 'water') {
+          out.calfWetSteps++
+          out.calfWetSpeed = Math.max(out.calfWetSpeed, step / dt)
+        }
         if (ls.mode === 'chase' && T(ls.lx, ls.lz) === 'water' && T(last.lx, last.lz) === 'water') {
+          out.hunterWetSteps++
           out.hunterWetSpeed = Math.max(out.hunterWetSpeed, Math.hypot(ls.lx - last.lx, ls.lz - last.lz) / dt)
         }
       }
@@ -7218,11 +7222,12 @@ if (section('water-shy-flight')) {
   // The swim itself: every wet sample holds the chest-deep sheet height (a
   // jump or a bed-walk leaves it), and both animals keep the braked swim pace
   // (at most CROSS_SWIM_SPEED 2.6 before the seasonal brake; 2.9 allows the
-  // sim-clock sampling jitter). A far-bank escape means the hunter swam after it.
+  // sim-clock sampling jitter), each measured over wholly wet stretches — the
+  // staged lead puts the hunter in the water behind its calf.
   check(
     'the hunted calf swims chest-deep on the sheet at the swim pace, and its hunter follows at the swim pace (design.md §19.5)',
-    !!hunt && hunt.swimSamples >= 3 && hunt.maxSwimYErr < 0.1 && hunt.calfWetSpeed <= 2.9 &&
-      hunt.hunterWetSpeed <= 2.9 && (hunt.outcome !== 'far-bank' || hunt.hunterSwam),
+    !!hunt && hunt.swimSamples >= 3 && hunt.maxSwimYErr < 0.1 && hunt.calfWetSteps >= 2 && hunt.calfWetSpeed <= 2.9 &&
+      hunt.hunterWetSteps >= 2 && hunt.hunterWetSpeed <= 2.9,
     JSON.stringify(hunt),
   )
   check(
