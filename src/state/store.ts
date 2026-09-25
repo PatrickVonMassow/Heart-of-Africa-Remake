@@ -18,6 +18,8 @@ import { lakeDistance, riverDistance } from '../world/geoIndex'
 import { rollEvent, resolveEvent, type EventContext, type EventKind, type EventOutcome } from '../systems/events'
 import { REGION_PREDATORS } from '../scenes/travel/wildlifeBehavior'
 import { movementPenalty, slideAlongBlocked } from '../systems/movement'
+import { findFreeSpot } from '../systems/unstuck'
+import { devAssert } from '../systems/devAssert'
 import { currentDriftDegPerSecond, waterTravelCost } from '../systems/current'
 import {
   KNOWN_FROM_START_LANDMARKS,
@@ -516,10 +518,10 @@ export function startState(seed: number, placeId: string = startPlaceId()) {
     // Start gifts are copper trinkets (START_GIFTS, user decision 18.09.2026):
     // villages trade in gifts only, so a giftless start locked every village buy.
     gifts: { gold: 0, silver: 0, emerald: 0, copper: START_GIFTS, ivory: 0 } as Record<Material, number>,
-    // The expedition sets out with a rifle and a full canteen (user decision
-    // 18.09.2026, revising 17.09.2026); shovel, rope, machete, medicine and canoe
-    // are bought in the port. Money/start place stay the design.md fixed values.
-    equipment: { shovel: 0, rope: 0, machete: 0, rifle: 1, medicine: 0, canteen: 1 } as Partial<Record<EquipmentId, number>>,
+    // The expedition sets out with a rifle, a full canteen, a rope and a machete
+    // (user decisions 18.09.2026 and 25.09.2026); shovel, medicine and canoe are
+    // bought in the port. Money/start place stay the design.md fixed values.
+    equipment: { shovel: 0, rope: 1, machete: 1, rifle: 1, medicine: 0, canteen: 1 } as Partial<Record<EquipmentId, number>>,
     treasures: { gold: 0, silver: 0, emerald: 0, copper: 0, ivory: 0, statue: 0 } as Record<TreasureId, number>,
     treasureSites: generateTreasureSites(seed),
     graveyardIvoryLeft: balance.economy.graveyardIvory,
@@ -914,16 +916,38 @@ export const useGame = create<GameState>()((set, get) => ({
     let nextT = sampleTerrain(next.lat, next.lon, s.seed)
     let tx = nx
     let tz = nz
-    if (isBlocked(nextT.type, next.lat, next.lon)) {
+    const blockedAt = (px: number, pz: number) => travelBlockedAt(px, pz, s.seed)
+    // Already standing in blocked water (point 1212: a wading animal's collision
+    // push once left him there): a step headed toward the nearest open spot is
+    // allowed, so the border can hold him out but never hold him in. "Toward"
+    // means within the balance cone AND actually closer, so he can neither creep
+    // sideways along a closed sea nor overshoot the exit with a long step.
+    const exit = isBlocked(here.type, cur.lat, cur.lon)
+      ? findFreeSpot(s.pos.x, s.pos.z, {
+          step: balance.strandedExit.searchStep,
+          maxRadius: balance.strandedExit.searchRadius,
+          accept: (px, pz) => !blockedAt(px, pz),
+          fallback: [s.pos.x, s.pos.z],
+        })
+      : null
+    devAssert(exit === null || exit.found, 'travel-stranded', () => `no open spot within ${balance.strandedExit.searchRadius} of ${s.pos.x.toFixed(2)}/${s.pos.z.toFixed(2)}`)
+    let towardExit = false
+    if (exit?.found === true) {
+      const ex = exit.pos[0] - s.pos.x
+      const ez = exit.pos[1] - s.pos.z
+      const d = Math.hypot(ex, ez)
+      towardExit =
+        d > 0 &&
+        ((nx - s.pos.x) * ex + (nz - s.pos.z) * ez) / (d * step) >= balance.strandedExit.minHeadingCos &&
+        Math.hypot(exit.pos[0] - nx, exit.pos[1] - nz) < d // a long step must not overshoot past the exit
+    }
+    if (!towardExit && isBlocked(nextT.type, next.lat, next.lon)) {
       // SLIDE along the boundary rather than stopping dead (point 316): a
       // swimmer pushed against the ocean by the river current had no lateral
       // escape and was stuck for good in the delta's mouth notch. Only a
       // genuine dead end — every direction in the fan blocked — still reports
       // the blocked notice.
-      const slid = slideAlongBlocked(s.pos.x, s.pos.z, nx - s.pos.x, nz - s.pos.z, (px, pz) => {
-        const ll = worldToLatLon(px, pz)
-        return isBlocked(sampleTerrain(ll.lat, ll.lon, s.seed).type, ll.lat, ll.lon)
-      })
+      const slid = slideAlongBlocked(s.pos.x, s.pos.z, nx - s.pos.x, nz - s.pos.z, blockedAt)
       if (!slid) {
         set({ toast: getStrings().toasts.oceanBlocked })
         return
@@ -2392,9 +2416,16 @@ export function priceOfGood(good: EquipmentId | 'food' | Material): number {
   }
 }
 
-// Dev-only hook for the headless Playwright verification (CLAUDE.md §7.2).
+/** Whether a travel position lies in water the traveller may not enter. */
+export function travelBlockedAt(x: number, z: number, seed: number): boolean {
+  const ll = worldToLatLon(x, z)
+  return isBlocked(sampleTerrain(ll.lat, ll.lon, seed).type, ll.lat, ll.lon)
+}
+
+// Dev-only hooks for the headless Playwright verification (CLAUDE.md §7.2).
 if (import.meta.env.DEV && typeof window !== 'undefined') {
   ;(window as unknown as Record<string, unknown>).__game = useGame
+  ;(window as unknown as Record<string, unknown>).__travelBlocked = travelBlockedAt
 }
 
 

@@ -31849,3 +31849,62 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Test: Vitest store/interaction test — outside `DRUM_MESSAGE_VILLAGE` no chiefStepsOut toast, no
   chiefWalk entry, no walk; inside Bambara unchanged.
   Bundle: Kommunikation.
+
+- [x] 1208. Hunted animals flee into rivers and lakes too.
+  Hunted animals flee into rivers and lakes too (user 24.09.2026, reopening the flight half of
+  point 312). Point 312 switched only the shared `fleeMove` flight (predator flee, elephant dart,
+  player-shy) to the ocean-only `fleeWaterStep`; the HUNT itself was left on the old water-barred
+  rule, and the hunt is the flight the player watches most.
+  MEASURED on main 4b983b67f (report local/TiereImmernochWassergesperrt.zip, build 15c2da2, which
+  contains the 312 merge 9c8e4e299; seed 129298658, x/z 323.86/-244.65, cheetah hunt of a real-herd
+  antelope at a river bank, carcass left at the bank 298.07/-256.67):
+  - `src/scenes/travel/Wildlife.tsx` ~4707: the chase victim's flight `calfFleeStep(...)` uses
+    `fleeBlocked` = `ty === 'ocean' || ty === 'water'` — the victim slides and fans along the bank
+    ("zittert am Ufer") and is taken at the waterline instead of swimming.
+  - ~4749 / `blockHeading`: the parent guarding its hunted calf moves under the same land-only rule.
+  - ~2582: `!isChaseVictim` keeps a chase victim that does reach water out of the §19.8 water
+    handling, so even a wet victim would have no water behaviour.
+  FINAL STATE (design.md §19.5 (c), already stated — do not restate):
+  (a) The chase victim's flight and the guarding parent's station run use the ocean-only
+      `flightBlocked` predicate: a heading into river/lake water is taken straight; the ocean edge
+      still deflects, and the calfFleeStep corridor/dead-end logic stays for the ocean only.
+  (b) A victim in water swims at the swim pace (as `fleeMove` does) with water-surface height, and
+      the hunter follows or gives up by the existing chase rules; the hunt still RESOLVES (catch,
+      far bank reached → chase ends, or the existing offstage abort) — no endless swim (I4).
+  (c) When the chase ends with the victim still in water, it heads for the nearest bank under the
+      312 no-lingering rule.
+  (d) Fights (`wetOrSea`, ~2970) stay land-only — they are not flights.
+  VERIFIABLE: pure — the victim flee step with a river ahead is not deflected, with the ocean ahead it
+  is. Live (`scripts/verify/enrichments.mjs`, both backends): a staged real-herd hunt with the victim
+  between the predator and a straight river bank sends the victim into the river (path sampled: a
+  swim, not a jump) and the hunt resolves; the reported seed/position is the natural repro.
+
+  --- bounds the user named (verbatim) ---
+  PLACEMENT (user 24.09.2026): rank this point IMMEDIATELY AFTER point 659 in the work order (.claude/queue-rank.json, origin user) — it is the next point worked once 659 lands.
+
+  --- the user’s own sentences, with their date ---
+  user 24.09.2026: "Ich sehe überhaupt keine Auswirkung vom angeblich erledigten Task 312. Auch wenn ein Löwe ein Tier jagt, lässt es sich lieber am Ufer fressen, als einen Fuß ins Wasser zu setzen."
+  user 24.09.2026: "Das soll direkt direkt nach 659 behoben werden."
+  PLACEMENT (user 24.09.2026): rank this point IMMEDIATELY AFTER point 659 in the work order (.claude/queue-rank.json, origin user) — it is the next point worked once 659 lands.
+  Criticality: medium.
+  Bundle: Tierverhalten.
+
+- [x] 1212. The traveller can always leave the spot where the user got stuck (user bug
+  report 25.09.2026, local/GefangenerSpieler.zip: "Ich hänge fest!", seed 804048534,
+  position x/z 299.93 / -310.14, lat/lon 31.0145 / 29.9926, north region, day 42.14,
+  travel mode, build 6a5373c, WebGPU, medium).
+  The report's standpoint is at a waterhole where antelopes drink and wade within a few
+  units of the traveller; the traveller cannot move away. The cause is not yet known.
+  Final state:
+
+  1. From the report's exact position and state (load the report JSON), the traveller
+     can move away in at least one direction under player input; the cause of the
+     trap (terrain, water edge, collision, animal body, or state) is named in the
+     commit that fixes it.
+  2. The fix removes the cause rather than teleporting the traveller; if a general
+     escape guarantee is needed, it is a dev-mode invariant (a travel-mode position
+     from which no direction moves is a loud product defect).
+  3. Proof: a Vitest reproducing the trap from the report's position that fails before
+     and passes after, and a Playwright run on WebGPU from the report's standpoint in
+     which the traveller walks at least ten world units away.
+  Bundle: Steuerung & Performance.

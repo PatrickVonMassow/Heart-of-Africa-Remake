@@ -241,15 +241,17 @@ describe('listCheckpoints row shape (design.md §18 table columns)', () => {
 })
 
 describe('demo start preset (point 104)', () => {
-  it('a new game starts with a rifle, a full canteen and copper gifts (user decision 18.09.2026)', () => {
+  it('a new game starts with a rifle, a full canteen, rope, machete and copper gifts (user decisions 18.09./25.09.2026)', () => {
     // Direct newGame — NOT freshGame, which strips the pack for the
     // mechanics-focused tests above.
     localStorage.clear()
     g().newGame()
     const s = g()
-    for (const item of ['shovel', 'rope', 'machete', 'medicine', 'canoe'] as const) {
+    for (const item of ['shovel', 'medicine', 'canoe'] as const) {
       expect(s.equipment[item] ?? 0, item).toBe(0)
     }
+    expect(s.equipment.rope).toBe(1)
+    expect(s.equipment.machete).toBe(1)
     expect(s.equipment.rifle).toBe(1)
     expect(s.equipment.canteen).toBe(1)
     expect(s.canteenFill).toBe(1)

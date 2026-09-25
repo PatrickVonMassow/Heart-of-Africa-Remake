@@ -6973,6 +6973,11 @@ if (section('water-shy-flight')) {
     const hx = Math.sin(h), hz = Math.cos(h)
     const prey = { x: B.x, z: B.z, y: 0.2, rot: h, scale: 1, phase: 0.61 }
     herds.zebra.unshift(prey)
+    // The sim's own terrain for the landing: the coarse __terrainType and
+    // sampleTerrain can disagree at a bank cell, and the swim-out stops on the
+    // sim's land.
+    const [geo, terrain] = await Promise.all([import('/src/world/geo.ts'), import('/src/world/terrain.ts')])
+    const simType = (x, z) => { const ll = geo.worldToLatLon(x, z); return terrain.sampleTerrain(ll.lat, ll.lon, seed).type }
     setPos(B.x - hx * 3, B.z - hz * 3)
     const out = { inWater: false, released: false, swamOut: false, sawSwim: false, onLand: false, maxSpeed: 0 }
     // The nearest bank from a point (the same ray scan as the rule).
@@ -7008,10 +7013,13 @@ if (section('water-shy-flight')) {
       if (dt > 1e-3 && step > 0.05) out.maxSpeed = Math.max(out.maxSpeed, step / dt)
       last = { x: prey.x, z: prey.z, t: now }
       if (prey.crossing !== undefined) out.sawSwim = true
-      out.onLand = dry(prey.x, prey.z)
+      const st = simType(prey.x, prey.z)
+      out.onLand = st !== 'water' && st !== 'ocean'
       return out.onLand && prey.crossing === undefined
     })
     out.swamOut = out.onLand
+    out.endCoarse = T(prey.x, prey.z)
+    out.endCrossing = prey.crossing !== undefined
     out.nearest = +nearest.toFixed(2)
     out.travelled = +Math.hypot(prey.x - from.x, prey.z - from.z).toFixed(2)
     out.maxSpeed = +out.maxSpeed.toFixed(2)
@@ -7120,6 +7128,159 @@ if (section('water-shy-flight')) {
     !!pass && pass.samples > 20 && pass.worstParked < 1.5,
     JSON.stringify(pass),
   )
+
+  // (5) The HUNT flees into the water too (design.md §19.5): a real-herd calf
+  // run down by a lion toward the straight bank swims the river instead of
+  // skating along the bank, and the hunt resolves — caught, or the far bank
+  // reached (the hunter follows at the swim pace and gives up there). The path
+  // is sampled on the sim clock: a swim, never a jump.
+  await page.evaluate(() => {
+    const st = window.__waterShy
+    const hx = Math.sin(st.h), hz = Math.cos(st.h)
+    st.stageHunt = (lead = 3.5) => {
+      const { B } = st
+      const fam = window.__makeTestFamily(B.x, B.z)
+      fam.parent.x = B.x - 200 // parked out of shield reach, like the vigil backstop
+      fam.parent.z = B.z
+      const ls = window.__lionHunt.state
+      ls.predator = 'lion'
+      ls.mode = 'chase'; ls.victim = fam.calf; ls.victimHunt = true
+      ls.lx = B.x - hx * lead; ls.lz = B.z - hz * lead
+      ls.lionHeading = st.h
+      ls.px = B.x; ls.pz = B.z; ls.timer = 0
+      return fam
+    }
+    st.endHunt = (fam) => {
+      const ls = window.__lionHunt.state
+      ls.mode = 'idle'; ls.timer = 999; ls.victim = null; ls.victimHunt = false
+      fam.dispose()
+    }
+  })
+  const hunt = stage.staged && await page.evaluate(async () => {
+    const st = window.__waterShy
+    const { B, h, N } = st
+    const seed = window.__game.getState().seed
+    const T = (x, z) => window.__terrainType(-z / 10, x / 10, seed)
+    const dry = (x, z) => { const t = T(x, z); return t !== 'water' && t !== 'ocean' }
+    // The chest-deep body height the swim must hold (the sim's own formula).
+    const [geo, terrain, surface, behavior] = await Promise.all([
+      import('/src/world/geo.ts'), import('/src/world/terrain.ts'),
+      import('/src/scenes/travel/waterSurface.ts'), import('/src/scenes/travel/wildlifeBehavior.ts'),
+    ])
+    const sheetY = (x, z) => {
+      const ll = geo.worldToLatLon(x, z)
+      const t = terrain.sampleTerrain(ll.lat, ll.lon, seed)
+      return behavior.sheetAnchorY(surface.waterSurfaceY(ll.lat, ll.lon, seed, t.height), t.height, 0.32)
+    }
+    window.__ui.getState().setTravelZoom(0.5)
+    window.__game.setState({ pos: { x: N.x, z: N.z } })
+    const hx = Math.sin(h), hz = Math.cos(h)
+    const fam = st.stageHunt()
+    const calf = fam.calf
+    const ls = window.__lionHunt.state
+    const out = {
+      enteredWater: false, maxSideways: 0, maxSpeed: 0, swimSamples: 0, maxSwimYErr: 0,
+      calfWetSpeed: 0, calfWetSteps: 0, hunterSwam: false, hunterWetSpeed: 0, hunterWetSteps: 0, outcome: null,
+    }
+    let last = { x: calf.x, z: calf.z, lx: ls.lx, lz: ls.lz, t: window.__simTime() }
+    await window.__pollSim(30, () => {
+      const now = window.__simTime()
+      const dt = now - last.t
+      const step = Math.hypot(calf.x - last.x, calf.z - last.z)
+      const calfWet = T(calf.x, calf.z) === 'water'
+      if (dt > 1e-3) {
+        out.maxSpeed = Math.max(out.maxSpeed, step / dt)
+        // Wet pace only over a stretch that lay wholly in the water.
+        if (calfWet && T(last.x, last.z) === 'water') {
+          out.calfWetSteps++
+          out.calfWetSpeed = Math.max(out.calfWetSpeed, step / dt)
+        }
+        if (ls.mode === 'chase' && T(ls.lx, ls.lz) === 'water' && T(last.lx, last.lz) === 'water') {
+          out.hunterWetSteps++
+          out.hunterWetSpeed = Math.max(out.hunterWetSpeed, Math.hypot(ls.lx - last.lx, ls.lz - last.lz) / dt)
+        }
+      }
+      last = { x: calf.x, z: calf.z, lx: ls.lx, lz: ls.lz, t: now }
+      if (calfWet && calf.caught === undefined && !calf.dead) {
+        out.enteredWater = true
+        const dx = calf.x - B.x, dz = calf.z - B.z
+        out.maxSideways = Math.max(out.maxSideways, Math.abs(dx * Math.cos(h) - dz * Math.sin(h)))
+        out.swimSamples++
+        out.maxSwimYErr = Math.max(out.maxSwimYErr, Math.abs(calf.y - sheetY(calf.x, calf.z)))
+      }
+      if (ls.mode === 'chase' && T(ls.lx, ls.lz) === 'water') out.hunterSwam = true
+      if (calf.caught !== undefined || calf.dead) { out.outcome = 'caught'; return true }
+      if (ls.victim !== calf || ls.mode !== 'chase') {
+        const along = (calf.x - B.x) * hx + (calf.z - B.z) * hz
+        out.outcome = dry(calf.x, calf.z) && along > 1 ? 'far-bank' : `ended:${ls.mode}`
+        return true
+      }
+      return false
+    })
+    for (const k of ['maxSideways', 'maxSpeed', 'maxSwimYErr', 'calfWetSpeed', 'hunterWetSpeed']) out[k] = +out[k].toFixed(2)
+    out.huntMode = ls.mode
+    st.endHunt(fam)
+    return out
+  })
+  check(
+    'a hunted calf driven at a straight bank swims into the river rather than along it (design.md §19.5)',
+    !!hunt && hunt.enteredWater && hunt.maxSideways < 1.5 && hunt.maxSpeed < 6,
+    JSON.stringify(hunt),
+  )
+  // The swim itself: every wet sample holds the chest-deep sheet height (a
+  // jump or a bed-walk leaves it), and both animals keep the braked swim pace
+  // (at most CROSS_SWIM_SPEED 2.6 before the seasonal brake; 2.9 allows the
+  // sim-clock sampling jitter), each measured over wholly wet stretches — the
+  // staged lead puts the hunter in the water behind its calf.
+  check(
+    'the hunted calf swims chest-deep on the sheet at the swim pace, and its hunter follows at the swim pace (design.md §19.5)',
+    !!hunt && hunt.swimSamples >= 3 && hunt.maxSwimYErr < 0.1 && hunt.calfWetSteps >= 2 && hunt.calfWetSpeed <= 2.9 &&
+      hunt.hunterWetSteps >= 2 && hunt.hunterWetSpeed <= 2.9,
+    JSON.stringify(hunt),
+  )
+  check(
+    'the hunt that drove its calf into the river resolves — caught, or the far bank reached (design.md §19.5)',
+    !!hunt && (hunt.outcome === 'caught' || hunt.outcome === 'far-bank'),
+    JSON.stringify(hunt),
+  )
+  if (hunt) {
+    const mid = await page.evaluate(() => {
+      const { B, h, width } = window.__waterShy
+      return { x: B.x + Math.sin(h) * width * 0.35, z: B.z + Math.cos(h) * width * 0.35 }
+    })
+    await captureFrame(page, OUT, '1208-hunted-calf-swims-the-river', {
+      world: mid,
+      label: 'a calf run down by a lion, swimming the river with the hunter behind it',
+    }, {
+      beforeCapture: () => page.evaluate(async () => {
+        const st = window.__waterShy
+        const { B, h, width } = st
+        const seed = window.__game.getState().seed
+        const T = (x, z) => window.__terrainType(-z / 10, x / 10, seed)
+        // A longer lead than the check's, so the shutter finds the calf still
+        // swimming ahead of its hunter rather than already seized.
+        st.huntFam = st.stageHunt(6)
+        const calf = st.huntFam.calf
+        await window.__pollSim(10, () => {
+          const along = (calf.x - B.x) * Math.sin(h) + (calf.z - B.z) * Math.cos(h)
+          return calf.caught !== undefined || (T(calf.x, calf.z) === 'water' && along > width * 0.3)
+        })
+        st.huntFrame = { caught: calf.caught !== undefined || !!calf.dead, wet: T(calf.x, calf.z) === 'water' }
+      }),
+    })
+    const huntFrame = await page.evaluate(() => window.__waterShy.huntFrame ?? null)
+    check(
+      'the hunt frame catches the calf swimming, not already seized (design.md §19.5)',
+      !!huntFrame && huntFrame.wet && !huntFrame.caught,
+      JSON.stringify(huntFrame),
+    )
+    await page.evaluate(() => {
+      const st = window.__waterShy
+      if (st.huntFam) st.endHunt(st.huntFam)
+      st.huntFam = undefined
+      window.__ui.getState().setTravelZoom(1)
+    })
+  }
 }
 
 // --- Point 6: the predator never despawns in view (zoom-aware) ----------------
