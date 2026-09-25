@@ -456,27 +456,46 @@ async function observations() {
   await localFrame('03-full-jar-set-down', geography.waterStand, 'full jar returned to the stand')
   // Follow a naturally cast pair to its invitation; it may meet away from
   // the excavation. The frame must name the speaker, not an empty future pit.
-  const gathering = await d.wait(() => window.__placeErrands().villagers.find((v) => v.work?.phase === 'invite'), null, 480000)
-  const gatheringAt = await gathering.jsonValue(); await gathering.dispose()
-  await event('dig-gathering', { at: gatheringAt })
-  await d.inspect(gatheringAt, 3)
   let invitation = null
-  const invitationDeadline = Date.now() + 480000
-  while (!invitation) {
+  const invitationDeadline = Date.now() + 960000
+  for (let lapses = 0; !invitation;) {
     assert(Date.now() < invitationDeadline, 'No dig invitation note reached the picture')
-    const invitationHandle = await d.wait(() => {
+    const gathering = await d.wait(() => {
+      const vs = window.__placeErrands().villagers, i = vs.findIndex((v) => v.work?.phase === 'invite' && v.work.owes)
+      return i < 0 ? null : { ...vs[i], index: i }
+    }, null, Math.max(1000, invitationDeadline - Date.now()))
+    const gatheringAt = await gathering.jsonValue(); await gathering.dispose()
+    await event('dig-gathering', { at: gatheringAt })
+    await d.inspect(gatheringAt, 3)
+    await d.read(() => { window.__inviteWatch = null })
+    // A stalled initiator is let go (`stallSeconds`) and the pair recast
+    // elsewhere; that lapse is recorded for the report, and the next pair is
+    // followed instead of waiting out a word that will never come.
+    const invitationHandle = await d.wait((initiator) => {
       const e = window.__placeErrands(), word = e.last
-      if (word?.purpose !== 'invitation' || word.age > window.__balance.communication.labelSeconds) return null
-      const speaker = e.villagers[word.speaker], id = `villager-${word.speaker}`
-      if (!speaker?.work || !document.querySelector(`.speech-label[data-speaker="${id}"]`)) return null
-      return { id, siteIndex: speaker.work.siteIndex, speaker, strikes: e.digProgress[speaker.work.siteIndex].strikes }
-    }, null, Math.max(1000, invitationDeadline - Date.now())).catch(async (e) => {
+      if (word?.purpose === 'invitation' && word.age <= window.__balance.communication.labelSeconds) {
+        const speaker = e.villagers[word.speaker], id = `villager-${word.speaker}`
+        if (speaker?.work && document.querySelector(`.speech-label[data-speaker="${id}"]`)) {
+          return { id, siteIndex: speaker.work.siteIndex, speaker, strikes: e.digProgress[speaker.work.siteIndex].strikes }
+        }
+      }
+      const task = e.villagers[initiator]?.work
+      if (task?.phase === 'invite' && task.owes) { window.__inviteWatch = { at: performance.now(), villager: { ...e.villagers[initiator], drawn: undefined } }; return null }
+      const spoke = word?.purpose === 'invitation' && word.speaker === initiator
+      if (spoke && word.age <= window.__balance.communication.labelSeconds) return null
+      return { lapsed: true, spokeUnseen: spoke, last: window.__inviteWatch ?? null, now: task ?? null }
+    }, gatheringAt.index, Math.max(1000, invitationDeadline - Date.now())).catch(async (e) => {
       // Name why the pair stayed silent: its owed word, hush and the children's ear.
       const state = await d.read(() => ({ last: window.__placeErrands().last, player: { ...window.__placePlayer },
         pairs: window.__placeErrands().villagers.map((v, i) => ({ i, x: v.x, z: v.z, work: v.work })).filter((v) => v.work?.situation?.startsWith('dig')) }))
       throw new Error(`${e.message} — no invitation note: ${JSON.stringify(state)}`)
     })
     const candidate = await invitationHandle.jsonValue(); await invitationHandle.dispose()
+    if (candidate.lapsed) {
+      await event('dig-invitation-lapsed', { lapses, initiator: gatheringAt.index, ...candidate, player: await d.read(() => ({ ...window.__placePlayer })) })
+      assert(++lapses < 3, `Three dig initiators lapsed without their invitation: ${JSON.stringify(candidate)}`)
+      continue
+    }
     if (await faceNote(candidate.id)) invitation = candidate
     else await d.wait(() => window.__placeErrands().last?.purpose !== 'invitation', null, 30000).catch(() => {})
   }
