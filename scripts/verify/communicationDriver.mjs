@@ -11,13 +11,10 @@ export function travelKeys(from, target, tolerance = 0.12) {
   return keys
 }
 
-/** Back away along the door approach before turning to the departing chief.
+/** Walk to the precomputed outside spot, then turn to the departing chief.
  * Read his position after moving and again after aiming: he keeps walking. */
-export async function faceWalkingChief(d, door) {
-  await d.held(['KeyS'], () => d.wait((door) => {
-    const p = window.__placePlayer
-    return Math.hypot(p.x - door[0], p.z - door[1]) >= 3.5
-  }, door, 10000))
+export async function faceWalkingChief(d, stand) {
+  await d.walk(stand)
   const subject = () => d.read(() => ({ x: window.__chief.x, y: 1.2, z: window.__chief.z }))
   await d.aim(await subject())
   return subject()

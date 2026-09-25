@@ -255,15 +255,34 @@ async function chief(prefix = '05') {
   await d.close()
   const hut = await d.read(() => window.__placeLayout.interactives.find((i) => i.type === 'chief'))
   if (await d.read(() => window.__chief?.phase !== 'at-drummer')) {
+    const stand = await d.read(async (hut) => {
+      const { chiefBesideDrummerSpot } = await import('/src/scenes/place/chiefWalk.ts')
+      const { chiefStandingSpot, interactiveCircleRadius } = await import('/src/scenes/place/layout.ts')
+      const { REGION_PLACE_STYLES } = await import('/src/scenes/place/regionStyles.ts')
+      const { placeById } = await import('/src/world/geo.ts')
+      const style = REGION_PLACE_STYLES[placeById(window.__game.getState().placeId).region]
+      const { chiefWalkStand } = await import('/scripts/verify/communicationRouteCore.mjs')
+      const { standingClear, PLAYER_RADIUS } = await import('/src/scenes/place/collision.ts')
+      const { insidePlace } = await import('/src/scenes/place/boundary.ts')
+      const { buildPlaceNavGrid, findPlaceRoute } = await import('/src/scenes/place/routing.ts')
+      const layout = window.__placeLayout
+      const grid = buildPlaceNavGrid(layout, layout.colliders, PLAYER_RADIUS)
+      const route = { from: chiefStandingSpot(hut, interactiveCircleRadius('chief', style)),
+        to: chiefBesideDrummerSpot(window.__balance.communication.chiefBesideDrummer) }
+      return chiefWalkStand(hut, route, (p) => insidePlace(layout, p.x, p.z, 0.6) &&
+        standingClear(layout.colliders, p.x, p.z, PLAYER_RADIUS) &&
+        findPlaceRoute(grid, { x: hut.door[0], z: hut.door[1] }, p))
+    }, hut)
     await d.walk({ x: hut.door[0], z: hut.door[1] })
     await d.aim({ x: hut.door[0], y: 1.2, z: hut.door[1] })
     await prompt('hut')
+    const chiefWalkStarted = Date.now()
     await page.keyboard.press('Space')
     await d.wait(() => window.__chief?.phase === 'walking-out')
-    const walkingChief = await faceWalkingChief(d, hut.door)
-    assert(await d.read(() => window.__chief.phase === 'walking-out'), 'Chief walk framing was late')
+    const walkingChief = await faceWalkingChief(d, stand)
+    assert(await d.read(() => window.__chief.phase === 'walking-out'), `Chief walk framing was late: ${(Date.now() - chiefWalkStarted) / 1000}s since Space`)
     await localFrame(`${prefix}-chief-walks-out`, walkingChief, 'the chief leaving his hut')
-    assert(await d.read(() => window.__chief.phase === 'walking-out'), 'Chief walk frame was late')
+    assert(await d.read(() => window.__chief.phase === 'walking-out'), `Chief walk frame was late: ${(Date.now() - chiefWalkStarted) / 1000}s since Space`)
   }
   const drummer = await d.read(() => ({ x: window.__placeSpots.drummer[0], z: window.__placeSpots.drummer[1] }))
   await d.wait(() => window.__chief?.phase === 'at-drummer')
