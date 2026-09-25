@@ -305,3 +305,10 @@ Findings filed from these runs (findings carrier): a swimmer makes no headway
 against the Niger current near Mopti (backlog candidate), and one water
 carrier's errand ended with the empty jar before the water (seen once,
 driver now records `water-errand-abandoned`; none in either green run).
+
+## Round 2: retained endpoint wording
+
+The review's “Dummy message: …” toast finding is accepted as the documented
+placeholder, not treated as a new product defect. Its wording, fit endpoint,
+retained impression and `victory === false` contract are unchanged. The new
+visible socket response supplements that endpoint; it does not replace it.
