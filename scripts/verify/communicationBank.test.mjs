@@ -76,3 +76,11 @@ it('records ROCK-first evidence and rejects a missing, reversed or simultaneous 
   expect(bankTeachingOrder([rock, { ...river, pageMs: rock.pageMs, heardBefore: [] }], call).rockBeforeRiver).toBe(false)
   expect(bankTeachingOrder([rock, river], { shownAt: 200 }).rockBeforeCall).toBe(false)
 })
+
+it('preserves a message-first drum hearing while proving ROCK preceded the observed child call', () => {
+  const river = { concept: 'RIVER', atom: 'BA', pageMs: 1000, heardBefore: [], drumMessage: 'errand' }
+  const rock = { concept: 'ROCK', atom: 'ba', pageMs: 3000, heardBefore: ['BA'], drumMessage: 'errand' }
+  expect(bankTeachingOrder([river, rock], { shownAt: 200 })).toEqual({
+    river, rock, callShownAt: 200, rockBeforeRiver: false, rockBeforeCall: true,
+  })
+})

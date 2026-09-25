@@ -57,7 +57,7 @@ it('follows ROCK before the child call using a live configured cycle and saves t
   expect(source).toContain("speech('child-call', children, '02-child-call', budgetMs)")
   expect(source).toContain("event('bank-rock-heard'")
   expect(source).toContain("event('bank-rock-before-river', receipt.bankTeaching)")
-  expect(source).toContain('receipt.bankTeaching.rockBeforeRiver && receipt.bankTeaching.rockBeforeCall')
+  expect(source).toContain("receipt.bankTeaching.rockBeforeCall && (receipt.order === 'message-first' || receipt.bankTeaching.rockBeforeRiver)")
 })
 
 it('aims before the drum trigger and rejects missed action frames', () => {
