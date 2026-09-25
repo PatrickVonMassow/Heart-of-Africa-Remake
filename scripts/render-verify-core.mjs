@@ -95,6 +95,7 @@ export const NON_RENDER_VERIFY = new Set([
   'communicationAudio.mjs', // PCM analysis and WAV encoding; no browser
   'communicationCapture.mjs', // final-output tap; communication.mjs supplies the page
   'communicationDriver.mjs', // normal-input driver; communication.mjs supplies the page
+  'communicationTimeline.mjs', // read-only hearing subscription; no browser
   'communicationRouteCore.mjs', // ordered river stations; pure geometry
   'cropLuma.mjs', // how a ground crop's pixels become one reading; polish.mjs captures them
   'digSitePicture.mjs', // excavation composition and hold checks; polish.mjs supplies the browser page
