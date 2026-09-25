@@ -1858,3 +1858,12 @@ stood right behind him; his head fills the foreground and the label sits high ab
 twin shows the pair and the label cleanly. `07-clay-impression` / `07-answer-sounding`: the
 "Space — Have the answer beaten again" prompt sits over inventory slot 6 ("Clay Impression of a
 Rock"); both stay legible. Non-blocking: the game behaves correctly and every word is readable.
+
+## CI flake: batch-daemon M40 lease-fence test
+
+Found 26.09.2026 on main `22f10b130` (CI run 36199903308, job fast (1)):
+`scripts/batch-daemon.test.mjs` › "fences a resumed worker whose lease moved on" (M40)
+read "no usable lease; ownership is uncertain…" instead of /not the lease that stands/.
+The same commit was green in the local pre-push gate and the rerun of the failed job
+was green. Non-blocking: infrastructure timing under the 01.09 freeze, no player impact;
+queue it only if it reproduces.
