@@ -374,7 +374,9 @@ export function chaseSwimEscaped(
   if (!entry) return false
   const here = terrainTypeAt(x, z)
   if (here === 'water' || here === 'ocean') return false
-  // Probe the line at a quarter unit, so even a narrow channel is not skipped.
+  // Probes at most a quarter unit apart find every channel at least that wide
+  // (a line crossing a channel runs through at least its width); every river
+  // is RIVER_WIDTH_DEG wide, about 2.7 units, and lakes are wider still.
   const n = Math.max(4, Math.ceil(Math.hypot(x - entry.x, z - entry.z) / 0.25))
   for (let i = 1; i < n; i++) {
     const f = i / n

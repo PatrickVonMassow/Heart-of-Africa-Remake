@@ -4847,9 +4847,13 @@ describe('the hunted calf flees into rivers and lakes too (design.md §19.5)', (
     expect(chaseSwimEscaped(undefined, 0.5, 4, river)).toBe(false) // never swam
     const sea = (_x: number, z: number) => (z >= 0 ? 'ocean' : 'savanna')
     expect(chaseSwimEscaped(entry, 0.5, 4, sea)).toBe(false) // the sea is no far bank
-    // An asymmetric crossing of a narrow channel is still found.
-    const narrow = (_x: number, z: number) => (z >= 0 && z <= 0.2 ? 'water' : 'savanna')
-    expect(chaseSwimEscaped({ x: 0, z: -0.3 }, 0, 0.3, narrow)).toBe(true)
-    expect(chaseSwimEscaped({ x: 0, z: -3 }, 0, 0.3, narrow)).toBe(true)
+    // Asymmetric crossings of a channel at the quarter-unit bound are found
+    // wherever the calf lands, far or near.
+    const narrow = (_x: number, z: number) => (z >= 0 && z <= 0.25 ? 'water' : 'savanna')
+    for (const ez of [-0.3, -3, -7.1]) {
+      for (let lz = 0.26; lz < 4; lz += 0.07) {
+        expect(chaseSwimEscaped({ x: 0, z: ez }, 0.4, lz, narrow)).toBe(true)
+      }
+    }
   })
 })
