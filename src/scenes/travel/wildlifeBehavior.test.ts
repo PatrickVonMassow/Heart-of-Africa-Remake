@@ -4855,5 +4855,8 @@ describe('the hunted calf flees into rivers and lakes too (design.md §19.5)', (
         expect(chaseSwimEscaped({ x: 0, z: ez }, 0.4, lz, narrow)).toBe(true)
       }
     }
+    // An open quarter-unit channel whose banks fall exactly on even spacing.
+    const open = (_x: number, z: number) => (z > 0 && z < 0.25 ? 'water' : 'savanna')
+    expect(chaseSwimEscaped({ x: 0, z: -0.25 }, 0, 0.75, open)).toBe(true)
   })
 })
