@@ -139,7 +139,7 @@ async function faceNote(id) {
   const world = await d.read((id) => window.__speech.anchorWorld(id), id)
   if (!world) return false
   // A running child can outpace the turn; a missed aim waits for his next note.
-  if (!await d.aim({ x: world[0], z: world[2] }).then(() => true, (error) => (console.log(`# ${id}: ${error.message}`), false))) return false
+  if (!await d.aim({ x: world[0], y: world[1] + 1.1, z: world[2] }).then(() => true, (error) => (console.log(`# ${id}: ${error.message}`), false))) return false
   return d.wait((id) => {
     const box = document.querySelector(`.speech-label[data-speaker="${id}"]`)?.getBoundingClientRect()
     return box && box.width > 1 && box.left > 0 && box.top > 0 && box.right < innerWidth && box.bottom < innerHeight
@@ -179,7 +179,9 @@ async function speech(kind, point, frameName) {
     if (!heard) { await approach(); continue }
     const label = await heard.jsonValue(); await heard.dispose()
     after = label.shownAt
-    if (await faceNote(label.speakerId)) spoken = label
+    if (await faceNote(label.speakerId) && await d.read((label) =>
+      performance.now() / 1000 < label.shownAt + 4 * window.__balance.communication.syllableSeconds,
+    label)) spoken = label
   }
   const windowStart = await audioStart(kind, kind === 'child-call' ? receipt.bands.child : receipt.bands.adult, 0, spoken)
   const planned = await d.read(async (atoms) => {
@@ -213,11 +215,12 @@ async function chief(prefix = '05') {
   const hut = await d.read(() => window.__placeLayout.interactives.find((i) => i.type === 'chief'))
   if (await d.read(() => window.__chief?.phase !== 'at-drummer')) {
     await d.walk({ x: hut.door[0], z: hut.door[1] })
-    await d.aim({ x: hut.pos[0], z: hut.pos[1] })
+    await d.aim({ x: hut.door[0], y: 1.2, z: hut.door[1] })
     await prompt('hut')
     await page.keyboard.press('Space')
     await d.wait(() => window.__chief?.phase === 'walking-out')
-    await localFrame(`${prefix}-chief-walks-out`, { x: hut.pos[0], z: hut.pos[1] }, 'the chief leaving his hut')
+    await localFrame(`${prefix}-chief-walks-out`, await d.read(() => ({ x: window.__chief.x, y: 1.2, z: window.__chief.z })), 'the chief leaving his hut')
+    assert(await d.read(() => window.__chief.phase === 'walking-out'), 'Chief walk frame was late')
   }
   const drummer = await d.read(() => ({ x: window.__placeSpots.drummer[0], z: window.__placeSpots.drummer[1] }))
   await d.wait(() => window.__chief?.phase === 'at-drummer')
@@ -247,6 +250,8 @@ async function chief(prefix = '05') {
 async function message(which, trigger, point) {
   const count = which === 'errand' ? 16 : 8
   const prefix = which === 'errand' ? '05' : '07'
+  const bodies = { x: point.x, y: 1.0, z: point.z }
+  await d.aim(bodies)
   await audioStart(`drum-${which}`, receipt.bands.drums, 0.25)
   await d.read(() => {
     const timing = { firstShown: null, observer: null }
@@ -266,9 +271,9 @@ async function message(which, trigger, point) {
   // Giving at the chief leaves the view on him; the pair is framed at the drum.
   // Aimed at the pair's upper bodies: from the 1.4-2 m the key needs, a
   // point at knee height falls below a level view's bottom edge.
-  const bodies = { x: point.x, y: 1.0, z: point.z }
-  await d.aim(bodies)
+  assert(await d.read((which) => window.__ui.getState().drumPerformance?.plan.message === which, which), 'Drum frame was late')
   await localFrame(`${prefix}-${which}-sounding`, bodies, 'chief and drummer together sounding the message')
+  assert(await d.read((which) => window.__ui.getState().drumPerformance?.plan.message === which, which), 'Drum frame completed after the performance')
   await d.wait((which) => window.__game.getState().drumMessageHeard[which] && !!document.querySelector('.drum-message'), which, 60000)
   const firstShown = await d.read(() => {
     const timing = window.__communicationPaperTiming
@@ -314,16 +319,20 @@ async function observations() {
   }
   await d.wait(() => window.__placeTapHand()?.tapFor > 0, null, 480000)
   const touch = await d.read(() => window.__placeTapHand())
-  await d.inspect(touch.rock, 2.5)
+  await d.inspect(touch.rock, 3.5)
+  await d.aim({ ...touch.rock, y: 0.9 })
   await d.wait((rock) => {
     const h = window.__placeTapHand()
     return h?.tapFor > 0 && Math.abs(h.gap) < 0.12 && Math.hypot(h.rock.x - rock.x, h.rock.z - rock.z) < 0.1
   }, touch.rock, 480000)
-  await localFrame('02-stationary-rock-touch', touch.rock, 'stationary hand contact at the bank rock')
+  await localFrame('02-stationary-rock-touch', { ...touch.rock, y: 0.9 }, 'stationary hand contact at the bank rock')
+  assert(await d.read(() => window.__placeTapHand()?.tapFor > 0), 'Rock contact frame was late')
   const boulder = await d.read(() => window.__placeTag().boulder)
   await d.inspect(boulder, 4)
-  await d.wait(() => window.__placeTag().children.some((c) => c.lift > 0.2), null, 480000)
-  await localFrame('02-off-game-climb', boulder, 'child climbing the separate off-game rock')
+  await d.aim({ ...boulder, y: 1.2 })
+  await d.wait(() => window.__placeTag().children.some((c) => c.climb === 'top'), null, 480000)
+  await localFrame('02-off-game-climb', { ...boulder, y: 1.2 }, 'child standing on the separate off-game rock')
+  assert(await d.read(() => window.__placeTag().children.some((c) => c.climb === 'top')), 'Boulder climb frame was late')
 
 
   await step('3-adult-work-and-loom')
@@ -394,11 +403,11 @@ async function observations() {
   }, { index: siteIndex, before: invitation.strikes }, 480000)
   await localFrame('03-finished-work', site, 'the completed pit, post or planting after the bout')
   const loom = await d.read(() => window.__placeLayout.loom)
-  await d.walk({ x: loom.weaver.x - loom.ax * 3, z: loom.weaver.z - loom.az * 3 }); await d.aim(loom.seat)
+  await d.walk({ x: loom.weaver.x - loom.ax * 3, z: loom.weaver.z - loom.az * 3 }); await d.aim({ ...loom.seat, y: 0.9 })
   for (const sign of [-1, 1]) {
     await d.wait((sign) => {
       const h = window.__placeScene.getObjectByName('village-loom-helper')
-      return h && h.position.z * sign > 1
+      return h && h.position.z * sign > 1 && h.userData.errand?.toward === (sign < 0 ? 'UPSTREAM' : 'DOWNSTREAM') && h.userData.errand.phase === 'walk'
     }, sign, 480000)
     await localFrame(`03-loom-${sign < 0 ? 'upstream' : 'downstream'}`, loom.seat, 'weaver, helper consequence and the river axis')
   }

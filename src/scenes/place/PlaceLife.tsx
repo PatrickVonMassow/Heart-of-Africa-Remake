@@ -705,6 +705,7 @@ function Loom({
     const phase = stride + gaitOffset.current
     helperGait.current = phase
     if (helper.current) {
+      if (import.meta.env.DEV) helper.current.userData.errand = work.errand ? { toward: work.errand.toward, phase: work.errand.phase } : null
       // Dropped onto his stance leg, so the swinging feet ride the ground
       // instead of hanging above it.
       helper.current.position.set(waterSide * HELPER_SIDE_OFFSET, gaitBodyLift(phase, FIGURE_LIMBS.hipY), picture.helperAt)

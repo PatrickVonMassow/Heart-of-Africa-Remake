@@ -50,3 +50,12 @@ describe('continuous communication route contract', () => {
     expect(source).toContain('firstShown >= startedAt + plan.duration * 1000')
   })
 })
+
+it('aims before the drum trigger and rejects missed action frames', () => {
+  const message = source.slice(source.indexOf('async function message('), source.indexOf('async function errand('))
+  expect(message.indexOf('await d.aim(bodies)')).toBeLessThan(message.indexOf('await trigger()'))
+  expect(message).toContain('Drum frame completed after the performance')
+  expect(source).toContain('Rock contact frame was late')
+  expect(source).toContain('Boulder climb frame was late')
+  expect(source).toContain("h.userData.errand.phase === 'walk'")
+})
