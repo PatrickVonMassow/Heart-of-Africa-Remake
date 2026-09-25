@@ -147,13 +147,17 @@ the low and high membrane ranges. The worklet taps `__ambience.output()` on
 that branch. It never resumes audio itself: failure of the normal entry gesture
 to unlock it is missing evidence and fails the route.
 
-Block receipts retain delivery time, audio time, visible speech labels and
+Block receipts retain delivery time, audio time, currently drawn speech labels and
 active drum-message identity to expose overlap. These are observations at block
 delivery, not isolated voice stems. The baseline is the first three seconds
 after entry and may include natural village sound; the receipt makes any overlap
-visible. Speech windows include pre-roll so detecting the natural note does not
-lose its opening syllable. Silent output, missing samples or a suspended context
-fail, but a nonzero peak does **not** certify intelligibility. The reviewer must
+visible. Speech windows recover their start from a continuously recorded 30-second ring,
+using the label timestamp and 250 ms of pre-roll. Each labelled syllable must
+be fully recorded and its expected pitch band must exceed both four times the
+ambient baseline energy and an absolute mean-square floor of 1e-10. Missing
+syllables, failed band comparisons, silent output, gaps or a suspended context
+fail after the WAV and receipt are written. This certifies measured tone energy,
+not intelligibility. The reviewer must
 listen to the WAVs and judge the frames/video. Coordinate-based navigation alone
 does not certify that a human can infer the destination.
 
@@ -312,3 +316,34 @@ The review's “Dummy message: …” toast finding is accepted as the documente
 placeholder, not treated as a new product defect. Its wording, fit endpoint,
 retained impression and `victory === false` contract are unchanged. The new
 visible socket response supplements that endpoint; it does not replace it.
+
+
+## Round 2: responses to the reviewed findings
+
+These are authored changes, not new browser verdicts. The reviewer still owns
+both backend runs, rendered-picture judgment and listening to the final mix.
+
+| Finding | Response and unit-level evidence |
+| --- | --- |
+| B1: DIG result | Removed the solid cap and completed slatted lid from the pit. The completed pit retains an open dark mouth and fresh earth rim, with a spoil heap growing to 0.8 m; planted rows have larger seedlings. The existing durable completion record remains the source. Scene-tree, ground/feet, throw, persistence and geometry tests cover this work. |
+| B2: direction and current | No world-direction reversal was found. The new three-seed test compares both bank destinations, both loom destinations and the helper's actual local-to-world rotation against the river flow vector. Half the foam now rides within four metres of the bank; larger elongated patches are aligned with and move along the current. The loom harness distinguishes the outward errand from the return. |
+| B3: teaching order | The scene supplies a callback reading the live heard set. Until ROCK is heard, bank cycles omit the river call and direction announcement and offer rock-only contact/climb lessons. Tests deliberately miss the first two rock namings, then hear one and require both directions to become available. English and German errand prose no longer claims prior village hearings. |
+| B4: socket | A sloping talus block carries a dark socket and pale asymmetric relief; the inventory impression uses the same outline. Fitting shifts the relief and exposes a dark seam. Geometry tests check the match and that the stone cannot cover the face. The cliff faces the fixed travel camera; the harness stands clear at the front and checks that cliff crown and relief project into view. |
+| B5: audio proof | A 30-second ring recovers audio from before the note, even after turning. The actual phrase timing supplies per-syllable windows; each is compared with the ambient baseline in its expected tone band. Tests reject ambience alone, truncated openings, absent label/baseline evidence and an unrelated later loud tone. Hidden/offscreen DOM notes are omitted from block labels. |
+| Route frames | Shutters run inside actual travel, after distance thresholds and at separated world positions. Receipts retain these positions and distances. A leg without at least two separated views fails. |
+| Wrong moments/places | Aim now honors height and inverted look. The drum pair is aimed at before triggering the answer; screenshots require an active performance before and after capture. Chief, touch and climb shots use their live positions/phases and reject late frames. Child-call selection requires the spoken interval still to be live after turning. Loom shots require the named outward direction, not its return. |
+| Voice over drums | The speech floor yields to the entire drum performance; scheduled speech gain is cut before the first strike and restored afterward. Unit tests cover reservation and audio-clock automation. |
+| First-hearing evidence | A store subscription installed before entry records each first hearing with page/audio clocks, prior heard atoms, concept and drum-message identity. It survives navigation waits and is copied into the receipt on events and failure cleanup. |
+| Oversized/overlapping labels | Speech labels have fixed screen size and a bounded width. The status bar sits above scene labels; dialogs remain above it. |
+| WebGL notice | The dismissal sits above the journal and below modal dialogs, checked using the real stylesheet in jsdom. |
+| Dummy success toast | Intentionally retained as explained above. |
+
+Run the two continuous commands already listed in this document. In particular,
+review the new pit/heap, near-bank foam, impression/socket match and fitted
+change at normal player zoom. The stricter audio and moment gates may now
+reject windows or shots that the earlier harness falsely accepted; such a
+failure is missing evidence, not a successful replacement run.
+
+Author gate logs for this revision are retained under
+`local/verify-logs/communication-round2-{unit,build,lint}.log` (git-ignored).
+The final gate outcome is reported after the fixed-revision run completes.
