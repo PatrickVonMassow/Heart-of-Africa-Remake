@@ -316,6 +316,10 @@ async function message(which, trigger, point) {
     timing.observer.observe(document.body, { childList: true, subtree: true })
     window.__communicationPaperTiming = timing
   })
+  // The answer sounds 3.2 s: wait for a drawn picture BEFORE the trigger, so
+  // the shutter's readiness wait cannot consume the performance.
+  const ready = await waitForSceneReady(page, { mode: 'drawn' })
+  assert(!ready.timedOut, `Scene not drawn before the ${which} performance: ${ready.reason}`)
   await trigger()
   await d.wait((which) => window.__ui.getState().drumPerformance?.plan.message === which, which, 15000)
   const performance = await d.read(() => window.__ui.getState().drumPerformance)
@@ -332,7 +336,7 @@ async function message(which, trigger, point) {
   await localFrame(`${prefix}-${which}-sounding`, bodies, 'chief and drummer together sounding the message', async () => {
     shot.shutter = await d.read(() => performance.now())
     assert(await d.read((which) => window.__ui.getState().drumPerformance?.plan.message === which, which), 'Drum frame was late at the shutter')
-  })
+  }, { sceneReady: false })
   shot.written = await d.read(() => performance.now())
   await event(`drum-${which}-frame-timing`, shot)
   assert(await d.read((which) => window.__ui.getState().drumPerformance?.plan.message === which, which), 'Drum frame completed after the performance')

@@ -71,6 +71,9 @@ it('watches calls from the bank stand and saves refused candidates instead of ch
 it('aims before the drum trigger and rejects missed action frames', () => {
   const message = source.slice(source.indexOf('async function message('), source.indexOf('async function errand('))
   expect(message.indexOf('await d.aim(bodies)')).toBeLessThan(message.indexOf('await trigger()'))
+  expect(message.indexOf("waitForSceneReady(page, { mode: 'drawn' })")).toBeLessThan(message.indexOf('await trigger()'))
+  const shutter = message.indexOf("'Drum frame was late at the shutter'")
+  expect(message.slice(shutter, shutter + 80)).toContain('{ sceneReady: false }')
   expect(message).toContain('Drum frame completed after the performance')
   expect(source).toContain('Rock contact frame was late')
   expect(source).toContain('Boulder climb frame was late')
