@@ -19,6 +19,7 @@ import { rollEvent, resolveEvent, type EventContext, type EventKind, type EventO
 import { REGION_PREDATORS } from '../scenes/travel/wildlifeBehavior'
 import { movementPenalty, slideAlongBlocked } from '../systems/movement'
 import { findFreeSpot } from '../systems/unstuck'
+import { devAssert } from '../systems/devAssert'
 import { currentDriftDegPerSecond, waterTravelCost } from '../systems/current'
 import {
   KNOWN_FROM_START_LANDMARKS,
@@ -930,6 +931,7 @@ export const useGame = create<GameState>()((set, get) => ({
           fallback: [s.pos.x, s.pos.z],
         })
       : null
+    devAssert(exit === null || exit.found, 'travel-stranded', () => `no open spot within ${balance.strandedExit.searchRadius} of ${s.pos.x.toFixed(2)}/${s.pos.z.toFixed(2)}`)
     const towardExit =
       exit?.found === true &&
       Math.hypot(nx - exit.pos[0], nz - exit.pos[1]) < Math.hypot(s.pos.x - exit.pos[0], s.pos.z - exit.pos[1])
