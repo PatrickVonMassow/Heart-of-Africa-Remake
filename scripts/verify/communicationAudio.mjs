@@ -88,3 +88,24 @@ export function stereoWav(channels, sampleRate) {
   }
   return buffer
 }
+
+/** Require output energy at EACH labelled tone, over its own audible interval.
+ * A loud ambient bed or a later unrelated word cannot approve a missed call. */
+export function voiceEvidence(channels, sampleRate, startFrame, bands, expected, baseline) {
+  if (!expected?.syllables?.length || !baseline?.channels?.length) {
+    return { passed: false, reason: 'Missing labelled syllables or ambient baseline', syllables: [] }
+  }
+  const syllables = expected.syllables.map(({ tone, start, duration }) => {
+    const from = Math.round(start * sampleRate) - startFrame
+    const to = Math.round((start + duration) * sampleRate) - startFrame
+    const covered = from >= 0 && to <= channels[0].length && to - from >= 2048
+    if (!covered) return { tone, start, duration, passed: false, reason: 'Labelled syllable not fully recorded' }
+    const measured = analyseAudioWindow(channels.map((c) => c.slice(from, to)), sampleRate, { voice: bands[tone] })
+    const baselineKey = expected.voice === 'child' ? (tone === 'low' ? 'childLow' : 'childHigh') : tone
+    const ambient = Math.max(...baseline.channels.map((c) => c.bandMeanSquare[baselineKey] ?? Infinity))
+    const energy = Math.max(...measured.channels.map((c) => c.bandMeanSquare.voice))
+    const required = Math.max(ambient * 4, 1e-10)
+    return { tone, start, duration, energy, ambient, required, passed: energy > required }
+  })
+  return { passed: syllables.every((s) => s.passed), syllables }
+}

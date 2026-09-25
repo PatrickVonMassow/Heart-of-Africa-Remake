@@ -51,3 +51,18 @@ describe('final-output audio evidence', () => {
     expect(() => stereoWav([[0], []], sr)).toThrow()
   })
 })
+
+it('rejects ambience-only or truncated labelled tones, including a late loud word', async () => {
+  const { voiceEvidence } = await import('./communicationAudio.mjs')
+  const sr = 8192, bands = { low: [100, 160], high: [220, 280] }
+  const ambient = Array.from({ length: sr * 3 }, (_, i) => Math.sin(2 * Math.PI * 32 * i / sr) * 0.03)
+  const baseline = analyseAudioWindow([ambient, ambient], sr, bands)
+  const expected = { voice: 'adult', syllables: [{ tone: 'low', start: 0.25, duration: 0.4 }, { tone: 'high', start: 1, duration: 0.4 }] }
+  expect(voiceEvidence([ambient, ambient], sr, 0, bands, expected, baseline).passed).toBe(false)
+  const voice = ambient.map((a, i) => a + (i / sr >= 0.25 && i / sr < 0.65 ? Math.sin(2 * Math.PI * 128 * i / sr) * 0.1 : 0)
+    + (i / sr >= 1 && i / sr < 1.4 ? Math.sin(2 * Math.PI * 256 * i / sr) * 0.1 : 0))
+  expect(voiceEvidence([voice, voice], sr, 0, bands, expected, baseline).passed).toBe(true)
+  expect(voiceEvidence([voice.slice(sr), voice.slice(sr)], sr, sr, bands, expected, baseline).passed).toBe(false)
+  const late = ambient.map((a, i) => a + (i > sr * 2 ? Math.sin(2 * Math.PI * 128 * i / sr) : 0))
+  expect(voiceEvidence([late, late], sr, 0, bands, expected, baseline).passed).toBe(false)
+})

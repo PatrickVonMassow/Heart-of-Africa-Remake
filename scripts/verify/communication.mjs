@@ -30,6 +30,8 @@ const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, rec
 const d = communicationDriver(page)
 const shutter = frameShutter(page, out)
 const pendingAudio = new Map()
+let ambientBaseline = null
+const voiceWindows = new Map()
 page.on('pageerror', (e) => receipt.errors.push(String(e)))
 page.on('console', (m) => { if (m.type() === 'error') receipt.errors.push(m.text()) })
 const check = (name, ok) => { assert(ok, name); console.log(`PASS  ${name}${sections.tag()}`) }
@@ -53,14 +55,15 @@ async function frame(name, subject) {
 async function localFrame(name, point, label) {
   await frame(name, { local: { x: point.x, y: point.y ?? 0.8, z: point.z }, label, settle: false })
 }
-async function audioStart(name, bands, preRoll = 0) {
+async function audioStart(name, bands, preRoll = 0, label = null) {
   pendingAudio.set(name, bands)
-  const opened = await startAudioWindow(page, name, preRoll)
+  const opened = await startAudioWindow(page, name, preRoll, label)
   await event(`audio-${name}-start`, opened)
   return opened
 }
 async function audioEnd(name, bands) {
-  const audio = await saveAudioWindow(page, out, name, bands, prefix + name)
+  const audio = await saveAudioWindow(page, out, name, bands, prefix + name, { expected: voiceWindows.get(name), baseline: ambientBaseline })
+  if (name === 'ambient-baseline') ambientBaseline = audio
   pendingAudio.delete(name)
   receipt.audio.push({ name, receipt: `${prefix}${name}.json`, recording: audio.recording, startFrame: audio.startFrame, endFrame: audio.endFrame }); save()
 }
@@ -171,7 +174,13 @@ async function speech(kind, point, frameName) {
     after = label.shownAt
     if (await faceNote(label.speakerId)) spoken = label
   }
-  const windowStart = await audioStart(kind, kind === 'child-call' ? receipt.bands.child : receipt.bands.adult, 1)
+  const windowStart = await audioStart(kind, kind === 'child-call' ? receipt.bands.child : receipt.bands.adult, 0, spoken)
+  const planned = await d.read(async (atoms) => {
+    const { phrasePlan } = await import('/src/communication/speaking.ts')
+    return phrasePlan(atoms, 0).syllables
+  }, spoken.atoms)
+  const syllables = planned.map(({ tone, startOffset, duration }) => ({ tone, start: windowStart.labelTime + startOffset, duration }))
+  voiceWindows.set(kind, { voice: kind === 'child-call' ? 'child' : 'adult', syllables })
   await event(kind, { spoken })
   await frame(frameName, { element: `.speech-label[data-speaker="${spoken.speakerId}"]`,
     label: `${kind} speaker and natural note`, settle: false })
@@ -653,7 +662,7 @@ try {
   // Preserve even an interrupted window. It stays explicitly incomplete and
   // cannot turn the failed expedition into passing audio evidence.
   for (const [name, bands] of pendingAudio) {
-    try { await saveAudioWindow(page, out, name, bands, prefix + name) }
+    try { await saveAudioWindow(page, out, name, bands, prefix + name, { expected: voiceWindows.get(name), baseline: ambientBaseline }) }
     catch (error) { receipt.errors.push(`incomplete ${name}: ${error.message}`) }
   }
   await d.read(() => {
