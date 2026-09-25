@@ -18,6 +18,9 @@ import {
   drinkExemptFromPlayerShy,
   resolveFleeTarget,
   fleeWaterStep,
+  chaseFleeStep,
+  swimBrakedPace,
+  chaseSwimEscaped,
   flightBlocked,
   roamCrossing,
   nearestBankTarget,
@@ -4791,5 +4794,69 @@ describe('the shipped fight balance is internally consistent (point 264)', () =>
   })
   it('ships unforced: the test-only outcome pin is never set in play', () => {
     expect(fb.forceOutcome).toBeUndefined()
+  })
+})
+
+describe('the hunted calf flees into rivers and lakes too (design.md §19.5)', () => {
+  // Hunter to the south (z = -5): the calf's away-heading is +z, straight at the band.
+  const riverThenLand = (_x: number, z: number) => (z > 0 && z <= 3 ? 'water' : 'savanna')
+  const coast = (_x: number, z: number) => (z > 0 ? 'ocean' : 'savanna')
+
+  it('the chase flee step with a river ahead is not deflected — it swims straight in', () => {
+    const step = chaseFleeStep(0, -0.05, 0, -5, 0.1, riverThenLand, 0.8)
+    expect(step.moved).toBe(true)
+    expect(step.heading).toBe(0)
+    expect(riverThenLand(step.x, step.z)).toBe('water')
+    expect(step.corridor).toBeUndefined()
+  })
+
+  it('the same chase step with the ocean ahead is still deflected along the shore', () => {
+    const step = chaseFleeStep(0, -0.05, 0, -5, 0.1, coast, 0.8)
+    expect(step.moved).toBe(true)
+    expect(step.heading).not.toBe(0)
+    expect(coast(step.x, step.z)).not.toBe('ocean')
+  })
+
+  it('a calf already in the river keeps swimming away from the hunter to the far bank', () => {
+    let x = 0
+    let z = 0.5
+    let steps = 0
+    while (riverThenLand(x, z) === 'water' && steps < 1000) {
+      const s = chaseFleeStep(x, z, 0, z - 3, 0.05, riverThenLand, 0.8)
+      expect(s.moved).toBe(true)
+      x = s.x
+      z = s.z
+      steps++
+    }
+    expect(z).toBeGreaterThan(3) // landed on the FAR bank, never parked in the water
+  })
+
+  it('the swim pace brakes a runner only in river/lake water', () => {
+    expect(swimBrakedPace(5.6, 'water', 2.6)).toBe(2.6)
+    expect(swimBrakedPace(5.6, 'savanna', 2.6)).toBe(5.6)
+    expect(swimBrakedPace(1.5, 'water', 2.6)).toBe(1.5)
+  })
+
+  it('the far-bank resolution fires only for a calf that swam and lands across the water', () => {
+    // A river between z = 0 and z = 3; the calf went in from (0, -1).
+    const river = (_x: number, z: number) => (z >= 0 && z <= 3 ? 'water' : 'savanna')
+    const entry = { x: 0, z: -1 }
+    expect(chaseSwimEscaped(entry, 0.5, 4, river)).toBe(true) // far bank
+    expect(chaseSwimEscaped(entry, 0.5, 1.5, river)).toBe(false) // still swimming
+    expect(chaseSwimEscaped(entry, 2, -0.5, river)).toBe(false) // back on the entry bank
+    expect(chaseSwimEscaped(undefined, 0.5, 4, river)).toBe(false) // never swam
+    const sea = (_x: number, z: number) => (z >= 0 ? 'ocean' : 'savanna')
+    expect(chaseSwimEscaped(entry, 0.5, 4, sea)).toBe(false) // the sea is no far bank
+    // Asymmetric crossings of a channel at the quarter-unit bound are found
+    // wherever the calf lands, far or near.
+    const narrow = (_x: number, z: number) => (z >= 0 && z <= 0.25 ? 'water' : 'savanna')
+    for (const ez of [-0.3, -3, -7.1]) {
+      for (let lz = 0.26; lz < 4; lz += 0.07) {
+        expect(chaseSwimEscaped({ x: 0, z: ez }, 0.4, lz, narrow)).toBe(true)
+      }
+    }
+    // An open quarter-unit channel whose banks fall exactly on even spacing.
+    const open = (_x: number, z: number) => (z > 0 && z < 0.25 ? 'water' : 'savanna')
+    expect(chaseSwimEscaped({ x: 0, z: -0.25 }, 0, 0.75, open)).toBe(true)
   })
 })

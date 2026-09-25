@@ -327,6 +327,65 @@ export function fleeWaterStep(
 }
 
 /**
+ * The hunted calf's flight step (design.md §19.5): calfFleeStep against the
+ * OCEAN only, so a chase victim heading into a river or lake goes straight in
+ * instead of fanning along the bank; the corridor/dead-end fallback of
+ * calfFleeStep now serves the sea edge alone.
+ */
+export function chaseFleeStep(
+  cx: number,
+  cz: number,
+  hunterX: number,
+  hunterZ: number,
+  dist: number,
+  terrainTypeAt: (x: number, z: number) => string,
+  lookahead = 0.8,
+  corridor?: number,
+): { x: number; z: number; heading: number; moved: boolean; corridor?: number } {
+  return calfFleeStep(
+    cx, cz, hunterX, hunterZ, dist,
+    (px, pz) => flightBlocked(terrainTypeAt(px, pz)),
+    lookahead, corridor,
+  )
+}
+
+/**
+ * A running pace through river/lake water (design.md §19.5): braked to the
+ * seasonal swim pace in the water, unchanged on land. Shared by the fleeing
+ * victim and its hunter so a swim neither outruns nor is overrun by pace alone.
+ */
+export function swimBrakedPace(speed: number, terrainType: string, swimPace: number): number {
+  return terrainType === 'water' ? Math.min(speed, swimPace) : speed
+}
+
+/**
+ * The far-bank resolution of a hunt (design.md §19.5): a victim that swam
+ * during the chase and stands on dry land ACROSS the water from its entry spot
+ * has escaped — the chase ends there instead of resuming on the far side. A
+ * landing back on the entry bank (the line to the entry spot stays dry) keeps
+ * the chase going.
+ */
+export function chaseSwimEscaped(
+  entry: { x: number; z: number } | undefined,
+  x: number,
+  z: number,
+  terrainTypeAt: (x: number, z: number) => string,
+): boolean {
+  if (!entry) return false
+  const here = terrainTypeAt(x, z)
+  if (here === 'water' || here === 'ocean') return false
+  // Probes at most 0.2 units apart find every channel at least a quarter unit
+  // wide (a line crossing a channel runs through at least its width); every
+  // river is RIVER_WIDTH_DEG wide, about 2.7 units, and lakes are wider still.
+  const n = Math.max(5, Math.ceil(Math.hypot(x - entry.x, z - entry.z) / 0.2))
+  for (let i = 1; i < n; i++) {
+    const f = i / n
+    if (terrainTypeAt(entry.x + (x - entry.x) * f, entry.z + (z - entry.z) * f) === 'water') return true
+  }
+  return false
+}
+
+/**
  * The roaming crossing decision (point 192, kept by point 312): a ROAMING
  * mover blocked by water crosses only when the readiness roll passes
  * (`roll < chance`) and the channel fits its swim width (`maxUnits`) — the
