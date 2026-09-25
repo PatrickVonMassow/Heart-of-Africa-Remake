@@ -8,7 +8,7 @@ import { launchVerifyBrowser, assertBackend, VERIFY_GL } from './_browser.mjs'
 import { sectionGate } from './sections.mjs'
 import { frameShutter } from './frameSubject.mjs'
 import { installTtsCache } from './ttsCache.mjs'
-import { communicationDriver, bankCycleSeconds, followBankTeaching, bankTeachingOrder } from './communicationDriver.mjs'
+import { communicationDriver, bankCycleSeconds, followBankTeaching, bankTeachingOrder, observeBankCall } from './communicationDriver.mjs'
 import { riverBankRoute, routeFrameProgress } from './communicationRouteCore.mjs'
 import { installCommunicationCapture, startAudioWindow, saveAudioWindow } from './communicationCapture.mjs'
 
@@ -145,6 +145,46 @@ async function faceNote(id) {
     return box && box.width > 1 && box.left > 0 && box.top > 0 && box.right < innerWidth && box.bottom < innerHeight
   }, id, 3000).then(() => true, () => false)
 }
+// The bank's viewing stand contains both ends of the game. Stay there and
+// follow the group's centre at child height BEFORE a call; a turn after RIVER
+// has begun consumes the very audio window this observation must preserve.
+async function bankCall(budgetMs) {
+  const after = await d.read(() => performance.now() / 1000)
+  let positioned = false
+  return observeBankCall({
+    budgetMs,
+    prepare: async () => {
+      if (!positioned) {
+        await d.walk(await d.read(() => window.__bankStageView()))
+        positioned = true
+      }
+      const centre = await d.read(() => {
+        const kids = window.__placeTag().children
+        return { x: kids.reduce((sum, c) => sum + c.x, 0) / kids.length,
+          z: kids.reduce((sum, c) => sum + c.z, 0) / kids.length, y: 0.85 }
+      })
+      await d.aim(centre)
+    },
+    sample: () => d.read((after) => ({
+      pageSeconds: performance.now() / 1000,
+      syllableSeconds: window.__balance.communication.syllableSeconds,
+      player: { ...window.__placePlayer },
+      candidates: window.__speech.labels().filter((label) => label.shownAt > after &&
+        label.speakerId.startsWith('kid-') && label.atoms.includes(window.__game.getState().vocabulary.RIVER))
+        .map((label) => {
+          const node = document.querySelector(`.speech-label[data-speaker="${label.speakerId}"]`)
+          const box = node?.getBoundingClientRect()
+          const visible = !!node?.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true }) &&
+            !!box && box.width > 1 && box.left > 0 && box.top > 0 && box.right < innerWidth && box.bottom < innerHeight
+          return { label, visible }
+        }),
+    }), after),
+    pause: (ms) => page.waitForTimeout(ms),
+    reject: (data) => event('child-call-rejected', data),
+  }).catch(async (error) => {
+    throw new Error(`${error.message} — ${await speechState()}`)
+  })
+}
 // `point` may be a function: a moving group is followed, re-approached every
 // 20 s while no note of theirs has reached the picture.
 async function speech(kind, point, frameName, budgetMs = 480000) {
@@ -152,11 +192,11 @@ async function speech(kind, point, frameName, budgetMs = 480000) {
   const approach = async () => typeof point === 'function'
     ? d.inspect(await point(), 5).catch(() => {})
     : d.inspect(point, kind === 'adult-talk' ? 2 : 5)
-  await approach()
+  if (kind !== 'child-call') await approach()
   // A player turns to the voice he hears: wait for a drawn note (unheard speech
   // is never drawn), face its speaker with the normal controls, and take it only
   // once the note stands inside the picture.
-  let spoken = null
+  let spoken = kind === 'child-call' ? await bankCall(budgetMs) : null
   const deadline = Date.now() + budgetMs
   let after = await d.read(() => performance.now() / 1000)
   while (!spoken) {

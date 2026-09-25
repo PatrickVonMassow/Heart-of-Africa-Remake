@@ -58,6 +58,33 @@ export function bankTeachingOrder(hearings, call) {
     rockBeforeCall: !!rock && rock.pageMs <= call.shownAt * 1000 }
 }
 
+/** Observe from a stand that contains the bank, facing the group before it
+ * speaks. Never spend the four syllables turning toward an already heard call.
+ * A rejected label is consumed once, with the evidence that refused it. */
+export async function observeBankCall({ budgetMs, prepare, sample, pause, reject, now = Date.now }) {
+  const deadline = now() + budgetMs
+  const seen = new Set()
+  while (now() < deadline) {
+    let aimError = null
+    try { await prepare() } catch (error) { aimError = error.message }
+    const snapshot = await sample()
+    for (const { label, visible } of snapshot.candidates) {
+      const key = `${label.speakerId}:${label.shownAt}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      const ageSeconds = snapshot.pageSeconds - label.shownAt
+      const reason = aimError ? 'aim error' : !visible ? 'off-picture'
+        : ageSeconds >= 4 * snapshot.syllableSeconds || now() >= deadline ? 'too late' : null
+      if (!reason) return label
+      await reject({ speaker: label.speakerId, shownAt: label.shownAt, reason,
+        ageSeconds, aimError, visible, player: snapshot.player })
+    }
+    const remaining = deadline - now()
+    if (remaining > 0) await pause(Math.min(250, remaining))
+  }
+  throw new Error(`No child-call note reached the picture within ${budgetMs / 1000}s`)
+}
+
 /** All writes after entry are Playwright keyboard/mouse input. evaluate reads
  * poses or computes routes on private grids; it never changes the live pose. */
 export function communicationDriver(page, { onTravelProgress = async () => {} } = {}) {

@@ -59,6 +59,15 @@ it('follows ROCK before the child call using a live configured cycle and saves t
   expect(source).toContain("receipt.bankTeaching.rockBeforeCall && (receipt.order === 'message-first' || receipt.bankTeaching.rockBeforeRiver)")
 })
 
+it('watches calls from the bank stand and saves refused candidates instead of chasing their notes', () => {
+  const observer = source.slice(source.indexOf('async function bankCall('), source.indexOf('// `point` may be a function:'))
+  expect(observer).toContain('d.walk(await d.read(() => window.__bankStageView()))')
+  expect(observer).toContain('await d.aim(centre)')
+  expect(observer).toContain("event('child-call-rejected', data)")
+  expect(observer).not.toContain('faceNote(')
+  expect(source).toContain("kind === 'child-call' ? await bankCall(budgetMs) : null")
+})
+
 it('aims before the drum trigger and rejects missed action frames', () => {
   const message = source.slice(source.indexOf('async function message('), source.indexOf('async function errand('))
   expect(message.indexOf('await d.aim(bodies)')).toBeLessThan(message.indexOf('await trigger()'))
