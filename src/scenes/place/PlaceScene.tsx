@@ -2061,7 +2061,8 @@ function PlaceRiver({
       now.push(p)
       if (!mesh) continue
       dummy.position.set(p.x, p.y, p.z)
-      dummy.scale.setScalar(flecks[i].size)
+      dummy.rotation.y = Math.atan2(bank.fx, bank.fz)
+      dummy.scale.set(flecks[i].size * 0.55, 1, flecks[i].size * 2.4)
       dummy.updateMatrix()
       mesh.setMatrixAt(i, dummy.matrix)
     }
