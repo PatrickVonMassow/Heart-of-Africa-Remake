@@ -57,11 +57,11 @@ it('finishes the aim with mouse-look when a turn key overshoots by a whole frame
   expect(presses).toBe(0)
 })
 
-it('aims at a declared subject height with normal mouse pitch before the shutter', async () => {
+it.each([false, true])('aims at a declared subject height with invertLook=%s before the shutter', async (invertLook) => {
   let pitch = 0, cursor = { x: 720, y: 450 }
   const d = communicationDriver({
-    evaluate: async (fn) => String(fn).includes('journalOpen') ? false : String(fn).includes('__driverCursor') ? cursor : { x: 0, z: 0, yaw: 0, pitch, eyeY: 1.7 },
-    mouse: { move: async (x, y) => { pitch -= (y - cursor.y) * 0.0011; cursor = { x, y } } },
+    evaluate: async (fn) => String(fn).includes('journalOpen') ? false : String(fn).includes('__driverCursor') ? cursor : { x: 0, z: 0, yaw: 0, pitch, eyeY: 1.7, invertLook },
+    mouse: { move: async (x, y) => { pitch += (invertLook ? 1 : -1) * (y - cursor.y) * 0.0011; cursor = { x, y } } },
   })
   await d.aim({ x: 0, y: 0.8, z: -3 })
   expect(pitch).toBeCloseTo(Math.atan2(-0.9, 3), 2)

@@ -35,7 +35,7 @@ export function communicationDriver(page, { onTravelProgress = async () => {} } 
     if (await read(() => window.__game.getState().journalOpen)) await page.locator('.journal header button').click()
     let scale = 1, last = 0, delta = 0, distance = 0
     for (let i = 0; i < 80; i++) {
-      const p = await read(() => ({ ...window.__placePlayer, eyeY: window.__placeCamera?.position.y ?? 1.7 }))
+      const p = await read(() => ({ ...window.__placePlayer, eyeY: window.__placeCamera?.position.y ?? 1.7, invertLook: window.__ui.getState().invertLook, sensitivity: window.__balance.mouseSensitivity }))
       delta = turnDelta(p.yaw, p, target)
       distance = Math.hypot(target.x - p.x, target.z - p.z)
       if (Math.abs(delta) < 0.065) {
@@ -44,7 +44,7 @@ export function communicationDriver(page, { onTravelProgress = async () => {} } 
           const change = desired - (p.pitch ?? 0)
           if (Math.abs(change) > 0.025) {
             const at = await read(() => window.__driverCursor ?? { x: 720, y: 450 })
-            const y = at.y - Math.round(change / 0.0011)
+            const y = at.y + Math.round(change / ((p.invertLook ? 1 : -1) * (p.sensitivity ?? 0.0011)))
             await page.mouse.move(at.x, y < 30 || y > 870 ? 450 : y, { steps: 4 })
             continue
           }
