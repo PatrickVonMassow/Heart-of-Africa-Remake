@@ -6973,6 +6973,11 @@ if (section('water-shy-flight')) {
     const hx = Math.sin(h), hz = Math.cos(h)
     const prey = { x: B.x, z: B.z, y: 0.2, rot: h, scale: 1, phase: 0.61 }
     herds.zebra.unshift(prey)
+    // The sim's own terrain for the landing: the coarse __terrainType and
+    // sampleTerrain can disagree at a bank cell, and the swim-out stops on the
+    // sim's land.
+    const [geo, terrain] = await Promise.all([import('/src/world/geo.ts'), import('/src/world/terrain.ts')])
+    const simType = (x, z) => { const ll = geo.worldToLatLon(x, z); return terrain.sampleTerrain(ll.lat, ll.lon, seed).type }
     setPos(B.x - hx * 3, B.z - hz * 3)
     const out = { inWater: false, released: false, swamOut: false, sawSwim: false, onLand: false, maxSpeed: 0 }
     // The nearest bank from a point (the same ray scan as the rule).
@@ -7008,10 +7013,13 @@ if (section('water-shy-flight')) {
       if (dt > 1e-3 && step > 0.05) out.maxSpeed = Math.max(out.maxSpeed, step / dt)
       last = { x: prey.x, z: prey.z, t: now }
       if (prey.crossing !== undefined) out.sawSwim = true
-      out.onLand = dry(prey.x, prey.z)
+      const st = simType(prey.x, prey.z)
+      out.onLand = st !== 'water' && st !== 'ocean'
       return out.onLand && prey.crossing === undefined
     })
     out.swamOut = out.onLand
+    out.endCoarse = T(prey.x, prey.z)
+    out.endCrossing = prey.crossing !== undefined
     out.nearest = +nearest.toFixed(2)
     out.travelled = +Math.hypot(prey.x - from.x, prey.z - from.z).toFixed(2)
     out.maxSpeed = +out.maxSpeed.toFixed(2)
