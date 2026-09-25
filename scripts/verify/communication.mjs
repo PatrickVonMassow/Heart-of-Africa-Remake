@@ -135,8 +135,14 @@ async function faceNote(id) {
     return box && box.width > 1 && box.left > 0 && box.top > 0 && box.right < innerWidth && box.bottom < innerHeight
   }, id, 3000).then(() => true, () => false)
 }
+// `point` may be a function: a moving group is followed, re-approached every
+// 20 s while no note of theirs has reached the picture.
 async function speech(kind, point, frameName) {
-  await d.inspect(point, kind === 'adult-talk' ? 2 : 5)
+  // A group standing somewhere unreachable (in the water) is heard from where he is.
+  const approach = async () => typeof point === 'function'
+    ? d.inspect(await point(), 5).catch(() => {})
+    : d.inspect(point, kind === 'adult-talk' ? 2 : 5)
+  await approach()
   // A player turns to the voice he hears: wait for a drawn note (unheard speech
   // is never drawn), face its speaker with the normal controls, and take it only
   // once the note stands inside the picture.
@@ -148,7 +154,8 @@ async function speech(kind, point, frameName) {
     const heard = await d.wait(({ after, child }) => window.__speech?.labels().find((l) =>
       l.shownAt > after && document.querySelector(`.speech-label[data-speaker="${l.speakerId}"]`) &&
       (child ? l.speakerId.startsWith('kid-') && l.atoms.includes(window.__game.getState().vocabulary.RIVER) : l.speakerId.startsWith('villager-'))
-    ), { after, child: kind === 'child-call' }, Math.max(1000, deadline - Date.now())).catch(async (e) => {
+    ), { after, child: kind === 'child-call' }, typeof point === 'function' ? Math.min(20000, Math.max(1000, deadline - Date.now())) : Math.max(1000, deadline - Date.now())).catch(async (e) => {
+      if (typeof point === 'function' && Date.now() < deadline) return null
       // Name what was said and drawn meanwhile, and who stood where.
       const state = await d.read((after) => ({
         river: window.__game.getState().vocabulary.RIVER, player: { ...window.__placePlayer },
@@ -159,6 +166,7 @@ async function speech(kind, point, frameName) {
       }), after)
       throw new Error(`${e.message} — no ${kind} note: ${JSON.stringify(state)}`)
     })
+    if (!heard) { await approach(); continue }
     const label = await heard.jsonValue(); await heard.dispose()
     after = label.shownAt
     if (await faceNote(label.speakerId)) spoken = label
@@ -277,7 +285,7 @@ async function observations() {
   const view = await d.read(() => window.__bankStageView())
   // A player walks to where the children are playing, not to the empty
   // playground: the bank game can run 30 m off it, beyond their call's reach.
-  const children = await d.read(() => {
+  const children = () => d.read(() => {
     const kids = window.__placeTag?.().children ?? []
     if (!kids.length) return window.__placeLayout.playGround
     return { x: kids.reduce((a, c) => a + c.x, 0) / kids.length, z: kids.reduce((a, c) => a + c.z, 0) / kids.length }
