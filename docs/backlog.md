@@ -1831,3 +1831,13 @@ Punkt in die Arbeitsordnung.
   the 659 card and removed 1208's now- and queue card; dashboard-guard then refused the stop
   ("open point 1208 appears nowhere"). Workaround: `board-queue.mjs set`, render, `board.mjs
   promote` again. NOT QUEUED: infrastructure under the 01.09 freeze, with a workaround.
+
+## Board card titles keep a hold marker after the point resumes
+
+Found 25.09.2026 (board chat). The queue card for point 659 still read
+"Die ganze Verständigungskette durchgespielt (angehalten)" although the point
+had long since resumed and its round 6 was the live focus. The marker lives in
+the card title in `.claude/board-queue.json` and nothing strips it when a point
+is picked up again, so the board contradicted itself until the user reported it.
+Corrected by hand with `scripts/board.mjs title 659`. Non-blocking: no player
+impact, board bookkeeping only.
