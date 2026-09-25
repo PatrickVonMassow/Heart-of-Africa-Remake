@@ -6,7 +6,7 @@ import { mkdirSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { launchVerifyBrowser, assertBackend, VERIFY_GL } from './_browser.mjs'
 import { sectionGate } from './sections.mjs'
-import { frameShutter } from './frameSubject.mjs'
+import { captureFrame } from './frameSubject.mjs'
 import { installTtsCache } from './ttsCache.mjs'
 import { communicationDriver, bankCycleSeconds, followBankTeaching, bankTeachingOrder, observeBankCall, faceWalkingChief } from './communicationDriver.mjs'
 import { riverBankRoute, routeFrameProgress } from './communicationRouteCore.mjs'
@@ -34,7 +34,8 @@ const d = communicationDriver(page, { onTravelProgress: async (position) => {
   await frame(`${riverLeg.prefix}-river-${riverLeg.frames - 1}`, { world: at, label: 'the river leg at a new travelled station', settle: false })
   await event('river-frame-station', { prefix: riverLeg.prefix, position, travelled: riverLeg.distance })
 } })
-const shutter = frameShutter(page, out)
+// `beforeCapture` checks a live action at the shutter itself, not after the write.
+const shutter = (name, decl, beforeCapture) => captureFrame(page, out, name, decl, { beforeCapture })
 const pendingAudio = new Map()
 let ambientBaseline = null
 const voiceWindows = new Map()
@@ -47,8 +48,8 @@ async function event(name, data = {}) {
   receipt.events.push({ name, step: receipt.step, ...clocks, ...data }); save()
 }
 async function step(name) { receipt.step = name; await event(name) }
-async function frame(name, subject) {
-  await shutter(prefix + name, subject).catch(async (error) => {
+async function frame(name, subject, beforeCapture) {
+  await shutter(prefix + name, subject, beforeCapture).catch(async (error) => {
     // A refused frame records where the game really stood, so the red names its cause.
     await event(`${name}-refused`, await d.read(() => {
       const s = window.__game.getState()
@@ -59,8 +60,8 @@ async function frame(name, subject) {
   })
   receipt.frames.push({ name: `${prefix}${name}.png`, step: receipt.step, subject, pageMs: await d.read(() => performance.now()) }); save()
 }
-async function localFrame(name, point, label) {
-  await frame(name, { local: { x: point.x, y: point.y ?? 0.8, z: point.z }, label, settle: false })
+async function localFrame(name, point, label, beforeCapture) {
+  await frame(name, { local: { x: point.x, y: point.y ?? 0.8, z: point.z }, label, settle: false }, beforeCapture)
 }
 async function audioStart(name, bands, preRoll = 0, label = null) {
   pendingAudio.set(name, bands)
@@ -266,8 +267,10 @@ async function chief(prefix = '05') {
     await d.wait(() => window.__chief?.phase === 'walking-out')
     const walkingChief = await faceWalkingChief(d)
     assert(await d.read(() => window.__chief.phase === 'walking-out'), `Chief walk framing was late: ${(Date.now() - chiefWalkStarted) / 1000}s since Space`)
-    await localFrame(`${prefix}-chief-walks-out`, walkingChief, 'the chief leaving his hut')
-    assert(await d.read(() => window.__chief.phase === 'walking-out'), `Chief walk frame was late: ${(Date.now() - chiefWalkStarted) / 1000}s since Space`)
+    // At 11 FPS the PNG write outlasts his short walk, so the phase is checked
+    // when the capture is requested; the picture is the next rendered frame.
+    await localFrame(`${prefix}-chief-walks-out`, walkingChief, 'the chief leaving his hut', async () =>
+      assert(await d.read(() => window.__chief.phase === 'walking-out'), `Chief walk frame was late: ${(Date.now() - chiefWalkStarted) / 1000}s since Space`))
   }
   const drummer = await d.read(() => ({ x: window.__placeSpots.drummer[0], z: window.__placeSpots.drummer[1] }))
   await d.wait(() => window.__chief?.phase === 'at-drummer')

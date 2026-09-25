@@ -78,7 +78,7 @@ it('aims before the drum trigger and rejects missed action frames', () => {
   expect(source).toContain("h.userData.errand.phase === 'walk'")
 })
 
-it('frames the departing chief after walking-out begins and keeps the phase around the shutter', () => {
+it('frames the departing chief after walking-out begins and checks the phase before and at the shutter', () => {
   const chief = source.slice(source.indexOf('async function chief('), source.indexOf('async function message('))
   const stand = chief.indexOf('await d.aim({ ...drum, y: 1.2 })')
   const space = chief.indexOf("await page.keyboard.press('Space')")
@@ -94,6 +94,7 @@ it('frames the departing chief after walking-out begins and keeps the phase arou
   expect(before).toBeGreaterThan(face)
   expect(frame).toBeGreaterThan(before)
   expect(after).toBeGreaterThan(frame)
+  expect(chief.slice(frame, after)).toContain('async () =>')
 })
 
 it('checks the socket and cliff at their terrain-raised rendered heights', () => {
