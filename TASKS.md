@@ -16188,3 +16188,55 @@ to land than a mechanism that needs a review.
   Test: `npm test -- enrichments --section=elephant-trampling` green; a Vitest case if the leave
   decision is a pure helper. Refs: src/scenes/travel/Wildlife.tsx, scripts/verify/enrichments.mjs.
   Bundle: Tierverhalten.
+
+- [ ] 1214. Apply the rule-review findings of 25.09.2026 (deletions and contradiction fixes).
+  Fortnightly rule-inventory review of 25.09.2026 (rule-review-guard). Each item deletes or simplifies a stale, redundant, contradictory or never-firing rule; the freeze admits exactly such points. Items touching .claude/settings.json need an attended session.
+  1. scripts/batch-resume-hook.mjs:216 + :225 — contradictory (with code and CLAUDE.md §6:63-64). RESUME_BODY
+     requires render/GUI picture checks on BOTH backends. `render-verify-core.mjs:1726/1870` (`isBackendSensitivePath`)
+     and §6 require one backend unless the change is backend-sensitive. Change: use §6 wording ("both backends when backend-sensitive, else one").
+  2. scripts/batch-resume-hook.mjs:218-223 — contradictory with the §2 freeze and §6:69/:80. The text sends "guards, docs,
+     dashboard, process files" straight to main and demands delegating "infra/guard" work to Agent-tool subagents.
+     §6 allows only small bookkeeping on main, and Agent-tool children block handover. Change: delete the MAXIMAL
+     DELEGATION and cross-cutting sentences and point to §6. The pool cap of 3 is already code (`DAEMON_POOL_CAP`, batch-daemon-core.mjs:68).
+  3. .claude/settings.json:62 and :66 — ineffective. `mechanism-review-guard` and `criticality-review-guard` are
+     Stop hooks that can never fire: `gather…Inputs` returns `applicable:false` without `--status`
+     (mechanism-review-guard.mjs:656, criticality-review-guard.mjs:783). About 2,000 lines run at every turn end
+     and do nothing. Change: remove both Stop registrations (protected path, needs an attended session) and keep `--status` as the reader.
+  4. docs/batch-owner-runbook.md:116 + :119 — not current and redundant. It says "Fable 5" twice, but the code is Fable 5.1.
+     It also copies the serving chain, which `servingChain()` (fable-switch-core.mjs:147) derives from the switch.
+     The runbook is not in the rule-echo `RULE_REGISTRY` (rule-echo-core.mjs:63), so nothing catches this drift.
+     Change: delete both sentences and point to CLAUDE.md §6 and `fable-switch --status`. Do not register it (freeze).
+  5. scripts/batch-resume-hook.mjs:212-236 — redundant. RESUME_BODY restates §6 (branch per point, push per commit,
+     TASKS main-only) and §9 (closing freeze). It also names "merge -> fast-gate -> tick -> deploy" but not
+     `land-point.mjs`, and land-point has no deploy step (0 hits). Change: cut to "Continue per CLAUDE.md §6/§9;
+     land via `node scripts/land-point.mjs <N> --model <m>`" and keep only the POINT BOUNDARY paragraph.
+  6. memory/ — obsolete and contradictory. 51 of the 101 memory files are not in the MEMORY.md index, but indexed files
+     link to them. Several contradict current rules: `verify-gui-on-both-backends` (vs §6 one-backend),
+     `never-stop-the-batch` (vs indexed `a-question-is-only-a-question`), `new-tasks-append-and-defer` ("EVERY change
+     request" vs §2 finding intake), and `sol-authors-by-default` (self-described ENDED 17.08.). Change: delete the ended
+     and superseded ones. `hard-cases-go-to-sol` is also a rule-echo registry entry, so deleting it means dropping that
+     entry too. Also delete the stray `854-rule-echo-model-policy.patch`.
+  7. memory/ — 8 dangling [[links]]: batch-runs-autonomously (7 files), queue-order-v02-bugfixes-only,
+     recommendation-is-a-decision, switch-to-fable-when-opus-stuck, tasks-md-english, resume-184-qa-framework,
+     parallel-batch-instances, parallel-session-same-dir-incident. Change: remove the links.
+  8. memory/release-order-communication-first.md (MEMORY.md:30) — contradictory. The index and TASKS.md:72-77 say
+     "communication → 633 → 174", while the body adds a higher "tier 1 token reduction". Most of that tier is archived
+     (700/701); 553/596 are still open. Change: delete the tier-1 paragraph (TASKS.md is authoritative) and ask the user to veto.
+  9. CLAUDE.md:81 vs :180 — contradictory within the file. The context fence is called "preventive text, not a pointer",
+     but it is a registered PreToolUse hook (`context-fence-guard.mjs`), and :180 says pre-action hooks are pointers.
+     Mode observe / armed false is current (point 1204 open). Change: drop "not a pointer".
+  10. CLAUDE.md:177 — partly obsolete. "supply required render/mechanism PROOF", but the mechanism gate no longer
+      blocks (finding 3). Change: "render PROOF (mechanism review: `--status`, advisory)".
+  11. CLAUDE.md:79 — not clean. "Regenerate a brief from an older revision." is ambiguous. Change: delete it, or say when to regenerate.
+  12. scripts/dashboard-reminder-core.mjs:24/:176 — current and clean (budgeted, enforced claims pinned). One nit: its
+      contract target `batch-dashboard-artifact` is not in the MEMORY.md index. Add that one line to the index. The
+      board-first duty is stated 3 times (reminder, §7.2:174, board-first-guard). Accepted: the reminder is the only prompt-time pointer.
+  Stop guards not listed have messages consistent with the code (render-verify, rule-echo registry, fence, pre-push gate, fold-point `--none`,
+  `finding.mjs`, all CLAUDE.md-named scripts exist); the other 27 Stop guards all have a live block path.
+  ## Evidence (for rule-review.mjs --reviewed)
+  Read hooks, settings.json Stop list, MEMORY.md + 101 memory files, CLAUDE.md §2-§9 against code. Fable 5.1 in fable-switch-core:9;
+  runbook:116/119 stale "Fable 5", unregistered echo. resume-hook:216 BOTH-backends contradicts isBackendSensitivePath;
+  :218-223 delegation/main-push contradicts §2 freeze/§6. mechanism/criticality Stop guards return applicable:false (656/783) =
+  never fire. 51 unindexed memories, 8 dangling links, 4 superseded. CLAUDE.md:81 vs :180 fence wording. No edits made.
+  Criticality: low — deletions and wording fixes; item 3 needs an attended session.
+  Bundle: Modell & Wächter.
