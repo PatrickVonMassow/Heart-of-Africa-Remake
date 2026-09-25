@@ -1458,6 +1458,12 @@
       "why": "Deletions and wording fixes under the freeze; no player impact, so behind the release work",
       "origin": "machine",
       "place": "last"
+    },
+    "1215": {
+      "at": "2026-09-25T18:19:59.224Z",
+      "why": "a readable-HUD polish point with no blocker; it follows the communication release work already ordered ahead of it",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1489,7 +1495,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-25T10:09:00.827Z",
+    "at": "2026-09-25T18:19:59.233Z",
     "points": [
       174,
       184,
@@ -1913,7 +1919,8 @@
       1209,
       1211,
       1213,
-      1214
+      1214,
+      1215
     ]
   }
 }
