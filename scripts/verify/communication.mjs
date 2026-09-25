@@ -9,6 +9,7 @@ import { sectionGate } from './sections.mjs'
 import { frameShutter } from './frameSubject.mjs'
 import { installTtsCache } from './ttsCache.mjs'
 import { communicationDriver } from './communicationDriver.mjs'
+import { bankCycleSeconds, followBankTeaching, bankTeachingOrder } from './communicationBank.mjs'
 import { riverBankRoute, routeFrameProgress } from './communicationRouteCore.mjs'
 import { installCommunicationCapture, startAudioWindow, saveAudioWindow } from './communicationCapture.mjs'
 
@@ -147,7 +148,7 @@ async function faceNote(id) {
 }
 // `point` may be a function: a moving group is followed, re-approached every
 // 20 s while no note of theirs has reached the picture.
-async function speech(kind, point, frameName) {
+async function speech(kind, point, frameName, budgetMs = 480000) {
   // A group standing somewhere unreachable (in the water) is heard from where he is.
   const approach = async () => typeof point === 'function'
     ? d.inspect(await point(), 5).catch(() => {})
@@ -157,7 +158,7 @@ async function speech(kind, point, frameName) {
   // is never drawn), face its speaker with the normal controls, and take it only
   // once the note stands inside the picture.
   let spoken = null
-  const deadline = Date.now() + 480000
+  const deadline = Date.now() + budgetMs
   let after = await d.read(() => performance.now() / 1000)
   while (!spoken) {
     assert(Date.now() < deadline, `No ${kind} note reached the picture: ${await speechState()}`)
@@ -196,6 +197,7 @@ async function speech(kind, point, frameName) {
   await d.wait((end) => window.__ambience.context().currentTime >= end,
     windowStart.contextTime + 4 * receipt.setup.levels.communication.syllableSeconds + 0.5, 30000)
   await audioEnd(kind, kind === 'child-call' ? receipt.bands.child : receipt.bands.adult)
+  return spoken
 }
 async function prompt(kind) {
   const label = await d.read(async (kind) => {
@@ -311,7 +313,28 @@ async function observations() {
     if (!kids.length) return window.__placeLayout.playGround
     return { x: kids.reduce((a, c) => a + c.x, 0) / kids.length, z: kids.reduce((a, c) => a + c.z, 0) / kids.length }
   })
-  await speech('child-call', children, '02-child-call')
+  const timing = await d.read(() => ({ bank: window.__balance.villageLife.bankGame,
+    communication: window.__balance.communication, childCount: window.__placeTag().children.length }))
+  const cycleSeconds = bankCycleSeconds(timing.bank, timing.communication, timing.childCount)
+  await event('bank-lesson-start', { cycleSeconds, childCount: timing.childCount })
+  const call = await followBankTeaching({
+    cycleSeconds,
+    approach: async () => d.inspect(await children(), 5).catch(() => {}),
+    readRock: () => d.read(() => window.__communicationHearings.events.find((h) => h.concept === 'ROCK')),
+    waitForRock: async (timeout) => {
+      const heard = await d.wait(() => window.__communicationHearings.events.find((h) => h.concept === 'ROCK'), null, timeout)
+        .catch((error) => { if (error.name === 'TimeoutError') return null; throw error })
+      if (!heard) return null
+      try { return await heard.jsonValue() } finally { await heard.dispose() }
+    },
+    onRock: (rock) => event('bank-rock-heard', { rock, cycleSeconds }),
+    call: (budgetMs) => speech('child-call', children, '02-child-call', budgetMs),
+  })
+  receipt.bankTeaching = { cycleSeconds,
+    ...bankTeachingOrder(await d.read(() => window.__communicationHearings.events), call) }
+  await event('bank-rock-before-river', receipt.bankTeaching)
+  check('ROCK was heard before RIVER and the observed child call',
+    receipt.bankTeaching.rockBeforeRiver && receipt.bankTeaching.rockBeforeCall)
   await d.walk(view); await d.aim(view.look)
   for (const direction of ['UPSTREAM', 'DOWNSTREAM']) {
     await d.wait((direction) => window.__placeTag().phase === 'run' && window.__placeTag().direction === direction, direction, 480000)
