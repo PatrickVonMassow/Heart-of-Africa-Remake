@@ -11,21 +11,14 @@ export function travelKeys(from, target, tolerance = 0.12) {
   return keys
 }
 
-/** Walk to the precomputed outside spot and aim `lead` metres ahead of the
- * departing chief on his straight path (stopping short of its end): he
- * outpaces a view that chases him. Keep the view still and shoot once he
- * walks within 0.45 rad of its centre. */
-export async function faceWalkingChief(d, stand, { from, to }, lead = 2) {
-  await d.walk(stand)
-  const chief = await d.read(() => ({ x: window.__chief.x, z: window.__chief.z }))
-  const dx = to.x - from.x, dz = to.z - from.z, length = Math.hypot(dx, dz)
-  const along = Math.min(length - 0.8, (chief.x - from.x) * dx / length + (chief.z - from.z) * dz / length + lead)
-  await d.aim({ x: from.x + dx * along / length, y: 1.2, z: from.z + dz * along / length })
+/** With the view already facing his path, wait until the departing chief has
+ * walked 1.5 m clear of the traveller and within 0.45 rad of the view centre. */
+export async function faceWalkingChief(d) {
   await d.wait(() => {
     const p = window.__placePlayer, c = window.__chief
     if (c.phase !== 'walking-out') return true
     const off = Math.atan2(-(c.x - p.x), -(c.z - p.z)) - p.yaw
-    return Math.abs(Math.atan2(Math.sin(off), Math.cos(off))) <= 0.45
+    return Math.hypot(c.x - p.x, c.z - p.z) >= 1.5 && Math.abs(Math.atan2(Math.sin(off), Math.cos(off))) <= 0.45
   }, null, 15000)
   return d.read(() => ({ x: window.__chief.x, y: 1.2, z: window.__chief.z }))
 }

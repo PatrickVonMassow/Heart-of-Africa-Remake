@@ -80,10 +80,10 @@ it('aims before the drum trigger and rejects missed action frames', () => {
 
 it('frames the departing chief after walking-out begins and keeps the phase around the shutter', () => {
   const chief = source.slice(source.indexOf('async function chief('), source.indexOf('async function message('))
-  const stand = chief.indexOf('const stand = await d.read(async (hut)')
+  const stand = chief.indexOf('await d.aim({ ...drum, y: 1.2 })')
   const space = chief.indexOf("await page.keyboard.press('Space')")
   const start = chief.indexOf("await d.wait(() => window.__chief?.phase === 'walking-out')")
-  const face = chief.indexOf('await faceWalkingChief(d, stand.spot, stand.path)')
+  const face = chief.indexOf('await faceWalkingChief(d)')
   const before = chief.indexOf("assert(await d.read(() => window.__chief.phase === 'walking-out'), `Chief walk framing was late:")
   const frame = chief.indexOf('await localFrame(`${prefix}-chief-walks-out`, walkingChief,')
   const after = chief.indexOf("assert(await d.read(() => window.__chief.phase === 'walking-out'), `Chief walk frame was late:")

@@ -1,12 +1,5 @@
 import { it, expect } from 'vitest'
 import { runInNewContext } from 'node:vm'
-import { buildLayout, chiefStandingSpot, interactiveCircleRadius } from '../../src/scenes/place/layout.ts'
-import { chiefBesideDrummerSpot } from '../../src/scenes/place/chiefWalk.ts'
-import { REGION_PLACE_STYLES } from '../../src/scenes/place/regionStyles.ts'
-import { standingClear, PLAYER_RADIUS } from '../../src/scenes/place/collision.ts'
-import { buildPlaceNavGrid, findPlaceRoute } from '../../src/scenes/place/routing.ts'
-import { balance } from '../../src/config/balance.ts'
-import { chiefWalkStand } from './communicationRouteCore.mjs'
 import { turnDelta, travelKeys, communicationDriver, faceWalkingChief } from './communicationDriver.mjs'
 it('turns through the shortest angle and maps world axes to ordinary travel keys', () => {
   expect(turnDelta(0, { x: 0, z: 0 }, { x: 0, z: -1 })).toBeCloseTo(0)
@@ -112,95 +105,20 @@ function pitchPage({ invertLook = false, cursorY = 450, sensitivity = 0.0011, fr
   return { page, player, state, moves, keys, window }
 }
 
-it.each([42, 12345])('frames the chief route from outside the real hut, seed %s', (seed) => {
-  const layout = buildLayout('bambara-village', seed)
-  const hut = layout.interactives.find((i) => i.type === 'chief')
-  const radius = interactiveCircleRadius('chief', REGION_PLACE_STYLES.west)
-  const from = chiefStandingSpot(hut, radius)
-  const to = chiefBesideDrummerSpot(balance.communication.chiefBesideDrummer)
-  const stand = chiefWalkStand(hut, { from, to }, (p) => standingClear(layout.colliders, p.x, p.z, PLAYER_RADIUS))
-  const dx = hut.door[0] - hut.pos[0], dz = hut.door[1] - hut.pos[1]
-  const length = Math.hypot(dx, dz)
-  expect(((stand.x - hut.door[0]) * dx + (stand.z - hut.door[1]) * dz) / length).toBeCloseTo(3)
-  expect(Math.hypot(stand.x - hut.door[0], stand.z - hut.door[1])).toBeCloseTo(Math.hypot(3, 2.5))
-  expect(Math.hypot(stand.x - hut.pos[0], stand.z - hut.pos[1])).toBeGreaterThan(radius + PLAYER_RADIUS)
-  expect(standingClear(layout.colliders, stand.x, stand.z, PLAYER_RADIUS)).toBe(true)
-  const grid = buildPlaceNavGrid(layout, layout.colliders, PLAYER_RADIUS)
-  expect(findPlaceRoute(grid, { x: hut.door[0], z: hut.door[1] }, stand)?.length).toBeGreaterThan(0)
-  const rx = to[0] - from[0], rz = to[1] - from[1]
-  // Stay off the chief's line; when aimed across the route, both ends
-  // remain in the camera's forward half-space, with no hut between us and him.
-  expect(Math.abs((stand.x - from[0]) * rz - (stand.z - from[1]) * rx) / Math.hypot(rx, rz)).toBeGreaterThan(PLAYER_RADIUS + 0.6)
-  for (const progress of [0, 0.25, 0.5, 0.75, 1]) {
-    const live = { x: from[0] + progress * rx, z: from[1] + progress * rz }
-    const yaw = Math.atan2(-((from[0] + to[0]) / 2 - stand.x), -((from[1] + to[1]) / 2 - stand.z))
-    for (const [x, z] of [from, to]) {
-      expect((x - stand.x) * -Math.sin(yaw) + (z - stand.z) * -Math.cos(yaw)).toBeGreaterThan(0)
-    }
-    for (let i = 0; i <= 20; i++) {
-      const t = i / 20
-      expect(Math.hypot(stand.x + t * (live.x - stand.x) - hut.pos[0],
-        stand.z + t * (live.z - stand.z) - hut.pos[1])).toBeGreaterThan(radius)
-    }
-  }
-})
-
-it.each([0, Math.PI / 2, Math.PI, -Math.PI / 2])('rotates the outside stand with the hut geometry: %s', (angle) => {
-  const rotate = ([x, z]) => [10 + x * Math.cos(angle) - z * Math.sin(angle),
-    -7 + x * Math.sin(angle) + z * Math.cos(angle)]
-  const hut = { pos: [0, 0], door: [0, 4] }, from = [1.6, 4], to = [5, 10]
-  const stand = chiefWalkStand(hut, { from, to })
-  const rotated = chiefWalkStand({ pos: rotate(hut.pos), door: rotate(hut.door) }, { from: rotate(from), to: rotate(to) })
-  const expected = rotate([stand.x, stand.z])
-  expect(rotated.x).toBeCloseTo(expected[0])
-  expect(rotated.z).toBeCloseTo(expected[1])
-})
-
-it('refuses blocked outside spots and missing geometry before calling the chief', () => {
-  const hut = { pos: [0, 0], door: [0, 4] }, route = { from: [1.6, 4], to: [5, 10] }
-  expect(() => chiefWalkStand(hut, route, () => false)).toThrow('No reachable outside spot')
-  expect(() => chiefWalkStand({ pos: [0, 0], door: [0, 0] }, route)).toThrow('outward door normal')
-  expect(() => chiefWalkStand(hut, { from: [1, 1], to: [1, 1] })).toThrow('route towards the drummer')
-})
-
-it('walks to the planned spot, aims ahead of the chief and shoots once he walks into view', async () => {
-  const stand = { x: 4, z: 3 }, chief = { x: 0, z: 0, phase: 'walking-out' }, events = []
-  const player = { x: 4, z: 3, yaw: 0 }
+it('shoots the departing chief once he walks clear and into the view', async () => {
+  const chief = { x: 0, z: -0.5, phase: 'walking-out' }, player = { x: 0, z: 0, yaw: 0 }, seen = []
+  const context = () => ({ window: { __chief: chief, __placePlayer: player }, Math })
   const driver = {
-    walk: async (target) => { events.push(['walk', target]); chief.x = -5 },
-    aim: async (subject) => { events.push(['aim', subject]); player.yaw = Math.atan2(-(subject.x - 4), -(subject.z - 3)) },
-    read: async (fn) => runInNewContext(`(${fn.toString()})()`, { window: { __chief: chief, __placePlayer: player } }),
+    read: async (fn) => runInNewContext(`(${fn.toString()})()`, context()),
     wait: async (fn) => {
-      const inView = () => runInNewContext(`(${fn.toString()})()`, { window: { __chief: chief, __placePlayer: player }, Math })
-      events.push(['in view at start', inView()])
-      chief.x = 1.1
-      events.push(['in view later', inView()])
+      for (const at of [{ x: 0, z: -0.5 }, { x: 3, z: -1 }, { x: 0.5, z: -2 }]) {
+        Object.assign(chief, at)
+        seen.push(runInNewContext(`(${fn.toString()})()`, context()))
+      }
     },
   }
-  expect(await faceWalkingChief(driver, stand, { from: { x: -5, z: 0 }, to: { x: 5, z: 0 } }, 6)).toEqual({ x: 1.1, y: 1.2, z: 0 })
-  expect(events).toEqual([['walk', stand], ['aim', { x: 1, y: 1.2, z: 0 }], ['in view at start', false], ['in view later', true]])
-})
-
-it('aims no further than just short of the drummer', async () => {
-  const aims = []
-  const driver = {
-    walk: async () => {},
-    read: async () => ({ x: 4, z: 0 }),
-    aim: async (subject) => aims.push(subject),
-    wait: async () => {},
-  }
-  await faceWalkingChief(driver, { x: 0, z: 3 }, { from: { x: 0, z: 0 }, to: { x: 5, z: 0 } })
-  expect(aims[0].x).toBeCloseTo(4.2)
-})
-
-it('refuses to aim or shoot when the outside walk is blocked', async () => {
-  const aims = []
-  const driver = {
-    walk: async () => { throw new Error('blocked outside walk') },
-    aim: async (subject) => aims.push(subject),
-  }
-  await expect(faceWalkingChief(driver, { x: 4, z: 3 }, { from: { x: 0, z: 0 }, to: { x: 5, z: 0 } })).rejects.toThrow('blocked outside walk')
-  expect(aims).toEqual([])
+  expect(await faceWalkingChief(driver)).toEqual({ x: 0.5, y: 1.2, z: -2 })
+  expect(seen).toEqual([false, false, true])
 })
 
 it.each([false, true].flatMap((invertLook) => [10, 450, 890].flatMap((cursorY) =>

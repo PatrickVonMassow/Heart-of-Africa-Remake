@@ -15,7 +15,7 @@ Format: one line per finding — `- YYYY-MM-DD <source> — <finding>`.
   run on `b9cffdc7b`, log `local/verify-logs/2026-09-25T11-00-29-016-communication.log`,
   receipt and frames `local/659-round6-red/` (reviewer's main checkout). The subsequent
   phase assertion correctly failed because the chief had reached the drummer. The driver
-  now chooses a reachable outside spot; the shared shutter's occlusion limitation remains
+  now faces the chief's path from the door before calling him; the shared shutter's occlusion limitation remains
   non-blocking. Promote only if it reproduces as a false approval outside this driver.
 - 2026-09-21 Weberin-Gespräch (`docs/peoples-1890.md`, `src/scenes/place/lifeSpots.ts` `LOOM_SPOT`)
   — die Völker-Doku kennt kein Weben: `grep -rli "weaver|loom" docs` trifft `peoples-1890.md`

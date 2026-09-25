@@ -1,24 +1,3 @@
-/** Stand three metres outward from the door and 2.5 to its side (3.9 m away).
- * Choose the side furthest from the line towards the drummer, so the chief
- * crosses the view and the player's arrival yaw cannot send him into the hut. */
-export function chiefWalkStand(hut, { from, to }, reachable = () => true) {
-  const [x, z] = hut.door
-  const dx = x - hut.pos[0], dz = z - hut.pos[1]
-  const length = Math.hypot(dx, dz)
-  if (!(length > 0)) throw new Error('Chief hut needs an outward door normal')
-  const nx = dx / length, nz = dz / length
-  const rx = to[0] - from[0], rz = to[1] - from[1]
-  if (!(Math.hypot(rx, rz) > 0)) throw new Error('Chief needs a route towards the drummer')
-  const candidates = [-1, 1].map((side) => ({
-    x: x + 3 * nx + side * 2.5 * nz,
-    z: z + 3 * nz - side * 2.5 * nx,
-  }))
-  const clearance = (p) => Math.abs((p.x - from[0]) * rz - (p.z - from[1]) * rx)
-  const stand = candidates.sort((a, b) => clearance(b) - clearance(a)).find(reachable)
-  if (!stand) throw new Error('No reachable outside spot for the departing chief')
-  return stand
-}
-
 /** Ordered river stations, source-to-mouth in the source data. Navigation uses
  * coordinates; the named route frames are still owed as evidence of the clue. */
 export function riverBankRoute(axis, from, to, offset = 0.2) {
