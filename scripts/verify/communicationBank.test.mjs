@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest'
 import { balance } from '../../src/config/balance'
-import { bankCycleSeconds, followBankTeaching, bankTeachingOrder } from './communicationBank.mjs'
+import { bankCycleSeconds, followBankTeaching, bankTeachingOrder } from './communicationDriver.mjs'
 
 const bank = balance.villageLife.bankGame
 const cycleSeconds = bankCycleSeconds(bank, balance.communication, balance.villageLife.tag.childCount)

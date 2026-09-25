@@ -7,7 +7,6 @@ import { DEV_SUITES, laneFor, suitesFor } from './tiers.mjs'
 import { UNMEASURED_SUITES, COUNTED_SUITE_FRAMES } from './run-wait-core.mjs'
 const source = readFileSync(new URL('./communication.mjs', import.meta.url), 'utf8')
 const driver = readFileSync(new URL('./communicationDriver.mjs', import.meta.url), 'utf8')
-const bank = readFileSync(new URL('./communicationBank.mjs', import.meta.url), 'utf8')
 describe('continuous communication route contract', () => {
   it('is selectable as one indivisible section on either real backend', () => {
     expect(listSections(source)).toEqual(['continuous-route'])
@@ -27,7 +26,7 @@ describe('continuous communication route contract', () => {
     const setupEnd = source.indexOf('receipt.seed = receipt.setup.seed')
     expect(setupStart).toBeGreaterThan(0)
     expect(setupEnd).toBeGreaterThan(setupStart)
-    const continuous = source.slice(0, setupStart) + source.slice(setupEnd) + driver + bank
+    const continuous = source.slice(0, setupStart) + source.slice(setupEnd) + driver
     expect(continuous).not.toMatch(/\.(?:setState|debugJumpTo|debugAddEquipment|enterPlace|leavePlace|hearUtterance|setUtteranceHypothesis|requestDrumMessage|handArtefactToChief|useCarriedForm|callChiefOut|dig|buy)\s*\(/)
     expect(continuous).not.toMatch(/__speech\.(?:speak|clear)|__placeCast|__chiefHome|__ambience\.(?:speak|start|refresh)/)
     expect(continuous).not.toMatch(/__placePlayer\.[\w]+\s*=/)
