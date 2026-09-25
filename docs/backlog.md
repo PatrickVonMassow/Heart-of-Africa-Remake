@@ -1826,3 +1826,8 @@ Punkt in die Arbeitsordnung.
   never filled; likely the stall or errand-expiry release dropping the pair. NOT QUEUED: seen
   once, not in the following green runs on either backend; the continuous route now records
   `water-errand-abandoned`, so a repeat is filed with its state.
+- **`board.mjs focus` drops the other now-cards** (25.09.2026, reproduced twice 05:37–05:49).
+  With 659 and 1208 both current, `board.mjs focus 659 …` cut "Woran ich gerade arbeite" down to
+  the 659 card and removed 1208's now- and queue card; dashboard-guard then refused the stop
+  ("open point 1208 appears nowhere"). Workaround: `board-queue.mjs set`, render, `board.mjs
+  promote` again. NOT QUEUED: infrastructure under the 01.09 freeze, with a workaround.
