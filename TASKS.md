@@ -162,7 +162,7 @@ put it is the mistake this line exists to stop.
   keeps hitting the bugs.
   Bundle: Verständigung.
 
-- [ ] 1210. Two wildlife checks went red on WebGL 2 right after the hunted-animal water
+- [ ] 1211. Two wildlife checks went red on WebGL 2 right after the hunted-animal water
   flight landed, and both touch what that change moved: prey at a bank and the hunt's end.
   MEASURED 25.09.2026, full `enrichments` WebGL 2 on `main` 40dc83d10 (285 pass, 3 fail):
   (a) `prey squeezed against a bank flees ALONG it — real ground covered, never a waterline
@@ -180,6 +180,7 @@ put it is the mistake this line exists to stop.
   deflects — so a 201 bank that is river/lake water may legitimately be entered, and the
   check's staging must then use a sea edge or assert the swim); fix the side that is wrong;
   both sections green on BOTH backends, frames judged; unit coverage for any behaviour change.
+  Bundle: Tierverhalten — beside 1208, whose change the two checks meet.
 - [ ] 1206. Route blind-parallel enumerate halves to Astra at the default share setting, then switch to default.
   FINAL STATE: at `default`, a blind-parallel half reaches GPT-6 Astra; authoring stays with Claude; and the machine switch stands at `default`.
 
