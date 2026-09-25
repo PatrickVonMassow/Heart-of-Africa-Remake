@@ -11,20 +11,19 @@ export function travelKeys(from, target, tolerance = 0.12) {
   return keys
 }
 
-/** Walk to the precomputed outside spot, then turn to the departing chief.
- * He keeps walking while the view turns, so aim again until his refreshed
- * position lies well inside the view (0.3 rad off its centre at most). */
-export async function faceWalkingChief(d, stand, attempts = 4) {
+/** Walk to the precomputed outside spot and aim ahead of the departing chief,
+ * at `lead` on his path: he outpaces a view that chases him. Keep the view
+ * still and shoot once he walks within 0.3 rad of its centre. */
+export async function faceWalkingChief(d, stand, lead) {
   await d.walk(stand)
-  const subject = () => d.read(() => ({ x: window.__chief.x, y: 1.2, z: window.__chief.z }))
-  let chief = await subject()
-  for (let i = 0; i < attempts; i++) {
-    await d.aim(chief)
-    chief = await subject()
-    const p = await d.read(() => ({ x: window.__placePlayer.x, z: window.__placePlayer.z, yaw: window.__placePlayer.yaw }))
-    if (Math.abs(turnDelta(p.yaw, p, chief)) <= 0.3) break
-  }
-  return chief
+  await d.aim({ x: lead.x, y: 1.2, z: lead.z })
+  await d.wait(() => {
+    const p = window.__placePlayer, c = window.__chief
+    if (c.phase !== 'walking-out') return true
+    const off = Math.atan2(-(c.x - p.x), -(c.z - p.z)) - p.yaw
+    return Math.abs(Math.atan2(Math.sin(off), Math.cos(off))) <= 0.3
+  }, null, 15000)
+  return d.read(() => ({ x: window.__chief.x, y: 1.2, z: window.__chief.z }))
 }
 
 /** One healthy cycle at its configured backstops. Every child can own a run;
