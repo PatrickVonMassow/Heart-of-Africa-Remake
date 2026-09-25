@@ -13,7 +13,7 @@
 // `tagShuffle.test.ts` replays.
 
 import { SHIPPED_VOCABULARY } from '../../communication/vocabulary'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { SpeechFloor } from '../../communication/speechFloor'
 import { bankPlayRocksView } from './riverBank'
 import { registerOptions, utterancePlan, utteranceSeconds } from '../../communication/speaking'
@@ -1718,11 +1718,48 @@ it('starts natural first and follow-up charges with the whole catcher group off 
 })
 
 describe('the bank teaches from the live heard set', () => {
+  beforeEach(() => resetDevAsserts())
+  afterEach(() => vi.restoreAllMocks())
+
   it('keeps cycles rock-only when the listener has missed every rock naming', () => {
-    const { log } = replay(180, { world: { ...openWorld(), hasHeard: () => false } })
+    const errors = vi.spyOn(console, 'error')
+    const { s, log } = replay(360, { world: { ...openWorld(), hasHeard: () => false } })
+    expect(s.cycles).toBeGreaterThan(0)
     expect(log.said.length).toBeGreaterThan(2)
     expect(log.said.every((u) => u.concept === 'ROCK')).toBe(true)
     expect(log.said.some((u) => u.moment === 'tap')).toBe(true)
+    expect(errors).not.toHaveBeenCalled()
+  })
+  it('keeps the rock-only exception through the tap that teaches ROCK, then announces the next run', () => {
+    const errors = vi.spyOn(console, 'error')
+    let heard = false
+    let lessonRun = -1
+    let continued = false
+    const { log } = replay(240, {
+      world: { ...openWorld(), hasHeard: () => heard },
+      observe: (s, u) => {
+        if (!heard && u?.moment === 'tap') { heard = true; lessonRun = s.runs }
+        if (heard && s.phase === 'run' && s.runs === lessonRun) {
+          expect(s.rockOnly).toBe(true)
+          expect(s.direction).toBeNull()
+          continued = true
+        }
+        if (s.phase === 'run' && s.runs > lessonRun && heard) {
+          expect(s.rockOnly).toBe(false)
+          expect(s.direction).not.toBeNull()
+        }
+      },
+    })
+    expect(continued).toBe(true)
+    expect(log.said.some((u) => u.moment === 'announce')).toBe(true)
+    expect(errors).not.toHaveBeenCalled()
+  })
+  it('still reports a direction run whose announcement is missing', () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
+    replay(180, { observe: (s) => {
+      if (s.phase === 'run') s.direction = null
+    } })
+    expect(errors).toHaveBeenCalledWith(expect.stringContaining('[ASSERT] bank-run-unannounced'))
   })
   it('admits directions only after a rock naming actually enters the listener memory', () => {
     const heard = new Set<string>()
