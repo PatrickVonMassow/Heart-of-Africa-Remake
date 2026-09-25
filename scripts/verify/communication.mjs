@@ -269,8 +269,8 @@ async function chief(prefix = '05') {
       const grid = buildPlaceNavGrid(layout, layout.colliders, PLAYER_RADIUS)
       const route = { from: chiefStandingSpot(hut, interactiveCircleRadius('chief', style)),
         to: chiefBesideDrummerSpot(window.__balance.communication.chiefBesideDrummer) }
-      const lead = { x: route.from[0] + 0.6 * (route.to[0] - route.from[0]), z: route.from[1] + 0.6 * (route.to[1] - route.from[1]) }
-      return { lead, spot: chiefWalkStand(hut, route, (p) => insidePlace(layout, p.x, p.z, 0.6) &&
+      const path = { from: { x: route.from[0], z: route.from[1] }, to: { x: route.to[0], z: route.to[1] } }
+      return { path, spot: chiefWalkStand(hut, route, (p) => insidePlace(layout, p.x, p.z, 0.6) &&
         standingClear(layout.colliders, p.x, p.z, PLAYER_RADIUS) &&
         findPlaceRoute(grid, { x: hut.door[0], z: hut.door[1] }, p)) }
     }, hut)
@@ -280,7 +280,7 @@ async function chief(prefix = '05') {
     const chiefWalkStarted = Date.now()
     await page.keyboard.press('Space')
     await d.wait(() => window.__chief?.phase === 'walking-out')
-    const walkingChief = await faceWalkingChief(d, stand.spot, stand.lead)
+    const walkingChief = await faceWalkingChief(d, stand.spot, stand.path)
     assert(await d.read(() => window.__chief.phase === 'walking-out'), `Chief walk framing was late: ${(Date.now() - chiefWalkStarted) / 1000}s since Space`)
     await localFrame(`${prefix}-chief-walks-out`, walkingChief, 'the chief leaving his hut')
     assert(await d.read(() => window.__chief.phase === 'walking-out'), `Chief walk frame was late: ${(Date.now() - chiefWalkStarted) / 1000}s since Space`)

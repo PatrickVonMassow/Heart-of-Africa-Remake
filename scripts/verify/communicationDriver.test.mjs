@@ -164,10 +164,10 @@ it('refuses blocked outside spots and missing geometry before calling the chief'
 })
 
 it('walks to the planned spot, aims ahead of the chief and shoots once he walks into view', async () => {
-  const stand = { x: 4, z: 3 }, lead = { x: 1, z: 0 }, chief = { x: 0, z: 0, phase: 'walking-out' }, events = []
+  const stand = { x: 4, z: 3 }, chief = { x: 0, z: 0, phase: 'walking-out' }, events = []
   const player = { x: 4, z: 3, yaw: 0 }
   const driver = {
-    walk: async (target) => { events.push(['walk', target]); chief.x = -3 },
+    walk: async (target) => { events.push(['walk', target]); chief.x = -5 },
     aim: async (subject) => { events.push(['aim', subject]); player.yaw = Math.atan2(-(subject.x - 4), -(subject.z - 3)) },
     read: async (fn) => runInNewContext(`(${fn.toString()})()`, { window: { __chief: chief, __placePlayer: player } }),
     wait: async (fn) => {
@@ -177,8 +177,20 @@ it('walks to the planned spot, aims ahead of the chief and shoots once he walks 
       events.push(['in view later', inView()])
     },
   }
-  expect(await faceWalkingChief(driver, stand, lead)).toEqual({ x: 1.1, y: 1.2, z: 0 })
+  expect(await faceWalkingChief(driver, stand, { from: { x: -5, z: 0 }, to: { x: 5, z: 0 } }, 6)).toEqual({ x: 1.1, y: 1.2, z: 0 })
   expect(events).toEqual([['walk', stand], ['aim', { x: 1, y: 1.2, z: 0 }], ['in view at start', false], ['in view later', true]])
+})
+
+it('aims no further than just short of the drummer', async () => {
+  const aims = []
+  const driver = {
+    walk: async () => {},
+    read: async () => ({ x: 4, z: 0 }),
+    aim: async (subject) => aims.push(subject),
+    wait: async () => {},
+  }
+  await faceWalkingChief(driver, { x: 0, z: 3 }, { from: { x: 0, z: 0 }, to: { x: 5, z: 0 } })
+  expect(aims[0].x).toBeCloseTo(4.2)
 })
 
 it('refuses to aim or shoot when the outside walk is blocked', async () => {
@@ -187,7 +199,7 @@ it('refuses to aim or shoot when the outside walk is blocked', async () => {
     walk: async () => { throw new Error('blocked outside walk') },
     aim: async (subject) => aims.push(subject),
   }
-  await expect(faceWalkingChief(driver, { x: 4, z: 3 }, { x: 1, z: 0 })).rejects.toThrow('blocked outside walk')
+  await expect(faceWalkingChief(driver, { x: 4, z: 3 }, { from: { x: 0, z: 0 }, to: { x: 5, z: 0 } })).rejects.toThrow('blocked outside walk')
   expect(aims).toEqual([])
 })
 

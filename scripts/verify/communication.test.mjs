@@ -83,7 +83,7 @@ it('frames the departing chief after walking-out begins and keeps the phase arou
   const stand = chief.indexOf('const stand = await d.read(async (hut)')
   const space = chief.indexOf("await page.keyboard.press('Space')")
   const start = chief.indexOf("await d.wait(() => window.__chief?.phase === 'walking-out')")
-  const face = chief.indexOf('await faceWalkingChief(d, stand.spot, stand.lead)')
+  const face = chief.indexOf('await faceWalkingChief(d, stand.spot, stand.path)')
   const before = chief.indexOf("assert(await d.read(() => window.__chief.phase === 'walking-out'), `Chief walk framing was late:")
   const frame = chief.indexOf('await localFrame(`${prefix}-chief-walks-out`, walkingChief,')
   const after = chief.indexOf("assert(await d.read(() => window.__chief.phase === 'walking-out'), `Chief walk frame was late:")
