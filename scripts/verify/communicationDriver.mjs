@@ -102,8 +102,16 @@ export async function observeBankCall({ budgetMs, prepare, sample, pause, reject
  * `last` meanwhile; only then is he recorded as lapsed. */
 export function inviteOutcome(s, watch, labelSeconds) {
   if (s.labelled) return { seen: s.labelled }
+  const sampledBefore = watch.sampledAt
+  watch.sampledAt = s.nowS
   if (s.last?.purpose === 'invitation' && s.last.speaker === s.initiator) {
-    watch.spokeAt ??= s.nowS - s.last.age
+    const spokeAt = s.nowS - s.last.age
+    // Spoken and expired inside a sampling gap (the player was walking back
+    // into reach): the picture was never asked, so this is no lapse.
+    if (watch.spokeAt === undefined && sampledBefore !== undefined && spokeAt > sampledBefore && s.last.age > labelSeconds) {
+      return { missed: true, spokeAt, gapSeconds: s.nowS - sampledBefore }
+    }
+    watch.spokeAt ??= spokeAt
     // What the label channel held when the word was first seen spoken: no
     // label, a label the heard-filter hides, or a label dropped later.
     watch.atSpeak ??= s.speech ?? null

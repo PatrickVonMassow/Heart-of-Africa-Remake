@@ -166,3 +166,20 @@ it('keeps the label channel as it stood when the initiator was first seen speaki
   inviteOutcome({ ...base, nowS: 1, last: { purpose: 'invitation', speaker: 2, age: 1 }, speech: { channel: 'later' }, task: null }, watch, 4)
   expect(inviteOutcome({ ...base, nowS: 6, last: null, task: null }, watch, 4)).toMatchObject({ lapsed: true, spokeUnseen: true, atSpeak: speech })
 })
+it('does not charge a lapse for an invitation spoken and expired while the player walked back into reach', async () => {
+  const task = { phase: 'invite', owes: true, siteIndex: 1 }, base = { initiator: 2, labelled: null, initiatorLabel: null }
+  const samples = [
+    { ...base, nowS: 0, task, last: null, villager: { x: 1 } },
+    // The pursuit walk suspends sampling for 9 s; the word came at 2 s and its label is gone.
+    { ...base, nowS: 9, task: null, last: { purpose: 'invitation', speaker: 2, age: 7 } },
+  ]
+  let t = 0, i = 0
+  const outcome = await followInvitation({ budgetMs: 1000, labelSeconds: 4, now: () => t, pause: async (ms) => { t += ms }, sample: async () => samples[Math.min(i++, samples.length - 1)] })
+  expect(outcome).toEqual({ missed: true, spokeAt: 2, gapSeconds: 9 })
+})
+it('still charges a lapse when the invitation was spoken while being sampled', () => {
+  const watch = {}, base = { initiator: 2, labelled: null, initiatorLabel: null }
+  inviteOutcome({ ...base, nowS: 0, task: { phase: 'invite', owes: true }, last: null, villager: { x: 1 } }, watch, 4)
+  inviteOutcome({ ...base, nowS: 0.1, task: null, last: { purpose: 'invitation', speaker: 2, age: 0 } }, watch, 4)
+  expect(inviteOutcome({ ...base, nowS: 6, task: null, last: { purpose: 'invitation', speaker: 2, age: 5.9 } }, watch, 4)).toMatchObject({ lapsed: true, spokeUnseen: true })
+})

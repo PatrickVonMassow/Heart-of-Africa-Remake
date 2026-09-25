@@ -505,6 +505,10 @@ async function observations() {
       throw new Error(`no invitation note: ${JSON.stringify(state)}`)
     }
     const candidate = outcome.seen ?? outcome
+    if (candidate.missed) {
+      await event('dig-invitation-unsampled', { initiator: gatheringAt.index, ...candidate })
+      continue
+    }
     if (candidate.lapsed) {
       await event('dig-invitation-lapsed', { lapses, initiator: gatheringAt.index, ...candidate, player: await d.read(() => ({ ...window.__placePlayer })) })
       assert(++lapses < 3, `Three dig initiators lapsed without their invitation: ${JSON.stringify(candidate)}`)
