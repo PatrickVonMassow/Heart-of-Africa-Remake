@@ -1,4 +1,5 @@
 import { it, expect } from 'vitest'
+import { runInNewContext } from 'node:vm'
 import { turnDelta, travelKeys, communicationDriver } from './communicationDriver.mjs'
 it('turns through the shortest angle and maps world axes to ordinary travel keys', () => {
   expect(turnDelta(0, { x: 0, z: 0 }, { x: 0, z: -1 })).toBeCloseTo(0)
@@ -65,4 +66,64 @@ it.each([false, true])('aims at a declared subject height with invertLook=%s bef
   })
   await d.aim({ x: 0, y: 0.8, z: -3 })
   expect(pitch).toBeCloseTo(Math.atan2(-0.9, 3), 2)
+})
+
+function pitchPage({ invertLook = false, cursorY = 450, sensitivity = 0.0011, frozen = false } = {}) {
+  const player = { x: 0, z: 0, yaw: 0.031, pitch: 0 }
+  const state = { journalOpen: false }
+  const window = {
+    __placePlayer: player, __placeCamera: { position: { y: 1.7 } },
+    __game: { getState: () => state }, __ui: { getState: () => ({ invertLook }) },
+    __balance: { mouseSensitivity: sensitivity }, __driverCursor: { x: 720, y: cursorY },
+  }
+  const moves = [], keys = []
+  const evaluate = async (fn, arg) => runInNewContext(`(${fn.toString()})(arg)`, { window, arg })
+  const page = {
+    evaluate,
+    waitForFunction: async (fn, arg) => expect(await evaluate(fn, arg)).toBe(true),
+    keyboard: { press: async (key) => {
+      keys.push(key)
+      if (key === 'Tab') state.journalOpen = !state.journalOpen
+      else if (key === 'Escape') state.journalOpen = false
+      else throw new Error(`Unexpected aim key: ${key}`)
+    } },
+    mouse: { move: async (x, y, { steps = 1 } = {}) => {
+      expect(y).toBeGreaterThanOrEqual(0)
+      expect(y).toBeLessThan(900)
+      moves.push({ x, y, journalOpen: state.journalOpen })
+      const start = window.__driverCursor
+      for (let step = 1; step <= steps; step++) {
+        const next = { x: start.x + (x - start.x) * step / steps, y: start.y + (y - start.y) * step / steps }
+        if (!state.journalOpen && !frozen) {
+          player.yaw -= (next.x - window.__driverCursor.x) * sensitivity
+          player.pitch += (invertLook ? 1 : -1) * (next.y - window.__driverCursor.y) * sensitivity
+        }
+        window.__driverCursor = next
+      }
+    } },
+  }
+  return { page, player, state, moves, keys }
+}
+
+it.each([false, true].flatMap((invertLook) => [10, 450, 890].flatMap((cursorY) =>
+  [0.0011, 0.0004].map((sensitivity) => ({ invertLook, cursorY, sensitivity })),
+)))('converges on the tapped bank rock from pitch zero: %j', async (options) => {
+  const fake = pitchPage(options)
+  await communicationDriver(fake.page).aim({ x: 0, y: 0.9, z: -3.57 })
+  expect(Math.abs(fake.player.pitch - Math.atan2(-0.8, 3.57))).toBeLessThan(0.025)
+  expect(fake.player.yaw).toBeCloseTo(0.031)
+  expect(fake.moves.length).toBeLessThan(8)
+  expect(fake.state.journalOpen).toBe(false)
+  if ((options.invertLook && options.cursorY === 10) || (!options.invertLook && options.cursorY === 890)) {
+    expect(fake.moves.some((move) => move.journalOpen)).toBe(true)
+    expect(fake.keys).toContain('Tab')
+  }
+})
+
+it('names the pitch error when mouse-look cannot reach the bank rock', async () => {
+  const fake = pitchPage({ frozen: true })
+  await expect(communicationDriver(fake.page).aim({ x: 0, y: 0.9, z: -3.57 }))
+    .rejects.toThrow(/yaw -0\.031 rad, pitch -0\.220 rad off at 3\.57 m/)
+  expect(fake.moves.length).toBeLessThanOrEqual(160)
+  expect(fake.state.journalOpen).toBe(false)
 })

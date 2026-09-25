@@ -100,30 +100,43 @@ export function communicationDriver(page, { onTravelProgress = async () => {} } 
   // the next press instead of swinging past the subject indefinitely. A turn
   // key still moves a whole frame's worth, so the last stretch goes through
   // mouse-look, which turns by the exact pixel delta (0.0011 rad/px). The
-  // cursor's real position is only recorded, so every nudge stays on its row
-  // and never tilts the view (movementY 0).
+  // cursor's real position is recorded, so yaw nudges stay on their row and
+  // only an explicitly requested subject height tilts the view.
   page.addInitScript?.(() => addEventListener('mousemove', (e) => { window.__driverCursor = { x: e.clientX, y: e.clientY } }, { capture: true, passive: true }))
   async function aim(target) {
     // An entry that opened the journal by itself holds the cursor; a player
     // closes it before turning (the view does not turn under an open panel).
     if (await read(() => window.__game.getState().journalOpen)) await page.locator('.journal header button').click()
-    let scale = 1, last = 0, delta = 0, distance = 0
-    for (let i = 0; i < 80; i++) {
+    let scale = 1, last = 0, delta = 0, distance = 0, pitchChange = null
+    for (let i = 0; i <= 80; i++) {
       const p = await read(() => ({ ...window.__placePlayer, eyeY: window.__placeCamera?.position.y ?? 1.7, invertLook: window.__ui.getState().invertLook, sensitivity: window.__balance.mouseSensitivity }))
       delta = turnDelta(p.yaw, p, target)
       distance = Math.hypot(target.x - p.x, target.z - p.z)
+      pitchChange = target.y === undefined ? null
+        : Math.atan2(target.y - (p.eyeY ?? 1.7), Math.max(0.1, distance)) - (p.pitch ?? 0)
+      if (Math.abs(delta) < 0.065 && (pitchChange === null || Math.abs(pitchChange) <= 0.025)) return
+      // Read once after the final input so failures report the remaining error.
+      if (i === 80) break
       if (Math.abs(delta) < 0.065) {
-        if (target.y !== undefined && page.mouse) {
-          const desired = Math.atan2(target.y - (p.eyeY ?? 1.7), Math.max(0.1, distance))
-          const change = desired - (p.pitch ?? 0)
-          if (Math.abs(change) > 0.025) {
-            const at = await read(() => window.__driverCursor ?? { x: 720, y: 450 })
-            const y = at.y + Math.round(change / ((p.invertLook ? 1 : -1) * (p.sensitivity ?? 0.0011)))
-            await page.mouse.move(at.x, y < 30 || y > 870 ? 450 : y, { steps: 4 })
-            continue
+        if (!page.mouse) break
+        const at = await read(() => window.__driverCursor ?? { x: 720, y: 450 })
+        const dy = Math.max(-400, Math.min(400, Math.round(pitchChange / ((p.invertLook ? 1 : -1) * (p.sensitivity ?? 0.0011)))))
+        let y = at.y
+        if (y + dy < 30 || y + dy > 870) {
+          // Automation has no pointer lock. Recentring with look engaged would
+          // undo earlier pitch progress. Tab frees the cursor through the real
+          // journal UI; Escape closes it without moving the cursor again.
+          await page.keyboard.press('Tab')
+          await wait(() => window.__game.getState().journalOpen, null, 5000)
+          try { await page.mouse.move(at.x, 450, { steps: 4 }) }
+          finally {
+            await page.keyboard.press('Escape')
+            await wait(() => !window.__game.getState().journalOpen, null, 5000)
           }
+          y = 450
         }
-        return
+        await page.mouse.move(at.x, y + dy, { steps: 4 })
+        continue
       }
       if (Math.abs(delta) < 0.35 && page.mouse) {
         const at = await read(() => window.__driverCursor ?? { x: 0, y: 0 })
@@ -137,7 +150,7 @@ export function communicationDriver(page, { onTravelProgress = async () => {} } 
       last = delta
       await held([delta > 0 ? 'ArrowLeft' : 'ArrowRight'], () => page.waitForTimeout(Math.max(8, Math.min(180, Math.max(20, Math.abs(delta) / 2.2 * 700)) * scale)))
     }
-    throw new Error(`Could not aim at the declared subject using turn keys (${delta.toFixed(3)} rad off at ${distance.toFixed(2)} m)`)
+    throw new Error(`Could not aim at the declared subject using keyboard/mouse look (yaw ${delta.toFixed(3)} rad, pitch ${pitchChange === null ? 'not requested' : `${pitchChange.toFixed(3)} rad`} off at ${distance.toFixed(2)} m)`)
   }
   async function walkLeg(target) {
     const started = Date.now()
