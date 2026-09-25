@@ -22,13 +22,13 @@ describe('one walkable place surface', () => {
   it('carries a crossing up and down a continuous mound with no edge step', () => {
     const c = spoilCentre(site)
     const ground = { bank: null, sites: [site], progress: [full], rocks: [] }
-    expect(placeGroundHeight(ground, c.x, c.z)).toBeCloseTo(0.54)
+    expect(placeGroundHeight(ground, c.x, c.z)).toBeCloseTo(0.8)
     let last = 0
     let peak = 0
     for (let x = -SPOIL_RADIUS_X - 0.1; x <= SPOIL_RADIUS_X + 0.1; x += 0.01) {
       const p = digLocalToWorld(site, 1.65 + x, 0)
       const h = placeGroundHeight(ground, p.x, p.z)
-      expect(Math.abs(h - last)).toBeLessThan(0.009)
+      expect(Math.abs(h - last)).toBeLessThan(0.013)
       peak = Math.max(peak, h)
       last = h
     }

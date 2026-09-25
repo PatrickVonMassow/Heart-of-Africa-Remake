@@ -13,7 +13,7 @@
 // `tagShuffle.test.ts` replays.
 
 import { SHIPPED_VOCABULARY } from '../../communication/vocabulary'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { SpeechFloor } from '../../communication/speechFloor'
 import { bankPlayRocksView } from './riverBank'
 import { registerOptions, utterancePlan, utteranceSeconds } from '../../communication/speaking'
@@ -953,7 +953,7 @@ describe('the children`s game at the bank (point 687)', () => {
     expect(walkedAfterOut).toBeGreaterThan(0)
   })
 
-  it('walks round the traveller instead of stopping the game, and gives him the wider berth', () => {
+  it('walks round the traveller instead of stopping the game', () => {
     // The stranger stands in the middle of the lane, squarely on the line the
     // runners take. The game must go on, and nobody may come nearer than a
     // villager's body plus the extra berth.
@@ -962,8 +962,11 @@ describe('the children`s game at the bank (point 687)', () => {
     const { runs: blocked, log } = replayAll(600, { world })
     expect(blocked.reduce((n, r) => n + r.s.runs, 0)).toBeGreaterThan(2)
     expect(log.said.some((u) => u.moment === 'arrival')).toBe(true)
-    // …and the same replays without him produce a game too, so the case is
-    // measuring the swerve rather than a settlement that never plays.
+  })
+
+  it('keeps the bank game running without a traveller in the lane', () => {
+    // Keep the same five-seed control, with its own timeout budget: both
+    // groups together exceeded 20 seconds under concurrent authoring load.
     const { runs: open } = replayAll(600)
     expect(open.reduce((n, r) => n + r.s.runs, 0)).toBeGreaterThan(2)
   })
@@ -1712,4 +1715,66 @@ it('starts natural first and follow-up charges with the whole catcher group off 
   } })
   expect(firstCharges).toBeGreaterThan(0)
   expect(groupCharges).toBeGreaterThan(0)
+})
+
+describe('the bank teaches from the live heard set', () => {
+  beforeEach(() => resetDevAsserts())
+  afterEach(() => vi.restoreAllMocks())
+
+  it('keeps cycles rock-only when the listener has missed every rock naming', () => {
+    const errors = vi.spyOn(console, 'error')
+    const { s, log } = replay(360, { world: { ...openWorld(), hasHeard: () => false } })
+    expect(s.cycles).toBeGreaterThan(0)
+    expect(log.said.length).toBeGreaterThan(2)
+    expect(log.said.every((u) => u.concept === 'ROCK')).toBe(true)
+    expect(log.said.some((u) => u.moment === 'tap')).toBe(true)
+    expect(errors).not.toHaveBeenCalled()
+  })
+  it('keeps the rock-only exception through the tap that teaches ROCK, then announces the next run', () => {
+    const errors = vi.spyOn(console, 'error')
+    let heard = false
+    let lessonRun = -1
+    let continued = false
+    const { log } = replay(240, {
+      world: { ...openWorld(), hasHeard: () => heard },
+      observe: (s, u) => {
+        if (!heard && u?.moment === 'tap') { heard = true; lessonRun = s.runs }
+        if (heard && s.phase === 'run' && s.runs === lessonRun) {
+          expect(s.rockOnly).toBe(true)
+          expect(s.direction).toBeNull()
+          continued = true
+        }
+        if (s.phase === 'run' && s.runs > lessonRun && heard) {
+          expect(s.rockOnly).toBe(false)
+          expect(s.direction).not.toBeNull()
+        }
+      },
+    })
+    expect(continued).toBe(true)
+    expect(log.said.some((u) => u.moment === 'announce')).toBe(true)
+    expect(errors).not.toHaveBeenCalled()
+  })
+  it('still reports a direction run whose announcement is missing', () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
+    replay(180, { observe: (s) => {
+      if (s.phase === 'run') s.direction = null
+    } })
+    expect(errors).toHaveBeenCalledWith(expect.stringContaining('[ASSERT] bank-run-unannounced'))
+  })
+  it('admits directions only after a rock naming actually enters the listener memory', () => {
+    const heard = new Set<string>()
+    let rocks = 0
+    const { log } = replay(240, {
+      world: { ...openWorld(), hasHeard: (concept) => heard.has(concept) },
+      observe: (_s, u) => {
+        if (!u) return
+        if (u.concept === 'UPSTREAM' || u.concept === 'DOWNSTREAM') expect(heard.has('ROCK')).toBe(true)
+        // The first two namings are out of earshot: emitted is not heard.
+        if (u.concept === 'ROCK' && ++rocks >= 3) heard.add('ROCK')
+      },
+    })
+    expect(rocks).toBeGreaterThanOrEqual(3)
+    expect(log.said.some((u) => u.concept === 'UPSTREAM')).toBe(true)
+    expect(log.said.some((u) => u.concept === 'DOWNSTREAM')).toBe(true)
+  })
 })

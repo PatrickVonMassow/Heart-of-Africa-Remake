@@ -9,6 +9,14 @@ when their area is touched anyway or a triage says otherwise.
 Format: one line per finding — `- YYYY-MM-DD <source> — <finding>`.
 
 <!-- entries -->
+- 2026-09-25 point 659 round 6, R6-N1 — the frame shutter checks subject projection but
+  did not detect hut occlusion: `05-chief-walks-out.png` was accepted from inside the hut
+  although the chief himself was absent from the visible picture. WebGPU continuous-route
+  run on `b9cffdc7b`, log `local/verify-logs/2026-09-25T11-00-29-016-communication.log`,
+  receipt and frames `local/659-round6-red/` (reviewer's main checkout). The subsequent
+  phase assertion correctly failed because the chief had reached the drummer. The driver
+  now faces the chief's path from the door before calling him; the shared shutter's occlusion limitation remains
+  non-blocking. Promote only if it reproduces as a false approval outside this driver.
 - 2026-09-21 Weberin-Gespräch (`docs/peoples-1890.md`, `src/scenes/place/lifeSpots.ts` `LOOM_SPOT`)
   — die Völker-Doku kennt kein Weben: `grep -rli "weaver|loom" docs` trifft `peoples-1890.md`
   nicht. `design.md` nennt Weben unter den Alltagstätigkeiten, aber weder Bauform noch Technik
@@ -1841,3 +1849,12 @@ the card title in `.claude/board-queue.json` and nothing strips it when a point
 is picked up again, so the board contradicted itself until the user reported it.
 Corrected by hand with `scripts/board.mjs title 659`. Non-blocking: no player
 impact, board bookkeeping only.
+
+## Communication route: two framing weaknesses seen in round 7
+
+Found 26.09.2026 in the point-659 route evidence (`communication-webgpu-1790372136841-*`).
+`03-dig-invitation`: the driver keeps within 0.6 × talk reach of the initiator, so on WebGPU it
+stood right behind him; his head fills the foreground and the label sits high above it. The WebGL
+twin shows the pair and the label cleanly. `07-clay-impression` / `07-answer-sounding`: the
+"Space — Have the answer beaten again" prompt sits over inventory slot 6 ("Clay Impression of a
+Rock"); both stay legible. Non-blocking: the game behaves correctly and every word is readable.

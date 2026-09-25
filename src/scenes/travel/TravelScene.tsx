@@ -1,3 +1,4 @@
+import { TalusSocket } from './TalusSocket'
 // Bird's-eye travel view (design.md §2): 3D terrain around the player,
 // top-down oriented movement, camera following from above. Visuals: TSL sky
 // dome, sun with soft shadows, animated ocean, instanced biome vegetation.
@@ -2224,6 +2225,7 @@ function CommunicationRock() {
  * (§16) carries that framing.
  */
 function CulturalLandmarks() {
+  const fitted = useGame((s) => s.spentSockets.includes('bandiagara-talus'))
   const seed = useGame((s) => s.seed)
   const geos = useMemo(
     () => ({
@@ -2248,7 +2250,7 @@ function CulturalLandmarks() {
         // playthroughs — except Giza: its row diagonal (Khufu NE) and the
         // east-facing Sphinx are real geography the geometry encodes, and the
         // west-bank footprint clearance assumes the unrotated extent.
-        const yaw = c.kind === 'giza-pyramids' ? 0 : mulberry32((seed ^ (0x9e3779b1 * (i + 1))) >>> 0)() * Math.PI * 2
+        const yaw = (c.kind === 'giza-pyramids' || c.id === 'bandiagara') ? 0 : mulberry32((seed ^ (0x9e3779b1 * (i + 1))) >>> 0)() * Math.PI * 2
         return { id: c.id, kind: c.kind, x: w.x, z: w.z, y, yaw }
       }),
     [seed],
@@ -2273,16 +2275,16 @@ function CulturalLandmarks() {
   return (
     <>
       {items.map((it) => (
+        <group key={it.id} position={[it.x, it.y, it.z]} rotation={[0, it.yaw, 0]}>
+        {it.id === 'bandiagara' && <TalusSocket fitted={fitted} />}
         <mesh
-          key={it.id}
           geometry={geos[it.kind]}
           material={material}
-          position={[it.x, it.y, it.z]}
-          rotation={[0, it.yaw, 0]}
           castShadow
           receiveShadow
           dispose={null}
         />
+        </group>
       ))}
     </>
   )

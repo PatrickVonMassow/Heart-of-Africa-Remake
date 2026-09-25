@@ -29,7 +29,7 @@ describe('the work has a visible purpose and result', () => {
   })
 
   it('requires a completed bout, rather than accumulated partial digging, to leave the result', () => {
-    for (const [kind, result] of [['pit', 'covered-store'], ['postHole', 'set-post'], ['patch', 'planted-rows']] as const) {
+    for (const [kind, result] of [['pit', 'excavated-pit'], ['postHole', 'set-post'], ['patch', 'planted-rows']] as const) {
       expect(digSiteFurniture(kind, { dug: 100, strikes: 80 }).result).toBeNull()
       expect(digSiteFurniture(kind, { dug: 12, strikes: 8, completed: true }).result).toBe(result)
     }

@@ -220,8 +220,8 @@ export function buildRiverFlecks(count: number): RiverFleck[] {
     const g = (i * 0.6180339887) % 1
     out.push({
       along0: ((i + 0.5) / n) * RIVER_DRIFT_SPAN,
-      across: 1.1 + g * (RIVER_REACH - 3),
-      size: 0.22 + ((i * 0.381966) % 1) * 0.3,
+      across: i % 2 === 0 ? 0.8 + g * 3 : 4 + g * (RIVER_REACH - 5),
+      size: 0.35 + ((i * 0.381966) % 1) * 0.3,
     })
   }
   return out

@@ -60,6 +60,8 @@ export interface LoomWorkView {
   /** Whether the two direction words exist in this settlement at all. False
    *  where the warp lies on no river and there is no upstream to name. */
   teaches: boolean
+  /** Directions follow the listener's first ROCK hearing, as at the bank. */
+  rockHeard: boolean
   /** Whether the helper is at the station to take an order. */
   helper: boolean
   /** Where the weaver sits — where her word falls. */
@@ -270,11 +272,11 @@ export function stepLoomWork(
   if (state.owed) {
     // NOBODY SPEAKS TO NOBODY: with no helper at the station the order is not
     // given at all, and it is not lost either — it waits for him.
-    const blocked = !view.helper || view.childrenHear(view.seat.x, view.seat.z)
+    const blocked = !view.rockHeard || !view.helper || view.childrenHear(view.seat.x, view.seat.z)
     // The backstop counts only the time the word COULD have been said. A
     // station with nobody to address is LEGITIMATELY quiet, and an alarm that
     // cries on a healthy quiet spell is switched off within a week (point 589).
-    if (view.helper) state.owedFor += dt
+    if (view.helper && view.rockHeard) state.owedFor += dt
     const floor = view.floor
     const allowed = !blocked && (!floor || floor.request({
       situation: state.situation,

@@ -1037,6 +1037,24 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
         })
         expect(codes().join(' ')).toContain('speech-inaudible')
       })
+
+      it('stays silent while a drum message quiets the voices — that is not a defect', () => {
+        ctx.currentTime = 10000
+        const plan = drumMessagePlan(SHIPPED_VOCABULARY)
+        playDrumMessage(plan)
+        // The live bus sits at zero until the drum ends; the fake applies both
+        // automation steps at once, so the quiet is held here by hand.
+        const bus = speechBusOf(speak()[0])
+        const held = bus.gain.value
+        spy.mockClear()
+        bus.gain.value = 0
+        speak()
+        expect(codes()).toEqual([])
+        ctx.currentTime = 10000 + plan.duration
+        speak()
+        bus.gain.value = held
+        expect(codes().join(' ')).toContain('speech-inaudible')
+      })
     })
   })
 
@@ -1447,4 +1465,12 @@ describe('the reed beat reaches the placed audio route', () => {
     playLoomBeat(0, 1)
     expect([ctx.sources.length, ctx.panners.length]).toEqual(before)
   })
+})
+
+it('cuts scheduled speech for the complete drum interval and restores the voice volume', async () => {
+  const { quietSpeechBus } = await import('./ambience')
+  const gain = { cancelScheduledValues: vi.fn(), setValueAtTime: vi.fn() }
+  quietSpeechBus(gain as unknown as AudioParam, 10, 8, 0.7)
+  expect(gain.cancelScheduledValues).toHaveBeenCalledWith(10)
+  expect(gain.setValueAtTime.mock.calls).toEqual([[0, 10], [0.7, 18]])
 })

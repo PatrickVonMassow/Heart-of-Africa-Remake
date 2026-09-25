@@ -13,6 +13,7 @@ import { MONTH_KEYS } from '../systems/season'
 
 import { useUi } from '../state/ui'
 import { StatusBar } from './StatusBar'
+import { ClayImpression } from './ClayImpression'
 import { JournalPanel } from './JournalPanel'
 import { Dialogs } from './Dialogs'
 import { DrumMessageWatcher } from './DrumMessage'
@@ -215,6 +216,7 @@ function InventoryBar() {
           onClick={slot.activate}
         >
           {i < 9 && <span className="inv-digit" aria-hidden="true">{i + 1}</span>}
+          {slot.form === 'rock-relief' && <ClayImpression />}
           {slot.label}
         </button>
       ))}

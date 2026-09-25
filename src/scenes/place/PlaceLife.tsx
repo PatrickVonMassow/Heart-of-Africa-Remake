@@ -632,6 +632,7 @@ function Loom({
         // A settlement whose warp lies on no river has no upstream to name.
         vocabulary: useGame.getState().vocabulary,
         teaches: station.onRiverAxis,
+        rockHeard: Object.hasOwn(useGame.getState().communication.heard, useGame.getState().vocabulary.ROCK),
         helper: true,
         seat: station.weaver,
         childrenHear,
@@ -705,6 +706,7 @@ function Loom({
     const phase = stride + gaitOffset.current
     helperGait.current = phase
     if (helper.current) {
+      if (import.meta.env.DEV) helper.current.userData.errand = work.errand ? { toward: work.errand.toward, phase: work.errand.phase } : null
       // Dropped onto his stance leg, so the swinging feet ride the ground
       // instead of hanging above it.
       helper.current.position.set(waterSide * HELPER_SIDE_OFFSET, gaitBodyLift(phase, FIGURE_LIMBS.hipY), picture.helperAt)
@@ -1130,6 +1132,10 @@ function Kids({
     // walk itself (`wayTo`).
     if (nav) navRestrict(nav, onGround)
     return {
+      hasHeard: (concept) => {
+        const s = useGame.getState()
+        return Object.hasOwn(s.communication.heard, s.vocabulary[concept])
+      },
       radius: region.radius,
       centerX: region.x,
       centerZ: region.z,
@@ -1605,6 +1611,11 @@ function Kids({
       /** The bank round's own phase, for a check that wants to know what it is
        *  looking at; absent in the tag round. */
       phase: bank ? bank.phase : null,
+      // How far the round has come and whether a word waits for the floor, so
+      // a silent round names whether it is stalled or only muted.
+      cycles: bank ? bank.cycles : null,
+      runs: bank ? bank.runs : null,
+      pendingWords: bank ? bank.pending.map((u) => u.concept) : null,
       chargeHeld: chargeCapture.current.held,
       // The tag round's catch reading (work-order 1176); null in the bank round.
       pauseFor: game ? game.pauseFor : null,
@@ -3521,7 +3532,9 @@ function ErrandVillagers({
           drawn: { squatY: g ? g.scale.y : null, handY, headAspect },
           carry: carryOf(work, i),
           work: task
-            ? { situation: task.situation, phase: task.phase, siteIndex: task.siteIndex, x: task.x, z: task.z, arrived: task.arrived }
+            ? { situation: task.situation, phase: task.phase, siteIndex: task.siteIndex, x: task.x, z: task.z, arrived: task.arrived,
+                partner: task.partner, owes: !!task.owes, hushed: !!task.hushed, withheld: !!task.withheld,
+                pending: task.pendingWord?.concept ?? null, childrenHear: view.childrenHear(p.x, p.z) }
             : null,
         }
       }),
@@ -3796,10 +3809,16 @@ function speakWork(
   anchor: THREE.Group | null,
   gesture: RefObject<GestureState> | undefined,
 ): void {
-  if (!gesture) return
   const distance = placePlayerPosition.active
     ? Math.hypot(speaker.x - placePlayerPosition.x, speaker.z - placePlayerPosition.z)
     : Infinity
+  if (import.meta.env.DEV) {
+    // Why a spoken work word did or did not raise its note, for the checks.
+    const w = window as unknown as { __workSpeech?: unknown[] }
+    w.__workSpeech = [...(w.__workSpeech ?? []).slice(-7), { speaker: said.speaker, purpose: said.purpose,
+      at: performance.now() / 1000, distance, audible: speechReach(distance).audible, anchor: !!anchor, gesture: !!gesture }]
+  }
+  if (!gesture) return
   const { utterance, plan } = conceptSpeech(said.concept, useGame.getState().vocabulary, distance, { bearing: speechBearing(camera, speaker) })
   playSpeech(plan)
   if (speechReach(distance).audible) {
@@ -3958,7 +3977,7 @@ export function PlaceLife({
 }) {
   const speechTime = useRef(0)
   useFrame((_, dt) => { speechTime.current += Math.min(dt, 0.1) })
-  const speechFloor = useMemo(() => new SpeechFloor(() => placePlayerPosition, () => speechTime.current, placeId), [placeId])
+  const speechFloor = useMemo(() => new SpeechFloor(() => placePlayerPosition, () => speechTime.current, placeId, () => !!useUi.getState().drumPerformance), [placeId])
   let hash = 0
   for (const c of placeId) hash = (hash * 31 + c.charCodeAt(0)) | 0
   const localSeed = (seed ^ hash) >>> 0

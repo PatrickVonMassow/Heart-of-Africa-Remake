@@ -60,6 +60,7 @@ textarea {
 /* --- Status bar ---------------------------------------------------------- */
 
 .status-bar {
+  z-index: 16777500;
   position: absolute;
   top: 0;
   left: 0;
@@ -660,6 +661,7 @@ textarea {
 
 /* Dismissible notice when the renderer fell back to WebGL 2. */
 .renderer-warning {
+  z-index: 16778500;
   position: absolute;
   top: 56px;
   left: 50%;
@@ -1549,6 +1551,8 @@ textarea {
    z-index of its own, so the HUD panels and modals above keep their order
    (§17.4). */
 .speech-label {
+  max-width: min(320px, calc(100vw - 32px));
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   align-items: center;

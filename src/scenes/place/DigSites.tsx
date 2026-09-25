@@ -62,7 +62,7 @@ function Spoil({ site, index }: { site: DigSite; index: number }) {
 }
 
 function Seedling({ x, z }: { x: number; z: number }) {
-  return <group position={[x, 0.055, z]}>
+  return <group position={[x, 0.055, z]} scale={1.7}>
     <mesh position={[0, 0.11, 0]}><cylinderGeometry args={[0.012, 0.018, 0.22, 5]} /><meshStandardMaterial color="#6f7d35" /></mesh>
     {[-1, 1].map((side) => <mesh key={side} position={[side * 0.075, 0.17, 0]} rotation={[0, 0, side * -0.6]} scale={[0.1, 0.035, 0.045]}>
       <sphereGeometry args={[1, 6, 4]} /><meshStandardMaterial color="#58733c" roughness={1} />
@@ -95,10 +95,11 @@ export function DigSites({ sites, progress }: { sites: readonly DigSite[]; progr
           <cylinderGeometry args={[0.14, 0.14, 2.45, 7]} /><meshStandardMaterial color="#775334" roughness={1} />
         </mesh>)}
       </group> : <group name="dig-mouth">
-        <mesh position={[0, 0.018, 0]} receiveShadow><cylinderGeometry args={[r * 1.08, r * 1.12, 0.035, 16]} /><meshStandardMaterial color="#62452a" roughness={1} /></mesh>
-        <mesh position={[0, 0.058, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow receiveShadow><torusGeometry args={[r * 0.78, r * 0.14, 5, 16]} /><meshStandardMaterial color="#775334" roughness={1} /></mesh>
-        <mesh position={[0, 0.045 - look.wallDepth * 0.12, 0]}><cylinderGeometry args={[r * 0.82, r * look.bottomRadius, look.wallDepth, 16, 2, true]} /><meshStandardMaterial color="#49301f" side={THREE.DoubleSide} roughness={1} /></mesh>
-        <mesh position={[0, 0.026, 0]}><cylinderGeometry args={[r * look.bottomRadius, r * look.bottomRadius, 0.025, 16]} /><meshStandardMaterial color="#211914" roughness={1} /></mesh>
+        {/* An open earth rim: no opaque cap across the mouth. The ground
+            plate is uncut, so the shadow floor sits just above it. */}
+        <mesh position={[0, 0.08, 0]} rotation={[Math.PI / 2, 0, 0]} scale={[1, 0.92, 1]} castShadow receiveShadow><torusGeometry args={[r * 0.9, r * 0.12, 5, 13]} /><meshStandardMaterial color="#775334" roughness={1} /></mesh>
+        <mesh name="pit-shadow" position={[0, 0.025, 0]} rotation={[-Math.PI / 2, 0, 0]}><circleGeometry args={[r * 0.86, 13]} /><meshStandardMaterial color={worked?.completed ? '#17100c' : '#49301f'} roughness={1} /></mesh>
+        <mesh position={[0, 0.06, 0]}><cylinderGeometry args={[r * 0.86, r * look.bottomRadius, 0.07, 13, 1, true]} /><meshStandardMaterial color="#49301f" side={THREE.DoubleSide} roughness={1} /></mesh>
       </group>}
       <group name={furniture.beside}>
         {furniture.beside === 'grain-baskets-and-cover' && <>
@@ -114,10 +115,9 @@ export function DigSites({ sites, progress }: { sites: readonly DigSite[]; progr
         </mesh>)}
       </group>
       {furniture.result && <group name={furniture.result}>
-        {furniture.result === 'covered-store' && <>
-          <mesh position={[0, 0.085, 0]} receiveShadow><cylinderGeometry args={[0.66, 0.66, 0.09, 16]} /><meshStandardMaterial color="#a18451" roughness={1} /></mesh>
-          {[-0.35, -0.12, 0.12, 0.35].map((x) => <mesh key={x} position={[x, 0.135, 0]}><boxGeometry args={[0.024, 0.012, 0.95]} /><meshStandardMaterial color="#6d512f" roughness={1} /></mesh>)}
-        </>}
+        {furniture.result === 'excavated-pit' && <mesh name="fresh-earth-rim" position={[0, 0.045, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[r * 0.98, r * 1.3, 13]} /><meshStandardMaterial color="#956341" roughness={1} />
+        </mesh>}
         {furniture.result === 'planted-rows' && [-0.65, 0, 0.65].flatMap((z) => [-0.85, -0.3, 0.3, 0.85].map((x) => <Seedling key={`${x}/${z}`} x={x} z={z} />))}
         {furniture.result === 'set-post' && <mesh position={[0, 0.85, 0]} castShadow><cylinderGeometry args={[0.09, 0.13, 1.7, 8]} /><meshStandardMaterial color="#886239" roughness={1} /></mesh>}
       </group>}

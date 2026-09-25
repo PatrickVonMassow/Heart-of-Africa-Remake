@@ -11,7 +11,7 @@ function nodes(node: ReactNode): Array<{ type: unknown; props: Record<string, un
 
 it('renders worked rows instead of a hole and leaves real result meshes after completion', () => {
   for (const [kind, beside, result] of [
-    ['pit', 'grain-baskets-and-cover', 'covered-store'],
+    ['pit', 'grain-baskets-and-cover', 'excavated-pit'],
     ['postHole', 'stacked-posts', 'set-post'],
     ['patch', 'seedling-tray', 'planted-rows'],
   ] as const) {
@@ -26,4 +26,12 @@ it('renders worked rows instead of a hole and leaves real result meshes after co
     expect(Children.count(shown.props.children as ReactNode)).toBeGreaterThan(0)
     if (kind === 'patch') expect(finished.find((n) => n.props.name === 'dig-furrows')).toBeDefined()
   }
+})
+
+it('leaves the pit mouth uncovered and its shadow above the uncut ground', () => {
+  const tree = nodes(DigSites({ sites: [{ x: 0, z: 0, kind: 'pit' }], progress: [{ dug: 18, strikes: 12, completed: true }] }))
+  const shadow = tree.find((n) => n.props.name === 'pit-shadow')!
+  expect((shadow.props.position as number[])[1]).toBeGreaterThan(0)
+  expect(tree.some((n) => n.props.name === 'fresh-earth-rim')).toBe(true)
+  expect(tree.filter((n) => n.type === 'cylinderGeometry').every((n) => (n.props.args as unknown[])[5] === true)).toBe(true)
 })

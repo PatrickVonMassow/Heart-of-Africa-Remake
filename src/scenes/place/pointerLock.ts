@@ -183,3 +183,13 @@ export function restorePointerLockAfterDialogs(
 if (import.meta.env.DEV && typeof window !== 'undefined') {
   ;(window as unknown as Record<string, unknown>).__placeLock = pointerLockProbe
 }
+
+/**
+ * Whether a mouse movement turns the first-person view. A locked pointer
+ * always does; under automation the lock is skipped, and the stand-in turns
+ * only while no journal, map or debug menu holds the cursor, as a player's
+ * released pointer on those panels turns nothing.
+ */
+export function mouseLookApplies(locked: boolean, automated: boolean, overlayOpen: boolean): boolean {
+  return locked || (automated && !overlayOpen)
+}

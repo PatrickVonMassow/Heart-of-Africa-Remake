@@ -243,3 +243,11 @@ describe('the foam shows WHICH WAY the water runs', () => {
     expect(forward).toBeGreaterThanOrEqual(flecks.length - 1)
   })
 })
+
+it('keeps half of the current markers within four metres of the teaching bank', () => {
+  for (const count of [8, 16, 32]) {
+    const flecks = buildRiverFlecks(count)
+    expect(flecks.filter((f) => f.across < 4).length).toBeGreaterThanOrEqual(count / 2)
+    expect(flecks.every((f) => f.size >= 0.35)).toBe(true)
+  }
+})

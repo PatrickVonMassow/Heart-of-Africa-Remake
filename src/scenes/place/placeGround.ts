@@ -47,7 +47,7 @@ export function digEarthFlight(site: DigSite, progress: DigSiteProgress | undefi
   const x = 0.12 + (spoilOffset(site) - 0.12 + (clod % 3 - 1) * 0.12) * u
   const z = (clod - 2.5) * 0.075
   const landing = digLocalToWorld(site, x, z)
-  const y = 0.12 * (1 - u) + spoilHeightAt(site, progress, landing.x, landing.z) * u + 2.4 * u * (1 - u)
+  const y = 0.12 * (1 - u) + spoilHeightAt(site, progress, landing.x, landing.z) * u + 3.2 * u * (1 - u)
   return { x, y, z }
 }
 
@@ -61,7 +61,7 @@ export function spoilHeightAt(site: DigSite, progress: DigSiteProgress | undefin
   const u = (Math.cos(a) * dx - Math.sin(a) * dz) / SPOIL_RADIUS_X
   const v = (Math.sin(a) * dx + Math.cos(a) * dz) / SPOIL_RADIUS_Z
   const q = Math.max(0, 1 - u * u - v * v)
-  return (0.12 + 0.42 * digSiteAppearance(progress).work) * q * q
+  return (0.12 + 0.68 * digSiteAppearance(progress).work) * q * q
 }
 
 export function placeGroundHeight(ground: PlaceGround, x: number, z: number): number {

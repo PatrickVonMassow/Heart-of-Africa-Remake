@@ -1,0 +1,294 @@
+{
+ "model": "GPT-6 Astra",
+ "point": 659,
+ "stage": "blind-parallel B — what can break, what the player must do and what can silently fail along the village communication chain",
+ "input": "docs/blind-659/material.md",
+ "verbatim": "docs/blind-659/B.txt",
+ "entries": [
+  {
+   "id": "B1",
+   "file": "src/communication/speaking.ts:171",
+   "defect": "stage 1 | must-do | Hear distinguishable syllables over drums and ambience at shipped defaults on both backends; a generated SpeechPlan proves no audible output, and the audio engine and balance.ts are not attached."
+  },
+  {
+   "id": "B2",
+   "file": "src/communication/speaking.ts:88",
+   "defect": "stage 1 | break | The source reports a conservative mixed peak of 1.336 after the speech-bus increase and a missing limiter; output clipping could damage the tonal distinctions the player needs."
+  },
+  {
+   "id": "B3",
+   "file": "src/communication/speaking.ts:258",
+   "defect": "stage 1 | silent | hearUtterance records by distance alone, while phrasePlan can produce silence at zero volume, loudness or syllable duration; recorded speech is not proof that anything was heard."
+  },
+  {
+   "id": "B4",
+   "file": "src/communication/lexicon.ts:24",
+   "defect": "stage 1 | must-do | Distinguish four-syllable high/low patterns and associate the same pattern with speech, written syllables and drums; merely noticing that somebody spoke does not teach a word."
+  },
+  {
+   "id": "B5",
+   "file": "src/communication/heard.ts:80",
+   "defect": "stage 1 | silent | observePhrase records every atom immediately without tracking completed playback; interrupted or partly heard speech can appear fully learned unless the omitted caller accounts for playback."
+  },
+  {
+   "id": "B6",
+   "file": "src/communication/speechFloor.ts:97",
+   "defect": "stage 1 | break | The deadline forces requests through even when another exchange owns the floor or the speaker is blocked; starvation prevention can therefore create overlapping speech or an unreadable teaching moment."
+  },
+  {
+   "id": "B7",
+   "file": "src/communication/speechFloor.ts:55",
+   "defect": "stage 1 | break | holdsFloor ignores the separate consequence reservation; after an ending request releases its situation, a wordless cry can be permitted during a consequence that still blocks other words."
+  },
+  {
+   "id": "B8",
+   "file": "src/scenes/place/bankGame.ts:4",
+   "defect": "stage 2 | must-do | Find the children, hear RIVER while its speaker points at water, and follow their departure to the bank; missing this transition can leave the player searching an empty teaching area."
+  },
+  {
+   "id": "B9",
+   "file": "src/scenes/place/bankGame.ts:29",
+   "defect": "stage 2 | must-do | Distinguish movement with and against visible river flow from both ends of the game; the previously observed direction ambiguity remains unverified because water rendering and camera views are not attached."
+  },
+  {
+   "id": "B10",
+   "file": "src/scenes/place/bankGame.ts:25",
+   "defect": "stage 2 | must-do | See ROCK applied both to a stationary touch and an ordinary climbed boulder; arrivals alone permit plausible but wrong readings such as “safe,” “goal” or “made it.”"
+  },
+  {
+   "id": "B11",
+   "file": "src/scenes/place/bankGame.ts:387",
+   "defect": "stage 2 | silent | The off-game boulder lesson can be abandoned after failed approaches or its overtime bound; the game continues while its strongest evidence against interpreting ROCK as “base” disappears."
+  },
+  {
+   "id": "B12",
+   "file": "src/scenes/place/bankGame.ts:418",
+   "defect": "stage 2 | silent | An unreachable tapper opens a run without the ROCK utterance or its teaching hold; advancing run counters do not establish that the stationary rock lesson reached the player."
+  },
+  {
+   "id": "B13",
+   "file": "src/scenes/place/bankGame.ts:129",
+   "defect": "stage 2 | silent | Becoming safe at a rock is separate from reaching hand contact; a missing contact stand or expired arrival approach can leave a successful runner without an audible ROCK result."
+  },
+  {
+   "id": "B14",
+   "file": "src/scenes/place/bankGame.ts:269",
+   "defect": "stage 2 | break | Gather and regroup have timeout exits, so an announcement can precede everybody reaching the intended stations; the player may hear a direction over a spatially incoherent starting arrangement."
+  },
+  {
+   "id": "B15",
+   "file": "src/scenes/place/bankGame.ts:272",
+   "defect": "stage 2 | break | A run timeout accepts runners that never reached the far rock and permits the side swap; repeated timeouts can make the announced directions describe intended movement rather than the movement the player sees."
+  },
+  {
+   "id": "B16",
+   "file": "src/scenes/place/bankGame.ts:247",
+   "defect": "stage 2 | break | The bank-stage contract prohibits construction without an ordinary boulder; the omitted stage builder must supply one or the whole teaching game may be unavailable, not merely its supplementary ROCK lesson."
+  },
+  {
+   "id": "B17",
+   "file": "src/scenes/place/bankGame.ts:236",
+   "defect": "stage 2 | break | Named cause 1 is only structurally addressed here: BankStage accepts two named endpoints, but layout.ts and the specification are absent, so actual bank placement and upstream consistency cannot be certified."
+  },
+  {
+   "id": "B18",
+   "file": "src/communication/speaking.ts:249",
+   "defect": "stage 2 | must-do | Named cause 2 requires recognizable adult results, including fetching or carrying water and visible digging; instructionDelay only times an instruction, and the adult errand implementations and renderers are not attached."
+  },
+  {
+   "id": "B19",
+   "file": "src/scenes/place/bankGame.ts:94",
+   "defect": "stage 2 | break | Named cause 3 has changed: bank utterances contain one concept each, but neither BankUtterance nor SpeechFloor tracks understood meanings; adult teaching order and elimination of two-unknown errands remain unverified."
+  },
+  {
+   "id": "B20",
+   "file": "src/scenes/place/bankGame.ts:8",
+   "defect": "stage 2 | break | The bank game deliberately alternates direction and repeats fixed utterance moments; varying roaming duration does not remove that recognizable pattern, and the omitted adult scheduler prevents closing the separate fixed-errand-loop observation."
+  },
+  {
+   "id": "B21",
+   "file": "src/communication/heard.ts:95",
+   "defect": "stage 3 | must-do | Enter, revise and clear a hypothesis for the exact heard utterance; notes are trimmed free text and never checked, so the player needs usable correction rather than an assumed correctness signal."
+  },
+  {
+   "id": "B22",
+   "file": "src/communication/speechTarget.ts:38",
+   "defect": "stage 3 | must-do | Reliably identify and activate the highlighted speaker; selection uses a caller-supplied maximum distance, which must accommodate the bank game's different talk and call reaches without promising an unusable interaction."
+  },
+  {
+   "id": "B23",
+   "file": "src/communication/speechLabel.ts:156",
+   "defect": "stage 3 | silent | dropFloorLabels removes even the currently targeted floor label and clears its invitation; target-based expiry protection does not guarantee time to respond before the next granted word."
+  },
+  {
+   "id": "B24",
+   "file": "src/communication/speechLabel.ts:46",
+   "defect": "stage 3 | must-do | Read the label above the actual speaking figure, including small children and a child lifted onto a boulder; the height helper alone cannot establish correct actor measurement, projection or unobstructed rendering."
+  },
+  {
+   "id": "B25",
+   "file": "src/communication/speechTarget.ts:74",
+   "defect": "stage 3 | must-do | Discover the actual guess key and open the intended dialog; this file contains older SPACE instructions and newer E wording, while input bindings and localized invitations are absent."
+  },
+  {
+   "id": "B26",
+   "file": "src/communication/speechTarget.ts:79",
+   "defect": "stage 3 | silent | Any open dialog removes the label invitation, and the guess dialog additionally hides its source label; the dialog must visibly preserve the selected syllables and accept the note before those cues disappear."
+  },
+  {
+   "id": "B27",
+   "file": "src/communication/speechLabel.ts:100",
+   "defect": "stage 3 | break | Label lifetime adds only inter-atom pauses, not additional atoms' speaking time; sufficiently long phrases can outlast their labels unless the caller supplies an adequate duration."
+  },
+  {
+   "id": "B28",
+   "file": "src/communication/speechLabel.ts:202",
+   "defect": "stage 3 | break | Label visibility requires only one previously heard atom, not the whole phrase; mixed known/unheard phrases can expose readings whose corresponding memory entries are still unavailable for editing."
+  },
+  {
+   "id": "B29",
+   "file": "src/communication/heard.ts:63",
+   "defect": "stage 3 | silent | Repeat observations preserve only the first hearing's day and place, with no action or phrase context; a journal entry cannot by itself recover which gesture, journey or result supported a later guess."
+  },
+  {
+   "id": "B30",
+   "file": "src/scenes/place/chiefWalk.ts:66",
+   "defect": "stage 4 | must-do | Activate the chief's hut, follow him to the drummer, then request the message there; his initial walk sets drumOnArrival false, so first arrival does not automatically deliver the errand."
+  },
+  {
+   "id": "B31",
+   "file": "src/scenes/place/chiefWalk.ts:66",
+   "defect": "stage 4 | silent | Using the hut while the chief is outside does nothing, and calling while he walks outward also does nothing; visible location and interaction feedback must explain these otherwise silent presses."
+  },
+  {
+   "id": "B32",
+   "file": "src/scenes/place/chiefWalk.ts:85",
+   "defect": "stage 4 | must-do | Recall a chief walking home and receive the automatic message when he returns to the drummer; losing that arrival event would turn an apparently accepted recall into silence."
+  },
+  {
+   "id": "B33",
+   "file": "src/scenes/place/chiefWalk.ts:148",
+   "defect": "stage 4 | break | The chief walks a straight interpolated path without collision resolution; the source identifies a maasai-village rock intersecting that path, so the visible chief can pass through scenery."
+  },
+  {
+   "id": "B34",
+   "file": "src/scenes/place/chiefWalk.ts:104",
+   "defect": "stage 4 | break | Walk and stay use wall-clock timestamps and consume one boundary per tick; after a long interruption, successive ticks can immediately exhaust his stay unless the omitted integration compensates for paused time."
+  },
+  {
+   "id": "B35",
+   "file": "src/communication/drumMessage.ts:44",
+   "defect": "stage 4 | must-do | Rejudge the old cultural-gift prelude against the actual handler: shown message selection depends only on rockArtefact being given, but no supplied interaction code proves that legacy trust or gift gates are gone."
+  },
+  {
+   "id": "B36",
+   "file": "src/communication/drumMessage.ts:92",
+   "defect": "stage 4 | must-do | Hear and see low/high drum strikes grouped into the same atoms learned from voices; shared plan data establishes intended correspondence, while audible synthesis and drummer animation remain outside the attachment."
+  },
+  {
+   "id": "B37",
+   "file": "src/communication/drumMessage.ts:67",
+   "defect": "stage 4 | silent | A sounding plan retains its original message while giving the artefact changes currentDrumMessage; the display and animation must follow that retained plan or the player can read the answer while hearing the errand."
+  },
+  {
+   "id": "B38",
+   "file": "src/communication/drumMessage.ts:39",
+   "defect": "stage 4 | must-do | Receive RIVER · DOWNSTREAM together with a readable mould or impression explaining the next action; DIG is deliberately absent, so missing the wordless object removes essential information."
+  },
+  {
+   "id": "B39",
+   "file": "src/scenes/place/chiefWalk.ts:85",
+   "defect": "stage 4 | must-do | Request repeats while the chief is beside the drummer; each request refreshes his stay, and the omitted interaction layer must actually dispatch replay rather than merely keep him standing."
+  },
+  {
+   "id": "B40",
+   "file": "src/communication/lexicon.ts:24",
+   "defect": "stage 5 | break | The authoritative lexicon contains six concepts, including CHIEF, contradicting the material's five-word state note; completeness of teaching and glossary coverage must include this additional word."
+  },
+  {
+   "id": "B41",
+   "file": "src/communication/vocabulary.ts:60",
+   "defect": "stage 5 | must-do | Learn UPSTREAM as the rising pattern and DOWNSTREAM as its reverse; these assignments are fixed by construction, so the claim that all vocabulary assignments are rolled per run is inaccurate."
+  },
+  {
+   "id": "B42",
+   "file": "src/communication/vocabulary.ts:79",
+   "defect": "stage 5 | break | Other concepts can also form a reversal pair, including nonadjacent errand words; a player who generalizes “reversed tones mean opposites” beyond the taught direction pair can draw a false conclusion."
+  },
+  {
+   "id": "B43",
+   "file": "src/communication/drumMessage.ts:159",
+   "defect": "stage 5 | must-do | Decipher messages whether heard before or after learning their words; elements derive live hypotheses correctly, but actual retention and rerendering of earlier messages are not shown."
+  },
+  {
+   "id": "B44",
+   "file": "src/communication/heard.ts:95",
+   "defect": "stage 5 | silent | Displaying a drum-message atom does not itself record it as heard; if the omitted playback caller fails to observe it, setHypothesis silently rejects the player's attempted reading."
+  },
+  {
+   "id": "B45",
+   "file": "src/communication/heard.ts:117",
+   "defect": "stage 5 | break | Memory serialization contains notes but no vocabulary mapping; save integration must restore the matching run vocabulary or restored notes can silently acquire different meanings."
+  },
+  {
+   "id": "B46",
+   "file": "docs/blind-659/material.md:40",
+   "defect": "stage 5 | must-do | Find and edit the glossary and reread deciphered messages in both English and German; glossary components, language files and communication-poc-spec.md were requested but are not attached, so their player-facing behavior is unverified."
+  },
+  {
+   "id": "B47",
+   "file": "src/communication/drumMessage.ts:25",
+   "defect": "stage 6 | must-do | Interpret the initial errand as RIVER · UPSTREAM · ROCK · DIG and distinguish its travel-world destination from the children's two local play rocks."
+  },
+  {
+   "id": "B48",
+   "file": "src/world/communicationRock.ts:29",
+   "defect": "stage 6 | must-do | Travel far enough upstream to find the seeded landmark: the initial offset is 1.6–2.4 degrees along the river, and rejected candidates move it farther; searching only beside the village cannot succeed."
+  },
+  {
+   "id": "B49",
+   "file": "src/world/communicationRock.ts:42",
+   "defect": "stage 6 | must-do | Recognize the quest boulder by its upright size and cleared surroundings; geometry constants do not prove that the omitted renderer and dressing suppression make it conspicuous in actual travel views."
+  },
+  {
+   "id": "B50",
+   "file": "src/world/communicationRock.ts:173",
+   "defect": "stage 6 | break | Placement accepts locally dry, unblocked probes on either bank without proving a traversable route to the site; geometric validity alone cannot guarantee the player can reach the excavation."
+  },
+  {
+   "id": "B51",
+   "file": "src/world/communicationRock.ts:199",
+   "defect": "stage 6 | break | Exhausting placement search returns the village coordinate with upstreamDeg zero; when that footprint is dry, unvouched is absent even though the destination no longer satisfies the chief's upstream clue."
+  },
+  {
+   "id": "B52",
+   "file": "src/world/communicationRock.ts:130",
+   "defect": "stage 6 | break | Excavation range is measured to the boulder's centre while its footprint blocks movement; the omitted dig-reach and collision integration must leave a reachable standing position that passes this test."
+  },
+  {
+   "id": "B53",
+   "file": "src/world/communicationRock.ts:116",
+   "defect": "stage 6 | must-do | Obtain and use the shovel at the landmark and visibly receive the excavated artefact; this module supplies only coordinates, while tool requirements, excavation actions and inventory feedback are not attached."
+  },
+  {
+   "id": "B54",
+   "file": "src/communication/drumMessage.ts:44",
+   "defect": "stage 6 | must-do | Carry the excavated artefact back and complete the give interaction; carried still selects the original errand, so merely returning to the village cannot produce the answer."
+  },
+  {
+   "id": "B55",
+   "file": "src/communication/drumMessage.ts:39",
+   "defect": "stage 6 | break | RIVER · DOWNSTREAM contains no explicit starting reference; the surrounding scene or impression must establish where to begin, otherwise the player can reasonably search downstream from the excavation rock instead of the intended origin."
+  },
+  {
+   "id": "B56",
+   "file": "src/communication/drumMessage.ts:32",
+   "defect": "stage 6 | must-do | Use the mould or impression to recognize the intended downstream target and perform the next excavation; neither its visual information nor the corresponding search and excavation implementation is attached."
+  },
+  {
+   "id": "B57",
+   "file": "docs/blind-659/material.md:36",
+   "defect": "stage 6 | must-do | Complete the required final return and receive an unmistakable victory state; goal handlers, destination rules and victory presentation are absent, so no supplied state transition establishes that the complete chain reaches victory."
+  }
+ ]
+}

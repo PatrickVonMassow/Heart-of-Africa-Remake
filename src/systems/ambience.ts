@@ -72,6 +72,7 @@ let ambientBus: GainNode | null = null
 // to set to zero. It carries the SAME level the speech had on the ambient bus,
 // so the split moved the routing and left the mix where it was.
 let speechBus: GainNode | null = null
+let speechQuietUntil = 0
 const layers: Record<string, Layer> = {}
 let scene: AmbienceScene = { region: 'north', mode: 'place', placeKind: 'port', nearVillage: false }
 let started = false
@@ -1212,7 +1213,9 @@ export function playSpeech(plan: SpeechPlan): void {
   const chain = speechBus ? speechBus.gain.value * master.gain.value : master.gain.value
   const leaving = throughDeployedLimiter(peak * chain * route.monoGain)
   devAssert(
-    leaving > 0 || balance.communication.speechVolume <= 0,
+    // The second legitimate silence: a drum message quiets the voices on
+    // purpose until `speechQuietUntil` (playDrumMessage).
+    leaving > 0 || balance.communication.speechVolume <= 0 || ctx.currentTime < speechQuietUntil,
     'speech-inaudible',
     () =>
       `${plan.syllables.length} syllables leave the graph at ${leaving.toExponential(2)} ` +
@@ -1251,6 +1254,8 @@ export function playDrumMessage(plan: DrumMessagePlan): void {
   if (!ctx || !master) return
   const dest = ambientBus ?? master
   const t0 = ctx.currentTime
+  speechQuietUntil = t0 + plan.duration
+  if (speechBus) quietSpeechBus(speechBus.gain, t0, plan.duration, balance.communication.speechVolume)
   for (const strike of plan.strikes) {
     const { head, body, ring } = DRUM_TONE[strike.drum]
     const peak = Math.max(0.0001, strike.peak)
@@ -1332,7 +1337,7 @@ export function refreshAmbienceVolume() {
   for (const w of wobbles) w.gain.gain.value = w.baseDepth * balance.ambienceVolume * wobbleExtra(w.name)
   if (ambientBus) ambientBus.gain.value = balance.ambientVolume
   if (footstepBus) footstepBus.gain.value = balance.footstepVolume
-  if (speechBus) speechBus.gain.value = Math.max(0, balance.communication.speechVolume)
+  if (speechBus && (!ctx || ctx.currentTime >= speechQuietUntil)) speechBus.gain.value = Math.max(0, balance.communication.speechVolume)
 }
 
 /** Update the ambience to the current game situation. */
@@ -1381,4 +1386,11 @@ if (import.meta.env.DEV && typeof window !== 'undefined') {
     speechProbe: () => ({ ...(speechProbe ?? { spoken: 0, syllables: 0, lastPeak: 0 }) }),
     cryProbe: () => ({ ...(cryProbe ?? { cries: 0, scheduled: 0, lastPeak: 0, lastLeaving: 0 }) }),
   }
+}
+
+/** Silence any already scheduled syllables before the first drum strike. */
+export function quietSpeechBus(gain: AudioParam, now: number, duration: number, volume: number): void {
+  gain.cancelScheduledValues(now)
+  gain.setValueAtTime(0, now)
+  gain.setValueAtTime(Math.max(0, volume), now + duration)
 }
