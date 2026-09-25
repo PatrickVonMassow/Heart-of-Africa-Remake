@@ -473,16 +473,17 @@ async function observations() {
     const labelSeconds = await d.read(() => window.__balance.communication.labelSeconds)
     const outcome = await followInvitation({ budgetMs: Math.max(1000, invitationDeadline - Date.now()), labelSeconds,
       pause: (ms) => page.waitForTimeout(ms),
-      sample: () => d.read(({ initiator, labelSeconds }) => {
+      sample: () => d.read(({ initiator, labelSeconds, followedSite }) => {
         const e = window.__placeErrands(), word = e.last, v = e.villagers[initiator]
-        const seen = (i) => {
+        // The followed initiator keeps his site even when his task has been cleared.
+        const seen = (i, site = e.villagers[i]?.work?.siteIndex) => {
           const speaker = e.villagers[i], id = `villager-${i}`
-          if (!speaker?.work || !document.querySelector(`.speech-label[data-speaker="${id}"]`)) return null
-          return { id, siteIndex: speaker.work.siteIndex, speaker, strikes: e.digProgress[speaker.work.siteIndex]?.strikes }
+          if (!speaker || site === undefined || site === null || !document.querySelector(`.speech-label[data-speaker="${id}"]`)) return null
+          return { id, siteIndex: site, speaker, strikes: e.digProgress[site]?.strikes }
         }
         return { nowS: performance.now() / 1000, last: word, initiator, task: v?.work ?? null, villager: v ? { ...v, drawn: undefined } : null,
-          labelled: word?.purpose === 'invitation' && word.age <= labelSeconds ? seen(word.speaker) : null, initiatorLabel: seen(initiator) }
-      }, { initiator: gatheringAt.index, labelSeconds }) })
+          labelled: word?.purpose === 'invitation' && word.age <= labelSeconds ? seen(word.speaker) : null, initiatorLabel: seen(initiator, followedSite) }
+      }, { initiator: gatheringAt.index, labelSeconds, followedSite: gatheringAt.work.siteIndex }) })
     if (!outcome) {
       // Name why the pair stayed silent: its owed word, hush and the children's ear.
       const state = await d.read(() => ({ last: window.__placeErrands().last, player: { ...window.__placePlayer },
