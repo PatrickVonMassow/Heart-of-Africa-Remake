@@ -57,5 +57,6 @@ it('aims before the drum trigger and rejects missed action frames', () => {
   expect(message).toContain('Drum frame completed after the performance')
   expect(source).toContain('Rock contact frame was late')
   expect(source).toContain('Boulder climb frame was late')
+  expect(source).toContain('Loom frame caught the return instead of the named direction')
   expect(source).toContain("h.userData.errand.phase === 'walk'")
 })

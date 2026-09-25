@@ -139,7 +139,7 @@ async function faceNote(id) {
   const world = await d.read((id) => window.__speech.anchorWorld(id), id)
   if (!world) return false
   // A running child can outpace the turn; a missed aim waits for his next note.
-  if (!await d.aim({ x: world[0], y: world[1] + 1.1, z: world[2] }).then(() => true, (error) => (console.log(`# ${id}: ${error.message}`), false))) return false
+  if (!await d.aim({ x: world[0], y: world[1] + (id.startsWith('kid-') ? 0.85 : 1.5), z: world[2] }).then(() => true, (error) => (console.log(`# ${id}: ${error.message}`), false))) return false
   return d.wait((id) => {
     const box = document.querySelector(`.speech-label[data-speaker="${id}"]`)?.getBoundingClientRect()
     return box && box.width > 1 && box.left > 0 && box.top > 0 && box.right < innerWidth && box.bottom < innerHeight
@@ -409,7 +409,12 @@ async function observations() {
       const h = window.__placeScene.getObjectByName('village-loom-helper')
       return h && h.position.z * sign > 1 && h.userData.errand?.toward === (sign < 0 ? 'UPSTREAM' : 'DOWNSTREAM') && h.userData.errand.phase === 'walk'
     }, sign, 480000)
-    await localFrame(`03-loom-${sign < 0 ? 'upstream' : 'downstream'}`, loom.seat, 'weaver, helper consequence and the river axis')
+    await localFrame(`03-loom-${sign < 0 ? 'upstream' : 'downstream'}`, { ...loom.seat, y: 0.9 }, 'weaver, helper consequence and the river axis')
+    assert(await d.read((sign) => {
+      const h = window.__placeScene.getObjectByName('village-loom-helper')
+      return h && h.position.z * sign > 1 && ['walk', 'work'].includes(h.userData.errand?.phase)
+        && h.userData.errand.toward === (sign < 0 ? 'UPSTREAM' : 'DOWNSTREAM')
+    }, sign), 'Loom frame caught the return instead of the named direction')
   }
 }
 async function readings() {
