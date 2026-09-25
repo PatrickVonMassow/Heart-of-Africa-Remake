@@ -13,9 +13,9 @@ it('shares live work with every mounted sampler without a React render between s
   expect(samplers.map((sample) => sample(c.x, c.z))).toEqual([0.12, 0.12, 0.12])
   ground.progress = [{ dug: 18, strikes: 12, completed: true }]
   for (const sample of samplers) {
-    expect(sample(c.x, c.z)).toBeCloseTo(0.54)
+    expect(sample(c.x, c.z)).toBeCloseTo(0.8)
     const pose = placeCameraPose(c.x, c.z, 1.7 + sample(c.x, c.z), 0, 0, 0, 0, 0)
-    expect(pose.position[1]).toBeCloseTo(2.24)
+    expect(pose.position[1]).toBeCloseTo(2.5)
     expect(sample(-20, -20)).toBe(0)
   }
   view.unmount()

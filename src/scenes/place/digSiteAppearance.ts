@@ -25,13 +25,13 @@ export function digSiteAppearance(progress?: DigSiteProgress): DigSiteAppearance
 export interface DigSiteFurniture {
   ground: 'round-mouth' | 'narrow-mouth' | 'furrows'
   beside: 'grain-baskets-and-cover' | 'stacked-posts' | 'seedling-tray'
-  result: 'covered-store' | 'set-post' | 'planted-rows' | null
+  result: 'excavated-pit' | 'set-post' | 'planted-rows' | null
 }
 
 /** The same recipe drives the visible props before and after a finished bout. */
 export function digSiteFurniture(kind: DigSite['kind'], progress?: DigSiteProgress): DigSiteFurniture {
   switch (kind) {
-    case 'pit': return { ground: 'round-mouth', beside: 'grain-baskets-and-cover', result: progress?.completed ? 'covered-store' : null }
+    case 'pit': return { ground: 'round-mouth', beside: 'grain-baskets-and-cover', result: progress?.completed ? 'excavated-pit' : null }
     case 'postHole': return { ground: 'narrow-mouth', beside: 'stacked-posts', result: progress?.completed ? 'set-post' : null }
     case 'patch': return { ground: 'furrows', beside: 'seedling-tray', result: progress?.completed ? 'planted-rows' : null }
   }

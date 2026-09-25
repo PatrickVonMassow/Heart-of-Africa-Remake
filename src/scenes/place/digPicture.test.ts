@@ -43,7 +43,7 @@ it('keeps the picture fixture walkable, distinct, and in a standing camera proje
     expect(standingClear(l.colliders, p.x, p.z, 0.3)).toBe(true)
     const height = placeGroundHeight(ground, p.x, p.z)
     if (i === 0 || i === 32) expect(height).toBe(0)
-    if (i === 16) expect(height).toBeCloseTo(0.54)
+    if (i === 16) expect(height).toBeCloseTo(0.8)
     if (height > 0.27) {
       for (const y of [height, height + 1.5]) {
         const projected = new Vector3(p.x, y, p.z).project(camera)
