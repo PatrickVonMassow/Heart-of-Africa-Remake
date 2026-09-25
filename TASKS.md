@@ -77,6 +77,45 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
+- [ ] 1212. The traveller can always leave the spot where the user got stuck (user bug
+  report 25.09.2026, local/GefangenerSpieler.zip: "Ich hänge fest!", seed 804048534,
+  position x/z 299.93 / -310.14, lat/lon 31.0145 / 29.9926, north region, day 42.14,
+  travel mode, build 6a5373c, WebGPU, medium).
+  The report's standpoint is at a waterhole where antelopes drink and wade within a few
+  units of the traveller; the traveller cannot move away. The cause is not yet known.
+  Final state:
+
+  1. From the report's exact position and state (load the report JSON), the traveller
+     can move away in at least one direction under player input; the cause of the
+     trap (terrain, water edge, collision, animal body, or state) is named in the
+     commit that fixes it.
+  2. The fix removes the cause rather than teleporting the traveller; if a general
+     escape guarantee is needed, it is a dev-mode invariant (a travel-mode position
+     from which no direction moves is a loud product defect).
+  3. Proof: a Vitest reproducing the trap from the report's position that fails before
+     and passes after, and a Playwright run on WebGPU from the report's standpoint in
+     which the traveller walks at least ten world units away.
+  Bundle: Steuerung & Performance.
+- [ ] 1213. A young animal killed by a predator stays dead and becomes a carcass (user bug
+  report 25.09.2026, local/JungtierZombie.zip: the lion caught the young animal, the
+  parent stood mourning beside it, no vultures came, and then the young was alive again
+  and hopped around; seed 804048534, position x/z 305.26 / -311.2, north region,
+  day 42.14, build 6a5373c, WebGPU, medium).
+  The report's wildlife section lists 0 carcasses, the young antelope at 300.36 / -305.26
+  in state `separated` with `young: true`, and its parent at 304.88 / -313.6 wading with
+  `childAt` pointing at it — the killed young was restored instead of leaving a carcass.
+  Final state:
+
+  1. A young animal killed in a hunt leaves a carcass like an adult victim does, the
+     vultures come to it by the ordinary carcass mechanism, and the young is not
+     re-created alive at that spot or re-linked to its parent.
+  2. The parent's mourning ends with the parent released from the dead young (no
+     `childAt` to a carcass or a respawned young); a later new young, if the herd
+     mechanism creates one, is a distinct animal that does not appear at the kill.
+  3. Proof: a Vitest driving a hunt that kills a young animal and asserting a carcass,
+     a vulture flock that owns it, and no living young with that identity afterwards;
+     and a Playwright picture on WebGPU of the carcass with the vultures.
+  Bundle: Tierverhalten.
 - [ ] 659. The whole communication chain, played through and judged by what reaches the
   PLAYER — A SIX-EYES ALL-ROUND REVIEW.
   ON HOLD (user 13.08.2026, 22:25: »Stoppe 659 erstmal — der macht erstmal keinen Sinn, wenn wir
