@@ -661,6 +661,7 @@ textarea {
 
 /* Dismissible notice when the renderer fell back to WebGL 2. */
 .renderer-warning {
+  z-index: 16778500;
   position: absolute;
   top: 56px;
   left: 50%;
