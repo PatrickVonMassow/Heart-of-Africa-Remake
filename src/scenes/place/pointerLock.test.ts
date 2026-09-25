@@ -4,7 +4,7 @@
 // headless check reads, since pointer lock is deliberately never engaged under
 // automation.
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { createPlacePointerLock, pointerLockProbe, releasePointerLock, requestPlacePointerLock, restorePointerLockAfterDialogs } from './pointerLock'
+import { createPlacePointerLock, mouseLookApplies, pointerLockProbe, releasePointerLock, requestPlacePointerLock, restorePointerLockAfterDialogs } from './pointerLock'
 import { useUi, type Dialog } from '../../state/ui'
 
 const canvas = () => document.querySelector('canvas') as HTMLCanvasElement
@@ -566,5 +566,14 @@ describe('restoring settlement steering after dialogs', () => {
     } finally {
       off()
     }
+  })
+})
+
+describe('mouseLookApplies', () => {
+  it('turns under a locked pointer, and under automation only while no panel holds the cursor', () => {
+    expect(mouseLookApplies(true, false, true)).toBe(true)
+    expect(mouseLookApplies(false, true, false)).toBe(true)
+    expect(mouseLookApplies(false, true, true)).toBe(false)
+    expect(mouseLookApplies(false, false, false)).toBe(false)
   })
 })

@@ -122,7 +122,7 @@ import { forgetSpeechLabel, speechClock, speechUseCandidate } from './speechChan
 import type { SpeechLabel } from '../../communication/speechLabel'
 import { currentDrumMessage } from '../../communication/drumMessage'
 import { playThunder } from '../../systems/ambience'
-import { createPlacePointerLock, releasePointerLock, restorePointerLockAfterDialogs } from './pointerLock'
+import { createPlacePointerLock, mouseLookApplies, releasePointerLock, restorePointerLockAfterDialogs } from './pointerLock'
 import { ActorLabels } from '../ActorLabels'
 import { markActor } from '../actorLabelSource'
 import { resolveMove, standingClear, PLAYER_RADIUS, CHIEF_BODY_RADIUS } from './collision'
@@ -2695,7 +2695,9 @@ export function PlaceScene() {
       // Under automation we deliberately skip the real pointer lock (above), so
       // apply mouse-look from the raw movement instead — the verify suites still
       // drive and assert first-person yaw, without the OS cursor being grabbed.
-      if (document.pointerLockElement === el || navigator.webdriver) {
+      const ui = useUi.getState()
+      if (mouseLookApplies(document.pointerLockElement === el, navigator.webdriver,
+        useGame.getState().journalOpen || ui.debugOpen || ui.mapOpen)) {
         player.current.yaw -= e.movementX * balance.mouseSensitivity
         // Vertical look (design.md §17.5, point 392) at the SAME sensitivity,
         // inverted by default (mouse forward = look down) and clamped short of
