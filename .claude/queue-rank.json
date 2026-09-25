@@ -1452,6 +1452,12 @@
       "why": "User 25.09.2026 09:30: »Schiebe vorher noch 1213 nach 1185 … Der ist jetzt doch nicht mehr so dringend.« — directly behind 1185",
       "origin": "user",
       "place": "ahead"
+    },
+    "1214": {
+      "at": "2026-09-25T10:09:00.816Z",
+      "why": "Deletions and wording fixes under the freeze; no player impact, so behind the release work",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1483,7 +1489,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-25T09:56:55.418Z",
+    "at": "2026-09-25T10:09:00.827Z",
     "points": [
       174,
       184,
@@ -1906,7 +1912,8 @@
       1207,
       1209,
       1211,
-      1213
+      1213,
+      1214
     ]
   }
 }
