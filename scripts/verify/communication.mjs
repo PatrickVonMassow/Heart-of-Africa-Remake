@@ -427,7 +427,8 @@ async function observations() {
     await d.inspect(geography.waterStand, 3)
     await d.wait(() => window.__placeErrands().villagers.some((v) => v.carry === 'emptyJar'), null, 480000)
     const i = await d.read(() => window.__placeErrands().villagers.findIndex((v) => v.carry === 'emptyJar'))
-    const empty = await d.read((i) => window.__placeErrands().villagers[i], i)
+    // Aim at the framed height: without y the view keeps the previous pitch.
+    const empty = await d.read((i) => ({ ...window.__placeErrands().villagers[i], y: 0.8 }), i)
     await d.aim(empty)
     await localFrame(`03-empty-jar${attempt ? '-' + attempt : ''}`, empty, 'the water carrier sets out with the empty jar')
     await d.inspect(geography.waterFoot, 3)
