@@ -5,8 +5,8 @@ its report. Then `VERIFY_GL=webgpu npm test -- communication
 --section=continuous-route` on `cfcf29299`: RED after 7m 58s at
 `2-childrens-bank-game`, 5 of 48 frames. Log:
 `local/verify-logs/2026-09-25T03-37-03-977-communication.log` (main checkout);
-receipt `verification/communication-webgpu-1790307428401-route.json` (this
-worktree). The run was flagged UNDER LOAD (a second author ran unit tests), so
+receipt
+`local/659-round4-red/communication-webgpu-1790307428401-route.json` (main checkout). The run was flagged UNDER LOAD (a second author ran unit tests), so
 the red is corroborated by reading the code, not by the timing.
 
 R3-B1 is answered: first hearings DIG 125, ROCK 301, DOWNSTREAM 314,
