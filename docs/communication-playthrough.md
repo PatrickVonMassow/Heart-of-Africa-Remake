@@ -262,3 +262,46 @@ Logs are local, git-ignored files under `local/verify-logs/`, named
 `communication-harness-{unit,build,lint,types}-final.log`. This is an authoring
 and cheap-gate record, not a browser acceptance result. No new browser frames,
 recordings or journal captures are claimed here.
+
+## Browser runs, both backends (Claude reviewer, 24./25.09.2026)
+
+`npm test -- communication --section=continuous-route` ran the whole chain,
+entry to fit and both-language journal, as one expedition per backend on
+**`80c0a39ff`**:
+
+| Backend | Order | Result | Frames | Route receipt |
+| --- | --- | --- | --- | --- |
+| WebGPU | words-first | GREEN, 17m 59s, no browser errors | 73 | `verification/communication-webgpu-1790297789751-route.json` |
+| WebGL 2 | message-first | GREEN, 16m 22s, no browser errors | 74 | `verification/communication-webgl-1790296797094-route.json` |
+
+All five audio windows (ambient baseline, adult talk, child call, drum errand,
+drum answer) are complete in both receipts. A green run proves the chain is
+walkable with the normal controls; the per-frame picture judgment, the sound
+judgment and the three named causes below it remain open.
+
+Earlier reds of this leg and what they were — every one was a driver that
+did not play like a player, except where marked:
+
+- A net-zero audio restamp (block early by 128 frames, successor late by
+  128) was counted as lost audio; it is now recorded as `restamped`.
+- Travel collided with wildlife the planner did not know; stuck legs now
+  replan around animals and record terrain, animals and flora at the stop.
+- In the inland delta the bank route ran through water and the current
+  carried the swimmer up to 27 units off; the planner now walks the bank on
+  land, swims only without a land way, skips flooded or passed waypoints and
+  photographs where the traveller actually is.
+- The return ended in the river beside Bambara and drifted off the entry ring;
+  the driver keeps steering in until the prompt shows.
+- Landmark and chief entries open the journal by themselves; the driver
+  closes it before pressing the impression or turning.
+- **Product change:** under automation every cursor move turned the view,
+  including clicks on the journal, which tilted it 49° to the ground. A real
+  pointer is released on such panels, so `mouseLookApplies` now turns nothing
+  while the journal, map or debug menu is open (unit-tested).
+- Under message-first the children played 32 m from the playground; the
+  driver now follows the group.
+
+Findings filed from these runs (findings carrier): a swimmer makes no headway
+against the Niger current near Mopti (backlog candidate), and one water
+carrier's errand ended with the empty jar before the water (seen once,
+driver now records `water-errand-abandoned`; none in either green run).
