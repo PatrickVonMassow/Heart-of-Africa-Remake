@@ -1797,4 +1797,27 @@ export const RED_CHARGES = [
       + 'one fetch of voices/bm_george.bin from huggingface.co ended "fetch failed" — a network '
       + 'transient the check counts as a product red. The charge dies with point 1203.',
   },
+  {
+    point: 1211,
+    suite: 'enrichments',
+    kind: 'check',
+    backend: 'webgl',
+    match: /^prey squeezed against a bank flees ALONG it — real ground covered, never a waterline pin \(point 201\)/i,
+    why:
+      'MEASURED 25.09.2026 on the covering enrichments pass (webgl, 285 pass / 3 fail) at main '
+      + '40dc83d10, right after the hunted-animal water flight landed: {"onWater":true}. Point 1211 '
+      + 'decides whether the check or the behaviour is wrong under design.md §19.5 and repairs it; '
+      + 'the charge dies with it.',
+  },
+  {
+    point: 1211,
+    suite: 'enrichments',
+    kind: 'check',
+    backend: 'webgl',
+    match: /^the giraffe mother kicks the hunt off — calf freed, parent alive, lion leaves \(point 124\)/i,
+    why:
+      'MEASURED 25.09.2026 on the same webgl enrichments pass at main 40dc83d10: '
+      + '{"caught":false,"kicked":false,"lionLeft":true} — the hunt ended without the kick, plausibly '
+      + 'by the new far-bank resolution. The charge dies with point 1211.',
+  },
 ]
