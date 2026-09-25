@@ -1213,7 +1213,9 @@ export function playSpeech(plan: SpeechPlan): void {
   const chain = speechBus ? speechBus.gain.value * master.gain.value : master.gain.value
   const leaving = throughDeployedLimiter(peak * chain * route.monoGain)
   devAssert(
-    leaving > 0 || balance.communication.speechVolume <= 0,
+    // The second legitimate silence: a drum message quiets the voices on
+    // purpose until `speechQuietUntil` (playDrumMessage).
+    leaving > 0 || balance.communication.speechVolume <= 0 || ctx.currentTime < speechQuietUntil,
     'speech-inaudible',
     () =>
       `${plan.syllables.length} syllables leave the graph at ${leaving.toExponential(2)} ` +
