@@ -16255,4 +16255,4 @@ to land than a mechanism that needs a review.
   Test: a Playwright layout check that the notice, toast and title boxes do not intersect when all
   three are shown, on WebGL 2 (where the notice appears) and WebGPU; picture check on both backends.
   Refs: src/ui/Hud.tsx, the graphics-notice and place-title components.
-  Bundle: unbundled (HUD).
+  Bundle: Kommunikation.
