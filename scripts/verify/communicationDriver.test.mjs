@@ -163,15 +163,29 @@ it('refuses blocked outside spots and missing geometry before calling the chief'
   expect(() => chiefWalkStand(hut, { from: [1, 1], to: [1, 1] })).toThrow('route towards the drummer')
 })
 
+function chiefDriver(stand, chief, steps, events) {
+  const player = { x: stand.x, z: stand.z, yaw: 0 }
+  return {
+    walk: async (target) => { events.push(['walk', target]); chief.x = 1 },
+    read: async (fn) => runInNewContext(`(${fn.toString()})()`, { window: { __chief: chief, __placePlayer: player } }),
+    aim: async (subject) => {
+      events.push(['aim', { ...subject }])
+      player.yaw = Math.atan2(-(subject.x - player.x), -(subject.z - player.z))
+      chief.x += steps.shift() ?? 0
+    },
+  }
+}
+
 it('walks to the planned spot before reading the live chief and refreshes him after aiming', async () => {
   const stand = { x: 4, z: 3 }, chief = { x: 0, z: 0 }, events = []
-  const driver = {
-    walk: async (target) => { events.push(['walk', target]); chief.x = 1 },
-    read: async (fn) => runInNewContext(`(${fn.toString()})()`, { window: { __chief: chief } }),
-    aim: async (subject) => { events.push(['aim', subject]); chief.x = 2 },
-  }
-  expect(await faceWalkingChief(driver, stand)).toEqual({ x: 2, y: 1.2, z: 0 })
+  expect(await faceWalkingChief(chiefDriver(stand, chief, [1], events), stand)).toEqual({ x: 2, y: 1.2, z: 0 })
   expect(events).toEqual([['walk', stand], ['aim', { x: 1, y: 1.2, z: 0 }]])
+})
+
+it('aims again while the walking chief drifts out of the view centre', async () => {
+  const stand = { x: 0, z: 3 }, chief = { x: 0, z: 0 }, events = []
+  expect(await faceWalkingChief(chiefDriver(stand, chief, [3, 0.1], events), stand)).toEqual({ x: 4.1, y: 1.2, z: 0 })
+  expect(events.filter(([k]) => k === 'aim').map(([, s]) => s.x)).toEqual([1, 4])
 })
 
 it('refuses to aim or shoot when the outside walk is blocked', async () => {

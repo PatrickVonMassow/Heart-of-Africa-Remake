@@ -12,12 +12,19 @@ export function travelKeys(from, target, tolerance = 0.12) {
 }
 
 /** Walk to the precomputed outside spot, then turn to the departing chief.
- * Read his position after moving and again after aiming: he keeps walking. */
-export async function faceWalkingChief(d, stand) {
+ * He keeps walking while the view turns, so aim again until his refreshed
+ * position lies well inside the view (0.3 rad off its centre at most). */
+export async function faceWalkingChief(d, stand, attempts = 4) {
   await d.walk(stand)
   const subject = () => d.read(() => ({ x: window.__chief.x, y: 1.2, z: window.__chief.z }))
-  await d.aim(await subject())
-  return subject()
+  let chief = await subject()
+  for (let i = 0; i < attempts; i++) {
+    await d.aim(chief)
+    chief = await subject()
+    const p = await d.read(() => ({ x: window.__placePlayer.x, z: window.__placePlayer.z, yaw: window.__placePlayer.yaw }))
+    if (Math.abs(turnDelta(p.yaw, p, chief)) <= 0.3) break
+  }
+  return chief
 }
 
 /** One healthy cycle at its configured backstops. Every child can own a run;
