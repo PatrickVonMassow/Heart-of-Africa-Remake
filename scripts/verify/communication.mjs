@@ -6,7 +6,7 @@ import { mkdirSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { launchVerifyBrowser, assertBackend, VERIFY_GL } from './_browser.mjs'
 import { sectionGate } from './sections.mjs'
-import { captureFrame } from './frameSubject.mjs'
+import { captureFrame, waitForSceneReady } from './frameSubject.mjs'
 import { installTtsCache } from './ttsCache.mjs'
 import { communicationDriver, bankCycleSeconds, followBankTeaching, bankTeachingOrder, observeBankCall, faceWalkingChief } from './communicationDriver.mjs'
 import { riverBankRoute, routeFrameProgress } from './communicationRouteCore.mjs'
@@ -60,8 +60,8 @@ async function frame(name, subject, beforeCapture) {
   })
   receipt.frames.push({ name: `${prefix}${name}.png`, step: receipt.step, subject, pageMs: await d.read(() => performance.now()) }); save()
 }
-async function localFrame(name, point, label, beforeCapture) {
-  await frame(name, { local: { x: point.x, y: point.y ?? 0.8, z: point.z }, label, settle: false }, beforeCapture)
+async function localFrame(name, point, label, beforeCapture, extra = {}) {
+  await frame(name, { local: { x: point.x, y: point.y ?? 0.8, z: point.z }, label, settle: false, ...extra }, beforeCapture)
 }
 async function audioStart(name, bands, preRoll = 0, label = null) {
   pendingAudio.set(name, bands)
@@ -262,6 +262,10 @@ async function chief(prefix = '05') {
     // him: his walk lasts seconds, too short to walk or turn after him.
     await d.aim({ ...drum, y: 1.2 })
     await prompt('hut')
+    // His walk lasts seconds: wait for a drawn picture BEFORE sending him, so
+    // the shutter's readiness wait cannot consume the walk it is meant to show.
+    const ready = await waitForSceneReady(page, { mode: 'drawn' })
+    assert(!ready.timedOut, `Scene not drawn before the chief's walk: ${ready.reason}`)
     const chiefWalkStarted = Date.now()
     await page.keyboard.press('Space')
     await d.wait(() => window.__chief?.phase === 'walking-out')
@@ -270,7 +274,8 @@ async function chief(prefix = '05') {
     // At 11 FPS the PNG write outlasts his short walk, so the phase is checked
     // when the capture is requested; the picture is the next rendered frame.
     await localFrame(`${prefix}-chief-walks-out`, walkingChief, 'the chief leaving his hut', async () =>
-      assert(await d.read(() => window.__chief.phase === 'walking-out'), `Chief walk frame was late: ${(Date.now() - chiefWalkStarted) / 1000}s since Space`))
+      assert(await d.read(() => window.__chief.phase === 'walking-out'), `Chief walk frame was late: ${(Date.now() - chiefWalkStarted) / 1000}s since Space`),
+    { sceneReady: false })
   }
   const drummer = await d.read(() => ({ x: window.__placeSpots.drummer[0], z: window.__placeSpots.drummer[1] }))
   await d.wait(() => window.__chief?.phase === 'at-drummer')

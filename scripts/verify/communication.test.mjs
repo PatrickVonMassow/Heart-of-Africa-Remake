@@ -81,6 +81,7 @@ it('aims before the drum trigger and rejects missed action frames', () => {
 it('frames the departing chief after walking-out begins and checks the phase before and at the shutter', () => {
   const chief = source.slice(source.indexOf('async function chief('), source.indexOf('async function message('))
   const stand = chief.indexOf('await d.aim({ ...drum, y: 1.2 })')
+  const ready = chief.indexOf("await waitForSceneReady(page, { mode: 'drawn' })")
   const space = chief.indexOf("await page.keyboard.press('Space')")
   const start = chief.indexOf("await d.wait(() => window.__chief?.phase === 'walking-out')")
   const face = chief.indexOf('await faceWalkingChief(d)')
@@ -88,13 +89,15 @@ it('frames the departing chief after walking-out begins and checks the phase bef
   const frame = chief.indexOf('await localFrame(`${prefix}-chief-walks-out`, walkingChief,')
   const after = chief.indexOf("assert(await d.read(() => window.__chief.phase === 'walking-out'), `Chief walk frame was late:")
   expect(stand).toBeGreaterThanOrEqual(0)
-  expect(space).toBeGreaterThan(stand)
+  expect(ready).toBeGreaterThan(stand)
+  expect(space).toBeGreaterThan(ready)
   expect(start).toBeGreaterThan(space)
   expect(face).toBeGreaterThan(start)
   expect(before).toBeGreaterThan(face)
   expect(frame).toBeGreaterThan(before)
   expect(after).toBeGreaterThan(frame)
   expect(chief.slice(frame, after)).toContain('async () =>')
+  expect(chief.slice(after, after + 200)).toContain('{ sceneReady: false }')
 })
 
 it('checks the socket and cliff at their terrain-raised rendered heights', () => {
