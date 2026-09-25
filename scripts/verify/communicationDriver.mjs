@@ -223,7 +223,9 @@ export function communicationDriver(page, { onTravelProgress = async () => {} } 
       return null
     }, { target, distance })
     assert(stand, `No reachable viewing spot at ${JSON.stringify(target)}`)
-    await walk(stand); await aim(target)
+    // Default to the frame shutter's subject height: without y the view keeps
+    // whatever pitch the previous subject left behind.
+    await walk(stand); await aim({ ...target, y: target.y ?? 0.8 })
   }
   async function leave() {
     const exit = await read(async () => {
