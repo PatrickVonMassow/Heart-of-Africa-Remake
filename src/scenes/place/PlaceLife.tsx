@@ -3809,10 +3809,16 @@ function speakWork(
   anchor: THREE.Group | null,
   gesture: RefObject<GestureState> | undefined,
 ): void {
-  if (!gesture) return
   const distance = placePlayerPosition.active
     ? Math.hypot(speaker.x - placePlayerPosition.x, speaker.z - placePlayerPosition.z)
     : Infinity
+  if (import.meta.env.DEV) {
+    // Why a spoken work word did or did not raise its note, for the checks.
+    const w = window as unknown as { __workSpeech?: unknown[] }
+    w.__workSpeech = [...(w.__workSpeech ?? []).slice(-7), { speaker: said.speaker, purpose: said.purpose,
+      at: performance.now() / 1000, distance, audible: speechReach(distance).audible, anchor: !!anchor, gesture: !!gesture }]
+  }
+  if (!gesture) return
   const { utterance, plan } = conceptSpeech(said.concept, useGame.getState().vocabulary, distance, { bearing: speechBearing(camera, speaker) })
   playSpeech(plan)
   if (speechReach(distance).audible) {
