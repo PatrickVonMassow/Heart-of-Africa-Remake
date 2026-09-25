@@ -37,6 +37,7 @@ page.on('console', (m) => { if (m.type() === 'error') receipt.errors.push(m.text
 const check = (name, ok) => { assert(ok, name); console.log(`PASS  ${name}${sections.tag()}`) }
 async function event(name, data = {}) {
   const clocks = await d.read(() => ({ pageMs: performance.now(), audioSeconds: window.__ambience?.context()?.currentTime ?? null }))
+  receipt.firstHearings = await d.read(() => window.__communicationHearings?.events ?? [])
   receipt.events.push({ name, step: receipt.step, ...clocks, ...data }); save()
 }
 async function step(name) { receipt.step = name; await event(name) }
@@ -511,6 +512,14 @@ try {
     const c = receipt.setup.levels.communication
     const band = (low) => ({ low: [low * 0.85, low * 1.12], high: [low * c.speechPitchInterval * 0.85, low * c.speechPitchInterval * 1.12] })
     receipt.bands = { adult: band(c.speechPitchHz), child: band(c.speechChildPitchHz), drums: { low: [45, 150], high: [150, 450] } }
+    receipt.initialHearings = await d.read(async () => {
+      const { observeFirstHearings } = await import('/scripts/verify/communicationTimeline.mjs')
+      window.__communicationHearings = observeFirstHearings(window.__game, () => ({
+        pageMs: performance.now(), audioSeconds: window.__ambience?.context()?.currentTime ?? null,
+        drumMessage: window.__ui.getState().drumPerformance?.plan.message ?? null,
+      }))
+      return window.__communicationHearings.initial
+    })
     await event('pre-entry-setup', { description: 'bought shovel in Cairo using buy; left and debugJumpTo Bambara before entry' })
     await d.wait(() => window.__ui.getState().enterPlaceId === 'bambara-village')
     await page.keyboard.press('Space') // normal entry gesture unlocks audio
@@ -665,7 +674,9 @@ try {
     try { await saveAudioWindow(page, out, name, bands, prefix + name, { expected: voiceWindows.get(name), baseline: ambientBaseline }) }
     catch (error) { receipt.errors.push(`incomplete ${name}: ${error.message}`) }
   }
+  receipt.firstHearings = await d.read(() => window.__communicationHearings?.events ?? []).catch(() => receipt.firstHearings ?? [])
   await d.read(() => {
+    window.__communicationHearings?.stop()
     window.__communicationCapture?.stop()
     window.__communicationPaperTiming?.observer.disconnect()
   }).catch(() => {})
