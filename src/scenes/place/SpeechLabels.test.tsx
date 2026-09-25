@@ -14,7 +14,8 @@ vi.mock('@react-three/fiber', () => ({
   useFrame: () => {},
   useThree: (select: (state: unknown) => unknown) => select({ scene, camera, size }),
 }))
-vi.mock('@react-three/drei', () => ({ Html: () => null }))
+const htmlProps = vi.hoisted(() => vi.fn())
+vi.mock('@react-three/drei', () => ({ Html: (props: unknown) => { htmlProps(props); return null } }))
 
 const atoms: Phrase = [utteranceOf('UPSTREAM', SHIPPED_VOCABULARY)]
 const hook = () => (window as unknown as {
@@ -75,4 +76,19 @@ it('rejects a remembered child anchor that has left the scene', () => {
   const before = speechLabelState()
   expect(hook().speak('kid-1', atoms, undefined, 120)).toBe(false)
   expect(speechLabelState()).toBe(before)
+})
+
+it('keeps speech notes at screen size and below the HUD instead of enlarging at close range', async () => {
+  const { useGame } = await import('../../state/store')
+  const child = new THREE.Group()
+  scene.add(child)
+  useGame.getState().hearUtterance(atoms[0])
+  speakOverhead('kid-close', atoms, child)
+  htmlProps.mockClear()
+  render(<SpeechLabels />)
+  expect(htmlProps).toHaveBeenCalled()
+  for (const [props] of htmlProps.mock.calls) {
+    expect(props.distanceFactor).toBeUndefined()
+    expect(props.zIndexRange).toEqual([20, 10])
+  }
 })

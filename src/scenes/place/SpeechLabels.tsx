@@ -69,7 +69,7 @@ function SpeechLabelView({
 
   return (
     <group ref={group}>
-      <Html center distanceFactor={14}>
+      <Html center zIndexRange={[20, 10]}>
         <SpeechLabelCard
           speakerId={label.speakerId}
           atoms={label.atoms}
