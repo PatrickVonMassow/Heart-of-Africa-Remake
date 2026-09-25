@@ -377,10 +377,11 @@ interface Animal {
    *  flight that took it onto river/lake water keeps swimming and the
    *  backstop leaves it alone; once it lapses the swim-to-bank takes over. */
   fleeAt?: number
-  /** A hunted calf swam during its chase (design.md §19.5): landing again ends
-   *  the chase (far bank), and a chase that ends first sends it to the nearest
-   *  bank. Cleared once it stands on land. */
-  chaseSwim?: true
+  /** A hunted calf swam during its chase (design.md §19.5), holding the last
+   *  land spot before it went in: landing across the water from that spot ends
+   *  the chase (far bank), landing back on the entry bank does not, and a chase
+   *  that ends first sends it to the nearest bank. Cleared once it stands on land. */
+  chaseSwim?: { x: number; z: number }
   /** The crocodile ambush (design.md §19.16, point 130), per-crocodile state:
    *  absent = hidden at its spot; set = lunging at / gripping a victim or
    *  slinking back home. Its own state — the scripted LION hunt is never
@@ -2239,12 +2240,19 @@ function Herds() {
     // lands in river/lake water marks the swim (chaseSwim) — the far-bank
     // resolution and the swim-out after the chase read it.
     const chaseFleeMove = (a: Animal, hunterX: number, hunterZ: number, speed: number) => {
-      const pace = swimBrakedPace(speed, terrainTypeAtWorld(a.x, a.z), swimPace)
+      const fromType = terrainTypeAtWorld(a.x, a.z)
+      const fromX = a.x
+      const fromZ = a.z
+      const pace = swimBrakedPace(speed, fromType, swimPace)
       const step = chaseFleeStep(a.x, a.z, hunterX, hunterZ, pace * dt, terrainTypeAtWorld, 0.8, a.fleeCorridor)
       a.fleeCorridor = step.corridor
       a.x = step.x
       a.z = step.z
-      if (settleFlight(a, false) === 'water') a.chaseSwim = true
+      // Entering the water notes the entry bank spot, so only a landing across
+      // the water counts as the far bank.
+      if (settleFlight(a, false) === 'water' && (fromType !== 'water' || !a.chaseSwim)) {
+        a.chaseSwim = { x: fromX, z: fromZ }
+      }
       return step
     }
     // The one burst-derived speed of all four rescue drives (point 127),
@@ -5639,7 +5647,7 @@ function LionHunt() {
             s.mode = 'feed'
             s.timer = 30
           }
-        } else if (v.chaseSwim && chaseSwimEscaped(true, terrainAt(v.x, v.z))) {
+        } else if (v.chaseSwim && chaseSwimEscaped(v.chaseSwim, v.x, v.z, terrainAt)) {
           // Far bank reached (design.md §19.5): the calf swam and stands on
           // land again — it got away across the water and the hunter gives up
           // into the ordinary walk-off. The hunt resolves; nothing re-chases.

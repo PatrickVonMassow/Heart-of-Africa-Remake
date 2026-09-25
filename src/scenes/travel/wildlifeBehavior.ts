@@ -360,11 +360,24 @@ export function swimBrakedPace(speed: number, terrainType: string, swimPace: num
 
 /**
  * The far-bank resolution of a hunt (design.md §19.5): a victim that swam
- * during the chase and stands on dry land again has escaped across the water —
- * the chase ends there instead of resuming on the far side.
+ * during the chase and stands on dry land ACROSS the water from its entry spot
+ * has escaped — the chase ends there instead of resuming on the far side. A
+ * landing back on the entry bank (the line to the entry spot stays dry) keeps
+ * the chase going.
  */
-export function chaseSwimEscaped(swam: boolean, terrainType: string): boolean {
-  return swam && terrainType !== 'water' && terrainType !== 'ocean'
+export function chaseSwimEscaped(
+  entry: { x: number; z: number } | undefined,
+  x: number,
+  z: number,
+  terrainTypeAt: (x: number, z: number) => string,
+): boolean {
+  if (!entry) return false
+  const here = terrainTypeAt(x, z)
+  if (here === 'water' || here === 'ocean') return false
+  for (const f of [0.25, 0.5, 0.75]) {
+    if (terrainTypeAt(entry.x + (x - entry.x) * f, entry.z + (z - entry.z) * f) === 'water') return true
+  }
+  return false
 }
 
 /**

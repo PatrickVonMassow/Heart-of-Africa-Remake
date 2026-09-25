@@ -4837,10 +4837,15 @@ describe('the hunted calf flees into rivers and lakes too (design.md §19.5)', (
     expect(swimBrakedPace(1.5, 'water', 2.6)).toBe(1.5)
   })
 
-  it('the far-bank resolution fires only for a calf that swam and stands on land again', () => {
-    expect(chaseSwimEscaped(true, 'savanna')).toBe(true)
-    expect(chaseSwimEscaped(true, 'water')).toBe(false)
-    expect(chaseSwimEscaped(true, 'ocean')).toBe(false)
-    expect(chaseSwimEscaped(false, 'savanna')).toBe(false)
+  it('the far-bank resolution fires only for a calf that swam and lands across the water', () => {
+    // A river between z = 0 and z = 3; the calf went in from (0, -1).
+    const river = (_x: number, z: number) => (z >= 0 && z <= 3 ? 'water' : 'savanna')
+    const entry = { x: 0, z: -1 }
+    expect(chaseSwimEscaped(entry, 0.5, 4, river)).toBe(true) // far bank
+    expect(chaseSwimEscaped(entry, 0.5, 1.5, river)).toBe(false) // still swimming
+    expect(chaseSwimEscaped(entry, 2, -0.5, river)).toBe(false) // back on the entry bank
+    expect(chaseSwimEscaped(undefined, 0.5, 4, river)).toBe(false) // never swam
+    const sea = (_x: number, z: number) => (z >= 0 ? 'ocean' : 'savanna')
+    expect(chaseSwimEscaped(entry, 0.5, 4, sea)).toBe(false) // the sea is no far bank
   })
 })
