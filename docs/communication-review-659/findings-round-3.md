@@ -6,7 +6,7 @@ green (`bankGame.test.ts` 70/70, `communicationBank.test.mjs` +
 communication --section=continuous-route` on `8ef74bedf`: RED after 17m 57s at
 `2-childrens-bank-game`, 2 of 48 frames. Log:
 `local/verify-logs/2026-09-25T02-55-51-215-communication.log`; receipt
-`verification/communication-webgpu-1790304955236-route.json`.
+`local/659-round3-red/communication-webgpu-1790304955236-route.json` (main checkout).
 
 R2-B1 is answered: no `bank-run-unannounced` assertion fired, and the receipt
 lists no console errors. R2-N1 is answered.
