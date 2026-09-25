@@ -30,6 +30,9 @@ export function communicationDriver(page) {
   // and never tilts the view (movementY 0).
   page.addInitScript?.(() => addEventListener('mousemove', (e) => { window.__driverCursor = { x: e.clientX, y: e.clientY } }, { capture: true, passive: true }))
   async function aim(target) {
+    // An entry that opened the journal by itself holds the cursor; a player
+    // closes it before turning (the view does not turn under an open panel).
+    if (await read(() => window.__game.getState().journalOpen)) await page.locator('.journal header button').click()
     let scale = 1, last = 0, delta = 0, distance = 0
     for (let i = 0; i < 80; i++) {
       const p = await read(() => ({ ...window.__placePlayer }))
