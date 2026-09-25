@@ -18,6 +18,7 @@ import { lakeDistance, riverDistance } from '../world/geoIndex'
 import { rollEvent, resolveEvent, type EventContext, type EventKind, type EventOutcome } from '../systems/events'
 import { REGION_PREDATORS } from '../scenes/travel/wildlifeBehavior'
 import { movementPenalty, slideAlongBlocked } from '../systems/movement'
+import { findFreeSpot } from '../systems/unstuck'
 import { currentDriftDegPerSecond, waterTravelCost } from '../systems/current'
 import {
   KNOWN_FROM_START_LANDMARKS,
@@ -914,16 +915,31 @@ export const useGame = create<GameState>()((set, get) => ({
     let nextT = sampleTerrain(next.lat, next.lon, s.seed)
     let tx = nx
     let tz = nz
-    if (isBlocked(nextT.type, next.lat, next.lon)) {
+    const blockedAt = (px: number, pz: number) => {
+      const ll = worldToLatLon(px, pz)
+      return isBlocked(sampleTerrain(ll.lat, ll.lon, s.seed).type, ll.lat, ll.lon)
+    }
+    // Already standing in blocked water (point 1212: a wading animal's collision
+    // push once left him there): every step toward the nearest open spot is
+    // allowed, so the border can hold him out but never hold him in.
+    const exit = isBlocked(here.type, cur.lat, cur.lon)
+      ? findFreeSpot(s.pos.x, s.pos.z, {
+          step: balance.strandedExit.searchStep,
+          maxRadius: balance.strandedExit.searchRadius,
+          accept: (px, pz) => !blockedAt(px, pz),
+          fallback: [s.pos.x, s.pos.z],
+        })
+      : null
+    const towardExit =
+      exit?.found === true &&
+      Math.hypot(nx - exit.pos[0], nz - exit.pos[1]) < Math.hypot(s.pos.x - exit.pos[0], s.pos.z - exit.pos[1])
+    if (!towardExit && isBlocked(nextT.type, next.lat, next.lon)) {
       // SLIDE along the boundary rather than stopping dead (point 316): a
       // swimmer pushed against the ocean by the river current had no lateral
       // escape and was stuck for good in the delta's mouth notch. Only a
       // genuine dead end — every direction in the fan blocked — still reports
       // the blocked notice.
-      const slid = slideAlongBlocked(s.pos.x, s.pos.z, nx - s.pos.x, nz - s.pos.z, (px, pz) => {
-        const ll = worldToLatLon(px, pz)
-        return isBlocked(sampleTerrain(ll.lat, ll.lon, s.seed).type, ll.lat, ll.lon)
-      })
+      const slid = slideAlongBlocked(s.pos.x, s.pos.z, nx - s.pos.x, nz - s.pos.z, blockedAt)
       if (!slid) {
         set({ toast: getStrings().toasts.oceanBlocked })
         return

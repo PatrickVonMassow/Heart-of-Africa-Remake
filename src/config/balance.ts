@@ -243,6 +243,13 @@ export interface BalanceConfig {
   /** How far (degrees) off the coast the sea stays swimmable (design.md
    *  §11.2); beyond it the open ocean blocks movement even inside bays. */
   oceanSwimMarginDeg: number
+  /** Way out of blocked water the traveller already stands in (point 1212). */
+  strandedExit: {
+    /** Ring spacing of the search for the nearest open spot, world units. */
+    searchStep: number
+    /** Farthest the search looks, world units. */
+    searchRadius: number
+  }
   /** Random events enabled (design.md §14). */
   randomEventsEnabled: boolean
   /** Per-day base probabilities of the random events (design.md §14). */
@@ -1116,6 +1123,7 @@ export const balance: BalanceConfig = {
   // passage down the channel is never deflected by a riverside settlement.
   placeCollisionFactor: 0.6,
   oceanSwimMarginDeg: 1.0, // calibratable: swimmable coastal band width in degrees (point 221: narrowed from 1.2 so the traveller cannot wade ~1.18 deg out into deep blue while the ~0.89 deg nearshore stays swimmable)
+  strandedExit: { searchStep: 0.5, searchRadius: 20 }, // calibratable: the report's trap lay 2.5 units off the beach
   randomEventsEnabled: false, // demo start preset (point 104): events off by default; debug toggle
   // Per-day base probabilities (design.md §14). Reduced by a factor of 5 from
   // the earlier calibration on user request — events should be markedly rarer.
