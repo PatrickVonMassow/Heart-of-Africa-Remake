@@ -3969,7 +3969,7 @@ export function PlaceLife({
 }) {
   const speechTime = useRef(0)
   useFrame((_, dt) => { speechTime.current += Math.min(dt, 0.1) })
-  const speechFloor = useMemo(() => new SpeechFloor(() => placePlayerPosition, () => speechTime.current, placeId), [placeId])
+  const speechFloor = useMemo(() => new SpeechFloor(() => placePlayerPosition, () => speechTime.current, placeId, () => !!useUi.getState().drumPerformance), [placeId])
   let hash = 0
   for (const c of placeId) hash = (hash * 31 + c.charCodeAt(0)) | 0
   const localSeed = (seed ^ hash) >>> 0

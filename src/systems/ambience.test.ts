@@ -1448,3 +1448,11 @@ describe('the reed beat reaches the placed audio route', () => {
     expect([ctx.sources.length, ctx.panners.length]).toEqual(before)
   })
 })
+
+it('cuts scheduled speech for the complete drum interval and restores the voice volume', async () => {
+  const { quietSpeechBus } = await import('./ambience')
+  const gain = { cancelScheduledValues: vi.fn(), setValueAtTime: vi.fn() }
+  quietSpeechBus(gain as unknown as AudioParam, 10, 8, 0.7)
+  expect(gain.cancelScheduledValues).toHaveBeenCalledWith(10)
+  expect(gain.setValueAtTime.mock.calls).toEqual([[0, 10], [0.7, 18]])
+})

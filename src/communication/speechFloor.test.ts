@@ -141,3 +141,15 @@ describe('one speech floor at the player’s ear', () => {
     expect(errors.mock.calls.flat().join(' ')).toContain('overrun situation overrunning dig pair')
   })
 })
+
+it('reserves the floor for drum messages, including against a forced deadline', () => {
+  let interrupted = true
+  const f = new SpeechFloor(() => ({ x: 0, z: 0, active: true }), () => 100, 'test', () => interrupted)
+  const source = { x: 0, z: 0, register: 'talk' as const }
+  const request = { situation: {}, name: 'dig', word: 'DIG', source, sources: () => [source], remaining: 0 }
+  expect(f.request(request)).toBe(false)
+  expect(f.holdsFloor(source)).toBe(true)
+  expect(f.forcedCount).toBe(0)
+  interrupted = false
+  expect(f.request(request)).toBe(true)
+})

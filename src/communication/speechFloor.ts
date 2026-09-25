@@ -37,7 +37,7 @@ export class SpeechFloor {
   private readonly player: () => { x: number; z: number; active: boolean }
   private readonly now: () => number
   private readonly scope: string
-  constructor(player: () => { x: number; z: number; active: boolean }, now: () => number, scope = 'village') {
+  constructor(player: () => { x: number; z: number; active: boolean }, now: () => number, scope = 'village', private readonly interrupted: () => boolean = () => false) {
     this.player = player
     this.now = now
     this.scope = scope
@@ -53,6 +53,7 @@ export class SpeechFloor {
    *  that is not a word (the tag catcher's cry, work-order 1176) must not fall
    *  into. A question only: it reserves nothing and queues nothing. */
   holdsFloor(source: FloorSource): boolean {
+    if (this.interrupted()) return true
     if (!this.audible(source)) return false
     const now = this.now()
     return [...this.situations.values()].some((s) => now < s.next && s.sources().some((p) => this.audible(p)))
@@ -68,6 +69,7 @@ export class SpeechFloor {
   }
 
   request(r: FloorRequest): boolean {
+    if (this.interrupted()) return false
     const now = this.now()
     const own = this.situations.get(r.situation)
     // A word and its consequence finish before any ready continuation. After
