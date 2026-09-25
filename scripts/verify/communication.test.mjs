@@ -60,3 +60,9 @@ it('aims before the drum trigger and rejects missed action frames', () => {
   expect(source).toContain('Loom frame caught the return instead of the named direction')
   expect(source).toContain("h.userData.errand.phase === 'walk'")
 })
+
+it('checks the socket and cliff at their terrain-raised rendered heights', () => {
+  expect(source).toContain('baseY: Math.max(0.2, sampleTerrain(')
+  expect(source).toContain('onScreen(x, z - 0.5, baseY + 2.2)')
+  expect(source).toContain('onScreen(x, z + 0.7, baseY + 1.05)')
+})
