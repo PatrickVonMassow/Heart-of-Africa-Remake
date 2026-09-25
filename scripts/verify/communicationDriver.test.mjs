@@ -1,6 +1,6 @@
 import { it, expect } from 'vitest'
 import { runInNewContext } from 'node:vm'
-import { turnDelta, travelKeys, communicationDriver } from './communicationDriver.mjs'
+import { turnDelta, travelKeys, communicationDriver, faceWalkingChief } from './communicationDriver.mjs'
 it('turns through the shortest angle and maps world axes to ordinary travel keys', () => {
   expect(turnDelta(0, { x: 0, z: 0 }, { x: 0, z: -1 })).toBeCloseTo(0)
   expect(turnDelta(Math.PI - 0.01, { x: 0, z: 0 }, { x: 0, z: 1 })).toBeCloseTo(0.01)
@@ -102,8 +102,51 @@ function pitchPage({ invertLook = false, cursorY = 450, sensitivity = 0.0011, fr
       }
     } },
   }
-  return { page, player, state, moves, keys }
+  return { page, player, state, moves, keys, window }
 }
+
+it('backs away from the door and aims at the chief who moved during the retreat', async () => {
+  const fake = pitchPage()
+  const door = [0, -0.2]
+  const chief = fake.window.__chief = { x: door[0], z: door[1] }
+  const held = new Set(), movement = []
+  fake.page.keyboard.down = async (key) => { held.add(key); movement.push(['down', key]) }
+  fake.page.keyboard.up = async (key) => { held.delete(key); movement.push(['up', key]) }
+  fake.page.waitForFunction = async (fn, arg) => {
+    for (let tick = 0; tick < 100; tick++) {
+      if (await fake.page.evaluate(fn, arg)) return
+      expect([...held]).toEqual(['KeyS'])
+      fake.player.x += Math.sin(fake.player.yaw) * 0.1
+      fake.player.z += Math.cos(fake.player.yaw) * 0.1
+      chief.x += 0.025
+    }
+    throw new Error('Retreat never reached its framing distance')
+  }
+  const subject = await faceWalkingChief(communicationDriver(fake.page), door)
+  const distance = Math.hypot(fake.player.x - door[0], fake.player.z - door[1])
+  expect(distance).toBeGreaterThanOrEqual(3.5)
+  expect(distance).toBeLessThan(3.7)
+  expect(chief.x).toBeGreaterThan(0.8)
+  expect(subject).toEqual({ x: chief.x, y: 1.2, z: chief.z })
+  expect(Math.abs(turnDelta(fake.player.yaw, fake.player, chief))).toBeLessThan(0.065)
+  expect(Math.abs(turnDelta(fake.player.yaw, fake.player, { x: door[0], z: door[1] }))).toBeGreaterThan(0.15)
+  expect(fake.player.pitch).toBeCloseTo(Math.atan2(1.2 - 1.7,
+    Math.hypot(chief.x - fake.player.x, chief.z - fake.player.z)), 2)
+  expect(movement).toEqual([['down', 'KeyS'], ['up', 'KeyS']])
+  expect(held.size).toBe(0)
+})
+
+it('releases the backward key and refuses to aim when the door retreat is blocked', async () => {
+  const keys = [], aims = []
+  const driver = communicationDriver({
+    keyboard: { down: async (key) => keys.push(['down', key]), up: async (key) => keys.push(['up', key]) },
+    waitForFunction: async () => { throw new Error('blocked retreat') },
+  })
+  driver.aim = async (subject) => aims.push(subject)
+  await expect(faceWalkingChief(driver, [0, 0])).rejects.toThrow('blocked retreat')
+  expect(keys).toEqual([['down', 'KeyS'], ['up', 'KeyS']])
+  expect(aims).toEqual([])
+})
 
 it.each([false, true].flatMap((invertLook) => [10, 450, 890].flatMap((cursorY) =>
   [0.0011, 0.0004].map((sensitivity) => ({ invertLook, cursorY, sensitivity })),

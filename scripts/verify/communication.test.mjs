@@ -78,6 +78,20 @@ it('aims before the drum trigger and rejects missed action frames', () => {
   expect(source).toContain("h.userData.errand.phase === 'walk'")
 })
 
+it('frames the departing chief after walking-out begins and keeps the phase around the shutter', () => {
+  const chief = source.slice(source.indexOf('async function chief('), source.indexOf('async function message('))
+  const start = chief.indexOf("await d.wait(() => window.__chief?.phase === 'walking-out')")
+  const face = chief.indexOf('await faceWalkingChief(d, hut.door)')
+  const before = chief.indexOf("assert(await d.read(() => window.__chief.phase === 'walking-out'), 'Chief walk framing was late')")
+  const frame = chief.indexOf('await localFrame(`${prefix}-chief-walks-out`, walkingChief,')
+  const after = chief.indexOf("assert(await d.read(() => window.__chief.phase === 'walking-out'), 'Chief walk frame was late')")
+  expect(start).toBeGreaterThanOrEqual(0)
+  expect(face).toBeGreaterThan(start)
+  expect(before).toBeGreaterThan(face)
+  expect(frame).toBeGreaterThan(before)
+  expect(after).toBeGreaterThan(frame)
+})
+
 it('checks the socket and cliff at their terrain-raised rendered heights', () => {
   expect(source).toContain('baseY: Math.max(0.2, sampleTerrain(')
   expect(source).toContain('onScreen(x, z - 0.5, baseY + 2.2)')

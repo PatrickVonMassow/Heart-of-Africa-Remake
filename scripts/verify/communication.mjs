@@ -8,7 +8,7 @@ import { launchVerifyBrowser, assertBackend, VERIFY_GL } from './_browser.mjs'
 import { sectionGate } from './sections.mjs'
 import { frameShutter } from './frameSubject.mjs'
 import { installTtsCache } from './ttsCache.mjs'
-import { communicationDriver, bankCycleSeconds, followBankTeaching, bankTeachingOrder, observeBankCall } from './communicationDriver.mjs'
+import { communicationDriver, bankCycleSeconds, followBankTeaching, bankTeachingOrder, observeBankCall, faceWalkingChief } from './communicationDriver.mjs'
 import { riverBankRoute, routeFrameProgress } from './communicationRouteCore.mjs'
 import { installCommunicationCapture, startAudioWindow, saveAudioWindow } from './communicationCapture.mjs'
 
@@ -260,7 +260,9 @@ async function chief(prefix = '05') {
     await prompt('hut')
     await page.keyboard.press('Space')
     await d.wait(() => window.__chief?.phase === 'walking-out')
-    await localFrame(`${prefix}-chief-walks-out`, await d.read(() => ({ x: window.__chief.x, y: 1.2, z: window.__chief.z })), 'the chief leaving his hut')
+    const walkingChief = await faceWalkingChief(d, hut.door)
+    assert(await d.read(() => window.__chief.phase === 'walking-out'), 'Chief walk framing was late')
+    await localFrame(`${prefix}-chief-walks-out`, walkingChief, 'the chief leaving his hut')
     assert(await d.read(() => window.__chief.phase === 'walking-out'), 'Chief walk frame was late')
   }
   const drummer = await d.read(() => ({ x: window.__placeSpots.drummer[0], z: window.__placeSpots.drummer[1] }))
