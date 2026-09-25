@@ -269,7 +269,7 @@ async function chief(prefix = '05') {
       const grid = buildPlaceNavGrid(layout, layout.colliders, PLAYER_RADIUS)
       const route = { from: chiefStandingSpot(hut, interactiveCircleRadius('chief', style)),
         to: chiefBesideDrummerSpot(window.__balance.communication.chiefBesideDrummer) }
-      const lead = { x: route.from[0] + 0.85 * (route.to[0] - route.from[0]), z: route.from[1] + 0.85 * (route.to[1] - route.from[1]) }
+      const lead = { x: route.from[0] + 0.6 * (route.to[0] - route.from[0]), z: route.from[1] + 0.6 * (route.to[1] - route.from[1]) }
       return { lead, spot: chiefWalkStand(hut, route, (p) => insidePlace(layout, p.x, p.z, 0.6) &&
         standingClear(layout.colliders, p.x, p.z, PLAYER_RADIUS) &&
         findPlaceRoute(grid, { x: hut.door[0], z: hut.door[1] }, p)) }
