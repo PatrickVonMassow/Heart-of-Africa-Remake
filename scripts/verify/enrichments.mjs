@@ -7154,25 +7154,47 @@ if (section('water-shy-flight')) {
     const seed = window.__game.getState().seed
     const T = (x, z) => window.__terrainType(-z / 10, x / 10, seed)
     const dry = (x, z) => { const t = T(x, z); return t !== 'water' && t !== 'ocean' }
+    // The chest-deep body height the swim must hold (the sim's own formula).
+    const [geo, terrain, surface, behavior] = await Promise.all([
+      import('/src/world/geo.ts'), import('/src/world/terrain.ts'),
+      import('/src/scenes/travel/waterSurface.ts'), import('/src/scenes/travel/wildlifeBehavior.ts'),
+    ])
+    const sheetY = (x, z) => {
+      const ll = geo.worldToLatLon(x, z)
+      const t = terrain.sampleTerrain(ll.lat, ll.lon, seed)
+      return behavior.sheetAnchorY(surface.waterSurfaceY(ll.lat, ll.lon, seed, t.height), t.height, 0.32)
+    }
     window.__ui.getState().setTravelZoom(0.5)
     window.__game.setState({ pos: { x: N.x, z: N.z } })
     const hx = Math.sin(h), hz = Math.cos(h)
     const fam = st.stageHunt()
     const calf = fam.calf
     const ls = window.__lionHunt.state
-    const out = { enteredWater: false, maxSideways: 0, maxSpeed: 0, swimY: null, hunterSwam: false, outcome: null }
-    let last = { x: calf.x, z: calf.z, t: window.__simTime() }
+    const out = {
+      enteredWater: false, maxSideways: 0, maxSpeed: 0, swimSamples: 0, maxSwimYErr: 0,
+      calfWetSpeed: 0, hunterSwam: false, hunterWetSpeed: 0, outcome: null,
+    }
+    let last = { x: calf.x, z: calf.z, lx: ls.lx, lz: ls.lz, t: window.__simTime() }
     await window.__pollSim(30, () => {
       const now = window.__simTime()
       const dt = now - last.t
       const step = Math.hypot(calf.x - last.x, calf.z - last.z)
-      if (dt > 1e-3) out.maxSpeed = Math.max(out.maxSpeed, step / dt)
-      last = { x: calf.x, z: calf.z, t: now }
-      if (T(calf.x, calf.z) === 'water') {
+      const calfWet = T(calf.x, calf.z) === 'water'
+      if (dt > 1e-3) {
+        out.maxSpeed = Math.max(out.maxSpeed, step / dt)
+        // Wet pace only over a stretch that lay wholly in the water.
+        if (calfWet && T(last.x, last.z) === 'water') out.calfWetSpeed = Math.max(out.calfWetSpeed, step / dt)
+        if (ls.mode === 'chase' && T(ls.lx, ls.lz) === 'water' && T(last.lx, last.lz) === 'water') {
+          out.hunterWetSpeed = Math.max(out.hunterWetSpeed, Math.hypot(ls.lx - last.lx, ls.lz - last.lz) / dt)
+        }
+      }
+      last = { x: calf.x, z: calf.z, lx: ls.lx, lz: ls.lz, t: now }
+      if (calfWet && calf.caught === undefined && !calf.dead) {
         out.enteredWater = true
         const dx = calf.x - B.x, dz = calf.z - B.z
         out.maxSideways = Math.max(out.maxSideways, Math.abs(dx * Math.cos(h) - dz * Math.sin(h)))
-        if (out.swimY === null) out.swimY = +calf.y.toFixed(2)
+        out.swimSamples++
+        out.maxSwimYErr = Math.max(out.maxSwimYErr, Math.abs(calf.y - sheetY(calf.x, calf.z)))
       }
       if (ls.mode === 'chase' && T(ls.lx, ls.lz) === 'water') out.hunterSwam = true
       if (calf.caught !== undefined || calf.dead) { out.outcome = 'caught'; return true }
@@ -7183,8 +7205,7 @@ if (section('water-shy-flight')) {
       }
       return false
     })
-    out.maxSideways = +out.maxSideways.toFixed(2)
-    out.maxSpeed = +out.maxSpeed.toFixed(2)
+    for (const k of ['maxSideways', 'maxSpeed', 'maxSwimYErr', 'calfWetSpeed', 'hunterWetSpeed']) out[k] = +out[k].toFixed(2)
     out.huntMode = ls.mode
     st.endHunt(fam)
     return out
@@ -7192,6 +7213,16 @@ if (section('water-shy-flight')) {
   check(
     'a hunted calf driven at a straight bank swims into the river rather than along it (design.md §19.5)',
     !!hunt && hunt.enteredWater && hunt.maxSideways < 1.5 && hunt.maxSpeed < 6,
+    JSON.stringify(hunt),
+  )
+  // The swim itself: every wet sample holds the chest-deep sheet height (a
+  // jump or a bed-walk leaves it), and both animals keep the braked swim pace
+  // (at most CROSS_SWIM_SPEED 2.6 before the seasonal brake; 2.9 allows the
+  // sim-clock sampling jitter). A far-bank escape means the hunter swam after it.
+  check(
+    'the hunted calf swims chest-deep on the sheet at the swim pace, and its hunter follows at the swim pace (design.md §19.5)',
+    !!hunt && hunt.swimSamples >= 3 && hunt.maxSwimYErr < 0.1 && hunt.calfWetSpeed <= 2.9 &&
+      hunt.hunterWetSpeed <= 2.9 && (hunt.outcome !== 'far-bank' || hunt.hunterSwam),
     JSON.stringify(hunt),
   )
   check(
