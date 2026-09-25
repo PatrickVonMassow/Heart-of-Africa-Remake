@@ -31908,3 +31908,88 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
      and passes after, and a Playwright run on WebGPU from the report's standpoint in
      which the traveller walks at least ten world units away.
   Bundle: Steuerung & Performance.
+
+- [x] 659. The whole communication chain, played through and judged by what reaches the
+  PLAYER — A SIX-EYES ALL-ROUND REVIEW.
+  ON HOLD (user 13.08.2026, 22:25: »Stoppe 659 erstmal — der macht erstmal keinen Sinn, wenn wir
+  jetzt die Mechanik umbauen.«). This point must NOT be started while the communication rebuild
+  is unlanded: it would play through and judge a state that will no longer exist. It keeps its
+  number and its full spec below, sits BEHIND the rebuild points in the queue, and is resumed
+  the moment the rebuild has landed — where it matters MORE than before, because it is then the
+  proof that the NEW chain reaches the player. What is being rebuilt (conversation with the user
+  on the evening of 13.08.2026; each part arrives as its own point): the vocabulary shrinks to
+  FIVE words (RIVER, UPSTREAM, DOWNSTREAM, ROCK instead of BIG_ROCK, DIG), with COME, NO, HERE,
+  GO_THERE, FOLLOW and THERE dropped; the trust/gift prelude goes, and the chief speaks from the
+  start; the children teach ROCK/UPSTREAM/DOWNSTREAM through ONE running game between two rocks
+  on the bank (the situation catalogue is dropped outright), the adults only RIVER and DIG; the
+  two rocks in TODAY'S size stand on the bank, one upstream and one downstream, while the old
+  stone in the village middle goes; and the chief's answer is exactly RIVER DOWNSTREAM plus the
+  clay impression carried by the mould/impression system.
+  (original spec, user 12.08.2026: "Danach will ich endlich mal
+  erfolgreich die ganze Kette der Kommunikationsmechanik in diesem Dorf durchspielen können,
+  ohne bei jedem Schritt sofort auf blockierende Bugs zu stoßen, obwohl du bereits mehrfach
+  getestet und nachgebessert hast. Die QS war bei diesem Feature bisher offensichtlich völlig
+  unzureichend."). THE RECORD BEARS HIM OUT: every part of this feature passed its own tests
+  and the player still could not get through it, and the cross-vendor review of the children's
+  proof needed four rounds before the proof could see the symptom at all (points 648, 656,
+  657). What failed was not any single check but the SHAPE of the checking: partial chains
+  verified in isolation, each green, with nobody walking the whole way as a player.
+
+  THE METHOD IS SIX EYES, and the user named the three models anew (24.09.2026, 07:43, replacing
+  the pairs of 12.08.2026; the first run was discarded): the ENUMERATING half
+  — what can break, what a player must be able to do, which step could silently not arrive —
+  is collected BLIND PARALLEL by OPUS 5.5 and GPT-6 ASTRA, neither seeing the other's list, and
+  FABLE 5.1 merges the two into one counted union, accounting for every entry as `only A`, `only B`
+  or `merged with <id>` (`scripts/blind-merge.mjs`, `mechanism-review.mjs --merged-by`). That is
+  the CLAUDE.md §6 rule with the models we actually have: the merger wrote neither list. The
+  JUDGING half — does this play-through really work — is convergent and keeps the ordinary
+  cross-vendor review, the reviewer reading the artefact before the author's rationale.
+
+  WHAT IS COVERED — the whole chain a player walks, not its parts:
+  1. Arriving in the village and HEARING the speech: the syllables are actually audible at the
+     shipped defaults over drums and ambience, measured on the audio path, not merely "the call
+     was made".
+  2. The children's staged situations and the adults' errands: from the scene alone, can a
+     player recognise WHAT is being expressed — the gesture, the object, the direction — or
+     only that something was said?
+  3. The guess: hypothesis label, the invitation, the dialog, and what the journal keeps of it.
+  4. The chief: the culturally correct gift, his reply, and the hint it yields.
+  5. The direction words, the glossary and the retroactive deciphering in either order.
+  6. Search, excavation and the return — the goal chain to the victory state.
+
+  HOW IT IS JUDGED: by what ARRIVES. Every step is played through as a player plays it — one
+  continuous session per run, not a per-check probe — on BOTH backends, and each step is judged
+  by the rendered picture, by the sound measured where it leaves the audio path, and by the text
+  actually shown. A step that works internally but does not reach the player is a DEFECT, and
+  the report says which of the two it was.
+
+  THREE CAUSES ARE ALREADY NAMED AND MUST BE FIXED HERE, not merely re-measured (user
+  observation on the deployed build, 13.08.2026, with the debug switch "language: show terms
+  instead of syllables" ON — the adults' actions make no sense even WITH the words visible):
+  1. THE TEACHING ROCK STANDS IN THE MIDDLE OF THE VILLAGE, NOT AT THE RIVER. `layout.ts` places
+     it 6.5–13.6 m from the village centre on the golden-angle sweep, while
+     `docs/communication-poc-spec.md` (rule 3) says "The rock lies upstream". Document and code
+     contradict each other, and for the player it is a purposeless boulder on the village square
+     that everyone walks to — and it is NOT the rock of the chief's drum message.
+  2. THE ERRANDS HAVE NO VISIBLE PURPOSE. `walkToTarget`/`walkToSpeaker`/`followToTarget` end in
+     standing about (`dwellSeconds` 6): nobody carries anything, fetches anything or works. Only
+     the three DIG errands end in visible work. A word cannot be inferred from an errand that
+     produces no result.
+  3. THERE IS NO TEACHING ORDER. `ErrandView` knows villagers and geography, not what the player
+     has already heard. The spec's method ("leaves exactly one unknown") presumes the six
+     children's terms are already learned, and nothing enforces or encourages that — so the
+     player hears two unknowns at once.
+  ALSO OBSERVED, to be judged in the same pass: upstream and downstream are barely
+  distinguishable at the bank ("recognisable with a lot of goodwill"), and the errand sequence
+  reads as a fixed loop (a fair queue over few fillable errands).
+  VERIFIABLE: a complete play-through of the chain from entering the village to the victory
+  state, with no blocking defect, evidenced by the frames of each step, an audio measurement at
+  the shipped defaults, and the journal it wrote; the three causes above demonstrably closed —
+  the rock upstream and consistent with the spec document, every errand ending in a visible
+  result, and a teaching order that does not present two unknowns at once; every further defect
+  found is listed with its severity and either fixed here or filed as its own point, and the
+  blocking ones are fixed before this point is ticked. The enumerating lists, their merge and the
+  counted union are recorded.
+  Criticality: high — this is the feature the release exists for, and the user is the one who
+  keeps hitting the bugs.
+  Bundle: Verständigung.
