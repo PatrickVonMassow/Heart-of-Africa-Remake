@@ -7129,7 +7129,7 @@ if (section('water-shy-flight')) {
   await page.evaluate(() => {
     const st = window.__waterShy
     const hx = Math.sin(st.h), hz = Math.cos(st.h)
-    st.stageHunt = () => {
+    st.stageHunt = (lead = 3.5) => {
       const { B } = st
       const fam = window.__makeTestFamily(B.x, B.z)
       fam.parent.x = B.x - 200 // parked out of shield reach, like the vigil backstop
@@ -7137,7 +7137,7 @@ if (section('water-shy-flight')) {
       const ls = window.__lionHunt.state
       ls.predator = 'lion'
       ls.mode = 'chase'; ls.victim = fam.calf; ls.victimHunt = true
-      ls.lx = B.x - hx * 3.5; ls.lz = B.z - hz * 3.5
+      ls.lx = B.x - hx * lead; ls.lz = B.z - hz * lead
       ls.lionHeading = st.h
       ls.px = B.x; ls.pz = B.z; ls.timer = 0
       return fam
@@ -7213,14 +7213,23 @@ if (section('water-shy-flight')) {
         const { B, h, width } = st
         const seed = window.__game.getState().seed
         const T = (x, z) => window.__terrainType(-z / 10, x / 10, seed)
-        st.huntFam = st.stageHunt()
+        // A longer lead than the check's, so the shutter finds the calf still
+        // swimming ahead of its hunter rather than already seized.
+        st.huntFam = st.stageHunt(6)
         const calf = st.huntFam.calf
         await window.__pollSim(10, () => {
           const along = (calf.x - B.x) * Math.sin(h) + (calf.z - B.z) * Math.cos(h)
           return calf.caught !== undefined || (T(calf.x, calf.z) === 'water' && along > width * 0.3)
         })
+        st.huntFrame = { caught: calf.caught !== undefined || !!calf.dead, wet: T(calf.x, calf.z) === 'water' }
       }),
     })
+    const huntFrame = await page.evaluate(() => window.__waterShy.huntFrame ?? null)
+    check(
+      'the hunt frame catches the calf swimming, not already seized (design.md §19.5)',
+      !!huntFrame && huntFrame.wet && !huntFrame.caught,
+      JSON.stringify(huntFrame),
+    )
     await page.evaluate(() => {
       const st = window.__waterShy
       if (st.huntFam) st.endHunt(st.huntFam)
