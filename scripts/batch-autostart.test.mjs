@@ -333,6 +333,14 @@ describe('the launcher runs the board watchdog', () => {
     expect(code).toMatch(/board republish failed/)
   })
 
+  it('republishes on a PAUSED tick too: the block precedes the pause exit', () => {
+    // A parked batch has nobody else to publish; its reason and restart clock
+    // must still reach the page (review 978eb7a07, finding 1).
+    const republish = lineOf(/staleBoardDue\(/, 'the age/progress due decision')
+    const pauseExit = lineOf(/^if \(batchParked\) \{$/, 'the pause exit')
+    expect(republish).toBeLessThan(pauseExit)
+  })
+
   it('cannot stop the launcher: the block is wrapped and fails open', () => {
     // A board check that could throw would take the RESURRECTION down with it —
     // the launcher's job is bringing the batch back, and this is a backstop.

@@ -751,6 +751,34 @@ try {
   log(`chat watcher supervision skipped (${(e && e.message) || e})`)
 }
 
+// --- BOARD REPUBLISH ON AGE OR PROGRESS (user order 24.09.2026) ---------------
+// The due mark only follows the open-point set, so a batch working on ONE point
+// for hours left the page standing, and a standing batch has nobody to publish.
+// This tick republishes when the live board is older than BOARD_MAX_AGE_MS or the
+// active point's feat branch head moved since the last publish — the publish
+// path measures the liveness and progress lines itself. Runs before the watchdog
+// below, so the probe reads the fresh page. Bounded and fail-open. It runs
+// BEFORE the pause exit: a parked batch is exactly when nobody else publishes,
+// and its reason and restart clock must still reach the page.
+try {
+  const dash = readJson(join(REPO, '.claude', 'dashboard-state.json')) ?? {}
+  const branch = focusBranch(focusPoint(readJson(join(REPO, '.claude', 'current-focus.json'))), { cwd: REPO })
+  const due = staleBoardDue({ state: dash, focusHead: branch?.head ?? null })
+  if (due.due) {
+    execFileSync(process.execPath, [R('board-publish.mjs')], {
+      windowsHide: true,
+      cwd: REPO,
+      encoding: 'utf8',
+      timeout: 120000,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+    log(`board: republished (${due.reason})`)
+  }
+} catch (e) {
+  const detail = String(e.stderr || e.message || e).trim().split('\n').filter(Boolean).pop()
+  log(`board republish failed${detail ? ` (${detail})` : ''}`)
+}
+
 // --- Guards: never resurrect when it would be wrong ---------------------------
 // The verdict was taken above (point 445), before the watcher supervision: a park
 // with a clock still running waits it out, one without a clock waits for a human.
@@ -783,32 +811,6 @@ try {
 } catch (e) {
   const detail = String(e.stderr || e.stdout || e.message || e).trim().split('\n').filter(Boolean).pop()
   log(`answered-card redemption deferred${detail ? ` (${detail})` : ''}`)
-}
-
-// --- BOARD REPUBLISH ON AGE OR PROGRESS (user order 24.09.2026) ---------------
-// The due mark only follows the open-point set, so a batch working on ONE point
-// for hours left the page standing, and a standing batch has nobody to publish.
-// This tick republishes when the live board is older than BOARD_MAX_AGE_MS or the
-// active point's feat branch head moved since the last publish — the publish
-// path measures the liveness and progress lines itself. Runs before the watchdog
-// below, so the probe reads the fresh page. Bounded and fail-open.
-try {
-  const dash = readJson(join(REPO, '.claude', 'dashboard-state.json')) ?? {}
-  const branch = focusBranch(focusPoint(readJson(join(REPO, '.claude', 'current-focus.json'))), { cwd: REPO })
-  const due = staleBoardDue({ state: dash, focusHead: branch?.head ?? null })
-  if (due.due) {
-    execFileSync(process.execPath, [R('board-publish.mjs')], {
-      windowsHide: true,
-      cwd: REPO,
-      encoding: 'utf8',
-      timeout: 120000,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    })
-    log(`board: republished (${due.reason})`)
-  }
-} catch (e) {
-  const detail = String(e.stderr || e.message || e).trim().split('\n').filter(Boolean).pop()
-  log(`board republish failed${detail ? ` (${detail})` : ''}`)
 }
 
 // --- BOARD WATCHDOG (point 400, delta E) --------------------------------------

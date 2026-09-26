@@ -160,6 +160,12 @@ describe('the age/progress publish-due decision', () => {
     expect(staleBoardDue({ state: published(BOARD_MAX_AGE_MS + 1), focusHead: 'h1', now: NOW }).due).toBe(true)
   })
 
+  it('a paused batch: an overdue board is due, a fresh one is not (pause is no input)', () => {
+    const paused = { ...published(BOARD_MAX_AGE_MS + MIN), publishDue: undefined }
+    expect(staleBoardDue({ state: paused, focusHead: 'h1', now: NOW }).due).toBe(true)
+    expect(staleBoardDue({ state: published(3 * MIN), focusHead: 'h1', now: NOW }).due).toBe(false)
+  })
+
   it('a board never published is due', () => {
     expect(staleBoardDue({ state: {}, now: NOW }).due).toBe(true)
   })
