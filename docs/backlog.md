@@ -1867,3 +1867,9 @@ read "no usable lease; ownership is uncertain…" instead of /not the lease that
 The same commit was green in the local pre-push gate and the rerun of the failed job
 was green. Non-blocking: infrastructure timing under the 01.09 freeze, no player impact;
 queue it only if it reproduces.
+- 2026-09-26 main 62a6642d0, webgpu/communication `--section=continuous-route` — red once under
+  load (a concurrent Astra vitest run): `[ASSERT] adult-atom-lost — bambara-village: water-back pair
+  1/0/walk: forced after 224.77s; overrun situation water-out pair 0/1 (speaker blocked)`. The same
+  section on the quiet machine at 5f34e87dd went green (12/12). Not reproducible, so not queued;
+  a second sighting on a quiet host makes it a point. The whole-suite covering run on both
+  backends is still owed for the render paths landed since 27d3cc2.
