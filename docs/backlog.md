@@ -1879,3 +1879,11 @@ queue it only if it reproduces.
   only: title-share and column-width checks for cards #9632 and #1192 (long card titles). The
   fixture board is green. Board presentation, no player impact; queue it only if a card
   becomes unreadable in portrait.
+
+## Board liveness: running verification unattributed on Windows
+
+Found 26.09.2026 in the round-2 review of the board-liveness point (feat/1195, `903cb438e`):
+`scripts/board-liveness.mjs` reads a process's directory only through `/proc/<pid>/cwd`, so on
+Windows every run is dropped and the progress line says no verification runs. The batch runs in
+the Linux container; board wording only, no player impact. Queue it if the batch ever runs on
+Windows.
