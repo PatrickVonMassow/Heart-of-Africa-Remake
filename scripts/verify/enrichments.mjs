@@ -4618,10 +4618,27 @@ if (section('calf-predation-drama')) {
       if (liveChunk) break
     }
     const p0 = window.__game.getState().pos
+    // The calf flees AWAY from the lion. Since the hunted-animal water flight
+    // (design.md §19.5) a river on that line is an escape — the far bank ends
+    // the hunt before any catch — so the lion comes from the side whose
+    // opposite 24 units are dry land.
+    const seed = window.__game.getState().seed
+    const U = 10
+    const cx0 = p0.x + 8
+    const cz0 = p0.z - 8
+    const dry = (x, z) => { const t = window.__terrainType(-z / U, x / U, seed); return t !== 'water' && t !== 'ocean' }
+    let flee = { x: -1, z: 0 }
+    for (let k = 0; k < 16; k++) {
+      const a = (k / 16) * Math.PI * 2
+      const d = { x: Math.cos(a), z: Math.sin(a) }
+      let ok = true
+      for (let r = 0; r <= 24 && ok; r += 0.5) ok = dry(cx0 + d.x * r, cz0 + d.z * r)
+      if (ok) { flee = d; break }
+    }
     // Park the parent out of shield reach during the chase (the shield would
     // defend BEFORE the catch and the kick never shows), reposition after.
     const parent = { x: p0.x - 200, z: p0.z - 8, y: 0.2, rot: 0, scale: 0.95, phase: 0.4, chunk: liveChunk ?? 'kick-test' }
-    const calf = { x: p0.x + 8, z: p0.z - 8, y: 0.2, rot: 0, scale: 0.5, phase: 0.8, chunk: liveChunk ?? 'kick-test', young: true, parent }
+    const calf = { x: cx0, z: cz0, y: 0.2, rot: 0, scale: 0.5, phase: 0.8, chunk: liveChunk ?? 'kick-test', young: true, parent }
     parent.child = calf
     herds.giraffe.push(parent, calf)
     const st = window.__lionHunt.state
@@ -4629,8 +4646,8 @@ if (section('calf-predation-drama')) {
     st.mode = 'chase'
     st.victim = calf
     st.victimHunt = true
-    st.lx = calf.x + 10
-    st.lz = calf.z + 2
+    st.lx = calf.x - flee.x * 10
+    st.lz = calf.z - flee.z * 10
     st.px = calf.x
     st.pz = calf.z
     st.timer = 0
@@ -6068,7 +6085,9 @@ if (section('crocodile-ambush')) {
   // its parent — the raw radial flee step ran onto the water cell and the §19.5
   // backstop teleported it back, a vibrating stand-still. The flee now routes
   // through the water-deflected step, so prey squeezed against the bank (lion
-  // inland, water behind) must still COVER GROUND along the bank.
+  // inland, water behind) must still COVER GROUND. Since the hunted-animal water
+  // flight (design.md §19.5) a river or lake is no wall: the prey may run along
+  // the bank OR take to the water and swim — only the waterline pin is a defect.
   const bankFlee = await page.evaluate(async () => {
     const herds = window.__wildlife.herdsRef.current
     const seed = window.__game.getState().seed
@@ -6124,8 +6143,8 @@ if (section('crocodile-ambush')) {
     return { staged: true, path: +path.toFixed(1), net: +net.toFixed(1), onWater }
   })
   check(
-    'prey squeezed against a bank flees ALONG it — real ground covered, never a waterline pin (point 201)',
-    bankFlee.staged && bankFlee.net > 2 && !bankFlee.onWater,
+    'prey squeezed against a bank escapes along it or into the river — real ground covered, never a waterline pin (point 201)',
+    bankFlee.staged && bankFlee.net > 2 && bankFlee.path > 2,
     JSON.stringify(bankFlee),
   )
 }
