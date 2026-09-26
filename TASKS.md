@@ -16083,3 +16083,26 @@ to land than a mechanism that needs a review.
   Test: crossbrowser green.
   Refs: scripts/verify/crossbrowser.mjs, the renderer bring-up.
   Bundle: Steuerung & Performance.
+- [ ] 1220. The WebGL 2 notice no longer covers the start journal's title.
+  PROBLEM, measured 26.09.2026 on main 96f8c1e: flow frame `verification/06-start-journal.png`
+  (WebGL 2) shows the dismissible compatibility notice drawn OVER the open journal panel, its
+  "Verstanden" button on the "Tagebuch" heading. The frame committed 8 days earlier shows the
+  notice behind the panel and the title readable.
+  FINAL STATE: at a WebGL 2 start with the journal open, the notice and the journal title are
+  both readable (neither covers the other); the notice stays dismissible.
+  Criticality: low — the journal title is hidden at every WebGL 2 start until dismissal.
+  Test: a Playwright layout check in the flow or layout suite asserting the notice's box does
+  not intersect the journal header on WebGL 2; picture check of 06-start-journal.
+  Refs: the compatibility notice component, the journal panel, verification/06-start-journal.png.
+  Bundle: Steuerung & Performance.
+- [ ] 1221. The Cairo place ground is no longer flat white at the start.
+  PROBLEM, measured 26.09.2026 on main 96f8c1e: in flow frame `verification/06-start-journal.png`
+  (WebGL 2, 1 FPS at the shutter) the whole foreground floor of the Cairo place is untextured
+  near-white; the frame committed 8–9 days earlier shows the same.
+  FINAL STATE: the cause is found — the shutter fires before the ground material is ready (a
+  check that does not reach its state) or a player really sees a white floor — and fixed; the
+  frame shows the textured place ground on both backends.
+  Criticality: medium — possibly the first view of the game has no ground texture.
+  Test: flow picture check of 06-start-journal on WebGL 2 and WebGPU.
+  Refs: the place scene ground material, scripts/verify/flow.mjs start-journal shutter.
+  Bundle: Siedlungsgeometrie.
