@@ -31993,3 +31993,19 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Criticality: high — this is the feature the release exists for, and the user is the one who
   keeps hitting the bugs.
   Bundle: Verständigung.
+
+- [x] 1206. Route blind-parallel enumerate halves to Astra at the default share setting, then switch to default.
+  FINAL STATE: at `default`, a blind-parallel half reaches GPT-6 Astra; authoring stays with Claude; and the machine switch stands at `default`.
+
+  (a) ROUTING (scripts/astra-share-core.mjs): the `default` row routes `review` AND `enumerate` to Astra; diagnose, audit, explain and author stay with Claude. `audit` stays with Claude deliberately (large sweeps are the costly kind); a blind audit half at `default` uses the existing `--anyway`. No new setting, no new kind, no new mechanism - a table entry.
+
+  (b) Every text that describes `default` says the same: SETTING_NOTES.default, the `default` branch of briefLine, the board note if it names the kinds, and the table and prose in docs/astra-routing.md (row `default`, the "today's behaviour" sentence).
+
+  (c) Tests: astra-share-core.test.mjs / astra-share-cli.test.mjs pin the new `default` row (enumerate -> astra; audit/diagnose/explain/author -> claude); ask-astra-cli.test.mjs pins that `--kind enumerate` at `default` is NOT refused with exit 3 while `--kind audit` still is. Adjust any existing test that pinned the old refusal.
+
+  (d) After the merge, switch this machine: `node scripts/astra-share.mjs --set default`, and state the resulting `--status` line in the closing record.
+
+  NOT IN SCOPE: changing `prefer-astra` or `claude-only`, the review path, or the author-routing cut.
+  Criticality: medium.
+  PLACEMENT (user 24.09.2026, 13:08): directly behind point 174, not with 1195: "1206 und 1207 solln nicht mitrücken. Sie sollen also nach dem Vorziehen von 1195 direkt hinter 174 stehen."
+  Bundle: Modell & Wächter.
