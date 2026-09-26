@@ -586,6 +586,15 @@ if (section('fresh-start-window')) {
   // (it would grab the OS cursor under system-Chrome --headless=new) and instead
   // applies mouse-look from raw movement — so assert the behaviour (the view turns
   // on a mouse move at a fresh, overlay-free start) rather than the grab call.
+  // Two halves. (1) The scene ASKED for the lock on entry: that is what engages a
+  // player's mouse-look, and the probe counts the decision the browser skips here.
+  // (2) The stand-in turns the view. A fresh game opens the journal on its departure
+  // entry, and the stand-in turns nothing while the journal holds the cursor (as a
+  // released pointer on it turns nothing), so the check sets the book aside first,
+  // as a player does; a LOCKED pointer turns with the journal open regardless
+  // (mouseLookApplies, src/scenes/place/pointerLock.ts).
+  const grabs = await page2.evaluate(() => window.__placeLock?.grabs ?? 0)
+  await page2.evaluate(() => window.__game.getState().setJournalOpen(false))
   const yawBefore = await page2.evaluate(() => window.__placePlayer?.yaw ?? null)
   await page2.mouse.move(640, 400)
   await page2.mouse.move(760, 400)
@@ -594,7 +603,7 @@ if (section('fresh-start-window')) {
   const fresh = await page2.evaluate(() => ({ overlay: !!document.querySelector('.overlay'), yaw: window.__placePlayer?.yaw ?? null }))
   check(
     'a fresh start (no overlay) engages mouse-look (the view turns on a mouse move)',
-    !fresh.overlay && fresh.yaw !== null && fresh.yaw !== yawBefore,
+    grabs > 0 && !fresh.overlay && fresh.yaw !== null && fresh.yaw !== yawBefore,
   )
   // Save-load is DISABLED for the PoC (user decision 24.07.2026): even with a
   // checkpoint seeded (entering a port saves one), NO start-choice overlay appears
