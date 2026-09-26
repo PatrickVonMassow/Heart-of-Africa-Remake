@@ -21,6 +21,7 @@ import { join } from 'node:path'
 import { chromium } from 'playwright'
 import { commonRepoPath, REPO_ROOT } from '../repo-paths.mjs'
 import { renderCardCriticalities } from '../board-core.mjs'
+import { applyLivenessBlock, livenessVerdict, progressLine, renderLivenessBlock } from '../board-liveness-core.mjs'
 
 // The portrait widths the complaint names, plus the narrowest phone the board
 // has ever been read on.
@@ -599,6 +600,83 @@ try {
       )
       await page.close()
     }
+  }
+  // THE LIVENESS AND PROGRESS LINES (user order 23.09.2026): the block the
+  // publisher stamps on the way out must reach the page, sit at its top and read
+  // in portrait. Measured with the longest words the lines carry — a standing
+  // batch with a pause, a long branch subject and a red verdict — and against a
+  // control that forbids wrapping, which must fail the containment bound.
+  const LIVE_NOW = Date.now()
+  const livenessBlock = renderLivenessBlock({
+    liveness: livenessVerdict({
+      lock: { sessionId: 'e121fadd-d61e-4131-aa45-6095aebda19f', kind: 'session', claimedAt: LIVE_NOW - 75 * 60000 },
+      focus: { point: 1195, confirmedAt: LIVE_NOW - 89 * 60000 },
+      pause: { reason: 'Kontingent erschöpft, Anbieterwechsel angefordert', type: 'quota', retryAfter: LIVE_NOW + 40 * 60000 },
+      launcherLine: 'SKIP: the batch lock is held by a live session whose heartbeat is stale — waiting for the handover grace',
+      now: LIVE_NOW,
+    }),
+    progress: progressLine({
+      point: 1195,
+      commit: { at: LIVE_NOW - 12 * 60000, subject: 'Republish the board from the launcher tick on age or focus-branch progress' },
+      running: [{ suite: 'communication', section: 'continuous-route' }],
+      verdict: { status: 'red', suite: 'communication', section: 'continuous-route', at: LIVE_NOW - 30 * 60000, firstFail: 'continuous route at 9-fit-and-journal: continuous route has no browser errors' },
+      now: LIVE_NOW,
+    }),
+    measuredAt: LIVE_NOW,
+    focusHead: 'a3ed04abd',
+  })
+  const measureLiveness = (page) =>
+    page.evaluate(() => {
+      const block = document.querySelector('.liveness')
+      if (!block) return null
+      const lines = ['.liveness-line', '.progress-line', '.liveness-age'].map((sel) => {
+        const el = block.querySelector(sel)
+        const r = el?.getBoundingClientRect()
+        // The TEXT's own extent, not the paragraph box: a line that may not wrap
+        // runs past its box while the box keeps the block's width.
+        const range = document.createRange()
+        if (el) range.selectNodeContents(el)
+        const textRight = el ? range.getBoundingClientRect().right : 0
+        return { sel, text: el?.textContent ?? '', height: r?.height ?? 0, right: Math.max(r?.right ?? 0, textRight), fontPx: el ? parseFloat(getComputedStyle(el).fontSize) : 0 }
+      })
+      const box = block.getBoundingClientRect()
+      const firstSection = document.querySelector('details.sect')
+      return {
+        state: block.getAttribute('data-liveness'),
+        above: !firstSection || (block.compareDocumentPosition(firstSection) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
+        top: box.top,
+        right: box.right,
+        lines,
+        viewport: document.documentElement.clientWidth,
+        scrollWidth: document.documentElement.scrollWidth,
+      }
+    })
+  for (const { name, html } of pages) {
+    const published = applyLivenessBlock(html, livenessBlock)
+    check(`${name}: the liveness block reaches the published HTML`, published.includes('class="liveness-line"') && published.includes('class="progress-line"'))
+    for (const width of WIDTHS) {
+      const page = await browser.newPage({ viewport: { width, height: 900 } })
+      await page.setContent(published, { waitUntil: 'load' })
+      const m = await measureLiveness(page)
+      check(`${name} at ${width}px: the liveness block renders above the first section`, Boolean(m) && m.above, m ? `top ${Math.round(m.top)}px` : 'no block')
+      if (m) {
+        const [live, progress] = m.lines
+        check(`${name} at ${width}px: the standstill verdict is on the page`, m.state === 'standing' && live.text.startsWith('BATCH STEHT seit 1 h 15 min'), live.text.slice(0, 60))
+        check(`${name} at ${width}px: the progress line is on the page`, progress.text.includes('Fortschritt Punkt 1195') && progress.text.includes('ROT'), progress.text.slice(0, 60))
+        check(
+          `${name} at ${width}px: both lines read in portrait (laid out, >= 11px, inside the viewport)`,
+          m.lines.every((l) => l.height > 0 && l.fontPx >= 11 && l.right <= m.viewport + 1) && m.right <= m.viewport + 1 && m.scrollWidth <= m.viewport + 1,
+          m.lines.map((l) => `${l.sel} ${Math.round(l.height)}px/${l.fontPx}px/r${Math.round(l.right)}`).join(', ') + ` page ${m.scrollWidth}/${m.viewport}`,
+        )
+      }
+      await page.close()
+    }
+    // Control: a block that may not wrap must overflow a portrait viewport.
+    const page = await browser.newPage({ viewport: { width: 360, height: 900 } })
+    await page.setContent(`${published}\n<style>.liveness p{white-space:nowrap;overflow-wrap:normal;word-break:normal}</style>`, { waitUntil: 'load' })
+    const control = await measureLiveness(page)
+    check(`${name}: the portrait bound rejects the no-wrap control at 360px`, Boolean(control) && control.lines.some((l) => l.right > control.viewport + 1))
+    await page.close()
   }
 } finally {
   await browser.close()

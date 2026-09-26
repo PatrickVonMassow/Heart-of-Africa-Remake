@@ -58,6 +58,8 @@ import { structureViolations } from './board-structure-core.mjs'
 import { QUEUE_STUB_META, parseTasks } from './dashboard-guard-core.mjs'
 import { ESTIMATE_CMD, TITLE_CMD, boardTitleReport, parseTaskTitles } from './board-queue-core.mjs'
 import { readTasksAll } from './tasks-source.mjs'
+import { applyLivenessBlock } from './board-liveness-core.mjs'
+import { measureLiveness } from './board-liveness.mjs'
 import {
   ARCHIVE_CONTENT_URL,
   ARCHIVE_FILE,
@@ -229,7 +231,7 @@ if (!existsSync(boardFile)) {
 }
 
 const fail = (reason) => {
-  mergeState(pagesFailurePatch({ reason }))
+  mergeState(pagesFailurePatch({ reason, state: readJson(STATE_PATH) }))
   console.error(`board-publish FAILED — ${reason}`)
   console.error('The failure is recorded; the launcher watchdog reports it if no session retries.')
   process.exit(1)
@@ -367,7 +369,20 @@ try {
 // The fingerprint is stamped on the way OUT, never into the repo file: the repo
 // bytes are what every publish record attests, and moving them under that record
 // would make the board look stale on every publish.
-const published = stampFingerprint(repoBytes, fingerprint)
+let published = stampFingerprint(repoBytes, fingerprint)
+// THE LIVENESS AND PROGRESS LINES are measured HERE, on the way out, like the
+// fingerprint: they change on every publish, so writing them into the repo file
+// would move the bytes every publish record attests. No session writes them —
+// the publish path reads lock, focus stamp, pause, launcher log, focus branch
+// and verify runs itself, so the page is right even when no session runs.
+let focusHead = null
+try {
+  const measured = measureLiveness()
+  published = applyLivenessBlock(published, measured.block)
+  focusHead = measured.focusHead
+} catch (e) {
+  console.error(`board-publish: liveness line not measured (${e.message})`)
+}
 const archive = existsSync(archiveFile)
   ? renderCardCriticalities(readFileSync(archiveFile, 'utf8'), readTasksAll())
   : null
@@ -408,7 +423,7 @@ try {
 // Hash the bytes that were actually published, not a fourth read of the file:
 // an edit landing during the push would otherwise be attested as live while the
 // OLD bytes went out (four-eyes finding 5).
-mergeState(pagesPublishPatch({ fileHash: sha256(repoBytes), fingerprint }))
+mergeState(pagesPublishPatch({ fileHash: sha256(repoBytes), fingerprint, focusHead }))
 console.log(`board PUBLISHED (${fingerprint}) — commit ${commit.slice(0, 12)} on ${BOARD_REF}`)
 console.log(`  live in seconds, cached up to ${Math.round(LIVE_GRACE_MS / 60000)} min: ${BOARD_PAGE_URL}`)
 console.log('  verify against the PAGE: node scripts/board-publish.mjs --check')

@@ -320,6 +320,27 @@ describe('the launcher runs the board watchdog', () => {
     expect(codeLines.slice(redeem, watch).join('\n')).toContain('answered-card redemption deferred')
   })
 
+  it('republishes on board age or focus-branch progress before the watchdog, fail-open', () => {
+    // The due mark follows only the open-point set; a batch working one point
+    // for hours, or a standing one, has nobody else to publish (user 24.09.2026).
+    const republish = lineOf(/staleBoardDue\(/, 'the age/progress due decision')
+    const publish = lineOf(/R\('board-publish\.mjs'\)/, 'the republish child')
+    const watch = lineOf(/board-watchdog\.mjs/, 'the board watchdog call')
+    expect(republish).toBeLessThan(publish)
+    expect(publish).toBeLessThan(watch)
+    const opener = [...codeLines.slice(0, republish)].reverse().find((l) => /^(try \{|\} catch)/.test(l))
+    expect(opener, 'the republish is not inside a try block').toMatch(/^try \{/)
+    expect(code).toMatch(/board republish failed/)
+  })
+
+  it('republishes on a PAUSED tick too: the block precedes the pause exit', () => {
+    // A parked batch has nobody else to publish; its reason and restart clock
+    // must still reach the page (review 978eb7a07, finding 1).
+    const republish = lineOf(/staleBoardDue\(/, 'the age/progress due decision')
+    const pauseExit = lineOf(/^if \(batchParked\) \{$/, 'the pause exit')
+    expect(republish).toBeLessThan(pauseExit)
+  })
+
   it('cannot stop the launcher: the block is wrapped and fails open', () => {
     // A board check that could throw would take the RESURRECTION down with it —
     // the launcher's job is bringing the batch back, and this is a backstop.

@@ -292,6 +292,16 @@ describe('delta E — the watchdog alert decision', () => {
     const d = watchdogDecision({ verdict: 'current', state, now })
     expect(d.notify).toBe(true)
     expect(d.priority).toBe('urgent')
+    expect(d.message).toContain('not been retried since')
+  })
+
+  it('reports a failure that kept failing on retry with its first and latest time', () => {
+    const state = { publishFailed: { at: now - WATCHDOG_TICK_MS * 3, lastAt: now - 60000 } }
+    const d = watchdogDecision({ verdict: 'current', state, now })
+    expect(d.priority).toBe('urgent')
+    expect(d.message).toContain(`FAILING since ${Math.round((WATCHDOG_TICK_MS * 3) / 60000)} min ago`)
+    expect(d.message).toContain('latest attempt failed 1 min ago')
+    expect(d.message).not.toContain('never retried')
   })
 
   it('never throws on junk', () => {
@@ -335,7 +345,7 @@ describe('delta D — what a pages publish records', () => {
 
   it('records a failure with its reason and leaves the due mark standing', () => {
     const p = pagesFailurePatch({ reason: 'push rejected', at: 11 })
-    expect(p.publishFailed).toEqual({ at: 11, reason: 'push rejected' })
+    expect(p.publishFailed).toEqual({ at: 11, lastAt: 11, reason: 'push rejected' })
     expect(Object.prototype.hasOwnProperty.call(p, 'publishDue')).toBe(false)
   })
 

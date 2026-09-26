@@ -217,9 +217,12 @@ export function boardMissingPoints(html, open) {
  * `fingerprint` is what the live page will carry, and it is what the watchdog
  * and `--check` compare the fetched page against.
  */
-export function pagesPublishPatch({ fileHash, fingerprint, at = Date.now() } = {}) {
+export function pagesPublishPatch({ fileHash, fingerprint, focusHead = null, at = Date.now() } = {}) {
   const fp = typeof fingerprint === 'string' && fingerprint ? fingerprint : null
   return {
+    // The focus branch head the page's progress line was measured at; null
+    // clears it, so a point that ended does not keep a stale head.
+    pagesPublishedFocusHead: typeof focusHead === 'string' && focusHead ? focusHead : undefined,
     pagesPublishedHash: typeof fileHash === 'string' && fileHash ? fileHash : undefined,
     pagesPublishedAt: at,
     publishDue: undefined,
@@ -230,13 +233,42 @@ export function pagesPublishPatch({ fileHash, fingerprint, at = Date.now() } = {
 }
 
 /**
+ * Calibratable: a live board older than this is republished by the launcher
+ * watchdog even when the open-point set is unchanged — a batch that WORKS on
+ * one point for hours must not leave the page standing (user order 24.09.2026).
+ */
+export const BOARD_MAX_AGE_MS = 25 * 60 * 1000
+
+/**
+ * Is a publish due on AGE or on PROGRESS? The fingerprint mark above only sees
+ * a changed open-point set; this sees a board older than `maxAgeMs` (exclusive
+ * boundary) and an active point whose feat branch head differs from the head
+ * stamped on the published board. Returns { due, reason }.
+ */
+export function staleBoardDue({ state, focusHead = null, now = Date.now(), maxAgeMs = BOARD_MAX_AGE_MS } = {}) {
+  const s = state && typeof state === 'object' ? state : {}
+  const at = Number(s.pagesPublishedAt)
+  if (!Number.isFinite(at) || at <= 0) return { due: true, reason: 'no publish on record' }
+  if (now - at > maxAgeMs) return { due: true, reason: `board is ${Math.round((now - at) / 60000)} min old` }
+  const head = typeof focusHead === 'string' && focusHead ? focusHead : null
+  if (head && head !== s.pagesPublishedFocusHead) return { due: true, reason: `focus branch moved to ${head.slice(0, 9)}` }
+  return { due: false, reason: '' }
+}
+
+/**
  * What a FAILED pages publish writes. The failure is persisted rather than
  * merely printed: the watchdog (delta E) reports a `publishFailed` that survived
  * a tick, and that is the layer that still speaks when the session is wedged.
  * The due mark is deliberately left standing — nothing went live.
  */
-export function pagesFailurePatch({ reason, at = Date.now() } = {}) {
-  return { publishFailed: { at, reason: String(reason ?? 'unknown') } }
+export function pagesFailurePatch({ reason, at = Date.now(), state = null } = {}) {
+  // THE FIRST UNRESOLVED FAILURE KEEPS ITS TIME. The launcher now attempts a
+  // publish every tick; resetting `at` on each retry would keep every failure
+  // younger than one tick, and watchdogDecision would never report it. A success
+  // (pagesPublishPatch) clears the record, so the next failure starts afresh.
+  const prior = Number(state && typeof state === 'object' ? state.publishFailed?.at : NaN)
+  const first = Number.isFinite(prior) && prior > 0 && prior <= at ? prior : at
+  return { publishFailed: { at: first, lastAt: at, reason: String(reason ?? 'unknown') } }
 }
 
 /**
@@ -370,7 +402,13 @@ export function watchdogDecision({
   const failedAt = Number(s.publishFailed && s.publishFailed.at)
   const publishFailureStanding = Number.isFinite(failedAt) && failedAt > 0 && now - failedAt > tickMs
   if (publishFailureStanding) {
-    parts.push(`The last publish FAILED ${Math.round((now - failedAt) / 60000)} min ago and was never retried.`)
+    // `at` is the FIRST unresolved failure (retries keep it); `lastAt` the latest attempt.
+    const lastAt = Number(s.publishFailed.lastAt)
+    const latest =
+      Number.isFinite(lastAt) && lastAt > failedAt
+        ? ` The latest attempt failed ${Math.round((now - lastAt) / 60000)} min ago.`
+        : ' It has not been retried since.'
+    parts.push(`Publishing has been FAILING since ${Math.round((now - failedAt) / 60000)} min ago.${latest}`)
     priority = 'urgent'
   }
 
