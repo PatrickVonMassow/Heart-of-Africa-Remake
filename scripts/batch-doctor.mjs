@@ -16,6 +16,7 @@ import { execFileSync, execSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { isAbsolute, join } from 'node:path'
 import { WAIT_LEASE_PATH } from './wait-lease-core.mjs'
+import { liveRecordPaths } from './verify/run-record.mjs'
 import {
   planRemediation,
   needsRepair,
@@ -124,7 +125,15 @@ try {
 // ends; no author ever edits it. Counting it as an unattributable change made the
 // doctor plan a quarantine for the lease of the very run the owner was waiting on,
 // and `pendingRepair` then blocked every Stop of that session — measured 20.09.2026
-// during the point 1094 picture run.
+// during the point 1094 picture run. The frames a LIVE verify run writes into
+// `verification/` are the same machine state: stashing them mid-run destroys the
+// run's picture evidence (measured 26.09.2026 during the closing LARGE).
+let liveVerifyRun = false
+try {
+  liveVerifyRun = liveRecordPaths().length > 0
+} catch {
+  /* unreadable run records: count the frames as ordinary changes */
+}
 let dirtyFiles = []
 try {
   dirtyFiles = git(['status', '--porcelain'])
@@ -135,6 +144,7 @@ try {
     // path's first character — every dirty list started with a mangled name.
     .map((l) => l.replace(/^[ MADRCU?!]{1,2} +/, ''))
     .filter((f) => f !== WAIT_LEASE_PATH)
+    .filter((f) => !(liveVerifyRun && f.startsWith('verification/')))
 } catch {
   /* unreadable status */
 }
