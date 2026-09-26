@@ -5013,7 +5013,10 @@ Build order, chosen so no two parallel agents own the same file:
   documented fix is already in place and the suite timed out anyway; look past it. The
   fix this point already names stands and is cause-independent: wait for the app's own
   ready signal instead of `networkidle`.
-
+  OBSERVED 26.09.2026 (closing LARGE, WebGL 2, main 2a617300a): communication
+  `continuous-route` "Three dig initiators lapsed without their invitation" (invitation emitted
+  unheard) and the point-121 remnant check again (`deadAfter:2`, calf alive) — both green alone
+  on a quiet machine at 487ad8d4f; charged here as rotating-flake entries.
 - [ ] 309. Serving-model degradation: repair + tripwire (user 25.07.2026). REPAIR: the
   late-evening session of 24.07 ran silently on Haiku 4.5 (proven by the Co-Authored-By
   commit trailers) and merged three deliveries that missed their specs; main is RESTORED

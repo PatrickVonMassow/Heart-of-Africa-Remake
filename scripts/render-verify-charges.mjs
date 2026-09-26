@@ -1894,4 +1894,37 @@ export const RED_CHARGES = [
       + '{"caught":false,"kicked":false,"lionLeft":true} — the hunt ended without the kick, plausibly '
       + 'by the new far-bank resolution. The charge dies with point 1211.',
   },
+  {
+    point: 200,
+    suite: 'communication',
+    kind: 'check',
+    backend: 'webgl',
+    match: /^continuous route at [^:]+: Three dig initiators lapsed without their invitation\b/i,
+    why:
+      'MEASURED 26.09.2026 in the closing LARGE on main 2a617300a (webgl, under load): the dig '
+      + 'invitation was emitted unheard and three initiators lapsed. The same section alone on a quiet '
+      + 'machine at 487ad8d4f was 14 pass / 0 fail — a load flake of point 200\'s class. The charge dies with 200.',
+  },
+  {
+    point: 200,
+    suite: 'enrichments',
+    kind: 'check',
+    backend: 'webgl',
+    match: /^a feed that ends without a kill leaves no remnant\b/i,
+    why:
+      'MEASURED 26.09.2026 in the closing LARGE on main 2a617300a (webgl): deadAfter 2 with the calf alive — '
+      + 'the global dead-count flake point 200 already documents (24.07). The section alone at 487ad8d4f '
+      + 'was green. The charge dies with 200.',
+  },
+  {
+    point: 1211,
+    suite: 'enrichments',
+    kind: 'check',
+    backend: 'webgl',
+    match: /^a player-driven animal left alone in the river swims out to the nearest bank\b/i,
+    why:
+      'MEASURED 26.09.2026 in the closing LARGE on main 2a617300a (webgl): swamOut false after 0.96 m — '
+      + 'the water-flight area 1211 owns. The section alone at 487ad8d4f was green, so load-dependent. '
+      + 'The charge dies with point 1211.',
+  },
 ]
