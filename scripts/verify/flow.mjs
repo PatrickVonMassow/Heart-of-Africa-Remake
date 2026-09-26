@@ -142,7 +142,10 @@ if (section('core-loop')) {
     s.journal.some((e) => titleKey(e) === 'journal.titles.departure'))
   check('Starting money $250', s.money === 250)
   check('Provisions 35 days', s.foodDays === 35)
-  check('2 starting gifts', Object.values(s.gifts).reduce((a, b) => a + b, 0) === 2)
+  // The start pack carries START_GIFTS (10) copper trinkets and nothing else
+  // (src/config/balance.ts, user decision 18.09.2026).
+  check('10 starting copper gifts', s.gifts.copper === 10 &&
+    Object.values(s.gifts).reduce((a, b) => a + b, 0) === 10)
   await shot('06-start-journal', { element: '.journal', label: 'the departure journal' })
   await page.evaluate(() => window.__game.getState().setJournalOpen(false))
   await page.waitForTimeout(300)
@@ -157,13 +160,13 @@ if (section('core-loop')) {
     return lefts.length >= 2 && lefts.every((l) => Math.abs(l - lefts[0]) <= 1)
   })
   check('Buy prices are aligned in a column (table layout)', priceAligned)
-  // Scope to the BUY grid: with the start kit (point 104) the sell-back list
-  // also carries a 'Schaufel' row, so the unscoped locator matched twice.
+  // Scope to the BUY grid: once a shovel is carried, the sell-back list also
+  // carries a 'Schaufel' row, and an unscoped locator would match twice.
   await page.locator('.buy-grid .trade-row', { hasText: 'Schaufel' }).locator('button').click()
   await page.waitForTimeout(300)
   s = await state()
-  // The demo start kit (point 104) already holds one shovel; the buy adds a second.
-  check('Shovel bought (−$20)', (s.equipment.shovel ?? 0) === 2 && s.money === 230)
+  // The expedition starts without a shovel (src/state/store.ts), so the buy lands on one.
+  check('Shovel bought (−$20)', (s.equipment.shovel ?? 0) === 1 && s.money === 230)
   await closeDialog()
 
   await enterBuilding('shop')
