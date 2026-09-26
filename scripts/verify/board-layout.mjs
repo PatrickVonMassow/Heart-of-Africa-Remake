@@ -155,7 +155,14 @@ const FIXTURE = `<!doctype html><html><head><meta name="viewport" content="width
 const tasks = readFileSync(join(REPO_ROOT, 'TASKS.md'), 'utf8')
 const stressedTasks = `${tasks}\n${STRESS_TASKS}\n${FIXTURE_TASKS}\n`
 
-const pages = [{ name: 'fixture', html: renderCardCriticalities(FIXTURE, stressedTasks) }]
+// `judgesTitleWidthOf`: which cards the title-share and title-column checks
+// judge. The fixture judges every card. The published board judges only the
+// injected stress cards — controlled text under the published stylesheet — since
+// a live card's own text, not the layout, decides those two checks for it.
+const STRESS_CARD_POINTS = new Set([STRESS_POINT, STRESS_QUEUE_POINT, STRESS_SHORT_POINT, STRESS_BARE_POINT])
+const pages = [
+  { name: 'fixture', judgesTitleWidthOf: () => true, html: renderCardCriticalities(FIXTURE, stressedTasks) },
+]
 
 // THE PUBLISHED PAGE ITSELF, whenever this checkout can see it. It lives in the
 // main checkout beside every linked worktree, and it is the artefact the user
@@ -164,6 +171,7 @@ const livePath = commonRepoPath('.batch-dashboard.html')
 if (existsSync(livePath)) {
   pages.push({
     name: 'published board',
+    judgesTitleWidthOf: (point) => STRESS_CARD_POINTS.has(point),
     // BEFORE `</main>`, not after `<main>`: the page's refresher carries the
     // opening tag inside a JavaScript comment, so an opening-tag anchor buries
     // the measurement cards in dead text and every check on them reads "not
@@ -386,15 +394,19 @@ const measureBoard = async (page, html) => {
 
 const worstTitle = (measured) =>
   measured.titles.reduce((worst, title) => (title.share < worst.share ? title : worst), measured.titles[0])
+// The worst title among those a page judges, or undefined when it judges none.
+const worstJudgedTitle = (titles) => (titles.length > 0 ? worstTitle({ titles }) : undefined)
 
 const browser = await chromium.launch()
 try {
-  for (const { name, html } of pages) {
+  for (const { name, html, judgesTitleWidthOf } of pages) {
     for (const width of WIDTHS) {
       const page = await browser.newPage({ viewport: { width, height: 900 } })
       const measured = await measureBoard(page, html)
-      const worst = worstTitle(measured)
       const at = `${name} at ${width}px`
+      const judgedTitles = measured.titles.filter((title) => judgesTitleWidthOf(title.point))
+      const judgedNotDominant = measured.notDominant.filter((item) => judgesTitleWidthOf(item.point))
+      const worst = worstJudgedTitle(judgedTitles)
 
       check(
         `${at}: the rendered board carries its cards and every stress header`,
@@ -437,8 +449,8 @@ try {
       // the flat share rule alone refused every compact one-line header).
       check(
         `${at}: every title fits one line or keeps ${Math.round(MIN_TITLE_SHARE * 100)}% of its card`,
-        measured.titles.every((title) => title.oneLine || title.share >= MIN_TITLE_SHARE),
-        worst ? `worst #${worst.point} ${Math.round(worst.width)}px/${Math.round(worst.share * 100)}%` : 'no title',
+        judgedTitles.length > 0 && judgedTitles.every((title) => title.oneLine || title.share >= MIN_TITLE_SHARE),
+        worst ? `worst #${worst.point} ${Math.round(worst.width)}px/${Math.round(worst.share * 100)}%` : 'no title judged',
       )
       check(
         `${at}: the title shares its line with the number and the time column`,
@@ -458,8 +470,8 @@ try {
       )
       check(
         `${at}: the title column is wider than both side columns together`,
-        measured.notDominant.length === 0,
-        measured.notDominant
+        judgedTitles.length > 0 && judgedNotDominant.length === 0,
+        judgedNotDominant
           .slice(0, 6)
           .map((item) => `#${item.point} ${item.title}px vs ${item.sides}px`)
           .join(', '),
@@ -512,20 +524,21 @@ try {
 
   // Negative control: restore the declarations this point replaced, and the same
   // measurement must condemn the same page.
-  for (const { name, html } of pages) {
+  for (const { name, html, judgesTitleWidthOf } of pages) {
     const page = await browser.newPage({ viewport: { width: 360, height: 900 } })
     // APPENDED, not spliced into a head: the published board is a headless
     // fragment, and a control that lands nowhere silently proves nothing.
     const broken = await measureBoard(page, `${html}\n${OLD_HEADER_RULES}`)
-    const worst = worstTitle(broken)
+    const brokenTitles = broken.titles.filter((title) => judgesTitleWidthOf(title.point))
+    const worst = worstJudgedTitle(brokenTitles)
     // The control must fall to the SAME predicate the positive check uses —
     // a compact one-line title may no longer stand in for a squeezed one
     // (review finding 3).
     check(
       `${name}: the measurement rejects the old squeezed-header control at 360px`,
-      broken.titles.some((title) => !title.oneLine && title.share < MIN_TITLE_SHARE) ||
+      brokenTitles.some((title) => !title.oneLine && title.share < MIN_TITLE_SHARE) ||
         broken.clipped.length > 0,
-      worst ? `worst #${worst.point} ${Math.round(worst.width)}px/${Math.round(worst.share * 100)}%` : 'no title',
+      worst ? `worst #${worst.point} ${Math.round(worst.width)}px/${Math.round(worst.share * 100)}%` : 'no title judged',
     )
     await page.close()
   }
@@ -565,10 +578,11 @@ try {
   // Third control: the SHARE floor alone, with nothing clipped. If this control
   // ever passes the positive checks, the lowered 40% floor has stopped meaning
   // anything (Sol review, finding 2).
-  for (const { name, html } of pages) {
+  for (const { name, html, judgesTitleWidthOf } of pages) {
     const page = await browser.newPage({ viewport: { width: 360, height: 900 } })
     const squeezed = await measureBoard(page, `${html}\n${SQUEEZED_HEADER_RULES}`)
-    const worst = worstTitle(squeezed)
+    const squeezedTitles = squeezed.titles.filter((title) => judgesTitleWidthOf(title.point))
+    const worst = worstJudgedTitle(squeezedTitles)
     check(
       `${name}: the squeeze control starves the title without cutting anything off`,
       squeezed.clipped.length === 0,
@@ -579,8 +593,8 @@ try {
     )
     check(
       `${name}: the ${Math.round(MIN_TITLE_SHARE * 100)}% floor rejects the squeeze control at 360px`,
-      squeezed.titles.some((title) => !title.oneLine && title.share < MIN_TITLE_SHARE),
-      worst ? `worst #${worst.point} ${Math.round(worst.width)}px/${Math.round(worst.share * 100)}%` : 'no title',
+      squeezedTitles.some((title) => !title.oneLine && title.share < MIN_TITLE_SHARE),
+      worst ? `worst #${worst.point} ${Math.round(worst.width)}px/${Math.round(worst.share * 100)}%` : 'no title judged',
     )
     await page.close()
   }
