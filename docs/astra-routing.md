@@ -7,7 +7,7 @@ the Anthropic volume is nearly spent, rather than at the last percent.
 Point 654 built the cheap half: the READ-ONLY kinds, where Astra authored nothing
 and no commit carried its trailer, so the author allowlist, the `commit-msg`
 hook and the model guard could all stay as they were. That half is described
-first below, and it is unchanged.
+first below; `default` now also routes blind-parallel enumerate halves to Astra.
 
 Point 667 built the other half, because the read-only lever had reached its
 maximum while the largest single item of the spend — the AUTHORING of delegated
@@ -26,13 +26,16 @@ node scripts/astra-share.mjs --less            # one step back towards Claude
 node scripts/astra-share.mjs --set prefer-astra  # or default, or claude-only
 ```
 
-| setting | review | diagnose · audit · enumerate · explain |
+| setting | review · enumerate | diagnose · audit · explain |
 | --- | --- | --- |
 | `claude-only` | Claude | Claude |
 | `default` | GPT-6 Astra | Claude |
 | `prefer-astra` | GPT-6 Astra | GPT-6 Astra |
 
-`default` is today's behaviour and changes nothing. `prefer-astra` hands every
+`default` routes reviews and enumerate to Astra; diagnose, audit, explain and
+authoring stay with Claude. Audit stays with Claude deliberately because large
+sweeps are costly; a blind audit half at `default` uses the existing `--anyway`.
+`prefer-astra` hands every
 read-only kind to Astra. `claude-only` is the escape hatch for the other
 direction — when the ChatGPT side is the scarce one — and it stops the review
 path too: `review-astra.mjs` then sends nothing at all and hands the review to a
