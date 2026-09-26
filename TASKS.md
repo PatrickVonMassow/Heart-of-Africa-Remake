@@ -16116,3 +16116,4 @@ to land than a mechanism that needs a review.
   Criticality: low — board presentation; no player impact.
   Test: board-layout suite green on the live and fixture board.
   Refs: scripts/verify/board-layout.mjs, scripts/render-verify-charges.mjs.
+  Bundle: Chat & Tafel.
