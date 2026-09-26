@@ -32125,3 +32125,16 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Test: board-layout suite green on the live and fixture board.
   Refs: scripts/verify/board-layout.mjs, scripts/render-verify-charges.mjs.
   Bundle: Chat & Tafel.
+
+- [x] 1218. A fresh start no longer turns the view on a mouse move.
+  PROBLEM, measured 26.09.2026: flow `fresh-start-window` reds "a fresh start (no overlay)
+  engages mouse-look" in the closing LARGE on main 5dff420 (WebGL 2) and again alone on a
+  quiet machine on 80081b15c (`VERIFY_GL=webgl npm test -- flow --section=fresh-start-window`,
+  2 pass, 1 fail). The place player's yaw does not change after two mouse moves.
+  FINAL STATE: the cause is found — a player-visible loss of mouse-look at start, or a check
+  that no longer reaches the state it reads — and fixed; the section is green on both backends.
+  Remove this point's charge from scripts/render-verify-charges.mjs when it lands.
+  Criticality: medium — possibly the first-person view cannot be turned at start.
+  Test: flow --section=fresh-start-window green on WebGL 2 and WebGPU.
+  Refs: scripts/verify/flow.mjs L550–600, the place player's mouse-look input.
+  Bundle: Steuerung & Performance.
