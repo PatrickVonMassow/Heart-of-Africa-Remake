@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { JSDOM } from 'jsdom'
 import {
   LIVENESS_GRACE_MS,
@@ -208,5 +210,14 @@ describe('the block on the page', () => {
 
   it('adds no structure violation of its own', () => {
     expect(structureViolations(applyLivenessBlock(doc, block(true)))).toEqual(structureViolations(doc))
+  })
+})
+
+describe('the publisher stamps the block on the way out', () => {
+  const source = readFileSync(resolve(process.cwd(), 'scripts', 'board-publish.mjs'), 'utf8')
+  it('applies the measured block to the published bytes, never to the repo file', () => {
+    expect(source).toMatch(/published = applyLivenessBlock\(published, measured\.block\)/)
+    expect(source).not.toMatch(/repoBytes = applyLivenessBlock/)
+    expect(source).toMatch(/pagesPublishPatch\(\{ fileHash: sha256\(repoBytes\), fingerprint, focusHead \}\)/)
   })
 })
