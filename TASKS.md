@@ -16117,3 +16117,16 @@ to land than a mechanism that needs a review.
   Test: board-layout suite green on the live and fixture board.
   Refs: scripts/verify/board-layout.mjs, scripts/render-verify-charges.mjs.
   Bundle: Chat & Tafel.
+- [ ] 1217. The gamepad and touch suites still call the Nubian chief out of his hut.
+  PROBLEM, measured 26.09.2026 in the closing LARGE on main 5dff420 (WebGL 2 lane):
+  gamepad `interact-chief` and touch `prompt-tap` red — the prompt shows, but
+  `chiefOutside` stays false. Since 333c0c66d only Bambara's chief (DRUM_MESSAGE_VILLAGE)
+  steps out (src/state/store.ts L798); the Nubian chief answers with the no-message toast.
+  Both checks still enter `nubian-village` — a stale expectation, not a product defect.
+  FINAL STATE: both checks enter the drum-message village (or assert the no-message toast
+  in the Nubian one); gamepad and touch are green. Remove this point's charges from
+  scripts/render-verify-charges.mjs when it lands.
+  Criticality: low — test expectation; no player impact.
+  Test: gamepad --section=interact-chief and touch --section=prompt-tap green.
+  Refs: scripts/verify/gamepad.mjs, scripts/verify/touch.mjs, scripts/render-verify-charges.mjs.
+  Bundle: Kommunikation.

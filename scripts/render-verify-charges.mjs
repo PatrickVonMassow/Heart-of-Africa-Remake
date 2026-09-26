@@ -56,6 +56,24 @@
 /** @type {RedCharge[]} */
 export const RED_CHARGES = [
   {
+    point: 1217,
+    suite: 'gamepad',
+    kind: 'check',
+    match: /^A interacts: the chief comes out of his hut/i,
+    why:
+      'FILED AS 1217 ON 26.09.2026: since 333c0c66d only Bambara\'s chief steps out, and the check '
+      + 'still calls the Nubian one — a stale expectation. The charge dies with 1217.',
+  },
+  {
+    point: 1217,
+    suite: 'touch',
+    kind: 'check',
+    match: /^tapping the prompt fires the interaction \(the chief comes out\)/i,
+    why:
+      'FILED AS 1217 ON 26.09.2026: the prompt shows and fires, but the Nubian chief no longer steps '
+      + 'out (333c0c66d) — a stale expectation. The charge dies with 1217.',
+  },
+  {
     point: 1216,
     suite: 'board-layout',
     kind: 'check',

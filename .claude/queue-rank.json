@@ -1458,6 +1458,12 @@
       "why": "Low-criticality board check; last is right, it blocks nothing once charged",
       "origin": "machine",
       "place": "last"
+    },
+    "1217": {
+      "at": "2026-09-26T06:14:47.171Z",
+      "why": "Stale test expectation, charged; blocks nothing once charged, so last is right",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1488,7 +1494,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-26T03:17:10.172Z",
+    "at": "2026-09-26T06:14:47.184Z",
     "points": [
       174,
       184,
@@ -1911,7 +1917,8 @@
       1213,
       1214,
       1215,
-      1216
+      1216,
+      1217
     ]
   }
 }
