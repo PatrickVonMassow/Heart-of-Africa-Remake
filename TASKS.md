@@ -77,57 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1195. The board says by itself that the batch is standing.
-  USER ORDER 23.09.2026, 12:21: »Fast genauso schlimm wie eine stehende Batch ist, dass ich auf
-  dem Dashboard nicht sehen konnte, dass sie stand. Dazu einen Task nach 174 einreihen, der das
-  behebt.« Placed behind point 174 on that instruction.
-  PROBLEM, measured on the 75-minute standstill of this morning (retrospective §3.304). The
-  "Woran ich gerade arbeite" card still read "Stand 09:22 — Landungsbereitschaft prüfen" at
-  10:51, because the card is written by the working session and nobody was left to write one.
-  The board therefore shows the LAST CLAIM, never its age, and a standstill looks exactly like
-  work in progress. Every fact needed to see it was already on disk — `.claude/batch-lock.json`
-  absent or its heartbeat stale, the focus stamp's age, the launcher's own skip reason in
-  `.claude/batch-launcher.log`, a `.claude/batch-paused` record — and none of it reaches the page.
-  FINAL STATE: the board's own state block carries a measured LIVENESS line, written by the
-  publish path rather than by the working session, so it is right even when no session runs:
-  who holds the batch (or that nobody does), how old the heartbeat and the focus stamp are, and,
-  when the batch is paused, the pause's type, reason and restart clock — a clockless hold said
-  in those words. Where the newest of those readings is older than one launcher tick plus its
-  grace, the card SAYS the batch is standing and for how long, visibly at the top and legible in
-  mobile portrait, instead of repeating the last claim. The readings are taken at publish time;
-  no session has to remember to write them. A deploy whose page is older than the readings says
-  its own age, so a cached page cannot claim a live batch.
-  Test: Vitest on the pure decision — a lock absent, a stale heartbeat, a fresh heartbeat, a
-  clockless `user-stop` and a clocked park each yield the line the board prints, with the
-  standstill verdict and its measured duration; the boundary at one tick plus grace is asserted
-  from both sides. Plus a render assertion that the line reaches the published HTML and reads in
-  portrait width.
-  Criticality: high — without it the only detector of a standstill is the user looking, which is
-  how this morning's was found.
-  Refs: scripts/board-publish.mjs, scripts/board-queue-core.mjs, scripts/dashboard-guard-core.mjs,
-  .claude/batch-lock.json, .claude/batch-paused, .claude/current-focus.json,
-  .claude/batch-launcher.log, memory `batch-dashboard-artifact`, points 1193 and 1194.
-  AMENDMENT, user order 24.09.2026: the board also publishes while a batch WORKS.
-  Measured 24.09.2026, 12:56: the board stood at 10:41 while point 659 took eight commits and
-  three verify runs, because publishDue (scripts/board-currency-core.mjs publishDuePatch) is set
-  only when the open-point fingerprint changes, and the progress card is written by hand.
-  (f) A publish is also due when the live board is older than a calibratable age (default
-  25 min) or the active point's feat/<N>-* branch head differs from the head stamped on the
-  published board (.claude/current-focus.json names the point). The launcher watchdog
-  (WATCHDOG_TICK_MS) performs that publish itself; the working session gets no new duty and no
-  new guard is added (infrastructure freeze).
-  (g) A measured PROGRESS line beside the liveness line, built by the publish path from disk:
-  active point, its branch's newest commit (time, subject), the verification running now
-  (suite and section), and that point's newest verify verdict (green/red with its first FAIL
-  line). The hand-written focus card stays optional commentary.
-  Test additions: Vitest on the due-decision (unchanged open set + board older than the limit
-  is due; + new focus-branch commit is due; fresh board + same head is not due; the age limit
-  asserted from both sides) and on the progress-line builder (running suite, red verdict with
-  FAIL line, no active point); the render assertion covers the progress line in portrait.
-  PLACEMENT (user 24.09.2026, 13:03): "Okay, mach das so und ziehe das Ticket vor 633."
-  user 24.09.2026, 12:58: "Was können wir dagegen tun, die Status-Updates viel zu selten erfolgen?"
-  Bundle: Modell & Wächter
-
 - [ ] 633. The release's closing run — two regressions with the cleanup between them (user
   11.08.2026, splitting point 174: "Dafür scheint mir die Schätzung von 1 h viel zu wenig
   zu sein"). 174 carried the whole release in one card estimated at ~1 h, which was true
