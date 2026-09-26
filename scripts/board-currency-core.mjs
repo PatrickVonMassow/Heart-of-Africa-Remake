@@ -217,9 +217,12 @@ export function boardMissingPoints(html, open) {
  * `fingerprint` is what the live page will carry, and it is what the watchdog
  * and `--check` compare the fetched page against.
  */
-export function pagesPublishPatch({ fileHash, fingerprint, at = Date.now() } = {}) {
+export function pagesPublishPatch({ fileHash, fingerprint, focusHead = null, at = Date.now() } = {}) {
   const fp = typeof fingerprint === 'string' && fingerprint ? fingerprint : null
   return {
+    // The focus branch head the page's progress line was measured at; null
+    // clears it, so a point that ended does not keep a stale head.
+    pagesPublishedFocusHead: typeof focusHead === 'string' && focusHead ? focusHead : undefined,
     pagesPublishedHash: typeof fileHash === 'string' && fileHash ? fileHash : undefined,
     pagesPublishedAt: at,
     publishDue: undefined,
@@ -227,6 +230,29 @@ export function pagesPublishPatch({ fileHash, fingerprint, at = Date.now() } = {
     publishFailed: undefined,
     ...(fp ? { publishedFingerprint: fp, publishedFingerprintAt: at } : {}),
   }
+}
+
+/**
+ * Calibratable: a live board older than this is republished by the launcher
+ * watchdog even when the open-point set is unchanged — a batch that WORKS on
+ * one point for hours must not leave the page standing (user order 24.09.2026).
+ */
+export const BOARD_MAX_AGE_MS = 25 * 60 * 1000
+
+/**
+ * Is a publish due on AGE or on PROGRESS? The fingerprint mark above only sees
+ * a changed open-point set; this sees a board older than `maxAgeMs` (exclusive
+ * boundary) and an active point whose feat branch head differs from the head
+ * stamped on the published board. Returns { due, reason }.
+ */
+export function staleBoardDue({ state, focusHead = null, now = Date.now(), maxAgeMs = BOARD_MAX_AGE_MS } = {}) {
+  const s = state && typeof state === 'object' ? state : {}
+  const at = Number(s.pagesPublishedAt)
+  if (!Number.isFinite(at) || at <= 0) return { due: true, reason: 'no publish on record' }
+  if (now - at > maxAgeMs) return { due: true, reason: `board is ${Math.round((now - at) / 60000)} min old` }
+  const head = typeof focusHead === 'string' && focusHead ? focusHead : null
+  if (head && head !== s.pagesPublishedFocusHead) return { due: true, reason: `focus branch moved to ${head.slice(0, 9)}` }
+  return { due: false, reason: '' }
 }
 
 /**
