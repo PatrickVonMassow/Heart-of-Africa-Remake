@@ -10,7 +10,7 @@
 // absent, never a failed publish.
 
 import { execFileSync } from 'node:child_process'
-import { closeSync, existsSync, fstatSync, openSync, readFileSync, readSync } from 'node:fs'
+import { closeSync, existsSync, fstatSync, openSync, readFileSync, readlinkSync, readSync } from 'node:fs'
 import { commonRepoPath, REPO_ROOT } from './repo-paths.mjs'
 import { readPause } from './board-state.mjs'
 import { readVerifyProcesses } from './verify/large-run-wait.mjs'
@@ -89,9 +89,32 @@ function branchCommits(branch, cwd) {
   }
 }
 
-function readRunning() {
+/** Every worktree path and the branch it has checked out. */
+function readWorktrees(cwd) {
   try {
-    return runningVerifications(readVerifyProcesses())
+    const list = []
+    let cur = null
+    for (const line of git(['worktree', 'list', '--porcelain'], cwd).split('\n')) {
+      if (line.startsWith('worktree ')) list.push((cur = { path: line.slice(9), branch: null }))
+      else if (line.startsWith('branch ') && cur) cur.branch = line.slice(7).replace(/^refs\/heads\//, '')
+    }
+    return list
+  } catch {
+    return []
+  }
+}
+
+/** Only the active point's runs: those whose cwd lies in its branch's worktree. */
+function readRunning(branch, cwd) {
+  try {
+    const worktrees = readWorktrees(cwd)
+    const own = branch ? worktrees.find((w) => w.branch === branch.name)?.path ?? null : null
+    const rows = readVerifyProcesses().map((row) => {
+      let procCwd = null
+      try { procCwd = readlinkSync(`/proc/${row.pid}/cwd`) } catch { /* not readable: not attributable */ }
+      return { ...row, cwd: procCwd }
+    })
+    return runningVerifications(rows, { worktree: own, worktrees: worktrees.map((w) => w.path) })
   } catch {
     return []
   }
@@ -114,7 +137,7 @@ export function measureLiveness({ now = Date.now(), cwd = REPO_ROOT } = {}) {
   const branch = focusBranch(point, { cwd })
   const runs = readJson(LIVENESS_PATHS.renderState)?.runs
   const verdict = branch ? pointVerifyVerdict(runs, branchCommits(branch, cwd)) : null
-  const progress = progressLine({ point, commit: branch, running: readRunning(), verdict, now })
+  const progress = progressLine({ point, commit: branch, running: readRunning(branch, cwd), verdict, now })
   const focusHead = branch?.head ?? null
   return { liveness, progress, focusHead, block: renderLivenessBlock({ liveness, progress, measuredAt: now, focusHead }) }
 }

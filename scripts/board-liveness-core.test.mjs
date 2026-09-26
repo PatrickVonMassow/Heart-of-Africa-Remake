@@ -12,6 +12,7 @@ import {
   progressLine,
   renderLivenessBlock,
   runningVerifications,
+  worktreeOf,
 } from './board-liveness-core.mjs'
 import { BOARD_MAX_AGE_MS, WATCHDOG_TICK_MS, pagesFailurePatch, pagesPublishPatch, staleBoardDue, watchdogDecision } from './board-currency-core.mjs'
 import { structureViolations } from './board-structure-core.mjs'
@@ -247,5 +248,29 @@ describe('a publish failure that repeats every tick', () => {
     const ok = { ...failed, ...pagesPublishPatch({ fileHash: 'f', fingerprint: 'sha256:a', at: NOW + MIN }) }
     const again = pagesFailurePatch({ reason: 'y', at: NOW + 2 * MIN, state: JSON.parse(JSON.stringify(ok)) })
     expect(again.publishFailed.at).toBe(NOW + 2 * MIN)
+  })
+})
+
+describe('the running verification belongs to the active point', () => {
+  const worktrees = ['/w/hoa', '/w/hoa/.claude/worktrees/point-659', '/w/hoa/.claude/worktrees/point-1195']
+  const rows = [
+    { cwd: '/w/hoa/.claude/worktrees/point-659', argv: ['node', 'scripts/verify/run-all.mjs', 'communication', '--section=continuous-route'] },
+    { cwd: '/w/hoa/.claude/worktrees/point-1195/sub', argv: ['node', 'scripts/verify/run-all.mjs', 'board-layout'] },
+    { cwd: '/w/hoa', argv: ['node', 'scripts/verify/run-all.mjs', 'polish'] },
+  ]
+
+  it('two simultaneous runs for different points: each point sees only its own', () => {
+    expect(runningVerifications(rows, { worktree: '/w/hoa/.claude/worktrees/point-1195', worktrees })).toEqual([{ suite: 'board-layout', section: null }])
+    expect(runningVerifications(rows, { worktree: '/w/hoa/.claude/worktrees/point-659', worktrees })).toEqual([{ suite: 'communication', section: 'continuous-route' }])
+  })
+
+  it('the main tree does not swallow its linked worktrees', () => {
+    expect(worktreeOf('/w/hoa/.claude/worktrees/point-659', worktrees)).toBe('/w/hoa/.claude/worktrees/point-659')
+    expect(runningVerifications(rows, { worktree: '/w/hoa', worktrees })).toEqual([{ suite: 'polish', section: null }])
+  })
+
+  it('a point with no worktree, or a run with no readable cwd, attributes nothing', () => {
+    expect(runningVerifications(rows, { worktree: null, worktrees })).toEqual([])
+    expect(runningVerifications([{ argv: ['node', 'run-all.mjs', 'x'] }], { worktree: '/w/hoa', worktrees })).toEqual([])
   })
 })

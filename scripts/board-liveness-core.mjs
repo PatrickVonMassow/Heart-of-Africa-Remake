@@ -122,13 +122,32 @@ export function livenessVerdict({ lock = null, focus = null, pause = null, launc
   }
 }
 
+/** The worktree (longest path prefix among `worktrees`) that contains `cwd`, or null. */
+export function worktreeOf(cwd, worktrees) {
+  const dir = String(cwd ?? '').replace(/[\\/]+$/, '')
+  if (!dir) return null
+  let best = null
+  for (const wt of Array.isArray(worktrees) ? worktrees : []) {
+    const root = String(wt ?? '').replace(/[\\/]+$/, '')
+    if (!root) continue
+    if ((dir === root || dir.startsWith(`${root}/`) || dir.startsWith(`${root}\\`)) && (!best || root.length > best.length)) best = root
+  }
+  return best
+}
+
 /**
- * The verification runs currently alive, from process rows ({argv}): every
- * `run-all.mjs` process with its suite(s) and `--section`.
+ * The verification runs currently alive, from process rows ({argv, cwd}): every
+ * `run-all.mjs` process with its suite(s) and `--section`. With `worktree` given,
+ * only the runs whose cwd lies in THAT worktree (by longest prefix among
+ * `worktrees`, so the main tree does not swallow its linked worktrees) — another
+ * point's run must never read as the active point's.
  */
-export function runningVerifications(rows) {
+export function runningVerifications(rows, { worktree = undefined, worktrees = [] } = {}) {
   const out = []
+  const scoped = worktree !== undefined
+  const target = scoped && worktree ? String(worktree).replace(/[\\/]+$/, '') : null
   for (const row of Array.isArray(rows) ? rows : []) {
+    if (scoped && (!target || worktreeOf(row?.cwd, worktrees.length ? worktrees : [target]) !== target)) continue
     const argv = Array.isArray(row?.argv) ? row.argv.map(String) : []
     const i = argv.findIndex((a) => /(^|[\\/])run-all\.mjs$/.test(a))
     if (i < 0) continue
