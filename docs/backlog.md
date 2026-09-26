@@ -1887,3 +1887,11 @@ Found 26.09.2026 in the round-2 review of the board-liveness point (feat/1195, `
 Windows every run is dropped and the progress line says no verification runs. The batch runs in
 the Linux container; board wording only, no player impact. Queue it if the batch ever runs on
 Windows.
+
+## Doctor quarantine stash sweeps a live run's frames
+
+Found 26.09.2026 during the closing LARGE: `scripts/batch-doctor.mjs` quarantines with
+`git stash push -u` over the whole tree. Live-run frames are left out of the dirty count, but once
+any other file is dirty the planned `--repair` stash would still take the running suite's
+`verification/` frames along. Avoided by committing the one attributable file instead. Fix when it
+recurs: stash only the counted paths.
