@@ -4577,9 +4577,22 @@ if (section('calf-predation-drama')) {
     const calf = fam.calf
     parent.x = calf.x - 200 // parked out of the race, like the main check
     parent.z = calf.z
+    // A river on the calf's flight line is an escape (design.md §19.5) and no
+    // catch means no vigil, so the lion comes from the side whose opposite 24
+    // units are dry land — the same staging as the kick check below.
+    const seed = window.__game.getState().seed
+    const dry = (x, z) => { const t = window.__terrainType(-z / 10, x / 10, seed); return t !== 'water' && t !== 'ocean' }
+    let flee = { x: -1, z: 0 }
+    for (let k = 0; k < 16; k++) {
+      const a = (k / 16) * Math.PI * 2
+      const d = { x: Math.cos(a), z: Math.sin(a) }
+      let ok = true
+      for (let r = 0; r <= 24 && ok; r += 0.5) ok = dry(calf.x + d.x * r, calf.z + d.z * r)
+      if (ok) { flee = d; break }
+    }
     const st = window.__lionHunt.state
     st.mode = 'chase'; st.victim = calf; st.victimHunt = true
-    st.lx = calf.x + 10; st.lz = calf.z + 2; st.px = calf.x; st.pz = calf.z; st.timer = 0
+    st.lx = calf.x - flee.x * 10; st.lz = calf.z - flee.z * 10; st.px = calf.x; st.pz = calf.z; st.timer = 0
     const out = { vigilSet: false, cleared: false, parentAlive: false }
     await window.__pollSim(30, () => calf.caught !== undefined || calf.dead, 110000)
     if (calf.caught !== undefined && !calf.dead) {
