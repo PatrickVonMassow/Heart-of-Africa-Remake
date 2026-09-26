@@ -394,6 +394,8 @@ const measureBoard = async (page, html) => {
 
 const worstTitle = (measured) =>
   measured.titles.reduce((worst, title) => (title.share < worst.share ? title : worst), measured.titles[0])
+// The worst title among those a page judges, or undefined when it judges none.
+const worstJudgedTitle = (titles) => (titles.length > 0 ? worstTitle({ titles }) : undefined)
 
 const browser = await chromium.launch()
 try {
@@ -404,7 +406,7 @@ try {
       const at = `${name} at ${width}px`
       const judgedTitles = measured.titles.filter((title) => judgesTitleWidthOf(title.point))
       const judgedNotDominant = measured.notDominant.filter((item) => judgesTitleWidthOf(item.point))
-      const worst = judgedTitles.length > 0 ? worstTitle({ titles: judgedTitles }) : undefined
+      const worst = worstJudgedTitle(judgedTitles)
 
       check(
         `${at}: the rendered board carries its cards and every stress header`,
@@ -522,20 +524,21 @@ try {
 
   // Negative control: restore the declarations this point replaced, and the same
   // measurement must condemn the same page.
-  for (const { name, html } of pages) {
+  for (const { name, html, judgesTitleWidthOf } of pages) {
     const page = await browser.newPage({ viewport: { width: 360, height: 900 } })
     // APPENDED, not spliced into a head: the published board is a headless
     // fragment, and a control that lands nowhere silently proves nothing.
     const broken = await measureBoard(page, `${html}\n${OLD_HEADER_RULES}`)
-    const worst = worstTitle(broken)
+    const brokenTitles = broken.titles.filter((title) => judgesTitleWidthOf(title.point))
+    const worst = worstJudgedTitle(brokenTitles)
     // The control must fall to the SAME predicate the positive check uses —
     // a compact one-line title may no longer stand in for a squeezed one
     // (review finding 3).
     check(
       `${name}: the measurement rejects the old squeezed-header control at 360px`,
-      broken.titles.some((title) => !title.oneLine && title.share < MIN_TITLE_SHARE) ||
+      brokenTitles.some((title) => !title.oneLine && title.share < MIN_TITLE_SHARE) ||
         broken.clipped.length > 0,
-      worst ? `worst #${worst.point} ${Math.round(worst.width)}px/${Math.round(worst.share * 100)}%` : 'no title',
+      worst ? `worst #${worst.point} ${Math.round(worst.width)}px/${Math.round(worst.share * 100)}%` : 'no title judged',
     )
     await page.close()
   }
@@ -575,10 +578,11 @@ try {
   // Third control: the SHARE floor alone, with nothing clipped. If this control
   // ever passes the positive checks, the lowered 40% floor has stopped meaning
   // anything (Sol review, finding 2).
-  for (const { name, html } of pages) {
+  for (const { name, html, judgesTitleWidthOf } of pages) {
     const page = await browser.newPage({ viewport: { width: 360, height: 900 } })
     const squeezed = await measureBoard(page, `${html}\n${SQUEEZED_HEADER_RULES}`)
-    const worst = worstTitle(squeezed)
+    const squeezedTitles = squeezed.titles.filter((title) => judgesTitleWidthOf(title.point))
+    const worst = worstJudgedTitle(squeezedTitles)
     check(
       `${name}: the squeeze control starves the title without cutting anything off`,
       squeezed.clipped.length === 0,
@@ -589,8 +593,8 @@ try {
     )
     check(
       `${name}: the ${Math.round(MIN_TITLE_SHARE * 100)}% floor rejects the squeeze control at 360px`,
-      squeezed.titles.some((title) => !title.oneLine && title.share < MIN_TITLE_SHARE),
-      worst ? `worst #${worst.point} ${Math.round(worst.width)}px/${Math.round(worst.share * 100)}%` : 'no title',
+      squeezedTitles.some((title) => !title.oneLine && title.share < MIN_TITLE_SHARE),
+      worst ? `worst #${worst.point} ${Math.round(worst.width)}px/${Math.round(worst.share * 100)}%` : 'no title judged',
     )
     await page.close()
   }
