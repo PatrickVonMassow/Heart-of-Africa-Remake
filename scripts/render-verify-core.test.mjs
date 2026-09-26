@@ -3074,13 +3074,17 @@ describe('the shipped charge ledger', () => {
   // 28.08.2026), while its evidence names exactly one restored compatibility
   // adapter — so it would have excused the same freeze on WebGL 2 and on core,
   // where nobody has ever measured it. Both recorded reds carry that level.
-  it('charges the startup freeze to the restored compatibility lane alone', () => {
+  // Widened to WebGL 2 on 26.09.2026 by the closing run's measurement; the
+  // WebGPU core adapter stays unmeasured and therefore uncharged.
+  it('charges the startup freeze to the compatibility adapter and WebGL 2, never the core adapter', () => {
     const freeze = red('the loading picture never freezes longer than the balance budget (4000 ms, design.md §21.2)')
     const scoped = { suite: 'startup', backend: 'webgpu', kind: 'check' }
     expect(chargeFor(freeze, { ...scoped, featureLevel: 'compatibility' }).point).toBe(733)
     expect(chargeFor(freeze, { ...scoped, featureLevel: 'core' })).toBeNull()
     expect(chargeFor(freeze, { ...scoped })).toBeNull()
-    expect(chargeFor(freeze, { suite: 'startup', backend: 'webgl', kind: 'check', featureLevel: 'compatibility' })).toBeNull()
+    expect(chargeFor(freeze, { suite: 'startup', backend: 'webgl', kind: 'check' }).point).toBe(733)
+    const consoleRed = red('the loading picture never freezes longer than the balance budget (4000 ms, design.md §21.2)', null, 'console')
+    expect(chargeFor(consoleRed, { suite: 'startup', backend: 'webgl' })).toBeNull()
   })
 
   // THE MSAA CHECK ENTRY HELD NO KIND (review finding, 28.08.2026). Every name

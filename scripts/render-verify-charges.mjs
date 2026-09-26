@@ -299,6 +299,20 @@ export const RED_CHARGES = [
       'lanes until someone runs them.',
   },
   {
+    point: 733,
+    suite: 'startup',
+    backend: 'webgl',
+    kind: 'check',
+    match: /loading picture never freezes longer than the balance budget/i,
+    why:
+      'WIDENED TO WEBGL 2 26.09.2026 BY THE CLOSING RUN (point 633 names this measurement). The ' +
+      'LARGE on a4e1a811a read 4026 ms on webgl/startup; five further runs on the same HEAD at ' +
+      'load 2.3-2.6 read 3962 / 4020 / 3998 / 3981 ms plus three passes - the freeze sits on the ' +
+      '4000 ms budget with the webgpu shape (~1.3 s blocked thread, ~2.7 s inside one animation ' +
+      'frame), so it is the app, not the compatibility adapter. The core-adapter lane stays ' +
+      'unmeasured and uncharged. The charge dies with point 733.',
+  },
+  {
     point: 694,
     suite: 'polish',
     backend: 'webgl',
