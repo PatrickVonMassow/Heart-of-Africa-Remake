@@ -1873,3 +1873,9 @@ queue it only if it reproduces.
   section on the quiet machine at 5f34e87dd went green (12/12). Not reproducible, so not queued;
   a second sighting on a quiet host makes it a point. The whole-suite covering run on both
   backends is still owed for the render paths landed since 27d3cc2.
+  Settled 26.09.2026: `VERIFY_GL=webgl node scripts/verify/run-all.mjs communication` on
+  bae5ea3b5 went green (exit 0, 74 frames); the WebGPU whole-suite run was already clean.
+- 2026-09-26 main bae5ea3b5, `node scripts/verify/board-layout.mjs` — 8 FAILs on the LIVE board
+  only: title-share and column-width checks for cards #9632 and #1192 (long card titles). The
+  fixture board is green. Board presentation, no player impact; queue it only if a card
+  becomes unreadable in portrait.
