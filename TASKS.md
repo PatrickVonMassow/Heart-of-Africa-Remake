@@ -165,25 +165,6 @@ put it is the mistake this line exists to stop.
   that /v0.3/ and /poc/ serve the new state, and FREEZE the tag: it is never
   re-pointed.
 
-- [ ] 1211. Two wildlife checks went red on WebGL 2 right after the hunted-animal water
-  flight landed, and both touch what that change moved: prey at a bank and the hunt's end.
-  MEASURED 25.09.2026, full `enrichments` WebGL 2 on `main` 40dc83d10 (285 pass, 3 fail):
-  (a) `prey squeezed against a bank flees ALONG it — real ground covered, never a waterline
-  pin (point 201)` [--section=crocodile-ambush] read `{"staged":true,"path":6.9,"net":5.6,
-  "onWater":true}` — the prey now ends in the water; (b) `the giraffe mother kicks the hunt
-  off — calf freed, parent alive, lion leaves (point 124)` [--section=calf-predation-drama]
-  read `{"caught":false,"kicked":false,"calfAlive":true,"parentAlive":true,"lionLeft":true}`
-  — the hunt ended without the kick, plausibly by the new far-bank resolution. The third
-  red (streamed dressing, point 278) is charged to point 938. The same full pass on WebGPU
-  was 45/46 with only point 1145's `72-water-victoria-falls` frame red (run killed, so the
-  WebGPU half of these two sections is unmeasured). Log: the WebGL 2 `enrichments` log of
-  25.09.2026 ~07:15 in `local/verify-logs/`.
-  DONE WHEN: first decide per check whether the check or the behaviour is wrong under
-  design.md §19.5 (a flight meeting a river or lake goes in and swims; the OCEAN still
-  deflects — so a 201 bank that is river/lake water may legitimately be entered, and the
-  check's staging must then use a sea edge or assert the swim); fix the side that is wrong;
-  both sections green on BOTH backends, frames judged; unit coverage for any behaviour change.
-  Bundle: Tierverhalten — beside 1208, whose change the two checks meet.
 - [ ] 1207. The stand-down fence refuses writes outside the checkout, so the documented request handoff cannot be used.
   FINAL STATE: a stood-down session can deposit a request with `finding.mjs --request` using files it writes itself, with no workaround.
 
