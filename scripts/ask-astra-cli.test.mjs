@@ -135,14 +135,26 @@ describe('what it refuses before spending anything', () => {
     expect(bad.status).toBe(2)
   })
 
-  it('sends NOTHING while the switch routes this kind to Claude, and says which way out', () => {
+  it.each(['diagnose', 'audit', 'explain'])('sends NOTHING for %s at default, and says which way out', (kind) => {
     setting('default')
     clearCalls()
-    const r = run(['--kind', 'diagnose', '--brief', 'why is it red?', '--file', materialFile])
+    const r = run(['--kind', kind, '--brief', 'inspect this material', '--file', materialFile])
     expect(r.status).toBe(3)
     expect(r.stderr).toMatch(/share switch is at `default`/)
     expect(r.stderr).toMatch(/astra-share\.mjs --more/)
     expect(calls()).toEqual([])
+  })
+
+  it('sends a blind-parallel enumerate half to Astra at default without an override', () => {
+    setting('default')
+    clearCalls()
+    const r = run(['--kind', 'enumerate', '--brief', 'list the risks', '--file', materialFile], {
+      STUB_ANSWER: 'B1 | scripts/verify/place.mjs | The shutter may capture the port instead of the village',
+    })
+    expect(r.status, r.stderr).toBe(0)
+    expect(r.stderr).not.toMatch(/share switch is at `default`/)
+    expect(calls()).toContain('gpt-6-astra')
+    expect(readFileSync(join(dir, 'stdin.txt'), 'utf8')).toContain('FAIL place')
   })
 
   // Audit finding, 12.08.2026: a consumer that reads the setting but not the problem
@@ -157,10 +169,11 @@ describe('what it refuses before spending anything', () => {
     expect(calls()).toEqual([])
   })
 
-  it('runs anyway on an explicit --anyway, the override being deliberate', () => {
+  it.each(['diagnose', 'audit'])('runs %s on an explicit --anyway at default', (kind) => {
     setting('default')
     clearCalls()
-    const r = run(['--kind', 'diagnose', '--brief', 'why is it red?', '--file', materialFile, '--anyway'])
+    const r = run(['--kind', kind, '--brief', 'inspect this material', '--file', materialFile, '--anyway'],
+      kind === 'audit' ? { STUB_ANSWER: 'A1 | scripts/verify/place.mjs | The frame is written before the shutter' } : {})
     expect(r.status, r.stderr).toBe(0)
     expect(calls()).toContain('gpt-6-astra')
   })

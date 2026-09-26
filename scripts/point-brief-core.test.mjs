@@ -896,10 +896,13 @@ describe('the durability demand every brief carries (point 629)', () => {
 describe('the astra-routing line', () => {
   const briefAt = (astraShare) => assembleBrief({ point: { number: 1, done: false, body: 'x' }, astraShare })
 
-  it('names the switch at the default, without asking for anything', () => {
-    expect(briefAt('default')).toMatch(/ASTRA ROUTING is at `default`/)
-    expect(briefAt('default')).toMatch(/astra-share\.mjs --status/)
-    expect(briefAt('default')).not.toMatch(/ask-astra\.mjs --kind/)
+  it('hands enumerate halves to Astra at default and keeps the other work with Claude', () => {
+    const brief = briefAt('default')
+    expect(brief).toMatch(/ASTRA ROUTING is at `default`/)
+    expect(brief).toContain('reviews and enumerate go to GPT-6 Astra')
+    expect(brief).toContain('ask-astra.mjs --kind enumerate')
+    expect(brief).toContain('Diagnose, audit, explain and author stay with Claude')
+    expect(brief).toContain('a blind audit half uses `--anyway`')
   })
 
   it('tells the agent WHAT to hand over while the switch prefers Astra', () => {

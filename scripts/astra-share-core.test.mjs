@@ -60,9 +60,11 @@ describe('the settings themselves', () => {
 })
 
 describe('routing', () => {
-  it('sends only the review to Astra at the default — today’s behaviour, unchanged', () => {
+  it('sends review and enumerate to Astra at default, keeping the other kinds with Claude', () => {
     expect(routeFor('review', 'default')).toBe('astra')
-    for (const kind of ASK_KINDS) expect(routeFor(kind, 'default')).toBe('claude')
+    expect(routeFor('enumerate', 'default')).toBe('astra')
+    for (const kind of ['diagnose', 'audit', 'explain', 'author']) expect(routeFor(kind, 'default'), kind).toBe('claude')
+    expect(kindsToAstra('default')).toEqual(['review', 'enumerate'])
   })
 
   it('sends every read-only kind to Astra at prefer-astra', () => {
@@ -184,8 +186,8 @@ describe('what it says', () => {
   it('states in ONE line what goes where', () => {
     const line = statusLine('default')
     expect(line.split('\n')).toHaveLength(1)
-    expect(line).toMatch(/to GPT-6 Astra: review/)
-    expect(line).toMatch(/to Claude: diagnose/)
+    expect(line).toBe('astra-share: default — to GPT-6 Astra: review, enumerate · to Claude: diagnose, audit, explain, author')
+    expect(SETTING_NOTES.default).toContain('reviews and enumerate to Astra; diagnose, audit, explain and author to Claude')
     expect(statusLine('claude-only')).toMatch(/to GPT-6 Astra: nothing/)
     expect(statusLine('prefer-astra')).toMatch(/to Claude: nothing/)
   })
@@ -206,7 +208,10 @@ describe('what it says', () => {
     expect(briefLine('prefer-astra')).toMatch(/ask-astra\.mjs/)
     expect(briefLine('prefer-astra')).toMatch(/diagnose/)
     expect(briefLine('claude-only')).toMatch(/do NOT call/)
-    expect(briefLine('default')).toMatch(/reviews go to GPT-6 Astra/)
+    expect(briefLine('default')).toMatch(/reviews and enumerate go to GPT-6 Astra/)
+    expect(briefLine('default')).toContain('ask-astra.mjs --kind enumerate')
+    expect(briefLine('default')).toContain('Diagnose, audit, explain and author stay with Claude')
+    expect(briefLine('default')).toContain('a blind audit half uses `--anyway`')
     for (const s of SETTINGS) expect(briefLine(s)).toBeTruthy()
   })
 })
