@@ -106,7 +106,8 @@ import { WATCHER_PID_FILE, watcherSupervision } from './chat-watcher-core.mjs'
 import { SECRET_FAULT } from './chat-secret.mjs'
 import { chatInboxLogLines } from './chat-core.mjs'
 import { openPointStatus } from './tasks-source.mjs'
-import { BOARD_PAGE_URL } from './board-currency-core.mjs'
+import { BOARD_PAGE_URL, staleBoardDue } from './board-currency-core.mjs'
+import { focusBranch, focusPoint } from './board-liveness.mjs'
 import { emitActivity } from './batch-activity-journal.mjs'
 import { ACTIVITY_EVENTS, parseActivityJournal } from './batch-activity-journal-core.mjs'
 import { ownerActivityDecision } from './batch-ownership-core.mjs'
@@ -782,6 +783,32 @@ try {
 } catch (e) {
   const detail = String(e.stderr || e.stdout || e.message || e).trim().split('\n').filter(Boolean).pop()
   log(`answered-card redemption deferred${detail ? ` (${detail})` : ''}`)
+}
+
+// --- BOARD REPUBLISH ON AGE OR PROGRESS (user order 24.09.2026) ---------------
+// The due mark only follows the open-point set, so a batch working on ONE point
+// for hours left the page standing, and a standing batch has nobody to publish.
+// This tick republishes when the live board is older than BOARD_MAX_AGE_MS or the
+// active point's feat branch head moved since the last publish — the publish
+// path measures the liveness and progress lines itself. Runs before the watchdog
+// below, so the probe reads the fresh page. Bounded and fail-open.
+try {
+  const dash = readJson(join(REPO, '.claude', 'dashboard-state.json')) ?? {}
+  const branch = focusBranch(focusPoint(readJson(join(REPO, '.claude', 'current-focus.json'))), { cwd: REPO })
+  const due = staleBoardDue({ state: dash, focusHead: branch?.head ?? null })
+  if (due.due) {
+    execFileSync(process.execPath, [R('board-publish.mjs')], {
+      windowsHide: true,
+      cwd: REPO,
+      encoding: 'utf8',
+      timeout: 120000,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+    log(`board: republished (${due.reason})`)
+  }
+} catch (e) {
+  const detail = String(e.stderr || e.message || e).trim().split('\n').filter(Boolean).pop()
+  log(`board republish failed${detail ? ` (${detail})` : ''}`)
 }
 
 // --- BOARD WATCHDOG (point 400, delta E) --------------------------------------
