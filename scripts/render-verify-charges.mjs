@@ -56,15 +56,6 @@
 /** @type {RedCharge[]} */
 export const RED_CHARGES = [
   {
-    point: 1218,
-    suite: 'flow',
-    kind: 'check',
-    match: /^a fresh start \(no overlay\) engages mouse-look/i,
-    why:
-      'FILED AS 1218 ON 26.09.2026: red in the closing LARGE on 5dff420 and alone on a quiet '
-      + 'machine on 80081b15c (WebGL 2). The charge dies with 1218.',
-  },
-  {
     point: 1219,
     suite: 'crossbrowser',
     kind: 'check',
