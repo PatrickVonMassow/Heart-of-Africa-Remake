@@ -1,5 +1,13 @@
 {
-  "commit": "5e18c90f7129abf067a621b2ff934b02eae94a9a",
-  "steps": {},
-  "resetAt": null
+  "commit": "00a276714a9553d6fb301e4a7ab894fe6046e40b",
+  "steps": {
+    "lint-audit": {
+      "evidence": "npm run lint (oxlint) exit 0; scripts/audit-check.mjs OK, 1 known-accepted GHSA-82fw-gwwq-j7x9 (dev-only vitest mocker), on 00a276714",
+      "at": "2026-09-26T14:01:00.879Z"
+    },
+    "open-items": {
+      "evidence": "grep '// OPEN:' src on 00a276714: 6 items — balance.ts:1865 gift items undefined; chiefWalk.ts:151 chief walk only maasai-village; store.ts:1657 work-order place enumeration; speech.ts:16 German read-aloud pending voice; Effects.tsx:18 true water refraction absent; Hud.tsx:281 hiding under automation",
+      "at": "2026-09-26T14:01:06.520Z"
+    }
+  }
 }
