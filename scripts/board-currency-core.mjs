@@ -402,7 +402,13 @@ export function watchdogDecision({
   const failedAt = Number(s.publishFailed && s.publishFailed.at)
   const publishFailureStanding = Number.isFinite(failedAt) && failedAt > 0 && now - failedAt > tickMs
   if (publishFailureStanding) {
-    parts.push(`The last publish FAILED ${Math.round((now - failedAt) / 60000)} min ago and was never retried.`)
+    // `at` is the FIRST unresolved failure (retries keep it); `lastAt` the latest attempt.
+    const lastAt = Number(s.publishFailed.lastAt)
+    const latest =
+      Number.isFinite(lastAt) && lastAt > failedAt
+        ? ` The latest attempt failed ${Math.round((now - lastAt) / 60000)} min ago.`
+        : ' It has not been retried since.'
+    parts.push(`Publishing has been FAILING since ${Math.round((now - failedAt) / 60000)} min ago.${latest}`)
     priority = 'urgent'
   }
 

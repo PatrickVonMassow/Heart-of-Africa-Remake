@@ -240,7 +240,7 @@ describe('a publish failure that repeats every tick', () => {
     expect(state.publishFailed.lastAt).toBe(t0 + 2 * WATCHDOG_TICK_MS)
     const d = watchdogDecision({ verdict: 'current', state, now: t0 + 2 * WATCHDOG_TICK_MS + MIN })
     expect(d.notify).toBe(true)
-    expect(d.message).toContain('FAILED')
+    expect(d.message).toContain('FAILING since')
   })
 
   it('a success in between starts the next failure afresh', () => {
