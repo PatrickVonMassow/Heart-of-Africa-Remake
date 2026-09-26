@@ -1458,6 +1458,18 @@
       "why": "Reproduced red, charged; behind the release work already ordered",
       "origin": "machine",
       "place": "last"
+    },
+    "1220": {
+      "at": "2026-09-26T19:56:57.795Z",
+      "why": "low-criticality layout overlap; no reason to jump ahead of the settled order",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1221": {
+      "at": "2026-09-26T19:56:57.910Z",
+      "why": "unclear whether players see it; measured first by its own point, not urgent over the settled order",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1488,7 +1500,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-26T19:16:26.575Z",
+    "at": "2026-09-26T19:56:57.920Z",
     "points": [
       174,
       184,
@@ -1910,7 +1922,9 @@
       1214,
       1215,
       1217,
-      1219
+      1219,
+      1220,
+      1221
     ]
   }
 }
