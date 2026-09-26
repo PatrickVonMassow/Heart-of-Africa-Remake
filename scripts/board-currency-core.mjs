@@ -261,8 +261,14 @@ export function staleBoardDue({ state, focusHead = null, now = Date.now(), maxAg
  * a tick, and that is the layer that still speaks when the session is wedged.
  * The due mark is deliberately left standing — nothing went live.
  */
-export function pagesFailurePatch({ reason, at = Date.now() } = {}) {
-  return { publishFailed: { at, reason: String(reason ?? 'unknown') } }
+export function pagesFailurePatch({ reason, at = Date.now(), state = null } = {}) {
+  // THE FIRST UNRESOLVED FAILURE KEEPS ITS TIME. The launcher now attempts a
+  // publish every tick; resetting `at` on each retry would keep every failure
+  // younger than one tick, and watchdogDecision would never report it. A success
+  // (pagesPublishPatch) clears the record, so the next failure starts afresh.
+  const prior = Number(state && typeof state === 'object' ? state.publishFailed?.at : NaN)
+  const first = Number.isFinite(prior) && prior > 0 && prior <= at ? prior : at
+  return { publishFailed: { at: first, lastAt: at, reason: String(reason ?? 'unknown') } }
 }
 
 /**

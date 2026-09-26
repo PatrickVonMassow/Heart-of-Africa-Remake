@@ -335,7 +335,7 @@ describe('delta D — what a pages publish records', () => {
 
   it('records a failure with its reason and leaves the due mark standing', () => {
     const p = pagesFailurePatch({ reason: 'push rejected', at: 11 })
-    expect(p.publishFailed).toEqual({ at: 11, reason: 'push rejected' })
+    expect(p.publishFailed).toEqual({ at: 11, lastAt: 11, reason: 'push rejected' })
     expect(Object.prototype.hasOwnProperty.call(p, 'publishDue')).toBe(false)
   })
 

@@ -231,7 +231,7 @@ if (!existsSync(boardFile)) {
 }
 
 const fail = (reason) => {
-  mergeState(pagesFailurePatch({ reason }))
+  mergeState(pagesFailurePatch({ reason, state: readJson(STATE_PATH) }))
   console.error(`board-publish FAILED — ${reason}`)
   console.error('The failure is recorded; the launcher watchdog reports it if no session retries.')
   process.exit(1)

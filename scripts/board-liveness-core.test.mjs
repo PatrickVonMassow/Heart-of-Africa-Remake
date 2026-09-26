@@ -13,7 +13,7 @@ import {
   renderLivenessBlock,
   runningVerifications,
 } from './board-liveness-core.mjs'
-import { BOARD_MAX_AGE_MS, WATCHDOG_TICK_MS, pagesPublishPatch, staleBoardDue } from './board-currency-core.mjs'
+import { BOARD_MAX_AGE_MS, WATCHDOG_TICK_MS, pagesFailurePatch, pagesPublishPatch, staleBoardDue, watchdogDecision } from './board-currency-core.mjs'
 import { structureViolations } from './board-structure-core.mjs'
 
 const NOW = Date.UTC(2026, 8, 23, 8, 51) // 10:51 Berlin
@@ -225,5 +225,27 @@ describe('the publisher stamps the block on the way out', () => {
     expect(source).toMatch(/published = applyLivenessBlock\(published, measured\.block\)/)
     expect(source).not.toMatch(/repoBytes = applyLivenessBlock/)
     expect(source).toMatch(/pagesPublishPatch\(\{ fileHash: sha256\(repoBytes\), fingerprint, focusHead \}\)/)
+  })
+})
+
+describe('a publish failure that repeats every tick', () => {
+  it('keeps its first time, so the watchdog reports it after one tick', () => {
+    let state = {}
+    const t0 = NOW
+    for (let tick = 0; tick < 3; tick++) {
+      state = { ...state, ...pagesFailurePatch({ reason: 'push rejected', at: t0 + tick * WATCHDOG_TICK_MS, state }) }
+    }
+    expect(state.publishFailed.at).toBe(t0)
+    expect(state.publishFailed.lastAt).toBe(t0 + 2 * WATCHDOG_TICK_MS)
+    const d = watchdogDecision({ verdict: 'current', state, now: t0 + 2 * WATCHDOG_TICK_MS + MIN })
+    expect(d.notify).toBe(true)
+    expect(d.message).toContain('FAILED')
+  })
+
+  it('a success in between starts the next failure afresh', () => {
+    const failed = pagesFailurePatch({ reason: 'x', at: NOW })
+    const ok = { ...failed, ...pagesPublishPatch({ fileHash: 'f', fingerprint: 'sha256:a', at: NOW + MIN }) }
+    const again = pagesFailurePatch({ reason: 'y', at: NOW + 2 * MIN, state: JSON.parse(JSON.stringify(ok)) })
+    expect(again.publishFailed.at).toBe(NOW + 2 * MIN)
   })
 })
