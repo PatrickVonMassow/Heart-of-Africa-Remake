@@ -224,7 +224,7 @@ export const LIVENESS_SCRIPT =
   `var stale=Date.now()-at>${STANDSTILL_AFTER_MS};` +
   'p.className=stale?"liveness-age stale":"liveness-age";' +
   'p.textContent=stale?"Diese Seite ist "+min+" min alt (gemessen "+clock+") — die Zeilen darüber sind nicht aktuell.":"Gemessen "+clock+", vor "+min+" min.";}' +
-  'tick();setInterval(tick,30000);' +
+  'tick();document.addEventListener("DOMContentLoaded",tick);setInterval(tick,30000);' +
   'document.addEventListener("visibilitychange",tick);window.addEventListener("hoa-board-swapped",tick);})();' +
   '</script>'
 
