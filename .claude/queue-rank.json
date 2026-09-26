@@ -1393,12 +1393,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "1195": {
-      "at": "2026-09-24T11:19:47.294Z",
-      "why": "User 24.09.2026 13:03: ziehe das Ticket vor 633",
-      "origin": "user",
-      "place": "ahead"
-    },
     "1197": {
       "at": "2026-09-23T12:48:00.322Z",
       "why": "Follow-up refinement of a landed point; medium urgency, waits behind the release",
@@ -1458,6 +1452,12 @@
       "why": "a readable-HUD polish point with no blocker; it follows the communication release work already ordered ahead of it",
       "origin": "machine",
       "place": "last"
+    },
+    "1216": {
+      "at": "2026-09-26T03:17:10.162Z",
+      "why": "Low-criticality board check; last is right, it blocks nothing once charged",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1488,7 +1488,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-26T01:46:00.983Z",
+    "at": "2026-09-26T03:17:10.172Z",
     "points": [
       174,
       184,
@@ -1900,7 +1900,6 @@
       1188,
       1189,
       1192,
-      1195,
       1197,
       1202,
       1203,
@@ -1911,7 +1910,8 @@
       1211,
       1213,
       1214,
-      1215
+      1215,
+      1216
     ]
   }
 }

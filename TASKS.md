@@ -16104,3 +16104,15 @@ to land than a mechanism that needs a review.
   three are shown, on WebGL 2 (where the notice appears) and WebGPU; picture check on both backends.
   Refs: src/ui/Hud.tsx, the graphics-notice and place-title components.
   Bundle: Kommunikation.
+- [ ] 1216. The board-layout check judges the live board's card titles and reds on content.
+  PROBLEM, measured 26.09.2026 on main fec9bf2 (`node scripts/verify/run-all.mjs board-layout`):
+  every fixture check is green, but the "published board" title-share and title-column checks
+  red at 320–414 px on live cards #9632 and #1192 — their text, not the layout, decides the
+  verdict, so any change under scripts/verify/ now holds render-verify-guard on a red no code
+  change caused (first backlogged in docs/backlog.md, main bae5ea3b5).
+  FINAL STATE: the title-width checks judge the fixture board only (the live board keeps its
+  liveness/portrait checks), or the two cards read in portrait; board-layout is green on main.
+  Remove the charge for this point from scripts/render-verify-charges.mjs when it lands.
+  Criticality: low — board presentation; no player impact.
+  Test: board-layout suite green on the live and fixture board.
+  Refs: scripts/verify/board-layout.mjs, scripts/render-verify-charges.mjs.

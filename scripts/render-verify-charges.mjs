@@ -56,6 +56,15 @@
 /** @type {RedCharge[]} */
 export const RED_CHARGES = [
   {
+    point: 1216,
+    suite: 'board-layout',
+    kind: 'check',
+    match: /published board at \d+px: (every title fits one line or keeps 40% of its card|the title column is wider than both side columns together)/i,
+    why:
+      'FILED AS 1216 ON 26.09.2026: on main fec9bf2 the fixture board is green and only the live '
+      + 'board\'s title checks red on cards #9632 and #1192 — content, not layout. The charge dies with 1216.',
+  },
+  {
     point: 1078,
     suite: 'world',
     kind: 'check',
