@@ -56,6 +56,24 @@
 /** @type {RedCharge[]} */
 export const RED_CHARGES = [
   {
+    point: 1218,
+    suite: 'flow',
+    kind: 'check',
+    match: /^a fresh start \(no overlay\) engages mouse-look/i,
+    why:
+      'FILED AS 1218 ON 26.09.2026: red in the closing LARGE on 5dff420 and alone on a quiet '
+      + 'machine on 80081b15c (WebGL 2). The charge dies with 1218.',
+  },
+  {
+    point: 1219,
+    suite: 'crossbrowser',
+    kind: 'check',
+    match: /^chromium-mobile (the renderer initialises on mobile|no console errors on mobile)/i,
+    why:
+      'FILED AS 1219 ON 26.09.2026: getSupportedExtensions on a null context, red in the closing '
+      + 'LARGE on 5dff420 and alone on 80081b15c; green in earlier LARGE runs. The charge dies with 1219.',
+  },
+  {
     point: 1217,
     suite: 'gamepad',
     kind: 'check',
