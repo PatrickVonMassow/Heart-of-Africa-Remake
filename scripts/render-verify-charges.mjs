@@ -1872,29 +1872,6 @@ export const RED_CHARGES = [
       + 'transient the check counts as a product red. The charge dies with point 1203.',
   },
   {
-    point: 1211,
-    suite: 'enrichments',
-    kind: 'check',
-    backend: 'webgl',
-    match: /^prey squeezed against a bank flees ALONG it\b/i, // the recorded red name ends before its ' — ' detail
-    why:
-      'MEASURED 25.09.2026 on the covering enrichments pass (webgl, 285 pass / 3 fail) at main '
-      + '40dc83d10, right after the hunted-animal water flight landed: {"onWater":true}. Point 1211 '
-      + 'decides whether the check or the behaviour is wrong under design.md §19.5 and repairs it; '
-      + 'the charge dies with it.',
-  },
-  {
-    point: 1211,
-    suite: 'enrichments',
-    kind: 'check',
-    backend: 'webgl',
-    match: /^the giraffe mother kicks the hunt off\b/i, // the recorded red name ends before its ' — ' detail
-    why:
-      'MEASURED 25.09.2026 on the same webgl enrichments pass at main 40dc83d10: '
-      + '{"caught":false,"kicked":false,"lionLeft":true} — the hunt ended without the kick, plausibly '
-      + 'by the new far-bank resolution. The charge dies with point 1211.',
-  },
-  {
     point: 200,
     suite: 'communication',
     kind: 'check',
@@ -1915,16 +1892,5 @@ export const RED_CHARGES = [
       'MEASURED 26.09.2026 in the closing LARGE on main 2a617300a (webgl): deadAfter 2 with the calf alive — '
       + 'the global dead-count flake point 200 already documents (24.07). The section alone at 487ad8d4f '
       + 'was green. The charge dies with 200.',
-  },
-  {
-    point: 1211,
-    suite: 'enrichments',
-    kind: 'check',
-    backend: 'webgl',
-    match: /^a player-driven animal left alone in the river swims out to the nearest bank\b/i,
-    why:
-      'MEASURED 26.09.2026 in the closing LARGE on main 2a617300a (webgl): swamOut false after 0.96 m — '
-      + 'the water-flight area 1211 owns. The section alone at 487ad8d4f was green, so load-dependent. '
-      + 'The charge dies with point 1211.',
   },
 ]
