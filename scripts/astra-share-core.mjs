@@ -43,7 +43,7 @@ export const DEFAULT_SETTING = 'default'
  * What a file that EXISTS but cannot be read falls back to (cross-vendor review,
  * 12.08.2026), and what any value that is not a setting routes as.
  *
- * NOT the default. The default routes reviews to Astra, so a corrupted `claude-only` state
+ * NOT the default. The default routes reviews and enumerate to Astra, so a corrupted `claude-only` state
  * would quietly start spending the very allowance the operator had moved away from —
  * fail-open in the one direction a switch can fail open UNOBSERVED.
  *
@@ -64,7 +64,7 @@ export const SAFE_SETTING = 'claude-only'
  * The setting a value is TREATED as. PURE.
  *
  * One rule everywhere: a value that is not one of the three is an anomaly, and an anomaly
- * is read as the safe setting. It used to fall back to the default, which routes reviews
+ * is read as the safe setting. It used to fall back to the default, which routes reviews and enumerate
  * to Astra — so a garbled setting spent the second vendor's allowance (audit, 12.08.2026).
  */
 export function settingOrSafe(value) {
@@ -133,14 +133,14 @@ export const KIND_NOTES = Object.freeze({
  */
 const ROUTING = Object.freeze({
   'claude-only': Object.freeze({ review: 'claude', diagnose: 'claude', audit: 'claude', enumerate: 'claude', explain: 'claude', author: 'claude' }),
-  default: Object.freeze({ review: 'astra', diagnose: 'claude', audit: 'claude', enumerate: 'claude', explain: 'claude', author: 'claude' }),
+  default: Object.freeze({ review: 'astra', diagnose: 'claude', audit: 'claude', enumerate: 'astra', explain: 'claude', author: 'claude' }),
   'prefer-astra': Object.freeze({ review: 'astra', diagnose: 'astra', audit: 'astra', enumerate: 'astra', explain: 'astra', author: 'astra' }),
 })
 
 /** One line per setting, saying what it is FOR — printed by `--status` and by `--help`. */
 export const SETTING_NOTES = Object.freeze({
   'claude-only': 'the escape hatch when the ChatGPT side is the scarce one — nothing goes to Astra',
-  default: 'reviews to Astra, everything else to Claude — BELOW the standing policy of CLAUDE.md §6',
+  default: 'reviews and enumerate to Astra; diagnose, audit, explain and author to Claude — BELOW the standing policy of CLAUDE.md §6',
   'prefer-astra': 'the standing policy of CLAUDE.md §6: every read-only kind AND the authoring of every point the cut does not keep here — the hard and critical ones included — goes to Astra; Claude reviews it, runs the suites, judges the picture and lands',
 })
 
@@ -388,7 +388,7 @@ export function briefLine(state) {
   if (value === 'claude-only') {
     return `- ASTRA ROUTING is at \`claude-only\`: the ChatGPT side is the scarce one — do NOT call \`scripts/ask-astra.mjs\`.${mark}`
   }
-  return `- ASTRA ROUTING is at \`default\`: reviews go to GPT-6 Astra, everything else stays with you (\`node scripts/astra-share.mjs --status\`).${mark}`
+  return `- ASTRA ROUTING is at \`default\`: reviews and enumerate go to GPT-6 Astra; hand blind-parallel enumerate halves to \`node scripts/ask-astra.mjs --kind enumerate --brief "…"\` (material on stdin). Diagnose, audit, explain and author stay with Claude; a blind audit half uses \`--anyway\`.${mark}`
 }
 
 /**

@@ -33,7 +33,17 @@ describe('astra-share.mjs', () => {
   it('reports the default before anything has ever been set, and writes no file to do it', () => {
     const r = run('--status')
     expect(r.status).toBe(0)
-    expect(r.stdout).toMatch(/^astra-share: default —/)
+    expect(r.stdout.split('\n')[0]).toBe('astra-share: default — to GPT-6 Astra: review, enumerate · to Claude: diagnose, audit, explain, author')
+    const json = run('--status', '--json')
+    expect(json.status).toBe(0)
+    expect(JSON.parse(json.stdout).routing.map(({ kind, to }) => ({ kind, to }))).toEqual([
+      { kind: 'review', to: 'astra' },
+      { kind: 'diagnose', to: 'claude' },
+      { kind: 'audit', to: 'claude' },
+      { kind: 'enumerate', to: 'astra' },
+      { kind: 'explain', to: 'claude' },
+      { kind: 'author', to: 'claude' },
+    ])
     expect(existsSync(file)).toBe(false)
   })
 
