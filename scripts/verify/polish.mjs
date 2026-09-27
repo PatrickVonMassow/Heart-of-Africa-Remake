@@ -3445,14 +3445,14 @@ if (section('children-tag')) {
     // and then re-standing on the winner looked tidier and produced a frame of
     // the inside of a hut: re-standing recomputes the aim against a pair that
     // has run on, so the camera lands 5.5 m from somewhere nobody validated. The
-    // reading is taken again after the shutter's own delay, too, because the
-    // children keep running through it — and only a standpoint that still holds
-    // both of them opens it.
+    // reading is taken again a few frames on, too, because the children keep
+    // running — and only a standpoint that still holds both of them opens it.
     //
     // The offsets fan out from the inward-looking bearing rather than sweeping
-    // the circle from due north, so the first standpoint that qualifies is the
-    // one with the most village behind the pair, not merely the first with a
-    // clear line — and it is still shot from where it was validated.
+    // the circle from due north, so the bearings tried first are those most
+    // likely to have the village behind the pair; the first that qualifies is
+    // taken (no bearing is compared against another), and it is still shot from
+    // where it was validated.
     const OFFSETS = [0, 1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6, -6, 7, -7, 8].map((n) => (n / 16) * Math.PI * 2)
     // THE PICTURE IS WAITED FOR ONCE, HERE — before the sweep, not between the
     // reading and the shutter. The shutter opens only on a scene that has been
@@ -3479,7 +3479,7 @@ if (section('children-tag')) {
           const r = await readsFromHere()
           const verdict = judgeTagStandpoint(r)
           if (!verdict.ok) {
-            bestSeen = `best read: ${describeReading(r)} — ${verdict.reason}`
+            bestSeen = `last read: ${describeReading(r)} — ${verdict.reason}`
             continue
           }
           // It reads from here NOW — does it still, a few frames on? Only then
@@ -3506,10 +3506,10 @@ if (section('children-tag')) {
     if (stood) {
       // The subject is A CHILD (point 524), read where it is NOW rather than
       // where the pair was when the standpoint was picked: the settle delay
-      // above is eight frames of running children, and the shutter must be told
-      // what it is actually looking at. The midpoint between the two used to
-      // stand here, and a midpoint is a patch of ground — it projects into an
-      // empty plain as happily as into a game of tag.
+      // above is six frames of running children, and the shutter must be told
+      // what it is actually looking at. The midpoint between the two stays only
+      // as the fallback when no chaser is published — a midpoint is a patch of
+      // ground and projects into an empty plain as happily as into a game of tag.
       const subject = await page.evaluate(() => {
         const t = window.__placeTag()
         if (!t || t.chaser < 0) return null
@@ -3588,7 +3588,7 @@ if (section('tag-catch')) {
     )
 
     // Side-on to the pair, a few metres off, on a line the rendered scene
-    // leaves clear to the subject — both sides tried, the nearer range first.
+    // leaves clear to the subject — both sides tried at 3.2 m, then 4.2 m, then 2.6 m.
     // Each candidate is stood on, DRAWN, and only then ray-probed: the camera
     // follows the player pose in the next frame, not in the call that sets it.
     const standBeside = async (from, to, subject) => {
@@ -3636,7 +3636,7 @@ if (section('tag-catch')) {
           if (!aimed) continue
           await nextFrames(3)
           const hit = await page.evaluate((q) => window.__placeRayHit?.(q.x, 0.3, q.z) ?? null, subject)
-          if (hit && (hit.hitDistance == null || hit.hitDistance >= hit.targetDistance * 0.9)) return { back, side, hit }
+          if (hit && (hit.hitDistance == null || hit.hitDistance >= hit.targetDistance * 0.9)) return { back }
         }
       }
       return null
@@ -3826,10 +3826,10 @@ async function checkChildrenMotion(motionPlace) {
       FRAMES,
     )
     const log = trace.log
-    const n = log[0]?.c.length ?? 0
+    const n = log[0].c.length
     checkAt(
       'the trace covers a real stretch of the game, frame by frame',
-      log.length >= FRAMES && n >= 2 && log[log.length - 1].clock - log[0].clock > 5,
+      n >= 2 && log[log.length - 1].clock - log[0].clock > 5,
       `${log.length} frames, ${n} children, ${(log[log.length - 1].clock - log[0].clock).toFixed(1)}s`,
     )
     // AND THE TRACE ITSELF HOLDS A GAME (point 656). Between rounds the group
@@ -3881,7 +3881,7 @@ async function checkChildrenMotion(motionPlace) {
     checkAt(
       'no two children are ever inside one another, in any frame',
       overlapFrames === 0,
-      `${overlapFrames} of ${log.length} frames, worst ${Math.max(0, worstOverlap).toFixed(4)} m inside a ${contact.toFixed(3)} m contact`,
+      `${overlapFrames} of ${log.length} frames, worst ${worstOverlap.toFixed(4)} m inside a ${contact.toFixed(3)} m contact`,
     )
 
     // 1. NOTHING SNAGS. A child COMMANDED to move that covers no ground is the
@@ -3951,9 +3951,9 @@ async function checkChildrenMotion(motionPlace) {
       'no child walks without getting anywhere',
       // The bar is CHILD-SECONDS of game, not a count of frames: this trace is
       // 1200 rendered frames and buys anything from 20 s of game to a minute
-      // and a half of it. 20 child-seconds is the same floor the trace check
-      // above sets (5 s of game, four children), read in the unit the share is
-      // weighted in.
+      // and a half of it. The floor is CHILD_MOTION.minJudgedSeconds, 20
+      // child-seconds (childMotionMetric.mjs) — four children over five seconds
+      // of game — read in the unit the share is weighted in.
       // AND THE VERDICT MUST REST ON THE TRACE, CHILD BY CHILD. A live frame gap
       // longer than the window is judged by nobody — interpolating across a
       // silence longer than the question would invent the answer — so a share is
@@ -4006,11 +4006,11 @@ async function checkChildrenMotion(motionPlace) {
       // EACH FIGURE WITH THE CHILD IT BELONGS TO, AND CALLED WHAT IT IS. Three
       // different questions with three possibly different answers: the highest
       // RATE (what the gate reads), the most rescues in ABSOLUTE count, and the
-      // furthest CARRIED. The rate used to be printed as "most-often-picked-up",
+      // most CARRIED per minute. The rate used to be printed as "most-often-picked-up",
       // which is the count's name, and the count was not printed at all.
       `highest rescue rate: child ${rescues.worstRescueChild} at ` +
         `${rescues.worstPerChildMinute.toFixed(2)}/min. Most rescues in all: child ` +
-        `${rescues.worstChild} with ${rescues.worstRescues}. Furthest carried: child ` +
+        `${rescues.worstChild} with ${rescues.worstRescues}. Most carried per minute: child ` +
         `${rescues.worstCarriedChild} at ${rescues.worstCarriedMetresPerChildMinute.toFixed(2)} m/min. ` +
         `Group ` +
         `${rescues.rescues} rescues (${rescues.carriedMetres.toFixed(2)} m carried in all` +
@@ -4021,8 +4021,9 @@ async function checkChildrenMotion(motionPlace) {
 
     // AND A LOOK AT THEM. The complaint is what the player SEES, so the run
     // leaves a frame of the children themselves — the traveller stepped back to
-    // the group and turned to face it, the shutter projecting their centroid so
-    // a frame named after them cannot photograph an empty lane (point 375).
+    // the group and turned to face the nearest child it can see, the shutter
+    // projecting that child so a frame named after them cannot photograph an
+    // empty lane (point 375).
     // THE STANDPOINT IS SEARCHED, AND SO IS THE MOMENT. Where the children
     // stand decides what any standpoint can see of them: their ground is 13 m
     // across with the huts standing in it, so while the chase has them strung
@@ -4030,7 +4031,8 @@ async function checkChildrenMotion(motionPlace) {
     // of them past a wall — a photograph of an empty village with a figure in
     // it. The search below is therefore run EVERY frame and the shutter waits,
     // bounded, for a moment worth photographing; if the game never offers one it
-    // shoots the best it found rather than skipping the picture.
+    // searches once more and shoots that moment's best vantage rather than
+    // skipping the picture.
     await page.evaluate(() => {
       window.__pickChildVantage = () => {
         const kids = window.__placeTag().children
@@ -4048,7 +4050,8 @@ async function checkChildrenMotion(motionPlace) {
         // obstacle whatever: it read every child as visible THROUGH a wall,
         // stood the camera inside one, and the frame named after the children
         // photographed a mud face (point 690). Every body the layout collides
-        // against counts now, as the circle that encloses it; anything smaller
+        // against counts now, as the circle that encloses it — except wall
+        // segments, which the search leaves out; anything smaller
         // than a child neither hides one nor crowds the camera and is dropped,
         // so scattered stones do not veto every vantage in the settlement.
         const huts = [
@@ -4091,7 +4094,8 @@ async function checkChildrenMotion(motionPlace) {
             // against a hut generously wider than its footprint.
             const seen = kids.filter((k) => !blocks(sx, sz, k.x, k.z, 1.2))
             if (seen.length === 0) continue
-            // Then ELBOW ROOM, then nearness. Seeing them was not enough on its
+            // Then ELBOW ROOM and nearness, weighed in one score in which each
+            // child seen outweighs both. Seeing them was not enough on its
             // own: the first standpoint that did stood in the alley between two
             // dwellings, and at eye height a wall a metre away fills half the
             // picture whatever the sightline says. Room counts up to four metres
@@ -4112,13 +4116,9 @@ async function checkChildrenMotion(motionPlace) {
             const score = seen.length * 1000 + clear * 50 - near * 30
             if (score > bestScore) {
               bestScore = score
-              best = { sx, sz, seen: seen.length, of: kids.length, clear, dist, near }
-              const vx = seen.reduce((s, k) => s + k.x, 0) / seen.length
-              const vz = seen.reduce((s, k) => s + k.z, 0) / seen.length
-              best.vx = vx
-              best.vz = vz
-              // THE NEAREST CHILD IT CAN SEE, which is what the frame DECLARES.
-              // The centroid is where the camera looks; it is not a thing, and a
+              best = { sx, sz, seen: seen.length, of: kids.length, clear, near }
+              // THE NEAREST CHILD IT CAN SEE, which is what the frame DECLARES
+              // and the camera faces. A centroid is not a thing, and a
               // frame that declares it satisfies the shutter by projecting a
               // point in empty air — which is how a port frame came back green
               // with no child in it at all (point 690). A child is a body: if it
@@ -4154,7 +4154,7 @@ async function checkChildrenMotion(motionPlace) {
       // by construction, and it is the same body the shutter is handed (point 690).
       p.yaw = Math.atan2(-(best.kx - p.x), -(best.kz - p.z))
       return {
-        pose, cx: best.vx, cz: best.vz, kx: best.kx, kz: best.kz,
+        pose, kx: best.kx, kz: best.kz,
         seen: best.seen, of: best.of, clear: best.clear, near: best.near,
       }
     })
@@ -4169,7 +4169,7 @@ async function checkChildrenMotion(motionPlace) {
       !!aimed && aimed.seen >= Math.min(3, aimed.of) && aimed.clear >= 2.5,
       aimed
         ? `${aimed.seen} of ${aimed.of} in the clear, ${aimed.clear.toFixed(1)} m of room around the camera, ` +
-          `nearest child ${aimed.near.toFixed(1)} m off`
+          `seen children ${aimed.near.toFixed(1)} m off on average`
         : 'no vantage at all',
     )
     if (aimed) {
@@ -4184,7 +4184,7 @@ async function checkChildrenMotion(motionPlace) {
         local: { x: aimed.kx, y: 1.0, z: aimed.kz },
         label:
           `the children at their game of tag (${aimed.seen} of ${aimed.of} in the clear, ` +
-          `nearest at ${aimed.near.toFixed(1)} m)`,
+          `on average ${aimed.near.toFixed(1)} m off)`,
       })
       await page.evaluate((pose) => {
         const p = window.__placePlayer
@@ -4206,7 +4206,7 @@ async function checkChildrenMotion(motionPlace) {
 }
 
 if (section('children-motion')) {
-  // Keep the same motion thresholds on both games, including the port staging.
+  // Keep the same motion thresholds in all three settlements, including the port staging.
   for (const motionPlace of ['bambara-village', 'maasai-village', 'cairo']) {
     await checkChildrenMotion(motionPlace)
   }
@@ -4244,8 +4244,9 @@ if (section('children-bank-game')) {
   // The roaming phase is a balance value the debug menu edits (§21), and its
   // shipped 55 s is chosen so a VISITING player does not miss the call that opens
   // a cycle. This section needs the RUN, twice, so it shortens the roam the way
-  // the debug menu would and puts it back afterwards. Nothing else about the
-  // cycle is touched: the walk down to the bank and every run is the shipped one.
+  // the debug menu would and puts it back afterwards. It also lengthens the tap
+  // pause (below) and, for the tap photograph, the arrival hold, and latches the
+  // charge; the walk down to the bank and every run are the shipped ones.
   //
   // BOTH LENGTHS OF THAT PHASE, not only the first. `roamSeconds` is what the
   // phase is SCHEDULED for; the off-game ROCK guard may then hold the cycle for
@@ -4253,8 +4254,9 @@ if (section('children-bank-game')) {
   // unnamed every cycle, so the guard runs its overtime out every time. Shortening
   // the schedule alone therefore did not shorten the phase at all: measured in the
   // fast-layer replay, the roaming phase still ran 55 s and the cycles came 74-100 s
-  // apart, which is what left the window below with a single 2 s run in it. With
-  // both shortened the cycles come 35-59 s apart. The guard's own bound is proved
+  // apart, which left the lane window of that time with a single 2 s run in it.
+  // With both shortened the cycles came 35-59 s apart (measured before the tap
+  // pause was lengthened; the run-wait budget below gives today's spacing). The guard's own bound is proved
   // at its SHIPPED length in `src/scenes/place/tagShuffle.test.ts`; this is a
   // spectator-time knob, not a weakened assertion.
   const shippedRoam = await page.evaluate(() => {
@@ -4325,7 +4327,6 @@ if (section('children-bank-game')) {
       const len = Math.hypot(dx, dz) || 1
       const ax = dx / len
       const az = dz / len
-      const pose = { x: p.x, z: p.z, yaw: p.yaw, pitch: p.pitch }
       // Inland is the side of the lane the village is on — the water is the other
       // one, and there is no standing in it.
       const inland = ax * -near.z - az * -near.x > 0 ? 1 : -1
@@ -4356,7 +4357,7 @@ if (section('children-bank-game')) {
         const m = c.kind === 'segment' ? { x: (c.x1 + c.x2) / 2, z: (c.z1 + c.z2) / 2 } : { x: c.x, z: c.z }
         clear = Math.min(clear, Math.hypot(p.x - m.x, p.z - m.z) - reach(c))
       }
-      return { pose, near, far, r: L.playRocks.r, stretch: len, back, clear, x: p.x, z: p.z }
+      return { near, far, r: L.playRocks.r, stretch: len, back, clear, x: p.x, z: p.z }
     })
     check(
       'a spectator can stand back of the start line on ground the colliders leave free',
@@ -4472,8 +4473,9 @@ if (section('children-bank-game')) {
 
       // THE CALL REACHES THE STAND THE GAME IS PHOTOGRAPHED FROM (work-order
       // 1073). The defect this exists for: the runner announces the direction
-      // from the START rock while this stand lies 22.0 m from EITHER rock, and
-      // the old 10 m hearing radius is a HARD cut — so from the one place the
+      // from the START rock while this stand lies about 0.28 of the stretch from
+      // it and 1.26 from the far rock, and the ordinary 10 m hearing radius
+      // (communication.hearingRadius) is a HARD cut — so from the one place the
       // project photographs the round, the taught direction word arrived as no
       // sound, no reading and no arm at all. The CALL register carries it. What
       // only a browser can answer is whether the reading and the arm are in the
@@ -4528,7 +4530,7 @@ if (section('children-bank-game')) {
         !!called && !!called.gesture && called.gesture.kind === 'point' && called.gesture.t < called.gesture.duration,
         JSON.stringify(called && called.gesture),
       )
-      if (called && Array.isArray(called.atoms) && called.atoms.length > 0) {
+      if (called) {
         // Held for the shutter exactly as the chief's answer is, and for the
         // same reason: a reading stands its few seconds only and the scene-ready
         // wait before a frame outlasts them. What was really said is measured
@@ -4577,7 +4579,7 @@ if (section('children-bank-game')) {
       p.z = (near.z + far.z) / 2
       p.pitch = 0
       p.yaw = Math.atan2(far.x - p.x, far.z - p.z) + Math.PI
-      return { x: p.x, z: p.z, ax: dx / len, az: dz / len, far, r: L.playRocks.r, berth: window.__balance.villageLife.bankGame.strangerBerth }
+      return { ax: dx / len, az: dz / len, far, r: L.playRocks.r, berth: window.__balance.villageLife.bankGame.strangerBerth }
     })
     // WAITING FOR A RUN IS WAITING ON THE GAME'S CLOCK, NOT ON THE WALL'S. This
     // was a 240 s wall-clock deadline on an event of the round's own clock, and
@@ -4607,7 +4609,6 @@ if (section('children-bank-game')) {
           return { phase: t.phase, playedClock: t.playedClock }
         })
       const first = await readRound()
-      let seen = first.playedClock
       const wallStart = Date.now()
       // THE WINDOW OPENS ON A CYCLE'S FIRST RUN, never wherever a run happens to
       // be. Two things were wrong with taking any run at all. The round keeps
@@ -4644,7 +4645,7 @@ if (section('children-bank-game')) {
         // dead-page detector and nothing else: a scene that is still stepping
         // satisfies it in a frame however slow the machine, and only one that
         // has stopped buying game time at all can run it out.
-        seen = now.playedClock
+        const seen = now.playedClock
         const stepped = await page
           .waitForFunction((was) => window.__placeTag().playedClock > was, seen, {
             timeout: RUN_WAIT_STALL_MS,
@@ -4665,7 +4666,7 @@ if (section('children-bank-game')) {
       running
         ? `after ${runPlayed.toFixed(1)}s of played time (budget ${RUN_WAIT_PLAYED_S}s)`
         : runDead
-          ? `THE PAGE STOPPED STEPPING — only ${runPlayed.toFixed(1)}s of played time in ` +
+          ? `THE PAGE STOPPED STEPPING (or the wall-clock bound ran out) — only ${runPlayed.toFixed(1)}s of played time in ` +
             `${(runWallMs / 1000).toFixed(0)}s of wall clock. This is a dead or frozen scene, NOT a round ` +
             `that failed to open a run: nothing about the GAME is judged by this red.`
           : `the round played ${runPlayed.toFixed(1)}s of its own clock without opening a run ` +
@@ -4684,7 +4685,7 @@ if (section('children-bank-game')) {
       // the round is the shipped one and every check below reads the longer trace.
       const LANE_WINDOW_S = 120
       // What counts as "went nowhere" over that window. A child that walked less
-      // than half a metre in forty-five seconds of play did not walk; anything
+      // than half a metre over the whole window of play did not walk; anything
       // above it is a slow child, which is a different complaint and not this
       // check's.
       const LANE_STARVED_M = 0.5
