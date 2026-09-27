@@ -1895,3 +1895,12 @@ Found 26.09.2026 during the closing LARGE: `scripts/batch-doctor.mjs` quarantine
 any other file is dirty the planned `--repair` stash would still take the running suite's
 `verification/` frames along. Avoided by committing the one attributable file instead. Fix when it
 recurs: stash only the counted paths.
+
+## Blind-reviewer net rejects complete enumerations
+
+Found 27.09.2026 during closing 633's blind cleanup: `BLIND_FIRST_PERSON` in
+`scripts/mechanism-review-core.mjs` treats any first-person "I could not check …" as an admission,
+even when the answer says the whole file was read and carries 40+ evidenced entries (10 of 23 Opus
+parts, 1 Astra part). A duplicated list (B1 twice) is likewise rejected whole. Worked around by a
+brief amendment (`local/blind-633-4f6c83e/run-lane.sh`). Fix when it recurs: scope the net to the
+material itself, not to context outside it.
