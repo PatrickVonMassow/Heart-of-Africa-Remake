@@ -16106,3 +16106,34 @@ to land than a mechanism that needs a review.
   Test: flow picture check of 06-start-journal on WebGL 2 and WebGPU.
   Refs: the place scene ground material, scripts/verify/flow.mjs start-journal shutter.
   Bundle: Siedlungsgeometrie.
+- [ ] 1222. The WebGPU world suite no longer aborts on a click the dialog backdrop intercepts.
+  PROBLEM, measured 27.09.2026 in the closing LARGE on main 4f6c83e (WebGPU pass, log
+  `local/verify-logs/2026-09-26T20-55-22-675-large.log`): world ends 7 pass, 0 fail, exit 1 — a
+  Playwright TimeoutError after 32 click retries because `<div class="dialog-backdrop">` intercepts
+  pointer events. No open point carries this red.
+  FINAL STATE: the cause is found (a dialog the suite does not close, or one a player cannot close)
+  and fixed; world exits 0 on WebGPU and WebGL 2.
+  Criticality: medium — the suite's exit hides every later world check on WebGPU.
+  Test: world suite green on both backends.
+  Refs: scripts/verify/world.mjs, the dialog backdrop component.
+  Bundle: Testinfrastruktur.
+- [ ] 1223. The WebGPU polish suite finishes inside its wall timeout.
+  PROBLEM, measured 27.09.2026 in the closing LARGE on main 4f6c83e: polish was KILLED after the
+  45-minute wall timeout on WebGPU; the WebGL 2 pass of the same run finished (its reds charged to
+  1197 and 1202). No open point carries this red, and the kill hides every WebGPU polish result.
+  FINAL STATE: it is measured whether the suite hangs or is slow; a hang is fixed, a genuine slow
+  run is split or given a justified timeout; polish reports PASS/FAIL lines on WebGPU.
+  Criticality: high — the largest picture suite yields no WebGPU evidence.
+  Test: polish on WebGPU ends with its PASS/FAIL line inside the timeout.
+  Refs: scripts/verify/polish.mjs, VERIFY_SUITE_TIMEOUT_MS.
+  Bundle: Testinfrastruktur.
+- [ ] 1224. The Victoria Falls enrichment frame shows its subject on WebGPU.
+  PROBLEM, measured 27.09.2026 in the closing LARGE on main 4f6c83e (WebGPU pass): enrichments
+  45 pass, 1 fail — frame `72-water-victoria-falls`: its subject is not in the rendered picture
+  (off the left and bottom edge of the frame). No open point carries this red.
+  FINAL STATE: the frame's camera frames the falls on both backends, or the subject declaration is
+  corrected to what a player sees there.
+  Criticality: medium — a water-realism evidence frame (§7.1 pt 21) is missing its subject.
+  Test: enrichments green on both backends; picture check of the frame.
+  Refs: scripts/verify/enrichments.mjs, the Victoria Falls water scene.
+  Bundle: Testinfrastruktur.
