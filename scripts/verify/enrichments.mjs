@@ -3419,8 +3419,8 @@ if (section('calf-jitter')) {
     // East/central African lakes-and-rivers belt — plenty of savanna shoreline.
     // Keep the spots spread out: neighbouring scan cells respawn the very same
     // deterministic herds, which would only re-count the same drinkers.
-    // A wide band and a generous spot cap: the bathe flag is a 40% roll per
-    // drinker and re-seeds per run, so a small drinker sample fails ~3% of
+    // A wide band and a generous spot cap: the bathe flag is a 40% hash per
+    // drinker (fixed per chunk for one seed, but the seed changes per run), so a small drinker sample fails ~3% of
     // runs by pure chance — the roam must be able to gather a real sample.
     for (let lat = 4; lat >= -16 && spots.length < 48; lat -= 0.4)
       for (let lon = 27; lon <= 38 && spots.length < 48; lon += 0.4)
@@ -3432,9 +3432,9 @@ if (section('calf-jitter')) {
           spots.push([lat, lon])
     return spots
   })
-  // Aggregate drinkers/bathers over ALL roamed shores: ~40 % of drinkers bathe,
-  // so a single shore with a handful of drinkers can easily hold none — the
-  // union across shores makes the sample large enough to be reliable. The roam
+  // Aggregate drinkers/bathers across the roamed shores until one bather shows:
+  // ~40 % of drinkers bathe, so a single shore with a handful of drinkers can
+  // easily hold none — the union across shores makes the sample large enough. The roam
   // runs at zoom 1: the streaming ring scales with the zoom, and the closer 0.5
   // default streams too small a shore population for a reliable sample.
   await page.evaluate(() => {
@@ -3479,15 +3479,16 @@ if (section('calf-jitter')) {
           for (const sp of Object.keys(h))
             for (const a of h[sp]) {
               animals++
-              // Key by SPAWN position (deterministic per chunk), not the drink
-              // target: bank targets legitimately collapse onto the same shore
-              // point since the banks-only rule, which broke the unique count.
+              // Key by the animal's current position (read right after the
+              // restock), not the drink target: bank targets legitimately
+              // collapse onto the same shore point since the banks-only rule,
+              // which broke the unique count.
               if (a.drink) drinkers.push(`${sp}:${a.x.toFixed(1)},${a.z.toFixed(1)}`)
               if (a.bathe) bathers++
             }
         return { drinkers, bathers, animals }
       })
-      for (const k of here.drinkers) if (!drinkerKeys.has(k)) drinkerKeys.add(k)
+      for (const k of here.drinkers) drinkerKeys.add(k)
       bathe.drinkers = drinkerKeys.size
       bathe.bathers += here.bathers
       bathe.animalsSeen += here.animals
@@ -3527,10 +3528,10 @@ if (section('calf-jitter')) {
     const parent = fam.parent
     const calf = fam.calf
     const L = window.__lionHunt.state
-    // Predator pinned 4 (was 5) from the calf — WELL inside the guard trigger range
-    // so it reliably fires, but NOT set as the hunt victim: victim = calf triggers
-    // the parent's FLEE branch instead (it ran 15 units away, before 8 / after 23.7),
-    // not the guard. The guard keys on a predator near the calf, not on victimHunt.
+    // Predator pinned 4 from the calf — WELL inside the guard trigger range so it
+    // reliably fires, but NOT set as the hunt victim: victim = calf triggers the
+    // parent's FLEE branch instead, not the guard. The guard keys on a predator
+    // near the calf, not on victimHunt.
     const lx = calf.x + 4, lz = calf.z
     // Start the parent on the far side of the calf: the guard standoff sits 2.2
     // from the calf toward the predator, so a parent that happens to stand right
@@ -3561,9 +3562,9 @@ if (section('calf-jitter')) {
     const after = dist()
     L.mode = 'idle'; L.timer = 60
     fam.dispose()
-    return { found: true, before: +before.toFixed(2), after: +after.toFixed(2) }
+    return { before: +before.toFixed(2), after: +after.toFixed(2) }
   })
-  check('a parent moves to guard its calf from a predator', guard.found && guard.after < guard.before - 0.05, JSON.stringify(guard))
+  check('a parent moves to guard its calf from a predator', guard.after < guard.before - 0.05, JSON.stringify(guard))
 
   // --- Point 369: an orphaned juvenile mourns before it plays again ------------
   // A calf whose parent has just DIED used to go straight back to gambolling, and
@@ -3734,7 +3735,7 @@ if (section('calf-jitter')) {
     }
     if (generic) {
       let nextAt = window.__simTime()
-      await window.__pollSim(45 * 0.1, () => {
+      await window.__pollSim(4.5, () => { // a 4.5 sim-second budget, sampled every 0.1 below
         if (s.mode !== 'chase' || s.victim !== null) return true
         if (window.__simTime() >= nextAt) {
           nextAt = window.__simTime() + 0.1
@@ -3865,7 +3866,9 @@ if (section('predator-food-web')) {
 // --- Point 2: a predator eating a calf — struggle, parent sacrifice -----------
 // design.md §19: a caught calf struggles for a few seconds before the kill
 // completes (no stain/shrink yet); in that window a parent charges the predator
-// and, reaching it, is eaten instead so the calf escapes; a parent that only got
+// and, reaching it, is eaten instead so the calf escapes (unless its defence
+// roll of point 125 wins — the sacrifice scenarios below disable prey weapons
+// to force this branch); a parent that only got
 // close by the time the window ends is eaten alongside the calf. The predation is
 // resolved by the herds off the calf's `caught` timer, so it can be forced by
 // hand (the live LionHunt is pinned idle first). Each scenario re-finds a live
@@ -4031,10 +4034,9 @@ if (section('calf-predation-drama')) {
     s.mode = 'idle'; s.timer = 60; s.victim = null; s.victimHunt = false
     pd.preyWeapon = prevWeapons
     const calfEscaped = !calf.dead && calf.caught === undefined && calf.parent === undefined
-    // The struggle window can resolve within 1-2 frames when the parent nurses
-    // right beside the calf, so 50ms polling may miss `caught` — but the
-    // sacrifice outcome itself is proof of the catch: it only ever fires while
-    // the calf's caught timer is running.
+    // The struggle window can resolve between two polls, so the poll may miss
+    // `caught` — but the sacrifice outcome itself is proof of the catch: it only
+    // ever fires while the calf's caught timer is running.
     const catchEvidenced = caughtSeen || (!!parent.dead && calfEscaped)
     return {
       found: true, caughtSeen, catchEvidenced,
