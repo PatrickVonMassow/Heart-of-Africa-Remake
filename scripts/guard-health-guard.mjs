@@ -8,7 +8,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { spawnSync } from 'node:child_process'
-import { anchorCommand, auditGuardHealth, commandAnchoring, formatGuardHealth } from './guard-health-core.mjs'
+import { ENFORCER_RE, anchorCommand, auditGuardHealth, commandAnchoring, formatGuardHealth } from './guard-health-core.mjs'
 import { parseHookTable } from './guard-inventory-core.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 import { isMainModule } from './is-main.mjs'
@@ -22,7 +22,7 @@ const PAUSE = repoPath('.claude', 'batch-paused')
 /** Names Git itself may invoke from core.hooksPath. A readable sample beside
  * them is documentation, not wiring; a non-executable recognized file cannot
  * fire on POSIX either. */
-export const RECOGNIZED_GIT_HOOKS = new Set([
+const RECOGNIZED_GIT_HOOKS = new Set([
   'applypatch-msg', 'pre-applypatch', 'post-applypatch', 'pre-commit', 'pre-merge-commit',
   'prepare-commit-msg', 'commit-msg', 'post-commit', 'pre-rebase', 'post-checkout',
   'post-merge', 'pre-push', 'pre-receive', 'update', 'proc-receive', 'post-receive',
@@ -104,7 +104,7 @@ export function measureWiringSources({
  * Everything the core needs — exported so the guard preflight predicts this gate
  * from the SAME gathering the Stop hook uses rather than a second copy of it.
  *
- * `ignoreOwnership` is for the --status probe alone: a probe that stays silent
+ * `ignoreOwnership` is for the --status and --wiring probes alone: a probe that stays silent
  * under another owner is indistinguishable from "nothing wrong", which is the
  * very defect this guard looks for.
  */
@@ -122,7 +122,7 @@ export function gatherGuardHealthInputs({ sessionId = '', ignoreOwnership = fals
   const files = readdirSync(SCRIPTS)
   const sources = {}
   for (const f of files) {
-    if (!/-(guard|gate|hook)\.mjs$/.test(f)) continue
+    if (!ENFORCER_RE.test(f)) continue
     try {
       sources[f] = readFileSync(resolve(SCRIPTS, f), 'utf8')
     } catch {
@@ -196,15 +196,12 @@ if (isMainModule(import.meta.url)) {
     const { ok, violations, report } = auditGuardHealth(gathered.inputs)
 
     if (status) {
-      // A dimension that could not be MEASURED is named, never folded into the
-      // all-clear: an unparsable settings file leaves the anchoring unjudged,
-      // and an OK line that hides that is the false clean this guard exists to
-      // prevent elsewhere (four-eyes review 07.08.2026).
-      const unmeasured = gathered.inputs.hookCommands === null ? ' — Verdrahtungs-Anker NICHT messbar' : ''
+      // An unmeasurable settings file never reaches this line: the gathering
+      // already answered not-applicable for it.
       console.log(
         ok
-          ? `guard-health: OK (${report.length} Durchsetzer, alle verdrahtet und geprüft)${unmeasured}`
-          : `${formatGuardHealth(violations)}${unmeasured}`,
+          ? `guard-health: OK (${report.length} Durchsetzer — verdrahtet oder als ruhend erfasst; ungeprüfte nur aus KNOWN_UNTESTED)`
+          : formatGuardHealth(violations),
       )
       process.exit(0)
     }

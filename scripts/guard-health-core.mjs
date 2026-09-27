@@ -27,19 +27,12 @@ export const ENFORCER_RE = /^(?!.*-core\.)([a-z0-9-]+-(?:guard|gate|hook))\.mjs$
  * An entry here is a DECISION on the record; an empty reason is not accepted,
  * so "park it quietly" is not available as an escape.
  */
-// It EMPTIED on 30.07.2026, and the way it emptied is the point. All three entries
-// carried the SAME one reason — the Stop-hook line lives in
-// `.claude/settings.json`, a protected path that always raises a permission
-// prompt, so none of them could be wired by the unattended night that built them.
-// They sat dormant for a day: finished, tested, and enforcing nothing. What ended
-// it was a user question ("und das ist eine Garantie?"), not a mechanism, which is
-// the lesson to keep — a guard the corpus KNOWS is dormant is still a guard that
-// does not guard, and the record of the reason is not a substitute for the wiring.
-// The three were wired together the moment the user was attended.
-//
-// The map stays: an enforcer may be dormant on the record, never quietly. An entry
-// without a written reason is refused, so "park it" is not available as an escape,
-// and the entry must be removed in the same commit that adds the hook line.
+// It has emptied twice — 30.07.2026 and again 19.08.2026 — and each time the
+// dormant guards had sat finished, tested and enforcing nothing because their
+// hook line lives in `.claude/settings.json`, a protected path an unattended
+// session cannot edit. The lesson: a guard the corpus KNOWS is dormant still does
+// not guard, and the recorded reason is no substitute for the wiring. An entry
+// must be removed in the same commit that adds its hook line.
 export const INTENTIONALLY_DORMANT = {
   // commission-guard.mjs left this map on 18.08.2026, in the commit that added
   // its PreToolUse line ("Agent|Task|Bash|PowerShell") — the rule above, kept.
@@ -63,7 +56,7 @@ export const INTENTIONALLY_DORMANT = {
  * parses without the entry, is NOT wired.
  *
  * `event` narrows to one hook event (`PreToolUse`, `Stop`, …); `tools` demands
- * that the entry's matcher name every one of them, because a hook that never
+ * that the matchers of the entries wiring it together name every one of them, because a hook that never
  * sees the call that opens work refuses nothing either.
  */
 export function isEnforcerWired(settingsText, name, { event = null, tools = [] } = {}) {
@@ -98,12 +91,12 @@ export function isEnforcerWired(settingsText, name, { event = null, tools = [] }
  * (fourth review, finding 14: `node scripts/other-guard.mjs --config
  * scripts/commission-guard.mjs` reported the commission guard ARMED, the exact
  * failure the structural parse was installed to end). The rule: a command is
- * read segment by segment (`&&`, `||`, `;`, `|`, `&`, newline), and the FIRST
- * script's arguments. A segment only counts when its command is Node and the
- * path is Node's entry script. Thus `echo scripts/x.mjs`, `git diff --
+ * read segment by segment (`&&`, `||`, `;`, `|`, `&`, newline), and a segment
+ * only counts when its command is Node and the path is Node's entry script —
+ * never a later argument. Thus `echo scripts/x.mjs`, `git diff --
  * scripts/x.mjs`, and `node --check scripts/x.mjs` execute no guard.
  */
-export function executedScriptRefs(command) {
+function executedScriptRefs(command) {
   const out = []
   for (const seg of String(command ?? '').split(/\n|&&|\|\||[;|&]/)) {
     const tokens = seg.match(/"(?:\\.|[^"])*"|'[^']*'|\S+/g) ?? []
@@ -176,7 +169,7 @@ export function enforcerWiredByCommands(commands, name) {
  * reliably fire it, and salvaging valid-looking alternatives would recreate a
  * false ARMED report.
  */
-export function matcherCoversTool(matcher, tool) {
+function matcherCoversTool(matcher, tool) {
   const m = String(matcher ?? '').trim()
   if (m === '' || m === '*') return true
   const t = String(tool ?? '')
@@ -228,9 +221,9 @@ export const KNOWN_UNTESTED = new Set([
 //
 // The check is deliberately structural, not textual: it judges the hook COMMANDS
 // out of `.claude/settings.json`, one row each, never the concatenated wiring
-// blob. `scripts/git-hooks/pre-push` and `commit-msg` are relative ON PURPOSE
-// (git always runs a hook from the repo root), so a blob-wide grep would accuse
-// two correct files. They are excluded by construction: they are not in this
+// blob. The hooks in `scripts/git-hooks/` (pre-commit, pre-push, commit-msg) are
+// relative ON PURPOSE (git always runs a hook from the repo root), so a blob-wide
+// grep would accuse three correct files. They are excluded by construction: they are not in this
 // input at all.
 // ---------------------------------------------------------------------------
 
@@ -248,7 +241,7 @@ const QUOTED_SCRIPT_REF_RE = new RegExp(String.raw`(['"]?)(${SCRIPT_REF_SRC})\1`
 /**
  * A script path the node bootstrap resolves against the env var itself, i.e. the
  * one place a relative-LOOKING string is genuinely anchored. Matched per
- * occurrence and by SHAPE — the env var, its optional `|| '.'` default, then the
+ * occurrence and by SHAPE — the env var, an optional quoted `|| '…'` default, then the
  * path as the next argument. Both loosenings were measured false clearances: a
  * whole-command substring test cleared every other ref on the line, so
  * `node -e "<bootstrap>" && node scripts/b-guard.mjs` passed with its second
@@ -262,14 +255,10 @@ const BOOTSTRAP_REF_RE = new RegExp(
   'g',
 )
 
-/** Every script path a hook command names, with the prefix that anchors it (or does not). */
-export function scriptRefsInCommand(command) {
-  return String(command ?? '').match(SCRIPT_REF_RE) ?? []
-}
-
 /**
  * How a single path token resolves:
- *   'project-dir'  anchored on $CLAUDE_PROJECT_DIR (POSIX, braced, or %VAR% for cmd)
+ *   'project-dir'  anchored on $CLAUDE_PROJECT_DIR (POSIX, braced, %VAR% for cmd,
+ *                  or `${CLAUDE_PROJECT_DIR:-/abs}` with an absolute default)
  *   'absolute'     a full path — it fires, but binds this committed file to one
  *                  checkout, so it is the last resort, never the goal
  *   'relative'     resolved against the cwd, i.e. against luck
@@ -346,7 +335,7 @@ export function anchorCommand(command) {
  * that only an attended session may edit, and the rollout is staged on purpose —
  * ONE harmless high-frequency hook first (`lock-heartbeat-hook`), verified in a
  * NEW session from a non-root cwd, and only then the rest. Never all at once: a
- * failed expansion would disable all 35 silently, which is the very failure this
+ * failed expansion would disable all of them silently, which is the very failure this
  * point exists to end. A guard that blocked the whole chain the moment the check
  * landed would have trapped the headless batch on an edit it is not allowed to
  * make.
@@ -472,7 +461,8 @@ export function auditHookAnchoring({ hookCommands = null, rollout = RELATIVE_WIR
  *                recognized executable Git hooks (preferred)
  *   hookCommands the settings' hook rows, structured — the ANCHORING check needs
  *                to know which line came from where, which the blob cannot say
- *   dormant      override for INTENTIONALLY_DORMANT (tests inject their own)
+ *   dormant, knownUntested, rollout  overrides for INTENTIONALLY_DORMANT,
+ *                KNOWN_UNTESTED and RELATIVE_WIRING_ROLLOUT (tests inject their own)
  *
  * Returns { ok, violations: [{ kind, script, detail }], report }.
  */
@@ -498,7 +488,8 @@ export function auditGuardHealth({
     // name (not the base) keeps `foo-guard.mjs` from being satisfied by a
     // mention of `foo-guard-core.mjs`.
     const wired = enforcerWiredByCommands(commands, file)
-    // Which pure modules does this wrapper actually import? Guessing the core
+    // Which local modules does this wrapper import? Any one counts as its core
+    // here; testedness then asks whether one of them has a test. Guessing the core
     // from the wrapper's NAME produced false accusations — retro-currency-guard
     // imports retro-core, which is thoroughly tested, and a name-based rule
     // called it untested. A guard that cries wolf trains the reader to skip it.
@@ -514,13 +505,13 @@ export function auditGuardHealth({
     report.push({ script: file, wired, core, tested, imports: imported, dormant: reason !== null })
 
     // THE RECORD MUST NOT OUTLIVE THE DORMANCY (four-eyes review 30.07.2026).
-    // Until now a dormant entry was read ONLY while the guard was unwired, so a
+    // Before that review a dormant entry was read ONLY while the guard was unwired, so a
     // guard that got its hook line and kept its entry produced no violation at
     // all: the map went on claiming an enforcer was inert while it enforced, and
     // a reader who checks the map before trusting a rule is told the opposite of
-    // the truth. Every entry already ENDS with "remove this entry in the same
-    // commit that adds the hook line" — that convention is now the mechanism it
-    // describes rather than a sentence somebody has to obey.
+    // the truth. The convention "remove the entry in the same commit that adds
+    // the hook line" is now the mechanism rather than a sentence somebody has to
+    // obey.
     if (wired && reason !== null) {
       violations.push({
         kind: 'dormant-but-wired',
