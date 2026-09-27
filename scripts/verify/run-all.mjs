@@ -736,7 +736,9 @@ if (redSuites.length > 0) {
 
 const failed = results.filter((r) => !r).length
 const charges = [...chargedPoints].sort((a, b) => a - b)
-console.log(`\n${failed === 0 ? 'ALL GREEN' : failed + ' SUITE(S) FAILED'} — ${results.length} stages run` +
+// `results` counts every stage, preflight included — the "suites run" wording is
+// pinned by run-all.test.mjs, so it stays.
+console.log(`\n${failed === 0 ? 'ALL GREEN' : failed + ' SUITE(S) FAILED'} — ${results.length} suites run` +
   (charges.length ? ` — reds charged to open points ${charges.join(', ')}` : ''))
 // The stages that are not suites and can arrive here red — lint and the
 // preview's own build (a failed build, unit or GPU preflight exits earlier) —
