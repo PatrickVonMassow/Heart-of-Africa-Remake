@@ -12,9 +12,10 @@
 // .claude/chat-state.json. A stage-1 .jsonl left on disk is migrated into that
 // directory on the first tick and archived, never dropped.
 //
-// FAIL-SOFT, ALWAYS EXIT 0. Its caller is scripts/batch-autostart.mjs, whose job
+// FAIL-SOFT, EXIT 0 ON EVERY PATH IT CONTROLS. Its caller is scripts/batch-autostart.mjs, whose job
 // is resurrecting a dead batch: a chat poll may never be the reason that fails.
-// Every error path prints `{ ok: false, reason }` and exits 0.
+// Every error path prints `{ ok: false, reason }` and exits 0 — though its own
+// post-fetch `process.exit(0)` may still abort as described next.
 //
 // IT RUNS AS ITS OWN PROCESS for the same reason the board watchdog does: on
 // this platform a `process.exit()` after any `fetch` tears undici's socket down
