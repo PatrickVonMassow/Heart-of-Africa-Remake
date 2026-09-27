@@ -39,8 +39,9 @@ const readJsonStrict = (path, { exists = existsSync, read = readFileSync } = {})
  * record indistinguishable from the two genuinely absent sources, which silently
  * retired the focus half of the projection invariant while the fail-closed
  * publish still passed — the exact fail-open this boundary exists to prevent
- * (ninth cross-vendor round, pass 1 and its confirming pass). An ABSENT record
- * is the one shape that still answers "no focus", because that is true.
+ * (ninth cross-vendor round, pass 1 and its confirming pass). Only an ABSENT
+ * (or null) record and an explicit `null` point answer "no focus", because
+ * that is true.
  */
 const readFocusPoint = ({ present, value }) => {
   if (!present || !value) return { point: null, error: null }

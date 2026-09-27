@@ -1,12 +1,13 @@
 // Dependency audit gate (CLAUDE.md §7.1 pt.18). `npm audit` fails the whole run
 // on ANY vulnerability, including ones with NO upstream fix — which then blocks
-// CI indefinitely. The rule is: a vulnerability with no upstream fix is RECORDED
-// here with its advisory ID (not silently ignored), while every NEW advisory
+// CI indefinitely. The rule is: a vulnerability with no upstream fix, or whose only
+// fix is a deferred upgrade with its own work-order point, is RECORDED here with its
+// advisory ID and justification (not silently ignored), while every NEW advisory
 // still fails loudly. This wraps `npm audit --json`, tolerates the recorded
 // allowlist, and exits non-zero for anything else.
 import { execSync } from 'node:child_process'
 
-// KNOWN + ACCEPTED advisories (no upstream fix). Re-check periodically for a fix.
+// KNOWN + ACCEPTED advisories (no upstream fix, or a deferred fix). Re-check periodically.
 const ALLOW = new Map([
   [
     'GHSA-f88m-g3jw-g9cj',
@@ -61,12 +62,12 @@ for (const v of Object.values(json.vulnerabilities ?? {})) {
 const accepted = [...advisories.keys()].filter((id) => ALLOW.has(id))
 const unexpected = [...advisories.entries()].filter(([id]) => !ALLOW.has(id))
 
-for (const id of accepted) console.log(`audit-check: ACCEPTED (no upstream fix, recorded) ${id} — ${ALLOW.get(id)}`)
+for (const id of accepted) console.log(`audit-check: ACCEPTED (recorded) ${id} — ${ALLOW.get(id)}`)
 
 if (unexpected.length > 0) {
   console.error(`\naudit-check: ${unexpected.length} unaccepted advisory(ies) — FAIL:`)
   for (const [id, a] of unexpected) console.error(`  ${id} — ${a.severity} in ${a.name} (${a.url})`)
-  console.error('\nFix them (npm audit fix / upgrade), or — only if truly unfixable — add the ID to ALLOW in scripts/audit-check.mjs with a written justification.')
+  console.error('\nFix them (npm audit fix / upgrade), or — only if truly unfixable or its fix is deferred to its own work-order point — add the ID to ALLOW in scripts/audit-check.mjs with a written justification.')
   process.exit(1)
 }
 

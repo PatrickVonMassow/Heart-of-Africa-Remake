@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// ASK THE OTHER VENDOR FOR PURE TEXT WORK (work-order point 654, A1).
+// ASK THE OTHER VENDOR FOR PURE TEXT WORK (work-order point 654, A1). `--model` also
+// addresses the Claude-family lanes (fable, opus, opus48), run through runClaudeAsk.
 //
 //   node scripts/ask-astra.mjs --kind diagnose  --brief "why did the place suite go red?" \
 //        --log /tmp/place.log --diff main..HEAD
@@ -8,7 +9,7 @@
 //   node scripts/ask-astra.mjs --kind explain   --brief "…" --file scripts/board-core.mjs
 //   … and anything piped on stdin is material too.
 //
-// It is `scripts/review-astra.mjs`'s proven path — `codex exec` at effort HIGH in a
+// It is `scripts/review-astra.mjs`'s proven path — `codex exec` at ASTRA_REASONING_EFFORT in a
 // READ-ONLY sandbox, the artefact on stdin — generalised past reviews to the four kinds
 // of work that need no write access: DIAGNOSE, AUDIT, ENUMERATE, EXPLAIN. The login
 // handling, the unavailability classification and the model-id freshness probe are
@@ -18,9 +19,10 @@
 // commit carries Astra's trailer from here. Astra's AUTHORING lane is a different command
 // (scripts/author-astra.mjs, point 667), where the trailer and the allowlist do apply.
 //
-// WHEN ASTRA IS NOT AVAILABLE — or when the share switch has moved the load away from it —
-// this says so in ONE line, names the cause, hands the work back to the Claude chain and
-// exits 3, so a script can tell "Astra answered" from "Astra did not" without reading prose.
+// WHEN THE SHARE SWITCH has moved the load away from Astra, or the model did not answer,
+// this says so, names the cause, hands the work back and exits 3, so a script can tell
+// "answered" from "did not" without reading prose. A measured Astra outage (point 1194)
+// serves the ask on Opus 5.5 instead.
 import { readFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { isMainModule } from './is-main.mjs'
@@ -60,7 +62,7 @@ export function readStdin() {
  * 12.08.2026). The caller refuses a request whose material is entirely such placeholders,
  * and names the ones that failed even when the rest went through.
  */
-export function gatherSections({ stdin = '', logs = [], diff = '', files = [] } = {}) {
+function gatherSections({ stdin = '', logs = [], diff = '', files = [] } = {}) {
   const sections = []
   const read = (title, path) => {
     try {
@@ -97,7 +99,7 @@ export const usage = () =>
 
 /** Run a Claude-family ask with no tools and prove the serving model from the
  * CLI's modelUsage receipt. Material travels on stdin, never through a read tool. */
-export function runClaudeAsk({ prompt, input = '', model, timeoutMs = REVIEW_TIMEOUT_MS, spawn = spawnSync } = {}) {
+function runClaudeAsk({ prompt, input = '', model, timeoutMs = REVIEW_TIMEOUT_MS, spawn = spawnSync } = {}) {
   const args = authoringClaudeArgs({ modelId: model.id, prompt })
   const dangerous = args.indexOf('--dangerously-skip-permissions')
   if (dangerous >= 0) args.splice(dangerous, 1)
@@ -173,7 +175,7 @@ if (isMainModule(import.meta.url)) {
       } else if (routed.to !== 'astra' && !argv.includes('--anyway')) {
         console.error(
           `ask-astra: the share switch is at \`${share.setting}\`, which routes ${kind} to Claude — not asking ${ASTRA_MODEL_NAME}.\n` +
-            `  Do it in the Claude chain, or: node scripts/astra-share.mjs --more   (override once with --anyway)`,
+            `  Do it in the Claude chain, or: node scripts/astra-share.mjs --more until --status routes ${kind} to Astra   (override once with --anyway)`,
         )
         process.exit(3)
       }

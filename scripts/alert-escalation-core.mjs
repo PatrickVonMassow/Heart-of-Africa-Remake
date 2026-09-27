@@ -1,8 +1,9 @@
 // THE ESCALATION LADDER (point 434, the remainder of part 1) — the pure half.
 //
-// WHY. `.github/workflows/batch-watchdog.yml` alerts every 30 minutes while the
-// repository has not moved, and it shares the ntfy topic with the CI-red alert.
-// An alert that repeats unchanged every half hour is an alert that gets slept
+// WHY. `.github/workflows/batch-watchdog.yml` alerted every 30 minutes while the
+// repository had not moved, on the ntfy topic it shares with the CI-red alert
+// (it posts directly and never passes through this ladder; the local alerts
+// routed through scripts/notify.mjs do). An alert that repeats unchanged every half hour is an alert that gets slept
 // through: by the fourth identical buzz it carries no information, and the one
 // thing it must not do — get quieter over the night — is exactly what it does to
 // a reader. The night of 29./30.07.2026 ended with a stopped batch and a phone
@@ -12,12 +13,12 @@
 //
 //   rung 0  send immediately          — the first time the condition is seen
 //   rung 1  not before 15 min later
-//   rung 2  not before 30 min later
-//   rung 3  not before 60 min later   — condition priority rises with the rung
-//   rung 4  not before 120 min later  — decide once, or hold a probe/event at its ceiling
+//   rung 2  not before 30 min later   — condition priority rises to high
+//   rung 3  not before 60 min later
+//   rung 4  not before 120 min later  — urgent; decide once, or hold a probe/event at its ceiling
 //   above   silence: a non-corruption condition's decision card carries the answer
 //
-// Four buzzes over ~3.5 hours instead of eight identical ones, then a state the
+// Five buzzes over ~3.75 hours (0/15/45/105/225 min) instead of eight identical ones, then a state the
 // morning reader cannot miss. The LAST RUNG no longer manufactures a standstill:
 // for a CONDITION it records the decision to continue and the user's retroactive
 // veto route. A recurring EVENT stays on that rung, at the caller's own priority,
@@ -38,18 +39,20 @@
 // that cannot be read must never swallow a message. The I/O half enforces that;
 // this half only decides.
 
-/** The minimum gap before the next send at each rung. Index = rung = how many
- *  identical alerts have already gone out. The last entry is the decision rung. */
+/** The minimum gap before the next send at each rung. Index = rung; below the
+ *  ceiling, rung = how many identical alerts have already gone out. The last
+ *  entry is the decision rung. */
 export const ALERT_GAPS_MS = [0, 15 * 60 * 1000, 30 * 60 * 1000, 60 * 60 * 1000, 120 * 60 * 1000]
 
-/** The last rung — reaching it resolves the unanswered alert instead of buzzing again. */
+/** The last (decision) rung; escalationDecision says what each alert shape does there. */
 export const ALERT_PAUSE_RUNG = ALERT_GAPS_MS.length - 1
 
 /** ntfy priority per rung. Rising, so the fourth buzz does not look like the
  *  first one on a lock screen. */
 export const ALERT_PRIORITIES = ['default', 'default', 'high', 'high', 'urgent']
 
-/** With no identical alert for this long, the condition is taken to have cleared
+/** With no identical alert DELIVERED for this long (measured from lastSentAt;
+ *  suppressed repeats do not count), the condition is taken to have cleared
  *  and the ladder starts from the bottom again. Deliberately longer than the top
  *  gap: a condition that flaps just under the ceiling must still climb. */
 export const ALERT_RESET_MS = 6 * 60 * 60 * 1000
@@ -77,7 +80,7 @@ export function higherPriority(a, b) {
  * Priority is presentation, not authority. A generic stall may be urgent and a
  * repository finding may initially be quiet; neither fact decides whether
  * continuing can damage the work. Callers therefore name the condition class,
- * and this list — beside the decision core — is the complete pause capability.
+ * and this list — beside the decision core — is the complete repair capability.
  * Unknown, absent and newly invented classes all fall toward continuation.
  */
 export const CORRUPTION_ALERT_CLASSES = Object.freeze([
@@ -85,7 +88,7 @@ export const CORRUPTION_ALERT_CLASSES = Object.freeze([
 ])
 
 /** Every closed-list class owns an explicit machine-runnable recovery. */
-export const CORRUPTION_RECOVERIES = Object.freeze({
+const CORRUPTION_RECOVERIES = Object.freeze({
   'repository-integrity': Object.freeze({
     command: Object.freeze(['scripts/batch-doctor.mjs', '--repair']),
     remedy: 'batch-doctor quarantine or repair',
@@ -94,7 +97,7 @@ export const CORRUPTION_RECOVERIES = Object.freeze({
 
 const CORRUPTION_ALERT_CLASS_SET = new Set(CORRUPTION_ALERT_CLASSES)
 
-export function isCorruptionAlertClass(alertClass) {
+function isCorruptionAlertClass(alertClass) {
   return CORRUPTION_ALERT_CLASS_SET.has(String(alertClass ?? ''))
 }
 
@@ -158,9 +161,11 @@ export function ladderEntry(state, key) {
 /**
  * THE DECISION. Pure.
  *
- * @returns {{action:'send'|'suppress'|'repair-and-probe'|'continue-and-record', rung:number,
- *            nextRung:number, priority:string, dueInMs:number, reason:string,
- *            reset:boolean, decisionCard?:string}}
+ * @returns {{key:string, action:'send'|'suppress'|'repair-and-probe'|'continue-and-record',
+ *            rung:number, nextRung:number, priority:string, dueInMs:number, reason:string,
+ *            reset:boolean, decisionCard?:string, probeAfterMs?:number, nextAttemptAt?:number,
+ *            alertClass?:string, repair?:object, decisionRecord?:object}}
+ *          The last five optional fields are set on the corruption repair path.
  */
 export function escalationDecision({
   key,

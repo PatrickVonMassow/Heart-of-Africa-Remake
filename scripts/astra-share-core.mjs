@@ -35,7 +35,8 @@ export const SETTINGS = Object.freeze(['claude-only', 'default', 'prefer-astra']
  * audit, 17.08.2026): CLAUDE.md §6 has Astra authoring the points — the hard and critical
  * ones included — which only `prefer-astra` routes. A checkout that never set the switch therefore
  * runs BELOW the standing policy rather than at it — deliberately, because an unset file
- * must never spend a vendor nobody chose.
+ * spends the second vendor only on reviews and enumerate halves, never on authoring
+ * nobody chose.
  */
 export const DEFAULT_SETTING = 'default'
 
@@ -80,14 +81,14 @@ export function settingOrSafe(value) {
  * forgotten one presents a fallback as the operator's choice — which is exactly the
  * defect the flag was added to fix. With one object there is nothing to forget.
  */
-export function asState(value, now = Date.now()) {
+function asState(value, now = Date.now()) {
   return value && typeof value === 'object'
     ? { setting: settingOrSafe(value.setting), corrupt: Boolean(value.corrupt), fallback: activeFallback(value, now) }
     : { setting: settingOrSafe(value), corrupt: false, fallback: null }
 }
 
 /** Where the setting lives, relative to the checkout that owns it. */
-export const SETTING_FILE_NAME = 'astra-share.json'
+const SETTING_FILE_NAME = 'astra-share.json'
 
 /**
  * The setting's path, given git's common dir. PURE.
@@ -114,8 +115,8 @@ export function settingPathFrom(gitCommonDir, repoRoot, { sep = '/' } = {}) {
  */
 export const KINDS = Object.freeze(['review', ...ASK_KINDS, 'author'])
 
-/** The kinds `scripts/ask-astra.mjs` carries — every kind that is pure reading. */
-export const READ_ONLY_KINDS = Object.freeze([...ASK_KINDS])
+/** The kinds `scripts/ask-astra.mjs` carries (review has its own command). */
+const READ_ONLY_KINDS = Object.freeze([...ASK_KINDS])
 
 export const KIND_NOTES = Object.freeze({
   review: 'the four-eyes review of a diff (scripts/review-astra.mjs)',
@@ -171,7 +172,7 @@ export function normaliseSetting(value) {
  */
 export function readSetting(raw) {
   const broken = (problem) => ({ setting: SAFE_SETTING, changedAt: null, changedBy: '', problem, corrupt: true })
-  // ONLY `null` IS "no file" — the caller passes it when nothing exists. An EMPTY string
+  // ONLY `null` (or undefined) IS "no file" — the caller passes it when nothing exists. An EMPTY string
   // is a file that is there and says nothing, which is what a torn write leaves behind
   // (audit, 12.08.2026): reading it as "never set" would resume spending on a state the
   // operator had chosen.
@@ -232,10 +233,10 @@ export const OUTAGE_PROBE_MS = 30 * 60 * 1000
 
 /** The models serving under the fallback, named once for every consumer. */
 export const FALLBACK_AUTHOR = OPUS_MODEL
-export const FALLBACK_REVIEWER = FABLE_MODEL
+const FALLBACK_REVIEWER = FABLE_MODEL
 
 /** A fallback record as stored, or null when it is malformed. PURE. */
-export function readFallback(value) {
+function readFallback(value) {
   if (!value || typeof value !== 'object') return null
   const since = Number(value.since)
   const probeAt = Number(value.probeAt)
@@ -252,7 +253,7 @@ export function readFallback(value) {
 }
 
 /** The fallback in force at `now`, or null — an expired probe clock routes by the setting. PURE. */
-export function activeFallback(state, now = Date.now()) {
+function activeFallback(state, now = Date.now()) {
   const fb = readFallback(state?.fallback)
   return fb && fb.probeAt > now ? fb : null
 }
@@ -345,7 +346,7 @@ export function routingTable(setting) {
   return KINDS.map((kind) => ({ kind, to: routeFor(kind, setting), note: KIND_NOTES[kind] }))
 }
 
-/** Are ANY of the read-only kinds routed to Astra under this setting? PURE. */
+/** Every kind routed to Astra under this setting. PURE. */
 export function kindsToAstra(setting) {
   return KINDS.filter((kind) => routeFor(kind, setting) === 'astra')
 }
@@ -362,11 +363,11 @@ export function statusLine(state, now = Date.now()) {
 
 /**
  * The line the DELEGATION BRIEF carries (point 654 A3), so a delegated agent asks Astra
- * for its diagnosis or its enumeration instead of doing it in its own context.
+ * for the read-only work its setting routes there instead of doing it in its own context.
  *
- * It is one line at every setting, including the default: an agent that is never told
- * the lever exists cannot be blamed for not pulling it, and one line is what the brief
- * can afford.
+ * It is present at every setting, including the default: an agent that is never told
+ * the lever exists cannot be blamed for not pulling it. It stays short (prefer-astra
+ * wraps to two lines), which is what the brief can afford.
  */
 export function briefLine(state) {
   const { setting: value, corrupt, fallback } = asState(state)
@@ -392,11 +393,12 @@ export function briefLine(state) {
 }
 
 /**
- * THE BOARD NOTE, in the board's own language, or '' at the default setting.
+ * THE BOARD NOTE, in the board's own language, or '' at the default setting with no
+ * active outage fallback.
  *
  * It exists so nobody wonders why a diagnosis came back in another voice: while the
- * switch is off its default, the board says so. At the default it says nothing at all —
- * a note that is always there is a note nobody reads.
+ * switch is off its default, or a fallback is active, the board says so. Otherwise it
+ * says nothing at all — a note that is always there is a note nobody reads.
  */
 export function boardNoteSegment(state) {
   const { setting: value, corrupt, fallback } = asState(state)
@@ -424,8 +426,8 @@ const NOTE_MARK = /^Astra-Routing:/
  * The footer is where it belongs: `refreshFooter` (scripts/board-core.mjs) keeps every
  * segment it does not own, so a note written once would otherwise survive for ever —
  * hence this function REMOVES any earlier note before adding the current one, and
- * removes without adding at the default setting. Unchanged html comes back identical,
- * so a publish does not rewrite the file for nothing.
+ * removes without adding when there is no note. An already-normalised footer with an
+ * unchanged note comes back identical, so a publish does not rewrite the file for nothing.
  */
 export function applyFooterNote(html, state) {
   const text = String(html ?? '')
