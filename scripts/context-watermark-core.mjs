@@ -39,8 +39,9 @@ export const CONTEXT_CEILING_TOKENS = 150_000
  *
  * THE FLOOR RULE still binds: this number may never sit below the measured
  * startup cost of a session that has done no work, plus a margin. A threshold
- * under that floor bounds nothing — it forbids a fresh session its FIRST call,
- * and the batch cannot advance a point at all. That is what the earlier 82,000
+ * under that floor bounds nothing — a fresh session stands past it before its
+ * first call (and, while the mark also gated admission, was refused that call),
+ * so the batch cannot advance a point at all. That is what the earlier 82,000
  * did: four autostarted sessions in a row stood above it before any work of
  * their own (85,225 / 83,079 / 86,416, and one that reached 91,605 on
  * orientation alone). A freshly cleared session's first response already carries
@@ -68,15 +69,17 @@ export const CONTEXT_HANDOVER_RESERVE_TOKENS =
  *
  *   'observe' — DEFAULT. The fence measures, records what it WOULD have
  *               refused, and refuses nothing.
- *   'armed'   — the fence refuses exactly as it did before point 758.
+ *   'armed'   — the fence refuses a call whose projected cost does not fit
+ *               under the ceiling after pending debits and the handover
+ *               reserve (context-budget-core.mjs).
  *
  * WHY OBSERVE IS THE DEFAULT (user 20.08.2026): "Introducing the limits now was
  * nonsense. That should have happened right at the end, once the outstanding
- * tickets had reduced the consumption." The fence refuses writes to every
- * authoring target — the work order, the archive, CLAUDE.md, design.md, docs/,
- * memory/ — which is exactly the file set the consumption-reducing points must
- * edit, and three fresh sessions in a row were stopped above the mark before
- * beginning any work at all.
+ * tickets had reduced the consumption." The mark-based fence of that day refused
+ * writes to every authoring target — the work order, the archive, CLAUDE.md,
+ * design.md, docs/, memory/ — which is exactly the file set the
+ * consumption-reducing points must edit, and three fresh sessions in a row were
+ * stopped above the mark before beginning any work at all.
  *
  * RE-ARMING IS NOT AUTOMATIC and is not this point's business: it is a condition
  * inside point 747, once 757/614/742/744/597 have landed and the start floor has
@@ -139,15 +142,6 @@ export function parseContextTokens(text) {
 }
 
 /**
- * PAST, BELOW, OR UNREADABLE? PURE.
- *
- * Returns { state, tokens, watermark, alert }:
- *   'past'       — the reading is real and at/over the mark: hand over.
- *   'below'      — the reading is real and under it: keep working.
- *   'unreadable' — NO real reading. `alert` is true: this must surface loudly
- *                  (a watermark that silently never fires is defeat 3 intact).
- */
-/**
  * THE STATED MARGIN (point 700): how far past the ceiling a boundary may
  * honestly land. A boundary taken FURTHER past it than this says so in the
  * session's closing report, so the distance between the ceiling and the real
@@ -178,6 +172,15 @@ export function contextDistanceNote({ tokens, ceiling, margin = CONTEXT_MARGIN_T
   )
 }
 
+/**
+ * PAST, BELOW, OR UNREADABLE? PURE.
+ *
+ * Returns { state, tokens, watermark, alert }:
+ *   'past'       — the reading is real and at/over the mark: hand over.
+ *   'below'      — the reading is real and under it: keep working.
+ *   'unreadable' — NO real reading. `alert` is true: this must surface loudly
+ *                  (a watermark that silently never fires is defeat 3 intact).
+ */
 export function watermarkDecision({ reading, watermark = CONTEXT_TRIGGER_TOKENS } = {}) {
   const mark = Number.isFinite(watermark) && watermark > 0 ? watermark : CONTEXT_TRIGGER_TOKENS
   if (!reading || typeof reading.tokens !== 'number' || !(reading.tokens > 0)) {
