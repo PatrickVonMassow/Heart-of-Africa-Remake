@@ -17,7 +17,7 @@ const isolatedGit = (args) =>
     stdio: ['ignore', 'pipe', 'pipe'],
   })
 
-/** Locate the exact shared config and checkout-local HEAD before tests run. */
+/** Locate the common dir, the shared config and the checkout-local HEAD and index before tests run. */
 export function repositoryStatePaths(root = process.cwd()) {
   const checkout = resolve(root)
   const commonDir = resolve(git(checkout, ['rev-parse', '--path-format=absolute', '--git-common-dir']))
@@ -68,7 +68,7 @@ const administrativeFileState = (paths, name) =>
 /** Capture owned state for enforcement and foreign state for run-log diagnostics.
  *
  * Remote-tracking refs are deliberately outside the boundary: the authoring
- * harness pushes this branch every two minutes and updates origin/* in this
+ * harness pushes this branch during the run and updates origin/* in this
  * same shared repository. Other local branches and worktrees are observed, but
  * cannot be enforced: a legitimate concurrent author changes the same bytes. */
 export function repositoryState(paths) {
@@ -186,7 +186,8 @@ export function assertRepositoryUnchanged(before, after) {
   )
 }
 
-/** Vitest global setup: the returned teardown runs even after ordinary failures. */
+/** The protection the Vitest global setup (`setup` below) installs: the returned
+ *  teardown runs even after ordinary failures. */
 export function protectRepository(root = process.cwd()) {
   const paths = repositoryStatePaths(root)
   const before = repositoryState(paths)
