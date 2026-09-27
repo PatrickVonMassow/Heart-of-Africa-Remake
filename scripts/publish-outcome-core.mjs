@@ -18,7 +18,7 @@
 //     outcome (a blocked turn produces nothing).
 // So only an AFFIRMATIVE failure signal counts as failure, an affirmative
 // success marker counts as success, and an unrecognised shape stays 'unknown':
-// the hash is still recorded (today's behaviour, no new block loop) but flagged
+// the hash is still recorded (as before point 399, no new block loop) but flagged
 // unverified, so the watchdog can say "this publish was never confirmed"
 // instead of a guard silently trusting it.
 
@@ -69,10 +69,10 @@ export function classifyPublishResponse(toolResponse) {
  * should be written. `hash` is the sha256 of the file that was handed to the
  * Artifact tool; pass null when it could not be read.
  *
- * success  → today's record, plus publishFailed/publishUnverified cleared.
+ * success  → the pre-399 record, plus publishFailed/publishUnverified cleared.
  * failure  → NO publishedHash (the board is not live), publishFailed set so the
  *            guards and the watchdog can see and name it.
- * unknown  → the hash IS recorded (unchanged behaviour, no new block loop) but
+ * unknown  → the hash IS recorded (as before point 399, no new block loop) but
  *            publishUnverified marks it as un-confirmed evidence.
  */
 export function publishStatePatch(outcome, { hash, path, at }) {

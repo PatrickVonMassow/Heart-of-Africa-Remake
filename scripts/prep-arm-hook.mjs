@@ -1,4 +1,4 @@
-// PostToolUse[Bash] hook (user mandate 21.07.2026): AUTO-ARM the waiting-time
+// PostToolUse[Bash|PowerShell] hook (user mandate 21.07.2026): AUTO-ARM the waiting-time
 // prep guard so the guarantee does not depend on the assistant remembering to
 // arm it. When a Bash call launches a background VALIDATION/REGRESSION
 // (run_in_background + a verify/regression command), write the wait-prep marker
@@ -24,6 +24,8 @@ async function main() {
   } catch {
     process.exit(0)
   }
+  // Valid JSON need not be an object (`null`): observe only, never throw.
+  if (!data || typeof data !== 'object') process.exit(0)
   const input = data.tool_input ?? data.toolInput ?? {}
   const name = data.tool_name ?? data.toolName ?? ''
   const cmd = String(input.command ?? '')

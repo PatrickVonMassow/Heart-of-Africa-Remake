@@ -7,11 +7,12 @@
 // The marker `.claude/wait-prep.json` is ARMED automatically by the PostToolUse
 // companion `prep-arm-hook.mjs` whenever a background validation is launched, so
 // the guarantee does not depend on the assistant remembering to arm it. The
-// assistant then does read-only prep and records it:
+// assistant then preps (read-only on the code) and records it:
 //   node scripts/prep-guard.mjs --prepped   # after doing prep for the next ticket
 //   node scripts/prep-guard.mjs --clear      # optional: on consuming the result
 //   node scripts/prep-guard.mjs --await "x"  # manual arm (rarely needed)
-// Stop-hook mode (no args): BLOCK while the marker exists and prepped == false.
+// Stop-hook mode (no args): BLOCK while the marker is an object whose prepped is
+// falsy or absent.
 //
 // The decision lives in prep-guard-core.mjs (pure, Vitest-covered) since point
 // 437 E — it was inline here, which made it unpredictable by the preflight and

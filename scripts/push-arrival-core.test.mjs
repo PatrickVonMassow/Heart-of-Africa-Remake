@@ -21,7 +21,7 @@ describe('evaluatePushArrival (the 24.07 lost-night witness)', () => {
 
   it('demands the ARRIVAL proof, not the push command alone', () => {
     const v = evaluatePushArrival({ branch: 'main', ahead: 2, hasUpstream: true })
-    expect(v.reason).toContain('rev-list --count @{u}..HEAD')
+    expect(v.reason).toContain('rev-list --count HEAD --not --remotes')
     expect(v.reason).toContain('Everything up-to-date')
   })
 
