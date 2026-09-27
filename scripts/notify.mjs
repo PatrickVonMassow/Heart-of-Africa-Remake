@@ -16,7 +16,7 @@ import { repoPath } from './repo-paths.mjs'
 
 // The topic is a shared secret in the URL — anyone who knows it can read/post.
 // Kept in a gitignored file so it is easy to rotate and never committed.
-export const TOPIC_FILE = repoPath('.claude/ntfy-topic')
+const TOPIC_FILE = repoPath('.claude/ntfy-topic')
 
 /** The configured topic, or null. The PATH is a parameter so a test can point at
  *  a temp file: the topic exists in the real working directory and is in active
@@ -57,9 +57,10 @@ export function ntfyTopic(topicFile = TOPIC_FILE) {
  *                                   a new event, not an unanswered condition.
  * @param {string}  [opts.topicFile] where the topic is read from (tests only).
  * @param {object}  [opts.escalation] injected ladder module (tests only).
- * @returns {Promise<boolean>} true when the message went out. FALSE also means
- *          "held back by the ladder", not only "failed"; the ladder log
- *          (.claude/resilience/alert-escalation.log) says which of the two it was.
+ * @returns {Promise<boolean>} true when the message went out. FALSE means no
+ *          topic is configured, the ladder held it back, or the send failed;
+ *          only a hold-back shows in the ladder log
+ *          (.claude/resilience/alert-escalation.log).
  *
  * PRIORITY CONTROLS PRESENTATION ONLY. `recurring` declares event/condition
  * shape. Pause authority comes exclusively from `alertClass` and the closed
@@ -110,10 +111,10 @@ export async function notify(
 }
 
 // CLI form.
-if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith('notify.mjs')) {
+if (process.argv[1]?.endsWith('notify.mjs')) {
   const [, , title = 'ping', message = '', priority = 'default'] = process.argv
   notify(title, message, priority).then((ok) => {
-    console.log(ok ? 'notified' : 'not sent (no topic configured or send failed)')
+    console.log(ok ? 'notified' : 'not sent (no topic configured, held back by the escalation ladder, or send failed)')
     process.exit(0)
   })
 }
