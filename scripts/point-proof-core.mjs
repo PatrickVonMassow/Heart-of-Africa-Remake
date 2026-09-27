@@ -9,15 +9,16 @@
 // which is exactly the class this project's core lesson forbids: a rule that
 // exists only as prose.
 //
-// THE GRAMMAR IS OPT-IN. A point that wants its condition enforced writes ONE
-// machine-readable line naming the command whose run must be recorded:
+// THE GRAMMAR IS OPT-IN. A point that wants its condition enforced writes a
+// machine-readable line naming the command whose run must be recorded (one line
+// per command; with several, the recorded run must cover all of them):
 //
 //     PROOF: node scripts/measure-context-cost.mjs --since 2026-07-01
 //
 // and the tick of that point is refused until that run is RECORDED FOR THE
 // CURRENT HEAD, in the same evidence grammar `closing-guard --step --evidence`
 // already uses. A point WITHOUT such a line ticks exactly as before, so adding
-// this gate can never block the existing corpus of 500-odd points.
+// this gate can never block the existing corpus of points.
 //
 // PER-COMMIT, like the closing checklist: a proof run says something about the
 // code it ran against. Recorded at an older head it counts for nothing, because
@@ -73,7 +74,8 @@ export function proofCommands(body) {
  * `closingTickClaim` learned the hard way): the point leaves TASKS.md and lands,
  * ticked, in the archive, so at the moment the archive is written the work order
  * may no longer hold the point at all. The text BEING WRITTEN is therefore read
- * as a work order too, and the first text that knows the point wins.
+ * as a work order too, and the first text whose copy of the point names proof
+ * commands wins.
  */
 export function proofCommandsFor(n, ...texts) {
   for (const text of texts) {
@@ -115,7 +117,7 @@ export function proofSatisfied({ runs, n, commands = [], headSha = '' } = {}) {
  * Inputs (plain data — the wrapper does the I/O):
  *   toolName/toolInput  the call being made
  *   tasksText           the whole work order (open + archive)
- *   runs                the ledger, { "<point>": { commit, commands, evidence, at } }
+ *   runs                the ledger, { "<point>": { commit, commands, evidence, atIso } }
  *   ledgerReadable      false when the ledger exists but could NOT be read —
  *                       then nothing is judged (fail-open, per the point's own
  *                       verifiable list). Absent-and-empty is NOT unreadable:

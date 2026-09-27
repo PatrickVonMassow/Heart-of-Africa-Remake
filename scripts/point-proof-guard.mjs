@@ -5,8 +5,8 @@
 // A point's own acceptance condition was enforced by nothing: `closing-guard`
 // gates a version tag and the single tick that claims a closing, and no guard
 // ever read a point's OWN "counts as delivered when …". A point could therefore
-// be ticked because it FELT finished. A point that wants better writes one
-// machine-readable line:
+// be ticked because it FELT finished. A point that wants better writes a
+// machine-readable line per command:
 //
 //     PROOF: node scripts/measure-context-cost.mjs --since 2026-07-01
 //
@@ -39,12 +39,12 @@ import { isMainModule } from './is-main.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 import { readTasksAll } from './tasks-source.mjs'
 import { mayTickPoint } from './closing-guard-core.mjs'
-import { evaluate, proofCommandsFor } from './point-proof-core.mjs'
+import { evaluate, proofCommandsFor, proofSatisfied } from './point-proof-core.mjs'
 
 const PAUSE = repoPath('.claude/batch-paused')
 
 /** The run ledger. Local bookkeeping of what this tree has actually run. */
-export const RUNS_PATH = repoPath('.claude/point-proof-runs.json')
+const RUNS_PATH = repoPath('.claude/point-proof-runs.json')
 
 /** The tools whose calls can carry a tick — the same set closing-guard guards. */
 const GUARDED_TOOLS = new Set(['Bash', 'PowerShell', 'Edit', 'Write', 'MultiEdit', 'NotebookEdit'])
@@ -65,7 +65,7 @@ function headSha() {
  * file that exists and cannot be parsed or read means this guard does not know —
  * and a guard that does not know must not block.
  */
-export function readRuns() {
+function readRuns() {
   if (!existsSync(RUNS_PATH)) return { readable: true, runs: {} }
   try {
     const parsed = JSON.parse(readFileSync(RUNS_PATH, 'utf8'))
@@ -91,7 +91,7 @@ function readTasks() {
 }
 
 /** Every point that carries a proof line, with its commands. */
-export function pointsWithProof(tasksText) {
+function pointsWithProof(tasksText) {
   const out = []
   for (const m of String(tasksText ?? '').matchAll(/^- \[( |x)\] (\d+)\./gm)) {
     const n = Number(m[2])
@@ -125,7 +125,9 @@ if (isMainModule(import.meta.url)) {
     if (!owed.length) console.log('  no point in the work order carries a PROOF line')
     for (const p of owed) {
       const entry = runs[String(p.point)]
-      const fresh = entry && entry.commit === head && String(entry.evidence ?? '').trim()
+      // The gate's own reading, so --status can never call a proof satisfied the
+      // tick would refuse (changed demand, unknown HEAD).
+      const fresh = proofSatisfied({ runs, n: p.point, commands: p.commands, headSha: head }).ok
       console.log(`  [${fresh ? 'x' : ' '}] point ${p.point}${p.done ? ' (ticked)' : ''}`)
       for (const cmd of p.commands) console.log(`        PROOF: ${cmd}`)
       if (entry) console.log(`        recorded at ${String(entry.commit ?? '').slice(0, 12)}: ${entry.evidence ?? ''}`)
