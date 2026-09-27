@@ -9,10 +9,11 @@
 // This drill settles it by running both shapes against the same kill:
 //
 //   pipes  stdio: ['ignore', 'pipe', 'pipe']  — today's lane
-//   files  stdio: ['ignore', fd, fd] + unref  — the launcher's shape
+//   files  stdio: ['ignore', fd, fd]          — the launcher's shape
 //
-// Both children are `detached` group leaders. The parent runs in its OWN
-// session (setsid) and its whole process group is SIGKILLed, which is how a
+// Both children are `detached` group leaders and unref'd; stdio is the only
+// difference. The parent runs in its OWN session (`detached`, i.e. setsid(2))
+// and its whole process group is SIGKILLed, which is how a
 // dying session takes its children. The child writes to stdout while it works,
 // exactly as codex does, and keeps an independent file heartbeat so the drill
 // can see how far it got after the kill.
@@ -33,7 +34,7 @@ import { isMainModule } from './is-main.mjs'
 /** The two shapes this drill compares, by the only field that differs. */
 export const SHAPES = ['pipes', 'files']
 
-/** The heartbeat period the fixture worker writes at. */
+/** The heartbeat period the fixture worker writes at; WORKER hard-codes the same 200 ms. */
 export const BEAT_MS = 200
 
 /** The longest silence a working lane may show, in beat periods. */
@@ -46,8 +47,8 @@ export const MIN_BASELINE_BEATS = 5
  * Linux process states, split into living and dead.
  *
  * `Z` is not the only dead one: `X` and `x` are the exit states, and a table
- * entry in any of them is a corpse. Everything not named here is UNKNOWN and
- * reads as dead, because a liveness probe that guesses in the optimistic
+ * entry in any of them is a corpse. Everything not named here is UNKNOWN —
+ * never alive, and labelled UNKNOWN rather than DIED — because a liveness probe that guesses in the optimistic
  * direction is what produces a green run over a dead lane.
  */
 export const LIVE_STATES = new Set(['R', 'S', 'D', 'T', 't', 'I', 'W', 'K', 'P'])
@@ -172,7 +173,7 @@ export function readOutcome({
                     ? 'the raise carries no clock to order against the kill'
                     : `the raise at ${raisedAt} predates the kill at ${killedAt}`
               }`
-            : 'died with the parent, cause not recorded in its own log'
+            : 'died, cause not recorded in its own log as EPIPE'
         : label === 'UNKNOWN'
           ? 'liveness could not be established, and an unreadable probe is not a survivor'
           : label === 'UNMEASURED'
@@ -290,7 +291,7 @@ export function verdict(outcomes) {
       ? 'the pipe is the binding: same detachment, opposite outcome'
       : pipes?.dead === true && pipes?.pipeCause !== true && files?.escaped === true
         ? `inconclusive — the pipes worker died, but its death cannot be attributed to the pipe: ${pipes.why}`
-        : 'inconclusive — both shapes behaved alike, so this run identifies no cause',
+        : 'inconclusive — the shapes did not diverge as pipe death against escape, so this run identifies no cause',
     outcomes,
   }
 }
@@ -412,8 +413,8 @@ export function probeAlive(pid, { startedAt = 0, requireIdentity = false, readPr
     return { alive: false, unknown: true, how: `unrecognised /proc state ${state || '(none)'} — read as dead` }
   }
   // FAIL CLOSED WHERE /proc CANNOT BE READ. The signal probe answers true for a
-  // corpse, and `verdict` consumes only the boolean — so a transient read failure
-  // would have greened a dead lane. A drill that cannot see the truth reports
+  // corpse, so reading it as `alive` would let a transient read failure green a
+  // dead lane. A drill that cannot see the truth reports
   // that it cannot, and `signal` is kept only to distinguish "gone" from
   // "unreadable" in the explanation.
   // ONLY ESRCH ESTABLISHES "GONE". A pid that exists but refuses the signal, or
@@ -511,8 +512,8 @@ async function runShape(dir, shape, { settleMs = 2000, observeMs = 3000 } = {}) 
   // to kill, and whether SIGKILL is what ended it. Attached before any await,
   // so an early independent death cannot slip past unobserved.
   let parentExit = null
-  parent.on('exit', (code, signal) => {
-    parentExit = { code, signal, at: Date.now() }
+  parent.on('exit', (_code, signal) => {
+    parentExit = { signal }
   })
   // The parent writes "<pid> <startTicks>" as one line, taken in the tick it
   // spawned the child, so the identity cannot belong to a replacement.
@@ -545,7 +546,7 @@ async function runShape(dir, shape, { settleMs = 2000, observeMs = 3000 } = {}) 
   // back to `Date.now()`. That EPIPE then read as PREDATING the kill and a
   // genuine result was thrown away as unattributable. The kill cannot cause an
   // EPIPE before it is initiated, so the instant just before the syscall is the
-  // earliest sound lower bound — and it makes the `>=` below honest rather than
+  // earliest sound lower bound — and it makes readOutcome's `>=` honest rather than
   // a concession to the clock.
   const killedAt = Date.now()
   try {
@@ -579,8 +580,8 @@ async function runShape(dir, shape, { settleMs = 2000, observeMs = 3000 } = {}) 
   // signal would hit a stranger. So the identity is re-checked at the moment of
   // the kill, and anything it cannot vouch for is left alone and reported.
   outcome.leftAlone = reap(pid, startedAt)
-  // The capture itself is evidence: a run whose pid or spawn-time identity was
-  // never read is one probeAlive answered UNKNOWN for, and the integration
+  // The capture itself is evidence: without a spawn-time identity probeAlive
+  // can never answer ALIVE (only ESRCH death or UNKNOWN), and the integration
   // test asserts the capture rather than trusting the label alone.
   outcome.pid = pid
   outcome.identityCaptured = startedAt > 0
@@ -635,9 +636,6 @@ export function reap(
     if (err?.code === 'ESRCH') return undefined
     return `pid ${pid} was NOT signalled: ${err?.code ?? err}`
   }
-  // ONLY AN IDENTITY CHANGE IS REPORTED. A process still running an instant after
-  // SIGKILL is ordinary — signal delivery is asynchronous — and reporting that as
-  // a recycled pid was a false alarm on every healthy run.
   // SIGNAL DELIVERY IS ASYNCHRONOUS, so one read proves nothing about a process
   // that is still there. It is re-read a bounded number of times, and whatever
   // is still true at the end is REPORTED — silence used to cover both a live
@@ -676,9 +674,9 @@ if (isMainModule(import.meta.url)) {
   const result = await runDrill()
   for (const o of result.outcomes) {
     // SIX OUTCOMES, NOT TWO, and the same precedence the reading used.
-    console.log(`${o.shape}: ${labelFor(o)} — ${o.why} (beats ${o.beatsBefore} → ${o.beatsAfter})`)
+    console.log(`${o.shape}: ${o.label} — ${o.why} (beats ${o.beatsBefore} → ${o.beatsAfter})`)
     if (o.leftAlone) console.log(`  ${o.leftAlone}`)
   }
-  console.log(result.ok ? `VERDICT: ${result.note}` : `VERDICT: ${result.note}`)
+  console.log(`VERDICT: ${result.note}`)
   process.exit(result.ok ? 0 : 1)
 }
