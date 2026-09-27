@@ -32,7 +32,6 @@ import {
   compareSectionIds,
   estimateTokens,
   extractPointRefs,
-  findPoint,
   isRenderPoint,
   orientationBlock,
   parseDesignSections,
@@ -72,6 +71,8 @@ const ARCHIVE = [
 ].join('\n')
 
 const ALL = `${TASKS}\n${ARCHIVE}`
+/** The point with that number, or null — a lookup over parseWorkOrderPoints. */
+const findPoint = (text, n) => parseWorkOrderPoints(text).find((p) => p.number === Number(n)) ?? null
 
 const DESIGN = [
   '# Design',
@@ -220,7 +221,7 @@ describe('parseWorkOrderPoints', () => {
   })
 })
 
-describe('findPoint', () => {
+describe('point lookup over parseWorkOrderPoints', () => {
   it('finds an OPEN number', () => {
     expect(findPoint(ALL, 401).body).toContain('ANOTHER OPEN POINT')
   })
@@ -310,7 +311,7 @@ describe('resolveSectionRefs — which document a § belongs to', () => {
 
   it('gives a hyphenated basename a short reach, not the filename’s generous one', () => {
     expect(DOC_WINDOW.file).toBeGreaterThan(DOC_WINDOW.basename)
-    expect(DOC_WINDOW.stem).toBe(0)
+    expect(DOC_WINDOW).not.toHaveProperty('stem')
     expect(mapOf('peoples-1890 §8 is the record')).toEqual({ 'docs/peoples-1890.md|8': 'named-nearby' })
   })
 

@@ -273,7 +273,7 @@
 | `pause-retry-drill.mjs` | THE RESTART-CLOCK DRILL (point 445). | — |
 | `perf-bench.mjs` | Bird's-eye framerate benchmark + CONFIG SWEEP (point 276). | Usage: start a dev server, then: |
 | `perf-breakdown.mjs` | Per-object triangle breakdown of the bird's-eye frame (point 276). | Usage: BASE_URL=http://localhost:5173/ VERIFY_GL=webgpu node scripts/perf-breakdown.mjs |
-| `perf-structure.mjs` | Structural frame-load probe (point 276): what the renderer actually SUBMITS per frame at a fixed state — draw calls, triangles, compiled programs, scene object count. | Usage: BASE_URL=http://localhost:5174/ VERIFY_GL=webgpu node scripts/perf-structure.mjs |
+| `perf-structure.mjs` | Structural frame-load probe (point 276): what the renderer actually SUBMITS per frame at a fixed state — render calls, draw calls, triangles, and the live geometry and texture counts. | Usage: BASE_URL=http://localhost:5173/ VERIFY_GL=webgpu node scripts/perf-structure.mjs |
 | `permission-autogrant-core.mjs` | Pure core of the permission auto-grant (see scripts/permission-autogrant.mjs). | — |
 | `permission-autogrant.mjs` | PermissionRequest hook: grants what the harness would otherwise ask the user about. | — |
 | `picture-stability-core.mjs` | Pure decision logic of the capture-stability probe (picture-stability.mjs is the I/O wrapper: it drives the suite, reads the PNGs and restores the tracked frames). | — |
