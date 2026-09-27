@@ -1,6 +1,7 @@
 // Runtime transaction for pre-call context admission. Pure arithmetic lives in
-// context-budget-core; this module serializes the pending-debit ledger and the
-// optional one-use permit across separate PreToolUse hook processes.
+// context-budget-core; this module serializes the per-context pending-debit
+// ledgers and the optional one-use permit across separate PreToolUse hook
+// processes.
 import { createHash } from 'node:crypto'
 import { mkdirSync, readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
@@ -21,7 +22,9 @@ import {
   sessionCeilingDecision,
 } from './session-context-ceiling-core.mjs'
 
-export const CONTEXT_FENCE_LEDGER_PATH = repoPath('.claude/context-fence-ledger.json')
+/** The former shared ledger's path — now only the anchor whose directory holds
+ *  the per-context ledgers (`contextLedgerPath`). */
+const CONTEXT_FENCE_LEDGER_PATH = repoPath('.claude/context-fence-ledger.json')
 export const CONTEXT_FENCE_LEDGER_LOCK_PATH = repoPath('.claude/context-fence-ledger.lock')
 
 /** Separate stale-reading debits for every real context. Subagents inherit the
@@ -33,7 +36,7 @@ export function contextLedgerPath(sessionId, legacyBase = CONTEXT_FENCE_LEDGER_P
   return resolve(dirname(legacyBase), 'context-fence-ledgers', `${key}.json`)
 }
 
-export function readPendingLedger(path = CONTEXT_FENCE_LEDGER_PATH, sessionId = '') {
+export function readPendingLedger(path, sessionId = '') {
   try {
     const value = JSON.parse(readFileSync(path, 'utf8'))
     return value && typeof value === 'object' && !Array.isArray(value)
