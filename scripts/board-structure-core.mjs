@@ -16,15 +16,19 @@
 // published at all, whatever produced it and whoever forgot which editing
 // technique is safe.
 //
-// It deliberately checks STRUCTURE only — nothing about content, freshness or
-// wording, which the consistency audit already owns. Pure and total: it never
-// throws, so a publish can never be blocked by this module misbehaving.
+// It checks STRUCTURE, plus one naming rule for current-work cards (check 7:
+// every card names its point and subject, the handover card its follow-on work)
+// — nothing about content freshness, which the consistency audit already owns.
+// Pure and total: it never throws, so a publish can never be blocked by this
+// module misbehaving.
 //
-// The one import is the board's OWN names for its two unnumbered state cards
-// (point 544): which KIND a current-work card is cannot be judged from markup
-// alone, and spelling those titles a second time here is how the writer and the
-// gate would drift apart. board-core does not import this module, so the
-// direction cannot become a cycle.
+// The imports are the board's OWN vocabulary: the idle and legacy closing titles
+// (point 544; since point 655 a closing card carries its point, so its legacy
+// title only identifies a pre-655 card), the title and follow-on predicates, and
+// the derived state card's kind. Which KIND a current-work card is cannot be
+// judged from markup alone, and spelling those a second time here is how the
+// writer and the gate would drift apart. Neither imported module imports this
+// one, so the direction cannot become a cycle.
 import {
   CLOSING_WORK_TITLE,
   NO_CURRENT_WORK_TITLE,
@@ -59,8 +63,8 @@ export function markupOnly(html) {
 
 /**
  * Structural violations of one board, as [{code, msg}]. Empty = intact.
- * Total: a non-string, or anything unparseable, yields a single violation
- * rather than an exception.
+ * Total: it never throws; a non-string or empty board yields the single
+ * 'board-unreadable' violation.
  */
 export function structureViolations(html) {
   if (typeof html !== 'string' || html.trim() === '') {
@@ -148,7 +152,7 @@ export function structureViolations(html) {
   // mixture can only come from a hand edit — which is also how three idle cards
   // came to stand stacked. Both shapes are caught here, before the bytes leave.
   // THE DERIVED STATE CARD IS NOT ONE OF THE THREE VOICES (point 749). It says
-  // what the BATCH is doing — paused, repairing, waiting on a probe — which is
+  // what the BATCH is doing — paused, deciding on its own, retrying — which is
   // true beside a running point rather than instead of it, so counting it here
   // would make every paused batch an unpublishable board.
   const kinds = nowCardKinds(m).filter((kind) => kind !== DERIVED_STATE_KIND)
@@ -222,8 +226,8 @@ export function cardNamingViolations(html) {
           'none "<Grund>" (boundary) replaces a card without a number'
         : `node scripts/board.mjs title ${card.chip} "<Betreff>"`
     if (card.kind === 'idle') {
-      // The ONE deliberate exception (point 434(7)): the handover card belongs to
-      // no point, so it may not carry a chip — but it owes the successor's point
+      // The authored exception (point 434(7); the derived card is skipped above):
+      // the handover card belongs to no point, so it may not carry a chip — but it owes the successor's point
       // in prose or the canonical statement that none remains. Its SHAPE is
       // checked all the same: the marker alone must not be able to exempt an
       // arbitrary card from every rule above.
@@ -271,8 +275,8 @@ export function cardNamingViolations(html) {
       out.push({
         code: 'now-card-unnumbered',
         msg:
-          `the current-work card ${named} carries no numbered chip — every card but the handover ` +
-          'card names its point, and no numbered command can reach a card without one. ANY ' +
+          `the current-work card ${named} carries no numbered chip — every authored card but the ` +
+          'handover card names its point, and no numbered command can reach a card without one. ANY ' +
           'board.mjs edit sweeps such a card and prints what it removed, so the next command ' +
           'repairs this whatever else stands; write the card the state really is with ' +
           'node scripts/board.mjs closing <N> "<Grund>", none "<Grund>" or now <N> "<Stand>"',
@@ -323,7 +327,8 @@ export function cardNamingViolations(html) {
 /**
  * The KIND of every current-work card, in document order: 'point' for a
  * numbered card, 'idle' for "Gerade keine laufende Arbeit", 'closing' for the
- * card that names the closing duties still owed (point 544).
+ * card that names the closing duties still owed (point 544), and the derived
+ * state card's own kind (`DERIVED_STATE_KIND`).
  *
  * Scoped to the current-work section, so the same words quoted in the archive
  * are a report and not a card. Total: anything unreadable yields [].
@@ -333,13 +338,14 @@ export function nowCardKinds(html) {
 }
 
 /**
- * Every current-work card as {kind, point, title}, in document order.
+ * Every current-work card as {kind, chip, point, title}, in document order.
  *
  * The KIND comes from the `data-state` marker the writers stamp on since point
  * 655 — the closing card's title is composed per point now, so no literal text
  * can identify it — and falls back to the two legacy titles for a card written
- * before that. `point` is the numbered chip, null on the unnumbered handover
- * card. Total: anything unreadable yields [].
+ * before that. `chip` is the numbered chip; `point` is the chip or, failing it,
+ * a pre-chip title's leading number; both are null on an unnumbered card.
+ * Total: anything unreadable yields [].
  */
 export function nowCards(html) {
   const m = markupOnly(typeof html === 'string' ? html : '')

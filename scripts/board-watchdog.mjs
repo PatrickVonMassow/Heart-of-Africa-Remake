@@ -22,7 +22,7 @@
 // WHY A SEPARATE PROCESS, and not a block inside the launcher. On this platform
 // a `process.exit()` after any `fetch` tears undici's socket down mid-close and
 // ABORTS the process (`Assertion failed: !(handle->flags & UV_HANDLE_CLOSING)`,
-// exit 127). The launcher exits that way at fifteen different points, and its
+// exit 127). The launcher exits that way at many points, and its
 // real job is resurrecting a dead batch — so it must not hold a fetch at all.
 // A child process is also containment no try/catch can match: whatever happens
 // in here, the resurrection above it is untouched.

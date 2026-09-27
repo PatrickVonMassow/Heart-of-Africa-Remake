@@ -54,6 +54,7 @@ import {
   untranslatedTitlePoints,
 } from './board-queue-core.mjs'
 import { withBoardEditLock } from './board-edit-lock.mjs'
+import { PUBLISH_CMD } from './board-remedy.mjs'
 import { CALIBRATION_PATH, parseCriticality, pictureBearingPoints } from './queue-calibration-core.mjs'
 import { carrierPath } from './findings-paths.mjs'
 import { pendingRequests, requestRoute } from './findings-request-core.mjs'
@@ -268,7 +269,7 @@ try {
       console.log(`queue rebuilt from the work order: ${built.entries.length} card(s)${rendered === html ? ' (unchanged)' : ''}`)
       reportEntries(built.entries, tasks)
       saySoIfRequests()
-      console.log('Publish it: node scripts/board-publish.mjs')
+      console.log(`Publish it: ${PUBLISH_CMD}`)
     }
   } else {
     console.error(
