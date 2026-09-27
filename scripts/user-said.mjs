@@ -2,14 +2,15 @@
 // WHAT THE USER SAID, AND WHEN — the CLI half. Rationale: scripts/user-said-core.mjs.
 //
 //   node scripts/user-said.mjs                          the last 20 things he said
-//   node scripts/user-said.mjs --grep "reihenfolge"     every message matching, one line each
+//   node scripts/user-said.mjs --grep "reihenfolge"     the last 20 matching, one line each
 //   node scripts/user-said.mjs --grep "614" --full      the matches in full
 //   node scripts/user-said.mjs --since 6h --last 50     a window, widened
 //   node scripts/user-said.mjs --sessions 5             only the five newest conversations
 //   node scripts/user-said.mjs --session d5fcb9cf       one conversation
 //
-// It streams the transcripts line by line and never holds a file in memory, so a
-// 100 MB conversation costs the same as a small one.
+// It streams the transcripts line by line and never holds a whole file in memory:
+// only the parsed human rows are kept, so a 100 MB conversation costs read time
+// but little memory beyond its human messages.
 import { createReadStream } from 'node:fs'
 import { readdir } from 'node:fs/promises'
 import { homedir } from 'node:os'

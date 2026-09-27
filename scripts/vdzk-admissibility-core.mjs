@@ -67,7 +67,8 @@ export function withoutCategoryLine(text) {
 }
 
 /**
- * Two alternatives, spelled out. A card must still tell the user what decision
+ * The user's choices, named: two alternatives spelled out, or an options label
+ * (`Optionen:`, `Varianten:` …) introducing them. A card must still tell the user what decision
  * the selected category leaves to them; the category is authority, not content.
  */
 export function namesOptions(text) {
