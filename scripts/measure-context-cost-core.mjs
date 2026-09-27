@@ -21,11 +21,11 @@
  */
 export const COST_WEIGHTS = { input: 1, cacheCreation: 1.25, cacheRead: 0.1, output: 5 }
 
-/** The context size above which a turn counts as "large" — the threshold the original
- *  measurement used. */
+/** The context size at or above which a turn counts as "large" — the threshold the
+ *  original measurement used. */
 export const LARGE_CONTEXT_TOKENS = 150_000
 
-/** A gap longer than this is not work: it separates one active stretch from the next,
+/** A gap this long or longer is not work: it separates one active stretch from the next,
  *  so an idle night cannot dilute a per-hour rate into meaninglessness. */
 export const IDLE_GAP_MS = 30 * 60 * 1000
 
@@ -58,7 +58,7 @@ function lineUsage(usage, field) {
  * repeat the same usage. `output_tokens` is a STREAMED SNAPSHOT that grows as the
  * response is written (5 → 234 → 234), so taking the first line counts a fraction of what
  * was billed. Measured over 32.697 responses in this repository's transcripts: 13.630 are
- * multi-line and 6.708 of those differ, ALL of them in `output_tokens` alone, and the
+ * multi-line and 6.708 of those differ, all but one of them in `output_tokens` alone, and the
  * sequence NEVER falls — first-line folding reported 7,65 M output tokens against 14,09 M
  * actually billed, an undercount of 1,84×.
  *
@@ -82,11 +82,10 @@ export function foldUsage(usages = []) {
 
 /** One turn's weighted spend, and the context it ran in. PURE. */
 export function turnCost(usage = {}) {
-  const n = (v) => (Number.isFinite(v) && v > 0 ? v : 0)
-  const input = n(usage.input_tokens)
-  const cacheCreation = n(usage.cache_creation_input_tokens)
-  const cacheRead = n(usage.cache_read_input_tokens)
-  const output = n(usage.output_tokens)
+  const input = num(usage.input_tokens)
+  const cacheCreation = num(usage.cache_creation_input_tokens)
+  const cacheRead = num(usage.cache_read_input_tokens)
+  const output = num(usage.output_tokens)
   return {
     contextTokens: input + cacheCreation + cacheRead,
     weighted:
@@ -252,8 +251,8 @@ export const LEGACY_TRANSCRIPT_SLUG = 'c--Users-Patri-Documents-Developing-hoa'
  * Transcript-folder candidates for a checkout, most specific first. PURE — the path
  * `join` is the caller's, so this needs no path module and no filesystem.
  *
- * The slug is offered with AND without a trailing dash because the harness does not
- * strip one: a repo root carrying a trailing separator produces `-workspace-hoa-`,
+ * The slug is offered as derived and, when it ends in a dash, also without it, because
+ * the harness does not strip one: a repo root carrying a trailing separator produces `-workspace-hoa-`,
  * and that directory really does exist next to `-workspace-hoa` on this machine.
  * Which of the two holds transcripts is decided by looking, not by guessing.
  */
