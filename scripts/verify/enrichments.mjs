@@ -4949,9 +4949,9 @@ if (section('calf-predation-drama')) {
 // relocated to the radius edge (its herdState already exists), then the
 // behaviour is measured: closing on the site, holding, releasing.
 // Source the herd where elephants reliably spawn (the Serengeti, like the
-// trample check), then move it to the graveyard and follow the player there
-// — retagging each member's chunk to a live graveyard chunk so the jump's
-// despawn pass does not cull the relocated herd.
+// trample check) and clear its members' chunk tags (the despawn filter keeps
+// chunk-less animals), then jump the player to the graveyard and move the herd
+// to the radius edge there.
 if (section('elephant-mourning')) {
   await page.evaluate(() => window.__game.getState().debugJumpTo(-2.2, 34.8))
   await page.waitForFunction(() => !!window.__wildlife?.herdsRef?.current, null, { timeout: 20000 }).catch(() => {})
@@ -5093,10 +5093,11 @@ if (section('elephant-mourning')) {
   }, [-4.9, 36.6])
   check(
     'an elephant herd mourns at the graveyard — closes on the bones, holds, moves on (point 126)',
-    // closed < 10: the herd halves its 20-unit start and stands in the ring —
-    // the exact convergence value is formation-dependent (measured 8.6-9.0
-    // across green runs), the hold and release carry the semantics.
-    mourn.found && mourn.closed !== null && mourn.closed < 10 && mourn.held !== null && mourn.held < 3 && mourn.released,
+    // The poll above already demands closed < 9 (the herd halves its 20-unit
+    // start and stands in the ring; held stays null otherwise) — the exact
+    // convergence value is formation-dependent, the hold and release carry the
+    // semantics.
+    mourn.found && mourn.closed !== null && mourn.held !== null && mourn.held < 3 && mourn.released,
     JSON.stringify(mourn),
   )
   await shot('128-elephant-mourning', { world: { lat: -4.9, lon: 36.6 }, label: 'the elephant graveyard', settle: false })
@@ -5107,9 +5108,11 @@ if (section('elephant-mourning')) {
 // exist and every one lies ON a water cell (the pure water-only rule,
 // witnessed live). (2) The drama, staged deterministically on a SYNTHETIC
 // crocodile + family: hidden -> visible lunge -> grip through the shared
-// caught window, then all three endings (drive-off frees the calf, sacrifice
-// takes the parent under, too-late takes both), with the scripted lion hunt
-// untouched throughout. Screenshots 129 (hidden) / 130 (lunge).
+// caught window, then all three family endings (drive-off frees the calf,
+// sacrifice takes the parent under, too-late takes both) plus the release when
+// a gripped victim vanishes, with the scripted lion hunt
+// parked idle so it never claims a staged animal (point 194). Screenshots 129
+// (hidden) / 130 (lunge).
 if (section('crocodile-ambush')) {
   await page.evaluate(() => {
     window.__game.getState().debugJumpTo(-17.9, 25.9) // the Zambezi reach
@@ -5189,11 +5192,12 @@ if (section('crocodile-ambush')) {
   // body==water, visible = body!=water, and an empty frame = eyes absent -> FAIL.
   //
   // HOW "different from water" IS MEASURED (point 382). Every leg above is read
-  // through ONE scale-free statistic, `animalShare` (defined at its use below):
-  // the share of a rect whose colour sits further from that frame's OWN water
-  // colour than a fixed multiple of the water's OWN spread. Nothing is compared
-  // against a hand-set colour number, and nothing depends on brightness, exposure,
-  // backend or projection — the water in the picture is the yardstick.
+  // through ONE scale-free statistic, `animalShare` (./animalShare.mjs, described
+  // at its use below): the share of a rect whose colour sits further from that
+  // frame's OWN water colour than a fixed multiple of the water's OWN spread.
+  // Nothing is compared against a hand-set colour number beyond a 1-unit floor
+  // under the spread, so brightness, exposure and backend cancel out — the water
+  // in the picture is the yardstick.
   // It replaced three absolute deltas whose worst, `strikeDiff > 45`, decided the
   // verdict on the second decimal of a mean and went red on an undisputed picture
   // (44.2 and 44.6 in one evening, and 37.5-42.9 across the eight staged repeats
@@ -5212,7 +5216,7 @@ if (section('crocodile-ambush')) {
   // bar of 45 — it landed on the passing side exactly once. That is the flake seen
   // from the other end: the same undisputed picture, a verdict decided by which
   // side of 45 a colour average happened to fall on.
-  // and the criterion is written ONCE so it can be FED THE HIDDEN FRAME and shown
+  // The criterion is written ONCE so it can be FED THE HIDDEN FRAME and shown
   // to say no — `hiddenWouldReadAsAnimal` must be false, asserted, so a body that
   // stayed water-coloured through the strike still turns this check red.
   // Staging discipline (the fix of this check's own false-fail): the ambush
@@ -5233,15 +5237,7 @@ if (section('crocodile-ambush')) {
   // reach ~1.35 + margin) holds through every sample, and `playerClear`
   // (player-croc distance > 4 at the hidden sample) is asserted and logged so a
   // pass PROVES the body rect held pure water-over-the-submerged-croc.
-  // That freeze happens AT THE JUMP now (point 382), not here. Frozen only once
-  // the camera had settled, it left the traveller a wall-clock-dependent stretch
-  // of drifting first — and the cell search starts from where he ended up, so the
-  // staged cell and the sampled rects landed somewhere different on every run.
-  // Measured on unpinned runs: one put the eye rect over the falls' foam (its
-  // reference read 2548 of 2613 pixels as crocodile), another put the body rect
-  // under the "Unknown waterfall" map label, which is no more water than the HUD
-  // is. Frozen at the jump, three separate browser sessions staged the identical
-  // cell (265, 179) and the identical body rect (1145, 304, 167x118).
+  // That freeze happens AT THE JUMP now (point 382, explained there), not here.
   // Sampled at an ACHIEVABLE gameplay zoom (point 172 —
   // the non-debug wheel range is 0.125–0.5): the closest candidate at which both
   // rects project fully on screen, preferring 0.25 where the two ~0.06-unit
@@ -5352,7 +5348,7 @@ if (section('crocodile-ambush')) {
       player: { x: +pp.x.toFixed(2), z: +pp.z.toFixed(2), dist: +Math.hypot(pp.x - cx, pp.z - cz).toFixed(2) },
     }
   }, live)
-  // (2) Zoom to the closest achievable level that keeps both rects on screen.
+  // (2) Zoom to the closest of four achievable levels (0.25-0.5) that keeps both rects on screen.
   let crocView = null
   if (crocStage.staged) {
     for (const zoom of [0.25, 0.32, 0.4, 0.5]) {
@@ -5393,16 +5389,12 @@ if (section('crocodile-ambush')) {
     // It is SCALE-FREE by construction: multiply every colour distance in the rect
     // by any λ (a brighter sky, a darker backend, a cloud passing, a different
     // exposure) and both d_i and `spread` scale with it, so the share does not
-    // move. It is also free of the projection: it is a fraction of the rect, not a
-    // pixel count. Nothing here is compared against a hand-set colour number — the
-    // only absolute is the 1-unit floor under `spread`, which is one 8-bit step,
-    // i.e. the smallest colour difference that exists at all.
-    // This REPLACES an absolute channel delta (`l1(strikeMean, waterMean) > 45`)
-    // that decided the verdict on the second decimal of a mean: it read 44.2 and
-    // 44.6 against its own 45 in one evening, and 37.5-42.9 across eight staged
-    // repeats measured for point 382 — the check was red on a picture nobody
-    // disputes, because a mean over the rect DILUTES the body with the water
-    // beside it and the dilution moves with the projection.
+    // move — as long as `spread` stays above its 1-unit floor, the only absolute
+    // here, which is one 8-bit step, i.e. the smallest colour difference that
+    // exists at all. It counts a fraction of the rect rather than pixels, so the
+    // rect's pixel size drops out (the body's share of the rect still follows the
+    // framing). It replaces the absolute `l1(strikeMean, waterMean) > 45` delta
+    // described in the section header.
     // Bright specular/foam is water, not animal, and is dropped BEFORE anything is
     // measured (the point-274 exclusion, now applied to the reference colour too:
     // the old code excluded foam from the count but left it in the mean, so a rect
@@ -5414,7 +5406,7 @@ if (section('crocodile-ambush')) {
     const bodyRef = await sample(refClips.bodyClip)
     const eyeRef = await sample(refClips.eyeClip)
     const waterMean = bodyRef.mean
-    const bodyRefShare = animalShare(bodyRef) // water-only floor (measured 0)
+    const bodyRefShare = animalShare(bodyRef) // water-only floor (measured 0 - 0.00257)
     const eyeRefShare = animalShare(eyeRef)   // water-only floor (measured 0)
     // (b) HIDDEN croc on that cell — body vanishes into the water, eye knobs show.
     await page.evaluate(() => {
@@ -5426,12 +5418,7 @@ if (section('crocodile-ambush')) {
     const bodyHidden = await sample(hiddenClips.bodyClip)
     const eyeHidden = await sample(hiddenClips.eyeClip)
     const stagedCroc = await page.evaluate(() => (window.__stagedCrocPos ? { x: window.__stagedCrocPos.x, z: window.__stagedCrocPos.z } : null))
-    await shot(
-      '129-crocodile-hidden',
-      stagedCroc
-        ? { world: stagedCroc, label: 'the hidden crocodile', settle: false }
-        : { general: 'no crocodile was staged, so the water cell itself is all this frame can show' },
-    )
+    await shot('129-crocodile-hidden', { world: stagedCroc, label: 'the hidden crocodile', settle: false })
     // (c) STRIKING control — the SAME croc forced fully out. A gripped lunge holds
     // it in place (the AI settles it at its own spot with the victim 0.6 ahead) and
     // reads as striking (fully out, opaque); a live `caught` keeps
@@ -5449,7 +5436,7 @@ if (section('crocodile-ambush')) {
     // --- THE CRITERION (point 382), written ONCE so the same function can be fed
     // the HIDDEN frame and demanded to say no. Both clauses are dimensionless:
     //   * a GEOMETRIC floor — the risen body must repaint at least a tenth of its
-    //     own footprint (measured 0.305-0.314 over eight staged repeats, so a 3x
+    //     own footprint (measured 0.303-0.316 over the fifteen frames in the header table, so a 3x
     //     margin, against a share of the rect rather than a colour value); and
     //   * a SEPARATION against the water's own floor: whatever share the same rect
     //     shows with NO crocodile over it, the strike must beat many times over.
@@ -5460,8 +5447,9 @@ if (section('crocodile-ambush')) {
       staged: true, zoom: crocView.zoom,
       croc: hiddenClips.croc, bodyClip: hiddenClips.bodyClip, eyeClip: hiddenClips.eyeClip,
       // The staged croc must have LAIN STILL through the hidden sample: not
-      // lunging (the frozen strikeRadius) and at its staged spot — else the
-      // rects, live-derived or not, would compare different water.
+      // lunging (the frozen strikeRadius) — else the rects, live-derived or not,
+      // would compare different water. Its position is not compared with the
+      // staged spot; the rects follow the live croc.
       notLunged: hiddenClips.croc.lunging === false,
       // The canoeing player (drift-frozen) stood clear of the body rect: the
       // sampled pixels were water over the submerged croc, never the boat.
@@ -5521,7 +5509,7 @@ if (section('crocodile-ambush')) {
       // (1) eye knobs present — the croc is there, not an empty frame (a false
       // pass): a readable share of the eye rect stands outside that frame's own
       // water population, many times whatever the same rect shows croc-free
-      // (measured 0.108-0.119 against a floor of 0 over eight staged repeats)
+      // (measured 0.108-0.119 against a floor of 0 over the fifteen measured frames)
       crocHiddenResult.eyeRefShare >= 0 && // -1 = the rect was not water enough to measure
       crocHiddenResult.eyeHiddenShare >= 0.02 &&
       crocHiddenResult.eyeHiddenShare >= 8 * Math.max(crocHiddenResult.eyeRefShare, 1 / crocHiddenResult.eyeN) &&
@@ -5530,7 +5518,7 @@ if (section('crocodile-ambush')) {
       // (measured 0-0.00046)
       crocHiddenResult.bodyHiddenShare >= 0 && crocHiddenResult.bodyHiddenShare <= 0.02 &&
       // (3) teeth: the risen strike body reads as an ANIMAL by the scale-free
-      // criterion (measured 0.305-0.314 against its 0.10 bar) …
+      // criterion (measured 0.303-0.316 against its 0.10 bar) …
       crocHiddenResult.strikeReadsAsAnimal === true &&
       // … and that same criterion, fed the HIDDEN frame, still says no — proof it
       // discriminates rather than merely passing today's picture
