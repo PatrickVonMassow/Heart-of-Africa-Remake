@@ -5,7 +5,8 @@
 // the fire, food is fetched from the huts and cooked over it, grain is
 // pounded in a mortar, a drummer waits for the chief's message, and water is
 // carried from the well where the village has one (point 1092).
-// Pure animation, no mechanics.
+// Mostly animation: the few game effects it causes (heard words through
+// hearUtterance, the loom's cloth record) go through the store.
 
 import { usePlaceGround } from './PlaceGroundContext'
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, type ReactNode, type RefObject } from 'react'
@@ -166,16 +167,17 @@ import { queuedDrummerVoice, setDrummerVoice } from './drummerVoice'
 import { buildWedgeCarve } from './wedgeCarve'
 import { figureStance, unplacedInhabitant, type PlaceSpot } from './placement'
 
-/** Collision radius of inhabitants (matches the player's). */
+/** Collision radius of inhabitants (WALKER_RADIUS; the player's own is PLAYER_RADIUS). */
 const NPC_RADIUS = WALKER_RADIUS
+
+/** The settlement's speech floor (who may speak next), shared by every vignette. */
+const SpeechFloorContext = createContext<SpeechFloor | null>(null)
 
 /**
  * The cold-weather cloaks this settlement's people wear today (design.md
  * §19.13), or null for the everyday dress. A context rather than a prop: every
  * life vignette builds its own Figures, and only the Figure itself cares.
  */
-const SpeechFloorContext = createContext<SpeechFloor | null>(null)
-
 const ColdCloaksContext = createContext<ColdDress | null>(null)
 
 /**
@@ -188,7 +190,7 @@ const LimbDetailContext = createContext<number>(8)
 
 /**
  * The settlement's inhabitant bodies (work-order point 578). A context for the
- * reason the two above are: the life vignettes are a dozen separate components,
+ * reason the contexts above are: the life vignettes are a dozen separate components,
  * and every one of them has to see EVERY other one's figures — the defect was
  * exactly that none of them did. PlaceLife owns one set per settlement; each
  * component claims its slots, writes them where it moved its figures, and
@@ -258,15 +260,16 @@ const HEAD_CARRY_POSE: { current: FigurePose } = {
  *
  * Since point 479 the figure has ARMS — a cone with a sphere head cannot show
  * what it is talking about, and the pointing gesture is the anchor the
- * communication PoC's HERE/THERE hang on. LEGS are opt-in: a floor-length wrap
+ * communication's direction words hang on. LEGS are opt-in: a floor-length wrap
  * is the period dress for most adults and legs under it would draw nothing, so
- * they go on the figures that RUN (the children), whose stride then reads.
+ * they go on the figures whose stride must read (the running children, the
+ * walking loom helper).
  *
  * The gesture itself is driven from outside through `gesture`, a ref the caller
  * owns and this figure advances — one state per figure, which is why two
  * gestures can never run on one body. `pose` is the direct alternative for a
- * figure whose arms are doing work rather than speaking (the drummer, the
- * porter's carry).
+ * caller that computes the whole pose itself (the drummer, the porter's carry,
+ * the children, whose round combines their gestures with the run).
  */
 function Figure({
   cloth,
@@ -387,7 +390,7 @@ function Figure({
       head.current.rotation.x = flattened ? -(trunk.current?.rotation.x ?? 0) : 0
     }
     if (withLegs && gait) {
-      const phase = gait.current ?? 0
+      const phase = gait.current
       const a = legPivots.current[0]
       const b = legPivots.current[1]
       if (a) a.rotation.x = legSwingAngle(phase, 0)
@@ -432,7 +435,7 @@ function Figure({
             />
             <meshStandardMaterial
               color={wrap}
-              roughness={0.8} // greased hide sits glossier than the cloth beneath
+              roughness={0.8} // every wrap, hide or woven, sits a touch glossier than the body cloth
             />
           </mesh>
         )}
@@ -470,8 +473,8 @@ function Figure({
           </group>
         ))}
       </group>
-      {/* Legs, on the figures that run (point 479/480). They swing about their
-          hips on the DISTANCE-driven gait phase the fauna and the §2.5
+      {/* Legs, on the figures whose stride must read (point 479/480). They
+          swing about their hips on the DISTANCE-driven gait phase the fauna and the §2.5
           silhouettes already use, so a faster child steps faster and a stopped
           one stands still — never a wall-clock bob. */}
       {withLegs &&
@@ -985,8 +988,8 @@ function speakBankUtterance(
  * itself is the pure `tagGame` module — this component only feeds it the
  * settlement and draws the result.
  *
- * They are the figures that RUN, so they are the ones that carry legs (point
- * 479): the swing rides the DISTANCE each child covers at the cadence its own
+ * They RUN, so they carry legs (point 479; the walking loom helper does too):
+ * the swing rides the DISTANCE each child covers at the cadence its own
  * short legs dictate, exactly as the fauna and the §2.5 silhouettes do — a
  * stopped child's legs are still, and the body dips onto the stance leg instead
  * of riding a wall-clock bob. The sprint therefore reads three ways at once: the
@@ -995,7 +998,8 @@ function speakBankUtterance(
  * survives at any distance the cadence no longer resolves at.
  *
  * A bank village stages its bank round here; ports and bankless villages
- * stage silent tag. Only a bank round can emit an utterance.
+ * stage wordless tag (the catcher's one "ha" cry is no word). Only a bank round
+ * can emit an utterance.
  */
 function Kids({
   x,
@@ -1012,7 +1016,8 @@ function Kids({
 }: {
   x: number
   z: number
-  /** How far from (x, z) the group may roam — its own play ground (point 481). */
+  /** How far from (x, z) the tag group may roam — its own play ground (point
+   *  481). The bank round walks the whole settlement instead. */
   playRadius: number
   count: number
   seed: number
@@ -1057,9 +1062,11 @@ function Kids({
   }, [bodies, childBodies])
 
   // The settlement as the chase sees it: ONE predicate for the colliders, the
-  // fire ring (a collider like any other), the walkable rim and the PLAY GROUND
-  // — so a child can never end a step where a walker may not stand, and never
-  // wander out of its group into the adults' earshot (point 481.4) — and beside
+  // fire ring (a collider like any other), the walkable rim and, in the tag
+  // round, the PLAY GROUND and the wedge carve — so a child can never end a step
+  // where a walker may not stand, and a tag group never wanders out into the
+  // adults' earshot (point 481.4; the bank round roams the whole settlement,
+  // below) — and beside
   // it the OTHER INHABITANTS' BODIES as ground the chase walks round (point
   // 657): without that, a child whose way crossed an adult standing in the
   // ground read it as open, walked into the body, and the separation pushed it
@@ -1128,8 +1135,7 @@ function Kids({
     //
     // The wedge carve is deliberately NOT part of this — measured over five
     // layouts of the bambara village it disconnects the bank from the village on
-    // three of them, and a corner that does fall in a wedge is dropped by the
-    // walk itself (`wayTo`).
+    // three of them — and with a stage it is switched off altogether (above).
     if (nav) navRestrict(nav, onGround)
     return {
       hasHeard: (concept) => {
@@ -1366,9 +1372,7 @@ function Kids({
     // cm off the stone with ROCK still falling. Advancing here means the new
     // utterance's gesture is only READ below, never advanced in its own frame:
     // the fade-out begins exactly at the hold's end.
-    for (const gesture of gestures.current) {
-      if (gesture) gesture.current = advanceGesture(gesture.current, dt)
-    }
+    for (const gesture of gestures.current) gesture.current = advanceGesture(gesture.current, dt)
     if (spoken) {
       speakBankUtterance(camera, spoken, children[spoken.speaker], refs.current[spoken.speaker], gestures.current[spoken.speaker])
     }
@@ -1591,8 +1595,9 @@ function Kids({
       if (!g) return null
       g.updateWorldMatrix(true, true)
       return worldHands(g).map((h) => {
-        // The outer group is unscaled (metres); the figure inside it is drawn
-        // at the child's scale, so body heights are metres over that scale.
+        // The outer group is unscaled (metres) apart from a tagged child's crouch
+        // squash in the bank round; the figure inside it is drawn at the child's
+        // scale, so body heights are metres over that scale.
         const local = g.worldToLocal(new THREE.Vector3(h.x, h.y, h.z)).divideScalar(KID_SCALE)
         return { ...h, local: { x: local.x, y: local.y, z: local.z } }
       })
@@ -1609,7 +1614,7 @@ function Kids({
       tags: bank ? bank.tags : game!.tags,
       chaserFor: bank ? bank.phaseFor : game!.chaserFor,
       /** The bank round's own phase, for a check that wants to know what it is
-       *  looking at; absent in the tag round. */
+       *  looking at; null in the tag round. */
       phase: bank ? bank.phase : null,
       // How far the round has come and whether a word waits for the floor, so
       // a silent round names whether it is stalled or only muted.
@@ -1686,8 +1691,8 @@ function Kids({
         // the spectator's stand has to prove the arm, not just the note; nothing
         // outside the game can read a live gesture off the drawn pose.
         gesture: ((g) => g && { kind: g.kind, t: g.t, duration: g.duration, bearing: g.bearing })(gestures.current[i]?.current),
-        // How the body reads in the tag round (work-order 1176) and the trunk
-        // turn it is drawn with; null in the bank round.
+        // How the body reads in the tag round (work-order 1176; null in the bank
+        // round), and the trunk turn it is drawn with.
         body: game ? tagBody(game, i) : null,
         facing: c.facing,
         turn: poses.current[i]?.current?.turn ?? 0,
@@ -1736,8 +1741,8 @@ function Kids({
       // hanging at the child's side.
       const best = hands.sort((a, b) => Math.abs(a.gap) - Math.abs(b.gap))[0] ?? null
       if (!best) return null
-      // WHAT WAS WRITTEN against what is DRAWN. The pose is written by this
-      // component's frame callback and applied by the figure's own; a reading
+      // WHAT WAS WRITTEN against what is DRAWN. The pose is written and applied
+      // to the pivots by this component's frame callback; a reading
       // that finds the touch pose already written while the drawn hand is still
       // out at the child's side is a frame of render lag, not a hand that never
       // arrived (work-order 1065).
@@ -1797,22 +1802,17 @@ function Kids({
     w.__placeTapHand = () => readTouchHand('tap')
     w.__placeArrivalHand = (speaker?: number) => readTouchHand('arrival', speaker)
 
-    // Compatibility probe for the retired tag catalogue; bank speech is
-    // observed through the bank round and the shared speech channel.
-    w.__placeChildSpeech = () => ({
-      staged: {},
-      last: null,
-      ground: { x, z, radius: playRadius },
-    })
     return () => {
       delete w.__placeHoldCharge
       chargeCapture.current = { armed: false, held: false }
+      delete w.__placeHoldCatch
+      catchCapture.current = { armed: null, held: false, pending: false }
+      delete w.__placeTagHands
       delete w.__placeTag
       delete w.__placeTapHand
       delete w.__placeArrivalHand
-      delete w.__placeChildSpeech
     }
-  }, [round, game, children, stage, x, z, playRadius])
+  }, [round, game, children, stage])
 
   return (
     <>
@@ -1846,10 +1846,10 @@ function Kids({
  *  their hips on a phase driven by the DISTANCE it covers, at the cadence its own
  *  leg length dictates, so the planted foot stays put on the ground while the
  *  body travels over it (no skating, still legs at rest); the body dips with each
- *  footfall so the standing foot really touches, and it FACES its velocity so it
- *  can never glide backward. The settlement ground is one flat disc at y = 0, so
- *  no slope pitch is needed here — the panorama silhouettes, which walk real
- *  relief, carry that half. */
+ *  footfall so the standing foot really touches, and it turns toward its
+ *  velocity at a bounded rate (fast, but never a snap). The body rides the
+ *  sampled settlement ground height but takes no slope pitch — the panorama
+ *  silhouettes, which walk real relief, carry that half. */
 function Goats({ seed, count, pen, colliders }: { seed: number; count: number; pen: PenDef | null; colliders: Collider[] }) {
   const groundHeight = usePlaceGround()
   const parts = useMemo(() => buildGoatParts(), [])
@@ -2115,7 +2115,8 @@ function Porters({
       {routes.map((r, i) => (
         <group
           key={i}
-          // Born at the end of its route it starts from (point 509).
+          // Born at the start end of its route (point 509); the first frame moves
+          // it on to its phase point along the route.
           position={figureStance({ x: r.ax, z: r.az })}
           ref={(el) => {
             refs.current[i] = el
@@ -2187,13 +2188,8 @@ function talkerAim(
  *
  * The dev hook below still drives the pair's arms directly — it is the rig the
  * headless verification poses the four gestures on (point 479), and it never
- * runs outside a dev build.
- *
- * OPEN: design.md §19.10 still lists this vignette as "pairs stand together in
- * conversation, GESTURING", which point 580's rule contradicts for a pair that
- * says nothing. design.md is not changed unilaterally, so the wording is left to
- * the user's decision: either it drops the gesturing here, or the pair is given
- * real utterances and gestures again behind the hearing gate.
+ * runs outside a dev build. design.md §19.10 now describes the pair as standing
+ * "in quiet conversation".
  */
 function Talkers({ x, z, cloth }: { x: number; z: number; cloth: string[] }) {
   const groundHeight = usePlaceGround()
@@ -2202,7 +2198,7 @@ function Talkers({ x, z, cloth }: { x: number; z: number; cloth: string[] }) {
   const gestureA = useRef<GestureState>(restGesture())
   const gestureB = useRef<GestureState>(restGesture())
 
-  // The two stand half a metre apart facing each other, so figure A looks along
+  // The two stand a metre apart facing each other, so figure A looks along
   // world +x and figure B along −x. Their aims are computed in each one's own
   // frame from that facing.
   const stances = useMemo<TalkerStance[]>(
@@ -2372,7 +2368,8 @@ function speakChiefWord(
  * drum's stroke reads its hand off the drum's OWN placement (`drummerPose.ts`),
  * so the hand that falls is always the one standing over the drum that sounds,
  * and that drum's head dips under it. While no message is going out his arms
- * use the figure's genuine rest pose and both drum heads stay still.
+ * rest — or carry the gesture of a word he is speaking — and both drum heads
+ * stay still.
  *
  * Both the falling hand and the sounding beat come from the ONE plan
  * (src/communication/drumMessage.ts) the ambience engine plays, so the picture
@@ -2474,7 +2471,7 @@ function Well({ x, z }: { x: number; z: number }) {
         <cylinderGeometry args={[0.04, 0.04, 1.3, 5]} />
         <meshStandardMaterial color="#5f4526" roughness={0.95} />
       </mesh>
-      {/* Bucket on the rope */}
+      {/* Bucket hanging under the crossbar */}
       <mesh position={[0, 0.95, 0]} castShadow>
         <cylinderGeometry args={[0.11, 0.09, 0.18, 7]} />
         <meshStandardMaterial color="#6e4f2a" roughness={0.9} />
@@ -2597,8 +2594,8 @@ function TaskWalker({
       s.z += (dz / d) * step
       s.yaw = Math.atan2(dx, dz)
     } else {
-      // Point 657: another inhabitant on the way to the field is walked round,
-      // not walked into.
+      // Point 657: another inhabitant on the way is walked round, not walked
+      // into.
       const want = body
         ? stepRoundBodies(bodySet, body, s.x, s.z, s.x + (dx / d) * step, s.z + (dz / d) * step, balance.villageLife.separation, separationWorld.blocked)
         : { x: s.x + (dx / d) * step, z: s.z + (dz / d) * step }
@@ -2645,13 +2642,13 @@ function TaskWalker({
   )
 }
 
-export interface HomeDef {
+interface HomeDef {
   x: number
   z: number
   door: [number, number]
 }
 
-export interface PenDef {
+interface PenDef {
   x: number
   z: number
   r: number
@@ -3002,8 +2999,8 @@ function ErrandVillagers({
   const handJars = useRef<Array<THREE.Object3D | null>>([])
   const digTools = useRef<Array<THREE.Object3D | null>>([])
   /** A villager PINNED into the fill, by index and progress — the dev route the
-   *  verification poses one by, since the errand itself does not dip yet
-   *  (work-order 1085 owes the pose, 1087 owes the act that drives it). Null
+   *  verification poses one by. The errand's own fill phase drives the live dip;
+   *  this only overrides which man is held and how far along it is. Null
    *  outside a forced frame, which is every real run. */
   const forcedFill = useRef<{
     who: number
@@ -3208,7 +3205,7 @@ function ErrandVillagers({
         // head of the path first, where his word falls, and only then to the
         // water.
         goal = task.arrived ? null : goalOf(task)
-      } else if (!task) {
+      } else {
         if (state.pause > 0) {
           state.pause -= dt
         } else if (!state.target) {
@@ -3458,8 +3455,10 @@ function ErrandVillagers({
     const progress = digProgressOf(work, geography.digSites.length)
     onDigProgress(progress)
     for (const said of work.emitted) {
-      // The speaker turns to what he is talking about before he says it: a word
-      // thrown over a shoulder at nothing reads as nothing at all.
+      // The speaker turns to what he is talking about as he says it: a word
+      // thrown over a shoulder at nothing reads as nothing at all. The word and
+      // its gesture take the new yaw now; the body is drawn turned from the
+      // next frame.
       const speaker = people[said.speaker]
       if (speaker) {
         yaws.current[said.speaker] = Math.atan2(said.aim.x - speaker.x, said.aim.z - speaker.z)
@@ -3560,10 +3559,9 @@ function ErrandVillagers({
       return true
     }
     // Pins one villager into the fill pose at a given progress, or releases him
-    // with `null`. It is the only thing that dips anybody today: the errand
-    // still flips 'emptyJar' to 'fullJar' with no act in between, which is
-    // work-order 1087's half. This exists so the POSE the design decided on can
-    // be photographed on the figure it belongs to (work-order 1085).
+    // with `null`, overriding the live dip the errand's fill phase drives. This
+    // exists so the POSE the design decided on can be photographed on the
+    // figure it belongs to, at a chosen moment (work-order 1085).
     w.__placeForceFill = (who: number | null, progress = 0.5, facing: number | null = null) => {
       forcedFill.current =
         who === null
@@ -3588,10 +3586,9 @@ function ErrandVillagers({
             refs.current[i] = el
           }}
         >
-          {/* The water carrier's jar — the same vessel the task walkers carry to
-              the well, so the object the player learns RIVER beside is one he has
-              already seen in the village. The EMPTY one hangs in his hand, inside
-              the arm pivot, so it goes where the hand goes. */}
+          {/* The water carrier's open jar (Jar, below; the task walkers still
+              carry a closed one). The EMPTY one hangs in his hand, inside the
+              arm pivot, so it goes where the hand goes. */}
           <Figure
             cloth={cloth[i % cloth.length]}
             pose={poses.current[i]}
@@ -3660,25 +3657,25 @@ function ErrandVillagers({
 // inside it is what tells the two apart at a glance — a dark hollow in the empty
 // one, the river's own tone at the rim in the full one.
 //
-// The rim is FLARED past the body's waist. A head-carried jar sits near the
-// player's own eye height, so its mouth is seen at a shallow angle; a wider
-// mouth is a wider ellipse, which is what makes the reading survive the
-// distance the player watches from.
+// The mouth is kept nearly as wide as the body (rim 0.155 against the 0.16
+// waist). A head-carried jar sits near the player's own eye height, so its
+// mouth is seen at a shallow angle; a wider mouth is a wider ellipse, which is
+// what makes the reading survive the distance the player watches from.
 const JAR_RIM_R = 0.155
 const JAR_WAIST_R = 0.16
 const JAR_BASE_R = 0.13
 const JAR_HEIGHT = 0.32
-/** How far below the rim the water stands in a full jar, and the hollow in an
- *  empty one. The full one is brim-full; the empty one is a shadow well down. */
+/** How far below the rim the water stands in a full jar: brim-full. */
 const JAR_WATER_DROP = 0.03
 /** How flat the meniscus is against the hemisphere its geometry starts from.
  *  A FULL hemisphere of the rim's radius stands 0.117 m over a jar 0.32 m tall —
  *  a ball on a pot, not water in it, and not the "shallow dome standing slightly
- *  proud of the rim" its own drawing describes. Flattened to a fifth of the
- *  jar's height it clears the rim by about 6.5 cm — judged at the picture:
- *  3 cm left a stripe too thin to read at the distance a player watches from,
+ *  proud of the rim" its own drawing describes. Flattened to 0.65 of that
+ *  (about 9.6 cm tall, from 3 cm below the rim) it clears the rim by about
+ *  6.5 cm — judged at the picture: 3 cm left a stripe too thin to read at the distance a player watches from,
  *  and the full hemisphere read as a ball sitting on a pot. */
 const JAR_MENISCUS_FLATTEN = 0.65
+/** How far below the rim the dark hollow of an EMPTY jar sits: a shadow well down. */
 const JAR_HOLLOW_DROP = 0.13
 
 function Jar({ full }: { full: boolean }) {
@@ -3697,8 +3694,9 @@ function Jar({ full }: { full: boolean }) {
       {/* What is IN it. The full jar's water is a shallow DOME standing slightly
           proud of the rim, not a flat disc in it: a head-carried jar's mouth
           sits at about 1.66 m and the player's eye at about 1.6 m, so a disc
-          inside the rim is edge-on from every standing distance and reads as
-          nothing. A meniscus breaks the rim line and shows as a bright cap. */}
+          inside the rim is nearly edge-on from a standing eye (the small lean
+          helps only a little) and reads as nothing. A meniscus breaks the rim
+          line and shows as a bright cap. */}
       {full ? (
         <mesh position={[0, JAR_HEIGHT / 2 - JAR_WATER_DROP, 0]} scale={[1, JAR_MENISCUS_FLATTEN, 1]}>
           <sphereGeometry args={[JAR_RIM_R - 0.008, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />
@@ -3742,9 +3740,10 @@ function Jar({ full }: { full: boolean }) {
  * destination — the carrier used to walk to a radius, where his task was nulled
  * and the full jar vanished in the same frame.
  *
- * It draws `jars` of them, capped by the errand state at
- * `balance.waterStandCapacity`, so a delivery past the cap replaces the oldest
- * standing jar rather than piling one more on.
+ * It mounts `balance.waterStandCapacity` hidden jars; the frame loop shows as
+ * many as the errand state's `standJars`, which that state caps at the
+ * capacity, so a delivery past the cap replaces the oldest standing jar rather
+ * than piling one more on.
  */
 function WaterStand({ x, z, jarRefs }: { x: number; z: number; jarRefs: RefObject<Array<THREE.Object3D | null>> }) {
   return (
@@ -3807,7 +3806,7 @@ function speakWork(
   speaker: { x: number; z: number },
   yaw: number,
   anchor: THREE.Group | null,
-  gesture: RefObject<GestureState> | undefined,
+  gesture: RefObject<GestureState>,
 ): void {
   const distance = placePlayerPosition.active
     ? Math.hypot(speaker.x - placePlayerPosition.x, speaker.z - placePlayerPosition.z)
@@ -3818,7 +3817,6 @@ function speakWork(
     w.__workSpeech = [...(w.__workSpeech ?? []).slice(-7), { speaker: said.speaker, purpose: said.purpose,
       at: performance.now() / 1000, distance, audible: speechReach(distance).audible, anchor: !!anchor, gesture: !!gesture }]
   }
-  if (!gesture) return
   const { utterance, plan } = conceptSpeech(said.concept, useGame.getState().vocabulary, distance, { bearing: speechBearing(camera, speaker) })
   playSpeech(plan)
   if (speechReach(distance).audible) {
@@ -3938,7 +3936,8 @@ export function PlaceLife({
   /** The ground work the adults teach DIG at (point 483/688). */
   digSites: DigSite[]
   /** The walkable river bank, where the settlement stands on a river
-   *  (work-order 482): the ground the children's stage stands on. */
+   *  (work-order 482): the ground the children's stage stands on, and part of
+   *  the walkable shape the errands, walkers and navigation grid use. */
   bank: PlaceRiverBank | null
   /** The village's water path (work-order 688): its head in the village, where
    *  the carriers speak, its foot at the river, where neither does, and the
@@ -3970,7 +3969,8 @@ export function PlaceLife({
   climbRock: [number, number, number] | null
   pen: PenDef | null
   colliders: Collider[]
-  /** The settlement's walkable radius — the children's play area (point 480). */
+  /** The settlement's walkable radius, for navigation and movement (point 480);
+   *  the children's tag ground is `playGround`. */
   radius: number
   /** Publishes strike-quantized progress to the site meshes in PlaceScene. */
   onDigProgress: (progress: readonly DigSiteProgress[]) => void
@@ -3985,9 +3985,8 @@ export function PlaceLife({
   // THE SETTLEMENT'S INHABITANT BODIES (work-order point 578). One set per
   // settlement, shared by every life vignette below: the defect was that no
   // villager was in any set the others resolved against, so children and adults
-  // alike walked into one another and stayed there as one tangle of limbs. One
-  // per mounted settlement: every vignette claims its slots from it and gives
-  // them back when it goes.
+  // alike walked into one another and stayed there as one tangle of limbs. Every
+  // vignette claims its slots from it and gives them back when it goes.
   const inhabitantBodies = useMemo(() => createInhabitantSet(), [])
   // WHERE THE CHILDREN ARE, for the one part of the settlement that has to know
   // (work-order 688): the adults' work holds a word rather than say it into a
@@ -4031,7 +4030,7 @@ export function PlaceLife({
   // Seasonal presence (point 142, "the young men are gone"): the adult walkers
   // thin in a people's away season — the Maasai at the dry-season highland
   // camps (PERIOD), the Tuareg on the autumn caravan, the Sahel farmers out at
-  // the field huts in the rains — while the elder and the home vignettes REMAIN
+  // the field huts in the rains — while the home vignettes REMAIN
   // (the research's shape: "a camp of women, children and elders"). The children
   // thin WITH the camp but never vanish (point 480): the group that plays tag is
   // smaller in the away season, so the player count genuinely changes with the
@@ -4068,20 +4067,24 @@ export function PlaceLife({
   // (point 481.4) and against the village's own walls, so the chase is watched
   // with the settlement behind it (point 524). It moved out of this component
   // because the adults' dig sites are placed CLEAR of it, and a quarter derived
-  // once there and once here would be two quarters (points 129/378).
+  // once there and once here would be two quarters (points 129/378). The
+  // balanceVersion subscription re-renders this component on a live balance
+  // change, since its render reads balance values (child count, climb
+  // threshold, fallback play radius).
   useGame((s) => s.balanceVersion)
-  // A VILLAGE WITHOUT A QUARTER IS NOT A PASS. The separation assert below used
-  // to accept `!playGround` outright, so the one state that switches the bank
-  // stage off entirely and drops the chase onto an origin-centred disc with no
-  // clearance at all went by as success (GPT-5.6 Sol, first cross-vendor round,
-  // C1). The fallback stays — a malformed layout must not take the scene down —
-  // but it says so.
+  // A VILLAGE WITHOUT A QUARTER IS NOT A PASS. The separation assert below
+  // accepts `!playGround` outright, so on its own the one state that switches
+  // the bank stage off entirely went by as success (GPT-5.6 Sol, first
+  // cross-vendor round, C1): a bankless settlement's chase drops onto an
+  // origin-centred disc with no clearance, and a bank village mounts no
+  // children at all. The fallback stays — a malformed layout must not take the
+  // scene down — but this assert says so.
   devAssert(
     !!playGround,
     'tag-play-ground-missing',
     () =>
       `${placeId}: a settlement with no children's quarter — the chase falls back to the origin ` +
-      `and the bank stage is switched off`,
+      `and the bank stage is switched off (a bank village then mounts no children)`,
   )
   // Point 524.2: a ground that had to give up its separation leaves two teaching
   // voices inside one earshot. Nothing in the shipped villages reaches this, so
@@ -4108,8 +4111,8 @@ export function PlaceLife({
     // A STONE THAT CAN BE STOOD ON (work-order 1080), AND ONE PLACED TO BE
     // CLIMBED (work-order 1082). The layout derives it — just off the rim of the
     // children's own quarter, at the top of the scatter's size range — and the
-    // round is handed that one; the search below it stays as the fallback for a
-    // fabric that left no room, taking the nearest climbable stone or, failing
+    // round is handed that one; climbBoulder's own search stays as the fallback
+    // for a fabric that left no room, taking the nearest climbable stone or, failing
     // that, the tallest the settlement has, rather than dropping the whole
     // off-game ROCK: a low step still reads as getting up onto a rock, an
     // unreachable guard reads as nothing at all.
@@ -4144,7 +4147,9 @@ export function PlaceLife({
     fabric: 1,
   }
 
-  // Every spot this settlement hands out (point 509): what tells an inhabitant
+  // The spots this settlement hands out to its homes, adult stations, errands
+  // and buildings (point 509; the children's ground and the loom are not
+  // listed): what tells an inhabitant
   // standing at the middle of a village apart from one that was never placed —
   // a settlement whose own layout puts a figure at its origin is not reported.
   const placementAnchors = useMemo<PlaceSpot[]>(() => {
