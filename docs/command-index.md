@@ -309,8 +309,8 @@
 | `resume-batch.mjs` | THE SUCCESSOR'S STARTUP — step 8 of the "Ordered work" in docs/handover-architecture.md (work-order point 834, the front stage of 676; union M26-M29). | usage: node scripts/resume-batch.mjs --batch <id> [--repo <dir>] [--session <sid>] |
 | `retro-core.mjs` | Pure logic of the retrospective-currency toolchain: the sources fingerprint, the auto-generated doc section and the stale/fresh decision. | — |
 | `retro-currency-guard.mjs` | Stop hook: GUARANTEE the retrospective document (docs/analysis_de/retrospektive-zusammenarbeit.md) stays current — enforcement, not a reminder (the document's own lesson #1: only blocking mechanisms hold). | — |
-| `retro-refresh.mjs` | Refresh the retrospective's auto-generated section (docs/analysis_de/retrospektive-zusammenarbeit.md — git-ignored, German). | — |
-| `retro-sources.mjs` | Shared fs/git source collector for the retrospective-currency toolchain (retro-refresh.mjs + retro-currency-guard.mjs). | — |
+| `retro-refresh.mjs` | Refresh the retrospective's auto-generated section (docs/analysis_de/retrospektive-zusammenarbeit.md — tracked, German). | — |
+| `retro-sources.mjs` | Shared fs/git source collector for the retrospective-currency toolchain (retro-refresh.mjs + retro-currency-guard.mjs; rule-review-state.mjs borrows defaultMemoryDir). | — |
 | `review-astra-core.mjs` | Pure decision core of the CROSS-VENDOR four-eyes review (work-order point 624). | — |
 | `review-astra.mjs` | THE ONE COMMAND FOR A CROSS-VENDOR FOUR-EYES REVIEW (work-order point 624). | usage: node scripts/review-astra.mjs [--reviewer astra\|fable\|opus\|opus48] --sha <sha> --brief "<what to judge>" \\ |
 | `review-material-core.mjs` | WHAT A REVIEW ROUND ACTUALLY CARRIED — the material budget, its accounting, and the passes a range too large is cut into (work-order point 714). | — |
