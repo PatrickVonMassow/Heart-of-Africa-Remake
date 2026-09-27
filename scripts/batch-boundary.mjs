@@ -904,7 +904,7 @@ if (isMain) {
           (handover.destination === BOUNDARY_DESTINATIONS.CLAIMING_WINDOW
             ? `The batch goes to claiming window ${handover.claimantSid}. `
             : `The launcher (${launcherRemedy().name}) starts the fresh session. `) +
-          'Any further mutation is DENIED loudly (`--clear` withdraws deliberately).' +
+          'Any further mutation outside the closing set is DENIED loudly (`--clear` withdraws deliberately).' +
           (transferred
             ? ` The in-flight declaration was marked TRANSFERRED (${transferred}); the successor adopts it ` +
               'with `node scripts/batch-in-flight.mjs --adopt`.'
@@ -1129,7 +1129,7 @@ if (isMain) {
     console.log(
       `boundary COMMITTED: point ${point} is landed and the launcher is armed. This was the last repository ` +
         `action of this session — END IT NOW. The batch lock is HANDED OVER already. ${destinationLine}` +
-        `Any further mutation is DENIED loudly ` +
+        `Any further mutation outside the closing set is DENIED loudly ` +
         '(withdraw deliberately with `node scripts/batch-boundary.mjs --clear` if you truly must work again).' +
         transferLine,
     )

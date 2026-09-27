@@ -37,7 +37,7 @@
 | `batch-boundary-core.mjs` | Pure core of the AUTONOMOUS SESSION BOUNDARY (user 27.07.2026). | — |
 | `batch-boundary-plane-core.mjs` | DURABLE TWO-PHASE BOUNDARY — ordered-work step 7. | — |
 | `batch-boundary-plane.mjs` | Tests and support for batch-boundary-plane. | — |
-| `batch-boundary.mjs` | The autonomous session boundary (point 373, user 27.07.2026) — the IO half. | Usage: node scripts/batch-boundary.mjs <point><br>usage: node scripts/batch-boundary.mjs ${phaseFlag} <point>)` : ''), |
+| `batch-boundary.mjs` | The autonomous session boundary (point 373, user 27.07.2026) — the IO half. | Usage: node scripts/batch-boundary.mjs --prepare <point>, then --commit <point><br>usage: node scripts/batch-boundary.mjs ${phaseFlag} <point>)` : ''), |
 | `batch-checkpoint-core.mjs` | CHECKPOINT BARRIER — ordered-work step 6. | — |
 | `batch-checkpoint.mjs` | Tests and support for batch-checkpoint. | — |
 | `batch-claim-core.mjs` | TAKING THE BATCH BACK INTO THE WINDOW THE USER IS SITTING AT (point 395, user 28.07.2026) — the decision half, pure and dependency-injected. | — |
