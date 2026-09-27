@@ -32,9 +32,9 @@ export const EDGE_BAND_MAX_WANDER_M = 1.5
 
 /**
  * The share of the band's width the value change is CONCENTRATED into (work-order
- * 581). The band stays as wide as it is calibrated — its tails fade out over the
- * full `widthM` — but the fall from swept to open happens over this fraction of
- * it, centred on the true boundary.
+ * 581). The band stays as wide as it is calibrated (`widthM`), but the whole
+ * fall from swept to open happens over this fraction of it, centred on the true
+ * boundary; outside that core the band is flat.
  *
  * The reason is how an eye works, and the user's report is the evidence: at the
  * shipped defaults, with `strength` already at its ceiling, the boundary was
@@ -46,10 +46,10 @@ export const EDGE_BAND_MAX_WANDER_M = 1.5
  * identical amount of contrast becomes a LOCAL step the eye reads at a glance,
  * while the soft shoulders keep it a give-way rather than a painted stripe.
  */
-export const EDGE_RAMP_CORE = 0.5
+const EDGE_RAMP_CORE = 0.5
 
 /** How the swept settlement ground differs from the open land outside. */
-export interface SweptLook {
+interface SweptLook {
   /** How much darker the compacted, swept inside reads (0..1, multiplicative). */
   tone: number
   /** How much of the ground's micro-relief the swept inside loses (0..1). */
@@ -71,7 +71,8 @@ export interface SweptLook {
  *
  * The tones are what `strength: 1` MEANS, and work-order 581 moved them with the
  * design rather than raising a ceiling that was already at its top: the swept
- * ground now reads about half as bright again as the open land in a village —
+ * ground now reads about half as bright as the open land in a village (tone
+ * 0.48, a ×0.52 step) —
  * calibrated by LOOKING at the Bambara village the complaint came from. It
  * can be stated that plainly because the mottling no longer fights it — the
  * swept side is levelled to the open ground's own MEAN (`SWEPT_PATCH_MEAN`)
@@ -153,7 +154,8 @@ export function edgeOpenness(radius: number, width: number, distance: number, wa
   return smoothstep01(0.5 - EDGE_RAMP_CORE / 2, 0.5 + EDGE_RAMP_CORE / 2, t)
 }
 
-/** The band's visible extent around the boundary, worst case over the wander. */
+/** The band's nominal extent (its full width) around the boundary, worst case
+ *  over the wander; the visible fall is the narrower EDGE_RAMP_CORE share. */
 export function edgeBandBounds(radius: number, width: number, wander: number): { inner: number; outer: number } {
   const w = clampWander(wander, width)
   const half = Math.max(0.05, width) / 2
@@ -176,8 +178,9 @@ export function clampWander(wander: number, width = Infinity): number {
 }
 
 /**
- * CPU mirror of the shader's swept-earth tone step. It is MULTIPLICATIVE and
- * applied after the season tint, so the inside/outside contrast is the same
+ * CPU mirror of the shader's swept-earth tone step. Its value step is
+ * MULTIPLICATIVE (the desaturation toward the colour's own grey moves no
+ * brightness) and applied after the season tint, so the inside/outside contrast is the same
  * ratio at both ends of the year — the edge stays readable in the dry-season
  * straw as well as in the rains (design.md §19.13).
  */
@@ -266,8 +269,8 @@ export const MIN_EDGE_CONTRAST = 0.22
 
 // The boundary sampled over the full turn, as a byte lookup: radius(angle) =
 // base + span · texel. A byte is filterable on both backends (a float texture
-// is not, on WebGPU) and costs nothing today, where the boundary is a circle
-// and every texel is 0 — the radius is then exactly `base`. Module-level, like
+// is not, on WebGPU); where the boundary is a circle every texel is 0 and the
+// radius is exactly `base`, and a bank lobe fills the texels it bulges over. Module-level, like
 // SEASON_TINT_U: one texture and one set of uniforms for the whole game, so a
 // place change never relinks a shader program (point 96).
 const BOUNDARY_TEX = new THREE.DataTexture(new Uint8Array(BOUNDARY_LUT_SIZE), BOUNDARY_LUT_SIZE, 1, THREE.RedFormat)
@@ -302,7 +305,8 @@ export function edgeBandState() {
     relief: EDGE_RELIEF_U.value as number,
     mottle: EDGE_MOTTLE_U.value as number,
     desat: EDGE_DESAT_U.value as number,
-    /** The boundary the band draws at, decoded back from the lookup. */
+    /** The boundary decoded back from the lookup at the nearest texel (the
+     *  shader filters linearly between texels). */
     radiusAt: (angle: number) => {
       const u = angle / (Math.PI * 2)
       const j = ((Math.round(u * BOUNDARY_LUT_SIZE - 0.5) % BOUNDARY_LUT_SIZE) + BOUNDARY_LUT_SIZE) % BOUNDARY_LUT_SIZE
@@ -387,7 +391,7 @@ const FINGER_SHARE = 0.35
  * Shader mirror of `edgeOpenness`: 0 on the swept settlement ground, 1 out on
  * the open land, ramping across the band at the true boundary.
  */
-export function edgeOpennessNode() {
+function edgeOpennessNode() {
   const p = positionWorld.xz
   // Domain warp (design.md §3.3), the same technique the biome borders use: the
   // coordinate that decides the classification is perturbed before it is

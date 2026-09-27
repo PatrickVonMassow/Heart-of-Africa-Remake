@@ -102,14 +102,14 @@ function describeProgram(renderObject: unknown, pipeline: unknown): ProgramDiagn
 
 /** Injectable frame scheduler — `requestAnimationFrame` in the game, a manual
  *  pump in the tests. */
-export type FrameScheduler = (cb: () => void) => void
+type FrameScheduler = (cb: () => void) => void
 
 export interface AsyncPipelineState {
   /** Pipelines whose compile has been started and not yet resolved. */
   pending: number
   /** Pipelines that went down the asynchronous path in total. */
   started: number
-  /** Pipelines whose compile has resolved. */
+  /** Pipelines whose compile has settled (resolved or failed). */
   done: number
   /** Linked programs waiting for their throttled first-use release (WebGL 2). */
   queued: number
@@ -267,7 +267,7 @@ export function enableAsyncPipelineCompile(
     pending += sink.length
     for (const p of sink) {
       // Settle the sink here so the array is free and a backend-side failure
-      // surfaces as a console error rather than an unhandled rejection.
+      // is counted (in `done`) rather than left as an unhandled rejection.
       void Promise.resolve(p).then(
         () => {
           pending--
@@ -332,7 +332,8 @@ export function asyncPipelineHandle(backend: PipelineBackend | null | undefined)
  * the headless WebGL 2 lane (a machine painting 3-16 fps), 3.4 s for the first
  * capture's ~35 pipelines and ~0.2-0.4 s for every later one, which is the
  * render itself. On WebGPU `createRenderPipeline` returns at once and the
- * compile happens off the main thread, so no comparable stall exists there.
+ * compile happens off the main thread, so no comparable main-thread stall
+ * exists there.
  *
  * Use it around a render that has no next frame — never around the render loop,
  * which is exactly what point 337 moved off the critical path.
