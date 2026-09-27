@@ -10,10 +10,12 @@
 //   node scripts/defer-for-user.mjs --clear <point>     # the answer arrived
 //   node scripts/defer-for-user.mjs --forget <point>    # remove a leftover marker
 //   node scripts/defer-for-user.mjs --list              # what is waiting, and why
+//   node scripts/defer-for-user.mjs --help | -h         # usage
 //
 // THE REASON IS MANDATORY. The queue skips a gated point *after recording why*,
 // and this marker is that record — the only durable one, readable by every
-// session and by the board. A gate with no reason is refused here.
+// session and by the board. The reason is built from --act/--detail/--prepared,
+// and a gate missing any of them is refused (`markGated`).
 //
 // WHAT THE MARKER DOES, once written (all of it in scripts/user-gate-core.mjs,
 // which documents the syntax):
@@ -84,8 +86,9 @@ const write = (text) => writeTextAtomic(TASKS, text)
  * A FLAG IS NEVER A VALUE (fifth cross-vendor round, GPT-5.6 Sol, 23.08.2026).
  * `--detail --prepared "verified locally"` used to store the literal
  * `"--prepared"` as the detail: a typed gate, or a decision card, with a field
- * nobody wrote. A missing or flag-shaped value is no value, and the field check
- * downstream then names exactly which one is missing.
+ * nobody wrote. A missing value, or one beginning with `--`, is no value, and the
+ * field check downstream then names exactly which one is missing. (A
+ * single-dash token such as `-h` is read as a value.)
  */
 const option = (args, name) => {
   const i = args.indexOf(name)
@@ -103,11 +106,12 @@ const option = (args, name) => {
  */
 const FLAG_ALIASES = new Map([['-h', '--help']])
 
-/** The flags that consume NO value. Every OTHER flag takes the next token, and
- *  a token sitting in that value slot is never read as a flag — otherwise a
+/** The flags that consume NO value (canonical spellings — `-h` arrives here as
+ *  `--help`). Every OTHER flag takes the next token unless that token begins
+ *  with `--`, and a token sitting in that value slot is never read as a flag — otherwise a
  *  field whose value is spelled like one would be refused for the wrong reason
  *  (sixth cross-vendor round, GPT-5.6 Sol, 23.08.2026). */
-const VALUELESS_FLAGS = new Set(['--help', '-h', '--list', '--migrate'])
+const VALUELESS_FLAGS = new Set(['--help', '--list', '--migrate'])
 
 /**
  * A REPEATED FLAG IS A MISTAKE, NOT A CHOICE (fifth cross-vendor round, GPT-5.6
@@ -309,13 +313,16 @@ await notify(
   `${reason}\n\n${
     stranded
       ? `All ${gates.gated.length} open point(s) now wait on you. Answer in chat or on the board and the batch resumes.`
-      : "Answer in chat / on the board; I've moved on to the next point meanwhile."
+      : 'Answer in chat / on the board; the batch moves on to the next point meanwhile.'
   }`,
   'high',
 )
 
 console.log(`point ${n} marked AWAITING-CONFIRMATION since ${today()}: ${reason}`)
 if (stranded) console.log('EVERY open point now awaits a true confirmation — there is no next point to move on to.')
-console.log('Now: add its "Von dir zu klären" card, rebuild the board (node scripts/board-queue.mjs) and continue elsewhere.')
+console.log(
+  'Now: add its "Von dir zu klären" card, rebuild the board (node scripts/board-queue.mjs)' +
+    (stranded ? '.' : ' and continue elsewhere.'),
+)
 console.log('When the answer arrives: node scripts/defer-for-user.mjs --clear ' + n)
 process.exit(0)
