@@ -32,7 +32,7 @@ const MAX_BUFFER = 512 * 1024 * 1024
 // any recordable split can carry, so the trap this file ends must not re-arm
 // on the ranges big enough to need it most. The error is tagged, never
 // swallowed: everything that is not the overflow still rethrows.
-export const OVERSIZE_FLOOR_CHARS = Math.floor(MAX_BUFFER / 4)
+const OVERSIZE_FLOOR_CHARS = Math.floor(MAX_BUFFER / 4)
 export { MAX_BUFFER }
 
 /** ENOBUFS ALONE PROVES NOTHING (landing-round pass 4): execFileSync raises it
