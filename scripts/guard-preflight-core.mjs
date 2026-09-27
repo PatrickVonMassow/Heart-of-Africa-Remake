@@ -6,7 +6,8 @@
 // process run instead.
 //
 // This module only orchestrates and formats. The inputs come from each guard
-// WRAPPER's exported gather step and the verdict from its pure core (wired in
+// WRAPPER's exported gather step and the verdict from its registered decide step
+// — usually the pure core, sometimes a wrapper adapter or a constant (wired in
 // scripts/guard-preflight.mjs): the gathering is where a reimplementation would
 // drift and hand back a false "clean", so the preflight never writes its own.
 //
@@ -30,8 +31,8 @@ export const STATUS = {
   skip: 'not-applicable',
   /**
    * The guard is registered and WIRED, and this report cannot say what it would
-   * do — its verdict needs something a read-only preflight does not have (a
-   * network round trip, the reply that is not written yet) or must not do
+   * do — its verdict needs something a read-only preflight does not have (the
+   * reply that is not written yet) or must not do
    * (acquire the batch lock). Deliberately distinct from `not-applicable`, which
    * means the guard genuinely does not govern this state: a reader who cannot
    * tell those apart reads silence as a clean bill, which is the whole defect
@@ -47,7 +48,7 @@ export const STATUS = {
  * Why a guard stood down, when the caller has to treat the answer differently.
  * `not-lock-owner` is the one that matters: those guards key on the session id,
  * and without one `heldByOtherLiveOwner('')` treats the OWNING session as a
- * stranger — four guards then report "not-applicable" for the very session that
+ * stranger — several guards then report "not-applicable" for the very session that
  * owns the batch. That is a false all-clear, so it is reported as UNKNOWN.
  */
 export const CAUSE = { notLockOwner: 'not-lock-owner', notJudged: 'not-judged' }
@@ -56,8 +57,8 @@ export const CAUSE = { notLockOwner: 'not-lock-owner', notJudged: 'not-judged' }
  * The Stop hooks a settings object wires, as preflight ids (the script base name
  * without `.mjs`, which is the id convention the registry uses).
  *
- * `.claude/settings.json` is the AUTHORITATIVE chain; the registry below is a
- * second list, and until point 437 nothing compared them. A hook outside the
+ * `.claude/settings.json` is the AUTHORITATIVE chain; the registry (GUARDS in
+ * guard-preflight.mjs) is a second list, and until point 437 nothing compared them. A hook outside the
  * registry reported nothing at all while it would block — and CLAUDE.md §7.2
  * tells the session to preflight and answer LAST, so a false clean reproduces
  * exactly the answer-twice loop the preflight exists to prevent.
@@ -89,12 +90,12 @@ export function unregisteredStopHooks(wiredIds = [], guards = []) {
 }
 
 /**
- * Which guards govern which action. `turn-end` is every guard (the Stop chain
- * runs them all); the narrower actions name the ones that realistically bite
+ * Which guards govern which action. `turn-end` is every guard the Stop chain
+ * runs (a guard registered with `turnEnd: false` is left out); the narrower actions name the ones that realistically bite
  * there, so a preflight before a merge does not read like a full audit.
  */
 export const ACTIONS = {
-  'turn-end': null, // null = all registered guards
+  'turn-end': null, // null = every registered guard with turnEnd !== false
   // The closing reply is the LAST thing written (point 403): a guard that
   // blocks after it was composed forces a second message, and the user reads
   // the same answer twice. `--for answer` is therefore the whole chain under
@@ -185,7 +186,7 @@ function preflightResult(guard, gathered, sessionKnown) {
 }
 
 /**
- * Run gather + decide per guard descriptor `{ id, gather, decide, why }`.
+ * Run gather + decide per guard descriptor `{ id, gather, decide, turnEnd? }`.
  * A guard that throws is reported as `error` and never takes the preflight down:
  * the tool exists to save turns, so it must not cost one itself.
  *
@@ -347,7 +348,8 @@ export function formatPreflightReport(results, { action = 'turn-end', unregister
       '',
       `DRIFT: these Stop hooks are wired in .claude/settings.json but registered with NO gather/decide ` +
         `pair here, so this report says nothing about them: ${drift.join(', ')}.`,
-      'Register each in guard-preflight.mjs (GUARDS) — a gather that honestly reports "not judged" counts.',
+      'Register each in guard-preflight.mjs (GUARDS) and in EXPECTED_GUARD_IDS (guard-preflight-expected.mjs) —',
+      'a gather that honestly reports "not judged" counts.',
     )
   }
   // Asked AFTER the verdict and outside the guard lines, so it can never be read
