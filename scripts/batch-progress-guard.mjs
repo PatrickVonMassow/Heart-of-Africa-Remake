@@ -834,8 +834,9 @@ try {
   block(
     `DO NOT STOP THE BATCH. ${claim}${open.length} open TASKS point(s) remain (${list}) and the batch is not ` +
       `paused. Continue the NEXT queue item now — on its own feat/<point>-<slug> branch off main: ` +
-      `implement it, commit + push the branch after every commit, merge to main only when it is ` +
-      `complete + verified, and tick it in TASKS.md on main at the merge (CLAUDE.md §6). If a validation ` +
+      `implement it, commit + push the branch after every commit, and land it only when it is ` +
+      `complete + verified, through \`node scripts/land-point.mjs <N> --model <m>\`, which merges and ticks TASKS.md on main ` +
+      `(CLAUDE.md §6). If a validation ` +
       `is running, AWAIT it within this turn — \`node scripts/verify/run-wait.mjs --await\` is ONE blocking ` +
       `call that returns with the run's receipt — never a poll loop and never by ending the turn to idle. ` +
       `Keep the dashboard current as you go. The batch went idle for HOURS after silent ` +

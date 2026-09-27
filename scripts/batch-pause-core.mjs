@@ -222,7 +222,7 @@ export function planPause({ cause = null, attempt = 0, now = Date.now(), ladder 
   const delay = ladder[Math.min(n, ladder.length - 1)]
   if (!Number.isFinite(delay)) {
     return {
-      cause: cause ?? 'retries-exhausted',
+      cause: cause ?? 'unusable-ladder',
       attempt: n,
       retryAfter: now + PAUSE_RETRY_LADDER_MS[0],
       clockless: false,

@@ -328,7 +328,6 @@ export function reconcileExitRed(report) {
     (report.lanes ?? []).some((l) => l.quarantine || l.alert) ||
     (report.publications ?? []).some((p) => p.quarantine) ||
     (report.pair?.action !== 'none' && report.applied?.ok !== true) ||
-    !report.refill?.ok ||
-    report.applied?.ok === false
+    !report.refill?.ok
   )
 }

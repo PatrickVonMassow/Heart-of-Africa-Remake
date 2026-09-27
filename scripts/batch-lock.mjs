@@ -47,7 +47,8 @@ export function readLock() {
   return null
 }
 
-/** The user PAUSE marker: while present, no session auto-resumes the batch. */
+/** The PAUSE marker: while present, no session auto-resumes the batch (a clocked
+ *  park is cleared by the launcher tick when its clock runs out). */
 export function isPaused({ path = PAUSE_PATH } = {}) {
   return existsSync(path)
 }
