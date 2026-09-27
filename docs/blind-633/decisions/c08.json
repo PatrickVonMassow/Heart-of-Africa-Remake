@@ -1042,7 +1042,7 @@
  {
   "id": "U4069",
   "decision": "rewritten",
-  "reason": "The final tally now says \"stages run\", matching the count that includes preflight stages"
+  "reason": "The tally keeps its test-pinned \"suites run\" label; a comment beside it now says the count includes the preflight stages"
  },
  {
   "id": "U4070",
@@ -2373,5 +2373,345 @@
   "id": "U4335",
   "decision": "backlog",
   "reason": "scripts/windows-task-watch.mjs:110 — the 45-minute PEER_MAX_SILENCE_MS is applied to the hourly emergency task, so a healthy hourly task can be started before its next tick"
+ },
+ {
+  "id": "U4336",
+  "decision": "backlog",
+  "reason": "scripts/windows/stage-host-commands.mjs:99 — the printed Windows cd command is fixed to one user's default hoa-host path even when --target stages elsewhere"
+ },
+ {
+  "id": "U4337",
+  "decision": "backlog",
+  "reason": "scripts/windows/stage-host-commands.mjs:23 — the staging list omits setup-boot-path.ps1, which windows-task-core names as the script the user runs elevated and which the header says is unreachable from scripts/windows/ alone"
+ },
+ {
+  "id": "U4338",
+  "decision": "rewritten",
+  "reason": "The ACTIONS doc now names planBootstrap() instead of a nonexistent plan()"
+ },
+ {
+  "id": "U4339",
+  "decision": "removed",
+  "reason": "REASONS.notAWorktree, which planBootstrap never returns and nothing reads, is removed"
+ },
+ {
+  "id": "U4340",
+  "decision": "rewritten",
+  "reason": "The header now says a checkout that already has node_modules (ordinarily the main one) is left alone"
+ },
+ {
+  "id": "U4341",
+  "decision": "backlog",
+  "reason": "scripts/worktree-bootstrap.mjs:12 — once a dependency link exists, inspect sees hasOwnDeps and planBootstrap answers none before comparing lockfiles, so a branch that later changes package-lock.json keeps the main tree's linked dependencies"
+ },
+ {
+  "id": "U4342",
+  "decision": "rewritten",
+  "reason": "installDependencies's doc now names all three install cases (lockfile differs, no main checkout, no donor)"
+ },
+ {
+  "id": "U4343",
+  "decision": "kept",
+  "reason": "The functions are used internally by bootstrap/planBootstrap; only their export is surplus"
+ },
+ {
+  "id": "U4344",
+  "decision": "rewritten",
+  "reason": "The usage block now lists the positional checkout-root argument"
+ },
+ {
+  "id": "U4345",
+  "decision": "rewritten",
+  "reason": "CLEANUP_LOCK_BODY is no longer exported; only its module reads it"
+ },
+ {
+  "id": "U4346",
+  "decision": "rewritten",
+  "reason": "describeEntry is no longer exported"
+ },
+ {
+  "id": "U4347",
+  "decision": "rewritten",
+  "reason": "proveExclusion is no longer exported"
+ },
+ {
+  "id": "U4348",
+  "decision": "rewritten",
+  "reason": "worktreeEntry is no longer exported"
+ },
+ {
+  "id": "U4349",
+  "decision": "rewritten",
+  "reason": "checkoutDirty is no longer exported"
+ },
+ {
+  "id": "U4350",
+  "decision": "rewritten",
+  "reason": "removeStubBranch is no longer exported"
+ },
+ {
+  "id": "U4351",
+  "decision": "backlog",
+  "reason": "scripts/worktree-cleanup.mjs:480 — releaseCleanupLock keeps an unused `target` parameter from its path-based past; dropping it changes every call site's shape"
+ },
+ {
+  "id": "U4352",
+  "decision": "rewritten",
+  "reason": "The matchesExpectation doc now says each identity field is judged on its own: carried 0 is not carried, carried non-zero re-read as 0 refuses"
+ },
+ {
+  "id": "U4353",
+  "decision": "rewritten",
+  "reason": "readIdentity's doc no longer says a same-path replacement cannot reuse the inode; it says the inode can come back, which is why the timestamps ride with it"
+ },
+ {
+  "id": "U4354",
+  "decision": "rewritten",
+  "reason": "readIdentity's doc now names gitMtime/gitBirth and says unreadable fields answer null or 0, and a carried field read back empty refuses"
+ },
+ {
+  "id": "U4355",
+  "decision": "rewritten",
+  "reason": "The residual now speaks of the millisecond precision stat reports (mtimeMs, birthtimeMs), not the nanosecond"
+ },
+ {
+  "id": "U4356",
+  "decision": "backlog",
+  "reason": "scripts/worktree-cleanup-core.mjs:349 — \"matches exactly the writer's bytes\" is overstated: CLEANUP_LOCK_SIGNATURE's $ anchor also accepts a final newline"
+ },
+ {
+  "id": "U4357",
+  "decision": "rewritten",
+  "reason": "cleanupLockFile's doc now says takeCleanupLock refuses and releaseCleanupLock leaves the lock in place when no lock file resolves"
+ },
+ {
+  "id": "U4358",
+  "decision": "rewritten",
+  "reason": "proveExclusion's doc now names the WITHOUT_A_LOCK sentinel's immediate return as the one said-out-loud exception"
+ },
+ {
+  "id": "U4359",
+  "decision": "backlog",
+  "reason": "scripts/worktree-cleanup.mjs:130 — an unreadable directory (readdirSync or describeEntry failure) is treated as having nothing to detach, although removal is promised only once every link is detached"
+ },
+ {
+  "id": "U4360",
+  "decision": "backlog",
+  "reason": "scripts/worktree-cleanup.mjs:197 — the proof-to-unlink gap stated at 197-198 and 459 (string comparison then unlink, no I/O) no longer matches detachLinks, where readlinkSync precedes proveExclusion and the unlinkSync fallback runs without another proof"
+ },
+ {
+  "id": "U4361",
+  "decision": "rewritten",
+  "reason": "The comment now says the lock is taken first whenever there is an expectation to verify and a tree to delete, outside a dry run"
+ },
+ {
+  "id": "U4362",
+  "decision": "point",
+  "reason": "Proposed point: worktree-cleanup.mjs without --expect deletes a git-locked (or dirty) registered worktree — no lock is taken (635), `git worktree remove --force` refuses the locked tree, and removeTreeSafely falls back to rmSync under WITHOUT_A_LOCK, contradicting \"a foreign lock refuses the removal long before this line\" (213); refuse a locked registered tree on the no-expectation path (data risk: an active agent's tree)"
+ },
+ {
+  "id": "U4363",
+  "decision": "rewritten",
+  "reason": "The bound now says the merge is the caller's proof and the selection/clean/unwritten proofs hold under an expectation"
+ },
+ {
+  "id": "U4364",
+  "decision": "backlog",
+  "reason": "scripts/worktree-cleanup.mjs:6 — --expect with valid JSON lacking a non-empty branch ({}, null, a scalar) silently disables the expectation checks (wants is false at 630)"
+ },
+ {
+  "id": "U4365",
+  "decision": "backlog",
+  "reason": "scripts/worktree-cleanup.mjs:611 — the residual excludes lock-respecting writers although the proof-to-deletion gap (456-464) and takeCleanupLock's unconditional `worktree unlock` (560) remain"
+ },
+ {
+  "id": "U4366",
+  "decision": "rewritten",
+  "reason": "The residual window is now stated as the time between the last read and the deletion, the link walk included"
+ },
+ {
+  "id": "U4367",
+  "decision": "rewritten",
+  "reason": "The release-site comment now says the winner refuses at verification or, later, at the next proveExclusion"
+ },
+ {
+  "id": "U4368",
+  "decision": "rewritten",
+  "reason": "removeStubBranch's doc now says it runs after removal and prune (a failed prune is swallowed) and in a dry run only to report"
+ },
+ {
+  "id": "U4369",
+  "decision": "rewritten",
+  "reason": "The unlock comment now says releaseCleanupLock answers '' for a missing lock file and turns other failures into notes"
+ },
+ {
+  "id": "U4370",
+  "decision": "backlog",
+  "reason": "scripts/worktree-cleanup.mjs:800 — the CLI prints detached, note and stub but never result.lockNote, so a recovered or left-in-place lock goes unsaid on success against the rule at 650"
+ },
+ {
+  "id": "U4371",
+  "decision": "backlog",
+  "reason": "scripts/worktree-cleanup.mjs:709 — the already-gone note says only git's record was pruned even when pruning was skipped (dry), failed (swallowed) or a stub branch was deleted"
+ },
+ {
+  "id": "U4372",
+  "decision": "rewritten",
+  "reason": "The throw comment now says most probes catch their own failures and worktreeEntry's git call does not"
+ },
+ {
+  "id": "U4373",
+  "decision": "rewritten",
+  "reason": "The second-failure comment now says tryLock reports any failure, so another holder is only the likely cause"
+ },
+ {
+  "id": "U4374",
+  "decision": "backlog",
+  "reason": "scripts/worktree-cleanup-core.mjs:477 — \"never guess a hand-made worktree's setup branch\" is stronger than the basename-only mapping at 489-490"
+ },
+ {
+  "id": "U4375",
+  "decision": "rewritten",
+  "reason": "The trigger doc now says run_in_background anything but false"
+ },
+ {
+  "id": "U4376",
+  "decision": "rewritten",
+  "reason": "The no-op list now says a missing or non-object toolInput, noting an array counts as an object"
+ },
+ {
+  "id": "U4377",
+  "decision": "removed",
+  "reason": "The unused `sep` import and its re-export are removed from worktree-cleanup-core.mjs"
+ },
+ {
+  "id": "U4378",
+  "decision": "removed",
+  "reason": "The unused insideRoot re-export (and its now-unused import) is removed from worktree-cleanup.mjs"
+ },
+ {
+  "id": "U4379",
+  "decision": "backlog",
+  "reason": "scripts/worktree-cleanup-core.mjs:321 — CLEANUP_LOCK_LEGACY only shapes a message (staleLockVerdict refuses a legacy lock either way) and is read outside only by tests"
+ },
+ {
+  "id": "U4380",
+  "decision": "kept",
+  "reason": "The listed exports are used in-file and serve the Vitest cases by design (line 188)"
+ },
+ {
+  "id": "U4381",
+  "decision": "rewritten",
+  "reason": "The private normPathOf copy is replaced by the core's identical normPath"
+ },
+ {
+  "id": "U4382",
+  "decision": "backlog",
+  "reason": "scripts/worktree-cleanup-core.mjs:214 — the got.head fallback in `entry.head ?? got.head` is never taken in production (worktreeEntry sets head to ''), though the pure function's tests exercise shapes around it"
+ },
+ {
+  "id": "U4383",
+  "decision": "backlog",
+  "reason": "scripts/worktree-cleanup-core.mjs:82 — the 'outside-repo' refusal fires only for an empty mainRoot; an outside path gets 'not-a-worktree', so the REFUSALS text for outside-repo never describes that case"
+ },
+ {
+  "id": "U4384",
+  "decision": "kept",
+  "reason": "The known[0] === path branch guards judgeTarget's other callers, as the claim itself allows"
+ },
+ {
+  "id": "U4385",
+  "decision": "backlog",
+  "reason": "scripts/worktree-cleanup-core.mjs:78 — judgeTarget's allowOrphan flag is never set by any caller, which always takes the default true"
+ },
+ {
+  "id": "U4386",
+  "decision": "backlog",
+  "reason": "scripts/worktree-cleanup-core.mjs:376 — staleLockVerdict's tolerance parameter is never passed by its caller takeCleanupLock"
+ },
+ {
+  "id": "U4387",
+  "decision": "removed",
+  "reason": "The try/catch in cleanupLockFile guarded nothing (readIdentity catches its own failures); it is removed and the doc says so"
+ },
+ {
+  "id": "U4388",
+  "decision": "rewritten",
+  "reason": "The 11.08.2026 measurement now agrees with the identity comparison: the .git inode may differ or come straight back"
+ },
+ {
+  "id": "U4389",
+  "decision": "rewritten",
+  "reason": "matchesExpectation is now the last of three identity re-proofs, with proveExclusion's later lock re-reads named"
+ },
+ {
+  "id": "U4390",
+  "decision": "rewritten",
+  "reason": "The lock-print comment now says the value arrives already trimmed by worktreeEntry; only the decision trims here"
+ },
+ {
+  "id": "U4391",
+  "decision": "rewritten",
+  "reason": "The residual now runs from the verification's reads (checkoutDirty on) to the deletion, and says removeTreeSafely's widths bound the lock re-reads"
+ },
+ {
+  "id": "U4392",
+  "decision": "rewritten",
+  "reason": "The header's order of operations now includes the lock, verification, unlock and stub-branch deletion"
+ },
+ {
+  "id": "U4393",
+  "decision": "backlog",
+  "reason": "scripts/worktree-cleanup.mjs:423 — releaseCleanupLock says the code stopped calling `git worktree unlock` (an unconditional unlink), yet takeCleanupLock still clears a judged-dead lock with it at 560 after a separate read"
+ },
+ {
+  "id": "U4394",
+  "decision": "kept",
+  "reason": "The REFUSALS table covers the judged refusals; the dynamic ones carry their own text through formatRefusal, as the claim's proposal keeps"
+ },
+ {
+  "id": "U4395",
+  "decision": "kept",
+  "reason": "claim does not hold: retrospective §3.49 is in docs/analysis_de, branch-hygiene-guard.mjs exists and headMerged is land-cleanup-core's evidence field"
+ },
+ {
+  "id": "U4396",
+  "decision": "kept",
+  "reason": "claim does not hold: batch-doctor-states.mjs imports cleanupWorktree and removes orphans without an expectation, as the comment says"
+ },
+ {
+  "id": "U4397",
+  "decision": "kept",
+  "reason": "claim does not hold: scripts/worktree-reminder-core.test.mjs exists"
+ },
+ {
+  "id": "U4398",
+  "decision": "rewritten",
+  "reason": "The header now says the hook answers allow, which also approves the call, with the rule as the reason"
+ },
+ {
+  "id": "U4399",
+  "decision": "kept",
+  "reason": "The reminder allows uncommitted work only for agents on non-overlapping files, which avoids the entangled-files incident the header describes"
+ },
+ {
+  "id": "U4400",
+  "decision": "kept",
+  "reason": "claim does not hold: batch-progress-guard, board-first-guard, branch-hygiene-guard and bundle-first-guard all honour .claude/batch-paused"
+ },
+ {
+  "id": "U4401",
+  "decision": "backlog",
+  "reason": "src/App.tsx:108 — renderer.shadowMap.enabled = true duplicates the Canvas shadows prop; whether R3F applies it to the async gl-factory renderer decides whether the line can go"
+ },
+ {
+  "id": "U4402",
+  "decision": "backlog",
+  "reason": "src/App.tsx:109 — the \"soft shadows\" comment rests on PCFSoftShadowMap, which the WebGPU renderer may not honour in three r185"
+ },
+ {
+  "id": "U4403",
+  "decision": "kept",
+  "reason": "claim does not hold: ~62 pipelines matches render/asyncPipelines.ts:15-19, design.md §21 and CLAUDE.md §3/§7.2 exist, and the ~15 s / ~35 % figures carry their points (100, 277)"
  }
 ]
