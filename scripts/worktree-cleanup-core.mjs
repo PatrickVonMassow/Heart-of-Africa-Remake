@@ -27,7 +27,7 @@
 // WORKTREES ARE NOT THE DEFECT. Parallel agents need worktree isolation
 // (CLAUDE.md §6); the removal is what was wrong.
 
-import { resolve, sep } from 'node:path'
+import { resolve } from 'node:path'
 
 /** Compare paths the way Windows and git both will. */
 export const normPath = (p) =>
@@ -129,15 +129,17 @@ export function assertInside(path, root) {
  *
  * A caller that knows exactly which tree it selected passes `--expect <json>`, and
  * the removal is refused unless the checkout in front of this command is STILL
- * that tree. This is the last of three re-proofs and the only one inside the
- * process that actually deletes: the landing's selection and its per-path re-check
- * both answer BEFORE this command is spawned.
+ * that tree. This is the last of three identity re-proofs and the only one inside
+ * the process that actually deletes: the landing's selection and its per-path
+ * re-check both answer BEFORE this command is spawned. (The lock itself is proven
+ * again later, at every destructive step — `proveExclusion` in the cleanup.)
  *
  * A BRANCH NAME IS NOT AN IDENTITY (second review, finding 1). Branch + unlocked +
  * clean also describes a DIFFERENT checkout that appeared at the same path, and a
  * same-path replacement even reuses git's admin record name — measured 11.08.2026:
  * after `worktree remove` + `worktree add` at the same path, the admin gitdir is
- * byte-identical while the `.git` FILE's inode is not. So the expectation carries:
+ * byte-identical, and the `.git` FILE's inode may differ or come straight back
+ * (see the identity comparison below). So the expectation carries:
  *   branch   — what it was checked out on
  *   head     — the commit it stood on. This also carries the containment proof
  *              forward: `headMerged` was established for THIS sha, so an unchanged
@@ -153,8 +155,9 @@ export function assertInside(path, root) {
  *
  * Every carried field must be re-read and must MATCH; a field the caller carried
  * and the re-read could not answer refuses, exactly as everywhere else in this
- * rule. `ino`/`dev` are exempt from that one-sidedness only where the platform
- * reports 0 for both, which is its way of saying it has no such number.
+ * rule. Each identity field is judged on its own: one carried as 0 counts as not
+ * carried (a platform reporting 0 for `ino`/`dev` has no such number), and one
+ * carried non-zero but re-read as 0 refuses.
  *
  * WITHOUT an expectation nothing changes. `batch-doctor` removes ORPHANS, which by
  * definition have no branch and no registration to compare against; making the
@@ -197,10 +200,9 @@ export function matchesExpectation({ expected, entry, actual = null, dirty, ownL
     }
     if (lock !== own) return { ok: false, reason: `it is git-locked: ${lock}` }
   } else if (lock.trim()) {
-    // Printed VERBATIM, like the branch above it: the padding is part of what is
-    // in git's file, and a reader comparing this line against the file must see
-    // the same bytes. Only the DECISION trims, so a lock of pure whitespace still
-    // reads as "no lock".
+    // Printed as it arrives, like the branch above it (the porcelain value, which
+    // `worktreeEntry` has already trimmed). Only the DECISION trims here, so a lock
+    // of pure whitespace still reads as "no lock".
     return { ok: false, reason: `it is git-locked: ${lock}` }
   }
 
@@ -246,7 +248,8 @@ export function matchesExpectation({ expected, entry, actual = null, dirty, ownL
   // THE RESIDUAL, STATED. These are (device, inode, two timestamps) and nothing
   // stronger: POSIX exposes no file GENERATION number through Node, so a
   // filesystem that hands back the same inode AND reproduces both timestamps to
-  // the nanosecond would defeat them. That is the honest bound; it sits behind the
+  // the precision `stat` reports them in milliseconds (`mtimeMs`, `birthtimeMs`)
+  // would defeat them. That is the honest bound; it sits behind the
   // branch, HEAD and admin-record checks above and behind the lock this command
   // holds while it asks.
   const IDENTITY = ['ino', 'dev', 'gitMtime', 'gitBirth']
@@ -313,7 +316,7 @@ export function matchesExpectation({ expected, entry, actual = null, dirty, ownL
  * never bent. The writer and the reader are built from ONE template so they
  * cannot drift apart.
  */
-export const CLEANUP_LOCK_BODY = 'worktree-cleanup verifying and deleting'
+const CLEANUP_LOCK_BODY = 'worktree-cleanup verifying and deleting'
 
 /** The one lock spelling this command has ever written before it carried a run
  *  identity. Recognised so its message can say how to clear it — never
@@ -494,4 +497,3 @@ export function stubBranchFor(target) {
 export const formatRefusal = (verdict) =>
   `worktree-cleanup: REFUSED ${verdict?.path ?? '(nothing)'} — ${REFUSALS[verdict?.reason] ?? verdict?.reason}`
 
-export { sep }
