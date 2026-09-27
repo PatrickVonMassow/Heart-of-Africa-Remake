@@ -19,7 +19,7 @@
 // IT RUNS AS ITS OWN PROCESS for the same reason the board watchdog does: on
 // this platform a `process.exit()` after any `fetch` tears undici's socket down
 // mid-close and ABORTS the process (exit 127, `Assertion failed: !(handle->flags
-// & UV_HANDLE_CLOSING)`), and the launcher exits that way at fifteen points.
+// & UV_HANDLE_CLOSING)`), and the launcher exits that way at many points.
 //
 // THE CURSOR IS NOT THE DEDUPE. It only narrows the next poll; the ledger of
 // seen ids in the state file is what guarantees once-only delivery. Delete the
@@ -135,8 +135,8 @@ async function fetchWithTimeout(url, ms = FETCH_TIMEOUT_MS) {
   }
 }
 
-// The CLI half is GATED: scripts/chat-inbox.test.mjs imports `seededLedger` and
-// `stateAfterSpool`, and an unguarded top-level body would poll the network on
+// The CLI half is GATED: scripts/chat-inbox.test.mjs imports `seededLedger`,
+// `stateAfterSpool` and `secretGateReport`, and an unguarded top-level body would poll the network on
 // every test run.
 const args = process.argv.slice(2)
 const isCli = Boolean(process.argv[1] && process.argv[1].replace(/\\/g, '/').endsWith('scripts/chat-inbox.mjs'))

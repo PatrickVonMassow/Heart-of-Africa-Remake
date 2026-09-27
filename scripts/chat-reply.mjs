@@ -47,7 +47,7 @@ export function recordReplyReceipt({ id = null, at = Date.now(), path = RECEIPT_
   }
 }
 
-/** The moment of the last SENT reply, or null. TOTAL. */
+/** The last SENT reply's receipt `{ at, id }`, or null. TOTAL. */
 export function readReplyReceipt(path = RECEIPT_PATH) {
   try {
     const r = JSON.parse(readFileSync(path, 'utf8'))

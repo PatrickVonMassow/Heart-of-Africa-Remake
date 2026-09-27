@@ -1,8 +1,8 @@
 // PER-TOOL-CALL DELIVERY — the deciding half. PURE: no I/O, no clock of its own.
 //
-// Stage 1 bounds a message at one launcher tick (15 minutes). A running session
-// makes a tool call every few seconds, and its PostToolUse hook already runs on
-// every one of them — so the same spool read there turns 15 minutes into
+// A launcher tick alone would bound a message at up to 15 minutes. A running
+// session makes a tool call every few seconds, and its PostToolUse hook already
+// runs on every one of them — so the same spool read there delivers within
 // seconds, with no new process and no new schedule.
 //
 // TWO RULES SHAPE EVERY LINE BELOW.
@@ -14,32 +14,32 @@
 //     silently invisible — the failure this whole channel exists to prevent.
 //
 // (2) THE TOKEN RULE. Injected context is re-sent with EVERY later request for
-//     the rest of the session. So an empty spool emits NOTHING AT ALL — not a
-//     "no new messages" line, not an empty JSON object, nothing. The user's
+//     the rest of the session. So an empty spool adds NOTHING AT ALL — not a
+//     "no new messages" line, not an empty JSON object, nothing (the combined
+//     hook may still ring the findings-carrier bell on its own schedule). The user's
 //     condition for the mechanism is that it costs nothing while they send
 //     nothing, and this is the one place that condition can break. `hookStdout`
 //     returns `''` for an empty delivery and the hook writes nothing when it is.
 //
 // A MESSAGE IS QUEUED, NOT AN INTERRUPT. The rendered text says so: arriving
 // mid-merge it is read and the session finishes the atomic step first.
+import { MAX_TEXT_LEN } from './chat-core.mjs'
 
 /** ntfy ids and envelope ids share this charset (see parseEnvelope). Anything
  *  else must never become a file name. */
-export const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/
+const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/
 
 /** How many messages one tool call may inject. A flood is delivered a few at a
  *  time rather than all at once — the rest stays spooled for the next call, and
  *  the context cost per call stays bounded. */
 export const MAX_PER_CALL = 5
 
-/** Same ceiling the sanitiser enforces (chat-core.mjs MAX_TEXT_LEN). */
-export const MAX_TEXT_CHARS = 2000
-
 /**
  * The file a message lives in. The ntfy id is the natural key — the transport
  * assigns it and the poll dedupes on it — with the envelope id as the fallback
  * for an event that carried none. The `m-` prefix keeps the two id spaces
- * apart, so two different messages can never claim one file name.
+ * apart as long as no ntfy id itself starts with `m-` (ntfy's ids are plain
+ * alphanumerics).
  */
 export function spoolFileName(message) {
   const ntfyId = message?.ntfyId
@@ -114,7 +114,7 @@ export function messageLine(message) {
   const text = String(message?.text ?? '')
     .replace(/\s+/g, ' ')
     .trim()
-    .slice(0, MAX_TEXT_CHARS)
+    .slice(0, MAX_TEXT_LEN)
   return `- [${when}] ${JSON.stringify(text)}`
 }
 
