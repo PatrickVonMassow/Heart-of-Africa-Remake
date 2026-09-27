@@ -1,6 +1,7 @@
 // THE WAIT MARKER A HOOK SETS (point 592) — the IO half.
 //
-// It reads the newest verify RUN RECORD (scripts/verify/run-record.mjs), asks
+// It reads a verify RUN RECORD (scripts/verify/run-record.mjs) — the run its own
+// marker already names while that lives, else the newest live one — asks
 // the pure decision in ./wait-marker-core.mjs what to do, and writes or
 // withdraws the `batch-in-flight` declaration accordingly — the same file, in
 // the same shape, that a session writes by hand with
@@ -11,10 +12,12 @@
 // duty (5) lives there: .claude/settings.json is a protected path an unattended
 // session cannot edit.
 //
-// Cost on the hot path: one `readdir` of the verify log directory. With no run
-// record on disk — the ordinary case — it returns before anything else happens.
+// Cost on the hot path: a non-owner or paused session pays one comparison; the
+// owner reads its declaration and one `readdir` of the verify log directory.
 //
-//   node scripts/wait-marker.mjs --status   what the hook would do right now
+//   node scripts/wait-marker.mjs   a preview of the decision (arguments are
+//                                  ignored; it reads the newest run without the
+//                                  named-run preference and writes nothing)
 import { existsSync, statSync } from 'node:fs'
 import { isAbsolute } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -25,8 +28,9 @@ import { extendLease, readOwnerLock, clearDeclaredWait } from './batch-singleton
 import { DECLARED_WAIT_LEASE_MS } from './batch-lease-core.mjs'
 import { MARKER_SOURCE, markerDeclaration, waitMarkerDecision } from './wait-marker-core.mjs'
 
-/** The newest verify run this checkout knows about, with the freshness of its
- *  log. All of it failure-tolerant: nothing readable means nothing declared. */
+/** The verify run the marker should follow — `preferLog`'s while it lives, else
+ *  the newest live one, else the newest — with the freshness of its log. All of
+ *  it failure-tolerant: nothing readable means nothing declared. */
 export function readActiveRun({ dir = logDir(), preferLog = null } = {}) {
   const empty = { record: null, live: false, logMtime: null, logPath: null }
   try {
@@ -65,7 +69,7 @@ export function readActiveRun({ dir = logDir(), preferLog = null } = {}) {
 
 /**
  * ARM (or withdraw) THE MARKER. Returns the decision that was acted on, so the
- * `--status` mode and the tests can see what a real call would do. Never
+ * tests can see what a real call did. Never
  * throws: a hook may not break a tool call over its own bookkeeping.
  */
 export function armWaitMarker({
@@ -102,7 +106,7 @@ export function armWaitMarker({
       // REPORTED, not assumed (four-eyes finding 9): the extension is refused
       // whenever the lock names another session id — after a context compaction
       // it can be, and the hand-written path at least PRINTS that. The verdict
-      // carries it so `--status` and the tests can see it.
+      // carries it so the tests can see it.
       const extended = extendLease(sid, now + DECLARED_WAIT_LEASE_MS, {
         declaredWait: true,
         now,
@@ -122,8 +126,8 @@ export function armWaitMarker({
   }
 }
 
-/** Is the batch paused? Read here so the hook passes one flag rather than a path. */
-export function batchPaused() {
+/** Is the batch paused? The CLI preview's own read; the hook passes `paused` in. */
+function batchPaused() {
   try {
     return existsSync(repoPath('.claude', 'batch-paused'))
   } catch {
