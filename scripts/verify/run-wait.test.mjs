@@ -90,7 +90,7 @@ describe('--await: one blocking call, and no poll counted', () => {
     expect(res.stdout).toMatch(/already over/)
     expect(res.stdout).toMatch(/verify receipt/)
     expect(res.stdout).toMatch(/frames: 19\/19/)
-    expect(res.stdout).toMatch(/polls: {3}0 \(awaited, not polled\)/)
+    expect(res.stdout).toMatch(/polls: {3}0 \(never polled\)/)
   })
 
   it('hands back the run’s own exit code, so a red run is red here too', () => {

@@ -4,8 +4,9 @@
 // single habit in this project. 2857 responses were poll answers (10.9 % of the
 // weighted spend) and another 1189 were bare idle holders (3.6 %); the longest
 // unbroken poll chain was 437 responses for a result that is one word. One
-// 42-minute LARGE run polled every 30 s costs ~1.9 M weighted for the loop
-// alone. Nothing about that loop is work: it re-reads a log that has not
+// 42-minute LARGE run (the single-pass plan of 09.08.2026; a both-backend LARGE
+// measured 115-121 min in September) polled every 30 s costs ~1.9 M weighted for
+// the loop alone. Nothing about that loop is work: it re-reads a log that has not
 // changed to learn a fact the process will announce by itself.
 //
 // THE RULE THIS MODULE ENCODES:
@@ -16,16 +17,16 @@
 //      suite's MEASURED median runtime, not 30 s. The medians are below and
 //      come from docs/picture-check-cost.md §1 — the same table, pinned by
 //      run-wait-core.test.mjs so the two cannot drift apart.
-//   3. After MAX_POLLS the run is either awaited blocking or treated as HUNG.
-//      No third option: 13 chains of ten or more polls carried 4.9 % of the
-//      whole window's spend.
+//   3. After MAX_POLLS the poll loop is over: the run is awaited blocking, and
+//      it is HUNG only once it is past its ceiling AND silent (pollBudget). 13
+//      chains of ten or more polls carried 4.9 % of the whole window's spend.
 //   4. The count is PRINTED, not remembered. `run-wait.mjs --status` is the one
 //      counted poll and the verify wrapper prints the total in its receipt, so
 //      the rule is visible in the transcript rather than trusted.
 //
 // Everything here is data-in / data-out so the Vitest layer can pin it; all
-// process work — the record file, the frame scan, the blocking wait — lives in
-// run-wait.mjs and run-logged.mjs.
+// process work lives elsewhere — the record file and the frame scan in
+// run-record.mjs, the blocking wait in run-wait.mjs, the writing in run-logged.mjs.
 import { laneFor, parseArgs, planBackends, selectBackend, suitesFor } from './tiers.mjs'
 import {
   PROGRESS_LEASE_MS, SUITE_CEILING_MS, WAIT_EXPECTATION_FLOOR_MS, WAIT_LEASE_CAP_MS,
@@ -64,8 +65,8 @@ export const SUITE_RUNTIME_S = Object.freeze({
  * How many FRAMES a passing run of each suite writes — the same table's shot
  * column. This is the half point 375 could not see: its shutter refuses a frame
  * whose subject is missing, but a frame that was never written AT ALL goes
- * unnoticed, and a run that photographs 60 of its 93 frames exits 0 today.
- * Awaiting instead of polling is the moment to make the run state one checkable
+ * unnoticed by it, and a run that photographed 60 of its 93 frames used to exit
+ * 0 unremarked. Awaiting instead of polling is the moment to make the run state one checkable
  * object, so the receipt carries expected-against-written.
  */
 export const SUITE_FRAMES = Object.freeze({
@@ -89,8 +90,8 @@ export const SUITE_FRAMES = Object.freeze({
 
 /**
  * Suites whose RUNTIME the cost measurement never recorded: `docs` opens no
- * browser, `board-layout` was added after the measurement, and
- * `startup`/`report`/`crossbrowser` predate the recording window. They are NAMED
+ * browser, `board-layout` and `communication` were added after the measurement,
+ * and `startup`/`report`/`crossbrowser` predate the recording window. They are NAMED
  * rather than silently treated as zero — an estimate that quietly omits a suite
  * is how a wait comes out too short and the poll loop returns.
  */
@@ -99,8 +100,8 @@ export const UNMEASURED_SUITES = Object.freeze(['docs', 'board-layout', 'startup
 /**
  * Their FRAME counts, which — unlike their runtimes — can be established by
  * reading the suite: `startup` takes exactly one shutter frame
- * (`142-startup-picture-live`, scripts/verify/startup.mjs), and `docs`,
- * `board-layout`, `report` and `crossbrowser` take none. Kept apart from
+ * (`142-startup-picture-live`, scripts/verify/startup.mjs), `communication`
+ * takes 48, and `docs`, `board-layout`, `report` and `crossbrowser` take none. Kept apart from
  * SUITE_RUNTIME_S's
  * table so the lockstep test can hold that table to the document verbatim
  * while these stay counted from the source.
@@ -114,25 +115,26 @@ export const COUNTED_SUITE_FRAMES = Object.freeze({ docs: 0, 'board-layout': 0, 
 /** When the runtime/shot table was measured — printed with a frames verdict, so
  *  a reader can tell "the table is older than the suites" from "a suite stopped
  *  short". */
-export const FRAME_TABLE_MEASURED = '09.08.2026'
+const FRAME_TABLE_MEASURED = '09.08.2026'
 
 /**
  * WHAT A WHOLE RUN REALLY TOOK — docs/picture-check-cost.md §7, measured
  * 09.09.2026 over the 35 finished run records of point 1065.
  *
  * WHY THIS SITS BESIDE `SUITE_RUNTIME_S` AND NOT INSIDE IT (point 1083): the
- * per-suite table is the July baseline the runner PLANS from, and it stays
+ * per-suite table is the 09.08.2026 baseline the runner PLANS from, and it stays
  * exactly what it measured. What it cannot say is what the assembled run costs
  * end to end — the plan it produces for a both-backend LARGE is 80 min 48 s
  * against a real 115.3–120.9, and for a whole `polish` pass 5 min 41 s against
  * 9.9–61.5. With the plan a third to two thirds short, a 62-minute `polish` run
  * and a fifth two-hour LARGE never read as out of band. So the observed band is
- * PRINTED under the planned expectation, and the reader compares.
+ * PRINTED under the planned expectation, and the reader compares; `waitPlan`
+ * also lets a band's high end choose foreground or background and the timeout.
  *
  * THESE ARE OUTLIER BANDS, NEVER TARGETS. A second author held a worktree for
  * part of the window and the host is shared, and §1 already records a 19 %
  * spread from load alone. 118 minutes is inside the band; 200 is not. That is
- * the whole use of the figure — no guard reads it and nothing fails on it.
+ * what the figure is for — no guard fails on it.
  */
 export const SEPTEMBER_BANDS = Object.freeze({
   measured: '09.09.2026',
@@ -205,20 +207,23 @@ export function formatObservedBand(band) {
   return lines
 }
 
-/** The first wait is 0.9 × the measured median: long enough that the run is
- *  almost always over, short enough that it is not idling past the end. */
+/** The first wait is 0.9 × the planned median: long enough that a run on its
+ *  plan is almost over, short enough that it is not idling past the end. Whole
+ *  passes run well past the plan (SEPTEMBER_BANDS), which the later waits and
+ *  `waitPlan`'s observed band cover. */
 export const FIRST_WAIT_FRACTION = 0.9
 
 /** Every wait after the first, as a fraction of the expected runtime. */
-export const FOLLOW_WAIT_FRACTION = 0.1
+const FOLLOW_WAIT_FRACTION = 0.1
 
 /** No wait shorter than this — a one-second re-check is a poll with a new name. */
 export const MIN_WAIT_MS = 10_000
 
-/** After this many counted polls the run is awaited blocking or called hung. */
+/** After this many counted polls the loop is over: await the run blocking (it is
+ *  hung only past its ceiling and silent — see pollBudget). */
 export const MAX_POLLS = 5
 
-/**
+/*
  * THE WALL-CLOCK CEILING, NOT A MULTIPLE OF AN ESTIMATE (point 1135).
  *
  * The hung mark used to be 2.5x the `--plan` estimate, and the project has
@@ -230,17 +235,18 @@ export const MAX_POLLS = 5
  * run the release was waiting for.
  *
  * A wrong estimate must not decide it. The ceiling is the one the runner itself
- * enforces — `VERIFY_SUITE_TIMEOUT_MS` in run-all.mjs, 45 minutes, at which a
- * suite is KILLED — added to whatever this run was planned to cost. Past its
+ * enforces — `VERIFY_SUITE_TIMEOUT_MS` in run-all.mjs, 45 minutes unless that
+ * variable overrides it, at which a suite is KILLED (SUITE_CEILING_MS in
+ * wait-lease-core.mjs) — added to whatever this run was planned to cost. Past its
  * plan by a whole suite ceiling AND silent for a progress lease, a run has
  * outlived the mechanism that would have ended it; below that it is SLOW, and
  * ending it is a HAND decision, never this tool's.
  */
-export { SUITE_CEILING_MS } from '../wait-lease-core.mjs'
 
 /**
- * Past this wall-clock mark a run is HUNG, not slow: its own plan plus one whole
- * suite ceiling, bounded exactly as the lease bounds it.
+ * Past this wall-clock mark a run that has also been SILENT for a progress lease
+ * is HUNG, not slow: its own plan plus one whole suite ceiling, bounded exactly
+ * as the lease bounds it.
  *
  * ONE CALCULATION, TWO READERS. The counted poll and the lease used to compute
  * this mark separately, and at the edges they disagreed: with the ceiling raised
@@ -258,8 +264,8 @@ export const hungMarkMs = (expectedMs = null, ceilingMs = SUITE_CEILING_MS) => {
 }
 
 /**
- * The longest a single blocking call may run here. The harness caps a shell
- * call at 600 s, so anything longer than this CANNOT be a blocking call and
+ * The longest blocking call this module PLANS (an explicit `--timeout` given to
+ * run-wait.mjs is taken as asked). The harness caps a shell call at 600 s, so anything longer than this CANNOT be a blocking call and
  * must ride on the background run's completion notification instead. Kept just
  * under the cap so the call reports its own timeout rather than being killed.
  */
@@ -392,8 +398,9 @@ export function planRun({ argv = [], verifyGl } = {}) {
 /**
  * How long to wait BEFORE looking again — the whole point of the measured
  * medians. The first wait consumes 0.9 of the expected runtime (minus whatever
- * has already elapsed), every later one a tenth of it. Never below MIN_WAIT_MS,
- * and never past what is left of the blocking budget.
+ * has already elapsed), every later one a tenth of it. Never below MIN_WAIT_MS —
+ * which wins even over a smaller blocking budget — and otherwise never past what
+ * is left of that budget.
  */
 export function nextWaitMs({ polls = 0, expectedMs = null, elapsedMs = 0, limitMs = BLOCKING_LIMIT_MS } = {}) {
   const expected = Number.isFinite(expectedMs) && expectedMs > 0 ? expectedMs : null
@@ -408,7 +415,7 @@ export function nextWaitMs({ polls = 0, expectedMs = null, elapsedMs = 0, limitM
 /**
  * THE POLL BUDGET. `running:false` ends it; past the wall-clock hung mark — the
  * run's own plan plus one suite ceiling — a SILENT run is hung rather than slow;
- * at MAX_POLLS the loop is over either way. Returns
+ * at MAX_POLLS the poll loop is over either way, without calling the run hung. Returns
  * the verdict and the sentence that says what to do instead — the message is
  * part of the decision because a budget nobody is told about is a counter.
  */
@@ -444,7 +451,7 @@ export function pollBudget({
       message:
         `HUNG: ${formatDuration(elapsed)} elapsed, past the ceiling of ${formatDuration(ceiling)} ` +
         `(its plan${expected === null ? ' (none)' : ` of ${formatDuration(expected)}`} plus one suite ceiling of ` +
-        `${formatDuration(SUITE_CEILING_MS)}), and nothing written for ${formatDuration(silentForMs ?? silenceMs)}. ` +
+        `${formatDuration(SUITE_CEILING_MS)}, floored and capped as the lease is), and nothing written for ${formatDuration(silentForMs ?? silenceMs)}. ` +
         "Read the log's tail and end it by hand.",
     }
   }
@@ -465,7 +472,8 @@ export function pollBudget({
       remaining,
       message:
         `POLL BUDGET SPENT (${count}/${maxPolls}). Stop looking: either await it blocking ` +
-        '(`node scripts/verify/run-wait.mjs --await`) or treat it as hung and end it. A sixth poll buys nothing.',
+        '(`node scripts/verify/run-wait.mjs --await`) or, once it is past its ceiling and silent (hung), end it by hand. ' +
+        'Another poll buys nothing.',
     }
   }
   return {
@@ -482,13 +490,13 @@ export function pollBudget({
 /**
  * SHOULD THIS RUN BE AWAITED IN THE FOREGROUND, OR RIDE ON THE NOTIFICATION?
  * The one question a caller has to answer BEFORE it starts the run, and the
- * reason a 42-minute LARGE run cannot simply be blocked on: the harness caps a
+ * reason a LARGE run (about two hours on both backends) cannot simply be blocked on: the harness caps a
  * shell call at 600 s, so past BLOCKING_LIMIT_MS the completion notification of
  * a background run is the only mechanism that carries.
  */
 export function waitPlan({ expectedMs = null, limitMs = BLOCKING_LIMIT_MS, observedHighMs = null } = {}) {
   // FOREGROUND OR BACKGROUND IS DECIDED ON WHAT THE RUN REALLY COSTS (point
-  // 1137). The §1 plan is the sum of July per-suite medians and is measured to
+  // 1137). The §1 plan is the sum of the 09.08.2026 per-suite medians and is measured to
   // be a third to two thirds of the assembled run: on that figure alone a whole
   // `polish` pass reads as 5 min 41 s and is advised into a 9-minute blocking
   // call, while six measured passes took 9.9-61.5 min. The advice was therefore
@@ -544,9 +552,9 @@ const BACKEND_LABEL = Object.freeze({ webgpu: 'WebGPU', webgl: 'WebGL 2' })
 /**
  * WHICH BACKEND(S) DID THIS RUN ACTUALLY COVER? Read from the run's own banners
  * where it printed them (a both-backends LARGE re-invokes itself once per pass),
- * and from VERIFY_GL otherwise. A receipt that guessed the backend would be
- * worse than one that admits it does not know, so an unreadable case answers an
- * empty list.
+ * from VERIFY_GL otherwise, and failing both from the plan's lane list
+ * (`fallback`) — the planned, not the observed, coverage. Only when none of these
+ * names a backend is the answer an empty list.
  */
 export function backendsFrom({ lines = [], verifyGl = null, fallback = null } = {}) {
   const seen = []
@@ -577,7 +585,8 @@ export function framesVerdict({ expected = null, written = null } = {}) {
   const exp = Number.isFinite(expected) ? expected : null
   const got = Number.isFinite(written) ? written : null
   if (exp === null || got === null) {
-    return { status: 'unknown', expected: exp, written: got, message: 'frames: not comparable (no measured expectation)' }
+    const why = exp === null ? 'no measured expectation' : 'no count of written frames'
+    return { status: 'unknown', expected: exp, written: got, message: `frames: not comparable (${why})` }
   }
   if (got === exp) return { status: 'ok', expected: exp, written: got, message: `frames: ${got}/${exp}` }
   if (got < exp) {
@@ -672,7 +681,7 @@ export function formatReceipt(receipt) {
   out.push(`   HEAD:    ${r.head ?? 'unknown'}${r.branch ? ` (${r.branch})` : ''}`)
   out.push(`   log:     ${r.logPath || '(no log file)'}`)
   out.push(`   ${r.frames?.message ?? 'frames: unknown'}`)
-  out.push(`   polls:   ${r.polls ?? 0}${(r.polls ?? 0) === 0 ? ' (awaited, not polled)' : ` of ${MAX_POLLS}`}`)
+  out.push(`   polls:   ${r.polls ?? 0}${(r.polls ?? 0) === 0 ? ' (never polled)' : ` of ${MAX_POLLS}`}`)
   if ((r.failing ?? []).length === 0) {
     out.push('   failing: none')
   } else {
