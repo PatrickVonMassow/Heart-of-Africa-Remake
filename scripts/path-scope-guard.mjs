@@ -30,7 +30,7 @@ import { interceptToolOutput, interceptionEnvelope } from './tool-output-interce
 const PAUSE = repoPath('.claude/batch-paused')
 
 /** Tools whose payload carries a shell command. */
-export const COMMAND_TOOLS = new Set(['Bash', 'PowerShell'])
+const COMMAND_TOOLS = new Set(['Bash', 'PowerShell'])
 
 /** Tools whose payload carries a first-class filesystem path. `MultiEdit` is
  *  named although this harness does not offer it: the same settings file guards
@@ -40,7 +40,7 @@ export const COMMAND_TOOLS = new Set(['Bash', 'PowerShell'])
 export const PATH_TOOLS = new Set(['Read', 'Edit', 'Write', 'MultiEdit', 'NotebookEdit', 'Glob', 'Grep'])
 
 /** The real machine's context: its homes and its top-level directories. */
-export function machineContext() {
+function machineContext() {
   const home = String(homedir() || '').replace(/\\/g, '/').replace(/\/+$/, '')
   const homes = [...new Set([...DEFAULT_CONTEXT.homes, home.toLowerCase()].filter(Boolean))]
   const cache = new Map()
@@ -73,11 +73,11 @@ export function subjectFrom(payload) {
   return null
 }
 
-/** The guard's stand-down question, shared with the preflight. */
-export function gatherPathScope({ sessionId = '' } = {}) {
+/** The guard's stand-down question. */
+function gatherPathScope({ sessionId = '' } = {}) {
   if (existsSync(PAUSE)) return { applicable: false, why: 'the batch is paused' }
   if (heldByOtherLiveOwner(sessionId)) {
-    return { applicable: false, why: 'another live session owns the batch lock', cause: 'not-lock-owner' }
+    return { applicable: false, why: 'another live session owns the batch lock' }
   }
   return { applicable: true, inputs: { ctx: machineContext() } }
 }
