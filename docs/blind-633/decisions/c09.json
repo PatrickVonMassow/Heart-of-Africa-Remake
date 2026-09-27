@@ -1,0 +1,1132 @@
+[
+ {
+  "id": "U4404",
+  "decision": "rewritten",
+  "reason": "Dropped the export on DrumStrike; no other file imports it, local use stays."
+ },
+ {
+  "id": "U4405",
+  "decision": "rewritten",
+  "reason": "Comment now says no later strike has begun, which is what elapsed < strike.at shows."
+ },
+ {
+  "id": "U4406",
+  "decision": "rewritten",
+  "reason": "Dropped the export on DrumMessageElement; only local use remains."
+ },
+ {
+  "id": "U4407",
+  "decision": "kept",
+  "reason": "CHIEF_ANSWER_CONCEPTS is read live by drumMessagePhrase."
+ },
+ {
+  "id": "U4408",
+  "decision": "rewritten",
+  "reason": "Peak doc no longer points at SpeechPlan; states volume scaling and no distance falloff."
+ },
+ {
+  "id": "U4409",
+  "decision": "backlog",
+  "reason": "src/communication/drumMessage.ts:93 — drum strikes exist only while phrasePlan's speech level (talk.loudness) is non-zero, although the drums claim their own level; loudness 0 silences the drums."
+ },
+ {
+  "id": "U4410",
+  "decision": "rewritten",
+  "reason": "Header now says every UPDATE takes and returns a memory; the query helpers do not."
+ },
+ {
+  "id": "U4411",
+  "decision": "rewritten",
+  "reason": "Dropped the export on HeardUtterance; no other file imports it."
+ },
+ {
+  "id": "U4412",
+  "decision": "kept",
+  "reason": "claim does not hold: the live hearing path is store.hearUtterance/hearPhrase, which pass heardIn(s) as the place; speaking.ts's helpers are test-only."
+ },
+ {
+  "id": "U4413",
+  "decision": "rewritten",
+  "reason": "ConceptId doc now says which parts compile-check a new concept and that the rolled vocabulary is cast and has no seventh sequence."
+ },
+ {
+  "id": "U4414",
+  "decision": "kept",
+  "reason": "The syllable-pair assertion is a forward guard for the lect table; one lect makes it trivially true, not wrong."
+ },
+ {
+  "id": "U4415",
+  "decision": "rewritten",
+  "reason": "Example phrase now uses real concepts (\"river + upstream\") instead of the non-existent HERE."
+ },
+ {
+  "id": "U4416",
+  "decision": "rewritten",
+  "reason": "Phrase doc now names the unsounded tail of the last syllable's step alongside the constant pause."
+ },
+ {
+  "id": "U4417",
+  "decision": "backlog",
+  "reason": "src/communication/lexicon.ts:69 — Lect.reserved is read only by tests while vocabulary.ts re-derives the single-tone exclusion; the rule has two sources."
+ },
+ {
+  "id": "U4418",
+  "decision": "rewritten",
+  "reason": "LECTS doc now says the vocabulary roll writes in DEFAULT_LECT instead of claiming a new region touches no consumer."
+ },
+ {
+  "id": "U4419",
+  "decision": "backlog",
+  "reason": "src/communication/lexicon.ts:129 — MIRROR_PAIRS is read only by tests; vocabulary.ts builds the UPSTREAM/DOWNSTREAM mirror directly."
+ },
+ {
+  "id": "U4420",
+  "decision": "rewritten",
+  "reason": "toneDistance doc drops the false near-match promise (a three-beat prefix scores 1, as the test pins)."
+ },
+ {
+  "id": "U4421",
+  "decision": "backlog",
+  "reason": "src/communication/lexicon.ts:170 — toneDistance has no runtime caller; only lexicon.test.ts uses it."
+ },
+ {
+  "id": "U4422",
+  "decision": "rewritten",
+  "reason": "isWellFormed doc no longer narrates its own earlier wording."
+ },
+ {
+  "id": "U4423",
+  "decision": "kept",
+  "reason": "The same-tone/different-text branch keeps the sort total for any saved text; cheap and correct."
+ },
+ {
+  "id": "U4424",
+  "decision": "rewritten",
+  "reason": "Dropped the export on SpokenSyllable; no other file imports it."
+ },
+ {
+  "id": "U4425",
+  "decision": "rewritten",
+  "reason": "SpokenSyllable docs speak of tones/syllables, not played samples; speech is synthesized."
+ },
+ {
+  "id": "U4426",
+  "decision": "rewritten",
+  "reason": "SpeechPlan.gain doc now says it is the distance level only; volume and loudness do not enter it."
+ },
+ {
+  "id": "U4427",
+  "decision": "backlog",
+  "reason": "src/communication/speaking.ts:88 — SPEECH_PEAK measurement history cannot be re-checked and its ratios are inconsistent (1.336/0.977 ≈ 1.37, not the cited 1.5x)."
+ },
+ {
+  "id": "U4428",
+  "decision": "rewritten",
+  "reason": "hearingGain doc now says in-range and recorded are the same condition and that volume/loudness do not gate recording."
+ },
+ {
+  "id": "U4429",
+  "decision": "kept",
+  "reason": "The pinned \"shipped 4\" matches talk.falloff: 4 in balance.ts today."
+ },
+ {
+  "id": "U4430",
+  "decision": "rewritten",
+  "reason": "Collapsed the unreachable zero arm: after the gate radius <= 0 only admits distance 0, so it returns 1 directly."
+ },
+ {
+  "id": "U4431",
+  "decision": "backlog",
+  "reason": "src/communication/speaking.ts:117 — utteranceSeconds counts full syllable steps while phraseSeconds (the declared length source) trims the last unsounded fraction; speechFloor times words with utteranceSeconds(4)."
+ },
+ {
+  "id": "U4432",
+  "decision": "kept",
+  "reason": "conceptSeconds is used live by instructionDelay."
+ },
+ {
+  "id": "U4433",
+  "decision": "rewritten",
+  "reason": "instructionDelay doc drops the hard-coded four syllables and names phraseSeconds via conceptSeconds as the length source."
+ },
+ {
+  "id": "U4434",
+  "decision": "rewritten",
+  "reason": "hearUtterance doc no longer describes seeing a gesture from too far away, which the gesture rule excludes."
+ },
+ {
+  "id": "U4435",
+  "decision": "rewritten",
+  "reason": "The cry doc says child voice, not child register."
+ },
+ {
+  "id": "U4436",
+  "decision": "kept",
+  "reason": "FloorRequest is the parameter type of the live request method."
+ },
+ {
+  "id": "U4437",
+  "decision": "backlog",
+  "reason": "src/communication/speechFloor.ts:53 — holdsFloor checks only situations, while request still honours a consequence window that outlives a released situation; a cry can fall into that window."
+ },
+ {
+  "id": "U4438",
+  "decision": "kept",
+  "reason": "The inline measurement explains why first-come ordering exists; it is rationale, not stale state."
+ },
+ {
+  "id": "U4439",
+  "decision": "backlog",
+  "reason": "src/communication/speechFloor.ts:113 — the forced-release assert id 'adult-atom-lost' names adults only; renaming it touches assert consumers, so it is not a small in-place edit."
+ },
+ {
+  "id": "U4440",
+  "decision": "rewritten",
+  "reason": "The floor reservation now reads utteranceSeconds(SEQUENCE_LENGTH) instead of a literal 4 (same value)."
+ },
+ {
+  "id": "U4441",
+  "decision": "rewritten",
+  "reason": "GROWN_FIGURE_HEIGHT now says metres (place units), matching the rest of the file."
+ },
+ {
+  "id": "U4442",
+  "decision": "kept",
+  "reason": "GROWN_FIGURE_HEIGHT is the live fallback in speechLabelHeight."
+ },
+ {
+  "id": "U4443",
+  "decision": "rewritten",
+  "reason": "Label docs now name the guess key instead of a click; targeting is by key E."
+ },
+ {
+  "id": "U4444",
+  "decision": "rewritten",
+  "reason": "speechLabelSeconds doc now says the targeted note outlasts its time instead of promising all labels are brief."
+ },
+ {
+  "id": "U4445",
+  "decision": "backlog",
+  "reason": "src/communication/speechLabel.ts:95 — speechLabelSeconds counts pauses but not syllables: the 4-atom errand stands 2.6+3×0.9 = 5.3 s while it takes ~7.4 s to speak, so the note may leave before the phrase ends."
+ },
+ {
+  "id": "U4446",
+  "decision": "rewritten",
+  "reason": "Dropped the seven-atom example; the doc now says a longer phrase stands longer."
+ },
+ {
+  "id": "U4447",
+  "decision": "rewritten",
+  "reason": "showSpeechLabel doc now names the targeted-label exception to the sweep."
+ },
+ {
+  "id": "U4448",
+  "decision": "rewritten",
+  "reason": "expireSpeechLabels doc no longer states a fixed 2.6 s; the duration is per phrase."
+ },
+ {
+  "id": "U4449",
+  "decision": "rewritten",
+  "reason": "Dropped the export on AtomReading; no other file imports it."
+ },
+ {
+  "id": "U4450",
+  "decision": "rewritten",
+  "reason": "Visibility doc now says one heard atom unlocks the whole phrase's label."
+ },
+ {
+  "id": "U4451",
+  "decision": "rewritten",
+  "reason": "speechTarget header now names the guess key (E) instead of SPACE."
+ },
+ {
+  "id": "U4452",
+  "decision": "rewritten",
+  "reason": "Header no longer says speech is arbitrated against doors; it says useKeyTarget routes speech to the guess key."
+ },
+ {
+  "id": "U4453",
+  "decision": "rewritten",
+  "reason": "Dropped the export on LabelPresentation; no other file imports it."
+ },
+ {
+  "id": "U4454",
+  "decision": "rewritten",
+  "reason": "\"no dialog, no target\" corrected to \"an open dialog, no target\", matching the code."
+ },
+ {
+  "id": "U4455",
+  "decision": "rewritten",
+  "reason": "The rule is now stated as the distance gate it is (within hearing range), not a guarantee of being heard."
+ },
+ {
+  "id": "U4456",
+  "decision": "rewritten",
+  "reason": "Dropped the export on SpeechReach; no other file imports it."
+ },
+ {
+  "id": "U4457",
+  "decision": "kept",
+  "reason": "gesture mirrors audible by design so callers read the rule by name."
+ },
+ {
+  "id": "U4458",
+  "decision": "rewritten",
+  "reason": "Header now says the roll writes no four-syllable literal and names SHIPPED_VOCABULARY as the fixed legacy table."
+ },
+ {
+  "id": "U4459",
+  "decision": "rewritten",
+  "reason": "Header now says rule (a) is built into the enumeration and only rule (b) is a predicate."
+ },
+ {
+  "id": "U4460",
+  "decision": "rewritten",
+  "reason": "The pinned table exists in vocabulary.test.ts; the header now names it there."
+ },
+ {
+  "id": "U4461",
+  "decision": "rewritten",
+  "reason": "SHIPPED_VOCABULARY doc now names both uses: the save fallback in store.ts and the tests' fixed vocabulary."
+ },
+ {
+  "id": "U4462",
+  "decision": "kept",
+  "reason": "These exports are reached from the live rollVocabulary."
+ },
+ {
+  "id": "U4463",
+  "decision": "backlog",
+  "reason": "src/communication/vocabulary.ts:60 — hasIconicDirections has no runtime caller; it is a test oracle for a rule enumerateVocabularies enforces by construction."
+ },
+ {
+  "id": "U4464",
+  "decision": "rewritten",
+  "reason": "The unavoidable second mirror pair is now stated as a four-syllable property."
+ },
+ {
+  "id": "U4465",
+  "decision": "kept",
+  "reason": "The seed-stream comment is a pointer to a project idiom; harmless and accurate enough."
+ },
+ {
+  "id": "U4466",
+  "decision": "rewritten",
+  "reason": "Dropped the export on BalanceConfig; no other file imports it."
+ },
+ {
+  "id": "U4467",
+  "decision": "backlog",
+  "reason": "src/config/balance.ts:23 — placeStepOverTop (0.3) is called \"strictly below\" climbableRockTop, but the climb fallback may take the tallest stone below 0.5 m, which can be under 0.3 m and so be ground and climbing stone at once."
+ },
+ {
+  "id": "U4468",
+  "decision": "rewritten",
+  "reason": "Moved the touch-controls JSDoc from above waterDrama onto the touch field."
+ },
+ {
+  "id": "U4469",
+  "decision": "rewritten",
+  "reason": "reachDistance interface doc now says arrival/safe radius outside the collider, matching the value's comment."
+ },
+ {
+  "id": "U4470",
+  "decision": "rewritten",
+  "reason": "Canteen comment now says the 555-day figure held at the former 0.9 drain."
+ },
+ {
+  "id": "U4471",
+  "decision": "kept",
+  "reason": "claim does not hold: 5.6 is the lion's hunt speed (HUNT_LION_SPEED) and 4.6 the fleeing prey (HUNT_PREY_SPEED) in Wildlife.tsx; the two comments name different speeds."
+ },
+ {
+  "id": "U4472",
+  "decision": "rewritten",
+  "reason": "\"≫ 6×\" corrected to \"6×\", the configured value."
+ },
+ {
+  "id": "U4473",
+  "decision": "rewritten",
+  "reason": "The ~4.5 s figure is now marked as belonging to the former 2.8 s hold."
+ },
+ {
+  "id": "U4474",
+  "decision": "rewritten",
+  "reason": "climbableRockTop: interface doc and first paragraph now say it governs only the fallback search; the floor wording is marked as pre-1082 history."
+ },
+ {
+  "id": "U4475",
+  "decision": "rewritten",
+  "reason": "Silence-window sum corrected to ~125 s and \"half again\" to roughly half again (180 s)."
+ },
+ {
+  "id": "U4476",
+  "decision": "rewritten",
+  "reason": "Separation note now gives both catch distances (tag 0.45 m, bank game 0.8 m) and the 1.7–3× ratio."
+ },
+ {
+  "id": "U4477",
+  "decision": "backlog",
+  "reason": "src/config/balance.ts:1757 — hearingRadius is described as the one bound of utterance, note and arms, but speech carry is talk.reach/call.reach (call 34 m) and spokenGesture defaults to talk.reach; hearingRadius is read only by speechChannel."
+ },
+ {
+  "id": "U4478",
+  "decision": "kept",
+  "reason": "claim does not hold: phraseSeconds of one 4-syllable atom is 1.2 − 0.114 = 1.086 s, plus the 1 s hold gives 2.09 s, below the 3.2 s floor window and the 2.6 s label."
+ },
+ {
+  "id": "U4479",
+  "decision": "rewritten",
+  "reason": "DETAIL_LEVELS doc no longer names menus; only tests enumerate it."
+ },
+ {
+  "id": "U4480",
+  "decision": "backlog",
+  "reason": "src/config/quality.ts:56 — waterCalm is set in every preset but read by nothing outside quality.ts and its test (\"consumed by the water material when wired\")."
+ },
+ {
+  "id": "U4481",
+  "decision": "backlog",
+  "reason": "src/config/quality.ts:59 — wildlifeDensity is set in every preset but read by nothing outside quality.ts and its test (\"consumed by the spawner when wired\")."
+ },
+ {
+  "id": "U4482",
+  "decision": "rewritten",
+  "reason": "Alarm-window comment no longer explains itself through the deleted catalogue; it reads off the round's own phases."
+ },
+ {
+  "id": "U4483",
+  "decision": "rewritten",
+  "reason": "The 0.20 m paragraph is marked as pre-1082 history; the 0.5 m reasoning below stays current."
+ },
+ {
+  "id": "U4484",
+  "decision": "backlog",
+  "reason": "src/config/balance.ts:944 — hearingRadius (10) and talk.reach (10) both define speech carry; balance.test pins them equal, so one is a legacy duplicate."
+ },
+ {
+  "id": "U4485",
+  "decision": "backlog",
+  "reason": "src/config/balance.ts:1770 — the call-reach justification cites replay distances (22.03 m, 32.64 m) without stating the layout (settlementRoom) they were measured on."
+ },
+ {
+  "id": "U4486",
+  "decision": "kept",
+  "reason": "deadline.enabled is a documented temporary switch (design.md §5.1), not dead code."
+ },
+ {
+  "id": "U4487",
+  "decision": "kept",
+  "reason": "fight.forceOutcome is a documented test-only override."
+ },
+ {
+  "id": "U4488",
+  "decision": "kept",
+  "reason": "The drum bed is a documented debug probe, shipped disabled."
+ },
+ {
+  "id": "U4489",
+  "decision": "rewritten",
+  "reason": "predatorFlight doc now says the crocodile sits outside the danger order and is set on its own."
+ },
+ {
+  "id": "U4490",
+  "decision": "kept",
+  "reason": "DETAIL_LEVELS is the tests' level enumeration; its doc is corrected under U4479, and removing it would only move the literal into the tests."
+ },
+ {
+  "id": "U4491",
+  "decision": "kept",
+  "reason": "QUALITY_KEYS exists for the completeness test by design."
+ },
+ {
+  "id": "U4492",
+  "decision": "rewritten",
+  "reason": "\"today's\" comments now name medium's 2048 or the pre-preset values."
+ },
+ {
+  "id": "U4493",
+  "decision": "rewritten",
+  "reason": "startPlace rationale no longer ties the parameter to a temporary repair state."
+ },
+ {
+  "id": "U4494",
+  "decision": "kept",
+  "reason": "START_PARAM's stated purpose is test/reader agreement; that is its use."
+ },
+ {
+  "id": "U4495",
+  "decision": "kept",
+  "reason": "claim does not hold: ?bench (startBenchmark.ts) works in production and ?seed is DEV-only (store.ts newSeed), as the header says."
+ },
+ {
+  "id": "U4496",
+  "decision": "rewritten",
+  "reason": "Translated the German block comments in de.ts (port, monument, village sections) to English, as the header requires."
+ },
+ {
+  "id": "U4497",
+  "decision": "rewritten",
+  "reason": "Pyramids title now reads `Die ${name}` (both languages), so Meroë no longer renders \"Die Pyramiden von Pyramiden von Meroë\"."
+ },
+ {
+  "id": "U4498",
+  "decision": "rewritten",
+  "reason": "Giza title and flavour now use the landmark name directly (both languages): \"Die großen Pyramiden von Gizeh\" / \"The Great Pyramids of Giza\"."
+ },
+ {
+  "id": "U4499",
+  "decision": "backlog",
+  "reason": "src/i18n/de.ts:1033 (en.ts:1032) — artefactGiven says the mould \"wants to go INTO something, not onto it\", while formInSettlement and mouldFitted describe pressing it against rock; an authored clue, so the wording needs a design decision."
+ },
+ {
+  "id": "U4500",
+  "decision": "rewritten",
+  "reason": "German hyena attack now uses the plural verb (\"kamen Hyänen näher\")."
+ },
+ {
+  "id": "U4501",
+  "decision": "rewritten",
+  "reason": "German friendRescue now uses dative animal forms after \"von\" (\"von einem Geparden\"); English unchanged."
+ },
+ {
+  "id": "U4502",
+  "decision": "backlog",
+  "reason": "src/i18n/de.ts:410 (en.ts:411) — pocSolved is a marked \"Dummy\" placeholder toast, raised by store.ts when the mould fits (useCarriedForm)."
+ },
+ {
+  "id": "U4503",
+  "decision": "backlog",
+  "reason": "src/i18n/de.ts:1044 — dehydration narration says \"Ohne Feldflasche\" although an empty canteen (not a missing one) can also cause it."
+ },
+ {
+  "id": "U4504",
+  "decision": "backlog",
+  "reason": "src/i18n/de.ts:1150 — treasureReaction reads as automatic on entering a village, while the tooltip describes deliberately showing the treasure; trigger not checked."
+ },
+ {
+  "id": "U4505",
+  "decision": "backlog",
+  "reason": "src/i18n/de.ts:86 — Giza is both a discoverable landmark and a walkable monument place; decide whether the landmark entry is still wanted."
+ },
+ {
+  "id": "U4506",
+  "decision": "kept",
+  "reason": "A generic fallback for a future port is cheap insurance, not dead weight."
+ },
+ {
+  "id": "U4507",
+  "decision": "kept",
+  "reason": "claim does not hold: portArrival is journaled by store.ts for every port re-entry without a situation change."
+ },
+ {
+  "id": "U4508",
+  "decision": "kept",
+  "reason": "The generic village fallback guards a future people without a vignette."
+ },
+ {
+  "id": "U4509",
+  "decision": "kept",
+  "reason": "claim does not hold: calling the chief out is still the mechanic (store callChiefOut / chiefStepsOut)."
+ },
+ {
+  "id": "U4510",
+  "decision": "kept",
+  "reason": "claim does not hold: 'clean' is a real RinderpestPhase (systems/rinderpest.ts)."
+ },
+ {
+  "id": "U4511",
+  "decision": "kept",
+  "reason": "claim does not hold: rinderpestPhase never returns 'clean' for the Sidama (struck until 1892, then aftermath)."
+ },
+ {
+  "id": "U4512",
+  "decision": "kept",
+  "reason": "The generic port/monument return texts are fallbacks for places without modelled situations."
+ },
+ {
+  "id": "U4513",
+  "decision": "backlog",
+  "reason": "src/i18n/de.ts:1038 — the victory entry passes a literal 1890 as start year to formatDate instead of the configured start year."
+ },
+ {
+  "id": "U4514",
+  "decision": "backlog",
+  "reason": "src/i18n/de.ts:870 (en.ts:871) — the journal start text hard-codes \"Januar 1890\" and \"250 Dollar\", which can drift from the start date and cash in balance/store."
+ },
+ {
+  "id": "U4515",
+  "decision": "backlog",
+  "reason": "src/i18n/de.ts:455 — food is labelled a fixed one-week unit while the debug menu exposes days per food unit."
+ },
+ {
+  "id": "U4516",
+  "decision": "rewritten",
+  "reason": "Gender-agreement comment now also lists Hafen and Wahrzeichen."
+ },
+ {
+  "id": "U4517",
+  "decision": "kept",
+  "reason": "Both sets are live: hud.movementPenalty in StatusBar, the toasts via store.ts PenaltyToast."
+ },
+ {
+  "id": "U4518",
+  "decision": "kept",
+  "reason": "graveDebug is used by TravelScene's debug HiddenCross label."
+ },
+ {
+  "id": "U4519",
+  "decision": "kept",
+  "reason": "The drum bed is a documented debug probe; its labels belong to its debug controls."
+ },
+ {
+  "id": "U4520",
+  "decision": "kept",
+  "reason": "Both labels are live debug controls (hearingRadius and talk.reach); the duplicate value is filed under U4484."
+ },
+ {
+  "id": "U4521",
+  "decision": "kept",
+  "reason": "ambienceVolume and ambientVolume are two distinct live balance fields (speech/ambience vs other ambient sound)."
+ },
+ {
+  "id": "U4522",
+  "decision": "kept",
+  "reason": "All three copies are live keys of three screens (JournalPanel/SpeechLabelCard, SpeechGuess, DrumMessage)."
+ },
+ {
+  "id": "U4523",
+  "decision": "kept",
+  "reason": "\"es\" refers to the neuter noun \"Oberhaupt\" and \"er\" to the person; both are grammatical German."
+ },
+ {
+  "id": "U4524",
+  "decision": "backlog",
+  "reason": "src/i18n/de.ts:190 — the village leader is called 'Chefhütte'/'Oberhaupt'/'Häuptling' in different strings; pick one term."
+ },
+ {
+  "id": "U4525",
+  "decision": "backlog",
+  "reason": "src/i18n/de.ts:1120 — the canteen is 'Trinkflasche' in some strings and 'Feldflasche' in others; pick one term."
+ },
+ {
+  "id": "U4526",
+  "decision": "rewritten",
+  "reason": "German bug-report heading now uses the German title \"Das Herz von Afrika\"."
+ },
+ {
+  "id": "U4527",
+  "decision": "rewritten",
+  "reason": "claim holds the other way: English is the default (i18n/index.ts), so de.ts's header no longer calls German the default."
+ },
+ {
+  "id": "U4528",
+  "decision": "kept",
+  "reason": "claim does not hold: 'clean' is a real phase; villageReturn keys only on transitions that occur."
+ },
+ {
+  "id": "U4529",
+  "decision": "kept",
+  "reason": "DICTIONARIES is typed Record<Lang, Strings>, so the Lang union cannot drift from the registry without a compile error."
+ },
+ {
+  "id": "U4530",
+  "decision": "rewritten",
+  "reason": "Dropped the export on ActorNoun; no other file imports it."
+ },
+ {
+  "id": "U4531",
+  "decision": "rewritten",
+  "reason": "Dropped the export on UnknownPlaceKind; no other file imports it."
+ },
+ {
+  "id": "U4532",
+  "decision": "rewritten",
+  "reason": "Dropped the export on ArrivalEntry; no other file imports it."
+ },
+ {
+  "id": "U4533",
+  "decision": "rewritten",
+  "reason": "Dropped the export on VoiceMood; no other file imports it."
+ },
+ {
+  "id": "U4534",
+  "decision": "rewritten",
+  "reason": "types.ts header now says every string AFTER boot lives there and names main.tsx's bilingual boot lines."
+ },
+ {
+  "id": "U4535",
+  "decision": "rewritten",
+  "reason": "Actor-label docs speak of the hold/label key (rebindable, Ctrl by default) instead of Ctrl."
+ },
+ {
+  "id": "U4536",
+  "decision": "rewritten",
+  "reason": "speechGuess docs in types.ts now name the guess key (E), matching en/de invite."
+ },
+ {
+  "id": "U4537",
+  "decision": "rewritten",
+  "reason": "landmarkDiscovered doc now covers the monument kinds too."
+ },
+ {
+  "id": "U4538",
+  "decision": "rewritten",
+  "reason": "speech.ts header now says the model is pre-warmed at game start, not fetched on first use."
+ },
+ {
+  "id": "U4539",
+  "decision": "rewritten",
+  "reason": "Autoplay comment now says no synthesis is requested before a gesture, while warmup may already load the model."
+ },
+ {
+  "id": "U4540",
+  "decision": "rewritten",
+  "reason": "speakSegments doc now says it rejects only when the audio context cannot run and skips failed segments."
+ },
+ {
+  "id": "U4541",
+  "decision": "rewritten",
+  "reason": "onSpeaking doc now says it fires just before the first audio starts."
+ },
+ {
+  "id": "U4542",
+  "decision": "rewritten",
+  "reason": "Resolve doc now says a stopped run resolves once its pending synthesis or pause settles."
+ },
+ {
+  "id": "U4543",
+  "decision": "kept",
+  "reason": "The !ctx arm narrows the type for TypeScript."
+ },
+ {
+  "id": "U4544",
+  "decision": "rewritten",
+  "reason": "ttsWorker comment now says every console.error with the onnxruntime warning prefix is dropped."
+ },
+ {
+  "id": "U4545",
+  "decision": "removed",
+  "reason": "Removed the always-true MOODS membership check and the MOODS array; TAG_RE leaves only moods at that branch."
+ },
+ {
+  "id": "U4546",
+  "decision": "removed",
+  "reason": "Removed the final empty-text filter; addText never stores an empty-trim chunk and shaping cannot empty one."
+ },
+ {
+  "id": "U4547",
+  "decision": "rewritten",
+  "reason": "artefactGiven (en and de) now uses [breath] as the standalone beat it is; spoken pauses and display text are unchanged."
+ },
+ {
+  "id": "U4548",
+  "decision": "rewritten",
+  "reason": "English pyramid titles and Giza flavour now use the landmark name directly (see U4497/U4498)."
+ },
+ {
+  "id": "U4549",
+  "decision": "rewritten",
+  "reason": "main.tsx comment and log now describe any boot rejection, not only geodata."
+ },
+ {
+  "id": "U4550",
+  "decision": "rewritten",
+  "reason": "AO_FLOOR doc now says occlusion never darkens below this fraction."
+ },
+ {
+  "id": "U4551",
+  "decision": "rewritten",
+  "reason": "Effects comments now say warm tint over the whole image, not warm highlights."
+ },
+ {
+  "id": "U4552",
+  "decision": "backlog",
+  "reason": "src/i18n/en.ts:87 — Giza is both a LANDMARKS entry and a walkable PLACES monument (duplicate of U4505)."
+ },
+ {
+  "id": "U4553",
+  "decision": "rewritten",
+  "reason": "portArrival doc now says it is the unchanged-situation re-entry notice."
+ },
+ {
+  "id": "U4554",
+  "decision": "kept",
+  "reason": "claim does not hold: portArrival is journaled by store.ts:1615 for an unchanged port re-entry."
+ },
+ {
+  "id": "U4555",
+  "decision": "rewritten",
+  "reason": "useTooltip doc now lists medicine/shovel and carried forms; there is no map item."
+ },
+ {
+  "id": "U4556",
+  "decision": "rewritten",
+  "reason": "Benchmark example now matches en.ts (\"Setting 3/10: ssao-off\")."
+ },
+ {
+  "id": "U4557",
+  "decision": "rewritten",
+  "reason": "Contract now says every dictionary, not both."
+ },
+ {
+  "id": "U4558",
+  "decision": "rewritten",
+  "reason": "i18n/index.ts header now also names the ?lang= start language."
+ },
+ {
+  "id": "U4559",
+  "decision": "kept",
+  "reason": "Duplicate of U4502 (pocSolved placeholder toast), filed there."
+ },
+ {
+  "id": "U4560",
+  "decision": "rewritten",
+  "reason": "Effects header now marks GTAO and bloom as optional too."
+ },
+ {
+  "id": "U4561",
+  "decision": "rewritten",
+  "reason": "TRAA comment now names the low graphics level as well as the debug toggle."
+ },
+ {
+  "id": "U4562",
+  "decision": "rewritten",
+  "reason": "SSAO comment now says on only at high (point 276) and off in the touch preset."
+ },
+ {
+  "id": "U4563",
+  "decision": "rewritten",
+  "reason": "SSR removal note now says the first-person scenes THEN had no water; settlements have rivers now."
+ },
+ {
+  "id": "U4564",
+  "decision": "rewritten",
+  "reason": "Comment now cites \"...\" as the code emits."
+ },
+ {
+  "id": "U4565",
+  "decision": "kept",
+  "reason": "claim does not hold: 'clean' is a real phase and Sidama is never clean, so its default branch is the struck text by design."
+ },
+ {
+  "id": "U4566",
+  "decision": "kept",
+  "reason": "The comment's \"struck text\" is the Maasai one (Baumann's account); the Sidama branch is not claimed by it."
+ },
+ {
+  "id": "U4567",
+  "decision": "backlog",
+  "reason": "src/journal/speech.ts:51 — read-aloud cites design.md §16 (presentation) where §15.3 is Read-aloud (TTS); ttsWorker.ts:1 and arrival.ts:1 likewise."
+ },
+ {
+  "id": "U4568",
+  "decision": "backlog",
+  "reason": "src/journal/sketches.tsx:1 — §19.10 is cited for both tag (types.ts:601) and campfire shadows (types.ts:771); check the design section references."
+ },
+ {
+  "id": "U4569",
+  "decision": "kept",
+  "reason": "The inline indexes in en.ts use `[p.x as ...]`, which no voice tag pattern matches; the rationale concerns a bare dict[id]."
+ },
+ {
+  "id": "U4570",
+  "decision": "kept",
+  "reason": "Two lookups for two dictionaries (places and landmarks); correct as written."
+ },
+ {
+  "id": "U4571",
+  "decision": "rewritten",
+  "reason": "debug.traa doc now says the low level disables TRAA regardless of the flag."
+ },
+ {
+  "id": "U4572",
+  "decision": "kept",
+  "reason": "The claim is true for the shipped situations; the comment is accurate today."
+ },
+ {
+  "id": "U4573",
+  "decision": "kept",
+  "reason": "Both toasts are raised by distinct store actions (store.ts:780 and :810)."
+ },
+ {
+  "id": "U4574",
+  "decision": "kept",
+  "reason": "graveDebug is used by TravelScene; debug.grave is a separate menu label."
+ },
+ {
+  "id": "U4575",
+  "decision": "kept",
+  "reason": "\"POC pipeline\" is accurate: this is the POC."
+ },
+ {
+  "id": "U4576",
+  "decision": "rewritten",
+  "reason": "Dropped the export on FrameScheduler; no other file imports it."
+ },
+ {
+  "id": "U4577",
+  "decision": "kept",
+  "reason": "AsyncPipelineState/Handle are the public shape of the exported handle; kept exported by the more conservative proposal."
+ },
+ {
+  "id": "U4578",
+  "decision": "backlog",
+  "reason": "src/render/asyncPipelines.ts:118 — AsyncPipelineState.reused is always 0 since the repeat-source bypass was removed, yet scripts/verify/settings.mjs:801 still reports a reused difference; remove field and report together."
+ },
+ {
+  "id": "U4579",
+  "decision": "rewritten",
+  "reason": "done is now documented as settled (resolved or failed) compiles."
+ },
+ {
+  "id": "U4580",
+  "decision": "backlog",
+  "reason": "src/render/asyncPipelines.ts:157 — the releasePerFrame option is passed only by asyncPipelines.test.ts; production always uses RELEASE_PER_FRAME."
+ },
+ {
+  "id": "U4581",
+  "decision": "kept",
+  "reason": "The !entry break narrows shift()'s T | undefined for TypeScript without a non-null assertion."
+ },
+ {
+  "id": "U4582",
+  "decision": "backlog",
+  "reason": "src/render/asyncPipelines.ts:224 — postQueue.unshift releases several 'RenderPipeline' composites LIFO among themselves, while the comment promises FIFO feeders with the final composite first."
+ },
+ {
+  "id": "U4583",
+  "decision": "rewritten",
+  "reason": "The settle comment now says a failure is counted in done, not logged as a console error."
+ },
+ {
+  "id": "U4584",
+  "decision": "kept",
+  "reason": "asyncPipelineHandle backs the live withSynchronousPipelineCompile."
+ },
+ {
+  "id": "U4585",
+  "decision": "rewritten",
+  "reason": "Now says WebGPU has no comparable MAIN-THREAD stall, consistent with the header's unpainted-frame measurement."
+ },
+ {
+  "id": "U4586",
+  "decision": "kept",
+  "reason": "claim does not hold: design.md §21.1 is \"Shortcut keys\", which covers both F8 and F6."
+ },
+ {
+  "id": "U4587",
+  "decision": "kept",
+  "reason": "BackendInfo is the return type of an exported function; kept exported by the more conservative proposal."
+ },
+ {
+  "id": "U4588",
+  "decision": "rewritten",
+  "reason": "demElevation header now names the B channel (dataset-land flag, demDatasetLand)."
+ },
+ {
+  "id": "U4589",
+  "decision": "kept",
+  "reason": "claim does not hold: the non-test consumers are water.ts (depth tint) and Climate.tsx (haze), exactly as listed."
+ },
+ {
+  "id": "U4590",
+  "decision": "rewritten",
+  "reason": "EDGE_RAMP_CORE doc now says the band is flat outside the concentrated core."
+ },
+ {
+  "id": "U4591",
+  "decision": "rewritten",
+  "reason": "Dropped the exports on EDGE_RAMP_CORE, SweptLook and edgeOpennessNode; none has an importer outside the module."
+ },
+ {
+  "id": "U4592",
+  "decision": "rewritten",
+  "reason": "Village tone doc now says the swept ground reads about half as bright (×0.52), not half as bright again."
+ },
+ {
+  "id": "U4593",
+  "decision": "kept",
+  "reason": "These exports feed live internal code; tests reading them is fine."
+ },
+ {
+  "id": "U4594",
+  "decision": "kept",
+  "reason": "edgeOpenness is the documented CPU mirror for tests."
+ },
+ {
+  "id": "U4595",
+  "decision": "rewritten",
+  "reason": "edgeBandBounds doc now says nominal extent, with the visible fall narrower."
+ },
+ {
+  "id": "U4596",
+  "decision": "backlog",
+  "reason": "src/render/edgeBand.ts:157 — edgeBandBounds is used only by edgeBand.test.ts."
+ },
+ {
+  "id": "U4597",
+  "decision": "rewritten",
+  "reason": "sweptGroundColor doc now says its VALUE step is multiplicative and the desaturation moves no brightness."
+ },
+ {
+  "id": "U4598",
+  "decision": "kept",
+  "reason": "The doc says these exist to pin palettes in tests; that is their use."
+ },
+ {
+  "id": "U4599",
+  "decision": "rewritten",
+  "reason": "LUT comment no longer claims every texel is 0; a bank lobe fills the texels it bulges over (PlaceScene builds a per-layout LUT)."
+ },
+ {
+  "id": "U4600",
+  "decision": "rewritten",
+  "reason": "radiusAt doc now says it decodes the nearest texel while the shader filters linearly."
+ },
+ {
+  "id": "U4601",
+  "decision": "backlog",
+  "reason": "src/render/environment.ts:17 — the IBL rows are written zenith-first into an unflipped DataTexture with EquirectangularReflectionMapping, where three's v=0 is the nadir; the environment may be vertically flipped (needs a render check)."
+ },
+ {
+  "id": "U4602",
+  "decision": "rewritten",
+  "reason": "fauna.ts header now mentions the split walking rigs, the crocodile material and the gait math."
+ },
+ {
+  "id": "U4603",
+  "decision": "kept",
+  "reason": "Test-only exports that live builders use internally."
+ },
+ {
+  "id": "U4604",
+  "decision": "rewritten",
+  "reason": "FAUNA_TESSELLATION.limb doc now says the thin bird legs use spike."
+ },
+ {
+  "id": "U4605",
+  "decision": "rewritten",
+  "reason": "createFaunaMaterial doc now names the crocodile's own material instead of \"the one shared\" material."
+ },
+ {
+  "id": "U4606",
+  "decision": "rewritten",
+  "reason": "Stride ratio corrected to ~3× (legs 1.3 vs 0.43)."
+ },
+ {
+  "id": "U4607",
+  "decision": "rewritten",
+  "reason": "wrapPhase doc corrected to [−π, π]; atan2 can return −π."
+ },
+ {
+  "id": "U4608",
+  "decision": "rewritten",
+  "reason": "Dropped the exports on GAIT_FRACTION_MAX, RESTING_SETTLE_RATE, FootPlantPose, LegSeating and GaitRig; none is imported elsewhere."
+ },
+ {
+  "id": "U4609",
+  "decision": "kept",
+  "reason": "GAIT_SWING_MAX and footForwardOffset state the bound the tests assert; cheap and documented."
+ },
+ {
+  "id": "U4610",
+  "decision": "rewritten",
+  "reason": "Swing-foot doc now says at or just above the ground (zero at phase π)."
+ },
+ {
+  "id": "U4611",
+  "decision": "rewritten",
+  "reason": "groundPitch doc now says it tips the body toward the slope (two-sample fit, clamped); legSeating seats the feet."
+ },
+ {
+  "id": "U4612",
+  "decision": "rewritten",
+  "reason": "buildQuadruped doc now lists every species built on it."
+ },
+ {
+  "id": "U4613",
+  "decision": "rewritten",
+  "reason": "Wildebeest height corrected to ~1.6 at the horn tips."
+ },
+ {
+  "id": "U4614",
+  "decision": "rewritten",
+  "reason": "Wildebeest horns described as angled, not curved (straight cones)."
+ },
+ {
+  "id": "U4615",
+  "decision": "rewritten",
+  "reason": "Warthog height corrected to ~0.9 at the head (computed 0.878)."
+ },
+ {
+  "id": "U4616",
+  "decision": "rewritten",
+  "reason": "Warthog tusks described as angled, not curved."
+ },
+ {
+  "id": "U4617",
+  "decision": "rewritten",
+  "reason": "Lion doc now gives the back height and the ~1.7 mane."
+ },
+ {
+  "id": "U4618",
+  "decision": "rewritten",
+  "reason": "Leopard doc no longer promises a rosetted coat; buildCatPredator uses solid colours."
+ },
+ {
+  "id": "U4619",
+  "decision": "rewritten",
+  "reason": "Flamingo height corrected to ~1.3 (head top 1.33)."
+ },
+ {
+  "id": "U4620",
+  "decision": "rewritten",
+  "reason": "tailBaseZ doc now says near the torso's rear, which ends at ~−0.76."
+ },
+ {
+  "id": "U4621",
+  "decision": "rewritten",
+  "reason": "Waterline doc now says the derivation follows the documented back line while the torso mesh must be kept to it by hand."
+ },
+ {
+  "id": "U4622",
+  "decision": "rewritten",
+  "reason": "Lunge-lift doc now says the back and flanks ride out while belly and feet stay just under the sheet."
+ },
+ {
+  "id": "U4623",
+  "decision": "rewritten",
+  "reason": "Nostril comment now says it lies below the fade floor, so a lurking croc shows only its eyes."
+ },
+ {
+  "id": "U4624",
+  "decision": "backlog",
+  "reason": "src/render/fauna.ts:1386 — buildGoat is used only by fauna.test.ts; production builds goats through buildGoatParts."
+ },
+ {
+  "id": "U4625",
+  "decision": "rewritten",
+  "reason": "GoatLeg doc now names every species whose legs it types."
+ },
+ {
+  "id": "U4626",
+  "decision": "rewritten",
+  "reason": "phaseOffset doc now says diagonal pairs share a beat, the pairs in antiphase."
+ },
+ {
+  "id": "U4627",
+  "decision": "rewritten",
+  "reason": "gaitRig doc now says it reads the legs' hip positions, not the built geometry."
+ },
+ {
+  "id": "U4628",
+  "decision": "rewritten",
+  "reason": "buildQuadrupedParts doc is now generic (goat, zebra, antelope)."
+ },
+ {
+  "id": "U4629",
+  "decision": "rewritten",
+  "reason": "Dropped the export on buildQuadrupedParts; only in-file builders call it."
+ }
+]
