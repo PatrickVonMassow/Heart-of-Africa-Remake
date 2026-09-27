@@ -2389,6 +2389,7 @@ export function queueEstimateHours(html, point) {
 export function promotionEstimateWarning(html, point) {
   return queueEstimateHours(html, point) == null
     ? `board: point ${point} was promoted with NO estimate, so its card shows a start time and no ` +
-        `expected end. Set one and re-promote: node scripts/board-queue.mjs set ${point} --estimate "~2 h"`
+        `expected end. Give it one: node scripts/board.mjs eta ${point} "<HH:MM>" (a queue --estimate no ` +
+        'longer reaches the promoted card)'
     : null
 }

@@ -206,7 +206,7 @@ export function validateList(list) {
   const seen = new Map()
   for (const line of list?.unreadable ?? []) {
     errors.push(
-      `list ${list?.list ?? '?'}: "${line}" was meant to be an entry but carries no id — write it as ` +
+      `list ${list?.list ?? '?'}: "${line}" was meant to be an entry but carries no id or lacks its \` | \` fields — write it as ` +
         '`A3 | <file> | <the defect>`, or it is counted by nobody',
     )
   }
