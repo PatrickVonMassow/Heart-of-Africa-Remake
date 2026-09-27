@@ -67,8 +67,15 @@ export const LARGE_FILE_DIRS = ['verification', 'public', 'cover']
  *  describe it. Measured 07.09.2026: at 2.0 MB it blocked the routine commit that
  *  moves a folded point out of the open work order, which is the one commit that
  *  MUST touch this file. Named here rather than by raising the ceiling, so a real
- *  stray file of the same size still blocks. */
-export const LARGE_FILE_PATHS = ['docs/tasks-archive.md']
+ *  stray file of the same size still blocks. The blind cleanup record of closing
+ *  633 is the same case: docs/four-eyes/README.md requires both halves verbatim
+ *  and the union tracked, and at 7158 entries each crosses the limit. */
+export const LARGE_FILE_PATHS = [
+  'docs/tasks-archive.md',
+  'docs/blind-633/A.txt',
+  'docs/blind-633/B.txt',
+  'docs/four-eyes/633-union.json',
+]
 
 const topSegment = (p) => String(p).split('/')[0]
 

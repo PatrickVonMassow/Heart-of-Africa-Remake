@@ -1,0 +1,1392 @@
+[
+ {
+  "id": "c01-p01",
+  "chars": 172120,
+  "files": [
+   "scripts/active-work-source.mjs",
+   "scripts/alert-escalation-core.mjs",
+   "scripts/alert-escalation.mjs",
+   "scripts/ask-astra-core.mjs",
+   "scripts/ask-astra.mjs",
+   "scripts/assertionHealth.mjs",
+   "scripts/astra-share-core.mjs",
+   "scripts/astra-share.mjs",
+   "scripts/atomic-write.mjs",
+   "scripts/attended-context-notice.mjs",
+   "scripts/audit-check.mjs",
+   "scripts/author-astra-core.mjs"
+  ]
+ },
+ {
+  "id": "c01-p02",
+  "chars": 164063,
+  "files": [
+   "scripts/author-astra.mjs",
+   "scripts/author-fable-core.mjs",
+   "scripts/author-fable.mjs",
+   "scripts/author-routing-core.mjs",
+   "scripts/authorship-check-core.mjs",
+   "scripts/authorship-check-io.mjs",
+   "scripts/authorship-check.mjs",
+   "scripts/batch-activity-journal-core.mjs",
+   "scripts/batch-activity-journal.mjs",
+   "scripts/batch-adoption-core.mjs",
+   "scripts/batch-attempt-lease-core.mjs"
+  ]
+ },
+ {
+  "id": "c01-p03",
+  "chars": 92253,
+  "files": [
+   "scripts/batch-autostart-core.mjs"
+  ]
+ },
+ {
+  "id": "c01-p04",
+  "chars": 127355,
+  "files": [
+   "scripts/batch-autostart.mjs",
+   "scripts/batch-baseline-core.mjs",
+   "scripts/batch-baseline.mjs",
+   "scripts/batch-board-core.mjs",
+   "scripts/batch-board.mjs"
+  ]
+ },
+ {
+  "id": "c01-p05",
+  "chars": 180595,
+  "files": [
+   "scripts/batch-boundary-core.mjs",
+   "scripts/batch-boundary-plane-core.mjs",
+   "scripts/batch-boundary-plane.mjs",
+   "scripts/batch-boundary.mjs",
+   "scripts/batch-checkpoint-core.mjs",
+   "scripts/batch-checkpoint.mjs",
+   "scripts/batch-claim-core.mjs"
+  ]
+ },
+ {
+  "id": "c01-p06",
+  "chars": 174337,
+  "files": [
+   "scripts/batch-claim.mjs",
+   "scripts/batch-context-samples.mjs",
+   "scripts/batch-daemon-core.mjs",
+   "scripts/batch-daemon-drill.mjs",
+   "scripts/batch-daemon-failure-drills.mjs",
+   "scripts/batch-daemon.mjs"
+  ]
+ },
+ {
+  "id": "c01-p07",
+  "chars": 170020,
+  "files": [
+   "scripts/batch-dispatch-core.mjs",
+   "scripts/batch-dispatch.mjs",
+   "scripts/batch-doctor-core.mjs",
+   "scripts/batch-doctor-states.mjs",
+   "scripts/batch-doctor.mjs",
+   "scripts/batch-emergency-core.mjs",
+   "scripts/batch-emergency-drill.mjs",
+   "scripts/batch-emergency.mjs",
+   "scripts/batch-handover-observe-core.mjs",
+   "scripts/batch-handover-observe.mjs"
+  ]
+ },
+ {
+  "id": "c01-p08",
+  "chars": 148617,
+  "files": [
+   "scripts/batch-in-flight-core.mjs"
+  ]
+ },
+ {
+  "id": "c02-p01",
+  "chars": 166908,
+  "files": [
+   "scripts/batch-in-flight.mjs",
+   "scripts/batch-landing-core.mjs",
+   "scripts/batch-landing-journal-core.mjs",
+   "scripts/batch-landing-journal.mjs",
+   "scripts/batch-launcher-core.mjs",
+   "scripts/batch-launcher.mjs"
+  ]
+ },
+ {
+  "id": "c02-p02",
+  "chars": 172299,
+  "files": [
+   "scripts/batch-lease-core.mjs",
+   "scripts/batch-lock.mjs",
+   "scripts/batch-metric-events.mjs",
+   "scripts/batch-metrics-core.mjs",
+   "scripts/batch-metrics.mjs",
+   "scripts/batch-owner-work.mjs",
+   "scripts/batch-ownership-core.mjs",
+   "scripts/batch-pause-core.mjs",
+   "scripts/batch-pause.mjs",
+   "scripts/batch-progress-guard.mjs"
+  ]
+ },
+ {
+  "id": "c02-p03",
+  "chars": 151761,
+  "files": [
+   "scripts/batch-reconcile-core.mjs",
+   "scripts/batch-reconcile.mjs",
+   "scripts/batch-resume-hook-core.mjs",
+   "scripts/batch-resume-hook.mjs",
+   "scripts/batch-schema-core.mjs",
+   "scripts/batch-singleton-race-worker.mjs"
+  ]
+ },
+ {
+  "id": "c02-p04",
+  "chars": 177429,
+  "files": [
+   "scripts/batch-singleton.mjs",
+   "scripts/batch-standstill-core.mjs",
+   "scripts/batch-standstill-inputs.mjs"
+  ]
+ },
+ {
+  "id": "c02-p05",
+  "chars": 107344,
+  "files": [
+   "scripts/batch-standstill-report.mjs",
+   "scripts/batch-state-core.mjs",
+   "scripts/batch-state.mjs",
+   "scripts/batch-trial.mjs",
+   "scripts/blind-merge-core.mjs",
+   "scripts/blind-merge.mjs",
+   "scripts/board-archive-rotate.mjs"
+  ]
+ },
+ {
+  "id": "c02-p06",
+  "chars": 172102,
+  "files": [
+   "scripts/board-core.mjs",
+   "scripts/board-currency-core.mjs",
+   "scripts/board-edit-core.mjs",
+   "scripts/board-edit-lock.mjs"
+  ]
+ },
+ {
+  "id": "c02-p07",
+  "chars": 182464,
+  "files": [
+   "scripts/board-first-core.mjs",
+   "scripts/board-first-guard.mjs",
+   "scripts/board-heartbeat-core.mjs",
+   "scripts/board-heartbeat.mjs",
+   "scripts/board-liveness-core.mjs",
+   "scripts/board-liveness.mjs",
+   "scripts/board-probe-core.mjs",
+   "scripts/board-publish.mjs",
+   "scripts/board-queue-core.mjs"
+  ]
+ },
+ {
+  "id": "c02-p08",
+  "chars": 93959,
+  "files": [
+   "scripts/board-queue.mjs",
+   "scripts/board-refresher-core.mjs",
+   "scripts/board-remedy.mjs",
+   "scripts/board-state-core.mjs",
+   "scripts/board-state.mjs",
+   "scripts/board-structure-core.mjs",
+   "scripts/board-watchdog.mjs",
+   "scripts/board.mjs"
+  ]
+ },
+ {
+  "id": "c03-p01",
+  "chars": 163111,
+  "files": [
+   "scripts/branch-hygiene-core.mjs",
+   "scripts/branch-hygiene-guard.mjs",
+   "scripts/build-geodata.mjs",
+   "scripts/build-info.mjs",
+   "scripts/bundle-first-core.mjs",
+   "scripts/bundle-first-guard.mjs",
+   "scripts/carrier-bell-core.mjs",
+   "scripts/chat-core.mjs",
+   "scripts/chat-delivery-core.mjs",
+   "scripts/chat-inbox.mjs",
+   "scripts/chat-reply.mjs",
+   "scripts/chat-secret.mjs",
+   "scripts/chat-spool.mjs"
+  ]
+ },
+ {
+  "id": "c03-p02",
+  "chars": 142688,
+  "files": [
+   "scripts/chat-watcher-core.mjs",
+   "scripts/chat-watcher.mjs",
+   "scripts/check-deployed-benchmark.mjs",
+   "scripts/child-retry-core.mjs",
+   "scripts/child-retry.mjs",
+   "scripts/ci-failure-cause-core.mjs",
+   "scripts/ci-gate-verdict-core.mjs",
+   "scripts/ci-gate-verdict.mjs"
+  ]
+ },
+ {
+  "id": "c03-p03",
+  "chars": 167302,
+  "files": [
+   "scripts/ci-status-guard-core.mjs",
+   "scripts/ci-status-guard.mjs",
+   "scripts/clear-claim-guard-core.mjs",
+   "scripts/clear-claim-guard.mjs",
+   "scripts/closing-guard-core.mjs",
+   "scripts/closing-guard.mjs",
+   "scripts/closing-reply-core.mjs"
+  ]
+ },
+ {
+  "id": "c03-p04",
+  "chars": 143787,
+  "files": [
+   "scripts/command-classify-core.mjs",
+   "scripts/commission-guard.mjs",
+   "scripts/commit-scope-guard-core.mjs",
+   "scripts/commit-scope-guard.mjs",
+   "scripts/container-ask-guard-core.mjs",
+   "scripts/container-ask-guard.mjs",
+   "scripts/context-budget-core.mjs",
+   "scripts/context-budget.mjs"
+  ]
+ },
+ {
+  "id": "c03-p05",
+  "chars": 180408,
+  "files": [
+   "scripts/context-fence-core.mjs",
+   "scripts/context-fence-guard.mjs",
+   "scripts/context-fence-override.mjs",
+   "scripts/context-fence-permit-core.mjs",
+   "scripts/context-fence-permit.mjs",
+   "scripts/context-incidents-core.mjs",
+   "scripts/context-incidents.mjs",
+   "scripts/context-watermark-core.mjs",
+   "scripts/context-watermark.mjs",
+   "scripts/criticality-review-guard-core.mjs"
+  ]
+ },
+ {
+  "id": "c03-p06",
+  "chars": 169979,
+  "files": [
+   "scripts/criticality-review-guard.mjs",
+   "scripts/cut-account-attest.mjs",
+   "scripts/cut-account-core.mjs",
+   "scripts/dashboard-card-topic-guard-core.mjs",
+   "scripts/dashboard-card-topic-guard.mjs",
+   "scripts/dashboard-conciseness-guard-core.mjs",
+   "scripts/dashboard-conciseness-guard.mjs",
+   "scripts/dashboard-guard-core.mjs",
+   "scripts/dashboard-guard-fixtures.mjs"
+  ]
+ },
+ {
+  "id": "c03-p07",
+  "chars": 174770,
+  "files": [
+   "scripts/dashboard-guard.mjs",
+   "scripts/dashboard-integrity-guard-core.mjs",
+   "scripts/dashboard-integrity-guard.mjs",
+   "scripts/dashboard-point-reader-core.mjs",
+   "scripts/dashboard-publish.mjs",
+   "scripts/dashboard-reminder-core.mjs",
+   "scripts/dashboard-reminder-hook.mjs",
+   "scripts/dashboard-state.mjs",
+   "scripts/dashboard-sync-core.mjs",
+   "scripts/dashboard-sync.mjs",
+   "scripts/decision-card-guard-core.mjs",
+   "scripts/decision-card-guard.mjs",
+   "scripts/decision-log-core.mjs"
+  ]
+ },
+ {
+  "id": "c03-p08",
+  "chars": 69475,
+  "files": [
+   "scripts/defer-for-user.mjs",
+   "scripts/deploy-staleness-core.mjs",
+   "scripts/deploy-staleness.mjs",
+   "scripts/deps-preflight.mjs",
+   "scripts/detached-agent.mjs"
+  ]
+ },
+ {
+  "id": "c04-p01",
+  "chars": 180004,
+  "files": [
+   "scripts/detached-escape-drill.mjs",
+   "scripts/doc-budget-core.mjs",
+   "scripts/doc-budget-guard.mjs",
+   "scripts/doc-corpus.mjs",
+   "scripts/durable-lane-flag-core.mjs",
+   "scripts/enable-hooks.mjs",
+   "scripts/fable-switch-core.mjs",
+   "scripts/fable-switch.mjs",
+   "scripts/finding.mjs",
+   "scripts/findings-core.mjs"
+  ]
+ },
+ {
+  "id": "c04-p02",
+  "chars": 178749,
+  "files": [
+   "scripts/findings-fixtures.mjs",
+   "scripts/findings-guard.mjs",
+   "scripts/findings-paths.mjs",
+   "scripts/findings-request-core.mjs",
+   "scripts/firewall-allow.mjs",
+   "scripts/firewall-guard-core.mjs",
+   "scripts/firewall-guard.mjs",
+   "scripts/firewall-rebuild.mjs",
+   "scripts/focus.mjs",
+   "scripts/fold-point-core.mjs",
+   "scripts/fold-point.mjs",
+   "scripts/generate-surface-textures.mjs",
+   "scripts/generate-terrain-textures.mjs",
+   "scripts/git-tracked.mjs",
+   "scripts/guard-compatibility-core.mjs",
+   "scripts/guard-duty-core.mjs",
+   "scripts/guard-duty.mjs"
+  ]
+ },
+ {
+  "id": "c04-p03",
+  "chars": 114199,
+  "files": [
+   "scripts/guard-health-core.mjs",
+   "scripts/guard-health-guard.mjs",
+   "scripts/guard-inventory-core.mjs",
+   "scripts/guard-inventory.mjs",
+   "scripts/guard-preflight-core.mjs",
+   "scripts/guard-preflight-expected.mjs",
+   "scripts/guard-preflight.mjs",
+   "scripts/guard-registration-core.mjs",
+   "scripts/guard-registration-guard.mjs"
+  ]
+ },
+ {
+  "id": "c04-p04",
+  "chars": 167028,
+  "files": [
+   "scripts/guide-brevity-core.mjs",
+   "scripts/guide-brevity-guard.mjs",
+   "scripts/handover-attribution-core.mjs",
+   "scripts/handover-attribution.mjs",
+   "scripts/handover-budget-core.mjs",
+   "scripts/handover-budget.mjs",
+   "scripts/handover-card-contract.mjs",
+   "scripts/handover-repair-loop-core.mjs",
+   "scripts/handover-repair-loop.mjs",
+   "scripts/help-core.mjs",
+   "scripts/help.mjs",
+   "scripts/hooks/berlin-timestamp.cjs",
+   "scripts/hooks/check-reply-timestamp.cjs",
+   "scripts/is-main.mjs"
+  ]
+ },
+ {
+  "id": "c04-p05",
+  "chars": 182782,
+  "files": [
+   "scripts/land-cleanup-core.mjs",
+   "scripts/land-point-core.mjs",
+   "scripts/land-point.mjs",
+   "scripts/launcher-stall-core.mjs",
+   "scripts/local-bin.mjs",
+   "scripts/lock-heartbeat-hook.mjs",
+   "scripts/lock-release-hook.mjs",
+   "scripts/main-checkout-core.mjs",
+   "scripts/mandatory-duty-core.mjs",
+   "scripts/measure-context-cost-core.mjs"
+  ]
+ },
+ {
+  "id": "c04-p06",
+  "chars": 139027,
+  "files": [
+   "scripts/measure-context-cost.mjs",
+   "scripts/measure-picture-cost.mjs",
+   "scripts/measure-point-cost-core.mjs",
+   "scripts/measure-point-cost.mjs",
+   "scripts/measure-task-cost-core.mjs",
+   "scripts/measure-task-cost.mjs"
+  ]
+ },
+ {
+  "id": "c04-p07",
+  "chars": 176380,
+  "files": [
+   "scripts/mechanism-review-core.mjs",
+   "scripts/mechanism-review-guard-gap-core.mjs",
+   "scripts/mechanism-review-guard-gap.mjs"
+  ]
+ },
+ {
+  "id": "c04-p08",
+  "chars": 62354,
+  "files": [
+   "scripts/mechanism-review-guard.mjs",
+   "scripts/mechanism-review-merge-core.mjs",
+   "scripts/mechanism-review-merge.mjs"
+  ]
+ },
+ {
+  "id": "c05-p01",
+  "chars": 174775,
+  "files": [
+   "scripts/mechanism-review-range-core.mjs",
+   "scripts/mechanism-review.mjs",
+   "scripts/model-guard-core.mjs",
+   "scripts/model-guard.mjs"
+  ]
+ },
+ {
+  "id": "c05-p02",
+  "chars": 128141,
+  "files": [
+   "scripts/model-handoff-core.mjs",
+   "scripts/model-trailer-gate.mjs",
+   "scripts/module-link-check.builtin-fixture.mjs",
+   "scripts/module-link-check.default-fixture.mjs",
+   "scripts/module-link-check.fixture.mjs",
+   "scripts/module-link-check.mjs",
+   "scripts/module-link-check.unresolvable-fixture.mjs",
+   "scripts/notify.mjs",
+   "scripts/pages-deploy-unblock-core.mjs",
+   "scripts/pages-deploy-unblock.mjs",
+   "scripts/path-scope-core.mjs",
+   "scripts/path-scope-guard.mjs",
+   "scripts/pause-retry-drill.mjs",
+   "scripts/perf-bench.mjs",
+   "scripts/perf-breakdown.mjs",
+   "scripts/perf-structure.mjs",
+   "scripts/permission-autogrant-core.mjs",
+   "scripts/permission-autogrant.mjs",
+   "scripts/picture-stability-core.mjs",
+   "scripts/picture-stability.mjs",
+   "scripts/png.mjs"
+  ]
+ },
+ {
+  "id": "c05-p03",
+  "chars": 182989,
+  "files": [
+   "scripts/point-brief-core.mjs",
+   "scripts/point-brief.mjs",
+   "scripts/point-proof-core.mjs",
+   "scripts/point-proof-guard.mjs",
+   "scripts/pre-push-gate-core.mjs",
+   "scripts/pre-push-gate.mjs"
+  ]
+ },
+ {
+  "id": "c05-p04",
+  "chars": 167341,
+  "files": [
+   "scripts/prep-arm-hook.mjs",
+   "scripts/prep-guard-core.mjs",
+   "scripts/prep-guard.mjs",
+   "scripts/probe-label-fusion.mjs",
+   "scripts/publish-outcome-core.mjs",
+   "scripts/push-arrival-core.mjs",
+   "scripts/push-arrival-guard.mjs",
+   "scripts/queue-calibration-core.mjs",
+   "scripts/queue-calibration.mjs",
+   "scripts/queue-order-guard-core.mjs",
+   "scripts/queue-order-guard.mjs"
+  ]
+ },
+ {
+  "id": "c05-p05",
+  "chars": 97427,
+  "files": [
+   "scripts/queue-rank-core.mjs",
+   "scripts/queue-rank.mjs",
+   "scripts/quota-drill.mjs"
+  ]
+ },
+ {
+  "id": "c05-p06",
+  "chars": 130918,
+  "files": [
+   "scripts/render-verify-charges.mjs"
+  ]
+ },
+ {
+  "id": "c05-p07",
+  "chars": 131215,
+  "files": [
+   "scripts/render-verify-core.mjs"
+  ]
+ },
+ {
+  "id": "c05-p08",
+  "chars": 183529,
+  "files": [
+   "scripts/render-verify-guard.mjs",
+   "scripts/render-verify-recorder.mjs",
+   "scripts/render-verify-state.mjs",
+   "scripts/repo-paths.mjs",
+   "scripts/repository-integrity.mjs",
+   "scripts/resume-batch.mjs",
+   "scripts/retro-core.mjs",
+   "scripts/retro-currency-guard.mjs",
+   "scripts/retro-refresh.mjs"
+  ]
+ },
+ {
+  "id": "c05-p09",
+  "chars": 8023,
+  "files": [
+   "scripts/retro-sources.mjs"
+  ]
+ },
+ {
+  "id": "c06-p01",
+  "chars": 136175,
+  "files": [
+   "scripts/review-astra-core.mjs",
+   "scripts/review-astra.mjs"
+  ]
+ },
+ {
+  "id": "c06-p02",
+  "chars": 184787,
+  "files": [
+   "scripts/review-material-core.mjs",
+   "scripts/rule-echo-core.mjs",
+   "scripts/rule-echo-guard.mjs",
+   "scripts/rule-echo.mjs",
+   "scripts/rule-review-core.mjs",
+   "scripts/rule-review-guard.mjs",
+   "scripts/rule-review-state.mjs",
+   "scripts/rule-review.mjs",
+   "scripts/section-tag-core.mjs",
+   "scripts/session-context-ceiling-core.mjs",
+   "scripts/session-death-core.mjs",
+   "scripts/session-death.mjs",
+   "scripts/settled-owner-rulings.mjs",
+   "scripts/settled-ruling-core.mjs",
+   "scripts/tasks-archive-guard-core.mjs",
+   "scripts/tasks-archive-guard.mjs",
+   "scripts/tasks-source.mjs",
+   "scripts/tasks-spec-guard-core.mjs"
+  ]
+ },
+ {
+  "id": "c06-p03",
+  "chars": 176860,
+  "files": [
+   "scripts/tasks-spec-guard.mjs",
+   "scripts/textureFields.mjs",
+   "scripts/throttle-probe-core.mjs",
+   "scripts/throttle-probe.mjs",
+   "scripts/timestamp-guard-core.mjs",
+   "scripts/timestamp-guard.mjs",
+   "scripts/timestamp-race-fixture.mjs",
+   "scripts/tool-output-budget-core.mjs",
+   "scripts/tool-output-budget-launch.mjs",
+   "scripts/tool-output-budget.mjs",
+   "scripts/tool-output-intercept-core.mjs",
+   "scripts/tool-output-log-retention.mjs",
+   "scripts/tool-output-shell.mjs",
+   "scripts/user-gate-core.mjs",
+   "scripts/user-said-core.mjs",
+   "scripts/user-said.mjs"
+  ]
+ },
+ {
+  "id": "c06-p04",
+  "chars": 172970,
+  "files": [
+   "scripts/vdzk-admissibility-core.mjs",
+   "scripts/vdzk-answer.mjs",
+   "scripts/verify-bringup.mjs",
+   "scripts/verify/_boot.mjs",
+   "scripts/verify/_browser.mjs",
+   "scripts/verify/_server.mjs",
+   "scripts/verify/animalShare.mjs",
+   "scripts/verify/backend-lane-check.mjs",
+   "scripts/verify/backend-lane-core.mjs",
+   "scripts/verify/baseline-classify-core.mjs",
+   "scripts/verify/baseline-classify.mjs",
+   "scripts/verify/benchmark.mjs",
+   "scripts/verify/board-layout.mjs"
+  ]
+ },
+ {
+  "id": "c06-p05",
+  "chars": 182654,
+  "files": [
+   "scripts/verify/childMotionMetric.mjs",
+   "scripts/verify/colliderProbe.mjs",
+   "scripts/verify/collision.mjs",
+   "scripts/verify/communication.mjs",
+   "scripts/verify/communicationAudio.mjs"
+  ]
+ },
+ {
+  "id": "c06-p06",
+  "chars": 95322,
+  "files": [
+   "scripts/verify/communicationCapture.mjs",
+   "scripts/verify/communicationDriver.mjs",
+   "scripts/verify/communicationRouteCore.mjs",
+   "scripts/verify/communicationTimeline.mjs",
+   "scripts/verify/cropLuma.mjs",
+   "scripts/verify/crossbrowser.mjs",
+   "scripts/verify/digSitePicture.mjs",
+   "scripts/verify/docs.mjs",
+   "scripts/verify/drumFrame.mjs",
+   "scripts/verify/eavesColumn.mjs",
+   "scripts/verify/edgeBandReading.mjs",
+   "scripts/verify/edgeBandSettle.mjs"
+  ]
+ },
+ {
+  "id": "c07-p01",
+  "chars": 112495,
+  "files": [
+   "scripts/verify/enrichments.mjs"
+  ]
+ },
+ {
+  "id": "c07-p02",
+  "chars": 112501,
+  "files": [
+   "scripts/verify/enrichments.mjs"
+  ]
+ },
+ {
+  "id": "c07-p03",
+  "chars": 112521,
+  "files": [
+   "scripts/verify/enrichments.mjs"
+  ]
+ },
+ {
+  "id": "c07-p04",
+  "chars": 112532,
+  "files": [
+   "scripts/verify/enrichments.mjs"
+  ]
+ },
+ {
+  "id": "c07-p05",
+  "chars": 177898,
+  "files": [
+   "scripts/verify/enrichments.mjs",
+   "scripts/verify/events.mjs",
+   "scripts/verify/fixedWaits.mjs",
+   "scripts/verify/flow.mjs",
+   "scripts/verify/footingSeries.mjs"
+  ]
+ },
+ {
+  "id": "c07-p06",
+  "chars": 183543,
+  "files": [
+   "scripts/verify/frameSubject-core.mjs",
+   "scripts/verify/frameSubject.mjs",
+   "scripts/verify/gamepad.mjs",
+   "scripts/verify/gpu-backend-probe-core.mjs",
+   "scripts/verify/gpu-backend-probe.mjs",
+   "scripts/verify/handwriting.mjs",
+   "scripts/verify/health.mjs",
+   "scripts/verify/i18n.mjs",
+   "scripts/verify/invariants.mjs",
+   "scripts/verify/labelFusion.mjs",
+   "scripts/verify/ladder-core.mjs",
+   "scripts/verify/ladder.mjs",
+   "scripts/verify/large-run-wait.mjs",
+   "scripts/verify/launch-args-core.mjs",
+   "scripts/verify/liveness.mjs"
+  ]
+ },
+ {
+  "id": "c07-p07",
+  "chars": 50575,
+  "files": [
+   "scripts/verify/machine-load-core.mjs",
+   "scripts/verify/machine-load.mjs"
+  ]
+ },
+ {
+  "id": "c08-p01",
+  "chars": 112489,
+  "files": [
+   "scripts/verify/polish.mjs"
+  ]
+ },
+ {
+  "id": "c08-p02",
+  "chars": 112564,
+  "files": [
+   "scripts/verify/polish.mjs"
+  ]
+ },
+ {
+  "id": "c08-p03",
+  "chars": 112526,
+  "files": [
+   "scripts/verify/polish.mjs"
+  ]
+ },
+ {
+  "id": "c08-p04",
+  "chars": 112489,
+  "files": [
+   "scripts/verify/polish.mjs"
+  ]
+ },
+ {
+  "id": "c08-p05",
+  "chars": 183893,
+  "files": [
+   "scripts/verify/polish.mjs",
+   "scripts/verify/preview.mjs",
+   "scripts/verify/red-ownership-core.mjs",
+   "scripts/verify/report-archive-names.mjs",
+   "scripts/verify/report.mjs",
+   "scripts/verify/run-all.mjs",
+   "scripts/verify/run-digest-core.mjs",
+   "scripts/verify/run-green-cache.mjs",
+   "scripts/verify/run-logged-args.mjs"
+  ]
+ },
+ {
+  "id": "c08-p06",
+  "chars": 158563,
+  "files": [
+   "scripts/verify/run-logged.mjs",
+   "scripts/verify/run-record.mjs",
+   "scripts/verify/run-wait-core.mjs",
+   "scripts/verify/run-wait.mjs",
+   "scripts/verify/sceneReady-core.mjs",
+   "scripts/verify/sectionScope.mjs",
+   "scripts/verify/sections.mjs"
+  ]
+ },
+ {
+  "id": "c08-p07",
+  "chars": 173744,
+  "files": [
+   "scripts/verify/settings.mjs",
+   "scripts/verify/settingsPipelineState.mjs",
+   "scripts/verify/settingsSceneLuma.mjs",
+   "scripts/verify/snowMetric.mjs",
+   "scripts/verify/spawnAssertion.mjs",
+   "scripts/verify/speechSampler.mjs",
+   "scripts/verify/stanceSlip.mjs",
+   "scripts/verify/startup.mjs",
+   "scripts/verify/system-chrome.mjs",
+   "scripts/verify/tagFrameReading.mjs",
+   "scripts/verify/textureLeak.mjs",
+   "scripts/verify/tiers.mjs",
+   "scripts/verify/touch.mjs",
+   "scripts/verify/ttsCache.mjs",
+   "scripts/verify/verify-seed.mjs",
+   "scripts/verify/visualsweep.mjs"
+  ]
+ },
+ {
+  "id": "c08-p08",
+  "chars": 168794,
+  "files": [
+   "scripts/verify/voice.mjs",
+   "scripts/verify/world.mjs",
+   "scripts/wait-command-core.mjs",
+   "scripts/wait-command-guard.mjs",
+   "scripts/wait-lease-core.mjs",
+   "scripts/wait-lease.mjs",
+   "scripts/wait-marker-core.mjs",
+   "scripts/wait-marker.mjs",
+   "scripts/window-hide-core.mjs",
+   "scripts/windows-task-core.mjs",
+   "scripts/windows-task-watch.mjs",
+   "scripts/windows/stage-host-commands.mjs",
+   "scripts/worktree-bootstrap-core.mjs",
+   "scripts/worktree-bootstrap.mjs"
+  ]
+ },
+ {
+  "id": "c08-p09",
+  "chars": 84388,
+  "files": [
+   "scripts/worktree-cleanup-core.mjs",
+   "scripts/worktree-cleanup.mjs",
+   "scripts/worktree-reminder-core.mjs",
+   "scripts/worktree-reminder.mjs",
+   "src/App.tsx"
+  ]
+ },
+ {
+  "id": "c09-p01",
+  "chars": 76663,
+  "files": [
+   "src/communication/drumMessage.ts",
+   "src/communication/heard.ts",
+   "src/communication/lexicon.ts",
+   "src/communication/speaking.ts",
+   "src/communication/speechFloor.ts",
+   "src/communication/speechLabel.ts",
+   "src/communication/speechTarget.ts",
+   "src/communication/spokenGesture.ts",
+   "src/communication/vocabulary.ts"
+  ]
+ },
+ {
+  "id": "c09-p02",
+  "chars": 124514,
+  "files": [
+   "src/config/balance.ts",
+   "src/config/quality.ts",
+   "src/config/startLang.ts",
+   "src/config/startPlace.ts"
+  ]
+ },
+ {
+  "id": "c09-p03",
+  "chars": 97532,
+  "files": [
+   "src/i18n/de.ts",
+   "src/i18n/dictionaries.ts"
+  ]
+ },
+ {
+  "id": "c09-p04",
+  "chars": 175410,
+  "files": [
+   "src/i18n/en.ts",
+   "src/i18n/index.ts",
+   "src/i18n/names.ts",
+   "src/i18n/types.ts",
+   "src/journal/arrival.ts",
+   "src/journal/sketches.tsx",
+   "src/journal/speech.ts",
+   "src/journal/ttsWorker.ts",
+   "src/journal/voiceMarkup.ts",
+   "src/main.tsx",
+   "src/render/Effects.tsx"
+  ]
+ },
+ {
+  "id": "c09-p05",
+  "chars": 171959,
+  "files": [
+   "src/render/asyncPipelines.ts",
+   "src/render/backendInfo.ts",
+   "src/render/demElevation.ts",
+   "src/render/edgeBand.ts",
+   "src/render/environment.ts",
+   "src/render/fauna.ts",
+   "src/render/figurePose.ts",
+   "src/render/figures.ts",
+   "src/render/flora.ts",
+   "src/render/frameCapture.ts"
+  ]
+ },
+ {
+  "id": "c09-p06",
+  "chars": 184583,
+  "files": [
+   "src/render/gesture.ts",
+   "src/render/groundStains.ts",
+   "src/render/landmarks.ts",
+   "src/render/materials.ts",
+   "src/render/placeRiver.ts",
+   "src/render/renderContext.ts",
+   "src/render/renderLeak.ts",
+   "src/render/sceneFrame.ts",
+   "src/render/scenePass.ts",
+   "src/render/seasonField.ts",
+   "src/render/seasonTint.ts"
+  ]
+ },
+ {
+  "id": "c09-p07",
+  "chars": 81681,
+  "files": [
+   "src/render/seasonalSnow.ts",
+   "src/render/shadowRelease.ts",
+   "src/render/sky.tsx",
+   "src/render/skyOvercast.ts",
+   "src/render/skyPresets.ts",
+   "src/render/water.ts",
+   "src/render/waterAppearance.ts",
+   "src/report/bugReport.ts",
+   "src/report/overlaySnapshot.ts",
+   "src/report/zip.ts",
+   "src/scenes/ActorLabels.tsx",
+   "src/scenes/actorLabelSource.ts",
+   "src/scenes/place/DigSites.tsx",
+   "src/scenes/place/PlaceGroundContext.ts"
+  ]
+ },
+ {
+  "id": "c09-p08",
+  "chars": 112696,
+  "files": [
+   "src/scenes/place/PlaceLife.tsx"
+  ]
+ },
+ {
+  "id": "c09-p09",
+  "chars": 102928,
+  "files": [
+   "src/scenes/place/PlaceLife.tsx",
+   "src/scenes/place/PlaceRain.tsx"
+  ]
+ },
+ {
+  "id": "c10-p01",
+  "chars": 174752,
+  "files": [
+   "src/scenes/place/PlaceScene.tsx",
+   "src/scenes/place/SpeechLabels.tsx"
+  ]
+ },
+ {
+  "id": "c10-p02",
+  "chars": 179945,
+  "files": [
+   "src/scenes/place/adultWork.ts",
+   "src/scenes/place/animalSpots.ts",
+   "src/scenes/place/backdrop.ts",
+   "src/scenes/place/backdropMaterial.ts",
+   "src/scenes/place/bankGame.ts",
+   "src/scenes/place/boundary.ts",
+   "src/scenes/place/chiefMeeting.ts"
+  ]
+ },
+ {
+  "id": "c10-p03",
+  "chars": 98915,
+  "files": [
+   "src/scenes/place/chiefPresence.ts",
+   "src/scenes/place/chiefWalk.ts",
+   "src/scenes/place/collision.ts",
+   "src/scenes/place/digSiteAppearance.ts",
+   "src/scenes/place/digSpoilGeometry.ts",
+   "src/scenes/place/drummerPose.ts",
+   "src/scenes/place/drummerVoice.ts",
+   "src/scenes/place/gizaSite.ts",
+   "src/scenes/place/groundScatter.ts",
+   "src/scenes/place/inhabitantBodies.ts",
+   "src/scenes/place/lanePlan.ts"
+  ]
+ },
+ {
+  "id": "c10-p04",
+  "chars": 176992,
+  "files": [
+   "src/scenes/place/layout.ts",
+   "src/scenes/place/layoutHarness.ts",
+   "src/scenes/place/lifeSpots.ts"
+  ]
+ },
+ {
+  "id": "c10-p05",
+  "chars": 175915,
+  "files": [
+   "src/scenes/place/loom.ts",
+   "src/scenes/place/loomVisual.ts",
+   "src/scenes/place/loomWork.ts",
+   "src/scenes/place/looseRocks.ts",
+   "src/scenes/place/panoramaWildlife.ts",
+   "src/scenes/place/placeGround.ts",
+   "src/scenes/place/placement.ts",
+   "src/scenes/place/playRockSurface.ts",
+   "src/scenes/place/playerPosition.ts",
+   "src/scenes/place/pointerLock.ts",
+   "src/scenes/place/regionStyles.ts",
+   "src/scenes/place/riverBank.ts",
+   "src/scenes/place/rockTouch.ts",
+   "src/scenes/place/roofClearance.ts",
+   "src/scenes/place/routing.ts",
+   "src/scenes/place/speechBearing.ts"
+  ]
+ },
+ {
+  "id": "c10-p06",
+  "chars": 169755,
+  "files": [
+   "src/scenes/place/speechChannel.ts",
+   "src/scenes/place/tagGame.ts",
+   "src/scenes/place/tagShuffleHarness.ts",
+   "src/scenes/place/useColdCloaks.ts",
+   "src/scenes/place/useKeyTarget.ts",
+   "src/scenes/place/wedgeCarve.ts",
+   "src/scenes/travel/Climate.tsx",
+   "src/scenes/travel/RegionBorders.tsx"
+  ]
+ },
+ {
+  "id": "c10-p07",
+  "chars": 184917,
+  "files": [
+   "src/scenes/travel/Rivers.tsx",
+   "src/scenes/travel/TalusSocket.tsx",
+   "src/scenes/travel/TravelScene.tsx"
+  ]
+ },
+ {
+  "id": "c11-p01",
+  "chars": 112563,
+  "files": [
+   "src/scenes/travel/Wildlife.tsx"
+  ]
+ },
+ {
+  "id": "c11-p02",
+  "chars": 112546,
+  "files": [
+   "src/scenes/travel/Wildlife.tsx"
+  ]
+ },
+ {
+  "id": "c11-p03",
+  "chars": 182304,
+  "files": [
+   "src/scenes/travel/Wildlife.tsx",
+   "src/scenes/travel/animalBodies.ts",
+   "src/scenes/travel/borderGeometry.ts",
+   "src/scenes/travel/canoeDrag.ts",
+   "src/scenes/travel/farColor.ts",
+   "src/scenes/travel/floraSpecies.ts",
+   "src/scenes/travel/floraStreaming.ts",
+   "src/scenes/travel/frameVisibility.ts",
+   "src/scenes/travel/panoramaCapture.ts",
+   "src/scenes/travel/panoramaMath.ts",
+   "src/scenes/travel/perfProbe.ts"
+  ]
+ },
+ {
+  "id": "c11-p04",
+  "chars": 73225,
+  "files": [
+   "src/scenes/travel/riverBanks.ts",
+   "src/scenes/travel/settlementEntry.ts",
+   "src/scenes/travel/springAnimation.ts",
+   "src/scenes/travel/talusSocketGeometry.ts",
+   "src/scenes/travel/terrainLod.ts",
+   "src/scenes/travel/terrainQueue.ts",
+   "src/scenes/travel/travelSpace.ts",
+   "src/scenes/travel/waterEdgeRules.ts",
+   "src/scenes/travel/waterSurface.ts",
+   "src/scenes/travel/wildlifeActorSource.ts"
+  ]
+ },
+ {
+  "id": "c11-p05",
+  "chars": 174531,
+  "files": [
+   "src/scenes/travel/wildlifeBehavior.ts",
+   "src/scenes/travel/wildlifeCollision.ts",
+   "src/state/stateDump.ts"
+  ]
+ },
+ {
+  "id": "c11-p06",
+  "chars": 158288,
+  "files": [
+   "src/state/store.ts",
+   "src/state/ui.ts",
+   "src/systems/actorLabels.ts"
+  ]
+ },
+ {
+  "id": "c11-p07",
+  "chars": 174727,
+  "files": [
+   "src/systems/ambience.ts",
+   "src/systems/benchmark.ts",
+   "src/systems/benchmarkRun.ts",
+   "src/systems/cookShelter.ts",
+   "src/systems/current.ts",
+   "src/systems/debugEvents.ts",
+   "src/systems/devAssert.ts",
+   "src/systems/dress.ts",
+   "src/systems/economy.ts",
+   "src/systems/events.ts",
+   "src/systems/fuzzRandom.ts"
+  ]
+ },
+ {
+  "id": "c11-p08",
+  "chars": 184491,
+  "files": [
+   "src/systems/input.ts",
+   "src/systems/jumpTargets.ts",
+   "src/systems/keyboardGuard.ts",
+   "src/systems/lookPitch.ts",
+   "src/systems/loomCloth.ts",
+   "src/systems/mixLimiter.ts",
+   "src/systems/movement.ts",
+   "src/systems/placeSituation.ts",
+   "src/systems/pursuit.ts",
+   "src/systems/rinderpest.ts",
+   "src/systems/season.ts",
+   "src/systems/seasonalLife.ts",
+   "src/systems/startBenchmark.ts",
+   "src/systems/swimEscape.ts",
+   "src/systems/touchInput.ts",
+   "src/systems/unstuck.ts",
+   "src/systems/walkFeel.ts",
+   "src/systems/wildlifeDump.ts"
+  ]
+ },
+ {
+  "id": "c11-p09",
+  "chars": 74028,
+  "files": [
+   "src/test/geodata.ts",
+   "src/test/setup.ts",
+   "src/test/store.ts",
+   "src/test/yieldSetup.ts",
+   "src/ui/AmbienceController.tsx",
+   "src/ui/BenchmarkOverlay.tsx",
+   "src/ui/ClayImpression.tsx",
+   "src/ui/DebugMenu.tsx"
+  ]
+ },
+ {
+  "id": "c12-p01",
+  "chars": 181082,
+  "files": [
+   "src/ui/Dialogs.tsx",
+   "src/ui/DrumMessage.tsx",
+   "src/ui/HealthBar.tsx",
+   "src/ui/Hud.tsx",
+   "src/ui/JournalPanel.tsx",
+   "src/ui/MapOverlay.tsx",
+   "src/ui/SpeechGuess.tsx",
+   "src/ui/SpeechLabelCard.tsx",
+   "src/ui/StateDump.tsx",
+   "src/ui/StatusBar.tsx",
+   "src/ui/TouchControls.tsx",
+   "src/ui/ctrlHold.ts",
+   "src/ui/cursorHintPlacement.ts",
+   "src/ui/debugMenuGroups.ts",
+   "src/ui/mapLayout.ts",
+   "src/world/coastVector.ts",
+   "src/world/communicationRock.ts",
+   "src/world/data/coastline.ts",
+   "src/world/data/gizaPlateau.ts",
+   "src/world/data/lakes.ts"
+  ]
+ },
+ {
+  "id": "c12-p02",
+  "chars": 180330,
+  "files": [
+   "src/world/data/landmarks.ts",
+   "src/world/data/rivers.ts",
+   "src/world/finds.ts",
+   "src/world/forms.ts",
+   "src/world/geo.ts",
+   "src/world/geoIndex.ts",
+   "src/world/geodata.ts",
+   "src/world/hydro.ts",
+   "src/world/lore.ts",
+   "src/world/noise.ts",
+   "src/world/redSea.ts",
+   "src/world/riverClearance.ts",
+   "src/world/riverMouths.ts",
+   "src/world/riverProfile.ts",
+   "src/world/riverWidth.ts",
+   "src/world/rockRelief.ts",
+   "src/world/terrain.ts",
+   ".claude/agents/trivial-task.md",
+   ".claude/skills/sketch/SKILL.md",
+   "CLAUDE.md",
+   "README.md"
+  ]
+ },
+ {
+  "id": "c12-p03",
+  "chars": 180936,
+  "files": [
+   "design.md"
+  ]
+ },
+ {
+  "id": "c12-p04",
+  "chars": 97111,
+  "files": [
+   "docs/1131-water-errand.md",
+   "docs/205-world-accuracy-findings.md",
+   "docs/acceptance-criteria-detail.md"
+  ]
+ },
+ {
+  "id": "c12-p05",
+  "chars": 143225,
+  "files": [
+   "docs/acceptance-evidence.md"
+  ]
+ },
+ {
+  "id": "c12-p06",
+  "chars": 104351,
+  "files": [
+   "docs/analysis_de/durchsatz-analyse.md"
+  ]
+ },
+ {
+  "id": "c12-p07",
+  "chars": 171189,
+  "files": [
+   "docs/analysis_de/lesson-mechanisms.md",
+   "docs/analysis_de/vibe-coding-anleitung.md",
+   "docs/astra-routing.md"
+  ]
+ },
+ {
+  "id": "c13-p01",
+  "chars": 112568,
+  "files": [
+   "docs/batch-autonomy.md"
+  ]
+ },
+ {
+  "id": "c13-p02",
+  "chars": 163074,
+  "files": [
+   "docs/batch-autonomy.md",
+   "docs/batch-owner-runbook.md"
+  ]
+ },
+ {
+  "id": "c13-p03",
+  "chars": 171732,
+  "files": [
+   "docs/batch-resilience.md",
+   "docs/batch-singleton-analysis.md",
+   "docs/board-candidate/README.md",
+   "docs/catcher-station-replay.md",
+   "docs/climate-1890.md",
+   "docs/command-index.md",
+   "docs/communication-1890.md"
+  ]
+ },
+ {
+  "id": "c13-p04",
+  "chars": 154384,
+  "files": [
+   "docs/communication-playthrough.md",
+   "docs/communication-poc-spec.md",
+   "docs/communication-rebuild-sweep.md",
+   "docs/communication-review-659/audio-and-teaching-order.md",
+   "docs/communication-review-659/findings-round-1.md",
+   "docs/communication-review-659/findings-round-2.md",
+   "docs/communication-review-659/findings-round-3.md",
+   "docs/communication-review-659/findings-round-4.md",
+   "docs/communication-review-659/findings-round-5.md",
+   "docs/communication-review-659/findings-round-6.md",
+   "docs/communication-review-659/findings-round-7.md",
+   "docs/communication-review-659/pictures-steps-1-3.md",
+   "docs/communication-review-659/pictures-steps-4-9.md",
+   "docs/criticality-review.md",
+   "docs/design-reference.md",
+   "docs/document-cut-757.md"
+  ]
+ },
+ {
+  "id": "c13-p05",
+  "chars": 176796,
+  "files": [
+   "docs/fauna-behaviour-1890.md",
+   "docs/four-eyes/1048-blind-a-opus5.md",
+   "docs/four-eyes/1048-blind-b-sol.md",
+   "docs/four-eyes/659-provenance.md",
+   "docs/four-eyes/676-blind-a-opus5.md",
+   "docs/four-eyes/676-blind-b-sol.md",
+   "docs/four-eyes/676-provenance.md",
+   "docs/four-eyes/713-blind-a-opus5.md",
+   "docs/four-eyes/713-blind-b-sol.md",
+   "docs/four-eyes/713-provenance.md",
+   "docs/four-eyes/947-blind-a-opus5.md",
+   "docs/four-eyes/947-blind-b-sol.md",
+   "docs/four-eyes/README.md"
+  ]
+ },
+ {
+  "id": "c13-p06",
+  "chars": 176598,
+  "files": [
+   "docs/giza-1890.md",
+   "docs/graphics-detail-levels.md",
+   "docs/guard-memory-audit.md",
+   "docs/hand-stone-contact.md",
+   "docs/handover-architecture.md",
+   "docs/harness-primitives-evaluation.md",
+   "docs/host-environment.md"
+  ]
+ },
+ {
+  "id": "c13-p07",
+  "chars": 79369,
+  "files": [
+   "docs/intraspecies-combat-1890.md",
+   "docs/maximum-qa.md",
+   "docs/multistep-analysis-17-08/multistep-A.md",
+   "docs/multistep-analysis-17-08/multistep-B.md"
+  ]
+ },
+ {
+  "id": "c14-p01",
+  "chars": 112549,
+  "files": [
+   "docs/peoples-1890.md"
+  ]
+ },
+ {
+  "id": "c14-p02",
+  "chars": 181824,
+  "files": [
+   "docs/peoples-1890.md",
+   "docs/perf-276-findings.md",
+   "docs/perf-277-user-hardware.md",
+   "docs/perf-driving-hitches.md",
+   "docs/picture-check-cost.md",
+   "docs/picture-check-levers.md"
+  ]
+ },
+ {
+  "id": "c14-p03",
+  "chars": 86706,
+  "files": [
+   "docs/point-cost-report.md",
+   "docs/render-architecture.md",
+   "docs/rule-corpus-audit.md",
+   "docs/settlement-edge-settle-review.md",
+   "docs/standstill-analysis-809.md",
+   "docs/traa-toggle-review.md",
+   "docs/tts-architecture.md",
+   "docs/wsl-vm-recovery.md",
+   "scripts/README.md"
+  ]
+ },
+ {
+  "id": "c14-p04",
+  "chars": 175262,
+  "files": [
+   "scripts/verify/README.md",
+   "verification/README.md",
+   "verification/wedged-adults-authoring.md"
+  ]
+ }
+]
