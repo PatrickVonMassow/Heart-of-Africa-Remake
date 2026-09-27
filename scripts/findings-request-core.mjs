@@ -16,9 +16,9 @@
 // implies for the documents — leaving the owner the mechanical half it alone may
 // do: append it verbatim and number it.
 //
-// Side-effect free and total: every function takes text and returns data, a
-// malformed entry is REPORTED rather than thrown on, and nothing here can block
-// a turn (findings-guard.mjs is fail-open and owns that direction).
+// Side-effect free: every function takes text and returns data, a malformed
+// entry is REPORTED rather than thrown on (only the transitions throw, to refuse
+// an invalid call), and nothing here can block a turn (findings-guard.mjs is fail-open and owns that direction).
 import { HEAD_SEP, REQUEST_MARKER, findPending, parseHead } from './findings-core.mjs'
 
 /** The body indent — six spaces, the same the finding detail already uses. */
@@ -28,13 +28,12 @@ const INDENT = '      '
  * The fields a request carries, in the order they are written and read.
  *
  * `key` is the programmatic name, `tag` the marker in the file (`#spec`), and
- * `label` what the drain prints. `verbatim` marks the ones the owner appends
- * WITHOUT interpreting — the spec and the bounds the user named.
+ * `label` what the drain prints.
  */
-export const REQUEST_FIELDS = Object.freeze([
+const REQUEST_FIELDS = Object.freeze([
   { key: 'why', tag: 'why', label: 'observed problem' },
-  { key: 'spec', tag: 'spec', label: 'spec (final state — append VERBATIM)', verbatim: true },
-  { key: 'constraints', tag: 'constraints', label: 'bounds the user named (verbatim)', verbatim: true },
+  { key: 'spec', tag: 'spec', label: 'spec (final state — append VERBATIM)' },
+  { key: 'constraints', tag: 'constraints', label: 'bounds the user named (verbatim)' },
   { key: 'userQuotes', tag: 'quotes', label: 'the user’s own sentences, with their date' },
   { key: 'docImpact', tag: 'docimpact', label: 'implied design.md / CLAUDE.md / memory changes' },
   { key: 'bundle', tag: 'bundle', label: 'proposed bundle (German name)' },
@@ -48,7 +47,7 @@ const BY_TAG = new Map(REQUEST_FIELDS.map((f) => [f.tag, f]))
 const BY_KEY = new Map(REQUEST_FIELDS.map((f) => [f.key, f]))
 
 /** The fields without which a deposit is not a spec but a note. */
-export const REQUIRED_FIELDS = Object.freeze(['spec', 'why'])
+const REQUIRED_FIELDS = Object.freeze(['spec', 'why'])
 
 /** One line, whitespace collapsed — a head field may never break the line. */
 const oneLine = (value) => String(value ?? '').replace(/\s+/g, ' ').trim()
@@ -98,7 +97,7 @@ function trimBlankEdges(lines) {
  * indented, or the next entry head. Returns { body, end } with `body` already
  * un-indented and edge-trimmed, `end` the index AFTER the last consumed line.
  */
-export function readBody(lines, start) {
+function readBody(lines, start) {
   const body = []
   let i = start
   for (; i < lines.length; i++) {

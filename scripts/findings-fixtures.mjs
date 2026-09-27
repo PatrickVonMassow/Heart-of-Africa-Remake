@@ -14,11 +14,11 @@
 // three fields the decision reads (tool name, shell command, written path), with
 // home directories folded to `~`, anything token-shaped removed, and every long
 // shell segment shortened — but ONLY as far as the shortened text still classifies
-// exactly like the original, which the cutter verifies call by call.
+// exactly like the path-scrubbed original, which the cutter verifies call by call.
 //
 // Usage:
-//   node scripts/findings-fixtures.mjs --measure   # rates over the local corpus
-//   node scripts/findings-fixtures.mjs --cut       # rewrite findings-fixtures.json
+//   node scripts/findings-fixtures.mjs [--measure] # rates over the local corpus (always printed)
+//   node scripts/findings-fixtures.mjs --cut       # also rewrite findings-fixtures.json
 //   …    [--dir <transcript dir>] [--limit <per family>]
 import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
@@ -59,14 +59,14 @@ function transcriptDir(env = process.env, home = homedir()) {
  * four-eyes finding 6: taking only the string form merged every attachment-carrying
  * prompt into the turn before it).
  */
-export function isUserPrompt(content) {
+function isUserPrompt(content) {
   if (typeof content === 'string') return content.trim().length > 0
   if (!Array.isArray(content)) return false
   if (content.some((p) => p && p.type === 'tool_result')) return false
   return content.some((p) => p && p.type === 'text' && String(p.text ?? '').trim())
 }
 
-export function turnsOfTranscript(text, source = '') {
+function turnsOfTranscript(text, source = '') {
   const turns = []
   let current = null
   for (const line of String(text ?? '').split(/\r?\n/)) {
@@ -119,7 +119,7 @@ const ANY_HOME = /(?:\/mnt\/[a-z])?\/(?:home|Users)\/[^/\s"']+|[A-Za-z]:\\Users\
  * happens to run in, since a worktree's own root matches nothing a session outside
  * it ever wrote.
  */
-export function scrubPaths(text, home = homedir(), root = REPO_ROOT) {
+function scrubPaths(text, home = homedir(), root = REPO_ROOT) {
   let out = String(text ?? '')
   for (const r of [root, mainCheckoutOf(root)].filter(Boolean)) out = out.split(r).join('<repo>')
   return out
@@ -157,7 +157,7 @@ export function redactCommand(command, { head = 90, classify = classifyCall } = 
 /** One turn, reduced to what the decision reads and safe to commit. With
  *  `shorten` off the commands keep their full (still path-scrubbed) text — the
  *  fallback for a turn whose meaning the head cut would not survive. */
-export function redactTurn(turn, { shorten = true } = {}) {
+function redactTurn(turn, { shorten = true } = {}) {
   return {
     source: String(turn.source ?? '').slice(0, 8),
     at: turn.at,
@@ -173,17 +173,18 @@ export function redactTurn(turn, { shorten = true } = {}) {
 //
 // A fixture's expectation comes from its FAMILY — what KIND of turn it is — and the
 // membership test is deliberately NOT the core's own verdict, so the two can
-// disagree and the cut can refuse.
+// disagree and the cut skips and reports the turn.
 //
 // HOW INDEPENDENT IT REALLY IS (four-eyes finding 1, Fable 5, 08.08.2026). The
 // first version computed membership from the core's tally against the core's own
 // threshold, which made every predicate imply its family's verdict by construction:
-// the refusal below could not fire, and the claim that an expectation "can never be
+// the contradiction check below could not fire, and the claim that an expectation "can never be
 // copied from current behaviour" was false as written. What is independent now:
 //   - the RECORD, the AGENT and the DECLARED WAIT are read structurally from the
 //     calls themselves (below), not from `tallyTurn`'s record kinds;
 //   - the threshold is a FROZEN COPY (`PINNED_THRESHOLD`), not the core's constant,
-//     so re-tuning the core makes family and verdict disagree and `--cut` refuses.
+//     so re-tuning the core makes family and verdict disagree and `--cut` skips and
+//     reports the turn as a contradiction.
 // What is NOT independent: the COUNTING RULE — which calls are investigation at all
 // — is still the core's, because re-implementing it here would be a second decision
 // to keep in step. So the honest statement of the protection is: the committed
@@ -198,11 +199,12 @@ function looksLikeBuildOrVerify(calls) {
 
 /** The calibrated threshold as it stood when these families were written. A frozen
  *  copy on purpose — see the note above. */
-export const PINNED_THRESHOLD = 6
+const PINNED_THRESHOLD = 6
 
 const isAgentCall = (c) => c.name === 'Agent'
 /** A durable record, read from the call rather than from the core's record kinds.
- *  The dry run is excluded and the memory path is the project's own, so the mirror
+ *  The dry run is excluded and the memory path uses the core's pattern (any project
+ *  slug under .claude/projects), so the mirror
  *  does not disagree with the core over a case both already agree on (four-eyes
  *  re-review advisory 1, Fable 5). */
 const leavesARecord = (c) => {
@@ -295,7 +297,7 @@ function readCorpus(dir) {
   return turns
 }
 
-/** The tally a rule that counted EVERY shell call as investigation would produce —
+/** The tally a rule that counted every non-record shell call as investigation would produce —
  *  the alternative the threshold comment rejects, kept here so the rejection stays
  *  a measurement rather than a memory. */
 function naiveTally(calls) {
@@ -313,7 +315,7 @@ function naiveTally(calls) {
   return { investigative, agents, records }
 }
 
-export function measureCorpus(turns) {
+function measureCorpus(turns) {
   const counts = { turns: turns.length, blocks: 0, naiveBlocks: 0, naiveBuildVerify: 0, agents: 0, agentBlocks: 0, agentWait: 0, byFamily: {} }
   for (const turn of turns) {
     const tally = tallyTurn(turn.calls)
@@ -334,7 +336,8 @@ export function measureCorpus(turns) {
 }
 
 /**
- * Pick up to `limit` turns per family, oldest first, so a re-cut is deterministic.
+ * Pick up to `limit` turns per family, oldest first (the representation fallback
+ * below takes the shortest), so a re-cut is deterministic.
  * Returns { picked, contradictions }.
  *
  * A turn whose verdict contradicts its family is SKIPPED and REPORTED, not thrown on
@@ -343,7 +346,7 @@ export function measureCorpus(turns) {
  * tool nobody runs. The contradictions are carried into the committed JSON and
  * asserted empty by the test, so skipping is not a way to lose one quietly.
  */
-export function pickFixtures(turns, limit = 3, maxCalls = 14) {
+function pickFixtures(turns, limit = 3, maxCalls = 14) {
   const perFamily = new Map()
   const contradictions = []
   const take = (turn, family) => {
@@ -373,10 +376,10 @@ export function pickFixtures(turns, limit = 3, maxCalls = 14) {
     if (turn.calls.length > maxCalls || (perFamily.get(family.id) ?? []).length >= limit) continue
     take(turn, family)
   }
-  // EVERY family must be REPRESENTED, even where the corpus only has long turns:
-  // a family that silently produced no fixture is a case the test does not cover,
-  // and the missing one would be the case nobody notices. The shortest turn stands
-  // in.
+  // EVERY family the corpus holds is OFFERED a fixture, even where it only has long
+  // turns: a family that silently produced no fixture is a case the test does not
+  // cover. The shortest turn stands in; if it contradicts its family it is reported
+  // as a contradiction instead, and a family absent from the corpus stays empty.
   for (const family of FAMILIES) {
     if ((perFamily.get(family.id) ?? []).length > 0) continue
     const candidates = [...(byFamily.get(family.id) ?? [])].sort((a, b) => a.calls.length - b.calls.length)
