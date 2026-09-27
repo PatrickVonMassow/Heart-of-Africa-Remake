@@ -16,7 +16,9 @@
 //     DIFFERENT model, against a commit that is genuinely in this history;
 //   - a `do-not-merge` or `merge-with-fixes` verdict does NOT satisfy it. Only a
 //     later `merge` record, for a LATER commit (a descendant of the refused one),
-//     says the findings were answered. That is deliberately stricter than the
+//     says the findings were answered — or a review-findings-filed receipt that
+//     binds the refusal to open work-order points; a verified review-unavailable
+//     clearance stands in where Git proves no vendor may review. That is deliberately stricter than the
 //     MECHANISM gate beside it (mechanism-review-core.mjs), where
 //     `merge-with-fixes` clears: there the fixes are in the diff a human still
 //     reads, here the point is being declared finished.
@@ -37,7 +39,7 @@ export const CLEARING_VERDICT = 'merge'
 export const LEVELS = Object.freeze(['low', 'med', 'high'])
 
 /** The level that arms this gate. */
-export const GATED_LEVEL = 'high'
+const GATED_LEVEL = 'high'
 
 /** Append-only ledger row that transfers every finding of one review to open points. */
 export const FINDINGS_FILED_KIND = 'review-findings-filed'
@@ -81,11 +83,12 @@ export function parsePointBlocks(text) {
  *   - the tag may sit MID-LINE ("…in the same commit as in point 535.
  *     Criticality: medium."), so it is not anchored to the line start;
  *   - `medium` is accepted and normalised to `med` — both spellings are in use;
- *   - a QUOTED occurrence is skipped. Point 298's own spec quotes the convention
+ *   - an occurrence directly preceded by a quote mark (" ' `) is skipped. Point 298's own spec quotes the convention
  *     it defines ("Criticality: low|med|high"), and reading that as a tag would
  *     have the gate judge points by a sentence ABOUT the tag.
- * The LAST surviving match wins: the tag is written at the end of a spec, while
- * an earlier mention is prose.
+ * The LAST surviving match wins (at most one per line — a match runs to the line
+ * end): the tag is written at the end of a spec, while an earlier mention is
+ * prose.
  *
  * Anything else — no tag, an unknown word — answers `{ level: null }`, which
  * leaves the point ungated. That is the fail-open direction on purpose: a
@@ -122,7 +125,7 @@ export function openNumbers(text) {
  * docs/tasks-archive.md, and reading only one of them would either miss the tick
  * (archive-only, if the mover left it behind) or report every archived point as
  * new (tasks-only). `tasks-archive-guard` owns the split's hygiene; this only
- * needs to know that the point went from open to done.
+ * needs to know that the point is done now and was not done at the baseline.
  */
 export function newlyTicked({ baseTasks = '', baseArchive = '', headTasks = '', headArchive = '' } = {}) {
   const before = new Set([...tickedNumbers(baseTasks), ...tickedNumbers(baseArchive)])
@@ -236,14 +239,16 @@ export function strictAncestorProbe(index, fallback) {
  *              baseline
  *   openPoints point numbers that are visibly open in the current work order
  *   records    [{ point, sha, model, verdict, evidence, at, authoredBy,
- *                reachable, descendsFrom, pointFiles }]
+ *                reachable, descendsFrom, pointFiles, and where present mode,
+ *                pass, kind, specExamination, carried/carriedVerified,
+ *                findingPoints, reviewAt, unavailableFiles }]
  *              `reachable` false means the record judged a commit that is not in
  *              this history (an abandoned branch) — it does not count.
  *              `descendsFrom` are the shas of OTHER records for the same point
  *              that are strict ancestors of this one's commit, which is how
  *              "a later record for a LATER commit" is decided without git here.
  *
- * Returns { block, clear, bootstrap, findings }.
+ * Returns { block, clear, bootstrap, findings, head }.
  */
 export function evaluateCriticalityReview({ baseline = null, head = '', ticks = [], openPoints = [], records = [] } = {}) {
   if (!baseline) return { block: false, clear: true, bootstrap: true, findings: [], head }
@@ -324,7 +329,7 @@ export function evaluateCriticalityReview({ baseline = null, head = '', ticks = 
     // trailer (a merge, the user's own edit), and `!sameModel(model, '')` then
     // read the UNKNOWN author as a different model — the one gate that exists
     // to prove two vendors cleared on absence of evidence. Emptiness stays
-    // WELL-FORMED (38 such rows stand in the ledger; poisoning them would
+    // WELL-FORMED (38 such rows stood in the ledger on 23.08.2026; poisoning them would
     // redden history), it just can never be the diversity proof.
     const valid = reviews.filter((r) => String(r.authoredBy).trim() && !sameModel(r.model, r.authoredBy))
 
@@ -367,7 +372,8 @@ export function evaluateCriticalityReview({ baseline = null, head = '', ticks = 
     // shape produced for a fitting delta, but accepting it on its index alone
     // lets one named file clear a point that changed ten. `pointFiles` is not a
     // ledger claim: the wrapper replaces it with the paths changed by this
-    // point between its authoring commission and the reviewed sha. Coverage is
+    // point between the start of its measured range (authoring commission,
+    // landing merge or feat/<point> lane) and the reviewed sha. Coverage is
     // cumulative along the review ancestry. An earlier refusal still proves
     // what that review read; the later clean verdict decides whether its
     // findings were answered. Unknown coverage refuses rather than narrowing.
@@ -468,8 +474,8 @@ export function evaluateCriticalityReview({ baseline = null, head = '', ticks = 
     // sha without rewriting either historical ledger row.
     const filed = (review) =>
       reachable.some((r) => {
-        if (r?.kind !== FINDINGS_FILED_KIND || r.reachable === false) return false
-        if (Number(r.point) !== Number(tick.number) || r.sha !== review.sha) return false
+        // `reachable` already holds only this point's in-history rows.
+        if (r?.kind !== FINDINGS_FILED_KIND || r.sha !== review.sha) return false
         if (String(r.model ?? '').trim() !== String(review.model ?? '').trim()) return false
         if (Number(r.reviewAt) !== Number(review.at) || !ledgerAtUsable(r.at) || Number(r.at) <= Number(review.at)) {
           return false
@@ -540,26 +546,27 @@ export function formatCriticalityReviewVerdict(verdict) {
     const head = `  ✗ point ${t.number}${t.rationale ? ` — Criticality: high (${t.rationale})` : ''}`
     const r = f.records?.[0] ?? {}
     if (f.kind === 'no-review') {
-      lines.push(head, '      no review recorded for this point')
+      lines.push(head, '      no review recorded for this point (a row failing the well-formedness check does not count)')
     } else if (f.kind === 'malformed-record') {
       lines.push(
         head,
-        `      a recorded ${r.verdict} on ${short(r.sha)} is malformed — a timestamp outside the ` +
-          "ledger's millisecond domain (it then cannot be ORDERED against the reviews around it)",
-        '      or a missing model. The recorder never writes such a row, so it can only have',
+        `      a recorded ${r.verdict} on ${short(r.sha)} is malformed — e.g. a timestamp outside the ` +
+          "ledger's millisecond domain (it then cannot be ORDERED against the reviews around it),",
+        '      a missing model, a misspelled verdict/authoredBy/mode, or an unverified carried row.',
+        '      The recorder never writes such a row, so it can only have',
         '      arrived by hand. It refuses rather than vanishes: fix or remove the row, on the record.',
       )
     } else if (f.kind === 'not-in-history') {
       lines.push(
         head,
-        `      the only record judges ${short(r.sha)}, which is not in this history — a review of an ` +
+        `      the record judges ${short(r.sha)}, which is not in this history — a review of an ` +
           'abandoned state is not a review of what is being shipped',
       )
     } else if (f.kind === 'self-review') {
       lines.push(
         head,
-        `      the only review on record is by ${String(r.model ?? '').trim() || 'the same model'}, which ` +
-          `authored the work — a self-review is not a review`,
+        `      the review on record is by ${String(r.model ?? '').trim() || 'the same model'}, which ` +
+          `authored the work or names no author — neither proves a second pair of eyes`,
       )
     } else if (f.kind === 'uncovered-files') {
       lines.push(head)
@@ -587,8 +594,9 @@ export function formatCriticalityReviewVerdict(verdict) {
       lines.push(
         head,
         `      ${String(r.model ?? '').trim()} recorded ${r.verdict} on ${short(r.sha)}: ${r.evidence ?? ''}`,
-        '      A later `merge` exists, but not for a LATER commit — so nothing was fixed between them.',
-        '      Commit the fixes, then record the re-review against that commit.',
+        '      No later `merge`, recorded after it for a LATER commit (a descendant), answers it.',
+        '      Commit the fixes and record the re-review against that commit, or file every finding',
+        '      as an open work-order point and append a review-findings-filed receipt naming them.',
       )
     }
   }
