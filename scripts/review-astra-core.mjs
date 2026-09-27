@@ -96,9 +96,9 @@ export const CLAUDE_REVIEW_CHAIN = Object.freeze([OPUS_MODEL, FABLE_MODEL, OPUS_
  *  an assignment incomplete unless it is runnable. */
 export const REVIEWER_ROSTER = Object.freeze([
   Object.freeze({ key: 'astra', name: ASTRA_MODEL_NAME, id: ASTRA_MODEL_ID, runtime: 'codex', effort: ASTRA_REASONING_EFFORT }),
-  Object.freeze({ key: 'fable', name: FALLBACK_MODEL_NAME, id: FABLE_MODEL_ID, runtime: 'claude', effort: 'high' }),
-  Object.freeze({ key: 'opus', name: SECOND_FALLBACK_MODEL_NAME, id: OPUS_MODEL_ID, runtime: 'claude', effort: 'high' }),
-  Object.freeze({ key: 'opus48', name: OPUS_FALLBACK_MODEL, id: OPUS_FALLBACK_MODEL_ID, runtime: 'claude', effort: 'high' }),
+  Object.freeze({ key: 'fable', name: FALLBACK_MODEL_NAME, id: FABLE_MODEL_ID, runtime: 'claude', effort: 'medium' }),
+  Object.freeze({ key: 'opus', name: SECOND_FALLBACK_MODEL_NAME, id: OPUS_MODEL_ID, runtime: 'claude', effort: 'medium' }),
+  Object.freeze({ key: 'opus48', name: OPUS_FALLBACK_MODEL, id: OPUS_FALLBACK_MODEL_ID, runtime: 'claude', effort: 'medium' }),
 ])
 
 /** The executable identity for a policy model name/key/id, or null. */

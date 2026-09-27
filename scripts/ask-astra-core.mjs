@@ -35,9 +35,9 @@ export { MATERIAL_BUDGET_CHARS, ASTRA_MODEL_NAME, ASTRA_REASONING_EFFORT }
  *  with this descriptor before any output is attributed to it. */
 export const ASK_MODELS = Object.freeze({
   astra: Object.freeze({ key: 'astra', name: ASTRA_MODEL_NAME, id: ASTRA_MODEL_ID, runtime: 'codex', effort: ASTRA_REASONING_EFFORT }),
-  fable: Object.freeze({ key: 'fable', name: FABLE_MODEL, id: FABLE_MODEL_ID, runtime: 'claude', effort: 'high' }),
-  opus: Object.freeze({ key: 'opus', name: OPUS_MODEL, id: OPUS_MODEL_ID, runtime: 'claude', effort: 'high' }),
-  opus48: Object.freeze({ key: 'opus48', name: OPUS_FALLBACK_MODEL, id: OPUS_FALLBACK_MODEL_ID, runtime: 'claude', effort: 'high' }),
+  fable: Object.freeze({ key: 'fable', name: FABLE_MODEL, id: FABLE_MODEL_ID, runtime: 'claude', effort: 'medium' }),
+  opus: Object.freeze({ key: 'opus', name: OPUS_MODEL, id: OPUS_MODEL_ID, runtime: 'claude', effort: 'medium' }),
+  opus48: Object.freeze({ key: 'opus48', name: OPUS_FALLBACK_MODEL, id: OPUS_FALLBACK_MODEL_ID, runtime: 'claude', effort: 'medium' }),
 })
 
 /** A supported model descriptor, or null. Astra remains the compatibility default. */
