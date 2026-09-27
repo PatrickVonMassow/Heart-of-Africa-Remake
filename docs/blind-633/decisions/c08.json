@@ -1008,5 +1008,575 @@
   "id": "U4062",
   "decision": "rewritten",
   "reason": "The standOff doc now says the ground he faces beside the drummer (outward)"
+ },
+ {
+  "id": "U4063",
+  "decision": "rewritten",
+  "reason": "The wantsBaseline doc now says the runner only prints the separate baseline-classify.mjs command"
+ },
+ {
+  "id": "U4064",
+  "decision": "rewritten",
+  "reason": "The ignored isLargeEquivalent argument is no longer passed to wantsBaseline"
+ },
+ {
+  "id": "U4065",
+  "decision": "removed",
+  "reason": "runSuite's never-passed onlySection parameter and its announcement suffix, SECTION_ENV override and scope suffix are removed"
+ },
+ {
+  "id": "U4066",
+  "decision": "rewritten",
+  "reason": "The timeout comment now says a slow run is not expected to reach the limit and one that does is killed and reported as hung"
+ },
+ {
+  "id": "U4067",
+  "decision": "removed",
+  "reason": "The never-called deferred `point` lookup on printed occurrences is removed"
+ },
+ {
+  "id": "U4068",
+  "decision": "removed",
+  "reason": "The retry-era checks/runs/depth fields are dropped from redSuites entries"
+ },
+ {
+  "id": "U4069",
+  "decision": "rewritten",
+  "reason": "The final tally now says \"stages run\", matching the count that includes preflight stages"
+ },
+ {
+  "id": "U4070",
+  "decision": "rewritten",
+  "reason": "The digest rationale now describes today's runner transcript (announce, result, failure echoes or crash tail)"
+ },
+ {
+  "id": "U4071",
+  "decision": "rewritten",
+  "reason": "\"the retry/flake notices\" is dropped from the kept-lines list"
+ },
+ {
+  "id": "U4072",
+  "decision": "kept",
+  "reason": "FLAKE still classifies the retry notices in older saved logs read back through --show; its comment now says so (see U4082)"
+ },
+ {
+  "id": "U4073",
+  "decision": "rewritten",
+  "reason": "HIGH_PRIORITY is now described as outranking the rest and dropped only once every low-priority line is gone"
+ },
+ {
+  "id": "U4074",
+  "decision": "rewritten",
+  "reason": "The budget doc now says declared limitations and bookkeeping lines are never dropped, so the result can exceed the budget by those"
+ },
+ {
+  "id": "U4075",
+  "decision": "removed",
+  "reason": "The unused heartbeatKinds export is removed; nothing imports or calls it"
+ },
+ {
+  "id": "U4076",
+  "decision": "rewritten",
+  "reason": "The showWindow doc now says a tail or max of 0 returns the whole filtered log (slice(-0)); behaviour unchanged"
+ },
+ {
+  "id": "U4077",
+  "decision": "rewritten",
+  "reason": "The progress description now says a count plus the last PROGRESS_TAIL_CHARS of the newest line"
+ },
+ {
+  "id": "U4078",
+  "decision": "rewritten",
+  "reason": "The doc now says a dot reporter moves the tail only until the retained characters are all dots"
+ },
+ {
+  "id": "U4079",
+  "decision": "rewritten",
+  "reason": "PROGRESS_TAIL_CHARS is no longer exported; only this module reads it"
+ },
+ {
+  "id": "U4080",
+  "decision": "rewritten",
+  "reason": "The cache comment now says VERIFY_GL is matched separately as the receipt's backend"
+ },
+ {
+  "id": "U4081",
+  "decision": "rewritten",
+  "reason": "The --no-ladder doc now says the wrapper asks the ladder and marks it (RVA_LADDER_ASKED), and run-all asks only when no parent has"
+ },
+ {
+  "id": "U4082",
+  "decision": "rewritten",
+  "reason": "The ACCOUNTED FOR/STRIKE/POINT REDS comment is moved onto FINAL, and FLAKE gets its own comment"
+ },
+ {
+  "id": "U4083",
+  "decision": "kept",
+  "reason": "resultName, classifyLine, selectLines and applyBudget are live inside buildDigest/failureSurface; only their export is test-facing"
+ },
+ {
+  "id": "U4084",
+  "decision": "kept",
+  "reason": "MAX_SELECTED_LINES bounds boundedLines/parseRunLoggedArgs; the export only serves tests"
+ },
+ {
+  "id": "U4085",
+  "decision": "rewritten",
+  "reason": "\"retry policy\" is replaced by \"retry marker\" (VERIFY_RETRY_AFTER still exists)"
+ },
+ {
+  "id": "U4086",
+  "decision": "kept",
+  "reason": "lastGreenReceipt is the live core of findGreenReceipt; the export only serves tests"
+ },
+ {
+  "id": "U4087",
+  "decision": "rewritten",
+  "reason": "\"Suites that stayed red\" now reads \"Suites that ended red\""
+ },
+ {
+  "id": "U4088",
+  "decision": "rewritten",
+  "reason": "The comment now says only lint and the preview build can reach the tally red; build, unit and GPU preflight exit earlier"
+ },
+ {
+  "id": "U4089",
+  "decision": "rewritten",
+  "reason": "The migration-era \"old→new mapping table\" pointer now points at the README's strategy and suite map"
+ },
+ {
+  "id": "U4090",
+  "decision": "rewritten",
+  "reason": "The second usage block is replaced by a pointer to the one at the top of run-all.mjs"
+ },
+ {
+  "id": "U4091",
+  "decision": "kept",
+  "reason": "baselineReport serves the hand-run baseline-classify path the header names; it is live"
+ },
+ {
+  "id": "U4092",
+  "decision": "rewritten",
+  "reason": "The rationale now says the baseline classifier is run by hand since point 1135"
+ },
+ {
+  "id": "U4093",
+  "decision": "rewritten",
+  "reason": "The SPREAD, RECORDED note now says which search each standpoint came from (the conversational one is the villager-gestures section's own 16-bearing search)"
+ },
+ {
+  "id": "U4094",
+  "decision": "rewritten",
+  "reason": "The recorded spread now attributes the 16-bearing conversational standpoint to the villager-gestures section's own search"
+ },
+ {
+  "id": "U4095",
+  "decision": "rewritten",
+  "reason": "The doc now reads \"48 (49 with a preferred one)\" bearings"
+ },
+ {
+  "id": "U4096",
+  "decision": "rewritten",
+  "reason": "The SPREAD, RECORDED block is moved above the standOff JSDoc, which now sits on its function again"
+ },
+ {
+  "id": "U4097",
+  "decision": "rewritten",
+  "reason": "The walkUntilStalled doc now says the trade-house rotation that outlived the repair was a porter's crate, as the section header records"
+ },
+ {
+  "id": "U4098",
+  "decision": "rewritten",
+  "reason": "The crate depth now reads 0.23-0.28 m in both places"
+ },
+ {
+  "id": "U4099",
+  "decision": "backlog",
+  "reason": "scripts/verify/polish.mjs:8066 — ROOF_HEADROOM = 1.85 is hand-copied from roofClearance.ts (EYE_HEIGHT 1.5 + 0.15 + 0.05 + 0.15, equal today) under a \"Keep in sync\" note"
+ },
+ {
+  "id": "U4100",
+  "decision": "backlog",
+  "reason": "scripts/verify/polish.mjs:8398 — the fire position is transcribed from VILLAGE_FIRE in layout.ts (equal today, [-3.5, 2.5]) instead of read from the scene"
+ },
+ {
+  "id": "U4101",
+  "decision": "backlog",
+  "reason": "scripts/verify/polish.mjs:8745 — the drummer's facing is aimed at a hard-coded (3.5, 2.5), the mirror of the village fire, although the artefact block says the bearing should come from the scene"
+ },
+ {
+  "id": "U4102",
+  "decision": "removed",
+  "reason": "The first standAt(front, mid), overridden by the next standAt before anything reads it, is removed"
+ },
+ {
+  "id": "U4103",
+  "decision": "rewritten",
+  "reason": "ctrl-actor-labels' own frames(n) helper is removed; the call uses the file's nextFrames(3), which waits the same four drawn frames"
+ },
+ {
+  "id": "U4104",
+  "decision": "rewritten",
+  "reason": "The crowd count now reads \"roughly 17-24 labels\""
+ },
+ {
+  "id": "U4105",
+  "decision": "kept",
+  "reason": "claim does not hold: placeWalkSpeed is 10 (src/config/balance.ts:1001)"
+ },
+ {
+  "id": "U4106",
+  "decision": "backlog",
+  "reason": "scripts/verify/polish.mjs:7878 — the comment transcribes layout.ts's scatter formula, a copy that drifts silently when layout.ts changes"
+ },
+ {
+  "id": "U4107",
+  "decision": "backlog",
+  "reason": "scripts/verify/polish.mjs:8520 — the elder's exclusion rests on a claim about PlaceScene's Villager that the suite does not assert"
+ },
+ {
+  "id": "U4108",
+  "decision": "kept",
+  "reason": "The dated check counts are a recorded measurement, marked with their date"
+ },
+ {
+  "id": "U4109",
+  "decision": "kept",
+  "reason": "claim does not hold: preview.mjs launches through launchVerifyBrowser, whose applySeedRoute announces the UNSEEDED_SUITES exemption in the suite's output"
+ },
+ {
+  "id": "U4110",
+  "decision": "kept",
+  "reason": "claim does not hold: voice.mjs installs and marks the TTS cache complete, handwriting.mjs:43 consumes it via installTtsCache"
+ },
+ {
+  "id": "U4111",
+  "decision": "kept",
+  "reason": "The baseline classifier (run by hand) still reads check names as identities; the comment is accurate"
+ },
+ {
+  "id": "U4112",
+  "decision": "rewritten",
+  "reason": "\"the archive path is already covered above\" now names the bug-report-archive section"
+ },
+ {
+  "id": "U4113",
+  "decision": "kept",
+  "reason": "The role suffixes and separator are live inside ARCHIVE_MEMBER_SUFFIXES and archiveMemberDetail"
+ },
+ {
+  "id": "U4114",
+  "decision": "kept",
+  "reason": "claim does not hold: render-verify-core.test.mjs pins a point-927 charge matched against the printed archive member line"
+ },
+ {
+  "id": "U4115",
+  "decision": "kept",
+  "reason": "claim does not hold: src/report/bugReport.ts writes .png, .json, -overlay.json, .txt in the documented order"
+ },
+ {
+  "id": "U4116",
+  "decision": "rewritten",
+  "reason": "The frame sampler is now described as sampling the newest frame time"
+ },
+ {
+  "id": "U4117",
+  "decision": "rewritten",
+  "reason": "The ladder is now asked before the runner is spawned, the re-exec shim already running"
+ },
+ {
+  "id": "U4118",
+  "decision": "backlog",
+  "reason": "scripts/verify/run-logged.mjs:529 — only the re-exec shim reproduces a terminating signal; runVerify's close handler still maps a null exit code to 1 and closeRecord records an interrupted run as red"
+ },
+ {
+  "id": "U4119",
+  "decision": "rewritten",
+  "reason": "The finish event now reads receipt.frames.expected/written, the fields buildReceipt actually stores"
+ },
+ {
+  "id": "U4120",
+  "decision": "backlog",
+  "reason": "scripts/verify/run-logged.mjs:99 — repeated output cannot renew journal events, but consume always writes the log and noteProgress, whose mtimes lastProgressAtFor reads as progress"
+ },
+ {
+  "id": "U4121",
+  "decision": "rewritten",
+  "reason": "The log-name example now carries milliseconds"
+ },
+ {
+  "id": "U4122",
+  "decision": "rewritten",
+  "reason": "The header and run-wait-core.mjs now say the receipt names a never-written frame (FRAME(S) MISSING)"
+ },
+ {
+  "id": "U4123",
+  "decision": "rewritten",
+  "reason": "The usage block now lists --again"
+ },
+ {
+  "id": "U4124",
+  "decision": "rewritten",
+  "reason": "The --log-file help now names <log dir>/<stamp>-<label>.log and VERIFY_LOG_DIR"
+ },
+ {
+  "id": "U4125",
+  "decision": "rewritten",
+  "reason": "The literal \"15-minute lease\" is replaced by PROGRESS_LEASE_MS"
+ },
+ {
+  "id": "U4126",
+  "decision": "kept",
+  "reason": "claim does not hold: run-all.mjs:109-118 asks ladderCheck itself unless RVA_LADDER_ASKED is set"
+ },
+ {
+  "id": "U4127",
+  "decision": "kept",
+  "reason": "claim does not hold: commandNamesRun exists in scripts/batch-in-flight.mjs:1076"
+ },
+ {
+  "id": "U4128",
+  "decision": "removed",
+  "reason": "The test-only latestRecordPath is removed; its test now pins activeRecordPath's no-live fallback"
+ },
+ {
+  "id": "U4129",
+  "decision": "removed",
+  "reason": "Its stale docblock went with latestRecordPath"
+ },
+ {
+  "id": "U4130",
+  "decision": "removed",
+  "reason": "The unused frameDirExists and its existsSync import are removed"
+ },
+ {
+  "id": "U4131",
+  "decision": "rewritten",
+  "reason": "The sort doc now says wrapper-picked names are chronological and a hand-named --log-file sorts wherever its name falls"
+ },
+ {
+  "id": "U4132",
+  "decision": "rewritten",
+  "reason": "liveRecordPaths now says every live record among the newest SCAN_LIMIT"
+ },
+ {
+  "id": "U4133",
+  "decision": "rewritten",
+  "reason": "The elapsedMs doc now says an explicit null or empty start stamp reads as 0 (the epoch); behaviour unchanged"
+ },
+ {
+  "id": "U4134",
+  "decision": "rewritten",
+  "reason": "The countPoll doc now says it does not check the run's status itself"
+ },
+ {
+  "id": "U4135",
+  "decision": "rewritten",
+  "reason": "The lastProgressAtFor doc now names the two marks it reads (progress mark and log)"
+ },
+ {
+  "id": "U4136",
+  "decision": "rewritten",
+  "reason": "The doc now says unreadable evidence is left out rather than counted as a mark, which is what the callers then read as silence"
+ },
+ {
+  "id": "U4137",
+  "decision": "rewritten",
+  "reason": "The asymmetry is now narrowed to an ownership change, agreeing with openProgressMark's doc"
+ },
+ {
+  "id": "U4138",
+  "decision": "rewritten",
+  "reason": "The null case now says the log is opened separately and carries the sign of life alone"
+ },
+ {
+  "id": "U4139",
+  "decision": "kept",
+  "reason": "Only run-logged.mjs calls openProgressMark in production; the other importers are its tests"
+ },
+ {
+  "id": "U4140",
+  "decision": "rewritten",
+  "reason": "The two stacked JSDoc blocks on FRAME_DIR are merged into one"
+ },
+ {
+  "id": "U4141",
+  "decision": "backlog",
+  "reason": "scripts/verify/run-record.mjs:184 — the 93/182 frame illustration (also run-wait-core.mjs:67/302, run-logged.mjs:398) does not match COUNTED_SUITE_FRAMES (startup 1 and communication 48 added) or twice 93"
+ },
+ {
+  "id": "U4142",
+  "decision": "kept",
+  "reason": "claim does not hold: scripts/wait-marker.mjs is duty (8) of scripts/lock-heartbeat-hook.mjs (lines 49, 86)"
+ },
+ {
+  "id": "U4143",
+  "decision": "kept",
+  "reason": "claim does not hold: nothing prunes run records, and lock-heartbeat-hook runs per tool call, as the SCAN_LIMIT doc says"
+ },
+ {
+  "id": "U4144",
+  "decision": "kept",
+  "reason": "FRAME_DIR, SCAN_LIMIT and progressMarkPathFor are used inside the module; live code"
+ },
+ {
+  "id": "U4145",
+  "decision": "backlog",
+  "reason": "scripts/verify/run-wait-core.mjs:97 — UNMEASURED_SUITES is a maintained list only tests read; planRun derives the unmeasured suites itself"
+ },
+ {
+  "id": "U4146",
+  "decision": "rewritten",
+  "reason": "The UNMEASURED_SUITES doc now explains communication (added after the measurement)"
+ },
+ {
+  "id": "U4147",
+  "decision": "rewritten",
+  "reason": "FRAME_TABLE_MEASURED is no longer exported"
+ },
+ {
+  "id": "U4148",
+  "decision": "rewritten",
+  "reason": "FOLLOW_WAIT_FRACTION is no longer exported"
+ },
+ {
+  "id": "U4149",
+  "decision": "rewritten",
+  "reason": "The COUNTED_SUITE_FRAMES doc now lists communication: 48"
+ },
+ {
+  "id": "U4150",
+  "decision": "rewritten",
+  "reason": "The band doc now says waitPlan lets a band's high end choose foreground/background and the timeout"
+ },
+ {
+  "id": "U4151",
+  "decision": "rewritten",
+  "reason": "\"the July baseline\" now reads \"the 09.08.2026 baseline\" here and in run-wait.mjs"
+ },
+ {
+  "id": "U4152",
+  "decision": "rewritten",
+  "reason": "The first-wait doc now says a run on its plan is almost over, and that whole passes run past the plan"
+ },
+ {
+  "id": "U4153",
+  "decision": "rewritten",
+  "reason": "hungMarkMs now says past the mark a run that has also been silent is hung"
+ },
+ {
+  "id": "U4154",
+  "decision": "rewritten",
+  "reason": "The poll-count policy now says exhausted polls end the loop without calling the run hung"
+ },
+ {
+  "id": "U4155",
+  "decision": "rewritten",
+  "reason": "\"A sixth poll\" now reads \"Another poll\""
+ },
+ {
+  "id": "U4156",
+  "decision": "rewritten",
+  "reason": "nextWaitMs's doc now says MIN_WAIT_MS wins even over a smaller blocking budget"
+ },
+ {
+  "id": "U4157",
+  "decision": "rewritten",
+  "reason": "BLOCKING_LIMIT_MS is now the longest call this module plans; an explicit --timeout is taken as asked"
+ },
+ {
+  "id": "U4158",
+  "decision": "rewritten",
+  "reason": "The hung diagnostic now says the threshold is floored and capped as the lease is (also run-wait.mjs)"
+ },
+ {
+  "id": "U4159",
+  "decision": "rewritten",
+  "reason": "backendsFrom's doc now names the plan's lane-list fallback"
+ },
+ {
+  "id": "U4160",
+  "decision": "backlog",
+  "reason": "scripts/verify/run-wait-core.mjs:572 — unknown frame expectations are documented as giving an unknown receipt, but planRun/run-logged pass a partial numeric total without checking framesUnmeasured"
+ },
+ {
+  "id": "U4161",
+  "decision": "rewritten",
+  "reason": "The not-comparable diagnostic now says which side is missing (expectation or written count)"
+ },
+ {
+  "id": "U4162",
+  "decision": "backlog",
+  "reason": "scripts/verify/run-wait-core.mjs:665 — formatReceipt prints GREEN on exitCode 0 alone while buildReceipt's green also requires no failing entries"
+ },
+ {
+  "id": "U4163",
+  "decision": "rewritten",
+  "reason": "The receipt now prints \"(never polled)\" for zero polls"
+ },
+ {
+  "id": "U4164",
+  "decision": "rewritten",
+  "reason": "The header now places the record file and frame scan in run-record.mjs"
+ },
+ {
+  "id": "U4165",
+  "decision": "rewritten",
+  "reason": "The ceiling comment now says 45 minutes unless VERIFY_SUITE_TIMEOUT_MS overrides it (SUITE_CEILING_MS in wait-lease-core.mjs)"
+ },
+ {
+  "id": "U4166",
+  "decision": "removed",
+  "reason": "The SUITE_CEILING_MS re-export nobody imports from run-wait-core.mjs is removed"
+ },
+ {
+  "id": "U4167",
+  "decision": "kept",
+  "reason": "The listed exports are all used inside run-wait-core.mjs; live code"
+ },
+ {
+  "id": "U4168",
+  "decision": "rewritten",
+  "reason": "The header now says which modes resolve the newest live run, that --await refuses with several, and that --plan reads no record"
+ },
+ {
+  "id": "U4169",
+  "decision": "rewritten",
+  "reason": "The 42-minute figure is now marked as the single-pass plan, beside the 115-121 min both-backend band"
+ },
+ {
+  "id": "U4170",
+  "decision": "backlog",
+  "reason": "scripts/verify/run-wait.mjs:195 — doAwait's doc says a wait past the hung mark asks the emergency core to recover the batch, but the timeout path only prints and returns 5"
+ },
+ {
+  "id": "U4171",
+  "decision": "backlog",
+  "reason": "scripts/verify/run-wait.mjs:289 — \"The wait has been recorded as hung\" is not established: finishWait releases the lease before waitStatus runs, and the local fallback only prints"
+ },
+ {
+  "id": "U4172",
+  "decision": "rewritten",
+  "reason": "The finally comment now says a killed process runs no finally and its lease is left to the registry's reaping"
+ },
+ {
+  "id": "U4173",
+  "decision": "rewritten",
+  "reason": "The timeout commentary and message now name the progress mark and the log, not record and frames"
+ },
+ {
+  "id": "U4174",
+  "decision": "rewritten",
+  "reason": "The counted-poll explanation now says progress is read from the marker file and the log"
+ },
+ {
+  "id": "U4175",
+  "decision": "backlog",
+  "reason": "scripts/verify/run-wait.mjs:230 — the --await band ignores the section and uses record.backends.length for passes, so a --section run gets the whole-suite band"
+ },
+ {
+  "id": "U4176",
+  "decision": "rewritten",
+  "reason": "The literal 590_000 fallback now imports BLOCKING_LIMIT_MS"
  }
 ]
