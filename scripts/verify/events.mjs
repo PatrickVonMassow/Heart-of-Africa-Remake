@@ -84,7 +84,7 @@ if (section('lion-contact')) {
         const pos = g.pos
         const s = window.__lionHunt?.state
         if (s) {
-          s.predator = 'lion' // only the lion attacks on contact (design.md §14)
+          s.predator = 'lion' // stage the lion as the hunter (every wandering predator attacks on contact, point 9)
           s.mode = 'chase'
           s.timer = 5
           s.px = pos.x; s.pz = pos.z
