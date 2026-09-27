@@ -114,11 +114,11 @@
 | `branch-hygiene-core.mjs` | A MERGED BRANCH MUST NOT SURVIVE ITS MERGE — the pure decision half (branch-hygiene-guard.mjs is the fail-open I/O wrapper). | — |
 | `branch-hygiene-guard.mjs` | Stop hook: A MERGED BRANCH MUST NOT SURVIVE ITS MERGE. | — |
 | `build-geodata.mjs` | Geodata preprocessing (design.md §3 "Real geodata and terrain rendering"). | — |
-| `build-info.mjs` | THE REVISION MARKER THE BUILT SITE CARRIES — pure, never throws, Vitest-covered in scripts/deploy-staleness-core.test.mjs (which round-trips it through the reader, so emitter and reader cannot drift apart). | — |
+| `build-info.mjs` | THE REVISION MARKER THE BUILT SITE CARRIES — pure (no I/O), Vitest-covered in scripts/deploy-staleness-core.test.mjs (which round-trips it through the reader, so emitter and reader cannot drift apart). | — |
 | `bundle-first-core.mjs` | Pure decision core of the bundle-first Stop-hook guard (bundle-first-guard.mjs is the thin fail-open wrapper). | — |
-| `bundle-first-guard.mjs` | Stop hook: the BUNDLE-FIRST rule, until now memory only (`bundle-first-not-new-point`). | — |
+| `bundle-first-guard.mjs` | Stop hook: the BUNDLE-FIRST rule (memory `bundle-first-not-new-point`). | — |
 | `carrier-bell-core.mjs` | THE FINDINGS CARRIER BELL — the deciding half. | — |
-| `chat-core.mjs` | THE CHAT CHANNEL'S DECIDING HALF — pure, no I/O, no clock of its own. | — |
+| `chat-core.mjs` | THE CHAT CHANNEL'S DECIDING HALF — pure, no I/O; `now` defaults to Date.now() but every clock reading can be injected. | — |
 | `chat-delivery-core.mjs` | PER-TOOL-CALL DELIVERY — the deciding half. | — |
 | `chat-inbox.mjs` | ONE TICK OF "HAS THE USER WRITTEN ANYTHING" — the reader half of the channel. | — |
 | `chat-reply.mjs` | THE WRITER HALF — an agent reply on its way to the phone. | — |
@@ -129,7 +129,7 @@
 | `check-deployed-benchmark.mjs` | Prove the F8 benchmark reached the DEPLOYED build (point 277). | Usage: node scripts/check-deployed-benchmark.mjs [url] |
 | `child-retry-core.mjs` | LAYER 5 — RETRY A CHILD, NOT AN OUTAGE (point 434 part 3), the decision half: pure, dependency-injected, no I/O. | — |
 | `child-retry.mjs` | LAYER 5 — RETRY A CHILD, NOT AN OUTAGE (point 434 part 3), the I/O half. | usage: |
-| `ci-failure-cause-core.mjs` | WHERE a red CI run's cause lies — pure, never throws, Vitest-covered in ci-failure-cause-core.test.mjs. | — |
+| `ci-failure-cause-core.mjs` | WHERE a red CI run's cause lies — pure (classifyFailureCause never throws), Vitest-covered in ci-failure-cause-core.test.mjs. | — |
 | `ci-gate-verdict-core.mjs` | Pure decision logic of the CI gate verdict step (point 513, user decision 05.08.2026). | — |
 | `ci-gate-verdict.mjs` | The CI gate's verdict step (point 513). | — |
 | `ci-status-guard-core.mjs` | Pure decision logic for the CI-status Stop hook (ci-status-guard.mjs). | — |
@@ -147,8 +147,8 @@
 | `container-ask-guard.mjs` | Stop hook (user 04.08.2026, memory container-work-is-mine): the outgoing answer may not hand the USER a step that runs inside the dev container. | — |
 | `context-budget-core.mjs` | PRE-CALL CONTEXT ADMISSION — the pure arithmetic shared by every fence call. | — |
 | `context-budget.mjs` | Runtime transaction for pre-call context admission. | — |
-| `context-fence-core.mjs` | THE CONTEXT FENCE (point 700) — the decision half, pure. | — |
-| `context-fence-guard.mjs` | THE CONTEXT FENCE (point 700) — thin fail-OPEN I/O wrapper around the pure core (context-fence-core.mjs). | — |
+| `context-fence-core.mjs` | THE CONTEXT FENCE (point 700) — the call classification, pure. | — |
+| `context-fence-guard.mjs` | THE CONTEXT FENCE (point 700) — thin fail-OPEN I/O wrapper around the pure admission arithmetic (context-budget-core.mjs, via context-budget.mjs), which takes its call classification from context-fence-core.mjs. | — |
 | `context-fence-override.mjs` | Create one short-lived, session-bound, point-bound, single-use context permit. | — |
 | `context-fence-permit-core.mjs` | The emergency context permit, pure validation and record shaping. | — |
 | `context-fence-permit.mjs` | Durable, single-use context permit IO. | — |
@@ -157,9 +157,9 @@
 | `context-watermark-core.mjs` | THE CONTEXT WATERMARK (point 675, defeat 3) — the decision half, pure. | — |
 | `context-watermark.mjs` | THE CONTEXT WATERMARK (point 675, defeat 3) — the IO half. | — |
 | `criticality-review-guard-core.mjs` | Pure decision core of the CRITICALITY four-eyes gate (work-order point 298). | — |
-| `criticality-review-guard.mjs` | Stop hook (work-order point 298): a HIGH-criticality point does not get ticked without a second model's recorded, ANSWERED review. | usage: node scripts/criticality-review-guard.mjs --record-unavailable <sha> --point <N> --files "<exact paths>" --reason "<why no vendor is eligible>" |
+| `criticality-review-guard.mjs` | Stop hook (work-order point 298), SWITCHED OFF (see below): it once refused a HIGH-criticality tick without a second model's recorded, ANSWERED review; today the hook path exits silently and `--status` reports the same debt. | usage: node scripts/criticality-review-guard.mjs --record-unavailable <sha> --point <N> --files "<exact paths>" --reason "<why no vendor is eligible>" |
 | `cut-account-attest.mjs` | Preserve the floor witnesses while the platform's expiring transcript exists. | Usage: node scripts/cut-account-attest.mjs [owner\|subagent]<br>usage: verbatim(usage), kind: verbatim(kind), earliest: verbatim(earliest) } |
-| `cut-account-core.mjs` | Pure parser and judge for the CUT ACCOUNT of work-order point 757. | — |
+| `cut-account-core.mjs` | Pure parser and judge for the CUT ACCOUNT of work-order point 757, plus the parsing and dating of its FLOOR readings (session kinds, Berlin dates). | — |
 | `dashboard-card-topic-guard-core.mjs` | Pure decision logic of the dashboard-card-topic Stop-hook guard (dashboard-card-topic-guard.mjs is the thin fail-open I/O wrapper). | — |
 | `dashboard-card-topic-guard.mjs` | Stop hook (user mandate 23.07.2026): GUARANTEE each batch-dashboard card speaks STRICTLY about its OWN topic — the active "272" now-card once reported the status of points 246 and 266, and reminders do not hold. | — |
 | `dashboard-conciseness-guard-core.mjs` | Pure decision logic of the dashboard-conciseness Stop-hook guard (dashboard-conciseness-guard.mjs is the thin fail-open I/O wrapper). | — |
@@ -171,9 +171,9 @@
 | `dashboard-integrity-guard.mjs` | Stop hook (user mandate 22.07.2026): the dashboard must be TRUSTABLE, not merely present — in one session the now-card named the wrong point for hours, a queue card kept describing an outdated spec, and each error was only fixed when the USER spotted it. | — |
 | `dashboard-point-reader-core.mjs` | One grammar for point ownership recovered from FREE dashboard title text. | — |
 | `dashboard-publish.mjs` | LEGACY (claude.ai artifact, retired 29.07.2026) — the board's transport is `scripts/board-publish.mjs`, which pushes the live page from every session. | usage: node scripts/dashboard-publish.mjs [--to <scratchpad path>] \| --confirm-published \| --defer "<reason> |
-| `dashboard-reminder-core.mjs` | The text the UserPromptSubmit hook injects into EVERY user prompt — the most expensive text in this project, so it lives in a pure module the Vitest layer can hold to its shape and its size (point 436). | — |
-| `dashboard-reminder-hook.mjs` | UserPromptSubmit hook (user mandate 16.07.2026, after repeated dashboard staleness): inject the standing dashboard obligation into the context on EVERY user prompt, so no turn can end with a stale board. | — |
-| `dashboard-state.mjs` | Shared state I/O for the dashboard-currency toolchain (dashboard-guard, focus, dashboard-publish, lock-heartbeat-hook). | — |
+| `dashboard-reminder-core.mjs` | The text the UserPromptSubmit hook injects into every user prompt of the batch owner (a non-owner gets STAND_DOWN_TEXT instead) — the most expensive text in this project, so it lives in a pure module the Vitest layer can hold to its shape and its size (point 436). | — |
+| `dashboard-reminder-hook.mjs` | UserPromptSubmit hook (user mandate 16.07.2026, after repeated dashboard staleness): inject the standing dashboard obligation into the context on every user prompt of the batch owner, so no turn can end with a stale board — plus the context-level line and, for an attended window past the ceiling, a one-time notice (a non-owner gets the stand-down text instead). | — |
+| `dashboard-state.mjs` | Shared state I/O for the dashboard-currency toolchain (the dashboard guards, focus, the board scripts, the prompt and heartbeat hooks, among others). | — |
 | `dashboard-sync-core.mjs` | Pure decision logic of the dashboard SYNC Stop-hook guard (dashboard-sync.mjs is the thin I/O wrapper). | — |
 | `dashboard-sync.mjs` | Stop hook (point 308, user mandate): the »Woran ich gerade arbeite« card must mirror REALITY — the checked-out git branch, the worktree agent pool and the TASKS.md point state — not only the declared focus. | — |
 | `decision-card-guard-core.mjs` | THE CHAT IS AN INBOX, NOT A NOTICE-BOARD — pure decision half of the Stop hook scripts/decision-card-guard.mjs (point 421). | — |
