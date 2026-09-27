@@ -1,5 +1,7 @@
 // Per-object triangle breakdown of the bird's-eye frame (point 276). Walks the
-// live R3F scene graph and sums the RENDERED triangles per top-level group, so
+// live R3F scene graph and sums the geometry triangles of every mesh flagged
+// visible (its own flag only: no ancestor visibility, culling or draw ranges)
+// per nearest named object, so
 // the doubled geometry between two builds can be attributed to a system
 // (terrain / flora / wildlife / water / far sheet) instead of guessed at.
 //
