@@ -1488,6 +1488,12 @@
       "why": "same closing lane; last is fine while the closing runs",
       "origin": "machine",
       "place": "last"
+    },
+    "1225": {
+      "at": "2026-09-27T10:03:20.321Z",
+      "why": "a flaky unit gate blocks no player path; it ranks with the other test-infrastructure points behind the closing",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1518,7 +1524,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-09-27T00:24:52.057Z",
+    "at": "2026-09-27T10:03:20.341Z",
     "points": [
       174,
       184,
@@ -1945,7 +1951,8 @@
       1221,
       1222,
       1223,
-      1224
+      1224,
+      1225
     ]
   }
 }
