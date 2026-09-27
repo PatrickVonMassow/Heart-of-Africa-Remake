@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // THE CONTEXT FENCE (point 700) — thin fail-OPEN I/O wrapper around the pure
-// core (context-fence-core.mjs).
+// admission arithmetic (context-budget-core.mjs, via context-budget.mjs), which
+// takes its call classification from context-fence-core.mjs.
 //
 // REGISTRATION (.claude/settings.json is a protected path — the main session
 // wires it): one entry under `PreToolUse`, beside board-first-guard's. The
@@ -8,16 +9,18 @@
 // two must agree, or the fence never sees the very call it denies (Sol review
 // of d0aebb6, finding 4):
 //
-//   { "matcher": "Edit|Write|NotebookEdit|Agent|Task|Bash|PowerShell",
-//     "hooks": [{ "type": "command", "command": "node scripts/context-fence-guard.mjs" }] }
+//   { "matcher": "Edit|Write|MultiEdit|NotebookEdit|Agent|Task|Bash|PowerShell",
+//     "hooks": [{ "type": "command",
+//                 "command": "node \"$CLAUDE_PROJECT_DIR/scripts/context-fence-guard.mjs\"" }] }
 //
 // Modes:
 //   1. PreToolUse HOOK: reads the tool call on stdin, MEASURES the session's
 //      context from its own transcript (the payload's transcript_path, else
 //      located by session id) and asks whether THIS call's measured p90 cost
 //      still fits below the ceiling after pending debits and the handover
-//      reserve. Reads are admitted like every other growing call; only the
-//      enumerated bounded controls are exempt. Any internal error → ALLOW.
+//      reserve. Shell reads are admitted like every other growing call (the
+//      Read/Grep/Glob tools are not in the matcher); only the enumerated
+//      bounded controls are exempt. Any internal error → ALLOW.
 //   2. `--status`: the current measurement and what a starting call would get.
 //
 // OBSERVATION MODE IS THE DEFAULT (point 758, user 20.08.2026). The fence is
@@ -64,7 +67,7 @@ const PAUSE = resolve(REPO_ROOT, '.claude', 'batch-paused')
  *  .claude runtime record — these are THIS machine's session readings. One
  *  JSON object per line, appended; nothing reads it automatically. It is
  *  DELIBERATELY not `.claude/context-incidents.jsonl`: that series records
- *  BOUNDARY overshoots (point 742) and mixing a second record kind into it
+ *  BOUNDARY overshoots (point 742, plus the seeded startup readings) and mixing a second record kind into it
  *  would corrupt exactly the reading point 747 needs. */
 const OBSERVATIONS = resolve(REPO_ROOT, '.claude', 'context-fence-observations.jsonl')
 
@@ -112,8 +115,8 @@ const costSeries = () => summarizeSeries(readSeries().records)
 // late-link && node late-link/world.mjs` — the link is unborn when judged,
 // and the copy-based variant needs no link at all). The fence binds a
 // cooperating session against its own watermark; it is not a sandbox. The one
-// cheap catch — an `ln` targeting scripts/verify counts as starting a verify
-// run — lives in the core; the rest of the class is pinned as the intended
+// cheap catch — an `ln -s` whose link target lies under scripts/verify counts
+// as starting a verify run (a hard link does not) — lives in the core; the rest of the class is pinned as the intended
 // limit (see resolveThroughAncestors in context-fence-core.mjs).
 // KNOWN, BOUNDED LIMIT: paths resolve relative to REPO_ROOT. A `cd` earlier
 // in the same command changes the base a relative word really resolves
