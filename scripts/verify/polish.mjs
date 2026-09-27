@@ -1974,7 +1974,7 @@ if (section('giza-site')) {
       }
       return { width: c.width, splitColumns: split, worstGapRows: worst }
     })
-    // Measured on this very state: with the capture reaching 900 wu the band
+    // Measured before the bound: with the capture reaching 900 wu the band
     // split 231/3072 of Giza's columns (and 168/3072 of Cairo's — the defect was
     // never Giza-only, just most visible on an open plateau), gaps up to 11 rows;
     // bounded to the committed ring it splits none, and a settlement's worst is
@@ -2054,12 +2054,13 @@ if (section('giza-site')) {
 
     // Human-viewable evidence from two standpoints on the site.
     const radius = await page.evaluate(() => window.__placeLayout?.radius ?? 60)
+    // South rim, then east rim.
     const posts = [
-      ['south rim', 0, radius * 0.75, Math.PI / 2],
-      ['east rim', radius * 0.7, 0, Math.PI],
+      [0, radius * 0.75, Math.PI / 2],
+      [radius * 0.7, 0, Math.PI],
     ]
     let shot = 0
-    for (const [, px, pz, yaw] of posts) {
+    for (const [px, pz, yaw] of posts) {
       await page.evaluate(
         ([x, z, y]) => {
           const p = window.__placePlayer
@@ -2164,7 +2165,8 @@ if (section('giza-site')) {
 // --- Villager arms and gestures (point 479) ---------------------------------
 // The figures were cones with sphere heads: nobody could show what he was
 // talking about. What is checked here is what needs a real browser — that the
-// arms the renderer DRAWS actually take the four poses, that a gesture ends on
+// gesture state the live figures publish takes the four poses (each framed on
+// the drawn pair), that a gesture ends on
 // its own while the game runs, and that a figure at rest really stands at rest.
 // The state machine itself (bounded duration, one gesture per figure, the
 // return to rest) is pinned purely in src/render/gesture.test.ts.
@@ -2219,14 +2221,14 @@ if (section('villager-gestures')) {
               requestAnimationFrame(() =>
                 requestAnimationFrame(() => {
                   const h = window.__placeRayHit(c.cx, 1.05, c.cz)
-                  res({ x: p.x, z: p.z, hit: h.hitDistance, target: h.targetDistance, name: h.hitName })
+                  res({ hit: h.hitDistance, target: h.targetDistance, name: h.hitName })
                 }),
               )
             }),
           [a, centre],
         )
         if (hit.hit == null || hit.hit >= hit.target - 0.45) {
-          return { stood: { x: hit.x, z: hit.z, cx: centre.cx, cz: centre.cz, bearing: a }, tried: i + 1, blocked }
+          return { stood: { cx: centre.cx, cz: centre.cz, bearing: a }, tried: i + 1, blocked }
         }
         blocked.push(`${a.toFixed(2)}→${hit.name} at ${hit.hit.toFixed(2)} of ${hit.target.toFixed(2)}`)
       }
@@ -2250,7 +2252,7 @@ if (section('villager-gestures')) {
 
     // --- the four poses, one frame each -------------------------------------
     // Long durations so the pose survives the shutter's own settling; the wait
-    // is on the GESTURE's own clock, never on the wall clock.
+    // is on the pose being open, never on the wall clock.
     const HOLD = 12
     const poseAway = (p) =>
       Math.abs(p.left.pitch - 0.04) +
@@ -2336,7 +2338,7 @@ if (section('villager-gestures')) {
     )
 
     // --- sampled over the standing conversation -----------------------------
-    // A single instant proves nothing about a scheduler: sample across frames.
+    // A single instant proves nothing about a quiet pair: sample across frames.
     // Since point 580 the sample must find the pair QUIET — the two used to
     // cycle the four gestures as ambient dressing, with no utterance behind any
     // of them and at any distance, which is the mute pantomime the user
@@ -2370,15 +2372,15 @@ if (section('villager-gestures')) {
   await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
 }
 // --- Cold-weather dress (design.md §19.13, point 120g) ---
-// LAST in the file on purpose: it hops between settlements, and each leave
-// remounts the travel scene, which makes the next enter capture a panorama —
-// exactly the state the fallback check above asserts is absent.
-// --- (checks) ------------------------
-// The Zulu isipuku is the ONE period-sourced case (Mayr 1907): a cloak worn
-// over the everyday dress in cold weather. So the Zulu village must dress for
-// its austral winter and shed the cloak in its summer — while the peoples the
-// research found no evidence for stay bare in any month, however cold their
-// own ground gets. See src/systems/dress.ts for the per-people evidence.
+// It hops between settlements, and each leave remounts the travel scene, which
+// makes the next enter capture a panorama — the state the travel-panorama-capture
+// fallback check asserts is absent, which is why that section stages its own
+// direct enter.
+// The Zulu isipuku (Mayr 1907) is a cloak worn over the everyday dress in cold
+// weather, so the Zulu village must dress for its austral winter and shed the
+// cloak in its summer; the San, Somali and Hausa cases rest on Passarge, Swayne
+// and Barth, while a people without a seasonal rule stays bare in any month.
+// See src/systems/dress.ts for the per-people evidence.
 if (section('cold-weather-dress')) {
   // NOTE: debugJumpToMonth is ONE-indexed (dayOfMonthJump clamps to 1..12 then
   // subtracts one; Hud.tsx calls it as i + 1). A zero-based probe lands a month
@@ -2396,9 +2398,9 @@ if (section('cold-weather-dress')) {
     return page.evaluate(() => window.__placeDress ?? null)
   }
 
-  // Point 137: the six dressed peoples, each at its own village in its own
-  // month, against the fifteen that never dress. The pure mapping is covered in
-  // src/systems/dress.test.ts; this is the live half.
+  // Point 137: four of the dressed peoples, each at its own village in its own
+  // month, and the Maasai as a people that never dresses. The pure mapping is
+  // covered in src/systems/dress.test.ts; this is the live half.
   const somaliKarif = await dressAt('somali-village', 8) // August — the karif on the Haud
   await frame('113-somali-karif-tobe', { place: 'somali-village', label: 'the Somali karif dress' })
   const somaliJilal = await dressAt('somali-village', 2) // February — jilal, dry and HOT
@@ -2561,8 +2563,9 @@ if (section('campfire-shadows')) {
   // (point 499). After 1.5 s it has not here: both probe points then landed on the
   // same unrendered ground and every contrast came out as exactly 0.0 — ON and OFF
   // alike, three stones each, which is a blind probe rather than a missing shadow.
-  // Built, the same measurement reads OFF 8/-5/12 and ON 56/40/53, inside the
-  // recorded ranges. Neither threshold below is touched.
+  // Built, the same measurement reads OFF 8/-5/12 and ON 56/40/53, each on its
+  // side of the bars (OFF under 20, ON at 25 or more). Neither threshold below is
+  // touched.
   await waitForSceneBuilt(page)
 
   // The fire ring's stones ARE the visible occluders (light at the pit centre,
@@ -2644,7 +2647,8 @@ if (section('campfire-shadows')) {
     window.__ui.getState().setSeasonWetnessOverride(null)
   })
 
-  // Measured on both backends: OFF contrast 3-12, ON contrast 42-57.
+  // Measured on both backends across the readings recorded here: OFF contrast
+  // about -5 to 12, ON contrast about 34 to 57.
   //
   // Point 387 — the ON check was red on `main` at per-stone [1.6, -1.3, 0]:
   // three readings of three different signs, all sitting on zero. VERDICT: the
@@ -2672,17 +2676,19 @@ if (section('campfire-shadows')) {
 }
 
 // --- The settlement edge painted on the ground (design.md §2.6, point 352/488) ---
-// The band must TELL THE TRUTH, so this measures it in the rendered picture and
-// against the leave check itself, in EVERY kind of place and at BOTH ends of the
-// year — a step visible only in the dry-season straw would be half a feature.
+// The band must TELL THE TRUTH, so this measures it in the rendered picture in
+// four kinds of place, in both seasons (the wetness override forces dry and
+// wet), and against the leave check itself in one village — a step visible only
+// in the dry-season straw would be half a feature.
 if (section('settlement-edge')) {
   // Ground crops: how far inside / outside the boundary each sample sits.
   //
   // THE INSIDE CROP SITS INSIDE THE BAND, NOT ON ITS INNER EDGE (work-order
   // 688). It stood at −5 m, which was well clear of the band this check was
   // written against — but the band was widened to 8 m in play on 27.08.2026 and
-  // the crops were not re-aimed with it. −5 then sat ON the band's own inner
-  // edge (radius − 4, ± the 0.4 m wander), the least stable ground on the whole
+  // the crops were not re-aimed with it. −5 then sat just inside the band's own
+  // inner edge (radius − 4, ± the 0.4 m wander), close enough for its crop to
+  // straddle it — the least stable ground on the whole
   // profile, and whether the criterion passed came down to which bearing the
   // corridor scan happened to pick.
   //
@@ -2696,7 +2702,7 @@ if (section('settlement-edge')) {
   // core says it should. At −3 the sweep is at full strength everywhere and in
   // both seasons; at −5 it is not — bambara in the rains reads ×0.838 there,
   // ABOVE its own boundary crop, and the give-way check had a margin of −0.001
-  // against a bar of 0.008. Off −3 the same margins are 0.11 to 0.16: the bar is
+  // against a bar of 0.008. Off −3 the same margins are 0.07 to 0.16: the bar is
   // unchanged and is no longer decided by noise.
   const SAMPLES = [
     { name: 'inside', at: -3 },
@@ -2887,7 +2893,7 @@ if (section('settlement-edge')) {
     // spatial median). Five reads, so a streak surviving into two of them still
     // cannot reach the middle value.
     //
-    // The isolated WebGPU run exposed a THIRD missing-reading cause: maasai
+    // The isolated WebGPU run exposed another missing-reading cause: maasai
     // dry had healthy inside luminance (ON 73.4, OFF 107.5), but drift of
     // 1.29% / 1.25%. The two-frame absolute settle admitted a slow trend that
     // the full shot rejected. Wait on the shot's OWN timescale and statistic,
@@ -3000,7 +3006,8 @@ if (section('settlement-edge')) {
   // Both were reading a wet state still on its way in. With the soak and the
   // light on it polled until they stop, four consecutive WebGL 2 runs reported
   // capetown inside ×0.946, ×0.944, ×0.944, ×0.946 (spread 0.002) and giza
-  // inside ×0.905, ×0.906, ×0.906.
+  // inside ×0.905, ×0.906, ×0.906 (three recorded). These figures predate the
+  // re-aimed −3 crop and the 8 m band.
   //
   // WHAT STILL ROTATED, AND WHY (point 641). The outside half kept moving —
   // ×1.000, ×1.000, ×0.980, and on 11.08.2026 `giza (wet)` went red at ×0.963,
@@ -3026,8 +3033,8 @@ if (section('settlement-edge')) {
   const kinds = [
     // THE CASE THE USER REPORTED (point 581) LEADS. His frame was the Bambara
     // village: pale sand inside, pale sand outside, the master strength already
-    // at its ceiling and the line still unreadable. A roster that measures three
-    // other kinds and not this one cannot say the report is answered, so the
+    // at its ceiling and the line still unreadable. A roster that measures the
+    // other three places and not this one cannot say the report is answered, so the
     // sand-on-sand village is measured and PHOTOGRAPHED like the rest.
     { id: 'bambara-village', shoot: { name: '581-sand-village-edge-band', label: 'the swept Bambara village ground giving way at the edge' } },
     { id: 'maasai-village', shoot: { name: '488-village-edge-band', label: 'the swept village ground giving way at the edge' } },
@@ -3081,7 +3088,7 @@ if (section('settlement-edge')) {
     check(
       'walking straight over the painted edge is the frame in which the village is left (design.md §2.6)',
       crossing.left && Math.abs(crossing.last - crossing.radius) < 1.5,
-      `left at ${crossing.last?.toFixed(2)} m of a ${crossing.radius} m boundary`,
+      `left at ${crossing.last.toFixed(2)} m of a ${crossing.radius} m boundary`,
     )
   }
 }
@@ -3091,9 +3098,9 @@ if (section('settlement-edge')) {
 // route: the pure round is pinned in src/scenes/place/tagGame.test.ts, but only
 // the live scene can show that the paths are not periodic, that the gap between
 // chaser and quarry breathes, that the role really moves, and that a child is
-// seen running out of steam. Sampled over an interval, and gated on a round
-// actually being in play — the group idles between rounds by design, so a sample
-// window straddling a break would judge the wrong thing.
+// seen running out of steam. Sampled over an interval that opens once a round is
+// in play and runs on through the breaks — the group idles between rounds by
+// design, so the checks below judge playing samples and breaks apart.
 if (section('children-tag')) {
   await page.evaluate(() => {
     const g = window.__game.getState()
