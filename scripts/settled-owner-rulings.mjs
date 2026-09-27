@@ -1,6 +1,6 @@
 // The single tracked register of owner decisions that must not be put back to
 // the owner. Keep the record as data: both board admission and the Stop guard
-// consume it through settled-ruling-core.mjs, and the repository test below
+// consume it through settled-ruling-core.mjs, and settled-ruling-core.test.mjs
 // checks the fields that make an entry reviewable rather than mnemonic.
 
 export const SETTLED_OWNER_RULINGS = Object.freeze([

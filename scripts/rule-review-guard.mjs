@@ -3,9 +3,10 @@
 // what an unreviewed corpus accumulates.
 //
 // The decision logic is pure and Vitest-covered; this wrapper only reads the
-// bookkeeping and is fail-OPEN: any throw, an unreadable state file, an
-// uncountable corpus — all allow the stop. It stands down while the batch is
-// paused and while another live session owns the batch lock.
+// bookkeeping and is fail-OPEN for its own errors: any throw allows the stop.
+// An unreadable state file reads as "no review recorded" (which owes one), and
+// an uncountable corpus only switches the growth trigger off. It stands down
+// while the batch is paused and while another live session owns the batch lock.
 import { existsSync, readFileSync } from 'node:fs'
 import { repoPath } from './repo-paths.mjs'
 import { isMainModule } from './is-main.mjs'

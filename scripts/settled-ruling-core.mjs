@@ -3,7 +3,7 @@ import { SETTLED_OWNER_RULINGS } from './settled-owner-rulings.mjs'
 export const NOT_SETTLED_PREFIX = 'Not settled ruling'
 
 /** Canonical words for phrase matching, including German ASCII transliteration. */
-export function normalizeRulingText(value) {
+function normalizeRulingText(value) {
   return String(value ?? '')
     .toLowerCase()
     .replaceAll('ä', 'ae')
@@ -56,7 +56,7 @@ export function matchSettledRuling(text, rulings = SETTLED_OWNER_RULINGS) {
 }
 
 /** The only uncertain-match escape, deliberately visible in the card/reply. */
-export function statedDistinction(text, rulingId) {
+function statedDistinction(text, rulingId) {
   if (typeof text !== 'string' || typeof rulingId !== 'string') return null
   const escaped = rulingId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   const line = new RegExp(`^${NOT_SETTLED_PREFIX}\\s+${escaped}:\\s*(\\S[^\\r\\n]*)$`, 'im').exec(text)

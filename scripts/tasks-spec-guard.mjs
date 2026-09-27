@@ -97,7 +97,7 @@ export function gatherTasksSpecInputs({ sessionId = '' } = {}) {
   try {
     branch = git('rev-parse --abbrev-ref HEAD')
   } catch {
-    /* detached or unborn — HEAD is a sufficient local-state key */
+    /* abbrev-ref failed — HEAD is a sufficient local-state key */
   }
   const stored = baselineFor(readBaselineState(), branch)
   const baseline = stored || bootstrapBase(head)
@@ -127,7 +127,7 @@ if (isMainModule(import.meta.url)) {
     }
 
     const gathered = gatherTasksSpecInputs({ sessionId: sid })
-    if (!gathered.applicable) process.exit(0) // paused / non-owner / no work log
+    if (!gathered.applicable) process.exit(0) // paused / non-owner / no TASKS.md
 
     const result = evaluate(gathered.inputs)
     if (result.block) process.stdout.write(JSON.stringify({ decision: 'block', reason: result.reason }))
