@@ -7,9 +7,8 @@ import {
   AFTER_CLEANUP_STEP_ID,
   CLEANUP_STEP_IDS,
   CLOSING_STEPS,
-  ORDERED_STEP_IDS,
   STEP_IDS,
-  afterCleanupProblem,
+  orderProblems,
   evidenceAnchors,
   isVersionTagCommand,
   isWorkOrderPath,
@@ -274,10 +273,6 @@ describe('the second regression must stand AFTER the cleanup', () => {
     const order = CLOSING_STEPS.map((s) => s.id)
     expect(order.indexOf('large-regression')).toBeLessThan(order.indexOf('cleanup-blind-parallel'))
     expect(order.indexOf('cleanup-blind-parallel')).toBeLessThan(order.indexOf(AFTER_CLEANUP_STEP_ID))
-    // the ENFORCED order is a separate list, and it holds the same three stages
-    expect(ORDERED_STEP_IDS[0]).toBe('large-regression')
-    expect(ORDERED_STEP_IDS[ORDERED_STEP_IDS.length - 1]).toBe(AFTER_CLEANUP_STEP_ID)
-    for (const id of CLEANUP_STEP_IDS) expect(ORDERED_STEP_IDS).toContain(id)
   })
 
   it('ACCEPTS a run named by a timestamp between the cleanup and the record', () => {
@@ -448,17 +443,17 @@ describe('the second regression must stand AFTER the cleanup', () => {
     }
     const hostile = new Proxy({}, { get: explode, ownKeys: explode, has: explode })
     expect(() => missingSteps({ commit: HEAD, steps: hostile }, HEAD)).not.toThrow()
-    expect(() => afterCleanupProblem(hostile, HEAD)).not.toThrow()
-    expect(afterCleanupProblem(hostile, HEAD)).toBe('')
+    expect(() => orderProblems(hostile, HEAD)).not.toThrow()
+    expect(orderProblems(hostile, HEAD).size).toBe(0)
     // an entry whose own fields throw on access
     const hostileEntry = { commit: HEAD, steps: { [AFTER_CLEANUP_STEP_ID]: new Proxy({}, { get: explode }) } }
     expect(() => missingSteps(hostileEntry, HEAD)).not.toThrow()
-    expect(() => afterCleanupProblem(hostileEntry.steps, HEAD)).not.toThrow()
+    expect(() => orderProblems(hostileEntry.steps, HEAD)).not.toThrow()
     // nothing counted → the tag stays shut, which is the safe direction
     expect(evaluate({ command: 'git tag v0.3', state: { commit: HEAD, steps: hostile }, headSha: HEAD }).block).toBe(true)
     // and the plain totality of the new helpers, including a junk head
     for (const junk of [null, undefined, 42, 'x', [], {}]) {
-      expect(() => afterCleanupProblem(junk, junk)).not.toThrow()
+      expect(() => orderProblems(junk, junk)).not.toThrow()
       expect(() => evidenceAnchors(junk)).not.toThrow()
       expect(evidenceAnchors(junk).commits).toEqual([])
       expect(() => missingSteps({ commit: HEAD, steps: { [AFTER_CLEANUP_STEP_ID]: junk } }, HEAD)).not.toThrow()

@@ -88,7 +88,7 @@ if (argv.includes('--status')) {
 }
 
 if (argv.includes('--reset')) {
-  writeState({ commit: headSha(), steps: {}, resetAt: null })
+  writeState({ commit: headSha(), steps: {} })
   console.log(`Closing state reset for HEAD ${headSha().slice(0, 12)} — all steps cleared.`)
   process.exit(0)
 }
@@ -139,7 +139,7 @@ try {
   const toolInput = payload.tool_input
   const command = toolInput && toolInput.command
   // The work order is read ONLY when the payload could carry a tick — every
-  // other call (the overwhelming majority) costs no file read at all.
+  // other call (the overwhelming majority) reads only the small closing state.
   const tasksText = mayTickPoint(payload.tool_name, toolInput) ? readTasks() : ''
   const decision = evaluate({ command, state: readState(), headSha: headSha(), toolName: payload.tool_name, toolInput, tasksText })
   if (decision.block) {

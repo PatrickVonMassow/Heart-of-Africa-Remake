@@ -7,10 +7,11 @@
 // stale-comment cleanup + the .md audit (the very steps that distinguish a
 // CLOSING from a plain regression, §7.2 / Maximum-QA Phase 8) were SKIPPED,
 // because the closing steps were tracked by fallible MEMORY, not enforced. This
-// guard makes a version release IMPOSSIBLE while any closing step is unchecked:
-// a PreToolUse hook on the shell tools blocks the version-tag creation-or-push
-// (and --tags) unless EVERY step below is recorded done FOR THE EXACT COMMIT
-// tagged. The `poc` tag is NOT a release and is not gated — see
+// guard bars a version release while any closing step is unchecked: a
+// PreToolUse hook on the shell tools blocks every version-tag act (create, push,
+// force, delete, bulk --tags/--follow-tags, `gh release create` — see
+// `isVersionTagCommand`) unless EVERY step below is recorded done FOR THE
+// COMMIT being closed (the wrapper judges HEAD). The `poc` tag is NOT a release and is not gated — see
 // `isVersionTagCommand` for the one-way dependency (user decision 20.09.2026).
 //
 // The SECOND release act the checklist gates is the CLAIM that a closing is
@@ -20,14 +21,16 @@
 // never run. So the same checklist decides the tick, on the work-order EDIT.
 //
 // The enforcement is PRE-tag (a PreToolUse deny), not a post-hoc Stop block, so
-// the bad state can never reach the remote. Fail-open is the WRAPPER's job; this
+// the bad state does not reach the remote — except through the wrapper's
+// deliberate fail-open on its own internal error. Fail-open is the WRAPPER's job; this
 // core must never throw on partial input (a guard bug must not trap the session).
 
 /**
  * The canonical closing checklist — every step a full closing cycle must
  * complete before a version tag (§7.2 + Maximum-QA Phase 8 + CLAUDE.md §9).
  * A step counts as done only when recorded for the tagged commit WITH evidence.
- * Adding a step here automatically tightens the gate (no other edit needed).
+ * Adding a step here automatically tightens the gate; a new CLEANUP step must
+ * also join CLEANUP_STEP_IDS for its place in the sequence to be checked.
  */
 export const CLOSING_STEPS = [
   { id: 'large-regression', title: 'Full LARGE regression green on BOTH backends, flake-free (§7.2)' },
@@ -68,6 +71,21 @@ const GIT_PUSH = gitVerb('push')
 const PATH_OPTION = /\s(?:-C|--git-dir|--work-tree)(?:\s+|=)\S+/g
 
 /**
+ * A command with its PROSE removed: heredoc bodies and QUOTED -m/--message
+ * values (an unquoted or `--message=` value stays). What a command SAYS is not
+ * what it DOES — a commit message quoting `v0.2` or a ticked point line is
+ * talk, and blocking talk is obstruction. Only those two forms are stripped: a blanket quote-strip would swallow the real
+ * arguments (`git tag "v0.3"`, `sed 's/…/- [x] 224./'`), and an apostrophe in a
+ * double-quoted string would consume unintended spans ("Don't …").
+ */
+function withoutProse(command, { keepHeredocBodies = false } = {}) {
+  let c = keepHeredocBodies ? command : command.replace(/<<-?\s*['"]?(\w+)['"]?[\s\S]*?\n[ \t]*\1\b/g, ' ')
+  c = c.replace(/(-m|--message)\s+"[^"]*"/g, '$1 MESSAGE')
+  c = c.replace(/(-m|--message)\s+'[^']*'/g, '$1 MESSAGE')
+  return c
+}
+
+/**
  * Does this shell command CREATE or PUSH a version tag (vX.Y)?
  * That is the release act the closing gates. Matches:
  *   git tag [..] vX.Y             (create/move a version tag)
@@ -92,24 +110,9 @@ const PATH_OPTION = /\s(?:-C|--git-dir|--work-tree)(?:\s+|=)\S+/g
  * (`git -C /build/poc push origin main`) — the gate is only for a version
  * RELEASE. Total: any non-string → false.
  */
-/**
- * A command with its PROSE removed: heredoc bodies and -m/--message values.
- * What a command SAYS is not what it DOES — a commit message quoting `v0.2`,
- * `poc` or a ticked point line is talk, and blocking talk is obstruction. Only
- * those two forms are stripped: a blanket quote-strip would swallow the real
- * arguments (`git tag "v0.3"`, `sed 's/…/- [x] 224./'`), and an apostrophe in a
- * double-quoted string would consume unintended spans ("Don't …").
- */
-function withoutProse(command, { keepHeredocBodies = false } = {}) {
-  let c = keepHeredocBodies ? command : command.replace(/<<-?\s*['"]?(\w+)['"]?[\s\S]*?\n[ \t]*\1\b/g, ' ')
-  c = c.replace(/(-m|--message)\s+"[^"]*"/g, '$1 MESSAGE')
-  c = c.replace(/(-m|--message)\s+'[^']*'/g, '$1 MESSAGE')
-  return c
-}
-
 export function isVersionTagCommand(command) {
   if (typeof command !== 'string') return false
-  // `git commit -m "… the v0.2 / poc release …" && git push origin main` is NOT
+  // `git commit -m "… the v0.2 release …" && git push origin main` is NOT
   // a release — the real false positive that once blocked this guard's own commit.
   let c = withoutProse(command)
   // A backslash-newline is a CONTINUATION, not a command break — joining it back
@@ -118,7 +121,7 @@ export function isVersionTagCommand(command) {
   // (four-eyes review 07.08.2026).
   c = c.replace(/\\\r?\n/g, ' ')
   // Evaluate each command SEGMENT on its own — a `git push origin main` segment
-  // must not inherit a `poc`/`vX.Y` token from a sibling segment.
+  // must not inherit a `vX.Y` token from a sibling segment.
   const segments = c.split(/&&|\|\||;|\||\n/)
   // A version tag as a bare ARGUMENT (v0.1, v1.0, v12.34), or a bulk tag push.
   // Matches quoted or unquoted. Word-bounded so `v0.2-rc` refspecs don't
@@ -149,8 +152,6 @@ export function isVersionTagCommand(command) {
 }
 
 
-/** The work-order files a tick is written into (the split of 26.07.2026). */
-export const WORK_ORDER_FILES = ['TASKS.md', 'docs/tasks-archive.md']
 
 /** Does this path (any separator, any prefix) name one of the work-order files? */
 export function isWorkOrderPath(path) {
@@ -164,8 +165,8 @@ export function isWorkOrderPath(path) {
 // complete/final one (174/184/330). A point that merely REFERS to some other
 // closing ("found in the point-173 closing run", "before the final closing run
 // and the tag") is not one — that reference shape is stripped before the demand
-// is read. Measured over the whole corpus (536 points): 7 match, all of them
-// points that genuinely deliver a closing, and no incidental mention.
+// is read. Measured over the corpus of the time (536 points): 7 matched, all of
+// them points that genuinely deliver a closing, and no incidental mention.
 // The headline word stands on its own — `pre-closing pass` is a preparation FOR
 // a closing, not a closing, so the hyphenated compound must not match.
 const CLOSING_HEADLINE = /(^|[\s(—])closing\s+(run|cycle|pass)\b/i
@@ -411,8 +412,9 @@ export function tickClaim({ toolName, toolInput, tasksText } = {}) {
 // A record time is only ever a NECESSARY condition (it is an upper bound of the
 // run it describes, never a lower one), and ties are allowed throughout: two
 // steps recorded in the same millisecond are a fast hand, not a violation.
-// A step recorded WITHOUT a record time cannot be ordered at all, so it is
-// reported missing with a re-record remedy rather than waved through.
+// A step recorded WITHOUT a record time cannot be ordered at all, so once the
+// second regression is recorded (nothing is ordered before) it is reported
+// missing with a re-record remedy rather than waved through.
 
 /** The cleanup steps the second regression must come after. */
 export const CLEANUP_STEP_IDS = ['dead-code', 'stale-doc', 'stale-comment', 'md-audit', 'cleanup-blind-parallel']
@@ -427,7 +429,7 @@ const TIMESTAMP_IN_TEXT = /\b\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2})?(?:\.
  * digit rule read `face2face` as a commit and missed an honest `defaced`, so the
  * CONTEXT decides instead (four-eyes review 11.08.2026). What follows the word is
  * the RUN TARGET; a sha mentioned anywhere else ("fixes 9f3c1a2") is a remark and
- * is ignored, so the first one named is the one judged.
+ * is ignored, and every run target named must be the commit being closed.
  */
 const RUN_COMMIT_IN_TEXT = /\b(?:on|commit|sha|rev|revision)\s+(?:commit\s+)?([0-9a-f]{7,40})\b/gi
 const DAY_MS = 86_400_000
@@ -504,9 +506,6 @@ const claimOf = (text) =>
     .replace(/[^a-z0-9]+/g, ' ')
     .trim()
 const sameClaim = (a, b) => claimOf(a) === claimOf(b)
-
-/** The steps whose POSITION in the sequence is checked, first to last. */
-export const ORDERED_STEP_IDS = ['large-regression', ...CLEANUP_STEP_IDS, AFTER_CLEANUP_STEP_ID]
 
 /**
  * Which recorded steps stand in the WRONG PLACE in the closing sequence, as
@@ -590,7 +589,7 @@ export function orderProblems(steps, headSha) {
     if (!namesHead && anchors.times.length === 0) {
       add(
         AFTER_CLEANUP_STEP_ID,
-        `its evidence names neither the commit being closed ("on <sha>") nor a timestamp, so nothing places it after the cleanup — record it as e.g. --evidence "LARGE green on ${head.slice(0, 12) || '<sha>'}, both backends, 2026-08-11T14:00Z"`,
+        `its evidence names neither the commit being closed ("on <sha>") nor a timestamp, so nothing places it after the cleanup — record it as e.g. --evidence "LARGE green on ${head.slice(0, 12) || '<sha>'}, both backends"`,
       )
       return problems
     }
@@ -600,7 +599,7 @@ export function orderProblems(steps, headSha) {
     if (first && sameClaim(first.evidence, second.evidence)) {
       add(
         AFTER_CLEANUP_STEP_ID,
-        `its evidence is word for word the evidence of "large-regression" — the closing runs the regression TWICE, and one run cannot be both`,
+        `its evidence is the same claim as the evidence of "large-regression" (case and punctuation aside) — the closing runs the regression TWICE, and one run cannot be both`,
       )
       return problems
     }
@@ -630,7 +629,7 @@ export function orderProblems(steps, headSha) {
         if (Math.floor(earliest.time / DAY_MS) <= Math.floor(youngest.at / DAY_MS)) {
           add(
             AFTER_CLEANUP_STEP_ID,
-            `its evidence dates the run ${earliest.token}, the cleanup's own day or earlier ("${youngest.id}", ${iso(youngest.at)}) — a bare date cannot order two runs of one day, so name the time or the commit ${head.slice(0, 12) || ''}`.trim(),
+            `its evidence dates the run ${earliest.token}, the cleanup's own day or earlier ("${youngest.id}", ${iso(youngest.at)}) — a bare date cannot order two runs of one day, so name the time (or the commit ${head.slice(0, 12) || '<sha>'} and drop or fix that date)`,
           )
           return problems
         }
@@ -659,20 +658,6 @@ export function orderProblems(steps, headSha) {
     return problems
   }
   return problems
-}
-
-/**
- * Why the recorded `regression-after-cleanup` does NOT count for the closing of
- * `headSha`, or '' when it does — the single-step view of `orderProblems`, kept
- * because that step is the one the checklist is named after.
- * Total by contract: anything unreadable → ''.
- */
-export function afterCleanupProblem(steps, headSha) {
-  try {
-    return orderProblems(steps, headSha).get(AFTER_CLEANUP_STEP_ID) ?? ''
-  } catch {
-    return ''
-  }
 }
 
 /**
