@@ -78,7 +78,7 @@ export function openPointsHeadline(openNumbers = [], { gated = [] } = {}) {
   const waiting = (gated ?? []).map(Number).filter(Number.isFinite)
   const head = nums[0]
   return (
-    `[batch-resume] TASKS.md has ${nums.length} open point(s); the first in work-order ` +
+    `[batch-resume] TASKS.md has ${nums.length} open point(s) ready to work; the first in work-order ` +
     `order is ${head ?? 'none'}` +
     (head === undefined ? '. ' : ` (node scripts/point-brief.mjs ${head} for its spec; TASKS.md for the rest). `) +
     // THE GATED POINTS ARE NAMED, NOT OFFERED (point 450). A fresh session must
@@ -220,8 +220,8 @@ export function standDownMessage({
       text:
         `A message RESPONDER holds a bounded claim on the batch (claim ${claimantSid}, ` +
         'scripts/chat-watcher.mjs) while it answers one chat message, so the lock is reserved and this ' +
-        `session cannot take it. ${NOT_THE_WORKER}The claim releases itself within minutes — it is bounded ` +
-        `by the responder's lifetime and expires on its own. ${wayBackText}`,
+        `session cannot take it. ${NOT_THE_WORKER}The responder's claim releases itself within minutes — it is ` +
+        `bounded by the responder's lifetime and expires on its own. ${wayBackText}`,
     }
   }
 
@@ -232,7 +232,8 @@ export function standDownMessage({
         `NO session owns the batch lock right now, but session ${claimantSid} has CLAIMED it ` +
         '(.claude/batch-claim.json) and that claim is still live, so taking the lock here would pull the ' +
         `batch out of the window it was reserved for. ${NOT_THE_WORKER}${wayBackText} ` +
-        `NOTE: session ${claimantSid} has already claimed the batch — do not claim over it.`,
+        `NOTE: session ${claimantSid} has already claimed the batch — use the way back only on the user's ` +
+        'word, never to claim over it on your own.',
     }
   }
 
@@ -254,6 +255,9 @@ export function standDownMessage({
       `But another session OWNS the batch lock (session ${lock?.sessionId ?? 'unknown'}, ` +
       `pid ${lock && lock.pid ? lock.pid : 'unknown'}, heartbeat ${ageMin} min ago, .claude/batch-lock.json) ` +
       `and its liveness check passed. ${NOT_THE_WORKER}${wayBackText}` +
-      (claimHonoured ? ` NOTE: session ${claimantSid} has already claimed the batch — do not claim over it.` : ''),
+      (claimHonoured
+        ? ` NOTE: session ${claimantSid} has already claimed the batch — use the way back only on the user's ` +
+          'word, never to claim over it on your own.'
+        : ''),
   }
 }

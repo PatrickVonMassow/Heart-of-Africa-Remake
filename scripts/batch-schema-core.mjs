@@ -178,7 +178,8 @@ export function sameProcess(a, b, { tolerance = PROCESS_START_TOLERANCE_MS } = {
 
 /** The state vocabulary of union M16, unchanged. A state outside it is not a state
  *  this lane can record; adding one is a design change, not an implementation
- *  detail, because reconciliation (step 8) decides on exactly these names. */
+ *  detail, because every reader of an attempt record — reconciliation (step 8)
+ *  among them — is written against exactly these names. */
 export const ATTEMPT_STATES = Object.freeze([
   'queued',
   'running',
