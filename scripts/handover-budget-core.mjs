@@ -1,7 +1,7 @@
 // Pure arithmetic for the measured handover cap: first refusal to committed boundary.
 import { CONTEXT_HANDOVER_RESERVE_TOKENS } from './context-watermark-core.mjs'
 
-export const HANDOVER_BUDGET_RECORD_V = 1
+const HANDOVER_BUDGET_RECORD_V = 1
 
 const positive = (value) =>
   typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null

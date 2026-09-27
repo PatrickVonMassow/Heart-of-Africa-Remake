@@ -3,7 +3,7 @@
 // into the model context on EVERY user prompt, so each chat reply can begin with
 // it per the chat-timestamp rule ("**Donnerstag, 23.07.2026, 07:04**").
 // Computed via Node ICU (toLocaleString with timeZone), never via TZ= in Git-Bash.
-// Live install: C:\Users\Patri\.claude\hooks\berlin-timestamp.cjs
+// Live install: /home/node/.claude/hooks/berlin-timestamp.cjs; C:\Users\Patri\.claude\hooks\berlin-timestamp.cjs
 // Versioned copy: scripts/hooks/berlin-timestamp.cjs in the hoa repo.
 'use strict';
 

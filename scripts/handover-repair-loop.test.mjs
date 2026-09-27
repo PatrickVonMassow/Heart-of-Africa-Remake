@@ -32,7 +32,7 @@ describe('observeOwnerLoops', () => {
     }
     expect(handBack).toHaveBeenCalledOnce()
     expect(result.context).toContain('HAND-BACK BOUND REACHED')
-    expect(result.context).toContain('never reached its Stop hook')
+    expect(result.context).toContain('without being handed back at a Stop hook')
   })
 
   it('states the dirty reason at the bound without releasing', () => {
