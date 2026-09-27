@@ -266,7 +266,7 @@ if (section('travel-wildlife-dump')) {
   // --- Out in the savanna the dump SEES the wildlife (point 454) ---------------
   // Only a live run proves that the travel scene really registers its read-only
   // source; the pure layer can prove the shaping alone. Read straight off the
-  // modal's JSON — the archive path is already covered above.
+  // modal's JSON — the archive path is the bug-report-archive section's.
   await page.evaluate(() => {
     const g = window.__game.getState()
     g.setJournalOpen(false)
