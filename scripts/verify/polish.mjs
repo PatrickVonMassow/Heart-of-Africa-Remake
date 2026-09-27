@@ -8418,17 +8418,6 @@ if (section('roof-clearance')) {
 // checked here is that the SAME layer answers in this perspective, over the
 // inhabitants and their animals, and that it leaves nothing behind.
 if (section('ctrl-actor-labels')) {
-  const frames = (n) =>
-    page.evaluate(
-      (count) =>
-        new Promise((res) => {
-          let i = 0
-          const step = () => (++i >= count ? res() : requestAnimationFrame(step))
-          requestAnimationFrame(step)
-        }),
-      n,
-    )
-
   await page.evaluate(() => {
     const g = window.__game.getState()
     g.setJournalOpen(false)
@@ -8452,7 +8441,7 @@ if (section('ctrl-actor-labels')) {
     p.pitch = 0
     p.yaw = Math.atan2(-(0 - p.x), -(0 - p.z))
   })
-  await frames(4)
+  await nextFrames(3) // four drawn frames
 
   const idle = await page.evaluate(() => document.querySelectorAll('.actor-label').length)
   check('a settlement stands unlabelled while Ctrl is up (point 342)', idle === 0, `${idle} labels`)
@@ -8603,8 +8592,9 @@ if (section('ctrl-actor-labels')) {
     `${walking.named}/${walking.moved} moved figures named after ${walking.frames} frame(s) [${walking.kinds.join(', ')}]`,
   )
 
-  // NO TWO DRAWN BOXES FUSE IN THIS CROWD (point 628). Every check above asks
-  // the DOM whether a TEXT is present — which is exactly what let the evidence
+  // NO TWO DRAWN BOXES FUSE IN THIS CROWD (point 628). The label checks above
+  // ask which TEXT is present and where its figure stands, never how its drawn
+  // box lies — which is exactly what let the evidence
   // frame below read "Villager llager" while the whole suite was green: the
   // defective frame had been written by ANOTHER revision's run (main, 14.08,
   // before the declutter), and no assertion in THIS suite — the one that owns
@@ -8677,7 +8667,7 @@ if (section('ctrl-actor-labels')) {
 
   const fusionPost = await sampleFusion(45)
   // The DENSE-CROWD cushion, not the sparse one (point 1067): this scene holds
-  // 17–23 labels, so a loaded lane's drift crosses the tolerance in several
+  // roughly 17–24 labels, so a loaded lane's drift crosses the tolerance in several
   // frames of the ninety where the savanna twin sees none. The measurement
   // behind the number is in labelFusion.mjs beside FUSE_CROWD_SHARE.
   const fusionVerdict = judgeLabelFusion(mergeFusionReadings(fusionPre, fusionPost), { maxShare: FUSE_CROWD_SHARE })
@@ -8733,9 +8723,10 @@ if (section('chief-to-drummer')) {
   check('the village names where its drummer sits', !!drummer, JSON.stringify(drummer))
   const inFrontOf = (at, away) => ({ x: at.x + Math.sin(drummer.facing) * away, z: at.z + Math.cos(drummer.facing) * away })
   await standAt(inFrontOf(drummer, 2), drummer)
-  // Wait for the prompt that NAMES this key, not for any prompt: a villager
-  // speaking nearby would otherwise own the key and the press would open his
-  // guess dialog instead (the arbitration of point 691).
+  // Wait for the prompt that NAMES this key, not for any prompt: another offer
+  // standing at the same moment would make the press mean something else.
+  // (Before the two keys of point 1139, a nearby word could take this key and
+  // open a guess dialog — the arbitration of point 691.)
   const askDrummer = await page.evaluate(async () => {
     const { getStrings } = await import('/src/i18n/index.ts')
     return getStrings().labels.askDrummer
@@ -8807,10 +8798,15 @@ if (section('chief-to-drummer')) {
     .waitForFunction(() => !!document.querySelector('.dialog.speech-guess'), null, { timeout: 15000 })
     .then(() => true)
     .catch(() => false)
+  const chiefCameOut = await page.evaluate(() => window.__game.getState().chiefOutside[window.__game.getState().placeId] === true)
   check(
     'E takes the word and leaves the man to SPACE (point 1139)',
-    guessAtDrummer && (await page.evaluate(() => window.__game.getState().chiefOutside[window.__game.getState().placeId] !== true)),
-    guessAtDrummer ? 'the chief came out of his hut on the guess key' : 'no guess dialog opened at the drummer',
+    guessAtDrummer && !chiefCameOut,
+    !guessAtDrummer
+      ? 'no guess dialog opened at the drummer'
+      : chiefCameOut
+        ? 'the chief came out of his hut on the guess key'
+        : 'the guess dialog opened and the chief stayed in his hut',
   )
   await page.evaluate(() => window.__ui.getState().setDialog(null))
   await nextFrames(2)
@@ -8883,7 +8879,6 @@ if (section('chief-to-drummer')) {
     // 4. In FRONT of the pair, the key at the DRUMMER beats the message out.
     const mid = { x: (stood.x + stood.drummer[0]) / 2, z: (stood.z + stood.drummer[1]) / 2 }
     const front = { x: mid.x + Math.sin(stood.facing) * 5, z: mid.z + Math.cos(stood.facing) * 5 }
-    await standAt(front, mid)
     await standAt(inFrontOf({ x: stood.drummer[0], z: stood.drummer[1] }, 2), mid)
     const askLabel = await page.evaluate(async () => {
       const { getStrings } = await import('/src/i18n/index.ts')
@@ -9029,8 +9024,9 @@ if (section('artefact-give')) {
 
   if (chiefStood && outward) {
     const reach = await page.evaluate(() => window.__balance.communication.giveReach)
-    /** Stand `away` metres in front of the chief, on the open ground his own
-     *  door faces, looking at him — the pose the player gives the find in. */
+    /** Stand `away` metres in front of the chief, on the open ground he faces
+     *  beside the drummer (`outward`), looking at him — the pose the player
+     *  gives the find in. */
     const standOff = async (away) => {
       await page.evaluate(
         ({ at, dir, away }) => {
