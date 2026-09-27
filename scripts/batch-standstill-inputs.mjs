@@ -57,7 +57,8 @@ export function autostartEvidence(text = '', { end = Number.POSITIVE_INFINITY } 
 }
 
 /** Atomic JSON state contributes boundaries and, where it carries the launcher's
- * measured veto object, the exact maximum veto interval. */
+ * measured veto object, a veto interval ending two hours after the writer's last
+ * write (the veto's maximum, hard-coded below). */
 export function autostartLastEvidence(text = '') {
   let record
   try { record = JSON.parse(text) } catch { return { intervals: [], boundaries: [] } }
@@ -150,7 +151,7 @@ export function delegatedBranchProgress(text = '', { repo, records = [], start =
   const events = []
   const seen = new Set()
   const historical = records
-    .filter((record) => record?.event === 'delegated-start' || record?.event === 'delegated-finish')
+    .filter((record) => record?.event === ACTIVITY_EVENTS.DELEGATED_START || record?.event === ACTIVITY_EVENTS.DELEGATED_FINISH)
     .flatMap((record) => record?.evidence?.items ?? [])
   for (const item of [...(declaration?.evidence ?? []), ...historical]) {
     if (item?.kind !== 'branch' && item?.kind !== 'worktree') continue

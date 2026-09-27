@@ -340,7 +340,7 @@ export function assessOwner(lock, {
     return age <= stale ? { alive: true, reason: 'legacy-fresh' } : { alive: false, reason: 'legacy-stale' }
   }
   if (!probe || probe.exists !== true) {
-    // The owning process no longer exists → provably dead (past the grace).
+    // The owning process no longer exists → provably dead.
     return { alive: false, reason: 'pid-dead' }
   }
   if (
@@ -2136,8 +2136,7 @@ export function withdrawHandover(sessionId, opts = {}) {
   // (`sealedBoundaryDeny`), and only the deliberate `--clear` (or the user's own
   // prompt, `force`) withdraws. Without this, the seal would deny a mutation and
   // this withdrawal would still eat the marker for the call that was denied.
-  const sealNow = opts.now ?? Date.now()
-  if (sealedMarkerHolds(marker, sessionId, sealNow, lock) && opts.force !== true) {
+  if (sealedMarkerHolds(marker, sessionId, now, lock) && opts.force !== true) {
     // THE MUTATION ESCALATES, IT DOES NOT WITHDRAW (point 1048, union entry
     // U19). The seal stands, the triggering call is recorded against it, and
     // from the second one the log says so loudly instead of leaving the reader
@@ -2154,7 +2153,7 @@ export function withdrawHandover(sessionId, opts = {}) {
     try {
       appendFileSync(
         opts.logPath ?? statePathsFor(lockPath).boundaryLogPath,
-        `[${new Date(sealNow).toISOString()}] ${escalation.alert ? 'SEALED BOUNDARY MUTATED AGAIN' : 'SEALED MARKER KEPT'} for ` +
+        `[${new Date(now).toISOString()}] ${escalation.alert ? 'SEALED BOUNDARY MUTATED AGAIN' : 'SEALED MARKER KEPT'} for ` +
           `${what} by ${sessionId} — a post-commit call (${opts.trigger ?? 'unrecorded'}) does not withdraw a ` +
           `committed boundary; only \`batch-boundary.mjs --clear\` or the user's own prompt does.` +
           (escalation.keep ? ` Mutation ${escalation.mutations} since the commit.` : '') +
@@ -2173,7 +2172,7 @@ export function withdrawHandover(sessionId, opts = {}) {
           {
             ...lock,
             handedOver: true,
-            handedOverAt: sealNow,
+            handedOverAt: now,
             boundarySeal: { ...lock.boundarySeal, mutations: escalation.mutations },
           },
           opts,
@@ -2268,8 +2267,9 @@ const HANDOVER_TOUCH_MS = 60 * 1000
  * throttled — it only rewrites the lock when the stamp has gone stale.
  *
  * It exists for the window `heartbeat` cannot cover: a PreToolUse hook runs
- * BEFORE the call, and a closing-set call could otherwise sit through the whole
- * grace with an ageing stamp before its PostToolUse heartbeat refreshes it.
+ * BEFORE the call, so it keeps `handedOverAt` current across closing-set calls.
+ * The handover no longer ages out (it frees ownership at once), so the stamp's
+ * only reader is the causality test of `withdrawalIsCausal`.
  */
 export function touchHandover(sessionId, opts = {}) {
   const lockPath = opts.lockPath ?? LOCK_PATH
