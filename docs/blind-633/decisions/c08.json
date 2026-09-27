@@ -2073,5 +2073,305 @@
   "id": "U4275",
   "decision": "rewritten",
   "reason": "The comment now says a --section=auto-narration run meets a cold engine and the timeout covers the load"
+ },
+ {
+  "id": "U4276",
+  "decision": "rewritten",
+  "reason": "The header now names the errand's live checks (seating, digs, hand-over, clay mould, inventory clicks) and the section list the errand's hand-over checks"
+ },
+ {
+  "id": "U4277",
+  "decision": "rewritten",
+  "reason": "\"where 487 will dig\" now reads \"where the point-487 dig happens\""
+ },
+ {
+  "id": "U4278",
+  "decision": "rewritten",
+  "reason": "The errand inventory now reads three frames and two digs, as the section shoots and digs"
+ },
+ {
+  "id": "U4279",
+  "decision": "rewritten",
+  "reason": "The seating comment now says the ring points are re-sampled for the verdict and the dense grid is only reported"
+ },
+ {
+  "id": "U4280",
+  "decision": "rewritten",
+  "reason": "The stale 0.02 tolerance rationale is replaced by a pointer to SEAT_TOLERANCE (float noise)"
+ },
+ {
+  "id": "U4281",
+  "decision": "rewritten",
+  "reason": "The landmark block now says the Nile delta is photographed by the first-travel-frame section"
+ },
+ {
+  "id": "U4282",
+  "decision": "rewritten",
+  "reason": "\"an order of magnitude below\" now reads \"about five times below\" (200 kB against 1008 kB)"
+ },
+ {
+  "id": "U4283",
+  "decision": "rewritten",
+  "reason": "The toast comment now points at clickForm's toast log below"
+ },
+ {
+  "id": "U4284",
+  "decision": "backlog",
+  "reason": "scripts/wait-command-core.mjs:26 — \"anything unparseable answers allowed\" is not implemented: an incomplete segment that satisfies the loop, sleep and probe regexes is denied without syntax validation"
+ },
+ {
+  "id": "U4285",
+  "decision": "backlog",
+  "reason": "scripts/wait-command-core.mjs:109 — the self-matching verdict says the loop \"CAN NEVER RETURN\" also for bounded for loops with a cap, which LOOP_HEAD recognises"
+ },
+ {
+  "id": "U4286",
+  "decision": "removed",
+  "reason": "The unreachable ?? '' on match[1] is dropped; the group always participates"
+ },
+ {
+  "id": "U4287",
+  "decision": "rewritten",
+  "reason": "selfMatchingPattern now returns the first searched pattern directly; the tautological includes test is gone and the doc says why every pattern is self-matching (same result)"
+ },
+ {
+  "id": "U4288",
+  "decision": "backlog",
+  "reason": "scripts/wait-command-core.mjs:76 — literal substring inclusion stands in for proof that the pgrep -f search matches the watcher; search-pattern semantics and real argv are never evaluated"
+ },
+ {
+  "id": "U4289",
+  "decision": "kept",
+  "reason": "The exports are live inside judgeWaitCommand; only their export surface serves tests"
+ },
+ {
+  "id": "U4290",
+  "decision": "rewritten",
+  "reason": "The heading now names PowerShell beside Bash, as GUARDED_TOOLS does"
+ },
+ {
+  "id": "U4291",
+  "decision": "rewritten",
+  "reason": "Header rule 3 now says the plan plus one suite ceiling while silent, or the lease cap, marks the run hung"
+ },
+ {
+  "id": "U4292",
+  "decision": "backlog",
+  "reason": "scripts/wait-lease-core.mjs:28 — the \"two hours\" absolute limit on withholding recovery is stronger than the code: recent progress suppresses hung and past-cap expiry is hungAt plus another WAIT_LEASE_CAP_MS"
+ },
+ {
+  "id": "U4293",
+  "decision": "removed",
+  "reason": "The unreachable ?? '' after pop() in runIdFromLog is dropped"
+ },
+ {
+  "id": "U4294",
+  "decision": "kept",
+  "reason": "The listed functions are used inside the module; only their export surface is surplus"
+ },
+ {
+  "id": "U4295",
+  "decision": "rewritten",
+  "reason": "leaseIsLive's doc now names the past-cap release that overrides the probes"
+ },
+ {
+  "id": "U4296",
+  "decision": "rewritten",
+  "reason": "The waitTimeoutDecision comment now puts the 2.5x mark and its 14 minutes in the past (plan plus one suite ceiling since point 1135)"
+ },
+ {
+  "id": "U4297",
+  "decision": "rewritten",
+  "reason": "waitThresholds's doc now says the hung mark adds one suite ceiling (SUITE_CEILING_MS)"
+ },
+ {
+  "id": "U4298",
+  "decision": "rewritten",
+  "reason": "The header now names the three CLI verbs --claim, --release and --status"
+ },
+ {
+  "id": "U4299",
+  "decision": "rewritten",
+  "reason": "The header now says the start time is verified where both are known and an unknown one does not block the signal (the code's behaviour)"
+ },
+ {
+  "id": "U4300",
+  "decision": "rewritten",
+  "reason": "retireWaiters's doc now says TERM only, with no KILL escalation"
+ },
+ {
+  "id": "U4301",
+  "decision": "kept",
+  "reason": "leaseProgress and runTerminalFor are used inside wait-lease.mjs; only their export is surplus"
+ },
+ {
+  "id": "U4302",
+  "decision": "backlog",
+  "reason": "scripts/wait-lease.mjs:198 — waitStatus walks the unreaped registry.leases without a liveness filter, so terminal or dead-writer leases can enter the hung and recovery results"
+ },
+ {
+  "id": "U4303",
+  "decision": "rewritten",
+  "reason": "The mirror-duty paragraph now says the marker moves to another live run instead of clearing"
+ },
+ {
+  "id": "U4304",
+  "decision": "rewritten",
+  "reason": "The decision doc now says the hook withdraws its own marker when the record is gone or unreadable, which fails closed"
+ },
+ {
+  "id": "U4305",
+  "decision": "kept",
+  "reason": "MARKER_REFRESH_MS and describeRun are used by waitMarkerDecision; only their export serves tests"
+ },
+ {
+  "id": "U4306",
+  "decision": "rewritten",
+  "reason": "\"exactly as it accepts today's turn\" now reads \"exactly as it accepts a hand-written one\""
+ },
+ {
+  "id": "U4307",
+  "decision": "rewritten",
+  "reason": "The header and readActiveRun's doc now describe the named-run preference, then the newest live run, then the newest"
+ },
+ {
+  "id": "U4308",
+  "decision": "rewritten",
+  "reason": "The hot-path note now says a non-owner or paused session pays one comparison and the owner reads its declaration and one readdir"
+ },
+ {
+  "id": "U4309",
+  "decision": "rewritten",
+  "reason": "The CLI note now says arguments are ignored and the preview reads the newest run without the named-run preference and writes nothing"
+ },
+ {
+  "id": "U4310",
+  "decision": "rewritten",
+  "reason": "The armWaitMarker comments now say the returned verdict (and `extended`) is for the tests, not --status"
+ },
+ {
+  "id": "U4311",
+  "decision": "rewritten",
+  "reason": "batchPaused is no longer exported and its doc says it is the CLI preview's own read"
+ },
+ {
+  "id": "U4312",
+  "decision": "kept",
+  "reason": "readActiveRun is used by armWaitMarker and the CLI; live"
+ },
+ {
+  "id": "U4313",
+  "decision": "rewritten",
+  "reason": "findChildProcessCalls's doc now says only `api(` is matched and `spawn (…)` is not"
+ },
+ {
+  "id": "U4314",
+  "decision": "rewritten",
+  "reason": "The documented call shape now includes `args`"
+ },
+ {
+  "id": "U4315",
+  "decision": "rewritten",
+  "reason": "The ALLOW doc now says no awaiting entry stands today while the kind stays supported (its test still pins the rule)"
+ },
+ {
+  "id": "U4316",
+  "decision": "backlog",
+  "reason": "scripts/window-hide-core.mjs:286 — whole-file (unscoped) exceptions are kept only for injected test fixtures; both live ALLOW entries are scoped"
+ },
+ {
+  "id": "U4317",
+  "decision": "rewritten",
+  "reason": "formatWindowHideVerdict now takes the exception map the verdict was audited against (default ALLOW), so an injected map's reason prints"
+ },
+ {
+  "id": "U4318",
+  "decision": "kept",
+  "reason": "The exports are the Vitest-layer audit's gate by design"
+ },
+ {
+  "id": "U4319",
+  "decision": "rewritten",
+  "reason": "The header now says no clock beyond a Date.now() default a caller overrides"
+ },
+ {
+  "id": "U4320",
+  "decision": "rewritten",
+  "reason": "The header now names the hourly emergency task the watchdog keeps alive"
+ },
+ {
+  "id": "U4321",
+  "decision": "rewritten",
+  "reason": "TASK_INTERVAL_MINUTES is now the cadence of the primary and the watchdog; the emergency task runs hourly"
+ },
+ {
+  "id": "U4322",
+  "decision": "kept",
+  "reason": "claim does not hold: windows-task-core.test.mjs:354-359 pins both offsets against setup-boot-path.ps1's $WatchdogOffsetMinutes and $EmergencyOffsetMinutes"
+ },
+ {
+  "id": "U4323",
+  "decision": "kept",
+  "reason": "The listed names are used inside the module; only their export is surplus"
+ },
+ {
+  "id": "U4324",
+  "decision": "rewritten",
+  "reason": "parseTaskReport's doc now says consumers read `readable` before `exists`, the exists: false beside it being a placeholder"
+ },
+ {
+  "id": "U4325",
+  "decision": "rewritten",
+  "reason": "peerVerdict's doc now says a silent task is started whatever its last result and only a recently failed one is left alone"
+ },
+ {
+  "id": "U4326",
+  "decision": "rewritten",
+  "reason": "The no-role message now lists every role from TASK_NAMES (primary|watchdog|emergency)"
+ },
+ {
+  "id": "U4327",
+  "decision": "removed",
+  "reason": "The undocumented --peer alias, used by no task definition, is removed"
+ },
+ {
+  "id": "U4328",
+  "decision": "rewritten",
+  "reason": "The header now lists the watchdog's --check emergency invocation"
+ },
+ {
+  "id": "U4329",
+  "decision": "rewritten",
+  "reason": "The header now says only a not-ok verdict or a failed repair appends a log line"
+ },
+ {
+  "id": "U4330",
+  "decision": "kept",
+  "reason": "readTaskReport and applyRemedy are used by watchPeer; only their export is surplus"
+ },
+ {
+  "id": "U4331",
+  "decision": "rewritten",
+  "reason": "watchPeer is no longer exported; the CLI entry path stays"
+ },
+ {
+  "id": "U4332",
+  "decision": "rewritten",
+  "reason": "watchPeer's doc no longer claims the readiness check reads its return value (nothing imports it)"
+ },
+ {
+  "id": "U4333",
+  "decision": "rewritten",
+  "reason": "applyRemedy's doc now names the null no-action result"
+ },
+ {
+  "id": "U4334",
+  "decision": "rewritten",
+  "reason": "watchPeer's doc now lists the paused field"
+ },
+ {
+  "id": "U4335",
+  "decision": "backlog",
+  "reason": "scripts/windows-task-watch.mjs:110 — the 45-minute PEER_MAX_SILENCE_MS is applied to the hourly emergency task, so a healthy hourly task can be started before its next tick"
  }
 ]
