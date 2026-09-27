@@ -281,8 +281,10 @@ export function claimIsOurs(claim, sessionId) {
  * The launcher restarts a dead watcher at its next tick, and a responder it had
  * spawned outlives it (the child is detached). That responder is then a live
  * top-level claude session with nothing reserving the batch for it. The new
- * watcher therefore ADOPTS it: it re-files the claim under its own process and
- * waits for the responder to exit, instead of starting a second one.
+ * watcher therefore ADOPTS it: it re-files the claim under its own process
+ * instead of leaving the responder unreserved. (The wrapper does not supervise
+ * the adopted responder — no exit handler, no RESPONDER_MAX_MS timer; the claim
+ * is released when this watcher exits.)
  *
  * Narrow on purpose — an adoption is only ever of OUR OWN kind of claim
  * (`by === CLAIM_BY`) whose recorded responder is still alive. Anything else is
