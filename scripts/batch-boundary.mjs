@@ -1,12 +1,18 @@
 // The autonomous session boundary (point 373, user 27.07.2026) — the IO half.
 // The decision logic is pure in scripts/batch-boundary-core.mjs; this module
-// only reads the work order, probes the OS launcher, and stores/clears the
-// marker. CLI:
+// does the IO around it: it reads the work order, the board and the claim,
+// probes the launcher, writes the prepare receipt and the marker, hands the
+// lock over, requests the successor, records attribution and overshoot, and
+// drives the durable plane for `--batch`. CLI:
 //
-//   node scripts/batch-boundary.mjs --prepare <point>  validate + name ALL the
-//                                             boundary bookkeeping; NO marker
-//   node scripts/batch-boundary.mjs --commit <point>   the session's LAST
-//                                             repository action: seal the marker
+//   node scripts/batch-boundary.mjs --prepare <point>|--context [--transcript <path>]
+//                                             validate + name ALL the boundary
+//                                             bookkeeping; writes the receipt, NO marker
+//   node scripts/batch-boundary.mjs --commit <point>|--context [--transcript <path>]
+//                                             the session's LAST repository
+//                                             action: seal the marker
+//   node scripts/batch-boundary.mjs --prepare|--commit --batch <id>
+//                                             the durable-plane boundary
 //   node scripts/batch-boundary.mjs <point>   alias for --prepare <point> — the
 //                                             sealing one-shot is retired (a stop
 //                                             after its write left a marker with
@@ -14,17 +20,19 @@
 //   node scripts/batch-boundary.mjs --status  what the Stop hook would decide
 //   node scripts/batch-boundary.mjs --clear   withdraw a recorded boundary
 //
-// Recording is DELIBERATE and verified up front: the command refuses unless the
-// point is really closed in the work order and the launcher is really armed, so
-// the session learns at the boundary rather than at a blocked turn end.
+// Recording is DELIBERATE and verified up front: a point boundary refuses unless
+// the point is really closed in the work order and the launcher is really armed;
+// a context boundary refuses unless a real reading is past the watermark and the
+// launcher is armed. The session learns at the boundary rather than at a blocked
+// turn end. (The durable `--batch` mode leaves its checks to the plane.)
 //
 // TWO-PHASE since point 675: the marker used to be written first and the
 // bookkeeping done after, and that bookkeeping (the card publish, guard
 // remedies) counted as work and deleted the marker — twice on 13.08.2026.
-// `--prepare` therefore writes NOTHING (there is nothing to lose while the
-// session ends), and `--commit` seals a marker no later call silently deletes:
-// post-commit mutations are DENIED loudly (`sealedBoundaryDeny`), with
-// `--clear` as the deliberate way back.
+// `--prepare` therefore writes no marker (only its receipt and the attribution
+// record, nothing work can delete), and `--commit` seals a marker no later call
+// silently deletes: post-commit mutations outside the closing set are DENIED
+// loudly (`sealedBoundaryDeny`), with `--clear` as the deliberate way back.
 import { readFileSync, rmSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { repoPath } from './repo-paths.mjs'
@@ -72,7 +80,7 @@ import {
 } from './handover-attribution.mjs'
 import { commitDurableBoundary, prepareDurableBoundary } from './batch-boundary-plane.mjs'
 
-export const BOUNDARY_PATH = repoPath('.claude/batch-boundary.json')
+const BOUNDARY_PATH = repoPath('.claude/batch-boundary.json')
 
 /** The boundary's overshoot consumer is deliberately fixed to the cost
  * ceiling. Admission uses the lower trigger through gatherWatermark. */
@@ -127,18 +135,19 @@ export function readBoundary(path = BOUNDARY_PATH) {
   }
 }
 
-/** Retries a Windows EPERM/EBUSY like every other state write here — the marker
- *  is what authorises the stop, and a lost one costs the batch a whole session. */
-export function writeBoundary(marker, path = BOUNDARY_PATH) {
+/** Retries a Windows EPERM/EBUSY like every other state write here (through
+ *  writeJsonAtomic) — the marker is what authorises the stop, and a lost one
+ *  costs the batch a whole session. */
+function writeBoundary(marker, path = BOUNDARY_PATH) {
   writeJsonAtomic(path, marker)
 }
 
 /** Where `--prepare` leaves its receipt for `--commit` (Sol's review of 4e93933).
- *  Beside the marker, but NOT a marker: nothing withdraws it and no guard reads
- *  it, so it cannot become a second thing work can delete. */
-export const PREPARED_PATH = repoPath('.claude/batch-boundary-prepared.json')
+ *  Beside the marker, but NOT a marker: only the deliberate `--clear` removes it
+ *  and no guard reads it, so it cannot become a second thing work can delete. */
+const PREPARED_PATH = repoPath('.claude/batch-boundary-prepared.json')
 
-export function readPrepared(path = PREPARED_PATH) {
+function readPrepared(path = PREPARED_PATH) {
   try {
     const r = JSON.parse(readFileSync(path, 'utf8'))
     return r && typeof r === 'object' ? r : null
@@ -147,7 +156,7 @@ export function readPrepared(path = PREPARED_PATH) {
   }
 }
 
-export function writePrepared(receipt, path = PREPARED_PATH) {
+function writePrepared(receipt, path = PREPARED_PATH) {
   writeJsonAtomic(path, receipt)
 }
 
@@ -342,8 +351,8 @@ export function closureOf(point, { cwd = repoPath('.') } = {}) {
 }
 
 /**
- * Everything the Stop hook needs, gathered: the marker's verdict and the
- * launcher state. Kept here (not in the guard) so the CLI and the guard judge
+ * Everything the Stop hook needs, gathered: the marker, the point's closure, the
+ * marker's verdict, the launcher state and a due boundary. Kept here (not in the guard) so the CLI and the guard judge
  * the same inputs.
  */
 export function gatherBoundary(sid, { now = Date.now(), path = BOUNDARY_PATH } = {}) {
@@ -352,13 +361,13 @@ export function gatherBoundary(sid, { now = Date.now(), path = BOUNDARY_PATH } =
   // The CURRENT configured trigger rides along (Sol final round, finding 1):
   // a context claim must clear it as well as its own recorded mark.
   const boundary = assessBoundary({ marker, sid, now, closure, watermarkNow: triggerTokens() })
-  // Probe the OS only when a boundary is actually claimed — this runs at every
-  // turn end of the owning session, and a PowerShell round-trip per turn for a
-  // question nobody asked would be pure waste.
+  // Probe the launcher only when a boundary is actually claimed — this runs at
+  // every turn end of the owning session, and a probe per turn (a PowerShell
+  // round-trip on Windows) for a question nobody asked would be pure waste.
   let launcher = boundary.valid ? probeLauncherState() : 'unknown'
   // Is one DUE (point 388)? Asked at every turn end that has no valid marker —
-  // that is the whole failure case — at the cost of two short git calls, and
-  // only ever for the owning session (the guard gathers nothing for the others).
+  // that is the whole failure case — at the cost of one `git log` plus at most
+  // TICK_SCAN_MAX `git show` calls, and only ever for the owning session (the guard gathers nothing for the others).
   let due = null
   if (!boundary.valid) {
     const lock = readOwnerLock()
@@ -373,8 +382,8 @@ export function gatherBoundary(sid, { now = Date.now(), path = BOUNDARY_PATH } =
       // Never DEMAND a boundary the CLI would refuse. With an unarmed launcher
       // `batch-boundary.mjs` says "keep working" while the guard would keep
       // saying "take the boundary" — a contradiction that loops for as long as
-      // the tick stays fresh (four-eyes review, finding 4). The probe costs a
-      // PowerShell round trip, and only in the rare window after a tick.
+      // the tick stays fresh (four-eyes review, finding 4). The probe (a
+      // PowerShell round trip on Windows) runs only in the rare window after a tick.
       launcher = probeLauncherState()
       if (launcher === 'armed') due = candidate
     }
@@ -382,26 +391,6 @@ export function gatherBoundary(sid, { now = Date.now(), path = BOUNDARY_PATH } =
   return { marker, closure, boundary, launcher, due }
 }
 
-/**
- * WHERE THE BATCH GOES AFTER THIS BOUNDARY, and the German card that says so
- * (point 434 (7)). The decision is pure (`boundaryDestination` /
- * `boundaryCardText`); this only reads the claim state through the SAME
- * `gatherClaim` the guard and the launcher use, so the card cannot announce a
- * successor the launcher will not spawn.
- *
- * An unreadable claim answers "fresh session": that is what happens with no
- * honoured claim, and it is the state the old text always assumed anyway.
- */
-/**
- * Does the board still carry a current-work card for `point` (point 470)? That
- * decides WHICH command puts the boundary card up, and the answer must be read
- * rather than assumed: printing `done <n> --none` for a point whose card was
- * already archived is what left sessions with no working command at all, so they
- * hand-edited the board file and stacked three idle cards on it.
- *
- * Any read failure answers false — the pointless `--none` is the one that can
- * fail; `board.mjs none` works in both states, so it is the safe default.
- */
 /**
  * The handover cards of this cause and destination ALREADY on the board — what
  * `--prepare` records so `--commit` can demand a card that is not one of them.
@@ -423,14 +412,14 @@ export function standingCards({ cause, destination, path = repoPath(BOARD_FILE_D
  * that cannot be READ waves the commit through but SAYS so — a missing file must
  * not end the batch, and an unverified check must never pass in silence.
  */
-export function requireBoardCard({
+function requireBoardCard({
   cause,
   destination,
   what,
   prepare,
   fail,
   path = repoPath(BOARD_FILE_DEFAULT),
-  receipt = readPrepared(),
+  receipt,
 }) {
   // The card must be one the preparation did NOT already see, and stamped at or
   // after it — or the card an earlier handover left standing would prove this
@@ -468,7 +457,8 @@ export function requireBoardCard({
     fail(
       (proof.stale === true
         ? `THE BOARD CARRIES ${what} FROM AN EARLIER HANDOVER — the preparation already found that exact card ` +
-          'there, so it says nothing about the session ending now. (If you DID just re-put it: the board stamps ' +
+          'there, or every card added since carries a stamp from before the preparation, so it says nothing ' +
+          'about the session ending now. (If you DID just re-put it: the board stamps ' +
           'whole minutes, so a replacement written inside the same minute is byte-identical to what was there. ' +
           'Put it up again once the minute has turned.)'
         : `THE BOARD DOES NOT CARRY ${what} — a handover the board does not explain leaves the reader with a ` +
@@ -479,6 +469,16 @@ export function requireBoardCard({
   }
 }
 
+/**
+ * Does the board still carry a current-work card for `point` (point 470)? That
+ * decides WHICH command puts the boundary card up, and the answer must be read
+ * rather than assumed: printing `done <n> --none` for a point whose card was
+ * already archived is what left sessions with no working command at all, so they
+ * hand-edited the board file and stacked three idle cards on it.
+ *
+ * Any read failure answers false — the pointless `--none` is the one that can
+ * fail; `board.mjs none` works in both states, so it is the safe default.
+ */
 export function pointCardStanding(point, { path = repoPath(BOARD_FILE_DEFAULT) } = {}) {
   try {
     return nowCard(readFileSync(path, 'utf8'), point) != null
@@ -487,6 +487,16 @@ export function pointCardStanding(point, { path = repoPath(BOARD_FILE_DEFAULT) }
   }
 }
 
+/**
+ * WHERE THE BATCH GOES AFTER THIS BOUNDARY, and the German card that says so
+ * (point 434 (7)). The decision is pure (`boundaryDestination` /
+ * `boundaryCardText`); this only reads the claim state through the SAME
+ * `gatherClaim` the guard and the launcher use, so the card cannot announce a
+ * successor the launcher will not spawn.
+ *
+ * An unreadable claim answers "fresh session": that is what happens with no
+ * honoured claim, and it is the state the old text always assumed anyway.
+ */
 export function boundaryHandover({
   sid = readOwnerLock()?.sessionId ?? '',
   tasksText = readTasksOpen(TASKS_PATH),
@@ -579,11 +589,12 @@ export function successorRequestFailureLine(result) {
 
 /**
  * THE COMMIT'S WRITE ORDER, extracted so a test can prove it (Sol re-review of
- * cd6faaa, finding 4): the transfer is recorded FIRST and the marker LAST — a
+ * cd6faaa, finding 4): the transfer is recorded FIRST and the marker after it — a
  * throwing transfer leaves NO marker, because the marker is what authorises the
  * stop. The ownership handover follows the marker inside this same commit — it
  * may no longer depend on `batch-progress-guard` being the first Stop guard to
- * allow. Both writes are injectable for an ordered proof.
+ * allow — and the completion evidence comes last. The marker write, handover and
+ * completion are injectable for an ordered proof.
  */
 export function commitSealedBoundary({
   transfer,
@@ -792,7 +803,7 @@ if (isMain) {
           destination: handover.destination,
         })
         console.log(
-          `PREPARED (nothing recorded yet): the context measures ${wm.tokens} tokens against the ` +
+          `PREPARED (no marker yet): the context measures ${wm.tokens} tokens against the ` +
             `${wm.watermark} watermark, the launcher is armed` +
             (transfer.note ? `, and ${transfer.note}` : '') +
             '. Do the boundary bookkeeping NOW, while no marker exists that work could delete:\n\n' +
@@ -828,7 +839,7 @@ if (isMain) {
         fail,
         receipt,
       })
-      // Transfer FIRST, marker LAST (Sol review of 807c2bf, finding 1) —
+      // Transfer FIRST, then the marker (Sol review of 807c2bf, finding 1) —
       // `commitSealedBoundary` pins the order, and a failed transfer refuses
       // before anything is recorded.
       let transferred = null
@@ -980,8 +991,8 @@ if (isMain) {
     const destinationLine = toWindow
       ? `the batch does NOT go to a fresh session: window ${handover.claimantSid} holds an honoured claim, ` +
         'so batch-autostart reserves the batch for it and SKIPS the spawn. '
-      : `the launcher (${launcherRemedy().name}) starts a fresh one within its interval and ` +
-        'batch-resume-hook re-orients it. '
+      : `the launcher (${launcherRemedy().name}) is asked to start a fresh one at once (its interval tick is ` +
+        'the fallback) and batch-resume-hook re-orients it. '
 
     if (phaseFlag !== '--commit') {
       // Both `--prepare <point>` AND the bare `<point>` land here. The one-shot
@@ -1012,9 +1023,9 @@ if (isMain) {
       console.log(
         (phaseFlag === null
           ? `NOTE: the one-shot form is retired (point 675) — this call ran --prepare ${point} instead, and ` +
-            'NOTHING is recorded until the commit.\n\n'
+            'no marker is written until the commit.\n\n'
           : '') +
-          `PREPARED (nothing recorded yet): point ${point} is landed, the launcher is armed` +
+          `PREPARED (no marker yet): point ${point} is landed, the launcher is armed` +
           (transfer.note ? `, and ${transfer.note}` : '') +
           '. Do the boundary bookkeeping NOW, while no marker exists that work could delete:\n\n' +
           `${cardBlock}\n` +
@@ -1038,8 +1049,8 @@ if (isMain) {
     if (unprepared) fail(unprepared)
 
     // The OLD card being gone is no evidence that the NEW one is up (Sol's
-    // review of 389bbc7) — both are asked, in the order that names the likelier
-    // omission first.
+    // review of 389bbc7) — both are asked: the new card first, then the old
+    // card's absence.
     requireBoardCard({
       cause: BOUNDARY_CAUSES.POINT,
       destination: handover.destination,
@@ -1057,7 +1068,7 @@ if (isMain) {
       )
     }
 
-    // Transfer FIRST, marker LAST (Sol review of 807c2bf, finding 1) —
+    // Transfer FIRST, then the marker (Sol review of 807c2bf, finding 1) —
     // `commitSealedBoundary` pins the order.
     let transferred = null
     let handoverResult = null
@@ -1126,7 +1137,8 @@ if (isMain) {
     if (successorFailureLine) console.log(successorFailureLine)
     // Point 700: a boundary further past the ceiling than the stated margin —
     // or one whose context could not be measured — owes the closing report a
-    // line. The trigger in wmPoint is for admission, not this overshoot record.
+    // line. The point boundary is not admitted by wmPoint; the overshoot is
+    // measured against the separate cost ceiling.
     const distance = boundaryContextDistanceNote(contextTokens)
     if (distance) console.log(`\n${distance}`)
     // A POINT boundary overshoots too (the 311,039-token handover of 19.08.2026

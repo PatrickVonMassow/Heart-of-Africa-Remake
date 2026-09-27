@@ -30,13 +30,14 @@
 //      stranger. This is the same rule `checkEvidence` applies to a declared
 //      background run, and it reuses `resolveOwnership` for "is this claim mine"
 //      rather than inventing a second notion of liveness beside the lock's.
-//   3. ONE CLAIM AT A TIME. A second window cannot overwrite a live claim by a
-//      first (`claimWriteDecision`), and even if both were somehow recorded, the
+//   3. ONE CLAIM AT A TIME. A second window cannot overwrite a first window's
+//      honoured claim (`claimWriteDecision`; a released record, even a reserving
+//      one, may be written over), and even if both were somehow recorded, the
 //      atomic acquire still admits exactly one owner.
-//   4. THE OWNER RELEASES ONLY AT A CLEAN MOMENT. Never mid-merge, never with a
-//      delegated agent still building or a verification running — the evidence
-//      for that is `assessInFlight` (scripts/batch-in-flight-core.mjs), not a new
-//      guess. A wrongly withheld release costs the user one more turn; a release
+//   4. THE OWNER RELEASES ONLY AT A CLEAN MOMENT. Never mid-merge, never with
+//      in-flight work that cannot transfer (a declared agent with pushed
+//      checkpoints moves to the claimant, point 716) — the evidence for that is
+//      `assessInFlight` (scripts/batch-in-flight-core.mjs), not a new guess. A wrongly withheld release costs the user one more turn; a release
 //      mid-merge costs the work.
 //
 // Where two verdicts are close this file chooses NOT to release: the owner
@@ -54,7 +55,7 @@ import { resolveOwnership, PID_START_TOLERANCE_MS, LAUNCHER_TICK_MS } from './ba
  *
  *  IT COUPLES IN BOTH DIRECTIONS (four-eyes review, Fable 5, finding 2). The same
  *  product is `CLAIM_MAX_AGE_MS`, which also bounds a claim NOBODY has released to
- *  yet and feeds the resume hook's stand-down text and the claim CLI — doors that
+ *  yet once no live owner holds the batch (a machine errand always) and feeds the resume hook's stand-down text and the claim CLI — doors that
  *  have nothing to do with the tick. So a future SPEED-UP of `LAUNCHER_TICK_MS`
  *  shortens all of them: whoever changes the tick raises this count (or
  *  HOA_CLAIM_MAX_MIN) to keep the claim window where it belongs. The equality is
@@ -67,7 +68,7 @@ export const PICKUP_WINDOW_TICKS = 2
  * taken. Past it the ordinary handover applies again, so a claim can never leave
  * the batch ownerless. The same window bounds the reservation a RELEASED claim
  * holds on the freed lock (point 461), counted from the RELEASE — the moment
- * there is nobody left to wait for — so a window left open but never taking what
+ * there is nobody left to wait for — or from a later claimant `activityAt`, so a window left open but never taking what
  * it asked for cannot hold the batch either. `HANDOVER_GRACE_MS` is deliberately
  * NOT reused for it: that one means the pid-alive handover before a successor
  * takeover, and overloading it would couple two calibrations.
@@ -153,7 +154,7 @@ export function claimWaitDecision(state = {}, claimantSid = '') {
  * Wait for the first probe that sees a free lock. A released claim belonging to
  * this waiter only changes the success message; it can never outweigh a live
  * lock. PURE ASYNC
- * orchestration: state reader, monotonic clock and sleep are all injected, so a
+ * orchestration: state reader, clock and sleep are all injected, so a
  * fixture advances without a real timer and a successful probe returns without
  * one trailing poll delay.
  */
@@ -206,7 +207,7 @@ export const GIT_STATE_UNVERIFIABLE = 'unverifiable'
  * Returns { alive, reason }; `reason` names the failing half and is what
  * `assessClaim` reports.
  */
-export function claimantLiveness({ claim, probePid = null, tolerance = PID_START_TOLERANCE_MS } = {}) {
+function claimantLiveness({ claim, probePid = null, tolerance = PID_START_TOLERANCE_MS } = {}) {
   const pid = Number(claim?.pid)
   if (!Number.isInteger(pid) || pid <= 0) return { alive: false, reason: 'claimant-unidentified' }
   const probe = probePid ? probePid(pid) : null
@@ -233,7 +234,8 @@ export function claimantLiveness({ claim, probePid = null, tolerance = PID_START
  *               session, so the owner's own claim would otherwise read as a
  *               stranger's and it would release the batch to itself.
  *   ownerSid  — who holds the lock right now, when known
- *   ownerHolding — retained caller context; it does not suspend reservation age.
+ *   ownerHolding — a live session owner holds the lock (`ownerIsHolding`); while
+ *               true, a pending human claim's take-up clock is suspended.
  *   now, maxAgeMs, probePid, tolerance
  *
  * Returns { honour, reserve, mine, reason, ageMs, claimantSid, releasedAt }.
@@ -260,7 +262,8 @@ export function claimantLiveness({ claim, probePid = null, tolerance = PID_START
  * and the claimant's own path is untouched because the own-claim branch is asked
  * BEFORE this one. A dead or closed claimant frees the lock INSTANTLY, so the
  * batch can never idle out a reservation, and the take-up window (`maxAgeMs`,
- * counted from the RELEASE — that is the moment there is nobody left to wait for)
+ * counted from the RELEASE — that is the moment there is nobody left to wait for —
+ * or from a later claimant `activityAt`)
  * caps a window that stays open but never takes what it asked for. An ERRAND claim
  * (`claimIsBounded`) reserves nothing here: its pid names its ISSUER, not its
  * taker, so it proves nothing about anybody waiting. A new claim may still be
@@ -324,8 +327,8 @@ export function assessClaim({
     // An ERRAND claim's pid names its ISSUER rather than its taker, so it proves
     // nobody is waiting. Asked first: it needs no probe at all.
     if (claimIsBounded(claim)) return out(false, 'released', { ...base, ageMs })
-    // THE TAKE-UP WINDOW, counted from the RELEASE: that is the moment there is
-    // nobody left to wait for, and counting from `claim.at` instead would expire
+    // THE TAKE-UP WINDOW, counted from the RELEASE (or a later `activityAt`):
+    // that is the moment there is nobody left to wait for, and counting from `claim.at` instead would expire
     // every reservation a long-held batch produces before it ever began. Without a
     // usable stamp — `releasedBy` alone, or a stamp from the future, which is a
     // clock nobody here can reason about — there is no window to measure, and the
@@ -481,13 +484,15 @@ export function resolveBoundaryDestination({
  *
  * So the launcher asks ONE question, and it is this one. The verdicts are the
  * claim vocabulary the other doors already share (`assessClaim` →
- * `reservationDecision`) — no second reading of liveness, no second calendar:
+ * `resolveBoundaryDestination` → `reservationDecision`) — no second reading of
+ * liveness, no second calendar:
  *   spawn=false 'reserved'          — a claim nobody has released to yet stands
  *   spawn=false 'reserved-released' — the release HAPPENED and the claimant's
  *                                     window is provably alive: the free lock is
- *                                     held for its pick-up, for the window of
- *                                     `PICKUP_WINDOW_TICKS` ticks counted from
- *                                     the release
+ *                                     held for its pick-up, for `maxAgeMs`
+ *                                     (by default `PICKUP_WINDOW_TICKS` ticks,
+ *                                     HOA_CLAIM_MAX_MIN calibrates it) counted
+ *                                     from the release or a later activityAt
  *   spawn=true  everything else     — no claim, a dead or closed claimant, a
  *                                     recycled pid, an elapsed window, a
  *                                     malformed record or a clock nobody can
@@ -526,7 +531,7 @@ export function takeoverDecision({
   // and a false diagnosis line is worse than a short one (finding 1).
   const windowText =
     maxAgeMs === CLAIM_MAX_AGE_MS
-      ? `${minutes(maxAgeMs) ?? `${PICKUP_WINDOW_TICKS} ticks`} = ${PICKUP_WINDOW_TICKS} launcher ticks`
+      ? `${minutes(maxAgeMs)} = ${PICKUP_WINDOW_TICKS} launcher ticks`
       : `${minutes(maxAgeMs) ?? 'unreadable'} (calibrated, HOA_CLAIM_MAX_MIN)`
   const releasedAgo = minutes(
     Number.isFinite(assessment?.releasedAt) && Number.isFinite(now) ? now - assessment.releasedAt : NaN,
