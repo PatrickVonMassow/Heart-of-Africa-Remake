@@ -13,7 +13,7 @@
 
 export type DetailLevel = 'low' | 'medium' | 'high'
 
-/** All three levels, low→high, for enumeration (menus, tests). */
+/** All three levels, low→high, for enumeration (tests). */
 export const DETAIL_LEVELS: readonly DetailLevel[] = ['low', 'medium', 'high']
 
 /** One quality preset: a value for every quality-relevant render setting. Adding
@@ -33,7 +33,7 @@ export interface QualityPreset {
   /** Directional sun shadows cast at all (design.md §2.7/§21). */
   sunShadows: boolean
   /** Sun shadow-map resolution in texels — low < medium < high, high above
-   *  today's 2048 default (user wants sharper shadows on high, softer on low). */
+   *  medium's 2048 (user wants sharper shadows on high, softer on low). */
   sunShadowResolution: number
   /** Campfire cube shadows (design.md §19.10, point 289) cast at all. */
   fireShadows: boolean
@@ -120,7 +120,7 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     traa: true,
     bloom: true,
     sunShadows: true,
-    sunShadowResolution: 2048, // today's default
+    sunShadowResolution: 2048, // the resolution before the presets existed
     fireShadows: true,
     fireShadowResolution: 256, // the point-289 variant
     fireShadowSoft: false,
@@ -133,7 +133,7 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     figureLimbSegments: 8, // point 479: smooth enough at conversation range
     placeRiverSegments: 32,
     placeRiverFoam: 16,
-    waterDetailOctaves: 3, // today's field
+    waterDetailOctaves: 3, // the field before the presets existed
   },
   // HIGH — the richest. SSAO on, sharper sun shadows (4096, above the default),
   // the softer/higher-res campfire shadow variant, everything else full.
@@ -143,7 +143,7 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     traa: true,
     bloom: true,
     sunShadows: true,
-    sunShadowResolution: 4096, // above today's default (user wants sharper)
+    sunShadowResolution: 4096, // above medium's 2048 (user wants sharper)
     fireShadows: true,
     fireShadowResolution: 512, // the costlier variant
     fireShadowSoft: true,
