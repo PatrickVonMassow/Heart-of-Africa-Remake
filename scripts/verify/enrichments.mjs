@@ -1,13 +1,15 @@
-// Headless verification for the world/settlement/water enrichments
-// (CLAUDE.md §7.1 pts. 3/4/12/15/20/21): the browser-only remainder. The pure
-// and store-driven asserts (movementPenalty mapping, biome-border/terrain
-// classification, driftCurrent, moveTravel swim/ocean, mountain climb & fall,
-// canoe-on-land malus, once-only penalty/danger journaling, wheel-zoom clamp)
-// moved to the fast Vitest suite (src/systems/movement.test.ts,
+// Headless verification for the world/settlement/water/wildlife enrichments
+// (CLAUDE.md §7.1 pts. 3/4/12/15/20/21 and the many work-order points each
+// block cites): the browser-only remainder. The pure and store-driven asserts
+// (movementPenalty mapping, biome-border/terrain classification, driftCurrent,
+// moveTravel swim/ocean, mountain climb & fall, canoe-on-land malus, once-only
+// penalty/danger journaling, wheel-zoom clamp) moved to the fast Vitest suite (src/systems/movement.test.ts,
 // src/state/store.travel.test.ts, src/world/world.test.ts), and the HUD-render
 // asserts (.movement-penalty text, the .inv-active glow, the DebugMenu
 // dropdown/renderer-row presence) to src/ui/StatusBar.test.tsx, Hud.test.tsx and
-// DebugMenu.test.tsx. What stays here needs a real browser: RAF-driven wildlife
+// DebugMenu.test.tsx; the live moveTravel/driftCurrent drives below (canoe
+// passage, river mouth) stay because they run over the streamed, rendered world.
+// What stays here needs a real browser: RAF-driven wildlife
 // behaviour, in-scene settlement/river/graveyard geometry via the dev hooks,
 // the drei <Html> map/region labels, real layout geometry (getBoundingClientRect
 // hit-tests), a real WheelEvent zoom, the screenshots and the console-error
@@ -25,7 +27,9 @@ const BASE = process.env.BASE_URL ?? 'http://localhost:5173/'
 const OUT = fileURLToPath(new URL('../../verification/', import.meta.url))
 
 // SECTIONS (point 566). Everything below the boot prologue sits in a named
-// block that owns the jumps and waits it needs: `if (section('<slug>')) { … }`.
+// block that owns the jumps and waits it needs: `if (section('<slug>')) { … }`
+// — apart from the short unconditional return to the travel view between the
+// settlement and the travel blocks.
 // Without a request every one runs, in file order, exactly as before;
 // `--section=<slug>` (VERIFY_SECTION) runs ONE of them, which is how a check
 // that itself needs repairing stops costing the whole 17-minute pass. The names
@@ -58,9 +62,10 @@ const waitForHerds = (min = 6, timeout = 30000) =>
         const h = window.__wildlife?.herdsRef?.current
         if (!h) return false
         let n = 0
-        // Count only real streamed animals (chunk-tagged): animals injected or
-        // relocated by earlier tests have no chunk and would otherwise satisfy
-        // the wait long before the local herds actually streamed in.
+        // Count only chunk-tagged animals: chunk-less injected or relocated
+        // animals would otherwise satisfy the wait long before the local herds
+        // streamed in. (A synthetic family borrows a live chunk key and does
+        // count — this is a spawn wait, not proof of natural streaming.)
         for (const sp of Object.keys(h)) n += h[sp].filter((a) => !a.dead && a.chunk !== undefined).length
         return n >= m
       },
@@ -151,8 +156,9 @@ const installSimHelpers = () =>
     // with a backend-agnostic robustness rule (point 249): a slow-but-PROGRESSING
     // sim (WebGPU pipeline-compile hitches, headless fps drops) keeps polling until
     // the state is reached — it is NEVER failed for merely being slow. The poll
-    // gives up ONLY when the sim clock is genuinely FROZEN (no sim-time progress for
-    // a long wall window — a real 0-fps bug) or a very large hard ceiling as a final
+    // ends when the sim budget is spent (answering with one last done-check), when
+    // the sim clock is genuinely FROZEN (no sim-time progress for a long wall
+    // window — a real 0-fps bug), or at a very large hard ceiling as a final
     // backstop. A passed wallCapMs only RAISES the ceiling (it never lowers it below
     // the computed floor), so an old, too-tight cap can no longer time a slow-green
     // drama out early — the slow backend just polls longer to reach the SAME state.
@@ -184,7 +190,7 @@ const installSimHelpers = () =>
     window.__sleepSim = (simSecs, wallCapMs) => window.__pollSim(simSecs, () => false, wallCapMs)
     // The block-scope rule holds for a helper installed on the PAGE too, where
     // no linter can see it (point 566): `__makeTestFamily` was installed inside
-    // `calf-jitter` and called from four later blocks, so each of those died
+    // `calf-jitter` and called from later blocks, so each of those died
     // standalone on `window.__makeTestFamily is not a function`. It belongs with
     // the other window helpers, which the crash-reload path also re-installs.
     //
@@ -219,8 +225,8 @@ page.evaluate = async (...args) => {
     } catch (e) {
       if (!isNavTransient(e) || attempt >= 8) throw e
       // Let the reloaded page re-establish before retrying: wait for the load
-      // and for the app's dev hooks to be back (the same readiness the boot
-      // sequence waits on), then a short settle. Each guard is failure-soft so
+      // and for the app's core dev hooks (__game, __ui) to be back, then a short
+      // settle. Each guard is failure-soft so
       // the retry proceeds even if a wait times out — the bounded loop caps it.
       await page.waitForLoadState('domcontentloaded').catch(() => {})
       await page
@@ -247,8 +253,7 @@ await page.waitForTimeout(700)
 await page.evaluate(() => window.__game.getState().setJournalOpen(false))
 await page.waitForTimeout(300)
 // Keep the wildlife/geometry checks deterministic (random events are covered by
-// events.mjs and store.events.test.ts); several removed blocks used to disable
-// them, so pin it off once for the whole run.
+// events.mjs and store.events.test.ts), so pin it off once for the whole run.
 await page.evaluate(() => { window.__balance.randomEventsEnabled = false })
 await installSimHelpers()
 
@@ -343,7 +348,7 @@ if (section('settlement-sizes')) {
       // and look back, so hands and drums face the camera.
       const dx = 3.5 - d.x
       const dz = 2.5 - d.z
-      const len = Math.hypot(dx, dz) || 1
+      const len = Math.hypot(dx, dz)
       const gap = 4.0
       const p = window.__placePlayer
       p.x = d.x + (dx / len) * gap
@@ -502,7 +507,7 @@ if (section('cultural-landmarks')) {
   check('the Meroë pyramids reveal their name once sighted', meroeRevealed, '')
   await shot('91-cultural-landmark-meroe', { world: { lat: 16.94, lon: 33.75 }, label: 'the Meroe pyramids' })
 
-  // Stage-2 evidence: one new cultural site (Aksum stelae) and one natural site
+  // Further evidence: one more cultural site (Aksum stelae) and one natural site
   // (Ngorongoro crater) with their labels revealed.
   await page.evaluate(() => window.__game.getState().debugJumpTo(14.13, 38.72)) // Aksum
   await page.evaluate(() =>
@@ -642,13 +647,13 @@ if (section('rivers')) {
   // Confluence bank rule (user-reported artifact): tributaries mask their bank
   // foam where their edges lie inside the joined water — the Nile system's
   // joining rivers must report interior edges, while the masking stays LOCAL
-  // (only a small fraction of all edge vertices, never whole rivers).
+  // (a small absolute count of interior edges, under 400 in all, never whole rivers).
   {
     const rep = rivers?.report ?? {}
     const joined = ['white-nile', 'blue-nile'].map((id) => rep[id]?.interiorEdges ?? 0)
     const totals = Object.values(rep).reduce(
-      (a, r) => ({ interior: a.interior + (r.interiorEdges ?? 0), strips: a.strips + r.strips }),
-      { interior: 0, strips: 0 },
+      (a, r) => ({ interior: a.interior + (r.interiorEdges ?? 0) }),
+      { interior: 0 },
     )
     check('Rivers: confluence edges are masked (Nile tributaries report them)', joined.every((n) => n > 0), `white/blue nile ${joined.join('/')}`)
     check('Rivers: bank masking stays local (small interior fraction)', totals.interior > 0 && totals.interior < 400, `total interior edges ${totals.interior}`)
@@ -726,7 +731,7 @@ if (section('region-border-labels')) {
     const hint = await page.evaluate(() => {
       const bar = document.querySelector('.status-bar')
       const el = document.querySelector('.movement-penalty')
-      if (!el || !bar) return { topRight: false }
+      if (!el || !bar) return { centred: false }
       const r = el.getBoundingClientRect()
       const br = bar.getBoundingClientRect()
       // The hint is an actual child of the status bar (not a floating panel):
