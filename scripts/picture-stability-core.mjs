@@ -64,7 +64,7 @@ export function comparePixels(a, b, { width, height, channels = 3, tol = TOLERAN
 
 /**
  * Roll the per-frame rows into a verdict. `stable` is the claim a golden-image
- * pre-filter needs: EVERY frame must sit under the bar, because one unstable
+ * pre-filter needs: EVERY frame must sit at or under the bar, because one unstable
  * frame is one frame the filter would flag on every run for ever.
  */
 export function summarise(rows, bar = SIGNAL_BAR) {
