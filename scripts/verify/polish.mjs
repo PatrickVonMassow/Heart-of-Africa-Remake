@@ -5743,8 +5743,10 @@ if (section('wedged-adults')) {
     )
     // THE REPORTED PICTURE, STAGED WHERE THE REPORT WAS MADE: the village's own
     // tightest slot between two different bodies — a hut wall and a fence run is
-    // exactly such a pair — with a household walker set down in it. What the
-    // pair of frames then shows is the reported corner with an adult pressed
+    // exactly such a pair — with a household walker set down in it. The search
+    // takes the smallest gap in the layout and stands in for the reported corner
+    // rather than matching its location. What the pair of frames then shows is
+    // that slot with an adult pressed
     // into it and, one window later, the same corner with the adult gone. The
     // subject of both shutters is the SLOT, which stays in the picture whether
     // the body is still in it or not (point 375).
@@ -5798,8 +5800,9 @@ if (section('wedged-adults')) {
           local: { x: wedge.x, y: 0.9, z: wedge.z },
           label: "an adult set down in the reported village's tightest slot",
         })
-        // Long enough for every rung of the ladder to have answered, measured on
-        // the game's own window rather than on a frame count.
+        // Long enough for every rung of the ladder to have answered: 600 drawn
+        // frames, and the check below asserts they spanned at least the escape
+        // window's own seconds.
         const freeing = await readBodies(600)
         const out = freeing.at(-1).bodies.find((b) => b.who === 'walker 0')
         const seconds2 = (freeing.at(-1).t - freeing[0].t) / 1000
@@ -5841,8 +5844,8 @@ if (section('wedged-adults')) {
 //
 // It stands BEFORE `village-stations` rather than after it because
 // `polishVillageStations.test.mjs` runs that section by slicing the source
-// between its header and `adult-errands`: a section in between is swept into
-// the slice and run against the stub.
+// between its header and the next section's (`village-loom`): a section in
+// between would be swept into the slice and run against the stub.
 if (section('bambara-no-well')) {
   const bootSeed = await page.evaluate(() => window.__game.getState().seed)
   const WELL_NAME = 'village-well'
@@ -5947,7 +5950,7 @@ if (section('bambara-no-well')) {
       await frame('1092-bambara-former-well-spot', {
         local: { x: staged.spot.x, y: 0.9, z: staged.spot.z },
         label: 'the bambara village at the spot where the well stood: no well '
-          + 'anywhere, and a family hut on the ground the well left free',
+          + 'anywhere, and (at this seed) a family hut on the ground the well left free',
       })
     }
   } finally {
@@ -5961,7 +5964,8 @@ if (section('bambara-no-well')) {
 
 // The fixed weaver in the user's "Festklemmend" report, not a moving adult.
 // Run on each backend with the ordinary polish launcher; the frame declares
-// the live figure as its subject and leaves the trading post in the background.
+// the live figure as its subject, and frames the trading post with her only
+// when it stands close.
 if (section('village-stations')) {
   const bootSeed = await page.evaluate(() => window.__game.getState().seed)
   try {
@@ -6007,7 +6011,7 @@ if (section('village-stations')) {
       const e = figure.matrixWorld.elements
       const facesLoom = e[8] * (prop.x - body.x) + e[10] * (prop.z - body.z) > 0
       // The point wants the trading post's wall VISIBLY CLEAR BEHIND her, so
-      // ONE frame has to carry both: the stand goes to the SIDE of the pair
+      // when the wall is close ONE frame carries both: the stand goes to the SIDE of the pair
       // and the view is aimed between them. Square to the pair the loom falls
       // BESIDE her instead of in front of her, and the open ground between her
       // and the wall is what the picture shows. Reject a stand or sight line
@@ -6033,14 +6037,15 @@ if (section('village-stations')) {
       const aim = far
         ? { x: body.x, z: body.z }
         : { x: body.x + (market.pos[0] - body.x) * 0.4, z: body.z + (market.pos[1] - body.z) * 0.4 }
-      // A hut further off needs the lens further back to hold both in one frame.
+      // Close by, the lens stands 1.1 × the span back (4.5 to 9 m) to hold her
+      // and the trading post in one frame; far off it stands a fixed 6 m from her.
       const stand = far ? 6 : Math.min(9, Math.max(4.5, span * 1.1))
       let cameraGap = -Infinity
       let framed = null
       for (let k = 0; k < 24; k++) {
         // Square to the pair first, then swing AWAY from the hut in steps:
         // that closes the two together, at the price of the loom drifting in
-        // front of her, so the squarest stand that frames both wins.
+        // front of her, so the squarest stand that frames both (far off: her) wins.
         const angle = toMarket + (k % 2 ? -1 : 1) * (Math.PI / 2 + Math.floor(k / 2) * Math.PI / 24)
         const x = body.x + Math.sin(angle) * stand
         const z = body.z + Math.cos(angle) * stand
@@ -6063,8 +6068,9 @@ if (section('village-stations')) {
           const az = pz - z
           return Math.abs(Math.atan2((ax * vz - az * vx) / reach, (ax * vx + az * vz) / reach) * 180 / Math.PI)
         }
-        // Half of the 50-degree vertical fov spreads to about 33 degrees over a
-        // wide frame; 26 keeps both subjects clear of the very edge.
+        // Half of the 50-degree vertical fov (App.tsx) spreads to about 37 degrees
+        // across the suite's 1440×900 frame; 26 keeps her, and close by the
+        // trading post, clear of the very edge.
         const bodyOff = offAxis(body.x, body.z)
         const marketOff = offAxis(market.pos[0], market.pos[1])
         if (bodyOff > 26 || (!far && marketOff > 26)) continue
@@ -6093,7 +6099,7 @@ if (section('village-stations')) {
     await nextFrames(3)
     if (staged.cameraGap >= 0.35) await frame('1143-village-weaver-clear-of-market', {
       local: { x: staged.body.x, y: staged.body.y + 0.9, z: staged.body.z },
-      label: 'the reported-seed weaver at her loom seen from the side, with open ground between her and the trading-post wall',
+      label: 'the reported-seed weaver at her loom seen from the side, on open ground clear of the trading-post wall',
     })
   } finally {
     await page.evaluate((seed) => {
@@ -6108,13 +6114,16 @@ if (section('village-stations')) {
 // 1157), from the standpoint of the report that opened it: Bambara Village at
 // seed 394349866, where the user photographed a figure with both arms hanging.
 //
-// Two pictures, and they answer two different questions.
-//  - THE MOTION. Two frames a second apart, from ONE camera stand, must DIFFER
-//    where her arms and the shuttle are. A scene-graph reading alone would not
+// Four frames, answering three questions.
+//  - THE MOTION. Two frames (working-a/-b) half a pass of the weaver's own clock
+//    apart, from ONE close camera stand, must DIFFER where her arms and the
+//    shuttle are. A scene-graph reading alone would not
 //    settle it: the defect reported was a picture, so the evidence is pixels.
 //  - THE TEACHING. One frame carrying the helper part-way along the warp, the
 //    weaver's own reading over her head, and the river in the same picture — the
-//    three things that make the axis claim checkable by the player.
+//    three things that make the axis claim checkable by the player; taken from
+//    a separate wide stand (named-tending).
+//  - THE PLAZA. The station read from the plaza a player crosses (point 1183).
 if (section('village-loom')) {
   /** The loom station's projected height from the plaza stand, in pixels of a
    *  900-high viewport (work-order 1191). Measured 23.09.2026: 94.9 px from
@@ -6138,14 +6147,12 @@ if (section('village-loom')) {
       !!window.__placeScene?.getObjectByName('village-loom-shuttle'), null, { timeout: 40000 })
     await waitForSceneBuilt(page)
 
-    // THE STAND: on the inland side of the warp, looking straight out at the
-    // water. The warp then runs left-to-right across the picture, the weaver is
-    // in the middle of it, the helper is in frame wherever the word sends him,
-    // and the river lies beyond — one stand that serves both questions.
+    // THE STANDS: on the inland side of the warp, looking out toward the water.
+    // A close stand serves the motion (below); the teaching frame takes a
+    // separate wide stand later, because one stand for both failed the eye.
     const stand = await page.evaluate(() => {
       const layout = window.__placeLayout
       const station = layout.loom
-      const bank = layout.bank
       const solids = layout.colliders.filter(c => !(
         (c.kind === 'segment' && c.x1 === station.upstream.x && c.z1 === station.upstream.z) ||
         (c.x === station.weaver.x && c.z === station.weaver.z)
@@ -6189,9 +6196,6 @@ if (section('village-loom')) {
       return close && {
         close,
         weaver: station.weaver,
-        seat: station.seat,
-        warpHalf: Math.hypot(station.downstream.x - station.seat.x, station.downstream.z - station.seat.z),
-        water: bank ? { x: bank.bank.x, z: bank.bank.z } : null,
         onRiverAxis: station.onRiverAxis,
       }
     })
@@ -6288,7 +6292,8 @@ if (section('village-loom')) {
       // THE TEACHING PICTURE. The stand steps back FIRST: the teaching is the
       // station's — her, the warp, the helper wherever the word sends him, and
       // the river behind them — and it is taken while he is still on his way,
-      // so nothing may run between the wait and the shutter.
+      // so as little as possible runs between the wait and the shutter (two
+      // readings and their checks do), and the state is read again after it.
       const wide = await page.evaluate(() =>
         window.__loomPlace([7.5, 8.5, 6.5, 9.5], 2.4, window.__loomStation.seat, -0.05))
       check('a wide stand carries the whole station with the water behind it', !!wide,
@@ -6326,9 +6331,9 @@ if (section('village-loom')) {
           const state = new Function('limit', 'return (' + src + ')(limit)')(limit)
           const along = state.along
           const screen = window.__speech?.anchorScreen('village-weaver') ?? null
-          // Three points ON THE WATER: three metres beyond the waterline
-          // straight out from her seat, and a stride either way along the
-          // warp. Each is projected through the live camera; the frame is
+          // Nine points ON THE WATER: three depths beyond the waterline (below)
+          // straight out from her seat, each also a stride either way along
+          // the warp. Each is projected through the live camera; the frame is
           // then read at the ones inside it.
           const cam = window.__placeCamera
           const V = Object.getPrototypeOf(cam.position).constructor
