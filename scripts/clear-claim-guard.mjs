@@ -84,14 +84,6 @@ export function gatherClearClaimCondition({ sessionId = '', claim } = {}) {
 }
 
 /**
- * Was the text this guard is about to judge written BEFORE the claim was taken?
- *
- * Only the newest assistant row is judged, so its own timestamp answers it. A
- * row without a readable timestamp, or a claim without one, is not evidence of
- * anything — those pass through and are judged, because the guard's fail
- * direction is to allow rather than to invent a reason.
- */
-/**
  * Is the newest assistant text the FINAL reply, or an earlier one still waiting
  * for the flush?
  *
@@ -99,7 +91,7 @@ export function gatherClearClaimCondition({ sessionId = '', claim } = {}) {
  * wrapper-level shape check remains useful for narration-with-tool-use before a
  * result has arrived, and for a partial transcript tail.
  */
-export function replyNotFlushed(transcript) {
+function replyNotFlushed(transcript) {
   const rows = String(transcript ?? '')
     .split('\n')
     .map((line) => line.trim())
@@ -124,7 +116,15 @@ export function replyNotFlushed(transcript) {
   return !hasText || hasToolUse
 }
 
-export function textPredatesClaim(transcript, claim) {
+/**
+ * Was the text this guard is about to judge written BEFORE the claim was taken?
+ *
+ * The newest READABLE timestamp among the assistant text rows answers it (a
+ * newer row without one leaves the older timestamp standing). No readable
+ * timestamp, or a claim without one, is not evidence of anything — those pass
+ * through and are judged.
+ */
+function textPredatesClaim(transcript, claim) {
   const claimedAt = Number(claim && (claim.at ?? claim.claimedAt))
   if (!Number.isFinite(claimedAt) || claimedAt <= 0) return false
   let newest = null
@@ -157,8 +157,9 @@ function main() {
   }
   const sessionId = (payload && payload.session_id) || ''
   const claim = readClaim()
-  // Cheapest half first: without a standing claim of this session there is
-  // nothing to refuse, and the transcript need not be read at all.
+  // Cheapest half first: without a claim or a session id there is nothing to
+  // refuse, and the transcript need not be read at all (whose claim it is, and
+  // whether it still stands, `evaluate` judges below).
   if (!claim || !sessionId) return
   const transcriptPath = payload && payload.transcript_path
   if (!transcriptPath || !existsSync(transcriptPath)) return
