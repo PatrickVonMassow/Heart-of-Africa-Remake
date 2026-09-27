@@ -6,11 +6,13 @@
 //
 // Usage:
 //   node scripts/batch-doctor.mjs            # diagnose + safe fixes; exit 2 if --repair is needed
-//   node scripts/batch-doctor.mjs --repair   # execute the repair plan (rescue branch, stash, abort, reset)
+//   node scripts/batch-doctor.mjs --repair   # also execute the repair-level actions of the plan
 //   node scripts/batch-doctor.mjs --gate     # additionally run the fast gate (test:unit + build + lint)
+//   --session <id>                           # the calling session (else CLAUDE_SESSION_ID)
 //
-// Exit codes: 0 = consistent (or fully remediated), 1 = gate failed / alert-level
-// findings remain, 2 = repairs planned but not executed (run with --repair).
+// Exit codes: 0 = consistent, fully remediated, or gate inconclusive under load;
+// 1 = gate failed / alert-level findings remain / not a usable checkout;
+// 2 = repairs planned but not executed (run with --repair).
 import { readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { execFileSync, execSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
@@ -151,9 +153,8 @@ try {
 
 let conflictMarkers = false
 try {
-  // git diff --check reports conflict markers/whitespace in unstaged changes;
-  // additionally grep the tracked tree for real marker lines.
-  const hits = git(['grep', '-l', '-E', '^(<{7}|>{7}|={7})( |$)', '--', ':!*.md', ':!scripts/batch-doctor.mjs'])
+  // Grep the tracked tree for real marker lines.
+  const hits = git(['grep', '-l', '-E', '^(<{7}|>{7}|={7})( |$)', '--', ':!*.md'])
   conflictMarkers = hits.length > 0
   if (conflictMarkers) log(`conflict markers found in: ${hits.replace(/\n/g, ', ')}`)
 } catch {
@@ -203,7 +204,7 @@ const parallelSids = [...new Set([...parallelNow.map((p) => p.sid), ...alertOthe
 // --- THE TORN STATES A KILL LEAVES BEHIND (point 443) ---------------------------
 // A kill during a critical action leaves more behind than a half merge, and until
 // 30.07.2026 the doctor could not see any of it. Each gather is wrapped fail-open:
-// one unreadable state must never cost the diagnosis of the other five.
+// one unreadable state must never cost the diagnosis of the others.
 const nowMs = Date.now()
 
 const gather = (what, fn, fallback) => {
@@ -328,7 +329,7 @@ for (const a of plan) {
       const { killed, failed } = killStrayProcesses(strays)
       log(`EXECUTED kill-stray-verify-processes: ended ${killed.length} leftover process(es) of an aborted verification (pid ${killed.join(', ') || 'none'})`)
       for (const f of failed) {
-        log(`FAILED to end pid ${f.pid} (${f.reason}) — it is not this user's to signal; end it by hand`)
+        log(`FAILED to end pid ${f.pid} (${f.reason}) — it could not be signalled; end it by hand`)
         alertsRemain = true
       }
     } else if (a.action === 'restore-tasks-from-head') {
@@ -336,7 +337,7 @@ for (const a of plan) {
       log(
         r.restored
           ? `EXECUTED restore-tasks-from-head: TASKS.md restored from HEAD; the damaged bytes are kept at ${r.backup ?? '(the file was missing)'}`
-          : 'SKIPPED restore-tasks-from-head: the working copy parses again — nothing to restore',
+          : "SKIPPED restore-tasks-from-head: the working copy parses again, or HEAD's copy does not parse — nothing restored",
       )
     } else if (a.action === 'clear-stale-pending-lock') {
       // Re-read at execute time: a launcher tick or a returning session can win
@@ -399,8 +400,9 @@ if (gate) {
   gateInconclusive = verdict.inconclusive
 }
 
-/** Agent worktrees other than the main checkout — a build in one of them
- *  competes for the machine as surely as a busy CPU does. */
+/** Registered worktrees under a `worktrees/` directory, other than the main
+ *  checkout — idle or not, since a build in one of them competes for the machine
+ *  as surely as a busy CPU does. */
 function liveAgentWorktrees() {
   try {
     return git(['worktree', 'list', '--porcelain'])
@@ -433,7 +435,7 @@ if (shouldRecordSatisfaction({ gateRan: gate, broken: gateFailed, inconclusive: 
   recordGateSatisfied()
 }
 if (pendingRepair) {
-  log('VERDICT: repairs planned but NOT executed — rerun with --repair to execute them (all actions are recoverable and logged)')
+  log('VERDICT: repairs planned but NOT executed — rerun with --repair to execute them (all actions are logged)')
   process.exit(2)
 }
 if (gateFailed || alertsRemain) {

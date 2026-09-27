@@ -4,9 +4,9 @@
 
 import { DAEMON_POOL_CAP, SLOT_OCCUPYING_STATES } from './batch-daemon-core.mjs'
 
-export const DEFAULT_QUEUE_LIMIT = 12
-export const DEFAULT_REVIEW_BACKLOG_LIMIT = 2
-export const DISPATCH_REASON_CODES = Object.freeze([
+const DEFAULT_QUEUE_LIMIT = 12
+const DEFAULT_REVIEW_BACKLOG_LIMIT = 2
+const DISPATCH_REASON_CODES = Object.freeze([
   'dependency-blocked',
   'review-backlog',
   'adapter-unavailable',
@@ -57,7 +57,7 @@ const pointOf = (attempt) => String(attempt?.pointId ?? '')
 
 /** One refill decision from a coherent snapshot. Queue order is authority:
  * dependency checks may skip an entry, but dispatch never reorders the entries
- * it does select. A second coordinator reading the six same candidates still
+ * it does select. A second coordinator reading the same candidates still
  * sees the shared active set and receives at most the remaining global slots. */
 export function dispatchDecision({
   queue = [],
@@ -113,8 +113,9 @@ export function dispatchDecision({
   }
 }
 
-/** Journal projection for one reason interval. Repeated observations extend an
- * open interval without creating duplicates; a recovered pool closes it. */
+/** Journal projection for one reason interval. A repeated observation of the
+ * same reason keeps the interval open without a new open event (its observedAt
+ * is updated in the return value only); a recovered pool closes it. */
 export function updateReasonInterval({ open = null, decision, at } = {}) {
   if (!Number.isFinite(at)) return { ok: false, reason: 'reason accounting needs a finite observation time' }
   if (!decision?.underutilized) {

@@ -23,7 +23,7 @@
 // checkout is refused by startDaemon itself, and that refusal is pinned by
 // scripts/batch-daemon.test.mjs.
 import { execFileSync, spawn } from 'node:child_process'
-import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, renameSync, unlinkSync, utimesSync, writeFileSync } from 'node:fs'
+import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, renameSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { isMainModule } from './is-main.mjs'
@@ -320,9 +320,10 @@ async function parentDeathScenario({ keep, neuterEpoch = false }) {
   })
   closeSync(out)
   parent.unref()
-  // The start time recorded NOW is what makes every later signal to this pid
-  // identity-checked: after the group dies, the bare number can be recycled by
-  // an unrelated process, and a signal to a bare number is not cleanup.
+  // The start time recorded NOW is what makes the cleanup signal to this pid
+  // identity-checked (the kill itself is sent while the group is known alive):
+  // after the group dies, the bare number can be recycled by an unrelated
+  // process, and a signal to a bare number is not cleanup.
   const parentStartedAt = processStartTime(parent.pid)
   const sameRecordedProcess = (pid, startedAt) => {
     const probe = probePid(pid)
@@ -452,8 +453,9 @@ async function parentDeathScenario({ keep, neuterEpoch = false }) {
     // idle window proves life outright and WITHOUT a pid probe (rule 3 of
     // ownershipVerdict) — deliberately, because a session mid-tool-call writes no
     // heartbeat. A session killed seconds ago therefore still reads alive, and a
-    // real successor waits that window out. The drill injects the clock instead
-    // of sleeping five minutes; everything the acquisition then does — the dead-pid
+    // real successor waits that window out. The drill injects the clock (idle
+    // window + lease + one minute) instead of sleeping it out; everything the
+    // acquisition then does — the dead-pid
     // assessment, the reap mutex, the unlink and recreate, the fence mint — runs
     // for real against the real lock the parent acquired.
     const successorNow = Date.now() + IDLE_WINDOW_MS + LEASE_MS + 60_000
@@ -638,7 +640,8 @@ const REAL_FAILURE_SCENARIOS = new Set([
 
 /** Exercise the named failure through a real drill daemon, its real detached
  * stub worker, and the same durable files production reconciliation reads.
- * The pure matrix remains the first, cheap check; it is never the proof. */
+ * The pure matrix remains the first, cheap check beneath it. Scenarios outside
+ * REAL_FAILURE_SCENARIOS return the pure matrix alone. */
 async function realFailureScenario(scenario, pure, { injectFailure = false } = {}) {
   const checks = [{ name: 'the cheap decision-layer check passes beneath the real drill', ok: pure.ok === true, detail: pure.checks?.map((item) => item.detail).filter(Boolean).join('; ') ?? '' }]
   const check = (name, ok, detail = '') => checks.push({ name, ok: ok === true, detail })
@@ -716,15 +719,12 @@ async function realFailureScenario(scenario, pure, { injectFailure = false } = {
         check('the real stopped worker misses the daemon checkpoint deadline and remains non-transferable', reply.ok === true && answer?.acknowledged === false && answer?.transferable === false, JSON.stringify(answer ?? reply))
       }
     } else if (scenario === 'marker-deletion') {
-      const fence = readJsonIfAny(lockPath).fence
+      // The seal writes no marker; the absent marker is presented as null.
       const sealed = await request('seal-boundary', { requestId: 'deleted-marker' })
-      const markerPath = join(repo, '.claude', 'batch-boundary.json')
-      writeFileSync(markerPath, `${JSON.stringify({ kind: 'durable-batch-boundary', phase: 'committed', batchId, fence, requestId: 'deleted-marker', at: Date.now() })}\n`)
-      unlinkSync(markerPath)
       const journal = readJournal(openStateStore({ repoDir: repo, batchId }))
       const sealedFence = journal.entries.filter((entry) => entry.kind === 'command' && entry.name === 'seal-boundary').at(-1)?.fence ?? null
       const verdict = successorBoundaryVerdict({ marker: null, batchId, lock: readJsonIfAny(lockPath), sealedFence })
-      check('deleting the real marker after the daemon seal makes successor reconciliation quarantine the boundary', sealed.ok === true && verdict.ok === false && verdict.quarantine === true && /marker deletion/.test(verdict.reason), verdict.reason)
+      check('a real daemon seal without a boundary marker makes successor reconciliation quarantine the boundary', sealed.ok === true && verdict.ok === false && verdict.quarantine === true && /marker deletion/.test(verdict.reason), verdict.reason)
     } else if (scenario === 'daemon-restart') {
       const firstPid = daemonRecord.pid
       const firstGeneration = daemonRecord.generation
@@ -747,7 +747,7 @@ async function realFailureScenario(scenario, pure, { injectFailure = false } = {
     if (workerStopped && workerHolder?.pid && probePid(workerHolder.pid).exists) {
       try { process.kill(workerHolder.pid, 'SIGCONT') } catch { /* already gone */ }
     }
-    try { await request('shutdown', { drain: true }, 10_000) } catch { /* daemon may be the injected failure */ }
+    try { await request('shutdown', { drain: true }, 10_000) } catch { /* the daemon may already be gone */ }
 
     // A shutdown reply only says the request was accepted. Wait for the daemon
     // itself to disappear, and make exceeding that bound a drill failure even
@@ -773,7 +773,7 @@ async function realFailureScenario(scenario, pure, { injectFailure = false } = {
   return { ...result, ok: checks.every((item) => item.ok), checks, resources }
 }
 
-/** `neuterEpoch` is the NEGATIVE CONTROL: the same scenario against a real
+/** `keep` and `neuterEpoch` apply to parent-death only. `neuterEpoch` is the NEGATIVE CONTROL: the same scenario against a real
  *  daemon whose epoch enforcement is off (a drill-only startDaemon/serve flag).
  *  Such a run must come back red at the two stale-refusal checks — a drill
  *  that stays green over it does not call the thing it claims to prove. */
