@@ -258,6 +258,7 @@ const fail = (reason) => {
 // the audit, so the two cannot disagree. The same block applies the Sol note,
 // the chip upgrade, the derived state and the criticalities; a failure in any
 // of them is logged as "footer not refreshed".
+let footerRefreshed = false
 try {
   // LF-NORMALISED HERE TOO (point 439). This is the last write before the bytes
   // go out, so whatever wrote the file before — a hand edit in Windows text mode
@@ -289,6 +290,7 @@ try {
     ),
   )
   repoBytes = refreshed
+  footerRefreshed = true
 } catch (e) {
   // A publish must never be blocked by the footer; the audit still catches a
   // stale one, and saying why beats failing silently.
@@ -302,7 +304,7 @@ if (repoBytes !== original) {
   if (repoBytes.includes('data-state="stub"') && !original.includes('data-state="stub"')) {
     console.log('current-work section reconciled to the active-work record')
   }
-  console.log(`footer refreshed: ${open.length} open point(s)`)
+  if (footerRefreshed) console.log(`footer refreshed: ${open.length} open point(s)`)
   if (upgradeNowCards(original) !== original) console.log('current-work card(s) lifted into the numbered chip')
 }
 

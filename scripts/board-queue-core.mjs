@@ -87,11 +87,12 @@ export const QUEUE_REBUILD_CMD = 'node scripts/board-queue.mjs'
  */
 export const FINDER_POINTS = new Set([184, 200, 203, 204, 205, 207, 285])
 
-/** The release tag point. It keeps the POSITION the work order gives it (user
- *  10.08.2026: v0.3 ships once the communication mechanic and the critical bugs
- *  are done — the feature work and the audits follow it, they do not gate it), and
- *  it stays exempt from the fixes-before-finders rule, which orders the work that
- *  comes BEFORE the release. */
+/** The release tag point (user 10.08.2026: v0.3 ships once the communication
+ *  mechanic and the critical bugs are done — the feature work and the audits
+ *  follow it, they do not gate it). The queue-order guard exempts it from the
+ *  fixes-before-finders rule, which orders the work that comes BEFORE the
+ *  release; `queueOrder` itself ranks it with the fixes, so it keeps its
+ *  work-order position among them and a finder listed before it moves behind it. */
 export const RELEASE_TAG_POINT = 174
 
 /** The command that gives a card a German title — named by every report below. */

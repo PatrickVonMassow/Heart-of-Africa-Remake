@@ -394,8 +394,8 @@ export function evaluate({
       recordFired: true,
       reason:
         'BOARD FIRST — the board must describe the work BEFORE it starts, not after it ends ' +
-        '(user 27.07.2026). The user reads the published board while the turn runs; every other ' +
-        'board enforcer is a Stop hook and says nothing about that hour.\nMissing:\n' +
+        '(user 27.07.2026). The user reads the published board while the turn runs; the Stop-hook ' +
+        'board enforcers only speak at its end.\nMissing:\n' +
         missing.join('\n') +
         '\nDo this now, then repeat the call:\n' +
         '  1. Update the "Woran ich gerade arbeite" card so it names what you are about to do.\n' +

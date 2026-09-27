@@ -11,8 +11,9 @@
 // The LEGACY (claude.ai artifact, retired 29.07.2026) mirror survives here in
 // exactly two places — `publishedHash` and `artifactToolSeen` — so that an old
 // record still counts and never re-blocks a board that was live. Only the
-// Artifact-tool hook (lock-heartbeat-hook.mjs) still writes them; the transport
-// below is what every session runs.
+// Artifact-tool hook (lock-heartbeat-hook.mjs, `artifactToolSeen`) and the manual
+// dashboard-publish.mjs (`publishedHash`) still write them; the transport below
+// is what every session runs.
 //
 // The chain this module serves, in the order it was built:
 //   A  the DUE MARK — the open-point set is hashed after every tool call and a
