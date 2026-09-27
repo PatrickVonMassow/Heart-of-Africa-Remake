@@ -3,7 +3,7 @@
 // The board's Warteschlange carries an estimate on every card, and
 // `dashboard-guard-core.mjs` defines it as the time by which the work is VISIBLY
 // DONE — merged, verified, board updated. That makes it a falsifiable promise to
-// the reader. None of the stored estimates was ever derived from a measurement,
+// the reader. Until this command, none of the stored estimates was derived from a measurement,
 // and on 19.08.2026 the reader said so: the batch had got markedly faster and the
 // queue still promised the old pace.
 //
@@ -26,7 +26,8 @@
 // A DISTRIBUTION, NEVER A MEAN. The elapsed times are heavy-tailed — a branch cut
 // early and merged days later sits in the same sample as one built and landed in
 // forty minutes — so a mean is dominated by the tail. Every reading here is a
-// five-number summary, and every correction factor is a MEDIAN of ratios.
+// five-number summary, and every correction factor rests on medians — a median
+// of ratios, or for the measured-elapsed basis a ratio of medians.
 //
 // THE CLASSES DECIDE WHETHER ONE FACTOR IS HONEST. The reading is split three
 // ways — the point's criticality tag, an established delegated lane or an
@@ -55,16 +56,17 @@ export const MIN_CLASS_SAMPLES = 5
 export const ELAPSED_BIAS_BASIS = 'measured-elapsed'
 
 /** Beyond this spread between an axis's class factors, one global factor lies. */
-export const GLOBAL_FACTOR_TOLERANCE = 1.5
+const GLOBAL_FACTOR_TOLERANCE = 1.5
 
 /** No card ever promises less than this, however small the measured factor. */
 export const ESTIMATE_FLOOR_HOURS = 0.5
 
 /** The board writes half-hour steps; a card reading "~0,73 h" helps nobody. */
-export const ESTIMATE_STEP_HOURS = 0.5
+const ESTIMATE_STEP_HOURS = 0.5
 
-/** The criticality labels the work order actually uses, lowest first. */
-export const CRITICALITY_LEVELS = Object.freeze(['low', 'medium', 'high'])
+/** The standard criticality labels, lowest first. A word the work order invents
+ *  (MAXIMUM) stays its own label — see parseCriticality. */
+const CRITICALITY_LEVELS = Object.freeze(['low', 'medium', 'high'])
 
 /** The label a point with no `Criticality:` line carries — a class, not a gap. */
 export const UNTAGGED = 'untagged'
@@ -73,7 +75,7 @@ export const UNTAGGED = 'untagged'
 export const AXES = Object.freeze(['criticality', 'lane', 'picture'])
 
 /** Missing-information classes can never become comparisons by adding members. */
-export const UNKNOWABLE_CLASSES = new Set(['lane-unestablished', 'picture-unestablished'])
+const UNKNOWABLE_CLASSES = new Set(['lane-unestablished', 'picture-unestablished'])
 
 const asNumber = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null)
 
@@ -144,7 +146,8 @@ export function parseEstimateHours(estimate) {
 }
 
 /**
- * Whatever a card says AFTER its duration, or '' — preserved verbatim.
+ * Whatever a card says AFTER its duration, or '' — preserved, trimmed and set
+ * behind one space.
  *
  * The note is not always a ` · …` clause: cards carry `~4 h (mehrere Sitzungen)`
  * too, and a tail rule that only knew the middot silently deleted it.
@@ -207,7 +210,8 @@ export function parseCriticality(text) {
 }
 
 /**
- * The `[ ]→[x]` events out of a `git log -p` over the two work-order files.
+ * The `[ ]→[x]` events out of a `git log -p` over the two work-order files —
+ * read as every ADDED `- [x] N.` line, which is how a tick shows in the diff.
  *
  * THE TICK IS THE LANDING, not the merge (point 730). Most merges name their
  * branch — `Merge branch 'feat/701-…'` — but 208 of 283 first-parent merges on
@@ -239,23 +243,23 @@ export function mergedBranchPoint(subject) {
 }
 
 /** How far back from a tick a landing's merge may sit, in first-parent commits. */
-export const MERGE_LOOKBACK = 3
+const MERGE_LOOKBACK = 3
 
 /**
  * …and how long before the tick it may sit, in hours.
  *
  * MEASURED, not guessed: over the 73 landings whose merge NAMES its branch, the
- * gap from merge to tick runs 0.03 h (median) to 1.55 h (max), p99 0.34 h —
- * `land-point.mjs` merges, gates and ticks in one command. Three hours is twice
- * the widest one ever recorded, so it excludes nothing real while it cuts the
+ * gap from merge to tick runs 0.03 h (median) to 1.55 h (max) —
+ * `land-point.mjs` merges, gates and ticks in one command. Three hours is about
+ * twice the widest one ever recorded, so it excludes nothing real while it cuts the
  * case this bound exists for: a main-session tick that happens to follow
  * somebody else's merge from hours or days earlier.
  */
-export const MERGE_MAX_LAG_HOURS = 3
+const MERGE_MAX_LAG_HOURS = 3
 
 /**
  * `main`'s first-parent chain out of `git log --pretty=%H %ct %p<TAB>%s`,
- * newest first — sha, time, parent count and subject, nothing else.
+ * newest first — sha, time, parent shas and subject, nothing else.
  */
 export function parseFirstParentChain(log) {
   const out = []
@@ -323,7 +327,7 @@ export function attributeMerges(chain, ticks, { lookback = MERGE_LOOKBACK, maxLa
     const byName = rows.find(
       (c) => owner.get(c.sha) === tick.point && c.at <= tick.at && !claimed.has(c.sha),
     )
-    if (!byName || claimed.has(byName.sha)) continue
+    if (!byName) continue
     claimed.add(byName.sha)
     out.set(tick.point, { merge: byName, attribution: 'named' })
   }
@@ -372,15 +376,7 @@ export function summarise(values) {
  * Future delegated landings can always add measured spans to that class.
  */
 export const SPAN_MEASURED = 'branch-to-landing'
-export const SPAN_NO_BRANCH = 'no-branch'
 export const SPAN_UNKNOWN = 'unknown'
-
-/** A landing's span basis — inferred for a row that does not carry one. */
-export function spanBasisOf(landing) {
-  const stated = landing?.spanBasis
-  if (stated === SPAN_MEASURED || stated === SPAN_NO_BRANCH || stated === SPAN_UNKNOWN) return stated
-  return asNumber(landing?.elapsedHours) !== null ? SPAN_MEASURED : SPAN_UNKNOWN
-}
 
 /**
  * Which class a landing falls into on each axis.
@@ -433,9 +429,10 @@ export function elapsedHoursToTick(firstCommitAt, tickAt) {
  * A landing with no MEASURABLE elapsed time still counts towards the class's
  * size. Reporting only rated members would hide the evidence gaps themselves.
  *
- * Only a class whose NAME records missing information is unknowable. Every
- * criticality class and every established process class is pending when thin:
- * more measured landings can settle it.
+ * Only a class whose NAME records missing information is unknowable here (the
+ * spread additionally holds picture-verified outside its vote, see axisSpread).
+ * Every criticality class and every established process class is pending when
+ * thin: more measured landings can settle it.
  */
 export function classSummaries(landings, axis) {
   const groups = new Map()
@@ -466,9 +463,9 @@ export function classSummaries(landings, axis) {
     const rated = members.filter((m) => asNumber(m.elapsedHours) !== null && asNumber(m.estimateHours))
     // TWO POPULATIONS, TWO PURPOSES, KEPT APART.
     //
-    // `ratio` covers the WHOLE class and answers the question the axes ask: do
-    // these classes differ? Blinding it to render work would make the picture
-    // axis permanently unmeasurable and silently mute the global-factor test.
+    // `ratio` covers the WHOLE class and is what the report shows per class;
+    // blinding it to render work would hide what the picture axis measured. The
+    // global-factor test itself (axisSpread) reads the correctable population.
     //
     // `correctableRatio` covers only what a correction may be measured on. It is
     // the one a card's factor comes from, so render work can reach a card by
@@ -533,7 +530,7 @@ export function axisSpread(summaries) {
 /**
  * IS ONE CORRECTION FACTOR HONEST FOR THE WHOLE QUEUE? (point 730's central test.)
  *
- * Only when EVERY axis was actually compared and none separated its classes by
+ * Only when every axis that can be compared was compared and none separated its classes by
  * more than the tolerance. The moment one does, a single factor would be right
  * for the average point and wrong for every actual one, so it is refused BY NAME
  * and the caller falls back to per-class factors on the axis it can apply.
@@ -657,8 +654,8 @@ export function factorForCard(reading, criticality, { promiseMedian = null } = {
   }
   // THE SECOND BASIS, and the one that answers the question this point was filed
   // for. A ratio needs a promise recorded at the landing, and those snapshots
-  // begin only with this command's first run — so on the day it ships, every
-  // class is "pending" and the queue keeps a promise no measurement supports.
+  // begin only with this command's first run — so at that first run every
+  // class was "pending" and the queue kept a promise no measurement supported.
   // The bias is measurable without a single snapshot: the class's MEASURED
   // median elapsed against the median of what its open cards currently promise.
   // Applied as a FACTOR, so each card keeps its position relative to its
@@ -704,7 +701,7 @@ export function promiseMedians({ cards = {}, open = [], criticality = new Map(),
     // what a card said before a correction touched it — it is not a store the
     // card can be restored from, and reading it here resurrected estimates that
     // had been removed and let them weigh on the denominator.
-    if (from === null || from === undefined) continue
+    if (from === null) continue
     const baseline = ledgerEntry(ledger, point)?.baseline ?? from
     // BOTH values, exactly as the plan tests them. A card showing an inherited
     // class median while the ledger still remembers an older ordinary promise is
@@ -730,20 +727,8 @@ export function promiseMedians({ cards = {}, open = [], criticality = new Map(),
   return out
 }
 
-/**
- * WHICH OPEN POINTS ASK FOR A PICTURE PROOF — the confounder, made operative.
- *
- * Point 730's own measurement carries a binding limit: its window holds no
- * render point with a picture check, so its factor "must NOT be carried over to
- * render points". A queued card's picture axis cannot be READ off the board —
- * whether a picture check happened is a property of how the work turned out —
- * but the point's own spec says whether one is OWED, and that is the half that
- * exists before the work starts.
- *
- * The markers are deliberately narrow: a demand for a rendered PROOF, not any
- * mention of pictures. A process point that discusses the picture lane is not a
- * render point, and excluding it would quietly shrink the correction.
- */
+/** The picture class of a landing whose retained branch record establishes a
+ *  picture verification. */
 export const PICTURE_VERIFIED = 'picture-verified'
 
 /**
@@ -753,7 +738,7 @@ export const PICTURE_VERIFIED = 'picture-verified'
 export const PICTURE_HOLDOUT_REASON =
   'the point asks for a rendered proof, and this measurement cannot establish what one costs'
 
-export const PICTURE_PROOF_MARKERS = [
+const PICTURE_PROOF_MARKERS = [
   /\bbrowser frames?\b/i,
   /\bscreenshots?\b/i,
   // "picture check" and "picture proof" name a DEMAND. "picture verification",
@@ -772,8 +757,8 @@ export const PICTURE_PROOF_MARKERS = [
  * picture. It counts only where the same clause also names something VISUAL,
  * which is how a render point's VERIFIABLE actually reads.
  */
-export const PICTURE_BACKEND_MARKER = /\bboth backends\b/i
-export const PICTURE_VISUAL_COMPANION = /\b(pictures?|screenshots?|frames?|framing|renders?|rendered|rendering|visual|visually|Bild|Ansicht)\b/i
+const PICTURE_BACKEND_MARKER = /\bboth backends\b/i
+const PICTURE_VISUAL_COMPANION = /\b(pictures?|screenshots?|frames?|framing|renders?|rendered|rendering|visual|visually|Bild|Ansicht)\b/i
 
 /**
  * A mention that DENIES the proof rather than demanding it. Narrow on purpose:
@@ -804,8 +789,9 @@ export const PICTURE_PROOF_DENIALS = [
  * The markers name a DEMAND, not any mention — but every mention matched, so
  * "Delete the obsolete screenshot fixture" was held out as render work. Narrow
  * and symmetrical to the denials above: a housekeeping verb reaching a proof
- * noun, or a proof noun naming a stored artefact. Nothing here touches
- * "screenshot test" or "picture check", which is how a point ASKS for a proof.
+ * noun (the noun-only stored-artefact rule is gone, see UPKEEP_GAP). Only a
+ * housekeeping verb's own object is touched, so a clause that ASKS for a
+ * "screenshot test" or a "picture check" stays a demand.
  */
 const UPKEEP_VERB =
   '(delete|deletes|deleted|remove|removes|removed|drop|drops|dropped|rename|renames|renamed|' +
@@ -833,7 +819,7 @@ const UPKEEP_GAP =
  */
 const UPKEEP_MORE = `(?:\\s*,?\\s*(?:and|or|und|oder)?${UPKEEP_GAP}\\s+${PROOF_NOUN})*`
 
-export const PICTURE_PROOF_UPKEEP = [
+const PICTURE_PROOF_UPKEEP = [
   new RegExp(`\\b${UPKEEP_VERB}\\b${UPKEEP_GAP}\\s+${PROOF_NOUN}${UPKEEP_MORE}`, 'i'),
 ]
 
@@ -850,8 +836,8 @@ export const splitClauses = (line) => String(line ?? '').split(/[;.,:]|—|–|-
 /**
  * A fragment that states nothing of its own — the tail of a coordinated list.
  *
- * "No screenshot, browser frame, or picture proof is required" cuts into three,
- * and the last two are bare nouns that a marker test happily accepts. They are
+ * "No screenshot, browser frame, or picture proof" cuts into three, and the
+ * last two are bare nouns that a marker test happily accepts. They are
  * not new statements; they belong to the clause in front of them. A fragment
  * that carries a word of its own ("provide a browser frame") does state
  * something, and the clause before it does not reach that far.
@@ -865,12 +851,12 @@ const LIST_GLUE =
 
 
 
-export const isListContinuation = (fragment, markers = PICTURE_PROOF_MARKERS) => {
+const isListContinuation = (fragment) => {
   // Nothing but the proof noun and the words that carry it: no statement of its
   // own. A fragment that says something ("provide …", "must be supplied") is a
   // statement and ends whatever the fragment before it decided — a leading "and"
   // does not turn it back into a list item.
-  const bare = markers.reduce((acc, re) => acc.replace(new RegExp(re.source, 'gi'), ' '), String(fragment ?? ''))
+  const bare = PICTURE_PROOF_MARKERS.reduce((acc, re) => acc.replace(new RegExp(re.source, 'gi'), ' '), String(fragment ?? ''))
   return LIST_GLUE.test(bare)
 }
 
@@ -898,7 +884,7 @@ export function clauseDemandsPicture(clause) {
  * Does one LINE demand a rendered proof? Clause by clause, left to right, with a
  * denial governing the bare list items that trail it.
  */
-export function lineDemandsPicture(line) {
+function lineDemandsPicture(line) {
   // The two clauses that SUPPRESS the proof nouns trailing them are kept apart,
   // because they are different statements: a DENIAL denies what it lists, while
   // HOUSEKEEPING deletes its own objects. Conflating them made "Lösche den alten
@@ -943,6 +929,20 @@ export function lineDemandsPicture(line) {
   return false
 }
 
+/**
+ * WHICH OPEN POINTS ASK FOR A PICTURE PROOF — the confounder, made operative.
+ *
+ * Point 730's own measurement carries a binding limit: its window holds no
+ * render point with a picture check, so its factor "must NOT be carried over to
+ * render points". A queued card's picture axis cannot be READ off the board —
+ * whether a picture check happened is a property of how the work turned out —
+ * but the point's own spec says whether one is OWED, and that is the half that
+ * exists before the work starts.
+ *
+ * The markers are deliberately narrow: a demand for a rendered PROOF, not any
+ * mention of pictures. A process point that discusses the picture lane is not a
+ * render point, and excluding it would quietly shrink the correction.
+ */
 export function pictureBearingPoints(text) {
   const out = new Set()
   let point = null
@@ -981,9 +981,9 @@ export const heldOutForPicture = (plan) =>
  * file said each time the command looked at it.
  *
  *   · A ratio measured against today's mutable card is not the promise that stood
- *     at the landing. Once a point has landed, its ledger entry is FROZEN — the
- *     last thing the card said while the point was still open is the promise the
- *     reader was given, and nothing later can edit it.
+ *     at the landing. Once a point has landed, its ledger entry is FROZEN — its
+ *     baseline, the last promise the card carried before any correction, is what
+ *     the landing is measured against, and nothing later can edit it.
  *   · A correction applied to an already-corrected card multiplies the same
  *     factor in again. So the target is always BASELINE × factor, never
  *     CURRENT × factor: re-running the same reading writes the same value, and a
@@ -993,7 +993,7 @@ export const heldOutForPicture = (plan) =>
  * A card the user rewrites by hand becomes its own new baseline — a number a
  * human just chose is a fresh promise, not a corrected one.
  */
-export function ledgerEntry(ledger, point) {
+function ledgerEntry(ledger, point) {
   const l = ledger && typeof ledger === 'object' ? ledger : {}
   return l[String(point)] ?? l[Number(point)] ?? null
 }
@@ -1041,8 +1041,8 @@ export function estimateForLanding(ledger, point, currentEstimate) {
 /**
  * WHAT THE REWRITE WOULD WRITE, per card — pure, so it is reviewable before it runs.
  *
- * A card is only moved when its class HAS a landed comparable and its stored
- * estimate parses. Otherwise it keeps exactly what it had, and the plan carries
+ * A card is only moved when its class has a usable factor — a landed ratio
+ * comparable, or the measured-elapsed basis — and its stored estimate parses. Otherwise it keeps exactly what it had, and the plan carries
  * the reason in words: a guessed correction on a class nobody measured would put
  * back the very thing this point removes.
  *
@@ -1072,7 +1072,7 @@ export function rewritePlan(reading, { cards = {}, open = [], criticality = new 
     const entry = ledgerEntry(ledger, point)
     // Same rule as the denominator's: with no estimate on the card there is
     // nothing to correct, and a remembered baseline is not a replacement for one.
-    const baseline = from === null || from === undefined ? null : (entry?.baseline ?? from)
+    const baseline = from === null ? null : (entry?.baseline ?? from)
     // BEFORE EVERY OTHER BRANCH: owing a rendered proof is a property of the
     // POINT, not of what its card happens to hold right now. Testing the live
     // estimate let a render card with an empty card but a surviving ledger
@@ -1212,7 +1212,7 @@ export function ledgerAfterApply(ledger, plan, { now = Math.floor(Date.now() / 1
  * `updateEstimateLedger` recognises the announced value as this tool's own
  * writing instead of snapshotting a corrected estimate as a fresh baseline.
  */
-export function ledgerWithIntent(ledger, p, { now = Math.floor(Date.now() / 1000) } = {}) {
+function ledgerWithIntent(ledger, p, { now = Math.floor(Date.now() / 1000) } = {}) {
   const out = { ...(ledger && typeof ledger === 'object' ? ledger : {}) }
   if (!p || !p.baseline || !p.to) return out
   out[String(p.point)] = {
@@ -1224,7 +1224,7 @@ export function ledgerWithIntent(ledger, p, { now = Math.floor(Date.now() / 1000
 }
 
 /** …and the ledger after that write was REFUSED: the announcement is withdrawn. */
-export function ledgerWithoutIntent(ledger, point) {
+function ledgerWithoutIntent(ledger, point) {
   const out = { ...(ledger && typeof ledger === 'object' ? ledger : {}) }
   const entry = ledgerEntry(out, point)
   if (!entry?.intent) return out
@@ -1240,7 +1240,7 @@ export function ledgerWithoutIntent(ledger, point) {
  * The order is the whole content of this function, which is why it is here and
  * not in the command: for every card the ledger is persisted BEFORE the write
  * and again AFTER it, so no interruption can leave a corrected card whose
- * promise nothing remembers. `writeCard` returns 'written' or 'refused' and
+ * promise nothing remembers. `writeCard` returns `{ refused, detail }` and
  * throws only on a real failure; a throw stops the run with everything written
  * so far already on the ledger.
  */
@@ -1258,7 +1258,6 @@ export function applyCorrections({
   const save = (next) => {
     estimates = next
     persist(estimates)
-    return estimates
   }
   for (const p of Array.isArray(plan) ? plan : []) {
     save(ledgerWithIntent(estimates, p, { now }))
@@ -1334,8 +1333,8 @@ export function inheritedEstimateForClass(label, defaults = {}) {
  */
 export function inheritedEstimate(point, { defaults = {}, criticality = new Map(), pictureBearing = new Set() } = {}) {
   const crit = criticality instanceof Map ? criticality : new Map(Object.entries(criticality).map(([k, v]) => [Number(k), v]))
-  // The medians are measured from landings whose picture is not established, so
-  // they say nothing about a point that owes a rendered proof. Such a card keeps
+  // The medians are measured on the correctable population — landings that owed
+  // no rendered proof — so they say nothing about a point that owes one. Such a card keeps
   // the "no estimate yet" marker rather than inheriting a number measured on
   // other work — the same holdout the rewrite applies, at the other door in.
   const declared = pictureBearing instanceof Set ? pictureBearing : new Set(pictureBearing ?? [])
