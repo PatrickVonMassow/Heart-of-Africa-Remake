@@ -6,7 +6,7 @@
 // `node_modules/` is git-ignored, so it is not there, and the spawn fails with
 // ENOENT. That cost every delegated agent a detour — and worse, it made a whole
 // suite LIE, because a spawn that never started exits non-zero exactly like a
-// tool that ran and rejected (see `assertRan` below, and scope.test.mjs).
+// tool that ran and rejected (see `didRun` below, and scope.test.mjs).
 //
 // THE ORDER, and why each step earns its place:
 //  1. WALK UP from the checkout. Node itself resolves modules by walking
@@ -117,8 +117,9 @@ export function findLocalBin(
   return null
 }
 
-/** Why nothing was found, naming the tool and everywhere it was looked for —
- *  the message a reader can act on, in place of a bare ENOENT. */
+/** Why nothing was found, naming the tool and every directory in `tried` — the
+ *  message a reader can act on, in place of a bare ENOENT. findLocalBin returns
+ *  null on a miss, so requireLocalBin has no list to pass and names none. */
 export function describeMissing(name, tried = []) {
   return [
     `${name} could not be found — neither in a node_modules/.bin above this checkout,`,
@@ -150,7 +151,8 @@ export function requireLocalBin(name, options) {
  * A process that RAN said something. `error` (a spawn-level failure) is decisive
  * on its own; otherwise real output is the evidence, and a caller that knows the
  * tool's shape passes `expect` to demand it looks like that tool's output rather
- * than like a shell complaining the command was not found.
+ * than like a shell complaining the command was not found. A silent run counts
+ * only with exit 0, and is not shape-checked.
  *
  * @param {{ error?: Error|null, status?: number|null, stdout?: string, stderr?: string, out?: string }} result
  * @param {{ expect?: RegExp }} [options]
