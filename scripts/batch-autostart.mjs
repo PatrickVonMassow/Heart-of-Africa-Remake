@@ -1255,7 +1255,7 @@ const featureWriterRegister = registeredFeatureWriters({
 })
 const ciWait = readJson(C('ci-status-guard-state.json'))?.ciWait ?? null
 const ciWaitAssessment = assessCiWait({ wait: ciWait, now, probePid })
-if (!batchParked && ciWaitAssessment.repair) {
+if (ciWaitAssessment.repair) {
   try {
     const observer = spawn(process.execPath, [R('./ci-status-guard.mjs'), '--observe', ciWait.wakeToken], {
       cwd: REPO,

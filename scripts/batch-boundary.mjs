@@ -717,7 +717,7 @@ if (isMain) {
     if (launcherProbe !== 'armed') {
       console.log(`\nThe launcher "${remedy.name}" is ${launcherProbe} — no boundary stop is possible. To arm it, ${remedy.how}.`)
     }
-    if (!g.marker) console.log('\nNo boundary recorded. Usage: node scripts/batch-boundary.mjs <point>')
+    if (!g.marker) console.log('\nNo boundary recorded. Usage: node scripts/batch-boundary.mjs --prepare <point>, then --commit <point>')
     else if (g.boundary.valid && g.launcher === 'armed') console.log('\nA boundary stop would be ALLOWED.')
     else console.log(`\nA boundary stop would be REFUSED (${g.boundary.reason}, launcher ${g.launcher}).`)
   } else {

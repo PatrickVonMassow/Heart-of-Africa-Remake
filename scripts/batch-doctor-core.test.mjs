@@ -616,11 +616,11 @@ describe('repoRepairDecision — the repo check the launcher runs before spawnin
     expect(d.reason).toBe('findings-remain')
   })
 
-  it('distinguishes the read-only tick, and says nothing was mended for the silent owner', () => {
+  it('distinguishes the tick without --repair, and says nothing was mended', () => {
     const d = repoRepairDecision({ ran: true, code: 1, repaired: false })
     expect(d.reason).toBe('unclean-not-repaired')
-    expect(d.alert).toMatch(/read-only/)
-    expect(d.alert).toMatch(/alive but silent/)
+    expect(d.alert).toMatch(/without --repair/)
+    expect(d.alert).toMatch(/did not license a repair/)
     expect(d.mandate).toBe(true)
   })
 

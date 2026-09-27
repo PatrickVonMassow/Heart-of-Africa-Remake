@@ -474,7 +474,7 @@ function recordGateMeasurement(clean) {
     const statePath = DOCTOR_STATE_PATH
     const state = existsSync(statePath) ? JSON.parse(readFileSync(statePath, 'utf8')) : {}
     const detail = clean
-      ? 'repo state CONSISTENT; npm run test:unit, npm run build and npm run lint passed'
+      ? `repo state CONSISTENT; ${GATE_COMMANDS.join(', ')} passed`
       : gateInconclusive
         ? 'the gate was inconclusive under machine load'
         : 'the doctor or at least one fast gate reported findings'

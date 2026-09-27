@@ -336,7 +336,7 @@ export function repoRepairDecision({ ran = true, code = 0, repaired = false } = 
   if (n === 0) return { spawn: true, mandate: false, reason: 'consistent', standing: false, alert: null }
   const how = repaired
     ? 'The launcher ran batch-doctor --repair before spawning and findings REMAIN afterwards'
-    : 'The launcher checked the repo before spawning (read-only — the previous owner is alive but silent, so nothing was mended for it) and found it unclean'
+    : 'The launcher checked the repo before spawning (without --repair — the lock of the previous owner did not license a repair, so nothing was mended for it) and found it unclean'
   return {
     spawn: true,
     mandate: true,

@@ -190,8 +190,7 @@ export function emergencyDecision({
   if (sameEpisode && Number.isFinite(state?.lastStrikeAt) && now - state.lastStrikeAt < cooldownMs) {
     return { action: 'observe', reason: 'strike-cooldown', strike: false, progressAt, stalledMs }
   }
-  const recoveryAlreadyFailed = state?.lastStrikeProgressAt === progressAt &&
-    Number.isFinite(state?.lastStrikeAt) && state.lastStrikeAt > progressAt
+  const recoveryAlreadyFailed = sameEpisode && Number.isFinite(state?.lastStrikeAt) && state.lastStrikeAt > progressAt
   return {
     action: recoveryAlreadyFailed ? 'hard-recover' : 'soft-recover',
     reason: recoveryAlreadyFailed ? 'batch-still-stalled-after-recorded-recovery' : 'batch-stalled-past-threshold',

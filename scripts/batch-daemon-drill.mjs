@@ -396,7 +396,7 @@ async function parentDeathScenario({ keep, neuterEpoch = false }) {
     // taking its children.
     process.kill(-parent.pid, 'SIGKILL')
     await sleep(500)
-    check('the parent group is dead', probePid(parent.pid)?.exists !== true)
+    check('the parent group leader is dead', probePid(parent.pid)?.exists !== true)
 
     // THE BASELINE FOR POST-DEATH WORK IS TAKEN HERE, after the death is
     // CONFIRMED — not from the pre-kill sample. A push that landed between that
