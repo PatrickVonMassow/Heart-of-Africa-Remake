@@ -2,7 +2,7 @@
 // this enumeration: changing enumeration order must not reinterpret old notes.
 //
 // LENGTH-GENERIC BY CONSTRUCTION. The roll writes no four-syllable literal
-// (SHIPPED_VOCABULARY is the fixed legacy table): the word inventory is derived
+// (the shipped mapping below is the fixed legacy table): the word inventory is derived
 // from SEQUENCE_LENGTH, rule (a) is built into the enumeration and rule (b) is a
 // predicate over a vocabulary. Raising the syllable count — to fit more
 // concepts into the language — is a change of that constant plus re-pinning the
