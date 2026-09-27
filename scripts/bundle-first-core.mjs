@@ -1,7 +1,7 @@
 // Pure decision core of the bundle-first Stop-hook guard (bundle-first-guard.mjs
 // is the thin fail-open wrapper).
 //
-// THE RULE, until now memory only (`bundle-first-not-new-point`): a new finding
+// THE RULE (memory `bundle-first-not-new-point`): a new finding
 // JOINS AN EXISTING BUNDLE POINT, and a standalone point is the exception. The
 // bundling itself lives in `docs/work-packages.md`, whose own text states the
 // property this guard makes true:
@@ -18,8 +18,8 @@
 // that silently left a bundle is caught by exactly the same comparison as one
 // that never joined.
 //
-// WHAT COUNTS AS PLACED: a number in a bundle row's Points cell, or a number in
-// the "Not bundled" list. Listing in that list IS the exemption — the section's
+// WHAT COUNTS AS PLACED: a `#`-marked reference in a bundle row's Points cell,
+// or in the "Not bundled" list (see referenceList). Listing in that list IS the exemption — the section's
 // own heading carries the reasons ("each for its own reason"), and demanding
 // prose per bullet would make the guard block on a formatting nicety instead of
 // on the drift it exists to catch.
@@ -42,7 +42,8 @@
 // answered with the sentence an operator reads as proof.
 import { parseOpenPoints } from './queue-order-guard-core.mjs'
 
-/** The heading that opens the bundle table, and the one that closes the section. */
+/** The heading that opens the bundle table, and the bold marker that closes the
+ *  table section and opens the unbundled list. */
 export const BUNDLES_HEADING = '## The bundles'
 export const UNBUNDLED_MARKER = '**Not bundled**'
 
@@ -87,9 +88,8 @@ export function referenceList(text) {
   // point standing in two homes. Refusing every run above the safe range was the
   // wrong cut — it threw away `#9007199254740992`, which converts exactly, and a
   // legitimate home would have been reported missing. So the run is kept exactly
-  // when the number spells it back: aliasing is impossible, and no reference that
-  // survives the conversion is lost. Leading zeros are a spelling, not a
-  // different number, and are normalised before the comparison.
+  // when the converted number equals it: aliasing is impossible, and no reference
+  // that survives the conversion is lost.
   return [...String(text ?? '').matchAll(/(?<=^|[\s,([*_])(?<!\]\()#(\d+)(?![0-9A-Za-z#])/g)]
     .map((m) => ({ digits: m[1], value: Number(m[1]) }))
     // COMPARED AS INTEGERS, NOT AS TEXT (round-thirteen review finding): a
@@ -102,8 +102,9 @@ export function referenceList(text) {
 }
 
 /**
- * The bundles as `[{ name, id, points }]`, in document order. A row is a bundle
- * row when it has the table's five pipes and its id cell is a single letter —
+ * The bundles as `[{ name, id, points, list }]`, in document order. A row is a
+ * bundle row when it has at least the table's five pipes and its id cell is a
+ * single uppercase letter —
  * the header and its separator therefore drop out by shape, not by counting.
  */
 export function parseBundles(md) {
@@ -120,8 +121,8 @@ export function parseBundles(md) {
     if (cells.length < 6) continue
     const [, name, id, , points] = cells
     if (!/^[A-Z]$/.test(id)) continue
-    // `list` keeps the references IN ORDER and with their repeats, so a point
-    // named twice in one cell is still two placements; `points` stays the set
+    // `list` keeps the references IN ORDER and with their repeats (duplicateHomes
+    // walks it and still counts the row as ONE home); `points` stays the set
     // every membership question is asked of.
     const list = referenceList(points)
     bundles.push({ name: name.replace(/\*/g, '').trim(), id, points: new Set(list), list })
@@ -185,7 +186,8 @@ export function unplacedPoints(openSet, bundles, unbundled) {
 
 /**
  * Open points with MORE THAN ONE home — the second half of the invariant this
- * document states about itself ("exactly once"), and the round-ten review
+ * document states about itself ("exactly one bundle … or in the unbundled
+ * list"), and the round-ten review
  * finding. `unplacedPoints` unions the memberships, so it can only ever see a
  * point with NO home: a point standing in two bundle rows, or in a bundle and
  * in "Not bundled", passed it silently and the guard reported no drift. While
@@ -225,17 +227,11 @@ export function duplicateHomes(openSet, bundles, unbundled) {
   for (const b of rows) idCounts.set(b.id, (idCounts.get(b.id) ?? 0) + 1)
   rows.forEach((b, i) => {
     const label = (idCounts.get(b.id) ?? 0) > 1 ? `${b.id} (row ${i + 1})` : String(b.id)
-    for (const n of b.list ?? [...b.points]) add(n, label)
+    for (const n of b.list ?? []) add(n, label)
   })
-  const bullets = Array.isArray(unbundled?.bullets) ? unbundled.bullets : null
-  if (bullets) {
-    bullets.forEach((bullet, i) => {
-      const where = `"Not bundled" bullet ${bullet.index ?? i + 1}`
-      for (const n of bullet.points ?? []) add(n, where)
-    })
-  } else {
-    const set = unbundled instanceof Set ? unbundled : unbundled?.points
-    for (const n of set instanceof Set ? set : []) add(n, 'Not bundled')
+  for (const bullet of Array.isArray(unbundled?.bullets) ? unbundled.bullets : []) {
+    const where = `"Not bundled" bullet ${bullet.index}`
+    for (const n of bullet.points ?? []) add(n, where)
   }
   return [...homes.entries()]
     .filter(([, where]) => where.size > 1)
@@ -260,7 +256,7 @@ export function statusLine(result) {
 }
 
 /** The remedy for a point standing in two homes: one copy, same reason. */
-export function duplicateRemedy(duplicates) {
+function duplicateRemedy(duplicates) {
   return (
     `delete the reference that does not belong, so ${duplicates.length === 1 ? 'it' : 'each of them'} stands in ` +
     'exactly one bundle row or in the "Not bundled" list — the split follows SHARED FILES, so two homes say two ' +
@@ -269,9 +265,10 @@ export function duplicateRemedy(duplicates) {
 }
 
 /** The remedy sentence, one copy, so the guard and its `--status` agree. */
-export function bundleRemedy(missing) {
+function bundleRemedy(missing) {
   return (
-    `place ${missing.length === 1 ? 'it' : 'them'} in the bundle whose files ${missing.length === 1 ? 'it' : 'they'} ` +
+    `place ${missing.length === 1 ? 'it' : 'them'}, written as a \`#<n>\` reference, in the bundle whose files ` +
+    `${missing.length === 1 ? 'it' : 'they'} ` +
     'touch (the table under "## The bundles" in docs/work-packages.md — the split follows SHARED FILES, so the ' +
     'bundle says which points must not run in parallel), or add it to the "Not bundled" list with the reason it ' +
     'stands alone. Then re-run: node scripts/bundle-first-guard.mjs --status'
@@ -279,9 +276,10 @@ export function bundleRemedy(missing) {
 }
 
 /** How many unplaced points the block message names before it truncates. */
-export const MAX_NAMED = 40
+const MAX_NAMED = 40
 
-/** Top-level decision on the two raw file contents. Total: any bad input → allow. */
+/** Top-level decision on the two raw file contents. Any bad CONTENT → allow
+ *  (the argument itself must be an object or undefined). */
 export function evaluate({ tasksMd, workPackagesMd } = {}) {
   try {
     if (typeof workPackagesMd !== 'string' || !workPackagesMd.trim()) return { block: false, checked: false, reason: '' }
