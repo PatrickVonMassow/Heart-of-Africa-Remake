@@ -3,7 +3,7 @@
 // the cards kept regressing into changelog walls (commit hashes, file paths,
 // code spans, single giant paragraphs). The decision logic lives in
 // dashboard-conciseness-guard-core.mjs (pure, Vitest-covered); this wrapper
-// only reads the dashboard file and is fail-OPEN: any internal error → allow,
+// only reads the dashboard file and the work order's point numbers, and is fail-OPEN: any internal error → allow,
 // so a guard bug never traps the session.
 import { readFileSync, existsSync } from 'node:fs'
 import { repoPath } from './repo-paths.mjs'

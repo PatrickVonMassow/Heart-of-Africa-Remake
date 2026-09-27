@@ -10,6 +10,7 @@
 //   (4) every open point visible                (5) focus declared (focus.mjs)
 //   (6) now-card title point == declared focus  (7) reconcile after a user prompt
 //   (8) re-affirm after ~30 min of work         (8b) full-consistency audit (313)
+//   (8c) now-card text changed since the last review   the expected-end (ETA) rule
 //   (9) repo file == published content
 //
 // The companion flow after every dashboard edit:
@@ -38,6 +39,7 @@ import {
   mergeState,
   removeFile,
   sha256File,
+  BOARD_FILE_DEFAULT,
 } from './dashboard-state.mjs'
 import { createHash } from 'node:crypto'
 import {
@@ -113,8 +115,9 @@ export function gatherDashboardInputs({ sessionId = '' } = {}) {
   const markerFileExists = !!(dashboardFile && existsSync(dashboardFile))
   const html = markerFileExists ? readFileSync(dashboardFile, 'utf8') : null
 
-  // Only THIS session's tool activity drives the focus-freshness invariant —
-  // a parallel chat window's calls must not nag the batch session (and vice versa).
+  // Only THIS session's tool activity (or a record naming no session, or a call
+  // with no session id) drives the focus-freshness invariant — a parallel chat
+  // window's calls must not nag the batch session (and vice versa).
   const activity = readJson(ACTIVITY_PATH)
   const lastToolAt =
     activity && (!activity.sessionId || !sessionId || activity.sessionId === sessionId)
@@ -163,7 +166,7 @@ if (RUN_AS_SCRIPT && process.argv[2] === '--waive-audit') {
   // Falls back to the default board path so the hatch also works BEFORE the
   // first registration (a fresh clone with a violation would otherwise have no
   // way out but pausing the whole batch).
-  const rel = (marker && marker.dashboardPath) || '.batch-dashboard.html'
+  const rel = (marker && marker.dashboardPath) || BOARD_FILE_DEFAULT
   const file = resolve(REPO_ROOT, process.argv[4] || rel)
   if (!reason || !existsSync(file)) {
     console.error('usage: node scripts/dashboard-guard.mjs --waive-audit "<reason>" [dashboard.html]')
@@ -240,7 +243,8 @@ if (RUN_AS_SCRIPT && process.argv[2] === '--synced') {
   // Advance the doneSeen baseline — but a WAIVED pass must not absorb an
   // erledigt-missing finding forever: it only advances over points that
   // actually have a card (plus everything already seen). A clean pass has no
-  // such finding, so it advances over the full done set. The waiver itself is
+  // such finding, so it advances over the full done set — as does a first pass
+  // with no stored baseline yet. The waiver itself is
   // consumed here: reverting to previously waived bytes must not revive it.
   const prevSeen = Array.isArray(priorState.doneSeen) ? priorState.doneSeen : null
   const carded = new Set(
