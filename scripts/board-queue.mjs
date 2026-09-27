@@ -264,16 +264,15 @@ try {
       // Atomic (point 443, four-eyes F3): a kill mid-write leaves torn bytes that
       // the doctor's board repair would push to the public page. LF-normalised
       // (point 439) so a hand edit's CRLF cannot outlive one rebuild.
-      const out = rendered
-      if (out !== html) writeTextAtomic(boardFile, out)
-      console.log(`queue rebuilt from the work order: ${built.entries.length} card(s)${out === html ? ' (unchanged)' : ''}`)
+      if (rendered !== html) writeTextAtomic(boardFile, rendered)
+      console.log(`queue rebuilt from the work order: ${built.entries.length} card(s)${rendered === html ? ' (unchanged)' : ''}`)
       reportEntries(built.entries, tasks)
       saySoIfRequests()
       console.log('Publish it: node scripts/board-publish.mjs')
     }
   } else {
     console.error(
-      'usage: board-queue.mjs [--check] | set <N> ["<text>"] [--title …] [--estimate …] [--if-estimate …] | import',
+      'usage: board-queue.mjs [--check] | set <N> ["<text>"] [--title …] [--estimate …] [--if-estimate …] [--text-stdin] | import',
     )
     process.exitCode = 2
   }

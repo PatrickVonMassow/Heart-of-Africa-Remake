@@ -55,8 +55,8 @@ import { SINGLE_PARAGRAPH_WORD_BUDGET, WORD_BUDGET } from './dashboard-concisene
 import { gateSets } from './user-gate-core.mjs'
 import { INHERITED_ESTIMATE_NOTE, inheritedEstimate } from './queue-calibration-core.mjs'
 import { pointNumbersFromChip } from './dashboard-point-reader-core.mjs'
-// The pool cap is the width of the queue's front (point 712) — three slots,
-// three candidates. It is IMPORTED rather than restated: a second 3 in this file
+// The pool cap is the width of the queue's front (point 712) — one candidate
+// per slot. It is IMPORTED rather than restated: a second 3 in this file
 // would be a second home for the number CLAUDE.md §6 states.
 import { POOL_CAP } from './batch-in-flight-core.mjs'
 
@@ -239,7 +239,7 @@ export function assertNotFlagValue(value, field) {
 
 /**
  * A card body as the list of paragraphs it renders to. Accepts a single string
- * (one paragraph) or an array of them, and drops anything empty.
+ * (split on blank lines) or an array of them, and drops anything empty.
  *
  * The array form exists because the derived queue could only ever emit ONE <p>,
  * while the hand-kept board it replaced carried two or three per card — and the
@@ -398,14 +398,14 @@ export function queueEntries({ open = [], data = null, exclude = [], titles = {}
 // stands without asking.
 
 /** How many pending requests the card names before it says "and n more". */
-export const REQUEST_CARD_MAX = 5
+const REQUEST_CARD_MAX = 5
 
 /** The card's title — no leading number, so no parser reads it as a point. */
-export const REQUEST_CARD_TITLE = 'Anfragen aus anderen Fenstern'
+const REQUEST_CARD_TITLE = 'Anfragen aus anderen Fenstern'
 
 /** ae/oe/ue back to ä/ö/ü, but ONLY in a word the audit's stem list flags. */
 const UMLAUT = { ae: 'ä', oe: 'ö', ue: 'ü' }
-export function repairTransliteration(word) {
+function repairTransliteration(word) {
   const w = String(word ?? '')
   if (!TRANSLITERATION_STEMS.some((stem) => w.toLowerCase().includes(stem))) return w
   return w.replace(/[AaOoUu][eE]/g, (digraph) => {
@@ -450,7 +450,7 @@ export function boardSafeTitle(title, { maxLength = 60 } = {}) {
 
 /** The fixed half of the card an undrainable request becomes — ours, so it is
  *  never neutralised, and `vdzk-remove` finds the card by it. */
-export const BLOCKED_CARD_PREFIX = 'Anfrage nicht übernehmbar: '
+const BLOCKED_CARD_PREFIX = 'Anfrage nicht übernehmbar: '
 
 /**
  * The title of the decision card a request that cannot be carried in becomes.
@@ -552,12 +552,12 @@ export function renderQueueCard({ point, title, body, meta }) {
 }
 
 /** The whole Warteschlange body, cards only — the section wrapper is the caller's. */
-export function renderQueueCards(entries) {
+function renderQueueCards(entries) {
   return (Array.isArray(entries) ? entries : []).map(renderQueueCard).join('')
 }
 
 /** Where the Warteschlange section's card list begins and ends in the board. */
-export function queueSectionBounds(html) {
+function queueSectionBounds(html) {
   const doc = String(html ?? '')
   const head = '<summary><h2>Warteschlange</h2></summary>'
   const at = doc.indexOf(head)
@@ -606,9 +606,9 @@ const cardText = (html) =>
     .trim()
 
 /**
- * Seed the data file from a board that still carries a hand-written queue — the
- * one-time migration, so the transition to the generator does not throw the
- * existing prose away. Reads only the Warteschlange section.
+ * Read the board's Warteschlange back into queue data. `board-queue import`
+ * merges it additively (`mergeQueueImport`), and `boardTitleReport` reads it on
+ * every publish. Reads only the Warteschlange section.
  *
  * EACH `<p>` STAYS ITS OWN PARAGRAPH (point 530). The body used to be stripped
  * to one flat sentence run, so a round trip through the board — which renders
@@ -720,8 +720,7 @@ export function mergeQueueImport(existing, imported, { titles = {} } = {}) {
     const prev = points[n]
     // A TITLE THE GENERATOR ITSELF FELL BACK TO IS NOT DATA. Importing "Punkt
     // 465" or the work order's English headline would freeze the fallback into
-    // the file, where it outranks the work order for ever and stops being
-    // reported as still untranslated.
+    // the file, where it outranks the work order for ever.
     const entry = { ...raw, title: isUntranslatedTitle(raw.title, n, titles) ? null : raw.title }
     // A card the board shows as a bare stub carries nothing to import; storing
     // the empty record would only make the data file grow one key per rebuild.
@@ -788,7 +787,7 @@ export function setQueueEntry(data, point, { title, body, estimate } = {}) {
 export const SET_STDIN_FLAG = '--text-stdin'
 
 /** Every flag `set` knows — named back at a caller that mistyped one. */
-export const SET_FLAGS = Object.freeze(['--title', '--estimate', '--if-estimate', SET_STDIN_FLAG, '--'])
+const SET_FLAGS = Object.freeze(['--title', '--estimate', '--if-estimate', SET_STDIN_FLAG, '--'])
 
 /** Exact compare decision used by `set --if-estimate`, kept pure for tests. */
 export function estimateCompareDecision(current, expected) {
@@ -807,6 +806,7 @@ export function estimateCompareDecision(current, expected) {
  *   set <N> --text-stdin                body from stdin
  *   set <N> --title --text-stdin        title from stdin (the umlaut-safe path)
  *   set <N> --estimate "~2 h"           estimate from the argv
+ *   set <N> … --if-estimate "~1 h"      write only if the stored estimate is exactly this
  *   set <N> -- "-so beginnt der Text"   everything after `--` is literal text
  *
  * `stdinField` names which of the three the piped text fills; only one may claim

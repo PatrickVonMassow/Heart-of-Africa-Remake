@@ -68,15 +68,15 @@
 | `batch-lock.mjs` | Batch PAUSE state + legacy lock reader. | — |
 | `batch-metric-events.mjs` | Production bridge from measured operations to the daemon's fenced journal. | — |
 | `batch-metrics-core.mjs` | UNBIASED DURABLE-LANE METRICS — ordered-work step 11. | — |
-| `batch-metrics.mjs` | Seal inputs, record independent context samples, and reconstruct trial metrics. | usage: node scripts/batch-metrics.mjs report --batch <id> [--repo <dir>]<br>usage: node scripts/batch-metrics.mjs seal-plan --batch <id> --session <id> --fence <n> --plan <plan.json> [--repo <dir>]<br>usage: node scripts/batch-metrics.mjs sample-context --batch <id> --scope handover\|ordinary --transcript <session.jsonl> [--repo <dir>]<br>usage: node scripts/batch-metrics.mjs report --batch <id> [--repo <dir>] [--context <samples.json>] |
+| `batch-metrics.mjs` | Seal inputs, record independent context samples, and reconstruct trial metrics. | usage: node scripts/batch-metrics.mjs report --batch <id> [--repo <dir>] [--context <samples.json>]<br>usage: node scripts/batch-metrics.mjs seal-plan --batch <id> --session <id> --fence <n> --plan <plan.json> [--repo <dir>]<br>usage: node scripts/batch-metrics.mjs sample-context --batch <id> --scope handover\|ordinary --transcript <session.jsonl> [--repo <dir>] |
 | `batch-owner-work.mjs` | THE OWNER'S CORROBORATION, GATHERED ONCE FOR EVERY DOOR (four-eyes review of point 556, confirmed finding 2). | — |
 | `batch-ownership-core.mjs` | THE OWNERSHIP VERDICT — ONE function, and deliberately only one (point 612, with the cross-point ruling of point 614). | — |
 | `batch-pause-core.mjs` | EVERY PARK CARRIES A RESTART CLOCK (point 445, out of the fortnight-alone review). | — |
 | `batch-pause.mjs` | Deliberate writer for an allowed batch stop. | usage: node scripts/batch-pause.mjs --user-stop "<quoted user words>" \| --awaiting-user "<reason>" |
 | `batch-progress-guard.mjs` | Stop hook (user mandate 22.07.2026): GUARANTEE the batch never idle-stops. | — |
 | `batch-reconcile-core.mjs` | SUCCESSOR RECONCILIATION — step 8 of the "Ordered work" in docs/handover-architecture.md (work-order point 834, the front stage of 676; union M26-M29, M41). | — |
-| `batch-reconcile.mjs` | EVIDENCE GATHERING FOR SUCCESSOR RECONCILIATION — step 8 of the "Ordered work" in docs/handover-architecture.md (work-order point 834, the front stage of 676). | usage: node scripts/batch-reconcile.mjs --repo <dir> --batch <id> [--apply --session <sid>] |
-| `batch-resume-hook-core.mjs` | WHAT A SESSION THAT DID NOT GET THE BATCH IS TOLD — the deciding half of scripts/batch-resume-hook.mjs's stand-down branch. | — |
+| `batch-reconcile.mjs` | EVIDENCE GATHERING FOR SUCCESSOR RECONCILIATION — step 8 of the "Ordered work" in docs/handover-architecture.md (work-order point 834, the front stage of 676). | usage: node scripts/batch-reconcile.mjs [--repo <dir>] --batch <id> [--apply --session <sid>] |
+| `batch-resume-hook-core.mjs` | WHAT THE SESSION-START HOOK SAYS — the deciding half of scripts/batch-resume-hook.mjs: the owner-runbook gate, the open-point headline, and above all the stand-down branch. | — |
 | `batch-resume-hook.mjs` | SessionStart hook: auto-resume the TASKS.md batch (user mandate 2026-07-14 — the batch must complete autonomously; no session may sit idle waiting for a "continue"). | — |
 | `batch-schema-core.mjs` | THE DURABLE LANE'S SCHEMAS AND INVARIANTS — step 1 of the "Ordered work" in docs/handover-architecture.md (work-order point 891, the front stage of 676). | — |
 | `batch-singleton-race-worker.mjs` | Test worker for the batch-singleton race tests: attempts one atomic acquire against the lock path in argv and prints the result. | — |
@@ -90,7 +90,7 @@
 | `blind-merge-core.mjs` | Pure accounting for the MERGE of a blind-parallel four-eyes stage (point 634). | — |
 | `blind-merge.mjs` | The command that MERGES a blind-parallel four-eyes stage — cheaply, and then countably (point 634). | usage: node scripts/blind-merge.mjs --a <A> --b <B> (what to decide) |
 | `board-archive-rotate.mjs` | Keeps the board's Erledigt section at its cap (point 371) by moving the oldest cards onto the archive page. | — |
-| `board-core.mjs` | Pure half of the board command (point 372): the card edit, so the markup the board guard accepts is pinned by tests rather than by the shape of one regex written once. | — |
+| `board-core.mjs` | Pure half of the board command (point 372): the card edits, plus the footer, criticality and current-work projection passes and the publish preflight they share, so the markup the board guard accepts is pinned by tests rather than by the shape of one regex written once. | — |
 | `board-currency-core.mjs` | Pure core of the BOARD-CURRENCY chain (point 400). | — |
 | `board-edit-core.mjs` | Dependency-injected controller for a board edit. | — |
 | `board-edit-lock.mjs` | Cross-process serialization for the board's read-modify-write commands. | — |
@@ -103,7 +103,7 @@
 | `board-probe-core.mjs` | THE BOARD REACHABILITY PROBE — pure decision core (point 562). | — |
 | `board-publish.mjs` | THE BOARD TRANSPORT (point 400, delta D) — the board goes live from a script, so EVERY session can publish it, and comes back over plain HTTPS, so a check can read the PAGE rather than a record of an attempt. | usage: node scripts/board-publish.mjs [--check \| --url] |
 | `board-queue-core.mjs` | Pure core of the DERIVED QUEUE (point 400, delta C). | — |
-| `board-queue.mjs` | THE QUEUE GENERATOR (point 400, delta C) — rebuild the Warteschlange from the work order plus the board's own prose, instead of maintaining it card by card. | usage: board-queue.mjs set <N> ["<text>"] [--title …] [--estimate "~2 h"] [--if-estimate "~old h"] [--text-stdin]<br>usage: board-queue.mjs [--check] \| set <N> ["<text>"] [--title …] [--estimate …] [--if-estimate …] \| import |
+| `board-queue.mjs` | THE QUEUE GENERATOR (point 400, delta C) — rebuild the Warteschlange from the work order plus the board's own prose, instead of maintaining it card by card. | usage: board-queue.mjs set <N> ["<text>"] [--title …] [--estimate "~2 h"] [--if-estimate "~old h"] [--text-stdin]<br>usage: board-queue.mjs [--check] \| set <N> ["<text>"] [--title …] [--estimate …] [--if-estimate …] [--text-stdin] \| import |
 | `board-refresher-core.mjs` | The board's self-refresh, as VERSIONED source (point 419 b). | — |
 | `board-remedy.mjs` | The board's remedy text, in ONE place (point 435). | — |
 | `board-state-core.mjs` | DERIVED BATCH STATE FOR THE BOARD (point 749). | — |

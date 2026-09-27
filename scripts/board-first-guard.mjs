@@ -5,19 +5,24 @@
 // REGISTRATION (.claude/settings.json is a protected path — the main session
 // wires it): one entry per state-changing tool matcher under `PreToolUse`:
 //
-//   { "matcher": "Edit|Write|NotebookEdit|Agent|Bash|PowerShell",
+//   { "matcher": "Edit|Write|MultiEdit|NotebookEdit|Agent|Bash|PowerShell",
 //     "hooks": [{ "type": "command", "command": "node scripts/board-first-guard.mjs" }] }
 //
 // Modes:
-//   1. PreToolUse HOOK: reads the tool call on stdin and DENIES the FIRST
-//      state-changing call of a turn while the board does not yet describe the
-//      work that is starting (see board-first-core.mjs for the rule and the
-//      escape path). Any internal error → ALLOW.
-//   2. `--status`: what the gate would say right now, without a tool call.
+//   1. PreToolUse HOOK: reads the tool call on stdin. Piggy-backed first: it
+//      renews the batch lease and the own claim and withdraws or keeps a
+//      handover. It then applies the stale-fence, main-write, ownership and
+//      sealed-boundary denies, and finally DENIES the FIRST state-changing call
+//      of a turn while the board does not yet describe the work that is
+//      starting (see board-first-core.mjs for the rule and the escape path).
+//      Any internal error → ALLOW.
+//   2. `--status`: the board-first verdict alone for a sample write (`evaluate`
+//      only — the fence, ownership, worktree and sealed-boundary checks are not run).
 //
 // Ownership-aware like every guard since the hard singleton: a session that does
-// not own the live batch lock has no board duty, and a paused batch is never
-// gated. A subagent is not exempt by that rule — its tool calls carry the PARENT
+// not own the live batch lock has no board duty — but since points 795 and 897
+// its mutations are refused (main-write fence, ownership stand-down) — and a
+// paused batch is never gated. A subagent is not exempt by that rule — its tool calls carry the PARENT
 // session id, so it is judged like the owner (four-eyes review, 27.07.2026) —
 // but a WORKTREE-ISOLATED one is (point 440): its checkout path says what the
 // session id cannot, and the deny it used to eat was one it could never act on.
@@ -154,7 +159,7 @@ if (process.argv.includes('--status')) {
   const armed = Number.isFinite(turn) && turn > 0
   console.log(`turn started   : ${armed ? new Date(turn).toISOString() : '<no stamp — gate inactive>'}`)
   console.log(
-    `fired this turn: ${!armed ? 'n/a' : Number(state.boardFirstFiredAt ?? 0) >= turn ? 'yes (stood down)' : 'no'}`,
+    `fired this turn: ${!armed ? 'n/a' : Number(state.boardFirstFiredAt ?? 0) >= turn ? 'yes (board-first deny stood down)' : 'no'}`,
   )
   console.log(`verdict for a mutating call: ${verdict.block ? 'DENY' : 'allow'}`)
   if (verdict.block) console.log(verdict.reason)
@@ -215,11 +220,10 @@ try {
   // withdraws — a wrongly withdrawn boundary costs one command, a wrongly kept
   // one lets a successor spawn beside a working session.
   try {
-    const call = input0
     const keep = handoverSurvivesCall({
       toolName: payload.tool_name,
-      filePath: call.file_path ?? call.notebook_path,
-      command: call.command,
+      filePath: input0.file_path ?? input0.notebook_path,
+      command: input0.command,
     })
     if (keep.survives) touchHandover(payload.session_id || '')
     else {
@@ -228,8 +232,8 @@ try {
       withdrawHandover(payload.session_id || '', {
         trigger: describeWithdrawalTrigger({
           toolName: payload.tool_name,
-          filePath: call.file_path ?? call.notebook_path,
-          command: call.command,
+          filePath: input0.file_path ?? input0.notebook_path,
+          command: input0.command,
         }),
         // Point 396: a handover is not un-taken by a call that predates it.
         callAt: hookCallTimestamp(payload),
@@ -261,10 +265,11 @@ try {
   // without this the fence would protect only the file that was already protected
   // while the woken owner still pushed to main.
   //
-  // It cannot trap a session: it refuses four families of call and nothing else,
-  // so reading, committing locally and finishing its own file work all continue —
-  // and every OTHER guard stands down for a non-owner anyway, so the Stop chain
-  // cannot demand of it the very publish this refuses.
+  // It cannot trap a session: the fence itself refuses these four families of
+  // call and nothing else. The main-write and ownership checks below refuse more
+  // of a non-owner's mutations, but reads always continue, and the board duties
+  // stand down for a non-owner, so the Stop chain cannot demand of it the very
+  // publish this refuses.
   try {
     const fence = fenceDecision({
       fenceState: readFence(),
@@ -423,12 +428,11 @@ try {
     /* fail-OPEN: an unreadable marker must never cost anybody a tool call */
   }
 
-  const input = input0
   const { state, focus, repoHash, boardPaths, boardHtml } = gather()
   const decision = evaluate({
     toolName: payload.tool_name,
-    command: input.command,
-    filePath: input.file_path ?? input.notebook_path,
+    command: input0.command,
+    filePath: input0.file_path ?? input0.notebook_path,
     state,
     focus,
     repoHash,

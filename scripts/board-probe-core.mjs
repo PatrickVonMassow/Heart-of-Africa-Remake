@@ -14,8 +14,8 @@
 // FOUR RULES, and they are the whole module:
 //
 // 1. A TRANSPORT FAILURE AND A STALE BOARD ARE NOT THE SAME CLAIM. A fetch that
-//    failed says nothing about the board's CURRENCY; only staleness is worth
-//    waking anybody for. The two get different verdicts, different titles and —
+//    failed says nothing about the board's CURRENCY; only staleness is a claim
+//    about the board. The two get different verdicts, different titles and —
 //    because the ladder keys on the title and message — different rungs.
 // 2. A FAILED PROBE IS RETRIED AT ONCE, briefly spaced, before it counts as
 //    anything. A success at ANY attempt makes the probe a success.
@@ -35,7 +35,7 @@
 
 /** How often ONE probe is attempted before it counts as a failure. Two: the
  *  measured fault was a single flickering attempt, and a second one costs a
- *  couple of seconds against a batch-wide pause. Calibratable. */
+ *  couple of seconds against a false outage report. Calibratable. */
 export const PROBE_ATTEMPTS = 2
 
 /** The spacing between the attempts of one probe. Brief on purpose — this sits
@@ -65,7 +65,7 @@ const isOk = (a) => !!(a && typeof a === 'object' && a.ok === true)
  * naming in a log, it is simply not a fault.
  *
  * `attempts` is an array of { ok, error?, body? }. An empty or unusable array is
- * a failure with no error text: a probe that never ran cannot have succeeded.
+ * a failure whose error reads 'the probe never ran': it cannot have succeeded.
  */
 export function probeResult(attempts) {
   const list = Array.isArray(attempts) ? attempts : []
