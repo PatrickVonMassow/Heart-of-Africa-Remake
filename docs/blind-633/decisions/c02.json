@@ -1,0 +1,3357 @@
+[
+ {
+  "id": "U601",
+  "decision": "rewritten",
+  "reason": "header now lists the side writes (activity events, commission record, lease extension, transfer/adoption records, board heartbeat)"
+ },
+ {
+  "id": "U602",
+  "decision": "rewritten",
+  "reason": "header CLI synopsis now lists --point, --slots-free, --durable-*, --transferable, --handover-check and --adopt"
+ },
+ {
+  "id": "U603",
+  "decision": "rewritten",
+  "reason": "header now says --waiting-on extends the lease and --clear drops declaredWait on the lock"
+ },
+ {
+  "id": "U604",
+  "decision": "rewritten",
+  "reason": "claim holds: no caller-identity check exists; comment corrected to 'refuses unless a batch lock owner exists (written under that owner's session id)'"
+ },
+ {
+  "id": "U605",
+  "decision": "removed",
+  "reason": "the IN_FLIGHT_PATH re-export had no importer (active-work-source, land-point import it from batch-singleton.mjs); dropped"
+ },
+ {
+  "id": "U606",
+  "decision": "rewritten",
+  "reason": "the reaping/transfer block moved from readDeclaration to reapDeadDeclaration; readDeclaration got its own read-only doc"
+ },
+ {
+  "id": "U607",
+  "decision": "rewritten",
+  "reason": "transfer exemption now explains that an adopted declaration keeps transfer while its pid becomes the adopter's"
+ },
+ {
+  "id": "U608",
+  "decision": "kept",
+  "reason": "claim itself says not dead: reapDeadDeclaration runs at every CLI start"
+ },
+ {
+  "id": "U609",
+  "decision": "rewritten",
+  "reason": "hard-coded '~94' branch census replaced by 'many'"
+ },
+ {
+  "id": "U610",
+  "decision": "rewritten",
+  "reason": "documented open-branch record shape now includes tip"
+ },
+ {
+  "id": "U611",
+  "decision": "rewritten",
+  "reason": "commitsBehind export dropped (no importer); function kept as openFeatBranches' behind default"
+ },
+ {
+  "id": "U612",
+  "decision": "rewritten",
+  "reason": "COMMISSION_RECORD_FILE export dropped; stays a module-local default"
+ },
+ {
+  "id": "U613",
+  "decision": "removed",
+  "reason": "worktreeFilesActiveAt's limit option had no caller anywhere (only the test calls it without limit); option removed, porcelainPaths' default applies as before"
+ },
+ {
+  "id": "U614",
+  "decision": "rewritten",
+  "reason": "doc now says a failed git status answers null and an unstat-able path is skipped"
+ },
+ {
+  "id": "U615",
+  "decision": "rewritten",
+  "reason": "comment now says -uall names files, never a collapsed dir/"
+ },
+ {
+  "id": "U616",
+  "decision": "rewritten",
+  "reason": "currentBranchOf's doc moved from above absPath onto the function"
+ },
+ {
+  "id": "U617",
+  "decision": "rewritten",
+  "reason": "currentBranchOf export dropped; only the local --waiting-on path calls it"
+ },
+ {
+  "id": "U618",
+  "decision": "rewritten",
+  "reason": "the FULL-probe comment moved from runFailureOf to the probes table that picks probePid"
+ },
+ {
+  "id": "U619",
+  "decision": "rewritten",
+  "reason": "runFailureOf doc now names the whole-line regex over the runner's verdict line in a still-running LARGE log"
+ },
+ {
+  "id": "U620",
+  "decision": "backlog",
+  "reason": "scripts/batch-in-flight.mjs:589 — the record.tier == null fallback classifies run records written before tier existed; drop once no such record can remain"
+ },
+ {
+  "id": "U621",
+  "decision": "rewritten",
+  "reason": "gatherInFlight's doc moved from above CLOSING_FREEZE_PATH onto gatherInFlight"
+ },
+ {
+  "id": "U622",
+  "decision": "backlog",
+  "reason": "scripts/batch-in-flight.mjs:605 — the hand-placed .claude/closing-freeze override is written by nothing and CLAUDE.md §9 does not document it; keep or remove as a decided manual override"
+ },
+ {
+  "id": "U623",
+  "decision": "rewritten",
+  "reason": "CLOSING_FREEZE_PATH and CLOSING_STATE_PATH exports dropped; both stay internal"
+ },
+ {
+  "id": "U624",
+  "decision": "backlog",
+  "reason": "scripts/batch-in-flight.mjs:731 — slot census reads 'paused' from the existence of .claude/batch-paused while batch-launcher uses pauseState() including clocked parks; the two can disagree"
+ },
+ {
+  "id": "U625",
+  "decision": "backlog",
+  "reason": "scripts/batch-in-flight.mjs:683 — a partially failing branch census drops only the failed branch and still demands a reason, contrary to 'unreadable means no demand'"
+ },
+ {
+  "id": "U626",
+  "decision": "kept",
+  "reason": "claim itself says not dead: runningBranchFiles is live through gatherSlots"
+ },
+ {
+  "id": "U627",
+  "decision": "rewritten",
+  "reason": "'gathers the four facts' replaced by 'gathers its facts'"
+ },
+ {
+  "id": "U628",
+  "decision": "rewritten",
+  "reason": "'two git calls' replaced by the census (git calls, file reads)"
+ },
+ {
+  "id": "U629",
+  "decision": "rewritten",
+  "reason": "'the same three probes' replaced by 'the same probes'"
+ },
+ {
+  "id": "U630",
+  "decision": "kept",
+  "reason": "claim itself says not dead: used by checkDeclaredAgentOutput"
+ },
+ {
+  "id": "U631",
+  "decision": "kept",
+  "reason": "claim itself says not dead: used by the --agent-check CLI"
+ },
+ {
+  "id": "U632",
+  "decision": "kept",
+  "reason": "claim itself says not dead: used by the stand-down and successor gatherers and the CLI"
+ },
+ {
+  "id": "U633",
+  "decision": "rewritten",
+  "reason": "checkpointOf export dropped; local callers remain"
+ },
+ {
+  "id": "U634",
+  "decision": "kept",
+  "reason": "claims hold: selfCommandLine and recordPathFor exist in scripts/verify/run-record.mjs and batch-progress-guard imports this module"
+ },
+ {
+  "id": "U635",
+  "decision": "rewritten",
+  "reason": "transferItems export dropped; used by gatherHandoverTransfer only"
+ },
+ {
+  "id": "U636",
+  "decision": "backlog",
+  "reason": "scripts/batch-in-flight.mjs:1302 — legacy-item point migration on transfer/adoption only serves declarations written before points were mandatory; remove once none can remain"
+ },
+ {
+  "id": "U637",
+  "decision": "kept",
+  "reason": "claim itself says not dead: used by adoptTransferred"
+ },
+ {
+  "id": "U638",
+  "decision": "kept",
+  "reason": "claim itself says not dead: used by the --adopt CLI"
+ },
+ {
+  "id": "U639",
+  "decision": "kept",
+  "reason": "claim itself says not dead: used by --waiting-on"
+ },
+ {
+  "id": "U640",
+  "decision": "kept",
+  "reason": "claim itself says not dead: used by --clear and --waiting-on"
+ },
+ {
+  "id": "U641",
+  "decision": "rewritten",
+  "reason": "reap message no longer claims nothing was in flight; it warns that named work (a durable agent) may still run"
+ },
+ {
+  "id": "U642",
+  "decision": "rewritten",
+  "reason": "'Read-only twin' replaced; comment notes the dead-declaration reap still applies"
+ },
+ {
+  "id": "U643",
+  "decision": "rewritten",
+  "reason": "handover-check success text now says NOT BLOCKED and that only this session's transferable declaration is marked"
+ },
+ {
+  "id": "U644",
+  "decision": "backlog",
+  "reason": "scripts/batch-in-flight.mjs:1714 — --clear ignores clearDeclaration's false return and still reports 'in-flight declaration cleared' after a failed delete"
+ },
+ {
+  "id": "U645",
+  "decision": "rewritten",
+  "reason": "owner-checkout exclusion rationale no longer claims the repo root is git-active on every git command"
+ },
+ {
+  "id": "U646",
+  "decision": "rewritten",
+  "reason": "time-bound 'successor tooling of step 8' wording removed; nothing reads durable yet (verified by grep)"
+ },
+ {
+  "id": "U647",
+  "decision": "rewritten",
+  "reason": "'up to an hour' replaced by 'up to maxAgeMs()'"
+ },
+ {
+  "id": "U648",
+  "decision": "rewritten",
+  "reason": "claim holds: docs/batch-resilience.md no longer carries the cited sentence; the stale citation was removed from the comment"
+ },
+ {
+  "id": "U649",
+  "decision": "rewritten",
+  "reason": "lease message now says the launcher ends the extension early when evidence stops advancing"
+ },
+ {
+  "id": "U650",
+  "decision": "rewritten",
+  "reason": "header no longer calls the landing journal unbuilt: it lives in batch-landing-journal*.mjs and scripts/land-point.mjs drives it"
+ },
+ {
+  "id": "U651",
+  "decision": "rewritten",
+  "reason": "'imported only by the reconciliation core' corrected to the reconciliation, boundary-plane and landing-journal cores"
+ },
+ {
+  "id": "U652",
+  "decision": "backlog",
+  "reason": "scripts/batch-landing-core.mjs:39 — a post-merge stage is called 'the published act is proven' while advanceLanding accepts merge/bookkeeping evidence without remote confirmation"
+ },
+ {
+  "id": "U653",
+  "decision": "removed",
+  "reason": "LANDING_EVIDENCE_STAGES had no reader anywhere; deleted"
+ },
+ {
+  "id": "U654",
+  "decision": "backlog",
+  "reason": "scripts/batch-landing-journal-core.mjs:8 — createLandingTransaction has only test callers; the durable landing path of land-point (--batch-id) needs a prepared candidate journal that no production code writes"
+ },
+ {
+  "id": "U655",
+  "decision": "kept",
+  "reason": "claim does not hold: land-point.mjs:869 writes the claimant with stage 'picture-webgl2', so existing.stage is set and the 'candidate' fallback only covers foreign owner files"
+ },
+ {
+  "id": "U656",
+  "decision": "backlog",
+  "reason": "scripts/batch-landing-journal-core.mjs:71 — recoverLanding is a test-only wrapper; remove if the landing journal stays without a recovery caller"
+ },
+ {
+  "id": "U657",
+  "decision": "rewritten",
+  "reason": "landingPaths export dropped; stays a local helper"
+ },
+ {
+  "id": "U658",
+  "decision": "backlog",
+  "reason": "scripts/batch-landing-journal.mjs:19 — acquireLandingLock always passes ownerLive: null, so a live holder is always reported as stranded"
+ },
+ {
+  "id": "U659",
+  "decision": "rewritten",
+  "reason": "readLanding and writeLanding exports dropped; used by recordLandingStage/assertLandingReady"
+ },
+ {
+  "id": "U660",
+  "decision": "kept",
+  "reason": "claim does not hold: probeLauncherState/classifyLauncherState exist in scripts/batch-boundary-core.mjs"
+ },
+ {
+  "id": "U661",
+  "decision": "rewritten",
+  "reason": "header now names all the module's decisions instead of 'the two decisions'"
+ },
+ {
+  "id": "U662",
+  "decision": "rewritten",
+  "reason": "record-version doc now says a stopped mark is read first whatever the version ('disabled')"
+ },
+ {
+  "id": "U663",
+  "decision": "kept",
+  "reason": "claim itself says not dead: LAUNCHER_STALE_TICKS is classifyDaemonRecord's default"
+ },
+ {
+  "id": "U664",
+  "decision": "backlog",
+  "reason": "scripts/batch-launcher-core.mjs:223 — fixed 2000 ms start-time tolerance can read a weeks-old daemon as 'pid recycled' on WSL2, where batch-in-flight.mjs:1150 records start-time drift growing with process age"
+ },
+ {
+  "id": "U665",
+  "decision": "rewritten",
+  "reason": "armed-verdict doc now says a probe that cannot read the live start time skips the recycle check"
+ },
+ {
+  "id": "U666",
+  "decision": "rewritten",
+  "reason": "worktree refusal now attributed to --start, --arm and --daemon only"
+ },
+ {
+  "id": "U667",
+  "decision": "kept",
+  "reason": "claim does not hold: scripts/chat-watcher.mjs exists and still refuses to run from a worktree (line 22)"
+ },
+ {
+  "id": "U668",
+  "decision": "rewritten",
+  "reason": "LAUNCHER_RECORD_PATH, LAUNCHER_LOG_PATH, TICK_TIMEOUT_MS and ALERT_SEND_TIMEOUT_MS exports dropped"
+ },
+ {
+  "id": "U669",
+  "decision": "rewritten",
+  "reason": "late-settling send is now described as dropped, not logged (both comments)"
+ },
+ {
+  "id": "U670",
+  "decision": "rewritten",
+  "reason": "worktreeVerdict export dropped"
+ },
+ {
+  "id": "U671",
+  "decision": "kept",
+  "reason": "claim itself says not dead: used by launcherState"
+ },
+ {
+  "id": "U672",
+  "decision": "kept",
+  "reason": "claim does not hold: lastWorkOrderTickSince exists in scripts/batch-boundary.mjs:284"
+ },
+ {
+  "id": "U673",
+  "decision": "kept",
+  "reason": "claim itself says not dead: used by the --daemon CLI"
+ },
+ {
+  "id": "U674",
+  "decision": "backlog",
+  "reason": "scripts/batch-launcher.mjs:429 — a release suppressed by the early-tick floor is consumed (lastSignal = signal), so the one-minute fast path can wait the regular interval"
+ },
+ {
+  "id": "U675",
+  "decision": "backlog",
+  "reason": "scripts/batch-launcher.mjs:573 — stop verification can accept the stopped:true marker stopDaemon just wrote as proof the daemon stopped"
+ },
+ {
+  "id": "U676",
+  "decision": "kept",
+  "reason": "claim itself says not dead: used by the --stop CLI"
+ },
+ {
+  "id": "U677",
+  "decision": "backlog",
+  "reason": "scripts/batch-launcher.mjs:648 — '--stop' promises nothing restarts the batch, but an already-running tick child (batch-autostart) is not cancelled"
+ },
+ {
+  "id": "U678",
+  "decision": "rewritten",
+  "reason": "renewal rationale now says the lease counts from the call's start and must outlive the longest undeclared call; longer waits are declared"
+ },
+ {
+  "id": "U679",
+  "decision": "rewritten",
+  "reason": "coverage now stated per call start (renew or more than LEASE_MS - LEASE_RENEW_INTERVAL_MS left), not as renewals at most 5 min apart"
+ },
+ {
+  "id": "U680",
+  "decision": "rewritten",
+  "reason": "claim holds; the 'local arithmetic always acts first' rationale now limited to undeclared silence and names the declared-wait and effectiveLeaseUntil extensions"
+ },
+ {
+  "id": "U681",
+  "decision": "rewritten",
+  "reason": "comment now says a stale declared wait reaches leaseTakeoverDecision with workAdvancing false"
+ },
+ {
+  "id": "U682",
+  "decision": "rewritten",
+  "reason": "leaseTakeoverDecision doc lists work-breathing-only and override-expired, the workJudgedOn/overrideMaxMs inputs, and that ownershipVerdict calls it for every reader"
+ },
+ {
+  "id": "U683",
+  "decision": "rewritten",
+  "reason": "declared-wait withdrawal now described as limited to the window the wait bought (inDeclaredWaitWindow)"
+ },
+ {
+  "id": "U684",
+  "decision": "rewritten",
+  "reason": "fenceHeldBy doc now names the bounded holder history"
+ },
+ {
+  "id": "U685",
+  "decision": "rewritten",
+  "reason": "dispossession notice no longer tells a fenced-out session to push; it says commit"
+ },
+ {
+  "id": "U686",
+  "decision": "rewritten",
+  "reason": "fence contract comments now include the landing chain and the 'nested' refusal"
+ },
+ {
+  "id": "U687",
+  "decision": "rewritten",
+  "reason": "claim holds; redirect doc now says only stdout (fd '' or 1) counts and stderr-only redirects do not"
+ },
+ {
+  "id": "U688",
+  "decision": "rewritten",
+  "reason": "claim holds; containment doc now says only Edit/Write targets are filesystem-resolved and the shell path is lexical"
+ },
+ {
+  "id": "U689",
+  "decision": "rewritten",
+  "reason": "header now names the main-write gate and checkout-containment half of the module"
+ },
+ {
+  "id": "U690",
+  "decision": "rewritten",
+  "reason": "wrong rule reference replaced: the no-probe stance is the lease door; corroboration runs in ownershipVerdict"
+ },
+ {
+  "id": "U691",
+  "decision": "rewritten",
+  "reason": "corroboration now attributed to ownershipVerdict over work each caller gathers (batch-owner-work), not the launcher alone"
+ },
+ {
+  "id": "U692",
+  "decision": "rewritten",
+  "reason": "rule 4 now notes the separate main-write gate refuses a lockless session's main-checkout writes"
+ },
+ {
+  "id": "U693",
+  "decision": "rewritten",
+  "reason": "'ONE classifier for both gates' now names every PreToolUse gate including the main-write gate"
+ },
+ {
+  "id": "U694",
+  "decision": "backlog",
+  "reason": "scripts/batch-lease-core.mjs:155 — leaseUntilOf's implicit claimedAt + leaseMs lease is a migration fallback for pre-lease locks; every lock writer now stamps leaseUntil"
+ },
+ {
+  "id": "U695",
+  "decision": "rewritten",
+  "reason": "leaseExpired doc no longer calls the evidence-based extension rejected; it points to effectiveLeaseUntil/ownershipVerdict"
+ },
+ {
+  "id": "U696",
+  "decision": "rewritten",
+  "reason": "renewedLock's reason for keeping claimedAt now names its current meaning (owner's last state change), not the retired handover withdrawal"
+ },
+ {
+  "id": "U697",
+  "decision": "kept",
+  "reason": "claim does not hold as a contradiction: the rule governs the declared-wait window test; ownership-core deliberately re-applies the ordinary lease from claimedAt after a dead wait (documented at batch-ownership-core.mjs:398)"
+ },
+ {
+  "id": "U698",
+  "decision": "rewritten",
+  "reason": "lastTakeover comment now says the record stays until the next takeover and dispossessionNotice de-duplicates via announcedFence"
+ },
+ {
+  "id": "U699",
+  "decision": "rewritten",
+  "reason": "fence refusal now lists lease expiry, handover, idle and stalled owner as dispossession causes"
+ },
+ {
+  "id": "U700",
+  "decision": "rewritten",
+  "reason": "the 'writes the main checkout' JSDoc moved from NON_TRACKED_GATE_SCRIPTS onto mainWritingAction"
+ },
+ {
+  "id": "U701",
+  "decision": "rewritten",
+  "reason": "comment now says only FILE_TOOLS heads qualify, instead of citing git push as the no-path shape"
+ },
+ {
+  "id": "U702",
+  "decision": "kept",
+  "reason": "claim itself says not dead: FENCE_HOLDER_HISTORY is the live historyLimit default"
+ },
+ {
+  "id": "U703",
+  "decision": "kept",
+  "reason": "claim itself says not dead: renewalDecision calls shouldRenewLease"
+ },
+ {
+  "id": "U704",
+  "decision": "kept",
+  "reason": "claim itself says not dead: fenceStatus calls fenceHeldBy"
+ },
+ {
+  "id": "U705",
+  "decision": "kept",
+  "reason": "claim itself says not dead: fenceStatus is called internally"
+ },
+ {
+  "id": "U706",
+  "decision": "kept",
+  "reason": "claim itself says not dead: resolvedTargetInCheckout is called internally"
+ },
+ {
+  "id": "U707",
+  "decision": "kept",
+  "reason": "claim itself says not dead: mainWriteFenceDecision calls mainWritingAction"
+ },
+ {
+  "id": "U708",
+  "decision": "rewritten",
+  "reason": "pause overview no longer claims the explicit-go-only policy; isPaused's doc now notes the launcher clears a clocked park"
+ },
+ {
+  "id": "U709",
+  "decision": "rewritten",
+  "reason": "readPauseRecord export dropped; used internally only"
+ },
+ {
+  "id": "U710",
+  "decision": "rewritten",
+  "reason": "pauseState's documented states now include 'recover'"
+ },
+ {
+  "id": "U711",
+  "decision": "kept",
+  "reason": "claim itself says not dead: setPaused uses retryAttempts"
+ },
+ {
+  "id": "U712",
+  "decision": "backlog",
+  "reason": "scripts/batch-lock.mjs:100 — setPaused accepts cause 'user-stop' from any caller, bypassing the lock-holder and utterance checks batch-pause.mjs's recordUserStop applies"
+ },
+ {
+  "id": "U713",
+  "decision": "kept",
+  "reason": "deliberate do-not-reintroduce note for the removed lockStatus/claimLock/releaseLock API"
+ },
+ {
+  "id": "U714",
+  "decision": "kept",
+  "reason": "historical rationale for the repo-paths form; it states the current fact (the launcher reads the park directly) and misleads nothing"
+ },
+ {
+  "id": "U715",
+  "decision": "rewritten",
+  "reason": "header now says ids default to content-derived and a caller-supplied eventId overrides"
+ },
+ {
+  "id": "U716",
+  "decision": "kept",
+  "reason": "claim itself says not dead: metricEventId is the live default event id"
+ },
+ {
+  "id": "U717",
+  "decision": "rewritten",
+  "reason": "SAFETY_INCIDENT_KINDS export dropped"
+ },
+ {
+  "id": "U718",
+  "decision": "rewritten",
+  "reason": "CONTEXT_HIGH_WATER export dropped"
+ },
+ {
+  "id": "U719",
+  "decision": "kept",
+  "reason": "'ordered-work step 11' is the handover-architecture ordered-work reference used throughout these modules; nothing contradicts it"
+ },
+ {
+  "id": "U720",
+  "decision": "rewritten",
+  "reason": "header usage for report now shows --context"
+ },
+ {
+  "id": "U721",
+  "decision": "kept",
+  "reason": "claim does not hold in effect: --scope is validated by contextSampleFromTranscript (batch-context-samples.mjs:19), which refuses a missing or wrong scope"
+ },
+ {
+  "id": "U722",
+  "decision": "kept",
+  "reason": "claim itself says not dead: the seal-plan CLI branch uses sealSamplingPlanIntoJournal"
+ },
+ {
+  "id": "U723",
+  "decision": "rewritten",
+  "reason": "early return now described as reading nothing"
+ },
+ {
+  "id": "U724",
+  "decision": "rewritten",
+  "reason": "unverifiable caller count replaced by naming the hook-path callers (batch-progress-guard, batch-resume-hook)"
+ },
+ {
+  "id": "U725",
+  "decision": "rewritten",
+  "reason": "claim holds; comment now says the idle rule reads work.declared and a sanctioned wait is visible on the lock via lockDeclaresWait (batch-ownership-core.mjs:434)"
+ },
+ {
+  "id": "U726",
+  "decision": "kept",
+  "reason": "claim itself says not dead: gatherOwnerWork uses corroborationNeeded"
+ },
+ {
+  "id": "U727",
+  "decision": "rewritten",
+  "reason": "'open point 517' now 'point 517'; the extension is implemented"
+ },
+ {
+  "id": "U728",
+  "decision": "rewritten",
+  "reason": "header now says assessOwner decides only where the verdict returns settled:false (the pid-probe branches)"
+ },
+ {
+  "id": "U729",
+  "decision": "backlog",
+  "reason": "scripts/batch-ownership-core.mjs:15 — the header's 10.08.2026 timeline (13:20/13:28/13:57/14:31) and idleVerdict's (14:11/14:32) are not reconciled; say whether they are one incident or two"
+ },
+ {
+  "id": "U730",
+  "decision": "rewritten",
+  "reason": "authority list now includes step 2b, stalled activity"
+ },
+ {
+  "id": "U731",
+  "decision": "rewritten",
+  "reason": "dispossessed session's refusals now include the main-write gate's refusal of every main-checkout write"
+ },
+ {
+  "id": "U732",
+  "decision": "rewritten",
+  "reason": "the 'remaining gap filed separately' now points to ownerActivityDecision's stalled-no-progress"
+ },
+ {
+  "id": "U733",
+  "decision": "kept",
+  "reason": "claim does not hold: DEAD_CONFIRM_MS (batch-singleton.mjs:119) and IDLE_WINDOW_MS are both 5 min and the singleton doc states the same pairing"
+ },
+ {
+  "id": "U734",
+  "decision": "rewritten",
+  "reason": "the 'no advancing progress evidence' prerequisite the function has no input for was removed from idleVerdict's doc"
+ },
+ {
+  "id": "U735",
+  "decision": "rewritten",
+  "reason": "workedSinceClaim's JSDoc moved back onto workedSinceClaim"
+ },
+ {
+  "id": "U736",
+  "decision": "rewritten",
+  "reason": "comment now says the in-flight declaration is seen by readers that gather owner work (batch-owner-work.mjs), not the launcher only"
+ },
+ {
+  "id": "U737",
+  "decision": "kept",
+  "reason": "claim itself says not dead: ownershipVerdict uses lockDeclaresWait"
+ },
+ {
+  "id": "U738",
+  "decision": "backlog",
+  "reason": "scripts/batch-ownership-core.mjs:46 — ownerActivityDecision admits pid-backed observation timestamps with no pid filter, unlike ownershipVerdict and work-breathing-only"
+ },
+ {
+  "id": "U739",
+  "decision": "rewritten",
+  "reason": "'the journal is telemetry, never a takeover guard' corrected: it feeds stalled, which dispossesses"
+ },
+ {
+  "id": "U740",
+  "decision": "backlog",
+  "reason": "scripts/batch-ownership-core.mjs:137 — the claim-age-unknown branch serves locks without acquiredAt; acquire and convertPendingSpawn always write it"
+ },
+ {
+  "id": "U741",
+  "decision": "rewritten",
+  "reason": "handover comment now includes the context-boundary handover"
+ },
+ {
+  "id": "U742",
+  "decision": "rewritten",
+  "reason": "header now lists what proves a clockless user stop: type, cause, retry-after never and the quoted user words"
+ },
+ {
+  "id": "U743",
+  "decision": "rewritten",
+  "reason": "header now limits recovery to records without a readable clock"
+ },
+ {
+  "id": "U744",
+  "decision": "kept",
+  "reason": "claim does not hold: CLAUDE.md §6 (Working Method) holds both the model policy/serving chain and the branch/merge/tick rules, so both citations are right"
+ },
+ {
+  "id": "U745",
+  "decision": "rewritten",
+  "reason": "'no clock of its own' corrected: now is an input defaulting to Date.now()"
+ },
+ {
+  "id": "U746",
+  "decision": "rewritten",
+  "reason": "PAUSE_KEYS export dropped"
+ },
+ {
+  "id": "U747",
+  "decision": "rewritten",
+  "reason": "NEVER's doc now says only a proved user stop may carry it and untyped never / legacy records are recovered"
+ },
+ {
+  "id": "U748",
+  "decision": "rewritten",
+  "reason": "USER_UTTERANCE export dropped"
+ },
+ {
+  "id": "U749",
+  "decision": "rewritten",
+  "reason": "retry-ladder doc now says past the last rung the park keeps probing at the capped interval"
+ },
+ {
+  "id": "U750",
+  "decision": "kept",
+  "reason": "claim itself says not dead: planPause uses isClocklessCause"
+ },
+ {
+  "id": "U751",
+  "decision": "kept",
+  "reason": "claim itself says not dead: parsePauseRecord uses parseInstant"
+ },
+ {
+  "id": "U752",
+  "decision": "rewritten",
+  "reason": "planPause's attempt now documented as resumes in the current spell, matching the ladder"
+ },
+ {
+  "id": "U753",
+  "decision": "rewritten",
+  "reason": "the leftover default cause 'retries-exhausted' in the unusable-ladder branch renamed 'unusable-ladder' (no reader; the branch needs an injected non-finite ladder)"
+ },
+ {
+  "id": "U754",
+  "decision": "rewritten",
+  "reason": "--user-stop usage now shows the reason quoting the user's words inside shell quotes"
+ },
+ {
+  "id": "U755",
+  "decision": "backlog",
+  "reason": "scripts/batch-pause.mjs:11 — the user-stop ownership check is pid plus process start time, which cannot tell successive sessions in one claude window apart"
+ },
+ {
+  "id": "U756",
+  "decision": "rewritten",
+  "reason": "pauseUsage export dropped"
+ },
+ {
+  "id": "U757",
+  "decision": "kept",
+  "reason": "claim itself says not dead: the CLI uses parsePauseCommand"
+ },
+ {
+  "id": "U758",
+  "decision": "kept",
+  "reason": "claim itself says not dead: userStopRefusal uses holdsBatchLock"
+ },
+ {
+  "id": "U759",
+  "decision": "rewritten",
+  "reason": "userStopRefusal export dropped; doc now says owner is injected through recordUserStop options"
+ },
+ {
+  "id": "U760",
+  "decision": "rewritten",
+  "reason": "recordUserStop no longer called the one reachable writer; doc says setPaused itself does not check ownership (the design gap is U712's backlog line)"
+ },
+ {
+  "id": "U761",
+  "decision": "rewritten",
+  "reason": "recordAwaitingUser export dropped"
+ },
+ {
+  "id": "U762",
+  "decision": "kept",
+  "reason": "claim itself says not dead: the CLI uses recordPause"
+ },
+ {
+  "id": "U763",
+  "decision": "rewritten",
+  "reason": "opening no longer forbids yielding outright; it points to the declared-wait exception for work not awaitable in one call"
+ },
+ {
+  "id": "U764",
+  "decision": "rewritten",
+  "reason": "hard-singleton paragraph now says a session with open work acquires a free lock and a non-owner can be held by the stand-down child boundary"
+ },
+ {
+  "id": "U765",
+  "decision": "rewritten",
+  "reason": "handover overview now includes the context-boundary handover"
+ },
+ {
+  "id": "U766",
+  "decision": "rewritten",
+  "reason": "claim holds; format-safety comment narrowed to what the code checks (checkbox lines with neither a parseable open nor done point)"
+ },
+ {
+  "id": "U767",
+  "decision": "rewritten",
+  "reason": "'fail-open on any error' corrected: transfer and stand-down paths block on their own errors"
+ },
+ {
+  "id": "U768",
+  "decision": "removed",
+  "reason": "readOnlyOwnership's never-set ownerWork and readLock parameters removed; the defaults they fell back to are now called directly"
+ },
+ {
+  "id": "U769",
+  "decision": "rewritten",
+  "reason": "preflight doc now says a non-owner gets applicable:false and the stand-down child-boundary check is not evaluated"
+ },
+ {
+  "id": "U770",
+  "decision": "rewritten",
+  "reason": "runBatchProgressGuard export dropped; called only by the isMainModule entry"
+ },
+ {
+  "id": "U771",
+  "decision": "rewritten",
+  "reason": "transfer-probe comment now includes the honoured claim"
+ },
+ {
+  "id": "U772",
+  "decision": "rewritten",
+  "reason": "watermark note now said to be appended to the in-flight allow and default block only"
+ },
+ {
+  "id": "U773",
+  "decision": "removed",
+  "reason": "the orphaned claim-expiry paragraph (CLAIM_MAX_AGE_MS, ERRAND claims, claimIsBounded) that names nothing in this file was deleted"
+ },
+ {
+  "id": "U774",
+  "decision": "rewritten",
+  "reason": "claimNote now documented as appended to the slots, in-flight, take-boundary, context-handover and default messages"
+ },
+ {
+  "id": "U775",
+  "decision": "rewritten",
+  "reason": "messages now say no successor is spawned while the evidence holds / until ownership lapses on its own"
+ },
+ {
+  "id": "U776",
+  "decision": "backlog",
+  "reason": "scripts/batch-progress-guard.mjs:641 — the in-flight allow says the declaration stops holding when ANY evidence item stops checking out, while batch-lease-core treats work as advancing if ANY item checks out; state which consumer each rule belongs to"
+ },
+ {
+  "id": "U777",
+  "decision": "rewritten",
+  "reason": "the live-pid grace window was removed from both comments; ownership ends at once on an explicit handover"
+ },
+ {
+  "id": "U778",
+  "decision": "rewritten",
+  "reason": "point-handover retry now names 'batch-boundary.mjs --commit <point>', consistent with --commit --context and the two-phase instruction"
+ },
+ {
+  "id": "U779",
+  "decision": "backlog",
+  "reason": "scripts/batch-progress-guard.mjs:836 — the default block tells the session to merge and tick by hand instead of naming land-point.mjs; naming a script there trips the Stop-remedy fence tests (batch-boundary-core, guard-compatibility-core), so it needs a fence deferral first"
+ },
+ {
+  "id": "U780",
+  "decision": "kept",
+  "reason": "LANE_READINGS is the documented reading vocabulary pinned by tests; harmless as a vocabulary list"
+ },
+ {
+  "id": "U781",
+  "decision": "rewritten",
+  "reason": "the unverifiable 'Mirrors the adoption probe's ceiling' sentence was removed"
+ },
+ {
+  "id": "U782",
+  "decision": "rewritten",
+  "reason": "classifyLane doc now says completed needs the remote-visible or landed-in-target commit for reviewable/landed records, and failed/cancelled complete when no live worker contradicts them"
+ },
+ {
+  "id": "U783",
+  "decision": "rewritten",
+  "reason": "'worker proven not-live' corrected to 'no live worker contradicting them'"
+ },
+ {
+  "id": "U784",
+  "decision": "backlog",
+  "reason": "scripts/batch-reconcile-core.mjs:95 — the 'live process with NO lease' branch and the !lease half of line 63 cannot be reached from gatherEvidence, which probes a worker only when a lease exists"
+ },
+ {
+  "id": "U785",
+  "decision": "rewritten",
+  "reason": "section header now names refill (M29) and the successor boundary too"
+ },
+ {
+  "id": "U786",
+  "decision": "rewritten",
+  "reason": "'only uniform verdicts collapse' corrected: LANDED with LANDED-REWRITTEN reads LANDED-REWRITTEN"
+ },
+ {
+  "id": "U787",
+  "decision": "rewritten",
+  "reason": "daemonPairResolution's JSDoc moved onto it (daemonGenerationOrder got its own) and now lists the four refusing rows"
+ },
+ {
+  "id": "U788",
+  "decision": "rewritten",
+  "reason": "normalisation comment now says the gatherer's probe answers startedAt, without the two-shapes claim"
+ },
+ {
+  "id": "U789",
+  "decision": "backlog",
+  "reason": "scripts/batch-schema-core.mjs:334 — classifyDaemonPair's actions arrays are spread into the report but read by nobody and name different acts than daemonPairResolution's action strings"
+ },
+ {
+  "id": "U790",
+  "decision": "rewritten",
+  "reason": "registryVerdict doc no longer attributes a work-order/worktree/log reconstruction to the gatherer; it says a non-ok registry makes the run red and apply refuse"
+ },
+ {
+  "id": "U791",
+  "decision": "backlog",
+  "reason": "scripts/batch-reconcile-core.mjs:301 — registry source 'snapshot-and-journal' names the snapshot although the gatherer uses it only for its verdict, never its contents"
+ },
+ {
+  "id": "U792",
+  "decision": "rewritten",
+  "reason": "landingRecovery's 'ONE reconciliation entry point' rationale replaced by 'no production caller routes a landing state here yet'"
+ },
+ {
+  "id": "U793",
+  "decision": "removed",
+  "reason": "report.applied?.ok === false was redundant with the pair clause (apply answers ok:true for 'none'); removed, tests green"
+ },
+ {
+  "id": "U794",
+  "decision": "rewritten",
+  "reason": "header now says the probes fetch into private refs/reconcile-probe/* refs and delete them again"
+ },
+ {
+  "id": "U795",
+  "decision": "rewritten",
+  "reason": "header now lists the corrupt/quarantined-registry and stalled-lane refusals of --apply"
+ },
+ {
+  "id": "U796",
+  "decision": "rewritten",
+  "reason": "usage now shows --repo as optional in header and runtime message"
+ },
+ {
+  "id": "U797",
+  "decision": "kept",
+  "reason": "reconcileProbe is an intended test seam"
+ },
+ {
+  "id": "U798",
+  "decision": "rewritten",
+  "reason": "LANDING_TARGET_REF export dropped; local use remains"
+ },
+ {
+  "id": "U799",
+  "decision": "removed",
+  "reason": "the git helper's never-read err field removed"
+ },
+ {
+  "id": "U800",
+  "decision": "backlog",
+  "reason": "scripts/batch-reconcile.mjs:131 — a failed 'git show' trailer read leaves trailerFound false instead of null, so resolvePublicationIntent can conclude ABANDONED from a failed probe"
+ },
+ {
+  "id": "U801",
+  "decision": "removed",
+  "reason": "the derived name field in publication probes was never read; removed"
+ },
+ {
+  "id": "U802",
+  "decision": "removed",
+  "reason": "the reassignment of trailerFound to its initial null was folded away; logic unchanged"
+ },
+ {
+  "id": "U803",
+  "decision": "rewritten",
+  "reason": "landingTargetProbe export dropped; gatherEvidence calls it locally"
+ },
+ {
+  "id": "U804",
+  "decision": "backlog",
+  "reason": "scripts/batch-reconcile.mjs:157 — the landing-target fetch is assumed to obtain the target's whole history; a shallow clone is neither checked nor recovered"
+ },
+ {
+  "id": "U805",
+  "decision": "removed",
+  "reason": "the never-read unasked:true flag on the fallback listing removed"
+ },
+ {
+  "id": "U806",
+  "decision": "rewritten",
+  "reason": "comment now says a failed cat-file reads as foreign history (false) and only an errored ancestry probe stays null, matching the code"
+ },
+ {
+  "id": "U807",
+  "decision": "backlog",
+  "reason": "scripts/batch-reconcile.mjs:233 — write-copy revalidation compares pid and generation only, not pidStartedAt as the comment promises"
+ },
+ {
+  "id": "U808",
+  "decision": "backlog",
+  "reason": "scripts/batch-reconcile.mjs:269 — the clear-copy branch revalidates only lock session/fence before deleting the daemon copy, not the report's full pair reading"
+ },
+ {
+  "id": "U809",
+  "decision": "kept",
+  "reason": "the .reaping mutex and wx-creation claims concern batch-singleton.mjs and the daemon; nothing here contradicts them"
+ },
+ {
+  "id": "U810",
+  "decision": "rewritten",
+  "reason": "refusal message now names transitioning, unknown, impossible or ambiguous readings"
+ },
+ {
+  "id": "U811",
+  "decision": "backlog",
+  "reason": "scripts/batch-reconcile.mjs:338 — release can proceed over a live 'divergent' lane (live worker, expired/malformed lease); the guard blocks only running and stalled"
+ },
+ {
+  "id": "U812",
+  "decision": "rewritten",
+  "reason": "header now says the module decides the owner-runbook gate, the open-point headline and the stand-down branch"
+ },
+ {
+  "id": "U813",
+  "decision": "rewritten",
+  "reason": "'no clock' corrected: the clock is read only as the default of an uninjected now"
+ },
+ {
+  "id": "U814",
+  "decision": "rewritten",
+  "reason": "the headline doc moved from namedFew onto openPointsHeadline"
+ },
+ {
+  "id": "U815",
+  "decision": "rewritten",
+  "reason": "headline now says 'open point(s) ready to work', since DEFERRED and gated points are removed before the count"
+ },
+ {
+  "id": "U816",
+  "decision": "kept",
+  "reason": "claim itself says not dead: STAND_DOWN_KINDS is used internally by live functions"
+ },
+ {
+  "id": "U817",
+  "decision": "backlog",
+  "reason": "scripts/batch-resume-hook-core.mjs:124 — LIVE_OWNER is chosen for any lock with numeric claimedAt, yet the message asserts a passed liveness check"
+ },
+ {
+  "id": "U818",
+  "decision": "rewritten",
+  "reason": "'the one line every stand-down ends with' changed to 'the way-back text every stand-down carries' (RESERVED/LIVE_OWNER append a NOTE)"
+ },
+ {
+  "id": "U819",
+  "decision": "rewritten",
+  "reason": "RESERVED and LIVE_OWNER notes now say to use the way back only on the user's word, never to claim over it on one's own"
+ },
+ {
+  "id": "U820",
+  "decision": "rewritten",
+  "reason": "OTHER_RESPONDER now says 'the responder's claim' expires, distinguishing it from the way-back claim"
+ },
+ {
+  "id": "U821",
+  "decision": "rewritten",
+  "reason": "header now lists the launcher re-arm, all-gated, pause and stand-down texts"
+ },
+ {
+  "id": "U822",
+  "decision": "rewritten",
+  "reason": "MANDATE_PATH moved above the readRepoVerdict JSDoc so the doc sits on the function"
+ },
+ {
+  "id": "U823",
+  "decision": "rewritten",
+  "reason": "comment now says ownership comes only through convertPendingSpawn or the atomic acquire"
+ },
+ {
+  "id": "U824",
+  "decision": "backlog",
+  "reason": "scripts/batch-resume-hook.mjs:170 — the random fallback sessionId reaches convertPendingSpawn and acquire without an asserted session id, while the comment says an unknown session can never own the lock"
+ },
+ {
+  "id": "U825",
+  "decision": "rewritten",
+  "reason": "RESUME_BODY now says small cross-cutting bookkeeping may land on main and a larger mechanism goes to its own worktree (CLAUDE.md §6)"
+ },
+ {
+  "id": "U826",
+  "decision": "rewritten",
+  "reason": "RESUME_BODY's blanket Astra routing with an Opus exception replaced by 'the model policy stated above, whose lanes decide who authors each point'"
+ },
+ {
+  "id": "U827",
+  "decision": "rewritten",
+  "reason": "'name the ALLOWLIST' replaced by 'name the authoring policy'"
+ },
+ {
+  "id": "U828",
+  "decision": "rewritten",
+  "reason": "ancestor comments now say the startup-resolved ancestor is reused only when a claim exists, without the 'paid only here' claim"
+ },
+ {
+  "id": "U829",
+  "decision": "backlog",
+  "reason": "scripts/batch-resume-hook.mjs:398 — claim cleanup covers acquired and mine but not acquired-spawn"
+ },
+ {
+  "id": "U830",
+  "decision": "rewritten",
+  "reason": "RESUME_BODY opening now says one stretch of work per session, matching the POINT BOUNDARY paragraph"
+ },
+ {
+  "id": "U831",
+  "decision": "rewritten",
+  "reason": "'Four situations' corrected to five"
+ },
+ {
+  "id": "U832",
+  "decision": "backlog",
+  "reason": "scripts/batch-resume-hook.mjs:484 — the outer catch labelled 'No TASKS.md — nothing to resume' wraps the whole flow and swallows any throw under that label"
+ },
+ {
+  "id": "U833",
+  "decision": "rewritten",
+  "reason": "'NOTHING IMPORTS THIS FILE' and 'no caller reads these schemas yet' removed; header now says the lane stays dark until its activation flag enables it"
+ },
+ {
+  "id": "U834",
+  "decision": "rewritten",
+  "reason": "header list now includes 5. MUTATION VALIDATION, so items 6 and 7 match the section headers"
+ },
+ {
+  "id": "U835",
+  "decision": "rewritten",
+  "reason": "command-table item now says DAEMON_COMMANDS declares compensation and key and registerDaemonCommand refuses one that declares neither"
+ },
+ {
+  "id": "U836",
+  "decision": "kept",
+  "reason": "claim itself says the test-only exports serve as in-file defaults or tables of live exports"
+ },
+ {
+  "id": "U837",
+  "decision": "kept",
+  "reason": "claim holds: batch-schema-core.test.mjs:153 asserts PROCESS_START_TOLERANCE_MS equals PID_START_TOLERANCE_MS"
+ },
+ {
+  "id": "U838",
+  "decision": "rewritten",
+  "reason": "ATTEMPT_STATES doc now says every reader of an attempt record, reconciliation among them, is written against these names"
+ },
+ {
+  "id": "U839",
+  "decision": "kept",
+  "reason": "the terminal rows make the transition table total, which batch-schema-core.test.mjs:179 pins; removing them needs a test change outside this chunk"
+ },
+ {
+  "id": "U840",
+  "decision": "rewritten",
+  "reason": "ATTEMPT_STATE_FIELDS export dropped; local validation reads it"
+ },
+ {
+  "id": "U841",
+  "decision": "removed",
+  "reason": "DAEMON_COPY_FIELDS had no reader anywhere; deleted"
+ },
+ {
+  "id": "U842",
+  "decision": "rewritten",
+  "reason": "doc now says a dead record is cold only once the copy's generation is placed (ambiguous-generations comes first)"
+ },
+ {
+  "id": "U843",
+  "decision": "backlog",
+  "reason": "scripts/batch-schema-core.mjs:356 — generationPresent accepts numeric generations only for synthetic fixtures while credential() demands a string generation"
+ },
+ {
+  "id": "U844",
+  "decision": "rewritten",
+  "reason": "copy comment now says an older generation is accepted on journal ordering evidence (superseded-copy)"
+ },
+ {
+  "id": "U845",
+  "decision": "backlog",
+  "reason": "scripts/batch-schema-core.mjs:404 — daemonPairInvariantHolds has no production caller (tests only); remove with its tests or wire it as an assertion"
+ },
+ {
+  "id": "U846",
+  "decision": "backlog",
+  "reason": "scripts/batch-schema-core.mjs:416 — 'seq increments on EVERY publishing act' is stronger than publicationPush, whose strictlyAhead accepts any higher fence regardless of seq"
+ },
+ {
+  "id": "U847",
+  "decision": "rewritten",
+  "reason": "sameCredential export dropped; publicationPush calls it"
+ },
+ {
+  "id": "U848",
+  "decision": "backlog",
+  "reason": "scripts/batch-schema-core.mjs:439 — credentialBody, documented as the shared serializer, has only test callers although publicationPush's credentialOid must hash it"
+ },
+ {
+  "id": "U849",
+  "decision": "backlog",
+  "reason": "scripts/batch-schema-core.mjs:445 — advancedCredential's seq + 1 does not change past Number.MAX_SAFE_INTEGER because credential() accepts any integer rather than safe integers"
+ },
+ {
+  "id": "U850",
+  "decision": "backlog",
+  "reason": "scripts/batch-schema-core.mjs:446 — advancedCredential has no production caller (tests only)"
+ },
+ {
+  "id": "U851",
+  "decision": "rewritten",
+  "reason": "strictlyAhead export dropped; publicationPush calls it"
+ },
+ {
+  "id": "U852",
+  "decision": "backlog",
+  "reason": "scripts/batch-schema-core.mjs:558 — credentialAccepted promises a reader-side refusal of stale pushes but no production reader calls it"
+ },
+ {
+  "id": "U853",
+  "decision": "backlog",
+  "reason": "scripts/batch-schema-core.mjs:695 — PUBLISHED_ACTS serves only the test-only registerDaemonCommand; removal needs its tests changed"
+ },
+ {
+  "id": "U854",
+  "decision": "backlog",
+  "reason": "scripts/batch-schema-core.mjs:697 — PUBLICATION_TRAILER_KEY is read by reconcile only; land-point writes the 'Publication-Id:' trailer as a literal, so the two can drift"
+ },
+ {
+  "id": "U855",
+  "decision": "backlog",
+  "reason": "scripts/batch-schema-core.mjs:705 — DAEMON_COMMANDS compensation strings have no production consumer; only the test-only registration helper checks them"
+ },
+ {
+  "id": "U856",
+  "decision": "backlog",
+  "reason": "scripts/batch-schema-core.mjs:754 — registerDaemonCommand is test-only and the frozen DAEMON_COMMANDS literal never passes through it, so the 'cannot be registered' rule is unenforced on the real table"
+ },
+ {
+  "id": "U857",
+  "decision": "rewritten",
+  "reason": "future-tense 'arrives in step 2' replaced: the durable state store persists applied"
+ },
+ {
+  "id": "U858",
+  "decision": "rewritten",
+  "reason": "interpolation example corrected to the invalid text 'undefined'"
+ },
+ {
+  "id": "U859",
+  "decision": "rewritten",
+  "reason": "markUnverifiedTail doc no longer claims reconciliation quarantines exactly the unverified tail; it states which entries are quarantined"
+ },
+ {
+  "id": "U860",
+  "decision": "kept",
+  "reason": "claim does not hold: scripts/batch-singleton-core.test.mjs exists and spawns this worker; it tests the singleton through batch-singleton.mjs"
+ },
+ {
+  "id": "U861",
+  "decision": "rewritten",
+  "reason": "comment now says the ancestor walk is a process walk per worker (a PowerShell round trip on Windows)"
+ },
+ {
+  "id": "U862",
+  "decision": "rewritten",
+  "reason": "header no longer claims no probe at the acquire door; an expired lease is taken unless pid probe and advancing work corroborate (ownershipVerdict)"
+ },
+ {
+  "id": "U863",
+  "decision": "rewritten",
+  "reason": "fence paragraphs now say the number is taken where the fence file can be written (implicit grant fails open, requested one returns stale-fence)"
+ },
+ {
+  "id": "U864",
+  "decision": "rewritten",
+  "reason": "sealedMarkerHolds doc and heartbeat comment now include the lock's own clockless seal"
+ },
+ {
+  "id": "U865",
+  "decision": "rewritten",
+  "reason": "idleWindow export dropped"
+ },
+ {
+  "id": "U866",
+  "decision": "rewritten",
+  "reason": "FENCE_MUTEX_WAIT_MS export dropped; doc also names the stale-fence outcome"
+ },
+ {
+  "id": "U867",
+  "decision": "rewritten",
+  "reason": "statePathsFor now called 'the state files beside the lock' and names the journal, fence notice and mutex dirs derived elsewhere"
+ },
+ {
+  "id": "U868",
+  "decision": "backlog",
+  "reason": "scripts/batch-singleton.mjs:2347 — noteTopLevelSession and noteSessionStandDown read opts.lockPath but write opts.path ?? SESSIONS_SEEN_PATH, so a redirected lockPath does not redirect the sessions-seen file"
+ },
+ {
+  "id": "U869",
+  "decision": "backlog",
+  "reason": "scripts/batch-singleton.mjs:207 — BOUNDARY_MARKER_PATH is exported only for tests; production derives boundaryPath through statePathsFor"
+ },
+ {
+  "id": "U870",
+  "decision": "rewritten",
+  "reason": "FENCE_PATH export dropped"
+ },
+ {
+  "id": "U871",
+  "decision": "backlog",
+  "reason": "scripts/batch-singleton.mjs:214 — ANCESTOR_CACHE_PATH is exported only for tests; production derives ancestorCachePath through statePathsFor"
+ },
+ {
+  "id": "U872",
+  "decision": "rewritten",
+  "reason": "assessOwner intro now says a lock is freed by a dead owner, a handover or an uncorroborated expired lease"
+ },
+ {
+  "id": "U873",
+  "decision": "rewritten",
+  "reason": "assessOwner doc now says it takes the lock and pid probe as data"
+ },
+ {
+  "id": "U874",
+  "decision": "backlog",
+  "reason": "scripts/batch-singleton.mjs:435 — the tmp sweeper excludes only probes with exists true, so missing or inconclusive probes pass as 'provably dead'"
+ },
+ {
+  "id": "U875",
+  "decision": "rewritten",
+  "reason": "verdict-repeat doc now says the second identical tick is one launcher tick (15 min) after the first"
+ },
+ {
+  "id": "U876",
+  "decision": "rewritten",
+  "reason": "classifyParallel doc now shows the object record shape and lists the invalid-owner, probe, own-incarnation and stood-down skips"
+ },
+ {
+  "id": "U877",
+  "decision": "rewritten",
+  "reason": "standDownNoteCurrent export dropped; classifyParallel is its only caller"
+ },
+ {
+  "id": "U878",
+  "decision": "rewritten",
+  "reason": "progressGuardDecision's return list now includes block-slots-free and block-context-handover"
+ },
+ {
+  "id": "U879",
+  "decision": "rewritten",
+  "reason": "findClaudeAncestor's doc moved onto the function and lists its real callers (acquire, heartbeat backfill, ourClaudeProcess memo miss, transitionOwnerSession, convertPendingSpawn)"
+ },
+ {
+  "id": "U880",
+  "decision": "backlog",
+  "reason": "scripts/batch-singleton.mjs:1028 — withLockWriteMutex's rule that every update of the existing lock takes the mutex is not implemented: heartbeat, renewLease, extendLease, clearDeclaredWait, updateOwnLock, markHandover, withdrawHandover and touchHandover write without it"
+ },
+ {
+  "id": "U881",
+  "decision": "rewritten",
+  "reason": "acquire's doc now lists 'probe' and 'invalid' and the flat option names"
+ },
+ {
+  "id": "U882",
+  "decision": "rewritten",
+  "reason": "FENCE_NOTICE_HISTORY export dropped"
+ },
+ {
+  "id": "U883",
+  "decision": "rewritten",
+  "reason": "grantFence doc now says it is called from acquire and from convertPendingSpawn under the reap mutex, serialised by its own .claiming mutex"
+ },
+ {
+  "id": "U884",
+  "decision": "rewritten",
+  "reason": "renewLease now points to 'the note below readJson'"
+ },
+ {
+  "id": "U885",
+  "decision": "rewritten",
+  "reason": "extendLease no longer claims readers only compare numbers; past the lease only corroborating evidence keeps the batch"
+ },
+ {
+  "id": "U886",
+  "decision": "rewritten",
+  "reason": "heartbeat and markHandover comments now say a handover is withdrawn only by deletion; the removed claimedAt comparison is no longer cited"
+ },
+ {
+  "id": "U887",
+  "decision": "rewritten",
+  "reason": "ANCESTOR_RETRY_MS doc now says a miss is retried once per window; export dropped"
+ },
+ {
+  "id": "U888",
+  "decision": "backlog",
+  "reason": "scripts/batch-singleton.mjs:1582 — cached ancestor identities are accepted with cheapProbePid and their old startedAt, which performs no pid-reuse check"
+ },
+ {
+  "id": "U889",
+  "decision": "rewritten",
+  "reason": "cache comment now says a throwing probe skips write-back and an unreadable file reads as {}"
+ },
+ {
+  "id": "U890",
+  "decision": "removed",
+  "reason": "the inaccurate 'Symmetry with heldByOtherLiveOwner' comment was deleted"
+ },
+ {
+  "id": "U891",
+  "decision": "backlog",
+  "reason": "scripts/batch-singleton.mjs:1865 — transitionOwnerSession passes a string generation (fence:N) to retireBatchWriter, which accepts only safe-integer generations and so disables its generation guard"
+ },
+ {
+  "id": "U892",
+  "decision": "removed",
+  "reason": "isOwner had no caller anywhere; deleted"
+ },
+ {
+  "id": "U893",
+  "decision": "rewritten",
+  "reason": "stand-down doc now says an unreadable lock reads as free and a thrown error as held"
+ },
+ {
+  "id": "U894",
+  "decision": "backlog",
+  "reason": "scripts/batch-singleton.mjs:1947 — release emits PROCESS_EXIT although release is not host-process exit, and journalIntervals maps it to process-identity-lost"
+ },
+ {
+  "id": "U895",
+  "decision": "rewritten",
+  "reason": "markHandover no longer claimed as the ONE place a write failure becomes data"
+ },
+ {
+  "id": "U896",
+  "decision": "rewritten",
+  "reason": "settle doc now says 'without a call timestamp' a younger handover is never withdrawn"
+ },
+ {
+  "id": "U897",
+  "decision": "rewritten",
+  "reason": "withdrawHandover now 'the one place real work ends a boundary', naming clearOwnBoundary"
+ },
+ {
+  "id": "U898",
+  "decision": "rewritten",
+  "reason": "HANDOVER_TOUCH_MS doc drops the quarter-hour grace rationale; export dropped"
+ },
+ {
+  "id": "U899",
+  "decision": "backlog",
+  "reason": "scripts/batch-singleton.mjs:2508 — the manual CLI release only rmSyncs the lock, skipping writer retirement and the journal entry the exported release writes"
+ },
+ {
+  "id": "U900",
+  "decision": "rewritten",
+  "reason": "ACTIVITY_CLASS_SET export dropped"
+ },
+ {
+  "id": "U901",
+  "decision": "rewritten",
+  "reason": "CLASS_PRECEDENCE export dropped"
+ },
+ {
+  "id": "U902",
+  "decision": "backlog",
+  "reason": "scripts/batch-standstill-core.mjs:323 — WEDGE_REPEAT_THRESHOLD belongs to the busy-wedge detector (repeatedOutcomeWedge), which no production caller runs"
+ },
+ {
+  "id": "U903",
+  "decision": "rewritten",
+  "reason": "OUTCOME_EVENTS export dropped (no importer); it still serves the unwired detector covered by U902's backlog line"
+ },
+ {
+  "id": "U904",
+  "decision": "backlog",
+  "reason": "scripts/batch-standstill-core.mjs:343 — outcomeSignature and VOLATILE_EVIDENCE serve only the unwired detector and its tests"
+ },
+ {
+  "id": "U905",
+  "decision": "backlog",
+  "reason": "scripts/batch-standstill-core.mjs:359 — repeatedOutcomeWedge has no production caller; wire it into the standstill report or remove it with its tests"
+ },
+ {
+  "id": "U906",
+  "decision": "backlog",
+  "reason": "scripts/batch-standstill-inputs.mjs:86 — markerBoundary is exported only for tests and superseded by boundaryMarkerEvidence"
+ },
+ {
+  "id": "U907",
+  "decision": "rewritten",
+  "reason": "comment now says a tip contained by main is represented by its merge commit on the first-parent line"
+ },
+ {
+  "id": "U908",
+  "decision": "backlog",
+  "reason": "scripts/batch-standstill-inputs.mjs:204 — progress marks are deduplicated here, but batch-standstill-core.mjs:154 takes the maximum leaseUntil over all matching progress events without comparing marks"
+ },
+ {
+  "id": "U909",
+  "decision": "backlog",
+  "reason": "scripts/batch-standstill-inputs.mjs:247 — verificationRecordEvidence creates an interval to progressAt + leaseMs before recording processAlive=false, while runIdentityTerminalAt clamps a dead process to lastProgress"
+ },
+ {
+  "id": "U910",
+  "decision": "rewritten",
+  "reason": "sessionId/claimedAt are now described as the lock's core fields readOwnerLock requires, not legacy fields"
+ },
+ {
+  "id": "U911",
+  "decision": "rewritten",
+  "reason": "header now says the pure logic lives here and in batch-lease-core, batch-ownership-core and batch-boundary-core (the test file exists)"
+ },
+ {
+  "id": "U912",
+  "decision": "rewritten",
+  "reason": "DEAD_CONFIRM_MS doc now says the grace is applied by ownershipVerdict's idle window"
+ },
+ {
+  "id": "U913",
+  "decision": "rewritten",
+  "reason": "pid-less locks now described as legacy or a failed ancestor walk"
+ },
+ {
+  "id": "U914",
+  "decision": "kept",
+  "reason": "claim itself says the constant is used internally at 334"
+ },
+ {
+  "id": "U915",
+  "decision": "rewritten",
+  "reason": "FENCE_MUTEX_WAIT_MS doc now names the requested-fence 'stale-fence' outcome"
+ },
+ {
+  "id": "U916",
+  "decision": "rewritten",
+  "reason": "ancestorCachePath now carries a comment that the file also holds the batch-writer authority records"
+ },
+ {
+  "id": "U917",
+  "decision": "kept",
+  "reason": "claim itself says the constants are live internal defaults"
+ },
+ {
+  "id": "U918",
+  "decision": "rewritten",
+  "reason": "the atomic-write note is referenced correctly ('below readJson'); it describes the write helper this module calls"
+ },
+ {
+  "id": "U919",
+  "decision": "rewritten",
+  "reason": "comment now says callers that must not be taken down convert the throw themselves (markHandover; the per-call lease writers catch it)"
+ },
+ {
+  "id": "U920",
+  "decision": "rewritten",
+  "reason": "assessOwner doc no longer says 'no probing, no evidence'; it names the corroboration"
+ },
+ {
+  "id": "U921",
+  "decision": "rewritten",
+  "reason": "migration-era 'live owner across this change' note removed; leaseUntilOf is attributed to batch-lease-core"
+ },
+ {
+  "id": "U922",
+  "decision": "rewritten",
+  "reason": "pid-less branch comment now names PENDING_STALE_MS and LEGACY_STALE_MS and when each applies"
+ },
+ {
+  "id": "U923",
+  "decision": "rewritten",
+  "reason": "'(past the grace)' removed from the pid-dead branch, which has no grace"
+ },
+ {
+  "id": "U924",
+  "decision": "kept",
+  "reason": "restamp: false is a stable part of the returned shape callers read; harmless"
+ },
+ {
+  "id": "U925",
+  "decision": "rewritten",
+  "reason": "pidCorroboration no longer says 'further down'/'the older branch below'; it names assessOwner's pid branches"
+ },
+ {
+  "id": "U926",
+  "decision": "kept",
+  "reason": "claim holds: leaseTakeoverDecision (batch-lease-core.mjs) takes only with workAdvancing and produced work, so the takeover does require advancing declared work"
+ },
+ {
+  "id": "U927",
+  "decision": "kept",
+  "reason": "claim itself says the export is verdictRepeat's live default"
+ },
+ {
+  "id": "U928",
+  "decision": "rewritten",
+  "reason": "PROBE_SESSION_PREFIX doc now lists the consequences 'among' others (ownsLock, writer and process records) instead of 'three'"
+ },
+ {
+  "id": "U929",
+  "decision": "kept",
+  "reason": "claim itself says the constant is used internally"
+ },
+ {
+  "id": "U930",
+  "decision": "rewritten",
+  "reason": "classifyParallel's JSDoc now sits directly above classifyParallel"
+ },
+ {
+  "id": "U931",
+  "decision": "backlog",
+  "reason": "scripts/batch-singleton.mjs:596 — sessionRecord's scalar { seenAt } branch only serves number-valued entries that noteTopLevelSession rewrites and prunes after 7 days"
+ },
+ {
+  "id": "U932",
+  "decision": "kept",
+  "reason": "claim itself says claimGeneration is used internally"
+ },
+ {
+  "id": "U933",
+  "decision": "rewritten",
+  "reason": "comment now says a declared wait passes both blocks only while its work is not transferable (point 675)"
+ },
+ {
+  "id": "U934",
+  "decision": "rewritten",
+  "reason": "ownership parameter comment now says acquire()'s result or 'none', only mine/acquired may drive"
+ },
+ {
+  "id": "U935",
+  "decision": "rewritten",
+  "reason": "processStartTime doc now names the Linux /proc branch and its 100 Hz assumption"
+ },
+ {
+  "id": "U936",
+  "decision": "kept",
+  "reason": "claim itself says the constant is used internally"
+ },
+ {
+  "id": "U937",
+  "decision": "rewritten",
+  "reason": "acquisitionExpectationMatches moved above the acquire JSDoc so the doc sits on acquire"
+ },
+ {
+  "id": "U938",
+  "decision": "rewritten",
+  "reason": "acquire doc now says an owner assessOwner reads as not alive (dead, handed over, uncorroborated expired lease) lets the successor in"
+ },
+ {
+  "id": "U939",
+  "decision": "backlog",
+  "reason": "scripts/batch-singleton.mjs:1068 — a renewal landing in the takeover race window is unlinked because renewLease writes without the reap mutex, contrary to 'keeps its owner'"
+ },
+ {
+  "id": "U940",
+  "decision": "kept",
+  "reason": "claim itself says the function is used internally"
+ },
+ {
+  "id": "U941",
+  "decision": "rewritten",
+  "reason": "nextFence references replaced by fenceClaimDecision (both places)"
+ },
+ {
+  "id": "U942",
+  "decision": "rewritten",
+  "reason": "'legacy heartbeat field' now 'the heartbeat'"
+ },
+ {
+  "id": "U943",
+  "decision": "kept",
+  "reason": "claim itself says fenceNoticePath is used internally"
+ },
+ {
+  "id": "U944",
+  "decision": "backlog",
+  "reason": "scripts/batch-singleton.mjs:1306 — the pre-map single-record fence-notice compatibility code only serves a ledger never written since recordFenceNotice writes the v: 2 map"
+ },
+ {
+  "id": "U945",
+  "decision": "rewritten",
+  "reason": "grantFence doc now names its own .claiming mutex"
+ },
+ {
+  "id": "U946",
+  "decision": "kept",
+  "reason": "claim holds on checking: LEASE_RENEW_INTERVAL_MS and the stale-fence refusal live in renewalDecision (batch-lease-core.mjs), which renewLease calls"
+ },
+ {
+  "id": "U947",
+  "decision": "rewritten",
+  "reason": "the stale 'left as not built here' docs/batch-resilience.md citation was removed from extendLease"
+ },
+ {
+  "id": "U948",
+  "decision": "backlog",
+  "reason": "scripts/batch-singleton.mjs:1594 — ourClaudeProcess replaces whole per-session entries and prunes after 24 h in the same session-process.json where noteBatchWriter keeps authority records for 7 days"
+ },
+ {
+  "id": "U949",
+  "decision": "backlog",
+  "reason": "scripts/batch-singleton.mjs:1756 — the processIdentity: false option ('the old id-only behaviour') has no visible caller"
+ },
+ {
+  "id": "U950",
+  "decision": "backlog",
+  "reason": "scripts/batch-singleton.mjs:1778 — validTransitionSessionId now validates lock ids generally (acquire, classifyParallel, noteSessionStandDown); the name is too narrow"
+ },
+ {
+  "id": "U951",
+  "decision": "backlog",
+  "reason": "scripts/batch-singleton.mjs:1801 — ownerLockGeneration's started: fallback serves only locks without acquiredAt, which acquire and convertPendingSpawn always write"
+ },
+ {
+  "id": "U952",
+  "decision": "rewritten",
+  "reason": "currentHeadForSeal moved below release so the markHandover JSDoc sits on markHandover"
+ },
+ {
+  "id": "U953",
+  "decision": "rewritten",
+  "reason": "markHandover doc now names the point boundary, context boundary and ordinary Stop-side callers"
+ },
+ {
+  "id": "U954",
+  "decision": "rewritten",
+  "reason": "readBoundaryMarker moved above the withdrawHandover JSDoc so the doc sits on withdrawHandover"
+ },
+ {
+  "id": "U955",
+  "decision": "rewritten",
+  "reason": "the unverifiable 'sixteen guards' count replaced by 'further guards'"
+ },
+ {
+  "id": "U956",
+  "decision": "removed",
+  "reason": "sealNow duplicated now (both opts.now ?? Date.now() in the same function); the duplicate was removed and now used"
+ },
+ {
+  "id": "U957",
+  "decision": "rewritten",
+  "reason": "'a live owner past the grace' replaced by 'a live owner no longer handed over'"
+ },
+ {
+  "id": "U958",
+  "decision": "rewritten",
+  "reason": "touchHandover's rationale no longer cites an ageing grace; it says the stamp's only reader is withdrawalIsCausal"
+ },
+ {
+  "id": "U959",
+  "decision": "rewritten",
+  "reason": "convertPendingSpawn doc now says the caller vouches for the authorization (opts.authorized)"
+ },
+ {
+  "id": "U960",
+  "decision": "rewritten",
+  "reason": "'Raise/read/clear' corrected to 'Raise/read/mark handled'"
+ },
+ {
+  "id": "U961",
+  "decision": "rewritten",
+  "reason": "CLASS_PRECEDENCE doc now says user, quota and environment blocks win first, then named work, then waits, veto and handover"
+ },
+ {
+  "id": "U962",
+  "decision": "removed",
+  "reason": "the never-matched IDLE_OWNER/NO_WORKER/UNKNOWN entries and the loop's continue for exactly them were removed; selection unchanged"
+ },
+ {
+  "id": "U963",
+  "decision": "kept",
+  "reason": "the <= is equivalent for numeric seqs and stays safe for a non-numeric seq, where === would differ"
+ },
+ {
+  "id": "U964",
+  "decision": "rewritten",
+  "reason": "header now says the detector is built here but not yet wired to a production caller"
+ },
+ {
+  "id": "U965",
+  "decision": "kept",
+  "reason": "claim does not hold: WAIT_LEASE_ACQUIRE, WAIT_LEASE_ATTACH and SPAWN_ATTEMPT are defined in batch-activity-journal-core.mjs (lines 27, 34, 35)"
+ },
+ {
+  "id": "U966",
+  "decision": "rewritten",
+  "reason": "the launcher still writes the matched line (batch-autostart-core.mjs:546); 'Legacy launcher text' renamed 'Launcher log text (autostart.log)'"
+ },
+ {
+  "id": "U967",
+  "decision": "rewritten",
+  "reason": "doc now says the veto interval ends two hours after the writer's last write (hard-coded), not 'the exact maximum'"
+ },
+ {
+  "id": "U968",
+  "decision": "rewritten",
+  "reason": "the string literals were replaced by ACTIVITY_EVENTS.DELEGATED_START/FINISH (same values)"
+ },
+ {
+  "id": "U969",
+  "decision": "kept",
+  "reason": "claim itself says resolveVerificationLog is used internally"
+ },
+ {
+  "id": "U970",
+  "decision": "kept",
+  "reason": "the mark-less compatibility path is harmless until every emitter is shown to set a mark"
+ },
+ {
+  "id": "U971",
+  "decision": "backlog",
+  "reason": "scripts/batch-standstill-inputs.mjs:402 — declaredInputPaths joins repo/.claude/... while batch state belongs to the common checkout (commonRepoPath); from a linked worktree the paths name a different family"
+ },
+ {
+  "id": "U972",
+  "decision": "removed",
+  "reason": "the one-line existing() wrapper had no importer; removed with its existsSync import"
+ },
+ {
+  "id": "U973",
+  "decision": "rewritten",
+  "reason": "'Still DARK: no runtime caller imports either file' replaced by 'the lane stays DARK behind its activation flag'"
+ },
+ {
+  "id": "U974",
+  "decision": "rewritten",
+  "reason": "replay doc now says entries are every parsed entry that is not itself corruption"
+ },
+ {
+  "id": "U975",
+  "decision": "backlog",
+  "reason": "scripts/batch-state-core.mjs:171 — publishIntent (and oidLike) has only test callers, so 'validated before it may be framed' is enforced by no live path"
+ },
+ {
+  "id": "U976",
+  "decision": "backlog",
+  "reason": "scripts/batch-state-core.mjs:188 — oidLike's only caller is the test-only publishIntent; goes with U975"
+ },
+ {
+  "id": "U977",
+  "decision": "rewritten",
+  "reason": "the mint refusal is now attributed to ensureFenceStore (batch-state.mjs)"
+ },
+ {
+  "id": "U978",
+  "decision": "rewritten",
+  "reason": "'fenceInForceAt reads these' corrected to 'replayJournal reads these'"
+ },
+ {
+  "id": "U979",
+  "decision": "kept",
+  "reason": "claim itself says replayJournal uses JOURNAL_KINDS and splitFrames internally"
+ },
+ {
+  "id": "U980",
+  "decision": "kept",
+  "reason": "the { v } option of sealSnapshotText is a harmless version parameter; no contradiction"
+ },
+ {
+  "id": "U981",
+  "decision": "rewritten",
+  "reason": "'STILL DARK: nothing imports this file' replaced by 'the lane stays DARK behind its activation flag'"
+ },
+ {
+  "id": "U982",
+  "decision": "rewritten",
+  "reason": "header now says WRITE–FLUSH–LINK for receipts"
+ },
+ {
+  "id": "U983",
+  "decision": "removed",
+  "reason": "writeAllSync's unused byte-count return removed"
+ },
+ {
+  "id": "U984",
+  "decision": "rewritten",
+  "reason": "the append doc block moved from above ensureFenceStore onto appendJournalEntry"
+ },
+ {
+  "id": "U985",
+  "decision": "rewritten",
+  "reason": "'a single write' now 'a single line written in full before the flush'"
+ },
+ {
+  "id": "U986",
+  "decision": "rewritten",
+  "reason": "append doc now states the { ok, bytes, repairedTail? } / refusal return"
+ },
+ {
+  "id": "U987",
+  "decision": "rewritten",
+  "reason": "fence-store doc now contrasts a never-created store (minted only while no journal exists) with a corrupt one"
+ },
+ {
+  "id": "U988",
+  "decision": "rewritten",
+  "reason": "the refusal is attributed to ensureFenceStore itself, not mayMintFence"
+ },
+ {
+  "id": "U989",
+  "decision": "rewritten",
+  "reason": "fence store documented as { v, generation, fence }"
+ },
+ {
+  "id": "U990",
+  "decision": "rewritten",
+  "reason": "readJournal's caller named as ensureFenceStore"
+ },
+ {
+  "id": "U991",
+  "decision": "rewritten",
+  "reason": "fsyncDir doc now includes receipts and notes writeFileAtomic flushes inline"
+ },
+ {
+  "id": "U992",
+  "decision": "rewritten",
+  "reason": "writeFileAtomic no longer called the only producer of receipts"
+ },
+ {
+  "id": "U993",
+  "decision": "rewritten",
+  "reason": "crash description now includes the new committed file already renamed into place"
+ },
+ {
+  "id": "U994",
+  "decision": "rewritten",
+  "reason": "claim holds (tmp is unlinked first); doc now says the existing receipt is left intact"
+ },
+ {
+  "id": "U995",
+  "decision": "backlog",
+  "reason": "scripts/batch-state.mjs:447 — abandonedTemporaries has only test consumers, so no operator sees crash leftovers or dropped journal tails through it"
+ },
+ {
+  "id": "U996",
+  "decision": "rewritten",
+  "reason": "receipt cleanup comments now say a leftover stays as .tmp- crash evidence, not that abandonedTemporaries lists it"
+ },
+ {
+  "id": "U997",
+  "decision": "kept",
+  "reason": "claim does not hold: batch-daemon-drill.mjs reads store.daemonRecordPath (lines 355, 420, 604)"
+ },
+ {
+  "id": "U998",
+  "decision": "kept",
+  "reason": "claim itself says the exports are used internally or a declared test seam"
+ },
+ {
+  "id": "U999",
+  "decision": "kept",
+  "reason": "claim itself says parseWindow is live through argsOf"
+ },
+ {
+  "id": "U1000",
+  "decision": "kept",
+  "reason": "claim itself says main uses renderStandstillReport"
+ },
+ {
+  "id": "U1001",
+  "decision": "kept",
+  "reason": "verificationProcessAlive is a test seam the gatherer defaults; harmless"
+ },
+ {
+  "id": "U1002",
+  "decision": "rewritten",
+  "reason": "'union entry U15' now names its union (point 1048)"
+ },
+ {
+  "id": "U1003",
+  "decision": "kept",
+  "reason": "claim itself says the CLI uses parseTrialArgs and runTrial"
+ },
+ {
+  "id": "U1004",
+  "decision": "kept",
+  "reason": "the header and runtime usage agree today; duplication alone is no defect"
+ },
+ {
+  "id": "U1005",
+  "decision": "kept",
+  "reason": "claim does not hold: validateSamplingPlan exists in scripts/batch-metrics-core.mjs:25 and feeds the durable reader"
+ },
+ {
+  "id": "U1006",
+  "decision": "kept",
+  "reason": "claim does not hold: flagChange (durable-lane-flag-core.mjs:64) refuses to enable while any required step is not green, so batch-trial needs no step input"
+ },
+ {
+  "id": "U1007",
+  "decision": "rewritten",
+  "reason": "identity safeguard now includes the recorded two-model fallback where the merger wrote a list"
+ },
+ {
+  "id": "U1008",
+  "decision": "rewritten",
+  "reason": "header now says candidatePairs ranks likely pairs while the merger reads both lists in full and may pair anything"
+ },
+ {
+  "id": "U1009",
+  "decision": "rewritten",
+  "reason": "pre-634 procedure now in past tense ('Before point 634 …')"
+ },
+ {
+  "id": "U1010",
+  "decision": "rewritten",
+  "reason": "validateMerger now attributed to mechanism-review-core.mjs, re-exported here"
+ },
+ {
+  "id": "U1011",
+  "decision": "rewritten",
+  "reason": "CANDIDATE_THRESHOLD doc now says it applies to pairs in different files; same-file pairs always qualify"
+ },
+ {
+  "id": "U1012",
+  "decision": "kept",
+  "reason": "claim itself says the test-only exports are used internally"
+ },
+ {
+  "id": "U1013",
+  "decision": "rewritten",
+  "reason": "parseEntryLines doc no longer says prose is skipped unreported; it points to readEntryLines' unreadable report"
+ },
+ {
+  "id": "U1014",
+  "decision": "backlog",
+  "reason": "scripts/blind-merge-core.mjs:133 — parseEntryLines is a test-only wrapper that discards unreadable lines; production reads through parseListText/readEntryLines"
+ },
+ {
+  "id": "U1015",
+  "decision": "rewritten",
+  "reason": "readEntryLines export dropped; its callers are in this file"
+ },
+ {
+  "id": "U1016",
+  "decision": "backlog",
+  "reason": "scripts/blind-merge-core.mjs:168 — the pipeless branch requires a letter id prefix so numbered prose stays prose, but the piped branch accepts a bare number as an id"
+ },
+ {
+  "id": "U1017",
+  "decision": "backlog",
+  "reason": "scripts/blind-merge-core.mjs:181 — an encoded empty JSON list [] sets hadText with zero entries and is reported unreadable, contrary to 'can tell an EMPTY list from an unreadable one'"
+ },
+ {
+  "id": "U1018",
+  "decision": "rewritten",
+  "reason": "the unreadable-line diagnostic now also names a line whose id lacks its ' | ' fields"
+ },
+ {
+  "id": "U1019",
+  "decision": "rewritten",
+  "reason": "accountUnion's findings list now includes duplicate-union-id"
+ },
+ {
+  "id": "U1020",
+  "decision": "rewritten",
+  "reason": "disposition doc now says one A-id is only A, one B-id only B, several ids merged with the others"
+ },
+ {
+  "id": "U1021",
+  "decision": "rewritten",
+  "reason": "header count form now shows --merged-by as optional and points to usage() for the full flag list"
+ },
+ {
+  "id": "U1022",
+  "decision": "rewritten",
+  "reason": "--fallback now documented as the switch-generated reason"
+ },
+ {
+  "id": "U1023",
+  "decision": "rewritten",
+  "reason": "header now says the count reads only tracked JSON halves with their own model field; the line form serves the prompt form"
+ },
+ {
+  "id": "U1024",
+  "decision": "rewritten",
+  "reason": "header union example now carries the defect line accountUnion requires for a fold"
+ },
+ {
+  "id": "U1025",
+  "decision": "removed",
+  "reason": "the unused readJson helper was deleted (the union is read with readText and JSON.parse)"
+ },
+ {
+  "id": "U1026",
+  "decision": "kept",
+  "reason": "a remark on the export index's reliability, not a defect in this file"
+ },
+ {
+  "id": "U1027",
+  "decision": "kept",
+  "reason": "history comments explain why the current checks exist; they describe nothing false"
+ },
+ {
+  "id": "U1028",
+  "decision": "rewritten",
+  "reason": "comment now says the union must name its merger and the flag may only agree"
+ },
+ {
+  "id": "U1029",
+  "decision": "rewritten",
+  "reason": "the unreachable mergedBy/expectedMerger fallbacks and the declared && guard were dropped; declared is the union's non-empty mergedBy"
+ },
+ {
+  "id": "U1030",
+  "decision": "backlog",
+  "reason": "scripts/blind-merge.mjs:389 — the --fallback flag can only equal switchFallback, which is applied anyway, so the flag adds only a way to fail"
+ },
+ {
+  "id": "U1031",
+  "decision": "removed",
+  "reason": "the unreachable late 'list names no model' check was deleted; the proven-halves check already exits"
+ },
+ {
+  "id": "U1032",
+  "decision": "kept",
+  "reason": "claim does not hold: REPUBLISH (board-remedy.mjs:51) is built from PUBLISH_CMD, which is node scripts/board-publish.mjs"
+ },
+ {
+  "id": "U1033",
+  "decision": "rewritten",
+  "reason": "comment now points to erledigtSectionStart's anchor in board-core.mjs instead of 'the anchor above'"
+ },
+ {
+  "id": "U1034",
+  "decision": "removed",
+  "reason": "the post-write recount that was read and thrown away (void after) was deleted"
+ },
+ {
+  "id": "U1035",
+  "decision": "removed",
+  "reason": "the post-rotation count check that could never fire (the moved slice fixes the count) was deleted"
+ },
+ {
+  "id": "U1036",
+  "decision": "rewritten",
+  "reason": "header now names the footer, criticality and projection passes and the publish preflight beside the card edits"
+ },
+ {
+  "id": "U1037",
+  "decision": "rewritten",
+  "reason": "import overview now describes all imported gate modules and states none reaches back"
+ },
+ {
+  "id": "U1038",
+  "decision": "kept",
+  "reason": "claim does not hold: batch-boundary-core.test.mjs imports namesFollowOnWork from board-core, which is what the re-export serves"
+ },
+ {
+  "id": "U1039",
+  "decision": "rewritten",
+  "reason": "LF doc now says it applies as an edit reads the board and after its transform, not 'on every write'"
+ },
+ {
+  "id": "U1040",
+  "decision": "rewritten",
+  "reason": "comment now says only the Erledigt anchor is matched with a literal newline"
+ },
+ {
+  "id": "U1041",
+  "decision": "backlog",
+  "reason": "scripts/board-core.mjs:44 — ERLEDIGT_ANCHOR needs exactly one newline while sectionBounds accepts any whitespace, so erledigtSectionStart can return -1 on a board toDone reads fine"
+ },
+ {
+  "id": "U1042",
+  "decision": "kept",
+  "reason": "claim itself says ERLEDIGT_ANCHOR is used in-file"
+ },
+ {
+  "id": "U1043",
+  "decision": "kept",
+  "reason": "claim itself says cardParagraphs is used in-file"
+ },
+ {
+  "id": "U1044",
+  "decision": "rewritten",
+  "reason": "berlinDateStamp export dropped"
+ },
+ {
+  "id": "U1045",
+  "decision": "rewritten",
+  "reason": "handover card no longer called the one unnumbered card; the derived card, stub and empty element are named too"
+ },
+ {
+  "id": "U1046",
+  "decision": "rewritten",
+  "reason": "CRITICALITY_LABELS export dropped"
+ },
+ {
+  "id": "U1047",
+  "decision": "backlog",
+  "reason": "scripts/board-core.mjs:253 — unwrapCardHeaderGroups says the editing grammar needs the unwrapped sequence, but CARD_NUMBER_SOURCE/CARD_TITLE_HEAD_SOURCE match the wrapper, so the unwrap calls may be redundant"
+ },
+ {
+  "id": "U1048",
+  "decision": "rewritten",
+  "reason": "escapeCardTitle rationale now says readers used to match [^<]* and titles are still escaped so they carry no markup"
+ },
+ {
+  "id": "U1049",
+  "decision": "rewritten",
+  "reason": "escapeCardTitle export dropped"
+ },
+ {
+  "id": "U1050",
+  "decision": "rewritten",
+  "reason": "stageOnlyTitle now uses the shared DASH definition instead of its own [—–-]"
+ },
+ {
+  "id": "U1051",
+  "decision": "backlog",
+  "reason": "scripts/board-core.mjs:341 — upgradeNowCards migrates pre-655 cards on every edit; remove once no board carries that shape"
+ },
+ {
+  "id": "U1052",
+  "decision": "rewritten",
+  "reason": "cardText moved above the dropStrayNowCards JSDoc, which now sits on its function"
+ },
+ {
+  "id": "U1053",
+  "decision": "rewritten",
+  "reason": "dropStrayNowCards is now 'the one sweep that removes cards no command named'; the other owners' removals are named"
+ },
+ {
+  "id": "U1054",
+  "decision": "rewritten",
+  "reason": "comment now says the authenticated derived card and a marked closing card are kept too"
+ },
+ {
+  "id": "U1055",
+  "decision": "backlog",
+  "reason": "scripts/board-core.mjs:422 — dropStrayNowCards never calls isHandoverCard, so a data-state=handover card with another title is swept while compare/reconcile accept it"
+ },
+ {
+  "id": "U1056",
+  "decision": "rewritten",
+  "reason": "stripPointPrefix export dropped"
+ },
+ {
+  "id": "U1057",
+  "decision": "backlog",
+  "reason": "scripts/board-core.mjs:461 — queueCard searches the whole document and can return an archive card with the same markup"
+ },
+ {
+  "id": "U1058",
+  "decision": "rewritten",
+  "reason": "nowSectionSlice doc now names setCardTitle as the one whenMissing:'document' caller"
+ },
+ {
+  "id": "U1059",
+  "decision": "kept",
+  "reason": "claim itself says NOW_EMPTY_STATE_MARKUP is used in-file"
+ },
+ {
+  "id": "U1060",
+  "decision": "rewritten",
+  "reason": "unnumbered-count comment now includes the derived cards"
+ },
+ {
+  "id": "U1061",
+  "decision": "rewritten",
+  "reason": "comment now says two authored honest forms, the closing card being the third"
+ },
+ {
+  "id": "U1062",
+  "decision": "rewritten",
+  "reason": "comment now says beside work the section holds numbered, derived and at most one handover card"
+ },
+ {
+  "id": "U1063",
+  "decision": "rewritten",
+  "reason": "NOW_STUB_TEXT doc now says renderNowStub may append carried prose"
+ },
+ {
+  "id": "U1064",
+  "decision": "rewritten",
+  "reason": "renderNowStub export dropped"
+ },
+ {
+  "id": "U1065",
+  "decision": "kept",
+  "reason": "transformExisting is a test seam; the check it enables is harmless"
+ },
+ {
+  "id": "U1066",
+  "decision": "backlog",
+  "reason": "scripts/board-core.mjs:942 — the handover card is called 'the idle form refused above', yet isHandoverCard is exempted separately and no writer emits data-state=handover"
+ },
+ {
+  "id": "U1067",
+  "decision": "kept",
+  "reason": "a defensive refusal its own comment marks unreachable; harmless"
+ },
+ {
+  "id": "U1068",
+  "decision": "backlog",
+  "reason": "scripts/board-core.mjs:1083 — preflight facts never learned closingBesideWork, duplicateClosing and emptyStateWrong, so those failures report only 'state mismatch'"
+ },
+ {
+  "id": "U1069",
+  "decision": "kept",
+  "reason": "claim itself says hoursLabel is used in-file"
+ },
+ {
+  "id": "U1070",
+  "decision": "removed",
+  "reason": "the no-op .replace(/\\.0$/, '') was removed; rounded is a half-step Number whose String never ends in .0"
+ },
+ {
+  "id": "U1071",
+  "decision": "kept",
+  "reason": "claim itself says addHours is used in-file"
+ },
+ {
+  "id": "U1072",
+  "decision": "rewritten",
+  "reason": "statusOf doc now says every paragraph is carried"
+ },
+ {
+  "id": "U1073",
+  "decision": "rewritten",
+  "reason": "toQueue comment now says the throw is for a point with neither a current-work nor a queue card"
+ },
+ {
+  "id": "U1074",
+  "decision": "rewritten",
+  "reason": "toDone doc now names the earliest start across merged cards and all paragraphs"
+ },
+ {
+  "id": "U1075",
+  "decision": "kept",
+  "reason": "claim itself says doneEntries is used in-file"
+ },
+ {
+  "id": "U1076",
+  "decision": "kept",
+  "reason": "claim itself says doneCards is used in-file"
+ },
+ {
+  "id": "U1077",
+  "decision": "backlog",
+  "reason": "scripts/board-core.mjs:1333 — doneCard is a test-only wrapper with no production or in-file caller"
+ },
+ {
+  "id": "U1078",
+  "decision": "backlog",
+  "reason": "scripts/board-core.mjs:1374 — mergeDoneDuplicates repairs boards from before toDone merged; remove once no board carries duplicates"
+ },
+ {
+  "id": "U1079",
+  "decision": "backlog",
+  "reason": "scripts/board-core.mjs:1418 — the point-416 banner and closeCard treat an empty now-section as a defect while reconcile writes an honest empty state"
+ },
+ {
+  "id": "U1080",
+  "decision": "backlog",
+  "reason": "scripts/board-core.mjs:1429 — hasCurrentWork counts any <details>, including the derived state card, so closeCard can leave only a pause or decision card"
+ },
+ {
+  "id": "U1081",
+  "decision": "kept",
+  "reason": "claim itself says hasCurrentWork is used in-file"
+ },
+ {
+  "id": "U1082",
+  "decision": "kept",
+  "reason": "claim itself says CLOSING_STAGE is used in-file"
+ },
+ {
+  "id": "U1083",
+  "decision": "backlog",
+  "reason": "scripts/board-core.mjs:1456 — pre-655 legacy title recognition is scattered across the file for boards that may no longer exist"
+ },
+ {
+  "id": "U1084",
+  "decision": "kept",
+  "reason": "claim itself says closingCardTitle is used in-file"
+ },
+ {
+  "id": "U1085",
+  "decision": "removed",
+  "reason": "the duplicate 'an' in FILLER_WORDS was removed (the Set is unchanged)"
+ },
+ {
+  "id": "U1086",
+  "decision": "removed",
+  "reason": "STATE_KINDS had no reader anywhere; deleted with its stale doc"
+ },
+ {
+  "id": "U1087",
+  "decision": "rewritten",
+  "reason": "the derived-card JSDoc moved from escapeForRegExp onto isTrulyDerivedCard"
+ },
+ {
+  "id": "U1088",
+  "decision": "rewritten",
+  "reason": "'thirty lines above' replaced by 'applyDerivedStateCard below'"
+ },
+ {
+  "id": "U1089",
+  "decision": "removed",
+  "reason": "the reserved-title check DERIVED_SUMMARY already implies was removed"
+ },
+ {
+  "id": "U1090",
+  "decision": "kept",
+  "reason": "claim itself says STATE_CARD_TITLES is used in-file"
+ },
+ {
+  "id": "U1091",
+  "decision": "rewritten",
+  "reason": "the three stacked JSDoc blocks were moved onto isTrulyStateCard, isHandoverCard and summaryCarriesPoint"
+ },
+ {
+  "id": "U1092",
+  "decision": "rewritten",
+  "reason": "'the three state predicates' corrected to 'the handover and state-card predicates'"
+ },
+ {
+  "id": "U1093",
+  "decision": "backlog",
+  "reason": "scripts/board-core.mjs:1793 — noCurrentWorkCards has only test callers"
+ },
+ {
+  "id": "U1094",
+  "decision": "backlog",
+  "reason": "scripts/board-core.mjs:1798 — closingWorkCards has only test callers"
+ },
+ {
+  "id": "U1095",
+  "decision": "rewritten",
+  "reason": "stripNoCurrentWork export dropped"
+ },
+ {
+  "id": "U1096",
+  "decision": "backlog",
+  "reason": "scripts/board-core.mjs:1817 — withinNowSection and nowSectionSlice's opt-in fallback catch every sectionBounds error and edit the whole document, broader than the documented fragment exception"
+ },
+ {
+  "id": "U1097",
+  "decision": "rewritten",
+  "reason": "withinNowSection doc now says a document without the section is edited as it stands"
+ },
+ {
+  "id": "U1098",
+  "decision": "rewritten",
+  "reason": "stripClosingWork export dropped"
+ },
+ {
+  "id": "U1099",
+  "decision": "rewritten",
+  "reason": "stripStateCards doc now covers the idle and closing kinds and says the derived card stands beside them"
+ },
+ {
+  "id": "U1100",
+  "decision": "rewritten",
+  "reason": "the obsolete 'AN UNNUMBERED CARD IS A STATE CARD' clause text was replaced by a pointer to dropStrayNowCards"
+ },
+ {
+  "id": "U1101",
+  "decision": "rewritten",
+  "reason": "stripStateCards export dropped"
+ },
+ {
+  "id": "U1102",
+  "decision": "backlog",
+  "reason": "scripts/board-core.mjs:1909 — claimsClosingWork has only test callers"
+ },
+ {
+  "id": "U1103",
+  "decision": "removed",
+  "reason": "the closing writer's unreachable emptyReason was removed (its body is composed and never empty)"
+ },
+ {
+  "id": "U1104",
+  "decision": "rewritten",
+  "reason": "comment now says addVdzk is the only builder that escapes its body too"
+ },
+ {
+  "id": "U1105",
+  "decision": "backlog",
+  "reason": "scripts/board-core.mjs:2184 — addVdzk's own escaper is not entity-aware and double-escapes '&amp;', the defect escapeCardTitle avoids"
+ },
+ {
+  "id": "U1106",
+  "decision": "rewritten",
+  "reason": "setCardStatus doc now says one paragraph per text paragraph, the first stamped"
+ },
+ {
+  "id": "U1107",
+  "decision": "rewritten",
+  "reason": "setCardTitle comment now says the queue branch writes the text as given without stripping a prefix"
+ },
+ {
+  "id": "U1108",
+  "decision": "kept",
+  "reason": "claim itself says queueEstimateHours is used in-file"
+ },
+ {
+  "id": "U1109",
+  "decision": "rewritten",
+  "reason": "missing-estimate warning now names node scripts/board.mjs eta <point> \"<HH:MM>\", since a queue estimate no longer reaches the promoted card"
+ },
+ {
+  "id": "U1110",
+  "decision": "rewritten",
+  "reason": "delta list now names C (the derived queue, board-queue-core.mjs) as not served here"
+ },
+ {
+  "id": "U1111",
+  "decision": "rewritten",
+  "reason": "BOARD_OWNER export dropped"
+ },
+ {
+  "id": "U1112",
+  "decision": "rewritten",
+  "reason": "BOARD_REPO export dropped"
+ },
+ {
+  "id": "U1113",
+  "decision": "rewritten",
+  "reason": "BOARD_BRANCH export dropped"
+ },
+ {
+  "id": "U1114",
+  "decision": "rewritten",
+  "reason": "FINGERPRINT_META export dropped"
+ },
+ {
+  "id": "U1115",
+  "decision": "kept",
+  "reason": "claim itself says openSetFingerprint is used in-file"
+ },
+ {
+  "id": "U1116",
+  "decision": "rewritten",
+  "reason": "the publish record is now labelled delta D"
+ },
+ {
+  "id": "U1117",
+  "decision": "kept",
+  "reason": "claim itself says readFingerprint is used in-file"
+ },
+ {
+  "id": "U1118",
+  "decision": "rewritten",
+  "reason": "rule now notes the due-mark repair write when the live board has caught up"
+ },
+ {
+  "id": "U1119",
+  "decision": "rewritten",
+  "reason": "syncedPublishPatch no longer called the ONLY place the due mark is cleared; publishDuePatch and pagesPublishPatch are named"
+ },
+ {
+  "id": "U1120",
+  "decision": "kept",
+  "reason": "claim does not hold: dashboard-publish.mjs:51 still writes publishDeferred (its --defer path), so the handling is live"
+ },
+ {
+  "id": "U1121",
+  "decision": "rewritten",
+  "reason": "claim does not hold as stated: dashboard-publish.mjs:39 still writes publishedHash (and lock-heartbeat-hook artifactToolSeen); the header's 'nothing writes them' was corrected accordingly"
+ },
+ {
+  "id": "U1122",
+  "decision": "rewritten",
+  "reason": "boardMissingPoints doc now names the three sections it inspects"
+ },
+ {
+  "id": "U1123",
+  "decision": "backlog",
+  "reason": "scripts/board-currency-core.mjs:304 — publishCapability's artifact fallback never decides anything, since every caller passes transport 'pages'"
+ },
+ {
+  "id": "U1124",
+  "decision": "rewritten",
+  "reason": "liveBoardVerdict's verdict list now includes 'unknown'"
+ },
+ {
+  "id": "U1125",
+  "decision": "rewritten",
+  "reason": "watchdog doc now includes the 'transport' alert cause"
+ },
+ {
+  "id": "U1126",
+  "decision": "rewritten",
+  "reason": "controller overview now says write -> state -> rotate -> publish, without the retry"
+ },
+ {
+  "id": "U1127",
+  "decision": "rewritten",
+  "reason": "runBoardEdit doc now includes recording the active-work state before rotating"
+ },
+ {
+  "id": "U1128",
+  "decision": "rewritten",
+  "reason": "derive comment now says the criticality render and second sweep run after it but leave the derived card alone"
+ },
+ {
+  "id": "U1129",
+  "decision": "backlog",
+  "reason": "scripts/board-edit-core.mjs:61 — the second stray-card sweep's edited.dropped is never reported; reportDropped iterates only swept.dropped"
+ },
+ {
+  "id": "U1130",
+  "decision": "rewritten",
+  "reason": "removal message now also covers a card outside the current-work section"
+ },
+ {
+  "id": "U1131",
+  "decision": "rewritten",
+  "reason": "BOARD_EDIT_LOCK_POLL_MS export dropped"
+ },
+ {
+  "id": "U1132",
+  "decision": "rewritten",
+  "reason": "BOARD_EDIT_LOCK_LEASE_MS export dropped"
+ },
+ {
+  "id": "U1133",
+  "decision": "rewritten",
+  "reason": "BOARD_FILE_HINTS export dropped"
+ },
+ {
+  "id": "U1134",
+  "decision": "backlog",
+  "reason": "scripts/board-first-core.mjs:158 — classifyTool is a test-only wrapper; evaluate and ownershipStandDownDecision call classifyCall"
+ },
+ {
+  "id": "U1135",
+  "decision": "rewritten",
+  "reason": "isSessionEndingCall export dropped"
+ },
+ {
+  "id": "U1136",
+  "decision": "rewritten",
+  "reason": "noWorkClaimReason export dropped"
+ },
+ {
+  "id": "U1137",
+  "decision": "rewritten",
+  "reason": "denial text now says the Stop-hook board enforcers only speak at the turn's end, instead of 'every other enforcer is a Stop hook'"
+ },
+ {
+  "id": "U1138",
+  "decision": "rewritten",
+  "reason": "header now notes the point-470 idle-claim deny never stands down"
+ },
+ {
+  "id": "U1139",
+  "decision": "rewritten",
+  "reason": "rule now says 'at or after' turnStartedAt, matching the >= comparison"
+ },
+ {
+  "id": "U1140",
+  "decision": "kept",
+  "reason": "claim does not hold for the reader: a worktree subagent exits before evaluate (board-first-guard.mjs:392), so only a main-tree subagent can see this text, and for it the statement is true"
+ },
+ {
+  "id": "U1141",
+  "decision": "rewritten",
+  "reason": "--status now documented as the board-first verdict alone, without the fence, ownership, worktree and sealed-boundary checks"
+ },
+ {
+  "id": "U1142",
+  "decision": "rewritten",
+  "reason": "status output now says 'yes (board-first deny stood down)', scoping the stand-down to that deny"
+ },
+ {
+  "id": "U1143",
+  "decision": "rewritten",
+  "reason": "fence explanation now says the main-write and ownership checks refuse more of a non-owner's mutations"
+ },
+ {
+  "id": "U1144",
+  "decision": "rewritten",
+  "reason": "rationale now includes board-first-guard's pre-mutation gate; the other mechanisms bite at a turn boundary or not at all"
+ },
+ {
+  "id": "U1145",
+  "decision": "rewritten",
+  "reason": "the 'at most one round invisible' claim replaced by 'at most ten minutes of rounds'"
+ },
+ {
+  "id": "U1146",
+  "decision": "rewritten",
+  "reason": "a matching digest now yields the exact age only when the writer stamped the record, otherwise an upper bound"
+ },
+ {
+  "id": "U1147",
+  "decision": "rewritten",
+  "reason": "ageMs JSDoc now describes cardAge's digest-record age"
+ },
+ {
+  "id": "U1148",
+  "decision": "rewritten",
+  "reason": "header now says it reads the focus, the card digest and its own record, not the last live publish"
+ },
+ {
+  "id": "U1149",
+  "decision": "rewritten",
+  "reason": "readCard's doc now says it returns ok, point and a SHA-256 digest"
+ },
+ {
+  "id": "U1150",
+  "decision": "rewritten",
+  "reason": "comment now says the observation is persisted only after the decision"
+ },
+ {
+  "id": "U1151",
+  "decision": "rewritten",
+  "reason": "comment now says a differing digest is aged from the old seenAt (upper bound), or unknown without a record"
+ },
+ {
+  "id": "U1152",
+  "decision": "rewritten",
+  "reason": "warning now says later triggers may republish, not every trigger will"
+ },
+ {
+  "id": "U1153",
+  "decision": "backlog",
+  "reason": "scripts/board-heartbeat.mjs:94 — the minute cap does not bound board-root discovery: gitCommonDir's execFileSync has no timeout"
+ },
+ {
+  "id": "U1154",
+  "decision": "rewritten",
+  "reason": "LIVENESS_CLASS, LIVENESS_STYLE_ID and LIVENESS_SCRIPT_ID exports dropped"
+ },
+ {
+  "id": "U1155",
+  "decision": "rewritten",
+  "reason": "ageText, durationText and berlinClock exports dropped"
+ },
+ {
+  "id": "U1156",
+  "decision": "rewritten",
+  "reason": "LIVENESS_STYLE and LIVENESS_SCRIPT exports dropped"
+ },
+ {
+  "id": "U1157",
+  "decision": "backlog",
+  "reason": "scripts/board-liveness-core.mjs:57 — berlinClock compares only day and month, so the same date in another year is treated as today"
+ },
+ {
+  "id": "U1158",
+  "decision": "backlog",
+  "reason": "scripts/board-liveness-core.mjs:77 — livenessVerdict prefers any valid confirmedAt over setAt while board-first-core takes their maximum"
+ },
+ {
+  "id": "U1159",
+  "decision": "rewritten",
+  "reason": "LIVENESS_PATHS and readLauncherLine exports dropped"
+ },
+ {
+  "id": "U1160",
+  "decision": "rewritten",
+  "reason": "rule 1 now says only staleness is a claim about the board, not 'the only thing worth waking anybody for'"
+ },
+ {
+  "id": "U1161",
+  "decision": "rewritten",
+  "reason": "retry justification now cites a false outage report, not a batch-wide pause"
+ },
+ {
+  "id": "U1162",
+  "decision": "rewritten",
+  "reason": "doc now says an empty attempt set fails with 'the probe never ran'"
+ },
+ {
+  "id": "U1163",
+  "decision": "backlog",
+  "reason": "scripts/board-probe-core.mjs:96 — 'only both failing is an outage' is not enforced when the viewer was never asked: failed currency with viewer=null reads 'unreachable'"
+ },
+ {
+  "id": "U1164",
+  "decision": "backlog",
+  "reason": "scripts/board-probe-core.mjs:193 — describeProbe has no production caller (tests only), though its doc says the caller prints it"
+ },
+ {
+  "id": "U1165",
+  "decision": "rewritten",
+  "reason": "--check instruction now says it verifies the live content, not the page"
+ },
+ {
+  "id": "U1166",
+  "decision": "rewritten",
+  "reason": "orphan-commit comment now says each publish replaces the one reachable commit and leaves superseded objects to gc"
+ },
+ {
+  "id": "U1167",
+  "decision": "rewritten",
+  "reason": "header now says only fingerprint, commit and push failures are persisted; the earlier refusals exit without the record"
+ },
+ {
+  "id": "U1168",
+  "decision": "rewritten",
+  "reason": "hash comments now say the recorded hash covers the repo bytes before the outbound fingerprint and liveness stamps"
+ },
+ {
+  "id": "U1169",
+  "decision": "backlog",
+  "reason": "scripts/board-publish.mjs:83 — fetchWithTimeout clears its timer before the caller awaits res.text(), so the stated fetch bound does not cover the body"
+ },
+ {
+  "id": "U1170",
+  "decision": "rewritten",
+  "reason": "the two inner repoBytes !== original checks that repeated the enclosing condition were dropped"
+ },
+ {
+  "id": "U1171",
+  "decision": "removed",
+  "reason": "the try/catch around a plain assignment and its dangling 'judged unreadable above' comment were removed"
+ },
+ {
+  "id": "U1172",
+  "decision": "rewritten",
+  "reason": "comment now scopes 'working tree untouched' to the tree-construction step"
+ },
+ {
+  "id": "U1173",
+  "decision": "rewritten",
+  "reason": "'footer refreshed' is now printed only when the footer block actually succeeded (footerRefreshed), not on any change"
+ },
+ {
+  "id": "U1174",
+  "decision": "rewritten",
+  "reason": "RELEASE_TAG_POINT doc now says the guard exempts it from fixes-before-finders while queueOrder ranks it with the fixes, so a finder listed before it moves behind it"
+ },
+ {
+  "id": "U1175",
+  "decision": "backlog",
+  "reason": "scripts/board-queue-core.mjs:223 — the documented bare '--' escape does not let prose begin with two dashes: setQueueEntry still rejects it via /^--/"
+ },
+ {
+  "id": "U1176",
+  "decision": "rewritten",
+  "reason": "paragraphs doc now says a string is split on blank lines"
+ },
+ {
+  "id": "U1177",
+  "decision": "rewritten",
+  "reason": "REQUEST_CARD_MAX and REQUEST_CARD_TITLE exports dropped"
+ },
+ {
+  "id": "U1178",
+  "decision": "rewritten",
+  "reason": "repairTransliteration export dropped"
+ },
+ {
+  "id": "U1179",
+  "decision": "rewritten",
+  "reason": "BLOCKED_CARD_PREFIX export dropped"
+ },
+ {
+  "id": "U1180",
+  "decision": "rewritten",
+  "reason": "renderQueueCards and queueSectionBounds exports dropped"
+ },
+ {
+  "id": "U1181",
+  "decision": "rewritten",
+  "reason": "SET_FLAGS export dropped"
+ },
+ {
+  "id": "U1182",
+  "decision": "rewritten",
+  "reason": "importQueueFromHtml no longer called 'the one-time migration'; the doc names its import and publish-time readers"
+ },
+ {
+  "id": "U1183",
+  "decision": "backlog",
+  "reason": "scripts/board-queue-core.mjs:682 — parseQueueDataFile treats empty or whitespace-only files as absent instead of refusing them as unreadable"
+ },
+ {
+  "id": "U1184",
+  "decision": "rewritten",
+  "reason": "the claim that a stored fallback title stops being reported as untranslated was removed"
+ },
+ {
+  "id": "U1185",
+  "decision": "kept",
+  "reason": "a defensive allowance for an empty front; harmless and documented"
+ },
+ {
+  "id": "U1186",
+  "decision": "rewritten",
+  "reason": "condition (ii) now names the hash board-publish.mjs records, a legacy mirror record still counting"
+ },
+ {
+  "id": "U1187",
+  "decision": "backlog",
+  "reason": "scripts/board-first-core.mjs:318 — canPublish can no longer be false in production (the guard always passes transport 'pages'), so the flag is vestigial"
+ },
+ {
+  "id": "U1188",
+  "decision": "rewritten",
+  "reason": "comment now says the guard passes the pages transport, so the publish-due mark bites for every session"
+ },
+ {
+  "id": "U1189",
+  "decision": "kept",
+  "reason": "claim does not hold: board-first-core.test.mjs imports shellSegments from this module, which is what the re-export serves"
+ },
+ {
+  "id": "U1190",
+  "decision": "rewritten",
+  "reason": "'used to' removed: the deny still tells a subagent to repeat the call"
+ },
+ {
+  "id": "U1191",
+  "decision": "rewritten",
+  "reason": "claim holds (.claude/settings.json matches MultiEdit); the header's documented matcher now includes MultiEdit"
+ },
+ {
+  "id": "U1192",
+  "decision": "kept",
+  "reason": "claim does not hold: dashboard-publish.mjs, dashboard-guard.mjs and dashboard-sync.mjs all still exist"
+ },
+ {
+  "id": "U1193",
+  "decision": "kept",
+  "reason": "claim does not hold: dashboard-publish.mjs:39 still writes publishedHash, so the branch is live"
+ },
+ {
+  "id": "U1194",
+  "decision": "rewritten",
+  "reason": "classifyTool reference replaced by classifyCall"
+ },
+ {
+  "id": "U1195",
+  "decision": "rewritten",
+  "reason": "'the focus/publish conditions above it' corrected to 'the conditions evaluate checks after it'"
+ },
+ {
+  "id": "U1196",
+  "decision": "kept",
+  "reason": "claim itself says the tested behaviour is used internally"
+ },
+ {
+  "id": "U1197",
+  "decision": "rewritten",
+  "reason": "Modes section now lists the lease/claim renewal, handover handling and the fence, main-write, ownership and sealed-boundary denies"
+ },
+ {
+  "id": "U1198",
+  "decision": "rewritten",
+  "reason": "header now says a non-owner's mutations are refused since points 795 and 897"
+ },
+ {
+  "id": "U1199",
+  "decision": "backlog",
+  "reason": "scripts/board-first-guard.mjs:124 — TRANSPORT has the single value 'pages', so the transport and canPublish plumbing is vestigial"
+ },
+ {
+  "id": "U1200",
+  "decision": "removed",
+  "reason": "the call/input aliases of input0 were removed; input0 is used directly"
+ },
+ {
+  "id": "U1201",
+  "decision": "kept",
+  "reason": "the paused re-read guards a pause written between the early exit and this check; heldByOtherLiveOwner is true by construction inside 'if (otherOwner)'"
+ },
+ {
+  "id": "U1202",
+  "decision": "kept",
+  "reason": "the note explains why the check replaced an exit; it describes nothing false"
+ },
+ {
+  "id": "U1203",
+  "decision": "rewritten",
+  "reason": "comment now says a null age means no record yet (first sight) and that NEVER_STAMPED keeps its historical name"
+ },
+ {
+  "id": "U1204",
+  "decision": "kept",
+  "reason": "claim itself says decideHeartbeat uses both"
+ },
+ {
+  "id": "U1205",
+  "decision": "rewritten",
+  "reason": "timeout rationale now says a publish is a local commit build and a git push (no HTTPS read-back)"
+ },
+ {
+  "id": "U1206",
+  "decision": "rewritten",
+  "reason": "@returns now carries reread and names the non-REASONS reasons"
+ },
+ {
+  "id": "U1207",
+  "decision": "kept",
+  "reason": "claim itself says heartbeat() uses both"
+ },
+ {
+  "id": "U1208",
+  "decision": "kept",
+  "reason": "claim does not hold: the PostToolUse heartbeat writes claimedAt on every tool call; only renewLease (leaseUntil) is rate-limited"
+ },
+ {
+  "id": "U1209",
+  "decision": "kept",
+  "reason": "claim itself says the constants and worktreeOf are used internally"
+ },
+ {
+  "id": "U1210",
+  "decision": "kept",
+  "reason": "claim holds: batch-autostart.mjs:110 imports focusBranch/focusPoint from this module and board-publish.mjs imports measureLiveness"
+ },
+ {
+  "id": "U1211",
+  "decision": "kept",
+  "reason": "a defensive default arm; harmless"
+ },
+ {
+  "id": "U1212",
+  "decision": "kept",
+  "reason": "claim does not hold: batch-autostart.mjs:834-846 runs scripts/board-watchdog.mjs as its own process, so both references are right"
+ },
+ {
+  "id": "U1213",
+  "decision": "kept",
+  "reason": "claim does not hold: WATCHDOG_TICK_MS is 15 min (board-currency-core.mjs:74), matching the prose"
+ },
+ {
+  "id": "U1214",
+  "decision": "backlog",
+  "reason": "scripts/board-probe-core.mjs:90 — the comment says the viewer is asked only after the currency probe fails, which would make the 'currency ok + viewer failed' arm dead"
+ },
+ {
+  "id": "U1215",
+  "decision": "rewritten",
+  "reason": "'the serialization this branch introduced' now 'the board-edit-lock serialization'"
+ },
+ {
+  "id": "U1216",
+  "decision": "rewritten",
+  "reason": "publish() rationale now names the --locked child path"
+ },
+ {
+  "id": "U1217",
+  "decision": "rewritten",
+  "reason": "footer block comment now lists the note, chip upgrade, derived state and criticalities and how their failure is logged"
+ },
+ {
+  "id": "U1218",
+  "decision": "rewritten",
+  "reason": "'UPGRADED LAST' corrected to 'UPGRADED HERE TOO'"
+ },
+ {
+  "id": "U1219",
+  "decision": "kept",
+  "reason": "claim does not hold: scripts/dashboard-publish.mjs exists and still gates on structureViolations (line 100)"
+ },
+ {
+  "id": "U1220",
+  "decision": "rewritten",
+  "reason": "'three slots, three candidates' replaced by 'one candidate per slot', leaving the cap to the import"
+ },
+ {
+  "id": "U1221",
+  "decision": "kept",
+  "reason": "claim does not hold: board-queue-core.test.mjs imports QUEUE_GATED_META and QUEUE_STUB_BODY from this module"
+ },
+ {
+  "id": "U1222",
+  "decision": "kept",
+  "reason": "claim does not hold: 174, 184, 200, 203, 205, 207 and 285 are still open in TASKS.md"
+ },
+ {
+  "id": "U1223",
+  "decision": "kept",
+  "reason": "the prefix is part of the card title and vdzk-remove matches a caller-given title fragment; no duplicate of the string exists"
+ },
+ {
+  "id": "U1224",
+  "decision": "rewritten",
+  "reason": "parseSetArgs usage table now shows --if-estimate"
+ },
+ {
+  "id": "U1225",
+  "decision": "kept",
+  "reason": "claim itself says each export is used internally"
+ },
+ {
+  "id": "U1226",
+  "decision": "backlog",
+  "reason": "scripts/board.mjs:84 — board.mjs hard-codes .batch-dashboard.html (also in attest) while board-queue.mjs honours state.dashboardPath, so the two edit different files when the override is set"
+ },
+ {
+  "id": "U1227",
+  "decision": "rewritten",
+  "reason": "claim holds for board-queue.mjs's direct write; the header now says 'every board.mjs edit and every publish'"
+ },
+ {
+  "id": "U1228",
+  "decision": "rewritten",
+  "reason": "claim holds: no gate checks for the refresher (structureViolations strips script bodies); the header now says so instead of claiming a refusal"
+ },
+ {
+  "id": "U1229",
+  "decision": "rewritten",
+  "reason": "comment now says the swap replaces <main>'s whole content (innerHTML), not <main> itself"
+ },
+ {
+  "id": "U1230",
+  "decision": "rewritten",
+  "reason": "board-remedy's rule narrowed to the publish/attest commands; board-queue.mjs's publish hint now uses PUBLISH_CMD instead of a literal"
+ },
+ {
+  "id": "U1231",
+  "decision": "rewritten",
+  "reason": "REPUBLISH is now 'the tail a board remedy ends with when its fix needs a republish'"
+ },
+ {
+  "id": "U1232",
+  "decision": "rewritten",
+  "reason": "deriveStateCard doc now gives the real order: pause first, decisions newest first, recoveries by next attempt"
+ },
+ {
+  "id": "U1233",
+  "decision": "rewritten",
+  "reason": "RETRY_STATE_PATH export dropped; stays the retryPath default"
+ },
+ {
+  "id": "U1234",
+  "decision": "rewritten",
+  "reason": "currentStateCard export dropped; withDerivedState calls it"
+ },
+ {
+  "id": "U1235",
+  "decision": "rewritten",
+  "reason": "fail-soft note now says a throwing derivation leaves the document, its old state card included, as it was"
+ },
+ {
+  "id": "U1236",
+  "decision": "rewritten",
+  "reason": "header now says the gate checks structure plus check 7's naming rule, not structure only"
+ },
+ {
+  "id": "U1237",
+  "decision": "rewritten",
+  "reason": "'The one import' replaced by a description of all imports (titles, predicates, derived kind)"
+ },
+ {
+  "id": "U1238",
+  "decision": "rewritten",
+  "reason": "import note now says the closing title only identifies a pre-655 card, since a closing card carries its point"
+ },
+ {
+  "id": "U1239",
+  "decision": "rewritten",
+  "reason": "structureViolations doc now says a non-string or empty board yields the single board-unreadable violation"
+ },
+ {
+  "id": "U1240",
+  "decision": "backlog",
+  "reason": "scripts/board-structure-core.mjs:85 — the comment says each required heading is wrapped, but heading order and wrapper count are checked separately and never paired per heading"
+ },
+ {
+  "id": "U1241",
+  "decision": "rewritten",
+  "reason": "handover exception now called 'the authored exception' (the derived card is skipped above) and the unnumbered message says 'every authored card'"
+ },
+ {
+  "id": "U1242",
+  "decision": "rewritten",
+  "reason": "nowCardKinds doc now includes the derived state kind"
+ },
+ {
+  "id": "U1243",
+  "decision": "rewritten",
+  "reason": "nowCards doc now documents {kind, chip, point, title} and the chip/legacy point distinction"
+ },
+ {
+  "id": "U1244",
+  "decision": "rewritten",
+  "reason": "header now contrasts the six-step ritual with the two-step loop (an edit, then attest)"
+ },
+ {
+  "id": "U1245",
+  "decision": "rewritten",
+  "reason": "attest documented as rotate, audit (--synced), confirm prep; it does not publish"
+ },
+ {
+  "id": "U1246",
+  "decision": "backlog",
+  "reason": "scripts/board.mjs:277 — title reads and writes the queue data file outside edit()'s lock and ignores HOA_QUEUE_DATA_FILE and the parse-refusal rule board-queue.mjs enforces"
+ },
+ {
+  "id": "U1247",
+  "decision": "rewritten",
+  "reason": "ROLLBACK comment now says it restores only where the transition is rollbackable and fails loudly either way"
+ },
+ {
+  "id": "U1248",
+  "decision": "kept",
+  "reason": "the paused tombstone redirects callers to the derived state; harmless"
+ },
+ {
+  "id": "U1249",
+  "decision": "rewritten",
+  "reason": "header no longer advertises --automated as selecting anything (accepted, ignored); the flag stays accepted for callers"
+ },
+ {
+  "id": "U1250",
+  "decision": "rewritten",
+  "reason": "general usage now shows queue's text as optional"
+ },
+ {
+  "id": "U1251",
+  "decision": "rewritten",
+  "reason": "fallback usage now includes merge-done (paused is a redirect, noted in the header)"
+ },
+ {
+  "id": "U1252",
+  "decision": "kept",
+  "reason": "claim itself says pauseParagraph is live through deriveStateCard"
+ },
+ {
+  "id": "U1253",
+  "decision": "kept",
+  "reason": "claim itself says decisionParagraphs is live through deriveStateCard"
+ },
+ {
+  "id": "U1254",
+  "decision": "kept",
+  "reason": "claim itself says recoveryParagraphs is live through deriveStateCard"
+ },
+ {
+  "id": "U1255",
+  "decision": "kept",
+  "reason": "claim itself says markupOnly is used by the live gate"
+ },
+ {
+  "id": "U1256",
+  "decision": "kept",
+  "reason": "claim itself says cardNamingViolations is live in structureViolations"
+ },
+ {
+  "id": "U1257",
+  "decision": "kept",
+  "reason": "claim itself says nowCardKinds is live in structureViolations"
+ },
+ {
+  "id": "U1258",
+  "decision": "kept",
+  "reason": "claim does not hold: board-structure-core.test.mjs imports looksLikeClosingTitle and stageOnlyTitle from this module, which the re-exports serve"
+ },
+ {
+  "id": "U1259",
+  "decision": "rewritten",
+  "reason": "doc now says refresherScript appends the small IIFE that arms the refresher"
+ },
+ {
+  "id": "U1260",
+  "decision": "backlog",
+  "reason": "scripts/board-refresher-core.mjs:20 — BOARD_CONTENT_URL is spelled as its own literal beside board-currency-core's derived constant; two sources for one URL"
+ },
+ {
+  "id": "U1261",
+  "decision": "rewritten",
+  "reason": "derived card now described as paused, deciding on its own, retrying — what board-state-core derives"
+ },
+ {
+  "id": "U1262",
+  "decision": "backlog",
+  "reason": "scripts/board-structure-core.mjs:256 — the legacy-closing-card branch only serves pre-655 boards, which board.mjs upgrades on every edit"
+ },
+ {
+  "id": "U1263",
+  "decision": "backlog",
+  "reason": "scripts/board-structure-core.mjs:357 — nowCards' legacy title matching and legacyNum serve only pre-655 cards"
+ },
+ {
+  "id": "U1264",
+  "decision": "backlog",
+  "reason": "scripts/board-structure-core.mjs:207 — bodies are collected from every details.now in the document but indexed by nowCards' section-scoped position, so an out-of-section card shifts the pairing"
+ },
+ {
+  "id": "U1265",
+  "decision": "rewritten",
+  "reason": "board-remedy now says the contract is stated in prose once and the gates carry only the data they check (REQUIRED_SECTIONS)"
+ },
+ {
+  "id": "U1266",
+  "decision": "rewritten",
+  "reason": "CLOSING_CARD_CMD doc now says it is a prefix and callers append <N> \"<Grund>\" since point 655"
+ },
+ {
+  "id": "U1267",
+  "decision": "rewritten",
+  "reason": "header command list now includes eta, promote, merge-done, closing --title and notes paused as a redirect"
+ },
+ {
+  "id": "U1268",
+  "decision": "rewritten",
+  "reason": "header now calls the mirror step 'the since-retired mirror'"
+ },
+ {
+  "id": "U1269",
+  "decision": "removed",
+  "reason": "the pure alias const out = rendered was removed"
+ },
+ {
+  "id": "U1270",
+  "decision": "rewritten",
+  "reason": "fallback usage now includes --text-stdin"
+ },
+ {
+  "id": "U1271",
+  "decision": "rewritten",
+  "reason": "the unmaintained 'fifteen different points' count replaced by 'many points'"
+ }
+]
