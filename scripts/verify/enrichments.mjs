@@ -5263,7 +5263,7 @@ if (section('crocodile-ambush')) {
     const U = 10
     const p0 = window.__game.getState().pos
     let water = null
-    outer: for (let r = 6; r <= 45 && !water; r += 2) {
+    outer: for (let r = 6; r <= 45; r += 2) {
       for (let k = 0; k < 24; k++) {
         const ang = (k / 24) * Math.PI * 2
         const x = p0.x + Math.cos(ang) * r
@@ -5284,8 +5284,8 @@ if (section('crocodile-ambush')) {
     window.__stagedCrocPrevStrike = window.__balance.crocodile.strikeRadius
     window.__balance.crocodile.strikeRadius = 0
     window.__stagedCrocBackup = { crocodile: herds.crocodile.splice(0), flamingo: herds.flamingo.splice(0) }
-    // Anchor at the visibly DRAWN sheet (point 274): sheetAt, never the canoe
-    // float height surfaceAt — its local-bed floor can stand ~0.22 proud of the
+    // Anchor at the visibly DRAWN sheet (point 274): sheetAt; the canoe float
+    // height surfaceAt only where no sheet answers — its local-bed floor can stand ~0.22 proud of the
     // rendered ribbon row on a cross-sloping bank, floating the croc's waterline
     // (and its "submerged" back) above the visible water.
     const ws = window.__rivers?.sheetAt(-water.z / U, water.x / U) ?? window.__rivers?.surfaceAt(-water.z / U, water.x / U) ?? 0.4
@@ -5556,7 +5556,7 @@ if (section('crocodile-ambush')) {
       // relocated by the no-standing-in-water sweep and the staging starved).
       let water = null
       let bank = null
-      outer: for (let r = 4; r <= 40 && !water; r += 3) {
+      outer: for (let r = 4; r <= 40; r += 3) {
         for (let k = 0; k < 16; k++) {
           const ang = (k / 16) * Math.PI * 2
           const x = p0.x + Math.cos(ang) * r
@@ -5571,15 +5571,16 @@ if (section('crocodile-ambush')) {
           }
         }
       }
-      if (!water || !bank) return { staged: false, noWater: true }
+      if (!water) return { staged: false, noWater: true }
       // Isolate: the natural crocodiles stand down for the staged scenario.
       const naturals = herds.crocodile.splice(0)
       // Chunk-LESS staging (the point-126 lesson): the despawn filter keeps
       // chunk-less animals, so no zoom restore or ring change can silently
       // filter the stage out mid-scenario (the rotating crocLunge:false runs
       // were exactly that — a despawned liveChunk took croc and calf with it).
-      // Stage the croc at the visibly DRAWN sheet (points 187/274 — sheetAt,
-      // never the canoe-float surfaceAt with its proud local-bed floor) so the
+      // Stage the croc at the visibly DRAWN sheet (points 187/274 — sheetAt; the
+      // canoe-float surfaceAt with its proud local-bed floor only where no sheet
+      // answers) so the
       // hidden pose shows the eye knobs breaking the water on the screenshots too.
       const stageWs = window.__rivers?.sheetAt(-water.z / U, water.x / U) ?? window.__rivers?.surfaceAt(-water.z / U, water.x / U)
       const croc = { x: water.x, z: water.z, y: stageWs ?? 0.4, rot: 0, scale: 1, phase: 0.1, chunk: undefined }
@@ -5627,8 +5628,8 @@ if (section('crocodile-ambush')) {
       // the croc for motion and teleports until it grips.
       let lastX = croc.x
       let lastZ = croc.z
-      // point 177: gauge the lunge step against SIM time (clamped to 0.1/frame),
-      // not wall-clock. Under load a wall-dt threshold falsely flagged the burst
+      // point 177: gauge the lunge step against SIM time (floored at 1/60 s per
+      // poll), not wall-clock. Under load a wall-dt threshold falsely flagged the burst
       // (a slow frame widened dtw while the croc still advanced only lungeSpeed·
       // 0.1); a real teleport (a chunk relocation) jumps far more than any
       // lungeSpeed·dt, so a sim-time bound separates the two on both cadences.
@@ -5644,7 +5645,7 @@ if (section('crocodile-ambush')) {
         const nowSim = window.__wildlife.simTime()
         const dts = Math.max(nowSim - lastSimT, 1 / 60)
         // 20 > lungeSpeed (12): the burst always fits under 2 + 20·dts, a
-        // relocation never does — dt-robust because dts is the clamped sim step.
+        // relocation never does — dt-robust because dts is the floored sim step.
         if (step > 2 + 20 * dts) out.noTeleport = false
         if (step > 0.05) out.lunged = true
         lastX = croc.x; lastZ = croc.z; lastSimT = nowSim
@@ -5695,8 +5696,8 @@ if (section('crocodile-ambush')) {
           // far enough off, and under machine load that assumption flipped: the
           // parent drove the crocodile off and the check accused the product of a
           // bug that was not there. Now the distance is ENFORCED (well beyond the
-          // §19.8 charge reach) and the outcome pinned, the way kill, drive-off
-          // and rescue have been pinned since point 177.
+          // §19.8 charge reach) and the outcome pinned, the way the other stagings
+          // pin theirs through forceOutcome since point 177.
           parent.x = calf.x + (lx / ll2) * 40
           parent.z = calf.z + (lz / ll2) * 40
           window.__balance.parentDefense.forceOutcome = 'taken'
@@ -5734,39 +5735,30 @@ if (section('crocodile-ambush')) {
           // and the outcome is pinned, so the grip window simply expires.
           await window.__pollSim(12, () => calf.dead, 56000)
           await window.__sleepSim(0.4)
-          out.calfAlive = !calf.dead
-          out.parentAlive = !parent.dead
-          out.crocRetreated = croc.lunge === undefined || croc.lunge.retreat === true
-          out.lionTouched = lion.victim === calf || lion.victim === parent
-          window.__balance.parentDefense.forceOutcome = undefined
-          pf.crocodile = prevPf
-          window.__balance.family.adoptionRadius = prevAdoption
-          herds.zebra = herds.zebra.filter((a) => a !== parent && a !== calf)
-          herds.crocodile = naturals
-          out.calfAt = { x: +calf.x.toFixed(1), z: +calf.z.toFixed(1), bankX: +bankX.toFixed(1), bankZ: +bankZ.toFixed(1) }
-          return out
+        } else {
+          await window.__pollSim(25, () => {
+            // Rescue (point 249): the calf rises a frame or two BEFORE the crocodile's
+            // retreat flag lands, so wait for BOTH the freed calf AND the retreat —
+            // a fixed 0.6 s settle alone sampled crocRetreated too early on a slow
+            // backend (the rotating crocRetreated:false flake); the settle now
+            // follows the poll. A slow backend just polls longer to reach the same
+            // fully-resolved state.
+            const retreated = croc.lunge === undefined || croc.lunge.retreat === true
+            if (MODE.kind === 'rescue' && calf.caught === undefined && !calf.dead && retreated) return true
+            if (MODE.kind === 'sacrifice' && parent.dead) return true
+            // toolate: both are taken — wait for BOTH deaths (point 249), they can
+            // resolve a frame apart and the check asserts both dead.
+            if (MODE.kind === 'toolate' && calf.dead && parent.dead) return true
+            return false
+          })
+          await window.__sleepSim(0.6)
         }
-        await window.__pollSim(25, () => {
-          // Rescue (point 249): the calf rises a frame or two BEFORE the crocodile's
-          // retreat flag lands, so wait for BOTH the freed calf AND the retreat —
-          // the old fixed 0.6 s settle sampled crocRetreated too early on a slow
-          // backend (the rotating crocRetreated:false flake). A slow backend just
-          // polls longer to reach the same fully-resolved state.
-          const retreated = croc.lunge === undefined || croc.lunge.retreat === true
-          if (MODE.kind === 'rescue' && calf.caught === undefined && !calf.dead && retreated) return true
-          if (MODE.kind === 'sacrifice' && parent.dead) return true
-          // toolate: both are taken — wait for BOTH deaths (point 249), they can
-          // resolve a frame apart and the check asserts both dead.
-          if (MODE.kind === 'toolate' && calf.dead && parent.dead) return true
-          return false
-        })
-        await window.__sleepSim(0.6)
       }
       out.calfAlive = !calf.dead
       out.parentAlive = !parent.dead
       out.crocRetreated = croc.lunge === undefined || croc.lunge.retreat === true
       out.lionTouched = lion.victim === calf || lion.victim === parent
-      window.__balance.parentDefense.forceOutcome = undefined // clear the forced rescue outcome
+      window.__balance.parentDefense.forceOutcome = undefined // clear any forced outcome (lunge, rescue, toolate)
       pf.crocodile = prevPf
       window.__balance.family.adoptionRadius = prevAdoption // the herds adopt again
       herds.zebra = herds.zebra.filter((a) => a !== parent && a !== calf)
@@ -5821,10 +5813,10 @@ if (section('crocodile-ambush')) {
 
   // --- Point 275: the BROADENED waterline ambush --------------------------------
   // A wandering GRAZER (no drink pose) that steps to the bank within the ambush
-  // band is now a legal target; one just OUTSIDE the band (but still within the
-  // strike radius) is not. Staged like crocDrama: a croc on water, a grazer on
-  // the true bank beside it — but the grazer never drinks, proving the trigger
-  // no longer needs a formal drink pose.
+  // band is now a legal target; one clearly past the band (band + 6) is not.
+  // Staged like crocDrama: a croc on water, a grazer on the true bank beside it
+  // — but the grazer is staged with no drink pose, proving the trigger no longer
+  // needs a formal one.
   const crocGrazerAmbush = await page.evaluate(async () => {
     const herds = window.__wildlife.herdsRef.current
     const seed = window.__game.getState().seed
@@ -5876,13 +5868,12 @@ if (section('crocodile-ambush')) {
     // be taken — the ambush stays occasional and never reaches up the shore.
     herds.zebra = herds.zebra.filter((a) => a !== grazer)
     croc.lunge = undefined
-    // Clearly beyond the reach — and by MORE than the drift the pin below
-    // tolerates, or a grazer that wanders toward the water reaches the band's
-    // inclusive edge on its own and the check fails on the animal's own roaming.
+    // Clearly beyond the reach — a margin past the band's inclusive edge, so the
+    // distance (held by the hard pin below) cannot be read as inside the band.
     const far = bc.ambushBankBand + 6
     const fx = croc.x + bankDir.x * far
     const fz = croc.z + bankDir.z * far
-    // Only run the far check where that spot is still land (else skip, not fail).
+    // Only run the far check where that spot is not river water (else skip, not fail).
     if (window.__terrainType(-fz / U, fx / U, seed) !== 'water') {
       const farGrazer = { x: fx, z: fz, y: 0.2, rot: 0, scale: 1, phase: 0.3, chunk: undefined }
       herds.zebra.push(farGrazer)
@@ -5940,7 +5931,8 @@ if (section('crocodile-ambush')) {
     if (!water) return { staged: false, noWater: true }
     const naturals = herds.crocodile.splice(0)
     const stageWs = window.__rivers?.sheetAt(-water.z / U, water.x / U) ?? window.__rivers?.surfaceAt(-water.z / U, water.x / U)
-    // Croc facing +z (rot 0). Its victim, gripped, must sit AHEAD along +z.
+    // Croc staged facing +z (rot 0), its gripped victim placed AHEAD along +z;
+    // the read-back below projects onto the croc's live heading.
     const croc = { x: water.x, z: water.z, y: stageWs ?? 0.4, rot: 0, scale: 1, phase: 0.1, chunk: undefined }
     const victim = { x: water.x, z: water.z + 0.6, y: croc.y, rot: 0, scale: 0.5, phase: 0.2, chunk: undefined, young: true, caught: 5, caughtBy: 'crocodile' }
     croc.lunge = { victim, timer: 0, gripped: true, retreat: false, homeX: water.x, homeZ: water.z }
@@ -5989,7 +5981,7 @@ if (section('crocodile-ambush')) {
   // feeding while the carcass lay at the waterline. Staged like crocDrama (the
   // natural crocs stand down, the lion is parked, the prey is a lone ADULT so no
   // family drama or adoption can claim it), then the terrain under BOTH bodies is
-  // read back across the whole feed — struggle, kill and sink.
+  // read back through the feed that follows the grip and the frame capture.
   await page.evaluate(async () => {
     const herds = window.__wildlife.herdsRef.current
     const seed = window.__game.getState().seed
@@ -6013,7 +6005,7 @@ if (section('crocodile-ambush')) {
         }
       }
     }
-    if (!water || !bank) return { staged: false, noWater: true }
+    if (!water || !bank) return // no stage: the second call reports noStage
     const naturals = herds.crocodile.splice(0)
     const stageWs = window.__rivers?.sheetAt(-water.z / U, water.x / U) ?? window.__rivers?.surfaceAt(-water.z / U, water.x / U)
     const croc = { x: water.x, z: water.z, y: stageWs ?? 0.4, rot: 0, scale: 1, phase: 0.1, chunk: undefined }
@@ -6024,7 +6016,7 @@ if (section('crocodile-ambush')) {
     herds.zebra.push(prey)
     const lion = window.__lionHunt.state
     lion.mode = 'idle'; lion.timer = 9999; lion.victim = null; lion.victimHunt = false
-    const out = { staged: true, seized: false, feeding: false, samples: 0, onLand: 0, tooFar: 0, sawSink: false }
+    const out = { staged: true, seized: false, feeding: false, samples: 0, onLand: 0, tooFar: 0, sawKill: false }
     await window.__pollSim(30, () => {
       prey.phase = (prey.phase + 0.1) % 75
       if (!prey.drink) prey.drink = { tx: bank.x, tz: bank.z }
@@ -6040,7 +6032,6 @@ if (section('crocodile-ambush')) {
     // Hand the stage to the frame capture below — the PICTURE has to be taken
     // mid-feed, so the sampling continues in a second call after the screenshot.
     window.__crocFeedStage = { croc, prey, naturals, out, terrainAt }
-    return out
   })
   // The subject is the staged pair itself: the shutter projects the crocodile's
   // own position, so a frame taken while the camera sits elsewhere is refused
@@ -6060,9 +6051,9 @@ if (section('crocodile-ambush')) {
     const herds = window.__wildlife.herdsRef.current
     if (out.seized) {
       await window.__pollSim(20, () => {
-        // Sample the whole feed: struggle, kill and the sink under it. It ends
-        // when the body is gone and the crocodile lets go (retreat) — from there
-        // the two are no longer a pair and nothing is being held.
+        // Sample the rest of the feed. It ends when the crocodile lets go (its
+        // lunge over or in retreat) or the body is gone — from there the two are
+        // no longer a pair and nothing is being held.
         if (croc.lunge === undefined || croc.lunge.retreat === true || prey.gone === true) return true
         out.samples++
         if (terrainAt(croc.x, croc.z) !== 'water') out.onLand++
@@ -6070,7 +6061,7 @@ if (section('crocodile-ambush')) {
         // 3.7 = CROCODILE_BODY_LENGTH_LOCAL (wildlifeBehavior.ts): the catch lies
         // beside the crocodile, never adrift somewhere else in the river.
         if (Math.hypot(prey.x - croc.x, prey.z - croc.z) > 3.7 * croc.scale) out.tooFar++
-        if (prey.dead) out.sawSink = true
+        if (prey.dead) out.sawKill = true
         return false
       })
     }
@@ -6086,14 +6077,14 @@ if (section('crocodile-ambush')) {
     'the crocodile eats its catch IN the water: both bodies on water cells, the carcass beside it, through the whole feed (point 383)',
     crocFeedsInWater.staged && crocFeedsInWater.seized && crocFeedsInWater.feeding &&
       crocFeedsInWater.samples > 10 && crocFeedsInWater.onLand === 0 && crocFeedsInWater.tooFar === 0 &&
-      crocFeedsInWater.sawSink,
+      crocFeedsInWater.sawKill,
     JSON.stringify(crocFeedsInWater),
   )
 
   await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(null))
   await page.waitForTimeout(300)
 
-  // --- Point 201: a fleeing animal at a bank escapes ALONG it, never pins ------
+  // --- Point 201: a fleeing animal at a bank escapes along it or into the water, never pins
   // The user report: a freed calf stood pinned at the waterline while the lion ate
   // its parent — the raw radial flee step ran onto the water cell and the §19.5
   // backstop teleported it back, a vibrating stand-still. The flee now routes
@@ -6132,7 +6123,6 @@ if (section('crocodile-ambush')) {
     const prey = { x: bank.x, z: bank.z, y: 0.2, rot: 0, scale: 1, phase: 0.2, chunk: undefined }
     herds.zebra.push(prey)
     const s = window.__lionHunt.state
-    const prev = { mode: s.mode, timer: s.timer, lx: s.lx, lz: s.lz }
     s.mode = 'feed'
     s.timer = 90
     s.victim = null
@@ -6150,7 +6140,7 @@ if (section('crocodile-ambush')) {
       return false
     }, 40000)
     const net = Math.hypot(prey.x - start.x, prey.z - start.z)
-    s.mode = prev.mode === 'idle' ? 'idle' : 'idle'
+    s.mode = 'idle'
     s.timer = 9999
     herds.zebra = herds.zebra.filter((a) => a !== prey)
     return { staged: true, path: +path.toFixed(1), net: +net.toFixed(1), onWater }
