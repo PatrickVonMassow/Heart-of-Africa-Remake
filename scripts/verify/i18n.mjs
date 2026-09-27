@@ -56,7 +56,7 @@ const switchToGerman = async () => {
   await page.waitForTimeout(800)
 }
 
-// --- English is the default: capture the status bar + journal ----------------
+// --- English is the default: capture the status bar ---------------------------
 if (section('english-default')) {
   await shot('54-i18n-english-default', { element: '.status-bar', label: 'the English status bar' })
 }
