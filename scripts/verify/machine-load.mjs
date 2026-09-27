@@ -1,17 +1,18 @@
 // Probe the machine, then let machine-load-core.mjs judge it (point 296/386).
 //
 // Everything impure lives here: two `os.cpus()` samples a moment apart, the OS
-// process table, the per-adapter GPU engine counters, and the repo path a
-// leftover is matched against. The verdict, the stray classification and the
+// process table, the GPU utilisation (Windows engine counters; Linux sysfs
+// `gpu_busy_percent` or `nvidia-smi`), and the repo path a leftover is matched
+// against. The verdict, the stray classification and the
 // proceed/flag/defer decision are pure and pinned in
 // scripts/verify/machine-load.test.mjs.
 //
 // Standalone — ask BEFORE you spend a browser run (CLAUDE.md §7.2, "ask the
 // guards before the action"):
 //
-//   node scripts/verify/machine-load.mjs            # report; exit 0 quiet, 2 not quiet
+//   node scripts/verify/machine-load.mjs            # report; exit 0 quiet or unknown, 2 measurably not quiet
 //   node scripts/verify/machine-load.mjs --json     # the same as machine-readable JSON
-//   node scripts/verify/machine-load.mjs --suites enrichments,polish
+//   node scripts/verify/machine-load.mjs --suites=enrichments,polish
 //
 // FAIL-OPEN: every step is guarded. A probe that cannot read the machine returns
 // `ok: false`, which classifies as UNKNOWN — reported, never mistaken for quiet,
@@ -37,8 +38,9 @@ const SAMPLE_MS = Number(process.env.VERIFY_LOAD_SAMPLE_MS) || 600
 /** The process table is a means, not the goal: a slow WMI call must never hold
  *  a regression, so it is killed and the probe carries on without strays. */
 const PS_TIMEOUT_MS = 15000
-/** The GPU counter read costs ~1.5 s here; anything beyond this is a hung
- *  performance-counter service, which is a "not measured", not a reason to wait. */
+/** The GPU read (Windows counters, Linux `nvidia-smi`) costs ~1.5 s on Windows;
+ *  anything beyond this is a hung reader, which is a "not measured", not a reason
+ *  to wait. */
 const GPU_TIMEOUT_MS = 10000
 
 /**
@@ -80,23 +82,25 @@ try {
 }
 `
 
-/** Where a Linux driver publishes its own busy percentage. amdgpu's shape, copied
- *  by several others; absent on the drivers that publish nothing. */
-const DRM_BUSY_GLOB = '/sys/class/drm'
+/** The directory under which a Linux driver publishes its own busy percentage
+ *  (`<card>/device/gpu_busy_percent`). amdgpu's shape, copied by several others;
+ *  absent on the drivers that publish nothing. */
+const DRM_DIR = '/sys/class/drm'
 
 /**
- * LINUX: the busiest device, read without a new dependency (point 474). Two
- * sources in order of directness — the driver's own sysfs counter first, then
- * `nvidia-smi` where it is installed. Neither present is an honest `unreadable`,
+ * LINUX: the busiest device of the first source that yields a reading, without a
+ * new dependency (point 474). Two sources in order of directness — the driver's
+ * own sysfs counter first, then `nvidia-smi` only when sysfs gave nothing.
+ * Neither readable is an honest `unreadable`,
  * never a comforting zero: the load gate must say it is blind rather than certify
  * a machine it did not measure.
  */
 function readLinuxGpuUtilisation() {
   const readings = []
   try {
-    for (const card of readdirSync(DRM_BUSY_GLOB)) {
+    for (const card of readdirSync(DRM_DIR)) {
       try {
-        readings.push(readFileSync(join(DRM_BUSY_GLOB, card, 'device', 'gpu_busy_percent'), 'utf8'))
+        readings.push(readFileSync(join(DRM_DIR, card, 'device', 'gpu_busy_percent'), 'utf8'))
       } catch {
         /* this card publishes no busy counter — the next one may */
       }
@@ -108,7 +112,6 @@ function readLinuxGpuUtilisation() {
   if (fromSysfs !== null) return { fraction: fromSysfs, unreadable: null }
   try {
     const res = spawnSync('nvidia-smi', ['--query-gpu=utilization.gpu', '--format=csv,noheader,nounits'], {
-      windowsHide: true,
       encoding: 'utf8', timeout: GPU_TIMEOUT_MS, maxBuffer: 1024 * 1024,
     })
     if (res.status === 0) {
@@ -120,12 +123,13 @@ function readLinuxGpuUtilisation() {
   }
   return {
     fraction: null,
-    unreadable: 'no GPU busy counter on this host (no sysfs gpu_busy_percent, no nvidia-smi)',
+    unreadable: 'no readable GPU busy counter on this host (sysfs gpu_busy_percent, nvidia-smi)',
   }
 }
 
 /**
- * `{ fraction, unreadable }` — the busiest engine as a fraction in [0,1], or a
+ * `{ fraction, unreadable }` — the busiest engine (Windows) or device (Linux) as
+ * a fraction in [0,1], or a
  * one-line reason why the device could not be read. Never throws.
  */
 export function readGpuUtilisation() {
@@ -189,7 +193,6 @@ export function listProcesses() {
       return parseWindowsProcessJson(res.stdout ?? '')
     }
     const res = spawnSync('ps', ['-axo', 'pid=,ppid=,comm=,args='], {
-      windowsHide: true,
       encoding: 'utf8', timeout: PS_TIMEOUT_MS, maxBuffer: 64 * 1024 * 1024,
     })
     return parsePsOutput(res.stdout ?? '')
@@ -200,14 +203,15 @@ export function listProcesses() {
 
 /**
  * One reading of the machine: the CPU busy fraction over `sampleMs`, the POSIX
- * run queue per core (0 on Windows, where the core ignores it) and the strays.
- * `ok` is false only when NOTHING could be read — a missing process table alone
- * still leaves a usable CPU verdict, and is reported as `processTable: false`.
+ * run queue per core (null on Windows, whose load average reads 0) and the
+ * strays. `ok` is false when neither the CPU, the process table nor the GPU could
+ * be read, or when the probe threw — a missing process table alone still leaves
+ * a usable CPU verdict, and is reported as `processTable: false`.
  */
 export async function probeMachine({ sampleMs = SAMPLE_MS, pid = process.pid } = {}) {
   try {
-    // The process table and the GPU counters FIRST, outside the CPU window: both
-    // calls cost a core for about a second, and sampling across them would charge
+    // The process table and the GPU counters FIRST, outside the CPU window: on
+    // Windows both calls cost a core for about a second, and sampling across them would charge
     // the probe's own cost to the machine it is judging.
     const processes = listProcesses()
     const gpu = readGpuUtilisation()
