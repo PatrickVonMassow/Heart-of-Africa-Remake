@@ -42,7 +42,6 @@ import {
   markVariedDetails,
   runVerdict,
   formatSuspectEnv,
-  parseSuspectEnv,
   parseSuspectReds,
   suspectRedsOf,
   unexplainedRuns,
@@ -60,6 +59,8 @@ import {
 import { RED_CHARGES } from './render-verify-charges.mjs'
 import { checkKey, failedChecks } from './verify/baseline-classify-core.mjs'
 import { readTasksAll } from './tasks-source.mjs'
+/** The retry marker's bare names — what a message prints. */
+const parseSuspectEnv = (value) => parseSuspectReds(value).map((r) => r.name)
 
 const VERIFY_DIR = join(dirname(fileURLToPath(import.meta.url)), 'verify')
 
@@ -1662,7 +1663,7 @@ describe('evaluate — a red is not closed by the runs that FOLLOWED it (point 6
     // as an unexplained red sent the reader hunting a defect the run never
     // reported. The charge still lifts nothing; only the message class moved.
     expect(result.reason).toMatch(/CRASHED RUN — NOT AN UNEXPLAINED RED/)
-    expect(result.reason).not.toMatch(/UNEXPLAINED RED SINCE THE LAST RENDER EDIT/)
+    expect(result.reason).not.toMatch(/UNEXPLAINED RED NOT YET SHOWN GONE/)
   })
 
   it('a charge to a point that is NOT open explains nothing', () => {
@@ -1992,7 +1993,7 @@ describe('an INCOMPLETE RECORDING is its own class, and has its own way out (poi
     expect(result.reason).toMatch(/INCOMPLETE RECORDING — NOT AN UNEXPLAINED RED/)
     expect(result.reason).toMatch(/--incomplete/)
     // It must NOT send the reader hunting a defect that was never captured.
-    expect(result.reason).not.toMatch(/UNEXPLAINED RED SINCE THE LAST RENDER EDIT/)
+    expect(result.reason).not.toMatch(/UNEXPLAINED RED NOT YET SHOWN GONE/)
   })
 
   // Round-5 finding 3: with backend coverage still MISSING, the message read
@@ -2014,7 +2015,7 @@ describe('an INCOMPLETE RECORDING is its own class, and has its own way out (poi
     const result = evaluate(
       renderChange({ runs: [truncatedLegacy('webgpu', 1500), unfiled, run('webgpu', 2000), run('webgl', 2100)], openPoints }),
     )
-    expect(result.reason).toMatch(/UNEXPLAINED RED SINCE THE LAST RENDER EDIT/)
+    expect(result.reason).toMatch(/UNEXPLAINED RED NOT YET SHOWN GONE/)
     expect(result.reason).toMatch(/INCOMPLETE RECORDING/)
   })
 

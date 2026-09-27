@@ -9,7 +9,8 @@
 // shader's path. Standing rule (user, enforced not reminded): every
 // GUI/rendering/shader change must be verified on BOTH renderer backends
 // (`VERIFY_GL=webgpu` AND `VERIFY_GL=webgl`), judged by the rendered picture,
-// before it is committed/ticked/called done. This core decides, from committed
+// before it is committed/ticked/called done — except a DOM-only src/ui/ change,
+// which owes one backend (isBackendSensitivePath). This core decides, from committed
 // render-path changes and the mechanically recorded verify runs, whether the
 // turn may end. Fail-open is the WRAPPER's job; this core only decides on the
 // inputs it is handed and must never throw on partial ones.
@@ -24,7 +25,8 @@ import { RED_CHARGES } from './render-verify-charges.mjs'
 import { isSectionName } from './section-tag-core.mjs'
 import { scopeMandatoryDuty } from './mandatory-duty-core.mjs'
 
-/** Both renderer backends the game ships; each needs a passing verify run. */
+/** Both renderer backends the game ships; each needs a COVERING verify run —
+ *  clean or accounted for (runVerdict) — unless the change is DOM-only. */
 export const BACKENDS = ['webgpu', 'webgl']
 
 /**
@@ -53,21 +55,6 @@ export function featureLevelOf(info) {
 }
 
 /**
- * The scripts under scripts/verify/ that DRIVE NO BROWSER: the orchestrator,
- * the server plumbing, the pure decision cores and the Node-only checks. The
- * harness RUNS the suites, it does not draw, so a change here cannot move a
- * pixel and owes no picture — three such commits on 27.07.2026 each cost a real
- * suite run and a turn before this list existed (docs/picture-check-levers.md
- * §5).
- *
- * A DENYLIST, deliberately, not an allowlist: an unrecognised verify script
- * stays IN the render set, so a NEW browser suite is covered from its first
- * commit and only a new HELPER needs an entry here. render-verify-core.test.mjs
- * re-derives the membership from the directory (a file is in the render set iff
- * it imports playwright or the shared browser/boot helpers) and fails when this
- * list drifts from the files.
- */
-/**
  * BROWSER-FREE SUITES THAT NO LONGER EXIST.
  *
  * This classification reads CHANGED PATHS, and a deletion is a change: when
@@ -84,6 +71,21 @@ export const DELETED_NON_RENDER_VERIFY = new Set([
   'red-ownership.mjs', // point 1135: the baseline-pass spawner; it never opened a page
 ])
 
+/**
+ * The scripts under scripts/verify/ that DRIVE NO BROWSER: the orchestrator,
+ * the server plumbing, the pure decision cores and the Node-only checks. The
+ * harness RUNS the suites, it does not draw, so a change here cannot move a
+ * pixel and owes no picture — three such commits on 27.07.2026 each cost a real
+ * suite run and a turn before this list existed (docs/picture-check-levers.md
+ * §5).
+ *
+ * A DENYLIST, deliberately, not an allowlist: an unrecognised verify script
+ * stays IN the render set, so a NEW browser suite is covered from its first
+ * commit and only a new HELPER needs an entry here. render-verify-core.test.mjs
+ * re-derives the membership from the directory (a file is in the render set iff
+ * it imports playwright or the shared browser/boot helpers) and fails when this
+ * list drifts from the files.
+ */
 export const NON_RENDER_VERIFY = new Set([
   '_server.mjs', // vite start/stop plumbing shared by the runner and the classifier
   'animalShare.mjs', // the animal-vs-water decision layer; enrichments.mjs feeds it pixels
@@ -178,11 +180,6 @@ export function isRenderPath(path) {
   if (p.startsWith('src/world/')) return true
   if (p === 'src/App.tsx') return true // renderer setup / scene switch
   if (p.includes('.tsl.')) return true // TSL shader modules wherever they live
-  // A *.test.mjs beside the suites is a VITEST file: it runs in jsdom, never
-  // opens a browser and cannot touch a picture. Classifying it as a render path
-  // demanded a two-backend browser run for editing a pure text scanner — and a
-  // guard that sends you on pointless errands is one you learn to wave through.
-  if (/^scripts\/verify\/.+\.test\.mjs$/.test(p)) return false
   const suite = p.match(/^scripts\/verify\/([^/]+\.mjs)$/)
   if (suite && !NON_RENDER_VERIFY.has(suite[1]) && !DELETED_NON_RENDER_VERIFY.has(suite[1])) return true
   return false
@@ -236,15 +233,6 @@ export function chargeablePoints(text) {
   return out
 }
 
-/**
- * The ledger entry that owns this red, or null. `red` is one entry of the run
- * record's `reds` — `{ name, key, kind }` plus the `detail` the record keeps
- * (point 734) as the recorder wrote it — and `suite` / `backend` are the run's
- * own, so a charge scoped to one lane cannot excuse the other. The same call
- * answers both readings: the recorder's, while the run is written, and
- * `owned()`'s, when a later ledger is asked whether it owns a red already on
- * disk. Total: a malformed entry matches nothing rather than throwing.
- */
 /**
  * A LEDGER PATTERN TESTED STATELESSLY (review finding, 28.08.2026). A regex
  * carrying `g` or `y` keeps its `lastIndex` between calls, so the SAME entry
@@ -300,7 +288,8 @@ function patternHits(pattern, value) {
 
 /**
  * Was this red's measurement CUT by the record's bound? Records written from
- * this revision carry `detailCut` explicitly, set where the cut is observed.
+ * this revision carry `detailCut` where length alone would mislead: `true` when
+ * the bound cut, `false` for an uncut detail exactly at the bound, absent otherwise.
  * Older records carry nothing, and only one signal survives in them: a detail
  * that ends exactly ON the bound was longer than it, or ended there by
  * coincidence — the record cannot tell which, so it reads as cut.
@@ -348,8 +337,8 @@ export function wasDetailCut(red) {
  * still match if the text went on — and every one of them was refused with a
  * counterexample, the last being `/^(?=A{200}$)|^A{200}.$/`, which asserts the
  * end in one alternative and swallows the probe character in the other
- * (cross-vendor review, GPT-5.6 Sol). The lesson is the one this file already
- * learned about the section tag, in the same words: recovering intent from TEXT
+ * (cross-vendor review, GPT-5.6 Sol). The lesson is the one the section-tag
+ * reader (section-tag-core.mjs) learned: recovering intent from TEXT
  * proves SYNTAX, not PROVENANCE. A regex cannot be interrogated about what its
  * author meant, and no finite probe closes a pattern written to defeat it.
  *
@@ -366,6 +355,15 @@ function mayReadCutDetail(charge) {
   return charge?.detailReadsPrefix === true
 }
 
+/**
+ * The ledger entry that owns this red, or null. `red` is one entry of the run
+ * record's `reds` — `{ name, key, kind }` plus the `detail` the record keeps
+ * (point 734) as the recorder wrote it — and `suite` / `backend` are the run's
+ * own, so a charge scoped to one lane cannot excuse the other. The same call
+ * answers both readings: the recorder's, while the run is written, and
+ * `owned()`'s, when a later ledger is asked whether it owns a red already on
+ * disk. Total: a malformed entry matches nothing rather than throwing.
+ */
 export function chargeFor(red, options) {
   const { suite = '', backend = '', featureLevel = null, ledger = RED_CHARGES } = options ?? {}
   const name = text(red?.name)
@@ -535,8 +533,8 @@ export function chargeReds(reds, options) {
  */
 export const RETRY_ENV = 'VERIFY_RETRY_AFTER'
 
-/** What run-all puts in that variable: the first attempt's failing check names,
- *  newline-separated. A retry that has no names to give (a crash, a wall-timeout
+/** What the variable carries: the first attempt's failing reds as `<kind>\t<name>`
+ *  lines (formatSuspectEnv), plus one truncated-kind line for any overflow. A retry that has no names to give (a crash, a wall-timeout
  *  kill) still says SOMETHING — the run is a retry either way, and an empty value
  *  would read as "not a retry". Bounded, because it travels in an environment. */
 export const SUSPECT_UNNAMED = 'the first attempt failed without naming a check'
@@ -553,11 +551,12 @@ const MAX_SUSPECT_NAME_LEN = 200
  *  hidden trap: `chargeReds` charges the TRUNCATED text, so a signature past
  *  the bound matches at record time no more than it does afterwards.
  *
- *  What the bound MAY NOT do is make a cut measurement look whole. Every
- *  `detailMatch` is anchored at both ends, so `<cut>` out of `<cut><more>`
- *  satisfies a signature written for a genuinely shorter red — a different red,
+ *  What the bound MAY NOT do is make a cut measurement look whole. A
+ *  `detailMatch` anchored at both ends lets `<cut>` out of `<cut><more>`
+ *  satisfy a signature written for a genuinely shorter red — a different red,
  *  quietly excused. A cut red is marked at the cut (`detailCut`) and refuses
- *  every narrow charge from then on; see `wasDetailCut`. */
+ *  every narrow charge that has not declared `detailReadsPrefix`; see
+ *  `wasDetailCut`. */
 const MAX_RED_NAME_LEN = 200
 const MAX_RED_DETAIL_LEN = 200
 
@@ -576,19 +575,15 @@ function text(value) {
  *  DISTINCT from 0: collapsing both to zero made two records with no timestamp
  *  read as the same run (review finding, 19.08.2026). */
 function finite(value) {
-  try {
-    if (typeof value === 'number') return Number.isFinite(value) ? value : null
-    // A NUMERIC STRING is readable; nothing else is. `Number()` turns null, ''
-    // and false into 0, which made two records with NO timestamp read as the
-    // same run and an `exit: null` read as a clean pass (review, 19.08.2026).
-    if (typeof value === 'string' && value.trim() !== '') {
-      const n = Number(value)
-      return Number.isFinite(n) ? n : null
-    }
-    return null
-  } catch {
-    return null
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null
+  // A NUMERIC STRING is readable; nothing else is. `Number()` turns null, ''
+  // and false into 0, which made two records with NO timestamp read as the
+  // same run and an `exit: null` read as a clean pass (review, 19.08.2026).
+  if (typeof value === 'string' && value.trim() !== '') {
+    const n = Number(value)
+    return Number.isFinite(n) ? n : null
   }
+  return null
 }
 
 /** The same, with 0 where nothing is readable — for the places a missing number
@@ -605,7 +600,9 @@ function exitOf(run) {
 
 /**
  * THE TIMESTAMP A RUN CAN BE NAMED BY, or null (point 734). One reading in one
- * place, because two of them disagreeing is how a run stops being closable: the
+ * place for NAMING a run (freshness asks when a run STARTED and reads
+ * `startedAt` first — see sawCodeSince), because two naming readings
+ * disagreeing is how a run stops being closable: the
  * signature route keyed on `at` alone while the re-recording route already fell
  * back to `startedAt`, so a record whose `at` is unreadable could be signed for —
  * the CLI even reported success — and the closure then matched nothing.
@@ -676,8 +673,8 @@ export function formatSuspectEnv(reds) {
   const list = all.slice(0, MAX_SUSPECT_NAMES).map((r) => `${r.kind === 'console' ? 'console' : 'check'}\t${r.name}`)
   // A first attempt with more reds than the marker can carry says SO, as one
   // more red — a truncation nobody is told about is a red that quietly stops
-  // blocking once the eight that fitted are charged. Deliberately worded so no
-  // ledger entry can match it: what is missing cannot be charged.
+  // blocking once the eight that fitted are charged. Its KIND, below, is what
+  // keeps any ledger entry from owning it: what is missing cannot be charged.
   if (all.length > MAX_SUSPECT_NAMES) {
     // Its own KIND, not a check: a truncation is not a red anybody can own, and
     // a ledger entry with a broad enough regex would otherwise charge it away
@@ -705,11 +702,6 @@ export function parseSuspectReds(value) {
     if (out.length >= MAX_SUSPECT_NAMES + 1) break
   }
   return out
-}
-
-/** The same, as bare names — what a message prints. Total. */
-export function parseSuspectEnv(value) {
-  return parseSuspectReds(value).map((r) => r.name)
 }
 
 /** What the FIRST attempt of a suspect run failed on, as reds. The record holds
@@ -777,8 +769,9 @@ function isTruncationEntry(red) {
 /**
  * WHAT A LIFTED TRUNCATION LEAVES BEHIND — the run judged by ORDINARY semantics,
  * as if it had never truncated (review, 19.08.2026). Reading `r.reds` alone here
- * lost a whole class: a SUSPECT run exited 0 and therefore carries NO reds of its
- * own, because its real failure is the FIRST attempt's, held in `suspectOf`. So a
+ * lost a whole class: a SUSPECT run that exited 0 usually carries no reds of its
+ * own (the exception is below), because its real failure is the FIRST attempt's,
+ * held in `suspectOf`. So a
  * truncated run that also passed on the retry dropped its first attempt's reds
  * the moment the truncation was lifted, and left the list silently.
  *
@@ -824,7 +817,7 @@ function incompleteSentence(run) {
 
 /** How many result lines the cap swallowed, as the record knows it — the number
  *  the new field carries, or the one the old synthetic red states in its text.
- *  0 when the run is not truncated or the count cannot be read. */
+ *  0 when the record carries neither or the count cannot be read. */
 export function droppedLinesOf(run) {
   // `Number(x)` THROWS on a symbol, and these records come off disk and out of a
   // suite's exit handler — total means total (review finding, 19.08.2026).
@@ -841,8 +834,9 @@ export function droppedLinesOf(run) {
 
 /** A value as canonical JSON text — object keys sorted recursively, so the same
  *  record read twice off disk canonicalises identically whatever a writer's key
- *  order was. Non-JSON leaves (symbols, functions) read as null, the same
- *  collapse JSON.stringify performs. */
+ *  order was. Non-JSON leaves (symbols, functions) read as null — as
+ *  JSON.stringify does inside arrays; it would drop them as object properties,
+ *  which this keeps as null. */
 function canonicalText(value) {
   if (value === null || typeof value !== 'object') return JSON.stringify(value) ?? 'null'
   if (Array.isArray(value)) return `[${value.map(canonicalText).join(',')}]`
@@ -862,8 +856,8 @@ function canonicalText(value) {
  *
  * WHY THE DIGEST IS CRYPTOGRAPHIC (review finding, 28.08.2026, round 13). The
  * first version reduced unbounded text to 64 bits of FNV — chosen to keep this
- * core arithmetic-only — and `signedClosureFor` treats identity equality as
- * SUFFICIENT AUTHORISATION to close a record. Two properties are therefore
+ * core arithmetic-only — and `signedClosureFor` treats identity equality as the
+ * binding (beside suite, backend and written evidence) that closes a record. Two properties are therefore
  * load-bearing, and 64 non-cryptographic bits had neither: a collision must not
  * be reachable by accident (birthday reach ~2^32 records, which is a bound
  * nobody should have to argue about), and it must not be reachable on purpose —
@@ -872,17 +866,15 @@ function canonicalText(value) {
  * close it.
  *
  * SHA-256 truncated to 128 bits answers both by construction, and costs one
- * Node built-in import in a file that already imports two modules and runs only
+ * Node built-in import in a file that already imports three project modules and runs only
  * under Node (the Stop hook and Vitest; `scripts/verify/_browser.mjs` imports it
  * beside Playwright, never into a page). No stored closure predates this — the
  * identity moved before any was written to `.claude/render-verify-state.json` —
  * so nothing is invalidated by the change.
  *
  * WHAT THE IDENTITY STILL DOES NOT DO, unchanged: a signature never makes a run
- * cover a backend, and it never touches a red the run recorded. The identity is
- * the record's WHOLE canonical content, so no field a writer controls can be
- * changed without the identity moving with it — the decision and its full
- * residual are recorded at the signing site in render-verify-guard.mjs.
+ * cover a backend, and it never touches a red the run recorded. The decision and
+ * its full residual are recorded at the signing site in render-verify-guard.mjs.
  *
  * Null for a non-record; never throws (the wrapper's fail-open depends on it).
  */
@@ -991,7 +983,7 @@ export function isCrashedRun(run) {
  * the record positively holds — a lost recording, the reds it printed before it
  * died — is judged exactly as it would be in a run that never crashed. Without
  * this, a run that crashed AND truncated was stuck: the crash outranks the
- * truncation, so `openIncompleteRuns` never offered it the `--incomplete`
+ * truncation, so `openIncompleteRuns` (render-verify-guard.mjs) never offered it the `--incomplete`
  * route, and its lost lines could be reached by no signature at all.
  *
  * Returns the run itself where there is nothing to lift, so a caller may
@@ -1031,26 +1023,29 @@ function signedClosureFor(run, closures) {
  * WHAT ONE RECORDED RUN IS WORTH (point 550). Six verdicts, and the difference
  * between the first two must stay visible everywhere it is reported:
  *
- *   clean     — exit 0. The picture was judged and nothing was red.
+ *   clean     — exit 0: the suite reported no failure. (Reds a crashed exit-0
+ *               run printed are judged apart, in unexplainedRuns.)
  *   accounted — the run failed, but EVERY red in it (failing check and console
  *               error alike) is charged to an OPEN work-order point named in the
  *               record. It proves the picture on that backend as far as this
  *               change is concerned, and it is never called a pass.
  *   red       — anything else: a red charged to nothing, a red charged to a point
  *               that is finished or deferred, a failure the run never reported
- *               (a crash prints no FAIL line), or a run that ended in a crash.
+ *               (a crash may print no FAIL line for what killed it), or a run
+ *               that ended in a crash.
  *   partial   — a `--section` run (point 566): one named block of the suite ran,
  *               so the record says nothing about the rest. Judged FIRST, before
  *               the exit code, because its exit code is exactly what must not
  *               clear the gate.
- *   incomplete— THE CAPTURE CAP ATE ITS REDS (point 734): the run printed more
- *               result lines than the recorder's buffer holds, so its red list is
- *               a fragment and no reader can say what it found. Judged before the
- *               exit code, like partial, because an exit 0 whose result lines were
- *               dropped is exactly a pass nobody read. It is NOT an unexplained
- *               red — there is nothing to explain, only a recording to redo — and
- *               it closes by its own signed route (incompleteClosureFor), never by
- *               the three ways of point 640, which all need the red's identity.
+ *   incomplete— THE RECORDING LOST REDS (point 734): the run printed more
+ *               result lines than the recorder keeps (its identity and length
+ *               budgets), so its red list is a fragment and no reader can say
+ *               what it found. Judged before the exit code, like partial, because
+ *               an exit 0 whose result lines were dropped is exactly a pass nobody
+ *               read. The LOST part has nothing to explain: it closes by a real
+ *               re-recording or its own signed route (incompleteClosureFor), never
+ *               by the three ways of point 640, which all need the red's identity;
+ *               the reds the run DID record keep blocking like any other.
  *   suspect   — it PASSED ON THE RETRY (point 640): the first attempt of the same
  *               suite failed, and nothing about the second run explains why. "It
  *               worked the next time" is consistent with a fixed defect, a rare
@@ -1150,12 +1145,6 @@ export function runVerdict(run, options) {
 }
 
 /**
- * The most recent COVERING run of `backend` recorded at/after `since` (the last
- * render-file edit) — or null. Covering means clean (exit 0) or, with
- * `openPoints` handed in, ACCOUNTED FOR: every red charged to an open point
- * (runVerdict). A crashed/unexplained failure proves nothing about the picture.
- */
-/**
  * Can a change to this path render DIFFERENTLY on the two backends? Only such a
  * change needs the expensive dual-backend picture, and picture inspection is the
  * costliest thing this project does (user 26.07.2026).
@@ -1164,7 +1153,7 @@ export function runVerdict(run, options) {
  * dual-backend except the DOM. The HUD, the dialogs, the map and journal
  * overlays under src/ui/ are HTML — the browser draws them identically whichever
  * renderer holds the canvas, so a second run inspects the same pixels twice. A
- * change there still owes ONE passing run: it can break the picture, just not
+ * change there still owes ONE covering run: it can break the picture, just not
  * per backend.
  *
  * Everything else stays dual, including the pure geometry/behaviour modules
@@ -1194,14 +1183,6 @@ export function isBackendSensitivePath(path) {
 // run the backend it describes; the guard cannot tell branches apart.
 
 /**
- * `featureLevel` narrows the query to runs recorded AT that level (point 505): asked for
- * 'core', a compat run — and a record from before the level was written at all — counts
- * for nothing, because an unrecorded level is not evidence of the player's path. Omitted,
- * the query is level-agnostic and the answer is exactly what it always was; the guard
- * itself asks that way, so a compat lane still proves the WebGPU picture rather than
- * blocking every render change on a host that has no core adapter.
- */
-/**
  * DID THIS RUN SEE THE CODE AS IT NOW STANDS? Judged on when it STARTED, not on
  * when it finished (four-eyes, 11.08.2026): a suite loads the page at its
  * beginning, so a run that began before the last edit and ended after it tested
@@ -1209,7 +1190,7 @@ export function isBackendSensitivePath(path) {
  * never loaded, and let a pre-fix failure condemn one. `at` stands in for a
  * record that carries no start. Total.
  */
-export function sawCodeSince(run, since) {
+function sawCodeSince(run, since) {
   const from = Number.isFinite(since) ? since : 0
   // No edit time known (or none at all): the freshness question does not apply,
   // and the guard's fail-open posture says accept rather than invent a window.
@@ -1218,6 +1199,21 @@ export function sawCodeSince(run, since) {
   return when !== null && when >= from
 }
 
+/**
+ * The most recent COVERING run of `backend` — or null. Covering means clean
+ * (exit 0) or, with `openPoints` handed in, ACCOUNTED FOR: every red charged to
+ * an open point (runVerdict). A crashed/unexplained failure proves nothing about
+ * the picture. Fresh means the run saw the code as it now stands: judged by its
+ * START against `since` (sawCodeSince), or, where `matchesTree` is supplied, by
+ * whether its recorded tree matches.
+ *
+ * `featureLevel` narrows the query to runs recorded AT that level (point 505): asked for
+ * 'core', a compat run — and a record from before the level was written at all — counts
+ * for nothing, because an unrecorded level is not evidence of the player's path. Omitted,
+ * the query is level-agnostic and the answer is exactly what it always was; the guard
+ * itself asks that way, so a compat lane still proves the WebGPU picture rather than
+ * blocking every render change on a host that has no core adapter.
+ */
 export function coveringRun(runs, backend, since, options) {
   const { featureLevel = null, openPoints = null, matchesTree = null } = options ?? {}
   if (!Array.isArray(runs)) return null
@@ -1236,15 +1232,16 @@ export function coveringRun(runs, backend, since, options) {
 }
 
 /**
- * EVERY RUN IN THE WINDOW THAT FAILED AND WAS NEVER EXPLAINED (point 640) — an
- * unaccounted red, or a pass that only came on the retry.
+ * EVERY RUN THAT FAILED AND WAS NEVER EXPLAINED (point 640) — in the window, or
+ * older and not yet shown gone — an unaccounted red, or a pass that only came on
+ * the retry.
  *
  * This is what stops the fourth closing. Refusing the retry's own record was
  * only half of it: the gate reads the most recent COVERING run, so running the
  * same code again until it comes up green cleared it just as well — which is
  * the very argument the point forbids. A red therefore stays in force until
- * something explains it: a fix (which edits a render file and moves the window
- * past the red), a CHARGE to the open point that owns it, a point of its own, or
+ * something explains it: a fix (a render edit after the red, then the red's own
+ * suite covering on its backend — see WHAT COUNTS AS FIXED), a CHARGE to the open point that owns it, a point of its own, or
  * the loud deferral valve.
  *
  * PARTIAL (`--section`) runs are excluded in BOTH directions: they are not
@@ -1318,7 +1315,7 @@ export function unexplainedRuns(runs, since, options) {
         later.suite === r.suite &&
         sawCodeSince(later, from) &&
         // NO LEDGER HERE, DELIBERATELY — see COVERING IS READ AS IT WAS
-        // RECORDED below. This asks whether a run VERIFIED the picture, and
+        // RECORDED above. This asks whether a run VERIFIED the picture, and
         // that is not a claim a text edit may create.
         runVerdict(later, { openPoints }).covers,
     )
@@ -1327,8 +1324,9 @@ export function unexplainedRuns(runs, since, options) {
    * WAS THE LOST MEASUREMENT TAKEN AGAIN (point 734)? A covering run of the SAME
    * suite on the SAME backend, later than this one and on code since the last
    * render edit. Deliberately NOT the rule for a red — a red is an observation
-   * and no later green un-observes it — but a truncated recording observed
-   * nothing to keep: it is a reading that was lost, and a reading is redone.
+   * and no later green un-observes it — but the LOST part of a truncated
+   * recording observed nothing to keep: it is a reading that was lost, and a
+   * reading is redone (the reds it did record are judged apart).
    */
   const reRecorded = (r) => {
     // WITHOUT A READABLE TIMESTAMP, NOTHING CAN BE SHOWN TO BE LATER. Folding an
@@ -1361,7 +1359,8 @@ export function unexplainedRuns(runs, since, options) {
     // entry only when the runs really are the same run.
     const id = runIdentity(r)
 
-    // A red is carried until its own suite is shown green on newer code. Runs
+    // A red is carried until its own suite is shown covering (clean or
+    // accounted for) on newer code. Runs
     // that saw the current code are judged directly; older ones only leave the
     // list once that demonstration exists.
     if (!sawCodeSince(r, from) && shownGone(r)) continue
@@ -1559,8 +1558,9 @@ export function unexplainedRuns(runs, since, options) {
       })
       continue
     }
-    // Only red and suspect runs reach this point — a crash took its own branch
-    // above, where the ledger can never touch it.
+    // Red and suspect runs reach this point, and so does a signed crash's
+    // residual (postCrash); an open crash took its own branch above, where the
+    // ledger can never touch it.
     let unowned = null
     // The post-crash residual where there is one — the reds the record still
     // holds, read by the run's own class — and otherwise the verdict's own.
@@ -1585,8 +1585,9 @@ export function unexplainedRuns(runs, since, options) {
     // The individual reds, NOT the one sentence runVerdict writes about them: a
     // suspect run's whole first attempt is summarised into a single unaccounted
     // entry, and a caller counting those would report two reds as one.
-    const open_ =
-      unowned ?? (verdict.status === 'suspect' ? residualOf(r).reds : postCrash ? postCrash.reds : verdict.unaccounted)
+    // (A non-null postCrash with no reds left the loop above, so it needs no
+    // branch here.)
+    const open_ = unowned ?? (verdict.status === 'suspect' ? residualOf(r).reds : verdict.unaccounted)
     // EVERY ENTRY, NAMED OR NOT (review finding, 28.08.2026, round 23). The
     // filter dropped the unnamed ones outright, so a run carrying a named and an
     // unnamed red reported one waved cost instead of two — and several unnamed
@@ -1720,7 +1721,8 @@ export function baselineFor(state, branch) {
  * and that src/ui/domOnly.test.ts keeps free of three.js. `flow` covers the HUD
  * and the end-to-end flow in 8 frames: 10,672 tokens and 140 s, i.e. 5.7× the
  * tokens and 6.8× the wall clock off that class. No corpus row contradicts it —
- * none of the eight is a src/ui/-only change.
+ * none of the eight historical picture-caught bugs replayed there
+ * (docs/picture-check-levers.md) is a src/ui/-only change.
  *
  * Anything else keeps the old behaviour exactly.
  */
@@ -1760,7 +1762,7 @@ function incompleteRecordingParagraph(incomplete) {
     `INCOMPLETE RECORDING — NOT AN UNEXPLAINED RED: ${incomplete.length} recorded run(s) printed more ` +
     `result lines than the capture buffer holds — ${named}${incomplete.length > 3 ? ', …' : ''}. Do NOT ` +
     'hunt a defect in them: what they list is a FRAGMENT of their red set, so the three closings of ' +
-    'point 640 cannot apply — all three need the red\'s identity, and this record has none. RE-RUN the ' +
+    'point 640 cannot apply — all three need the red\'s identity, and the lost part has none. RE-RUN the ' +
     'suite to get a real recording; where that is impossible, sign the recording off as broken: ' +
     'node scripts/render-verify-guard.mjs --incomplete "<backend>/<suite>" --evidence "<why it cannot ' +
     'be re-recorded>". That closure signs off the LOST PART of the recording — never the picture, and ' +
@@ -1772,7 +1774,8 @@ function incompleteRecordingParagraph(incomplete) {
 /** The block-message paragraph that names crashed runs AS crashes (point 734,
  *  sixth round): the gate used to report one as an unexplained red, which sends
  *  the reader hunting a defect the run never reported — a crashed run judged no
- *  picture and holds nothing to explain, and its way out is its own. */
+ *  picture, the crash itself holds nothing to explain (the reds printed before
+ *  it are judged as reds), and its way out is its own. */
 function crashedRunParagraph(crashed) {
   const named = crashed
     .slice(0, 3)
@@ -1825,20 +1828,26 @@ const MAX_WAVED = 20
  * Decide whether the turn may end. Inputs (all optional — missing data errs
  * fail-open, matching the wrapper's contract):
  *   head               current git HEAD
- *   clearedHead        HEAD of the last dual-backend-verified (or deferred) state
+ *   clearedHead        HEAD of the last cleared state — verified on the backends
+ *                      the change owed (one for DOM-only), deferred, or reached
+ *                      with no render change
  *   changedRenderPaths render-set paths in the clearedHead..HEAD diff
- *   latestChangeAt     max mtime (ms) of those files — a run older than the last
- *                      edit cannot have seen the final code
+ *   latestChangeAt     max mtime (ms) of those files — without `matchesTree`, a
+ *                      run that started before it cannot have seen the final code
  *   runs               recorded verify runs (render-verify-recorder.mjs)
+ *   matchesTree        optional (run) => boolean: freshness by recorded tree
  *   deferral           { head, reason, at } — the loud escape valve, current HEAD only
  *   openPoints         the chargeable work-order points (chargeablePoints); without
  *                      them only a clean exit-0 run covers (point 550)
+ *   ledger, incompleteClosures, crashClosures   what unexplainedRuns reads
+ *   fence, sessionId   the context fence that may hand the duty on
  *
- * Returns { decision:'allow', clear?, deferred?, accounted? } or
- * { decision:'block', reason }. `clear` tells the wrapper to advance the verified
- * baseline to `head`; `accounted` lists the runs that covered a backend on
- * ACCOUNTED-FOR reds rather than on a clean pass, so the wrapper can record and
- * report the difference.
+ * Returns { decision:'allow', clear?, deferred?, accounted?, waved?, wavedCount? },
+ * { decision:'block', reason }, or { decision:'defer', deferred, reason, debt }
+ * when the fence hands a block on. `clear` tells the wrapper to advance the
+ * verified baseline to `head`; `accounted` lists the runs that covered a backend
+ * on ACCOUNTED-FOR reds rather than on a clean pass, so the wrapper can record
+ * and report the difference; `waved` names what a deferral waved through.
  */
 export function evaluate(input) {
   const {
@@ -1869,7 +1878,9 @@ export function evaluate(input) {
 
   const since = Number.isFinite(latestChangeAt) ? latestChangeAt : 0
   const opts = { openPoints, ledger, incompleteClosures, crashClosures, matchesTree }
-  // Two backends only where the two backends can DIFFER; otherwise one passing
+  // coveringRun and runVerdict read only these two; the rest is unexplainedRuns'.
+  const coverOpts = { openPoints, matchesTree }
+  // Two backends only where the two backends can DIFFER; otherwise one covering
   // run is the whole proof, and the second is a picture inspection bought for
   // nothing (user 26.07.2026).
   const dual = changedRenderPaths.some(isBackendSensitivePath)
@@ -1878,8 +1889,9 @@ export function evaluate(input) {
   // retry's own record was only half the job: the gate reads the most recent
   // COVERING run, so re-running the same code until it came up green cleared it
   // just as well — "it passed three times since" wearing a mechanism's clothes.
-  // So an unexplained failure in the window holds the gate whatever came after,
-  // and the way out is a CAUSE: fix it (which moves the window past the red),
+  // So an unexplained failure holds the gate whatever came after, and the way
+  // out is a CAUSE: fix it (a render edit, then its own suite covering on the
+  // new code),
   // charge it to the open point that owns it, file it as a point, or record the
   // loud deferral.
   const unexplained = unexplainedRuns(runs, since, opts)
@@ -1922,7 +1934,7 @@ export function evaluate(input) {
       : { decision: 'allow', clear: true, deferred: true }
   }
 
-  const covering = new Map(BACKENDS.map((b) => [b, coveringRun(runs, b, since, opts)]))
+  const covering = new Map(BACKENDS.map((b) => [b, coveringRun(runs, b, since, coverOpts)]))
   const missing = dual
     ? BACKENDS.filter((b) => !covering.get(b))
     : BACKENDS.some((b) => covering.get(b))
@@ -1935,9 +1947,9 @@ export function evaluate(input) {
   if (missing.length === 0 && unexplained.length > 0) {
     // THE THREE FAMILIES ARE NAMED APART (point 734). An incomplete recording —
     // and a crash — sent the reader hunting for a defect that was never
-    // captured, because the gate called each an unexplained red; both are the
-    // opposite, a record with nothing in it to explain, and each has its own
-    // way out.
+    // captured, because the gate called each an unexplained red; the LOST part
+    // of the one and the crash itself of the other hold nothing to explain (the
+    // reds they did print are judged as reds), and each has its own way out.
     const incomplete = unexplained.filter((u) => u.status === 'incomplete')
     const crashed = unexplained.filter((u) => u.status === 'crashed')
     const reds = unexplained.filter((u) => u.status !== 'incomplete' && u.status !== 'crashed')
@@ -1952,11 +1964,11 @@ export function evaluate(input) {
         })
         .join(' | ')
       parts.push(
-        `UNEXPLAINED RED SINCE THE LAST RENDER EDIT: ${reds.length} recorded run(s) failed and nothing ` +
+        `UNEXPLAINED RED NOT YET SHOWN GONE: ${reds.length} recorded run(s) failed and nothing ` +
           `says why — ${named}${reds.length > 3 ? ', …' : ''}. A LATER GREEN DOES NOT CLOSE IT (point 640): ` +
           'three greens are consistent with a fixed defect, a rare one, a timing race and an idle machine alike. ' +
-          'A red closes in exactly THREE ways: (1) its CAUSE is named and FIXED — the fix edits the code, which ' +
-          'moves this window past the red; (2) it is CHARGED in scripts/render-verify-charges.mjs to the OPEN ' +
+          'A red closes in exactly THREE ways: (1) its CAUSE is named and FIXED — the fix edits the code, and ' +
+          'the red\'s own suite then comes up covering on its backend; (2) it is CHARGED in scripts/render-verify-charges.mjs to the OPEN ' +
           'point that owns it — the charge counts at once, no re-run needed; (3) it becomes an OPEN ' +
           'point of its own, charged there. Is it load? MEASURE it: ' +
           `node scripts/throttle-probe.mjs ${reds[0].suite} --section=<name> --runs 8. If the cause lies ` +
@@ -1976,7 +1988,7 @@ export function evaluate(input) {
     for (const b of BACKENDS) {
       const run = covering.get(b)
       if (!run) continue
-      const verdict = runVerdict(run, opts)
+      const verdict = runVerdict(run, coverOpts)
       if (verdict.status !== 'accounted') continue
       accounted.push({ backend: b, suite: run.suite ?? 'unknown', at: runStamp(run), charges: verdict.charges })
     }
@@ -2000,7 +2012,7 @@ export function evaluate(input) {
   for (const b of missing) {
     const run = latestRun(runs, b, since)
     if (!run) continue
-    const verdict = runVerdict(run, opts)
+    const verdict = runVerdict(run, coverOpts)
     if (verdict.unaccounted.length === 0) continue
     // WHAT IS REALLY STILL BLOCKING THIS RUN — the entry unexplainedRuns wrote,
     // not the raw verdict. A truncated run whose truncation has been lifted can
@@ -2061,9 +2073,6 @@ export function evaluate(input) {
       // report THAT red, never the truncation (a second signature resolves
       // nothing).
     }
-    // ONLY the incomplete fall-through reads the reported entry: every other
-    // family's verdict sentence is the one to print (a suspect run's entry
-    // carries the first attempt's raw check names, not the sentence about them).
     // ONLY the two record classes read the reported entry — the truncation whose
     // residual red still stands, and the signed crash whose residual red still
     // stands. Every other family's verdict sentence is the one to print (a
@@ -2102,11 +2111,12 @@ export function evaluate(input) {
       'GUI/rendering/shader fix is judged by the rendered PICTURE before it counts as done — ' +
       (dual
         ? 'and on BOTH backends, because this change can render differently on each. '
-        : 'here ONE backend suffices: the change is DOM-only, and the browser draws the HUD ' +
-          'identically whichever renderer holds the canvas. ') +
+        : 'here ONE backend suffices — either one; the command names WebGPU as the default: the ' +
+          'change is DOM-only, and the browser draws the HUD identically whichever renderer holds ' +
+          'the canvas. ') +
       `Run: ${cmds} (pick the suite whose screenshots show the changed view — ` +
-      'passing runs are recorded automatically by the suite itself), then INSPECT the frames of ' +
-      'both backends. ' +
+      'every run is recorded automatically by the suite itself), then INSPECT the frames' +
+      (dual ? ' of both backends. ' : '. ') +
       // THIS REFUSAL NAMES THE FINISH, NOT THE NEXT STEP (point 1086). It
       // accepts only a full covering run, so while a fix is still being made it
       // says "not verified" after every edit — and on 09.09.2026 that was read
@@ -2120,13 +2130,15 @@ export function evaluate(input) {
       (whyNot.length
         ? `WHY THE LAST ATTEMPT DID NOT COUNT — ${whyNot.join(' | ')}. A RED CLOSES IN EXACTLY ` +
           'THREE WAYS (point 640): (1) its CAUSE is named and fixed; (2) it is CHARGED in ' +
-          'scripts/render-verify-charges.mjs to the OPEN point that owns it, and the run then ' +
-          'counts as ACCOUNTED FOR (never as a pass); (3) it becomes an OPEN point of its own. ' +
+          'scripts/render-verify-charges.mjs to the OPEN point that owns it — the red stops blocking, ' +
+          'though a run recorded before the charge still covers nothing, and a new run counts as ' +
+          'ACCOUNTED FOR (never as a pass); (3) it becomes an OPEN point of its own. ' +
           'Running it again until it passes is none of them. To ask whether it is load rather ' +
           'than argue it: node scripts/throttle-probe.mjs <suite> --section=<name> --runs 8. '
         : '') +
       'ONLY if one backend genuinely cannot be judged headless (e.g. a washed-out ' +
-      'WebGPU frame — that is a FINDING, not a pass), record a loud deferral: ' +
+      'WebGPU frame — that is a FINDING, not a pass), or the cause lies outside the render set, ' +
+      'record a loud deferral: ' +
       'node scripts/render-verify-guard.mjs --defer "<reason>".' +
       // Named in THIS branch too: a crash and an incomplete recording must
       // never hide behind a missing backend or a later red (round-5 finding 3;
