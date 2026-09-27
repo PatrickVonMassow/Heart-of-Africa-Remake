@@ -21,7 +21,7 @@
 // so every branch is covered by plain Vitest cases.
 import { createHash } from 'node:crypto'
 
-/** Actions plan() can return. */
+/** Actions planBootstrap() can return. */
 export const ACTIONS = {
   /** The checkout already has its dependencies — nothing to do. */
   none: 'none',
@@ -34,7 +34,6 @@ export const ACTIONS = {
 /** The reasons, spelled once so the CLI and the tests share the wording. */
 export const REASONS = {
   present: 'this checkout already has node_modules',
-  notAWorktree: 'this is the main checkout, not a worktree',
   lockMatch: "the main checkout's lockfile is identical, so its node_modules fits",
   lockDiffers: 'the lockfile differs from the main checkout — linking would test against the wrong dependency tree',
   noDonor: 'the main checkout has no node_modules to lend',

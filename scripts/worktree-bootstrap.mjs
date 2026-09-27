@@ -3,9 +3,11 @@
 //
 //   node scripts/worktree-bootstrap.mjs         bootstrap this checkout
 //   node scripts/worktree-bootstrap.mjs --dry   say what it would do
+//   node scripts/worktree-bootstrap.mjs <root>  bootstrap that checkout instead
 //
-// Run it as the FIRST command in a new worktree, before any gate. In the main
-// checkout it is a no-op, so it is always safe to run.
+// Run it as the FIRST command in a new worktree, before any gate. A checkout
+// that already has node_modules (the main one, ordinarily) is left alone, so it
+// is always safe to run.
 //
 // THE LINK IS THE FAST PATH: a directory symlink (a junction on Windows) to the
 // main checkout's `node_modules`, taking a second instead of the minutes a real
@@ -63,8 +65,9 @@ export function linkDependencies(root, donor) {
   symlinkSync(join(donor, 'node_modules'), join(root, 'node_modules'), process.platform === 'win32' ? 'junction' : 'dir')
 }
 
-/** A real install into `root`. `npm ci` is the lockfile-faithful form, and this
- *  path is only reached when the lockfile is the thing that differs. */
+/** A real install into `root`. `npm ci` is the lockfile-faithful form; this
+ *  path is reached when the lockfile differs, or when there is no main checkout
+ *  or no donor node_modules to link. */
 export function installDependencies(root) {
   const r = spawnSync('npm', ['ci'], { cwd: root, stdio: 'inherit', windowsHide: true, shell: process.platform === 'win32' })
   return r.status === 0
