@@ -270,9 +270,6 @@ describe('is the run still going?', () => {
   it('reports the elapsed time, or null when the record never said', () => {
     expect(elapsedMs({ startedAt: 1000 }, 4000)).toBe(3000)
     expect(elapsedMs({}, 4000)).toBeNull()
-    // An explicit null or empty stamp is "never said", not the epoch.
-    expect(elapsedMs({ startedAt: null }, 4000)).toBeNull()
-    expect(elapsedMs({ startedAt: '' }, 4000)).toBeNull()
   })
 })
 

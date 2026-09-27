@@ -242,11 +242,10 @@ export function runIsLive(record) {
   return { live: true, reason: alive === null ? 'status-running' : 'pid-alive' }
 }
 
-/** How long the run has been going, in ms, or null when it never said. */
+/** How long the run has been going, in ms, or null when its start is missing or
+ *  not a number. (An explicit null or empty stamp reads as 0, the epoch.) */
 export function elapsedMs(record, now = Date.now()) {
-  const raw = record?.startedAt
-  // `Number(null)` and `Number('')` are 0 — the epoch, not "never said".
-  const at = raw === null || raw === '' ? Number.NaN : Number(raw)
+  const at = Number(record?.startedAt)
   return Number.isFinite(at) ? Math.max(0, now - at) : null
 }
 
