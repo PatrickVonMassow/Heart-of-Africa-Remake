@@ -1128,5 +1128,675 @@
   "id": "U4629",
   "decision": "rewritten",
   "reason": "Dropped the export on buildQuadrupedParts; only in-file builders call it."
+ },
+ {
+  "id": "U4630",
+  "decision": "rewritten",
+  "reason": "figures.ts header now also names the limb proportions, child scale and traveller pack."
+ },
+ {
+  "id": "U4631",
+  "decision": "rewritten",
+  "reason": "claim does not hold as stated: roof finials use neither family; figureHand's doc now names its real uses (hands, the chief's staff knob)."
+ },
+ {
+  "id": "U4632",
+  "decision": "rewritten",
+  "reason": "Moved CHILD_FIGURE_SCALE and its doc above the FIGURE_LIMBS doc block, so the limb doc sits on FIGURE_LIMBS again."
+ },
+ {
+  "id": "U4633",
+  "decision": "rewritten",
+  "reason": "Limb intro now gives the real shoulder height (0.62, 0.12 wide) instead of the abandoned 0.8."
+ },
+ {
+  "id": "U4634",
+  "decision": "rewritten",
+  "reason": "TRAVELLER_PACK doc now states the current placement instead of narrating the past fix."
+ },
+ {
+  "id": "U4635",
+  "decision": "rewritten",
+  "reason": "flora.ts header now names splitFoliage and the foliage attribute instead of promising one draw call with plain vertexColors materials."
+ },
+ {
+  "id": "U4636",
+  "decision": "rewritten",
+  "reason": "foliage doc now says the attribute carries the part's class (1 or 2)."
+ },
+ {
+  "id": "U4637",
+  "decision": "rewritten",
+  "reason": "Shrub height corrected to ~0.55 (sphere tops 0.553 and 0.396)."
+ },
+ {
+  "id": "U4638",
+  "decision": "kept",
+  "reason": "PLAY_ROCK_HEIGHT_UNITS is live in buildPlayRock."
+ },
+ {
+  "id": "U4639",
+  "decision": "backlog",
+  "reason": "src/render/flora.ts:376 — the play rock is sized to ROCK_FOOTPRINT_UNITS (0.9), the communication erratic's own footprint constant; check whether the play rock should have its own."
+ },
+ {
+  "id": "U4640",
+  "decision": "rewritten",
+  "reason": "Baobab comment now mentions the thin flat crown that collapses in the dry season."
+ },
+ {
+  "id": "U4641",
+  "decision": "kept",
+  "reason": "CapturedFrame is the return type of the exported captureRenderedFrame; kept by the more conservative proposal."
+ },
+ {
+  "id": "U4642",
+  "decision": "rewritten",
+  "reason": "Capture timeout doc now says two seconds, matching CAPTURE_TIMEOUT_MS."
+ },
+ {
+  "id": "U4643",
+  "decision": "removed",
+  "reason": "Removed the `if (done) off()` guard: R3F's addAfterEffect only registers the callback and the timeout cannot fire before it returns, so done is always false there."
+ },
+ {
+  "id": "U4644",
+  "decision": "rewritten",
+  "reason": "gesture.ts header now names the trunk lean and turn in the pose, and the direction words instead of HERE/THERE."
+ },
+ {
+  "id": "U4645",
+  "decision": "rewritten",
+  "reason": "GestureKind doc now says five gestures."
+ },
+ {
+  "id": "U4646",
+  "decision": "rewritten",
+  "reason": "GESTURE_KINDS doc now names only the tests as its users."
+ },
+ {
+  "id": "U4647",
+  "decision": "rewritten",
+  "reason": "Blend doc now excepts the GESTURE_NO_FADE_IN kinds from starting at rest."
+ },
+ {
+  "id": "U4648",
+  "decision": "rewritten",
+  "reason": "Blend doc no longer promises continuity on interruption; a new gesture replaces the running one outright."
+ },
+ {
+  "id": "U4649",
+  "decision": "rewritten",
+  "reason": "GESTURE_BLENDS doc now says touch's 0.12 s is its fade-out; the fade-in is dropped entirely."
+ },
+ {
+  "id": "U4650",
+  "decision": "rewritten",
+  "reason": "Dropped the export on GESTURE_BLENDS; only gestureBlendOf reads it."
+ },
+ {
+  "id": "U4651",
+  "decision": "rewritten",
+  "reason": "phase docs now say only the refusal's shake reads it."
+ },
+ {
+  "id": "U4652",
+  "decision": "rewritten",
+  "reason": "GestureAim.duration doc now says it is a hold for touch, with the blend added on top."
+ },
+ {
+  "id": "U4653",
+  "decision": "rewritten",
+  "reason": "Envelope doc now says a no-fade-in kind starts at 1 and a short gesture still peaks rather than never showing."
+ },
+ {
+  "id": "U4654",
+  "decision": "removed",
+  "reason": "Removed the unreachable blend <= 0 return; after the duration guard the blend is always positive."
+ },
+ {
+  "id": "U4655",
+  "decision": "rewritten",
+  "reason": "The no-fade-in branch now returns the out-ramp directly; t is never negative."
+ },
+ {
+  "id": "U4656",
+  "decision": "rewritten",
+  "reason": "gesturePose doc no longer claims every gesture is a motion; point and touch hold still."
+ },
+ {
+  "id": "U4657",
+  "decision": "rewritten",
+  "reason": "gesturePose doc now lists touch."
+ },
+ {
+  "id": "U4658",
+  "decision": "rewritten",
+  "reason": "Progress comment now says only beckon and refusal ride it; indicate's sweep rides its own seconds."
+ },
+ {
+  "id": "U4659",
+  "decision": "rewritten",
+  "reason": "Removed the unreachable duration > 0 fallback; the envelope has already returned for any duration <= 0."
+ },
+ {
+  "id": "U4660",
+  "decision": "rewritten",
+  "reason": "digPose comment now says the arms stay rolled in close (less outward than rest), not rolled IN."
+ },
+ {
+  "id": "U4661",
+  "decision": "rewritten",
+  "reason": "The CROUCH_POSE reference now says it lives in PlaceLife (the bank-game crouch)."
+ },
+ {
+  "id": "U4662",
+  "decision": "rewritten",
+  "reason": "Dropped the export on FILL_REACH_ELEVATION; only fillPose reads it."
+ },
+ {
+  "id": "U4663",
+  "decision": "backlog",
+  "reason": "src/render/gesture.ts:591 — FILL_CARRY_SIDE is the constant 'left', so every right-carry ternary is dead, and fillPose hard-wires REST_POSE.left/right rolls, so flipping the side would not work; simplify with its test."
+ },
+ {
+  "id": "U4664",
+  "decision": "rewritten",
+  "reason": "fillHandAt doc now says the jar prop is not hung from it yet; tests assert the reach."
+ },
+ {
+  "id": "U4665",
+  "decision": "rewritten",
+  "reason": "poseDistanceFromRest doc now names only the tests."
+ },
+ {
+  "id": "U4666",
+  "decision": "kept",
+  "reason": "GroundStain/StainLook type exported functions' parameters; kept by the more conservative proposal."
+ },
+ {
+  "id": "U4667",
+  "decision": "rewritten",
+  "reason": "GroundStain.r doc no longer defines the radius by the removed decal disc."
+ },
+ {
+  "id": "U4668",
+  "decision": "rewritten",
+  "reason": "Seed doc now says two patches rarely share an outline; the hash does not enforce uniqueness."
+ },
+ {
+  "id": "U4669",
+  "decision": "rewritten",
+  "reason": "Harmonic comment now says the four orders share no common factor (2 and 8 do pairwise)."
+ },
+ {
+  "id": "U4670",
+  "decision": "rewritten",
+  "reason": "Dropped the export on stainPhase; no other file imports it."
+ },
+ {
+  "id": "U4671",
+  "decision": "backlog",
+  "reason": "src/render/groundStains.ts:145 — stainContourRadius is used only by groundStains.test.ts."
+ },
+ {
+  "id": "U4672",
+  "decision": "rewritten",
+  "reason": "Warp doc now says the two spellings agree away from the centre's 1e-8 floor."
+ },
+ {
+  "id": "U4673",
+  "decision": "rewritten",
+  "reason": "Slot-packing comment now says it spares the square root of the distance and the divide by the radius; the warp itself uses inverseSqrt."
+ },
+ {
+  "id": "U4674",
+  "decision": "rewritten",
+  "reason": "Dropped the exports on the four ground-stain uniforms; only this module reads them."
+ },
+ {
+  "id": "U4675",
+  "decision": "rewritten",
+  "reason": "groundStainSlots, groundStainWarpSlots and CONTOUR_ORDERS now name only the tests."
+ },
+ {
+  "id": "U4676",
+  "decision": "rewritten",
+  "reason": "selectGroundStains doc uses the parameter's name, maxCount."
+ },
+ {
+  "id": "U4677",
+  "decision": "rewritten",
+  "reason": "CPU-mirror doc now says the grain scales the tint by 0.82-1.18, clamped to 1."
+ },
+ {
+  "id": "U4678",
+  "decision": "rewritten",
+  "reason": "Grain comment now says the soaked middle clamps at 1 only where the grain is high and keeps at least 0.82 elsewhere."
+ },
+ {
+  "id": "U4679",
+  "decision": "rewritten",
+  "reason": "Header now says the outline's falloff is monotonic along each ray and the grain only scales it."
+ },
+ {
+  "id": "U4680",
+  "decision": "rewritten",
+  "reason": "Dropped the unchecked claim that the deepest cut sits on the largest tomb (tomb sizes are random)."
+ },
+ {
+  "id": "U4681",
+  "decision": "backlog",
+  "reason": "src/render/landmarks.ts:175 — the pyramids are 4-segment cones with b as circumradius, so h = 1.28·b gives a ~61° face, not the documented ~52° Old-Kingdom slope."
+ },
+ {
+  "id": "U4682",
+  "decision": "rewritten",
+  "reason": "buildGizaPyramids doc now says the Sphinx is buried to the shoulders, as buildSphinx builds it."
+ },
+ {
+  "id": "U4683",
+  "decision": "rewritten",
+  "reason": "buildGizaPyramids doc no longer advertises Menkaure's granite band; it points to the walkable site."
+ },
+ {
+  "id": "U4684",
+  "decision": "rewritten",
+  "reason": "Walkable-site doc now says only Khufu's and Khafre's cues are shared; the granite skirt is site-only."
+ },
+ {
+  "id": "U4685",
+  "decision": "rewritten",
+  "reason": "Khafre's cap is now called the plateau's only surviving Tura casing, which does not conflict with Menkaure's granite."
+ },
+ {
+  "id": "U4686",
+  "decision": "rewritten",
+  "reason": "Khafre's core is no longer called stepped; both builders use a single frustum."
+ },
+ {
+  "id": "U4687",
+  "decision": "rewritten",
+  "reason": "Burial doc now says the lappets' lower ends reach just into the drift."
+ },
+ {
+  "id": "U4688",
+  "decision": "rewritten",
+  "reason": "Zimbabwe wall comment now says straight segments, not tapering."
+ },
+ {
+  "id": "U4689",
+  "decision": "backlog",
+  "reason": "src/render/landmarks.ts:452 — Lalibela's \"recessed trench\" is two raised boxes, not a cut; the church does not read as sunk into the slab."
+ },
+ {
+  "id": "U4690",
+  "decision": "rewritten",
+  "reason": "Church-body comment now says it stands a little proud of the slab top."
+ },
+ {
+  "id": "U4691",
+  "decision": "rewritten",
+  "reason": "Kilwa arch comment now describes the sagging lintel instead of a fallen side the builder does not make."
+ },
+ {
+  "id": "U4692",
+  "decision": "rewritten",
+  "reason": "GONDAR_PARAPET doc now says one long wall, the short wall carrying two fixed merlons."
+ },
+ {
+  "id": "U4693",
+  "decision": "rewritten",
+  "reason": "Tower-top comment now says a dark disc reads as the open shell."
+ },
+ {
+  "id": "U4694",
+  "decision": "backlog",
+  "reason": "src/render/landmarks.ts:720 — the crater blocks' rotateX tilts them tangentially (the box's x axis ends up radial), not outward into an open bowl."
+ },
+ {
+  "id": "U4695",
+  "decision": "rewritten",
+  "reason": "Volcano doc now calls the smoke hint opaque, as the implementation comment says."
+ },
+ {
+  "id": "U4696",
+  "decision": "rewritten",
+  "reason": "buildDelta doc now describes the papyrus only and points to buildDeltaWater for the ribbons."
+ },
+ {
+  "id": "U4697",
+  "decision": "backlog",
+  "reason": "src/render/landmarks.ts:805 — the \"under six units\" family cap and \"broadest site\" claim conflict with the deliberately enlarged Meroë field; re-measure the landmark footprints."
+ },
+ {
+  "id": "U4698",
+  "decision": "backlog",
+  "reason": "src/render/landmarks.ts:824 — reeds are placed on unrotated lobe ellipses while the water lobes are rotated, so belts can miss the lobe edges."
+ },
+ {
+  "id": "U4699",
+  "decision": "rewritten",
+  "reason": "Table Mountain width corrected to ~230 with the flanking peaks (table alone ~185)."
+ },
+ {
+  "id": "U4700",
+  "decision": "rewritten",
+  "reason": "detailFade doc now says far surfaces keep only their broad colour field and a flat normal."
+ },
+ {
+  "id": "U4701",
+  "decision": "kept",
+  "reason": "These types shape exported functions' parameters; kept by the more conservative proposal."
+ },
+ {
+  "id": "U4702",
+  "decision": "rewritten",
+  "reason": "GROUND_PATCH_WEIGHT doc now says it is exported for the edge-band contrast test."
+ },
+ {
+  "id": "U4703",
+  "decision": "rewritten",
+  "reason": "Sand comment now says only the Worley patch is muted and the relief softened; the broad drift is the same."
+ },
+ {
+  "id": "U4704",
+  "decision": "rewritten",
+  "reason": "Moved the season-tint and rain-wetness comments next to the code they describe."
+ },
+ {
+  "id": "U4705",
+  "decision": "rewritten",
+  "reason": "Sand-relief comment now says weaker relief on the same tile, not a finer grain."
+ },
+ {
+  "id": "U4706",
+  "decision": "backlog",
+  "reason": "src/render/placeRiver.ts:44 — the fan's rim vertices lie on the bank cut only where a vertex falls on it; the corners where disc and cut meet are faceted, so \"exact however few segments\" overstates it."
+ },
+ {
+  "id": "U4707",
+  "decision": "removed",
+  "reason": "Removed the shore's explicit up-normals, which computeVertexNormals overwrote anyway."
+ },
+ {
+  "id": "U4708",
+  "decision": "kept",
+  "reason": "RiverFleck types exported functions; kept by the more conservative proposal."
+ },
+ {
+  "id": "U4709",
+  "decision": "kept",
+  "reason": "RenderContext is the module's handle type; kept by the more conservative proposal."
+ },
+ {
+  "id": "U4710",
+  "decision": "rewritten",
+  "reason": "renderLeak header now says a page that stops producing frames leaves its watch pending, and only an unsettled budget drops the reading."
+ },
+ {
+  "id": "U4711",
+  "decision": "kept",
+  "reason": "claim does not hold: App.tsx:105 imports the module dynamically inside its DEV block, and armRenderLeakWatch checks DEV."
+ },
+ {
+  "id": "U4712",
+  "decision": "rewritten",
+  "reason": "SignatureInput doc now allows texture streaming within bounds and forbids only render-target growth."
+ },
+ {
+  "id": "U4713",
+  "decision": "kept",
+  "reason": "These types describe exported functions; kept by the more conservative proposal."
+ },
+ {
+  "id": "U4714",
+  "decision": "kept",
+  "reason": "An index artefact (name collision), not a code problem."
+ },
+ {
+  "id": "U4715",
+  "decision": "rewritten",
+  "reason": "Warm-up doc now says only a leak above the bound per transition is caught at once, a smaller one by the drift bound."
+ },
+ {
+  "id": "U4716",
+  "decision": "rewritten",
+  "reason": "Leak doc now says the baseline counts stay while the visit count advances."
+ },
+ {
+  "id": "U4717",
+  "decision": "rewritten",
+  "reason": "stableFrames doc now counts repeats after the first reading."
+ },
+ {
+  "id": "U4718",
+  "decision": "rewritten",
+  "reason": "stableFrames doc now says a frame without a reading neither breaks nor extends the run."
+ },
+ {
+  "id": "U4719",
+  "decision": "kept",
+  "reason": "The r185 note explains typings of the installed three 0.185; accurate today."
+ },
+ {
+  "id": "U4720",
+  "decision": "rewritten",
+  "reason": "sceneFrame comment now names the shared single-sampled attachment policy of scenePass.ts."
+ },
+ {
+  "id": "U4721",
+  "decision": "rewritten",
+  "reason": "seasonField header now says vegetation reads the per-instance seasonTint attribute."
+ },
+ {
+  "id": "U4722",
+  "decision": "rewritten",
+  "reason": "The hard-coded slot count 15 now reads \"one per SEASON_SLOTS entry\"."
+ },
+ {
+  "id": "U4723",
+  "decision": "backlog",
+  "reason": "src/render/seasonField.ts:138 — the upload-only-on-change fix still carries \"needs a manual WebGPU check\" with no recorded outcome."
+ },
+ {
+  "id": "U4724",
+  "decision": "backlog",
+  "reason": "src/render/seasonField.ts:174 — sharing the blurred zone weights does not make ground and weather agree exactly at a border, since their spatial sampling differs."
+ },
+ {
+  "id": "U4725",
+  "decision": "rewritten",
+  "reason": "seasonFieldTintAttrNode doc now says the texture WAS re-uploaded every frame."
+ },
+ {
+  "id": "U4726",
+  "decision": "rewritten",
+  "reason": "seasonTint header now says only the settlement drives the uniform; travel samples the season field."
+ },
+ {
+  "id": "U4727",
+  "decision": "rewritten",
+  "reason": "Desert comment now says sand is left alone by the greenness mask, not by a neutral tint."
+ },
+ {
+  "id": "U4728",
+  "decision": "backlog",
+  "reason": "src/render/seasonTint.ts:56 — SEASON_COLLAPSE_U is a diagnostic for a WebGPU flora jump since fixed by baking into instance matrices; the CPU mirrors ignore it."
+ },
+ {
+  "id": "U4729",
+  "decision": "rewritten",
+  "reason": "groundSprout doc now lists grass with bush and papyrus."
+ },
+ {
+  "id": "U4730",
+  "decision": "rewritten",
+  "reason": "FLORA_COLOR_LIFT doc now says 2.6 is the travel ground's lift and 2.0 the settlement ground's."
+ },
+ {
+  "id": "U4731",
+  "decision": "rewritten",
+  "reason": "seasonTintNode doc now says it recolours by green cast, not by identifying foliage."
+ },
+ {
+  "id": "U4732",
+  "decision": "kept",
+  "reason": "claim does not hold: each measurement names its state (multiplicative-lush version 41→45; restrained pair 41→51)."
+ },
+ {
+  "id": "U4733",
+  "decision": "rewritten",
+  "reason": "The foliage attribute is now described as a per-part class (0/1/2), not binary."
+ },
+ {
+  "id": "U4734",
+  "decision": "rewritten",
+  "reason": "Zone-correctness note now speaks of the tint it is given and notes the travel crowns' CPU collapse."
+ },
+ {
+  "id": "U4735",
+  "decision": "rewritten",
+  "reason": "Dropped the exports on the four snow/hail uniforms; only this module reads them."
+ },
+ {
+  "id": "U4736",
+  "decision": "rewritten",
+  "reason": "seasonalSnow header now includes the storm hail term."
+ },
+ {
+  "id": "U4737",
+  "decision": "rewritten",
+  "reason": "Identity note now names both massif uniforms and the hail."
+ },
+ {
+  "id": "U4738",
+  "decision": "rewritten",
+  "reason": "The dangling \"bare-branches shards\" reference now explains itself (point 144)."
+ },
+ {
+  "id": "U4739",
+  "decision": "kept",
+  "reason": "claim does not hold: season.ts exports seasonalSnowAt and hailAt."
+ },
+ {
+  "id": "U4740",
+  "decision": "kept",
+  "reason": "The 1,400 m quote is the cited research; the world-unit line is its calibrated stand-in."
+ },
+ {
+  "id": "U4741",
+  "decision": "rewritten",
+  "reason": "Dropped the exports on DisposableTarget and CascadeShadowNode."
+ },
+ {
+  "id": "U4742",
+  "decision": "rewritten",
+  "reason": "releaseCascadeShadowMaps doc now says it counts dispose calls."
+ },
+ {
+  "id": "U4743",
+  "decision": "kept",
+  "reason": "The three-internal notes are the rationale for the defensive reads."
+ },
+ {
+  "id": "U4744",
+  "decision": "rewritten",
+  "reason": "Cloud comment no longer guards a cloudless preset; the block is built unconditionally."
+ },
+ {
+  "id": "U4745",
+  "decision": "rewritten",
+  "reason": "Added a note that /0.7 recovers the dust from paleMix (max 0.7), so the halo factor stays >= 0.25."
+ },
+ {
+  "id": "U4746",
+  "decision": "kept",
+  "reason": "The dust/rain exclusivity is a stated season-model property; harmless."
+ },
+ {
+  "id": "U4747",
+  "decision": "kept",
+  "reason": "claim does not hold: season.ts exports MONTH_KEYS."
+ },
+ {
+  "id": "U4748",
+  "decision": "rewritten",
+  "reason": "Dropped the export on WaterMaterialHandle."
+ },
+ {
+  "id": "U4749",
+  "decision": "rewritten",
+  "reason": "offset doc now says (x, −z)."
+ },
+ {
+  "id": "U4750",
+  "decision": "removed",
+  "reason": "Removed the scalar roughness 0.08, superseded by the roughnessNode."
+ },
+ {
+  "id": "U4751",
+  "decision": "rewritten",
+  "reason": "riverTone comment now says the shallowest tone; the sheet is masked over land."
+ },
+ {
+  "id": "U4752",
+  "decision": "rewritten",
+  "reason": "Glint comment now says it fades by distance to the camera."
+ },
+ {
+  "id": "U4753",
+  "decision": "rewritten",
+  "reason": "Opacity comment now gives the real range (0.58 → 0.93, foam +0.3)."
+ },
+ {
+  "id": "U4754",
+  "decision": "kept",
+  "reason": "claim does not hold: scenes/travel/Rivers.tsx exists and draws the travel rivers and lakes the header means."
+ },
+ {
+  "id": "U4755",
+  "decision": "kept",
+  "reason": "\"POC\" is accurate; Effects.tsx carries the SSR note."
+ },
+ {
+  "id": "U4756",
+  "decision": "rewritten",
+  "reason": "Removed the duplicated IBL sentence from the water.ts header."
+ },
+ {
+  "id": "U4757",
+  "decision": "rewritten",
+  "reason": "Dropped the exports on WATER_FOAM_ROUGHNESS, WATER_DETAIL_NEAR/FAR and RiverWaterInput."
+ },
+ {
+  "id": "U4758",
+  "decision": "rewritten",
+  "reason": "Header now says only the shading is distance-alone; the near mesh also rides the ripple."
+ },
+ {
+  "id": "U4759",
+  "decision": "rewritten",
+  "reason": "Streak comment now says the far sheet keeps the mean base colour without the streak foam."
+ },
+ {
+  "id": "U4760",
+  "decision": "rewritten",
+  "reason": "riverWaterSurface doc no longer promises metalness."
+ },
+ {
+  "id": "U4761",
+  "decision": "kept",
+  "reason": "claim does not hold: BANK_SHORE_HALF is 1.2 (scenes/place/riverBank.ts:43)."
+ },
+ {
+  "id": "U4762",
+  "decision": "rewritten",
+  "reason": "Opacity comment now says the shallows let a trace through (0.94), not that they are seen through."
+ },
+ {
+  "id": "U4763",
+  "decision": "kept",
+  "reason": "claim does not hold: placeRiver.ts and backdropMaterial.ts are exactly the non-test readers."
  }
 ]
