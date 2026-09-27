@@ -1798,5 +1798,485 @@
   "id": "U4763",
   "decision": "kept",
   "reason": "claim does not hold: placeRiver.ts and backdropMaterial.ts are exactly the non-test readers."
+ },
+ {
+  "id": "U4764",
+  "decision": "rewritten",
+  "reason": "Header now lists the overlay member beside picture, state and description."
+ },
+ {
+  "id": "U4765",
+  "decision": "rewritten",
+  "reason": "Overview now says four files, or three when a failed capture leaves the PNG out."
+ },
+ {
+  "id": "U4766",
+  "decision": "rewritten",
+  "reason": "Dropped the export on ReportTexts and AssembledReport; local use stays."
+ },
+ {
+  "id": "U4767",
+  "decision": "kept",
+  "reason": "ReportInput, reportStem and describeReport are live through buildBugReport."
+ },
+ {
+  "id": "U4768",
+  "decision": "rewritten",
+  "reason": "dataUrlToBytes doc now states that a malformed base64 payload throws (atob)."
+ },
+ {
+  "id": "U4769",
+  "decision": "rewritten",
+  "reason": "Doc now says the report leaves the member out, matching buildBugReport."
+ },
+ {
+  "id": "U4770",
+  "decision": "backlog",
+  "reason": "src/report/bugReport.ts:162 — the description file always names the JSON \"wildlife\" section, even when the dump carries none (only the counts are suppressed)."
+ },
+ {
+  "id": "U4771",
+  "decision": "rewritten",
+  "reason": "Dropped the export on SnapshotOptions and DEFAULT_SKIP_SELECTOR; local use stays."
+ },
+ {
+  "id": "U4772",
+  "decision": "kept",
+  "reason": "OverlayRect is the rect type of the live OverlayItem."
+ },
+ {
+  "id": "U4773",
+  "decision": "kept",
+  "reason": "claim does not hold: the F6 report modal is src/ui/StateDump.tsx, which renders the .state-dump-backdrop class."
+ },
+ {
+  "id": "U4774",
+  "decision": "rewritten",
+  "reason": "Comment now says a missing entry means the label did not render as visible text and names the skipped cases."
+ },
+ {
+  "id": "U4775",
+  "decision": "rewritten",
+  "reason": "Comment now says matching (possibly truncated) text only points to a duplicated label."
+ },
+ {
+  "id": "U4776",
+  "decision": "rewritten",
+  "reason": "zip.ts header now says a PNG and three small text files."
+ },
+ {
+  "id": "U4777",
+  "decision": "kept",
+  "reason": "dosDateTime is called by buildZip."
+ },
+ {
+  "id": "U4778",
+  "decision": "rewritten",
+  "reason": "Comment now says ten refreshes a second (REFRESH_SECONDS = 0.1)."
+ },
+ {
+  "id": "U4779",
+  "decision": "rewritten",
+  "reason": "Header now lists herds, vultures and carcasses as source functions and pitched camps and the canoe as marked nodes."
+ },
+ {
+  "id": "U4780",
+  "decision": "rewritten",
+  "reason": "Dropped the stale \"twenty call sites\" count."
+ },
+ {
+  "id": "U4781",
+  "decision": "kept",
+  "reason": "claim does not hold: src/scenes/travel/wildlifeCollision.ts and recordDrawnBody (animalBodies.ts:80) both exist."
+ },
+ {
+  "id": "U4782",
+  "decision": "kept",
+  "reason": "claim does not hold: the registered wildlife sources set dead and concealed (wildlifeActorSource.ts:63-64, 100)."
+ },
+ {
+  "id": "U4783",
+  "decision": "rewritten",
+  "reason": "Dropped the export on ActorSource and ActorMark; local use stays."
+ },
+ {
+  "id": "U4784",
+  "decision": "rewritten",
+  "reason": "collectActors doc now says registered sources only and points to pushMarkedActors for marked nodes."
+ },
+ {
+  "id": "U4785",
+  "decision": "rewritten",
+  "reason": "firstMarked doc now says first depth-first match, not necessarily the shallowest."
+ },
+ {
+  "id": "U4786",
+  "decision": "kept",
+  "reason": "The disc is the shadow floor the comment's second sentence names; no cap spans the rim."
+ },
+ {
+  "id": "U4787",
+  "decision": "rewritten",
+  "reason": "usePlaceGround doc now says it returns a ground-height sampler that reads live dig progress."
+ },
+ {
+  "id": "U4788",
+  "decision": "rewritten",
+  "reason": "Dropped the export on HomeDef; in-file use stays."
+ },
+ {
+  "id": "U4789",
+  "decision": "rewritten",
+  "reason": "Dropped the export on PenDef; in-file use stays."
+ },
+ {
+  "id": "U4790",
+  "decision": "rewritten",
+  "reason": "Header now says mostly animation and names the store effects (hearUtterance, loom cloth record)."
+ },
+ {
+  "id": "U4791",
+  "decision": "rewritten",
+  "reason": "Moved SpeechFloorContext above the cold-cloaks doc so the doc sits on ColdCloaksContext; gave the speech floor its own line."
+ },
+ {
+  "id": "U4792",
+  "decision": "rewritten",
+  "reason": "Figure and Kids docs now name the walking loom helper as a legged figure too."
+ },
+ {
+  "id": "U4793",
+  "decision": "rewritten",
+  "reason": "Kids doc now says wordless tag with the catcher's one \"ha\" cry."
+ },
+ {
+  "id": "U4794",
+  "decision": "rewritten",
+  "reason": "World-memo comment now limits the play ground and wedge carve to the tag round; the bank round roams the settlement."
+ },
+ {
+  "id": "U4795",
+  "decision": "rewritten",
+  "reason": "Navigation comment now says the wedge carve is switched off with a stage."
+ },
+ {
+  "id": "U4796",
+  "decision": "rewritten",
+  "reason": "readTouchHand comment now says this component writes and applies the pose."
+ },
+ {
+  "id": "U4797",
+  "decision": "removed",
+  "reason": "Removed the constant-empty __placeChildSpeech probe (no reader in src or scripts) and its x, z, playRadius effect deps."
+ },
+ {
+  "id": "U4798",
+  "decision": "rewritten",
+  "reason": "Teardown now deletes __placeHoldCatch and __placeTagHands and resets catchCapture."
+ },
+ {
+  "id": "U4799",
+  "decision": "rewritten",
+  "reason": "Goats doc now says the body rides the sampled ground height without slope pitch."
+ },
+ {
+  "id": "U4800",
+  "decision": "rewritten",
+  "reason": "Goats doc now says the goat turns toward its velocity at a bounded rate."
+ },
+ {
+  "id": "U4801",
+  "decision": "rewritten",
+  "reason": "Porter comment now says born at the start end, moved to its phase point on the first frame."
+ },
+ {
+  "id": "U4802",
+  "decision": "removed",
+  "reason": "Removed the stale OPEN note: design.md §19.10 now says \"pairs stand together in quiet conversation\"."
+ },
+ {
+  "id": "U4803",
+  "decision": "rewritten",
+  "reason": "Dev-hook comment now limits the null to body; turn is always numeric."
+ },
+ {
+  "id": "U4804",
+  "decision": "rewritten",
+  "reason": "phase doc now says null in the tag round."
+ },
+ {
+  "id": "U4805",
+  "decision": "rewritten",
+  "reason": "Hand-probe comment now names the crouch squash on the outer group."
+ },
+ {
+  "id": "U4806",
+  "decision": "kept",
+  "reason": "helperPose is typed FigurePose | null, so the if (hp) guard is the type narrowing, not dead logic."
+ },
+ {
+  "id": "U4807",
+  "decision": "kept",
+  "reason": "poses refs are typed FigurePose | null; the guard is the type narrowing."
+ },
+ {
+  "id": "U4808",
+  "decision": "removed",
+  "reason": "Dropped the unreachable ?? 0 on gait.current (RefObject<number>)."
+ },
+ {
+  "id": "U4809",
+  "decision": "removed",
+  "reason": "Dropped the redundant per-entry guard in the gesture-advance loop."
+ },
+ {
+  "id": "U4810",
+  "decision": "rewritten",
+  "reason": "Comment now says \"the contexts above\"."
+ },
+ {
+  "id": "U4811",
+  "decision": "rewritten",
+  "reason": "Figure doc now names the children among the callers that compute the whole pose."
+ },
+ {
+  "id": "U4812",
+  "decision": "rewritten",
+  "reason": "Roughness comment now covers every wrap, hide or woven, against the 0.95 body cloth."
+ },
+ {
+  "id": "U4813",
+  "decision": "rewritten",
+  "reason": "NPC_RADIUS doc now names WALKER_RADIUS and PLAYER_RADIUS instead of claiming equality."
+ },
+ {
+  "id": "U4814",
+  "decision": "kept",
+  "reason": "claim does not hold: HEAD_CARRY_POSE is read at PlaceLife.tsx lines 2629, 2931 and 3421."
+ },
+ {
+  "id": "U4815",
+  "decision": "kept",
+  "reason": "claim does not hold: useStandingBodies is called by Talkers and Traders (PlaceLife.tsx lines 2213, 3840)."
+ },
+ {
+  "id": "U4816",
+  "decision": "kept",
+  "reason": "claim does not hold: the listed imports are used in the second half of the file (e.g. digPose, fillSquat, escapeToFree, RIVER_WATER_TONES, ADULT_SITUATIONS, WORK_ARRIVE_RADIUS); lint passes."
+ },
+ {
+  "id": "U4817",
+  "decision": "backlog",
+  "reason": "src/scenes/place/PlaceLife.tsx:639 — stepLoomWork always receives helper: true, so loomWork.ts's helper-less branch is reachable only from tests."
+ },
+ {
+  "id": "U4818",
+  "decision": "rewritten",
+  "reason": "playRadius doc now says it bounds the tag group; the bank round walks the whole settlement."
+ },
+ {
+  "id": "U4819",
+  "decision": "backlog",
+  "reason": "src/scenes/place/PlaceLife.tsx:1092 — the comment hard-codes measured distances (32.5 m, 28, 27.4) that depend on balance and layout values defined elsewhere."
+ },
+ {
+  "id": "U4820",
+  "decision": "kept",
+  "reason": "claim does not hold: talkerAim is called at PlaceLife.tsx line 2249 (the dev pose rig)."
+ },
+ {
+  "id": "U4821",
+  "decision": "rewritten",
+  "reason": "Talkers comment now says a metre apart, matching the ±0.5 stances."
+ },
+ {
+  "id": "U4822",
+  "decision": "rewritten",
+  "reason": "Drummer doc now says his arms rest or carry the gesture of a word he speaks."
+ },
+ {
+  "id": "U4823",
+  "decision": "rewritten",
+  "reason": "Well comment now says the bucket hangs under the crossbar."
+ },
+ {
+  "id": "U4824",
+  "decision": "rewritten",
+  "reason": "Dropped the export on HomeDef (same edit as U4788)."
+ },
+ {
+  "id": "U4825",
+  "decision": "rewritten",
+  "reason": "Dropped the export on PenDef (same edit as U4789)."
+ },
+ {
+  "id": "U4826",
+  "decision": "rewritten",
+  "reason": "forcedFill doc now says the errand's fill phase drives the live dip and this only overrides it."
+ },
+ {
+  "id": "U4827",
+  "decision": "rewritten",
+  "reason": "Comment now says the word and gesture take the new yaw at once and the body is drawn turned from the next frame."
+ },
+ {
+  "id": "U4828",
+  "decision": "rewritten",
+  "reason": "__placeForceFill comment now says it overrides the live dip the errand's fill phase drives."
+ },
+ {
+  "id": "U4829",
+  "decision": "rewritten",
+  "reason": "Carrier-jar comment now says the open Jar and that task walkers still carry a closed one."
+ },
+ {
+  "id": "U4830",
+  "decision": "rewritten",
+  "reason": "Carrier-jar comment no longer claims the task walkers carry the same vessel (same edit as U4829)."
+ },
+ {
+  "id": "U4831",
+  "decision": "rewritten",
+  "reason": "Dropped the \"already seen in the village\" claim from the carrier-jar comment."
+ },
+ {
+  "id": "U4832",
+  "decision": "rewritten",
+  "reason": "Jar comment now says the mouth is nearly as wide as the body (rim 0.155, waist 0.16)."
+ },
+ {
+  "id": "U4833",
+  "decision": "rewritten",
+  "reason": "JAR_WATER_DROP doc now covers the full jar only; JAR_HOLLOW_DROP got its own doc."
+ },
+ {
+  "id": "U4834",
+  "decision": "rewritten",
+  "reason": "Meniscus doc now says flattened to 0.65 (about 9.6 cm tall), clearing the rim by about 6.5 cm."
+ },
+ {
+  "id": "U4835",
+  "decision": "backlog",
+  "reason": "src/scenes/place/PlaceLife.tsx:3688 — the jar base (JAR_BASE_R 0.13) is narrower than the wall's bottom radius (JAR_WAIST_R 0.16), leaving an open 3 cm ring at the bottom of a vessel the comment calls closed."
+ },
+ {
+  "id": "U4836",
+  "decision": "rewritten",
+  "reason": "Meniscus comment now says the disc is nearly edge-on and the lean helps only a little."
+ },
+ {
+  "id": "U4837",
+  "decision": "rewritten",
+  "reason": "WaterStand doc now says it mounts waterStandCapacity hidden jars and the frame loop shows standJars of them."
+ },
+ {
+  "id": "U4838",
+  "decision": "rewritten",
+  "reason": "radius doc now says walkable radius for navigation and movement; the tag ground is playGround."
+ },
+ {
+  "id": "U4839",
+  "decision": "rewritten",
+  "reason": "Missing-playground comment and assert message now say a bank village mounts no children in that state."
+ },
+ {
+  "id": "U4840",
+  "decision": "rewritten",
+  "reason": "Anchor comment now lists the spots it collects and names the ones it leaves out."
+ },
+ {
+  "id": "U4841",
+  "decision": "point",
+  "reason": "Settlement rain never reaches the ground: PlaceRain.tsx:23-25 puts the column's base at EYE (1.5 m) with fall in [0, RAIN_HEIGHT), so streaks run from eye height to 16.5 m; centre the column on the eye as the comments intend and verify the rain picture in a settlement."
+ },
+ {
+  "id": "U4842",
+  "decision": "rewritten",
+  "reason": "Follow comment now says the column follows the head horizontally with its base fixed at EYE."
+ },
+ {
+  "id": "U4843",
+  "decision": "kept",
+  "reason": "The Talkers' gesture refs are the documented dev pose rig; design.md §19.10 now describes a quiet conversation, so the ambient pair needs no gestures."
+ },
+ {
+  "id": "U4844",
+  "decision": "point",
+  "reason": "The fire tender does not face the fire: PlaceLife.tsx:2435 turns him toward the hard-coded point (-3.5, 2.5) instead of the fire at firePos (he stands at firePos − (1.3, 0.7)); aim the rotation at the fire and verify in a village whose fire is off that point."
+ },
+ {
+  "id": "U4845",
+  "decision": "rewritten",
+  "reason": "TaskWalker comment now says \"on the way\", not \"to the field\"."
+ },
+ {
+  "id": "U4846",
+  "decision": "removed",
+  "reason": "Replaced the always-true else if (!task) with a plain else."
+ },
+ {
+  "id": "U4847",
+  "decision": "backlog",
+  "reason": "src/scenes/place/PlaceLife.tsx:3207/3943 — comments put the water carrier's word at the water path head, while adultWork.ts:61 says both words are spoken at the water stand; reconcile."
+ },
+ {
+  "id": "U4848",
+  "decision": "kept",
+  "reason": "The cap is confirmed at adultWork.ts:437 and the stand is placed in gaps round the fire (layout.ts WATER_STAND_FIRE_GAPS)."
+ },
+ {
+  "id": "U4849",
+  "decision": "removed",
+  "reason": "Made speakWork's gesture parameter required and dropped the early return; its only caller passes a ref from an array filled to count."
+ },
+ {
+  "id": "U4850",
+  "decision": "rewritten",
+  "reason": "bank prop doc now names the errands, walkers and navigation grid as users too."
+ },
+ {
+  "id": "U4851",
+  "decision": "rewritten",
+  "reason": "Comment now explains that the balanceVersion subscription re-renders on balance changes the render reads (child count, climb threshold, fallback radius)."
+ },
+ {
+  "id": "U4852",
+  "decision": "rewritten",
+  "reason": "Presence comment no longer mentions the retired elder (layout.ts:989)."
+ },
+ {
+  "id": "U4853",
+  "decision": "rewritten",
+  "reason": "Climb comment now says climbBoulder's own search is the fallback."
+ },
+ {
+  "id": "U4854",
+  "decision": "kept",
+  "reason": "claim does not hold: the comment itself says the fallback covers a malformed layout and the assert reports it."
+ },
+ {
+  "id": "U4855",
+  "decision": "rewritten",
+  "reason": "Comment now says the separation assert still accepts !playGround and this assert reports that state."
+ },
+ {
+  "id": "U4856",
+  "decision": "rewritten",
+  "reason": "Removed the duplicated \"one per settlement\" sentence."
+ },
+ {
+  "id": "U4857",
+  "decision": "kept",
+  "reason": "The pose refs are typed FigurePose | null; the guards are the type narrowing."
+ },
+ {
+  "id": "U4858",
+  "decision": "rewritten",
+  "reason": "claim partly holds: the travel RAIN_RADIUS is 55 (Climate.tsx:69); the header now says \"55-unit radius\" instead of \"55 units wide\"."
+ },
+ {
+  "id": "U4859",
+  "decision": "kept",
+  "reason": "claim does not hold: __placeTag is defined in Kids' dev hook (PlaceLife.tsx:1608)."
  }
 ]
