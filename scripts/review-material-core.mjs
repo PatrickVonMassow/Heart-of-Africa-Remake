@@ -13,8 +13,10 @@
 //
 // So the accounting is DATA, produced where the cut is made:
 //   assembleMaterial()  returns the text AND what it had to drop
-//   materialShortfall() turns that into a refusal, or null
-// and the two are the only inputs to "may this be recorded". Nothing here reads
+//   materialShortfall() turns that (and the transport's own report) into a
+//                       refusal, or null
+// and those are the inputs to "may this be recorded" — planShortfall() asks the
+// same question of the plan alone, on the paths that assemble nothing. Nothing here reads
 // the material text looking for a truncation marker — a source file under review
 // can contain that marker verbatim (this one does), and a check that scans for it
 // answers about the wrong thing in both directions.
@@ -50,14 +52,15 @@ export const MATERIAL_BUDGET_CHARS = 200_000
 export const PATCH_SHARE = 0.5
 
 /** The share the diffstat may take — it is a summary, never the artefact. */
-export const STAT_SHARE = 0.05
+const STAT_SHARE = 0.05
 
 /** Room kept free per pass for the frame the assembly writes around each part. */
 const PASS_RESERVE = 1024
 
 /**
- * What one file costs a pass BEYOND its own characters: its header, the 80 the
- * assembly charges it, and the 200 the omit-guard insists stay free. Padded,
+ * What one file costs a pass BEYOND its own characters and its header (charged
+ * separately): the 80 the assembly charges it, and the 200 the omit-guard
+ * insists stay free. Padded,
  * because a plan that packs a pass full to the last character is a plan the
  * assembly then reports as short — and the assembly, not the plan, is authority.
  */
@@ -90,7 +93,8 @@ export const MANIFEST_END = '=== END OF PASS MANIFEST — the DIFFSTAT and PATCH
  * until they are, no pass verdict means what the ledger records it as meaning.
  *
  * The manifest therefore names, for THIS pass: which pass of how many, every
- * file it carries WITH its delivery level (complete, or diff-only by design),
+ * file it carries WITH its delivery level (complete, diff-only by design, or its
+ * body absent by design),
  * every file of the range that is absent by design with the pass covering it,
  * and the files beyond the reach of any pass. It is written by the same module
  * that plans the passes, so the two cannot drift apart.
@@ -118,7 +122,7 @@ export function formatPassManifest(plan, pass) {
       absentByDesign.has(path)
         ? `  · ${quotePassFile(path)} — ABSENT BY DESIGN, ${absentByDesign.get(path)}`
         : patchOnly.has(path)
-          ? `  · ${quotePassFile(path)} — DIFF ONLY, by design (content larger than a round; its PATCH is complete)`
+          ? `  · ${quotePassFile(path)} — DIFF ONLY, by design (content does not fit the round beside the rest; its PATCH is complete)`
           : `  · ${quotePassFile(path)} — complete: its diff in the PATCH, its current content below`,
     )
   }
@@ -141,7 +145,8 @@ export function formatPassManifest(plan, pass) {
   }
   lines.push(
     'A file declared ABSENT BY DESIGN here is NOT truncated — the two mean opposite things:',
-    'a designed absence is covered by another pass and bars no verdict, while anything marked',
+    'a designed absence (another pass\'s file, or a body this pass names ABSENT BY DESIGN) bars',
+    'no verdict, while anything marked',
     'TRUNCATED or OMITTED further down is a DEFECT of this round and must not be concluded',
     'about. Your verdict covers exactly the files this pass carries.',
     MANIFEST_END,
@@ -166,13 +171,13 @@ export function manifestAllowance(paths = []) {
 }
 
 /**
- * The marker for a file whose CONTENT is larger than a whole round but whose DIFF
- * is complete in the patch above it. It is not an omission and not a cut: the
+ * The marker for a file whose CONTENT does not fit its round beside its diff and
+ * the rest of the pass, but whose DIFF is complete in the patch above it. It is not an omission and not a cut: the
  * change is fully there, the surrounding file is not, and the reviewer is told
  * exactly that instead of being left to guess which of the three it is.
  */
 const patchOnlyHeader = (path) =>
-  `=== FILE CONTENT NOT SENT — it is larger than one whole review round; its COMPLETE diff is in the PATCH above: ${quotePassFile(path)} ===`
+  `=== FILE CONTENT NOT SENT — it does not fit this review round; its COMPLETE diff is in the PATCH above: ${quotePassFile(path)} ===`
 
 /** The header of a patch-only declaration the patch does not back — an omission. */
 const unbackedHeader = (path) =>
@@ -232,14 +237,17 @@ const cut = (text, room) =>
 /**
  * Assemble the material for one round AND account for it.
  *
- * The text is byte-identical to what this project has always sent; what is new is
- * the second half of the return value, which says what the text could not hold.
+ * The text is the manifest (when given), the diffstat, the patch, the files and
+ * a closing RECEIPT line; the second half of the return value says what the
+ * text could not hold.
  * `patchOnly` names paths whose content is deliberately left out because the
  * patch carries the whole change (see patchOnlyHeader) — a declared coverage
  * level, never a silent drop, and therefore not a short-fall.
  *
- * Returns { text, size, rawSize, budget, fit, statTruncated, patchTruncated,
- *           truncated[], omitted[], patchOnly[], sent[] }.
+ * Returns { text, receipt, size, rawSize, budget, fit, statTruncated,
+ *           patchTruncated, truncated[], omitted[], patchOnly[],
+ *           absentByDesign[], sent[] }. `rawSize` counts the diffstat, the
+ * patch and the file content, never the frames, manifest or receipt.
  */
 export function assembleMaterial({
   stat = '',
@@ -442,7 +450,7 @@ export function sentMaterialMatches(assembly = null, sent = undefined) {
 /**
  * The reason a record may NOT be printed for this round, or null.
  *
- * Fail-open in the honest direction (the point's own words): a round whose fit
+ * Fails closed, the honest direction: a round whose fit
  * cannot be established refuses the record, exactly like a round that is known
  * not to have fitted. The only answer that clears it is a complete assembly whose
  * text is provably the text that went out.
@@ -564,7 +572,8 @@ export function unquoteGitPath(value) {
   // that end-to-end would mean carrying Buffers through the whole material
   // pipeline (git → files → Map keys → git show), which this string-based
   // pipeline cannot do. So every consumer REFUSES a path that decodes with
-  // U+FFFD in it (undecodablePaths below; gatherRange and parsePassFiles ask) —
+  // U+FFFD in it (undecodablePaths below; parsePassFiles here and gatherRange in
+  // review-astra.mjs ask) —
   // erring to refusing a record, never to granting one. The cost knowingly
   // paid: a file genuinely NAMED with U+FFFD is refused alongside, because the
   // two are indistinguishable after the decode.
@@ -702,7 +711,8 @@ export function parseDiffHeader(line, lookahead = []) {
  *
  * Pure, and the reason no extra git call is needed to cost a file: a per-file
  * patch size is already in the patch. The `b/` side is taken as the path, as
- * `newFilePathsIn` does, so a rename is costed against where it landed.
+ * review-astra-core.mjs's `newFilePathsIn` does; a rename's section is also
+ * emitted under its source, flagged as an alias (see below).
  */
 export function splitPatchByFile(patch) {
   const lines = String(patch ?? '').split('\n')
@@ -865,10 +875,8 @@ export function planPasses({ stat = '', patch = '', files = [], budget = MATERIA
     let currentSections = null
     for (const entry of entries) {
       const frame = FILE_FRAME_CHARS + fileHeader(entry.path).length
-      // An alias whose section the CURRENT pass already carries costs the pass
-      // no second copy — the join sends it once (round-4 pass 4). The fit test
-      // and the uncoverable ruling keep the full length: alone in a pass, the
-      // section is paid for in full.
+      // The fit test and the uncoverable ruling use the full section length:
+      // alone in a pass, the section is paid for in full.
       const sectionLen = entry.patchText.length
       // A PASS MAY ONLY PROMISE WHAT THE ASSEMBLY WOULD DELIVER: every path
       // needs its patch section, including an absent-by-design body whose mode
@@ -898,7 +906,7 @@ export function planPasses({ stat = '', patch = '', files = [], budget = MATERIA
       }
       let placed = shape(currentSections)
       if (!current || current.size + placed.cost > room) {
-        current = { files: [], patchOnly: [], absentByDesign: [], patchChars: 0, size: 0 }
+        current = { files: [], patchOnly: [], absentByDesign: [], size: 0 }
         currentSections = new Set()
         passes.push(current)
         placed = shape(currentSections)
@@ -908,7 +916,6 @@ export function planPasses({ stat = '', patch = '', files = [], budget = MATERIA
       if (entry.absentByDesign) {
         current.absentByDesign.push({ path: entry.path, reason: entry.absentByDesign })
       }
-      current.patchChars += placed.patchLen
       current.size += placed.cost
       currentSections.add(entry.patchText)
     }
@@ -917,8 +924,9 @@ export function planPasses({ stat = '', patch = '', files = [], budget = MATERIA
 
   // PACKED TWICE WHERE IT SPLITS (structural finding, fourth cross-vendor
   // round): a single fitting round carries no manifest, so the first packing
-  // uses the whole room — and only a range that genuinely splits is re-packed
-  // with the manifest's reservation taken off, because every pass of a split
+  // uses the whole room — and only a range that splits or leaves a file beyond
+  // reach (either way it cannot fit one round) is re-packed with the
+  // manifest's reservation taken off, because every pass of a split
   // must then carry its own shape declaration inside the budget.
   let room = baseRoom
   let { passes, uncoverable } = pack(room)
@@ -968,7 +976,7 @@ export function passByIndex(plan, index) {
  * assignment regardless of how many commits touched it. A character-weighted
  * percentage would claim a precision the ledger cannot reproduce.
  */
-export function reviewCoverage(plan = null, pass = null) {
+function reviewCoverage(plan = null, pass = null) {
   const passes = Array.isArray(plan?.passes) ? plan.passes : []
   const allAssignments = passes.flatMap((candidate) => candidate?.files ?? []).map(String)
   const uncoverable = (plan?.uncoverable ?? []).map((item) => String(item?.path ?? '')).filter(Boolean)
@@ -1034,98 +1042,6 @@ export function formatCoveragePlan(plan) {
 }
 
 /**
- * The line the caller must see BEFORE a round is spent: the threshold, this
- * range's real size, and — when it does not fit — the passes it needs.
- */
-export function formatBudgetNotice(plan, { sha = '', command = 'node scripts/review-astra.mjs' } = {}) {
-  const at = String(sha).slice(0, 7)
-  const head = `review-astra: the material budget is ${plan.budget} characters per round; this range assembles ${plan.rawSize}.`
-  if (plan.fits) {
-    // A round that fits only at a DECLARED delivery level says so: the caller
-    // deciding whether this review suffices must know which content stays out.
-    const declared = plan.passes?.[0]?.patchOnly ?? []
-    return declared.length
-      ? `${head}\n  It fits in one round, with ${declared.length} file(s) travelling as their diff alone` +
-          ` (content larger than a round): ${declared.map((p) => quotePassFile(p)).join(', ')}.`
-      : `${head}\n  It fits in one round.`
-  }
-  if (plan.statTruncated) {
-    return [
-      head,
-      '  The DIFFSTAT ALONE exceeds its share of a round, and every pass carries the whole',
-      '  diffstat — no pass of this range can assemble complete. Review a NARROWER range.',
-    ].join('\n')
-  }
-  const lines = [
-    head,
-    `  IT DOES NOT FIT, so ${at || 'this range'} is reviewed in ${plan.passes.length} PASSES over the FILE SET`,
-    '  (splitting by COMMIT does not help: every commit ships the current content of the files it',
-    '  touches, so the same files overflow one commit at a time and cost a round each).',
-  ]
-  // Structural path lists spell every name through quotePassFile (round-2
-  // pass 3): a legal path holding a newline or comma could otherwise forge a
-  // line or make the printed pass membership ambiguous.
-  //
-  // A SPLIT OF ONE CANNOT BE RECORDED (round-3 pass 4): a plan that packs one
-  // coverable pass beside files beyond reach would advertise `--pass 1` of a
-  // total the recorder refuses (a pass record needs a total of at least 2 — a
-  // pass of one IS a whole range). No runnable command is printed for it.
-  // NEITHER CAN A SPLIT PAST THE RECORDER'S CEILING (landing-round pass 5):
-  // parsePassSpec refuses any total above MAX_PASS_TOTAL, so advertising the
-  // commands of a wider plan sends the caller into rounds whose records are
-  // all refused — paid reviews that can never clear anything.
-  const recordable = plan.passes.length >= 2 && plan.passes.length <= MAX_PASS_TOTAL
-  if (plan.passes.length > MAX_PASS_TOTAL) {
-    lines.push(
-      `  This range splits into ${plan.passes.length} passes — more than the ${MAX_PASS_TOTAL} a`,
-      '  record can hold, so no pass of it could ever be recorded. No round is worth spending:',
-      '  narrow the range, or split the change itself.',
-    )
-    // WHAT IS BEYOND REACH IS STILL NAMED (fourth landing round, carried
-    // pass 7): the early return silently dropped the files no pass covers.
-    if (plan.uncoverable.length) {
-      lines.push(
-        '  BEYOND REACH — no round can hold these, not even their diff alone:',
-        ...plan.uncoverable.map(
-          (u) => `    ${quotePassFile(u.path)} — ${u.reason || 'no round can carry its complete diff'} ` +
-            `(diff ${u.patchChars}, content ${u.contentChars} characters)`,
-        ),
-      )
-    }
-    return lines.join('\n')
-  }
-  for (const pass of plan.passes) {
-    lines.push(
-      `    pass ${pass.index}/${pass.total}  ${pass.files.length} file(s), ~${pass.size} characters` +
-        (pass.patchOnly.length ? `  [diff only: ${pass.patchOnly.map((p) => quotePassFile(p)).join(', ')}]` : ''),
-      `      ${pass.files.map((p) => quotePassFile(p)).join(', ')}`,
-    )
-    if (recordable) {
-      lines.push(`      ${command} --sha ${at || '<sha>'} --brief "<what to judge>" --pass ${pass.index}`)
-    }
-  }
-  if (!recordable) {
-    lines.push(
-      '  This range packs into ONE coverable pass beside what is beyond reach, and a split of',
-      '  one cannot be recorded as passes. No record can cover this range: narrow the range,',
-      '  or split the change itself.',
-    )
-  }
-  if (plan.uncoverable.length) {
-    lines.push(
-      '  BEYOND REACH — no round can hold these, not even their diff alone:',
-      ...plan.uncoverable.map(
-        (u) => `    ${quotePassFile(u.path)} — ${u.reason || 'no round can carry its complete diff'} ` +
-          `(diff ${u.patchChars}, content ${u.contentChars} characters)`,
-      ),
-      '  They are covered by NO pass. Split the change itself, or review them by another means',
-      '  and say so — a record that names them would be claiming a reading nobody did.',
-    )
-  }
-  return lines.join('\n')
-}
-
-/**
  * The reason a WHOLE-RANGE record may not be offered for a range NOBODY has
  * reviewed yet, or null — the same question as materialShortfall, asked one step
  * earlier, from the plan alone.
@@ -1184,11 +1100,12 @@ function lostLines(shortfall) {
 /** The passes the caller is sent to instead, from the plan or from the shortfall. */
 function passLines(shortfall, plan) {
   const passes = plan && !plan.fits ? plan.passes : (shortfall.passes ?? [])
-  // A SPLIT OF ONE CANNOT BE RECORDED here either (round-5 pass 4): the same
-  // rule formatBudgetNotice applies — the recorder refuses totals below 2, so
-  // pointing the caller at `--pass 1` of a one-pass plan sends them to a
-  // command whose record is refused. A split past MAX_PASS_TOTAL is refused
-  // the same way (landing-round pass 5): the recorder holds no such total.
+  // A SPLIT OF ONE CANNOT BE RECORDED (round-5 pass 4): a pass record of a
+  // split needs a total of at least 2 (passComposition), and `1/1` is a bounded
+  // review of the carried files only — it could never clear the range beside
+  // what is beyond reach, so no `--pass 1` of a one-pass plan is advertised.
+  // A split past MAX_PASS_TOTAL is refused the same way (landing-round pass
+  // 5): the recorder holds no such total.
   const recordable = passes.length >= 2 && passes.length <= MAX_PASS_TOTAL
   const lines = recordable
     ? passes.map(
@@ -1201,7 +1118,7 @@ function passLines(shortfall, plan) {
           '  change itself.',
         ]
       : [
-          '  This range packs into ONE coverable pass beside what is beyond reach, and a split of',
+          '  This range packs into at most ONE coverable pass beside what is beyond reach, and a split of',
           '  one cannot be recorded as passes. No record can cover this range: narrow the range,',
           '  or split the change itself.',
         ]
@@ -1258,7 +1175,7 @@ export function formatShortfall(shortfall, { sha = '', plan = null } = {}) {
   if (shortfall.reason === 'needs-passes') {
     lines[0] = `  NO RECORD COMMAND IS PRINTED for ${at}: this range does not fit ONE review round.`
     lines.push(
-      `  The material budget is ${shortfall.budget} characters and the complete material is ${shortfall.rawSize}.`,
+      `  The material budget is ${shortfall.budget} characters and the raw material (diffstat, patch, content) is ${shortfall.rawSize}.`,
     )
     // NO PASS CAN CARRY AN OVERSIZED DIFFSTAT EITHER — every pass ships the
     // whole range's stat for context, so sending the caller to the passes
@@ -1289,7 +1206,7 @@ export function formatShortfall(shortfall, { sha = '', plan = null } = {}) {
   }
   const splitCount = (plan && !plan.fits ? plan.passes : (shortfall.passes ?? [])).length
   lines.push(
-    `  The material budget is ${shortfall.budget} characters and the complete material is ${shortfall.rawSize}.`,
+    `  The material budget is ${shortfall.budget} characters and the raw material (diffstat, patch, content) is ${shortfall.rawSize}.`,
     ...lostLines(shortfall),
     ...(splitCount >= 2 && splitCount <= MAX_PASS_TOTAL
       ? [
@@ -1311,7 +1228,7 @@ export function formatShortfall(shortfall, { sha = '', plan = null } = {}) {
  * `1/1` is meaningful for a BOUNDED review: it says the one round covered only
  * the end-state files named beside it. The recorder stores its reviewed sha, so
  * it can never masquerade as an ordinary whole-range record. Larger totals are
- * the size/authorship split used by passComposition for legacy rows.
+ * the size/authorship split whose records passComposition composes.
  */
 export function parsePassSpec(value) {
   const raw = String(value ?? '').trim()
@@ -1498,9 +1415,8 @@ export function passComposition(records = [], { expect = null } = {}) {
       continue
     }
     const key = `${String(record.sha ?? '')}|${total}`
-    if (!groups.has(key)) groups.set(key, { sha: String(record.sha ?? ''), total, byIndex: new Map(), records: [] })
+    if (!groups.has(key)) groups.set(key, { sha: String(record.sha ?? ''), total, byIndex: new Map() })
     const group = groups.get(key)
-    group.records.push(record)
     const prior = group.byIndex.get(index)
     // A pass reviewed twice keeps the LATER verdict, exactly as a re-review of a
     // whole range supersedes the earlier one.
