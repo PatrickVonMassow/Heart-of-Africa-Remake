@@ -1,12 +1,7 @@
-// READ-ONLY PROGRESS-BOARD PROJECTION — ordered-work step 10. This is the
-// canonical data projection; board ownership/publishing remains serial in the
-// main session and never becomes a worker mutation.
+// READ-ONLY PROGRESS-BOARD PROJECTION — ordered-work step 10. Pure: it projects
+// durable batch state and mutates nothing.
 
 import { DAEMON_POOL_CAP } from './batch-daemon-core.mjs'
-
-export const BATCH_ALERT_KINDS = Object.freeze([
-  'stalled-worker', 'missing-successor', 'marker-deletion', 'rejected-old-epoch', 'quarantined-evidence',
-])
 
 export function projectBatchBoard({ batchId, lanes = [], daemon = null, coordinator = null, queue = [], boundary = null, reasonIntervals = [], now } = {}) {
   if (typeof batchId !== 'string' || !batchId || !Number.isFinite(now)) return { ok: false, reason: 'board projection needs batch identity and a finite observation time' }

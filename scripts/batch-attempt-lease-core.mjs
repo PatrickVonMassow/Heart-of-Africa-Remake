@@ -55,21 +55,6 @@ function attemptIdentity(attempt) {
   return identity
 }
 
-/** THE RECORDS THIS MODULE DECIDES ON ARE READ EXACTLY ONCE, into a snapshot of
- *  plain values, and every guard and every comparison after that reads the SNAPSHOT.
- *  Re-reading a caller's object after validating it decides on a value the guard
- *  never saw: an accessor-backed field answers a valid name to the check and a
- *  shared object to the comparison that follows, so both guards pass while the
- *  comparison matches by reference and frees a claim this module cannot read
- *  (cross-vendor review of point 893). A persisted record has no accessors, but not
- *  every record this module is handed comes from JSON — and the rule costs one copy.
- *  A snapshot that cannot be taken is `null`: unreadable ownership, as everywhere. */
-/** TAKING A READING IS ITSELF FALLIBLE, so every reader here is TOTAL: a record
- *  whose own reading throws answers `null` — no reading could be taken — and every
- *  caller already treats that as unreadable ownership and fails closed. Letting the
- *  exception out instead turned a documented refusal into a crash in the grant and
- *  the write check, which are exactly the two paths a worker runs before it writes
- *  (cross-vendor review of point 893). */
 function carriesFields(value) {
   // A REFERENCE THAT CAN CARRY FIELDS IS AN OBJECT **OR A CALLABLE**. `typeof x ===
   // 'object'` alone let a function slip past every isolated reading in this file
@@ -83,6 +68,22 @@ function carriesFields(value) {
   return value !== null && (typeof value === 'object' || typeof value === 'function')
 }
 
+/** THE RECORDS THIS MODULE DECIDES ON ARE READ EXACTLY ONCE, into a snapshot of
+ *  plain values, and every guard and every comparison after that reads the SNAPSHOT.
+ *  Re-reading a caller's object after validating it decides on a value the guard
+ *  never saw: an accessor-backed field answers a valid name to the check and a
+ *  shared object to the comparison that follows, so both guards pass while the
+ *  comparison matches by reference and frees a claim this module cannot read
+ *  (cross-vendor review of point 893). A persisted record has no accessors, but not
+ *  every record this module is handed comes from JSON — and the rule costs one copy.
+ *  A snapshot that cannot be taken is `null`: unreadable ownership, as everywhere.
+ *
+ *  TAKING A READING IS ITSELF FALLIBLE, so every reader here is TOTAL: a record
+ *  whose own reading throws answers `null` — no reading could be taken — and every
+ *  caller already treats that as unreadable ownership and fails closed. Letting the
+ *  exception out instead turned a documented refusal into a crash in the grant and
+ *  the write check, which are exactly the two paths a worker runs before it writes
+ *  (cross-vendor review of point 893). */
 function readOnce(take) {
   try {
     return take()
@@ -227,8 +228,8 @@ export function grantAttemptLease({ existing = null, attempt = {}, holder = {}, 
   // through to the fresh grant, so unreadable ownership was interpreted as no
   // ownership (cross-vendor review of point 893). Every other value is a lease
   // this module must read, and failing to read it fails closed.
-  const existingLease = existing === null || existing === undefined ? null : snapshotLease(existing)
-  if (existing !== null && existing !== undefined) {
+  const existingLease = existing === null ? null : snapshotLease(existing)
+  if (existing !== null) {
     if (!usableLease(existingLease)) {
       // An unreadable lease is UNCERTAIN ownership, and uncertain fails closed
       // (M39) — never "broken, therefore free".
@@ -353,7 +354,8 @@ export function leaseAllowsWrite({ lease = null, holder = {}, leaseId = null, no
 }
 
 /** Expiry is LOUD (M18/M38): every expired lease is an alert naming its attempt,
- *  never merely an unblocked slot. The daemon raises these; it frees nothing.
+ *  never merely an unblocked slot. It frees nothing. No production caller raises
+ *  these yet (only tests call it).
  *  A MALFORMED lease is louder still, not quieter: it is durable ownership this
  *  module can no longer read, and silently skipping it would hide exactly the
  *  uncertainty the rest of this file fails closed on. The same goes for a clock
@@ -386,8 +388,7 @@ export function expiredLeaseAlerts({ leases = [], now } = {}) {
     if (!Number.isFinite(now)) {
       return [{ ...name, alert: 'no finite current time was supplied; this lease cannot be judged and stands unverified' }]
     }
-    const l = lease
-    if (!usableLease(l)) {
+    if (!usableLease(lease)) {
       return [{ ...name, alert: 'a persisted attempt lease is malformed; its ownership is uncertain and it is quarantined, not skipped' }]
     }
     // A CLOCK BEHIND THE LEASE'S LAST EVIDENCE IS THE ONE STATE THIS FUNCTION MUST
@@ -395,11 +396,11 @@ export function expiredLeaseAlerts({ leases = [], now } = {}) {
     // rollback, so a rolled-back clock silenced the alert on exactly the state
     // every other decision here fences (cross-vendor review of point 893). An
     // unusable clock is an alert here as it is a refusal everywhere else.
-    if (now < clockFloor(l)) {
-      return [{ ...name, alert: `the clock is ${clockFloor(l) - now}ms before this lease's last renewal — a rolled-back clock cannot judge expiry` }]
+    if (now < clockFloor(lease)) {
+      return [{ ...name, alert: `the clock is ${clockFloor(lease) - now}ms before this lease's last renewal — a rolled-back clock cannot judge expiry` }]
     }
-    if (now <= l.expiresAt) return []
-    return [{ ...name, alert: `attempt lease expired ${now - l.expiresAt}ms ago and its holder pid ${l.holder.pid} is not proven dead` }]
+    if (now <= lease.expiresAt) return []
+    return [{ ...name, alert: `attempt lease expired ${now - lease.expiresAt}ms ago and its holder pid ${lease.holder.pid} is not proven dead` }]
   })
 }
 
@@ -428,7 +429,7 @@ export function worktreeClaimKey(worktree) {
  *  spread into a map of its own characters and a null map threw (hostile re-read of
  *  point 893, the class the review closed for the existing lease). */
 function readClaims(claims) {
-  if (claims === null || claims === undefined) return { ok: true, claims: {} }
+  if (claims === null) return { ok: true, claims: {} }
   const unreadable = (why) => ({ ok: false, reason: why })
   // THE CONTAINER IS A PLAIN MAP, and `typeof` is not what says so. A Map, a Date or
   // a class instance all answer `object` and carry no own enumerable entries, so
@@ -503,10 +504,6 @@ function readClaims(claims) {
  *  record this module cannot read passes through untouched, so the collision path
  *  still fails closed on it rather than seeing a tidied copy. */
 function sealedClaims(claims) {
-  // fromEntries and not `sealed[key] = …`: a persisted map carrying a `__proto__`
-  // key — JSON.parse makes it an OWN property — would set the new map's PROTOTYPE
-  // instead of storing the entry, so the map handed out silently lost a key and
-  // carried a claim record as its prototype.
   return Object.freeze(
     Object.fromEntries(
       Object.entries(claims).map(([key, record]) => [key, carriesFields(record) ? Object.freeze({ ...record }) : record]),

@@ -6,7 +6,7 @@
  * never acquire a batch lock or mutate runtime state.
  */
 
-export const ACTIVITY_JOURNAL_VERSION = 1
+const ACTIVITY_JOURNAL_VERSION = 1
 
 export const ACTIVITY_EVENTS = Object.freeze({
   OWNER_CLAIM: 'owner-claim',
@@ -38,7 +38,7 @@ export const ACTIVITY_EVENTS = Object.freeze({
   VERIFICATION_WAIT_TIMEOUT: 'verification-wait-timeout',
 })
 
-export const ACTIVITY_EVENT_SET = new Set(Object.values(ACTIVITY_EVENTS))
+const ACTIVITY_EVENT_SET = new Set(Object.values(ACTIVITY_EVENTS))
 
 const finiteOrNull = (value) => (typeof value === 'number' && Number.isFinite(value) ? value : null)
 
@@ -81,7 +81,7 @@ export function activityRecord({
 }
 
 /** Strict enough to keep corrupt/partial lines out of classification. */
-export function validActivityRecord(value) {
+function validActivityRecord(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false
   if (value.v !== ACTIVITY_JOURNAL_VERSION) return false
   if (!Number.isSafeInteger(value.seq) || value.seq <= 0) return false

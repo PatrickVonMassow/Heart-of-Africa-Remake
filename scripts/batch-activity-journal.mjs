@@ -8,7 +8,6 @@
  * fail-open because telemetry must never stop ownership, handover, or a tool.
  */
 import {
-  appendFileSync,
   mkdirSync,
   openSync,
   closeSync,
@@ -39,10 +38,9 @@ export function activityJournalPath({ repo = REPO_ROOT, exec = execFileSync, exp
   return join(repo, '.claude', 'batch-activity.jsonl')
 }
 
-export const ACTIVITY_JOURNAL_PATH = activityJournalPath()
-export const ACTIVITY_JOURNAL_LOCK_PATH = `${ACTIVITY_JOURNAL_PATH}.lock`
-export const JOURNAL_LOCK_STALE_MS = 30_000
-export const JOURNAL_LOCK_WAIT_MS = 2_000
+const ACTIVITY_JOURNAL_PATH = activityJournalPath()
+const JOURNAL_LOCK_STALE_MS = 30_000
+const JOURNAL_LOCK_WAIT_MS = 2_000
 const RETRY_MS = 5
 
 const wait = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
@@ -80,7 +78,7 @@ function acquireJournalLock(lockPath, { now = Date.now, waitMs = JOURNAL_LOCK_WA
  * the durable journal under the mutex — there is still no side counter that can
  * advance without its line — and falls back to the whole file when the tail
  * carries no complete record. */
-export const SEQUENCE_TAIL_BYTES = 64 * 1024
+const SEQUENCE_TAIL_BYTES = 64 * 1024
 
 function nextSequence(path, { tailBytes = SEQUENCE_TAIL_BYTES } = {}) {
   let fd
@@ -109,9 +107,8 @@ function nextSequence(path, { tailBytes = SEQUENCE_TAIL_BYTES } = {}) {
   }
 }
 
-/** Append one transition and return the exact durable record. Throws so tests
- * and explicit callers can detect storage failure. Runtime lifecycle code uses
- * emitActivity below. */
+/** Append one transition and return the exact durable record. Throws on
+ * storage failure; runtime lifecycle code uses the fail-open emitActivity below. */
 export function appendActivity(input, {
   path = ACTIVITY_JOURNAL_PATH,
   lockPath = `${path}.lock`,
@@ -144,9 +141,4 @@ export function emitActivity(input, options = {}) {
   } catch {
     return false
   }
-}
-
-/** Kept injectable for the concurrency fixture; ordinary code never calls it. */
-export function appendRawForTest(path, text) {
-  appendFileSync(path, text)
 }

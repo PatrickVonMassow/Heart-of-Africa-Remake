@@ -7,8 +7,8 @@
 // that must be provable, so they are built here, purely, and the CLI only hands
 // them to `spawn`.
 //
-// THE ONE THING THIS FILE EXISTS FOR (point 402, 28.07.2026, four measured
-// deaths in one afternoon): the spawn environment. `.claude/autostart-run.log`
+// THE SPAWN ENVIRONMENT (point 402, 28.07.2026, four measured deaths in one
+// afternoon). `.claude/autostart-run.log`
 // carries the executioner's own words four times over —
 //
 //     Background tasks still running after 600s; terminating.
@@ -27,15 +27,17 @@
 //
 // The ceiling therefore goes to INFINITE, deliberately: the runtime knows nothing
 // about the work, so it must not hold the policy. What bounds a wait instead is
-// PROGRESS — `assessOwnerWork` in scripts/batch-in-flight-core.mjs feeding
-// `assessOwner`, which reads an owner as stalled only when nothing has advanced
-// for two launcher ticks. `0` is the value the runtime's own message documents.
+// PROGRESS — `ownerKeepsBatch` below: past a threshold the owner keeps the batch
+// only while its declared work advances (`assessOwnerWork` in
+// scripts/batch-in-flight-core.mjs), and past an absolute hard deadline it does
+// not keep it at all. `0` is the value the runtime's own message documents.
 
+/** The runtime's variable, always set explicitly on the child. */
+export const BG_WAIT_CEILING_ENV = 'CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS'
 /** The launcher's own override, deliberately NOT the runtime's variable name: an
  *  inherited `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS` from some other context must
  *  never silently re-arm the ten-minute execution. Set HOA_BG_WAIT_CEILING_MS to
  *  a millisecond value to put a ceiling back. */
-export const BG_WAIT_CEILING_ENV = 'CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS'
 export const BG_WAIT_CEILING_OVERRIDE_ENV = 'HOA_BG_WAIT_CEILING_MS'
 /** 0 = wait indefinitely (the runtime's own documented value). */
 export const BG_WAIT_CEILING_DEFAULT = '0'
@@ -44,7 +46,7 @@ import { OPUS_MODEL_ID, servingFallbackModelId } from './fable-switch-core.mjs'
 import { PAUSE_RETRY_LADDER_MS, planPause } from './batch-pause-core.mjs'
 
 /** Model policy (CLAUDE.md §6). rule:model-policy@aa7f5b05
- *  The session starts on Opus 5.5. Its one CLI fallback is the next member of the
+ *  The session starts on OPUS_MODEL_ID (scripts/fable-switch-core.mjs). Its one CLI fallback is the next member of the
  *  chain reported by scripts/fable-switch.mjs; the model guard enforces that
  *  same allowlist from inside the spawned session. */
 export const SPAWN_MODEL = OPUS_MODEL_ID
@@ -99,10 +101,9 @@ export function callDisciplineTopics() {
 }
 
 export const RESUME_PROMPT =
-  'Autonome Batch-Wiederaufnahme (vom OS-Scheduler gestartet, weil keine Claude-Session aktiv war). ' +
+  'Autonome Batch-Wiederaufnahme (vom Launcher gestartet). ' +
   'Setze den "Heart of Africa"-Batch fort. Orientiere dich am Board (scripts/focus.mjs show plus die ' +
-  'Warteschlange in .batch-dashboard.html) — die frueher hier genannte Handoff-Memory ist retiriert und ' +
-  'existiert nicht mehr. ' +
+  'Warteschlange in .batch-dashboard.html). ' +
   'Pruefe als erstes den ausgecheckten Git-Branch und ob ein Merge halb fertig ist. Arbeite die offenen ' +
   'TASKS-Punkte in Reihenfolge ab — Feature-Branch-Workflow (CLAUDE.md §6): jeder Punkt auf seinem ' +
   'EIGENEN feat/<punkt>-<slug>-Branch von main, atomare Commits, den BRANCH nach jedem Commit pushen, ' +
@@ -145,7 +146,7 @@ export const RESUME_PROMPT =
 // The chat channel (scripts/chat-core.mjs) is only half a channel if nothing
 // reads it. The launcher already ticks every fifteen minutes and already speaks
 // to the network, so it polls the inbox and hands what is waiting to the session
-// it spawns. That bounds delivery at one tick with no new process.
+// it spawns. Consuming the spool belongs to the per-tool-call delivery.
 //
 // THE SIGNATURE SAYS WHO WROTE IT, NOT WHAT MAY BE DONE. A verified message is
 // still UNTRUSTED INPUT, so the framing says so in the prompt itself: it is a
@@ -163,7 +164,7 @@ export const CHAT_PROMPT_MAX_CHARS = 600
  * Empty for no messages, so the prompt stays byte-identical to before wherever
  * the channel is unused or unconfigured.
  *
- * ASCII only, like RESUME_PROMPT: the argv goes through a Windows spawn.
+ * Umlauts as digraphs, like RESUME_PROMPT; message text is passed through as is.
  */
 export function chatPromptSuffix(messages) {
   const list = (Array.isArray(messages) ? messages : [])
@@ -257,7 +258,7 @@ export function standingAlertDue({ lastAt = null, now = Date.now(), intervalMs =
 }
 
 /**
- * The argv the launcher hands to claude.exe. PURE.
+ * The argv the launcher hands to the Claude CLI. PURE.
  *
  * --dangerously-skip-permissions: the resurrected session is HEADLESS (-p) and
  * unattended, so it can neither show a permission prompt nor have one answered. A
@@ -383,8 +384,9 @@ export function pruneSpawns({ spawns, probePid } = {}) {
  * writer can therefore be alive after the lock was lost or released, and using
  * lock absence as liveness evidence starts a second writer beside it. The
  * PreToolUse ownership fence records batch-writer process identities separately;
- * this decision probes those identities and lets a live one veto a start even
- * when `lock` is null.
+ * this decision probes those identities and lets an authoritative one (active
+ * authority state, same process, and on the current fence or advancing) veto a
+ * start even when `lock` is null.
  *
  * A PID alone is not an identity. Where both recorded and measured start times
  * exist they must match; a recycled PID is measured as dead. Where the host
@@ -436,7 +438,8 @@ export function launcherStartDecision({
     )
     // Missing state is the one-release migration path for records written by the
     // previous build. New writes always make the state explicit; only an explicit
-    // retirement can remove authority.
+    // retirement makes the state 'retired'. Authority below additionally needs
+    // the same process and the current fence or an advancing write.
     const authorityState = record.authorityState === 'retired' ? 'retired' : 'active'
     const currentFence =
       generation !== null &&
@@ -476,7 +479,8 @@ export function launcherStartDecision({
     },
   }
   // A lock's OWN writer does not overrule an explicit handover, idle release or
-  // expired lease: those are ownership transitions the existing assessment was
+  // expired lease (unless `includeOwnerWriter` asks for it, as the CI-terminal
+  // successor start does): those are ownership transitions the existing assessment was
   // built to decide, and handover deliberately leaves its process alive. What
   // this independent registry adds is the process the lock DOES NOT name — a
   // lockless writer, or a second writer beside a stale lock.
@@ -848,7 +852,7 @@ export function launcherStartRecord({ decision, at, head = '', pid, pidStartedAt
 // Two spawners need it — the launcher and the message watcher
 // (scripts/chat-watcher.mjs) — so the lookup lives here rather than twice. The
 // filesystem calls are INJECTED, which is what keeps this file testable on any
-// host: the defaults are the real ones.
+// host: the callers pass the real ones.
 //
 // THE HOST IS NOT ALWAYS WINDOWS (point 490, 04.08.2026). This lookup knew
 // exactly one shape — the versioned bundle under %LOCALAPPDATA% — and the batch
@@ -867,7 +871,7 @@ export const CLAUDE_CLI_ENV = 'HOA_CLAUDE_CLI'
 
 /** The npm package installs its bin as `claude`; on the Linux host that name is a
  *  symlink to a file still called `claude.exe`, so both names are tried. */
-export const CLI_NAMES = ['claude', 'claude.exe']
+const CLI_NAMES = ['claude', 'claude.exe']
 
 /**
  * The bin names to try, in the order THIS platform can execute them. On Windows
@@ -922,10 +926,11 @@ export function pathDirs({ env = process.env, platform = process.platform } = {}
 }
 
 /**
- * The CLI this host can actually spawn, or null. Ordered: the explicit override
+ * The CLI this host should spawn, or null. Ordered: the explicit override
  * first, then the Windows bundle, then PATH, then the usual install dirs.
  *
- * Every candidate must EXIST before it is returned — an override naming nothing
+ * Every candidate must EXIST (and be a regular file where `isFile` is given)
+ * before it is returned — an override naming nothing
  * falls THROUGH rather than being handed to `spawn`, because a resolver that
  * returns an unusable path only moves the same failure one line down, into a
  * spawn error whose message no longer names the real cause.
@@ -1017,12 +1022,14 @@ export function claudeConfigPath({ env = process.env, home = '', join: j = (a, b
 // `failCount` only ever rose when the spawn's pid was GONE. A chain of
 // alive-but-wedged successors would burn tokens all night and look busy.
 //
-// Three answers, all pure here and wired in scripts/batch-autostart.mjs.
+// Three answers, marked (i) to (iii) below, all pure here and wired in
+// scripts/batch-autostart.mjs.
 
 /**
  * (i) MAY THE LAUNCHER SPAWN AT ALL? PURE.
  *
- * `probes` is one entry per check: { name, ok, detail }. Every probe must pass —
+ * `probes` is one entry per check: { name, ok, detail }. Every conclusive probe
+ * must pass —
  * an environment that cannot run the CLI, cannot read git or cannot write the
  * state directory cannot host a rescue either.
  *
@@ -1045,7 +1052,8 @@ export function judgeSpawnPreflight({ probes = [] } = {}) {
   }
 }
 
-/** How long a spawn gets to prove itself: convert the lock or land a first commit.
+/** How long a spawn gets to prove itself: convert the lock, write as the batch
+ *  writer, or land a first commit.
  *  Calibratable via HOA_SPAWN_PROVE_MIN (minutes). Twenty is two boots' worth of
  *  slack over the ten-minute pending window a spawn already gets. */
 export const SPAWN_PROVE_MS = 20 * 60 * 1000
@@ -1053,8 +1061,9 @@ export const SPAWN_PROVE_MS = 20 * 60 * 1000
 /**
  * DID ANYTHING ACTUALLY MOVE SINCE THE LAST SPAWN? PURE.
  *
- * Two facts count: the repository head advanced, or a SESSION claimed the batch
- * lock after the spawn. The second needs the qualification this function exists
+ * Three facts count, each only when attributed to this spawn: a SESSION claimed
+ * the batch lock after the spawn, a fenced batch-writer write after the spawn, or
+ * the repository head advanced. The lock claim needs the qualification this function exists
  * for (point 444). The launcher writes its OWN `pending-spawn` lock milliseconds
  * after `lastSpawnAt` and rebinds it to the child, so that lock's `claimedAt` is
  * ALWAYS later than the spawn — and a spawn that dies before converting it leaves
@@ -1114,8 +1123,9 @@ export function spawnProgressed({
  *
  * The old rule counted a failure only when the spawn's pid was GONE, so a spawn
  * that came up, wedged and kept its process alive counted as success forever.
- * Living is not working: a spawn that has neither converted the lock nor produced a
- * commit within `proveMs` is a failure whether it breathes or not.
+ * Living is not working: a spawn that has shown no progress (`spawnProgressed`:
+ * lock conversion, fenced write or commit) within `proveMs` is a failure whether
+ * it breathes or not.
  *
  * Returns { verdict: 'progress' | 'failed' | 'pending' | 'none', reason }.
  */
@@ -1239,9 +1249,10 @@ export function spawnBackoffMs({
  *  `.claude/autostart-run.log` carries three times over from 22.07.2026:
  *  "You've hit your session limit · resets 4:20pm (Europe/Berlin)". The rest are
  *  the CLI's other refusal wordings, kept narrow ON PURPOSE — a session's own
- *  prose about limits must never be read as a refusal, so nothing here matches a
- *  WARNING ("approaching your usage limit") or a bare mention of the word. */
-export const QUOTA_SIGNATURES = Object.freeze([
+ *  prose about limits is not read as a refusal: nothing here matches a WARNING
+ *  ("approaching your usage limit") or a bare mention of the word. A quoted
+ *  refusal line inside the searched tail still matches. */
+const QUOTA_SIGNATURES = Object.freeze([
   /you'?ve hit your (?:session|usage|weekly|opus|\d+-hour) limit\b/i,
   /\b(?:claude ai |claude )?usage limit reached\b/i,
   /\b\d+-hour limit reached\b/i,
@@ -1345,14 +1356,17 @@ export function runawayRecoveryDecision({
  * terminal spawn from climbing the ladder again on later ticks which merely
  * refused to start its successor.
  *
- * Returns { state, failCount, quota, pause, nextProbeMs, note }:
+ * `verdict` is judgePreviousSpawn's, or 'refused' when this tick's start was
+ * refused.
+ *
+ * Returns { state, failCount, quota, pause, nextProbeMs, accountedAttemptKey, note }:
  *   state 'quota'    the limit refused the start — failCount UNTOUCHED, no pause,
  *                    next probe at the ordinary interval, the probe logged.
  *   state 'failed'   an ordinary failure — the ladder climbs exactly as before.
  *   state 'progress' work is happening; a standing quota record is cleared and
  *                    the MOMENT OF RESUMPTION is the note, so the real reset
  *                    rhythm can be read out of the log instead of assumed.
- *   state 'wait'     this tick spawned nothing, or already accounted this spawn;
+ *   state 'wait'     this tick's start was refused, or this spawn was already accounted;
  *                    failCount is UNTOUCHED.
  *   'pending'/'none' nothing concluded: everything is carried unchanged.
  */
@@ -1511,7 +1525,7 @@ export const ETA_OVERDUE_ALERT_MIN = 15
 
 /**
  * The launcher's log line for overdue published promises, or null when there is
- * nothing to say. PURE, pinned like its board-behind sibling. `overdue` is the
+ * nothing to say. PURE, pinned by its tests. `overdue` is the
  * watchdog child's `etaOverdue` — `pastEtaCards` of the LIVE page — and anything
  * malformed answers null (the child is a separate process; its output is data,
  * not trusted structure).
@@ -1555,7 +1569,8 @@ export function staleEtaLogLine({ overdue, tickMin = ETA_OVERDUE_ALERT_MIN } = {
 //     That is evidence of work, and evidence of work is what the threshold
 //     exists to protect;
 //   · past the HARD DEADLINE nothing keeps it. Not a heartbeat, not a declared
-//     wait, not a fresh log. This is the bound the incident had no equivalent
+//     wait, not a fresh log. (The takeover itself still waits for a successor
+//     that can start: `takeoverHandsOver` above.) This is the bound the incident had no equivalent
 //     of, and its whole purpose is that no signal a wedged session can keep
 //     producing may extend it.
 //
