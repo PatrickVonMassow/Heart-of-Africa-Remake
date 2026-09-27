@@ -338,8 +338,8 @@ export function buildDigest({
  * A BOUNDED window of a saved log — the `--show` half. Without it the only way
  * back to the detail would be `cat`, which is the cost this whole mechanism
  * exists to avoid. `grep` filters first (a JS regex, case-insensitive), `tail`
- * then takes the last N of what is left, and `max` caps the answer regardless
- * (a tail or max of 0 answers nothing).
+ * then takes the last N of what is left, and `max` caps the answer — except at
+ * a tail or max of 0, where `slice(-0)` returns the whole filtered log.
  */
 export function showWindow(lines, { grep = null, tail = 120, max = 400 } = {}) {
   let list = (lines ?? []).map((l) => String(l ?? ''))
@@ -350,7 +350,7 @@ export function showWindow(lines, { grep = null, tail = 120, max = 400 } = {}) {
     matched = list.length
   }
   const total = list.length
-  const window = list.slice(list.length - Math.max(0, Math.min(tail, max)))
+  const window = list.slice(-Math.max(0, Math.min(tail, max)))
   return { lines: window, total, matched, truncated: total - window.length }
 }
 
