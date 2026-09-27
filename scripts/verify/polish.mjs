@@ -4720,7 +4720,6 @@ if (section('children-bank-game')) {
             playedClock: t.playedClock,
             phase: t.phase,
             tags: t.tags,
-            bodyRadius: t.bodyRadius,
             px: p.x,
             pz: p.z,
             // `held` is the settlement's own word for a stillness that was ORDERED —
@@ -4886,11 +4885,12 @@ if (section('children-bank-game')) {
         `closest approach ${minGap.toFixed(2)} m against the berth ${(bodies + planted.berth).toFixed(2)} m ` +
           `(strangerBerth ${planted.berth})`,
       )
-      // A window in which no runner ever came within `LANE_SHOT_GAP` of him is a
-      // FAILURE of the check above, not a picture to paper over — but the frame
+      // A window in which no child of a run ever came within `LANE_SHOT_GAP` of
+      // him, ahead of him and closing, is a FAILURE of the check directly below,
+      // not a picture to paper over — but the frame
       // is still written, aimed at the stage, so the reader can see WHAT the
       // group was doing instead.
-      check('and the run was photographed with a child in it', shotRun, shotRun ? '' : 'no runner came near enough to shoot')
+      check('and the run was photographed with a child in it', shotRun, shotRun ? '' : 'no runner came near enough, ahead and closing, to shoot')
       if (!shotRun) {
         await frame('687-bank-game-traveller', {
           local: { x: planted.far.x, y: planted.r * 0.5, z: planted.far.z },
@@ -4914,7 +4914,8 @@ if (section('children-bank-game')) {
     // hand-sphere faceting, rounded up by 1 mm. The flank is now the exact mesh,
     // not the edge-bin approximation that overstated it by up to 64 mm in the
     // unit fixtures (docs/hand-stone-contact.md). Judge the new pictures too;
-    // this bar covers BOTH whole holds and their recorded word frames.
+    // this bar covers the hold the checks below judge (the trace restarts at
+    // every hold, so the last one read) and its recorded word frames.
     const contactBar = 0.005
     const holdSeconds = await page.evaluate(
       () => window.__balance?.villageLife?.bankGame?.tapPauseSeconds ?? 0,
@@ -4967,7 +4968,7 @@ if (section('children-bank-game')) {
     let tapAimed = false
     let tapShot = false
     const holdTrace = []
-    /** A spectator's stance in the lane, four metres off and level with the
+    /** A spectator's stance in the lane, 4.2 m off and level with the
      *  contact, so a hand and a stone read as two things.
      *
      *  AND ON THE SIDE THE ARM IS ON (work-order 1065). The quarter-turn used to
@@ -5005,7 +5006,7 @@ if (section('children-bank-game')) {
         p.z = stand.z
         p.yaw = Math.atan2(-(h.x - p.x), -(h.z - p.z))
         p.pitch = -0.1
-        return { x: p.x, z: p.z }
+        return true
       }, hand))
     // THE BUDGET IS THE HOLD'S OWN LENGTH, NOT A ROUND NUMBER (work-order 1065).
     // INSIDE a hold this loop steps ONE frame per turn, so reading a hold from
@@ -5090,12 +5091,11 @@ if (section('children-bank-game')) {
       // ONE READING OF A HOLD IS A COIN TOSS. The loop used to stop at its first
       // good reading, so which single frame of a nine-second hold got measured
       // was luck — and the worst-reading check below then went red or green at
-      // random on the same code (measured 08.09.2026). It now reads the hold at
-      // every frame and runs THROUGH IT: a hand that arrives and then leaves
-      // again is caught only by staying to the end, so the loop leaves on the
-      // far side of a hold, never inside one.
-      // …and never from inside a hold: `inHold` is the current sample's own state,
-      // so the loop can only leave on the far side of one.
+      // random on the same code (measured 08.09.2026). It now samples the hold
+      // one frame per turn and runs THROUGH IT: a hand that arrives and then
+      // leaves again is caught only by staying to the end. `inHold` is the
+      // current sample's own state, so the loop can only leave on the far side
+      // of a hold.
       if (bestTouch && Math.abs(bestTouch.gap) <= contactBar && sawTouchPose && heldToTheEnd && !inHold) break
       await nextFrames(now && now.phase === 'run' && now.tapFor > 0 ? 1 : 2)
     }
@@ -5155,10 +5155,9 @@ if (section('children-bank-game')) {
         // failed at 61.1 cm). The opening is still worth one frame, so it is
         // kept and the window is spliced in after it.
         const worst = holdTrace.indexOf(stationTap)
-        const around =
-          worst < 0
-            ? holdTrace.slice(0, 6)
-            : [holdTrace[0], ...holdTrace.slice(Math.max(1, worst - 3), worst + 4)]
+        // stationTap is only ever set on a holding sample the trace has just
+        // taken, and both reset together, so it is always in the trace.
+        const around = [holdTrace[0], ...holdTrace.slice(Math.max(1, worst - 3), worst + 4)]
         check(
           'and the tapping hand stays within 5 mm of the flank over the whole hold',
           Math.abs(stationTap.gap) <= contactBar,
@@ -5360,8 +5359,8 @@ if (section('children-bank-game')) {
     )
   }
 
-  // The world goes back as it was found: the shipped roaming phase, and the game
-  // left outside the settlement — every section after this one would otherwise be
+  // The world goes back as it was found: the shipped roam, roam guard, tap pause
+  // and arrival hold, and the game left outside the settlement — every section after this one would otherwise be
   // reading a village this one staged.
   await page.evaluate((was) => {
     const b = window.__balance.villageLife.bankGame
@@ -5378,9 +5377,9 @@ if (section('children-bank-game')) {
 // THE OFF-GAME ROCK HAS TO BE SEEN (work-order 1080). The children's spec asks
 // for ROCK to be spoken at a stone that is no part of the game, so the word
 // cannot be learned as "the thing you run to" — and the round has said it since
-// work-order 687. Nothing in this file ever looked at it: the only mention of
-// the boulder here SHORTENS the guard so the running section need not wait for
-// it, and at the verify seed the stone goes unnamed every cycle. So the picture
+// work-order 687. Until this section nothing in this file looked at it: the only
+// mention of the boulder SHORTENED the guard so the running section need not
+// wait for it. So the picture
 // side of that guard was never taken at all, while the unit suite asserted a
 // flag that a child hovering 2.2 m from the stone for a third of a second
 // satisfied. The user reported the climb as missing from the game, and he was
@@ -5401,15 +5400,13 @@ if (section('children-boulder-climb')) {
   // approach finish, and cutting it would stage away the very moment this
   // section exists to photograph.
   //
-  //
   // AND THE HOLD IS NOT TOUCHED (work-order 1082). It used to be forced to 25 s
   // to give the shutter's five-second readiness wait room, and THAT staging was
   // the defect: the accepted picture proved the mechanic ran, never that a player
   // could see it, and the user reported the climb missing a second time at
   // shipped values. The stand is now the shipped one, the readiness wait is taken
   // BEFORE the climb rather than during it, and the frame is declared as the
-  // moment it is (`settle: false`) — the same way every other frame of a moment
-  // in this file is taken.
+  // moment it is (`settle: false`), as other moment frames in this file are.
   const shippedClimbRoam = await page.evaluate(() => {
     const b = window.__balance.villageLife.bankGame
     const was = { roamSeconds: b.roamSeconds }
@@ -5431,9 +5428,9 @@ if (section('children-boulder-climb')) {
     // the children, who give the traveller a wider berth than they give each
     // other (spec item 7), swerved round it until the approach watch gave up:
     // three minutes of `roam` in which no child ever started to climb. The
-    // camera therefore stands on the far side of the stone from the children's
-    // own quarter, and falls back to the flanks where that would put it off the
-    // settlement's ground.
+    // camera therefore keeps out of the wedge toward the children's quarter and
+    // takes the best-lit side of the rest of the circle; it stands in the wedge
+    // only when the settlement's ground leaves nothing else.
     // AND IT STANDS WHERE THE SUN IS BEHIND IT. The first take of this frame put
     // the camera on whichever side came first and photographed the shadowed
     // flank: a black stone with a black figure on it against bright sand, which
@@ -5480,8 +5477,8 @@ if (section('children-boulder-climb')) {
       if (!best) return null
       p.x = best.x
       p.z = best.z
-      // The place camera's own convention, as every other aimed frame in this
-      // file writes it: the bearing to the target plus a half turn.
+      // The place camera's own convention, as the other aimed frames in this
+      // file write it: the bearing to the target plus a half turn.
       p.yaw = Math.atan2(b.x - p.x, b.z - p.z) + Math.PI
       p.pitch = 0
       return best
@@ -5493,9 +5490,10 @@ if (section('children-boulder-climb')) {
     // readiness wait started after the child is up there would photograph the
     // empty stone it climbed down from.
     await waitForSceneReady(page).catch(() => {})
-    // THE CLIMB ITSELF, waited for on the round's own state. The roaming phase
-    // is the shipped one: the guard holds the cycle until the boulder is named,
-    // so a visit that begins in `roam` reaches this without any staging.
+    // THE CLIMB ITSELF, waited for on the round's own state. Only the roam's
+    // schedule is shortened above; the guard is the shipped one and holds the
+    // cycle for up to its 45 s until the boulder is named, so a visit that begins
+    // in `roam` reaches this without further staging.
     const up = await page
       .waitForFunction(
         () => (window.__placeTag().children ?? []).some((c) => c.climb === 'top'),
@@ -5578,7 +5576,6 @@ if (section('children-boulder-climb')) {
           const label = (window.__speech?.labels() ?? []).find((l) => l.speakerId === `kid-${i}`)
           return {
             i,
-            climb: c.climb,
             child: ndcFeet && ndcHead
               ? { pixels: (Math.abs(ndcHead[1] - ndcFeet[1]) / 2) * height, occluded, confirmed, ndcFeet, ndcHead }
               : { pixels: 0, occluded, confirmed, ndcFeet: null, ndcHead: null },
@@ -5639,22 +5636,6 @@ if (section('children-boulder-climb')) {
   await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
 }
 
-// --- The adults at the water and the ground work ------------------------------
-// THE ADULTS TEACH BY DOING THEIR OWN WORK (work-order 688). The errand
-// catalogue is gone: what the live scene has to show now is that the two words
-// really are spoken, that they are spoken IN THE VILLAGE and never at the bank,
-// and that the digging one falls while a man is at the ground rather than while
-// he walks to it. The where-and-when is proven in Vitest over the pure module
-// (`adultWork.test.ts`); what only the browser can settle is that PlaceLife
-// carries it out at all — a villager with a jar, a villager at the dig pose, and
-// a word over his head.
-//
-// The rest of the section proves the STAGE the teaching stands on: the dig
-// sites, the water path, the bank, the drawn river and the direction its current
-// runs.
-//
-// The village is the PoC's own (the Bambara village); the ground work is in
-// every village.
 // --- No adult stays wedged (work-order 1138) ---------------------------------
 // The user photographed two adults pressed into the corner between a dwelling's
 // wall and a fence panel, still there frame after frame. The escape ladder that
