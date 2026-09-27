@@ -219,7 +219,7 @@ export function pendingSinceHandover(pending, handedAt) {
  *       rode along AGAIN at the next spawn — two successive sessions told the
  *       same instruction, exactly what the filter above exists to prevent;
  *   (b) if `spawn()` threw, the stamp had already advanced and those messages
- *       reached no prompt at all — and in stage 1 nothing else consumes the
+ *       reached no prompt at all — and at the time (stage 1) nothing else consumed the
  *       spool, so they were simply lost.
  * The stamp therefore moves only for a spawn that HAPPENED, and is read at that
  * moment rather than inherited from the top of the tick.
@@ -1330,13 +1330,13 @@ export function runawayRecoveryDecision({
     ? [refusalCode, refusalReason].filter(Boolean).join(' — ')
     : 'unavailable (no measured refusal was persisted)'
   const reason =
-    `autostart watchdog: ${failCount} actual spawn attempts made no Git progress; ` +
+    `autostart watchdog: ${failCount} actual spawn attempts made no progress (no lock claim, fenced write or commit); ` +
     `last measured refusal: ${measuredRefusal}. The launcher retries when the clock below runs out.`
   const decisionRecord = capped
     ? {
         title: 'Entscheidungsprotokoll: Runaway-Watchdog prüft am Zeitlimit weiter',
         body:
-          `Automatische Entscheidung [${new Date(now).toISOString()}]: ${failCount} Starts ohne Git-Fortschritt ` +
+          `Automatische Entscheidung [${new Date(now).toISOString()}]: ${failCount} Starts ohne Fortschritt (kein Lock, kein Schreibzugriff, kein Commit) ` +
           `haben die ${ladder.length} Stufen des Watchdogs verbraucht. Der Batch wird nicht an eine Person ` +
           `übergeben; der bestehende Evidence-, Preflight- und Doctor-Pfad läuft nach der gedeckelten Uhr erneut. ` +
           `Nächster Versuch: ${new Date(plan.retryAfter).toISOString()}. Retroaktives Veto: Antworte mit „Veto“ ` +
@@ -1470,8 +1470,9 @@ export function judgeSpawnOutcome({
  * Every spawn pushes a "Resurrected" notice. Probing every quarter of an hour
  * through a limit window would turn that into a phone buzzing all night for a
  * condition that is standing rather than new — so a probe under a known block is
- * logged and not pushed. The first spawn after the block clears announces itself
- * normally, because by then the record is gone.
+ * logged and not pushed. The record is cleared only once a spawn shows progress
+ * (judgeSpawnOutcome), so the recovering spawn itself stays quiet and the next
+ * one announces normally.
  */
 export function announceSpawn({ quota = null } = {}) {
   return !quota

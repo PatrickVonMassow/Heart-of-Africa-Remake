@@ -217,7 +217,7 @@ export function checkAuthorship({ claimedModel = '', artefactAt, transcriptText 
       sidechain: false,
       reason: reading.messages.length
         ? 'the transcript has no model-bearing message covering the artefact timestamp'
-        : 'the transcript has no readable message.model metadata',
+        : 'the transcript has no readable per-message model metadata (message.model or a Codex turn_context)',
     }
   }
   const agrees = sameModel(claimed, message.model)
@@ -230,8 +230,8 @@ export function checkAuthorship({ claimedModel = '', artefactAt, transcriptText 
     messageId: message.messageId,
     sidechain: message.sidechain,
     reason: agrees
-      ? 'the claimed author agrees with message.model'
-      : 'the claimed author disagrees with message.model',
+      ? 'the claimed author agrees with the transcript per-message model'
+      : 'the claimed author disagrees with the transcript per-message model',
   }
 }
 
