@@ -1,5 +1,6 @@
-// PostToolUse hook (matcher: every tool). Observe-only duties, each isolated
-// and never erroring:
+// PostToolUse hook (matcher: every tool). Duties, each isolated and never
+// erroring — most observe; (1) also withdraws a taken boundary and (8) writes
+// the wait declaration:
 //
 // (1) OWNER-ONLY lock heartbeat (hard singleton, 24.07.2026): refresh THIS
 //     session's batch lock on every tool call — but ONLY if this session
@@ -33,11 +34,12 @@
 //     between the change and the publish hands it to its successor.
 // (6) THE USER'S MESSAGE, DELIVERED WHILE THE SESSION WORKS (point 406): read
 //     the LOCAL chat spool — never the network, a hook on every tool call must
-//     not do network I/O — and inject what it finds as `additionalContext`. This
-//     is the only duty here that WRITES to stdout, and it writes exactly nothing
-//     while the spool is empty: injected context is re-sent with every later
+//     not do network I/O — and inject what it finds as `additionalContext`. It
+//     writes exactly nothing while the spool is empty: injected context is re-sent with every later
 //     request, so even a "no new messages" line would cost tokens at tool-call
-//     rate. Owner-only and silent under a user pause, like every guard here.
+//     rate. Owner-only, and it still speaks under a user pause: that is when a
+//     corrective instruction matters most. Duties (7) and (9) share its stdout
+//     channel, one envelope per call.
 // (7) THE DISPOSSESSION NOTICE (point 556): a session whose fence has been
 //     superseded is TOLD so here, at its very next hook, instead of discovering
 //     it at a denied merge. On 08.08.2026 an owner mid-verification lost the
@@ -74,6 +76,8 @@
 //      checkpoint each outgoing bookkeeping call and the successor's mechanical
 //      ramp through its first work-bearing call. It is owner-only, pause-aware,
 //      silent and fail-open.
+// (12) THE FOREGROUND JOURNAL: each owning-session call is recorded as a
+//      FOREGROUND_ACTIVITY event in the batch activity journal.
 import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { basename } from 'node:path'
 import { heartbeat, noteActivity, readFence, readFenceNotice, recordFenceNotice } from './batch-singleton.mjs'
@@ -114,7 +118,7 @@ const sid = data.session_id || ''
 // two can never disagree about one call.
 // Its verdict doubles as the ownership signal duty (6) stands down on: it is
 // true exactly for the session named in the batch lock, and it is already paid
-// for here — no second lock read on the hot path.
+// for here, so duty (6) needs no lock read of its own.
 let ownsBatch = false
 let callAt = null
 try {
@@ -239,7 +243,7 @@ try {
   /* no TASKS.md / unwritable state — the watchdog is the backstop */
 }
 
-// (6) the user's message — the ONLY duty that speaks. `deliverPendingMessages`
+// (6) the user's message — the first duty that speaks ((7) and (9) share the channel). `deliverPendingMessages`
 // claims each message before it renders it and returns '' for every reason not
 // to speak (not the owner, empty spool, any error at all), and '' is written as
 // nothing whatsoever. Pause is NOT a stand-down: that is when a corrective user

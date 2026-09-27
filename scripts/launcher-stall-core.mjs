@@ -42,9 +42,9 @@
  *  is the measured incident. */
 export const STALL_ALERT_AFTER = 2
 
-/** A sleep that overshoots its plan by more than one whole interval marks a
- *  SUSPEND (the host slept or froze — timers cannot overshoot that far on a
- *  healthy machine). After one, the very FIRST dead tick alerts: the incident
+/** The floor of the suspend bar: a sleep that overshoots its plan by more than
+ *  max(one whole interval, this floor) marks a SUSPEND (the host slept or froze —
+ *  timers cannot overshoot that far on a healthy machine). After one, the very FIRST dead tick alerts: the incident
  *  showed a container that comes back sick from a suspend, and waiting out
  *  the ordinary threshold there costs another quarter hour of silence. */
 export const SUSPEND_OVERSHOOT_MS_MIN = 5 * 60 * 1000
