@@ -164,8 +164,8 @@ export function ladderEntry(state, key) {
  * @returns {{key:string, action:'send'|'suppress'|'repair-and-probe'|'continue-and-record',
  *            rung:number, nextRung:number, priority:string, dueInMs:number, reason:string,
  *            reset:boolean, decisionCard?:string, probeAfterMs?:number, nextAttemptAt?:number,
- *            alertClass?:string, repair?:object}}
- *          The last four optional fields are set on the corruption repair path.
+ *            alertClass?:string, repair?:object, decisionRecord?:object}}
+ *          The last five optional fields are set on the corruption repair path.
  */
 export function escalationDecision({
   key,
@@ -264,6 +264,13 @@ export function escalationDecision({
     const probeAfterMs = gaps[pauseRung]
     const decisionCard = corruptionDecisionCard(title, alertClass)
     const nextAttemptAt = now + probeAfterMs
+    const decisionRecord = {
+      title: decisionCard,
+      body:
+        `Automatische Entscheidung: ${repair.remedy} für „${title || 'unnamed alert'}“ ausführen; ` +
+        `nächster Versuch ${new Date(nextAttemptAt).toISOString()}. Retroaktives Veto: „Veto“ mit dem ` +
+        `letzten zulässigen Commit; Doctor-Quarantäne und Rescue-Nachweise bleiben erhalten.`,
+    }
     return {
       key,
       action: 'repair-and-probe',
@@ -277,6 +284,7 @@ export function escalationDecision({
       alertClass,
       repair,
       decisionCard,
+      decisionRecord,
       reason:
         `last rung: corruption class "${alertClass}" runs ${repair.remedy}, records decision card ` +
         `"${decisionCard}", and probes again in ${Math.round(probeAfterMs / 60000)} min`,
