@@ -1,5 +1,6 @@
-// Headless verification for CLAUDE.md §7.1.31 (settlement orientation after
-// a gift and distant panorama wildlife, design.md §17/§2). Dev server only.
+// Headless polish verification (CLAUDE.md §7.1.31 and neighbours): settlement
+// orientation once the chief is met, distant panorama wildlife, speech, season,
+// travel capture, Giza and settlement life (design.md §17/§2). Dev server only.
 import { launchVerifyBrowser, waitForStable, waitForReadingStable, waitForSceneBuilt, assertBackend } from './_browser.mjs'
 import { frameShutter, capturePixels, waitForSceneReady } from './frameSubject.mjs'
 import { frameSpeakingDrums } from './drumFrame.mjs'
@@ -35,10 +36,7 @@ import { onBaselineLane } from './baseline-classify-core.mjs'
 import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
 
-// Point 549: the same world every run. Unseeded, this suite built a new
-// settlement layout per attempt and half its checks were a draw — see
-// verify-seed.mjs for the measurement. The seed is applied by the LAUNCHER now
-// (point 557), so this is the plain URL every other suite carries.
+// The seed is applied by the launcher (verify-seed.mjs), so this is the plain URL.
 const BASE = process.env.BASE_URL ?? 'http://localhost:5173/'
 const OUT = fileURLToPath(new URL('../../verification/', import.meta.url))
 // SECTIONS (point 566). Every block below the boot prologue is a named block
@@ -125,11 +123,8 @@ const probeSilhouetteFooting = async (page, check, label) => {
     p.z = saved.z
     p.yaw = saved.yaw
     // `pitch` is part of the pose since point 392 (the view looks up and down),
-    // so restoring it restores the aim the caller had — before that it was a
-    // stray field the probe itself added, and the undefined branch below is
-    // what handed the object back unchanged then.
-    if (saved.pitch === undefined) delete p.pitch
-    else p.pitch = saved.pitch
+    // so restoring it restores the aim the caller had.
+    p.pitch = saved.pitch
   }, pose)
   check(
     `${label}: every panorama silhouette's feet meet drawn ground (point 181)`,
@@ -144,7 +139,7 @@ const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
 // it stands in, the building it is aimed at, the overlay it documents — and the
 // shutter proves that subject is in the picture before the file is written.
 const frame = frameShutter(page, OUT)
-// The collider geometry the staged-wedge section reads with (scripts/verify/colliderProbe.mjs).
+// The collider geometry the wedged-adults and village sections read with (scripts/verify/colliderProbe.mjs).
 await installColliderProbe(page)
 const errors = []
 page.on('console', (m) => {
@@ -262,8 +257,9 @@ if (section('giza-skyline')) {
 
   // Point 273: Menkaure's red-granite base casing read as a floating RED ERROR
   // BAND at this distant skyline scale, so it was removed (kept only at the
-  // walkable site). Prove no strongly red-dominant pixels remain over the
-  // pyramid silhouette — a red-granite stripe would light many up. The sky is
+  // walkable site). Prove no strongly red-dominant pixels remain anywhere in the
+  // skyline frame (it holds the pyramid silhouette) — a red-granite stripe would
+  // light many up. The sky is
   // warm haze (r≈g≈b-ish) and the pyramids are tawny (r>g>b but not RED), so a
   // true red band (r well above BOTH g and b) is the error signature.
   {
@@ -330,7 +326,7 @@ if (section('panorama-wildlife')) {
     'every panorama silhouette sits on the ground line it was placed on',
     // Point 300: the body DIPS onto whichever leg is planted (that is what puts
     // the standing foot on the ground), so the anchor may sit below the line by
-    // that dip — `drop` — and never above it.
+    // that dip — `drop` — and at most 0.2 above it.
     wInfo.length >= 3 && wInfo.every((w) => w.y >= w.visibleY - w.drop - 1e-3 && w.y <= w.visibleY + 0.2),
     `y vs line [${wInfo.map((w) => `${w.y.toFixed(2)}/${w.visibleY.toFixed(2)}-${(w.drop ?? 0).toFixed(2)}`).join(', ')}]`,
   )
@@ -348,8 +344,8 @@ if (section('panorama-wildlife')) {
   // Point 255 (3): the silhouettes must WALK the horizon, not glide along it.
   // Their stride phase rides the ground they cover on the ring, so over the same
   // interval each one's phase advance divided by its (scale-normalised, point 286)
-  // gait speed is the SAME constant — a wall-clock bob would advance them all
-  // alike whatever their speed.
+  // gait speed and its cadence is the SAME constant — a wall-clock bob would
+  // advance them all alike whatever their speed.
   {
     const sample = () =>
       page.evaluate(() =>
@@ -388,7 +384,7 @@ if (section('panorama-wildlife')) {
   // Point 286: the silhouettes must WALK FORWARD, never backward. The facing is
   // derived from the ring velocity, so each visible silhouette's displacement over
   // an interval must project POSITIVELY onto its facing (forward = (sin yaw,
-  // cos yaw)), and a moving one must actually advance. The reverted bug set the
+  // cos yaw)) or be zero, and at least one must actually advance. The reverted bug set the
   // yaw exactly π off the tangent, so every silhouette moonwalked.
   //
   // Stepped by RENDERED FRAMES, never by a wall clock: this scene occasionally
@@ -634,8 +630,9 @@ if (section('speech-hypothesis')) {
   // a hypothesis. The axis that actually varies for the player is the world SEED,
   // which is drawn at every start; the village is not.
   await goToPlace('bambara-village')
-  // A SHIPPED word, not a hand-typed shape: RIVER as src/communication/lexicon.ts
-  // beats it. A five-syllable literal survived the four-syllable rebuild here and
+  // A word the game speaks, not a hand-typed shape: one of the six four-syllable
+  // words (RIVER in SHIPPED_VOCABULARY, src/communication/vocabulary.ts; its
+  // meaning is rolled per run). A five-syllable literal survived the four-syllable rebuild here and
   // proved the label path for an utterance the game can no longer produce
   // (point 686); src/communication/verifySuiteUtterances.test.ts pins it now.
   const RIVER = 'ba-BA-ba-BA'
@@ -865,8 +862,7 @@ if (section('speech-hypothesis')) {
       if (!(s.bodyX > 0)) return 'off the left edge'
       if (!(s.bodyX < s.vw)) return 'off the right edge'
       if (!(s.bodyY > s.labelBottom)) return 'above its own note'
-      if (!(s.bodyY < s.vh)) return 'below the bottom edge'
-      return 'in frame'
+      return 'below the bottom edge'
     }
     const misses = [...new Set(samples.filter((s) => !inFrame(s)).map(missReason))]
     check(
@@ -950,13 +946,13 @@ if (section('speech-hypothesis')) {
     p.x = saved.x
     p.z = saved.z
     p.yaw = saved.yaw
-    if (saved.pitch !== undefined) p.pitch = saved.pitch
+    p.pitch = saved.pitch
   }, pose)
 }
 // --- Guessing a meaning where it is spoken (design.md §13.4, points 588/691) --
 // The arbitration, the dialog and the note it writes are pinned in the Vitest
-// layer. What ONLY a browser can answer is the input path: the use key opens the
-// dialog at all, a real left click on the settlement view opens NOTHING because
+// layer. What ONLY a browser can answer is the input path: the guess key E opens
+// the dialog at all (point 1139), a real left click on the settlement view opens NOTHING because
 // the mouse handler is gone (point 691), the pointer lock is given up for the
 // dialog and asked back on close, and real keystrokes land in the field. The
 // lock itself cannot be exercised here — it is deliberately never engaged under
@@ -1183,7 +1179,7 @@ if (section('speech-guess')) {
       p.x = saved.x
       p.z = saved.z
       p.yaw = saved.yaw
-      if (saved.pitch !== undefined) p.pitch = saved.pitch
+      p.pitch = saved.pitch
     },
     { u: GUESS_UTTERANCE, saved: guessPose },
   )
@@ -1270,7 +1266,8 @@ if (section('panorama-slope-footing')) {
     leaning.ok,
     `at ${where} — ${leaning.detail}`,
   )
-  // Hand the scene back to the settlement the rest of this suite expects.
+  // Leave the scene in maasai-village, as a whole run always has; every later
+  // section stages its own place.
   await goTo('maasai-village')
 }
 
@@ -1324,8 +1321,8 @@ if (section('orientation-markers')) {
     const d = Math.hypot(mx, mz) || 1
     // Stand 14 m from the hut on the line toward the settlement centre — the open
     // ground every layout keeps clear — and far enough back that the marker at
-    // ~5.6 m sits well inside the vertical field of view (the place camera builds
-    // its rotation from yaw alone, so there is no pitch to tilt up with).
+    // ~5.6 m sits well inside the vertical field of view (the pitch is left as it
+    // stands, so the distance, not a tilt, frames the marker).
     p.x = mx - (mx / d) * 14
     p.z = mz - (mz / d) * 14
     // Place-camera yaw 0 looks toward -Z, so aim with the +PI complement.
@@ -1350,7 +1347,8 @@ if (section('orientation-markers')) {
   const again = await page.evaluate(() => document.querySelectorAll('.building-highlight').length)
   check('the orientation persists across re-entry', again >= 1, `${again} markers`)
 
-  // A settlement without a gift stays unmarked.
+  // A settlement whose chief was not met stays unmarked. (The check name below
+  // keeps its old wording: it is the ledger identity.)
   await page.evaluate(() => {
     const g = window.__game.getState()
     g.leavePlace()
@@ -1525,9 +1523,9 @@ if (section('settlement-season')) {
     cairoMaxRain = Math.max(cairoMaxRain, await page.evaluate(() => window.__placeSeason().rain))
   }
   check('Cairo stays bone dry in every month (hyper-arid, no rain)', cairoMaxRain === 0, `max rain ${cairoMaxRain.toFixed(3)}`)
-  // Restore what the panorama check below expects: standing in a DIRECTLY
-  // entered place (place->place, no travel scene, so no capture). Enter without
-  // leaving first, and reset the calendar.
+  // Leave a DIRECTLY entered place behind (place->place, no travel scene, so no
+  // capture), as a whole run always has; the capture section below stages its
+  // own. Enter without leaving first, and reset the calendar.
   await page.evaluate(() => {
     const g = window.__game.getState()
     g.debugJumpToMonth(1)
@@ -1538,16 +1536,17 @@ if (section('settlement-season')) {
 
 // --- Travel panorama capture (design.md §2.5, point 81) -----------------------
 // Entering from the travel scene captures the REAL surroundings as the
-// first-person horizon: at the riverside Nubian village the Nile must show in
-// the north/east sectors (direction-true), while a direct place->place enter
-// (no travel scene) falls back to the geometry backdrop.
+// first-person horizon: at the riverside Nubian village the Nile must show as a
+// directional water signal and an injected compass pillar proves the band
+// direction-true, while a direct place->place enter (no travel scene) falls back
+// to the geometry backdrop.
 if (section('travel-panorama-capture')) {
   await goToPlace('maasai-village')
   const before = await page.evaluate(() => window.__placePanoramaActive ?? null)
   check('a direct enter without the travel scene falls back (no capture)', before === false, `active ${before}`)
-  // Point 96 gate: this leave happens AFTER several settlement visits (the
-  // suite has entered masai, swahili, capetown, timbuktu, mongo and cairo by
-  // now) — exactly the recipe that used to freeze the main thread 13-16 s on
+  // Point 96 gate: in a whole run this leave happens AFTER several settlement
+  // visits (maasai, bambara, swahili, pedi or sidama, capetown and cairo among
+  // them; a single --section run stages none of them) — exactly the recipe that used to freeze the main thread 13-16 s on
   // synchronous shader re-links. With the module-singleton meshes/materials/
   // CSM the travel programs survive the place visits, so the transition must
   // stay fluid.
@@ -1640,15 +1639,14 @@ if (section('travel-panorama-capture')) {
   await probeSilhouetteFooting(page, check, 'nubian-village (capture active)')
   const f = pano.fractions
   // The Nile must show as a clearly DIRECTIONAL water signal: real water
-  // pixels overall, concentrated in some sectors while others stay dry
-  // (which way the river bends around the village depends on the run's
+  // pixels overall with one leading sector (no sector is required to be dry;
+  // which way the river bends around the village depends on the run's
   // camera height over the bank dunes — the geography itself is fixed).
   const total = f ? f.reduce((a, b) => a + b, 0) : 0
   const max = f ? Math.max(...f) : 0
   const min = f ? Math.min(...f) : 1
   // Water present with a leading sector; the strict east-west proof lives in
-  // the rendered-pixel check below (the band mirror made per-sector ratios a
-  // weak discriminator with the low camera).
+  // the rendered-pixel check below.
   check(
     'the Nile shows as a water signal in the band',
     !!f && total > 0.003 && max > total * 0.3 && min >= 0,
@@ -1674,7 +1672,8 @@ if (section('travel-panorama-capture')) {
     return hit
   }
   // Condition-based probing: poll until the pillar shows (west) or the
-  // window ends (east must stay empty) — fixed sleeps starve under load.
+  // window ends (east must stay under a tenth of west) — fixed sleeps starve
+  // under load.
   const magentaPx = async (yaw, pollMs) => {
     await page.evaluate((y) => { const p = window.__placePlayer; p.x = 0; p.z = 0; p.yaw = y; p.pitch = 0.02 }, yaw)
     const deadline = Date.now() + pollMs
