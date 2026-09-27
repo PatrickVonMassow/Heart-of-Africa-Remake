@@ -6,8 +6,8 @@
 //   options: --repo owner/name · --sha <sha> (inspect this one too) · --json
 //
 // It runs in two places: inside the deploy workflow (with the job's
-// GITHUB_TOKEN, after a failed deploy attempt, writing `retry=` to
-// $GITHUB_OUTPUT for the one retry step) and by hand on a dev machine (with the
+// GITHUB_TOKEN, after a failed deploy attempt, writing `retry=` and `cleared=`
+// to $GITHUB_OUTPUT for the one retry step) and by hand on a dev machine (with the
 // PAT at .secrets/github-token) as the remedy `ci-status-guard` names.
 //
 // This is a COMMAND, not a hook: it fails loud and says what it could not do.
@@ -53,7 +53,7 @@ function readToken() {
 }
 
 /** "owner/repo" from --repo, the runner environment, or the origin remote. */
-export function resolveRepo(argv = []) {
+function resolveRepo(argv = []) {
   const explicit = flag(argv, '--repo')
   if (explicit) return explicit
   const env = (process.env.GITHUB_REPOSITORY ?? '').trim()
@@ -163,7 +163,8 @@ export async function cancelAll(call, blocking) {
   return { cancelled, failed }
 }
 
-/** The step-output contract the workflow's retry step reads (`retry`), written
+/** The step-output contract the workflow's retry step reads (`retry`, beside
+ *  `cleared`), written
  *  in GitHub's `key=value` line format. Exported because a typo in a key would
  *  silently disable the retry — pages-deploy-unblock.test.mjs pins both ends. */
 export function writeGithubOutput(pairs) {
