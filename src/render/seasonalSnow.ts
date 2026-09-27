@@ -1,7 +1,8 @@
 // Seasonal snow on the two massifs that really take it (design.md §19.13,
-// point 141): the High Atlas (Nov-Apr) and the Drakensberg (Jun-Aug). A
-// COLOUR-ONLY shader term — after the bare-branches shards, geometry stays
-// untouched; snow is a whitening of the terrain's composed colour inside two
+// point 141): the High Atlas (Nov-Apr) and the Drakensberg (Jun-Aug), plus a
+// storm's brief hail dusting around the traveller (point 141b). A COLOUR-ONLY
+// shader term — geometry stays untouched (vertex displacement is what tore
+// the flora into shards, point 144); snow is a whitening of the terrain's composed colour inside two
 // fixed massif masks, above a height that sinks as the winter deepens (the
 // research: the Atlas line "settles to 1,400 m" in the hard months).
 //
@@ -14,13 +15,13 @@ import { float, mix, positionWorld, smoothstep, uniform, vec2, vec3 } from 'thre
 import { Vector2 } from 'three/webgpu'
 import { snowMassifDef } from '../systems/season'
 
-export const ATLAS_SNOW_U = uniform(0)
-export const DRAKENSBERG_SNOW_U = uniform(0)
+const ATLAS_SNOW_U = uniform(0)
+const DRAKENSBERG_SNOW_U = uniform(0)
 // Hail (point 141b): a brief white dusting of the ground around the storm —
 // the one defensible white ground at low altitude. Centre follows the
 // traveller (the storm cell is where the weather is computed).
-export const HAIL_U = uniform(0)
-export const HAIL_CENTER_U = uniform(new Vector2())
+const HAIL_U = uniform(0)
+const HAIL_CENTER_U = uniform(new Vector2())
 
 /** Drive from the frame loop with `seasonalSnowAt` for each massif. */
 export function setSeasonalSnow(atlas: number, drakensberg: number) {
@@ -58,7 +59,7 @@ function massifTerm(centerLon: number, centerLat: number, radiusDeg: number, dep
 
 /**
  * Whiten a composed terrain colour where the season's snow lies. Apply to the
- * final colour node; identity when both uniforms are 0.
+ * final colour node; identity when both massif uniforms and the hail are 0.
  */
 // The col parameter is any vec3-valued TSL node; the exact node type varies by
 // call site, so it is typed loosely on purpose.

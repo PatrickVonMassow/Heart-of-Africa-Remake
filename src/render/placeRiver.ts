@@ -87,13 +87,11 @@ export function buildBankShoreGeometry(bank: PlaceRiverBank, halfLength: number)
   const rows = bankShoreRows(bank)
   const cols = 2
   const positions: number[] = []
-  const normals: number[] = []
   const indices: number[] = []
   for (const [out, y] of rows) {
     for (let c = 0; c < cols; c++) {
       const along = (c / (cols - 1) - 0.5) * 2 * halfLength
       positions.push(bank.nx * out + bank.fx * along, y, bank.nz * out + bank.fz * along)
-      normals.push(0, 1, 0)
     }
   }
   // Wound so the faces look UP: the row step runs outward along the bank normal
@@ -108,7 +106,6 @@ export function buildBankShoreGeometry(bank: PlaceRiverBank, halfLength: number)
   }
   const g = new THREE.BufferGeometry()
   g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(positions), 3))
-  g.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(normals), 3))
   g.setIndex(indices)
   g.computeVertexNormals()
   return g
