@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// THE COMMAND THAT LETS THE OPENAI LANE AUTHOR A POINT (work-order point 667).
+// THE COMMAND THAT LETS AN OUTSIDE LANE AUTHOR A POINT (work-order point 667):
+// the OpenAI lane by default, the Fable lane through author-fable.mjs.
 //
 //   node scripts/author-astra.mjs --point 651                  # author it, here, on this branch
 //   node scripts/author-astra.mjs --point 651 --findings f.md  # the second leg: answer the review
@@ -7,15 +8,20 @@
 //   node scripts/author-astra.mjs --routing --all              # the whole open queue
 //   node scripts/author-astra.mjs --point 651 --dry-run        # the prompt and argv, no spend
 //
+// Exit codes: 0 clean delivery, 1 failure, 2 usage or readiness refusal,
+// 3 not a clean delivery or routed elsewhere, 4 spec examination due,
+// 5 Astra outage fallback (author in the Claude lane).
+//
 // It is the delegated-agent flow with the author swapped: an isolated worktree,
 // its own `feat/` branch, the point handed over as a BRIEF, atomic commits, and
 // the branch pushed the moment the run ends so nothing lives only here. What it
-// does NOT do is VERIFY its own work: it runs the three cheap gates (test:unit,
-// build, lint) and must name each in its report, but the browser suites, the
-// picture and the verdict are the reviewing Claude session's, and nothing here
-// merges. The report ends by naming what that session owes.
+// does NOT do is VERIFY its own work: the authoring model runs the three cheap
+// gates (test:unit, build, lint) and must name each in its report, which this
+// wrapper judges; the browser suites, the picture and the verdict are the
+// reviewing session's, and nothing here merges. The report ends by naming what that session owes.
 //
-// The decisions are pure and tested (author-astra-core.mjs, author-routing-core.mjs);
+// The decisions are pure and tested (author-astra-core.mjs, author-routing-core.mjs,
+// author-fable-core.mjs);
 // this half does the process work, the git work and the push, and fails LOUD.
 import { spawn, spawnSync } from 'node:child_process'
 import { closeSync, fstatSync, mkdirSync, openSync, readFileSync, readSync, rmSync, writeFileSync } from 'node:fs'
@@ -87,19 +93,10 @@ function git(args, { cwd = process.cwd(), required = false, input } = {}) {
 }
 
 /** The point's own text out of the OPEN work order, or '' when it is not there. */
-export function pointBody(number, text = readTasksOpen()) {
+function pointBody(number, text = readTasksOpen()) {
   const block = parsePointBlocks(text).find((b) => b.n === Number(number))
   return block ? block.body : ''
 }
-
-/** The ledger-derived escalation signal. No record is the ordinary zero case. */
-export function recordedReworkRounds(number, { records } = {}) {
-  const rows = records ?? readRecords(process.env.AUTHOR_REVIEW_RECORDS_FILE || undefined)
-  return authorRoundHistory(rows, number).freshRounds
-}
-
-// Re-exported beside the writer for callers that inspect its record shape.
-export { AUTHORING_COMMISSION_KIND }
 
 /**
  * The ledger's state before an append: its BYTES and its INDEX entry.
@@ -158,7 +155,7 @@ export function restoreLedger(snapshot, { git: run = git } = {}) {
 /**
  * Append one commission to the shared ledger and make that append durable.
  * The injected callbacks keep the state transition unit-testable; production
- * appends to the tracked review ledger and commits it before Astra starts.
+ * appends to the tracked review ledger and commits it before the author starts.
  */
 export function recordAuthoringCommission({
   records = [],
@@ -318,7 +315,7 @@ export function uncommittedNumstat({ cwd = process.cwd(), read = readFileSync } 
 /** git's unit separator, so a subject holding any punctuation still parses. */
 const UNIT = String.fromCharCode(31)
 
-/** Push the branch, quietly. Returns true only on a real success.
+/** Push the branch, quietly. Returns `{ ok, why }`; `ok` only on a real success.
  *
  *  A CHECKPOINT PUSH DOES NOT RUN THE FAST GATE (`verify: false`). Measured
  *  04.09.2026 on point 1051: `scripts/git-hooks/pre-push` runs build, lint and
@@ -350,8 +347,9 @@ export function pushBranch(branch, { cwd = process.cwd(), timeoutMs = PUSH_TIMEO
 }
 
 /**
- * Run codex as an AUTHOR: sandbox bypassed (it cannot work here), credentials
- * stripped from the environment, the worktree as the working root.
+ * Run the author CLI (codex, or claude for the Fable lane) as an AUTHOR: sandbox
+ * bypassed (it cannot work here), credentials stripped from the environment,
+ * the worktree as the working root.
  *
  * ASYNCHRONOUS, so the branch can be PUSHED WHILE IT WORKS (cross-vendor review
  * of point 667, P2). The house rule is a push after every commit; the child
@@ -359,7 +357,7 @@ export function pushBranch(branch, { cwd = process.cwd(), timeoutMs = PUSH_TIMEO
  * instead and a commit is durable within two minutes rather than at the end of
  * an hour-long run.
  */
-export async function runAuthoringCodex({
+async function runAuthoringCodex({
   prompt,
   cwd,
   branch = '',
@@ -571,9 +569,8 @@ export async function startAuthoringSession({ point, lane, logPath = '' }) {
   try {
     // Snapshot each pass: concurrent appends cannot make one pass unbounded.
     // Start at the old EOF, so a repeated commission never replays old output.
-    let lastPass
-    do {
-      lastPass = finished
+    for (;;) {
+      const lastPass = finished
       const end = fstatSync(fd).size
       while (offset < end) {
         const count = readSync(fd, buffer, 0, Math.min(buffer.length, end - offset), offset)
@@ -583,7 +580,7 @@ export async function startAuthoringSession({ point, lane, logPath = '' }) {
       }
       if (lastPass) break
       await new Promise((done) => setTimeout(done, 100))
-    } while (!lastPass)
+    }
     if (failure) throw failure
     return exitCode
   } finally {
@@ -599,9 +596,9 @@ export const usage = ({ commandName = 'author-astra', model = ASTRA_MODEL_NAME, 
     '',
     `${model} AUTHORS the point in THIS worktree, on THIS branch, committing at every step;`,
     'the branch is pushed for it while it works. It runs the three cheap gates (test:unit, build,',
-    'lint) on its own work and merges nothing: the REVIEW, the browser suites, the picture and the',
-    `landing belong to the ${reviewerLabel} session that called it, which is what keeps two vendors on the`,
-    'point and neither reviewing itself.',
+    'lint) on its own work and merges nothing: the browser suites, the picture and the landing',
+    `belong to the Claude session that called it and the REVIEW to ${reviewerLabel}, which is what keeps`,
+    'two vendors on the point and neither reviewing itself.',
     '',
     `The script appends to local/<point>-${commandName === 'author-fable' ? 'fable' : 'astra'}-author.log in the main checkout (--log overrides it).`,
     'It detaches itself, waits for completion and streams the log to stdout.',
@@ -917,7 +914,7 @@ export async function runAuthoringCli({ authorLane = 'astra', argv = process.arg
           cwd,
           required: true,
           input: authorCommitMessage({
-            subject: 'Record hostile-test authoring commission',
+            subject: 'Record the authoring commission',
             rescue: 'the commissioned authoring run has not started yet',
             trailer: config.trailer,
           }),
@@ -935,7 +932,7 @@ export async function runAuthoringCli({ authorLane = 'astra', argv = process.arg
     }
 
     // The commission receipt is orchestration, not authored work. Start the
-    // delivered range after it so the report and reviewer see only Astra's edits.
+    // delivered range after it so the report and reviewer see only the author's edits.
     const base = git(['rev-parse', 'HEAD'], { cwd, required: true })
     console.error(
       `${commandName}: ${authorModel}${config.detail ? ` ${config.detail}` : ''} is authoring point ${point} on ${branch}` +
@@ -960,7 +957,7 @@ export async function runAuthoringCli({ authorLane = 'astra', argv = process.arg
         ),
     })
     const outcome = config.runtime === 'claude' ? fableAuthoringOutcome(run) : classifyOutcome(run)
-    // A vendor outage is a fallback, not the point's red: recorded, then handed to Opus 5.5.
+    // A vendor outage is a fallback, not the point's red: recorded, then handed to FALLBACK_AUTHOR.
     const outage = config.lane === 'astra'
       ? recordAstraRun({ outcome, text: `${run.stderr ?? ''}\n${run.stdout ?? ''}`, kind: 'author', who: commandName })
       : { fellBack: false }
@@ -1055,9 +1052,9 @@ export async function runAuthoringCli({ authorLane = 'astra', argv = process.arg
     }))
     // 0 only for a clean run that produced work; 3 says "look at this before you
     // treat it as a delivery", which is what a script chaining on it must see;
-    // 5 is the outage fallback — author the point in the Claude lane on Opus 5.5.
+    // 5 is the outage fallback — author the point in the Claude lane on FALLBACK_AUTHOR.
     if (outage.fellBack) {
-      console.error(`${commandName}: GPT-6 Astra is out — author point ${point} in the Claude lane on ${FALLBACK_AUTHOR} (not the point's red).`)
+      console.error(`${commandName}: ${ASTRA_MODEL_NAME} is out — author point ${point} in the Claude lane on ${FALLBACK_AUTHOR} (not the point's red).`)
       process.exitCode = 5
     } else process.exitCode = judged.clean ? 0 : 3
   } catch (e) {

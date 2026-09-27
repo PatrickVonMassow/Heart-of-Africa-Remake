@@ -1,12 +1,13 @@
 // PROVE WHO WROTE AN ARTEFACT FROM THE SESSION TRANSCRIPT (point 840).
 //
 // A model name written inside an artefact is a claim. The harness's transcript
-// is the evidence: every assistant message carries the serving model in
-// `message.model`. The lookup is deliberately per message, because one session
+// is the evidence: every Claude Code assistant message carries the serving model
+// in `message.model`; a Codex transcript names it on each `turn_context`, which
+// applies to the later `response_item` answers. The lookup is deliberately per message, because one session
 // may switch models. Sidechain messages are deliberately retained, because a
 // delegated artefact belongs to the model in that sidechain, not to the parent.
 //
-// Pure on purpose. scripts/authorship-check.mjs owns file I/O; blind-merge and
+// Pure on purpose. scripts/authorship-check-io.mjs owns file I/O; blind-merge and
 // mechanism-review consume the same verdict rather than reimplementing it.
 import { sameModel } from './mechanism-review-core.mjs'
 
@@ -78,7 +79,7 @@ export function claimedModelFromArtefact(text) {
 }
 
 /** One timestamp in the transcript/CLI domain, or null when it is unusable. */
-export function parseArtefactTime(value) {
+function parseArtefactTime(value) {
   if (typeof value === 'number') return Number.isFinite(value) && value >= 0 ? value : null
   const raw = String(value ?? '').trim()
   if (!raw) return null
@@ -141,7 +142,7 @@ export function readTranscriptMessages(text) {
 }
 
 /** The last model-bearing assistant message at or before an artefact timestamp. */
-export function messageAtArtefact(reading, at) {
+function messageAtArtefact(reading, at) {
   const stamp = parseArtefactTime(at)
   if (stamp === null || reading?.firstAt == null || reading?.lastAt == null) return null
   // Outside the transcript is not evidence. In particular, a recovered file's
