@@ -121,10 +121,10 @@ function runClaudeAsk({ prompt, input = '', model, timeoutMs = REVIEW_TIMEOUT_MS
   })
   const modelResult = parseClaudeAskOutput(res.stdout, model)
   const timedOut = res.error?.code === 'ETIMEDOUT' || res.signal != null
-  const cause = res.error
-    ? `Claude could not complete the ask: ${res.error.message}`
-    : timedOut
-      ? 'Claude timed out before the ask completed'
+  const cause = timedOut
+    ? 'Claude timed out before the ask completed'
+    : res.error
+      ? `Claude could not complete the ask: ${res.error.message}`
       : res.status !== 0
         ? `Claude exited with code ${res.status}: ${String(res.stderr ?? '').trim().split('\n').slice(-1)[0] || 'no detail'}`
         : !modelResult.ok
@@ -240,7 +240,7 @@ if (isMainModule(import.meta.url)) {
       if (recorded.fellBack) {
         model = ASK_MODELS.opus
         console.error(`ask-astra: serving the ${kind} on ${model.name} instead …`)
-        run = runClaudeAsk({ ...request, model })
+        run = runClaudeAsk({ ...request, prompt: buildAskPrompt({ kind, brief, modelName: model.name }), model })
         outcome = run
       }
     }

@@ -412,7 +412,7 @@ export function boardNoteSegment(state) {
   // A fallback is named as one here too — on the board the reader is the user, and the
   // difference between "I set this" and "the file is broken" is the whole message.
   const mark = corrupt ? ' (Notfall-Rückfall: die Einstellungsdatei ist unlesbar)' : ''
-  if (value === 'prefer-astra') return `Astra-Routing: prefer-astra — Diagnose, Audit, Aufzählungen und Erklärungen laufen über GPT-6 Astra${mark}`
+  if (value === 'prefer-astra') return `Astra-Routing: prefer-astra — Reviews, Autorschaft, Diagnose, Audit, Aufzählungen und Erklärungen laufen über GPT-6 Astra${mark}`
   if (value === 'claude-only') return `Astra-Routing: claude-only — auch Reviews bleiben in der Claude-Kette${mark}`
   return ''
 }

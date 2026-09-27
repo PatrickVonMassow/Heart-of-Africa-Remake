@@ -399,7 +399,7 @@ export function parseAnswer({ kind = '', text = '' } = {}) {
 
 /**
  * WHAT THE COMMAND SAYS WHEN THE MODEL DID NOT DELIVER: the cause named and the work
- * handed back, in two lines (a third for the claude-only switch hint). PURE.
+ * handed back, in two lines (a third for Astra under the claude-only switch). PURE.
  *
  * The exit code beside it (3, as on the review path) is what lets a script tell "the model
  * answered" from "it did not" without reading prose.
@@ -410,7 +410,7 @@ export function formatUnavailable({ kind = '', cause = '', setting = '', modelNa
   return [
     `ask-astra: ${modelName} did NOT answer this ${k}: ${cause || 'no cause was reported'}.`,
     `  The ${k} is NOT done. ${handoff} — nothing here may be recorded as ${modelName}'s work.`,
-    ...(setting === 'claude-only' ? ['  (The share switch is at `claude-only`; `node scripts/astra-share.mjs --more` steps toward Astra; at `default` only review and enumerate go there.)'] : []),
+    ...(setting === 'claude-only' && modelName === ASTRA_MODEL_NAME ? ['  (The share switch is at `claude-only`; `node scripts/astra-share.mjs --more` steps toward Astra; at `default` only review and enumerate go there.)'] : []),
   ].join('\n')
 }
 

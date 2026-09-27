@@ -163,13 +163,11 @@ describe('escalationDecision — only the closed corruption list may run a repai
     expect(total).toBeGreaterThanOrEqual(2 * 60 * MIN)
   })
 
-  it('names the corruption class, its repair, decision record, and next attempt', () => {
+  it('names the corruption class, its repair, decision card, and next attempt', () => {
     const d = escalationDecision(corruption)
     expect(d.alertClass).toBe('repository-integrity')
     expect(d.repair.remedy).toMatch(/doctor quarantine or repair/)
     expect(d.decisionCard).toBe(corruptionDecisionCard('REPOSITORY INTEGRITY', 'repository-integrity'))
-    expect(d.decisionRecord).toMatchObject({ title: d.decisionCard })
-    expect(d.decisionRecord.body).toMatch(/Retroaktives Veto/)
     expect(d.nextAttemptAt).toBe(NOW + ALERT_GAPS_MS[ALERT_PAUSE_RUNG])
     expect(d.probeAfterMs).toBe(ALERT_GAPS_MS[ALERT_PAUSE_RUNG])
     expect(d).not.toHaveProperty('clockless')

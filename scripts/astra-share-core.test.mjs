@@ -227,7 +227,7 @@ describe('the board note', () => {
 
   it('names a non-default setting in the board’s own language', () => {
     expect(applyFooterNote(footer('Stand: 11.08.2026 · 3 offene Punkte'), 'prefer-astra')).toContain(
-      'Astra-Routing: prefer-astra — Diagnose, Audit, Aufzählungen und Erklärungen laufen über GPT-6 Astra',
+      'Astra-Routing: prefer-astra — Reviews, Autorschaft, Diagnose, Audit, Aufzählungen und Erklärungen laufen über GPT-6 Astra',
     )
     expect(applyFooterNote(footer('Stand: x'), 'claude-only')).toContain('Astra-Routing: claude-only')
   })
