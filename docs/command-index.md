@@ -285,7 +285,7 @@
 | `point-proof-guard.mjs` | POINT-PROOF gate (work-order point 437 C) — thin fail-OPEN I/O wrapper + CLI around the pure core (point-proof-core.mjs). | usage: node scripts/point-proof-guard.mjs --ran <point number> --evidence "<result> |
 | `pre-push-gate-core.mjs` | Pure decision logic of the pre-push gate (point 302): which checks a push must survive before it may reach the remote, and whether a set of results blocks it. | — |
 | `pre-push-gate.mjs` | Pre-push wrapper for the fast gate (point 302). | — |
-| `prep-arm-hook.mjs` | PostToolUse[Bash] hook (user mandate 21.07.2026): AUTO-ARM the waiting-time prep guard so the guarantee does not depend on the assistant remembering to arm it. | — |
+| `prep-arm-hook.mjs` | PostToolUse[Bash\|PowerShell] hook (user mandate 21.07.2026): AUTO-ARM the waiting-time prep guard so the guarantee does not depend on the assistant remembering to arm it. | — |
 | `prep-guard-core.mjs` | Pure decision core of the waiting-time prep guard (user mandate 21.07.2026; extracted 07.08.2026 for point 437 E). | — |
 | `prep-guard.mjs` | Stop hook (user mandate 21.07.2026): GUARANTEE waiting-time prep. | — |
 | `probe-label-fusion.mjs` | DOES THE DRAWN LABEL MATCH THE DECLUTTER'S MODEL? | — |
@@ -295,9 +295,9 @@
 | `queue-calibration-core.mjs` | WHAT A QUEUE CARD PROMISES, MEASURED AGAINST WHAT THE WORK TOOK (point 730). | — |
 | `queue-calibration.mjs` | THE QUEUE'S ESTIMATES, MEASURED AGAINST THE BATCH THAT LANDS THEM (point 730). | — |
 | `queue-order-guard-core.mjs` | Pure decision logic of the queue-order Stop-hook guard (queue-order-guard.mjs is the thin fail-open I/O wrapper). | — |
-| `queue-order-guard.mjs` | Stop hook (user mandate 22.07.2026): GUARANTEE the batch rules the assistant repeatedly broke despite reminders — (1) the dashboard Warteschlange works known-bug FIXES before the finder/QA tickets (memory queue-order-fixes-before-finders) and renders the work order's own sequence, (1c) an APPENDED point is ranked once, deliberately, before the turn ends (point 590), and (2) no dashboard card claims a point is done ("behoben"/"erledigt"/…) while it is still open in TASKS.md. | — |
-| `queue-rank-core.mjs` | THE APPEND GATE (point 590) — an appended point is ranked ONCE, deliberately. | — |
-| `queue-rank.mjs` | THE APPEND GATE (point 590) — an appended point is ranked ONCE, deliberately. | — |
+| `queue-order-guard.mjs` | Stop hook (user mandate 22.07.2026): GUARANTEE the batch rules the assistant repeatedly broke despite reminders — (1) the dashboard Warteschlange works known-bug FIXES before the finder/QA tickets (memory queue-order-fixes-before-finders) and renders the work order's own sequence, (1c) an APPENDED point is ranked, deliberately, before the turn ends (point 590), (1d) a machine-filed point stands before the release point only with stated high urgency and a recorded reason (point 789), and (2) no dashboard card claims a point is done ("behoben"/"erledigt"/…) while it is still open in TASKS.md. | — |
+| `queue-rank-core.mjs` | THE APPEND GATE (point 590) — an appended point is ranked deliberately — and THE RELEASE BOUNDARY (point 789) below it. | — |
+| `queue-rank.mjs` | THE APPEND GATE (point 590) AND THE RELEASE BOUNDARY (point 789) — the CLI. | — |
 | `quota-drill.mjs` | THE FAKE-SIGNATURE DRILL (point 444, 30.07.2026). | — |
 | `render-verify-charges.mjs` | THE RED CHARGE LEDGER — which currently-known red belongs to which OPEN work-order point (point 550). | — |
 | `render-verify-core.mjs` | Pure decision logic of the render-verify Stop-hook guard (render-verify-guard.mjs is the thin I/O wrapper). | — |
