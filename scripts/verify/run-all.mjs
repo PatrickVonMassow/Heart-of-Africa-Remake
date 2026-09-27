@@ -69,20 +69,17 @@ clearInheritedBaselineLane(process.env)
 // manual `npm run dev` never collides): the R3F/three scene + RAF wildlife, real layout geometry,
 // canvas/WebGL init, pointer-lock, TTS audio, the §7.2 acceptance screenshots
 // and one end-to-end core flow. `docs` is a pure Node check that runs in the
-// same pass for a single report. See scripts/verify/README.md for the full
-// old→new mapping table.
+// same pass for a single report. See scripts/verify/README.md for the strategy
+// and the suite map.
 //
 // Regression tiers (point 173) and the backend dimension (points 184/204) are
 // the pure decision layer in ./tiers.mjs (Vitest-pinned in tiers.test.mjs):
 // DEV_SUITES (the LARGE set), SMALL_SUITES (the fast everyday gate),
 // WEBGL_ONLY_SUITES (touch/voice — the documented headless-WebGPU exception,
 // ROUTED to WebGL 2 rather than dropped since point 571), DEFAULT_BACKEND (the
-// everyday lane, WebGPU) and the arg/backend planning below. Pick per task:
-//   npm run test:small   # Vitest + the small browser gate (no prod preview), WebGPU
-//   npm run test:large   # Vitest + every browser suite + preview, BOTH backends
-//   npm test             # the full LARGE regression (default) — same
-//   npm test -- flow …   # just the named suite(s); dev server managed, no preflight
-// The closing cycle ALWAYS runs LARGE.
+// everyday lane, WebGPU) and the arg/backend planning below. Pick per task from
+// the usage block at the top (test:small runs WebGPU only, test:large both
+// backends; a named suite skips the preflight). The closing cycle ALWAYS runs LARGE.
 // VERIFY_GL selects the renderer the suites launch (mirrored from _browser.mjs).
 // Since point 571 the default is WEBGPU — the player's backend is the everyday
 // lane, WebGL 2 the regression lane every LARGE run covers. It is pinned PER SUITE
@@ -95,7 +92,7 @@ const WEBGL_ONLY_COVERED = process.env.RVA_WEBGL_COVERED === '1'
 
 const args = process.argv.slice(2)
 const { tier, filter, flags, fullRun, isLargeEquivalent, baseline, section } = parseArgs(args)
-const wantBaseline = wantsBaseline({ isLargeEquivalent, baseline, env: process.env })
+const wantBaseline = wantsBaseline({ baseline, env: process.env })
 
 // THE VERIFICATION LADDER (point 1086), asked HERE because this is the
 // ENTRYPOINT. run-logged.mjs wraps this file and asks it too, but the README
@@ -242,15 +239,16 @@ if (loadMode !== 'off') {
 
 // Per-suite wall timeout (point 249): a GENEROUS backstop so a genuinely hung
 // suite (a frozen renderer, a dead server) is killed and reported rather than
-// hanging the whole regression forever — but high enough that a slow-but-green
-// run (the staged-drama suites poll until state on a slow WebGPU backend) is
-// NEVER killed for merely being slow. Configurable via VERIFY_SUITE_TIMEOUT_MS.
+// hanging the whole regression forever — set high enough that a slow-but-green
+// run (the staged-drama suites poll until state on a slow WebGPU backend) is not
+// expected to reach it; one that does is killed and reported as hung, and the
+// message names VERIFY_SUITE_TIMEOUT_MS, which configures it.
 const SUITE_TIMEOUT_MS = Number(process.env.VERIFY_SUITE_TIMEOUT_MS) || 45 * 60 * 1000
 /** ONE PASS OF ONE SUITE. Since point 1135 the runner makes no second attempt
  *  of its own: `RETRY_ENV` is written BLANK so a stale export in the calling
  *  shell cannot stamp this first attempt SUSPECT, and a HAND retry of the
  *  smallest affected check stays the diagnosis (CLAUDE.md §7.2). */
-function runSuite(name, baseUrl, onlySection = '') {
+function runSuite(name, baseUrl) {
   const before = readRenderState()?.runs
   const previous = new Set((Array.isArray(before) ? before : []).map(runIdentity))
   const startedAt = Date.now()
@@ -259,7 +257,7 @@ function runSuite(name, baseUrl, onlySection = '') {
   // learns about a suite - and a 55-minute `polish` therefore left the log
   // standing at `# starting dev server` for its entire length. Twice on
   // 15.09.2026 a reader took that silence for a hang and ended a healthy run.
-  console.log(`# → ${name}${onlySection ? ` [--section=${onlySection}]` : ''} running — its PASS/FAIL line arrives when the suite ENDS`)
+  console.log(`# → ${name} running — its PASS/FAIL line arrives when the suite ENDS`)
   const res = spawnSync(process.execPath, [join(HERE, `${name}.mjs`)], {
     windowsHide: true,
     encoding: 'utf8',
@@ -272,10 +270,6 @@ function runSuite(name, baseUrl, onlySection = '') {
       ...process.env,
       ...(baseUrl ? { BASE_URL: baseUrl } : {}),
       [RETRY_ENV]: '',
-      // ONE BLOCK OF THE SUITE, for a diagnosis run that needs no more (point
-      // 1126). Blank restores whatever the pass itself selected, so a normal
-      // spawn is untouched; the suite's own gate stamps the record PARTIAL.
-      ...(onlySection ? { [SECTION_ENV]: onlySection } : {}),
       VERIFY_GL: laneFor(name, VERIFY_GL),
     },
     timeout: SUITE_TIMEOUT_MS,
@@ -292,10 +286,7 @@ function runSuite(name, baseUrl, onlySection = '') {
   const { pass, fail } = countCheckLines(out)
   const consoleErrors = countedConsoleErrors(out)
   const ok = res.status === 0 && fail === 0 && consoleErrors === 0
-  // A narrowed spawn says so on its own result line: a reader who sees only the
-  // headline must never mistake one block's tally for the suite's (point 1126).
-  const scope = onlySection ? ` [--section=${onlySection}]` : ''
-  console.log(`${ok ? 'PASS' : 'FAIL'}  ${name.padEnd(12)}${scope} ${pass} pass, ${fail} fail, ${consoleErrors} console-errors (exit ${res.status})`)
+  console.log(`${ok ? 'PASS' : 'FAIL'}  ${name.padEnd(12)} ${pass} pass, ${fail} fail, ${consoleErrors} console-errors (exit ${res.status})`)
   // A NON-PREDICTIVE PASS MUST BE SEEN (point 1086). Only the summary above
   // leaves this child, so a marker sitting on a passing line would die here —
   // and a green that does not mean what it looks like is exactly the thing a
@@ -352,7 +343,7 @@ function runSuite(name, baseUrl, onlySection = '') {
   // and a check without a detail carries the tag inside its NAME, so read raw,
   // one red arrived twice: keyed by the record, and keyed with the tag by the
   // output. Only a tag of a section the suite declares is stripped.
-  const declared = new Set([onlySection, process.env[SECTION_ENV]])
+  const declared = new Set([process.env[SECTION_ENV]])
   try {
     for (const n of listSections(readFileSync(join(HERE, `${name}.mjs`), 'utf8'))) declared.add(n)
   } catch { /* an unreadable suite source strips the live section's tag only */ }
@@ -396,7 +387,6 @@ function runSuite(name, baseUrl, onlySection = '') {
       recorded: false,
       reading: readingOf(check),
       owned: ownedPrinted(check),
-      point: () => chargeFor(check, { suite: name, backend: record?.backend, featureLevel: record?.featureLevel })?.point ?? null,
     })
   }
   const row = ({ key, name: check, fromRecord }) => {
@@ -509,7 +499,7 @@ function runSuite(name, baseUrl, onlySection = '') {
 // nothing. `scripts/verify/baseline-classify.mjs <suite>` is still the tool
 // that measures a red against the pre-change tree — by hand, when a red is
 // actually in doubt, never automatically for every red of every LARGE.
-/** Suites that stayed red, kept for the end-of-run classification below. */
+/** Suites that ended red, kept for the end-of-run classification below. */
 const redSuites = []
 function runSuiteOnce(name, baseUrl) {
   const result = runSuite(name, baseUrl)
@@ -526,8 +516,6 @@ function runSuiteOnce(name, baseUrl) {
   redSuites.push({
     suite: name,
     failed: failedChecks(result.out),
-    checks: allChecks(result.out).length,
-    runs: 1,
     unresolved: result.unresolved,
     rows: result.rows,
   })
@@ -565,7 +553,7 @@ function runCrossBrowser(baseUrl, depth) {
     if (/backend:|^SKIP/.test(line)) console.log('      ' + line.trim())
     else if (!ok && /^FAIL\s{2,}\S/.test(line)) console.log('      ' + line.trim())
   }
-  if (!ok) redSuites.push({ suite: 'crossbrowser', failed: failing, checks: allChecks(out).length, runs: 1, depth, rows: [],
+  if (!ok) redSuites.push({ suite: 'crossbrowser', failed: failing, rows: [],
     unresolved: Boolean(res.error || res.signal) || !/^\d+ CROSS-BROWSER\/MOBILE CHECK\(S\) FAILED$/m.test(out) })
   return ok
 }
@@ -748,10 +736,11 @@ if (redSuites.length > 0) {
 
 const failed = results.filter((r) => !r).length
 const charges = [...chargedPoints].sort((a, b) => a - b)
-console.log(`\n${failed === 0 ? 'ALL GREEN' : failed + ' SUITE(S) FAILED'} — ${results.length} suites run` +
+console.log(`\n${failed === 0 ? 'ALL GREEN' : failed + ' SUITE(S) FAILED'} — ${results.length} stages run` +
   (charges.length ? ` — reds charged to open points ${charges.join(', ')}` : ''))
-// The stages that are not suites — build, lint, unit, the GPU preflight — are
-// unresolved by construction: no charge ledger names them.
+// The stages that are not suites and can arrive here red — lint and the
+// preview's own build (a failed build, unit or GPU preflight exits earlier) —
+// are unresolved by construction: no charge ledger names them.
 const otherStages = failed > redSuites.length ? ['other failed stages: see regression report'] : []
 const unresolved = ownership ? [...ownership.unresolved, ...otherStages] : otherStages
 if (ownership) console.log(formatOwnershipVerdict({ rows: ownership.rows, unresolved }))
