@@ -8,9 +8,10 @@
 //
 // Rasterising the DOM would cost a dependency, so the overlay is captured as
 // DATA instead: every visible text-carrying element with its text and its
-// on-screen rectangle. Two entries with the same text at overlapping boxes
-// say "duplicated label" outright; a box outside the viewport says "off
-// screen"; a missing entry says the label never rendered.
+// on-screen rectangle. Two entries with the same (possibly truncated) text at
+// overlapping boxes point to a duplicated label; a box outside the viewport
+// says "off screen"; a missing entry says the label did not render as visible
+// text (skipped subtrees, text-less wrappers and zero-area boxes are left out).
 //
 // Pure apart from the DOM it is handed: the rectangle and visibility readers
 // are injectable, so the assembly is testable without a layout engine.
@@ -33,7 +34,7 @@ export interface OverlayItem {
   offScreen?: boolean
 }
 
-export interface SnapshotOptions {
+interface SnapshotOptions {
   /** On-screen rectangle of an element; defaults to getBoundingClientRect. */
   rectOf?: (el: Element) => OverlayRect
   /** Whether an element renders at all; defaults to a computed-style read.
@@ -52,7 +53,7 @@ export interface SnapshotOptions {
 
 /** The report modal itself — it covers the scene and is never its subject.
  *  Everything else the player can see stays in, dialogs included. */
-export const DEFAULT_SKIP_SELECTOR = '.state-dump-backdrop'
+const DEFAULT_SKIP_SELECTOR = '.state-dump-backdrop'
 
 const DEFAULT_MAX_TEXT = 240
 
