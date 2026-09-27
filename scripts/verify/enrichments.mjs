@@ -6217,8 +6217,9 @@ if (section('intraspecies-fight')) {
       fb.forceOutcome = force
       // Pair them the way the debug entry does — both willing, so the bout takes
       // the CONVERGE path and always reaches the clash. Everything after this is
-      // the ordinary drive; the injection only supplies the two animals, exactly
-      // as the §19.16 checks inject a crocodile and its catch.
+      // the ordinary drive; the injection supplies the two animals, their
+      // converge-state pairing and the forced clash length and outcome above, as
+      // the §19.16 checks inject a crocodile and its catch.
       const bout = { mode: 'converge', ox: one.x, oz: one.z, time: 0, clash: 0 }
       one.fight = { foe: two, aggressor: true, ...bout }
       two.fight = { foe: one, aggressor: false, ...bout }
@@ -6412,6 +6413,8 @@ if (section('intraspecies-fight')) {
 // Stage: place the leave phase at the waterline with the seaward radial (the
 // player inland-west of it), then poll the sim until the hunt retires — via the
 // escape corridor or, past the calibratable overtime, the off-frame backstop.
+// The section also holds the point-4 spacing check and the no-animal-in-water
+// check below.
 if (section('coastal-walk-off')) {
   const coastRetire = await page.evaluate(async () => {
     const seed = window.__game.getState().seed
@@ -6459,9 +6462,10 @@ if (section('coastal-walk-off')) {
 
   // --- Point 4: spawn spacing and animal-animal collision -----------------------
   // design.md §19: animals spawn with natural spacing (no two inside one another)
-  // and never walk through each other — overlapping animals part at once. The
-  // elephant×smaller-prey pair stays exempt (trampling is designed; its own test
-  // above still passes). Body radii mirror Wildlife.tsx BODY_RADIUS.
+  // and never walk through each other — overlapping animals part quickly. The
+  // check lets the separation settle and accepts a distance of 0.7 of the
+  // combined radii. Every elephant/non-elephant pair stays exempt (trampling is
+  // designed). Body radii mirror Wildlife.tsx BODY_RADIUS.
   await pinFamily(-2.9, 34.2)
   // Freshly restocked animals may briefly overlap until the separation behaviour
   // has run a few frames — under load that takes visibly longer, so poll until
@@ -6476,7 +6480,7 @@ if (section('coastal-walk-off')) {
           // Free-spacing applies to freely-streamed animals only. A drama-locked or
           // purposefully-walking one (caught/water/rescued/mired/vigil/trample/
           // plunge/drink) holds its spot by its drama, not the separation force —
-          // pinFamily above stages exactly such animals, so exclude them all.
+          // pinFamily above stages exactly such animals, so exclude these.
           if (a.dead || a.caught !== undefined || a.inWater !== undefined || a.rescued !== undefined ||
               a.mired || a.trampleTo || a.plungeTo || a.vigil || a.drink) continue
           if (a.chunk === undefined) continue // only real streamed animals
@@ -6517,7 +6521,7 @@ if (section('coastal-walk-off')) {
       let seen = 0
       for (const sp of Object.keys(herds)) {
         // Flamingos wade and the crocodile LIVES in the water (design.md
-        // (SS)19.16) - both exempt by design.
+        // §19.16) - both exempt by design.
         if (sp === 'flamingo' || sp === 'crocodile') continue
         for (const a of herds[sp]) {
           // A purposeful crossing and a caught victim at the waterline are
@@ -6549,7 +6553,8 @@ if (section('coastal-walk-off')) {
 // never spawn or idle in it, and the ocean stays absolute. Staged: a zebra at a
 // bank gets a crossing to the far side; it must traverse ON the water (never
 // teleported out by the setback — the exemption under test), ride BELOW the
-// bank line while swimming, and land with the state cleared.
+// bank line while swimming, and land with the state cleared. The section also
+// holds the parting check, point 5's vulture flights and point 162's drive-off.
 if (section('channel-crossing')) {
   await page.evaluate(() => {
     // A known narrow reach (the croc staging's Zambezi spot): banks with land
@@ -6627,7 +6632,8 @@ if (section('channel-crossing')) {
 
   const parting = await page.evaluate(async () => {
     const herds = window.__wildlife.herdsRef.current
-    // Two live grazers of the same species, neither in a scripted drama.
+    // Two live grazers of the same species, neither caught, in the water,
+    // rescued or plunging (other drama states are not filtered).
     let a = null, b = null, sp = null
     for (const s of ['zebra', 'wildebeest', 'antelope', 'warthog']) {
       const live = (herds[s] ?? []).filter(
@@ -6852,7 +6858,7 @@ if (section('water-shy-flight')) {
           const h = (n / 16) * Math.PI * 2
           const hx = Math.sin(h), hz = Math.cos(h)
           const tx = Math.cos(h), tz = -Math.sin(h) // bank tangent
-          // Channel: water from 0.5 on, land again within 2..4.5 units, no ocean.
+          // Channel: water from 0.5 on, land again between 1.5 and 9 units, no ocean.
           let width = null
           let ok = T(bx + hx * 0.5, bz + hz * 0.5) === 'water'
           for (let s = 0.75; ok && s <= 14; s += 0.25) {
@@ -7133,7 +7139,7 @@ if (section('water-shy-flight')) {
     await window.__pollSim(14, () => {
       const now = window.__simTime()
       const e = now - s0
-      // Walk the bank line for 8 sim-s, three units inland, then stand still.
+      // Walk the bank line for 8 sim-s, 2.2 units inland, then stand still.
       const u = Math.min(e, 8) - 4
       setPos(B.x + tx * u * 1.5 - hx * 2.2, B.z + tz * u * 1.5 - hz * 2.2)
       if (window.__wildlife.lion) { window.__wildlife.lion.mode = 'idle'; window.__wildlife.lion.timer = 999 }
@@ -7328,8 +7334,9 @@ if (section('predator-despawn')) {
     window.__ui.getState().setTravelZoom(1)
     // Deterministic inland stage (point 200): the predator must walk off over open
     // LAND, never a coast pocket the inherited player position might drop it in
-    // (there it can neither cross offstageR nor leave the frame, so it never
-    // despawns and the test reads a false null). The Serengeti is deep inland.
+    // (there it once could neither cross offstageR nor leave the frame, never
+    // despawned and the test read a false null; the escape corridor and the
+    // off-frame backstop of point 188 have since closed that). The Serengeti is deep inland.
     window.__game.getState().debugJumpTo(-2.2, 34.8)
     L.victim = null
     L.victimHunt = false
@@ -7389,7 +7396,9 @@ if (section('predator-despawn')) {
 
 // --- Point 83: the walk-off obeys the land constraint --------------------------
 // A predator leaving straight toward the sea must deflect along the coast —
-// never standing on an ocean cell — while still making distance.
+// never standing on an ocean cell — while still making distance. The section
+// also holds the zoom-aware despawn ring, the kill remnant (point 7) and the
+// scavenger clearance checks (points 128/185).
 if (section('walk-off-land-constraint')) {
   const coastLeave = await page.evaluate(async () => {
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
@@ -7433,7 +7442,7 @@ if (section('walk-off-land-constraint')) {
     coastLeave.ok && coastLeave.samples > 30 && !coastLeave.everOcean, JSON.stringify(coastLeave))
   check('the deflected walk-off still makes distance along the shore',
     coastLeave.ok && coastLeave.moved > 8, JSON.stringify(coastLeave))
-  // Restore the default (closer) zoom and re-lock for the checks that follow.
+  // Restore the calibration zoom 1 and re-lock for the checks that follow.
   await page.evaluate(() => {
     window.__ui.getState().setTravelZoom(1)
     window.__ui.getState().setWheelZoomEnabled(false)
