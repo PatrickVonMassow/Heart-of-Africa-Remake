@@ -7732,8 +7732,7 @@ if (section('walk-off-land-constraint')) {
 }
 
 // --- Point 15: animals never stand in the impassable open ocean --------------
-// Jump to the west coast (clear of any settlement's enter radius) so genuine
-// open-ocean cells are in probing reach; the travel scene must stay mounted.
+// Jump to the west coast so genuine open-ocean cells are in probing reach.
 if (section('ocean-backstop')) {
   await page.evaluate(() => window.__game.getState().debugJumpTo(4.9, 6.1))
   await page.waitForFunction(() => window.__wildlife && window.__game.getState().mode === 'travel', null, { timeout: 15000 })
@@ -7770,9 +7769,6 @@ if (section('ocean-backstop')) {
     JSON.stringify(oceanBackstop))
 }
 
-// --- Point 8: whole-continent debug zoom without haze -------------------------
-// design.md §21: the debug-unlocked zoom reaches a view of the whole continent
-// (a coarse far-terrain sheet streams in), and in that debug-only range no
 // --- Point 151: the season belongs to the PLACE, never to the traveller ------
 // The "flying plants" witness: with the real June calendar, the field's value
 // at the user's reported spot (13.4N/31.8E, the Sahel's ITCZ edge) and the
@@ -7790,7 +7786,8 @@ if (section('seasons')) {
     const read = () => window.__vegetation.seasonTintAt(13.4, 31.8)
     // Baseline: how much the fixed-spot value drifts over 2 SIM-seconds while the
     // player STANDS (the slot greens keep lerping toward the June targets — that
-    // calendar tail is legitimate and identical in both phases). Both phases are
+    // calendar tail is legitimate and comparable in both phases, 2 sim-s standing
+    // against ~1.5 sim-s moving). Both phases are
     // sim-paced (point 249) so their drift comparison stays calibrated on any
     // backend.
     const s0 = read()
@@ -7809,7 +7806,7 @@ if (section('seasons')) {
       const lat = 13.4 + i * 0.35 // north across the ITCZ gradient
       window.__game.getState().debugJumpTo(lat, 31.8)
       await window.__sleepSim(0.12)
-      far = Math.max(far, Math.hypot((31.8 - 31.8) * 10, (lat - 13.4) * 10))
+      far = Math.max(far, Math.abs(lat - 13.4) * 10)
     }
     window.__game.getState().debugJumpTo(13.4, 31.8)
     await window.__sleepSim(0.3)
@@ -7830,7 +7827,8 @@ if (section('seasons')) {
   // (clearView pushes the fog to the horizon at a wide zoom, so a fog-far radius
   // would falsely flag plants the player cannot see — the point-172 trap this very
   // check fell into first). So each drawn plant is PROJECTED to NDC and a "pop" is
-  // a plant that is on screen now but was not in the drawn set last frame. Driven
+  // a plant that is on screen now but was not in the drawn set at the previous
+  // settled movement step. Driven
   // at an ACHIEVABLE zoom (0.5), the F3 report zoom (1.5) and wider (2.2), across
   // chunk boundaries (steps > the rebuild hysteresis so rebuilds fire).
   const drivenFlora = await page.evaluate(async () => {
@@ -7860,7 +7858,7 @@ if (section('seasons')) {
           for (const [x, z] of window.__vegetation.drawnTranslations(sp)) {
             const kk = key(x, z)
             cur.add(kk)
-            // A plant on screen NOW that was not drawn last frame popped in view.
+            // A plant on screen NOW that was not drawn at the previous step popped in view.
             if (window.__camera.onScreen(x, z) && prev[sp] && !prev[sp].has(kk)) onScreenPops++
           }
           prev[sp] = cur
@@ -7925,7 +7923,7 @@ if (section('seasons')) {
       window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyW', key: 'w' }))
       await window.__sleepSim(0.6)
     }
-    window.__game.getState().debugJumpTo(-3.2, 34.2) // Serengeti acacia savanna (no village to auto-enter)
+    window.__game.getState().debugJumpTo(-3.2, 34.2) // Serengeti acacia savanna, clear of any village
     window.__balance.season.weatherStrength = 1
     window.__ui.getState().setTravelZoom(0.5)
     await window.__sleepSim(1.5)
@@ -7992,9 +7990,9 @@ if (section('seasons')) {
 
   // Season weather (design.md §19, point 120c): forcing the rainy season via the
   // debug override must rain visibly (rain streak opacity up) and pull the fog
-  // in toward overcast; forcing dry must clear it again. Checked at zoom 1,
-  // before the zoom section below — the zoomed-out view is deliberately
-  // season-free.
+  // in toward overcast; forcing dry must clear it again. Checked at the zoom 0.5
+  // set above, before the whole-continent zoom block below — the zoomed-out view
+  // is deliberately season-free.
   const season = await page.evaluate(async () => {
     const read = () => ({
       wet: window.__climate.seasonWetness(),
@@ -8044,11 +8042,11 @@ if (section('seasons')) {
       return { id: p.id, lat: p.lat, lon: p.lon, zone: s.climateZoneAt(p.lat, p.lon, el), maxWet }
     })
   })
-  // The genuine deserts, which SHOULD be dry all year (Cairo and any Saharan
-  // settlement) — everything else in the tropics must get a real wet season.
-  const KNOWN_DRY = new Set(['cairo'])
+  // The genuine deserts, which SHOULD be dry all year (Cairo lies north of the
+  // band, a Saharan settlement carries a sahara zone) — everything else in the
+  // tropics must get a real wet season.
   const boneDryTropical = placeClimate.filter(
-    (p) => Math.abs(p.lat) < 18 && p.maxWet < 0.12 && !KNOWN_DRY.has(p.id) && !p.zone.startsWith('sahara'),
+    (p) => Math.abs(p.lat) < 18 && p.maxWet < 0.12 && !p.zone.startsWith('sahara'),
   )
   check(
     'no tropical settlement is bone dry all year (the fallback-desert bug class)',
@@ -8064,13 +8062,11 @@ if (section('seasons')) {
   // point 200: wait for a blended scalar to CONVERGE instead of a fixed wall wait.
   // These weather values approach their target at ~0.02/frame, so they settle well
   // before the old 4000-4500 ms AND a heavy-load frame drop can no longer race the
-  // wait. Poll until two consecutive samples agree within a RELATIVE tolerance
+  // wait. Poll until two samples at least 0.5 sim-seconds apart agree within a RELATIVE tolerance
   // (fogFar ~155 needs relative; the small absolute floor covers floodRise ~1),
   // capped. Settle on the SAME value the check reads — the mistake in the reverted
   // first attempt was settling on the blend DRIVER (dust) while the check reads a
   // value that LAGS it (fogFar), so it returned before the read value had closed.
-  // The 250 ms lead lets the blend get underway so two pre-motion samples can't
-  // read as "already converged" at the previous month's value.
   const settleScalar = async (read, rel = 0.003) => {
     // Convergence judged over SIM-spaced samples (point 249): the blend advances
     // ~0.02 per FRAME, so on a slow backend two wall-adjacent samples read nearly
@@ -8324,12 +8320,12 @@ if (section('seasons')) {
     // above 205) and demand 2 % of the crop. That bar was found under it —
     // 1.2-1.3 %, twice — while the February frame showed an unmistakably
     // snow-capped range. The picture was right and the MEASURE had drifted: this
-    // scene renders no near-white pixel at all (the whole frame, journal
+    // scene renders almost no near-white pixel (the whole frame, journal
     // parchment and HUD included, tops out at a darkest channel of 210), so an
     // absolute 205 sat inside the snow's own brightness spread and counted its
     // top sliver instead of its extent. The snow cover is untouched; the bar is
-    // RAISED — 10 % against the ~31 % the February crest now measures, with July
-    // at 0.0 %.
+    // RAISED — 10 % against the 28–30 % the February crest measures (point 387
+    // note below), with July at 0.0 %.
     await page.evaluate(() => window.__game.getState().debugJumpTo(31.06, -7.91)) // Toubkal
     await page.evaluate(() => window.__sleepSim(1.5))
     // Sample until the crop stops changing rather than after a fixed pause: on a
@@ -8449,7 +8445,7 @@ if (section('seasons')) {
     })
     await page.waitForTimeout(3500)
     await page.evaluate(() => window.__game.getState().setJournalOpen(false))
-    const litBuf = await capturePixels(page, 'daylight desert frame')
+    const litBuf = await capturePixels(page, 'jungle crown frame')
     const { data: litD, info: litI } = await sharp(litBuf)
       .extract({ left: 360, top: 240, width: 720, height: 420 })
       .raw()
@@ -8486,7 +8482,8 @@ if (section('seasons')) {
     // Condition-polled: the shore seeder tops the bank up on a 2-second clock
     // and a seeded animal receives its drink target on the NEXT assignment
     // pass — a fixed 2.5 s window read the count one upkeep too early
-    // (measured 3/4). The wet probe keeps waitFor 0 and reads immediately.
+    // (measured 3/4). The wet probe keeps waitFor 0 and reads after the loop's
+    // first 1.2 s pass.
     const count = () =>
       page.evaluate(() => {
         const h = window.__wildlife.herdsRef.current
@@ -8529,6 +8526,9 @@ if (section('seasons')) {
     JSON.stringify({ dryDrinkers, wetDrinkers, minDry }),
   )
 
+  // --- Point 8: whole-continent debug zoom without haze -----------------------
+  // design.md §21: the debug-unlocked zoom reaches a view of the whole continent
+  // (a coarse far-terrain sheet streams in), and in that debug-only range no
   // haze is shown — the fog recedes to the horizon and the ground haze fades.
   const continentZoom = await page.evaluate(async () => {
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
@@ -8692,10 +8692,11 @@ if (section('debug-jump-dropdown')) {
   // event (zoom-in). The zoom-out clamp/gate is a pure store assert that moved to
   // Vitest (store.*.test.ts); what stays is the real WheelEvent a jsdom test
   // cannot dispatch against the live bird's-eye scene.
-  // A single wheel event is used deliberately: after the first zoom the camera
-  // moves and the newly revealed terrain chunks briefly Suspend the scene
+  // One wheel event per attempt is used deliberately: after the first zoom the
+  // camera moves and the newly revealed terrain chunks briefly Suspend the scene
   // subtree, dropping its window wheel listener until React remounts it — so
   // chaining several synthetic wheel events in the headless run is unreliable.
+  // An attempt that did not zoom resets to 1 and retries, up to ten times.
   await page.evaluate(() => window.__ui.getState().setWheelZoomEnabled(false))
   // The wheel zoom only responds in the bird's-eye view while its scene is
   // mounted. Settlement entry is now a deliberate Space press (design.md §2.3), so
@@ -8831,9 +8832,8 @@ if (section('modal-above-labels')) {
 // chief stepping out of his hut, the longest of them — REQUIRES the two
 // rectangles to overlap, and samples the middle of that overlap. The modal
 // backdrop spans the whole viewport, so the toast's centre is a real sample
-// for it. The map plate and the debug menu can never reach the top-centre
-// strip, so their layering is read off the computed z-index rather than from
-// pretended geometry.
+// for it. The map plate can never reach the top-centre strip, so its layering
+// is read off the computed z-index rather than from pretended geometry.
 //
 // AND THE WAIT IS ON THE TOAST, NEVER ON THE CLOCK. A toast dismisses itself
 // after 3.5 s (Hud.tsx), and a fixed settle that a loaded machine stretches
@@ -8869,7 +8869,7 @@ if (section('toast-above-panels')) {
     if (window.__ui.getState().mapOpen) window.__ui.getState().toggleMap()
     g().debugAddEquipment('rifle')
     // The journal stands OPEN before the item is pressed: the case the point
-    // names, where the same act both opens a panel and raises a sentence.
+    // names, a sentence raised while a panel is up.
     g().setJournalOpen(true)
     // A sentence still standing from an earlier section would let a press that
     // reached nothing look like an answer, so the field starts EMPTY.
@@ -9045,7 +9045,7 @@ if (section('settlement-vicinity')) {
     // (Cairo's Nile-facing bearings), and each attempt draws FRESH bearings
     // (vicinityAttemptSeed — the old frozen draw could defer forever under the
     // static post-leave camera and stalled the count one short), so a deferral
-    // resolves within a few frames. `ok` latches the moment count>=min is first
+    // resolves within a few frames. `reached` latches the moment count>=min is first
     // reached, so a later drift/despawn cannot un-satisfy it; a generous sim budget
     // gives the seeder enough frames. A genuine seeder failure exhausts the budget.
     let reached = false
@@ -9177,7 +9177,7 @@ if (section('event-trigger-dropdown')) {
   // Point 163: the opened map must clear the inventory bar even when a full F3
   // loadout WRAPS it to a second row — the map anchors its bottom to the live bar
   // height (--inv-bar-height, published by a ResizeObserver), not a fixed 56px.
-  // Placed LAST: F3's loadout/zoom/speed changes must not leak into earlier checks.
+  // Placed LAST in this section: F3's loadout/zoom/speed changes must not leak into its earlier checks.
   const wrap163 = await page.evaluate(async () => {
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
     window.dispatchEvent(new KeyboardEvent('keydown', { code: 'F3' }))
@@ -9244,9 +9244,9 @@ if (section('ctrl-actor-labels')) {
   const herds = await waitForHerds(6)
   // The camera eases to its target; scan only once it has caught up (point 177).
   await page.waitForFunction(() => window.__camera?.settled?.() === true, null, { timeout: 30000 }).catch(() => {})
-  // There must be a LIVING subject in the frame: the traveller's own canoe is on
-  // screen at every spot, so a label count alone would pass over an empty plain
-  // and prove nothing about the animals (the first run's frame showed exactly
+  // There must be a LIVING subject in the frame: a label count alone could pass
+  // over an empty plain on usable objects and prove nothing about the animals
+  // (the first run's frame, when the own canoe was still labelled, showed exactly
   // that). Streaming alone cannot be relied on to put one in view within a
   // bounded wait — on the slower backend it did not — so if none has arrived, a
   // pair is STAGED beside the traveller, the way the drama checks stage theirs.
@@ -9284,14 +9284,7 @@ if (section('ctrl-actor-labels')) {
       h.zebra.push({ x: p.x - 3, z: p.z + 3, y: 0.2, rot: 0, scale: 0.6, phase: 0.7, young: true })
     })
     // The layer reads the transform the RENDER PASS wrote, so let it draw them.
-    await page.evaluate(
-      () =>
-        new Promise((res) => {
-          let i = 0
-          const step = () => (++i >= 6 ? res() : requestAnimationFrame(step))
-          requestAnimationFrame(step)
-        }),
-    )
+    await frames(6)
   }
 
   const before = await page.evaluate(() => document.querySelectorAll('.actor-label').length)
@@ -9466,7 +9459,7 @@ if (section('ctrl-actor-labels')) {
   check(
     'a pitched camp still reaches the label layer (points 342/600)',
     camped.candidate,
-    camped.candidate ? 'the camp is offered as a candidate' : 'the pitched camp reached the layer at all',
+    camped.candidate ? 'the camp is offered as a candidate' : 'the pitched camp never reached the layer',
   )
   check(
     'a pitched camp carries exactly ONE name under Ctrl (point 628)',
