@@ -1931,7 +1931,7 @@ if (section('elephant-trampling')) {
         if (window.__simTime() >= nextAt) {
           nextAt = window.__simTime() + 0.04
           const step = Math.hypot(z.x - prev.x, z.z - prev.z)
-          if (samples >= 1) maxStep = Math.max(maxStep, step) // skip the pin interval, as before
+          if (samples >= 1) maxStep = Math.max(maxStep, step) // skip the first interval, which includes the pin
           samples++
           prev = { x: z.x, z: z.z }
         }
@@ -1953,8 +1953,8 @@ if (section('elephant-trampling')) {
 // zoom-scaled despawn radius.
 if (section('streaming-despawn')) {
   await page.evaluate(() => window.__game.getState().debugJumpTo(-2.2, 34.8))
-  // The elephant/oscillation/flee tests above emptied herd arrays while their
-  // chunk keys stayed registered — restock so the area streams in fresh.
+  // Restock so the area streams in fresh, whatever an earlier section left in
+  // the herd arrays or the registered chunk keys.
   await page.evaluate(() => window.__wildlife.restock())
   await waitForHerds()
   const stream = await page.evaluate(async () => {
@@ -1988,34 +1988,25 @@ if (section('streaming-despawn')) {
     await window.__sleepSim(1)
     const survivesCross = hasMark('A')
     // Move far past the zoom-1 despawn radius (~160 world units). This LATCHES,
-    // so a longer window can never turn a real failure into a pass. It used to be
-    // the suite's most frequent first-attempt failure and was long treated as a
-    // point-200 flake; point 282 proved it a PRODUCT bug on WebGL 2: the herd
-    // despawn filter ran only on a frame that DELETED a chunk, but the cull
-    // decision hinges on `isOnScreen`, which changes as the camera EASES to its
-    // target (0.12/frame). A large jump removes all the old chunks in one burst
-    // while the camera still looks at the old spot, so the stranded animals are
-    // kept by the on-screen backstop that frame; with no further chunk deletions
-    // the gate never re-ran the filter and they were never re-evaluated once the
-    // camera caught up. Wildlife now culls every frame, so the animal despawns the
-    // frame it falls off-screen — a modest window suffices.
+    // so a longer window can never turn a real failure into a pass. Wildlife culls
+    // every frame (point 282: a cull run only on chunk-deleting frames kept
+    // animals stranded on-screen while the camera eased away), so the animal
+    // despawns the frame it falls off-screen — a modest window suffices.
     setPos(p0.x + 600, p0.z + 600)
     await window.__pollSim(20, () => !hasMark('A'))
     const goneWhenFar = !hasMark('A')
 
-    // At a wider zoom the same distance is still in view and is kept.
+    // At zoom 1, 230 units away is beyond the view and the animal despawns …
     window.__game.getState().debugJumpTo(-2.2, 34.8)
     await window.__pollSim(10, () => !!nearest())
-    window.__ui.getState().setTravelZoom(3)
-    const p3 = { ...window.__game.getState().pos }
-    const m3 = nearest()
-    if (!m3) return { ok: false, why: 'no animals (zoom 3)' }
-    m3.__mark = 'B'
-    window.__ui.getState().setTravelZoom(1)
-    setPos(p3.x + 230, p3.z)
+    const p1 = { ...window.__game.getState().pos }
+    const m1b = nearest()
+    if (!m1b) return { ok: false, why: 'no animals (zoom 1)' }
+    m1b.__mark = 'B'
+    setPos(p1.x + 230, p1.z)
     await window.__pollSim(6, () => !hasMark('B'))
     const goneAtZoom1 = !hasMark('B')
-    // Reset, remark, repeat at zoom 3 (wider despawn radius keeps it).
+    // … while at the wider zoom 3 the same distance is still in view and kept.
     window.__game.getState().debugJumpTo(-2.2, 34.8)
     await window.__pollSim(10, () => !!nearest())
     window.__ui.getState().setTravelZoom(3)
@@ -2083,9 +2074,6 @@ if (section('dressing-growth')) {
     JSON.stringify(dressingGrowth),
   )
 
-  // (The __pollSim/__sleepSim/__simTime helpers are installed at boot — and
-  // re-installed after any crash-reload — see installSimHelpers above.)
-
   // Point 165: no ground animal appears INSIDE the rendered frame. The guarantee
   // seeders (settlement vicinity, dry-shore drinkers) used to place standing
   // animals at the frame edge, where they popped into view. Drive through a
@@ -2094,12 +2082,9 @@ if (section('dressing-growth')) {
   // screen (projected via __camera.onScreen, the point-172 picture standard) the
   // frame it first joins the herds. Driven ONLY at the achievable zoom 0.5
   // (point 172): 0.5 is the widest view reachable without the debug unlock, so it
-  // is the hardest achievable case. A former zoom-out to 1.3 tested a DEBUG-ONLY
-  // wide view whose frustum covers a settlement's whole vicinity ring, where the
-  // never-empty-vicinity seeder (point 102) cannot place off-screen and must fall
-  // back on-screen — an inherent, unavoidable conflict at that zoom, not a spawn
-  // bug; a real achievable-zoom driving pop-in (the point-183 report) is caught by
-  // its own Nile-corridor check, not by over-testing an impossible debug condition.
+  // is the hardest achievable case. A debug-only wider zoom is not driven: its
+  // frustum covers a settlement's whole vicinity ring, where the never-empty-
+  // vicinity seeder (point 102) must fall back on-screen by design.
   const noPop = await page.evaluate(async () => {
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
     const SP = ['zebra', 'wildebeest', 'antelope', 'gazelle', 'buffalo', 'elephant', 'giraffe', 'lion',
@@ -2159,13 +2144,9 @@ if (section('dressing-growth')) {
     const prevSpeed = window.__balance.travelSpeed // restore below — must not leak to later checks (e.g. 129)
     window.__balance.travelSpeed = 6 // F3 set 25 (too fast); bound the drive to the seeded area
     window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW', key: 'w' }))
-    await scanFrames(9)
-    // Keep driving at the SAME achievable 0.5 (point 172) to cover more ground —
-    // the widest view the player can reach — rather than a debug wide zoom.
-    await scanFrames(5)
+    await scanFrames(14)
     window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyW', key: 'w' }))
     window.__balance.travelSpeed = prevSpeed
-    window.__ui.getState().setTravelZoom(0.5)
     window.__ui.getState().setSeasonWetnessOverride(null)
     const perf = {
       terrain: { count: window.__perf.terrain.count, maxMs: +window.__perf.terrain.maxMs.toFixed(1) },
@@ -2218,7 +2199,8 @@ if (section('dressing-growth')) {
   check('a higher calfFraction raises more juveniles (point 169)',
     moreCalves.many > moreCalves.few && moreCalves.few >= 1, JSON.stringify(moreCalves))
 
-  // Point 262: orphan adoption. When a juvenile's parent DIES (any cause), the
+  // Point 262: orphan adoption. When a juvenile's parent DIES (any cause; point
+  // 341 below extends the hand-off to culled and out-of-reach parents), the
   // nearest eligible ADULT of its kind within balance.family.adoptionRadius takes
   // it in — re-establishing the parent↔child link every §19.8 drama reads, so the
   // sacrifice/grief/rescue dramas RECUR instead of a one-off orphaning. Injected
@@ -2662,7 +2644,7 @@ if (section('collision-on-the-animal')) {
     // 2. Through the animal's own spot, where nothing is drawn: free ground.
     const past = await drive(S.x - 5, () => S)
     const pastFlank = past.min
-    const bodyKeptOffFlank = past.minBody // the body never came near the flank line
+    const bodyKeptOffFlank = past.minBody // how close the body ever came to the flank's target spot S
     const drawnEnd = zebra.drawn ? { x: zebra.drawn.x, z: zebra.drawn.z } : null
     const offsetEnd = drawnEnd ? Math.hypot(drawnEnd.x - S.x, drawnEnd.z - S.z) : 0
     const onScreen = into.onScreenAtMin // in the picture at the moment it blocked
@@ -2673,9 +2655,8 @@ if (section('collision-on-the-animal')) {
   if (drawnCollision.notReady || drawnCollision.noDryTarget || drawnCollision.noPlateau ||
       !(drawnCollision.bodyKeptOffFlank > drawnCollision.radius + 0.9)) {
     // Staging miss (no wildlife hook / no dry bank / the drink cycle never reached
-    // its plateau, or walked the body back onto the flank line mid-drive) — fail
-    // SOFT like the neighbouring wildlife checks: an environment transient, not a
-    // product defect. The flank must be provably empty for its check to mean
+    // its plateau, or walked the body back onto the flank spot mid-drive) — fail
+    // SOFT: an environment transient, not a product defect. The flank must be provably empty for its check to mean
     // anything, so a body that came back is a miss, never a pass.
     console.log(`SKIP  the collider follows the drawn body — staging miss ${JSON.stringify(drawnCollision)}`)
   } else {
