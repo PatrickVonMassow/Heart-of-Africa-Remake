@@ -19,7 +19,6 @@ import { doneCard, doneEntries, hasCurrentWork, nowCard, queueCard } from './boa
 import { LandingError, VERDICT, transitionAccepted } from './land-point-core.mjs'
 import {
   FOLD_STEPS,
-  FOLD_STEP_IDS,
   foldBoardTransform,
   foldCardText,
   foldCommitMessage,
@@ -31,6 +30,8 @@ import {
   resolveSurvivor,
   validateFold,
 } from './fold-point-core.mjs'
+
+const FOLD_STEP_IDS = FOLD_STEPS.map((s) => s.id)
 
 // --- fixtures ---------------------------------------------------------------
 
@@ -120,9 +121,8 @@ describe('the chain itself', () => {
   })
 
   it('gives every step a label', () => {
-    for (const id of FOLD_STEP_IDS) expect(foldStepLabel(id)).not.toBe(id)
+    for (const { id } of FOLD_STEPS) expect(foldStepLabel(id)).not.toBe(id)
     expect(foldStepLabel('nonesuch')).toBe('nonesuch')
-    expect(FOLD_STEPS.length).toBe(FOLD_STEP_IDS.length)
   })
 })
 
