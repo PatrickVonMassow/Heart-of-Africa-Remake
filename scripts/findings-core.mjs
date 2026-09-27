@@ -9,14 +9,17 @@
 // TASKS.md at all, so the state most likely to produce a finding is exactly
 // the one with no durable path anything checks.
 //
-// Hence two conditions, one per session state:
+// Hence three conditions:
 //   1. A turn that INVESTIGATED and recorded nothing blocks. Investigation is
 //      COUNTED from the turn's tool calls, never inferred from meaning — a
 //      guard that guesses what a turn was "about" would be unfalsifiable.
 //   2. A session that OWNS the batch and still has entries in the carrier
-//      blocks. Memory is the transport for a locked-out session, never the
-//      resting place; without this the carrier becomes what
-//      pending-queue-work-29-07.md already was — a note nothing drains.
+//      blocks, unless the context fence defers that duty. Memory is the
+//      transport for a locked-out session, never the resting place; without
+//      this the carrier becomes what pending-queue-work-29-07.md already
+//      was — a note nothing drains.
+//   3. An owner taking the boundary while deposited requests wait blocks
+//      (point 462).
 //
 // Side-effect free; the wrapper (findings-guard.mjs) reads the tree and is
 // fail-open, so a bug in here can never trap a session.
@@ -64,8 +67,8 @@ const WRITE_TOOLS = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit'])
  * would otherwise count as a commit (a search laundering itself into a
  * record), and `git commit --dry-run; git commit -m real` would lose the real
  * commit to the dry run beside it. Quoting is not parsed — a separator inside
- * a quoted string splits too, which can only ever split one segment into two
- * and never invents a match at a segment head.
+ * a quoted string splits too, so quoted text after it can land at a segment
+ * head and be judged as a command; that imprecision is accepted.
  */
 function segments(command) {
   return String(command ?? '')
@@ -80,7 +83,8 @@ function segments(command) {
 const GIT_OPTS = '(?:-[Cc]\\s+\\S+\\s+|-\\S+\\s+|\\S+=\\S+\\s+)*'
 const GIT_DURABLE = new RegExp(`^git\\s+${GIT_OPTS}(?:commit|merge|cherry-pick|revert)\\b`)
 
-/** Shell heads that only ever look at something. */
+/** Shell heads treated as looking. Their options (`sed -i`, `find -exec`) and any
+ *  redirection are not inspected — an accepted imprecision. */
 const READ_ONLY_HEADS = new Set([
   'ls', 'cat', 'head', 'tail', 'wc', 'grep', 'rg', 'find', 'sed', 'awk', 'echo', 'pwd',
   'which', 'type', 'stat', 'diff', 'sort', 'uniq', 'tree', 'file', 'basename', 'dirname',
@@ -99,18 +103,21 @@ function segmentIsReadOnly(segment) {
   if (READ_ONLY_HEADS.has(head)) return true
   if (head === 'git') {
     const sub = words.slice(1).find((w) => !w.startsWith('-') && !w.includes('='))
-    // A bare `git tag`/`git stash` lists; with more words they act.
+    // A bare `git tag`/`worktree`/`remote` lists; with more words they act. A bare
+    // `git stash` pushes and `branch` counts as read whatever its flags — both
+    // accepted imprecisions.
     if (sub === 'tag' || sub === 'stash' || sub === 'worktree' || sub === 'remote') {
       return words.length <= 2
     }
     return READ_ONLY_GIT.has(sub)
   }
-  // The project's own probes are how analysis actually happens here.
+  // The project's own probes, and any `node -e` one-liner, count as looking.
   if (head === 'node') return /\s(?:-e|--status|--drain|--check|--dry-run)\b/.test(segment)
   return false
 }
 
-/** A shell command that itself constitutes a durable record. */
+/** A shell command whose invocation names a durable record (its success is not
+ *  checked here). */
 function shellRecordKind(command) {
   for (const segment of segments(command)) {
     if (GIT_DURABLE.test(segment) && !/--dry-run\b/.test(segment)) return 'commit'
@@ -133,9 +140,10 @@ function shellRecordKind(command) {
     // record. Counted as an unrecorded investigation, the guard would fire on the
     // batch's MOST COMMON turn shape, and the sanctioned answer would degenerate
     // into a reflexive `--none`, which is precisely the desensitization this
-    // file's own header forbids. The declaration is the honest durable trace of
-    // such a turn: it names what was handed out, it is probed for liveness, and
-    // it expires on its own.
+    // file's own header forbids. The declaration is the honest trace of such a
+    // turn: it names what was handed out, it is probed for liveness, and
+    // it expires on its own. It is an exemption, earned in delegationExemption,
+    // rather than a durable record.
     if (/^(?:\S*node\s+)?\S*batch-in-flight\.mjs\b/.test(segment) && /\s--waiting-on\b/.test(segment)) {
       return 'wait-declared'
     }
@@ -185,14 +193,14 @@ export function classifyCall({ name, command, filePath } = {}) {
 
 /** The record kind a DECLARED WAIT leaves — the one that is an exemption rather
  *  than a durable trace, and therefore the one that has to be earned. */
-export const DELEGATION_RECORD = 'wait-declared'
+const DELEGATION_RECORD = 'wait-declared'
 
 /**
  * MAY THE DECLARED WAIT STAND IN FOR A RECORD? PURE (point 437 G).
  *
  * Returns { claimed, honoured, why }:
  *   claimed   the turn ran the declaration command at all
- *   honoured  and it is allowed to count — an Agent really was spawned this
+ *   honoured  and it is allowed to count — an Agent call was made this
  *             turn, or the declaration FILE was written inside this turn (which
  *             a successful CLI run leaves behind and a refused one does not)
  *
@@ -302,9 +310,11 @@ export function turnTakesBoundary(calls = []) {
  *   carrierPending  how many FINDINGS still sit in the memory carrier
  *   carrierRequests how many REQUESTS still sit there (point 462)
  *   atBoundary      is this turn taking the session boundary
+ *   fence, sessionId  context-fence state and owner id for scopeMandatoryDuty
+ *   declarationWrittenAt, turnStartedAt  the delegation exemption's file proof
  *   threshold       override for DEFAULT_THRESHOLD (tests inject their own)
  *
- * Returns { ok, violations: [{ kind, detail }] }.
+ * Returns { ok, violations: [{ kind, detail }], deferred: [{ kind, detail }] }.
  */
 export function auditFindings({
   tally,
@@ -429,7 +439,8 @@ export function formatFindings(violations) {
 
 // ---- the carrier ----------------------------------------------------------
 //
-// One entry per line, so the file stays readable as prose AND parseable:
+// One head line per entry, its detail indented below, so the file stays readable
+// as prose AND parseable:
 //   - [ ] <ISO> · <session> · <title>
 //         <detail>
 // `- [ ]` is pending, `- [x]` has reached the work order.
