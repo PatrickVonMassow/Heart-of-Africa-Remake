@@ -16137,3 +16137,15 @@ to land than a mechanism that needs a review.
   Test: enrichments green on both backends; picture check of the frame.
   Refs: scripts/verify/enrichments.mjs, the Victoria Falls water scene.
   Bundle: Testinfrastruktur.
+- [ ] 1225. The place-scene unit tests pass in a full unit run under load.
+  PROBLEM, measured 27.09.2026 by the closing cleanup's chunk authors (branches feat/633-cleanup-c01
+  77fae9a1b, -c02 f77a6e33a, -c03 06843b44a, none touching src/): the full `npm run test:unit`
+  went red on 20-second timeouts in src/scenes/place/layout.test.ts (3 tests) and bankGame.test.ts
+  ("calls ROCK once with nobody arriving…") at machine load ~10-12; alone both files pass (669/669),
+  and bankGame failed 1 of 3 isolated runs. The mandatory unit gate turns red at random.
+  FINAL STATE: the cause is measured (slow setup, real-timer wait, or order dependence) and fixed so
+  both files pass inside their timeout in a full run under parallel load; bankGame is deterministic.
+  Criticality: medium — a random red blocks landings and invites a retry, which covers nothing.
+  Test: three consecutive full unit runs with both files green; bankGame alone 10/10.
+  Refs: src/scenes/place/layout.test.ts, src/scenes/place/bankGame.test.ts.
+  Bundle: Testinfrastruktur.
