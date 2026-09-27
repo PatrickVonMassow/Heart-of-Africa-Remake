@@ -3,10 +3,11 @@
 //   node scripts/measure-task-cost.mjs                  # the phase table + the spread
 //   node scripts/measure-task-cost.mjs --json           # everything, machine-readable
 //   node scripts/measure-task-cost.mjs --tasks 20       # the 20 costliest points
+//   node scripts/measure-task-cost.mjs --min-weighted 200000   # the per-task floor
 //   node scripts/measure-task-cost.mjs --git-since 2026-07-06   # the calendar clock only
 //
 // It reads the same transcripts as `scripts/measure-context-cost.mjs` — same folder
-// resolution, same dedup, same weighting — and adds the PHASE attribution the older tool
+// resolution, same response fold, same weighting — and adds the PHASE attribution the older tool
 // has no opinion about. The decision rules are pure and Vitest-covered in
 // `scripts/measure-task-cost-core.mjs`; this file only does IO.
 //
@@ -44,7 +45,7 @@ import {
  * blocks. Keeping only the first line dropped the tool call of every response that began
  * with thinking — see that function for what it cost the earlier reading.
  */
-export async function readTurns(dir = transcriptDir()) {
+async function readTurns(dir = transcriptDir()) {
   const lineRows = []
   const branchRows = []
   for (const { path, rel, scope } of listTranscripts(dir)) {
@@ -83,7 +84,7 @@ const git = (args) =>
   })
 
 /**
- * The calendar clock: every first-parent merge on `main`, with the span from its
+ * The calendar clock: every first-parent merge on `ref` (default `main`), with the span from its
  * branch's FIRST commit to the merge, and the main-only commits that followed it before
  * the next merge — the bookkeeping no branch ever sees.
  */
@@ -144,8 +145,9 @@ if (isMain) {
     process.exit(1)
   }
   // TWO READINGS, always reported together: `strict` attributes only turns that issue a
-  // recognised tool call — a FLOOR per phase; `result` fills the evidence-free turns
-  // from their neighbours in the same session. The gap between the two is the error bar.
+  // recognised tool call; `result` fills the evidence-free turns from their neighbours
+  // in the same session. The strict column is shown as a share of what it attributed,
+  // so it is a second reading beside the filled one, not a lower bound of it.
   const result = attribute({ turns })
   const strict = attribute({ turns, carry: false })
   // The verification phase split again into the half a read-only model could take and
@@ -160,9 +162,9 @@ if (isMain) {
     ...Object.fromEntries(PHASES.map((p) => [p, taskSpread(result.tasks, { minWeighted, pick: (t) => t.phases[p].weighted })])),
   }
   const span = { from: new Date(turns[0].at).toISOString(), to: new Date(turns[turns.length - 1].at).toISOString() }
-  // THE FIXED OVERHEAD. Main-session cost that no branch carries — orchestration,
-  // board, queue, the merges — divided by the points that actually merged inside the
-  // transcript window. It is an AMORTISED figure, not a per-task measurement: the
+  // THE FIXED OVERHEAD. Cost that no task carries — orchestration, board, queue, the
+  // merges, and any delegated turn no point was assigned to — divided by the
+  // first-parent merges inside the transcript window (not deduplicated by point). It is an AMORTISED figure, not a per-task measurement: the
   // window's overhead does not decompose into points, and pretending otherwise would be
   // the estimate-as-measurement mistake.
   const windowFrom = turns[0].at
@@ -222,8 +224,8 @@ if (isMain) {
     console.log(`BILLED COUNTERS over all phases (${k(compTotal)} raw): ` + Object.entries(comp).map(([key, v]) => `${key} ${k(v)} (${pct(v / compTotal)} raw, ${pct(compW[key] / compWTotal)} weighted)`).join(' · '))
     console.log('')
     // WHICH HALF OF THE VERIFICATION PHASE COULD LEAVE THIS MACHINE (point 654). The
-    // phase table above says verification is the biggest single share; this says how
-    // much of it is pure text, which is the only part a read-only model can take.
+    // phase table above shows verification's share; this says how much of it is pure
+    // text, which is the only part a read-only model can take.
     console.log(`VERIFICATION SPLIT — the ${k(verification.weighted)} weighted of the verification phase, by half`)
     for (const kind of VERIFICATION_KINDS) {
       const b = verification.kinds[kind]
@@ -258,7 +260,7 @@ if (isMain) {
     for (const p of PHASES) console.log(`  ${p.padEnd(15)} ${q(spread[p])}`)
     console.log('')
     console.log('FIXED OVERHEAD')
-    console.log(`  main-session cost no branch carries: ${k(overhead.noTaskWeighted)} over ${overhead.mergesInWindow} merges in the window → ${overhead.perMergedPoint == null ? 'n/a' : k(overhead.perMergedPoint)} per merged point (AMORTISED)`)
+    console.log(`  cost no task carries (main sessions and unassigned agents): ${k(overhead.noTaskWeighted)} over ${overhead.mergesInWindow} merges in the window → ${overhead.perMergedPoint == null ? 'n/a' : k(overhead.perMergedPoint)} per merged point (AMORTISED)`)
     console.log(`  brief+merge+bookkeeping inside a task: ${q(overhead.sizeIndependentPerTask)}`)
     console.log('')
     console.log(`CALENDAR CLOCK from git — ${merges.merges} merges on main`)
