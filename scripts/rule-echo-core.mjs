@@ -2,10 +2,10 @@
 //
 // WHY IT EXISTS (user 17.08.2026, measured the same evening): the model policy
 // moved the hard cases out of the Fable lane, and the sentence describing that
-// rule stood in NINE places — CLAUDE.md §6, docs/astra-routing.md, four script
-// headers, the resume hook's two prompt texts and three memory entries. Changing
-// the rule left eight of them asserting the old one, and one of those eight is
-// read into EVERY session's context at start. This is not a one-off: the same
+// rule stood in CLAUDE.md §6, docs/astra-routing.md, four script headers, the
+// resume hook's two prompt texts and three memory entries. Changing the rule left
+// all the others asserting the old one, and one of them is read into EVERY
+// session's context at start (the registry below lists today's echoes). This is not a one-off: the same
 // shape produced "the fallback is Opus 4.8" in a memory the code has never
 // matched, and a memory claiming a guard did not exist while it sat wired in the
 // Stop chain.
@@ -25,9 +25,8 @@
 // then names each file, and re-stamping is per FILE, so the stamp cannot be
 // refreshed for a place nobody opened.
 //
-// The fingerprint is over the source text as written; only line endings and
-// trailing whitespace are normalised, because collapsing more hid real Markdown
-// edits. Pure: no I/O, no clock. The reading and the blocking live in
+// The fingerprint is over the source text as written; only line endings are
+// normalised, because collapsing more hid real Markdown edits. Pure: no I/O, no clock. The reading and the blocking live in
 // scripts/rule-echo.mjs and scripts/rule-echo-guard.mjs.
 
 import { createHash } from 'node:crypto'
@@ -83,7 +82,7 @@ export const RULE_REGISTRY = Object.freeze([
 ])
 
 /** The stamp a restating file carries: `rule:<id>@<hash>`. */
-export const STAMP_PATTERN = /rule:([a-z0-9-]+)@([0-9a-f]{8})/g
+const STAMP_PATTERN = /rule:([a-z0-9-]+)@([0-9a-f]{8})/g
 
 /**
  * The fingerprint of a rule's source text.
@@ -132,7 +131,6 @@ export function sourceTextOf(documentText = '', source = {}) {
  * anything else means the tree is there and a missing file is a finding.
  */
 export function treeKeyOf(echo = {}) {
-  if (echo.tree) return String(echo.tree)
   const file = String(echo.file ?? '')
   const cut = file.indexOf('/')
   return cut < 0 ? '' : file.slice(0, cut + 1)
@@ -150,8 +148,9 @@ export function stampsIn(text = '') {
 /**
  * The verdict for one rule, given the texts that were read.
  *
- * `files` maps a repo-relative path to its content, or to `null` for a path that
- * does not exist. Everything here is decided from that map — the caller reads,
+ * `files` maps a repo-relative path to its content, to an array of contents when
+ * the path resolves to several physical copies (memory directories), or to
+ * `null` for a path that does not exist. Everything here is decided from that map — the caller reads,
  * this decides.
  *
  * Verdict kinds:
@@ -182,7 +181,7 @@ export function checkRule(rule = {}, files = {}) {
     // current stamp in the first copy cover a stale one in the second. Each copy
     // is therefore judged on its own, and the worst answer wins.
     const copies = Array.isArray(entry) ? entry : [entry]
-    const text = copies.length === 1 ? copies[0] : copies.find((c) => c === null || c === undefined) ?? copies[0]
+    const text = copies[0]
     if (text === null || text === undefined) {
       // AN OPTIONAL PATH IS SKIPPED ONLY WHEN ITS WHOLE TREE IS ABSENT
       // (cross-vendor review, P1). Skipping every missing optional file could
@@ -290,7 +289,8 @@ export function quoteIsInFile(text = '', quote = '', { minLength = 24, id = '' }
 
 /**
  * The passage a rule's stamp belongs to: the block of consecutive non-blank
- * lines holding the stamp, plus the block before and after it.
+ * lines holding the stamp — plus the block before and after it when the stamp's
+ * own block holds no letter or digit of its own (a lone stamp line).
  *
  * A radius in characters was the first attempt and the review was right about it
  * (round 4, P1): it let unrelated prose a few lines away clear the gate, and it
@@ -422,7 +422,7 @@ export function formatVerdict(results = [], strays = []) {
     lines.push('')
   }
   lines.push('READ each file above and make its wording match the rule — then stamp it:')
-  lines.push('  node scripts/rule-echo.mjs --stamp <file> --quote "<a phrase from that file>"')
+  lines.push('  node scripts/rule-echo.mjs --stamp <file> [--rule <id>] --quote "<a phrase from that file>"')
   lines.push('The quote must occur in the file, so the stamp cannot be set from the list alone.')
   lines.push('A file whose wording is already right is stamped just the same; the stamp says')
   lines.push('somebody looked, not that something changed.')
