@@ -4,9 +4,11 @@
 // sources — so the core stays pinnable without a repository.
 //
 // EVERY FAILURE HERE IS OPEN. A ladder that cannot read the tree must never be
-// the reason a regression did not run, so each probe answers with an empty list
-// rather than a throw, and `ladderCheck` returns an `unreadable` verdict that
-// lets the run start.
+// the reason a regression did not run: the git probes answer a failure with less
+// data (an empty list, or no sections) rather than a throw, and anything that
+// still throws is caught by `ladderCheck`, which returns an `unreadable` verdict
+// that lets the run start. Less data is still judged, so a missing ledger beside
+// covered edits can refuse.
 import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
@@ -45,9 +47,9 @@ function mergeBase(cwd) {
  *
  * Two sources, because either alone misses half the repair loop: the commits
  * this branch carries beyond `main`, and the working tree's uncommitted changes.
- * The time is the LATER of the file's own mtime and the newest branch commit
- * that touched it — which is what this function always promised and, until the
- * four-eyes round of 11.09.2026, did not do: it read mtimes alone.
+ * A clean file is dated by the newest branch commit that touched it; a DIRTY
+ * one by the LATER of its mtime and that commit (editTimeFor — an mtime alone
+ * moves on a checkout without an edit).
  *
  * AND A FILE THAT IS GONE STILL COUNTS. The earlier reasoning — "a deletion
  * drops out: no suite can be pre-checked for it" — had it backwards. Deleting a
@@ -55,7 +57,8 @@ function mergeBase(cwd) {
  * dropping the path made the whole run answer FREE: delete one tracked file
  * under a covered directory, change nothing else, and the ladder waved the full
  * pass through. A deleted path therefore keeps its commit time, and an
- * UNCOMMITTED deletion keeps the path with time 0 — present in the material, so
+ * UNCOMMITTED deletion keeps the path, dated by its branch commit or 0 when it
+ * has none — present in the material, so
  * the run is not free, without the moving `now` that would refuse every run
  * forever.
  *
@@ -184,7 +187,7 @@ function sectionsTouched(path, cwd, base) {
 
 /** The merge commits this branch carries beyond `main`. A merge brings in other
  *  material the suite covers, so it ages the rung exactly as an edit does. */
-export function branchMerges({ cwd = ROOT } = {}) {
+function branchMerges({ cwd = ROOT } = {}) {
   const base = mergeBase(cwd)
   if (!base) return []
   try {
@@ -198,7 +201,7 @@ export function branchMerges({ cwd = ROOT } = {}) {
 }
 
 /** The work order's own diff→suite mapping paragraph. */
-export function diffSuiteMap({ cwd = ROOT } = {}) {
+function diffSuiteMap({ cwd = ROOT } = {}) {
   try {
     return parseDiffSuiteMap(readFileSync(join(cwd, 'TASKS.md'), 'utf8'))
   } catch {
@@ -209,7 +212,7 @@ export function diffSuiteMap({ cwd = ROOT } = {}) {
 /** The non-predictive declarations of the suites that actually have a section
  *  run in the ledger — reading every suite's source would cost megabytes for an
  *  answer only those suites can change. */
-export function nonPredictiveDeclarations(runs, { cwd = ROOT } = {}) {
+function nonPredictiveDeclarations(runs, { cwd = ROOT } = {}) {
   const out = {}
   const suites = new Set((runs ?? []).filter((r) => r?.partial === true).map((r) => r.suite))
   for (const suite of suites) {

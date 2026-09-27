@@ -21,7 +21,7 @@
  *  chosen on 03.08.2026 from a premise that has since been measured false — "the
  *  container has no GPU, no DRI driver and no system libEGL/libGL". It has all three:
  *  /dev/dxg is passed through, /usr/lib/wsl/lib carries libd3d12/libd3d12core/libdxcore,
- *  and Mesa's d3d12 Gallium driver turns that into hardware GL. With `gl` the lane comes
+ *  and Mesa's d3d12 Gallium driver turns that into hardware GL. With ANGLE's `gl` route (measured first) the lane comes
  *  up as "ANGLE (Microsoft Corporation, D3D12 (NVIDIA GeForce RTX 4070 Ti), OpenGL 4.6)"
  *  against SwiftShader's "Vulkan 1.3.0 (SwiftShader Device (Subzero))" — measured on the
  *  identical scene at 170 vs 22.7 renderer calls per second, a 7.5× picture rate. What
@@ -57,7 +57,7 @@ export function angleBackend(platform, override) {
   return ANGLE_BY_PLATFORM[platform] ?? ANGLE_FALLBACK
 }
 
-/** The Gallium driver the ANGLE `gl` backend should load, as an ENVIRONMENT value —
+/** The Gallium driver ANGLE's GL backends (`gl`, `gl-egl`) should load, as an ENVIRONMENT value —
  *  Mesa reads it there, not from a browser flag.
  *
  *  Linux gets `d3d12`, the driver that reaches /dev/dxg (point 493). Mesa 22.3.6 picked it
@@ -122,7 +122,8 @@ function platformArgs(platform) {
  *  `--enable-unsafe-webgpu` byte for byte, because there the bundled Chromium brings up
  *  no headless WebGPU adapter at all (point 184) and the flag has never done anything.
  *
- *  On Linux it does. Measured 03.08.2026 in the container: SwiftShader DOES expose a
+ *  On Linux it does. Measured 03.08.2026 in the container, when this lane still ran on
+ *  SwiftShader (it rides gl-egl now, line 44): SwiftShader DOES expose a
  *  WebGPU adapter under that flag, the game initialises it in preference to WebGL 2, and
  *  it dies on its first attribute buffer ("createBuffer failed, size (288) is too large
  *  for the implementation") — the page never finishes loading, so `assertBackend` never
@@ -162,11 +163,12 @@ export function webglLaunchOptions(platform, angleOverride, baseEnv, galliumOver
  *
  *  The cause is two graphics stacks disagreeing. Dawn picks Chrome's bundled SwiftShader
  *  Vulkan, while ANGLE (the compositor's GL side) finds no `libGL.so.1` and the loader's
- *  only system ICD is Mesa 22.3.6 lavapipe; the GPU process then drops the Dawn instance
+ *  only system ICD is Mesa 22.3.6 lavapipe (the host as measured then, before point 493
+ *  installed libgl1 and the move to Mesa 25); the GPU process then drops the Dawn instance
  *  under it. Pinning BOTH sides to the browser's own bundled SwiftShader ends the
  *  disagreement. All three are required — measured, every proper subset of them still
  *  dropped the instance on 2/2 runs, while the full set drew the real game on 3/3
- *  (~4 fps, the same order as the WebGL 2 lane's SwiftShader).
+ *  (~4 fps, the same order as the WebGL 2 lane's former SwiftShader route).
  *
  *  Linux only, and deliberately so: the flags describe a host with no usable driver.
  *  Windows and macOS keep the argument list byte for byte. */
@@ -276,7 +278,7 @@ export const WEBGPU_UNAVAILABLE = 'WebGPU backend unavailable on this host'
  *  A distro `chromium` counts, and only because the resolved path is HANDED to the
  *  launch (webgpuLaunchOptions): a full Chromium build is the same engine, while the
  *  `chrome` channel alone would never have found it. Whether a given build really
- *  brings up a headless WebGPU adapter is not a question any probe can answer — the
+ *  brings up a headless WebGPU adapter is not a question this executable probe can answer — the
  *  lane's own assertBackend answers it, loudly, on the running renderer.
  *
  *  Windows returns NOTHING deliberately — not "no Chrome", but "do not probe": Chrome's
@@ -323,8 +325,8 @@ export function webgpuLaneVerdict({ platform, systemChrome } = {}) {
     probed: true,
     reason:
       `${WEBGPU_UNAVAILABLE}: the lane needs a SYSTEM Chrome/Chromium (launched by path, ` +
-      "--headless=new, point 184 — Playwright's bundled Chromium has no headless WebGPU " +
-      'adapter), and none of ' +
+      "--headless=new, point 184 — Playwright's bundled Chromium fails requestDevice " +
+      'headless), and none of ' +
       `[${systemChromeCandidates(platform).join(', ')}] exists on this ${platform} host. ` +
       'Install one (see the host bring-up in scripts/verify/README.md) and re-run. This run is ' +
       'NOT silently downgraded to WebGL 2: a WebGL 2 picture is no evidence about the WebGPU one ' +
