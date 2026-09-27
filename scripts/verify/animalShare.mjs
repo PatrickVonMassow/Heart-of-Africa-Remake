@@ -17,16 +17,19 @@
 //
 // THE REPLACEMENT is scale-free. Within ONE frame:
 //   median colour of the rect  the water (water is the majority of these rects,
-//                              so the median pixel IS a water pixel)
+//                              so the per-channel median lands on the water's colour)
 //   d_i                        each pixel's L1 distance from that median
 //   spread                     the median of the d_i — the water's own scale
 //   share                      #{ d_i > sigmas · spread } / (ordinary pixels)
 // Multiply every colour distance in the rect by any λ — a brighter sky, a
 // darker backend, a passing cloud, a different exposure — and both d_i and
 // `spread` scale with it, so the share does not move. Add any constant to every
-// channel and nothing moves either. It is a FRACTION of the rect, so the
-// projection drops out too. The only absolute left is the 1-unit floor under
-// `spread`, which is one 8-bit step: the smallest colour difference that exists.
+// channel and nothing moves either — once the foam cut below has chosen which
+// pixels are measured (FOAM_MIN_CHANNEL is absolute, so a brightness shift can
+// move pixels across it). It is a FRACTION of the rect's ordinary (non-foam)
+// pixels, so the projection's scale drops out too. The other absolute is the
+// 1-unit floor under `spread`, which is one 8-bit step: the smallest colour
+// difference that exists.
 //
 // Bright specular/foam is water, not animal, and is dropped BEFORE anything is
 // measured — including before the reference colour is taken. The old code
@@ -38,8 +41,8 @@
 export const FOAM_MIN_CHANNEL = 200
 /** How many "water spreads" from the water colour a pixel must sit to read as animal. */
 export const ANIMAL_SIGMAS = 6
-/** Below this fraction of ordinary (non-foam) pixels the median is no longer the
- *  water and the measure has no meaning — it reports null rather than a number
+/** Below this fraction of ordinary (non-foam) pixels the median can no longer be
+ *  trusted to be the water, and the measure has no meaning — it reports null rather than a number
  *  that looks like one. */
 export const MIN_ORDINARY_FRACTION = 0.6
 /** The risen body must repaint at least this share of its own footprint.

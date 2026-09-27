@@ -1,6 +1,7 @@
 // Shared Playwright boot helpers for the verify suites and scratch probes
 // (process point 4, 2026-07-14): every script repeated the same launch /
-// clear / wait-for-game block — this is the single home for it.
+// clear / wait-for-game block — this is its shared home. The suites' own
+// backend-asserting launch lives in _browser.mjs.
 import { chromium } from 'playwright'
 import { webglLaunchOptions } from './launch-args-core.mjs'
 import { applySeedRoute } from './verify-seed.mjs'
