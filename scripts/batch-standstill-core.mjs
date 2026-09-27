@@ -19,15 +19,16 @@ export const ACTIVITY_CLASSES = Object.freeze({
   UNKNOWN: 'unknown',
 })
 
-export const ACTIVITY_CLASS_SET = new Set(Object.values(ACTIVITY_CLASSES))
+const ACTIVITY_CLASS_SET = new Set(Object.values(ACTIVITY_CLASSES))
 
 /**
- * Evidence precedence, highest first. A deliberate external block wins; named
- * advancing work then wins over waits; measured infrastructure blocks win over
- * transition/idle fallbacks. Owner presence and launcher skips are state facts,
- * not work, and are applied only after every positive interval is exhausted.
+ * Evidence precedence, highest first. Deliberate and measured external blocks
+ * (user, quota, environment) win; named advancing work then wins over waits; the
+ * writer veto and the handover transition come last. Owner presence and launcher
+ * skips (idle owner, no worker, unknown) are state facts, not work, and are
+ * applied only after every positive interval is exhausted.
  */
-export const CLASS_PRECEDENCE = Object.freeze([
+const CLASS_PRECEDENCE = Object.freeze([
   ACTIVITY_CLASSES.BLOCKED_USER,
   ACTIVITY_CLASSES.BLOCKED_QUOTA,
   ACTIVITY_CLASSES.BLOCKED_ENVIRONMENT,
@@ -37,9 +38,6 @@ export const CLASS_PRECEDENCE = Object.freeze([
   ACTIVITY_CLASSES.CI_WAIT,
   ACTIVITY_CLASSES.BLOCKED_WRITER_VETO,
   ACTIVITY_CLASSES.HANDOVER,
-  ACTIVITY_CLASSES.IDLE_OWNER,
-  ACTIVITY_CLASSES.NO_WORKER,
-  ACTIVITY_CLASSES.UNKNOWN,
 ])
 
 const finite = (value) => typeof value === 'number' && Number.isFinite(value)
@@ -65,7 +63,6 @@ function selectedEvidence(active) {
     return { className: ACTIVITY_CLASSES.UNKNOWN, cause: 'contradictory-owners', evidence: owners.map((x) => x.evidence) }
   }
   for (const className of CLASS_PRECEDENCE) {
-    if (className === ACTIVITY_CLASSES.IDLE_OWNER || className === ACTIVITY_CLASSES.NO_WORKER || className === ACTIVITY_CLASSES.UNKNOWN) continue
     const match = active.find((item) => item.className === className)
     if (match) return match
   }
@@ -314,7 +311,7 @@ export function commitGapSummary(commitTimes = [], thresholdMs = STANDSTILL_THRE
 
 /**
  * THE BUSY WEDGE, COUNTED (point 1048, union entry U16; the detector point 958
- * named and never built).
+ * named, built here but not yet wired to a production caller).
  *
  * Both incidents ended the same way: the session kept emitting the SAME outcome.
  * Ten identical watcher spawns on 02./03.09.2026, then ten identical farewell
@@ -327,7 +324,7 @@ export const WEDGE_REPEAT_THRESHOLD = 4
 
 /** Events that ARE a turn's outcome. A heartbeat or a lease renewal is not one:
  *  those are the signals that stayed green throughout the incident. */
-export const OUTCOME_EVENTS = Object.freeze([
+const OUTCOME_EVENTS = Object.freeze([
   ACTIVITY_EVENTS.FOREGROUND_ACTIVITY,
   ACTIVITY_EVENTS.WAIT_LEASE_ACQUIRE,
   ACTIVITY_EVENTS.WAIT_LEASE_ATTACH,

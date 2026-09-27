@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
+import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { isAbsolute, join, resolve, win32 } from 'node:path'
 import { ACTIVITY_EVENTS, parseActivityJournal } from './batch-activity-journal-core.mjs'
@@ -36,7 +36,7 @@ export function timestampedLogBoundaries(text = '') {
   return entries.sort((a, b) => a.at - b.at)
 }
 
-/** Legacy launcher text provides event boundaries and a conservative no-worker
+/** Launcher log text (autostart.log) provides event boundaries and a conservative no-worker
  * state only when the line itself says both facts. It never promotes a living
  * writer or heartbeat to work. Journal-era vetoes carry exact bounds elsewhere. */
 export function autostartEvidence(text = '', { end = Number.POSITIVE_INFINITY } = {}) {
@@ -121,7 +121,8 @@ function delegatedTip(item, { repo } = {}) {
       stdio: ['ignore', 'pipe', 'ignore'],
     }).trim()
     if (!/^[0-9a-f]{40}$/i.test(sha)) return null
-    // A tip already contained by main is counted by the first-parent source.
+    // A tip already contained by main is represented there (its merge commit on
+    // the first-parent line).
     // Only an independently moved delegate branch belongs in this source.
     try {
       execFileSync('git', ['-C', repo, 'merge-base', '--is-ancestor', sha, 'main'], {
@@ -413,5 +414,3 @@ export function declaredInputPaths(repo, transcriptPaths = [], ref = 'main') {
     journal: join(repo, '.claude', 'batch-activity.jsonl'),
   }
 }
-
-export function existing(path) { return existsSync(path) }

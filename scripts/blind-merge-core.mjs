@@ -4,15 +4,17 @@
 // DISAPPEAR without a trace. Both models produce a complete list, and the two are
 // then folded into one union — and the errors of that fold are one-sided:
 // collapsing two entries that were not the same LOSES a finding silently, while
-// wrongly keeping them apart costs one duplicated review. Until now the merge was
-// done by the model that had authored one of the two lists (it judged its own
-// work, which the recorder refuses one stage earlier) and nothing counted the
-// result.
+// wrongly keeping them apart costs one duplicated review. Before point 634 the
+// merge was done by the model that had authored one of the two lists (it judged
+// its own work, which the recorder refuses one stage earlier) and nothing
+// counted the result.
 //
 // Two safeguards, and only the second is arithmetic:
-//   IDENTITY   the merge goes to the model that wrote NEITHER list — recorded by
-//              scripts/mechanism-review.mjs (`--merged-by`), validated here by
-//              validateMerger().
+//   IDENTITY   the merge goes to the model that wrote NEITHER list, or to one
+//              that wrote a list only as a recorded two-model fallback —
+//              recorded by scripts/mechanism-review.mjs (`--merged-by`),
+//              validated by validateMerger() (mechanism-review-core.mjs,
+//              re-exported below).
 //   COUNTING   every entry of both input lists carries an ID, and the union must
 //              account for EVERY one of them: `only A`, `only B`, or `merged
 //              with <id>`. A dropped finding is then an arithmetic error rather
@@ -20,8 +22,9 @@
 //
 // The cheap shape (the point's item 3): both models deliver structured entries
 // (id, file, the defect in one line), exactDuplicates() collapses the identical
-// ones for free, and the third model decides only the CANDIDATE PAIRS. So the
-// added cost is a read of two lists, not a third full pass over the material.
+// ones for free, and candidatePairs() ranks the likely pairs for the third model,
+// which still reads both lists in full and may pair anything. So the added cost
+// is a read of two lists, not a third full pass over the material.
 //
 // Side-effect free: file reading, printing and the exit code belong to the CLI
 // half, scripts/blind-merge.mjs. Pinned by blind-merge-core.test.mjs.
@@ -35,7 +38,7 @@ export { validateMerger } from './mechanism-review-core.mjs'
 /** The two input lists, named the way the dispositions name them. */
 export const LISTS = Object.freeze(['A', 'B'])
 
-/** How similar two entries must read before the merger is asked about them. */
+/** How similar two entries in DIFFERENT files must read to become a candidate pair (same-file pairs always are). */
 export const CANDIDATE_THRESHOLD = 0.4
 
 /** Words that carry no signal when two defect lines are compared. */
@@ -127,8 +130,9 @@ export function readList(name, raw) {
  *
  * Accepted beside JSON because the lists arrive inside a chat answer, and making
  * the countable shape depend on a model emitting well-formed JSON would put the
- * accounting at the mercy of a stray comma. Prose lines are SKIPPED, never
- * guessed at: an entry has an id like A3/B12 in its first field.
+ * accounting at the mercy of a stray comma. Returns the entries only (an entry
+ * has an id like A3/B12 in its first field); readEntryLines below also reports
+ * the lines it could not read.
  */
 export function parseEntryLines(text) {
   return readEntryLines(text).entries
@@ -142,7 +146,7 @@ export function parseEntryLines(text) {
  * finding gone, the count green. So a pipe line that is not an entry and is not
  * table furniture is REPORTED, and validateList refuses on it.
  */
-export function readEntryLines(text) {
+function readEntryLines(text) {
   const entries = []
   const unreadable = []
   for (const raw of String(text ?? '').split(/\r?\n/)) {
@@ -295,8 +299,8 @@ const unionName = (entry, index) => String(entry?.id ?? '').trim() || `#${index 
  *
  * `union` is `{ entries: [{ id?, defect?, from: [ids…] }] }` or a bare array of
  * those entries — one entry per finding kept, `from` naming the input entries it
- * stands for. Everything else is derived: a `from` of A-ids alone is `only A`, of
- * B-ids alone `only B`, and a mixed one is `merged with <the others>`. That is
+ * stands for. Everything else is derived: a `from` of one A-id is `only A`, of
+ * one B-id `only B`, and one of several ids is `merged with <the others>`. That is
  * the point's three dispositions, written once by the merger instead of twice.
  *
  * Returns { ok, dispositions, findings, counts }. Findings by kind:
@@ -304,6 +308,7 @@ const unionName = (entry, index) => String(entry?.id ?? '').trim() || `#${index 
  *   unknown-id     a `from` naming an ID that exists in neither list
  *   double-counted an input entry claimed by two union entries (or twice by one)
  *   empty-from     a union entry standing for nothing, which accounts for nothing
+ *   duplicate-union-id  two union entries under one id
  *   no-defect      a FOLD with no line saying what the merged finding is
  *
  * That last one is what keeps the arithmetic from being satisfiable by cheating

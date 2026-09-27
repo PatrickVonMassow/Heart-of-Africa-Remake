@@ -5,16 +5,15 @@
 // a journal's bytes MEAN — which lines are entries, which tail is an ordinary
 // crash, which middle is corruption, what a snapshot derived from the entries must
 // contain — and scripts/batch-state.mjs is the thin I/O that feeds it bytes and
-// writes what it returns. Still DARK: no runtime caller imports either file until
-// the daemon of step 3 exists, and the activation flag refuses to enable while
-// steps 8 and 9 are not green (scripts/durable-lane-flag-core.mjs).
+// writes what it returns. The lane stays DARK: its activation flag refuses to
+// enable while steps 8 and 9 are not green (scripts/durable-lane-flag-core.mjs).
 //
 // THE ONE DISTINCTION THE STORE RESTS ON (mechanism 2): a TRUNCATED FINAL record —
 // the delimiter never written, the JSON never completed — is an ordinary crash,
 // dropped and reported. A CHECKSUM MISMATCH, or any defect BEFORE the final line,
 // is corruption: an append-only journal with a single writer cannot legally
-// contain it, so the verdict is `corrupt`, and `mayMintFence` (step 1) refuses to
-// mint on that verdict — an old fence file beside a broken journal must not hand
+// contain it, so the verdict is `corrupt`, and ensureFenceStore
+// (scripts/batch-state.mjs) refuses to mint on that verdict — an old fence file beside a broken journal must not hand
 // out a number a durable record already carries.
 import { SCHEMA_VERSION, TERMINAL_ATTEMPT_STATES, attemptStateRecord, attemptTransition, canonicalJson, checkSchemaVersion, checksumOf, migrateRecord, parseFramedLine, sameAttempt } from './batch-schema-core.mjs'
 
@@ -29,7 +28,7 @@ import { SCHEMA_VERSION, TERMINAL_ATTEMPT_STATES, attemptStateRecord, attemptTra
  *  quarantine instead of guessing at a meaning this code does not know. */
 export const JOURNAL_KINDS = Object.freeze([
   // The fence's own history: appended by the daemon when it observes the lock
-  // under a credential it has not journalled yet. `fenceInForceAt` reads these.
+  // under a credential it has not journalled yet. replayJournal reads these.
   'fence-transition',
   // One accepted daemon mutation: name, idempotency key, payload, and after the
   // post-write re-read either `confirmed: true` or its journalled compensation.
@@ -68,7 +67,8 @@ export function splitFrames(text) {
 
 /** The whole journal, judged. Returns:
  *    verdict        'ok' | 'corrupt'  — feeds mayMintFence's journalOk as verdict === 'ok'
- *    entries        every parsed entry, in order, quarantined ones marked in place
+ *    entries        every parsed entry that is not itself corruption, in order,
+ *                   quarantined ones marked in place
  *    droppedTail    the ordinary-crash tail, or null — reported, never silently eaten
  *    corruption     [{ index, reason }] — why the verdict is corrupt
  *    highWater      the highest fence any entry carries, or null for an empty journal
