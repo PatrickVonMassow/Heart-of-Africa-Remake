@@ -1,4 +1,4 @@
-// DOES THIS COMMAND CHANGE ANYTHING? — the ONE classifier both PreToolUse gates
+// DOES THIS COMMAND CHANGE ANYTHING? — the ONE classifier the PreToolUse gates
 // judge a shell call with. Side-effect free; swept by
 // scripts/command-classify-core.test.mjs.
 //
@@ -19,16 +19,20 @@
 // module makes that shape the single implementation, so the two gates cannot
 // drift apart again:
 //   1. LEX the command with quotes honoured, so a `|`, a `;` or a `>` inside an
-//      argument is a character, never an operator. QUOTED TEXT NEVER DECIDES.
+//      argument is a character, never an operator. QUOTED TEXT NEVER DECIDES —
+//      except a wrapper's payload (`bash -c "…"`, `eval`), which IS a command
+//      and is unwrapped and judged (see "The wrappers that HIDE a command").
 //   2. SPLIT into the segments a shell would run separately.
 //   3. Per segment, take the HEAD (the program), and where a verb's nature
 //      depends on a SUBCOMMAND — `git worktree list` vs `add`, `npm ls` vs
 //      `run`, `git stash list` vs `push` — decide on THAT subcommand, never on
 //      the word appearing somewhere in the line.
 //
-// FAIL OPEN, ALWAYS. An unrecognised head, an unreadable subcommand, a shape
-// nobody thought of: READ. This gate must UNDER-block rather than trap a
-// session — a blocked turn produces nothing, and one block-loop cost this
+// FAIL OPEN BY DEFAULT. An unrecognised head, an unreadable subcommand, a shape
+// nobody thought of: READ. The named exceptions take the conservative side on
+// purpose — wrapped payloads, an interpreter executing opaque stdin, an unknown
+// package-manager verb and this repository's own mutating scripts. Otherwise
+// this gate must UNDER-block rather than trap a session — a blocked turn produces nothing, and one block-loop cost this
 // project ~30 turns (point 278). The Stop chain remains the backstop for
 // whatever slips past.
 
@@ -339,32 +343,37 @@ function splitHeadAndArgs(seg) {
   }
 }
 
-/** Heads that write by their nature, whatever their arguments. */
+/** Heads that write by their nature, whatever their arguments (a bare
+ *  `--help`/`--version` is judged first and reads). */
 const WRITING_HEADS = new Set([
   // POSIX file mutation.
   'rm', 'mv', 'cp', 'mkdir', 'rmdir', 'touch', 'chmod', 'chown', 'ln', 'truncate', 'dd', 'tee', 'shred', 'unlink',
+  // npx runs an arbitrary package binary.
   'npx',
   // cmd.exe / PowerShell aliases for the same.
   'del', 'erase', 'rd', 'ren', 'rename', 'move', 'copy', 'md', 'mklink',
-  // PowerShell cmdlets that write (compared lower-cased).
+  // PowerShell cmdlets that write or control processes (compared lower-cased).
   'remove-item', 'new-item', 'set-content', 'add-content', 'out-file', 'copy-item', 'move-item', 'rename-item',
   'set-itemproperty', 'clear-content', 'new-itemproperty', 'remove-itemproperty', 'start-process', 'stop-process',
 ])
 
-/** Interpreters — only after one of these does a path argument mean "run this". */
+/** Interpreters — only after one of these does a path ARGUMENT mean "run this"
+ *  (a script run directly is its own head word). */
 const INTERPRETERS = new Set(['node', 'npx', 'bun', 'deno', 'tsx', 'ts-node', 'sh', 'bash', 'zsh', 'pwsh', 'powershell', 'cmd'])
 
 /** Shells that take the real command as a STRING argument (`sh -c "…"`). */
 const SHELL_HEADS = new Set(['sh', 'bash', 'zsh', 'pwsh', 'powershell', 'cmd'])
 
 /**
- * The flag after which the argument IS the command. A COMBINED short cluster
+ * The flag after which the argument IS the command (for `-File`/`--file`, the
+ * script it runs — unwrapped as a command line all the same). A COMBINED short cluster
  * counts (`-lc`, `-ec`, `-xec`): the shell reads it as `-l -c`, and matching
  * only an exact `-c` let `bash -lc "git push"` past (four-eyes review round 2).
  */
 const SHELL_COMMAND_FLAGS = /^(-[a-z]*c|--?command|\/c|--?file)$/i
 
-/** A word's program name: no path, no extension, lower-cased. */
+/** A word's program name: no path, no Windows executable extension
+ *  (exe/cmd/bat/ps1 — a `.mjs` stays), lower-cased. */
 const baseOf = (text) =>
   String(text ?? '')
     .replace(/\\/g, '/')
@@ -373,7 +382,7 @@ const baseOf = (text) =>
     .replace(/\.(exe|cmd|bat|ps1)$/i, '')
     .toLowerCase()
 
-/** The program a segment runs, lower-cased and stripped of path and extension. */
+/** The program a segment runs, as `baseOf` spells it. */
 export function commandHead(segment) {
   const seg = asSegments(segment)[0]
   if (!seg) return ''
@@ -400,7 +409,7 @@ function argsOf(seg) {
 
 const hasFlag = (args, flags) => args.some((a) => flags.some((f) => a.text === f || a.text.startsWith(`${f}=`)))
 
-/** Does a shell argument list select a `-c`/`--command` payload? */
+/** Does a shell argument list select a `-c`/`--command`/`--file` payload? */
 function hasShellCommandArgument(args) {
   return args.some((a) => {
     if (SHELL_COMMAND_FLAGS.test(a.text)) return true
@@ -431,7 +440,7 @@ function shellExecutesStdin(args) {
 
 /** Node invocation modes that execute stdin instead of `-e` or a named file. */
 function nodeExecutesStdin(args) {
-  const valueFlags = new Set(['-e', '--eval', '-p', '--print', '-r', '--require', '--import', '--loader'])
+  const valueFlags = new Set(['-r', '--require', '--import', '--loader'])
   for (let i = 0; i < args.length; i++) {
     const text = args[i].text
     if (/^(?:-[epc]|--(?:eval|print|check)(?:=|$))/.test(text)) return false
@@ -550,8 +559,9 @@ const MAX_NESTING = 6
 
 /**
  * Every segment a call runs — the top-level ones AND the segments of every
- * command nested inside a wrapper. This is what the LEASE FENCE iterates, so a
- * `bash -c`, an `eval` or a `$( … )` cannot hide a guarded action from it.
+ * command nested inside a wrapper, down to `maxDepth`. This is what the LEASE
+ * FENCE iterates, so a `bash -c`, an `eval` or a `$( … )` cannot hide a guarded
+ * action from it; past the cap the walk stops and only `onTruncate` says so.
  */
 export function expandSegments(command, { maxDepth = MAX_NESTING, onTruncate } = {}) {
   const out = []
@@ -603,7 +613,7 @@ const GIT_WRITES = new Set([
   'pack-refs', 'prune', 'prune-packed', 'repack',
 ])
 
-/** `git worktree <sub>` — only `list` reads. */
+/** `git worktree <sub>` — these write; anything else (`list`, none) reads. */
 const WORKTREE_WRITES = new Set(['add', 'remove', 'move', 'prune', 'lock', 'unlock', 'repair'])
 
 /** `git tag` flags that mean "list", whatever else stands on the line. */
@@ -788,15 +798,9 @@ export function directSegmentIntent(segment) {
   return 'read'
 }
 
-/** Does this segment mutate anything? (Kept as the name both gates import.) */
+/** Does this segment mutate anything? (The name the gates import.) */
 export function isMutatingSegment(segment) {
   return segmentIntent(segment) === 'write'
-}
-
-/** The FIRST state-changing segment of a command, verbatim — or ''. */
-export function firstMutatingSegment(command) {
-  for (const seg of parseSegments(command)) if (intentOfParsed(seg) === 'write') return seg.raw
-  return ''
 }
 
 /**
@@ -867,8 +871,7 @@ export function posixNormalizePath(path) {
  *     prefix and would pass the rule while running the very work it fences
  *     (Sol round 4). Where the word resolves, the predicate judges the
  *     RESOLVED target; a word that does not resolve is judged on its lexical
- *     normalised shape, so unresolvability can still DENY but never becomes
- *     an ACCEPT.
+ *     normalised shape, exactly as without a resolver.
  *   - Only the path being INVOKED is judged: the program word itself, or the
  *     FIRST non-flag argument after an interpreter. A matching path standing
  *     LATER is an argument — data handed to another program, not an
@@ -896,8 +899,8 @@ export function segmentInvokesPathWhere(segment, predicate, { resolvePath = null
     } catch {
       real = null
     }
-    // A word that cannot be resolved is judged on its LEXICAL shape —
-    // unresolvability must never turn into an accept.
+    // A word that cannot be resolved is judged on its LEXICAL shape, as if no
+    // resolver had been passed.
     return typeof real === 'string' && real ? posixNormalizePath(real) : lexical
   }
   const matches = (text) => {
@@ -913,7 +916,8 @@ export function segmentInvokesPathWhere(segment, predicate, { resolvePath = null
   return args.some((a) => matches(a.text)) // flags in front → ambiguous → judge every word
 }
 
-/** Does this segment NAME one of these files as an argument? */
+/** Does this segment NAME one of these files in any word (head included) or
+ *  redirection target? */
 export function segmentMentionsFile(segment, names = []) {
   const seg = asSegments(segment)[0]
   if (!seg) return false
