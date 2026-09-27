@@ -112,6 +112,7 @@ function readLinuxGpuUtilisation() {
   if (fromSysfs !== null) return { fraction: fromSysfs, unreadable: null }
   try {
     const res = spawnSync('nvidia-smi', ['--query-gpu=utilization.gpu', '--format=csv,noheader,nounits'], {
+      windowsHide: true,
       encoding: 'utf8', timeout: GPU_TIMEOUT_MS, maxBuffer: 1024 * 1024,
     })
     if (res.status === 0) {
@@ -193,6 +194,7 @@ export function listProcesses() {
       return parseWindowsProcessJson(res.stdout ?? '')
     }
     const res = spawnSync('ps', ['-axo', 'pid=,ppid=,comm=,args='], {
+      windowsHide: true,
       encoding: 'utf8', timeout: PS_TIMEOUT_MS, maxBuffer: 64 * 1024 * 1024,
     })
     return parsePsOutput(res.stdout ?? '')
