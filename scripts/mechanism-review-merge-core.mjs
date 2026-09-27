@@ -1,8 +1,9 @@
 // SAFE THREE-WAY MERGE FOR THE APPEND-ONLY REVIEW LEDGER.
 //
 // A text or `union` driver cannot distinguish two legitimate appends from an
-// edit to an existing review. This resolver can: each tip must contain the
-// ancestor byte-for-byte as its prefix, followed only by complete JSONL rows.
+// edit to an existing review. This resolver can: each tip must carry the
+// ancestor's rows unchanged, in order, as its prefix (compared row by row, so a
+// dropped final newline is not told apart), followed only by complete JSONL rows.
 // Only then are the appended raw rows unioned and ordered by their `at` stamps.
 // The ancestor stays byte-for-byte first and in its recorded order: it is the
 // history future append-only checks must continue to recognize. Raw spelling is

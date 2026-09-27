@@ -6,30 +6,31 @@
 // rule-corpus audit found it claimed a Stop check that had never been built. It
 // was skipped in exactly the cases where it mattered. So: when the commits since
 // the last confirmed baseline add or change a guard, a gate, a core beside one or
-// a versioned git hook, the turn does not end until a review by a DIFFERENT model
-// is recorded for that change.
+// a versioned git hook, a review by a model of a DIFFERENT vendor is owed for that
+// change — and was meant to hold the turn until recorded (switched off, below).
 //
 // Decision logic: mechanism-review-core.mjs (pure, Vitest-covered). This wrapper
-// only gathers git output and the two state files, and is fail-OPEN — an internal
-// error never traps the session.
+// gathers git output and the two state files, and runs the gap measurement and
+// the contribution planning for the report. An internal error does not trap the
+// session; the typed ledger and authorship read failures print a block response.
 //
 // THAT BLOCK IS SWITCHED OFF (point 1036) — see GATE_SWITCHED_OFF below for why
 // and how to reverse it. What remains is the MEASUREMENT: `--status` reports the
 // outstanding debt in full, to whoever asks, under any lock or pause.
 //
-// RECOVERY: the baseline is per branch local state. Its absence blocks once and
-// seeds a fixed tracked-history anchor; it never self-arms at HEAD, because on
-// main that would forgive every outstanding review in one empty-range turn.
+// RECOVERY: the baseline is per branch local state. A missing one is reported
+// and the range is judged from a fixed tracked-history anchor; it never
+// self-arms at HEAD, because on main that would forgive every outstanding review
+// in one empty-range turn.
 //
-// How the gate clears:
+// How the debt clears:
 //   node scripts/mechanism-review.mjs --record <sha> --model <name> \
 //       --verdict <merge|merge-with-fixes|do-not-merge> --evidence "<one line>" \
 //       --mode <review|blind-parallel>
 // CLI:
 //   node scripts/mechanism-review-guard.mjs --status
-import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { execFileSync, execSync } from 'node:child_process'
-import { dirname } from 'node:path'
 import { commonRepoPath, REPO_ROOT, repoPath } from './repo-paths.mjs'
 import { isMainModule } from './is-main.mjs'
 import { readOwnerLock } from './batch-singleton.mjs'
@@ -84,26 +85,21 @@ import { buildAuthorshipPassPlan, formatContributionPassPlan } from './review-as
 //
 //   node scripts/mechanism-review-guard.mjs --status
 //
-// Reversing this is one commit: drop the stand-down below.
+// Reversing this means restoring the Stop path (block, gap suspension and
+// baseline advance) that was removed as unreachable after the switch-off — see
+// the git history of this file — and dropping the stand-down in the gathering.
 export const GATE_SWITCHED_OFF =
   'the four-eyes mechanism gate no longer blocks — switched off under the infrastructure ' +
   'freeze (CLAUDE.md §2, user decision 01.09.2026) after it refused every merge and ' +
   'fourteen cross-vendor rounds in one day did not clear it. The debt is not forgiven ' +
   'and stays readable: node scripts/mechanism-review-guard.mjs --status'
 
-/** THE REPORT OUTLIVES THE DEFERRAL (cross-vendor review of point 1036). The
- * context fence suspends the gate's ENFORCEMENT; with the block gone, the
- * measuring read is all that is left, and a fenced session silently exiting
- * before it prints is the same defect as the batch-lock stand-down above. A
- * deferral therefore ends the run only when nobody asked for the report. */
-export const deferralEndsTheRun = (verdict, { status = false } = {}) =>
-  Boolean(verdict?.deferred) && !status
-
 /** WHAT THE REPORT PRINTS IS DECIDED BY THE FINDINGS, NEVER BY `block`
  * (cross-vendor review of point 1036). A deferred verdict carries its findings
  * and sets `block` false, so a status keyed on `block` announced GATE CLEAR
  * over a real debt — and with the block switched off that keying is wrong for
- * good, because `block` no longer decides anything. */
+ * good, because `block` no longer decides what the report prints (it still
+ * selects whether the gap is measured). */
 export const statusReportsFindings = (verdict) => (verdict?.findings?.length ?? 0) > 0
 
 /** Per-branch baseline. Host-local rather than tracked, but shared by every
@@ -117,15 +113,10 @@ export const BASELINE_PATH = commonRepoPath('.claude/mechanism-review-baseline.j
  * value the recording hand can edit. */
 export const BASELINE_RECOVERY_ANCHOR = '28293f97ce0149a9936593733763fd20e62b13e7'
 
-// The record/field sentinels and the header shape of the one `git log` this
-// guard runs now live with the parser that owns them, in
-// mechanism-review-range-core.mjs — including WHY they are raw control bytes
-// and why the header carries no free text. This file only consumes them.
-
 const git = (cmd, options = {}) =>
   execSync(`git ${cmd}`, { windowsHide: true, cwd: REPO_ROOT, encoding: 'utf8', ...options }).trim()
 
-/** The NO-SHELL lane for the two path-carrying commands (round-5 pass 3): on
+/** The NO-SHELL lane for the path-carrying log command (round-5 pass 3): on
  *  Windows, execSync routes through cmd.exe, which expands `%x1e%`-shaped
  *  spans as environment variables BEFORE git sees the format string — the
  *  headers then never appear and an empty parse would clear the gate. An args
@@ -137,7 +128,7 @@ const gitRawFile = (args) =>
   execFileSync('git', args, { windowsHide: true, cwd: REPO_ROOT, encoding: 'utf8' })
 
 /**
- * True when `sha` names no reachable commit — the ONE condition under which an
+ * True when `sha` resolves to no commit object — the ONE condition under which an
  * undiffable range may move the gate. A git failure here answers "cannot tell",
  * which counts as PRESENT: the gate then stays where it is rather than
  * recovering on a question it could not answer.
@@ -158,10 +149,9 @@ export function commitMissing(sha, run = (cmd) => execSync(cmd, { windowsHide: t
 }
 
 /**
- * Recovery is a two-turn operation: the blocked turn reports and refuses the
- * missing evidence and may seed only the IMMUTABLE anchor, never HEAD; the next
- * turn then judges the complete anchor..HEAD range. A `--status` read decides
- * nothing and therefore writes nothing.
+ * The recovery predicate of the switched-off Stop path: a blocked turn could seed
+ * only the IMMUTABLE anchor, never HEAD. Only `--status` gathers now, and a
+ * `--status` read decides nothing and therefore writes nothing, so nothing seeds.
  *
  * Both facts must come from the SAME shape — the gathered result reports the
  * flag and the anchor side by side, and this predicate is what a test can pin.
@@ -174,8 +164,8 @@ export function shouldSeedRecoveryAnchor(gathered, { status = false } = {}) {
 /**
  * Whose session a guard invocation belongs to.
  *
- * A Stop payload is authoritative and keeps the ordinary stand-down rule. A
- * manual `--status` invocation has no payload, however, and is the read-only
+ * A Stop payload's id is used as given (the Stop path stands down while the gate
+ * is off). A manual `--status` invocation has no payload, however, and is the read-only
  * command every refusal prints. Resolve that inspection through the same two
  * honest fallbacks as guard-preflight: the caller's environment, then the live
  * lock's recorded owner. Without this distinction the owner's own bare status
@@ -195,7 +185,7 @@ export function resolveMechanismReviewSessionId({
     const lock = readLock()
     if (lock?.sessionId) return String(lock.sessionId)
   } catch {
-    /* unreadable lock — the gatherer fails closed to its normal stand-down */
+    /* unreadable lock — the id stays empty; --status still measures */
   }
   return ''
 }
@@ -209,18 +199,11 @@ function readBaselineState() {
   }
 }
 
-function writeBaseline(branch, head) {
-  const state = readBaselineState()
-  const baselines = { ...(state.baselines ?? {}), [branch]: head }
-  mkdirSync(dirname(BASELINE_PATH), { recursive: true })
-  writeFileSync(BASELINE_PATH, `${JSON.stringify({ ...state, baselines }, null, 2)}\n`)
-}
-
 /**
  * The baseline this branch is judged against. A branch without one falls back to
- * main's: without that fallback a fresh feature branch would bootstrap at its own
- * HEAD and grandfather the very mechanism it just added — the hole that makes the
- * gate look green precisely where it should bite.
+ * main's: without that fallback a fresh feature branch would read as missing its
+ * baseline and be judged from the fixed recovery anchor rather than from main's
+ * confirmed state.
  */
 export function baselineFor(state, branch) {
   const map = state?.baselines ?? {}
@@ -230,7 +213,7 @@ export function baselineFor(state, branch) {
 // Size only the contributions the evaluator still says are owed. A stale
 // baseline increases this list but never enters a contribution's material, so
 // accumulated history cannot turn a runnable commit into a review gap. Planner
-// failure stays fail-closed: an unmeasured contribution earns no suspension.
+// failure stays fail-closed: an unmeasured contribution earns no gap ruling.
 export async function measureReviewGap({
   blocked = false,
   commits = [],
@@ -325,7 +308,12 @@ function scriptFiles() {
   }
 }
 
-/** Commits in base..head that touch a mechanism path, oldest first.
+/**
+ * The raw `git log --name-only` output of base..head, parsed into EVERY commit
+ * of the range with its files, oldest first (mechanism selection happens later,
+ * in pendingReviewContributions). The parsing lives in
+ * mechanism-review-range-core.mjs, which the gate, the criticality guard and the
+ * planners share; this wrapper only adds git's path unquoting.
  *
  *  `--diff-merges=cc` is load-bearing, and the WEAKER `first-parent` was worse
  *  than none (four-eyes review, 27.07.2026, both readings measured on real
@@ -339,12 +327,10 @@ function scriptFiles() {
  *  and merges carry no model trailer, so the self-review refusal could not even
  *  bite on the record the trapped session would write. `cc` shows only what the
  *  merge changed against ALL its parents: nothing for a clean merge, the
- *  resolution delta for an evil one. */
-/**
- * The pure half of mechanismCommits: the raw `git log --name-only` output,
- * parsed into the commits that touch a mechanism path. EXPORTED for the test —
- * the parsing IS the gate's view of the tree, and two of its old habits each
- * blinded it to a legal path (cross-vendor review, second and third rounds):
+ *  resolution delta for an evil one.
+ *
+ * Two old habits of the parser each blinded it to a legal path (cross-vendor
+ * review, second and third rounds):
  *
  *  - a path is read BYTE-EXACT, never trimmed. git does not quote a plain
  *    leading or trailing space, so `scripts/git-hooks/check ` printed as-is and
@@ -359,9 +345,10 @@ function scriptFiles() {
  *    read as one — that shape names itself as adversarial, and git quotes any
  *    path that could smuggle a newline to fake a line of its own.
  *
- * The header carries NO free-text field — the subject and the trailers travel
- * per commit through commitFacts (escalation round, pass 2) — so this parser
- * returns { sha, at, files } and the wrapper adds who wrote it.
+ * The header carries NO free-text field — the subject travels per commit through
+ * readSubject and the trailers through rangeCommits' own reads (escalation
+ * round, pass 2) — so this parser returns { sha, at, parentShas, files } and the
+ * wrapper adds who wrote it.
  *
  * git QUOTES a path with a tab, a quote or a high byte in it, and the quoted
  * form matches neither a mechanism path nor a pass record's file list — so
@@ -369,12 +356,6 @@ function scriptFiles() {
  */
 export function parseRangeLog(out) {
   return parseWholeRangeLog(out, { decodePath: unquoteGitPath })
-}
-
-export function parseMechanismLog(out, files) {
-  return parseRangeLog(out)
-    .map((commit) => ({ ...commit, files: mechanismPathsIn(commit.files, { scriptFiles: files }) }))
-    .filter((commit) => commit.files.length)
 }
 
 /** Select mechanism contributions without shrinking their review file set. */
@@ -390,48 +371,9 @@ export function pendingReviewContributions(commits = [], files = [], subjectFor 
 }
 
 /**
- * The free-text facts of ONE commit — its subject and its co-author trailers —
- * each through its own single-format `git show`, so no separator exists for a
- * crafted subject to forge (escalation round, pass 2: the combined format's
- * separator inside a legal subject shifted the trailers out of their field,
- * and the self-review refusal read an empty author). Two calls per PENDING
- * MECHANISM commit only — the common turn has none.
- */
-/**
- * THE FOURTH AUTHORSHIP READ, found by the same cross-vendor round that typed
- * the other three (GPT-5.6 Sol at effort high). It carried neither
- * `--no-replace-objects` nor the wrapper, and it ran EAGERLY although every
- * caller here takes only `.subject` — so a replaced, missing or oversized object
- * threw an untyped error that reached the allow-stop catch and switched the gate
- * off. It is lazy now, so a caller that wants a subject pays for a subject, and
- * the trailer read is replacement-blind, bounded and typed like its siblings.
- */
-function commitFacts(sha) {
-  return {
-    // DISPLAY ONLY, so it DEGRADES rather than throws (cross-vendor review,
-    // GPT-5.6 Sol at effort high). The subject names a commit in the refusal
-    // text and decides nothing; making its read fail closed would have let a
-    // commit with an enormous subject line throw into the allow-stop catch —
-    // the same bypass, arriving through the one read that has no authority.
-    // Nothing else here may take this shape: a read that decides authorship
-    // must refuse, and a read that decides nothing must not be able to.
-    subject: readSubject(sha),
-    get trailers() {
-      return authorshipRead(
-        () =>
-          git(
-            `--no-replace-objects show -s --format="%(trailers:key=Co-Authored-By,valueonly,separator=;)" "${sha}"`,
-            { maxBuffer: PARENT_READ_MAX_BYTES },
-          ),
-        `the trailers of commit ${String(sha).slice(0, 12)}`,
-      )
-    },
-  }
-}
-
-/**
- * The two path-carrying git commands, built pure so the unit layer can pin
- * their flags (round-1 pass 2, both findings):
+ * The path-carrying log command, built pure in mechanism-review-range-core.mjs
+ * and re-exported so the unit layer can pin its flags (round-1 pass 2, both
+ * findings):
  *  - `-c core.quotepath=on` makes the LOG's path spelling CONFIG-INDEPENDENT:
  *    with a user's `core.quotePath=false`, a legal non-UTF-8 file name arrived
  *    as raw bytes and the UTF-8 decode collapsed distinct paths into one
@@ -439,7 +381,7 @@ function commitFacts(sha) {
  *    pure-ASCII octal escape and unquoteGitPath decodes it; what remains
  *    undecodable surfaces as U+FFFD, which the pass records can never name
  *    (parsePassFiles refuses it), so a conflated path can only ever DENY a
-   *    clearance.
+ *    clearance.
  *  - `--no-renames` closes the rename-out blindness: with rename detection on,
  *    `--name-only` reports only the DESTINATION, so renaming a guard to an
  *    ordinary path hid the mechanism's removal from the gate. Split into
@@ -447,6 +389,9 @@ function commitFacts(sha) {
  *    demands its review.
  */
 export { mechanismLogCommand }
+
+/** The command buffer every authorship and subject read is bounded by. */
+const PARENT_READ_MAX_BYTES = 1024 * 1024
 
 /**
  * The default parent reader, exported so a test can exercise the REAL command
@@ -457,10 +402,9 @@ export { mechanismLogCommand }
  * BOUNDED, and the bound fails closed: `cat-file -p` emits the whole object
  * though only its header is wanted, so a commit with a huge message would
  * otherwise exceed the command buffer. Overflow throws, `authorshipRead` types
- * it, and the gate blocks — a denial of progress rather than a bypass.
+ * it, and the failure is reported, never read as "no author" — a denial of
+ * progress rather than a bypass.
  */
-export const PARENT_READ_MAX_BYTES = 1024 * 1024
-
 export function defaultParentReader(sha, runGit) {
   return commitObjectParents(
     runGit(`--no-replace-objects cat-file -p "${sha}"`, { maxBuffer: PARENT_READ_MAX_BYTES }),
@@ -492,7 +436,7 @@ export function authorshipBlockResponse(error) {
       'proven independently reviewed.\n' +
       `  ${error?.message ?? error}\n` +
       '  Repair the read (a missing object, an unreachable repository, or an object past the command ' +
-      'buffer) and end the turn again. An empty author list is not the answer: it omits an author.',
+      'buffer) and run --status again. An empty author list is not the answer: it omits an author.',
   }
 }
 
@@ -561,20 +505,13 @@ export function rangeCommits(base, head, files, readers = {}) {
       () => trailersOf(commit.sha),
       `the trailers of commit ${String(commit.sha).slice(0, 12)}`,
     )
-    // EVERY non-first parent, never only the ones outside this range. The
-    // criticality guard may skip an in-range parent because it hands the
-    // planner the WHOLE list, so the resolver finds that parent itself. This
-    // gate plans ONE COMMIT AT A TIME, so its resolver's lookup table holds
-    // that single commit and nothing else — an in-range parent is exactly as
-    // invisible to it as an out-of-range one, and skipping it left the merge
-    // unattributed.
     const own = modelsFromTrailers(trailers)
     // A FAILED AUTHORSHIP READ IS A BLOCK, NEVER A SHRUG (cross-vendor review,
     // GPT-5.6 Sol at effort high, do-not-merge on the end state). Both reads
     // below can throw — an object too large for the command buffer, a parent
     // missing from a shallow or partial clone, a repository that cannot be
     // reached — and the exception used to travel all the way to this file's
-    // top-level catch, which prints "allowing stop" and exits 0. A single large
+    // top-level catch, which then allowed the stop. A single large
     // trailerless commit anywhere in the measured range would therefore have
     // switched the whole gate off, without touching a mechanism file at all.
     // The failure is typed here and answered with `decision: block` there, the
@@ -584,6 +521,13 @@ export function rangeCommits(base, head, files, readers = {}) {
       () => readParents(commit.sha),
       `the parents of commit ${String(commit.sha).slice(0, 12)}`,
     )
+    // EVERY non-first parent, never only the ones outside this range. The
+    // criticality guard may skip an in-range parent because it hands the
+    // planner the WHOLE list, so the resolver finds that parent itself. This
+    // gate plans ONE COMMIT AT A TIME, so its resolver's lookup table holds
+    // that single commit and nothing else — an in-range parent is exactly as
+    // invisible to it as an out-of-range one, and skipping it left the merge
+    // unattributed.
     const parentAuthorModels = Object.fromEntries(
       parentShas
         .slice(1)
@@ -636,10 +580,10 @@ export function planningContributions(pendingCommits = [], records = []) {
 }
 
 /**
- * Everything the core needs — exported so the guard preflight judges the gate
- * from the SAME gathering the Stop hook uses rather than a second copy of this
- * git work, which would drift and hand back a false "clean". Read-only: arming
- * and advancing the baseline stay in the main path below.
+ * Everything the core needs — exported so the guard preflight and `--status`
+ * share ONE gathering rather than a second copy of this git work, which would
+ * drift. Without `report` it stands down (the gate is switched off); with it,
+ * it measures. Read-only: nothing here writes the baseline.
  */
 export function gatherMechanismReviewInputs({
   sessionId = '',
@@ -659,7 +603,7 @@ export function gatherMechanismReviewInputs({
   try {
     branch = git('rev-parse --abbrev-ref HEAD')
   } catch {
-    /* detached or unborn — the 'HEAD' key is as good a bucket as any */
+    /* no branch name — the 'HEAD' key is as good a bucket as any */
   }
   const state = readBaseline()
   const stored = baselineFor(state, branch)
@@ -690,7 +634,7 @@ export function gatherMechanismReviewInputs({
     base = git(`merge-base "${baseline}" "${head}"`)
     if (base) rangeBase = base
   } catch {
-    /* unrelated baseline — the raw range below decides, or re-arms us at HEAD */
+    /* unrelated baseline — the raw range below decides */
   }
   let effective = baseline
   let pendingCommits = []
@@ -698,7 +642,7 @@ export function gatherMechanismReviewInputs({
   if (base !== head) {
     try {
       commits = rangeCommits(base, head, scriptFiles())
-      pendingCommits = pendingReviewContributions(commits, scriptFiles(), (sha) => commitFacts(sha).subject)
+      pendingCommits = pendingReviewContributions(commits, scriptFiles(), (sha) => readSubject(sha))
     } catch (e) {
       // ONLY a baseline that is genuinely GONE may move the gate. A baseline
       // rebased away or gc'd makes the range undiffable forever, and falling
@@ -710,12 +654,13 @@ export function gatherMechanismReviewInputs({
       // recovering from those would forgive pending unreviewed commits for good —
       // fail-open ONCE turned into fail-open FOREVER (the lesson render-verify
       // learned with its typed BaselineDiffError). Those rethrow into the
-      // wrapper's per-turn fail-open, which leaves the gate exactly where it was.
+      // wrapper's catch, and no path advances the baseline while the block is off.
       if (!commitMissing(baseline)) throw e
-      // Recover at the FORK POINT, not at HEAD: HEAD would grandfather this
-      // branch's own pending mechanism work in the act of recovering. The range
-      // is then judged for real — a recovery that reported "clear" without
-      // looking would be the same silent pass in a new place.
+      // Recover from the fixed BASELINE_RECOVERY_ANCHOR (an ancestor of HEAD),
+      // never from HEAD: HEAD would grandfather this branch's own pending
+      // mechanism work in the act of recovering. The range is then judged for
+      // real — a recovery that reported "clear" without looking would be the
+      // same silent pass in a new place.
       effective = bootstrap(head)
       if (!effective) {
         return {
@@ -740,15 +685,15 @@ export function gatherMechanismReviewInputs({
         /* the raw range below decides */
       }
       commits = base === head ? [] : rangeCommits(base, head, scriptFiles())
-      pendingCommits = pendingReviewContributions(commits, scriptFiles(), (sha) => commitFacts(sha).subject)
+      pendingCommits = pendingReviewContributions(commits, scriptFiles(), (sha) => readSubject(sha))
     }
   }
 
   // Which recorded reviews CONTAIN each pending commit (see attachCoverage for
   // the cost rule this obeys). Nothing pending means nothing to cover, and the
-  // ledger is not even read then: the overwhelmingly common turn changes no
-  // mechanism at all, and a hook that costs a process per ledger line on every
-  // turn end is a hook people switch off.
+  // ledger is not even read then: the overwhelmingly common range changes no
+  // mechanism at all, and a gathering that costs a process per ledger line is
+  // one nobody runs.
   // Carried rows are RE-MEASURED on every read (delta rounds, 18.08.2026):
   // the blob-identity stamp is the wrapper's, never the ledger's own word.
   const records = attachContributionDispositions(verifyCarried(attachCoverage({
@@ -781,7 +726,7 @@ export function gatherMechanismReviewInputs({
   }
   // An incomplete raw set cannot become complete through reviewer validation,
   // so planning it spends Git work without changing the verdict. This keeps
-  // the common Stop/preflight read bounded to the few historical splits whose
+  // the common --status/preflight read bounded to the few historical splits whose
   // every claimed round is actually present (408757d is one).
   const splitShas = new Set(
     [...claimedSplits.values()]
@@ -812,17 +757,14 @@ export function gatherMechanismReviewInputs({
     head,
     branch,
     baseline: effective,
-    // TOP-LEVEL, exactly as both early returns report it. The Stop path reads
-    // `gathered.baselineMissing` beside `gathered.baseline` to decide whether to
-    // seed the recovery anchor; while this field lived only under `inputs`, that
-    // condition could never be true and false together in one shape — an early
-    // return has the flag but no baseline, this one had the baseline but no flag
-    // — so the documented two-turn recovery never wrote anything and the gate
-    // stayed shut for good once the local baseline file was gone.
+    // TOP-LEVEL, exactly as both early returns report it, so
+    // shouldSeedRecoveryAnchor can read the flag beside `gathered.baseline` in
+    // one shape. While it lived only under `inputs`, the switched-off Stop path's
+    // two-turn recovery never wrote anything.
     baselineMissing,
     // Null if git could not establish a merge-base: pending detection may keep
-    // using its conservative raw fallback, but that unproved range can never
-    // support a gap waiver.
+    // using its conservative raw fallback. Informational only — the gap ruling
+    // measures contributions, not this range.
     rangeBase,
     inputs: {
       baseline: effective,
@@ -855,7 +797,8 @@ export function gatherMechanismReviewInputs({
  * was green locally. Its budget had already been raised once; a second raise
  * would have hidden it again.
  *
- * WORST CASE, and it does not depend on the ledger's size: 1 + R calls, where R
+ * WORST CASE, and it does not depend on the ledger's size: 1 + R calls (1 + 2R
+ * when a `rangeFiles` measurer is supplied, which the guard does not do), where R
  * is the number of records that lie on THIS branch (in practice a handful, and
  * zero on the overwhelmingly common turn, which has no pending mechanism commit
  * at all). Never 1 per pair, never 1 per ledger line. `revList(rev)` answers
@@ -875,16 +818,15 @@ export function attachCoverage({ pendingCommits = [], allRecords = [], head, rev
         .map((l) => l.trim())
         .filter(Boolean),
     )
-  // Call 1 of 1 + 2R: the whole branch range, which selects the records at all.
+  // Call 1 of 1 + R: the whole branch range, which selects the records at all.
   const branchRange = pendingCommits.length ? lines(head) : new Set()
   const records = (pendingCommits.length ? allRecords : []).filter((r) => branchRange.has(r.sha))
-  // Calls 2..1+2R: two per SURVIVING record — the reviews recorded on this
-  // branch, never the whole ledger. `rangeFiles` is what a record at that sha
-  // would CLEAR: the file set of `effective..record.sha`, which the gate holds
-  // a pass composition's union against (escalation round). An unanswerable
-  // diff attaches nothing, and the gate then falls back to the pending
-  // commit's own mechanism paths — a NARROWER expected set, so the failure
-  // can only ever demand less, never clear more.
+  // Then one per SURVIVING record — the reviews recorded on this branch, never
+  // the whole ledger — plus one more each where `rangeFiles` is supplied: the
+  // file set of `effective..record.sha`, which the gate holds a pass
+  // composition's union against (escalation round). An unanswerable diff
+  // attaches nothing, and the evaluator treats that unmeasured range as UNKNOWN
+  // coverage, which blocks.
   for (const r of records) {
     r.containedShas = lines(r.sha)
     // MEASURED HERE OR NOT AT ALL (round-4 pass 3): the ledger accepts extra
@@ -918,28 +860,17 @@ if (isMainModule(import.meta.url)) {
     try {
       payloadSessionId = JSON.parse(readFileSync(0, 'utf8')).session_id || ''
     } catch {
-      /* manual run — the gate is global truth, not session-local */
+      /* manual run — the session id is resolved below */
     }
     const sessionId = resolveMechanismReviewSessionId({ payloadSessionId, status })
 
+    // Without --status the gathering stands down (the gate is switched off),
+    // and with it the gathering always measures — so past this line the run is a
+    // status report.
     const gathered = gatherMechanismReviewInputs({ sessionId, report: status })
-    if (!gathered.applicable) {
-      if (status) console.log(`mechanism-review-guard stands down: ${gathered.why}`)
-      process.exit(0)
-    }
+    if (!gathered.applicable) process.exit(0)
 
     const verdict = evaluateMechanismReview(gathered.inputs)
-
-    if (shouldSeedRecoveryAnchor(gathered, { status })) {
-      writeBaseline(gathered.branch, gathered.baseline)
-    }
-
-    if (deferralEndsTheRun(verdict, { status })) {
-      // Leave the baseline behind the pending mechanism range: that range is
-      // the successor's inbox, not a clearance by the fenced session.
-      process.stdout.write(JSON.stringify({ systemMessage: verdict.reason }))
-      process.exit(0)
-    }
 
     // THE GAP CLAUSE NOW MEASURES EACH OWED CONTRIBUTION IN ISOLATION. The
     // baseline decides how many findings exist, never how much material one
@@ -957,80 +888,53 @@ if (isMainModule(import.meta.url)) {
     })
     const outcome = guardOutcome({ blocked: verdict.block, gap })
 
-    if (status) {
-      let statusPlan = sizedGapPlan
-      if (owedContributions.length) {
-        try {
-          if (!statusPlan) {
-            const { buildContributionPassPlan } = await import('./review-astra.mjs')
-            statusPlan = buildContributionPassPlan({ commits: owedContributions })
-          }
-        } catch {
-          /* the status names an unavailable plan instead of inventing a count */
+    let statusPlan = sizedGapPlan
+    if (owedContributions.length) {
+      try {
+        if (!statusPlan) {
+          const { buildContributionPassPlan } = await import('./review-astra.mjs')
+          statusPlan = buildContributionPassPlan({ commits: owedContributions })
         }
+      } catch {
+        /* the status names an unavailable plan instead of inventing a count */
       }
-      console.log(`HEAD:      ${gathered.head.slice(0, 7)} (branch ${gathered.branch})`)
-      console.log(`baseline:  ${String(gathered.baseline ?? '<none — arms at this HEAD>').slice(0, 7)}`)
-      const pending = gathered.inputs.pendingCommits ?? []
-      console.log(`mechanism commits since the baseline: ${pending.length}`)
-      for (const c of pending) {
-        console.log(
-          // Quoted like every structural path list (round-3 pass 3): the log
-          // parser unquotes git's spelling, so a legal newline or comma in a
-          // name could forge a --status line if joined raw.
-          `  ${c.sha.slice(0, 7)}  ${c.files.map((f) => quotePassFile(f)).join(', ')}\n      authored by ${c.authorModel || 'unknown'}, ` +
-            `${c.coveringRecordShas.length} covering review(s)`,
-        )
-      }
-      console.log(`outstanding review contributions: ${owedContributions.length}`)
-      console.log(`outstanding review passes: ${statusPlan?.passCount ?? '<plan unavailable>'}`)
-      if (statusPlan) {
-        console.log(formatContributionPassPlan(statusPlan))
-      }
-      // NOTHING SUPPRESSES THE DEBT ANY MORE (cross-vendor rounds 2 and 3 of
-      // point 1036). The report used to choose ONE of three things to print —
-      // the gap, the verdict, or GATE CLEAR — and both other branches hid a
-      // real debt: the deferral because it left `block` false, the gap because
-      // it replaced the finding list with the reason it could not be assembled.
-      // The report is the only reader the debt has left, so it prints the
-      // findings whenever there are findings, and the gap and the deferral are
-      // context ABOVE them rather than alternatives to them.
-      if (verdict.deferred) console.log(`\nDEFERRED, NOT CLEAR: ${verdict.reason}`)
-      if (outcome.action === 'report-gap') console.log(`\n${gap.report}`)
-      if (statusReportsFindings(verdict)) {
-        console.log(
-          `\n${formatMechanismReviewVerdict(verdict, {
-            authorshipPlan: gathered.authorshipPlan,
-            contributionPlan: statusPlan,
-          })}`,
-        )
-      } else if (outcome.action !== 'report-gap') console.log('\nGATE CLEAR')
-      process.exit(0)
     }
-
-    if (outcome.action === 'report-gap') {
-      // The gap holds: name it where the session sees it, and let the turn
-      // end. Deliberately NOT a baseline advance — the demand is suspended,
-      // never satisfied, and blocking resumes when the material fits again.
-      console.error(gap.report)
-      process.exit(0)
-    }
-    if (outcome.action === 'block') {
-      process.stdout.write(
-        JSON.stringify({
-          decision: 'block',
-          reason: formatMechanismReviewVerdict(verdict, {
-            authorshipPlan: gathered.authorshipPlan,
-            contributionPlan: sizedGapPlan,
-            contributionPlanText: sizedGapPlan ? formatContributionPassPlan(sizedGapPlan) : '',
-          }),
-        }),
+    console.log(`HEAD:      ${gathered.head.slice(0, 7)} (branch ${gathered.branch})`)
+    console.log(`baseline:  ${gathered.baseline ? String(gathered.baseline).slice(0, 7) : '<none — missing, and the recovery anchor did not resolve>'}`)
+    const pending = gathered.inputs.pendingCommits ?? []
+    console.log(`mechanism commits since the baseline: ${pending.length}`)
+    for (const c of pending) {
+      console.log(
+        // Quoted like every structural path list (round-3 pass 3): the log
+        // parser unquotes git's spelling, so a legal newline or comma in a
+        // name could forge a --status line if joined raw.
+        `  ${c.sha.slice(0, 7)}  ${c.files.map((f) => quotePassFile(f)).join(', ')}\n      authored by ${c.authorModel || 'unknown'}, ` +
+          `${c.coveringRecordShas.length} covering review(s)`,
       )
-      process.exit(0)
     }
-    // Clear (or bootstrapping): pin the confirmed state so the next turn starts
-    // from here instead of re-walking history.
-    if (gathered.head) writeBaseline(gathered.branch, gathered.head)
+    console.log(`outstanding review contributions: ${owedContributions.length}`)
+    console.log(`outstanding review passes: ${statusPlan?.passCount ?? '<plan unavailable>'}`)
+    if (statusPlan) {
+      console.log(formatContributionPassPlan(statusPlan))
+    }
+    // NOTHING SUPPRESSES THE DEBT ANY MORE (cross-vendor rounds 2 and 3 of
+    // point 1036). The report used to choose ONE of three things to print —
+    // the gap, the verdict, or GATE CLEAR — and both other branches hid a
+    // real debt: the deferral because it left `block` false, the gap because
+    // it replaced the finding list with the reason it could not be assembled.
+    // The report is the only reader the debt has left, so it prints the
+    // findings whenever there are findings, and the gap and the deferral are
+    // context ABOVE them rather than alternatives to them.
+    if (verdict.deferred) console.log(`\nDEFERRED, NOT CLEAR: ${verdict.reason}`)
+    if (outcome.action === 'report-gap') console.log(`\n${gap.report}`)
+    if (statusReportsFindings(verdict)) {
+      console.log(
+        `\n${formatMechanismReviewVerdict(verdict, {
+          authorshipPlan: gathered.authorshipPlan,
+          contributionPlan: statusPlan,
+        })}`,
+      )
+    } else if (outcome.action !== 'report-gap') console.log('\nGATE CLEAR')
     process.exit(0)
   } catch (e) {
     // AN UNREADABLE LEDGER IS NOT AN ENVIRONMENT TRANSIENT (cross-vendor review
@@ -1044,7 +948,7 @@ if (isMainModule(import.meta.url)) {
           reason:
             `mechanism-review-guard: the review ledger cannot be read, so nothing here can be proven reviewed.\n` +
             `  ${e.message}\n` +
-            '  Repair the ledger (it is tracked in git) and end the turn again.',
+            '  Repair the ledger (it is tracked in git) and run --status again.',
         }),
       )
       process.exit(0)
@@ -1056,7 +960,7 @@ if (isMainModule(import.meta.url)) {
       process.stdout.write(JSON.stringify(authorshipBlockResponse(e)))
       process.exit(0)
     }
-    console.error(`mechanism-review-guard error (allowing stop): ${e && e.message}`)
+    console.error(`mechanism-review-guard --status could not complete: ${e && e.message}`)
     process.exit(0)
   }
 }
