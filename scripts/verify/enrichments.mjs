@@ -1366,8 +1366,8 @@ if (section('elephant-trampling')) {
       victim = herds[victimSpecies][0]
     } else {
       // Inject a plain zebra at the player's spot (point 177) rather than hoping
-      // the streaming spawned one. The ring below — its [0,0] elephant sits ON the
-      // victim — tramples it at once, exactly as it would a natural prey animal.
+      // the streaming spawned one. The ring below — six elephants at 0.9 bearing
+      // down on it — tramples it at once, exactly as it would a natural prey animal.
       const terr = await import('/src/world/terrain.ts')
       const geo = await import('/src/world/geo.ts')
       const seed = window.__game.getState().seed
@@ -1410,8 +1410,9 @@ if (section('elephant-trampling')) {
   // over it. The old decal was a plane; on a slope the rising terrain poked
   // through its middle and the pool showed a see-through hole. Judged by the
   // PICTURE (CLAUDE.md §7.2), on SLOPED ground and at an in-game-achievable zoom:
-  // the same clip is sampled with and without the stain, and EVERY pixel of the
-  // soaked core must change — a hole would leave the bare ground standing there.
+  // the same clip is sampled with and without the stain, and the soaked pool must
+  // be practically gap-free (at most 2 % of its size in row/column gaps) — a hole
+  // would leave the bare ground standing there.
   const stainPixels = await (async () => {
     const VW = 1440, VH = 900
     // Freeze the weather for the pair of shots: falling rain would change pixels
@@ -1487,7 +1488,7 @@ if (section('elephant-trampling')) {
       }
     }, [cx, cz, cy, r, VW, VH])
     let clip = null, box = null, zoomUsed = null, spot = null
-    // The clip must also sit clear of the HUD (status bar, the WebGL notice, the
+    // The clip must also sit clear of the HUD (status bar, the WebGL fallback notice where shown, the
     // inventory bar and the button row): an overlay does not change between the
     // two shots and would read as a hole that is not one.
     const safe = (c) => c.x >= 20 && c.x + c.width <= VW - 20 && c.y >= 110 && c.y + c.height <= VH - 110
@@ -1528,7 +1529,7 @@ if (section('elephant-trampling')) {
     // The pair of samples measures the ground, so the ground has to BE there.
     // `capturePixels` takes pixels the moment it is asked, without the shutter's
     // readiness wait — and run on its own, with no earlier section having drawn
-    // this stretch of the Nile, both samples came back as the same flat haze:
+    // this stretch of ground, both samples came back as the same flat haze:
     // soaked 0, blobs 0, and a 1 kB crop of uniform grey where the picture
     // belongs. Waiting for the renderer's own counters to stand still is what
     // this block was silently inheriting from the sections before it.
@@ -1548,7 +1549,7 @@ if (section('elephant-trampling')) {
     const after = await sample()
     // A crop around the patch, so a HUMAN can judge the picture (CLAUDE.md §7.2):
     // a full frame at the bird's-eye zoom shows the stain a few dozen pixels wide.
-    const shot = {
+    const crop = {
       x: Math.min(VW - 420, Math.max(0, Math.round(box.x + box.width / 2 - 210))),
       y: Math.min(VH - 300, Math.max(0, Math.round(box.y + box.height / 2 - 150))),
       width: 420, height: 300,
@@ -1557,7 +1558,7 @@ if (section('elephant-trampling')) {
       world: { x: spot.x, z: spot.z },
       label: 'the blood stain soaked into the ground, on its own ragged outline',
       settle: false,
-      clip: shot,
+      clip: crop,
     })
     await page.evaluate((prev) => window.__ui.getState().setSeasonWetnessOverride(prev.wet), prevState)
     // A pixel counts as soaked when the blood REDDENED it — the signature of the
@@ -1593,7 +1594,8 @@ if (section('elephant-trampling')) {
       if (size > poolSize) { poolSize = size; poolId = id }
     }
     // THE no-hole measure, and it does not care where on screen the pool landed:
-    // across every row and column the pool's pixels must be CONTIGUOUS. An
+    // across every row and column the pool's pixels must be CONTIGUOUS (up to
+    // the 2 % gap allowance asserted below). An
     // unpainted island inside it — the point-267 bug, ground poking through the
     // decal — leaves a gap between the first and the last soaked pixel of every
     // row and column that crosses it. It is also what proves the point-323
@@ -1678,19 +1680,15 @@ if (section('elephant-trampling')) {
     // endpoint: the amble curves in arcs (and headless RAF is throttled), so a
     // net start→end distance can be small even though the herd clearly roamed.
     let maxCentreDisp = 0
-    // Poll on the SIM clock, not a fixed wall-clock window (point 177): headless RAF
-    // throttling yields too few sim-frames in a fixed wall time, so the amble can fall
-    // short of the 1.5 threshold though it is really roaming (the rotating flake seen at
-    // centreMoved 0.63). Sample spread/heading each tick and run until the centre has
-    // CLEARLY roamed, or a generous sim-time cap — a genuine no-roam still fails.
+    // Poll on the SIM clock (points 177/249): headless RAF throttling yields too few
+    // sim-frames in a fixed wall time or iteration count, so the amble fell short of
+    // the 1.5 threshold though it was really roaming (the rotating flake seen at
+    // centreMoved 0.63). Sample spread/heading each tick until the centre has
+    // CLEARLY roamed, 12 sim-seconds are spent, or a 90 s wall backstop ends the
+    // loop (which also stops a genuinely frozen sim) — a genuine no-roam still fails.
     const simStart = window.__wildlife.simTime()
-    // Gate on the SIM clock plus a generous wall backstop (point 249): a fixed
-    // iteration cap bounded WALL time, so a slow backend ran out of iterations
-    // before enough sim-seconds accumulated and the amble read short. Sample until
-    // the centre has clearly roamed, the sim-time budget is spent, or a generous
-    // wall backstop (a genuinely frozen sim, not mere slowness).
     const herdWallStart = Date.now()
-    for (let k = 0; maxCentreDisp <= 2.0 && window.__wildlife.simTime() - simStart < 12 && Date.now() - herdWallStart < 90000; k++) {
+    while (maxCentreDisp <= 2.0 && window.__wildlife.simTime() - simStart < 12 && Date.now() - herdWallStart < 90000) {
       let maxd = 0
       for (const a of members) for (const b of members) maxd = Math.max(maxd, Math.hypot(a.x - b.x, a.z - b.z))
       spreads.push(maxd)
@@ -1767,8 +1765,8 @@ if (section('elephant-trampling')) {
     const p = window.__game.getState().pos
     const prey = { x: p.x, z: p.z, y: 0.2, rot: 0, scale: 1, phase: 0.5 }
     herds.zebra.push(prey)
-    // Two elephants flanking the prey ~90° apart (slightly asymmetric), pinned
-    // relative to the prey each frame so they keep pace and it stays in range.
+    // Two elephants flanking the prey ~90° apart (slightly asymmetric), re-pinned
+    // relative to the prey on every sim poll so they keep pace and it stays in range.
     const a = { x: prey.x + 2.2, z: prey.z + 2.2, y: 0.2, rot: 0, scale: 1, phase: 0, heading: 0 }
     const b = { x: prey.x + 2.6, z: prey.z - 1.6, y: 0.2, rot: 0, scale: 1, phase: 0, heading: 0 }
     herds.elephant.push(a, b)
@@ -1811,13 +1809,15 @@ if (section('elephant-trampling')) {
       while (d < -Math.PI) d += Math.PI * 2
       return d
     }
-    // Per-frame turn stays rate-limited (the heading can never snap): the cap is
-    // PREY_DODGE_TURN·dt = 8·0.1 = 0.8 rad on a throttled frame, so a step well
-    // under that proves no snap (the old bug jumped ~1.57 rad / 90°).
+    // The turn between samples (~0.07 sim-s apart) stays rate-limited (the heading
+    // can never snap): the cap is PREY_DODGE_TURN·dt = 8·0.1 = 0.8 rad on a
+    // throttled frame, and the bar below (0.85, the cap plus sampling slack) sits
+    // far under the old bug's ~1.57 rad / 90° jump.
     let maxDelta = 0
     for (let i = 1; i < samples.length; i++) maxDelta = Math.max(maxDelta, Math.abs(wrap(samples[i] - samples[i - 1])))
-    // The RENDERED facing obeys the same cap across the whole episode,
-    // including the moment the flight disengages (FACE_TURN·dt ≤ 0.7 throttled).
+    // The RENDERED facing obeys the same kind of cap across the whole episode,
+    // including the moment the flight disengages (FACE_TURN·dt ≤ 0.7 throttled;
+    // asserted below 0.9 with sampling slack).
     let maxFaceDelta = 0
     for (let i = 1; i < faces.length; i++) maxFaceDelta = Math.max(maxFaceDelta, Math.abs(wrap(faces[i] - faces[i - 1])))
     // The whole flee stays in one steady direction: the heading never wanders far
