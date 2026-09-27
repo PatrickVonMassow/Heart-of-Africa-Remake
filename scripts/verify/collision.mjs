@@ -1,10 +1,13 @@
 // Headless verification for CLAUDE.md §7.1.16 (collision inside settlements).
-// Headless Chromium throttles requestAnimationFrame, so sustained key-held
-// walking is unreliable; the collision resolver runs in useFrame per input
-// frame, so we verify it directly: place the player inside/against a solid
-// object, feed a few input frames, and assert it is ejected to the object's
-// surface and never penetrates. Reachability of paths/accesses is verified
-// geometrically. Dev server only (dev hooks).
+// Headless rendering is slow and uneven, so the collision resolver is verified
+// directly: place the player inside/against a solid object, hold the key until
+// the resolver has decided (pushUntilClear, pushUntilWithin — conditions, not
+// frame counts), and assert it is ejected to the object's surface and never
+// penetrates. Reachability of paths/accesses is verified geometrically. Beyond
+// the port and village sections it covers the drawn colliders' instance
+// buffers, the play rocks, the river bank, the wedge escape, inhabitant
+// placement across every settlement and a stranded-in-water rescue. Dev server
+// only (dev hooks).
 import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
 import { frameShutter } from './frameSubject.mjs'
 import { sectionGate } from './sections.mjs'
@@ -58,7 +61,7 @@ await page.addInitScript(() => {
 })
 // Point 375: every frame declares what it must show and the shutter projects
 // that subject before the file is written. It lives ABOVE the section blocks
-// because three of them photograph — a helper declared inside one section is
+// because several of them photograph — a helper declared inside one section is
 // invisible to the next (scripts/verify/scope.test.mjs).
 const shot = frameShutter(page, OUT)
 const errors = []
@@ -199,9 +202,10 @@ async function pushUntilWithin(target, reach, { settleFrames = 3, maxMs = 60000 
  *  a fixed frame count measures the host's drawing speed, and the software lane
  *  draws the steps to the water far slower than the hardware one. */
 async function pushIntoTheRiver(bank, maxMs = 20000) {
-  // Each step waits for DRAWN frames, never for wall-clock milliseconds: on the
-  // software lane two 80 ms polls can fall inside a single frame, and a walk that
-  // simply had not been drawn yet would read as a wall.
+  // Each step waits for two animation frames, never for wall-clock milliseconds:
+  // on the software lane two 80 ms polls can fall inside a single frame, and a
+  // walk that simply had not been drawn yet would read as a wall. (These are the
+  // browser's callbacks, not the scene's own resolves — see pushUntilWithin.)
   const step = () =>
     page.evaluate(
       (b) =>
@@ -238,8 +242,8 @@ async function pushIntoTheRiver(bank, maxMs = 20000) {
 }
 
 /**
- * Place the player exactly on a collider center, aimed outward, and feed
- * input frames; the resolver must push it out to (near) the surface.
+ * Place the player exactly on a collider center, facing yaw 0, and hold the key;
+ * the resolver must push it out to (near) the surface.
  */
 async function ejectTest(sceneLabel, pick) {
   const info = await page.evaluate((pickSrc) => {
@@ -278,7 +282,8 @@ async function ejectTest(sceneLabel, pick) {
  * standpoint within the door's trigger radius from which the Space use key
  * does what that door does (§7.1.16 / design.md §2 walk-in). For a trade or
  * service building that is its dialog; at the chief's hut it is the chief
- * himself, who steps OUT of it (design.md §12) and opens no window at all.
+ * himself — Bambara's steps OUT of it (design.md §12, §13.4), elsewhere he
+ * answers from indoors with a toast — and no window opens at all.
  */
 async function reachableBuildings(sceneLabel) {
   const targets = await page.evaluate(() =>
@@ -291,8 +296,9 @@ async function reachableBuildings(sceneLabel) {
       continue
     }
     // Find a collision-free standpoint within the door trigger radius (1.2) and
-    // teleport the player there; the door prompt then arms and Space opens the
-    // dialog (design.md §2.3 — walking in alone no longer enters).
+    // teleport the player there; the door prompt then arms and Space does what
+    // the door does — the dialog, or the chief's answer (design.md §2.3 —
+    // walking in alone no longer enters).
     const placed = await page.evaluate((d) => {
       const cs = window.__placeColliders
       for (let r = 0; r <= 1.0; r += 0.2) {
@@ -300,7 +306,7 @@ async function reachableBuildings(sceneLabel) {
           const ang = (a / 10) * Math.PI * 2
           const x = d[0] + Math.cos(ang) * r
           const z = d[1] + Math.sin(ang) * r
-          if (Math.hypot(x - d[0], z - d[1]) <= 1.15 && cs.every((c) => window.__clearanceTo(c, x, z) > 0.36)) {
+          if (cs.every((c) => window.__clearanceTo(c, x, z) > 0.36)) {
             window.__placePlayer.x = x
             window.__placePlayer.z = z
             return true
@@ -441,9 +447,9 @@ async function enterSettlement(id) {
     .catch(() => {})
   await page.evaluate(() => window.__game.getState().setJournalOpen(false))
   // Wait on the CONDITION the pause stood for — the journal actually gone from the
-  // DOM — and then on the app's own clock for the frame that redraws without it
-  // (CLAUDE.md §7.2: never a wall-clock guess, which is too short on a loaded host
-  // and wasted time on a quiet one).
+  // DOM — and then on two animation frames for the redraw without it (CLAUDE.md
+  // §7.2: never a wall-clock guess, which is too short on a loaded host and
+  // wasted time on a quiet one).
   await page
     .waitForFunction(() => !window.__game.getState().journalOpen && !document.querySelector('.journal'), null, { timeout: 8000 })
     .catch(() => {})
@@ -454,10 +460,11 @@ async function enterSettlement(id) {
 // The boot prologue above already stands in Cairo, so this section needs no
 // entry of its own.
 if (section('port')) {
-  // Eject from: biggest building (box collider), and a mid-size circle collider.
+  // Eject from: the biggest collider of any kind, and the biggest circle prop.
   await ejectTest('Port', '(cs)=>cs.reduce((b,c,i,a)=>window.__colliderSize(c)>window.__colliderSize(a[b])?i:b,0)')
-  // Biggest circle prop. A fence panel has an `r` too but no centre to eject
-  // from, so segments are skipped here (point 413).
+  // Biggest circle prop. A fence panel has an `r` too, so segments are skipped
+  // here; the fence's own ejection (from a panel midpoint) is the village's
+  // (point 413).
   await ejectTest('Port', '(cs)=>cs.reduce((b,c,i,a)=>(c.kind!=="box"&&c.kind!=="segment"&&(b<0||c.r>a[b].r))?i:b,-1)')
   const funcTypes = await page.evaluate(() =>
     window.__placeLayout.interactives.filter((b) => b.type !== 'villager').map((b) => b.type),
@@ -486,8 +493,8 @@ if (section('port')) {
   await shot('52-collision-port-wall', { local: { x: rammedWall.x, z: rammedWall.z }, label: 'the rammed wall' })
 
   // Corner clipping (§7.1.16): drop the player exactly onto each corner of the
-  // biggest box building; the resolver must eject it with positive clearance —
-  // the former circle approximation left gaps here.
+  // biggest box building; the resolver must eject it clear of the wall (within
+  // the usual 3 cm tolerance) — the former circle approximation left gaps here.
   for (let corner = 0; corner < 4; corner++) {
     await page.evaluate((k) => {
       const boxes = window.__placeColliders.filter((c) => c.kind === 'box')
@@ -509,7 +516,7 @@ if (section('port')) {
   }
 }
 
-// === Village (Masai) =========================================================
+// === Village (Maasai) ========================================================
 if (section('village')) {
   await page.evaluate(() => window.__game.getState().enterPlace('maasai-village'))
   await page
@@ -658,13 +665,7 @@ if (section('village')) {
   )
 }
 
-// === The PoC village's play rocks (work-order 687/688) =======================
-// The word for a rock is learnt at the TWO large rocks on the bank now — the village's
-// lone teaching stone went with the errands that pointed at it (work-order 688).
-// They have to BE there: solids the player walks up to and not through, resting
-// where the layout says. The backend-sensitive pictures are also where the
-// detailed surfaces and broad level bases can actually be judged; neither may
-// read as an egg balanced on a vertex.
+// === The chief's body at his hut ===============================================
 // Hold the chief at the beginning of his real walk so contact can be measured
 // and photographed at his hut. The authored unit tests cover the moving body.
 if (section('chief-body')) {
@@ -818,8 +819,9 @@ if (section('drawn-colliders')) {
     const uz = (foot.z - head.z) / len
     const along = (x, z) => Math.max(0, Math.min(len, (x - head.x) * ux + (z - head.z) * uz))
     // A panel is DRAWN as a segment collider between its two posts; a post pair
-    // with no such collider is the gap. Read from the drawn set rather than from
-    // the builder's intent, because the drawn set is what the player walks into.
+    // with no such collider is the gap. Read from the layout's collider set
+    // rather than from the builder's intent, because the colliders are what the
+    // player walks into.
     const bridged = (a, b) => l.colliders.some((c) => c.kind === 'segment'
       && ((Math.hypot(c.x1 - a[0], c.z1 - a[1]) < 0.01 && Math.hypot(c.x2 - b[0], c.z2 - b[1]) < 0.01)
         || (Math.hypot(c.x1 - b[0], c.z1 - b[1]) < 0.01 && Math.hypot(c.x2 - a[0], c.z2 - a[1]) < 0.01)))
@@ -892,6 +894,13 @@ if (section('drawn-colliders')) {
   }
 }
 
+// === The PoC village's play rocks (work-order 687/688) =======================
+// The word for a rock is learnt at the TWO large rocks on the bank now — the village's
+// lone teaching stone went with the errands that pointed at it (work-order 688).
+// They have to BE there: solids the player walks up to and not through, resting
+// where the layout says. The backend-sensitive pictures are also where the
+// detailed surfaces and broad level bases can actually be judged; neither may
+// read as an egg balanced on a vertex.
 if (section('play-rocks')) {
   await enterSettlement('bambara-village')
   const rocks = await page.evaluate(() => window.__placeLayout.playRocks ?? null)
@@ -942,8 +951,9 @@ if (section('play-rocks')) {
         p.yaw = v.yaw
         p.pitch = -0.05
       }, view)
-      // Let the scene consume the teleport on ITS clock before the shutter
-      // judges: two animation frames, not a wall-clock guess (CLAUDE.md §7.2).
+      // Let the scene consume the teleport before the shutter judges: two
+      // animation frames (the browser's clock, not the scene's own resolves),
+      // not a wall-clock guess (CLAUDE.md §7.2).
       // On a loaded host a frame can take a second, and the camera would still
       // be easing toward the stage when the picture is taken.
       await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(null)))))
@@ -1017,8 +1027,11 @@ if (section('river-bank')) {
 // this village has, with the game's own resolver deciding every step.
 if (section('unstuck')) {
   await enterSettlement('bambara-village')
-  // The tightest slot the layout really has: the two colliders of DIFFERENT
-  // bodies that approach closest, and the midpoint of that approach.
+  // An approximation of the tightest slot: sample points of every collider pair
+  // (a segment along its length, any other shape at its centre, sized by
+  // __colliderSize — a box by its larger half-extent), the smallest positive gap
+  // between them, and the midpoint of those two sample points. Body identity is
+  // not checked; colliders that merge are skipped.
   const wedge = await page.evaluate(() => {
     const cs = window.__placeColliders
     const sample = (c) =>
@@ -1153,8 +1166,8 @@ if (section('unstuck')) {
     // expedition — the very loss it exists to prevent. The MAP is pinned in the
     // unit layer; what only the live scene can show is that the rAF button poll
     // turns the press into the key the handler listens for, and that the handler
-    // then frees him for real. The button is pulsed with clean edges until the
-    // key lands, never on a fixed wall-clock tap (point 184).
+    // then frees him for real. The button is pressed once with a clean rising
+    // edge and held until the key lands, never a fixed wall-clock tap (point 184).
     await page.evaluate((w) => {
       window.__padKeys = []
       window.addEventListener('keydown', (e) => window.__padKeys.push(e.code))
