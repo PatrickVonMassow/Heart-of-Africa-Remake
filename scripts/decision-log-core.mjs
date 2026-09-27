@@ -2,12 +2,12 @@
 //
 // A decision is evidence, not a permanent warning. Its record names the
 // measurement that can settle it; the board stops projecting the record only
-// after a clean result newer than the decision. Both inputs remain in their
+// after a clean result timestamped at or after the decision. Both inputs remain in their
 // durable stores, so expiry hides a settled card without deleting its history.
 
-export const BATCH_DOCTOR_GATE_KEY = 'batch-doctor-gate'
+const BATCH_DOCTOR_GATE_KEY = 'batch-doctor-gate'
 
-export const BATCH_DOCTOR_GATE_MEASUREMENT = Object.freeze({
+const BATCH_DOCTOR_GATE_MEASUREMENT = Object.freeze({
   key: BATCH_DOCTOR_GATE_KEY,
   label: 'node scripts/batch-doctor.mjs --gate',
   cleanWhen: 'the doctor reports the repository state consistent and every fast gate is green',
@@ -76,7 +76,7 @@ const explicitMeasurement = (record) => {
 }
 
 /** The measurement named by a decision, including the legacy PARALLEL shape. */
-export function measurementForRecord(record) {
+function measurementForRecord(record) {
   if (!record || typeof record !== 'object') return null
   return explicitMeasurement(record) ?? legacyParallelMeasurement(record)
 }
