@@ -859,7 +859,6 @@ if (section('canoe-depiction')) {
     // figure visibly walked the bottom under the water.
     const swim = await page.evaluate(async () => {
       const g = window.__game.getState()
-      window.__game.setState({ equipment: { ...g.equipment, canoe: 0 } })
       // The lake CENTER from the data (pure, import-safe): a border scan once
       // hit a cell where the coarse __terrainType and the sim's sampleTerrain
       // disagree (land at height 0.34) and the figure never swam.
@@ -889,12 +888,6 @@ if (section('canoe-depiction')) {
         ? { world: { lat: swim.spot[0], lon: swim.spot[1] }, label: 'the swimmer on Lake Edward', settle: false }
         : { general: 'Lake Edward was not found in the data, so there is no spot to aim at' },
     )
-    // State hygiene: the swim check leaves the player mid-Lake-Edward; jump
-    // back to the Cairo reach so the downstream checks (vicinity seeding,
-    // scripted hunts) run over their usual streamed chunks.
-    await page.evaluate(() => window.__game.getState().debugJumpTo(29.5, 31.4))
-    await page.waitForTimeout(800)
-
     // --- Point 136 (the playability claim itself): a long driven canoe passage
     // down the Nile stays on water the whole way. Before the widening, steering
     // along the kinked course kept slipping the traveller onto land.
@@ -902,7 +895,7 @@ if (section('canoe-depiction')) {
       const hydro = await import('/src/world/hydro.ts')
       const g = window.__game.getState()
       window.__game.setState({ equipment: { ...g.equipment, canoe: 1 } })
-      g.debugJumpTo(spot.lat, spot.lon) // a verified Nile water tile
+      g.debugJumpTo(spot.lat, spot.lon) // the water tile found above (the Nile cataract stretch when available)
       const st = () => window.__game.getState()
       let onWater = 0
       let offWater = 0
@@ -1061,8 +1054,8 @@ if (section('river-mouth-swim')) {
     escape.alive && !escape.endBlocked && escape.movedDeg > 0.25 && escape.southedDeg > 0.1,
     JSON.stringify(escape),
   )
-  // State hygiene: back to the Cairo reach the later checks stream over. Wait on
-  // the traveller actually standing there, not on the wall clock.
+  // State hygiene: back to the Cairo reach before the next section. Wait on the
+  // traveller actually standing there, not on the wall clock.
   await page.evaluate(() => window.__game.getState().debugJumpTo(29.5, 31.4))
   await page.waitForFunction(() => {
     const p = window.__game.getState().pos
@@ -1070,9 +1063,10 @@ if (section('river-mouth-swim')) {
   })
 }
 
-// --- Point 5: the journal panel stops above the camp/journal buttons ----------
-// The open journal must not reach the bottom and cover the camp/journal toggle
-// buttons; its bottom edge sits above their top edges with a small gap.
+// --- Point 5: the journal panel stops above the map/journal buttons -----------
+// The open journal must not reach the bottom and cover the map/journal toggle
+// buttons (the camp button is conditional); its bottom edge sits above their
+// top edges with a small gap.
 if (section('hud-bottom-row')) {
   await page.evaluate(() => window.__game.getState().setJournalOpen(true))
   await page.waitForTimeout(300)
@@ -1122,7 +1116,7 @@ if (section('hud-bottom-row')) {
   // note), so point 1146 had to judge its CSS on a probe. This judges the REAL
   // element instead, behind a throwaway mask of that one flag: it is set false,
   // the HUD is re-rendered through the touch flag it already subscribes to, and
-  // both are put back afterwards. The mask is safe here because every other
+  // afterwards the mask is deleted and the touch flag left false, with a rerender. The mask is safe here because every other
   // reader of the flag sits in a CLICK handler (the pointer-lock request), and
   // nothing clicks in this block. The rectangles are the rendered ones —
   // the hint, the real inventory bar and the real button group — never a
@@ -1307,11 +1301,12 @@ if (section('hud-bottom-row')) {
   )
 }
 
-// --- Lion: carcass consumed, lion moves on (§7.1.12) -------------------------
+// --- Section elephant-trampling: first the lion's carcass is consumed and the
+// lion moves on (§7.1.12); the elephant trampling follows below --------------
 if (section('elephant-trampling')) {
   // The lion feed below is staged RELATIVE to the traveller, so it used to
   // inherit wherever the section before it left him. A section owns the setup it
-  // needs (point 566): it goes to that same spot — the Nile mouth — itself.
+  // needs (point 566): it goes to that same spot — the Cairo reach — itself.
   await page.evaluate(() => window.__game.getState().debugJumpTo(29.5, 31.4))
   await page.evaluate(() => {
     const pos = window.__game.getState().pos
