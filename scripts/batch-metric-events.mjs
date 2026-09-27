@@ -1,6 +1,7 @@
 // Production bridge from measured operations to the daemon's fenced journal.
-// Event ids are content-derived: retrying the same observation is idempotent,
-// while changing any measured fact necessarily names a different event.
+// Event ids default to content-derived (`metricEventId`): retrying the same
+// observation is idempotent, while changing any measured fact names a different
+// event. A caller-supplied `eventId` overrides that.
 import { checksumOf } from './batch-schema-core.mjs'
 import { controlRequest } from './batch-daemon.mjs'
 

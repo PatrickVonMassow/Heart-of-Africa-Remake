@@ -4,13 +4,11 @@
 // Pure decision core: no filesystem, no process, no clock of its own. Everything
 // this module decides, it decides from arguments, so the Vitest layer sweeps every
 // rule without a container (scripts/batch-schema-core.test.mjs). The I/O that reads
-// and writes these shapes arrives in step 2 (the durable state store) and step 3
-// (the daemon); until then NOTHING IMPORTS THIS FILE, and that is the point.
+// and writes these shapes lives in the durable state store (step 2) and the daemon
+// (step 3).
 //
-// IT IS BUILT DARK, and dark is a property of the code rather than a habit: no
-// caller reads these schemas yet, today's authoring path is byte-for-byte the path
-// that ran before this file existed, and the activation flag that will one day let
-// a daemon start REFUSES to enable while steps 8 and 9 are not green
+// THE LANE STAYS DARK until its activation flag enables it, and that flag REFUSES
+// to enable while steps 8 and 9 are not green
 // (scripts/durable-lane-flag-core.mjs). Advertising the lane before a successor can
 // prove and land what it adopted is the one failure this staging exists to prevent.
 //
@@ -37,11 +35,12 @@
 //      credential update would be a no-op cannot be constructed — git may leave an
 //      up-to-date ref out of the transaction entirely, and then the lease it was
 //      supposed to carry is never evaluated.
-//   5. THE COMMAND TABLE. Every mutating daemon command declares its COMPENSATION
-//      and its IDEMPOTENCY KEY, and one that declares neither cannot be registered.
-//      That is a rule of this table rather than a convention, because the mutation
-//      whose lock moved under it is reversed by exactly what it declared here.
-//   6. THE JOURNAL FRAMING. Checksummed, canonically serialised lines, so a
+//   5. MUTATION VALIDATION. The fence is the coordinator epoch.
+//   6. THE COMMAND TABLE. Every mutating daemon command in DAEMON_COMMANDS declares
+//      its COMPENSATION and its IDEMPOTENCY KEY, and registerDaemonCommand refuses
+//      one that declares neither: the mutation whose lock moved under it is
+//      reversed by exactly what it declared here.
+//   7. THE JOURNAL FRAMING. Checksummed, canonically serialised lines, so a
 //      truncated tail reads as truncated instead of as data, and every entry carries
 //      the fence it was written under.
 import { createHash } from 'node:crypto'
@@ -226,7 +225,7 @@ export function attemptTransition(from, to) {
  *  epoch (the lock's fence), the timestamp, the last commit and the last pushed
  *  SHA. The pushed SHA is what makes a cancelled attempt's work findable, so the
  *  states that claim finished work must carry one. */
-export const ATTEMPT_STATE_FIELDS = Object.freeze(['actor', 'fence', 'at', 'lastCommit', 'lastPushedSha'])
+const ATTEMPT_STATE_FIELDS = Object.freeze(['actor', 'fence', 'at', 'lastCommit', 'lastPushedSha'])
 
 const STATES_REQUIRING_PUSHED_SHA = Object.freeze(['ready-for-review', 'landing', 'landed'])
 const STATES_REQUIRING_REASON = Object.freeze(['failed', 'stalled', 'cancelled'])
@@ -295,11 +294,6 @@ export function daemonLifecycleTransition(from, to) {
   return { ok: true }
 }
 
-/** The copy in .claude/batch-lock.json: identity only. It exists so that "is there
- *  a daemon" and "may I work" are ONE read for the current lock owner, and for
- *  nothing else — liveness is never read from it. */
-export const DAEMON_COPY_FIELDS = Object.freeze(['pid', 'pidStartedAt', 'generation'])
-
 /** Every combination of (record, copy, probe) the write orders can produce, plus
  *  the one they cannot. The table is exported so the acceptance case can ENUMERATE
  *  it: a reading added without a case fails the test rather than passing silently. */
@@ -330,8 +324,8 @@ export const DAEMON_PAIR_READINGS = Object.freeze({
  *  THE ORDER OF THE QUESTIONS IS THE MECHANISM. "Is the copy possible at all" comes
  *  first, because a copy that the write orders cannot produce says nothing about
  *  liveness and must not be resolved by it. Only then does the record's own probe
- *  decide, because the record is the authority on existence: a DEAD record is cold
- *  whatever the copy says, and the copy's staleness is part of that resolution
+ *  decide, because the record is the authority on existence: once the copy's
+ *  generation is placed, a DEAD record is cold whatever the copy says, and the copy's staleness is part of that resolution
  *  rather than a competing reading. */
 export function classifyDaemonPair({ record = null, copy = null, probe = null, generationOrder = null } = {}) {
   const reading = (name, { actions = [], ...extra } = {}) => ({
@@ -358,8 +352,10 @@ export function classifyDaemonPair({ record = null, copy = null, probe = null, g
     return impossible('the record carries no generation, so nothing can be compared to it')
   }
 
-  // The copy is only ever written FROM the record, so anything it says that the
-  // record does not is a claim no write order could have made.
+  // The copy is only ever written FROM the record: a foreign process, another
+  // generation kind or a generation the journal orders after the record is a
+  // claim no write order could have made. An older generation is accepted only
+  // on journal ordering evidence.
   if (copy) {
     if (!generationPresent(copy.generation)) return impossible('the copy carries no generation and cannot be placed')
     if (typeof copy.generation !== typeof record.generation) {
@@ -427,7 +423,7 @@ export function credential({ generation, fence, seq } = {}) {
   return { ok: true, credential: Object.freeze({ generation, fence, seq }) }
 }
 
-export function sameCredential(a, b) {
+function sameCredential(a, b) {
   return Boolean(a && b && a.generation === b.generation && a.fence === b.fence && a.seq === b.seq)
 }
 
@@ -547,7 +543,7 @@ export function publicationPush({ current = null, next = null, expectedOid, cred
 }
 
 /** (fence, seq) ordered lexicographically within one generation. */
-export function strictlyAhead(candidate, reference) {
+function strictlyAhead(candidate, reference) {
   if (candidate.fence !== reference.fence) return candidate.fence > reference.fence
   return candidate.seq > reference.seq
 }
@@ -827,7 +823,7 @@ function keyableScalar(value) {
 
 /** Applying a key that has already been applied changes nothing and says so. This
  *  is the whole of "every mutating command is idempotent" as a pure function; the
- *  store that persists `applied` arrives in step 2. */
+ *  durable state store (step 2) persists `applied`. */
 export function applyOnce(applied, key, mutate) {
   if (!key) return { ok: false, reason: 'a mutation without an idempotency key cannot be applied' }
   // Own properties only: a plain object inherits `constructor` and friends, and an
@@ -845,8 +841,8 @@ export function applyOnce(applied, key, mutate) {
  *  the same value regardless of who assembled the object. Follows JSON.stringify's
  *  own semantics for the values JSON cannot carry — an unserialisable ARRAY element
  *  (undefined, a hole, a function) becomes `null`, an unserialisable object VALUE
- *  drops its key — because `[${undefined}]` would be the invalid text `[,...]`, and
- *  an invalid frame reads as corruption it is not. */
+ *  drops its key — because naive interpolation would render such a value as the
+ *  invalid text `undefined`, and an invalid frame reads as corruption it is not. */
 export function canonicalJson(value) {
   if (value === null || typeof value !== 'object') return JSON.stringify(value)
   if (Array.isArray(value)) {
@@ -944,8 +940,8 @@ export function fenceInForceAt(transitions, seq) {
 
 /** The tail the daemon cannot prove the order of says so, instead of inventing one:
  *  everything after the last CONFIRMED position is marked `unverified` when the
- *  current credential has no transition in the journal. Reconciliation (step 8)
- *  quarantines exactly those, and nothing else. */
+ *  current credential has no transition in the journal. Unplaceable entries and
+ *  entries whose fence was not in force at their position are quarantined. */
 export function markUnverifiedTail({ entries = [], transitions = [], lastConfirmedSeq = 0, currentFence = null } = {}) {
   const currentHasTransition = transitions.some((t) => t.fence === currentFence)
   return entries.map((e) => {

@@ -11,13 +11,12 @@ import { classifyDaemonPair, sameProcess } from './batch-schema-core.mjs'
 import { landingCrashDecision } from './batch-landing-core.mjs'
 
 // ---------------------------------------------------------------------------
-// 1. LANE CLASSIFICATION (M28)
+// 1. LANE CLASSIFICATION (M28), REFILL (M29) AND THE SUCCESSOR BOUNDARY
 // ---------------------------------------------------------------------------
 
 export const LANE_READINGS = Object.freeze(['running', 'completed', 'stalled', 'missing', 'divergent', 'orphaned'])
 
-/** How silent a live worker's heartbeat may be before the lane reads stalled.
- *  Mirrors the adoption probe's ceiling. */
+/** How silent a live worker's heartbeat may be before the lane reads stalled. */
 export const LANE_STALL_MS = 10 * 60 * 1000
 
 /** One recorded lane against its probes, BEFORE any refill (M28):
@@ -41,8 +40,10 @@ export const LANE_STALL_MS = 10 * 60 * 1000
  *                   landing merges to the target and deletes the branch, so a
  *                   merely pushed candidate must not satisfy a landed claim.
  *
- *  `completed` requires M37's whole condition — a terminal-commit claim VISIBLE
- *  on the remote — and is never concluded from the record alone. The clock and
+ *  A reviewable or landed record reads `completed` only under M37's whole
+ *  condition — the terminal commit visible on the remote, or the landed commit
+ *  contained in the landing target. failed/cancelled claim no remote success
+ *  and complete whenever no live worker contradicts them. The clock and
  *  the lease FAIL CLOSED: liveness, heartbeat freshness and lease validity are
  *  judgments about time, and without a usable `now` — or past the lease's
  *  expiry — a live process is never read as a cleanly running lane. */
@@ -88,8 +89,8 @@ function classifyLaneInner({ record, workerProbe, lease, heartbeatAt, worktreeEx
     return { reading: 'divergent', reason: 'the landed claim could not be verified against the landing target (M37)', quarantine: true }
   }
   if (['failed', 'cancelled'].includes(state)) {
-    // These claim no remote success, so with the worker proven not-live there
-    // is nothing left to verify.
+    // These claim no remote success, so with no live worker contradicting them
+    // (checked above) there is nothing left to verify.
     return { reading: 'completed', reason: `terminal state ${state}; nothing to adopt` }
   }
   if (workerProbe?.live === true && !lease) {
@@ -218,9 +219,10 @@ export function resolvePublicationIntent({ intent = null, refProbes = {} } = {})
   })
   // COLLAPSING BY PRIORITY WOULD HIDE A PARTIAL PUBLICATION: one ref landed
   // and another abandoned is not "landed", it is an intent that half-executed
-  // and needs an operator. Only uniform verdicts collapse cleanly; any UNKNOWN
-  // keeps the whole intent unknown, and a landed/abandoned mix quarantines as
-  // PARTIAL instead of letting the strongest ref speak for the weakest.
+  // and needs an operator. Any UNKNOWN keeps the whole intent unknown, a
+  // landed/abandoned mix quarantines as PARTIAL instead of letting the strongest
+  // ref speak for the weakest, and LANDED mixed with LANDED-REWRITTEN reads as
+  // the weaker LANDED-REWRITTEN.
   const kinds = new Set(outcomes.map((m) => m.outcome))
   let worst
   if (kinds.has('UNKNOWN')) worst = 'UNKNOWN'
@@ -234,9 +236,8 @@ export function resolvePublicationIntent({ intent = null, refProbes = {} } = {})
 // 3. THE DAEMON PAIR, RESOLVED (mechanism 2's table, applied)
 // ---------------------------------------------------------------------------
 
-/** Turns the pair table's reading into the idempotent action the successor
- *  performs. Every action is a write toward the record's own truth, and the
- *  impossible row acts by REFUSING — an operator act, never an automatic one. */
+/** Orders two differing daemon generations by their single journalled
+ *  lifecycle start each; null when that evidence is absent or ambiguous. */
 export function daemonGenerationOrder({ entries = [], record = null, copy = null } = {}) {
   if (!record || !copy || record.generation === copy.generation) return null
   const startSeqs = (identity) =>
@@ -261,9 +262,13 @@ export function daemonGenerationOrder({ entries = [], record = null, copy = null
   return null
 }
 
+/** Turns the pair table's reading into the idempotent action the successor
+ *  performs. Every action is a write toward the record's own truth; the
+ *  transitioning, unknown, impossible and ambiguous rows REFUSE — an operator
+ *  act, never an automatic one. */
 export function daemonPairResolution({ record = null, copy = null, probe = null, generationOrder = null } = {}) {
-  // Two probe shapes exist in this repository: batch-singleton's probePid answers
-  // `startedAt`, the pair table compares `pidStartedAt`. Normalised HERE so a
+  // The gatherer's probe answers `startedAt`, the pair table compares
+  // `pidStartedAt`. Normalised HERE so a
   // caller cannot silently feed the table a probe it reads as "not asked".
   const normalized = probe ? { live: probe.live, pid: probe.pid, pidStartedAt: probe.pidStartedAt ?? probe.startedAt ?? null } : null
   const classified = classifyDaemonPair({ record, copy, probe: normalized, generationOrder })
@@ -288,9 +293,8 @@ export function daemonPairResolution({ record = null, copy = null, probe = null,
 // ---------------------------------------------------------------------------
 
 /** The registry verdicts a successor can meet and what each permits. A corrupt
- *  journal never becomes state: provable facts are rebuilt from the work order,
- *  worktrees, logs and pushed branches (M41) — that rebuilding is the caller's
- *  gathering — and every lane it cannot prove arrives here quarantined. */
+ *  or unreadable registry never becomes state: the verdict is not ok, so the
+ *  run is red and apply refuses every mutation (M41). */
 export function registryVerdict({ journalVerdict = null, snapshotVerdict = null } = {}) {
   if (journalVerdict === 'ok' && (snapshotVerdict === 'ok' || snapshotVerdict === 'missing')) {
     return { ok: true, source: snapshotVerdict === 'ok' ? 'snapshot-and-journal' : 'journal-only' }
@@ -304,8 +308,8 @@ export function registryVerdict({ journalVerdict = null, snapshotVerdict = null 
   return { ok: false, source: 'reconstruction', reason: 'no readable registry; reconstruct only provable facts and quarantine the rest' }
 }
 
-/** A crashed landing found at startup, decided by step 9's rule. Exposed here so
- *  the successor has ONE reconciliation entry point. */
+/** A crashed landing found at startup, decided by step 9's rule. No production
+ *  caller routes a landing state here yet. */
 export function landingRecovery({ stage = null } = {}) {
   return landingCrashDecision({ stage })
 }

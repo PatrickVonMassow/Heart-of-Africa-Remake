@@ -2,8 +2,8 @@
 // come from the fenced journal; context samples are independently recorded.
 import { checksumOf } from './batch-schema-core.mjs'
 
-export const SAFETY_INCIDENT_KINDS = Object.freeze(['lost-attempt', 'duplicate-writer', 'overlapping-lease', 'unaccounted-idle', 'missed-boundary'])
-export const CONTEXT_HIGH_WATER = 150_000
+const SAFETY_INCIDENT_KINDS = Object.freeze(['lost-attempt', 'duplicate-writer', 'overlapping-lease', 'unaccounted-idle', 'missed-boundary'])
+const CONTEXT_HIGH_WATER = 150_000
 
 const finite = (value) => typeof value === 'number' && Number.isFinite(value)
 const duration = (event, start, end) => finite(event?.[start]) && finite(event?.[end]) && event[end] >= event[start] ? event[end] - event[start] : null

@@ -17,8 +17,10 @@
 //     retry-after: 2026-08-06T09:20:00.000Z
 //     attempt: 1
 //
-// Only `type: user-stop` proves that a clockless record came from the user. Every
-// untyped, legacy or malformed record is a recovery request: the launcher first
+// Only a typed user stop (`type: user-stop`, `cause: user-stop`, `retry-after:
+// never`, and the user's words in quotation marks) proves that a clockless record
+// came from the user. Every other record without a readable clock — untyped,
+// legacy, malformed or a misfiled stop — is a recovery request: the launcher first
 // snapshots its raw bytes in a decision card, then replaces it atomically with a
 // short clock. Corruption is never read as an already-expired clock.
 //
@@ -27,22 +29,24 @@
 // not park in the first place — a forbidden serving model lets the fallback chain
 // of CLAUDE.md §6 run rather than stopping.
 //
-// Pure: no fs, no clock of its own, no process state. The fs side lives in
+// Pure: no fs, no process state; `now` is an input (defaulting to Date.now()).
+// The fs side lives in
 // scripts/batch-lock.mjs, the tick's decision in scripts/batch-autostart.mjs.
 
 import { createHash } from 'node:crypto'
 
 /** The metadata keys the record understands. Anything else is part of the reason,
  *  so a legacy line like `autostart watchdog: …` is never eaten as metadata. */
-export const PAUSE_KEYS = ['type', 'cause', 'paused-at', 'retry-after', 'attempt']
+const PAUSE_KEYS = ['type', 'cause', 'paused-at', 'retry-after', 'attempt']
 
 export const PAUSE_TYPES = Object.freeze({
   AUTOMATIC: 'automatic',
   USER_STOP: 'user-stop',
 })
 
-/** The literal that says "this park has no clock ON PURPOSE" — distinct from a
- *  record that simply predates the mechanism, though both park the same way. */
+/** The literal that says "this park has no clock ON PURPOSE". Only a proved user
+ *  stop may carry it; an untyped `never` and a legacy record without the key are
+ *  both recovered (`classifyPause`). */
 export const NEVER = 'never'
 
 /**
@@ -59,15 +63,15 @@ export const CLOCKLESS_CAUSES = {
  * batch stood still for 75 minutes. A clockless stop therefore carries the user's
  * words in quotation marks; a typed user-stop without one is misfiled.
  */
-export const USER_UTTERANCE = /"[^"\n]{3,}"|„[^“”\n]{3,}[“”]|“[^”\n]{3,}”|»[^«\n]{3,}«/
+const USER_UTTERANCE = /"[^"\n]{3,}"|„[^“”\n]{3,}[“”]|“[^”\n]{3,}”|»[^«\n]{3,}«/
 
 export function namesUserUtterance(reason) {
   return USER_UTTERANCE.test(String(reason ?? ''))
 }
 
 /**
- * The retry ladder: a first park is short, each further one longer, and after the
- * last rung the park becomes clockless ('retries-exhausted'). Twenty minutes is the
+ * The retry ladder: a first park is short, each further one longer, and past the
+ * last rung the park keeps probing at the capped interval. Twenty minutes is the
  * point's own measure of a self-clearing cause; three hours is long enough that a
  * genuinely broken batch is not spawning all night.
  *
@@ -75,8 +79,8 @@ export function namesUserUtterance(reason) {
  * many times the launcher has resumed the batch SINCE IT LAST MADE PROGRESS — the
  * counter is cleared with `failCount` the moment a spawn commits something. Two
  * findings of the four-eyes review meet here: a counter that never resets would
- * make every park clockless for ever after three retries in the machine's whole
- * history, and a counter only the launcher's own parks carried would leave an
+ * pin every park at the capped rung for ever after three retries in the machine's
+ * whole history, and a counter only the launcher's own parks carried would leave an
  * unanswered alert or a standing outage oscillating at rung 1 all night.
  */
 export const PAUSE_RETRY_LADDER_MS = [20 * 60 * 1000, 60 * 60 * 1000, 3 * 60 * 60 * 1000]
@@ -204,8 +208,9 @@ export function classifyPause({ text, now = Date.now() } = {}) {
 }
 
 /**
- * The clock a NEW park gets: `attempt` is how many retries this cause has already
- * had (0 for the first park). Returns the record fields to write. A cause on the
+ * The clock a NEW park gets: `attempt` is how many times the launcher has resumed
+ * the batch in the current spell (0 for the first park; see PAUSE_RETRY_LADDER_MS).
+ * Returns the record fields to write. A cause on the
  * clockless list parks without one. A cause that has climbed off the end of the
  * ladder keeps probing at the capped interval instead of becoming a human gate.
  */
