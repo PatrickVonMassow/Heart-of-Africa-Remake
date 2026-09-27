@@ -1578,5 +1578,500 @@
   "id": "U4176",
   "decision": "rewritten",
   "reason": "The literal 590_000 fallback now imports BLOCKING_LIMIT_MS"
+ },
+ {
+  "id": "U4177",
+  "decision": "rewritten",
+  "reason": "The unavailable reason now also names a production build without the dev hook"
+ },
+ {
+  "id": "U4178",
+  "decision": "rewritten",
+  "reason": "\"Never throws\" now says it raises nothing of its own while a rejection from the injected read/sleep still propagates"
+ },
+ {
+  "id": "U4179",
+  "decision": "rewritten",
+  "reason": "The empty-frame diagnostic now says whether draw calls or triangles are zero"
+ },
+ {
+  "id": "U4180",
+  "decision": "kept",
+  "reason": "claim does not hold: scripts/verify/sceneReady.test.mjs and scripts/verify/frameSubject.mjs both exist"
+ },
+ {
+  "id": "U4181",
+  "decision": "kept",
+  "reason": "judgeSceneReady is called by awaitSceneReady, which other files use; live code"
+ },
+ {
+  "id": "U4182",
+  "decision": "kept",
+  "reason": "claim does not hold: baseline-classify-core.mjs:31-33 parses `FAIL  <name> — <detail>`, the shape the failure line keeps"
+ },
+ {
+  "id": "U4183",
+  "decision": "backlog",
+  "reason": "scripts/verify/sectionScope.mjs:34 — DECL_NAME (own slug, closing paren right after the name) differs from sections.mjs's DECL_RE, so a section() call with an extra argument is discoverable but not scoped; the \"same declaration shape\" note overstates it"
+ },
+ {
+  "id": "U4184",
+  "decision": "rewritten",
+  "reason": "conditionOpen's doc now says any brace or semicolon ends the search whatever the paren depth"
+ },
+ {
+  "id": "U4185",
+  "decision": "rewritten",
+  "reason": "WRITE_AFTER's doc now says only postfix increments count and a prefix ++x reads as a read (known limit)"
+ },
+ {
+  "id": "U4186",
+  "decision": "kept",
+  "reason": "sectionScope's exports are the behaviour its gate test uses; nothing to remove"
+ },
+ {
+  "id": "U4187",
+  "decision": "rewritten",
+  "reason": "makeSectionGate's doc now says a named request against an empty list is refused like any unknown name"
+ },
+ {
+  "id": "U4188",
+  "decision": "rewritten",
+  "reason": "sectionGate's doc and catch comment now say a whole run proceeds but a named request is refused when the source is unreadable"
+ },
+ {
+  "id": "U4189",
+  "decision": "rewritten",
+  "reason": "The unrun diagnostic no longer mentions a declaration only in a comment (comments are masked)"
+ },
+ {
+  "id": "U4190",
+  "decision": "backlog",
+  "reason": "scripts/verify/sections.mjs:416 — sectionsForLines claims exact block membership but records only declaration lines, assigning shared code after a block to the preceding section"
+ },
+ {
+  "id": "U4191",
+  "decision": "backlog",
+  "reason": "scripts/verify/sections.mjs:20 — the header says the recorder stamps partial on the run record and runVerdict refuses it, but run-logged's baseRecord/buildReceipt carry neither section nor partial"
+ },
+ {
+  "id": "U4192",
+  "decision": "backlog",
+  "reason": "scripts/verify/sections.mjs:505 — narrowDiagnosis extracts a section tag from the label but tests undeclarable.has(label) with the tag still on, so a tagged pasted name misses the bare non-predictive name"
+ },
+ {
+  "id": "U4193",
+  "decision": "rewritten",
+  "reason": "The 17-minute figure is now marked as that day's, beside the 951 s median of 09.08.2026"
+ },
+ {
+  "id": "U4194",
+  "decision": "rewritten",
+  "reason": "\"nonPredictive below\" now points at listNonPredictive above"
+ },
+ {
+  "id": "U4195",
+  "decision": "kept",
+  "reason": "makeSectionGate is the body of sectionGate, which the suites use; live code"
+ },
+ {
+  "id": "U4196",
+  "decision": "rewritten",
+  "reason": "The heading now reads \"Forward and strafe move\", matching KeyW and KeyD"
+ },
+ {
+  "id": "U4197",
+  "decision": "rewritten",
+  "reason": "The head-bob heading now says the walking check reads the bob's largest deviation from rest"
+ },
+ {
+  "id": "U4198",
+  "decision": "rewritten",
+  "reason": "The comment now says resetLook sets inversion explicitly, so the default value itself is not what is measured"
+ },
+ {
+  "id": "U4199",
+  "decision": "rewritten",
+  "reason": "\"scripted prey/stain meshes\" now reads \"the scripted prey mesh and the ground stain\""
+ },
+ {
+  "id": "U4200",
+  "decision": "rewritten",
+  "reason": "The animal-call comment now says the reproducer removes the animal by identity and the check keeps its old name as ledger identity"
+ },
+ {
+  "id": "U4201",
+  "decision": "removed",
+  "reason": "The outer PRESETS table is removed; the low check reads 1024 directly, like the hard-coded high/medium checks"
+ },
+ {
+  "id": "U4202",
+  "decision": "removed",
+  "reason": "The unread dpr properties are dropped from effective()'s preset table"
+ },
+ {
+  "id": "U4203",
+  "decision": "backlog",
+  "reason": "scripts/verify/settings.mjs:989 — check 'graphics level defaults to medium' runs after setDetailLevel('medium') set it explicitly, so it verifies the setter, not the default; the name is a ledger identity"
+ },
+ {
+  "id": "U4204",
+  "decision": "rewritten",
+  "reason": "The wheel heading now says a wheel over the panel never moves the zoom; the panel's own scroll is not measured"
+ },
+ {
+  "id": "U4205",
+  "decision": "rewritten",
+  "reason": "\"Deliberately LAST\" is dropped; the comment now says the section restores the zoom at its end"
+ },
+ {
+  "id": "U4206",
+  "decision": "rewritten",
+  "reason": "The F11 comment no longer says it sets no fullscreenElement; the reproducer drives the grown state as fullscreen: true"
+ },
+ {
+  "id": "U4207",
+  "decision": "rewritten",
+  "reason": "\"never produces a near-white pixel at all\" now reads \"barely reaches near-white\""
+ },
+ {
+  "id": "U4208",
+  "decision": "rewritten",
+  "reason": "SNOW_MAX_CHROMA is now described as the spread a snow pixel must stay below"
+ },
+ {
+  "id": "U4209",
+  "decision": "rewritten",
+  "reason": "The scope note now says a spawn-like call in the file's text puts it in scope; no import is checked"
+ },
+ {
+  "id": "U4210",
+  "decision": "rewritten",
+  "reason": "POSITIVE_MATCHER's doc now admits a degenerate toContain('') or match-everything toMatch is not screened out"
+ },
+ {
+  "id": "U4211",
+  "decision": "rewritten",
+  "reason": "caseRanges's doc now says each whole it/test call, from its name to its closing parenthesis"
+ },
+ {
+  "id": "U4212",
+  "decision": "removed",
+  "reason": "The unreachable optional-match fallback is dropped; the chain has already matched NEGATIVE_MATCHER"
+ },
+ {
+  "id": "U4213",
+  "decision": "rewritten",
+  "reason": "establishesRun's doc now says it claims a run by a RUN_ESTABLISHERS word match on raw text or a positive output claim"
+ },
+ {
+  "id": "U4214",
+  "decision": "rewritten",
+  "reason": "The cap is now documented as the displacement at the first frame past the floor, not a single-frame limit"
+ },
+ {
+  "id": "U4215",
+  "decision": "rewritten",
+  "reason": "The probe now describes the gap between completed animation-frame callbacks, drawing or not"
+ },
+ {
+  "id": "U4216",
+  "decision": "rewritten",
+  "reason": "The window now closes on the picture's signal with a 180 s backstop reported as picture settled: false"
+ },
+ {
+  "id": "U4217",
+  "decision": "rewritten",
+  "reason": "The INFO line now says \"reported beside the gate\", since the tick gap feeds freezeMs"
+ },
+ {
+  "id": "U4218",
+  "decision": "rewritten",
+  "reason": "The self-test now demands the budget gate itself failed (!withinBudget), not any failure; left as it was it could approve a broken gate on a trust-check failure"
+ },
+ {
+  "id": "U4219",
+  "decision": "rewritten",
+  "reason": "fileExists is no longer exported; it stays hasHardwareGlChain's default"
+ },
+ {
+  "id": "U4220",
+  "decision": "rewritten",
+  "reason": "findSystemChrome's doc now says the first candidate that exists and is executable"
+ },
+ {
+  "id": "U4221",
+  "decision": "rewritten",
+  "reason": "The eight module-internal constants are no longer exported"
+ },
+ {
+  "id": "U4222",
+  "decision": "rewritten",
+  "reason": "The axis-sample doc now says the samples reach the base of the neck (0.75 sits just under the head sphere)"
+ },
+ {
+  "id": "U4223",
+  "decision": "rewritten",
+  "reason": "The stranded JSDoc now sits on judgeTagStandpoint"
+ },
+ {
+  "id": "U4224",
+  "decision": "rewritten",
+  "reason": "survivorBreakdown's doc now says it is empty only with no change of any kind, substitutions included"
+ },
+ {
+  "id": "U4225",
+  "decision": "rewritten",
+  "reason": "The doc now says a failed verdict prints \"no per-kind change\" for empty snapshots"
+ },
+ {
+  "id": "U4226",
+  "decision": "rewritten",
+  "reason": "The rationale now says WebGL 2 runs in every unpinned LARGE; a LARGE with VERIFY_GL set runs one lane"
+ },
+ {
+  "id": "U4227",
+  "decision": "rewritten",
+  "reason": "The GPU-probe doc now excludes the serverless board-layout check"
+ },
+ {
+  "id": "U4228",
+  "decision": "rewritten",
+  "reason": "isLargeEquivalent's doc now says a suite filter beside `large` still narrows the suites"
+ },
+ {
+  "id": "U4229",
+  "decision": "rewritten",
+  "reason": "claim holds only in part: run-all ORs in VERIFY_BASELINE=1 through wantsBaseline; the doc now says so and that the runner only prints the hand baseline command"
+ },
+ {
+  "id": "U4230",
+  "decision": "rewritten",
+  "reason": "The comment now places before-first-touch below the arming helper"
+ },
+ {
+  "id": "U4231",
+  "decision": "rewritten",
+  "reason": "The comment now says the wait watches x and the drift check covers both axes"
+ },
+ {
+  "id": "U4232",
+  "decision": "rewritten",
+  "reason": "ttsCacheComplete is no longer exported"
+ },
+ {
+  "id": "U4233",
+  "decision": "rewritten",
+  "reason": "VERIFY_SEED_ORIGIN is no longer exported"
+ },
+ {
+  "id": "U4234",
+  "decision": "removed",
+  "reason": "The unreachable ?? '' after pop() is dropped"
+ },
+ {
+  "id": "U4235",
+  "decision": "rewritten",
+  "reason": "The route doc now says the announcement is the pin, and a URL with its own ?seed keeps it"
+ },
+ {
+  "id": "U4236",
+  "decision": "rewritten",
+  "reason": "The header now says BASE_URL must be the dev server, since the sweep drives the dev hooks"
+ },
+ {
+  "id": "U4237",
+  "decision": "rewritten",
+  "reason": "The cadence now reads \"every ~1.8 s of wall clock\""
+ },
+ {
+  "id": "U4238",
+  "decision": "rewritten",
+  "reason": "The journal comment now calls the close belt and braces beside the do-not-disturb"
+ },
+ {
+  "id": "U4239",
+  "decision": "removed",
+  "reason": "The no-op setDebugMonth(null) reset is removed (no such API exists); a comment says the month carries over between spots"
+ },
+ {
+  "id": "U4240",
+  "decision": "rewritten",
+  "reason": "The header now lists the ground detail, head bob, vertical look, graphics levels, wheel zoom, keyboard lock, leak watch and speech blocks"
+ },
+ {
+  "id": "U4241",
+  "decision": "rewritten",
+  "reason": "The forceFrame comment now names the graphics-level TRAA draw as a third user"
+ },
+ {
+  "id": "U4242",
+  "decision": "kept",
+  "reason": "The check name is the ledger identity (lines 40-41), as the claim says"
+ },
+ {
+  "id": "U4243",
+  "decision": "kept",
+  "reason": "claim does not hold: design.md §17.5 is \"Controls and focus\", covering both vertical look and touch controls"
+ },
+ {
+  "id": "U4244",
+  "decision": "backlog",
+  "reason": "scripts/verify/settings.mjs:60 — the assertBackend guardrail is credited to point 184 here but to point 204 in visualsweep.mjs and touch.mjs"
+ },
+ {
+  "id": "U4245",
+  "decision": "rewritten",
+  "reason": "The ambience-sources heading now names the drum bed, village speech and speech bus"
+ },
+ {
+  "id": "U4246",
+  "decision": "rewritten",
+  "reason": "\"the birdsong check above\" now reads \"the birdsong measurement above\""
+ },
+ {
+  "id": "U4247",
+  "decision": "rewritten",
+  "reason": "The birdsong check moved beside its measurement and the speech-bus block is indented into its section (formatting only)"
+ },
+ {
+  "id": "U4248",
+  "decision": "rewritten",
+  "reason": "The comment now says the cause is carried in the detail and the console lines serve a full-log reader"
+ },
+ {
+  "id": "U4249",
+  "decision": "rewritten",
+  "reason": "The comment now says the toggle waits on the application's clock rather than traa-toggle's fixed pause"
+ },
+ {
+  "id": "U4250",
+  "decision": "rewritten",
+  "reason": "The reproducer is now named: the TRAA on/off cycles before the LOW preset (frame 1105)"
+ },
+ {
+  "id": "U4251",
+  "decision": "rewritten",
+  "reason": "claim does not hold for the value: SETTLE_POLICY.maxFrames is 600 (src/render/renderLeak.ts:294); the comment now says the cap copies it"
+ },
+ {
+  "id": "U4252",
+  "decision": "backlog",
+  "reason": "scripts/verify/settings.mjs:1259 — the TRAA pipeline-rebuild leak is credited to point 276 while 276 is the graphics levels and the leak gate is point 334 elsewhere"
+ },
+ {
+  "id": "U4253",
+  "decision": "rewritten",
+  "reason": "The point-375 list now includes the pitched frames and the graphics-level frames"
+ },
+ {
+  "id": "U4254",
+  "decision": "kept",
+  "reason": "SETTINGS_SCENE_CROP is live inside settingsSceneLuma; the export serves a test"
+ },
+ {
+  "id": "U4255",
+  "decision": "rewritten",
+  "reason": "The comment now says only the unit tests read the exported thresholds"
+ },
+ {
+  "id": "U4256",
+  "decision": "kept",
+  "reason": "The thresholds are the defaults of isSnowPixel/snowFraction; live"
+ },
+ {
+  "id": "U4257",
+  "decision": "kept",
+  "reason": "isSnowPixel is called by snowFraction; live"
+ },
+ {
+  "id": "U4258",
+  "decision": "kept",
+  "reason": "The exports are the live gate's behaviour its test drives"
+ },
+ {
+  "id": "U4259",
+  "decision": "rewritten",
+  "reason": "\"Both of the old sampler's halves\" and the lone \"1.\" are gone; the old sampler is described as frame-rate dependent"
+ },
+ {
+  "id": "U4260",
+  "decision": "rewritten",
+  "reason": "The comment now says 0.4 survives only as the coarseness cap, a different job"
+ },
+ {
+  "id": "U4261",
+  "decision": "kept",
+  "reason": "isExecutable is findSystemChrome's default predicate; live"
+ },
+ {
+  "id": "U4262",
+  "decision": "kept",
+  "reason": "VILLAGE_BEHIND is read by judgeTagStandpoint; live"
+ },
+ {
+  "id": "U4263",
+  "decision": "rewritten",
+  "reason": "judgeTagStandpoint's doc now lists clear, behind, gap, nearestWall, separation and children"
+ },
+ {
+  "id": "U4264",
+  "decision": "kept",
+  "reason": "The chain is live inside leakVerdict; exports serve tests"
+ },
+ {
+  "id": "U4265",
+  "decision": "rewritten",
+  "reason": "The SMALL_SUITES doc now names the board layout"
+ },
+ {
+  "id": "U4266",
+  "decision": "rewritten",
+  "reason": "\"the two run shapes\" now reads \"the run-shape fields\""
+ },
+ {
+  "id": "U4267",
+  "decision": "rewritten",
+  "reason": "The touch comment now calls it point 204's guardrail and points at tiers.mjs for the WebGL2-only status"
+ },
+ {
+  "id": "U4268",
+  "decision": "backlog",
+  "reason": "scripts/verify/touch.mjs:54 — touch still waits a fixed 4 s after boot, the wall-clock wait settings.mjs records as miscalibrated and replaced by waitForSceneBuilt (point 499)"
+ },
+ {
+  "id": "U4269",
+  "decision": "kept",
+  "reason": "The listed functions are on applySeedRoute's live path; exports serve tests"
+ },
+ {
+  "id": "U4270",
+  "decision": "kept",
+  "reason": "claim does not hold: the other two importers are README.md and verify-seed.test.mjs, not launchers"
+ },
+ {
+  "id": "U4271",
+  "decision": "rewritten",
+  "reason": "The header now names the village stereo mix and limiter and the tag cry"
+ },
+ {
+  "id": "U4272",
+  "decision": "rewritten",
+  "reason": "\"Four blocks\" now reads \"Six blocks\""
+ },
+ {
+  "id": "U4273",
+  "decision": "rewritten",
+  "reason": "The overview now says the verdict runs every time and a partial run only may not mark the cache complete"
+ },
+ {
+  "id": "U4274",
+  "decision": "backlog",
+  "reason": "scripts/verify/voice.mjs:203 — the probe is said to close on a load that provably happened inside it, but the speaking-state wait's failure is swallowed and modelServed checks service time, not a completed load"
+ },
+ {
+  "id": "U4275",
+  "decision": "rewritten",
+  "reason": "The comment now says a --section=auto-narration run meets a cold engine and the timeout covers the load"
  }
 ]
