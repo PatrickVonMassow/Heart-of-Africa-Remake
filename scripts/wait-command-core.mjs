@@ -64,7 +64,7 @@ export function searchedPatterns(segment = '') {
   const call = /\b(?:pgrep|pkill)\b((?:\s+-{1,2}[A-Za-z-]+)*)\s+(?:(["'])([^"']+)\2)/g
   let match
   while ((match = call.exec(text)) !== null) {
-    const flags = match[1] ?? ''
+    const flags = match[1]
     // Only `-f` matches the FULL command line, and only that can match the
     // watcher's own argv. A plain `pgrep "node"` matches the executable name.
     if (/f/.test(flags.replace(/-{1,2}/g, ''))) out.push(match[3])
@@ -82,12 +82,10 @@ export function searchedPatterns(segment = '') {
  */
 export function selfMatchingPattern(segment = '') {
   const text = typeof segment === 'string' ? segment : ''
-  for (const pattern of searchedPatterns(text)) {
-    // Compare against the segment with the pattern's own quoted occurrence
-    // still in place — that IS the command line the shell will carry.
-    if (text.includes(pattern)) return pattern
-  }
-  return null
+  // Every searched pattern is read out of this very segment, and the segment IS
+  // the command line the shell will carry — so any `-f` pattern it searches for
+  // is a substring of its own command line by construction.
+  return searchedPatterns(text)[0] ?? null
 }
 
 /**
