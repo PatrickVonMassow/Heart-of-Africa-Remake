@@ -2,8 +2,8 @@
 // start → trade in Cairo → checkpoint → travel → village → meet the chief →
 // grave → victory. Runs against the dev server (dev hooks __game,
 // __placePlayer, __placeLayout are DEV-only). UI text is asserted in German,
-// the default game language; journal entries are asserted by their
-// language-neutral keys (design.md §17).
+// switched to at startup (the default game language is English); journal
+// entries are asserted by their language-neutral keys (design.md §17).
 import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
 import { frameShutter } from './frameSubject.mjs'
 import { sectionGate } from './sections.mjs'
@@ -19,14 +19,14 @@ const errors = []
 page.on('console', (m) => m.type() === 'error' && errors.push(m.text()))
 page.on('pageerror', (e) => errors.push('PAGEERROR: ' + e.message))
 
-// SECTIONS (point 566). This suite is ONE story — trade, travel, the chief, hint,
+// SECTIONS (point 566). This suite is ONE story — trade, travel, the chief,
 // grave — and a step of it cannot be replayed without the steps before it, so it
 // is NOT cut into per-step blocks: that would be the silent-dependency shape the
-// mechanism exists to avoid. What IS separable is the pair of checks that run in
-// a SECOND, freshly started window, which own their whole state; they are the
+// mechanism exists to avoid. What IS separable is the checks that run in a
+// SECOND, freshly started window, which own their whole state; they are the
 // second section, and the story is the first. Without a request both run, in
 // file order, exactly as before; `--section=fresh-start-window` repairs those
-// two without replaying the core loop. The names are read out of THIS FILE by
+// checks without replaying the core loop. The names are read out of THIS FILE by
 // scripts/verify/sections.mjs, so an unknown one is refused with the list of the
 // real ones — and the run is stamped PARTIAL, never counted as suite coverage.
 const sections = sectionGate()
@@ -34,10 +34,11 @@ const { section } = sections
 if (sections.banner()) console.log(sections.banner())
 
 let failCount = 0
-function check(name, cond) {
+function check(name, cond, detail) {
   // The section tag goes after the name: the check's NAME is its identity for
-  // the red ledger and the baseline classifier and must not change.
-  console.log((cond ? 'PASS' : 'FAIL') + '  ' + name + sections.tag())
+  // the red ledger and the baseline classifier and must not change. The detail
+  // follows after the ' — ' separator.
+  console.log((cond ? 'PASS' : 'FAIL') + '  ' + name + sections.tag() + (detail ? ' — ' + detail : ''))
   if (!cond) failCount++
 }
 // Point 375: a frame states what it must show and the shutter proves it is in
@@ -50,7 +51,7 @@ const moveTo = (x, z) =>
 const findInteractive = async (type) =>
   page.evaluate((t) => {
     const it = window.__placeLayout.interactives.find((i) => i.type === t)
-    return it ? { pos: it.pos, door: it.door ?? null } : null
+    return it ? { door: it.door ?? null } : null
   }, type)
 
 // German building labels (src/i18n/de.ts): the door prompt NAMES its building, so
@@ -65,26 +66,24 @@ const BUILDING_LABELS = { tools: 'Geräte-Hütte', shop: 'Laden', chief: 'Chefh�
 // the head man provides settlement orientation (design.md §17.3).
 async function enterBuilding(type) {
   const it = await findInteractive(type)
-  {
-    // Step onto the door point; the door prompt arms in the render loop, then
-    // Space enters (walking in alone does nothing now, design.md §2.3). Wait for
-    // the prompt that NAMES THIS building so the press cannot fire on a stale or
-    // neighbouring candidate (point 244).
-    await moveTo(it.door[0], it.door[1])
-    await page.waitForFunction(
-      (label) => (document.querySelector('.prompt')?.textContent ?? '').includes(label),
-      BUILDING_LABELS[type],
-      { timeout: 30000 },
-    )
-    await page.keyboard.press('Space')
-    if (type === 'chief') {
-      await page.waitForFunction(() => {
-        const g = window.__game.getState()
-        return g.orientationGiven[g.placeId] === true
-      }, null, { timeout: 30000 })
-    } else {
-      await page.waitForFunction(() => !!document.querySelector('.dialog'), null, { timeout: 30000 })
-    }
+  // Step onto the door point; the door prompt arms in the render loop, then
+  // Space enters (walking in alone does nothing now, design.md §2.3). Wait for
+  // the prompt that NAMES THIS building so the press cannot fire on a stale or
+  // neighbouring candidate (point 244).
+  await moveTo(it.door[0], it.door[1])
+  await page.waitForFunction(
+    (label) => (document.querySelector('.prompt')?.textContent ?? '').includes(label),
+    BUILDING_LABELS[type],
+    { timeout: 30000 },
+  )
+  await page.keyboard.press('Space')
+  if (type === 'chief') {
+    await page.waitForFunction(() => {
+      const g = window.__game.getState()
+      return g.orientationGiven[g.placeId] === true
+    }, null, { timeout: 30000 })
+  } else {
+    await page.waitForFunction(() => !!document.querySelector('.dialog'), null, { timeout: 30000 })
   }
   await page.waitForTimeout(400)
 }
@@ -280,7 +279,7 @@ if (section('core-loop')) {
   // Points 287/318: the localized German name of this village, to prove the enter
   // hint hides it behind the kind placeholder while the place is undiscovered.
   const villageName = await page.evaluate(async (id) => (await import('/src/i18n/de.ts')).de.places[id], village.id)
-  // 0.5° ≈ 5 world units: outside the enter radius (2.5), so real walking
+  // 0.5° ≈ 5 world units: outside the enter radius (balance.placeEnterRadius), so real walking
   // (movement, time, provisions) is required to get in.
   await page.evaluate(([lat, lon]) => window.__game.getState().debugJumpTo(lat, lon), [village.lat + 0.5, village.lon])
   await page.waitForTimeout(400)
@@ -440,8 +439,9 @@ if (section('core-loop')) {
   await shot('03-village-nubians', { place: village.id, label: 'the village interior' })
 
   // --- 5b. Regression guard (design.md §16): the open, non-modal journal must
-  // not block entering a hut with Space at its door. A fresh village-discovered
-  // entry auto-opens the journal; Space must still enter (and close the book). ---
+  // not block entering a hut with Space at its door. The journal is opened by
+  // hand (DND keeps it from auto-opening in this run); Space must still enter
+  // (and close the book). ---
   await page.evaluate(() => window.__game.getState().setJournalOpen(true))
   const marketDoor = await page.evaluate(() => {
     const it = window.__placeLayout.interactives.find((i) => i.type === 'market')
@@ -467,7 +467,7 @@ if (section('core-loop')) {
     check('a hut door opens even with the journal open (design.md §16)', true, 'no market hut in this village — skipped')
   }
 
-  // --- 6. The Nubian head man answers without Bambara's drum chain ---
+  // --- 6. The Nubian head man answers with nothing to send ---
   const journalBeforeChief = (await state()).journal.length
   await enterBuilding('chief')
   await page.waitForTimeout(300)
@@ -541,13 +541,12 @@ if (section('core-loop')) {
   await shot('07-victory', { element: '.overlay', label: 'the victory overlay' })
 }
 
-// --- Point 59: mouse-look is not grabbed while the start-choice overlay is up -
-// (design.md §17.5) A checkpoint at startup shows the StartOverlay; the pointer
-// must not be grabbed then, or the load choice is unclickable. Spy on
-// requestPointerLock across two loads: fresh (no overlay) grabs, with a
-// checkpoint (overlay up) does not.
+// --- Point 59: mouse-look at a fresh start, and no start overlay -------------
+// (design.md §17.5) A fresh start engages mouse-look (the scene's lock request,
+// counted by __placeLock.grabs, and the view turning); with a checkpoint seeded
+// no start-choice overlay appears, since save-load is disabled for the PoC.
 //
-// Both halves below run on THIS second window and nothing else does, so they are
+// The checks below run on THIS second window and nothing else does, so they are
 // one section: the monument entry reads the very page the pointer-lock half
 // booted, and a whole run opens that window exactly once, as it always did.
 if (section('fresh-start-window')) {
@@ -561,18 +560,6 @@ if (section('fresh-start-window')) {
   await page2.bringToFront()
   page2.on('console', (m) => m.type() === 'error' && errors.push('page2: ' + m.text()))
   page2.on('pageerror', (e) => errors.push('page2 PAGEERROR: ' + e.message))
-  await page2.addInitScript(() => {
-    window.__plCalls = 0
-    const orig = HTMLCanvasElement.prototype.requestPointerLock
-    HTMLCanvasElement.prototype.requestPointerLock = function (...a) {
-      window.__plCalls++
-      try {
-        return orig.apply(this, a)
-      } catch {
-        return undefined
-      }
-    }
-  })
   await page2.goto(BASE)
   await page2.evaluate(() => localStorage.clear())
   await page2.reload()
