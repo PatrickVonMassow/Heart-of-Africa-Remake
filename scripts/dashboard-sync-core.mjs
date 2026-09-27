@@ -7,10 +7,10 @@
 // not hold, so this guard detects and BLOCKS that drift mechanically.
 //
 // READ-ONLY by design: the guard never edits the card, it only decides
-// block/allow. Every function here is total — no I/O, no mutation, no throw on
-// malformed input — so the Vitest layer can sweep every decision path and the
-// wrapper's fail-open guarantee (any unreadable state → allow) rests on a core
-// that cannot blow up either.
+// block/allow. No I/O, no mutation; the parsers are total on malformed input
+// and `evaluate` on a malformed state (a card list must hold parsed cards), so
+// the Vitest layer can sweep every decision path, and the wrapper's catch
+// allows on anything else.
 //
 // Reality signals (gathered by the wrapper, all optional):
 //   headBranch     the primary checkout's branch (git symbolic-ref); a point
@@ -47,7 +47,7 @@ export function parseWorktreeBranches(porcelain) {
   return branches
 }
 
-/** Open/done TASKS point numbers; skips DEFERRED lines like dashboard-guard. */
+/** Open/done TASKS point numbers; skips DEFERRED open lines like dashboard-guard. */
 export function parseTasksPoints(text) {
   const open = []
   const done = []
@@ -83,8 +83,8 @@ export function parseCardTitle(raw, options = {}) {
 }
 
 /**
- * All `.now` card titles of the »Woran ich gerade arbeite« section, parsed, in
- * document order. Bounded to the now SECTION (up to the next <h2>) exactly like
+ * The card titles of the »Woran ich gerade arbeite« section (every card in it,
+ * whatever its class), parsed, in document order. Bounded to the now SECTION (up to the next <h2>) exactly like
  * dashboard-guard's parser, so numbered cards in »Von dir zu klären« or the
  * Warteschlange are never mistaken for now-cards. Empty array on non-string
  * input or a missing section.
@@ -154,8 +154,8 @@ export function claimsAgents(raw) {
  *   - a label token appearing in the head or an agent branch slug
  *   - an agent-work claim while the worktree agent pool is non-empty
  * The card's declared point being merely OPEN in TASKS.md is deliberately NOT a
- * match here — `main` as HEAD confirms nothing (the prompt's »card 306, HEAD
- * main → no match«); evaluate() decides separately which unmatched cards are
+ * match here — `main` as HEAD confirms nothing (»card 306, HEAD main« is no
+ * match); evaluate() decides separately which unmatched cards are
  * harmless and which are drift.
  */
 export function matches(card, state) {
@@ -188,22 +188,22 @@ export const DRIFTS = Object.freeze([
   }),
   Object.freeze({
     id: 'head-drift',
-    detects: 'the working tree is on a point branch that no now-card names',
+    detects: 'the working tree is on a point branch that no now-card names by point or label',
     example: 'the card says »306« but HEAD is on »feat/224-workflow«',
   }),
   Object.freeze({
     id: 'unknown-point',
-    detects: 'a now-card names a point that exists neither in the work order nor on any branch',
+    detects: 'a now-card names a point that exists neither in the work order nor on any branch (a card a live branch or label backs is exempt)',
     example: 'a card »999 — Phantom« survives a typo or a renumbering',
   }),
   Object.freeze({
     id: 'stale-done',
-    detects: 'every point a now-card names is ticked done and no branch still works one',
+    detects: 'every point a now-card names is ticked done and no branch, label or agent claim still backs the card',
     example: 'the »306« card still stands after 306 was merged and its branch pruned',
   }),
   Object.freeze({
     id: 'agent-claim',
-    detects: 'a card claims running delegated work while no agent worktree exists and HEAD is on no work branch',
+    detects: 'a card with no point number claims running delegated work while no agent worktree exists and HEAD is on no work branch',
     example: '»Fable-Verifikationen + Agent-Pool« with an empty pool',
   }),
 ])
@@ -221,7 +221,8 @@ export function formatDriftReport(drifts = DRIFTS) {
   }
   lines.push('')
   lines.push('Signals it reads: the HEAD branch, the branches of the other git worktrees (the agent pool),')
-  lines.push('the work order ticks, and the now-card titles. Anything unreadable ALLOWS the stop.')
+  lines.push('the work order ticks, and the now-card titles. An unreadable board or work order ALLOWS the stop;')
+  lines.push('an unreadable git answer reads as no branch and an empty pool.')
   return lines.join('\n')
 }
 
@@ -237,7 +238,7 @@ const FIX = ` Fix the CARD (rewrite it to the real current work, then ${REPUBLIS
  *           the dashboard HTML was unreadable
  *   state   { headBranch, agentBranches, open, done, tasksReadable }
  *   paused  .claude/batch-paused exists → no dashboard duty at all
- * Returns { block, reason }.
+ * Returns { block, reason, drift }.
  */
 export function evaluate(input) {
   const { cards = null, state = null, paused = false } = input ?? {}

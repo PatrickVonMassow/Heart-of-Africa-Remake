@@ -6,8 +6,9 @@
 //
 // The decision logic lives in dashboard-sync-core.mjs (pure, Vitest-covered);
 // this wrapper only GATHERS the inputs (git + file reads — the core does no
-// I/O) and is fail-OPEN: any read failure or internal error → allow, so a
-// guard bug never traps the session. READ-ONLY: it never edits the card.
+// I/O) and is fail-OPEN: an unreadable board or work order, or an internal
+// error → allow, so a guard bug never traps the session (a failed git read
+// counts as no branch and an empty pool). READ-ONLY: it never edits the card.
 //
 // Reality signals gathered here:
 //   - HEAD branch of the primary checkout (git symbolic-ref)

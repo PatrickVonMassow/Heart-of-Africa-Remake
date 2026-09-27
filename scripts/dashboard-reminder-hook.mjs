@@ -1,6 +1,9 @@
 // UserPromptSubmit hook (user mandate 16.07.2026, after repeated dashboard
 // staleness): inject the standing dashboard obligation into the context on
-// EVERY user prompt, so no turn can end with a stale board. Stdout becomes
+// every user prompt of the batch owner, so no turn can end with a stale board —
+// plus the context-level line and, for an attended window past the ceiling, a
+// one-time notice (a non-owner gets the stand-down text instead). It also seeds
+// the decision-card baseline and withdraws a pending handover. Stdout becomes
 // context for the assistant.
 //
 // Since 22.07.2026 (the now-card still said point 200 while the work had
@@ -25,7 +28,7 @@ import { activeRecordPath, logDir, readRecord, runIsLive } from './verify/run-re
 // Hard singleton (24.07.2026): a session that does not own the live batch lock
 // has NO dashboard/focus duty — arming the pivot check or issuing the board
 // obligations would conscript it into batch work. Since point 440 it is told
-// that and nothing else; the chat-timestamp rule reaches every session through
+// that (beside the context-level line and any ceiling notice); the chat-timestamp rule reaches every session through
 // the user-scope hook and timestamp-guard, not through this one.
 let standDown = false
 let sid = ''

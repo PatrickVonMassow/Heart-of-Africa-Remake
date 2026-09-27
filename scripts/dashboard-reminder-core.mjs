@@ -1,5 +1,6 @@
-// The text the UserPromptSubmit hook injects into EVERY user prompt — the most
-// expensive text in this project, so it lives in a pure module the Vitest layer
+// The text the UserPromptSubmit hook injects into every user prompt of the batch
+// owner (a non-owner gets STAND_DOWN_TEXT instead) — the most expensive text in
+// this project, so it lives in a pure module the Vitest layer
 // can hold to its shape and its size (point 436).
 //
 // WHY IT SHRANK, from 2153 characters to under 900. It used to restate the
@@ -7,7 +8,7 @@
 // the `open`-attribute ban, the queue card's header meta. Every one of those is
 // now REFUSED by a gate before the board can be published — `structureViolations`
 // (board-structure-core) on the sections, their order and the wrappers,
-// `auto-open` and `queue-meta` in dashboard-guard-core. Reminding of a rule a
+// `auto-open`, `section-not-collapsible` and `queue-meta` in dashboard-guard-core. Reminding of a rule a
 // gate already refuses to break is the pattern this project replaced everywhere
 // else, and here it was billed on every single prompt.
 //
@@ -64,8 +65,8 @@ export const REMINDER_CHAR_BUDGET = 950
  * The claims the PROMPT INJECTION as a whole no longer makes, because a gate
  * refuses to let them be broken and hands the remedy at the moment it is needed
  * (point 440, applying 436's rule to the rest of the hook's output). Measured
- * before the cut: the hook printed 1771 characters per prompt, of which 927
- * were these three blocks.
+ * before the cut: the hook printed 1771 characters per prompt, of which about
+ * 925 (139 + 358 + 427, plus separators) were these three blocks.
  *
  *   · the chat-timestamp rule, stated TWICE more (a `[timestamp] PFLICHT` line
  *     of 139 characters and a 358-character `WICHTIGSTE REGEL` banner). Both
@@ -128,7 +129,7 @@ export function contextLevelSuffix(tokens) {
 
 /** The compact per-prompt handoff. The user-scope timestamp hook supplies the
  * bold German stamp; this project hook supplies what belongs directly after it. */
-export function contextLevelInstruction(tokens) {
+function contextLevelInstruction(tokens) {
   return `[context-level] Kopfzeilen-Suffix:${contextLevelSuffix(tokens)}\n`
 }
 
@@ -157,9 +158,9 @@ export function attendedCeilingNoticeText({ tokens, ceiling, mode } = {}) {
 }
 
 /**
- * Everything the hook writes to stdout for a session that owns the batch — the
- * measurable unit, so a test can hold the WHOLE per-prompt cost to
- * PROMPT_CHAR_BUDGET rather than one paragraph of it.
+ * The owner's board part of what the hook writes — `hookInjectionText` adds the
+ * context-level line and the attended ceiling notice around it. The measurable
+ * unit PROMPT_CHAR_BUDGET holds.
  */
 export function promptInjectionText(mtimeNote = '') {
   return boardReminderText(mtimeNote) + '\n'
