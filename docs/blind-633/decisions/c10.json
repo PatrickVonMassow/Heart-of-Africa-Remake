@@ -1,0 +1,282 @@
+[
+ {
+  "id": "U4860",
+  "decision": "rewritten",
+  "reason": "Header now names the walkable monument site (Giza) beside port and village."
+ },
+ {
+  "id": "U4861",
+  "decision": "rewritten",
+  "reason": "FIRE_SHADOW_MAP_SIZE comment now says the graphics level picks the resolution and this is only the fallback size."
+ },
+ {
+  "id": "U4862",
+  "decision": "removed",
+  "reason": "Dropped the two surplus blank lines before the shared-materials section."
+ },
+ {
+  "id": "U4863",
+  "decision": "kept",
+  "reason": "claim does not hold: groundDebugFlat is a live debug toggle, set from DebugMenu (t.debug.flatGround) via setGroundDebugFlat."
+ },
+ {
+  "id": "U4864",
+  "decision": "rewritten",
+  "reason": "Roof comment now limits the roofClearance contract to the roof shapes and names parapet and label heights as dressing literals."
+ },
+ {
+  "id": "U4865",
+  "decision": "rewritten",
+  "reason": "Comment now calls it the walk's only write of chiefOutside and notes the drum message writes its own state."
+ },
+ {
+  "id": "U4866",
+  "decision": "removed",
+  "reason": "Dropped Stall's unused plenty default; the prop is now required, as Dwelling always passes it."
+ },
+ {
+  "id": "U4867",
+  "decision": "rewritten",
+  "reason": "Mosque body comment now says a plain mud box."
+ },
+ {
+  "id": "U4868",
+  "decision": "rewritten",
+  "reason": "FirePit doc now says the cook-shelter stands only where sheltered, dome-dweller villages keep an open fire."
+ },
+ {
+  "id": "U4869",
+  "decision": "removed",
+  "reason": "Dropped FirePit's unused blaze default; the prop is required and the sole caller passes fireBlaze."
+ },
+ {
+  "id": "U4870",
+  "decision": "removed",
+  "reason": "rainRef is now required and the missing-ref branch is gone; the sole caller passes placeWetness."
+ },
+ {
+  "id": "U4871",
+  "decision": "removed",
+  "reason": "thatchMat is now required on FirePit and CookShelter and the unreachable fallback material is gone; createSurfaceMaterial always returns a material."
+ },
+ {
+  "id": "U4872",
+  "decision": "rewritten",
+  "reason": "Gait probe comment now speaks of the phase's rate, not the accumulated phase."
+ },
+ {
+  "id": "U4873",
+  "decision": "rewritten",
+  "reason": "Moved the landscape-backdrop annulus doc onto LandscapeBackdrop."
+ },
+ {
+  "id": "U4874",
+  "decision": "rewritten",
+  "reason": "Moved the Table Mountain doc onto TableMountainSkyline."
+ },
+ {
+  "id": "U4875",
+  "decision": "kept",
+  "reason": "claim does not hold: pickForKeyPress exists in useKeyTarget.ts and is what pressKey and advanceKeyPicks call; the doc now names its module."
+ },
+ {
+  "id": "U4876",
+  "decision": "rewritten",
+  "reason": "Candidate-list doc now names the drummer and standing chief it already includes and drops the dig-site/rebuild promise."
+ },
+ {
+  "id": "U4877",
+  "decision": "removed",
+  "reason": "Dropped the orphaned walls/play-ground comment above the place-kind flags."
+ },
+ {
+  "id": "U4878",
+  "decision": "rewritten",
+  "reason": "Comment now says the monument takes the port's sandy sky/light/flora/scatter treatment while keeping its own desert-sand ground material."
+ },
+ {
+  "id": "U4879",
+  "decision": "rewritten",
+  "reason": "Walk-state comment now says the eased velocity is what the movement integrates."
+ },
+ {
+  "id": "U4880",
+  "decision": "removed",
+  "reason": "Dropped the stale touch-preset shadow comment; the graphics-level comment below states the real driver."
+ },
+ {
+  "id": "U4881",
+  "decision": "rewritten",
+  "reason": "The dev-hook cleanup now also deletes __placeSpots and __chiefHome on unmount."
+ },
+ {
+  "id": "U4882",
+  "decision": "rewritten",
+  "reason": "Comment now says a dialog freezes looking as it cuts walking input."
+ },
+ {
+  "id": "U4883",
+  "decision": "rewritten",
+  "reason": "Speech-guess opener doc now names the E guess key and the pad's shared use button (point 1139)."
+ },
+ {
+  "id": "U4884",
+  "decision": "rewritten",
+  "reason": "Comment now speaks of the last rendered frame's pick instead of a non-existent nearRef."
+ },
+ {
+  "id": "U4885",
+  "decision": "rewritten",
+  "reason": "Touch-look comment now says the drag turns as far as the mouse, yaw only."
+ },
+ {
+  "id": "U4886",
+  "decision": "rewritten",
+  "reason": "Comment now says EYE_HEIGHT above its footing."
+ },
+ {
+  "id": "U4887",
+  "decision": "rewritten",
+  "reason": "Footstep comment now says the phase advances by the eased walk speed, not the resolved displacement."
+ },
+ {
+  "id": "U4888",
+  "decision": "rewritten",
+  "reason": "Prompt comment now says the hut leaves the list once he is out and the prompt names the action at him."
+ },
+ {
+  "id": "U4889",
+  "decision": "rewritten",
+  "reason": "Chief mount comment now describes the walk to the drummer, the stay and the return home."
+ },
+ {
+  "id": "U4890",
+  "decision": "rewritten",
+  "reason": "Marker comment now says every interactive, the chief's hut included."
+ },
+ {
+  "id": "U4891",
+  "decision": "removed",
+  "reason": "Dropped the teaching-stone JSX comment; no stone is rendered."
+ },
+ {
+  "id": "U4892",
+  "decision": "rewritten",
+  "reason": "Play-rocks comment no longer compares with the removed teaching stone."
+ },
+ {
+  "id": "U4893",
+  "decision": "rewritten",
+  "reason": "PlaceLife now receives firePos={VILLAGE_FIRE} (same value) instead of a copied literal."
+ },
+ {
+  "id": "U4894",
+  "decision": "rewritten",
+  "reason": "Header now says a label is gone after a moment unless the player is targeting it."
+ },
+ {
+  "id": "U4895",
+  "decision": "rewritten",
+  "reason": "Header now scopes the no-standing-text claim to speech and names building and name labels as separate."
+ },
+ {
+  "id": "U4896",
+  "decision": "rewritten",
+  "reason": "Targeting comments now name the guess-key candidate and say E acts on the speaker, only the pad arbitrating against other uses."
+ },
+ {
+  "id": "U4897",
+  "decision": "removed",
+  "reason": "Dropped ADULT_CONCEPTS; nothing read it but two tautological test assertions, which went with it."
+ },
+ {
+  "id": "U4898",
+  "decision": "rewritten",
+  "reason": "Dropped the export on AdultPhase, DigUtterance and AdultWorker; only local use remains."
+ },
+ {
+  "id": "U4899",
+  "decision": "rewritten",
+  "reason": "Dropped the export on AIM_CLEARANCE; only siteClear reads it."
+ },
+ {
+  "id": "U4900",
+  "decision": "rewritten",
+  "reason": "Header now says RIVER is the sender's order and the carrier's report, both at the water stand."
+ },
+ {
+  "id": "U4901",
+  "decision": "rewritten",
+  "reason": "Header now says the two digging situations start their site search one site apart and never share a held site, instead of promising distinct sites."
+ },
+ {
+  "id": "U4902",
+  "decision": "rewritten",
+  "reason": "orderedBy doc now says the sender walks only to his spot beside the stand."
+ },
+ {
+  "id": "U4903",
+  "decision": "rewritten",
+  "reason": "anotherFreeAdult doc now describes picking the carrier and why his ground needs no clearance."
+ },
+ {
+  "id": "U4904",
+  "decision": "removed",
+  "reason": "Dropped the superseded stacked comment that called the stand the carrier's spot."
+ },
+ {
+  "id": "U4905",
+  "decision": "rewritten",
+  "reason": "siteClear doc now says the partner is exempt when passed, as at the word itself."
+ },
+ {
+  "id": "U4906",
+  "decision": "rewritten",
+  "reason": "Frame-deferral comment now limits one word per frame to non-urgent requests."
+ },
+ {
+  "id": "U4907",
+  "decision": "backlog",
+  "reason": "src/scenes/place/adultWork.ts:682 — the final arrived-walk cleanup branch (owes nothing, no hold) looks unreachable through the module's own transitions and would bypass clearPair's floor release; needs a state-machine check before removal."
+ },
+ {
+  "id": "U4908",
+  "decision": "backlog",
+  "reason": "src/scenes/place/adultWork.ts:104 — AdultTask.role 'worker' is never assigned by the module (only a test fixture uses it); drop the variant together with that fixture."
+ },
+ {
+  "id": "U4909",
+  "decision": "backlog",
+  "reason": "src/scenes/place/adultWork.ts:140 — AdultTask.via is always null (every constructor and fixture), so goalOf's via fallback and the !t.via guard are dead; remove the field with its test fixtures."
+ },
+ {
+  "id": "U4910",
+  "decision": "kept",
+  "reason": "claim does not hold: PlaceLife reads geography.waterHead (PlaceLife.tsx:3030) for its adult destinations; the field is live."
+ },
+ {
+  "id": "U4911",
+  "decision": "backlog",
+  "reason": "src/config/balance.ts adultErrands.dwellSeconds — declared in AdultWorkConfig and debug-editable but read by no code (pace is live via PlaceLife); remove it with its debug row and language keys."
+ },
+ {
+  "id": "U4912",
+  "decision": "rewritten",
+  "reason": "Header now says the completed strokes are counted at most one per frame."
+ },
+ {
+  "id": "U4913",
+  "decision": "rewritten",
+  "reason": "Comment now says only say.at is read for the report and its aim is the sender's position in readyWord."
+ },
+ {
+  "id": "U4914",
+  "decision": "kept",
+  "reason": "claim does not hold: PlaceLife's dev hook reads task.hushed (PlaceLife.tsx:3536), which the verify suites inspect."
+ },
+ {
+  "id": "U4915",
+  "decision": "kept",
+  "reason": "AdultWorkState is the return type of createAdultWork and used across files; live."
+ }
+]
