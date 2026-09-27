@@ -12,8 +12,8 @@
 //
 // This script is the answer to the common case. It NEVER flushes, NEVER
 // destroys, NEVER touches a policy or a chain — it only adds addresses to the
-// existing `allowed-domains` ipset. Every failure mode therefore leaves the
-// firewall exactly as it was: an add that fails adds nothing. It cannot seal the
+// existing `allowed-domains` ipset. No failure mode can take anything away: an
+// add that fails adds nothing, and the adds that succeeded stay. It cannot seal the
 // container, which is the whole reason it is a separate script rather than a
 // flag on the rebuild.
 //
@@ -30,9 +30,9 @@
 // held one address out of that pool, the browser install failed, and the session
 // reached for the rebuild because no smaller tool existed.
 //
-// With NO argument it tops up exactly that set — the Playwright CDN and its
-// Chrome-for-Testing storage, Hugging Face, npm and the API host itself — and
-// then VERIFIES each one is actually reachable, so the answer to "did that help?"
+// With NO argument it tops up the project's own set (DEFAULT_TOPUP below) — the
+// Playwright CDNs and their Chrome-for-Testing storage, Hugging Face, jsDelivr,
+// npm, the reviewer's OpenAI hosts and the API host itself — and then VERIFIES each one is actually reachable, so the answer to "did that help?"
 // comes from the network rather than from an exit code.
 //
 // A top-up is NOT persistent: the ipset lives in the kernel and a container
@@ -102,15 +102,15 @@ export const DEFAULT_TOPUP = [
 ]
 
 /** Per-command ceiling. An `ipset add` is instant; anything slower is stuck. */
-export const COMMAND_TIMEOUT_MS = 10_000
+const COMMAND_TIMEOUT_MS = 10_000
 
 /** DNS ceiling. The firewall permits port 53 unconditionally, so this is fast. */
-export const RESOLVE_TIMEOUT_MS = 15_000
+const RESOLVE_TIMEOUT_MS = 15_000
 
 /**
  * Reachability probe ceiling. Short on purpose: a blocked host does not answer
- * at all, and the whole point of this script is that nothing it does can hang
- * long enough to hit a tool timeout.
+ * at all, and no single step of this script may hang. The default run works its
+ * hosts serially, so on a bad network the whole run can still take minutes.
  */
 export const PROBE_TIMEOUT_MS = 8_000
 
@@ -219,10 +219,11 @@ function run(args, { timeout = COMMAND_TIMEOUT_MS } = {}) {
  *
  * A missing set is not something this script repairs. Creating it would produce
  * a set nothing matches against (the OUTPUT rule referencing it is gone too),
- * i.e. a silent no-op dressed as success. A missing set means the firewall
- * itself is gone, and the answer to that is the rebuild.
+ * i.e. a silent no-op dressed as success. A missing set usually means the
+ * firewall itself is gone, and the answer to that is the rebuild. A failed
+ * listing (sudo refused, ipset missing) also answers false.
  */
-export function setExists(set) {
+function setExists(set) {
   try {
     const out = run(['ipset', 'list', '-n'], { timeout: COMMAND_TIMEOUT_MS })
     return out.split('\n').some((line) => line.trim() === set)
@@ -247,7 +248,7 @@ async function resolve4(host) {
  * This is the difference between "the command exited 0" and "the thing works".
  * The incident began with an install that failed while everything looked fine.
  */
-export async function probeReachable(host, timeoutMs = PROBE_TIMEOUT_MS) {
+async function probeReachable(host, timeoutMs = PROBE_TIMEOUT_MS) {
   try {
     const res = await fetch(`https://${host}/`, {
       method: 'HEAD',
@@ -278,8 +279,8 @@ async function main(argv) {
 
   if (!opts.dryRun && !setExists(opts.set)) {
     console.error(
-      `firewall-allow: ipset "${opts.set}" does not exist. That means the firewall is not up at all,\n` +
-        'not that a host is missing from it — adding to a set nothing matches against would look like\n' +
+      `firewall-allow: ipset "${opts.set}" does not exist or could not be listed. That usually means the\n` +
+        'firewall is not up at all, not that a host is missing from it — adding to a set nothing matches against would look like\n' +
         'success and change nothing. Rebuild instead:\n' +
         '  node scripts/firewall-rebuild.mjs --run',
     )
@@ -358,7 +359,7 @@ async function main(argv) {
   if (failures) {
     console.error(
       `\n${failures} target(s) did not come out reachable. Nothing was flushed and nothing was\n` +
-        'undone — the firewall is exactly as it was. If the allowlist itself is gone:\n' +
+        'undone — every add that succeeded stays, every one that failed changed nothing. If the allowlist itself is gone:\n' +
         '  node scripts/firewall-rebuild.mjs --run',
     )
   }
