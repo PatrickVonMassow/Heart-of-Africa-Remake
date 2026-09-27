@@ -1,5 +1,5 @@
-// Retention for the tool-output budget's spill logs. Every intercepted call
-// writes one capture file, so without an age rule the directory grows for as
+// Retention for the tool-output budget's spill logs. Every captured producer
+// run writes one capture file, so without an age rule the directory grows for as
 // long as the project runs; 30 days keeps a recent failure's full output
 // reachable and lets the rest go.
 import { readdirSync, rmSync, statSync } from 'node:fs'
@@ -12,7 +12,8 @@ export const CAPTURE_LOG_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000
 // not ours to remove.
 const CAPTURE_LOG_NAME = /^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}-\d+\.log$/
 
-/** Remove stale completed captures. Best-effort by design: retention failure
+/** Remove captures (matched by name) whose mtime is older than maxAgeMs.
+ * Best-effort by design: retention failure
  * must never prevent the current command from running or preserving its log. */
 export function pruneCaptureLogs(directory, { now = Date.now(), maxAgeMs = CAPTURE_LOG_MAX_AGE_MS } = {}) {
   const removed = []

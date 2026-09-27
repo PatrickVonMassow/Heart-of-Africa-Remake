@@ -18,16 +18,16 @@ import { resolve } from 'node:path'
 /** The session whose race this fixture replays, and the rows that carry it. */
 const WHO = 'timestamp-race-fixture'
 
-export const RACE_SESSION = 'd5fcb9cf-2936-4743-9502-f504f08b8ac5'
-export const NARRATION_ROW = 711
-export const LAST_TOOL_RESULT_ROW = 948
-export const FINAL_REPLY_ROW = 950
-export const STOP_FEEDBACK_ROW = 953
-export const TAIL_FROM = 930
-export const TAIL_TO = 949
+const RACE_SESSION = 'd5fcb9cf-2936-4743-9502-f504f08b8ac5'
+const NARRATION_ROW = 711
+const LAST_TOOL_RESULT_ROW = 948
+const FINAL_REPLY_ROW = 950
+const STOP_FEEDBACK_ROW = 953
+const TAIL_FROM = 930
+const TAIL_TO = 949
 /** Long bodies are cut so the fixture stays reviewable; the served refusal is not. */
-export const CAP = 120
-export const REFUSAL_CAP = 4000
+const CAP = 120
+const REFUSAL_CAP = 4000
 
 export function raceTranscriptPath(home = homedir()) {
   return resolve(home, '.claude', 'projects', '-workspace-hoa', `${RACE_SESSION}.jsonl`)
