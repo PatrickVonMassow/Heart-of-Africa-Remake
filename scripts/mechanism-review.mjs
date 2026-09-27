@@ -125,6 +125,8 @@ const git = (args) =>
     windowsHide: true,
     cwd: REPO_ROOT,
     encoding: 'utf8',
+    // Blind halves pass the 1 MB default (closing 633: 1.9 MB), which read as "no model field".
+    maxBuffer: 64 * 1024 * 1024,
   }).trim()
 
 
