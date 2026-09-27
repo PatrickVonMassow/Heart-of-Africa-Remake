@@ -9,7 +9,7 @@
 //
 //   node scripts/child-retry.mjs --point 421 --branch feat/421-slug \
 //        --death "API Error: 500 {…}" [--child <agent id>] [--brief-revision <sha>] \
-//        [--reported-complete] [--committed|--no-committed] [--tokens N] \
+//        [--reported-complete] [--committed|--no-committed] [--critical] [--tokens N] \
 //        [--session <id>] [--json]
 //
 //   node scripts/child-retry.mjs --status              what the state file holds
@@ -51,7 +51,7 @@ import {
 
 // Both resilience layers keep their runtime state in ONE gitignored directory,
 // so the repository's ignore list grows by a single path rather than by a line
-// per file — this branch shares .gitignore with two parallel ones.
+// per file.
 export const STATE_PATH = repoPath('.claude/resilience/child-retry.json')
 export const LOG_PATH = repoPath('.claude/resilience/child-retry.log')
 
@@ -166,11 +166,10 @@ function berlinStamp(now = new Date()) {
 // the channel built for reaching the user.
 
 /**
- * The pause marker is read through batch-lock.mjs, LAZILY. That module resolves
- * its paths with `fileURLToPath(new URL(…, import.meta.url))`, which THROWS
- * under a test runner (the reason scripts/repo-paths.mjs exists) — a top-level
- * import would take this whole module down before a single test could load it.
- * The CLI is the only caller, and it is never the test runner.
+ * The pause marker is read through batch-lock.mjs, LAZILY — only the CLI needs
+ * it, so a test importing this module's helpers never loads it. (It once
+ * resolved its paths via `import.meta.url`, which threw under a test runner; it
+ * now goes through scripts/repo-paths.mjs.)
  */
 async function pauseApi() {
   return import('./batch-lock.mjs')
@@ -284,8 +283,8 @@ async function main() {
     tokenCap: tokenCap(),
   })
 
-  // Stand-down changes nothing and records nothing: a session that may not act
-  // must not leave footprints in the state either.
+  // Stand-down and scheduled change no state: a session that may not act must
+  // not leave footprints there (the log line below still records the decision).
   if (!['stand-down', 'scheduled'].includes(decision.verdict)) {
     let next = recordDeath(state, { point, branch, childId, signature: decision.signature, verdict: decision.verdict, at: Date.now() })
     // A reported completion is PERSISTED here, not only used for this verdict
@@ -338,7 +337,7 @@ if (isCli) {
     })
     // The retry state IS the record (point 749): the board derives its state card
     // from it, so this path writes the decision once and nothing else.
-    try { writeState(recordRecovery(readState(), decision)) } catch { /* the log still retains the same decision */ }
+    try { writeState(recordRecovery(readState(), decision)) } catch { /* the log line below still records a summary of it */ }
     console.log(describeDecision(decision))
     logLine(`internal error → exchange; next attempt ${new Date(decision.retryAt).toISOString()}: ${e?.message ?? e}`)
     code = 0
