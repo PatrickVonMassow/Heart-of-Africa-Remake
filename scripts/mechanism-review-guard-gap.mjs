@@ -4,17 +4,17 @@
 // Called by mechanism-review-guard.mjs ONLY on a turn it would block: it
 // assembles the same shape of material `review-astra` would send for the range
 // (diffstat + patch + every touched path's content at head), measures it
-// against the budget, asks the pass-splitting tool — where this tree carries
-// one — whether a split covers the range, and hands the numbers to the pure
-// ruling. The common clear turn never reaches this file.
+// against the budget, asks the pass-splitting tool whether a split covers the
+// range, and hands the numbers to the pure ruling. The common clear turn never reaches this file.
 //
 // THE GATE CHAIN REQUIRES THE SPLITTER MODULE (review-material-core.mjs) AND
 // FAILS LOUDLY WITHOUT IT. An earlier revision documented a pre-splitter
 // cherry-pick tree this file would tolerate — a claim the rest of the chain
 // (the guard, the recorder, the core) defeated at import time, so it was a
 // capability that failed on its first import. Retired (second landing round,
-// pass 4): a splitter that cannot load is a measurement failure, which rules
-// 'unmeasured' and keeps the gate blocking.
+// pass 4): the splitter is imported statically below, so a missing module fails
+// this file's import outright; the dynamic load in assessReviewGap rules
+// 'unmeasured' only for a loader that fails after that (an injected one).
 
 import { execFileSync } from 'node:child_process'
 import { REPO_ROOT } from './repo-paths.mjs'
@@ -22,8 +22,8 @@ import { decideReviewGap, formatReviewGap, REVIEW_GAP_BUDGET_CHARS } from './mec
 import { reviewEndStateFiles } from './mechanism-review-range-core.mjs'
 import { isBinaryPatchSection, patchSectionMap } from './review-material-core.mjs'
 
-// The patch of a jammed range is megabytes by definition here — the default
-// 1 MiB pipe would throw ENOBUFS and turn every measurement into 'unmeasured'.
+// The patch of a jammed range can run to megabytes — the default 1 MiB pipe
+// would throw ENOBUFS and turn such a measurement into 'unmeasured'.
 const MAX_BUFFER = 512 * 1024 * 1024
 
 // A read that OVERFLOWS the buffer is a MEASUREMENT (landing-round pass 3): it
@@ -74,9 +74,10 @@ export const runGitArgs = (args, { cwd = REPO_ROOT, env = process.env } = {}) =>
 
 /**
  * Assemble and measure the range's material. Character counts over the same
- * parts `review-astra` sends: the diffstat, the whole patch, and each touched
- * path's content at `head` (a path absent there — deleted — still counts its
- * patch, which the patch total already carries).
+ * parts `review-astra` sends, restricted to the review end-state files (the
+ * work-order documents excluded): the diffstat, the patch, and each path's
+ * content at `head` (a path absent there — deleted — still counts its patch).
+ * Binary sections and blobs beyond any pass's room are priced, not read whole.
  */
 export function measureReviewMaterial({ baseline, head, run = runGitArgs }) {
   const range = `${baseline}..${head}`
@@ -180,10 +181,11 @@ export function measureReviewMaterial({ baseline, head, run = runGitArgs }) {
 }
 
 /**
- * The full ruling for one range: measure, consult the splitter where present,
- * decide, and format the report the guard prints while the gap holds.
- * NEVER throws: a failure inside rules 'unmeasured', which keeps the gate
- * blocking — it does not assume the material fit, and it does not waive.
+ * The full ruling for one range: measure, consult the splitter, decide, and
+ * format the report the guard prints while the gap holds. A measurement or
+ * planning failure rules 'unmeasured', which keeps the gate blocking — it does
+ * not assume the material fit, and it does not waive. (A malformed `sizedPlan`
+ * from the caller can still throw.)
  */
 export async function assessReviewGap({
   baseline,
