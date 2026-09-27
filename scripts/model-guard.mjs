@@ -2,16 +2,18 @@
 // commit. On 24.07.2026 the session degraded to Haiku 4.5 unnoticed and merged
 // three defective deliveries in 14 minutes; no config review could have caught
 // it live, but every commit records its author model in the Co-Authored-By
-// trailer. Any commit after the committed baseline authored by a model outside
-// the user's allowlist (Opus 5 / Opus 4.8 / Fable 5 / GPT-5.6 Sol — Sonnet and
-// Haiku are NOT acceptable) transfers the batch to the next recorded allowed
+// trailer. Any commit after the committed baseline (and within the last 48
+// hours, the log window) authored by a model outside the user's allowlist
+// (Opus 5 / Opus 4.8 / GPT-6 Astra, and Fable while its switch is ON — Sonnet
+// and Haiku are NOT acceptable) transfers the batch to the next recorded allowed
 // lane. That fresh lane verifies the trailers; the suspect never advances its
 // own baseline.
 //
 // Decision logic: model-guard-core.mjs (pure, Vitest-covered). This wrapper
 // gathers `git log` output and is fail-OPEN — an internal error never traps
-// the session. While a clocked handoff probe is parked in .claude/batch-paused
-// the guard stands down; the launcher removes that record when the probe is due.
+// the session. While any pause record sits in .claude/batch-paused (a clocked
+// handoff probe among them) the guard stands down; the launcher removes a
+// probe's record when it is due.
 // Manual drive: node scripts/model-guard.mjs --status
 import { readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs'
 import { execSync } from 'node:child_process'
