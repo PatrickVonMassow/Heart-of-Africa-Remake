@@ -1,4 +1,6 @@
-// Tessellation of the close-range settlement primitives (design.md §2.6):
+// Tessellation of the close-range settlement primitives (design.md §2.6), plus
+// the villager figure's limb proportions and child scale and the bird's-eye
+// traveller's pack. The tessellation:
 // segment counts high enough that neither the lighting facets nor the
 // polygonal silhouette read at first-person range (the old 8-segment body
 // cones and 10x8 head spheres visibly faceted). One constant per primitive
@@ -20,7 +22,7 @@ export const TESSELLATION = {
   figureHead: [24, 16],
   /** Headwrap/turban cap sphere [width, height]. */
   figureCap: [20, 14],
-  /** Small spheres at reach: hands, roof finials [width, height]. */
+  /** Small spheres at reach: hands, the chief's staff knob [width, height]. */
   figureHand: [12, 9],
   /** Hut roof cone, radial — the eye passes within metres of these. */
   hutRoof: 24,
@@ -37,19 +39,6 @@ export const TESSELLATION = {
 } as const
 
 /**
- * The villager figure's limbs (point 479). The figure was a cone with a sphere
- * head, which cannot show what it is talking about — and the pointing gesture is
- * what the HERE/THERE concepts hang on. Arms are therefore permanent; LEGS are
- * opt-in, because a floor-length wrap is the period dress for most of the adults
- * and legs under it would draw nothing. The running children get them.
- *
- * All values are FRACTIONS of the figure's body height, so a child at scale 0.55
- * carries the same proportions. The body cone spans y 0..1 with base radius 0.32
- * and tapers to a point, so the shoulder line sits where the cone is already
- * narrow (radius ≈ 0.064 at 0.8) and the arms read against the sky rather than
- * against the trunk.
- */
-/**
  * The scale a CHILD figure is drawn at, against an adult's 1. Shared rather than
  * repeated: the children's round solves a reach with it (work-order 1065) and
  * the scene draws with it, and a reach solved at one scale against a body drawn
@@ -57,6 +46,19 @@ export const TESSELLATION = {
  */
 export const CHILD_FIGURE_SCALE = 0.55
 
+/**
+ * The villager figure's limbs (point 479). The figure was a cone with a sphere
+ * head, which cannot show what it is talking about — and the pointing gesture is
+ * what the direction words hang on. Arms are therefore permanent; LEGS are
+ * opt-in, because a floor-length wrap is the period dress for most of the adults
+ * and legs under it would draw nothing. The running children get them.
+ *
+ * All values are FRACTIONS of the figure's body height, so a child at scale 0.55
+ * carries the same proportions. The body cone spans y 0..1 with base radius 0.32
+ * and tapers to a point, so the shoulder sits low on it (0.62, where the cone is
+ * 0.12 wide — see `shoulderY`) and the arm separates from the trunk a short way
+ * down.
+ */
 export const FIGURE_LIMBS = {
   /** Body-cone base radius at the ground, in body heights: the cone tapers to a
    *  point at the top, so its radius at height y is `bodyRadius * (1 - y)`. A
@@ -98,10 +100,8 @@ export const FIGURE_LIMBS = {
  *  `rotation.y = Math.atan2(dx, dz)`, which maps the group's LOCAL +Z axis
  *  onto the travel direction — local +Z is the figure's FRONT, local -Z its
  *  BACK. The pack therefore carries a NEGATIVE z offset so it rides behind
- *  the torso (the torso box spans z -0.14..+0.14); at +0.2 it hung on the
- *  chest, facing the camera whenever the traveller walked toward the viewer
- *  (user report 22.07.2026). Size and material are unchanged — only the
- *  side. */
+ *  the torso (the torso box spans z -0.14..+0.14), never on the chest facing
+ *  the camera when the traveller walks toward the viewer. */
 export const TRAVELLER_PACK = {
   /** Box size [width, height, depth]. */
   size: [0.32, 0.38, 0.16],

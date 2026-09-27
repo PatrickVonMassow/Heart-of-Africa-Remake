@@ -1,7 +1,8 @@
 // Low-poly, vertex-colored flora/prop geometries. Each builder merges its
-// parts into a single BufferGeometry so instanced rendering needs one draw
-// call per species. Colors carry slight per-vertex jitter for a hand-made
-// look; materials just enable vertexColors.
+// parts into a single BufferGeometry for instanced rendering; splitFoliage
+// splits a species into base and crown meshes where the season needs it, and
+// the baked 'foliage' attribute drives the dry-season collapse. Colors carry
+// slight per-vertex jitter for a hand-made look.
 
 import * as THREE from 'three/webgpu'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
@@ -25,7 +26,7 @@ function tint(geo: THREE.BufferGeometry, hex: string, jitter = 0.08, seed = 1): 
 }
 
 /**
- * Mark a part as FOLIAGE (the 'foliage' attribute = 1 on every vertex). The
+ * Mark a part as FOLIAGE (the 'foliage' attribute = its class on every vertex). The
  * dry-season collapse (point 144) keys on this baked, PER-PART-UNIFORM signal
  * — never on the jittered colour: colour varies per vertex by design, and a
  * position mask derived from it collapsed neighbouring vertices by different
@@ -283,7 +284,7 @@ export function buildPalm(detailed = false): THREE.BufferGeometry {
   return merge(parts)
 }
 
-/** Dry shrub. Height ~0.7 units. */
+/** Dry shrub. Height ~0.55 units. */
 export function buildBush(): THREE.BufferGeometry {
   const b1 = new THREE.SphereGeometry(0.42, 6, 4)
   b1.scale(1, 0.65, 1)
@@ -443,7 +444,8 @@ export function buildBaobab(): THREE.BufferGeometry {
   trunk.translate(0, 1.1, 0)
   tint(trunk, '#9a7f5e', 0.08, 91)
   const parts: THREE.BufferGeometry[] = [trunk]
-  // A ring of stubby branches instead of a leafy canopy (dry-season look).
+  // A ring of stubby branches under a thin, flat crown that collapses in the
+  // dry season (foliage).
   for (let i = 0; i < 5; i++) {
     const a = (i / 5) * Math.PI * 2
     const branch = new THREE.CylinderGeometry(0.05, 0.11, 0.9, 5)
