@@ -1,0 +1,1997 @@
+[
+  {
+    "id": "U3462",
+    "decision": "rewritten",
+    "reason": "header now says the live moveTravel/driftCurrent drives (canoe passage, river mouth) stay in the browser suite"
+  },
+  {
+    "id": "U3463",
+    "decision": "rewritten",
+    "reason": "header scope no longer implies only pts. 3/4/12/15/20/21; it names the work-order points each block cites"
+  },
+  {
+    "id": "U3464",
+    "decision": "kept",
+    "reason": "claim does not hold: the graveyard geometry (elephant-graveyard/mourning sections) and the real WheelEvent zoom (debug-jump-dropdown) are in the later part of the file"
+  },
+  {
+    "id": "U3465",
+    "decision": "kept",
+    "reason": "claim does not hold: animalShare, readsAsAnimal and waterFloor are used in the crocodile-hidden block"
+  },
+  {
+    "id": "U3466",
+    "decision": "kept",
+    "reason": "claim does not hold: FUSE_HARD, FUSE_TOLERANCE, judgeLabelFusion and mergeFusionReadings are used in the ctrl-label fusion checks"
+  },
+  {
+    "id": "U3467",
+    "decision": "kept",
+    "reason": "claim does not hold: snowFraction is used by the Toubkal snow measure"
+  },
+  {
+    "id": "U3468",
+    "decision": "rewritten",
+    "reason": "section note names the unconditional return to the travel view between the settlement and travel blocks"
+  },
+  {
+    "id": "U3469",
+    "decision": "kept",
+    "reason": "dated historical figures (17-minute pass, 176 of 251 checks) are stated as measurements of that incident"
+  },
+  {
+    "id": "U3470",
+    "decision": "rewritten",
+    "reason": "waitForHerds comment says synthetic families borrow a live chunk key and count, so this is a spawn wait, not proof of natural streaming"
+  },
+  {
+    "id": "U3471",
+    "decision": "kept",
+    "reason": "'~50 poll evaluates' is an explicit approximation in a rationale; no contradiction shown"
+  },
+  {
+    "id": "U3472",
+    "decision": "rewritten",
+    "reason": "__pollSim note lists the spent sim budget as an exit beside the freeze and hard-ceiling backstops"
+  },
+  {
+    "id": "U3473",
+    "decision": "rewritten",
+    "reason": "'called from four later blocks' made count-free (__makeTestFamily is now called from ten sites)"
+  },
+  {
+    "id": "U3474",
+    "decision": "rewritten",
+    "reason": "reload recovery comment names the two hooks it waits for instead of claiming the boot's full readiness"
+  },
+  {
+    "id": "U3475",
+    "decision": "rewritten",
+    "reason": "orphaned 'several removed blocks' rationale removed"
+  },
+  {
+    "id": "U3476",
+    "decision": "backlog",
+    "reason": "scripts/verify/enrichments.mjs:336 — DRUMMER {x:-2.2,z:0.2} and the facing (3.5,2.5) are hand copies of VILLAGE_SPOTS.drummer in src/scenes/place/lifeSpots.ts (currently equal) and can drift"
+  },
+  {
+    "id": "U3477",
+    "decision": "removed",
+    "reason": "unreachable '|| 1' zero-length fallback removed from the drummer heading (the only input is the fixed DRUMMER spot)"
+  },
+  {
+    "id": "U3478",
+    "decision": "backlog",
+    "reason": "scripts/verify/enrichments.mjs:460 — 'position the camera over each site' loops over ten of the eleven sites; Giza, one of the eight enumerated cultural landmarks, is not rendered-checked"
+  },
+  {
+    "id": "U3479",
+    "decision": "backlog",
+    "reason": "scripts/verify/enrichments.mjs:491 — check name 'cultural landmark ${id} renders a non-black frame' also runs for the four natural sites; renaming changes ledger identities"
+  },
+  {
+    "id": "U3480",
+    "decision": "rewritten",
+    "reason": "'Stage-2 evidence: one new cultural site' reworded as further evidence; no rollout stage is implied"
+  },
+  {
+    "id": "U3481",
+    "decision": "backlog",
+    "reason": "scripts/verify/enrichments.mjs:546 — the map lum() weights blue 0.587 instead of Rec.601's 0.114 (weights sum 1.473); fixing shifts the measured explored/fogged values"
+  },
+  {
+    "id": "U3482",
+    "decision": "backlog",
+    "reason": "scripts/verify/enrichments.mjs:557/580 — the map-overlap check claims clearance from the bottom-right buttons but measures only the inventory bar and the journal button; renaming changes a ledger identity"
+  },
+  {
+    "id": "U3483",
+    "decision": "rewritten",
+    "reason": "river-mask comment describes the absolute interior-edge count (< 400), not a fraction"
+  },
+  {
+    "id": "U3484",
+    "decision": "removed",
+    "reason": "unused strips accumulation removed from the river-report reduce"
+  },
+  {
+    "id": "U3485",
+    "decision": "rewritten",
+    "reason": "missing-element result returns { centred: false }, the field the consumer reads, instead of the obsolete topRight"
+  },
+  {
+    "id": "U3486",
+    "decision": "removed",
+    "reason": "second canoe = 0 in the swim staging removed; the stow step above already cleared and confirmed it"
+  },
+  {
+    "id": "U3487",
+    "decision": "removed",
+    "reason": "redundant Cairo-reach jump and its 800 ms wait removed; the passage below jumps straight to its own water tile and no vicinity/hunt check follows in the section"
+  },
+  {
+    "id": "U3488",
+    "decision": "rewritten",
+    "reason": "passage comment calls its start the water tile found above, not a verified Nile tile"
+  },
+  {
+    "id": "U3489",
+    "decision": "rewritten",
+    "reason": "hygiene comment no longer claims later checks inherit the Cairo reach"
+  },
+  {
+    "id": "U3490",
+    "decision": "rewritten",
+    "reason": "banner names the map/journal buttons it measures and notes the camp button is conditional"
+  },
+  {
+    "id": "U3491",
+    "decision": "kept",
+    "reason": "the mask rationale cites Hud.tsx and the click-only readers; nothing in the block contradicts it"
+  },
+  {
+    "id": "U3492",
+    "decision": "rewritten",
+    "reason": "restore comment says the mask is deleted and the touch flag left false with a rerender, not 'both put back'"
+  },
+  {
+    "id": "U3493",
+    "decision": "rewritten",
+    "reason": "banner above section('elephant-trampling') now names the section and says the lion feed comes first, the trampling below"
+  },
+  {
+    "id": "U3494",
+    "decision": "rewritten",
+    "reason": "lion staging calls (29.5, 31.4) the Cairo reach, matching 895 and 1064"
+  },
+  {
+    "id": "U3495",
+    "decision": "rewritten",
+    "reason": "injected-victim comment describes the six-elephant ring at 0.9 instead of an elephant on the victim"
+  },
+  {
+    "id": "U3496",
+    "decision": "rewritten",
+    "reason": "stain comments state the 2 % gap allowance the assertion actually uses"
+  },
+  {
+    "id": "U3497",
+    "decision": "backlog",
+    "reason": "scripts/verify/enrichments.mjs:1425/1519 — 'streaming does not refill an already-spawned chunk' conflicts with 'the herds restock on their own' in the same block"
+  },
+  {
+    "id": "U3498",
+    "decision": "rewritten",
+    "reason": "HUD list says 'the WebGL fallback notice where shown'"
+  },
+  {
+    "id": "U3499",
+    "decision": "rewritten",
+    "reason": "'this stretch of the Nile' corrected to 'this stretch of ground' (the section stands on savanna)"
+  },
+  {
+    "id": "U3500",
+    "decision": "rewritten",
+    "reason": "local crop rect renamed from shot to crop so it no longer shadows the shutter; captureFrame is itself the shutter, so frame 137 is still subject-checked"
+  },
+  {
+    "id": "U3501",
+    "decision": "rewritten",
+    "reason": "the two overlapping comments on the herd loop merged into one that names the 90 s wall backstop"
+  },
+  {
+    "id": "U3502",
+    "decision": "rewritten",
+    "reason": "backstop comment says the 90 s wall cap ends the loop (and with it a frozen sim), not that it detects only a frozen sim"
+  },
+  {
+    "id": "U3503",
+    "decision": "removed",
+    "reason": "unused loop counter k removed (for-loop became a while-loop with the same condition)"
+  },
+  {
+    "id": "U3504",
+    "decision": "backlog",
+    "reason": "scripts/verify/enrichments.mjs:1710 — maxTurn divides heading differences by a fixed 0.18 while the samples follow a wall-clock sleep(120); no measured interval supplies that denominator"
+  },
+  {
+    "id": "U3505",
+    "decision": "rewritten",
+    "reason": "flanker comment says they are re-pinned on every sim poll, not every frame"
+  },
+  {
+    "id": "U3506",
+    "decision": "rewritten",
+    "reason": "turn-cap comment describes the ~0.07 sim-s sample spacing instead of per-frame measurement"
+  },
+  {
+    "id": "U3507",
+    "decision": "rewritten",
+    "reason": "cap comments state the 0.85 and 0.9 bars the assertions use, with the sampling slack"
+  },
+  {
+    "id": "U3508",
+    "decision": "kept",
+    "reason": "the quoted PREY_DODGE_TURN 8 and FACE_TURN caps are the rationale for the bars; no mismatch shown"
+  },
+  {
+    "id": "U3509",
+    "decision": "backlog",
+    "reason": "scripts/verify/enrichments.mjs:1853 — ringFlap samples on a wall-clock sleep(70) x 40 with n >= 20, against the point-249 sim-cadence rule the neighbouring blocks follow"
+  },
+  {
+    "id": "U3510",
+    "decision": "backlog",
+    "reason": "scripts/verify/enrichments.mjs:1946 — check label 'no single-frame jump' is judged on 0.04 sim-s samples, coarser than a frame; renaming changes a ledger identity"
+  },
+  {
+    "id": "U3511",
+    "decision": "rewritten",
+    "reason": "'as before' pointer replaced by what is skipped: the first interval, which includes the pin"
+  },
+  {
+    "id": "U3512",
+    "decision": "rewritten",
+    "reason": "restock rationale no longer depends on earlier sections having emptied the herds"
+  },
+  {
+    "id": "U3513",
+    "decision": "rewritten",
+    "reason": "flake-history narrative condensed to the current per-frame-cull rationale"
+  },
+  {
+    "id": "U3514",
+    "decision": "rewritten",
+    "reason": "comments now say the zoom-1 block tests the despawn and the zoom-3 block the keep"
+  },
+  {
+    "id": "U3515",
+    "decision": "removed",
+    "reason": "no-effect setTravelZoom(3)/(1) pair removed from the zoom-1 despawn case; p3/m3 renamed p1/m1b"
+  },
+  {
+    "id": "U3516",
+    "decision": "backlog",
+    "reason": "scripts/verify/enrichments.mjs:2035 — check label 'the default view would despawn' calls zoom 1 the default (DEFAULT_TRAVEL_ZOOM is 0.5); renaming changes a ledger identity"
+  },
+  {
+    "id": "U3517",
+    "decision": "backlog",
+    "reason": "scripts/verify/enrichments.mjs:2081 — check label speaks of 'the streamed dressing' while liveInstances counts only live wildlife; renaming changes a ledger identity"
+  },
+  {
+    "id": "U3518",
+    "decision": "kept",
+    "reason": "the comment itself says the leak lives in the wildlife pools and cites the triangle figure as the original report; the animal bar matches the ~12-per-round-trip leak it states"
+  },
+  {
+    "id": "U3519",
+    "decision": "removed",
+    "reason": "free-floating parenthetical about the sim helpers removed"
+  },
+  {
+    "id": "U3520",
+    "decision": "backlog",
+    "reason": "scripts/verify/enrichments.mjs:2089 — the no-pop, driving-hitch, calfFraction, adoption and bond checks all live inside section('dressing-growth'), whose header covers only point 278"
+  },
+  {
+    "id": "U3521",
+    "decision": "rewritten",
+    "reason": "the removed 1.3 zoom-out narrative reduced to one sentence on why no debug zoom is driven"
+  },
+  {
+    "id": "U3522",
+    "decision": "backlog",
+    "reason": "scripts/verify/enrichments.mjs:2111 — setWheelZoomEnabled(true) is a remnant of the removed 1.3 zoom-out and is never disabled again; removing it changes the unlock state later checks inherit"
+  },
+  {
+    "id": "U3523",
+    "decision": "rewritten",
+    "reason": "split scanFrames(9)+scanFrames(5) merged into scanFrames(14); the no-op setTravelZoom(0.5) restore removed"
+  },
+  {
+    "id": "U3524",
+    "decision": "kept",
+    "reason": "the ndc guard is a harmless defensive branch for a diagnostic field"
+  },
+  {
+    "id": "U3525",
+    "decision": "backlog",
+    "reason": "scripts/verify/enrichments.mjs:2242 — the comment hard-codes 'adoptionRadius (20)', a balance value that can drift"
+  },
+  {
+    "id": "U3526",
+    "decision": "rewritten",
+    "reason": "point-262 comment notes point 341's extension to culled and out-of-reach parents"
+  },
+  {
+    "id": "U3527",
+    "decision": "backlog",
+    "reason": "scripts/verify/enrichments.mjs:1949/2344 — two unrelated sections (zoom-aware streaming despawn, non-lion carcass scavenging) both cite 'point 5'"
+  },
+  {
+    "id": "U3528",
+    "decision": "backlog",
+    "reason": "scripts/verify/enrichments.mjs:2372/3087 — 'clear any leftover carcasses' filters only zebra/antelope/giraffe/elephant/flamingo, leaving e.g. dead wildebeest as scavenger targets"
+  },
+  {
+    "id": "U3529",
+    "decision": "rewritten",
+    "reason": "collision intro says an injected zebra is pinned and drops the unchecked 'slides around' promise"
+  },
+  {
+    "id": "U3530",
+    "decision": "backlog",
+    "reason": "scripts/verify/enrichments.mjs:2422 — fixed 400 ms wall waits remain (also 2117, 2924) although 1983 says fixed wall waits cover too few frames on slow backends"
+  },
+  {
+    "id": "U3531",
+    "decision": "rewritten",
+    "reason": "notReady comment says the checks fail on it without aborting the suite, not that they skip"
+  },
+  {
+    "id": "U3532",
+    "decision": "rewritten",
+    "reason": "front-insertion note points to the unshift in the drive loop"
+  },
+  {
+    "id": "U3533",
+    "decision": "rewritten",
+    "reason": "the in-loop insertion is described as the primary insert plus re-add, not a fallback"
+  },
+  {
+    "id": "U3534",
+    "decision": "removed",
+    "reason": "unreachable 'a === zebra' test dropped from the corridor clear (the zebra joins the herds only in the loop below)"
+  },
+  {
+    "id": "U3535",
+    "decision": "rewritten",
+    "reason": "bare block and its shadowing p0 re-declaration removed; the outer p0 is used"
+  },
+  {
+    "id": "U3536",
+    "decision": "rewritten",
+    "reason": "re-anchor rationale no longer assumes the previous section's drives carry over"
+  },
+  {
+    "id": "U3537",
+    "decision": "backlog",
+    "reason": "scripts/verify/enrichments.mjs:2611 — the '75 s cycle' and the phase scan bound p < 1.9 duplicate product constants that can drift"
+  },
+  {
+    "id": "U3538",
+    "decision": "rewritten",
+    "reason": "bodyKeptOffFlank comment says it is the distance to the flank's target spot S, not a line"
+  },
+  {
+    "id": "U3539",
+    "decision": "rewritten",
+    "reason": "fail-soft comment no longer claims the neighbouring checks fail soft (animal-collision fails hard on its staging miss)"
+  },
+  {
+    "id": "U3540",
+    "decision": "rewritten",
+    "reason": "hypothesis lettering with the missing (b) replaced by the two named hypotheses"
+  },
+  {
+    "id": "U3541",
+    "decision": "removed",
+    "reason": "dead '&& !tree' loop condition dropped (the only assignment breaks outer)"
+  },
+  {
+    "id": "U3542",
+    "decision": "rewritten",
+    "reason": "drive comment says the three drives run in turn from where the previous one ended"
+  },
+  {
+    "id": "U3543",
+    "decision": "backlog",
+    "reason": "scripts/verify/enrichments.mjs:2809 — the phantom-collider sweep can pass vacuously (a missing renderedNear continues every cell and circles is never asserted > 0) and queries 7N/26E while the section stands at -2.2/34.8"
+  },
+  {
+    "id": "U3544",
+    "decision": "rewritten",
+    "reason": "carrion intro now says 'nearby within an assumed 55-unit radius' and points to the OPEN note; the check name is left as its ledger identity"
+  },
+  {
+    "id": "U3545",
+    "decision": "backlog",
+    "reason": "scripts/verify/enrichments.mjs:2927 — the OPEN plague-carcass placement follow-up (carrion not in the rendered frame at zoom 0.5, 0 of 13 on screen) lives only as a code comment"
+  },
+  {
+    "id": "U3546",
+    "decision": "rewritten",
+    "reason": "fire comment says ignite north of the calf, burning south (heading 0 = +z, north = -z), matching the staging"
+  },
+  {
+    "id": "U3547",
+    "decision": "removed",
+    "reason": "bandSeen removed; it was set with resolved and never asserted (resolved already requires the smoulder)"
+  },
+  {
+    "id": "U3548",
+    "decision": "rewritten",
+    "reason": "stale '~4 units from where this stages its nest' removed; the section jumps to the Serengeti first"
+  },
+  {
+    "id": "U3549",
+    "decision": "backlog",
+    "reason": "scripts/verify/enrichments.mjs:3040/2991/2377/3617 — staged animals are appended with push while other sections insist on front insertion because of the per-species behaviour window"
+  },
+  {
+    "id": "U3550",
+    "decision": "rewritten",
+    "reason": "unidentified 'run-2 exact-zero riddle' reference removed"
+  },
+  {
+    "id": "U3551",
+    "decision": "rewritten",
+    "reason": "frame 132's label describes the nest site after the lure, which is what it shows (the plovers are removed and the lure resolved before the shutter)"
+  },
+  {
+    "id": "U3552",
+    "decision": "backlog",
+    "reason": "scripts/verify/enrichments.mjs:3080 — the carcass-bound (freeze-fix) checks live inside section('broken-wing-lure') and depend on the position it left"
+  },
+  {
+    "id": "U3553",
+    "decision": "rewritten",
+    "reason": "family-life heading no longer advertises guarding and bathing; it points to calf-jitter where they now run"
+  },
+  {
+    "id": "U3554",
+    "decision": "rewritten",
+    "reason": "family-life heading cites design.md §19 instead of the unrelated §7.1.8 (Chronicle/journal)"
+  },
+  {
+    "id": "U3555",
+    "decision": "backlog",
+    "reason": "scripts/verify/enrichments.mjs:3218 — section('calf-jitter') also holds guard-flee, trample-grief, bathing, predator-guard, mourning and lion-hunt checks, so its name misdescribes what --section reruns"
+  },
+  {
+    "id": "U3556",
+    "decision": "rewritten",
+    "reason": "unreachable Math.max(1, …) fallback dropped; samples >= 20 is checked first"
+  },
+  {
+    "id": "U3557",
+    "decision": "rewritten",
+    "reason": "feeding-lion intro says the gate is the flee distance and the reversal rate is a diagnostic"
+  },
+  {
+    "id": "U3558",
+    "decision": "removed",
+    "reason": "guardFlee truthiness guard removed; every exit returns an object"
+  },
+  {
+    "id": "U3559",
+    "decision": "rewritten",
+    "reason": "trample intro says the elephant bears down on the calf, not parked on it"
+  },
+  {
+    "id": "U3560",
+    "decision": "rewritten",
+    "reason": "stale '6 REAL sim-seconds' and 'injected decoy' wording corrected"
+  },
+  {
+    "id": "U3561",
+    "decision": "removed",
+    "reason": "trampleGrief truthiness guard removed; every exit returns an object"
+  },
+  {
+    "id": "U3562",
+    "decision": "rewritten",
+    "reason": "verified Wildlife.tsx:1348 hashes the bathe flag per chunk and seed; the 3422 comment now says so, consistent with 3462"
+  },
+  {
+    "id": "U3563",
+    "decision": "rewritten",
+    "reason": "aggregation comment says the roam stops at the first shore that yields a bather"
+  },
+  {
+    "id": "U3564",
+    "decision": "rewritten",
+    "reason": "drinker key described as the current position read after the restock, not a spawn position"
+  },
+  {
+    "id": "U3565",
+    "decision": "rewritten",
+    "reason": "redundant has() guard before Set.add removed"
+  },
+  {
+    "id": "U3566",
+    "decision": "backlog",
+    "reason": "scripts/verify/enrichments.mjs:3514 — waitForFamily() still runs before the guard check although guard and the following checks stage synthetic families via __makeTestFamily"
+  },
+  {
+    "id": "U3567",
+    "decision": "rewritten",
+    "reason": "'(was 5)' and the before/after flee numbers (change history) removed from the guard comment"
+  },
+  {
+    "id": "U3568",
+    "decision": "removed",
+    "reason": "always-true guard.found removed from the result and the check"
+  },
+  {
+    "id": "U3569",
+    "decision": "backlog",
+    "reason": "scripts/verify/enrichments.mjs:3583 — the 12 s idle gap in CYCLE is a hand copy of the scene's GAMBOL_IDLE_SECONDS"
+  },
+  {
+    "id": "U3570",
+    "decision": "rewritten",
+    "reason": "leftover 45 * 0.1 budget written as a plain 4.5 sim-second budget"
+  },
+  {
+    "id": "U3571",
+    "decision": "backlog",
+    "reason": "scripts/verify/enrichments.mjs:3770 — REGION_PREY/REGION_PREDATORS/PREDATOR_PREY are hand copies of the Wildlife.tsx maps and go stale silently"
+  },
+  {
+    "id": "U3572",
+    "decision": "kept",
+    "reason": "claim does not hold: geo is used at ~3836-3837 (worldToLatLon, regionAt)"
+  },
+  {
+    "id": "U3573",
+    "decision": "rewritten",
+    "reason": "predation overview notes the point-125 defence roll and that the scenarios disable prey weapons to force the sacrifice"
+  },
+  {
+    "id": "U3574",
+    "decision": "backlog",
+    "reason": "scripts/verify/enrichments.mjs:3940 — check 'a parent charges the predator as soon as its calf is eaten' stages only a catch (calf.caught = 5) and asserts the calf survives; renaming changes a ledger identity"
+  },
+  {
+    "id": "U3575",
+    "decision": "rewritten",
+    "reason": "catchEvidenced rationale no longer assumes a nursing parent and 50 ms polling"
+  },
+  {
+    "id": "U3576",
+    "decision": "rewritten",
+    "reason": "drowning overview and dry-season note say the calf gets out alive on its own or via the late parent, matching the 65 s budget and the check"
+  },
+  {
+    "id": "U3577",
+    "decision": "rewritten",
+    "reason": "retry rationale describes a fresh synthetic pair per attempt and the water-sweep race"
+  },
+  {
+    "id": "U3578",
+    "decision": "rewritten",
+    "reason": "mire comment says the hunt is forced straight into a chase; the inapplicable idle-timer note removed"
+  },
+  {
+    "id": "U3579",
+    "decision": "removed",
+    "reason": "always-true found flags removed from the mire and release results and their checks"
+  },
+  {
+    "id": "U3580",
+    "decision": "backlog",
+    "reason": "scripts/verify/enrichments.mjs:4268/4497 — staging comments quote the rescue burst as 6 u/s and 6.5 u/s while 4894 speaks of one burst-derived speed"
+  },
+  {
+    "id": "U3581",
+    "decision": "backlog",
+    "reason": "scripts/verify/enrichments.mjs:4529 — carcassKept = herds.zebra.includes(calf) || parent.vigil !== undefined is satisfied by the vigil flag alone, so 'something of the calf is still there' is not proven"
+  },
+  {
+    "id": "U3582",
+    "decision": "rewritten",
+    "reason": "revenge overview says the outcome is forced to 'kill' via forceOutcome, no phase roll"
+  },
+  {
+    "id": "U3583",
+    "decision": "rewritten",
+    "reason": "lioness overview names pd.forceOutcome = 'driveOff' instead of killFlight/predatorFlight pins"
+  },
+  {
+    "id": "U3584",
+    "decision": "removed",
+    "reason": "stale 'retries a fresh pair' sentence removed; the scenario runs once"
+  },
+  {
+    "id": "U3585",
+    "decision": "removed",
+    "reason": "constant-true isLionCub guard removed from the staging, its result and the check"
+  },
+  {
+    "id": "U3586",
+    "decision": "rewritten",
+    "reason": "mourning overview describes clearing chunk tags before the jump and moving the herd afterwards"
+  },
+  {
+    "id": "U3587",
+    "decision": "rewritten",
+    "reason": "overview says the lion hunt is parked idle (point 194), not untouched"
+  },
+  {
+    "id": "U3588",
+    "decision": "rewritten",
+    "reason": "overview points to ./animalShare.mjs instead of 'defined at its use below'"
+  },
+  {
+    "id": "U3589",
+    "decision": "rewritten",
+    "reason": "invariance claims now state the 1-unit spread floor as their limit"
+  },
+  {
+    "id": "U3590",
+    "decision": "rewritten",
+    "reason": "zoom heading names the four candidate levels tried"
+  },
+  {
+    "id": "U3591",
+    "decision": "removed",
+    "reason": "redundant '&& !water' loop conditions dropped at the crocStage and crocDrama searches (success always breaks outer)"
+  },
+  {
+    "id": "U3592",
+    "decision": "rewritten",
+    "reason": "both staging comments say surfaceAt is the fallback where sheetAt has no sheet"
+  },
+  {
+    "id": "U3593",
+    "decision": "rewritten",
+    "reason": "projection claim narrowed: the share drops the rect's pixel size but still follows the framing"
+  },
+  {
+    "id": "U3594",
+    "decision": "removed",
+    "reason": "unreachable 'no crocodile was staged' shot fallback dropped (the path requires crocStage.staged and __stagedCrocPos)"
+  },
+  {
+    "id": "U3595",
+    "decision": "rewritten",
+    "reason": "notLunged comment no longer claims the staged spot is verified"
+  },
+  {
+    "id": "U3596",
+    "decision": "removed",
+    "reason": "unreachable '|| !bank' dropped from the crocDrama staging guard (water and bank are set together)"
+  },
+  {
+    "id": "U3597",
+    "decision": "backlog",
+    "reason": "scripts/verify/enrichments.mjs:3859 — check 'every predator fits the region and period' only verifies region (predMismatch), not period"
+  },
+  {
+    "id": "U3598",
+    "decision": "kept",
+    "reason": "claim does not hold: pinFamily (enrichments.mjs:273-276) parks __lionHunt.state idle before every scenario"
+  },
+  {
+    "id": "U3599",
+    "decision": "backlog",
+    "reason": "scripts/verify/enrichments.mjs:3873 — section('calf-predation-drama') wraps points 3/122/123/121/124/146/145c/127 up to ~4944, so one --section rerun covers far more than its name"
+  },
+  {
+    "id": "U3600",
+    "decision": "backlog",
+    "reason": "scripts/verify/enrichments.mjs:4322/4414 — fixed 300/400 ms wall waits remain after wetness switches although 4302 waits on the wetness reaching the wildlife system; the mire's override 0 is not reset in its own block"
+  },
+  {
+    "id": "U3601",
+    "decision": "backlog",
+    "reason": "scripts/verify/enrichments.mjs:4621 — the kick scenario forces its outcome by solving the parent's phase for a ~0 hash roll, while the revenge/lioness stagings moved to forceOutcome because that roll drifts; kick is the one still relying on the solved roll"
+  },
+  {
+    "id": "U3602",
+    "decision": "rewritten",
+    "reason": "tableau comment says the journal is closed"
+  },
+  {
+    "id": "U3603",
+    "decision": "backlog",
+    "reason": "scripts/verify/enrichments.mjs:4880 — the lioness tableau still waits a fixed 1600 ms wall clock instead of sim time"
+  },
+  {
+    "id": "U3604",
+    "decision": "kept",
+    "reason": "claim does not hold: the comments say the zoom is restored to 1, never that 1 is the default; 0.5 is correctly called the default"
+  },
+  {
+    "id": "U3605",
+    "decision": "removed",
+    "reason": "unreachable closed < 10 bar dropped; the poll's dMin < 9 gate (held stays null otherwise) already decides, and the misleading 8.6-9.0 range is gone"
+  },
+  {
+    "id": "U3606",
+    "decision": "rewritten",
+    "reason": "overview names the vanished-victim release beside the three family endings"
+  },
+  {
+    "id": "U3607",
+    "decision": "rewritten",
+    "reason": "stranded lowercase fragment turned into its own sentence"
+  },
+  {
+    "id": "U3608",
+    "decision": "rewritten",
+    "reason": "duplicated point-382 freeze history reduced to a pointer at the jump; inline 45-bar history reduced to a pointer at the header"
+  },
+  {
+    "id": "U3609",
+    "decision": "rewritten",
+    "reason": "bodyRefShare note quotes the table's 0 - 0.00257"
+  },
+  {
+    "id": "U3610",
+    "decision": "rewritten",
+    "reason": "inline measured ranges now quote the header table's 0.303-0.316 over fifteen frames"
+  },
+  {
+    "id": "U3611",
+    "decision": "kept",
+    "reason": "waterMean/l1/bodyDiff/strikeDiff are labelled diagnostics kept for the failure log; intentional"
+  },
+  {
+    "id": "U3612",
+    "decision": "backlog",
+    "reason": "scripts/verify/enrichments.mjs:5592 — the per-attempt parent phase shift and predatorFlight pins predate forceOutcome and are now redundant for the pinned endings"
+  },
+  {
+    "id": "U3613",
+    "decision": "kept",
+    "reason": "claim does not hold: 'lunge' is one of crocDrama's modes (crocDrama('lunge'))"
+  },
+  {
+    "id": "U3614",
+    "decision": "rewritten",
+    "reason": "dt comments say the sim step is floored at 1/60 s, not clamped to 0.1"
+  },
+  {
+    "id": "U3615",
+    "decision": "rewritten",
+    "reason": "cleanup comment says it clears any forced outcome (lunge, rescue, toolate)"
+  },
+  {
+    "id": "U3616",
+    "decision": "rewritten",
+    "reason": "intro says the grazer is staged with no drink pose, not that it never drinks"
+  },
+  {
+    "id": "U3617",
+    "decision": "rewritten",
+    "reason": "control described as clearly past the band (band + 6), no strike-radius claim"
+  },
+  {
+    "id": "U3618",
+    "decision": "backlog",
+    "reason": "scripts/verify/enrichments.mjs:5872 — the positive ambush control accepts any croc.lunge, while the negative control requires lunge.victim === farGrazer because herd animals can trigger lunges"
+  },
+  {
+    "id": "U3619",
+    "decision": "rewritten",
+    "reason": "far-distance comment no longer cites a pin drift tolerance; the pin is hard"
+  },
+  {
+    "id": "U3620",
+    "decision": "rewritten",
+    "reason": "far-check gate comment says 'not river water', matching the only excluded type"
+  },
+  {
+    "id": "U3621",
+    "decision": "backlog",
+    "reason": "scripts/verify/enrichments.mjs:5867/5886/5910 — farBalked starts true, so a skipped far control reports as a successful outside-band control"
+  },
+  {
+    "id": "U3622",
+    "decision": "rewritten",
+    "reason": "jaws staging comment separates the staged +z placement from the live-heading projection"
+  },
+  {
+    "id": "U3623",
+    "decision": "rewritten",
+    "reason": "first croc-feed evaluate no longer builds return payloads nobody reads; the stage object carries the state"
+  },
+  {
+    "id": "U3624",
+    "decision": "rewritten",
+    "reason": "feed-monitoring intro says sampling follows the grip and the frame capture"
+  },
+  {
+    "id": "U3625",
+    "decision": "rewritten",
+    "reason": "termination comment states the OR conditions the code uses"
+  },
+  {
+    "id": "U3626",
+    "decision": "rewritten",
+    "reason": "sawSink renamed sawKill: it records prey.dead, not an observed sink"
+  },
+  {
+    "id": "U3627",
+    "decision": "rewritten",
+    "reason": "bank-flight heading names escape along the bank or into the water"
+  },
+  {
+    "id": "U3628",
+    "decision": "rewritten",
+    "reason": "unread prev snapshot removed together with the no-op ternary that was its only reader"
+  },
+  {
+    "id": "U3629",
+    "decision": "rewritten",
+    "reason": "fight-fixture comment lists what the injection supplies beyond the two animals"
+  },
+  {
+    "id": "U3630",
+    "decision": "backlog",
+    "reason": "scripts/verify/enrichments.mjs:6356 — the posed bout sets forceOutcome = 'submit', not an accepted value ('death' | 'submission', wildlifeBehavior.ts:2923)"
+  },
+  {
+    "id": "U3631",
+    "decision": "rewritten",
+    "reason": "spacing intro states the settle allowance and the 0.7 overlap ratio the check accepts"
+  },
+  {
+    "id": "U3632",
+    "decision": "rewritten",
+    "reason": "spacing filter comment says 'exclude these', no longer claiming every drama/walking state"
+  },
+  {
+    "id": "U3633",
+    "decision": "backlog",
+    "reason": "scripts/verify/enrichments.mjs:6508 — water-occupancy check requires bad === 0 with no exemption for fleeing swimmers that points 312/201 now allow"
+  },
+  {
+    "id": "U3634",
+    "decision": "backlog",
+    "reason": "scripts/verify/enrichments.mjs:6616/6623 — 'lands on the far bank' only requires cleared crossing state and non-water terrain, never which bank"
+  },
+  {
+    "id": "U3635",
+    "decision": "rewritten",
+    "reason": "parting-fixture comment lists the drama states the filter actually excludes"
+  },
+  {
+    "id": "U3636",
+    "decision": "backlog",
+    "reason": "scripts/verify/enrichments.mjs:6702/6782 — the two vulture 'flies off and despawns' checks discard the idle-poll result and assert only outSeen plus the last off-screen sample, not a completed despawn"
+  },
+  {
+    "id": "U3637",
+    "decision": "rewritten",
+    "reason": "channel comment states the 1.5-9 unit width actually accepted"
+  },
+  {
+    "id": "U3638",
+    "decision": "rewritten",
+    "reason": "driven-pass comment says 2.2 units inland, matching the offset"
+  },
+  {
+    "id": "U3639",
+    "decision": "backlog",
+    "reason": "scripts/verify/enrichments.mjs:7247/7274 — hunt outcome 'far-bank' needs only dry ground and along > 1 while the staged channel may be up to 9 wide, so reaching the far bank is not proven"
+  },
+  {
+    "id": "U3640",
+    "decision": "rewritten",
+    "reason": "coast-pocket note marked historical, naming point 188's corridor and backstop"
+  },
+  {
+    "id": "U3641",
+    "decision": "rewritten",
+    "reason": "restore comment says zoom 1 is the calibration zoom, not the default"
+  },
+  {
+    "id": "U3642",
+    "decision": "backlog",
+    "reason": "scripts/verify/enrichments.mjs:7563 — 'the flock lands while the predator is still walking off in sight' records the mode at descend > 0.5, not a landing, and never checks visibility"
+  },
+  {
+    "id": "U3643",
+    "decision": "backlog",
+    "reason": "scripts/verify/enrichments.mjs:7565 — remnant minClearance starts at Infinity, so 'no landed vulture sinks' passes with no finite sample (scavSlope nulls this case)"
+  },
+  {
+    "id": "U3644",
+    "decision": "rewritten",
+    "reason": "lunge pin comment refers to the other stagings' forceOutcome pins instead of a mislisted set"
+  },
+  {
+    "id": "U3645",
+    "decision": "kept",
+    "reason": "claim does not hold: toolate was pinned by timing before 25.07.2026; lunge pinned nothing, as stated"
+  },
+  {
+    "id": "U3646",
+    "decision": "rewritten",
+    "reason": "rescue comment says the fixed 0.6 s settle now follows the poll instead of calling it old"
+  },
+  {
+    "id": "U3647",
+    "decision": "rewritten",
+    "reason": "lunge branch now only waits and falls through to the shared readout and cleanup instead of duplicating them"
+  },
+  {
+    "id": "U3648",
+    "decision": "kept",
+    "reason": "the initial hasDrink: false is a harmless default overwritten on the next line"
+  },
+  {
+    "id": "U3649",
+    "decision": "backlog",
+    "reason": "scripts/verify/enrichments.mjs:6070 — literal 3.7 mirrors CROCODILE_BODY_LENGTH_LOCAL (wildlifeBehavior.ts) and can go stale silently"
+  },
+  {
+    "id": "U3650",
+    "decision": "kept",
+    "reason": "no override is set in this section; the reset is defensive state hygiene before later sections"
+  },
+  {
+    "id": "U3651",
+    "decision": "rewritten",
+    "reason": "no-op ternary replaced by s.mode = 'idle'"
+  },
+  {
+    "id": "U3652",
+    "decision": "kept",
+    "reason": "the comment presents water as an accepted outcome, not a required one; reporting onWater without asserting it matches that"
+  },
+  {
+    "id": "U3653",
+    "decision": "kept",
+    "reason": "frame ids are the evidence index's own numbering (148/148a), not point numbers; no conflict shown"
+  },
+  {
+    "id": "U3654",
+    "decision": "kept",
+    "reason": "claim does not hold: frame 1208 is keyed to point 1208 (hunted animals flee into rivers), the change these checks meet"
+  },
+  {
+    "id": "U3655",
+    "decision": "kept",
+    "reason": "held is a diagnostic field of the returned probe; harmless"
+  },
+  {
+    "id": "U3656",
+    "decision": "rewritten",
+    "reason": "coastal-walk-off header lists the point-4 spacing and water checks it also holds"
+  },
+  {
+    "id": "U3657",
+    "decision": "rewritten",
+    "reason": "channel-crossing header lists the parting, point-5 and point-162 checks it also holds"
+  },
+  {
+    "id": "U3658",
+    "decision": "rewritten",
+    "reason": "section header lists the remnant and scavenger checks it also holds"
+  },
+  {
+    "id": "U3659",
+    "decision": "rewritten",
+    "reason": "spacing comment says every elephant/non-elephant pair is exempt, as the code does"
+  },
+  {
+    "id": "U3660",
+    "decision": "backlog",
+    "reason": "scripts/verify/enrichments.mjs:6511 — the sweep rate '1/7 of the animals per frame' is quoted from a constant held in another file"
+  },
+  {
+    "id": "U3661",
+    "decision": "rewritten",
+    "reason": "garbled (SS)19.16 corrected to §19.16"
+  },
+  {
+    "id": "U3662",
+    "decision": "backlog",
+    "reason": "scripts/verify/enrichments.mjs:6613 — crossing depth reads surfaceAt alone while other stagings use sheetAt ?? surfaceAt"
+  },
+  {
+    "id": "U3663",
+    "decision": "backlog",
+    "reason": "scripts/verify/enrichments.mjs:6841 — FALLS is a hand copy of landmarks.ts WATERFALLS and drifts silently if that table changes"
+  },
+  {
+    "id": "U3664",
+    "decision": "backlog",
+    "reason": "scripts/verify/enrichments.mjs:6879 — shy ring 6 and exit ring 9 are quoted from game constants held elsewhere"
+  },
+  {
+    "id": "U3665",
+    "decision": "kept",
+    "reason": "claim does not hold: __wildlife.lion is LION_STATE, the same object as __lionHunt.state (Wildlife.tsx:1864, 5360)"
+  },
+  {
+    "id": "U3666",
+    "decision": "backlog",
+    "reason": "scripts/verify/enrichments.mjs:7040 — two sim-clock hooks are used side by side (window.__simTime and window.__wildlife.simTime)"
+  },
+  {
+    "id": "U3667",
+    "decision": "kept",
+    "reason": "claim does not hold: the canoe is a live player item (equipment.canoe, own-canoe label checks at ~9495); the lane is the player's river route"
+  },
+  {
+    "id": "U3668",
+    "decision": "kept",
+    "reason": "the quoted CROSS_SWIM_SPEED 2.6 matches Wildlife.tsx:642; the 2.9 bound is the documented jitter allowance"
+  },
+  {
+    "id": "U3669",
+    "decision": "kept",
+    "reason": "claim does not hold: the hunt's leave step reads s.heading (Wildlife.tsx:5812 turnToward(s.heading, …))"
+  },
+  {
+    "id": "U3670",
+    "decision": "kept",
+    "reason": "claim does not hold: the no-kill case is checked separately ('a feed that ends without a kill leaves no remnant', ~7729)"
+  },
+  {
+    "id": "U3671",
+    "decision": "kept",
+    "reason": "point 200 is a determinism point covering both the inland stage and the landing; no contradiction"
+  },
+  {
+    "id": "U3672",
+    "decision": "kept",
+    "reason": "claim does not hold: the vanish branch and its hard-deadline comment are complete inside crocDrama (MODE.kind === 'vanish' block)"
+  },
+  {
+    "id": "U3673",
+    "decision": "kept",
+    "reason": "claim does not hold: the scavFlat evaluate is complete and its upper-bound check (maxClear <= 0.35) follows at 7695-7700"
+  },
+  {
+    "id": "U3674",
+    "decision": "rewritten",
+    "reason": "ocean-backstop jump comment drops the obsolete enter-radius/auto-entry rationale"
+  },
+  {
+    "id": "U3675",
+    "decision": "rewritten",
+    "reason": "Point-8 intro moved from 7773 to its code at the continent-zoom block; that block still runs inside section('seasons')"
+  },
+  {
+    "id": "U3676",
+    "decision": "rewritten",
+    "reason": "orphaned continuation now carries its moved-in opening lines"
+  },
+  {
+    "id": "U3677",
+    "decision": "rewritten",
+    "reason": "calendar tail described as comparable, naming the two phase durations"
+  },
+  {
+    "id": "U3678",
+    "decision": "rewritten",
+    "reason": "always-zero longitude term dropped; distance is Math.abs(lat - 13.4) * 10"
+  },
+  {
+    "id": "U3679",
+    "decision": "rewritten",
+    "reason": "driven-flora comments say 'previous settled movement step' instead of 'last frame'"
+  },
+  {
+    "id": "U3680",
+    "decision": "rewritten",
+    "reason": "savanna jump comment drops the obsolete auto-enter rationale"
+  },
+  {
+    "id": "U3681",
+    "decision": "backlog",
+    "reason": "scripts/verify/enrichments.mjs:7980 — frame 123-season-field-gezira-june and its label say June, but the calendar stands at August (debugJumpToMonth(8) at 7955) when it is shot"
+  },
+  {
+    "id": "U3682",
+    "decision": "rewritten",
+    "reason": "weather-probe comment names the zoom 0.5 set above and the continent-zoom block (not a section) below"
+  },
+  {
+    "id": "U3683",
+    "decision": "backlog",
+    "reason": "scripts/verify/enrichments.mjs:8059 — 'every settlement classifies into a known climate zone' only checks for a nonempty string, not membership in a known zone list"
+  },
+  {
+    "id": "U3684",
+    "decision": "removed",
+    "reason": "KNOWN_DRY with its unreachable 'cairo' entry removed (Cairo lies at 30.05N, outside the |lat| < 18 band)"
+  },
+  {
+    "id": "U3685",
+    "decision": "rewritten",
+    "reason": "settleScalar intro describes the 0.5 sim-second sample spacing; stale 250 ms lead remark removed (the in-function note already covers the 0.25 sim-s lead)"
+  },
+  {
+    "id": "U3686",
+    "decision": "rewritten",
+    "reason": "'no near-white pixel at all' softened to 'almost no', consistent with the quoted 210 maximum"
+  },
+  {
+    "id": "U3687",
+    "decision": "rewritten",
+    "reason": "point-503 note now quotes the 28-30 % February measurement of the point-387 note"
+  },
+  {
+    "id": "U3688",
+    "decision": "backlog",
+    "reason": "scripts/verify/enrichments.mjs:8393-8403 — ground-tint settle compares two reads 300 ms wall apart, the pattern the settleScalar note at 8064 rejects as falsely converging on slow backends"
+  },
+  {
+    "id": "U3689",
+    "decision": "rewritten",
+    "reason": "capture site label renamed 'jungle crown frame'"
+  },
+  {
+    "id": "U3690",
+    "decision": "kept",
+    "reason": "the second close after the wait is a harmless re-assertion before the capture"
+  },
+  {
+    "id": "U3691",
+    "decision": "rewritten",
+    "reason": "wet-probe note says it reads after the loop's first 1.2 s pass"
+  },
+  {
+    "id": "U3692",
+    "decision": "backlog",
+    "reason": "scripts/verify/enrichments.mjs:8597/8599 — check names call zoom 1 'the default zoom' though DEFAULT_TRAVEL_ZOOM is 0.5 (ui.ts:249); fixing renames ledger identities"
+  },
+  {
+    "id": "U3693",
+    "decision": "rewritten",
+    "reason": "wheel comment says one event per attempt with up to ten retries"
+  },
+  {
+    "id": "U3694",
+    "decision": "backlog",
+    "reason": "scripts/verify/enrichments.mjs:8649 — section('debug-jump-dropdown') also holds the wheel-zoom and journal DND/F2 checks, so its name misdescribes what --section reruns"
+  },
+  {
+    "id": "U3695",
+    "decision": "rewritten",
+    "reason": "toast intro no longer promises a debug-menu z-index check; only the map plate is read by z-index"
+  },
+  {
+    "id": "U3696",
+    "decision": "rewritten",
+    "reason": "inventory-press comment describes a sentence raised while the journal is already open"
+  },
+  {
+    "id": "U3697",
+    "decision": "backlog",
+    "reason": "scripts/verify/enrichments.mjs:9008/9016 — adjacent vicinity comments disagree whether the seeder anchors on the leave position or a distinct settlement anchor"
+  },
+  {
+    "id": "U3698",
+    "decision": "rewritten",
+    "reason": "comment names reached as the latch"
+  },
+  {
+    "id": "U3699",
+    "decision": "kept",
+    "reason": "a defensive fallback for a missing anchor; harmless and correct"
+  },
+  {
+    "id": "U3700",
+    "decision": "rewritten",
+    "reason": "'Placed LAST' scoped to its section"
+  },
+  {
+    "id": "U3701",
+    "decision": "backlog",
+    "reason": "scripts/verify/enrichments.mjs:9177 — the point-163 map/inventory-bar check lives inside section('event-trigger-dropdown') and cannot be rerun under its own name"
+  },
+  {
+    "id": "U3702",
+    "decision": "rewritten",
+    "reason": "living-subject rationale no longer says the own canoe is labelled now"
+  },
+  {
+    "id": "U3703",
+    "decision": "kept",
+    "reason": "the filter documents and guards the alive-only intent; the comment already states point 628 keeps both kinds out"
+  },
+  {
+    "id": "U3704",
+    "decision": "rewritten",
+    "reason": "inline six-frame rAF promise replaced by the section's frames(6) helper; the page-side waitForFunction predicate stays (it cannot call the Node-side onScreenAnimal)"
+  },
+  {
+    "id": "U3705",
+    "decision": "rewritten",
+    "reason": "missing-camp failure detail now says the camp never reached the layer"
+  },
+  {
+    "id": "U3706",
+    "decision": "rewritten",
+    "reason": "lion staging comment no longer says only the lion attacks on contact"
+  },
+  {
+    "id": "U3707",
+    "decision": "kept",
+    "reason": "claim does not hold: died is printed in the check detail via JSON.stringify(lionTouch)"
+  },
+  {
+    "id": "U3708",
+    "decision": "rewritten",
+    "reason": "FIXED_WAIT_RE no longer exported; only countFixedWaits uses it"
+  },
+  {
+    "id": "U3709",
+    "decision": "kept",
+    "reason": "claim does not hold: fixedWaits.test.mjs:68-85 sweeps every suite against fixed-wait-baseline.json in the unit layer — that is the wired gate; header now names it"
+  },
+  {
+    "id": "U3710",
+    "decision": "kept",
+    "reason": "claim does not hold: compareToBaseline is the comparison the unit-layer ratchet sweep runs (fixedWaits.test.mjs:80-85)"
+  },
+  {
+    "id": "U3711",
+    "decision": "kept",
+    "reason": "claim does not hold: formatRegressions is the failure message of the unit-layer ratchet sweep"
+  },
+  {
+    "id": "U3712",
+    "decision": "kept",
+    "reason": "claim does not hold: the gate is live as the unit-layer sweep; the 239 is the stated historical stock; header now points at the sweep"
+  },
+  {
+    "id": "U3713",
+    "decision": "rewritten",
+    "reason": "relative 'the last days' removed"
+  },
+  {
+    "id": "U3714",
+    "decision": "backlog",
+    "reason": "scripts/verify/fixedWaits.mjs:16 — literal wall waits wrapped in local sleep(ms)/page-side helpers escape FIXED_WAIT_RE, so the ratchet undercounts"
+  },
+  {
+    "id": "U3715",
+    "decision": "kept",
+    "reason": "claim does not hold: fixedWaits.test.mjs:68 reads fixed-wait-baseline.json"
+  },
+  {
+    "id": "U3716",
+    "decision": "rewritten",
+    "reason": "header says German is switched to at startup and English is the default"
+  },
+  {
+    "id": "U3717",
+    "decision": "rewritten",
+    "reason": "story outline no longer lists a hint step"
+  },
+  {
+    "id": "U3718",
+    "decision": "rewritten",
+    "reason": "fresh-window section described as its checks, not a pair"
+  },
+  {
+    "id": "U3719",
+    "decision": "rewritten",
+    "reason": "check() now takes and prints the detail argument after ' — '; name+tag identity unchanged"
+  },
+  {
+    "id": "U3720",
+    "decision": "rewritten",
+    "reason": "with detail printed, the skip branch's 'skipped' note is now visible on its PASS line"
+  },
+  {
+    "id": "U3721",
+    "decision": "removed",
+    "reason": "findInteractive no longer returns the unconsumed pos field"
+  },
+  {
+    "id": "U3722",
+    "decision": "rewritten",
+    "reason": "bare block in enterBuilding unwrapped"
+  },
+  {
+    "id": "U3723",
+    "decision": "rewritten",
+    "reason": "comment names balance.placeEnterRadius instead of the hard-coded 2.5"
+  },
+  {
+    "id": "U3724",
+    "decision": "backlog",
+    "reason": "scripts/verify/flow.mjs:329 — the settlement-collision rAF sampler keeps rescheduling for the rest of the run after its last reader"
+  },
+  {
+    "id": "U3725",
+    "decision": "rewritten",
+    "reason": "regression-guard comment says the journal is opened by hand because DND is on"
+  },
+  {
+    "id": "U3726",
+    "decision": "rewritten",
+    "reason": "step heading no longer references Bambara's drum chain"
+  },
+  {
+    "id": "U3727",
+    "decision": "backlog",
+    "reason": "scripts/verify/flow.mjs:521 — 'Grave lies north of the village' compares grave.lat against a fixed 21.8, not village.lat"
+  },
+  {
+    "id": "U3728",
+    "decision": "rewritten",
+    "reason": "Point-59 header describes the __placeLock.grabs check and the disabled-save-load overlay check"
+  },
+  {
+    "id": "U3729",
+    "decision": "removed",
+    "reason": "unread __plCalls requestPointerLock spy removed (the game skips requestPointerLock under webdriver, pointerLock.ts:39)"
+  },
+  {
+    "id": "U3730",
+    "decision": "rewritten",
+    "reason": "no-slope diagnostic claims 'below the floor / never ran' only when no sample was sloped"
+  },
+  {
+    "id": "U3731",
+    "decision": "rewritten",
+    "reason": "pitch diagnostic says too few sloped stances rather than 'a flat stance cannot lean'"
+  },
+  {
+    "id": "U3732",
+    "decision": "kept",
+    "reason": "MAX_FOOT_GAP_RATIO is the live default inside judgeFootingSeries"
+  },
+  {
+    "id": "U3733",
+    "decision": "rewritten",
+    "reason": "judgePitchSeries doc states its return shape, empty-series behaviour and the maxPitch default"
+  },
+  {
+    "id": "U3734",
+    "decision": "rewritten",
+    "reason": "SUBJECT_KINDS no longer exported; only normaliseDeclaration uses it"
+  },
+  {
+    "id": "U3735",
+    "decision": "rewritten",
+    "reason": "RAW_FRAME_RE no longer exported; only findRawFrames uses it"
+  },
+  {
+    "id": "U3736",
+    "decision": "kept",
+    "reason": "claim does not hold: frameSubject.test.mjs:546-549 sweeps every suite source with findRawFrames/formatRawFrameFindings — the gate runs in the unit layer"
+  },
+  {
+    "id": "U3737",
+    "decision": "kept",
+    "reason": "claim does not hold: formatUnbudgetedCaptureFindings is the message of the unit-layer sweep at frameSubject.test.mjs:557-560"
+  },
+  {
+    "id": "U3738",
+    "decision": "rewritten",
+    "reason": "branchMerges, diffSuiteMap and nonPredictiveDeclarations no longer exported; only ladderCheck uses them"
+  },
+  {
+    "id": "U3739",
+    "decision": "rewritten",
+    "reason": "declaration shapes list the world { x, z } form and the world-only settle option"
+  },
+  {
+    "id": "U3740",
+    "decision": "kept",
+    "reason": "claim does not hold: the raw-frame gate is enforced by the unit-layer sweep in frameSubject.test.mjs"
+  },
+  {
+    "id": "U3741",
+    "decision": "rewritten",
+    "reason": "depth comment describes the z >= 1 test and the probe's z = 2 behind-camera encoding"
+  },
+  {
+    "id": "U3742",
+    "decision": "removed",
+    "reason": "local-subject probe no longer collects the unread player field"
+  },
+  {
+    "id": "U3743",
+    "decision": "rewritten",
+    "reason": "aim-first comment scopes 'the camera stays put' to settled frames and names settle:false"
+  },
+  {
+    "id": "U3744",
+    "decision": "backlog",
+    "reason": "scripts/verify/frameSubject.mjs:273-285 — beforeCapture and clip/locator captures can change the saved picture after the subject check without re-checking it"
+  },
+  {
+    "id": "U3745",
+    "decision": "rewritten",
+    "reason": "section header and shared-staging comment count three village blocks"
+  },
+  {
+    "id": "U3746",
+    "decision": "rewritten",
+    "reason": "section note says blocks reset wound level and DND to defaults, as the code assigns fixed values"
+  },
+  {
+    "id": "U3747",
+    "decision": "rewritten",
+    "reason": "section note no longer counts four reveal animations"
+  },
+  {
+    "id": "U3748",
+    "decision": "rewritten",
+    "reason": "WASM-force comment no longer claims headless has no WebGPU adapter"
+  },
+  {
+    "id": "U3749",
+    "decision": "rewritten",
+    "reason": "verified JournalPanel.tsx:227 uses setInterval; RAF/render-loop wording at the click and wait comments corrected"
+  },
+  {
+    "id": "U3750",
+    "decision": "rewritten",
+    "reason": "autoscroll comments no longer claim the journal is closed while fillers are added"
+  },
+  {
+    "id": "U3751",
+    "decision": "rewritten",
+    "reason": "overview says I1 checks newly joined animals every frame and I5 all wildlife every tenth frame"
+  },
+  {
+    "id": "U3752",
+    "decision": "rewritten",
+    "reason": "recovery log line names the actual error instead of always claiming a lost context"
+  },
+  {
+    "id": "U3753",
+    "decision": "backlog",
+    "reason": "scripts/verify/invariants.mjs:207 — once any recovery happens, every simTime/context-destroyed/navigation error of the whole run is dropped, not only the crashed attempt's teardown"
+  },
+  {
+    "id": "U3754",
+    "decision": "rewritten",
+    "reason": "header states the shared-allowance depth bar of point 1067 instead of 'no pair may EVER'"
+  },
+  {
+    "id": "U3755",
+    "decision": "rewritten",
+    "reason": "header calls FUSE_HARD one full line height, matching lines 23-33"
+  },
+  {
+    "id": "U3756",
+    "decision": "rewritten",
+    "reason": "judgeLabelFusion docblock moved from above mergeFusionReadings to its own declaration"
+  },
+  {
+    "id": "U3757",
+    "decision": "rewritten",
+    "reason": "samples doc says the refresh coverage is the caller's obligation; only nonpositive counts are refused"
+  },
+  {
+    "id": "U3758",
+    "decision": "rewritten",
+    "reason": "residual (2) now covers shallow and FUSE_HARD fusions within the shared allowance"
+  },
+  {
+    "id": "U3759",
+    "decision": "rewritten",
+    "reason": "residual rationale names the 130-170 ms loaded-lane frames and the standing-vs-transient distinction"
+  },
+  {
+    "id": "U3760",
+    "decision": "rewritten",
+    "reason": "fail-open note names both blocking verdicts (REFUSED, RED_RUNG); REFUSED status comment corrected"
+  },
+  {
+    "id": "U3761",
+    "decision": "rewritten",
+    "reason": "rule sentence now says a green whole run also answers, as lines 352-379 credit it"
+  },
+  {
+    "id": "U3762",
+    "decision": "rewritten",
+    "reason": "changes input documented as dated by editTimeFor, with the carried sections field"
+  },
+  {
+    "id": "U3763",
+    "decision": "rewritten",
+    "reason": "input doc states missing runs beside covered edits refuses; only changes/merges degrade to FREE"
+  },
+  {
+    "id": "U3764",
+    "decision": "backlog",
+    "reason": "scripts/verify/ladder-core.mjs:319 — a merge ages only suites with covered edits when any exist, not every rung the run covers as 299-304 claim"
+  },
+  {
+    "id": "U3765",
+    "decision": "backlog",
+    "reason": "scripts/verify/ladder-core.mjs:367-375 — demanded sections of several edits are unioned, so one green section run credits edits in other sections"
+  },
+  {
+    "id": "U3766",
+    "decision": "rewritten",
+    "reason": "commands comment says section is derivable only for an edit to a suite's own source"
+  },
+  {
+    "id": "U3767",
+    "decision": "rewritten",
+    "reason": "editedFiles doc: clean files by commit time, dirty by later of mtime and commit"
+  },
+  {
+    "id": "U3768",
+    "decision": "rewritten",
+    "reason": "uncommitted deletion documented as keeping its branch commit time or 0"
+  },
+  {
+    "id": "U3769",
+    "decision": "rewritten",
+    "reason": "header says probes degrade to less data, ladderCheck catches throws, and less data can still refuse"
+  },
+  {
+    "id": "U3770",
+    "decision": "rewritten",
+    "reason": "narrowed to 'this executable probe'; the adapter question is answered at runtime by the launched browser"
+  },
+  {
+    "id": "U3771",
+    "decision": "rewritten",
+    "reason": "unavailable message now says bundled Chromium fails requestDevice headless, matching line 213"
+  },
+  {
+    "id": "U3772",
+    "decision": "backlog",
+    "reason": "scripts/verify/launch-args-core.mjs:191 — compat GLES is called a THIRD lane though linuxWebgpuArgs swaps it into the same webgpu lane; whether coverage records it separately is in _browser.mjs"
+  },
+  {
+    "id": "U3773",
+    "decision": "rewritten",
+    "reason": "success summary scoped to a __renderer timeout right after the probe, not later GPU loss"
+  },
+  {
+    "id": "U3774",
+    "decision": "kept",
+    "reason": "worldPointOf is called by normaliseDeclaration; not dead"
+  },
+  {
+    "id": "U3775",
+    "decision": "kept",
+    "reason": "describeSubject/offScreenReason/describeFinding are called by the failure and pass formatters; not dead"
+  },
+  {
+    "id": "U3776",
+    "decision": "rewritten",
+    "reason": "no-declaration error now also lists { place: '<id>' }"
+  },
+  {
+    "id": "U3777",
+    "decision": "rewritten",
+    "reason": "second-gate rationale no longer calls the host GPU-less"
+  },
+  {
+    "id": "U3778",
+    "decision": "rewritten",
+    "reason": "CAPTURE_BUDGET_MS rationale marks SwiftShader as the Linux lane before point 493"
+  },
+  {
+    "id": "U3779",
+    "decision": "removed",
+    "reason": "unread on-screen-but-unsettled probe.reason dropped"
+  },
+  {
+    "id": "U3780",
+    "decision": "removed",
+    "reason": "page-side mode-mismatch and wrong-place reasons dropped; judgeFrameSubject builds its own"
+  },
+  {
+    "id": "U3781",
+    "decision": "kept",
+    "reason": "claim does not hold: settings.mjs:783-787 measures TRAA luma on the buffer the shutter returns; the capturePixels lines are only usage examples"
+  },
+  {
+    "id": "U3782",
+    "decision": "kept",
+    "reason": "probeFrameSubject and sampleSceneCounts are shipped into the page by captureFrame/waitForSceneReady; not dead"
+  },
+  {
+    "id": "U3783",
+    "decision": "rewritten",
+    "reason": "dropped the panorama-capture reason; the suite takes no shutter"
+  },
+  {
+    "id": "U3784",
+    "decision": "rewritten",
+    "reason": "hold rationale no longer blames a place-entry stall that waitForSceneBuilt already absorbs"
+  },
+  {
+    "id": "U3785",
+    "decision": "rewritten",
+    "reason": "SPACE check prints its failure detail only when it fails"
+  },
+  {
+    "id": "U3786",
+    "decision": "backlog",
+    "reason": "scripts/verify/gamepad.mjs:53/136/176/200 — fixed wall-clock waits remain in a suite that cites the fixed-wait rule"
+  },
+  {
+    "id": "U3787",
+    "decision": "backlog",
+    "reason": "scripts/verify/gpu-backend-probe-core.mjs:26 — webgl2 lane's feature detail reads featureStatus.webgl rather than a WebGL 2-specific key"
+  },
+  {
+    "id": "U3788",
+    "decision": "kept",
+    "reason": "softwareRenderer is called by gpuBackendVerdict; not dead"
+  },
+  {
+    "id": "U3789",
+    "decision": "backlog",
+    "reason": "scripts/verify/gpu-backend-probe.mjs:48 — secureContext and browser version are recorded but no consumer (run-all, verify-bringup via gpuBackendVerdict) reads them"
+  },
+  {
+    "id": "U3790",
+    "decision": "rewritten",
+    "reason": "relative 'today's' dropped from the TTS cache measurement"
+  },
+  {
+    "id": "U3791",
+    "decision": "kept",
+    "reason": "claim does not hold: the locator click with a 15 s timeout does wait for the writing entry to attach before force-clicking"
+  },
+  {
+    "id": "U3792",
+    "decision": "backlog",
+    "reason": "scripts/verify/handwriting.mjs:129/195 — wounded-hand and autoscroll blocks sample after fixed 350/500 ms, the pattern lines 79-81 reject in favour of polling"
+  },
+  {
+    "id": "U3793",
+    "decision": "rewritten",
+    "reason": "heading says the frame captures the status bar, its declared subject"
+  },
+  {
+    "id": "U3794",
+    "decision": "backlog",
+    "reason": "scripts/verify/i18n.mjs:53 — switchToGerman waits a fixed 800 ms instead of waiting for <html lang> === 'de'"
+  },
+  {
+    "id": "U3795",
+    "decision": "kept",
+    "reason": "citing point 566 alone is accurate for this file's sections; adding 595 would be unverified"
+  },
+  {
+    "id": "U3796",
+    "decision": "backlog",
+    "reason": "scripts/verify/invariants.mjs:123 — page-side U = 10 units-per-degree copy is not pinned against geo.ts"
+  },
+  {
+    "id": "U3797",
+    "decision": "backlog",
+    "reason": "scripts/verify/invariants.mjs:95 — fixed 1500 ms wall sleep for the camera lerp although __camera.settled() exists"
+  },
+  {
+    "id": "U3798",
+    "decision": "rewritten",
+    "reason": "retry comment says six stops only when no --section narrows the route"
+  },
+  {
+    "id": "U3799",
+    "decision": "backlog",
+    "reason": "scripts/verify/labelFusion.mjs:79 — crowd cushion arithmetic assumes a 90-frame series while mergeFusionReadings sums both bracket windows, roughly doubling the allowance"
+  },
+  {
+    "id": "U3800",
+    "decision": "kept",
+    "reason": "claim does not hold: 0/3600 and 2160 frames are two separate measurements, both reporting 0 fused; no contradiction"
+  },
+  {
+    "id": "U3801",
+    "decision": "kept",
+    "reason": "FUSE_MAX_SHARE is the live default maxShare of judgeLabelFusion"
+  },
+  {
+    "id": "U3802",
+    "decision": "rewritten",
+    "reason": "header rule now also states the red-rung rule of point 1126"
+  },
+  {
+    "id": "U3803",
+    "decision": "rewritten",
+    "reason": "LADDER_STATUS doc no longer claims reachability order; notes UNREADABLE comes from ladder.mjs"
+  },
+  {
+    "id": "U3804",
+    "decision": "rewritten",
+    "reason": "runs record shape lists terminalVerdict, crashed, reds, at"
+  },
+  {
+    "id": "U3805",
+    "decision": "rewritten",
+    "reason": "REFUSED message quotes the measured 31 to 63 minutes from the header"
+  },
+  {
+    "id": "U3806",
+    "decision": "rewritten",
+    "reason": "second escape test reuses escapeGiven"
+  },
+  {
+    "id": "U3807",
+    "decision": "rewritten",
+    "reason": "declaresNonPredictive doc says it returns the declarations"
+  },
+  {
+    "id": "U3808",
+    "decision": "kept",
+    "reason": "LADDER_ESCAPE_FLAG and suitesCovering are used internally; not dead"
+  },
+  {
+    "id": "U3809",
+    "decision": "kept",
+    "reason": "editedFiles is called by ladderCheck; not dead"
+  },
+  {
+    "id": "U3810",
+    "decision": "kept",
+    "reason": "namesLargeRun/blockingLargeRun are live via waitForLargeRun; test-only export surface is not dead code"
+  },
+  {
+    "id": "U3811",
+    "decision": "rewritten",
+    "reason": "ANGLE doc marks the gl measurement as the first route; gallium doc names both gl and gl-egl"
+  },
+  {
+    "id": "U3812",
+    "decision": "rewritten",
+    "reason": "comparison marked as the WebGL 2 lane's former SwiftShader route"
+  },
+  {
+    "id": "U3813",
+    "decision": "rewritten",
+    "reason": "software-args doc marks Mesa 22.3.6/no libGL as the host measured before point 493"
+  },
+  {
+    "id": "U3814",
+    "decision": "rewritten",
+    "reason": "webgpuArg rationale marks the SwiftShader measurement as historical and names gl-egl"
+  },
+  {
+    "id": "U3815",
+    "decision": "kept",
+    "reason": "all four helpers are called by the launch-option builders; test-only export surface is not dead code"
+  },
+  {
+    "id": "U3816",
+    "decision": "rewritten",
+    "reason": "frameBlockMs documented as the largest frame-covered part of any tick gap, matching line 95"
+  },
+  {
+    "id": "U3817",
+    "decision": "kept",
+    "reason": "unionCoverage is live via attributeBlocks; test-only export surface is not dead code"
+  },
+  {
+    "id": "U3818",
+    "decision": "kept",
+    "reason": "verified: startup.mjs:116 stringifies pictureSettled and liveness.test.mjs pins SETTLE_DEFAULTS"
+  },
+  {
+    "id": "U3819",
+    "decision": "rewritten",
+    "reason": "ELEVATED_LOADAVG/HEAVY_LOADAVG no longer exported; only classifyLoad uses them"
+  },
+  {
+    "id": "U3820",
+    "decision": "rewritten",
+    "reason": "strayLabel no longer exported; used only inside the module"
+  },
+  {
+    "id": "U3821",
+    "decision": "rewritten",
+    "reason": "isAgentSession no longer exported; only classifyProcess calls it"
+  },
+  {
+    "id": "U3822",
+    "decision": "rewritten",
+    "reason": "ELEVATED_CPU gloss corrected to about a third of the machine busy"
+  },
+  {
+    "id": "U3823",
+    "decision": "rewritten",
+    "reason": "GPU doc now says it never blocks under the default flag mode, only opt-in defer skips"
+  },
+  {
+    "id": "U3824",
+    "decision": "rewritten",
+    "reason": "STRAY_KIND doc names the five real kinds; foreign-load removed"
+  },
+  {
+    "id": "U3825",
+    "decision": "rewritten",
+    "reason": "isAgentSession doc describes the whole-command-line token match it actually does"
+  },
+  {
+    "id": "U3826",
+    "decision": "rewritten",
+    "reason": "order rationale reduced to the still-valid vite-build-before-server part"
+  },
+  {
+    "id": "U3827",
+    "decision": "rewritten",
+    "reason": "sibling rationale now names the second agent's runs as the load; the session itself classifies as nothing"
+  },
+  {
+    "id": "U3828",
+    "decision": "rewritten",
+    "reason": "strayProcesses doc says one entry per stray tree in process-table order"
+  },
+  {
+    "id": "U3829",
+    "decision": "rewritten",
+    "reason": "GPU reason comment matches the generic-cause wording the code emits"
+  },
+  {
+    "id": "U3830",
+    "decision": "backlog",
+    "reason": "scripts/verify/machine-load-core.mjs:473 — classifyLoad with no CPU reading and no other signal stays LEVEL.quiet, contradicting the header's 'never claims quiet'"
+  },
+  {
+    "id": "U3831",
+    "decision": "rewritten",
+    "reason": "decideRun doc says 'mode is off, or the level is unknown'"
+  },
+  {
+    "id": "U3832",
+    "decision": "rewritten",
+    "reason": "comment now points unit-stage deaths to annotateStageFailure"
+  },
+  {
+    "id": "U3833",
+    "decision": "backlog",
+    "reason": "scripts/verify/machine-load-core.mjs:638/664 — an UNKNOWN machine is headed 'UNDER LOAD' though its load was not measured"
+  },
+  {
+    "id": "U3834",
+    "decision": "backlog",
+    "reason": "scripts/verify/machine-load-core.mjs:589 — every fromThisRepo stray is called a leftover to shut down, including a concurrent live run of this checkout"
+  },
+  {
+    "id": "U3835",
+    "decision": "rewritten",
+    "reason": "usage line states exit 0 for quiet or unknown"
+  },
+  {
+    "id": "U3836",
+    "decision": "rewritten",
+    "reason": "usage example uses the accepted --suites= form"
+  },
+  {
+    "id": "U3837",
+    "decision": "rewritten",
+    "reason": "GPU_TIMEOUT_MS doc names both the Windows counter read and Linux nvidia-smi"
+  },
+  {
+    "id": "U3838",
+    "decision": "rewritten",
+    "reason": "Linux reader doc says first source that yields a reading"
+  },
+  {
+    "id": "U3839",
+    "decision": "rewritten",
+    "reason": "unreadable message no longer asserts both sources are absent"
+  },
+  {
+    "id": "U3840",
+    "decision": "rewritten",
+    "reason": "readGpuUtilisation doc names engine (Windows) or device (Linux)"
+  },
+  {
+    "id": "U3841",
+    "decision": "rewritten",
+    "reason": "probeMachine ok doc matches line 222 and the catch path"
+  },
+  {
+    "id": "U3842",
+    "decision": "rewritten",
+    "reason": "classifyLoad doc: any stray raises to BUSY, verify/unit runs to LOADED"
+  },
+  {
+    "id": "U3843",
+    "decision": "rewritten",
+    "reason": "ok:false documented as probe threw or read nothing at all"
+  },
+  {
+    "id": "U3844",
+    "decision": "backlog",
+    "reason": "scripts/verify/machine-load-core.mjs:638 — annotateResult stamps UNDER LOAD — NOT AUTHORITATIVE when only non-timing suites are red, beyond the rule stated at 617-619"
+  },
+  {
+    "id": "U3845",
+    "decision": "rewritten",
+    "reason": "core header names GPU reading among the wrapper's impure work"
+  },
+  {
+    "id": "U3846",
+    "decision": "kept",
+    "reason": "the exports are live internally; test-only export surface is not dead code"
+  },
+  {
+    "id": "U3847",
+    "decision": "kept",
+    "reason": "ON_LOAD is the constant decideRun and onLoadMode compare against internally; not dead"
+  },
+  {
+    "id": "U3848",
+    "decision": "kept",
+    "reason": "claim does not hold: run-all.mjs:239 exits with decision.exitCode, so DEFERRED_EXIT reaches a caller"
+  },
+  {
+    "id": "U3849",
+    "decision": "backlog",
+    "reason": "scripts/verify/machine-load.mjs:278 — standalone wrapper never passes mode to formatLoadReport, so the '--on-load=off' report-only line cannot print"
+  },
+  {
+    "id": "U3850",
+    "decision": "backlog",
+    "reason": "scripts/verify/machine-load-core.mjs:93 — VERIFY_LOAD_FORCE=quiet yields a 'verdict is evidence' decision and exit 0 for an unmeasured machine"
+  },
+  {
+    "id": "U3851",
+    "decision": "kept",
+    "reason": "header and GPU note may describe the same day; no contradiction shown"
+  },
+  {
+    "id": "U3852",
+    "decision": "kept",
+    "reason": "baseline-classify-core.mjs and machine-load.test.mjs both exist"
+  },
+  {
+    "id": "U3853",
+    "decision": "rewritten",
+    "reason": "probeMachine doc says the run queue is null on Windows"
+  },
+  {
+    "id": "U3854",
+    "decision": "backlog",
+    "reason": "scripts/verify/machine-load.mjs:228 — processTable:false is produced but no consumer reads or prints it"
+  },
+  {
+    "id": "U3855",
+    "decision": "rewritten",
+    "reason": "wrapper header names the Linux sysfs/nvidia-smi GPU path"
+  },
+  {
+    "id": "U3856",
+    "decision": "rewritten",
+    "reason": "DRM_BUSY_GLOB renamed DRM_DIR and documented as a directory"
+  },
+  {
+    "id": "U3857",
+    "decision": "kept",
+    "reason": "claim holds technically but windowsHide is a repository-wide invariant enforced on every scripts/ child-process call (window-hide-core.test.mjs); the flag stays"
+  },
+  {
+    "id": "U3858",
+    "decision": "rewritten",
+    "reason": "cost note scoped to Windows"
+  },
+  {
+    "id": "U3859",
+    "decision": "backlog",
+    "reason": "scripts/verify/machine-load.mjs:265 — standalone default suite list is three suites, not the six TIMING_SENSITIVE_SUITES"
+  },
+  {
+    "id": "U3860",
+    "decision": "kept",
+    "reason": "CLAUDE.md §7.2 does carry the ask-the-guards-before-a-governed-action rule"
+  }
+]
