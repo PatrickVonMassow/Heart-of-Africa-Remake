@@ -7513,8 +7513,10 @@ if (section('adult-errands')) {
           // the middle, so a patch at the very rim, one drift step from the next
           // red, only ever wins when the picture holds nothing better.
           if (Math.abs(ndc.x) > 0.9 || Math.abs(ndc.y) > 0.9) continue
-          // Centred decides, nearness breaks the tie: a patch dead ahead 200 m
-          // downstream reads as water, not as the foam at this bank.
+          // Centring weighs most, and distance adds 0.002 per metre to every
+          // score, so of two near-equally centred patches the nearer wins: a
+          // patch dead ahead 200 m downstream reads as water, not as the foam at
+          // this bank.
           const score = Math.hypot(ndc.x, ndc.y) + Math.hypot(f.x - p.x, f.z - p.z) * 0.002
           if (score < bestScore) {
             bestScore = score
@@ -7653,13 +7655,13 @@ if (section('adult-errands')) {
         check(
           `the water beyond the plate’s rim is the SAME water as the water at the bank (≤ ${RIM_STEP_LIMIT}/255 per channel)`,
           enough && step <= RIM_STEP_LIMIT,
-          `${mid.strips} clear strips · far ${say(mid.far)} against near ${say(mid.near)} — step ${step.toFixed(1)} ` +
+          `middle capture: ${mid.strips} clear strips · far ${say(mid.far)} against near ${say(mid.near)} — median step ${step.toFixed(1)} ` +
             `(${readings.map((r) => r.step.toFixed(1)).join(', ')})`,
         )
         check(
           'and the handover zone itself carries neither band’s edge — no line at the rim',
           enough && zoneStep <= RIM_STEP_LIMIT,
-          `rim zone ${say(mid.zone)} against the water either side — step ${zoneStep.toFixed(1)} ` +
+          `middle capture: rim zone ${say(mid.zone)} against the water either side — median step ${zoneStep.toFixed(1)} ` +
             `(${readings.map((r) => r.zoneStep.toFixed(1)).join(', ')})`,
         )
       }
@@ -7722,7 +7724,8 @@ if (section('adult-errands')) {
   // an open standing view (the layout unit test pins both the view and crossing).
   //
   // IT ASKS THE BUILD WHETHER IT CAN BE PHOTOGRAPHED AT ALL. The baseline
-  // classifier runs THIS suite file against the PRE-CHANGE app, which has no
+  // classifier (run by hand since point 1135) runs THIS suite file against the
+  // PRE-CHANGE app, which has no
   // durable dig record — and an unguarded call to it threw an uncaught
   // TypeError that killed the whole baseline run after 225 of 274 checks, twice
   // (measured 14.09.2026). A died baseline yields no verdict, so every red of
@@ -7850,9 +7853,9 @@ if (section('stone-step')) {
     const { ROCK_RADIUS_UNITS } = await import('/src/render/flora.ts')
     const layout = window.__placeLayout
     if (!layout) return null
-    // The settlement's surface WITHOUT its stones: the shore slopes and worked
-    // earth rises, and a stone standing on either would hide its own rise in
-    // the reading below.
+    // The settlement's surface WITHOUT its stones and with no digging progress
+    // (`progress: []`): the shore slopes and the dig sites' own ground rise, and
+    // a stone standing on either would hide its own rise in the reading below.
     const bare = (x, z) => placeGroundHeight({ bank: layout.bank, sites: layout.digSites, progress: [], rocks: [] }, x, z)
     // The clearest walked-over stone the settlement has: standable, on flat
     // ground away from the bank, and with room for the player to walk in at it
@@ -8071,9 +8074,9 @@ if (section('roof-clearance')) {
    *  Point 549: it reports WHAT IT SEARCHED, never a bare `null`. Three checks
    *  ride on this one search — the village eaves, the port eaves and the cook
    *  shelter — and each of them used to fail as `false` beside the target's
-   *  coordinates, which says nothing about why 49 bearings were all rejected.
-   *  Now the miss names how many bearings the disc edge closed, how many each
-   *  collider closed, and which colliders those were. */
+   *  coordinates, which says nothing about why 48 (49 with a preferred one)
+   *  bearings were all rejected. Now the miss names how many bearings the disc
+   *  edge closed, and which four colliders closed the most and how many each. */
   const searchStandOff = (target, startR, prefer = null) =>
     page.evaluate(
       ([t, start, preferred]) => {
@@ -8123,33 +8126,32 @@ if (section('roof-clearance')) {
           p.z = t.z + Math.sin(b) * start
           p.pitch = 0
           p.yaw = Math.atan2(-(t.x - p.x), -(t.z - p.z))
-          return { bearing: b, tried: bearings.length, colliders: others.length }
+          return { bearing: b, tried: bearings.indexOf(b) + 1 }
         }
         const worst = [...byCollider.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4)
         return {
           bearing: null,
           tried: bearings.length,
-          colliders: others.length,
           detail: `${bearings.length} bearings from r=${start} to r=1.2, all blocked: ${byDisc} by the disc edge (radius ${radius}), the rest by [${worst.map(([k, n]) => `${k}×${n}`).join(', ')}] of ${others.length} colliders`,
         }
       },
       [target, startR, prefer],
     )
 
+  // THE SPREAD, RECORDED (point 549). Three standpoint searches rotated: the
+  // zulu hut approach (this search) reported a bare `false` in one of five runs
+  // and passed the other four, the cairo trade house (this search) did the
+  // same, and the conversational standpoint (the villager-gestures section's
+  // own 16-bearing search) reddened once on a loaded machine. With the world
+  // seed pinned, the search reporting what it tried, and one retry from a
+  // settled scene, four consecutive WebGL 2 runs picked the IDENTICAL
+  // standpoint every time — the zulu hut at {x 15.79, z 2.20} on bearing 2.487
+  // of 48, the cairo trade house at {x -19.22, z -1.18} on bearing 0.000 of 49,
+  // the conversational standpoint on bearing 0.00, the first of 16. A search
+  // over a world that does not change no longer produces a verdict that does.
   /** The same search, but never reporting a miss off a scene that may still be
    *  streaming in: a first miss is retried once from a settled state (point
    *  549 — the settled-reading shape point 499 established). */
-  // THE SPREAD, RECORDED (point 549). Three checks rode on this one search and
-  // each of them rotated: the zulu hut approach reported a bare `false` in one
-  // of five runs and passed the other four, the cairo trade house did the same,
-  // and the conversational standpoint reddened once on a loaded machine. With
-  // the world seed pinned, the search reporting what it tried, and one retry
-  // from a settled scene, four consecutive WebGL 2 runs picked the IDENTICAL
-  // standpoint every time — the zulu hut at {x 15.79, z 2.20} on bearing 2.487
-  // of 48 tried, the cairo trade house at {x -19.22, z -1.18} on bearing 0.000
-  // of 49, the conversational standpoint on bearing 0.00, the first of 16. A
-  // search over a world that does not change no longer produces a verdict that
-  // does.
   const standOff = async (target, startR, prefer = null) => {
     const first = await searchStandOff(target, startR, prefer)
     if (first.bearing != null) return first
@@ -8167,11 +8169,11 @@ if (section('roof-clearance')) {
    *  at wherever it came to rest. A blocked step SLIDES along the collider, so
    *  the last frames of a stalled walk drift sideways along the wall by however
    *  much the host drew in them — and the eaves probe then reads whatever
-   *  happens to stand at that drifted spot. Measured: the same trade house, same
-   *  seed, same approach bearing, once read `1.52 m down to ground-disc` and
-   *  once `0.24 m down to BoxGeometry`. Standing him back on the nearest point
-   *  the walk actually reached is a position he really walked to, and it is the
-   *  one the check means: at the eaves. */
+   *  happens to stand at that drifted spot. Standing him back on the nearest
+   *  point the walk actually reached is a position he really walked to, and it
+   *  is the one the check means: at the eaves. (The trade-house rotation that
+   *  outlived this repair, from standpoints within seven centimetres, was a
+   *  porter's crate — see the section header.) */
   const walkUntilStalled = async (target, maxMs = 20000) => {
     const step = () =>
       page.evaluate(
@@ -8208,7 +8210,6 @@ if (section('roof-clearance')) {
       best,
     )
     await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(null)))))
-    return best.d
   }
 
   /** What the frame really draws straight above and straight below the eye, over
@@ -8217,7 +8218,7 @@ if (section('roof-clearance')) {
    *  The player stands still here, so the building fabric — the only thing this
    *  criterion is about — reads identically in every frame of the window. What
    *  varies is the settlement's TRAFFIC: measured at the cairo standpoint over
-   *  2842 consecutive frames, 115 of them had a porter's carried crate 0.26 m
+   *  2842 consecutive frames, 115 of them had a porter's carried crate 0.23–0.28 m
    *  under the eye and 72 his robe, and a single-frame probe therefore decided
    *  the verdict by whether a porter happened to be passing. The window is
    *  recorded in ONE round trip and judged by the pure `judgeEavesColumn`. */
@@ -8316,7 +8317,7 @@ if (section('roof-clearance')) {
     check(`${label}: nothing hangs under the eye at the eaves`, verdict.belowClear, `${verdict.belowDetail}, ${where}`)
     // And whatever DOES hang over him clears the eye, the near plane and a margin.
     check(`${label}: the roof over him clears the head`, verdict.roofClears, `${verdict.roofDetail}, ${where}`)
-    return { target, probe: { bearing: stood.bearing, x: at.x, z: at.z } }
+    return { target, probe: { bearing: stood.bearing } }
   }
 
   /** The photograph a HUMAN judges: the eave line where roof meets wall, taken
