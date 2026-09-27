@@ -7,8 +7,9 @@
 // and each error was only fixed on the user's prompt. The existing guards check
 // the now-card against the DECLARED focus; nothing checked either against the
 // ACTUAL work, or a queue card against its (possibly re-specced) TASKS point.
-// Three new machine-checkable invariants, each conservative (allow on
-// ambiguity — better a missed nag than a false block):
+// Machine-checkable invariants, each conservative (allow on ambiguity — better
+// a missed nag than a false block); (A)–(C) came first, (D) and the derived
+// now-section check (`nowProjectionStopDecision`) were added later:
 //
 //   (A) NOW-CARD ~ ACTUAL WORK — the now-card/declared-focus point must be
 //       supported by the git evidence: working-tree edits attributable (via the
@@ -25,9 +26,10 @@
 //       card is flagged possibly-stale. This is a reminder-to-reconcile, NOT a
 //       correctness proof: re-running --synced after an honest review (card
 //       still accurate) refreshes the snapshot and clears the flag.
+//   (D) ONE POINT, ONE ERLEDIGT CARD — a point archived more than once blocks.
 //
-// Fail-open is shared: the wrapper allows on any I/O error, and every function
-// here is total (never throws, degrades to "no finding") on partial input.
+// Fail-open is shared: the wrapper allows on any I/O error, and `evaluate` is
+// total (never throws, degrades to "no finding") on partial input.
 import { createHash } from 'node:crypto'
 import { parseQueueCards, parseNowCard } from './queue-order-guard-core.mjs'
 import { parseNowCardPoints } from './dashboard-guard-core.mjs'
@@ -54,7 +56,7 @@ export const RECENT_COMMIT_COUNT = 5
 export const FOREIGN_EVIDENCE_MIN = 2
 
 /** File-path prefixes that count as work evidence (docs/dashboard edits do not). */
-export const EVIDENCE_PATH_RE = /^(src|scripts)\//
+const EVIDENCE_PATH_RE = /^(src|scripts)\//
 
 // ---- TASKS parsing ----------------------------------------------------------
 
@@ -118,8 +120,8 @@ export function pointsFromText(text, knownPoints) {
  * Does the git evidence support the now-card(s) / declared focus?
  * Inputs: nowPoints (Set of ALL now-section card points — with the parallel
  * feature-branch workflow the section holds one card per point in active
- * work, and evidence for ANY of them supports the board), nowPoint/focusPoint
- * (numbers or null; nowPoint kept for back-compat single-card callers),
+ * work, and evidence for ANY of them supports the board), focusPoint
+ * (number or null),
  * commitSubjects (recent subject lines), touchedFiles (working-tree paths,
  * any separator), specs (parsePointSpecs output). Returns {ok:true} or
  * {ok:false, foreignPoints:[…], evidence:[…strings]}.
@@ -132,10 +134,9 @@ export function pointsFromText(text, knownPoints) {
  */
 export function nowCardMatchesWork(input) {
   try {
-    const { nowPoints = null, nowPoint = null, focusPoint = null, commitSubjects = [], touchedFiles = [], specs } =
-      input ?? {}
+    const { nowPoints = null, focusPoint = null, commitSubjects = [], touchedFiles = [], specs } = input ?? {}
     const support = new Set(
-      [...(nowPoints instanceof Set ? nowPoints : []), nowPoint, focusPoint].filter((n) => Number.isInteger(n)),
+      [...(nowPoints instanceof Set ? nowPoints : []), focusPoint].filter((n) => Number.isInteger(n)),
     )
     if (support.size === 0) return { ok: true } // non-point work — nothing to hold evidence against
     if (!(specs instanceof Map)) return { ok: true }
@@ -319,14 +320,6 @@ export function nowProjectionStopDecision({
 }
 
 /**
- * Decide on the raw inputs. All optional; any bad shape → allow:
- *   dashboardHtml, tasksMd   the two files' contents
- *   focusPoint               declared focus point (current-focus.json, or null)
- *   commitSubjects           last RECENT_COMMIT_COUNT commit subject lines
- *   touchedFiles             working-tree changed/untracked paths
- *   snapshots                integritySnapshots from dashboard-state.json
- */
-/**
  * Point numbers standing in the Erledigt section more than once.
  *
  * WHY IT IS A CHECK AND NOT ONLY A FIX: `board.mjs done` folds duplicates now,
@@ -358,6 +351,16 @@ export function duplicateDonePoints(dashboardHtml) {
   return [...twice]
 }
 
+/**
+ * Decide on the raw inputs. All optional; any bad shape → allow:
+ *   dashboardHtml, tasksMd   the two files' contents
+ *   focusPoint               declared focus point (current-focus.json, or null)
+ *   commitSubjects           subject lines of the commits since the last attested
+ *                            --synced review (at most RECENT_COMMIT_COUNT)
+ *   touchedFiles             working-tree changed/untracked paths
+ *   snapshots                integritySnapshots from dashboard-state.json
+ *   activeWork, paused, heldByOther   inputs of the derived now-section check
+ */
 export function evaluate(input) {
   try {
     const { dashboardHtml, tasksMd, focusPoint = null, commitSubjects = [], touchedFiles = [], snapshots = null,
@@ -397,8 +400,8 @@ export function evaluate(input) {
     // evidence for any of them, not only the first card.
     const nowPoints = parseNowCardPoints(dashboardHtml)
     if (!nowCard && cards.length === 0 && !projection.block) {
-      // no board — dashboard-guard owns registration, but a duplicated archive is
-      // still a duplicated archive
+      // a board with neither a now-card nor queue cards — dashboard-guard owns
+      // registration, but a duplicated archive is still a duplicated archive
       return duplicateProblem ? block(duplicateProblem) : ALLOW
     }
 
@@ -417,7 +420,7 @@ export function evaluate(input) {
     if (unknown.length) {
       problems.push(
         `UNKNOWN QUEUE CARD(S): point(s) ${unknown.join(', ')} have a Warteschlange card but NO TASKS.md ` +
-          'point. Fix the card number or remove the card, republish, re-run --synced.',
+          `point. Fix the card number or remove the card, then ${REPUBLISH}.`,
       )
     }
 
@@ -435,7 +438,7 @@ export function evaluate(input) {
           `${nowPoints.size ? [...nowPoints].join(', ') : focusPoint} but the git evidence points at ` +
           `open point(s) ${match.foreignPoints.join(', ')} — ${match.evidence.join('; ')}. Reconcile NOW: ` +
           'if the work really is on the evidenced point(s), retitle the now-card + re-declare ' +
-          '(focus.mjs set) + republish + --synced; if the card is right, commit/clean the unrelated edits ' +
+          `(focus.mjs set), then ${REPUBLISH}; if the card is right, commit/clean the unrelated edits ` +
           'so the evidence matches what you are doing.',
       )
     }
