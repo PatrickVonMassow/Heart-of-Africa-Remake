@@ -1,6 +1,6 @@
 // Journal read-aloud (design.md §15/§16): speaks journal entries with the
-// Kokoro TTS model (kokoro-js), fetched from the Hugging Face CDN on first use
-// and cached by the browser. The model runs in a Web Worker (ttsWorker.ts) so
+// Kokoro TTS model (kokoro-js), fetched from the Hugging Face CDN (pre-warmed
+// at game start, see below) and cached by the browser. The model runs in a Web Worker (ttsWorker.ts) so
 // synthesis never blocks the game loop — the main thread only posts text and
 // plays back the returned PCM through the AudioContext. The device is decided
 // here on the main thread: the onnxruntime WebGPU compute path (separate from
@@ -147,17 +147,20 @@ function playSegment(run: Run, raw: RawAudioLike, seg: SpeechSegment): Promise<v
 
 /**
  * Narrate the given segments in order. Cancels any narration in progress.
- * `onSpeaking` fires when the first audio actually starts (after the model
+ * `onSpeaking` fires just before the first audio starts (after the model
  * has loaded and the first chunk is synthesized). Resolves when narration
- * finishes or is stopped; rejects when the engine cannot be loaded.
+ * finishes, or for a stopped run once its pending synthesis or pause has
+ * settled; rejects only when the audio context cannot run — a segment whose
+ * synthesis fails is skipped.
  */
 export async function speakSegments(segments: SpeechSegment[], onSpeaking?: () => void): Promise<void> {
   stopSpeech()
   const run: Run = { cancelled: false, source: null }
   currentRun = run
 
-  // Check the autoplay policy BEFORE loading the engine: while audio is
-  // blocked (no user gesture yet), the model download must not start.
+  // Check the autoplay policy BEFORE synthesizing: while audio is blocked (no
+  // user gesture yet), no synthesis is requested (the model itself may already
+  // be loading through warmupSpeech).
   if (!ctx) ctx = new AudioContext()
   if (ctx.state === 'suspended') await ctx.resume()
   if ((ctx.state as string) !== 'running') throw new Error('audio context suspended')

@@ -17,8 +17,9 @@ import { KokoroTTS } from 'kokoro-js'
 // onnxruntime's WASM runtime prints two session-setup warning blocks
 // ("[W:onnxruntime:...] Some nodes were not assigned ...") straight to
 // stderr → console.error on every model load, and kokoro-js offers no
-// session-options passthrough to lower that severity. Filter the known
-// noise here — this worker's console is otherwise ours alone.
+// session-options passthrough to lower that severity. Drop every console.error
+// whose first argument carries the onnxruntime warning prefix — this worker's
+// console is otherwise ours alone.
 const rawConsoleError = console.error.bind(console)
 console.error = (...args: unknown[]) => {
   if (String(args[0] ?? '').includes('[W:onnxruntime:')) return
