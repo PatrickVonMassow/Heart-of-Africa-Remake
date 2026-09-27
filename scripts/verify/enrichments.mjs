@@ -2399,10 +2399,11 @@ if (section('carcass-scavenging')) {
 }
 
 // --- Point 56: the traveller collides with animals -----------------------------
-// design.md §19: the bird's-eye traveller cannot walk through wildlife. Pin a
-// live animal ahead of the player (clear of him), drive straight at it, and
-// confirm his path never enters the animal's body — he is turned aside (slides
-// around) rather than passing through it (which would drop the distance to ~0).
+// design.md §19: the bird's-eye traveller cannot walk through wildlife. Pin an
+// injected zebra ahead of the player (clear of him), drive straight at it, and
+// confirm his path never enters the animal's body rather than passing through
+// it (which would drop the distance to ~0); then steering must still drive him
+// back clear.
 if (section('animal-collision')) {
   await page.evaluate(() => window.__game.getState().debugJumpTo(-2.2, 34.8))
   // Poll until streamed animals exist: the injected test zebra borrows a live
@@ -2422,11 +2423,11 @@ if (section('animal-collision')) {
   await page.waitForTimeout(400)
   const animalHit = await page.evaluate(async () => {
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
-    // Fail-soft (point 200): if the travel scene's wildlife hook is not ready
-    // (a rare transient during a scene remount — the waitForFunction above can
-    // time out), skip gracefully instead of throwing an UNCAUGHT error that aborts
-    // the whole suite. A persistent absence would fail every collision run, which
-    // is a different signal from this one-off staging miss.
+    // Point 200: if the travel scene's wildlife hook is not ready (a rare
+    // transient during a scene remount — the waitForFunction above can time
+    // out), return a notReady result instead of throwing an UNCAUGHT error that
+    // aborts the whole suite; the two checks below then fail on it (reached
+    // false, escaped 0) without taking the rest of the suite down.
     if (!window.__wildlife?.herdsRef?.current) return { notReady: true, minDist: 0, reached: false, escaped: 0 }
     const p0 = window.__game.getState().pos
     const ax = p0.x + 2.6 // 2.6 east — clear of the player (body+player ≈ 1.2)
@@ -2435,7 +2436,8 @@ if (section('animal-collision')) {
     // the injected zebra out of the streaming despawn entirely: with an invalid
     // key it was despawned and re-injected each poll, and under full-regression
     // load the player could drive through it inside that gap. Front insertion
-    // keeps it inside the MAX_INSTANCES behaviour window.
+    // (the unshift in the drive loop below) keeps it inside the MAX_INSTANCES
+    // behaviour window.
     const liveChunk = (() => {
       const h = window.__wildlife.herdsRef.current
       if (!h) return undefined
@@ -2451,18 +2453,15 @@ if (section('animal-collision')) {
     // guarantee seeders (vicinity, dry shore) can stand a grazer on the
     // straight line to the pinned target, and the traveller then collides —
     // correctly — with the wrong body and never reaches the test target.
-    {
-      const p0 = window.__game.getState().pos
-      const h0 = window.__wildlife?.herdsRef?.current
-      if (h0) {
-        for (const sp of Object.keys(h0)) {
-          for (const a of h0[sp]) {
-            if (a === zebra || a.dead) continue
-            const onCorridor =
-              a.x > Math.min(p0.x, ax) - 4 && a.x < Math.max(p0.x, ax) + 4 &&
-              Math.abs(a.z - az) < 6
-            if (onCorridor) a.z += 25 // shove it well off the line
-          }
+    const h0 = window.__wildlife?.herdsRef?.current
+    if (h0) {
+      for (const sp of Object.keys(h0)) {
+        for (const a of h0[sp]) {
+          if (a.dead) continue
+          const onCorridor =
+            a.x > Math.min(p0.x, ax) - 4 && a.x < Math.max(p0.x, ax) + 4 &&
+            Math.abs(a.z - az) < 6
+          if (onCorridor) a.z += 25 // shove it well off the line
         }
       }
     }
@@ -2477,9 +2476,9 @@ if (section('animal-collision')) {
     // Wall backstop widened (point 249) so a slow backend accumulates the full
     // sim-budget of driving before the loop ends; the sim-time gate is the real bound.
     while (window.__simTime() - s0 < 2.5 && Date.now() - t0 < 60000) {
-      // Fallback: should the zebra be streamed out regardless, re-add and re-pin
-      // it — the real game collides against genuinely streamed animals, this
-      // only keeps the fixed test target present.
+      // Insert the zebra at the front on the first pass, re-add it should it be
+      // streamed out, and re-pin it every pass — the real game collides against
+      // genuinely streamed animals, this only keeps the fixed test target present.
       const herds = window.__wildlife?.herdsRef?.current
       if (herds && !herds.zebra.includes(zebra)) herds.zebra.unshift(zebra)
       zebra.x = ax
@@ -2546,11 +2545,11 @@ if (section('animal-collision')) {
 // spot the body merely "belongs" to is free. Everything is measured against the
 // instance matrix the renderer wrote and the circles the movement loop really
 // collides against — never an assumed radius (§7.2).
-// Re-anchor clear of every settlement first (point 299): the drives above walk
-// the traveller east, and a settlement footprint now collides in the bird's-eye
-// view — staged from the drifted position, the "empty ground" flank ended up
-// inside the Maasai village and was blocked for a perfectly good reason, which
-// would grade the wrong thing. (-2.2, 34.8) is ~20 units from the nearest place.
+// Re-anchor clear of every settlement first (point 299): a settlement footprint
+// collides in the bird's-eye view, and once staged from a drifted position the
+// "empty ground" flank ended up inside the Maasai village and was blocked for a
+// perfectly good reason, which would grade the wrong thing. (-2.2, 34.8) is ~20
+// units from the nearest place.
 if (section('collision-on-the-animal')) {
   await page.evaluate(() => window.__game.getState().debugJumpTo(-2.2, 34.8))
   await page
@@ -2702,8 +2701,8 @@ if (section('collision-on-the-animal')) {
 
 // --- Point 129: a tree contact leaves every free direction free ---------------
 // The user's invisible-blocker report (west dead at a spot with nothing
-// visible west) could not be reproduced; hypotheses (a) two-circle resting
-// contact and (c) asymmetric query window are refuted by pure tests and code
+// visible west) could not be reproduced; the two-circle resting contact and
+// the asymmetric query window hypotheses are refuted by pure tests and code
 // reading. This live witness pins the guarantee at a REAL tree: drive into
 // it (blocked at the body edge), then prove north, south and west all move.
 // Jump to wooded savanna first (the Serengeti) so a collidable tree is
@@ -2721,7 +2720,7 @@ if (section('tree-contact')) {
     // Find a collidable tree near the current position with land on all sides.
     const p0 = window.__game.getState().pos
     let tree = null
-    outer: for (let dx = -70; dx <= 70 && !tree; dx += 5) {
+    outer: for (let dx = -70; dx <= 70; dx += 5) {
       for (let dz = -70; dz <= 70; dz += 5) {
         for (const [ox, oz, r] of window.__vegetation.obstaclesNear(p0.x + dx, p0.z + dz)) {
           let landAround = true
@@ -2764,7 +2763,8 @@ if (section('tree-contact')) {
       return false
     }, 20000)
     window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyD' }))
-    // From the resting contact: each free direction must actually move.
+    // From the resting contact, drive north, then south, then west in turn (each
+    // from where the previous drive ended): each must actually move.
     const drive = async (code, dist, sign, axis) => {
       const start = window.__game.getState().pos
       window.dispatchEvent(new KeyboardEvent('keydown', { code }))
@@ -2909,11 +2909,13 @@ if (section('rinderpest')) {
   )
 
   // Point 168: at the USER's conditions — STANDARD zoom in a struck year near
-  // the Maasai village — the carrion must be VISIBLE without travelling away.
+  // the Maasai village — the carrion must be NEARBY without travelling away
+  // (counted within an assumed 55-unit radius, not the rendered frame — see the
+  // OPEN note below; the check's name is kept as its ledger identity).
   // Done in ONE evaluate like the point-133 check (a split into jump/wait/count
   // evaluates lost window.__wildlife to a remount between them). Jump to the
   // same reliable spot the 133 check uses (-2.5/36.4), pin 1892, restock, and
-  // count carcasses in the standard-zoom view around the ACTUAL player pos.
+  // count carcasses within that radius around the ACTUAL player pos.
   const carrionVicinity = await page.evaluate(async () => {
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
     window.__ui.getState().setWheelZoomEnabled(false)
