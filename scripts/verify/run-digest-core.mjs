@@ -2,16 +2,15 @@
 //
 // WHY: the session boundary fires between POINTS. Inside one heavy point the
 // context still grows unchecked, and the largest single contributor is a verify
-// run's own transcript: `run-all.mjs` prints ONE line per suite while it is
-// green, but on a red one it echoes the WHOLE captured output — the entire
-// vitest dump, the entire tsc/vite build error, the entire lint report. Those
-// are the thousands of lines a session pays for, and it pays for them again on
-// every poll of a background run.
+// run's own transcript: `run-all.mjs` announces each suite and prints its
+// result, and every red adds its failure echoes or a crash tail, on top of what
+// the vitest, build and lint stages print. Those are the thousands of lines a
+// session pays for, and it pays for them again on every poll of a background run.
 //
 // THE COUNTER-MEASURE IS NOT A COMPACTION: the run's output goes to a FILE, and
 // the caller reads a BOUNDED selection of it — the runner's own structured
 // lines (every PASS/FAIL/SKIP verdict, every stage heading, every failure echo,
-// the retry/flake notices, the final verdict) plus, when the run failed, the
+// the final verdict) plus, when the run failed, the
 // last few dozen raw lines. What is dropped is the unstructured bulk, which is
 // on disk and one `--show` away.
 //
@@ -76,14 +75,14 @@ const BANNER = /^={3,}/
  *  the suite's own. Losing that also hands the reader a pass. `NOT-COVERING`
  *  (work-order 1136) is the measured version of the same thing: the check ran,
  *  saw too few subjects to answer, and counts as neither red nor green — so the
- *  exit code carries nothing about it and only this line does. */
+ *  exit code carries nothing about it and only this line does.
+ *  The run's own bookkeeping demands belong here too (point 1135): `ACCOUNTED
+ *  FOR` says a red suite's reds all have an owner, `STRIKE` names a ledger entry
+ *  whose check has gone green, and `POINT REDS` is the run's ownership verdict —
+ *  each a conclusion about a headline above it rather than droppable bulk. */
 const FINAL = /^(ALL GREEN\b|\d+\s+SUITE\(S\) FAILED\b|DEFERRED\b|LARGE FAILED\b|PARTIAL\b|NON-PREDICTIVE\b|NOT-COVERING\b|ACCOUNTED FOR\b|STRIKE\b|POINT REDS\b)/
-/** The run's own bookkeeping demands (point 1135). `ACCOUNTED FOR` says a red
- *  suite's reds all have an owner, `STRIKE` names a ledger entry whose check has
- *  gone green, and `POINT REDS` is the run's ownership verdict — each of them a
- *  conclusion about a headline above it, so each belongs with FINAL rather than
- *  in the droppable bulk. The old `↻`/`⚠` retry notices are gone with the retry
- *  itself. */
+/** The old `↻`/`⚠` retry notices. The retry itself is gone (point 1135); the
+ *  class only still matches them in older logs. */
 const FLAKE = /^[↻⚠]/
 /** The runner's indented failure echo (`      FAIL …`, `      ERR: …`,
  *  `      | <crash tail>`) — and vitest's own ` FAIL  file > case` lines, which
@@ -107,7 +106,8 @@ export function classifyLine(line) {
   return null
 }
 
-/** Kinds that must survive the line budget: everything a red run is read for. */
+/** Kinds that outrank the rest under the line budget — dropped only once every
+ *  low-priority line is gone: everything a red run is read for. */
 const HIGH_PRIORITY = new Set(['echo', 'flake', 'final'])
 
 /** A FAIL result outranks a PASS result — a red run's budget belongs to it. */
@@ -197,7 +197,9 @@ function clip(line, maxLineChars) {
  * Apply the line budget: low-priority lines (PASS verdicts, headings, banners,
  * heading continuations) go first, and from the FRONT — the end of a run is
  * what a reader needs. Only if that is not enough do high-priority lines go,
- * also from the front. Returns the surviving entries and how many were dropped.
+ * also from the front. Declared limitations and the run's bookkeeping lines
+ * (below) are never dropped, so the result can exceed the budget by those few.
+ * Returns the surviving entries and how many were dropped.
  */
 export function applyBudget(entries, maxKeptLines) {
   const list = [...(entries ?? [])]
@@ -332,18 +334,12 @@ export function buildDigest({
   }
 }
 
-/** Should the wrapper echo this line LIVE? Exactly the structured selection —
- *  so a background run still shows progress and a red suite still names itself
- *  the moment it happens, at about one line per suite. */
-export function heartbeatKinds() {
-  return ['result', 'echo', 'heading', 'banner', 'final', 'flake', 'continuation']
-}
-
 /**
  * A BOUNDED window of a saved log — the `--show` half. Without it the only way
  * back to the detail would be `cat`, which is the cost this whole mechanism
  * exists to avoid. `grep` filters first (a JS regex, case-insensitive), `tail`
- * then takes the last N of what is left, and `max` caps the answer regardless.
+ * then takes the last N of what is left, and `max` caps the answer regardless
+ * (a tail or max of 0 answers nothing).
  */
 export function showWindow(lines, { grep = null, tail = 120, max = 400 } = {}) {
   let list = (lines ?? []).map((l) => String(l ?? ''))
@@ -354,7 +350,7 @@ export function showWindow(lines, { grep = null, tail = 120, max = 400 } = {}) {
     matched = list.length
   }
   const total = list.length
-  const window = list.slice(-Math.max(0, Math.min(tail, max)))
+  const window = list.slice(list.length - Math.max(0, Math.min(tail, max)))
   return { lines: window, total, matched, truncated: total - window.length }
 }
 
@@ -367,18 +363,19 @@ export function showWindow(lines, { grep = null, tail = 120, max = 400 } = {}) {
  * That is the mistake the progress clock of U1 corrected elsewhere — a repeat of
  * an identical observation is the same observation, not new progress.
  *
- * The mark below is what the run has actually produced, in two numbers a
- * repetition cannot move: how many DISTINCT lines it has emitted, and what its
- * newest line currently says. A loop reprinting one line adds no distinct line
- * and leaves the tail identical, so its mark stands still. A dot reporter, whose
- * dots accumulate on one unterminated line, moves the tail with every dot. A
- * suite naming its next file adds a distinct line.
+ * The mark below is what the run has actually produced, in two parts a
+ * repetition cannot move: how many DISTINCT lines it has emitted, and the last
+ * PROGRESS_TAIL_CHARS of what its newest line currently says. A loop reprinting
+ * one line adds no distinct line and leaves the tail identical, so its mark
+ * stands still. A dot reporter, whose dots accumulate on one unterminated line,
+ * moves the tail with every dot until those last characters are all dots; after
+ * that only a new line moves it. A suite naming its next file adds a distinct line.
  *
  * Lines are kept as 32-bit hashes rather than text: a LARGE run emits hundreds
  * of thousands of them, and a collision can only make a new line look seen —
  * which errs towards NOT renewing a lease, the safe side.
  */
-export const PROGRESS_TAIL_CHARS = 200
+const PROGRESS_TAIL_CHARS = 200
 
 function lineHash(line) {
   let h = 0x811c9dc5

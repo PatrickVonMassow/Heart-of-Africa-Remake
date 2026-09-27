@@ -13,7 +13,6 @@ import {
   elapsedMs,
   framesWrittenSince,
   lastProgressAtFor,
-  latestRecordPath,
   newestFrameMtimeMs,
   openProgressMark,
   progressMarkPathFor,
@@ -42,15 +41,15 @@ describe('the record lives beside its log', () => {
     expect(readRecord(join(dir, 'b.log.run.json'))).toBeNull()
   })
 
-  it('resolves the NEWEST run by the start time it carries, not by mtime', () => {
+  it('resolves the NEWEST run by the start time it carries, not by mtime (none live)', () => {
     const dir = tmp()
     // Written newest-first on purpose: a poll rewrites a record, so mtime order
     // and run order are different things.
     writeRecord(join(dir, 'new.log.run.json'), { startedAt: 2000 })
     writeRecord(join(dir, 'old.log.run.json'), { startedAt: 1000 })
     writeFileSync(join(dir, 'junk.run.json'), '{}')
-    expect(latestRecordPath(dir)).toBe(join(dir, 'new.log.run.json'))
-    expect(latestRecordPath(join(dir, 'nope'))).toBeNull()
+    expect(activeRecordPath(dir)).toBe(join(dir, 'new.log.run.json'))
+    expect(activeRecordPath(join(dir, 'nope'))).toBeNull()
   })
 
   it('bounds its scan, so a hook on every tool call does not grow with the log directory', () => {
@@ -59,8 +58,8 @@ describe('the record lives beside its log', () => {
       writeRecord(join(dir, `2026-08-10T00-00-${String(i).padStart(2, '0')}.log.run.json`), { startedAt: 1000 + i })
     }
     // The oldest five are outside the window; the newest is still found.
-    expect(latestRecordPath(dir)).toContain(`00-${String(SCAN_LIMIT + 4).padStart(2, '0')}`)
-    expect(latestRecordPath(dir, { max: 1 })).toContain(`00-${String(SCAN_LIMIT + 4).padStart(2, '0')}`)
+    expect(activeRecordPath(dir)).toContain(`00-${String(SCAN_LIMIT + 4).padStart(2, '0')}`)
+    expect(activeRecordPath(dir, { max: 1 })).toContain(`00-${String(SCAN_LIMIT + 4).padStart(2, '0')}`)
   })
 })
 
@@ -271,6 +270,9 @@ describe('is the run still going?', () => {
   it('reports the elapsed time, or null when the record never said', () => {
     expect(elapsedMs({ startedAt: 1000 }, 4000)).toBe(3000)
     expect(elapsedMs({}, 4000)).toBeNull()
+    // An explicit null or empty stamp is "never said", not the epoch.
+    expect(elapsedMs({ startedAt: null }, 4000)).toBeNull()
+    expect(elapsedMs({ startedAt: '' }, 4000)).toBeNull()
   })
 })
 

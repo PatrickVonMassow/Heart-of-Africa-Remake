@@ -13,7 +13,7 @@
 // proves to the batch guard that a session is waiting rather than idling).
 // Every read is failure-tolerant: an absent or unreadable record means "nothing
 // known", never a false verdict.
-import { closeSync, existsSync, futimesSync, mkdirSync, openSync, readFileSync, readdirSync, statSync } from 'node:fs'
+import { closeSync, futimesSync, mkdirSync, openSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -23,8 +23,8 @@ import { REPO_ROOT, COMMON_REPO_ROOT } from '../repo-paths.mjs'
 const HERE = dirname(fileURLToPath(import.meta.url))
 export const ROOT = REPO_ROOT || join(HERE, '..', '..')
 
-/** Where the frames land — the one directory every suite's shutter writes to. */
-/** `HOA_FRAME_DIR` redirects it, on the same grounds as `HOA_WAIT_LEASE_PATH`:
+/** Where the frames land — the one directory every suite's shutter writes to.
+ *  `HOA_FRAME_DIR` redirects it, on the same grounds as `HOA_WAIT_LEASE_PATH`:
  *  a fixture must be able to ask about frames without the live repository's
  *  own `verification/` answering for it. */
 export const FRAME_DIR = process.env.HOA_FRAME_DIR || join(ROOT, 'verification')
@@ -99,25 +99,11 @@ export function writeRecord(path, record) {
 }
 
 /**
- * The NEWEST run record, by the start time it carries (not by mtime — a poll
- * rewrites the file). This is what `run-wait.mjs` resolves when no log is
- * named, which is the ordinary case: the session has just started one run.
- */
-export function latestRecordPath(dir = logDir(), { max = SCAN_LIMIT } = {}) {
-  let best = null
-  for (const { path, record } of scanRecords(dir, max)) {
-    const at = Number(record?.startedAt)
-    if (!Number.isFinite(at)) continue
-    if (!best || at > best.at) best = { path, at }
-  }
-  return best?.path ?? null
-}
-
-/**
  * How many record files a scan reads. Records are never pruned, so an unbounded
  * scan would grow the cost of a hook that runs on EVERY tool call without limit.
- * The filenames start with an ISO stamp, so a descending sort is chronological
- * and the newest few are always the interesting ones.
+ * The filenames the wrapper picks start with an ISO stamp, so a descending sort
+ * is chronological and the newest few are the interesting ones; a hand-named
+ * `--log-file` sorts wherever its name falls.
  */
 export const SCAN_LIMIT = 20
 
@@ -160,7 +146,8 @@ export function activeRecordPath(dir = logDir(), { max = SCAN_LIMIT } = {}) {
 }
 
 /**
- * EVERY run record that is still going (point 1048, union entry U13).
+ * EVERY run record that is still going among the newest SCAN_LIMIT (point
+ * 1048, union entry U13).
  *
  * `activeRecordPath` answers "the newest live one", which is the right answer
  * for a status glance and the wrong one for an automated wait: a quick suite
@@ -257,15 +244,17 @@ export function runIsLive(record) {
 
 /** How long the run has been going, in ms, or null when it never said. */
 export function elapsedMs(record, now = Date.now()) {
-  const at = Number(record?.startedAt)
+  const raw = record?.startedAt
+  // `Number(null)` and `Number('')` are 0 — the epoch, not "never said".
+  const at = raw === null || raw === '' ? Number.NaN : Number(raw)
   return Number.isFinite(at) ? Math.max(0, now - at) : null
 }
 
 /**
  * COUNT ONE POLL. Returns the record as it now stands (with the raised count),
  * or null when there is nothing to count against. Deliberately the ONLY way the
- * counter moves, so the number in the receipt means "somebody looked while it
- * was running" and nothing else.
+ * counter moves, so the number in the receipt means "somebody looked" and
+ * nothing else; this function does not check the run's status itself.
  */
 export function countPoll(path) {
   const record = readRecord(path)
@@ -274,11 +263,6 @@ export function countPoll(path) {
   const next = { ...record, polls, lastPolledAt: Date.now() }
   writeRecord(path, next)
   return next
-}
-
-/** Does this checkout have a frame directory at all (a worktree may not)? */
-export function frameDirExists() {
-  return existsSync(FRAME_DIR)
 }
 
 /** The newest mtime among the frame files, or null when the directory cannot be
@@ -311,11 +295,9 @@ export function newestFrameMtimeMs({ dir = FRAME_DIR, since = null } = {}) {
 /**
  * WHEN DID THIS RUN LAST SHOW A SIGN OF LIFE (point 1137)?
  *
- * The newest of three marks, because no single one covers a whole run: the LOG
- * grows at every stage and suite boundary, the RECORD is rewritten when the run
- * starts and ends, and the FRAMES advance inside a long render suite, which is
- * the stretch the log cannot see. Anything unreadable is left out rather than
- * counted as silence — a probe that cannot see is not evidence of a wedge.
+ * The newer of two marks the run itself writes: the writer's PROGRESS MARK and
+ * the LOG. The record and the frames are deliberately not consulted (below).
+ * Anything unreadable is left out rather than counted as a mark.
  *
  * Returns null when nothing could be read at all, which callers treat as
  * "nobody looked" and not as "nothing happened".
@@ -352,9 +334,10 @@ export function lastProgressAtFor({ logPath = null, recordPath = null, markPath 
   // WHY LOSING THEM COSTS THIS READER NOTHING (Astra review rounds 5 to 9): the
   // writer holds its mark OPEN for the run, in the same directory and from the
   // same moment as the log. The case that worried the review — a mark that stops
-  // being writable while the log carries on — cannot arise between two held
-  // descriptors, so the run always has a sign of life this probe can read
-  // without borrowing anybody else's pictures.
+  // being writable while the log carries on — is narrowed to an ownership change
+  // under a running run (see `openProgressMark`), and the log then carries the
+  // run alone, so the run keeps a sign of life this probe can read without
+  // borrowing anybody else's pictures.
   const marks = []
   const mark = markPath === undefined ? progressMarkPathFor(logPath ?? recordPath) : markPath
   for (const path of [mark, logPath]) {
@@ -397,8 +380,8 @@ export function progressMarkPathFor(logPath) {
  * docs/backlog.md rather than bridged, because every bridge built for it so far
  * cost more than the case it covered.
  *
- * Null when the mark cannot be opened at all — which is the case where the log
- * could not have been created either, so the run has larger problems than this.
+ * Null when the mark cannot be opened at all. The log is opened separately, so
+ * it then carries the run's sign of life on its own.
  */
 export function openProgressMark(logPath) {
   const path = progressMarkPathFor(logPath)

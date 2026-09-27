@@ -340,6 +340,11 @@ describe('showWindow', () => {
     expect(showWindow(log, { tail: 400, max: 10 }).lines).toHaveLength(10)
   })
 
+  it('answers nothing for a zero tail or max rather than the whole log', () => {
+    expect(showWindow(log, { tail: 0 }).lines).toHaveLength(0)
+    expect(showWindow(log, { tail: 50, max: 0 }).lines).toHaveLength(0)
+  })
+
   it('accepts a regex and is case-insensitive by default', () => {
     expect(showWindow(['Fail here', 'ok'], { grep: 'fail' }).matched).toBe(1)
     expect(showWindow(['Fail here', 'ok'], { grep: /fail/i }).matched).toBe(1)
