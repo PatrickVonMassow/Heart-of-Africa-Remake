@@ -2989,10 +2989,10 @@ if (section('burning-grass')) {
     const calf = { x: p0.x + 6, z: p0.z + 14, y: 0.2, rot: 0, scale: 0.5, phase: 0.7, chunk: undefined, young: true, parent }
     parent.child = calf
     herds.zebra.push(parent, calf)
-    // Ignite south of the calf, burning due north over it (heading 0 = +z).
+    // Ignite north of the calf, burning due south over it (heading 0 = +z; north is -z).
     window.__wildlife.igniteFire(p0.x + 6, p0.z + 4, 0)
     const f = window.__wildlife.fire
-    const out = { trapped: false, calfDead: false, parentDead: false, resolved: false, bandSeen: false }
+    const out = { trapped: false, calfDead: false, parentDead: false, resolved: false }
     await window.__pollSim(40, () => {
       // Staging fix (point 177): hold the calf in the fire front's narrow catch
       // band until it is caught — its young-animal gambol/idle drift otherwise
@@ -3003,7 +3003,7 @@ if (section('burning-grass')) {
       if (calf.fireTrapped !== undefined) out.trapped = true
       if (calf.dead) out.calfDead = true
       if (parent.dead) out.parentDead = true
-      if (f.mode === 'smoulder') { out.resolved = true; out.bandSeen = true; return true }
+      if (f.mode === 'smoulder') { out.resolved = true; return true }
       return false
     })
     // Cleanup: the staged family retires; the fire resolves on its own clock.
@@ -3025,8 +3025,8 @@ if (section('burning-grass')) {
 // always resolves — the bird recovers, flies home and lands at its nest.
 if (section('broken-wing-lure')) {
   const brokenWing = await page.evaluate(async () => {
-    // Jump clear of the point-145a grass fire (left smouldering at the Sahel spot,
-    // ~4 units from where this stages its nest) so it cannot catch the plover
+    // Jump clear of the point-145a grass fire (left smouldering at the Sahel
+    // spot) so it cannot catch the plover
     // mid-lure (point 177: an intermittent regression once 145a's fire timing
     // shifted — the bird died before it could fly home).
     window.__game.getState().debugJumpTo(-2.5, 34.0) // Serengeti savanna, no fire
@@ -3056,8 +3056,8 @@ if (section('broken-wing-lure')) {
       return false
     })
     if (!out.resolved) {
-      // Self-explaining failure (the run-2 exact-zero riddle): where does the
-      // bird stand, is it still OUR object in the list, what does its state say?
+      // Self-explaining failure: where does the bird stand, is it still OUR
+      // object in the list, what does its state say?
       out.diag = {
         inList: herds.plover.includes(parent),
         dead: !!parent.dead,
@@ -3075,7 +3075,7 @@ if (section('broken-wing-lure')) {
     brokenWing.lured && brokenWing.maxFromNest > 5 && brokenWing.tookOff && brokenWing.resolved && brokenWing.homeAgain,
     JSON.stringify(brokenWing),
   )
-  await shot('132-broken-wing', { world: { lat: -2.5, lon: 34.0 }, label: 'the plover feigning the broken wing', settle: false })
+  await shot('132-broken-wing', { world: { lat: -2.5, lon: 34.0 }, label: 'the Serengeti nest site after the broken-wing lure', settle: false })
 
   // --- Carcasses do not accumulate off-screen (freeze fix) ---------------------
   // A single scavenger cannot keep up with every kill, so carcasses left far off
@@ -3105,10 +3105,10 @@ if (section('broken-wing-lure')) {
   check('a carcass in view is kept (dissolves on screen, not popped)', carcassBound.nearKept === true, JSON.stringify(carcassBound))
 }
 
-// --- Family life: young that nurse, parents that guard, bathing (§7.1.8) ------
+// --- Family life: young that keep close to a parent (design.md §19) ---------
 // design.md §19 richer interactions: grazer/elephant herds raise a calf that
-// keeps close to a parent; a parent moves between an approaching predator and
-// its calf (defends the young); and some shore visitors wade in and bathe.
+// keeps close to a parent. The guarding parent and the bathing shore visitors
+// are checked in section('calf-jitter') below.
 if (section('family-life')) {
   await page.evaluate(() => window.__game.getState().debugJumpTo(-2.2, 34.8))
   await page.evaluate(() => window.__wildlife.restock())
@@ -3278,15 +3278,15 @@ if (section('calf-jitter')) {
   })
   check(
     'a playing calf moves without direction sawtooth (no trembling)',
-    calfJitter.samples >= 20 && calfJitter.flips / Math.max(1, calfJitter.samples) < 0.15,
+    calfJitter.samples >= 20 && calfJitter.flips / calfJitter.samples < 0.15,
     JSON.stringify(calfJitter),
   )
 
   // A parent does NOT orbit a lion that is FEEDING on other prey near its calf
   // (point 118): the guard only engages a HUNTING lion, so beside a feeder the
   // family flees instead of the parent oscillating around it forever. Force a lion
-  // feeding beside a calf and sample the parent: its step direction must not
-  // saw-tooth and it must move AWAY from the lion. (Runs after the ambient
+  // feeding beside a calf and sample the parent: it must move AWAY from the lion
+  // (its step-reversal rate is reported as a diagnostic only). (Runs after the ambient
   // playing-calf check above so its lion-feed disturbance cannot starve it.)
   const guardFlee = await page.evaluate(async () => {
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
@@ -3336,14 +3336,14 @@ if (section('calf-jitter')) {
     // 0.56 loaded) while fled stayed a clean 4 (point 177). reversalRate is kept in
     // the JSON as a diagnostic, out of the gate.
     'a parent flees a feeding lion beside its calf instead of orbiting it (point 118)',
-    guardFlee && !guardFlee.error && guardFlee.samples >= 6 && guardFlee.fled > 2,
+    !guardFlee.error && guardFlee.samples >= 6 && guardFlee.fled > 2,
     JSON.stringify(guardFlee),
   )
 
   // A calf trampled by an elephant takes its parent with it (point 119): the
   // parent throws itself before the elephant's feet and is trampled too. Grief,
   // not a rescue — it must CLOSE on the elephant (ordinary prey dodges away) and
-  // end up dead over its own stain. Park an elephant on a calf and watch both.
+  // end up dead over its own stain. Bear an elephant down on a calf and watch both.
   const trampleGrief = await page.evaluate(async () => {
     const w = window.__wildlife
     const herds = w.herdsRef.current
@@ -3367,13 +3367,13 @@ if (section('calf-jitter')) {
     // parent charges at sim speed (dt is clamped at 0.1, so long frames advance
     // the sim SLOWER than wall time), and the old wall-clock sleep loops starved
     // a loaded WebGPU run — the flake read closed≈2.4 with the parent still
-    // mid-chase, kinematically impossible within 6 REAL sim-seconds. The budgets
+    // mid-chase, kinematically impossible in the sim time that had passed. The budgets
     // sit well inside the 24 s grief window; a genuine regression (parent never
     // trampled) still exhausts them and fails.
     const calfDead = await window.__pollSim(10, () => calf.dead === true)
     const charged = parent.trampleTo !== undefined // it inherited the grief
     // Measure the approach against the elephant the grief ACTUALLY charges —
-    // the nearest living one — not against the injected decoy: with a natural
+    // the nearest living one — not against the injected elephant: with a natural
     // herd nearby the parent (correctly) went for a different animal and the
     // decoy-based "closed" metric read negative on a successful trample
     // (point 135d — a measurement bug, not a sim bug).
@@ -3397,7 +3397,7 @@ if (section('calf-jitter')) {
   })
   check(
     'a parent whose calf is trampled throws itself before the elephant and is trampled too (point 119)',
-    trampleGrief && !trampleGrief.error && trampleGrief.calfDead && trampleGrief.charged &&
+    !trampleGrief.error && trampleGrief.calfDead && trampleGrief.charged &&
       trampleGrief.parentDead && trampleGrief.closed > 2 && trampleGrief.stainsAdded >= 2,
     JSON.stringify(trampleGrief),
   )
