@@ -32,8 +32,9 @@
 //     assertion or use a recognised helper.
 //   · only assertions written as `expect(…)` are read. A hand-rolled
 //     `if (r.status === 0) throw …` is invisible.
-//   · a spawn wrapper defined in ANOTHER module is not followed; the file's own
-//     use of `child_process` is what puts it in scope at all.
+//   · a spawn wrapper defined in ANOTHER module is not followed; a spawn-like
+//     call in the file's own TEXT (`spawn(`, `execFileSync(` …, see SPAWNS — no
+//     import is checked) is what puts it in scope at all.
 import { maskCode, balancedEnd } from '../window-hide-core.mjs'
 
 /** Does this file spawn a child process at all? Nothing else is in scope. */
@@ -53,7 +54,9 @@ const EXPECT = /(?<![\w.$])expect\s*\(/g
 const NEGATIVE_MATCHER =
   /^\s*(?:\.not\s*\.\s*(?:toBe|toEqual|toStrictEqual)\s*\(\s*\+?0\s*\)|\.toBeGreaterThan\s*\(\s*0\s*\)|\.toBeTruthy\s*\(\s*\))/
 
-/** The matcher chains an EMPTY output cannot satisfy — a positive claim. */
+/** The matcher chains read as a positive claim about output. Most cannot be
+ *  satisfied by EMPTY output; a degenerate `toContain('')` or a match-everything `toMatch`
+ *  can, and is not screened out. */
 const POSITIVE_MATCHER = /^\s*\.(?:toContain|toMatch|toContainEqual)\s*\(/
 
 /** The names an exit status goes by. Word-bounded, so `codeLines` is not one. */
@@ -96,8 +99,9 @@ export function expectCalls(source) {
 const lineAt = (source, index) => source.slice(0, index).split('\n').length
 
 /**
- * The `it`/`test` case bodies in a file, as [start, end) index ranges over the
- * ORIGINAL source. Scanned over masked text so a case head in a comment or a
+ * The `it`/`test` cases in a file — each whole call, from the `it`/`test` name
+ * to its closing parenthesis — as [start, end) index ranges over the ORIGINAL
+ * source. Scanned over masked text so a case head in a comment or a
  * string opens nothing.
  */
 export function caseRanges(source) {
@@ -147,7 +151,7 @@ export function spawnAssertionFindings(source) {
     const owner = caseAt(cases, call.index)
     const scope = owner ? src.slice(owner.start, owner.end) : src
     if (establishesRun(scope)) continue
-    const chain = call.chain.match(NEGATIVE_MATCHER)?.[0] ?? ''
+    const chain = call.chain.match(NEGATIVE_MATCHER)[0]
     findings.push({
       line: lineAt(src, call.index),
       case: owner?.name ?? '(module level)',
@@ -158,8 +162,9 @@ export function spawnAssertionFindings(source) {
   return findings
 }
 
-/** Does this text prove the process ran — by name, or by a positive claim about
- *  its output? */
+/** Does this text claim the process ran — by naming a RUN_ESTABLISHERS helper
+ *  (a word match on the raw text, comments and strings included), or by a
+ *  positive claim about its output? */
 export function establishesRun(scope) {
   const text = String(scope ?? '')
   if (RUN_ESTABLISHERS.test(text)) return true

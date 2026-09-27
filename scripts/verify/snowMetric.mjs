@@ -4,9 +4,9 @@
 // whose DARKEST channel exceeded 205 — "near white" — and demanded 2 % of the
 // crop. Measured on 04.08.2026 the February High Atlas read 1.2-1.3 %, twice in
 // a row, while the picture showed an unmistakably snow-capped range. The frame
-// says why: this scene never produces a near-white pixel at all. Under the
-// filmic tone mapping and the warm desert light the WHOLE frame — HUD, journal
-// parchment and sunlit snow alike — tops out at a darkest channel of 210, and
+// says why: this scene barely reaches near-white. Under the filmic tone mapping
+// and the warm desert light the WHOLE frame — HUD, journal parchment and sunlit
+// snow alike — tops out at a darkest channel of 210, and
 // sunlit snow lands around (215, 212, 205). An absolute 205 threshold therefore
 // sits INSIDE the snow's own brightness distribution: the same frame yields
 // 14 % at 195, 1.5 % at 205 and 0 % at 215. It measured the top sliver of the
@@ -21,11 +21,11 @@
 // 155/12 and 195/35. Nothing else in the frame (label plates, HUD, rock,
 // vegetation) ever crosses it.
 //
-// Both thresholds are exported so a check can state the ones it used.
+// Both thresholds are exported; today only the unit tests read them.
 
 /** Darkest channel a snow pixel must exceed (0..255). */
 export const SNOW_MIN_CHANNEL = 175
-/** Largest channel spread (max - min) a snow pixel may show. */
+/** Channel spread (max - min) a snow pixel must stay BELOW. */
 export const SNOW_MAX_CHROMA = 25
 
 /** Whether one RGB triple reads as snow: bright enough and neutral enough. */
