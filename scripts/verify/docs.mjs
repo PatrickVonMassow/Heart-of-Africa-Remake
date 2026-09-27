@@ -110,9 +110,10 @@ function main() {
   // The evidence chains live in docs/acceptance-evidence.md under the SAME
   // numbers (user 26.07.2026), and since point 555 the criteria's full wording
   // lives in docs/acceptance-criteria-detail.md the same way. §7.1 asks for
-  // criterion and section to change in one commit — a request nothing enforced,
-  // in a project whose model is "enforce, don't remind" (four-eyes review,
-  // second round). These checks do.
+  // criterion and section to change together — a request nothing enforced, in a
+  // project whose model is "enforce, don't remind" (four-eyes review, second
+  // round). These checks enforce the result: the current section numbers of
+  // each companion must match §7.1's (they read no commit history).
   const companions = [
     { kind: 'evidence', doc: EVIDENCE_DOC },
     { kind: 'detail', doc: DETAIL_DOC },
