@@ -4235,13 +4235,13 @@ if (section('calf-predation-drama')) {
   // --- Point 122: the swollen river of the rains, and drowning ------------------
   // design.md §19.8: in a SWOLLEN current the self-rescue must not fire — an
   // animal carried too long drowns (dead, sinking, never scavenged). The same
-  // mid-channel setup in the dry season still clambers out on its own: the
-  // season, not the script, decides the fate. One self-contained evaluate per
-  // season: it stages a calf on a strong lower-Nile flow (no waterfall within
-  // drift reach) with its parent held far beyond wading range, RETRIES with the
-  // next family if the calf never enters the water state (the scripted lion may
-  // be hunting exactly that calf, which blocks the fall-in), then follows that
-  // one calf to its fate.
+  // mid-channel setup in the dry season still gets out alive (on its own, or
+  // pulled out once the far-parked parent arrives): the season, not the script,
+  // decides the fate. One self-contained evaluate per season: it stages a calf
+  // on a strong lower-Nile flow (no waterfall within drift reach) with its
+  // parent held far beyond wading range, RETRIES with a fresh synthetic pair if
+  // the calf never enters the water state (the water sweep can win the race),
+  // then follows that one calf to its fate.
   const runDrownScenario = async () =>
     page.evaluate(async () => {
       const hydro = await import('/src/world/hydro.ts')
@@ -4308,7 +4308,8 @@ if (section('calf-predation-drama')) {
   check('the forced rains reach the drowning rule: full wetness and a flow above the drown threshold (point 502)',
     drowned.reading?.wetness === 1 && drowned.reading.effective >= drowned.reading.drownThreshold,
     JSON.stringify(drowned.reading))
-  // (b) The dry season: the SAME setup still clambers out alive on its own.
+  // (b) The dry season: the SAME setup still gets out alive (self-rescue or the
+  //     late parent — the check does not tell them apart).
   await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(0))
   await page.waitForFunction(() => window.__wildlife.waterDrama(29, 31).wetness === 0)
   const clambered = await runDrownScenario()
@@ -4427,9 +4428,9 @@ if (section('calf-predation-drama')) {
     const vigil0 = Math.hypot(parent.x - calf.x, parent.z - calf.z)
     await window.__sleepSim(2)
     const vigil1 = Math.hypot(parent.x - calf.x, parent.z - calf.z)
-    // The predators find the pair (target bias): force the hunt's next pick
-    // window and let the chase run — the mud holds the calf, so the parent's
-    // charge costs its life WITHOUT freeing it, and the countdown takes both.
+    // The predators find the pair: force the hunt straight into a chase of the
+    // calf and let it run — the mud holds the calf, so the parent's charge costs
+    // its life WITHOUT freeing it, and the countdown takes both.
     const st = window.__lionHunt.state
     st.mode = 'chase'
     st.victim = calf
@@ -4438,7 +4439,7 @@ if (section('calf-predation-drama')) {
     st.lz = calf.z + 2
     st.px = calf.x
     st.pz = calf.z
-    st.timer = 0 // the hunt loop waits its idle timer out before acting
+    st.timer = 0
     await window.__pollSim(45, () => calf.dead && parent.dead, 155000)
     const bothDeadAtWater =
       calf.dead && parent.dead &&
@@ -4447,16 +4448,16 @@ if (section('calf-predation-drama')) {
     window.__lionHunt.state.mode = 'idle'
     window.__lionHunt.state.timer = 60
     fam.dispose()
-    return { found: true, held, vigil0, vigil1, calfDead: !!calf.dead, parentDead: !!parent.dead, bothDeadAtWater }
+    return { held, vigil0, vigil1, calfDead: !!calf.dead, parentDead: !!parent.dead, bothDeadAtWater }
   })
   check(
     'a mired calf holds its spot and its parent stands vigil beside it (point 123)',
-    mire.found && mire.held < 0.6 && mire.vigil0 < 2.2 && mire.vigil1 < 2.2,
+    mire.held < 0.6 && mire.vigil0 < 2.2 && mire.vigil1 < 2.2,
     JSON.stringify(mire),
   )
   check(
     'the hunt takes calf AND vigil parent at the waterhole — the mud never frees the calf (point 123)',
-    mire.found && mire.bothDeadAtWater,
+    mire.bothDeadAtWater,
     JSON.stringify(mire),
   )
   // Without a predator, the mud RELEASES (the drama always resolves): shorten
@@ -4473,11 +4474,11 @@ if (section('calf-predation-drama')) {
     window.__balance.waterDrama.mireSeconds = prev
     const released = calf.mired === undefined && !calf.dead
     fam.dispose()
-    return { found: true, released }
+    return { released }
   })
   check(
     'without a predator the mud releases the calf alive (point 123 — the drama always resolves)',
-    release.found && release.released,
+    release.released,
     JSON.stringify(release),
   )
 
@@ -4702,9 +4703,8 @@ if (section('calf-predation-drama')) {
   )
 
   // --- Point 146: revenge — a zebra parent kills the hyena and walks away ------
-  // Same staging and phase-forced ~0 roll as the kick check: with the roll at
-  // ~0 the natural zebra-vs-hyena KILL chance (0.075, below the drive-off
-  // 0.7) already decides the three-way outcome as 'kill'. The hyena falls as
+  // Staged like the kick check, with the three-way outcome forced to 'kill'
+  // (pd.forceOutcome, point 177). The hyena falls as
   // an ordinary carcass the scavengers may work (dead, NOT lionFed), and the
   // unwounded parent simply rejoins — no vigil, it fought.
   const revenge = await page.evaluate(async () => {
@@ -4787,9 +4787,8 @@ if (section('calf-predation-drama')) {
   // herds.lion, and the ONE hunt state forced to a hyena chasing the cub. The
   // lioness reaches the shared resolution core through FAMILY_DEFEND_SPECIES —
   // not the prey loops — and routs the hyena (drive-off forced deterministically:
-  // killFlight 0, predatorFlight high, so any roll below the 0.95 cap drives off).
-  // The drama must RESOLVE (the point-118 lesson): cub freed, lioness alive, hunt
-  // left. A staging roll in the 5% taken band retries a fresh pair.
+  // pd.forceOutcome = 'driveOff'). The drama must RESOLVE (the point-118 lesson):
+  // cub freed, lioness alive, hunt left.
   const cubDefence = await page.evaluate(async () => {
       const herds = window.__wildlife.herdsRef.current
       let liveChunk
@@ -4802,7 +4801,6 @@ if (section('calf-predation-drama')) {
       const cub = { x: p0.x + 8, z: p0.z + 12, y: 0.2, rot: 0, scale: 0.55, phase: 0.8, chunk: liveChunk ?? 'cub-test', young: true, parent: lioness, __cubTest: true }
       lioness.child = cub
       herds.lion.push(lioness, cub)
-      const isLionCub = cub.young === true && herds.lion.includes(cub)
       const st = window.__lionHunt.state
       st.predator = 'hyena'
       st.mode = 'chase'
@@ -4819,7 +4817,7 @@ if (section('calf-predation-drama')) {
       // short-circuits the roll for the test; restored below.
       const pd = window.__balance.parentDefense
       pd.forceOutcome = 'driveOff'
-      const out = { isLionCub, resolved: false, cubAlive: false, lionessAlive: false, huntLeft: false, mode: '' }
+      const out = { resolved: false, cubAlive: false, lionessAlive: false, huntLeft: false, mode: '' }
       await window.__pollSim(30, () => {
         if (st.mode === 'leave' || st.mode === 'idle') return true
         if (cub.dead || lioness.dead) return true
@@ -4836,12 +4834,12 @@ if (section('calf-predation-drama')) {
     })
   check(
     'the lioness routs the hyena and her cub lives — the drama resolves (point 145c)',
-    cubDefence.isLionCub && cubDefence.resolved,
+    cubDefence.resolved,
     JSON.stringify(cubDefence),
   )
   // A human-check tableau of the drama itself (not the dispersed aftermath): a
   // fresh family centred on the camera, the hyena closing, captured MID-shield so
-  // the lioness stands between hunter and cub. The journal is cleared and the
+  // the lioness stands between hunter and cub. The journal is closed and the
   // bird's-eye pulled to the default close zoom first.
   await page.evaluate(() => {
     window.__game.getState().setJournalOpen(false)
