@@ -98,6 +98,8 @@ export function gatherStampedFiles() {
     // restatements of any rule, and reading them as stray ones would block the
     // turn for a doc string.
     if (rel.startsWith('scripts/rule-echo')) continue
+    // Four-eyes records quote model output verbatim, stamps included.
+    if (rel.startsWith('docs/blind-') || rel.startsWith('docs/four-eyes/')) continue
     const full = resolve(REPO_ROOT, rel)
     if (existsSync(full)) out[rel] = readFileSync(full, 'utf8')
   }
