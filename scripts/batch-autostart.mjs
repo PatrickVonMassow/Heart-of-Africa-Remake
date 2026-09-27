@@ -1,6 +1,6 @@
 // OS-scheduler launcher (user mandate 22.07.2026) — resurrects a DEAD batch when
 // nothing else can, and VERIFIES its own work / RAISES A SIGNAL when the batch
-// is sick, not just dead. The launcher's TRIGGER runs this every few minutes: a
+// is sick, not just dead. The launcher's TRIGGER runs this every quarter of an hour: a
 // Windows Scheduled Task there, the scripts/batch-launcher.mjs daemon on Linux
 // (point 474). This file does not care which — only that it is ticked.
 //
@@ -9,16 +9,17 @@
 //   - Liveness is judged by scripts/batch-singleton.mjs: heartbeat age AND a
 //     REAL OS pid check. A session mid-long-tool-call (stale heartbeat, live
 //     claude process) reads ALIVE — the old 12-min claimedAt window read it
-//     dead and spawned the second session. A reboot alone is NOT death: only
-//     a provably dead owner (dead/reused pid, heartbeat predating the boot,
-//     or a legacy lock gone very stale) frees the lock.
+//     dead and spawned the second session. A reboot alone is NOT death: the
+//     lock frees for a provably dead owner (dead/reused pid, heartbeat
+//     predating the boot, or a legacy lock gone very stale), an expired lease
+//     (point 434), or a live owner whose batch stopped progressing (point 1048).
 //   - Spawning goes through the SAME ATOMIC acquire as every session: the
 //     launcher first wins a 'pending-spawn' lock (test-and-set); only then
 //     does it spawn, and the spawned session converts that lock to itself
 //     (pid-bound). If the acquire loses (a session claimed in the race
 //     window), NOTHING is spawned. No path overrides a live lock.
-//   - ACTIVE DETECTOR + REMEDIATION: every tick it checks for a second live
-//     top-level session. If its OWN previous spawn is live but is not the
+//   - ACTIVE DETECTOR + REMEDIATION: every tick that reaches it with a live
+//     owner checks for a second live top-level session. If its OWN previous spawn is live but is not the
 //     owner, it KILLS that rogue spawn (it created it, it may reap it), logs
 //     it and notifies. A rogue interactive session is never killed — the
 //     guards make it stand down — but the user is notified urgently.
@@ -186,8 +187,9 @@ const head = () => { try { return execSync('git rev-parse HEAD', { windowsHide: 
 const pidAlive = (pid) => { try { process.kill(pid, 0); return true } catch (e) { return e && e.code === 'EPERM' } }
 
 // WHEN THE BATCH ITSELF LAST MOVED (point 1048, union entry U4). The three kinds
-// `BATCH_PROGRESS_KINDS` names, measured the cheapest way the launcher can: all
-// local refs, no network, no suite, ~30 ms together. A commit on the trunk, a
+// `BATCH_PROGRESS_KINDS` (batch-emergency-core.mjs) names, measured the cheapest
+// way the launcher can: two local ref reads and one file mtime, no network, no
+// suite, ~30 ms together. A commit on the trunk, a
 // delegated branch that grew, and the boundary log a committed handover writes.
 // Returns epoch ms, or null when nothing could be read — and null is NOT a
 // verdict: `ownerKeepsBatch` treats an unreadable measurement as "keeps".
@@ -217,8 +219,6 @@ const observableProgressAt = () => {
   ].filter((value) => Number.isFinite(value) && value > 0)
   return candidates.length > 0 ? Math.max(...candidates) : null
 }
-// (`sleepSync`/`waitForExit` went with the kill-then-take valve, point 434: the
-// launcher no longer ends the owner's process, so nothing here waits for an exit.)
 // Open points, or -1 for the FORMAT ALARM (checkboxes but no parseable point).
 // The rule itself lives in scripts/tasks-source.mjs, because the message watcher
 // asks the same question — a second copy of it would drift silently, and both
@@ -257,8 +257,9 @@ const trigger = {
     : {}),
 }
 
-/** Start the short-lived watcher which owns no batch state and can only request
- * another guarded run after this exact child identity disappears. */
+/** Start the detached watcher, which lives as long as the child, owns no batch
+ * state and can only request another guarded run after this exact child
+ * identity disappears. */
 function startChildSupervisor({ pid, pidStartedAt, token }) {
   if (!(Number.isInteger(pid) && pid > 0 && typeof token === 'string' && token)) return null
   let out = 'ignore'
@@ -277,8 +278,9 @@ function startChildSupervisor({ pid, pidStartedAt, token }) {
   }
 }
 
-/** Internal detached mode. It observes pid AND start time, so a recycled pid can
- * never inherit an old child's exit notification. */
+/** Internal detached mode. It observes pid AND start time, so a recycled pid
+ * cannot delay an old child's exit notification; when either start time is
+ * unknown it falls back to pid liveness alone. */
 if (argv[0] === '--supervise') {
   const childPid = Number(argv[1])
   const childStartedAt = Number(argv[2])
@@ -322,11 +324,11 @@ if (argv[0] === '--supervise') {
   process.exit(0)
 }
 
-const state = readJson(C('autostart-state.json')) ?? { failCount: 0, lastHead: '', lastSpawnAt: 0, lastPid: 0, lastTickAt: 0, spawns: [] }
+const state = readJson(C('autostart-state.json')) ?? { failCount: 0, lastHead: '', lastSpawnAt: 0, lastPid: 0, spawns: [] }
 state.spawns = Array.isArray(state.spawns) ? state.spawns : []
 const lock = readOwnerLock()
 const probe = lock && lock.pid ? probePid(lock.pid) : null
-/** Every exit persists the state, so a sweep that ran is never forgotten. */
+/** `bail` persists the state before exiting, so a sweep that ran is never forgotten. */
 const bail = (code = 0) => { writeJsonAtomic(C('autostart-state.json'), state); process.exit(code) }
 
 // A periodic tick is the repair path for a supervisor which died first. It
@@ -359,8 +361,10 @@ if (!immediate) {
 // line is the only evidence of the difference between "the batch is broken" and
 // "the budget is spent". The spawned session's stdout and stderr both land in
 // .claude/autostart-run.log, so the launcher records the log's SIZE at each spawn
-// and reads exactly what has been appended since — no timestamps to parse and no
-// chance of reading an older session's words as this one's.
+// and reads the tail (at most 64 KiB) of what has been appended since — no
+// timestamps to parse. Supervisors and immediate launcher runs append to the same
+// log, and a missing or invalid offset falls back to the log's last 64 KiB, so
+// the segment may also carry their lines or older output.
 const RUN_LOG = join(REPO, '.claude', 'autostart-run.log')
 /** Bound: a refusal is a handful of bytes, a working session's report is not. */
 const RUN_LOG_SEGMENT_MAX = 64 * 1024
@@ -384,10 +388,12 @@ function readRunLogSegment(from) {
 
 // --- THE DRILL: one real tick over a fake signature, with no side effect -------
 // `--quota-report [segmentFile]` runs the REAL classification and the REAL
-// decision, in this process, against the REAL state file — reading the spawn
-// segment from the file named (default: the live run log) — prints the verdict as
-// JSON and exits BEFORE the first side effect of a tick. Nothing is swept, nothing
-// is spawned, nothing is written. scripts/quota-drill.mjs is its caller: it hands
+// decision (without the tick's per-attempt dedupe key, so it always judges a
+// fresh failure), in this process, against the REAL state file — reading the
+// spawn segment from the file named (default: the live run log) — prints the
+// verdict as JSON and exits before the tick's sweeps. Only the supervisor repair
+// above runs first (it may restart a missing supervisor and rewrite
+// autostart-last.json); nothing else is spawned or written. scripts/quota-drill.mjs is its caller: it hands
 // in a segment carrying a limit line and asserts what comes back.
 {
   const i = process.argv.indexOf('--quota-report')
@@ -419,9 +425,10 @@ function readRunLogSegment(from) {
 // --- THE PAUSE DRILL: the real classification, no side effect (point 445) ------
 // `--pause-report [recordFile]` reads a pause record — the one named, or the live
 // `.claude/batch-paused` — runs the SAME classification the tick below runs, prints
-// what the tick would do as JSON and exits BEFORE the first side effect. It clears
-// nothing, spawns nothing and writes nothing, so scripts/pause-retry-drill.mjs can
-// prove the wiring on a machine whose batch is running.
+// what the tick would do as JSON and exits before the tick's sweeps. It clears
+// nothing; only the supervisor repair above runs first, so
+// scripts/pause-retry-drill.mjs can prove the wiring on a machine whose batch is
+// running.
 {
   const i = process.argv.indexOf('--pause-report')
   if (i >= 0) {
@@ -434,7 +441,8 @@ function readRunLogSegment(from) {
       file,
       now,
       ...verdict,
-      // What the tick does with it: park (hold/wait) or resume (retry/none).
+      // What the tick does with it: park (hold/wait/recover) or resume (retry/none,
+      // or a misfiled user stop's recovery).
       parksTheTick: verdict.state === 'hold' || verdict.state === 'wait' || (verdict.state === 'recover' && !verdict.misfiledUserStop),
       clearsTheRecord: verdict.state === 'retry',
       replacesWithRecoveryClock: verdict.state === 'recover',
@@ -444,12 +452,6 @@ function readRunLogSegment(from) {
   }
 }
 
-// --- LEAKED SPAWNS: reap what the removed runtime ceiling used to reap --------
-// `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0` means a `claude -p` waits forever for
-// a background task — including one that never exits, which a left-running dev
-// server routinely is. The 600-second ceiling used to end exactly those, and
-// `state.lastPid` alone cannot track them because a handover overwrites it. A
-// leaked session holds ports, and that breaks the next session's verify suites.
 // --- THE FIREWALL TOP-UP: reachability decays while nobody looks ------------
 // The container's allowlist is an ipset of ADDRESSES, filled at boot by
 // `init-firewall.sh` from a `dig A` of each domain. Cloudflare-fronted hosts
@@ -477,8 +479,7 @@ function readRunLogSegment(from) {
 // ledger — the tick's reaper only knows its own Claude workers — so one wedged in DNS
 // would survive while every later tick started another, a slow pile-up nobody watches.
 // The previous child's pid is therefore written down and probed first: while it still
-// runs, this tick starts nothing and says so. A stale record is harmless (an unrelated
-// pid at most costs one skipped tick), and the top-up is idempotent anyway.
+// runs, this tick starts nothing and says so. The top-up is idempotent anyway.
 // A LIVE PID IS NOT PROOF OF OUR CHILD, and a lost record is not proof of none
 // (third review, 11.08.2026). `kill(pid, 0)` says only that SOMEBODY owns that
 // number: after reuse an unrelated long-lived process would read as "busy" and
@@ -536,6 +537,12 @@ try {
   log(`firewall top-up skipped (${(e && e.message) || e})`)
 }
 
+// --- LEAKED SPAWNS: reap what the removed runtime ceiling used to reap --------
+// `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0` means a `claude -p` waits forever for
+// a background task — including one that never exits, which a left-running dev
+// server routinely is. The 600-second ceiling used to end exactly those, and
+// `state.lastPid` alone cannot track them because a handover overwrites it. A
+// leaked session holds ports, and that breaks the next session's verify suites.
 // Narrow by construction (see reapableSpawns): our own spawn by pid AND start
 // time, past its boot window, not the lock owner, and superseded.
 //
@@ -575,7 +582,7 @@ try {
 // The board is READ from a phone; this is the tick that reads the reply channel.
 // It polls the inbox topic, drops everything unsigned/mis-signed/stale/seen and
 // spools what survives; the pending ones are handed to the session spawned
-// below. That bounds delivery at one launcher tick without a new process.
+// below. That bounds delivery at one launcher tick without a long-lived process.
 //
 // IT RUNS BEFORE EVERY GUARD, THE PAUSE INCLUDED. ntfy keeps a message for
 // twelve hours, so whether the batch is paused, complete or wedged may not
@@ -632,10 +639,10 @@ try {
 // the tick proceeds to its ordinary spawn decision — through the singleton and the
 // claim, exactly as any other tick, so a retry can never double-spawn.
 //
-// A record WITHOUT a clock still parks for ever (`hold`): every marker an older
-// session wrote, every one a human writes by hand, and the short written-down list
-// of genuinely unsafe causes (CLOCKLESS_CAUSES) read the same way. A missing clock
-// is never read as an expired one — that direction is the safe one.
+// A record WITHOUT a clock parks for ever (`hold`) only as a typed user stop
+// quoting the user (CLOCKLESS_CAUSES). Every other clockless record — one an older
+// session wrote, one written by hand, an unreadable stamp — is recovered with a
+// restart clock (`recover`). A missing clock is never read as an expired one.
 //
 // THE RUNAWAY COUNTER IS CLEARED WITH IT. `failCount` is what paused the batch in
 // the first place, and it survives in the state file; left standing, the runaway
@@ -685,7 +692,6 @@ if (pause.state === 'retry') {
     })
     delete state.pauseJournalKey
     state.pauseAttempt = (pause.attempt || 0) + 1
-    state.pauseRetryAt = now
     state.failCount = 0
     log(describePause(pause))
     await notify(
@@ -711,7 +717,7 @@ if (!batchParked && pause.state !== 'retry' && state.pauseJournalKey) {
 // within seconds instead of at the next tick of this launcher.
 //
 // IT GETS NO TRIGGER OF ITS OWN. The launcher already runs every
-// few minutes, at boot included, and is the one thing here that runs when
+// quarter of an hour, at boot included, and is the one thing here that runs when
 // nothing else does — so start-at-boot, restart-after-crash and listening through
 // a pause are three readings of the SAME line rather than three mechanisms. The
 // decision is pure (`watcherSupervision`); liveness is by pid AND start time, so
@@ -835,7 +841,7 @@ try {
 // tidiness. On this platform a `process.exit()` after any `fetch` tears undici's
 // socket down mid-close and ABORTS the process — measured: exit 127 with
 // `Assertion failed: !(handle->flags & UV_HANDLE_CLOSING)`. This launcher exits
-// that way at fifteen points, so it must not hold a fetch at all. The child is
+// that way at many points, so it must not hold a fetch at all. The child is
 // also containment nothing else matches: it cannot take the resurrection with it.
 // Bounded by a timeout and wrapped fail-open on top, because the launcher's job
 // is bringing the batch back and a board check may never be a reason it does not.
@@ -904,7 +910,7 @@ try {
 // revisions, and re-dispatches the deploy once GitHub answers again.
 //
 // Its own process for the same two reasons: a `fetch` in this file would abort it
-// at any of its fifteen exits, and the resurrection must be unreachable from a
+// at any of its exits, and the resurrection must be unreachable from a
 // site check. Bounded and fail-open on top — a stale site may never be a reason
 // the batch does not come back.
 try {
@@ -944,17 +950,16 @@ const curHead = head()
 // THE LEASE DECIDES (point 434, docs/batch-resilience.md §3 layer 1). The launcher
 // no longer judges wedgedness at all: it reads whether the owner's lease has run
 // out, which is arithmetic on two numbers, and everything else follows from the
-// ordinary "not alive" path this file has always had. The declaration below is
-// still read for the owner report, never as owner-liveness evidence. Its child
-// process identities separately feed the registered-writer verdict below.
+// ordinary "not alive" path this file has always had. The declaration below feeds
+// the owner report and the evidence-backed lease renewal; its child process
+// identities separately feed the registered-writer verdict below.
 // (`lock` and `probe` were read further up — the leak sweep needs them before any
 // guard may exit.)
 // The declaration is also the feature-writer process registry. It survives the
 // owner lock by design, so read it even after that lock is gone; otherwise the
 // launcher's register loses the exact PID evidence the declaration probe uses.
 const declaration = readDeclaration()
-// Read for the REPORT, not for the verdict: when the batch is taken from an owner
-// whose lease ran out, the notification should name what that owner said it was
+// Read for the REPORT: when the batch is taken from an owner whose lease ran out, the notification should name what that owner said it was
 // doing. `LAUNCHER_WORK_MAX_AGE_MS` is the launcher's own window on a declaration.
 const work = assessOwnerWork({
   declaration,
@@ -1011,7 +1016,7 @@ const destination = resolveBoundaryDestination({
 if (destination.action === 'reserve') {
   // A released claim is bounded where `markClaimReleased` writes its stamp: two
   // launcher ticks from this release. A dead claimant or an elapsed reservation
-  // reaches `spawn` above immediately, so this can never park the batch forever.
+  // resolves to `spawn` in the destination above, so this can never park the batch forever.
   const handed = lock ? handBackToClaimant(lock.sessionId, claim, { now }) : { released: false, stamped: false }
   const line = takeoverDecision({ assessment: claimantAssessment, now, maxAgeMs: claimMaxAgeMs() }).message
   log(line ?? `skip: batch reserved for claiming session ${destination.claimantSid}`)
@@ -1065,7 +1070,7 @@ if (state.lastSpawnAt > 0) {
     progressed,
     pidAlive: !!(state.lastPid && pidAlive(state.lastPid)),
     // The spawn proved the lock is its own the moment it converted the pending
-    // lock to itself — then it is judged as the OWNER, by the wedge ladder above.
+    // lock to itself — then it is judged as the OWNER, by the lease assessment above.
     lockConverted: !!(lock && lock.kind !== 'pending-spawn' && lock.pid === state.lastPid),
     proveMs: Number.isFinite(proveMin) && proveMin > 0 ? proveMin * 60000 : undefined,
   })
@@ -1115,17 +1120,15 @@ if (state.lastSpawnAt > 0) {
   }
   // THE RETRY RUNG GOES WITH IT (point 445, four-eyes finding 2). `pauseAttempt`
   // counts the resumptions of ONE spell of trouble; a counter that survived a
-  // recovery would make every park months later clockless on a ladder spent long
-  // ago, silently retiring the restart clock.
+  // recovery would start every park months later at the capped rung of a ladder
+  // spent long ago.
   if (outcome.state === 'progress' && (state.pauseAttempt || 0) > 0) {
     log(`previous spawn made progress — clearing the pause retry rung (${state.pauseAttempt})`)
     delete state.pauseAttempt
-    delete state.pauseRetryAt
   }
   if (outcome.quota) state.quota = outcome.quota
   else delete state.quota
 }
-state.lastTickAt = now
 
 // --- ACTIVE DETECTOR: a second live session? ----------------------------------
 const ownerSid = lock ? lock.sessionId : ''
@@ -1168,13 +1171,6 @@ if (
   await notify('Rogue spawn killed', `The launcher killed its own previous spawn (pid ${state.lastPid}) — it was alive but not the batch owner.`, 'high', { recurring: true })
 }
 
-// THE SILENCE REPORT IS GONE (point 434). It existed because the launcher could
-// name a wedged owner and not act on it — "it may neither take over nor kill it"
-// was its own text — so the best it could do was tell a person, in two stages, and
-// hope. The lease removed the reason: an owner that stopped saying it was there
-// stops owning the batch, and what used to be a notification is now the takeover
-// below, which reports itself. One verdict, one consequence, one line.
-
 // --- Runaway / stuck watchdog: pause + signal ----------------------------------
 // It is NEVER reached by a quota block (point 444): a limit refusal counts no
 // failure at all, so an unattended fortnight is no longer paused by a budget that
@@ -1191,7 +1187,7 @@ if (state.failCount >= RUNAWAY_FAIL_LIMIT) {
     refusal: state.lastWatchdogCause ?? null,
   })
   const when = `retry at ${new Date(plan.retryAfter).toISOString()}${plan.capped ? ' (capped probe)' : ''}`
-  log(`RUNAWAY: ${state.failCount} spawns with no git progress — pausing the batch (${when}) and notifying`)
+  log(`RUNAWAY: ${state.failCount} spawns with no progress — pausing the batch (${when}) and notifying`)
   if (plan.decisionRecord) {
     // The pause record written just below IS this decision's durable form, and the
     // board derives its state card from it (point 749) — so the log line is all
@@ -1239,11 +1235,11 @@ const spawnBackoffReason = spawnBackoffBlocks
   : ''
 
 // --- Liveness verdict ----------------------------------------------------------
-// TWO OUTCOMES, NOT THREE (point 434). 'skip-wedged' and everything under it —
-// the stall verdict, the two-stage silence report, the wedge takeover, the
-// kill-then-take valve — are gone. An owner whose lease ran out is not a third
-// state to be adjudicated; it is simply not the owner, and the takeover below is
-// the one this file has always performed for a dead one.
+// TWO OUTCOMES, NOT THREE (point 434): spawn or skip. 'skip-wedged', the stall
+// verdict, the two-stage silence report and the kill-then-take valve are gone. An
+// owner whose lease ran out is not the owner unless its declared work still moves
+// ('lease-expired-owner-working'), and a live owner still loses the batch when
+// observable progress stalls past the emergency threshold (point 1048, below).
 const batchWriters = readSessionProcesses()
 const previousBatchWriters = state.writerObservations && typeof state.writerObservations === 'object'
   ? state.writerObservations
@@ -1294,8 +1290,7 @@ let startDecision = successorStartDecision({
 // timestamp that actually advances is work; a historical timestamp merely
 // sitting beside a breathing editor is not.
 state.writerObservations = batchWriters
-let verdict = startDecision.start ? 'spawn' : 'skip-alive'
-if (verdict === 'skip-alive') {
+if (!startDecision.start) {
   const waitOutcome = judgeSpawnOutcome({
     verdict: 'refused',
     failCount: state.failCount || 0,
@@ -1417,7 +1412,6 @@ if (verdict === 'skip-alive') {
       if (recoveries.every((item) => item.recovered) && after.start) {
         log(`RECOVERED: ${recoveries.map((item) => `${item.action} ${item.writer.sessionId}#${item.writer.generation}`).join(', ')}`)
         startDecision = after
-        verdict = 'spawn'
         writerRecovered = true
         delete state.wedgeVerdictKey
         delete state.wedgeVerdictRepeats
@@ -1585,13 +1579,8 @@ if (dispossessed) {
     )
   }
 }
-if (dispossessed) {
-  // Nothing is killed and nothing waits for an exit: the dispossessed process
-  // keeps running and learns at its next hook that it no longer owns the batch,
-  // which stands every ownership-gated guard down. The kill-then-take valve that
-  // used to sit here needed an identity check it could rarely satisfy, and on the
-  // lost night that check is exactly what stopped the rescue.
-} else if (lock) {
+// A dispossessed owner was reported above; nothing is killed or waited for.
+if (lock && !dispossessed) {
   // "handed-over" is not death: the owner finished a point and passed the batch
   // on (point 388). Logged distinctly so the end-to-end chain can be READ out of
   // this file rather than inferred.
@@ -1616,7 +1605,7 @@ if (dispossessed) {
     })
   }
   if (assessment.reason === 'idle' && assessment.detail) log(`  ${assessment.detail}`)
-} else {
+} else if (!lock) {
   // The headless path leaves no lock at all: a `claude -p` that ends at a
   // boundary exits, and SessionEnd releases the lock before this tick runs. Said
   // distinctly so the handover chain can be read from this file either way.
@@ -1724,8 +1713,8 @@ if (repoVerdict.alert) {
   // And the MARKER goes with the condition (four-eyes re-review, finding 1). A tick
   // whose spawn failed leaves one behind; without this line only its 15-minute
   // expiry keeps the next, CLEAN tick from handing a false "repo not clean" to a
-  // healthy successor — and that expiry equals the tick interval, i.e. about a
-  // minute of margin. One deletion closes the class instead of leaning on timing.
+  // healthy successor — and that expiry equals the tick interval, i.e. no margin
+  // at all. One deletion closes the class instead of leaning on timing.
   clearMandateMarker({ path: C('repo-mandate.json') })
 }
 if (repoVerdict.mandate) writeMandateMarker({ path: C('repo-mandate.json'), at: now, code: repo.code ?? null, reason: repoVerdict.reason })
@@ -1749,15 +1738,15 @@ function runRepoDoctor(write) {
     return { ran: true, code: 0 }
   } catch (e) {
     // A non-zero exit lands here too — that is the doctor's verdict, not a failure
-    // to run it. Only a missing binary/file or the timeout means it never ran.
+    // to run it (a missing doctor script also exits non-zero). Only a spawn error
+    // or the timeout means it never ran.
     if (e && typeof e.status === 'number') return { ran: true, code: e.status }
     return { ran: false, code: null, detail: (e && e.message) || String(e) }
   }
 }
 
-/** The cheap, local checks that must hold before a successor is worth starting. An
- *  UNRUNNABLE probe returns `ok: null` — inconclusive never blocks (the preflight
- *  must not become a new way for the batch to stand still). */
+/** The cheap, local checks that must hold before a successor is worth starting.
+ *  Each probe reports `ok` true or false; a probe that throws reports false. */
 function environmentProbes() {
   const probes = []
   // 1. git answers — the successor's first act is reading the work order out of a
@@ -1863,7 +1852,7 @@ try {
     cfg.projects[k] ??= {}
     if (cfg.projects[k].hasTrustDialogAccepted !== true) { cfg.projects[k].hasTrustDialogAccepted = true; changed = true }
   }
-  if (changed) { const t = `${cfgPath}.tmp`; writeFileSync(t, JSON.stringify(cfg, null, 2)); renameSync(t, cfgPath); log('ensured repo trust in ~/.claude.json') }
+  if (changed) { const t = `${cfgPath}.tmp`; writeFileSync(t, JSON.stringify(cfg, null, 2)); renameSync(t, cfgPath); log(`ensured repo trust in ${cfgPath}`) }
 } catch (e) { log(`warn: could not ensure trust (${e && e.message})`) }
 
 // Author the run: verify-able spawn (log to file, record pid+head), atomic markers.
@@ -1880,18 +1869,20 @@ const runLogAt = runLogSize()
 let child
 try {
   const out = openSync(join(REPO, '.claude', 'autostart-run.log'), 'a')
-  // Everything about the launch — argv, the model chain, the environment — is
-  // built purely in scripts/batch-autostart-core.mjs, because THIS file cannot be
+  // The launch argv, model chain and environment are built purely in
+  // scripts/batch-autostart-core.mjs (only the prompt is concatenated here), because THIS file cannot be
   // imported by a test without spawning a session. The environment is the part
   // that matters most: it carries CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0, without
   // which the runtime terminates the session ten minutes into every delegated
   // build (point 402).
   // Only what arrived SINCE the last spawn. The stamp is NOT advanced here: it
-  // moves below, after a spawn that actually happened and read at that moment —
+  // moves below, once `spawn` returned without throwing (an asynchronous spawn
+  // error still advances it; the spool keeps the messages), read at that moment —
   // `now` is the top of the tick, from before the chat poll even ran.
   //
   // DELIVERY HERE IS AT-LEAST-ONCE, DELIBERATELY. These messages ride into the
-  // prompt WITHOUT being claimed off the spool, so the session this launcher
+  // prompt (except under a model handoff, whose prompt replaces it) WITHOUT being
+  // claimed off the spool, so the session this launcher
   // spawns will read the same words a second time when its per-tool-call hook
   // claims them at its first tool call. Claiming them here instead would make
   // delivery at-most-once: a spawn that dies before its first tool call — or one
@@ -1999,7 +1990,7 @@ log(`launched pid ${child.pid} under pending-spawn lock ${launcherSid}; supervis
 if (announceSpawn({ quota: state.quota })) {
   await notify(
     'Resurrected',
-    `No live session — launched a headless worker to continue the batch (${open} open, failCount ${state.failCount}). Progress on GitHub.`,
+    `Launched a headless worker to continue the batch (${open} open, failCount ${state.failCount}). Progress on GitHub.`,
     'low',
     { recurring: true },
   )
