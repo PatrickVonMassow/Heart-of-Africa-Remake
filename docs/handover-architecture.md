@@ -174,7 +174,7 @@ The implementation lives in:
 - `<git-common-dir>/codex-batches/<batch-id>/landing.json`: current landing transaction.
 - `<git-common-dir>/codex-batches/<batch-id>/receipts/`: checkpoint and boundary receipts.
 
-The attached material did not disclose the existing progress-board source path or this repository's test conventions, so the union named test files in conventions that do not exist here. THEY ARE TRANSLATED BELOW RATHER THAN LEFT TO THE IMPLEMENTER, each with the union's original name beside it: Vitest lives beside its subject as `scripts/<name>.test.mjs` and `src/**/*.test.ts[x]` (`npm run test:unit`), browser suites are `scripts/verify/<name>.mjs` driven by `npm test -- <suite>`, and there is no Playwright and no `tests/` directory. A step whose files do not exist yet is marked unbuilt where it is named.
+The union was written without this repository's progress-board source path or test conventions, so it named test files in conventions that do not exist here. THEY ARE TRANSLATED BELOW RATHER THAN LEFT TO THE IMPLEMENTER, each with the union's original name beside it: Vitest lives beside its subject as `scripts/<name>.test.mjs` and `src/**/*.test.ts[x]` (`npm run test:unit`), browser suites are `scripts/verify/<name>.mjs` driven by `npm test -- <suite>`, and there is no Playwright test runner (the browser suites drive Playwright as a library) and no `tests/` directory. A step whose files do not exist yet is marked unbuilt where it is named.
 
 ### What stands on `main`, and who owns the rest
 
@@ -188,17 +188,17 @@ along its subsystem seams on 24.08.2026, because what remained was cross-vendor 
 ~12,000 lines that no single round can hold. Each seam is its own work-order point, lands
 on its own branch, and carries its own review:
 
-| Step below | Owning point | State |
+| Step below | Owning point | State (24.08.2026 plan; all points since closed) |
 |---|---|---|
-| — this document | 890 | lands first; every other seam is judged against it |
-| — the four-eyes artefacts, the fold and the merger check | 889 | built, behind 890 |
-| 1 schemas and invariants, and the activation flag | 891 | built, not yet on `main` |
-| 2 the durable state store and its journal | 892 | built, not yet on `main` |
-| 4 attempt leases and epoch fencing | 893 | built, not yet on `main` |
-| 3 the daemon, its control plane and the worker contract | 894 | built, not yet on `main` |
-| 8, and the slice of 9 it needs | 895 | built, not yet on `main` |
-| the drills, and switching the lane on | 834 | built, lands last |
-| 5 dispatch, 6 the checkpoint barrier, 7 the two-phase boundary, the rest of 9, 10 the board projection, 11 the metrics and the staged trials | 676 | UNBUILT — the remainder of 676, which begins after 834 |
+| — this document | 890 | landed first; every other seam is judged against it |
+| — the four-eyes artefacts, the fold and the merger check | 889 | landed |
+| 1 schemas and invariants, and the activation flag | 891 | landed |
+| 2 the durable state store and its journal | 892 | landed |
+| 4 attempt leases and epoch fencing | 893 | landed |
+| 3 the daemon, its control plane and the worker contract | 894 | landed |
+| 8, and the slice of 9 it needs | 895 | landed |
+| the drills, and switching the lane on | 834 | landed |
+| 5 dispatch, 6 the checkpoint barrier, 7 the two-phase boundary, the rest of 9, 10 the board projection, 11 the metrics and the staged trials | 676 | closed (the remainder of 676, begun after 834) |
 
 Until 834 has landed and the flag has been switched on, nothing in this repository advertises
 a surviving lane, and `scripts/durable-lane-flag-core.mjs` REFUSES to enable one.
@@ -228,13 +228,13 @@ survives a crash.
 
    Implement append-only journal writes, checksum validation, atomic snapshot replacement, replay and corruption quarantine. Require write–flush–rename durability for a committed snapshot or receipt. Verify normal replay, truncated final record, checksum mismatch and interrupted snapshot replacement with `npx vitest run scripts/batch-state-core.test.mjs scripts/batch-state.test.mjs scripts/batch-state-durability.test.mjs` (the union's `scripts/__tests__/batch-state.test.mjs`, translated).
 
-3. Implement the daemon and the Sol adapter.
+3. Implement the daemon and the authoring adapter (`author-astra.mjs`; the union's `author-sol.mjs` under its earlier name).
 
    Add `scripts/batch-daemon.mjs`; move transferable process parentage, leases, stable identities, logs and heartbeats under it. Adapt `scripts/author-astra.mjs` without changing its proven authoring behavior. Commands must include `node scripts/batch-daemon.mjs start`, `status`, `stop` and `drill`. Verify worker survival after launcher-client exit, global-cap enforcement, daemon restart and the readiness rule of mechanism 1 — `start` reports ready only on a record whose launch nonce equals the one it generated, whose pid and pid start time probe live and whose state reads `running`, and a record left at `starting` must time the start out rather than satisfy it — with `npx vitest run scripts/detached-agent.test.mjs scripts/batch-daemon-core.test.mjs scripts/batch-daemon.test.mjs` (the union's `scripts/__tests__/…`, translated).
 
 4. Implement transferable declarations and fencing.
 
-   Extend `scripts/batch-in-flight.mjs` with batch/job/attempt/process-start identity and `transferable`. Add one coordinator lease per batch and require its epoch on mutations, checkpoints and pushes. Verify PID reuse, stale epochs, duplicate attempts, lease expiry and a resumed fenced worker with `npx vitest run scripts/batch-attempt-lease-core.test.mjs scripts/batch-in-flight-core.test.mjs` (the union's `scripts/__tests__/batch-in-flight.test.mjs` and `scripts/__tests__/batch-leases.test.mjs`, translated).
+   Extend `scripts/batch-in-flight.mjs` with batch/job/attempt/process-start identity and `transferable`. Add one coordinator lease per batch whose epoch is the lock's fence (mechanism 2, no second counter) and require it on mutations, checkpoints and pushes. Verify PID reuse, stale epochs, duplicate attempts, lease expiry and a resumed fenced worker with `npx vitest run scripts/batch-attempt-lease-core.test.mjs scripts/batch-in-flight-core.test.mjs` (the union's `scripts/__tests__/batch-in-flight.test.mjs` and `scripts/__tests__/batch-leases.test.mjs`, translated).
 
 5. Add bounded dispatch and backpressure.
 
@@ -258,7 +258,7 @@ survives a crash.
 
 10. Project state and alerts into the board.
 
-    Implement `scripts/batch-board.mjs` to show every lane, heartbeat age, ETA, coordinator epoch, backlog, boundary state and red mismatches. Alerts cover stalled workers, missing successor readiness, marker deletion and rejected old-epoch mutations. Verify data projection with `npx vitest run scripts/batch-board-core.test.mjs` (unbuilt), then the rendered page with `npm test -- docs` — the only existing suite that reads a shipped document — plus a NEW suite `scripts/verify/board.mjs` that this step creates and runs as `npm test -- board` if it adds page behaviour a document check cannot see. This repository has no Playwright and no `tests/` directory, so the union's `tests/progress-board-batch.spec.ts` and `tests/batch-handover.spec.ts` name no file here: they are replaced by those two, not created.
+    Implement `scripts/batch-board.mjs` to show every lane, heartbeat age, ETA, coordinator epoch, backlog, boundary state and red mismatches. Alerts cover stalled workers, missing successor readiness, marker deletion and rejected old-epoch mutations. Verify data projection with `npx vitest run scripts/batch-board-core.test.mjs` (unbuilt), then the rendered page with `npm test -- docs` — the only existing suite that reads a shipped document — plus a NEW suite `scripts/verify/board.mjs` that this step creates and runs as `npm test -- board` if it adds page behaviour a document check cannot see. This repository has no Playwright test runner and no `tests/` directory, so the union's `tests/progress-board-batch.spec.ts` and `tests/batch-handover.spec.ts` name no file here: they are replaced by those two, not created.
 
 11. Implement unbiased metrics.
 
@@ -266,7 +266,7 @@ survives a crash.
 
 12. Run staged failure trials.
 
-    First enable only `author-astra.mjs`. Run normal handover plus worker crash, stall, push failure, dirty worktree, marker deletion, daemon restart, corrupt snapshot, PID reuse, duplicate coordinator, remote outage and checkpoint-timeout drills through `node scripts/batch-daemon.mjs drill --scenario <name>`. Run the complete regression layers with `npm run test:unit` and the LARGE browser gate `npm test` (CLAUDE.md §5); there is no Playwright here. Enable another adapter only after all drills pass.
+    First enable only `author-astra.mjs`. Run normal handover plus worker crash, stall, push failure, dirty worktree, marker deletion, daemon restart, corrupt snapshot, PID reuse, duplicate coordinator, remote outage and checkpoint-timeout drills through `node scripts/batch-daemon.mjs drill --scenario <name>`. Run the complete regression layers with `npm run test:unit` and the LARGE browser gate `npm test` (CLAUDE.md §5); there is no Playwright test runner here. Enable another adapter only after all drills pass.
 
 13. Measure a representative trial before changing the default.
 
@@ -358,7 +358,7 @@ Three rules complete the mechanism:
   returns as soon as the daemon's own identity record — pid, pid start time, schema version, the
   fence it is serving, the LAUNCH NONCE and its lifecycle state — stands in the state store
   reading `running`, and the caller waits for THAT STATE with a bounded timeout. The presence of
-  the file is not the condition: mechanism 1's table refuses every mutation and every adoption
+  the file is not the condition: the lifecycle-state table (mechanism 2, below) refuses every mutation and every adoption
   while the record reads `starting`, so a `start` that returned on the first write would report a
   daemon nothing may yet use, and the caller would go on to ask it for work the table forbids.
   Readiness is therefore THREE conditions together — the record's launch nonce equals the one this
@@ -400,8 +400,7 @@ epoch 8 or A renews, A submits a mutation carrying epoch 7 — which the daemon'
 epoch still accepts. A separate counter cannot be made atomic against a lock it does not share.
 So it is not separate: the coordinator epoch IS the FENCE this repository already keeps —
 monotonic, taken by every acquisition, durable in `.claude/batch-fence.json` because `acquire`
-deletes the lock file, and copied onto the live lock as `lock.fence` (the lock this batch is
-running under carries 603). Ownership and authority are therefore read from one record, and the
+deletes the lock file, and copied onto the live lock as `lock.fence`. Ownership and authority are therefore read from one record, and the
 lock file is the single serialization point for both.
 
 **Precedence.** The batch lock remains the sole authority on whether a session may work at all.
@@ -521,7 +520,7 @@ ref MOVEMENT, not a dispossessed pusher — that was the hole in the third answe
 **THE FENCE THEREFORE LIVES ON THE REMOTE, where both parties actually meet.** The coordinator
 credential is a pair — a random `generation`, minted when the fence store is created, and the
 monotone `fence` within it — and it is published as a ref, `refs/hoa/coordinator`, whose blob
-carries exactly that pair. Acquisition advances it; every publishing act then goes out as ONE
+carries that pair (with the publication counter `seq`, below). Acquisition advances it; every publishing act then goes out as ONE
 atomic push carrying both the work and the credential:
 
 ```
@@ -600,10 +599,11 @@ of the guarantee there; reversal is not offered.
 coordinator epoch", which would make the boundary a second, unsynchronised writer of the same
 number and reopen everything above. It does not advance it. `--commit` seals the snapshot and
 RECORDS the fence it ran under; the next acquisition takes the next number, as every acquisition
-already does. Step 7 is corrected to that wording in the same commit that builds it.
+already does. Step 7 below already carries that wording.
 M22's own line — "record the next coordinator epoch and nonce" — is the union's wording and is
 superseded by this mechanism for the same reason; the union table is frozen evidence and is not
-edited, so the correction is stated here. What `--commit` seals into the snapshot is THE FENCE IT
+edited, so the correction is stated here. Likewise M2's "would have survived that session's
+death" is the union's reading of 13.08.2026: mechanism 1 records that lane dying on 21.08.2026. What `--commit` seals into the snapshot is THE FENCE IT
 RAN UNDER. The next number does not exist yet at that moment and is minted by the next
 acquisition, which is the only writer of it.
 
@@ -657,8 +657,9 @@ window does not fix it either: `--prepare` proves quiescence at an INSTANT, and 
 reserving; the same lock-owning session could begin a legacy operation immediately afterwards.
 
 **So the daemon's existence is ALSO A FIELD OF THE BATCH LOCK — a copy of its record, not a
-second record.** `start` writes a `daemon` field — pid, pid start time, generation — into
-`.claude/batch-lock.json`, and `stop` clears it the same way. **And that write is a
+second record.** The lock owner writes a `daemon` field — pid, pid start time, generation —
+into `.claude/batch-lock.json` from the daemon's own record (the write orders below), and the
+copy is cleared the same way. **And that write is a
 COMPARE-AND-SWAP, not a replacement** — the distinction the first draft blurred by calling it
 "the same atomic test-and-set": exclusive create only governs a lock that does not exist, and a
 bare write–rename over an existing lock would let a writer that prepared its update under fence
@@ -901,8 +902,9 @@ and change nothing until the probe answers or an operator supplies the evidence.
 | present | a generation the journal orders AFTER the record's, or no generation, or this generation under another process identity | — | impossible by construction | refuse every mutation and alert; an operator act, never an automatic one |
 | no generation | any | — | impossible by construction | a record nothing can be compared to fails closed like the row above |
 
-Its acceptance cases are step 1's own: every row of this table decided from the pair alone plus
-the record's lifecycle state, the forbidden row refused rather than resolved, and each UNKNOWN row
+Its acceptance cases are step 1's own: every row of this table decided from the pair plus the
+record's lifecycle state (and, where a row names one, its liveness probe or the journal's mint
+order), the forbidden row refused rather than resolved, and each UNKNOWN row
 asserted to change nothing — no release, no mint, no copy write. NO ROW READS A LIVE RECORD
 WITHOUT ITS STATE: every live row names `running`, `starting` or `stopping` explicitly, and a case
 asserts that no resolution adopts, rewrites a copy or mutates anything under the latter two. Three of them are ordering cases

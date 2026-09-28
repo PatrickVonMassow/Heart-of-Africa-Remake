@@ -19,8 +19,8 @@ has no opening interpolation. These results isolate a further candidate:
 `playRockSurfaceRadius` measures binned edge maxima, fills empty bins from
 neighbours, and interpolates height rings. That surface can stand centimetres
 outside the actual triangles. The live hand reader also uses this profile,
-so its reported gap understates the visible gap. The existing 30 mm admission
-tolerance can add further daylight before the gesture even starts.
+so its reported gap understates the visible gap. The then-existing 30 mm admission
+tolerance (2 mm since, below) could add further daylight before the gesture even starts.
 
 The existing verification images were inspected; they show ground between
 the reaching hand and the stone. New browser captures and whole-hold readings
@@ -157,5 +157,4 @@ hold exists and `bankChildTouching` is false. A sampler regression supplies no
 opening and requires all three arrival evidence checks to fail, with Infinity
 cm over zero readings and no photograph. The absence is already observable;
 it cannot silently pass the picture checks, and is distinct from the reported
-finite hold. The rotating adult-fill and settlement-visit findings are unchanged
-and remain outside this review's assigned work.
+finite hold.

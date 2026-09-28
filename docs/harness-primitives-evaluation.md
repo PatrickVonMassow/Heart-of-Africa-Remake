@@ -83,7 +83,7 @@ prefix of agent calls. Unavailable for the same reason as §3.
 Verdict: **kept.** Note the shapes differ even if it returns: a replay restores
 an *agent call sequence*, while our resume restores a *session's orientation*
 from committed state. The second is what a batch that lives in git needs, and it
-costs three orders of magnitude less than the "clear the context and re-read the
+costs two orders of magnitude less than the "clear the context and re-read the
 work order" alternative (`TASKS.md` is ~78k tokens; the resume hook is ~600).
 
 ## 5. Watching in-flight work — PARTLY REPLACED, and narrowed
@@ -97,7 +97,9 @@ The primitives: background agents notify on completion by themselves, and the
 Verdict: **narrowed, not retired.**
 
 - For "tell me when it is done", the completion notification replaces log
-  polling outright — use it, and stop tailing agent output. (Reading a
+  polling outright for agents whose notifications the session receives (Agent-tool
+  children) — use it, and stop tailing their output. Durable authors outside the
+  Agent tool are still polled by log and branch tip (`docs/handover-architecture.md`). (Reading a
   subagent's raw transcript file is worse than useless: it is the whole
   conversation.)
 - What no primitive answers is the question our declaration exists for: an agent

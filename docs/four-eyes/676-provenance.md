@@ -13,8 +13,8 @@ while the transcript still existed.
 
     ~/.claude/projects/-workspace-hoa/57b71875-2cf3-4f99-b7e9-a793562f263f.jsonl
 
-It ran the blind-parallel stage on 13.08.2026, wrote both halves, commissioned
-the merge, and filed `docs/handover-architecture.md` as commit `b716c2d8`.
+It ran the blind-parallel stage on 13.08.2026 — wrote half A, commissioned half
+B from Sol and parsed its answer (below) — commissioned the merge, and filed `docs/handover-architecture.md` as commit `b716c2d8`.
 
 ## Half A says it is Fable 5's. It is not.
 
@@ -126,7 +126,7 @@ is the message metadata:
 This is the session-authored evidence kind of `README.md`: the model that
 performed the fold is read off the messages that performed it, not off a label.
 
-## How the mislabel survived five days
+## How the mislabel survived nine days
 
 Nothing checked it. The halves were never versioned, so no reviewer read them
 beside the union; the union restated the label; and the label was the only

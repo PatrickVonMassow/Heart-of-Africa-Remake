@@ -52,7 +52,9 @@ device pixel ratio is kept (no cap).
 
 The lever order below follows the real-hardware benchmark (point 277,
 `docs/perf-277-user-hardware.md`): fill-rate first (device pixel ratio, then the
-post pipeline), geometry last — the cuts that only genuinely weak GPUs feel.
+post pipeline), geometry last — the cuts that only genuinely weak GPUs feel;
+later levers (from `figureLimbSegments` on) are appended in the order they were
+added.
 
 - **`dprCap`** — Device-pixel-ratio cap; `native` keeps R3F's native ratio, `1`
   caps it to one physical pixel per CSS pixel. The single biggest fill-rate lever
@@ -69,7 +71,7 @@ post pipeline), geometry last — the cuts that only genuinely weak GPUs feel.
   draw calls (952 → 72) and ~2 M extra shadow-pass triangles — the biggest
   remaining lever once low's dpr and post cuts are in.
 - **`sunShadowResolution`** — Sun shadow-map resolution in texels; climbs
-  1024 → 2048 → 4096, high deliberately above today's 2048 default for sharper
+  1024 → 2048 → 4096, high deliberately above medium's 2048 for sharper
   shadows. Low's 1024 is moot while its `sunShadows` is off; it stays below
   medium for the strict low < medium < high climb.
 - **`fireShadows`** — Whether the campfire cube shadows are cast at all
