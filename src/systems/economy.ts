@@ -1,6 +1,7 @@
 // Economy (design.md §8/§9/§10): treasure finds as items, bazaar bids with
-// regional value factors (arbitrage), ferry passages between ports and
-// discovery bounties. This module is pure — the store applies the results.
+// regional value factors (arbitrage), ferry passages between ports and the
+// landmark positions the discovery bounty is paid for (the store computes and
+// pays the bounty). This module is pure — the store applies the results.
 
 import { balance } from '../config/balance'
 import type { LatLon, Material, RegionId } from '../world/geo'
@@ -84,7 +85,7 @@ export function generateTreasureSites(seed: number): TreasureSite[] {
   const wanted: Array<{ region: RegionId | null; treasure: TreasureId }> = [
     ...regions.map((region) => ({
       region,
-      // A material the region does not reject — worth carrying elsewhere.
+      // A material the region reveres — worth carrying elsewhere.
       treasure: REGION_VALUES[region].revered[Math.floor(rand() * REGION_VALUES[region].revered.length)],
     })),
     { region: null, treasure: 'statue' as TreasureId },
@@ -108,7 +109,7 @@ export function generateTreasureSites(seed: number): TreasureSite[] {
   return sites
 }
 
-export interface LandmarkPoint extends LatLon {
+interface LandmarkPoint extends LatLon {
   id: string
   /** What kind of landmark this is — the discovery journal entry (design.md
    *  §16) flavors its text by it. */

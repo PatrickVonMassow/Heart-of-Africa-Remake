@@ -3916,7 +3916,7 @@ function Herds() {
     }
 
     // Walking into a crocodile routes through the EXISTING §14.2 event
-    // (machete always protects, rifle only from the canoe) exactly like the
+    // (rifle only from the canoe, machete wherever the rifle does not) exactly like the
     // wandering-predator contact — no new attack path (point 130 (e)).
     {
       for (const c of herds.crocodile) {
