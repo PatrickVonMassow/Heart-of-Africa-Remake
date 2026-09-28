@@ -1234,9 +1234,11 @@ not land on the body. It lands on the **hut**, the **sleeping place** and the
 > `congo-north`, because the east-rift rule stopped at lat < 6 and nothing
 > covered the Horn — the moved village would silently have been given the
 > Congo's unimodal June–September rains. There is now a `horn` climate zone
-> running Swayne's PERIOD four seasons (jilal Jan–Mar driest with great heat,
-> gu Apr–Jun the main rains, haga Jul–Sep hot and dry with the karif, dayr
-> Oct–Dec the lesser rains), arid throughout and far drier than the rift
+> keyed to Swayne's PERIOD four seasons (jilal driest with great heat, gu the
+> main rains, haga Jul–Sep hot and dry with the karif, dayr Oct–Dec the lesser
+> rains); its month table rains from April and peaks in May, a month ahead of
+> Swayne's gu (May–June, jilal Jan–Apr, §4.0.2) — so it reads jilal Jan–Mar
+> and gu Apr–Jun, arid throughout and far drier than the rift
 > beside it. The reasoning that led there is kept in full below.
 
 - **The best single find of the pass.** Swayne (1895, fieldwork **1885–93** — the
@@ -2489,8 +2491,9 @@ The chief's and trading huts and the landmarks stay. The teaching rules are in
 
 ## 9. Keeping the cook-fire alight in the rains (TASKS point 256)
 
-The game's §19.10 village fire currently burns unprotected through the rain,
-which reads wrong. The question behind this section: did ~1890 settlements have
+When this was written the game's §19.10 village fire burned unprotected
+through the rain, which read wrong; the answer below has since shipped as
+`src/systems/cookShelter.ts`. The question behind this section: did ~1890 settlements have
 a real answer for keeping a hearth/cooking fire alight through the rainy
 season? **They did — two structural answers and one maintenance practice, all
 attested**, and which answer applies depends on the people. Every quotation
@@ -2684,7 +2687,8 @@ period record says happens to an unprotected flame (§9.3).
 **Rendering implication.** Recommended in-game shelter: a small open-sided
 thatched canopy on posts over the village fire, shown where a kitchen structure
 is attested or safely inferable (Baganda, Hausa, Bambara, Mandinka, Bemba,
-Lunda, Swahili and the ports). Rain-response rule: under the canopy the fire
+Lunda, Swahili and the ports — Bemba and Lunda on RETRO-APPLIED/MODERN
+evidence only, §9.4). Rain-response rule: under the canopy the fire
 burns on through rain, a touch lower and steamier; an UNSHELTERED flame (the
 dome-dweller villages, or any fire outside a canopy) is visibly damped by rain;
 the rainless desert settlements are unaffected.
