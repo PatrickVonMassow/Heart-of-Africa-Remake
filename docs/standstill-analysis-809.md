@@ -18,7 +18,8 @@ That is the result, not a failed estimate: the old inputs cannot prove whether a
 commit gap held foreground work, an agent, verification, waiting, or nobody.
 Backfilling work from a heartbeat, transcript existence, commit gap, or living
 pid would recreate the ambiguity this mechanism removes. No removal candidate
-can honestly be ranked from the 14-day aggregate until the journal accumulates.
+could honestly be ranked from that 14-day aggregate; a ranking needs a window
+covered by journal records (this baseline is dated 21.08.2026).
 
 ## Reproducible measured fixtures
 
@@ -41,10 +42,10 @@ The independently decomposed 21 August incident covers
 Every millisecond appears once. The owner session's last transcript line at
 08:15:29Z was inside CI wait run `32462093487`; it is evidence for the trigger
 carried by point 813, but it is not double-counted over the writer-veto and
-handover intervals. For this decomposed hour, point 812's veto is the largest
-removable class, point 811 removes the remaining scheduler transition, and point
-813 makes that CI wait durable. Population-wide sizing stays unknown until new
-journal evidence exists.
+handover intervals. For this decomposed hour, point 812's veto was the largest
+removable class, point 811 targeted the remaining scheduler transition, and point
+813 the durable CI wait. Population-wide sizing was unknown at the time, pending
+journal evidence.
 
 ## Threshold
 

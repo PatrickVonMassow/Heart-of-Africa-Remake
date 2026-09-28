@@ -24,12 +24,12 @@ single-sampled depth for its history copy.
 
 `src/render/sceneFrame.ts` owns the frame: it draws the scene pass itself, at
 top-level render depth, before the post pipeline runs, and the pass's texture
-nodes no longer trigger a nested scene render of their own. Three keys its
-render contexts by nested call depth as well as by MRT layout, so consuming the
-pass from inside TRAA's beauty render target moved both the scene and its shadow
-draws into new contexts the moment temporal resolve was switched off — the whole
-scene relinked and the composite sampled a target nothing had drawn into, which
-is a black frame for as long as the first-use queue takes to drain. The same
+nodes do not trigger a nested scene render of their own. The reason: Three keys
+its render contexts by nested call depth as well as by MRT layout, so a pass
+consumed from inside TRAA's beauty render target would move both the scene and
+its shadow draws into new contexts whenever temporal resolve is switched off —
+the scene would relink and the composite would sample an undrawn target, a black
+frame until the first-use queue drains. The same
 owner applies the TRAA jitter before that draw and clears it afterwards, and the
 output node disables Three's own pipeline jitter callbacks so no frame is
 jittered or advanced twice.

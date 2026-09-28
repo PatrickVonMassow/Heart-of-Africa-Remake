@@ -27,13 +27,15 @@ death — sleep and resume, Kernel-Power, Windows Update, Hyper-V and dxgkrnl.
 A death window with no Windows event at all is itself the answer: nothing on the
 Windows side acted, so the VM was lost rather than shut down.
 
-The deploy step copies FIVE files, not the three this document first named:
-`init-firewall.sh` also differs between the reviewed and the active copy, and
+The deploy step copies five files: `devcontainer.json`, `Dockerfile`,
+`container-entrypoint.sh`, `init-firewall.sh` and `fill-workspace.sh`.
+`init-firewall.sh` differs between the reviewed and the active copy, and
 rebuilding from the host's older one would silently narrow the network allowlist.
 
 ## Host remedy and evidence still required
 
-The incident brief records VM deaths at 12:11 and 12:45 during GPU browser suites,
+Point 1069's incident record (`docs/tasks-archive.md`, measured 07.09.2026)
+records VM deaths at 12:11 and 12:45 during GPU browser suites,
 with dxgkrnl wait failures followed by Docker Desktop engine restarts. Those
 observations identify the failing path; they do not prove that updating WSL fixes it.
 
@@ -59,11 +61,11 @@ it changes both the picture and runtime. No software lane is selected by this ch
 
 ## Deploy the prepared startup change
 
-First land the repository change so `/workspace/hoa/scripts/batch-launcher.mjs`
-supports `--arm`. On the Windows host, copy only the reviewed `Dockerfile`,
-`devcontainer.json`, and new `container-entrypoint.sh` from the repository's
-`.devcontainer` into the active host `.devcontainer`, preserving its other files
-(including the host-only `CLAUDE.md` and hooks). Rebuild the container using that
+The repository change has landed (point 1069): `scripts/batch-launcher.mjs`
+supports `--arm`. On the Windows host, the Deploy step copies the five reviewed
+files named above from the repository's `.devcontainer` into the active host
+`.devcontainer`, preserving its other files (including the host-only
+`CLAUDE.md` and hooks). Rebuild the container using that
 configuration. A reload or `docker update` alone cannot install the entrypoint.
 
 The image entrypoint checks the read-only configuration and restores the firewall
@@ -84,6 +86,10 @@ the drill must therefore explicitly start it again. See
 [Docker restart policies](https://docs.docker.com/engine/containers/start-containers-automatically/).
 
 ## Host drill without a VS Code session
+
+`restart-drill.ps1` (the Proof step) is the authoritative way to run this drill;
+the steps below are the procedure it implements, for reading its report or
+running it by hand when the script cannot.
 
 Schedule this after the batch's work is committed and no browser suite is running;
 stopping the container kills every author and owner in it. Use a Windows terminal
