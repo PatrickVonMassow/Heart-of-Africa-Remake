@@ -1,5 +1,5 @@
-// Exact vector hydrology (design.md §3 "Reale Geodaten und Terrain-
-// Darstellung"): the authored ~1890 river courses and lake outlines
+// Exact vector hydrology (design.md §3.3 "Real geodata and terrain
+// rendering"): the authored ~1890 river courses and lake outlines
 // (data/rivers.ts, data/lakes.ts) are densified with Catmull-Rom splines and
 // queried with true point-to-segment distances via a spatial bucket grid.
 // No rasterization → no visible stair-steps on banks and shores.
@@ -11,7 +11,7 @@ import { isSeaMouthCourse, mouthSlackFactor } from './riverMouths'
 
 const DENSIFY_STEP = 0.02 // degrees between generated points
 const BUCKET = 0.5 // degrees per spatial bucket
-const MAX_QUERY = 0.45 // maximum distance the queries need to resolve
+const MAX_QUERY = 0.45 // default distance cap (the range-1 reach); wider callers pass their own
 
 // Flat segment arrays [ax, ay, bx, by, ...] in (lon, lat).
 let riverSegs: Float64Array
@@ -212,7 +212,7 @@ function bucketDistance(
 
 /** Exact distance (degrees) to the nearest river centerline, capped.
  *  `range` is the bucket-neighbourhood half-width searched (default 1 = 3x3,
- *  reliable to ~0.45deg; 2 = 5x5, reliable to ~1.0deg — the dry-season drink
+ *  reliable to ~0.45deg; 2 = 5x5, reliable to ~0.9deg — the dry-season drink
  *  catchment needs the wider reach, point 176). */
 export function riverDistanceExact(lat: number, lon: number, maxDist = MAX_QUERY, range = 1): number {
   return bucketDistance(lon, lat, riverSegs, riverBuckets, maxDist, range)
@@ -238,8 +238,9 @@ export function riverFlowExact(
   // Reach past the calibratable channel half-width (point 136): a traveller
   // at the widened bank must still feel the current.
   maxDist = RIVER_WIDTH_DEG + 0.05,
-  // Point 316: the sea-mouth slack. Only the escapability sweep's regression
-  // witness turns it off, to reproduce the funnel that trapped the swimmer.
+  // Point 316: the sea-mouth slack. Turned off by the §19.8 drama current
+  // (geoIndex dramaCurrent) and by the escapability sweep's regression witness,
+  // which reproduces the funnel that trapped the swimmer.
   mouthSlack = true,
 ): { dirLat: number; dirLon: number; strength: number } {
   const bx = Math.floor(lon / BUCKET)

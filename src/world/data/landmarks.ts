@@ -1,20 +1,23 @@
 // Named landmarks of design.md §4.4: mountains ("u. a." — the five named
-// peaks plus further major peaks of the continent), waterfalls, and the
-// special site (elephant graveyard). Positions are real (~1890 geography);
-// only the elephant graveyard is fictional and placed by educated guess.
+// peaks plus further major peaks of the continent), waterfalls, the special
+// site (elephant graveyard), the built cultural landmarks and the natural
+// sites. Positions are real (~1890 geography), cultural and natural sites
+// shifted off the river band where needed; only the elephant graveyard is
+// fictional and placed by educated guess.
 
-import { RIVER_WIDTH_DEG } from '../terrain'
+import { RIVER_WIDTH_DEG } from '../riverWidth'
 import { clearedOfRiversBy } from '../riverClearance'
 import { GIZA_FIELD_RADIUS_DEG, GIZA_PLATEAU } from './gizaPlateau'
 
-export interface MountainDef {
+interface MountainDef {
   /** Landmark id; display names come from the language files (i18n). */
   id: string
   lon: number
   lat: number
-  /** Real elevation in meters (drives the stylized terrain bump). */
+  /** Real elevation in meters — reference data; terrain heights come from the
+   *  elevation dataset, not from this table. */
   elevationM: number
-  /** Bump radius in degrees (massif footprint, stylized). */
+  /** Massif footprint radius in degrees — reference data, unread by terrain. */
   radiusDeg: number
 }
 
@@ -33,7 +36,7 @@ export const MOUNTAINS: MountainDef[] = [
   { id: 'thabana-ntlenyana', lon: 29.27, lat: -29.47, elevationM: 3482, radiusDeg: 0.8 },
 ]
 
-export interface WaterfallDef {
+interface WaterfallDef {
   /** Landmark id; display names come from the language files (i18n). */
   id: string
   lon: number
@@ -57,7 +60,8 @@ export const WATERFALLS: WaterfallDef[] = [
 export const ELEPHANT_GRAVEYARD = { id: 'elephant-graveyard', lon: 36.6, lat: -4.9 }
 
 // Built cultural landmarks (design.md §4.4): achievements of African
-// civilisations — the Nubian pyramids of Meroë (kingdom of Kush), Great
+// civilisations — the Nubian pyramids of Meroë (kingdom of Kush), the
+// pyramids and Sphinx of Giza, Great
 // Zimbabwe, the Zagwe-era rock-hewn churches of Lalibela, the coastal
 // ruins of the Swahili Kilwa Sultanate, the towering stelae of the Aksumite
 // kingdom, the Gondarine castles of Fasil Ghebbi (imperial Ethiopia), and
@@ -82,24 +86,22 @@ export interface CulturalLandmarkDef {
     | 'cliff-dwellings'
 }
 
-// The Meroë pyramid FIELD (render/landmarks.ts buildMeroePyramids) spreads
-// ~6.4 world units (0.64° at 10 units/°) from its mount and sits on the Nile's
-// east bank, so at its raw coordinate the westernmost tombs stand in the
-// rendered river band (user report). Shift the mount off the nearest river until
-// the WHOLE footprint clears the water: field radius + the CALIBRATABLE river
-// half-width (terrain RIVER_WIDTH_DEG) + a small margin. Deterministic (pure
-// river geometry), bounded; a site already clear returns unchanged after one
-// query. Since point 156 EVERY cultural landmark and the natural sites run
-// through this shift — the widened rivers reach anchors that used to be clear.
-// The shift itself lives in ../riverClearance (shared with the Giza plateau
-// constant, which geo.ts cannot reach through this module).
+// River shift: a landmark field that sits on a bank would stand in the rendered
+// river band at its raw coordinate (Meroë's westernmost tombs did — user report),
+// so each anchor is shifted off the nearest river until its whole footprint
+// clears the water: field radius + the CALIBRATABLE river half-width
+// (RIVER_WIDTH_DEG). Deterministic (pure river geometry), bounded; a site
+// already clear returns unchanged after one query. Since point 156 every
+// cultural landmark and the natural sites except the Okavango run through this
+// shift. The shift itself lives in ../riverClearance (shared with the Giza
+// plateau constant, which geo.ts cannot reach through this module).
 
 const CULTURAL_LANDMARK_DEFS: CulturalLandmarkDef[] = [
   { id: 'meroe', lon: 33.75, lat: 16.94, kind: 'pyramids' },
   // Just west of Cairo across the Nile — via the travel-scene panorama the
   // field also stands on the port's first-person horizon (point 82). West of
   // the Nile's rendered band (axis ~31.22 at this latitude, at the calibratable
-  // RIVER_WIDTH_DEG half-width): the whole FIELD FOOTPRINT (±~0.29° incl. the
+  // RIVER_WIDTH_DEG half-width): the whole FIELD FOOTPRINT (GIZA_FIELD_RADIUS_DEG, ~0.35°, incl. the
   // Sphinx) must stand on the west-bank desert, not in the channel (user
   // report; auto-cleared like every field since 156). The position comes from
   // the shared ./gizaPlateau constant, which the ENTERABLE monument map point
@@ -117,8 +119,8 @@ const CULTURAL_LANDMARK_DEFS: CulturalLandmarkDef[] = [
 // rendered field radius (point 156): with the point-136 widening, "already
 // clear" stopped being true for anchors that were hand-placed against the
 // scale-true width. The radius is the field spread the world.test rims probe:
-// Meroë's pyramid field reaches ~0.64°, Giza's ~0.32°, the single-building
-// sites ~0.3°.
+// Meroë's pyramid field reaches ~0.64° (cleared at 0.73), Giza's
+// GIZA_FIELD_RADIUS_DEG (~0.35°), the single-building sites ~0.3°.
 const LANDMARK_FIELD_RADIUS_DEG: Record<string, number> = {
   meroe: 0.73,
   // Giza's anchor is ALREADY resolved against this clearance in ./gizaPlateau,

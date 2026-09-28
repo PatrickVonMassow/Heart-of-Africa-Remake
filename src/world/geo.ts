@@ -1,7 +1,8 @@
 // Fixed geography of the continent (design.md §3/§4): coordinate mapping,
-// region model and the full place roster — all 10 port cities and one village
-// per each of the 22 peoples. Coastline, rivers, lakes and landmarks live in
-// ./data/* and are indexed by ./geoIndex.ts. The geographic *positions* are
+// region model and the full place roster — all 10 port cities, one village per
+// each of the 22 peoples and the enterable Giza monument site. Coastline,
+// rivers, lakes and landmarks live in ./data/*; ./geoIndex.ts is the query
+// layer over the elevation data and the hydrology. The geographic *positions* are
 // fixed (authentic ~1890); only the visual appearance of the landscape is
 // procedural per run (design.md §18).
 
@@ -163,9 +164,9 @@ const PORTS: PlaceDef[] = [
 ]
 
 // Minimum river clearance for villages (design.md §4.2): the river water band
-// reaches ~0.165° from the axis (terrain.ts RIVER_WIDTH_DEG) and the village
-// marker footprint ~0.145° (TravelScene VillageMarker at 10 units/degree), so
-// The clearances scale with the calibratable river half-width (point 156):
+// reaches RIVER_WIDTH_DEG from the axis (riverWidth.ts: 0.17° × the
+// calibratable balance.river.widthFactor), and the clearances below scale
+// with it (point 156):
 // with the point-136 widening, fixed margins left Khartoum's building
 // cluster in the confluence. A village keeps its full hut footprint dry;
 // a port stays AT the river by design (§4.2 exemption for closeness) but
@@ -180,9 +181,9 @@ const PORTS: PlaceDef[] = [
 // waterline stood ~36 m out and the built disc kept 8.1 m of it; 0.20 puts the
 // waterline ~42 m out and leaves the grown disc 11.2 m — the "etwas mehr
 // Abstand" the user asked for, measured rather than eyeballed.
-// NOTE: the queries below resolve to `0.45 × range`, so this margin needs the
-// WIDER range — at range 1 the gradient walk saturates at 0.45° and stops
-// short of any clearance above it, wherever the shipped width factor puts it.
+// NOTE: a range-1 bucket search is reliable only to ~0.45° (hydro.ts), so this
+// margin needs the WIDER range 2 — at range 1 the gradient walk reads a flat
+// gradient past that reach and stops short of any clearance above it.
 export const VILLAGE_RIVER_CLEARANCE_DEG = RIVER_WIDTH_DEG + 0.20
 // 0.15: the port cluster (main house ~2.2 world units wide plus annex)
 // reaches ~1.3 units past the anchor — the first 0.1 margin left Khartoum's
@@ -195,9 +196,10 @@ export const PORT_RIVER_CLEARANCE_DEG = RIVER_WIDTH_DEG + 0.15
 function clearedOfRivers(lat: number, lon: number, clearance = VILLAGE_RIVER_CLEARANCE_DEG): LatLon {
   let a = lat
   let o = lon
-  // RANGE 2, not the default 1: the query saturates at `0.45 × range`, and a
-  // walk that cannot MEASURE past its own target distance reads a flat
-  // gradient there and halts short of it (point 1173).
+  // RANGE 2, not the default 1: a range-1 query is reliable only to ~0.45°
+  // (the query cap here is maxDist = 1), and a walk that cannot MEASURE past
+  // its own target distance reads a flat gradient there and halts short of it
+  // (point 1173).
   const RANGE = 2
   for (let i = 0; i < 24; i++) {
     const d = riverDistanceExact(a, o, 1, RANGE)
@@ -220,26 +222,27 @@ function clearedOfRivers(lat: number, lon: number, clearance = VILLAGE_RIVER_CLE
 // One village per each of the 22 peoples (design.md §4.2), region membership
 // per design.md §4.5. Positions are educated guesses at each people's ~1890
 // heartland; where the design region and the historical heartland disagree
-// (Bombara, Bemba, Fang), the position is shifted toward the design region.
-// These are the raw heartland anchors — the exported VILLAGES below shift each
-// off nearby river water per the clearance rule (exported for the world test).
+// (Bemba, Fang), the position is shifted toward the design region.
+// These are the raw heartland anchors (exported for the world test) — the
+// module-local VILLAGES below shift each off nearby river water per the
+// clearance rule.
 export const VILLAGE_HEARTLANDS: PlaceDef[] = [
   // North — Tuareg, Berbers, Nubians
   { id: 'tuareg-village', kind: 'village', peopleId: 'tuareg', lat: 23.2, lon: 5.8, region: 'north' },
   { id: 'berber-village', kind: 'village', peopleId: 'berbers', lat: 31.7, lon: -7.2, region: 'north' },
   { id: 'nubian-village', kind: 'village', peopleId: 'nubians', lat: 21.8, lon: 31.6, region: 'north' },
-  { id: 'bambara-village', kind: 'village', peopleId: 'bambara', lat: 13.45, lon: -6.27, region: 'west' },
   // West — Hausa, Mandinka, Fang, Bambara (moved to its Ségou heartland)
+  { id: 'bambara-village', kind: 'village', peopleId: 'bambara', lat: 13.45, lon: -6.27, region: 'west' },
   { id: 'hausa-village', kind: 'village', peopleId: 'hausa', lat: 12.0, lon: 8.5, region: 'west' },
   { id: 'mandinka-village', kind: 'village', peopleId: 'mandinka', lat: 11.5, lon: -9.0, region: 'west' },
   { id: 'fang-village', kind: 'village', peopleId: 'fang', lat: 1.8, lon: 11.5, region: 'west' },
-  // Central — Mongo, Pygmies, Banda, Bambundu, Lunda
+  // Central — Mongo, Mbuti, Banda, Bambundu, Lunda
   { id: 'mongo-village', kind: 'village', peopleId: 'mongo', lat: -1.5, lon: 21.0, region: 'central' },
   { id: 'mbuti-village', kind: 'village', peopleId: 'mbuti', lat: 1.4, lon: 28.6, region: 'central' },
   { id: 'banda-village', kind: 'village', peopleId: 'banda', lat: 6.0, lon: 21.5, region: 'central' },
   { id: 'bambundu-village', kind: 'village', peopleId: 'bambundu', lat: -9.3, lon: 15.3, region: 'central' },
   { id: 'lunda-village', kind: 'village', peopleId: 'lunda', lat: -10.0, lon: 23.4, region: 'central' },
-  // East — Masai, Swahili, Somali, Sidamo, Uganda
+  // East — Maasai, Swahili, Somali, Sidama, Baganda
   { id: 'maasai-village', kind: 'village', peopleId: 'maasai', lat: -2.5, lon: 36.8, region: 'east' },
   { id: 'swahili-village', kind: 'village', peopleId: 'swahili', lat: -2.4, lon: 40.6, region: 'east' },
   { id: 'somali-village', kind: 'village', peopleId: 'somali', lat: 9.0, lon: 45.0, region: 'east' },
@@ -308,14 +311,14 @@ export function landmarkLabelHiddenByMapPoint(landmarkId: string): boolean {
   return PLACES.some((p) => p.id === landmarkId)
 }
 
-// Settlements an ~1890 explorer already knew and could name from the outset
-// (design.md §3.2/§17.2): the ten port cities. They start DISCOVERED — their
-// map labels show their names from the start (never a placeholder, §17.2) and returning to
-// them credits no discovery bounty (design.md §10). Every period-famous inland
-// centre in the model is itself one of these ports (Timbuktu, Khartoum on the
-// caravan/Nile routes). The Giza monument site is likewise world-famous and
-// beside Cairo, so it is known too; the known set is the ten ports plus Giza,
-// while the ordinary ethnic villages stay discovery-gated as before.
+// Places an ~1890 explorer already knew and could name from the outset
+// (design.md §3.2/§17.2): the ten port cities and the Giza monument site. They
+// start DISCOVERED — their map labels show their names from the start (never a
+// placeholder, §17.2) and returning to them credits no discovery bounty
+// (design.md §10). Every period-famous inland centre in the model is itself one
+// of these ports (Timbuktu, Khartoum on the caravan/Nile routes); Giza is
+// world-famous and beside Cairo. The ordinary ethnic villages stay
+// discovery-gated.
 export const KNOWN_FROM_START_PLACES: readonly string[] = PLACES.filter(
   (p) => p.kind === 'port' || p.kind === 'monument',
 ).map((p) => p.id)
@@ -323,7 +326,7 @@ export const KNOWN_FROM_START_PLACES: readonly string[] = PLACES.filter(
 /** Every settlement the player can walk into — the ports and the villages, not
  *  the monument sites, which carry their own sparse crowd instead of the §19.10
  *  bustle. */
-export const SETTLEMENT_IDS: readonly string[] = PLACES.filter(
+const SETTLEMENT_IDS: readonly string[] = PLACES.filter(
   (p) => p.kind === 'port' || p.kind === 'village',
 ).map((p) => p.id)
 

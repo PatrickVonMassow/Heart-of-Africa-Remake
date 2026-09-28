@@ -69,7 +69,7 @@ const JUNCTION_DEG = 0.2
 const JUNCTION_RAMP = 0.04
 
 /** Centered moving average with clamped window edges. */
-export function lowPass(vals: number[], radius: number): number[] {
+function lowPass(vals: number[], radius: number): number[] {
   const n = vals.length
   const out = new Array<number>(n)
   for (let i = 0; i < n; i++) {
@@ -86,7 +86,7 @@ export function lowPass(vals: number[], radius: number): number[] {
 
 /** Monotone non-increasing clamp from source (index 0) to mouth: every
  *  upward jag is removed, every genuine drop (waterfall, rapid) is kept. */
-export function runningMin(vals: number[]): number[] {
+function runningMin(vals: number[]): number[] {
   const out = vals.slice()
   for (let i = 1; i < out.length; i++) {
     if (out[i] > out[i - 1]) out[i] = out[i - 1]
@@ -95,7 +95,7 @@ export function runningMin(vals: number[]): number[] {
 }
 
 /** The full longitudinal smoothing: low-pass → running min → low-pass. */
-export function smoothBedProfile(raw: number[]): number[] {
+function smoothBedProfile(raw: number[]): number[] {
   const clamped = raw.map((v) => Math.max(v, RAW_FLOOR))
   return lowPass(runningMin(lowPass(clamped, SMOOTH_PRE)), SMOOTH_POST)
 }
@@ -116,7 +116,7 @@ export interface BedProfile {
  * — A's tail descends to it under the bounded ramp, B carries it downstream
  * via a running min. Iterated so chains (Sankuru → Kasai → Congo) propagate.
  */
-export function chainJunctions(profiles: BedProfile[]): void {
+function chainJunctions(profiles: BedProfile[]): void {
   for (let pass = 0; pass < 3; pass++) {
     for (const a of profiles) {
       const tail = a.pts[a.pts.length - 1]

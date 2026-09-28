@@ -2,11 +2,12 @@
 // extents. Lake Chad is drawn at its large late-19th-century "Normal Chad"
 // extent, considerably bigger than the modern lake.
 
-export interface LakeDef {
+interface LakeDef {
   /** Landmark id; display names come from the language files (i18n). */
   id: string
   points: Array<[number, number]>
-  /** Label anchor (lon, lat). */
+  /** Interior anchor (lon, lat): jump target, lake-level sample point and
+   *  landmark position. */
   center: [number, number]
 }
 
