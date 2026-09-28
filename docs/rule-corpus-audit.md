@@ -1,7 +1,12 @@
-# Rule-corpus audit — every rule on six axes
+# Rule-corpus audit — the rule corpus on six axes
 
-Full review of the project's rule corpus (work-order point 307, user mandate
-25.07.2026). Cut on **27.07.2026** against `main` at `9b44275`.
+Review of the project's rule corpus (work-order point 307, user mandate
+25.07.2026). Cut on **27.07.2026** against `main` at `9b44275`; sections A–F
+state that cut (later additions are dated in place: row A67 on 24.08, the C9 fix
+by point 527, §G on 20.08, §H on 28.08). Where a later pass (§H) disagrees with a
+section-A verdict, the later pass is the current reading; §H also reports the
+grown corpus (137 entries, 96 memory files) against the scope table's 27.07
+sizes.
 
 The corpus had grown by accretion for three weeks and had never been read as a
 whole. The symptoms that triggered the mandate: one rule change had to be applied
@@ -20,7 +25,7 @@ assumptions.
 | Derived advice documents | 2 | `docs/analysis_de/` (guide + retrospective) |
 
 Judged in full: the memories and the enforcers. Judged in part: `CLAUDE.md` and
-the guide. NOT judged, and named as gaps in rows B6–B9 rather than passed over:
+the guide. The retrospective, listed in scope, is not recorded as judged. NOT judged, and named as gaps in rows B6–B9 rather than passed over:
 `design.md`'s process sections, the `TASKS.md` preamble, the user-global
 `~/.claude/CLAUDE.md`, and the two wired user-global timestamp hooks — the last
 two were outside the corpus definition this audit started from, which the
@@ -44,11 +49,12 @@ Verdict key: **OK** — nothing found · **STALE** — no longer describes how t
 project works · **CONTRA** — conflicts with another rule or with the code ·
 **REDUNDANT** — the same rule is stated elsewhere · **INEFFECTIVE** — its claimed
 mechanism does not fire or does not exist · **OBSOLETE** — superseded, to be
-retired with its surviving insight.
+retired with its surviving insight · **RESOLVED** — the finding was fixed
+while the audit ran.
 
 ---
 
-## A. Project memories (67)
+## A. Project memories (67 + index)
 
 | # | Memory | Verdict | Finding (evidence) | Action | 2nd |
 | --- | --- | --- | --- | --- | --- |
@@ -78,7 +84,7 @@ retired with its surviving insight.
 | A24 | journal-voice-markup | STALE | "verify with `node scripts/verify/voice.mjs` (checks balance, stripping, …)" — the static de/en tag scan **moved** to `src/i18n/i18n.test.ts` (voice.mjs's own header records the move). | Name the real enforcing test. | |
 | A25 | language-german | OK | | keep | |
 | A26 | lint-and-cve-clean-always | OK | | keep | |
-| A27 | maximal-delegation | CONTRA | Instructs `model: fable` and "Prefer the cheap Fable model", and claims to be "baked into the batch-resume hook". The hook (`batch-resume-hook.mjs:105/142`) states the **opposite** and correct policy: Opus 5 is the worker, Fable reviews only. A high-frequency rule contradicting the highest-frequency channel. | Correct to Opus 5; keep the pool size and the closing freeze. | |
+| A27 | maximal-delegation | CONTRA | Instructs `model: fable` and "Prefer the cheap Fable model", and claims to be "baked into the batch-resume hook". The hook (`batch-resume-hook.mjs:105/142`) states the **opposite** and correct policy: Opus 5 is the worker, Fable reviews only. A high-frequency rule contradicting the highest-frequency channel. | Correct to Opus 5; keep the pool size and the closing freeze. (Since superseded by the 18.08 Sol-author rule, §H row A2.) | |
 | A28 | maximum-qa-process | OK | | keep | |
 | A29 | model-diverse-by-criticality | RESOLVED | Claims enforcement "by point 298's criticality-triage convention + a **Stop-hook guard** that blocks a high-criticality tick without a recorded diverse review". No such guard existed in `scripts/` or in the Stop chain when this audit was cut. This is the exemplar the mandate names. | BUILT on 27.07.2026: `scripts/mechanism-review-guard.mjs` (see D-b). | |
 | A30 | model-effort-discretion | OBSOLETE | Grants Fable discretion with "Opus 4.8 on High stays the DEFAULT" — withdrawn 25.07.2026 by `fable-sparingly` + `serving-model-watch`. | RETIRE with the surviving insight (never lower the model/effort on load-bearing work to save budget). | |
@@ -119,7 +125,7 @@ retired with its surviving insight.
 | A65 | webgpu-untestable-headless | OK | Content is the 19.07 correction and is right. Its NAME still asserts the withdrawn claim, which is what a skim reads. | Keep; note the naming trap (renaming a memory breaks 4 inbound links — not worth it). | |
 | A66 | workflows-token-budget | OK | | keep | |
 | A67 | recommendation-is-a-decision | OK | User ruling **24.08.2026**, on “Zeiterfassung in der Arbeitsordnung: abschaffen oder wiederbeleben?”, after “Mach es so, wie du es empfohlen hast”: “Ja, das sollst du künftig dürfen.” `CLAUDE.md` §6 grants decision, execution, and recorded closure by a stated recommendation while keeping tags, publishes, force-pushes, user-data deletions, and unrecommended genuine choices outside that same sentence's authorization. | keep; verified against the session-read rule and linked from `no-standstill-decide-and-record` | |
-| A68 | MEMORY.md (index) | INEFFECTIVE | Two memories are not linked at all (`queue-order-fixes-before-finders`, `tasks-time-tracking`), so a session reading the index never learns they exist. **And the index is far staler than the first pass recorded** — the review found five more wrong lines that no memory row would have caught, because the index paraphrases rather than quotes: the F7 key, a zoom range of "0.25–0.5" that appears nowhere else, "gate being built" for a shipped guard, "being built into point 184" for a shipped WebGPU lane, "task DISABLED … singleton being built" for a re-enabled task, and a dashboard path that moved. The index is a SECOND copy of 66 rules and drifts like any copy. | Fix all of them; add the two links; add a pointer to this audit. Longer term the index is a candidate for generation from the memories' own `description` fields rather than hand-paraphrase. | ≠ → adopted, scope widened |
+| A68 | MEMORY.md (index) | INEFFECTIVE | Two memories are not linked at all (`queue-order-fixes-before-finders`, `tasks-time-tracking`), so a session reading the index never learns they exist. **And the index is far staler than the first pass recorded** — the review found six more wrong lines that no memory row would have caught, because the index paraphrases rather than quotes: the F7 key, a zoom range of "0.25–0.5" that appears nowhere else, "gate being built" for a shipped guard, "being built into point 184" for a shipped WebGPU lane, "task DISABLED … singleton being built" for a re-enabled task, and a dashboard path that moved. The index is a SECOND copy of 67 rules and drifts like any copy. | Fix all of them; add the two links; add a pointer to this audit. Longer term the index is a candidate for generation from the memories' own `description` fields rather than hand-paraphrase. | ≠ → adopted, scope widened |
 
 ## B. Session-read rule documents
 
@@ -137,7 +143,8 @@ retired with its surviving insight.
 
 ## C. Enforcer health (27 wired scripts)
 
-`guard-health-guard --status` reports all 27 wired and tested. That answers "can
+`guard-health-guard --status` reports all 27 wired, and tested apart from the
+seven `KNOWN_UNTESTED` of C6. That answers "can
 it fire" and "is its decision logic tested". The remaining questions of the
 mandate are answered here.
 
@@ -151,7 +158,7 @@ mandate are answered here.
 | C6 | `KNOWN_UNTESTED` in `guard-health-core.mjs` is a ratchet of 7 enforcers hanging off `batch-lock`/`dashboard-state`, which carry real decision logic and no tests. It can only shrink, which is the right shape, but it has not shrunk since it was written. | OK (debt, recorded) | keep | |
 | C7 | Noise: the two guards whose status probes were run here (`guard-health`, `rule-review`) report nothing owed on a clean tree, and none of the 27 is unconditional by construction — every one is gated on a state it reads. No enforcer is in the "always fires, trains the reader to skip it" class. This is a construction argument, not a measurement: without C1's fire log the noisiness of a guard cannot actually be measured. | OK (unproven) | Depends on C1. | ✓ |
 | C8 | **`core.hooksPath` pointed at an ABSOLUTE path inside the MAIN working tree**, so every worktree agent ran the main tree's hook SCRIPTS against its own checkout. Observed live during this audit at 16:54: the main tree had an in-progress `pre-push` hook whose `scripts/pre-push-gate.mjs` did not exist on this branch, and **every push from every worktree failed** with `Cannot find module …`. A mechanism built to protect main had made the durability rule ("push after every commit") unfollowable. | INEFFECTIVE (and actively harmful) | FIXED ON MAIN INDEPENDENTLY while this audit ran (`e1372d2`): the hooks path is relative now, so each worktree runs the hooks of the branch it has checked out, and the gate skips silently on a branch that predates it. Recorded because the diagnosis converged from two directions and the failure mode will recur for any future hook. | ✓ (verdict, not row — added after the review) |
-| C9 | `model-guard-core.mjs` enforced the three-model allowlist with `ALLOWED = /\b(opus\|fable)\b/i` **searched inside the whole trailer line**. That blocks the case it was built for (the Haiku degradation) but is coarser than the policy: any line merely CONTAINING "opus" or "fable" passed — `Claude Haiku 4.5 (opus mode)`, `Claude Sonnet 5 / Claude Opus 5`. | OK (weaker than its rule) | FIXED (point 527): the allowlist is anchored against the model name PARSED out of the trailer (`modelNamesIn`, one claim per "Claude" token, the raw model id `claude-opus-5[1m]` normalised), so an allowed name with any addition no longer passes and a two-model line is a finding rather than a pass on its first allowed name. Replayed over all 2530 commits in history: the verdicts are unchanged (7 bare trailers unidentified, the 7 Haiku commits forbidden). The version stays open — the policy names FAMILIES, and a pinned version would redden the batch on the next point release. | ≠ (review found it) |
+| C9 | `model-guard-core.mjs` enforced the model allowlist with `ALLOWED = /\b(opus\|fable)\b/i` **searched inside the whole trailer line**. That blocks the case it was built for (the Haiku degradation) but is coarser than the policy: any line merely CONTAINING "opus" or "fable" passed — `Claude Haiku 4.5 (opus mode)`, `Claude Sonnet 5 / Claude Opus 5`. | OK (weaker than its rule) | FIXED (point 527): the allowlist is anchored against the model name PARSED out of the trailer (`modelNamesIn`, one claim per "Claude" token, the raw model id `claude-opus-5[1m]` normalised), so an allowed name with any addition no longer passes and a two-model line is a finding rather than a pass on its first allowed name. Replayed over all 2530 commits in history: the verdicts are unchanged (7 bare trailers unidentified, the 7 Haiku commits forbidden). The version stays open — the policy names FAMILIES, and a pinned version would redden the batch on the next point release. | ≠ (review found it) |
 | C10 | Two counters disagree about what an enforcer is: `guard-health-core` matches `-(guard\|gate\|hook)`, `rule-review-state` matches `-(guard\|hook)`. They are described as counting "the same corpus", so a future `*-gate.mjs` would be health-checked but not counted toward the review-growth budget. | REDUNDANT (two definitions of one fact) | Recorded; the honest fix is one exported pattern that both import — the D-d "one authoritative place per fact" shape, applied to code rather than prose. | ≠ (review found it) |
 
 ## D. The beginner guide's own advice — is every prompt it hands out built here?
@@ -163,7 +170,7 @@ must be a recorded decision (user 25.07.2026).
 | --- | --- | --- | --- | --- |
 | D-a | A mechanism that fires when product code changed with **no test** added on either layer | UNBUILT | Buildable as a Stop check over the commit's file list (product paths vs `*.test.*`). Not built here: the honest version needs a per-commit exemption channel (a pure refactor, a doc commit), which is a design decision with a real false-positive cost. Recorded as owed. | |
 | D-b | **Four eyes when a mechanism is added or changed** — the reviewing model recorded by name | BUILT | This was the highest-value unbuilt one: it is ordered by the guide, claimed as built by A29, and the corpus already shows what an unreviewed guard costs (C2). Built on 27.07.2026 to that design: `scripts/mechanism-review-core.mjs` + `scripts/mechanism-review-guard.mjs` + the record CLI `scripts/mechanism-review.mjs`, keyed on the mechanism files a commit touches, refusing the authoring model and grandfathering everything before its baseline. Its OWN four-eyes review returned five findings, one of them a silently passable path — the evidence the row argues for. | ≠ (review found it) |
-| D-c | **Guard health** — can each fire, does it duplicate, is its message actionable | BUILT | `guard-health-core.mjs` + `guard-health-guard.mjs`, wired. The mandate listed this as unbuilt; it shipped since. Its one gap is C1 ("has it ever fired"). | |
+| D-c | **Guard health** — can each fire, does it duplicate, is its message actionable | BUILT | `guard-health-core.mjs` + `guard-health-guard.mjs`, wired. The mandate listed this as unbuilt; it shipped since. Its gaps are C1 ("has it ever fired") and C3 (a wired hook outside its name pattern). | |
 | D-d | **One authoritative place per fact**, prose checked against the code that owns it | PARTIAL | `src/config/qualityDoc.test.ts` is the pattern, covering only the quality presets. This audit found four live drifts of exactly this class (A9 zoom range, A46 F9 key, A44 doc path, A59 default zoom) — all in memories, which no test can reach because they live outside the repo. Generalising the pattern to `docs/` prose is buildable; to the memory corpus it is not. Recorded. | |
 | D-e | **Red-test triage** — decide by experiment whether the finding accuses product or measurement | NOT MECHANISABLE | A judgment call before a code edit; no check can observe it. Recorded as a deliberate non-mechanism, per the guide's own carve-out. | |
 | D-f | **No fixed wall-clock waits** in tests | BUILT (pre-existing) | `scripts/verify/fixedWaits.mjs` + `fixedWaits.test.mjs` + `fixed-wait-baseline.json` — a per-file RATCHET: the current count is frozen and a file that GAINS a wait fails. Landed `4ff67bb` on 25.07.2026, i.e. two days before this audit's base commit. **The first pass listed it as unbuilt and was about to rebuild it**, having enumerated only `scripts/*.mjs` and never `scripts/verify/`; the review caught both that and the number (a loose grep counts 273 hits, the shipped detector's stricter pattern counts 239 — the loose number was never the baseline). | Nothing to do. Recorded because "I nearly rebuilt an existing mechanism" is the same inventory failure the mandate is about. | ≠ → adopted |
@@ -177,8 +184,10 @@ must be a recorded decision (user 25.07.2026).
 ## E. What the four-eyes review changed
 
 The review ran on the committed table and the evidence, without the reasoning
-behind it. It confirmed 60 rows and disputed 8. Every dispute was checked against
-the repository before being accepted, and **six of the eight were upheld** —
+behind it. It confirmed 60 rows and raised 8 disputes (several span more than one
+row, so the `2nd` column marks ≠ on more rows). Every dispute was checked
+against the repository before being accepted, and **seven of the eight were
+upheld, one partly** —
 including two that reversed edits already made:
 
 | Dispute | Outcome |
@@ -190,10 +199,10 @@ including two that reversed edits already made:
 | A8 — the reminder-hook banner is still live | UPHELD; the correction was rewritten and the planned compression dropped. |
 | B3 — the §7.2 guard list is stale by four | UPHELD (found independently by both passes); recorded as owed. |
 | B5 / completeness — three guide prompts and five rule documents were outside the table | UPHELD; D-j…D-l and B6…B9 added. |
-| Section E claimed changes that had not landed | PARTLY. The memory edits HAD landed (the review read the corpus before they were written), but the D-f claim was genuinely wrong. Section E is rewritten below to state what is verifiable. |
+| Section E claimed changes that had not landed | PARTLY. The memory edits HAD landed (the review read the corpus before they were written), but the D-f claim was genuinely wrong. Section E states only what is verifiable. |
 
 Plus three defects the first pass missed entirely: C9, C10, and the wider index
-rot recorded in A67. **The second model earned its cost on this point**: two of
+rot recorded in A68. **The second model earned its cost on this point**: two of
 its findings would have destroyed live rules, and one would have rebuilt an
 existing mechanism.
 
@@ -221,7 +230,7 @@ Recorded, with the reason, rather than built:
   **D-l** — each touches many wrappers or the verify harness while a parallel
   strand works the same area. They are owed, not refused. **D-b was the one to
   build first** — ordered by the guide, falsely claimed as built (A29) — and it
-  is now built; C9's tightening is a change that goes through it.
+  is now built; C9's tightening has since landed too (point 527).
 - **B3** — owed and cheap in principle, blocked by one word of budget head-room
   and an active parallel edit in that exact section.
 - **A11** (commit messages, 0 violations in 200 commits), **A19** (germanisms),
@@ -229,10 +238,12 @@ Recorded, with the reason, rather than built:
 - **D-e**, **D-g** — genuinely not mechanisable; recorded as such rather than
   left silently empty, per the mandate.
 - **A52** (time tracking) — dead in practice but an explicit user mandate; the
-  choice between reviving it with a mechanism and retiring it belongs to the user.
-- **B6…B9** — four rule carriers this audit's own SCOPE omitted (design.md's
-  process sections, the TASKS preamble, the user-global CLAUDE.md, and the two
-  user-global timestamp hooks). Named here so the next review starts from a
+  choice between reviving it with a mechanism and retiring it was put to the
+  user, who on 24.08.2026 authorised deciding it by the stated recommendation
+  (A67). The execution is not recorded here.
+- **B6…B9** — four rule carriers left unjudged: design.md's process sections
+  and the TASKS preamble (in scope, not judged), and the user-global CLAUDE.md
+  and the two user-global timestamp hooks (outside the scope). Named here so the next review starts from a
   complete corpus definition rather than this one's.
 
 ## G. Why-history extracted from the per-turn policy (20.08.2026)
@@ -274,7 +285,10 @@ kept for disputes rather than paid on every turn.
 
 ## H. Second pass — GPT-5.6 Sol, 28.08.2026
 
-The rule corpus had grown from 127 to 137 entries since the 19.08.2026 review, so
+Row ids in this section (A1–A16) are §H's own, cited under these ids by the open
+work order; they do not refer to section A's rows of the same number.
+
+The rule corpus had grown from 127 to 137 entries since the last rule-review attestation (19.08.2026, `.claude/rule-review-state.json`), so
 `rule-review-guard` came due. The reading was commissioned cross-vendor (`ask-sol.mjs
 --kind audit`) over the complete memory corpus — 96 files including `MEMORY.md` — plus
 `CLAUDE.md`, the per-prompt dashboard reminder hook, the session-start resume hook and

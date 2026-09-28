@@ -1,9 +1,18 @@
 # Driving hitches in the bird's-eye view — analysis (TASKS point 272)
 
-Read-only code analysis of the occasional short frame stalls while driving
-continuously in one direction in the travel view. No code was changed; this doc
-ranks the likely spike sources, recommends a fix approach per source, and
-specifies the instrumentation to confirm the ranking before the fix lands.
+Code analysis of the occasional short frame stalls while driving continuously
+in one direction in the travel view: it ranks the likely spike sources,
+recommends a fix approach per source, and specifies the instrumentation to
+confirm the ranking.
+
+> **STATUS: historical analysis.** Everything from "Symptom shape" to "Bottom
+> line" was written read-only against the PRE-FIX code; its file:line
+> references and present-tense descriptions (synchronous window build,
+> per-crossing probe memo, `number[]` indices, uncached flora scan) describe
+> that code, not today's. What landed is in "Implementation status" at the
+> end. The ranking stayed a hypothesis: docs/perf-276-findings.md later found
+> the sampled p99 trail to be a measurement artifact and measured the bursts
+> at terrain max 0.3 ms, flora max 0.6 ms (headless).
 
 ## Symptom shape
 
@@ -11,15 +20,17 @@ The user reports occasional short stalls while driving straight. Two periodic,
 synchronous work bursts fire on movement thresholds — every 24 wu (a chunk
 boundary crossing) and every 16 wu (the flora rebuild hysteresis) — and both run
 to completion inside a single `useFrame` callback on the main thread. At the
-default travel speed 5.6 that is one burst roughly every 2.9 s and 4.3 s; at the
-F3 test speed 25 every 0.64 s and 0.96 s. Every 48 wu the two coincide in
+default travel speed 5.6 that is one burst roughly every 4.3 s and 2.9 s; at the
+F3 test speed 25 every 0.96 s and 0.64 s. Every 48 wu the two coincide in
 back-to-back frames (16·3 = 24·2), which predicts an occasional extra-long
-stall — matching "occasional short hitches" exactly. The bursts only do real
-work over NEW ground (both are cached/keyed), which matches "driving
-continuously in one direction" being the trigger.
+stall — matching "occasional short hitches" exactly. The terrain burst only
+does real work over NEW ground (it is cached/keyed), which matches "driving
+continuously in one direction" being the trigger; the flora burst re-decided
+its whole scan on every step (see spike 2).
 
 An aggravator, not a cause: the camera follow lerp is a fixed 0.12 per FRAME,
-not dt-scaled (`TravelScene.tsx:2349`), so after one long frame the camera
+not dt-scaled (the travel camera follow in `TravelScene.tsx`, still so
+on 28.09.2026), so after one long frame the camera
 falls behind and visibly snaps to catch up — a 100 ms stall reads worse than it
 is. (Known/intentional per the `__camera.settled` comment, but worth noting for
 the perceived severity.)
@@ -219,7 +230,7 @@ the budget still measures over).
    spawn/despawn block — with `performance.now()` and expose
    `window.__perf = { terrain: {count, lastMs, maxMs, totalMs}, flora: {...},
    wildlife: {...}, frames: ringBuffer<{t, dt}> }` (ring buffer of the last
-   ~600 rAF deltas). Zero-cost when not read.
+   ~600 rAF deltas). Cheap enough to leave on in DEV.
 2. **Measurement pass**: a driven straight run over FRESH ground (e.g. from
    Cairo south-west across the desert/Nile, and a second leg through a
    mountainous belt — Ethiopian highlands — for the 112-seg case), at the
@@ -257,7 +268,8 @@ same seed, the same picture — just not all in one frame.
 Landed, in order:
 
 1. **Attribution probe**: `src/scenes/travel/perfProbe.ts` + `window.__perf`
-   (DEV) — terrain/flora burst stats and a 600-frame delta ring, pure-tested.
+   (DEV) — terrain/flora burst stats and a 600-frame delta ring, pure-tested
+   (wildlife, planned in the instrumentation section, was left out).
 2. **Terrain (spike 1)**: the crossing now only PLANS the window
    (`src/scenes/travel/terrainQueue.ts`, pure-tested in
    `terrainQueue.test.ts`); missing builds drain under a ~5 ms/frame budget,
@@ -277,11 +289,13 @@ Landed, in order:
    synchronous.
 4. **Regression gate**: the enrichments driven no-pop pass also asserts via
    `__perf` that both systems worked the drive in bounded slices (terrain
-   maxMs < 150, flora maxMs < 100 — generous headless bounds).
+   maxMs < 150, flora maxMs < 100 — generous headless bounds, in place of the
+   8 ms/frame budgets and the separate `perf.mjs` proposed above).
 
 **Deferred (documented follow-up): the Web Worker.** A refined 112-seg chunk
-build is atomic and can alone overshoot the terrain frame budget (~20-40 ms on
-real hardware) in mountain/coast belts; moving `buildChunkGeometry`'s sampling
+build is atomic and could alone overshoot the terrain frame budget in
+mountain/coast belts (the ~20-40 ms is the unmeasured estimate from spike 1;
+docs/perf-276-findings.md measured terrain bursts at max 0.3 ms headless); moving `buildChunkGeometry`'s sampling
 into a worker (ttsWorker pattern, transferable typed arrays, geodata
 initialised worker-side) remains the second stage if the measured overshoot
 still reads as a hitch after this pass. The prefetch usually hides it today:

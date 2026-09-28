@@ -69,18 +69,19 @@ npm test              # scripts/verify/run-all.mjs: type-check + build, oxlint,
                       # the fast Vitest layer (jsdom), then the browser suites
                       # against a managed dev server, then the
                       # production-preview smoke test
+npm run test:small    # the SMALL everyday tier
+npm run test:large    # the LARGE tier
 npm test -- flow      # a single suite (dev server managed for you)
 npm test -- build lint  # just the build + lint preflight
 ```
 
+Which tier to run for a change, and what each covers, is in
+[`scripts/verify/README.md`](verify/README.md) and `scripts/verify/tiers.mjs`.
+
 `npm test` exits non-zero if any stage fails or a suite logs a browser console
-error. The verification suites are: `docs` (README/CLAUDE.md consistency),
-`board-layout` (the narrow batch-board card-header geometry), `world`, `i18n`,
-`flow`, `health`, `events`, `collision`, `handwriting`,
-`polish`, `gamepad`, `touch`, `voice`, `settings`, `enrichments`,
-`invariants`, `benchmark`, and `preview` (the production build). Each maps to
-the CLAUDE.md §7.1 criteria named in its
-header comment. The bulk of the regression (pure logic, store transitions,
+error. The verification suites are listed, in run order, in
+`scripts/verify/tiers.mjs` (`DEV_SUITES`, plus `preview` for the production
+build). Each maps to the CLAUDE.md §7.1 criteria named in its header comment. The bulk of the regression (pure logic, store transitions,
 HTML-HUD components) runs in the Vitest layer (`npm run test:unit`); the
 layer split and the old→new coverage map live in
 [`scripts/verify/README.md`](verify/README.md).
@@ -96,17 +97,14 @@ which needs a `npm run build && npm run preview` on :4173).
 
 Notes:
 
-- The dev-server checks rely on DEV-only hooks (`__game`, `__ui`,
-  `__placePlayer`, `__placeLayout`, `__placeColliders`, `__placeCamera`,
-  `__placeWalkers`, `__placeBackdrop`, `__placeBackdropInfo`, `__balance`,
-  `__movement`, `__events`, `__lionHunt`, `__wildlife`, `__player`, `__rivers`,
-  `__culturalLandmarks`, `__terrainType`, `__setLang`, `__voiceMarkup`);
-  they do not work against the production build.
+- The dev-server checks rely on DEV-only `window.__*` hooks (`__game`, `__ui`
+  and many more, defined next to the code they expose); they do not work
+  against the production build.
 - Chromium must run with `--enable-gpu` and the ANGLE backend its PLATFORM can
   provide — `--use-angle=d3d11` on Windows, and surfaceless EGL over the host's GPU
   on Linux (`VERIFY_ANGLE=gl-egl`). The verify suites pick it themselves (point 475,
-  `scripts/verify/launch-args-core.mjs`); the perf tools here still hard-code the
-  Windows flag. Beware the SwiftShader fallback — the only backend a GPU-less
+  `scripts/verify/launch-args-core.mjs`); the perf tools here (`perf-bench.mjs`, `perf-breakdown.mjs`,
+  `perf-structure.mjs`) still hard-code the Windows flag. Beware the SwiftShader fallback — the only backend a GPU-less
   container can run: requestAnimationFrame drops to ~1 fps and interaction tests
   become meaninglessly slow, so a machine that verifies pictures wants a real GPU.
 - The default language is English (design.md §17); suites that assert

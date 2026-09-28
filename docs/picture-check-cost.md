@@ -1,8 +1,8 @@
 # What one rendered-picture check costs
 
 Measurement phase of work-order point 361. The rendered-picture check is this
-project's most expensive control and it dominates the remaining work — 42 of the
-67 open points touch the canvas — yet the price of a SINGLE check had never been
+project's most expensive control and it dominated the remaining work — 42 of the
+67 points open on 27.07.2026 touched the canvas — yet the price of a SINGLE check had never been
 measured. This document records that price. It is a *before* figure: it proposes
 nothing and changes nothing, so that a later phase has a baseline any *after*
 figure can be compared against.
@@ -10,7 +10,9 @@ figure can be compared against.
 Everything below is either **measured** from artefacts in the repository or
 **derived** from a measured input by arithmetic that is shown in place.
 Nothing is estimated by feel. Where a number could not be obtained, the gap is
-named in [§5](#5-what-could-not-be-measured) rather than filled.
+named in [§5](#5-what-could-not-be-measured) rather than filled. §1–§6 are a
+snapshot of 27.07.2026 (counts, suite membership, open points); §7 and §8 add
+later measurements beside them.
 
 Reproduce the per-suite and per-image tables with:
 
@@ -90,12 +92,12 @@ History size was not measured.
 
 ### Tier totals
 
-Suite membership from `scripts/verify/tiers.mjs`.
+Suite membership from `scripts/verify/tiers.mjs` as it stood on 27.07.2026.
 
 | | Suites | Shots | Reviewing tokens | Summed median runtime |
 | --- | ---: | ---: | ---: | ---: |
-| SMALL (`npm run test:small`) | 8 (one unmeasured) | 19 | 29,548 | 469.3 s measured = 7.8 min |
-| LARGE, one backend (`test:large`) | 17 + preview (one unmeasured) | 93 | 150,289 | 2,536.0 s measured = 42.3 min |
+| SMALL (`npm run test:small`) | 7 (one unmeasured) | 19 | 29,548 | 469.3 s measured = 7.8 min |
+| LARGE, one backend (`test:large`) | 16 + preview (one unmeasured) | 93 | 150,289 | 2,536.0 s measured = 42.3 min |
 | LARGE, both backends (`npm test`) | — | 182 | 294,096 | — |
 
 The both-backend row follows the wiring in `tiers.mjs`: the WebGPU pass skips
@@ -103,7 +105,7 @@ the preflight, the prod preview, and the two WebGL2-only suites (`touch`, which
 writes no frames, and `voice`, which writes 3). So the second pass adds 89 shots
 and 143,807 tokens on top of the first pass's 93 / 150,289.
 
-### Two runtime observations from the log
+### Three runtime observations from the log
 
 - **Failure is not cheaper for the expensive suite.** All ten recorded
   `enrichments` runs took between 951.1 s and 1029.0 s, and eight of them exited
@@ -201,17 +203,19 @@ needs one. Doubling the rows above accordingly:
 
 `enrichments` is the guard's fallback suggestion: `suggestSuite()` in
 `render-verify-core.mjs` returns the most recently run suite and defaults to
-`'enrichments'` when the log holds none. Its two-backend pair is **121,374
-tokens — 12 % of a 1M context window, and 11× the cost of the same check run
-through `flow`.** The both-backend wall clock is derived (2 × the WebGL 2 median),
+`'enrichments'` when the log holds none (since picture-check-levers.md §4.2 an
+all-DOM-only change set is routed to `flow` first). Its two-backend pair is
+**121,374 tokens — 12 % of a 1M context window, and 5.7× the cost of the same
+two-backend check run through `flow`.** The both-backend wall clock is derived (2 × the WebGL 2 median),
 not measured; no WebGPU `enrichments` run exists in the log.
 
 ---
 
 ## 3. The real review pattern
 
-How many frames a verification actually puts in front of a reader, from the 40
-recorded runs. Reporting the distribution, not only the average, because the
+How many frames a verification writes — the most it can put in front of a
+reader (§5.1: what is actually read is not recorded) — from the 40 recorded
+runs. Reporting the distribution, not only the average, because the
 average is not near anything.
 
 **23 passing runs, shots per run, sorted:**
@@ -243,9 +247,10 @@ separate 37-shot `enrichments` failures. Counting every run, passing or not,
 **the two days in the window wrote 413 screenshots**, which at 1,716 tokens each
 would be roughly 709,000 tokens if each had been looked at once.
 
-**The backend split contradicts the standing rule as practised in this window.**
-The guard demands both backends for a backend-sensitive change, but 39 of 40
-recorded runs were WebGL 2 and only one was WebGPU. This is reported as a
+**The backend split sits uneasily with the standing rule as practised in this
+window.** The guard demands both backends for a backend-sensitive change, but 39
+of 40 recorded runs were WebGL 2 and only one was WebGPU; the log does not record
+which changes were backend-sensitive, so this is not proof of a violation. This is reported as a
 measurement of what happened, not as a judgement of it.
 
 ---
@@ -261,9 +266,9 @@ listed, not judged.
 
 | # | Bug | Fixing commit | Parent (before) | Suite | Frame(s) that showed it |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Stepped coast on one backend (pt. 210) | `9284f05` 2026-07-22 | `01fa8a8` | `world`, `visualsweep` | `10-worldmodel-nile-delta-cairo.png`; sweep `cairo-coast-f*.png` |
+| 1 | Stepped coast on one backend (pt. 210) | `9284f05` 2026-07-22 | `01fa8a8` | `world`, `visualsweep` | `10-worldmodel-nile-delta-cairo.png`; sweep `verification/sweep/cairo-coast-f*.png` (the standalone `scripts/verify/visualsweep.mjs`, not a tier suite, so outside §1's table and the 97 tracked frames) |
 | 2 | Flora jitter (pt. 175) | `be444d1` 2026-07-19 | `5963979` | `enrichments` | **none — no screenshot** |
-| 3 | Floating horizon strip at the monument site (pt. 181) | `c2dcb0a` 2026-07-24 | `6f63bac` | `polish` | `136-cairo-silhouette-footing.png` (+ re-baselined `100`, `103`, `105`) |
+| 3 | Floating horizon strip at the monument site (pt. 181) | `c2dcb0a` 2026-07-24 | `6f63bac` | `polish` | `136-cairo-silhouette-footing.png` (+ 16 re-baselined frames, among them `100`, `103`, `105`) |
 | 4 | Doubled Giza label (pt. 338) | **none — still open** | — | (none exists) | — |
 | 5 | Invisible season | `4e9ad8b` 2026-07-16 | `74f1619` | `enrichments`, `polish` | `106`–`109-season-*.png` (the stale four); post-fix gate `115`/`116-savanna-{dry,wet}.png` |
 | 6 | Haze at default zoom | `d833863` 2026-07-12 | `e581415` | `world` (bug), `enrichments` (the check that missed it) | `10-worldmodel-nile-delta-cairo.png`, `14-worldmodel-congo-mouth-boma.png`, `16-worldmodel-cape-town.png`; the blind check shot `87-continent-zoom.png` |
@@ -313,11 +318,12 @@ What each fix changed, one line each:
 
 ### Three rows that qualify the corpus
 
-- **Row 2 has no screenshot.** The flora jitter is WebGPU-only and headless
-  Chromium has no WebGPU adapter for that path, so the `enrichments` checks
-  measure the rebuild *rate*, not the picture. A replay phase cannot compare
+- **Row 2 has no screenshot.** The flora jitter is WebGPU-only and temporal,
+  and the runs of the window were almost all WebGL 2 (§3), so the `enrichments`
+  checks measure the rebuild *rate*, not the picture. A replay phase cannot compare
   frames for this bug.
-- **Row 4 was never fixed.** Point 338 is still `[ ]` in `TASKS.md`; the only
+- **Row 4 was not fixed in the window** (point 338 has since closed, see
+  `docs/tasks-archive.md`). Point 338 was still `[ ]` in `TASKS.md`; the only
   commit naming it (`d4d5258`) queues it and touches `TASKS.md` alone. The two
   records still sit at split coordinates — `src/world/data/landmarks.ts:123`
   (lon 30.59, lat 29.98) and `src/world/geo.ts:267` (lat 29.75, lon 30.85) — and
@@ -331,9 +337,9 @@ What each fix changed, one line each:
   value checks `monuments.sphinxBuried === true` and
   `culturalLandmarks.ids.includes('giza')`.
 
-Row 8 is the corpus's only non-visual member, and row 1 the only one whose fix
-commit touched no screenshot at all — its evidence is a pure test in
-`src/world/redSea.test.ts`.
+Row 8 is the corpus's only non-visual member. The fix commits of rows 1, 2, 5,
+6 and 8 touched no screenshot at all (`git show --stat`); row 1's evidence is a
+pure test in `src/world/redSea.test.ts`.
 
 ---
 
@@ -346,8 +352,10 @@ communicated as measured.
    sits directly under the point's central question. `.claude/render-verify-state.json`
    records what a run *wrote*; nothing records what entered a reviewing context.
    Every token figure in [§2](#2-the-reviewing-cost-what-it-costs-to-look-at-one-frame)
-   is therefore an **upper bound conditional on every written frame being read
-   once**. A reviewer who opens three frames from a 37-frame `enrichments` run
+   is therefore conditional on every written frame being read exactly once —
+   an upper bound only for the first read: picture-check-levers.md (B-P) notes
+   that frames are re-sent on every following turn unless cached, so the real
+   figure can be a multiple. A reviewer who opens three frames from a 37-frame `enrichments` run
    pays 5,148 tokens, not 60,687. No instrumentation exists to tell the two apart.
 2. **Fresh runtimes on a quiet machine.** The brief permitted one run of the two
    cheapest suites; I did not take it. Seven worktrees with file-mutating agents
@@ -356,12 +364,13 @@ communicated as measured.
    regression. The repository's own run log already covers all sixteen suites
    from a clean sequential LARGE pass on 25.07.2026, which is better data than a
    loaded run would have produced. The 19 % `flow` spread reported in
-   [§1](#two-runtime-observations-from-the-log) is the measured size of that
+   [§1](#three-runtime-observations-from-the-log) is the measured size of that
    load effect.
 3. **WebGPU runtimes for fifteen of sixteen suites.** The log holds exactly one
-   WebGPU run (`flow`, 75.5 s). Every both-backend wall clock in this document is
-   derived as 2 × the WebGL 2 median and is labelled as derived.
-4. **Runtime distributions.** Eleven of sixteen suites have `n = 1` passing run in
+   WebGPU run (`flow`, 75.5 s). Every both-backend wall clock in §1–§6 is
+   derived as 2 × the WebGL 2 median and is labelled as derived; §7 later
+   measured five whole two-backend LARGE runs.
+4. **Runtime distributions.** Twelve of sixteen suites have `n = 1` passing run in
    the window. Those medians are single observations.
 5. **Whether the token rule matches what the harness actually bills.** The rule and
    the tier ceilings are taken from the vendor documentation cited in
@@ -380,7 +389,7 @@ communicated as measured.
 2. **A LARGE regression on both backends produces 182 frames = 294,096 tokens**
    ≈ $1.47, ≈ 29 % of a 1M context — if every frame is read once.
 3. **The guard's default covering pair (`enrichments` × 2 backends) is 74 frames
-   = 121,374 tokens and about 32 minutes of wall clock** — 11× the token cost of
+   = 121,374 tokens and about 32 minutes of wall clock** — 5.7× the token cost of
    the same two-backend check run through `flow`.
 4. **The median passing run writes 3 frames, but one suite writes 37.** The
    distribution is bimodal; a single `enrichments` run accounted for 29 % of all

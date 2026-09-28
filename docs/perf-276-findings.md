@@ -76,7 +76,7 @@ near-universal. Switching it off reproduces v0.1's histogram exactly.
 | shadow map half | 5.90 | 5.60 | 8.50 | no win |
 | all post off | 5.80 | 5.40 | 8.20 | no win |
 | everything off | 5.90 | 5.70 | 8.40 | no win |
-| device pixel ratio 2 (4x pixels) | 5.50 | 7.90 | 8.60 | barely moves — not fill-rate bound |
+| device pixel ratio 2 (4x pixels) | 5.50 | 7.90 | 8.60 | savanna and driving barely move; only the empty desert pays (+2.5 ms) |
 | wildlife behaviour LOD (N1) | — | slower | 9.4 vs 9.1 | no win, parked |
 | **terrain refine OFF** | **5.20** | **5.00** | **8.10** | **the only real win: ~0.4-0.6 ms (~8 %)** |
 | refine rings 0-2 only | 5.80 | 5.00 | 8.60 | little — the 15 near chunks are the cost |
@@ -84,8 +84,9 @@ near-universal. Switching it off reproduces v0.1's histogram exactly.
 
 ### Consequences
 
-- **The render features are not the problem.** Everything the debug menu can
-  switch off is worth almost nothing here; an F9 "Low Details" mode built out of
+- **The render features are not the problem — on this headless machine.** (The
+  user's real hardware inverts this: docs/perf-277-user-hardware.md.) Everything
+  the debug menu can switch off is worth almost nothing here; an F9 "Low Details" mode built out of
   those switches would buy the user nothing on hardware like this.
 - **The p99 "hitch" trail was a measurement artifact.** A short 6 s sample once
   showed p99 38 ms; 12 s samples put every config at 12-13 ms with a single
@@ -141,8 +142,9 @@ Two things showed up the moment the benchmark measured geometry rather than
 render features:
 
 1. **The terrain lever really is worth its 2x.** With the refinement off, the
-   desert scene graph drops from **847 074 to 425 058** triangles — the v0.1
-   histogram of the table above, reproduced live and now switchable at runtime.
+   desert scene graph drops from **847 074 to 425 058** triangles — the
+   scene-graph terrain rows of the table above (847 076 → 425 114), reproduced
+   live and now switchable at runtime.
    (It also caught its own wiring bug: the first version passed the override
    under a mis-named key, so the lever silently did nothing while every test
    stayed green. The gate now asserts the RENDERED triangle drop, not the
@@ -160,7 +162,7 @@ render features:
    "flora/dressing" row and the growth read as flora. Splitting them by material
    at a fixed anchor over six round trips showed the **flora bit-stable** (206 946
    tris / 2 742 instances, IDENTICAL every trip) and the **wildlife instance count
-   climbing monotonically** (live animals 7 → 11 → 14 → 17 → 22, ~+12 per round
+   climbing monotonically** (live animals 7 → 11 → 14 → 17 → 22, ~+4 per round
    trip; the live enrichments check reproduced it as `samples:[7,11,14,17,22]`).
 
    **Root cause.** `keepStreamedAnimal` (design.md §19.4) re-homes a roamer whose
@@ -186,26 +188,11 @@ render features:
    dressing does not grow over a session at a fixed anchor (point 278)" in
    `scripts/verify/enrichments.mjs`.
 
-   **The fate of `feat/278-dressing-growth` — verdict, 30.07.2026 (point 329 (b)).**
-   The branch-cleanup of 25.07.2026 removed 133 merged branches and 26 orphaned
-   worktrees but held two back whose unmerged work had to be JUDGED rather than
-   deleted; this was the second of them, believed to carry an alternative fix plus
-   enrichments checks and pure tests that main might lack. It carries nothing main
-   lacks. Its tip was recovered from a dangling commit (`afab68d5`, 24.07. 10:15) —
-   the branch itself was already gone locally and from GitHub — and `git diff`
-   between that tip and main's `cc11bb1b` (24.07. 10:19, four minutes later) is
-   EMPTY: the same tree, re-committed onto main. Line by line, all 222 substantive
-   lines it added across the five files (the five `retainedSpawnChunks` cases, the
-   live enrichments gate, `Wildlife.tsx`, `wildlifeBehavior.ts` and this document)
-   are present in main verbatim. So there is no check to salvage, nothing landed, and
-   nothing to re-verify. Both branches of point 329 are now closed: (a) retired
-   unmerged with its lever moved to point 310, (b) closed as a duplicate of what
-   shipped.
-
 ## The campfire shadow map (point 289) — measured verdict, 24.07.2026
 
 The village fire light can cast a cube shadow map (design.md §19.10, debug
-toggle "Campfire shadows", OFF by default). Measured with the perf-bench
+toggle "Campfire shadows"; OFF by default when measured, level-driven since —
+see finding 4). Measured with the perf-bench
 method (vsync off, warm dev server, SOLO) but in the FIRST-PERSON Maasai
 village, standing at the fire pit — the state the feature affects; the travel
 anchors above never mount a fire. Wall-clock frame medians, 6 s samples,
@@ -224,19 +211,19 @@ Findings:
    within noise — the price is the ~170 extra draw calls of the SIX cube-face
    shadow passes (per-face frustum culling over the casters within the light's
    14 m range), not map fill. The shipped size is therefore 256 (quality is
-   free); a "cheap blob-shadow approximation" would buy nothing measurable and
-   was not built.
+   free). A "cheap blob-shadow approximation" was neither built nor measured.
 2. **Both backends carry it, zero console errors**, and the picture gate holds
    on both (`scripts/verify/polish.mjs`, screenshot 138: behind-stone vs
    beside-stone contrast 3–12 off, 40–58 on).
 3. **Affordability verdict (headless): acceptable as an OPT-IN, not as a
-   default.** +1.5 ms is real money on this rig (~8 % of a driving travel
-   frame), but it applies only inside villages, where the scene is otherwise
+   default.** +1.5 ms is real money on this rig (~17 % of the 8.70 ms driving
+   travel frame), but it applies only inside villages, where the scene is otherwise
    cheap (place scene ran 280–450 fps here with shadows off, ~190–270 fps on).
 4. **The user's hardware gives the real verdict** — its budget is fill-rate and
    post (see docs/perf-277-user-hardware.md), and six small cube-face passes
    are draw/geometry work, exactly what that GPU shrugs at, so the expected
    real-world cost is well under the headless number. The F8 benchmark routes
    only bird's-eye states and cannot price a settlement feature: judge it with
-   the FPS counter standing at a village fire, toggle on vs off. If it proves
-   cheap, making it the default is a one-flag change (`fireShadowsEnabled`).
+   the FPS counter standing at a village fire, toggle on vs off. It has since
+   become level-driven: off on low, the 256² map on medium (the default level),
+   512² on high (design.md §19.10, `src/config/quality.ts`).
