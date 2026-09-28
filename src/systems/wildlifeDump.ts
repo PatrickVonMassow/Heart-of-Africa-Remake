@@ -16,9 +16,10 @@
 //   - a radius around the traveller and a cap per list, BOTH named in the
 //     dumped section (`bounds`) together with the totals, so a reader sees
 //     what was cut off rather than reading a truncated list as complete;
-//   - every list is sorted by a stable key (distance, then species, then x/z
-//     — all rounded values from the entry itself), never by the iteration
-//     order of the herd arrays, which a hunt, a cull or a re-home reshuffles.
+//   - the animal and carcass lists are sorted by a stable key (distance, then
+//     species, then x/z — all rounded values from the entry itself), never by
+//     the iteration order of the herd arrays, which a hunt, a cull or a re-home
+//     reshuffles; the flock list keeps the pool's own index order.
 
 /** Traveller-centred radius (world units) the section reports animals within.
  *  The on-screen ring is 100 × zoom (default zoom 0.5 → 50), so this covers
@@ -27,7 +28,8 @@
 export const WILDLIFE_DUMP_RADIUS = 120
 
 /** Maximum entries per list (animals, carcasses, flocks). Keeps the report
- *  small in a dense herd; the omitted count is reported beside it. */
+ *  small in a dense herd; the omitted count is reported beside the animal and
+ *  carcass lists (the flock pool is far smaller than the cap). */
 export const WILDLIFE_DUMP_CAP = 80
 
 /** The animal fields this section reads — a structural subset of the travel
@@ -45,7 +47,6 @@ export interface WildlifeAnimalLike {
   lionFed?: boolean
   plague?: boolean
   remnant?: boolean
-  gone?: boolean
   caught?: number
   inWater?: number
   wadeTime?: number
@@ -57,8 +58,8 @@ export interface WildlifeAnimalLike {
   grief?: number
   separated?: number
   drink?: { tx: number; tz: number }
-  crossing?: { tx: number; tz: number; time: number }
-  vigil?: { x: number; z: number; time: number }
+  crossing?: { tx: number; tz: number }
+  vigil?: { x: number; z: number }
   rescueEntry?: { x: number; z: number }
   mournAt?: { x: number; z: number }
   plungeTo?: { x: number; z: number }
@@ -79,7 +80,7 @@ export interface WildlifeFlockLike {
 }
 
 /** The single scripted hunt (design.md §19.3). */
-export interface WildlifeHuntLike {
+interface WildlifeHuntLike {
   mode: string
   lx: number
   lz: number
@@ -99,13 +100,13 @@ export interface WildlifeSource {
 }
 
 /** Where an animal is headed, with the reason it is headed there. */
-export interface WildlifeTarget {
+interface WildlifeTarget {
   kind: string
   x: number
   z: number
 }
 
-export interface WildlifeAnimalEntry {
+interface WildlifeAnimalEntry {
   /** `zebra@12.3,-45.6` — names this body across the lists (flock, hunt). */
   id: string
   species: string
@@ -123,7 +124,7 @@ export interface WildlifeAnimalEntry {
   childAt?: { x: number; z: number }
 }
 
-export interface WildlifeFeeder {
+interface WildlifeFeeder {
   kind: 'vultureFlock' | 'predator' | 'crocodile'
   /** Pool index of the flock, for a vulture feeder. */
   flock?: number
@@ -132,7 +133,7 @@ export interface WildlifeFeeder {
   mode?: string
 }
 
-export interface WildlifeCarcassEntry {
+interface WildlifeCarcassEntry {
   id: string
   species: string
   x: number
@@ -143,11 +144,12 @@ export interface WildlifeCarcassEntry {
   lionFed?: boolean
   plague?: boolean
   remnant?: boolean
-  /** Who is feeding on it right now. */
+  /** Who is bound to it: its owning flock (landed or not), the hunt's
+   *  predator, a gripping crocodile — not necessarily feeding this instant. */
   feeders: WildlifeFeeder[]
 }
 
-export interface WildlifeFlockEntry {
+interface WildlifeFlockEntry {
   /** Pool index — the flock list is ordered by it, never by a Map. */
   index: number
   mode: string
@@ -160,7 +162,7 @@ export interface WildlifeFlockEntry {
   carcass: { id: string; species: string; x: number; z: number } | null
 }
 
-export interface WildlifeHuntEntry {
+interface WildlifeHuntEntry {
   mode: string
   predator: string
   prey: string
@@ -212,7 +214,7 @@ export function setWildlifeDumpSource(fn: SourceGetter | null): void {
 }
 
 /** The live source, or null outside the travel scene. */
-export function readWildlifeDumpSource(): WildlifeSource | null {
+function readWildlifeDumpSource(): WildlifeSource | null {
   return source ? source() : null
 }
 
@@ -261,8 +263,9 @@ function targetOf(a: WildlifeAnimalLike): WildlifeTarget | null {
   return null
 }
 
-/** Distance, then species, then x/z — a total order over the rounded values
- *  the entry itself carries, so two dumps of one state list identically. */
+/** Distance, then species, then x/z — an order over the rounded values the
+ *  entry itself carries, so two dumps of one state list identically; entries
+ *  equal on all four (one spot to the centimetre) keep their herd order. */
 function byDistance(
   a: { dist: number; species: string; x: number; z: number },
   b: { dist: number; species: string; x: number; z: number },
@@ -285,7 +288,7 @@ function emptyDump(
       radius,
       capPerList: cap,
       origin: { x: r2(origin.x), z: r2(origin.z) },
-      note: `animals within ${radius} world units of the traveller, at most ${cap} entries per list, nearest first`,
+      note: `animals within ${radius} world units of the traveller, at most ${cap} entries per list, animals and carcasses nearest first, flocks by pool index`,
     },
     active,
     counts: {
@@ -312,7 +315,7 @@ function emptyDump(
  * position and a source — the registry is only how the scene hands its live
  * state over.
  */
-export function collectWildlife(
+function collectWildlife(
   origin: { x: number; z: number },
   src: WildlifeSource | null,
   opts: { radius?: number; cap?: number } = {},
