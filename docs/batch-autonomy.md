@@ -4,8 +4,9 @@ Goal: the autonomous TASKS batch keeps working through open points until the bat
 is **done** or the user **explicitly pauses** it — surviving idle turns, crashes,
 session limits, and reboots. This document is the FULL failure-mode analysis
 (instead of patching one hole at a time). It lists every scenario in which
-progress could stop, what handles it, and the single residual that is genuinely
-outside the agent's control.
+progress could stop, what handles it, and the residuals that are genuinely
+outside the agent's control (the S-12 state below and the host-level arming
+residuals named in the failure table).
 
 ## Human-wait inventory and standing autonomy rule (23.08.2026)
 
@@ -52,17 +53,17 @@ not permission to fold their implementation into this policy-only point.
 |---|---|---|---|
 | P1 | A valid clocked `.claude/batch-paused` record is classified as `wait`; every guard and launcher stands down until `retry-after` (`scripts/batch-pause-core.mjs`, `scripts/batch-lock.mjs`, `scripts/batch-autostart.mjs`). | **Self-recovery.** The launcher rechecks the clock, removes the expired record, clears the failure count, and attempts an ordinary singleton-protected start. | **In place:** point 445. |
 | P2 | An expired clock is classified as `retry`; a successful spawn clears `pauseAttempt` (`scripts/batch-pause-core.mjs`, `scripts/batch-autostart.mjs`). | **Self-recovery.** Resume immediately; success resets the ladder. | **In place:** point 445. |
-| P3 | A legacy/empty marker, `retry-after: never`, or an unreadable clock is classified as clockless `hold` (`scripts/batch-pause-core.mjs`, `scripts/batch-pause.mjs`, `scripts/pause-retry-drill.mjs`). | **Recorded default.** Preserve only a typed `user-stop`. For an untyped, legacy, or malformed record, snapshot it in the decision card, choose continuation, replace it atomically with a short recovery clock, and let the launcher retry. | **Follow-up point — Typed pause recovery:** migrate untyped records and distinguish a proven user stop from corrupt metadata. |
-| P4 | `serving-model`, `awaiting-user`, and `retries-exhausted` are clockless causes (`CLOCKLESS_CAUSES` in `scripts/batch-pause-core.mjs`). | **Split by cause.** A proven `user-stop` remains held. `serving-model` uses an allowed fallback and scheduled probes; `awaiting-user` uses the advisory/confirmation split U1–U3; an exhausted ladder keeps probing at its capped interval and never turns elapsed time into a human gate. | The advisory/confirmation split is **in place:** point 864 (Advisory decision defaults); the rest are **Follow-up points — Typed pause recovery and Failure-lane retry.** |
+| P3 | A legacy/empty marker, `retry-after: never`, or an unreadable clock was classified as clockless `hold` before point 865 (`scripts/batch-pause-core.mjs`, `scripts/batch-pause.mjs`, `scripts/pause-retry-drill.mjs`). | **Recorded default.** Preserve only a typed `user-stop`. For an untyped, legacy, or malformed record, snapshot it in the decision card, choose continuation, replace it atomically with a short recovery clock, and let the launcher retry. | **In place:** point 865 (Typed pause recovery). |
+| P4 | `serving-model`, `awaiting-user`, and `retries-exhausted` were clockless causes; `CLOCKLESS_CAUSES` in `scripts/batch-pause-core.mjs` now holds only `user-stop`. | **Split by cause.** A proven `user-stop` remains held. `serving-model` uses an allowed fallback and scheduled probes; `awaiting-user` uses the advisory/confirmation split U1–U3; an exhausted ladder keeps probing at its capped interval and never turns elapsed time into a human gate. | **In place:** points 864 (Advisory decision defaults), 865 (Typed pause recovery) and 866 (Failure-lane retry). |
 | P5 | The runaway watchdog writes a clocked pause after repeated no-progress spawns; after three wakes it stays on the three-hour cap and records that scheduling choice (`scripts/batch-autostart-core.mjs`, `scripts/batch-autostart.mjs`). | **Self-recovery.** Each wake runs the existing evidence/preflight/doctor path; capped probes repeat instead of parking forever. | **In place:** point 866 (Failure-lane retry), on point 445's clock. |
 | P6 | A repeated child `429`/`5xx`/network signature yields `outage-probe`; every non-transient, completed, changed, or spent-budget outcome yields a clocked `recover` choice (`scripts/child-retry-core.mjs`, `scripts/child-retry.mjs`, `docs/batch-resilience.md`). | **Self-recovery plus recorded default.** Branch evidence chooses resume/fix/exchange. A spent point is re-opened when critical and otherwise requeued; the persistent retry state and board card record the choice for veto while the rest of the queue continues. | **In place:** point 866 (Failure-lane retry). |
 | P7 | At the alert ladder ceiling, the point-860 closed corruption list contains only `repository-integrity`; generic alerts `continue-and-record`, while corruption runs `batch-doctor --repair` and stays on the two-hour probe rung (`scripts/alert-escalation-core.mjs`, `scripts/alert-escalation.mjs`). | **Self-recovery.** Doctor quarantine/repair is named in the decision record; ordinary work does not cross an uncleared corruption finding, and the clock never becomes a human handoff. | **In place:** point 860's closed list and point 866's corruption recovery. |
 | P8 | The serving-model tripwire records a trusted-lane handoff; only transcript proof from the recorded allowed lane advances the baseline, and an unavailable route gets a typed 20-minute probe (`scripts/model-handoff-core.mjs`, `scripts/model-guard.mjs`). | **Self-recovery.** Never let the suspect model bless itself. The handoff state records the target, offending trailers, next attempt and veto route. | **In place:** point 866 (Failure-lane retry). |
-| U1 | `AWAITING-USER` makes an open point non-commissionable; only `USER-ANSWERED` currently clears it (`scripts/user-gate-core.mjs`, `scripts/board-queue-core.mjs`, `scripts/board-queue.mjs`, `scripts/batch-in-flight-core.mjs`, `scripts/defer-for-user.mjs`). | **Recorded default for advisory choices.** Decide from the brief and repository evidence, record a `SELF-DECIDED` result plus veto card, and keep the point workable. Do not create an advisory `AWAITING-USER` gate. | Policy changes **in place here**; marker, queue, CLI, and card wiring are **in place:** point 864 (Advisory decision defaults). |
+| U1 | Before point 864, `AWAITING-USER` made an open point non-commissionable until `USER-ANSWERED` cleared it; now only a typed `AWAITING-CONFIRMATION` gates, and a legacy `AWAITING-USER` never gates (`scripts/user-gate-core.mjs`, `scripts/board-queue-core.mjs`, `scripts/board-queue.mjs`, `scripts/batch-in-flight-core.mjs`, `scripts/defer-for-user.mjs`). | **Recorded default for advisory choices.** Decide from the brief and repository evidence, record a `SELF-DECIDED` result plus veto card, and keep the point workable. Do not create an advisory `AWAITING-USER` gate. | Policy changes **in place here**; marker, queue, CLI, and card wiring are **in place:** point 864 (Advisory decision defaults). |
 | U2 | If every open point is gated, the resume hook reports no workable point and the progress guard permits a whole-batch pause (`scripts/batch-resume-hook-core.mjs`, `scripts/batch-resume-hook.mjs`, `scripts/batch-progress-guard.mjs`). | **Recorded default.** Resolve every advisory gate by U1. A queue may be entirely gated only when every remaining next act satisfies U3; it is then a set of explicit confirmations, not an accidental batch pause. | **In place:** point 864 (Advisory decision defaults) — an all-advisory queue yields a workable point; the parallel-remediation decision in `scripts/batch-singleton.mjs` remains D2. |
-| U3 | The same marker currently represents both an advisory question and a true confirmation. | **Retained confirm gate, narrowly typed.** A point may wait only when its next act is outward-facing/hard to reverse and not durably authorized. The reason must name that act and the safe prepared state; unrelated work continues. | Policy changes **in place here**; typed `AWAITING-CONFIRMATION` enforcement is **in place:** point 864 (Advisory decision defaults). |
+| U3 | Before point 864 one marker represented both an advisory question and a true confirmation; `SELF-DECIDED` and `AWAITING-CONFIRMATION` now separate them. | **Retained confirm gate, narrowly typed.** A point may wait only when its next act is outward-facing/hard to reverse and not durably authorized. The reason must name that act and the safe prepared state; unrelated work continues. | Policy changes **in place here**; typed `AWAITING-CONFIRMATION` enforcement is **in place:** point 864 (Advisory decision defaults). |
 | U4 | Existing untyped `AWAITING-USER` markers may predate this split. | **Recorded default.** Migrate a marker to confirmation only when its recorded reason itself names a U3 act; otherwise choose and record the reversible default. Ambiguity falls toward continuation, not confirmation. | **In place:** point 864 (Advisory decision defaults), including the `--migrate` report command. |
-| C1 | A reply that asks a decision without a matching “Von dir zu klären” card is Stop-blocked (`evaluate` in `scripts/decision-card-guard-core.mjs`). | **Mechanical recovery.** Add the card or rewrite the rhetorical/self-answerable question. This guard records communication; it does not authorize waiting. After the follow-up, an advisory card carries the default already taken. | Card remedy **in place** (point 421); semantic change rides **Follow-up point — Advisory decision defaults**. |
+| C1 | A reply that asks a decision without a matching “Von dir zu klären” card is Stop-blocked (`evaluate` in `scripts/decision-card-guard-core.mjs`). | **Mechanical recovery.** Add the card or rewrite the rhetorical/self-answerable question. This guard records communication; it does not authorize waiting. An advisory card carries the default already taken. | Card remedy **in place** (point 421); semantic change **in place:** point 864 (Advisory decision defaults). |
 | C2 | On each user message, standing cards must be removed or explicitly kept; carried answers must be applied by the owner (`evaluateCardReviews` / `evaluateCarriedAnswers` in `scripts/decision-card-guard-core.mjs`). | **Mechanical recovery.** Apply/remove/keep from the message and evidence. No further user response is required, so these blocks remain as machine duties. | **In place:** point 421 and its carried-answer extension. |
 | C3 | Generic alert ceilings create `Entscheidungsprotokoll:` cards while continuing (`continuationDecisionCard` in `scripts/alert-escalation-core.mjs`). | **Recorded default.** This is the reference lane: continue first, retain the evidence and retroactive veto on the board. | **In place:** point 860. |
 | C4 | A standing “Von dir zu klären” card plus an `AWAITING-USER` marker can park that point indefinitely; a card without the marker is informational and does not block queue selection (`scripts/board-queue-core.mjs`, `scripts/dashboard-guard-core.mjs`, `scripts/vdzk-admissibility-core.mjs`). | **Recorded default or narrow confirm.** Advisory cards become C3-style decision records; only a question selecting one of the closed user-owned categories may remain open, and only U3 cards retain a point gate. | **In place:** points 864 (Advisory decision defaults) and 946 (typed card admissibility). |
@@ -204,7 +205,7 @@ The five code points above are filed in the work order as points 864-868, in the
 same bundle as this inventory. They stay separate because they own different
 state and failure directions:
 
-- **Typed pause recovery** (point 865) owns the pause-record schema, legacy migration, and
+- **Typed pause recovery** (point 865, shipped) owns the pause-record schema, legacy migration, and
   the invariant that only a proved `user-stop` is clockless.
 - **Advisory decision defaults** (point 864, shipped) owns question classification,
   `SELF-DECIDED` / `AWAITING-CONFIRMATION`, queue eligibility, and the veto-card
@@ -217,7 +218,7 @@ state and failure directions:
   installed ahead of absence; it must not grant a running session general
   elevation.
 
-Until those code points land, this policy changes operator behaviour immediately:
+Until points 867 and 868 land, this policy changes operator behaviour immediately:
 do not create a new advisory gate; do not treat a card as permission to idle; do
 not turn a spent retry ladder into “wait for the user”; and do not ask the user to
 perform a machine-remedy step. Existing guards remain safety evidence, and an
@@ -230,8 +231,11 @@ agent must not bypass them—the follow-up changes their state transitions.
    is absent, it **hard-blocks the turn from ending** — the agent must continue
    the next item (waiting on a validation by polling within the turn, never by
    yielding to idle). It also refreshes the lock heartbeat (below) each turn-end.
-   Since 27.07.2026 it makes ONE exception, the point boundary — see the section
-   further down. Fail-open: any error → allow (a guard bug can never freeze the
+   It lets the turn end in named cases only: a committed boundary (the point
+   boundary since 27.07.2026, and the `--context` watermark handover), an
+   honoured claim's release, and a wait on provably running declared work
+   (`allow-boundary`, `allow-release`, `allow-in-flight` in
+   `scripts/batch-singleton.mjs`) — see the sections further down. Fail-open: any error → allow (a guard bug can never freeze the
    session).
 2. **Recurring heartbeat cron** (this-session only). Fires every ~15–20 min while
    the REPL is idle and re-invokes the agent. A backstop for a live session whose
@@ -261,7 +265,9 @@ agent must not bypass them—the follow-up changes their state transitions.
    heartbeat AND a real OS pid check — a live claude process blocks takeover no
    matter how stale the heartbeat (a long tool call starves the heartbeat, not the
    process), and a reboot alone is never death while a fresh post-boot heartbeat
-   exists. Since 28.07.2026 the owner's DECLARED WORK is a third input: a silent
+   exists (the 24.07.2026 rule; since point 434 ownership is a LEASE, and an
+   expired lease is taken over when the pid is dead or the declared work is not
+   advancing — see *Taking the boundary*, item 3). Since 28.07.2026 the owner's DECLARED WORK is a third input: a silent
    session whose delegated agent is still committing reads alive, and only a stall
    — nothing moving for six ticks, with the declaration still the owner's last
    word — reads wedged (see "Liveness is judged by PROGRESS" below). The spawn itself goes through the SAME atomic acquire (a
@@ -320,7 +326,7 @@ agent must not bypass them—the follow-up changes their state transitions.
    gates a version tag and the single tick that claims a closing, and no guard
    ever read a point's "counts as delivered when the rate is MEASURED, not when
    the mechanism runs" — with `scripts/measure-context-cost.mjs` sitting in the
-   tree, used by no gate. So a point could be ticked because it FELT finished,
+   tree, then used by no gate. So a point could be ticked because it FELT finished,
    the class this project's core lesson forbids. A point that wants better writes
    one machine-readable line — `PROOF:` followed by the command whose run must be
    recorded — and its `[ ]`→`[x]` tick is refused until that run is recorded FOR
@@ -341,19 +347,19 @@ agent must not bypass them—the follow-up changes their state transitions.
 | 2 | Live session, Stop-hook not yet active (added mid-session) | (2) heartbeat cron re-invokes on idle | none (in-session) |
 | 3 | Session crashes / is closed, PC stays on | (4) scheduler resurrects ≤15 min | none |
 | 4 | API/usage limit reached → session dies | (4) the refusal is recognised by its own signature and treated as a WAITING state (point 444): no `failCount`, no pause file, and a probe in every ordinary 15-min tick — so work resumes within one tick of the reset instead of behind a backoff ladder that had climbed to two hours and a runaway brake that had paused the batch | the limit window itself (unavoidable); every probe and the moment work resumed are logged, so the reset rhythm is measured rather than assumed |
-| 5 | Normal reboot, user logs in | (4) task persists + `StartWhenAvailable` + boot-time check → resurrects promptly after login | none beyond the login itself |
-| 6 | **Forced Windows-Update reboot** | same as #5: the task survives the update; after the user logs back in it resurrects promptly (boot-time check makes the stale-but-recent lock read as dead) | **the user must log in** — see the one true residual below |
+| 5 | Normal reboot, user logs in | (4) task persists + `StartWhenAvailable` + boot-time check → resurrects promptly after login (Windows task; the Linux container needs its entrypoint arming, see mechanism 4) | none beyond the login itself |
+| 6 | **Forced Windows-Update reboot** | same as #5: the task survives the update; after the user logs back in it resurrects promptly (boot-time check makes the stale-but-recent lock read as dead) | **the user must log in** — see "The two true residuals" below |
 | 7 | Power loss / hard crash | same as #5/#6 (boot-time check) | user login |
-| 8 | Two sessions (scheduler + a manually opened one) | the HARD SINGLETON (`scripts/batch-singleton.mjs`, 24.07.2026): atomic test-and-set acquire (exactly one winner, proven by real process races), pid-backed liveness (no false-dead under long tool calls), stand-down gates in EVERY guard for non-owners, and the active parallel-session detector with auto-remediation (launcher kills its own rogue spawn; the owner is blocked into `scripts/batch-doctor.mjs` verification). Full analysis: `docs/batch-singleton-analysis.md` | none — a second session refuses to act even if it exists |
-| 9 | A guard has a bug / throws | all guards are **fail-open** (error → allow) so they can never freeze the session; the scheduler still backstops the idle case | none |
+| 8 | Two sessions (scheduler + a manually opened one) | the HARD SINGLETON (`scripts/batch-singleton.mjs`, 24.07.2026): atomic test-and-set acquire (exactly one winner, proven by real process races), pid-backed liveness (no false-dead under long tool calls; since point 434 a lease with corroborated takeover, see *Taking the boundary*, item 3), stand-down gates in EVERY guard for non-owners, and the active parallel-session detector with auto-remediation (launcher kills its own rogue spawn; the owner is blocked into `scripts/batch-doctor.mjs` verification). Full analysis: `docs/batch-singleton-analysis.md` | none — a second session refuses to act even if it exists |
+| 9 | A guard has a bug / throws | guards are **fail-open** by default (error → allow) so they can never freeze the session — a guard that deliberately refuses on a failure (such as the fence chokepoint) says so in its own section; the scheduler still backstops the idle case | none |
 | 10 | The CLI moved — an app update, or a different host entirely | `resolveClaudeCli` (point 490): explicit `HOA_CLAUDE_CLI` → newest bundled Windows `claude.exe` → `PATH` → the usual install dirs, each candidate checked to exist. The Windows-only lookup cost three silent hours the night the batch moved to Linux | none — and a resolver that finds nothing now names the platform and what it searched |
-| 11 | Batch stuck on one item (needs data / a user decision) | the current guard says “pick a DIFFERENT open item”; if all are user-gated it can still leave no workable item | the binding inventory U1–U4 replaces advisory gates with recorded defaults; only narrowly typed confirmations may remain unworkable |
-| 12 | The launcher is gone (the scheduled task deleted, the daemon never started or killed) | on Linux the session re-arms it itself (`node scripts/batch-launcher.mjs --start`); on Windows the task must be re-created | Windows only: the agent cannot create a scheduled task — re-create it with the command below |
-| 13 | Session ENDS at a point boundary (27.07.2026, deliberate — the context is the batch's dominant cost) | (4) the launcher spawns the successor once the old pid is provably dead; `batch-progress-guard` allows the stop only against a verified-closed point AND an armed task | a few idle minutes per point, traded for a fresh context |
+| 11 | Batch stuck on one item (needs data / a user decision) | the guard says “pick a DIFFERENT open item”; since point 864 an advisory gate is a recorded default, so an all-advisory queue still yields a workable item | only narrowly typed confirmations (U3) may remain unworkable |
+| 12 | The launcher is gone (the scheduled task deleted, the daemon never started or killed) | on Linux the session re-arms it itself (`node scripts/batch-launcher.mjs --start`); on Windows the task must be re-created | Windows only: the agent cannot create a scheduled task — re-create it with `scripts/windows/setup-boot-path.ps1` (see *The boot path* below) |
+| 13 | Session ENDS at a point boundary (27.07.2026, deliberate — the context is the batch's dominant cost) | (4) the launcher spawns the successor once the old pid is provably dead; `batch-progress-guard` allows the stop only against a verified-closed point (or a measured `--context` watermark reading) AND an armed task | a few idle minutes per point, traded for a fresh context |
 | 14 | The launcher is DISABLED while the boundary is in use | the guard reads the launcher's REAL state each time — the task's `State` on Windows, the daemon's own record on Linux, both in one ready/running/disabled/unknown vocabulary — and blocks the stop when it is not armed (`unknown` counts as unarmed), so the session keeps working instead of stranding the batch | Windows: the user must re-arm it (`Enable-ScheduledTask`, elevated). Linux: the session re-arms it itself |
-| 15 | **The RUNTIME kills the session for waiting on a delegated agent** (28.07.2026, four deaths in one afternoon) | the spawn carries `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0`, so a `claude -p` waits indefinitely for its background tasks instead of terminating at 600 s; what bounds a wait instead is PROGRESS — see the section below | none for a healthy wait; a genuinely frozen one is reported and taken over after six launcher ticks (90 min), and only while the declaration is the owner's last word |
+| 15 | **The RUNTIME kills the session for waiting on a delegated agent** (28.07.2026, four deaths in one afternoon) | the spawn carries `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0`, so a `claude -p` waits indefinitely for its background tasks instead of terminating at 600 s; what bounds a wait instead is PROGRESS — see the section below | none for a healthy wait; a genuinely frozen one is reported and taken over once its lease (60 min, or 4 h under a declared wait) has expired and a corroborating signal comes back negative — see *Taking the boundary*, item 3 |
 | 16 | The user writes from the phone and NOTHING is running (29.07.2026) | (5) the watcher wakes a light responder within seconds under a bounded claim; if the watcher is itself down, (4) still delivers the message into the next spawn prompt | ≤ 15 min in the watcher-down case — the pre-watcher bound, never worse |
-| 17 | **A pause parks the batch and nobody is there to clear it** (point 445) | the park RECORDS its reason and a RETRY-AFTER; the launcher tick resumes the batch when that clock runs out, notes the attempt and clears the `failCount` that caused the park — see below | only a proved explicit user stop may remain clockless; inventory P3–P8 names the code follow-ups for today's other holds |
+| 17 | **A pause parks the batch and nobody is there to clear it** (point 445) | the park RECORDS its reason and a RETRY-AFTER; the launcher tick resumes the batch when that clock runs out, notes the attempt and clears the `failCount` that caused the park — see below | only a proved explicit user stop may remain clockless; inventory P3–P8 are in place (points 864–866) |
 
 ### Every park carries a restart clock (point 445)
 
@@ -370,29 +376,30 @@ and reads the file; the launcher tick (`scripts/batch-autostart.mjs`) is what ac
   cleared (left standing, the runaway brake would re-pause in the same tick and the
   clock would have bought nothing) and the tick proceeds to its ordinary spawn
   decision — through the singleton and the claim, so a retry can never double-spawn;
-- **no clock at all →** it parks until a human clears it. Every marker an older
-  session wrote reads this way: a MISSING clock is never read as an expired one.
+- **no clock at all →** only a typed `user-stop` that quotes the user parks until a
+  human clears it. An untyped, legacy or malformed record is snapshotted into a
+  decision card and replaced by a short recovery clock (point 865): a MISSING clock
+  is never read as an expired one.
 
 Each further park climbs the ladder — 20 min, 1 h, 3 h — and after the last rung it
-becomes clockless, because a cause that survived three retries needs a person. The
+keeps probing at the three-hour cap (point 866) instead of turning into a human gate. The
 rung is counted PER SPELL and shared by every writer: `setPaused` takes it from the
 launcher's `pauseAttempt`, which is cleared together with `failCount` the moment a
 spawn makes progress. Both halves matter — a counter that never reset would make
 every park clockless for ever after three retries in the machine's whole history, and
 a counter only the launcher's own parks carried would leave an unanswered alert or a
 standing outage oscillating at rung 1 all night (four-eyes review, Fable 5).
-**In the current implementation, parking without a clock is a short, written-down list**
-(`CLOCKLESS_CAUSES`): a serving model outside the CLAUDE.md §6 allowlist (retrying
-only spawns the same degraded session — where a fallback exists, the §6 chain runs
-instead of parking at all), the user's own stop, a queue in which every open point
-waits on a user decision, and a ladder already spent. Proof: the decision in
+**In the current implementation, parking without a clock is a one-entry list**
+(`CLOCKLESS_CAUSES`): the user's own typed stop. A serving model outside the
+CLAUDE.md §6 allowlist runs the fallback chain or probes on a clock (P8), an
+all-advisory queue stays workable (U2), and a spent ladder keeps probing (P5). Proof: the decision in
 `scripts/batch-pause-core.test.mjs`, the wiring in `scripts/batch-autostart.test.mjs`,
 and `node scripts/pause-retry-drill.mjs` — which parks with a 60-second clock, waits
 it out on the real wall clock and asserts that the next real tick resumes. The drill
 runs against its own record under `local/` through the launcher's side-effect-free
 `--pause-report` mode, so it never spawns a session and never touches the live park.
-Inventory P3–P8 is the forward rule: the list contracts to a typed `user-stop`;
-the other entries gain durable recovery clocks and do not terminate on a person.
+Inventory P3–P8 records how the list contracted to a typed `user-stop` (points
+864–866); the former entries now carry recovery clocks and do not terminate on a person.
 
 ## The hard singleton (24.07.2026 — replaces the advisory lock)
 
@@ -405,7 +412,7 @@ from advisory claim-and-check to a HARD mutual exclusion in
   start time, pid-reuse-proof); dead = provably dead (dead/reused pid,
   heartbeat predating the boot, or a very stale legacy lock). A live pid with a
   stale heartbeat is ALIVE — the old 12-min age window read exactly that state
-  as dead and double-spawned.
+  as dead and double-spawned. Since point 434 ownership is a LEASE, and an expired lease is taken over when the pid is dead or the declared work is not advancing (point 556; see *Taking the boundary*, item 3).
 - **Atomic acquisition.** First claim by exclusive `'wx'` create; takeover of a
   dead lock under an mkdir reap-mutex with re-verification inside — two racing
   starters resolve to exactly one winner (tested with real processes).
@@ -478,7 +485,7 @@ from advisory claim-and-check to a HARD mutual exclusion in
 - **NOTHING MAY OPEN A CONSOLE WINDOW (point 401, user report 28.07.2026: "es
   poppen immer wieder Konsolenfenster auf, die mir den Fokus stehlen").** On Windows
   a child console process gets a NEW console window unless `CREATE_NO_WINDOW` is
-  set, which in Node is `windowsHide: true`. Only 7 script files set it; every member
+  set, which in Node is `windowsHide: true`. At the time only 7 script files set it; every member
   of the Stop chain that shells out to git did not — and the Stop chain runs at EVERY
   turn end with several git calls per guard, so a turn ended in dozens of window
   flashes. Two causes, both measured:
@@ -600,11 +607,11 @@ How it works:
    (`scripts/context-watermark.mjs`, read from the session's own transcript — an
    unobtainable reading fails loudly, never silently) the guard demands the same
    two-phase handover with `--context` in place of a point, and the board card
-   names the watermark as the reason. Since point 700 the watermark BINDS during
+   names the watermark as the reason. Since point 700 the watermark CAN bind during
    the turn, not only at its end: a PreToolUse fence
    (`scripts/context-fence-guard.mjs`, pure core `context-fence-core.mjs`)
-   measures the owner's context on every state-changing call and DENIES the
-   ones that would START a new unit of work past its OWN, lower 110k REFUSAL
+   measures the owner's context on every state-changing call and, when armed
+   (see the default below), DENIES the ones that would START a new unit of work past its OWN, lower 110k REFUSAL
    MARK (split from the handover mark by point 758: ending late is cheap, the
    boundary still fits; refusing early forbids work a session could still do) —
    spawning a
@@ -675,8 +682,9 @@ asymmetry decides it.
 
 Point 373 is delivered by a MEASUREMENT, not by a mechanism ("the point counts as
 delivered when the rate is measured, not when the mechanism runs"), and the command
-that measures it is `node scripts/measure-context-cost.mjs` — so the figures below can
-be re-derived rather than believed. It reads the transcripts, splits them at the moment
+that measures it is `node scripts/measure-context-cost.mjs` — so the figures below could
+be re-derived rather than believed while their transcripts existed (they are gone
+since; see the 09.08.2026 restatement). It reads the transcripts, splits them at the moment
 the boundary FIRST fired (`.claude/boundary.log`, 28.07.2026 08:56Z) and weights each
 turn's billed tokens into one comparable number (`COST_WEIGHTS`; a PROXY, stated as
 one, not a bill).
@@ -730,7 +738,8 @@ Carried through the 1.11 %/h anchor the 30.07.2026 state was measured at:
 the ~0.6 %/h that fits the quota, **the criterion is NOT met in either scope** — the
 honest number is the full one, 0.988 %/h, still about 1.6× the ceiling. Nor is the
 1.11 %/h anchor itself safe any more: measured in the full scope, the top-level count
-captures only **42 % of the weighted spend**, so the historical anchors understate the
+captures only **42 % of the weighted spend** (first-line fold, before the 09.08.2026
+correction below), so the historical anchors understate the
 real rate by roughly the same factor.
 
 **RESTATED 09.08.2026 after a measurement fix, and it barely moves.** The fold
@@ -759,18 +768,22 @@ that regime equals the state measured on 30.07.
 
 What the levers did buy is visible per session: the median peak context in the full
 scope fell from 180k to 153k and the share of sessions ever crossing 150k from 57.9 %
-to 54.9 %, while the large-context share of the spend fell from 78.6 % to 71.4 %. The
+to 54.9 %, while the large-context share of the spend fell from 77.2 % to 69.8 %
+(corrected fold). The
 shape of the finding is unchanged from 30.07 — the bill is roughly linear in the live
 context, and trimming the peak moves it only a little. **The next lever must therefore
 be chosen by measurement, and the scope figure points at which one:** with 62 % of the
-turns and 58 % of the spend coming from delegated agents, option (b) — moving the
+turns and 58 % of the spend (first-line fold) coming from delegated agents, option (b) — moving the
 reading-heavy part of a point into an agent so the parent never carries the files —
 only relocates the cost unless the AGENT's context is bounded too. Option (c), an
 explicit per-point context budget with a written handoff, is the one that cuts inside
 both.
 
-**A TAKEN BOUNDARY IS WITHDRAWN BY WORK — AND A PAGER IS NOT WORK (point 426).** The
-marker is withdrawn by any tool call that reads as continuing the batch, which is
+**A TAKEN BOUNDARY IS WITHDRAWN BY WORK — AND A PAGER IS NOT WORK (point 426).** Before
+the two-phase boundary of point 675, the marker was withdrawn by any tool call that
+read as continuing the batch; a COMMITTED marker is now sealed instead (a later
+mutation is denied; only `--clear` or the user's prompt withdraws it). The rule below
+still decides which calls count as work, which is
 correct (working is proof the session is not finished) and is judged by
 `handoverSurvivesCall` → `isClosingSetCommand`: the command line is split at its
 separators and EVERY segment must be a closing-set script. On 29.07.2026 that cost a
@@ -847,22 +860,24 @@ Three changes, and none of them loosens the singleton:
    moment the guard ALLOWS the stop, and only there, it marks the lock
    `handedOver` (`markHandover`). `assessOwner` then reads that lock as free, and
    the launcher's next tick spawns the successor even though the pid still lives.
-   The three properties that keep the singleton intact:
+   The properties that keep the singleton intact:
    - It is written in exactly ONE place, the `allow-boundary` branch, which is
      reached only after a fresh session-bound marker, a point the work order
-     confirms closed and an armed launcher. A crash, a wedge or an ordinary turn
+     confirms closed (or a measured `--context` watermark reading) and an armed launcher. A crash, a wedge or an ordinary turn
      end never reaches it.
    - It is **withdrawn the moment the session goes back to WORK**: `heartbeat()`
      deletes the fields on a tool call, a PreToolUse withdrawal (piggy-backed
      on `board-first-guard`, whose matcher already covers every state-changing
      tool) clears it BEFORE a long call starts, and the UserPromptSubmit hook
      clears it on the user's first word — earlier than any tool call, and it
-     arrives even in a turn that never makes one. That matters because sixteen
+     arrives even in a turn that never makes one. That matters because the other
      Stop hooks run after `batch-progress-guard` and several can block: the
      session's first act after such a block may be one 40-minute verification,
      during which no heartbeat would land (four-eyes review, findings 1 and 4).
    - …but NOT by the work those guards DEMANDED (live finding 2, below): the
-     handover and its marker survive a call confined to the CLOSING SET.
+     handover and its marker survive a call confined to the CLOSING SET. (Since
+     point 675 a COMMITTED marker is sealed and later mutations are denied; the
+     bookkeeping this exception served now runs between `--prepare` and `--commit`.)
    - …and NOT by a call that happened BEFORE the handover was written (point 396,
      measured in `.claude/boundary.log`). Two of the ten boundary attempts on the
      morning of 28.07.2026 were cancelled 117 ms and 154 ms after being written —
@@ -898,10 +913,12 @@ Three changes, and none of them loosens the singleton:
      fires when a call RETURNS, so a lease renewed there would have to outlive the
      longest single call. The window is 60 minutes and a renewal happens at most
      every 5, giving a guaranteed 55 minutes of cover — above the LARGE regression
-     (30–40 min) and about twice the longest undeclared call measured over this
+     (30–40 min per backend; the 80m48s two-backend run belongs in a declared
+     wait, below) and about twice the longest undeclared call measured over this
      project's 43 transcripts / 32 440 tool calls (27.8 min; p99 8.9, p99.9 10.0).
      A wait that needs longer says so IN ADVANCE by writing a longer lease
-     (`extendLease`); nothing is inferred from evidence any more.
+     (`extendLease`); liveness is no longer inferred from silence, and evidence
+     only corroborates an expiry (next bullet).
    - **Expiry is arithmetic — but expiry alone no longer TAKES the batch**
      (point 556, measured 08.08.2026). `assessOwner` still compares two numbers and
      answers `lease-expired`; what the takeover then additionally requires is that a
@@ -942,7 +959,8 @@ Three changes, and none of them loosens the singleton:
      move, `git merge`/`push`, the board publish and `dashboard-state.json`. Only a
      session that demonstrably HELD a fence can be refused, so a window that never
      drove the batch is never blocked, and a missing fence file blocks nobody.
-   A declaration still never extends ownership ON ITS OWN — it CORROBORATES, and
+   Apart from the explicit `--waiting-on` extension above, a declaration never
+   extends ownership ON ITS OWN — it CORROBORATES, and
    only where the reader holds the evidence (the launcher tick, nowhere else);
    `LAUNCHER_WORK_MAX_AGE_MS` bounds how long it stays readable as one.
 4. **The threshold that preceded it (point 433, superseded).** Before the lease,
@@ -1022,7 +1040,7 @@ finding and its fix:
 
 | # | What the log shows | Why | Fix |
 | --- | --- | --- | --- |
-| 1 | `FAIL-OPEN: the guard errored and allowed the stop (EPERM … rename batch-lock.json.tmp-<pid> -> batch-lock.json)`, five times | The guard rewrote the lock three times within milliseconds (acquire's heartbeat, an explicit heartbeat, `markHandover`) and a scanner still held the file the previous rename had replaced. The throw escaped into the fail-open catch — with the marker ALREADY consumed | The redundant heartbeat is gone; the write retries over a short backoff (`scripts/atomic-write.mjs`) and stays atomic; `markHandover` reports instead of throwing; the marker is consumed only if the handover landed; and a failure is stated in the same breath as the allow, so a session never stops believing it passed the batch on |
+| 1 | `FAIL-OPEN: the guard errored and allowed the stop (EPERM … rename batch-lock.json.tmp-<pid> -> batch-lock.json)`, five times | The guard rewrote the lock three times within milliseconds (acquire's heartbeat, an explicit heartbeat, `markHandover`) and a scanner still held the file the previous rename had replaced. The throw escaped into the fail-open catch — with the marker ALREADY consumed | The redundant heartbeat is gone; the write retries over a short backoff (`scripts/atomic-write.mjs`) and stays atomic; `markHandover` reports instead of throwing; the marker was consumed only if the handover landed (since superseded: the stop no longer consumes it, see the lifecycle below); and a failure is stated in the same breath as the allow, so a session never stops believing it passed the batch on |
 | 2 | `HANDOVER point 378` at 08:56:12, `WITHDRAWN point 378` at 08:56:16 — twice | The Stop chain sent the session back for a timestamp, a review record, a dashboard republish, and each round un-took the handover. A boundary that survives only a turn with nothing left to do is not a mechanism | The withdrawal distinguishes work that CONTINUES the batch from work a Stop guard DEMANDED: a call confined to the CLOSING SET (the board, the review ledger, the work order's own entry, the boundary's own bookkeeping, and the scripts that satisfy those guards) carries the handover AND its marker forward; anything else ends both. Narrow on purpose — an unknown tool, an unparseable command or one non-closing segment in a chain all withdraw (`handoverSurvivesCall`) |
 | 3 | `WITHDRAWN point 388 by s1` — `s1` is a TEST session id | The unit suite reached into the live `.claude/`: `withdrawHandover` defaulted its log path to the repo while the test had redirected only the lock. The pre-push gate runs that suite on every push | Every state file is derived from the caller's lock path (`statePathsFor`), so a redirected lock redirects the whole family; a pure test pins that none of them lands in the repository |
 | 4 | the marker consumed while the lock kept no flag | Suspected a compaction renaming the session id under the lock. The evidence did NOT support it — the consumed marker proves ownership resolved fine, and #1 explains the state completely | Kept as a HARDENING, not a fix: ownership resolves on the recorded process when the id no longer matches, and re-stamps the lock. It cannot widen — the pid must be our own ancestor with a matching start time, so a second window is still a second window, and an unestablished ancestry falls back to the id |
@@ -1064,7 +1082,9 @@ script as the prevention.
 at a handover can wake the old session after the successor has spawned; its tool
 calls withdraw the handover only while it still owns the lock, so the containment
 past that point is the parallel-session detector and `batch-doctor`, as for any
-rogue window (four-eyes finding 2 — the drain rule stays a rule, not a gate).
+rogue window (four-eyes finding 2 — then the drain rule was a rule, not a gate;
+since point 675 work without a pushed checkpoint blocks the handover, see *The
+point boundary*, step 1).
 During the handover window `heldByOtherLiveOwner` reads false, so a third session
 may be conscripted into the batch; that has always been true of a dead lock, and
 it is new only in that the previous owner's process may still exist (finding 8).
@@ -1102,12 +1122,12 @@ session is still the working session, the launcher keeps seeing a live owner and
 no successor is spawned beside it.
 
 It is deliberately not a way off the block — the five-and-a-half-hour standstill
-is what that block exists for. Four properties keep an abandoned wait from
+is what that block exists for. These properties keep an abandoned wait from
 becoming an idle night:
 
 | property | how |
 | --- | --- |
-| **Evidence, not assertion — and RECENCY, never existence** | Every item is answered by a probe, and every answer must be FRESH. A `pid` must be alive AND have started when the declaration says (`probePid`, compared with `PID_START_TOLERANCE_MS` the way `resolveOwnership` compares the lock's — a reused pid is a stranger). A `branch` counts only while its tip commit is younger than `WORK_FRESH_MS` (15 min); a `worktree` only while git activity in it is (its gitdir's index/HEAD/COMMIT_EDITMSG and the directory's own mtime); a `log` only while it is younger than `LOG_FRESH_MS` (15 min). Windows are overridable per item at the format level (`freshMs`; the CLI has no flag for it). An unknown kind never passes. Declaring is verified up front, so a typo fails at the command, not at a turn end |
+| **Evidence, not assertion — and RECENCY, never existence** | Every item is answered by a probe, and every answer must be FRESH. A `pid` must be alive AND have started when the declaration says (`probePid`, compared with `PID_START_TOLERANCE_MS` the way `resolveOwnership` compares the lock's — a reused pid is a stranger). A `branch` counts only while its tip commit is younger than `WORK_FRESH_MS` (15 min); a `worktree` only while git activity or working-file edits in it are (its gitdir's index/HEAD/COMMIT_EDITMSG, the directory's own mtime, and since point 434 (5b) the newest working file, below); a `log` only while it is younger than `LOG_FRESH_MS` (15 min). Windows are overridable per item at the format level (`freshMs`; the CLI has no flag for it). An unknown kind never passes. Declaring is verified up front, so a typo fails at the command, not at a turn end |
 | **All of it, not some — except a SILENT LOG beside moving output** | One finished agent ends the declaration. That is the point: the finished agent's work is now the session's next action, and re-declaring the rest is one command. The one exception is point 434 (5): a `log` that has gone quiet never on its own supports the conclusion "dead" while a `branch` or `worktree` in the same declaration is still moving. On 30.07.2026 a bundle agent was declared dead on `evidence-gone: silent for 59 min` while its worktree had committed four minutes earlier, and the successor rebuilt two finished points. The ignored item is reported, never hidden (`ignored`), and the reverse never holds: a quiet worktree beside a fresh log still blocks |
 | **It ends with the WORK, not on a clock** | `IN_FLIGHT_MAX_AGE_MS` (45 min, `HOA_IN_FLIGHT_MAX_MIN` to tune) still blocks — but only where nothing in the declaration is producing OUTPUT (point 434 (6b)). Nothing refreshes a declaration while the work runs, so as a flat expiry it read `live:false, expired` on 29.07.2026 while its agent had been building for 63 minutes and was mid-merge. A branch or worktree that still moves needs no deadline: it stops checking out `WORK_FRESH_MS` after the last commit, all by itself. A pid or a log, which can look alive indefinitely without producing anything, keeps the clock |
 | **The verdict NAMES its evidence** | Every assessment reports `judgedOn` — `git` (the work's own output), `process`, `log` or `none` — and `describeInFlight` puts it in the allow message and the boundary log. The 30.07 mistake was invisible precisely because "evidence-gone" never said which source had answered |
@@ -1115,9 +1135,11 @@ becoming an idle night:
 | **The pool runs at its cap, or says why not** (point 427) | Delegation allows THREE concurrent agents, and until now the cap was only an UPPER bound: a session could commission ONE point, declare a wait, break no rule, and leave two slots empty for ninety minutes beside a queue of independent points — which is what the user found and asked about. The wait is now allowed only once the idle slots are accounted for. `gatherSlots` counts the agents the declaration's own evidence SHOWS (`declaredAgentCount` over worktrees and branches), reads the open work order, and asks `slotReasonDecision`. It answers "no reason needed" on its own for every state in which the slots are genuinely unusable — pool at its cap, a queue whose remaining points all touch the running branch's files, `.claude/batch-paused`, a closing freeze (CLAUDE.md §9), recognised from the closing checklist `closing-guard` already records for the CURRENT head (`.claude/closing-state.json`) — writing it is a side effect of DOING the closing, so nothing has to be remembered; `.claude/closing-freeze` stays as a hand-placed override — and otherwise demands `--slots-free "<why>"`. The demand also errs toward silence by construction: a queued point whose spec names NO files is never a candidate, and an unreadable running-file set answers "no demand". It is refused at the declaration as well as at the turn end (`block-slots-free`, wording pinned in `slotsRemedy`), so the session learns at the command rather than at a blocked stop |
 
 What it never overrides: a parallel-session alert (remediation cannot wait on an
-agent), an unarmed launcher, or a boundary already taken. A due boundary it does
-pass — ending mid-flight would throw the agents' work away — and the allow says so,
-naming the point still to be taken once the wait is over.
+agent), an unarmed launcher, or a boundary already taken. A due boundary it
+passes only for work that could not survive it (no committed-and-pushed
+checkpoint); transferable work is adopted by the successor instead, so the
+boundary is demanded right through it (point 675, `batch-singleton.mjs`). Where it
+does pass, the allow names the point still to be taken once the wait is over.
 
 **Why recency and not existence** (four-eyes review, 28.07.2026 — the one real
 "yes" to *can this switch the block off*): this repository carries ~94 `feat/*`
@@ -1128,6 +1150,7 @@ the full 45 minutes and been renewable with one command — the weak kinds were 
 common path, not a corner case. Judged on recency, a quarter of an hour without a
 commit or a git operation means the agent is finished, stuck or gone, and in all
 three cases the session's next action is to look rather than to keep waiting.
+(Since point 434 (5b) an edited working file counts as activity too, below.)
 
 **The residual this used to leave open — now closed from the outside.** Expiry is
 measured from the declaration's timestamp and only ever evaluated when the Stop
@@ -1408,8 +1431,11 @@ declaration above.
    which the resume prompt now says in as many words. Every poll is a tool call
    and every tool call refreshes the heartbeat, so a healthy waiting session never
    looks dead. A SILENT wait is what made a working session indistinguishable from
-   a corpse.
-3. **The launcher judges progress.** `assessOwner` takes the owner's declared work
+   a corpse. (Since then a DECLARED wait may instead end the turn on
+   `allow-in-flight` and make no tool calls; its `--waiting-on` lease extension
+   covers it.)
+3. **The launcher judges progress.** (28.07.2026; since point 434 this verdict
+   feeds only the report — item 4.) `assessOwner` takes the owner's declared work
    as an input (`assessOwnerWork` in `scripts/batch-in-flight-core.mjs`, wired in
    `scripts/batch-autostart.mjs`): an owner with a silent heartbeat reads
    `work-advancing` — alive, never wedged — while a branch tip, a worktree, a log
@@ -1419,8 +1445,9 @@ declaration above.
    guard asks whether ALL of it is, because a finished agent is the session's next
    action — but one finished agent among three is no reason to shoot the session),
    and evidence recency alone decides "is it moving", so an aged declaration still
-   proves progress. A DEAD pid stays dead whatever the evidence says: the process
-   checks come first and are untouched.
+   proves progress. A DEAD pid stays dead whatever the evidence says (then the
+   process checks came first; since point 434 the lease verdict in
+   `ownershipVerdict` runs first and the pid corroborates an expiry).
 4. **The bound is the LEASE, not a stall verdict (point 434, 30.07.2026).** This
    item used to describe `WORK_STALL_TICKS` — six launcher ticks of complete
    silence, after which `assessOwner` returned `work-stalled` and the launcher
@@ -1428,7 +1455,7 @@ declaration above.
    with `WEDGED_MS` and the two-stage silence report, because all three inferred
    liveness from silence and all three read the standstill of 29./30.07.2026 as a
    live owner. What bounds a standstill now is the owner's own `leaseUntil`: it is
-   renewed BEFORE each tool call and expires by arithmetic (item 3 above), so
+   renewed BEFORE each tool call and expires by arithmetic (*Taking the boundary*, item 3), so
    nothing needs to decide whether a silence "means" anything. The launcher no
    longer kills anything at all on this path — an expired lease costs the lock and
    nothing else, and the process learns it at its next hook.
@@ -1475,10 +1502,11 @@ probes from its own working directory, not from the one the declaration was
 written in. `normRef` keeps a string belt for what git will not resolve (`heads/…`
 and a `…@{0}` revision expression have no symbolic name), and `@` joins `main` and
 `HEAD` on the always-refused list.
-Since point 434 no amount of live evidence protects a lock: the lease does that,
-and only by being renewed. Evidence that goes quiet is reported, evidence that
-keeps moving is reported too, and neither buys the owner a minute more of
-ownership than it asked for in advance.
+Since point 434 live evidence alone never protects a lock: the lease does that,
+by being renewed. Since point 556 declared work that keeps ADVANCING can only keep
+an already expired lease from being taken (`lease-expired-owner-working` in
+`batch-ownership-core.mjs`); evidence that goes quiet buys nothing, and both are
+reported.
 
 Pinned in `scripts/batch-singleton-core.test.mjs` (an expired lease is takeable
 and a running one is not, a fresh heartbeat with an implicit lease reads ALIVE, a
@@ -1504,8 +1532,9 @@ aggressively — so a days-old spawn exits, an INTERACTIVE window later inherits
 number and takes the batch lock, and the launcher would have killed the user's own
 window. `isOwnSpawn` now demands the pid AND a process start time matching
 `state.lastSpawnAt` within `SPAWN_IDENTITY_TOLERANCE_MS`; an unverifiable start
-time answers no. Both call sites use it: the wedge reaping and the older
-rogue-spawn remediation.
+time answers no. Both call sites use it: the rogue-spawn remediation and the
+spawn-ledger reaping below (`reapableSpawns`); the wedge reaping that once used it
+is gone.
 
 **Waiting forever leaks processes** (finding 1.4). The 600-second ceiling used to
 end a `claude -p` whose turn had finished but whose background task never exits —
@@ -1543,7 +1572,7 @@ complete / 1 pending / 2 broken:
 | --- | --- | --- |
 | `close` | the point the NEWEST `HANDOVER` line names is closed in the split work order (`closureOf`: gone from `TASKS.md`, ticked in `docs/tasks-archive.md`), with the commit that ticked it printed alongside as evidence where it is still findable — an archive move cancels out and is never a tick | the handed-over point still reads `- [ ] N.`, or there is no handover line to anchor on and no tick either |
 | `take` | `.claude/boundary.log`: `HANDOVER point N by <sid>` | no such line — the session stopped without taking the boundary, the failure of 28.07.2026; the guard must have blocked with "TAKE THE POINT BOUNDARY" |
-| `spawn` | `.claude/autostart.log`: `launched pid <pid>` after the handover, preceded by `HANDOVER accepted: …` when the process still lived, or by `no owner lock — taking over` on the headless path, where a `claude -p` has already exited and SessionEnd freed the lock | `skip: owner alive` more than one grace window (15 min) after the handover — the handover never reached the lock, or a `WITHDRAWN` line in `boundary.log` says a tool call took it back. A `handover-grace` skip is the mechanism waiting on purpose and never counts. A spawn preceded by `owner provably dead` also counts as broken: the batch continued, but by the old route — the lock EXPIRED rather than being handed over |
+| `spawn` | `.claude/autostart.log`: `launched pid <pid>` after the handover, preceded by `HANDOVER accepted: …` when the process still lived, or by `no owner lock — taking over` on the headless path, where a `claude -p` has already exited and SessionEnd freed the lock | `skip: owner alive` more than one grace window (15 min) after the handover — the handover never reached the lock, or a `WITHDRAWN` line in `boundary.log` says it was taken back (by a tool call before point 675's seal; since then by `--clear` or the user's prompt). A `handover-grace` skip is the mechanism waiting on purpose and never counts. A spawn preceded by `owner provably dead` also counts as broken: the batch continued, but by the old route — the lock EXPIRED rather than being handed over |
 | `takeover` | `.claude/batch-lock.json` names a DIFFERENT session, kind `session`, with a heartbeat after the handover | still the old session, or still the launcher's own `pending-spawn` lock, ten minutes after the spawn — the successor never converted it |
 | `work` | a commit on `main` after the spawn: the next point's branch or its first atomic commit | nothing committed — the successor stood down (lock) or `batch-resume-hook` never oriented it |
 
@@ -1579,8 +1608,9 @@ the session legitimately working on, two were the race recorded as point 396.
 
 The run itself belongs to the MAIN session in the main tree: it needs the live
 batch lock, and no worktree agent may take or release it. The natural occasion is
-the next point that closes — merge, tick, run `node scripts/batch-boundary.mjs
-<point>`, stop, and read the observer afterwards. Nothing about the design forces
+the next point that closes — land it (`node scripts/land-point.mjs`), run
+`node scripts/batch-boundary.mjs --prepare <point>`, finish the bookkeeping it
+names, `--commit <point>`, stop, and read the observer afterwards. Nothing about the design forces
 the batch to be stopped for the observation; the chain is exactly the ordinary
 path through a point boundary.
 
@@ -1591,7 +1621,8 @@ KNEW. In one evening a window found three defects — the project hooks that can
 fire outside the repo root, a bundling scheme covering 53 of 91 open points, and
 point 409 repeating within 24 hours — and all three lived in the chat until the
 user asked, twice, whether they were being kept. The cause is structural: a
-session that does not own the batch lock may not write `TASKS.md` at all, so the
+session that does not own the batch lock may not write `TASKS.md` (beyond the
+responder's point append, below), so the
 state in which a finding is MOST likely is the state with no durable path.
 
 The carrier therefore lives in the MEMORY directory, which every session may
@@ -1634,9 +1665,9 @@ turn; what it cannot do is relabel one silently.
 
 **The Agent trigger stays (decided 08.08.2026).** Spawning an agent counts as
 investigation on its own, and the corpus review objected: 96 of 235 agent-spawning
-turns carried no record, which on a project built around maximal delegation reads
+turns of the corpus it read then carried no record, which on a project built around maximal delegation reads
 as a `--none` per delegation turn. The objection predates the exemption that
-answers it. Of the current corpus's 73 agent-spawning turns, 42 leave a durable
+answers it. Of the current (smaller, differently cut) corpus's 73 agent-spawning turns, 42 leave a durable
 record anyway, 27 are carried by the DECLARED WAIT
 (`batch-in-flight.mjs --waiting-on`, honoured only when an agent really was
 spawned or the declaration file really was written this turn), and 4 block —
@@ -1672,10 +1703,10 @@ The chain, and where each link lives:
 
 | step | who | what happens |
 | --- | --- | --- |
-| claim | the returning window | `acquire` first: with no live owner the claim is satisfied AT ONCE and the command reports the batch is yours. Otherwise `.claude/batch-claim.json` records `{ sessionId, pid, pidStartedAt, at }` |
+| claim | the returning window | `acquire` first: with no live owner the claim is satisfied AT ONCE and the command reports the batch is yours. Otherwise `.claude/batch-claim.json` records `{ sessionId, pid, pidStartedAt, at }` (plus `by` for an errand claim, and `releasedAt`/`releasedBy` once released) |
 | see | the owner's Stop hook | `batch-progress-guard` gathers the claim before the parallel detector and asks `releaseDecision` whether this is a clean moment |
 | release | the owner's Stop hook | at a clean moment: `handBackToClaimant` — a real release, not a handover — and ONLY where the release really happened is the claim stamped `releasedAt`; `.claude/boundary.log` gets `RELEASED to <sid> by <sid>`, and the session is told out loud that it is no longer the batch worker. Where the lock did not name this session there is nothing to release, and nothing is stamped: the stamp is a promise to the claiming window and a session that freed nothing must not make it |
-| take | the returning window | the SAME command again: `acquire` succeeds and clears the claim. (Its next `SessionStart` does the same thing by itself.) The stamp keeps the freed lock RESERVED for it in the meantime (bound 1a), so this is not a race |
+| take | the returning window | the SAME command again: `acquire` succeeds and clears the claim. (Its next `SessionStart` does the same thing by itself.) The stamp keeps the freed lock RESERVED for it in the meantime (bound 1b), so this is not a race |
 
 **A claim is a REQUEST, never a transfer.** Nothing in it writes the lock:
 ownership is still gained only through the atomic `acquire` in
@@ -1780,8 +1811,10 @@ session — the failure the whole singleton exists to prevent.
    its own claim reads as its own.
 3. **ONE claim at a time.** `claimWriteDecision` refuses a second claim while a
    first is live, so two windows are never both told the batch is coming to them.
-4. **The owner releases only at a CLEAN moment.** Never mid-merge, never with a
-   delegated agent still building or a verification running. The in-flight
+4. **The owner releases only at a CLEAN moment.** Never mid-merge, and never with
+   delegated work or a verification in flight that cannot transfer: pushed author
+   checkpoints and recorded runs transfer to the claimant (`work-transferable` in
+   `releaseDecision`). The in-flight
    evidence is the existing one (`assessInFlight().live`) and the git state is
    probed (`MERGE_HEAD`, `CHERRY_PICK_HEAD`, `REVERT_HEAD`, `REBASE_HEAD`, an
    unmerged index). Anything unclean makes the claim WAIT — it stays pending and
@@ -1793,7 +1826,7 @@ session — the failure the whole singleton exists to prevent.
    direction costs at most one more turn, because the claim stands only as long as
    the claimant's own process does.
 
-Two consequences that are easy to miss and were both built:
+Consequences that are easy to miss and were all built:
 
 - **The claimant is a second live top-level session by DESIGN.** It would trip the
   parallel-session detector, and that block demands the doctor before any further
@@ -1843,7 +1876,9 @@ via `statePathsFor`, so a redirected lock redirects it too (finding 3).
 
 The one residual is the same one the in-flight declaration has: the guard only
 runs at a TURN END. A session that has stopped and is never re-invoked never sees
-the claim — its lock then ages out the honest way, and the claim expires with it.
+the claim — its lock then ages out the honest way (the lease), and the claim, now
+with nobody left to wait for, expires on its own `CLAIM_MAX_AGE_MS`, counted from
+its recording (bound 1).
 
 ### A window that is NOT the master can still enqueue what the user says (30.07.2026, point 462)
 
@@ -1910,8 +1945,8 @@ open questions.
 
 **The gate is the point boundary**, not every turn end: a mid-branch owner cannot
 write `TASKS.md` at all, so `findings-guard` fires the request rule only on the
-turn that TAKES the boundary (`batch-boundary.mjs <point>`; `--status`/`--clear`
-only read). It stands down for a non-owner and for a paused batch like every
+turn that TAKES the boundary (`batch-boundary.mjs --prepare`/`--commit <point>`;
+`--status` only reads, `--clear` withdraws). It stands down for a non-owner and for a paused batch like every
 guard here, and it is fail-open. Findings keep their own, unchanged rule.
 
 **The board shows what waits.** The queue rebuild renders one card under the
@@ -1952,8 +1987,8 @@ resurrects the batch (promptly, thanks to `StartWhenAvailable` + the boot-time
 check). A forced update reboots and then waits at the login screen for the user
 anyway; the batch simply resumes when they next log in. Making that resume
 **instant on login** (instead of within ~15 min) on the WINDOWS host is one of
-the three things the setup script below arms — see *The boot path, and a second
-task that watches the first*.
+the things the setup script below arms — see *The boot path, its mutual watch,
+and an independent emergency timer*.
 
 ### The boot path, its mutual watch, and an independent emergency timer (point 447/947)
 
@@ -2022,13 +2057,14 @@ all the now-card ("Woran ich gerade arbeite"). Reminders repeatedly failed
 (latest: the card still said point 200 while the work had pivoted to 210 after a
 user question), so currency is machine-enforced by `scripts/dashboard-guard.mjs`
 (Stop hook; decision logic in `dashboard-guard-core.mjs`, Vitest-covered). It
-blocks turn-end on nine invariants: registered board, fresh vs HEAD, no ticked
+blocks turn-end on invariants that include: registered board, fresh vs HEAD, no ticked
 point in the queue, every open point visible, a DECLARED focus
 (`scripts/focus.mjs set <N> "<what>"`), now-card title == declared focus, an
 acknowledged pivot check after every user prompt (`focus.mjs confirm` — armed
 automatically by the UserPromptSubmit hook), a re-affirmation after ~30 min of
 tool work, and publish parity (repo file bytes == the content last pushed to the
-live page — so "edited" can never masquerade as "live").
+live page — so "edited" can never masquerade as "live"); later additions such
+as the queue's stub density (`queue-stubbed`, below) join them.
 
 The standard cycle after any dashboard edit:
 `node scripts/board-publish.mjs` (the live page — works in every session) →
@@ -2038,12 +2074,14 @@ as the focus confirmation when card and focus agree). On every work switch:
 verifies the card's POINT NUMBER, publish state and freshness, never the truth of
 the prose.
 
-**Every remedy names those two commands and nothing else (point 435).** They live
+**Every remedy names those two commands (point 435)**; the one addition is
+`board-queue.mjs`, the way out of a missing-card refusal (below). They live
 once, in `scripts/board-remedy.mjs`, and every board guard imports them — until
 30.07.2026 each guard carried its own copy still pointing at the retired claude.ai
 mirror, and a remedy is read at the moment of a block and FOLLOWED. The board's
-CONTRACT — four sections, transport, update discipline — is likewise stated
-exactly once, in the memory `batch-dashboard-artifact`; nothing restates it. The
+CONTRACT — four sections, transport, update discipline — has its authoritative
+statement in the memory `batch-dashboard-artifact`; the runbook and the sections
+below summarise it and defer to it. The
 canonical file is the git-ignored `.batch-dashboard.html` in the repo root,
 resolved by `boardFilePath()` so nothing measures a stale copy. `scripts/board-remedy.test.mjs`
 holds the three gates: no remedy names the retired path, only the canonical file
@@ -2095,13 +2133,13 @@ unreadable page is **never** called current.
     node scripts/board-publish.mjs --check   # fetch the live page and judge it
     node scripts/board-publish.mjs --url     # print the URLs
     node scripts/board-queue.mjs             # rebuild the queue from the work order
-    node scripts/board-queue.mjs set <N> "…" # write one queue card's prose
+    node scripts/board-queue.mjs set <N> --text-stdin             # write one queue card's prose
     node scripts/board-queue.mjs set <N> --title --text-stdin    # …its German title
     node scripts/board-queue.mjs set <N> --estimate "~2 h"       # …its estimate
     node scripts/board-queue.mjs import      # take over cards the data file lacks
-    node scripts/board.mjs title <N> "…"     # retitle a now- OR queue card
-    node scripts/board.mjs none "<Grund>"    # the gap card, with NO point to close
-    node scripts/board.mjs closing <N> "<Grund>"  # …still owed: its closing duties
+    node scripts/board.mjs title <N> --text-stdin    # retitle a now- OR queue card
+    node scripts/board.mjs none --text-stdin         # the gap card, with NO point to close
+    node scripts/board.mjs closing <N> --text-stdin  # …still owed: its closing duties
 
 **Every text goes in on stdin, and a flag is never prose.** `--text-stdin` now
 fills whichever field it follows in both commands, `--none`'s reason included —
@@ -2364,8 +2402,10 @@ currency and only staleness is worth waking anybody for.
 notices a changed open-point set after any tool call and persists `publishDue`,
 so a session that dies before publishing hands the mark to its successor. The
 deny (`board-first-guard`) refuses a turn's first state-changing call while that
-mark stands — everywhere now, because every session can run the remedy. The
-watchdog (`batch-autostart.mjs`, every 15 min) fetches the live page and sends
+mark stands — in every session now (a worktree agent excepted, see inventory row
+12 below), because every session can run the remedy. The
+watchdog (`batch-autostart.mjs`, every 15 min, through its child process
+`board-watchdog.mjs`, which holds the fetch) reads the live page and sends
 the ntfy alert when it is behind or unreadable, or when a `publishDue` /
 `publishFailed` has survived a whole tick; each fault is keyed, so one standing
 problem is reported once rather than four times an hour. That last layer is the
@@ -2381,8 +2421,8 @@ for its offline `--defer` valve; nothing in the loop calls it.
 **What each half owns (29.07.2026, point 419).** Splitting one document into a
 shell plus a fragment silently took four properties with it — the shell had them,
 the fragment did not, and nothing asked. Each is now owned by the FRAGMENT, which
-is the half that survives every transport (Pages shell, the retired mirror, the
-raw file opened straight from disk):
+is the half that survives every transport (Pages shell and the raw file opened
+straight from disk; the retired mirror was a third):
 
 | property | owner | what enforces it |
 |---|---|---|
@@ -2442,10 +2482,10 @@ the SPOOLED `receivedAt`, so a restarted watcher cannot reset the clock, and a
 message already handed to a responder is never handed again — one answer, not one
 per window. The
 launcher's 15-minute tick is now only the BACKSTOP: it is what still delivers if
-the watcher is down, and it is what brings the watcher back. The first two bounds
-come from reusing something that already runs (the launcher ticks and already
-speaks to the network; the PostToolUse hook `scripts/lock-heartbeat-hook.mjs`
-already runs on every tool call); the third costs one open connection.
+the watcher is down, and it is what brings the watcher back. The running-session
+and watcher-down rows below reuse something that already runs (the PostToolUse
+hook `scripts/lock-heartbeat-hook.mjs` on every tool call; the launcher, which
+ticks and already speaks to the network); the watcher rows cost one open connection.
 
 | the machine is… | who delivers | bound |
 |---|---|---|
@@ -2472,7 +2512,8 @@ and `progressGuardDecision` then conscripts it into working the whole queue — 
 opposite of a quick answer; taking NO lock makes it exactly the parallel
 top-level session `classifyParallel` raises an alert about, and that alert blocks
 the real owner's turn end. The compatible channel already existed: the watcher
-spawns ONLY when `assessOwner` reports no live owner AND no honoured claim, and
+spawns ONLY when `assessOwner` reports no live owner AND no honoured claim — or,
+past `DEFERRAL_MS`, for a message a waiting owner has not collected (above) — and
 for the responder's lifetime it files a BOUNDED `batch-claim` — already a reason
 for the launcher to stand down at its tick. It never touches the pending-spawn
 conversion.
@@ -2483,8 +2524,10 @@ list keys on a SESSION ID, and the claim's is synthetic
 which nothing knows before that session starts. The responder is therefore **not
 excluded** from the parallel-session detector. In the ordinary run that costs
 nothing: the launcher bails at the honoured claim *before* it detects, and the
-wake gate refuses to spawn beside a live owner at all. It bites only in the
-narrow window where the watcher dies while its responder is still answering —
+wake gate refuses to spawn beside a live owner except on the `DEFERRAL_MS`
+wake beside a waiting owner, whose guard may then also name the responder. It
+otherwise bites only in the narrow window where the watcher dies while its
+responder is still answering —
 the claim stops being honoured, a tick may spawn a real owner, and that owner's
 guard *will* raise a parallel alert naming the responder. Bounded (ten minutes)
 and visible (the alert is the point), but real, and stated rather than promised
@@ -2494,8 +2537,8 @@ away.
 detail.** `assessClaim` honours a claim only while the recorded pid exists and
 started when the claim says it did, so a watcher that is SIGKILLed, or a machine
 that reboots, releases the claim by ceasing to exist — there is no exit path on
-which a dead watcher leaves the batch reserved, and the 30-minute expiry is only
-the second bound. Naming the RESPONDER's pid instead reads better and is wrong:
+which a dead watcher leaves the batch reserved, and the tick-derived
+`CLAIM_MAX_AGE_MS` (bound 1) is only the second bound. Naming the RESPONDER's pid instead reads better and is wrong:
 the responder's own SessionStart hook would resolve that claim as ITS OWN
 (`resolveOwnership` matches by process) and would then acquire the owner lock —
 precisely the outcome the paragraph above forbids.
@@ -2531,12 +2574,12 @@ live owner suppresses it too — stage 2 is already delivering to that session.
 **The responder is LIGHT.** Its prompt forbids the work order: read the message,
 answer with `scripts/chat-reply.mjs`, append a point if the message is an
 instruction, then exit. A one-line question does not pay for a batch
-orientation. Its reply is obligatory — it is also the receipt (see below) — and
+orientation. Its reply is obligatory — it is also the receipt (see above) — and
 it is bounded at ten minutes, after which it is killed and the reservation
 released.
 
 **Lifecycle: no second launcher.** The launcher (the Scheduled Task on Windows,
-the `batch-launcher.mjs` daemon on Linux) already runs every few minutes, at boot
+the `batch-launcher.mjs` daemon on Linux) already runs every 15 minutes, at boot
 included, and is the one thing here that runs when nothing else does — so it is
 the supervisor. Each tick asks `watcherSupervision` whether
 the watcher is alive (by pid AND start time, so a recycled pid is never mistaken
@@ -2562,9 +2605,9 @@ every instruction in it.
     node scripts/chat-watcher.mjs --status   # is one running, and what does it hold
     node scripts/chat-watcher.mjs --stop     # stop it (the next tick starts it again)
 
-`--dry-run` is how the subscription gets PROVEN. The live path can only be
-observed on a machine with no session running, which is the machine nobody is
-sitting at — so the dry run opens the real subscription, verifies each arriving
+`--dry-run` is how the subscription gets PROVEN. The live path is observed
+mainly on a machine with no session running (or past `DEFERRAL_MS` beside a
+waiting owner), which is the machine nobody is sitting at — so the dry run opens the real subscription, verifies each arriving
 envelope through the same `chat-core` path, prints one
 `{event, decision, reason}` line per event and spawns, claims and spools nothing.
 From a session that is holding the batch lock it reports `skip / owner-live`, and
@@ -2597,8 +2640,9 @@ handover instead would make delivery at-most-once: a spawn that dies before its
 first tool call — or whose prompt never reaches a model — would take the user's
 message with it. Seeing an instruction twice costs a few tokens; losing it costs
 the user their message, so the duplicate is the side to err on. Within one
-running session delivery is exactly-once, because the claim precedes the
-injection.
+running session a message is never injected twice, because the claim precedes the
+injection; that makes it at-most-once there — the hook is fail-open, so an error
+between the rename and the injection is not retried in that session.
 
 **The spool is a directory, one file per message** (`.claude/chat-spool/`,
 `scripts/chat-spool.mjs`). The poller creates each file atomically (tmp+rename
@@ -2637,8 +2681,9 @@ as an agent message.
 **What earns a notice is narrower than "a drop", and every exclusion is
 load-bearing.** Only a VERIFIED envelope earns one: a failed signature gets no
 answer at all, because replying would turn the outbox into an ORACLE for someone
-probing the inbox topic. A `duplicate` earns none — the original was accepted and
-delivered, so the words did land, and a notice would additionally hand a captured
+probing the inbox topic. A `duplicate` earns none — either the original was accepted and
+delivered, so the words did land, or the envelope was already notified (point 430,
+below), and a notice would additionally hand a captured
 envelope an amplifier. And of the two halves of `stale`, only `ahead` (the clock
 running fast) qualifies; `expired` (older than the window) does NOT, because it is
 indistinguishable from a message that was accepted long ago and has since aged out
@@ -2646,8 +2691,10 @@ of the envelope ledger — a four-eyes review proved a replay of a DELIVERED
 instruction landing exactly there, which would have told the user that something
 the machine had already carried out never arrived. The information to tell the two
 apart is genuinely gone, so the notice is narrowed rather than guessed at, and
-nothing is lost in practice: the acceptance window matches ntfy's cache, so an
-`expired` message is one the transport has dropped as well. `ahead` is safe by
+nothing is lost in practice: the acceptance window matches ntfy's cache in length,
+so an `expired` message is, give or take the send delay (the window counts from the
+envelope's stamp, the cache from its publication), one the transport has dropped as
+well. `ahead` is safe by
 construction — acceptance requires `age >= -skew`, and at every earlier moment
 such an envelope's age was more negative still, so no past poll can have taken it.
 
@@ -2721,8 +2768,8 @@ realistic worst case is command execution on the user's machine. So:
 | derived topics | `hoa-<32 hex>` from SHA-256 over the shared secret, domain-separated per direction. No topic name is in any tracked file or in the published HTML; the page derives them client-side with WebCrypto |
 | the secret | git-ignored `.claude/chat-secret` on the machine, `localStorage` on the phone. Never committed, never logged, never echoed into a page |
 | HMAC-SHA256 | over the canonical `(direction, id, ts, text)`, every field JSON-quoted so no two different messages share a canonical form. Both directions are signed — and the DIRECTION is inside the signed string, see below |
-| the drop rules | `scripts/chat-core.mjs` drops anything unsigned, mis-signed, older than the window, or already seen — **before** it is spooled. A drop of a VERIFIED envelope is reported back to the sender (see below); a failed signature never is |
-| the dedupe | TWO ledgers: the ntfy ids rotate under a count cap, the accepted ENVELOPE ids are kept for the whole acceptance window (see below). Both are rebuilt from the spool — the consumed messages included, since one already read is exactly the one a re-poll must not hand over again. The cursor in `.claude/chat-state.json` only narrows the next poll: losing or corrupting it replays the whole window and spools nothing twice |
+| the drop rules | `scripts/chat-core.mjs` drops anything unsigned, mis-signed, older than the window, or already seen — **before** it is spooled. A drop of a VERIFIED envelope whose clock ran `ahead` is reported back to the sender (see *What earns a notice* above); a duplicate, an expired envelope and a failed signature never are |
+| the dedupe | TWO ledgers: the ntfy ids rotate under a count cap, the accepted ENVELOPE ids are kept for the whole acceptance window (see *The replay bound is a WINDOW* above). Both are rebuilt from the spool — the consumed messages included, since one already read is exactly the one a re-poll must not hand over again. The cursor in `.claude/chat-state.json` only narrows the next poll: losing or corrupting it replays the whole window and spools nothing twice |
 
 **The direction is part of the signature, and that was a correction.** The first
 cut signed only `(id, ts, text)` under one key for both topics — so an
@@ -2766,7 +2813,8 @@ trusted with — which is the same bound the paragraph above sets for a differen
 reason. Rotating is cheap if it is ever suspected:
 `node scripts/chat-secret.mjs --rotate`.
 
-**The page.** A collapsible section at the top of the board viewer, DEFAULT
+**The page.** A collapsible section under the board's heading, inside `<main>`
+(re-injected after every refresher swap, see point 423 above), DEFAULT
 CLOSED, that makes no request at all until it is opened; message list above,
 input below at `font-size: 16px` (below that iOS zooms the page on focus), with
 `env(safe-area-inset-bottom)` padding and autoscroll to the newest message. It is
@@ -2864,8 +2912,8 @@ every checkout to one machine.
 THE ROLLOUT IS STAGED, and the staging is the point: one harmless
 high-frequency line first (`lock-heartbeat-hook`), verified in a NEW session
 started from a non-root cwd — settings are read at session start — and only then
-the other 34. Never all at once, because a failed expansion would disable all 35
-as silently as the bug it replaces. `.claude/settings.json` is a protected path,
+the rest, in steps. Never all at once, because a failed expansion would disable
+every hook as silently as the bug it replaces. `.claude/settings.json` is a protected path,
 so every one of those edits is attended work; a headless session cannot make it.
 
 The check lives in `guard-health-core.mjs`, beside "can this enforcer fire at
@@ -2874,7 +2922,7 @@ one at a time, never the concatenated wiring blob, because
 `scripts/git-hooks/pre-push` and `commit-msg` are relative ON PURPOSE — git runs
 a hook from the repo root — and a blob-wide grep would accuse two correct files.
 While the rollout runs, the still-relative lines are recorded in
-`RELATIVE_WIRING_ROLLOUT`, the same idiom as the dormancy map above and with the
+`RELATIVE_WIRING_ROLLOUT`, the same idiom as `INTENTIONALLY_DORMANT` in that file and with the
 same ratchet: a hook outside the record must be anchored, and an entry whose line
 is already anchored is itself a finding, so the record cannot outlive the
 building site. `node scripts/guard-health-guard.mjs --wiring` prints the table
@@ -2935,6 +2983,10 @@ workflow: healthy deploy jobs take 9-16 s, the slowest that ever succeeded took
 
 ### The two reviewer residuals, closed
 
+Two residuals a review named in `ci-status-guard`'s outage waiver — the
+classifier that excuses a red run whose workflow is byte-identical to its last
+green one (the "untouched" proof):
+
 **A workflow byte-identical to its last green run can still be broken from
 outside** — a retired `runs-on` image, a yanked action tag — and that dies in the
 same shape the "untouched" proof excuses, though only a push fixes it. The two
@@ -2992,7 +3044,7 @@ needed, not in every prompt.
 | 6 | user-scope `berlin-timestamp.cjs` | per prompt | 179 ch | 179 ch | KEPT — it delivers the current TIME, which no gate can; it is now the only INJECTED statement of the rule (versioned copy: `scripts/hooks/berlin-timestamp.cjs`; without it wired, the first reply costs one `timestamp-guard` block, which hands the line) |
 | 7 | `batch-resume-hook` — the headline enumerating all 118 open point numbers | per session | 637 ch (588 of them numbers) | 156 ch | CUT — a session carries ONE point since the boundary; replaced by the count, the first point and `point-brief.mjs` |
 | 8 | `batch-resume-hook` total | per session | 4035 ch | 3554 ch | −12 % |
-| 9 | `CLAUDE.md` | per turn | 61 169 ch (988 lines / 8991 words) | unchanged | PREPARED, needs the user's go — see below |
+| 9 | `CLAUDE.md` | per turn | 61 169 ch (988 lines / 8991 words) | unchanged | PREPARED then; executed since (`CLAUDE.md` is now about 200 lines) — see below |
 | 10 | `MEMORY.md` (user scope) | per turn | 13 223 ch | unchanged | NAMED — outside the repository |
 | 11 | global `CLAUDE.md` (user scope) | per turn | 5069 ch | unchanged | NAMED — outside the repository |
 | 12 | BOARD-FIRST deny to a worktree agent | per delegated agent | 1058 ch + one discarded tool call | 0 | CUT — the checkout path says what the inherited session id cannot |
@@ -3020,14 +3072,17 @@ user's go because it is the governing file.
 **The Stop chain is free while it is green** — 24 of its 25 guards cost 906 ms
 together, less than a second at a turn end. `ci-status-guard` costs 1592 ms on
 its own, because it asks GitHub, and every subagent turn pays it too. That is
-not waste (it is the CI detector) but it IS the whole wall-clock of the chain,
+not waste (it is the CI detector) but it IS most of the chain's wall-clock (1592 of 2498 ms),
 and point 387 already owns that guard.
 
 **A block, by contrast, is expensive** — it is read in full, and per "the duties
 come before the answer" above it can force a second message. That is why the
 block texts stay long: rows 13–15 are where the remedies for rows 1–3 now live.
 
-### The `CLAUDE.md` half — prepared, not executed
+### The `CLAUDE.md` half — prepared then, executed since
+
+(The figures below are the 30.07.2026 state; the cut has since been made —
+`CLAUDE.md` now counts about 200 lines, see `docs/document-cut-757.md`.)
 
 The method is the one that already worked twice: §7.1's evidence chains moved to
 `docs/acceptance-evidence.md` (point 306) and nos. 20/21's detail to
@@ -3053,7 +3108,7 @@ simply refilled.
 Every GUI/rendering/shader fix must be verified on BOTH renderer backends —
 `VERIFY_GL=webgpu` (system Chrome, the user's real backend) AND `VERIFY_GL=webgl`
 (the shipped fallback) — judged by the rendered PICTURE, before it is
-committed/ticked/called done. The reminder alone failed (22.07.2026: the
+ticked or called done (the gate below fires once the change is committed). The reminder alone failed (22.07.2026: the
 point-210 sea-coast fix was "done" after a WebGL2-only check while the WebGPU
 picture was still stepped — the fix never touched the water shader's path), so
 the rule is machine-enforced by `scripts/render-verify-guard.mjs` (Stop hook;
@@ -3099,14 +3154,15 @@ How it works, mechanically:
 What stays judgment: the machine proves a passing run per backend happened
 after the change — it cannot prove a human (or the assistant) actually LOOKED
 at the frames. Looking is the standing rule; the gate makes skipping a backend
-impossible, not skipping the inspection.
+loud — short of the recorded `--defer`/`--clear` valves and its fail-open on a
+guard error — not skipping the inspection.
 
 ## Signal channel + never blocking on the user
 
 - **Out-of-band notification (ntfy):** `scripts/notify.mjs` POSTs to `ntfy.sh/<topic>`
   (topic in the gitignored `.claude/ntfy-topic`; subscribe once on the phone). No
   auth, works headless and from the launcher. The launcher notifies on
-  resurrection, on a stalled batch (auto-pause), and on a missing claude.exe; the
+  resurrection, on a batch the alert ladder has paused, and on a missing claude.exe; the
   batch should notify on a failed `git push` (write `.claude/push-failed`).
 - **A pending advisory decision NEVER stalls a point or the batch** (standing
   rule 23.08.2026; inventory U1–U4). The assistant does not block on
@@ -3178,7 +3234,7 @@ impossible, not skipping the inspection.
   burning the limit each cycle without advancing a point), pause it; the design
   favours a stuck-but-recoverable state over silent idle.
 
-## Parallel subagents and the working tree (enforced, not reminded)
+## Parallel subagents and the working tree (reminded at spawn, never blocked)
 
 Two parallel file-mutating subagents once shared the ONE working tree
 (22.07.2026): both left uncommitted edits, the files entangled, and selective
