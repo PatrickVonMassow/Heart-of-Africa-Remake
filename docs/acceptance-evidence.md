@@ -3,8 +3,8 @@
 For each acceptance criterion the full chain of proof: which check, which file, which
 screenshot. Moved out of CLAUDE.md because that file is loaded at EVERY session start
 and these chains were the larger part of it, while they are needed at a closing and at
-a tag. The wording is moved verbatim; numbering and conditions are as they stood in
-§7.1. A criterion and its evidence section change in the SAME commit.
+a tag. The wording was moved verbatim, numbered as in §7.1; the sections have grown
+since. A criterion and its evidence section change in the SAME commit.
 
 **Two rules bind every chain below (point 589).** Twelve defects shipped in one
 mechanic whose twelve points had all been accepted as finished, because the
@@ -247,7 +247,8 @@ browser sections judge the drawn teaching, motion, interaction and sound:
 - `src/scenes/place/speechChannel.test.ts` — the scene speaks over a named
   figure, holds the speaker target, and never accumulates standing text.
 - `src/systems/ambience.test.ts` (`playSpeech`) — the syllables reach the audio
-  clock on the speech bus, under the single §21 ambience volume (point 577).
+  clock on the speech bus, at its own level (`balance.communication.speechVolume`)
+  under the master volume (point 577).
 - `src/state/store.communication.test.ts` — hearing recorded on the in-game day
   with the settlement the player stands in, a note only on what was heard, the
   label reading that same note, and the save round trip.
@@ -413,7 +414,7 @@ both hint texts from both language files), `src/systems/input.test.ts`
 (the exact-modifier match, the pad press that is no held key),
 `src/systems/keyboardGuard.test.ts` (the digits are game keys while
 Ctrl+digit stays the browser's), and the bar's digits stand in the
-picture (`scripts/verify/polish.mjs`, screenshot 149).
+picture (`scripts/verify/polish.mjs`, `149-artefact-in-the-bar`).
 The map is NOT an inventory item (point 93):
 the bottom-right button row holds camp / map / journal in that order,
 the always-present MAP button opens the overview without any
@@ -445,7 +446,7 @@ frustum: registered sources and marked scene objects report only what is
 drawn (`src/scenes/actorLabelSource.test.ts`), and the shared projection
 rejects a point behind the camera as well as one outside the frame
 (`src/scenes/travel/frameVisibility.test.ts`). Component: the layer
-mounts on Ctrl down, is gone on keyup, is cleared by a blur or a hidden
+mounts on hold-key down (Ctrl by default), is gone on keyup, is cleared by a blur or a hidden
 tab with no keyup at all, re-syncs from the next input event, speaks the
 selected language and honours `balance.labelOverlay.maxLabels`
 (`src/scenes/ActorLabels.test.tsx`). Live, both backends: holding Ctrl
@@ -461,7 +462,7 @@ mired, at vigil, at play, mourning and dead; the scripted hunt's
 predator named through chase, feed and walk-off and its prey both
 running and as the carcass it becomes; concealment proved to be the
 submerged crocodile and nothing else, with a lunging, dragging,
-gripping or withdrawing one named and no predator ever concealed
+gripping or withdrawing one named and no attacking predator concealed
 (`src/scenes/travel/wildlifeActorSource.test.ts`). Live, both backends:
 a STAGED predator attack carries the attacker's label at the attacker
 while the attack runs, the label really stands in the frame, the fleeing
@@ -788,7 +789,7 @@ Verifiable (`scripts/verify/settings.mjs`,
   giraffe parent reaching the hunter drives the hunt off with the
   calibratable `parentDefense` chance (deterministic per-event roll,
   pure-tested boundary; visible hind-leg kick pose; the lion leaves via
-  the ordinary walk-off) while a failed roll keeps today's sacrifice
+  the ordinary walk-off) while a failed roll keeps the sacrifice
   (live in `scripts/verify/enrichments.mjs`); the vigil at the
   carcass (point 121): a too-late parent walks to its eaten calf and
   HOLDS there (pure-tested landing block: no vulture lands, no ground
@@ -845,7 +846,7 @@ Verifiable (`scripts/verify/settings.mjs`,
   instead of entering the ocean (the step rule pure-tested in
   `src/scenes/travel/wildlifeBehavior.test.ts`, the coast walk
   live-gated in `scripts/verify/enrichments.mjs`) (no animal strays into the impassable sea or
-  stands in a channel, and the scripted hunt's prey balks at the
+  stands in a channel outside its documented water roles, and the scripted hunt's prey balks at the
   waterline); drinkers walk only to the bank and bathers one wade
   past it (the bank-targeting rules pure-tested in
   `src/scenes/travel/waterEdgeRules.test.ts`, the standing rule
@@ -1034,10 +1035,7 @@ Verifiable (`scripts/verify/settings.mjs`,
 OPEN: tree-climbing-to-flee remains to be implemented (§9 open item);
 and the one seasonal-dress reading the research allows but the
 figures cannot yet show — a wrap worn DIFFERENTLY in the cold rather
-than in greater number (§19.13). (The former "additional new
-species/birds" item is now CLOSED: point 130's crocodile, point 145b's
-ground-nesting plover with its chicks and point 145c's lion cub joined
-the roster beyond the original fauna and the grazer calves.)
+than in greater number (§19.13).
 
 ## 13. Real geodata.
 
@@ -1046,7 +1044,7 @@ a rift edge and a coastline show smooth, real courses and textured
 ground instead of vertex colors; a pure-threshold biome edge (the
 south desert) is sampled across latitudes and its longitude varies
 rather than running straight (`scripts/verify/enrichments.mjs`); the
-geodata preprocessing is reproducibly documented in the repository.
+geodata preprocessing is reproducibly documented in `scripts/build-geodata.mjs`.
 
 ## 14. Lighting and post-processing pipeline.
 
@@ -1284,15 +1282,15 @@ The inhabitants have ARMS, and gesture with them (point 479). The figure
 carries two shoulder-pivoted arms with hands in the existing primitive style,
 and the children — the figures that RUN — carry legs whose swing rides the
 DISTANCE they cover at their own short-legged cadence, the same
-distance-driven gait the fauna and the §2.5 silhouettes walk on. Four gestures
-read at conversational distance: BECKON (the arm scoops toward the speaker),
+distance-driven gait the fauna and the §2.5 silhouettes walk on. Four body-language
+gestures (the teaching TOUCH below is a fifth kind) read at conversational distance: BECKON (the arm scoops toward the speaker),
 POINT (one held aim at a visible spot or person), REFUSE (both arms out, the
 trunk shaking) and INDICATE A DIRECTION (the arm sweeps out onto a bearing and
 holds). None of them explains itself — there is no label and no caption; the
 gesture is the body half of a situation whose other half is what happens next.
 The driving layer owns ONE `GestureState` per figure and the figure advances
 it, so two gestures can never run on one body, and the same ref is what the
-speaking layer takes over when it arrives. The added geometry carries its
+speaking layer (§7) takes over. The added geometry carries its
 per-level entry (`figureLimbSegments`, 5 / 8 / 12).
 Verifiable: the state machine is pure-tested — every kind's duration bounded,
 one kind per figure at every instant, the pose ending exactly at rest with no
@@ -1350,8 +1348,8 @@ in the real walk loop and the place is left within 1.5 m of the drawn line
 (`scripts/verify/polish.mjs`, screenshots 488-village-edge-band /
 488-port-edge-band / 488-monument-edge-band).
 
-THE CHILDREN PLAY A GAME OF TAG (§19.10, points 480/351) WHERE THE SETTLEMENT
-STANDS ON NO RIVER. In the rebuilt mechanic a riverside village plays the
+THE CHILDREN PLAY A GAME OF TAG (§19.10, points 480/351) EVERYWHERE BUT IN A
+RIVERSIDE VILLAGE. In the rebuilt mechanic a riverside village plays the
 bank round instead (§7), and this chase is what the children play everywhere
 else. One of them is IT and chases the others; whoever is caught becomes the new IT, and any number plays.
 It is a CHASE, not a route — nothing here holds a ring, an orbit or a tour of
@@ -1408,7 +1406,7 @@ against the built fabric (`src/scenes/place/lifeSpots.test.ts` pins that for
 every shipped village) (`scripts/verify/polish.mjs`, screenshot
 480-village-tag).
 
-CLASSIC TAG IS SILENT in every port and every bankless village. A bank village
+CLASSIC TAG CARRIES NO WORDS in every port and every bankless village (only a wordless catch cry). A bank village
 stages only the teaching bank round. `PlaceLife.games.test.ts` executes the
 scene composition and game initialization for all shipped settlements;
 `tagGame.test.ts` covers pursuit, stamina, role transfer and progress rescue.
@@ -1424,9 +1422,7 @@ the dev-assert channel's long-run family (`watchProducer`,
 `bank-speech-silent` once it has produced nothing for its own window
 (`balance.villageLife.tag.silenceSeconds` and
 `balance.villageLife.bankGame.roundSilenceSeconds`, debug-editable in both
-languages) — the two alarms of the deleted situation catalogues went with them,
-because a watch on a producer that can no longer produce reads as covered —
-so a village that goes quiet after minutes reports itself in every session,
+languages) — so a village that goes quiet after minutes reports itself in every session,
 headless or manual, which no seconds-long suite can reach. Verifiable both ways
 in the fast layer (`src/systems/devAssert.test.ts`, plus both producers'
 own test files): a stalled producer trips its alarm, a healthy one is silent
@@ -1437,7 +1433,8 @@ The watches reach the SCHEDULERS, so the ear's own end of the chain is armed
 where it lives: `playSpeech` raises `speech-inaudible` when the level that
 actually LEAVES the graph is zero — peak × speech bus × master — while the
 player's speech slider says otherwise, which is the shape point 577 had, an
-intact plan silenced further down (`src/systems/ambience.test.ts`). The separation rule is pinned
+intact plan silenced further down (`src/systems/ambience.test.ts`). The separation of adult
+stations from the children's play ground is pinned
 in `src/scenes/place/lifeSpots.test.ts` (every adult station outside the hearing
 radius of the whole play ground, swept over the fire's position, shrinking rather
 than giving up), and the chase's side of it in
@@ -1511,8 +1508,7 @@ proves the eaves were not simply fenced off — it is still standable and still 
 solid surface from below — and every thatch roof mesh draws both faces, so an
 open dome hemisphere is no longer a back face one can see through.
 
-AND NO WEDGE IS FATAL (work-order 604). The control stands in `design.md` §17.5, paid
-for at the ceiling by tightening three passages that stated the same rule twice. The collision rules keep him out of the
+AND NO WEDGE IS FATAL (work-order 604). The control stands in `design.md` §17.5. The collision rules keep him out of the
 walls; the escape keeps him out of the gaps BETWEEN them, because the game saves
 only on entering a port (design.md §18) and a traveller stuck in a village would
 lose everything since the last harbour. The reported case (F6 report
@@ -1587,10 +1583,11 @@ on every change rather than saved up for a closing. `node scripts/audit-check.mj
 wraps `npm audit --json` and exits non-zero for ANY advisory not recorded in its
 `ALLOW` map together with the reason it is tolerable, so a new vulnerability
 fails loudly while a recorded one cannot quietly rot; CLAUDE.md §7.2 runs it
-whenever the lockfile changes. The single current entry is GHSA-f88m-g3jw-g9cj
-(sharp/libvips, high, no upstream fix): a transitive Node dependency of
+whenever the lockfile changes. It holds two entries: GHSA-f88m-g3jw-g9cj
+(sharp/libvips, high, no upstream fix), a transitive Node dependency of
 kokoro-js that is absent from the browser bundle and never runs at build time,
-so it is not reachable in the shipped game.
+and GHSA-82fw-gwwq-j7x9 (the vitest mocker), a dev dependency reachable only in
+vitest browser mode, which the project does not use.
 
 ## 19. Journal voice markup and read-aloud.
 
@@ -1672,7 +1669,7 @@ Verifiable, by suite:
   `src/systems/keyboardGuard.test.ts` — a modifier chord on a key the
   game binds UNDER a modifier is prevented (Ctrl+W, +S, +P, +D, +A, +T,
   Alt+Arrow) and an unbound one (Ctrl+R, +I, F5) is not, nor the
-  plain-bound calendar row, whose chords stay the browser's tab jumps
+  digit row (plain digits the inventory, Shift the calendar), whose Ctrl chords stay the browser's tab jumps
   and keyboard zoom (Ctrl+1–9, Ctrl +/−/0) while the LOCK still takes
   those keys; none of it inside a form control; the
   lock is requested once, only with fullscreen AND the pointer, with
@@ -1927,10 +1924,7 @@ prompt a tappable button firing the SPACE use key; `src/state/ui.test.ts` that
 `activateTouch` arms the layer with the preset and is idempotent (a
 debug re-enable is not clobbered); `src/ui/DebugMenu.test.tsx` the
 localized graphics detail-level dropdown writing `detailLevel` through to
-the store (the per-setting graphics allow-flags the touch preset sets —
-TRAA, SSAO, half sun shadows, campfire shadows — are internal store
-fields, no longer surfaced as debug-menu checkboxes after the point-276
-declutter);
+the store;
 `scripts/verify/touch.mjs` (a `hasTouch` context, real CDP touch
 events) that no overlay shows before the first touch, the first touch
 mounts it and applies the preset, the stick walks the character (and
@@ -2054,7 +2048,7 @@ removed from the debug menu with the point-276 declutter; the
 `traaEnabled` store field remains, set internally by the touch preset
 and the F8 benchmark). The post pipeline (TRAA, SSAO, bloom) reads its
 enable through the graphics-level effective selectors (`effectiveTraa`
-etc., pt. 20 / point 276): the level drives the post chain — SSAO on only
+etc., point 276): the level drives the post chain — SSAO on only
 at high, TRAA + bloom off only on low — combined with the internal flags
 without ever clobbering them; `settings.mjs` gates the F9 cycle and the
 effective flips.

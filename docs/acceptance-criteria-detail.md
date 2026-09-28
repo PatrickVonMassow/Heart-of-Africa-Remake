@@ -219,9 +219,9 @@ another language must require only a new language file).
 The codebase has no linter findings or unrecorded known vulnerabilities after
 every change. `npm run lint` reports zero errors and warnings; `npm audit` runs
 through `scripts/audit-check.mjs`, which fails every new advisory and permits
-only a justified entry in its `ALLOW` map. The current allowance is
-GHSA-f88m-g3jw-g9cj (sharp/libvips, high, no upstream fix), a transitive Node
-dependency of kokoro-js that is absent from the browser bundle.
+only a justified entry in its `ALLOW` map. The current allowances are
+GHSA-f88m-g3jw-g9cj (sharp/libvips via kokoro-js, absent from the browser bundle)
+and GHSA-82fw-gwwq-j7x9 (the vitest mocker, dev-only).
 
 ## 19. Journal voice markup and read-aloud.
 
