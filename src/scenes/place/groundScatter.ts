@@ -1,5 +1,5 @@
 // The settlement's loose ground cover: the grass tufts scattered over the
-// walkable ground (design.md §19.9 landscape dressing). Pure geometry, kept out
+// walkable ground and a few metres past its edge (design.md §19.9 landscape dressing). Pure geometry, kept out
 // of the scene component so the rule it obeys is unit-testable.
 //
 // It obeys the SAME rule as every other loose object (work-order 585): nothing
@@ -18,7 +18,7 @@ export type GrassTuft = [x: number, z: number, scale: number]
 export interface GrassScatterInput {
   placeId: string
   seed: number
-  /** Ports carry a thinner, sandier cover than villages. */
+  /** Ports ask for fewer tufts than villages. */
   isPort: boolean
   /** The region's grass density factor (`RegionPlaceStyle.grass`). */
   grassFactor: number
