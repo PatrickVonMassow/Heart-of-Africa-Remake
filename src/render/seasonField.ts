@@ -1,6 +1,7 @@
 // The seasonal greenness FIELD (design.md §19.13, point 151): a small
-// continent-covering texture the travel scene's ground and vegetation sample
-// PER POSITION through a baked 'seasonUV' attribute — replacing the single
+// continent-covering texture the travel scene's ground samples PER POSITION
+// through a baked 'seasonUV' attribute (the vegetation reads the same value
+// baked per instance, 'seasonTint') — replacing the single
 // player-position uniform whose per-frame drift made every visible crown
 // slide ("fly") while walking a wetness gradient, and whose zone flips
 // snapped the whole scene at once (user bug, 16.07.2026).
@@ -8,8 +9,8 @@
 // Spatially the field is SMOOTH: each texel stores a blend of the season
 // slots (hyper-arid + the climate zones), precomputed ONCE by blurring the
 // one-hot slot map with a ~2 degree kernel — so a zone border is a gradient,
-// never an edge. Temporally it is driven per frame from the calendar: the 15
-// slot greens move with the day (lerped, so a debug month jump fades), and
+// never an edge. Temporally it is driven per frame from the calendar: the slot
+// greens (one per SEASON_SLOTS entry) move with the day (lerped, so a debug month jump fades), and
 // the texel values are their weighted blend. Nothing reads the player.
 //
 // The texel value is the TINT value the old uniform carried (0 = full straw,
@@ -212,8 +213,8 @@ export function seasonFieldTintNode(): ReturnType<typeof float> {
 /** TSL: the field's tint value read straight from a per-INSTANCE 'seasonTint'
  *  float attribute the CPU bakes at each rebuild (point 175). The vegetation uses
  *  THIS instead of sampling the texture in its vertex stage: a texture sampled in
- *  the vertex stage through a per-instance UV, over a texture re-uploaded every
- *  frame, jittered the crown collapse on the WebGPU backend and made the crowns
+ *  the vertex stage through a per-instance UV, over a texture then re-uploaded
+ *  every frame, jittered the crown collapse on the WebGPU backend and made the crowns
  *  hop. A baked float is read once per instance and never samples the moving
  *  texture, so it is stable on both backends. The tint tracks the calendar as of
  *  the last rebuild (every hysteresis step of travel) — imperceptible against the

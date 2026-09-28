@@ -12,13 +12,13 @@ import { balance } from '../config/balance'
 import { isWithinHearing, observePhrase, observeUtterance, type CommunicationMemory } from './heard'
 import { tonesOf, utteranceOf, type ConceptId, type Phrase, type Tone, type UtteranceId, type Vocabulary } from './lexicon'
 
-/** One syllable as it is played: which of the two samples, when, how loud. */
-export interface SpokenSyllable {
-  /** `low` plays the low sample (`ba`), `high` the high one (`BA`). */
+/** One syllable as it is played: which of the two tones, when, how loud. */
+interface SpokenSyllable {
+  /** `low` sounds the low syllable (`ba`), `high` the high one (`BA`). */
   tone: Tone
   /** Seconds after the start of the whole plan. */
   startOffset: number
-  /** Seconds the sample sounds — shorter than the step, so syllables separate. */
+  /** Seconds the syllable sounds — shorter than the step, so syllables separate. */
   duration: number
   /** Envelope peak (pre-bus), already distance- and volume-scaled. */
   peak: number
@@ -30,7 +30,7 @@ export interface SpeechPlan {
   syllables: SpokenSyllable[]
   /** Seconds from the first syllable's start to the last one's end. */
   duration: number
-  /** The level the utterance arrives at, 0..1; 0 = out of range or muted. */
+  /** The distance level the utterance arrives at, 0..1; 0 = out of range. Volume and loudness do not enter it. */
   gain: number
   /** Fixed for the whole utterance, negative left / positive right. */
   pan: number
@@ -96,8 +96,9 @@ const SPEECH_PEAK = 0.85
  * How loud an utterance spoken `distance` away arrives: 1 right beside the
  * speaker, falling off with the square of the distance, and cut to
  * exactly 0 beyond the hearing radius. The hard cut is deliberate — it makes
- * "audible" and isWithinHearing() the SAME condition, so nothing is ever
- * recorded that could not be heard, and nothing heard goes unrecorded.
+ * "in range" and isWithinHearing() the SAME condition, so nothing out of range
+ * is ever recorded, and nothing in range goes unrecorded (volume and loudness
+ * do not gate the record).
  *
  * `falloff` is the steepness: the level at the rim of the radius is
  * 1/(1+falloff), so a large value means the voices die away close to the
@@ -109,7 +110,7 @@ export function hearingGain(
   falloff: number = balance.communication.talk.falloff,
 ): number {
   if (!isWithinHearing(distance, radius)) return 0
-  if (radius <= 0) return distance <= 0 ? 1 : 0
+  if (radius <= 0) return 1 // at radius 0 only distance 0 passes the gate
   const d = distance / radius
   return 1 / (1 + Math.max(0, falloff) * d * d)
 }
@@ -238,14 +239,14 @@ export function conceptSeconds(concept: ConceptId, vocabulary: Vocabulary, optio
  * granted the floor (work-order 1184, user 22.09.2026): the word's own length
  * plus the calibratable pause after it.
  *
- * An instruction carried out in the same frame it is spoken — before its four
+ * An instruction carried out in the same frame it is spoken — before its
  * syllables have even finished — reads as a man narrating his own act rather
  * than as one man sending another, which is exactly the failure the water
  * errand was rebuilt to avoid (`adultWork.ts`, user 07.09.2026). The body is
  * still the meaning; it simply must not move before the word has been heard.
  *
- * The length comes from the plan, not from a guessed syllable count, so it
- * stays right when the phrase, the pace or the pause changes.
+ * The length comes from phraseSeconds (via conceptSeconds), not from a guessed
+ * syllable count, so it stays right when the word, the pace or the pause changes.
  */
 export function instructionDelay(concept: ConceptId, vocabulary: Vocabulary, options: SpeechOptions = {}): number {
   return conceptSeconds(concept, vocabulary, options) + Math.max(0, balance.communication.instructionHoldSeconds)
@@ -253,8 +254,8 @@ export function instructionDelay(concept: ConceptId, vocabulary: Vocabulary, opt
 
 /**
  * Records an utterance the player HEARD: within the hearing radius it goes into
- * the memory of point 477, beyond it nothing happens — seeing a villager speak
- * or gesture from too far away teaches him nothing.
+ * the memory of point 477, beyond it nothing happens — a villager speaking
+ * from too far away teaches him nothing.
  */
 export function hearUtterance(
   memory: CommunicationMemory,
@@ -282,7 +283,7 @@ export function hearPhrase(
  * catch. Deliberately NOT a plan of syllables — it carries no tone of the lect,
  * no utterance and nothing the hearing memory or the overhead label could read,
  * so there is no concept in it to learn. It shares only what every voice
- * shares: the child register, the camera-relative pan, the distance fall-off
+ * shares: the child voice, the camera-relative pan, the distance fall-off
  * and the §21 volume (and, where it is played, the speech bus).
  */
 export interface CryPlan {

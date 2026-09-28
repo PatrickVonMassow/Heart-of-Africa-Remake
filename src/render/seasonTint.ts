@@ -3,15 +3,17 @@
 // tint its own ground and flora with the SAME curve (point 143) — writing a
 // second one would drift, and the acacia-crown mask below was hard-won.
 //
-// A module-level uniform, in the mould of skyOvercast: both scenes drive it per
-// frame from their OWN greenness and only ever one renders. It is a uniform,
+// A module-level uniform, in the mould of skyOvercast: the settlement scene
+// drives it per frame from its greenness; the travel scene samples the
+// per-position season field instead (seasonField.ts). It is a uniform,
 // not a fresh material, so it does not trip point 96's program-relink cost.
 
 import { attribute, float, mix, positionLocal, uniform, vec3 } from 'three/tsl'
 import type { vertexColor } from 'three/tsl'
 
 // 0.5 = the untouched mid-year colour, 0 = full straw (dry), 1 = full green
-// (lush). Deserts stay neutral on their own: their greenness is ~0 year round.
+// (lush). Deserts stay unchanged on their own: their sand carries no green
+// cast, so the recolour's greenness mask leaves it alone.
 export const SEASON_TINT_U = uniform(0.5)
 
 /** Set this frame's season tint (from `effectiveGreenness`, 0..1). */
@@ -92,7 +94,7 @@ export function crownCollapse(dryness: number): { shrink: number; drop: number }
 }
 
 /**
- * Ground-flora sprout scale for foliage class 2 (bush, papyrus): a uniform
+ * Ground-flora sprout scale for foliage class 2 (bush, grass, papyrus): a uniform
  * withdraw toward the soil, folded into the plant matrix scale. Mirror of
  * seasonFoliagePosition's sprout (sproutK = 1): 1 - dryness*0.85.
  */
@@ -102,8 +104,8 @@ export function groundSprout(dryness: number): number {
 }
 
 /**
- * The flora material's brightness lift (point 206): the ground multiplies its
- * albedo by 2.6 while the vertex-coloured flora never got a matching lift, so
+ * The flora material's brightness lift (point 206): the travel ground multiplies
+ * its albedo by 2.6 (the settlement ground's baked structure by 2.0) while the vertex-coloured flora never got a matching lift, so
  * crowns read as near-black silhouettes. Both scenes (travel + settlement)
  * multiply their flora colorNode by THIS constant — shared so the pure
  * luminance floor in flora.test.ts gates the same number the shaders use.
@@ -144,8 +146,8 @@ export function seasonTintCpu(
 }
 
 /**
- * Recolour a base colour toward straw (dry) or deep green (lush), leaving
- * everything that is not foliage alone.
+ * Recolour a base colour toward straw (dry) or deep green (lush) by how
+ * greenish it is; a colour without a green cast is left alone.
  *
  * Note the greenness mask: the obvious `g > max(r, b)` test misses the savanna
  * acacia outright — its crown is OLIVE (#6e7c2f, r ≈ g), the single most visible
@@ -189,14 +191,16 @@ export function seasonTintNode(
  * The first attempt derived the mask from the per-vertex COLOUR — which
  * jitters by design — so neighbouring vertices of one crown collapsed by
  * different amounts and the trees tore into the screen-wide shards of the
- * 16.07 critical bug. This one reads the baked, per-part-uniform, BINARY
- * `foliage` attribute (flora.ts): every vertex of a part carries the same
+ * 16.07 critical bug. This one reads the baked, per-part-uniform `foliage`
+ * class attribute (flora.ts; 0 none, 1 crown, 2 ground flora): every vertex of a part carries the same
  * value by construction, the part moves as one, and nothing can tear.
  *
- * Zone-correctness is free, as before: the collapse scales with the tint
- * uniform's DRYNESS, which only falls below neutral in a zone that has a dry
- * season — the Congo's evergreen trees stay full because their uniform never
- * leaves neutral.
+ * Zone-correctness is free, as before: the collapse scales with the DRYNESS of
+ * the tint it is given (the settlement uniform or a per-position field value),
+ * which only falls below neutral in a zone that has a dry season — the Congo's
+ * evergreen trees stay full because their tint never leaves neutral. (The
+ * travel crowns bake the same collapse into their instance matrices on the
+ * CPU, crownCollapse.)
  */
 export function seasonFoliagePosition(
   tint: ReturnType<typeof float> = SEASON_TINT_U as unknown as ReturnType<typeof float>,

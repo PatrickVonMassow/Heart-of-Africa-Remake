@@ -4,11 +4,11 @@
 // subdued noise swell,
 // depth-dependent absorption sampled from the real bathymetry (the DEM
 // texture), foam along shorelines and on wave crests, and low roughness so
-// the IBL environment provides sky reflections. World-anchored via a uniform
-// offset so the plane can follow the player without the pattern swimming.
+// the IBL environment provides sky reflections everywhere. World-anchored via
+// a uniform offset so the plane can follow the player without the pattern
+// swimming.
 //
-// The IBL environment provides the sky reflections everywhere. OPEN: true
-// refraction (design.md §2) is beyond the POC pipeline. (Screen-space
+// OPEN: true refraction (design.md §2) is beyond the POC pipeline. (Screen-space
 // reflections were tried and removed — see render/Effects.tsx.)
 
 import * as THREE from 'three/webgpu'
@@ -31,9 +31,9 @@ import {
 import { getDemMeta } from '../world/geodata'
 import { demDatasetLand, demElevation } from './demElevation'
 
-export interface WaterMaterialHandle {
+interface WaterMaterialHandle {
   material: THREE.MeshStandardNodeMaterial
-  /** World-space XZ position of the plane center; update when the plane moves. */
+  /** World position of the plane center as (x, −z); update when the plane moves. */
   offset: { value: THREE.Vector2 }
   /** 0 = normal sea; 1 = glassy calm (debug continent zoom, design.md §21):
    *  waves, crest foam and sparkle fade out — at that distance they alias
@@ -57,7 +57,6 @@ export function createWaterMaterial(): WaterMaterialHandle {
   // sea level (the lower Nile) — even where the land mask makes the plane
   // fully transparent, since alpha-0 pixels still write depth.
   m.depthWrite = false
-  m.roughness = 0.08
   m.metalness = 0.02
 
   const offset = uniform(new THREE.Vector2(0, 0))
@@ -109,7 +108,7 @@ export function createWaterMaterial(): WaterMaterialHandle {
   const depthM = mix(float(3500), depthSampled, inLon.mul(inLat))
 
   // --- Depth-dependent absorption (design.md §2) --------------------------
-  const riverTone = color('#2c6285') // over land pixels (rivers, lakes)
+  const riverTone = color('#2c6285') // the shallowest tone, at depth 0
   const shallow = color('#3f9aa8')
   const mid = color('#1c5c86')
   const deep = color('#0b2f4e')
@@ -145,8 +144,8 @@ export function createWaterMaterial(): WaterMaterialHandle {
 
   // Sparse moving glints from a tight Worley cell pattern. The cells are
   // world-sized, so a close camera would read them as dense confetti
-  // scattered over the sea — fade them out below the default view height
-  // and keep them sparse and subtle beyond it.
+  // scattered over the sea — fade them out within ~16-32 units of the
+  // camera and keep them sparse and subtle beyond it.
   const camDist = positionWorld.sub(cameraPosition).length()
   const w = mx_worley_noise_float(vec3(wp.mul(1.7), time.mul(0.3)))
   const glintVis = smoothstep(float(16), float(32), camDist)
@@ -157,8 +156,8 @@ export function createWaterMaterial(): WaterMaterialHandle {
   col = col.add(vec3(sparkle, sparkle, sparkle))
 
   m.colorNode = col
-  // Shallow water is clearer, deep water opaque; foam always opaque. Far
-  // from the camera the surface turns fully opaque, so the end of the
+  // Shallow water is clearer and deep water denser (0.58 → 0.93), foam adding
+  // up to 0.3 on top. Far from the camera the surface turns fully opaque, so the end of the
   // terrain chunks underneath is never visible.
   // The plane is the OPEN-SEA surface only: over dataset land it fades out
   // entirely — keyed on the dataset's own land flag, not on elevation (the

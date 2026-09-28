@@ -24,7 +24,7 @@ export interface CapturedFrame {
   height: number
 }
 
-/** Frames come at ~16 ms; a few hundred ms of grace covers a hitching tab,
+/** Frames come at ~16 ms; two seconds of grace covers a hitching tab,
  *  and giving up beats hanging the download button forever. */
 const CAPTURE_TIMEOUT_MS = 2000
 
@@ -69,8 +69,5 @@ export function captureRenderedFrame(timeoutMs: number = CAPTURE_TIMEOUT_MS): Pr
         finish(null)
       }
     })
-    // Should the timeout have fired before the subscription came back, drop
-    // it right here rather than leaving a listener behind.
-    if (done) off()
   })
 }

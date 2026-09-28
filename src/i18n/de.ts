@@ -1,4 +1,4 @@
-// German language file (default game language, design.md §17). All player-
+// German language file (design.md §17; English is the default). All player-
 // visible German text lives here; identifiers and comments stay English.
 
 import type { Strings, TextParams } from './types'
@@ -161,7 +161,7 @@ export const de: Strings = {
   peoples: PEOPLES,
   landmarks: LANDMARKS,
   // Adjective agreement is written out per gender, never assembled from parts:
-  // der Berg/Wasserfall/See, das Dorf/Denkmal, die Stätte/Ruinen.
+  // der Hafen/Berg/Wasserfall/See, das Dorf/Denkmal/Wahrzeichen, die Stätte/Ruinen.
   unknownPlaces: {
     port: 'Unbekannter Hafen', monument: 'Unbekanntes Denkmal', village: 'Unbekanntes Dorf',
     mountain: 'Unbekannter Berg', waterfall: 'Unbekannter Wasserfall', lake: 'Unbekannter See',
@@ -329,7 +329,7 @@ export const de: Strings = {
     contents: 'Das Archiv enthält das Bild, den vollständigen Spielzustand und deine Beschreibung. Du kannst es ungeöffnet weitergeben.',
     saved: 'Fehlerbericht gespeichert.',
     report: {
-      heading: 'The Heart of Africa – Fehlerbericht',
+      heading: 'Das Herz von Afrika – Fehlerbericht',
       description: 'Was schiefgelaufen ist',
       noDescription: '(keine Beschreibung angegeben)',
       environment: 'Umgebung',
@@ -836,8 +836,8 @@ export const de: Strings = {
           falls: `Tosendes Wasser: ${name}`,
           lake: `Ein Binnenmeer: ${name}`,
           grave: 'Wo die Elefanten sterben',
-          pyramids: `Die Pyramiden von ${name}`,
-          'giza-pyramids': `Die großen Pyramiden von ${name}`,
+          pyramids: `Die ${name}`,
+          'giza-pyramids': `Die großen ${name}`,
           'stone-city': `Die Steinmauern von ${name}`,
           'rock-churches': `Die Felsenkirchen von ${name}`,
           'coastal-ruins': `Die Ruinen von ${name}`,
@@ -885,11 +885,10 @@ export const de: Strings = {
     },
     portArrival: (p: TextParams) =>
       `Ich habe ${PLACES[p.place as string]} erreicht. [excited]Der Lärm des Hafens, die Rufe der Händler, der Geruch von Salz und Gewürzen[/excited] – hier kann ich Vorräte auffrischen und Kräfte sammeln. [pause]Meine Aufzeichnungen habe ich in Sicherheit gebracht. [mute](Checkpoint gespeichert)[/mute]`,
-    // Der erste Eintritt in eine Hafenstadt (Punkt 394): was der Reisende um
-    // 1890 an DIESEM Ort tatsächlich sieht – Khartum eine Ruine gegenüber dem
-    // Omdurman des Khalifa, Timbuktu eine Lehmstadt im Sand, Boma eine
-    // zusammengeschraubte Station. Berbera liest seine belegte Messesaison
-    // (docs/peoples-1890.md §4.0.2).
+    // The first entry into a port (point 394): what the traveller actually sees
+    // on arriving at THAT city in ~1890 – Khartoum a ruin opposite the Khalifa's
+    // Omdurman, Timbuktu a mud town in the sand, Boma a bolted-together station.
+    // Berbera reads its documented fair season (docs/peoples-1890.md §4.0.2).
     portFirstVisit: (p: TextParams) => {
       const name = PLACES[p.place as string]
       const texts: Record<string, string> = {
@@ -912,8 +911,8 @@ export const de: Strings = {
         `Ich habe ${name} erreicht. [excited]Der Hafen, die Rufe der Händler, der Geruch von Salz und Teer[/excited] – ein Ort, um meine Vorräte zu ordnen, ehe es weitergeht.`
       return `${text} [pause]Meine Aufzeichnungen habe ich in Sicherheit gebracht. [mute](Checkpoint gespeichert)[/mute]`
     },
-    // Rückkehr in eine Hafenstadt, deren Lage sich geändert hat (Punkt 394):
-    // beschrieben wird NUR die Änderung. Modelliert ist heute Berberas Saison.
+    // Re-entering a port whose situation has changed (point 394): only the
+    // change is described. Berbera's fair season is the one modelled today.
     portReturn: (p: TextParams) => {
       const transitionKey = `${p.fromSituation as string}_${p.toSituation as string}`
       const texts: Record<string, Record<string, string>> = {
@@ -927,11 +926,10 @@ export const de: Strings = {
         `[somber]${PLACES[p.place as string]} ist nicht die Stadt, die ich verlassen habe.[pause] Was sich hier seit meinem letzten Besuch geändert hat, steht offen in den Straßen.[/somber]`
       return `${text} [pause]Meine Aufzeichnungen habe ich in Sicherheit gebracht. [mute](Checkpoint gespeichert)[/mute]`
     },
-    // Ankunft an einer begehbaren Monumentstätte (Punkt 394; Recherche:
-    // docs/giza-1890.md): das Bild der ZEIT, nicht die moderne Postkarte –
-    // Chufus abgebrochene Spitze, Chephrens blasse Verkleidungskappe, die bis
-    // zu den Schultern versandete Sphinx – und die Nilflut des Besuchsdatums,
-    // die das Plateau vor dem Staudamm jeden Herbst zur Insel machte.
+    // Arrival at a walkable monument site (point 394; research: docs/giza-1890.md):
+    // the PERIOD picture, not the modern postcard – Khufu's broken apex, Khafre's
+    // pale casing cap, the Sphinx buried to the shoulders – and the Nile flood of
+    // the visit date, which before the dam made the plateau an island every autumn.
     monumentFirstVisit: (p: TextParams) => {
       const flood = p.situation === 'flood'
       const texts: Record<string, string> = {
@@ -944,7 +942,7 @@ export const de: Strings = {
         `[awe]Ich habe ${PLACES[p.place as string]} erreicht und stand lange davor, ohne etwas aufzuschreiben.[/awe] [pause]Manche Dinge sind älter als jeder Bericht über sie.`
       )
     },
-    // Rückkehr an eine Monumentstätte in veränderter Lage (Punkt 394).
+    // Re-entering a monument site in a changed situation (point 394).
     monumentReturn: (p: TextParams) => {
       const transitionKey = `${p.fromSituation as string}_${p.toSituation as string}`
       const texts: Record<string, Record<string, string>> = {
@@ -960,10 +958,10 @@ export const de: Strings = {
     },
     villageFirstVisit: (p: TextParams) => {
       const name = PLACES[p.place as string]
-      // Jedes Dorf liest sich wie es selbst um 1890 (design.md §16) – und die
-      // Rinderpest-Jahre sind datumsabhängig (Punkt 133): die Phase des
-      // Besuchsdatums wählt bei Maasai und Sidama die Vignette. Der deutsche
-      // Getroffen-Text trägt Baumanns wörtliche Sätze (Baumann 1894, S. 31-32).
+      // Each people's village reads like its ~1890 self (design.md §16) –
+      // and the rinderpest years are date-dependent (point 133): the plague
+      // phase of the visit date picks the Maasai and Sidama vignette. The
+      // German struck text carries Baumann's own sentences (Baumann 1894, pp. 31-32).
       const phase = (p.phase as string) ?? 'clean'
       const texts: Record<string, string> = {
         tuareg: `Ich habe das ${name} erreicht – ein Lager der blau verschleierten Reiter der Wüste. [awe]Flache Zelte aus Häuten, Kamele im Sand gelagert, und Männer, deren Gesichter in Indigotuch gehüllt sind –[pause] bei den Tuareg verschleiern sich die Männer, nicht die Frauen.[/awe] Ihre Salzkarawanen durchqueren die Leere wochenlang. [somber]Der Häuptling empfängt Fremde im großen Zelt.[/somber]`,
@@ -1030,7 +1028,7 @@ export const de: Strings = {
     rockArtefact:
       '[excited]Vier Wörter – und es war doch ein Auftrag.[/excited] Ich bin dem Wasser gegen seinen eigenen Zug gefolgt, bis ein Steinblock am Ufer stand – von der Art, die die Kinder an ihren beiden Felsen benennen, und der einzige hier oben. [pause]Meine Deutung habe ich neben den Trommelschlägen in meinen Notizen festgehalten. [pause]Drei Spann tief stieß mein Spaten auf etwas, das kein Stein war: gehämmertes Metall auf verwittertem Holz, eingeschlossen im Lehm des Flusses. [awe]Es liegt hier länger, als das Dorf steht.[/awe] [pause]Ich habe es nicht weiter geöffnet. [somber]Es steht mir nicht zu, es zu öffnen.[/somber]',
     artefactGiven:
-      '[breath]Ich habe es den Fluss hinab zurückgetragen und dem Oberhaupt in die Hände gelegt.[/breath] [pause]Er legte den Fund neben die Trommeln und ließ seinen Trommler antworten – zwei Wörter auf den Trommeln. [excited]Beide hatte ich schon im Dorf gehört.[/excited] [pause]Was die beiden zusammen sagen, muss ich selbst herausbekommen; niemand hier wird es mir in einer meiner Sprachen sagen. [pause]Dann nahm er ein Ding aus gebranntem Ton neben den Trommeln auf und legte es mir in die Hände, ohne ein einziges Wort darüber. [pause]Es ist flach im Rücken und ausgehöhlt an der Vorderseite, und die Höhlung ist keine Schale: Sie ist die Gestalt eines Stücks Fels, ihm abgenommen, wie ein Siegel ein Petschaft abnimmt. [awe]Eine Form, die IN etwas hinein will, nicht auf etwas darauf.[/awe] [pause][somber]Wir haben keine gemeinsame Sprache.[pause] Und doch hat er mir zwei Wörter und eine Gestalt gegeben, und beides ist für jemanden gemeint, der zugehört hat.[/somber]',
+      'Ich habe es den Fluss hinab zurückgetragen und dem Oberhaupt in die Hände gelegt.[breath] [pause]Er legte den Fund neben die Trommeln und ließ seinen Trommler antworten – zwei Wörter auf den Trommeln. [excited]Beide hatte ich schon im Dorf gehört.[/excited] [pause]Was die beiden zusammen sagen, muss ich selbst herausbekommen; niemand hier wird es mir in einer meiner Sprachen sagen. [pause]Dann nahm er ein Ding aus gebranntem Ton neben den Trommeln auf und legte es mir in die Hände, ohne ein einziges Wort darüber. [pause]Es ist flach im Rücken und ausgehöhlt an der Vorderseite, und die Höhlung ist keine Schale: Sie ist die Gestalt eines Stücks Fels, ihm abgenommen, wie ein Siegel ein Petschaft abnimmt. [awe]Eine Form, die IN etwas hinein will, nicht auf etwas darauf.[/awe] [pause][somber]Wir haben keine gemeinsame Sprache.[pause] Und doch hat er mir zwei Wörter und eine Gestalt gegeben, und beides ist für jemanden gemeint, der zugehört hat.[/somber]',
     mouldFitted:
       '[whisper]Diesmal bin ich dem Wasser dorthin gefolgt, wohin es selbst will, bis sich das Land in einer langen Wand aus Stein über der Ebene aufrichtete.[/whisper] [pause]Zu den kleinen Kammern in der Wand bin ich nicht hinaufgestiegen – es sind Gräber und Speicher, und sie gehen mich nichts an. [pause]Am Fuß der Wand, auf dem Boden, auf dem die Menschen leben, trug ein verwitterter Block ein Relief, das ich längst in Händen gehalten hatte: Der Ton legte sich dagegen und saß darin ohne ein Haar Spiel. [pause][awe]Hinter dem Stein gab etwas nach – ein Gewicht, das sich verschob, ein langer Zug kalter Luft aus dem Boden.[/awe] [pause][excited]Dafür also waren die Wörter.[/excited] [pause][somber]Was dahinterliegt, ist eine Sache für einen anderen Tag.[/somber]',
     digNothing: '[weary]Ich grub an dieser Stelle, doch der Sand gab nichts preis als Steine und alte Wurzeln.[/weary]',
@@ -1060,7 +1058,7 @@ export const de: Strings = {
         lion: `[fear]Ich wurde von ${animal} angegriffen![/fear]`,
         cheetah: `[fear]In rasender Geschwindigkeit brach ${animal} aus dem Gras auf mich zu![/fear]`,
         leopard: `[fear]Aus dem Nichts war ${animal} über mir![/fear]`,
-        hyena: `[fear]Mit schnappenden Kiefern kam ${animal} näher![/fear]`,
+        hyena: `[fear]Mit schnappenden Kiefern kamen ${animal} näher![/fear]`,
         snake: `[fear]Beinahe wäre ich auf ${animal} getreten![/fear]`,
         crocodile: `[fear]Das Wasser brach auf –[pause] ${animal}![/fear]`,
       }
@@ -1091,7 +1089,7 @@ export const de: Strings = {
         falls: `[awe]Ein fernes Donnern rollte über das Land, lange bevor ich es sah:[pause] ${name}![/awe] [excited]Der Fluss stürzt sich in weißen Wänden in die Tiefe –[pause] ein Anblick, den ich nie vergessen werde.[/excited]`,
         lake: `[awe]Ein großes Wasser öffnete sich vor mir –[pause] ${name}, bis zum Horizont gedehnt wie ein Meer.[/awe] [somber]Ich habe sein Ufer auf meiner Karte vermerkt.[/somber]`,
         grave: `[whisper]Ich gehe zwischen gebleichten Knochen und mächtigen Stoßzähnen –[pause] der Friedhof der Elefanten.[/whisper] [awe]Die alten Geschichten haben also die Wahrheit gesagt.[/awe]`,
-        'giza-pyramids': `[awe]Da standen sie jenseits des Stroms, als der Morgendunst sich hob –[pause] die drei großen Pyramiden von ${name}, und davor kauerte der löwenleibige Wächter.[/awe] [excited]Von afrikanischen Händen errichtet, viertausend Jahre vor jedem europäischen Reich –[pause] das älteste aller Weltwunder, und es steht in Afrika.[/excited]`,
+        'giza-pyramids': `[awe]Da standen sie jenseits des Stroms, als der Morgendunst sich hob –[pause] die drei großen ${name}, und davor kauerte der löwenleibige Wächter.[/awe] [excited]Von afrikanischen Händen errichtet, viertausend Jahre vor jedem europäischen Reich –[pause] das älteste aller Weltwunder, und es steht in Afrika.[/excited]`,
         pyramids: `[awe]Steile Pyramiden drängen sich am Ostufer des Nils –[pause] ${name}, die Königsstadt von Kusch.[/awe] [excited]Ein Reich, das diese Gräber errichtete und in eigener Schrift schrieb –[pause] ein afrikanisches Reich aus eigenem Recht, kein Schatten Ägyptens.[/excited]`,
         'stone-city': `[awe]Fugenlose Mauern aus behauenem Granit schwingen über den Hügel, überragt von einem großen Kegelturm –[pause] ${name}.[/awe] [somber]Afrikanische Hände errichteten diese Hauptstadt, was die Siedler daheim auch behaupten mögen.[/somber]`,
         'rock-churches': `[awe]In den lebenden Fels hinabgehauene Kirchen, Kreuz um Kreuz in den Stein gesenkt –[pause] ${name}.[/awe] [excited]Das Werk eines christlichen äthiopischen Königreichs,[pause] und noch heute knien Gläubige darin.[/excited]`,
@@ -1151,7 +1149,12 @@ export const de: Strings = {
     valuableRejected: (p: TextParams) =>
       `[fear]Ein Fehler, es offen zu tragen![/fear] Die ${PEOPLES[p.people as string]} wichen vor [emph]${de.treasures[p.treasure as keyof typeof de.treasures]}[/emph] in meiner Hand zurück wie vor einem bösen Omen. [somber]Türen schlossen sich;[pause] Mütter zogen ihre Kinder ins Haus.[/somber]`,
     friendRescue: (p: TextParams) => {
-      const animal = de.animals[p.animal as keyof typeof de.animals]
+      // After "von" the animal takes the dative, which de.animals (nominative) lacks.
+      const dative: Record<string, string> = {
+        lion: 'Löwen', cheetah: 'einem Geparden', leopard: 'einem Leoparden', hyena: 'Hyänen',
+        snake: 'einer Schlange', crocodile: 'einem Krokodil',
+      }
+      const animal = dative[p.animal as string] ?? de.animals[p.animal as keyof typeof de.animals]
       const hurt = p.result === 'light' ? ' [somber]Ich wurde nur leicht verletzt.[/somber]' : ' [excited]Ich blieb unversehrt.[/excited]'
       return `[fear]Ich wurde von ${animal} angegriffen![/fear] [excited]Eine Gruppe der ${PEOPLES[p.people as string]} eilte mir sofort zu Hilfe und vertrieb das Tier.[/excited]${hurt} [pause][somber]Ich verdanke diesen Menschen mein Leben.[/somber]`
     },

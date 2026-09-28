@@ -1,11 +1,12 @@
 // Pure vocabulary construction. A run saves the value, never its position in
 // this enumeration: changing enumeration order must not reinterpret old notes.
 //
-// LENGTH-GENERIC BY CONSTRUCTION. Nothing here writes a four-syllable literal:
-// the word inventory is derived from SEQUENCE_LENGTH and the two rules are
-// predicates over a vocabulary. Raising the syllable count — to fit more
-// concepts into the language — is a change of that constant plus a new pinned
-// table, not a redesign of the roll.
+// LENGTH-GENERIC BY CONSTRUCTION. The roll writes no four-syllable literal
+// (the shipped mapping below is the fixed legacy table): the word inventory is derived
+// from SEQUENCE_LENGTH, rule (a) is built into the enumeration and rule (b) is a
+// predicate over a vocabulary. Raising the syllable count — to fit more
+// concepts into the language — is a change of that constant plus re-pinning the
+// table in vocabulary.test.ts, not a redesign of the roll.
 import {
   DEFAULT_LECT, SEQUENCE_LENGTH, CONCEPT_IDS, highCount, reversed, speak, tonesOf,
   wellFormedSequences,
@@ -14,7 +15,7 @@ import {
 import { CHIEF_MESSAGE_CONCEPTS } from './drumMessage'
 import { mulberry32 } from '../world/noise'
 
-/** The original mapping, used only to preserve saves made before the roll. */
+/** The original mapping: the fallback for saves made before the roll, and the tests' fixed vocabulary. */
 export const SHIPPED_VOCABULARY: Vocabulary = {
   RIVER: 'ba-BA-ba-BA',
   UPSTREAM: 'ba-ba-BA-BA',
@@ -76,9 +77,9 @@ export function hasIconicDirections(
  * must decode. At today's errand (RIVER-UPSTREAM-ROCK-DIG) the rule bites on
  * ROCK and DIG; that is the case it produces, not the rule itself.
  *
- * WHAT IT DOES NOT DO: the directions spend one whole reversal pair, so a
- * second, meaningless mirror pair always remains among the free concepts. That
- * is unavoidable and accepted (user 21.09.2026); in 8 of the 20 four-syllable
+ * WHAT IT DOES NOT DO: at four syllables the directions spend one whole
+ * reversal pair, so a second, meaningless mirror pair always remains among the
+ * free concepts. That is unavoidable at this length and accepted (user 21.09.2026); in 8 of the 20 four-syllable
  * results both its members still sit inside the errand, only never adjacently.
  */
 export function hasNoAdjacentMirrors(

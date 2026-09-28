@@ -18,8 +18,10 @@ export type Tone = 'low' | 'high'
 export type ToneSequence = readonly Tone[]
 
 /**
- * The concepts of the slice. Adding another here fails to compile
- * until every vocabulary gives it a sequence (the Record below is exhaustive).
+ * The concepts of the slice. Adding another here fails to compile until
+ * CONCEPT_ORDER and every written Vocabulary literal give it an entry; the
+ * rolled vocabulary (vocabulary.ts) is cast, not checked, and at
+ * SEQUENCE_LENGTH 4 has no seventh mixed sequence to give.
  */
 export type ConceptId =
   | 'RIVER'
@@ -53,8 +55,9 @@ export type Vocabulary = Readonly<Record<ConceptId, UtteranceId>>
 
 /**
  * A PHRASE is an ordered list of atoms spoken one after another, separated by
- * the constant pause the drums also use (balance.communication.phrasePauseSeconds)
- * and by nothing else — that is how a villager says "dig + here".
+ * the constant pause the drums also use (balance.communication.phrasePauseSeconds),
+ * added to the unsounded tail of the last syllable's step, and by nothing
+ * else — that is how a villager says "river + upstream".
  */
 export type Phrase = readonly UtteranceId[]
 
@@ -102,7 +105,10 @@ const TONAL_WEST_CENTRE: Lect = {
   ),
 }
 
-/** Every lect. A new region adds an entry here and touches no consumer. */
+/**
+ * Every lect. The vocabulary roll (vocabulary.ts) writes in DEFAULT_LECT, so a
+ * second region also needs the roll to take its lect.
+ */
 export const LECTS: Readonly<Record<LectId, Lect>> = {
   tonalWestCentre: TONAL_WEST_CENTRE,
 }
@@ -164,8 +170,8 @@ export function highCount(sequence: ToneSequence): number {
 
 /**
  * Syllables in which two sequences differ. Sequences of unequal length differ
- * in every position past the shorter one, so a dropped beat never reads as a
- * near-match.
+ * in every position past the shorter one, so a dropped beat counts as one
+ * differing syllable.
  */
 export function toneDistance(a: ToneSequence, b: ToneSequence): number {
   const len = Math.max(a.length, b.length)
@@ -178,7 +184,7 @@ export function toneDistance(a: ToneSequence, b: ToneSequence): number {
  * A sequence the village's tongue CAN form: the fixed length and an even number
  * of highs, which buys the distance of two between any two inventory entries.
  *
- * Not the same as "usable as a concept", which it used to say. The single-tone
+ * Not the same as "usable as a concept". The single-tone
  * sequences `ba-ba-ba-ba` and `BA-BA-BA-BA` are well formed by this rule and are
  * deliberately never words — two of two reserved sequences. Whether a sequence
  * IS a word is `conceptOf`'s question, answered against the run vocabulary.

@@ -1,8 +1,10 @@
-// Assembly of the F6 bug report (design.md §21.1): the picture, the state and
-// the user's description as ONE archive the user can pass on unopened.
+// Assembly of the F6 bug report (design.md §21.1): the picture, the state, the
+// visible overlay and the user's description as ONE archive the user can pass
+// on unopened.
 //
 // Every member is named from the SAME stem as the plain state dump
-// (`dumpFilename`), so the four files stay recognisably one report:
+// (`dumpFilename`), so the files stay recognisably one report (four, or three
+// when a failed capture leaves the PNG out):
 //
 //   hoa-state-2026-07-27-4711.png       the 3-D scene, read back from the canvas
 //   hoa-state-2026-07-27-4711.json      the full serialised game state
@@ -19,7 +21,7 @@ import { buildZip, type ZipEntry } from './zip'
 
 /** Localized labels for the description file — English and German are served
  *  from the language files like every other player-visible text (§17.7). */
-export interface ReportTexts {
+interface ReportTexts {
   heading: string
   /** Section title above the user's own words. */
   description: string
@@ -66,7 +68,7 @@ export interface ReportInput {
   generatedAt?: Date
 }
 
-export interface AssembledReport {
+interface AssembledReport {
   /** `<stem>.zip` — what the browser saves. */
   filename: string
   zip: Uint8Array
@@ -81,9 +83,10 @@ export function reportStem(dumpFilename: string): string {
   return dumpFilename.replace(/\.json$/i, '')
 }
 
-/** Decodes a `data:image/png;base64,…` URL to bytes; null for anything else —
- *  a failed capture yields an empty or non-PNG URL, and an empty member is
- *  better than a blank picture somebody reads as evidence. */
+/** Decodes a `data:image/png;base64,…` URL to bytes; null for an empty or
+ *  non-PNG URL (a failed capture), so the report leaves the member out rather
+ *  than ship a blank picture somebody reads as evidence. A malformed base64
+ *  payload throws (atob). */
 export function dataUrlToBytes(dataUrl: string | null | undefined): Uint8Array | null {
   if (!dataUrl) return null
   const match = /^data:image\/png;base64,(.+)$/is.exec(dataUrl)

@@ -49,7 +49,7 @@ export function currentDrumMessage(state: { rockArtefact: 'buried' | 'carried' |
 export type DrumId = 'low' | 'high'
 
 /** One beat of the message: which drum, when, how long, and in which concept. */
-export interface DrumStrike {
+interface DrumStrike {
   drum: DrumId
   /** Seconds after the start of the message. */
   at: number
@@ -59,7 +59,7 @@ export interface DrumStrike {
   conceptIndex: number
   /** Index of the syllable within that concept's sequence. */
   syllableIndex: number
-  /** Envelope peak of the hit, already volume-scaled (as in a SpeechPlan). */
+  /** Envelope peak of the hit, already volume-scaled; no distance falloff applies. */
   peak: number
 }
 
@@ -126,7 +126,7 @@ export function drumMessagePlan(vocabulary: Vocabulary, message: DrumMessageId =
  */
 export function drumStrikeAt(plan: DrumMessagePlan, elapsed: number): DrumStrike | null {
   for (const strike of plan.strikes) {
-    if (elapsed < strike.at) return null // the strikes are ordered — none can follow
+    if (elapsed < strike.at) return null // the strikes are ordered — none later has begun
     if (elapsed < strike.at + strike.duration) return strike
   }
   return null
@@ -139,7 +139,7 @@ export function drumStrikeProgress(strike: DrumStrike, elapsed: number): number 
 }
 
 /** One concept of the message as the display shows it. */
-export interface DrumMessageElement {
+interface DrumMessageElement {
   /** Position in the message, 0-based. */
   index: number
   /** The syllables as they were beaten, and as the journal lists them. */

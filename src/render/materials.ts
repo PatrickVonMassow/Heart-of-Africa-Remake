@@ -60,7 +60,7 @@ export function proceduralBump(height: unknown, strength: unknown) {
  * noise turns sub-pixel in the distance, where the TRAA camera jitter samples
  * a different value every frame and the temporal resolve cannot converge —
  * the ground visibly trembles. Detail amplitudes are multiplied by this fade
- * so far surfaces fall back to their flat base color/normal. (The baked
+ * so far surfaces keep only their broad colour field and a flat normal. (The baked
  * settlement textures need none of this: their mip chain band-limits.)
  */
 export function detailFade(near: number, far: number) {
@@ -284,9 +284,10 @@ export function createNoisyMaterial(opts: NoisyMaterialOptions): THREE.MeshStand
 /**
  * How much of the dark blotch colour the ground's patch mottling ever mixes in.
  * Sand (the open Giza plateau) keeps far less of it, so it reads as even desert
- * sand rather than a pebbled field (point 273). Exported because the settlement
- * edge's contrast model measures against the ground's MEAN colour, which this
- * weight decides (work-order 581) — one number, not two that can drift.
+ * sand rather than a pebbled field (point 273). Exported for the settlement
+ * edge's contrast test (edgeBand.test.ts), which measures against the ground's
+ * MEAN colour that this weight decides (work-order 581) — one number, not two
+ * that can drift.
  */
 export const GROUND_PATCH_WEIGHT = { earth: 0.5, sand: 0.14 } as const
 
@@ -316,8 +317,8 @@ export function createGroundMaterial(
   // Desert-sand ground (the walkable Giza plateau, point 273) reads as even,
   // warm, granular sand — NOT the blotchy pebbled earth the settlements use.
   // Over a large open disc that earth mottling read as wavy pale parchment
-  // (user report), so for sand the broad tonal drift and the dark Worley patch
-  // are muted and the baked relief is softened to a fine even grain.
+  // (user report), so for sand the dark Worley patch is muted
+  // (GROUND_PATCH_WEIGHT.sand) and the baked relief is softened.
   const sand = opts?.sand ?? false
   const m = new THREE.MeshStandardNodeMaterial()
   m.roughness = 1
@@ -359,13 +360,6 @@ export function createGroundMaterial(
       .clamp(0, 1)
   })()
   if (paths) col = mix(col, color(paths.color), pathMask.mul(float(0.95)))
-  // The settlement ground follows the season like the travel terrain does
-  // (design.md §19.13, point 143): the tint bleaches any greenish earth toward
-  // straw in the dry season and deepens it in the rains, and leaves bare sand
-  // and trodden paths alone (its greenness mask). createGroundMaterial is
-  // settlement-only, so this never double-tints the travel scene.
-  // Rain wets the settlement ground (design.md §19.13, point 225): darker and
-  // glossier as the storm soaks it, driven by the shared GROUND_WET_U uniform.
   // Tonal edge term (point 352/488): the compacted, swept inside sits a little
   // darker than the open land. MULTIPLIED ONTO the season-tinted colour, not
   // mixed into the base — so the inside/outside contrast is the same ratio in
@@ -377,13 +371,21 @@ export function createGroundMaterial(
   // the grey is the colour's weighted luma — so the value step above stays the
   // whole value step, and a sand-coloured village gets a second, chromatic cue
   // where value alone had little to work with.
+  // The settlement ground follows the season like the travel terrain does
+  // (design.md §19.13, point 143): the tint bleaches any greenish earth toward
+  // straw in the dry season and deepens it in the rains, and leaves bare sand
+  // and trodden paths alone (its greenness mask). createGroundMaterial is
+  // settlement-only, so this never double-tints the travel scene.
   const tinted = seasonTintNode(col)
   const dust = tinted.r.mul(0.35).add(tinted.g.mul(0.5)).add(tinted.b.mul(0.15))
   const dusted = mix(tinted, vec3(dust, dust, dust), swept.mul(edgeBandUniforms.desat))
+  // Rain wets the settlement ground (design.md §19.13, point 225): darker and
+  // glossier as the storm soaks it, driven by the shared GROUND_WET_U uniform.
   m.colorNode = wetGroundColor(dusted.mul(sweptTone).mul(surfaceStructure('ground')))
   // Baked micro-relief; trodden paths are worn flat (the tangent deflection
-  // fades where the mask is strong). Sand keeps a softer, finer grain so the
-  // open plateau reads as smooth desert sand rather than a pebbled field. The
+  // fades where the mask is strong). Sand keeps a softer grain (weaker relief,
+  // same tile) so the open plateau reads as smooth desert sand rather than a
+  // pebbled field. The
   // swept settlement ground is worn flatter the same way the paths are, so the
   // edge reads as a change in the SURFACE as well as in the tone.
   const sweptRelief = float(1).sub(swept.mul(edgeBandUniforms.relief))

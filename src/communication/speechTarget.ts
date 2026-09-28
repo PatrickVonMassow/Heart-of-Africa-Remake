@@ -1,12 +1,12 @@
-// Which speaker the use key would take (design.md §13.4, work-order points
-// 588/691).
+// Which speaker the guess key would take (design.md §13.4, work-order points
+// 588/691/1139).
 //
-// The guess belongs where the guess is formed, so SPACE in the settlement opens
-// the reading dialog for ONE speaker. Which one must never be in doubt: the
-// NEAREST one, and his label alone carries the highlight and the invitation.
-// This decides WHICH speaker is the speaker candidate; whether SPACE means him
-// at all — rather than the door he happens to stand beside — is arbitrated
-// against every other candidate in src/scenes/place/useKeyTarget.ts.
+// The guess belongs where the guess is formed, so the guess key (E) in the
+// settlement opens the reading dialog for ONE speaker. Which one must never be
+// in doubt: the NEAREST one, and his label alone carries the highlight and the
+// invitation. This decides WHICH speaker is the speaker candidate;
+// src/scenes/place/useKeyTarget.ts routes speech to the guess key, apart from
+// the doors on SPACE.
 //
 // Pure logic — no scene, no store, no clock. The caller measures the distances,
 // this decides. A tie KEEPS the standing pick: two figures walking abreast are
@@ -52,7 +52,7 @@ export function pickSpeechTarget(
 }
 
 /** What the notes show while a dialog stands open. */
-export interface LabelPresentation {
+interface LabelPresentation {
   /** The speaker whose note carries the highlight and the invitation, if any. */
   targetedId: string | null
   /** The speaker whose note is not drawn at all, because a dialog says it. */
@@ -62,7 +62,7 @@ export interface LabelPresentation {
 /**
  * How the notes are drawn (points 588/691/1139). The guess key is ignored while
  * ANY dialog is open, so a highlight and its invitation would promise something
- * the game will not do — no dialog, no target. The same holds when no word is
+ * the game will not do — an open dialog, no target. The same holds when no word is
  * in reach of that key: a note that invited a press E will not answer is a bug
  * rather than a detail. A door at the player's feet no longer silences it — the
  * use key and the guess key stopped competing when they became two keys.

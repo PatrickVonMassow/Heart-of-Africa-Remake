@@ -3,7 +3,7 @@
 // TILTED streaks, because a plumb streak seen from above is nearly edge-on. At
 // eye height none of that holds: the player looks horizontally, so the streaks
 // must be near-VERTICAL, and the column is tight around the head rather than
-// 55 units wide. So this is its own field, not a reused one.
+// the travel field's 55-unit radius. So this is its own field, not a reused one.
 //
 // Driven by the place's own wetness (rainAmount), which is 0 in Cairo and every
 // hyper-arid coordinate — so a port in the desert never rains, with no special
@@ -55,7 +55,8 @@ export function PlaceRain({ wetness }: { wetness: React.MutableRefObject<number>
   }, [material, geometry])
 
   useFrame(({ camera }, dt) => {
-    // Follow the head so the column always surrounds the player.
+    // Follow the head horizontally; the column's base stays at EYE whatever
+    // the camera's height.
     if (group.current) group.current.position.set(camera.position.x, EYE, camera.position.z)
     const target = rainAmount(wetness.current, balance.season.weatherStrength)
     opacityU.value += (target - opacityU.value) * Math.min(1, dt * 1.5)

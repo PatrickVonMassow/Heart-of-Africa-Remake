@@ -1,6 +1,7 @@
-// Vertex-colored ambient wildlife geometries (design.md §19). Same approach
-// as flora.ts: each species merges into one BufferGeometry so herds render as
-// a single instanced draw call. Origin at the ground, +Z is the animal's
+// Vertex-colored ambient wildlife geometries and their gait math (design.md
+// §19). Same approach as flora.ts: a far herd species merges into one
+// BufferGeometry drawn as a single instanced call; the walking rigs split a body
+// from separately pivoted legs, and the crocodile has its own material. Origin at the ground, +Z is the animal's
 // forward direction. The rounded body parts are tessellated per
 // FAUNA_TESSELLATION and smooth-shaded (point 214): the primitives carry
 // per-vertex normals and the shared material never flat-shades, so curvature
@@ -36,15 +37,17 @@ export const FAUNA_TESSELLATION = {
   head: [28, 20],
   /** Small spheres: eyes, bird bodies/heads, chicks [width, height]. */
   small: [12, 9],
-  /** Limb cylinders/cones: legs, necks, tails, trunk segments (radial). */
+  /** Limb cylinders/cones: legs, necks, tails, trunk segments (radial); the
+   *  thin bird legs use `spike`. */
   limb: 12,
   /** Spike cones: horns, tusks, beaks (radial). */
   spike: 8,
 } as const
 
 /**
- * The one shared fauna material (bird's-eye herds and hunt actors in
- * Wildlife.tsx, the village goats in PlaceLife.tsx). Smooth shading is
+ * The shared fauna material (bird's-eye herds and hunt actors in Wildlife.tsx,
+ * the village goats in PlaceLife.tsx); the crocodile has its own
+ * (createCrocodileMaterial). Smooth shading is
  * explicit (point 214): flat shading would give every merged body per-face
  * normals and collapse the rounded tessellation back into panels.
  */
@@ -72,7 +75,7 @@ export function createFaunaMaterial(): THREE.MeshStandardMaterial {
  * through the body frame, and the two cancel: the foot does not move. The
  * cadence is therefore DERIVED per species from its own leg length (`gaitRig`),
  * never a shared guess — the old single 11.0 rad/unit over-drove every long
- * leg (an elephant's stride is ~4.4× a goat's, so it cycled ~4.4× too fast:
+ * leg (an elephant's leg is ~3× a goat's, so it cycled ~3× too fast:
  * the point-300 report).
  */
 
@@ -111,7 +114,7 @@ export function gaitCadence(legLength: number, amp = GAIT_SWING): number {
   return s > 0 ? (2 * Math.PI) / s : 0
 }
 
-/** Wrap a phase into (−π, π]. */
+/** Wrap a phase into [−π, π]. */
 function wrapPhase(phase: number): number {
   return Math.atan2(Math.sin(phase), Math.cos(phase))
 }
@@ -148,7 +151,7 @@ export function gaitFootFraction(phase: number): number {
 /** Peak |fraction| the swing return reaches (the Hermite's overshoot), read off
  *  the profile itself at the stationary point of its derivative
  *  (−24τ² + 24τ − 2 = 0) rather than restated as a magic number. */
-export const GAIT_FRACTION_MAX = Math.abs(
+const GAIT_FRACTION_MAX = Math.abs(
   gaitFootFraction(Math.PI / 2 + ((24 - Math.sqrt(24 * 24 - 4 * 24 * 2)) / (2 * 24)) * Math.PI),
 )
 
@@ -170,7 +173,7 @@ export function gaitPhase(distanceTravelled: number, cadence: number): number {
  *  full cycle is 2π, so the furthest a stop can be from the neutral stance is
  *  π — reached in a quarter second, which is a foot set down rather than a leg
  *  slid across the ground. */
-export const RESTING_SETTLE_RATE = 4 * Math.PI
+const RESTING_SETTLE_RATE = 4 * Math.PI
 
 /**
  * The gait phase a figure that has STOPPED is drawn at (work-order 1065).
@@ -243,7 +246,7 @@ export interface FootPlantBodyPose {
 }
 
 /** The local direction and reach that draw a straight leg onto its target. */
-export interface FootPlantPose {
+interface FootPlantPose {
   /** The held world contact, or null while the foot is in swing. */
   contact: FootPlant | null
   /** Unit direction from the hip to the foot, in the body's local frame. */
@@ -350,8 +353,8 @@ export function footPlantPose(
  * the terrain" half of the report on flat ground. Dropping the body by the
  * shortfall of whichever diagonal pair is currently in stance plants it, and
  * gives the walk its natural rise and fall for free (two per cycle, one per
- * footfall, exactly zero at rest). The SWING foot rides just clear of the ground
- * throughout and never sinks below it.
+ * footfall, exactly zero at rest). The SWING foot rides at or just above the
+ * ground and never sinks below it.
  */
 export function gaitBodyLift(phase: number, legLength: number, amp = GAIT_SWING): number {
   const stanceOffset = isStance(phase) ? 0 : Math.PI
@@ -378,8 +381,9 @@ export function footHeight(phase: number, phaseOffset: number, legLength: number
 export const GAIT_MAX_PITCH = 0.3
 
 /**
- * Body pitch (rad about the local x axis) that lays all four feet on a sloped
- * ground (point 300): the front and back ground heights under the animal's own
+ * Body pitch (rad about the local x axis) that tips the body toward a sloped
+ * ground (point 300; a two-sample fit clamped to `maxPitch` — legSeating
+ * seats each foot the rest of the way): the front and back ground heights under the animal's own
  * wheelbase give the incline it stands on. Positive pitch tips the nose DOWN
  * (rotation about +x carries +z to −y), so walking UPHILL — front ground higher
  * than back — returns a negative angle. Pair it with a body anchored at the MEAN
@@ -423,7 +427,7 @@ export function footBodyOffset(
 }
 
 /** A leg re-aimed and re-reached to put its foot on a given spot. */
-export interface LegSeating {
+interface LegSeating {
   /** Hip angle (rad about the body's local x) to draw the leg at. */
   angle: number
   /** Factor on the leg's own length — the telescoping reach to the ground. */
@@ -536,7 +540,8 @@ export function calfProportions(s: QuadrupedSpec): QuadrupedSpec {
   }
 }
 
-/** Shared quadruped body plan (zebra, antelope, goat, lion base). */
+/** Shared quadruped body plan (zebra, antelope, goat, wildebeest, warthog,
+ *  lion, hyena and the cat predators). */
 function buildQuadruped(s: QuadrupedSpec): THREE.BufferGeometry[] {
   const parts: THREE.BufferGeometry[] = []
   const backY = s.legH + s.bodyR * 0.8
@@ -843,7 +848,7 @@ const WILDEBEEST_SPEC: QuadrupedSpec = {
   seed: 171,
 }
 
-/** Wildebeest (gnu), the quintessential savanna lion prey (~1.35 units tall). */
+/** Wildebeest (gnu), the quintessential savanna lion prey (~1.6 units tall at the horn tips). */
 export function buildWildebeest(): THREE.BufferGeometry {
   const parts = buildQuadruped(WILDEBEEST_SPEC)
   // Muscular shoulder hump.
@@ -851,7 +856,7 @@ export function buildWildebeest(): THREE.BufferGeometry {
   hump.scale(0.85, 0.7, 1.0)
   hump.translate(0, 1.36, 0.5)
   parts.push(tint(hump, '#4a453f', 0.1, 172))
-  // Short curved horns sweeping out to the sides.
+  // Short horns angled out to the sides.
   for (const hx of [-1, 1]) {
     const horn = new THREE.ConeGeometry(0.04, 0.3, FAUNA_TESSELLATION.spike)
     horn.rotateZ(hx * 1.1)
@@ -884,10 +889,10 @@ const WARTHOG_SPEC: QuadrupedSpec = {
   seed: 181,
 }
 
-/** Warthog, a small tusked savanna lion prey (~0.65 units tall). */
+/** Warthog, a small tusked savanna lion prey (~0.9 units tall at the head). */
 export function buildWarthog(): THREE.BufferGeometry {
   const parts = buildQuadruped(WARTHOG_SPEC)
-  // Curved tusks from the snout.
+  // Tusks angled out of the snout.
   for (const hx of [-1, 1]) {
     const tusk = new THREE.ConeGeometry(0.022, 0.18, FAUNA_TESSELLATION.spike)
     tusk.rotateX(-0.5)
@@ -919,7 +924,7 @@ const LION_SPEC: QuadrupedSpec = {
   seed: 141,
 }
 
-/** Lion, ~1.3 units tall, with mane. */
+/** Lion, ~1.3 units at the back, with a mane reaching ~1.7. */
 export function buildLion(): THREE.BufferGeometry {
   const parts = buildQuadruped(LION_SPEC)
   const mane = new THREE.SphereGeometry(0.42, ...FAUNA_TESSELLATION.body)
@@ -966,7 +971,7 @@ export function buildCheetah(): THREE.BufferGeometry {
   return buildCatPredator('#c9a86a', '#8f7038', 1.0, 191)
 }
 
-/** Leopard: stockier, darker rosetted coat; ambush hunter near cover. */
+/** Leopard: stockier, darker coat; ambush hunter near cover. */
 export function buildLeopard(): THREE.BufferGeometry {
   return buildCatPredator('#b7923f', '#6f5722', 1.05, 201)
 }
@@ -997,7 +1002,7 @@ export function buildHyena(): THREE.BufferGeometry {
   return merge(parts)
 }
 
-/** Flamingo, ~1.1 units tall, standing. */
+/** Flamingo, ~1.3 units tall, standing. */
 export function buildFlamingo(): THREE.BufferGeometry {
   const parts: THREE.BufferGeometry[] = []
   const leg = new THREE.CylinderGeometry(0.018, 0.018, 0.55, FAUNA_TESSELLATION.spike)
@@ -1087,7 +1092,7 @@ export function buildPloverChick(): THREE.BufferGeometry {
  * forward, origin at the ground/waterline.
  */
 export const CROCODILE_LAYOUT = {
-  /** Rear end of the torso ellipsoid — where the tail takes over. */
+  /** Near the rear of the torso ellipsoid (which ends at ~−0.76) — where the tail takes over. */
   tailBaseZ: -0.7,
   /** Front end of the torso — the skull sits ahead of this. */
   torsoFrontZ: 0.56,
@@ -1112,12 +1117,14 @@ export const CROCODILE_LAYOUT = {
  * shows the camera IS its dorsal back — whose crest sat exactly at the line and
  * rendered fully opaque, so the whole body read as a dark silhouette from above
  * even though the never-seen flanks faded correctly. Lifting the line above the
- * crest submerges the back itself. Derived from CROCODILE_LAYOUT so a mesh
- * rebuild can never silently drift the pose off the geometry.
+ * crest submerges the back itself. Derived from CROCODILE_LAYOUT, so moving the
+ * documented back line moves the waterline with it; the torso mesh itself
+ * hard-codes its size and must be kept to the layout by hand.
  */
 export const CROCODILE_WATERLINE_LOCAL = CROCODILE_LAYOUT.backTopY + 0.034 // 0.30
 /** Ride-out lift while lunging/striking (point 130): the origin sits just under
- *  the surface so the whole body clears the sheet — the burst rides fully out. */
+ *  the surface so the back and flanks ride out of the sheet; the belly and feet
+ *  stay just under it. */
 export const CROCODILE_LUNGE_LIFT = 0.02
 
 /**
@@ -1278,7 +1285,8 @@ export function buildCrocodile(): THREE.BufferGeometry {
   lowerJaw.scale(1.35, 0.34, 1)
   lowerJaw.translate(0, 0.1, 1.08) // slight overbite: ends behind the upper tip
   parts.push(tint(lowerJaw, '#8a9070', 0.08, 194))
-  // Nostril bump on the snout tip — with the eyes, what a swimmer sees first.
+  // Nostril bump on the snout tip. It lies below the hidden croc's fade floor,
+  // so a lurking croc shows only its eye knobs.
   const nostril = new THREE.SphereGeometry(0.032, ...FAUNA_TESSELLATION.small)
   nostril.scale(1.3, 0.7, 1)
   nostril.translate(0, 0.185, 1.47)
@@ -1387,10 +1395,11 @@ export function buildGoat(): THREE.BufferGeometry {
   return merge(buildQuadruped(GOAT_SPEC))
 }
 
-/** One pivoted goat leg (point 228). `geo` has its HIP (top) at the local
- *  origin, so a render group placed at `hip` and rotated about X swings the
- *  foot fore/aft. `phaseOffset` (0 or π) puts diagonal legs on opposite beats
- *  (a trot). */
+/** One pivoted quadruped leg (point 228; goat, zebra, antelope, elephant,
+ *  giraffe). `geo` has its HIP (top) at the local origin, so a render group
+ *  placed at `hip` and rotated about X swings the foot fore/aft. `phaseOffset`
+ *  (0 or π) splits the legs into two diagonal pairs that share a beat, the
+ *  pairs in antiphase (a trot). */
 export interface GoatLeg {
   geo: THREE.BufferGeometry
   hip: [number, number, number]
@@ -1398,7 +1407,7 @@ export interface GoatLeg {
 }
 
 /** The gait constants a built rig walks on — all read off its OWN legs. */
-export interface GaitRig {
+interface GaitRig {
   /** Hip height above the foot: the leg the animal actually stands on. */
   legLength: number
   /** Fore/aft distance between the front and back hips. */
@@ -1413,8 +1422,8 @@ export interface GaitRig {
  * Read a species' gait off the legs that were built for it (point 300): the
  * cadence must follow the leg length, so a long-legged animal takes long, slow
  * strides and a short-legged one short, quick ones — and neither skates. The
- * wheelbase is what the body pitches over on a slope. Measured from the built
- * geometry, so a species whose proportions change re-derives automatically.
+ * wheelbase is what the body pitches over on a slope. Read off the legs' hip
+ * positions, so a species whose proportions change re-derives automatically.
  */
 export function gaitRig(legs: readonly GoatLeg[], amp = GAIT_SWING): GaitRig {
   let legLength = 0
@@ -1430,14 +1439,15 @@ export function gaitRig(legs: readonly GoatLeg[], amp = GAIT_SWING): GaitRig {
 }
 
 /**
- * The goat split into a body (everything but the legs) and four separately
- * pivoted legs (design.md §19, point 228). The settlement gait rotates each leg
- * about its hip so a walking goat no longer foot-slides. Same geometry as
- * buildGoat — just not merged across the hip joints. Village goats stand at
+ * A quadruped split into a body (everything but the legs) and four separately
+ * pivoted legs (design.md §19, point 228) — the goat, zebra and antelope rigs.
+ * The gait rotates each leg about its hip so a walking animal no longer
+ * foot-slides. Same geometry as the merged buildQuadruped — just not merged
+ * across the hip joints. Village goats stand at
  * first-person range, where a legless glide reads plainly; the far bird's-eye
  * herds keep the cheaper merged build.
  */
-export function buildQuadrupedParts(s: QuadrupedSpec): { body: THREE.BufferGeometry; legs: GoatLeg[] } {
+function buildQuadrupedParts(s: QuadrupedSpec): { body: THREE.BufferGeometry; legs: GoatLeg[] } {
   const backY = s.legH + s.bodyR * 0.8
   const bodyParts: THREE.BufferGeometry[] = []
 

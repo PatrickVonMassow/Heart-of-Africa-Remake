@@ -2,7 +2,7 @@
 //
 // It mounts only while the key is down: an idle frame runs one boolean
 // subscription and nothing else — no traversal, no projection, no DOM. While it
-// is up it refreshes a few times a second rather than every frame; the labels
+// is up it refreshes ten times a second rather than every frame; the labels
 // ride their subjects closely enough for a reading aid, and a per-frame React
 // pass over a herd would cost more than the picture gains.
 //

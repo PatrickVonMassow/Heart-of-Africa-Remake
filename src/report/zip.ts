@@ -1,6 +1,6 @@
 // Minimal STORE-only (uncompressed) zip writer for the F6 bug report
 // (design.md §21.1). Pure: bytes in, bytes out, no DOM and no dependency —
-// a bug-report archive holding a PNG and two small text files gains nothing
+// a bug-report archive holding a PNG and three small text files gains nothing
 // from deflate, and an archiver package would be a runtime dependency for one
 // keypress (CLAUDE.md §3).
 //

@@ -135,8 +135,8 @@ export const MEROE_PYRAMIDS: ReadonlyArray<{
     [-1.5, -2.4],
     [4.5, -1.2],
   ]
-  // Four of six broken, the deepest cut on the largest tomb (Ferlini worked
-  // the richest one); the two left whole keep the field legible.
+  // Four of six broken (Ferlini worked the richest one); the two left whole
+  // keep the field legible.
   const standing = [0.66, 1, 0.72, 0.63, 1, 0.55]
   return spots.map(([x, z], i) => {
     const base = 1.0 + rand() * 0.4
@@ -173,12 +173,11 @@ export const KHUFU_STANDING = 0.945
 /** Giza: the three great pyramids in their real southwest-diagonal row —
  *  Khufu NE (largest), Khafre centre, Menkaure SW, flatter-sided than the
  *  steep Nubian tombs (Old-Kingdom ~52° slope, height ≈ 0.64 · base) — with
- *  the Sphinx crouching east of Khafre, readable at a glance (design.md
- *  §4.4), and each core carrying its ~1890 casing cue (docs/giza-1890.md
- *  §1.1-§1.2/§3): Khufu ends in a blunt flat platform, not a point; Khafre
- *  alone keeps a paler cap of original smooth Tura casing near its apex —
- *  the plateau's one distinguishing mark; Menkaure wears the darker band of
- *  its red Aswan granite lower casing. All three cues are cosmetic; the
+ *  the Sphinx east of Khafre, buried to the shoulders as in 1890 (design.md
+ *  §4.4), and the ~1890 casing cues (docs/giza-1890.md §1.1-§1.2/§3): Khufu
+ *  ends in a blunt flat platform, not a point; Khafre alone keeps a paler cap
+ *  of original smooth Tura casing near its apex. Menkaure's red-granite casing
+ *  is left to the walkable site (see below). Both cues are cosmetic; the
  *  footprint is unchanged. */
 export function buildGizaPyramids(): THREE.BufferGeometry {
   const parts: THREE.BufferGeometry[] = []
@@ -199,9 +198,9 @@ export function buildGizaPyramids(): THREE.BufferGeometry {
     parts.push(tint(frustum, core, 0.09, 8200))
   }
   {
-    // Khafre: tawny stepped core, and near the apex the pale smooth cap of
-    // surviving Tura-limestone casing — the only casing left on the plateau
-    // and the cue that tells Khafre from Khufu at a glance.
+    // Khafre: tawny core, and near the apex the pale smooth cap of surviving
+    // Tura-limestone casing — the only Tura casing left on the plateau and the
+    // cue that tells Khafre from Khufu at a glance.
     const [x, z, b] = [0, 0, 1.5]
     const h = b * 0.64 * 2
     const capStart = 0.8 // fraction of the height where the casing survives
@@ -245,7 +244,8 @@ export function buildGizaPyramids(): THREE.BufferGeometry {
  * expedition therefore sees a head and its nemes rising out of a drift, with
  * the shoulders barely breaking the surface — nothing of the paws, torso,
  * haunches or tail. The depth is chosen so the chest just grazes the sand while
- * head, nemes and crown stand wholly proud.
+ * head, crown and most of the nemes stand proud (the hanging lappets' lower
+ * ends reach just into the drift).
  */
 export const SPHINX_BURIAL_DEPTH = 0.4
 
@@ -344,9 +344,9 @@ export function buildSphinx(): THREE.BufferGeometry {
 }
 
 /** One great pyramid at the WALKABLE Giza site (design.md §4.4, point 273):
- *  the same ~1890 casing cues as buildGizaPyramids — Khufu's blunt flat summit
- *  (missing apex), Khafre's pale Tura-limestone cap on the stepped core,
- *  Menkaure's red-granite skirt — but at site scale so the traveller walks
+ *  the ~1890 casing cues — Khufu's blunt flat summit (missing apex) and
+ *  Khafre's pale Tura-limestone cap, shared with buildGizaPyramids, plus
+ *  Menkaure's red-granite skirt, which only this site carries — at site scale so the traveller walks
  *  around the mass as a giant building, and lifted onto its own bedrock plinth
  *  (Khafre stands on higher rock and so reads as tall as Khufu). */
 function gizaSitePyramidParts(p: GizaPyramid, seed: number): THREE.BufferGeometry[] {
@@ -427,7 +427,7 @@ export function buildStoneCity(): THREE.BufferGeometry {
   const R = 2.0
   const seg = 12
   for (let i = 0; i < seg; i++) {
-    // A ~200° arc of wall (leaves an opening), thick and tapering upward.
+    // A ~200° arc of wall (leaves an opening) in thick, straight segments.
     const a = -Math.PI * 0.15 + (i / (seg - 1)) * Math.PI * 1.15
     const w = new THREE.BoxGeometry(0.55, 1.0, 0.3)
     w.rotateY(-a)
@@ -456,7 +456,7 @@ export function buildRockChurches(): THREE.BufferGeometry {
   const trench2 = new THREE.BoxGeometry(0.62, 0.42, 1.9)
   trench2.translate(0, 0.3, 0)
   parts.push(tint(trench2, '#5f3323', 0.06, 4402))
-  // The cross-shaped church body, flush with the slab top.
+  // The cross-shaped church body, standing a little proud of the slab top.
   const arm1 = new THREE.BoxGeometry(1.4, 0.55, 0.42)
   arm1.translate(0, 0.42, 0)
   parts.push(tint(arm1, '#a86048', 0.07, 4403))
@@ -487,7 +487,7 @@ export function buildCoastalRuins(): THREE.BufferGeometry {
     c.translate(x, 0.3 + h / 2, z)
     parts.push(tint(c, '#d3c9a8', 0.07, 4510 + i))
   })
-  // A broken arch: two pillars bridged by a lintel, one side fallen away.
+  // A broken arch: two pillars bridged by a sagging, broken lintel.
   for (const sx of [-0.5, 0.5]) {
     const p = new THREE.BoxGeometry(0.22, 1.1, 0.22)
     p.translate(sx, 0.3 + 0.55, -1.0)
@@ -580,8 +580,9 @@ export function buildStelae(): THREE.BufferGeometry {
 }
 
 /**
- * What is left of the keep's parapet, slot by slot along each long wall: the
- * merlon height, or 0 where the merlon is gone. Mahdist forces stormed and
+ * What is left of the keep's parapet, slot by slot along one long wall: the
+ * merlon height, or 0 where the merlon is gone (a short wall carries two fixed
+ * merlons of its own). Mahdist forces stormed and
  * burned Gondar in JANUARY 1888 — two years before the expedition sets out —
  * torching most of its churches; Fasil Ghebbi itself "fell into ruins" as the
  * city declined, and the unbroken parapets and conical tower caps a visitor
@@ -649,7 +650,7 @@ export function buildCastles(): THREE.BufferGeometry {
     const tower = new THREE.CylinderGeometry(0.28, 0.32, h, 9)
     tower.translate(tx, h / 2, tz)
     parts.push(tint(tower, si ? sooted : '#968e84', 0.08, 4720 + si))
-    // Open, blackened top: the cap burnt off, the shell hollow.
+    // A dark disc on the top reads as the open, blackened shell of a burnt-off cap.
     const hollow = new THREE.CylinderGeometry(0.21, 0.21, 0.06, 9)
     hollow.translate(tx, h - 0.03, tz)
     parts.push(tint(hollow, '#443d38', 0.06, 4724 + si))
@@ -726,7 +727,7 @@ export function buildCrater(): THREE.BufferGeometry {
 }
 
 /** Ol Doinyo Lengai: a steep dark basalt cone with a flattened top plus a
- *  subtle translucent smoke hint (no particle system). */
+ *  subtle, opaque pale smoke hint (no particle system). */
 export function buildVolcano(): THREE.BufferGeometry {
   const parts: THREE.BufferGeometry[] = []
   const cone = new THREE.CylinderGeometry(0.28, 1.5, 2.4, 12)
@@ -749,8 +750,8 @@ export function buildVolcano(): THREE.BufferGeometry {
   return merge(parts)
 }
 
-/** Okavango: low braided water ribbons (thin flat blue strips splitting
- *  outward) interspersed with papyrus tufts. */
+/** Okavango: the papyrus tufts between the braided channels; the water
+ *  ribbons themselves are buildDeltaWater. */
 export function buildDelta(): THREE.BufferGeometry {
   // Papyrus tufts between the channels. The WATER fan is a separate build
   // (buildDeltaWater) so the Okavango inversion can scale it with the flood —
@@ -840,7 +841,8 @@ export function buildWetland(): THREE.BufferGeometry {
  * Table Mountain skyline massif for Cape Town's first-person backdrop
  * (design.md §4.4 Part C): a broad flat-topped plateau flanked by two lesser
  * peaks (Devil's Peak, Lion's Head), sized for the settlement panorama
- * (~140 units wide) rather than the travel map. Placed and scaled by the
+ * (~230 units wide with its flanking peaks, the table alone ~185) rather than
+ * the travel map. Placed and scaled by the
  * scene; origin at the ground, the plateau top around y≈26.
  */
 export function buildTableMountain(): THREE.BufferGeometry {

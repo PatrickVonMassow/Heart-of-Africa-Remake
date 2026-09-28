@@ -10,8 +10,9 @@
 // sits exactly where the player looks while he is being taught upstream and
 // downstream, and it read as a rendering fault rather than as distance.
 //
-// So both read their appearance HERE. Nothing distinguishes near from far but
-// DISTANCE: the moving detail is scaled by the shared `detailFade`, so the far
+// So both read their appearance HERE. In the shading nothing distinguishes near
+// from far but DISTANCE (the near mesh additionally rides the ripple): the
+// moving detail is scaled by the shared `detailFade`, so the far
 // continuation resolves into the calm sheet the same water becomes at that
 // range instead of into a second, independently tuned material.
 //
@@ -42,7 +43,7 @@ export const RIVER_WATER_TONES = {
 
 /** Open water is glossy (the IBL sky reflects in it), foam is not. */
 export const WATER_ROUGHNESS = 0.11
-export const WATER_FOAM_ROUGHNESS = 0.55
+const WATER_FOAM_ROUGHNESS = 0.55
 export const WATER_METALNESS = 0.02
 
 /** Metres of view distance the moving detail is drawn at full strength within,
@@ -50,8 +51,8 @@ export const WATER_METALNESS = 0.02
  *  The streak field is coarse (a period of ~11 m), so it stays legible far out
  *  and only fades where it would turn sub-pixel and tremble under the TRAA
  *  jitter — the same reason `detailFade` exists for the ground. */
-export const WATER_DETAIL_NEAR = 60
-export const WATER_DETAIL_FAR = 220
+const WATER_DETAIL_NEAR = 60
+const WATER_DETAIL_FAR = 220
 
 /** World size of the streak field: long along the current, narrow across it. */
 const STREAK_ALONG = 0.09
@@ -66,7 +67,7 @@ const STREAK_ACROSS = 0.55
 const SHORE_FOAM_REACH = 2.4
 const SHORE_FOAM_INNER = -1.8
 
-export interface RiverWaterInput {
+interface RiverWaterInput {
   /** Metres DOWNSTREAM along the current. */
   along: unknown
   /** Metres out from the waterline (negative = inland of it). */
@@ -77,8 +78,8 @@ export interface RiverWaterInput {
 }
 
 /**
- * The water surface at a point: its colour, how rough and metallic it is, how
- * opaque, and the ripple it rides. The near mesh displaces its vertices by the
+ * The water surface at a point: its colour, how rough it is, how opaque, and
+ * the ripple it rides. The near mesh displaces its vertices by the
  * ripple; the panorama, a compressed heightfield, only shades.
  */
 export function riverWaterSurface({ along, across, octaves }: RiverWaterInput) {
@@ -93,7 +94,7 @@ export function riverWaterSurface({ along, across, octaves }: RiverWaterInput) {
   // downstream at the drift speed the foam flecks ride, so shader and props
   // tell the same story. Fading toward 0.5 — the field's own mean — is what
   // "resolved by distance" means here: the far sheet keeps the near water's
-  // AVERAGE colour exactly, it just stops carrying the pattern.
+  // mean base colour, it just stops carrying the pattern and its streak foam.
   const streakField = mx_fractal_noise_float(
     vec3(u.mul(STREAK_ALONG).sub(time.mul(RIVER_DRIFT_SPEED * STREAK_ALONG)), v.mul(STREAK_ACROSS), 1.0),
     Math.max(1, Math.round(octaves)),
@@ -117,8 +118,8 @@ export function riverWaterSurface({ along, across, octaves }: RiverWaterInput) {
     detail,
     color: mix(base, color(RIVER_WATER_TONES.foam), foam.mul(0.85)),
     roughness: foam.mul(WATER_FOAM_ROUGHNESS).add(WATER_ROUGHNESS),
-    // The shallows are seen THROUGH at the bank and the sheet turns opaque a
-    // few metres out — which is also what keeps the drawn surface from reading
+    // The shallows let a trace of the bed through at the bank (0.94) and the
+    // sheet turns fully opaque a few metres out — which is also what keeps the drawn surface from reading
     // darker than the opaque panorama where the two meet.
     opacity: smoothstep(float(0.5), float(3), v).mul(0.06).add(0.94),
     /** Vertical ripple in metres (design.md §11: only slight movement). */
