@@ -10,7 +10,7 @@
 // THE MECHANISM IS DERIVATION. Nothing writes a state card any more. The state
 // lives where it already lived — the pause marker, the alert ladder, the retry
 // state and the doctor's measurement — and this module RE-DERIVES the board's
-// state card from them on every board edit and every publish. That is what makes
+// state card from them on every `board.mjs` edit and every publish. That is what makes
 // the card self-resolving:
 // when `.claude/batch-paused` is removed the pause paragraph is simply not
 // derived again, so a condition that has passed cannot outlive itself on the
@@ -126,7 +126,8 @@ export function recoveryParagraphs(retryState, { now = Date.now() } = {}) {
  * One card and not three: the board's entries are collapsible cards and its
  * binding structure keeps them compact, so three stacked machine cards would be
  * the "Text-Tapete" the user has objected to. The strongest state names the card;
- * every standing item gets its own paragraph, newest first, capped.
+ * every standing item gets its own paragraph — the pause first, then decisions
+ * newest first, then recoveries by next attempt — capped.
  */
 export function deriveStateCard({ pause = null, ladder = null, retryState = null, doctorState = null, now = Date.now() } = {}) {
   const paragraphs = [

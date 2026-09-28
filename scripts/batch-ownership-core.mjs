@@ -2,7 +2,7 @@
 // with the cross-point ruling of point 614).
 //
 // WHY IT IS ONE FUNCTION. Point 612 ("an idle owner loses the lock after a short
-// idle window") and open point 517 ("the launcher EXTENDS the lease while
+// idle window") and point 517 ("the launcher EXTENDS the lease while
 // evidence advances") pull the SAME `leaseUntil` arithmetic in opposite
 // directions. Built as two independent patches, whichever landed second would
 // silently undo the first. So the whole question — does this lock still belong to
@@ -10,7 +10,8 @@
 // `effectiveLeaseUntil`, and 517's extension is expressed INSIDE
 // `effectiveLeaseUntil` rather than as a second competing code path. The impure
 // half (`assessOwner` in scripts/batch-singleton.mjs) reads files and probes pids
-// and then asks this module; it decides nothing itself.
+// and then asks this module; it decides only where this verdict returns
+// `{ settled: false }` (the pid-probe branches).
 //
 // WHAT 612 MEASURED, twice on 10.08.2026:
 //
@@ -69,13 +70,12 @@ import { LEASE_MS, declaredWaitStale, leaseTakeoverDecision, leaseUntilOf } from
  * undeclared. Once ANY call has completed, `claimedAt` has moved past `acquiredAt`
  * and this window no longer applies at all — what bounds such a session from there
  * is the ordinary lease, unchanged. Nothing is killed either way: the dispossessed
- * session keeps running, keeps its work, and is refused only merge, push, the tick
- * and the board publish (the fence).
+ * session keeps running, keeps its work, and is refused merge, push, the tick
+ * and the board publish (the fence) and, on the main checkout, every write (the
+ * main-write gate, which needs a held lock).
  *
- * The remaining gap is deliberate and filed separately: an owner that works ONCE
- * and then idles holds the batch for the whole lease. Closing that needs a middle
- * rule with a renewal stamp of its own — `leaseUntil` cannot serve, being polluted
- * by the ±4 h declared-wait extensions — and it is not this window's job.
+ * An owner that works ONCE and then idles is not this window's job: it loses the
+ * batch through `ownerActivityDecision` (reason `stalled-no-progress`).
  *
  * It coincides with `DEAD_CONFIRM_MS` on purpose: a state change inside the
  * window is what "fresh heartbeat" already meant, so the two are one rule read
@@ -113,7 +113,6 @@ export function effectiveLeaseUntil(lock, { now = null, leaseMs = LEASE_MS, evid
  *
  * Idle means ALL of:
  *   - nothing was DECLARED in flight (`batch-in-flight.mjs`), and
- *   - no evidence of progress is known to be advancing, and
  *   - the owner has NOT COMPLETED A SINGLE TOOL CALL since it took the lock, and
  *   - that silence is longer than the window.
  *
@@ -183,19 +182,12 @@ export function idleVerdict({
 }
 
 /**
- * HAS THIS OWNER DONE ANYTHING AT ALL SINCE IT TOOK THE LOCK? PURE, tri-state.
- *
- * `acquire` stamps `acquiredAt` and `claimedAt` with the same moment; every
- * completed tool call then moves `claimedAt` alone (`heartbeat`). So a `claimedAt`
- * still equal to `acquiredAt` is a session that reserved the batch and has not run
- * one thing. `null` where the lock predates `acquiredAt` — unknown, never idle.
- */
-/**
  * IS A DECLARED WAIT RECORDED ON THE LOCK ITSELF, and still running? PURE.
  *
  * `extendLease --declaredWait` writes `declaredWait: { at, until }` onto the lock,
  * which is a declaration EVERY reader can see — unlike `batch-in-flight.json`,
- * which only the launcher reads. The idle rule honours both, or a session that
+ * which only readers that gather owner work (batch-owner-work.mjs) see. The idle
+ * rule honours both, or a session that
  * declared its wait the sanctioned way and then blocked for hours without writing
  * anything would be dispossessed by a door that never asked.
  */
@@ -207,6 +199,14 @@ export function lockDeclaresWait(lock, now) {
   return until !== null && t !== null && t <= until
 }
 
+/**
+ * HAS THIS OWNER DONE ANYTHING AT ALL SINCE IT TOOK THE LOCK? PURE, tri-state.
+ *
+ * `acquire` stamps `acquiredAt` and `claimedAt` with the same moment; every
+ * completed tool call then moves `claimedAt` alone (`heartbeat`). So a `claimedAt`
+ * still equal to `acquiredAt` is a session that reserved the batch and has not run
+ * one thing. `null` where the lock predates `acquiredAt` — unknown, never idle.
+ */
 export function workedSinceClaim(lock) {
   const acquired = num(lock?.acquiredAt)
   const claimed = num(lock?.claimedAt)
@@ -248,8 +248,9 @@ export function ownerActivityDecision({ lock = null, work = null, records = [], 
       reason: 'no-owner',
     }
   }
-  // The journal is telemetry, never a takeover guard. `null` means its reader
-  // could not establish a complete snapshot (missing, unreadable, or short read),
+  // The journal feeds `stalled`, which dispossesses (`ownershipVerdict`).
+  // `null` means its reader could not establish a complete snapshot (missing,
+  // unreadable, or short read),
   // which is categorically different from a successfully read journal containing
   // no attributable records. Without that evidence the launcher may not advance
   // the unchanged-interval counter in the unsafe direction.
@@ -301,6 +302,7 @@ export function ownerActivityDecision({ lock = null, work = null, records = [], 
  * once got it wrong:
  *   1. no usable lock                → nobody owns it
  *   2. an explicit HANDOVER          → the owner said it is finished (property 1)
+ *   2b. STALLED activity             → renewed paperwork but no real progress
  *   3. a state change inside the window → alive, and no probe is needed
  *   4. a heartbeat from before this boot → no claude process survives a reboot
  *   5. the LEASE, with point 556's corroboration
@@ -325,7 +327,8 @@ export function ownershipVerdict({
   // 2. THE HANDOVER OUTRANKS EVERYTHING (property 1). No grace, no comparison
   // against `claimedAt`, no pid: the mark is the owner's own statement, written
   // only after the Stop chain confirmed a session-bound marker, a verifiably
-  // closed point and an armed launcher. It is withdrawn by DELETING it, never by
+  // closed point (or a context boundary) and an armed launcher. It is withdrawn
+  // by DELETING it, never by
   // outdating it — see the header for the incident that distinction cost.
   if (lock.handedOver === true && typeof lock.handedOverAt === 'number') {
     return { settled: true, owns: false, reason: 'handed-over' }

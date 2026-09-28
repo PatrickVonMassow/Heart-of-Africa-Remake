@@ -2,7 +2,9 @@
 // docs/batch-resilience.md §3). Side-effect free, so the Vitest layer can sweep
 // every rule without a filesystem (scripts/batch-lease-core.test.mjs). The I/O
 // lives in scripts/batch-singleton.mjs (lock + fence file) and in
-// scripts/board-first-guard.mjs (the one PreToolUse chokepoint).
+// scripts/board-first-guard.mjs (the PreToolUse hook that runs both the fence
+// and the main-write gate). The second half of this module is that main-write
+// gate (`mainWriteFenceDecision`) with its checkout-containment predicates.
 //
 // WHY (the night of 29./30.07.2026): work stopped at 21:50 and the state at
 // 04:19 was byte-for-byte the same. Every layer could OBSERVE the stall while
@@ -17,7 +19,9 @@
 //    call returns, so a lease renewed by it would have to outlive the longest
 //    single call — and this repository legitimately runs 30-40 minute suites and
 //    has recorded 87 minutes of silence with work advancing. Renewing BEFORE the
-//    long call keeps the window short and the reader side pure arithmetic.
+//    call means the lease counts from the call's start, so it must still outlive
+//    the longest undeclared call (see `LEASE_MS`); longer waits are declared
+//    (`DECLARED_WAIT_LEASE_MS`). The reader side stays pure arithmetic.
 //
 // 2. THE FENCE IS NOT IN THE LOCK FILE. `acquire` DELETES the lock on a takeover
 //    and a corrupt one reads as null, so a high-water mark kept there would be
@@ -34,20 +38,23 @@
 //    a live pid and declared work that had moved two minutes earlier, both of
 //    which the tick had already read and printed. `leaseTakeoverDecision` makes
 //    the takeover ask them, and `DECLARED_WAIT_LEASE_MS` is how such a wait says
-//    in advance that it will be long. This is NOT the probing rule 1 refuses: the
-//    acquire door still compares numbers, and the corroboration lives in the one
-//    reader that already holds the signals.
+//    in advance that it will be long. This is NOT a probe at the lease door
+//    (`leaseExpired` stays pure arithmetic): the corroboration runs inside
+//    `ownershipVerdict` (batch-ownership-core.mjs) over work evidence each caller
+//    gathers and passes in as data (batch-owner-work.mjs).
 //
 // 4. A SESSION IS ONLY EVER FENCED OUT BY ITS OWN RECORD. Staleness is
 //    `heldFence < currentFence` for a session that DEMONSTRABLY held a fence.
-//    A session that never held one is never blocked — an attended window, a
-//    fresh clone, a session that never drove the batch. Being wrong toward
+//    A session that never held one is never blocked by the fence — an attended
+//    window, a fresh clone, a session that never drove the batch. (The separate
+//    main-write gate, `mainWriteFenceDecision`, does refuse a lockless session's
+//    writes to the main checkout.) Being wrong toward
 //    "allow" costs a stale board; being wrong toward "deny" costs a block-loop,
 //    which this project has already paid ~30 turns for once.
 
-// ONE classifier for both PreToolUse gates (point 473): the board-first deny and
-// this chokepoint judge a shell call the same way — per segment, on the command
-// HEAD, with quoted text deciding nothing. `expandSegments` also unwraps what
+// ONE classifier for every PreToolUse gate (point 473): the board-first deny, the
+// fence chokepoint and the main-write gate judge a shell call the same way — per
+// segment, on the command HEAD, with quoted text deciding nothing. `expandSegments` also unwraps what
 // CARRIES a command (`bash -c "…"`, `eval`, `$( … )`), because at THIS gate the
 // safe direction is the conservative one: the old string regexes saw through a
 // wrapper by accident, and losing that would let a dispossessed session push
@@ -72,14 +79,16 @@ import {
  * calibrated against from this project's own 43 transcripts / 32 440 tool calls
  * (p99 8.9 min · p99.9 10.0 min · longest undeclared unattended call 27.8 min),
  * plus the longest declared one, the LARGE browser regression at 30-40 minutes.
- * With renewals at most `LEASE_RENEW_INTERVAL_MS` apart the guaranteed coverage
- * is 55 minutes: ~2.0x the longest measured undeclared call and 1.4x the LARGE
- * regression. Below that a running verification could lose the batch mid-run,
- * which docs/batch-resilience.md §5 forbids outright.
+ * Every call start either finds more than `LEASE_MS - LEASE_RENEW_INTERVAL_MS`
+ * left or renews (`shouldRenewLease`), so each call starts with at least 55
+ * minutes of coverage: ~2.0x the longest measured undeclared call and 1.4x the
+ * LARGE regression. Below that a running verification could lose the batch
+ * mid-run, which docs/batch-resilience.md §5 forbids outright.
  *
- * It stays far under the demolished four-hour valve, and the ladder above it is
- * monotone: the external GitHub-Actions watcher judges repository OUTPUT at 120
- * minutes, so the local arithmetic always acts first.
+ * It stays far under the demolished four-hour valve. For an undeclared silence
+ * the local arithmetic acts before the external GitHub-Actions watcher (repository
+ * OUTPUT at 120 minutes); a declared wait (`DECLARED_WAIT_LEASE_MS`) or advancing
+ * declared evidence (`effectiveLeaseUntil`) deliberately extends past it.
  */
 export const LEASE_MS = 60 * 60 * 1000
 
@@ -118,9 +127,10 @@ export const LEASE_RENEW_INTERVAL_MS = 5 * 60 * 1000
  *
  * IT IS NOT AN UNCONDITIONAL FOUR HOURS. The spec says the wait extends the lease
  * "for as long as its own evidence keeps advancing", so the extension is recorded
- * on the lock as `declaredWait: { at, until }` and `declaredWaitStale` lets the one
- * reader that HAS the evidence — the launcher — end it early when the declared work
- * stops moving. Every other reader compares numbers, exactly as before.
+ * on the lock as `declaredWait: { at, until }` and `declaredWaitStale` lets a
+ * reader that HAS the evidence (`ownershipVerdict`, given gathered work) end it
+ * early when the declared work stops moving. A reader without evidence compares
+ * numbers.
  */
 export const DECLARED_WAIT_LEASE_MS = 4 * 60 * 60 * 1000
 
@@ -129,13 +139,14 @@ export const DECLARED_WAIT_LEASE_MS = 4 * 60 * 60 * 1000
  * point 556, confirmed finding 1).
  *
  * The corroboration of `leaseTakeoverDecision` is a safety net for an UNDECLARED
- * long call — a declared wait extends the lease outright and never reaches it. A
+ * long call — a live declared wait extends the lease outright, and a stale one
+ * reaches it only with `workAdvancing: false`, i.e. to be taken. A
  * net with no bound is a hole: an owner wedged with something still producing in
  * the background would skip every tick for ever, and since the skip also ends the
- * launcher's repetition count nobody would be told either. ONE FURTHER WINDOW is
- * the bound, so total silence stays inside two hours — the point at which the
- * external repository-output watcher acts regardless, which keeps the ladder
- * monotone (renew 5 < lease 60 < override +60 ≤ watcher 120).
+ * launcher's repetition count nobody would be told either. ONE FURTHER WINDOW past
+ * the (effective) lease end is the bound, so an undeclared silence stays inside
+ * two hours — the point at which the external repository-output watcher acts
+ * regardless (renew 5 < lease 60 < override +60 ≤ watcher 120).
  */
 export const TAKEOVER_OVERRIDE_MAX_MS = LEASE_MS
 
@@ -173,11 +184,11 @@ export function leaseUntilOf(lock, { leaseMs = LEASE_MS } = {}) {
 /**
  * HAS THE LEASE RUN OUT? PURE ARITHMETIC, AND DELIBERATELY NOTHING ELSE.
  *
- * There is NO probing at this door (docs/batch-resilience.md §3, layer 1). The
- * first revision of that design let a declared in-flight wait extend the lease
- * "while the declared work is provably moving", which put the judgement straight
- * back in. Declared work extends the lease by WRITING a longer `leaseUntil`; the
- * reader only compares two numbers.
+ * There is NO probing at this door (docs/batch-resilience.md §3, layer 1): it
+ * compares the lock's own `leaseUntil` with `now`. A declared wait extends the
+ * lease by WRITING a longer `leaseUntil`. The evidence-based extension and its
+ * corroboration live in batch-ownership-core.mjs (`effectiveLeaseUntil`,
+ * `ownershipVerdict`), not here.
  *
  * An unreadable lease is NOT expired — a lock we cannot understand must never
  * cost a live owner the batch.
@@ -207,7 +218,8 @@ export function shouldRenewLease({ lock, now, leaseMs = LEASE_MS, renewIntervalM
 
 /** The lock as it reads after a renewal. PURE — the caller does the writing.
  *  Nothing else on the lock is touched: `claimedAt` in particular stays where it
- *  was, because bumping it here would silently withdraw a taken handover. */
+ *  was, because it is the owner's last state change (`ownershipVerdict`) and a
+ *  renewal at call start is not one. */
 export function renewedLock(lock, { now, leaseMs = LEASE_MS } = {}) {
   const t = num(now)
   if (!lock || typeof lock !== 'object' || t === null) return lock
@@ -238,8 +250,9 @@ export function inDeclaredWaitWindow(lock, { now, leaseMs = LEASE_MS } = {}) {
 }
 
 /**
- * THE LAUNCHER'S TAKEOVER VERDICT. PURE, TOTAL, AND THE WHOLE OF POINT 556's
- * FIRST CLAUSE.
+ * THE TAKEOVER VERDICT on an expired lease. PURE, TOTAL, AND THE WHOLE OF POINT
+ * 556's FIRST CLAUSE. Called by `ownershipVerdict` (batch-ownership-core.mjs) for
+ * every reader, not only the launcher.
  *
  * MEASURED 08.08.2026, 05:45Z: the launcher logged `LEASE EXPIRED: 5551713b…
  * (pid 4048953) has not renewed for 63 min — taking the batch` and spawned a
@@ -253,9 +266,11 @@ export function inDeclaredWaitWindow(lock, { now, leaseMs = LEASE_MS } = {}) {
  * the takeover additionally requires that a corroborating signal come back
  * NEGATIVE:
  *   - the pid is dead, or its identity cannot be established at all, OR
- *   - the declared work is not advancing (which includes: nothing was declared).
- * With a live pid AND advancing declared work the tick SKIPS and says so, naming
- * the lease age it overrode.
+ *   - the declared work is not advancing (which includes: nothing was declared), OR
+ *   - the work is judged on a live process alone (`work-breathing-only`), OR
+ *   - the lease is out longer than `overrideMaxMs` (`override-expired`).
+ * Only a live pid AND declared work that PRODUCED something, inside the override
+ * bound, keeps the owner, and the verdict says so, naming the lease age.
  *
  * WHY NOT "live pid alone": a wedged process breathes. The whole reason the lease
  * exists is that a pid probe cannot tell working from wedged, so the pid may only
@@ -266,11 +281,13 @@ export function inDeclaredWaitWindow(lock, { now, leaseMs = LEASE_MS } = {}) {
  * the work is still moving. A silent owner with nothing declared is dispossessed
  * exactly as before — the recovery this mechanism exists for is untouched.
  *
- * Inputs (all already read by the tick before it reaches this door):
- *   leaseAgeMs      — how long the lease has been out, for the message
+ * Inputs (all already read by the caller before it reaches this door):
+ *   leaseAgeMs      — how long the lease has been out (message and override bound)
  *   pidIdentifiable — could the lock's process be identified at all
  *   pidLive         — that same process exists and is not a reused number
  *   workAdvancing   — `assessOwnerWork(...).advancing`
+ *   workJudgedOn    — what the work evidence rests on ('process'/'none' do not count)
+ *   overrideMaxMs   — how long produced work may outvote the lease
  *   pid, workSummary — for the sentence only, never for the verdict
  *
  * Returns { take, reason, why }. `why` is prose for the log; `reason` is the key.
@@ -352,7 +369,9 @@ export function leaseTakeoverDecision({
  *
  * The other half of the same honesty: a declared wait extends the lease only "for
  * as long as its own evidence keeps advancing", so a reader that HAS the evidence
- * ends the extension the moment the work stops moving, instead of letting four
+ * ends the extension once the work stops moving — only inside the stretch the wait
+ * bought (`inDeclaredWaitWindow`; before it the ordinary lease rules), instead
+ * of letting four
  * hours of paperwork hold a batch nobody is driving. A reader WITHOUT the evidence
  * (`workAdvancing` undefined) never ends it — being wrong toward "the owner keeps
  * it" costs a delayed recovery, being wrong the other way costs the incident.
@@ -469,8 +488,8 @@ export function grantedFenceState({
   // A grant that took the batch FROM somebody records that, so the dispossessed
   // session can be told at its next hook rather than at a denied merge. A grant
   // that took it from nobody (a free lock) leaves the previous record standing —
-  // it belongs to whoever was last dispossessed and is dropped when that session
-  // has been told.
+  // it belongs to whoever was last dispossessed and stays until the next takeover
+  // replaces it; `dispossessionNotice` speaks once per fence via `announcedFence`.
   const took =
     takeover && typeof takeover === 'object' && typeof takeover.from === 'string' && takeover.from && takeover.from !== sid
       ? { from: takeover.from, fence: n, reason: typeof takeover.reason === 'string' ? takeover.reason : '', at }
@@ -485,7 +504,8 @@ export function grantedFenceState({
   }
 }
 
-/** The highest fence this session was ever granted, or null if it never held one. */
+/** The highest fence this session holds in the bounded holder history
+ *  (`FENCE_HOLDER_HISTORY`), or null if it is not listed there. */
 export function fenceHeldBy(fenceState, sessionId) {
   const sid = typeof sessionId === 'string' ? sessionId : ''
   if (!sid) return null
@@ -557,7 +577,7 @@ export function dispossessionNotice({ fenceState, sessionId, announcedFence = 0,
           'and to COMMIT. What you may no longer do is merge, push, tick the work order or publish the board; ' +
           'the current owner does that, and the PreToolUse fence refuses those four families outright.',
         'You are told here, at your next hook, rather than at the merge, because work worth handing over is ' +
-          'worth handing over while it is still fresh: commit and push what you have on its branch, and say in ' +
+          'worth handing over while it is still fresh: commit what you have on its branch, and say in ' +
           'your last message what was verified and what is left.',
         'To take the batch back through the sanctioned channel: `node scripts/batch-claim.mjs --session <this ' +
           'session id>`. `node scripts/batch-doctor.mjs` reports who owns it now.',
@@ -635,7 +655,8 @@ const asPosix = (p) => String(p ?? '').replace(/\\/g, '/')
  * clearOwnBoundary — are already sessionId-guarded and need nothing, and neither
  * does `batch-claim` (own expiry plus pid probe). Without this chokepoint the
  * fence would protect only the file that was already protected, and the woken
- * owner would still push to main.
+ * owner would still push to main. The landing chain counts as `git-main`, and a
+ * shell command nested too deep to read fails closed as kind `nested`.
  *
  * Returns null (not guarded) or { kind, what }.
  */
@@ -698,7 +719,8 @@ export function fenceGuardedAction({ toolName, command, filePath } = {}) {
  * Returns { block, reason, kind }. It blocks only where ALL of these hold:
  *   - the batch is not paused,
  *   - this session demonstrably held a fence and the mark has moved past it,
- *   - and the call belongs to one of the four unguarded families.
+ *   - and `fenceGuardedAction` classifies the call (the four unguarded families,
+ *     or a shell command nested too deep to read).
  */
 export function fenceDecision({ fenceState, sessionId, toolName, command, filePath, paused = false } = {}) {
   try {
@@ -715,8 +737,8 @@ export function fenceDecision({ fenceState, sessionId, toolName, command, filePa
         `${status.held}; the batch has since been taken over and stands at fence ${status.current}. ` +
         `${status.takeover?.reason ? `The takeover recorded: ${status.takeover.reason}\n` : ''}` +
         `The call refused is ${action.what}.\n` +
-        'This is not a permission problem and not a bug: the batch lease expired while this session was ' +
-        'silent, another session took over, and two sessions writing the work order, the shared git ' +
+        'This is not a permission problem and not a bug: this session lost ownership (lease expiry, handover, ' +
+        'idle or stalled owner), another session took over, and two sessions writing the work order, the shared git ' +
         'history or the board is the incident the singleton exists to prevent (docs/batch-resilience.md ' +
         '§3, layer 1).\nWhat to do:\n' +
         '  - Do NOT merge, push, tick the work order or publish the board. The current owner does that.\n' +
@@ -730,12 +752,6 @@ export function fenceDecision({ fenceState, sessionId, toolName, command, filePa
   }
 }
 
-/**
- * Is this call about to write the checkout whose current branch is `main`?
- * PURE. The PreToolUse matcher already narrows the possible tools; this second
- * classification keeps reads and repository gates open and treats an unreadably
- * deep shell wrapper conservatively as a write.
- */
 const NON_TRACKED_GATE_SCRIPTS = /^(?:build|lint|test(?::.*)?|typecheck(?::.*)?)$/
 const NON_TRACKED_GATE_BINS = new Set(['vitest', 'tsc', 'vite', 'oxlint'])
 
@@ -757,7 +773,8 @@ function nonTrackedGateSegment(segment) {
   return false
 }
 
-/** A gate redirected into a real file is once again an arbitrary checkout write. */
+/** A gate whose stdout (fd '' or 1) is redirected into a real file is once again
+ *  an arbitrary checkout write. Stderr-only redirects are not counted. */
 function writesOutputFile(segment) {
   const nullSinks = new Set(['/dev/null', '$null', 'nul', 'nul:', '/dev/zero'])
   return (segment?.redirects ?? []).some(
@@ -773,10 +790,11 @@ function writesOutputFile(segment) {
 /**
  * Does a canonical target land in the checkout? PURE.
  *
- * The wrapper resolves both paths through the filesystem before calling this
- * predicate. Keeping containment here means `..`, symlinks and platform path
- * separators all receive one decision, while the unit layer can exercise the
- * security boundary without touching the live checkout.
+ * For Edit/Write calls the wrapper resolves both paths through the filesystem
+ * before calling this predicate, so `..`, symlinks and platform separators get one
+ * decision. `segmentWritesOnlyOutsideCheckout` passes a lexically resolved shell
+ * target (no symlink resolution). The unit layer can exercise the boundary
+ * without touching the live checkout.
  *
  * Missing path evidence answers true (the conservative direction): a malformed
  * write payload must not turn into an exemption from the main-write fence.
@@ -813,8 +831,8 @@ const FILE_TOOLS = new Set([
  * same path did not, so the fix had to be handed to the owner session instead of
  * being made by the one that found the defect.
  *
- * Conservative in both directions: a segment with no path argument at all is NOT
- * exempted (that is the `git push` shape), and one path inside the checkout
+ * Conservative in both directions: only FILE_TOOLS heads qualify, a segment with
+ * no path argument at all is NOT exempted, and one path inside the checkout
  * removes the exemption for the whole segment.
  */
 export function segmentWritesOnlyOutsideCheckout(segment, { cwd = '', checkoutRoot = '' } = {}) {
@@ -839,6 +857,12 @@ export function segmentWritesOnlyOutsideCheckout(segment, { cwd = '', checkoutRo
   )
 }
 
+/**
+ * Is this call about to write the checkout whose current branch is `main`?
+ * PURE. The PreToolUse matcher already narrows the possible tools; this second
+ * classification keeps reads and repository gates open and treats an unreadably
+ * deep shell wrapper conservatively as a write.
+ */
 export function mainWritingAction({ toolName, command, filePath, resolvedFilePath, checkoutRoot, cwd = '' } = {}) {
   const tool = String(toolName ?? '')
   if (['Edit', 'Write', 'MultiEdit', 'NotebookEdit'].includes(tool)) {

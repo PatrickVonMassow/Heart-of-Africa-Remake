@@ -10,9 +10,9 @@
 // the page dutifully polled.
 //
 // The source is therefore a string in a TRACKED module. The board embeds it
-// verbatim, `structureViolations` refuses to publish a board that does not carry
-// it, and the Vitest layer runs it in jsdom against both shapes. A transport
-// change can still break the refresher — but not silently.
+// verbatim and the Vitest layer runs it in jsdom against both shapes. No publish
+// gate checks that the board carries it: `structureViolations` strips every
+// script body before it looks.
 
 /** Where the published board content lives. The shell knows this URL too; the
  *  fragment must carry its own copy because it is written INTO that shell and
@@ -27,7 +27,7 @@ export const BOARD_CONTENT_URL =
  * WHY A SIGNAL AND NOT MARKUP: the message channel is INJECTED by the viewer
  * into the rendered board, because nothing about the chat may enter the board
  * CONTENT. Since the chat moved under the board's heading it sits inside
- * `<main>` — and the swap replaces `<main>` wholesale, so every successful
+ * `<main>` — and the swap replaces `<main>`'s whole content, so every successful
  * refresh deleted the channel while the reader was looking at it (returning to
  * the browser makes the page visible, which fires the poll at once). The
  * refresher is versioned source and the injection lives in the viewer, so the
@@ -37,8 +37,8 @@ export const BOARD_SWAP_EVENT = 'hoa-board-swapped'
 
 /**
  * The refresher, as the text the board embeds. It is a function DECLARATION
- * rather than an IIFE so the test can call it with injected collaborators; the
- * board appends the one line that starts it with the real ones.
+ * rather than an IIFE so the test can call it with injected collaborators;
+ * `refresherScript` appends the small IIFE that arms it with the real ones.
  */
 export const REFRESHER_SOURCE = String.raw`
 function createBoardRefresher(env) {

@@ -1,5 +1,7 @@
-// WHAT A SESSION THAT DID NOT GET THE BATCH IS TOLD — the deciding half of
-// scripts/batch-resume-hook.mjs's stand-down branch. PURE: no I/O, no clock.
+// WHAT THE SESSION-START HOOK SAYS — the deciding half of
+// scripts/batch-resume-hook.mjs: the owner-runbook gate, the open-point
+// headline, and above all the stand-down branch. PURE: no I/O; the clock is
+// read only as the default of an uninjected `now`.
 //
 // WHY THIS EXISTS AT ALL (four-eyes review, 29.07.2026 — the worst finding of
 // the message-watcher review). That branch had exactly ONE message, written when
@@ -40,18 +42,6 @@ export function ownerRunbookContext(ownership, runbookText) {
   return `\n\n--- OWNER-ONLY BATCH RUNBOOK ---\n${body}\n--- END OWNER-ONLY BATCH RUNBOOK ---`
 }
 
-/**
- * How the SessionStart text opens: how much is open, and the one point the
- * session will actually carry (point 440).
- *
- * IT USED TO ENUMERATE EVERY OPEN NUMBER — 118 of them, 588 measured characters
- * of the hook's 4035, injected at every session start. Since the point boundary
- * (27.07.2026) a session carries ONE stretch of work and ends, so 117 of those
- * numbers were never acted on; and a bare number tells nothing anyway — the
- * spec behind it comes from `point-brief.mjs`, which is the pointer this hands
- * over instead. The board's Warteschlange, which DOES have to list them all,
- * builds its own list from the work order (`board-queue.mjs import`).
- */
 /** At most a handful of numbers, then a count — the headline may not grow with the queue. */
 const namedFew = (nums, max = 6) =>
   nums.length > max ? `${nums.slice(0, max).join(', ')} and ${nums.length - max} more` : nums.join(', ')
@@ -71,12 +61,24 @@ export function allGatedMessage(gated = []) {
   )
 }
 
+/**
+ * How the SessionStart text opens: how much is open, and the one point the
+ * session will actually carry (point 440).
+ *
+ * IT USED TO ENUMERATE EVERY OPEN NUMBER — 118 of them, 588 measured characters
+ * of the hook's 4035, injected at every session start. Since the point boundary
+ * (27.07.2026) a session carries ONE stretch of work and ends, so 117 of those
+ * numbers were never acted on; and a bare number tells nothing anyway — the
+ * spec behind it comes from `point-brief.mjs`, which is the pointer this hands
+ * over instead. The board's Warteschlange, which DOES have to list them all,
+ * builds its own list from the work order (`board-queue.mjs import`).
+ */
 export function openPointsHeadline(openNumbers = [], { gated = [] } = {}) {
   const nums = (openNumbers ?? []).map(Number).filter(Number.isFinite)
   const waiting = (gated ?? []).map(Number).filter(Number.isFinite)
   const head = nums[0]
   return (
-    `[batch-resume] TASKS.md has ${nums.length} open point(s); the first in work-order ` +
+    `[batch-resume] TASKS.md has ${nums.length} open point(s) ready to work; the first in work-order ` +
     `order is ${head ?? 'none'}` +
     (head === undefined ? '. ' : ` (node scripts/point-brief.mjs ${head} for its spec; TASKS.md for the rest). `) +
     // THE GATED POINTS ARE NAMED, NOT OFFERED (point 450). A fresh session must
@@ -127,7 +129,7 @@ export function standDownKind({ lock = null, claim = null, claimHonoured = false
 }
 
 /**
- * The one line every non-responder stand-down ends with: how the user takes the
+ * The way-back text every non-responder stand-down carries: how the user takes the
  * batch into THIS window. Printed with the session id already in it, because a
  * CLI gets no hook payload and this is the one place it is known.
  *
@@ -170,7 +172,8 @@ const NOT_THE_WORKER =
   'user normally. '
 
 /**
- * THE WHOLE STAND-DOWN MESSAGE. PURE — `now` is injected, nothing is read.
+ * THE WHOLE STAND-DOWN MESSAGE. PURE — nothing is read; `now` defaults to the
+ * clock only when not injected.
  *
  * Returns { kind, text }. The text is the body only; the hook prefixes its own
  * header (the open-point count and the model policy).
@@ -217,8 +220,8 @@ export function standDownMessage({
       text:
         `A message RESPONDER holds a bounded claim on the batch (claim ${claimantSid}, ` +
         'scripts/chat-watcher.mjs) while it answers one chat message, so the lock is reserved and this ' +
-        `session cannot take it. ${NOT_THE_WORKER}The claim releases itself within minutes — it is bounded ` +
-        `by the responder's lifetime and expires on its own. ${wayBackText}`,
+        `session cannot take it. ${NOT_THE_WORKER}The responder's claim releases itself within minutes — it is ` +
+        `bounded by the responder's lifetime and expires on its own. ${wayBackText}`,
     }
   }
 
@@ -229,7 +232,8 @@ export function standDownMessage({
         `NO session owns the batch lock right now, but session ${claimantSid} has CLAIMED it ` +
         '(.claude/batch-claim.json) and that claim is still live, so taking the lock here would pull the ' +
         `batch out of the window it was reserved for. ${NOT_THE_WORKER}${wayBackText} ` +
-        `NOTE: session ${claimantSid} has already claimed the batch — do not claim over it.`,
+        `NOTE: session ${claimantSid} has already claimed the batch — use the way back only on the user's ` +
+        'word, never to claim over it on your own.',
     }
   }
 
@@ -251,6 +255,9 @@ export function standDownMessage({
       `But another session OWNS the batch lock (session ${lock?.sessionId ?? 'unknown'}, ` +
       `pid ${lock && lock.pid ? lock.pid : 'unknown'}, heartbeat ${ageMin} min ago, .claude/batch-lock.json) ` +
       `and its liveness check passed. ${NOT_THE_WORKER}${wayBackText}` +
-      (claimHonoured ? ` NOTE: session ${claimantSid} has already claimed the batch — do not claim over it.` : ''),
+      (claimHonoured
+        ? ` NOTE: session ${claimantSid} has already claimed the batch — use the way back only on the user's ` +
+          'word, never to claim over it on your own.'
+        : ''),
   }
 }

@@ -2,10 +2,11 @@
 // Vitest layer sweeps every rule without a filesystem, a board or a git remote
 // (scripts/board-heartbeat-core.test.mjs).
 //
-// WHY THIS EXISTS. Every currency mechanism the board has bites at a TURN END:
-// `dashboard-guard` enforces card currency in the Stop chain, and the launcher's
-// watchdog only speaks when the session is wedged. A session that works one
-// continuous turn reaches neither. Measured 23.08.2026 ~05:00: the board's last
+// WHY THIS EXISTS. Every other currency mechanism the board has bites at a TURN
+// BOUNDARY or not at all: `board-first-guard` before a turn's first mutation,
+// `dashboard-guard` in the Stop chain, and the launcher's watchdog only when the
+// session is wedged. A session that works one long continuous turn is carried
+// by none of them in between. Measured 23.08.2026 ~05:00: the board's last
 // publish was 02:30, while the watchdog session spawned at 01:50 worked point 847
 // through fifteen Sol review rounds until at least 04:58 in ONE `-p` turn and
 // never rewrote the now-card. The public board showed finished work for ~2.5 h of
@@ -38,8 +39,8 @@ const KNOWN = new Set(Object.values(TRIGGERS))
  * How long a now-card status may stand before a trigger refreshes it.
  *
  * CALIBRATABLE. The measured failure was ~2.5 h of silence, and a Sol review
- * round runs single-digit minutes, so ten minutes keeps at most one round
- * invisible while leaving the common case — several recordings inside one
+ * round runs single-digit minutes, so ten minutes keeps at most ten minutes of
+ * rounds invisible while leaving the common case — several recordings inside one
  * round — publishing once. Lower it and a fast round publishes twice for the
  * same news; raise it and the board goes quiet exactly when it is busiest.
  */
@@ -58,8 +59,9 @@ export const STALE_AFTER_MS = 10 * 60_000
  * WHAT THE RECORDED TIME MEANS IN EACH CASE. `now - seenAt` is the answer in
  * both, and it is sound in both — but for different reasons, and the difference
  * is what the third cross-vendor round (24.08.2026) forced:
- *   · the content MATCHES the record — the card has stood untouched that long,
- *     and the span is its EXACT age.
+ *   · the content MATCHES the record — the card has stood untouched that long:
+ *     the span is its EXACT age when the writer stamped the record, and stays
+ *     an UPPER BOUND when the record carries a bound kept from a change (below).
  *   · the content DIFFERS — somebody rewrote the card at some unknown moment
  *     between that observation and now, so the span is an UPPER BOUND on its
  *     age. Treating a change as age zero was wrong: a card last looked at 24
@@ -117,8 +119,8 @@ export function heartbeatStatus({ note, detail } = {}) {
  * @param {object}  a
  * @param {object}  a.focus      the declared focus ({point, note}), or null
  * @param {number}  a.cardPoint  the now-card's title point, or null when unknown
- * @param {number}  a.ageMs      how long the card's own status stamp has stood;
- *                               null when there is no stamp to read
+ * @param {number}  a.ageMs      the card's age from `cardAge` (exact or an upper
+ *                               bound); null when unknown (first sight)
  * @param {string}  a.trigger    one of TRIGGERS
  * @param {string}  a.detail     one line: what this trigger just recorded
  * @param {number}  a.staleAfterMs
@@ -142,9 +144,9 @@ export function decideHeartbeat({
   if (focus.point != null && cardPoint != null && cardPoint !== focus.point) return no(REASONS.CARD_MISMATCH)
 
   const status = heartbeatStatus({ note: focus.note, detail })
-  // No stamp on the card, so its currency CANNOT be proven — and an unprovable
-  // currency is treated as stale, never as fresh. A card the board never
-  // stamped and an unreadable clock both land here.
+  // No record yet (first sight) or a negative age (a clock stepped back), so
+  // its currency CANNOT be proven — and an unprovable currency is treated as
+  // stale, never as fresh. The reason keeps its historical name NEVER_STAMPED.
   if (!Number.isFinite(ageMs) || ageMs < 0) {
     return { refresh: true, reason: REASONS.NEVER_STAMPED, status, ageMs: null }
   }

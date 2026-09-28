@@ -4,8 +4,9 @@
 // Thin by design: every decision lives in scripts/batch-state-core.mjs and
 // scripts/batch-schema-core.mjs; this file only moves bytes, and it moves them
 // with the durability the union requires — an fsynced append for every journal
-// entry, WRITE–FLUSH–RENAME for every committed snapshot or receipt, and a
-// directory fsync after the rename so the new name itself survives a crash.
+// entry, WRITE–FLUSH–RENAME for every committed snapshot, WRITE–FLUSH–LINK for
+// every receipt, and a directory fsync after either so the new name itself
+// survives a crash.
 //
 // THE STATE PATHS ARE RESTRICTED (architecture, "Additional omissions"): the
 // store lives under the git COMMON directory — shared by every worktree,
@@ -15,9 +16,8 @@
 // chose. Restricted-file reads enforce O_NOFOLLOW on the open itself, so a path
 // swapped after an lstat check is refused rather than followed.
 //
-// STILL DARK: nothing on today's authoring path imports this file; its first
-// runtime caller is the daemon of step 3, and the activation flag refuses to
-// enable while steps 8 and 9 are not green.
+// The lane stays DARK: its activation flag refuses to enable while steps 8 and 9
+// are not green.
 import { closeSync, constants as fsConstants, existsSync, fstatSync, fsyncSync, ftruncateSync, linkSync, lstatSync, mkdirSync, openSync, readFileSync, readSync, readdirSync, renameSync, statSync, unlinkSync, writeSync } from 'node:fs'
 import { dirname, join, resolve, sep } from 'node:path'
 import { execFileSync } from 'node:child_process'
@@ -60,8 +60,8 @@ export const durabilityProbe = { onDirFsync: null }
 
 /** A new NAME is durable only once its directory is flushed: an fsynced file
  *  can still vanish with its filename after a crash if the directory entry
- *  never reached the disk. Called for every created directory and for the
- *  journal's own creation. */
+ *  never reached the disk. Called for every created directory, the journal's own
+ *  creation and every receipt; writeFileAtomic flushes its directory inline. */
 function fsyncDir(path) {
   const fd = openSync(path, 'r')
   try {
@@ -142,7 +142,6 @@ function writeAllSync(fd, text) {
     if (!Number.isInteger(n) || n <= 0) throw new Error(`short write: ${written} of ${buf.length} bytes reached the file`)
     written += n
   }
-  return buf.length
 }
 
 /** Read through the descriptor that performed O_NOFOLLOW. Passing the path to
@@ -204,26 +203,20 @@ function repairCutTail(store) {
   }
 }
 
-/** One journal append: frame, write, FLUSH, close. The frame is a single write of
- *  a single line, so a crash leaves either nothing or a truncated tail — the two
- *  cases replay reads as ordinary. A truncated tail left by an EARLIER crash is
- *  repaired (preserved beside the journal, then cut) before this frame goes in,
- *  because appending onto a fragment would weld it into delimited corruption.
- *  Returns the framed line's byte length so a caller can account, never the
- *  unflushed promise of one. */
 /**
- * The lane's fence store: `{ generation, fence }`.
+ * The lane's fence store: `{ v, generation, fence }`.
  *
  * The GENERATION is minted once, when the store is created, and never again —
- * `mayMintFence` refuses a store that has lost it rather than inventing one,
+ * ensureFenceStore refuses a store that has lost it rather than inventing one,
  * because a fresh generation silently invalidates every credential a running
  * publisher holds. The FENCE tracks the batch epoch and only ever RISES: it is
  * seeded from the owner lock at every daemon start, and a lock carrying an older
  * number than the store has already seen does not roll it back.
  *
  * A store that exists but cannot be read is a REFUSAL, never a re-mint: that is
- * the difference between an erased store (nothing to invalidate) and a corrupt
- * one (a running publisher whose generation we would be throwing away).
+ * the difference between a store never created (minted only while no journal
+ * exists either) and a corrupt one (a running publisher whose generation we
+ * would be throwing away).
  */
 export function ensureFenceStore(store, { fence } = {}) {
   if (!Number.isSafeInteger(fence) || fence < 1) return { ok: false, reason: 'a fence store is seeded with a usable fence' }
@@ -278,6 +271,13 @@ export function ensureFenceStore(store, { fence } = {}) {
   }
 }
 
+/** One journal append: frame, write, FLUSH, close. The frame is a single line
+ *  written in full before the flush, so a crash leaves either nothing or a
+ *  truncated tail — the two cases replay reads as ordinary. A truncated tail left
+ *  by an EARLIER crash is repaired (preserved beside the journal, then cut) before
+ *  this frame goes in, because appending onto a fragment would weld it into
+ *  delimited corruption. Returns { ok, bytes } plus `repairedTail` when a tail
+ *  was preserved, or { ok: false, reason } on refusal. */
 export function appendJournalEntry(store, entry) {
   const framed = frameEntry(entry)
   if (!framed.ok) return { ok: false, reason: framed.reason }
@@ -317,19 +317,21 @@ export function appendJournalEntry(store, entry) {
 
 /** The journal, read and judged by the core. A missing journal is an EMPTY one
  *  only for a store that has never written; once anything else exists in the store
- *  the distinction matters, and the caller (mayMintFence) treats missing-beside-
- *  evidence as prohibiting. This reader only reports what it found. */
+ *  the distinction matters, and ensureFenceStore refuses to mint when a journal
+ *  exists beside a missing fence store. This reader only reports what it found. */
 export function readJournal(store) {
   refuseSymlink(store.journalPath, 'the journal')
   const journal = readFileNoFollowIfExists(store.journalPath)
   return { exists: journal.exists, ...replayJournal(journal.text ?? '') }
 }
 
-/** WRITE–FLUSH–RENAME, the only way a committed snapshot or receipt is produced:
+/** WRITE–FLUSH–RENAME, the way a committed snapshot and every other replaceable
+ *  store file is produced:
  *  the bytes are complete and flushed under a temporary name before the real name
  *  ever points at them, the rename is atomic, and the DIRECTORY is fsynced after
- *  it so the name change itself is durable. A crash at any step leaves either the
- *  old committed file or a `.tmp-` leftover the reader ignores.
+ *  it so the name change itself is durable. A crash at any step leaves the old
+ *  or the new committed file, possibly beside a `.tmp-` leftover the reader
+ *  ignores.
  *
  *  The temporary name is RANDOM and the create EXCLUSIVE: a predictable
  *  pid-derived name is plantable as a symlink (O_EXCL fails on one, however
@@ -375,7 +377,7 @@ export function readSnapshot(store) {
  *  reused or racing receipt id must never silently overwrite what an earlier
  *  writer sealed, so the create is a hard-link into place — atomic, exclusive,
  *  first writer wins. Writing the SAME bytes again is idempotent; different
- *  bytes under an existing id are refused with both contents intact. */
+ *  bytes under an existing id are refused, leaving the existing receipt intact. */
 export function writeReceipt(store, receiptId, body) {
   if (!validBatchId(receiptId)) return { ok: false, reason: `not a usable receipt id: ${JSON.stringify(receiptId)}` }
   const sealed = sealSnapshotText(body)
@@ -407,7 +409,7 @@ export function writeReceipt(store, receiptId, body) {
     try {
       unlinkSync(tmp)
     } catch {
-      /* the leftover is listed by abandonedTemporaries */
+      /* a leftover stays as `.tmp-` crash evidence */
     }
     if (error?.code === 'EEXIST') {
       if (sameAsExisting()) {
@@ -424,7 +426,7 @@ export function writeReceipt(store, receiptId, body) {
   try {
     unlinkSync(tmp)
   } catch {
-    /* the leftover is listed by abandonedTemporaries */
+    /* a leftover stays as `.tmp-` crash evidence */
   }
   fsyncDir(store.receiptsDir)
   return { ok: true }

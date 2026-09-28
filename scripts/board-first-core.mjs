@@ -15,9 +15,9 @@
 // THE RULE: the FIRST state-changing tool call of a turn is DENIED while the
 // board does not yet describe the work that is starting. "Describes it" is not
 // judged from prose — the gate reads two already-recorded facts:
-//   (i)  a `focus set|confirm` stamped AFTER this turn's `turnStartedAt`, and
+//   (i)  a `focus set|confirm` stamped at or after this turn's `turnStartedAt`, and
 //   (ii) the published board content equal to the repo file's content
-//        (the invariant dashboard-publish already maintains).
+//        (the hash board-publish.mjs records; a legacy mirror record still counts).
 //
 // THE ESCAPE PATH IS PART OF THE DESIGN. A gate that can trap the session is
 // worse than the staleness it fixes (a block-loop cost ~30 turns on point 278),
@@ -27,7 +27,8 @@
 //     dashboard-publish.mjs, dashboard-guard.mjs, an edit of the board file),
 //   - denies AT MOST ONCE per turn — after it has fired it stands down, so a
 //     session that ignores it can still work; the Stop chain still catches the
-//     end state,
+//     end state (the point-470 idle-claim deny below is the exception: it never
+//     stands down),
 //   - and is fail-OPEN in the wrapper: any internal error allows the call.
 //
 // THE THIRD CONDITION (point 400, delta B): a publish is DUE. The open-point set
@@ -57,8 +58,8 @@ export { shellSegments, isMutatingSegment }
  * Is this checkout a delegated agent's isolated worktree? (point 440)
  *
  * WHY THE GATE ASKS. A subagent inherits the parent's session id, so the
- * ownership stand-down cannot tell it apart — the deny used to admit exactly
- * that and tell the agent to repeat the call. Measured, that is 1058 characters
+ * ownership stand-down cannot tell it apart — the deny admits exactly that and
+ * tells the agent to repeat the call. Measured, that is 1058 characters
  * of block text plus one thrown-away tool call for EVERY delegated agent, spent
  * on a duty the agent is forbidden to discharge: CLAUDE.md §6 keeps the board
  * with the main session, and a worktree agent must not publish it.
@@ -104,7 +105,7 @@ export const ESCAPE_SCRIPTS = [
 ]
 
 /** Board files an Edit/Write may always touch (suffix match on the path). */
-export const BOARD_FILE_HINTS = ['.batch-dashboard.html', 'hoa-batch-dashboard.html']
+const BOARD_FILE_HINTS = ['.batch-dashboard.html', 'hoa-batch-dashboard.html']
 
 /** Does this single segment invoke one of the gate's own remedy scripts? */
 export function isEscapeSegment(segment) {
@@ -233,7 +234,7 @@ export function isPublished(state, repoHash) {
 // gate refuses.
 //
 // WHAT STAYS OPEN, so the claim can never trap a session:
-//   - reads, and everything `classifyTool` already treats as escape (the board
+//   - reads, and everything `classifyCall` already treats as escape (the board
 //     commands themselves, an edit of the board file);
 //   - the whole CLOSING SET (`handoverSurvivesCall`) — the calls that END a
 //     session rather than carry it on: `batch-boundary.mjs`, the focus stamp, the
@@ -243,7 +244,7 @@ export function isPublished(state, repoHash) {
 // session working on, and it is denied while the claim stands.
 //
 // THIS DENY DOES NOT STAND DOWN after firing once, unlike the focus/publish
-// conditions above it. Those can be blocked on facts a session may be unable to
+// conditions `evaluate` checks after it. Those can be blocked on facts a session may be unable to
 // change; this one is a sentence the session itself wrote, its remedy is one
 // command, and that command is never blocked. A stand-down here would leave the
 // lie on the board for the rest of the turn — which is the whole defect.
@@ -260,7 +261,7 @@ export function isPublished(state, repoHash) {
 // it as the third way out.
 
 /** Is this call part of ENDING the session rather than carrying it on? */
-export function isSessionEndingCall({ toolName, command, filePath } = {}) {
+function isSessionEndingCall({ toolName, command, filePath } = {}) {
   try {
     return handoverSurvivesCall({ toolName, command, filePath }).survives === true
   } catch {
@@ -274,7 +275,7 @@ export function isSessionEndingCall({ toolName, command, filePath } = {}) {
  * without it a five-command line says only "something here writes", and the
  * reader has to guess which part the gate meant.
  */
-export function noWorkClaimReason(segment = '') {
+function noWorkClaimReason(segment = '') {
   const named = String(segment ?? '').trim()
   return (
     'THE BOARD CLAIMS NOTHING IS RUNNING — and this call would prove it wrong (point 470, user ' +
@@ -365,7 +366,7 @@ export function evaluate({
     const focusFresh = stampedAt >= turnStartedAt
     const published = isPublished(s, repoHash)
     // The publish-due mark only bites where a publish is possible (see the head
-    // of this file); everywhere else it is carried by the watchdog instead.
+    // of this file); the guard passes the pages transport, so that is every session.
     const dueUnpublished = canPublish === true && isPublishDue(s)
     if (focusFresh && published && !dueUnpublished) return { block: false, reason: '' }
 
@@ -393,8 +394,8 @@ export function evaluate({
       recordFired: true,
       reason:
         'BOARD FIRST — the board must describe the work BEFORE it starts, not after it ends ' +
-        '(user 27.07.2026). The user reads the published board while the turn runs; every other ' +
-        'board enforcer is a Stop hook and says nothing about that hour.\nMissing:\n' +
+        '(user 27.07.2026). The user reads the published board while the turn runs; the Stop-hook ' +
+        'board enforcers only speak at its end.\nMissing:\n' +
         missing.join('\n') +
         '\nDo this now, then repeat the call:\n' +
         '  1. Update the "Woran ich gerade arbeite" card so it names what you are about to do.\n' +

@@ -22,11 +22,11 @@ import { repoPath } from './repo-paths.mjs'
 
 export const BOARD_EDIT_LOCK_PATH = repoPath('.claude/board-edit-lock.json')
 export const BOARD_EDIT_LOCK_WAIT_MS = 3 * 60 * 1000
-export const BOARD_EDIT_LOCK_POLL_MS = 100
+const BOARD_EDIT_LOCK_POLL_MS = 100
 // A board edit normally finishes in seconds. The long lease is deliberate: if
 // publishing ever hangs, a living writer remains authoritative instead of a
 // clock permitting a second writer into the same read-modify-write.
-export const BOARD_EDIT_LOCK_LEASE_MS = 24 * 60 * 60 * 1000
+const BOARD_EDIT_LOCK_LEASE_MS = 24 * 60 * 60 * 1000
 
 /**
  * Run one synchronous board transaction under an exclusive cross-process lock.

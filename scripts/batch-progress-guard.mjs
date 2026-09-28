@@ -1,16 +1,18 @@
 // Stop hook (user mandate 22.07.2026): GUARANTEE the batch never idle-stops.
 // While open, non-deferred TASKS points remain and .claude/batch-paused is absent,
 // this BLOCKS the turn from ending — the assistant must continue the next item (and
-// wait for a running validation by AWAITING it inside the turn, never by yielding
-// and never by a poll loop: point 592 measured 2857 poll responses in six days,
-// 10.9 % of the weighted spend, the longest chain 437 answers for one word).
+// wait for a running validation by AWAITING it inside the turn, never by a poll
+// loop: point 592 measured 2857 poll responses in six days, 10.9 % of the weighted
+// spend, the longest chain 437 answers for one word). Only work it cannot await in
+// one call may be DECLARED and waited on (WAITING IS NOT IDLING, below).
 //
 // HARD SINGLETON (24.07.2026, after the e9407cae double-session incident):
-//   - It pushes ONLY the session that holds the live batch lock. A non-owner
-//     session STANDS DOWN unconditionally (allowed to stop, never conscripted)
-//     — even a session with no readable session id. Ownership is only ever
-//     gained through the ATOMIC acquire in scripts/batch-singleton.mjs; the
-//     old check-then-claim conscription is gone.
+//   - It pushes ONLY the session that holds (or atomically acquires) the batch
+//     lock. A session with open work acquires a FREE, unreserved lock through the
+//     ATOMIC acquire in scripts/batch-singleton.mjs; the old check-then-claim
+//     conscription is gone. A session that does not own the lock — even one with
+//     no readable session id — STANDS DOWN, blocked only while a declared child of
+//     its own still needs a transfer (the stand-down boundary, point 716).
 //   - ACTIVE PARALLEL-SESSION DETECTOR: each turn-end, the owner checks for a
 //     second live top-level session (fresh tool activity by a non-owner sid in
 //     THIS repo — subagents never register, so they are never flagged). On
@@ -29,8 +31,8 @@
 // the batch to the launcher (markHandover) — the night of 28.07.2026 the turn
 // ended, the process lived on, the lock stayed held and the launcher skipped 21
 // ticks in a row. The handover is written HERE and nowhere else: only this branch
-// has established a fresh session-bound marker, a verifiably closed point and an
-// armed launcher. A crash, a wedge or an ordinary turn end never reaches it.
+// has established a fresh session-bound marker, a verifiably closed point (or a
+// context boundary) and an armed launcher. A crash, a wedge or an ordinary turn end never reaches it.
 // WAITING IS NOT IDLING (28.07.2026, point 388, fifth live finding): this guard
 // could not see work it had HANDED OUT. With three delegated agents building and
 // a browser suite running, it blocked eight turn ends in a row demanding the next
@@ -49,8 +51,10 @@
 // point boundary's sibling: there the batch goes to the launcher, here it goes to
 // the window the user is sitting at, which is why the claim is honoured ahead of
 // a valid point boundary.
-// Format-safe: a TASKS.md whose checkboxes no longer parse blocks with a warning
-// instead of silently reading "complete". Fail-open on any error.
+// Format-safe: a TASKS.md with checkbox lines but neither a parseable open nor a
+// done point blocks with a warning instead of silently reading "complete".
+// An unexpected error fails open, loudly; the transfer and stand-down paths block
+// on their own errors instead.
 import { appendFileSync, existsSync, readFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import {
@@ -140,11 +144,9 @@ function readOnlyOwnership(sessionId, {
   lockPath = LOCK_PATH,
   lock: suppliedLock,
   now = Date.now(),
-  ownerWork,
-  readLock = readOwnerLock,
 } = {}) {
   if (!sessionId) return 'none'
-  const lock = suppliedLock === undefined ? readLock(lockPath) : suppliedLock
+  const lock = suppliedLock === undefined ? readOwnerLock(lockPath) : suppliedLock
   if (!lock) {
     // A present-but-unreadable lock cannot safely be predicted as acquirable.
     if (existsSync(lockPath)) return 'held'
@@ -157,14 +159,16 @@ function readOnlyOwnership(sessionId, {
   }
   if (ownsLock(sessionId, { lockPath, lock, now }).mine) return 'mine'
   const probe = lock.pid ? probePid(lock.pid) : null
-  const work = ownerWork ?? gatherOwnerWork(lock, { now })
+  const work = gatherOwnerWork(lock, { now })
   return assessOwner(lock, { now, bootTime: bootTimeMs(), probe, work }).alive ? 'held' : 'acquired'
 }
 
-/** Read-only batch-progress variant for guard-preflight. It answers whether a
- * boundary stop would be permitted from the same pure decision as the Stop hook,
- * but performs none of that hook's writes: no acquire/heartbeat, alert, claim
- * clear, release, handover or boundary-log entry. */
+/** Read-only batch-progress variant for guard-preflight. For an owning (or
+ * acquiring) session it answers whether a boundary stop would be permitted from
+ * the same pure decision as the Stop hook, but performs none of that hook's
+ * writes: no acquire/heartbeat, alert, claim clear, release, handover or
+ * boundary-log entry. A non-owner gets `applicable: false`; the Stop hook's
+ * stand-down child-boundary check is not evaluated here. */
 export function gatherBatchProgressInputs({
   sessionId = '',
   transcriptPath = '',
@@ -324,7 +328,7 @@ const warn = (message) => {
   }
 }
 
-export function runBatchProgressGuard() {
+function runBatchProgressGuard() {
 let sid = ''
 let transcriptPath = ''
 try {
@@ -479,8 +483,8 @@ try {
   }
 
   // MAY THE DECLARED WORK CROSS A BOUNDARY (point 675, defeat 2)? Only asked
-  // when it would change the verdict — a live wait beside a DUE boundary or a
-  // watermark demand — so an ordinary turn end pays nothing. Fail direction:
+  // when it would change the verdict — a live wait beside a DUE boundary, a
+  // watermark demand or an honoured claim — so an ordinary turn end pays nothing. Fail direction:
   // unverifiable → NOT transferable, i.e. the wait is honoured
   // (drain-before-boundary); the other direction would demand a handover whose
   // commit the CLI then refuses — a loop.
@@ -533,7 +537,8 @@ try {
 
   // FAIL VISIBLY, NEVER SILENTLY NEVER-FIRE (point 675, defeat 3): an owner
   // whose context cannot be measured must hear it, or the watermark is defeated
-  // by the very silence it exists to end. Appended to whatever this guard says.
+  // by the very silence it exists to end. Appended to the in-flight allow and
+  // the default block.
   const watermarkNote =
     watermark && watermark.state === 'unreadable'
       ? ' NOTE: the CONTEXT WATERMARK could not be measured this turn (no readable transcript/usage record), so ' +
@@ -543,7 +548,7 @@ try {
   if (decision === 'allow-release') {
     // HAND THE BATCH BACK. A real release, not a handover: the user is not the
     // launcher, and leaving a lock behind that names a session which is done would
-    // only make the claiming window wait for a grace window it should not have to.
+    // only make the claiming window wait for ownership to lapse.
     // The claim is stamped rather than deleted, and the stamp does two things. It
     // SPENDS the record — nothing is ever released to it twice (point 434 (6c)),
     // which is what left the batch ownerless for an hour. And it starts the
@@ -554,12 +559,6 @@ try {
     // six minutes. So this session does NOT take the lock back; the claimant runs
     // its own command, and if the reservation has run out and the launcher got
     // there first, it claims again against the new owner.
-    // Before the stamp a WINDOW's takeover claim is bound by the claimant's
-    // own liveness rather than by a clock it has to keep feeding, and for it
-    // `CLAIM_MAX_AGE_MS` bounds only how long a FREE lock waits for a claim nobody
-    // has taken. An ERRAND claim carrying an issuer (`claimIsBounded`) is the
-    // exception and keeps the wall clock even under a live owner, because its pid
-    // names the watcher rather than the taker.
     // Release, then stamp ONLY if the release actually happened — the stamp asserts
     // that the batch was handed over, so it is never written on the word of a session
     // that freed nothing. Both lines live in handBackToClaimant so the pairing is
@@ -614,8 +613,9 @@ try {
     process.exit(0)
   }
 
-  // Said at every turn end that does NOT release, so the owner knows somebody is
-  // waiting and why it is still holding on.
+  // Appended to the owner's slots, in-flight, take-boundary, context-handover
+  // and default messages, so the owner knows somebody is waiting and why it is
+  // still holding on.
   const claimNote =
     claimVerdict.verdict === 'wait'
       ? ` A CLAIM IS PENDING (${describeClaim(claimInfo)}): the user wants the batch back in their own window, ` +
@@ -638,7 +638,8 @@ try {
     record(`WAIT by ${sid} — stop allowed while declared work runs: ${what}`)
     warn(
       `THE BATCH IS WAITING, NOT IDLE: ${what}. This turn may end; the batch lock stays HELD and nothing was ` +
-        `handed over, so no successor will be spawned beside you. The declaration stops holding the moment any ` +
+        `handed over, so no successor is spawned beside you while that evidence holds. The declaration stops ` +
+        `holding the moment any ` +
         `of that evidence stops checking out, and it expires on its own — so when the work lands, ACT on it ` +
         `(merge the agent, read the suite result), then either re-declare what is still running ` +
         `(\`node scripts/batch-in-flight.mjs --waiting-on …\`) or clear it (\`--clear\`).` +
@@ -653,9 +654,9 @@ try {
     // HAND THE BATCH OVER (point 388). Waiting for the old process to die was
     // the flaw: an interactive window fires no SessionEnd, so the lock could
     // outlive the work by hours. The handover is not a release — the lock keeps
-    // naming this session, work that CONTINUES the batch withdraws it again, and
-    // a still-live pid buys the successor's spawn a grace window. The singleton
-    // therefore still admits exactly one working session.
+    // naming this session and work that CONTINUES the batch withdraws it again;
+    // while the mark stands, ownership ends at once (batch-ownership-core.mjs),
+    // with no pid grace, so the launcher may spawn the successor.
     //
     // THE WRITE COMES FIRST, AND THE MARKER IS NOT CONSUMED (live findings 1+2,
     // 28.07.2026). It used to run the other way round: clearBoundary(), then a
@@ -671,7 +672,7 @@ try {
     // was perfectly deliberate.
     const isContext = bound.boundary?.reason === 'context-boundary'
     const what = isContext ? 'context watermark' : `point ${point ?? '?'}`
-    const retry = isContext ? '--commit --context' : String(point ?? '<point>')
+    const retry = isContext ? '--commit --context' : `--commit ${point ?? '<point>'}`
     const handed = markHandover(sid, { point })
     if (handed.handed) {
       record(
@@ -687,7 +688,7 @@ try {
     warn(
       `THE HANDOVER DID NOT HAPPEN. The boundary (${what}) is valid and this stop is allowed, ` +
         `but the batch lock could NOT be marked handed-over (${why}), so the launcher will keep seeing a live ` +
-        `owner and will NOT spawn a successor. Do not stop believing the batch was passed on: retry with ` +
+        `owner and will NOT spawn a successor until that ownership lapses on its own. Do not stop believing the batch was passed on: retry with ` +
         `\`node scripts/batch-boundary.mjs ${retry}\` and end the turn again, or release the lock ` +
         `by hand (\`node scripts/batch-singleton.mjs release\`) once this session is really finished. The ` +
         `boundary marker was deliberately left in place, so a retry needs no new one.`,

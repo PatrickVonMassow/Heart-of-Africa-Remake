@@ -8,8 +8,9 @@
 //
 // EVERY read fails soft. A state file that is missing, half-written or from a
 // future version must never cost a board edit: the worst outcome of an unreadable
-// store is a paragraph the board does not show, and the store itself is not what
-// the reader consults for an incident.
+// store is a paragraph the board does not show, and a derivation that throws
+// leaves the document as it was, its old state card included. The store itself
+// is not what the reader consults for an incident.
 
 import { existsSync, readFileSync } from 'node:fs'
 
@@ -22,7 +23,7 @@ import { commonRepoPath, repoPath } from './repo-paths.mjs'
  *  guessed a path would silently derive nothing at all. */
 export const PAUSE_PATH = repoPath('.claude/batch-paused')
 export const LADDER_PATH = repoPath('.claude/resilience/alert-escalation.json')
-export const RETRY_STATE_PATH = repoPath('.claude/resilience/child-retry.json')
+const RETRY_STATE_PATH = repoPath('.claude/resilience/child-retry.json')
 export const DOCTOR_STATE_PATH = commonRepoPath('.claude/doctor-state.json')
 
 /** JSON, or null — an unreadable store is one paragraph fewer, never a failure. */
@@ -51,7 +52,7 @@ export function readPause({ path = PAUSE_PATH } = {}) {
  * batch has nothing to report. Every call re-reads: that is what lets a card
  * disappear the moment its condition does.
  */
-export function currentStateCard({
+function currentStateCard({
   pausePath = PAUSE_PATH,
   ladderPath = LADDER_PATH,
   retryPath = RETRY_STATE_PATH,

@@ -10,8 +10,10 @@
 //
 // The LEGACY (claude.ai artifact, retired 29.07.2026) mirror survives here in
 // exactly two places — `publishedHash` and `artifactToolSeen` — so that an old
-// record still counts and never re-blocks a board that was live. Nothing writes
-// them any more; the transport below is what every session runs.
+// record still counts and never re-blocks a board that was live. Only the
+// Artifact-tool hook (lock-heartbeat-hook.mjs, `artifactToolSeen`) and the manual
+// dashboard-publish.mjs (`publishedHash`) still write them; the transport below
+// is what every session runs.
 //
 // The chain this module serves, in the order it was built:
 //   A  the DUE MARK — the open-point set is hashed after every tool call and a
@@ -19,6 +21,7 @@
 //      that dies between the change and the publish hands the mark on).
 //   B  the DENY — board-first-guard refuses the first state-changing call while
 //      a publish is due, but only where a publish is actually POSSIBLE.
+//   C  the DERIVED QUEUE — board-queue-core.mjs; not served by this module.
 //   D  the TRANSPORT — the board is pushed to a branch of this repository and
 //      read back over plain HTTPS, which a headless session can do and a
 //      verification can check against the PAGE rather than a state record.
@@ -40,9 +43,9 @@ import {
 // rebuilds the game AND every frozen version tag — minutes of runner time for a
 // status card). The branch carries ONE orphan commit that is force-updated, so
 // the history never grows either.
-export const BOARD_OWNER = 'PatrickVonMassow'
-export const BOARD_REPO = 'Heart-of-Africa-Remake'
-export const BOARD_BRANCH = 'board'
+const BOARD_OWNER = 'PatrickVonMassow'
+const BOARD_REPO = 'Heart-of-Africa-Remake'
+const BOARD_BRANCH = 'board'
 export const BOARD_FILE = 'board.html'
 export const ARCHIVE_FILE = 'archive.html'
 
@@ -72,7 +75,7 @@ export const WATCHDOG_TICK_MS = 15 * 60 * 1000
 // ── The fingerprint (deltas A + E) ─────────────────────────────────────────
 
 /** The meta the published board carries so a fetched page can be compared. */
-export const FINGERPRINT_META = 'hoa-board-open'
+const FINGERPRINT_META = 'hoa-board-open'
 
 /** Sorted, unique, positive integers — the canonical form of an open-point set. */
 export function normaliseOpenSet(open) {
@@ -97,7 +100,7 @@ export function openSetFingerprint(open) {
 
 /**
  * THE fingerprint, derived from ONE source. The due mark (delta A) and the
- * record a publish leaves behind (delta B) MUST read the same text: derive one
+ * record a publish leaves behind (delta D) MUST read the same text: derive one
  * from TASKS.md and the other from TASKS.md plus the archive and a publish would
  * re-arm the very mark it just cleared — the block loop this whole design exists
  * to prevent. Every caller goes through here rather than parsing for itself.
@@ -132,7 +135,8 @@ export function readFingerprint(html) {
  * when nothing should be written.
  *
  * Rules, in the order they apply:
- *   - an unchanged set writes nothing (the hook runs on EVERY tool call);
+ *   - an unchanged set writes nothing (the hook runs on EVERY tool call),
+ *     except clearing a due mark the live board has meanwhile caught up with;
  *   - the FIRST observation records the fingerprint but demands nothing — a
  *     fresh state file must not deny the first call of a fresh session;
  *   - a set the live board ALREADY shows is recorded but not demanded;
@@ -161,7 +165,8 @@ export function isPublishDue(state) {
 
 /**
  * What an attestation (`dashboard-guard --synced`) writes about the publish
- * state — the ONLY place the due mark is cleared.
+ * state. It clears the due mark, as do publishDuePatch's repair and
+ * pagesPublishPatch.
  *
  * A publish counts only when the attested bytes ARE the bytes that went live. A
  * DEFERRED publish leaves the live board behind, so the mark must survive it,
@@ -193,7 +198,7 @@ export function syncedPublishPatch({ state, fileHash, fingerprint, at = Date.now
  *
  * The rule is invariant (4) of the Stop audit, moved EARLIER: a board that could
  * never be attested must not be publishable either. Returns the open points that
- * appear in no section.
+ * appear in none of current work, queue and clarification.
  */
 export function boardMissingPoints(html, open) {
   const doc = String(html ?? '')
@@ -315,7 +320,8 @@ export function publishCapability({ state, sessionId = '', transport = null } = 
  *   'current'     — the live page carries the expected fingerprint;
  *   'behind'      — it carries a different one, for longer than the grace;
  *   'settling'    — it differs, but within the deploy/CDN grace: not an alarm;
- *   'unreachable' — the fetch failed, or the page carries no fingerprint at all.
+ *   'unreachable' — the fetch failed, or the page carries no fingerprint at all;
+ *   'unknown'     — no expected fingerprint was computed.
  *
  * UNREACHABLE IS NEVER 'current'. A page that cannot be read says nothing about
  * the board, and the one thing this whole point exists to prevent is a green
@@ -356,7 +362,8 @@ export function liveBoardVerdict({
  * corruption authority. `flaky` is a failure that has not yet repeated for the
  * whole streak, which is reported to nobody at all.
  *
- * It alerts on a board that is BEHIND or UNREACHABLE, and on a `publishDue` /
+ * It alerts on a board that is BEHIND or UNREACHABLE, on a 'transport' event,
+ * and on a `publishDue` /
  * `publishFailed` that has survived a whole tick — the case where the session is
  * wedged and no Stop hook will ever run again. Each alert is keyed, so one
  * standing fault is reported ONCE rather than every fifteen minutes; a recovered

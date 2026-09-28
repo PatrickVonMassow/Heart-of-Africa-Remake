@@ -4,11 +4,13 @@
 // of 676). The decisions live in scripts/batch-reconcile-core.mjs; this file
 // reads the durable inputs of union M26 — batch store, journal, daemon record,
 // batch lock, worktrees, local and remote branch tips — probes them, and
-// returns one report. It MUTATES nothing unless asked: `--apply` performs only
-// the idempotent daemon-pair resolutions that write toward the record's own
-// truth, and never releases a record whose lanes still read running.
+// returns one report. Its probes fetch into private refs/reconcile-probe/* refs
+// and delete them again; beyond that it MUTATES nothing unless asked: `--apply`
+// performs only the idempotent daemon-pair resolutions that write toward the
+// record's own truth, refuses on a corrupt or quarantined registry, and never
+// releases a record whose lanes still read running or stalled.
 //
-//   node scripts/batch-reconcile.mjs --repo <dir> --batch <id> [--apply --session <sid>]
+//   node scripts/batch-reconcile.mjs [--repo <dir>] --batch <id> [--apply --session <sid>]
 import { execFileSync } from 'node:child_process'
 import { existsSync, statSync, unlinkSync } from 'node:fs'
 import { join, resolve } from 'node:path'
@@ -37,13 +39,13 @@ export const reconcileProbe = { onMutexEntered: null }
 /** The branch a LANDED claim must be visible on. Landing merges to main and
  *  deletes the worker branch (CLAUDE.md §6), so the worker branch's tip proves
  *  nothing about a landing — only reachability from the target does. */
-export const LANDING_TARGET_REF = 'refs/heads/main'
+const LANDING_TARGET_REF = 'refs/heads/main'
 
 function git(args, cwd) {
   try {
     return { ok: true, status: 0, out: execFileSync('git', args, { windowsHide: true, cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim() }
   } catch (error) {
-    return { ok: false, status: typeof error?.status === 'number' ? error.status : null, out: '', err: error?.stderr?.toString?.() ?? String(error) }
+    return { ok: false, status: typeof error?.status === 'number' ? error.status : null, out: '' }
   }
 }
 
@@ -97,7 +99,6 @@ export function probeIntentRefs(intent, repoDir) {
   let seq = 0
   for (const move of intent.moves ?? []) {
     seq += 1
-    const name = move.ref.replace(/^refs\/heads\//, '')
     const snapshotRef = `refs/reconcile-probe/${process.pid}-${seq}`
     const fetched = git(['fetch', '-q', 'origin', `+${move.ref}:${snapshotRef}`], repoDir)
     if (!fetched.ok) {
@@ -107,7 +108,7 @@ export function probeIntentRefs(intent, repoDir) {
       // unprobed, and unprobed resolves UNKNOWN.
       const listed = git(['ls-remote', 'origin', move.ref], repoDir)
       if (listed.ok && listed.out === '') {
-        probes[move.ref] = { refAt: null, afterIsAncestor: null, trailerFound: false, name }
+        probes[move.ref] = { refAt: null, afterIsAncestor: null, trailerFound: false }
       }
       continue
     }
@@ -123,9 +124,8 @@ export function probeIntentRefs(intent, repoDir) {
       // parser: only an exact PUBLICATION_TRAILER_KEY value counts.
       const candidates = git(['log', '--fixed-strings', `--grep=${intent.publicationId}`, '--format=%H', snapshotRef], repoDir)
       let trailerFound = null
-      if (!candidates.ok) trailerFound = null
-      else if (candidates.out === '') trailerFound = false
-      else {
+      if (candidates.ok && candidates.out === '') trailerFound = false
+      else if (candidates.ok) {
         trailerFound = false
         for (const sha of candidates.out.split('\n').filter(Boolean)) {
           const trailers = git(['show', '-s', `--format=%(trailers:key=${PUBLICATION_TRAILER_KEY},valueonly)`, sha], repoDir)
@@ -135,7 +135,7 @@ export function probeIntentRefs(intent, repoDir) {
           }
         }
       }
-      probes[move.ref] = { refAt, afterIsAncestor, trailerFound, name }
+      probes[move.ref] = { refAt, afterIsAncestor, trailerFound }
     } finally {
       git(['update-ref', '-d', snapshotRef], repoDir)
     }
@@ -147,7 +147,7 @@ export function probeIntentRefs(intent, repoDir) {
  *  per queried sha, whether the target's history CONTAINS it. true/false are
  *  verdicts from the snapshot; null means the target could not be probed, and
  *  the lane classifier fails closed on null. */
-export function landingTargetProbe(repoDir) {
+function landingTargetProbe(repoDir) {
   const snapshotRef = `refs/reconcile-probe/${process.pid}-landing-target`
   const fetched = git(['fetch', '-q', 'origin', `+${LANDING_TARGET_REF}:${snapshotRef}`], repoDir)
   if (!fetched.ok) return { contains: () => null, release: () => {} }
@@ -191,15 +191,15 @@ export function gatherEvidence({ repoDir = REPO_ROOT, batchId } = {}) {
     const workerProbe = lease ? probeOf(lease.holder) : { live: false }
     const worktreeExists = context.worktree ? existsSync(context.worktree) : false
     const localSha = context.worktree && worktreeExists ? git(['rev-parse', 'HEAD'], context.worktree).out || null : null
-    const remoteListed = context.branch ? git(['ls-remote', 'origin', `refs/heads/${context.branch}`], resolved) : { ok: false, unasked: true }
+    const remoteListed = context.branch ? git(['ls-remote', 'origin', `refs/heads/${context.branch}`], resolved) : { ok: false }
     const remoteSha = remoteListed.ok && remoteListed.out ? remoteListed.out.split(/\s+/)[0] : null
     // A FAILED listing (network, auth) is not an absent branch: the lane may
     // have diverged invisibly, so the classifier alerts instead of passing.
     const remoteProbeFailed = Boolean(context.branch) && !remoteListed.ok
     // ANCESTRY for a differing remote tip: contained in the local history means
     // "local ahead, a push interval away"; a commit the worktree does not even
-    // hold is history this lane never produced — an affirmative divergence. An
-    // errored probe stays null, which the core reads as unplaced, never as ok.
+    // hold — or a failed cat-file — reads as history this lane never produced.
+    // An errored ancestry probe stays null, which the core reads as unplaced.
     let remoteInLocal = null
     if (worktreeExists && localSha && remoteSha && localSha !== remoteSha) {
       const known = git(['cat-file', '-e', `${remoteSha}^{commit}`], context.worktree)
@@ -298,7 +298,7 @@ export function applyPairResolution({ repoDir = REPO_ROOT, batchId, report, sess
   }
   const { action } = report.pair
   if (action === 'none') return { ok: true, did: 'nothing to do' }
-  if (action === 'refuse-and-alert') return { ok: false, did: 'refused: the pair is impossible by construction; an operator resolves this' }
+  if (action === 'refuse-and-alert') return { ok: false, did: 'refused: the pair reading (transitioning, unknown, impossible or ambiguous) needs an operator' }
   // FAIL CLOSED ON THE REGISTRY: a corrupt or truncated journal can OMIT a
   // live lane, so its lane list must not authorise any mutation — least of all
   // the release of a daemon record whose workers it may not show (M41).
@@ -376,7 +376,7 @@ if (isMainModule(import.meta.url)) {
   const arg = (name) => (argv.includes(name) ? argv[argv.indexOf(name) + 1] : undefined)
   const batchId = arg('--batch')
   if (!batchId) {
-    console.error('usage: node scripts/batch-reconcile.mjs --repo <dir> --batch <id> [--apply --session <sid>]')
+    console.error('usage: node scripts/batch-reconcile.mjs [--repo <dir>] --batch <id> [--apply --session <sid>]')
     process.exit(2)
   }
   const repoDir = arg('--repo') ?? REPO_ROOT

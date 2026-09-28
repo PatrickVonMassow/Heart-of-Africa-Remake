@@ -15,7 +15,8 @@
 // the hard singleton, the claim reservation and the spawn decision are untouched
 // — this file can never spawn a session past them, because it never spawns one.
 //
-// It refuses to run from a git WORKTREE, for the reason `chat-watcher.mjs` does:
+// `--start`, `--arm` and `--daemon` refuse to run from a git WORKTREE, for the
+// reason `chat-watcher.mjs` does:
 // its record would land in a checkout nothing reads, and its tick would run the
 // launcher with a throwaway tree as its working directory. On Windows it refuses
 // outright and points at the Scheduled Task — a second launcher beside the task
@@ -52,14 +53,14 @@ import { resumeArmDecision } from './batch-launcher-core.mjs'
 import { notify } from './notify.mjs'
 import { LOCK_PATH, assessOwner, bootTimeMs, readOwnerLock } from './batch-singleton.mjs'
 
-export const LAUNCHER_RECORD_PATH = repoPath('.claude/batch-launcher.json')
-export const LAUNCHER_LOG_PATH = repoPath('.claude/batch-launcher.log')
+const LAUNCHER_RECORD_PATH = repoPath('.claude/batch-launcher.json')
+const LAUNCHER_LOG_PATH = repoPath('.claude/batch-launcher.log')
 const SELF_PATH = fileURLToPath(import.meta.url)
 
 /** How long a single tick may take before it is killed. One whole interval: the
  *  launcher's own work is seconds, and a tick still running when the next is due
  *  is wedged, not slow. */
-export const TICK_TIMEOUT_MS = LAUNCHER_TICK_MS
+const TICK_TIMEOUT_MS = LAUNCHER_TICK_MS
 
 /** How long `--start` waits for the child to publish its record before reporting
  *  what it sees. Node's own startup, not the tick's. */
@@ -67,15 +68,15 @@ const START_SETTLE_MS = 8000
 
 /** How long one stall alert send may take before the daemon moves on. The
  *  loop is what this alarm protects; it must never hang on its own voice. A
- *  send that settles later is harmless — the outcome is only logged. */
-export const ALERT_SEND_TIMEOUT_MS = 30_000
+ *  send that settles later is harmless — its late result is dropped. */
+const ALERT_SEND_TIMEOUT_MS = 30_000
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
 /** `.git` is a DIRECTORY in the real checkout and a FILE inside a worktree.
  *  Three answers, because an UNREADABLE `.git` is neither (Sol review,
  *  finding 5): true, false, or null for "could not be verified". */
-export function worktreeVerdict(root = REPO_ROOT) {
+function worktreeVerdict(root = REPO_ROOT) {
   try {
     return !statSync(join(root, '.git')).isDirectory()
   } catch {
@@ -334,7 +335,7 @@ export async function runDaemon({
     let ok = false
     try {
       // Race, not trust: a hung send loses to the budget and the loop moves on.
-      // The losing promise may settle later; its result is only a log line.
+      // The losing promise may settle later; its result is dropped.
       ok = await Promise.race([
         Promise.resolve(sendAlert(title, message, priority, key ? { key } : { escalate: false })).then(
           (r) => r === true,

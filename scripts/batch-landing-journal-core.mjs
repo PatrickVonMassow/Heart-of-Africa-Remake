@@ -1,7 +1,6 @@
 // CRASH-RECOVERABLE SERIAL LANDING — the remainder of ordered-work step 9.
 import { LANDING_STAGES, landingCrashDecision } from './batch-landing-core.mjs'
 
-export const LANDING_EVIDENCE_STAGES = Object.freeze(LANDING_STAGES.slice(1))
 const oid = (value) => typeof value === 'string' && /^[0-9a-f]{40}([0-9a-f]{24})?$/.test(value)
 const present = (value) => typeof value === 'string' && value.length > 0
 
