@@ -21,15 +21,15 @@ Bird's-eye view (3D travel across the continent) and first-person view (walkable
 settlement) exist; switching between them is movement-based, confirmed with the SPACE use
 key, per `design.md` §2.3. In particular: functional buildings are entered with the SPACE
 use key while standing at their door (door proximity shows the prompt and arms the key —
-merely walking into the door no longer enters), and the same use key at the chief's hut
+merely walking into the door does not enter), and the same use key at the chief's hut
 calls the chief out of it (§12). Settlement entry from the bird's-eye view is likewise movement-based but
 confirmed with SPACE: within the enter radius the localized hint "Space to enter <name>"
 shows (the map name-label hidden while it does) and a SPACE press enters; reaching the
 radius alone never enters. The hint honours the §17.2 discovery gate (point 287): an
 UNDISCOVERED settlement's name stays hidden — the hint reads its localized KIND
 placeholder ("Unknown village", matching its map label; point 318) until the place is
-discovered, while a known-from-start port always names itself. The accidental-entry
-debounce/clearance is removed (no just-left re-entry lock, no move-clear timing). A SPACE
+discovered, while a known-from-start port always names itself. There is no accidental-entry
+debounce or clearance (no just-left re-entry lock, no move-clear timing). A SPACE
 press while the traveller is on a water cell still does not enter, so a river passage
 never pulls him in. Entering focuses the controls without an extra click per `design.md`
 §17.5 (HUD buttons blurred; mouse-look engages on entry from the SPACE keypress, with the
@@ -108,7 +108,7 @@ Without prerequisites the chief drums `RIVER · UPSTREAM · ROCK · DIG`. Using
 the recovered inventory find before him yields `RIVER · DOWNSTREAM` and the
 wordless clay impression. Fitting it at Bandiagara's talus-foot socket ends the
 puzzle. Each message is remembered after its last beat and reopenable.
-Persisted readings deliberately break; saving is disabled and no migration is owed.
+Persisted readings deliberately break; loading is suspended (pt. 28) and no migration is owed.
 Only one lect is built; other regional teaching remains outside this slice.
 
 ## 8. Chronicle/journal.
@@ -125,7 +125,7 @@ hand-item slot, no permanent coordinates; transient status hints (e.g. the
 movement-penalty reason, pt. 4) render CENTRED inside the status bar; each stat is led by
 its symbol with the localized word as tooltip and the date reads DD.MM.YYYY; the inventory
 item currently in use glows, and the health bar with its affliction badges sits inside the
-bar's right end per §17.1 (never covered by the journal). Holding Ctrl names animals,
+bar's right end per §17.1 (never covered by the journal). Holding the hold key (§17.8) names animals,
 people and usable objects on screen (§17.8). Every inventory slot is a button whose click
 and digit key reach one handler in both views: the item acts where it can, and where it
 cannot the traveller says why in a toast, never in the journal; that toast stacks above
@@ -139,9 +139,8 @@ hints through the knowing-people cascade of `design.md` §13.3.
 
 ## 11. Game graphics.
 
-The visual presentation is appealing and elaborate at AAA level and replaces
-the POC's former schematic look. This includes smoothing the continent and
-river geometry, which previously showed visible steps.
+The visual presentation is appealing and elaborate at AAA level, with smooth
+continent and river geometry showing no visible steps.
 
 ## 12. Atmosphere.
 
@@ -291,8 +290,8 @@ INSIDE a rendered frame (no `preserveDrawingBuffer` — it would cost
 every player frame) and holds the scene ALONE; labels and HUD are
 DOM and ride along in the overlay list, which the description file
 states; F5 stays the browser's reload (it fires before
-preventDefault can stop it, hence F6; the lower F-key that Windows Chrome
-binds to Caret-Browsing is left to the browser) and F9 cycles the
+preventDefault can stop it, hence F6; F7, which Windows Chrome binds to
+Caret-Browsing, is left to the browser) and F9 cycles the
 GRAPHICS QUALITY LEVEL — low / medium / high (design.md §2.7/§21,
 point 276 part B), default MEDIUM. Each press steps DOWN one level, wrapping the bottom to
 the top: medium → low → high → medium. A `detailLevel` in `useUi` maps
@@ -337,8 +336,8 @@ focused, the typed text reaches the archive, Esc closes leaving focus
 on no control, both languages, the F6 default prevented, F5 untouched)
 and `scripts/verify/report.mjs` (a live F6 run on BOTH backends whose
 PNG member is DECODED and must vary — a blank capture is a valid
-PNG) — F8 the in-game render benchmark (point 277), the one
-debug tool that SHIPS IN THE DELIVERED BUILD (the levers of point 276
+PNG) — F8 the in-game render benchmark (point 277), a debug tool
+that SHIPS IN THE DELIVERED BUILD like the F6 report (the levers of point 276
 must be priced on the USER's hardware, not on the headless one), its
 runner LAZILY imported on the keypress so it stays out of the eager
 startup chunks: it sweeps the ten graphics configs of §21.1 over one
@@ -571,12 +570,12 @@ slow horizon crawl.
 
 ## 32. Render pipeline upgrades.
 
-TRAA, screen-space reflections and true water refraction (`design.md` §2.7) were rebuilt
-in small backend-neutral steps, each confirmed on real hardware — the lesson from the
+TRAA, screen-space reflections and true water refraction (`design.md` §2.7) were planned
+as small backend-neutral steps, each to be confirmed on real hardware — the lesson from the
 reverted first attempt, whose untested WebGPU-only TRAA/SSR branch rendered a black scene.
 Step 1 is done and accepted: TRAA runs backend-neutrally (upstream `TRAANode`, velocity
 MRT, MSAA off), passed its manual WebGPU check (stable across repeated toggles, visually
-on par with 4× MSAA) and is on by default; the debug checkbox (`design.md` §21.3) switches
+on par with 4× MSAA) and is on by default; its internal allow-flag (pt. 20) switches
 back to the render pass' MSAA. Step 2 (SSR) was delivered, then REMOVED by user decision:
 with the bird's-eye camera never at grazing angles and the first-person scenes having no
 water or gloss, no in-game situation makes it read — so the pipeline reads exactly as
