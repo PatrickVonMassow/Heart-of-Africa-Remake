@@ -9,7 +9,8 @@
 // than a reminder (the project's standing "enforce, don't remind" principle).
 //
 // The core is pure and Vitest-covered; `commit-scope-guard.mjs` only collects
-// the staged paths and sizes and prints the verdict.
+// the staged paths and sizes (or, with --message, reads the commit-msg file)
+// and prints the verdict.
 
 /** Top-level directories a commit may touch. A new one is a deliberate
  *  decision: add it HERE, in a reviewable diff, not by waving the guard off. */
@@ -122,7 +123,7 @@ export function evaluateStagedFiles(entries) {
       findings.push({
         path,
         rule: 'large-binary',
-        detail: `${(size / 1024 / 1024).toFixed(1)} MB outside ${LARGE_FILE_DIRS.join(', ')}`,
+        detail: `${(size / 1024 / 1024).toFixed(1)} MB outside ${LARGE_FILE_DIRS.join(', ')} and the listed large-file paths`,
       })
     }
   }

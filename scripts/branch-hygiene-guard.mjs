@@ -1,11 +1,11 @@
 // Stop hook: A MERGED BRANCH MUST NOT SURVIVE ITS MERGE. The decision logic is
 // pure in branch-hygiene-core.mjs (Vitest-covered); this wrapper only asks git
-// two local questions, reads the in-flight declaration and is fail-OPEN — any
+// local questions, reads the in-flight declaration and is fail-OPEN — any
 // internal error allows the stop, so a guard bug can never trap the session.
 //
 // Cheap by construction: `git for-each-ref`, `git branch --merged origin/main`
-// and `git worktree list --porcelain` are all local. No network, no `git show`
-// per branch.
+// (local and remote) and `git worktree list --porcelain` are all local; only a
+// DETACHED worktree costs a `git show` and a `git merge-base` more. No network.
 //
 //   node scripts/branch-hygiene-guard.mjs --status   what it would decide
 import { readFileSync, existsSync } from 'node:fs'
@@ -165,8 +165,8 @@ function isAncestorOfMain(sha) {
 /**
  * Branch/worktree evidence a session has declared it is still working on.
  *
- * Read leniently in SHAPE — a malformed field only ever widens the carve-out,
- * and merge-time deletion is the primary path anyway — but NOT in AGE (point
+ * Read leniently in SHAPE — a malformed field is dropped, so it shields
+ * nothing, and merge-time deletion is the primary path anyway — but NOT in AGE (point
  * 437 G). This used to read the file raw, so a dead session's declaration
  * shielded its branch and its worktree from the sweep for ever, while the expiry
  * sat in a consumer this never called. `declarationShields` applies the same
@@ -181,16 +181,15 @@ function readInFlight(now = Date.now()) {
     // whole 45 minutes of its clock, which is the shape that kept the incident's
     // dead pid credible.
     const verdict = declarationShields({ declaration: d, now, probePid })
-    if (!verdict.shields) return { branches: [], paths: [], expired: true, ageMs: verdict.ageMs }
+    if (!verdict.shields) return { branches: [], paths: [], expired: true }
     const evidence = Array.isArray(d?.evidence) ? d.evidence : []
     return {
       branches: evidence.filter((e) => e?.kind === 'branch').map((e) => String(e.ref ?? '')),
       paths: evidence.filter((e) => e?.kind === 'worktree').map((e) => String(e.path ?? '')),
       expired: false,
-      ageMs: verdict.ageMs,
     }
   } catch {
-    return { branches: [], paths: [], expired: false, ageMs: null }
+    return { branches: [], paths: [], expired: false }
   }
 }
 

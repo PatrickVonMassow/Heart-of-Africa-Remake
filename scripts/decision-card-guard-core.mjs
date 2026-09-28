@@ -66,6 +66,8 @@
 //      listed as their own gated entries rather than by loosening the boundary,
 //      which is what keeps "den er entscheidet" quiet.
 
+import { NOT_SETTLED_PREFIX, settledRulingVerdict } from './settled-ruling-core.mjs'
+
 /**
  * The phrasings this project's own replies use to put something to the user —
  * German, because the replies are German (CLAUDE.md: code English, chat German).
@@ -75,7 +77,8 @@
  * Per entry:
  *   phrase  — matched lowercased, as a whole word (see `containsPhrase`)
  *   address — 'self': the phrase itself is the second-person address, so it fires
- *             wherever it stands. 'sentence': the sentence must ask (`?`) or carry
+ *             wherever it stands — except that a non-imperative one stays quiet
+ *             in a retrospective or standing-arrangement sentence. 'sentence': the sentence must ask (`?`) or carry
  *             a second-person pronoun.
  *   verbFirst — 'sentence' entries only: the phrase is a VERB, so it also asks
  *             when it opens the sentence (German imperative) or when the sentence
@@ -86,8 +89,6 @@
  *   quiet   — ordinary prose carrying the same words that must NOT fire; required
  *             for every 'sentence' entry, which is where the false positives live
  */
-import { NOT_SETTLED_PREFIX, settledRulingVerdict } from './settled-ruling-core.mjs'
-
 export const DECISION_PHRASES = Object.freeze(
   [
     // ---- the phrase IS the address: a second-person imperative, or it carries
@@ -275,7 +276,7 @@ export const DECISION_PHRASES = Object.freeze(
  * deliberately: this project speaks to ONE user, and every live card uses the
  * singular.
  */
-export const SECOND_PERSON = Object.freeze(
+const SECOND_PERSON = Object.freeze(
   new Set(['du', 'dir', 'dich', 'dein', 'deine', 'deinem', 'deinen', 'deiner', 'deines', 'deins']),
 )
 
@@ -316,12 +317,12 @@ export const MIN_WORD_LENGTH = 4
 /** A single shared word only carries a match from this length on — a long German
  *  compound ("Kartenschrift") identifies a topic, a short word does not. Below it
  *  TWO shared words are required (four-eyes review 30.07.2026, finding 2). */
-export const STRONG_WORD_LENGTH = 8
+const STRONG_WORD_LENGTH = 8
 
 /** A shared term this long is distinctive enough to make an answered-card hit
  *  plausible. Unlike the outgoing-question matcher, one such term is enough:
  *  this match only raises the cost of `vdzk-keep`; it never removes a card. */
-export const DISTINCTIVE_WORD_LENGTH = 5
+const DISTINCTIVE_WORD_LENGTH = 5
 
 /** A carried answer must reach the board even when the owner is inside a long
  *  declared wait. The launcher ticks every fifteen minutes, so one interval is
@@ -364,7 +365,7 @@ export const startsWithPhrase = (sentence, phrase) =>
 
 /** A sentence that asks. The split below ends a sentence at `.!?`, so a `?` in it
  *  is its own — code, quoted commands and URLs are cut out before the split. */
-export const isQuestion = (sentence) => typeof sentence === 'string' && sentence.includes('?')
+const isQuestion = (sentence) => typeof sentence === 'string' && sentence.includes('?')
 
 /** Does a sentence address the user in the second person? */
 export function addressesUser(sentence) {
@@ -404,11 +405,11 @@ export function firingPhrase(sentence) {
 /** The `self` entries whose wording is itself imperative. The other self
  * entries merely contain a second-person form and can therefore look backward
  * ("deine Entscheidung von heute") without asking anything. */
-export const IMPERATIVE_PHRASES = Object.freeze(
+const IMPERATIVE_PHRASES = Object.freeze(
   new Set(['bitte entscheide', 'bitte wähle', 'bitte waehle', 'sag mir', 'sage mir', 'sag bescheid', 'gib mir bescheid']),
 )
 
-export const BACKWARD_MARKERS = Object.freeze([
+const BACKWARD_MARKERS = Object.freeze([
   'von heute', 'von gestern', 'vorhin', 'damals', 'bereits', 'schon',
 ])
 
@@ -425,7 +426,7 @@ export function isRetrospective(sentence) {
 /** Statements that name the standing decision-maker rather than requesting a
  * new decision. The colon form ("Deine Entscheidung: …") intentionally does
  * not match and remains loud. */
-export function describesStandingArrangement(sentence) {
+function describesStandingArrangement(sentence) {
   const s = normalize(sentence)
   return (
     /\b(?:bleibt|ist)\b[^.!?]*\bdeine (?:entscheidung|wahl)\b/.test(s) ||
@@ -433,7 +434,8 @@ export function describesStandingArrangement(sentence) {
   )
 }
 
-/** Topic words of a text, lowercased: letters only, stopwords and numbers out. */
+/** Topic words of a text, lowercased word tokens (digits allowed inside a
+ *  token): stopwords, short words and pure numbers out. */
 export function contentWords(text) {
   if (typeof text !== 'string') return new Set()
   const out = new Set()
@@ -531,8 +533,7 @@ export function matchingCard(questions, vdzkTitles) {
  * The topic words the asking sentences carry, longest first — what a card title
  * has to share for `matchingCard` to connect the two.
  *
- * Exported because the BLOCK REASON has to name them (four-eyes review
- * 30.07.2026): the guard demands a card whose title matches, then described the
+ * The BLOCK REASON names them (four-eyes review 30.07.2026): the guard demands a card whose title matches, then described the
  * matching rule in prose the writer had to reverse-engineer. A title written
  * blind matches by luck, and a second miss costs a second turn.
  */
@@ -542,7 +543,8 @@ export function topicWords(questions) {
   return [...out].sort((a, b) => b.length - a.length || a.localeCompare(b))
 }
 
-/** The one command that fixes a block — named, not described. */
+/** The command that files the missing card — the remedy of the card-presence
+ *  block, named, not described (settled rulings and card reviews name their own). */
 export const REMEDY = 'node scripts/board.mjs vdzk-add "<Titel der Frage>" --text-stdin'
 
 /**
@@ -551,7 +553,8 @@ export const REMEDY = 'node scripts/board.mjs vdzk-add "<Titel der Frage>" --tex
  * FAIL-OPEN inputs (a reply that could not be read, a board whose VDZK section
  * could not be parsed) allow the stop: an unreadable state is not evidence of a
  * violation, and a guard that cannot read must not be able to trap the session.
- * `cardAddedThisTurn` is the second way to pass — a card written in this very turn
+ * A question the settled-ruling register already answers blocks FIRST, whatever
+ * the cards say. `cardAddedThisTurn` is the second way to pass — a card written in this very turn
  * counts even when its wording shares no word with the question.
  */
 export function evaluate({ replyText = null, vdzkTitles = null, cardAddedThisTurn = false } = {}) {
@@ -601,7 +604,7 @@ const quoted = (value) => JSON.stringify(String(value ?? ''))
 /** The last real user message as the review rule consumes it. Both fields are
  * required: the UUID re-arms every card on the next message, while the text is
  * what makes a suspected answer loud. */
-export function validUserMessage(message) {
+function validUserMessage(message) {
   return Boolean(
     message &&
     typeof message.id === 'string' && message.id.trim() &&

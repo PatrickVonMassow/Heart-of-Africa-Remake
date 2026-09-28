@@ -13,7 +13,8 @@
 //   - THE WORKER CLI the daemon spawns: `--runner stub` is the hermetic worker
 //     the drills use; `--runner author-astra` WRAPS the proven scripts/author-astra.mjs
 //     without changing its authoring behavior — the wrapper is the daemon's
-//     child and holds the runner's pipes, so the session's death reaches neither.
+//     child and its runner writes to the attempt's log file (file descriptors,
+//     not pipes), so the session's death reaches neither.
 //   - THE CONTRACT PATHS a successor probes, all inside the attempt's own state
 //     directory, so adoption needs no live predecessor.
 //
@@ -153,7 +154,14 @@ export function pushBranchCheckpoint({ branch, worktree, mayPush, runGit = git }
 
 /** Build exactly the record the daemon consumes. `pushedOk` means the captured
  *  SHA is proven contained by the remote branch, whether the wrapper or its
- *  runner performed the push. */
+ *  runner performed the push.
+ *
+ *  THE ACK CLAIMS THE SHA THE CHECKPOINT CAPTURED, never a tip taken afterwards:
+ *  the wrapper cannot pause its runner, so a commit can land between the
+ *  containment proof and any later read — and an ack pairing pushedOk with a
+ *  NEWER, unpushed sha would let reconciliation treat that commit as
+ *  transferred and lose it. A head that moved past the pushed sha
+ *  (`aheadOfPush`), like a dirty tree, marks the checkpoint incomplete. */
 export function checkpointAcknowledgment({ requestId, branch, worktree, mayPush, runGit = git, now = Date.now } = {}) {
   const pushed = pushBranchCheckpoint({ branch, worktree, mayPush, runGit })
   if (pushed.fenced) return { fenced: true, reason: pushed.why }
@@ -222,12 +230,13 @@ export function leaseGateVerdict(args) {
 // THE WORKER PROCESS
 // ---------------------------------------------------------------------------
 
-export const WORKER_TICK_MS = 250
-export const STUB_WORK_EVERY_MS = 1200
+const WORKER_TICK_MS = 250
+const STUB_WORK_EVERY_MS = 1200
 
-/** Exit codes are part of the contract: the daemon reads them from the status
- *  file, never from a wait() it may not be alive to perform. */
-export const WORKER_EXIT = Object.freeze({ done: 0, runnerFailed: 1, badInvocation: 2, fenced: 3 })
+/** This worker's exit codes. The daemon learns the outcome from the status
+ *  file's phase (cancellation included), never from a wait() it may not be
+ *  alive to perform. */
+const WORKER_EXIT = Object.freeze({ done: 0, runnerFailed: 1, badInvocation: 2, fenced: 3 })
 
 function parseArgs(argv) {
   const args = {}
@@ -297,12 +306,7 @@ async function runWorker(argv) {
       mayPush,
     })
     if (answer.fenced) return fencedExit(answer.reason)
-    // THE ACK CLAIMS THE SHA THE CHECKPOINT CAPTURED, never a tip taken afterwards:
-    // the wrapper cannot pause its runner, so a commit can land between the
-    // containment proof and any later read — and an ack pairing pushedOk with a NEWER,
-    // unpushed sha would let reconciliation treat that commit as transferred
-    // and lose it. A head that moved past the pushed sha, like a dirty tree,
-    // marks the checkpoint incomplete.
+    // The ack carries the captured sha (see checkpointAcknowledgment).
     writeJsonAtomic(paths.checkpointAckPath, answer.ack)
     lastAckedRequest = request.requestId
     log(`checkpoint ${request.requestId}: pushedOk=${answer.ack.pushedOk} dirty=${answer.ack.dirty} aheadOfPush=${answer.ack.aheadOfPush}`)
@@ -342,8 +346,8 @@ async function runWorker(argv) {
   let runnerExit = null
   if (args.runner === 'author-astra') {
     // The proven authoring path, UNCHANGED (M2/M5): this wrapper is the daemon's
-    // child, so it survives the session, and the runner's pipes end HERE — at a
-    // parent that stays alive — never at the session that asked for the work.
+    // child, so it survives the session, and the runner writes to the attempt's
+    // log file — never to a pipe of the session that asked for the work.
     // The runner leads its OWN process group, so cancellation can take its
     // whole subtree with one group signal — a SIGTERM to the immediate child
     // alone leaves grandchildren writing. (If the wrapper itself is SIGKILLed
@@ -393,8 +397,10 @@ async function runWorker(argv) {
   }
   /** Cancellation is proven, never assumed: SIGTERM to the runner's group, a
    *  bounded grace, SIGKILL, and only a REAPED runner lets the worker record a
-   *  terminal state — a durable 'cancelled' over a still-writing subtree is
-   *  the lie this function exists to prevent. */
+   *  terminal state — a durable 'cancelled' over a still-writing runner is the
+   *  lie this function exists to prevent. (Only the immediate runner is
+   *  tracked: a group descendant that outlives the SIGTERM once the runner has
+   *  exited is not seen, and gets no SIGKILL.) */
   const stopRunner = async () => {
     if (runnerGone()) return true
     killRunnerGroup('SIGTERM')

@@ -17,16 +17,6 @@
 //
 // PURE. The wrapper scripts/clear-claim-guard.mjs does the reading.
 
-/**
- * How a reply asks the user to end the session.
- *
- * The matcher uses sentence context rather than the position of `/clear` alone:
- * an imperative, an offer, or a recommendation is an invitation even when the
- * command has ordinary words after it. Reports, guard descriptions, quotations,
- * negations, and orders about a test or document remain mentions rather than
- * invitations. This keeps the false-positive protections found by the reviews
- * on 20.08.2026 without making a sentence-final token the price of detection.
- */
 // A leading "Bitte" is the one particle that may precede the verb without making
 // the clause anything other than an order — "Bitte führe einen clear aus". The
 // adverbs that also lead clauses ("jetzt", "dann", "danach") are NOT allowed
@@ -51,9 +41,11 @@ const FILLER = String.raw`(?:\s+(?:bitte|jetzt|nun|dann|danach|noch|mal|am\s+bes
 // An article may stand between the verb and the object, and nothing else.
 const ARTICLE = String.raw`(?:(?:eine|einen|die|den|nen)\s+)?`
 
-// And nothing substantive may follow the command, or the clause is ABOUT it
-// rather than asking for it: "`Mach bitte /clear` ist der Positivfall" quotes the
-// order inside a sentence that makes a claim.
+// And nothing substantive may follow the command in the bare and articled forms
+// (TAIL), or the clause is ABOUT it rather than asking for it: "`Mach bitte
+// /clear` ist der Positivfall" quotes the order inside a sentence that makes a
+// claim. The imperative forms take COMMAND_TAIL below instead, which also admits
+// an "und …" continuation.
 // A German separable prefix belongs to the verb and may stand after the object:
 // "führe einen clear AUS". It is part of the order, not something after it.
 const PREFIX = String.raw`(?:\s+(?:aus|an|auf|durch|weiter|nach))?`
@@ -80,6 +72,16 @@ const ARTICLED_CLEAR = new RegExp(
   'i',
 )
 
+/**
+ * How a reply asks the user to end the session.
+ *
+ * The matcher uses sentence context rather than the position of `/clear` alone:
+ * an imperative, an offer, or a recommendation is an invitation even when the
+ * command has ordinary words after it. Reports, guard descriptions, quotations,
+ * negations, and orders about a test or document remain mentions rather than
+ * invitations. This keeps the false-positive protections found by the reviews
+ * on 20.08.2026 without making a sentence-final token the price of detection.
+ */
 export const CLEAR_INVITATION = Object.freeze([
   SLASH_CLEAR,
   // A separable restart instruction may carry the command after "mit".
@@ -111,9 +113,6 @@ export const CLEAR_INVITATION = Object.freeze([
     String.raw`^you\s+can\b(?:\s+(?:now|please))*\s+(?:(?:run|use)\s+)?\/clear\b${ENGLISH_COMMAND_TAIL}`,
     'i',
   ),
-  // English keeps no end constraint: a trailing prepositional phrase is ordinary
-  // there ("… for the rest"), and the quoted-fixture case it would guard against
-  // is already handled by stripping quotations and fenced code.
   // "session" must END the order or be followed by one of the prepositions that
   // can only introduce a purpose or a time. "in" and "on" are NOT among them:
   // "Start a new session in the test suite" is an order about something else
@@ -125,16 +124,17 @@ export const CLEAR_INVITATION = Object.freeze([
  * A NEGATED sentence is not an invitation — and the unit is the SENTENCE, not
  * the clause, precisely because that direction only ever produces MISSES. A
  * postposed "aber bitte nicht" sits in its own clause and still negates the
- * order before it; under the asymmetry above, reading too much as negated is the
- * safe mistake.
+ * order before it; under the asymmetry `invitesClear` states, reading too much
+ * as negated is the safe mistake. (The negators are German only.)
  */
 const NEGATOR = /\b(?:kein|keine|keinen|keinem|keines|keiner|nicht|niemals|nie)\b/i
 
 /**
  * A QUOTED sentence is a mention, not an order: "Der Negativtest verwendet den
- * Satz „Mach bitte /clear“." talks ABOUT the instruction. Quoted spans and
- * backticked code are removed before matching, which is a rule that can be read
- * off the text rather than guessed at.
+ * Satz „Mach bitte /clear“." talks ABOUT the instruction. Quoted spans, fenced
+ * code and whole-line backticked fixtures are removed before matching, and
+ * inline backticks are unwrapped — a rule that can be read off the text rather
+ * than guessed at.
  */
 function withoutQuotations(text) {
   return String(text ?? '')
@@ -160,7 +160,7 @@ function withoutQuotations(text) {
  */
 const ABBREVIATION = /(?:^|\s)(?:[A-Za-zÄÖÜäöü]|z|bzw|ca|vgl|evtl|ggf|Nr|Abs|Dr|usw|etc)\.$/
 
-export function sentencesOf(text) {
+function sentencesOf(text) {
   const value = withoutQuotations(text)
   const pieces = []
   let current = ''

@@ -1,6 +1,5 @@
 #!/usr/bin/env node
-// Stop hook: the BUNDLE-FIRST rule, until now memory only
-// (`bundle-first-not-new-point`). A new finding joins an existing bundle point;
+// Stop hook: the BUNDLE-FIRST rule (memory `bundle-first-not-new-point`). A new finding joins an existing bundle point;
 // a standalone point is the exception. `docs/work-packages.md` states the
 // property — "every open point in TASKS.md appears in exactly one bundle here,
 // or in the unbundled list below" — and this guard is what makes it true, over
@@ -67,7 +66,7 @@ if (isMainModule(import.meta.url)) {
     try {
       sid = JSON.parse(readFileSync(0, 'utf8')).session_id || ''
     } catch {
-      /* no/non-JSON stdin (manual run) — the rule is global truth, not session-local */
+      /* no/non-JSON stdin (manual run) — the rule itself is global; the session id only decides lock ownership */
     }
 
     const gathered = gatherBundleFirstInputs({ sessionId: sid })

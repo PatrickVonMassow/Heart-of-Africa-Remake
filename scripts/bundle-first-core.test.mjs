@@ -255,20 +255,26 @@ describe('unplacedPoints', () => {
 // cases are the ones it cannot see.
 describe('duplicateHomes', () => {
   it('names a point standing in two bundle rows, and where it stands', () => {
-    const bundles = [{ id: 'A', points: new Set([350, 351]) }, { id: 'J', points: new Set([351]) }]
-    expect(duplicateHomes(new Set([350, 351]), bundles, new Set())).toEqual([{ point: 351, homes: ['A', 'J'] }])
+    const bundles = [
+      { id: 'A', points: new Set([350, 351]), list: [350, 351] },
+      { id: 'J', points: new Set([351]), list: [351] },
+    ]
+    expect(duplicateHomes(new Set([350, 351]), bundles, { bullets: [] })).toEqual([{ point: 351, homes: ['A', 'J'] }])
   })
 
   it('names a point standing in a bundle AND in the exemption list', () => {
-    const bundles = [{ id: 'A', points: new Set([285]) }]
-    expect(duplicateHomes(new Set([285]), bundles, new Set([285]))).toEqual([
-      { point: 285, homes: ['A', 'Not bundled'] },
+    const bundles = [{ id: 'A', points: new Set([285]), list: [285] }]
+    expect(duplicateHomes(new Set([285]), bundles, { bullets: [{ index: 1, points: [285] }] })).toEqual([
+      { point: 285, homes: ['A', '"Not bundled" bullet 1'] },
     ])
   })
 
   it('says nothing about a CLOSED point named twice — only the open set is the measure', () => {
-    const bundles = [{ id: 'A', points: new Set([200]) }, { id: 'J', points: new Set([200]) }]
-    expect(duplicateHomes(new Set([350]), bundles, new Set([200]))).toEqual([])
+    const bundles = [
+      { id: 'A', points: new Set([200]), list: [200] },
+      { id: 'J', points: new Set([200]), list: [200] },
+    ]
+    expect(duplicateHomes(new Set([350]), bundles, { bullets: [{ index: 1, points: [200] }] })).toEqual([])
   })
 
   it('reads two rows carrying the SAME id as two homes, and says which row', () => {
@@ -276,14 +282,14 @@ describe('duplicateHomes', () => {
       { id: 'A', points: new Set([350]), list: [350] },
       { id: 'A', points: new Set([350]), list: [350] },
     ]
-    expect(duplicateHomes(new Set([350]), bundles, new Set())).toEqual([
+    expect(duplicateHomes(new Set([350]), bundles, { bullets: [] })).toEqual([
       { point: 350, homes: ['A (row 1)', 'A (row 2)'] },
     ])
   })
 
   it('counts the ENTRY, not the sighting — a repeat inside one home is one home', () => {
     const bundles = [{ id: 'A', points: new Set([350]), list: [350, 350] }]
-    expect(duplicateHomes(new Set([350]), bundles, new Set())).toEqual([])
+    expect(duplicateHomes(new Set([350]), bundles, { bullets: [] })).toEqual([])
     const bullets = { points: new Set([285]), bullets: [{ index: 1, points: [285, 285] }] }
     expect(duplicateHomes(new Set([285]), [], bullets)).toEqual([])
   })

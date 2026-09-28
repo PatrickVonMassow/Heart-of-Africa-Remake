@@ -12,7 +12,7 @@
 //
 // WHY A SEPARATE PROCESS, exactly as scripts/board-watchdog.mjs: on this
 // platform a `process.exit()` after any `fetch` tears undici's socket down
-// mid-close and ABORTS the process, and the launcher exits that way at fifteen
+// mid-close and ABORTS the process, and the launcher exits that way at many
 // points. It must not hold a fetch at all. The child is also containment: the
 // resurrection above it is untouched whatever happens in here.
 //
@@ -123,7 +123,8 @@ try {
   // which is the miss this whole watchdog exists to prevent. The fetch is
   // bounded and its failure is ignored: the stale refs are then still better
   // than no answer. 20 s of it, with the site GET, the run listing and a
-  // dispatch POST carrying 15 s each behind it inside the launcher's budget.
+  // dispatch POST carrying 15 s each, plus a few 5-second git calls, behind it
+  // inside the launcher's budget.
   //
   // The tip is then read from `origin/main`, which the fetch updates, and NOT
   // from FETCH_HEAD (second review pass): FETCH_HEAD is one shared unversioned
@@ -161,7 +162,7 @@ try {
       try {
         const runs = JSON.parse(res.body)?.workflow_runs
         const newest = (Array.isArray(runs) ? runs : [])
-          .map((r) => ({ id: r?.id, createdAt: Date.parse(r?.created_at ?? ''), status: String(r?.status ?? ''), conclusion: String(r?.conclusion ?? '') }))
+          .map((r) => ({ createdAt: Date.parse(r?.created_at ?? ''), status: String(r?.status ?? '') }))
           .filter((r) => Number.isFinite(r.createdAt))
           .sort((a, b) => b.createdAt - a.createdAt)[0]
         latestRun = newest ?? null
@@ -192,7 +193,9 @@ try {
   // The message may only claim what actually happened (four-eyes review, finding
   // 4): a dispatch decided but never posted — no token, no remote, --no-dispatch
   // — used to read as "Re-dispatched". `attempted` is the POST, nothing else.
-  const blocker = noDispatch ? '--no-dispatch was given' : !repo ? 'this is not a GitHub clone' : !token ? 'no token to dispatch with' : ''
+  // Without a repo nothing answered, so retryDecision never dispatches; only
+  // these two can stop a decided dispatch.
+  const blocker = noDispatch ? '--no-dispatch was given' : !token ? 'no token to dispatch with' : ''
   const attempted = decision.dispatch && !blocker
   let dispatchOutcome = ''
   let accepted = false

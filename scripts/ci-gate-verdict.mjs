@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // The CI gate's verdict step (point 513). Runs INSIDE the GitHub runner, after
-// the gate steps, with `if: always()`. It decides nothing on its own — the pure
-// core (ci-gate-verdict-core.mjs) does — it only writes what the core decided:
+// the gate steps, with `if: always()`. The pure core (ci-gate-verdict-core.mjs)
+// decides; this writes what it decided, and fails a hard aggregate run itself:
 //
 //   · `::error` annotations on the run page,
 //   · the run summary (`$GITHUB_STEP_SUMMARY`),
@@ -9,9 +9,9 @@
 //   · and, on a routine `feat/**` push, a COMMIT STATUS carrying the real
 //     result, since that run's own conclusion is green by design.
 //
-// Legacy single-job callers exit 0: their job already carries the failure.
-// The aggregate shard gate also fails hard runs itself, including missing shard
-// results. Routine branch pushes still report through their commit status.
+// The aggregate shard gate (ci.yml, `GATE_SHARDS` set) fails hard runs itself,
+// including missing shard results; a run without `GATE_SHARDS` (no current
+// workflow) exits 0. Routine branch pushes report through their commit status.
 
 import { appendFile } from 'node:fs/promises'
 import {
@@ -50,7 +50,8 @@ async function postCommitStatus(status) {
     })
     console.log(`commit status ${status.state} → HTTP ${res.status}`)
   } catch (err) {
-    // Never fatal: the summary and the ntfy alert already carry the finding.
+    // Never fatal: the summary carries the finding, and the ntfy alert step keys
+    // off the step outputs already written.
     console.log(`commit status could not be posted (non-fatal): ${err?.message ?? err}`)
   }
 }

@@ -21,7 +21,6 @@
 //       NEVER a point reference: it is the enumeration/inventory convention
 //       ("(1) Schrift-Norden … (4) Signal-Osten" on the live board), while
 //       every realistic cross-reference on the board is >= 2 digits.
-// The remedy's publish steps come from scripts/board-remedy.mjs — one copy.
 // Either form flags iff the number is a KNOWN TASKS point number (the caller
 // passes the set parsed from TASKS.md) AND differs from the card's own number.
 // A card without an own number (typical for "Von dir zu klären") owns nothing,
@@ -32,6 +31,7 @@
 // bare numbers and commit hashes — stays untouched by construction. A year in
 // parentheses has the same lexical shape as a point reference and is therefore
 // scanned, but the known-TASKS gate below keeps an ordinary year inert.
+// The remedy's publish steps come from scripts/board-remedy.mjs — one copy.
 // THE UNNUMBERED STATE CARDS ARE EXEMPT (point 544). "Gerade keine laufende
 // Arbeit" and "Abschlussarbeiten zum gerade beendeten Punkt" own no point number
 // BY DESIGN, and the rule above reads a card without one as owning nothing — so

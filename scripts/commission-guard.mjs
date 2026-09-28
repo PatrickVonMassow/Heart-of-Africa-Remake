@@ -6,8 +6,9 @@
 //   · `branchSlotDecision` (batch-in-flight-core.mjs), beside the free-slot
 //     judgment — is a slot free at all, counting OPEN BRANCHES rather than
 //     running agents?
-// Nothing is decided here. This file reads the work order, git and the record,
-// and prints or denies.
+// Neither decision is re-made here. This file reads the work order, git and the
+// record, combines the two verdicts (per point, per call, fail-open on a fact it
+// could not read — `commissionVerdict`), and prints or denies.
 //
 // REGISTRATION (.claude/settings.json is a protected path — the main session
 // wires it): one entry under `PreToolUse`, beside the context fence's. The
@@ -64,7 +65,7 @@ const SETTINGS = repoPath('.claude', 'settings.json')
 
 /** The tools whose calls can OPEN a point. A hook that does not see them refuses
  *  nothing, so the wiring check demands every one of them in the matcher. */
-export const COMMISSION_TOOLS = ['Agent', 'Task', 'Bash', 'PowerShell']
+const COMMISSION_TOOLS = ['Agent', 'Task', 'Bash', 'PowerShell']
 
 /** The PreToolUse line that arms this guard, named wherever its state is
  *  reported — ANCHORED on $CLAUDE_PROJECT_DIR, exactly as the real entry is. The
@@ -93,7 +94,7 @@ export function wiringReport(settingsText) {
     ? 'WIRING: ARMED — a PreToolUse hook runs this guard on every tool that can open a point, so a commissioning ' +
         'against the queue is really refused.'
     : 'WIRING: DORMANT — no PreToolUse entry in .claude/settings.json runs this guard on all of ' +
-        `${COMMISSION_TOOLS.join('/')}, so it REFUSES NOTHING; only the commands below still work. Arm it with ` +
+        `${COMMISSION_TOOLS.join('/')}, so it refuses nothing on the tools it misses; only the commands below still work. Arm it with ` +
         `one PreToolUse entry: ${COMMISSION_HOOK_LINE}`
 }
 
@@ -175,9 +176,9 @@ export function gatherCommissionInputs({
  * about the call, and asking it once keeps the branch listing from being printed
  * twice — the second point's queue refusal would be buried under the repeat.
  *
- * `queue` and `slots` carry the FIRST point's verdicts, which is what the
- * single-target callers (`--status`, the preflight) read; `verdicts` carries one
- * queue verdict per point. A call opening two points is refused when EITHER is
+ * `queue` carries the FIRST point's queue verdict and `slots` the one per-call
+ * slot verdict, which is what the single-target callers (`--status`, the
+ * preflight) read; `verdicts` carries one queue verdict per point. A call opening two points is refused when EITHER is
  * refused — a line that cuts a front-most branch beside a queue-jumping one is
  * still a queue jump.
  */
@@ -193,7 +194,7 @@ export function commissionVerdict(inputs, { now = Date.now() } = {}) {
       inFlight: inputs.inFlight,
       cap: POOL_CAP,
       // Each point's OWN recorded override, never the first one's.
-      override: commissionOverrideFor(inputs.record, point) || (point === inputs.point ? inputs.override : ''),
+      override: commissionOverrideFor(inputs.record, point),
     }),
   }))
   for (const v of verdicts) v.block = !v.queue.allowed
@@ -357,7 +358,7 @@ function printStatus(argv) {
   const verdict = commissionVerdict(inputs)
   console.log(`front of the queue (workable, cap ${POOL_CAP}): ${front.join(', ') || 'none'}`)
   console.log(`open feat/* branches: ${verdict.slots.count} of ${POOL_CAP} slots taken${
-    inputs.readable ? '' : ' (GIT UNREADABLE — the branch rule stands down)'
+    inputs.readable ? '' : ' (GIT UNREADABLE — both refusals stand down)'
   }`)
   for (const b of verdict.slots.open) {
     const behind = Number.isFinite(b.behind) ? `${b.behind} behind main` : 'behind-count unknown'

@@ -9,11 +9,14 @@
 //   (C) a queue card whose TASKS spec changed since the last --synced review
 //       while the card text did not (heuristic reminder-to-reconcile; the
 //       snapshots are recorded by dashboard-guard --synced)
+//   (D) a point standing in Erledigt more than once, and the derived
+//       now-section against the declared active work
 //
 // The decision logic lives in dashboard-integrity-guard-core.mjs (pure,
 // Vitest-covered); this wrapper only gathers the inputs and is fail-OPEN: any
-// internal error, git timeout or missing file → allow, so a guard bug never
-// traps the session.
+// internal error or missing file → allow, so a guard bug never traps the
+// session. A git timeout only empties the git evidence (check A then allows);
+// the other checks still decide.
 import { readFileSync, existsSync } from 'node:fs'
 import { execSync } from 'node:child_process'
 import { resolve } from 'node:path'

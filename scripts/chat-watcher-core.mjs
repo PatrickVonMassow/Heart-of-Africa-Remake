@@ -30,8 +30,8 @@
 // session id, which nothing knows before that session starts. So the responder
 // is NOT excluded from the parallel-session detector. In the ordinary run that
 // costs nothing, because the launcher bails at the honoured claim BEFORE it
-// detects, and the wake gate refuses to spawn beside a live owner in the first
-// place. It bites only in the narrow window where the watcher dies while its
+// detects, and the wake gate refuses to spawn beside a live owner unless that
+// owner's deferral has expired (`DEFER_EXPIRED`). It bites only in the narrow window where the watcher dies while its
 // responder is still answering: the claim stops being honoured, a launcher tick
 // may then spawn a real owner, and that owner's guard WILL raise a
 // parallel-session alert naming the responder. Bounded (the responder is capped
@@ -64,7 +64,8 @@ export const WAKE_REASONS = Object.freeze({
   PAUSED_MESSAGE: 'paused-message',
   /** The work order has checkboxes but no parseable point — never act on that. */
   ALARM: 'alarm',
-  /** A live batch session owns the lock; stage 2 delivers to it within seconds. */
+  /** A live batch session owns the lock; stage 2 delivers at its next tool call
+   *  (see `DEFERRAL_MS` for when that promise expires). */
   OWNER_LIVE: 'owner-live',
   /** The owner is alive but the deferral ran out of time — see `DEFERRAL_MS`. */
   DEFER_EXPIRED: 'defer-expired',
@@ -97,7 +98,7 @@ export const VERIFICATION_REASONS = Object.freeze([
  * live watcher's start time against zero, read it as dead and start a SECOND
  * watcher — and two idle watchers wake two responders for one message.
  *
- * So there is now one helper and both sites use it: a value that is not a real
+ * So there is now one helper and every site uses it: a value that is not a real
  * number is NaN, and every `Number.isFinite` test downstream then means what it
  * says.
  */
@@ -194,7 +195,7 @@ export const DEFERRAL_MS = 3 * 60 * 1000
 export function pendingAgeMs(message, now) {
   // `stampOf` per candidate, never `Number(a ?? b)` — see the note on `stampOf`:
   // `Number(null)` is 0, so a message with NEITHER stamp would read as sent at
-  // the epoch and be overdue by fifty-five years, which is the one direction this
+  // the epoch and be overdue by some fifty-six years, which is the one direction this
   // function must never fail in.
   const received = stampOf(message?.receivedAt)
   const at = Number.isFinite(received) ? received : stampOf(message?.ts)
@@ -206,8 +207,9 @@ export function pendingAgeMs(message, now) {
 /**
  * WHICH PENDING MESSAGES HAVE OUTLIVED THE DEFERRAL? PURE.
  *
- * `wokenIds` are the messages this watcher already handed to a responder. They
- * are excluded, so a responder that answered nothing leaves its messages pending
+ * `wokenIds` are the messages this watcher already handed to a responder (the
+ * wrapper caps that list at SEEN_MAX, so a very old id can fall out). They are
+ * excluded, so a responder that answered nothing leaves its messages pending
  * (deliberately, see `ackPlan`) without the sweep waking a fresh responder for
  * them every window — the user would be answered once and asked about it forever.
  * A message the owner consumed in between is not in `pending` at all any more: the
@@ -265,7 +267,7 @@ export function responderClaim({ sessionId, watcherPid, watcherStartedAt, respon
  * Only its own: a user's `batch-claim` (point 395) and another watcher's claim
  * must survive our exit untouched. Every release path — the responder exiting,
  * a signal, an uncaught throw, the ordinary process exit — asks this first, so
- * "released on every exit path" is one rule rather than five copies of one.
+ * "released on every exit path" is one rule rather than four copies of one.
  */
 export function claimIsOurs(claim, sessionId) {
   if (!claim || typeof claim !== 'object') return false
@@ -279,8 +281,10 @@ export function claimIsOurs(claim, sessionId) {
  * The launcher restarts a dead watcher at its next tick, and a responder it had
  * spawned outlives it (the child is detached). That responder is then a live
  * top-level claude session with nothing reserving the batch for it. The new
- * watcher therefore ADOPTS it: it re-files the claim under its own process and
- * waits for the responder to exit, instead of starting a second one.
+ * watcher therefore ADOPTS it: it re-files the claim under its own process
+ * instead of leaving the responder unreserved. (The wrapper does not supervise
+ * the adopted responder — no exit handler, no RESPONDER_MAX_MS timer; the claim
+ * is released when this watcher exits.)
  *
  * Narrow on purpose — an adoption is only ever of OUR OWN kind of claim
  * (`by === CLAIM_BY`) whose recorded responder is still alive. Anything else is
@@ -301,7 +305,7 @@ export function adoptDecision({ claim, probe } = {}) {
 
 // --- Lifecycle: the launcher tick is the supervisor ----------------------------
 //
-// NO SECOND LAUNCHER. The launcher already runs every few minutes,
+// NO SECOND LAUNCHER. The launcher already runs at every tick,
 // at boot included, and it is the one thing on this machine that runs when
 // nothing else does. So it is the supervisor: each tick it asks whether the
 // watcher is alive and starts one if it is not, including while the batch is
@@ -315,20 +319,20 @@ export function adoptDecision({ claim, probe } = {}) {
 export const WATCHER_PID_TOLERANCE_MS = 2000
 
 /** The watcher's pidfile, by NAME rather than by path: the launcher and the
- *  watcher build it from their own `.claude/` root, and importing the watcher
- *  module into the launcher to get a constant would install the watcher's signal
- *  handlers inside the launcher process. */
+ *  watcher build it from their own `.claude/` root, and the launcher takes the
+ *  name from this pure module rather than importing the watcher wrapper. */
 export const WATCHER_PID_FILE = 'chat-watcher.json'
 
 /**
  * IS THE WATCHER ALIVE, AND WHAT SHOULD THE TICK DO? PURE — `probe` is injected.
  *
  * `record` is the watcher's pidfile ({ pid, pidStartedAt, at }) or null.
- * Liveness is by IDENTITY, never by existence: a recycled pid is a stranger, and
- * killing a stranger because it inherited a number is the one failure this whole
- * family of probes was written to avoid.
+ * Liveness is by IDENTITY wherever one is known: a recycled pid is a stranger,
+ * and killing a stranger because it inherited a number is the one failure this
+ * whole family of probes was written to avoid. Only when the record or the probe
+ * carries no start time does a live pid count by existence (the lenient branch).
  *
- * Returns { action: 'start' | 'stop' | 'none', reason, pid }.
+ * Returns { action: 'start' | 'none', reason, pid }.
  */
 export function watcherSupervision({ paused = false, record = null, probe = null } = {}) {
   const pid = Number(record?.pid)
@@ -363,7 +367,7 @@ export function watcherSupervision({ paused = false, record = null, probe = null
 /** Reconnect backoff, doubling and capped. A dropped ntfy stream is ordinary —
  *  a proxy timeout, a laptop lid — so the first retry is quick and only a
  *  persistent outage backs off to the ceiling. */
-export const RECONNECT_BASE_MS = 2000
+const RECONNECT_BASE_MS = 2000
 export const RECONNECT_MAX_MS = 60000
 
 export function reconnectDelayMs(attempt, { base = RECONNECT_BASE_MS, max = RECONNECT_MAX_MS } = {}) {
@@ -407,7 +411,7 @@ export const RESPONDER_PROMPT_HEAD =
 /** At most this many messages ride into one responder prompt. */
 export const RESPONDER_MAX_MESSAGES = 5
 /** And at most this much of each — a prompt is not a transcript. */
-export const RESPONDER_MAX_CHARS = 600
+const RESPONDER_MAX_CHARS = 600
 
 /**
  * The whole responder prompt. PURE. Empty string for no usable message, so the
@@ -454,7 +458,7 @@ export function buildResponderPrompt(messages) {
  *
  * `actedAt` is the moment a reply was actually SENT: `recordReplyReceipt` in
  * scripts/chat-reply.mjs writes it only after the transport ACCEPTED the post.
- * It must postdate the spawn, or it is some earlier session's answer. NOT
+ * It must not predate the spawn, or it is some earlier session's answer. NOT
  * ACKING is the safe direction throughout — the message stays pending and the
  * next session is handed it, which costs a duplicate at worst. The exit code is
  * deliberately NOT a condition either way: a responder that answered and then

@@ -12,14 +12,15 @@
 // .claude/chat-state.json. A stage-1 .jsonl left on disk is migrated into that
 // directory on the first tick and archived, never dropped.
 //
-// FAIL-SOFT, ALWAYS EXIT 0. Its caller is scripts/batch-autostart.mjs, whose job
+// FAIL-SOFT, EXIT 0 ON EVERY PATH IT CONTROLS. Its caller is scripts/batch-autostart.mjs, whose job
 // is resurrecting a dead batch: a chat poll may never be the reason that fails.
-// Every error path prints `{ ok: false, reason }` and exits 0.
+// Every error path prints `{ ok: false, reason }` and exits 0 — though its own
+// post-fetch `process.exit(0)` may still abort as described next.
 //
 // IT RUNS AS ITS OWN PROCESS for the same reason the board watchdog does: on
 // this platform a `process.exit()` after any `fetch` tears undici's socket down
 // mid-close and ABORTS the process (exit 127, `Assertion failed: !(handle->flags
-// & UV_HANDLE_CLOSING)`), and the launcher exits that way at fifteen points.
+// & UV_HANDLE_CLOSING)`), and the launcher exits that way at many points.
 //
 // THE CURSOR IS NOT THE DEDUPE. It only narrows the next poll; the ledger of
 // seen ids in the state file is what guarantees once-only delivery. Delete the
@@ -135,8 +136,8 @@ async function fetchWithTimeout(url, ms = FETCH_TIMEOUT_MS) {
   }
 }
 
-// The CLI half is GATED: scripts/chat-inbox.test.mjs imports `seededLedger` and
-// `stateAfterSpool`, and an unguarded top-level body would poll the network on
+// The CLI half is GATED: scripts/chat-inbox.test.mjs imports `seededLedger`,
+// `stateAfterSpool` and `secretGateReport`, and an unguarded top-level body would poll the network on
 // every test run.
 const args = process.argv.slice(2)
 const isCli = Boolean(process.argv[1] && process.argv[1].replace(/\\/g, '/').endsWith('scripts/chat-inbox.mjs'))

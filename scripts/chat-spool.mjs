@@ -13,13 +13,13 @@
 // the target file open (see scripts/atomic-write.mjs), and a per-tool-call reader
 // is precisely the scanner-shaped load that produced it.
 //
-// So a message is a FILE. The poller creates `.claude/chat-spool/<id>.json`
-// atomically (tmp + rename, with the retry ladder); the consumer RENAMES it into
+// So a message is a FILE. The poller creates `.claude/chat-spool/<ntfyId>.json`
+// (`m-<id>.json` when the event carried no ntfy id) atomically (tmp + rename, with the retry ladder); the consumer RENAMES it into
 // `.claude/chat-spool/consumed/` before it shows it. Rename is the operation the
 // filesystem gives us for free: exactly one caller can move a given file, so two
 // consumers can never deliver the same message, and a crash between the rename
-// and the delivery loses at most that one message instead of duplicating it
-// forever. Creation and consumption never touch the same bytes.
+// and the delivery loses at most the messages that call claimed (up to
+// MAX_PER_CALL) instead of duplicating them forever. Creation and consumption never touch the same bytes.
 //
 // THE CONSUMED FILES ARE NOT RUBBISH. The replay ledger is seeded FROM the spool
 // (see `seededLedger` in scripts/chat-inbox.mjs): a message that vanished with no
@@ -43,15 +43,15 @@ import { carrierBellDecision, carrierBellState } from './carrier-bell-core.mjs'
 import { parseCarrier } from './findings-core.mjs'
 import { carrierPath } from './findings-paths.mjs'
 
-export const SPOOL_DIR = repoPath('.claude', 'chat-spool')
+const SPOOL_DIR = repoPath('.claude', 'chat-spool')
 
 /** The stage-1 spool. Read once, migrated, then kept as `.migrated-<ts>` — the
  *  user's words are never deleted by a format change. */
-export const LEGACY_SPOOL_PATH = repoPath('.claude', 'chat-spool.jsonl')
+const LEGACY_SPOOL_PATH = repoPath('.claude', 'chat-spool.jsonl')
 
 /** Delivery bookkeeping only. The findings carrier itself remains read-only on
  * this path; draining it is still exclusively `finding.mjs --drained`. */
-export const CARRIER_BELL_STATE_PATH = repoPath('.claude', 'carrier-bell-state.json')
+const CARRIER_BELL_STATE_PATH = repoPath('.claude', 'carrier-bell-state.json')
 
 /** Long past ntfy's 12-hour cache, so a consumed message is still in the ledger
  *  for every moment in which the transport could still replay it. */
@@ -66,20 +66,18 @@ const ensureDir = (dir) => {
 
 /** A rename that survives the same Windows moment `writeJsonAtomic` survives:
  *  a scanner holding either name open answers EPERM/EBUSY for a few ms. */
-export function renameWithRetry(from, to, opts = {}) {
+function renameWithRetry(from, to, opts = {}) {
   const { delays = WRITE_RETRY_DELAYS_MS, sleep = sleepSync, rename = renameSync } = opts
-  let last = null
   for (let attempt = 0; attempt <= delays.length; attempt++) {
     try {
       rename(from, to)
-      return { ok: true, attempts: attempt + 1, error: null }
+      return { ok: true }
     } catch (e) {
-      last = e
       if (!isTransientWriteError(e) || attempt === delays.length) break
       sleep(delays[attempt])
     }
   }
-  return { ok: false, attempts: delays.length + 1, error: last }
+  return { ok: false }
 }
 
 const jsonFiles = (dir) => {
@@ -110,7 +108,7 @@ function readDirMessages(dir) {
  *  file is skipped, never thrown. */
 export const readPending = (dir = SPOOL_DIR) => readDirMessages(dir)
 
-/** Everything already delivered and still inside the ledger window. */
+/** Everything already delivered and not yet pruned (see `pruneConsumed`). */
 export const readConsumed = (dir = SPOOL_DIR) => readDirMessages(consumedDir(dir))
 
 /** What the replay ledger must know about: delivered messages count exactly as
@@ -125,8 +123,9 @@ export function isSpooled(message, dir = SPOOL_DIR) {
 }
 
 /**
- * Write one accepted message as its own file. Idempotent: a message already
- * waiting or already consumed is NOT written again, so a re-poll of the same
+ * Write one accepted message as its own file. Idempotent for sequential callers
+ * (check and write are not one atomic step): a message already waiting or
+ * already consumed is NOT written again, so a re-poll of the same
  * ntfy cache cannot resurrect something the session has read.
  * Returns { ok, file, reason }.
  */
@@ -172,7 +171,7 @@ export function claimMessage(file, dir = SPOOL_DIR, opts = {}) {
  * copy wins over the claimed copy rather than being overwritten; either way,
  * the user's words remain available to a later owner hook or defer sweep.
  */
-export function restoreClaimedMessage(file, dir = SPOOL_DIR, opts = {}) {
+function restoreClaimedMessage(file, dir = SPOOL_DIR, opts = {}) {
   const pending = join(dir, file)
   const claimed = join(consumedDir(dir), file)
   try {
@@ -206,7 +205,8 @@ export function claimOldest(n, dir = SPOOL_DIR, opts = {}) {
  * would re-inject the same message on every tool call for as long as the claim
  * kept failing — the leak this rule exists to prevent — so only what the rename
  * actually moved is rendered. When an `emit` callback rejects or throws, every
- * claim is moved back to pending before this call returns; production supplies
+ * claim is put back to pending before this call returns, as far as the rename
+ * succeeds (a failed restore leaves the message in `consumed/`); production supplies
  * a synchronous stdout write as that acceptance boundary.
  *
  * FAIL-OPEN AND SILENT, always: this runs inside a hook on EVERY tool call, and
@@ -313,7 +313,8 @@ export function deliverPendingMessages({
   }
 }
 
-/** Parse a stage-1 JSONL spool. TOTAL — a torn line is skipped, oldest first. */
+/** Parse a stage-1 JSONL spool. TOTAL — a torn line is skipped; file order,
+ *  which is append order. */
 export function readLegacyJsonl(path = LEGACY_SPOOL_PATH) {
   try {
     return readFileSync(path, 'utf8')
@@ -328,17 +329,18 @@ export function readLegacyJsonl(path = LEGACY_SPOOL_PATH) {
 /**
  * THE ONE-TIME MIGRATION off the stage-1 JSONL spool.
  *
- * Every line becomes a WAITING message file, not a consumed one: the launcher
- * decides for itself what a spawn still needs (`pendingSinceHandover`, keyed on
- * `receivedAt`), so a message it already carried into a prompt is filtered there
- * as before, while one that never reached anybody is still delivered. Losing the
- * user's words to a storage change would be the worse failure of the two.
+ * Every line becomes a WAITING message file, not a consumed one: a message the
+ * launcher already carried into a prompt may then be shown once more by the
+ * per-tool-call delivery, while one that never reached anybody is still
+ * delivered. Losing the user's words to a storage change would be the worse
+ * failure of the two.
  *
  * The old file is then RENAMED aside (`.migrated-<ts>`), never deleted, and
  * every step is idempotent: a message whose file already exists is skipped, so a
  * migration interrupted halfway simply finishes on the next tick.
  *
- * THE ARCHIVE RENAME IS GATED ON EVERY LINE BEING SAFE. A line whose write
+ * THE ARCHIVE RENAME IS GATED ON EVERY PARSEABLE LINE BEING SAFE (a torn line is
+ * skipped and survives only in the archived file). A line whose write
  * FAILED still exists only in the old file, while its ids are already in the
  * stage-1 ledger (`.claude/chat-state.json`) — so renaming the file away would
  * take that message out of the only place it exists AND out of delivery, exactly

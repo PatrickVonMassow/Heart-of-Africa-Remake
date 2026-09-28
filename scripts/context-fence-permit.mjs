@@ -20,15 +20,15 @@ import {
   permitResultRecord,
 } from './context-fence-permit-core.mjs'
 
-export const CONTEXT_FENCE_PERMIT_PATH = repoPath('.claude/context-fence-permit.json')
-export const CONTEXT_FENCE_PERMIT_PENDING_PATH = repoPath('.claude/context-fence-permit-pending.json')
-export const CONTEXT_FENCE_PERMIT_RECORD_PATH = repoPath('.claude/context-fence-permits.jsonl')
-export const CONTEXT_FENCE_STATE_LOCK_PATH = repoPath('.claude/context-fence-state.lock')
+const CONTEXT_FENCE_PERMIT_PATH = repoPath('.claude/context-fence-permit.json')
+const CONTEXT_FENCE_PERMIT_PENDING_PATH = repoPath('.claude/context-fence-permit-pending.json')
+const CONTEXT_FENCE_PERMIT_RECORD_PATH = repoPath('.claude/context-fence-permits.jsonl')
+const CONTEXT_FENCE_STATE_LOCK_PATH = repoPath('.claude/context-fence-state.lock')
 
 /** One deliberate next-call window; long-running work must ask deliberately again. */
 export const CONTEXT_FENCE_PERMIT_TTL_MS = 10 * 60 * 1000
-export const CONTEXT_FENCE_STATE_LOCK_STALE_MS = 30_000
-export const CONTEXT_FENCE_STATE_LOCK_WAIT_MS = 2_000
+const CONTEXT_FENCE_STATE_LOCK_STALE_MS = 30_000
+const CONTEXT_FENCE_STATE_LOCK_WAIT_MS = 2_000
 const RETRY_MS = 5
 
 const readJson = (path) => {
@@ -129,10 +129,6 @@ export function issueContextPermit(input, {
   }, { lockPath, now })
 }
 
-export function readContextPermit(path = CONTEXT_FENCE_PERMIT_PATH) {
-  return readJson(path)
-}
-
 /** Atomically turn one matching issued permit into a consumed permit. */
 export function consumeContextPermit(input, {
   path = CONTEXT_FENCE_PERMIT_PATH,
@@ -162,7 +158,7 @@ export function consumeContextPermit(input, {
   }, { lockPath, now })
 }
 
-/** Called by the already-wired all-tools PostToolUse hook. */
+/** Called by the all-tools PostToolUse hook (lock-heartbeat-hook.mjs). */
 export function recordContextPermitResult(payload, {
   pendingPath = CONTEXT_FENCE_PERMIT_PENDING_PATH,
   recordPath = CONTEXT_FENCE_PERMIT_RECORD_PATH,

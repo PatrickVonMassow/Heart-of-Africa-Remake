@@ -11,8 +11,8 @@
 //
 // It reports how many overshoots there were, their size distribution, what each
 // session was doing, and the growth per KIND of call — the reading the deferred
-// decision of point 742 needs: after the context fence was armed (point 542), it
-// answers whether overshoots still happen at all.
+// decision of point 742 needs: whether overshoots still happen at all with the
+// context fence in place (point 542; observe mode by default since point 758).
 //
 // TWO FILES, ON PURPOSE:
 //   .claude/context-incidents.jsonl       the LIVE series the boundary appends
@@ -54,17 +54,16 @@ import {
 } from './context-incidents-core.mjs'
 
 /** The live series the boundary appends to (git-ignored runtime state). */
-export const INCIDENTS_PATH = repoPath('.claude/context-incidents.jsonl')
+const INCIDENTS_PATH = repoPath('.claude/context-incidents.jsonl')
 
 /** The tracked seed of readings no boundary could have taken. */
-export const SEED_PATH = repoPath('.claude/context-incidents-seed.jsonl')
+const SEED_PATH = repoPath('.claude/context-incidents-seed.jsonl')
 
-/** How much transcript is read for the growth series. The WHOLE file is wanted —
- *  the startup reading is its FIRST usage record, which a tail would miss — but a
- *  runaway transcript must not make the boundary chew a gigabyte. Past the cap
- *  the tail is read and the record says so, rather than reporting a startup
- *  reading it never saw. */
-export const MAX_TRANSCRIPT_BYTES = 64 * 1024 * 1024
+/** How much transcript feeds the growth series. The WHOLE file is wanted — the
+ *  startup reading is its FIRST usage record, which a tail would miss. Past the
+ *  cap the file is still read whole, only its last MAX_TRANSCRIPT_BYTES
+ *  characters are kept, and the result is marked truncated. */
+const MAX_TRANSCRIPT_BYTES = 64 * 1024 * 1024
 
 const readTextOrNull = (path) => {
   try {
@@ -255,7 +254,7 @@ export function parseReadArgs(argv = []) {
   const unknown = []
   for (let i = 0; i < argv.length; i += 1) {
     const arg = String(argv[i])
-    if (arg === '--status') continue
+    if (arg === '--status') continue // accepted and ignored: the bare reading IS the status
     else if (arg === '--json') json = true
     else if (arg === '--file') files.push(String(argv[++i] ?? ''))
     else if (arg === '--since') since = String(argv[++i] ?? '')
@@ -292,7 +291,7 @@ if (isMainModule(import.meta.url)) {
         '[--quantile <0..1>] [--json]\n\n' +
         'Reads the context-overshoot series: how many overshoots, how big, what each session was doing, and\n' +
         'the growth per kind of call. Nothing is filed or ranked. A session that dies without taking a\n' +
-        'boundary writes no record, so the series UNDER-counts and never over-counts.',
+        'boundary writes no record, so the series UNDER-counts; lines are not deduplicated.',
     )
     process.exit(0)
   }
