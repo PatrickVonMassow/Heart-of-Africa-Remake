@@ -72,8 +72,9 @@ function surfaceTriangles(seed: number): SurfaceTriangle[] {
   return triangles
 }
 
-// Synchronous queries reuse scratch vectors; only the two immutable meshes are
-// cached. No raycaster, material, scene graph or per-query allocation is needed.
+// Synchronous queries reuse one scratch vector; what is cached, per seed, is
+// the rock's triangle planes (the geometry they came from is disposed). No
+// raycaster, material or scene graph is needed.
 const hit = new THREE.Vector3()
 // Shared-edge rounding must not turn a vertex into a hole. This is one tenth
 // of a nanometre in mesh units, not a contact or silhouette allowance.
